@@ -18,16 +18,6 @@ function formatarDataHora(expiraEm: string): string {
   })
 }
 
-/** Badge alinhado ao StatusBadge do AppCard (convite pendente). */
-function ConvitePendenteBadge() {
-  return (
-    <span className="inline-flex items-center gap-2 text-xs font-semibold leading-none text-gray-700">
-      <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" aria-hidden />
-      Convite pendente
-    </span>
-  )
-}
-
 /** Avatar circular igual ao AppCard (nome fantasia da empresa). */
 function ConviteAvatar({ nome }: { nome: string }) {
   const fallback = nome.trim().slice(0, 2).toUpperCase()
@@ -72,12 +62,7 @@ export function ConviteCard({
       <div className="flex min-h-0 flex-1 flex-col justify-between">
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="flex flex-col gap-3">
-            {/* Mesma linha e alinhamento vertical que AppCard: status + engrenagem */}
-            <div className="flex min-h-9 w-full shrink-0 items-center justify-between gap-2">
-              <div className="flex shrink-0 items-center">
-                <ConvitePendenteBadge />
-              </div>
-              <div className="flex shrink-0 items-center gap-1">
+            <div className="flex min-h-9 w-full shrink-0 items-center justify-end gap-2">
                 <CardGearMenu
                   disabled={isLoading}
                   triggerAriaLabel="Opções do convite"
@@ -92,7 +77,6 @@ export function ConviteCard({
                     },
                   ]}
                 />
-              </div>
             </div>
 
             <div className="flex items-start gap-3">

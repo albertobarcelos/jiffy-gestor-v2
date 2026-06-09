@@ -9,7 +9,7 @@ import { fetchAccessTokenEscolherEmpresa } from '@/src/presentation/utils/escolh
 import type { ConvitePendente } from '@/src/presentation/components/features/convites/types'
 import { SearchBar } from './components/SearchBar'
 import { MeusAppsFeedGrid } from './components/MeusAppsFeedGrid'
-import type { MeusAppsFeedItem } from './types'
+import { MEUS_APPS_GRID_PREVIEW_LIMIT, type MeusAppsFeedItem } from './types'
 import { buildMeusAppsGridCells } from './utils/buildMeusAppsGridCells'
 import { MeusAppsFeedList } from './components/MeusAppsFeedList'
 import {
@@ -288,7 +288,7 @@ export default function MeusAppsPage() {
     return [...conv, ...emp]
   }, [convitesFiltrados, appsFiltrados, feedFiltro])
 
-  /** Com grade “resumida”, só os 2 primeiros itens do feed aparecem — convites vêm primeiro e escondiam empresas. Com busca ativa, expande para mostrar todos os resultados. */
+  /** Grade resumida: até 15 itens do feed; busca ativa expande para todos os resultados. */
   const buscaAtiva = Boolean(busca.trim())
   const gridExpandidoEfetivo = feedGridExpandido || buscaAtiva
 
@@ -297,7 +297,7 @@ export default function MeusAppsPage() {
     [feedItems, gridExpandidoEfetivo]
   )
 
-  /** Nova busca ou troca de filtro volta ao preview da primeira linha no grid. */
+  /** Nova busca ou troca de filtro volta ao preview do grid (15 itens). */
   useEffect(() => {
     setFeedGridExpandido(false)
   }, [busca, feedFiltro])
@@ -430,22 +430,12 @@ export default function MeusAppsPage() {
     return 'Ajuste o filtro de busca ou tente outro termo.'
   }, [busca, feedFiltro, temEmpresas, temConvitesLista, hubEmpresas])
 
-  const descricaoSecaoFeed = useMemo(() => {
-    if (feedFiltro === 'convites') {
-      return 'Somente convites pendentes para o seu e-mail.'
-    }
-    if (feedFiltro === 'empresas') {
-      return 'Somente empresas já vinculadas à sua conta.'
-    }
-    return 'Convites pendentes aparecem primeiro; em seguida, empresas vinculadas.'
-  }, [feedFiltro])
-
-  /** Só na grade: com ≤2 itens a primeira linha já mostra tudo (máx. 2 + slot promo); a partir do 3º item há conteúdo “escondido” até expandir. Busca já expande a grade. */
+  /** Só na grade: preview de até 15 itens (5×3); “Mostrar mais” expande o restante. Busca já expande a grade. */
   const gridPodeResumo =
     convitesCarregados &&
     !feedVazio &&
     viewMode === 'grid' &&
-    feedItems.length > 2 &&
+    feedItems.length > MEUS_APPS_GRID_PREVIEW_LIMIT &&
     !buscaAtiva
 
   return (
@@ -458,9 +448,6 @@ export default function MeusAppsPage() {
               <h1 className="font-exo text-2xl font-semibold text-gray-900 md:text-3xl">
                 Meus aplicativos
               </h1>
-              <p className="mt-1 text-sm text-gray-600">
-                Convites pendentes e empresas vinculadas à sua conta.
-              </p>
             </div>
           </div>
 
@@ -511,9 +498,6 @@ export default function MeusAppsPage() {
 
         {convitesCarregados ? (
           <section aria-label="Aplicativos e convites">
-            <h2 className="mb-1 text-lg font-semibold text-gray-900">Aplicativos e convites</h2>
-            <p className="mb-4 text-sm text-gray-600">{descricaoSecaoFeed}</p>
-
             {feedVazio ? (
               <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-12 text-center shadow-sm">
                 <p className="text-sm font-semibold text-gray-900">{mensagemFeedVazioTitulo}</p>
@@ -556,7 +540,8 @@ export default function MeusAppsPage() {
             </button>
             {!feedGridExpandido ? (
               <p className="max-w-md text-center text-xs text-gray-500">
-                Existem mais convites ou empresas além dos dois primeiros desta lista.
+                Existem mais convites ou empresas além dos {MEUS_APPS_GRID_PREVIEW_LIMIT} primeiros
+                desta lista.
               </p>
             ) : null}
           </div>

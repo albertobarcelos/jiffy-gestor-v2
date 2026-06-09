@@ -7,21 +7,6 @@ import { CardGearMenu } from '@/src/presentation/components/ui/CardGearMenu'
 import { cn } from '@/src/shared/utils/cn'
 import { buildEmpresaCardGearItems } from '../utils/buildEmpresaCardGearItems'
 
-function StatusPill({ status }: { status: MeusApp['status'] }) {
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold',
-        status === 'ativo'
-          ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100'
-          : 'bg-gray-100 text-gray-700 ring-1 ring-gray-200'
-      )}
-    >
-      {status === 'ativo' ? 'Ativo' : 'Inativo'}
-    </span>
-  )
-}
-
 export function MeusAppsFeedList({
   items,
   onAcessar,
@@ -88,52 +73,55 @@ function EmpresaListRow({
   const bloqueado = app.status === 'inativo'
   const isSelecting = busyAppId === app.id
   const actionsLocked = locked && busyAppId !== app.id
-  const navDisabled = bloqueado || actionsLocked || isSelecting
+  const interactionDisabled = bloqueado || actionsLocked || isSelecting
 
   const gearItems = buildEmpresaCardGearItems(app.id, {
-    navDisabled,
+    navDisabled: interactionDisabled,
     onGerenciarConvites,
     onGerenciarPerfisGestor,
   })
 
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex flex-col gap-3 px-4 py-4 sm:grid sm:grid-cols-[1fr_140px_140px] sm:items-center">
+      <div className="flex flex-col gap-3 px-4 py-4 sm:grid sm:grid-cols-[1fr_auto] sm:items-center">
         <div className="min-w-0">
+          {/* TODO: substituir por plano real quando o backend expuser o campo */}
+          <span
+            className="mb-1 block text-[11px] font-semibold leading-none text-secondary"
+            title="Jiffy Starter"
+          >
+            Jiffy Starter
+          </span>
           <p className="truncate text-sm font-semibold text-gray-900">{app.nome}</p>
           {app.tipo ? (
             <p className="truncate text-xs font-medium text-gray-500">{app.tipo}</p>
           ) : null}
         </div>
-        <div className="sm:flex sm:justify-center">
-          <StatusPill status={app.status} />
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <CardGearMenu
-            disabled={navDisabled}
-            triggerAriaLabel="Opções do aplicativo"
-            triggerTitle="Opções do aplicativo"
-            items={gearItems}
-            triggerClassName="h-10 w-10 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
-          />
+        <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
           <button
             type="button"
-            disabled={navDisabled}
+            disabled={interactionDisabled}
             onClick={() => {
-              if (!navDisabled) {
+              if (!interactionDisabled) {
                 onAcessar(app.id)
               }
             }}
             className={cn(
-              // Paridade com Aceitar em ConviteListRow: mesma altura, padding e largura em sm+
-              'inline-flex h-10 w-full shrink-0 items-center justify-center rounded-lg border-0 px-4 py-0 text-sm font-semibold leading-none text-white transition sm:w-[140px]',
-              navDisabled
+              'inline-flex h-10 min-w-0 flex-1 items-center justify-center rounded-lg border-0 px-4 py-0 text-sm font-semibold leading-none text-white transition sm:w-[140px] sm:flex-none disabled:opacity-100',
+              bloqueado || isSelecting
                 ? 'cursor-not-allowed bg-gray-400 text-white'
                 : 'bg-secondary hover:bg-alternate'
             )}
           >
             {bloqueado ? 'Bloqueado' : isSelecting ? 'Abrindo…' : 'Acessar'}
           </button>
+          <CardGearMenu
+            disabled={interactionDisabled}
+            triggerAriaLabel="Opções do aplicativo"
+            triggerTitle="Opções do aplicativo"
+            items={gearItems}
+            triggerClassName="h-10 w-10 shrink-0 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+          />
         </div>
       </div>
     </div>
