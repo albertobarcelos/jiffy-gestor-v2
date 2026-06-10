@@ -1,7 +1,6 @@
 'use client'
 
 import Image from 'next/image'
-import { MeusAppsTopNav } from '@/src/presentation/components/features/meus-apps/components/MeusAppsTopNav'
 
 interface EmBrevePageProps {
   titulo: string
@@ -9,9 +8,7 @@ interface EmBrevePageProps {
 
 export function EmBrevePage({ titulo }: EmBrevePageProps) {
   return (
-    <div className="flex h-full min-h-screen min-w-0 flex-col bg-[#fafafa]">
-      <MeusAppsTopNav />
-
+    <div className="flex min-h-0 w-full flex-1 flex-col bg-[#fafafa]">
       <div className="flex flex-1 flex-col items-center justify-center gap-6 px-4">
         <h1 className="font-nunito text-xl font-bold text-primary-text md:text-2xl">
           {titulo}

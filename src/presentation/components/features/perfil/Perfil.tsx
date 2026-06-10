@@ -168,7 +168,7 @@ export function Perfil() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans md:px-6 px-2 pt-4 pb-10">
+    <div className="w-full bg-gray-50 font-sans px-2 pb-10 pt-4 md:px-6">
       <div className="mx-auto w-full min-w-0 max-w-6xl">
         <div className="mb-3">
           <button

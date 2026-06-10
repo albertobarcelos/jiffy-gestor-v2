@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import type { LoginEmpresaSnapshot } from '@/src/domain/types/LoginEmpresaSnapshot'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
@@ -17,7 +18,6 @@ import {
   type MeusAppsFeedFiltro,
   type MeusAppsViewMode,
 } from './components/ViewControls'
-import { MeusAppsTopNav } from './components/MeusAppsTopNav'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { empresaParaMeusApp } from './utils/empresaParaMeusApp'
 import { conviteParaEmpresaSnapshot } from '@/src/presentation/components/features/convites/utils/conviteParaEmpresaSnapshot'
@@ -27,11 +27,12 @@ import {
   isLikelyVinculoRemovidoError,
 } from './utils/hubSessionTokenFeedback'
 import { appEmpresaCorrespondeBusca, conviteCorrespondeBusca } from './utils/meusAppsBusca'
-import { empresaNomeParaSlugUrl } from '@/src/shared/utils/empresaNomeParaSlugUrl'
+import { activateHubEmpresaSessionAndBuildUrl } from './utils/activateHubEmpresaSession'
 
 const HUB_SESSAO_TOAST_ID = 'meus-apps-sessao-token'
 
 export default function MeusAppsPage() {
+  const router = useRouter()
   const hubEmpresas = useAuthStore(s => s.hubEmpresas)
   const setHubEmpresas = useAuthStore(s => s.setHubEmpresas)
   /** Sessão do hub (identidade); não usar `auth` aqui — pode ser só tenant se outra aba abriu empresa. */
@@ -398,9 +399,13 @@ export default function MeusAppsPage() {
 
     try {
       const token = await obterTokenEmpresa(appId)
-      const { empParam } = prepareTabSession(token, app.nome, appId)
-      const slug = empresaNomeParaSlugUrl(app.nome)
-      window.open(`/meus-apps/gerenciar-usuarios/${slug}?${empParam}`, '_blank')
+      const url = activateHubEmpresaSessionAndBuildUrl(
+        token,
+        app.nome,
+        appId,
+        '/meus-apps/gerenciar-usuarios'
+      )
+      router.push(url)
     } catch (e) {
       reportErroAcessoEmpresa(e, appId)
     }
@@ -416,9 +421,13 @@ export default function MeusAppsPage() {
 
     try {
       const token = await obterTokenEmpresa(appId)
-      const { empParam } = prepareTabSession(token, app.nome, appId)
-      const slug = empresaNomeParaSlugUrl(app.nome)
-      window.open(`/meus-apps/perfis-gestor/${slug}?${empParam}`, '_blank')
+      const url = activateHubEmpresaSessionAndBuildUrl(
+        token,
+        app.nome,
+        appId,
+        '/meus-apps/perfis-gestor'
+      )
+      router.push(url)
     } catch (e) {
       reportErroAcessoEmpresa(e, appId)
     }
@@ -471,7 +480,6 @@ export default function MeusAppsPage() {
 
   return (
     <div className="min-h-0 w-full bg-gray-50 pb-8">
-      <MeusAppsTopNav />
       <div className="mx-auto w-full max-w-[1400px] px-2 pt-3 md:px-4">
         <header className="mb-4 flex flex-col gap-3">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
