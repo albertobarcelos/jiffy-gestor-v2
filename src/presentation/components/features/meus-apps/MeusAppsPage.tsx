@@ -288,13 +288,44 @@ export default function MeusAppsPage() {
     return [...conv, ...emp]
   }, [convitesFiltrados, appsFiltrados, feedFiltro])
 
-  /** Grade resumida: até 15 itens do feed; busca ativa expande para todos os resultados. */
+  const conviteFeedItems = useMemo(
+    () => feedItems.filter((item): item is Extract<MeusAppsFeedItem, { kind: 'convite' }> => item.kind === 'convite'),
+    [feedItems]
+  )
+
+  const empresaFeedItems = useMemo(
+    () => feedItems.filter((item): item is Extract<MeusAppsFeedItem, { kind: 'empresa' }> => item.kind === 'empresa'),
+    [feedItems]
+  )
+
+  /** Grade resumida: até 15 itens do feed (convites + empresas); busca ativa expande para todos os resultados. */
   const buscaAtiva = Boolean(busca.trim())
   const gridExpandidoEfetivo = feedGridExpandido || buscaAtiva
 
-  const gridCells = useMemo(
-    () => buildMeusAppsGridCells(feedItems, { expandido: gridExpandidoEfetivo }),
+  const feedItemsParaGrid = useMemo(
+    () => (gridExpandidoEfetivo ? feedItems : feedItems.slice(0, MEUS_APPS_GRID_PREVIEW_LIMIT)),
     [feedItems, gridExpandidoEfetivo]
+  )
+
+  const conviteFeedItemsGrid = useMemo(
+    () =>
+      feedItemsParaGrid.filter(
+        (item): item is Extract<MeusAppsFeedItem, { kind: 'convite' }> => item.kind === 'convite'
+      ),
+    [feedItemsParaGrid]
+  )
+
+  const empresaFeedItemsGrid = useMemo(
+    () =>
+      feedItemsParaGrid.filter(
+        (item): item is Extract<MeusAppsFeedItem, { kind: 'empresa' }> => item.kind === 'empresa'
+      ),
+    [feedItemsParaGrid]
+  )
+
+  const gridEmpresaCells = useMemo(
+    () => buildMeusAppsGridCells(empresaFeedItemsGrid, { expandido: true }),
+    [empresaFeedItemsGrid]
   )
 
   /** Nova busca ou troca de filtro volta ao preview do grid (15 itens). */
@@ -505,7 +536,8 @@ export default function MeusAppsPage() {
               </div>
             ) : viewMode === 'grid' ? (
               <MeusAppsFeedGrid
-                cells={gridCells}
+                conviteItems={conviteFeedItemsGrid}
+                empresaCells={gridEmpresaCells}
                 onAcessar={handleAcessar}
                 onGerenciarConvites={handleGerenciarConvites}
                 onGerenciarPerfisGestor={handleGerenciarPerfisGestor}
@@ -516,7 +548,8 @@ export default function MeusAppsPage() {
               />
             ) : (
               <MeusAppsFeedList
-                items={feedItems}
+                conviteItems={conviteFeedItems}
+                empresaItems={empresaFeedItems}
                 onAcessar={handleAcessar}
                 onGerenciarConvites={handleGerenciarConvites}
                 onGerenciarPerfisGestor={handleGerenciarPerfisGestor}

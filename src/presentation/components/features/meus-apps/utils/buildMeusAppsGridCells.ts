@@ -6,17 +6,17 @@ import {
 } from '../types'
 
 /**
- * Monta a lista de células do grid: insere o slot de propaganda entre o 1º e 2º item
- * (centro da primeira linha em 3 colunas). Só ocorre uma vez; demais linhas são só feed.
- * Com `expandido: false`, mostra até {@link MEUS_APPS_GRID_PREVIEW_LIMIT} itens do feed.
+ * Monta células do grid de empresas: insere propaganda entre o 1º e 2º item
+ * (centro da primeira linha em 3 colunas). Só ocorre uma vez.
+ * Com `expandido: false`, limita a {@link MEUS_APPS_GRID_PREVIEW_LIMIT} empresas.
  */
 export function buildMeusAppsGridCells(
-  feedItems: MeusAppsFeedItem[],
+  empresaItems: Extract<MeusAppsFeedItem, { kind: 'empresa' }>[],
   options: { expandido: boolean }
 ): MeusAppsGridCell[] {
   const visiveis = options.expandido
-    ? feedItems
-    : feedItems.slice(0, MEUS_APPS_GRID_PREVIEW_LIMIT)
+    ? empresaItems
+    : empresaItems.slice(0, MEUS_APPS_GRID_PREVIEW_LIMIT)
 
   if (visiveis.length < 2) {
     return visiveis

@@ -64,13 +64,13 @@ export function AppsList({
                   }
                 }}
                 className={cn(
-                  'inline-flex h-10 w-full items-center justify-center rounded-full px-4 text-sm font-semibold shadow-sm transition sm:w-auto disabled:opacity-100',
+                  'inline-flex h-10 w-full items-center justify-center rounded-full px-2 text-sm font-medium shadow-sm transition sm:w-auto disabled:opacity-100',
                   bloqueado || isSelecting
                     ? 'cursor-not-allowed bg-gray-400 text-white'
                     : 'bg-sky-500 text-white hover:bg-sky-600'
                 )}
               >
-                {bloqueado ? 'Bloqueado' : isSelecting ? 'Abrindo…' : 'Acessar'}
+                {bloqueado ? 'Empresa Bloqueada' : isSelecting ? 'Abrindo…' : 'Acessar Empresa'}
               </button>
             </div>
           </div>

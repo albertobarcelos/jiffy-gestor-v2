@@ -6,9 +6,11 @@ import type { MeusApp } from '../types'
 import { CardGearMenu } from '@/src/presentation/components/ui/CardGearMenu'
 import { cn } from '@/src/shared/utils/cn'
 import { buildEmpresaCardGearItems } from '../utils/buildEmpresaCardGearItems'
+import { MeusAppsConvitesSection } from './MeusAppsConvitesSection'
 
 export function MeusAppsFeedList({
-  items,
+  conviteItems,
+  empresaItems,
   onAcessar,
   onGerenciarConvites,
   onGerenciarPerfisGestor,
@@ -17,7 +19,8 @@ export function MeusAppsFeedList({
   onRecusarConvite,
   loadingConviteById,
 }: {
-  items: MeusAppsFeedItem[]
+  conviteItems: Extract<MeusAppsFeedItem, { kind: 'convite' }>[]
+  empresaItems: Extract<MeusAppsFeedItem, { kind: 'empresa' }>[]
   onAcessar: (appId: string) => void
   onGerenciarConvites?: (appId: string) => void
   onGerenciarPerfisGestor?: (appId: string) => void
@@ -27,30 +30,44 @@ export function MeusAppsFeedList({
   loadingConviteById: Record<string, 'aceitar' | 'recusar' | null>
 }) {
   const locked = busyAppId != null
+  const temConvites = conviteItems.length > 0
+  const temEmpresas = empresaItems.length > 0
 
   return (
-    <div className="flex flex-col gap-3">
-      {items.map(item =>
-        item.kind === 'convite' ? (
-          <ConviteListRow
-            key={`convite-${item.convite.id}`}
-            convite={item.convite}
-            onAceitar={onAceitarConvite}
-            onRecusar={onRecusarConvite}
-            loadingAction={loadingConviteById[item.convite.id] ?? null}
-          />
-        ) : (
-          <EmpresaListRow
-            key={`app-${item.app.id}`}
-            app={item.app}
-            onAcessar={onAcessar}
-            onGerenciarConvites={onGerenciarConvites}
-            onGerenciarPerfisGestor={onGerenciarPerfisGestor}
-            busyAppId={busyAppId}
-            locked={locked}
-          />
-        )
-      )}
+    <div className="flex flex-col gap-6">
+      {temConvites ? (
+        <MeusAppsConvitesSection>
+          <div className="flex flex-col gap-3">
+            {conviteItems.map(item => (
+              <ConviteListRow
+                key={`convite-${item.convite.id}`}
+                convite={item.convite}
+                onAceitar={onAceitarConvite}
+                onRecusar={onRecusarConvite}
+                loadingAction={loadingConviteById[item.convite.id] ?? null}
+              />
+            ))}
+          </div>
+        </MeusAppsConvitesSection>
+      ) : null}
+
+      {temEmpresas ? (
+        <section aria-label="Empresas vinculadas">
+          <div className="flex flex-col gap-3">
+            {empresaItems.map(item => (
+              <EmpresaListRow
+                key={`app-${item.app.id}`}
+                app={item.app}
+                onAcessar={onAcessar}
+                onGerenciarConvites={onGerenciarConvites}
+                onGerenciarPerfisGestor={onGerenciarPerfisGestor}
+                busyAppId={busyAppId}
+                locked={locked}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
     </div>
   )
 }
@@ -82,8 +99,12 @@ function EmpresaListRow({
   })
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex flex-col gap-3 px-4 py-4 sm:grid sm:grid-cols-[1fr_auto] sm:items-center">
+    <div
+      className={cn(
+        'overflow-hiddene'
+      )}
+    >
+      <div className="flex flex-col gap-3 px-4 py-2 sm:grid sm:grid-cols-[1fr_auto] sm:items-center">
         <div className="min-w-0">
           {/* TODO: substituir por plano real quando o backend expuser o campo */}
           <span
@@ -107,13 +128,13 @@ function EmpresaListRow({
               }
             }}
             className={cn(
-              'inline-flex h-10 min-w-0 flex-1 items-center justify-center rounded-lg border-0 px-4 py-0 text-sm font-semibold leading-none text-white transition sm:w-[140px] sm:flex-none disabled:opacity-100',
+              'inline-flex h-10 min-w-0 flex-1 items-center justify-center rounded-lg border-0 px-2 py-0 text-sm font-medium leading-none text-white transition sm:w-[180px] sm:flex-none disabled:opacity-100',
               bloqueado || isSelecting
                 ? 'cursor-not-allowed bg-gray-400 text-white'
                 : 'bg-secondary hover:bg-alternate'
             )}
           >
-            {bloqueado ? 'Bloqueado' : isSelecting ? 'Abrindo…' : 'Acessar'}
+            {bloqueado ? 'Empresa Bloqueada' : isSelecting ? 'Abrindo…' : 'Acessar Empresa'}
           </button>
           <CardGearMenu
             disabled={interactionDisabled}

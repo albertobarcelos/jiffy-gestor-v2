@@ -71,7 +71,8 @@ export function AppCard({
         }
       }}
       className={cn(
-        'flex h-52 flex-col rounded-2xl border border-gray-200 bg-white px-4 py-2 shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30',
+        'flex h-52 flex-col rounded-2xl border bg-white px-2 py-2 shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30',
+        bloqueado ? 'border-gray-200' : 'border-secondary/40',
         bloqueado
           ? 'cursor-not-allowed opacity-75'
           : interactionDisabled
@@ -85,7 +86,7 @@ export function AppCard({
           ? `${app.nome} (bloqueado)`
           : isSelecting
             ? `Abrindo ${app.nome}`
-            : `Acessar ${app.nome}`
+            : `Acessar empresa ${app.nome}`
       }
     >
       <div className="flex min-h-0 flex-1 flex-col justify-between">
@@ -145,13 +146,13 @@ export function AppCard({
               }
             }}
             className={cn(
-              'inline-flex h-10 w-full items-center justify-center rounded-lg px-4 text-sm font-semibold text-white transition disabled:opacity-100',
+              'inline-flex h-10 w-full items-center justify-center rounded-lg px-2 text-sm font-medium text-white transition disabled:opacity-100',
               bloqueado || buttonEmLoading
                 ? 'cursor-not-allowed bg-gray-400'
                 : 'bg-secondary hover:bg-alternate'
             )}
           >
-            {bloqueado ? 'Bloqueado' : isSelecting ? 'Abrindo…' : 'Acessar'}
+            {bloqueado ? 'Empresa Bloqueada' : isSelecting ? 'Abrindo…' : 'Acessar Empresa'}
           </button>
         </div>
       </div>

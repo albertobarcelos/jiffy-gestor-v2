@@ -46,9 +46,16 @@ export function ConviteListRow({
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex flex-col gap-3 px-4 py-4 sm:grid sm:grid-cols-[1fr_auto] sm:items-center">
+    <div className="overflow-hidden">
+      <div className="flex flex-col gap-3 px-4 py-2 sm:grid sm:grid-cols-[1fr_auto] sm:items-center">
         <div className="min-w-0">
+          {/* TODO: substituir por plano real quando o backend expuser o campo */}
+          <span
+            className="mb-1 block text-[11px] font-semibold leading-none text-secondary"
+            title="Jiffy Starter"
+          >
+            Jiffy Starter
+          </span>
           <p className="truncate text-sm font-semibold text-gray-900">{convite.nomeEmpresa}</p>
           <p className="truncate text-xs font-medium text-gray-500">{convite.email}</p>
           <p className="mt-0.5 truncate text-xs text-gray-600">
@@ -61,7 +68,7 @@ export function ConviteListRow({
             disabled={isLoading}
             onClick={() => onAceitar(convite.id)}
             className={cn(
-              'inline-flex h-10 min-w-0 flex-1 items-center justify-center rounded-lg border-0 px-4 py-0 text-sm font-semibold leading-none text-white transition sm:w-[140px] sm:flex-none',
+              'inline-flex h-10 min-w-0 flex-1 items-center justify-center rounded-lg border-0 px-2 py-0 text-sm font-medium leading-none text-white transition sm:w-[180px] sm:flex-none',
               isLoading && loadingAction !== 'aceitar'
                 ? 'cursor-not-allowed bg-gray-400'
                 : loadingAction === 'aceitar'
@@ -69,7 +76,7 @@ export function ConviteListRow({
                   : 'bg-secondary hover:bg-alternate'
             )}
           >
-            {loadingAction === 'aceitar' ? 'Aceitando…' : 'Aceitar'}
+            {loadingAction === 'aceitar' ? 'Aceitando…' : 'Aceitar Convite'}
           </button>
           <CardGearMenu
             disabled={isLoading}

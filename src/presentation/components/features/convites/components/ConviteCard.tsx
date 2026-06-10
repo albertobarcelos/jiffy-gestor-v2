@@ -57,12 +57,22 @@ export function ConviteCard({
   }
 
   return (
-    <div className="flex h-52 flex-col rounded-2xl border border-gray-200 bg-white px-4 py-2 shadow-sm">
+    <div className="flex h-52 flex-col rounded-2xl border border-secondary/40 px-4 py-2 shadow-sm">
       {/* Pai: justify-between — bloco de dados (scroll se precisar) + botão com mb-3 */}
       <div className="flex min-h-0 flex-1 flex-col justify-between">
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="flex flex-col gap-3">
-            <div className="flex min-h-9 w-full shrink-0 items-center justify-end gap-2">
+            <div className="flex min-h-9 w-full shrink-0 items-center justify-between gap-2">
+              <div className="flex min-w-0 shrink items-center">
+                {/* TODO: substituir por plano real quando o backend expuser o campo */}
+                <span
+                  className="truncate text-[11px] font-semibold leading-none text-secondary"
+                  title="Jiffy Starter"
+                >
+                  Jiffy Starter
+                </span>
+              </div>
+              <div className="flex shrink-0 items-center justify-end gap-1">
                 <CardGearMenu
                   disabled={isLoading}
                   triggerAriaLabel="Opções do convite"
@@ -77,6 +87,7 @@ export function ConviteCard({
                     },
                   ]}
                 />
+              </div>
             </div>
 
             <div className="flex items-start gap-3">
@@ -98,7 +109,7 @@ export function ConviteCard({
             disabled={isLoading}
             onClick={() => onAceitar(convite.id)}
             className={cn(
-              'inline-flex h-10 w-full items-center justify-center rounded-lg px-4 text-sm font-semibold text-white transition',
+              'inline-flex h-10 w-full items-center justify-center rounded-lg px-2 text-sm font-medium text-white transition',
               isLoading && loadingAction !== 'aceitar'
                 ? 'cursor-not-allowed bg-gray-400'
                 : loadingAction === 'aceitar'
@@ -106,7 +117,7 @@ export function ConviteCard({
                   : 'bg-secondary hover:bg-alternate'
             )}
           >
-            {loadingAction === 'aceitar' ? 'Aceitando…' : 'Aceitar'}
+            {loadingAction === 'aceitar' ? 'Aceitando…' : 'Aceitar Convite'}
           </button>
         </div>
       </div>
