@@ -1,15 +1,18 @@
 'use client'
 
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { MdAccountCircle, MdPerson, MdLock, MdDriveFileRenameOutline, MdEdit, MdEmail } from 'react-icons/md'
 import { useRouter } from 'next/navigation'
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { senhaGestorEhValida, SENHA_GESTOR_MENSAGEM_ERRO } from '@/src/shared/utils/senhaGestorRules'
 import { showToast } from '@/src/shared/utils/toast'
-import { GestorPasswordField } from '@/src/presentation/components/features/auth/components/GestorPasswordField'
-import { PasswordFieldPressReveal } from '@/src/presentation/components/features/auth/components/PasswordFieldPressReveal'
+import { cn } from '@/src/shared/utils/cn'
+import { PerfilIdentityCard } from './components/PerfilIdentityCard'
+import { PerfilDadosPessoaisTab } from './components/PerfilDadosPessoaisTab'
+import { PerfilConfiguracoesTab } from './components/PerfilConfiguracoesTab'
+import type { PerfilDadosExibicao, PerfilTabId } from './types/perfilTypes'
+import { PERFIL_CONTENT_WIDTH_CLASS, PERFIL_TABS } from './types/perfilTypes'
+import { getPerfilIniciais } from './utils/perfilDisplayUtils'
 
 /**
  * Perfil da conta (hub): dados do utilizador persistidos após o login
@@ -24,6 +27,7 @@ export function Perfil() {
   const sessionUser = useAuthStore(s => s.getUser())
 
   const [isHydrated, setIsHydrated] = useState(false)
+  const [activeTab, setActiveTab] = useState<PerfilTabId>('personal')
   const [novaSenha, setNovaSenha] = useState('')
   const [confirmarSenha, setConfirmarSenha] = useState('')
   const [salvandoSenha, setSalvandoSenha] = useState(false)
@@ -39,10 +43,6 @@ export function Perfil() {
     }
     return null
   }, [identityAuth, tenantAuth])
-
-  const handleVoltar = useCallback(() => {
-    router.back()
-  }, [router])
 
   useEffect(() => {
     setIsHydrated(true)
@@ -74,6 +74,18 @@ export function Perfil() {
   const nomeFonte = identityUser ?? sessionUser
   const nome = nomeFonte.getName()?.trim() || nomeFonte.getEmail() || 'Usuário'
   const email = nomeFonte.getEmail()
+  const iniciais = getPerfilIniciais(nome, email)
+
+  /** Campos futuros: null até o backend expor GET/PATCH de perfil completo. */
+  const dadosExibicao: PerfilDadosExibicao = {
+    nomeCompleto: nome,
+    apelido: null,
+    email,
+    dataNascimento: null,
+    telefone: null,
+    departamento: null,
+    localizacao: null,
+  }
 
   const handleAlterarNome = async (e: FormEvent) => {
     e.preventDefault()
@@ -168,126 +180,64 @@ export function Perfil() {
   }
 
   return (
-    <div className="w-full bg-gray-50 font-sans px-2 pb-10 pt-4 md:px-6">
-      <div className="mx-auto w-full min-w-0 max-w-6xl">
-        
-        <div className="mb-4 mt-6">
-          <h1 className="text-2xl font-semibold text-gray-900">Detalhes Pessoais</h1>
+    <div className="w-full bg-gray-50 px-2 pb-6 pt-4 font-sans md:px-6">
+      <div className={cn('min-w-0', PERFIL_CONTENT_WIDTH_CLASS)}>
+        <header className="mb-4">
+          <h1 className="text-2xl font-semibold text-gray-900">Meu perfil</h1>
+          <p className="mt-1 text-sm text-secondary-text">
+            Dados da sua conta na plataforma Jiffy.
+          </p>
+        </header>
+
+        <PerfilIdentityCard
+          nome={nome}
+          email={email}
+          iniciais={iniciais}
+          localizacao={dadosExibicao.localizacao}
+        />
+
+        <div
+          role="tablist"
+          aria-label="Seções do perfil"
+          className="mt-6 flex gap-1 border-b border-gray-200"
+        >
+          {PERFIL_TABS.map(tab => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                'relative -mb-px border-b-2 px-4 py-3 text-sm font-medium transition-colors',
+                activeTab === tab.id
+                  ? 'border-[var(--color-secondary)] text-gray-900'
+                  : 'border-transparent text-secondary-text hover:text-gray-900'
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        <div className="overflow-hidden rounded-lg bg-white shadow-lg">
-          <div
-            className="text-white md:px-6 px-4 py-8 font-sans"
-            style={{
-              background: 'linear-gradient(to right, var(--color-secondary), var(--color-alternate), var(--color-secondary))',
-            }}
-          >
-            <div className="flex min-w-0 flex-col gap-3">
-              <h2 className="flex min-w-0 items-center gap-2 text-xl font-semibold tracking-tight">
-                <MdAccountCircle className="shrink-0 text-white" size={24} aria-hidden />
-                <span className="truncate">{nome}</span>
-              </h2>
-              <p className="flex min-w-0 items-center gap-2 text-sm text-white/90">
-                <MdEmail className="shrink-0 text-white" size={20} aria-hidden />
-                <span className="truncate">{email}</span>
-              </p>
-            </div>
-          </div>
-
-          <div className="md:p-6 p-4">
-            <section>
-              <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-900">
-                <MdPerson className="text-[var(--color-secondary)]" size={22} aria-hidden />
-                Configurações da conta
-              </h3>
-              <div className="mt-6 grid grid-cols-1 gap-8 md:grid-cols-2">
-                <div className="bg-gray-50 rounded-lg p-4 border border-alternate">
-                  <h4 className="mb-3 flex items-center gap-2 text-base font-semibold text-gray-900">
-                    <MdEdit className="text-[var(--color-secondary)]" size={20} aria-hidden />
-                    Nome de Usuário
-                  </h4>
-                  {!tokenPerfil ? (
-                    <p className="rounded-lg px-4 py-3 text-sm text-secondary">
-                      Não há token de sessão válido para alterar o nome neste momento. Faça login novamente em{' '}
-                      <strong>Meus Aplicativos</strong> ou na empresa.
-                    </p>
-                  ) : (
-                    <form onSubmit={handleAlterarNome} className="space-y-4">
-                      <div>
-                        <label htmlFor="perfil-novo-nome" className="mb-1.5 block text-sm font-medium text-gray-800">
-                          Nome
-                        </label>
-                        <input
-                          id="perfil-novo-nome"
-                          type="text"
-                          autoComplete="name"
-                          maxLength={200}
-                          value={novoNome}
-                          onChange={ev => setNovoNome(ev.target.value)}
-                          disabled={salvandoNome}
-                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-[var(--color-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-secondary)] disabled:bg-gray-50"
-                        />
-                      </div>
-                      <div className="flex justify-end">
-                        <button
-                          type="submit"
-                          disabled={salvandoNome}
-                          className="rounded-lg bg-[var(--color-secondary)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-                        >
-                          {salvandoNome ? 'Salvando…' : 'Salvar nome'}
-                        </button>
-                      </div>
-                    </form>
-                  )}
-                </div>
-
-                <div className="bg-gray-50 rounded-lg p-4 border border-alternate">
-                  <h4 className="mb-3 flex items-center gap-2 text-base font-semibold text-gray-900">
-                    <MdLock className="text-[var(--color-secondary)]" size={20} aria-hidden />
-                    Alterar senha
-                  </h4>
-                  {!tokenPerfil ? (
-                    <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                      Não há token de sessão válido para alterar a senha neste momento. Faça login novamente em{' '}
-                      <strong>Meus Aplicativos</strong> ou na empresa.
-                    </p>
-                  ) : (
-                    <form onSubmit={handleAlterarSenha} className="space-y-4">
-                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <GestorPasswordField
-                          label="Nova senha"
-                          forcaBarIdPrefix="perfil-senha"
-                          required
-                          value={novaSenha}
-                          onChange={ev => setNovaSenha(ev.target.value)}
-                          autoComplete="new-password"
-                          disabled={salvandoSenha}
-                        />
-                        <PasswordFieldPressReveal
-                          label="Confirmar nova senha"
-                          leadingLockIcon
-                          required
-                          value={confirmarSenha}
-                          onChange={ev => setConfirmarSenha(ev.target.value)}
-                          autoComplete="new-password"
-                          disabled={salvandoSenha}
-                        />
-                      </div>
-                      <div className="flex justify-end">
-                        <button
-                          type="submit"
-                          disabled={salvandoSenha}
-                          className="rounded-lg bg-[var(--color-secondary)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-                        >
-                          {salvandoSenha ? 'Salvando…' : 'Salvar nova senha'}
-                        </button>
-                      </div>
-                    </form>
-                  )}
-                </div>
-              </div>
-            </section>
-          </div>
+        <div className="mt-6" role="tabpanel">
+          {activeTab === 'personal' ? (
+            <PerfilDadosPessoaisTab dados={dadosExibicao} />
+          ) : (
+            <PerfilConfiguracoesTab
+              tokenDisponivel={Boolean(tokenPerfil)}
+              novoNome={novoNome}
+              onNovoNomeChange={setNovoNome}
+              salvandoNome={salvandoNome}
+              onAlterarNome={handleAlterarNome}
+              novaSenha={novaSenha}
+              onNovaSenhaChange={setNovaSenha}
+              confirmarSenha={confirmarSenha}
+              onConfirmarSenhaChange={setConfirmarSenha}
+              salvandoSenha={salvandoSenha}
+              onAlterarSenha={handleAlterarSenha}
+            />
+          )}
         </div>
       </div>
     </div>
