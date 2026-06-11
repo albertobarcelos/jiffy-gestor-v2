@@ -8,7 +8,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { prepareTabSession } from '@/src/shared/utils/tabSession'
 import { fetchAccessTokenEscolherEmpresa } from '@/src/presentation/utils/escolherEmpresaApi'
 import type { ConvitePendente } from '@/src/presentation/components/features/convites/types'
-import { SearchBar } from './components/SearchBar'
+import { useRegisterHubSearch } from '@/src/presentation/contexts/HubSearchContext'
 import { MeusAppsFeedGrid } from './components/MeusAppsFeedGrid'
 import { MEUS_APPS_GRID_PREVIEW_LIMIT, type MeusAppsFeedItem } from './types'
 import { buildMeusAppsGridCells } from './utils/buildMeusAppsGridCells'
@@ -40,6 +40,12 @@ export default function MeusAppsPage() {
   const isRehydrated = useAuthStore(s => s.isRehydrated)
 
   const [busca, setBusca] = useState('')
+
+  useRegisterHubSearch({
+    value: busca,
+    onChange: setBusca,
+    placeholder: 'Busque sua empresa',
+  })
   const [viewMode, setViewMode] = useState<MeusAppsViewMode>('grid')
   const [feedFiltro, setFeedFiltro] = useState<MeusAppsFeedFiltro>('tudo')
   const [busyAppId, setBusyAppId] = useState<string | null>(null)
@@ -508,19 +514,16 @@ export default function MeusAppsPage() {
             </div>
           ) : null}
 
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <SearchBar value={busca} onChange={setBusca} className="md:max-w-[520px]" />
-            <div className="flex items-center justify-between gap-2 md:justify-end">
-              <ViewControls
-                mode={viewMode}
-                onModeChange={setViewMode}
-                feedFiltro={feedFiltro}
-                onFeedFiltroChange={setFeedFiltro}
-                onOpenFilters={() => {
-                  console.log('Abrir filtros')
-                }}
-              />
-            </div>
+          <div className="flex items-center justify-end gap-2">
+            <ViewControls
+              mode={viewMode}
+              onModeChange={setViewMode}
+              feedFiltro={feedFiltro}
+              onFeedFiltroChange={setFeedFiltro}
+              onOpenFilters={() => {
+                console.log('Abrir filtros')
+              }}
+            />
           </div>
         </header>
 

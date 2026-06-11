@@ -170,16 +170,7 @@ export function Perfil() {
   return (
     <div className="w-full bg-gray-50 font-sans px-2 pb-10 pt-4 md:px-6">
       <div className="mx-auto w-full min-w-0 max-w-6xl">
-        <div className="mb-3">
-          <button
-            type="button"
-            onClick={handleVoltar}
-            className="flex h-8 shrink-0 items-center gap-2 rounded-lg bg-secondary px-5 font-exo text-sm font-semibold text-info transition-colors hover:bg-alternate"
-          >
-            <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
-            Voltar
-          </button>
-        </div>
+        
         <div className="mb-4 mt-6">
           <h1 className="text-2xl font-semibold text-gray-900">Detalhes Pessoais</h1>
         </div>

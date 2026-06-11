@@ -5,7 +5,7 @@ import { HubAppShell } from '@/src/presentation/components/layouts/HubAppShell'
 
 /**
  * Layout compartilhado do hub pós-login (`/meus-apps`, `/perfil`, etc.).
- * MeusAppsTopNav não remonta ao navegar entre filhos.
+ * Sidebar + top bar do hub não remontam ao navegar entre filhos.
  */
 export default function HubRouteGroupLayout({ children }: { children: React.ReactNode }) {
   return (

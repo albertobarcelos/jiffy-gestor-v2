@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import type { ConviteGestaoDTO } from '@/src/application/dto/convites/ConvitesGestaoDTO'
 import type { PerfilGestorOption, UsuarioGestorListaItem } from './hooks/useConvitesGestao'
-import { MdSearch } from 'react-icons/md'
+import { useRegisterHubSearch } from '@/src/presentation/contexts/HubSearchContext'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { ConviteGestaoRow } from './components/ConviteGestaoRow'
 import { GestorSemConviteRow } from './components/GestorSemConviteRow'
@@ -42,6 +42,12 @@ export function ConvitesGestaoList({
   onEditarGrupos?: () => void
 }) {
   const [busca, setBusca] = useState('')
+
+  useRegisterHubSearch({
+    value: busca,
+    onChange: setBusca,
+    placeholder: 'Buscar por e-mail, nome ou perfil...',
+  })
 
   const linhasVisiveis = useMemo((): LinhaGestao[] => {
     const q = busca.trim().toLowerCase()
@@ -91,19 +97,6 @@ export function ConvitesGestaoList({
 
   return (
     <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-4">
-      <div className="flex flex-shrink-0 flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div className="relative h-8 min-w-[180px] max-w-[360px] flex-1">
-          <MdSearch className="absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-secondary-text" />
-          <input
-            type="search"
-            placeholder="Buscar por e-mail, nome ou perfil..."
-            value={busca}
-            onChange={e => setBusca(e.target.value)}
-            className="h-full w-full rounded-lg border border-gray-200 bg-info pl-11 pr-4 font-nunito text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
-          />
-        </div>
-      </div>
-
       {linhasVisiveis.length === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-300 bg-white px-6 py-12 text-center">
           <p className="font-nunito text-sm text-secondary-text">
