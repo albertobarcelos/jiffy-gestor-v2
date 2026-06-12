@@ -35,6 +35,49 @@ function formatDateTime(dateString: string | null | undefined): string {
   }
 }
 
+function parseNumeroCampo(value: string | number | null | undefined): number | null {
+  if (value == null || value === '') return null
+  const n = typeof value === 'string' ? parseFloat(value) : value
+  return Number.isFinite(n) ? n : null
+}
+
+function tipoAjusteEhPercentual(tipo: string | null | undefined): boolean {
+  const t = String(tipo ?? '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+  return (
+    t === 'percentual' ||
+    t === 'porcentagem' ||
+    t === 'percentage' ||
+    t.includes('percent')
+  )
+}
+
+type ProdutoCupom = NonNullable<VendaContingenciaPublica['produtosLancados']>[number]
+
+/** Exibe o ajuste configurado no produto (ex.: -50%, +2,00) usando campos da API, sem recalcular totais. */
+function formatarAjusteProdutoCupom(produto: ProdutoCupom): string {
+  const desconto = parseNumeroCampo(produto.desconto)
+  if (desconto != null && desconto > 0) {
+    if (tipoAjusteEhPercentual(produto.tipoDesconto)) {
+      return `-${Math.round(desconto * 100)}%`
+    }
+    return `-${formatMoney(desconto)}`
+  }
+
+  const acrescimo = parseNumeroCampo(produto.acrescimo)
+  if (acrescimo != null && acrescimo > 0) {
+    if (tipoAjusteEhPercentual(produto.tipoAcrescimo)) {
+      return `+${Math.round(acrescimo * 100)}%`
+    }
+    return `+${formatMoney(acrescimo)}`
+  }
+
+  return ''
+}
+
 function rotuloTipoDocPorModelo(modelo: number | null | undefined): string | null {
   if (modelo == null || Number.isNaN(modelo)) return null
   if (modelo === 65) return 'NFC-e'
@@ -221,6 +264,12 @@ export function CupomFiscalContingencia({ data, rodapeDanfeSrc }: CupomFiscalCon
                 <th className="text-right py-1 font-bold" style={{ padding: '2px' }}>
                   Qtd
                 </th>
+                <th className="text-right py-1 font-bold whitespace-nowrap" style={{ padding: '2px' }}>
+                  Acres/Desc
+                </th>
+                <th className="text-right py-1 font-bold whitespace-nowrap" style={{ padding: '2px' }}>
+                  Val Unit.
+                </th>
                 <th className="text-right py-1 font-bold" style={{ padding: '2px' }}>
                   Total
                 </th>
@@ -229,6 +278,7 @@ export function CupomFiscalContingencia({ data, rodapeDanfeSrc }: CupomFiscalCon
             <tbody>
               {produtos.map((p, i) => {
                 const q = p.quantidade ?? 0
+                const ajuste = formatarAjusteProdutoCupom(p)
                 return (
                   <tr key={i}>
                     <td style={{ padding: '2px', verticalAlign: 'top' }}>
@@ -242,6 +292,12 @@ export function CupomFiscalContingencia({ data, rodapeDanfeSrc }: CupomFiscalCon
                     </td>
                     <td className="text-right whitespace-nowrap" style={{ padding: '2px' }}>
                       {formatMoney(q)}
+                    </td>
+                    <td className="text-right whitespace-nowrap" style={{ padding: '2px' }}>
+                      {ajuste}
+                    </td>
+                    <td className="text-right whitespace-nowrap" style={{ padding: '2px' }}>
+                      {p.valorUnitario != null ? formatMoney(p.valorUnitario) : '—'}
                     </td>
                     <td className="text-right whitespace-nowrap" style={{ padding: '2px' }}>
                       {p.valorFinal != null ? formatCurrencyBrl(p.valorFinal) : '—'}

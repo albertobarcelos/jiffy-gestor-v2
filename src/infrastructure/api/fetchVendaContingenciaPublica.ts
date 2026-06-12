@@ -53,10 +53,14 @@ export type VendaContingenciaPublica = {
     nomeProduto?: string
     quantidade?: number
     valorUnitario?: number
-    /** Total da linha já calculado no backend (inclui complementos, desc./acrésc. do item). */
+    /** Total da linha já calculado no backend. */
     valorFinal?: number
     desconto?: string | number
     acrescimo?: string | number
+    tipoDesconto?: string | null
+    tipoAcrescimo?: string | null
+    valorDesconto?: number | null
+    valorAcrescimo?: number | null
     complementos?: Array<{
       nomeComplemento?: string
       quantidade?: number
