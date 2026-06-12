@@ -35,14 +35,6 @@ function formatDateTime(dateString: string | null | undefined): string {
   }
 }
 
-function linhaTotalItem(
-  q: number | undefined,
-  vu: number | undefined
-): number | null {
-  if (q == null || vu == null) return null
-  return q * vu
-}
-
 function rotuloTipoDocPorModelo(modelo: number | null | undefined): string | null {
   if (modelo == null || Number.isNaN(modelo)) return null
   if (modelo === 65) return 'NFC-e'
@@ -237,8 +229,6 @@ export function CupomFiscalContingencia({ data, rodapeDanfeSrc }: CupomFiscalCon
             <tbody>
               {produtos.map((p, i) => {
                 const q = p.quantidade ?? 0
-                const vu = p.valorUnitario ?? 0
-                const total = linhaTotalItem(q, vu)
                 return (
                   <tr key={i}>
                     <td style={{ padding: '2px', verticalAlign: 'top' }}>
@@ -254,7 +244,7 @@ export function CupomFiscalContingencia({ data, rodapeDanfeSrc }: CupomFiscalCon
                       {formatMoney(q)}
                     </td>
                     <td className="text-right whitespace-nowrap" style={{ padding: '2px' }}>
-                      {total != null ? formatCurrencyBrl(total) : '—'}
+                      {p.valorFinal != null ? formatCurrencyBrl(p.valorFinal) : '—'}
                     </td>
                   </tr>
                 )
