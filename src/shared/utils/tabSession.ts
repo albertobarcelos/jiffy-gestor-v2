@@ -4,6 +4,14 @@ import {
   SESSION_STORAGE_EMPRESA_SLUG,
 } from '@/src/shared/constants/sessionCoordinator'
 import { empresaNomeParaSlugUrl } from '@/src/shared/utils/empresaNomeParaSlugUrl'
+import {
+  buildGestaoPath,
+  isGestaoScopedPath,
+  parseEmpresaSlugFromPath,
+  parseEmpresaSlugFromSearch,
+  stripEmpresaSlugFromSearch,
+  stripGestaoEmpresaSlugFromPath,
+} from '@/src/shared/utils/gestaoRoutes'
 
 /**
  * Segmento de query usado na URL da aba ERP (ex.: `nexsyn-ab12cd34`):
@@ -141,31 +149,44 @@ function isEmpresaSlugQueryKey(key: string, sessionSlug: string): boolean {
   return /^.+-[a-z0-9]{8}$/i.test(key)
 }
 
-/** Alinha a query: sempre `?<slugDaSessão>[&outrosParams]` sem duplicar slug nem perder `periodo`, etc. */
-export function syncEmpresaUrlQueryFromSession(): void {
+/**
+ * Mantém tenant no path: `/gestao/{empresaSlug}/{modulo}`.
+ * Migra URLs legadas `?{empresaSlug}` para o novo formato.
+ */
+export function syncEmpresaUrlPathFromSession(): void {
   if (typeof window === 'undefined') return
   const slug = getEmpresaSlugParam()
   if (!slug) return
 
-  const sp = new URLSearchParams(window.location.search)
-  const rest = new URLSearchParams()
-  for (const [key, value] of sp.entries()) {
-    if (isEmpresaSlugQueryKey(key, slug)) {
-      continue
-    }
-    rest.append(key, value)
-  }
+  const { pathname, search, href } = window.location
 
-  const tail = rest.toString()
-  const newSearch = tail ? `${slug}&${tail}` : slug
-  const cur = window.location.search.slice(1)
-  if (cur === newSearch) {
+  if (!isGestaoScopedPath(pathname) && !parseEmpresaSlugFromSearch(search)) {
     return
   }
 
-  const url = new URL(window.location.href)
-  url.search = newSearch
+  let modulePath = stripGestaoEmpresaSlugFromPath(pathname)
+  const legacyEmpresaSlug = parseEmpresaSlugFromSearch(search)
+
+  if (!pathname.startsWith('/gestao/') && legacyEmpresaSlug) {
+    modulePath = pathname || '/dashboard'
+  }
+
+  const cleanSearch = stripEmpresaSlugFromSearch(search, slug)
+  const targetPath = buildGestaoPath(slug, modulePath)
+  const targetUrl = `${targetPath}${cleanSearch}`
+
+  const currentUrl = `${pathname}${search}`
+  if (currentUrl === targetUrl) return
+
+  const url = new URL(href)
+  url.pathname = targetPath
+  url.search = cleanSearch ? cleanSearch.replace(/^\?/, '') : ''
   window.history.replaceState(null, '', url.toString())
+}
+
+/** @deprecated Use `syncEmpresaUrlPathFromSession` — alias de compatibilidade. */
+export function syncEmpresaUrlQueryFromSession(): void {
+  syncEmpresaUrlPathFromSession()
 }
 
 /**

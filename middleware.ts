@@ -6,6 +6,13 @@ import {
   AUTH_COOKIE_TENANT,
 } from '@/src/shared/utils/authCookies'
 import { queryRegistroConviteNovoUsuarioFromLoginSearch } from '@/src/presentation/components/features/auth/utils/inviteLoginPayload'
+import {
+  buildGestaoPath,
+  isGestaoScopedPath,
+  parseEmpresaSlugFromPath,
+  parseEmpresaSlugFromSearch,
+  stripEmpresaSlugFromSearch,
+} from '@/src/shared/utils/gestaoRoutes'
 
 /**
  * Middleware para proteção de rotas - OTIMIZADO
@@ -52,6 +59,43 @@ export function middleware(request: NextRequest) {
   // Antiga URL /dashboard/v2 → /dashboard
   if (pathname === '/dashboard/v2' || pathname === '/dashboard/v2/') {
     return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
+
+  // Rota renomeada: /painel-contador → /portal-contador
+  if (pathname.includes('/painel-contador')) {
+    const dest = request.nextUrl.clone()
+    dest.pathname = pathname.replace('/painel-contador', '/portal-contador')
+    return NextResponse.redirect(dest)
+  }
+
+  const legacyEmpresaSlug = parseEmpresaSlugFromSearch(request.nextUrl.search)
+  if (legacyEmpresaSlug && isGestaoScopedPath(pathname) && !pathname.startsWith('/gestao/')) {
+    const dest = request.nextUrl.clone()
+    dest.pathname = buildGestaoPath(legacyEmpresaSlug, pathname || '/dashboard')
+    dest.search = stripEmpresaSlugFromSearch(request.nextUrl.search, legacyEmpresaSlug).replace(/^\?/, '')
+    return NextResponse.redirect(dest)
+  }
+
+  const empresaSlug = parseEmpresaSlugFromPath(pathname)
+  if (empresaSlug) {
+    const inner =
+      pathname === `/gestao/${empresaSlug}` || pathname === `/gestao/${empresaSlug}/`
+        ? '/dashboard'
+        : pathname.slice(`/gestao/${empresaSlug}`.length) || '/dashboard'
+
+    if (pathname === `/gestao/${empresaSlug}` || pathname === `/gestao/${empresaSlug}/`) {
+      const dest = request.nextUrl.clone()
+      dest.pathname = buildGestaoPath(empresaSlug, '/dashboard')
+      return NextResponse.redirect(dest)
+    }
+
+    if (!isGestaoScopedPath(inner)) {
+      return NextResponse.next()
+    }
+
+    const rewriteUrl = request.nextUrl.clone()
+    rewriteUrl.pathname = inner
+    return NextResponse.rewrite(rewriteUrl)
   }
 
   const tenantTok = request.cookies.get(AUTH_COOKIE_TENANT)?.value

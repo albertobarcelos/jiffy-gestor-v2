@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import type { ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -27,6 +27,9 @@ import {
 } from 'react-icons/md'
 import type { IconType } from 'react-icons'
 import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
+import { useAcessoFiscal } from '@/src/presentation/hooks/useAcessoFiscal'
+import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
+import { matchesModulePath } from '@/src/shared/utils/gestaoRoutes'
 
 /**
  * Navegação superior minimalista e clean
@@ -42,6 +45,8 @@ export function TopNav() {
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEmpresaUrlSync()
+  const temAcessoFiscal = useAcessoFiscal()
+  const { toGestao } = useGestaoPath()
   
   // Estado para controlar hidratação (evita hydration mismatch)
   const [isHydrated, setIsHydrated] = useState(false)
@@ -139,81 +144,84 @@ export function TopNav() {
     children?: ChildMenuItem[]
   }
 
-  const menuItems: MenuItem[] = [
-    { 
-      name: 'Dashboard', 
-      path: '/dashboard', 
-      icon: MdDashboard 
-    },
-    {
-      name: 'Produtos',
-      path: '#',
-      icon: MdShoppingBag,
-      children: [
-        { name: 'Grupo de Produtos', path: '/grupos-produtos', icon: MdCategory },
-        { name: 'Produtos', path: '/produtos', icon: MdShoppingBag },
-        { name: 'Grupo de Complementos', path: '/grupos-complementos', icon: MdCategory },
-        { name: 'Complementos', path: '/complementos', icon: MdAddCircle },
-      ],
-    },
-    {
-      name: 'Usuários',
-      path: '#',
-      icon: MdPeople,
-      children: [
-        { name: 'Perfis PDV', path: '/perfis-usuarios-pdv', icon: MdGroup },
-        { name: 'Usuários PDV', path: '/usuarios', icon: MdPerson },
-        { name: 'Entregadores', path: '/entregadores', icon: MdDeliveryDining },
-        { name: 'Clientes', path: '/clientes', icon: MdPeople },
-      ],
-    },
-    {
-      name: 'Vendas',
-      path: '#',
-      icon: MdPointOfSale,
-      children: [
-        { name: 'Pedidos e Clientes', path: '/pedidos-clientes', icon: MdReceipt },
-        {
-          name: 'Mesas Abertas',
-          path: '/vendas/abertas',
-          renderIcon: () => (
-            <TipoVendaIcon
-              tipoVenda="mesa"
-              numeroMesa="#"
-              size={32}
-              containerScale={0.9}
-              corTexto="#FFFFFF"
-              corCirculoInterno="#4b5563"
-              corBorda="#4b5563"
-              corFundo="#4b5563"
-              corPrincipal="#4b5563"
-            />
-          ),
-        },
-        { name: 'Relatórios Vendas', path: '/relatorios-vendas', icon: MdAssessment },
-        { name: 'Relatório Produtoss', path: '/relatorios-produtos-vendidos', icon: MdAnalytics },
-        { name: 'Hist. Fechamentos', path: '/historico-fechamento', icon: MdHistory },
-        { name: 'Comissões', path: '/vendas/comissoes', icon: MdPercent },
+  const menuItems: MenuItem[] = useMemo(() => {
+    const items: MenuItem[] = [
+      {
+        name: 'Dashboard',
+        path: '/dashboard',
+        icon: MdDashboard,
+      },
+      {
+        name: 'Produtos',
+        path: '#',
+        icon: MdShoppingBag,
+        children: [
+          { name: 'Grupo de Produtos', path: '/grupos-produtos', icon: MdCategory },
+          { name: 'Produtos', path: '/produtos', icon: MdShoppingBag },
+          { name: 'Grupo de Complementos', path: '/grupos-complementos', icon: MdCategory },
+          { name: 'Complementos', path: '/complementos', icon: MdAddCircle },
+        ],
+      },
+      {
+        name: 'Usuários',
+        path: '#',
+        icon: MdPeople,
+        children: [
+          { name: 'Perfis PDV', path: '/perfis-usuarios-pdv', icon: MdGroup },
+          { name: 'Usuários PDV', path: '/usuarios', icon: MdPerson },
+          { name: 'Clientes', path: '/clientes', icon: MdPeople },
+        ],
+      },
+      {
+        name: 'Vendas',
+        path: '#',
+        icon: MdPointOfSale,
+        children: [
+          { name: 'Pedidos e Clientes', path: '/pedidos-clientes', icon: MdReceipt },
+          {
+            name: 'Mesas Abertas',
+            path: '/vendas/abertas',
+            renderIcon: () => (
+              <TipoVendaIcon
+                tipoVenda="mesa"
+                numeroMesa="#"
+                size={32}
+                containerScale={0.9}
+                corTexto="#FFFFFF"
+                corCirculoInterno="#4b5563"
+                corBorda="#4b5563"
+                corFundo="#4b5563"
+                corPrincipal="#4b5563"
+              />
+            ),
+          },
+          { name: 'Relatórios Vendas', path: '/relatorios-vendas', icon: MdAssessment },
+          { name: 'Relatório Produtoss', path: '/relatorios-produtos-vendidos', icon: MdAnalytics },
+          { name: 'Hist. Fechamentos', path: '/historico-fechamento', icon: MdHistory },
+          { name: 'Comissões', path: '/vendas/comissoes', icon: MdPercent },
+        ],
+      },
+      { name: 'Portal do Contador', path: '/portal-contador', icon: MdAccountBalance },
+      { name: 'Configurações', path: '/configuracoes/empresa', icon: MdSettings },
+    ]
 
-      ],
-    },
-    { name: 'Painel do Contador', path: '/painel-contador', icon: MdAccountBalance },
-    { name: 'Configurações', path: '/configuracoes/empresa', icon: MdSettings },
-  ]
+    if (!temAcessoFiscal) {
+      return items.filter(item => item.path !== '/portal-contador')
+    }
+    return items
+  }, [temAcessoFiscal])
 
   const isMenuActive = (item: typeof menuItems[0]) => {
     if (item.path !== '#') {
-      return pathname === item.path || pathname?.startsWith(item.path + '/')
+      return matchesModulePath(pathname ?? '', item.path)
     }
     if (item.children) {
-      return item.children.some((child) => pathname === child.path || pathname?.startsWith(child.path + '/'))
+      return item.children.some(child => matchesModulePath(pathname ?? '', child.path))
     }
     return false
   }
 
-  const isChildActive = (childPath: string) => {
-    return pathname === childPath || pathname?.startsWith(childPath + '/')
-  }
+  const isChildActive = (childPath: string) => matchesModulePath(pathname ?? '', childPath)
 
   const closeSubmenus = useCallback(() => setExpandedMenus(new Set()), [])
 
@@ -227,10 +235,10 @@ export function TopNav() {
       closeSubmenus()
       setIsMobileMenuOpen(false)
       setTimeout(() => {
-        router.push(path)
+        router.push(toGestao(path))
       }, 80)
     },
-    [closeSubmenus, router]
+    [closeSubmenus, router, toGestao]
   )
 
   const handleMobileChildNavigate = useCallback(
@@ -395,7 +403,7 @@ export function TopNav() {
       <div className="h-full flex items-center justify-between xl:px-4">
         {/* Logo */}
         <div className="flex items-center">
-          <Link href="/dashboard" className="flex items-center">
+          <Link href={toGestao('/dashboard')} className="flex items-center">
             <div className="relative ml-6 md:ml-0 w-12 h-12 sm:w-20 sm:h-16">
               <Image
                 src="/images/jiffy-100x100.gif"
@@ -458,7 +466,7 @@ export function TopNav() {
                         return (
                           <Link
                             key={child.path}
-                            href={child.path}
+                            href={toGestao(child.path)}
                             onMouseEnter={() => handleLinkHover(child.path)}
                             onClick={() => setExpandedMenus(new Set())}
                             prefetch={true}
@@ -485,7 +493,7 @@ export function TopNav() {
             return (
               <Link
                 key={item.path}
-                href={item.path}
+                href={toGestao(item.path)}
                 onMouseEnter={() => handleLinkHover(item.path)}
                 prefetch={true}
                 className={`flex items-center gap-1.5 xl:px-4 px-1 py-2 rounded-lg text-xs lg:text-sm font-medium transition-all duration-200 ${

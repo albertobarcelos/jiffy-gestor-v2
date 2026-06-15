@@ -25,6 +25,7 @@ import {
   useVendasUnificadasInfinite,
   vendasUnificadasInfiniteQueryKey,
 } from '@/src/presentation/hooks/useVendasUnificadas'
+import { useVendaIdsPdvPorTerminal } from '@/src/presentation/hooks/useVendaIdsPdvPorTerminal'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import {
   MdReceipt,
@@ -94,6 +95,8 @@ import {
   KANBAN_VENDAS_REFETCH_INTERVAL_MS,
 } from './kanban/kanbanVendasListagem'
 
+type TerminalOpcao = { id: string; nome: string }
+
 /**
  * Componente Kanban para gerenciamento de pedidos e emissão fiscal.
  * O restante das regras, storage e componentes DnD fica em ./kanban.
@@ -134,7 +137,6 @@ export function FiscalFlowKanban() {
     rascunhoHoraFinalizacaoFim,
     setRascunhoHoraFinalizacaoFim,
     vendasUnificadasQueryParams,
-    vendasUnificadasQueryKeyFingerprint,
     handleClearFilters,
     abrirModalCriacaoDatas,
     handleRascunhoCriacaoRangeChange,
@@ -177,6 +179,9 @@ export function FiscalFlowKanban() {
     abaDetalhesInicial?: import('./novo-pedido/types').AbaDetalhesPedido
   } | null>(null)
   const [draggingVenda, setDraggingVenda] = useState<Venda | null>(null)
+  const [terminalFilter, setTerminalFilter] = useState('')
+  const [terminais, setTerminais] = useState<TerminalOpcao[]>([])
+  const [isLoadingTerminais, setIsLoadingTerminais] = useState(false)
   /** vendaId fixado no topo por coluna (Finalizadas / Pendente emissão), persistido em localStorage */
   const { primeiroPorColuna, setPrimeiroPorColuna } = useKanbanPinning()
 
@@ -191,6 +196,77 @@ export function FiscalFlowKanban() {
       /* quota / modo privado */
     }
   }, [modoKanbanVendas])
+
+  const loadAllTerminais = useCallback(async () => {
+    const token = auth?.getAccessToken()
+    if (!token) return
+
+    setIsLoadingTerminais(true)
+    try {
+      const allTerminais: TerminalOpcao[] = []
+      let currentOffset = 0
+      const limit = 50
+      let hasMore = true
+
+      while (hasMore) {
+        const params = new URLSearchParams({
+          limit: limit.toString(),
+          offset: currentOffset.toString(),
+        })
+
+        const response = await fetch(`/api/terminais?${params.toString()}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (!response.ok) break
+
+        const data = await response.json()
+        const newTerminais = (data.items || []).map((t: Record<string, unknown>) => ({
+          id: String(t.id),
+          nome: String(t.nome || t.name || t.codigoInterno || 'Sem nome'),
+        }))
+
+        allTerminais.push(...newTerminais)
+        hasMore = newTerminais.length === limit
+        currentOffset += newTerminais.length
+      }
+
+      setTerminais(allTerminais)
+    } catch (error) {
+      console.error('Erro ao carregar terminais:', error)
+    } finally {
+      setIsLoadingTerminais(false)
+    }
+  }, [auth])
+
+  useEffect(() => {
+    void loadAllTerminais()
+  }, [loadAllTerminais])
+
+  const usaFiltroTerminal = !!terminalFilter.trim()
+
+  const vendaIdsPdvPorTerminalParams = useMemo(
+    () => ({
+      terminalId: terminalFilter,
+      periodoInicial: vendasUnificadasQueryParams.dataCriacaoInicial,
+      periodoFinal: vendasUnificadasQueryParams.dataCriacaoFinal,
+      dataFinalizacaoInicio: vendasUnificadasQueryParams.dataFinalizacaoInicio,
+      dataFinalizacaoFim: vendasUnificadasQueryParams.dataFinalizacaoFim,
+    }),
+    [terminalFilter, vendasUnificadasQueryParams]
+  )
+
+  const vendasUnificadasQueryKeyFingerprintComTerminal = useMemo(
+    () =>
+      JSON.stringify({
+        ...vendasUnificadasQueryParams,
+        terminalFilter: terminalFilter || undefined,
+      }),
+    [vendasUnificadasQueryParams, terminalFilter]
+  )
 
   /** Evita PATCH duplicado ao reativar solicitarEmissaoFiscal para REJEITADA (Strict Mode / re-renders) */
   const rejeitadaReativacaoEmAndamentoRef = useRef(false)
@@ -224,24 +300,49 @@ export function FiscalFlowKanban() {
 
   useEffect(() => {
     rejeitadaReativacaoJaTentadaIdsRef.current = new Set()
-  }, [vendasUnificadasQueryKeyFingerprint])
+  }, [vendasUnificadasQueryKeyFingerprintComTerminal])
 
   const {
     data: vendasUnificadasInfiniteData,
-    isLoading,
+    isLoading: isLoadingUnificado,
     isFetchingNextPage,
     hasNextPage,
     fetchNextPage,
-    refetch,
+    refetch: refetchUnificado,
   } = useVendasUnificadasInfinite(vendasUnificadasQueryParams, {
     refetchIntervalMs: KANBAN_VENDAS_REFETCH_INTERVAL_MS,
     refetchOnWindowFocus: true,
   })
 
-  const { items: todasVendasCarregadas, totalCount: totalVendasApi } = useMemo(
+  const {
+    data: vendaIdsPdvPorTerminal,
+    isLoading: isLoadingIdsTerminal,
+    refetch: refetchIdsTerminal,
+  } = useVendaIdsPdvPorTerminal(vendaIdsPdvPorTerminalParams, { enabled: usaFiltroTerminal })
+
+  const isLoading = isLoadingUnificado || (usaFiltroTerminal && isLoadingIdsTerminal)
+
+  const refetch = useCallback(async () => {
+    const [result] = await Promise.all([
+      refetchUnificado(),
+      usaFiltroTerminal ? refetchIdsTerminal() : Promise.resolve(),
+    ])
+    return result
+  }, [usaFiltroTerminal, refetchUnificado, refetchIdsTerminal])
+
+  const { items: todasVendasFlattened, totalCount: totalVendasApi } = useMemo(
     () => flattenVendasUnificadasInfinite(vendasUnificadasInfiniteData),
     [vendasUnificadasInfiniteData]
   )
+
+  /** Lista do unificado; com terminal, só PDV cujo id está no Set do POS. */
+  const todasVendasCarregadas = useMemo(() => {
+    if (!usaFiltroTerminal) return todasVendasFlattened
+    if (!vendaIdsPdvPorTerminal) return []
+    return todasVendasFlattened.filter(
+      v => v.tabelaOrigem === 'venda' && vendaIdsPdvPorTerminal.has(v.id)
+    )
+  }, [usaFiltroTerminal, vendaIdsPdvPorTerminal, todasVendasFlattened])
 
   const entregadoresHydrationKey = useMemo(
     () =>
@@ -320,9 +421,15 @@ export function FiscalFlowKanban() {
 
   const temMaisVendasParaCarregar = useMemo(() => {
     if (hasNextPage) return true
-    if (totalVendasApi > 0 && todasVendasCarregadas.length < totalVendasApi) return true
+    if (
+      !usaFiltroTerminal &&
+      totalVendasApi > 0 &&
+      todasVendasCarregadas.length < totalVendasApi
+    ) {
+      return true
+    }
     return false
-  }, [hasNextPage, totalVendasApi, todasVendasCarregadas.length])
+  }, [hasNextPage, usaFiltroTerminal, totalVendasApi, todasVendasCarregadas.length])
 
   const handleCarregarMaisVendas = useCallback(() => {
     if (isFetchingNextPage || !temMaisVendasParaCarregar) return
@@ -332,6 +439,11 @@ export function FiscalFlowKanban() {
   const handleAtualizarListagem = useCallback(() => {
     void refetch()
   }, [refetch])
+
+  const handleClearFiltersComTerminal = useCallback(() => {
+    handleClearFilters()
+    setTerminalFilter('')
+  }, [handleClearFilters])
 
   const { onColumnScroll } = useKanbanColumnScrollLoadMore(handleCarregarMaisVendas)
 
@@ -888,13 +1000,18 @@ export function FiscalFlowKanban() {
         onToggleFiltrosMobile={() => setFiltrosVisiveisMobile(prev => !prev)}
         origemFilter={origemFilter}
         onOrigemFilterChange={setOrigemFilter}
+        terminalFilter={terminalFilter}
+        onTerminalFilterChange={setTerminalFilter}
+        terminais={terminais}
+        isLoadingTerminais={isLoadingTerminais}
+        origemFilterDisabled={usaFiltroTerminal}
         dataCriacaoInicio={dataCriacaoInicio}
         dataCriacaoFim={dataCriacaoFim}
         onOpenCriacaoDatas={abrirModalCriacaoDatas}
         dataFinalizacaoInicio={dataFinalizacaoInicio}
         dataFinalizacaoFim={dataFinalizacaoFim}
         onOpenFinalizacaoDatas={abrirModalFinalizacaoDatas}
-        onClearFilters={handleClearFilters}
+        onClearFilters={handleClearFiltersComTerminal}
         modoKanbanVendas={modoKanbanVendas}
         onModoKanbanVendasChange={setModoKanbanVendas}
         onAbrirConfiguracoesDelivery={() => setDeliveryConfiguracoesOpen(true)}

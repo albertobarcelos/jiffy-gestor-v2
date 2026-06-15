@@ -275,7 +275,7 @@ export function resolveModeloParaEmitirNota(v: VendaUnificadaDTO): 55 | 65 | nul
 
 /**
  * Parâmetros alinhados ao contrato do backend GET /vendas/unificado:
- * - origem, statusFiscal, periodoInicial, periodoFinal
+ * - origem, periodoInicial, periodoFinal (filtro por dataCriacao)
  * - dataFinalizacaoInicio, dataFinalizacaoFim
  * - q (busca no servidor — pesquisa em todo o dataset, não só itens já carregados)
  */
@@ -315,7 +315,7 @@ export interface VendasUnificadasInfiniteOptions {
 export const VENDAS_UNIFICADAS_PAGE_SIZE = VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE
 
 /** Converte um item bruto da API em DTO (reutilizado em cada página). */
-function mapItemJsonParaVendaUnificadaDTO(v: Record<string, unknown>): VendaUnificadaDTO {
+export function mapItemJsonParaVendaUnificadaDTO(v: Record<string, unknown>): VendaUnificadaDTO {
   return new VendaUnificadaDTO(
     v.id as string,
     v.numeroVenda as number,
@@ -344,6 +344,39 @@ function mapItemJsonParaVendaUnificadaDTO(v: Record<string, unknown>): VendaUnif
     extrairDataUltimaModificacao(v),
     (v.statusFinanceiro ?? null) as string | null
   )
+}
+
+/**
+ * Converte linha do GET /operacao-pdv/vendas (summary PDV) para o DTO do Kanban fiscal.
+ * Campos fiscais extras (resumoFiscal, solicitarEmissaoFiscal) são preservados quando a API envia.
+ */
+export function mapVendaPdvJsonParaVendaUnificadaDTO(v: Record<string, unknown>): VendaUnificadaDTO {
+  const clienteId = v.clienteId as string | null | undefined
+  const clienteObj = v.cliente as VendaUnificadaDTO['cliente'] | null | undefined
+  const abertoPorObj = v.abertoPor as VendaUnificadaDTO['abertoPor'] | null | undefined
+  const abertoPorId = String(v.abertoPorId ?? abertoPorObj?.id ?? '')
+
+  const unified: Record<string, unknown> = {
+    ...v,
+    origem: 'PDV',
+    tabelaOrigem: 'venda',
+    totalDesconto: (v.totalDesconto ?? 0) as number,
+    totalAcrescimo: (v.totalAcrescimo ?? 0) as number,
+    dataCriacao: v.dataCriacao as string,
+    dataFinalizacao: (v.dataFinalizacao ?? null) as string | null,
+    dataCancelamento: (v.dataCancelamento ?? null) as string | null,
+    cliente:
+      clienteObj ??
+      (clienteId
+        ? {
+            id: clienteId,
+            nome: String(v.identificacao ?? v.clienteNome ?? 'Cliente'),
+          }
+        : null),
+    abertoPor: abertoPorObj ?? { id: abertoPorId, nome: String(v.abertoPorNome ?? '—') },
+  }
+
+  return mapItemJsonParaVendaUnificadaDTO(unified)
 }
 
 export function montarSearchParamsVendasUnificadas(

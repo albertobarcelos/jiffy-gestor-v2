@@ -7,6 +7,27 @@ type ApiErrorResponse = {
   errors?: unknown
 }
 
+function mensagemErroRede(error: unknown): ApiError | null {
+  if (!(error instanceof TypeError) || error.message !== 'fetch failed') {
+    return null
+  }
+
+  const cause = (error as { cause?: { code?: string } }).cause
+  if (cause?.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE') {
+    return new ApiError(
+      'Certificado SSL da API externa inválido. Em desenvolvimento, defina API_TLS_SKIP_VERIFY=true no .env.local e reinicie o servidor.',
+      503,
+      { ssl: true, code: cause.code }
+    )
+  }
+
+  return new ApiError(
+    'Não foi possível conectar à API externa. Verifique NEXT_PUBLIC_EXTERNAL_API_BASE_URL e a conexão de rede.',
+    503,
+    { network: true }
+  )
+}
+
 /**
  * Cliente HTTP para comunicação com APIs externas
  */
@@ -166,7 +187,9 @@ export class ApiClient {
         }
         // Se foi abortado por signal externo, re-lançar o erro original
       }
-      // Re-lançar outros erros
+      const networkError = mensagemErroRede(error)
+      if (networkError) throw networkError
+
       throw error
     }
   }

@@ -1,11 +1,11 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader } from '@/src/presentation/components/ui/dialog'
 import { Button } from '@/src/presentation/components/ui/button'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { useHistoricoNcm } from '@/src/presentation/hooks/painel-contador/useHistoricoNcm'
 
 interface ConfiguracaoImpostoNcmHistorico {
   id: string
@@ -61,94 +61,27 @@ export function HistoricoConfiguracaoNcmModal({
   onClose,
   codigoNcm,
 }: HistoricoConfiguracaoNcmModalProps) {
-  const { auth } = useAuthStore()
-  const [isLoading, setIsLoading] = useState(false)
-  const [historico, setHistorico] = useState<ConfiguracaoImpostoNcmHistorico[]>([])
+  const historicoQuery = useHistoricoNcm(open ? codigoNcm : null)
+  const isLoading = historicoQuery.isLoading
+  const historico = (historicoQuery.data ?? []) as unknown as ConfiguracaoImpostoNcmHistorico[]
   /** Mobile: detalhes do card expandidos por id do registro */
   const [mobileExpandidoPorId, setMobileExpandidoPorId] = useState<Record<string, boolean>>({})
 
-  // Ref para armazenar o AbortController e cancelar requisições pendentes
-  const abortControllerRef = useRef<AbortController | null>(null)
-
-  // Memoizar loadHistorico para evitar recriações desnecessárias
-  const loadHistorico = useCallback(async () => {
-    // Cancelar requisição anterior se existir
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
+  useEffect(() => {
+    if (historicoQuery.isError) {
+      const message =
+        historicoQuery.error instanceof Error
+          ? historicoQuery.error.message
+          : 'Erro ao carregar histórico'
+      showToast.error(message)
     }
-
-    // Criar novo AbortController para esta requisição
-    const abortController = new AbortController()
-    abortControllerRef.current = abortController
-
-    const token = auth?.getAccessToken()
-    if (!token) return
-
-    setIsLoading(true)
-    try {
-      const response = await fetch(`/api/v1/fiscal/configuracoes/ncms/${codigoNcm}/impostos/historico`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        signal: abortController.signal, // Adicionar signal para permitir cancelamento
-      })
-
-      // Verificar se foi cancelado
-      if (abortController.signal.aborted) {
-        return
-      }
-
-      // Se for 404, trata como "sem histórico" (caso válido para NCM novo)
-      if (response.status === 404) {
-        if (!abortController.signal.aborted) {
-          setHistorico([])
-        }
-        return
-      }
-
-      if (!response.ok) {
-        throw new Error('Erro ao carregar histórico')
-      }
-
-      const data = await response.json()
-      
-      // Verificar novamente se foi cancelado antes de atualizar estado
-      if (!abortController.signal.aborted) {
-        setHistorico(data || [])
-      }
-    } catch (error: any) {
-      // Ignorar erros de cancelamento (AbortError)
-      if (error.name === 'AbortError' || abortController.signal.aborted) {
-        return
-      }
-      console.error('Erro ao carregar histórico:', error)
-      showToast.error(error.message || 'Erro ao carregar histórico')
-    } finally {
-      // Só atualizar loading se não foi cancelado
-      if (!abortController.signal.aborted) {
-        setIsLoading(false)
-      }
-    }
-  }, [auth, codigoNcm])
+  }, [historicoQuery.isError, historicoQuery.error])
 
   useEffect(() => {
-    if (open && codigoNcm) {
-      loadHistorico()
-    } else {
-      // Limpar estado quando o modal fechar
-      setHistorico([])
-      setIsLoading(false)
+    if (!open) {
       setMobileExpandidoPorId({})
     }
-
-    // Cleanup: cancelar requisições pendentes quando o componente desmontar ou o modal fechar
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort()
-        abortControllerRef.current = null
-      }
-    }
-  }, [open, codigoNcm, loadHistorico])
+  }, [open])
 
   const formatarData = (data: string) => {
     try {

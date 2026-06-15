@@ -24,8 +24,7 @@ export const SESSION_STORAGE_TENANT_TOKEN = 'jiffy:tenant-token'
 export const SESSION_STORAGE_SESSION_NONCE = 'jiffy:session-nonce'
 
 /**
- * Slug cosmético da empresa exibido na URL (ex: `nexsyn-ab12cd34`).
- * Gravado ao consumir sessão; lido por `useEmpresaUrlSync` para manter
- * `?slug` em toda navegação interna do ERP.
+ * Slug da empresa na URL (ex: `nexsyn-ab12cd34` em `/gestao/nexsyn-ab12cd34/dashboard`).
+ * Gravado ao consumir sessão; lido por `useEmpresaUrlSync` para manter o path.
  */
 export const SESSION_STORAGE_EMPRESA_SLUG = 'jiffy:empresa-slug'

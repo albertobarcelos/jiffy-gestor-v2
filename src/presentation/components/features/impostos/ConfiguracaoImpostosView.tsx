@@ -91,7 +91,7 @@ export function ConfiguracaoImpostosView() {
 
   const handleClose = () => {
     // Volta para a aba do Portal do Contador
-    setActiveTab('painel-contador')
+    setActiveTab('portal-contador')
   }
 
   return (

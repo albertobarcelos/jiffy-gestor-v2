@@ -12,6 +12,15 @@ if (fs.existsSync(envPath)) {
   if (portMatch) {
     port = parseInt(portMatch[1], 10)
   }
+
+  const tlsSkipMatch = envContent.match(/^API_TLS_SKIP_VERIFY=(.+)$/m)
+  if (tlsSkipMatch && tlsSkipMatch[1].trim().toLowerCase() === 'true') {
+    process.env.API_TLS_SKIP_VERIFY = 'true'
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+    console.warn(
+      '⚠️  API_TLS_SKIP_VERIFY=true: verificação TLS desabilitada (somente desenvolvimento local).'
+    )
+  }
 }
 
 // Verifica se há porta passada como argumento (tem prioridade)
@@ -27,6 +36,7 @@ console.log(`🚀 Iniciando servidor Next.js na porta ${port}...`)
 const nextProcess = spawn('npx', ['next', 'dev', '-p', port.toString()], {
   stdio: 'inherit',
   shell: true,
+  env: { ...process.env },
 })
 
 nextProcess.on('error', (error) => {

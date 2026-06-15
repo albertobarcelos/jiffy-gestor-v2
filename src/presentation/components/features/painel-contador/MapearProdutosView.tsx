@@ -1,8 +1,8 @@
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { showToast } from '@/src/shared/utils/toast'
+import { useConfiguracoesNcm } from '@/src/presentation/hooks/painel-contador/useConfiguracoesNcm'
+import { ConfiguracaoNcmImpostos } from '@/src/domain/entities/painel-contador/ConfiguracaoNcmImpostos'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { ConfigurarNcmModal } from './ConfigurarNcmModal'
 import { HistoricoConfiguracaoNcmModal } from './HistoricoConfiguracaoNcmModal'
@@ -64,106 +64,39 @@ function mapNcmToConfiguracaoImposto(item: unknown): ConfiguracaoImpostoNcm | nu
   }
 }
 
+function entityToViewConfig(entity: ConfiguracaoNcmImpostos): ConfiguracaoImpostoNcm {
+  return {
+    ncm: { codigo: entity.codigo, descricao: entity.descricao },
+    cfop: entity.impostos.cfop,
+    csosn: entity.impostos.csosn,
+    icms: entity.impostos.icms,
+    pis: entity.impostos.pis,
+    cofins: entity.impostos.cofins,
+  }
+}
+
 export function MapearProdutosView() {
-  const { auth, isRehydrated } = useAuthStore()
-  const [configuracoesImpostos, setConfiguracoesImpostos] = useState<ConfiguracaoImpostoNcm[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const { ncmsQuery } = useConfiguracoesNcm()
+  const configuracoesImpostos: ConfiguracaoImpostoNcm[] =
+    ncmsQuery.data?.ncms.map(entityToViewConfig) ?? []
+  const isLoading = ncmsQuery.isLoading
+  const regimeTributario = ncmsQuery.data?.regimeTributario ?? null
   const [selectedConfig, setSelectedConfig] = useState<ConfiguracaoImpostoNcm | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [showHistoricoModal, setShowHistoricoModal] = useState(false)
   const [showCopiarModal, setShowCopiarModal] = useState(false)
   const [ncmSelecionado, setNcmSelecionado] = useState<string | null>(null)
-  const [regimeTributario, setRegimeTributario] = useState<number | null>(null)
   /** Mobile: linhas expandidas na lista em cards (chave = código NCM ou índice) */
   const [ncmExpandidoMobile, setNcmExpandidoMobile] = useState<Record<string, boolean>>({})
   /** Mobile: duplo toque na área do NCM para abrir o modal (onDoubleClick nem sempre dispara bem no touch) */
   const ultimoToqueNcmMobileRef = useRef<{ ncm: string; timestamp: number } | null>(null)
 
-  // Buscar regime tributário da empresa
-  useEffect(() => {
-    // Aguardar reidratação do Zustand antes de fazer requisições
-    if (!isRehydrated) return
-    
-    const loadRegimeTributario = async () => {
-      const token = auth?.getAccessToken()
-      if (!token) return
+  const isSimplesNacional =
+    ncmsQuery.data?.isSimplesNacional ??
+    (regimeTributario === null || regimeTributario === 1 || regimeTributario === 2)
 
-      try {
-        const response = await fetch('/api/v1/fiscal/empresas-fiscais/me', {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-
-        if (response.ok) {
-          const config = await response.json()
-          const codigoRegime = config?.codigoRegimeTributario
-          const regimeNumero =
-            typeof codigoRegime === 'string'
-              ? parseInt(codigoRegime, 10)
-              : codigoRegime
-
-          if (regimeNumero === 1 || regimeNumero === 2 || regimeNumero === 3) {
-            setRegimeTributario(regimeNumero)
-          } else {
-            setRegimeTributario(1) // Default: Simples Nacional
-          }
-        } else {
-          setRegimeTributario(1) // Default: Simples Nacional
-        }
-      } catch (error) {
-        console.error('Erro ao buscar regime tributário:', error)
-        setRegimeTributario(1) // Default: Simples Nacional
-      }
-    }
-
-    loadRegimeTributario()
-  }, [auth, isRehydrated])
-
-  // Determinar se é Simples Nacional (1 ou 2) ou Regime Normal (3)
-  // Se regimeTributario for null, assume Simples Nacional por padrão
-  const isSimplesNacional = regimeTributario === null || regimeTributario === 1 || regimeTributario === 2
-
-  useEffect(() => {
-    // Aguardar reidratação do Zustand antes de fazer requisições
-    if (!isRehydrated) return
-    loadConfiguracoesImpostos()
-  }, [isRehydrated])
-
-  const loadConfiguracoesImpostos = async () => {
-    // Não mostrar toast se ainda não reidratou - pode ser apenas o estado inicial
-    if (!isRehydrated) return
-    
-    const token = auth?.getAccessToken()
-    if (!token) {
-      // Só mostrar toast se realmente não houver token após reidratação
-      return
-    }
-
-    setIsLoading(true)
-    try {
-      const response = await fetch('/api/v1/fiscal/configuracoes/ncms?page=0&size=1000', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || 'Erro ao carregar configurações de impostos')
-      }
-
-      const result = await response.json()
-      const content: unknown[] = Array.isArray(result?.content) ? result.content : []
-      const configuracoes = content
-        .map(mapNcmToConfiguracaoImposto)
-        .filter((item: ConfiguracaoImpostoNcm | null): item is ConfiguracaoImpostoNcm => item !== null)
-
-      setConfiguracoesImpostos(configuracoes)
-    } catch (error: any) {
-      console.error('Erro ao carregar configurações:', error)
-      showToast.error(error.message || 'Erro ao carregar configurações de impostos')
-    } finally {
-      setIsLoading(false)
-    }
+  const loadConfiguracoesImpostos = () => {
+    void ncmsQuery.refetch()
   }
 
   const handleDoubleClick = (config: ConfiguracaoImpostoNcm) => {
