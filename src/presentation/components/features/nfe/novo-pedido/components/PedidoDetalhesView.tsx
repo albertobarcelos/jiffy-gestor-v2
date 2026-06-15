@@ -54,6 +54,7 @@ export function PedidoDetalhesView() {
     pagamentos,
     pagamentosVisiveisNaAbaDetalhes,
     produtos,
+    observacaoPedido,
     removerPagamento,
     rotuloModeloNfe,
     rotuloStatusResumoModal,
@@ -376,7 +377,7 @@ export function PedidoDetalhesView() {
                                     <div key={index} className="space-y-0">
                                       {/* Linha do Produto Principal */}
                                       <div
-                                        className={`flex items-center gap-1 rounded ${
+                                        className={`flex items-start gap-1 rounded ${
                                           index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
                                         } cursor-pointer`}
                                         onDoubleClick={() =>
@@ -395,6 +396,11 @@ export function PedidoDetalhesView() {
                                           <span className="block truncate text-xs text-gray-900">
                                             {produto.nome}
                                           </span>
+                                          {produto.observacao?.trim() ? (
+                                            <span className="block truncate text-[11px] leading-tight text-gray-500">
+                                              Obs: {produto.observacao.trim()}
+                                            </span>
+                                          ) : null}
                                         </div>
                                         {/* Desconto/Acréscimo */}
                                         <div className="flex-1">
@@ -417,7 +423,6 @@ export function PedidoDetalhesView() {
                                         </div>
                                       </div>
 
-                                      {/* Linhas dos Complementos */}
                                       {produto.complementos.map((complemento: any, compIndex: number) => {
                                         const compKey = `comp-${index}-${complemento.grupoId}-${complemento.id}`
 
@@ -480,6 +485,18 @@ export function PedidoDetalhesView() {
                                   )
                                 })}
                               </div>
+                              {(observacaoPedido.trim() ||
+                                detalhesEntregaPedido?.observacaoPedido?.trim()) && (
+                                <div className="mt-2 border-t border-gray-200 px-1 pt-2">
+                                  <p className="text-[11px] font-semibold text-gray-700">
+                                    Observação do pedido
+                                  </p>
+                                  <p className="text-[11px] leading-snug text-gray-600">
+                                    {observacaoPedido.trim() ||
+                                      detalhesEntregaPedido?.observacaoPedido?.trim()}
+                                  </p>
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <div className="flex items-center justify-center py-4">

@@ -1,4 +1,5 @@
 import { pagamentoEstaCancelado } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
+import { textoFromObservacoesApi } from '@/src/shared/helpers/observacaoPedido'
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
 import type {
   DetalhesEntregaPedido,
@@ -48,10 +49,14 @@ export function mapDetalhesEntregaFromVendaApi(vendaData: Record<string, unknown
       clienteNested?.cpfCnpj != null ? String(clienteNested.cpfCnpj).trim() || null : null,
     clienteCelular: null,
     enderecoEntrega: mapEnderecoEntrega(vendaData.enderecoEntrega),
-    observacaoPedido:
-      vendaData.observacaoPedido != null
-        ? String(vendaData.observacaoPedido).trim() || null
-        : null,
+    observacaoPedido: (() => {
+      const fromArray = textoFromObservacoesApi(vendaData.observacoes)
+      if (fromArray) return fromArray
+      if (vendaData.observacaoPedido != null) {
+        return String(vendaData.observacaoPedido).trim() || null
+      }
+      return null
+    })(),
     previsaoEntrega:
       vendaData.previsaoEntrega != null
         ? String(vendaData.previsaoEntrega)

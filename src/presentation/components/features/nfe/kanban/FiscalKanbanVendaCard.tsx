@@ -1,7 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { MdArrowForward, MdDeliveryDining, MdEdit, MdPrint, MdVisibility } from 'react-icons/md'
+import Tooltip from '@mui/material/Tooltip'
+import {
+  MdArrowForward,
+  MdDeliveryDining,
+  MdEdit,
+  MdEditNote,
+  MdPrint,
+  MdVisibility,
+} from 'react-icons/md'
 import { Button } from '@/src/presentation/components/ui/button'
 import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
@@ -12,6 +20,7 @@ import { DraggableVendaCard } from './DraggableVendaCard'
 import { KanbanCardAcaoButton } from './KanbanCardAcaoButton'
 import { PedidoEntregaQuickViewPopover } from './PedidoEntregaQuickViewPopover'
 import { AtribuirEntregadorKanbanPainel } from './AtribuirEntregadorKanbanPainel'
+import { ObservacaoPedidoKanbanPainel } from './ObservacaoPedidoKanbanPainel'
 import type { ColunaKanbanId, KanbanColumn, Venda } from './types'
 import {
   COLUNAS_ENTREGA_OPERACIONAIS,
@@ -26,6 +35,7 @@ import {
 } from './fiscalFlowKanban.rules'
 
 const KANBAN_BUTTON_COLOR = '#530CA3'
+const TOOLTIP_VER_DETALHES_PEDIDO = 'Clique para ver os detalhes do pedido'
 
 interface FiscalKanbanVendaCardProps {
   venda: Venda
@@ -62,6 +72,7 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
   } = props
   const [entregaQuickViewAnchor, setEntregaQuickViewAnchor] = useState<HTMLElement | null>(null)
   const [atribuirEntregadorOpen, setAtribuirEntregadorOpen] = useState(false)
+  const [observacaoPedidoOpen, setObservacaoPedidoOpen] = useState(false)
   const valorFormatado = transformarParaReal(venda.valorFinal)
   const clienteNome = venda.cliente?.nome?.trim() ? venda.cliente.nome : LABEL_SEM_CLIENTE
 
@@ -131,17 +142,35 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
     COLUNAS_ENTREGA_OPERACIONAIS.includes(colunaAtual)
   const entregadorJaVinculado = Boolean(entregadorVinculadoId?.trim())
   const quickViewAberto = Boolean(entregaQuickViewAnchor)
-  const bloquearDragCard = quickViewAberto || atribuirEntregadorOpen
+  const bloquearDragCard = quickViewAberto || atribuirEntregadorOpen || observacaoPedidoOpen
+
+  const botaoObservacaoPedido = (
+    <Tooltip title="Adicionar observação ao pedido">
+      <button
+        type="button"
+        onClick={e => {
+          e.stopPropagation()
+          setObservacaoPedidoOpen(true)
+        }}
+        onDoubleClick={e => e.stopPropagation()}
+        className="flex shrink-0 items-center gap-1 rounded border border-gray-300 bg-white px-1.5 py-0.5 text-gray-600 transition-colors hover:border-primary hover:text-primary"
+        aria-label="Adicionar observação ao pedido"
+      >
+        <MdEditNote className="h-3.5 w-3.5 shrink-0" />
+        <span className="text-[10px] font-medium leading-none">Observação</span>
+      </button>
+    </Tooltip>
+  )
 
   return (
     <DraggableVendaCard venda={venda} column={column} dragDisabled={bloquearDragCard}>
       <div
         className={`relative rounded-lg border-l-4 ${cardBorderClass} ${cardBgClass} cursor-pointer border border-gray-200/80 p-3 transition-all hover:shadow-md`}
-        title="Clique para ver os detalhes do pedido"
         onClick={() => onViewDetails(venda)}
         onDoubleClick={() => onViewDetails(venda)}
       >
-        <div className={`mb-2 flex gap-2 ${podeEditarClienteNaVenda ? 'pr-1' : ''}`}>
+        <Tooltip title={TOOLTIP_VER_DETALHES_PEDIDO}>
+          <div className={`mb-2 flex gap-2 ${podeEditarClienteNaVenda ? 'pr-1' : ''}`}>
           <div className="min-w-0 flex-1 border-b border-gray-100 pb-1.5">
             <p className="mb-0.5 text-xs text-gray-500">
               {prefixoLinhaOrigemCard} | Venda {venda.numeroVenda}
@@ -208,6 +237,7 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
               </div>
             )}
         </div>
+        </Tooltip>
 
         <div className="space-y-0.5">
           {(() => {
@@ -218,15 +248,25 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
             )
             if (!linhaTempo) return null
             return (
-              <p className="text-xs text-gray-500">
-                {linhaTempo.prefixo} {formatarDataCard(linhaTempo.iso)}
-              </p>
+              <div className="flex items-center justify-between gap-1">
+                <Tooltip title={TOOLTIP_VER_DETALHES_PEDIDO}>
+                  <span className="text-xs text-gray-500">
+                    {linhaTempo.prefixo} {formatarDataCard(linhaTempo.iso)}
+                  </span>
+                </Tooltip>
+                {!venda.dataFinalizacao ? botaoObservacaoPedido : null}
+              </div>
             )
           })()}
           {venda.dataFinalizacao && (
-            <p className="text-xs text-gray-500">
-              Finalizada: {formatarDataCard(venda.dataFinalizacao)}
-            </p>
+            <div className="flex items-center justify-between gap-1">
+              <Tooltip title={TOOLTIP_VER_DETALHES_PEDIDO}>
+                <span className="text-xs text-gray-500">
+                  Finalizada: {formatarDataCard(venda.dataFinalizacao)}
+                </span>
+              </Tooltip>
+              {botaoObservacaoPedido}
+            </div>
           )}
         </div>
 
@@ -388,6 +428,12 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
           }}
         />
       )}
+
+      <ObservacaoPedidoKanbanPainel
+        open={observacaoPedidoOpen}
+        venda={venda}
+        onClose={() => setObservacaoPedidoOpen(false)}
+      />
 
       {exibirQuickViewEntrega && (
         <PedidoEntregaQuickViewPopover

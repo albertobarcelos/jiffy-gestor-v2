@@ -4,6 +4,7 @@ import {
 } from '@/src/application/mappers/VendaApiNormalizer'
 import type { ComplementoSelecionado, ProdutoSelecionado } from '@/src/domain/types/pedido'
 import type { ResumoFinanceiroDetalhes } from '@/src/domain/types/vendaDetalhe'
+import { textoObservacaoProdutoApi } from '@/src/shared/helpers/observacaoPedido'
 
 function mapComplementoRaw(comp: Record<string, unknown>): ComplementoSelecionado {
   return {
@@ -108,6 +109,7 @@ export function mapProdutoDetalheVenda(prod: Record<string, unknown>): ProdutoSe
     dataLancamento: prod.dataLancamento != null ? String(prod.dataLancamento) : undefined,
     dataRemocao: prod.dataRemocao != null ? String(prod.dataRemocao) : undefined,
     ncm: prod.ncm != null ? String(prod.ncm) : undefined,
+    observacao: textoObservacaoProdutoApi(prod) || undefined,
   }
 }
 

@@ -37,6 +37,7 @@ export interface AplicarVendaDetalheHandlers {
   setFluxoPagamentoEntrega: (fluxo: FluxoPagamentoEntrega) => void
   setNomesUsuariosPedido: (map: Record<string, string>) => void
   setNomesMeiosPagamentoPedido: (map: Record<string, string>) => void
+  setObservacaoPedido: (observacao: string) => void
   setCurrentStep: (step: 1 | 2 | 3 | 4) => void
 }
 
@@ -79,6 +80,7 @@ export function aplicarVendaDetalheCarregada(
   handlers.setFluxoPagamentoEntrega(dto.fluxoPagamentoEntrega)
   handlers.setNomesUsuariosPedido(dto.nomesUsuariosPedido)
   handlers.setNomesMeiosPagamentoPedido(dto.nomesMeiosPagamentoPedido)
+  handlers.setObservacaoPedido(dto.observacaoPedido?.trim() || '')
 
   if (dto.irParaStep4) {
     handlers.setCurrentStep(4)

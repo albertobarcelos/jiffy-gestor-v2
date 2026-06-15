@@ -17,6 +17,7 @@ import {
   resolveStatusFiscal,
 } from '@/src/application/mappers/VendaApiNormalizer'
 import type { VendaGestorApiResponse } from '@/src/application/dto/api/vendaGestorApi'
+import { textoFromObservacoesApi } from '@/src/shared/helpers/observacaoPedido'
 import type { IVendaDetalheReadRepository } from '@/src/domain/repositories/IVendaDetalheReadRepository'
 import { vendaDetalheReadRepository } from '@/src/infrastructure/api/repositories/VendaDetalheReadRepository'
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
@@ -412,6 +413,17 @@ export class CarregarVendaDetalheUseCase {
 
     const statusFiscal = resolveStatusFiscal(vendaData)
 
+    const observacaoPedidoCarregada = (() => {
+      const fromEntrega = detalhesEntregaPedido?.observacaoPedido?.trim()
+      if (fromEntrega) return fromEntrega
+      const fromArray = textoFromObservacoesApi(vendaData.observacoes)
+      if (fromArray) return fromArray
+      if (vendaData.observacaoPedido != null) {
+        return String(vendaData.observacaoPedido).trim() || null
+      }
+      return null
+    })()
+
     return {
       origem,
       status,
@@ -431,6 +443,7 @@ export class CarregarVendaDetalheUseCase {
       valorFinalVenda,
       dataFinalizacaoCarregada,
       vendaGestorJaCancelada,
+      observacaoPedido: observacaoPedidoCarregada,
       irParaStep4: Boolean(modoVisualizacao),
     }
   }

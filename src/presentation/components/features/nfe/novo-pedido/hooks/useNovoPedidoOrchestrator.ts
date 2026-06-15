@@ -412,6 +412,7 @@ export function useNovoPedidoOrchestrator({
       setFluxoPagamentoEntrega,
       setNomesUsuariosPedido,
       setNomesMeiosPagamentoPedido,
+      setObservacaoPedido,
       setCurrentStep,
     },
   })

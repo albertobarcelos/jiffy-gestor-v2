@@ -45,7 +45,35 @@ export function invalidateVendaDetalheCarregadaCache(
 ) {
   return queryClient.invalidateQueries({
     queryKey: ['tenant', empresaId, 'venda-detalhe-carregada', vendaId],
+    /** Modal fechado = query inativa; sem isso o cache antigo persiste (refetchOnMount global é false). */
+    refetchType: 'all',
   })
+}
+
+/** Atualiza observação no cache do detalhe sem esperar refetch (Kanban PATCH observação). */
+export function patchVendaDetalheObservacaoPedidoCache(
+  queryClient: QueryClient,
+  empresaId: string | null,
+  vendaId: string,
+  observacao: string
+) {
+  const texto = observacao.trim()
+  queryClient.setQueriesData<VendaDetalheCarregadaDTO>(
+    { queryKey: ['tenant', empresaId, 'venda-detalhe-carregada', vendaId] },
+    atual => {
+      if (!atual) return atual
+      return {
+        ...atual,
+        observacaoPedido: texto || null,
+        detalhesEntregaPedido: atual.detalhesEntregaPedido
+          ? {
+              ...atual.detalhesEntregaPedido,
+              observacaoPedido: texto || null,
+            }
+          : atual.detalhesEntregaPedido,
+      }
+    }
+  )
 }
 
 const useCase = new CarregarVendaDetalheUseCase()
@@ -80,6 +108,8 @@ export function useVendaDetalheCarregadaQuery({
     staleTime: STALE_TIME_MS,
     gcTime: GC_TIME_MS,
     refetchOnWindowFocus: false,
+    /** Garante GET fresco ao reabrir o modal após invalidate (global refetchOnMount é false). */
+    refetchOnMount: true,
     retry: 1,
   })
 }

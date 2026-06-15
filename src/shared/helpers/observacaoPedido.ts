@@ -20,12 +20,42 @@ export function observacoesArrayFromTexto(texto: string | undefined | null): str
 }
 
 export function textoFromObservacoesApi(observacoes: unknown): string {
-  if (!Array.isArray(observacoes) || observacoes.length === 0) return ''
-  const first = observacoes[0]
-  if (typeof first === 'string') return first.trim()
-  if (first && typeof first === 'object' && 'observacao' in first) {
-    return String((first as { observacao?: string }).observacao ?? '').trim()
+  if (!observacoes) return ''
+
+  if (!Array.isArray(observacoes)) {
+    if (typeof observacoes === 'string') return observacoes.trim()
+    if (typeof observacoes === 'object' && 'observacao' in observacoes) {
+      return String((observacoes as { observacao?: string }).observacao ?? '').trim()
+    }
+    return ''
   }
+
+  if (observacoes.length === 0) return ''
+
+  const textos = observacoes
+    .map(item => {
+      if (typeof item === 'string') return item.trim()
+      if (item && typeof item === 'object' && 'observacao' in item) {
+        return String((item as { observacao?: string }).observacao ?? '').trim()
+      }
+      return ''
+    })
+    .filter(Boolean)
+
+  return textos.join(' · ')
+}
+
+export function textoObservacaoProdutoApi(prod: Record<string, unknown>): string {
+  const fromObservacoes = textoFromObservacoesApi(prod.observacoes)
+  if (fromObservacoes) return fromObservacoes
+
+  const fromObservacoesLancadas = textoFromObservacoesApi(prod.observacoesLancadas)
+  if (fromObservacoesLancadas) return fromObservacoesLancadas
+
+  if (prod.observacao != null) {
+    return String(prod.observacao).trim()
+  }
+
   return ''
 }
 
