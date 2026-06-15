@@ -21,6 +21,7 @@ export function useNovoPedidoFormState(tipoInicioPedido: 'balcao' | 'entrega') {
   const [clienteId, setClienteId] = useState<string>('')
   const [clienteNome, setClienteNome] = useState<string>('')
   const [produtos, setProdutos] = useState<ProdutoSelecionado[]>([])
+  const [observacaoPedido, setObservacaoPedido] = useState<string>('')
   const { catalogoProdutosPorId, setCatalogoProdutosPorId } = useNovoPedidoCatalogo()
   const [pagamentos, setPagamentos] = useState<PagamentoSelecionado[]>([])
   const [meioPagamentoId, setMeioPagamentoId] = useState<string>('')
@@ -78,6 +79,8 @@ export function useNovoPedidoFormState(tipoInicioPedido: 'balcao' | 'entrega') {
     setClienteNome,
     produtos,
     setProdutos,
+    observacaoPedido,
+    setObservacaoPedido,
     catalogoProdutosPorId,
     setCatalogoProdutosPorId,
     pagamentos,

@@ -16,6 +16,7 @@ export type CreateNovoPedidoResetFormParams = {
   setModalLancamentoProdutoPainelOpen: (open: boolean) => void
   setProdutoParaLancamentoPainel: (produto: Produto | null) => void
   setIndiceLinhaPainelProduto: (index: number | null) => void
+  setPainelLinhaModo: (modo: import('../../../ModalLancamentoProdutoPainel').ModalLancamentoProdutoPainelModo) => void
   setModalEdicaoProdutoOpen: (open: boolean) => void
   setProdutoIndexEdicao: (index: number | null) => void
   setQuantidadeEdicao: (q: number) => void
@@ -36,6 +37,7 @@ export function createNovoPedidoResetForm({
   setModalLancamentoProdutoPainelOpen,
   setProdutoParaLancamentoPainel,
   setIndiceLinhaPainelProduto,
+  setPainelLinhaModo,
   setModalEdicaoProdutoOpen,
   setProdutoIndexEdicao,
   setQuantidadeEdicao,
@@ -62,6 +64,7 @@ export function createNovoPedidoResetForm({
     form.setClienteEntregaVinculado(null)
     setClienteTabsModalEntregaState({ open: false, tab: 'cliente', mode: 'edit' })
     form.setProdutos([])
+    form.setObservacaoPedido('')
     form.setPagamentos([])
     form.setMeioPagamentoId('')
     form.setValorRecebido('')
@@ -72,6 +75,7 @@ export function createNovoPedidoResetForm({
     setModalLancamentoProdutoPainelOpen(false)
     setProdutoParaLancamentoPainel(null)
     setIndiceLinhaPainelProduto(null)
+    setPainelLinhaModo('lancamento')
     setModalEdicaoProdutoOpen(false)
     setProdutoIndexEdicao(null)
     setQuantidadeEdicao(1)

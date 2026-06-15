@@ -2,6 +2,7 @@ import type { CriarVendaGestorApiRequest } from '@/src/application/dto/api/venda
 import type { CriarVendaGestorInputDTO } from '@/src/application/dto/CriarVendaGestorDTO'
 import { calcularTotalProduto } from '@/src/domain/services/pedido/CalculadoraPedido'
 import type { PagamentoSelecionado, ProdutoSelecionado } from '@/src/domain/types/pedido'
+import { observacoesArrayFromTexto } from '@/src/shared/helpers/observacaoPedido'
 
 export function mapProdutosLancadosPayload(produtos: ProdutoSelecionado[]) {
   return produtos.map(p => {
@@ -19,6 +20,8 @@ export function mapProdutosLancadosPayload(produtos: ProdutoSelecionado[]) {
 
     const valorFinalProduto = calcularTotalProduto(p)
 
+    const observacoes = observacoesArrayFromTexto(p.observacao)
+
     return {
       produtoId: p.produtoId,
       quantidade: p.quantidade,
@@ -28,6 +31,7 @@ export function mapProdutosLancadosPayload(produtos: ProdutoSelecionado[]) {
       valorDesconto: valorDescontoFinal,
       tipoAcrescimo: p.tipoAcrescimo || null,
       valorAcrescimo: valorAcrescimoFinal,
+      ...(observacoes ? { observacoes } : {}),
       complementos: (p.complementos || []).map(comp => ({
         complementoId: comp.id,
         grupoComplementoId: comp.grupoId,
@@ -122,6 +126,11 @@ export function buildCriarVendaGestorPayload(input: CriarVendaGestorInputDTO): C
       : input.clienteId
   if (clienteIdParaVenda) {
     vendaData.clienteId = clienteIdParaVenda
+  }
+
+  const observacoesPedido = observacoesArrayFromTexto(input.observacaoPedido)
+  if (observacoesPedido) {
+    vendaData.observacoes = observacoesPedido
   }
 
   if (input.pedidoComEntrega && input.moradaEntregaSelecionada?.endereco) {

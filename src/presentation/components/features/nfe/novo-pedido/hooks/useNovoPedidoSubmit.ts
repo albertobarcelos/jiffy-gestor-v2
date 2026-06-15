@@ -10,6 +10,7 @@ import {
 } from '@/src/application/use-cases/vendas/CriarVendaGestorUseCase'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { showToast } from '@/src/shared/utils/toast'
+import { validarObservacoesPedido } from '@/src/shared/helpers/observacaoPedido'
 
 export { validarInformacoesPedido }
 
@@ -70,7 +71,6 @@ export interface UseNovoPedidoSubmitParams {
   setVendaIdCriada: (id: string | null) => void
   status: CriarVendaGestorInputDTO['status']
   tipoInicioPedido: CriarVendaGestorInputDTO['tipoInicioPedido']
-  finalizarVendaGestor?: { mutateAsync: (params: { id: string }) => Promise<unknown> }
   processarAposTransicaoVendaGestorId?: (
     id: string,
     acao: 'iniciar_preparo'
@@ -92,7 +92,6 @@ export function useNovoPedidoSubmit({
   setVendaIdCriada,
   status,
   tipoInicioPedido,
-  finalizarVendaGestor,
   processarAposTransicaoVendaGestorId,
   preferenciasAutoIniciarPreparo,
 }: UseNovoPedidoSubmitParams) {
@@ -100,6 +99,15 @@ export function useNovoPedidoSubmit({
 
   const handleSubmit = useCallback(async () => {
     if (isPending) return
+
+    const validacaoObservacoes = validarObservacoesPedido({
+      observacaoPedido: input.observacaoPedido,
+      produtos: input.produtos,
+    })
+    if (!validacaoObservacoes.ok) {
+      showToast.error(validacaoObservacoes.message)
+      return
+    }
 
     const validacaoResult = validarCriarVendaGestor({
       produtosCount: input.produtos.length,
@@ -158,14 +166,6 @@ export function useNovoPedidoSubmit({
       if (idCriado) {
         setVendaIdCriada(idCriado)
 
-        if (status === 'FINALIZADA' || status === 'PENDENTE_EMISSAO') {
-          try {
-            await finalizarVendaGestor?.mutateAsync({ id: idCriado })
-          } catch {
-            // Falha silenciosa: a venda foi criada e a lista será atualizada pelo fluxo de sucesso.
-          }
-        }
-
         if (
           tipoInicioPedido === 'entrega' &&
           status === 'ABERTA' &&
@@ -211,7 +211,6 @@ export function useNovoPedidoSubmit({
     setVendaIdCriada,
     status,
     tipoInicioPedido,
-    finalizarVendaGestor,
     processarAposTransicaoVendaGestorId,
     preferenciasAutoIniciarPreparo,
     setInternalDialogOpen,

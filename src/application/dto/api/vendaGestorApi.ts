@@ -86,6 +86,7 @@ export interface CriarVendaGestorApiRequest {
   dataFinalizacao?: string
   pagamentos?: unknown[]
   pagamento?: CriarVendaGestorPagamentoApi
+  observacoes?: string[]
 }
 
 export interface MoradaEntregaSelecionadaApi {

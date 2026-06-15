@@ -2,7 +2,7 @@
 
 import { useRef, useState, useCallback } from 'react'
 import type { Produto } from '@/src/domain/entities/Produto'
-import type { ModalLancamentoProdutoPainelConfirmPayload } from '../../../ModalLancamentoProdutoPainel'
+import type { ModalLancamentoProdutoPainelConfirmPayload, ModalLancamentoProdutoPainelModo } from '../../../ModalLancamentoProdutoPainel'
 import type { ComplementoSelecionado, ProdutoSelecionado } from '../../types'
 import { produtoPermiteAlterarPreco } from '../../produtoCatalogoHelpers'
 
@@ -32,6 +32,8 @@ export function useNovoPedidoProdutos({
     null
   )
   const [indiceLinhaPainelProduto, setIndiceLinhaPainelProduto] = useState<number | null>(null)
+  const [painelLinhaModo, setPainelLinhaModo] =
+    useState<ModalLancamentoProdutoPainelModo>('lancamento')
   const [carregandoComplementosPainel, setCarregandoComplementosPainel] = useState(false)
 
   const longPressTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -95,6 +97,7 @@ export function useNovoPedidoProdutos({
       }
 
       setIndiceLinhaPainelProduto(null)
+      setPainelLinhaModo('lancamento')
       setProdutoParaLancamentoPainel(produto)
       setModalLancamentoProdutoPainelOpen(true)
       garantirComplementosProdutoNoPainel(produtoId, produto)
@@ -109,11 +112,27 @@ export function useNovoPedidoProdutos({
   )
 
   const confirmarLancamentoProdutoPainel = useCallback(
-    ({ valorUnitario, complementos }: ModalLancamentoProdutoPainelConfirmPayload) => {
+    ({ valorUnitario, complementos, observacao }: ModalLancamentoProdutoPainelConfirmPayload) => {
       const produto = produtoParaLancamentoPainel
       if (!produto) return
 
       const idxLinha = indiceLinhaPainelProduto
+
+      if (painelLinhaModo === 'observacao' && idxLinha !== null) {
+        const trimmed = observacao?.trim()
+        setProdutos(prev => {
+          const novos = [...prev]
+          const atual = novos[idxLinha]
+          if (!atual) return prev
+          novos[idxLinha] = {
+            ...atual,
+            observacao: trimmed || undefined,
+          }
+          return novos
+        })
+        return
+      }
+
       const permiteAlterarPreco = produto.permiteAlterarPrecoAtivo()
       const valorUnitarioFinal = permiteAlterarPreco
         ? valorUnitario
@@ -177,6 +196,7 @@ export function useNovoPedidoProdutos({
     [
       produtoParaLancamentoPainel,
       indiceLinhaPainelProduto,
+      painelLinhaModo,
       produtos,
       setProdutos,
       setCatalogoProdutosPorId,
@@ -200,6 +220,7 @@ export function useNovoPedidoProdutos({
               return
             }
             setIndiceLinhaPainelProduto(index)
+            setPainelLinhaModo('complementos')
             setProdutoParaLancamentoPainel(produto)
             setModalLancamentoProdutoPainelOpen(true)
             garantirComplementosProdutoNoPainel(produtoSelecionado.produtoId, produto)
@@ -211,6 +232,7 @@ export function useNovoPedidoProdutos({
       }
 
       setIndiceLinhaPainelProduto(index)
+      setPainelLinhaModo('complementos')
       setProdutoParaLancamentoPainel(produtoCache)
       setModalLancamentoProdutoPainelOpen(true)
       garantirComplementosProdutoNoPainel(produtoSelecionado.produtoId, produtoCache)
@@ -221,6 +243,38 @@ export function useNovoPedidoProdutos({
       produtosList,
       carregarProdutoNoCatalogoSeNecessario,
       garantirComplementosProdutoNoPainel,
+    ]
+  )
+
+  const abrirModalObservacaoProduto = useCallback(
+    (index: number) => {
+      const produtoSelecionado = produtos[index]
+      if (!produtoSelecionado) return
+
+      const abrirComProduto = (produto: Produto) => {
+        setIndiceLinhaPainelProduto(index)
+        setPainelLinhaModo('observacao')
+        setProdutoParaLancamentoPainel(produto)
+        setModalLancamentoProdutoPainelOpen(true)
+      }
+
+      const produtoCache =
+        catalogoProdutosPorId[produtoSelecionado.produtoId] ??
+        produtosList.find(p => p.getId() === produtoSelecionado.produtoId)
+      if (produtoCache) {
+        abrirComProduto(produtoCache)
+        return
+      }
+
+      void carregarProdutoNoCatalogoSeNecessario(produtoSelecionado.produtoId).then(produto => {
+        if (produto) abrirComProduto(produto)
+      })
+    },
+    [
+      produtos,
+      catalogoProdutosPorId,
+      produtosList,
+      carregarProdutoNoCatalogoSeNecessario,
     ]
   )
 
@@ -316,6 +370,8 @@ export function useNovoPedidoProdutos({
     setProdutoParaLancamentoPainel,
     indiceLinhaPainelProduto,
     setIndiceLinhaPainelProduto,
+    painelLinhaModo,
+    setPainelLinhaModo,
     longPressTimeoutRef,
     longPressIndexRef,
     longPressComplementoTimeoutRef,
@@ -325,6 +381,7 @@ export function useNovoPedidoProdutos({
     adicionarProduto,
     confirmarLancamentoProdutoPainel,
     abrirModalComplementosProdutoExistente,
+    abrirModalObservacaoProduto,
     removerProduto,
     atualizarProduto,
     atualizarComplemento,

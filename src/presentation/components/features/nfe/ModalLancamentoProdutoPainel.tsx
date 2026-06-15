@@ -15,6 +15,7 @@ import type { TransitionProps } from '@mui/material/transitions'
 import { MdClose } from 'react-icons/md'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
+import { Textarea } from '@/src/presentation/components/ui/textarea'
 import {
   PainelPedidoBackdrop,
   footerBarPrimaryMutedSx,
@@ -22,6 +23,11 @@ import {
 } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { Produto } from '@/src/domain/entities/Produto'
 import { showToast } from '@/src/shared/utils/toast'
+import {
+  OBSERVACAO_PEDIDO_MAX_CHARS,
+  observacaoTextoParcialInvalido,
+  observacaoTextoValidoParaEnvio,
+} from '@/src/shared/helpers/observacaoPedido'
 
 const PANEL_MS = { enter: 420, exit: 380 } as const
 
@@ -79,7 +85,10 @@ export interface ComplementoLancamentoPainelPayload {
 export interface ModalLancamentoProdutoPainelConfirmPayload {
   valorUnitario: number
   complementos: ComplementoLancamentoPainelPayload[]
+  observacao?: string
 }
+
+export type ModalLancamentoProdutoPainelModo = 'lancamento' | 'complementos' | 'observacao'
 
 interface ModalLancamentoProdutoPainelProps {
   open: boolean
@@ -111,6 +120,9 @@ interface ModalLancamentoProdutoPainelProps {
    * Aplicadas só ao abrir o painel.
    */
   chavesComplementosIniciais?: string[]
+  /** Exibe textarea de observação do item (modo edição de linha). */
+  mostrarObservacao?: boolean
+  observacaoInicial?: string
 }
 
 function formatarNumeroComMilhar(valor: number): string {
@@ -181,10 +193,13 @@ export function ModalLancamentoProdutoPainel({
   tituloBarra = 'Lançar na venda',
   valorUnitarioInicial,
   chavesComplementosIniciais,
+  mostrarObservacao = false,
+  observacaoInicial,
 }: ModalLancamentoProdutoPainelProps) {
   const [internalOpen, setInternalOpen] = useState(open)
   const [valorInput, setValorInput] = useState('')
   const [chavesComplementos, setChavesComplementos] = useState<string[]>([])
+  const [observacaoInput, setObservacaoInput] = useState('')
   const painelJaAbertoRef = useRef(false)
 
   useEffect(() => {
@@ -212,7 +227,8 @@ export function ModalLancamentoProdutoPainel({
         : produto.getValor()
     setValorInput(formatarNumeroComMilhar(Number.isFinite(base) && base >= 0 ? base : 0))
     setChavesComplementos(chavesComplementosIniciais ?? [])
-  }, [open, produto, valorUnitarioInicial, chavesComplementosIniciais])
+    setObservacaoInput(observacaoInicial ?? '')
+  }, [open, produto, valorUnitarioInicial, chavesComplementosIniciais, observacaoInicial])
 
   const parseValorMoedaParaNumero = (texto: string): number | null => {
     const limpo = texto.replace(/\./g, '').replace(',', '.').trim()
@@ -223,6 +239,31 @@ export function ModalLancamentoProdutoPainel({
 
   const handleConfirmar = () => {
     if (!produto) return
+
+    if (mostrarObservacao) {
+      const trimmed = observacaoInput.trim()
+      if (trimmed && !observacaoTextoValidoParaEnvio(trimmed)) {
+        showToast.error('Observação do item deve ter entre 3 e 100 caracteres.')
+        return
+      }
+
+      let valorUnitario = produto.getValor()
+      if (
+        valorUnitarioInicial !== undefined &&
+        valorUnitarioInicial !== null &&
+        Number.isFinite(valorUnitarioInicial)
+      ) {
+        valorUnitario = valorUnitarioInicial
+      }
+
+      onConfirm({
+        valorUnitario,
+        complementos: [],
+        observacao: trimmed || undefined,
+      })
+      onOpenChange(false)
+      return
+    }
 
     let valorUnitario = produto.getValor()
     if (mostrarAlterarPreco) {
@@ -401,6 +442,28 @@ export function ModalLancamentoProdutoPainel({
               </div>
             ) : null}
 
+            {mostrarObservacao ? (
+              <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
+                <h3 className="font-nunito mb-2 text-base font-semibold text-primary">
+                  Observação do item
+                </h3>
+                <Textarea
+                  label="Observação"
+                  placeholder="Ex.: sem cebola, bem passado…"
+                  value={observacaoInput}
+                  onChange={e => setObservacaoInput(e.target.value)}
+                  inputProps={{ maxLength: OBSERVACAO_PEDIDO_MAX_CHARS }}
+                  error={observacaoTextoParcialInvalido(observacaoInput)}
+                  helperText={
+                    observacaoTextoParcialInvalido(observacaoInput)
+                      ? 'Mínimo 3 caracteres (ou deixe vazio).'
+                      : `${observacaoInput.length}/${OBSERVACAO_PEDIDO_MAX_CHARS} caracteres`
+                  }
+                  rows={4}
+                />
+              </div>
+            ) : null}
+
             {mostrarAvisoComplementosManual ? (
               <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
                 <h3 className="font-nunito mb-2 text-base font-semibold text-primary">Complementos</h3>
@@ -436,7 +499,10 @@ export function ModalLancamentoProdutoPainel({
                 variant="contained"
                 color="primary"
                 onClick={handleConfirmar}
-                disabled={mostrarComplementos && carregandoComplementos}
+                disabled={
+                  (mostrarComplementos && carregandoComplementos) ||
+                  (mostrarObservacao && observacaoTextoParcialInvalido(observacaoInput))
+                }
                 className="h-12 min-h-12 w-full font-semibold shadow-none"
                 sx={footerSavePrimaryBarSx(false)}
               >

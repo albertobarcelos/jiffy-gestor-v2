@@ -18,7 +18,7 @@ import type {
 } from '@/src/presentation/hooks/useVendas'
 import type { ProdutosTabsModalState } from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
 import type { ClientesTabsModalState } from '@/src/presentation/components/features/clientes/ClientesTabsModal'
-import type { ModalLancamentoProdutoPainelConfirmPayload } from '../../ModalLancamentoProdutoPainel'
+import type { ModalLancamentoProdutoPainelConfirmPayload, ModalLancamentoProdutoPainelModo } from '../../ModalLancamentoProdutoPainel'
 import type {
   AbaDetalhesPedido,
   ComplementoSelecionado,
@@ -70,6 +70,8 @@ export interface NovoPedidoFormSlice {
   valorFinalVenda: number | null
   setValorFinalVenda: Dispatch<SetStateAction<number | null>>
   dataVenda: string
+  observacaoPedido: string
+  setObservacaoPedido: Dispatch<SetStateAction<string>>
 }
 
 /** Catálogo: grupos, produtos do grupo e busca. */
@@ -102,6 +104,7 @@ export interface NovoPedidoEdicaoLinhaSlice {
   ) => void
   removerComplemento: (produtoIndex: number, complementoIndex: number) => void
   abrirModalEdicaoProduto: (index: number) => void
+  abrirModalObservacaoProduto: (index: number) => void
   abrirModalComplementosProdutoExistente: (index: number) => void
   confirmarEdicaoProduto: () => void
   confirmarLancamentoProdutoPainel: (payload: ModalLancamentoProdutoPainelConfirmPayload) => void
@@ -111,6 +114,8 @@ export interface NovoPedidoEdicaoLinhaSlice {
   setProdutoParaLancamentoPainel: Dispatch<SetStateAction<Produto | null>>
   indiceLinhaPainelProduto: number | null
   setIndiceLinhaPainelProduto: Dispatch<SetStateAction<number | null>>
+  painelLinhaModo: ModalLancamentoProdutoPainelModo
+  setPainelLinhaModo: Dispatch<SetStateAction<ModalLancamentoProdutoPainelModo>>
   produtoIndexEdicao: number | null
   setProdutoIndexEdicao: Dispatch<SetStateAction<number | null>>
   quantidadeEdicao: number

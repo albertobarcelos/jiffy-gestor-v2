@@ -1393,8 +1393,8 @@ export function useTransicaoVendaGestor() {
 
 /**
  * Hook para finalizar a etapa operacional de uma venda gestor (via BFF → POST …/transicoes com acao finalizar).
- * O contrato do backend cria a venda pendente e esta chamada aplica a transição operacional de finalização.
- * Usado em NovoPedidoModal após criar pedido balcão com FINALIZADA ou PENDENTE_EMISSAO.
+ * Requer backend com POST /api/v1/gestor/vendas/{id}/transicoes — ainda não disponível na API atual.
+ * Pedidos balcão não devem usar este hook: o POST de criação já envia dataFinalizacao.
  */
 export function useFinalzarVendaGestor() {
   const { auth } = useAuthStore()

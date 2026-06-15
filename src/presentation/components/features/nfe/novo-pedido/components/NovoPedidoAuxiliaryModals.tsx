@@ -56,6 +56,7 @@ export function NovoPedidoAuxiliaryModals() {
     handleSelectCliente,
     handleTabChangeClienteTabsModalEntrega,
     indiceLinhaPainelProduto,
+    painelLinhaModo,
     produtoIndexEdicao,
     produtoParaLancamentoPainel,
     produtos,
@@ -64,6 +65,7 @@ export function NovoPedidoAuxiliaryModals() {
     setEhAcrescimo,
     setEhPorcentagem,
     setIndiceLinhaPainelProduto,
+    setPainelLinhaModo,
     setProdutoIndexEdicao,
     setProdutoParaLancamentoPainel,
     setQuantidadeEdicao,
@@ -91,22 +93,36 @@ export function NovoPedidoAuxiliaryModals() {
             onAfterClose={() => {
               setProdutoParaLancamentoPainel(null)
               setIndiceLinhaPainelProduto(null)
+              setPainelLinhaModo('lancamento')
             }}
             carregandoComplementos={carregandoComplementosPainel}
             produto={produtoParaLancamentoPainel}
-            mostrarAlterarPreco={produtoParaLancamentoPainel.permiteAlterarPrecoAtivo()}
+            mostrarAlterarPreco={
+              painelLinhaModo !== 'observacao' &&
+              produtoParaLancamentoPainel.permiteAlterarPrecoAtivo()
+            }
             mostrarComplementos={
-              produtoParaLancamentoPainel.abreComplementosAtivo() ||
-              indiceLinhaPainelProduto !== null
+              painelLinhaModo === 'complementos' ||
+              (painelLinhaModo === 'lancamento' &&
+                produtoParaLancamentoPainel.abreComplementosAtivo())
+            }
+            mostrarObservacao={painelLinhaModo === 'observacao'}
+            observacaoInicial={
+              painelLinhaModo === 'observacao' && indiceLinhaPainelProduto !== null
+                ? produtos[indiceLinhaPainelProduto]?.observacao
+                : undefined
             }
             mostrarAvisoComplementosManual={
+              painelLinhaModo === 'lancamento' &&
               indiceLinhaPainelProduto === null &&
               !produtoParaLancamentoPainel.abreComplementosAtivo()
             }
             tituloBarra={
-              indiceLinhaPainelProduto !== null
-                ? 'Ajustar produto no pedido'
-                : 'Lançar na venda'
+              painelLinhaModo === 'observacao'
+                ? 'Observação do item'
+                : indiceLinhaPainelProduto !== null
+                  ? 'Ajustar produto no pedido'
+                  : 'Lançar na venda'
             }
             valorUnitarioInicial={
               indiceLinhaPainelProduto !== null
@@ -114,9 +130,9 @@ export function NovoPedidoAuxiliaryModals() {
                 : undefined
             }
             chavesComplementosIniciais={
-              indiceLinhaPainelProduto !== null
+              painelLinhaModo === 'complementos' && indiceLinhaPainelProduto !== null
                 ? produtos[indiceLinhaPainelProduto]?.complementos?.map(
-                    (c: any) => `${c.grupoId}-${c.id}`
+                    (c: { grupoId: string; id: string }) => `${c.grupoId}-${c.id}`
                   )
                 : undefined
             }

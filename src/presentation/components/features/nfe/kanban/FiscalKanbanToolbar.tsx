@@ -21,6 +21,11 @@ interface FiscalKanbanToolbarProps {
   onToggleFiltrosMobile: () => void
   origemFilter: OrigemFiltro
   onOrigemFilterChange: (value: OrigemFiltro) => void
+  terminalFilter: string
+  onTerminalFilterChange: (value: string) => void
+  terminais: { id: string; nome: string }[]
+  isLoadingTerminais: boolean
+  origemFilterDisabled?: boolean
   dataCriacaoInicio: Date | null
   dataCriacaoFim: Date | null
   onOpenCriacaoDatas: () => void
@@ -115,6 +120,11 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
     onToggleFiltrosMobile,
     origemFilter,
     onOrigemFilterChange,
+    terminalFilter,
+    onTerminalFilterChange,
+    terminais,
+    isLoadingTerminais,
+    origemFilterDisabled = false,
     dataCriacaoInicio,
     dataCriacaoFim,
     onOpenCriacaoDatas,
@@ -174,11 +184,40 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
               value={origemFilter}
               onChange={e => onOrigemFilterChange(e.target.value as OrigemFiltro)}
               displayEmpty
+              disabled={origemFilterDisabled}
               className="font-nunito"
             >
               <MenuItem value="">Todos</MenuItem>
               <MenuItem value="PDV">PDV</MenuItem>
               <MenuItem value="GESTOR">Gestor</MenuItem>
+            </Select>
+          </FormControl>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <FormControl
+            size="small"
+            variant="outlined"
+            sx={{ ...sxKanbanFiltroSelect, minWidth: 160 }}
+          >
+            <InputLabel id="kanban-filtro-terminal-label" shrink>
+              Terminal
+            </InputLabel>
+            <Select
+              labelId="kanban-filtro-terminal-label"
+              label="Terminal"
+              value={terminalFilter}
+              onChange={e => onTerminalFilterChange(e.target.value)}
+              displayEmpty
+              disabled={isLoadingTerminais}
+              className="font-nunito"
+            >
+              <MenuItem value="">Todos</MenuItem>
+              {terminais.map(terminal => (
+                <MenuItem key={terminal.id} value={terminal.id}>
+                  {terminal.nome}
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
         </div>

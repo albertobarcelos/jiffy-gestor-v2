@@ -4,9 +4,8 @@ import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 
 /**
  * POST /api/vendas/gestor/[id]/finalizar
- * Proxies para a transição operacional `acao: finalizar` no backend.
- * O endpoint legado `/gestor/vendas/{id}/finalizar` foi substituído por POST `/gestor/vendas/{id}/transicoes`.
- * Chamado após criar pedido balcão com FINALIZADA/PENDENTE_EMISSAO quando o POST apenas registra a venda.
+ * Proxies para POST /api/v1/gestor/vendas/{id}/transicoes com `{ acao: 'finalizar' }`.
+ * O backend atual não expõe transicoes; pedidos balcão já são finalizados no POST de criação (dataFinalizacao).
  */
 export async function POST(
   request: NextRequest,

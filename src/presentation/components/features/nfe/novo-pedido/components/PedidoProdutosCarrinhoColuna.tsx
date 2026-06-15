@@ -1,9 +1,16 @@
 'use client'
 
+import { useState } from 'react'
 import Image from 'next/image'
+import Tooltip from '@mui/material/Tooltip'
 import { DropdownMenu, DropdownMenuItem } from '@/src/presentation/components/ui/dropdown-menu'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { produtoPermiteAlterarPreco } from '../produtoCatalogoHelpers'
+import {
+  OBSERVACAO_PEDIDO_MAX_CHARS,
+  observacaoTextoParcialInvalido,
+} from '@/src/shared/helpers/observacaoPedido'
+import { Textarea } from '@/src/presentation/components/ui/textarea'
 import {
   MdAdd,
   MdClear,
@@ -11,6 +18,7 @@ import {
   MdEdit,
   MdLaunch,
   MdMoreVert,
+  MdNote,
   MdRemove,
 } from 'react-icons/md'
 import { useNovoPedidoFormContext } from '../context/NovoPedidoFormContext'
@@ -20,6 +28,7 @@ export function PedidoProdutosCarrinhoColuna() {
   const {
     abrirModalComplementosProdutoExistente,
     abrirModalEdicaoProduto,
+    abrirModalObservacaoProduto,
     atualizarComplemento,
     atualizarProduto,
     calcularTotalProduto,
@@ -29,6 +38,8 @@ export function PedidoProdutosCarrinhoColuna() {
     formatarValorComplemento,
     produtos,
     produtosList,
+    observacaoPedido,
+    setObservacaoPedido,
     removerComplemento,
     removerProduto,
     setValoresEmEdicao,
@@ -41,6 +52,10 @@ export function PedidoProdutosCarrinhoColuna() {
     longPressIndexRef,
     longPressTimeoutRef,
   } = useNovoPedidoUIContext()
+
+  const [observacaoPedidoVisivel, setObservacaoPedidoVisivel] = useState(
+    () => observacaoPedido.trim().length > 0
+  )
 
   return (
     <div className="flex min-h-0 min-w-0 flex-[5] basis-0 flex-col gap-2">
@@ -231,6 +246,11 @@ export function PedidoProdutosCarrinhoColuna() {
                       <span className="block truncate text-xs text-gray-900">
                         {produto.nome}
                       </span>
+                      {produto.observacao?.trim() ? (
+                        <span className="block truncate text-[11px] leading-tight text-gray-500">
+                          Obs: {produto.observacao.trim()}
+                        </span>
+                      ) : null}
                     </div>
                     {/* Desconto/Acréscimo */}
                     <div className="w-20 shrink-0">
@@ -383,6 +403,12 @@ export function PedidoProdutosCarrinhoColuna() {
                           }
                         >
                           <span className="text-xs">Editar complementos</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          icon={<MdNote className="h-4 w-4 text-primary" />}
+                          onClick={() => abrirModalObservacaoProduto(index)}
+                        >
+                          <span className="text-xs">Observação do item</span>
                         </DropdownMenuItem>
                       </DropdownMenu>
                       <button
@@ -624,11 +650,60 @@ export function PedidoProdutosCarrinhoColuna() {
       )}
     </div>
 
-    <div className="flex shrink-0 items-center justify-end gap-2 border-t border-gray-200 bg-white px-2 py-2">
-      <span className="text-sm font-semibold text-gray-700">Total do Pedido:</span>
-      <span className="text-lg font-semibold text-primary">
-        {transformarParaReal(totalProdutos)}
-      </span>
+    <div className="flex shrink-0 flex-col gap-2 border-t border-gray-200 bg-white">
+      {produtos.length > 0 && observacaoPedidoVisivel ? (
+        <div className="px-2 pt-2">
+          <Textarea
+            label="Observação do pedido"
+            placeholder="Instruções gerais para o pedido (opcional)"
+            value={observacaoPedido}
+            onChange={e => setObservacaoPedido(e.target.value)}
+            inputProps={{ maxLength: OBSERVACAO_PEDIDO_MAX_CHARS }}
+            error={observacaoTextoParcialInvalido(observacaoPedido)}
+            helperText={
+              observacaoTextoParcialInvalido(observacaoPedido)
+                ? 'Mínimo 3 caracteres (ou deixe vazio).'
+                : `${observacaoPedido.length}/${OBSERVACAO_PEDIDO_MAX_CHARS} caracteres`
+            }
+            rows={2}
+          />
+        </div>
+      ) : null}
+      <div className="flex items-center justify-between gap-2 px-2 py-2">
+        {produtos.length > 0 &&
+          (!observacaoPedidoVisivel || !observacaoPedido.trim()) && (
+            <Tooltip
+              title={
+                observacaoPedidoVisivel
+                  ? 'Ocultar observação'
+                  : 'Adicionar observação ao pedido'
+              }
+            >
+              <button
+                type="button"
+                aria-label={
+                  observacaoPedidoVisivel
+                    ? 'Ocultar observação do pedido'
+                    : 'Adicionar observação ao pedido'
+                }
+                onClick={() => setObservacaoPedidoVisivel(!observacaoPedidoVisivel)}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded border border-gray-300 bg-white text-gray-600 transition-colors hover:border-primary hover:text-primary"
+              >
+                {observacaoPedidoVisivel ? (
+                  <MdRemove className="h-4 w-4" />
+                ) : (
+                  <MdAdd className="h-4 w-4" />
+                )}
+              </button>
+            </Tooltip>
+          )}
+        <div className="flex items-center justify-end gap-2 px-2 py-2">
+        <span className="text-sm font-semibold text-gray-700">Total do Pedido:</span>
+        <span className="text-lg font-semibold text-primary">
+          {transformarParaReal(totalProdutos)}
+        </span>
+        </div>
+      </div>
     </div>
     </div>
   )

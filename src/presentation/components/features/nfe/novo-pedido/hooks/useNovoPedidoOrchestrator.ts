@@ -7,7 +7,6 @@ import {
   useCancelarVendaGestor,
   useCancelarNotaFiscalVendaPdv,
   useCancelarNotaFiscalVendaGestor,
-  useFinalzarVendaGestor,
 } from '@/src/presentation/hooks/useVendas'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
@@ -77,7 +76,6 @@ export function useNovoPedidoOrchestrator({
   const cancelarVendaGestor = useCancelarVendaGestor()
   const cancelarNotaFiscalVendaPdv = useCancelarNotaFiscalVendaPdv()
   const cancelarNotaFiscalVendaGestor = useCancelarNotaFiscalVendaGestor()
-  const finalizarVendaGestor = useFinalzarVendaGestor()
 
   const form = useNovoPedidoFormState(tipoInicioPedido)
   const {
@@ -91,6 +89,8 @@ export function useNovoPedidoOrchestrator({
     setClienteNome,
     produtos,
     setProdutos,
+    observacaoPedido,
+    setObservacaoPedido,
     catalogoProdutosPorId,
     setCatalogoProdutosPorId,
     pagamentos,
@@ -226,6 +226,8 @@ export function useNovoPedidoOrchestrator({
     setProdutoParaLancamentoPainel,
     indiceLinhaPainelProduto,
     setIndiceLinhaPainelProduto,
+    painelLinhaModo,
+    setPainelLinhaModo,
     longPressTimeoutRef,
     longPressIndexRef,
     longPressComplementoTimeoutRef,
@@ -235,6 +237,7 @@ export function useNovoPedidoOrchestrator({
     adicionarProduto,
     confirmarLancamentoProdutoPainel,
     abrirModalComplementosProdutoExistente,
+    abrirModalObservacaoProduto,
     removerProduto,
     atualizarProduto,
     atualizarComplemento,
@@ -492,6 +495,7 @@ export function useNovoPedidoOrchestrator({
       status,
       produtos,
       pagamentos,
+      observacaoPedido,
       totalProdutos,
       totalPagamentos,
       totalPagamentosLancados,
@@ -529,7 +533,6 @@ export function useNovoPedidoOrchestrator({
     setVendaIdCriada,
     status,
     tipoInicioPedido,
-    finalizarVendaGestor,
     processarAposTransicaoVendaGestorId,
     preferenciasAutoIniciarPreparo: preferenciasImpressaoDelivery.autoIniciarPreparoNovosPedidos,
   })
@@ -600,6 +603,7 @@ export function useNovoPedidoOrchestrator({
     setModalLancamentoProdutoPainelOpen,
     setProdutoParaLancamentoPainel,
     setIndiceLinhaPainelProduto,
+    setPainelLinhaModo,
     setModalEdicaoProdutoOpen,
     setProdutoIndexEdicao,
     setQuantidadeEdicao,
@@ -639,6 +643,7 @@ export function useNovoPedidoOrchestrator({
     adicionarProduto,
     abrirModalComplementosProdutoExistente,
     abrirModalEdicaoProduto,
+    abrirModalObservacaoProduto,
     atualizarComplemento,
     atualizarProduto,
     buscaProdutoFiltrada,
@@ -721,9 +726,12 @@ export function useNovoPedidoOrchestrator({
     nomesMeiosPagamentoPedido,
     obterIconeMeioPagamento,
     obterTotalComplemento,
+    observacaoPedido,
+    setObservacaoPedido,
     origem,
     statusFiscalDetalhe,
     pagamentoModoCobranca,
+    painelLinhaModo,
     pagamentos,
     pagamentosVisiveisNaAbaDetalhes,
     podeEditarPagamentoEntregaEmAberto,
@@ -779,6 +787,7 @@ export function useNovoPedidoOrchestrator({
     setTooltipGrupoId,
     setTooltipPosition,
     setTipoCancelamentoSelecionado,
+    setPainelLinhaModo,
     setValoresEmEdicao,
     setValorDescontoAcrescimo,
     setValorFinalVenda,
