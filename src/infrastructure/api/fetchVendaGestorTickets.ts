@@ -58,7 +58,7 @@ function normalizarResposta(raw: Record<string, unknown>): VendaGestorTicketsRes
 }
 
 /**
- * Cliente → rota BFF Next (`GET /api/vendas/gestor/:id/tickets`).
+ * Cliente → rota BFF Next (`GET /api/delivery/pedidos/:id/tickets`).
  */
 export async function fetchVendaGestorTickets(
   vendaId: string,
@@ -81,11 +81,11 @@ export async function fetchVendaGestorTickets(
     vendaId,
     temEstacaoImpressao: Boolean(estacaoImpressaoId),
     estacaoDigits: estacaoImpressaoId ? String(estacaoImpressaoId).slice(0, 8) + '…' : null,
-    urlPath: `/api/vendas/gestor/…/tickets`,
+    urlPath: `/api/delivery/pedidos/…/tickets`,
   })
 
   const res = await fetch(
-    `/api/vendas/gestor/${encodeURIComponent(vendaId)}/tickets${query ? `?${query}` : ''}`,
+    `/api/delivery/pedidos/${encodeURIComponent(vendaId)}/tickets${query ? `?${query}` : ''}`,
     {
       headers: {
         Authorization: `Bearer ${token}`,

@@ -157,7 +157,7 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
         className={`flex flex-wrap items-end justify-center gap-x-1 gap-y-4 rounded-t-lg bg-custom-2 px-1 pb-2 pt-1.5 md:justify-start ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}
       >
         <div className="flex flex-col gap-1">
-          <div className="relative w-[250px] px-1 lg:w-[300px]">
+          <div className="relative w-[250px] px-1 lg:w-[280px]">
             <MdSearch
               className="absolute left-2 top-1/2 -translate-y-1/2 text-secondary-text"
               size={20}
@@ -261,26 +261,19 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
 
         <button
           onClick={onClearFilters}
-          className="font-nunito flex h-8 items-center justify-center gap-2 rounded-lg border px-4 text-sm transition-colors"
+          className="font-nunito flex h-8 items-center justify-center gap-2 rounded-lg border px-2 text-sm transition-colors"
           style={{ borderColor: KANBAN_BUTTON_COLOR, color: KANBAN_BUTTON_COLOR }}
         >
           <MdFilterAltOff size={18} />
-          Limpar filtros
+          Limpar
         </button>
 
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-          <button
-            onClick={onRefresh}
-            className="rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100"
-            title="Atualizar"
-          >
-            <MdRefresh className="h-5 w-5" />
-          </button>
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
           <KanbanModoVendasToggle value={modoKanbanVendas} onChange={onModoKanbanVendasChange} />
           <button
             type="button"
             onClick={onAbrirConfiguracoesDelivery}
-            className="rounded-lg border border-gray-200 bg-white p-2 text-gray-600 shadow-sm transition-colors hover:bg-gray-50 hover:text-primary"
+            className="rounded-lg border border-gray-200 bg-white p-1.5 text-gray-600 shadow-sm transition-colors hover:bg-gray-50 hover:text-primary"
             title="Configurações do delivery"
             aria-label="Abrir configurações do delivery"
           >
@@ -289,7 +282,7 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
           <button
             type="button"
             onClick={onAbrirNovoPedido}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-white transition-colors"
+            className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-white transition-colors"
             style={{ backgroundColor: KANBAN_BUTTON_COLOR }}
           >
             <MdAdd className="h-4 w-4" />

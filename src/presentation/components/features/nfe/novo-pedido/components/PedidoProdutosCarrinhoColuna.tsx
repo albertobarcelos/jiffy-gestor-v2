@@ -246,11 +246,6 @@ export function PedidoProdutosCarrinhoColuna() {
                       <span className="block truncate text-xs text-gray-900">
                         {produto.nome}
                       </span>
-                      {produto.observacao?.trim() ? (
-                        <span className="block truncate text-[11px] leading-tight text-gray-500">
-                          Obs: {produto.observacao.trim()}
-                        </span>
-                      ) : null}
                     </div>
                     {/* Desconto/Acréscimo */}
                     <div className="w-20 shrink-0">
@@ -422,6 +417,22 @@ export function PedidoProdutosCarrinhoColuna() {
                       </button>
                     </div>
                   </div>
+
+                  {produto.observacao?.trim() ? (
+                    <div
+                      className={`flex gap-1 rounded pb-0.5 ${
+                        index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                      }`}
+                    >
+                      <div className="w-[72px] shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <span className="block break-words text-[11px] leading-tight text-gray-500">
+                          Obs: {produto.observacao.trim()}
+                        </span>
+                      </div>
+                      <div className="w-[44px] shrink-0" />
+                    </div>
+                  ) : null}
 
                   {/* Linhas dos Complementos */}
                   {produto.complementos.map((complemento: any, compIndex: number) => {
