@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { MdSearch, MdDelete, MdEdit } from 'react-icons/md'
+import { MdDelete, MdSearch } from 'react-icons/md'
+import { Tooltip as MuiTooltip } from '@mui/material'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -21,6 +22,18 @@ export interface EntregadorDeliveryResumo {
   nome: string | null
   telefone?: string | null
 }
+
+const TOOLTIP_SLOT_PROPS = {
+  tooltip: {
+    sx: {
+      bgcolor: '#ffffff',
+      color: '#111827',
+      border: '1px solid #e5e7eb',
+      boxShadow: 2,
+      fontSize: '0.8125rem',
+    },
+  },
+} as const
 
 function normalizarResumo(raw: unknown): EntregadorDeliveryResumo | null {
   if (!raw || typeof raw !== 'object') return null
@@ -58,31 +71,55 @@ async function mensagemErroHttp(res: Response): Promise<string> {
   )
 }
 
+function telefoneListaExibicao(valor?: string | null): string {
+  if (!valor?.trim()) return '-'
+  return formatarTelefoneBr(valor) || valor
+}
+
 export function EntregadoresList() {
   const { auth, isAuthenticated } = useAuthStore()
   const [entregadores, setEntregadores] = useState<EntregadorDeliveryResumo[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [searchText, setSearchText] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
   const [total, setTotal] = useState(0)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deletingNome, setDeletingNome] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 
   const searchTextRef = useRef('')
   const filterStatusRef = useRef(filterStatus)
-  const debounceRef = useRef<NodeJS.Timeout | undefined>(undefined)
-  const hasLoadedRef = useRef(false)
+  const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const hasLoadedInitialRef = useRef(false)
 
   useEffect(() => {
-    searchTextRef.current = searchText
-  }, [searchText])
+    searchTextRef.current = debouncedSearch
+  }, [debouncedSearch])
 
   useEffect(() => {
     filterStatusRef.current = filterStatus
   }, [filterStatus])
+
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(searchText)
+    }, 500)
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+    }
+  }, [searchText])
 
   const loadEntregadores = useCallback(async () => {
     const token = auth?.getAccessToken()
@@ -127,27 +164,17 @@ export function EntregadoresList() {
       setTotal(0)
     } finally {
       setIsLoading(false)
+      hasLoadedInitialRef.current = true
     }
   }, [auth])
 
   useEffect(() => {
     if (!isAuthenticated) return
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => {
-      void loadEntregadores()
-    }, 400)
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current)
-    }
-  }, [searchText, filterStatus, isAuthenticated, loadEntregadores])
-
-  useEffect(() => {
-    if (!isAuthenticated || hasLoadedRef.current) return
     const token = auth?.getAccessToken()
     if (!token) return
-    hasLoadedRef.current = true
+
     void loadEntregadores()
-  }, [isAuthenticated, auth, loadEntregadores])
+  }, [isAuthenticated, debouncedSearch, filterStatus, auth, loadEntregadores])
 
   const abrirCriar = () => {
     setEditingId(null)
@@ -169,8 +196,9 @@ export function EntregadoresList() {
     void loadEntregadores()
   }
 
-  const solicitarExclusao = (id: string) => {
-    setDeletingId(id)
+  const solicitarExclusao = (entregador: EntregadorDeliveryResumo) => {
+    setDeletingId(entregador.id)
+    setDeletingNome(entregador.nome?.trim() || null)
     setConfirmDeleteOpen(true)
   }
 
@@ -194,6 +222,7 @@ export function EntregadoresList() {
       showToast.success('Entregador removido.')
       setConfirmDeleteOpen(false)
       setDeletingId(null)
+      setDeletingNome(null)
       void loadEntregadores()
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : 'Erro ao remover entregador')
@@ -202,107 +231,140 @@ export function EntregadoresList() {
     }
   }
 
-  const telefoneExibicao = (valor?: string | null) => {
-    if (!valor?.trim()) return '-'
-    return formatarTelefoneBr(valor) || valor
-  }
-
   return (
-    <div className="flex flex-col h-full">
-      <div className="md:px-6 px-1 pt-1 pb-1 flex-shrink-0">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-primary md:text-xl text-sm font-semibold font-nunito">
+    <div className="flex h-full flex-col">
+      <div className="flex-shrink-0 px-1 py-1 md:px-[30px]">
+        <div className="flex items-center justify-between">
+          <div className="w-1/2 md:pl-5">
+            <p className="text-primary text-sm font-semibold md:text-lg">
               Entregadores Cadastrados
             </p>
-            <p className="text-xs text-secondary-text mt-0.5">
-              Cadastro do módulo delivery — usado no Kanban e nos pedidos de entrega.
+            <p className="text-tertiary text-sm font-normal md:text-[22px]">
+              Total {entregadores.length} de {total}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={abrirCriar}
-            className="rounded-lg bg-secondary px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
-          >
-            Novo
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={abrirCriar}
+              className="flex h-8 items-center gap-2 rounded-lg bg-primary px-[30px] font-exo text-sm font-semibold text-info transition-colors hover:bg-primary/90"
+            >
+              Novo
+              <span className="text-lg">+</span>
+            </button>
+          </div>
         </div>
+      </div>
 
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+      <div className="h-[4px] flex-shrink-0 border-t-2 border-primary/70" />
+
+      <div className="flex items-start justify-start gap-3 p-1">
+        <div className="flex flex-row items-start justify-start gap-2">
+          <div className="relative flex-col h-8 min-w-[300px] max-w-[360px]">
+            <MdSearch
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text"
+              size={18}
+            />
             <input
-              type="search"
-              placeholder="Buscar por nome ou telefone..."
+              id="entregadores-search"
+              type="text"
+              placeholder="Pesquisar entregador..."
               value={searchText}
               onChange={e => setSearchText(e.target.value)}
-              className="w-full rounded-lg border border-gray-200 py-2 pl-10 pr-3 text-sm focus:border-secondary focus:outline-none focus:ring-1 focus:ring-secondary"
+              className="h-full w-full rounded-lg border border-gray-200 bg-info pl-11 pr-4 font-nunito text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
             />
           </div>
+        </div>
+
+        <div className="flex w-full flex-row items-center justify-start gap-2 sm:w-[160px]">
+          <label className="mb-1 block text-xs font-semibold text-secondary-text">Status</label>
           <select
             value={filterStatus}
-            onChange={e => setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-secondary focus:outline-none"
+            onChange={e =>
+              setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')
+            }
+            className="h-8 w-full rounded-lg border border-gray-200 bg-info px-5 font-nunito text-sm text-primary-text focus:border-primary focus:outline-none"
           >
-            <option value="Ativo">Ativos</option>
-            <option value="Desativado">Desativados</option>
             <option value="Todos">Todos</option>
+            <option value="Ativo">Ativo</option>
+            <option value="Desativado">Desativado</option>
           </select>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 md:px-6 px-1 pb-4">
-        {isLoading ? (
-          <JiffyLoading />
-        ) : entregadores.length === 0 ? (
-          <p className="text-sm text-secondary-text py-8 text-center">Nenhum entregador encontrado.</p>
-        ) : (
-          <div className="overflow-auto rounded-lg border border-gray-100 bg-white shadow-sm">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 text-left text-xs font-semibold text-secondary-text">
-                <tr>
-                  <th className="px-4 py-3">Nome</th>
-                  <th className="px-4 py-3">Telefone</th>
-                  <th className="px-4 py-3 w-28 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {entregadores.map(entregador => (
-                  <tr key={entregador.id} className="hover:bg-gray-50/80">
-                    <td className="px-4 py-3 font-medium text-primary-text">
-                      {entregador.nome?.trim() || '—'}
-                    </td>
-                    <td className="px-4 py-3 text-secondary-text">
-                      {telefoneExibicao(entregador.telefone)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-1">
-                        <button
-                          type="button"
-                          title="Editar"
-                          onClick={() => abrirEditar(entregador.id)}
-                          className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-secondary"
-                        >
-                          <MdEdit size={18} />
-                        </button>
-                        <button
-                          type="button"
-                          title="Remover"
-                          onClick={() => solicitarExclusao(entregador.id)}
-                          className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600"
-                        >
-                          <MdDelete size={18} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <div className="mt-0 flex-shrink-0 md:px-[0px]">
+        <div className="flex h-10 items-center gap-2 rounded-lg bg-custom-2 px-4">
+          <div className="flex-[2] font-nunito text-xs font-semibold text-primary-text md:text-sm">
+            Nome
+          </div>
+          <div className="flex-[2] font-nunito text-xs font-semibold text-primary-text md:text-sm">
+            Telefone
+          </div>
+          <div className="flex w-16 shrink-0 justify-end font-nunito text-xs font-semibold text-primary-text md:text-sm">
+            Remover
+          </div>
+        </div>
+      </div>
+
+      <div
+        ref={scrollContainerRef}
+        className="mt-1 flex-1 overflow-y-auto px-1 scrollbar-hide md:px-[0px]"
+        style={{ maxHeight: 'calc(100vh - 300px)' }}
+      >
+        {(isLoading || !hasLoadedInitialRef.current) && entregadores.length === 0 && (
+          <div className="flex flex-col items-center justify-center gap-2 py-12">
+            <JiffyLoading />
           </div>
         )}
-        {!isLoading && total > 0 && (
-          <p className="mt-2 text-xs text-secondary-text">{total} entregador(es)</p>
+
+        {entregadores.length === 0 && !isLoading && hasLoadedInitialRef.current && (
+          <div className="flex items-center justify-center py-12">
+            <p className="text-secondary-text">Nenhum entregador encontrado.</p>
+          </div>
+        )}
+
+        {entregadores.map((entregador, index) => {
+          const isZebraEven = index % 2 === 0
+          const bgClass = isZebraEven ? 'bg-gray-50' : 'bg-white'
+
+          return (
+            <div
+              key={entregador.id}
+              onClick={() => abrirEditar(entregador.id)}
+              className={`${bgClass} mb-1 flex cursor-pointer items-center rounded-lg py-2 hover:bg-secondary-bg/15 md:px-4`}
+            >
+              <div className="flex-[2] flex items-center font-nunito text-xs font-normal text-primary-text md:text-sm">
+                <span>{entregador.nome?.trim() || '-'}</span>
+              </div>
+              <div className="flex-[2] font-nunito text-xs text-secondary-text md:text-sm">
+                {telefoneListaExibicao(entregador.telefone)}
+              </div>
+              <div
+                className="flex w-16 shrink-0 justify-end"
+                onClick={e => e.stopPropagation()}
+                onMouseDown={e => e.stopPropagation()}
+                onTouchStart={e => e.stopPropagation()}
+              >
+                <MuiTooltip title="Remover entregador" placement="bottom" slotProps={TOOLTIP_SLOT_PROPS}>
+                  <button
+                    type="button"
+                    aria-label="Remover entregador"
+                    disabled={isDeleting && deletingId === entregador.id}
+                    onClick={() => solicitarExclusao(entregador)}
+                    className="flex h-7 w-7 items-center justify-center rounded transition-colors hover:bg-red-50 disabled:opacity-50"
+                  >
+                    <MdDelete className="h-4 w-4 text-red-500" />
+                  </button>
+                </MuiTooltip>
+              </div>
+            </div>
+          )
+        })}
+
+        {isLoading && entregadores.length > 0 && (
+          <div className="flex justify-center py-4">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          </div>
         )}
       </div>
 
@@ -319,12 +381,18 @@ export function EntregadoresList() {
             <DialogTitle>Remover entregador?</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-secondary-text">
-            O entregador será desativado e não aparecerá nas listas de seleção.
+            {deletingNome
+              ? `O entregador "${deletingNome}" será desativado e não aparecerá nas listas de seleção.`
+              : 'O entregador será desativado (exclusão lógica) e não aparecerá nas listas de seleção.'}
           </p>
           <DialogFooter className="gap-2 sm:gap-2">
             <button
               type="button"
-              onClick={() => setConfirmDeleteOpen(false)}
+              onClick={() => {
+                setConfirmDeleteOpen(false)
+                setDeletingId(null)
+                setDeletingNome(null)
+              }}
               className="rounded-lg border border-gray-200 px-4 py-2 text-sm"
             >
               Cancelar

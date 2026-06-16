@@ -1,10 +1,34 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { MdPerson } from 'react-icons/md'
+import {
+  JiffySidePanelModal,
+  type JiffySidePanelFooterActions,
+} from '@/src/presentation/components/ui/jiffy-side-panel-modal'
+import { Input } from '@/src/presentation/components/ui/input'
+import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
+import { formatarTelefoneBr } from '@/src/shared/utils/telefoneBr'
 import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
+
+const ENTREGADOR_FORM_ID = 'entregador-delivery-form'
+
+const INPUT_LABEL_PROPS = { shrink: true } as const
+
+const INPUT_SX = {
+  '& .MuiOutlinedInput-root': {
+    height: '38px',
+    backgroundColor: 'var(--color-primary-bg)',
+    borderRadius: '8px',
+  },
+  '& .MuiInputBase-input': {
+    padding: '8px 14px',
+    fontSize: '14px',
+  },
+} as const
 
 interface EntregadorDeliveryModalProps {
   open: boolean
@@ -47,6 +71,14 @@ function somenteDigitos(valor: string, max?: number): string {
   return digits
 }
 
+function formatCPF(value: string): string {
+  const numbers = value.replace(/\D/g, '')
+  if (numbers.length <= 11) {
+    return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
+  }
+  return value
+}
+
 export function EntregadorDeliveryModal({
   open,
   entregadorId,
@@ -59,6 +91,7 @@ export function EntregadorDeliveryModal({
   const [salvando, setSalvando] = useState(false)
 
   const isEdicao = Boolean(entregadorId)
+  const canSubmit = Boolean(form.nome.trim()) && !carregando
 
   useEffect(() => {
     if (!open) {
@@ -90,20 +123,24 @@ export function EntregadorDeliveryModal({
         }
         const data = (await res.json()) as Record<string, unknown>
         if (cancelado) return
+
+        const cpfRaw =
+          data.cpf != null
+            ? String(data.cpf)
+            : data.cpfFormatado != null
+              ? String(data.cpfFormatado)
+              : ''
+        const telefoneRaw =
+          data.telefone != null
+            ? String(data.telefone)
+            : data.telefoneFormatado != null
+              ? String(data.telefoneFormatado)
+              : ''
+
         setForm({
           nome: data.nome != null ? String(data.nome) : '',
-          telefone:
-            data.telefone != null
-              ? String(data.telefone)
-              : data.telefoneFormatado != null
-                ? String(data.telefoneFormatado)
-                : '',
-          cpf:
-            data.cpf != null
-              ? String(data.cpf)
-              : data.cpfFormatado != null
-                ? String(data.cpfFormatado)
-                : '',
+          telefone: telefoneRaw ? formatarTelefoneBr(telefoneRaw) : '',
+          cpf: cpfRaw ? formatCPF(cpfRaw) : '',
           ativo: typeof data.ativo === 'boolean' ? data.ativo : true,
         })
       } catch (error) {
@@ -145,9 +182,7 @@ export function EntregadorDeliveryModal({
       nome,
       telefone: telefoneDigits || null,
       cpf: cpfDigits || null,
-    }
-    if (isEdicao) {
-      payload.ativo = form.ativo
+      ativo: form.ativo,
     }
 
     setSalvando(true)
@@ -176,74 +211,135 @@ export function EntregadorDeliveryModal({
     }
   }, [auth, form, isEdicao, entregadorId, onSalvo])
 
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    void salvar()
+  }
+
+  const footerActions = useMemo((): JiffySidePanelFooterActions => {
+    return {
+      barActionOrder: ['cancel', 'save'],
+      showCancel: true,
+      cancelLabel: 'Fechar',
+      cancelVariant: 'primaryTint10',
+      onCancel: onClose,
+      showSave: true,
+      saveLabel: salvando ? 'Salvando…' : 'Salvar',
+      saveFormId: ENTREGADOR_FORM_ID,
+      saveLoading: salvando,
+      saveDisabled: !canSubmit || salvando,
+    }
+  }, [canSubmit, salvando, onClose])
+
+  const title = isEdicao ? 'Editar Entregador' : 'Novo Entregador'
+
   return (
     <JiffySidePanelModal
       open={open}
       onClose={onClose}
-      title={isEdicao ? 'Editar entregador' : 'Novo entregador'}
-      subtitle="Entregadores do módulo delivery (vinculação em pedidos e Kanban)."
-      panelClassName="w-[min(28rem,95vw)]"
+      title={title}
+      scrollableBody={false}
       footerVariant="bar"
-      footerActions={{
-        barActionOrder: ['cancel', 'saveAndClose'],
-        showCancel: true,
-        cancelLabel: 'Cancelar',
-        onCancel: onClose,
-        showSaveAndClose: true,
-        saveAndCloseLabel: isEdicao ? 'Salvar' : 'Cadastrar',
-        onSaveAndClose: () => void salvar(),
-        saveAndCloseLoading: salvando,
-        saveAndCloseDisabled: carregando,
-      }}
+      panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,45vw)]"
+      footerActions={footerActions}
     >
-      {carregando ? (
-        <p className="text-sm text-secondary-text py-6">Carregando...</p>
-      ) : (
-        <div className="flex flex-col gap-4 px-1">
-          <label className="flex flex-col gap-1">
-            <span className="text-sm font-medium text-primary-text">Nome *</span>
-            <input
-              type="text"
-              value={form.nome}
-              onChange={e => setForm(prev => ({ ...prev, nome: e.target.value }))}
-              className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-secondary focus:outline-none focus:ring-1 focus:ring-secondary"
-              maxLength={255}
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-sm font-medium text-primary-text">Telefone</span>
-            <input
-              type="text"
-              value={form.telefone}
-              onChange={e => setForm(prev => ({ ...prev, telefone: e.target.value }))}
-              placeholder="(65) 99999-9999"
-              className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-secondary focus:outline-none focus:ring-1 focus:ring-secondary"
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-sm font-medium text-primary-text">CPF</span>
-            <input
-              type="text"
-              value={form.cpf}
-              onChange={e => setForm(prev => ({ ...prev, cpf: e.target.value }))}
-              placeholder="Somente números (11 dígitos)"
-              className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-secondary focus:outline-none focus:ring-1 focus:ring-secondary"
-              maxLength={14}
-            />
-          </label>
-          {isEdicao && (
-            <label className="flex items-center justify-between gap-2 rounded-lg bg-gray-50 px-3 py-2">
-              <span className="text-sm font-medium text-primary-text">Ativo</span>
-              <input
-                type="checkbox"
-                checked={form.ativo}
-                onChange={e => setForm(prev => ({ ...prev, ativo: e.target.checked }))}
-                className="h-4 w-4 rounded border-gray-300 accent-secondary"
-              />
-            </label>
-          )}
-        </div>
-      )}
+      <div className="flex h-full min-h-0 flex-col">
+        {carregando ? (
+          <div className="flex flex-1 items-center justify-center py-12">
+            <JiffyLoading />
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto px-1 scrollbar-hide">
+            <form id={ENTREGADOR_FORM_ID} onSubmit={handleSubmit} className="">
+              <div className="bg-info px-1 py-3 md:px-5">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-xl font-semibold text-primary">Dados do Entregador</h2>
+                  <div className="flex-1 border-t border-primary/40" aria-hidden />
+                </div>
+              </div>
+
+              <div className="space-y-4 rounded-lg bg-info py-2 md:px-5">
+                <div className="flex items-center gap-1">
+                  <MdPerson className="text-2xl text-primary" />
+                  <h2 className="font-nunito text-base font-semibold text-primary">
+                    Dados Pessoais
+                  </h2>
+                  <div className="flex-1" aria-hidden />
+                  <div className="shrink-0">
+                    <JiffyIconSwitch
+                      checked={form.ativo}
+                      onChange={e =>
+                        setForm(prev => ({ ...prev, ativo: e.target.checked }))
+                      }
+                      disabled={salvando}
+                      label="Ativo"
+                      labelPosition="start"
+                      bordered={false}
+                      size="sm"
+                      className="shrink-0"
+                      inputProps={{
+                        'aria-label': form.ativo
+                          ? 'Desativar entregador'
+                          : 'Ativar entregador',
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-8">
+                  <Input
+                    label="Nome"
+                    value={form.nome}
+                    onChange={e =>
+                      setForm(prev => ({
+                        ...prev,
+                        nome: e.target.value.toLocaleUpperCase('pt-BR'),
+                      }))
+                    }
+                    required
+                    placeholder="Nome completo"
+                    fullWidth
+                    size="small"
+                    disabled={salvando}
+                    InputLabelProps={INPUT_LABEL_PROPS}
+                    sx={INPUT_SX}
+                  />
+                  <Input
+                    label="Telefone"
+                    value={form.telefone}
+                    onChange={e =>
+                      setForm(prev => ({
+                        ...prev,
+                        telefone: formatarTelefoneBr(e.target.value),
+                      }))
+                    }
+                    placeholder="(00) 00000-0000"
+                    fullWidth
+                    size="small"
+                    disabled={salvando}
+                    InputLabelProps={INPUT_LABEL_PROPS}
+                    sx={INPUT_SX}
+                  />
+                  <Input
+                    label="CPF"
+                    value={form.cpf}
+                    onChange={e =>
+                      setForm(prev => ({ ...prev, cpf: formatCPF(e.target.value) }))
+                    }
+                    placeholder="000.000.000-00"
+                    inputProps={{ maxLength: 14 }}
+                    fullWidth
+                    size="small"
+                    disabled={salvando}
+                    InputLabelProps={INPUT_LABEL_PROPS}
+                    sx={INPUT_SX}
+                  />
+                </div>
+              </div>
+            </form>
+          </div>
+        )}
+      </div>
     </JiffySidePanelModal>
   )
 }
