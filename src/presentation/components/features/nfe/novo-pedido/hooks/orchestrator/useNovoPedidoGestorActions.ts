@@ -2,6 +2,7 @@
 
 import { useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { atualizarCobrancasPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/AtualizarCobrancasPedidoDeliveryUseCase'
 import { atualizarPagamentoEntregaGestorUseCase } from '@/src/application/use-cases/vendas/AtualizarPagamentoEntregaGestorUseCase'
 import { Produto } from '@/src/domain/entities/Produto'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
@@ -51,6 +52,7 @@ export type UseNovoPedidoGestorActionsParams = {
   totalProdutos: number
   totalPagamentosLancados: number
   trocoLancamento: number
+  usarModuloDeliveryCobrancas?: boolean
 }
 
 export function useNovoPedidoGestorActions({
@@ -67,6 +69,7 @@ export function useNovoPedidoGestorActions({
   totalProdutos,
   totalPagamentosLancados,
   trocoLancamento,
+  usarModuloDeliveryCobrancas = false,
 }: UseNovoPedidoGestorActionsParams) {
   const queryClient = useQueryClient()
   const empresaId = useTenantEmpresaId()
@@ -121,11 +124,20 @@ export function useNovoPedidoGestorActions({
 
     setIsSavingPagamentoEntrega(true)
     try {
-      await atualizarPagamentoEntregaGestorUseCase.execute(
-        vendaId,
-        token,
-        pagamentosPayload
-      )
+      if (usarModuloDeliveryCobrancas) {
+        await atualizarCobrancasPedidoDeliveryUseCase.execute(
+          vendaId,
+          token,
+          pagamentosPayload,
+          fluxoPagamentoEntrega
+        )
+      } else {
+        await atualizarPagamentoEntregaGestorUseCase.execute(
+          vendaId,
+          token,
+          pagamentosPayload
+        )
+      }
 
       setPagamentos(prev =>
         prev.map(p => ({
@@ -159,6 +171,7 @@ export function useNovoPedidoGestorActions({
     setIsSavingPagamentoEntrega,
     queryClient,
     empresaId,
+    usarModuloDeliveryCobrancas,
   ])
 
   const handleAbrirEdicaoProdutoDetalhes = useCallback(

@@ -100,6 +100,7 @@ export function PedidoInformacoesStepView() {
             estado: empresa?.estado,
           }}
           mostrarEnderecos={pedidoComEntrega}
+          usarModuloDeliveryClientes={pedidoDeliveryGestor}
         />
         {pedidoComRetirada ? (
           <div className="mt-3 rounded-lg border border-primary/15 bg-white p-3 text-sm text-secondary-text">

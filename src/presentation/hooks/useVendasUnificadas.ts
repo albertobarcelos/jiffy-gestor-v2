@@ -6,6 +6,9 @@ import {
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import {
+  isPedidoEntregaKanban,
+} from '@/src/shared/helpers/pedidoEntregaKanban'
 
 /**
  * Primeiro texto não vazio entre candidatos (null, undefined e string só com espaços ignorados).
@@ -62,6 +65,8 @@ function parseSolicitarEmissaoFiscal(raw: unknown): boolean {
 /** Etapa logística no GET unificado (nomes variam conforme backend). */
 function extrairStatusEtapaOperacional(item: Record<string, unknown>): string | null {
   const keys = [
+    'statusDelivery',
+    'status_delivery',
     'statusEtapaOperacional',
     'status_etapa_operacional',
     'etapaOperacional',
@@ -184,11 +189,14 @@ export class VendaUnificadaDTO {
     return !!this.dataCancelamento || this.statusFiscal === 'CANCELADA'
   }
 
-  /** `tipoVenda === 'entrega' || tipoVenda === 'retirada'` vendido pelo Gestor (Kanban operacional). */
+  /** `tipoVenda` entrega/retirada/delivery ou etapa logística — vendas do módulo delivery no Kanban operacional. */
   isPedidoEntregaGestor(): boolean {
-    if (!this.isVendaGestor() || this.isCancelada()) return false
-    const tipo = (this.tipoVenda ?? '').trim().toLowerCase()
-    return tipo === 'entrega' || tipo === 'retirada'
+    if (this.isCancelada()) return false
+    return isPedidoEntregaKanban(
+      this.tabelaOrigem,
+      this.tipoVenda,
+      this.statusEtapaOperacional
+    )
   }
 
   /** Delivery gestor ainda sem pagamento quitado (bloqueia finalizar no Kanban). */

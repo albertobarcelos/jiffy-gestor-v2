@@ -20,6 +20,7 @@ export type VendaDetalheCarregadaQueryParams = {
   token: string | null | undefined
   enabled: boolean
   meiosPagamentoCache?: MeioPagamentoCacheItem[]
+  tipoVendaGestor?: string | null
 }
 
 export function vendaDetalheCarregadaQueryKey(args: {
@@ -85,6 +86,7 @@ export function useVendaDetalheCarregadaQuery({
   token,
   enabled,
   meiosPagamentoCache = [],
+  tipoVendaGestor,
 }: VendaDetalheCarregadaQueryParams) {
   const empresaId = useTenantEmpresaId()
   const queryKey = vendaDetalheCarregadaQueryKey({
@@ -103,6 +105,7 @@ export function useVendaDetalheCarregadaQuery({
         token: token!,
         modoVisualizacao,
         meiosPagamentoCache,
+        tipoVendaGestor,
       }),
     enabled: enabled && !!token && !!vendaId,
     staleTime: STALE_TIME_MS,

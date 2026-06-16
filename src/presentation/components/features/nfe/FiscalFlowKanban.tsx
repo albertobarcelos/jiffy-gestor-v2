@@ -18,7 +18,8 @@ import {
   useReemitirNfeGestor,
   useEmitirNfe,
   useEmitirNfeGestor,
-  useTransicaoVendaGestor,
+  useEmitirNfeDelivery,
+  useTransicaoPedidoDelivery,
 } from '@/src/presentation/hooks/useVendas'
 import {
   flattenVendasUnificadasInfinite,
@@ -77,9 +78,9 @@ import { useFiscalKanbanFilters } from './kanban/useFiscalKanbanFilters'
 import { useKanbanPinning } from './kanban/useKanbanPinning'
 import { useEntregaTransicoesKanban } from './kanban/useEntregaTransicoesKanban'
 import {
-  extrairPatchKanbanDeTransicaoGestor,
+  extrairPatchKanbanDeRespostaTransicao,
   patchVendaUnificadaInfiniteCache,
-  sincronizarVendaGestorKanbanEmBackground,
+  sincronizarPedidoDeliveryKanbanEmBackground,
 } from './kanban/kanbanVendaCacheUpdate'
 import { resolverEntregadorIdVendaKanban, hidratarEntregadoresKanbanDesdeApi, entregadorKanbanJaVerificado } from './kanban/entregadorKanbanStore'
 import {
@@ -176,6 +177,7 @@ export function FiscalFlowKanban() {
     id: string
     tabelaOrigem: 'venda' | 'venda_gestor'
     statusFiscal: Venda['statusFiscal']
+    tipoVenda?: string | null
     abaDetalhesInicial?: import('./novo-pedido/types').AbaDetalhesPedido
   } | null>(null)
   const [draggingVenda, setDraggingVenda] = useState<Venda | null>(null)
@@ -453,11 +455,12 @@ export function FiscalFlowKanban() {
   const reemitirNfeGestor = useReemitirNfeGestor()
   const emitirNotaPdv = useEmitirNfe()
   const emitirNotaGestor = useEmitirNfeGestor()
-  const transicaoVendaGestor = useTransicaoVendaGestor()
+  const emitirNotaDelivery = useEmitirNfeDelivery()
+  const transicaoPedidoDelivery = useTransicaoPedidoDelivery()
 
   const sincronizarVendaAposTransicao = useCallback(
     (vendaId: string, respostaTransicao: unknown) => {
-      const patch = extrairPatchKanbanDeTransicaoGestor(respostaTransicao)
+      const patch = extrairPatchKanbanDeRespostaTransicao(respostaTransicao)
       patchVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, vendaId, patch)
     },
     [infiniteQueryKey, queryClient]
@@ -467,7 +470,7 @@ export function FiscalFlowKanban() {
     (vendaId: string) => {
       const token = auth?.getAccessToken()
       if (!token) return
-      void sincronizarVendaGestorKanbanEmBackground(
+      void sincronizarPedidoDeliveryKanbanEmBackground(
         queryClient,
         infiniteQueryKey,
         vendaId,
@@ -544,6 +547,7 @@ export function FiscalFlowKanban() {
       id: venda.id,
       tabelaOrigem: venda.tabelaOrigem,
       statusFiscal: venda.statusFiscal,
+      tipoVenda: venda.tipoVenda,
       abaDetalhesInicial: 'pagamentos',
     })
     setNovoPedidoModalVisualizacaoOpen(true)
@@ -557,7 +561,7 @@ export function FiscalFlowKanban() {
     moverEntregaPorDrag,
     finalizarEntregaPorDrag,
   } = useEntregaTransicoesKanban({
-    executarTransicao: payload => transicaoVendaGestor.mutateAsync(payload),
+    executarTransicao: payload => transicaoPedidoDelivery.mutateAsync(payload),
     sincronizarVendaAposTransicao,
     agendarSincronizacaoLista,
     onAfterTransicaoSucesso: ({ venda, acoesExecutadas, ticketsPreload }) => {
@@ -574,6 +578,7 @@ export function FiscalFlowKanban() {
       reemitirNfeGestor: payload => reemitirNfeGestor.mutateAsync(payload),
       emitirNotaPdv: payload => emitirNotaPdv.mutateAsync(payload),
       emitirNotaGestor: payload => emitirNotaGestor.mutateAsync(payload),
+      emitirNotaDelivery: payload => emitirNotaDelivery.mutateAsync(payload),
       refetch: () => refetch(),
       setPrimeiroPorColuna,
       setVendaSelecionadaParaEmissao,
@@ -855,6 +860,7 @@ export function FiscalFlowKanban() {
       id: venda.id,
       tabelaOrigem: venda.tabelaOrigem,
       statusFiscal: venda.statusFiscal,
+      tipoVenda: venda.tipoVenda,
     })
     setNovoPedidoModalVisualizacaoOpen(true)
   }
@@ -1187,6 +1193,7 @@ export function FiscalFlowKanban() {
           clienteId={vendaSelecionadaParaEmissao.clienteId}
           clienteNome={vendaSelecionadaParaEmissao.clienteNome}
           tabelaOrigem={vendaSelecionadaParaEmissao.tabelaOrigem}
+          tipoVenda={vendaSelecionadaParaEmissao.tipoVenda}
           onClienteSalvo={() => void refetch()}
         />
       )}
@@ -1227,6 +1234,7 @@ export function FiscalFlowKanban() {
           vendaId={pedidoVisualizacaoContext.id}
           tabelaOrigemVenda={pedidoVisualizacaoContext.tabelaOrigem}
           statusFiscalUnificado={pedidoVisualizacaoContext.statusFiscal}
+          tipoVendaGestor={pedidoVisualizacaoContext.tipoVenda}
           abaDetalhesInicial={pedidoVisualizacaoContext.abaDetalhesInicial}
           modoVisualizacao={true}
         />

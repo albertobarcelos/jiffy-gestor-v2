@@ -17,6 +17,7 @@ import {
   resolveStatusFiscal,
 } from '@/src/application/mappers/VendaApiNormalizer'
 import type { VendaGestorApiResponse } from '@/src/application/dto/api/vendaGestorApi'
+import { deveUsarModuloDeliveryParaDetalhe } from '@/src/application/mappers/PedidoDeliveryDetalheAdapter'
 import { textoFromObservacoesApi } from '@/src/shared/helpers/observacaoPedido'
 import type { IVendaDetalheReadRepository } from '@/src/domain/repositories/IVendaDetalheReadRepository'
 import { vendaDetalheReadRepository } from '@/src/infrastructure/api/repositories/VendaDetalheReadRepository'
@@ -40,6 +41,8 @@ export interface CarregarVendaDetalheParams {
   token: string
   modoVisualizacao?: boolean
   meiosPagamentoCache?: MeioPagamentoCacheItem[]
+  /** Hint do Kanban/unificado (`entrega`, `retirada`, `balcao`) para escolher GET delivery vs gestor. */
+  tipoVendaGestor?: string | null
 }
 
 function mapDetalhesPedidoMeta(vendaData: Record<string, unknown>): DetalhesPedidoMeta {
@@ -282,13 +285,19 @@ export class CarregarVendaDetalheUseCase {
   ) {}
 
   async execute(params: CarregarVendaDetalheParams): Promise<VendaDetalheCarregadaDTO> {
-    const { vendaId, tabelaOrigemVenda, token, modoVisualizacao, meiosPagamentoCache = [] } =
+    const { vendaId, tabelaOrigemVenda, token, modoVisualizacao, meiosPagamentoCache = [], tipoVendaGestor } =
       params
 
     const vendaData = (await this.vendaDetalheRepo.loadVenda(
       vendaId,
       tabelaOrigemVenda,
-      token
+      token,
+      {
+        preferirModuloDelivery: deveUsarModuloDeliveryParaDetalhe(
+          tabelaOrigemVenda,
+          tipoVendaGestor
+        ),
+      }
     )) as VendaGestorApiResponse
 
     const detalhesPedidoMeta = mapDetalhesPedidoMeta(vendaData)
@@ -317,7 +326,7 @@ export class CarregarVendaDetalheUseCase {
     let clienteNome: string | null = null
     let detalhesEntregaPedido: DetalhesEntregaPedido | null = null
 
-    if (tipoVendaCarregada === 'entrega') {
+    if (tipoVendaCarregada === 'entrega' || tipoVendaCarregada === 'retirada') {
       let detalhesEntrega = mapDetalhesEntregaFromVendaApi(vendaData)
       const clienteIdVenda = String(vendaData.clienteId ?? '').trim()
 
@@ -336,7 +345,16 @@ export class CarregarVendaDetalheUseCase {
       }
 
       const entregadorIdVenda = String(vendaData.entregadorId ?? '').trim()
-      if (entregadorIdVenda) {
+      const entregadorNested =
+        vendaData.entregador && typeof vendaData.entregador === 'object'
+          ? (vendaData.entregador as Record<string, unknown>)
+          : null
+      const entregadorNomeApi = entregadorNested?.nome != null
+        ? String(entregadorNested.nome).trim() || null
+        : null
+      if (entregadorNomeApi) {
+        detalhesEntrega = { ...detalhesEntrega, entregadorNome: entregadorNomeApi }
+      } else if (entregadorIdVenda) {
         detalhesEntrega = await resolverNomeEntregador(
           this.vendaDetalheRepo,
           entregadorIdVenda,
@@ -370,7 +388,7 @@ export class CarregarVendaDetalheUseCase {
     const produtosResult = mapProdutosDetalheVenda(vendaData)
     let resumoFinanceiroDetalhes = produtosResult.resumoFinanceiroDetalhes
 
-    if (tipoVendaCarregada === 'entrega') {
+    if (tipoVendaCarregada === 'entrega' || tipoVendaCarregada === 'retirada') {
       const taxaEntrega = await resolverTaxaEntregaDetalhe(
         vendaData,
         token,

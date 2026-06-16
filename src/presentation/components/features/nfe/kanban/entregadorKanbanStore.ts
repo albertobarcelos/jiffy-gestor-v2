@@ -47,7 +47,7 @@ export async function resolverEntregadorIdVendaKanban(args: {
 
   const url =
     tabelaOrigem === 'venda_gestor'
-      ? `/api/vendas/gestor/${vendaId}?incluirFiscal=false`
+      ? `/api/delivery/pedidos/${encodeURIComponent(vendaId)}`
       : `/api/vendas/${vendaId}?incluirFiscal=false`
 
   try {
@@ -58,10 +58,32 @@ export async function resolverEntregadorIdVendaKanban(args: {
       },
       cache: 'no-store',
     })
+    if (!response.ok && tabelaOrigem === 'venda_gestor') {
+      const fallback = await fetch(`/api/vendas/gestor/${vendaId}?incluirFiscal=false`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+        cache: 'no-store',
+      })
+      if (!fallback.ok) return null
+      const fallbackData = (await fallback.json()) as Record<string, unknown>
+      const entregadorIdFallback = String(fallbackData.entregadorId ?? '').trim()
+      if (entregadorIdFallback) {
+        definirEntregadorKanbanCache(vendaId, entregadorIdFallback)
+        return entregadorIdFallback
+      }
+      marcarEntregadorKanbanAusente(vendaId)
+      return null
+    }
     if (!response.ok) return null
 
     const data = (await response.json()) as Record<string, unknown>
-    const entregadorId = String(data.entregadorId ?? '').trim()
+    const entregadorRaw =
+      data.entregador && typeof data.entregador === 'object'
+        ? (data.entregador as Record<string, unknown>).id
+        : data.entregadorId
+    const entregadorId = String(entregadorRaw ?? '').trim()
     if (entregadorId) {
       definirEntregadorKanbanCache(vendaId, entregadorId)
       return entregadorId
@@ -74,17 +96,18 @@ export async function resolverEntregadorIdVendaKanban(args: {
   }
 }
 
-export async function salvarEntregadorVendaGestor(args: {
+export async function salvarEntregadorPedidoDelivery(args: {
   vendaId: string
   entregadorId: string
   token: string
 }): Promise<void> {
   const { vendaId, entregadorId, token } = args
-  const response = await fetch(`/api/vendas/gestor/${vendaId}`, {
+  const response = await fetch(`/api/delivery/pedidos/${encodeURIComponent(vendaId)}`, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
+      Accept: 'application/json',
     },
     body: JSON.stringify({ entregadorId }),
   })
@@ -99,6 +122,15 @@ export async function salvarEntregadorVendaGestor(args: {
   }
 
   definirEntregadorKanbanCache(vendaId, entregadorId)
+}
+
+/** @deprecated Use `salvarEntregadorPedidoDelivery` — mantido para compatibilidade de imports. */
+export async function salvarEntregadorVendaGestor(args: {
+  vendaId: string
+  entregadorId: string
+  token: string
+}): Promise<void> {
+  return salvarEntregadorPedidoDelivery(args)
 }
 
 export type VendaEntregadorKanbanRef = {

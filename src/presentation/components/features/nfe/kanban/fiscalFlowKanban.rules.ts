@@ -1,3 +1,7 @@
+import {
+  isPedidoEntregaComEntregador,
+  isPedidoEntregaKanban,
+} from '@/src/shared/helpers/pedidoEntregaKanban'
 import type { AcaoTransicaoGestor } from '@/src/presentation/hooks/useVendas'
 import type { VendaUnificadaDTO } from '@/src/presentation/hooks/useVendasUnificadas'
 import type {
@@ -31,8 +35,7 @@ export const LABEL_SEM_CLIENTE = 'SEM CLIENTE'
 
 /** Pedidos de retirada não exigem entregador para avançar até Em Rota / Retirada. */
 export function vendaExigeEntregadorParaDespachar(venda: Venda): boolean {
-  const tipo = String(venda.tipoVenda ?? '').trim().toLowerCase()
-  return tipo === 'entrega'
+  return isPedidoEntregaComEntregador(venda.tipoVenda)
 }
 
 /** Fiscal: arrastar entre Finalizadas ↔ Pendente emissão (e para Com nota). */
@@ -62,10 +65,8 @@ export function getLinhaTempoPedidoEntregaKanban(
   /** Timestamp local de transição (DnD ou botão), tem prioridade sobre `dataUltimaModificacao` da API. */
   isoLocalTransicao?: string
 ): { prefixo: string; iso: string } | null {
-  const tipoVendaLower = String(v.tipoVenda ?? '').trim().toLowerCase()
   const entregaGestor =
-    v.tabelaOrigem === 'venda_gestor' &&
-    (tipoVendaLower === 'entrega' || tipoVendaLower === 'retirada')
+    isPedidoEntregaKanban(v.tabelaOrigem, v.tipoVenda, v.statusEtapaOperacional)
   if (!entregaGestor || !COLUNAS_ENTREGA_OPERACIONAIS.includes(columnId)) return null
 
   if (columnId === 'NOVOS_PEDIDOS') {

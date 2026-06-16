@@ -103,7 +103,19 @@ export async function fetchVendaGestorTickets(
     } catch {
       /* ignore */
     }
-    erroImpressao('fetchTickets.http_erro', { vendaId, status: res.status, mensagemApi: err || null })
+    if (res.status === 404) {
+      warnImpressao('fetchTickets.nao_disponivel', {
+        vendaId,
+        status: res.status,
+        motivo: 'endpoint_gestor_ou_pedido_modulo_delivery',
+      })
+    } else {
+      erroImpressao('fetchTickets.http_erro', {
+        vendaId,
+        status: res.status,
+        mensagemApi: err || null,
+      })
+    }
     return { ok: false, status: res.status, error: err }
   }
 

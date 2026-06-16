@@ -3,6 +3,7 @@ import type {
   CanalVendaCatalogo,
   INovoPedidoReadRepository,
 } from '@/src/domain/repositories/INovoPedidoReadRepository'
+import { normalizarListaEntregadoresDelivery } from '@/src/application/mappers/EntregadorDeliveryNormalizer'
 import type { UsuarioPdvEntregadorOption } from '@/src/domain/types/vendaDetalhe'
 
 const PRODUTOS_POR_PAGINA = 100
@@ -54,6 +55,14 @@ export class NovoPedidoReadRepository implements INovoPedidoReadRepository {
         }
       })
       .filter((item: UsuarioPdvEntregadorOption) => item.id && item.nome)
+  }
+
+  async listarEntregadoresDelivery(token: string): Promise<UsuarioPdvEntregadorOption[]> {
+    const data = await fetchJson<unknown>(
+      '/api/delivery/entregadores?ativo=true&limit=100&offset=0',
+      token
+    )
+    return normalizarListaEntregadoresDelivery(data)
   }
 
   async listarProdutosDoGrupo(
@@ -172,6 +181,51 @@ export class NovoPedidoReadRepository implements INovoPedidoReadRepository {
       method: 'PATCH',
       body: JSON.stringify({ pagamentos }),
     })
+  }
+
+  async buscarPedidoDelivery(pedidoId: string, token: string): Promise<Record<string, unknown>> {
+    const raw = await fetchJson<unknown>(
+      `/api/delivery/pedidos/${encodeURIComponent(pedidoId)}`,
+      token
+    )
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+      const o = raw as Record<string, unknown>
+      if (o.data != null && typeof o.data === 'object' && !Array.isArray(o.data)) {
+        return o.data as Record<string, unknown>
+      }
+      return o
+    }
+    return {}
+  }
+
+  async patchPedidoDelivery(
+    pedidoId: string,
+    token: string,
+    body: Record<string, unknown>
+  ): Promise<void> {
+    await fetchJson<unknown>(`/api/delivery/pedidos/${encodeURIComponent(pedidoId)}`, token, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    })
+  }
+
+  async emitirNotaPedidoDelivery(
+    pedidoId: string,
+    token: string,
+    modelo: 55 | 65
+  ): Promise<Record<string, unknown>> {
+    const raw = await fetchJson<unknown>(
+      `/api/delivery/pedidos/${encodeURIComponent(pedidoId)}/emitir-nota`,
+      token,
+      {
+        method: 'POST',
+        body: JSON.stringify({ modelo }),
+      }
+    )
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+      return raw as Record<string, unknown>
+    }
+    return {}
   }
 
   async buscarAuthMe(token: string): Promise<Record<string, unknown> | null> {

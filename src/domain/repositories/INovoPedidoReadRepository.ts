@@ -6,6 +6,8 @@ export type CanalVendaCatalogo = 'balcao' | 'entrega'
 export interface INovoPedidoReadRepository {
   listarEntregadores(token: string): Promise<UsuarioPdvEntregadorOption[]>
 
+  listarEntregadoresDelivery(token: string): Promise<UsuarioPdvEntregadorOption[]>
+
   listarProdutosDoGrupo(
     grupoId: string,
     token: string
@@ -27,6 +29,20 @@ export interface INovoPedidoReadRepository {
     token: string,
     pagamentos: Array<{ meioPagamentoId: string; valor: number }>
   ): Promise<void>
+
+  buscarPedidoDelivery(pedidoId: string, token: string): Promise<Record<string, unknown>>
+
+  patchPedidoDelivery(
+    pedidoId: string,
+    token: string,
+    body: Record<string, unknown>
+  ): Promise<void>
+
+  emitirNotaPedidoDelivery(
+    pedidoId: string,
+    token: string,
+    modelo: 55 | 65
+  ): Promise<Record<string, unknown>>
 
   buscarAuthMe(token: string): Promise<Record<string, unknown> | null>
 

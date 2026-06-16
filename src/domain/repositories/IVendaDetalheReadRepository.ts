@@ -2,6 +2,8 @@ import type { TabelaOrigemVenda } from '@/src/domain/types/vendaDetalhe'
 
 export type LoadVendaOptions = {
   incluirFiscal?: boolean
+  /** Pedido gestor entrega/retirada: prioriza GET módulo delivery. */
+  preferirModuloDelivery?: boolean
 }
 
 export interface IVendaDetalheReadRepository {

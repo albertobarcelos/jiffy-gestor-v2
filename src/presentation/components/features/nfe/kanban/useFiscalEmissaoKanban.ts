@@ -1,5 +1,6 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react'
 import { resolveModeloParaEmitirNota } from '@/src/presentation/hooks/useVendasUnificadas'
+import { deveUsarModuloDeliveryParaEmissaoFiscal } from '@/src/presentation/hooks/useVendas'
 import { showToast } from '@/src/shared/utils/toast'
 import type { Venda } from './types'
 
@@ -11,6 +12,7 @@ export interface VendaSelecionadaParaEmissao {
   origemVenda?: string
   clienteId?: string | null
   clienteNome?: string | null
+  tipoVenda?: string | null
 }
 
 interface UseFiscalEmissaoKanbanParams {
@@ -22,6 +24,7 @@ interface UseFiscalEmissaoKanbanParams {
   }) => Promise<unknown>
   emitirNotaPdv: (payload: { id: string; modelo: 55 | 65 }) => Promise<unknown>
   emitirNotaGestor: (payload: { id: string; modelo: 55 | 65 }) => Promise<unknown>
+  emitirNotaDelivery: (payload: { id: string; modelo: 55 | 65 }) => Promise<unknown>
   refetch: () => Promise<{ data?: { items?: Venda[] } } | unknown>
   setPrimeiroPorColuna: Dispatch<SetStateAction<Record<string, string>>>
   setVendaSelecionadaParaEmissao: Dispatch<SetStateAction<VendaSelecionadaParaEmissao | null>>
@@ -35,6 +38,7 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
     reemitirNfeGestor,
     emitirNotaPdv,
     emitirNotaGestor,
+    emitirNotaDelivery,
     refetch,
     setPrimeiroPorColuna,
     setVendaSelecionadaParaEmissao,
@@ -120,6 +124,21 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
     [getEtapaKanbanParaExibicao, setPrimeiroPorColuna]
   )
 
+  const emitirNotaParaVenda = useCallback(
+    async (venda: Venda, modelo: 55 | 65) => {
+      if (deveUsarModuloDeliveryParaEmissaoFiscal(venda.tabelaOrigem, venda.tipoVenda)) {
+        await emitirNotaDelivery({ id: venda.id, modelo })
+        return
+      }
+      if (venda.tabelaOrigem === 'venda_gestor') {
+        await emitirNotaGestor({ id: venda.id, modelo })
+        return
+      }
+      await emitirNotaPdv({ id: venda.id, modelo })
+    },
+    [emitirNotaDelivery, emitirNotaGestor, emitirNotaPdv]
+  )
+
   const handleEmitirNfe = useCallback(
     async (venda: Venda) => {
       const numeroNotaRejeitada =
@@ -167,11 +186,7 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
           pinVendaComoPrimeiraEmComNotaSolicitada(venda)
           setAcaoFiscalEmAndamento(venda.id, 'emitindo')
           try {
-            if (venda.tabelaOrigem === 'venda_gestor') {
-              await emitirNotaGestor({ id: venda.id, modelo: modeloEmitir })
-            } else {
-              await emitirNotaPdv({ id: venda.id, modelo: modeloEmitir })
-            }
+            await emitirNotaParaVenda(venda, modeloEmitir)
             await refetch()
             await refetchAteMudarStatusFiscal(venda.id, 'REJEITADA')
             return
@@ -194,13 +209,13 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
         origemVenda: venda.origem,
         clienteId: venda.cliente?.id ?? null,
         clienteNome: venda.cliente?.nome ?? null,
+        tipoVenda: venda.tipoVenda,
       })
       setSelectedVendaId(venda.id)
       setEmitirNfeModalOpen(true)
     },
     [
-      emitirNotaGestor,
-      emitirNotaPdv,
+      emitirNotaParaVenda,
       pinVendaComoPrimeiraEmComNotaSolicitada,
       reemitirNfeGestor,
       reemitirNfePdv,

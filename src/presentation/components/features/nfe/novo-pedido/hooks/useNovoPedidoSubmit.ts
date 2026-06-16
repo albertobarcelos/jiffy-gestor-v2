@@ -3,11 +3,16 @@
 import { useCallback, useMemo, useRef } from 'react'
 import type { CriarVendaGestorInputDTO } from '@/src/application/dto/CriarVendaGestorDTO'
 import {
+  CriarPedidoDeliveryUseCase,
+  extrairIdPedidoDeliveryCriado,
+} from '@/src/application/use-cases/delivery/CriarPedidoDeliveryUseCase'
+import {
   CriarVendaGestorUseCase,
   extrairIdVendaCriada,
   validarCriarVendaGestor,
   validarInformacoesPedido,
 } from '@/src/application/use-cases/vendas/CriarVendaGestorUseCase'
+import type { CriarPedidoDeliveryApiRequest } from '@/src/application/dto/api/pedidoDeliveryApi'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { showToast } from '@/src/shared/utils/toast'
 import { validarObservacoesPedido } from '@/src/shared/helpers/observacaoPedido'
@@ -48,7 +53,7 @@ export interface UseNovoPedidoSubmitParams {
   isPending: boolean
   iniciarSubmit: () => boolean
   finalizarSubmit: () => void
-  input: CriarVendaGestorInputDTO
+  input: CriarVendaGestorInputDTO & { telefoneCliente?: string }
   validacao: {
     pedidoDeliveryGestor: boolean
     pedidoGestorComPagamentoNoPasso3: boolean
@@ -63,6 +68,9 @@ export interface UseNovoPedidoSubmitParams {
     mutateAsync: (
       payload: import('@/src/application/dto/api/vendaGestorApi').CriarVendaGestorApiRequest
     ) => Promise<unknown>
+  }
+  createPedidoDelivery?: {
+    mutateAsync: (payload: CriarPedidoDeliveryApiRequest) => Promise<unknown>
   }
   onSuccess: () => void
   onClose: () => void
@@ -85,6 +93,7 @@ export function useNovoPedidoSubmit({
   input,
   validacao,
   createVendaGestor,
+  createPedidoDelivery,
   onSuccess,
   onClose,
   setInternalDialogOpen,
@@ -95,7 +104,8 @@ export function useNovoPedidoSubmit({
   processarAposTransicaoVendaGestorId,
   preferenciasAutoIniciarPreparo,
 }: UseNovoPedidoSubmitParams) {
-  const useCase = useMemo(() => new CriarVendaGestorUseCase(), [])
+  const criarVendaGestorUseCase = useMemo(() => new CriarVendaGestorUseCase(), [])
+  const criarPedidoDeliveryUseCase = useMemo(() => new CriarPedidoDeliveryUseCase(), [])
 
   const handleSubmit = useCallback(async () => {
     if (isPending) return
@@ -152,16 +162,36 @@ export function useNovoPedidoSubmit({
       return
     }
 
+    if (tipoInicioPedido === 'entrega' && !createPedidoDelivery) {
+      showToast.error('Criação de pedido delivery não disponível.')
+      return
+    }
+
     if (!iniciarSubmit()) return
 
     try {
-      const resultado = await useCase.execute(input, payload =>
-        createVendaGestor.mutateAsync(payload)
-      )
-      console.log('✅ Venda criada com sucesso:', resultado)
+      const isPedidoDelivery = tipoInicioPedido === 'entrega'
+
+      const resultado = isPedidoDelivery
+        ? await criarPedidoDeliveryUseCase.execute(
+            {
+              ...input,
+              telefoneCliente:
+                input.telefoneCliente?.trim() ||
+                input.moradaEntregaSelecionada?.telefone?.trim() ||
+                '',
+            },
+            payload => createPedidoDelivery!.mutateAsync(payload)
+          )
+        : await criarVendaGestorUseCase.execute(input, payload =>
+            createVendaGestor.mutateAsync(payload)
+          )
+
       showToast.success('Pedido criado com sucesso!')
 
-      const idCriado = extrairIdVendaCriada(resultado)
+      const idCriado = isPedidoDelivery
+        ? extrairIdPedidoDeliveryCriado(resultado)
+        : extrairIdVendaCriada(resultado)
 
       if (idCriado) {
         setVendaIdCriada(idCriado)
@@ -206,8 +236,10 @@ export function useNovoPedidoSubmit({
     validacao,
     iniciarSubmit,
     finalizarSubmit,
-    useCase,
+    criarVendaGestorUseCase,
+    criarPedidoDeliveryUseCase,
     createVendaGestor,
+    createPedidoDelivery,
     setVendaIdCriada,
     status,
     tipoInicioPedido,

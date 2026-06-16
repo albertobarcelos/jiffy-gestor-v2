@@ -1,0 +1,85 @@
+import type { StatusDeliveryApi } from '@/src/application/dto/api/pedidoDeliveryApi'
+import type {
+  AcaoTransicaoKanbanEntrega,
+  KanbanVendaCachePatch,
+} from '@/src/application/dto/TransicaoKanbanDTO'
+
+function isoDeCampoApi(valor: unknown): string | null {
+  if (valor == null) return null
+  const texto = String(valor).trim()
+  return texto || null
+}
+
+/** Mapeia ação operacional do Kanban gestor → `toStatus` do módulo delivery. */
+export function mapAcaoTransicaoGestorToStatusDelivery(
+  acao: AcaoTransicaoKanbanEntrega
+): StatusDeliveryApi {
+  switch (acao) {
+    case 'iniciar_preparo':
+      return 'EM_PREPARO'
+    case 'marcar_pronto':
+      return 'PRONTO'
+    case 'despachar':
+      return 'EM_ROTA'
+    case 'finalizar':
+      return 'FINALIZADO'
+    case 'cancelar':
+      return 'CANCELADO'
+    default:
+      return 'PENDENTE'
+  }
+}
+
+export function mapAcoesTransicaoGestorToStatusDelivery(
+  acoes: AcaoTransicaoKanbanEntrega[]
+): StatusDeliveryApi[] {
+  return acoes.map(mapAcaoTransicaoGestorToStatusDelivery)
+}
+
+/** Extrai patch de cache do Kanban a partir da resposta PATCH delivery/transicao-status ou GET pedido. */
+export function extrairPatchKanbanDeTransicaoDelivery(data: unknown): KanbanVendaCachePatch {
+  const registro =
+    data && typeof data === 'object' ? (data as Record<string, unknown>) : {}
+
+  const inner =
+    registro.data != null && typeof registro.data === 'object' && !Array.isArray(registro.data)
+      ? (registro.data as Record<string, unknown>)
+      : registro
+
+  const statusEtapaOperacional =
+    isoDeCampoApi(inner.statusDelivery) ?? isoDeCampoApi(registro.statusDelivery)
+
+  return {
+    statusEtapaOperacional,
+    dataUltimaModificacao:
+      isoDeCampoApi(inner.dataUltimaModificacao) ??
+      isoDeCampoApi(registro.dataUltimaModificacao),
+    dataFinalizacao:
+      isoDeCampoApi(inner.dataFinalizacao) ?? isoDeCampoApi(registro.dataFinalizacao),
+  }
+}
+
+/** Unifica resposta gestor (legado) e delivery no patch do Kanban. */
+export function extrairPatchKanbanDeRespostaTransicao(data: unknown): KanbanVendaCachePatch {
+  const delivery = extrairPatchKanbanDeTransicaoDelivery(data)
+  const registro =
+    data && typeof data === 'object' ? (data as Record<string, unknown>) : {}
+
+  const statusGestor =
+    isoDeCampoApi(registro.statusOperacional) ??
+    isoDeCampoApi(registro.status_operacional) ??
+    isoDeCampoApi(registro.statusEtapaOperacional) ??
+    isoDeCampoApi(registro.status_etapa_operacional)
+
+  return {
+    statusEtapaOperacional: delivery.statusEtapaOperacional ?? statusGestor,
+    dataUltimaModificacao:
+      delivery.dataUltimaModificacao ??
+      isoDeCampoApi(registro.dataUltimaModificacao) ??
+      isoDeCampoApi(registro.data_ultima_modificacao),
+    dataFinalizacao:
+      delivery.dataFinalizacao ??
+      isoDeCampoApi(registro.dataFinalizacao) ??
+      isoDeCampoApi(registro.data_finalizacao),
+  }
+}

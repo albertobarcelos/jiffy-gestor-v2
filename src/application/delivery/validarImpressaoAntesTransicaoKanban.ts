@@ -118,6 +118,14 @@ export async function validarImpressaoAntesTransicaoKanban(params: {
 
   const ticketsFetch = await fetchVendaGestorTickets(params.vendaId, params.token)
   if (!ticketsFetch.ok) {
+    if (ticketsFetch.status === 404) {
+      logImpressao('validarTransicao.tickets_indisponivel_permite_transicao', {
+        vendaId: params.vendaId,
+        acoes: params.acoes,
+      })
+      return { podeAvancar: true, abrirModalConfig: false }
+    }
+
     logImpressao('validarTransicao.fetch_tickets_falhou', {
       vendaId: params.vendaId,
       status: ticketsFetch.status,

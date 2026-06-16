@@ -98,6 +98,7 @@ export interface UseCarregarVendaParams {
   vendaIdCriada: string | null
   modoVisualizacao?: boolean
   tabelaOrigemVenda: 'venda' | 'venda_gestor'
+  tipoVendaGestor?: string | null
   meiosPagamentoRef: React.RefObject<MeioPagamentoLike[]>
   getToken: () => string | null | undefined
   onClose: () => void
@@ -110,6 +111,7 @@ export function useCarregarVenda({
   vendaIdCriada,
   modoVisualizacao,
   tabelaOrigemVenda,
+  tipoVendaGestor,
   meiosPagamentoRef,
   getToken,
   onClose,
@@ -134,6 +136,7 @@ export function useCarregarVenda({
     token: getTokenRef.current(),
     enabled: queryEnabled,
     meiosPagamentoCache: meiosPagamentoRef.current ?? [],
+    tipoVendaGestor,
   })
 
   useLayoutEffect(() => {

@@ -56,6 +56,8 @@ interface EntregaClienteSelectorProps {
     estado?: string
   }
   mostrarEnderecos?: boolean
+  /** Catálogo de moradas via módulo delivery (`/api/delivery/clientes`). */
+  usarModuloDeliveryClientes?: boolean
 }
 
 interface FormNovasMorada {
@@ -208,6 +210,7 @@ export function EntregaClienteSelector({
   onDigitosUltimaBuscaExternoChange,
   enderecoPadrao,
   mostrarEnderecos = true,
+  usarModuloDeliveryClientes = false,
 }: EntregaClienteSelectorProps) {
   const telefoneControlado =
     telefoneExibicaoExterno !== undefined &&
@@ -241,10 +244,12 @@ export function EntregaClienteSelector({
   const [formNova, setFormNova] = useState<FormNovasMorada>(FORM_INICIAL)
   const [isLoadingCep, setIsLoadingCep] = useState(false)
 
-  const { data: moradas, isLoading: buscando } = useMoradasPorTelefone(telefoneBuscado)
-  const criarMorada = useCriarMoradaTelefone()
-  const atualizarMorada = useAtualizarMoradaTelefone()
-  const registrarUsoMorada = useRegistrarUsoMoradaTelefone()
+  const moradaHookOptions = { usarModuloDelivery: usarModuloDeliveryClientes }
+
+  const { data: moradas, isLoading: buscando } = useMoradasPorTelefone(telefoneBuscado, moradaHookOptions)
+  const criarMorada = useCriarMoradaTelefone(moradaHookOptions)
+  const atualizarMorada = useAtualizarMoradaTelefone(moradaHookOptions)
+  const registrarUsoMorada = useRegistrarUsoMoradaTelefone(moradaHookOptions)
   const buscarCliente = useBuscarClientePorTelefone()
   const criarCliente = useCriarClienteRapido()
 

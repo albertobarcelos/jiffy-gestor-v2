@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
+import { enrichUnificadoItemsComModuloDelivery } from '@/src/application/mappers/EnrichUnificadoDeliveryMapper'
 
 /**
  * GET /api/vendas/unificado
  * Proxy passthrough para GET /api/v1/vendas/unificado do backend.
- * Parâmetros são repassados diretamente (frontend já envia no formato correto).
+ * Enriquece pedidos do módulo delivery (tipoEntrega + status) quando a view unificada omite campos.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -15,7 +16,6 @@ export async function GET(request: NextRequest) {
     }
     const { tokenInfo } = validation
 
-    // Repassa query params diretamente ao backend
     const { searchParams } = new URL(request.url)
 
     const apiClient = new ApiClient()
@@ -30,7 +30,14 @@ export async function GET(request: NextRequest) {
       }
     )
 
-    return NextResponse.json(response.data || {})
+    const data = response.data || {}
+    const items = Array.isArray(data.items) ? data.items : []
+    const itemsEnriquecidos = await enrichUnificadoItemsComModuloDelivery(
+      items,
+      tokenInfo.token
+    )
+
+    return NextResponse.json({ ...data, items: itemsEnriquecidos })
   } catch (error) {
     console.error('Erro ao buscar vendas unificadas:', error)
     if (error instanceof ApiError) {

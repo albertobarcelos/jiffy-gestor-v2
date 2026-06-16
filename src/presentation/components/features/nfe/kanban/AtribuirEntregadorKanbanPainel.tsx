@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { listarEntregadoresDeliveryUseCase } from '@/src/application/use-cases/delivery/ListarEntregadoresDeliveryUseCase'
+import { adaptPedidoDeliveryToVendaGestorApiResponse } from '@/src/application/mappers/PedidoDeliveryDetalheAdapter'
 import {
   Dialog,
   DialogContent,
@@ -35,7 +37,7 @@ import type {
 } from '@/src/domain/types/vendaDetalhe'
 import {
   resolverEntregadorIdVendaKanban,
-  salvarEntregadorVendaGestor,
+  salvarEntregadorPedidoDelivery,
 } from './entregadorKanbanStore'
 import type { Venda } from './types'
 
@@ -61,36 +63,11 @@ export function AtribuirEntregadorKanbanPainel({
   const [salvando, setSalvando] = useState(false)
 
   const entregadoresQuery = useQuery({
-    queryKey: ['usuarios-pdv-entregadores', { tipoUsuarioPdv: 'entregador' }],
+    queryKey: ['delivery-entregadores', { ativo: true }],
     queryFn: async (): Promise<UsuarioPdvEntregadorOption[]> => {
       const token = auth?.getAccessToken()
       if (!token) return []
-
-      const response = await fetch('/api/usuarios-pdv/entregadores?limit=100&offset=0', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-        cache: 'no-store',
-      })
-
-      if (!response.ok) return []
-
-      const data = await response.json()
-      const items = Array.isArray(data.items) ? data.items : []
-      return items
-        .filter((item: Record<string, unknown>) => {
-          const tipo = String(item.tipoUsuarioPdv ?? '')
-            .trim()
-            .toLowerCase()
-          return tipo === 'entregador'
-        })
-        .map((item: Record<string, unknown>) => ({
-          id: String(item.id ?? item.usuarioId ?? ''),
-          nome: String(item.nome ?? item.name ?? '').trim(),
-          telefone: item.telefone != null ? String(item.telefone) : undefined,
-        }))
-        .filter((item: UsuarioPdvEntregadorOption) => item.id && item.nome)
+      return listarEntregadoresDeliveryUseCase.execute(token)
     },
     enabled: open,
     staleTime: 1000 * 60 * 5,
@@ -123,7 +100,7 @@ export function AtribuirEntregadorKanbanPainel({
 
       if (venda.tabelaOrigem === 'venda_gestor') {
         const response = await fetch(
-          `/api/vendas/gestor/${venda.id}?incluirFiscal=false`,
+          `/api/delivery/pedidos/${encodeURIComponent(venda.id)}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -133,7 +110,8 @@ export function AtribuirEntregadorKanbanPainel({
           }
         )
         if (response.ok) {
-          const vendaData = (await response.json()) as Record<string, unknown>
+          const pedidoRaw = await response.json()
+          const vendaData = adaptPedidoDeliveryToVendaGestorApiResponse(pedidoRaw)
           const taxaDetalhe = await resolverTaxaEntregaDetalheKanban(vendaData, token)
           setTaxaEntregaDetalhe(taxaDetalhe)
         } else {
@@ -181,7 +159,7 @@ export function AtribuirEntregadorKanbanPainel({
 
     setSalvando(true)
     try {
-      await salvarEntregadorVendaGestor({
+      await salvarEntregadorPedidoDelivery({
         vendaId: venda.id,
         entregadorId: entregadorSelecionado,
         token,

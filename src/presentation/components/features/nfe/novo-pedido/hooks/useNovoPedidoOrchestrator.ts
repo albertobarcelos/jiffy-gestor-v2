@@ -3,6 +3,7 @@
 import { useMemo, useRef, useCallback } from 'react'
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
 import {
+  useCreatePedidoDelivery,
   useCreateVendaGestor,
   useCancelarVendaGestor,
   useCancelarNotaFiscalVendaPdv,
@@ -64,6 +65,7 @@ export function useNovoPedidoOrchestrator({
   modoVisualizacao,
   tabelaOrigemVenda = 'venda_gestor',
   statusFiscalUnificado = null,
+  tipoVendaGestor = null,
   tipoInicioPedido = 'balcao',
   abaDetalhesInicial,
 }: NovoPedidoModalProps) {
@@ -72,7 +74,10 @@ export function useNovoPedidoOrchestrator({
   const { processarAposTransicaoVendaGestorId } = useImpressaoDelivery()
   const empresaId = useTenantEmpresaId()
   const createVendaGestor = useCreateVendaGestor()
-  const { iniciarSubmit, finalizarSubmit } = useNovoPedidoSubmitGuard(createVendaGestor.isPending)
+  const createPedidoDelivery = useCreatePedidoDelivery()
+  const createSubmitPending =
+    createVendaGestor.isPending || createPedidoDelivery.isPending
+  const { iniciarSubmit, finalizarSubmit } = useNovoPedidoSubmitGuard(createSubmitPending)
   const cancelarVendaGestor = useCancelarVendaGestor()
   const cancelarNotaFiscalVendaPdv = useCancelarNotaFiscalVendaPdv()
   const cancelarNotaFiscalVendaGestor = useCancelarNotaFiscalVendaGestor()
@@ -384,12 +389,17 @@ export function useNovoPedidoOrchestrator({
   const authRef = useRef(auth)
   authRef.current = auth
 
+  const tipoVendaParaDetalhe =
+    tipoVendaGestor ??
+    (tipoInicioPedido === 'entrega' ? 'entrega' : null)
+
   const { carregarVendaExistente, isLoadingVenda, setIsLoadingVenda } = useCarregarVenda({
     open,
     vendaId,
     vendaIdCriada,
     modoVisualizacao,
     tabelaOrigemVenda,
+    tipoVendaGestor: tipoVendaParaDetalhe,
     meiosPagamentoRef,
     getToken: () => authRef.current?.getAccessToken(),
     onClose,
@@ -487,7 +497,7 @@ export function useNovoPedidoOrchestrator({
   })
 
   const { handleSubmit } = useNovoPedidoSubmit({
-    isPending: createVendaGestor.isPending,
+    isPending: createSubmitPending,
     iniciarSubmit,
     finalizarSubmit,
     input: {
@@ -515,6 +525,7 @@ export function useNovoPedidoOrchestrator({
       valorAPagar,
       meiosPagamento,
       nomesMeiosPagamentoPedido,
+      telefoneCliente: telefoneBuscadoEntrega ?? undefined,
     },
     validacao: {
       pedidoDeliveryGestor,
@@ -527,6 +538,7 @@ export function useNovoPedidoOrchestrator({
       troco,
     },
     createVendaGestor,
+    createPedidoDelivery,
     onSuccess,
     onClose,
     setInternalDialogOpen,
@@ -565,6 +577,7 @@ export function useNovoPedidoOrchestrator({
     totalProdutos,
     totalPagamentosLancados,
     trocoLancamento,
+    usarModuloDeliveryCobrancas: pedidoDeliveryGestor,
   })
 
   const {
@@ -842,7 +855,7 @@ export function useNovoPedidoOrchestrator({
     podeExibirAbaNotaFiscal,
     podeExibirAbaDadosEntrega,
     tipoInicioPedido,
-    createPending: createVendaGestor.isPending,
+    createPending: createSubmitPending,
     canSubmit,
     onSubmit: handleSubmit,
     onNextStep: handleNextStep,

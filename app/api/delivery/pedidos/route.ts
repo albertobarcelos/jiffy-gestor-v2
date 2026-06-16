@@ -2,10 +2,48 @@ import { NextRequest, NextResponse } from 'next/server'
 import { DeliveryRepository } from '@/src/infrastructure/database/repositories/DeliveryRepository'
 import { ListarPedidosUseCase } from '@/src/application/use-cases/delivery/ListarPedidosUseCase'
 import { StatusPedido } from '@/src/domain/entities/StatusPedido'
+import { validateRequest } from '@/src/shared/utils/validateRequest'
+import { ApiClient, ApiError, mensagemLegivelApiError } from '@/src/infrastructure/api/apiClient'
+
+/**
+ * POST /api/delivery/pedidos
+ * Cria pedido no módulo delivery Jiffy (`POST /api/v1/delivery/pedidos`).
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const validation = validateRequest(request)
+    if (!validation.valid || !validation.tokenInfo) {
+      return validation.error!
+    }
+
+    const body = await request.json()
+    const apiClient = new ApiClient()
+    const response = await apiClient.request<unknown>('/api/v1/delivery/pedidos', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${validation.tokenInfo.token}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(body),
+    })
+
+    return NextResponse.json(response.data ?? {}, { status: response.status || 201 })
+  } catch (error) {
+    console.error('Erro ao criar pedido delivery:', error)
+    if (error instanceof ApiError) {
+      return NextResponse.json(
+        { error: mensagemLegivelApiError(error), details: error.data },
+        { status: error.status }
+      )
+    }
+    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
+  }
+}
 
 /**
  * GET /api/delivery/pedidos
- * Lista pedidos de delivery (pendentes por padrão)
+ * Lista pedidos de delivery (pendentes por padrão) — API legada do integrador.
  */
 export async function GET(request: NextRequest) {
   try {

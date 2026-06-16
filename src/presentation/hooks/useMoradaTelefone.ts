@@ -1,8 +1,23 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import {
+  clienteDeliveryParaMoradas,
+  extrairMoradaDeClienteDeliveryResponse,
+  moradaDtoParaEnderecoDeliveryPayload,
+  normalizarClienteDeliveryApi,
+} from '@/src/application/mappers/ClienteDeliveryMoradaMapper'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
+
+export interface MoradaTelefoneHookOptions {
+  /** Usa `GET/POST/PATCH /api/delivery/clientes` em vez de morada-telefone do gestor. */
+  usarModuloDelivery?: boolean
+}
+
+function moradasTelefoneQueryKey(telefone: string | null, usarModuloDelivery: boolean) {
+  return ['moradas-telefone', telefone, usarModuloDelivery ? 'delivery' : 'gestor'] as const
+}
 
 /** Corpo JSON comum em erros do BFF / Nest (`error`, `message`, `title`). */
 function mensagemErroResposta(payload: unknown, status: number, fallback: string): string {
@@ -179,14 +194,43 @@ async function moradaFromResponse(
  * Busca moradas ativas da empresa para o telefone informado.
  * Retorna lista vazia quando não há moradas cadastradas para o número.
  */
-export function useMoradasPorTelefone(telefone: string | null) {
+export function useMoradasPorTelefone(
+  telefone: string | null,
+  options?: MoradaTelefoneHookOptions
+) {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
+  const usarModuloDelivery = options?.usarModuloDelivery ?? false
 
   return useQuery<MoradaTelefone[]>({
-    queryKey: ['moradas-telefone', telefone],
+    queryKey: moradasTelefoneQueryKey(telefone, usarModuloDelivery),
     queryFn: async () => {
       if (!telefone || !token) return []
+
+      if (usarModuloDelivery) {
+        const response = await fetch(
+          `/api/delivery/clientes/${encodeURIComponent(telefone)}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: 'application/json',
+            },
+          }
+        )
+
+        if (response.status === 404) return []
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(
+            mensagemErroResposta(errorData, response.status, 'Erro ao buscar moradas')
+          )
+        }
+
+        const data = await response.json()
+        const cliente = normalizarClienteDeliveryApi(data)
+        return cliente ? clienteDeliveryParaMoradas(cliente) : []
+      }
 
       const response = await fetch(
         `/api/gestor/morada-telefone?telefone=${encodeURIComponent(telefone)}`,
@@ -222,14 +266,87 @@ export function useMoradasPorTelefone(telefone: string | null) {
  * Cria uma nova morada reutilizável para o par empresa + telefone.
  * Invalida o cache de moradas do telefone após sucesso.
  */
-export function useCriarMoradaTelefone() {
+export function useCriarMoradaTelefone(options?: MoradaTelefoneHookOptions) {
   const { auth } = useAuthStore()
   const queryClient = useQueryClient()
   const token = auth?.getAccessToken()
+  const usarModuloDelivery = options?.usarModuloDelivery ?? false
 
   return useMutation({
     mutationFn: async (dto: CriarMoradaTelefoneDTO) => {
       if (!token) throw new Error('Token não encontrado')
+
+      if (usarModuloDelivery) {
+        const enderecoPayload = moradaDtoParaEnderecoDeliveryPayload(dto)
+        const telefone = dto.telefone.replace(/\D/g, '')
+
+        const getResponse = await fetch(
+          `/api/delivery/clientes/${encodeURIComponent(telefone)}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: 'application/json',
+            },
+          }
+        )
+
+        if (getResponse.ok) {
+          const patchResponse = await fetch(
+            `/api/delivery/clientes/${encodeURIComponent(telefone)}`,
+            {
+              method: 'PATCH',
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+              },
+              body: JSON.stringify({
+                enderecos: { create: [enderecoPayload] },
+              }),
+            }
+          )
+
+          if (!patchResponse.ok) {
+            const errorData = await patchResponse.json().catch(() => ({}))
+            throw new Error(
+              mensagemErroResposta(errorData, patchResponse.status, 'Erro ao criar morada')
+            )
+          }
+
+          const patchData = await patchResponse.json()
+          return extrairMoradaDeClienteDeliveryResponse(patchData, dto)
+        }
+
+        if (getResponse.status !== 404) {
+          const errorData = await getResponse.json().catch(() => ({}))
+          throw new Error(
+            mensagemErroResposta(errorData, getResponse.status, 'Erro ao criar morada')
+          )
+        }
+
+        const postResponse = await fetch('/api/delivery/clientes', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify({
+            telefone,
+            enderecos: [enderecoPayload],
+          }),
+        })
+
+        if (!postResponse.ok) {
+          const errorData = await postResponse.json().catch(() => ({}))
+          throw new Error(
+            mensagemErroResposta(errorData, postResponse.status, 'Erro ao criar morada')
+          )
+        }
+
+        const postData = await postResponse.json()
+        return extrairMoradaDeClienteDeliveryResponse(postData, dto)
+      }
 
       const response = await fetch('/api/gestor/morada-telefone', {
         method: 'POST',
@@ -250,7 +367,9 @@ export function useCriarMoradaTelefone() {
       return moradaFromResponse(response, dto)
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['moradas-telefone', variables.telefone] })
+      queryClient.invalidateQueries({
+        queryKey: moradasTelefoneQueryKey(variables.telefone, usarModuloDelivery),
+      })
       showToast.success('Endereço cadastrado com sucesso!')
     },
     onError: (error: Error) => {
@@ -262,10 +381,11 @@ export function useCriarMoradaTelefone() {
 /**
  * Atualiza morada existente (PATCH gestor/morada-telefone/:id).
  */
-export function useAtualizarMoradaTelefone() {
+export function useAtualizarMoradaTelefone(options?: MoradaTelefoneHookOptions) {
   const { auth } = useAuthStore()
   const queryClient = useQueryClient()
   const token = auth?.getAccessToken()
+  const usarModuloDelivery = options?.usarModuloDelivery ?? false
 
   return useMutation({
     mutationFn: async ({
@@ -276,6 +396,38 @@ export function useAtualizarMoradaTelefone() {
       dto: AtualizarMoradaTelefoneDTO
     }) => {
       if (!token) throw new Error('Token não encontrado')
+
+      if (usarModuloDelivery) {
+        const telefone = dto.telefone.replace(/\D/g, '')
+        const enderecoPayload = moradaDtoParaEnderecoDeliveryPayload(dto)
+
+        const response = await fetch(
+          `/api/delivery/clientes/${encodeURIComponent(telefone)}`,
+          {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+            body: JSON.stringify({
+              enderecos: {
+                update: [{ id, ...enderecoPayload }],
+              },
+            }),
+          }
+        )
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(
+            mensagemErroResposta(errorData, response.status, 'Erro ao atualizar morada')
+          )
+        }
+
+        const data = await response.json()
+        return extrairMoradaDeClienteDeliveryResponse(data, dto, id)
+      }
 
       const response = await fetch(`/api/gestor/morada-telefone/${encodeURIComponent(id)}`, {
         method: 'PATCH',
@@ -297,7 +449,7 @@ export function useAtualizarMoradaTelefone() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
-        queryKey: ['moradas-telefone', variables.dto.telefone],
+        queryKey: moradasTelefoneQueryKey(variables.dto.telefone, usarModuloDelivery),
       })
       showToast.success('Endereço atualizado com sucesso!')
     },
@@ -311,10 +463,11 @@ export function useAtualizarMoradaTelefone() {
  * Regista utilização da morada (POST …/registrar-uso) para ordenar como mais recente no catálogo.
  * Deve ser chamado ao selecionar um endereço; não está acoplado ao POST da venda.
  */
-export function useRegistrarUsoMoradaTelefone() {
+export function useRegistrarUsoMoradaTelefone(options?: MoradaTelefoneHookOptions) {
   const { auth } = useAuthStore()
   const queryClient = useQueryClient()
   const token = auth?.getAccessToken()
+  const usarModuloDelivery = options?.usarModuloDelivery ?? false
 
   return useMutation({
     mutationFn: async ({
@@ -326,6 +479,10 @@ export function useRegistrarUsoMoradaTelefone() {
       telefoneDigitos: string
     }) => {
       if (!token) throw new Error('Token não encontrado')
+
+      if (usarModuloDelivery) {
+        return
+      }
 
       const response = await fetch(
         `/api/gestor/morada-telefone/${encodeURIComponent(id)}/registrar-uso`,
@@ -347,7 +504,7 @@ export function useRegistrarUsoMoradaTelefone() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
-        queryKey: ['moradas-telefone', variables.telefoneDigitos],
+        queryKey: moradasTelefoneQueryKey(variables.telefoneDigitos, usarModuloDelivery),
       })
     },
     onError: (error: Error) => {

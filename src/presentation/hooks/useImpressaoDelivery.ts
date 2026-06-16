@@ -118,6 +118,13 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
         if (!ticketsPayload) {
           const ticketsFetch = await fetchVendaGestorTickets(venda.id, token)
           if (!ticketsFetch.ok) {
+            if (ticketsFetch.status === 404) {
+              warnImpressao('hook.fetch_tickets_404_modulo_delivery', {
+                vendaId: venda.id,
+                acao,
+              })
+              continue
+            }
             erroImpressao('hook.fetch_tickets_erro', {
               vendaId: venda.id,
               status: ticketsFetch.status,
@@ -242,6 +249,11 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
 
       const ticketsFetch = await fetchVendaGestorTickets(venda.id, token)
       if (!ticketsFetch.ok) {
+        if (ticketsFetch.status === 404) {
+          warnImpressao('hook.reimpressao.fetch_404_modulo_delivery', { vendaId: venda.id })
+          showToast.info('Impressão de cupons ainda não disponível para pedidos do módulo delivery.')
+          return
+        }
         erroImpressao('hook.reimpressao.fetch_erro', { status: ticketsFetch.status })
         showToast.error(ticketsFetch.error || 'Não foi possível carregar os tickets do pedido.')
         return

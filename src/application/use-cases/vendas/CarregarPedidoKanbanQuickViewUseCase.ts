@@ -17,6 +17,7 @@ import type {
   FluxoPagamentoEntrega,
   TabelaOrigemVenda,
 } from '@/src/domain/types/vendaDetalhe'
+import { deveUsarModuloDeliveryParaDetalhe } from '@/src/application/mappers/PedidoDeliveryDetalheAdapter'
 import { vendaDetalheReadRepository } from '@/src/infrastructure/api/repositories/VendaDetalheReadRepository'
 
 export interface ProdutoKanbanQuickView {
@@ -158,6 +159,7 @@ export class CarregarPedidoKanbanQuickViewUseCase {
     const { vendaId, tabelaOrigem, token } = params
     const vendaData = (await this.repo.loadVenda(vendaId, tabelaOrigem, token, {
       incluirFiscal: false,
+      preferirModuloDelivery: deveUsarModuloDeliveryParaDetalhe(tabelaOrigem),
     })) as Record<string, unknown>
 
     let detalhesEntrega = mapDetalhesEntregaFromVendaApi(vendaData)
@@ -187,7 +189,22 @@ export class CarregarPedidoKanbanQuickViewUseCase {
     let nomeEntregador = detalhesEntrega.entregadorNome?.trim() || ''
     let telefoneEntregador: string | null = null
 
-    if (entregadorData) {
+    const entregadorNested =
+      vendaData.entregador && typeof vendaData.entregador === 'object'
+        ? (vendaData.entregador as Record<string, unknown>)
+        : null
+
+    if (entregadorNested) {
+      nomeEntregador =
+        String(entregadorNested.nome ?? entregadorNested.name ?? '').trim() || nomeEntregador
+      const telefone = String(entregadorNested.telefone ?? entregadorNested.celular ?? '').trim()
+      telefoneEntregador = telefone || null
+      if (nomeEntregador) {
+        detalhesEntrega = { ...detalhesEntrega, entregadorNome: nomeEntregador }
+      }
+    }
+
+    if (!nomeEntregador && entregadorData) {
       nomeEntregador = String(entregadorData.nome ?? entregadorData.name ?? '').trim()
       const telefone = String(entregadorData.telefone ?? entregadorData.celular ?? '').trim()
       telefoneEntregador = telefone || null

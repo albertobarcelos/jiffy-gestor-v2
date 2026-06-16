@@ -11,6 +11,8 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
+
   try {
     const validation = validateRequest(request)
     if (!validation.valid || !validation.tokenInfo) {
@@ -18,7 +20,6 @@ export async function GET(
     }
     const { tokenInfo } = validation
 
-    const { id } = await params
     if (!id) {
       return NextResponse.json({ error: 'ID da venda é obrigatório' }, { status: 400 })
     }
@@ -50,6 +51,17 @@ export async function GET(
 
     return NextResponse.json(response.data ?? {})
   } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      logImpressaoBff('bff.gestor.vendas.tickets.nao_disponivel', {
+        vendaId: id,
+        motivo: 'endpoint_gestor_ou_pedido_modulo_delivery',
+      })
+      return NextResponse.json(
+        { error: error.message || 'Tickets não disponíveis para este pedido' },
+        { status: 404 }
+      )
+    }
+
     erroImpressaoBff('bff.gestor.vendas.tickets.erro', {
       mensagem: error instanceof Error ? error.message : String(error),
     })

@@ -14,6 +14,8 @@ export interface NovoPedidoModalProps {
   tabelaOrigemVenda?: 'venda' | 'venda_gestor'
   /** `statusFiscal` do GET vendas unificado (Kanban) */
   statusFiscalUnificado?: string | null
+  /** `tipoVenda` do unificado (Kanban) — orienta GET delivery vs gestor no detalhe. */
+  tipoVendaGestor?: string | null
   /** Ao abrir detalhes (step 4), seleciona esta aba — ex.: pagamentos antes de finalizar. */
   abaDetalhesInicial?: AbaDetalhesPedido
   /**

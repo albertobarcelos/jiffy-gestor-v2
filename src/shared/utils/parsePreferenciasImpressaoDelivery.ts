@@ -37,15 +37,25 @@ function modoNormalizado(v: unknown): ModoImpressaoDelivery {
 
 /**
  * Extrai preferências de impressão delivery do JSON de empresa (`GET /api/empresas/me`).
- * Campos oficiais em `parametroEmpresa`. Mantém aliases legados do front antigo.
+ * Campos oficiais em `parametroDelivery` (backend). Mantém aliases em `parametroEmpresa` legado.
  */
 export function parsePreferenciasImpressaoDelivery(
   data: Record<string, unknown>
 ): PreferenciasImpressaoDelivery {
-  const param = (data.parametroEmpresa ?? data.parametro_empresa) as Record<string, unknown> | undefined
+  const paramDelivery = (data.parametroDelivery ?? data.parametro_delivery) as
+    | Record<string, unknown>
+    | undefined
+  const paramEmpresa = (data.parametroEmpresa ?? data.parametro_empresa) as
+    | Record<string, unknown>
+    | undefined
   const root = data
   const pick = (k: string): unknown =>
-    param?.[k] ?? root[k] ?? param?.[snake(k)] ?? root[snake(k)]
+    paramDelivery?.[k] ??
+    paramDelivery?.[snake(k)] ??
+    paramEmpresa?.[k] ??
+    root[k] ??
+    paramEmpresa?.[snake(k)] ??
+    root[snake(k)]
 
   const modoImp = modoNormalizado(
     pick('modoImpressaoDelivery') ?? pick('modo_impressao_delivery')

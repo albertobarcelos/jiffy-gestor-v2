@@ -1,14 +1,14 @@
 import type { InfiniteData, QueryClient } from '@tanstack/react-query'
+import type { KanbanVendaCachePatch } from '@/src/application/dto/TransicaoKanbanDTO'
+import { extrairPatchKanbanDeRespostaTransicao } from '@/src/application/mappers/TransicaoPedidoDeliveryMapper'
+
+export type { KanbanVendaCachePatch } from '@/src/application/dto/TransicaoKanbanDTO'
+export { extrairPatchKanbanDeRespostaTransicao }
+
 import {
   VendaUnificadaDTO,
   type VendasUnificadasResponse,
 } from '@/src/presentation/hooks/useVendasUnificadas'
-
-export type KanbanVendaCachePatch = {
-  statusEtapaOperacional?: string | null
-  dataUltimaModificacao?: string | null
-  dataFinalizacao?: string | null
-}
 
 function isoDeCampoApi(valor: unknown): string | null {
   if (valor == null) return null
@@ -16,7 +16,7 @@ function isoDeCampoApi(valor: unknown): string | null {
   return texto || null
 }
 
-/** Extrai campos operacionais da resposta de POST /vendas/gestor/:id/transicoes. */
+/** Extrai campos operacionais da resposta de POST /vendas/gestor/:id/transicoes (legado). */
 export function extrairPatchKanbanDeTransicaoGestor(data: unknown): KanbanVendaCachePatch {
   const registro =
     data && typeof data === 'object' ? (data as Record<string, unknown>) : {}
@@ -102,6 +102,35 @@ export function patchVendaUnificadaInfiniteCache(
   return encontrou
 }
 
+/** Sincroniza pedido delivery gestor via GET leve (substitui refetch da lista inteira). */
+export async function sincronizarPedidoDeliveryKanbanEmBackground(
+  queryClient: QueryClient,
+  queryKey: readonly unknown[],
+  vendaId: string,
+  token: string
+): Promise<void> {
+  try {
+    const response = await fetch(`/api/delivery/pedidos/${encodeURIComponent(vendaId)}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      },
+      cache: 'no-store',
+    })
+    if (!response.ok) return
+
+    const data = await response.json()
+    patchVendaUnificadaInfiniteCache(
+      queryClient,
+      queryKey,
+      vendaId,
+      extrairPatchKanbanDeRespostaTransicao(data)
+    )
+  } catch {
+    /* falha silenciosa — cache otimista + patch da transição já atualizaram a UI */
+  }
+}
+
 /** Sincroniza uma venda gestor via GET leve (substitui refetch da lista inteira). */
 export async function sincronizarVendaGestorKanbanEmBackground(
   queryClient: QueryClient,
@@ -124,7 +153,7 @@ export async function sincronizarVendaGestorKanbanEmBackground(
       queryClient,
       queryKey,
       vendaId,
-      extrairPatchKanbanDeTransicaoGestor(data)
+      extrairPatchKanbanDeRespostaTransicao(data)
     )
   } catch {
     /* falha silenciosa — cache otimista + patch da transição já atualizaram a UI */

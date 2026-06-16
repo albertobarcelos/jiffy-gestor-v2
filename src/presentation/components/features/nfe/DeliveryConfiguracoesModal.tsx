@@ -98,7 +98,6 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
   const token = auth?.getAccessToken()
   const {
     empresa,
-    parametroEmpresa: parametroEmpresaRemoto,
     preferenciasImpressaoDelivery,
     deliveryCupomTemplate: cupomTemplateRemoto,
     isLoading: carregandoEmpresaMe,
@@ -107,7 +106,6 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
   const estacaoImpressaoQuery = useDeliveryConfigEstacaoImpressao(open)
   const invalidateDeliveryConfigQueries = useInvalidateDeliveryConfigImpressaoQueries()
 
-  const [parametroEmpresaDraft, setParametroEmpresaDraft] = useState<Record<string, unknown>>({})
   const [modoImpressao, setModoImpressao] = useState<ModoImpressaoDelivery>('unificado')
   const [copiasUnificado, setCopiasUnificado] = useState(1)
   const [autoIniciarPreparoNovosPedidos, setAutoIniciarPreparoNovosPedidos] = useState(true)
@@ -156,7 +154,6 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
 
     const prefs = preferenciasImpressaoDelivery
     formularioHidratadoRef.current = true
-    setParametroEmpresaDraft({ ...parametroEmpresaRemoto })
     setModoImpressao(prefs.modo)
     setCopiasUnificado(Math.min(99, Math.max(1, prefs.copiasCupomUnificado)))
     setAutoIniciarPreparoNovosPedidos(prefs.autoIniciarPreparoNovosPedidos)
@@ -168,7 +165,6 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
     open,
     carregandoEmpresaMe,
     empresa?.id,
-    parametroEmpresaRemoto,
     preferenciasImpressaoDelivery,
     cupomTemplateRemoto,
   ])
@@ -240,22 +236,15 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
     const empresaId = empresa?.id
     if (!token || !empresaId) return
 
-    const parametroEmpresa: Record<string, unknown> = {
-      ...parametroEmpresaDraft,
+    const expId = impressoraExpedicaoId.trim()
+    const parametroDelivery = {
       modoImpressaoDelivery: modoImpressao,
       copiasCupomUnificado: Math.min(99, Math.max(1, Math.floor(Number(copiasUnificado)) || 1)),
       autoIniciarPreparoNovosPedidos,
       imprimirAoReceber,
       imprimirAoFicarPronto,
+      impressoraExpedicaoId: expId || null,
     }
-
-    delete parametroEmpresa.impressoraExpedicaoId
-    delete parametroEmpresa.impressora_expedicao_id
-    delete parametroEmpresa.cupomDeliveryTemplate
-    delete parametroEmpresa.modeloCupomDelivery
-
-    const expId = impressoraExpedicaoId.trim()
-    parametroEmpresa.impressoraExpedicaoId = expId || null
 
     const payload = impressorasLogicas
       .map(i => ({
@@ -272,7 +261,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ parametroEmpresa }),
+        body: JSON.stringify({ parametroDelivery }),
       })
 
       if (!patchRes.ok) {
@@ -307,7 +296,6 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
     copiasUnificado,
     cupomTemplate,
     mapeamentos,
-    parametroEmpresaDraft,
     invalidateDeliveryConfigQueries,
     token,
   ])

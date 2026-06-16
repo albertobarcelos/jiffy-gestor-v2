@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Dialog, DialogContent, DialogFooter } from '@/src/presentation/components/ui/dialog'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
-import { useEmitirNfe, useEmitirNfeGestor } from '@/src/presentation/hooks/useVendas'
+import { useEmitirNfe, useEmitirNfeGestor, useEmitirNfeDelivery, deveUsarModuloDeliveryParaEmissaoFiscal } from '@/src/presentation/hooks/useVendas'
 import { showToast } from '@/src/shared/utils/toast'
 import { MdClose, MdEdit } from 'react-icons/md'
 import {
@@ -36,6 +36,7 @@ interface EmitirNfeModalProps {
   /** ID do cliente vinculado — NF-e (modelo 55) exige cliente cadastrado */
   clienteId?: string | null
   tabelaOrigem?: 'venda' | 'venda_gestor'
+  tipoVenda?: string | null
   /** Chamado após salvar o cadastro do cliente no modal de edição (ex.: refetch da lista). */
   onClienteSalvo?: () => void
 }
@@ -50,12 +51,18 @@ export function EmitirNfeModal({
   clienteNome,
   clienteId,
   tabelaOrigem = 'venda',
+  tipoVenda,
   onClienteSalvo,
 }: EmitirNfeModalProps) {
   const emitirNfePdv = useEmitirNfe()
   const emitirNfeGestor = useEmitirNfeGestor()
+  const emitirNfeDelivery = useEmitirNfeDelivery()
 
-  const emitirNfe = tabelaOrigem === 'venda_gestor' ? emitirNfeGestor : emitirNfePdv
+  const usarModuloDelivery = deveUsarModuloDeliveryParaEmissaoFiscal(tabelaOrigem, tipoVenda)
+  const emitirNfe =
+    usarModuloDelivery ? emitirNfeDelivery
+    : tabelaOrigem === 'venda_gestor' ? emitirNfeGestor
+    : emitirNfePdv
   const [emissaoEmProcessamento, setEmissaoEmProcessamento] = useState(false)
   const [modeloEmitindo, setModeloEmitindo] = useState<55 | 65 | null>(null)
   /** CPF do consumidor para NFC-e (UI preparada; envio ao backend pendente). */

@@ -169,6 +169,7 @@ export function TopNav() {
         children: [
           { name: 'Perfis PDV', path: '/perfis-usuarios-pdv', icon: MdGroup },
           { name: 'Usuários PDV', path: '/usuarios', icon: MdPerson },
+          { name: 'Entregadores', path: '/entregadores', icon: MdDeliveryDining },
           { name: 'Clientes', path: '/clientes', icon: MdPeople },
         ],
       },
