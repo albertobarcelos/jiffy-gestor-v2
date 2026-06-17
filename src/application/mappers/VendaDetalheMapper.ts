@@ -1,5 +1,11 @@
 import { pagamentoEstaCancelado } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import { textoFromObservacoesApi } from '@/src/shared/helpers/observacaoPedido'
+import {
+  enderecoEntregaDetalheTemConteudo,
+  extrairEnderecoEntregaDeClienteDeliveryApi,
+  extrairTelefoneClienteDeliveryDeFontes,
+  normalizarClienteDeliveryApi,
+} from '@/src/application/mappers/ClienteDeliveryMoradaMapper'
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
 import type {
   DetalhesEntregaPedido,
@@ -90,9 +96,81 @@ export function mergeClienteDetalhesEntrega(
 
     const tel = String(clienteApi.telefone ?? clienteApi.celular ?? '').trim()
     if (tel) next.clienteCelular = tel
+
+    if (
+      !enderecoEntregaDetalheTemConteudo(next.enderecoEntrega) &&
+      clienteApi.endereco != null
+    ) {
+      const enderecoGestor = mapEnderecoEntrega(clienteApi.endereco)
+      if (enderecoGestor) next.enderecoEntrega = enderecoGestor
+    }
   }
 
   return next
+}
+
+export type FetchClienteDeliveryPorTelefone = (
+  telefone: string
+) => Promise<Record<string, unknown> | null>
+
+/**
+ * Resolve endereço de entrega para pedidos delivery (módulo `/api/delivery/clientes`).
+ * Prioriza moradas do cliente delivery; fallback: endereço do cliente gestor ou snapshot legado na venda.
+ */
+export async function resolverEnderecoEntregaDetalhePedido(args: {
+  vendaData: Record<string, unknown>
+  detalhesEntrega: DetalhesEntregaPedido
+  clienteApi?: Record<string, unknown> | null
+  /** Pedido carregado via GET `/delivery/pedidos/{id}` — prioriza catálogo delivery. */
+  preferirModuloDelivery?: boolean
+  fetchClienteDelivery?: FetchClienteDeliveryPorTelefone
+}): Promise<EnderecoEntregaDetalhe | null | undefined> {
+  const { vendaData, detalhesEntrega, clienteApi, preferirModuloDelivery, fetchClienteDelivery } =
+    args
+
+  const tipo = String(vendaData.tipoEntrega ?? vendaData.tipoVenda ?? '')
+    .trim()
+    .toLowerCase()
+  if (tipo === 'retirada') {
+    return detalhesEntrega.enderecoEntrega
+  }
+
+  const snapshotVenda = mapEnderecoEntrega(vendaData.enderecoEntrega)
+  const embeddedRaw = vendaData.clienteDelivery ?? vendaData.cliente_delivery
+  const embeddedCliente = normalizarClienteDeliveryApi(embeddedRaw)
+  const enderecoEmbedded = extrairEnderecoEntregaDeClienteDeliveryApi(embeddedCliente)
+
+  const telefone = extrairTelefoneClienteDeliveryDeFontes(vendaData, clienteApi)
+  let enderecoDeliveryApi: EnderecoEntregaDetalhe | null = null
+
+  if (fetchClienteDelivery && telefone) {
+    const rawClienteDelivery = await fetchClienteDelivery(telefone)
+    const clienteDelivery = normalizarClienteDeliveryApi(rawClienteDelivery)
+    enderecoDeliveryApi = extrairEnderecoEntregaDeClienteDeliveryApi(clienteDelivery)
+  }
+
+  const enderecoGestorCliente =
+    clienteApi?.endereco != null ? mapEnderecoEntrega(clienteApi.endereco) : null
+
+  if (preferirModuloDelivery) {
+    return (
+      enderecoDeliveryApi ??
+      enderecoEmbedded ??
+      enderecoGestorCliente ??
+      snapshotVenda ??
+      detalhesEntrega.enderecoEntrega ??
+      null
+    )
+  }
+
+  return (
+    snapshotVenda ??
+    enderecoDeliveryApi ??
+    enderecoEmbedded ??
+    enderecoGestorCliente ??
+    detalhesEntrega.enderecoEntrega ??
+    null
+  )
 }
 
 function parseNumeroTaxa(raw: unknown): number | null {

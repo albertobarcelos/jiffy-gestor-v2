@@ -17,6 +17,7 @@ interface PedidoEntregaQuickViewPopoverProps {
   tabelaOrigem: 'venda' | 'venda_gestor'
   colunaAtual: ColunaKanbanId
   tipoVenda: 'entrega' | 'retirada'
+  observacaoPedidoHint?: string | null
   anchorEl: HTMLElement | null
   open: boolean
   onClose: () => void
@@ -33,6 +34,7 @@ export function PedidoEntregaQuickViewPopover({
   tabelaOrigem,
   colunaAtual,
   tipoVenda,
+  observacaoPedidoHint,
   anchorEl,
   open,
   onClose,
@@ -66,6 +68,8 @@ export function PedidoEntregaQuickViewPopover({
         vendaId,
         tabelaOrigem,
         token,
+        tipoVenda,
+        observacaoPedidoHint,
         forcarAtualizacao: Boolean(cacheLocal),
       })
       setDados(resultado)
@@ -77,7 +81,7 @@ export function PedidoEntregaQuickViewPopover({
     } finally {
       setLoading(false)
     }
-  }, [auth, tabelaOrigem, vendaId])
+  }, [auth, observacaoPedidoHint, tabelaOrigem, tipoVenda, vendaId])
 
   useEffect(() => {
     if (!open) {

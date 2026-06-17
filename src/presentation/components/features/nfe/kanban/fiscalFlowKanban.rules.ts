@@ -4,6 +4,7 @@ import {
 } from '@/src/shared/helpers/pedidoEntregaKanban'
 import type { AcaoTransicaoGestor } from '@/src/presentation/hooks/useVendas'
 import type { VendaUnificadaDTO } from '@/src/presentation/hooks/useVendasUnificadas'
+import type { ModoKanbanVendas } from '../KanbanModoVendasToggle'
 import type {
   ColunaKanbanId,
   CriterioOrdenacaoKanban,
@@ -87,6 +88,29 @@ export function getLinhaTempoPedidoEntregaKanban(
 /** Pedidos delivery gestor com pagamento ainda não quitado (não pode ir para Finalizadas). */
 export function vendaPrecisaConfirmarPagamentoParaFinalizar(venda: Venda): boolean {
   return venda.precisaConfirmarPagamentoParaFinalizar()
+}
+
+/**
+ * Cobrança em aberto ou status financeiro desconhecido no card.
+ * O GET /vendas/unificado não expõe `statusFinanceiro`; o valor só entra no cache após transição/GET delivery.
+ */
+export function vendaCobrancaEmAbertoOuIndeterminadaKanban(venda: VendaUnificadaDTO): boolean {
+  if (!venda.isPedidoEntregaGestor()) return false
+  const status = String(venda.statusFinanceiro ?? '').trim().toLowerCase()
+  if (status === 'pago' || status === 'cancelado') return false
+  if (status === 'pendente' || status === 'parcial') return true
+  return !status
+}
+
+/** Atalho no card: confirmar cobrança sem abrir o modal de detalhes (coluna Em Rota / Retirada). */
+export function deveExibirBotaoSalvarCobrancaKanban(
+  columnId: ColunaKanbanId,
+  venda: VendaUnificadaDTO,
+  modoKanbanVendas: ModoKanbanVendas
+): boolean {
+  if (modoKanbanVendas !== 'delivery') return false
+  if (columnId !== 'EM_ROTA') return false
+  return vendaCobrancaEmAbertoOuIndeterminadaKanban(venda)
 }
 
 /** Encadeia transições ao soltar à direita (ex.: Novos → Em rota = preparo + pronto + despacho). */
@@ -204,6 +228,35 @@ export function deveExibirBotaoEmitirNotaNoKanban(
   if (columnId === 'PENDENTE_EMISSAO') return true
   if (columnId === 'FINALIZADAS' && venda.isPedidoEntregaGestor()) return true
   return false
+}
+
+/** Delivery (gestor entrega/retirada ou integradores): pedido já concluído na operação. */
+export function isPedidoTipoDeliveryKanban(venda: VendaUnificadaDTO): boolean {
+  return venda.isDelivery() || venda.isPedidoEntregaGestor()
+}
+
+/**
+ * Botão "Observação" no card:
+ * - Delivery: oculto em Finalizadas, Pendente emissão e Com nota solicitada (pedido já entregue).
+ * - Balcão / PDV: visível em Finalizadas; oculto em Pendente emissão e Com nota solicitada.
+ */
+export function deveExibirBotaoObservacaoPedidoKanban(
+  columnId: ColunaKanbanId,
+  venda: VendaUnificadaDTO
+): boolean {
+  if (isPedidoTipoDeliveryKanban(venda)) {
+    return (
+      columnId !== 'FINALIZADAS' &&
+      columnId !== 'PENDENTE_EMISSAO' &&
+      columnId !== 'COM_NFE'
+    )
+  }
+
+  if (columnId === 'PENDENTE_EMISSAO' || columnId === 'COM_NFE') {
+    return false
+  }
+
+  return true
 }
 
 /** Venda sem nome de cliente preenchido (nome vazio ou só espaços). */

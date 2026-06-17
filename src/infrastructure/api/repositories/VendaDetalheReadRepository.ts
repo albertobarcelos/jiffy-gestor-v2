@@ -119,6 +119,15 @@ export class VendaDetalheReadRepository implements IVendaDetalheReadRepository {
     return fetchJson<Record<string, unknown>>(`/api/clientes/${clienteId}`, token)
   }
 
+  fetchClienteDeliveryByTelefone(telefone: string, token: string) {
+    const digits = telefone.replace(/\D/g, '')
+    if (digits.length < 10) return Promise.resolve(null)
+    return fetchJson<Record<string, unknown>>(
+      `/api/delivery/clientes/${encodeURIComponent(digits)}`,
+      token
+    )
+  }
+
   fetchUsuarioPdv(usuarioId: string, token: string) {
     return fetchJson<Record<string, unknown>>(`/api/usuarios/${usuarioId}`, token)
   }

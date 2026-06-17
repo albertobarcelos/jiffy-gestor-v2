@@ -14,6 +14,7 @@ import {
   taxaEntregaTemValor,
 } from '@/src/application/mappers/PedidoDisplayMapper'
 import type { DetalhesEntregaPedido, FluxoPagamentoEntrega, PagamentoSelecionado } from '../types'
+import { PedidoDetalhesObservacoesSection } from './PedidoDetalhesObservacoesSection'
 
 function LinhaDetalhe({ label, value }: { label: string; value: ReactNode }) {
   return (
@@ -33,6 +34,7 @@ export interface PedidoEntregaDetalheConteudoProps {
   valorPedido?: number | null
   nomeEntregador?: string | null
   trocoExibicao?: number | null
+  observacaoPedido?: string | null
   exibirTitulo?: boolean
   className?: string
 }
@@ -46,6 +48,7 @@ export function PedidoEntregaDetalheConteudo({
   valorPedido,
   nomeEntregador,
   trocoExibicao,
+  observacaoPedido,
   exibirTitulo = true,
   className = '',
 }: PedidoEntregaDetalheConteudoProps) {
@@ -116,12 +119,6 @@ export function PedidoEntregaDetalheConteudo({
           formatarDataDetalhePedido
         )}
       />
-      <div className="flex flex-col gap-1 px-1">
-        <span className="text-gray-600">Observação do Pedido:</span>
-        <span className="font-medium leading-snug">
-          {detalhesEntrega?.observacaoPedido?.trim() || '—'}
-        </span>
-      </div>
       <LinhaDetalhe
         label="Data Início Preparo:"
         value={formatarDataDetalhePedido(detalhesEntrega?.dataInicioPreparo)}
@@ -133,6 +130,13 @@ export function PedidoEntregaDetalheConteudo({
       <LinhaDetalhe
         label="Data da Saída (entrega):"
         value={formatarDataDetalhePedido(detalhesEntrega?.dataSaidaEntrega)}
+      />
+      <PedidoDetalhesObservacoesSection
+        observacaoPedido={observacaoPedido}
+        observacaoPedidoEntrega={detalhesEntrega?.observacaoPedido}
+        incluirObservacoesItens={false}
+        exibirTituloSecao={false}
+        className="border-t border-gray-100 pt-2"
       />
     </div>
   )

@@ -19,6 +19,7 @@ import { PedidoDetalhesNotaFiscal } from './PedidoDetalhesNotaFiscal'
 import { PedidoDetalhesPagamentos } from './PedidoDetalhesPagamentos'
 import { PedidoDetalhesProdutos } from './PedidoDetalhesProdutos'
 import { PedidoDetalhesEntrega } from './PedidoDetalhesEntrega'
+import { PedidoDetalhesObservacoesSection } from './PedidoDetalhesObservacoesSection'
 import { useNovoPedidoDetalheContext } from '../context/NovoPedidoDetalheContext'
 import { useNovoPedidoFormContext } from '../context/NovoPedidoFormContext'
 import { useNovoPedidoUIContext } from '../context/NovoPedidoUIContext'
@@ -326,6 +327,13 @@ export function PedidoDetalhesView() {
                               </span>
                             </div>
                           )}
+                          <PedidoDetalhesObservacoesSection
+                            observacaoPedido={observacaoPedido}
+                            observacaoPedidoEntrega={detalhesEntregaPedido?.observacaoPedido}
+                            incluirObservacoesItens={false}
+                            exibirTituloSecao={false}
+                            className="border-t border-gray-200 pt-3"
+                          />
                         </div>
                       </PedidoDetalhesInfo>
                     )}
@@ -497,18 +505,14 @@ export function PedidoDetalhesView() {
                                   )
                                 })}
                               </div>
-                              {(observacaoPedido.trim() ||
-                                detalhesEntregaPedido?.observacaoPedido?.trim()) && (
-                                <div className="mt-2 border-t border-gray-200 px-1 pt-2">
-                                  <p className="text-[11px] font-semibold text-gray-700">
-                                    Observação do pedido
-                                  </p>
-                                  <p className="text-[11px] leading-snug text-gray-600">
-                                    {observacaoPedido.trim() ||
-                                      detalhesEntregaPedido?.observacaoPedido?.trim()}
-                                  </p>
-                                </div>
-                              )}
+                              <PedidoDetalhesObservacoesSection
+                                observacaoPedido={observacaoPedido}
+                                observacaoPedidoEntrega={detalhesEntregaPedido?.observacaoPedido}
+                                produtos={produtos}
+                                variant="compact"
+                                incluirObservacoesItens={false}
+                                className="mt-2 border-t border-gray-200 px-1 pt-2"
+                              />
                             </div>
                           ) : (
                             <div className="flex items-center justify-center py-4">

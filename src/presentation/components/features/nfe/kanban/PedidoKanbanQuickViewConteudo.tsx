@@ -175,6 +175,11 @@ export function PedidoKanbanQuickViewConteudo({
                 <p className="text-[11px] leading-tight text-gray-800">
                   {produto.quantidade}x {produto.nome}
                 </p>
+                {produto.observacao?.trim() ? (
+                  <p className="pl-2 text-[10px] leading-tight text-gray-500">
+                    Obs: {produto.observacao.trim()}
+                  </p>
+                ) : null}
                 {produto.complementos.map((comp, compIndex) => (
                   <p
                     key={`${comp.nome}-${compIndex}`}
@@ -187,6 +192,15 @@ export function PedidoKanbanQuickViewConteudo({
             ))}
           </div>
         )}
+
+        {dados.observacaoPedido?.trim() ? (
+          <div className="pt-1">
+            <p className="text-[11px] leading-tight text-gray-600">
+              <span className="font-semibold text-gray-700">Obs. pedido:</span>{' '}
+              {dados.observacaoPedido.trim()}
+            </p>
+          </div>
+        ) : null}
 
         <div className="space-y-0.5 pt-1">
           <LinhaTotal label="Total do Pedido" valor={transformarParaReal(dados.totalItens)} />

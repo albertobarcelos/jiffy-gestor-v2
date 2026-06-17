@@ -1,4 +1,5 @@
 import type { EtiquetaEnderecoDeliveryApi } from '@/src/application/dto/api/pedidoDeliveryApi'
+import type { EnderecoEntregaDetalhe } from '@/src/domain/types/vendaDetalhe'
 import type {
   CriarMoradaTelefoneDTO,
   EnderecoMorada,
@@ -135,6 +136,73 @@ export function moradaDtoParaEnderecoDeliveryPayload(dto: CriarMoradaTelefoneDTO
     cep: onlyDigits(e.cep),
     complemento: e.complemento?.trim() || null,
   }
+}
+
+export function enderecoEntregaDetalheTemConteudo(
+  endereco: EnderecoEntregaDetalhe | null | undefined
+): boolean {
+  if (!endereco) return false
+  return Object.values(endereco).some(v => v != null && String(v).trim() !== '')
+}
+
+/** Converte endereço do módulo delivery (`GET /delivery/clientes`) para exibição no detalhe do pedido. */
+export function enderecoDeliveryApiParaEnderecoEntregaDetalhe(
+  endereco: ClienteDeliveryEnderecoApi
+): EnderecoEntregaDetalhe | null {
+  const mapped: EnderecoEntregaDetalhe = {
+    cep: asStr(endereco.cep) || null,
+    rua: asStr(endereco.rua) || null,
+    numero: asStr(endereco.numero) || null,
+    bairro: asStr(endereco.bairro) || null,
+    cidade: asStr(endereco.cidade) || null,
+    estado: asStr(endereco.estado) || null,
+    complemento: asStr(endereco.complemento) || null,
+  }
+  return enderecoEntregaDetalheTemConteudo(mapped) ? mapped : null
+}
+
+/** Primeiro endereço válido do cliente delivery (equivalente ao endereço principal). */
+export function extrairEnderecoEntregaDeClienteDeliveryApi(
+  cliente: ClienteDeliveryApi | null | undefined
+): EnderecoEntregaDetalhe | null {
+  if (!cliente?.enderecos?.length) return null
+  for (const endereco of cliente.enderecos) {
+    const mapped = enderecoDeliveryApiParaEnderecoEntregaDetalhe(endereco)
+    if (mapped) return mapped
+  }
+  return null
+}
+
+/** Telefone E.164/dígitos para buscar moradas em `GET /api/delivery/clientes/{telefone}`. */
+export function extrairTelefoneClienteDeliveryDeFontes(
+  vendaData: Record<string, unknown>,
+  clienteApi?: Record<string, unknown> | null
+): string | null {
+  const candidatos: unknown[] = []
+
+  const embedded = vendaData.clienteDelivery ?? vendaData.cliente_delivery
+  if (embedded && typeof embedded === 'object') {
+    candidatos.push((embedded as Record<string, unknown>).telefone)
+  }
+
+  if (clienteApi) {
+    candidatos.push(clienteApi.telefone, clienteApi.celular, clienteApi.phone)
+  }
+
+  const clienteNested =
+    vendaData.cliente && typeof vendaData.cliente === 'object'
+      ? (vendaData.cliente as Record<string, unknown>)
+      : null
+  if (clienteNested) {
+    candidatos.push(clienteNested.telefone, clienteNested.celular)
+  }
+
+  for (const raw of candidatos) {
+    const digitos = onlyDigits(asStr(raw))
+    if (digitos.length >= 10) return digitos
+  }
+
+  return null
 }
 
 export function extrairMoradaDeClienteDeliveryResponse(

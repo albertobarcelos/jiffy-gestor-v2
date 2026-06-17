@@ -21,6 +21,7 @@ export function PedidoDetalhesEntrega({ className = '', ...props }: PedidoDetalh
     trocoLancamento,
     valorFinalVenda,
     totalProdutos,
+    observacaoPedido,
   } = useNovoPedidoFormContext()
 
   const nomeEntregador = useMemo(() => {
@@ -79,6 +80,7 @@ export function PedidoDetalhesEntrega({ className = '', ...props }: PedidoDetalh
         valorPedido={valorPedido}
         nomeEntregador={nomeEntregador}
         trocoExibicao={trocoExibicao}
+        observacaoPedido={observacaoPedido}
       />
     </PedidoDetalhesInfo>
   )

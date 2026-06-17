@@ -82,6 +82,7 @@ import {
   patchVendaUnificadaInfiniteCache,
   sincronizarPedidoDeliveryKanbanEmBackground,
 } from './kanban/kanbanVendaCacheUpdate'
+import { invalidarPedidoKanbanQuickViewCache } from './kanban/carregarPedidoKanbanQuickView'
 import { resolverEntregadorIdVendaKanban, hidratarEntregadoresKanbanDesdeApi, entregadorKanbanJaVerificado } from './kanban/entregadorKanbanStore'
 import {
   useFiscalEmissaoKanban,
@@ -89,6 +90,7 @@ import {
 } from './kanban/useFiscalEmissaoKanban'
 import { useImpressaoDelivery } from '@/src/presentation/hooks/useImpressaoDelivery'
 import { validarImpressaoAntesTransicaoKanban } from '@/src/application/delivery/validarImpressaoAntesTransicaoKanban'
+import { confirmarCobrancaPendentePedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/ConfirmarCobrancaPendentePedidoDeliveryUseCase'
 import type { AcaoTransicaoGestor } from '@/src/presentation/hooks/useVendas'
 import { useKanbanColumnScrollLoadMore } from './kanban/useKanbanColumnScrollLoadMore'
 import {
@@ -181,6 +183,7 @@ export function FiscalFlowKanban() {
     abaDetalhesInicial?: import('./novo-pedido/types').AbaDetalhesPedido
   } | null>(null)
   const [draggingVenda, setDraggingVenda] = useState<Venda | null>(null)
+  const [confirmandoCobrancaIds, setConfirmandoCobrancaIds] = useState<Record<string, boolean>>({})
   const [terminalFilter, setTerminalFilter] = useState('')
   const [terminais, setTerminais] = useState<TerminalOpcao[]>([])
   const [isLoadingTerminais, setIsLoadingTerminais] = useState(false)
@@ -577,6 +580,45 @@ export function FiscalFlowKanban() {
     })
     setNovoPedidoModalVisualizacaoOpen(true)
   }, [])
+
+  const handleConfirmarCobrancaKanban = useCallback(
+    async (venda: Venda) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Sessão expirada.')
+        return
+      }
+
+      setConfirmandoCobrancaIds(prev => ({ ...prev, [venda.id]: true }))
+      try {
+        const pedidoAtualizado = await confirmarCobrancaPendentePedidoDeliveryUseCase.execute(
+          venda.id,
+          token
+        )
+        const patch = extrairPatchKanbanDeRespostaTransicao(pedidoAtualizado)
+        patchVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, venda.id, patch)
+        invalidarPedidoKanbanQuickViewCache(venda.id)
+        showToast.success('Cobrança confirmada.')
+      } catch (error) {
+        const mensagem =
+          error instanceof Error ? error.message : 'Não foi possível confirmar a cobrança.'
+        showToast.error(mensagem)
+        void sincronizarPedidoDeliveryKanbanEmBackground(
+          queryClient,
+          infiniteQueryKey,
+          venda.id,
+          token
+        )
+      } finally {
+        setConfirmandoCobrancaIds(prev => {
+          const next = { ...prev }
+          delete next[venda.id]
+          return next
+        })
+      }
+    },
+    [auth, infiniteQueryKey, queryClient]
+  )
 
   const {
     avancandoEtapaIds,
@@ -1188,6 +1230,12 @@ export function FiscalFlowKanban() {
                       onEntregadorAtualizado={(vendaId, entregadorId) => {
                         setEntregadorPorVendaId(prev => ({ ...prev, [vendaId]: entregadorId }))
                       }}
+                      onConfirmarCobranca={
+                        modoKanbanVendas === 'delivery'
+                          ? vendaAtual => void handleConfirmarCobrancaKanban(vendaAtual)
+                          : undefined
+                      }
+                      confirmandoCobrancaIds={confirmandoCobrancaIds}
                     />
                   ))}
                 </FiscalKanbanColumn>

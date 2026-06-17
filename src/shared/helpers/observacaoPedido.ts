@@ -59,6 +59,24 @@ export function textoObservacaoProdutoApi(prod: Record<string, unknown>): string
   return ''
 }
 
+export function textoObservacaoPedidoDetalhe(
+  observacaoPedido?: string | null,
+  observacaoPedidoEntrega?: string | null
+): string {
+  return observacaoPedido?.trim() || observacaoPedidoEntrega?.trim() || ''
+}
+
+export function produtosComObservacaoExibicao(
+  produtos: Array<{ nome: string; observacao?: string }>
+): Array<{ nome: string; observacao: string }> {
+  return produtos
+    .filter(produto => produto.observacao?.trim())
+    .map(produto => ({
+      nome: produto.nome,
+      observacao: produto.observacao!.trim(),
+    }))
+}
+
 export function validarObservacoesPedido(params: {
   observacaoPedido?: string
   produtos: Array<{ nome: string; observacao?: string }>

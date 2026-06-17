@@ -33,6 +33,7 @@ import {
   observacoesPayloadPatchObservacaoPedido,
   resolverEndpointObservacaoPedidoKanban,
 } from './observacaoPedidoKanban'
+import { invalidarPedidoKanbanQuickViewCache } from './carregarPedidoKanbanQuickView'
 import type { Venda } from './types'
 
 interface ObservacaoPedidoKanbanPainelProps {
@@ -154,6 +155,7 @@ export function ObservacaoPedidoKanbanPainel({
       queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
       queryClient.invalidateQueries({ queryKey: ['venda', venda.id] })
       await invalidateVendaDetalheCarregadaCache(queryClient, empresaId, venda.id)
+      invalidarPedidoKanbanQuickViewCache(venda.id)
       onSalvo?.(venda.id, observacaoSalva)
       onClose()
     } catch {

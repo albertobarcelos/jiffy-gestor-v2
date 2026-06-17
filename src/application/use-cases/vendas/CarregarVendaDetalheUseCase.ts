@@ -2,6 +2,7 @@ import type { VendaDetalheCarregadaDTO } from '@/src/application/dto/VendaDetalh
 import {
   mapDetalhesEntregaFromVendaApi,
   mergeClienteDetalhesEntrega,
+  resolverEnderecoEntregaDetalhePedido,
   resolverTaxaEntregaDetalhe,
   taxaEntregaTemValor,
 } from '@/src/application/mappers/VendaDetalheMapper'
@@ -75,29 +76,6 @@ function mapDetalhesPedidoMeta(vendaData: Record<string, unknown>): DetalhesPedi
         ? String(vendaData.dataUltimoProdutoLancado)
         : null,
   }
-}
-
-async function resolverClienteEntrega(
-  repo: IVendaDetalheReadRepository,
-  clienteIdVenda: string,
-  token: string,
-  detalhesEntrega: DetalhesEntregaPedido
-): Promise<{ clienteNome: string | null; detalhesEntrega: DetalhesEntregaPedido }> {
-  const clienteData = await repo.fetchCliente(clienteIdVenda, token)
-  if (!clienteData) {
-    return {
-      clienteNome: detalhesEntrega.clienteNome ?? null,
-      detalhesEntrega,
-    }
-  }
-
-  const clienteNome =
-    String(clienteData.nome ?? clienteData.name ?? detalhesEntrega.clienteNome ?? '').trim() ||
-    null
-  const detalhesAtualizados =
-    mergeClienteDetalhesEntrega(detalhesEntrega, clienteData) ?? detalhesEntrega
-
-  return { clienteNome, detalhesEntrega: detalhesAtualizados }
 }
 
 async function resolverNomeEntregador(
@@ -288,15 +266,17 @@ export class CarregarVendaDetalheUseCase {
     const { vendaId, tabelaOrigemVenda, token, modoVisualizacao, meiosPagamentoCache = [], tipoVendaGestor } =
       params
 
+    const preferirModuloDelivery = deveUsarModuloDeliveryParaDetalhe(
+      tabelaOrigemVenda,
+      tipoVendaGestor
+    )
+
     const vendaData = (await this.vendaDetalheRepo.loadVenda(
       vendaId,
       tabelaOrigemVenda,
       token,
       {
-        preferirModuloDelivery: deveUsarModuloDeliveryParaDetalhe(
-          tabelaOrigemVenda,
-          tipoVendaGestor
-        ),
+        preferirModuloDelivery: preferirModuloDelivery,
       }
     )) as VendaGestorApiResponse
 
@@ -329,19 +309,32 @@ export class CarregarVendaDetalheUseCase {
     if (tipoVendaCarregada === 'entrega' || tipoVendaCarregada === 'retirada') {
       let detalhesEntrega = mapDetalhesEntregaFromVendaApi(vendaData)
       const clienteIdVenda = String(vendaData.clienteId ?? '').trim()
+      let clienteData: Record<string, unknown> | null = null
 
       if (clienteIdVenda) {
         clienteId = clienteIdVenda
-        const clienteResolvido = await resolverClienteEntrega(
-          this.vendaDetalheRepo,
-          clienteIdVenda,
-          token,
-          detalhesEntrega
-        )
-        clienteNome = clienteResolvido.clienteNome
-        detalhesEntrega = clienteResolvido.detalhesEntrega
+        clienteData = await this.vendaDetalheRepo.fetchCliente(clienteIdVenda, token)
+        if (clienteData) {
+          clienteNome =
+            String(clienteData.nome ?? clienteData.name ?? detalhesEntrega.clienteNome ?? '').trim() ||
+            null
+          detalhesEntrega =
+            mergeClienteDetalhesEntrega(detalhesEntrega, clienteData) ?? detalhesEntrega
+        }
       } else if (detalhesEntrega.clienteNome) {
         clienteNome = detalhesEntrega.clienteNome
+      }
+
+      const enderecoResolvido = await resolverEnderecoEntregaDetalhePedido({
+        vendaData: vendaData as Record<string, unknown>,
+        detalhesEntrega,
+        clienteApi: clienteData,
+        preferirModuloDelivery,
+        fetchClienteDelivery: telefone =>
+          this.vendaDetalheRepo.fetchClienteDeliveryByTelefone(telefone, token),
+      })
+      if (enderecoResolvido !== undefined) {
+        detalhesEntrega = { ...detalhesEntrega, enderecoEntrega: enderecoResolvido }
       }
 
       const entregadorIdVenda = String(vendaData.entregadorId ?? '').trim()

@@ -21,4 +21,9 @@ export interface IVendaDetalheReadRepository {
   fetchUsuarioGestor(usuarioId: string, token: string): Promise<Record<string, unknown> | null>
 
   fetchMeioPagamento(meioId: string, token: string): Promise<Record<string, unknown> | null>
+
+  fetchClienteDeliveryByTelefone(
+    telefone: string,
+    token: string
+  ): Promise<Record<string, unknown> | null>
 }
