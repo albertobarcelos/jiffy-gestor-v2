@@ -13,6 +13,7 @@ import {
 import { Button } from '@/src/presentation/components/ui/button'
 import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
+import { textoFromObservacoesApi } from '@/src/shared/helpers/observacaoPedido'
 import { abrirDocumentoFiscalPdf } from '@/src/presentation/utils/abrirDocumentoFiscalPdf'
 import { StatusFiscalBadge } from '../StatusFiscalBadge'
 import type { ModoKanbanVendas } from '../KanbanModoVendasToggle'
@@ -75,6 +76,7 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
   const [observacaoPedidoOpen, setObservacaoPedidoOpen] = useState(false)
   const valorFormatado = transformarParaReal(venda.valorFinal)
   const clienteNome = venda.cliente?.nome?.trim() ? venda.cliente.nome : LABEL_SEM_CLIENTE
+  const observacaoPedidoTexto = textoFromObservacoesApi(venda.observacoes)
 
   const colunaPermiteEditarCliente =
     column.id === 'FINALIZADAS' ||
@@ -199,6 +201,14 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
             <p className="text-xs text-gray-600">
               <span className="text-sm font-semibold text-gray-900">{valorFormatado}</span>
             </p>
+            {observacaoPedidoTexto ? (
+              <p
+                className="mt-1 line-clamp-2 text-xs text-gray-600"
+                title={observacaoPedidoTexto}
+              >
+                <span className="font-medium text-gray-700">Obs:</span> {observacaoPedidoTexto}
+              </p>
+            ) : null}
             {venda.statusFiscal && (
               <>
                 <div className="mt-1 flex items-center">
@@ -224,7 +234,7 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
               <div className="flex flex-shrink-0 items-center justify-center">
                 <TipoVendaIcon
                   tipoVenda={tipoVendaExibicao as 'balcao' | 'mesa' | 'gestor' | 'entrega' | 'retirada'}
-                  numeroMesa="M"
+                  numeroMesa={tipoVendaExibicao === 'mesa' ? venda.numeroMesa : undefined}
                   size={56}
                   containerScale={0.9}
                   corPrincipal="var(--color-primary)"

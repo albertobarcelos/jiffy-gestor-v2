@@ -59,6 +59,7 @@ export function cloneVendaUnificadaDTO(
     venda.statusFiscal,
     venda.documentoFiscalId,
     venda.abertoPor,
+    venda.numeroMesa,
     venda.numeroFiscal,
     venda.serieFiscal,
     venda.dataEmissaoFiscal,
@@ -71,7 +72,8 @@ export function cloneVendaUnificadaDTO(
     patch.dataUltimaModificacao !== undefined
       ? patch.dataUltimaModificacao
       : venda.dataUltimaModificacao,
-    patch.statusFinanceiro !== undefined ? patch.statusFinanceiro : venda.statusFinanceiro
+    patch.statusFinanceiro !== undefined ? patch.statusFinanceiro : venda.statusFinanceiro,
+    venda.observacoes
   )
 }
 

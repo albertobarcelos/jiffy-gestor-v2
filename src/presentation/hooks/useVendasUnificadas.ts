@@ -95,6 +95,41 @@ function extrairDataUltimaModificacao(item: Record<string, unknown>): string | n
   return null
 }
 
+/** Número da mesa (vendas PDV tipo mesa) — GET /vendas/unificado. */
+function extrairNumeroMesa(item: Record<string, unknown>): string | number | null {
+  const raw = item.numeroMesa ?? item.numero_mesa
+  if (raw == null) return null
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw
+  const s = String(raw).trim()
+  return s || null
+}
+
+/** Observações do pedido — GET /vendas/unificado (array de strings). */
+function extrairObservacoesArray(item: Record<string, unknown>): string[] | undefined {
+  const raw = item.observacoes ?? item.observacao
+  if (raw == null) return undefined
+
+  if (Array.isArray(raw)) {
+    const textos = raw
+      .map(entry => {
+        if (typeof entry === 'string') return entry.trim()
+        if (entry && typeof entry === 'object' && 'observacao' in entry) {
+          return String((entry as { observacao?: string }).observacao ?? '').trim()
+        }
+        return ''
+      })
+      .filter(Boolean)
+    return textos.length > 0 ? textos : undefined
+  }
+
+  if (typeof raw === 'string') {
+    const t = raw.trim()
+    return t ? [t] : undefined
+  }
+
+  return undefined
+}
+
 function extrairStatusFinanceiro(item: Record<string, unknown>): string | null {
   const direct = item.statusFinanceiro ?? item.status_financeiro
   if (direct != null && String(direct).trim() !== '') {
@@ -155,6 +190,8 @@ export class VendaUnificadaDTO {
       id: string
       nome: string
     },
+    /** PDV mesa: número exibido no ícone do card (GET unificado). */
+    public readonly numeroMesa?: string | number | null,
     public readonly numeroFiscal?: number | null,
     public readonly serieFiscal?: string | null,
     public readonly dataEmissaoFiscal?: string | null,
@@ -167,7 +204,9 @@ export class VendaUnificadaDTO {
     /** Última modificação na venda (útil para “quando entrou na etapa” quando a API atualiza ao transicionar). */
     public readonly dataUltimaModificacao?: string | null,
     /** Gestor: pendente | parcial | pago | cancelado; PDV costuma vir null. */
-    public readonly statusFinanceiro?: string | null
+    public readonly statusFinanceiro?: string | null,
+    /** Observações do pedido (GET unificado — array de strings). */
+    public readonly observacoes?: string[]
   ) {}
 
   private possuiDocumentoFiscal(): boolean {
@@ -363,6 +402,7 @@ export function mapItemJsonParaVendaUnificadaDTO(v: Record<string, unknown>): Ve
     normalizarStatusFiscalUnificado(v),
     (v.documentoFiscalId ?? null) as string | null,
     v.abertoPor as VendaUnificadaDTO['abertoPor'],
+    extrairNumeroMesa(v),
     v.numeroFiscal as number | null | undefined,
     v.serieFiscal as string | null | undefined,
     v.dataEmissaoFiscal as string | null | undefined,
@@ -371,7 +411,8 @@ export function mapItemJsonParaVendaUnificadaDTO(v: Record<string, unknown>): Ve
     v.retornoSefaz as string | null | undefined,
     extrairStatusEtapaOperacional(v),
     extrairDataUltimaModificacao(v),
-    extrairStatusFinanceiro(v)
+    extrairStatusFinanceiro(v),
+    extrairObservacoesArray(v)
   )
 }
 
