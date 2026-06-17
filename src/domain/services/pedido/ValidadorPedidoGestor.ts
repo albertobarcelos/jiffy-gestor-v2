@@ -1,14 +1,16 @@
+import { validarQuantidadesComplementosLinha } from '@/src/domain/policies/pedido/ComplementoQuantidadeLinhaPolicy'
 import { pagamentosCobremTotalPedido } from '@/src/domain/services/pedido/CalculadoraPagamentoPedido'
-import type { PagamentoSelecionado, StatusVenda } from '@/src/domain/types/pedido'
+import type { PagamentoSelecionado, ProdutoSelecionado, StatusVenda } from '@/src/domain/types/pedido'
 
 export type ValidacaoErroPedido = {
   message: string
   goToStep?: 1 | 2 | 3
-  code?: 'pagamentos_total' | 'produtos' | 'entrega' | 'pagamento_entrega'
+  code?: 'pagamentos_total' | 'produtos' | 'complementos' | 'entrega' | 'pagamento_entrega'
 }
 
 export type ValidarPedidoGestorInput = {
   produtosCount: number
+  produtos?: ProdutoSelecionado[]
   pedidoDeliveryGestor: boolean
   clienteEntregaVinculadoId?: string
   pedidoComEntrega: boolean
@@ -137,6 +139,25 @@ function validarTotaisPagamento(input: ValidarPedidoGestorInput): ValidacaoErroP
   return null
 }
 
+function validarComplementosProdutos(
+  produtos?: ProdutoSelecionado[]
+): ValidacaoErroPedido | null {
+  if (!produtos?.length) return null
+
+  for (const produto of produtos) {
+    const resultado = validarQuantidadesComplementosLinha(produto)
+    if (!resultado.valido) {
+      return {
+        message: resultado.mensagem ?? 'Quantidade de complemento inválida para o produto.',
+        goToStep: 1,
+        code: 'complementos',
+      }
+    }
+  }
+
+  return null
+}
+
 export function validarPedidoGestor(
   input: ValidarPedidoGestorInput
 ): ValidarPedidoGestorResult {
@@ -145,6 +166,9 @@ export function validarPedidoGestor(
   if (input.produtosCount === 0) {
     erros.push({ message: 'Adicione pelo menos um produto', goToStep: 1 })
   }
+
+  const erroComplementos = validarComplementosProdutos(input.produtos)
+  if (erroComplementos) erros.push(erroComplementos)
 
   const erroEntrega = validarInformacoesPedidoEntrega({
     pedidoDeliveryGestor: input.pedidoDeliveryGestor,

@@ -3,6 +3,11 @@
 import { useMemo } from 'react'
 import { calcularTotalProduto } from '@/src/domain/services/pedido/CalculadoraPedido'
 import {
+  resolverSubtotalItensPedido,
+  resolverTotalPedidoComTaxaEntrega,
+  resolverValorTaxaEntregaPedido,
+} from '@/src/application/mappers/resolverTotalPedidoEntrega'
+import {
   podeExibirAbaDadosEntregaDetalhe,
   podeExibirAbaNotaFiscalDetalhe,
   podeExibirCancelarNotaFiscalDetalhe,
@@ -10,13 +15,17 @@ import {
 } from '@/src/domain/services/pedido/RegrasFluxoPedidoGestor'
 import { Taxa } from '@/src/domain/entities/Taxa'
 import type {
+  DetalhesEntregaPedido,
   DetalhesPedidoMeta,
   FluxoPagamentoEntrega,
   OrigemVenda,
   ProdutoSelecionado,
   ResumoFiscalVenda,
+  ResumoFinanceiroDetalhes,
   StatusVenda,
 } from '../../types'
+import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
+import { pagamentoEntregaConfirmadoNoPedido } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 
 export type UseNovoPedidoOrchestratorFlagsParams = {
   modoVisualizacao: boolean | undefined
@@ -37,8 +46,11 @@ export type UseNovoPedidoOrchestratorFlagsParams = {
   pedidoComEntrega: boolean
   valorFinalVenda: number | null
   produtos: ProdutoSelecionado[]
+  pagamentos: PagamentoSelecionado[]
   taxaEntregaId: string
   taxasEntrega: Taxa[]
+  resumoFinanceiroDetalhes: ResumoFinanceiroDetalhes | null
+  detalhesEntregaPedido: DetalhesEntregaPedido | null
 }
 
 export function useNovoPedidoOrchestratorFlags({
@@ -60,8 +72,11 @@ export function useNovoPedidoOrchestratorFlags({
   pedidoComEntrega,
   valorFinalVenda,
   produtos,
+  pagamentos,
   taxaEntregaId,
   taxasEntrega,
+  resumoFinanceiroDetalhes,
+  detalhesEntregaPedido,
 }: UseNovoPedidoOrchestratorFlagsParams) {
   const statusFiscal = useMemo(
     () =>
@@ -124,27 +139,46 @@ export function useNovoPedidoOrchestratorFlags({
   const rotuloCobrancaPendente =
     pedidoComRetirada ? 'Cobrança na Retirada' : 'Entregador vai cobrar'
 
-  const subtotalProdutos = useMemo(() => {
-    if (valorFinalVenda !== null) {
-      return valorFinalVenda
-    }
-    return produtos.reduce((sum, p) => sum + calcularTotalProduto(p), 0)
-  }, [produtos, valorFinalVenda])
+  const subtotalProdutosCalculado = useMemo(
+    () => produtos.reduce((sum, p) => sum + calcularTotalProduto(p), 0),
+    [produtos]
+  )
 
   const taxaEntregaSelecionada = useMemo(
     () => taxasEntrega.find(taxa => taxa.getId() === taxaEntregaId) ?? null,
     [taxaEntregaId, taxasEntrega]
   )
 
-  const valorTaxaEntrega = useMemo(() => {
-    if (!pedidoComEntrega) return 0
-    if (!taxaEntregaSelecionada || valorFinalVenda !== null) return 0
-    return taxaEntregaSelecionada.getValor()
-  }, [pedidoComEntrega, taxaEntregaSelecionada, valorFinalVenda])
+  const valorTaxaEntrega = useMemo(
+    () =>
+      resolverValorTaxaEntregaPedido({
+        pedidoComEntrega,
+        taxaEntregaValor: detalhesEntregaPedido?.taxaEntrega?.valor,
+        resumoFinanceiroDetalhes,
+        taxaEntregaCatalogoValor: taxaEntregaSelecionada?.getValor(),
+      }),
+    [
+      pedidoComEntrega,
+      detalhesEntregaPedido?.taxaEntrega?.valor,
+      resumoFinanceiroDetalhes,
+      taxaEntregaSelecionada,
+    ]
+  )
+
+  const subtotalProdutos = useMemo(
+    () => resolverSubtotalItensPedido(subtotalProdutosCalculado, resumoFinanceiroDetalhes),
+    [subtotalProdutosCalculado, resumoFinanceiroDetalhes]
+  )
 
   const totalProdutos = useMemo(
-    () => subtotalProdutos + valorTaxaEntrega,
-    [subtotalProdutos, valorTaxaEntrega]
+    () =>
+      resolverTotalPedidoComTaxaEntrega({
+        subtotalItens: subtotalProdutos,
+        taxaEntrega: valorTaxaEntrega,
+        valorFinalApi: valorFinalVenda,
+        resumoFinanceiroDetalhes,
+      }),
+    [subtotalProdutos, valorTaxaEntrega, valorFinalVenda, resumoFinanceiroDetalhes]
   )
 
   const totalItensPedido = useMemo(
@@ -178,11 +212,17 @@ export function useNovoPedidoOrchestratorFlags({
     [tabelaOrigemVenda, vendaId, currentStep, statusFiscal, resumoFiscal?.status]
   )
 
+  const pagamentoEntregaConfirmado = useMemo(
+    () => pagamentoEntregaConfirmadoNoPedido(pagamentos, totalProdutos),
+    [pagamentos, totalProdutos]
+  )
+
   const podeEditarPagamentoEntregaEmAberto = useMemo(
     () =>
       modoVisualizacao === true &&
       tabelaOrigemVenda === 'venda_gestor' &&
       Boolean(vendaId) &&
+      status === 'ABERTA' &&
       !dataFinalizacaoCarregada &&
       !vendaGestorJaCancelada &&
       currentStep === 4,
@@ -190,10 +230,16 @@ export function useNovoPedidoOrchestratorFlags({
       modoVisualizacao,
       tabelaOrigemVenda,
       vendaId,
+      status,
       dataFinalizacaoCarregada,
       vendaGestorJaCancelada,
       currentStep,
     ]
+  )
+
+  const podeAjustarPagamentoEntregaEmAberto = useMemo(
+    () => podeEditarPagamentoEntregaEmAberto && !pagamentoEntregaConfirmado,
+    [podeEditarPagamentoEntregaEmAberto, pagamentoEntregaConfirmado]
   )
 
   return {
@@ -215,5 +261,7 @@ export function useNovoPedidoOrchestratorFlags({
     podeExibirCancelarVendaGestor,
     podeExibirCancelarNotaFiscal,
     podeEditarPagamentoEntregaEmAberto,
+    podeAjustarPagamentoEntregaEmAberto,
+    pagamentoEntregaConfirmado,
   }
 }

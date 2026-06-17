@@ -36,6 +36,7 @@ import type {
   TipoAtendimentoDelivery,
   UsuarioPdvEntregadorOption,
 } from '../types'
+import type { UnidadeMedidaProduto } from '@/src/shared/types/unidadeMedidaProduto'
 
 type EmpresaMe = ReturnType<typeof useEmpresaMe>['empresa']
 type StatusPagamentoExibicao = 'pendente' | 'parcial' | 'pago'
@@ -120,6 +121,8 @@ export interface NovoPedidoEdicaoLinhaSlice {
   setProdutoIndexEdicao: Dispatch<SetStateAction<number | null>>
   quantidadeEdicao: number
   setQuantidadeEdicao: Dispatch<SetStateAction<number>>
+  unidadeMedidaEdicao: UnidadeMedidaProduto
+  setUnidadeMedidaEdicao: Dispatch<SetStateAction<UnidadeMedidaProduto>>
   ehAcrescimo: boolean
   setEhAcrescimo: Dispatch<SetStateAction<boolean>>
   ehPorcentagem: boolean
@@ -243,6 +246,8 @@ export interface NovoPedidoDetalheSlice {
   podeExibirAbaNotaFiscal: boolean
   podeExibirAbaDadosEntrega: boolean
   podeEditarPagamentoEntregaEmAberto: boolean
+  podeAjustarPagamentoEntregaEmAberto: boolean
+  pagamentoEntregaConfirmado: boolean
   produtoTabsModalState: ProdutosTabsModalState
   handleAbrirEdicaoProdutoDetalhes: (produtoId: string | null | undefined) => void
   handleFecharProdutoTabsModal: () => void

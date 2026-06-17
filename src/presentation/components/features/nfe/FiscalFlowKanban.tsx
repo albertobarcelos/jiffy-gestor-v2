@@ -480,6 +480,31 @@ export function FiscalFlowKanban() {
     [auth, infiniteQueryKey, queryClient]
   )
 
+  const revalidarPagamentoAntesFinalizar = useCallback(
+    async (vendaId: string) => {
+      const token = auth?.getAccessToken()
+      if (!token) return false
+      try {
+        const response = await fetch(`/api/delivery/pedidos/${encodeURIComponent(vendaId)}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+          },
+          cache: 'no-store',
+        })
+        if (!response.ok) return false
+        const data = await response.json()
+        const patch = extrairPatchKanbanDeRespostaTransicao(data)
+        patchVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, vendaId, patch)
+        const status = String(patch.statusFinanceiro ?? '').trim().toLowerCase()
+        return status === 'pago'
+      } catch {
+        return false
+      }
+    },
+    [auth, infiniteQueryKey, queryClient]
+  )
+
   const abrirConfigImpressoraExpedicao = useCallback(() => {
     setDeliveryConfiguracoesOpen(true)
   }, [])
@@ -570,6 +595,7 @@ export function FiscalFlowKanban() {
     verificarImpressaoAntesTransicoes,
     verificarEntregadorAntesDespachar,
     onPagamentoPendenteAoFinalizar: handlePagamentoPendenteAoFinalizar,
+    revalidarPagamentoAntesFinalizar,
   })
 
   const { acaoFiscalEmAndamentoPorVenda, getEtapaKanbanParaExibicao: getEtapaKanbanFiscal, handleEmitirNfe } =
@@ -1235,6 +1261,13 @@ export function FiscalFlowKanban() {
           tabelaOrigemVenda={pedidoVisualizacaoContext.tabelaOrigem}
           statusFiscalUnificado={pedidoVisualizacaoContext.statusFiscal}
           tipoVendaGestor={pedidoVisualizacaoContext.tipoVenda}
+          tipoInicioPedido={
+            modoKanbanVendas === 'delivery' ||
+            pedidoVisualizacaoContext.tipoVenda === 'entrega' ||
+            pedidoVisualizacaoContext.tipoVenda === 'retirada'
+              ? 'entrega'
+              : 'balcao'
+          }
           abaDetalhesInicial={pedidoVisualizacaoContext.abaDetalhesInicial}
           modoVisualizacao={true}
         />

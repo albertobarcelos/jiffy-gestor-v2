@@ -48,7 +48,7 @@ export function cloneVendaUnificadaDTO(
     venda.tipoVenda,
     venda.origem,
     venda.tabelaOrigem,
-    venda.valorFinal,
+    patch.valorFinal !== undefined ? patch.valorFinal : venda.valorFinal,
     venda.totalDesconto,
     venda.totalAcrescimo,
     venda.dataCriacao,
@@ -71,7 +71,7 @@ export function cloneVendaUnificadaDTO(
     patch.dataUltimaModificacao !== undefined
       ? patch.dataUltimaModificacao
       : venda.dataUltimaModificacao,
-    venda.statusFinanceiro
+    patch.statusFinanceiro !== undefined ? patch.statusFinanceiro : venda.statusFinanceiro
   )
 }
 

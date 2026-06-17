@@ -1,5 +1,6 @@
 import type {
   CriarPedidoDeliveryApiRequest,
+  CobrancaPedidoDeliveryApi,
   MomentoCobrancaDeliveryApi,
 } from '@/src/application/dto/api/pedidoDeliveryApi'
 import type { CriarPedidoDeliveryInputDTO } from '@/src/application/dto/CriarPedidoDeliveryDTO'
@@ -58,11 +59,17 @@ function buildCobrancasPedidoDeliveryPayload(input: CriarPedidoDeliveryInputDTO)
     ? 'na_entrega'
     : 'antecipado'
 
-  return input.pagamentos.map(p => ({
-    meioPagamentoId: p.meioPagamentoId,
-    valor: p.valor,
-    momentoCobranca,
-  }))
+  return input.pagamentos.map(p => {
+    const item: CobrancaPedidoDeliveryApi = {
+        meioPagamentoId: p.meioPagamentoId,
+        valor: p.valor,
+        momentoCobranca,
+      }
+    if (momentoCobranca === 'antecipado') {
+      item.pagamentoEfetivado = { confirmar: true }
+    }
+    return item
+  })
 }
 
 function buildClientePedidoDeliveryPayload(input: CriarPedidoDeliveryInputDTO) {

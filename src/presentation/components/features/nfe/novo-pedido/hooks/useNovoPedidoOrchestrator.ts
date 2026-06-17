@@ -172,9 +172,13 @@ export function useNovoPedidoOrchestrator({
     setVendaIdCriada,
   } = form
 
+  const tipoVendaHint = tipoVendaGestor ?? detalhesPedidoMeta?.tipoVenda ?? null
+
   const { pedidoDeliveryGestor, pedidoComEntrega, pedidoComRetirada } = useNovoPedidoDelivery({
     tipoInicioPedido,
     tipoAtendimentoDelivery,
+    tabelaOrigemVenda,
+    tipoVendaHint,
   })
   const pedidoBalcao = tipoInicioPedido !== 'entrega'
   const canalVendaNovoPedido: CanalVendaNovoPedido =
@@ -264,6 +268,8 @@ export function useNovoPedidoOrchestrator({
     setProdutoIndexEdicao,
     quantidadeEdicao,
     setQuantidadeEdicao,
+    unidadeMedidaEdicao,
+    setUnidadeMedidaEdicao,
     ehAcrescimo,
     setEhAcrescimo,
     ehPorcentagem,
@@ -355,8 +361,11 @@ export function useNovoPedidoOrchestrator({
     pedidoComEntrega,
     valorFinalVenda,
     produtos,
+    pagamentos,
     taxaEntregaId,
     taxasEntrega,
+    resumoFinanceiroDetalhes,
+    detalhesEntregaPedido,
   })
 
   const {
@@ -377,6 +386,8 @@ export function useNovoPedidoOrchestrator({
     podeExibirCancelarVendaGestor,
     podeExibirCancelarNotaFiscal,
     podeEditarPagamentoEntregaEmAberto,
+    podeAjustarPagamentoEntregaEmAberto,
+    pagamentoEntregaConfirmado,
   } = flags
 
   /** Primeira carga ou fetch sem cache ainda — evita área vazia sem feedback */
@@ -393,7 +404,8 @@ export function useNovoPedidoOrchestrator({
     tipoVendaGestor ??
     (tipoInicioPedido === 'entrega' ? 'entrega' : null)
 
-  const { carregarVendaExistente, isLoadingVenda, setIsLoadingVenda } = useCarregarVenda({
+  const { carregarVendaExistente, isLoadingVenda, setIsLoadingVenda, vendaDataUpdatedAt } =
+    useCarregarVenda({
     open,
     vendaId,
     vendaIdCriada,
@@ -548,6 +560,7 @@ export function useNovoPedidoOrchestrator({
     tipoInicioPedido,
     processarAposTransicaoVendaGestorId,
     preferenciasAutoIniciarPreparo: preferenciasImpressaoDelivery.autoIniciarPreparoNovosPedidos,
+    accessToken: auth?.getAccessToken(),
   })
 
   const formatarDataDetalhePedido = useCallback(
@@ -578,6 +591,9 @@ export function useNovoPedidoOrchestrator({
     totalPagamentosLancados,
     trocoLancamento,
     usarModuloDeliveryCobrancas: pedidoDeliveryGestor,
+    recarregarVendaExistente: carregarVendaExistente,
+    confirmarPagamentoParaFinalizar:
+      Boolean(modoVisualizacao) && abaDetalhesInicial === 'pagamentos',
   })
 
   const {
@@ -595,6 +611,7 @@ export function useNovoPedidoOrchestrator({
     modoVisualizacao,
     tipoInicioPedido,
     abaDetalhesInicial,
+    vendaDataUpdatedAt,
     auth,
     currentStep,
     abaDetalhesPedido,
@@ -603,6 +620,7 @@ export function useNovoPedidoOrchestrator({
     setCurrentStep,
     setAbaDetalhesPedido,
     setStatus,
+    setFluxoPagamentoEntrega,
     setNomeUsuario,
     longPressTimeoutRef,
     longPressComplementoTimeoutRef,
@@ -642,6 +660,7 @@ export function useNovoPedidoOrchestrator({
       pedidoEntregaAceitaPagamentoPendente,
       entregaComCobrancaPeloEntregador,
       produtosCount: produtos.length,
+      produtos,
       pagamentos,
       totalProdutos,
       totalPagamentos,
@@ -749,6 +768,8 @@ export function useNovoPedidoOrchestrator({
     pagamentos,
     pagamentosVisiveisNaAbaDetalhes,
     podeEditarPagamentoEntregaEmAberto,
+    podeAjustarPagamentoEntregaEmAberto,
+    pagamentoEntregaConfirmado,
     podeExibirAbaDadosEntrega,
     podeExibirAbaNotaFiscal,
     pedidoComEntrega,
@@ -791,6 +812,7 @@ export function useNovoPedidoOrchestrator({
     setProdutoIndexEdicao,
     setProdutoParaLancamentoPainel,
     setQuantidadeEdicao,
+    setUnidadeMedidaEdicao,
     setOrigem,
     setSeletorClienteOpen,
     setStatus,
@@ -838,6 +860,7 @@ export function useNovoPedidoOrchestrator({
     valorUnitarioEdicaoPainel,
     valoresEmEdicao,
     quantidadeEdicao,
+    unidadeMedidaEdicao,
     seletorClienteOpen,
   })
 

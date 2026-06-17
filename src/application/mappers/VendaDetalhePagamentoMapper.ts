@@ -27,6 +27,20 @@ export function mapearPagamentoDetalheVenda(pag: Record<string, unknown>): Pagam
       ? (p.meioPagamento as Record<string, unknown>)
       : null
 
+  const cobrarNaEntregaTrue =
+    p.cobrarNaEntrega === true ||
+    p.cobrar_na_entrega === true ||
+    p.cobrarNaEntrega === 'true' ||
+    p.cobrar_na_entrega === 'true'
+
+  const cobrarNaEntregaFalse =
+    p.cobrarNaEntrega === false ||
+    p.cobrar_na_entrega === false ||
+    p.cobrarNaEntrega === 'false' ||
+    p.cobrar_na_entrega === 'false'
+
+  const efetivadoFalse = p.efetivado === false || p.efetivado === 'false'
+
   return {
     id:
       p.id != null
@@ -38,18 +52,8 @@ export function mapearPagamentoDetalheVenda(pag: Record<string, unknown>): Pagam
       p.meioPagamentoId ?? p.meio_pagamento_id ?? meioPagamentoNested?.id ?? ''
     ),
     valor: typeof p.valor === 'number' ? p.valor : Number(p.valor) || 0,
-    cobrarNaEntrega:
-      p.cobrarNaEntrega === true ||
-      p.cobrar_na_entrega === true ||
-      p.cobrarNaEntrega === 'true' ||
-      p.cobrar_na_entrega === 'true',
-    naoEfetivo:
-      p.efetivado === false ||
-      p.efetivado === 'false' ||
-      p.cobrarNaEntrega === true ||
-      p.cobrar_na_entrega === true ||
-      p.cobrarNaEntrega === 'true' ||
-      p.cobrar_na_entrega === 'true',
+    cobrarNaEntrega: cobrarNaEntregaTrue,
+    naoEfetivo: cobrarNaEntregaTrue || (efetivadoFalse && !cobrarNaEntregaFalse),
     realizadoPorId:
       p.realizadoPorId != null
         ? String(p.realizadoPorId)

@@ -39,7 +39,7 @@ export function obterTotalComplemento(complemento: ComplementoSelecionado): numb
 export function calcularTotalComplementos(produto: ProdutoSelecionado): number {
   return produto.complementos.reduce((sum, comp) => {
     const tipo = comp.tipoImpactoPreco || 'nenhum'
-    const valorTotal = comp.valor * comp.quantidade * produto.quantidade
+    const valorTotal = comp.valor * comp.quantidade
 
     if (tipo === 'aumenta') {
       return sum + valorTotal

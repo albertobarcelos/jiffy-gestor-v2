@@ -32,6 +32,8 @@ interface UseEntregaTransicoesKanbanParams {
   verificarEntregadorAntesDespachar?: (venda: Venda) => Promise<boolean>
   /** Quando finalizar exige pagamento quitado: abrir detalhes em vez de chamar a API. */
   onPagamentoPendenteAoFinalizar?: (venda: Venda) => void
+  /** Reconsulta pagamento no delivery antes de bloquear finalização (lista unificada pode estar defasada). */
+  revalidarPagamentoAntesFinalizar?: (vendaId: string) => Promise<boolean>
 }
 
 export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanParams) {
@@ -43,6 +45,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
     verificarImpressaoAntesTransicoes,
     verificarEntregadorAntesDespachar,
     onPagamentoPendenteAoFinalizar,
+    revalidarPagamentoAntesFinalizar,
   } = params
 
   const [avancandoEtapaIds, setAvancandoEtapaIds] = useState<Record<string, boolean>>({})
@@ -112,8 +115,13 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
   const finalizarEntrega = useCallback(
     async (venda: Venda) => {
       if (vendaPrecisaConfirmarPagamentoParaFinalizar(venda)) {
-        onPagamentoPendenteAoFinalizar?.(venda)
-        return
+        const quitado = revalidarPagamentoAntesFinalizar
+          ? await revalidarPagamentoAntesFinalizar(venda.id)
+          : false
+        if (!quitado) {
+          onPagamentoPendenteAoFinalizar?.(venda)
+          return
+        }
       }
       iniciarTransicaoUi(venda.id, 'FINALIZADAS')
       try {
@@ -132,6 +140,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
       finalizarTransicaoUi,
       iniciarTransicaoUi,
       onPagamentoPendenteAoFinalizar,
+      revalidarPagamentoAntesFinalizar,
       reverterTransicaoUi,
     ]
   )

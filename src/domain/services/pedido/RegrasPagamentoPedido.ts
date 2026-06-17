@@ -1,4 +1,7 @@
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
+import { totalPagamentosEfetivos } from '@/src/domain/services/pedido/CalculadoraPagamentoPedido'
+
+const TOLERANCIA_TOTAL_PEDIDO = 0.01
 
 /**
  * Mesma regra de DetalhesVendas: cancelado pela flag ou por dataCancelamento preenchida.
@@ -24,6 +27,28 @@ export function pagamentoContaComoEfetivo(p: PagamentoSelecionado): boolean {
     if (!tefConfirmado) return false
   }
   return true
+}
+
+/** Cobrança ativa ainda não efetivada (ex.: “cobrar na entrega”). */
+export function pagamentoPendenteNaEntrega(p: PagamentoSelecionado): boolean {
+  if (pagamentoEstaCancelado(p)) return false
+  return p.cobrarNaEntrega === true || p.naoEfetivo === true
+}
+
+export function pedidoTemCobrancaPendenteNaEntrega(pagamentos: PagamentoSelecionado[]): boolean {
+  return pagamentos.some(pagamentoPendenteNaEntrega)
+}
+
+/** Pagamento quitado e efetivado — oculta ajuste/remover/salvar, mas não bloqueia novo lançamento após remover. */
+export function pagamentoEntregaConfirmadoNoPedido(
+  pagamentos: PagamentoSelecionado[],
+  totalPedido: number
+): boolean {
+  const ativos = pagamentos.filter(p => !pagamentoEstaCancelado(p))
+  if (ativos.length === 0) return false
+  if (pedidoTemCobrancaPendenteNaEntrega(pagamentos)) return false
+  const efetivo = totalPagamentosEfetivos(pagamentos)
+  return efetivo >= totalPedido - TOLERANCIA_TOTAL_PEDIDO
 }
 
 /**

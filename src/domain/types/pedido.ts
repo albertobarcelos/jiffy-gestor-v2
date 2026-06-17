@@ -1,3 +1,5 @@
+import type { UnidadeMedidaProduto } from '@/src/shared/types/unidadeMedidaProduto'
+
 /** Tipos de linha do pedido (compartilhados entre domain e apresentação). */
 
 export interface ComplementoSelecionado {
@@ -14,6 +16,8 @@ export interface ProdutoSelecionado {
   nome: string
   quantidade: number
   valorUnitario: number
+  /** UN = unitário (qtd inteira); KG/LT = qtd fracionária permitida. */
+  unidadeMedida?: UnidadeMedidaProduto
   complementos: ComplementoSelecionado[]
   tipoDesconto?: 'fixo' | 'porcentagem' | null
   valorDesconto?: number | null

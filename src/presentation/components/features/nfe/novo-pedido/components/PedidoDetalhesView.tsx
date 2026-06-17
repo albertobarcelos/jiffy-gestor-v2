@@ -8,6 +8,8 @@ import { showToast } from '@/src/shared/utils/toast'
 import { MdCreditCard, MdDelete } from 'react-icons/md'
 import { pagamentoComDestaqueCanceladoDetalhes } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import { statusFiscalEhEmitida } from '@/src/domain/services/pedido/RegrasFiscaisVenda'
+import { obterUnidadeMedidaProdutoLinha } from '../produtoCatalogoHelpers'
+import { formatarQuantidadeProdutoExibicao } from '@/src/shared/utils/quantidadeProdutoInput'
 import {
   rotuloOrigemExibicao,
   taxaEntregaTemValor,
@@ -26,7 +28,7 @@ export function PedidoDetalhesView() {
     abaDetalhesPedido,
     handleAbrirEdicaoProdutoDetalhes,
     isLoadingVenda,
-    podeEditarPagamentoEntregaEmAberto,
+    podeAjustarPagamentoEntregaEmAberto,
     podeExibirAbaNotaFiscal,
     resumoFinanceiroDetalhes,
     resumoFiscal,
@@ -54,6 +56,8 @@ export function PedidoDetalhesView() {
     pagamentos,
     pagamentosVisiveisNaAbaDetalhes,
     produtos,
+    produtosList,
+    catalogoProdutosPorId,
     observacaoPedido,
     removerPagamento,
     rotuloModeloNfe,
@@ -367,6 +371,11 @@ export function PedidoDetalhesView() {
                               {/* Linhas de produtos */}
                               <div className="space-y-1">
                                 {produtos.map((produto: any, index: number) => {
+                                  const unidadeMedida = obterUnidadeMedidaProdutoLinha(
+                                    produto,
+                                    catalogoProdutosPorId,
+                                    produtosList
+                                  )
                                   // Total do produto: usar valorFinal vindo do backend (já calculado com desconto/acréscimo)
                                   const totalProdutoComComplementos =
                                     produto.valorFinal !== null && produto.valorFinal !== undefined
@@ -388,7 +397,10 @@ export function PedidoDetalhesView() {
                                         {/* Quantidade */}
                                         <div className="w-[60px] flex-shrink-0">
                                           <span className="block text-center text-xs text-gray-900">
-                                            {Math.floor(produto.quantidade)}
+                                            {formatarQuantidadeProdutoExibicao(
+                                              produto.quantidade,
+                                              unidadeMedida
+                                            )}
                                           </span>
                                         </div>
                                         {/* Nome do Produto */}
@@ -596,6 +608,19 @@ export function PedidoDetalhesView() {
 
                         {/* Total Pago e Troco */}
                         <div className="mb-2 border-t pt-2 text-sm">
+                          {taxaEntregaTemValor(detalhesEntregaPedido?.taxaEntrega) && (
+                            <div className="mb-1 flex items-center justify-between gap-2">
+                              <span className="text-sm font-semibold text-gray-700">
+                                Taxa de entrega:
+                              </span>
+                              <span className="text-sm font-semibold text-primary">
+                                +{' '}
+                                {transformarParaReal(
+                                  Number(detalhesEntregaPedido?.taxaEntrega?.valor)
+                                )}
+                              </span>
+                            </div>
+                          )}
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-sm font-semibold text-gray-700">
                               Total do Pedido:
@@ -632,7 +657,7 @@ export function PedidoDetalhesView() {
                           )}
                         </div>
 
-                        {podeEditarPagamentoEntregaEmAberto && (
+                        {podeAjustarPagamentoEntregaEmAberto && (
                           <div className="mb-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
                             <div className="mb-2">
                               <div>
@@ -769,10 +794,16 @@ export function PedidoDetalhesView() {
                                   >
                                     {transformarParaReal(pagamento.valor)}
                                   </span>
-                                  {podeEditarPagamentoEntregaEmAberto && (
+                                  {podeAjustarPagamentoEntregaEmAberto && (
                                     <button
                                       type="button"
-                                      onClick={() => removerPagamento(index, pagamento.id)}
+                                      onClick={() => {
+                                        const idxCompleto = pagamentos.indexOf(pagamento)
+                                        removerPagamento(
+                                          idxCompleto >= 0 ? idxCompleto : index,
+                                          pagamento.id
+                                        )
+                                      }}
                                       className="mt-1 inline-flex items-center gap-1 rounded border border-red-200 px-2 py-0.5 text-[11px] font-semibold text-red-600 hover:bg-red-50"
                                     >
                                       <MdDelete className="h-3.5 w-3.5" />

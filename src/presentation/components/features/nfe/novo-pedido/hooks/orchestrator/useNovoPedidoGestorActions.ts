@@ -4,6 +4,8 @@ import { useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { atualizarCobrancasPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/AtualizarCobrancasPedidoDeliveryUseCase'
 import { atualizarPagamentoEntregaGestorUseCase } from '@/src/application/use-cases/vendas/AtualizarPagamentoEntregaGestorUseCase'
+import { pagamentoEstaCancelado } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
+import { pagamentosAtivosParaPatchDelivery } from '@/src/application/mappers/CobrancaPedidoDeliveryPayloadMapper'
 import { Produto } from '@/src/domain/entities/Produto'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { showToast } from '@/src/shared/utils/toast'
@@ -53,6 +55,9 @@ export type UseNovoPedidoGestorActionsParams = {
   totalPagamentosLancados: number
   trocoLancamento: number
   usarModuloDeliveryCobrancas?: boolean
+  recarregarVendaExistente?: () => Promise<unknown>
+  /** Aberto pelo Kanban para quitar pagamento antes de finalizar. */
+  confirmarPagamentoParaFinalizar?: boolean
 }
 
 export function useNovoPedidoGestorActions({
@@ -70,6 +75,8 @@ export function useNovoPedidoGestorActions({
   totalPagamentosLancados,
   trocoLancamento,
   usarModuloDeliveryCobrancas = false,
+  recarregarVendaExistente,
+  confirmarPagamentoParaFinalizar = false,
 }: UseNovoPedidoGestorActionsParams) {
   const queryClient = useQueryClient()
   const empresaId = useTenantEmpresaId()
@@ -87,18 +94,11 @@ export function useNovoPedidoGestorActions({
     setIsSavingPagamentoEntrega,
   } = form
 
-  const buildPagamentosPatchMeiosPayload = useCallback(
-    (pagamentosBase: PagamentoSelecionado[]) =>
-      pagamentosBase.map(p => ({
-        meioPagamentoId: p.meioPagamentoId,
-        valor: p.valor,
-      })),
-    []
-  )
-
   const handleSalvarPagamentoEntregaEmAberto = useCallback(async () => {
     if (!vendaId || tabelaOrigemVenda !== 'venda_gestor') return
-    if (pagamentos.length === 0) {
+
+    const pagamentosAtivos = pagamentos.filter(p => !pagamentoEstaCancelado(p))
+    if (pagamentosAtivos.length === 0) {
       showToast.error('Informe pelo menos uma forma de pagamento para cobrança.')
       return
     }
@@ -109,28 +109,35 @@ export function useNovoPedidoGestorActions({
       return
     }
 
-    const pagamentosPayload = buildPagamentosPatchMeiosPayload(pagamentos)
-    const diferencaPagamentoEntrega = totalProdutos - totalPagamentosLancados
+    const pagamentosPayload = pagamentosAtivosParaPatchDelivery(pagamentos)
+    const totalLancadoAtivos = pagamentosAtivos.reduce((sum, p) => sum + p.valor, 0)
+    const diferencaPagamentoEntrega = totalProdutos - totalLancadoAtivos
     const pagamentoEntregaQuitado = diferencaPagamentoEntrega <= 0.01
     const pagamentoEntregaComTrocoValido =
-      totalPagamentosLancados > totalProdutos && trocoLancamento > 0
+      totalLancadoAtivos > totalProdutos && trocoLancamento > 0
 
     if (!pagamentoEntregaQuitado && !pagamentoEntregaComTrocoValido) {
       showToast.error(
-        `Valor das formas de pagamento (${transformarParaReal(totalPagamentosLancados)}) não cobre o total do pedido (${transformarParaReal(totalProdutos)}).`
+        `Valor das formas de pagamento (${transformarParaReal(totalLancadoAtivos)}) não cobre o total do pedido (${transformarParaReal(totalProdutos)}).`
       )
       return
     }
 
     setIsSavingPagamentoEntrega(true)
     try {
+      const fluxoParaPatch = usarModuloDeliveryCobrancas ? 'ja_pago' : fluxoPagamentoEntrega
+
       if (usarModuloDeliveryCobrancas) {
-        await atualizarCobrancasPedidoDeliveryUseCase.execute(
+        const aplicado = await atualizarCobrancasPedidoDeliveryUseCase.execute(
           vendaId,
           token,
-          pagamentosPayload,
-          fluxoPagamentoEntrega
+          pagamentos,
+          fluxoParaPatch
         )
+        if (!aplicado) {
+          showToast.info('Nenhuma alteração de cobrança para salvar.')
+          return
+        }
       } else {
         await atualizarPagamentoEntregaGestorUseCase.execute(
           vendaId,
@@ -139,16 +146,14 @@ export function useNovoPedidoGestorActions({
         )
       }
 
-      setPagamentos(prev =>
-        prev.map(p => ({
-          ...p,
-          cobrarNaEntrega: fluxoPagamentoEntrega === 'cobrar_entregador',
-        }))
-      )
-      showToast.success('Cobrança da entrega atualizada.')
       if (vendaId) {
         await invalidateVendaDetalheCarregadaCache(queryClient, empresaId, vendaId)
       }
+      if (recarregarVendaExistente) {
+        await recarregarVendaExistente()
+      }
+
+      showToast.success('Cobrança da entrega atualizada.')
       onSuccess()
     } catch (error) {
       console.error('Erro ao atualizar pagamento da entrega:', error)
@@ -163,15 +168,13 @@ export function useNovoPedidoGestorActions({
     auth,
     fluxoPagamentoEntrega,
     trocoLancamento,
-    totalPagamentosLancados,
-    buildPagamentosPatchMeiosPayload,
     totalProdutos,
     onSuccess,
-    setPagamentos,
     setIsSavingPagamentoEntrega,
     queryClient,
     empresaId,
     usarModuloDeliveryCobrancas,
+    recarregarVendaExistente,
   ])
 
   const handleAbrirEdicaoProdutoDetalhes = useCallback(

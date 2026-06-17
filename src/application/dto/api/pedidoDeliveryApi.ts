@@ -52,10 +52,15 @@ export interface CancelaCobrancaPedidoDeliveryApi {
   cobrancaId: string
 }
 
+export interface ConfirmaCobrancaPedidoDeliveryApi {
+  cobrancaId: string
+}
+
 export interface AtualizarCobrancasPedidoDeliveryApi {
   cobrancas: {
     add?: CobrancaPedidoDeliveryApi[]
     cancel?: CancelaCobrancaPedidoDeliveryApi[]
+    confirm?: ConfirmaCobrancaPedidoDeliveryApi[]
   }
 }
 

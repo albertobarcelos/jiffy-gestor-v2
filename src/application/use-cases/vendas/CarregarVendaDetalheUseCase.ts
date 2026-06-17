@@ -413,6 +413,11 @@ export class CarregarVendaDetalheUseCase {
       }
     }
 
+    const valorFinalVendaNormalizado =
+      tipoVendaCarregada === 'entrega' || tipoVendaCarregada === 'retirada'
+        ? (resumoFinanceiroDetalhes?.totalDosItens ?? valorFinalVenda)
+        : valorFinalVenda
+
     const { pagamentos, fluxoPagamentoEntrega } = mapPagamentosDetalheVenda(vendaData)
 
     const idsUsuarios = coletarIdsUsuarios(vendaData)
@@ -458,7 +463,7 @@ export class CarregarVendaDetalheUseCase {
       nomesUsuariosPedido,
       nomesMeiosPagamentoPedido,
       dataVenda,
-      valorFinalVenda,
+      valorFinalVenda: valorFinalVendaNormalizado,
       dataFinalizacaoCarregada,
       vendaGestorJaCancelada,
       observacaoPedido: observacaoPedidoCarregada,

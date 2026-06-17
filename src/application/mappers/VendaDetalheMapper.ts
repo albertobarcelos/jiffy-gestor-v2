@@ -577,8 +577,7 @@ export function calcularTotalDosItensResumoEntrega(vendaData: Record<string, unk
       const tipo = String(comp.tipoImpactoPreco ?? 'nenhum').toLowerCase()
       const valorTotal =
         (Number(comp.valorUnitario ?? comp.valor) || 0) *
-        (Number(comp.quantidade) || 1) *
-        quantidade
+        (Number(comp.quantidade) || 1)
       if (tipo === 'aumenta') return sum + valorTotal
       if (tipo === 'diminui') return sum - valorTotal
       return sum

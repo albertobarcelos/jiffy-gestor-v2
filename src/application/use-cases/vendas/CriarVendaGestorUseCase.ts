@@ -8,7 +8,7 @@ import {
   validarInformacoesPedidoEntrega,
   validarPedidoGestor,
 } from '@/src/domain/services/pedido/ValidadorPedidoGestor'
-import type { PagamentoSelecionado, StatusVenda } from '@/src/domain/types/pedido'
+import type { PagamentoSelecionado, ProdutoSelecionado, StatusVenda } from '@/src/domain/types/pedido'
 
 export type CriarVendaGestorMutateFn = (payload: CriarVendaGestorPayload) => Promise<unknown>
 
@@ -23,6 +23,7 @@ export type ValidacaoCriarVendaResult =
 
 export interface ValidarCriarVendaParams {
   produtosCount: number
+  produtos?: ProdutoSelecionado[]
   pedidoDeliveryGestor: boolean
   clienteEntregaVinculadoId?: string
   pedidoComEntrega: boolean

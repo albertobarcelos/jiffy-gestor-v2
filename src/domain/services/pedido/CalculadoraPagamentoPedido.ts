@@ -13,6 +13,10 @@ export interface MeioPagamentoNomeLike {
 
 const TOLERANCIA_TOTAL = 0.01
 
+function emCentavos(valor: number): number {
+  return Math.round(valor * 100)
+}
+
 export function totalPagamentosEfetivos(pagamentos: PagamentoSelecionado[]): number {
   return pagamentos.reduce(
     (sum, p) => sum + (pagamentoContaComoEfetivo(p) ? p.valor : 0),
@@ -51,9 +55,9 @@ export function pagamentosCobremTotalPedido(
   totalPagamentos: number,
   troco: number
 ): boolean {
-  const diferenca = totalProdutos - totalPagamentos
-  if (Math.abs(diferenca) <= TOLERANCIA_TOTAL) return true
-  return totalPagamentos > totalProdutos && troco > 0
+  const diferencaCentavos = emCentavos(totalProdutos) - emCentavos(totalPagamentos)
+  if (Math.abs(diferencaCentavos) <= Math.round(TOLERANCIA_TOTAL * 100)) return true
+  return emCentavos(totalPagamentos) > emCentavos(totalProdutos) && troco > 0
 }
 
 function meioEhDinheiro(nome: string): boolean {

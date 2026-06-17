@@ -10,4 +10,6 @@ export type KanbanVendaCachePatch = {
   statusEtapaOperacional?: string | null
   dataUltimaModificacao?: string | null
   dataFinalizacao?: string | null
+  statusFinanceiro?: string | null
+  valorFinal?: number
 }

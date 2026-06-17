@@ -182,5 +182,6 @@ export function useCarregarVenda({
     carregarVendaExistente,
     isLoadingVenda,
     setIsLoadingVenda: () => {},
+    vendaDataUpdatedAt: query.dataUpdatedAt,
   }
 }

@@ -45,7 +45,7 @@ export function PedidoDetalhesFooter({
     modoVisualizacao,
     isLoadingVenda,
     abaDetalhesPedido,
-    podeEditarPagamentoEntregaEmAberto,
+    podeAjustarPagamentoEntregaEmAberto,
     cancelarVendaGestor,
     cancelarNotaFiscalVendaPdv,
     cancelarNotaFiscalVendaGestor,
@@ -64,7 +64,7 @@ export function PedidoDetalhesFooter({
     const chaves: ChaveRodape4[] = []
     if (podeExibirCancelarVendaGestor) chaves.push('cancelVenda')
     if (podeExibirCancelarNotaFiscal) chaves.push('cancelNota')
-    if (podeEditarPagamentoEntregaEmAberto && abaDetalhesPedido === 'pagamentos') {
+    if (podeAjustarPagamentoEntregaEmAberto && abaDetalhesPedido === 'pagamentos') {
       chaves.push('fechar')
       chaves.push('salvarCobranca')
     } else {
@@ -244,10 +244,13 @@ export function PedidoDetalhesFooter({
               type="button"
               variant="contained"
               color="primary"
-              disabled={createPending || !canSubmit()}
-              onClick={onSubmit}
+              disabled={createPending}
+              onClick={() => {
+                if (createPending) return
+                void onSubmit()
+              }}
               fullWidth
-              className="h-12 min-h-12 w-full font-semibold shadow-none"
+              className={`h-12 min-h-12 w-full font-semibold shadow-none${!createPending && !canSubmit() ? ' opacity-60' : ''}`}
               sx={{
                 ...footerSavePrimaryBarSx(false),
                 borderBottomRightRadius: painelRaioEsqInf,

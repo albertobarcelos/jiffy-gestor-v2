@@ -5,6 +5,7 @@ import {
 import type { ComplementoSelecionado, ProdutoSelecionado } from '@/src/domain/types/pedido'
 import type { ResumoFinanceiroDetalhes } from '@/src/domain/types/vendaDetalhe'
 import { textoObservacaoProdutoApi } from '@/src/shared/helpers/observacaoPedido'
+import { normalizarUnidadeMedidaProduto } from '@/src/shared/types/unidadeMedidaProduto'
 
 function mapComplementoRaw(comp: Record<string, unknown>): ComplementoSelecionado {
   return {
@@ -46,7 +47,7 @@ export function mapProdutoDetalheVenda(prod: Record<string, unknown>): ProdutoSe
   const valorProdutoSubtotal = (Number(prod.valorUnitario) || 0) * quantidade
   const valorComplementosSubtotal = complementosMapeados.reduce((sum, comp) => {
     const tipo = comp.tipoImpactoPreco || 'nenhum'
-    const valorTotal = comp.valor * comp.quantidade * quantidade
+    const valorTotal = comp.valor * comp.quantidade
     if (tipo === 'aumenta') return sum + valorTotal
     if (tipo === 'diminui') return sum - valorTotal
     return sum
@@ -92,11 +93,16 @@ export function mapProdutoDetalheVenda(prod: Record<string, unknown>): ProdutoSe
         ? Number(prod.valor_final)
         : null
 
+  const unidadeRaw = prod.unidadeMedida ?? prod.unidade_medida
+
   return {
     produtoId: String(prod.produtoId ?? prod.id ?? ''),
     nome: nomeProduto,
     quantidade,
     valorUnitario: Number(prod.valorUnitario) || 0,
+    ...(unidadeRaw != null && String(unidadeRaw).trim() !== ''
+      ? { unidadeMedida: normalizarUnidadeMedidaProduto(unidadeRaw) }
+      : {}),
     complementos: complementosMapeados,
     tipoDesconto: tipoDescontoFinal,
     valorDesconto: valorDescontoFinal,
@@ -150,7 +156,7 @@ export function mapProdutosDetalheVenda(
     const valorBaseProduto = produto.valorUnitario * produto.quantidade
     const valorComplementos = (produto.complementos || []).reduce((sum, comp) => {
       const tipo = comp.tipoImpactoPreco || 'nenhum'
-      const valorTotal = comp.valor * comp.quantidade * produto.quantidade
+      const valorTotal = comp.valor * comp.quantidade
       if (tipo === 'aumenta') return sum + valorTotal
       if (tipo === 'diminui') return sum - valorTotal
       return sum

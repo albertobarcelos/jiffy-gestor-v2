@@ -13,6 +13,7 @@ export type UseNovoPedidoOrchestratorEffectsParams = {
   modoVisualizacao: boolean | undefined
   tipoInicioPedido: 'balcao' | 'entrega'
   abaDetalhesInicial?: AbaDetalhesPedido
+  vendaDataUpdatedAt?: number
   auth: AuthState
   currentStep: 1 | 2 | 3 | 4
   abaDetalhesPedido: AbaDetalhesPedido
@@ -21,6 +22,7 @@ export type UseNovoPedidoOrchestratorEffectsParams = {
   setCurrentStep: (step: 1 | 2 | 3 | 4) => void
   setAbaDetalhesPedido: (aba: AbaDetalhesPedido) => void
   setStatus: (status: import('../../types').StatusVenda) => void
+  setFluxoPagamentoEntrega: (fluxo: import('../../types').FluxoPagamentoEntrega) => void
   setNomeUsuario: (nome: string) => void
   longPressTimeoutRef: React.RefObject<ReturnType<typeof setTimeout> | null>
   longPressComplementoTimeoutRef: React.RefObject<ReturnType<typeof setTimeout> | null>
@@ -32,6 +34,7 @@ export function useNovoPedidoOrchestratorEffects({
   modoVisualizacao,
   tipoInicioPedido,
   abaDetalhesInicial,
+  vendaDataUpdatedAt,
   auth,
   currentStep,
   abaDetalhesPedido,
@@ -40,6 +43,7 @@ export function useNovoPedidoOrchestratorEffects({
   setCurrentStep,
   setAbaDetalhesPedido,
   setStatus,
+  setFluxoPagamentoEntrega,
   setNomeUsuario,
   longPressTimeoutRef,
   longPressComplementoTimeoutRef,
@@ -60,6 +64,19 @@ export function useNovoPedidoOrchestratorEffects({
     if (!open || !vendaId || !modoVisualizacao || !abaDetalhesInicial) return
     setAbaDetalhesPedido(abaDetalhesInicial)
   }, [open, vendaId, modoVisualizacao, abaDetalhesInicial, setAbaDetalhesPedido])
+
+  /** Kanban abre pagamentos para quitar antes de finalizar — efetiva na API, não só “cobrar na entrega”. */
+  useEffect(() => {
+    if (!open || !vendaId || !modoVisualizacao || abaDetalhesInicial !== 'pagamentos') return
+    setFluxoPagamentoEntrega('ja_pago')
+  }, [
+    open,
+    vendaId,
+    modoVisualizacao,
+    abaDetalhesInicial,
+    vendaDataUpdatedAt,
+    setFluxoPagamentoEntrega,
+  ])
 
   useEffect(() => {
     if (!open || vendaId || modoVisualizacao) return

@@ -5,7 +5,17 @@ import Image from 'next/image'
 import Tooltip from '@mui/material/Tooltip'
 import { DropdownMenu, DropdownMenuItem } from '@/src/presentation/components/ui/dropdown-menu'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
-import { produtoPermiteAlterarPreco } from '../produtoCatalogoHelpers'
+import { produtoPermiteAlterarPreco, obterUnidadeMedidaProdutoLinha } from '../produtoCatalogoHelpers'
+import { quantidadeMaximaComplementoNaLinha } from '@/src/domain/policies/pedido/ComplementoQuantidadeLinhaPolicy'
+import { produtoPermiteQuantidadeDecimal } from '@/src/shared/types/unidadeMedidaProduto'
+import {
+  formatarQuantidadeProdutoExibicao,
+  incrementarQuantidadeProduto,
+  normalizarQuantidadeProduto,
+  parseQuantidadeProdutoInput,
+  quantidadeProdutoPodeDiminuir,
+  sanitizarTextoQuantidadeProdutoEmEdicao,
+} from '@/src/shared/utils/quantidadeProdutoInput'
 import {
   OBSERVACAO_PEDIDO_MAX_CHARS,
   observacaoTextoParcialInvalido,
@@ -97,6 +107,12 @@ export function PedidoProdutosCarrinhoColuna() {
               // calcularTotalProduto já inclui complementos e desconto/acréscimo
               const totalProdutoComComplementos = calcularTotalProduto(produto)
               const qtdProdKey = `qtd-prod-${index}`
+              const unidadeMedida = obterUnidadeMedidaProdutoLinha(
+                produto,
+                catalogoProdutosPorId,
+                produtosList
+              )
+              const qtdProdutoDecimal = produtoPermiteQuantidadeDecimal(unidadeMedida)
               const permiteAlterarPreco = produtoPermiteAlterarPreco(
                 produto.produtoId,
                 catalogoProdutosPorId,
@@ -155,11 +171,15 @@ export function PedidoProdutosCarrinhoColuna() {
                       <button
                         type="button"
                         aria-label="Diminuir quantidade"
-                        disabled={Math.floor(produto.quantidade) <= 1}
+                        disabled={!quantidadeProdutoPodeDiminuir(produto.quantidade, unidadeMedida)}
                         onClick={e => {
                           e.stopPropagation()
-                          const qtdAtual = Math.floor(produto.quantidade)
-                          atualizarProduto(index, 'quantidade', Math.max(1, qtdAtual - 1))
+                          const proxima = incrementarQuantidadeProduto(
+                            produto.quantidade,
+                            -1,
+                            unidadeMedida
+                          )
+                          atualizarProduto(index, 'quantidade', proxima)
                           setValoresEmEdicao((prev: Record<string | number, string>) => {
                             const next = { ...prev }
                             delete next[qtdProdKey]
@@ -172,42 +192,55 @@ export function PedidoProdutosCarrinhoColuna() {
                       </button>
                       <input
                         type="text"
-                        inputMode="numeric"
+                        inputMode={qtdProdutoDecimal ? 'decimal' : 'numeric'}
                         aria-label="Quantidade"
                         value={
                           valoresEmEdicao[qtdProdKey] !== undefined
                             ? valoresEmEdicao[qtdProdKey]
-                            : String(Math.floor(produto.quantidade))
+                            : formatarQuantidadeProdutoExibicao(produto.quantidade, unidadeMedida)
                         }
                         onClick={e => e.stopPropagation()}
                         onChange={e => {
                           e.stopPropagation()
-                          const digits = e.target.value.replace(/\D/g, '')
+                          const texto = sanitizarTextoQuantidadeProdutoEmEdicao(
+                            e.target.value,
+                            unidadeMedida
+                          )
                           setValoresEmEdicao((prev: Record<string | number, string>) => ({
                             ...prev,
-                            [qtdProdKey]: digits,
+                            [qtdProdKey]: texto,
                           }))
-                          if (digits !== '') {
-                            const valor = parseInt(digits, 10)
-                            if (Number.isFinite(valor) && valor >= 1) {
-                              atualizarProduto(index, 'quantidade', valor)
-                            }
+                          const parsed = parseQuantidadeProdutoInput(texto, unidadeMedida)
+                          if (parsed !== null) {
+                            atualizarProduto(
+                              index,
+                              'quantidade',
+                              normalizarQuantidadeProduto(parsed, unidadeMedida)
+                            )
                           }
                         }}
                         onFocus={e => {
                           e.stopPropagation()
                           setValoresEmEdicao((prev: Record<string | number, string>) => ({
                             ...prev,
-                            [qtdProdKey]: String(Math.floor(produto.quantidade)),
+                            [qtdProdKey]: formatarQuantidadeProdutoExibicao(
+                              produto.quantidade,
+                              unidadeMedida
+                            ),
                           }))
                           setTimeout(() => e.target.select(), 0)
                         }}
                         onBlur={e => {
                           e.stopPropagation()
-                          const digits = e.target.value.replace(/\D/g, '')
-                          const valor = parseInt(digits, 10)
-                          const qtdFinal =
-                            Number.isFinite(valor) && valor >= 1 ? valor : 1
+                          const texto =
+                            valoresEmEdicao[qtdProdKey] !== undefined
+                              ? valoresEmEdicao[qtdProdKey]
+                              : e.target.value
+                          const parsed = parseQuantidadeProdutoInput(texto, unidadeMedida)
+                          const qtdFinal = normalizarQuantidadeProduto(
+                            parsed ?? produto.quantidade,
+                            unidadeMedida
+                          )
                           atualizarProduto(index, 'quantidade', qtdFinal)
                           setValoresEmEdicao((prev: Record<string | number, string>) => {
                             const next = { ...prev }
@@ -228,8 +261,12 @@ export function PedidoProdutosCarrinhoColuna() {
                         aria-label="Aumentar quantidade"
                         onClick={e => {
                           e.stopPropagation()
-                          const qtdAtual = Math.floor(produto.quantidade)
-                          atualizarProduto(index, 'quantidade', qtdAtual + 1)
+                          const proxima = incrementarQuantidadeProduto(
+                            produto.quantidade,
+                            1,
+                            unidadeMedida
+                          )
+                          atualizarProduto(index, 'quantidade', proxima)
                           setValoresEmEdicao((prev: Record<string | number, string>) => {
                             const next = { ...prev }
                             delete next[qtdProdKey]
@@ -438,6 +475,15 @@ export function PedidoProdutosCarrinhoColuna() {
                   {produto.complementos.map((complemento: any, compIndex: number) => {
                     const compKey = `comp-${index}-${complemento.grupoId}-${complemento.id}`
                     const qtdCompKey = `qtd-${compKey}`
+                    const qtdMaxComp = quantidadeMaximaComplementoNaLinha(
+                      produto.quantidade,
+                      unidadeMedida
+                    )
+                    const qtdCompLinha = Math.floor(complemento.quantidade)
+                    const complementoQtdTravada = qtdMaxComp !== null
+                    const compMaisDesabilitado =
+                      complementoQtdTravada || (qtdMaxComp !== null && qtdCompLinha >= qtdMaxComp)
+                    const compMenosDesabilitado = complementoQtdTravada || qtdCompLinha <= 1
 
                     return (
                       <div
@@ -487,7 +533,7 @@ export function PedidoProdutosCarrinhoColuna() {
                           <button
                             type="button"
                             aria-label="Diminuir quantidade do complemento"
-                            disabled={Math.floor(complemento.quantidade) <= 1}
+                            disabled={compMenosDesabilitado}
                             onClick={e => {
                               e.stopPropagation()
                               const qtdAtual = Math.floor(complemento.quantidade)
@@ -511,6 +557,7 @@ export function PedidoProdutosCarrinhoColuna() {
                             type="text"
                             inputMode="numeric"
                             aria-label="Quantidade do complemento"
+                            readOnly={complementoQtdTravada}
                             value={
                               valoresEmEdicao[qtdCompKey] !== undefined
                                 ? valoresEmEdicao[qtdCompKey]
@@ -518,6 +565,7 @@ export function PedidoProdutosCarrinhoColuna() {
                             }
                             onClick={e => e.stopPropagation()}
                             onChange={e => {
+                              if (complementoQtdTravada) return
                               e.stopPropagation()
                               const digits = e.target.value.replace(/\D/g, '')
                               setValoresEmEdicao((prev: Record<string | number, string>) => ({
@@ -537,6 +585,7 @@ export function PedidoProdutosCarrinhoColuna() {
                               }
                             }}
                             onFocus={e => {
+                              if (complementoQtdTravada) return
                               e.stopPropagation()
                               setValoresEmEdicao((prev: Record<string | number, string>) => ({
                                 ...prev,
@@ -545,6 +594,7 @@ export function PedidoProdutosCarrinhoColuna() {
                               setTimeout(() => e.target.select(), 0)
                             }}
                             onBlur={e => {
+                              if (complementoQtdTravada) return
                               e.stopPropagation()
                               const digits = e.target.value.replace(/\D/g, '')
                               const valor = parseInt(digits, 10)
@@ -573,6 +623,7 @@ export function PedidoProdutosCarrinhoColuna() {
                           <button
                             type="button"
                             aria-label="Aumentar quantidade do complemento"
+                            disabled={compMaisDesabilitado}
                             onClick={e => {
                               e.stopPropagation()
                               const qtdAtual = Math.floor(complemento.quantidade)
@@ -588,7 +639,7 @@ export function PedidoProdutosCarrinhoColuna() {
                                 return next
                               })
                             }}
-                            className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-gray-300 bg-white text-gray-600 transition-colors hover:bg-gray-100"
+                            className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-gray-300 bg-white text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             <MdAdd className="h-3 w-3" />
                           </button>

@@ -145,7 +145,11 @@ export function PedidoPagamentoStepView() {
                     onClick={() => {
                       setFluxoPagamentoEntrega('cobrar_entregador')
                       setPagamentos(prev =>
-                        prev.map(pagamento => ({ ...pagamento, cobrarNaEntrega: true }))
+                        prev.map(pagamento => ({
+                          ...pagamento,
+                          cobrarNaEntrega: true,
+                          naoEfetivo: true,
+                        }))
                       )
                     }}
                     className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
@@ -161,7 +165,11 @@ export function PedidoPagamentoStepView() {
                     onClick={() => {
                       setFluxoPagamentoEntrega('ja_pago')
                       setPagamentos(prev =>
-                        prev.map(pagamento => ({ ...pagamento, cobrarNaEntrega: false }))
+                        prev.map(pagamento => ({
+                          ...pagamento,
+                          cobrarNaEntrega: false,
+                          naoEfetivo: false,
+                        }))
                       )
                     }}
                     className={`rounded-lg border px-3 py-2 text-sm font-semibold ${

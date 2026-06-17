@@ -4,7 +4,13 @@ import { useRef, useState, useCallback } from 'react'
 import type { Produto } from '@/src/domain/entities/Produto'
 import type { ModalLancamentoProdutoPainelConfirmPayload, ModalLancamentoProdutoPainelModo } from '../../../ModalLancamentoProdutoPainel'
 import type { ComplementoSelecionado, ProdutoSelecionado } from '../../types'
-import { produtoPermiteAlterarPreco } from '../../produtoCatalogoHelpers'
+import { produtoPermiteAlterarPreco, obterUnidadeMedidaProdutoLinha } from '../../produtoCatalogoHelpers'
+import {
+  aplicarQuantidadeComplementoNaLinha,
+  aplicarQuantidadeProdutoNaLinha,
+  normalizarComplementosLinha,
+} from '@/src/domain/policies/pedido/ComplementoQuantidadeLinhaPolicy'
+import { showToast } from '@/src/shared/utils/toast'
 
 export interface UseNovoPedidoProdutosParams {
   produtos: ProdutoSelecionado[]
@@ -90,6 +96,7 @@ export function useNovoPedidoProdutos({
             nome: produto.getNome(),
             quantidade: 1,
             valorUnitario: produto.getValor(),
+            unidadeMedida: produto.getUnidadeMedida(),
             complementos: [],
           },
         ])
@@ -163,32 +170,37 @@ export function useNovoPedidoProdutos({
         }
       })
 
+      const aplicarComplementos = (base: ProdutoSelecionado): ProdutoSelecionado => ({
+        ...base,
+        complementos: normalizarComplementosLinha(base, complementosLinha),
+      })
+
       if (idxLinha !== null) {
         setProdutos(prev => {
           const novos = [...prev]
           const atual = novos[idxLinha]
           if (!atual) return prev
-          novos[idxLinha] = {
+          novos[idxLinha] = aplicarComplementos({
             ...atual,
             valorUnitario: valorUnitarioFinal,
-            complementos: complementosLinha,
-          }
+          })
           return novos
         })
       } else {
         setProdutos(prev => [
           ...prev,
-          {
+          aplicarComplementos({
             produtoId: produto.getId(),
             nome: produto.getNome(),
             quantidade: 1,
             valorUnitario: valorUnitarioFinal,
+            unidadeMedida: produto.getUnidadeMedida(),
             complementos: complementosLinha,
             tipoDesconto: null,
             valorDesconto: null,
             tipoAcrescimo: null,
             valorAcrescimo: null,
-          },
+          }),
         ])
       }
       setCatalogoProdutosPorId(prev => ({ ...prev, [produto.getId()]: produto }))
@@ -300,7 +312,23 @@ export function useNovoPedidoProdutos({
 
       setProdutos(prev => {
         const novosProdutos = [...prev]
-        novosProdutos[index] = { ...novosProdutos[index], [campo]: valor }
+        const linhaAtual = novosProdutos[index]
+        if (!linhaAtual) return prev
+
+        if (campo === 'quantidade') {
+          const unidadeMedida = obterUnidadeMedidaProdutoLinha(
+            linhaAtual,
+            catalogoProdutosPorId,
+            produtosList
+          )
+          novosProdutos[index] = aplicarQuantidadeProdutoNaLinha(
+            { ...linhaAtual, unidadeMedida },
+            Number(valor)
+          )
+          return novosProdutos
+        }
+
+        novosProdutos[index] = { ...linhaAtual, [campo]: valor }
         return novosProdutos
       })
     },
@@ -316,13 +344,30 @@ export function useNovoPedidoProdutos({
     ) => {
       setProdutos(prev => {
         const novosProdutos = [...prev]
-        const novosComplementos = [...novosProdutos[produtoIndex].complementos]
+        const linhaAtual = novosProdutos[produtoIndex]
+        if (!linhaAtual) return prev
+
+        if (campo === 'quantidade') {
+          const resultado = aplicarQuantidadeComplementoNaLinha(
+            linhaAtual,
+            complementoIndex,
+            Number(valor)
+          )
+          if (!resultado.aceito) {
+            if (resultado.mensagem) showToast.error(resultado.mensagem)
+            return prev
+          }
+          novosProdutos[produtoIndex] = resultado.produto
+          return novosProdutos
+        }
+
+        const novosComplementos = [...linhaAtual.complementos]
         novosComplementos[complementoIndex] = {
           ...novosComplementos[complementoIndex],
           [campo]: valor,
         }
         novosProdutos[produtoIndex] = {
-          ...novosProdutos[produtoIndex],
+          ...linhaAtual,
           complementos: novosComplementos,
         }
         return novosProdutos

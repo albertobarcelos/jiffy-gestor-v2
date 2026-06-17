@@ -1,5 +1,6 @@
 import { validarPedidoGestor } from '@/src/domain/services/pedido/ValidadorPedidoGestor'
-import type { PagamentoSelecionado, StatusVenda } from '../../types'
+import type { ValidarPedidoGestorResult } from '@/src/domain/services/pedido/ValidadorPedidoGestor'
+import type { PagamentoSelecionado, ProdutoSelecionado, StatusVenda } from '../../types'
 
 export type CanSubmitNovoPedidoParams = {
   pedidoDeliveryGestor: boolean
@@ -9,6 +10,7 @@ export type CanSubmitNovoPedidoParams = {
   pedidoEntregaAceitaPagamentoPendente: boolean
   entregaComCobrancaPeloEntregador: boolean
   produtosCount: number
+  produtos?: ProdutoSelecionado[]
   pagamentos: PagamentoSelecionado[]
   totalProdutos: number
   totalPagamentos: number
@@ -18,9 +20,12 @@ export type CanSubmitNovoPedidoParams = {
   status: StatusVenda
 }
 
-export function canSubmitNovoPedido(params: CanSubmitNovoPedidoParams): boolean {
+export function validarNovoPedidoSubmit(
+  params: CanSubmitNovoPedidoParams
+): ValidarPedidoGestorResult {
   return validarPedidoGestor({
     produtosCount: params.produtosCount,
+    produtos: params.produtos,
     pedidoDeliveryGestor: params.pedidoDeliveryGestor,
     clienteEntregaVinculadoId: params.clienteEntregaVinculadoId,
     pedidoComEntrega: params.pedidoComEntrega,
@@ -35,5 +40,9 @@ export function canSubmitNovoPedido(params: CanSubmitNovoPedidoParams): boolean 
     troco: params.troco,
     status: params.status,
     pagamentos: params.pagamentos,
-  }).podeSubmeter
+  })
+}
+
+export function canSubmitNovoPedido(params: CanSubmitNovoPedidoParams): boolean {
+  return validarNovoPedidoSubmit(params).podeSubmeter
 }

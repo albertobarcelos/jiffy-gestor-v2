@@ -1,11 +1,25 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { MdAdd, MdRemove } from 'react-icons/md'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Switch } from '@/src/presentation/components/ui/switch'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { colors } from '@/src/shared/theme/colors'
+import type { UnidadeMedidaProduto } from '@/src/shared/types/unidadeMedidaProduto'
+import {
+  normalizarUnidadeMedidaProduto,
+  produtoPermiteQuantidadeDecimal,
+} from '@/src/shared/types/unidadeMedidaProduto'
+import {
+  formatarQuantidadeProdutoExibicao,
+  incrementarQuantidadeProduto,
+  normalizarQuantidadeProduto,
+  parseQuantidadeProdutoInput,
+  quantidadeProdutoPodeDiminuir,
+  sanitizarTextoQuantidadeProdutoEmEdicao,
+} from '@/src/shared/utils/quantidadeProdutoInput'
 
 /** Mesmo estilo do input de valor em `ModalLancamentoProdutoPainel` */
 const sxValorPainelOutlined = {
@@ -91,6 +105,7 @@ export interface PainelEdicaoProdutoLinhaPedidoProps {
   permiteAcrescimo: boolean
   quantidadeEdicao: number
   onQuantidadeEdicaoChange: (valor: number) => void
+  unidadeMedida: UnidadeMedidaProduto
   ehAcrescimo: boolean
   onEhAcrescimoChange: (valor: boolean) => void
   ehPorcentagem: boolean
@@ -142,6 +157,7 @@ export function PainelEdicaoProdutoLinhaPedido({
   permiteAcrescimo,
   quantidadeEdicao,
   onQuantidadeEdicaoChange,
+  unidadeMedida,
   ehAcrescimo,
   onEhAcrescimoChange,
   ehPorcentagem,
@@ -165,11 +181,23 @@ export function PainelEdicaoProdutoLinhaPedido({
     valorUnitarioEfetivo * quantidadeEdicao +
     produtoLinha.complementos.reduce((sum, comp) => {
       const tipo = comp.tipoImpactoPreco || 'nenhum'
-      const valorTotal = comp.valor * comp.quantidade * quantidadeEdicao
+      const valorTotal = comp.valor * comp.quantidade
       if (tipo === 'aumenta') return sum + valorTotal
       if (tipo === 'diminui') return sum - valorTotal
       return sum
     }, 0)
+
+  const qtdDecimal = produtoPermiteQuantidadeDecimal(unidadeMedida)
+  const labelUnidade = unidadeMedida === 'KG' ? 'kg' : unidadeMedida === 'LT' ? 'L' : ''
+  const [quantidadeTexto, setQuantidadeTexto] = useState(() =>
+    formatarQuantidadeProdutoExibicao(quantidadeEdicao, unidadeMedida)
+  )
+
+  useEffect(() => {
+    if (open) {
+      setQuantidadeTexto(formatarQuantidadeProdutoExibicao(quantidadeEdicao, unidadeMedida))
+    }
+  }, [open, quantidadeEdicao, unidadeMedida])
 
   let valorCalculadoFooter = 0
   if (valorDescontoAcrescimo && valorDescontoAcrescimo !== '0') {
@@ -252,43 +280,58 @@ export function PainelEdicaoProdutoLinhaPedido({
         )}
 
         <div className="mb-4 rounded-lg border border-gray-200 bg-white p-4">
-          <div className="mb-3 text-sm font-semibold text-primary">Quantidade</div>
+          <div className="mb-3 text-sm font-semibold text-primary">
+            Quantidade{labelUnidade ? ` (${labelUnidade})` : ''}
+          </div>
           <div className="flex items-center justify-center gap-4">
             <button
               type="button"
-              onClick={() => onQuantidadeEdicaoChange(Math.max(1, quantidadeEdicao - 1))}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500 text-white transition-colors hover:bg-red-600"
+              disabled={!quantidadeProdutoPodeDiminuir(quantidadeEdicao, unidadeMedida)}
+              onClick={() => {
+                const proxima = incrementarQuantidadeProduto(quantidadeEdicao, -1, unidadeMedida)
+                onQuantidadeEdicaoChange(proxima)
+                setQuantidadeTexto(formatarQuantidadeProdutoExibicao(proxima, unidadeMedida))
+              }}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500 text-white transition-colors hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <MdRemove className="h-5 w-5" />
             </button>
             <input
               id="edicao-painel-quantidade"
               type="text"
-              inputMode="numeric"
+              inputMode={qtdDecimal ? 'decimal' : 'numeric'}
               autoComplete="off"
               aria-label="Quantidade"
-              value={quantidadeEdicao.toFixed(0)}
+              value={quantidadeTexto}
               onChange={e => {
-                const digits = e.target.value.replace(/\D/g, '')
-                if (digits === '') {
-                  onQuantidadeEdicaoChange(1)
-                  return
-                }
-                const v = parseInt(digits, 10)
-                if (Number.isFinite(v)) {
-                  onQuantidadeEdicaoChange(Math.max(1, v))
+                const texto = sanitizarTextoQuantidadeProdutoEmEdicao(
+                  e.target.value,
+                  unidadeMedida
+                )
+                setQuantidadeTexto(texto)
+                const parsed = parseQuantidadeProdutoInput(texto, unidadeMedida)
+                if (parsed !== null) {
+                  onQuantidadeEdicaoChange(normalizarQuantidadeProduto(parsed, unidadeMedida))
                 }
               }}
               onBlur={() => {
-                if (!Number.isFinite(quantidadeEdicao) || quantidadeEdicao < 1) {
-                  onQuantidadeEdicaoChange(1)
-                }
+                const parsed = parseQuantidadeProdutoInput(quantidadeTexto, unidadeMedida)
+                const normalizada = normalizarQuantidadeProduto(
+                  parsed ?? quantidadeEdicao,
+                  unidadeMedida
+                )
+                onQuantidadeEdicaoChange(normalizada)
+                setQuantidadeTexto(formatarQuantidadeProdutoExibicao(normalizada, unidadeMedida))
               }}
               className="min-w-[72px] max-w-[140px] rounded-lg border border-gray-300 bg-white px-2 py-2 text-center text-2xl font-semibold text-gray-900 tabular-nums outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
             />
             <button
               type="button"
-              onClick={() => onQuantidadeEdicaoChange(quantidadeEdicao + 1)}
+              onClick={() => {
+                const proxima = incrementarQuantidadeProduto(quantidadeEdicao, 1, unidadeMedida)
+                onQuantidadeEdicaoChange(proxima)
+                setQuantidadeTexto(formatarQuantidadeProdutoExibicao(proxima, unidadeMedida))
+              }}
               className="flex h-10 w-10 items-center justify-center rounded-full bg-accent5 text-white transition-colors hover:brightness-95 active:brightness-90"
             >
               <MdAdd className="h-5 w-5" />

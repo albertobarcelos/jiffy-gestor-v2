@@ -1,3 +1,4 @@
+import { extrairStatusFinanceiroPedidoDelivery } from '@/src/application/mappers/PedidoDeliveryDetalheAdapter'
 import type { StatusDeliveryApi } from '@/src/application/dto/api/pedidoDeliveryApi'
 import type {
   AcaoTransicaoKanbanEntrega,
@@ -49,6 +50,10 @@ export function extrairPatchKanbanDeTransicaoDelivery(data: unknown): KanbanVend
   const statusEtapaOperacional =
     isoDeCampoApi(inner.statusDelivery) ?? isoDeCampoApi(registro.statusDelivery)
 
+  const valorFinalRaw = inner.valorFinal ?? registro.valorFinal
+  const valorFinalNum = Number(valorFinalRaw)
+  const valorFinal = Number.isFinite(valorFinalNum) ? valorFinalNum : undefined
+
   return {
     statusEtapaOperacional,
     dataUltimaModificacao:
@@ -56,6 +61,8 @@ export function extrairPatchKanbanDeTransicaoDelivery(data: unknown): KanbanVend
       isoDeCampoApi(registro.dataUltimaModificacao),
     dataFinalizacao:
       isoDeCampoApi(inner.dataFinalizacao) ?? isoDeCampoApi(registro.dataFinalizacao),
+    statusFinanceiro: extrairStatusFinanceiroPedidoDelivery(data),
+    valorFinal,
   }
 }
 
@@ -81,5 +88,6 @@ export function extrairPatchKanbanDeRespostaTransicao(data: unknown): KanbanVend
       delivery.dataFinalizacao ??
       isoDeCampoApi(registro.dataFinalizacao) ??
       isoDeCampoApi(registro.data_finalizacao),
+    statusFinanceiro: delivery.statusFinanceiro,
   }
 }

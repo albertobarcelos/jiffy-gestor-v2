@@ -62,6 +62,7 @@ export function NovoPedidoAuxiliaryModals() {
     produtos,
     produtosList,
     quantidadeEdicao,
+    unidadeMedidaEdicao,
     setEhAcrescimo,
     setEhPorcentagem,
     setIndiceLinhaPainelProduto,
@@ -69,6 +70,7 @@ export function NovoPedidoAuxiliaryModals() {
     setProdutoIndexEdicao,
     setProdutoParaLancamentoPainel,
     setQuantidadeEdicao,
+    setUnidadeMedidaEdicao,
     setValorDescontoAcrescimo,
     setValorUnitarioEdicaoPainel,
     clienteTabsModalEntregaState,
@@ -182,6 +184,7 @@ export function NovoPedidoAuxiliaryModals() {
             }
             quantidadeEdicao={quantidadeEdicao}
             onQuantidadeEdicaoChange={setQuantidadeEdicao}
+            unidadeMedida={unidadeMedidaEdicao}
             ehAcrescimo={ehAcrescimo}
             onEhAcrescimoChange={setEhAcrescimo}
             ehPorcentagem={ehPorcentagem}

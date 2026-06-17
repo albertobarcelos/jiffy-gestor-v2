@@ -95,6 +95,27 @@ function extrairDataUltimaModificacao(item: Record<string, unknown>): string | n
   return null
 }
 
+function extrairStatusFinanceiro(item: Record<string, unknown>): string | null {
+  const direct = item.statusFinanceiro ?? item.status_financeiro
+  if (direct != null && String(direct).trim() !== '') {
+    return String(direct).trim().toLowerCase()
+  }
+
+  const totalFaltaPagar = Number(item.totalFaltaPagar ?? item.total_falta_pagar)
+  if (Number.isFinite(totalFaltaPagar)) {
+    return totalFaltaPagar <= 0 ? 'pago' : 'pendente'
+  }
+
+  const pagamento =
+    item.pagamento && typeof item.pagamento === 'object'
+      ? (item.pagamento as Record<string, unknown>)
+      : null
+  const statusPagamento = String(pagamento?.status ?? '').trim().toLowerCase()
+  if (statusPagamento) return statusPagamento
+
+  return null
+}
+
 /**
  * DTO unificado para vendas do PDV e do Gestor (TypeScript)
  * Deve corresponder à classe VendaUnificadaDTO do backend
@@ -350,7 +371,7 @@ export function mapItemJsonParaVendaUnificadaDTO(v: Record<string, unknown>): Ve
     v.retornoSefaz as string | null | undefined,
     extrairStatusEtapaOperacional(v),
     extrairDataUltimaModificacao(v),
-    (v.statusFinanceiro ?? null) as string | null
+    extrairStatusFinanceiro(v)
   )
 }
 

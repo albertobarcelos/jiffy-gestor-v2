@@ -4,7 +4,9 @@ import { useState, useCallback } from 'react'
 import type { Produto } from '@/src/domain/entities/Produto'
 import { showToast } from '@/src/shared/utils/toast'
 import { formatarNumeroComMilhar } from '@/src/domain/services/pedido/CalculadoraPedido'
+import { aplicarQuantidadeProdutoNaLinha } from '@/src/domain/policies/pedido/ComplementoQuantidadeLinhaPolicy'
 import type { ProdutoSelecionado } from '../../types'
+import { obterUnidadeMedidaProdutoLinha } from '../../produtoCatalogoHelpers'
 
 export interface UseNovoPedidoEdicaoLinhaParams {
   produtos: ProdutoSelecionado[]
@@ -27,6 +29,8 @@ export function useNovoPedidoEdicaoLinha({
   const [modalEdicaoProdutoOpen, setModalEdicaoProdutoOpen] = useState(false)
   const [produtoIndexEdicao, setProdutoIndexEdicao] = useState<number | null>(null)
   const [quantidadeEdicao, setQuantidadeEdicao] = useState<number>(1)
+  const [unidadeMedidaEdicao, setUnidadeMedidaEdicao] =
+    useState<ProdutoSelecionado['unidadeMedida']>('UN')
   const [ehAcrescimo, setEhAcrescimo] = useState(false)
   const [ehPorcentagem, setEhPorcentagem] = useState(false)
   const [valorDescontoAcrescimo, setValorDescontoAcrescimo] = useState<string>('0')
@@ -42,7 +46,13 @@ export function useNovoPedidoEdicaoLinha({
       }
 
       setProdutoIndexEdicao(index)
-      setQuantidadeEdicao(Math.floor(produto.quantidade))
+      const unidadeMedida = obterUnidadeMedidaProdutoLinha(
+        produto,
+        catalogoProdutosPorId,
+        produtosList
+      )
+      setQuantidadeEdicao(produto.quantidade)
+      setUnidadeMedidaEdicao(unidadeMedida)
 
       if (produto.tipoDesconto && produto.valorDesconto) {
         setEhAcrescimo(false)
@@ -113,15 +123,21 @@ export function useNovoPedidoEdicaoLinha({
       }
     }
 
-    novosProdutos[produtoIndexEdicao] = {
-      ...produtoAtual,
-      valorUnitario: novoValorUnitario,
-      quantidade: Math.floor(quantidadeEdicao),
-      tipoDesconto: podeAplicarDesconto ? (ehPorcentagem ? 'porcentagem' : 'fixo') : null,
-      valorDesconto: podeAplicarDesconto ? valorNum : null,
-      tipoAcrescimo: podeAplicarAcrescimo ? (ehPorcentagem ? 'porcentagem' : 'fixo') : null,
-      valorAcrescimo: podeAplicarAcrescimo ? valorNum : null,
-    }
+    novosProdutos[produtoIndexEdicao] = aplicarQuantidadeProdutoNaLinha(
+      {
+        ...produtoAtual,
+        unidadeMedida:
+          produtoAtual.unidadeMedida ??
+          produtoEntity?.getUnidadeMedida() ??
+          unidadeMedidaEdicao,
+        valorUnitario: novoValorUnitario,
+        tipoDesconto: podeAplicarDesconto ? (ehPorcentagem ? 'porcentagem' : 'fixo') : null,
+        valorDesconto: podeAplicarDesconto ? valorNum : null,
+        tipoAcrescimo: podeAplicarAcrescimo ? (ehPorcentagem ? 'porcentagem' : 'fixo') : null,
+        valorAcrescimo: podeAplicarAcrescimo ? valorNum : null,
+      },
+      quantidadeEdicao
+    )
 
     setProdutos(novosProdutos)
     setModalEdicaoProdutoOpen(false)
@@ -137,6 +153,7 @@ export function useNovoPedidoEdicaoLinha({
     ehAcrescimo,
     ehPorcentagem,
     quantidadeEdicao,
+    unidadeMedidaEdicao,
     setProdutos,
   ])
 
@@ -144,6 +161,7 @@ export function useNovoPedidoEdicaoLinha({
     setModalEdicaoProdutoOpen(false)
     setProdutoIndexEdicao(null)
     setQuantidadeEdicao(1)
+    setUnidadeMedidaEdicao('UN')
     setEhAcrescimo(false)
     setEhPorcentagem(false)
     setValorDescontoAcrescimo('0')
@@ -157,6 +175,8 @@ export function useNovoPedidoEdicaoLinha({
     setProdutoIndexEdicao,
     quantidadeEdicao,
     setQuantidadeEdicao,
+    unidadeMedidaEdicao,
+    setUnidadeMedidaEdicao,
     ehAcrescimo,
     setEhAcrescimo,
     ehPorcentagem,

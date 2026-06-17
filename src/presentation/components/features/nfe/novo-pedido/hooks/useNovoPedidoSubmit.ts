@@ -84,6 +84,7 @@ export interface UseNovoPedidoSubmitParams {
     acao: 'iniciar_preparo'
   ) => Promise<void>
   preferenciasAutoIniciarPreparo?: boolean
+  accessToken?: string
 }
 
 export function useNovoPedidoSubmit({
@@ -103,6 +104,7 @@ export function useNovoPedidoSubmit({
   tipoInicioPedido,
   processarAposTransicaoVendaGestorId,
   preferenciasAutoIniciarPreparo,
+  accessToken,
 }: UseNovoPedidoSubmitParams) {
   const criarVendaGestorUseCase = useMemo(() => new CriarVendaGestorUseCase(), [])
   const criarPedidoDeliveryUseCase = useMemo(() => new CriarPedidoDeliveryUseCase(), [])
@@ -121,6 +123,7 @@ export function useNovoPedidoSubmit({
 
     const validacaoResult = validarCriarVendaGestor({
       produtosCount: input.produtos.length,
+      produtos: input.produtos,
       pedidoDeliveryGestor: validacao.pedidoDeliveryGestor,
       clienteEntregaVinculadoId: input.clienteEntregaVinculado?.id,
       pedidoComEntrega: validacao.pedidoComEntrega,
@@ -139,14 +142,7 @@ export function useNovoPedidoSubmit({
 
     if (!validacaoResult.ok) {
       if (validacaoResult.goToStep === 2 || validacaoResult.goToStep === 1) {
-        validarInformacoesPedido({
-          pedidoDeliveryGestor: validacao.pedidoDeliveryGestor,
-          clienteEntregaVinculadoId: input.clienteEntregaVinculado?.id,
-          pedidoComEntrega: validacao.pedidoComEntrega,
-          temEnderecoEntrega: validacao.temEnderecoEntrega,
-          exibirToast: true,
-          onError: showToast.error,
-        })
+        showToast.error(validacaoResult.message)
         setCurrentStep(validacaoResult.goToStep)
         return
       }
@@ -181,7 +177,8 @@ export function useNovoPedidoSubmit({
                 input.moradaEntregaSelecionada?.telefone?.trim() ||
                 '',
             },
-            payload => createPedidoDelivery!.mutateAsync(payload)
+            payload => createPedidoDelivery!.mutateAsync(payload),
+            accessToken
           )
         : await criarVendaGestorUseCase.execute(input, payload =>
             createVendaGestor.mutateAsync(payload)
@@ -249,6 +246,7 @@ export function useNovoPedidoSubmit({
     onSuccess,
     onClose,
     setCurrentStep,
+    accessToken,
   ])
 
   return { handleSubmit }
