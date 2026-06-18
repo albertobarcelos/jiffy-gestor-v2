@@ -9,6 +9,14 @@ import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import {
   isPedidoEntregaKanban,
 } from '@/src/shared/helpers/pedidoEntregaKanban'
+import type { FluxoPagamentoEntrega } from '@/src/domain/types/vendaDetalhe'
+import { derivarFluxoPagamentoEntregaDeliverySummary } from '@/src/application/mappers/DeliveryFluxoPagamentoMapper'
+
+/** Cobrança resumida da listagem delivery (Kanban). */
+export type CobrancaKanbanDeliveryResumo = {
+  meioPagamentoId: string
+  status: string
+}
 
 /**
  * Primeiro texto não vazio entre candidatos (null, undefined e string só com espaços ignorados).
@@ -130,6 +138,49 @@ function extrairObservacoesArray(item: Record<string, unknown>): string[] | unde
   return undefined
 }
 
+function extrairPrevisaoEntregaEm(item: Record<string, unknown>): string | null {
+  const raw = item.previsaoEntregaEm ?? item.previsaoEntrega ?? item.previsao_entrega_em
+  if (raw == null || String(raw).trim() === '') return null
+  return String(raw).trim()
+}
+
+function extrairTempoTotalEstimadoSegundos(item: Record<string, unknown>): number | null {
+  const raw = item.tempoTotalEstimadoSegundos ?? item.tempo_total_estimado_segundos
+  if (raw == null) return null
+  const n = typeof raw === 'number' ? raw : Number(raw)
+  return Number.isFinite(n) ? n : null
+}
+
+function extrairFluxoPagamentoEntrega(item: Record<string, unknown>): FluxoPagamentoEntrega | null {
+  const direct = item.fluxoPagamentoEntrega ?? item.fluxo_pagamento_entrega
+  if (direct === 'cobrar_entregador' || direct === 'ja_pago') return direct
+  if (Array.isArray(item.cobrancas)) {
+    const totalFaltaPagar = Number(item.totalFaltaPagar ?? item.total_falta_pagar ?? 0)
+    return derivarFluxoPagamentoEntregaDeliverySummary(
+      totalFaltaPagar,
+      item.cobrancas as Parameters<typeof derivarFluxoPagamentoEntregaDeliverySummary>[1]
+    )
+  }
+  return null
+}
+
+function extrairCobrancasDelivery(item: Record<string, unknown>): CobrancaKanbanDeliveryResumo[] | undefined {
+  const raw = item.cobrancas
+  if (!Array.isArray(raw) || raw.length === 0) return undefined
+
+  const lista: CobrancaKanbanDeliveryResumo[] = []
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object') continue
+    const o = entry as Record<string, unknown>
+    const meioPagamentoId = String(o.meioPagamentoId ?? o.meio_pagamento_id ?? '').trim()
+    if (!meioPagamentoId) continue
+    const status = String(o.status ?? '').trim().toLowerCase()
+    lista.push({ meioPagamentoId, status })
+  }
+
+  return lista.length > 0 ? lista : undefined
+}
+
 function extrairStatusFinanceiro(item: Record<string, unknown>): string | null {
   const direct = item.statusFinanceiro ?? item.status_financeiro
   if (direct != null && String(direct).trim() !== '') {
@@ -206,7 +257,15 @@ export class VendaUnificadaDTO {
     /** Gestor: pendente | parcial | pago | cancelado; PDV costuma vir null. */
     public readonly statusFinanceiro?: string | null,
     /** Observações do pedido (GET unificado — array de strings). */
-    public readonly observacoes?: string[]
+    public readonly observacoes?: string[],
+    /** Delivery Kanban: previsão de entrega/retirada (ISO). */
+    public readonly previsaoEntregaEm?: string | null,
+    /** Delivery Kanban: tempo estimado em segundos (fallback se sem `previsaoEntregaEm`). */
+    public readonly tempoTotalEstimadoSegundos?: number | null,
+    /** Delivery Kanban: antecipado vs cobrar na entrega/retirada. */
+    public readonly fluxoPagamentoEntrega?: FluxoPagamentoEntrega | null,
+    /** Delivery Kanban: cobranças da listagem (meio de pagamento por id). */
+    public readonly cobrancasDelivery?: CobrancaKanbanDeliveryResumo[]
   ) {}
 
   private possuiDocumentoFiscal(): boolean {
@@ -413,7 +472,11 @@ export function mapItemJsonParaVendaUnificadaDTO(v: Record<string, unknown>): Ve
     extrairStatusEtapaOperacional(v),
     extrairDataUltimaModificacao(v),
     extrairStatusFinanceiro(v),
-    extrairObservacoesArray(v)
+    extrairObservacoesArray(v),
+    extrairPrevisaoEntregaEm(v),
+    extrairTempoTotalEstimadoSegundos(v),
+    extrairFluxoPagamentoEntrega(v),
+    extrairCobrancasDelivery(v)
   )
 }
 

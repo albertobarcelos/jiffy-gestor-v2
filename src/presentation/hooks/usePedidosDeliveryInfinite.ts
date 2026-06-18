@@ -3,7 +3,9 @@
 import {
   keepPreviousData,
   useInfiniteQuery,
+  useQueryClient,
   type InfiniteData,
+  type QueryClient,
 } from '@tanstack/react-query'
 import type { FiltrosKanbanParaPedidosDelivery } from '@/src/application/dto/api/pedidoDeliveryListQuery'
 import {
@@ -18,6 +20,7 @@ import {
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { preservarObservacoesKanbanCacheNosItems } from '@/src/presentation/components/features/nfe/kanban/kanbanVendaCacheUpdate'
 import {
   flattenVendasUnificadasInfinite,
   getNextOffsetVendasUnificadas,
@@ -71,7 +74,8 @@ export async function fetchPedidosDeliveryPagina(
   offset: number,
   limit: number,
   token: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  queryClient?: QueryClient
 ): Promise<PedidosDeliveryInfinitePage> {
   const queryParams = montarPedidosDeliveryQueryParams({
     ...params,
@@ -99,9 +103,13 @@ export async function fetchPedidosDeliveryPagina(
   const data = await response.json()
   const normalizado = normalizarPedidosDeliveryListResponse(data)
   const mapeado = mapPedidosDeliveryListResponseParaVendaUnificadaDTO(normalizado)
+  const items =
+    queryClient != null
+      ? preservarObservacoesKanbanCacheNosItems(queryClient, mapeado.items)
+      : mapeado.items
 
   return {
-    items: mapeado.items,
+    items,
     count: mapeado.count,
     page: mapeado.page,
     limit: mapeado.limit,
@@ -139,6 +147,7 @@ export function usePedidosDeliveryInfinite(
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
   const empresaId = useTenantEmpresaId()
+  const queryClient = useQueryClient()
 
   const queryKey = pedidosDeliveryInfiniteQueryKey(params, empresaId)
   const enabled = options?.enabled !== false && !!token
@@ -159,7 +168,8 @@ export function usePedidosDeliveryInfinite(
         pageParam,
         PEDIDOS_DELIVERY_KANBAN_PAGE_SIZE,
         token!,
-        signal
+        signal,
+        queryClient
       ),
     getNextPageParam: (lastPage, allPages) => getNextOffsetPedidosDelivery(lastPage, allPages),
     enabled,

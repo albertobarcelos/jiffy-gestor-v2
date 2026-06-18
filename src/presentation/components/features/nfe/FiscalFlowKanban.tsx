@@ -33,6 +33,7 @@ import {
   vendasUnificadasQueryParamsParaPedidosDelivery,
 } from '@/src/presentation/hooks/usePedidosDeliveryInfinite'
 import { useVendaIdsPdvPorTerminal } from '@/src/presentation/hooks/useVendaIdsPdvPorTerminal'
+import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import {
   MdReceipt,
@@ -205,6 +206,23 @@ export function FiscalFlowKanban() {
   }, [modoKanbanVendas])
 
   const isModoDeliveryKanban = modoKanbanVendas === 'delivery'
+
+  const { data: meiosPagamentoInfiniteData } = useMeiosPagamentoInfinite({
+    ativo: true,
+    limit: 100,
+    enabled: isModoDeliveryKanban,
+  })
+
+  const nomesMeiosPagamentoKanban = useMemo(() => {
+    const mapa: Record<string, string> = {}
+    const pages = meiosPagamentoInfiniteData?.pages ?? []
+    for (const page of pages) {
+      for (const meio of page.meiosPagamento) {
+        mapa[meio.getId()] = meio.getNome()
+      }
+    }
+    return mapa
+  }, [meiosPagamentoInfiniteData])
 
   const pedidosDeliveryQueryParams = useMemo(
     () => vendasUnificadasQueryParamsParaPedidosDelivery(vendasUnificadasQueryParams),
@@ -1308,6 +1326,7 @@ export function FiscalFlowKanban() {
                           : undefined
                       }
                       confirmandoCobrancaIds={confirmandoCobrancaIds}
+                      nomesMeiosPagamento={nomesMeiosPagamentoKanban}
                     />
                   ))}
                 </FiscalKanbanColumn>

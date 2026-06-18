@@ -79,7 +79,11 @@ export function cloneVendaUnificadaDTO(
       ? patch.dataUltimaModificacao
       : venda.dataUltimaModificacao,
     patch.statusFinanceiro !== undefined ? patch.statusFinanceiro : venda.statusFinanceiro,
-    patch.observacoes !== undefined ? patch.observacoes : venda.observacoes
+    patch.observacoes !== undefined ? patch.observacoes : venda.observacoes,
+    venda.previsaoEntregaEm,
+    venda.tempoTotalEstimadoSegundos,
+    venda.fluxoPagamentoEntrega,
+    venda.cobrancasDelivery
   )
 }
 
@@ -163,6 +167,47 @@ export async function sincronizarPedidoDeliveryKanbanEmBackground(
   } catch {
     /* falha silenciosa — cache otimista + patch da transição já atualizaram a UI */
   }
+}
+
+const PREFIXOS_LISTAGEM_KANBAN = [
+  KANBAN_VENDAS_UNIFICADAS_QUERY_KEY,
+  KANBAN_PEDIDOS_DELIVERY_INFINITE_QUERY_KEY,
+] as const
+
+/**
+ * A listagem GET /delivery/pedidos (summary) não inclui `observacoes`.
+ * Ao refetch, preserva observações já presentes no cache do Kanban (patch local ou unificado).
+ */
+export function preservarObservacoesKanbanCacheNosItems(
+  queryClient: QueryClient,
+  novosItems: VendaUnificadaDTO[]
+): VendaUnificadaDTO[] {
+  const observacoesPorId = new Map<string, string[]>()
+
+  for (const prefix of PREFIXOS_LISTAGEM_KANBAN) {
+    const queries = queryClient.getQueriesData<InfiniteData<VendasUnificadasResponse>>({
+      queryKey: prefix,
+    })
+    for (const [, data] of queries) {
+      if (!data?.pages?.length) continue
+      for (const page of data.pages) {
+        for (const item of page.items) {
+          if (item.observacoes?.length) {
+            observacoesPorId.set(item.id, item.observacoes)
+          }
+        }
+      }
+    }
+  }
+
+  if (observacoesPorId.size === 0) return novosItems
+
+  return novosItems.map(item => {
+    if (item.observacoes?.length) return item
+    const cached = observacoesPorId.get(item.id)
+    if (!cached?.length) return item
+    return cloneVendaUnificadaDTO(item, { observacoes: cached })
+  })
 }
 
 /** Sincroniza uma venda gestor via GET leve (substitui refetch da lista inteira). */

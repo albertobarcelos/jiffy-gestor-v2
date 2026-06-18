@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PedidoDeliverySummaryApi } from '@/src/application/dto/api/pedidoDeliveryListApi'
+import { derivarFluxoPagamentoEntregaDeliverySummary } from '@/src/application/mappers/DeliveryFluxoPagamentoMapper'
 import {
   derivarStatusFinanceiroDeliverySummary,
   mapOrigemApiDeliveryParaVendaUnificada,
@@ -40,6 +41,7 @@ function criarSummary(
     solicitarEmissaoFiscal: false,
     cobrancas: [],
     resumoFiscal: null,
+    observacoes: [],
     ...overrides,
   }
 }
@@ -77,6 +79,36 @@ describe('PedidoDeliveryListMapper — origem e financeiro', () => {
       ])
     ).toBe('parcial')
   })
+
+  it('deriva fluxo de pagamento antecipado vs cobrar na entrega', () => {
+    expect(derivarFluxoPagamentoEntregaDeliverySummary(0, [])).toBe('ja_pago')
+    expect(
+      derivarFluxoPagamentoEntregaDeliverySummary(0, [
+        {
+          id: 'c1',
+          valor: 80,
+          meioPagamentoId: 'mp1',
+          momentoCobranca: 'antecipado',
+          status: 'paga',
+          criadaPor: { id: 'u1' },
+          dataCriacao: '2026-06-15T10:00:00.000Z',
+        },
+      ])
+    ).toBe('ja_pago')
+    expect(
+      derivarFluxoPagamentoEntregaDeliverySummary(30, [
+        {
+          id: 'c2',
+          valor: 30,
+          meioPagamentoId: 'mp2',
+          momentoCobranca: 'na_entrega',
+          status: 'pendente',
+          criadaPor: { id: 'u1' },
+          dataCriacao: '2026-06-15T10:00:00.000Z',
+        },
+      ])
+    ).toBe('cobrar_entregador')
+  })
 })
 
 describe('PedidoDeliveryListMapper — summary → VendaUnificadaDTO', () => {
@@ -91,6 +123,34 @@ describe('PedidoDeliveryListMapper — summary → VendaUnificadaDTO', () => {
     )
     expect(dto.tipoVenda).toBe('entrega')
     expect(dto.tabelaOrigem).toBe('venda_gestor')
+  })
+
+  it('propaga previsão, tempo estimado e forma de cobrança', () => {
+    const dto = mapPedidoDeliverySummaryParaVendaUnificadaDTO(
+      criarSummary({
+        previsaoEntregaEm: '2026-06-15T10:45:00.000Z',
+        tempoTotalEstimadoSegundos: 2700,
+        totalFaltaPagar: 25,
+        cobrancas: [
+          {
+            id: 'c1',
+            valor: 25,
+            meioPagamentoId: 'mp1',
+            momentoCobranca: 'na_entrega',
+            status: 'pendente',
+            criadaPor: { id: 'u1' },
+            dataCriacao: '2026-06-15T10:00:00.000Z',
+          },
+        ],
+      })
+    )
+
+    expect(dto.previsaoEntregaEm).toBe('2026-06-15T10:45:00.000Z')
+    expect(dto.tempoTotalEstimadoSegundos).toBe(2700)
+    expect(dto.fluxoPagamentoEntrega).toBe('cobrar_entregador')
+    expect(dto.cobrancasDelivery).toEqual([
+      { meioPagamentoId: 'mp1', status: 'pendente' },
+    ])
   })
 
   it('propaga statusDelivery e reconhece pedido entrega no Kanban', () => {
@@ -165,6 +225,21 @@ describe('PedidoDeliveryListMapper — summary → VendaUnificadaDTO', () => {
     expect(dto.getEtapaKanban()).toBe('COM_NFE')
     expect(dto.documentoFiscalId).toBe('doc-1')
     expect(dto.numeroFiscal).toBe(123)
+  })
+
+  it('propaga observações do pedido para o DTO do Kanban', () => {
+    const dto = mapPedidoDeliverySummaryParaVendaUnificadaDTO(
+      criarSummary({
+        observacoes: [
+          {
+            observacao: 'Sem cebola',
+            dataLancamento: '2026-06-15T10:01:00.000Z',
+          },
+        ],
+      })
+    )
+
+    expect(dto.observacoes).toEqual(['Sem cebola'])
   })
 
   it('PENDENTE operacional cai em NOVOS_PEDIDOS', () => {

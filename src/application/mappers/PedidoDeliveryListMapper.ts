@@ -2,6 +2,7 @@ import type {
   PedidoDeliverySummaryApi,
   PedidosDeliveryListResponse,
 } from '@/src/application/dto/api/pedidoDeliveryListApi'
+import { derivarFluxoPagamentoEntregaDeliverySummary } from '@/src/application/mappers/DeliveryFluxoPagamentoMapper'
 import {
   mapItemJsonParaVendaUnificadaDTO,
   type VendaUnificadaDTO,
@@ -83,6 +84,14 @@ export function pedidoDeliverySummaryParaUnifiedRecord(
       summary.totalPago,
       summary.cobrancas
     ),
+    previsaoEntregaEm: summary.previsaoEntregaEm,
+    tempoTotalEstimadoSegundos: summary.tempoTotalEstimadoSegundos,
+    fluxoPagamentoEntrega: derivarFluxoPagamentoEntregaDeliverySummary(
+      summary.totalFaltaPagar,
+      summary.cobrancas
+    ),
+    cobrancas: summary.cobrancas,
+    observacoes: summary.observacoes,
   }
 }
 
@@ -148,6 +157,10 @@ export function normalizarPedidoDeliverySummaryJson(raw: unknown): PedidoDeliver
       ? (o.resumoFiscal as PedidoDeliverySummaryApi['resumoFiscal'])
       : null
 
+  const observacoes = Array.isArray(o.observacoes)
+    ? (o.observacoes as PedidoDeliverySummaryApi['observacoes'])
+    : []
+
   return {
     id,
     numeroVenda: parseNumero(o.numeroVenda, 0),
@@ -179,6 +192,7 @@ export function normalizarPedidoDeliverySummaryJson(raw: unknown): PedidoDeliver
       typeof o.solicitarEmissaoFiscal === 'boolean' ? o.solicitarEmissaoFiscal : false,
     cobrancas,
     resumoFiscal: resumoFiscalRaw,
+    observacoes,
   }
 }
 

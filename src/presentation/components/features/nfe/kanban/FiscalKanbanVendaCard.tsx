@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Tooltip from '@mui/material/Tooltip'
 import {
+  MdAccessTime,
   MdArrowForward,
   MdDeliveryDining,
   MdEdit,
@@ -20,6 +21,11 @@ import { abrirDocumentoFiscalPdf } from '@/src/presentation/utils/abrirDocumento
 import { StatusFiscalBadge } from '../StatusFiscalBadge'
 import type { ModoKanbanVendas } from '../KanbanModoVendasToggle'
 import { DraggableVendaCard } from './DraggableVendaCard'
+import {
+  formatarFormaPagamentoKanbanCard,
+  formatarPrevisaoEntregaKanbanCard,
+  rotuloFormaCobrancaKanbanCard,
+} from './kanbanDeliveryCardDisplay'
 import { KanbanCardAcaoButton } from './KanbanCardAcaoButton'
 import { PedidoEntregaQuickViewPopover } from './PedidoEntregaQuickViewPopover'
 import { AtribuirEntregadorKanbanPainel } from './AtribuirEntregadorKanbanPainel'
@@ -61,6 +67,7 @@ interface FiscalKanbanVendaCardProps {
   /** Confirma cobrança pendente direto no card (coluna Em Rota). */
   onConfirmarCobranca?: (venda: Venda) => void
   confirmandoCobrancaIds?: Record<string, boolean>
+  nomesMeiosPagamento?: Record<string, string>
 }
 
 export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
@@ -80,6 +87,7 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
     onEntregadorAtualizado,
     onConfirmarCobranca,
     confirmandoCobrancaIds = {},
+    nomesMeiosPagamento = {},
   } = props
   const [entregaQuickViewAnchor, setEntregaQuickViewAnchor] = useState<HTMLElement | null>(null)
   const [atribuirEntregadorOpen, setAtribuirEntregadorOpen] = useState(false)
@@ -169,41 +177,92 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
     modoKanbanVendas
   )
   const confirmandoCobranca = Boolean(confirmandoCobrancaIds[venda.id])
+  const exibirMetaDeliveryKanban =
+    modoKanbanVendas === 'delivery' && venda.isPedidoEntregaGestor()
+  const previsaoEntregaKanban = exibirMetaDeliveryKanban
+    ? formatarPrevisaoEntregaKanbanCard(venda)
+    : null
+  const formaCobrancaKanban = exibirMetaDeliveryKanban
+    ? rotuloFormaCobrancaKanbanCard(venda.tipoVenda, venda.fluxoPagamentoEntrega)
+    : null
+  const formaPagamentoKanban = exibirMetaDeliveryKanban
+    ? formatarFormaPagamentoKanbanCard(venda.cobrancasDelivery, nomesMeiosPagamento)
+    : null
+
+  const linhaIdentificacaoVenda = `Venda ${venda.numeroVenda}${
+    venda.codigoVenda ? ` - #${venda.codigoVenda}` : ''
+  }`
+
+  const exibirColunaTipoVenda =
+    tipoVendaExibicao &&
+    (tipoVendaExibicao === 'balcao' ||
+      tipoVendaExibicao === 'mesa' ||
+      tipoVendaExibicao === 'gestor' ||
+      tipoVendaExibicao === 'entrega' ||
+      tipoVendaExibicao === 'retirada')
+
+  const tipoVendaIconEl = exibirColunaTipoVenda ? (
+    <TipoVendaIcon
+      tipoVenda={tipoVendaExibicao as 'balcao' | 'mesa' | 'gestor' | 'entrega' | 'retirada'}
+      numeroMesa={tipoVendaExibicao === 'mesa' ? venda.numeroMesa : undefined}
+      size={56}
+      containerScale={0.9}
+      corPrincipal="var(--color-primary)"
+      corTexto="var(--color-info)"
+      corBalcao="var(--color-primary)"
+      corGestor="var(--color-primary)"
+      corEntrega="var(--color-primary)"
+      corBorda="var(--color-primary)"
+    />
+  ) : null
+
+  const previsaoEntregaKanbanBadge =
+    exibirMetaDeliveryKanban && previsaoEntregaKanban ? (
+      <div
+        className="flex items-center gap-1 text-sm font-semibold tabular-nums leading-none text-gray-700"
+        title="Previsão de entrega"
+      >
+        <MdAccessTime className="h-[18px] w-[18px] shrink-0 text-primary" aria-hidden />
+        <span>{previsaoEntregaKanban}</span>
+      </div>
+    ) : null
+
+  const colunaTipoVendaIcon = tipoVendaIconEl ? (
+    <div className="flex flex-shrink-0 flex-col items-center justify-start">{tipoVendaIconEl}</div>
+  ) : null
 
   const botaoObservacaoPedido = exibirBotaoObservacaoPedido ? (
-    <Tooltip title="Adicionar observação ao pedido">
-      <button
-        type="button"
-        onClick={e => {
-          e.stopPropagation()
-          setObservacaoPedidoOpen(true)
-        }}
-        onDoubleClick={e => e.stopPropagation()}
-        className="flex shrink-0 items-center gap-1 rounded border border-gray-300 bg-white px-1.5 py-0.5 text-gray-600 transition-colors hover:border-primary hover:text-primary"
-        aria-label="Adicionar observação ao pedido"
-      >
-        <MdEditNote className="h-3.5 w-3.5 shrink-0" />
-        <span className="text-[10px] font-medium leading-none">Observação</span>
-      </button>
-    </Tooltip>
+    <Button
+      size="sm"
+      variant="outlined"
+      className="!min-w-0 !border-gray-300 !px-2 !text-gray-700 hover:!bg-gray-50"
+      sx={{ py: 0.375, minHeight: 'auto' }}
+      title="Adicionar observação ao pedido"
+      aria-label="Adicionar observação ao pedido"
+      onClick={e => {
+        e.stopPropagation()
+        setObservacaoPedidoOpen(true)
+      }}
+    >
+      <MdEditNote size={16} />
+    </Button>
   ) : null
 
   const botaoAlterarEnderecoEntrega = exibirBotaoAlterarEndereco ? (
-    <Tooltip title="Alterar endereço de entrega">
-      <button
-        type="button"
-        onClick={e => {
-          e.stopPropagation()
-          setEnderecoEntregaOpen(true)
-        }}
-        onDoubleClick={e => e.stopPropagation()}
-        className="flex shrink-0 items-center gap-1 rounded border border-gray-300 bg-white px-1.5 py-0.5 text-gray-600 transition-colors hover:border-primary hover:text-primary"
-        aria-label="Alterar endereço de entrega"
-      >
-        <MdLocationOn className="h-3.5 w-3.5 shrink-0" />
-        <span className="text-[10px] font-medium leading-none">Endereço</span>
-      </button>
-    </Tooltip>
+    <Button
+      size="sm"
+      variant="outlined"
+      className="!min-w-0 !border-gray-300 !px-2 !text-gray-700 hover:!bg-gray-50"
+      sx={{ py: 0.375, minHeight: 'auto' }}
+      title="Alterar endereço de entrega"
+      aria-label="Alterar endereço de entrega"
+      onClick={e => {
+        e.stopPropagation()
+        setEnderecoEntregaOpen(true)
+      }}
+    >
+      <MdLocationOn size={16} />
+    </Button>
   ) : null
 
   return (
@@ -213,104 +272,185 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
         onClick={() => onViewDetails(venda)}
         onDoubleClick={() => onViewDetails(venda)}
       >
-        <div className={`mb-2 flex gap-2 ${podeEditarClienteNaVenda ? 'pr-1' : ''}`}>
-          <div className="min-w-0 flex-1 border-b border-gray-100 pb-1.5">
-            <p className="mb-0.5 text-xs text-gray-500">
-              {prefixoLinhaOrigemCard} | Venda {venda.numeroVenda}
-              {venda.codigoVenda ? ` - #${venda.codigoVenda}` : ''}
-            </p>
-            <div className="flex min-w-0 items-center gap-1">
-              <span className="min-w-0 truncate text-sm font-semibold uppercase text-primary-text">
-                {clienteNome}
-              </span>
-              {podeEditarClienteNaVenda && venda.cliente?.id && (
-                <button
-                  type="button"
-                  onClick={e => {
-                    e.stopPropagation()
-                    onAbrirEdicaoCliente(venda.cliente!.id)
-                  }}
-                  onDoubleClick={e => e.stopPropagation()}
-                  className="shrink-0 rounded p-0.5 text-primary transition-colors hover:bg-primary/10"
-                  title="Editar dados do cliente"
-                  aria-label="Editar dados do cliente"
-                >
-                  <MdEdit className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="text-sm font-semibold text-gray-900">{valorFormatado}</span>
-              {exibirBotaoSalvarCobranca && onConfirmarCobranca ? (
-                <Tooltip title="Confirmar cobrança">
-                  <button
-                    type="button"
-                    onClick={e => {
-                      e.stopPropagation()
-                      onConfirmarCobranca(venda)
-                    }}
-                    onDoubleClick={e => e.stopPropagation()}
-                    disabled={confirmandoCobranca}
-                    className="shrink-0 rounded p-0.5 text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
-                    aria-label="Confirmar cobrança"
-                  >
-                    {confirmandoCobranca ? (
-                      <span
-                        className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"
-                        aria-hidden
-                      />
-                    ) : (
-                      <MdSave className="h-4 w-4" />
-                    )}
-                  </button>
-                </Tooltip>
-              ) : null}
-            </div>
-            {observacaoPedidoTexto ? (
-              <p
-                className="mt-1 line-clamp-2 text-xs text-gray-600"
-                title={observacaoPedidoTexto}
-              >
-                <span className="font-medium text-gray-700">Obs:</span> {observacaoPedidoTexto}
-              </p>
-            ) : null}
-            {venda.statusFiscal && (
-              <>
-                <div className="mt-1 flex items-center">
-                  <StatusFiscalBadge status={venda.statusFiscal} tone="neutral" />
+        <div className={`mb-2 ${podeEditarClienteNaVenda ? 'pr-1' : ''}`}>
+          {exibirMetaDeliveryKanban ? (
+            <div className="flex gap-2 border-b border-gray-100 pb-1.5">
+              <div className="min-w-0 flex-1">
+                <p className="mb-0.5 text-xs leading-tight text-gray-500">
+                  {linhaIdentificacaoVenda}
+                </p>
+                <div className="flex min-w-0 items-center gap-1">
+                  <span className="min-w-0 truncate text-sm font-semibold uppercase text-primary-text">
+                    {clienteNome}
+                  </span>
+                  {podeEditarClienteNaVenda && venda.cliente?.id && (
+                    <button
+                      type="button"
+                      onClick={e => {
+                        e.stopPropagation()
+                        onAbrirEdicaoCliente(venda.cliente!.id)
+                      }}
+                      onDoubleClick={e => e.stopPropagation()}
+                      className="shrink-0 rounded p-0.5 text-primary transition-colors hover:bg-primary/10"
+                      title="Editar dados do cliente"
+                      aria-label="Editar dados do cliente"
+                    >
+                      <MdEdit className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
-                {venda.numeroFiscal && venda.statusFiscal === 'EMITIDA' && (
-                  <div className="mt-0.5">
-                    <span className="text-xs font-semibold text-gray-900">
-                      {venda.tipoDocFiscal || 'NFe'} Nº {venda.numeroFiscal}
-                      {venda.serieFiscal && ` / Série ${venda.serieFiscal}`}
-                    </span>
+                <div className="flex items-center gap-1">
+                  <span className="text-sm font-semibold text-gray-900">{valorFormatado}</span>
+                  {exibirBotaoSalvarCobranca && onConfirmarCobranca ? (
+                    <Tooltip title="Confirmar cobrança">
+                      <button
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation()
+                          onConfirmarCobranca(venda)
+                        }}
+                        onDoubleClick={e => e.stopPropagation()}
+                        disabled={confirmandoCobranca}
+                        className="shrink-0 rounded p-0.5 text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label="Confirmar cobrança"
+                      >
+                        {confirmandoCobranca ? (
+                          <span
+                            className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"
+                            aria-hidden
+                          />
+                        ) : (
+                          <MdSave className="h-4 w-4" />
+                        )}
+                      </button>
+                    </Tooltip>
+                  ) : null}
+                </div>
+                {formaCobrancaKanban || formaPagamentoKanban ? (
+                  <div className="mt-0.5 gap-1">
+                    
+                    {formaPagamentoKanban ? (
+                      <p className="text-xs text-gray-600">
+                        <span className="font-medium text-gray-700">Pagamento:</span>{' '}
+                        {formaPagamentoKanban}
+                      </p>
+                    ) : null}
+                    {formaCobrancaKanban ? (
+                      <p className="text-xs text-gray-600 font-medium">
+                       {formaCobrancaKanban}
+                      </p>
+                    ) : null}
                   </div>
-                )}
-              </>
-            )}
-          </div>
-          {tipoVendaExibicao &&
-            (tipoVendaExibicao === 'balcao' ||
-              tipoVendaExibicao === 'mesa' ||
-              tipoVendaExibicao === 'gestor' ||
-              tipoVendaExibicao === 'entrega' ||
-              tipoVendaExibicao === 'retirada') && (
-              <div className="flex flex-shrink-0 items-center justify-center">
-                <TipoVendaIcon
-                  tipoVenda={tipoVendaExibicao as 'balcao' | 'mesa' | 'gestor' | 'entrega' | 'retirada'}
-                  numeroMesa={tipoVendaExibicao === 'mesa' ? venda.numeroMesa : undefined}
-                  size={56}
-                  containerScale={0.9}
-                  corPrincipal="var(--color-primary)"
-                  corTexto="var(--color-info)"
-                  corBalcao="var(--color-primary)"
-                  corGestor="var(--color-primary)"
-                  corEntrega="var(--color-primary)"
-                  corBorda="var(--color-primary)"
-                />
+                ) : null}
+                {observacaoPedidoTexto ? (
+                  <p
+                    className="mt-1 line-clamp-2 text-xs text-gray-600"
+                    title={observacaoPedidoTexto}
+                  >
+                    <span className="font-medium text-gray-700">Obs:</span> {observacaoPedidoTexto}
+                  </p>
+                ) : null}
+                {venda.statusFiscal ? (
+                  <>
+                    <div className="mt-1 flex items-center">
+                      <StatusFiscalBadge status={venda.statusFiscal} tone="neutral" />
+                    </div>
+                    {venda.numeroFiscal && venda.statusFiscal === 'EMITIDA' && (
+                      <div className="mt-0.5">
+                        <span className="text-xs font-semibold text-gray-900">
+                          {venda.tipoDocFiscal || 'NFe'} Nº {venda.numeroFiscal}
+                          {venda.serieFiscal && ` / Série ${venda.serieFiscal}`}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                ) : null}
               </div>
-            )}
+              <div className="flex flex-shrink-0 flex-col items-center self-start">
+                {previsaoEntregaKanbanBadge}
+                {tipoVendaIconEl}
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <div className="min-w-0 flex-1 border-b border-gray-100 pb-1.5">
+                <p className="mb-0.5 text-xs text-gray-500">
+                  {prefixoLinhaOrigemCard} | {linhaIdentificacaoVenda}
+                </p>
+                <div className="flex min-w-0 items-center gap-1">
+                  <span className="min-w-0 truncate text-sm font-semibold uppercase text-primary-text">
+                    {clienteNome}
+                  </span>
+                  {podeEditarClienteNaVenda && venda.cliente?.id && (
+                    <button
+                      type="button"
+                      onClick={e => {
+                        e.stopPropagation()
+                        onAbrirEdicaoCliente(venda.cliente!.id)
+                      }}
+                      onDoubleClick={e => e.stopPropagation()}
+                      className="shrink-0 rounded p-0.5 text-primary transition-colors hover:bg-primary/10"
+                      title="Editar dados do cliente"
+                      aria-label="Editar dados do cliente"
+                    >
+                      <MdEdit className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-sm font-semibold text-gray-900">{valorFormatado}</span>
+                  {exibirBotaoSalvarCobranca && onConfirmarCobranca ? (
+                    <Tooltip title="Confirmar cobrança">
+                      <button
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation()
+                          onConfirmarCobranca(venda)
+                        }}
+                        onDoubleClick={e => e.stopPropagation()}
+                        disabled={confirmandoCobranca}
+                        className="shrink-0 rounded p-0.5 text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label="Confirmar cobrança"
+                      >
+                        {confirmandoCobranca ? (
+                          <span
+                            className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"
+                            aria-hidden
+                          />
+                        ) : (
+                          <MdSave className="h-4 w-4" />
+                        )}
+                      </button>
+                    </Tooltip>
+                  ) : null}
+                </div>
+                {observacaoPedidoTexto ? (
+                  <p
+                    className="mt-1 line-clamp-2 text-xs text-gray-600"
+                    title={observacaoPedidoTexto}
+                  >
+                    <span className="font-medium text-gray-700">Obs:</span> {observacaoPedidoTexto}
+                  </p>
+                ) : null}
+                {venda.statusFiscal && (
+                  <>
+                    <div className="mt-1 flex items-center">
+                      <StatusFiscalBadge status={venda.statusFiscal} tone="neutral" />
+                    </div>
+                    {venda.numeroFiscal && venda.statusFiscal === 'EMITIDA' && (
+                      <div className="mt-0.5">
+                        <span className="text-xs font-semibold text-gray-900">
+                          {venda.tipoDocFiscal || 'NFe'} Nº {venda.numeroFiscal}
+                          {venda.serieFiscal && ` / Série ${venda.serieFiscal}`}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+              {colunaTipoVendaIcon}
+            </div>
+          )}
         </div>
 
         <div className="space-y-0.5">
@@ -326,30 +466,20 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
                 <span className="text-xs text-gray-500">
                   {linhaTempo.prefixo} {formatarDataCard(linhaTempo.iso)}
                 </span>
-                {!venda.dataFinalizacao ? (
-                  <div className="flex items-center gap-1">
-                    {botaoAlterarEnderecoEntrega}
-                    {botaoObservacaoPedido}
-                  </div>
-                ) : null}
               </div>
             )
           })()}
           {venda.dataFinalizacao && (
-              <div className="flex items-center justify-between gap-1">
+            <div className="flex items-center justify-between gap-1">
               <span className="text-xs text-gray-500">
                 Finalizada: {formatarDataCard(venda.dataFinalizacao)}
               </span>
-              <div className="flex items-center gap-1">
-                {botaoAlterarEnderecoEntrega}
-                {botaoObservacaoPedido}
-              </div>
             </div>
           )}
         </div>
 
         <div
-          className="mt-0.5 flex gap-2"
+          className="mt-0.5 flex gap-1"
           onClick={e => e.stopPropagation()}
           onDoubleClick={e => e.stopPropagation()}
         >
@@ -366,6 +496,9 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
                 {avancandoEtapaIds[venda.id] ? 'Avançando...' : 'Avançar etapa'}
               </KanbanCardAcaoButton>
             )}
+
+          {botaoAlterarEnderecoEntrega}
+          {botaoObservacaoPedido}
 
           {modoKanbanVendas === 'delivery' &&
             onReimprimirCupomDelivery &&

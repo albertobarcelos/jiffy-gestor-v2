@@ -5,6 +5,31 @@ import type {
   KanbanVendaCachePatch,
 } from '@/src/application/dto/TransicaoKanbanDTO'
 
+function extrairObservacoesPatchDeRegistro(registro: Record<string, unknown>): string[] | undefined {
+  const raw = registro.observacoes ?? registro.observacao
+  if (raw == null) return undefined
+
+  if (Array.isArray(raw)) {
+    const textos = raw
+      .map(entry => {
+        if (typeof entry === 'string') return entry.trim()
+        if (entry && typeof entry === 'object' && 'observacao' in entry) {
+          return String((entry as { observacao?: string }).observacao ?? '').trim()
+        }
+        return ''
+      })
+      .filter(Boolean)
+    return textos.length > 0 ? textos : undefined
+  }
+
+  if (typeof raw === 'string') {
+    const t = raw.trim()
+    return t ? [t] : undefined
+  }
+
+  return undefined
+}
+
 function isoDeCampoApi(valor: unknown): string | null {
   if (valor == null) return null
   const texto = String(valor).trim()
@@ -54,6 +79,9 @@ export function extrairPatchKanbanDeTransicaoDelivery(data: unknown): KanbanVend
   const valorFinalNum = Number(valorFinalRaw)
   const valorFinal = Number.isFinite(valorFinalNum) ? valorFinalNum : undefined
 
+  const observacoes =
+    extrairObservacoesPatchDeRegistro(inner) ?? extrairObservacoesPatchDeRegistro(registro)
+
   return {
     statusEtapaOperacional,
     dataUltimaModificacao:
@@ -63,6 +91,7 @@ export function extrairPatchKanbanDeTransicaoDelivery(data: unknown): KanbanVend
       isoDeCampoApi(inner.dataFinalizacao) ?? isoDeCampoApi(registro.dataFinalizacao),
     statusFinanceiro: extrairStatusFinanceiroPedidoDelivery(data),
     valorFinal,
+    observacoes,
   }
 }
 
@@ -89,5 +118,6 @@ export function extrairPatchKanbanDeRespostaTransicao(data: unknown): KanbanVend
       isoDeCampoApi(registro.dataFinalizacao) ??
       isoDeCampoApi(registro.data_finalizacao),
     statusFinanceiro: delivery.statusFinanceiro,
+    observacoes: delivery.observacoes,
   }
 }

@@ -32,7 +32,7 @@
  * | resumoFiscal.modelo      | modelo / tipoDocFiscal         | 55→NFE, 65→NFCE |
  * | resumoFiscal.retornoSefaz| retornoSefaz                   |            |
  *
- * Campos ausentes na listagem (defaults no mapper): observacoes, entregador,
+ * Campos ausentes na listagem (defaults no mapper): entregador,
  * contextoEntrega, abertoPor, totalDesconto, totalAcrescimo, numeroMesa.
  */
 
@@ -41,6 +41,11 @@ import type {
   StatusDeliveryApi,
   TipoEntregaDeliveryApi,
 } from '@/src/application/dto/api/pedidoDeliveryApi'
+
+export interface ObservacaoPedidoDeliverySummaryApi {
+  observacao: string
+  dataLancamento?: string
+}
 
 /** Valores persistidos em `origem` no módulo delivery (`OrigemVendaExterna`). */
 export type OrigemPedidoDeliveryApi = 'GESTOR' | 'JIFFY_DELIVERY'
@@ -118,6 +123,7 @@ export interface PedidoDeliverySummaryApi {
   solicitarEmissaoFiscal: boolean
   cobrancas: CobrancaPedidoDeliverySummaryApi[]
   resumoFiscal: ResumoFiscalPedidoDeliverySummaryApi | null
+  observacoes?: ObservacaoPedidoDeliverySummaryApi[]
 }
 
 /**

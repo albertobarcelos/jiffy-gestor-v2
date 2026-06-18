@@ -29,7 +29,6 @@ import {
   patchVendaDetalheObservacaoPedidoCache,
 } from '../novo-pedido/hooks/data/useVendaDetalheCarregadaQuery'
 import { observacoesArrayFromTexto } from '@/src/shared/helpers/observacaoPedido'
-import { invalidateKanbanVendasListagens } from '@/src/presentation/hooks/kanbanListagemQueryCache'
 import { patchKanbanVendasListagemCache } from './kanbanVendaCacheUpdate'
 import {
   extrairObservacaoPedidoDeRespostaApi,
@@ -158,7 +157,6 @@ export function ObservacaoPedidoKanbanPainel({
         observacoes: observacoesArrayFromTexto(observacaoSalva) ?? [],
       })
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      invalidateKanbanVendasListagens(queryClient)
       queryClient.invalidateQueries({ queryKey: ['venda', venda.id] })
       await invalidateVendaDetalheCarregadaCache(queryClient, empresaId, venda.id)
       invalidarPedidoKanbanQuickViewCache(venda.id)
