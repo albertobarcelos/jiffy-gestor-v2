@@ -18,6 +18,7 @@ import type {
   OrigemPedidoDeliveryApi,
   PedidosDeliveryQueryParams,
 } from '@/src/application/dto/api/pedidoDeliveryListApi'
+import type { StatusDeliveryApi } from '@/src/application/dto/api/pedidoDeliveryApi'
 import { PEDIDOS_DELIVERY_KANBAN_PAGE_SIZE } from '@/src/application/dto/api/pedidoDeliveryListApi'
 
 /**
@@ -37,6 +38,8 @@ export interface FiltrosKanbanParaPedidosDelivery {
   dataFinalizacaoFim?: string
   offset?: number
   limit?: number
+  /** Filtro operacional por coluna (contagem / listagem segmentada). */
+  statusDelivery?: StatusDeliveryApi | StatusDeliveryApi[]
   /** Default operacional: excluir cancelados (`cancelado=false`). */
   cancelado?: boolean
 }
@@ -127,6 +130,7 @@ export function montarPedidosDeliveryQueryParams(
     offset: filtros.offset ?? 0,
     limit: filtros.limit ?? PEDIDOS_DELIVERY_KANBAN_PAGE_SIZE,
     q: filtros.q?.trim() || undefined,
+    statusDelivery: filtros.statusDelivery,
     origem: origemApi,
     dataCriacaoInicial: filtros.dataCriacaoInicial,
     dataCriacaoFinal: filtros.dataCriacaoFinal,

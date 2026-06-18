@@ -430,7 +430,7 @@ export interface VendasUnificadasResponse {
 }
 
 /** Tamanho de cada página no Kanban (Pedidos de Clientes). */
-export const VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE = 50
+export const VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE = 10
 
 export interface VendasUnificadasInfiniteOptions {
   /** Polling leve enquanto o Kanban está aberto (ex.: 60_000). */

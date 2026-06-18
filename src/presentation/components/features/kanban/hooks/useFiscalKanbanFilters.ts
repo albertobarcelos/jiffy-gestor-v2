@@ -6,6 +6,9 @@ import { primeiroMesQuadroDuploCalendario } from '@/src/shared/utils/calendarioI
 import { combinarIntervaloCalendarParaDatas } from '@/src/shared/utils/intervaloCalendarioComHoras'
 import type { OrigemFiltro } from '../types'
 
+/** `periodo`: filtro por intervalo (criação usa hoje quando sem datas explícitas). `todos`: sem filtro desse tipo. */
+export type FiltroDataKanbanModo = 'periodo' | 'todos'
+
 function criarIntervaloHoje() {
   const hoje = new Date()
   return {
@@ -20,8 +23,10 @@ export function useFiscalKanbanFilters() {
   const intervaloCriacaoPadrao = useMemo(() => criarIntervaloHoje(), [])
   const [dataCriacaoInicio, setDataCriacaoInicio] = useState<Date | null>(null)
   const [dataCriacaoFim, setDataCriacaoFim] = useState<Date | null>(null)
+  const [criacaoDataModo, setCriacaoDataModo] = useState<FiltroDataKanbanModo>('periodo')
   const [dataFinalizacaoInicio, setDataFinalizacaoInicio] = useState<Date | null>(null)
   const [dataFinalizacaoFim, setDataFinalizacaoFim] = useState<Date | null>(null)
+  const [finalizacaoDataModo, setFinalizacaoDataModo] = useState<FiltroDataKanbanModo>('todos')
   const [origemFilter, setOrigemFilter] = useState<OrigemFiltro>('')
   const [filtrosVisiveisMobile, setFiltrosVisiveisMobile] = useState(false)
   const [modalCriacaoDatasAberto, setModalCriacaoDatasAberto] = useState(false)
@@ -55,7 +60,11 @@ export function useFiscalKanbanFilters() {
   }, [searchInput])
 
   const deveUsarCriacaoPadrao =
-    !dataCriacaoInicio && !dataCriacaoFim && !dataFinalizacaoInicio && !dataFinalizacaoFim
+    criacaoDataModo === 'periodo' &&
+    !dataCriacaoInicio &&
+    !dataCriacaoFim &&
+    !dataFinalizacaoInicio &&
+    !dataFinalizacaoFim
   const dataCriacaoInicioConsulta =
     dataCriacaoInicio ?? (deveUsarCriacaoPadrao ? intervaloCriacaoPadrao.inicio : null)
   const dataCriacaoFimConsulta =
@@ -90,6 +99,8 @@ export function useFiscalKanbanFilters() {
     setSearchInput('')
     setSearchQuery('')
     const periodoHoje = criarIntervaloHoje()
+    setCriacaoDataModo('periodo')
+    setFinalizacaoDataModo('todos')
     setDataCriacaoInicio(null)
     setDataCriacaoFim(null)
     setDataFinalizacaoInicio(null)
@@ -142,6 +153,7 @@ export function useFiscalKanbanFilters() {
       rascunhoHoraCriacaoFim
     )
     if (!dataInicial || !dataFinal) return
+    setCriacaoDataModo('periodo')
     if (dataInicial.getTime() > dataFinal.getTime()) {
       setDataCriacaoInicio(dataFinal)
       setDataCriacaoFim(dataInicial)
@@ -151,6 +163,7 @@ export function useFiscalKanbanFilters() {
     }
     setDataFinalizacaoInicio(null)
     setDataFinalizacaoFim(null)
+    setFinalizacaoDataModo('todos')
     setModalCriacaoDatasAberto(false)
   }, [rascunhoCriacaoRange, rascunhoHoraCriacaoInicio, rascunhoHoraCriacaoFim])
 
@@ -190,6 +203,7 @@ export function useFiscalKanbanFilters() {
       rascunhoHoraFinalizacaoFim
     )
     if (!dataInicial || !dataFinal) return
+    setFinalizacaoDataModo('periodo')
     if (dataInicial.getTime() > dataFinal.getTime()) {
       setDataFinalizacaoInicio(dataFinal)
       setDataFinalizacaoFim(dataInicial)
@@ -199,8 +213,21 @@ export function useFiscalKanbanFilters() {
     }
     setDataCriacaoInicio(null)
     setDataCriacaoFim(null)
+    setCriacaoDataModo('todos')
     setModalFinalizacaoDatasAberto(false)
   }, [rascunhoFinalizacaoRange, rascunhoHoraFinalizacaoInicio, rascunhoHoraFinalizacaoFim])
+
+  const aplicarCriacaoTodos = useCallback(() => {
+    setCriacaoDataModo('todos')
+    setDataCriacaoInicio(null)
+    setDataCriacaoFim(null)
+  }, [])
+
+  const aplicarFinalizacaoTodos = useCallback(() => {
+    setFinalizacaoDataModo('todos')
+    setDataFinalizacaoInicio(null)
+    setDataFinalizacaoFim(null)
+  }, [])
 
   return {
     searchInput,
@@ -238,8 +265,10 @@ export function useFiscalKanbanFilters() {
     abrirModalCriacaoDatas,
     handleRascunhoCriacaoRangeChange,
     aplicarCriacaoDatas,
+    aplicarCriacaoTodos,
     abrirModalFinalizacaoDatas,
     handleRascunhoFinalizacaoRangeChange,
     aplicarFinalizacaoDatas,
+    aplicarFinalizacaoTodos,
   }
 }

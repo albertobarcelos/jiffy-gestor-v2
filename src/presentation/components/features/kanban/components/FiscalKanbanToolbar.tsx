@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useRef, useState } from 'react'
 import { FormControl, InputLabel, MenuItem, Select } from '@mui/material'
 import {
   MdAdd,
@@ -28,9 +29,11 @@ interface FiscalKanbanToolbarProps {
   origemFilterDisabled?: boolean
   dataCriacaoInicio: Date | null
   dataCriacaoFim: Date | null
+  onCriacaoTodos: () => void
   onOpenCriacaoDatas: () => void
   dataFinalizacaoInicio: Date | null
   dataFinalizacaoFim: Date | null
+  onFinalizacaoTodos: () => void
   onOpenFinalizacaoDatas: () => void
   onClearFilters: () => void
   modoKanbanVendas: ModoKanbanVendas
@@ -111,6 +114,87 @@ function PeriodoSelecionadoResumo({
   )
 }
 
+function FiltroDataOpcoesBotao({
+  label,
+  onTodos,
+  onEscolherData,
+  periodoResumo,
+}: {
+  label: string
+  onTodos: () => void
+  onEscolherData: () => void
+  periodoResumo?: { inicio: Date; fim: Date } | null
+}) {
+  const [menuAberto, setMenuAberto] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!menuAberto) return
+    const fecharAoClicarFora = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setMenuAberto(false)
+      }
+    }
+    document.addEventListener('mousedown', fecharAoClicarFora)
+    return () => document.removeEventListener('mousedown', fecharAoClicarFora)
+  }, [menuAberto])
+
+  const opcaoClassName =
+    'font-nunito block w-full px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50'
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-2">
+        <div className="relative" ref={containerRef}>
+          <button
+            type="button"
+            onClick={() => setMenuAberto(prev => !prev)}
+            className="font-nunito flex h-8 items-center gap-2 rounded-lg px-2 text-sm text-white transition-colors"
+            style={{ backgroundColor: KANBAN_BUTTON_COLOR }}
+            aria-expanded={menuAberto}
+            aria-haspopup="menu"
+          >
+            <MdCalendarToday size={18} className="shrink-0" />
+            {label}
+          </button>
+          {menuAberto ? (
+            <div
+              className="absolute left-0 top-full z-50 mt-1 min-w-[180px] overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+              role="menu"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                className={opcaoClassName}
+                onClick={() => {
+                  onTodos()
+                  setMenuAberto(false)
+                }}
+              >
+                Todos os Pedidos
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className={opcaoClassName}
+                onClick={() => {
+                  onEscolherData()
+                  setMenuAberto(false)
+                }}
+              >
+                Escolher Data
+              </button>
+            </div>
+          ) : null}
+        </div>
+        {periodoResumo ? (
+          <PeriodoSelecionadoResumo inicio={periodoResumo.inicio} fim={periodoResumo.fim} />
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
 export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
   const {
     searchInput,
@@ -127,9 +211,11 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
     origemFilterDisabled = false,
     dataCriacaoInicio,
     dataCriacaoFim,
+    onCriacaoTodos,
     onOpenCriacaoDatas,
     dataFinalizacaoInicio,
     dataFinalizacaoFim,
+    onFinalizacaoTodos,
     onOpenFinalizacaoDatas,
     onClearFilters,
     modoKanbanVendas,
@@ -222,42 +308,27 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
           </FormControl>
         </div>
 
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onOpenFinalizacaoDatas}
-              className="font-nunito flex h-8 items-center gap-2 rounded-lg px-2 text-sm text-white transition-colors"
-              style={{ backgroundColor: KANBAN_BUTTON_COLOR }}
-            >
-              <MdCalendarToday size={18} className="shrink-0" />
-              Data Finalização
-            </button>
-          </div>
-        </div>
+        <FiltroDataOpcoesBotao
+          label="Data Finalização"
+          onTodos={onFinalizacaoTodos}
+          onEscolherData={onOpenFinalizacaoDatas}
+          periodoResumo={
+            dataFinalizacaoInicio && dataFinalizacaoFim
+              ? { inicio: dataFinalizacaoInicio, fim: dataFinalizacaoFim }
+              : null
+          }
+        />
 
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onOpenCriacaoDatas}
-              className="font-nunito flex h-8 items-center gap-2 rounded-lg px-2 text-sm text-white transition-colors"
-              style={{ backgroundColor: KANBAN_BUTTON_COLOR }}
-            >
-              <MdCalendarToday size={18} className="shrink-0" />
-              Data Criação
-            </button>
-            {dataFinalizacaoInicio && dataFinalizacaoFim ? (
-              <PeriodoSelecionadoResumo
-                inicio={dataFinalizacaoInicio}
-                fim={dataFinalizacaoFim}
-              />
-            ) : null}
-            {dataCriacaoInicio && dataCriacaoFim ? (
-              <PeriodoSelecionadoResumo inicio={dataCriacaoInicio} fim={dataCriacaoFim} />
-            ) : null}
-          </div>
-        </div>
+        <FiltroDataOpcoesBotao
+          label="Data Criação"
+          onTodos={onCriacaoTodos}
+          onEscolherData={onOpenCriacaoDatas}
+          periodoResumo={
+            dataCriacaoInicio && dataCriacaoFim
+              ? { inicio: dataCriacaoInicio, fim: dataCriacaoFim }
+              : null
+          }
+        />
 
         <button
           onClick={onClearFilters}

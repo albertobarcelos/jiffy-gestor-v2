@@ -25,6 +25,7 @@ import {
   flattenVendasUnificadasInfinite,
   useVendasUnificadasInfinite,
   vendasUnificadasInfiniteQueryKey,
+  VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE,
 } from './hooks/useVendasUnificadas'
 import {
   flattenPedidosDeliveryInfinite,
@@ -103,7 +104,7 @@ import { useImpressaoDelivery } from '../delivery/hooks/useImpressaoDelivery'
 import { validarImpressaoAntesTransicaoKanban } from '@/src/application/delivery/validarImpressaoAntesTransicaoKanban'
 import { confirmarCobrancaPendentePedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/ConfirmarCobrancaPendentePedidoDeliveryUseCase'
 import type { AcaoTransicaoGestor } from '@/src/presentation/hooks/useVendas'
-import { useKanbanColumnScrollLoadMore } from './hooks/useKanbanColumnScrollLoadMore'
+import { useKanbanDeliveryColumnCounts } from './hooks/useKanbanDeliveryColumnCounts'
 import {
   filtrarVendasKanbanPorModo,
   KANBAN_VENDAS_REFETCH_INTERVAL_MS,
@@ -155,9 +156,11 @@ export function FiscalFlowKanban() {
     abrirModalCriacaoDatas,
     handleRascunhoCriacaoRangeChange,
     aplicarCriacaoDatas,
+    aplicarCriacaoTodos,
     abrirModalFinalizacaoDatas,
     handleRascunhoFinalizacaoRangeChange,
     aplicarFinalizacaoDatas,
+    aplicarFinalizacaoTodos,
   } = useFiscalKanbanFilters()
   const { timezoneAgregacao, preferenciasImpressaoDelivery, empresa } = useEmpresaMe()
   const { auth } = useAuthStore()
@@ -196,6 +199,11 @@ export function FiscalFlowKanban() {
   const [isLoadingTerminais, setIsLoadingTerminais] = useState(false)
   /** vendaId fixado no topo por coluna (Finalizadas / Pendente emissão), persistido em localStorage */
   const { primeiroPorColuna, setPrimeiroPorColuna } = useKanbanPinning()
+
+  const [visibleLimitPorColuna, setVisibleLimitPorColuna] = useState<
+    Partial<Record<ColunaKanbanId, number>>
+  >({})
+  const columnScrollTickingRef = useRef(false)
 
   const [modoKanbanVendas, setModoKanbanVendas] = useState<ModoKanbanVendas>(() =>
     lerModoKanbanVendasDoStorage()
@@ -327,6 +335,10 @@ export function FiscalFlowKanban() {
       terminalFilter,
     ]
   )
+
+  useEffect(() => {
+    setVisibleLimitPorColuna({})
+  }, [vendasUnificadasQueryKeyFingerprintComTerminal])
 
   /** Evita PATCH duplicado ao reativar solicitarEmissaoFiscal para REJEITADA (Strict Mode / re-renders) */
   const rejeitadaReativacaoEmAndamentoRef = useRef(false)
@@ -535,6 +547,17 @@ export function FiscalFlowKanban() {
     void fetchNextPage()
   }, [isFetchingNextPage, temMaisVendasParaCarregar, fetchNextPage])
 
+  const deliveryColumnIdsParaContagem = useMemo((): ColunaKanbanId[] => {
+    if (!isModoDeliveryKanban) return []
+    return ['NOVOS_PEDIDOS', 'EM_PREPARO', 'PRONTO_ENTREGA', 'EM_ROTA', 'FINALIZADAS']
+  }, [isModoDeliveryKanban])
+
+  const deliveryColumnCounts = useKanbanDeliveryColumnCounts(
+    pedidosDeliveryQueryParams,
+    deliveryColumnIdsParaContagem,
+    isModoDeliveryKanban
+  )
+
   const handleAtualizarListagem = useCallback(() => {
     void refetch()
   }, [refetch])
@@ -543,8 +566,6 @@ export function FiscalFlowKanban() {
     handleClearFilters()
     setTerminalFilter('')
   }, [handleClearFilters])
-
-  const { onColumnScroll } = useKanbanColumnScrollLoadMore(handleCarregarMaisVendas)
 
   const marcarEmissaoFiscal = useMarcarEmissaoFiscal()
   const desmarcarEmissaoFiscal = useDesmarcarEmissaoFiscal()
@@ -824,6 +845,156 @@ export function FiscalFlowKanban() {
     return filtrarVendasKanbanPorModo(todasVendasCarregadas, modoKanbanVendas)
   }, [isModoDeliveryKanban, todasVendasCarregadas, modoKanbanVendas])
 
+  const vendasPorColuna = useMemo(() => {
+    const construirListaColuna = (columnId: string): Venda[] => {
+      let vendas: Venda[] = []
+      switch (columnId) {
+        case 'NOVOS_PEDIDOS':
+          vendas = todasVendas.filter(
+            (v: Venda) => getEtapaKanbanParaExibicao(v) === 'NOVOS_PEDIDOS'
+          )
+          break
+        case 'EM_PREPARO':
+          vendas = todasVendas.filter(
+            (v: Venda) => getEtapaKanbanParaExibicao(v) === 'EM_PREPARO'
+          )
+          break
+        case 'PRONTO_ENTREGA':
+          vendas = todasVendas.filter(
+            (v: Venda) => getEtapaKanbanParaExibicao(v) === 'PRONTO_ENTREGA'
+          )
+          break
+        case 'EM_ROTA':
+          vendas = todasVendas.filter(
+            (v: Venda) => getEtapaKanbanParaExibicao(v) === 'EM_ROTA'
+          )
+          break
+        case 'FINALIZADAS':
+          if (modoKanbanVendas === 'delivery') {
+            vendas = todasVendas.filter((v: Venda) => {
+              const etapa = getEtapaKanbanParaExibicao(v)
+              return etapa === 'FINALIZADAS' || etapa === 'PENDENTE_EMISSAO'
+            })
+          } else {
+            vendas = todasVendas.filter(
+              (v: Venda) => getEtapaKanbanParaExibicao(v) === 'FINALIZADAS'
+            )
+          }
+          break
+        case 'PENDENTE_EMISSAO':
+          vendas = todasVendas.filter(
+            (v: Venda) => getEtapaKanbanParaExibicao(v) === 'PENDENTE_EMISSAO'
+          )
+          break
+        case 'COM_NFE':
+          vendas = todasVendas.filter(
+            (v: Venda) => getEtapaKanbanParaExibicao(v) === 'COM_NFE'
+          )
+          break
+        default:
+          return []
+      }
+
+      const vendasUnicas = new Map<string, Venda>()
+      vendas.forEach(venda => {
+        if (!vendasUnicas.has(venda.id)) {
+          vendasUnicas.set(venda.id, venda)
+        }
+      })
+
+      const colId = columnId as ColunaKanbanId
+      const criterio = criterioOrdenacaoPorColuna[colId] ?? ('data' as CriterioOrdenacaoKanban)
+      const direcao = direcaoOrdenacaoPorColuna[colId] ?? ('desc' as DirecaoOrdenacaoKanban)
+      let ordenadas = ordenarVendasKanbanPorCriterio(
+        Array.from(vendasUnicas.values()),
+        criterio,
+        direcao
+      )
+
+      const pinId = primeiroPorColuna[columnId]
+      if (pinId) {
+        const idx = ordenadas.findIndex(v => v.id === pinId)
+        if (idx > 0) {
+          const [pinned] = ordenadas.splice(idx, 1)
+          ordenadas = [pinned, ...ordenadas]
+        }
+      }
+
+      return ordenadas
+    }
+
+    const ids: ColunaKanbanId[] = [
+      'NOVOS_PEDIDOS',
+      'EM_PREPARO',
+      'PRONTO_ENTREGA',
+      'EM_ROTA',
+      'FINALIZADAS',
+      'PENDENTE_EMISSAO',
+      'COM_NFE',
+    ]
+    const map: Partial<Record<ColunaKanbanId, Venda[]>> = {}
+    for (const id of ids) {
+      map[id] = construirListaColuna(id)
+    }
+    return map
+  }, [
+    todasVendas,
+    modoKanbanVendas,
+    getEtapaKanbanParaExibicao,
+    criterioOrdenacaoPorColuna,
+    direcaoOrdenacaoPorColuna,
+    primeiroPorColuna,
+  ])
+
+  const getColumnTotalCount = useCallback(
+    (columnId: ColunaKanbanId): number => {
+      if (isModoDeliveryKanban && deliveryColumnCounts[columnId] != null) {
+        return deliveryColumnCounts[columnId]
+      }
+      return vendasPorColuna[columnId]?.length ?? 0
+    },
+    [isModoDeliveryKanban, deliveryColumnCounts, vendasPorColuna]
+  )
+
+  const getColumnVisibleVendas = useCallback(
+    (columnId: ColunaKanbanId): Venda[] => {
+      const full = vendasPorColuna[columnId] ?? []
+      const limit =
+        visibleLimitPorColuna[columnId] ?? VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE
+      return full.slice(0, limit)
+    },
+    [vendasPorColuna, visibleLimitPorColuna]
+  )
+
+  const handleColumnScroll = useCallback(
+    (columnId: ColunaKanbanId, event: React.UIEvent<HTMLDivElement>) => {
+      if (columnScrollTickingRef.current) return
+      const el = event.currentTarget
+      if (!el) return
+      columnScrollTickingRef.current = true
+      requestAnimationFrame(() => {
+        columnScrollTickingRef.current = false
+        const distanciaDoFim = el.scrollHeight - el.scrollTop - el.clientHeight
+        if (distanciaDoFim > 120) return
+
+        const fullList = vendasPorColuna[columnId] ?? []
+        const currentLimit =
+          visibleLimitPorColuna[columnId] ?? VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE
+
+        if (currentLimit < fullList.length) {
+          setVisibleLimitPorColuna(prev => ({
+            ...prev,
+            [columnId]: currentLimit + VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE,
+          }))
+          return
+        }
+
+        handleCarregarMaisVendas()
+      })
+    },
+    [vendasPorColuna, visibleLimitPorColuna, handleCarregarMaisVendas]
+  )
+
   // Colunas fixas do Kanban (entrega → fiscal)
   const getColumns = (): KanbanColumn[] => [
     {
@@ -1068,86 +1239,6 @@ export function FiscalFlowKanban() {
     return []
   }
 
-  const getVendasByColumn = (columnId: string): Venda[] => {
-    let vendas: Venda[] = []
-    switch (columnId) {
-      case 'NOVOS_PEDIDOS':
-        vendas = todasVendas.filter(
-          (v: Venda) => getEtapaKanbanParaExibicao(v) === 'NOVOS_PEDIDOS'
-        )
-        break
-      case 'EM_PREPARO':
-        vendas = todasVendas.filter(
-          (v: Venda) => getEtapaKanbanParaExibicao(v) === 'EM_PREPARO'
-        )
-        break
-      case 'PRONTO_ENTREGA':
-        vendas = todasVendas.filter(
-          (v: Venda) => getEtapaKanbanParaExibicao(v) === 'PRONTO_ENTREGA'
-        )
-        break
-      case 'EM_ROTA':
-        vendas = todasVendas.filter(
-          (v: Venda) => getEtapaKanbanParaExibicao(v) === 'EM_ROTA'
-        )
-        break
-      case 'FINALIZADAS':
-        if (modoKanbanVendas === 'delivery') {
-          vendas = todasVendas.filter((v: Venda) => {
-            const etapa = getEtapaKanbanParaExibicao(v)
-            return etapa === 'FINALIZADAS' || etapa === 'PENDENTE_EMISSAO'
-          })
-        } else {
-          vendas = todasVendas.filter(
-            (v: Venda) => getEtapaKanbanParaExibicao(v) === 'FINALIZADAS'
-          )
-        }
-        break
-      case 'PENDENTE_EMISSAO':
-        vendas = todasVendas.filter(
-          (v: Venda) => getEtapaKanbanParaExibicao(v) === 'PENDENTE_EMISSAO'
-        )
-        break
-      case 'COM_NFE':
-        vendas = todasVendas.filter((v: Venda) => getEtapaKanbanParaExibicao(v) === 'COM_NFE')
-        break
-      default:
-        return []
-    }
-
-    // Garantir que não há duplicação por ID (usando Map para manter ordem)
-    const vendasUnicas = new Map<string, Venda>()
-    vendas.forEach(venda => {
-      if (!vendasUnicas.has(venda.id)) {
-        vendasUnicas.set(venda.id, venda)
-      }
-    })
-
-    const criterio =
-      criterioOrdenacaoPorColuna[columnId as ColunaKanbanId] ??
-      ('data' as CriterioOrdenacaoKanban)
-    const direcao =
-      direcaoOrdenacaoPorColuna[columnId as ColunaKanbanId] ??
-      ('desc' as DirecaoOrdenacaoKanban)
-    let ordenadas = ordenarVendasKanbanPorCriterio(
-      Array.from(vendasUnicas.values()),
-      criterio,
-      direcao
-    )
-
-    // Último card movido para esta coluna fica primeiro (persistido em localStorage)
-    const pinId = primeiroPorColuna[columnId]
-    if (pinId) {
-      const idx = ordenadas.findIndex(v => v.id === pinId)
-      if (idx > 0) {
-        const [pinned] = ordenadas.splice(idx, 1)
-        ordenadas = [pinned, ...ordenadas]
-      }
-    }
-
-    return ordenadas
-  }
-
   const mostrarLoadingInicial = isLoading && todasVendas.length === 0
 
   if (mostrarLoadingInicial) {
@@ -1175,9 +1266,11 @@ export function FiscalFlowKanban() {
         origemFilterDisabled={usaFiltroTerminal}
         dataCriacaoInicio={dataCriacaoInicio}
         dataCriacaoFim={dataCriacaoFim}
+        onCriacaoTodos={aplicarCriacaoTodos}
         onOpenCriacaoDatas={abrirModalCriacaoDatas}
         dataFinalizacaoInicio={dataFinalizacaoInicio}
         dataFinalizacaoFim={dataFinalizacaoFim}
+        onFinalizacaoTodos={aplicarFinalizacaoTodos}
         onOpenFinalizacaoDatas={abrirModalFinalizacaoDatas}
         onClearFilters={handleClearFiltersComTerminal}
         modoKanbanVendas={modoKanbanVendas}
@@ -1275,14 +1368,15 @@ export function FiscalFlowKanban() {
         >
           <div className="flex h-full min-w-max gap-3">
             {columns.map(column => {
-              const columnVendas = getVendasByColumn(column.id)
               const colId = column.id as ColunaKanbanId
+              const columnTotalCount = getColumnTotalCount(colId)
+              const columnVendas = getColumnVisibleVendas(colId)
 
               return (
                 <FiscalKanbanColumn
                   key={column.id}
                   column={column}
-                  count={columnVendas.length}
+                  count={columnTotalCount}
                   criterioOrdenacao={criterioOrdenacaoPorColuna[colId] ?? 'data'}
                   direcaoOrdenacao={direcaoOrdenacaoPorColuna[colId] ?? 'desc'}
                   onCriterioOrdenacaoChange={(columnId, criterio) =>
@@ -1297,7 +1391,7 @@ export function FiscalFlowKanban() {
                       [columnId]: prev[columnId] === 'asc' ? 'desc' : 'asc',
                     }))
                   }
-                  onColumnScroll={onColumnScroll}
+                  onColumnScroll={handleColumnScroll}
                 >
                   {columnVendas.map((venda: Venda) => (
                     <FiscalKanbanVendaCard

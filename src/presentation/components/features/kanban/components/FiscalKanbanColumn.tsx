@@ -18,7 +18,7 @@ interface FiscalKanbanColumnProps {
   direcaoOrdenacao: DirecaoOrdenacaoKanban
   onCriterioOrdenacaoChange: (columnId: ColunaKanbanId, criterio: CriterioOrdenacaoKanban) => void
   onToggleDirecaoOrdenacao: (columnId: ColunaKanbanId) => void
-  onColumnScroll?: (event: React.UIEvent<HTMLDivElement>) => void
+  onColumnScroll?: (columnId: ColunaKanbanId, event: React.UIEvent<HTMLDivElement>) => void
   columnFooter?: ReactNode
   children: ReactNode
 }
@@ -110,7 +110,7 @@ export function FiscalKanbanColumn(props: FiscalKanbanColumnProps) {
       <DroppableColumnContent
         columnId={column.id}
         className="scrollbar-thin min-h-0 flex-1 space-y-2 overflow-y-auto bg-gray-200 p-2.5"
-        onScroll={onColumnScroll}
+        onScroll={onColumnScroll ? event => onColumnScroll(colId, event) : undefined}
       >
         {count === 0 ? (
           <div className="py-6 text-center">

@@ -156,5 +156,5 @@ export interface PedidosDeliveryListResponse {
   items: PedidoDeliverySummaryApi[]
 }
 
-/** Tamanho de página no Kanban delivery (espelha `VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE`). */
-export const PEDIDOS_DELIVERY_KANBAN_PAGE_SIZE = 50
+/** Tamanho de página no Kanban (listagem global e expansão por coluna ao rolar). */
+export const PEDIDOS_DELIVERY_KANBAN_PAGE_SIZE = 10
