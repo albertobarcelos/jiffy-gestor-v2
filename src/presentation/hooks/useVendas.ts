@@ -5,7 +5,7 @@ import { showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
 import { useCallback, useRef } from 'react'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
-import { invalidateKanbanVendasListagens, refetchKanbanVendasListagens } from '@/src/presentation/hooks/kanbanListagemQueryCache'
+import { invalidateKanbanVendasListagens, refetchKanbanVendasListagens } from '@/features/kanban/hooks/kanbanListagemQueryCache'
 import type { AcaoTransicaoKanbanEntrega } from '@/src/application/dto/TransicaoKanbanDTO'
 import type { TransicaoPedidoDeliveryApiRequest } from '@/src/application/dto/api/pedidoDeliveryApi'
 import {

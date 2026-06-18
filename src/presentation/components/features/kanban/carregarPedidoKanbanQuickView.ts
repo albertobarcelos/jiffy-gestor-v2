@@ -1,4 +1,6 @@
 export {
   carregarPedidoKanbanQuickView,
+  invalidarPedidoKanbanQuickViewCache,
+  obterPedidoKanbanQuickViewCache,
   type PedidoKanbanQuickViewData,
-} from '../nfe/kanban/carregarPedidoKanbanQuickView'
+} from '../delivery/kanban-panels/carregarPedidoKanbanQuickView'

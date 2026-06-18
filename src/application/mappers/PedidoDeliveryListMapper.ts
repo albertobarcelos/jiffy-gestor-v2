@@ -6,7 +6,7 @@ import { derivarFluxoPagamentoEntregaDeliverySummary } from '@/src/application/m
 import {
   mapItemJsonParaVendaUnificadaDTO,
   type VendaUnificadaDTO,
-} from '@/src/presentation/hooks/useVendasUnificadas'
+} from '@/features/kanban/hooks/useVendasUnificadas'
 
 /** Origem comercial no card Kanban (`VendaUnificadaDTO.origem`). */
 export function mapOrigemApiDeliveryParaVendaUnificada(

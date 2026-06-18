@@ -1,3 +1,7 @@
 export {
+  COLUNAS_KANBAN_ALTERAR_ENDERECO_ENTREGA,
   deveExibirBotaoAlterarEnderecoEntregaKanban,
-} from '../nfe/kanban/enderecoEntregaPedidoKanban'
+  extrairContextoEnderecoPedidoDeliveryApi,
+  pedidoDeliveryPatchUrl,
+  type ContextoEnderecoPedidoKanban,
+} from '../delivery/kanban-panels/enderecoEntregaPedidoKanban'

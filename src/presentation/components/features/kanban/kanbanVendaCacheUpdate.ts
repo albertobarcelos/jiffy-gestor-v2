@@ -1,3 +1,7 @@
 export {
   preservarObservacoesKanbanCacheNosItems,
-} from '../nfe/kanban/kanbanVendaCacheUpdate'
+  patchKanbanVendasListagemCache,
+  patchVendaUnificadaInfiniteCache,
+  extrairPatchKanbanDeRespostaTransicao,
+  sincronizarPedidoDeliveryKanbanEmBackground,
+} from './utils/kanbanVendaCacheUpdate'

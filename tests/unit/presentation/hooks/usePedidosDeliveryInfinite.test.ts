@@ -3,8 +3,8 @@ import {
   getNextOffsetPedidosDelivery,
   vendasUnificadasQueryParamsParaPedidosDelivery,
   type PedidosDeliveryInfinitePage,
-} from '@/src/presentation/hooks/usePedidosDeliveryInfinite'
-import { VendaUnificadaDTO } from '@/src/presentation/hooks/useVendasUnificadas'
+} from '@/features/kanban/hooks/usePedidosDeliveryInfinite'
+import { VendaUnificadaDTO } from '@/features/kanban/hooks/useVendasUnificadas'
 
 function criarDto(id: string): VendaUnificadaDTO {
   return new VendaUnificadaDTO(

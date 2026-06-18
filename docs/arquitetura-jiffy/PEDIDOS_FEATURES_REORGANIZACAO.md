@@ -1,7 +1,7 @@
 # Reorganização: features `nfe` → kanban, pedidos, delivery, fiscal
 
 > **Documento de migração** — plano e inventário para sair de `features/nfe/` (nome legado) em features por domínio.  
-> **Status:** Fase 0 concluída · Fase 1 concluída · Fase 2 concluída · Fase 3 pendente  
+> **Status:** Migração concluída (Fase 7) — código em `kanban/`, `pedidos/`, `delivery/`, `fiscal/`  
 > **Última revisão:** 2026-06-15
 
 ---
@@ -90,11 +90,11 @@ pedidos/               # hoje: nfe/novo-pedido/
 | **0** | Inventário, limpeza legado, documentação | ✅ esta fase |
 | **1** | Criar pastas + `index.ts` re-exportando de `nfe/`; migrar imports externos | ✅ |
 | **2** | Mover `fiscal/` + atualizar dependentes | ✅ |
-| **3** | Mover `delivery/` (config + painéis kanban) | médio |
-| **4** | Mover `kanban/` + `FiscalFlowKanban` | médio |
-| **5** | Mover `pedidos/` (`novo-pedido/` completo) | grande |
-| **6** | Hooks globais → features; split `useVendas` se necessário | médio |
-| **7** | Remover `features/nfe/`; aliases TS; rename doc | limpeza |
+| **3** | Mover `delivery/` (config + painéis kanban) | ✅ |
+| **4** | Mover `kanban/` + `FiscalFlowKanban` | ✅ |
+| **5** | Mover `pedidos/` (`novo-pedido/` completo) | ✅ |
+| **6** | Hooks globais → features; split `useVendas` se necessário | ✅ (parcial: hooks listagem/impressão; `useVendas` mantido em `presentation/hooks`) |
+| **7** | Remover `features/nfe/`; aliases TS; rename doc | ✅ |
 
 **Ordem de movimentação real:** fiscal → delivery → kanban → pedidos (pedidos é o mais referenciado).
 
@@ -102,16 +102,10 @@ pedidos/               # hoje: nfe/novo-pedido/
 
 ## Compatibilidade durante a migração
 
-1. Manter `features/nfe/` re-exportando tudo até a Fase 7.
-2. Novos imports devem usar o path da feature (`@/src/presentation/components/features/kanban/...`).
-3. Após Fase 1, barrels públicos:
-
-```ts
-// features/kanban/index.ts (exemplo Fase 1)
-export { FiscalFlowKanban } from '../nfe/FiscalFlowKanban'
-```
-
-4. **Aliases TypeScript (Fase 1):** opcional em `tsconfig.json`:
+1. ~~Manter `features/nfe/` re-exportando tudo até a Fase 7.~~ **Concluído** — pasta removida.
+2. Novos imports devem usar o path da feature (`@/features/kanban/...` ou `@/src/presentation/components/features/kanban/...`).
+3. Barrels públicos: `kanban/index.ts`, `pedidos/index.ts`, `delivery/index.ts`, `fiscal/index.ts`.
+4. **Aliases TypeScript** em `tsconfig.json`:
 
 ```json
 "@/features/kanban/*": ["./src/presentation/components/features/kanban/*"],
@@ -119,6 +113,8 @@ export { FiscalFlowKanban } from '../nfe/FiscalFlowKanban'
 "@/features/delivery/*": ["./src/presentation/components/features/delivery/*"],
 "@/features/fiscal/*": ["./src/presentation/components/features/fiscal/*"]
 ```
+
+Hooks de listagem/impressão: importar de `@/features/kanban/hooks/*` e `@/features/delivery/hooks/*` (stubs em `presentation/hooks/` removidos).
 
 ---
 
@@ -179,5 +175,10 @@ Substituto atual: `FiscalFlowKanban` + `kanban/DroppableColumnContent.tsx`.
 
 | Data | Alteração |
 |------|-----------|
+| 2026-06-15 | Limpeza: removidos stubs `presentation/hooks/` (listagem/impressão); imports → `@/features/*` |
+| 2026-06-15 | Fase 7: removido `features/nfe/`; aliases `@/features/*` em `tsconfig.json` |
+| 2026-06-15 | Fase 6: `useVendasUnificadas`, `usePedidosDeliveryInfinite`, `kanbanListagemQueryCache` → `kanban/hooks/`; `useImpressaoDelivery` → `delivery/hooks/` |
+| 2026-06-15 | Fase 5: `novo-pedido/` → `features/pedidos/` (wizard, modais, hooks, context) |
+| 2026-06-15 | Fase 4: `FiscalFlowKanban`, `KanbanModoVendasToggle`, core `kanban/` em `features/kanban/` |
 | 2026-06-15 | Fase 2: `EmitirNfeModal`, `StatusFiscalBadge`, `DocumentoFiscalPdfRetryModal` em `features/fiscal/` |
 | 2026-06-15 | Fase 1: barrels `kanban`, `pedidos`, `delivery`, `fiscal`; imports externos migrados |

@@ -4,7 +4,7 @@ import {
   formatarPrevisaoEntregaKanbanCard,
   rotuloFormaCobrancaKanbanCard,
 } from '@/src/presentation/components/features/kanban/kanbanDeliveryCardDisplay'
-import { VendaUnificadaDTO } from '@/src/presentation/hooks/useVendasUnificadas'
+import { VendaUnificadaDTO } from '@/features/kanban/hooks/useVendasUnificadas'
 
 function criarVendaDelivery(partial: Partial<VendaUnificadaDTO> = {}): VendaUnificadaDTO {
   const base = new VendaUnificadaDTO(

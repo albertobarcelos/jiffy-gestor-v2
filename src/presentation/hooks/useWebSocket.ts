@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { invalidateKanbanVendasListagens } from '@/src/presentation/hooks/kanbanListagemQueryCache'
+import { invalidateKanbanVendasListagens } from '@/features/kanban/hooks/kanbanListagemQueryCache'
 import { showToast } from '@/src/shared/utils/toast'
 
 interface WebSocketMessage {

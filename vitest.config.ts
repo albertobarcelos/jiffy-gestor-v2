@@ -7,8 +7,24 @@ export default defineConfig({
     include: ['tests/**/*.test.ts'],
   },
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, '.'),
-    },
+    alias: [
+      {
+        find: '@/features/kanban',
+        replacement: path.resolve(__dirname, 'src/presentation/components/features/kanban'),
+      },
+      {
+        find: '@/features/pedidos',
+        replacement: path.resolve(__dirname, 'src/presentation/components/features/pedidos'),
+      },
+      {
+        find: '@/features/delivery',
+        replacement: path.resolve(__dirname, 'src/presentation/components/features/delivery'),
+      },
+      {
+        find: '@/features/fiscal',
+        replacement: path.resolve(__dirname, 'src/presentation/components/features/fiscal'),
+      },
+      { find: '@', replacement: path.resolve(__dirname, '.') },
+    ],
   },
 })
