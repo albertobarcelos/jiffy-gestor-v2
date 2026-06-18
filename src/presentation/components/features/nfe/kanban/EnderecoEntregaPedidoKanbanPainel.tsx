@@ -26,6 +26,7 @@ import {
 } from '@/src/presentation/hooks/useMoradaTelefone'
 import { formatarCepMascara, normalizarDigitosCep } from '@/src/shared/utils/consultaCep'
 import { showToast } from '@/src/shared/utils/toast'
+import { invalidateKanbanVendasListagens } from '@/src/presentation/hooks/kanbanListagemQueryCache'
 import { invalidateVendaDetalheCarregadaCache } from '../novo-pedido/hooks/data/useVendaDetalheCarregadaQuery'
 import { invalidarPedidoKanbanQuickViewCache } from './carregarPedidoKanbanQuickView'
 import {
@@ -281,7 +282,7 @@ export function EnderecoEntregaPedidoKanbanPainel({
 
       showToast.success('Endereço de entrega atualizado.')
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      invalidateKanbanVendasListagens(queryClient)
       queryClient.invalidateQueries({ queryKey: ['venda', venda.id] })
       await invalidateVendaDetalheCarregadaCache(queryClient, empresaId, venda.id)
       invalidarPedidoKanbanQuickViewCache(venda.id)

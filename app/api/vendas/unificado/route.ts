@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
-import { enrichUnificadoItemsComModuloDelivery } from '@/src/application/mappers/EnrichUnificadoDeliveryMapper'
 
 /**
  * GET /api/vendas/unificado
  * Proxy passthrough para GET /api/v1/vendas/unificado do backend.
- * Enriquece pedidos do módulo delivery (tipoEntrega + status) quando a view unificada omite campos.
+ * Listagem delivery do Kanban usa GET /api/delivery/pedidos (módulo Jiffy).
  */
 export async function GET(request: NextRequest) {
   try {
@@ -19,7 +18,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
 
     const apiClient = new ApiClient()
-    const response = await apiClient.request<any>(
+    const response = await apiClient.request<unknown>(
       `/api/v1/vendas/unificado?${searchParams.toString()}`,
       {
         method: 'GET',
@@ -30,14 +29,7 @@ export async function GET(request: NextRequest) {
       }
     )
 
-    const data = response.data || {}
-    const items = Array.isArray(data.items) ? data.items : []
-    const itemsEnriquecidos = await enrichUnificadoItemsComModuloDelivery(
-      items,
-      tokenInfo.token
-    )
-
-    return NextResponse.json({ ...data, items: itemsEnriquecidos })
+    return NextResponse.json(response.data ?? {})
   } catch (error) {
     console.error('Erro ao buscar vendas unificadas:', error)
     if (error instanceof ApiError) {
@@ -46,9 +38,6 @@ export async function GET(request: NextRequest) {
         { status: error.status }
       )
     }
-    return NextResponse.json(
-      { error: 'Erro interno do servidor' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
   }
 }

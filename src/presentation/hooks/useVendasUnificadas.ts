@@ -377,6 +377,7 @@ export interface VendasUnificadasInfiniteOptions {
   /** Polling leve enquanto o Kanban está aberto (ex.: 60_000). */
   refetchIntervalMs?: number | false
   refetchOnWindowFocus?: boolean
+  enabled?: boolean
 }
 
 /** @deprecated Use VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE */
@@ -603,7 +604,7 @@ export function useVendasUnificadasInfinite(
         signal
       ),
     getNextPageParam: (lastPage, allPages) => getNextOffsetVendasUnificadas(lastPage, allPages),
-    enabled: !!token,
+    enabled: options?.enabled !== false && !!token,
     refetchOnReconnect: true,
     refetchInterval: options?.refetchIntervalMs ?? false,
     refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,

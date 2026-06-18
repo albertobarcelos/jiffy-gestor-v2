@@ -1,6 +1,10 @@
 import type { InfiniteData, QueryClient } from '@tanstack/react-query'
 import type { KanbanVendaCachePatch } from '@/src/application/dto/TransicaoKanbanDTO'
 import { extrairPatchKanbanDeRespostaTransicao } from '@/src/application/mappers/TransicaoPedidoDeliveryMapper'
+import {
+  KANBAN_PEDIDOS_DELIVERY_INFINITE_QUERY_KEY,
+  KANBAN_VENDAS_UNIFICADAS_QUERY_KEY,
+} from '@/src/presentation/hooks/kanbanListagemQueryCache'
 
 export type { KanbanVendaCachePatch } from '@/src/application/dto/TransicaoKanbanDTO'
 export { extrairPatchKanbanDeRespostaTransicao }
@@ -55,17 +59,19 @@ export function cloneVendaUnificadaDTO(
     patch.dataFinalizacao !== undefined ? patch.dataFinalizacao : venda.dataFinalizacao,
     venda.dataCancelamento,
     venda.cliente,
-    venda.solicitarEmissaoFiscal,
-    venda.statusFiscal,
-    venda.documentoFiscalId,
+    patch.solicitarEmissaoFiscal !== undefined
+      ? patch.solicitarEmissaoFiscal
+      : venda.solicitarEmissaoFiscal,
+    patch.statusFiscal !== undefined ? patch.statusFiscal : venda.statusFiscal,
+    patch.documentoFiscalId !== undefined ? patch.documentoFiscalId : venda.documentoFiscalId,
     venda.abertoPor,
     venda.numeroMesa,
-    venda.numeroFiscal,
-    venda.serieFiscal,
-    venda.dataEmissaoFiscal,
-    venda.tipoDocFiscal,
-    venda.modelo,
-    venda.retornoSefaz,
+    patch.numeroFiscal !== undefined ? patch.numeroFiscal : venda.numeroFiscal,
+    patch.serieFiscal !== undefined ? patch.serieFiscal : venda.serieFiscal,
+    patch.dataEmissaoFiscal !== undefined ? patch.dataEmissaoFiscal : venda.dataEmissaoFiscal,
+    patch.tipoDocFiscal !== undefined ? patch.tipoDocFiscal : venda.tipoDocFiscal,
+    patch.modelo !== undefined ? patch.modelo : venda.modelo,
+    patch.retornoSefaz !== undefined ? patch.retornoSefaz : venda.retornoSefaz,
     patch.statusEtapaOperacional !== undefined
       ? patch.statusEtapaOperacional
       : venda.statusEtapaOperacional,
@@ -73,8 +79,34 @@ export function cloneVendaUnificadaDTO(
       ? patch.dataUltimaModificacao
       : venda.dataUltimaModificacao,
     patch.statusFinanceiro !== undefined ? patch.statusFinanceiro : venda.statusFinanceiro,
-    venda.observacoes
+    patch.observacoes !== undefined ? patch.observacoes : venda.observacoes
   )
+}
+
+/** Atualiza o item em todas as listagens infinitas do Kanban (balcão + delivery). */
+export function patchKanbanVendasListagemCache(
+  queryClient: QueryClient,
+  vendaId: string,
+  patch: KanbanVendaCachePatch
+): boolean {
+  let encontrou = false
+
+  const prefixos = [
+    KANBAN_VENDAS_UNIFICADAS_QUERY_KEY,
+    KANBAN_PEDIDOS_DELIVERY_INFINITE_QUERY_KEY,
+  ] as const
+
+  for (const prefix of prefixos) {
+    const queries = queryClient.getQueriesData<InfiniteData<VendasUnificadasResponse>>({
+      queryKey: prefix,
+    })
+    for (const [queryKey] of queries) {
+      const patched = patchVendaUnificadaInfiniteCache(queryClient, queryKey, vendaId, patch)
+      if (patched) encontrou = true
+    }
+  }
+
+  return encontrou
 }
 
 /** Atualiza um item no cache infinito do Kanban sem refetch da lista inteira. */

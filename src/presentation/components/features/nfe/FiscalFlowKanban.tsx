@@ -26,6 +26,12 @@ import {
   useVendasUnificadasInfinite,
   vendasUnificadasInfiniteQueryKey,
 } from '@/src/presentation/hooks/useVendasUnificadas'
+import {
+  flattenPedidosDeliveryInfinite,
+  pedidosDeliveryInfiniteQueryKey,
+  usePedidosDeliveryInfinite,
+  vendasUnificadasQueryParamsParaPedidosDelivery,
+} from '@/src/presentation/hooks/usePedidosDeliveryInfinite'
 import { useVendaIdsPdvPorTerminal } from '@/src/presentation/hooks/useVendaIdsPdvPorTerminal'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import {
@@ -152,10 +158,6 @@ export function FiscalFlowKanban() {
   const { auth } = useAuthStore()
   const queryClient = useQueryClient()
   const empresaId = useTenantEmpresaId()
-  const infiniteQueryKey = useMemo(
-    () => vendasUnificadasInfiniteQueryKey(vendasUnificadasQueryParams, empresaId),
-    [vendasUnificadasQueryParams, empresaId]
-  )
   const [entregadorPorVendaId, setEntregadorPorVendaId] = useState<Record<string, string>>({})
 
   /** Edição de cliente (lápis no card): mesmo painel que ClientesList / SeletorClienteModal */
@@ -201,6 +203,26 @@ export function FiscalFlowKanban() {
       /* quota / modo privado */
     }
   }, [modoKanbanVendas])
+
+  const isModoDeliveryKanban = modoKanbanVendas === 'delivery'
+
+  const pedidosDeliveryQueryParams = useMemo(
+    () => vendasUnificadasQueryParamsParaPedidosDelivery(vendasUnificadasQueryParams),
+    [vendasUnificadasQueryParams]
+  )
+
+  const infiniteQueryKey = useMemo(
+    () =>
+      isModoDeliveryKanban
+        ? pedidosDeliveryInfiniteQueryKey(pedidosDeliveryQueryParams, empresaId)
+        : vendasUnificadasInfiniteQueryKey(vendasUnificadasQueryParams, empresaId),
+    [
+      isModoDeliveryKanban,
+      pedidosDeliveryQueryParams,
+      vendasUnificadasQueryParams,
+      empresaId,
+    ]
+  )
 
   const loadAllTerminais = useCallback(async () => {
     const token = auth?.getAccessToken()
@@ -251,7 +273,7 @@ export function FiscalFlowKanban() {
     void loadAllTerminais()
   }, [loadAllTerminais])
 
-  const usaFiltroTerminal = !!terminalFilter.trim()
+  const usaFiltroTerminal = !!terminalFilter.trim() && !isModoDeliveryKanban
 
   const vendaIdsPdvPorTerminalParams = useMemo(
     () => ({
@@ -267,10 +289,21 @@ export function FiscalFlowKanban() {
   const vendasUnificadasQueryKeyFingerprintComTerminal = useMemo(
     () =>
       JSON.stringify({
-        ...vendasUnificadasQueryParams,
-        terminalFilter: terminalFilter || undefined,
+        modo: modoKanbanVendas,
+        ...(isModoDeliveryKanban
+          ? pedidosDeliveryQueryParams
+          : {
+              ...vendasUnificadasQueryParams,
+              terminalFilter: terminalFilter || undefined,
+            }),
       }),
-    [vendasUnificadasQueryParams, terminalFilter]
+    [
+      modoKanbanVendas,
+      isModoDeliveryKanban,
+      pedidosDeliveryQueryParams,
+      vendasUnificadasQueryParams,
+      terminalFilter,
+    ]
   )
 
   /** Evita PATCH duplicado ao reativar solicitarEmissaoFiscal para REJEITADA (Strict Mode / re-renders) */
@@ -310,14 +343,34 @@ export function FiscalFlowKanban() {
   const {
     data: vendasUnificadasInfiniteData,
     isLoading: isLoadingUnificado,
-    isFetchingNextPage,
-    hasNextPage,
-    fetchNextPage,
+    isFetchingNextPage: isFetchingNextPageUnificado,
+    hasNextPage: hasNextPageUnificado,
+    fetchNextPage: fetchNextPageUnificado,
     refetch: refetchUnificado,
   } = useVendasUnificadasInfinite(vendasUnificadasQueryParams, {
+    enabled: !isModoDeliveryKanban,
     refetchIntervalMs: KANBAN_VENDAS_REFETCH_INTERVAL_MS,
     refetchOnWindowFocus: true,
   })
+
+  const {
+    data: pedidosDeliveryInfiniteData,
+    isLoading: isLoadingDelivery,
+    isFetchingNextPage: isFetchingNextPageDelivery,
+    hasNextPage: hasNextPageDelivery,
+    fetchNextPage: fetchNextPageDelivery,
+    refetch: refetchDelivery,
+  } = usePedidosDeliveryInfinite(pedidosDeliveryQueryParams, {
+    enabled: isModoDeliveryKanban,
+    refetchIntervalMs: KANBAN_VENDAS_REFETCH_INTERVAL_MS,
+    refetchOnWindowFocus: true,
+  })
+
+  const isFetchingNextPage = isModoDeliveryKanban
+    ? isFetchingNextPageDelivery
+    : isFetchingNextPageUnificado
+  const hasNextPage = isModoDeliveryKanban ? hasNextPageDelivery : hasNextPageUnificado
+  const fetchNextPage = isModoDeliveryKanban ? fetchNextPageDelivery : fetchNextPageUnificado
 
   const {
     data: vendaIdsPdvPorTerminal,
@@ -325,20 +378,39 @@ export function FiscalFlowKanban() {
     refetch: refetchIdsTerminal,
   } = useVendaIdsPdvPorTerminal(vendaIdsPdvPorTerminalParams, { enabled: usaFiltroTerminal })
 
-  const isLoading = isLoadingUnificado || (usaFiltroTerminal && isLoadingIdsTerminal)
+  const isLoading = isModoDeliveryKanban
+    ? isLoadingDelivery
+    : isLoadingUnificado || (usaFiltroTerminal && isLoadingIdsTerminal)
 
   const refetch = useCallback(async () => {
+    if (isModoDeliveryKanban) {
+      return refetchDelivery()
+    }
     const [result] = await Promise.all([
       refetchUnificado(),
       usaFiltroTerminal ? refetchIdsTerminal() : Promise.resolve(),
     ])
     return result
-  }, [usaFiltroTerminal, refetchUnificado, refetchIdsTerminal])
+  }, [isModoDeliveryKanban, usaFiltroTerminal, refetchDelivery, refetchUnificado, refetchIdsTerminal])
 
-  const { items: todasVendasFlattened, totalCount: totalVendasApi } = useMemo(
-    () => flattenVendasUnificadasInfinite(vendasUnificadasInfiniteData),
-    [vendasUnificadasInfiniteData]
-  )
+  /** Normaliza refetch do infinite query para `refetchAteMudarStatusFiscal` (espera `{ data: { items } }`). */
+  const refetchParaEmissaoFiscal = useCallback(async () => {
+    if (isModoDeliveryKanban) {
+      const result = await refetchDelivery()
+      const { items } = flattenPedidosDeliveryInfinite(result.data)
+      return { data: { items } }
+    }
+    const result = await refetchUnificado()
+    const { items } = flattenVendasUnificadasInfinite(result.data)
+    return { data: { items } }
+  }, [isModoDeliveryKanban, refetchDelivery, refetchUnificado])
+
+  const { items: todasVendasFlattened, totalCount: totalVendasApi } = useMemo(() => {
+    if (isModoDeliveryKanban) {
+      return flattenPedidosDeliveryInfinite(pedidosDeliveryInfiniteData)
+    }
+    return flattenVendasUnificadasInfinite(vendasUnificadasInfiniteData)
+  }, [isModoDeliveryKanban, pedidosDeliveryInfiniteData, vendasUnificadasInfiniteData])
 
   /** Lista do unificado; com terminal, só PDV cujo id está no Set do POS. */
   const todasVendasCarregadas = useMemo(() => {
@@ -647,7 +719,7 @@ export function FiscalFlowKanban() {
       emitirNotaPdv: payload => emitirNotaPdv.mutateAsync(payload),
       emitirNotaGestor: payload => emitirNotaGestor.mutateAsync(payload),
       emitirNotaDelivery: payload => emitirNotaDelivery.mutateAsync(payload),
-      refetch: () => refetch(),
+      refetch: () => refetchParaEmissaoFiscal(),
       setPrimeiroPorColuna,
       setVendaSelecionadaParaEmissao,
       setSelectedVendaId,
@@ -725,10 +797,10 @@ export function FiscalFlowKanban() {
   // TouchSensor junto com PointerSensor gerava gesto “travado” no mobile; distance evita arraste ao rolar.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 10 } }))
 
-  const todasVendas = useMemo(
-    () => filtrarVendasKanbanPorModo(todasVendasCarregadas, modoKanbanVendas),
-    [todasVendasCarregadas, modoKanbanVendas]
-  )
+  const todasVendas = useMemo(() => {
+    if (isModoDeliveryKanban) return todasVendasCarregadas
+    return filtrarVendasKanbanPorModo(todasVendasCarregadas, modoKanbanVendas)
+  }, [isModoDeliveryKanban, todasVendasCarregadas, modoKanbanVendas])
 
   // Colunas fixas do Kanban (entrega → fiscal)
   const getColumns = (): KanbanColumn[] => [

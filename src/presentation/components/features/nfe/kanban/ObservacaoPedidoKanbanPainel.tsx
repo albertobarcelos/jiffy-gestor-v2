@@ -28,6 +28,9 @@ import {
   invalidateVendaDetalheCarregadaCache,
   patchVendaDetalheObservacaoPedidoCache,
 } from '../novo-pedido/hooks/data/useVendaDetalheCarregadaQuery'
+import { observacoesArrayFromTexto } from '@/src/shared/helpers/observacaoPedido'
+import { invalidateKanbanVendasListagens } from '@/src/presentation/hooks/kanbanListagemQueryCache'
+import { patchKanbanVendasListagemCache } from './kanbanVendaCacheUpdate'
 import {
   extrairObservacaoPedidoDeRespostaApi,
   observacoesPayloadPatchObservacaoPedido,
@@ -151,8 +154,11 @@ export function ObservacaoPedidoKanbanPainel({
 
       showToast.success('Observação do pedido salva.')
       patchVendaDetalheObservacaoPedidoCache(queryClient, empresaId, venda.id, observacaoSalva)
+      patchKanbanVendasListagemCache(queryClient, venda.id, {
+        observacoes: observacoesArrayFromTexto(observacaoSalva) ?? [],
+      })
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      invalidateKanbanVendasListagens(queryClient)
       queryClient.invalidateQueries({ queryKey: ['venda', venda.id] })
       await invalidateVendaDetalheCarregadaCache(queryClient, empresaId, venda.id)
       invalidarPedidoKanbanQuickViewCache(venda.id)

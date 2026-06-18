@@ -12,4 +12,14 @@ export type KanbanVendaCachePatch = {
   dataFinalizacao?: string | null
   statusFinanceiro?: string | null
   valorFinal?: number
+  solicitarEmissaoFiscal?: boolean | null
+  statusFiscal?: string | null
+  documentoFiscalId?: string | null
+  numeroFiscal?: number | null
+  serieFiscal?: number | null
+  dataEmissaoFiscal?: string | null
+  tipoDocFiscal?: string | null
+  modelo?: number | null
+  retornoSefaz?: string | null
+  observacoes?: string[] | null
 }

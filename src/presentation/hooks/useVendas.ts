@@ -5,6 +5,7 @@ import { showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
 import { useCallback, useRef } from 'react'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { invalidateKanbanVendasListagens, refetchKanbanVendasListagens } from '@/src/presentation/hooks/kanbanListagemQueryCache'
 import type { AcaoTransicaoKanbanEntrega } from '@/src/application/dto/TransicaoKanbanDTO'
 import type { TransicaoPedidoDeliveryApiRequest } from '@/src/application/dto/api/pedidoDeliveryApi'
 import {
@@ -518,7 +519,7 @@ export function useCreateVendaGestor() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      invalidateKanbanVendasListagens(queryClient)
       // Toast de sucesso é exibido no componente
     },
     onError: (error: Error) => {
@@ -568,7 +569,7 @@ export function useCreatePedidoDelivery() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      invalidateKanbanVendasListagens(queryClient)
     },
   })
 }
@@ -658,7 +659,7 @@ export function useDuplicateVenda() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      invalidateKanbanVendasListagens(queryClient)
       showToast.success('Venda duplicada com sucesso!')
     },
     onError: (error: Error) => {
@@ -715,7 +716,7 @@ export function useMarcarEmissaoFiscal() {
     },
     onSuccess: (_, params) => {
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      invalidateKanbanVendasListagens(queryClient)
       queryClient.invalidateQueries({ queryKey: ['venda', params.id] })
       if (!params.silent) {
         showToast.success('Venda marcada para emissão fiscal!')
@@ -771,7 +772,7 @@ export function useDesmarcarEmissaoFiscal() {
     },
     onSuccess: (_, params) => {
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      invalidateKanbanVendasListagens(queryClient)
       queryClient.invalidateQueries({ queryKey: ['venda', params.id] })
       showToast.success('Venda desmarcada da emissão fiscal.')
     },
@@ -838,7 +839,7 @@ export function useVincularClienteNaVenda() {
     },
     onSuccess: (_, params) => {
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      invalidateKanbanVendasListagens(queryClient)
       queryClient.invalidateQueries({ queryKey: ['venda', params.vendaId] })
       showToast.success('Cliente vinculado à venda.')
     },
@@ -922,7 +923,7 @@ export function useEmitirNfe() {
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      invalidateKanbanVendasListagens(queryClient)
       queryClient.invalidateQueries({ queryKey: ['venda', variables.id] })
 
       if (data?.status === 'EMITIDA') {
@@ -1008,7 +1009,7 @@ export function useEmitirNfeGestor() {
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      invalidateKanbanVendasListagens(queryClient)
       queryClient.invalidateQueries({ queryKey: ['venda-gestor', variables.id] })
 
       if (data.status === 'REJEITADA') {
@@ -1044,7 +1045,7 @@ export function useEmitirNfeDelivery() {
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      invalidateKanbanVendasListagens(queryClient)
       queryClient.invalidateQueries({ queryKey: ['venda-gestor', variables.id] })
 
       const status = data?.status != null ? String(data.status) : ''
@@ -1137,10 +1138,10 @@ export function useReemitirNfe() {
     },
     onSuccess: async (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      invalidateKanbanVendasListagens(queryClient)
       queryClient.invalidateQueries({ queryKey: ['venda', variables.id] })
 
-      await queryClient.refetchQueries({ queryKey: ['vendas-unificadas'] })
+      await refetchKanbanVendasListagens(queryClient)
 
       if (data?.status === 'REJEITADA') {
         const motivo =
@@ -1203,10 +1204,10 @@ export function useReemitirNfeGestor() {
     },
     onSuccess: async (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      invalidateKanbanVendasListagens(queryClient)
       queryClient.invalidateQueries({ queryKey: ['venda-gestor', variables.id] })
 
-      await queryClient.refetchQueries({ queryKey: ['vendas-unificadas'] })
+      await refetchKanbanVendasListagens(queryClient)
 
       if (data?.status === 'REJEITADA') {
         const motivo =
@@ -1268,7 +1269,7 @@ export function useCancelarVendaGestor() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      invalidateKanbanVendasListagens(queryClient)
       queryClient.invalidateQueries({ queryKey: ['venda-gestor', variables.id] })
       showToast.success('Venda cancelada com sucesso!')
     },
@@ -1318,7 +1319,7 @@ export function useCancelarNotaFiscalVendaPdv() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      invalidateKanbanVendasListagens(queryClient)
       queryClient.invalidateQueries({ queryKey: ['venda', variables.id] })
       showToast.success('Nota fiscal cancelada com sucesso!')
     },
@@ -1368,7 +1369,7 @@ export function useCancelarNotaFiscalVendaGestor() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      invalidateKanbanVendasListagens(queryClient)
       queryClient.invalidateQueries({ queryKey: ['venda-gestor', variables.id] })
       showToast.success('Nota fiscal cancelada com sucesso!')
     },
@@ -1414,7 +1415,7 @@ export function useExcluirVendaGestor() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      invalidateKanbanVendasListagens(queryClient)
       queryClient.invalidateQueries({ queryKey: ['venda-gestor', variables.id] })
       showToast.success('Venda excluída definitivamente!')
     },
@@ -1480,7 +1481,7 @@ export function useTransicaoVendaGestor() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['vendas'], refetchType: 'none' })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'], refetchType: 'none' })
+      invalidateKanbanVendasListagens(queryClient, { refetchType: 'none' })
       queryClient.invalidateQueries({ queryKey: ['venda-gestor', variables.id], refetchType: 'none' })
     },
     onError: (error: Error) => {
@@ -1566,7 +1567,7 @@ export function useTransicaoPedidoDelivery() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['vendas'], refetchType: 'none' })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'], refetchType: 'none' })
+      invalidateKanbanVendasListagens(queryClient, { refetchType: 'none' })
       queryClient.invalidateQueries({ queryKey: ['venda-gestor', variables.id], refetchType: 'none' })
       queryClient.invalidateQueries({
         queryKey: ['pedido-delivery', variables.id],
@@ -1616,7 +1617,7 @@ export function useFinalzarVendaGestor() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
+      invalidateKanbanVendasListagens(queryClient)
       queryClient.invalidateQueries({ queryKey: ['venda-gestor', variables.id] })
     },
     onError: (error: Error) => {
