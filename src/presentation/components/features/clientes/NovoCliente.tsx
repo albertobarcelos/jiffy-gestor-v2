@@ -16,6 +16,12 @@ import { Button } from '@/src/presentation/components/ui/button'
 import { CidadeAutocomplete } from '@/src/presentation/components/ui/cidade-autocomplete'
 import { showToast } from '@/src/shared/utils/toast'
 import { extrairDigitosTelefone, formatarTelefoneBr } from '@/src/shared/utils/telefoneBr'
+import {
+  extrairDigitosDocumento,
+  formatarCpfCnpjInput,
+  documentoParcialInvalido,
+  mapearDocumentoParaApi,
+} from '@/src/shared/utils/cpfCnpj'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { MdSearch, MdClear, MdPerson, MdLocationOn, MdReceiptLong } from 'react-icons/md'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
@@ -109,8 +115,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
   // Estados do formulário
   const [nome, setNome] = useState('')
   const [razaoSocial, setRazaoSocial] = useState('')
-  const [cpf, setCpf] = useState('')
-  const [cnpj, setCnpj] = useState('')
+  const [documento, setDocumento] = useState('')
   const [telefone, setTelefone] = useState('')
   const [email, setEmail] = useState('')
   const [nomeFantasia, setNomeFantasia] = useState('')
@@ -162,8 +167,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
     return JSON.stringify({
       nome: (nome || '').trim(),
       razaoSocial: (razaoSocial || '').trim(),
-      cpf: cpf.replace(/\D/g, ''),
-      cnpj: cnpj.replace(/\D/g, ''),
+      documento: extrairDigitosDocumento(documento),
       telefone: extrairDigitosTelefone(telefone),
       email: (email || '').trim(),
       nomeFantasia: (nomeFantasia || '').trim(),
@@ -185,8 +189,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
   }, [
     nome,
     razaoSocial,
-    cpf,
-    cnpj,
+    documento,
     telefone,
     email,
     nomeFantasia,
@@ -270,19 +273,15 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
           setNome(cliente.getNome())
           setRazaoSocial(cliente.getRazaoSocial() || '')
           
-          // Formata CPF e CNPJ ao carregar
           const cpfValue = cliente.getCpf() || ''
           const cnpjValue = cliente.getCnpj() || ''
-          
-          console.log('📥 Valores antes de formatar:', {
-            cpfValue,
-            cnpjValue,
-            cpfFormatado: cpfValue ? formatCPF(cpfValue) : '',
-            cnpjFormatado: cnpjValue ? formatCNPJ(cnpjValue) : '',
-          })
-          
-          setCpf(cpfValue ? formatCPF(cpfValue) : '')
-          setCnpj(cnpjValue ? formatCNPJ(cnpjValue) : '')
+          if (cpfValue && cnpjValue) {
+            console.warn(
+              '[NovoCliente] Cliente com CPF e CNPJ simultâneos; exibindo CPF no campo unificado.'
+            )
+          }
+          const documentoRaw = cpfValue || cnpjValue
+          setDocumento(documentoRaw ? formatarCpfCnpjInput(documentoRaw) : '')
           
           // Formata telefone ao carregar
           const telefoneValue = cliente.getTelefone() || ''
@@ -355,26 +354,6 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing, clienteId])
 
-  // Funções de máscara
-  const formatCPF = (value: string) => {
-    const numbers = value.replace(/\D/g, '')
-    if (numbers.length <= 11) {
-      return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
-    }
-    return value
-  }
-
-  const formatCNPJ = (value: string) => {
-    const numbers = value.replace(/\D/g, '')
-    if (numbers.length <= 14) {
-      return numbers.replace(
-        /(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,
-        '$1.$2.$3/$4-$5'
-      )
-    }
-    return value
-  }
-
   const formatCEP = (value: string) => {
     const numbers = value.replace(/\D/g, '')
     if (numbers.length <= 8) {
@@ -418,7 +397,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
    * Usa rota API do Next.js para evitar problemas de CORS
    */
   const handleBuscarCNPJ = async () => {
-    const rawCNPJ = cnpj.replace(/\D/g, '')
+    const rawCNPJ = extrairDigitosDocumento(documento)
     
     if (rawCNPJ.length !== 14) {
       showToast.warning('CNPJ inválido ou incompleto. Deve conter 14 dígitos.')
@@ -472,11 +451,8 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
     }
   }
 
-  /**
-   * Limpa o campo CNPJ
-   */
-  const handleClearCNPJ = () => {
-    setCnpj('')
+  const handleClearDocumento = () => {
+    setDocumento('')
   }
 
   /**
@@ -608,8 +584,12 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
       return
     }
 
-    const cpfLimpo = cpf.replace(/\D/g, '')
-    const cnpjLimpo = cnpj.replace(/\D/g, '')
+    const documentoDigitos = extrairDigitosDocumento(documento)
+
+    if (documentoParcialInvalido(documento)) {
+      showToast.error('CPF deve ter 11 dígitos ou CNPJ 14 dígitos. Verifique o documento digitado.')
+      return
+    }
 
     const telefoneLimpo = extrairDigitosTelefone(telefone)
     // API externa exige DDD + número completo (10 fixo ou 11 celular no Brasil)
@@ -675,17 +655,18 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
       }
       body.inscricaoEstadual = isEditing ? toNullableString(inscricaoEstadual) : inscricaoEstadual.trim()
 
-      // CPF e CNPJ: na edição envia o que estiver no formulário (ambos se preenchidos); string vazia limpa no backend
-      if (isEditing) {
-        body.cpf = cpfLimpo || ''
-        body.cnpj = cnpjLimpo || ''
+      const documentoApi = mapearDocumentoParaApi(
+        documento,
+        isEditing ? 'editar' : 'criar'
+      )
+      if (documentoApi.cpf !== undefined) body.cpf = documentoApi.cpf
+      if (documentoApi.cnpj !== undefined) body.cnpj = documentoApi.cnpj
 
+      if (isEditing) {
         // Telefone: null limpa na API externa (string vazia aciona validação de 11 dígitos)
         body.telefone = telefoneLimpo ? telefoneLimpo : null
-      } else {
-        if (cpfLimpo) body.cpf = cpfLimpo
-        if (cnpjLimpo) body.cnpj = cnpjLimpo
-        if (telefoneLimpo) body.telefone = telefoneLimpo
+      } else if (telefoneLimpo) {
+        body.telefone = telefoneLimpo
       }
 
       // Tratamento do endereço
@@ -708,14 +689,9 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
       console.log('📤 Dados sendo enviados do componente:', {
         modo: isEditing ? 'edição' : 'criação',
         clienteId: clienteId || 'novo',
-        cpfOriginal: cpf,
-        cpfLimpo: cpfLimpo,
-        cpfLimpoLength: cpfLimpo.length,
+        documentoOriginal: documento,
+        documentoDigitos,
         cpfEnviado: body.cpf,
-        cpfEnviadoType: typeof body.cpf,
-        cpfEnviadoInBody: 'cpf' in body,
-        cnpjOriginal: cnpj,
-        cnpjLimpo: cnpjLimpo,
         cnpjEnviado: body.cnpj,
         incluirEndereco,
         enderecoEnviado: body.endereco,
@@ -841,11 +817,8 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
     )
   }
 
-  // Aviso de UX: CPF e CNPJ não devem ser preenchidos juntos (validação definitiva no backend)
-  const cpfSoDigitos = cpf.replace(/\D/g, '')
-  const cnpjSoDigitos = cnpj.replace(/\D/g, '')
-  const exibeAvisoCpfECnpjPreenchidos =
-    cpfSoDigitos.length > 0 && cnpjSoDigitos.length > 0
+  const documentoDigitos = extrairDigitosDocumento(documento)
+  const isCnpjCompleto = documentoDigitos.length === 14
 
   return (
     <div className="flex flex-col h-full">
@@ -965,13 +938,13 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
               />
             </div>
 
-            <div className="grid md:grid-cols-2 grid-cols-1 gap-2">
+            <div className="relative">
               <Input
-                label="CPF"
-                value={cpf}
-                onChange={(e) => setCpf(formatCPF(e.target.value))}
-                placeholder="000.000.000-00"
-                inputProps={{ maxLength: 14 }}
+                label="CPF/CNPJ"
+                value={documento}
+                onChange={e => setDocumento(formatarCpfCnpjInput(e.target.value))}
+                placeholder="CPF ou CNPJ"
+                inputProps={{ maxLength: 18 }}
                 size="small"
                 InputLabelProps={INPUT_LABEL_PROPS}
                 sx={{
@@ -985,69 +958,42 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
                     fontSize: '14px',
                   },
                 }}
-              />
-              <div className="relative">
-                <Input
-                  label="CNPJ"
-                  value={cnpj}
-                  onChange={(e) => setCnpj(formatCNPJ(e.target.value))}
-                  placeholder="00.000.000/0000-00"
-                  inputProps={{ maxLength: 18 }}
-                  size="small"
-                  InputLabelProps={INPUT_LABEL_PROPS}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    height: '38px',
-                    backgroundColor: 'var(--color-primary-bg)',
-                    borderRadius: '8px',
-                  },
-                  '& .MuiInputBase-input': {
-                    padding: '8px 14px',
-                    fontSize: '14px',
-                  },
-                }}
-                  InputProps={{
-                    endAdornment: (
-                      <div className="flex items-center gap-1 md:pr-1">
-                        {cnpj && (
-                          <button
-                            type="button"
-                            onClick={handleClearCNPJ}
-                            className="md:p-1 hover:bg-gray-200 rounded transition-colors"
-                            aria-label="Limpar CNPJ"
-                          >
-                            <MdClear className="text-gray-500" size={18} />
-                          </button>
-                        )}
+                InputProps={{
+                  endAdornment: (
+                    <div className="flex items-center gap-1 md:pr-1">
+                      {documento && (
                         <button
                           type="button"
-                          onClick={handleBuscarCNPJ}
-                          disabled={isLoadingCNPJ || !cnpj}
-                          className="md:p-1 hover:bg-primary/10 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          aria-label="Buscar CNPJ"
+                          onClick={handleClearDocumento}
+                          className="md:p-1 hover:bg-gray-200 rounded transition-colors"
+                          aria-label="Limpar documento"
                         >
-                          {isLoadingCNPJ ? (
-                            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <MdSearch className="text-primary" size={18} />
-                          )}
+                          <MdClear className="text-gray-500" size={18} />
                         </button>
-                      </div>
-                    ),
-                  }}
-                />
-              </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleBuscarCNPJ}
+                        disabled={isLoadingCNPJ || !isCnpjCompleto}
+                        className="md:p-1 hover:bg-primary/10 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        aria-label="Buscar dados do CNPJ"
+                        title={
+                          isCnpjCompleto
+                            ? 'Buscar dados do CNPJ na Receita'
+                            : 'Disponível quando o CNPJ estiver completo (14 dígitos)'
+                        }
+                      >
+                        {isLoadingCNPJ ? (
+                          <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <MdSearch className="text-primary" size={18} />
+                        )}
+                      </button>
+                    </div>
+                  ),
+                }}
+              />
             </div>
-
-            {exibeAvisoCpfECnpjPreenchidos && (
-              <p
-                role="alert"
-                className="text-sm font-nunito rounded-md border border-secondary bg-secondary/50 px-3 py-2 text-secondary"
-              >
-                Informe apenas CPF ou CNPJ — não é possível preencher os dois ao mesmo tempo.
-                Remova um dos campos.
-              </p>
-            )}
 
             <div className="grid md:grid-cols-2 grid-cols-1 gap-3">
               <Input
