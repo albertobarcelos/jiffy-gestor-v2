@@ -3,7 +3,7 @@ import {
   formatarFormaPagamentoKanbanCard,
   formatarPrevisaoEntregaKanbanCard,
   rotuloFormaCobrancaKanbanCard,
-} from '@/src/presentation/components/features/nfe/kanban/kanbanDeliveryCardDisplay'
+} from '@/src/presentation/components/features/kanban/kanbanDeliveryCardDisplay'
 import { VendaUnificadaDTO } from '@/src/presentation/hooks/useVendasUnificadas'
 
 function criarVendaDelivery(partial: Partial<VendaUnificadaDTO> = {}): VendaUnificadaDTO {

@@ -20,7 +20,7 @@ import {
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
-import { preservarObservacoesKanbanCacheNosItems } from '@/src/presentation/components/features/nfe/kanban/kanbanVendaCacheUpdate'
+import { preservarObservacoesKanbanCacheNosItems } from '@/src/presentation/components/features/kanban/kanbanVendaCacheUpdate'
 import {
   flattenVendasUnificadasInfinite,
   getNextOffsetVendasUnificadas,

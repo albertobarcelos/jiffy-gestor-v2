@@ -1,4 +1,4 @@
-import type { PedidoKanbanQuickViewData } from '@/src/presentation/components/features/nfe/kanban/carregarPedidoKanbanQuickView'
+import type { PedidoKanbanQuickViewData } from '@/src/presentation/components/features/kanban/carregarPedidoKanbanQuickView'
 import {
   formatarCelularExibicao,
   formatarDataDetalhePedido,

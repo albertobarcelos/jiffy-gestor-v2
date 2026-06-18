@@ -9,7 +9,7 @@ import { EmpresaSessionLostGate } from '@/src/presentation/components/auth/Empre
 import { AuthGuard } from '@/src/presentation/components/auth/AuthGuard'
 import { TabSessionBootstrap } from '@/src/presentation/components/auth/TabSessionBootstrap'
 import { TenantCacheIsolation } from '@/src/presentation/components/auth/TenantCacheIsolation'
-import { DocumentoFiscalPdfRetryModal } from '@/src/presentation/components/features/nfe/DocumentoFiscalPdfRetryModal'
+import { DocumentoFiscalPdfRetryModal } from '@/src/presentation/components/features/fiscal'
 import './globals.css'
 
 /**

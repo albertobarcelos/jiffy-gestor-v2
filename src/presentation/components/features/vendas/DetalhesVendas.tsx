@@ -29,7 +29,7 @@ import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { TipoVendaIcon } from './TipoVendaIcon'
 import { useCancelarVendaGestor } from '@/src/presentation/hooks/useVendas'
-import { StatusFiscalBadge } from '@/src/presentation/components/features/nfe/StatusFiscalBadge'
+import { StatusFiscalBadge } from '@/src/presentation/components/features/fiscal'
 import {
   abrirDocumentoFiscalPdf,
   tipoDocFiscalFromModelo,

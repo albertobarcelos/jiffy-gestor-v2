@@ -12,8 +12,8 @@ import {
   notificarWarningsTickets,
 } from '@/src/application/delivery/imprimirTicketsApiGestor'
 import type { AcaoTransicaoGestor } from '@/src/presentation/hooks/useVendas'
-import type { ColunaKanbanId, Venda } from '@/src/presentation/components/features/nfe/kanban/types'
-import { COLUNAS_ENTREGA_OPERACIONAIS } from '@/src/presentation/components/features/nfe/kanban/fiscalFlowKanban.rules'
+import type { ColunaKanbanId, Venda } from '@/src/presentation/components/features/kanban/types'
+import { COLUNAS_ENTREGA_OPERACIONAIS } from '@/src/presentation/components/features/kanban/fiscalFlowKanban.rules'
 import type { PreferenciasImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
 import { tipoCupomParaReimpressao } from '@/src/shared/types/deliveryImpressao'
 import type { VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'

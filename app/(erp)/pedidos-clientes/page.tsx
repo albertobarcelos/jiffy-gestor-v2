@@ -11,7 +11,7 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
  */
 const PedidosClientesKanban = dynamic(
   () =>
-    import('@/src/presentation/components/features/nfe/FiscalFlowKanban').then(mod => ({
+    import('@/src/presentation/components/features/kanban').then(mod => ({
       default: mod.FiscalFlowKanban,
     })),
   {
