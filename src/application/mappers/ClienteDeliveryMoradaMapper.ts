@@ -16,6 +16,7 @@ export interface ClienteDeliveryEnderecoApi {
   estado?: string | null
   cep?: string | null
   complemento?: string | null
+  ultimaUtilizacaoEm?: string | null
 }
 
 export interface ClienteDeliveryApi {
@@ -115,11 +116,27 @@ export function enderecoDeliveryParaMoradaTelefone(
   }
 }
 
+function parseUltimaUtilizacaoEm(value: unknown): number {
+  if (value == null || String(value).trim() === '') return 0
+  const t = new Date(String(value)).getTime()
+  return Number.isFinite(t) ? t : 0
+}
+
+function ordenarEnderecosPorUtilizacaoRecente(
+  enderecos: ClienteDeliveryEnderecoApi[]
+): ClienteDeliveryEnderecoApi[] {
+  return [...enderecos].sort(
+    (a, b) =>
+      parseUltimaUtilizacaoEm(b.ultimaUtilizacaoEm) -
+      parseUltimaUtilizacaoEm(a.ultimaUtilizacaoEm)
+  )
+}
+
 export function clienteDeliveryParaMoradas(cliente: ClienteDeliveryApi): MoradaTelefone[] {
   const telefoneDigitos = onlyDigits(cliente.telefone)
   if (!telefoneDigitos) return []
 
-  return (cliente.enderecos ?? [])
+  return ordenarEnderecosPorUtilizacaoRecente(cliente.enderecos ?? [])
     .map(endereco => enderecoDeliveryParaMoradaTelefone(telefoneDigitos, endereco))
     .filter((m): m is MoradaTelefone => m != null)
 }

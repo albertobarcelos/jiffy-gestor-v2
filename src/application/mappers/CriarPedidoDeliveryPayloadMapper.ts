@@ -84,20 +84,27 @@ function buildClientePedidoDeliveryPayload(input: CriarPedidoDeliveryInputDTO) {
   const nome = input.clienteEntregaVinculado?.nome?.trim()
   if (nome) cliente.nome = nome
 
-  if (input.pedidoComEntrega && input.moradaEntregaSelecionada?.endereco) {
-    const e = input.moradaEntregaSelecionada.endereco
-    cliente.enderecos = [
-      {
-        etiqueta: mapEtiquetaDelivery(input.moradaEntregaSelecionada.tipoEtiqueta),
-        rua: String(e.rua ?? '').trim(),
-        numero: String(e.numero ?? '').trim(),
-        bairro: String(e.bairro ?? '').trim(),
-        cidade: e.cidade?.trim() || undefined,
-        estado: e.estado?.trim().slice(0, 2).toUpperCase() || undefined,
-        cep: onlyDigits(String(e.cep ?? '')).slice(0, 8) || undefined,
-        complemento: e.complemento?.trim() || undefined,
-      },
-    ]
+  if (input.pedidoComEntrega && input.moradaEntregaSelecionada) {
+    const morada = input.moradaEntregaSelecionada
+    const moradaId = morada.id?.trim()
+
+    if (moradaId) {
+      cliente.enderecoIdEntrega = moradaId
+    } else if (morada.endereco) {
+      const e = morada.endereco
+      cliente.enderecos = [
+        {
+          etiqueta: mapEtiquetaDelivery(morada.tipoEtiqueta),
+          rua: String(e.rua ?? '').trim(),
+          numero: String(e.numero ?? '').trim(),
+          bairro: String(e.bairro ?? '').trim(),
+          cidade: e.cidade?.trim() || undefined,
+          estado: e.estado?.trim().slice(0, 2).toUpperCase() || undefined,
+          cep: onlyDigits(String(e.cep ?? '')).slice(0, 8) || undefined,
+          complemento: e.complemento?.trim() || undefined,
+        },
+      ]
+    }
   }
 
   return cliente

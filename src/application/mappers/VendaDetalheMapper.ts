@@ -1,6 +1,10 @@
 import { pagamentoEstaCancelado } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import { textoFromObservacoesApi } from '@/src/shared/helpers/observacaoPedido'
 import {
+  extrairContextoEntregaDeVendaData,
+  extrairEnderecoEntregaSnapshotDeVendaData,
+} from '@/src/application/mappers/ContextoEntregaDeliveryMapper'
+import {
   enderecoEntregaDetalheTemConteudo,
   extrairEnderecoEntregaDeClienteDeliveryApi,
   extrairTelefoneClienteDeliveryDeFontes,
@@ -41,20 +45,32 @@ export function mapDetalhesEntregaFromVendaApi(vendaData: Record<string, unknown
       ? (vendaData.cliente as Record<string, unknown>)
       : null
 
+  const contextoEntrega = extrairContextoEntregaDeVendaData(vendaData)
+
   const trocoRaw = vendaData.troco
   const trocoApi =
     trocoRaw !== undefined && trocoRaw !== null && !Number.isNaN(Number(trocoRaw))
       ? Number(trocoRaw)
       : null
 
+  const enderecoSnapshot =
+    extrairEnderecoEntregaSnapshotDeVendaData(vendaData) ??
+    mapEnderecoEntrega(vendaData.enderecoEntrega)
+
   return {
     entregadorId:
       vendaData.entregadorId != null ? String(vendaData.entregadorId).trim() || null : null,
-    clienteNome: clienteNested?.nome != null ? String(clienteNested.nome).trim() || null : null,
+    clienteNome:
+      contextoEntrega?.destinatarioNome?.trim() ||
+      (clienteNested?.nome != null ? String(clienteNested.nome).trim() || null : null),
     clienteCpfCnpj:
-      clienteNested?.cpfCnpj != null ? String(clienteNested.cpfCnpj).trim() || null : null,
-    clienteCelular: null,
-    enderecoEntrega: mapEnderecoEntrega(vendaData.enderecoEntrega),
+      contextoEntrega?.destinatarioCpf?.trim() ||
+      (clienteNested?.cpfCnpj != null ? String(clienteNested.cpfCnpj).trim() || null : null),
+    clienteCelular:
+      contextoEntrega?.destinatarioTelefone?.trim() ||
+      (clienteNested?.telefone != null ? String(clienteNested.telefone).trim() || null : null) ||
+      (clienteNested?.celular != null ? String(clienteNested.celular).trim() || null : null),
+    enderecoEntrega: enderecoSnapshot,
     observacaoPedido: (() => {
       const fromArray = textoFromObservacoesApi(vendaData.observacoes)
       if (fromArray) return fromArray
@@ -115,13 +131,13 @@ export type FetchClienteDeliveryPorTelefone = (
 
 /**
  * Resolve endereço de entrega para pedidos delivery (módulo `/api/delivery/clientes`).
- * Prioriza moradas do cliente delivery; fallback: endereço do cliente gestor ou snapshot legado na venda.
+ * Prioriza snapshot congelado no pedido (`contextoEntrega`); fallback: catálogo do cliente delivery.
  */
 export async function resolverEnderecoEntregaDetalhePedido(args: {
   vendaData: Record<string, unknown>
   detalhesEntrega: DetalhesEntregaPedido
   clienteApi?: Record<string, unknown> | null
-  /** Pedido carregado via GET `/delivery/pedidos/{id}` — prioriza catálogo delivery. */
+  /** Pedido carregado via GET `/delivery/pedidos/{id}` — prioriza snapshot do pedido. */
   preferirModuloDelivery?: boolean
   fetchClienteDelivery?: FetchClienteDeliveryPorTelefone
 }): Promise<EnderecoEntregaDetalhe | null | undefined> {
@@ -135,7 +151,13 @@ export async function resolverEnderecoEntregaDetalhePedido(args: {
     return detalhesEntrega.enderecoEntrega
   }
 
-  const snapshotVenda = mapEnderecoEntrega(vendaData.enderecoEntrega)
+  const snapshotPedido =
+    extrairEnderecoEntregaSnapshotDeVendaData(vendaData) ??
+    mapEnderecoEntrega(vendaData.enderecoEntrega) ??
+    (enderecoEntregaDetalheTemConteudo(detalhesEntrega.enderecoEntrega)
+      ? detalhesEntrega.enderecoEntrega
+      : null)
+
   const embeddedRaw = vendaData.clienteDelivery ?? vendaData.cliente_delivery
   const embeddedCliente = normalizarClienteDeliveryApi(embeddedRaw)
   const enderecoEmbedded = extrairEnderecoEntregaDeClienteDeliveryApi(embeddedCliente)
@@ -154,21 +176,19 @@ export async function resolverEnderecoEntregaDetalhePedido(args: {
 
   if (preferirModuloDelivery) {
     return (
-      enderecoDeliveryApi ??
+      snapshotPedido ??
       enderecoEmbedded ??
       enderecoGestorCliente ??
-      snapshotVenda ??
-      detalhesEntrega.enderecoEntrega ??
+      enderecoDeliveryApi ??
       null
     )
   }
 
   return (
-    snapshotVenda ??
+    snapshotPedido ??
     enderecoDeliveryApi ??
     enderecoEmbedded ??
     enderecoGestorCliente ??
-    detalhesEntrega.enderecoEntrega ??
     null
   )
 }

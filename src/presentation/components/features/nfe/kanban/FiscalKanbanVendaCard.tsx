@@ -7,6 +7,7 @@ import {
   MdDeliveryDining,
   MdEdit,
   MdEditNote,
+  MdLocationOn,
   MdPrint,
   MdSave,
   MdVisibility,
@@ -23,6 +24,8 @@ import { KanbanCardAcaoButton } from './KanbanCardAcaoButton'
 import { PedidoEntregaQuickViewPopover } from './PedidoEntregaQuickViewPopover'
 import { AtribuirEntregadorKanbanPainel } from './AtribuirEntregadorKanbanPainel'
 import { ObservacaoPedidoKanbanPainel } from './ObservacaoPedidoKanbanPainel'
+import { EnderecoEntregaPedidoKanbanPainel } from './EnderecoEntregaPedidoKanbanPainel'
+import { deveExibirBotaoAlterarEnderecoEntregaKanban } from './enderecoEntregaPedidoKanban'
 import type { ColunaKanbanId, KanbanColumn, Venda } from './types'
 import {
   COLUNAS_ENTREGA_OPERACIONAIS,
@@ -81,6 +84,7 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
   const [entregaQuickViewAnchor, setEntregaQuickViewAnchor] = useState<HTMLElement | null>(null)
   const [atribuirEntregadorOpen, setAtribuirEntregadorOpen] = useState(false)
   const [observacaoPedidoOpen, setObservacaoPedidoOpen] = useState(false)
+  const [enderecoEntregaOpen, setEnderecoEntregaOpen] = useState(false)
   const valorFormatado = transformarParaReal(venda.valorFinal)
   const clienteNome = venda.cliente?.nome?.trim() ? venda.cliente.nome : LABEL_SEM_CLIENTE
   const observacaoPedidoTexto = textoFromObservacoesApi(venda.observacoes)
@@ -151,8 +155,14 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
     COLUNAS_ENTREGA_OPERACIONAIS.includes(colunaAtual)
   const entregadorJaVinculado = Boolean(entregadorVinculadoId?.trim())
   const quickViewAberto = Boolean(entregaQuickViewAnchor)
-  const bloquearDragCard = quickViewAberto || atribuirEntregadorOpen || observacaoPedidoOpen
+  const bloquearDragCard =
+    quickViewAberto || atribuirEntregadorOpen || observacaoPedidoOpen || enderecoEntregaOpen
   const exibirBotaoObservacaoPedido = deveExibirBotaoObservacaoPedidoKanban(colunaAtual, venda)
+  const exibirBotaoAlterarEndereco = deveExibirBotaoAlterarEnderecoEntregaKanban(
+    colunaAtual,
+    venda,
+    modoKanbanVendas
+  )
   const exibirBotaoSalvarCobranca = deveExibirBotaoSalvarCobrancaKanban(
     colunaAtual,
     venda,
@@ -174,6 +184,24 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
       >
         <MdEditNote className="h-3.5 w-3.5 shrink-0" />
         <span className="text-[10px] font-medium leading-none">Observação</span>
+      </button>
+    </Tooltip>
+  ) : null
+
+  const botaoAlterarEnderecoEntrega = exibirBotaoAlterarEndereco ? (
+    <Tooltip title="Alterar endereço de entrega">
+      <button
+        type="button"
+        onClick={e => {
+          e.stopPropagation()
+          setEnderecoEntregaOpen(true)
+        }}
+        onDoubleClick={e => e.stopPropagation()}
+        className="flex shrink-0 items-center gap-1 rounded border border-gray-300 bg-white px-1.5 py-0.5 text-gray-600 transition-colors hover:border-primary hover:text-primary"
+        aria-label="Alterar endereço de entrega"
+      >
+        <MdLocationOn className="h-3.5 w-3.5 shrink-0" />
+        <span className="text-[10px] font-medium leading-none">Endereço</span>
       </button>
     </Tooltip>
   ) : null
@@ -298,16 +326,24 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
                 <span className="text-xs text-gray-500">
                   {linhaTempo.prefixo} {formatarDataCard(linhaTempo.iso)}
                 </span>
-                {!venda.dataFinalizacao ? botaoObservacaoPedido : null}
+                {!venda.dataFinalizacao ? (
+                  <div className="flex items-center gap-1">
+                    {botaoAlterarEnderecoEntrega}
+                    {botaoObservacaoPedido}
+                  </div>
+                ) : null}
               </div>
             )
           })()}
           {venda.dataFinalizacao && (
-            <div className="flex items-center justify-between gap-1">
+              <div className="flex items-center justify-between gap-1">
               <span className="text-xs text-gray-500">
                 Finalizada: {formatarDataCard(venda.dataFinalizacao)}
               </span>
-              {botaoObservacaoPedido}
+              <div className="flex items-center gap-1">
+                {botaoAlterarEnderecoEntrega}
+                {botaoObservacaoPedido}
+              </div>
             </div>
           )}
         </div>
@@ -475,6 +511,12 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
         open={observacaoPedidoOpen}
         venda={venda}
         onClose={() => setObservacaoPedidoOpen(false)}
+      />
+
+      <EnderecoEntregaPedidoKanbanPainel
+        open={enderecoEntregaOpen}
+        venda={venda}
+        onClose={() => setEnderecoEntregaOpen(false)}
       />
 
       {exibirQuickViewEntrega && (

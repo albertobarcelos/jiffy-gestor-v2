@@ -3,6 +3,10 @@ import type {
   ProdutoLancadoApiItem,
   VendaGestorApiResponse,
 } from '@/src/application/dto/api/vendaGestorApi'
+import {
+  enderecoSnapshotParaEnderecoEntregaDetalhe,
+  extrairContextoEntregaDeVendaData,
+} from '@/src/application/mappers/ContextoEntregaDeliveryMapper'
 
 function isoString(value: unknown): string | null {
   if (value == null) return null
@@ -168,8 +172,15 @@ export function adaptPedidoDeliveryToVendaGestorApiResponse(
 
   const pedidoDeliveryFinalizado = statusDelivery === 'FINALIZADO'
 
+  const contextoEntrega = extrairContextoEntregaDeVendaData(registro)
+  const enderecoSnapshot = contextoEntrega?.enderecoEntrega
+    ? enderecoSnapshotParaEnderecoEntregaDetalhe(contextoEntrega.enderecoEntrega)
+    : null
+
   return {
     ...registro,
+    contextoEntrega: contextoEntrega ?? registro.contextoEntrega,
+    enderecoEntrega: enderecoSnapshot ?? registro.enderecoEntrega,
     id: registro.id != null ? String(registro.id) : undefined,
     origem: registro.origem != null ? String(registro.origem) : 'GESTOR',
     tipoVenda: tipoEntrega || String(registro.tipoVenda ?? ''),
