@@ -18,7 +18,7 @@ import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/Tip
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { textoFromObservacoesApi } from '@/src/shared/helpers/observacaoPedido'
 import { abrirDocumentoFiscalPdf } from '@/src/presentation/utils/abrirDocumentoFiscalPdf'
-import { StatusFiscalBadge } from '../StatusFiscalBadge'
+import { StatusFiscalBadge } from '../../fiscal/StatusFiscalBadge'
 import type { ModoKanbanVendas } from '../KanbanModoVendasToggle'
 import { DraggableVendaCard } from './DraggableVendaCard'
 import {

@@ -1,7 +1,7 @@
 # Reorganização: features `nfe` → kanban, pedidos, delivery, fiscal
 
 > **Documento de migração** — plano e inventário para sair de `features/nfe/` (nome legado) em features por domínio.  
-> **Status:** Fase 0 concluída · Fase 1 concluída · Fase 2 pendente  
+> **Status:** Fase 0 concluída · Fase 1 concluída · Fase 2 concluída · Fase 3 pendente  
 > **Última revisão:** 2026-06-15
 
 ---
@@ -89,7 +89,7 @@ pedidos/               # hoje: nfe/novo-pedido/
 |------|----------|-----|
 | **0** | Inventário, limpeza legado, documentação | ✅ esta fase |
 | **1** | Criar pastas + `index.ts` re-exportando de `nfe/`; migrar imports externos | ✅ |
-| **2** | Mover `fiscal/` + atualizar dependentes | pequeno |
+| **2** | Mover `fiscal/` + atualizar dependentes | ✅ |
 | **3** | Mover `delivery/` (config + painéis kanban) | médio |
 | **4** | Mover `kanban/` + `FiscalFlowKanban` | médio |
 | **5** | Mover `pedidos/` (`novo-pedido/` completo) | grande |
@@ -179,4 +179,5 @@ Substituto atual: `FiscalFlowKanban` + `kanban/DroppableColumnContent.tsx`.
 
 | Data | Alteração |
 |------|-----------|
+| 2026-06-15 | Fase 2: `EmitirNfeModal`, `StatusFiscalBadge`, `DocumentoFiscalPdfRetryModal` em `features/fiscal/` |
 | 2026-06-15 | Fase 1: barrels `kanban`, `pedidos`, `delivery`, `fiscal`; imports externos migrados |

@@ -44,7 +44,7 @@ import {
   MdLocalShipping,
   MdRoute,
 } from 'react-icons/md'
-import { EmitirNfeModal } from './EmitirNfeModal'
+import { EmitirNfeModal } from '../fiscal/EmitirNfeModal'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { NovoPedidoModal } from './novo-pedido/NovoPedidoModal'
 import { DeliveryConfiguracoesModal } from './DeliveryConfiguracoesModal'
