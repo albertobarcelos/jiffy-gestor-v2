@@ -1,6 +1,7 @@
 # Novo Pedido (Gestor) — API, campos e fluxos (balcão e delivery)
 
 > **Documento de referência para migração de API.** Descreve o comportamento **atual do frontend** (`src/presentation/components/features/nfe/novo-pedido` e BFFs relacionados).  
+> **Reorganização de pastas:** destino `features/pedidos/` — ver [`PEDIDOS_FEATURES_REORGANIZACAO.md`](../arquitetura-jiffy/PEDIDOS_FEATURES_REORGANIZACAO.md).  
 > Complementa [`novo-pedido.md`](./novo-pedido.md) e [`fiscal-flow-kanban-e-novo-pedido.md`](../fiscal-flow-kanban-e-novo-pedido.md).
 
 **Última revisão:** 2026-06-15  

@@ -2,9 +2,11 @@
 
 > **Documento vivo** — descreve o comportamento atual do código. Ao alterar `FiscalFlowKanban`, `NovoPedidoModal` ou módulos em `./kanban/`, atualize as seções afetadas e a data no rodapé.
 
-**Última revisão:** 2026-05-25  
+**Última revisão:** 2026-06-15  
 **Rota:** `/pedidos-clientes` → `app/(erp)/pedidos-clientes/page.tsx`  
 **Componente raiz:** `src/presentation/components/features/nfe/FiscalFlowKanban.tsx`
+
+> **Migração de pastas:** o código ainda está em `features/nfe/` (nome legado). Plano e inventário em [`docs/arquitetura-jiffy/PEDIDOS_FEATURES_REORGANIZACAO.md`](arquitetura-jiffy/PEDIDOS_FEATURES_REORGANIZACAO.md). Destino: `kanban/`, `pedidos/`, `delivery/`, `fiscal/`.
 
 ---
 
@@ -52,30 +54,34 @@ Funcionalidades centrais:
 
 ## 2. Arquitetura de arquivos
 
+### Estado atual (legado: pasta `nfe`)
+
 ```
 app/(erp)/pedidos-clientes/page.tsx    # dynamic import do Kanban (ssr: false)
 src/presentation/components/features/nfe/
 ├── FiscalFlowKanban.tsx               # Orquestrador principal
-├── NovoPedidoModal.tsx                # Wizard criar/editar/visualizar pedido (~5.8k linhas)
-├── EmitirNfeModal.tsx                 # Emissão com dados do cliente
-├── EscolhaTipoPedidoModal.tsx         # UI Balcão/Entrega (existe; não usado pelo Kanban hoje)
-├── DeliveryConfiguracoesModal.tsx     # Estação + template cupom + prefs impressão
-├── EntregaClienteSelector.tsx         # Telefone → cliente/morada (fluxo entrega)
-├── KanbanModoVendasToggle.tsx         # Segmento Delivery | Balcão
-└── kanban/
-    ├── types.ts                       # Venda, ColunaKanbanId, filtros
-    ├── fiscalFlowKanban.rules.ts      # Regras colunas, drag, estilos card, ordenação
-    ├── fiscalFlowKanban.storage.ts    # localStorage modo + pin por coluna
-    ├── useFiscalKanbanFilters.ts      # Busca, data de criação personalizada, data de finalização e origem
-    ├── useKanbanPinning.ts            # Card fixado no topo após drag
-    ├── useKanbanColumnScrollLoadMore.ts # Scroll por coluna dispara carregamento incremental
-    ├── useEntregaTransicoesKanban.ts  # Avançar etapa / drag entrega
-    ├── useFiscalEmissaoKanban.ts      # Emitir/reemitir + etapa “fantasma” COM_NFE
+├── novo-pedido/                        # Wizard (→ futuro: features/pedidos/)
+├── EmitirNfeModal.tsx                 # (→ futuro: features/fiscal/)
+├── DeliveryConfiguracoesModal.tsx     # (→ futuro: features/delivery/)
+├── KanbanModoVendasToggle.tsx
+└── kanban/                            # (→ futuro: features/kanban/ + delivery/kanban-panels/)
+    ├── types.ts
+    ├── fiscalFlowKanban.rules.ts
     ├── FiscalKanbanToolbar.tsx
     ├── FiscalKanbanColumn.tsx
     ├── FiscalKanbanVendaCard.tsx
-    ├── DraggableVendaCard.tsx
-    └── VendaCardDragPreview.tsx
+    └── …
+```
+
+### Estrutura alvo (em migração)
+
+Ver árvore completa e fases em [`docs/arquitetura-jiffy/PEDIDOS_FEATURES_REORGANIZACAO.md`](arquitetura-jiffy/PEDIDOS_FEATURES_REORGANIZACAO.md).
+
+```
+features/kanban/     # quadro + colunas + cards
+features/pedidos/    # NovoPedidoModal e wizard
+features/delivery/   # config cupom, painéis entrega no kanban
+features/fiscal/     # emissão, badge, PDF
 ```
 
 **DTO de venda no Kanban:** `VendaUnificadaDTO` em `useVendasUnificadas.ts` (alias `Venda` em `kanban/types.ts`).
@@ -403,9 +409,10 @@ Botão **Avançar etapa** no card (`FiscalKanbanVendaCard`) e drag entre colunas
 
 - [ ] `EscolhaTipoPedidoModal` existe mas o Kanban **não** pergunta Balcão/Entrega — tipo vem do toggle Delivery/Balcão.
 - [ ] `getVendasDeliveryPorStatus` em `FiscalFlowKanban` está **comentado/vazio** (legado iFood?).
-- [ ] `NovoPedidoModal` é muito grande (~5.9k linhas) — candidato a refatoração por passos/hooks.
+- [ ] `novo-pedido/` concentrado em `features/nfe/` — migração planejada (ver `PEDIDOS_FEATURES_REORGANIZACAO.md`).
 - [ ] Modo delivery esconde coluna Pendente emissão mas vendas fiscais pendentes aparecem em Finalizadas (estilo amarelo via `getCardBorderEFundoKanban`).
 - [ ] Documentação de otimização anterior: `docs/PLANO_OTIMIZACAO_PEDIDOS_CLIENTES_FRONTEND.md` (lazy mount do modal).
+- [x] Removidos na Fase 0: `NFeKanban*.disabled`, `NFeKanbanSimple`, `DroppableColumn` (legado).
 
 ---
 
@@ -413,6 +420,7 @@ Botão **Avançar etapa** no card (`FiscalKanbanVendaCard`) e drag entre colunas
 
 | Data | Alteração |
 |------|-----------|
+| 2026-06-15 | Fase 0 reorganização: doc `PEDIDOS_FEATURES_REORGANIZACAO.md`, estrutura alvo §2, remoção kanban legado |
 | 2026-05-27 | Fase 3 listagem: snapshot visual removido; filtro por modo derivado do React Query; paginação só por scroll; polling 60s + refetch ao focar janela |
 | 2026-05-25 | Atualização pós-migração para `app/(erp)`: rota canônica, filtros atuais (Data criação e Data finalização por calendário personalizado, sem Status fiscal), ordenação por coluna, snapshot visual por Delivery/Balcão e carregamento incremental por scroll |
 | 2026-05-18 | Documento inicial: mapeamento FiscalFlowKanban + NovoPedido (balcão/entrega) + kanban/ + hooks |
