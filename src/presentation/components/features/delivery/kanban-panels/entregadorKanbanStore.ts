@@ -79,6 +79,9 @@ export async function resolverEntregadorIdVendaKanban(args: {
     if (!response.ok) return null
 
     const data = (await response.json()) as Record<string, unknown>
+    if (tabelaOrigem === 'venda_gestor' && url.includes('/api/delivery/pedidos/')) {
+      salvarPedidoDeliveryDetalheCache(vendaId, data)
+    }
     const entregadorRaw =
       data.entregador && typeof data.entregador === 'object'
         ? (data.entregador as Record<string, unknown>).id

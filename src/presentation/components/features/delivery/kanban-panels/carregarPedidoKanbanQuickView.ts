@@ -3,6 +3,7 @@ import {
   type PedidoKanbanQuickViewData,
   type ProdutoKanbanQuickView,
 } from '@/src/application/use-cases/vendas/CarregarPedidoKanbanQuickViewUseCase'
+import { invalidarPedidoDeliveryDetalheCache } from '@/src/infrastructure/api/pedidoDeliveryDetalheCache'
 
 export type { PedidoKanbanQuickViewData, ProdutoKanbanQuickView }
 
@@ -64,5 +65,6 @@ export async function carregarPedidoKanbanQuickView(args: {
 export function invalidarPedidoKanbanQuickViewCache(vendaId: string): void {
   QUICK_VIEW_CACHE.delete(quickViewCacheKey(vendaId, 'venda'))
   QUICK_VIEW_CACHE.delete(quickViewCacheKey(vendaId, 'venda_gestor'))
+  invalidarPedidoDeliveryDetalheCache(vendaId)
 }
 

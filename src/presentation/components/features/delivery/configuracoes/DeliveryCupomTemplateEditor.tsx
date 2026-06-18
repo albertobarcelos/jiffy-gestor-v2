@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MdReceiptLong, MdRestartAlt } from 'react-icons/md'
 import { DeliveryConfigCollapsibleSection } from './DeliveryConfigCollapsibleSection'
-import { renderDeliveryCupomHtml } from '@/src/application/delivery/renderDeliveryCupomHtml'
+import { larguraCupomDeliveryPx, renderDeliveryCupomHtml } from '@/src/application/delivery/renderDeliveryCupomHtml'
 import {
   DEFAULT_DELIVERY_CUPOM_TEMPLATE,
   type DeliveryCupomModelo,
@@ -231,7 +231,8 @@ function sampleCupom(tipoCupom: VendaGestorTicket['tipoCupom']): {
       pagamento: {
         status: 'pendente',
         cobrarCliente: true,
-        meioPagamento: 'dinheiro',
+        meioPagamento: 'Dinheiro',
+        valorCobrarNaEntrega: 30,
         valorReceber: 30,
         valorFaltante: 30,
       },
@@ -273,7 +274,15 @@ function sampleCupom(tipoCupom: VendaGestorTicket['tipoCupom']): {
   }
 }
 
-function CupomPreviewIframe({ srcDoc, title }: { srcDoc: string; title: string }) {
+function CupomPreviewIframe({
+  srcDoc,
+  title,
+  widthPx,
+}: {
+  srcDoc: string
+  title: string
+  widthPx: number
+}) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
   const syncHeight = useCallback(() => {
@@ -300,7 +309,8 @@ function CupomPreviewIframe({ srcDoc, title }: { srcDoc: string; title: string }
       srcDoc={srcDoc}
       scrolling="no"
       onLoad={syncHeight}
-      className="mx-auto block w-full max-w-[340px] overflow-hidden rounded border border-gray-100 bg-white"
+      className="mx-auto block overflow-hidden rounded border border-gray-100 bg-white"
+      style={{ width: `${widthPx}px`, maxWidth: '100%' }}
     />
   )
 }
@@ -348,6 +358,7 @@ export function DeliveryCupomTemplateEditor({
   }, [value])
   const modeloPreview = MODELOS_CUPOM.find(modelo => modelo.value === modeloSelecionado)
   const previewSelecionado = previewHtml[modeloSelecionado]
+  const previewWidthPx = larguraCupomDeliveryPx(value.larguraMm)
 
   return (
     <DeliveryConfigCollapsibleSection
@@ -366,7 +377,7 @@ export function DeliveryCupomTemplateEditor({
         </button>
       }
     >
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
         <div className="space-y-4">
           <div className="grid gap-3 md:grid-cols-3">
             <div className="space-y-1">
@@ -540,6 +551,7 @@ export function DeliveryCupomTemplateEditor({
               key={modeloSelecionado}
               title={`Preview do cupom delivery ${modeloPreview?.label ?? modeloSelecionado}`}
               srcDoc={previewSelecionado}
+              widthPx={previewWidthPx}
             />
           </div>
         </div>

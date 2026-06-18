@@ -1,6 +1,7 @@
-import { fetchVendaGestorTickets } from '@/src/infrastructure/api/fetchVendaGestorTickets'
+import { carregarPayloadTicketsImpressaoDelivery } from '@/src/application/delivery/carregarPayloadTicketsImpressaoDelivery'
 import type { AcaoTransicaoGestor } from '@/src/presentation/hooks/useVendas'
-import type { ModoImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
+import type { EmpresaMeResumo } from '@/src/presentation/hooks/useEmpresaMe'
+import type { ModoImpressaoDelivery, PreferenciasImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
 import type {
   VendaGestorTicket,
   VendaGestorTicketsResponse,
@@ -108,15 +109,23 @@ function validarProducaoSeparadoParaIniciarPreparo(
 export async function validarImpressaoAntesTransicaoKanban(params: {
   vendaId: string
   token: string
-  modo: ModoImpressaoDelivery
+  prefs: PreferenciasImpressaoDelivery
+  empresa?: EmpresaMeResumo | null
   acoes: AcaoTransicaoGestor[]
-  impressoraExpedicaoId: string | null
 }): Promise<ValidarImpressaoAntesTransicaoResult> {
-  if (!transicaoPrecisaValidarTickets(params.modo, params.acoes)) {
+  const modo = params.prefs.modo
+  const impressoraExpedicaoId = params.prefs.impressoraExpedicaoId
+
+  if (!transicaoPrecisaValidarTickets(modo, params.acoes)) {
     return { podeAvancar: true, abrirModalConfig: false }
   }
 
-  const ticketsFetch = await fetchVendaGestorTickets(params.vendaId, params.token)
+  const ticketsFetch = await carregarPayloadTicketsImpressaoDelivery({
+    vendaId: params.vendaId,
+    accessToken: params.token,
+    prefs: params.prefs,
+    empresa: params.empresa,
+  })
   if (!ticketsFetch.ok) {
     if (ticketsFetch.status === 404) {
       logImpressao('validarTransicao.tickets_indisponivel_permite_transicao', {
@@ -140,21 +149,21 @@ export async function validarImpressaoAntesTransicaoKanban(params: {
 
   const payload = ticketsFetch.data
   const toastsInfo =
-    params.modo === 'separado' && params.acoes.includes('iniciar_preparo')
+    modo === 'separado' && params.acoes.includes('iniciar_preparo')
       ? avisosProdutoSemImpressoraDoPayload(payload)
       : []
 
   const bloqueioExpedicao = validarExpedicaoParaTransicao({
-    modo: params.modo,
+    modo,
     acoes: params.acoes,
-    impressoraExpedicaoId: params.impressoraExpedicaoId,
+    impressoraExpedicaoId,
     tickets: payload.tickets,
   })
   if (bloqueioExpedicao) {
     return { ...bloqueioExpedicao, toastsInfo, ticketsPayload: payload }
   }
 
-  if (params.modo === 'separado' && params.acoes.includes('iniciar_preparo')) {
+  if (modo === 'separado' && params.acoes.includes('iniciar_preparo')) {
     const bloqueioProducao = validarProducaoSeparadoParaIniciarPreparo(payload.tickets)
     if (bloqueioProducao) {
       return { ...bloqueioProducao, toastsInfo, ticketsPayload: payload }

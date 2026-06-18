@@ -1,6 +1,7 @@
 import type { InfiniteData, QueryClient } from '@tanstack/react-query'
 import type { KanbanVendaCachePatch } from '@/src/application/dto/TransicaoKanbanDTO'
 import { extrairPatchKanbanDeRespostaTransicao } from '@/src/application/mappers/TransicaoPedidoDeliveryMapper'
+import { syncPedidoDeliveryDetalheCaches } from '@/src/infrastructure/api/pedidoDeliveryDetalheCache'
 import {
   KANBAN_PEDIDOS_DELIVERY_INFINITE_QUERY_KEY,
   KANBAN_VENDAS_UNIFICADAS_QUERY_KEY,
@@ -158,6 +159,7 @@ export async function sincronizarPedidoDeliveryKanbanEmBackground(
     if (!response.ok) return
 
     const data = await response.json()
+    syncPedidoDeliveryDetalheCaches(queryClient, queryKey, vendaId, data)
     patchVendaUnificadaInfiniteCache(
       queryClient,
       queryKey,

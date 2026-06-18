@@ -3,6 +3,7 @@ import {
   adaptPedidoDeliveryToVendaGestorApiResponse,
   deveUsarModuloDeliveryParaDetalhe,
 } from '@/src/application/mappers/PedidoDeliveryDetalheAdapter'
+import { salvarPedidoDeliveryDetalheCache } from '@/src/infrastructure/api/pedidoDeliveryDetalheCache'
 import type {
   IVendaDetalheReadRepository,
   LoadVendaOptions,
@@ -46,6 +47,7 @@ export class VendaDetalheReadRepository implements IVendaDetalheReadRepository {
       )
     }
     const raw = await response.json()
+    salvarPedidoDeliveryDetalheCache(vendaId, raw)
     return adaptPedidoDeliveryToVendaGestorApiResponse(raw)
   }
 

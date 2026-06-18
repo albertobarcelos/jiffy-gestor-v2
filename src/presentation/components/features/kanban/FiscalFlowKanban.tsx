@@ -159,7 +159,7 @@ export function FiscalFlowKanban() {
     handleRascunhoFinalizacaoRangeChange,
     aplicarFinalizacaoDatas,
   } = useFiscalKanbanFilters()
-  const { timezoneAgregacao, preferenciasImpressaoDelivery } = useEmpresaMe()
+  const { timezoneAgregacao, preferenciasImpressaoDelivery, empresa } = useEmpresaMe()
   const { auth } = useAuthStore()
   const queryClient = useQueryClient()
   const empresaId = useTenantEmpresaId()
@@ -621,9 +621,9 @@ export function FiscalFlowKanban() {
       const resultado = await validarImpressaoAntesTransicaoKanban({
         vendaId: venda.id,
         token,
-        modo: preferenciasImpressaoDelivery.modo,
+        prefs: preferenciasImpressaoDelivery,
+        empresa,
         acoes,
-        impressoraExpedicaoId: preferenciasImpressaoDelivery.impressoraExpedicaoId,
       })
 
       for (const info of resultado.toastsInfo ?? []) {
@@ -642,7 +642,7 @@ export function FiscalFlowKanban() {
       }
       return { ok: false }
     },
-    [abrirConfigImpressoraExpedicao, auth, preferenciasImpressaoDelivery]
+    [abrirConfigImpressoraExpedicao, auth, empresa, preferenciasImpressaoDelivery]
   )
 
   const verificarEntregadorAntesDespachar = useCallback(

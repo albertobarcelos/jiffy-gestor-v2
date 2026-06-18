@@ -14,7 +14,6 @@ import {
 import type { AcaoTransicaoGestor } from '@/src/presentation/hooks/useVendas'
 import type { ColunaKanbanId, Venda } from '@/src/presentation/components/features/kanban/types'
 import { COLUNAS_ENTREGA_OPERACIONAIS } from '@/src/presentation/components/features/kanban/fiscalFlowKanban.rules'
-import type { PreferenciasImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
 import { tipoCupomParaReimpressao } from '@/src/shared/types/deliveryImpressao'
 import type { VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
 import { showToast } from '@/src/shared/utils/toast'
@@ -32,31 +31,6 @@ import {
 export interface UseImpressaoDeliveryOptions {
   /** Abre o modal de configurações quando falta impressora de expedição (toast é exibido aqui). */
   onImpressoraExpedicaoNecessaria?: () => void
-}
-
-function preferenciasDoPayloadTickets(
-  payload: VendaGestorTicketsResponse
-): PreferenciasImpressaoDelivery | null {
-  const modo = payload.modoImpressaoDelivery
-  const copiasCupomUnificado = Number(payload.copiasCupomUnificado)
-  if (
-    (modo !== 'unificado' && modo !== 'separado') ||
-    !Number.isFinite(copiasCupomUnificado) ||
-    typeof payload.imprimirAoReceber !== 'boolean' ||
-    typeof payload.imprimirAoFicarPronto !== 'boolean'
-  ) {
-    return null
-  }
-
-  return {
-    modo,
-    copiasCupomUnificado: Math.max(1, copiasCupomUnificado),
-    autoIniciarPreparoNovosPedidos: true,
-    imprimirAoReceber: payload.imprimirAoReceber,
-    imprimirAoFicarPronto: payload.imprimirAoFicarPronto,
-    impressoraExpedicaoId: null,
-    impressoraPadraoNome: null,
-  }
 }
 
 function warningCodes(payload: VendaGestorTicketsResponse): string[] {
@@ -77,7 +51,7 @@ function resolverTipoCupomComFallbackProduto(
 }
 
 /**
- * Impressão do fluxo delivery: os tickets vêm prontos do backend (`GET .../tickets`).
+ * Impressão do fluxo delivery: monta tickets via instruções + detalhe do pedido.
  */
 export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
   const { auth } = useAuthStore()
@@ -116,7 +90,10 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
         }
 
         if (!ticketsPayload) {
-          const ticketsFetch = await fetchVendaGestorTickets(venda.id, token)
+          const ticketsFetch = await fetchVendaGestorTickets(venda.id, token, {
+            prefs: preferenciasImpressaoDelivery,
+            empresa,
+          })
           if (!ticketsFetch.ok) {
             if (ticketsFetch.status === 404) {
               warnImpressao('hook.fetch_tickets_404_modulo_delivery', {
@@ -136,18 +113,7 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
           ticketsPayload = ticketsFetch.data
         }
 
-        const prefs = preferenciasDoPayloadTickets(ticketsPayload)
-        if (!prefs) {
-          warnImpressao('hook.preferencias_invalidas_do_payload', {
-            vendaId: venda.id,
-            modo: ticketsPayload.modoImpressaoDelivery,
-            copias: ticketsPayload.copiasCupomUnificado,
-            imprimirAoReceber: ticketsPayload.imprimirAoReceber,
-            imprimirAoFicarPronto: ticketsPayload.imprimirAoFicarPronto,
-          })
-          showToast.error('Resposta de tickets sem parâmetros de impressão delivery.')
-          continue
-        }
+        const prefs = preferenciasImpressaoDelivery
         const d = decidirImpressaoAposAcao(prefs, acao)
         logImpressao('hook.decidir_impressao', {
           acao,
@@ -208,7 +174,7 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
         logImpressao('hook.imprimir_tickets_concluido', { vendaId: venda.id })
       }
     },
-    [auth, deliveryCupomTemplate, empresa?.nomeExibicao]
+    [auth, deliveryCupomTemplate, empresa, preferenciasImpressaoDelivery]
   )
 
   const processarAposTransicaoVendaGestorId = useCallback(
@@ -247,7 +213,10 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
         return
       }
 
-      const ticketsFetch = await fetchVendaGestorTickets(venda.id, token)
+      const ticketsFetch = await fetchVendaGestorTickets(venda.id, token, {
+        prefs: prefsEmpresa,
+        empresa,
+      })
       if (!ticketsFetch.ok) {
         if (ticketsFetch.status === 404) {
           warnImpressao('hook.reimpressao.fetch_404_modulo_delivery', { vendaId: venda.id })
@@ -259,12 +228,7 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
         return
       }
 
-      const prefs = preferenciasDoPayloadTickets(ticketsFetch.data)
-      if (!prefs) {
-        warnImpressao('hook.reimpressao.prefs_invalidas', { vendaId: venda.id })
-        showToast.error('Resposta de tickets sem parâmetros de impressão delivery.')
-        return
-      }
+      const prefs = prefsEmpresa
       const tipo = tipoCupomParaReimpressao(
         prefs.modo,
         colunaId as 'NOVOS_PEDIDOS' | 'EM_PREPARO' | 'PRONTO_ENTREGA' | 'EM_ROTA'
@@ -317,7 +281,7 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
       auth,
       avisarImpressoraExpedicaoNecessaria,
       deliveryCupomTemplate,
-      empresa?.nomeExibicao,
+      empresa,
       preferenciasImpressaoDelivery,
     ]
   )

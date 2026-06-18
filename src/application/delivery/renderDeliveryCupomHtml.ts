@@ -34,6 +34,17 @@ function fmtBrl(n: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n)
 }
 
+function labelMeioPagamentoCupom(raw: string): string {
+  const t = raw.trim()
+  if (!t) return ''
+  if (/[a-záàâãéêíóôõúç]/.test(t)) return t
+  return t
+    .toLowerCase()
+    .split(/\s+/)
+    .map(word => (word ? word.charAt(0).toUpperCase() + word.slice(1) : ''))
+    .join(' ')
+}
+
 function numeroFinito(v: unknown): number | null {
   if (typeof v === 'number' && Number.isFinite(v)) return v
   if (typeof v === 'string' && v.trim() !== '') {
@@ -157,8 +168,12 @@ function nomeEntregador(root: VendaGestorTicketsResponse): string {
   return typeof e === 'string' ? e.trim() : e.nome?.trim() || ''
 }
 
+export function larguraCupomDeliveryPx(larguraMm: number): number {
+  return larguraMm === 58 ? 220 : 300
+}
+
 function larguraPx(mm: number): number {
-  return mm === 58 ? 220 : 300
+  return larguraCupomDeliveryPx(mm)
 }
 
 function paddingPorDensidade(densidade: DeliveryCupomTemplateConfig['densidade']): number {
@@ -193,19 +208,22 @@ function valorComplemento(comp: VendaGestorTicketItemComplemento): number | null
   return numeroFinito(comp?.impressao?.valorFinal ?? comp?.impressao?.valorTotal ?? comp?.impressao?.valorUnitario)
 }
 
-function textoComplemento(
-  comp: VendaGestorTicketItemComplemento,
-  mostrarValores: boolean
-): string {
+function labelComplemento(comp: VendaGestorTicketItemComplemento): string {
   const label =
     (comp && typeof comp === 'object' && (comp.nome || comp.descricao)
       ? String(comp.nome ?? comp.descricao)
       : '') || ''
   if (!label.trim()) return ''
   const q = numeroFinito(comp.impressao?.quantidade ?? comp.quantidade) ?? 1
-  const valor = valorComplemento(comp)
-  const preco = mostrarValores && valor != null ? ` ${fmtBrl(valor)}` : ''
-  return `${q > 1 ? `${q} X ` : ''}${label.trim()}${preco}`
+  return `${q > 1 ? `${q} X ` : ''}${label.trim()}`
+}
+
+function renderLinhaValor(labelHtml: string, valorHtml: string | null, options?: { strong?: boolean }): string {
+  if (!valorHtml) {
+    return `<div class="row-line"><span class="label">${labelHtml}</span></div>`
+  }
+  const tag = options?.strong ? 'strong' : 'span'
+  return `<div class="row-line"><${tag} class="label">${labelHtml}</${tag}><${tag} class="value">${valorHtml}</${tag}></div>`
 }
 
 function renderItens(
@@ -219,20 +237,29 @@ function renderItens(
       const q = quantidadeItem(p)
       const nome = escapeHtml((p.nomeProduto ?? 'Item').trim() || 'Item')
       const valor = valorItem(p)
-      const preco = options.mostrarValores && valor != null ? ` <span>${fmtBrl(valor)}</span>` : ''
+      const preco =
+        options.mostrarValores && valor != null ? escapeHtml(fmtBrl(valor)) : null
       const obs =
         typeof p.observacao === 'string' && p.observacao.trim()
           ? `<div class="item-note">${escapeHtml(p.observacao.trim())}</div>`
           : ''
       const compParts = Array.isArray(p.complementos) ? p.complementos : []
       const compHtml = compParts
-        .map(c => textoComplemento(c, options.mostrarValores))
+        .map(c => {
+          const label = labelComplemento(c)
+          if (!label) return ''
+          const valorComp = valorComplemento(c)
+          const precoComp =
+            options.mostrarValores && valorComp != null ? escapeHtml(fmtBrl(valorComp)) : null
+          return `<div class="item-comps">${renderLinhaValor(escapeHtml(label), precoComp)}</div>`
+        })
         .filter(Boolean)
-        .map(c => `<div class="item-comps">${escapeHtml(c)}</div>`)
         .join('')
 
+      const tituloHtml = renderLinhaValor(`${q} X ${nome}`, preco)
+
       return `<div class="item-row">
-        <div class="item-title" style="font-weight:${produtoWeight};">${q} X ${nome}${preco}</div>
+        <div class="item-title" style="font-weight:${produtoWeight};">${tituloHtml}</div>
         ${compHtml}
         ${obs}
       </div>`
@@ -367,16 +394,19 @@ function renderResumoExpedicao(root: VendaGestorTicketsResponse, ticket: VendaGe
           .map(m => {
             const nome = m.nome || m.tipo || 'PAGO'
             const valor = numeroFinito(m.valor) ?? recebido
-            return `<div><span>Pago em ${escapeHtml(nome.toUpperCase())}:</span> ${fmtBrl(valor)}</div>`
+            return renderLinhaValor(
+              `Pago em ${escapeHtml(nome.toUpperCase())}:`,
+              escapeHtml(fmtBrl(valor))
+            )
           })
           .join('')
-      : `<div><span>Valor Pago:</span> ${fmtBrl(recebido)}</div>`
+      : renderLinhaValor('Valor Pago:', escapeHtml(fmtBrl(recebido)))
 
     pagamentosHtml = `
     ${meios}
     ${
       faltante > 0
-        ? `<div><strong>Falta Pagar:</strong> <strong>${fmtBrl(faltante)}</strong></div>`
+        ? renderLinhaValor('Falta Pagar:', escapeHtml(fmtBrl(faltante)), { strong: true })
         : ''
     }`
   }
@@ -384,10 +414,10 @@ function renderResumoExpedicao(root: VendaGestorTicketsResponse, ticket: VendaGe
   return `<div class="separator"></div>
   <div class="summary-section">
     <div class="items-title">RESUMO PEDIDO</div>
-    <div><span>Valor total dos itens:</span> ${fmtBrl(resumo.valorItens)}</div>
-    <div><span>Adicionais:</span> ${fmtBrl(resumo.valorAdicionais)}</div>
-    <div><span>Taxa de Entrega:</span> ${fmtBrl(resumo.taxaEntrega)}</div>
-    <div><strong>Total do Pedido:</strong> ${fmtBrl(resumo.valorTotal)}</div>
+    ${renderLinhaValor('Valor total dos itens:', escapeHtml(fmtBrl(resumo.valorItens)))}
+    ${renderLinhaValor('Adicionais:', escapeHtml(fmtBrl(resumo.valorAdicionais)))}
+    ${renderLinhaValor('Taxa de Entrega:', escapeHtml(fmtBrl(resumo.taxaEntrega)))}
+    ${renderLinhaValor('Total do Pedido:', escapeHtml(fmtBrl(resumo.valorTotal)), { strong: true })}
     ${pagamentosHtml}
   </div>`
 }
@@ -400,6 +430,7 @@ function renderPagamento(root: VendaGestorTicketsResponse): string {
   const recebido = numeroFinito(p?.valorRecebido) ?? 0
   const receber = numeroFinito(p?.valorCobrarNaEntrega) ?? 0
   const meio = p?.meioPagamento || p?.formaPagamento || p?.meios?.[0]?.nome || p?.meios?.[0]?.tipo || ''
+  const meioLabel = meio ? labelMeioPagamentoCupom(meio) : ''
   const trocoCalculado = numeroFinito(p?.trocoParaLevar) ?? 0
   const trocoHtml =
     trocoCalculado > 0
@@ -413,8 +444,9 @@ function renderPagamento(root: VendaGestorTicketsResponse): string {
       <div class="charge">COBRAR DO CLIENTE</div>
       <div style="display: block; word-wrap: break-word; text-align: center; margin-top: 4px;">
         <strong>Cobrar na entrega:</strong><br/>
-        ${fmtBrl(receber)}${meio ? ` no ${escapeHtml(meio.toUpperCase())}` : ''}
+        ${fmtBrl(receber)}
       </div>
+      ${meioLabel ? `<div style="display: block; word-wrap: break-word; text-align: center; margin-top: 4px;">Pag. : ${escapeHtml(meioLabel)}</div>` : ''}
       ${trocoHtml}
     </div>`
   }
@@ -484,6 +516,7 @@ export function renderDeliveryCupomHtml(input: RenderDeliveryCupomHtmlInput): st
   const fontesModelo = fontesDoModelo(template, ticket.tipoCupom)
   const w = larguraPx(template.larguraMm)
   const padding = paddingPorDensidade(template.densidade)
+  const valueColPx = w <= 220 ? 58 : 68
   const separatorPy = padding <= 2 ? 5 : padding >= 12 ? 16 : 12
   const lineHeight = lineHeightPorDensidade(template.densidade)
   const fonteBase = template.tamanhoFonteBase
@@ -526,8 +559,9 @@ export function renderDeliveryCupomHtml(input: RenderDeliveryCupomHtmlInput): st
   return `<!DOCTYPE html><html><head><meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <style>
-  body { margin:0; font-family: system-ui, -apple-system, Segoe UI, sans-serif; color:#111; }
-  .receipt { width:${w}px; max-width:${w}px; margin:0 auto; padding:2px ${padding}px ${padding}px; font-size:${template.tamanhoFonteBase}px; line-height:${lineHeight}; }
+  html, body { margin:0; overflow-x:hidden; }
+  body { width:${w}px; max-width:100%; margin-left:auto; margin-right:auto; font-family: system-ui, -apple-system, Segoe UI, sans-serif; color:#111; }
+  .receipt { box-sizing:border-box; width:100%; max-width:100%; margin:0; padding:2px ${padding}px ${padding}px; font-size:${template.tamanhoFonteBase}px; line-height:${lineHeight}; overflow-x:hidden; }
   .header { text-align:center; padding-bottom:${Math.max(2, Math.floor(padding / 2))}px; margin-bottom:${Math.max(2, Math.floor(padding / 2))}px; font-size:${fonteCabecalho}px; }
   .brand { font-weight:800; font-size:${fonteCabecalho + 3}px; letter-spacing:.02em; }
   .method { margin-top:2px; font-weight:800; }
@@ -541,6 +575,9 @@ export function renderDeliveryCupomHtml(input: RenderDeliveryCupomHtmlInput): st
   .double-separator { width:100%; height:0; margin:0; padding:${separatorPy}px 0; border:0; border-top:1px dashed #333; border-bottom:1px dashed #333; font-weight:normal; box-sizing:content-box; }
   .items-title { margin:${padding}px 0 3px; font-weight:800; font-size:${fonteItens}px; }
   .item-row { padding:3px 0; font-size:${fonteItens}px; }
+  .row-line { display:flex; justify-content:space-between; align-items:flex-start; gap:4px; width:100%; max-width:100%; box-sizing:border-box; }
+  .row-line .label { flex:1 1 0; min-width:0; text-align:left; overflow-wrap:anywhere; word-break:break-word; }
+  .row-line .value { flex:0 0 ${valueColPx}px; width:${valueColPx}px; min-width:${valueColPx}px; text-align:right; white-space:nowrap; }
   .item-comps { padding-left:16px; font-size:${Math.max(8, fonteItens - 1)}px; color:#222; }
   .item-note { padding-left:28px; font-size:${Math.max(8, fonteItens - 1)}px; color:#333; }
   .obs { margin:${padding}px 0; font-size:${Math.max(8, fonteItens - 2)}px; }
