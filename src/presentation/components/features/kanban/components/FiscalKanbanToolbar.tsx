@@ -149,12 +149,12 @@ function FiltroDataOpcoesBotao({
           <button
             type="button"
             onClick={() => setMenuAberto(prev => !prev)}
-            className="font-nunito flex h-8 items-center gap-2 rounded-lg px-2 text-sm text-white transition-colors"
+            className="font-nunito flex h-8 items-center gap-1 rounded-lg px-1 text-sm text-white transition-colors"
             style={{ backgroundColor: KANBAN_BUTTON_COLOR }}
             aria-expanded={menuAberto}
             aria-haspopup="menu"
           >
-            <MdCalendarToday size={18} className="shrink-0" />
+            <MdCalendarToday size={16} className="shrink-0" />
             {label}
           </button>
           {menuAberto ? (
@@ -243,7 +243,7 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
         className={`flex flex-wrap items-end justify-center gap-x-1 gap-y-4 rounded-t-lg bg-custom-2 px-1 pb-2 pt-1.5 md:justify-start ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}
       >
         <div className="flex flex-col gap-1">
-          <div className="relative w-[250px] px-1 lg:w-[280px]">
+          <div className="relative w-[250px] px-1 lg:w-[220px]">
             <MdSearch
               className="absolute left-2 top-1/2 -translate-y-1/2 text-secondary-text"
               size={20}
@@ -332,10 +332,10 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
 
         <button
           onClick={onClearFilters}
-          className="font-nunito flex h-8 items-center justify-center gap-2 rounded-lg border px-2 text-sm transition-colors"
+          className="font-nunito flex h-8 items-center justify-center gap-1 rounded-lg border px-1 text-sm transition-colors"
           style={{ borderColor: KANBAN_BUTTON_COLOR, color: KANBAN_BUTTON_COLOR }}
         >
-          <MdFilterAltOff size={18} />
+          <MdFilterAltOff size={16} />
           Limpar
         </button>
 
@@ -357,7 +357,7 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
             style={{ backgroundColor: KANBAN_BUTTON_COLOR }}
           >
             <MdAdd className="h-4 w-4" />
-            Novo Pedido
+            Pedido
           </button>
         </div>
       </div>
