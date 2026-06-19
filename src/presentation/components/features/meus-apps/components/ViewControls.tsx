@@ -53,11 +53,11 @@ export function ViewControls({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-1">
-      <IconButton label="Visualização em lista" active={mode === 'list'} onClick={() => onModeChange('list')}>
-        <List className="h-4 w-4" aria-hidden />
-      </IconButton>
       <IconButton label="Visualização em grade" active={mode === 'grid'} onClick={() => onModeChange('grid')}>
         <LayoutGrid className="h-4 w-4" aria-hidden />
+      </IconButton>
+      <IconButton label="Visualização em lista" active={mode === 'list'} onClick={() => onModeChange('list')}>
+        <List className="h-4 w-4" aria-hidden />
       </IconButton>
       <span className="mx-1 hidden h-5 w-px bg-gray-200 sm:inline-block" aria-hidden />
       <IconButton

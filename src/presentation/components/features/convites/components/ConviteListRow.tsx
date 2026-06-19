@@ -18,15 +18,6 @@ function formatarDataHora(expiraEm: string): string {
   })
 }
 
-/** Pill no mesmo padrão visual de StatusPill (lista de empresas). */
-function ConvitePendentePill() {
-  return (
-    <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold bg-amber-50 text-amber-800 ring-1 ring-amber-100">
-      Convite pendente
-    </span>
-  )
-}
-
 /**
  * Linha de convite no modo lista — alinhada à grade de `EmpresaListRow` (MeusAppsFeedList).
  */
@@ -55,24 +46,42 @@ export function ConviteListRow({
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex flex-col gap-3 px-4 py-4 sm:grid sm:grid-cols-[1fr_140px_auto] sm:items-center">
+    <div className="overflow-hidden">
+      <div className="flex flex-col gap-3 px-4 py-2 sm:grid sm:grid-cols-[1fr_auto] sm:items-center">
         <div className="min-w-0">
+          {/* TODO: substituir por plano real quando o backend expuser o campo */}
+          <span
+            className="mb-1 block text-[11px] font-semibold leading-none text-secondary"
+            title="Jiffy Starter"
+          >
+            Jiffy Starter
+          </span>
           <p className="truncate text-sm font-semibold text-gray-900">{convite.nomeEmpresa}</p>
           <p className="truncate text-xs font-medium text-gray-500">{convite.email}</p>
           <p className="mt-0.5 truncate text-xs text-gray-600">
             Expira em <span className="font-semibold">{formatarDataHora(convite.expiraEm)}</span>
           </p>
         </div>
-        <div className="sm:flex sm:justify-center">
-          <ConvitePendentePill />
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-2">
+        <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+          <button
+            type="button"
+            disabled={isLoading}
+            onClick={() => onAceitar(convite.id)}
+            className={cn(
+              'inline-flex h-10 min-w-0 flex-1 items-center justify-center rounded-lg border-0 px-2 py-0 text-sm font-medium leading-none text-white transition sm:w-[180px] sm:flex-none',
+              isLoading && loadingAction !== 'aceitar'
+                ? 'cursor-not-allowed bg-gray-400'
+                : loadingAction === 'aceitar'
+                  ? 'cursor-wait bg-gray-400'
+                  : 'bg-secondary hover:bg-alternate'
+            )}
+          >
+            {loadingAction === 'aceitar' ? 'Aceitando…' : 'Aceitar Convite'}
+          </button>
           <CardGearMenu
             disabled={isLoading}
             triggerAriaLabel="Opções do convite"
             triggerTitle="Opções do convite"
-            triggerClassName="self-end sm:self-auto"
             items={[
               {
                 id: 'recusar',
@@ -82,23 +91,8 @@ export function ConviteListRow({
                 tone: 'danger',
               },
             ]}
+            triggerClassName="h-10 w-10 shrink-0 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
           />
-          <button
-            type="button"
-            disabled={isLoading}
-            onClick={() => onAceitar(convite.id)}
-            className={cn(
-              // Paridade com Acessar em EmpresaListRow (MeusAppsFeedList): mesma altura, padding e largura em sm+
-              'inline-flex h-10 w-full shrink-0 items-center justify-center rounded-lg border-0 px-4 py-0 text-sm font-semibold leading-none text-white transition sm:w-[140px]',
-              isLoading && loadingAction !== 'aceitar'
-                ? 'cursor-not-allowed bg-gray-400'
-                : loadingAction === 'aceitar'
-                  ? 'cursor-wait bg-gray-400'
-                  : 'bg-secondary hover:bg-alternate'
-            )}
-          >
-            {loadingAction === 'aceitar' ? 'Aceitando…' : 'Aceitar'}
-          </button>
         </div>
       </div>
 
