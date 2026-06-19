@@ -229,9 +229,14 @@ export function normalizarPedidosDeliveryListResponse(raw: unknown): PedidosDeli
   }
 }
 
+export type PedidosDeliveryListVendaUnificadaResponse = Omit<
+  PedidosDeliveryListResponse,
+  'items'
+> & { items: VendaUnificadaDTO[] }
+
 export function mapPedidosDeliveryListResponseParaVendaUnificadaDTO(
   response: PedidosDeliveryListResponse
-): PedidosDeliveryListResponse & { items: VendaUnificadaDTO[] } {
+): PedidosDeliveryListVendaUnificadaResponse {
   return {
     ...response,
     items: mapPedidosDeliverySummariesParaVendaUnificadaDTO(response.items),

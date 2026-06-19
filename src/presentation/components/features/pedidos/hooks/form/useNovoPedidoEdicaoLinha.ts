@@ -7,6 +7,7 @@ import { formatarNumeroComMilhar } from '@/src/domain/services/pedido/Calculador
 import { aplicarQuantidadeProdutoNaLinha } from '@/src/domain/policies/pedido/ComplementoQuantidadeLinhaPolicy'
 import type { ProdutoSelecionado } from '../../types'
 import { obterUnidadeMedidaProdutoLinha } from '../../produtoCatalogoHelpers'
+import type { UnidadeMedidaProduto } from '@/src/shared/types/unidadeMedidaProduto'
 
 export interface UseNovoPedidoEdicaoLinhaParams {
   produtos: ProdutoSelecionado[]
@@ -29,8 +30,7 @@ export function useNovoPedidoEdicaoLinha({
   const [modalEdicaoProdutoOpen, setModalEdicaoProdutoOpen] = useState(false)
   const [produtoIndexEdicao, setProdutoIndexEdicao] = useState<number | null>(null)
   const [quantidadeEdicao, setQuantidadeEdicao] = useState<number>(1)
-  const [unidadeMedidaEdicao, setUnidadeMedidaEdicao] =
-    useState<ProdutoSelecionado['unidadeMedida']>('UN')
+  const [unidadeMedidaEdicao, setUnidadeMedidaEdicao] = useState<UnidadeMedidaProduto>('UN')
   const [ehAcrescimo, setEhAcrescimo] = useState(false)
   const [ehPorcentagem, setEhPorcentagem] = useState(false)
   const [valorDescontoAcrescimo, setValorDescontoAcrescimo] = useState<string>('0')

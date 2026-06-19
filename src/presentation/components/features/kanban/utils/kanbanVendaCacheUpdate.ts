@@ -42,6 +42,45 @@ export function extrairPatchKanbanDeTransicaoGestor(data: unknown): KanbanVendaC
   }
 }
 
+function normalizarStatusFiscalPatch(
+  raw: string | null,
+  fallback: VendaUnificadaDTO['statusFiscal']
+): VendaUnificadaDTO['statusFiscal'] {
+  if (raw == null || String(raw).trim() === '') return null
+  return String(raw).trim().toUpperCase() as NonNullable<VendaUnificadaDTO['statusFiscal']>
+}
+
+function normalizarTipoDocFiscalPatch(
+  raw: string | null | undefined,
+  fallback: VendaUnificadaDTO['tipoDocFiscal']
+): VendaUnificadaDTO['tipoDocFiscal'] {
+  if (raw === undefined) return fallback
+  const t = String(raw ?? '')
+    .trim()
+    .toUpperCase()
+  if (t === 'NFE' || t === 'NFCE') return t
+  return null
+}
+
+function normalizarSerieFiscalPatch(
+  raw: number | string | null | undefined,
+  fallback: VendaUnificadaDTO['serieFiscal']
+): VendaUnificadaDTO['serieFiscal'] {
+  if (raw === undefined) return fallback
+  if (raw == null || String(raw).trim() === '') return null
+  return String(raw).trim()
+}
+
+function normalizarModeloFiscalPatch(
+  raw: number | null | undefined,
+  fallback: VendaUnificadaDTO['modelo']
+): VendaUnificadaDTO['modelo'] {
+  if (raw === undefined) return fallback
+  const n = Number(raw)
+  if (n === 55 || n === 65) return n
+  return null
+}
+
 export function cloneVendaUnificadaDTO(
   venda: VendaUnificadaDTO,
   patch: KanbanVendaCachePatch
@@ -61,17 +100,25 @@ export function cloneVendaUnificadaDTO(
     venda.dataCancelamento,
     venda.cliente,
     patch.solicitarEmissaoFiscal !== undefined
-      ? patch.solicitarEmissaoFiscal
+      ? patch.solicitarEmissaoFiscal === true
       : venda.solicitarEmissaoFiscal,
-    patch.statusFiscal !== undefined ? patch.statusFiscal : venda.statusFiscal,
+    patch.statusFiscal !== undefined
+      ? normalizarStatusFiscalPatch(patch.statusFiscal, venda.statusFiscal)
+      : venda.statusFiscal,
     patch.documentoFiscalId !== undefined ? patch.documentoFiscalId : venda.documentoFiscalId,
     venda.abertoPor,
     venda.numeroMesa,
     patch.numeroFiscal !== undefined ? patch.numeroFiscal : venda.numeroFiscal,
-    patch.serieFiscal !== undefined ? patch.serieFiscal : venda.serieFiscal,
+    patch.serieFiscal !== undefined
+      ? normalizarSerieFiscalPatch(patch.serieFiscal, venda.serieFiscal)
+      : venda.serieFiscal,
     patch.dataEmissaoFiscal !== undefined ? patch.dataEmissaoFiscal : venda.dataEmissaoFiscal,
-    patch.tipoDocFiscal !== undefined ? patch.tipoDocFiscal : venda.tipoDocFiscal,
-    patch.modelo !== undefined ? patch.modelo : venda.modelo,
+    patch.tipoDocFiscal !== undefined
+      ? normalizarTipoDocFiscalPatch(patch.tipoDocFiscal, venda.tipoDocFiscal)
+      : venda.tipoDocFiscal,
+    patch.modelo !== undefined
+      ? normalizarModeloFiscalPatch(patch.modelo, venda.modelo)
+      : venda.modelo,
     patch.retornoSefaz !== undefined ? patch.retornoSefaz : venda.retornoSefaz,
     patch.statusEtapaOperacional !== undefined
       ? patch.statusEtapaOperacional
@@ -80,7 +127,9 @@ export function cloneVendaUnificadaDTO(
       ? patch.dataUltimaModificacao
       : venda.dataUltimaModificacao,
     patch.statusFinanceiro !== undefined ? patch.statusFinanceiro : venda.statusFinanceiro,
-    patch.observacoes !== undefined ? patch.observacoes : venda.observacoes,
+    patch.observacoes !== undefined
+      ? (patch.observacoes ?? undefined)
+      : venda.observacoes,
     venda.previsaoEntregaEm,
     venda.tempoTotalEstimadoSegundos,
     venda.fluxoPagamentoEntrega,

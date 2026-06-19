@@ -1,6 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import CircularProgress from '@mui/material/CircularProgress'
 import { Button } from '@/src/presentation/components/ui/button'
 
 /** Azul institucional — Avançar etapa, Emitir nota e ações primárias do card. */
@@ -10,9 +11,11 @@ export function KanbanCardAcaoButton(props: {
   children: ReactNode
   onClick: () => void
   disabled?: boolean
+  loading?: boolean
   startIcon?: ReactNode
 }) {
-  const { children, onClick, disabled, startIcon } = props
+  const { children, onClick, disabled, loading, startIcon } = props
+  const bloqueado = Boolean(disabled || loading)
 
   return (
     <Button
@@ -37,21 +40,29 @@ export function KanbanCardAcaoButton(props: {
         },
         '&:hover': {
           backgroundColor: `${KANBAN_CARD_ACAO_COLOR} !important`,
-          filter: 'brightness(0.92)',
+          filter: bloqueado ? 'none' : 'brightness(0.92)',
           boxShadow: 'none',
           color: '#ffffff',
           WebkitTextFillColor: '#ffffff',
         },
         '&.MuiButton-contained.Mui-disabled': {
           backgroundColor: `${KANBAN_CARD_ACAO_COLOR} !important`,
-          opacity: 0.72,
+          opacity: loading ? 0.55 : 0.72,
           color: 'rgba(255,255,255,0.96)',
           WebkitTextFillColor: 'rgba(255,255,255,0.96)',
+          cursor: loading ? 'wait' : 'default',
         },
       }}
-      startIcon={startIcon}
+      startIcon={
+        loading ? (
+          <CircularProgress size={14} sx={{ color: '#ffffff' }} aria-hidden />
+        ) : (
+          startIcon
+        )
+      }
       onClick={onClick}
-      disabled={disabled}
+      disabled={bloqueado}
+      aria-busy={loading || undefined}
     >
       {children}
     </Button>

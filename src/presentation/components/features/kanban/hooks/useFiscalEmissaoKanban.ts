@@ -1,8 +1,43 @@
-import { useCallback, useState, type Dispatch, type SetStateAction } from 'react'
+import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { resolveModeloParaEmitirNota } from './useVendasUnificadas'
 import { deveUsarModuloDeliveryParaEmissaoFiscal } from '@/src/presentation/hooks/useVendas'
 import { showToast } from '@/src/shared/utils/toast'
+import { STATUS_FISCAL_AGUARDANDO_SEFAZ } from '../rules/fiscalFlowKanban.rules'
 import type { Venda } from '../types'
+
+export type AcaoFiscalKanbanEmAndamento = 'emitindo' | 'reemitindo'
+
+/** Lock síncrono por venda — evita duplo clique antes do re-render do React. */
+export function createEmissaoFiscalKanbanLock() {
+  const ids = new Set<string>()
+  return {
+    tryAcquire(vendaId: string): boolean {
+      if (ids.has(vendaId)) return false
+      ids.add(vendaId)
+      return true
+    },
+    release(vendaId: string): void {
+      ids.delete(vendaId)
+    },
+    isLocked(vendaId: string): boolean {
+      return ids.has(vendaId)
+    },
+  }
+}
+
+function statusFiscalAtualizadoAposEmissao(
+  statusAnterior: Venda['statusFiscal'],
+  statusAtual: Venda['statusFiscal']
+): boolean {
+  const anterior = String(statusAnterior ?? '')
+    .trim()
+    .toUpperCase()
+  const atual = String(statusAtual ?? '')
+    .trim()
+    .toUpperCase()
+  if (atual !== anterior) return true
+  return STATUS_FISCAL_AGUARDANDO_SEFAZ.has(atual)
+}
 
 export interface VendaSelecionadaParaEmissao {
   id: string
@@ -46,13 +81,20 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
     setEmitirNfeModalOpen,
   } = params
   const [acaoFiscalEmAndamentoPorVenda, setAcaoFiscalEmAndamentoPorVenda] = useState<
-    Record<string, 'emitindo' | 'reemitindo'>
+    Record<string, AcaoFiscalKanbanEmAndamento>
   >({})
+  const emissaoFiscalLockRef = useRef<ReturnType<typeof createEmissaoFiscalKanbanLock> | null>(
+    null
+  )
+  if (!emissaoFiscalLockRef.current) {
+    emissaoFiscalLockRef.current = createEmissaoFiscalKanbanLock()
+  }
+  const emissaoFiscalLock = emissaoFiscalLockRef.current
 
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
   const setAcaoFiscalEmAndamento = useCallback(
-    (vendaId: string, acao: 'emitindo' | 'reemitindo' | null) => {
+    (vendaId: string, acao: AcaoFiscalKanbanEmAndamento | null) => {
       setAcaoFiscalEmAndamentoPorVenda(prev => {
         if (!acao) {
           const { [vendaId]: _, ...rest } = prev
@@ -62,6 +104,23 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
       })
     },
     []
+  )
+
+  const iniciarAcaoFiscal = useCallback(
+    (vendaId: string, acao: AcaoFiscalKanbanEmAndamento): boolean => {
+      if (!emissaoFiscalLock.tryAcquire(vendaId)) return false
+      setAcaoFiscalEmAndamento(vendaId, acao)
+      return true
+    },
+    [emissaoFiscalLock, setAcaoFiscalEmAndamento]
+  )
+
+  const encerrarAcaoFiscal = useCallback(
+    (vendaId: string) => {
+      emissaoFiscalLock.release(vendaId)
+      setAcaoFiscalEmAndamento(vendaId, null)
+    },
+    [emissaoFiscalLock, setAcaoFiscalEmAndamento]
   )
 
   /**
@@ -91,7 +150,7 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
         const vendaAtualizada = result.data?.items?.find((item: Venda) => item.id === vendaId)
         if (!vendaAtualizada) return
 
-        if (vendaAtualizada.statusFiscal !== statusAnterior) {
+        if (statusFiscalAtualizadoAposEmissao(statusAnterior, vendaAtualizada.statusFiscal)) {
           return
         }
 
@@ -139,8 +198,44 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
     [emitirNotaDelivery, emitirNotaGestor, emitirNotaPdv]
   )
 
+  const executarAcaoFiscalComLock = useCallback(
+    async (
+      venda: Venda,
+      acao: AcaoFiscalKanbanEmAndamento,
+      statusAnterior: Venda['statusFiscal'],
+      executar: () => Promise<void>,
+      mensagemInicio: string
+    ) => {
+      pinVendaComoPrimeiraEmComNotaSolicitada(venda)
+      if (!iniciarAcaoFiscal(venda.id, acao)) return
+
+      showToast.info(mensagemInicio)
+      try {
+        await executar()
+        await refetch()
+        await refetchAteMudarStatusFiscal(venda.id, statusAnterior)
+      } catch (error) {
+        console.error(
+          acao === 'reemitindo' ? 'Erro ao tentar reemitir:' : 'Erro ao emitir nota fiscal:',
+          error
+        )
+      } finally {
+        encerrarAcaoFiscal(venda.id)
+      }
+    },
+    [
+      encerrarAcaoFiscal,
+      iniciarAcaoFiscal,
+      pinVendaComoPrimeiraEmComNotaSolicitada,
+      refetch,
+      refetchAteMudarStatusFiscal,
+    ]
+  )
+
   const handleEmitirNfe = useCallback(
     async (venda: Venda) => {
+      if (emissaoFiscalLock.isLocked(venda.id)) return
+
       const numeroNotaRejeitada =
         venda.numeroFiscal != null && Number.isFinite(Number(venda.numeroFiscal))
           ? Number(venda.numeroFiscal)
@@ -150,29 +245,25 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
       if (venda.statusFiscal === 'REJEITADA') {
         const docId = venda.documentoFiscalId?.trim()
         if (docId) {
-          pinVendaComoPrimeiraEmComNotaSolicitada(venda)
-
-          setAcaoFiscalEmAndamento(venda.id, 'reemitindo')
-          try {
-            const payload = {
-              id: venda.id,
-              documentId: docId,
-              ...(numeroNotaRejeitada != null ? { numero: numeroNotaRejeitada } : {}),
-            }
-            if (venda.tabelaOrigem === 'venda_gestor') {
-              await reemitirNfeGestor(payload)
-            } else {
-              await reemitirNfePdv(payload)
-            }
-            await refetch()
-            await refetchAteMudarStatusFiscal(venda.id, 'REJEITADA')
-            return
-          } catch (error) {
-            console.error('Erro ao tentar reemitir:', error)
-            return
-          } finally {
-            setAcaoFiscalEmAndamento(venda.id, null)
+          const payload = {
+            id: venda.id,
+            documentId: docId,
+            ...(numeroNotaRejeitada != null ? { numero: numeroNotaRejeitada } : {}),
           }
+          await executarAcaoFiscalComLock(
+            venda,
+            'reemitindo',
+            'REJEITADA',
+            async () => {
+              if (venda.tabelaOrigem === 'venda_gestor') {
+                await reemitirNfeGestor(payload)
+              } else {
+                await reemitirNfePdv(payload)
+              }
+            },
+            'Enviando reemissão para a SEFAZ...'
+          )
+          return
         }
 
         const modeloEmitir = resolveModeloParaEmitirNota(venda)
@@ -183,19 +274,14 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
             )
             return
           }
-          pinVendaComoPrimeiraEmComNotaSolicitada(venda)
-          setAcaoFiscalEmAndamento(venda.id, 'emitindo')
-          try {
-            await emitirNotaParaVenda(venda, modeloEmitir)
-            await refetch()
-            await refetchAteMudarStatusFiscal(venda.id, 'REJEITADA')
-            return
-          } catch (error) {
-            console.error('Erro ao emitir nota (rejeição sem documento fiscal):', error)
-            return
-          } finally {
-            setAcaoFiscalEmAndamento(venda.id, null)
-          }
+          await executarAcaoFiscalComLock(
+            venda,
+            'emitindo',
+            'REJEITADA',
+            () => emitirNotaParaVenda(venda, modeloEmitir),
+            'Enviando emissão para a SEFAZ...'
+          )
+          return
         }
       }
 
@@ -215,13 +301,12 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
       setEmitirNfeModalOpen(true)
     },
     [
+      emissaoFiscalLock,
       emitirNotaParaVenda,
+      executarAcaoFiscalComLock,
       pinVendaComoPrimeiraEmComNotaSolicitada,
       reemitirNfeGestor,
       reemitirNfePdv,
-      refetch,
-      refetchAteMudarStatusFiscal,
-      setAcaoFiscalEmAndamento,
       setEmitirNfeModalOpen,
       setSelectedVendaId,
       setVendaSelecionadaParaEmissao,

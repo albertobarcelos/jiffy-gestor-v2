@@ -1,7 +1,8 @@
 import {
   extrairContextoEntregaDeVendaData,
-  enderecoSnapshotParaEnderecoEntregaDetalhe,
+  extrairEnderecoEntregaSnapshotDeVendaData,
 } from '@/src/application/mappers/ContextoEntregaDeliveryMapper'
+import type { EnderecoEntregaDetalhe } from '@/src/domain/types/vendaDetalhe'
 import type { PreferenciasImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
 import type { InstrucoesImpressaoResponse } from '@/src/shared/types/instrucoesImpressao'
 import type {
@@ -9,6 +10,7 @@ import type {
   VendaGestorTicketItem,
   VendaGestorTicketItemComplemento,
   VendaGestorTicketWarning,
+  VendaGestorTicketsEndereco,
   VendaGestorTicketsPagamento,
   VendaGestorTicketsPagamentoMeio,
   VendaGestorTicketsResponse,
@@ -36,6 +38,22 @@ function isoOrEmpty(v: unknown): string {
 function numeroFinito(v: unknown): number {
   const n = Number(v)
   return Number.isFinite(n) ? n : 0
+}
+
+function enderecoDetalheParaTicketsEndereco(
+  endereco: EnderecoEntregaDetalhe | null | undefined
+): VendaGestorTicketsEndereco | null {
+  if (!endereco) return null
+  return {
+    rua: endereco.rua ?? undefined,
+    numero: endereco.numero ?? undefined,
+    bairro: endereco.bairro ?? undefined,
+    cidade: endereco.cidade ?? undefined,
+    estado: endereco.estado ?? undefined,
+    cep: endereco.cep ?? undefined,
+    complemento: endereco.complemento ?? undefined,
+    referencia: endereco.referencia ?? undefined,
+  }
 }
 
 function produtoLancadoAtivo(pl: Record<string, unknown>): boolean {
@@ -359,9 +377,7 @@ export function montarTicketsResponseFromInstrucoes(params: {
   const contexto = extrairContextoEntregaDeVendaData(pedido)
   const clienteRaw = asRecord(pedido.cliente)
   const entregadorRaw = asRecord(pedido.entregador)
-  const enderecoSnapshot = contexto?.enderecoEntrega
-    ? enderecoSnapshotParaEnderecoEntregaDetalhe(contexto.enderecoEntrega)
-    : null
+  const enderecoSnapshot = extrairEnderecoEntregaSnapshotDeVendaData(pedido)
 
   const clienteNome =
     asStr(clienteRaw?.nome) || asStr(contexto?.destinatarioNome) || undefined
@@ -477,7 +493,7 @@ export function montarTicketsResponseFromInstrucoes(params: {
       : null,
     cliente: clienteNome || clienteTelefone ? { nome: clienteNome, telefone: clienteTelefone } : null,
     observacaoPedido: buildObservacaoPedido(pedido),
-    enderecoEntrega: enderecoSnapshot ?? contexto?.enderecoEntrega ?? null,
+    enderecoEntrega: enderecoDetalheParaTicketsEndereco(enderecoSnapshot),
     valorFinal: numeroFinito(pedido.valorFinal),
     resumoPedido: buildResumoPedido(pedido, produtosAtivos),
     pagamento: buildPagamento(pedido, nomesMeiosPagamentoPorId),

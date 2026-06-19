@@ -11,8 +11,11 @@ function asStr(v: unknown): string {
   return String(v).trim()
 }
 
-function pickEnderecoField(e: Record<string, unknown>, key: string): string | null {
-  const v = e[key]
+function pickEnderecoField(
+  e: EnderecoEntregaSnapshotApi | Record<string, unknown>,
+  key: string
+): string | null {
+  const v = (e as Record<string, unknown>)[key]
   return v != null && String(v).trim() !== '' ? String(v).trim() : null
 }
 
@@ -30,15 +33,14 @@ export function enderecoSnapshotParaEnderecoEntregaDetalhe(
   snapshot: EnderecoEntregaSnapshotApi | null | undefined
 ): EnderecoEntregaDetalhe | null {
   if (!snapshot || typeof snapshot !== 'object') return null
-  const e = snapshot as Record<string, unknown>
   const mapped: EnderecoEntregaDetalhe = {
-    cep: pickEnderecoField(e, 'cep'),
-    rua: pickEnderecoField(e, 'rua'),
-    numero: pickEnderecoField(e, 'numero'),
-    bairro: pickEnderecoField(e, 'bairro'),
-    cidade: pickEnderecoField(e, 'cidade'),
-    estado: pickEnderecoField(e, 'estado'),
-    complemento: pickEnderecoField(e, 'complemento'),
+    cep: pickEnderecoField(snapshot, 'cep'),
+    rua: pickEnderecoField(snapshot, 'rua'),
+    numero: pickEnderecoField(snapshot, 'numero'),
+    bairro: pickEnderecoField(snapshot, 'bairro'),
+    cidade: pickEnderecoField(snapshot, 'cidade'),
+    estado: pickEnderecoField(snapshot, 'estado'),
+    complemento: pickEnderecoField(snapshot, 'complemento'),
     referencia: null,
   }
   const hasAny = Object.values(mapped).some(Boolean)

@@ -1,3 +1,5 @@
+import { salvarPedidoDeliveryDetalheCache } from '@/src/infrastructure/api/pedidoDeliveryDetalheCache'
+
 const entregadorPorVendaId = new Map<string, string>()
 const entregadorAusentePorVendaId = new Set<string>()
 

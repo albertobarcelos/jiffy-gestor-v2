@@ -772,11 +772,14 @@ export function FiscalFlowKanban() {
 
   const getEtapaKanbanParaExibicao = useCallback(
     (venda: Venda) => {
+      if (acaoFiscalEmAndamentoPorVenda[venda.id]) {
+        return getEtapaKanbanFiscal(venda)
+      }
       const etapaLocal = etapaLocalPorVendaId[venda.id]
       if (etapaLocal) return etapaLocal
       return getEtapaKanbanFiscal(venda)
     },
-    [etapaLocalPorVendaId, getEtapaKanbanFiscal]
+    [acaoFiscalEmAndamentoPorVenda, etapaLocalPorVendaId, getEtapaKanbanFiscal]
   )
 
   // REJEITADA com solicitarEmissaoFiscal false: reativa com o mesmo PATCH de "marcar emissão" (useMarcarEmissaoFiscal)

@@ -576,6 +576,7 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
                 venda,
                 acaoFiscalEmAndamentoPorVenda
               )}
+              loading={Boolean(acaoFiscalEmAndamentoPorVenda[venda.id])}
             >
               {(() => {
                 const acaoEmAndamento = acaoFiscalEmAndamentoPorVenda[venda.id]
