@@ -25,7 +25,6 @@ import {
   flattenVendasUnificadasInfinite,
   useVendasUnificadasInfinite,
   vendasUnificadasInfiniteQueryKey,
-  VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE,
 } from './hooks/useVendasUnificadas'
 import {
   flattenPedidosDeliveryInfinite,
@@ -105,6 +104,7 @@ import { validarImpressaoAntesTransicaoKanban } from '@/src/application/delivery
 import { confirmarCobrancaPendentePedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/ConfirmarCobrancaPendentePedidoDeliveryUseCase'
 import type { AcaoTransicaoGestor } from '@/src/presentation/hooks/useVendas'
 import { useKanbanDeliveryColumnCounts } from './hooks/useKanbanDeliveryColumnCounts'
+import { useKanbanColumnScrollLoadMore } from './hooks/useKanbanColumnScrollLoadMore'
 import {
   filtrarVendasKanbanPorModo,
   KANBAN_VENDAS_REFETCH_INTERVAL_MS,
@@ -199,11 +199,6 @@ export function FiscalFlowKanban() {
   const [isLoadingTerminais, setIsLoadingTerminais] = useState(false)
   /** vendaId fixado no topo por coluna (Finalizadas / Pendente emissão), persistido em localStorage */
   const { primeiroPorColuna, setPrimeiroPorColuna } = useKanbanPinning()
-
-  const [visibleLimitPorColuna, setVisibleLimitPorColuna] = useState<
-    Partial<Record<ColunaKanbanId, number>>
-  >({})
-  const columnScrollTickingRef = useRef(false)
 
   const [modoKanbanVendas, setModoKanbanVendas] = useState<ModoKanbanVendas>(() =>
     lerModoKanbanVendasDoStorage()
@@ -335,10 +330,6 @@ export function FiscalFlowKanban() {
       terminalFilter,
     ]
   )
-
-  useEffect(() => {
-    setVisibleLimitPorColuna({})
-  }, [vendasUnificadasQueryKeyFingerprintComTerminal])
 
   /** Evita PATCH duplicado ao reativar solicitarEmissaoFiscal para REJEITADA (Strict Mode / re-renders) */
   const rejeitadaReativacaoEmAndamentoRef = useRef(false)
@@ -546,6 +537,16 @@ export function FiscalFlowKanban() {
     if (isFetchingNextPage || !temMaisVendasParaCarregar) return
     void fetchNextPage()
   }, [isFetchingNextPage, temMaisVendasParaCarregar, fetchNextPage])
+
+  const { onColumnScroll: onGlobalColumnScroll } =
+    useKanbanColumnScrollLoadMore(handleCarregarMaisVendas)
+
+  const handleColumnScroll = useCallback(
+    (_columnId: ColunaKanbanId, event: React.UIEvent<HTMLDivElement>) => {
+      onGlobalColumnScroll(event)
+    },
+    [onGlobalColumnScroll]
+  )
 
   const deliveryColumnIdsParaContagem = useMemo((): ColunaKanbanId[] => {
     if (!isModoDeliveryKanban) return []
@@ -956,45 +957,6 @@ export function FiscalFlowKanban() {
     [isModoDeliveryKanban, deliveryColumnCounts, vendasPorColuna]
   )
 
-  const getColumnVisibleVendas = useCallback(
-    (columnId: ColunaKanbanId): Venda[] => {
-      const full = vendasPorColuna[columnId] ?? []
-      const limit =
-        visibleLimitPorColuna[columnId] ?? VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE
-      return full.slice(0, limit)
-    },
-    [vendasPorColuna, visibleLimitPorColuna]
-  )
-
-  const handleColumnScroll = useCallback(
-    (columnId: ColunaKanbanId, event: React.UIEvent<HTMLDivElement>) => {
-      if (columnScrollTickingRef.current) return
-      const el = event.currentTarget
-      if (!el) return
-      columnScrollTickingRef.current = true
-      requestAnimationFrame(() => {
-        columnScrollTickingRef.current = false
-        const distanciaDoFim = el.scrollHeight - el.scrollTop - el.clientHeight
-        if (distanciaDoFim > 120) return
-
-        const fullList = vendasPorColuna[columnId] ?? []
-        const currentLimit =
-          visibleLimitPorColuna[columnId] ?? VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE
-
-        if (currentLimit < fullList.length) {
-          setVisibleLimitPorColuna(prev => ({
-            ...prev,
-            [columnId]: currentLimit + VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE,
-          }))
-          return
-        }
-
-        handleCarregarMaisVendas()
-      })
-    },
-    [vendasPorColuna, visibleLimitPorColuna, handleCarregarMaisVendas]
-  )
-
   // Colunas fixas do Kanban (entrega → fiscal)
   const getColumns = (): KanbanColumn[] => [
     {
@@ -1370,7 +1332,7 @@ export function FiscalFlowKanban() {
             {columns.map(column => {
               const colId = column.id as ColunaKanbanId
               const columnTotalCount = getColumnTotalCount(colId)
-              const columnVendas = getColumnVisibleVendas(colId)
+              const columnVendas = vendasPorColuna[colId] ?? []
 
               return (
                 <FiscalKanbanColumn
