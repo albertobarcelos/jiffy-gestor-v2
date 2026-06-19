@@ -38,11 +38,13 @@ import { matchesModulePath } from '@/src/shared/utils/gestaoRoutes'
 export function TopNav() {
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set())
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
   const { logoutTenant, getUser } = useAuthStore()
   const queryClient = useQueryClient()
   const menuRef = useRef<HTMLDivElement>(null)
+  const notificationsRef = useRef<HTMLDivElement>(null)
 
   useEmpresaUrlSync()
   const temAcessoFiscal = useAcessoFiscal()
@@ -99,20 +101,27 @@ export function TopNav() {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setExpandedMenus(new Set())
       }
+      if (
+        notificationsRef.current &&
+        !notificationsRef.current.contains(event.target as Node)
+      ) {
+        setNotificationsOpen(false)
+      }
     }
 
-    if (expandedMenus.size > 0) {
+    if (expandedMenus.size > 0 || notificationsOpen) {
       document.addEventListener('mousedown', handleClickOutside)
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [expandedMenus, isMobileMenuOpen])
+  }, [expandedMenus, isMobileMenuOpen, notificationsOpen])
 
   // Fechar dropdown ao mudar de rota
   useEffect(() => {
     setExpandedMenus(new Set())
+    setNotificationsOpen(false)
   }, [pathname])
 
   const toggleMenu = useCallback(
@@ -373,7 +382,7 @@ export function TopNav() {
             )
           })}
 
-          <EmpresaSwitcherTopNav variant="mobile" onAfterSelect={closeMobileMenu} />
+          <EmpresaSwitcherTopNav variant="mobile" />
         </div>
 
         <div className="mt-auto border-t border-gray-200 pt-4 flex items-center gap-3">
@@ -526,12 +535,33 @@ export function TopNav() {
         <div className="hidden sm:flex items-center gap-2">
           
           {/* Notifications */}
-          <button className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-            </svg>
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
-          </button>
+          <div ref={notificationsRef} className="relative">
+            <button
+              type="button"
+              className="relative rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100"
+              aria-label="Notificações"
+              aria-expanded={notificationsOpen}
+              aria-haspopup="true"
+              onClick={() => setNotificationsOpen(open => !open)}
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                />
+              </svg>
+            </button>
+            {notificationsOpen ? (
+              <div
+                role="tooltip"
+                className="absolute left-1/2 top-full z-50 mt-2 w-max max-w-[240px] -translate-x-1/2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-center text-xs text-gray-600 shadow-lg"
+              >
+                Você não tem mensagens no momento.
+              </div>
+            ) : null}
+          </div>
 
           {/* Dados do usuário (perfil será acessado noutro local) */}
           <div

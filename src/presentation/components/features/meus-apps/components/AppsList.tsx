@@ -42,7 +42,7 @@ export function AppsList({
           const bloqueado = app.status === 'inativo'
           const isSelecting = busyAppId === app.id
           const actionsLocked = locked && busyAppId !== app.id
-          const navDisabled = bloqueado || actionsLocked || isSelecting
+          const interactionDisabled = bloqueado || actionsLocked || isSelecting
           return (
           <div key={app.id} className="flex flex-col gap-3 px-4 py-4 sm:grid sm:grid-cols-[1fr_140px_140px] sm:items-center">
             <div className="min-w-0">
@@ -57,20 +57,20 @@ export function AppsList({
             <div className="flex justify-end">
               <button
                 type="button"
-                disabled={navDisabled}
+                disabled={interactionDisabled}
                 onClick={() => {
-                  if (!navDisabled) {
+                  if (!interactionDisabled) {
                     onAcessar(app.id)
                   }
                 }}
                 className={cn(
-                  'inline-flex h-10 w-full items-center justify-center rounded-full px-4 text-sm font-semibold shadow-sm transition sm:w-auto',
-                  navDisabled
+                  'inline-flex h-10 w-full items-center justify-center rounded-full px-2 text-sm font-medium shadow-sm transition sm:w-auto disabled:opacity-100',
+                  bloqueado || isSelecting
                     ? 'cursor-not-allowed bg-gray-400 text-white'
                     : 'bg-sky-500 text-white hover:bg-sky-600'
                 )}
               >
-                {bloqueado ? 'Bloqueado' : isSelecting ? 'Abrindo…' : 'Acessar'}
+                {bloqueado ? 'Empresa Bloqueada' : isSelecting ? 'Abrindo…' : 'Acessar Empresa'}
               </button>
             </div>
           </div>

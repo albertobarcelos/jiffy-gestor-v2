@@ -25,7 +25,7 @@ export function LoginForm() {
   const [resendLoading, setResendLoading] = useState(false)
   const [resendMessage, setResendMessage] = useState<string | null>(null)
 
-  const { login, setHubEmpresas, setLoading, setError, isLoading } = useAuthStore()
+  const { loginWithHubEmpresas, setLoading, setError, isLoading } = useAuthStore()
 
   /** Convite por e-mail: `p` (base64url), ou legado `email` / `conviteId`. */
   useEffect(() => {
@@ -84,8 +84,7 @@ export function LoginForm() {
         throw new Error(resultado.error)
       }
 
-      login(resultado.auth)
-      setHubEmpresas(resultado.empresas)
+      loginWithHubEmpresas(resultado.auth, resultado.empresas)
 
       router.replace('/meus-apps')
     } catch (error) {

@@ -73,9 +73,7 @@ export default async function NotaFiscalPublicPage({ params }: PageProps) {
           color: '#0f172a',
         }}
       >
-        <header className="px-5 sm:px-6 pt-5 pb-2 border-b border-slate-200">
-          <p className="text-xs text-center text-slate-500">Jiffy Gestor</p>
-        </header>
+       
         <div className="px-5 sm:px-6 py-5">
           <CupomFiscalContingencia data={data} rodapeDanfeSrc={rodapeDanfeSrc} />
         </div>

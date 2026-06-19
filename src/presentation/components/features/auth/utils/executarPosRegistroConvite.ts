@@ -5,7 +5,7 @@ import { conviteParaEmpresaSnapshot } from '@/src/presentation/components/featur
 import { loginViaApiRoute } from '@/src/presentation/components/features/auth/utils/loginViaApiRoute'
 
 export type ExecutarPosRegistroConviteOptions = {
-  login: (auth: Auth) => void
+  loginWithHubEmpresas: (auth: Auth, empresas: LoginEmpresaSnapshot[] | null) => void
   setHubEmpresas: (empresas: LoginEmpresaSnapshot[] | null) => void
   getHubEmpresas: () => LoginEmpresaSnapshot[] | null
   onPrecisaConfirmarEmail: () => void
@@ -21,7 +21,8 @@ export async function executarPosRegistroConvite(
   password: string,
   options: ExecutarPosRegistroConviteOptions
 ): Promise<void> {
-  const { login, setHubEmpresas, getHubEmpresas, onPrecisaConfirmarEmail, onConcluido } = options
+  const { loginWithHubEmpresas, setHubEmpresas, getHubEmpresas, onPrecisaConfirmarEmail, onConcluido } =
+    options
 
   const resultado = await loginViaApiRoute(email, password)
   if (!resultado.ok) {
@@ -32,8 +33,7 @@ export async function executarPosRegistroConvite(
     throw new Error(resultado.error)
   }
 
-  login(resultado.auth)
-  setHubEmpresas(resultado.empresas)
+  loginWithHubEmpresas(resultado.auth, resultado.empresas)
 
   const token = resultado.auth.getAccessToken()
   const res = await fetch('/api/convites/me', {
