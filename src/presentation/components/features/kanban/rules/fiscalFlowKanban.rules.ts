@@ -1,4 +1,8 @@
 import {
+  fiscalPendentePodeReemitirAposCooldown,
+  fiscalPendenteTravadoLimiteTentativas,
+} from '@/src/domain/services/pedido/RegrasFiscaisVenda'
+import {
   isPedidoEntregaComEntregador,
   isPedidoEntregaKanban,
 } from '@/src/shared/helpers/pedidoEntregaKanban'
@@ -128,7 +132,29 @@ export function acoesTransicaoEntregaAvanco(
   return acoes
 }
 
+function dadosFiscalVendaKanban(v: VendaUnificadaDTO) {
+  return {
+    statusFiscal: v.statusFiscal,
+    retornoSefaz: v.retornoSefaz,
+    documentoFiscalId: v.documentoFiscalId,
+    numeroFiscal: v.numeroFiscal,
+    dataUltimaModificacao: v.dataUltimaModificacao,
+    dataEmissaoFiscal: v.dataEmissaoFiscal,
+    dataFinalizacao: v.dataFinalizacao,
+    dataCriacao: v.dataCriacao,
+  }
+}
+
+export function fiscalKanbanPodeReemitirAposCooldown(v: VendaUnificadaDTO): boolean {
+  return fiscalPendentePodeReemitirAposCooldown(dadosFiscalVendaKanban(v))
+}
+
+export function fiscalKanbanPendenteTravadoLimiteTentativas(v: VendaUnificadaDTO): boolean {
+  return fiscalPendenteTravadoLimiteTentativas(dadosFiscalVendaKanban(v))
+}
+
 export function statusFiscalAguardandoSefaz(v: VendaUnificadaDTO): boolean {
+  if (fiscalKanbanPodeReemitirAposCooldown(v)) return false
   const sf = String(v.statusFiscal ?? '')
     .trim()
     .toUpperCase()
@@ -177,7 +203,7 @@ export function getCardBorderEFundoKanban(
   if (sf === 'CANCELADA') {
     return { borderClass: 'border-l-gray-400', cardBgClass: 'bg-gray-50' }
   }
-  if (sf === 'REJEITADA') {
+  if (sf === 'REJEITADA' || fiscalKanbanPodeReemitirAposCooldown(v)) {
     return { borderClass: 'border-l-red-500', cardBgClass: 'bg-white' }
   }
 
@@ -226,6 +252,7 @@ export function deveExibirBotaoEmitirNotaNoKanban(
   const acao = acaoFiscalEmAndamentoPorVenda[venda.id]
   if (acao === 'reemitindo' || acao === 'emitindo') return true
   if (columnId === 'PENDENTE_EMISSAO') return true
+  if (columnId === 'COM_NFE' && fiscalKanbanPodeReemitirAposCooldown(venda)) return true
   if (columnId === 'FINALIZADAS' && venda.isPedidoEntregaGestor()) return true
   return false
 }

@@ -722,7 +722,8 @@ export function useMarcarEmissaoFiscal() {
         showToast.success('Venda marcada para emissão fiscal!')
       }
     },
-    onError: (error: Error) => {
+    onError: (error: Error, params) => {
+      if (params.silent) return
       showToast.error(error.message || 'Erro ao marcar emissão fiscal')
     },
   })

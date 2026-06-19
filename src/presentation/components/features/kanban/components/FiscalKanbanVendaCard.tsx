@@ -42,6 +42,7 @@ import {
   formatarDataCard,
   getCardBorderEFundoKanban,
   getLinhaTempoPedidoEntregaKanban,
+  fiscalKanbanPodeReemitirAposCooldown,
   statusFiscalAguardandoSefaz,
   vendaBloqueadaParaEmissaoInterativa,
   vendaSemNomeCliente,
@@ -353,7 +354,14 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
                 {venda.statusFiscal ? (
                   <>
                     <div className="mt-1 flex items-center">
-                      <StatusFiscalBadge status={venda.statusFiscal} tone="neutral" />
+                      <StatusFiscalBadge
+                        status={
+                          fiscalKanbanPodeReemitirAposCooldown(venda)
+                            ? 'REJEITADA'
+                            : venda.statusFiscal
+                        }
+                        tone="neutral"
+                      />
                     </div>
                     {venda.numeroFiscal && venda.statusFiscal === 'EMITIDA' && (
                       <div className="mt-0.5">
@@ -435,7 +443,14 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
                 {venda.statusFiscal && (
                   <>
                     <div className="mt-1 flex items-center">
-                      <StatusFiscalBadge status={venda.statusFiscal} tone="neutral" />
+                      <StatusFiscalBadge
+                        status={
+                          fiscalKanbanPodeReemitirAposCooldown(venda)
+                            ? 'REJEITADA'
+                            : venda.statusFiscal
+                        }
+                        tone="neutral"
+                      />
                     </div>
                     {venda.numeroFiscal && venda.statusFiscal === 'EMITIDA' && (
                       <div className="mt-0.5">
@@ -583,7 +598,10 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
                 if (acaoEmAndamento === 'reemitindo') return 'Reemitindo...'
                 if (acaoEmAndamento === 'emitindo') return 'Emitindo...'
                 const documentoLabel = venda.tipoDocFiscal === 'NFE' ? 'NFe' : 'NFCe'
-                if (venda.statusFiscal === 'REJEITADA') {
+                const podeReemitir =
+                  venda.statusFiscal === 'REJEITADA' ||
+                  fiscalKanbanPodeReemitirAposCooldown(venda)
+                if (podeReemitir) {
                   if (venda.tipoDocFiscal === 'NFE' || venda.tipoDocFiscal === 'NFCE') {
                     return `Reemitir ${documentoLabel}`
                   }

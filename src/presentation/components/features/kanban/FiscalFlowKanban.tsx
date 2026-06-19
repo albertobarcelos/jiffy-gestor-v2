@@ -799,6 +799,7 @@ export function FiscalFlowKanban() {
       return (
         rejeitada &&
         !v.solicitarEmissaoFiscal &&
+        !v.isPedidoEntregaGestor() &&
         !rejeitadaReativacaoJaTentadaIdsRef.current.has(v.id)
       )
     })
@@ -820,7 +821,8 @@ export function FiscalFlowKanban() {
             rejeitadaReativacaoJaTentadaIdsRef.current.add(v.id)
             sucesso += 1
           } catch {
-            // Erro por venda: não adiciona ao Set para permitir nova tentativa após novo carregamento
+            // Evita retentar a mesma venda em re-renders; sem toast (silent).
+            rejeitadaReativacaoJaTentadaIdsRef.current.add(v.id)
           }
         }
         if (!cancelled && sucesso > 0) {

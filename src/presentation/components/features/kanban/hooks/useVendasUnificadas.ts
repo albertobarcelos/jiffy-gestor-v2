@@ -11,6 +11,7 @@ import {
 } from '@/src/shared/helpers/pedidoEntregaKanban'
 import type { FluxoPagamentoEntrega } from '@/src/domain/types/vendaDetalhe'
 import { derivarFluxoPagamentoEntregaDeliverySummary } from '@/src/application/mappers/DeliveryFluxoPagamentoMapper'
+import { fiscalPendentePodeReemitirAposCooldown } from '@/src/domain/services/pedido/RegrasFiscaisVenda'
 
 /** Cobrança resumida da listagem delivery (Kanban). */
 export type CobrancaKanbanDeliveryResumo = {
@@ -89,7 +90,13 @@ function extrairStatusEtapaOperacional(item: Record<string, unknown>): string | 
   return null
 }
 
-/** Última alteração na venda (ex.: após transição de etapa), se o GET unificado expuser. */
+function resumoFiscalRecord(item: Record<string, unknown>): Record<string, unknown> | null {
+  return item.resumoFiscal && typeof item.resumoFiscal === 'object'
+    ? (item.resumoFiscal as Record<string, unknown>)
+    : null
+}
+
+/** Última alteração na venda ou no resumo fiscal (listagem unificada). */
 function extrairDataUltimaModificacao(item: Record<string, unknown>): string | null {
   const keys = [
     'dataUltimaModificacao',
@@ -100,6 +107,33 @@ function extrairDataUltimaModificacao(item: Record<string, unknown>): string | n
     const v = item[k]
     if (v != null && String(v).trim() !== '') return String(v).trim()
   }
+
+  const rf = resumoFiscalRecord(item)
+  if (rf) {
+    for (const k of ['dataUltimaModificacao', 'data_ultima_modificacao'] as const) {
+      const v = rf[k]
+      if (v != null && String(v).trim() !== '') return String(v).trim()
+    }
+  }
+
+  return null
+}
+
+function extrairRetornoSefaz(item: Record<string, unknown>): string | null {
+  const keys = ['retornoSefaz', 'RetornoSefaz', 'retorno_sefaz'] as const
+  for (const k of keys) {
+    const v = item[k]
+    if (v != null && String(v).trim() !== '') return String(v).trim()
+  }
+
+  const rf = resumoFiscalRecord(item)
+  if (rf) {
+    for (const k of ['retornoSefaz', 'retorno_sefaz'] as const) {
+      const v = rf[k]
+      if (v != null && String(v).trim() !== '') return String(v).trim()
+    }
+  }
+
   return null
 }
 
@@ -366,6 +400,21 @@ export class VendaUnificadaDTO {
     if (this.temNFeEmitida()) return 'COM_NFE'
     // Rejeitada: coluna "Pendente Emissão Fiscal" para reenvio/reemissão (botão vira "Reemitir NFe/NFCe")
     if (this.statusFiscal === 'REJEITADA') return 'PENDENTE_EMISSAO'
+    if (
+      (this.statusFiscal === 'PENDENTE' || this.statusFiscal === 'PENDENTE_AUTORIZACAO') &&
+      fiscalPendentePodeReemitirAposCooldown({
+        statusFiscal: this.statusFiscal,
+        retornoSefaz: this.retornoSefaz,
+        documentoFiscalId: this.documentoFiscalId,
+        numeroFiscal: this.numeroFiscal,
+        dataUltimaModificacao: this.dataUltimaModificacao,
+        dataEmissaoFiscal: this.dataEmissaoFiscal,
+        dataFinalizacao: this.dataFinalizacao,
+        dataCriacao: this.dataCriacao,
+      })
+    ) {
+      return 'PENDENTE_EMISSAO'
+    }
     // Aguardando retorno da SEFAZ (badge "Aguardando SEFAZ...") — só em "Com Nota Solicitada"
     if (this.statusFiscal === 'PENDENTE' || this.statusFiscal === 'PENDENTE_AUTORIZACAO') {
       return 'COM_NFE'
@@ -468,7 +517,7 @@ export function mapItemJsonParaVendaUnificadaDTO(v: Record<string, unknown>): Ve
     v.dataEmissaoFiscal as string | null | undefined,
     v.tipoDocFiscal as VendaUnificadaDTO['tipoDocFiscal'],
     parseModeloFiscalApi(v.modelo),
-    v.retornoSefaz as string | null | undefined,
+    extrairRetornoSefaz(v),
     extrairStatusEtapaOperacional(v),
     extrairDataUltimaModificacao(v),
     extrairStatusFinanceiro(v),

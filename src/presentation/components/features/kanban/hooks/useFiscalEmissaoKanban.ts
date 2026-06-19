@@ -2,6 +2,7 @@ import { useCallback, useRef, useState, type Dispatch, type SetStateAction } fro
 import { resolveModeloParaEmitirNota } from './useVendasUnificadas'
 import { deveUsarModuloDeliveryParaEmissaoFiscal } from '@/src/presentation/hooks/useVendas'
 import { showToast } from '@/src/shared/utils/toast'
+import { fiscalPendentePodeReemitirAposCooldown } from '@/src/domain/services/pedido/RegrasFiscaisVenda'
 import { STATUS_FISCAL_AGUARDANDO_SEFAZ } from '../rules/fiscalFlowKanban.rules'
 import type { Venda } from '../types'
 
@@ -241,8 +242,21 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
           ? Number(venda.numeroFiscal)
           : undefined
 
-      // REJEITADA: com documento → reemitir-nota; sem documento mas com modelo/tipoDoc → emitir-nota direto; sem modelo → modal.
-      if (venda.statusFiscal === 'REJEITADA') {
+      const podeReemitirInterativo =
+        venda.statusFiscal === 'REJEITADA' ||
+        fiscalPendentePodeReemitirAposCooldown({
+          statusFiscal: venda.statusFiscal,
+          retornoSefaz: venda.retornoSefaz,
+          documentoFiscalId: venda.documentoFiscalId,
+          numeroFiscal: venda.numeroFiscal,
+          dataUltimaModificacao: venda.dataUltimaModificacao,
+          dataEmissaoFiscal: venda.dataEmissaoFiscal,
+          dataFinalizacao: venda.dataFinalizacao,
+          dataCriacao: venda.dataCriacao,
+        })
+
+      // REJEITADA ou PENDENTE travado (limite de tentativas após cooldown): reemitir ou emitir direto.
+      if (podeReemitirInterativo) {
         const docId = venda.documentoFiscalId?.trim()
         if (docId) {
           const payload = {
@@ -250,11 +264,20 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
             documentId: docId,
             ...(numeroNotaRejeitada != null ? { numero: numeroNotaRejeitada } : {}),
           }
+          const usarDelivery = deveUsarModuloDeliveryParaEmissaoFiscal(
+            venda.tabelaOrigem,
+            venda.tipoVenda
+          )
+          const modeloReemitir = resolveModeloParaEmitirNota(venda)
           await executarAcaoFiscalComLock(
             venda,
             'reemitindo',
-            'REJEITADA',
+            venda.statusFiscal,
             async () => {
+              if (usarDelivery && modeloReemitir !== null) {
+                await emitirNotaDelivery({ id: venda.id, modelo: modeloReemitir })
+                return
+              }
               if (venda.tabelaOrigem === 'venda_gestor') {
                 await reemitirNfeGestor(payload)
               } else {
@@ -277,7 +300,7 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
           await executarAcaoFiscalComLock(
             venda,
             'emitindo',
-            'REJEITADA',
+            venda.statusFiscal,
             () => emitirNotaParaVenda(venda, modeloEmitir),
             'Enviando emissão para a SEFAZ...'
           )
@@ -302,6 +325,7 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
     },
     [
       emissaoFiscalLock,
+      emitirNotaDelivery,
       emitirNotaParaVenda,
       executarAcaoFiscalComLock,
       pinVendaComoPrimeiraEmComNotaSolicitada,
