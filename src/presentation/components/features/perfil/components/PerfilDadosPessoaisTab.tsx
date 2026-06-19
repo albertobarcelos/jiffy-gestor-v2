@@ -12,7 +12,9 @@ import {
   UserRound,
 } from 'lucide-react'
 import { Input } from '@/src/presentation/components/ui/input'
+import { cn } from '@/src/shared/utils/cn'
 import type { PerfilDadosExibicao } from '../types/perfilTypes'
+import { PERFIL_DADOS_PESSOAIS_EDICAO_HABILITADA } from '../types/perfilTypes'
 
 const INPUT_LABEL_PROPS = { shrink: true } as const
 
@@ -47,6 +49,8 @@ type CampoFormConfig = {
   icon: LucideIcon
   type?: string
   autoComplete?: string
+  /** `false` oculta o campo até o backend expor persistência (mantém no código). */
+  visivel?: boolean
 }
 
 function dadosToForm(dados: PerfilDadosExibicao): PerfilDadosForm {
@@ -106,13 +110,25 @@ function PerfilCampoInputRow({
 }
 
 const CAMPOS_CONTATO: CampoFormConfig[] = [
-  { key: 'nomeCompleto', label: 'Nome completo', icon: IdCard, autoComplete: 'name' },
-  { key: 'apelido', label: 'Apelido', icon: UserRound, autoComplete: 'nickname' },
-  { key: 'email', label: 'E-mail', icon: Mail, type: 'email', autoComplete: 'email' },
-  { key: 'dataNascimento', label: 'Data de Nascimento', icon: Cake, type: 'date' },
-  { key: 'telefone', label: 'Telefone', icon: Phone, type: 'tel', autoComplete: 'tel' },
-  { key: 'departamento', label: 'Departamento', icon: Building2 },
-  { key: 'localizacao', label: 'Cidade/UF', icon: MapPin, autoComplete: 'address-level1' },
+  { key: 'nomeCompleto', label: 'Nome completo', icon: IdCard, autoComplete: 'name', visivel: true },
+  { key: 'apelido', label: 'Apelido', icon: UserRound, autoComplete: 'nickname', visivel: false },
+  { key: 'email', label: 'E-mail', icon: Mail, type: 'email', autoComplete: 'email', visivel: true },
+  {
+    key: 'dataNascimento',
+    label: 'Data de Nascimento',
+    icon: Cake,
+    type: 'date',
+    visivel: false,
+  },
+  { key: 'telefone', label: 'Telefone', icon: Phone, type: 'tel', autoComplete: 'tel', visivel: false },
+  { key: 'departamento', label: 'Departamento', icon: Building2, visivel: false },
+  {
+    key: 'localizacao',
+    label: 'Cidade/UF',
+    icon: MapPin,
+    autoComplete: 'address-level1',
+    visivel: false,
+  },
 ]
 
 export function PerfilDadosPessoaisTab({ dados }: { dados: PerfilDadosExibicao }) {
@@ -146,24 +162,36 @@ export function PerfilDadosPessoaisTab({ dados }: { dados: PerfilDadosExibicao }
               Dados utilizados para identificação dentro da plataforma.
             </p>
           </div>
-          <button type="button" onClick={handleToggleEdit} className={submitButtonClassName}>
+          <button
+            type="button"
+            onClick={handleToggleEdit}
+            className={cn(
+              submitButtonClassName,
+              !PERFIL_DADOS_PESSOAIS_EDICAO_HABILITADA && 'hidden'
+            )}
+          >
             {isEditing ? 'Salvar' : 'Editar'}
           </button>
         </header>
 
         <div className="flex flex-col gap-4 px-6 py-4">
           {CAMPOS_CONTATO.map(campo => (
-            <PerfilCampoInputRow
+            <div
               key={campo.key}
-              id={`perfil-${campo.key}`}
-              label={campo.label}
-              icon={campo.icon}
-              value={form[campo.key]}
-              onChange={value => updateField(campo.key, value)}
-              disabled={!isEditing}
-              type={campo.type}
-              autoComplete={campo.autoComplete}
-            />
+              className={campo.visivel === false ? 'hidden' : undefined}
+              aria-hidden={campo.visivel === false ? true : undefined}
+            >
+              <PerfilCampoInputRow
+                id={`perfil-${campo.key}`}
+                label={campo.label}
+                icon={campo.icon}
+                value={form[campo.key]}
+                onChange={value => updateField(campo.key, value)}
+                disabled={!isEditing}
+                type={campo.type}
+                autoComplete={campo.autoComplete}
+              />
+            </div>
           ))}
         </div>
     </div>

@@ -12,7 +12,6 @@ import { PerfilDadosPessoaisTab } from './components/PerfilDadosPessoaisTab'
 import { PerfilConfiguracoesTab } from './components/PerfilConfiguracoesTab'
 import type { PerfilDadosExibicao, PerfilTabId } from './types/perfilTypes'
 import { PERFIL_CONTENT_WIDTH_CLASS, PERFIL_TABS } from './types/perfilTypes'
-import { getPerfilIniciais } from './utils/perfilDisplayUtils'
 
 /**
  * Perfil da conta (hub): dados do utilizador persistidos após o login
@@ -74,8 +73,6 @@ export function Perfil() {
   const nomeFonte = identityUser ?? sessionUser
   const nome = nomeFonte.getName()?.trim() || nomeFonte.getEmail() || 'Usuário'
   const email = nomeFonte.getEmail()
-  const iniciais = getPerfilIniciais(nome, email)
-
   /** Campos futuros: null até o backend expor GET/PATCH de perfil completo. */
   const dadosExibicao: PerfilDadosExibicao = {
     nomeCompleto: nome,
@@ -189,12 +186,7 @@ export function Perfil() {
           </p>
         </header>
 
-        <PerfilIdentityCard
-          nome={nome}
-          email={email}
-          iniciais={iniciais}
-          localizacao={dadosExibicao.localizacao}
-        />
+        <PerfilIdentityCard nome={nome} email={email} localizacao={dadosExibicao.localizacao} />
 
         <div
           role="tablist"
