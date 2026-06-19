@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { invalidateKanbanVendasListagens } from '@/features/kanban/hooks/kanbanListagemQueryCache'
 import { showToast } from '@/src/shared/utils/toast'
 
 interface WebSocketMessage {
@@ -106,9 +107,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
           } else if (message.type === 'status_update') {
             if (message.vendaId && message.status) {
               // Invalidar cache do React Query
-              queryClient.invalidateQueries({ 
-                queryKey: ['vendas-unificadas'] 
-              })
+              invalidateKanbanVendasListagens(queryClient)
               queryClient.invalidateQueries({ 
                 queryKey: ['vendas'] 
               })
@@ -181,9 +180,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
     const interval = setInterval(() => {
       // Refetch dados a cada 3 segundos
-      queryClient.invalidateQueries({ 
-        queryKey: ['vendas-unificadas'] 
-      })
+      invalidateKanbanVendasListagens(queryClient)
       queryClient.invalidateQueries({ 
         queryKey: ['vendas'] 
       })

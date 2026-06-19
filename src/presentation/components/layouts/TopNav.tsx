@@ -10,7 +10,7 @@ import { disconnectEmpresaTab } from '@/src/presentation/utils/disconnectEmpresa
 import { useEmpresaUrlSync } from '@/src/presentation/hooks/useEmpresaUrlSync'
 import { EmpresaSwitcherTopNav } from './EmpresaSwitcherTopNav'
 import { useQueryClient } from '@tanstack/react-query'
-import { MdDashboard, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight, MdMenu, MdClose } from 'react-icons/md'
+import { MdDashboard, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight, MdMenu, MdClose, MdDeliveryDining } from 'react-icons/md'
 import { 
   MdInventory2, 
   MdShoppingBag, 
@@ -178,6 +178,7 @@ export function TopNav() {
         children: [
           { name: 'Perfis PDV', path: '/perfis-usuarios-pdv', icon: MdGroup },
           { name: 'Usuários PDV', path: '/usuarios', icon: MdPerson },
+          { name: 'Entregadores', path: '/entregadores', icon: MdDeliveryDining },
           { name: 'Clientes', path: '/clientes', icon: MdPeople },
         ],
       },

@@ -12,7 +12,15 @@ type EmpresaSwitcherTopNavProps = {
 export function EmpresaSwitcherTopNav({ variant }: EmpresaSwitcherTopNavProps) {
   const { empresa: empresaLogada, isLoading: carregandoEmpresa } = useEmpresaMe()
 
-  if (carregandoEmpresa || !empresaLogada) {
+  if (carregandoEmpresa) {
+    const skeletonClass =
+      variant === 'mobile'
+        ? 'mt-2 h-10 w-full animate-pulse rounded-lg bg-gray-200/80'
+        : 'ml-auto mr-2 h-9 w-[8.5rem] animate-pulse rounded-lg border-l border-gray-200 bg-gray-200/80'
+    return <div className={skeletonClass} aria-hidden />
+  }
+
+  if (!empresaLogada) {
     return null
   }
 

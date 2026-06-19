@@ -12,6 +12,7 @@ export const ERP_ROUTE_PREFIXES = [
   '/complementos',
   '/taxas',
   '/usuarios',
+  '/entregadores',
   '/clientes',
   '/impressoras',
   '/perfis-usuarios-pdv',

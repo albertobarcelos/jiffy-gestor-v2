@@ -64,6 +64,7 @@ export async function GET(
         nome: response.data?.nome || usuario.getNome(),
         telefone: response.data?.telefone || usuario.getTelefone(),
         ativo: response.data?.ativo !== undefined ? response.data.ativo : usuario.isAtivo(),
+        tipoUsuarioPdv: response.data?.tipoUsuarioPdv || response.data?.tipoUsuario || usuario.getTipoUsuarioPdv(),
         // Extrai o perfilPdvId do objeto perfilPdv.id
         perfilPdvId: perfilPdvIdFromAPI,
         // Garante que a senha seja retornada (pode vir como 'password' ou 'senha')

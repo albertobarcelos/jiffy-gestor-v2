@@ -12,7 +12,15 @@ export const AtualizarClienteSchema = z.object({
   cpf: z.string().nullable().optional(),
   cnpj: z.string().nullable().optional(),
   // null ou '' limpam o valor na API (mesmo padrão de cpf/cnpj no repositório)
-  telefone: z.string().nullable().optional(),
+  telefone: z
+    .union([z.string(), z.null()])
+    .optional()
+    .transform(v => {
+      if (v === undefined) return undefined
+      if (v === null) return null
+      const digitos = v.replace(/\D/g, '')
+      return digitos.length > 0 ? digitos : null
+    }),
   email: z.union([z.string().email('Email inválido'), z.literal(''), z.null()]).optional(),
   nomeFantasia: z.string().nullable().optional(),
   indicadorInscricaoEstadual: z.string().optional(),
