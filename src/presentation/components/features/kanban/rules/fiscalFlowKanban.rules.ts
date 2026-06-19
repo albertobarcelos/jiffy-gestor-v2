@@ -387,3 +387,10 @@ export function formatarTipoVenda(tipo: string | null | undefined): string {
   if (t === 'gestor') return 'Gestor'
   return tipo.charAt(0).toUpperCase() + tipo.slice(1).toLowerCase()
 }
+
+/** Cupom público `/notas-fiscais/{id}`: apenas PDV + NFC-e (API homolog já suporta). */
+export function kanbanVendaUsaCupomPublicoNfce(
+  v: Pick<Venda, 'origem' | 'tipoDocFiscal'>
+): boolean {
+  return v.origem === 'PDV' && v.tipoDocFiscal === 'NFCE'
+}

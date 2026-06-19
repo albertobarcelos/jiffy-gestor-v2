@@ -9,6 +9,7 @@ import {
 import {
   fiscalKanbanPodeReemitirAposCooldown,
   deveExibirBotaoEmitirNotaNoKanban,
+  kanbanVendaUsaCupomPublicoNfce,
   statusFiscalAguardandoSefaz,
   vendaBloqueadaParaEmissaoInterativa,
 } from '@/src/presentation/components/features/kanban/rules/fiscalFlowKanban.rules'
@@ -150,5 +151,30 @@ describe('fiscalFlowKanban.rules — desbloqueio no Kanban', () => {
     Date.now = () => new Date('2026-06-08T12:11:00.000Z').getTime()
     expect(venda.getEtapaKanban()).toBe('PENDENTE_EMISSAO')
     Date.now = agoraAnterior
+  })
+})
+
+describe('kanbanVendaUsaCupomPublicoNfce', () => {
+  it('só habilita cupom público para PDV + NFC-e', () => {
+    expect(
+      kanbanVendaUsaCupomPublicoNfce(
+        criarVendaKanban({ origem: 'PDV', tipoDocFiscal: 'NFCE' })
+      )
+    ).toBe(true)
+    expect(
+      kanbanVendaUsaCupomPublicoNfce(
+        criarVendaKanban({ origem: 'GESTOR', tipoDocFiscal: 'NFCE' })
+      )
+    ).toBe(false)
+    expect(
+      kanbanVendaUsaCupomPublicoNfce(
+        criarVendaKanban({ origem: 'PDV', tipoDocFiscal: 'NFE' })
+      )
+    ).toBe(false)
+    expect(
+      kanbanVendaUsaCupomPublicoNfce(
+        criarVendaKanban({ origem: 'DELIVERY_IFOOD', tipoDocFiscal: 'NFCE' })
+      )
+    ).toBe(false)
   })
 })
