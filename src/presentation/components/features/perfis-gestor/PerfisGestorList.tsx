@@ -14,7 +14,8 @@ import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import { MdSearch, MdKeyboardArrowRight, MdPerson } from 'react-icons/md'
+import { MdKeyboardArrowRight, MdPerson } from 'react-icons/md'
+import { useRegisterHubSearch } from '@/src/presentation/contexts/HubSearchContext'
 import {
   PerfisGestorTabsModal,
   type PerfisGestorTabsModalState,
@@ -39,6 +40,12 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
   const [isLoading, setIsLoading] = useState(false)
   const [searchText, setSearchText] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  useRegisterHubSearch({
+    value: searchText,
+    onChange: setSearchText,
+    placeholder: 'Pesquisar perfil gestor...',
+  })
   const [expandedPerfis, setExpandedPerfis] = useState<Set<string>>(new Set())
   const [usuariosPorPerfil, setUsuariosPorPerfil] = useState<Record<string, any[]>>({})
   const [contagemUsuariosPorPerfil, setContagemUsuariosPorPerfil] = useState<Record<string, number>>({})
@@ -436,20 +443,6 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
         <span className="font-nunito text-sm font-semibold text-secondary md:text-lg">
           Perfis Gestor Cadastrados
         </span>
-      </div>
-
-      <div className="mt-2 flex flex-shrink-0 flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div className="relative h-8 min-w-[180px] max-w-[360px] flex-1">
-          <MdSearch className="absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-secondary-text" />
-          <input
-            id="perfis-gestor-search"
-            type="search"
-            placeholder="Pesquisar perfil gestor..."
-            value={searchText}
-            onChange={e => setSearchText(e.target.value)}
-            className="h-full w-full rounded-lg border border-gray-200 bg-info pl-11 pr-4 font-nunito text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
-          />
-        </div>
       </div>
 
       {perfis.length > 0 && (

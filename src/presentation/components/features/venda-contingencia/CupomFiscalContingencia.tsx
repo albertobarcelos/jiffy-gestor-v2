@@ -1,5 +1,7 @@
 import type { VendaContingenciaPublica } from '@/src/infrastructure/api/fetchVendaContingenciaPublica'
+import { deveExibirRodapeDanfe80mm } from '@/src/infrastructure/api/fetchVendaContingenciaPublica'
 import { CupomRodapeDanfe80 } from '@/src/presentation/components/features/venda-contingencia/CupomRodapeDanfe80'
+import { Heart } from 'lucide-react'
 
 function formatMoney(value: number | null | undefined): string {
   if (value == null || Number.isNaN(value)) return '0,00'
@@ -33,12 +35,47 @@ function formatDateTime(dateString: string | null | undefined): string {
   }
 }
 
-function linhaTotalItem(
-  q: number | undefined,
-  vu: number | undefined
-): number | null {
-  if (q == null || vu == null) return null
-  return q * vu
+function parseNumeroCampo(value: string | number | null | undefined): number | null {
+  if (value == null || value === '') return null
+  const n = typeof value === 'string' ? parseFloat(value) : value
+  return Number.isFinite(n) ? n : null
+}
+
+function tipoAjusteEhPercentual(tipo: string | null | undefined): boolean {
+  const t = String(tipo ?? '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+  return (
+    t === 'percentual' ||
+    t === 'porcentagem' ||
+    t === 'percentage' ||
+    t.includes('percent')
+  )
+}
+
+type ProdutoCupom = NonNullable<VendaContingenciaPublica['produtosLancados']>[number]
+
+/** Exibe o ajuste configurado no produto (ex.: -50%, +2,00) usando campos da API, sem recalcular totais. */
+function formatarAjusteProdutoCupom(produto: ProdutoCupom): string {
+  const desconto = parseNumeroCampo(produto.desconto)
+  if (desconto != null && desconto > 0) {
+    if (tipoAjusteEhPercentual(produto.tipoDesconto)) {
+      return `-${Math.round(desconto * 100)}%`
+    }
+    return `-${formatMoney(desconto)}`
+  }
+
+  const acrescimo = parseNumeroCampo(produto.acrescimo)
+  if (acrescimo != null && acrescimo > 0) {
+    if (tipoAjusteEhPercentual(produto.tipoAcrescimo)) {
+      return `+${Math.round(acrescimo * 100)}%`
+    }
+    return `+${formatMoney(acrescimo)}`
+  }
+
+  return ''
 }
 
 function rotuloTipoDocPorModelo(modelo: number | null | undefined): string | null {
@@ -48,8 +85,25 @@ function rotuloTipoDocPorModelo(modelo: number | null | undefined): string | nul
   return `Modelo ${modelo}`
 }
 
-/** Título do cupom: Poppins extrabold; corpo do cupom segue monoespaçada. */
-function TituloCupomVenda({ data }: { data: VendaContingenciaPublica }) {
+function resolveNomeEstabelecimento(data: VendaContingenciaPublica): string {
+  const razaoSocial = data.emitente?.razaoSocial?.trim()
+  if (razaoSocial) return razaoSocial
+  const nomeEmpresa = data.nomeEmpresa?.trim()
+  if (nomeEmpresa) return nomeEmpresa
+  const nomeEmpresaLegacy = data.empresa?.nome?.trim()
+  if (nomeEmpresaLegacy) return nomeEmpresaLegacy
+  return 'Estabelecimento'
+}
+
+function resolveCnpjEstabelecimento(data: VendaContingenciaPublica): string | undefined {
+  const cnpj = data.emitente?.cnpj?.trim() || data.empresa?.cnpj?.trim()
+  return cnpj || undefined
+}
+
+/** Cabeçalho: emitente em destaque + linha da venda mais compacta. */
+function CabecalhoCupom({ data }: { data: VendaContingenciaPublica }) {
+  const empresa = resolveNomeEstabelecimento(data)
+  const cnpj = resolveCnpjEstabelecimento(data)
   const codigoRaw = data.codigoVenda
   const codigo =
     codigoRaw != null && String(codigoRaw).trim() !== '' ? String(codigoRaw).trim() : '—'
@@ -59,10 +113,59 @@ function TituloCupomVenda({ data }: { data: VendaContingenciaPublica }) {
       : '—'
 
   return (
-    <h1 className="font-poppins flex flex-wrap items-baseline justify-center gap-x-2 sm:gap-x-3 text-center text-lg md:text-xl font-extrabold text-black pb-1 leading-tight">
-      <span>VENDA #{codigo}</span>
-      <span>N° {numero}</span>
-    </h1>
+    <header className="pb-1 text-center">
+      <div className="font-poppins text-base font-extrabold leading-snug text-black md:text-xl">
+        {empresa}
+      </div>
+      {cnpj && <div className="text-xs text-black/75">CNPJ: {cnpj}</div>}
+      <h1 className="font-poppins mt-2 flex flex-wrap items-baseline justify-center gap-x-2 text-sm font-semibold leading-tight text-black/85">
+        <span>VENDA #{codigo}</span>
+        <span>N° {numero}</span>
+      </h1>
+    </header>
+  )
+}
+
+function CupomFooterMarca() {
+  return (
+    <footer className="mt-4 border-t border-slate-300/80 pt-3">
+      <p className="font-poppins flex items-center justify-center gap-1 text-center text-xs text-black/70">
+        <span>Venda feita por Jiffy com amor</span>
+        <Heart className="size-3 shrink-0 fill-black text-black" aria-hidden />
+        <span>!</span>
+      </p>
+    </footer>
+  )
+}
+
+/** Rodapé: QR quando emitida; aviso de contingência + emissão em andamento caso contrário. */
+function CupomRodapeFiscal({
+  data,
+  rodapeDanfeSrc,
+}: {
+  data: VendaContingenciaPublica
+  rodapeDanfeSrc?: string | null
+}) {
+  const notaEmitida = deveExibirRodapeDanfe80mm(data)
+
+  if (notaEmitida) {
+    return <CupomRodapeDanfe80 src={rodapeDanfeSrc} />
+  }
+
+  return (
+    <>
+      <div className="my-3 h-px bg-black/40" />
+      <p className="text-center text-xs leading-snug">
+        Documento emitido em contingência. Troque pela via definitiva quando disponível, conforme
+        legislação.
+      </p>
+      <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-center text-xs leading-relaxed text-amber-950">
+        <p className="font-semibold">Nota fiscal em processamento</p>
+        <p className="mt-1">
+          A NFC-e está sendo emitida. Atualize esta página após 5 minutos para consultar o QR Code.
+        </p>
+      </div>
+    </>
   )
 }
 
@@ -84,22 +187,20 @@ export function CupomFiscalContingencia({ data, rodapeDanfeSrc }: CupomFiscalCon
   if (textoPuro) {
     return (
       <>
-        <TituloCupomVenda data={data} />
-        <div className="h-px bg-slate-300 my-2" />
+        <CabecalhoCupom data={data} />
+        <div className="my-2 h-px bg-slate-300" />
         <pre
           className="whitespace-pre-wrap break-words text-sm leading-relaxed"
           style={{ fontFamily: "'Roboto Mono', 'Courier New', monospace" }}
         >
           {textoPuro}
         </pre>
-        <CupomRodapeDanfe80 src={rodapeDanfeSrc} />
+        <CupomRodapeFiscal data={data} rodapeDanfeSrc={rodapeDanfeSrc} />
+        <CupomFooterMarca />
       </>
     )
   }
 
-  const empresa =
-    data.nomeEmpresa || data.empresa?.nome || 'Estabelecimento'
-  const cnpj = data.empresa?.cnpj
   const rf = data.resumoFiscal
   const tipoDocExibicao =
     data.tipoDocFiscal?.trim() || rotuloTipoDocPorModelo(rf?.modelo ?? undefined)
@@ -114,12 +215,10 @@ export function CupomFiscalContingencia({ data, rodapeDanfeSrc }: CupomFiscalCon
 
   return (
     <div className="space-y-2 text-sm" style={{ fontFamily: "'Roboto Mono', 'Courier New', monospace" }}>
-      <TituloCupomVenda data={data} />
-      <div className="h-px bg-slate-300 my-2" />
+      <CabecalhoCupom data={data} />
+      <div className="my-2 h-px bg-slate-300" />
 
       <div className="space-y-0.5">
-        <div className="font-bold">{empresa}</div>
-        {cnpj && <div>CNPJ: {cnpj}</div>}
         {data.codigoVenda != null && <div>Cód. venda: {data.codigoVenda}</div>}
         {data.numeroVenda != null && <div>Nº venda: {data.numeroVenda}</div>}
         {(data.codigoTerminal || data.terminalNome) && (
@@ -165,6 +264,12 @@ export function CupomFiscalContingencia({ data, rodapeDanfeSrc }: CupomFiscalCon
                 <th className="text-right py-1 font-bold" style={{ padding: '2px' }}>
                   Qtd
                 </th>
+                <th className="text-right py-1 font-bold whitespace-nowrap" style={{ padding: '2px' }}>
+                  Acres/Desc
+                </th>
+                <th className="text-right py-1 font-bold whitespace-nowrap" style={{ padding: '2px' }}>
+                  Val Unit.
+                </th>
                 <th className="text-right py-1 font-bold" style={{ padding: '2px' }}>
                   Total
                 </th>
@@ -173,8 +278,7 @@ export function CupomFiscalContingencia({ data, rodapeDanfeSrc }: CupomFiscalCon
             <tbody>
               {produtos.map((p, i) => {
                 const q = p.quantidade ?? 0
-                const vu = p.valorUnitario ?? 0
-                const total = linhaTotalItem(q, vu)
+                const ajuste = formatarAjusteProdutoCupom(p)
                 return (
                   <tr key={i}>
                     <td style={{ padding: '2px', verticalAlign: 'top' }}>
@@ -190,7 +294,13 @@ export function CupomFiscalContingencia({ data, rodapeDanfeSrc }: CupomFiscalCon
                       {formatMoney(q)}
                     </td>
                     <td className="text-right whitespace-nowrap" style={{ padding: '2px' }}>
-                      {total != null ? formatCurrencyBrl(total) : '—'}
+                      {ajuste}
+                    </td>
+                    <td className="text-right whitespace-nowrap" style={{ padding: '2px' }}>
+                      {p.valorUnitario != null ? formatMoney(p.valorUnitario) : '—'}
+                    </td>
+                    <td className="text-right whitespace-nowrap" style={{ padding: '2px' }}>
+                      {p.valorFinal != null ? formatCurrencyBrl(p.valorFinal) : '—'}
                     </td>
                   </tr>
                 )
@@ -244,11 +354,8 @@ export function CupomFiscalContingencia({ data, rodapeDanfeSrc }: CupomFiscalCon
         </>
       )}
 
-      <div className="h-px bg-black/40 my-3" />
-      <p className="text-center text-xs leading-snug">
-        Documento emitido em contingência. Troque pela via definitiva quando disponível, conforme legislação.
-      </p>
-      <CupomRodapeDanfe80 src={rodapeDanfeSrc} />
+      <CupomRodapeFiscal data={data} rodapeDanfeSrc={rodapeDanfeSrc} />
+      <CupomFooterMarca />
     </div>
   )
 }

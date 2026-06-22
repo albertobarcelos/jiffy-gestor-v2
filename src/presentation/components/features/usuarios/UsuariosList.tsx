@@ -29,13 +29,27 @@ import {
 
 interface UsuariosListProps {
   onReload?: () => void
+  tipoUsuarioPdv?: string
+  title?: string
+  createLabel?: string
+  emptyMessage?: string
+}
+
+function normalizarTipoUsuarioPdv(valor: unknown): string {
+  return String(valor ?? '').trim().toLowerCase()
 }
 
 /**
  * Lista de usuários carregando todos os itens de uma vez
  * Faz requisições sequenciais de 10 em 10 até carregar tudo
  */
-export function UsuariosList({ onReload }: UsuariosListProps) {
+export function UsuariosList({
+  onReload,
+  tipoUsuarioPdv,
+  title = 'Usuários Cadastrados',
+  createLabel = 'Novo',
+  emptyMessage = 'Nenhum usuário encontrado.',
+}: UsuariosListProps) {
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [searchText, setSearchText] = useState('')
@@ -57,7 +71,7 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
-  const { auth, isAuthenticated } = useAuthStore()
+  const { auth } = useAuthStore()
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -170,6 +184,7 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
               : null
 
         // Loop para carregar todas as páginas
+        hasLoadedInitialRef.current = true
         while (hasMore) {
           const params = new URLSearchParams({
             limit: '10',
@@ -182,6 +197,9 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
 
           if (ativoFilter !== null) {
             params.append('ativo', ativoFilter.toString())
+          }
+          if (tipoUsuarioPdv) {
+            params.append('tipoUsuarioPdv', tipoUsuarioPdv)
           }
 
           const response = await fetch(`/api/usuarios?${params.toString()}`, {
@@ -198,8 +216,15 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
           }
 
           const data = await response.json()
+          const rawItems = Array.isArray(data.items) ? data.items : []
+          const filteredItems = tipoUsuarioPdv
+            ? rawItems.filter((item: any) => {
+                const tipo = normalizarTipoUsuarioPdv(item.tipoUsuarioPdv)
+                return tipo === normalizarTipoUsuarioPdv(tipoUsuarioPdv)
+              })
+            : rawItems
 
-          const newUsuarios = (data.items || []).map((item: any) =>
+          const newUsuarios = filteredItems.map((item: any) =>
             Usuario.fromJSON(item)
           )
 
@@ -207,55 +232,22 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
 
           // Atualiza o total apenas na primeira requisição
           if (currentOffset === 0) {
-            totalCount = data.count || 0
+            totalCount = tipoUsuarioPdv ? allUsuarios.length : data.count || 0
           }
 
           // Verifica se há mais páginas
           // Se retornou menos de 10 itens, não há mais páginas
-          hasMore = newUsuarios.length === 10
-          currentOffset += newUsuarios.length
+          hasMore = rawItems.length === 10
+          currentOffset += rawItems.length
         }
 
-        // Coleta todos os perfilPdvId únicos
-        const perfilPdvIds = Array.from(
-          new Set(
-            allUsuarios
-              .map((u) => u.getPerfilPdvId())
-              .filter((id): id is string => !!id)
-          )
-        )
-
-        // Busca os roles de todos os perfis únicos em paralelo
-        const perfisMapTemp: Record<string, string> = {}
-        if (perfilPdvIds.length > 0) {
-          await Promise.all(
-            perfilPdvIds.map(async (perfilId) => {
-              try {
-                const perfilResponse = await fetch(`/api/perfis-pdv/${perfilId}`, {
-                  headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                  },
-                })
-
-                if (perfilResponse.ok) {
-                  const perfilData = await perfilResponse.json()
-                  perfisMapTemp[perfilId] = perfilData.role || '-'
-                } else {
-                  perfisMapTemp[perfilId] = '-'
-                }
-              } catch (error) {
-                console.error(`Erro ao buscar perfil PDV ${perfilId}:`, error)
-                perfisMapTemp[perfilId] = '-'
-              }
-            })
-          )
+        if (tipoUsuarioPdv) {
+          totalCount = allUsuarios.length
         }
 
-        // Atualiza o estado com todos os itens carregados e o mapa de perfis
+        // Atualiza o estado com todos os itens carregados.
         setUsuarios(allUsuarios)
         setTotalUsuarios(totalCount)
-        setPerfisMap(perfisMapTemp)
       } catch (error) {
         console.error('Erro ao carregar usuários:', error)
         setUsuarios([])
@@ -264,7 +256,7 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
         setIsLoading(false)
       }
     },
-    [auth]
+    [auth, tipoUsuarioPdv]
   )
 
   // Debounce da busca (500ms)
@@ -291,18 +283,6 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
 
     loadAllUsuarios()
   }, [debouncedSearch, filterStatus, auth, loadAllUsuarios])
-
-  // Carrega usuários iniciais apenas quando o token estiver disponível
-  useEffect(() => {
-    if (!isAuthenticated || hasLoadedInitialRef.current) return
-
-    const token = auth?.getAccessToken()
-    if (!token) return
-
-    hasLoadedInitialRef.current = true
-    loadAllUsuarios()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated])
 
   const handleStatusChange = () => {
     loadAllUsuarios()
@@ -553,7 +533,7 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
         <div className="flex items-center justify-between">
           <div className="w-1/2 md:pl-5">
             <p className="text-primary md:text-lg text-sm font-semibold font-nunito">
-              Usuários Cadastrados
+              {title}
             </p>
             <p className="text-tertiary md:text-[22px] text-sm font-normal font-nunito">
               Total {usuarios.length} de {totalUsuarios}
@@ -568,7 +548,7 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
             }}
             className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
           >
-            Novo
+            {createLabel}
             <span className="text-lg">+</span>
           </button>
         </div>
@@ -648,7 +628,7 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
         {/* Só exibir mensagem de "nenhum usuário" quando realmente não há usuários e já houve tentativa de carregamento */}
         {usuarios.length === 0 && !isLoading && hasLoadedInitialRef.current && (
           <div className="flex items-center justify-center py-12">
-            <p className="text-secondary-text">Nenhum usuário encontrado.</p>
+            <p className="text-secondary-text">{emptyMessage}</p>
           </div>
         )}
 
@@ -789,6 +769,8 @@ export function UsuariosList({ onReload }: UsuariosListProps) {
         onClose={closeTabsModal}
         onReload={handleTabsModalReload}
         onTabChange={handleTabsModalTabChange}
+        forcedTipoUsuarioPdv={tipoUsuarioPdv}
+        entityLabel={tipoUsuarioPdv === 'entregador' ? 'Entregador' : 'Usuário'}
       />
 
       {/* Modal de confirmação de exclusão */}

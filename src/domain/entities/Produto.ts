@@ -1,3 +1,8 @@
+import {
+  normalizarUnidadeMedidaProduto,
+  type UnidadeMedidaProduto,
+} from '@/src/shared/types/unidadeMedidaProduto'
+
 /**
  * Entidade de domínio representando um Produto
  */
@@ -118,7 +123,8 @@ export class Produto {
     private readonly cest?: string,
     private readonly origemMercadoria?: string,
     private readonly tipoProduto?: string,
-    private readonly indicadorProducaoEscala?: string | null
+    private readonly indicadorProducaoEscala?: string | null,
+    private readonly unidadeMedida: UnidadeMedidaProduto = 'UN'
   ) {}
 
   static create(
@@ -143,7 +149,8 @@ export class Produto {
     cest?: string,
     origemMercadoria?: string,
     tipoProduto?: string,
-    indicadorProducaoEscala?: string | null
+    indicadorProducaoEscala?: string | null,
+    unidadeMedida?: UnidadeMedidaProduto
   ): Produto {
     if (!id || !nome) {
       throw new Error('ID e nome são obrigatórios')
@@ -171,7 +178,8 @@ export class Produto {
       cest,
       origemMercadoria,
       tipoProduto,
-      indicadorProducaoEscala
+      indicadorProducaoEscala,
+      normalizarUnidadeMedidaProduto(unidadeMedida)
     )
   }
 
@@ -230,7 +238,8 @@ export class Produto {
       fisc.cest,
       fisc.origemMercadoria,
       fisc.tipoProduto,
-      fisc.indicadorProducaoEscala
+      fisc.indicadorProducaoEscala,
+      normalizarUnidadeMedidaProduto(data.unidadeMedida)
     )
   }
 
@@ -327,6 +336,10 @@ export class Produto {
     return String(v).trim()
   }
 
+  getUnidadeMedida(): UnidadeMedidaProduto {
+    return this.unidadeMedida
+  }
+
   toJSON() {
     return {
       id: this.id,
@@ -351,6 +364,7 @@ export class Produto {
       origemMercadoria: this.origemMercadoria ?? '',
       tipoProduto: this.tipoProduto ?? '',
       indicadorProducaoEscala: this.indicadorProducaoEscala ?? null,
+      unidadeMedida: this.unidadeMedida,
     }
   }
 }

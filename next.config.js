@@ -5,6 +5,7 @@ const path = require('path')
 const ERP_LEGACY_CADASTROS_SEGMENTS = [
   'clientes',
   'usuarios',
+  'entregadores',
   'perfis-usuarios-pdv',
   'grupos-produtos',
   'grupos-complementos',
@@ -104,10 +105,16 @@ const nextConfig = {
     const rechartsPath = path.resolve(__dirname, 'node_modules', 'recharts')
     const radixSlotPath = path.resolve(__dirname, 'node_modules', '@radix-ui', 'react-slot')
     
+    const featuresRoot = path.resolve(__dirname, 'src/presentation/components/features')
+
     config.resolve.alias = {
       ...config.resolve.alias,
       recharts: rechartsPath,
       '@radix-ui/react-slot': radixSlotPath,
+      '@/features/kanban': path.join(featuresRoot, 'kanban'),
+      '@/features/pedidos': path.join(featuresRoot, 'pedidos'),
+      '@/features/delivery': path.join(featuresRoot, 'delivery'),
+      '@/features/fiscal': path.join(featuresRoot, 'fiscal'),
     }
     
     return config

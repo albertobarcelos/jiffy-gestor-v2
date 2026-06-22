@@ -29,7 +29,7 @@ import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { TipoVendaIcon } from './TipoVendaIcon'
 import { useCancelarVendaGestor } from '@/src/presentation/hooks/useVendas'
-import { StatusFiscalBadge } from '@/src/presentation/components/features/nfe/StatusFiscalBadge'
+import { StatusFiscalBadge } from '@/src/presentation/components/features/fiscal'
 import {
   abrirDocumentoFiscalPdf,
   tipoDocFiscalFromModelo,
@@ -1326,7 +1326,14 @@ export function DetalhesVendas({
           <div className="flex flex-1 items-center justify-center gap-2">
             {venda && (
               <TipoVendaIcon
-                tipoVenda={tabelaOrigem === 'venda_gestor' ? 'gestor' : venda.tipoVenda}
+                tipoVenda={
+                  tabelaOrigem === 'venda_gestor'
+                    ? (String(venda.tipoVenda ?? '').trim().toLowerCase() === 'entrega' ||
+                      String(venda.tipoVenda ?? '').trim().toLowerCase() === 'retirada')
+                      ? (String(venda.tipoVenda ?? '').trim().toLowerCase() as 'entrega' | 'retirada')
+                      : 'gestor'
+                    : (venda.tipoVenda as 'mesa' | 'balcao' | 'gestor' | 'entrega' | 'retirada')
+                }
                 numeroMesa={venda.numeroMesa}
                 containerScale={0.9}
                 className="flex-shrink-0"
@@ -1337,6 +1344,7 @@ export function DetalhesVendas({
                 corFundo="var(--color-primary-background)"
                 corBalcao="var(--color-info)"
                 corGestor="var(--color-info)"
+                corEntrega="var(--color-info)"
               />
             )}
             <div className="flex flex-col" id="detalhes-vendas-titulo-appbar">

@@ -5,7 +5,7 @@ import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 /**
  * GET /api/vendas/unificado
  * Proxy passthrough para GET /api/v1/vendas/unificado do backend.
- * Parâmetros são repassados diretamente (frontend já envia no formato correto).
+ * Listagem delivery do Kanban usa GET /api/delivery/pedidos (módulo Jiffy).
  */
 export async function GET(request: NextRequest) {
   try {
@@ -15,11 +15,10 @@ export async function GET(request: NextRequest) {
     }
     const { tokenInfo } = validation
 
-    // Repassa query params diretamente ao backend
     const { searchParams } = new URL(request.url)
 
     const apiClient = new ApiClient()
-    const response = await apiClient.request<any>(
+    const response = await apiClient.request<unknown>(
       `/api/v1/vendas/unificado?${searchParams.toString()}`,
       {
         method: 'GET',
@@ -30,7 +29,7 @@ export async function GET(request: NextRequest) {
       }
     )
 
-    return NextResponse.json(response.data || {})
+    return NextResponse.json(response.data ?? {})
   } catch (error) {
     console.error('Erro ao buscar vendas unificadas:', error)
     if (error instanceof ApiError) {
@@ -39,9 +38,6 @@ export async function GET(request: NextRequest) {
         { status: error.status }
       )
     }
-    return NextResponse.json(
-      { error: 'Erro interno do servidor' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
   }
 }

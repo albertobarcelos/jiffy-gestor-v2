@@ -1,15 +1,16 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import type { LoginEmpresaSnapshot } from '@/src/domain/types/LoginEmpresaSnapshot'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { prepareTabSession } from '@/src/shared/utils/tabSession'
 import { fetchAccessTokenEscolherEmpresa } from '@/src/presentation/utils/escolherEmpresaApi'
 import type { ConvitePendente } from '@/src/presentation/components/features/convites/types'
-import { SearchBar } from './components/SearchBar'
+import { useRegisterHubSearch } from '@/src/presentation/contexts/HubSearchContext'
 import { MeusAppsFeedGrid } from './components/MeusAppsFeedGrid'
-import type { MeusAppsFeedItem } from './types'
+import { MEUS_APPS_GRID_PREVIEW_LIMIT, type MeusAppsFeedItem } from './types'
 import { buildMeusAppsGridCells } from './utils/buildMeusAppsGridCells'
 import { MeusAppsFeedList } from './components/MeusAppsFeedList'
 import {
@@ -17,7 +18,6 @@ import {
   type MeusAppsFeedFiltro,
   type MeusAppsViewMode,
 } from './components/ViewControls'
-import { MeusAppsTopNav } from './components/MeusAppsTopNav'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { empresaParaMeusApp } from './utils/empresaParaMeusApp'
 import { conviteParaEmpresaSnapshot } from '@/src/presentation/components/features/convites/utils/conviteParaEmpresaSnapshot'
@@ -27,11 +27,12 @@ import {
   isLikelyVinculoRemovidoError,
 } from './utils/hubSessionTokenFeedback'
 import { appEmpresaCorrespondeBusca, conviteCorrespondeBusca } from './utils/meusAppsBusca'
-import { empresaNomeParaSlugUrl } from '@/src/shared/utils/empresaNomeParaSlugUrl'
+import { activateHubEmpresaSessionAndBuildUrl } from './utils/activateHubEmpresaSession'
 
 const HUB_SESSAO_TOAST_ID = 'meus-apps-sessao-token'
 
 export default function MeusAppsPage() {
+  const router = useRouter()
   const hubEmpresas = useAuthStore(s => s.hubEmpresas)
   const setHubEmpresas = useAuthStore(s => s.setHubEmpresas)
   /** Sessão do hub (identidade); não usar `auth` aqui — pode ser só tenant se outra aba abriu empresa. */
@@ -39,6 +40,12 @@ export default function MeusAppsPage() {
   const isRehydrated = useAuthStore(s => s.isRehydrated)
 
   const [busca, setBusca] = useState('')
+
+  useRegisterHubSearch({
+    value: busca,
+    onChange: setBusca,
+    placeholder: 'Busque sua empresa',
+  })
   const [viewMode, setViewMode] = useState<MeusAppsViewMode>('grid')
   const [feedFiltro, setFeedFiltro] = useState<MeusAppsFeedFiltro>('tudo')
   const [busyAppId, setBusyAppId] = useState<string | null>(null)
@@ -288,16 +295,47 @@ export default function MeusAppsPage() {
     return [...conv, ...emp]
   }, [convitesFiltrados, appsFiltrados, feedFiltro])
 
-  /** Com grade “resumida”, só os 2 primeiros itens do feed aparecem — convites vêm primeiro e escondiam empresas. Com busca ativa, expande para mostrar todos os resultados. */
+  const conviteFeedItems = useMemo(
+    () => feedItems.filter((item): item is Extract<MeusAppsFeedItem, { kind: 'convite' }> => item.kind === 'convite'),
+    [feedItems]
+  )
+
+  const empresaFeedItems = useMemo(
+    () => feedItems.filter((item): item is Extract<MeusAppsFeedItem, { kind: 'empresa' }> => item.kind === 'empresa'),
+    [feedItems]
+  )
+
+  /** Grade resumida: até 15 itens do feed (convites + empresas); busca ativa expande para todos os resultados. */
   const buscaAtiva = Boolean(busca.trim())
   const gridExpandidoEfetivo = feedGridExpandido || buscaAtiva
 
-  const gridCells = useMemo(
-    () => buildMeusAppsGridCells(feedItems, { expandido: gridExpandidoEfetivo }),
+  const feedItemsParaGrid = useMemo(
+    () => (gridExpandidoEfetivo ? feedItems : feedItems.slice(0, MEUS_APPS_GRID_PREVIEW_LIMIT)),
     [feedItems, gridExpandidoEfetivo]
   )
 
-  /** Nova busca ou troca de filtro volta ao preview da primeira linha no grid. */
+  const conviteFeedItemsGrid = useMemo(
+    () =>
+      feedItemsParaGrid.filter(
+        (item): item is Extract<MeusAppsFeedItem, { kind: 'convite' }> => item.kind === 'convite'
+      ),
+    [feedItemsParaGrid]
+  )
+
+  const empresaFeedItemsGrid = useMemo(
+    () =>
+      feedItemsParaGrid.filter(
+        (item): item is Extract<MeusAppsFeedItem, { kind: 'empresa' }> => item.kind === 'empresa'
+      ),
+    [feedItemsParaGrid]
+  )
+
+  const gridEmpresaCells = useMemo(
+    () => buildMeusAppsGridCells(empresaFeedItemsGrid, { expandido: true }),
+    [empresaFeedItemsGrid]
+  )
+
+  /** Nova busca ou troca de filtro volta ao preview do grid (15 itens). */
   useEffect(() => {
     setFeedGridExpandido(false)
   }, [busca, feedFiltro])
@@ -367,9 +405,13 @@ export default function MeusAppsPage() {
 
     try {
       const token = await obterTokenEmpresa(appId)
-      const { empParam } = prepareTabSession(token, app.nome, appId)
-      const slug = empresaNomeParaSlugUrl(app.nome)
-      window.open(`/meus-apps/gerenciar-usuarios/${slug}?${empParam}`, '_blank')
+      const url = activateHubEmpresaSessionAndBuildUrl(
+        token,
+        app.nome,
+        appId,
+        '/meus-apps/gerenciar-usuarios'
+      )
+      router.push(url)
     } catch (e) {
       reportErroAcessoEmpresa(e, appId)
     }
@@ -385,9 +427,13 @@ export default function MeusAppsPage() {
 
     try {
       const token = await obterTokenEmpresa(appId)
-      const { empParam } = prepareTabSession(token, app.nome, appId)
-      const slug = empresaNomeParaSlugUrl(app.nome)
-      window.open(`/meus-apps/perfis-gestor/${slug}?${empParam}`, '_blank')
+      const url = activateHubEmpresaSessionAndBuildUrl(
+        token,
+        app.nome,
+        appId,
+        '/meus-apps/perfis-gestor'
+      )
+      router.push(url)
     } catch (e) {
       reportErroAcessoEmpresa(e, appId)
     }
@@ -430,27 +476,16 @@ export default function MeusAppsPage() {
     return 'Ajuste o filtro de busca ou tente outro termo.'
   }, [busca, feedFiltro, temEmpresas, temConvitesLista, hubEmpresas])
 
-  const descricaoSecaoFeed = useMemo(() => {
-    if (feedFiltro === 'convites') {
-      return 'Somente convites pendentes para o seu e-mail.'
-    }
-    if (feedFiltro === 'empresas') {
-      return 'Somente empresas já vinculadas à sua conta.'
-    }
-    return 'Convites pendentes aparecem primeiro; em seguida, empresas vinculadas.'
-  }, [feedFiltro])
-
-  /** Só na grade: com ≤2 itens a primeira linha já mostra tudo (máx. 2 + slot promo); a partir do 3º item há conteúdo “escondido” até expandir. Busca já expande a grade. */
+  /** Só na grade: preview de até 15 itens (5×3); “Mostrar mais” expande o restante. Busca já expande a grade. */
   const gridPodeResumo =
     convitesCarregados &&
     !feedVazio &&
     viewMode === 'grid' &&
-    feedItems.length > 2 &&
+    feedItems.length > MEUS_APPS_GRID_PREVIEW_LIMIT &&
     !buscaAtiva
 
   return (
     <div className="min-h-0 w-full bg-gray-50 pb-8">
-      <MeusAppsTopNav />
       <div className="mx-auto w-full max-w-[1400px] px-2 pt-3 md:px-4">
         <header className="mb-4 flex flex-col gap-3">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -458,9 +493,6 @@ export default function MeusAppsPage() {
               <h1 className="font-exo text-2xl font-semibold text-gray-900 md:text-3xl">
                 Meus aplicativos
               </h1>
-              <p className="mt-1 text-sm text-gray-600">
-                Convites pendentes e empresas vinculadas à sua conta.
-              </p>
             </div>
           </div>
 
@@ -482,19 +514,16 @@ export default function MeusAppsPage() {
             </div>
           ) : null}
 
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <SearchBar value={busca} onChange={setBusca} className="md:max-w-[520px]" />
-            <div className="flex items-center justify-between gap-2 md:justify-end">
-              <ViewControls
-                mode={viewMode}
-                onModeChange={setViewMode}
-                feedFiltro={feedFiltro}
-                onFeedFiltroChange={setFeedFiltro}
-                onOpenFilters={() => {
-                  console.log('Abrir filtros')
-                }}
-              />
-            </div>
+          <div className="flex items-center justify-end gap-2">
+            <ViewControls
+              mode={viewMode}
+              onModeChange={setViewMode}
+              feedFiltro={feedFiltro}
+              onFeedFiltroChange={setFeedFiltro}
+              onOpenFilters={() => {
+                console.log('Abrir filtros')
+              }}
+            />
           </div>
         </header>
 
@@ -511,9 +540,6 @@ export default function MeusAppsPage() {
 
         {convitesCarregados ? (
           <section aria-label="Aplicativos e convites">
-            <h2 className="mb-1 text-lg font-semibold text-gray-900">Aplicativos e convites</h2>
-            <p className="mb-4 text-sm text-gray-600">{descricaoSecaoFeed}</p>
-
             {feedVazio ? (
               <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-12 text-center shadow-sm">
                 <p className="text-sm font-semibold text-gray-900">{mensagemFeedVazioTitulo}</p>
@@ -521,7 +547,8 @@ export default function MeusAppsPage() {
               </div>
             ) : viewMode === 'grid' ? (
               <MeusAppsFeedGrid
-                cells={gridCells}
+                conviteItems={conviteFeedItemsGrid}
+                empresaCells={gridEmpresaCells}
                 onAcessar={handleAcessar}
                 onGerenciarConvites={handleGerenciarConvites}
                 onGerenciarPerfisGestor={handleGerenciarPerfisGestor}
@@ -532,7 +559,8 @@ export default function MeusAppsPage() {
               />
             ) : (
               <MeusAppsFeedList
-                items={feedItems}
+                conviteItems={conviteFeedItems}
+                empresaItems={empresaFeedItems}
                 onAcessar={handleAcessar}
                 onGerenciarConvites={handleGerenciarConvites}
                 onGerenciarPerfisGestor={handleGerenciarPerfisGestor}
@@ -556,7 +584,8 @@ export default function MeusAppsPage() {
             </button>
             {!feedGridExpandido ? (
               <p className="max-w-md text-center text-xs text-gray-500">
-                Existem mais convites ou empresas além dos dois primeiros desta lista.
+                Existem mais convites ou empresas além dos {MEUS_APPS_GRID_PREVIEW_LIMIT} primeiros
+                desta lista.
               </p>
             ) : null}
           </div>

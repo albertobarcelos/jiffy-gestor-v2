@@ -32,7 +32,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       ...(minLength !== undefined && { minLength }),
       ...(pattern !== undefined && { pattern }),
     }
-    
+
     return (
       <TextField
         ref={ref}
@@ -48,4 +48,3 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
 )
 
 Input.displayName = 'Input'
-

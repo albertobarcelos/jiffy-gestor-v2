@@ -7,6 +7,8 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { ClientesTabsModal, ClientesTabsModalState } from './ClientesTabsModal'
 import { MdSearch, MdVisibility } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
+import { formatarTelefoneBr } from '@/src/shared/utils/telefoneBr'
+import { documentoClienteExibicao } from '@/src/shared/utils/cpfCnpj'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { Tooltip as MuiTooltip } from '@mui/material'
@@ -37,6 +39,11 @@ function textoIndicadorIeLista(valor: string | undefined): string {
   if (valor == null || String(valor).trim() === '') return '-'
   const v = String(valor).trim()
   return INDICADOR_IE_LABELS[v] ?? v
+}
+
+function telefoneListaExibicao(valor: string | undefined): string {
+  if (valor == null || valor.trim() === '') return '-'
+  return formatarTelefoneBr(valor)
 }
 
 /**
@@ -378,10 +385,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
             Nome
           </div>
           <div className="flex-[1.5] font-nunito font-semibold text-sm text-primary-text hidden md:flex">
-            CPF
-          </div>
-          <div className="flex-[1.5] font-nunito font-semibold text-sm text-primary-text hidden md:flex">
-            CNPJ
+            CPF/CNPJ
           </div>
           <div className="flex-[1.5] font-nunito font-semibold text-sm text-primary-text hidden md:flex min-w-0">
             Indicador IE
@@ -439,10 +443,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
               <span>{cliente.getNome()}</span>
             </div>
             <div className="flex-[1.5] font-nunito text-sm text-secondary-text hidden md:flex">
-              {cliente.getCpf() || '-'}
-            </div>
-            <div className="flex-[1.5] font-nunito text-sm text-secondary-text hidden md:flex">
-              {cliente.getCnpj() || '-'}
+              {documentoClienteExibicao(cliente.getCpf(), cliente.getCnpj())}
             </div>
             <MuiTooltip
               title={textoIndicadorIeLista(cliente.getIndicadorInscricaoEstadual())}
@@ -465,7 +466,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
               </div>
             </MuiTooltip>
             <div className="md:flex-[2] flex-[1.5] font-nunito md:text-sm text-xs text-center md:text-start text-secondary-text">
-              {cliente.getTelefone() || '-'}
+              {telefoneListaExibicao(cliente.getTelefone())}
             </div>
             <div className="flex-[2] font-nunito text-sm text-secondary-text hidden md:flex">
               {cliente.getEmail() || '-'}

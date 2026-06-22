@@ -12,6 +12,7 @@ export const ERP_ROUTE_PREFIXES = [
   '/complementos',
   '/taxas',
   '/usuarios',
+  '/entregadores',
   '/clientes',
   '/impressoras',
   '/perfis-usuarios-pdv',
@@ -29,7 +30,7 @@ export const ERP_ROUTE_PREFIXES = [
   '/cadastro-por-planilha',
 ] as const
 
-/** Rotas com navegação própria — fora do `(erp)`. */
+/** Rotas com navegação própria — fora do `(erp)`. Hub usa `(hub)` com `HubAppShell`. */
 export const NON_ERP_ROUTE_PREFIXES = [
   '/login',
   '/registro',

@@ -7,22 +7,6 @@ import { cn } from '@/src/shared/utils/cn'
 import type { MeusApp } from '../types'
 import { buildEmpresaCardGearItems } from '../utils/buildEmpresaCardGearItems'
 
-function StatusBadge({ status }: { status: MeusApp['status'] }) {
-  const label = status === 'ativo' ? 'Ativo' : 'Inativo'
-  return (
-    <span className="inline-flex items-center gap-2 text-xs font-semibold leading-none text-gray-700">
-      <span
-        className={cn(
-          'h-2 w-2 rounded-full',
-          status === 'ativo' ? 'bg-emerald-500' : 'bg-gray-400'
-        )}
-        aria-hidden
-      />
-      {label}
-    </span>
-  )
-}
-
 function AppAvatar({ nome, sigla }: { nome: string; sigla?: string }) {
   const fallback = (sigla?.trim() || nome.trim().slice(0, 2)).toUpperCase()
   return (
@@ -48,10 +32,11 @@ export function AppCard({
   actionsLocked?: boolean
 }) {
   const bloqueado = app.status === 'inativo'
-  const navDisabled = bloqueado || actionsLocked || isSelecting
+  const interactionDisabled = bloqueado || actionsLocked || isSelecting
+  const buttonEmLoading = isSelecting
 
   const gearItems = buildEmpresaCardGearItems(app.id, {
-    navDisabled,
+    navDisabled: interactionDisabled,
     onGerenciarConvites,
     onGerenciarPerfisGestor,
   })
@@ -64,7 +49,7 @@ export function AppCard({
   }
 
   const tentarAcessarPeloCard = () => {
-    if (navDisabled) return
+    if (interactionDisabled) return
     if (Date.now() < ignorarAcessarAteRef.current) return
     onAcessar(app.id)
   }
@@ -72,12 +57,12 @@ export function AppCard({
   return (
     <div
       role="button"
-      tabIndex={navDisabled ? -1 : 0}
+      tabIndex={interactionDisabled ? -1 : 0}
       onClick={() => {
         tentarAcessarPeloCard()
       }}
       onKeyDown={e => {
-        if (navDisabled) {
+        if (interactionDisabled) {
           return
         }
         if (e.key === 'Enter' || e.key === ' ') {
@@ -86,30 +71,29 @@ export function AppCard({
         }
       }}
       className={cn(
-        'flex h-52 flex-col rounded-2xl border border-gray-200 bg-white px-4 py-2 shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30',
-        navDisabled
+        'flex h-52 flex-col rounded-2xl border bg-white px-2 py-2 shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30',
+        bloqueado ? 'border-gray-200' : 'border-secondary/40',
+        bloqueado
           ? 'cursor-not-allowed opacity-75'
-          : 'cursor-pointer hover:shadow-md'
+          : interactionDisabled
+            ? 'cursor-default'
+            : 'cursor-pointer hover:shadow-md'
       )}
       aria-busy={isSelecting}
-      aria-disabled={navDisabled}
+      aria-disabled={interactionDisabled}
       aria-label={
         bloqueado
           ? `${app.nome} (bloqueado)`
           : isSelecting
             ? `Abrindo ${app.nome}`
-            : `Acessar ${app.nome}`
+            : `Acessar empresa ${app.nome}`
       }
     >
       <div className="flex min-h-0 flex-1 flex-col justify-between">
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="flex flex-col gap-3">
-            {/* Uma linha: status à esquerda; plano + ícones à direita, todos com centro vertical alinhado */}
             <div className="flex min-h-9 w-full shrink-0 items-center justify-between gap-2">
-              <div className="flex shrink-0 items-center">
-                <StatusBadge status={app.status} />
-              </div>
-              <div className="flex min-w-0 flex-1 items-center justify-end gap-1">
+              <div className="flex min-w-0 shrink items-center">
                 {/* TODO: substituir por plano real quando o backend expuser o campo */}
                 <span
                   className="truncate text-[11px] font-semibold leading-none text-secondary"
@@ -117,6 +101,8 @@ export function AppCard({
                 >
                   Jiffy Starter
                 </span>
+              </div>
+              <div className="flex shrink-0 items-center justify-end gap-1">
                 <button
                   type="button"
                   onClick={e => e.stopPropagation()}
@@ -127,7 +113,7 @@ export function AppCard({
                   <Heart className="h-4 w-4" aria-hidden />
                 </button>
                 <CardGearMenu
-                  disabled={navDisabled}
+                  disabled={interactionDisabled}
                   triggerAriaLabel="Opções do aplicativo"
                   triggerTitle="Opções do aplicativo"
                   items={gearItems}
@@ -152,21 +138,21 @@ export function AppCard({
         <div className="mb-3 shrink-0">
           <button
             type="button"
-            disabled={navDisabled}
+            disabled={interactionDisabled}
             onClick={e => {
               e.stopPropagation()
-              if (!navDisabled) {
+              if (!interactionDisabled) {
                 onAcessar(app.id)
               }
             }}
             className={cn(
-              'inline-flex h-10 w-full items-center justify-center rounded-lg px-4 text-sm font-semibold text-white transition',
-              navDisabled
+              'inline-flex h-10 w-full items-center justify-center rounded-lg px-2 text-sm font-medium text-white transition disabled:opacity-100',
+              bloqueado || buttonEmLoading
                 ? 'cursor-not-allowed bg-gray-400'
                 : 'bg-secondary hover:bg-alternate'
             )}
           >
-            {bloqueado ? 'Bloqueado' : isSelecting ? 'Abrindo…' : 'Acessar'}
+            {bloqueado ? 'Empresa Bloqueada' : isSelecting ? 'Abrindo…' : 'Acessar Empresa'}
           </button>
         </div>
       </div>

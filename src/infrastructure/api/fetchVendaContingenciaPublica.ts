@@ -47,13 +47,20 @@ export type VendaContingenciaPublica = {
   nomeEmpresa?: string
   clienteNome?: string
   terminalNome?: string
+  emitente?: { razaoSocial?: string; cnpj?: string }
   empresa?: { nome?: string; cnpj?: string }
   produtosLancados?: Array<{
     nomeProduto?: string
     quantidade?: number
     valorUnitario?: number
+    /** Total da linha já calculado no backend. */
+    valorFinal?: number
     desconto?: string | number
     acrescimo?: string | number
+    tipoDesconto?: string | null
+    tipoAcrescimo?: string | null
+    valorDesconto?: number | null
+    valorAcrescimo?: number | null
     complementos?: Array<{
       nomeComplemento?: string
       quantidade?: number
