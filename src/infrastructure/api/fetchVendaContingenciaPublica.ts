@@ -52,7 +52,19 @@ export type VendaContingenciaPublica = {
   nomeEmpresa?: string
   clienteNome?: string
   terminalNome?: string
-  emitente?: { razaoSocial?: string; cnpj?: string }
+  emitente?: {
+    razaoSocial?: string
+    cnpj?: string
+    endereco?: {
+      rua?: string
+      numero?: string
+      bairro?: string | null
+      cidade?: string | null
+      estado?: string | null
+      cep?: string
+      complemento?: string | null
+    }
+  }
   empresa?: { nome?: string; cnpj?: string }
   produtosLancados?: Array<{
     nomeProduto?: string
@@ -70,6 +82,7 @@ export type VendaContingenciaPublica = {
       nomeComplemento?: string
       quantidade?: number
       valorUnitario?: number
+      tipoImpactoPreco?: string | null
     }>
     removido?: boolean
   }>

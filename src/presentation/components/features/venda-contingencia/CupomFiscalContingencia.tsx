@@ -1,9 +1,14 @@
+import { Fragment } from 'react'
 import type { VendaContingenciaPublica } from '@/src/infrastructure/api/fetchVendaContingenciaPublica'
 import {
   deveExibirAguardoFinalizacaoDelivery,
   deveExibirRodapeDanfe80mm,
 } from '@/src/infrastructure/api/fetchVendaContingenciaPublica'
 import { CupomRodapeDanfe80 } from '@/src/presentation/components/features/venda-contingencia/CupomRodapeDanfe80'
+import { formatarCnpjExibicao } from '@/src/presentation/components/features/meus-apps/utils/empresaParaMeusApp'
+import { formatarCepMascara } from '@/src/shared/utils/consultaCep'
+import { normalizeTipoImpactoPreco } from '@/src/application/mappers/VendaApiNormalizer'
+import { formatarValorComplemento } from '@/src/domain/services/pedido/CalculadoraPedido'
 import { Heart } from 'lucide-react'
 
 function formatMoney(value: number | null | undefined): string {
@@ -60,6 +65,18 @@ function tipoAjusteEhPercentual(tipo: string | null | undefined): boolean {
 
 type ProdutoCupom = NonNullable<VendaContingenciaPublica['produtosLancados']>[number]
 
+type ComplementoCupom = NonNullable<ProdutoCupom['complementos']>[number]
+
+function formatarValorUnitarioComplementoCupom(complemento: ComplementoCupom): string {
+  const tipo = normalizeTipoImpactoPreco(complemento.tipoImpactoPreco)
+  if (tipo === 'nenhum') {
+    return formatMoney(0)
+  }
+  const valor = complemento.valorUnitario
+  if (valor == null || Number.isNaN(valor)) return ''
+  return formatarValorComplemento(valor, tipo)
+}
+
 /** Exibe o ajuste configurado no produto (ex.: -50%, +2,00) usando campos da API, sem recalcular totais. */
 function formatarAjusteProdutoCupom(produto: ProdutoCupom): string {
   const desconto = parseNumeroCampo(produto.desconto)
@@ -98,15 +115,66 @@ function resolveNomeEstabelecimento(data: VendaContingenciaPublica): string {
   return 'Estabelecimento'
 }
 
+function resolveClienteCupomExibicao(data: VendaContingenciaPublica): string {
+  const nome = data.identificacao?.trim() || data.clienteNome?.trim()
+  return nome || 'Consumidor Final'
+}
+
 function resolveCnpjEstabelecimento(data: VendaContingenciaPublica): string | undefined {
   const cnpj = data.emitente?.cnpj?.trim() || data.empresa?.cnpj?.trim()
   return cnpj || undefined
+}
+
+type EnderecoEstabelecimentoCupom = NonNullable<
+  NonNullable<VendaContingenciaPublica['emitente']>['endereco']
+>
+
+function enderecoTemConteudo(endereco: EnderecoEstabelecimentoCupom | null | undefined): boolean {
+  if (!endereco) return false
+  return Boolean(
+    endereco.rua?.trim() ||
+      endereco.numero?.trim() ||
+      endereco.bairro?.trim() ||
+      endereco.cidade?.trim() ||
+      endereco.estado?.trim() ||
+      endereco.cep?.trim()
+  )
+}
+
+function formatarEnderecoEstabelecimentoLinhas(
+  endereco: EnderecoEstabelecimentoCupom | null | undefined
+): string[] {
+  if (!endereco || !enderecoTemConteudo(endereco)) return []
+
+  const linhas: string[] = []
+  const ruaNumero = [endereco.rua?.trim(), endereco.numero?.trim()].filter(Boolean).join(', ')
+  if (ruaNumero) linhas.push(ruaNumero)
+
+  const bairro = endereco.bairro?.trim()
+  const cidadeUf = [endereco.cidade?.trim(), endereco.estado?.trim()].filter(Boolean).join(' - ')
+  if (bairro || cidadeUf) {
+    linhas.push([bairro, cidadeUf].filter(Boolean).join(' - '))
+  }
+
+  const cep = endereco.cep?.trim()
+  if (cep) linhas.push(`CEP: ${formatarCepMascara(cep)}`)
+
+  return linhas
+}
+
+function resolveEnderecoEstabelecimentoLinhas(data: VendaContingenciaPublica): string[] {
+  const fromEmitente = data.emitente?.endereco
+  if (enderecoTemConteudo(fromEmitente)) {
+    return formatarEnderecoEstabelecimentoLinhas(fromEmitente)
+  }
+  return []
 }
 
 /** Cabeçalho: emitente em destaque + linha da venda mais compacta. */
 function CabecalhoCupom({ data }: { data: VendaContingenciaPublica }) {
   const empresa = resolveNomeEstabelecimento(data)
   const cnpj = resolveCnpjEstabelecimento(data)
+  const enderecoLinhas = resolveEnderecoEstabelecimentoLinhas(data)
   const codigoRaw = data.codigoVenda
   const codigo =
     codigoRaw != null && String(codigoRaw).trim() !== '' ? String(codigoRaw).trim() : '—'
@@ -117,10 +185,17 @@ function CabecalhoCupom({ data }: { data: VendaContingenciaPublica }) {
 
   return (
     <header className="pb-1 text-center">
-      <div className="font-poppins text-base font-extrabold leading-snug text-black md:text-xl">
+      <div className="font-poppins text-base font-extrabold leading-tight text-black md:text-xl">
         {empresa}
       </div>
-      {cnpj && <div className="text-xs text-black/75">CNPJ: {cnpj}</div>}
+      {(cnpj || enderecoLinhas.length > 0) && (
+        <div className="mt-0.5 space-y-0 text-xs leading-tight text-black/75">
+          {cnpj && <div>CNPJ: {formatarCnpjExibicao(cnpj)}</div>}
+          {enderecoLinhas.map((linha, i) => (
+            <div key={i}>{linha}</div>
+          ))}
+        </div>
+      )}
       <h1 className="font-poppins mt-2 flex flex-wrap items-baseline justify-center gap-x-2 text-sm font-semibold leading-tight text-black/85">
         <span>VENDA #{codigo}</span>
         <span>N° {numero}</span>
@@ -133,7 +208,7 @@ function CupomFooterMarca() {
   return (
     <footer className="mt-4 border-t border-slate-300/80 pt-3">
       <p className="font-poppins flex items-center justify-center gap-1 text-center text-xs text-black/70">
-        <span>Venda feita por Jiffy com amor</span>
+        <span>Feito carinho por Jiffy</span>
         <Heart className="size-3 shrink-0 fill-black text-black" aria-hidden />
         <span>!</span>
       </p>
@@ -174,8 +249,7 @@ function CupomRodapeFiscal({
     <>
       <div className="my-3 h-px bg-black/40" />
       <p className="text-center text-xs leading-snug">
-        Documento emitido em contingência. Troque pela via definitiva quando disponível, conforme
-        legislação.
+        Cupom não fiscal
       </p>
       <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-center text-xs leading-relaxed text-amber-950">
         <p className="font-semibold">Nota fiscal em processamento</p>
@@ -237,16 +311,13 @@ export function CupomFiscalContingencia({ data, rodapeDanfeSrc }: CupomFiscalCon
       <div className="my-2 h-px bg-slate-300" />
 
       <div className="space-y-0.5">
-        {data.codigoVenda != null && <div>Cód. venda: {data.codigoVenda}</div>}
-        {data.numeroVenda != null && <div>Nº venda: {data.numeroVenda}</div>}
+        
         {(data.codigoTerminal || data.terminalNome) && (
           <div>
             Terminal: {[data.codigoTerminal, data.terminalNome].filter(Boolean).join(' — ')}
           </div>
         )}
-        {(data.identificacao || data.clienteNome) && (
-          <div>Cliente / identif.: {data.identificacao || data.clienteNome}</div>
-        )}
+        <div>Cliente: {resolveClienteCupomExibicao(data)}</div>
         {data.tipoEntrega && (
           <div>
             Entrega:{' '}
@@ -279,7 +350,14 @@ export function CupomFiscalContingencia({ data, rodapeDanfeSrc }: CupomFiscalCon
         <>
           <div className="h-px bg-black/40 my-2" />
           <div className="font-bold mb-1">ITENS</div>
-          <table className="w-full text-xs" style={{ borderCollapse: 'collapse' }}>
+          <table className="w-full text-xs table-fixed" style={{ borderCollapse: 'collapse' }}>
+            <colgroup>
+              <col style={{ width: '36%' }} />
+              <col style={{ width: '14%' }} />
+              <col style={{ width: '18%' }} />
+              <col style={{ width: '16%' }} />
+              <col style={{ width: '16%' }} />
+            </colgroup>
             <thead>
               <tr>
                 <th className="text-left py-1 font-bold" style={{ padding: '2px' }}>
@@ -288,10 +366,10 @@ export function CupomFiscalContingencia({ data, rodapeDanfeSrc }: CupomFiscalCon
                 <th className="text-right py-1 font-bold" style={{ padding: '2px' }}>
                   Qtd
                 </th>
-                <th className="text-right py-1 font-bold whitespace-nowrap" style={{ padding: '2px' }}>
-                  Acre/Des
+                <th className="text-right py-1 font-bold" style={{ padding: '2px' }}>
+                  Acrés/Desc
                 </th>
-                <th className="text-right py-1 font-bold whitespace-nowrap" style={{ padding: '2px' }}>
+                <th className="text-right py-1 font-bold" style={{ padding: '2px' }}>
                   V Unit.
                 </th>
                 <th className="text-right py-1 font-bold" style={{ padding: '2px' }}>
@@ -303,30 +381,74 @@ export function CupomFiscalContingencia({ data, rodapeDanfeSrc }: CupomFiscalCon
               {produtos.map((p, i) => {
                 const q = p.quantidade ?? 0
                 const ajuste = formatarAjusteProdutoCupom(p)
+                const complementos = (p.complementos || []).filter(
+                  c => c.nomeComplemento?.trim() || c.quantidade != null
+                )
                 return (
-                  <tr key={i} className="align-top">
-                    <td className="align-top" style={{ padding: '2px' }}>
-                      <div>{p.nomeProduto || 'Item'}</div>
-                      {(p.complementos || []).map((c, j) => (
-                        <div key={j} className="text-[11px] opacity-80 pl-1">
-                          + {c.nomeComplemento} x{c.quantidade ?? 1}{' '}
-                          {c.valorUnitario != null ? `(${formatCurrencyBrl(c.valorUnitario)})` : ''}
-                        </div>
-                      ))}
-                    </td>
-                    <td className="text-right whitespace-nowrap align-top" style={{ padding: '2px' }}>
-                      {formatMoney(q)}
-                    </td>
-                    <td className="text-right whitespace-nowrap align-top" style={{ padding: '2px' }}>
-                      {ajuste}
-                    </td>
-                    <td className="text-right whitespace-nowrap align-top" style={{ padding: '2px' }}>
-                      {p.valorUnitario != null ? formatMoney(p.valorUnitario) : '—'}
-                    </td>
-                    <td className="text-right whitespace-nowrap align-top" style={{ padding: '2px' }}>
-                      {p.valorFinal != null ? formatMoney(p.valorFinal) : '—'}
-                    </td>
-                  </tr>
+                  <Fragment key={i}>
+                    <tr>
+                      <td
+                        className="align-top break-words"
+                        style={{ padding: '2px', verticalAlign: 'top' }}
+                      >
+                        {p.nomeProduto || 'Item'}
+                      </td>
+                      <td
+                        className="text-right whitespace-nowrap align-top"
+                        style={{ padding: '2px', verticalAlign: 'top' }}
+                      >
+                        {formatMoney(q)}
+                      </td>
+                      <td
+                        className="text-right whitespace-nowrap align-top"
+                        style={{ padding: '2px', verticalAlign: 'top' }}
+                      >
+                        {ajuste}
+                      </td>
+                      <td
+                        className="text-right whitespace-nowrap align-top"
+                        style={{ padding: '2px', verticalAlign: 'top' }}
+                      >
+                        {p.valorUnitario != null ? formatMoney(p.valorUnitario) : '—'}
+                      </td>
+                      <td
+                        className="text-right whitespace-nowrap align-top"
+                        style={{ padding: '2px', verticalAlign: 'top' }}
+                      >
+                        {p.valorFinal != null ? formatMoney(p.valorFinal) : '—'}
+                      </td>
+                    </tr>
+                    {complementos.map((c, j) => (
+                      <tr key={`${i}-comp-${j}`}>
+                        <td
+                          className="align-top break-words opacity-80"
+                          style={{ padding: '2px 2px 2px 14px', verticalAlign: 'top' }}
+                        >
+                          {c.nomeComplemento || 'Complemento'}
+                        </td>
+                        <td
+                          className="text-right whitespace-nowrap align-top opacity-80"
+                          style={{ padding: '2px', verticalAlign: 'top' }}
+                        >
+                          {formatMoney(c.quantidade ?? 1)}
+                        </td>
+                        <td
+                          className="text-right whitespace-nowrap align-top"
+                          style={{ padding: '2px', verticalAlign: 'top' }}
+                        />
+                        <td
+                          className="text-right whitespace-nowrap align-top opacity-80"
+                          style={{ padding: '2px', verticalAlign: 'top' }}
+                        >
+                          {formatarValorUnitarioComplementoCupom(c)}
+                        </td>
+                        <td
+                          className="text-right whitespace-nowrap align-top"
+                          style={{ padding: '2px', verticalAlign: 'top' }}
+                        />
+                      </tr>
+                    ))}
+                  </Fragment>
                 )
               })}
             </tbody>
