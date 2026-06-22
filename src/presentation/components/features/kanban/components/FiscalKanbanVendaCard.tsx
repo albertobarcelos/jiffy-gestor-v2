@@ -366,10 +366,11 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
                         tone="neutral"
                       />
                     </div>
-                    {venda.numeroFiscal && venda.statusFiscal === 'EMITIDA' && (
+                    {venda.numeroFiscal &&
+                      (venda.statusFiscal === 'EMITIDA' || venda.statusFiscal === 'INUTILIZADA') && (
                       <div className="mt-0.5">
                         <span className="text-xs font-semibold text-gray-900">
-                          {venda.tipoDocFiscal || 'NFe'} Nº {venda.numeroFiscal}
+                          {venda.tipoDocFiscal === 'NFCE' ? 'NFCe' : 'NFe'} Nº {venda.numeroFiscal}
                           {venda.serieFiscal && ` / Série ${venda.serieFiscal}`}
                         </span>
                       </div>
@@ -455,10 +456,11 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
                         tone="neutral"
                       />
                     </div>
-                    {venda.numeroFiscal && venda.statusFiscal === 'EMITIDA' && (
+                    {venda.numeroFiscal &&
+                      (venda.statusFiscal === 'EMITIDA' || venda.statusFiscal === 'INUTILIZADA') && (
                       <div className="mt-0.5">
                         <span className="text-xs font-semibold text-gray-900">
-                          {venda.tipoDocFiscal || 'NFe'} Nº {venda.numeroFiscal}
+                          {venda.tipoDocFiscal === 'NFCE' ? 'NFCe' : 'NFe'} Nº {venda.numeroFiscal}
                           {venda.serieFiscal && ` / Série ${venda.serieFiscal}`}
                         </span>
                       </div>
@@ -615,6 +617,12 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
                 return `Emitir Nota`
               })()}
             </KanbanCardAcaoButton>
+          )}
+
+          {column.id === 'COM_NFE' && venda.statusFiscal === 'INUTILIZADA' && (
+            <div className="flex-1 rounded border border-gray-200 bg-gray-50 px-2 py-1 text-center text-xs text-gray-500">
+              Venda com Nota Inutilizada
+            </div>
           )}
 
           {column.id === 'COM_NFE' &&

@@ -269,6 +269,7 @@ export class VendaUnificadaDTO {
       | 'EMITIDA'
       | 'REJEITADA'
       | 'CANCELADA'
+      | 'INUTILIZADA'
       | null,
     public readonly documentoFiscalId: string | null,
     public readonly abertoPor: {
@@ -310,6 +311,7 @@ export class VendaUnificadaDTO {
     // Vendas GESTOR: pendentes apenas quando foram marcadas para emissão (solicitarEmissaoFiscal), igual ao PDV
     // Vendas PDV: pendentes apenas se foram marcadas para emissão
     if (this.isCancelada()) return false
+    if (this.statusFiscal === 'INUTILIZADA') return false
 
     if (this.isVendaGestor()) {
       return !!this.solicitarEmissaoFiscal && this.statusFiscal !== 'EMITIDA'
@@ -398,6 +400,8 @@ export class VendaUnificadaDTO {
 
   getEtapaKanban(): string {
     if (this.temNFeEmitida()) return 'COM_NFE'
+    // Nota inutilizada: coluna "Com Nota Solicitada" — sem botão de ação
+    if (this.statusFiscal === 'INUTILIZADA') return 'COM_NFE'
     // Rejeitada: coluna "Pendente Emissão Fiscal" para reenvio/reemissão (botão vira "Reemitir NFe/NFCe")
     if (this.statusFiscal === 'REJEITADA') return 'PENDENTE_EMISSAO'
     if (

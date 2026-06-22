@@ -6,7 +6,7 @@ import type {
   CertificadoApiResult,
   HistoricoNcmItem,
   InutilizacaoItemDTO,
-  GapsResponseDTO,
+  NumeracaoInutilizavelDTO,
   ReformaTributariaItem,
 } from '@/src/domain/repositories/IFiscalPainelRepository'
 import type {
@@ -186,10 +186,11 @@ export class FiscalPainelApiRepository implements IFiscalPainelRepository {
     return Array.isArray(data) ? data : []
   }
 
-  async consultarGapsNumeracao(params: GapsQueryDTO): Promise<GapsResponseDTO> {
+  async consultarGapsNumeracao(params: GapsQueryDTO): Promise<NumeracaoInutilizavelDTO> {
     const search = new URLSearchParams({
       modelo: String(params.modelo),
       serie: String(params.serie),
+      ambiente: params.ambiente,
     })
     if (params.numeroInicial != null) {
       search.set('numeroInicial', String(params.numeroInicial))
@@ -197,11 +198,13 @@ export class FiscalPainelApiRepository implements IFiscalPainelRepository {
     if (params.numeroFinal != null) {
       search.set('numeroFinal', String(params.numeroFinal))
     }
-    return this.get<GapsResponseDTO>(`/api/v1/fiscal/numeracao/gaps?${search.toString()}`)
+    return this.get<NumeracaoInutilizavelDTO>(
+      `/api/v1/fiscal/documentos/inutilizaveis?${search.toString()}`
+    )
   }
 
   async inutilizarNumeracao(input: InutilizarNumeracaoDTO): Promise<void> {
-    const response = await this.mutate('/api/v1/fiscal/inutilizar', 'POST', input)
+    const response = await this.mutate('/api/v1/fiscal/operacoes/inutilizar', 'POST', input)
     if (!response.ok) {
       throw new Error('Erro ao inutilizar numeração')
     }

@@ -79,6 +79,7 @@ export type InutilizarNumeracaoDTO = z.infer<typeof InutilizarNumeracaoSchema>
 export interface GapsQueryDTO {
   modelo: 55 | 65
   serie: number
+  ambiente: 'HOMOLOGACAO' | 'PRODUCAO'
   numeroInicial?: number
   numeroFinal?: number
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { Badge } from '@/src/presentation/components/ui/badge'
-import { MdSchedule, MdCheckCircle, MdError, MdWarning, MdCancel } from 'react-icons/md'
+import { MdSchedule, MdCheckCircle, MdError, MdWarning, MdCancel, MdBlock } from 'react-icons/md'
 import { CircularProgress } from '@mui/material'
 
 type StatusFiscal =
@@ -13,6 +13,7 @@ type StatusFiscal =
   | 'EMITIDA'
   | 'REJEITADA'
   | 'CANCELADA'
+  | 'INUTILIZADA'
 
 interface StatusFiscalBadgeProps {
   status: StatusFiscal | string | null | undefined
@@ -86,6 +87,13 @@ export function StatusFiscalBadge({ status, className, tone = 'default' }: Statu
           color: '#EF4444',
           bgColor: '#FEE2E2',
           icon: <MdCancel className="h-3.5 w-3.5" />,
+        }
+      case 'INUTILIZADA':
+        return {
+          label: 'Nota Inutilizada',
+          color: '#6B7280',
+          bgColor: '#F3F4F6',
+          icon: <MdBlock className="h-3.5 w-3.5" />,
         }
       default:
         return {

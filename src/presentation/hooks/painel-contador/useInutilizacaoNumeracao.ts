@@ -20,16 +20,6 @@ export function useInutilizacaoNumeracao() {
     return uc.execute(params)
   }
 
-  const listarEmissoes = async () => {
-    const { consultarGaps: uc } = getUseCases()
-    return uc.listarEmissoes()
-  }
-
-  const getContextoFiscal = async () => {
-    const { consultarGaps: uc } = getUseCases()
-    return uc.getContextoFiscal()
-  }
-
   const listarInutilizacoes = async (modelo: number, serie: number) => {
     const { consultarGaps: uc } = getUseCases()
     return uc.listarInutilizacoes(modelo, serie)
@@ -49,8 +39,6 @@ export function useInutilizacaoNumeracao() {
 
   return {
     consultarGaps,
-    listarEmissoes,
-    getContextoFiscal,
     listarInutilizacoes,
     inutilizarMutation,
   }

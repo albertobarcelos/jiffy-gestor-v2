@@ -203,6 +203,9 @@ export function getCardBorderEFundoKanban(
   if (sf === 'CANCELADA') {
     return { borderClass: 'border-l-gray-400', cardBgClass: 'bg-gray-50' }
   }
+  if (sf === 'INUTILIZADA') {
+    return { borderClass: 'border-l-gray-400', cardBgClass: 'bg-gray-50' }
+  }
   if (sf === 'REJEITADA' || fiscalKanbanPodeReemitirAposCooldown(v)) {
     return { borderClass: 'border-l-red-500', cardBgClass: 'bg-white' }
   }
@@ -235,7 +238,7 @@ export function vendaBloqueadaParaEmissaoInterativa(
   const s = String(v.statusFiscal ?? '')
     .trim()
     .toUpperCase()
-  if (s === 'EMITIDA' || s === 'PENDENTE_EMISSAO') return true
+  if (s === 'EMITIDA' || s === 'PENDENTE_EMISSAO' || s === 'INUTILIZADA') return true
   if (statusFiscalAguardandoSefaz(v)) return true
   return false
 }
@@ -249,6 +252,7 @@ export function deveExibirBotaoEmitirNotaNoKanban(
   venda: VendaUnificadaDTO,
   acaoFiscalEmAndamentoPorVenda: Record<string, 'emitindo' | 'reemitindo'>
 ): boolean {
+  if (venda.statusFiscal === 'INUTILIZADA') return false
   const acao = acaoFiscalEmAndamentoPorVenda[venda.id]
   if (acao === 'reemitindo' || acao === 'emitindo') return true
   if (columnId === 'PENDENTE_EMISSAO') return true

@@ -39,17 +39,25 @@ export interface InutilizacaoItemDTO {
   inutilizadoEm: string
 }
 
-export interface GapsResponseDTO {
+export interface FaixaNumeracaoInutilizavelDTO {
+  numeroInicial: number
+  numeroFinal: number
+  quantidadeNumeros: number
+}
+
+export interface NumeracaoInutilizavelDTO {
   modelo: number
   serie: number
+  ambiente: string
   numeroInicialAnalisado: number
   numeroFinalAnalisado: number
   proximoNumeroConfigurado: number
-  totalNumerosEmitidosNaFaixa: number
-  totalFaixasInutilizadasNaFaixa: number
-  totalGaps: number
-  gaps: Array<{ numeroInicial: number; numeroFinal: number }>
+  totalItens: number
+  faixas: FaixaNumeracaoInutilizavelDTO[]
 }
+
+/** @deprecated Use NumeracaoInutilizavelDTO */
+export type GapsResponseDTO = NumeracaoInutilizavelDTO
 
 export interface ReformaTributariaItem {
   id: string
@@ -70,7 +78,7 @@ export interface IFiscalPainelRepository {
   salvarConfiguracaoNcm(ncm: string, input: SalvarNcmImpostosDTO): Promise<void>
   copiarConfiguracaoNcm(ncm: string, input: CopiarNcmDTO): Promise<void>
   getHistoricoNcm(ncm: string): Promise<HistoricoNcmItem[]>
-  consultarGapsNumeracao(params: GapsQueryDTO): Promise<GapsResponseDTO>
+  consultarGapsNumeracao(params: GapsQueryDTO): Promise<NumeracaoInutilizavelDTO>
   inutilizarNumeracao(input: InutilizarNumeracaoDTO): Promise<void>
   listarInutilizacoes(modelo: number, serie: number): Promise<InutilizacaoItemDTO[]>
   salvarIbptToken(token: string | null): Promise<ConfiguracaoFiscalEmpresa | null>
