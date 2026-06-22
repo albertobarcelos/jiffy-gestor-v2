@@ -155,7 +155,7 @@ describe('fiscalFlowKanban.rules — desbloqueio no Kanban', () => {
 })
 
 describe('kanbanVendaUsaCupomPublicoNfce', () => {
-  it('só habilita cupom público para PDV + NFC-e', () => {
+  it('habilita cupom público para NFC-e de PDV, gestor e delivery Jiffy', () => {
     expect(
       kanbanVendaUsaCupomPublicoNfce(
         criarVendaKanban({ origem: 'PDV', tipoDocFiscal: 'NFCE' })
@@ -165,7 +165,12 @@ describe('kanbanVendaUsaCupomPublicoNfce', () => {
       kanbanVendaUsaCupomPublicoNfce(
         criarVendaKanban({ origem: 'GESTOR', tipoDocFiscal: 'NFCE' })
       )
-    ).toBe(false)
+    ).toBe(true)
+    expect(
+      kanbanVendaUsaCupomPublicoNfce(
+        criarVendaKanban({ origem: 'JIFFY_DELIVERY', tipoDocFiscal: 'NFCE' })
+      )
+    ).toBe(true)
     expect(
       kanbanVendaUsaCupomPublicoNfce(
         criarVendaKanban({ origem: 'PDV', tipoDocFiscal: 'NFE' })

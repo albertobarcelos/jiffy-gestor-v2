@@ -1,5 +1,8 @@
 import type { VendaContingenciaPublica } from '@/src/infrastructure/api/fetchVendaContingenciaPublica'
-import { deveExibirRodapeDanfe80mm } from '@/src/infrastructure/api/fetchVendaContingenciaPublica'
+import {
+  deveExibirAguardoFinalizacaoDelivery,
+  deveExibirRodapeDanfe80mm,
+} from '@/src/infrastructure/api/fetchVendaContingenciaPublica'
 import { CupomRodapeDanfe80 } from '@/src/presentation/components/features/venda-contingencia/CupomRodapeDanfe80'
 import { Heart } from 'lucide-react'
 
@@ -138,7 +141,7 @@ function CupomFooterMarca() {
   )
 }
 
-/** Rodapé: QR quando emitida; aviso de contingência + emissão em andamento caso contrário. */
+/** Rodapé: QR quando emitida; aguardo finalização (delivery); contingência + processamento. */
 function CupomRodapeFiscal({
   data,
   rodapeDanfeSrc,
@@ -150,6 +153,21 @@ function CupomRodapeFiscal({
 
   if (notaEmitida) {
     return <CupomRodapeDanfe80 src={rodapeDanfeSrc} />
+  }
+
+  if (deveExibirAguardoFinalizacaoDelivery(data)) {
+    return (
+      <>
+        <div className="my-3 h-px bg-black/40" />
+        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-center text-xs leading-relaxed text-slate-800">
+          <p className="font-semibold">Pedido ainda não finalizado</p>
+          <p className="mt-1">
+            A venda ainda não foi finalizada. Aguarde: a nota fiscal será emitida após a
+            finalização do pedido.
+          </p>
+        </div>
+      </>
+    )
   }
 
   return (
@@ -229,6 +247,12 @@ export function CupomFiscalContingencia({ data, rodapeDanfeSrc }: CupomFiscalCon
         {(data.identificacao || data.clienteNome) && (
           <div>Cliente / identif.: {data.identificacao || data.clienteNome}</div>
         )}
+        {data.tipoEntrega && (
+          <div>
+            Entrega:{' '}
+            {data.tipoEntrega === 'entrega' ? 'Delivery' : data.tipoEntrega === 'retirada' ? 'Retirada' : data.tipoEntrega}
+          </div>
+        )}
         <div>Abertura: {formatDateTime(data.dataCriacao)}</div>
         <div>Finalização: {formatDateTime(data.dataFinalizacao)}</div>
       </div>
@@ -265,10 +289,10 @@ export function CupomFiscalContingencia({ data, rodapeDanfeSrc }: CupomFiscalCon
                   Qtd
                 </th>
                 <th className="text-right py-1 font-bold whitespace-nowrap" style={{ padding: '2px' }}>
-                  Acres/Desc
+                  Acre/Des
                 </th>
                 <th className="text-right py-1 font-bold whitespace-nowrap" style={{ padding: '2px' }}>
-                  Val Unit.
+                  V Unit.
                 </th>
                 <th className="text-right py-1 font-bold" style={{ padding: '2px' }}>
                   Total
@@ -280,8 +304,8 @@ export function CupomFiscalContingencia({ data, rodapeDanfeSrc }: CupomFiscalCon
                 const q = p.quantidade ?? 0
                 const ajuste = formatarAjusteProdutoCupom(p)
                 return (
-                  <tr key={i}>
-                    <td style={{ padding: '2px', verticalAlign: 'top' }}>
+                  <tr key={i} className="align-top">
+                    <td className="align-top" style={{ padding: '2px' }}>
                       <div>{p.nomeProduto || 'Item'}</div>
                       {(p.complementos || []).map((c, j) => (
                         <div key={j} className="text-[11px] opacity-80 pl-1">
@@ -290,23 +314,41 @@ export function CupomFiscalContingencia({ data, rodapeDanfeSrc }: CupomFiscalCon
                         </div>
                       ))}
                     </td>
-                    <td className="text-right whitespace-nowrap" style={{ padding: '2px' }}>
+                    <td className="text-right whitespace-nowrap align-top" style={{ padding: '2px' }}>
                       {formatMoney(q)}
                     </td>
-                    <td className="text-right whitespace-nowrap" style={{ padding: '2px' }}>
+                    <td className="text-right whitespace-nowrap align-top" style={{ padding: '2px' }}>
                       {ajuste}
                     </td>
-                    <td className="text-right whitespace-nowrap" style={{ padding: '2px' }}>
+                    <td className="text-right whitespace-nowrap align-top" style={{ padding: '2px' }}>
                       {p.valorUnitario != null ? formatMoney(p.valorUnitario) : '—'}
                     </td>
-                    <td className="text-right whitespace-nowrap" style={{ padding: '2px' }}>
-                      {p.valorFinal != null ? formatCurrencyBrl(p.valorFinal) : '—'}
+                    <td className="text-right whitespace-nowrap align-top" style={{ padding: '2px' }}>
+                      {p.valorFinal != null ? formatMoney(p.valorFinal) : '—'}
                     </td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
+        </>
+      )}
+
+      {(data.taxasLancadas?.length ?? 0) > 0 && (
+        <>
+          <div className="h-px bg-black/40 my-2" />
+          <div className="font-bold mb-1">TAXAS</div>
+          <ul className="space-y-1 text-xs">
+            {data.taxasLancadas!.map((taxa, i) => (
+              <li key={i} className="flex justify-between gap-2">
+                <span className="break-words">
+                  {taxa.nome || 'Taxa'}
+                  {taxa.quantidade != null && taxa.quantidade > 1 ? ` x${taxa.quantidade}` : ''}
+                </span>
+                <span className="shrink-0">{formatCurrencyBrl(taxa.valor)}</span>
+              </li>
+            ))}
+          </ul>
         </>
       )}
 
