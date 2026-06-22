@@ -118,6 +118,9 @@ function getCardBorderEFundoKanban(
   if (sf === 'CANCELADA') {
     return { borderClass: 'border-l-gray-400', cardBgClass: 'bg-gray-50' }
   }
+  if (sf === 'INUTILIZADA') {
+    return { borderClass: 'border-l-gray-400', cardBgClass: 'bg-gray-50' }
+  }
   if (sf === 'REJEITADA') {
     return { borderClass: 'border-l-red-500', cardBgClass: 'bg-white' }
   }
@@ -161,7 +164,7 @@ function vendaBloqueadaParaEmissaoInterativa(
   const s = String(v.statusFiscal ?? '')
     .trim()
     .toUpperCase()
-  if (s === 'EMITIDA' || s === 'PENDENTE_EMISSAO') return true
+  if (s === 'EMITIDA' || s === 'PENDENTE_EMISSAO' || s === 'INUTILIZADA') return true
   if (statusFiscalAguardandoSefaz(v)) return true
   return false
 }
@@ -756,19 +759,15 @@ export function FiscalFlowKanban() {
   const refetchAteMudarStatusFiscal = async (
     vendaId: string,
     statusAnterior: Venda['statusFiscal'],
-    tentativasMaximas = 6,
-    intervaloMs = 2000
+    tentativasMaximas = 12,
+    intervaloMs = 3000
   ) => {
     for (let tentativa = 0; tentativa < tentativasMaximas; tentativa++) {
+      await sleep(intervaloMs)
       const result = await refetch()
       const vendaAtualizada = result.data?.items?.find((item: Venda) => item.id === vendaId)
       if (!vendaAtualizada) return
-
-      if (vendaAtualizada.statusFiscal !== statusAnterior) {
-        return
-      }
-
-      await sleep(intervaloMs)
+      if (vendaAtualizada.statusFiscal !== statusAnterior) return
     }
   }
 
@@ -1573,10 +1572,12 @@ export function FiscalFlowKanban() {
                                           tone="neutral"
                                         />
                                       </div>
-                                      {venda.numeroFiscal && venda.statusFiscal === 'EMITIDA' && (
+                                      {venda.numeroFiscal &&
+                                        (venda.statusFiscal === 'EMITIDA' ||
+                                          venda.statusFiscal === 'INUTILIZADA') && (
                                         <div className="mt-0.5">
                                           <span className="text-xs font-semibold text-gray-900">
-                                            {venda.tipoDocFiscal || 'NFe'} Nº {venda.numeroFiscal}
+                                            {venda.tipoDocFiscal === 'NFCE' ? 'NFCe' : 'NFe'} Nº {venda.numeroFiscal}
                                             {venda.serieFiscal && ` / Série ${venda.serieFiscal}`}
                                           </span>
                                         </div>
@@ -1678,6 +1679,14 @@ export function FiscalFlowKanban() {
                                     })()}
                                   </Button>
                                 )}
+
+                                {/* Nota inutilizada: apenas label informativo, sem ação */}
+                                {column.id === 'COM_NFE' &&
+                                  venda.statusFiscal === 'INUTILIZADA' && (
+                                    <div className="flex-1 rounded border border-gray-200 bg-gray-50 px-2 py-1 text-center text-xs text-gray-500">
+                                      Venda com Nota Inutilizada
+                                    </div>
+                                  )}
 
                                 {/* PDF só existe após autorização ou após cancelamento de nota já emitida; demais status ficam sem botão */}
                                 {column.id === 'COM_NFE' &&

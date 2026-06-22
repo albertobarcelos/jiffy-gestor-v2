@@ -26,6 +26,10 @@ function primeiroStatusTextoNaoVazio(...candidatos: unknown[]): string | undefin
  * 1) `statusFiscal` (raiz)  2) `status_fiscal` (raiz)  3) `resumoFiscal.status`  4) `resumoFiscal.statusFiscal`
  *
  * Depois: trim + UPPER para bater com === 'REJEITADA' no FiscalFlowKanban e StatusFiscalBadge.
+ *
+ * Caso especial — PENDENTE com retornoSefaz preenchido: o backend processou a tentativa mas não atualizou o
+ * status para REJEITADA (bug de backend em erros de assinatura/validação antes da SEFAZ). Normalizamos para
+ * REJEITADA para que o frontend pare o polling e mostre o botão de reemissão.
  */
 function normalizarStatusFiscalUnificado(
   item: Record<string, unknown>
@@ -42,7 +46,28 @@ function normalizarStatusFiscalUnificado(
     rf?.statusFiscal
   )
   if (!raw) return null
-  return raw.toUpperCase() as VendaUnificadaDTO['statusFiscal']
+
+  const status = raw.toUpperCase() as VendaUnificadaDTO['statusFiscal']
+
+  if (status === 'PENDENTE') {
+    // Caso 1: backend processou mas não atualizou o status (ex: erro de assinatura/CST inválido)
+    // → retornoSefaz preenchido com erro = já terminou, trata como REJEITADA.
+    const retorno = primeiroStatusTextoNaoVazio(item.retornoSefaz, rf?.retornoSefaz)
+    if (retorno) return 'REJEITADA'
+
+    // Caso 2: PENDENTE há mais de 15 minutos sem retorno algum = SEFAZ não responderá mais.
+    // A SEFAZ tem SLA de resposta em segundos/poucos minutos; após 15 min é seguro tratar como falha.
+    const criadaEm = item.dataCriacao ? new Date(item.dataCriacao as string).getTime() : 0
+    const atualizadaEm = item.dataAtualizacao
+      ? new Date(item.dataAtualizacao as string).getTime()
+      : criadaEm
+    const referenciaMs = Math.max(criadaEm, atualizadaEm)
+    if (referenciaMs > 0 && Date.now() - referenciaMs > 15 * 60 * 1000) {
+      return 'REJEITADA'
+    }
+  }
+
+  return status
 }
 
 /** Evita Boolean("false") === true se a API enviar string */
@@ -89,6 +114,7 @@ export class VendaUnificadaDTO {
       | 'EMITIDA'
       | 'REJEITADA'
       | 'CANCELADA'
+      | 'INUTILIZADA'
       | null,
     public readonly documentoFiscalId: string | null,
     public readonly abertoPor: {
@@ -112,6 +138,7 @@ export class VendaUnificadaDTO {
     // Vendas GESTOR: pendentes apenas quando foram marcadas para emissão (solicitarEmissaoFiscal), igual ao PDV
     // Vendas PDV: pendentes apenas se foram marcadas para emissão
     if (this.isCancelada()) return false
+    if (this.statusFiscal === 'INUTILIZADA') return false
 
     if (this.isVendaGestor()) {
       return !!this.solicitarEmissaoFiscal && this.statusFiscal !== 'EMITIDA'
@@ -146,6 +173,8 @@ export class VendaUnificadaDTO {
 
   getEtapaKanban(): string {
     if (this.temNFeEmitida()) return 'COM_NFE'
+    // Nota inutilizada: vai para "Com Nota Solicitada" — sem botão de ação
+    if (this.statusFiscal === 'INUTILIZADA') return 'COM_NFE'
     // Rejeitada: coluna "Pendente Emissão Fiscal" para reenvio/reemissão (botão vira "Reemitir NFe/NFCe")
     if (this.statusFiscal === 'REJEITADA') return 'PENDENTE_EMISSAO'
     // Aguardando retorno da SEFAZ (badge "Aguardando SEFAZ...") — só em "Com Nota Solicitada"
@@ -421,7 +450,27 @@ export function useVendasUnificadas(
     // Não redefinir staleTime curto nem refetchOnWindowFocus aqui: ao fechar modal o foco volta à janela
     // e disparava novo GET em toda vez (dados stale após 30s).
     refetchOnReconnect: true,
-    // Polling por status fiscal (PENDENTE / EMITINDO / etc.) desativado: usar botão Atualizar no Kanban.
-    refetchInterval: false,
+    // Polling automático enquanto houver vendas genuinamente aguardando resposta da SEFAZ.
+    // "Genuíno" = PENDENTE sem retornoSefaz (que já foi normalizado para REJEITADA antes de chegar aqui).
+    // Quando todas sairem desses status o polling para automaticamente.
+    // Limite de tempo: para de pollar vendas com mais de 5 min de criação para evitar loop eterno em stuck.
+    refetchInterval: (query) => {
+      const items = query.state.data?.items
+      if (!Array.isArray(items)) return false
+      const agora = Date.now()
+      const CINCO_MIN_MS = 5 * 60 * 1000
+      const temAguardandoSefaz = items.some((v: VendaUnificadaDTO) => {
+        if (
+          v.statusFiscal !== 'PENDENTE' &&
+          v.statusFiscal !== 'PENDENTE_AUTORIZACAO' &&
+          v.statusFiscal !== 'EMITINDO'
+        )
+          return false
+        // Para de pollar vendas criadas há mais de 5 min sem resolução (SEFAZ provavelmente não responderá mais)
+        const criadaEm = v.dataCriacao ? new Date(v.dataCriacao).getTime() : 0
+        return agora - criadaEm < CINCO_MIN_MS
+      })
+      return temAguardandoSefaz ? 10_000 : false
+    },
   })
 }

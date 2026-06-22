@@ -15,12 +15,15 @@ export async function POST(request: NextRequest) {
     const params = buildInutilizarQueryFromBody(body)
 
     const apiClient = new ApiClient()
-    const response = await apiClient.request<any>(`/api/v1/fiscal/inutilizar?${params.toString()}`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${tokenInfo.token}`,
-      },
-    })
+    const response = await apiClient.request<unknown>(
+      `/api/v1/fiscal/operacoes/inutilizar?${params.toString()}`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenInfo.token}`,
+        },
+      }
+    )
 
     return NextResponse.json(response.data)
   } catch (error) {
@@ -31,9 +34,6 @@ export async function POST(request: NextRequest) {
         { status: error.status }
       )
     }
-    return NextResponse.json(
-      { error: 'Erro interno do servidor' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
   }
 }
