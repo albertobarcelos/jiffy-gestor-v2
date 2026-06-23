@@ -18,6 +18,8 @@ import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/Tip
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { textoFromObservacoesApi } from '@/src/shared/helpers/observacaoPedido'
 import { abrirDocumentoFiscalPdf } from '@/src/presentation/utils/abrirDocumentoFiscalPdf'
+import { abrirNotaFiscalPublica } from '@/src/shared/utils/notaFiscalPublicaUrl'
+import { showToast } from '@/src/shared/utils/toast'
 import { StatusFiscalBadge } from '../../fiscal/StatusFiscalBadge'
 import type { ModoKanbanVendas } from '../KanbanModoVendasToggle'
 import { DraggableVendaCard } from './DraggableVendaCard'
@@ -43,6 +45,7 @@ import {
   getCardBorderEFundoKanban,
   getLinhaTempoPedidoEntregaKanban,
   fiscalKanbanPodeReemitirAposCooldown,
+  kanbanVendaUsaCupomPublicoNfce,
   statusFiscalAguardandoSefaz,
   vendaBloqueadaParaEmissaoInterativa,
   vendaSemNomeCliente,
@@ -634,8 +637,12 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
                 variant="outlined"
                 title={
                   venda.statusFiscal === 'CANCELADA'
-                    ? 'Abrir PDF da nota (cancelada na SEFAZ)'
-                    : undefined
+                    ? kanbanVendaUsaCupomPublicoNfce(venda)
+                      ? 'Abrir cupom público da NFC-e (cancelada na SEFAZ)'
+                      : 'Abrir PDF da nota (cancelada na SEFAZ)'
+                    : kanbanVendaUsaCupomPublicoNfce(venda)
+                      ? 'Abrir cupom público da NFC-e'
+                      : undefined
                 }
                 className="flex-1"
                 sx={{
@@ -650,6 +657,18 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
                   },
                 }}
                 onClick={() => {
+                  if (kanbanVendaUsaCupomPublicoNfce(venda)) {
+                    try {
+                      abrirNotaFiscalPublica(venda.id)
+                    } catch (error) {
+                      const msg =
+                        error instanceof Error
+                          ? error.message
+                          : 'Não foi possível abrir o cupom público.'
+                      showToast.error(msg)
+                    }
+                    return
+                  }
                   void abrirDocumentoFiscalPdf(venda.documentoFiscalId!, venda.tipoDocFiscal)
                 }}
               >
