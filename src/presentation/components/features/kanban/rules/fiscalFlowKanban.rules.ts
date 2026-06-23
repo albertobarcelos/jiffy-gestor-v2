@@ -391,3 +391,19 @@ export function formatarTipoVenda(tipo: string | null | undefined): string {
   if (t === 'gestor') return 'Gestor'
   return tipo.charAt(0).toUpperCase() + tipo.slice(1).toLowerCase()
 }
+
+/** Cupom público `/notas-fiscais/{id}`: NFC-e de PDV, balcão gestor ou Jiffy Delivery. */
+const ORIGENS_CUPOM_PUBLICO_NFCE = new Set([
+  'PDV',
+  'GESTOR',
+  'JIFFY_DELIVERY',
+  'DELIVERY',
+])
+
+export function kanbanVendaUsaCupomPublicoNfce(
+  v: Pick<Venda, 'origem' | 'tipoDocFiscal'>
+): boolean {
+  return (
+    v.tipoDocFiscal === 'NFCE' && ORIGENS_CUPOM_PUBLICO_NFCE.has(v.origem)
+  )
+}

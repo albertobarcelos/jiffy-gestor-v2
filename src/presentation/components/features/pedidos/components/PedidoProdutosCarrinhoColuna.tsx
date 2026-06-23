@@ -73,32 +73,32 @@ export function PedidoProdutosCarrinhoColuna() {
       {produtos.length > 0 ? (
         <div className="p-2">
           {/* Cabeçalho da tabela */}
-          <div className="mb-2 flex gap-2 border-b border-gray-300 pb-2">
-            <div className="flex w-[72px] flex-shrink-0 items-center justify-center">
+          <div className="mb-2 flex gap-2 border-b border-gray-300 pb-2 items-center">
+            <div className="flex w-[66px] flex-shrink-0 items-center justify-center">
               <span className="text-center text-xs font-semibold text-gray-700">
                 Qtd
               </span>
             </div>
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 items-center">
               <span className="text-xs font-semibold text-gray-700">Produto</span>
             </div>
-            <div className="w-20 shrink-0">
+            <div className="w-16 shrink-0 items-center">
               <span className="block text-right text-xs font-semibold text-gray-700">
                 Desc./Acres.
               </span>
             </div>
-            <div className="w-24 shrink-0">
+            <div className="w-20 shrink-0">
               <span className="block text-right text-xs font-semibold text-gray-700">
                 Val Unit.
               </span>
             </div>
-            <div className="w-24 shrink-0">
+            <div className="w-20 shrink-0 items-center">
               <span className="block text-right text-xs font-semibold text-gray-700">
                 Total
               </span>
             </div>
-            <div className="flex w-[44px] flex-shrink-0 items-center justify-end">
-              <span className="text-xs font-semibold text-gray-700">Ações</span>
+            <div className="flex w-[22px] flex-shrink-0 items-center justify-end">
+              <MdMoreVert className="h-4 w-4 text-gray-700" aria-hidden />
             </div>
           </div>
           {/* Linhas de produtos */}
@@ -167,7 +167,7 @@ export function PedidoProdutosCarrinhoColuna() {
                     }}
                   >
                     {/* Quantidade */}
-                    <div className="flex w-[72px] flex-shrink-0 items-center justify-center gap-0.5">
+                    <div className="flex w-[66px] flex-shrink-0 items-center justify-center gap-0.5">
                       <button
                         type="button"
                         aria-label="Diminuir quantidade"
@@ -186,9 +186,9 @@ export function PedidoProdutosCarrinhoColuna() {
                             return next
                           })
                         }}
-                        className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-gray-300 bg-white text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="flex h-3 w-3 shrink-0 items-center justify-center bg-white text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
                       >
-                        <MdRemove className="h-3 w-3" />
+                        <MdRemove className="h-2 w-2" />
                       </button>
                       <input
                         type="text"
@@ -254,7 +254,7 @@ export function PedidoProdutosCarrinhoColuna() {
                             e.currentTarget.blur()
                           }
                         }}
-                        className="h-5 w-6 min-w-0 border-0 bg-transparent p-0 text-center text-xs tabular-nums text-gray-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary"
+                        className="h-5 w-5 min-w-0 border-0 bg-transparent p-0 text-center text-xs tabular-nums text-gray-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary"
                       />
                       <button
                         type="button"
@@ -273,7 +273,7 @@ export function PedidoProdutosCarrinhoColuna() {
                             return next
                           })
                         }}
-                        className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-gray-300 bg-white text-gray-600 transition-colors hover:bg-gray-100"
+                        className="flex h-3 w-3 shrink-0 items-center justify-center bg-white text-gray-600 transition-colors hover:bg-gray-100"
                       >
                         <MdAdd className="h-3 w-3" />
                       </button>
@@ -285,13 +285,13 @@ export function PedidoProdutosCarrinhoColuna() {
                       </span>
                     </div>
                     {/* Desconto/Acréscimo */}
-                    <div className="w-20 shrink-0">
+                    <div className="w-16 shrink-0">
                       <span className="block truncate text-right text-xs text-gray-600">
                         {formatarDescontoAcrescimo(produto)}
                       </span>
                     </div>
                     {/* Valor Unitário */}
-                    <div className="w-24 shrink-0">
+                    <div className="w-20 shrink-0">
                       {permiteAlterarPreco ? (
                         <input
                           type="text"
@@ -396,14 +396,14 @@ export function PedidoProdutosCarrinhoColuna() {
                       )}
                     </div>
                     {/* Total */}
-                    <div className="w-24 shrink-0">
+                    <div className="w-20 shrink-0">
                       <span className="block text-right text-xs font-semibold text-gray-900">
                         R$ {formatarNumeroComMilhar(totalProdutoComComplementos)}
                       </span>
                     </div>
                     {/* Ações: menu compacto + remover */}
                     <div
-                      className="flex w-[44px] shrink-0 items-center justify-end gap-0"
+                      className="flex w-[26px] shrink-0 items-center justify-end gap-0"
                       role="group"
                       aria-label="Ações do produto"
                       onClick={e => e.stopPropagation()}
@@ -416,7 +416,7 @@ export function PedidoProdutosCarrinhoColuna() {
                           <button
                             type="button"
                             aria-label="Mais ações do produto"
-                            className="flex h-5 w-4 shrink-0 items-center justify-center rounded border-0 p-0 text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-700"
+                            className="flex h-5 w-3 shrink-0 items-center justify-center rounded border-0 p-0 text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-700"
                           >
                             <MdMoreVert className="h-4 w-4" />
                           </button>
@@ -448,9 +448,9 @@ export function PedidoProdutosCarrinhoColuna() {
                         type="button"
                         title="Remover produto"
                         aria-label="Remover produto"
-                        className="flex h-4 w-4 shrink-0 items-center justify-center rounded border-0 p-0 transition-colors hover:bg-red-100"
+                        className="flex h-4 w-3 shrink-0 items-center justify-center rounded border-0 p-0 transition-colors hover:bg-red-100"
                       >
-                        <MdDelete className="h-4 w-4 text-red-500" />
+                        <MdDelete className="h-3 w-3 text-red-500" />
                       </button>
                     </div>
                   </div>
@@ -529,7 +529,7 @@ export function PedidoProdutosCarrinhoColuna() {
                         }}
                       >
                         {/* Quantidade do Complemento */}
-                        <div className="flex w-[72px] flex-shrink-0 items-center justify-center gap-0.5 pl-2">
+                        <div className="flex w-[66px] flex-shrink-0 items-center justify-center gap-0.5 pl-2">
                           <button
                             type="button"
                             aria-label="Diminuir quantidade do complemento"
@@ -549,9 +549,9 @@ export function PedidoProdutosCarrinhoColuna() {
                                 return next
                               })
                             }}
-                            className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-gray-300 bg-white text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                            className="flex h-3 w-3 shrink-0 items-center justify-center bg-white text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
                           >
-                            <MdRemove className="h-3 w-3" />
+                            <MdRemove className="h-2 w-2" />
                           </button>
                           <input
                             type="text"
@@ -618,7 +618,7 @@ export function PedidoProdutosCarrinhoColuna() {
                                 e.currentTarget.blur()
                               }
                             }}
-                            className="h-5 w-6 min-w-0 border-0 bg-transparent p-0 text-center text-xs tabular-nums text-gray-600 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary"
+                            className="h-5 w-5 min-w-0 border-0 bg-transparent p-0 text-center text-xs tabular-nums text-gray-600 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary"
                           />
                           <button
                             type="button"
@@ -639,21 +639,20 @@ export function PedidoProdutosCarrinhoColuna() {
                                 return next
                               })
                             }}
-                            className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-gray-300 bg-white text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                            className="flex h-3 w-3 shrink-0 items-center justify-center bg-white text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             <MdAdd className="h-3 w-3" />
                           </button>
                         </div>
                         {/* Nome do Complemento com indentação */}
-                        <div className="min-w-0 flex-1 pl-4">
+                        <div className="min-w-0 flex-1">
                           <span className="block truncate text-xs leading-tight text-gray-600">
                             {complemento.nome}
                           </span>
                         </div>
-                        {/* Espaço vazio para Desconto/Acréscimo (complementos não têm) */}
-                        <div className="w-20 shrink-0" />
+                       
                         {/* Valor Unitário do Complemento - Apenas exibição */}
-                        <div className="w-24 shrink-0">
+                        <div className="w-20 shrink-0">
                           <span className="block truncate text-right text-xs leading-tight text-gray-600">
                             {formatarValorComplemento(
                               complemento.valor,
@@ -662,10 +661,10 @@ export function PedidoProdutosCarrinhoColuna() {
                           </span>
                         </div>
                         {/* Espaço vazio onde seria o Total (complementos não têm total próprio) */}
-                        <div className="w-24 shrink-0" />
+                        <div className="w-20 shrink-0" />
                         {/* Ações: alinhado à coluna do produto (espaço do menu + remover) */}
                         <div
-                          className="flex w-[44px] shrink-0 items-center justify-end gap-0"
+                          className="flex w-[34px] shrink-0 items-center justify-end gap-0"
                           onClick={e => e.stopPropagation()}
                           onMouseDown={e => e.stopPropagation()}
                         >
@@ -675,9 +674,9 @@ export function PedidoProdutosCarrinhoColuna() {
                             type="button"
                             title="Remover complemento"
                             aria-label="Remover complemento"
-                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded border-0 p-0 transition-colors hover:bg-red-50"
+                            className="flex h-5 w-3 shrink-0 items-center justify-center rounded border-0 p-0 transition-colors hover:bg-red-50"
                           >
-                            <MdClear className="h-3.5 w-3.5 text-red-500" />
+                            <MdClear className="h-3 w-3 text-red-500" />
                           </button>
                         </div>
                       </div>
