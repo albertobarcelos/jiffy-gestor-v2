@@ -7,6 +7,7 @@ import {
   resolveDocumentoFiscalIdPublico,
 } from '@/src/infrastructure/api/fetchVendaContingenciaPublica'
 import { CupomFiscalContingencia } from '@/src/presentation/components/features/venda-contingencia/CupomFiscalContingencia'
+import { CupomPublicoShell } from '@/src/presentation/components/features/venda-contingencia/CupomPublicoShell'
 
 export const dynamic = 'force-dynamic'
 
@@ -66,18 +67,17 @@ export default async function NotaFiscalPublicPage({ params }: PageProps) {
       className="min-h-screen flex justify-center py-8 px-4 sm:px-5"
       style={{ background: 'linear-gradient(to bottom right, #f8fafc, #e2e8f0)' }}
     >
-      <article
-        className="w-full max-w-lg rounded-xl border border-slate-200/90 bg-white shadow-lg shadow-slate-200/60 overflow-hidden"
+      <CupomPublicoShell
+        className="max-w-lg"
         style={{
           fontFamily: "'Roboto Mono', 'Courier New', monospace",
           color: '#0f172a',
         }}
       >
-       
         <div className="px-5 sm:px-6 py-5">
           <CupomFiscalContingencia data={data} rodapeDanfeSrc={rodapeDanfeSrc} />
         </div>
-      </article>
+      </CupomPublicoShell>
     </div>
   )
 }
