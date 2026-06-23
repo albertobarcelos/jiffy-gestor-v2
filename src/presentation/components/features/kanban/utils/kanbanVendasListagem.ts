@@ -30,9 +30,8 @@ function dentroDoIntervaloIso(
 }
 
 /**
- * Filtro de datas da toolbar aplicado client-side no modo delivery.
- * A API operacional (carga + delta) não envia datas — evita 500 e garante
- * que pedidos novos apareçam via re-poll.
+ * Filtro de datas da toolbar aplicado client-side (fallback).
+ * Preferir filtros na API via `enviarFiltroCriacaoNaApi` e `dataFinalizacaoInicial/Final`.
  */
 export function filtrarPedidosDeliveryKanbanPorDatasToolbar(
   vendas: Venda[],

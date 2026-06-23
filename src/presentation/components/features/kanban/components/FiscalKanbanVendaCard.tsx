@@ -693,6 +693,7 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
       <ObservacaoPedidoKanbanPainel
         open={observacaoPedidoOpen}
         venda={venda}
+        observacaoPedidoHint={observacaoPedidoTexto || null}
         onClose={() => setObservacaoPedidoOpen(false)}
       />
 

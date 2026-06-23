@@ -178,3 +178,6 @@ export const PEDIDOS_DELIVERY_KANBAN_PAGE_SIZE = 10
  * Cobre a grande maioria dos restaurantes em 1 requisição.
  */
 export const KANBAN_DELIVERY_SYNC_PAGE_SIZE = 100
+
+/** Pedidos por coluna no Kanban delivery (scroll incremental por status). */
+export const KANBAN_DELIVERY_COLUMN_PAGE_SIZE = 15

@@ -260,7 +260,7 @@ export function usePedidosDeliveryKanbanSync(
       const paramsComStatus: PedidosDeliveryInfiniteParams =
         pageParam === 0
           ? { ...paramsApi, statusDelivery: STATUS_ATIVOS_KANBAN_DELIVERY }
-          : paramsApi
+          : { ...paramsApi, statusDelivery: STATUS_ATIVOS_KANBAN_DELIVERY }
 
       const result = await fetchPedidosDeliveryPagina(
         paramsComStatus,
