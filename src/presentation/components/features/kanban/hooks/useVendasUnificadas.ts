@@ -475,6 +475,18 @@ export class VendaUnificadaDTO {
 
     if (this.isPendenteEmissao()) return 'PENDENTE_EMISSAO'
 
+    const statusOp = String(this.statusEtapaOperacional ?? '')
+      .trim()
+      .toUpperCase()
+    if (
+      statusOp === 'FINALIZADO' ||
+      statusOp === 'FINALIZADA' ||
+      statusOp === 'ENTREGUE' ||
+      statusOp === 'CONCLUIDO'
+    ) {
+      return 'FINALIZADAS'
+    }
+
     if (this.dataFinalizacao) return 'FINALIZADAS'
     return 'ABERTA'
   }

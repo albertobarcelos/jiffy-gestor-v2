@@ -267,27 +267,22 @@ export function isPedidoTipoDeliveryKanban(venda: VendaUnificadaDTO): boolean {
 }
 
 /**
- * Botão "Observação" no card:
- * - Delivery: oculto em Finalizadas, Pendente emissão e Com nota solicitada (pedido já entregue).
- * - Balcão / PDV: visível em Finalizadas; oculto em Pendente emissão e Com nota solicitada.
+ * Botão "Observação" no card — apenas no modo delivery do kanban.
+ * Oculto em Finalizadas, Pendente emissão e Com nota solicitada.
  */
 export function deveExibirBotaoObservacaoPedidoKanban(
   columnId: ColunaKanbanId,
-  venda: VendaUnificadaDTO
+  venda: VendaUnificadaDTO,
+  modoKanbanVendas: ModoKanbanVendas
 ): boolean {
-  if (isPedidoTipoDeliveryKanban(venda)) {
-    return (
-      columnId !== 'FINALIZADAS' &&
-      columnId !== 'PENDENTE_EMISSAO' &&
-      columnId !== 'COM_NFE'
-    )
-  }
+  if (modoKanbanVendas !== 'delivery') return false
+  if (!isPedidoTipoDeliveryKanban(venda)) return false
 
-  if (columnId === 'PENDENTE_EMISSAO' || columnId === 'COM_NFE') {
-    return false
-  }
-
-  return true
+  return (
+    columnId !== 'FINALIZADAS' &&
+    columnId !== 'PENDENTE_EMISSAO' &&
+    columnId !== 'COM_NFE'
+  )
 }
 
 /** Venda sem nome de cliente preenchido (nome vazio ou só espaços). */

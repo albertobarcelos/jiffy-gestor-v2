@@ -67,14 +67,32 @@ export function mapAcoesTransicaoGestorToStatusDelivery(
   return acoes.map(mapAcaoTransicaoGestorToStatusDelivery)
 }
 
+function inferirDataFinalizacaoPatch(
+  status: string | null | undefined,
+  dataFinalizacao: string | null | undefined
+): string | null {
+  if (dataFinalizacao) return dataFinalizacao
+  const s = String(status ?? '').trim().toUpperCase()
+  if (
+    s === 'FINALIZADO' ||
+    s === 'FINALIZADA' ||
+    s === 'ENTREGUE' ||
+    s === 'CONCLUIDO'
+  ) {
+    return new Date().toISOString()
+  }
+  return null
+}
+
 /** Extrai patch de cache do Kanban a partir da resposta PATCH delivery/transicao-status ou GET pedido. */
 export function extrairPatchKanbanDeTransicaoDelivery(data: unknown): KanbanVendaCachePatch {
   const card = extrairVendaUnificadaDeRespostaDeliverySummary(data)
   if (card) {
+    const statusEtapaOperacional = card.statusEtapaOperacional ?? null
     return {
-      statusEtapaOperacional: card.statusEtapaOperacional ?? null,
+      statusEtapaOperacional,
       dataUltimaModificacao: card.dataUltimaModificacao ?? null,
-      dataFinalizacao: card.dataFinalizacao ?? null,
+      dataFinalizacao: inferirDataFinalizacaoPatch(statusEtapaOperacional, card.dataFinalizacao),
       statusFinanceiro: card.statusFinanceiro ?? null,
       valorFinal: card.valorFinal,
       observacoes: card.observacoes ?? null,
@@ -104,8 +122,10 @@ export function extrairPatchKanbanDeTransicaoDelivery(data: unknown): KanbanVend
     dataUltimaModificacao:
       isoDeCampoApi(inner.dataUltimaModificacao) ??
       isoDeCampoApi(registro.dataUltimaModificacao),
-    dataFinalizacao:
-      isoDeCampoApi(inner.dataFinalizacao) ?? isoDeCampoApi(registro.dataFinalizacao),
+    dataFinalizacao: inferirDataFinalizacaoPatch(
+      statusEtapaOperacional,
+      isoDeCampoApi(inner.dataFinalizacao) ?? isoDeCampoApi(registro.dataFinalizacao)
+    ),
     statusFinanceiro: extrairStatusFinanceiroPedidoDelivery(data),
     valorFinal,
     observacoes,

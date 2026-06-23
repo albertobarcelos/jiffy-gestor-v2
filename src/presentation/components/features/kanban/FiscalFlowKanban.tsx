@@ -168,6 +168,7 @@ export function FiscalFlowKanban() {
   } = useFiscalKanbanFilters()
   const { timezoneAgregacao, preferenciasImpressaoDelivery, empresa } = useEmpresaMe()
   const { auth } = useAuthStore()
+  const hasKanbanToken = !!auth?.getAccessToken()
   const queryClient = useQueryClient()
   const empresaId = useTenantEmpresaId()
   const [entregadorPorVendaId, setEntregadorPorVendaId] = useState<Record<string, string>>({})
@@ -299,8 +300,15 @@ export function FiscalFlowKanban() {
   }, [auth])
 
   useEffect(() => {
+    if (isModoDeliveryKanban) return
     void loadAllTerminais()
-  }, [loadAllTerminais])
+  }, [isModoDeliveryKanban, loadAllTerminais])
+
+  useEffect(() => {
+    if (isModoDeliveryKanban && terminalFilter) {
+      setTerminalFilter('')
+    }
+  }, [isModoDeliveryKanban, terminalFilter])
 
   const usaFiltroTerminal = !!terminalFilter.trim() && !isModoDeliveryKanban
 
@@ -377,9 +385,10 @@ export function FiscalFlowKanban() {
     fetchNextPage: fetchNextPageUnificado,
     refetch: refetchUnificado,
   } = useVendasUnificadasInfinite(vendasUnificadasQueryParams, {
-    enabled: !isModoDeliveryKanban,
-    refetchIntervalMs: KANBAN_VENDAS_REFETCH_INTERVAL_MS,
-    refetchOnWindowFocus: true,
+    // Mantém cache do balcão ao alternar modo; polling só no modo ativo.
+    enabled: hasKanbanToken,
+    refetchIntervalMs: !isModoDeliveryKanban ? KANBAN_VENDAS_REFETCH_INTERVAL_MS : false,
+    refetchOnWindowFocus: !isModoDeliveryKanban,
   })
 
   const {
@@ -390,9 +399,9 @@ export function FiscalFlowKanban() {
     fetchNextPage: fetchNextPageDelivery,
     refetch: refetchDelivery,
   } = usePedidosDeliveryKanbanSync(pedidosDeliveryQueryParams, {
-    enabled: isModoDeliveryKanban,
-    refetchIntervalMs: KANBAN_DELIVERY_DELTA_POLL_INTERVAL_MS,
-    refetchOnWindowFocus: true,
+    enabled: hasKanbanToken,
+    refetchIntervalMs: isModoDeliveryKanban ? KANBAN_DELIVERY_DELTA_POLL_INTERVAL_MS : false,
+    refetchOnWindowFocus: isModoDeliveryKanban,
   })
 
   const isFetchingNextPage = isModoDeliveryKanban
@@ -1248,15 +1257,7 @@ export function FiscalFlowKanban() {
     return []
   }
 
-  const mostrarLoadingInicial = isLoading && todasVendas.length === 0
-
-  if (mostrarLoadingInicial) {
-    return (
-      <div className="flex h-full items-center justify-center bg-gray-50">
-        <JiffyLoading />
-      </div>
-    )
-  }
+  const mostrarLoadingLista = isLoading && todasVendas.length === 0
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-gray-50">
@@ -1367,8 +1368,13 @@ export function FiscalFlowKanban() {
         </div>
       </JiffySidePanelModal>
 
-      {/* Kanban Board */}
+      {/* Kanban Board — loading só na área das colunas; toolbar permanece visível */}
       <div className="scrollbar-thin mb-[10px] min-h-0 flex-1 overflow-x-auto p-2 pb-4">
+        {mostrarLoadingLista ? (
+          <div className="flex h-full min-h-[200px] items-center justify-center">
+            <JiffyLoading />
+          </div>
+        ) : (
         <DndContext
           sensors={sensors}
           onDragStart={handleDragStart}
@@ -1446,7 +1452,8 @@ export function FiscalFlowKanban() {
             {draggingVenda ? <VendaCardDragPreview venda={draggingVenda} /> : null}
           </DragOverlay>
         </DndContext>
-        {isFetchingNextPage ? (
+        )}
+        {!mostrarLoadingLista && isFetchingNextPage ? (
           <p className="px-2 pb-2 text-center text-xs text-gray-500">Carregando mais vendas…</p>
         ) : null}
       </div>

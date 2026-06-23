@@ -5,12 +5,12 @@ import Tooltip from '@mui/material/Tooltip'
 import {
   MdAccessTime,
   MdArrowForward,
-  MdDeliveryDining,
   MdEdit,
   MdEditNote,
   MdLocationOn,
   MdPrint,
   MdSave,
+  MdSportsMotorsports,
   MdVisibility,
 } from 'react-icons/md'
 import { Button } from '@/src/presentation/components/ui/button'
@@ -166,7 +166,11 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
   const quickViewAberto = Boolean(entregaQuickViewAnchor)
   const bloquearDragCard =
     quickViewAberto || atribuirEntregadorOpen || observacaoPedidoOpen || enderecoEntregaOpen
-  const exibirBotaoObservacaoPedido = deveExibirBotaoObservacaoPedidoKanban(colunaAtual, venda)
+  const exibirBotaoObservacaoPedido = deveExibirBotaoObservacaoPedidoKanban(
+    colunaAtual,
+    venda,
+    modoKanbanVendas
+  )
   const exibirBotaoAlterarEndereco = deveExibirBotaoAlterarEnderecoEntregaKanban(
     colunaAtual,
     venda,
@@ -561,7 +565,7 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
                 setAtribuirEntregadorOpen(true)
               }}
             >
-              <MdDeliveryDining size={16} />
+              <MdSportsMotorsports size={16} />
             </Button>
           )}
 

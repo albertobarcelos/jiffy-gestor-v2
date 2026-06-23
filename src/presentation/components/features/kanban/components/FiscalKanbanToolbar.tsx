@@ -280,6 +280,7 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
           </FormControl>
         </div>
 
+        {modoKanbanVendas === 'balcao' ? (
         <div className="flex flex-col gap-1">
           <FormControl
             size="small"
@@ -307,6 +308,7 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
             </Select>
           </FormControl>
         </div>
+        ) : null}
 
         <FiltroDataOpcoesBotao
           label="Data Finalização"
