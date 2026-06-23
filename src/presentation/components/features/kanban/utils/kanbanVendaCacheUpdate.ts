@@ -8,7 +8,10 @@ import {
 } from '../hooks/kanbanListagemQueryCache'
 
 export type { KanbanVendaCachePatch } from '@/src/application/dto/TransicaoKanbanDTO'
-export { extrairPatchKanbanDeRespostaTransicao }
+export {
+  extrairPatchKanbanDeRespostaTransicao,
+  extrairVendaUnificadaDeRespostaDeliverySummary,
+} from '@/src/application/mappers/TransicaoPedidoDeliveryMapper'
 
 import {
   VendaUnificadaDTO,
@@ -133,8 +136,36 @@ export function cloneVendaUnificadaDTO(
     venda.previsaoEntregaEm,
     venda.tempoTotalEstimadoSegundos,
     venda.fluxoPagamentoEntrega,
-    venda.cobrancasDelivery
+    venda.cobrancasDelivery,
+    venda.entregador,
+    venda.contextoEntrega
   )
+}
+
+/** Substitui um item inteiro no cache infinito (resposta summary de transicao-status). */
+export function replaceVendaUnificadaInfiniteCache(
+  queryClient: QueryClient,
+  queryKey: readonly unknown[],
+  vendaAtualizada: VendaUnificadaDTO
+): boolean {
+  let encontrou = false
+
+  queryClient.setQueryData<InfiniteData<VendasUnificadasResponse>>(queryKey, atual => {
+    if (!atual?.pages?.length) return atual
+
+    const pages = atual.pages.map(page => ({
+      ...page,
+      items: page.items.map(item => {
+        if (item.id !== vendaAtualizada.id) return item
+        encontrou = true
+        return vendaAtualizada
+      }),
+    }))
+
+    return encontrou ? { ...atual, pages } : atual
+  })
+
+  return encontrou
 }
 
 /** Atualiza o item em todas as listagens infinitas do Kanban (balcão + delivery). */

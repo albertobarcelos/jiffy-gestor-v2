@@ -22,7 +22,11 @@ export type VerificarImpressaoKanbanResult = {
 
 interface UseEntregaTransicoesKanbanParams {
   executarTransicao: (payload: ExecutarTransicaoKanbanPayload) => Promise<unknown>
-  sincronizarVendaAposTransicao?: (vendaId: string, respostaTransicao: unknown) => void
+  /** Retorna true quando a resposta summary já atualizou o card (sem GET extra). */
+  sincronizarVendaAposTransicao?: (
+    vendaId: string,
+    respostaTransicao: unknown
+  ) => boolean | void
   agendarSincronizacaoLista?: (vendaId: string) => void
   onAfterTransicaoSucesso?: (ctx: {
     venda: Venda
@@ -94,11 +98,13 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
       ticketsPreload?: VendaGestorTicketsResponse
     ) => {
       marcarTransicaoLocal(venda.id)
-      sincronizarVendaAposTransicao?.(venda.id, respostaTransicao)
+      const cardCompleto = sincronizarVendaAposTransicao?.(venda.id, respostaTransicao)
       limparEtapaLocal(venda.id)
       showToast.success('Etapa do pedido atualizada.')
       void onAfterTransicaoSucesso?.({ venda, acoesExecutadas, ticketsPreload })
-      agendarSincronizacaoLista?.(venda.id)
+      if (!cardCompleto) {
+        agendarSincronizacaoLista?.(venda.id)
+      }
     },
     [
       agendarSincronizacaoLista,

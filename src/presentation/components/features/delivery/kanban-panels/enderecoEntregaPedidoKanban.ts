@@ -4,6 +4,7 @@ import {
 } from '@/src/application/mappers/ContextoEntregaDeliveryMapper'
 import type { EnderecoEntregaDetalhe } from '@/src/domain/types/vendaDetalhe'
 import type { ModoKanbanVendas } from '@/src/presentation/components/features/kanban'
+import type { VendaUnificadaDTO } from '@/src/presentation/components/features/kanban/hooks/useVendasUnificadas'
 import { pedidoKanbanUsaEndpointDelivery } from './observacaoPedidoKanban'
 import type { ColunaKanbanId, Venda } from '@/src/presentation/components/features/kanban/types'
 
@@ -55,6 +56,20 @@ export function extrairContextoEnderecoPedidoDeliveryApi(
     telefone: contexto?.destinatarioTelefone?.trim() || null,
     enderecoDeliveryIdRef: contexto?.enderecoDeliveryIdRef?.trim() || null,
     enderecoAtual: enderecoSnapshotParaEnderecoEntregaDetalhe(contexto?.enderecoEntrega ?? null),
+  }
+}
+
+/** Usa `contextoEntrega` do summary no card — evita GET /pedidos/:id só para ver endereço. */
+export function extrairContextoEnderecoDeVendaKanban(
+  venda: Pick<VendaUnificadaDTO, 'contextoEntrega'>
+): ContextoEnderecoPedidoKanban | null {
+  const contexto = venda.contextoEntrega
+  if (!contexto) return null
+
+  return {
+    telefone: contexto.destinatarioTelefone?.trim() || null,
+    enderecoDeliveryIdRef: contexto.enderecoDeliveryIdRef?.trim() || null,
+    enderecoAtual: enderecoSnapshotParaEnderecoEntregaDetalhe(contexto.enderecoEntrega ?? null),
   }
 }
 

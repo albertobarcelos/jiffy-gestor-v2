@@ -1,9 +1,17 @@
 import { erroImpressao, logImpressao, warnImpressao } from '@/src/shared/utils/logImpressaoDelivery'
-import { loadQzTray, ensureQzWebsocketConnected } from '@/src/infrastructure/printing/qzTrayClient'
+import {
+  loadQzTray,
+  ensureQzWebsocketConnected,
+  parseTcpPrinterRef,
+  printRawTcpQz,
+} from '@/src/infrastructure/printing/qzTrayClient'
 
 export interface PrintDeliveryCupomInput {
   html: string
-  /** Nome exato da impressora no Windows (lista do QZ Tray). Se vazio, só fallback. */
+  /**
+   * Nome da impressora Windows (lista QZ Tray) OU referência TCP direta `tcp://IP:PORTA`.
+   * Quando vazio/null o fallback browser.print() é usado.
+   */
   printerName: string | null
   copies?: number
   jobName?: string
@@ -70,14 +78,31 @@ export async function printDeliveryCupom(input: PrintDeliveryCupomInput): Promis
     return fallbackImprimirHtmlNoNavegador(input.html)
   }
 
+  // Detecta referência TCP direta (tcp://IP:PORTA) — sem spooler Windows
+  const tcpRef = parseTcpPrinterRef(nomeImpressora)
+
   try {
+    const qz = await loadQzTray()
+
+    if (tcpRef) {
+      logImpressao('printDeliveryCupom.qz_tcp_inicio', {
+        host: tcpRef.host,
+        port: tcpRef.port,
+        copies,
+        jobName: input.jobName ?? 'Jiffy',
+        htmlChars: input.html.length,
+      })
+      await printRawTcpQz(qz, tcpRef.host, tcpRef.port, input.html, copies, input.jobName ?? 'Jiffy')
+      logImpressao('printDeliveryCupom.qz_tcp_sucesso', { copies, host: tcpRef.host, port: tcpRef.port })
+      return { ok: true, metodo: 'qz' }
+    }
+
     logImpressao('printDeliveryCupom.qz_inicio', {
       impressoraWindows: nomeImpressora.slice(0, 80),
       copies,
       jobName: input.jobName ?? 'Jiffy Delivery',
       htmlChars: input.html.length,
     })
-    const qz = await loadQzTray()
     await ensureQzWebsocketConnected(qz)
     logImpressao('printDeliveryCupom.qz_modulo', { wsJaAtivo: qz.websocket.isActive() })
     const config = qz.configs.create(nomeImpressora, {

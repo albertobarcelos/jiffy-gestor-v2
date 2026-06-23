@@ -1,9 +1,14 @@
 import { extrairStatusFinanceiroPedidoDelivery } from '@/src/application/mappers/PedidoDeliveryDetalheAdapter'
+import {
+  mapPedidoDeliverySummaryParaVendaUnificadaDTO,
+  normalizarPedidoDeliverySummaryJson,
+} from '@/src/application/mappers/PedidoDeliveryListMapper'
 import type { StatusDeliveryApi } from '@/src/application/dto/api/pedidoDeliveryApi'
 import type {
   AcaoTransicaoKanbanEntrega,
   KanbanVendaCachePatch,
 } from '@/src/application/dto/TransicaoKanbanDTO'
+import type { VendaUnificadaDTO } from '@/features/kanban/hooks/useVendasUnificadas'
 
 function extrairObservacoesPatchDeRegistro(registro: Record<string, unknown>): string[] | undefined {
   const raw = registro.observacoes ?? registro.observacao
@@ -64,6 +69,18 @@ export function mapAcoesTransicaoGestorToStatusDelivery(
 
 /** Extrai patch de cache do Kanban a partir da resposta PATCH delivery/transicao-status ou GET pedido. */
 export function extrairPatchKanbanDeTransicaoDelivery(data: unknown): KanbanVendaCachePatch {
+  const card = extrairVendaUnificadaDeRespostaDeliverySummary(data)
+  if (card) {
+    return {
+      statusEtapaOperacional: card.statusEtapaOperacional ?? null,
+      dataUltimaModificacao: card.dataUltimaModificacao ?? null,
+      dataFinalizacao: card.dataFinalizacao ?? null,
+      statusFinanceiro: card.statusFinanceiro ?? null,
+      valorFinal: card.valorFinal,
+      observacoes: card.observacoes ?? null,
+    }
+  }
+
   const registro =
     data && typeof data === 'object' ? (data as Record<string, unknown>) : {}
 
@@ -93,6 +110,22 @@ export function extrairPatchKanbanDeTransicaoDelivery(data: unknown): KanbanVend
     valorFinal,
     observacoes,
   }
+}
+
+/** Converte resposta summary (listagem ou transicao-status) em card do Kanban. */
+export function extrairVendaUnificadaDeRespostaDeliverySummary(
+  data: unknown
+): VendaUnificadaDTO | null {
+  if (!data || typeof data !== 'object') return null
+  const registro = data as Record<string, unknown>
+  const inner =
+    registro.data != null && typeof registro.data === 'object' && !Array.isArray(registro.data)
+      ? (registro.data as Record<string, unknown>)
+      : registro
+
+  const summary = normalizarPedidoDeliverySummaryJson(inner)
+  if (!summary) return null
+  return mapPedidoDeliverySummaryParaVendaUnificadaDTO(summary)
 }
 
 /** Unifica resposta gestor (legado) e delivery no patch do Kanban. */

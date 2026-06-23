@@ -87,8 +87,10 @@ export function AtribuirEntregadorKanbanPainel({
 
     setCarregandoDados(true)
     try {
+      const entregadorDoCard = venda.entregador?.id?.trim()
       const entregadorResolvido =
         entregadorVinculadoId?.trim() ||
+        entregadorDoCard ||
         (await resolverEntregadorIdVendaKanban({
           vendaId: venda.id,
           tabelaOrigem: venda.tabelaOrigem === 'venda_gestor' ? 'venda_gestor' : 'venda',
@@ -98,7 +100,7 @@ export function AtribuirEntregadorKanbanPainel({
 
       setEntregadorId(entregadorResolvido)
 
-      if (venda.tabelaOrigem === 'venda_gestor') {
+      if (venda.tabelaOrigem === 'venda_gestor' && !entregadorDoCard) {
         const response = await fetch(
           `/api/delivery/pedidos/${encodeURIComponent(venda.id)}`,
           {

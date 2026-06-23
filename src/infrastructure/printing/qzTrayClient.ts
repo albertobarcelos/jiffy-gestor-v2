@@ -263,3 +263,94 @@ export async function loadQzTray(): Promise<QzModule> {
   await ensureQzTraySecurity(qz)
   return qz
 }
+
+// ─── Raw TCP (IP direto, sem spooler Windows) ──────────────────────────────
+
+/**
+ * Parseia `tcp://HOST:PORTA` e retorna `{ host, port }`, ou `null` se não for o formato.
+ * Usado para detectar impressoras configuradas por IP em vez de nome Windows.
+ */
+export function parseTcpPrinterRef(ref: string): { host: string; port: number } | null {
+  const m = ref.trim().match(/^tcp:\/\/([^:]+):(\d{1,5})$/)
+  if (!m) return null
+  const port = parseInt(m[2], 10)
+  if (port < 1 || port > 65535) return null
+  return { host: m[1], port }
+}
+
+/** Formata uma referência `tcp://HOST:PORTA`. */
+export function formatTcpPrinterRef(host: string, port: number | string): string {
+  return `tcp://${host.trim()}:${port}`
+}
+
+/**
+ * Converte HTML em texto simples para envio raw ESC/POS.
+ * Usa DOMParser (browser-only). Substitui <br> por \n e preserva o texto de cada bloco.
+ */
+function htmlParaTextoEscPos(html: string): string {
+  if (typeof window === 'undefined' || typeof DOMParser === 'undefined') {
+    return html.replace(/<[^>]+>/g, '')
+  }
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+
+  // <br> → newline
+  doc.querySelectorAll('br').forEach(el => el.replaceWith('\n'))
+
+  // separador de célula de tabela
+  doc.querySelectorAll('td, th').forEach(el => {
+    const sep = document.createTextNode('  ')
+    el.after(sep)
+  })
+
+  // nova linha após cada linha de tabela e após cada bloco
+  doc.querySelectorAll('tr, p, div, li, h1, h2, h3, h4').forEach(el => {
+    el.after('\n')
+  })
+
+  const texto = (doc.body.textContent ?? '')
+    .split('\n')
+    .map(l => l.trimEnd())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+
+  return texto
+}
+
+/**
+ * Imprime um HTML em uma impressora térmica via raw TCP (sem instalar no Windows).
+ *
+ * Fluxo:
+ * 1. Conecta ao WebSocket do QZ Tray
+ * 2. Cria config apontando direto para IP:porta (sem nome de impressora Windows)
+ * 3. Converte HTML → texto + comandos ESC/POS básicos (init + corte)
+ * 4. Envia como `type: 'raw'`
+ */
+export async function printRawTcpQz(
+  qz: QzModule,
+  host: string,
+  port: number,
+  html: string,
+  copies = 1,
+  jobName = 'Jiffy'
+): Promise<void> {
+  await ensureQzWebsocketConnected(qz)
+
+  const ESC_INIT = '\x1B\x40'          // ESC @ — inicializar impressora
+  const LF = '\n'
+  const CORTE_PARCIAL = '\x1D\x56\x41\x05' // GS V 65 5 — corte parcial
+
+  const texto = htmlParaTextoEscPos(html)
+  const conteudo = `${ESC_INIT}${texto}${LF}${LF}${LF}${CORTE_PARCIAL}`
+
+  // qz.configs.create aceita objeto { host, port } para conexão raw TCP
+  const config = (qz.configs as unknown as {
+    create: (printer: null, opts?: Record<string, unknown>) => unknown
+  }).create(null, { host, port, jobName })
+
+  const payload = [{ type: 'raw' as const, format: 'plain' as const, data: conteudo }]
+
+  for (let i = 0; i < Math.max(1, copies); i++) {
+    await qz.print(config as Parameters<QzModule['print']>[0], payload)
+  }
+}

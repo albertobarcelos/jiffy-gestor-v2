@@ -64,7 +64,6 @@ describe('PedidoDeliveryListMapper — origem e financeiro', () => {
           meioPagamentoId: 'mp1',
           momentoCobranca: 'antecipado',
           status: 'paga',
-          criadaPor: { id: 'u1' },
           dataCriacao: '2026-06-15T10:00:00.000Z',
         },
         {
@@ -73,7 +72,6 @@ describe('PedidoDeliveryListMapper — origem e financeiro', () => {
           meioPagamentoId: 'mp2',
           momentoCobranca: 'na_entrega',
           status: 'pendente',
-          criadaPor: { id: 'u1' },
           dataCriacao: '2026-06-15T10:00:00.000Z',
         },
       ])
@@ -90,7 +88,6 @@ describe('PedidoDeliveryListMapper — origem e financeiro', () => {
           meioPagamentoId: 'mp1',
           momentoCobranca: 'antecipado',
           status: 'paga',
-          criadaPor: { id: 'u1' },
           dataCriacao: '2026-06-15T10:00:00.000Z',
         },
       ])
@@ -103,7 +100,6 @@ describe('PedidoDeliveryListMapper — origem e financeiro', () => {
           meioPagamentoId: 'mp2',
           momentoCobranca: 'na_entrega',
           status: 'pendente',
-          criadaPor: { id: 'u1' },
           dataCriacao: '2026-06-15T10:00:00.000Z',
         },
       ])
@@ -138,7 +134,6 @@ describe('PedidoDeliveryListMapper — summary → VendaUnificadaDTO', () => {
             meioPagamentoId: 'mp1',
             momentoCobranca: 'na_entrega',
             status: 'pendente',
-            criadaPor: { id: 'u1' },
             dataCriacao: '2026-06-15T10:00:00.000Z',
           },
         ],
@@ -149,8 +144,35 @@ describe('PedidoDeliveryListMapper — summary → VendaUnificadaDTO', () => {
     expect(dto.tempoTotalEstimadoSegundos).toBe(2700)
     expect(dto.fluxoPagamentoEntrega).toBe('cobrar_entregador')
     expect(dto.cobrancasDelivery).toEqual([
-      { meioPagamentoId: 'mp1', status: 'pendente' },
+      { meioPagamentoId: 'mp1', status: 'pendente', momentoCobranca: 'na_entrega' },
     ])
+  })
+
+  it('propaga entregador e contextoEntrega do summary', () => {
+    const dto = mapPedidoDeliverySummaryParaVendaUnificadaDTO(
+      criarSummary({
+        entregador: { id: 'ent-1', nome: 'João', telefone: '11999999999' },
+        contextoEntrega: {
+          destinatarioNome: 'Maria',
+          destinatarioTelefone: '11988887777',
+          enderecoEntrega: {
+            etiqueta: 'casa',
+            rua: 'Rua A',
+            numero: '10',
+            bairro: 'Centro',
+            cep: '01310100',
+          },
+        },
+      })
+    )
+
+    expect(dto.entregador).toEqual({
+      id: 'ent-1',
+      nome: 'João',
+      telefone: '11999999999',
+    })
+    expect(dto.contextoEntrega?.destinatarioTelefone).toBe('11988887777')
+    expect(dto.contextoEntrega?.enderecoEntrega?.rua).toBe('Rua A')
   })
 
   it('propaga statusDelivery e reconhece pedido entrega no Kanban', () => {

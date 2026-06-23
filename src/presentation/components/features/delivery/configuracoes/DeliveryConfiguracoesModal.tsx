@@ -29,6 +29,8 @@ import {
   listQzWindowsPrinters,
   loadQzTray,
   mensagemErroCarregarQzTray,
+  parseTcpPrinterRef,
+  formatTcpPrinterRef,
 } from '@/src/infrastructure/printing/qzTrayClient'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import {
@@ -90,6 +92,127 @@ function DeliveryToggleRow(props: {
         className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 accent-secondary focus:ring-secondary"
       />
     </label>
+  )
+}
+
+/**
+ * Campo de mapeamento de impressora: alterna entre "impressora Windows" (select)
+ * e "IP direto" (dois inputs: host + porta) sem precisar instalar no Windows.
+ * O valor armazenado em IP direto é `tcp://HOST:PORTA`.
+ */
+function ImpressoraMapeamentoInput({
+  value,
+  impressorasWindows,
+  onChange,
+}: {
+  value: string
+  impressorasWindows: string[]
+  onChange: (next: string) => void
+}) {
+  const tcpRef = parseTcpPrinterRef(value)
+  const modoIp = tcpRef !== null || value.startsWith('tcp://')
+
+  const [host, setHost] = useState(tcpRef?.host ?? '')
+  const [porta, setPorta] = useState(String(tcpRef?.port ?? 9100))
+
+  // Sincroniza campos IP quando o valor externo muda (ex: hidratação)
+  useEffect(() => {
+    const parsed = parseTcpPrinterRef(value)
+    if (parsed) {
+      setHost(parsed.host)
+      setPorta(String(parsed.port))
+    }
+  }, [value])
+
+  function toggleModo() {
+    if (modoIp) {
+      onChange('')
+    } else {
+      const ref = host.trim() ? formatTcpPrinterRef(host.trim(), porta || '9100') : 'tcp://'
+      onChange(ref)
+    }
+  }
+
+  function handleHostChange(h: string) {
+    setHost(h)
+    const portaNum = parseInt(porta, 10)
+    if (h.trim() && portaNum >= 1 && portaNum <= 65535) {
+      onChange(formatTcpPrinterRef(h.trim(), portaNum))
+    } else {
+      onChange(h.trim() ? `tcp://${h.trim()}:${porta}` : '')
+    }
+  }
+
+  function handlePortaChange(p: string) {
+    setPorta(p)
+    const portaNum = parseInt(p, 10)
+    if (host.trim() && portaNum >= 1 && portaNum <= 65535) {
+      onChange(formatTcpPrinterRef(host.trim(), portaNum))
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-1.5">
+        {modoIp ? (
+          <div className="flex flex-1 gap-1">
+            <input
+              type="text"
+              placeholder="192.168.1.x"
+              value={host}
+              onChange={e => handleHostChange(e.target.value)}
+              className="h-9 min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-2.5 text-sm outline-none transition-colors focus:border-secondary"
+            />
+            <input
+              type="number"
+              placeholder="9100"
+              value={porta}
+              min={1}
+              max={65535}
+              onChange={e => handlePortaChange(e.target.value)}
+              className="h-9 w-20 rounded-lg border border-gray-200 bg-white px-2.5 text-sm outline-none transition-colors focus:border-secondary"
+            />
+          </div>
+        ) : (
+          <select
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            className="h-9 flex-1 rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none transition-colors focus:border-secondary"
+          >
+            <option value="">Selecione a impressora Windows</option>
+            {impressorasWindows.map(printer => (
+              <option key={printer} value={printer}>
+                {printer}
+              </option>
+            ))}
+          </select>
+        )}
+
+        <button
+          type="button"
+          title={modoIp ? 'Usar impressora Windows' : 'Usar IP direto (sem instalar no Windows)'}
+          onClick={toggleModo}
+          className={`flex h-9 shrink-0 items-center gap-1 rounded-lg border px-2 text-xs font-medium transition-colors ${
+            modoIp
+              ? 'border-secondary bg-secondary/10 text-secondary'
+              : 'border-gray-200 bg-white text-secondary-text hover:border-secondary hover:text-secondary'
+          }`}
+        >
+          IP
+        </button>
+      </div>
+
+      {modoIp && (
+        <p className="text-xs text-secondary-text">
+          Imprime via raw TCP — sem instalar no Windows.{' '}
+          {value.startsWith('tcp://') && !parseTcpPrinterRef(value) ? (
+            <span className="text-amber-600">IP ou porta inválidos.</span>
+          ) : (
+            <span className="font-medium text-primary-text">{value || '—'}</span>
+          )}
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -544,23 +667,13 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
                       {impressora.nome}
                     </div>
                     <div className="px-3 py-2">
-                      <select
+                      <ImpressoraMapeamentoInput
                         value={mapeamentos[impressora.id] ?? ''}
-                        onChange={e =>
-                          setMapeamentos(prev => ({
-                            ...prev,
-                            [impressora.id]: e.target.value,
-                          }))
+                        impressorasWindows={impressorasWindows}
+                        onChange={next =>
+                          setMapeamentos(prev => ({ ...prev, [impressora.id]: next }))
                         }
-                        className="h-9 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none transition-colors focus:border-secondary"
-                      >
-                        <option value="">Selecione a impressora Windows</option>
-                        {impressorasWindows.map(printer => (
-                          <option key={printer} value={printer}>
-                            {printer}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </div>
                   </div>
                 ))}

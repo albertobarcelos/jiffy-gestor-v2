@@ -142,10 +142,28 @@ export type VendaEntregadorKanbanRef = {
   id: string
   tabelaOrigem: 'venda' | 'venda_gestor'
   tipoVenda: string | null
+  entregador?: { id: string } | null
 }
 
 function vendaKanbanPrecisaEntregador(v: VendaEntregadorKanbanRef): boolean {
   return String(v.tipoVenda ?? '').trim().toLowerCase() === 'entrega'
+}
+
+/** Preenche cache a partir do summary (listagem) — evita GET por card. */
+export function hidratarEntregadoresKanbanDesdeSummary(
+  vendas: VendaEntregadorKanbanRef[]
+): Record<string, string> {
+  const updates: Record<string, string> = {}
+
+  for (const venda of vendas) {
+    if (!vendaKanbanPrecisaEntregador(venda)) continue
+    const entregadorId = String(venda.entregador?.id ?? '').trim()
+    if (!entregadorId) continue
+    definirEntregadorKanbanCache(venda.id, entregadorId)
+    updates[venda.id] = entregadorId
+  }
+
+  return updates
 }
 
 /**
@@ -164,6 +182,14 @@ export async function hidratarEntregadoresKanbanDesdeApi(args: {
   for (const venda of vendas) {
     if (!vendaKanbanPrecisaEntregador(venda)) continue
     if (idsJaConhecidos?.has(venda.id)) continue
+
+    const doSummary = String(venda.entregador?.id ?? '').trim()
+    if (doSummary) {
+      definirEntregadorKanbanCache(venda.id, doSummary)
+      updates[venda.id] = doSummary
+      continue
+    }
+
     if (entregadorKanbanJaVerificado(venda.id)) {
       const cached = obterEntregadorKanbanCache(venda.id)
       if (cached) updates[venda.id] = cached

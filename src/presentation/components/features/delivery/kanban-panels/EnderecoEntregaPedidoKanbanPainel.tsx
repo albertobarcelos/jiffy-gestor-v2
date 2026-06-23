@@ -30,6 +30,7 @@ import { invalidateKanbanVendasListagens } from '@/features/kanban/hooks/kanbanL
 import { invalidateVendaDetalheCarregadaCache } from '@/src/presentation/components/features/pedidos/hooks/data/useVendaDetalheCarregadaQuery'
 import { invalidarPedidoKanbanQuickViewCache } from './carregarPedidoKanbanQuickView'
 import {
+  extrairContextoEnderecoDeVendaKanban,
   extrairContextoEnderecoPedidoDeliveryApi,
   pedidoDeliveryPatchUrl,
   type ContextoEnderecoPedidoKanban,
@@ -133,6 +134,17 @@ export function EnderecoEntregaPedidoKanbanPainel({
 
   const carregarPedido = useCallback(async () => {
     if (!open || !venda) return
+
+    const contextoDoCard = extrairContextoEnderecoDeVendaKanban(venda)
+    if (contextoDoCard) {
+      setTelefoneCliente(contextoDoCard.telefone?.replace(/\D/g, '') || null)
+      setEnderecoDeliveryIdRef(contextoDoCard.enderecoDeliveryIdRef)
+      setEnderecoAtual(contextoDoCard.enderecoAtual)
+      setFormManual(formManualFromEnderecoAtual(contextoDoCard.enderecoAtual))
+      setMoradaSelecionadaId(contextoDoCard.enderecoDeliveryIdRef)
+      setModo('morada')
+      return
+    }
 
     const token = auth?.getAccessToken()
     if (!token) {

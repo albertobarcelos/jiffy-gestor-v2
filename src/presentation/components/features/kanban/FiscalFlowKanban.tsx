@@ -29,9 +29,9 @@ import {
 import {
   flattenPedidosDeliveryInfinite,
   pedidosDeliveryInfiniteQueryKey,
-  usePedidosDeliveryInfinite,
   vendasUnificadasQueryParamsParaPedidosDelivery,
 } from './hooks/usePedidosDeliveryInfinite'
+import { usePedidosDeliveryKanbanSync } from './hooks/usePedidosDeliveryKanbanSync'
 import { useVendaIdsPdvPorTerminal } from '@/src/presentation/hooks/useVendaIdsPdvPorTerminal'
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
@@ -86,13 +86,16 @@ import { useKanbanPinning } from './hooks/useKanbanPinning'
 import { useEntregaTransicoesKanban } from '../delivery/kanban-panels/useEntregaTransicoesKanban'
 import {
   extrairPatchKanbanDeRespostaTransicao,
+  extrairVendaUnificadaDeRespostaDeliverySummary,
   patchVendaUnificadaInfiniteCache,
+  replaceVendaUnificadaInfiniteCache,
   sincronizarPedidoDeliveryKanbanEmBackground,
 } from './utils/kanbanVendaCacheUpdate'
 import { invalidarPedidoKanbanQuickViewCache } from '../delivery/kanban-panels/carregarPedidoKanbanQuickView'
 import {
   resolverEntregadorIdVendaKanban,
   hidratarEntregadoresKanbanDesdeApi,
+  hidratarEntregadoresKanbanDesdeSummary,
   entregadorKanbanJaVerificado,
 } from '../delivery/kanban-panels/entregadorKanbanStore'
 import {
@@ -103,10 +106,11 @@ import { useImpressaoDelivery } from '../delivery/hooks/useImpressaoDelivery'
 import { validarImpressaoAntesTransicaoKanban } from '@/src/application/delivery/validarImpressaoAntesTransicaoKanban'
 import { confirmarCobrancaPendentePedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/ConfirmarCobrancaPendentePedidoDeliveryUseCase'
 import type { AcaoTransicaoGestor } from '@/src/presentation/hooks/useVendas'
-import { useKanbanDeliveryColumnCounts } from './hooks/useKanbanDeliveryColumnCounts'
 import { useKanbanColumnScrollLoadMore } from './hooks/useKanbanColumnScrollLoadMore'
 import {
+  filtrarPedidosDeliveryKanbanPorDatasToolbar,
   filtrarVendasKanbanPorModo,
+  KANBAN_DELIVERY_DELTA_POLL_INTERVAL_MS,
   KANBAN_VENDAS_REFETCH_INTERVAL_MS,
 } from './utils/kanbanVendasListagem'
 
@@ -385,9 +389,9 @@ export function FiscalFlowKanban() {
     hasNextPage: hasNextPageDelivery,
     fetchNextPage: fetchNextPageDelivery,
     refetch: refetchDelivery,
-  } = usePedidosDeliveryInfinite(pedidosDeliveryQueryParams, {
+  } = usePedidosDeliveryKanbanSync(pedidosDeliveryQueryParams, {
     enabled: isModoDeliveryKanban,
-    refetchIntervalMs: KANBAN_VENDAS_REFETCH_INTERVAL_MS,
+    refetchIntervalMs: KANBAN_DELIVERY_DELTA_POLL_INTERVAL_MS,
     refetchOnWindowFocus: true,
   })
 
@@ -432,10 +436,27 @@ export function FiscalFlowKanban() {
 
   const { items: todasVendasFlattened, totalCount: totalVendasApi } = useMemo(() => {
     if (isModoDeliveryKanban) {
-      return flattenPedidosDeliveryInfinite(pedidosDeliveryInfiniteData)
+      const { items, totalCount } = flattenPedidosDeliveryInfinite(pedidosDeliveryInfiniteData)
+      // Em delivery, só filtrar por data de criação quando o usuário definiu explicitamente
+      // (dataCriacaoInicio/Fim não-nulos). O padrão automático "hoje" é calculado via
+      // intervaloCriacaoPadrao no hook de filtros e não deve excluir pedidos ativos criados
+      // ontem à noite (ex.: pedido criado às 22h UTC-4 = 02h UTC do dia seguinte).
+      const filtradas = filtrarPedidosDeliveryKanbanPorDatasToolbar(items, {
+        ...vendasUnificadasQueryParams,
+        dataCriacaoInicial: dataCriacaoInicio?.toISOString() ?? undefined,
+        dataCriacaoFinal: dataCriacaoFim?.toISOString() ?? undefined,
+      })
+      return { items: filtradas, totalCount: filtradas.length || totalCount }
     }
     return flattenVendasUnificadasInfinite(vendasUnificadasInfiniteData)
-  }, [isModoDeliveryKanban, pedidosDeliveryInfiniteData, vendasUnificadasInfiniteData])
+  }, [
+    isModoDeliveryKanban,
+    pedidosDeliveryInfiniteData,
+    vendasUnificadasInfiniteData,
+    vendasUnificadasQueryParams,
+    dataCriacaoInicio,
+    dataCriacaoFim,
+  ])
 
   /** Lista do unificado; com terminal, só PDV cujo id está no Set do POS. */
   const todasVendasCarregadas = useMemo(() => {
@@ -482,13 +503,20 @@ export function FiscalFlowKanban() {
           tabelaOrigem:
             v.tabelaOrigem === 'venda_gestor' ? ('venda_gestor' as const) : ('venda' as const),
           tipoVenda: v.tipoVenda,
+          entregador: v.entregador,
         }))
 
-      const idsJaConhecidos = new Set(
-        Object.entries(entregadorPorVendaIdRef.current)
+      const updatesSummary = hidratarEntregadoresKanbanDesdeSummary(vendasRef)
+      if (Object.keys(updatesSummary).length > 0) {
+        setEntregadorPorVendaId(prev => ({ ...prev, ...updatesSummary }))
+      }
+
+      const idsJaConhecidos = new Set([
+        ...Object.keys(updatesSummary),
+        ...Object.entries(entregadorPorVendaIdRef.current)
           .filter(([, entregadorId]) => entregadorId?.trim())
-          .map(([vendaId]) => vendaId)
-      )
+          .map(([vendaId]) => vendaId),
+      ])
       for (const venda of vendasRef) {
         if (entregadorKanbanJaVerificado(venda.id)) {
           idsJaConhecidos.add(venda.id)
@@ -548,16 +576,16 @@ export function FiscalFlowKanban() {
     [onGlobalColumnScroll]
   )
 
-  const deliveryColumnIdsParaContagem = useMemo((): ColunaKanbanId[] => {
-    if (!isModoDeliveryKanban) return []
-    return ['NOVOS_PEDIDOS', 'EM_PREPARO', 'PRONTO_ENTREGA', 'EM_ROTA', 'FINALIZADAS']
-  }, [isModoDeliveryKanban])
-
-  const deliveryColumnCounts = useKanbanDeliveryColumnCounts(
-    pedidosDeliveryQueryParams,
-    deliveryColumnIdsParaContagem,
-    isModoDeliveryKanban
-  )
+  // Contagem por coluna derivada dos itens já em cache — sem requisições extras.
+  const deliveryColumnCounts = useMemo((): Record<string, number> => {
+    if (!isModoDeliveryKanban) return {}
+    const counts: Record<string, number> = {}
+    for (const item of todasVendasFlattened) {
+      if (!item.statusEtapaOperacional) continue
+      counts[item.statusEtapaOperacional] = (counts[item.statusEtapaOperacional] ?? 0) + 1
+    }
+    return counts
+  }, [isModoDeliveryKanban, todasVendasFlattened])
 
   const handleAtualizarListagem = useCallback(() => {
     void refetch()
@@ -578,9 +606,23 @@ export function FiscalFlowKanban() {
   const transicaoPedidoDelivery = useTransicaoPedidoDelivery()
 
   const sincronizarVendaAposTransicao = useCallback(
-    (vendaId: string, respostaTransicao: unknown) => {
+    (vendaId: string, respostaTransicao: unknown): boolean => {
+      const cardAtualizado = extrairVendaUnificadaDeRespostaDeliverySummary(respostaTransicao)
+      if (cardAtualizado) {
+        replaceVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, cardAtualizado)
+        if (cardAtualizado.entregador?.id) {
+          definirEntregadorKanbanCache(vendaId, cardAtualizado.entregador.id)
+          setEntregadorPorVendaId(prev => ({
+            ...prev,
+            [vendaId]: cardAtualizado.entregador!.id,
+          }))
+        }
+        return true
+      }
+
       const patch = extrairPatchKanbanDeRespostaTransicao(respostaTransicao)
       patchVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, vendaId, patch)
+      return false
     },
     [infiniteQueryKey, queryClient]
   )
@@ -1381,7 +1423,9 @@ export function FiscalFlowKanban() {
                               void reimprimirCupomEntrega(vendaAtual, colunaAtual)
                           : undefined
                       }
-                      entregadorVinculadoId={entregadorPorVendaId[venda.id] ?? null}
+                      entregadorVinculadoId={
+                        entregadorPorVendaId[venda.id] ?? venda.entregador?.id ?? null
+                      }
                       onEntregadorAtualizado={(vendaId, entregadorId) => {
                         setEntregadorPorVendaId(prev => ({ ...prev, [vendaId]: entregadorId }))
                       }}

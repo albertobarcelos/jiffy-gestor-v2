@@ -10,6 +10,7 @@ import {
   isPedidoEntregaKanban,
 } from '@/src/shared/helpers/pedidoEntregaKanban'
 import type { FluxoPagamentoEntrega } from '@/src/domain/types/vendaDetalhe'
+import type { ContextoEntregaDeliveryApi } from '@/src/application/dto/api/pedidoDeliveryApi'
 import { derivarFluxoPagamentoEntregaDeliverySummary } from '@/src/application/mappers/DeliveryFluxoPagamentoMapper'
 import { fiscalPendentePodeReemitirAposCooldown } from '@/src/domain/services/pedido/RegrasFiscaisVenda'
 
@@ -17,6 +18,14 @@ import { fiscalPendentePodeReemitirAposCooldown } from '@/src/domain/services/pe
 export type CobrancaKanbanDeliveryResumo = {
   meioPagamentoId: string
   status: string
+  momentoCobranca?: string
+}
+
+/** Entregador resumido no card delivery (summary). */
+export type EntregadorKanbanDeliveryResumo = {
+  id: string
+  nome: string | null
+  telefone: string | null
 }
 
 /**
@@ -209,10 +218,38 @@ function extrairCobrancasDelivery(item: Record<string, unknown>): CobrancaKanban
     const meioPagamentoId = String(o.meioPagamentoId ?? o.meio_pagamento_id ?? '').trim()
     if (!meioPagamentoId) continue
     const status = String(o.status ?? '').trim().toLowerCase()
-    lista.push({ meioPagamentoId, status })
+    const momentoCobranca = String(o.momentoCobranca ?? o.momento_cobranca ?? '').trim()
+    lista.push({
+      meioPagamentoId,
+      status,
+      ...(momentoCobranca ? { momentoCobranca } : {}),
+    })
   }
 
   return lista.length > 0 ? lista : undefined
+}
+
+function extrairEntregadorDelivery(
+  item: Record<string, unknown>
+): EntregadorKanbanDeliveryResumo | null {
+  const raw = item.entregador
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const o = raw as Record<string, unknown>
+  const id = String(o.id ?? '').trim()
+  if (!id) return null
+  return {
+    id,
+    nome: o.nome != null ? String(o.nome) : null,
+    telefone: o.telefone != null ? String(o.telefone) : null,
+  }
+}
+
+function extrairContextoEntregaDelivery(
+  item: Record<string, unknown>
+): ContextoEntregaDeliveryApi | null {
+  const raw = item.contextoEntrega
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  return raw as ContextoEntregaDeliveryApi
 }
 
 function extrairStatusFinanceiro(item: Record<string, unknown>): string | null {
@@ -300,7 +337,11 @@ export class VendaUnificadaDTO {
     /** Delivery Kanban: antecipado vs cobrar na entrega/retirada. */
     public readonly fluxoPagamentoEntrega?: FluxoPagamentoEntrega | null,
     /** Delivery Kanban: cobranças da listagem (meio de pagamento por id). */
-    public readonly cobrancasDelivery?: CobrancaKanbanDeliveryResumo[]
+    public readonly cobrancasDelivery?: CobrancaKanbanDeliveryResumo[],
+    /** Delivery Kanban: entregador vinculado (summary). */
+    public readonly entregador?: EntregadorKanbanDeliveryResumo | null,
+    /** Delivery Kanban: contexto de entrega com endereço (summary). */
+    public readonly contextoEntrega?: ContextoEntregaDeliveryApi | null
   ) {}
 
   private possuiDocumentoFiscal(): boolean {
@@ -423,12 +464,16 @@ export class VendaUnificadaDTO {
     if (this.statusFiscal === 'PENDENTE' || this.statusFiscal === 'PENDENTE_AUTORIZACAO') {
       return 'COM_NFE'
     }
-    if (this.isPendenteEmissao()) return 'PENDENTE_EMISSAO'
-
+    // Delivery operacional: status da logística tem prioridade sobre pendência fiscal.
+    // Pedido ativo (PENDENTE/EM_PREPARO/PRONTO/EM_ROTA) nunca deve cair em PENDENTE_EMISSAO
+    // só porque solicitarEmissaoFiscal=true; isso jogaria o card em "Finalizadas" no modo delivery.
     if (this.isPedidoEntregaGestor()) {
       const colunaOp = this.resolverEtapaKanbanOperacionalEntrega()
       if (colunaOp !== null) return colunaOp
+      // colunaOp === null → FINALIZADO/ENTREGUE → aplica regras fiscais abaixo
     }
+
+    if (this.isPendenteEmissao()) return 'PENDENTE_EMISSAO'
 
     if (this.dataFinalizacao) return 'FINALIZADAS'
     return 'ABERTA'
@@ -529,7 +574,9 @@ export function mapItemJsonParaVendaUnificadaDTO(v: Record<string, unknown>): Ve
     extrairPrevisaoEntregaEm(v),
     extrairTempoTotalEstimadoSegundos(v),
     extrairFluxoPagamentoEntrega(v),
-    extrairCobrancasDelivery(v)
+    extrairCobrancasDelivery(v),
+    extrairEntregadorDelivery(v),
+    extrairContextoEntregaDelivery(v)
   )
 }
 
