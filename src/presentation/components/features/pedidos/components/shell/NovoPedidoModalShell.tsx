@@ -40,6 +40,10 @@ export function NovoPedidoModalShell(props: NovoPedidoShellProps) {
     onSalvarPagamentoEntrega,
   } = props
 
+  const modalPaperWidth = estaNoPassoProdutos
+    ? { xs: '95vw', sm: '90vw', md: '90vw' }
+    : { xs: '95vw', sm: '50vw', md: '55vw' }
+
   return (
     <>
       <style>{`
@@ -80,9 +84,7 @@ export function NovoPedidoModalShell(props: NovoPedidoShellProps) {
             maxHeight: '100vh',
             margin: 0,
             marginLeft: 'auto',
-            width: estaNoPassoProdutos
-              ? { xs: '95vw', sm: '90vw', md: '75vw' }
-              : { xs: '95vw', sm: '90vw', md: '45vw' },
+            width: modalPaperWidth,
             maxWidth: '100vw',
             borderTopLeftRadius: '0.75rem',
             borderBottomLeftRadius: '0.75rem',

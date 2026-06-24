@@ -3,7 +3,11 @@
 import { useRef, useState, useCallback } from 'react'
 import type { Produto } from '@/src/domain/entities/Produto'
 import type { ModalLancamentoProdutoPainelConfirmPayload, ModalLancamentoProdutoPainelModo } from '../../components/ModalLancamentoProdutoPainel'
+import { aplicarProdutoAtualizadoNasLinhasCarrinho } from '../../produtoCatalogoHelpers'
 import type { ComplementoSelecionado, ProdutoSelecionado } from '../../types'
+import {
+  type ComplementosTabsModalState,
+} from '@/src/presentation/components/features/complementos/ComplementosTabsModal'
 import { produtoPermiteAlterarPreco, obterUnidadeMedidaProdutoLinha } from '../../produtoCatalogoHelpers'
 import {
   aplicarQuantidadeComplementoNaLinha,
@@ -41,11 +45,18 @@ export function useNovoPedidoProdutos({
   const [painelLinhaModo, setPainelLinhaModo] =
     useState<ModalLancamentoProdutoPainelModo>('lancamento')
   const [carregandoComplementosPainel, setCarregandoComplementosPainel] = useState(false)
+  const [complementoTabsModalPainelState, setComplementoTabsModalPainelState] =
+    useState<ComplementosTabsModalState>({
+      open: false,
+      tab: 'complemento',
+      mode: 'create',
+    })
 
   const longPressTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressIndexRef = useRef<number | null>(null)
   const longPressComplementoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressComplementoIndexRef = useRef<number | null>(null)
+  const produtoIdContextoEdicaoComplementoRef = useRef<string | undefined>(undefined)
 
   const produtoTemComplementos = useCallback((produto: Produto): boolean => {
     const gruposComplementos = produto.getGruposComplementos()
@@ -74,6 +85,82 @@ export function useNovoPedidoProdutos({
     },
     [carregarProdutoNoCatalogoSeNecessario, produtoTemComplementos]
   )
+
+  const abrirEdicaoComplementoNoPainel = useCallback(
+    (complementoId: string, options?: { produtoIdCarrinho?: string }) => {
+      if (!complementoId.trim()) return
+      produtoIdContextoEdicaoComplementoRef.current =
+        options?.produtoIdCarrinho?.trim() || undefined
+      setComplementoTabsModalPainelState({
+        open: true,
+        tab: 'complemento',
+        mode: 'edit',
+        complementoId,
+      })
+    },
+    []
+  )
+
+  const fecharComplementoTabsModalNoPainel = useCallback(() => {
+    setComplementoTabsModalPainelState(prev => ({
+      ...prev,
+      open: false,
+      complementoId: undefined,
+    }))
+  }, [])
+
+  const handleTabChangeComplementoTabsModalPainel = useCallback((tab: 'complemento') => {
+    setComplementoTabsModalPainelState(prev => ({ ...prev, tab }))
+  }, [])
+
+  const recarregarProdutoCarrinhoAposEdicao = useCallback(
+    async (produtoId?: string) => {
+      const id = produtoId?.trim()
+      if (!id) return
+
+      const produtoAnterior =
+        catalogoProdutosPorId[id] ?? produtosList.find(p => p.getId() === id)
+
+      const produtoAtualizado = await carregarProdutoNoCatalogoSeNecessario(id, {
+        forceRefresh: true,
+      })
+      if (!produtoAtualizado) return
+
+      setProdutos(prev =>
+        aplicarProdutoAtualizadoNasLinhasCarrinho(prev, produtoAtualizado, produtoAnterior)
+      )
+
+      if (produtoParaLancamentoPainel?.getId() === id) {
+        setProdutoParaLancamentoPainel(produtoAtualizado)
+      }
+    },
+    [
+      catalogoProdutosPorId,
+      produtosList,
+      carregarProdutoNoCatalogoSeNecessario,
+      setProdutos,
+      produtoParaLancamentoPainel,
+      setProdutoParaLancamentoPainel,
+    ]
+  )
+
+  const recarregarProdutoPainelAposEdicaoComplemento = useCallback(async () => {
+    const produtoIdCarrinho = produtoIdContextoEdicaoComplementoRef.current
+    produtoIdContextoEdicaoComplementoRef.current = undefined
+    const produtoId =
+      produtoIdCarrinho ?? produtoParaLancamentoPainel?.getId()?.trim() ?? undefined
+    if (!produtoId) return
+
+    const deveMostrarLoadingPainel =
+      Boolean(produtoParaLancamentoPainel) &&
+      produtoParaLancamentoPainel?.getId() === produtoId
+    if (deveMostrarLoadingPainel) setCarregandoComplementosPainel(true)
+    try {
+      await recarregarProdutoCarrinhoAposEdicao(produtoId)
+    } finally {
+      if (deveMostrarLoadingPainel) setCarregandoComplementosPainel(false)
+    }
+  }, [produtoParaLancamentoPainel, recarregarProdutoCarrinhoAposEdicao])
 
   const adicionarProduto = useCallback(
     (produtoId: string) => {
@@ -147,28 +234,14 @@ export function useNovoPedidoProdutos({
           ? (produtos[idxLinha]?.valorUnitario ?? produto.getValor())
           : produto.getValor()
 
-      const complementosLinha: ComplementoSelecionado[] = complementos.map(c => {
-        if (idxLinha !== null) {
-          const atual = produtos[idxLinha]
-          const antigo = atual?.complementos.find(x => x.grupoId === c.grupoId && x.id === c.id)
-          return {
-            id: c.id,
-            grupoId: c.grupoId,
-            nome: c.nome,
-            valor: c.valor,
-            quantidade: antigo?.quantidade ?? c.quantidade,
-            tipoImpactoPreco: c.tipoImpactoPreco,
-          }
-        }
-        return {
-          id: c.id,
-          grupoId: c.grupoId,
-          nome: c.nome,
-          valor: c.valor,
-          quantidade: c.quantidade,
-          tipoImpactoPreco: c.tipoImpactoPreco,
-        }
-      })
+      const complementosLinha: ComplementoSelecionado[] = complementos.map(c => ({
+        id: c.id,
+        grupoId: c.grupoId,
+        nome: c.nome,
+        valor: c.valor,
+        quantidade: c.quantidade,
+        tipoImpactoPreco: c.tipoImpactoPreco,
+      }))
 
       const aplicarComplementos = (base: ProdutoSelecionado): ProdutoSelecionado => ({
         ...base,
@@ -423,6 +496,12 @@ export function useNovoPedidoProdutos({
     longPressComplementoIndexRef,
     produtoTemComplementos,
     carregandoComplementosPainel,
+    complementoTabsModalPainelState,
+    abrirEdicaoComplementoNoPainel,
+    fecharComplementoTabsModalNoPainel,
+    handleTabChangeComplementoTabsModalPainel,
+    recarregarProdutoPainelAposEdicaoComplemento,
+    recarregarProdutoCarrinhoAposEdicao,
     adicionarProduto,
     confirmarLancamentoProdutoPainel,
     abrirModalComplementosProdutoExistente,

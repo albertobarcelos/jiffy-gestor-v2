@@ -7,7 +7,10 @@ import { DropdownMenu, DropdownMenuItem } from '@/src/presentation/components/ui
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { produtoPermiteAlterarPreco, obterUnidadeMedidaProdutoLinha } from '../produtoCatalogoHelpers'
 import { quantidadeMaximaComplementoNaLinha } from '@/src/domain/policies/pedido/ComplementoQuantidadeLinhaPolicy'
-import { produtoPermiteQuantidadeDecimal } from '@/src/shared/types/unidadeMedidaProduto'
+import {
+  formatarUnidadeMedidaProdutoExibicao,
+  produtoPermiteQuantidadeDecimal,
+} from '@/src/shared/types/unidadeMedidaProduto'
 import {
   formatarQuantidadeProdutoExibicao,
   incrementarQuantidadeProduto,
@@ -32,7 +35,16 @@ import {
   MdRemove,
 } from 'react-icons/md'
 import { useNovoPedidoFormContext } from '../context/NovoPedidoFormContext'
+import { useNovoPedidoDetalheContext } from '../context/NovoPedidoDetalheContext'
 import { useNovoPedidoUIContext } from '../context/NovoPedidoUIContext'
+
+/** Grid compartilhado: Qtd | Produto | Unid. | Desc. | Val Unit. | Total | Ações */
+const CARRINHO_PRODUTOS_GRID_CLASS =
+  'grid grid-cols-[66px_minmax(0,1fr)_2.75rem_4rem_5rem_5rem_34px] gap-x-1 items-center'
+
+/** Desloca qtd/nome do complemento à direita sem mover Unid., Val Unit., Total etc. */
+const COMPLEMENTO_CARRINHO_QTD_DESLOCAMENTO_CLASS = 'justify-start pl-6'
+const COMPLEMENTO_CARRINHO_NOME_DESLOCAMENTO_CLASS = 'pl-4'
 
 export function PedidoProdutosCarrinhoColuna() {
   const {
@@ -50,12 +62,14 @@ export function PedidoProdutosCarrinhoColuna() {
     produtosList,
     observacaoPedido,
     setObservacaoPedido,
+    abrirEdicaoComplementoNoPainel,
     removerComplemento,
     removerProduto,
     setValoresEmEdicao,
     totalProdutos,
     valoresEmEdicao,
   } = useNovoPedidoFormContext()
+  const { handleAbrirEdicaoProdutoDetalhes } = useNovoPedidoDetalheContext()
   const {
     longPressComplementoIndexRef,
     longPressComplementoTimeoutRef,
@@ -73,31 +87,34 @@ export function PedidoProdutosCarrinhoColuna() {
       {produtos.length > 0 ? (
         <div className="p-2">
           {/* Cabeçalho da tabela */}
-          <div className="mb-2 flex gap-2 border-b border-gray-300 pb-2 items-center">
-            <div className="flex w-[66px] flex-shrink-0 items-center justify-center">
-              <span className="text-center text-xs font-semibold text-gray-700">
-                Qtd
-              </span>
+          <div
+            className={`mb-2 border-b border-gray-300 pb-2 ${CARRINHO_PRODUTOS_GRID_CLASS}`}
+          >
+            <div className="flex items-center justify-center">
+              <span className="text-center text-xs font-semibold text-gray-700">Qtd</span>
             </div>
-            <div className="min-w-0 flex-1 items-center">
+            <div className="min-w-0">
               <span className="text-xs font-semibold text-gray-700">Produto</span>
             </div>
-            <div className="w-16 shrink-0 items-center">
+            <div>
+              <span className="block text-center text-xs font-semibold text-gray-700">Unid.</span>
+            </div>
+            <div>
               <span className="block text-right text-xs font-semibold text-gray-700">
                 Desc./Acres.
               </span>
             </div>
-            <div className="w-20 shrink-0">
-              <span className="block text-right text-xs font-semibold text-gray-700">
+            <div>
+              <span className="block text-right text-xs font-semibold text-gray-700 tabular-nums">
                 Val Unit.
               </span>
             </div>
-            <div className="w-20 shrink-0 items-center">
-              <span className="block text-right text-xs font-semibold text-gray-700">
+            <div>
+              <span className="block text-right text-xs font-semibold text-gray-700 tabular-nums">
                 Total
               </span>
             </div>
-            <div className="flex w-[22px] flex-shrink-0 items-center justify-end">
+            <div className="flex items-center justify-end">
               <MdMoreVert className="h-4 w-4 text-gray-700" aria-hidden />
             </div>
           </div>
@@ -127,9 +144,9 @@ export function PedidoProdutosCarrinhoColuna() {
                 <div key={index} className="space-y-0">
                   {/* Linha do Produto Principal */}
                   <div
-                    className={`flex items-center gap-1 rounded ${
+                    className={`rounded ${
                       index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                    } cursor-pointer hover:bg-gray-100`}
+                    } cursor-pointer hover:bg-gray-100 ${CARRINHO_PRODUTOS_GRID_CLASS}`}
                     onMouseDown={e => {
                       // Iniciar long press apenas se não for em um input ou button
                       const target = e.target as HTMLElement
@@ -167,7 +184,7 @@ export function PedidoProdutosCarrinhoColuna() {
                     }}
                   >
                     {/* Quantidade */}
-                    <div className="flex w-[66px] flex-shrink-0 items-center justify-center gap-0.5">
+                    <div className="flex items-center justify-center gap-0.5">
                       <button
                         type="button"
                         aria-label="Diminuir quantidade"
@@ -279,19 +296,34 @@ export function PedidoProdutosCarrinhoColuna() {
                       </button>
                     </div>
                     {/* Nome do Produto */}
-                    <div className="min-w-0 flex-1">
-                      <span className="block truncate text-xs text-gray-900">
+                    <div className="min-w-0">
+                      <span
+                        className="block truncate text-xs text-gray-900 cursor-pointer"
+                        title="Duplo clique para editar o produto"
+                        onDoubleClick={e => {
+                          e.stopPropagation()
+                          handleAbrirEdicaoProdutoDetalhes(produto.produtoId, {
+                            initialStepProduto: 0,
+                          })
+                        }}
+                      >
                         {produto.nome}
                       </span>
                     </div>
+                    {/* Unidade de medida */}
+                    <div>
+                      <span className="block text-center text-xs text-gray-600">
+                        {formatarUnidadeMedidaProdutoExibicao(unidadeMedida)}
+                      </span>
+                    </div>
                     {/* Desconto/Acréscimo */}
-                    <div className="w-16 shrink-0">
+                    <div>
                       <span className="block truncate text-right text-xs text-gray-600">
                         {formatarDescontoAcrescimo(produto)}
                       </span>
                     </div>
                     {/* Valor Unitário */}
-                    <div className="w-20 shrink-0">
+                    <div className="min-w-0">
                       {permiteAlterarPreco ? (
                         <input
                           type="text"
@@ -387,23 +419,23 @@ export function PedidoProdutosCarrinhoColuna() {
                             WebkitAppearance: 'none',
                             appearance: 'none',
                           }}
-                          className="h-7 w-full border-0 bg-transparent p-1 text-right text-xs focus:bg-white focus:ring-1 focus:ring-primary"
+                          className="h-7 w-full border-0 bg-transparent px-1 text-right text-xs tabular-nums focus:bg-white focus:ring-1 focus:ring-primary"
                         />
                       ) : (
-                        <span className="block truncate p-1 text-right text-xs text-gray-900">
+                        <span className="block truncate px-1 text-right text-xs tabular-nums text-gray-900">
                           {valorUnitarioExibicao}
                         </span>
                       )}
                     </div>
                     {/* Total */}
-                    <div className="w-20 shrink-0">
-                      <span className="block text-right text-xs font-semibold text-gray-900">
+                    <div>
+                      <span className="block px-1 text-right text-xs font-semibold tabular-nums text-gray-900">
                         R$ {formatarNumeroComMilhar(totalProdutoComComplementos)}
                       </span>
                     </div>
                     {/* Ações: menu compacto + remover */}
                     <div
-                      className="flex w-[26px] shrink-0 items-center justify-end gap-0"
+                      className="flex items-center justify-end gap-0"
                       role="group"
                       aria-label="Ações do produto"
                       onClick={e => e.stopPropagation()}
@@ -488,9 +520,9 @@ export function PedidoProdutosCarrinhoColuna() {
                     return (
                       <div
                         key={compKey}
-                        className={`-mt-0.5 flex items-center gap-1 rounded ${
+                        className={`-mt-0.5 rounded ${
                           index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                        } cursor-pointer hover:bg-gray-100`}
+                        } cursor-pointer hover:bg-gray-100 ${CARRINHO_PRODUTOS_GRID_CLASS}`}
                         style={{ minHeight: '24px' }}
                         onMouseDown={e => {
                           // Iniciar long press apenas se não for em um input ou button
@@ -529,7 +561,9 @@ export function PedidoProdutosCarrinhoColuna() {
                         }}
                       >
                         {/* Quantidade do Complemento */}
-                        <div className="flex w-[66px] flex-shrink-0 items-center justify-center gap-0.5 pl-2">
+                        <div
+                          className={`flex items-center gap-0.5 ${COMPLEMENTO_CARRINHO_QTD_DESLOCAMENTO_CLASS}`}
+                        >
                           <button
                             type="button"
                             aria-label="Diminuir quantidade do complemento"
@@ -645,15 +679,26 @@ export function PedidoProdutosCarrinhoColuna() {
                           </button>
                         </div>
                         {/* Nome do Complemento com indentação */}
-                        <div className="min-w-0 flex-1">
-                          <span className="block truncate text-xs leading-tight text-gray-600">
+                        <div className={`min-w-0 ${COMPLEMENTO_CARRINHO_NOME_DESLOCAMENTO_CLASS}`}>
+                          <span
+                            className="block truncate text-xs leading-tight text-gray-600 cursor-pointer"
+                            title="Duplo clique para editar o complemento"
+                            onDoubleClick={e => {
+                              e.stopPropagation()
+                              abrirEdicaoComplementoNoPainel(complemento.id, {
+                                produtoIdCarrinho: produto.produtoId,
+                              })
+                            }}
+                          >
                             {complemento.nome}
                           </span>
                         </div>
+                        <div aria-hidden />
+                        <div aria-hidden />
                        
                         {/* Valor Unitário do Complemento - Apenas exibição */}
-                        <div className="w-20 shrink-0">
-                          <span className="block truncate text-right text-xs leading-tight text-gray-600">
+                        <div className="min-w-0">
+                          <span className="block truncate px-1 text-right text-xs leading-tight tabular-nums text-gray-600">
                             {formatarValorComplemento(
                               complemento.valor,
                               complemento.tipoImpactoPreco
@@ -661,14 +706,14 @@ export function PedidoProdutosCarrinhoColuna() {
                           </span>
                         </div>
                         {/* Espaço vazio onde seria o Total (complementos não têm total próprio) */}
-                        <div className="w-20 shrink-0" />
+                        <div aria-hidden />
                         {/* Ações: alinhado à coluna do produto (espaço do menu + remover) */}
                         <div
-                          className="flex w-[34px] shrink-0 items-center justify-end gap-0"
+                          className="flex items-center justify-end gap-0"
                           onClick={e => e.stopPropagation()}
                           onMouseDown={e => e.stopPropagation()}
                         >
-                          <span className="block h-5 w-5 shrink-0" aria-hidden />
+                          <span className="block h-5 w-3 shrink-0" aria-hidden />
                           <button
                             onClick={() => removerComplemento(index, compIndex)}
                             type="button"
