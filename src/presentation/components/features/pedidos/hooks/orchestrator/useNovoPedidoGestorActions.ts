@@ -178,7 +178,10 @@ export function useNovoPedidoGestorActions({
   ])
 
   const handleAbrirEdicaoProdutoDetalhes = useCallback(
-    (produtoId: string | null | undefined) => {
+    (
+      produtoId: string | null | undefined,
+      options?: { initialStepProduto?: 0 | 1 | 2 }
+    ) => {
       const id = String(produtoId || '').trim()
       if (!id) {
         showToast.error('Não foi possível abrir a edição: produto sem ID.')
@@ -197,7 +200,7 @@ export function useNovoPedidoGestorActions({
         tab: 'produto',
         mode: 'edit',
         produto: produtoParaEditar,
-        initialStepProduto: 2,
+        initialStepProduto: options?.initialStepProduto ?? 2,
       })
     },
     [produtos, setProdutoTabsModalState]

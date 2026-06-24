@@ -21,3 +21,10 @@ export function produtoPermiteQuantidadeDecimal(unidade: UnidadeMedidaProduto): 
 export function produtoUsaRegraComplementoUnitario(unidade: UnidadeMedidaProduto): boolean {
   return unidade === 'UN'
 }
+
+/** Label curta para listagens (ex.: carrinho do pedido). */
+export function formatarUnidadeMedidaProdutoExibicao(unidade: UnidadeMedidaProduto): string {
+  if (unidade === 'KG') return 'KG'
+  if (unidade === 'LT') return 'LT'
+  return 'Unit'
+}

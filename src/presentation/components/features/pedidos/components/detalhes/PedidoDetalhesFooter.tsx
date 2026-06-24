@@ -182,7 +182,7 @@ export function PedidoDetalhesFooter({
             type="button"
             variant="outlined"
             color={showVoltar ? 'inherit' : 'error'}
-            onClick={showVoltar ? onPreviousStep : onClose}
+            onClick={showVoltar ? onPreviousStep : handleClose}
             fullWidth
             className={
               showVoltar ?

@@ -270,16 +270,27 @@ export function EntregaClienteSelector({
   )
 
   const abrirPainelNovo = useCallback(() => {
+    if (!clienteVinculado?.id?.trim()) {
+      showToast.warning('Cadastre o cliente antes de adicionar um endereço.')
+      return
+    }
     setMoradaEditando(null)
     setFormNova(formInicialComEnderecoPadrao(enderecoPadrao))
     setPainelMoradaAberto(true)
-  }, [enderecoPadrao])
+  }, [clienteVinculado?.id, enderecoPadrao])
 
-  const abrirPainelEditar = useCallback((m: MoradaTelefone) => {
-    setMoradaEditando(m)
-    setFormNova(moradaParaForm(m))
-    setPainelMoradaAberto(true)
-  }, [])
+  const abrirPainelEditar = useCallback(
+    (m: MoradaTelefone) => {
+      if (!clienteVinculado?.id?.trim()) {
+        showToast.warning('Cadastre o cliente antes de editar o endereço.')
+        return
+      }
+      setMoradaEditando(m)
+      setFormNova(moradaParaForm(m))
+      setPainelMoradaAberto(true)
+    },
+    [clienteVinculado?.id]
+  )
 
   const fecharPainelMorada = useCallback(() => {
     setPainelMoradaAberto(false)
@@ -386,6 +397,11 @@ export function EntregaClienteSelector({
   }, [formNova.cep, aplicarEnderecoDoCep])
 
   const handleSalvarMorada = useCallback(async () => {
+    if (!clienteVinculado?.id?.trim()) {
+      showToast.warning('Cadastre o cliente antes de salvar o endereço.')
+      return
+    }
+
     const digitos = extrairDigitosTelefone(telefoneInput)
     const nomeMoradaTrim = formNova.nomeMorada.trim()
     if (!digitos || !nomeMoradaTrim || !formNova.rua || !formNova.numero || !formNova.cidade || !formNova.estado) {
@@ -443,6 +459,7 @@ export function EntregaClienteSelector({
     setTelefoneBuscado(digitos)
     definirMoradaSelecionada(nova, digitos)
   }, [
+    clienteVinculado?.id,
     telefoneInput,
     formNova,
     moradaEditando,
@@ -481,6 +498,7 @@ export function EntregaClienteSelector({
   const moradasEncontradas = moradas ?? []
   const buscaRealizada = telefoneBuscado !== null || clienteVinculado !== null
   const buscandoCliente = buscarCliente.isPending
+  const clienteCadastrado = Boolean(clienteVinculado?.id?.trim())
 
   useEffect(() => {
     if (!mostrarEnderecos || !clienteVinculado || moradaSelecionada || moradasEncontradas.length === 0) {
@@ -629,10 +647,10 @@ export function EntregaClienteSelector({
         </div>
       </div>
 
-      {/* Resultado da busca */}
+      {/* Resultado da busca — endereços só após cliente cadastrado/vinculado */}
       {mostrarEnderecos && telefoneBuscado !== null && !buscando && (
         <div className="space-y-2">
-          {moradasEncontradas.length > 0 ? (
+          {clienteCadastrado && moradasEncontradas.length > 0 ? (
             <>
               <p className="text-xs font-medium text-gray-500">
                 {moradasEncontradas.length} endereço{moradasEncontradas.length !== 1 ? 's' : ''} encontrado{moradasEncontradas.length !== 1 ? 's' : ''}
@@ -642,9 +660,7 @@ export function EntregaClienteSelector({
                   key={morada.id}
                   morada={morada}
                   selecionada={moradaSelecionada?.id === morada.id}
-                  onSelecionar={() =>
-                    definirMoradaSelecionada(morada)
-                  }
+                  onSelecionar={() => definirMoradaSelecionada(morada)}
                   onVerDetalhes={() => abrirPainelEditar(morada)}
                 />
               ))}
@@ -653,13 +669,21 @@ export function EntregaClienteSelector({
             <div className="flex flex-col items-center gap-2 rounded-lg border-2 border-dashed border-gray-200 py-6 text-center">
               <MdAddLocation className="h-8 w-8 text-gray-300" />
               <p className="text-sm text-gray-500">
-                Nenhum endereço cadastrado para este número.
+                {clienteCadastrado
+                  ? 'Nenhum endereço cadastrado para este cliente.'
+                  : 'Cadastre o cliente antes de adicionar endereços de entrega.'}
               </p>
               <Button
                 type="button"
                 variant="outlined"
                 onClick={() => abrirPainelNovo()}
-                className="mt-1 border-primary/30 text-primary hover:bg-primary/10"
+                disabled={!clienteCadastrado}
+                className="mt-1 border-primary/30 text-primary hover:bg-primary/10 disabled:opacity-50"
+                title={
+                  clienteCadastrado
+                    ? 'Adicionar endereço de entrega'
+                    : 'Cadastre o cliente antes de adicionar um endereço'
+                }
               >
                 <MdAddLocation className="mr-1.5 h-4 w-4" />
                 Adicionar endereço
@@ -667,8 +691,7 @@ export function EntregaClienteSelector({
             </div>
           )}
 
-          {/* Botão para adicionar mais quando já existem moradas */}
-          {moradasEncontradas.length > 0 && (
+          {clienteCadastrado && moradasEncontradas.length > 0 && (
             <button
               type="button"
               onClick={() => abrirPainelNovo()}

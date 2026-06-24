@@ -18,6 +18,7 @@ import type {
 } from '@/src/presentation/hooks/useVendas'
 import type { ProdutosTabsModalState } from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
 import type { ClientesTabsModalState } from '@/src/presentation/components/features/clientes/ClientesTabsModal'
+import type { ComplementosTabsModalState } from '@/src/presentation/components/features/complementos/ComplementosTabsModal'
 import type { ModalLancamentoProdutoPainelConfirmPayload, ModalLancamentoProdutoPainelModo } from '../components/ModalLancamentoProdutoPainel'
 import type {
   AbaDetalhesPedido,
@@ -111,6 +112,15 @@ export interface NovoPedidoEdicaoLinhaSlice {
   confirmarLancamentoProdutoPainel: (payload: ModalLancamentoProdutoPainelConfirmPayload) => void
   produtoTemComplementos: (produto: Produto) => boolean
   carregandoComplementosPainel: boolean
+  complementoTabsModalPainelState: ComplementosTabsModalState
+  abrirEdicaoComplementoNoPainel: (
+    complementoId: string,
+    options?: { produtoIdCarrinho?: string }
+  ) => void
+  fecharComplementoTabsModalNoPainel: () => void
+  handleTabChangeComplementoTabsModalPainel: (tab: 'complemento') => void
+  recarregarProdutoPainelAposEdicaoComplemento: () => Promise<void>
+  recarregarProdutoCarrinhoAposEdicao: (produtoId?: string) => Promise<void>
   produtoParaLancamentoPainel: Produto | null
   setProdutoParaLancamentoPainel: Dispatch<SetStateAction<Produto | null>>
   indiceLinhaPainelProduto: number | null
@@ -249,7 +259,10 @@ export interface NovoPedidoDetalheSlice {
   podeAjustarPagamentoEntregaEmAberto: boolean
   pagamentoEntregaConfirmado: boolean
   produtoTabsModalState: ProdutosTabsModalState
-  handleAbrirEdicaoProdutoDetalhes: (produtoId: string | null | undefined) => void
+  handleAbrirEdicaoProdutoDetalhes: (
+    produtoId: string | null | undefined,
+    options?: { initialStepProduto?: 0 | 1 | 2 }
+  ) => void
   handleFecharProdutoTabsModal: () => void
   handleTabChangeProdutoModal: (
     tab: 'produto' | 'complementos' | 'impressoras' | 'grupo'

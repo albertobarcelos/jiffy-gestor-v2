@@ -10,6 +10,7 @@ import { pagamentoComDestaqueCanceladoDetalhes } from '@/src/domain/services/ped
 import { statusFiscalEhEmitida } from '@/src/domain/services/pedido/RegrasFiscaisVenda'
 import { obterUnidadeMedidaProdutoLinha } from '../produtoCatalogoHelpers'
 import { formatarQuantidadeProdutoExibicao } from '@/src/shared/utils/quantidadeProdutoInput'
+import { formatarUnidadeMedidaProdutoExibicao } from '@/src/shared/types/unidadeMedidaProduto'
 import {
   rotuloOrigemExibicao,
   taxaEntregaTemValor,
@@ -355,9 +356,14 @@ export function PedidoDetalhesView() {
                                     Qtd
                                   </span>
                                 </div>
-                                <div className="flex-[4]">
+                                <div className="min-w-0 flex-[4]">
                                   <span className="text-xs font-semibold text-gray-700">
                                     Produto
+                                  </span>
+                                </div>
+                                <div className="w-11 shrink-0">
+                                  <span className="block text-center text-xs font-semibold text-gray-700">
+                                    Unid.
                                   </span>
                                 </div>
                                 <div className="flex flex-1 justify-end">
@@ -422,6 +428,12 @@ export function PedidoDetalhesView() {
                                             </span>
                                           ) : null}
                                         </div>
+                                        {/* Unidade de medida */}
+                                        <div className="w-11 shrink-0">
+                                          <span className="block text-center text-xs text-gray-600">
+                                            {formatarUnidadeMedidaProdutoExibicao(unidadeMedida)}
+                                          </span>
+                                        </div>
                                         {/* Desconto/Acréscimo */}
                                         <div className="flex-1">
                                           <span className="block text-right text-xs text-gray-600">
@@ -466,6 +478,7 @@ export function PedidoDetalhesView() {
                                                 {complemento.nome}
                                               </span>
                                             </div>
+                                            <div className="w-11 shrink-0" aria-hidden />
                                             {/* Espaço vazio para Desconto/Acréscimo (complementos não têm) */}
                                             <div className="flex-1"></div>
                                             {/* Valor Unitário do Complemento - Apenas exibição */}
