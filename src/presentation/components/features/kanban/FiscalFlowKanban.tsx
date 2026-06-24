@@ -31,6 +31,8 @@ import {
   vendasUnificadasQueryParamsParaPedidosDelivery,
 } from './hooks/usePedidosDeliveryInfinite'
 import { usePedidosDeliveryKanbanColumns } from './hooks/usePedidosDeliveryKanbanColumns'
+import { usePedidosDeliveryContagemPorStatus } from './hooks/usePedidosDeliveryContagemPorStatus'
+import { combinarContagensColunasDeliveryKanban } from './utils/kanbanDeliveryColumnCounts'
 import { useVendaIdsPdvPorTerminal } from '@/src/presentation/hooks/useVendaIdsPdvPorTerminal'
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
@@ -95,6 +97,7 @@ import {
 } from './utils/kanbanDeliveryColumnCache'
 import {
   DELIVERY_KANBAN_COLUMN_IDS,
+  isColunaKanbanDeliveryFiscalSplit,
   vendaPertenceColunaDeliveryKanban,
 } from './utils/kanbanDeliveryColumnConfig'
 import { invalidarPedidoKanbanQuickViewCache } from '../delivery/kanban-panels/carregarPedidoKanbanQuickView'
@@ -115,6 +118,7 @@ import { confirmarCobrancaPendentePedidoDeliveryUseCase } from '@/src/applicatio
 import type { AcaoTransicaoGestor } from '@/src/presentation/hooks/useVendas'
 import { useKanbanColumnScrollLoadMore } from './hooks/useKanbanColumnScrollLoadMore'
 import {
+  filtrarVendaDeliveryKanbanColunaPorDatasToolbar,
   filtrarVendasKanbanPorModo,
   KANBAN_DELIVERY_DELTA_POLL_INTERVAL_MS,
   KANBAN_VENDAS_REFETCH_INTERVAL_MS,
@@ -131,14 +135,17 @@ export function FiscalFlowKanban() {
   const [vendaSelecionadaParaEmissao, setVendaSelecionadaParaEmissao] =
     useState<VendaSelecionadaParaEmissao | null>(null)
   const [emitirNfeModalOpen, setEmitirNfeModalOpen] = useState(false)
+  const { timezoneAgregacao, preferenciasImpressaoDelivery, empresa } = useEmpresaMe()
   const {
     searchInput,
     setSearchInput,
     searchQuery,
-    dataCriacaoInicio,
-    dataCriacaoFim,
+    criacaoPreset,
+    dataCriacaoInicioConsulta,
+    dataCriacaoFimConsulta,
     dataFinalizacaoInicio,
     dataFinalizacaoFim,
+    finalizacaoPreset,
     origemFilter,
     setOrigemFilter,
     filtrosVisiveisMobile,
@@ -166,13 +173,12 @@ export function FiscalFlowKanban() {
     abrirModalCriacaoDatas,
     handleRascunhoCriacaoRangeChange,
     aplicarCriacaoDatas,
-    aplicarCriacaoTodos,
+    aplicarCriacaoPreset,
     abrirModalFinalizacaoDatas,
     handleRascunhoFinalizacaoRangeChange,
     aplicarFinalizacaoDatas,
-    aplicarFinalizacaoTodos,
-  } = useFiscalKanbanFilters()
-  const { timezoneAgregacao, preferenciasImpressaoDelivery, empresa } = useEmpresaMe()
+    aplicarFinalizacaoPreset,
+  } = useFiscalKanbanFilters(timezoneAgregacao)
   const { auth } = useAuthStore()
   const hasKanbanToken = !!auth?.getAccessToken()
   const queryClient = useQueryClient()
@@ -225,8 +231,10 @@ export function FiscalFlowKanban() {
 
   const isModoDeliveryKanban = modoKanbanVendas === 'delivery'
 
-  /** Datas de criação escolhidas na toolbar (não o default automático "hoje" do balcão). */
-  const filtroCriacaoExplicitoDelivery = Boolean(dataCriacaoInicio || dataCriacaoFim)
+  /** Envia `dataCriacao*` na API delivery quando o período de criação está ativo na consulta (inclui default "hoje"). */
+  const enviarFiltroCriacaoNaDeliveryApi = Boolean(
+    vendasUnificadasQueryParams.dataCriacaoInicial || vendasUnificadasQueryParams.dataCriacaoFinal
+  )
 
   const { data: meiosPagamentoInfiniteData } = useMeiosPagamentoInfinite({
     ativo: true,
@@ -406,7 +414,12 @@ export function FiscalFlowKanban() {
     refetchIntervalMs: isModoDeliveryKanban ? KANBAN_DELIVERY_DELTA_POLL_INTERVAL_MS : false,
     refetchOnWindowFocus: isModoDeliveryKanban,
     getEtapaKanban: v => getEtapaKanbanParaExibicaoRef.current(v),
-    enviarFiltroCriacaoNaApi: filtroCriacaoExplicitoDelivery,
+    enviarFiltroCriacaoNaApi: enviarFiltroCriacaoNaDeliveryApi,
+  })
+
+  const deliveryContagem = usePedidosDeliveryContagemPorStatus(pedidosDeliveryQueryParams, {
+    enabled: hasKanbanToken && isModoDeliveryKanban,
+    enviarFiltroCriacaoNaApi: enviarFiltroCriacaoNaDeliveryApi,
   })
 
   const isLoadingDelivery = deliveryKanban.isLoading
@@ -436,26 +449,34 @@ export function FiscalFlowKanban() {
 
   const refetch = useCallback(async () => {
     if (isModoDeliveryKanban) {
-      return refetchDelivery()
+      await Promise.all([refetchDelivery(), deliveryContagem.refetch()])
+      return
     }
     const [result] = await Promise.all([
       refetchUnificado(),
       usaFiltroTerminal ? refetchIdsTerminal() : Promise.resolve(),
     ])
     return result
-  }, [isModoDeliveryKanban, usaFiltroTerminal, refetchDelivery, refetchUnificado, refetchIdsTerminal])
+  }, [
+    isModoDeliveryKanban,
+    usaFiltroTerminal,
+    refetchDelivery,
+    deliveryContagem.refetch,
+    refetchUnificado,
+    refetchIdsTerminal,
+  ])
 
   /** Normaliza refetch do infinite query para `refetchAteMudarStatusFiscal` (espera `{ data: { items } }`). */
   const refetchParaEmissaoFiscal = useCallback(async () => {
     if (isModoDeliveryKanban) {
-      await refetchDelivery()
+      await Promise.all([refetchDelivery(), deliveryContagem.refetch()])
       const items = deliveryKanban.flattenAllItems()
       return { data: { items } }
     }
     const result = await refetchUnificado()
     const { items } = flattenVendasUnificadasInfinite(result.data)
     return { data: { items } }
-  }, [isModoDeliveryKanban, refetchDelivery, deliveryKanban.flattenAllItems, refetchUnificado])
+  }, [isModoDeliveryKanban, refetchDelivery, deliveryContagem.refetch, deliveryKanban.flattenAllItems, refetchUnificado])
 
   const deliveryKanbanColumnStatesKey = useMemo(
     () => JSON.stringify(deliveryKanban.columnStates),
@@ -676,13 +697,23 @@ export function FiscalFlowKanban() {
 
   const deliveryColumnCounts = useMemo((): Record<string, number> => {
     if (!isModoDeliveryKanban) return {}
-    const counts: Record<string, number> = {}
-    for (const columnId of DELIVERY_KANBAN_COLUMN_IDS) {
-      const state = deliveryKanban.columnStates[columnId]
-      if (state) counts[columnId] = state.totalCount
-    }
-    return counts
-  }, [isModoDeliveryKanban, deliveryKanban.columnStates])
+
+    const finalizadasState = deliveryKanban.columnStates.FINALIZADAS
+    const { items: poolFinalizados } = flattenPedidosDeliveryInfinite(finalizadasState?.data)
+
+    return combinarContagensColunasDeliveryKanban(
+      deliveryContagem.operacional,
+      deliveryContagem.finalizadoTotal,
+      poolFinalizados,
+      v => getEtapaKanbanParaExibicaoRef.current(v),
+      finalizadasState?.hasNextPage ?? false
+    )
+  }, [
+    isModoDeliveryKanban,
+    deliveryContagem.operacional,
+    deliveryContagem.finalizadoTotal,
+    deliveryKanbanColumnStatesKey,
+  ])
 
   const handleAtualizarListagem = useCallback(() => {
     void refetch()
@@ -700,18 +731,13 @@ export function FiscalFlowKanban() {
   const emitirNotaPdv = useEmitirNfe()
   const emitirNotaGestor = useEmitirNfeGestor()
   const emitirNotaDelivery = useEmitirNfeDelivery()
-  const transicaoPedidoDelivery = useTransicaoPedidoDelivery()
 
   const sincronizarVendaAposTransicao = useCallback(
     (vendaId: string, respostaTransicao: unknown): boolean => {
       const cardAtualizado = extrairVendaUnificadaDeRespostaDeliverySummary(respostaTransicao)
       if (cardAtualizado) {
         if (isModoDeliveryKanban) {
-          upsertVendaDeliveryKanbanColumnCaches(
-            queryClient,
-            cardAtualizado,
-            v => getEtapaKanbanParaExibicaoRef.current(v)
-          )
+          upsertVendaDeliveryKanbanColumnCaches(queryClient, cardAtualizado)
         } else {
           replaceVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, cardAtualizado)
         }
@@ -727,12 +753,7 @@ export function FiscalFlowKanban() {
 
       const patch = extrairPatchKanbanDeRespostaTransicao(respostaTransicao)
       if (isModoDeliveryKanban) {
-        patchVendaDeliveryKanbanColumnCaches(
-          queryClient,
-          vendaId,
-          patch,
-          v => getEtapaKanbanParaExibicaoRef.current(v)
-        )
+        patchVendaDeliveryKanbanColumnCaches(queryClient, vendaId, patch)
       } else {
         patchVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, vendaId, patch)
       }
@@ -740,6 +761,10 @@ export function FiscalFlowKanban() {
     },
     [isModoDeliveryKanban, infiniteQueryKey, queryClient]
   )
+
+  const transicaoPedidoDelivery = useTransicaoPedidoDelivery({
+    onPedidoTransicionado: sincronizarVendaAposTransicao,
+  })
 
   const agendarSincronizacaoLista = useCallback(
     (vendaId: string) => {
@@ -761,12 +786,7 @@ export function FiscalFlowKanban() {
           const data = await response.json()
           const patch = extrairPatchKanbanDeRespostaTransicao(data)
           if (isModoDeliveryKanban) {
-            patchVendaDeliveryKanbanColumnCaches(
-              queryClient,
-              vendaId,
-              patch,
-              v => getEtapaKanbanParaExibicaoRef.current(v)
-            )
+            patchVendaDeliveryKanbanColumnCaches(queryClient, vendaId, patch)
           } else {
             patchVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, vendaId, patch)
           }
@@ -794,12 +814,7 @@ export function FiscalFlowKanban() {
         const data = await response.json()
         const patch = extrairPatchKanbanDeRespostaTransicao(data)
         if (isModoDeliveryKanban) {
-          patchVendaDeliveryKanbanColumnCaches(
-            queryClient,
-            vendaId,
-            patch,
-            v => getEtapaKanbanParaExibicaoRef.current(v)
-          )
+          patchVendaDeliveryKanbanColumnCaches(queryClient, vendaId, patch)
         } else {
           patchVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, vendaId, patch)
         }
@@ -901,12 +916,7 @@ export function FiscalFlowKanban() {
         )
         const patch = extrairPatchKanbanDeRespostaTransicao(pedidoAtualizado)
         if (isModoDeliveryKanban) {
-          patchVendaDeliveryKanbanColumnCaches(
-            queryClient,
-            venda.id,
-            patch,
-            v => getEtapaKanbanParaExibicaoRef.current(v)
-          )
+          patchVendaDeliveryKanbanColumnCaches(queryClient, venda.id, patch)
         } else {
           patchVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, venda.id, patch)
         }
@@ -1080,9 +1090,38 @@ export function FiscalFlowKanban() {
       for (const columnId of DELIVERY_KANBAN_COLUMN_IDS) {
         const state = deliveryKanban.columnStates[columnId]
         const { items } = flattenPedidosDeliveryInfinite(state?.data)
-        const vendas = items.filter(v =>
-          vendaPertenceColunaDeliveryKanban(v, columnId, getEtapaKanbanParaExibicao)
-        )
+        let vendas = items.filter(v => {
+          if (
+            isColunaKanbanDeliveryFiscalSplit(columnId) &&
+            !vendaPertenceColunaDeliveryKanban(v, columnId, getEtapaKanbanParaExibicao)
+          ) {
+            return false
+          }
+          return filtrarVendaDeliveryKanbanColunaPorDatasToolbar(
+            v,
+            columnId,
+            vendasUnificadasQueryParams
+          )
+        })
+
+        if (!isColunaKanbanDeliveryFiscalSplit(columnId)) {
+          for (const [vendaId, colunaDestino] of Object.entries(etapaLocalPorVendaId)) {
+            if (colunaDestino !== columnId) continue
+            if (vendas.some(v => v.id === vendaId)) continue
+            const vendaTransicao = todasVendasCarregadas.find(v => v.id === vendaId)
+            if (
+              vendaTransicao &&
+              filtrarVendaDeliveryKanbanColunaPorDatasToolbar(
+                vendaTransicao,
+                columnId,
+                vendasUnificadasQueryParams
+              )
+            ) {
+              vendas = [...vendas, vendaTransicao]
+            }
+          }
+        }
+
         map[columnId] = ordenarColuna(columnId, vendas)
       }
       return map
@@ -1153,9 +1192,12 @@ export function FiscalFlowKanban() {
     isModoDeliveryKanban,
     deliveryKanban.columnStates,
     getEtapaKanbanParaExibicao,
+    etapaLocalPorVendaId,
+    todasVendasCarregadas,
     criterioOrdenacaoPorColuna,
     direcaoOrdenacaoPorColuna,
     primeiroPorColuna,
+    vendasUnificadasQueryParams,
   ])
 
   const getColumnTotalCount = useCallback(
@@ -1429,14 +1471,14 @@ export function FiscalFlowKanban() {
         terminais={terminais}
         isLoadingTerminais={isLoadingTerminais}
         origemFilterDisabled={usaFiltroTerminal}
-        dataCriacaoInicio={dataCriacaoInicio}
-        dataCriacaoFim={dataCriacaoFim}
-        onCriacaoTodos={aplicarCriacaoTodos}
-        onOpenCriacaoDatas={abrirModalCriacaoDatas}
+        criacaoPreset={criacaoPreset}
+        onCriacaoPresetChange={aplicarCriacaoPreset}
+        dataCriacaoInicio={dataCriacaoInicioConsulta}
+        dataCriacaoFim={dataCriacaoFimConsulta}
+        finalizacaoPreset={finalizacaoPreset}
+        onFinalizacaoPresetChange={aplicarFinalizacaoPreset}
         dataFinalizacaoInicio={dataFinalizacaoInicio}
         dataFinalizacaoFim={dataFinalizacaoFim}
-        onFinalizacaoTodos={aplicarFinalizacaoTodos}
-        onOpenFinalizacaoDatas={abrirModalFinalizacaoDatas}
         onClearFilters={handleClearFiltersComTerminal}
         modoKanbanVendas={modoKanbanVendas}
         onModoKanbanVendasChange={setModoKanbanVendas}

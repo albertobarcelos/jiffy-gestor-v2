@@ -1,10 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
 import { FormControl, InputLabel, MenuItem, Select } from '@mui/material'
 import {
   MdAdd,
-  MdCalendarToday,
   MdFilterAltOff,
   MdFilterList,
   MdRefresh,
@@ -13,6 +11,10 @@ import {
 } from 'react-icons/md'
 import { KanbanModoVendasToggle, type ModoKanbanVendas } from '../KanbanModoVendasToggle'
 import type { OrigemFiltro } from '../types'
+import {
+  KANBAN_FILTRO_DATA_PRESET_OPCOES,
+  type KanbanFiltroDataPreset,
+} from '../utils/kanbanFiltroDataPresets'
 
 interface FiscalKanbanToolbarProps {
   searchInput: string
@@ -27,14 +29,14 @@ interface FiscalKanbanToolbarProps {
   terminais: { id: string; nome: string }[]
   isLoadingTerminais: boolean
   origemFilterDisabled?: boolean
+  criacaoPreset: KanbanFiltroDataPreset
+  onCriacaoPresetChange: (preset: KanbanFiltroDataPreset) => void
   dataCriacaoInicio: Date | null
   dataCriacaoFim: Date | null
-  onCriacaoTodos: () => void
-  onOpenCriacaoDatas: () => void
+  finalizacaoPreset: KanbanFiltroDataPreset
+  onFinalizacaoPresetChange: (preset: KanbanFiltroDataPreset) => void
   dataFinalizacaoInicio: Date | null
   dataFinalizacaoFim: Date | null
-  onFinalizacaoTodos: () => void
-  onOpenFinalizacaoDatas: () => void
   onClearFilters: () => void
   modoKanbanVendas: ModoKanbanVendas
   onModoKanbanVendasChange: (value: ModoKanbanVendas) => void
@@ -114,80 +116,45 @@ function PeriodoSelecionadoResumo({
   )
 }
 
-function FiltroDataOpcoesBotao({
+function FiltroDataPresetSelect({
+  labelId,
   label,
-  onTodos,
-  onEscolherData,
+  preset,
+  onPresetChange,
   periodoResumo,
 }: {
+  labelId: string
   label: string
-  onTodos: () => void
-  onEscolherData: () => void
+  preset: KanbanFiltroDataPreset
+  onPresetChange: (preset: KanbanFiltroDataPreset) => void
   periodoResumo?: { inicio: Date; fim: Date } | null
 }) {
-  const [menuAberto, setMenuAberto] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!menuAberto) return
-    const fecharAoClicarFora = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setMenuAberto(false)
-      }
-    }
-    document.addEventListener('mousedown', fecharAoClicarFora)
-    return () => document.removeEventListener('mousedown', fecharAoClicarFora)
-  }, [menuAberto])
-
-  const opcaoClassName =
-    'font-nunito block w-full px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50'
-
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center gap-2">
-        <div className="relative" ref={containerRef}>
-          <button
-            type="button"
-            onClick={() => setMenuAberto(prev => !prev)}
-            className="font-nunito flex h-8 items-center gap-1 rounded-lg px-1 text-sm text-white transition-colors"
-            style={{ backgroundColor: KANBAN_BUTTON_COLOR }}
-            aria-expanded={menuAberto}
-            aria-haspopup="menu"
-          >
-            <MdCalendarToday size={16} className="shrink-0" />
+        <FormControl
+          size="small"
+          variant="outlined"
+          sx={{ ...sxKanbanFiltroSelect, minWidth: 168 }}
+        >
+          <InputLabel id={labelId} shrink>
             {label}
-          </button>
-          {menuAberto ? (
-            <div
-              className="absolute left-0 top-full z-50 mt-1 min-w-[180px] overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
-              role="menu"
-            >
-              <button
-                type="button"
-                role="menuitem"
-                className={opcaoClassName}
-                onClick={() => {
-                  onTodos()
-                  setMenuAberto(false)
-                }}
-              >
-                Todos os Pedidos
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                className={opcaoClassName}
-                onClick={() => {
-                  onEscolherData()
-                  setMenuAberto(false)
-                }}
-              >
-                Escolher Data
-              </button>
-            </div>
-          ) : null}
-        </div>
-        {periodoResumo ? (
+          </InputLabel>
+          <Select
+            labelId={labelId}
+            label={label}
+            value={preset}
+            onChange={e => onPresetChange(e.target.value as KanbanFiltroDataPreset)}
+            className="font-nunito"
+          >
+            {KANBAN_FILTRO_DATA_PRESET_OPCOES.map(opcao => (
+              <MenuItem key={opcao.value} value={opcao.value}>
+                {opcao.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        {preset === 'por_data' && periodoResumo ? (
           <PeriodoSelecionadoResumo inicio={periodoResumo.inicio} fim={periodoResumo.fim} />
         ) : null}
       </div>
@@ -209,14 +176,14 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
     terminais,
     isLoadingTerminais,
     origemFilterDisabled = false,
+    criacaoPreset,
+    onCriacaoPresetChange,
     dataCriacaoInicio,
     dataCriacaoFim,
-    onCriacaoTodos,
-    onOpenCriacaoDatas,
+    finalizacaoPreset,
+    onFinalizacaoPresetChange,
     dataFinalizacaoInicio,
     dataFinalizacaoFim,
-    onFinalizacaoTodos,
-    onOpenFinalizacaoDatas,
     onClearFilters,
     modoKanbanVendas,
     onModoKanbanVendasChange,
@@ -310,10 +277,11 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
         </div>
         ) : null}
 
-        <FiltroDataOpcoesBotao
+        <FiltroDataPresetSelect
+          labelId="kanban-filtro-finalizacao-label"
           label="Data Finalização"
-          onTodos={onFinalizacaoTodos}
-          onEscolherData={onOpenFinalizacaoDatas}
+          preset={finalizacaoPreset}
+          onPresetChange={onFinalizacaoPresetChange}
           periodoResumo={
             dataFinalizacaoInicio && dataFinalizacaoFim
               ? { inicio: dataFinalizacaoInicio, fim: dataFinalizacaoFim }
@@ -321,10 +289,11 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
           }
         />
 
-        <FiltroDataOpcoesBotao
+        <FiltroDataPresetSelect
+          labelId="kanban-filtro-criacao-label"
           label="Data Criação"
-          onTodos={onCriacaoTodos}
-          onEscolherData={onOpenCriacaoDatas}
+          preset={criacaoPreset}
+          onPresetChange={onCriacaoPresetChange}
           periodoResumo={
             dataCriacaoInicio && dataCriacaoFim
               ? { inicio: dataCriacaoInicio, fim: dataCriacaoFim }

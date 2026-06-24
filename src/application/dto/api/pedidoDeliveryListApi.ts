@@ -159,6 +159,27 @@ export interface PedidosDeliveryQueryParams {
   dataUltimaModificacaoInicial?: string
 }
 
+/** Resposta de `GET /api/v1/delivery/pedidos/contagem-por-status`. */
+export interface PedidosDeliveryContagemPorStatusResponse {
+  PENDENTE: number
+  EM_PREPARO: number
+  PRONTO: number
+  EM_ROTA: number
+  FINALIZADO: number
+  CANCELADO: number
+  total: number
+}
+
+export const PEDIDOS_DELIVERY_CONTAGEM_POR_STATUS_VAZIA: PedidosDeliveryContagemPorStatusResponse = {
+  PENDENTE: 0,
+  EM_PREPARO: 0,
+  PRONTO: 0,
+  EM_ROTA: 0,
+  FINALIZADO: 0,
+  CANCELADO: 0,
+  total: 0,
+}
+
 /** Resposta paginada — `PaginationResult<VendaDeliverySummaryDTO>`. */
 export interface PedidosDeliveryListResponse {
   count: number

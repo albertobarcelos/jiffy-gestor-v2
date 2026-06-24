@@ -49,7 +49,7 @@ export interface PedidosDeliveryInfiniteOptions {
   refetchIntervalMs?: number | false
   refetchOnWindowFocus?: boolean
   enabled?: boolean
-  /** Envia `dataCriacaoInicial/Final` na API (somente quando o usuário definiu datas na toolbar). */
+  /** Envia `dataCriacaoInicial/Final` na API quando o período de criação está ativo na consulta. */
   enviarFiltroCriacaoNaApi?: boolean
 }
 

@@ -5,6 +5,10 @@ import { formatarHoraParaInputCalendar } from '@/src/presentation/components/fea
 import { primeiroMesQuadroDuploCalendario } from '@/src/shared/utils/calendarioIntervaloFaturamento'
 import { combinarIntervaloCalendarParaDatas } from '@/src/shared/utils/intervaloCalendarioComHoras'
 import type { OrigemFiltro } from '../types'
+import {
+  type KanbanFiltroDataPreset,
+  intervaloPresetKanbanFiltroData,
+} from '../utils/kanbanFiltroDataPresets'
 
 /** `periodo`: filtro por intervalo (criação usa hoje quando sem datas explícitas). `todos`: sem filtro desse tipo. */
 export type FiltroDataKanbanModo = 'periodo' | 'todos'
@@ -17,16 +21,18 @@ function criarIntervaloHoje() {
   }
 }
 
-export function useFiscalKanbanFilters() {
+export function useFiscalKanbanFilters(timeZoneEmpresa?: string) {
   const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const intervaloCriacaoPadrao = useMemo(() => criarIntervaloHoje(), [])
   const [dataCriacaoInicio, setDataCriacaoInicio] = useState<Date | null>(null)
   const [dataCriacaoFim, setDataCriacaoFim] = useState<Date | null>(null)
   const [criacaoDataModo, setCriacaoDataModo] = useState<FiltroDataKanbanModo>('periodo')
+  const [criacaoPreset, setCriacaoPreset] = useState<KanbanFiltroDataPreset>('hoje')
   const [dataFinalizacaoInicio, setDataFinalizacaoInicio] = useState<Date | null>(null)
   const [dataFinalizacaoFim, setDataFinalizacaoFim] = useState<Date | null>(null)
   const [finalizacaoDataModo, setFinalizacaoDataModo] = useState<FiltroDataKanbanModo>('todos')
+  const [finalizacaoPreset, setFinalizacaoPreset] = useState<KanbanFiltroDataPreset>('todos')
   const [origemFilter, setOrigemFilter] = useState<OrigemFiltro>('')
   const [filtrosVisiveisMobile, setFiltrosVisiveisMobile] = useState(false)
   const [modalCriacaoDatasAberto, setModalCriacaoDatasAberto] = useState(false)
@@ -100,7 +106,9 @@ export function useFiscalKanbanFilters() {
     setSearchQuery('')
     const periodoHoje = criarIntervaloHoje()
     setCriacaoDataModo('periodo')
+    setCriacaoPreset('hoje')
     setFinalizacaoDataModo('todos')
+    setFinalizacaoPreset('todos')
     setDataCriacaoInicio(null)
     setDataCriacaoFim(null)
     setDataFinalizacaoInicio(null)
@@ -164,6 +172,8 @@ export function useFiscalKanbanFilters() {
     setDataFinalizacaoInicio(null)
     setDataFinalizacaoFim(null)
     setFinalizacaoDataModo('todos')
+    setFinalizacaoPreset('todos')
+    setCriacaoPreset('por_data')
     setModalCriacaoDatasAberto(false)
   }, [rascunhoCriacaoRange, rascunhoHoraCriacaoInicio, rascunhoHoraCriacaoFim])
 
@@ -214,27 +224,77 @@ export function useFiscalKanbanFilters() {
     setDataCriacaoInicio(null)
     setDataCriacaoFim(null)
     setCriacaoDataModo('todos')
+    setCriacaoPreset('todos')
+    setFinalizacaoPreset('por_data')
     setModalFinalizacaoDatasAberto(false)
   }, [rascunhoFinalizacaoRange, rascunhoHoraFinalizacaoInicio, rascunhoHoraFinalizacaoFim])
 
   const aplicarCriacaoTodos = useCallback(() => {
     setCriacaoDataModo('todos')
+    setCriacaoPreset('todos')
     setDataCriacaoInicio(null)
     setDataCriacaoFim(null)
   }, [])
 
   const aplicarFinalizacaoTodos = useCallback(() => {
     setFinalizacaoDataModo('todos')
+    setFinalizacaoPreset('todos')
     setDataFinalizacaoInicio(null)
     setDataFinalizacaoFim(null)
   }, [])
+
+  const aplicarCriacaoPreset = useCallback(
+    (preset: KanbanFiltroDataPreset) => {
+      if (preset === 'todos') {
+        aplicarCriacaoTodos()
+        return
+      }
+      if (preset === 'por_data') {
+        abrirModalCriacaoDatas()
+        return
+      }
+      const intervalo = intervaloPresetKanbanFiltroData(preset, timeZoneEmpresa ?? '')
+      if (!intervalo) return
+      setCriacaoDataModo('periodo')
+      setCriacaoPreset(preset)
+      setDataCriacaoInicio(intervalo.inicio)
+      setDataCriacaoFim(intervalo.fim)
+    },
+    [aplicarCriacaoTodos, abrirModalCriacaoDatas, timeZoneEmpresa]
+  )
+
+  const aplicarFinalizacaoPreset = useCallback(
+    (preset: KanbanFiltroDataPreset) => {
+      if (preset === 'todos') {
+        aplicarFinalizacaoTodos()
+        return
+      }
+      if (preset === 'por_data') {
+        abrirModalFinalizacaoDatas()
+        return
+      }
+      const intervalo = intervaloPresetKanbanFiltroData(preset, timeZoneEmpresa ?? '')
+      if (!intervalo) return
+      setFinalizacaoDataModo('periodo')
+      setFinalizacaoPreset(preset)
+      setDataFinalizacaoInicio(intervalo.inicio)
+      setDataFinalizacaoFim(intervalo.fim)
+    },
+    [aplicarFinalizacaoTodos, abrirModalFinalizacaoDatas, timeZoneEmpresa]
+  )
 
   return {
     searchInput,
     setSearchInput,
     searchQuery,
+    criacaoDataModo,
+    criacaoPreset,
+    finalizacaoDataModo,
+    finalizacaoPreset,
     dataCriacaoInicio,
     dataCriacaoFim,
+    dataCriacaoInicioConsulta,
+    dataCriacaoFimConsulta,
     dataFinalizacaoInicio,
     dataFinalizacaoFim,
     origemFilter,
@@ -266,9 +326,11 @@ export function useFiscalKanbanFilters() {
     handleRascunhoCriacaoRangeChange,
     aplicarCriacaoDatas,
     aplicarCriacaoTodos,
+    aplicarCriacaoPreset,
     abrirModalFinalizacaoDatas,
     handleRascunhoFinalizacaoRangeChange,
     aplicarFinalizacaoDatas,
     aplicarFinalizacaoTodos,
+    aplicarFinalizacaoPreset,
   }
 }

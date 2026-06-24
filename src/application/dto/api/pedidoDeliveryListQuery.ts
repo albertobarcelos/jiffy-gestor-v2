@@ -152,6 +152,29 @@ export function montarPedidosDeliveryQueryString(
   return serializarPedidosDeliveryQueryParams(montarPedidosDeliveryQueryParams(filtros)).toString()
 }
 
+/**
+ * Params para `GET /contagem-por-status` — mesmos filtros da listagem, sem paginação nem `statusDelivery`.
+ */
+export function montarPedidosDeliveryContagemQueryParams(
+  filtros: FiltrosKanbanParaPedidosDelivery
+): Omit<PedidosDeliveryQueryParams, 'offset' | 'limit' | 'statusDelivery'> {
+  const { offset: _o, limit: _l, statusDelivery: _s, ...contagem } = montarPedidosDeliveryQueryParams({
+    ...filtros,
+    offset: 0,
+    limit: 1,
+  })
+  return contagem
+}
+
+/** Query string para contagem por status do Kanban delivery. */
+export function montarPedidosDeliveryContagemQueryString(
+  filtros: FiltrosKanbanParaPedidosDelivery
+): string {
+  return serializarPedidosDeliveryQueryParams(
+    montarPedidosDeliveryContagemQueryParams(filtros) as PedidosDeliveryQueryParams
+  ).toString()
+}
+
 function parseOptionalNumeroQuery(value: string | null): number | undefined {
   if (value == null || value.trim() === '') return undefined
   const n = Number(value)

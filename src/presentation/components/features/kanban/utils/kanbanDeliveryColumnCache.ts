@@ -63,11 +63,14 @@ function inserirVendaNaPrimeiraPagina(
   }
 }
 
+function etapaKanbanDeliveryCache(v: VendaUnificadaDTO): string {
+  return v.getEtapaKanban()
+}
+
 /** Substitui ou move o card entre caches de colunas após transição de status. */
 export function upsertVendaDeliveryKanbanColumnCaches(
   queryClient: QueryClient,
-  venda: VendaUnificadaDTO,
-  getEtapaKanban: (v: VendaUnificadaDTO) => string
+  venda: VendaUnificadaDTO
 ): void {
   const queries = queryClient.getQueriesData<InfiniteData<PedidosDeliveryInfinitePage>>({
     queryKey: KANBAN_PEDIDOS_DELIVERY_INFINITE_QUERY_KEY,
@@ -77,7 +80,7 @@ export function upsertVendaDeliveryKanbanColumnCaches(
     const columnId = extrairColumnIdDePedidosDeliveryKanbanQueryKey(queryKey)
     if (!columnId) continue
 
-    const pertence = vendaPertenceColunaDeliveryKanban(venda, columnId, getEtapaKanban)
+    const pertence = vendaPertenceColunaDeliveryKanban(venda, columnId, etapaKanbanDeliveryCache)
 
     if (!pertence) {
       const semVenda = removerVendaDasPaginas(data, venda.id)
@@ -99,8 +102,7 @@ export function upsertVendaDeliveryKanbanColumnCaches(
 export function patchVendaDeliveryKanbanColumnCaches(
   queryClient: QueryClient,
   vendaId: string,
-  patch: KanbanVendaCachePatch,
-  getEtapaKanban: (v: VendaUnificadaDTO) => string
+  patch: KanbanVendaCachePatch
 ): boolean {
   let encontrou = false
   let vendaAtualizada: VendaUnificadaDTO | null = null
@@ -128,6 +130,6 @@ export function patchVendaDeliveryKanbanColumnCaches(
 
   if (!encontrou || !vendaAtualizada) return false
 
-  upsertVendaDeliveryKanbanColumnCaches(queryClient, vendaAtualizada, getEtapaKanban)
+  upsertVendaDeliveryKanbanColumnCaches(queryClient, vendaAtualizada)
   return true
 }

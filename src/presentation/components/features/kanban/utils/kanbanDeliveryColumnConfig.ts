@@ -14,7 +14,7 @@ export const DELIVERY_KANBAN_COLUMN_IDS: ColunaKanbanId[] = [
   'COM_NFE',
 ]
 
-/** Params de coluna operacional — sem datas de finalização; criação só quando o usuário definiu na toolbar. */
+/** Params de coluna operacional — sem datas de finalização; criação conforme período ativo na consulta. */
 export function paramsOperacionaisDeliveryKanbanColumn(
   params: PedidosDeliveryInfiniteParams,
   options?: { enviarFiltroCriacaoNaApi?: boolean }
@@ -88,6 +88,11 @@ export function buildPedidosDeliveryParamsForKanbanColumn(
     statusDelivery: status,
     cancelado: false,
   }
+}
+
+/** Colunas que compartilham a mesma query API (`FINALIZADO`) e exigem split client-side. */
+export function isColunaKanbanDeliveryFiscalSplit(columnId: ColunaKanbanId): boolean {
+  return columnId === 'FINALIZADAS' || columnId === 'COM_NFE'
 }
 
 /** Filtra itens da listagem para a coluna visual (etapa Kanban + regras delivery). */
