@@ -1,9 +1,17 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { listarEntregadoresDeliveryUseCase } from '@/src/application/use-cases/delivery/ListarEntregadoresDeliveryUseCase'
-import { adaptPedidoDeliveryToVendaGestorApiResponse } from '@/src/application/mappers/PedidoDeliveryDetalheAdapter'
+import {
+  adaptPedidoDeliveryToVendaGestorApiResponse,
+  extrairStatusFinanceiroPedidoDelivery,
+} from '@/src/application/mappers/PedidoDeliveryDetalheAdapter'
+import { salvarTaxaPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/SalvarTaxaPedidoDeliveryUseCase'
+import { pedidoDeliveryEstaPago } from '@/src/application/mappers/TaxaPedidoDeliveryPayloadMapper'
+import { useTaxasEntregaQuery } from '@/src/presentation/components/features/pedidos/hooks/data/useTaxasEntregaQuery'
+import { patchVendaDeliveryKanbanColumnCaches } from '@/src/presentation/components/features/kanban/utils/kanbanDeliveryColumnCache'
+import { invalidarPedidoKanbanQuickViewCache } from './carregarPedidoKanbanQuickView'
 import {
   Dialog,
   DialogContent,
@@ -44,6 +52,9 @@ import {
   obterPedidoDeliveryDetalheCache,
   salvarPedidoDeliveryDetalheCache,
 } from '@/src/infrastructure/api/pedidoDeliveryDetalheCache'
+
+/** Valor sentinela do Select para "sem taxa" (Radix não aceita value vazio). */
+const SEM_TAXA = '__sem_taxa__'
 
 interface AtribuirEntregadorKanbanPainelProps {
   open: boolean
@@ -91,10 +102,42 @@ export function AtribuirEntregadorKanbanPainel({
   onSalvo,
 }: AtribuirEntregadorKanbanPainelProps) {
   const { auth } = useAuthStore()
+  const queryClient = useQueryClient()
   const [entregadorId, setEntregadorId] = useState('')
   const [taxaEntregaDetalhe, setTaxaEntregaDetalhe] = useState<TaxaEntregaDetalhe | null>(null)
+  const [taxaSelecionadaId, setTaxaSelecionadaId] = useState<string>(SEM_TAXA)
+  const [pedidoPago, setPedidoPago] = useState(false)
   const [carregandoTaxa, setCarregandoTaxa] = useState(false)
   const [salvando, setSalvando] = useState(false)
+  const [salvandoTaxa, setSalvandoTaxa] = useState(false)
+
+  const ehPedidoGestor = !!venda && venda.tabelaOrigem === 'venda_gestor'
+
+  const { taxasEntrega } = useTaxasEntregaQuery({
+    open,
+    modoVisualizacao: false,
+    pedidoComEntrega: ehPedidoGestor,
+  })
+
+  const opcoesTaxa = useMemo(() => {
+    const base = taxasEntrega.map(taxa => ({
+      id: taxa.getId(),
+      nome: taxa.getNome(),
+      valor: taxa.getValor(),
+    }))
+    const atualId = taxaEntregaDetalhe?.taxaId?.trim()
+    if (atualId && !base.some(opcao => opcao.id === atualId)) {
+      base.unshift({
+        id: atualId,
+        nome: taxaEntregaDetalhe?.nome ?? 'Taxa atual',
+        valor: taxaEntregaDetalhe?.valor ?? 0,
+      })
+    }
+    return base
+  }, [taxasEntrega, taxaEntregaDetalhe])
+
+  const selecaoTaxaAtual = taxaEntregaDetalhe?.taxaId?.trim() || SEM_TAXA
+  const taxaMudou = taxaSelecionadaId !== selecaoTaxaAtual
 
   const entregadoresQuery = useQuery({
     queryKey: ['delivery-entregadores', { ativo: true }],
@@ -124,6 +167,7 @@ export function AtribuirEntregadorKanbanPainel({
 
       const taxaDetalhe = await resolverTaxaEntregaDetalheKanban(vendaData, token)
       setTaxaEntregaDetalhe(taxaDetalhe)
+      setTaxaSelecionadaId(taxaDetalhe?.taxaId?.trim() || SEM_TAXA)
     },
     []
   )
@@ -153,13 +197,16 @@ export function AtribuirEntregadorKanbanPainel({
           (await buscarPedidoDeliveryKanban(venda.id, token))
 
         if (pedido) {
+          setPedidoPago(pedidoDeliveryEstaPago(pedido))
           if (!entregadorInicial) {
             const doPedido = extrairEntregadorIdDoPedidoDelivery(pedido)
             if (doPedido) setEntregadorId(doPedido)
           }
           await carregarTaxaEntrega(pedido, token)
         } else {
+          setPedidoPago(false)
           setTaxaEntregaDetalhe(null)
+          setTaxaSelecionadaId(SEM_TAXA)
         }
       } catch {
         showToast.error('Erro ao carregar dados do pedido.')
@@ -187,12 +234,67 @@ export function AtribuirEntregadorKanbanPainel({
     if (!open) {
       setEntregadorId('')
       setTaxaEntregaDetalhe(null)
+      setTaxaSelecionadaId(SEM_TAXA)
+      setPedidoPago(false)
       setCarregandoTaxa(false)
       setSalvando(false)
+      setSalvandoTaxa(false)
       return
     }
     void carregarDadosVenda()
   }, [open, carregarDadosVenda])
+
+  const handleSalvarTaxa = async () => {
+    if (!venda || !ehPedidoGestor) return
+    if (pedidoPago) {
+      showToast.error('Pedido já pago: não é possível alterar ou adicionar a taxa.')
+      return
+    }
+    if (!taxaMudou) return
+
+    const token = auth?.getAccessToken()
+    if (!token) {
+      showToast.error('Sessão expirada. Faça login novamente.')
+      return
+    }
+
+    const selecionadaId = taxaSelecionadaId === SEM_TAXA ? null : taxaSelecionadaId
+    const selecionadaValor = selecionadaId
+      ? opcoesTaxa.find(opcao => opcao.id === selecionadaId)?.valor ?? 0
+      : 0
+
+    setSalvandoTaxa(true)
+    try {
+      const { atualizado, pedido } = await salvarTaxaPedidoDeliveryUseCase.execute({
+        pedidoId: venda.id,
+        token,
+        taxaAtualId: taxaEntregaDetalhe?.taxaId ?? null,
+        taxaAtualValor: taxaEntregaDetalhe?.valor ?? 0,
+        taxaSelecionadaId: selecionadaId,
+        taxaSelecionadaValor: selecionadaValor,
+      })
+
+      if (!atualizado) {
+        showToast.info('Nenhuma alteração na taxa.')
+        return
+      }
+
+      salvarPedidoDeliveryDetalheCache(venda.id, pedido)
+      const valorFinalNum = Number((pedido as Record<string, unknown>).valorFinal)
+      patchVendaDeliveryKanbanColumnCaches(queryClient, venda.id, {
+        valorFinal: Number.isFinite(valorFinalNum) ? valorFinalNum : undefined,
+        statusFinanceiro: extrairStatusFinanceiroPedidoDelivery(pedido),
+      })
+      invalidarPedidoKanbanQuickViewCache(venda.id)
+      setPedidoPago(pedidoDeliveryEstaPago(pedido))
+      await carregarTaxaEntrega(pedido, token)
+      showToast.success('Taxa atualizada.')
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : 'Erro ao salvar taxa')
+    } finally {
+      setSalvandoTaxa(false)
+    }
+  }
 
   const handleSalvar = async () => {
     if (!venda) return
@@ -325,19 +427,57 @@ export function AtribuirEntregadorKanbanPainel({
               </Select>
             </div>
 
-            <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-3">
-              <Label className="mb-1 block text-sm font-semibold text-primary-text">
+            <div className="rounded-lg border border-primary/15 bg-white p-3">
+              <Label className="mb-2 block text-sm font-semibold text-primary-text">
                 Taxa de entrega
               </Label>
-              <p className="mb-2 text-[11px] text-secondary-text">
-                Em breve será possível alterar a taxa por aqui. Por enquanto, defina na criação
-                do pedido.
-              </p>
-              <div className="rounded-md border border-gray-200 bg-white px-3 py-2.5 text-sm text-primary-text opacity-90">
-                {carregandoTaxa && !taxaEntregaDetalhe
-                  ? 'Carregando taxa...'
-                  : formatarTaxaEntregaDetalheExibicao(taxaEntregaDetalhe, transformarParaReal)}
-              </div>
+
+              {pedidoPago ? (
+                <>
+                  <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-primary-text opacity-90">
+                    {carregandoTaxa && !taxaEntregaDetalhe
+                      ? 'Carregando taxa...'
+                      : formatarTaxaEntregaDetalheExibicao(taxaEntregaDetalhe, transformarParaReal)}
+                  </div>
+                  <p className="mt-2 text-[11px] text-secondary-text">
+                    Pedido já pago — não é possível alterar ou adicionar a taxa.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <Select
+                    value={taxaSelecionadaId}
+                    onValueChange={setTaxaSelecionadaId}
+                    disabled={carregandoTaxa || salvandoTaxa}
+                  >
+                    <SelectTrigger className="border-primary/30 bg-white">
+                      <SelectValue
+                        placeholder={carregandoTaxa ? 'Carregando taxa...' : 'Selecionar taxa'}
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={SEM_TAXA}>Sem taxa</SelectItem>
+                      {opcoesTaxa.map(opcao => (
+                        <SelectItem key={opcao.id} value={opcao.id}>
+                          {`${opcao.nome} — ${transformarParaReal(opcao.valor)}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Button
+                    type="button"
+                    variant="outlined"
+                    color="primary"
+                    onClick={() => void handleSalvarTaxa()}
+                    disabled={!taxaMudou || salvandoTaxa || carregandoTaxa}
+                    isLoading={salvandoTaxa}
+                    className="mt-3 h-9 min-h-9 w-full font-semibold shadow-none"
+                  >
+                    Salvar Taxa
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>

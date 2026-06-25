@@ -105,6 +105,23 @@ export interface TaxaPedidoDeliveryApi {
   quantidade?: number
 }
 
+/** PATCH pedido — adiciona/remove taxas (remove usa o `taxaId` do catálogo). */
+export interface AtualizarTaxasPedidoDeliveryApi {
+  taxas: {
+    add?: TaxaPedidoDeliveryApi[]
+    remove?: string[]
+  }
+}
+
+/**
+ * PATCH atômico para "Salvar Taxa" no Kanban: ajusta a taxa e, quando há cobrança
+ * pendente `na_entrega`, reemite a cobrança com o novo valor (cancel + add).
+ */
+export interface SalvarTaxaPedidoDeliveryApi {
+  taxas?: AtualizarTaxasPedidoDeliveryApi['taxas']
+  cobrancas?: AtualizarCobrancasPedidoDeliveryApi['cobrancas']
+}
+
 export interface CriarPedidoDeliveryApiRequest {
   origem: 'GESTOR' | 'JIFFY_DELIVERY'
   tipoEntrega: TipoEntregaDeliveryApi
