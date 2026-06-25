@@ -2,8 +2,13 @@ import { describe, expect, it } from 'vitest'
 import {
   buildSalvarTaxaPedidoDeliveryPatch,
   extrairCobrancasPendentesNaEntregaPedidoDelivery,
+  extrairTaxaEntregaAtivaPedidoDelivery,
   pedidoDeliveryEstaPago,
 } from '@/src/application/mappers/TaxaPedidoDeliveryPayloadMapper'
+import {
+  extrairTaxaEntregaIdDaVenda,
+  taxaLancadaPedidoEstaAtiva,
+} from '@/src/application/mappers/VendaDetalheMapper'
 
 describe('TaxaPedidoDeliveryPayloadMapper', () => {
   describe('pedidoDeliveryEstaPago', () => {
@@ -54,6 +59,46 @@ describe('TaxaPedidoDeliveryPayloadMapper', () => {
       expect(extrairCobrancasPendentesNaEntregaPedidoDelivery(pedido)).toEqual([
         { id: 'c1', valor: 30, meioPagamentoId: 'mp1' },
       ])
+    })
+  })
+
+  describe('extrairTaxaEntregaAtivaPedidoDelivery', () => {
+    it('ignora taxa removida (soft delete) e retorna null', () => {
+      const pedido = {
+        taxasLancadas: [
+          {
+            taxaId: 'tx1',
+            tipo: 'entrega',
+            valor: 8,
+            dataRemocao: '2026-01-01T00:00:00.000Z',
+            removidoPorId: 'user1',
+          },
+        ],
+        valorFinal: 58,
+      }
+      expect(extrairTaxaEntregaAtivaPedidoDelivery(pedido)).toEqual({ taxaId: null, valor: 0 })
+      expect(extrairTaxaEntregaIdDaVenda(pedido)).toBeNull()
+    })
+
+    it('retorna taxa ativa com valor', () => {
+      const pedido = {
+        taxasLancadas: [
+          {
+            taxaId: 'tx1',
+            tipo: 'entrega',
+            valor: 8,
+            valorCalculado: 8,
+          },
+        ],
+      }
+      expect(extrairTaxaEntregaAtivaPedidoDelivery(pedido)).toEqual({ taxaId: 'tx1', valor: 8 })
+    })
+
+    it('taxaLancadaPedidoEstaAtiva detecta remoção por dataRemocao', () => {
+      expect(
+        taxaLancadaPedidoEstaAtiva({ taxaId: 'tx1', dataRemocao: '2026-01-01T00:00:00.000Z' })
+      ).toBe(false)
+      expect(taxaLancadaPedidoEstaAtiva({ taxaId: 'tx1' })).toBe(true)
     })
   })
 

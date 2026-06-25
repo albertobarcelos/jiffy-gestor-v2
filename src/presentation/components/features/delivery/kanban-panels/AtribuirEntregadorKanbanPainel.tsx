@@ -37,8 +37,7 @@ import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { showToast } from '@/src/shared/utils/toast'
 import {
   formatarTaxaEntregaDetalheExibicao,
-  resolverTaxaEntregaDetalheKanban,
-  resolverTaxaEntregaValorSync,
+  resolverTaxaEntregaAtivaDetalheKanban,
 } from '@/src/application/mappers/VendaDetalheMapper'
 import type { TaxaEntregaDetalhe } from '@/src/domain/types/vendaDetalhe'
 import type { UsuarioPdvEntregadorOption } from '@/src/domain/types/vendaDetalhe'
@@ -48,20 +47,25 @@ import {
   salvarEntregadorPedidoDelivery,
 } from './entregadorKanbanStore'
 import type { Venda } from '@/src/presentation/components/features/kanban/types'
+import type { KanbanEntregadorCachePatch } from '@/src/application/dto/TransicaoKanbanDTO'
 import {
   obterPedidoDeliveryDetalheCache,
   salvarPedidoDeliveryDetalheCache,
+  invalidarPedidoDeliveryDetalheCache,
 } from '@/src/infrastructure/api/pedidoDeliveryDetalheCache'
 
 /** Valor sentinela do Select para "sem taxa" (Radix não aceita value vazio). */
 const SEM_TAXA = '__sem_taxa__'
+
+/** Valor sentinela do Select para "Nenhum" entregador (remove o vínculo). */
+const SEM_ENTREGADOR = '__sem_entregador__'
 
 interface AtribuirEntregadorKanbanPainelProps {
   open: boolean
   venda: Venda | null
   entregadorVinculadoId?: string | null
   onClose: () => void
-  onSalvo: (vendaId: string, entregadorId: string) => void
+  onSalvo: (vendaId: string, entregadorId: string | null) => void
 }
 
 function extrairEntregadorIdDoPedidoDelivery(
@@ -74,12 +78,32 @@ function extrairEntregadorIdDoPedidoDelivery(
   return String(entregadorRaw ?? '').trim()
 }
 
+function extrairEntregadorResumoDoPedidoDelivery(
+  pedido: Record<string, unknown>
+): KanbanEntregadorCachePatch | null {
+  const raw = pedido.entregador
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const entregador = raw as Record<string, unknown>
+  const id = String(entregador.id ?? '').trim()
+  if (!id) return null
+  return {
+    id,
+    nome: entregador.nome != null ? String(entregador.nome) : null,
+    telefone: entregador.telefone != null ? String(entregador.telefone) : null,
+  }
+}
+
 async function buscarPedidoDeliveryKanban(
   vendaId: string,
-  token: string
+  token: string,
+  options?: { forcarAtualizacao?: boolean }
 ): Promise<Record<string, unknown> | null> {
-  const cached = obterPedidoDeliveryDetalheCache(vendaId)
-  if (cached) return cached
+  if (options?.forcarAtualizacao) {
+    invalidarPedidoDeliveryDetalheCache(vendaId)
+  } else {
+    const cached = obterPedidoDeliveryDetalheCache(vendaId)
+    if (cached) return cached
+  }
 
   const response = await fetch(`/api/delivery/pedidos/${encodeURIComponent(vendaId)}`, {
     headers: {
@@ -92,6 +116,19 @@ async function buscarPedidoDeliveryKanban(
   if (!response.ok) return null
   const pedidoRaw = await response.json()
   return salvarPedidoDeliveryDetalheCache(vendaId, pedidoRaw)
+}
+
+async function aplicarPedidoNoPainel(args: {
+  pedido: Record<string, unknown>
+  token: string
+  carregarTaxaEntrega: (pedido: Record<string, unknown>, token: string) => Promise<void>
+  setEntregadorId: (id: string) => void
+  setPedidoPago: (pago: boolean) => void
+}): Promise<void> {
+  const { pedido, token, carregarTaxaEntrega, setEntregadorId, setPedidoPago } = args
+  setPedidoPago(pedidoDeliveryEstaPago(pedido))
+  setEntregadorId(extrairEntregadorIdDoPedidoDelivery(pedido))
+  await carregarTaxaEntrega(pedido, token)
 }
 
 export function AtribuirEntregadorKanbanPainel({
@@ -156,16 +193,7 @@ export function AtribuirEntregadorKanbanPainel({
   const carregarTaxaEntrega = useCallback(
     async (pedido: Record<string, unknown>, token: string) => {
       const vendaData = adaptPedidoDeliveryToVendaGestorApiResponse(pedido)
-      const valorSync = resolverTaxaEntregaValorSync(vendaData)
-      if (valorSync > 0) {
-        setTaxaEntregaDetalhe({
-          taxaId: null,
-          nome: null,
-          valor: valorSync,
-        })
-      }
-
-      const taxaDetalhe = await resolverTaxaEntregaDetalheKanban(vendaData, token)
+      const taxaDetalhe = await resolverTaxaEntregaAtivaDetalheKanban(vendaData, token)
       setTaxaEntregaDetalhe(taxaDetalhe)
       setTaxaSelecionadaId(taxaDetalhe?.taxaId?.trim() || SEM_TAXA)
     },
@@ -181,30 +209,24 @@ export function AtribuirEntregadorKanbanPainel({
       return
     }
 
-    const entregadorDoCard = venda.entregador?.id?.trim()
-    const entregadorInicial =
-      entregadorVinculadoId?.trim() ||
-      entregadorDoCard ||
-      obterEntregadorKanbanCache(venda.id) ||
-      ''
-    setEntregadorId(entregadorInicial)
-
     if (venda.tabelaOrigem === 'venda_gestor') {
       setCarregandoTaxa(true)
       try {
-        const pedido =
-          obterPedidoDeliveryDetalheCache(venda.id) ??
-          (await buscarPedidoDeliveryKanban(venda.id, token))
+        const pedido = await buscarPedidoDeliveryKanban(venda.id, token, {
+          forcarAtualizacao: true,
+        })
 
         if (pedido) {
-          setPedidoPago(pedidoDeliveryEstaPago(pedido))
-          if (!entregadorInicial) {
-            const doPedido = extrairEntregadorIdDoPedidoDelivery(pedido)
-            if (doPedido) setEntregadorId(doPedido)
-          }
-          await carregarTaxaEntrega(pedido, token)
+          await aplicarPedidoNoPainel({
+            pedido,
+            token,
+            carregarTaxaEntrega,
+            setEntregadorId,
+            setPedidoPago,
+          })
         } else {
           setPedidoPago(false)
+          setEntregadorId('')
           setTaxaEntregaDetalhe(null)
           setTaxaSelecionadaId(SEM_TAXA)
         }
@@ -215,6 +237,14 @@ export function AtribuirEntregadorKanbanPainel({
       }
       return
     }
+
+    const entregadorDoCard = venda.entregador?.id?.trim()
+    const entregadorInicial =
+      entregadorVinculadoId?.trim() ||
+      entregadorDoCard ||
+      obterEntregadorKanbanCache(venda.id) ||
+      ''
+    setEntregadorId(entregadorInicial)
 
     if (!entregadorInicial) {
       try {
@@ -268,8 +298,6 @@ export function AtribuirEntregadorKanbanPainel({
       const { atualizado, pedido } = await salvarTaxaPedidoDeliveryUseCase.execute({
         pedidoId: venda.id,
         token,
-        taxaAtualId: taxaEntregaDetalhe?.taxaId ?? null,
-        taxaAtualValor: taxaEntregaDetalhe?.valor ?? 0,
         taxaSelecionadaId: selecionadaId,
         taxaSelecionadaValor: selecionadaValor,
       })
@@ -279,15 +307,21 @@ export function AtribuirEntregadorKanbanPainel({
         return
       }
 
-      salvarPedidoDeliveryDetalheCache(venda.id, pedido)
-      const valorFinalNum = Number((pedido as Record<string, unknown>).valorFinal)
+      invalidarPedidoKanbanQuickViewCache(venda.id)
+      const pedidoAtualizado =
+        (await buscarPedidoDeliveryKanban(venda.id, token, { forcarAtualizacao: true })) ?? pedido
+      const valorFinalNum = Number(pedidoAtualizado.valorFinal)
       patchVendaDeliveryKanbanColumnCaches(queryClient, venda.id, {
         valorFinal: Number.isFinite(valorFinalNum) ? valorFinalNum : undefined,
-        statusFinanceiro: extrairStatusFinanceiroPedidoDelivery(pedido),
+        statusFinanceiro: extrairStatusFinanceiroPedidoDelivery(pedidoAtualizado),
       })
-      invalidarPedidoKanbanQuickViewCache(venda.id)
-      setPedidoPago(pedidoDeliveryEstaPago(pedido))
-      await carregarTaxaEntrega(pedido, token)
+      await aplicarPedidoNoPainel({
+        pedido: pedidoAtualizado,
+        token,
+        carregarTaxaEntrega,
+        setEntregadorId,
+        setPedidoPago,
+      })
       showToast.success('Taxa atualizada.')
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : 'Erro ao salvar taxa')
@@ -303,11 +337,7 @@ export function AtribuirEntregadorKanbanPainel({
       return
     }
 
-    const entregadorSelecionado = entregadorId.trim()
-    if (!entregadorSelecionado) {
-      showToast.error('Selecione um entregador.')
-      return
-    }
+    const entregadorSelecionado = entregadorId.trim() || null
 
     const token = auth?.getAccessToken()
     if (!token) {
@@ -322,11 +352,38 @@ export function AtribuirEntregadorKanbanPainel({
         entregadorId: entregadorSelecionado,
         token,
       })
-      showToast.success('Entregador vinculado ao pedido.')
+
+      invalidarPedidoKanbanQuickViewCache(venda.id)
+      const pedidoAtualizado = await buscarPedidoDeliveryKanban(venda.id, token, {
+        forcarAtualizacao: true,
+      })
+
+      if (pedidoAtualizado) {
+        patchVendaDeliveryKanbanColumnCaches(queryClient, venda.id, {
+          entregador: extrairEntregadorResumoDoPedidoDelivery(pedidoAtualizado),
+        })
+        await aplicarPedidoNoPainel({
+          pedido: pedidoAtualizado,
+          token,
+          carregarTaxaEntrega,
+          setEntregadorId,
+          setPedidoPago,
+        })
+      }
+
+      showToast.success(
+        entregadorSelecionado ? 'Entregador vinculado ao pedido.' : 'Entregador removido do pedido.'
+      )
       onSalvo(venda.id, entregadorSelecionado)
       onClose()
     } catch (error) {
-      showToast.error(error instanceof Error ? error.message : 'Erro ao vincular entregador')
+      showToast.error(
+        error instanceof Error
+          ? error.message
+          : entregadorSelecionado
+            ? 'Erro ao vincular entregador'
+            : 'Erro ao remover entregador'
+      )
     } finally {
       setSalvando(false)
     }
@@ -404,8 +461,10 @@ export function AtribuirEntregadorKanbanPainel({
                 Entregador *
               </Label>
               <Select
-                value={entregadorId || undefined}
-                onValueChange={setEntregadorId}
+                value={entregadorId || SEM_ENTREGADOR}
+                onValueChange={valor =>
+                  setEntregadorId(valor === SEM_ENTREGADOR ? '' : valor)
+                }
                 disabled={entregadoresQuery.isLoading}
               >
                 <SelectTrigger className="border-primary/30 bg-white">
@@ -418,6 +477,7 @@ export function AtribuirEntregadorKanbanPainel({
                   />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value={SEM_ENTREGADOR}>Nenhum</SelectItem>
                   {entregadores.map(entregador => (
                     <SelectItem key={entregador.id} value={entregador.id}>
                       {entregador.nome}

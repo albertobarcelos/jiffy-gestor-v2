@@ -3,16 +3,13 @@ import { novoPedidoReadRepository } from '@/src/infrastructure/api/repositories/
 import {
   buildSalvarTaxaPedidoDeliveryPatch,
   extrairCobrancasPendentesNaEntregaPedidoDelivery,
+  extrairTaxaEntregaAtivaPedidoDelivery,
   pedidoDeliveryEstaPago,
 } from '@/src/application/mappers/TaxaPedidoDeliveryPayloadMapper'
 
 export interface SalvarTaxaPedidoDeliveryInput {
   pedidoId: string
   token: string
-  /** `taxaId` do catálogo atualmente aplicada (null quando não há taxa). */
-  taxaAtualId: string | null
-  /** Valor da taxa atual (0 quando não há taxa). */
-  taxaAtualValor: number
   /** `taxaId` do catálogo escolhida (null = remover/sem taxa). */
   taxaSelecionadaId: string | null
   /** Valor da taxa escolhida (0 quando "sem taxa"). */
@@ -28,17 +25,12 @@ export interface SalvarTaxaPedidoDeliveryResult {
  * Salva a taxa de entrega de um pedido delivery (independente do entregador) e,
  * quando há cobrança pendente `na_entrega`, reemite-a com o valor ajustado.
  *
- * Regras:
- * - Pedido já pago → bloqueia (não altera/adiciona taxa).
- * - Taxa atual não identificada no catálogo (sem `taxaId`) mas com valor → bloqueia,
- *   pois não há como removê-la com segurança.
- * - Mais de uma cobrança pendente → bloqueia (ajuste manual via fluxo de pagamento).
+ * A taxa atual é sempre lida do GET fresco do pedido (taxas ativas), nunca do estado da UI.
  */
 export class SalvarTaxaPedidoDeliveryUseCase {
   constructor(private readonly repo: INovoPedidoReadRepository = novoPedidoReadRepository) {}
 
   async execute(input: SalvarTaxaPedidoDeliveryInput): Promise<SalvarTaxaPedidoDeliveryResult> {
-    const taxaAtual = input.taxaAtualId?.trim() || null
     const taxaSelecionada = input.taxaSelecionadaId?.trim() || null
 
     const pedido = await this.repo.buscarPedidoDelivery(input.pedidoId, input.token)
@@ -47,14 +39,11 @@ export class SalvarTaxaPedidoDeliveryUseCase {
       throw new Error('Pedido já pago: não é possível alterar ou adicionar a taxa.')
     }
 
+    const { taxaId: taxaAtual, valor: taxaAtualValor } =
+      extrairTaxaEntregaAtivaPedidoDelivery(pedido)
+
     if (taxaAtual === taxaSelecionada) {
       return { atualizado: false, pedido }
-    }
-
-    if (!taxaAtual && input.taxaAtualValor > 0) {
-      throw new Error(
-        'Não foi possível identificar a taxa atual deste pedido. Ajuste pela edição do pedido.'
-      )
     }
 
     const cobrancasPendentesNaEntrega = extrairCobrancasPendentesNaEntregaPedidoDelivery(pedido)
@@ -66,7 +55,7 @@ export class SalvarTaxaPedidoDeliveryUseCase {
 
     const { patch, mudou } = buildSalvarTaxaPedidoDeliveryPatch({
       taxaAtualId: taxaAtual,
-      taxaAtualValor: input.taxaAtualValor,
+      taxaAtualValor,
       taxaSelecionadaId: taxaSelecionada,
       taxaSelecionadaValor: input.taxaSelecionadaValor,
       cobrancasPendentesNaEntrega,

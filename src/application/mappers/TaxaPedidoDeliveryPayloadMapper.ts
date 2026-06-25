@@ -3,6 +3,49 @@ import type {
   SalvarTaxaPedidoDeliveryApi,
   TaxaPedidoDeliveryApi,
 } from '@/src/application/dto/api/pedidoDeliveryApi'
+import {
+  extrairTaxaEntregaIdDaVenda,
+  taxaLancadaPedidoEstaAtiva,
+} from '@/src/application/mappers/VendaDetalheMapper'
+
+/** Taxa de entrega ativa no pedido — fonte de verdade para o PATCH (ignora removidas). */
+export interface TaxaEntregaAtivaPedidoRef {
+  taxaId: string | null
+  valor: number
+}
+
+function parseNumeroTaxa(raw: unknown): number | null {
+  if (raw == null || raw === '') return null
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : null
+}
+
+export function extrairTaxaEntregaAtivaPedidoDelivery(
+  pedido: Record<string, unknown>
+): TaxaEntregaAtivaPedidoRef {
+  const taxaId = extrairTaxaEntregaIdDaVenda(pedido)
+  if (!taxaId) return { taxaId: null, valor: 0 }
+
+  const taxas = Array.isArray(pedido.taxasLancadas) ? pedido.taxasLancadas : []
+  let candidata: Record<string, unknown> | null = null
+
+  for (const raw of taxas) {
+    if (!raw || typeof raw !== 'object') continue
+    const taxa = raw as Record<string, unknown>
+    if (!taxaLancadaPedidoEstaAtiva(taxa)) continue
+    if (String(taxa.taxaId ?? taxa.taxa_id ?? '').trim() !== taxaId) continue
+    candidata = taxa
+    break
+  }
+
+  const valor =
+    parseNumeroTaxa(candidata?.valorCalculado) ??
+    parseNumeroTaxa(candidata?.valorAplicado) ??
+    parseNumeroTaxa(candidata?.valor) ??
+    0
+
+  return { taxaId, valor: valor > 0 ? valor : 0 }
+}
 
 /** Cobrança pendente `na_entrega` resumida — usada para reemitir com o novo valor. */
 export interface CobrancaPendenteNaEntregaRef {

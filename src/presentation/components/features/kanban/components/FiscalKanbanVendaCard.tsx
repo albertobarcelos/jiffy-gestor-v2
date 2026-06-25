@@ -67,7 +67,7 @@ interface FiscalKanbanVendaCardProps {
   /** Modo delivery: reimprime cupom (mesmo layout da automática). */
   onReimprimirCupomDelivery?: (venda: Venda, colunaAtual: ColunaKanbanId) => void
   entregadorVinculadoId?: string | null
-  onEntregadorAtualizado?: (vendaId: string, entregadorId: string) => void
+  onEntregadorAtualizado?: (vendaId: string, entregadorId: string | null) => void
   /** Confirma cobrança pendente direto no card (coluna Em Rota). */
   onConfirmarCobranca?: (venda: Venda) => void
   confirmandoCobrancaIds?: Record<string, boolean>
@@ -680,6 +680,7 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
 
       {exibirAtribuirEntregador && (
         <AtribuirEntregadorKanbanPainel
+          key={atribuirEntregadorOpen ? `atribuir-entregador-${venda.id}` : 'atribuir-entregador-fechado'}
           open={atribuirEntregadorOpen}
           venda={venda}
           entregadorVinculadoId={entregadorVinculadoId}

@@ -126,10 +126,13 @@ export async function resolverEntregadorIdVendaKanban(args: {
 
 export async function salvarEntregadorPedidoDelivery(args: {
   vendaId: string
-  entregadorId: string
+  /** `null` remove o entregador do pedido (envia `entregadorId: null` no PATCH). */
+  entregadorId: string | null
   token: string
-}): Promise<void> {
+}): Promise<Record<string, unknown>> {
   const { vendaId, entregadorId, token } = args
+  const entregadorIdNormalizado = entregadorId?.trim() ? entregadorId.trim() : null
+
   const response = await fetch(`/api/delivery/pedidos/${encodeURIComponent(vendaId)}`, {
     method: 'PATCH',
     headers: {
@@ -137,7 +140,7 @@ export async function salvarEntregadorPedidoDelivery(args: {
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
-    body: JSON.stringify({ entregadorId }),
+    body: JSON.stringify({ entregadorId: entregadorIdNormalizado }),
   })
 
   if (!response.ok) {
@@ -145,19 +148,28 @@ export async function salvarEntregadorPedidoDelivery(args: {
     throw new Error(
       (errorData as { error?: string; message?: string }).error ||
         (errorData as { error?: string; message?: string }).message ||
-        'Erro ao vincular entregador'
+        (entregadorIdNormalizado ? 'Erro ao vincular entregador' : 'Erro ao remover entregador')
     )
   }
 
-  definirEntregadorKanbanCache(vendaId, entregadorId)
+  const pedidoRaw = await response.json().catch(() => ({}))
+  const pedido = salvarPedidoDeliveryDetalheCache(vendaId, pedidoRaw)
+
+  if (entregadorIdNormalizado) {
+    definirEntregadorKanbanCache(vendaId, entregadorIdNormalizado)
+  } else {
+    marcarEntregadorKanbanAusente(vendaId)
+  }
+
+  return pedido
 }
 
 /** @deprecated Use `salvarEntregadorPedidoDelivery` — mantido para compatibilidade de imports. */
 export async function salvarEntregadorVendaGestor(args: {
   vendaId: string
-  entregadorId: string
+  entregadorId: string | null
   token: string
-}): Promise<void> {
+}): Promise<Record<string, unknown>> {
   return salvarEntregadorPedidoDelivery(args)
 }
 

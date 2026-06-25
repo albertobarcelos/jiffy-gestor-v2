@@ -1610,7 +1610,14 @@ export function FiscalFlowKanban() {
                         entregadorPorVendaId[venda.id] ?? venda.entregador?.id ?? null
                       }
                       onEntregadorAtualizado={(vendaId, entregadorId) => {
-                        setEntregadorPorVendaId(prev => ({ ...prev, [vendaId]: entregadorId }))
+                        definirEntregadorKanbanCache(vendaId, entregadorId)
+                        setEntregadorPorVendaId(prev => {
+                          if (!entregadorId) {
+                            const { [vendaId]: _removido, ...resto } = prev
+                            return resto
+                          }
+                          return { ...prev, [vendaId]: entregadorId }
+                        })
                       }}
                       onConfirmarCobranca={
                         modoKanbanVendas === 'delivery'

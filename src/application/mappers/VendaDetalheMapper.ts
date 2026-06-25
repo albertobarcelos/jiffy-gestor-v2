@@ -199,17 +199,32 @@ function parseNumeroTaxa(raw: unknown): number | null {
   return Number.isFinite(n) ? n : null
 }
 
+/** Taxa lançada ainda ativa no pedido (ignora soft delete com `dataRemocao`). */
+export function taxaLancadaPedidoEstaAtiva(taxa: Record<string, unknown>): boolean {
+  if (taxa.ativa === false) return false
+  const status = String(taxa.status ?? '').trim().toLowerCase()
+  if (status === 'removida' || status === 'cancelada') return false
+  const dataRemocao = taxa.dataRemocao
+  if (dataRemocao != null && String(dataRemocao).trim() !== '') return false
+  const removidoPorId = taxa.removidoPorId
+  if (removidoPorId != null && String(removidoPorId).trim() !== '') return false
+  return true
+}
+
+function listarTaxasLancadasAtivas(vendaData: Record<string, unknown>): Record<string, unknown>[] {
+  const taxas = Array.isArray(vendaData.taxasLancadas) ? vendaData.taxasLancadas : []
+  return taxas.filter(
+    (raw): raw is Record<string, unknown> =>
+      raw != null && typeof raw === 'object' && taxaLancadaPedidoEstaAtiva(raw as Record<string, unknown>)
+  )
+}
+
 /** Obtém `taxaEntregaId` da raiz ou `taxasLancadas[].taxaId` (tipo entrega). */
 export function extrairTaxaEntregaIdDaVenda(vendaData: Record<string, unknown>): string | null {
-  const direto = String(vendaData.taxaEntregaId ?? '').trim()
-  if (direto) return direto
-
-  const taxas = Array.isArray(vendaData.taxasLancadas) ? vendaData.taxasLancadas : []
+  const taxasAtivas = listarTaxasLancadasAtivas(vendaData)
   let fallbackId: string | null = null
 
-  for (const raw of taxas) {
-    if (!raw || typeof raw !== 'object') continue
-    const taxa = raw as Record<string, unknown>
+  for (const taxa of taxasAtivas) {
     const taxaId = String(taxa.taxaId ?? taxa.taxa_id ?? '').trim()
     if (!taxaId) continue
 
@@ -220,13 +235,16 @@ export function extrairTaxaEntregaIdDaVenda(vendaData: Record<string, unknown>):
     if (!fallbackId) fallbackId = taxaId
   }
 
-  return fallbackId
+  if (fallbackId) return fallbackId
+
+  const direto = String(vendaData.taxaEntregaId ?? '').trim()
+  return taxasAtivas.length > 0 && direto ? direto : null
 }
 
 function mapTaxaEntregaSnapshotFromVenda(
   vendaData: Record<string, unknown>
 ): TaxaEntregaDetalhe | null {
-  const taxas = Array.isArray(vendaData.taxasLancadas) ? vendaData.taxasLancadas : []
+  const taxas = listarTaxasLancadasAtivas(vendaData)
   const valorRaiz = parseNumeroTaxa(vendaData.taxaEntregaValor)
 
   let candidata: Record<string, unknown> | null = null
@@ -529,6 +547,20 @@ export function resolverTaxaEntregaValorSync(
   if (taxaEntregaTemValor(inferida)) return Number(inferida!.valor)
 
   return 0
+}
+
+/**
+ * Resolve taxa de entrega **ativa** no pedido (somente `taxasLancadas` não removidas).
+ * Não infere taxa por diferença de totais — evita "fantasma" após remoção via PATCH.
+ */
+export async function resolverTaxaEntregaAtivaDetalheKanban(
+  vendaData: Record<string, unknown>,
+  token: string
+): Promise<TaxaEntregaDetalhe | null> {
+  const snapshot = mapTaxaEntregaSnapshotFromVenda(vendaData)
+  if (!snapshot?.taxaId?.trim() || !taxaEntregaTemValor(snapshot)) return null
+  if (snapshot.nome?.trim()) return snapshot
+  return enrichTaxaEntregaDetalhe(vendaData, token)
 }
 
 export function formatarTaxaEntregaDetalheExibicao(
