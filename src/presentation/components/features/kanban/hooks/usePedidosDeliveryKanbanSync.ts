@@ -18,7 +18,6 @@
  */
 
 import { useRef, useEffect, useMemo, useCallback } from 'react'
-import { startOfDay } from 'date-fns'
 import {
   keepPreviousData,
   useInfiniteQuery,
@@ -79,20 +78,21 @@ function itemModificadoDesde(item: VendaUnificadaDTO, desdeIso: string): boolean
   return mod >= desde
 }
 
-/** Params para listar finalizados na carga inicial (com filtro de data quando definido na toolbar). */
+/** Params para listar finalizados na carga inicial (com filtro de período quando ativo na toolbar). */
 function paramsFinalizadosCargaInicialKanban(
-  params: PedidosDeliveryInfiniteParams
+  params: PedidosDeliveryInfiniteParams,
+  enviarFiltroFinalizacaoNaApi?: boolean
 ): PedidosDeliveryInfiniteParams {
   const base = paramsApiOperacionaisDeliveryKanban(params)
-  const temFiltroFinalizacao = Boolean(params.dataFinalizacaoInicio || params.dataFinalizacaoFim)
+  const temFiltroFinalizacao =
+    enviarFiltroFinalizacaoNaApi &&
+    Boolean(params.dataFinalizacaoInicio || params.dataFinalizacaoFim)
 
   return {
     ...base,
     statusDelivery: 'FINALIZADO',
     cancelado: false,
-    dataFinalizacaoInicio: temFiltroFinalizacao
-      ? params.dataFinalizacaoInicio
-      : startOfDay(new Date()).toISOString(),
+    dataFinalizacaoInicio: temFiltroFinalizacao ? params.dataFinalizacaoInicio : undefined,
     dataFinalizacaoFim: temFiltroFinalizacao ? params.dataFinalizacaoFim : undefined,
   }
 }

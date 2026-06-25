@@ -1,4 +1,3 @@
-import { startOfDay } from 'date-fns'
 import type { StatusDeliveryApi } from '@/src/application/dto/api/pedidoDeliveryApi'
 import type { ColunaKanbanId } from '../types'
 import type { PedidosDeliveryInfiniteParams } from '../hooks/usePedidosDeliveryInfinite'
@@ -14,10 +13,17 @@ export const DELIVERY_KANBAN_COLUMN_IDS: ColunaKanbanId[] = [
   'COM_NFE',
 ]
 
-/** Params de coluna operacional — sem datas de finalização; criação conforme período ativo na consulta. */
+export interface PedidosDeliveryKanbanColumnFilterOptions {
+  /** Envia `dataCriacaoInicial/Final` na API (colunas operacionais). */
+  enviarFiltroCriacaoNaApi?: boolean
+  /** Envia `dataFinalizacaoInicial/Final` na API (colunas fiscais). */
+  enviarFiltroFinalizacaoNaApi?: boolean
+}
+
+/** Colunas operacionais — sem datas de finalização; criação conforme período ativo na consulta. */
 export function paramsOperacionaisDeliveryKanbanColumn(
   params: PedidosDeliveryInfiniteParams,
-  options?: { enviarFiltroCriacaoNaApi?: boolean }
+  options?: Pick<PedidosDeliveryKanbanColumnFilterOptions, 'enviarFiltroCriacaoNaApi'>
 ): PedidosDeliveryInfiniteParams {
   const {
     dataFinalizacaoInicio: _fi,
@@ -45,18 +51,20 @@ export function paramsApiOperacionaisDeliveryKanban(
 
 function paramsFinalizadosKanbanColumn(
   params: PedidosDeliveryInfiniteParams,
-  options?: { enviarFiltroCriacaoNaApi?: boolean }
+  options?: Pick<PedidosDeliveryKanbanColumnFilterOptions, 'enviarFiltroFinalizacaoNaApi'>
 ): PedidosDeliveryInfiniteParams {
-  const base = paramsOperacionaisDeliveryKanbanColumn(params, options)
-  const temFiltroFinalizacao = Boolean(params.dataFinalizacaoInicio || params.dataFinalizacaoFim)
+  const base = paramsOperacionaisDeliveryKanbanColumn(params, {
+    enviarFiltroCriacaoNaApi: false,
+  })
+  const temFiltroFinalizacao =
+    options?.enviarFiltroFinalizacaoNaApi &&
+    Boolean(params.dataFinalizacaoInicio || params.dataFinalizacaoFim)
 
   return {
     ...base,
     statusDelivery: 'FINALIZADO',
     cancelado: false,
-    dataFinalizacaoInicio: temFiltroFinalizacao
-      ? params.dataFinalizacaoInicio
-      : startOfDay(new Date()).toISOString(),
+    dataFinalizacaoInicio: temFiltroFinalizacao ? params.dataFinalizacaoInicio : undefined,
     dataFinalizacaoFim: temFiltroFinalizacao ? params.dataFinalizacaoFim : undefined,
   }
 }
@@ -72,7 +80,7 @@ const STATUS_POR_COLUNA_OPERACIONAL: Partial<Record<ColunaKanbanId, StatusDelive
 export function buildPedidosDeliveryParamsForKanbanColumn(
   columnId: ColunaKanbanId,
   params: PedidosDeliveryInfiniteParams,
-  options?: { enviarFiltroCriacaoNaApi?: boolean }
+  options?: PedidosDeliveryKanbanColumnFilterOptions
 ): PedidosDeliveryInfiniteParams {
   if (columnId === 'FINALIZADAS' || columnId === 'COM_NFE') {
     return paramsFinalizadosKanbanColumn(params, options)

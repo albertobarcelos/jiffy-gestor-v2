@@ -30,16 +30,20 @@ import { showToast } from '@/src/shared/utils/toast'
 import {
   formatarTaxaEntregaDetalheExibicao,
   resolverTaxaEntregaDetalheKanban,
+  resolverTaxaEntregaValorSync,
 } from '@/src/application/mappers/VendaDetalheMapper'
-import type {
-  TaxaEntregaDetalhe,
-  UsuarioPdvEntregadorOption,
-} from '@/src/domain/types/vendaDetalhe'
+import type { TaxaEntregaDetalhe } from '@/src/domain/types/vendaDetalhe'
+import type { UsuarioPdvEntregadorOption } from '@/src/domain/types/vendaDetalhe'
 import {
+  obterEntregadorKanbanCache,
   resolverEntregadorIdVendaKanban,
   salvarEntregadorPedidoDelivery,
 } from './entregadorKanbanStore'
 import type { Venda } from '@/src/presentation/components/features/kanban/types'
+import {
+  obterPedidoDeliveryDetalheCache,
+  salvarPedidoDeliveryDetalheCache,
+} from '@/src/infrastructure/api/pedidoDeliveryDetalheCache'
 
 interface AtribuirEntregadorKanbanPainelProps {
   open: boolean
@@ -47,6 +51,36 @@ interface AtribuirEntregadorKanbanPainelProps {
   entregadorVinculadoId?: string | null
   onClose: () => void
   onSalvo: (vendaId: string, entregadorId: string) => void
+}
+
+function extrairEntregadorIdDoPedidoDelivery(
+  pedido: Record<string, unknown>
+): string {
+  const entregadorRaw =
+    pedido.entregador && typeof pedido.entregador === 'object'
+      ? (pedido.entregador as Record<string, unknown>).id
+      : pedido.entregadorId
+  return String(entregadorRaw ?? '').trim()
+}
+
+async function buscarPedidoDeliveryKanban(
+  vendaId: string,
+  token: string
+): Promise<Record<string, unknown> | null> {
+  const cached = obterPedidoDeliveryDetalheCache(vendaId)
+  if (cached) return cached
+
+  const response = await fetch(`/api/delivery/pedidos/${encodeURIComponent(vendaId)}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
+    },
+    cache: 'no-store',
+  })
+
+  if (!response.ok) return null
+  const pedidoRaw = await response.json()
+  return salvarPedidoDeliveryDetalheCache(vendaId, pedidoRaw)
 }
 
 export function AtribuirEntregadorKanbanPainel({
@@ -59,7 +93,7 @@ export function AtribuirEntregadorKanbanPainel({
   const { auth } = useAuthStore()
   const [entregadorId, setEntregadorId] = useState('')
   const [taxaEntregaDetalhe, setTaxaEntregaDetalhe] = useState<TaxaEntregaDetalhe | null>(null)
-  const [carregandoDados, setCarregandoDados] = useState(false)
+  const [carregandoTaxa, setCarregandoTaxa] = useState(false)
   const [salvando, setSalvando] = useState(false)
 
   const entregadoresQuery = useQuery({
@@ -76,6 +110,24 @@ export function AtribuirEntregadorKanbanPainel({
 
   const entregadores = entregadoresQuery.data ?? []
 
+  const carregarTaxaEntrega = useCallback(
+    async (pedido: Record<string, unknown>, token: string) => {
+      const vendaData = adaptPedidoDeliveryToVendaGestorApiResponse(pedido)
+      const valorSync = resolverTaxaEntregaValorSync(vendaData)
+      if (valorSync > 0) {
+        setTaxaEntregaDetalhe({
+          taxaId: null,
+          nome: null,
+          valor: valorSync,
+        })
+      }
+
+      const taxaDetalhe = await resolverTaxaEntregaDetalheKanban(vendaData, token)
+      setTaxaEntregaDetalhe(taxaDetalhe)
+    },
+    []
+  )
+
   const carregarDadosVenda = useCallback(async () => {
     if (!open || !venda) return
 
@@ -85,55 +137,57 @@ export function AtribuirEntregadorKanbanPainel({
       return
     }
 
-    setCarregandoDados(true)
-    try {
-      const entregadorDoCard = venda.entregador?.id?.trim()
-      const entregadorResolvido =
-        entregadorVinculadoId?.trim() ||
-        entregadorDoCard ||
-        (await resolverEntregadorIdVendaKanban({
-          vendaId: venda.id,
-          tabelaOrigem: venda.tabelaOrigem === 'venda_gestor' ? 'venda_gestor' : 'venda',
-          token,
-        })) ||
-        ''
+    const entregadorDoCard = venda.entregador?.id?.trim()
+    const entregadorInicial =
+      entregadorVinculadoId?.trim() ||
+      entregadorDoCard ||
+      obterEntregadorKanbanCache(venda.id) ||
+      ''
+    setEntregadorId(entregadorInicial)
 
-      setEntregadorId(entregadorResolvido)
+    if (venda.tabelaOrigem === 'venda_gestor') {
+      setCarregandoTaxa(true)
+      try {
+        const pedido =
+          obterPedidoDeliveryDetalheCache(venda.id) ??
+          (await buscarPedidoDeliveryKanban(venda.id, token))
 
-      if (venda.tabelaOrigem === 'venda_gestor' && !entregadorDoCard) {
-        const response = await fetch(
-          `/api/delivery/pedidos/${encodeURIComponent(venda.id)}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              Accept: 'application/json',
-            },
-            cache: 'no-store',
+        if (pedido) {
+          if (!entregadorInicial) {
+            const doPedido = extrairEntregadorIdDoPedidoDelivery(pedido)
+            if (doPedido) setEntregadorId(doPedido)
           }
-        )
-        if (response.ok) {
-          const pedidoRaw = await response.json()
-          const vendaData = adaptPedidoDeliveryToVendaGestorApiResponse(pedidoRaw)
-          const taxaDetalhe = await resolverTaxaEntregaDetalheKanban(vendaData, token)
-          setTaxaEntregaDetalhe(taxaDetalhe)
+          await carregarTaxaEntrega(pedido, token)
         } else {
           setTaxaEntregaDetalhe(null)
         }
-      } else {
-        setTaxaEntregaDetalhe(null)
+      } catch {
+        showToast.error('Erro ao carregar dados do pedido.')
+      } finally {
+        setCarregandoTaxa(false)
       }
-    } catch {
-      showToast.error('Erro ao carregar dados do pedido.')
-    } finally {
-      setCarregandoDados(false)
+      return
     }
-  }, [auth, entregadorVinculadoId, open, venda])
+
+    if (!entregadorInicial) {
+      try {
+        const resolvido = await resolverEntregadorIdVendaKanban({
+          vendaId: venda.id,
+          tabelaOrigem: 'venda',
+          token,
+        })
+        if (resolvido) setEntregadorId(resolvido)
+      } catch {
+        showToast.error('Erro ao carregar entregador do pedido.')
+      }
+    }
+  }, [auth, carregarTaxaEntrega, entregadorVinculadoId, open, venda])
 
   useEffect(() => {
     if (!open) {
       setEntregadorId('')
       setTaxaEntregaDetalhe(null)
-      setCarregandoDados(false)
+      setCarregandoTaxa(false)
       setSalvando(false)
       return
     }
@@ -242,52 +296,50 @@ export function AtribuirEntregadorKanbanPainel({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-          {carregandoDados ? (
-            <p className="text-sm text-secondary-text">Carregando...</p>
-          ) : (
-            <div className="space-y-4">
-              <div className="rounded-lg border border-primary/15 bg-white p-3">
-                <Label className="mb-2 block text-sm font-semibold text-primary-text">
-                  Entregador *
-                </Label>
-                <Select
-                  value={entregadorId || undefined}
-                  onValueChange={setEntregadorId}
-                  disabled={entregadoresQuery.isLoading}
-                >
-                  <SelectTrigger className="border-primary/30 bg-white">
-                    <SelectValue
-                      placeholder={
-                        entregadoresQuery.isLoading
-                          ? 'Carregando entregadores...'
-                          : 'Selecionar entregador'
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {entregadores.map(entregador => (
-                      <SelectItem key={entregador.id} value={entregador.id}>
-                        {entregador.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          <div className="space-y-4">
+            <div className="rounded-lg border border-primary/15 bg-white p-3">
+              <Label className="mb-2 block text-sm font-semibold text-primary-text">
+                Entregador *
+              </Label>
+              <Select
+                value={entregadorId || undefined}
+                onValueChange={setEntregadorId}
+                disabled={entregadoresQuery.isLoading}
+              >
+                <SelectTrigger className="border-primary/30 bg-white">
+                  <SelectValue
+                    placeholder={
+                      entregadoresQuery.isLoading
+                        ? 'Carregando entregadores...'
+                        : 'Selecionar entregador'
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {entregadores.map(entregador => (
+                    <SelectItem key={entregador.id} value={entregador.id}>
+                      {entregador.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-              <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-3">
-                <Label className="mb-1 block text-sm font-semibold text-primary-text">
-                  Taxa de entrega
-                </Label>
-                <p className="mb-2 text-[11px] text-secondary-text">
-                  Em breve será possível alterar a taxa por aqui. Por enquanto, defina na criação
-                  do pedido.
-                </p>
-                <div className="rounded-md border border-gray-200 bg-white px-3 py-2.5 text-sm text-primary-text opacity-90">
-                  {formatarTaxaEntregaDetalheExibicao(taxaEntregaDetalhe, transformarParaReal)}
-                </div>
+            <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-3">
+              <Label className="mb-1 block text-sm font-semibold text-primary-text">
+                Taxa de entrega
+              </Label>
+              <p className="mb-2 text-[11px] text-secondary-text">
+                Em breve será possível alterar a taxa por aqui. Por enquanto, defina na criação
+                do pedido.
+              </p>
+              <div className="rounded-md border border-gray-200 bg-white px-3 py-2.5 text-sm text-primary-text opacity-90">
+                {carregandoTaxa && !taxaEntregaDetalhe
+                  ? 'Carregando taxa...'
+                  : formatarTaxaEntregaDetalheExibicao(taxaEntregaDetalhe, transformarParaReal)}
               </div>
             </div>
-          )}
+          </div>
         </div>
 
         <div
@@ -313,7 +365,7 @@ export function AtribuirEntregadorKanbanPainel({
               variant="contained"
               color="primary"
               onClick={() => void handleSalvar()}
-              disabled={salvando || carregandoDados}
+              disabled={salvando || entregadoresQuery.isLoading}
               isLoading={salvando}
               className="h-12 min-h-12 w-full font-semibold shadow-none"
               sx={footerSavePrimaryBarSx(false)}

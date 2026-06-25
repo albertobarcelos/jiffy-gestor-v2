@@ -29,14 +29,10 @@ interface FiscalKanbanToolbarProps {
   terminais: { id: string; nome: string }[]
   isLoadingTerminais: boolean
   origemFilterDisabled?: boolean
-  criacaoPreset: KanbanFiltroDataPreset
-  onCriacaoPresetChange: (preset: KanbanFiltroDataPreset) => void
-  dataCriacaoInicio: Date | null
-  dataCriacaoFim: Date | null
-  finalizacaoPreset: KanbanFiltroDataPreset
-  onFinalizacaoPresetChange: (preset: KanbanFiltroDataPreset) => void
-  dataFinalizacaoInicio: Date | null
-  dataFinalizacaoFim: Date | null
+  periodoPreset: KanbanFiltroDataPreset
+  onPeriodoPresetChange: (preset: KanbanFiltroDataPreset) => void
+  periodoInicio: Date | null
+  periodoFim: Date | null
   onClearFilters: () => void
   modoKanbanVendas: ModoKanbanVendas
   onModoKanbanVendasChange: (value: ModoKanbanVendas) => void
@@ -176,14 +172,10 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
     terminais,
     isLoadingTerminais,
     origemFilterDisabled = false,
-    criacaoPreset,
-    onCriacaoPresetChange,
-    dataCriacaoInicio,
-    dataCriacaoFim,
-    finalizacaoPreset,
-    onFinalizacaoPresetChange,
-    dataFinalizacaoInicio,
-    dataFinalizacaoFim,
+    periodoPreset,
+    onPeriodoPresetChange,
+    periodoInicio,
+    periodoFim,
     onClearFilters,
     modoKanbanVendas,
     onModoKanbanVendasChange,
@@ -278,26 +270,12 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
         ) : null}
 
         <FiltroDataPresetSelect
-          labelId="kanban-filtro-finalizacao-label"
-          label="Data Finalização"
-          preset={finalizacaoPreset}
-          onPresetChange={onFinalizacaoPresetChange}
+          labelId="kanban-filtro-periodo-label"
+          label="Filtrar por Período"
+          preset={periodoPreset}
+          onPresetChange={onPeriodoPresetChange}
           periodoResumo={
-            dataFinalizacaoInicio && dataFinalizacaoFim
-              ? { inicio: dataFinalizacaoInicio, fim: dataFinalizacaoFim }
-              : null
-          }
-        />
-
-        <FiltroDataPresetSelect
-          labelId="kanban-filtro-criacao-label"
-          label="Data Criação"
-          preset={criacaoPreset}
-          onPresetChange={onCriacaoPresetChange}
-          periodoResumo={
-            dataCriacaoInicio && dataCriacaoFim
-              ? { inicio: dataCriacaoInicio, fim: dataCriacaoFim }
-              : null
+            periodoInicio && periodoFim ? { inicio: periodoInicio, fim: periodoFim } : null
           }
         />
 

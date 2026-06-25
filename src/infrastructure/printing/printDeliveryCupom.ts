@@ -31,7 +31,7 @@ function fallbackImprimirHtmlNoNavegador(html: string): PrintDeliveryCupomResult
         ok: false,
         metodo: 'browser',
         mensagem:
-          'Não foi possível abrir a janela de impressão. Permita pop-ups ou use o QZ Tray.',
+          'Não foi possível abrir a janela de impressão. Permita pop-ups ou verifique o serviço de impressão no computador.',
       }
     }
     janela.document.open()
@@ -124,7 +124,9 @@ export async function printDeliveryCupom(input: PrintDeliveryCupomInput): Promis
     return { ok: true, metodo: 'qz' }
   } catch (e) {
     const msg =
-      e instanceof Error ? e.message : 'QZ Tray não respondeu (instale/inicie o aplicativo no Windows).'
+      e instanceof Error
+        ? e.message
+        : 'Serviço de impressão não respondeu. Verifique se o aplicativo de impressão está instalado e em execução no Windows.'
     erroImpressao('printDeliveryCupom.qz_excecao', {
       mensagem: msg,
       stack: e instanceof Error ? e.stack?.slice(0, 600) : null,

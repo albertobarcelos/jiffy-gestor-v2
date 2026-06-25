@@ -49,8 +49,10 @@ export interface PedidosDeliveryInfiniteOptions {
   refetchIntervalMs?: number | false
   refetchOnWindowFocus?: boolean
   enabled?: boolean
-  /** Envia `dataCriacaoInicial/Final` na API quando o período de criação está ativo na consulta. */
+  /** Envia `dataCriacaoInicial/Final` na API quando o período está ativo (colunas operacionais). */
   enviarFiltroCriacaoNaApi?: boolean
+  /** Envia `dataFinalizacaoInicial/Final` na API quando o período está ativo (colunas fiscais). */
+  enviarFiltroFinalizacaoNaApi?: boolean
 }
 
 /** Converte filtros compartilhados do Kanban (unificado) para listagem delivery Jiffy. */

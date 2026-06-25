@@ -53,8 +53,14 @@ export function usePedidosDeliveryKanbanColumnInfinite(
     () =>
       buildPedidosDeliveryParamsForKanbanColumn(columnId, baseParams, {
         enviarFiltroCriacaoNaApi: options?.enviarFiltroCriacaoNaApi,
+        enviarFiltroFinalizacaoNaApi: options?.enviarFiltroFinalizacaoNaApi,
       }),
-    [columnId, baseParams, options?.enviarFiltroCriacaoNaApi]
+    [
+      columnId,
+      baseParams,
+      options?.enviarFiltroCriacaoNaApi,
+      options?.enviarFiltroFinalizacaoNaApi,
+    ]
   )
 
   const queryKey = pedidosDeliveryKanbanColumnQueryKey(columnId, columnParams, empresaId)

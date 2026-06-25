@@ -35,6 +35,7 @@ import { usePedidosDeliveryContagemPorStatus } from './hooks/usePedidosDeliveryC
 import { combinarContagensColunasDeliveryKanban } from './utils/kanbanDeliveryColumnCounts'
 import { useVendaIdsPdvPorTerminal } from '@/src/presentation/hooks/useVendaIdsPdvPorTerminal'
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
+import { useEntregadoresQuery } from '@/src/presentation/components/features/pedidos/hooks/data/useEntregadoresQuery'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import {
   MdReceipt,
@@ -140,44 +141,27 @@ export function FiscalFlowKanban() {
     searchInput,
     setSearchInput,
     searchQuery,
-    criacaoPreset,
-    dataCriacaoInicioConsulta,
-    dataCriacaoFimConsulta,
-    dataFinalizacaoInicio,
-    dataFinalizacaoFim,
-    finalizacaoPreset,
+    periodoPreset,
+    periodoInicioConsulta,
+    periodoFimConsulta,
     origemFilter,
     setOrigemFilter,
     filtrosVisiveisMobile,
     setFiltrosVisiveisMobile,
-    modalCriacaoDatasAberto,
-    setModalCriacaoDatasAberto,
-    rascunhoCriacaoRange,
-    mesCalendarioCriacao,
-    setMesCalendarioCriacao,
-    rascunhoHoraCriacaoInicio,
-    setRascunhoHoraCriacaoInicio,
-    rascunhoHoraCriacaoFim,
-    setRascunhoHoraCriacaoFim,
-    modalFinalizacaoDatasAberto,
-    setModalFinalizacaoDatasAberto,
-    rascunhoFinalizacaoRange,
-    mesCalendarioFinalizacao,
-    setMesCalendarioFinalizacao,
-    rascunhoHoraFinalizacaoInicio,
-    setRascunhoHoraFinalizacaoInicio,
-    rascunhoHoraFinalizacaoFim,
-    setRascunhoHoraFinalizacaoFim,
+    modalPeriodoDatasAberto,
+    setModalPeriodoDatasAberto,
+    rascunhoPeriodoRange,
+    mesCalendarioPeriodo,
+    setMesCalendarioPeriodo,
+    rascunhoHoraPeriodoInicio,
+    setRascunhoHoraPeriodoInicio,
+    rascunhoHoraPeriodoFim,
+    setRascunhoHoraPeriodoFim,
     vendasUnificadasQueryParams,
     handleClearFilters,
-    abrirModalCriacaoDatas,
-    handleRascunhoCriacaoRangeChange,
-    aplicarCriacaoDatas,
-    aplicarCriacaoPreset,
-    abrirModalFinalizacaoDatas,
-    handleRascunhoFinalizacaoRangeChange,
-    aplicarFinalizacaoDatas,
-    aplicarFinalizacaoPreset,
+    handleRascunhoPeriodoRangeChange,
+    aplicarPeriodoDatas,
+    aplicarPeriodoPreset,
   } = useFiscalKanbanFilters(timezoneAgregacao)
   const { auth } = useAuthStore()
   const hasKanbanToken = !!auth?.getAccessToken()
@@ -231,15 +215,25 @@ export function FiscalFlowKanban() {
 
   const isModoDeliveryKanban = modoKanbanVendas === 'delivery'
 
-  /** Envia `dataCriacao*` na API delivery quando o período de criação está ativo na consulta (inclui default "hoje"). */
+  /** Período unificado: criação nas colunas operacionais; finalização nas colunas fiscais. */
   const enviarFiltroCriacaoNaDeliveryApi = Boolean(
     vendasUnificadasQueryParams.dataCriacaoInicial || vendasUnificadasQueryParams.dataCriacaoFinal
+  )
+  const enviarFiltroFinalizacaoNaDeliveryApi = Boolean(
+    vendasUnificadasQueryParams.dataFinalizacaoInicio ||
+      vendasUnificadasQueryParams.dataFinalizacaoFim
   )
 
   const { data: meiosPagamentoInfiniteData } = useMeiosPagamentoInfinite({
     ativo: true,
     limit: 100,
     enabled: isModoDeliveryKanban,
+  })
+
+  /** Pré-carrega entregadores no cache React Query para o painel lateral do card. */
+  useEntregadoresQuery({
+    enabled: hasKanbanToken && isModoDeliveryKanban,
+    token: auth?.getAccessToken(),
   })
 
   const nomesMeiosPagamentoKanban = useMemo(() => {
@@ -415,11 +409,13 @@ export function FiscalFlowKanban() {
     refetchOnWindowFocus: isModoDeliveryKanban,
     getEtapaKanban: v => getEtapaKanbanParaExibicaoRef.current(v),
     enviarFiltroCriacaoNaApi: enviarFiltroCriacaoNaDeliveryApi,
+    enviarFiltroFinalizacaoNaApi: enviarFiltroFinalizacaoNaDeliveryApi,
   })
 
   const deliveryContagem = usePedidosDeliveryContagemPorStatus(pedidosDeliveryQueryParams, {
     enabled: hasKanbanToken && isModoDeliveryKanban,
     enviarFiltroCriacaoNaApi: enviarFiltroCriacaoNaDeliveryApi,
+    enviarFiltroFinalizacaoNaApi: enviarFiltroFinalizacaoNaDeliveryApi,
   })
 
   const isLoadingDelivery = deliveryKanban.isLoading
@@ -1471,14 +1467,10 @@ export function FiscalFlowKanban() {
         terminais={terminais}
         isLoadingTerminais={isLoadingTerminais}
         origemFilterDisabled={usaFiltroTerminal}
-        criacaoPreset={criacaoPreset}
-        onCriacaoPresetChange={aplicarCriacaoPreset}
-        dataCriacaoInicio={dataCriacaoInicioConsulta}
-        dataCriacaoFim={dataCriacaoFimConsulta}
-        finalizacaoPreset={finalizacaoPreset}
-        onFinalizacaoPresetChange={aplicarFinalizacaoPreset}
-        dataFinalizacaoInicio={dataFinalizacaoInicio}
-        dataFinalizacaoFim={dataFinalizacaoFim}
+        periodoPreset={periodoPreset}
+        onPeriodoPresetChange={aplicarPeriodoPreset}
+        periodoInicio={periodoInicioConsulta}
+        periodoFim={periodoFimConsulta}
         onClearFilters={handleClearFiltersComTerminal}
         modoKanbanVendas={modoKanbanVendas}
         onModoKanbanVendasChange={setModoKanbanVendas}
@@ -1494,16 +1486,16 @@ export function FiscalFlowKanban() {
       ) : null}
 
       <JiffySidePanelModal
-        open={modalCriacaoDatasAberto}
-        onClose={() => setModalCriacaoDatasAberto(false)}
-        title="Escolha o período de criação"
+        open={modalPeriodoDatasAberto}
+        onClose={() => setModalPeriodoDatasAberto(false)}
+        title="Escolha o período"
         panelClassName="!bg-[#f9fafb] w-[45vw] min-w-[260px] max-w-[min(100vw-1rem,95vw)] sm:min-w-[280px]"
         scrollableBody={false}
         footerSlot={
           <button
             type="button"
-            disabled={!rascunhoCriacaoRange?.from || !rascunhoCriacaoRange?.to}
-            onClick={aplicarCriacaoDatas}
+            disabled={!rascunhoPeriodoRange?.from || !rascunhoPeriodoRange?.to}
+            onClick={aplicarPeriodoDatas}
             className="rounded-b-l-lg font-nunito flex h-full w-full items-center justify-center bg-primary text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Aplicar
@@ -1514,52 +1506,16 @@ export function FiscalFlowKanban() {
           <FaturamentoRangeCalendar
             embutidoNoModal
             embutidoFundoClaro
-            range={rascunhoCriacaoRange}
-            onRangeChange={handleRascunhoCriacaoRangeChange}
-            month={mesCalendarioCriacao}
-            onMonthChange={setMesCalendarioCriacao}
+            range={rascunhoPeriodoRange}
+            onRangeChange={handleRascunhoPeriodoRangeChange}
+            month={mesCalendarioPeriodo}
+            onMonthChange={setMesCalendarioPeriodo}
             timeZoneEmpresa={timezoneAgregacao}
-            horaInicio={rascunhoHoraCriacaoInicio}
-            horaFim={rascunhoHoraCriacaoFim}
+            horaInicio={rascunhoHoraPeriodoInicio}
+            horaFim={rascunhoHoraPeriodoFim}
             onHorariosChange={(hi, hf) => {
-              setRascunhoHoraCriacaoInicio(hi)
-              setRascunhoHoraCriacaoFim(hf)
-            }}
-          />
-        </div>
-      </JiffySidePanelModal>
-
-      <JiffySidePanelModal
-        open={modalFinalizacaoDatasAberto}
-        onClose={() => setModalFinalizacaoDatasAberto(false)}
-        title="Escolha o período de finalização"
-        panelClassName="!bg-[#f9fafb] w-[45vw] min-w-[260px] max-w-[min(100vw-1rem,95vw)] sm:min-w-[280px]"
-        scrollableBody={false}
-        footerSlot={
-          <button
-            type="button"
-            disabled={!rascunhoFinalizacaoRange?.from || !rascunhoFinalizacaoRange?.to}
-            onClick={aplicarFinalizacaoDatas}
-            className="rounded-b-l-lg font-nunito flex h-full w-full items-center justify-center bg-primary text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Aplicar
-          </button>
-        }
-      >
-        <div className="flex min-h-0 w-full flex-1 flex-col items-stretch justify-start overflow-x-auto overflow-y-auto">
-          <FaturamentoRangeCalendar
-            embutidoNoModal
-            embutidoFundoClaro
-            range={rascunhoFinalizacaoRange}
-            onRangeChange={handleRascunhoFinalizacaoRangeChange}
-            month={mesCalendarioFinalizacao}
-            onMonthChange={setMesCalendarioFinalizacao}
-            timeZoneEmpresa={timezoneAgregacao}
-            horaInicio={rascunhoHoraFinalizacaoInicio}
-            horaFim={rascunhoHoraFinalizacaoFim}
-            onHorariosChange={(hi, hf) => {
-              setRascunhoHoraFinalizacaoInicio(hi)
-              setRascunhoHoraFinalizacaoFim(hf)
+              setRascunhoHoraPeriodoInicio(hi)
+              setRascunhoHoraPeriodoFim(hf)
             }}
           />
         </div>

@@ -207,6 +207,7 @@ export function usePedidosDeliveryKanbanColumns(
   const columnInfiniteOptions = {
     enabled,
     enviarFiltroCriacaoNaApi: options?.enviarFiltroCriacaoNaApi,
+    enviarFiltroFinalizacaoNaApi: options?.enviarFiltroFinalizacaoNaApi,
   }
 
   const novosQuery = usePedidosDeliveryKanbanColumnInfinite('NOVOS_PEDIDOS', params, columnInfiniteOptions)
@@ -234,11 +235,17 @@ export function usePedidosDeliveryKanbanColumns(
     for (const columnId of DELIVERY_KANBAN_COLUMN_IDS) {
       const columnParams = buildPedidosDeliveryParamsForKanbanColumn(columnId, params, {
         enviarFiltroCriacaoNaApi: options?.enviarFiltroCriacaoNaApi,
+        enviarFiltroFinalizacaoNaApi: options?.enviarFiltroFinalizacaoNaApi,
       })
       keys[columnId] = pedidosDeliveryKanbanColumnQueryKey(columnId, columnParams, empresaId)
     }
     return keys
-  }, [params, empresaId, options?.enviarFiltroCriacaoNaApi])
+  }, [
+    params,
+    empresaId,
+    options?.enviarFiltroCriacaoNaApi,
+    options?.enviarFiltroFinalizacaoNaApi,
+  ])
 
   const columnQueryKeysStr = useMemo(() => JSON.stringify(columnQueryKeys), [columnQueryKeys])
   const prevKeysStrRef = useRef(columnQueryKeysStr)

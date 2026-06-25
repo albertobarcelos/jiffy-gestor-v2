@@ -38,10 +38,10 @@ function montarFiltrosContagemOperacional(
 
 function montarFiltrosContagemFinalizados(
   params: PedidosDeliveryInfiniteParams,
-  enviarFiltroCriacaoNaApi?: boolean
+  enviarFiltroFinalizacaoNaApi?: boolean
 ): FiltrosKanbanParaPedidosDelivery {
   const finalizados = buildPedidosDeliveryParamsForKanbanColumn('FINALIZADAS', params, {
-    enviarFiltroCriacaoNaApi,
+    enviarFiltroFinalizacaoNaApi,
   })
   const { statusDelivery: _status, ...rest } = finalizados
   return { ...rest, cancelado: false }
@@ -109,6 +109,7 @@ export async function fetchPedidosDeliveryContagemPorStatus(
 export interface UsePedidosDeliveryContagemPorStatusOptions {
   enabled?: boolean
   enviarFiltroCriacaoNaApi?: boolean
+  enviarFiltroFinalizacaoNaApi?: boolean
 }
 
 /**
@@ -129,7 +130,7 @@ export function usePedidosDeliveryContagemPorStatus(
   )
   const filtrosFinalizados = montarFiltrosContagemFinalizados(
     params,
-    options?.enviarFiltroCriacaoNaApi
+    options?.enviarFiltroFinalizacaoNaApi
   )
 
   const results = useQueries({
