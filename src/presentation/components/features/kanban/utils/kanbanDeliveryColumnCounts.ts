@@ -2,6 +2,17 @@ import type { PedidosDeliveryContagemPorStatusResponse } from '@/src/application
 import type { ColunaKanbanId } from '../types'
 import type { VendaUnificadaDTO } from '../hooks/useVendasUnificadas'
 
+const COLUNAS_OPERACIONAIS_KANBAN: ColunaKanbanId[] = [
+  'NOVOS_PEDIDOS',
+  'EM_PREPARO',
+  'PRONTO_ENTREGA',
+  'EM_ROTA',
+]
+
+export type ColumnStatesContagemFallback = Partial<
+  Record<ColunaKanbanId, { totalCount?: number }>
+>
+
 /** Mapeia buckets operacionais da API para colunas do Kanban delivery. */
 export function mapContagemOperacionalParaColunas(
   data: PedidosDeliveryContagemPorStatusResponse
@@ -12,6 +23,22 @@ export function mapContagemOperacionalParaColunas(
     PRONTO_ENTREGA: data.PRONTO ?? 0,
     EM_ROTA: data.EM_ROTA ?? 0,
   }
+}
+
+/**
+ * Fallback enquanto `contagem-por-status` carrega: usa `count` da listagem paginada por coluna.
+ */
+export function mapContagemOperacionalFromListagemColunas(
+  columnStates: ColumnStatesContagemFallback
+): Partial<Record<ColunaKanbanId, number>> {
+  const counts: Partial<Record<ColunaKanbanId, number>> = {}
+  for (const columnId of COLUNAS_OPERACIONAIS_KANBAN) {
+    const total = columnStates[columnId]?.totalCount
+    if (typeof total === 'number') {
+      counts[columnId] = total
+    }
+  }
+  return counts
 }
 
 /**
@@ -55,12 +82,15 @@ export function combinarContagensColunasDeliveryKanban(
   finalizadoApiCount: number,
   poolItems: VendaUnificadaDTO[],
   getEtapaKanban: (v: VendaUnificadaDTO) => string,
-  hasNextPageFinalizados: boolean
+  hasNextPageFinalizados: boolean,
+  columnStatesFallback?: ColumnStatesContagemFallback
 ): Record<string, number> {
   const counts: Record<string, number> = {}
 
   if (operacional) {
     Object.assign(counts, mapContagemOperacionalParaColunas(operacional))
+  } else if (columnStatesFallback) {
+    Object.assign(counts, mapContagemOperacionalFromListagemColunas(columnStatesFallback))
   }
 
   const fiscal = derivarContagensColunasFiscaisKanban(

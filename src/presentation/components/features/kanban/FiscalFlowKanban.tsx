@@ -697,18 +697,25 @@ export function FiscalFlowKanban() {
     const finalizadasState = deliveryKanban.columnStates.FINALIZADAS
     const { items: poolFinalizados } = flattenPedidosDeliveryInfinite(finalizadasState?.data)
 
+    const finalizadoTotal = Math.max(
+      deliveryContagem.finalizadoTotal,
+      finalizadasState?.totalCount ?? 0
+    )
+
     return combinarContagensColunasDeliveryKanban(
       deliveryContagem.operacional,
-      deliveryContagem.finalizadoTotal,
+      finalizadoTotal,
       poolFinalizados,
       v => getEtapaKanbanParaExibicaoRef.current(v),
-      finalizadasState?.hasNextPage ?? false
+      finalizadasState?.hasNextPage ?? false,
+      deliveryKanban.columnStates
     )
   }, [
     isModoDeliveryKanban,
     deliveryContagem.operacional,
     deliveryContagem.finalizadoTotal,
     deliveryKanbanColumnStatesKey,
+    deliveryKanban.columnStates,
   ])
 
   const handleAtualizarListagem = useCallback(() => {
@@ -1198,12 +1205,19 @@ export function FiscalFlowKanban() {
 
   const getColumnTotalCount = useCallback(
     (columnId: ColunaKanbanId): number => {
-      if (isModoDeliveryKanban && deliveryColumnCounts[columnId] != null) {
-        return deliveryColumnCounts[columnId]
+      if (isModoDeliveryKanban) {
+        if (deliveryColumnCounts[columnId] != null) {
+          return deliveryColumnCounts[columnId]
+        }
+        const listApiTotal = deliveryKanban.columnStates[columnId]?.totalCount
+        if (typeof listApiTotal === 'number') {
+          return listApiTotal
+        }
+        return 0
       }
       return vendasPorColuna[columnId]?.length ?? 0
     },
-    [isModoDeliveryKanban, deliveryColumnCounts, vendasPorColuna]
+    [isModoDeliveryKanban, deliveryColumnCounts, deliveryKanban.columnStates, vendasPorColuna]
   )
 
   // Colunas fixas do Kanban (entrega → fiscal)

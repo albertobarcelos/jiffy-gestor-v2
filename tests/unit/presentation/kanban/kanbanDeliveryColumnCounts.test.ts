@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   combinarContagensColunasDeliveryKanban,
   derivarContagensColunasFiscaisKanban,
+  mapContagemOperacionalFromListagemColunas,
   mapContagemOperacionalParaColunas,
 } from '@/src/presentation/components/features/kanban/utils/kanbanDeliveryColumnCounts'
 import { VendaUnificadaDTO } from '@/src/presentation/components/features/kanban/hooks/useVendasUnificadas'
@@ -57,7 +58,42 @@ describe('derivarContagensColunasFiscaisKanban', () => {
   })
 })
 
+describe('mapContagemOperacionalFromListagemColunas', () => {
+  it('usa totalCount da listagem paginada por coluna', () => {
+    expect(
+      mapContagemOperacionalFromListagemColunas({
+        NOVOS_PEDIDOS: { totalCount: 42 },
+        EM_PREPARO: { totalCount: 7 },
+      })
+    ).toEqual({
+      NOVOS_PEDIDOS: 42,
+      EM_PREPARO: 7,
+    })
+  })
+})
+
 describe('combinarContagensColunasDeliveryKanban', () => {
+  it('usa fallback da listagem quando contagem operacional ainda não chegou', () => {
+    const counts = combinarContagensColunasDeliveryKanban(
+      undefined,
+      0,
+      [],
+      v => v.getEtapaKanban(),
+      false,
+      {
+        NOVOS_PEDIDOS: { totalCount: 42 },
+        EM_PREPARO: { totalCount: 7 },
+      }
+    )
+
+    expect(counts).toEqual({
+      NOVOS_PEDIDOS: 42,
+      EM_PREPARO: 7,
+      FINALIZADAS: 0,
+      COM_NFE: 0,
+    })
+  })
+
   it('combina operacional e fiscal', () => {
     const counts = combinarContagensColunasDeliveryKanban(
       contagemOperacional,

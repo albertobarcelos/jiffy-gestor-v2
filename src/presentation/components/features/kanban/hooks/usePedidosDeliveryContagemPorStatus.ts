@@ -1,6 +1,6 @@
 'use client'
 
-import { useQueries } from '@tanstack/react-query'
+import { keepPreviousData, useQueries } from '@tanstack/react-query'
 import type { FiltrosKanbanParaPedidosDelivery } from '@/src/application/dto/api/pedidoDeliveryListQuery'
 import { montarPedidosDeliveryContagemQueryString } from '@/src/application/dto/api/pedidoDeliveryListQuery'
 import {
@@ -140,6 +140,7 @@ export function usePedidosDeliveryContagemPorStatus(
         queryFn: ({ signal }) =>
           fetchPedidosDeliveryContagemPorStatus(filtrosOperacional, token!, signal),
         enabled,
+        placeholderData: keepPreviousData,
         staleTime: 30_000,
         gcTime: 5 * 60_000,
       },
@@ -148,6 +149,7 @@ export function usePedidosDeliveryContagemPorStatus(
         queryFn: ({ signal }) =>
           fetchPedidosDeliveryContagemPorStatus(filtrosFinalizados, token!, signal),
         enabled,
+        placeholderData: keepPreviousData,
         staleTime: 30_000,
         gcTime: 5 * 60_000,
       },
