@@ -104,18 +104,6 @@ function ordenarVinculadosPrimeiro<T extends { id: string; nome?: string }>(
   })
 }
 
-/**
- * Garante pelo menos um grupo de complementos vinculado ao produto.
- * Não há validação equivalente neste repositório na rota PATCH (`app/api/produtos/[id]`) —
- * o payload segue para o cardápio; convém confirmar no Swagger/API externa se lá existe regra.
- */
-function mensagemSeRemoverTodosGruposComplementos(idsPropostos: string[]): string | null {
-  if (idsPropostos.length === 0) {
-    return 'Não é possível remover todos os grupos de complementos. Mantenha pelo menos um grupo vinculado ao produto.'
-  }
-  return null
-}
-
 interface ComplementosMultiSelectDialogProps {
   open: boolean
   produtoId?: string
@@ -441,31 +429,46 @@ export function ComplementosMultiSelectDialog({
         return false
       }
 
-      const minMsg = mensagemSeRemoverTodosGruposComplementos(ids)
-      if (minMsg) {
-        showToast.error(minMsg)
-        return false
-      }
-
       const antesIds = options?.antesIdsSnapshot ?? groups.map(g => g.id)
+      const removedIds = antesIds.filter(id => !ids.includes(id))
+      const addedIds = ids.filter(id => !antesIds.includes(id))
 
       try {
-        const response = await fetch(`/api/produtos/${produtoId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ gruposComplementosIds: ids }),
-        })
+        if (ids.length === 0) {
+          // A API ignora PATCH com `gruposComplementosIds: []`, então removemos cada
+          // vínculo via DELETE para desvincular todos os grupos do produto.
+          const resultados = await Promise.allSettled(
+            removedIds.map(grupoId =>
+              fetch(`/api/produtos/${produtoId}/grupos-complementos/${grupoId}`, {
+                method: 'DELETE',
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              })
+            )
+          )
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.message || 'Erro ao atualizar grupos de complementos')
+          const algumFalhou = resultados.some(
+            r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok)
+          )
+          if (algumFalhou) {
+            throw new Error('Erro ao remover grupos de complementos')
+          }
+        } else {
+          const response = await fetch(`/api/produtos/${produtoId}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ gruposComplementosIds: ids }),
+          })
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            throw new Error(errorData.message || 'Erro ao atualizar grupos de complementos')
+          }
         }
-
-        const removedIds = antesIds.filter(id => !ids.includes(id))
-        const addedIds = ids.filter(id => !antesIds.includes(id))
 
         if (options?.optimisticPreApplied) {
           if (addedIds.length > 0) {
@@ -529,12 +532,6 @@ export function ComplementosMultiSelectDialog({
         ? [...sessionCatalogOrderRef.current]
         : null
       const newIds = antesIds.includes(id) ? antesIds.filter(x => x !== id) : [...antesIds, id]
-
-      const minMsg = mensagemSeRemoverTodosGruposComplementos(newIds)
-      if (minMsg) {
-        showToast.error(minMsg)
-        return
-      }
 
       const removedIds = antesIds.filter(x => !newIds.includes(x))
       const addedIds = newIds.filter(x => !antesIds.includes(x))
