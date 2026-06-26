@@ -1,4 +1,4 @@
-import { erroImpressao, logImpressao, warnImpressao } from '@/src/shared/utils/logImpressaoDelivery'
+import { logImpressao, warnImpressao } from '@/src/shared/utils/logImpressaoDelivery'
 import {
   loadQzTray,
   ensureQzWebsocketConnected,
@@ -127,7 +127,9 @@ export async function printDeliveryCupom(input: PrintDeliveryCupomInput): Promis
       e instanceof Error
         ? e.message
         : 'Serviço de impressão não respondeu. Verifique se o aplicativo de impressão está instalado e em execução no Windows.'
-    erroImpressao('printDeliveryCupom.qz_excecao', {
+    // Operacional/recuperável (QZ Tray ausente, impressora indisponível): cai no fallback do navegador.
+    // warn em vez de error evita poluir o painel "Issues" do Next.js com algo que não é bug de código.
+    warnImpressao('printDeliveryCupom.qz_excecao', {
       mensagem: msg,
       stack: e instanceof Error ? e.stack?.slice(0, 600) : null,
       impressora: nomeImpressora.slice(0, 80),

@@ -33,7 +33,10 @@ import { PedidoEntregaQuickViewPopover } from '../../delivery/kanban-panels/Pedi
 import { AtribuirEntregadorKanbanPainel } from '../../delivery/kanban-panels/AtribuirEntregadorKanbanPainel'
 import { ObservacaoPedidoKanbanPainel } from '../../delivery/kanban-panels/ObservacaoPedidoKanbanPainel'
 import { EnderecoEntregaPedidoKanbanPainel } from '../../delivery/kanban-panels/EnderecoEntregaPedidoKanbanPainel'
-import { deveExibirBotaoAlterarEnderecoEntregaKanban } from '../../delivery/kanban-panels/enderecoEntregaPedidoKanban'
+import {
+  deveExibirAcaoAlterarTipoPedidoKanban,
+  deveExibirBotaoAlterarEnderecoEntregaKanban,
+} from '../../delivery/kanban-panels/enderecoEntregaPedidoKanban'
 import type { ColunaKanbanId, KanbanColumn, Venda } from '../types'
 import {
   COLUNAS_ENTREGA_OPERACIONAIS,
@@ -179,6 +182,11 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
     venda,
     modoKanbanVendas
   )
+  const exibirAcaoAlterarTipoPedido = deveExibirAcaoAlterarTipoPedidoKanban(
+    colunaAtual,
+    venda,
+    modoKanbanVendas
+  )
   const exibirBotaoSalvarCobranca = deveExibirBotaoSalvarCobrancaKanban(
     colunaAtual,
     venda,
@@ -209,7 +217,7 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
       tipoVendaExibicao === 'entrega' ||
       tipoVendaExibicao === 'retirada')
 
-  const tipoVendaIconEl = exibirColunaTipoVenda ? (
+  const tipoVendaIconBase = exibirColunaTipoVenda ? (
     <TipoVendaIcon
       tipoVenda={tipoVendaExibicao as 'balcao' | 'mesa' | 'gestor' | 'entrega' | 'retirada'}
       numeroMesa={tipoVendaExibicao === 'mesa' ? venda.numeroMesa : undefined}
@@ -223,6 +231,26 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
       corBorda="var(--color-primary)"
     />
   ) : null
+
+  const tipoVendaIconEl =
+    tipoVendaIconBase && exibirAcaoAlterarTipoPedido ? (
+      <span
+        role="button"
+        tabIndex={0}
+        title="Clique duas vezes para alterar o tipo do pedido (entrega/retirada)"
+        aria-label="Alterar tipo do pedido (entrega ou retirada)"
+        className="cursor-pointer select-none"
+        onClick={e => e.stopPropagation()}
+        onDoubleClick={e => {
+          e.stopPropagation()
+          setEnderecoEntregaOpen(true)
+        }}
+      >
+        {tipoVendaIconBase}
+      </span>
+    ) : (
+      tipoVendaIconBase
+    )
 
   const previsaoEntregaKanbanBadge =
     exibirMetaDeliveryKanban && previsaoEntregaKanban ? (

@@ -7,7 +7,7 @@ import {
 import { warningRedundanteMapeamentoImpressoraWindows } from '@/src/application/delivery/deliveryTicketWarningUtils'
 import type { VendaGestorTicket, VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
 import { printDeliveryCupom } from '@/src/infrastructure/printing/printDeliveryCupom'
-import { erroImpressao, logImpressao, warnImpressao } from '@/src/shared/utils/logImpressaoDelivery'
+import { logImpressao, warnImpressao } from '@/src/shared/utils/logImpressaoDelivery'
 import type { DeliveryCupomTemplateConfig } from '@/src/shared/types/deliveryCupomTemplate'
 
 const AVISO_TEXTO: Record<string, string> = {
@@ -167,7 +167,8 @@ export async function imprimirTicketsApiGestor(params: {
     })
 
     if (!r.ok) {
-      erroImpressao('ticket.print_falhou', { metodo: r.metodo, mensagem: r.mensagem ?? null })
+      // Falha de impressão é operacional (impressora/serviço), não bug de código: warn não polui o painel "Issues".
+      warnImpressao('ticket.print_falhou', { metodo: r.metodo, mensagem: r.mensagem ?? null })
     }
 
     if (r.ok && r.mensagem) onMensagem?.(r.mensagem)

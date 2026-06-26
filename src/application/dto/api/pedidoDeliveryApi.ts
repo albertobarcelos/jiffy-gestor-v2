@@ -57,7 +57,10 @@ export interface UpdatePedidoEnderecoEntregaApi {
 
 export interface AtualizarPedidoDeliveryApiRequest {
   observacoes?: string[]
+  tipoEntrega?: TipoEntregaDeliveryApi
   enderecoEntrega?: UpdatePedidoEnderecoEntregaApi
+  taxas?: AtualizarTaxasPedidoDeliveryApi['taxas']
+  cobrancas?: AtualizarCobrancasPedidoDeliveryApi['cobrancas']
 }
 
 export interface ComplementoProdutoPedidoDeliveryApi {

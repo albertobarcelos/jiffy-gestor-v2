@@ -71,6 +71,7 @@ import type {
 import {
   COLUNAS_ENTREGA_OPERACIONAIS,
   COLUNAS_KANBAN_DESTINO_PIN,
+  dataOrdenacaoCardKanban,
   ordenarVendasKanbanPorCriterio,
   vendaBloqueadaParaEmissaoInterativa,
   vendaExigeEntregadorParaDespachar,
@@ -1073,7 +1074,8 @@ export function FiscalFlowKanban() {
       let ordenadas = ordenarVendasKanbanPorCriterio(
         Array.from(vendasUnicas.values()),
         criterio,
-        direcao
+        direcao,
+        v => dataOrdenacaoCardKanban(colId, v, timestampsEtapaEntregaLocal[v.id])
       )
 
       const pinId = primeiroPorColuna[columnId]
@@ -1083,6 +1085,18 @@ export function FiscalFlowKanban() {
           const [pinned] = ordenadas.splice(idx, 1)
           ordenadas = [pinned, ...ordenadas]
         }
+      }
+
+      // Card em transição otimista para esta coluna vai ao topo imediatamente: durante "Avançando..."
+      // a data ainda é a antiga, então sem isso ele entraria na posição da data anterior e só "subiria"
+      // após a API atualizar a data (efeito de movimento em 2 etapas).
+      const idsEmTransicao = new Set(
+        ordenadas.filter(v => etapaLocalPorVendaId[v.id] === colId).map(v => v.id)
+      )
+      if (idsEmTransicao.size > 0) {
+        const emTransicao = ordenadas.filter(v => idsEmTransicao.has(v.id))
+        const resto = ordenadas.filter(v => !idsEmTransicao.has(v.id))
+        ordenadas = [...emTransicao, ...resto]
       }
 
       return ordenadas
@@ -1098,6 +1112,11 @@ export function FiscalFlowKanban() {
             isColunaKanbanDeliveryFiscalSplit(columnId) &&
             !vendaPertenceColunaDeliveryKanban(v, columnId, getEtapaKanbanParaExibicao)
           ) {
+            return false
+          }
+          // Card em transição otimista sai da coluna de origem na hora (evita duplicata e dá feedback imediato de "mudou de coluna").
+          const etapaLocal = etapaLocalPorVendaId[v.id]
+          if (etapaLocal && etapaLocal !== columnId) {
             return false
           }
           return filtrarVendaDeliveryKanbanColunaPorDatasToolbar(
@@ -1196,6 +1215,7 @@ export function FiscalFlowKanban() {
     deliveryKanban.columnStates,
     getEtapaKanbanParaExibicao,
     etapaLocalPorVendaId,
+    timestampsEtapaEntregaLocal,
     todasVendasCarregadas,
     criterioOrdenacaoPorColuna,
     direcaoOrdenacaoPorColuna,

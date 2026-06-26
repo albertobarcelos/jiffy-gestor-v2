@@ -295,38 +295,51 @@ export function vendaSemNomeCliente(v: Venda): boolean {
  * Prioridade: data de finalização → data de emissão fiscal → data de criação.
  */
 export function ordenarVendasKanbanPorDataDesc(vendas: Venda[]): Venda[] {
-  const timestampOrdenacao = (v: Venda): number => {
-    const raw =
-      v.dataFinalizacao?.trim() || v.dataEmissaoFiscal?.trim() || v.dataCriacao?.trim() || ''
-    if (!raw) return 0
-    const ms = new Date(raw).getTime()
-    return Number.isFinite(ms) ? ms : 0
-  }
-  return [...vendas].sort((a, b) => {
-    const diff = timestampOrdenacao(b) - timestampOrdenacao(a)
-    if (diff !== 0) return diff
-    return b.id.localeCompare(a.id)
-  })
+  return ordenarVendasKanbanPorCriterio(vendas, 'data', 'desc')
+}
+
+function timestampDataOrdenacaoKanban(raw: string): number {
+  if (!raw) return 0
+  const ms = new Date(raw).getTime()
+  return Number.isFinite(ms) ? ms : 0
+}
+
+/** Data padrão (fallback) usada quando não há contexto de coluna: finalização → emissão fiscal → criação. */
+function dataOrdenacaoPadraoKanban(v: Venda): string {
+  return v.dataFinalizacao?.trim() || v.dataEmissaoFiscal?.trim() || v.dataCriacao?.trim() || ''
+}
+
+/**
+ * Data usada para ordenar o card na coluna, espelhando a data exibida no próprio card:
+ * - Novos pedidos → criação ("Recebido em")
+ * - Em preparo / Pronto / Em rota → entrada na etapa ("Na etapa desde", `dataUltimaModificacao`/transição local)
+ * - Demais colunas → finalização → emissão fiscal → criação
+ */
+export function dataOrdenacaoCardKanban(
+  columnId: ColunaKanbanId,
+  v: VendaUnificadaDTO,
+  isoLocalTransicao?: string
+): string {
+  const linha = getLinhaTempoPedidoEntregaKanban(columnId, v, isoLocalTransicao)
+  if (linha?.iso?.trim()) return linha.iso
+  return dataOrdenacaoPadraoKanban(v)
 }
 
 export function ordenarVendasKanbanPorCriterio(
   vendas: Venda[],
   criterio: CriterioOrdenacaoKanban,
-  direcao: DirecaoOrdenacaoKanban
+  direcao: DirecaoOrdenacaoKanban,
+  /** Resolve a data de ordenação por venda (alinhada ao card da coluna). Usado no critério 'data'. */
+  obterDataOrdenacao?: (v: Venda) => string
 ): Venda[] {
   if (criterio === 'data') {
-    if (direcao === 'desc') return ordenarVendasKanbanPorDataDesc(vendas)
+    const dataVenda = obterDataOrdenacao ?? dataOrdenacaoPadraoKanban
     return [...vendas].sort((a, b) => {
-      const timestampOrdenacao = (v: Venda): number => {
-        const raw =
-          v.dataFinalizacao?.trim() || v.dataEmissaoFiscal?.trim() || v.dataCriacao?.trim() || ''
-        if (!raw) return 0
-        const ms = new Date(raw).getTime()
-        return Number.isFinite(ms) ? ms : 0
-      }
-      const diff = timestampOrdenacao(a) - timestampOrdenacao(b)
+      const ta = timestampDataOrdenacaoKanban(dataVenda(a))
+      const tb = timestampDataOrdenacaoKanban(dataVenda(b))
+      const diff = direcao === 'desc' ? tb - ta : ta - tb
       if (diff !== 0) return diff
-      return a.id.localeCompare(b.id)
+      return direcao === 'desc' ? b.id.localeCompare(a.id) : a.id.localeCompare(b.id)
     })
   }
 
