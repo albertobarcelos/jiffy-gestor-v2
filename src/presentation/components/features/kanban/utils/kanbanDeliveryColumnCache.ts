@@ -8,7 +8,11 @@ import {
   extrairColumnIdDePedidosDeliveryKanbanQueryKey,
   vendaPertenceColunaDeliveryKanban,
 } from './kanbanDeliveryColumnConfig'
-import { cloneVendaUnificadaDTO } from './kanbanVendaCacheUpdate'
+import {
+  cloneVendaUnificadaDTO,
+  extrairPatchKanbanDeRespostaTransicao,
+  extrairVendaUnificadaDeRespostaDeliverySummary,
+} from './kanbanVendaCacheUpdate'
 import type { KanbanVendaCachePatch } from '@/src/application/dto/TransicaoKanbanDTO'
 
 function removerVendaDasPaginas(
@@ -147,4 +151,99 @@ export function patchVendaDeliveryKanbanColumnCaches(
 
   upsertVendaDeliveryKanbanColumnCaches(queryClient, vendaAtualizada)
   return true
+}
+
+/** Localiza um card em qualquer cache de coluna delivery (útil quando o patch não encontra o item). */
+export function encontrarVendaNasColunasDeliveryKanban(
+  queryClient: QueryClient,
+  vendaId: string
+): VendaUnificadaDTO | null {
+  const queries = queryClient.getQueriesData<InfiniteData<PedidosDeliveryInfinitePage>>({
+    queryKey: KANBAN_PEDIDOS_DELIVERY_INFINITE_QUERY_KEY,
+  })
+
+  for (const [, data] of queries) {
+    if (!data?.pages?.length) continue
+    for (const page of data.pages) {
+      const item = page.items.find(i => i.id === vendaId)
+      if (item) return item
+    }
+  }
+
+  return null
+}
+
+/** Status operacional (`statusDelivery`) esperado em cada coluna destino do Kanban. */
+const STATUS_OPERACIONAL_POR_COLUNA_DESTINO: Partial<Record<ColunaKanbanId, string>> = {
+  NOVOS_PEDIDOS: 'PENDENTE',
+  EM_PREPARO: 'EM_PREPARO',
+  PRONTO_ENTREGA: 'PRONTO',
+  EM_ROTA: 'EM_ROTA',
+  FINALIZADAS: 'FINALIZADO',
+}
+
+/**
+ * Garante que o patch carregue a etapa operacional do destino quando a resposta da transição
+ * não devolve `statusDelivery`. Sem isso, o card perde a etapa, `getEtapaKanban()` cai em `'ABERTA'`
+ * e o card é filtrado de todas as colunas (some até recarregar).
+ */
+function aplicarStatusDestinoNoPatch(
+  patch: KanbanVendaCachePatch,
+  colunaDestino?: ColunaKanbanId | null
+): KanbanVendaCachePatch {
+  if (!colunaDestino) return patch
+  if (String(patch.statusEtapaOperacional ?? '').trim()) return patch
+
+  const statusDestino = STATUS_OPERACIONAL_POR_COLUNA_DESTINO[colunaDestino]
+  if (!statusDestino) return patch
+
+  const ehFinalizado = statusDestino === 'FINALIZADO'
+  return {
+    ...patch,
+    statusEtapaOperacional: statusDestino,
+    dataFinalizacao: ehFinalizado
+      ? (patch.dataFinalizacao ?? new Date().toISOString())
+      : patch.dataFinalizacao,
+  }
+}
+
+/**
+ * Sincroniza caches de coluna após transição delivery.
+ * 1) summary completo → upsert; 2) patch no card existente; 3) merge fallback + patch + upsert.
+ *
+ * `colunaDestino` (quando conhecida) força a etapa operacional caso a resposta não a traga,
+ * evitando que o card caia em `'ABERTA'` e suma da tela.
+ */
+export function sincronizarVendaDeliveryKanbanColumnCaches(
+  queryClient: QueryClient,
+  vendaId: string,
+  respostaTransicao: unknown,
+  fallbackVenda?: VendaUnificadaDTO | null,
+  colunaDestino?: ColunaKanbanId | null
+): boolean {
+  const cardAtualizado = extrairVendaUnificadaDeRespostaDeliverySummary(respostaTransicao)
+  const cardSummaryUtilizavel =
+    cardAtualizado != null && vendaPertenceAlgumaColunaDeliveryKanban(cardAtualizado)
+
+  if (cardAtualizado && cardSummaryUtilizavel) {
+    upsertVendaDeliveryKanbanColumnCaches(queryClient, cardAtualizado)
+    return true
+  }
+
+  const patch = aplicarStatusDestinoNoPatch(
+    extrairPatchKanbanDeRespostaTransicao(respostaTransicao),
+    colunaDestino
+  )
+
+  const base = fallbackVenda ?? encontrarVendaNasColunasDeliveryKanban(queryClient, vendaId)
+  if (base) {
+    const merged = cloneVendaUnificadaDTO(base, patch)
+    if (vendaPertenceAlgumaColunaDeliveryKanban(merged)) {
+      upsertVendaDeliveryKanbanColumnCaches(queryClient, merged)
+      return true
+    }
+  }
+
+  // Último recurso: patch direto no cache (mantém comportamento anterior se nada acima resolveu).
+  return patchVendaDeliveryKanbanColumnCaches(queryClient, vendaId, patch)
 }

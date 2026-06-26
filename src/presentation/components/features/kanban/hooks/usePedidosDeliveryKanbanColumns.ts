@@ -199,6 +199,7 @@ export function usePedidosDeliveryKanbanColumns(
   tokenRef.current = token
 
   const getEtapaKanban = useCallback(
+    // Delta poll altera caches React Query: usar etapa canônica da API, nunca etapaLocal otimista.
     (v: VendaUnificadaDTO) => options?.getEtapaKanban?.(v) ?? v.getEtapaKanban(),
     [options?.getEtapaKanban]
   )

@@ -95,8 +95,7 @@ import {
 } from './utils/kanbanVendaCacheUpdate'
 import {
   patchVendaDeliveryKanbanColumnCaches,
-  upsertVendaDeliveryKanbanColumnCaches,
-  vendaPertenceAlgumaColunaDeliveryKanban,
+  sincronizarVendaDeliveryKanbanColumnCaches,
 } from './utils/kanbanDeliveryColumnCache'
 import {
   DELIVERY_KANBAN_COLUMN_IDS,
@@ -416,7 +415,6 @@ export function FiscalFlowKanban() {
     enabled: hasKanbanToken && isModoDeliveryKanban,
     refetchIntervalMs: isModoDeliveryKanban ? KANBAN_DELIVERY_DELTA_POLL_INTERVAL_MS : false,
     refetchOnWindowFocus: isModoDeliveryKanban,
-    getEtapaKanban: v => getEtapaKanbanParaExibicaoRef.current(v),
     enviarFiltroCriacaoNaApi: enviarFiltroCriacaoNaDeliveryApi,
     enviarFiltroFinalizacaoNaApi: enviarFiltroFinalizacaoNaDeliveryApi,
   })
@@ -745,36 +743,39 @@ export function FiscalFlowKanban() {
   const emitirNotaDelivery = useEmitirNfeDelivery()
 
   const sincronizarVendaAposTransicao = useCallback(
-    (vendaId: string, respostaTransicao: unknown): boolean => {
+    (vendaId: string, respostaTransicao: unknown, colunaDestino?: ColunaKanbanId): boolean => {
+      if (isModoDeliveryKanban) {
+        const fallback =
+          todasVendasCarregadasRef.current.find(v => v.id === vendaId) ?? null
+        const ok = sincronizarVendaDeliveryKanbanColumnCaches(
+          queryClient,
+          vendaId,
+          respostaTransicao,
+          fallback,
+          colunaDestino
+        )
+        if (ok) {
+          const cardAtualizado =
+            extrairVendaUnificadaDeRespostaDeliverySummary(respostaTransicao)
+          if (cardAtualizado?.entregador?.id) {
+            definirEntregadorKanbanCache(vendaId, cardAtualizado.entregador.id)
+            setEntregadorPorVendaId(prev => ({
+              ...prev,
+              [vendaId]: cardAtualizado.entregador!.id,
+            }))
+          }
+        }
+        return ok
+      }
+
       const cardAtualizado = extrairVendaUnificadaDeRespostaDeliverySummary(respostaTransicao)
-      // No modo delivery, só confiamos no card do summary quando ele mapeia para alguma coluna.
-      // Se a resposta perdeu a identidade de entrega (etapa → 'ABERTA'), o upsert removeria o card
-      // de todas as colunas (sumiço até reload); nesse caso usamos o patch, que clona o card existente.
-      const cardSummaryUtilizavel =
-        cardAtualizado != null &&
-        (!isModoDeliveryKanban || vendaPertenceAlgumaColunaDeliveryKanban(cardAtualizado))
-      if (cardAtualizado && cardSummaryUtilizavel) {
-        if (isModoDeliveryKanban) {
-          upsertVendaDeliveryKanbanColumnCaches(queryClient, cardAtualizado)
-        } else {
-          replaceVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, cardAtualizado)
-        }
-        if (cardAtualizado.entregador?.id) {
-          definirEntregadorKanbanCache(vendaId, cardAtualizado.entregador.id)
-          setEntregadorPorVendaId(prev => ({
-            ...prev,
-            [vendaId]: cardAtualizado.entregador!.id,
-          }))
-        }
+      if (cardAtualizado) {
+        replaceVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, cardAtualizado)
         return true
       }
 
       const patch = extrairPatchKanbanDeRespostaTransicao(respostaTransicao)
-      if (isModoDeliveryKanban) {
-        patchVendaDeliveryKanbanColumnCaches(queryClient, vendaId, patch)
-      } else {
-        patchVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, vendaId, patch)
-      }
+      patchVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, vendaId, patch)
       return false
     },
     [isModoDeliveryKanban, infiniteQueryKey, queryClient]
@@ -785,7 +786,7 @@ export function FiscalFlowKanban() {
   })
 
   const agendarSincronizacaoLista = useCallback(
-    (vendaId: string) => {
+    (vendaId: string, colunaDestino?: ColunaKanbanId, onRecovered?: () => void) => {
       const token = auth?.getAccessToken()
       if (!token) return
       void (async () => {
@@ -802,11 +803,21 @@ export function FiscalFlowKanban() {
           )
           if (!response.ok) return
           const data = await response.json()
-          const patch = extrairPatchKanbanDeRespostaTransicao(data)
           if (isModoDeliveryKanban) {
-            patchVendaDeliveryKanbanColumnCaches(queryClient, vendaId, patch)
+            const fallback =
+              todasVendasCarregadasRef.current.find(v => v.id === vendaId) ?? null
+            const ok = sincronizarVendaDeliveryKanbanColumnCaches(
+              queryClient,
+              vendaId,
+              data,
+              fallback,
+              colunaDestino
+            )
+            if (ok) onRecovered?.()
           } else {
+            const patch = extrairPatchKanbanDeRespostaTransicao(data)
             patchVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, vendaId, patch)
+            onRecovered?.()
           }
         } catch {
           /* falha silenciosa */
@@ -932,10 +943,15 @@ export function FiscalFlowKanban() {
           venda.id,
           token
         )
-        const patch = extrairPatchKanbanDeRespostaTransicao(pedidoAtualizado)
         if (isModoDeliveryKanban) {
-          patchVendaDeliveryKanbanColumnCaches(queryClient, venda.id, patch)
+          sincronizarVendaDeliveryKanbanColumnCaches(
+            queryClient,
+            venda.id,
+            pedidoAtualizado,
+            todasVendasCarregadasRef.current.find(x => x.id === venda.id) ?? null
+          )
         } else {
+          const patch = extrairPatchKanbanDeRespostaTransicao(pedidoAtualizado)
           patchVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, venda.id, patch)
         }
         invalidarPedidoKanbanQuickViewCache(venda.id)

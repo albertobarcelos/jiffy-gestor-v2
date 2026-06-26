@@ -25,9 +25,15 @@ interface UseEntregaTransicoesKanbanParams {
   /** Retorna true quando a resposta summary já atualizou o card (sem GET extra). */
   sincronizarVendaAposTransicao?: (
     vendaId: string,
-    respostaTransicao: unknown
+    respostaTransicao: unknown,
+    colunaDestino?: ColunaKanbanId
   ) => boolean | void
-  agendarSincronizacaoLista?: (vendaId: string) => void
+  /** Reconsulta lista após transição incompleta; `onRecovered` limpa UI otimista quando o cache foi corrigido. */
+  agendarSincronizacaoLista?: (
+    vendaId: string,
+    colunaDestino?: ColunaKanbanId,
+    onRecovered?: () => void
+  ) => void
   onAfterTransicaoSucesso?: (ctx: {
     venda: Venda
     acoesExecutadas: AcaoTransicaoGestor[]
@@ -98,15 +104,22 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
       venda: Venda,
       acoesExecutadas: AcaoTransicaoGestor[],
       respostaTransicao: unknown,
+      colunaDestino: ColunaKanbanId,
       ticketsPreload?: VendaGestorTicketsResponse
     ) => {
       marcarTransicaoLocal(venda.id)
-      const cardCompleto = sincronizarVendaAposTransicao?.(venda.id, respostaTransicao)
-      limparEtapaLocal(venda.id)
+      const cardCompleto = sincronizarVendaAposTransicao?.(
+        venda.id,
+        respostaTransicao,
+        colunaDestino
+      )
+      if (cardCompleto) {
+        limparEtapaLocal(venda.id)
+      }
       showToast.success('Etapa do pedido atualizada.')
       void onAfterTransicaoSucesso?.({ venda, acoesExecutadas, ticketsPreload })
       if (!cardCompleto) {
-        agendarSincronizacaoLista?.(venda.id)
+        agendarSincronizacaoLista?.(venda.id, colunaDestino, () => limparEtapaLocal(venda.id))
       }
     },
     [
@@ -141,7 +154,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
       iniciarTransicaoUi(venda.id, 'FINALIZADAS')
       try {
         const resposta = await executarTransicao({ id: venda.id, acao: 'finalizar' })
-        concluirTransicaoComSucesso(venda, ['finalizar'], resposta)
+        concluirTransicaoComSucesso(venda, ['finalizar'], resposta, 'FINALIZADAS')
       } catch (error) {
         reverterTransicaoUi(venda.id)
         throw error
@@ -197,7 +210,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
             ? await executarTransicao({ id: venda.id, acoes })
             : await executarTransicao({ id: venda.id, acao: acoes[0] })
 
-        concluirTransicaoComSucesso(venda, acoes, resposta, ticketsPreload)
+        concluirTransicaoComSucesso(venda, acoes, resposta, colunaDestino, ticketsPreload)
       } catch (error) {
         reverterTransicaoUi(venda.id)
         throw error

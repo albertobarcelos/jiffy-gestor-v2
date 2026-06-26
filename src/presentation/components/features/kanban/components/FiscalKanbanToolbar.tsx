@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { FormControl, InputLabel, MenuItem, Select } from '@mui/material'
 import {
   MdAdd,
@@ -188,6 +189,7 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
   } = props
 
   const isModoDelivery = modoKanbanVendas === 'delivery'
+  const [refreshSpinning, setRefreshSpinning] = useState(false)
 
   return (
     <div className="bg-primary-background mt-2 flex-shrink-0 rounded-b-lg rounded-t-lg">
@@ -319,6 +321,19 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
         </button>
 
         <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
+          <button
+            type="button"
+            onClick={() => {
+              setRefreshSpinning(true)
+              onRefresh()
+              window.setTimeout(() => setRefreshSpinning(false), 600)
+            }}
+            className="rounded-lg border border-gray-200 bg-white p-1.5 text-gray-600 shadow-sm transition-colors hover:bg-gray-50 hover:text-primary"
+            title="Atualizar listagem"
+            aria-label="Atualizar listagem do kanban"
+          >
+            <MdRefresh className={`h-5 w-5 ${refreshSpinning ? 'animate-spin' : ''}`} />
+          </button>
           <KanbanModoVendasToggle value={modoKanbanVendas} onChange={onModoKanbanVendasChange} />
           <button
             type="button"
