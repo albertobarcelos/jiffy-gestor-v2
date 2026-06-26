@@ -169,7 +169,9 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
           nomeEmpresa: empresa?.nomeExibicao,
           jobNamePrefix: 'Delivery',
           cupomTemplate: deliveryCupomTemplate,
+          accessToken: token,
           onMensagem: m => showToast.info(m),
+          onErro: m => showToast.error(m),
         })
         logImpressao('hook.imprimir_tickets_concluido', { vendaId: venda.id })
       }
@@ -273,7 +275,9 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
         nomeEmpresa: empresa?.nomeExibicao,
         jobNamePrefix: 'Reimpressão',
         cupomTemplate: deliveryCupomTemplate,
+        accessToken: token,
         onMensagem: m => showToast.info(m),
+        onErro: m => showToast.error(m),
       })
       logImpressao('hook.reimpressao_concluida', { vendaId: venda.id })
     },

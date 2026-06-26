@@ -31,6 +31,7 @@ import {
   mensagemErroCarregarQzTray,
   parseTcpPrinterRef,
   formatTcpPrinterRef,
+  isTcpPrinterRef,
 } from '@/src/infrastructure/printing/qzTrayClient'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import {
@@ -110,7 +111,7 @@ function ImpressoraMapeamentoInput({
   onChange: (next: string) => void
 }) {
   const tcpRef = parseTcpPrinterRef(value)
-  const modoIp = tcpRef !== null || value.startsWith('tcp://')
+  const modoIp = isTcpPrinterRef(value)
 
   const [host, setHost] = useState(tcpRef?.host ?? '')
   const [porta, setPorta] = useState(String(tcpRef?.port ?? 9100))

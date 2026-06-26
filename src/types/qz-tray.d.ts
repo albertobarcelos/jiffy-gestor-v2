@@ -5,23 +5,24 @@ declare module 'qz-tray' {
     disconnect(): Promise<void>
   }
 
+  /** Destino: nome de impressora Windows OU conexão raw TCP `{ host, port }`. */
+  type QzPrinterTarget = string | { host: string; port: string }
+
+  /** Conteúdo de impressão: objetos (pixel/html) ou strings raw ESC/POS. */
+  type QzPrintData =
+    | Array<{ type: string; format: string; flavor: string; data: string }>
+    | string[]
+
   interface QzConfigs {
-    create(printer: string, opts?: Record<string, unknown>): QzConfig
+    create(printer: QzPrinterTarget, opts?: Record<string, unknown>): QzConfig
   }
 
   interface QzConfig {
-    print(
-      data: Array<{ type: string; format: string; flavor: string; data: string }>,
-      signature?: string,
-      signingTimestamp?: number
-    ): void
+    print(data: QzPrintData, signature?: string, signingTimestamp?: number): void
   }
 
   interface QzPrint {
-    (
-      configs: QzConfig | QzConfig[],
-      data: Array<{ type: string; format: string; flavor: string; data: string }>
-    ): Promise<void>
+    (configs: QzConfig | QzConfig[], data: QzPrintData): Promise<void>
   }
 
   type QzSignaturePromiseFactory =

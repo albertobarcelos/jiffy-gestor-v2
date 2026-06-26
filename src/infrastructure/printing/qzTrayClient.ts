@@ -1,6 +1,7 @@
 'use client'
 
 import { logImpressao } from '@/src/shared/utils/logImpressaoDelivery'
+import { deliveryCupomHtmlParaEscPos } from '@/src/infrastructure/printing/deliveryCupomHtmlParaEscPos'
 
 /**
  * QZ Tray — configuração opcional de confiança (certificado + assinatura).
@@ -267,15 +268,34 @@ export async function loadQzTray(): Promise<QzModule> {
 // ─── Raw TCP (IP direto, sem spooler Windows) ──────────────────────────────
 
 /**
- * Parseia `tcp://HOST:PORTA` e retorna `{ host, port }`, ou `null` se não for o formato.
- * Usado para detectar impressoras configuradas por IP em vez de nome Windows.
+ * Parseia referência de impressora TCP.
+ * Aceita: `tcp://IP:PORTA`, `IP:PORTA` ou só `IP` (porta padrão 9100).
  */
 export function parseTcpPrinterRef(ref: string): { host: string; port: number } | null {
-  const m = ref.trim().match(/^tcp:\/\/([^:]+):(\d{1,5})$/)
-  if (!m) return null
-  const port = parseInt(m[2], 10)
-  if (port < 1 || port > 65535) return null
-  return { host: m[1], port }
+  const trimmed = ref.trim()
+  if (!trimmed) return null
+
+  const tcpMatch = trimmed.match(/^tcp:\/\/([^:/\s]+):(\d{1,5})$/i)
+  if (tcpMatch) {
+    const port = parseInt(tcpMatch[2], 10)
+    if (port >= 1 && port <= 65535) return { host: tcpMatch[1], port }
+  }
+
+  const ipPortMatch = trimmed.match(/^(\d{1,3}(?:\.\d{1,3}){3}):(\d{1,5})$/)
+  if (ipPortMatch) {
+    const port = parseInt(ipPortMatch[2], 10)
+    if (port >= 1 && port <= 65535) return { host: ipPortMatch[1], port }
+  }
+
+  const ipOnlyMatch = trimmed.match(/^(\d{1,3}(?:\.\d{1,3}){3})$/)
+  if (ipOnlyMatch) return { host: ipOnlyMatch[1], port: 9100 }
+
+  return null
+}
+
+export function isTcpPrinterRef(ref: string): boolean {
+  const t = ref.trim()
+  return t.startsWith('tcp://') || parseTcpPrinterRef(t) !== null
 }
 
 /** Formata uma referência `tcp://HOST:PORTA`. */
@@ -284,47 +304,13 @@ export function formatTcpPrinterRef(host: string, port: number | string): string
 }
 
 /**
- * Converte HTML em texto simples para envio raw ESC/POS.
- * Usa DOMParser (browser-only). Substitui <br> por \n e preserva o texto de cada bloco.
- */
-function htmlParaTextoEscPos(html: string): string {
-  if (typeof window === 'undefined' || typeof DOMParser === 'undefined') {
-    return html.replace(/<[^>]+>/g, '')
-  }
-  const doc = new DOMParser().parseFromString(html, 'text/html')
-
-  // <br> → newline
-  doc.querySelectorAll('br').forEach(el => el.replaceWith('\n'))
-
-  // separador de célula de tabela
-  doc.querySelectorAll('td, th').forEach(el => {
-    const sep = document.createTextNode('  ')
-    el.after(sep)
-  })
-
-  // nova linha após cada linha de tabela e após cada bloco
-  doc.querySelectorAll('tr, p, div, li, h1, h2, h3, h4').forEach(el => {
-    el.after('\n')
-  })
-
-  const texto = (doc.body.textContent ?? '')
-    .split('\n')
-    .map(l => l.trimEnd())
-    .join('\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
-
-  return texto
-}
-
-/**
  * Imprime um HTML em uma impressora térmica via raw TCP (sem instalar no Windows).
  *
  * Fluxo:
  * 1. Conecta ao WebSocket do QZ Tray
  * 2. Cria config apontando direto para IP:porta (sem nome de impressora Windows)
- * 3. Converte HTML → texto + comandos ESC/POS básicos (init + corte)
- * 4. Envia como `type: 'raw'`
+ * 3. Converte HTML → ESC/POS (negrito, centralizado, colunas, separadores)
+ * 4. Envia como raw command via TCP
  */
 export async function printRawTcpQz(
   qz: QzModule,
@@ -336,23 +322,14 @@ export async function printRawTcpQz(
 ): Promise<void> {
   await ensureQzWebsocketConnected(qz)
 
-  const ESC_INIT = '\x1B\x40'          // ESC @ — inicializar impressora
-  const LF = '\n'
-  const CORTE_PARCIAL = '\x1D\x56\x41\x05' // GS V 65 5 — corte parcial
+  const conteudo = deliveryCupomHtmlParaEscPos(html)
 
-  const texto = htmlParaTextoEscPos(html)
-  const conteudo = `${ESC_INIT}${texto}${LF}${LF}${LF}${CORTE_PARCIAL}`
-
-  // qz.configs.create aceita objeto { host, port } para conexão raw TCP
-  const config = (qz.configs as unknown as {
-    create: (printer: null, opts?: Record<string, unknown>) => unknown
-  }).create(null, { host, port, jobName })
-
-  const payload = [
-    { type: 'raw' as const, format: 'plain' as const, flavor: 'plain' as const, data: conteudo },
-  ]
+  const config = qz.configs.create(
+    { host, port: String(port) },
+    { jobName, encoding: 'Cp850' }
+  )
 
   for (let i = 0; i < Math.max(1, copies); i++) {
-    await qz.print(config as Parameters<QzModule['print']>[0], payload)
+    await qz.print(config, [conteudo])
   }
 }
