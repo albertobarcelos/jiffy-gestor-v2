@@ -38,8 +38,10 @@ interface UseEntregaTransicoesKanbanParams {
     acoes: AcaoTransicaoGestor[]
   ) => Promise<VerificarImpressaoKanbanResult>
   verificarEntregadorAntesDespachar?: (venda: Venda) => Promise<boolean>
-  /** Quando finalizar exige pagamento quitado: abrir detalhes em vez de chamar a API. */
-  onPagamentoPendenteAoFinalizar?: (venda: Venda) => void
+  /** Sem entregador ao despachar: abrir o modal de vínculo de entregador do card. */
+  onEntregadorAusenteAoDespachar?: (venda: Venda) => void
+  /** Quando finalizar exige pagamento quitado e ele ainda está pendente: confirma a cobrança automaticamente (retorna true se confirmado). */
+  confirmarPagamentoAntesFinalizar?: (venda: Venda) => Promise<boolean>
   /** Reconsulta pagamento no delivery antes de bloquear finalização (lista unificada pode estar defasada). */
   revalidarPagamentoAntesFinalizar?: (vendaId: string) => Promise<boolean>
 }
@@ -52,7 +54,8 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
     onAfterTransicaoSucesso,
     verificarImpressaoAntesTransicoes,
     verificarEntregadorAntesDespachar,
-    onPagamentoPendenteAoFinalizar,
+    onEntregadorAusenteAoDespachar,
+    confirmarPagamentoAntesFinalizar,
     revalidarPagamentoAntesFinalizar,
   } = params
 
@@ -129,8 +132,10 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
           ? await revalidarPagamentoAntesFinalizar(venda.id)
           : false
         if (!quitado) {
-          onPagamentoPendenteAoFinalizar?.(venda)
-          return
+          const confirmado = confirmarPagamentoAntesFinalizar
+            ? await confirmarPagamentoAntesFinalizar(venda)
+            : false
+          if (!confirmado) return
         }
       }
       iniciarTransicaoUi(venda.id, 'FINALIZADAS')
@@ -149,7 +154,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
       executarTransicao,
       finalizarTransicaoUi,
       iniciarTransicaoUi,
-      onPagamentoPendenteAoFinalizar,
+      confirmarPagamentoAntesFinalizar,
       revalidarPagamentoAntesFinalizar,
       reverterTransicaoUi,
     ]
@@ -181,6 +186,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
           const podeDespachar = await verificarEntregadorAntesDespachar(venda)
           if (!podeDespachar) {
             showToast.error('Vincule um entregador antes de despachar para entrega.')
+            onEntregadorAusenteAoDespachar?.(venda)
             reverterTransicaoUi(venda.id)
             return
           }
@@ -204,6 +210,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
       executarTransicao,
       finalizarTransicaoUi,
       iniciarTransicaoUi,
+      onEntregadorAusenteAoDespachar,
       reverterTransicaoUi,
       verificarEntregadorAntesDespachar,
       verificarImpressaoAntesTransicoes,

@@ -44,8 +44,15 @@ export async function resolverEntregadorIdVendaKanban(args: {
   tabelaOrigem: 'venda' | 'venda_gestor'
   token: string
   cacheLocal?: Record<string, string>
+  /**
+   * Ignora caches negativos (ausente) e hidratação ainda em andamento, forçando um GET
+   * autoritativo. Usado antes de despachar: a hidratação em background pode ter marcado
+   * `hydrationJaSolicitada` mas ainda não ter resolvido o fetch, o que retornaria `null`
+   * (falso "sem entregador") e abortaria a transição.
+   */
+  forcarRevalidacao?: boolean
 }): Promise<string | null> {
-  const { vendaId, tabelaOrigem, token, cacheLocal } = args
+  const { vendaId, tabelaOrigem, token, cacheLocal, forcarRevalidacao } = args
 
   const doCacheLocal = cacheLocal?.[vendaId]?.trim()
   if (doCacheLocal) return doCacheLocal
@@ -53,12 +60,14 @@ export async function resolverEntregadorIdVendaKanban(args: {
   const doCacheGlobal = obterEntregadorKanbanCache(vendaId)
   if (doCacheGlobal) return doCacheGlobal
 
-  if (entregadorAusentePorVendaId.has(vendaId)) {
-    return null
-  }
+  if (!forcarRevalidacao) {
+    if (entregadorAusentePorVendaId.has(vendaId)) {
+      return null
+    }
 
-  if (entregadorHydrationJaSolicitada(vendaId)) {
-    return obterEntregadorKanbanCache(vendaId)
+    if (entregadorHydrationJaSolicitada(vendaId)) {
+      return obterEntregadorKanbanCache(vendaId)
+    }
   }
 
   marcarEntregadorHydrationSolicitada(vendaId)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Tooltip from '@mui/material/Tooltip'
 import {
   MdAccessTime,
@@ -9,8 +9,8 @@ import {
   MdEditNote,
   MdLocationOn,
   MdPrint,
-  MdSave,
   MdSportsMotorsports,
+  MdSync,
   MdVisibility,
 } from 'react-icons/md'
 import { Button } from '@/src/presentation/components/ui/button'
@@ -71,9 +71,12 @@ interface FiscalKanbanVendaCardProps {
   onReimprimirCupomDelivery?: (venda: Venda, colunaAtual: ColunaKanbanId) => void
   entregadorVinculadoId?: string | null
   onEntregadorAtualizado?: (vendaId: string, entregadorId: string | null) => void
-  /** Confirma cobrança pendente direto no card (coluna Em Rota). */
+  /** Sinal externo (ex.: arraste para Em rota sem entregador) para abrir o modal de entregador. */
+  abrirEntregadorSolicitado?: boolean
+  /** Chamado após consumir o sinal de abertura (reseta o estado no pai). */
+  onAbrirEntregadorConsumido?: () => void
+  /** Abre o modal de detalhes na guia de pagamento para confirmar a cobrança (coluna Em Rota). */
   onConfirmarCobranca?: (venda: Venda) => void
-  confirmandoCobrancaIds?: Record<string, boolean>
   nomesMeiosPagamento?: Record<string, string>
 }
 
@@ -92,8 +95,9 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
     onReimprimirCupomDelivery,
     entregadorVinculadoId = null,
     onEntregadorAtualizado,
+    abrirEntregadorSolicitado = false,
+    onAbrirEntregadorConsumido,
     onConfirmarCobranca,
-    confirmandoCobrancaIds = {},
     nomesMeiosPagamento = {},
   } = props
   const [entregaQuickViewAnchor, setEntregaQuickViewAnchor] = useState<HTMLElement | null>(null)
@@ -169,6 +173,15 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
     venda.isPedidoEntregaGestor() &&
     COLUNAS_ENTREGA_OPERACIONAIS.includes(colunaAtual)
   const entregadorJaVinculado = Boolean(entregadorVinculadoId?.trim())
+
+  useEffect(() => {
+    if (!abrirEntregadorSolicitado) return
+    if (exibirAtribuirEntregador) {
+      setAtribuirEntregadorOpen(true)
+    }
+    onAbrirEntregadorConsumido?.()
+  }, [abrirEntregadorSolicitado, exibirAtribuirEntregador, onAbrirEntregadorConsumido])
+
   const quickViewAberto = Boolean(entregaQuickViewAnchor)
   const bloquearDragCard =
     quickViewAberto || atribuirEntregadorOpen || observacaoPedidoOpen || enderecoEntregaOpen
@@ -192,7 +205,6 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
     venda,
     modoKanbanVendas
   )
-  const confirmandoCobranca = Boolean(confirmandoCobrancaIds[venda.id])
   const exibirMetaDeliveryKanban =
     modoKanbanVendas === 'delivery' && venda.isPedidoEntregaGestor()
   const previsaoEntregaKanban = exibirMetaDeliveryKanban
@@ -338,7 +350,7 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
                 <div className="flex items-center gap-1">
                   <span className="text-sm font-semibold text-gray-900">{valorFormatado}</span>
                   {exibirBotaoSalvarCobranca && onConfirmarCobranca ? (
-                    <Tooltip title="Confirmar cobrança">
+                    <Tooltip title="Modificar Pagamento">
                       <button
                         type="button"
                         onClick={e => {
@@ -346,18 +358,10 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
                           onConfirmarCobranca(venda)
                         }}
                         onDoubleClick={e => e.stopPropagation()}
-                        disabled={confirmandoCobranca}
-                        className="shrink-0 rounded p-0.5 text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
-                        aria-label="Confirmar cobrança"
+                        className="shrink-0 rounded p-0.5 text-primary transition-colors hover:bg-primary/10"
+                        aria-label="Modificar pagamento"
                       >
-                        {confirmandoCobranca ? (
-                          <span
-                            className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"
-                            aria-hidden
-                          />
-                        ) : (
-                          <MdSave className="h-4 w-4" />
-                        )}
+                        <MdSync className="h-4 w-4" />
                       </button>
                     </Tooltip>
                   ) : null}
@@ -444,7 +448,7 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
                 <div className="flex items-center gap-1">
                   <span className="text-sm font-semibold text-gray-900">{valorFormatado}</span>
                   {exibirBotaoSalvarCobranca && onConfirmarCobranca ? (
-                    <Tooltip title="Confirmar cobrança">
+                    <Tooltip title="Modificar Pagamento">
                       <button
                         type="button"
                         onClick={e => {
@@ -452,18 +456,10 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
                           onConfirmarCobranca(venda)
                         }}
                         onDoubleClick={e => e.stopPropagation()}
-                        disabled={confirmandoCobranca}
-                        className="shrink-0 rounded p-0.5 text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
-                        aria-label="Confirmar cobrança"
+                        className="shrink-0 rounded p-0.5 text-primary transition-colors hover:bg-primary/10"
+                        aria-label="Modificar pagamento"
                       >
-                        {confirmandoCobranca ? (
-                          <span
-                            className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"
-                            aria-hidden
-                          />
-                        ) : (
-                          <MdSave className="h-4 w-4" />
-                        )}
+                        <MdSync className="h-4 w-4" />
                       </button>
                     </Tooltip>
                   ) : null}
