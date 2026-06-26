@@ -15,8 +15,21 @@ export {
 
 import {
   VendaUnificadaDTO,
+  type EntregadorKanbanDeliveryResumo,
   type VendasUnificadasResponse,
 } from '../hooks/useVendasUnificadas'
+
+function normalizarEntregadorKanbanPatch(
+  patch: KanbanVendaCachePatch['entregador']
+): EntregadorKanbanDeliveryResumo | null | undefined {
+  if (patch === undefined) return undefined
+  if (patch === null) return null
+  return {
+    id: patch.id,
+    nome: patch.nome ?? null,
+    telefone: patch.telefone ?? null,
+  }
+}
 
 function isoDeCampoApi(valor: unknown): string | null {
   if (valor == null) return null
@@ -137,7 +150,9 @@ export function cloneVendaUnificadaDTO(
     venda.tempoTotalEstimadoSegundos,
     venda.fluxoPagamentoEntrega,
     venda.cobrancasDelivery,
-    venda.entregador,
+    patch.entregador !== undefined
+      ? normalizarEntregadorKanbanPatch(patch.entregador)
+      : venda.entregador,
     venda.contextoEntrega
   )
 }

@@ -51,6 +51,14 @@ export function SeletorClienteModal({
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const loadMoreRef = useRef<HTMLDivElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
+  // Foca o campo de busca ao abrir o modal (timeout cobre a animação de entrada).
+  useEffect(() => {
+    if (!open) return
+    const id = setTimeout(() => searchInputRef.current?.focus(), 100)
+    return () => clearTimeout(id)
+  }, [open])
 
   // Debounce da busca (500ms)
   useEffect(() => {
@@ -286,6 +294,7 @@ export function SeletorClienteModal({
               <div className="relative">
                 <Input
                   type="text"
+                  inputRef={searchInputRef}
                   value={searchText}
                   onChange={e => setSearchText(e.target.value)}
                   placeholder="Pesquisar por nome..."

@@ -9,6 +9,7 @@ import { ModalLancamentoProdutoPainel } from './ModalLancamentoProdutoPainel'
 import { PainelEdicaoProdutoLinhaPedido } from './PainelEdicaoProdutoLinhaPedido'
 import { ProdutosTabsModal } from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
 import { ClientesTabsModal } from '@/src/presentation/components/features/clientes/ClientesTabsModal'
+import { ComplementosTabsModal } from '@/src/presentation/components/features/complementos/ComplementosTabsModal'
 import { useNovoPedidoDetalheContext } from '../context/NovoPedidoDetalheContext'
 import { useNovoPedidoFormContext } from '../context/NovoPedidoFormContext'
 import { useNovoPedidoUIContext } from '../context/NovoPedidoUIContext'
@@ -47,6 +48,12 @@ export function NovoPedidoAuxiliaryModals() {
   const {
     catalogoProdutosPorId,
     carregandoComplementosPainel,
+    complementoTabsModalPainelState,
+    abrirEdicaoComplementoNoPainel,
+    fecharComplementoTabsModalNoPainel,
+    handleTabChangeComplementoTabsModalPainel,
+    recarregarProdutoPainelAposEdicaoComplemento,
+    recarregarProdutoCarrinhoAposEdicao,
     confirmarEdicaoProduto,
     confirmarLancamentoProdutoPainel,
     ehAcrescimo,
@@ -84,7 +91,7 @@ export function NovoPedidoAuxiliaryModals() {
             open={seletorClienteOpen}
             onClose={() => setSeletorClienteOpen(false)}
             onSelect={handleSelectCliente}
-            title={tipoInicioPedido === 'entrega' ? 'Selecionar cliente da entrega' : undefined}
+            title={tipoInicioPedido === 'entrega' ? 'Selecionar cliente' : undefined}
           />
         )}
 
@@ -131,16 +138,33 @@ export function NovoPedidoAuxiliaryModals() {
                 ? produtos[indiceLinhaPainelProduto]?.valorUnitario
                 : undefined
             }
-            chavesComplementosIniciais={
-              painelLinhaModo === 'complementos' && indiceLinhaPainelProduto !== null
-                ? produtos[indiceLinhaPainelProduto]?.complementos?.map(
-                    (c: { grupoId: string; id: string }) => `${c.grupoId}-${c.id}`
+            quantidadesComplementosIniciais={
+              indiceLinhaPainelProduto !== null &&
+              (painelLinhaModo === 'complementos' ||
+                (painelLinhaModo === 'lancamento' &&
+                  produtoParaLancamentoPainel.abreComplementosAtivo()))
+                ? Object.fromEntries(
+                    produtos[indiceLinhaPainelProduto]?.complementos?.map(
+                      (c: { grupoId: string; id: string; quantidade: number }) => [
+                        `${c.grupoId}-${c.id}`,
+                        c.quantidade,
+                      ]
+                    ) ?? []
                   )
                 : undefined
             }
             onConfirm={confirmarLancamentoProdutoPainel}
+            onComplementoDoubleClick={abrirEdicaoComplementoNoPainel}
           />
         ) : null}
+
+        <ComplementosTabsModal
+          state={complementoTabsModalPainelState}
+          onClose={fecharComplementoTabsModalNoPainel}
+          onTabChange={handleTabChangeComplementoTabsModalPainel}
+          onReload={recarregarProdutoPainelAposEdicaoComplemento}
+          zIndex={1500}
+        />
 
         {modalEdicaoProdutoOpen && produtoIndexEdicao !== null ? (
           <PainelEdicaoProdutoLinhaPedido
@@ -316,6 +340,7 @@ export function NovoPedidoAuxiliaryModals() {
         <ProdutosTabsModal
           state={produtoTabsModalState}
           onClose={handleFecharProdutoTabsModal}
+          onReload={recarregarProdutoCarrinhoAposEdicao}
           onTabChange={handleTabChangeProdutoModal}
         />
         <ClientesTabsModal

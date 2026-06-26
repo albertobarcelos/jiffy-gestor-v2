@@ -1,10 +1,9 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { FormControl, InputLabel, MenuItem, Select } from '@mui/material'
 import {
   MdAdd,
-  MdCalendarToday,
   MdFilterAltOff,
   MdFilterList,
   MdRefresh,
@@ -12,29 +11,31 @@ import {
   MdSettings,
 } from 'react-icons/md'
 import { KanbanModoVendasToggle, type ModoKanbanVendas } from '../KanbanModoVendasToggle'
-import type { OrigemFiltro } from '../types'
+import type { OrigemFiltro, TipoEntregaFiltro } from '../types'
+import {
+  KANBAN_FILTRO_DATA_PRESET_OPCOES,
+  type KanbanFiltroDataPreset,
+} from '../utils/kanbanFiltroDataPresets'
 
 interface FiscalKanbanToolbarProps {
   searchInput: string
   onSearchInputChange: (value: string) => void
-  onRefresh: () => void
+  onRefresh: () => void | Promise<void>
   filtrosVisiveisMobile: boolean
   onToggleFiltrosMobile: () => void
   origemFilter: OrigemFiltro
   onOrigemFilterChange: (value: OrigemFiltro) => void
+  tipoEntregaFilter: TipoEntregaFiltro
+  onTipoEntregaFilterChange: (value: TipoEntregaFiltro) => void
   terminalFilter: string
   onTerminalFilterChange: (value: string) => void
   terminais: { id: string; nome: string }[]
   isLoadingTerminais: boolean
   origemFilterDisabled?: boolean
-  dataCriacaoInicio: Date | null
-  dataCriacaoFim: Date | null
-  onCriacaoTodos: () => void
-  onOpenCriacaoDatas: () => void
-  dataFinalizacaoInicio: Date | null
-  dataFinalizacaoFim: Date | null
-  onFinalizacaoTodos: () => void
-  onOpenFinalizacaoDatas: () => void
+  periodoPreset: KanbanFiltroDataPreset
+  onPeriodoPresetChange: (preset: KanbanFiltroDataPreset) => void
+  periodoInicio: Date | null
+  periodoFim: Date | null
   onClearFilters: () => void
   modoKanbanVendas: ModoKanbanVendas
   onModoKanbanVendasChange: (value: ModoKanbanVendas) => void
@@ -114,80 +115,45 @@ function PeriodoSelecionadoResumo({
   )
 }
 
-function FiltroDataOpcoesBotao({
+function FiltroDataPresetSelect({
+  labelId,
   label,
-  onTodos,
-  onEscolherData,
+  preset,
+  onPresetChange,
   periodoResumo,
 }: {
+  labelId: string
   label: string
-  onTodos: () => void
-  onEscolherData: () => void
+  preset: KanbanFiltroDataPreset
+  onPresetChange: (preset: KanbanFiltroDataPreset) => void
   periodoResumo?: { inicio: Date; fim: Date } | null
 }) {
-  const [menuAberto, setMenuAberto] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!menuAberto) return
-    const fecharAoClicarFora = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setMenuAberto(false)
-      }
-    }
-    document.addEventListener('mousedown', fecharAoClicarFora)
-    return () => document.removeEventListener('mousedown', fecharAoClicarFora)
-  }, [menuAberto])
-
-  const opcaoClassName =
-    'font-nunito block w-full px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50'
-
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center gap-2">
-        <div className="relative" ref={containerRef}>
-          <button
-            type="button"
-            onClick={() => setMenuAberto(prev => !prev)}
-            className="font-nunito flex h-8 items-center gap-1 rounded-lg px-1 text-sm text-white transition-colors"
-            style={{ backgroundColor: KANBAN_BUTTON_COLOR }}
-            aria-expanded={menuAberto}
-            aria-haspopup="menu"
-          >
-            <MdCalendarToday size={16} className="shrink-0" />
+        <FormControl
+          size="small"
+          variant="outlined"
+          sx={{ ...sxKanbanFiltroSelect, minWidth: 168 }}
+        >
+          <InputLabel id={labelId} shrink>
             {label}
-          </button>
-          {menuAberto ? (
-            <div
-              className="absolute left-0 top-full z-50 mt-1 min-w-[180px] overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
-              role="menu"
-            >
-              <button
-                type="button"
-                role="menuitem"
-                className={opcaoClassName}
-                onClick={() => {
-                  onTodos()
-                  setMenuAberto(false)
-                }}
-              >
-                Todos os Pedidos
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                className={opcaoClassName}
-                onClick={() => {
-                  onEscolherData()
-                  setMenuAberto(false)
-                }}
-              >
-                Escolher Data
-              </button>
-            </div>
-          ) : null}
-        </div>
-        {periodoResumo ? (
+          </InputLabel>
+          <Select
+            labelId={labelId}
+            label={label}
+            value={preset}
+            onChange={e => onPresetChange(e.target.value as KanbanFiltroDataPreset)}
+            className="font-nunito"
+          >
+            {KANBAN_FILTRO_DATA_PRESET_OPCOES.map(opcao => (
+              <MenuItem key={opcao.value} value={opcao.value}>
+                {opcao.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        {preset === 'por_data' && periodoResumo ? (
           <PeriodoSelecionadoResumo inicio={periodoResumo.inicio} fim={periodoResumo.fim} />
         ) : null}
       </div>
@@ -204,25 +170,26 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
     onToggleFiltrosMobile,
     origemFilter,
     onOrigemFilterChange,
+    tipoEntregaFilter,
+    onTipoEntregaFilterChange,
     terminalFilter,
     onTerminalFilterChange,
     terminais,
     isLoadingTerminais,
     origemFilterDisabled = false,
-    dataCriacaoInicio,
-    dataCriacaoFim,
-    onCriacaoTodos,
-    onOpenCriacaoDatas,
-    dataFinalizacaoInicio,
-    dataFinalizacaoFim,
-    onFinalizacaoTodos,
-    onOpenFinalizacaoDatas,
+    periodoPreset,
+    onPeriodoPresetChange,
+    periodoInicio,
+    periodoFim,
     onClearFilters,
     modoKanbanVendas,
     onModoKanbanVendasChange,
     onAbrirConfiguracoesDelivery,
     onAbrirNovoPedido,
   } = props
+
+  const isModoDelivery = modoKanbanVendas === 'delivery'
+  const [refreshSpinning, setRefreshSpinning] = useState(false)
 
   return (
     <div className="bg-primary-background mt-2 flex-shrink-0 rounded-b-lg rounded-t-lg">
@@ -259,6 +226,7 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
           </div>
         </div>
 
+        {!isModoDelivery ? (
         <div className="flex flex-col gap-1">
           <FormControl size="small" variant="outlined" sx={sxKanbanFiltroSelect}>
             <InputLabel id="kanban-filtro-origem-label" shrink>
@@ -279,7 +247,31 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
             </Select>
           </FormControl>
         </div>
+        ) : null}
 
+        {isModoDelivery ? (
+        <div className="flex flex-col gap-1">
+          <FormControl size="small" variant="outlined" sx={sxKanbanFiltroSelect}>
+            <InputLabel id="kanban-filtro-tipo-entrega-label" shrink>
+              Tipo de entrega
+            </InputLabel>
+            <Select
+              labelId="kanban-filtro-tipo-entrega-label"
+              label="Tipo de entrega"
+              value={tipoEntregaFilter}
+              onChange={e => onTipoEntregaFilterChange(e.target.value as TipoEntregaFiltro)}
+              displayEmpty
+              className="font-nunito"
+            >
+              <MenuItem value="">Todos</MenuItem>
+              <MenuItem value="entrega">Entrega</MenuItem>
+              <MenuItem value="retirada">Retirada</MenuItem>
+            </Select>
+          </FormControl>
+        </div>
+        ) : null}
+
+        {modoKanbanVendas === 'balcao' ? (
         <div className="flex flex-col gap-1">
           <FormControl
             size="small"
@@ -307,26 +299,15 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
             </Select>
           </FormControl>
         </div>
+        ) : null}
 
-        <FiltroDataOpcoesBotao
-          label="Data Finalização"
-          onTodos={onFinalizacaoTodos}
-          onEscolherData={onOpenFinalizacaoDatas}
+        <FiltroDataPresetSelect
+          labelId="kanban-filtro-periodo-label"
+          label="Filtrar por Período"
+          preset={periodoPreset}
+          onPresetChange={onPeriodoPresetChange}
           periodoResumo={
-            dataFinalizacaoInicio && dataFinalizacaoFim
-              ? { inicio: dataFinalizacaoInicio, fim: dataFinalizacaoFim }
-              : null
-          }
-        />
-
-        <FiltroDataOpcoesBotao
-          label="Data Criação"
-          onTodos={onCriacaoTodos}
-          onEscolherData={onOpenCriacaoDatas}
-          periodoResumo={
-            dataCriacaoInicio && dataCriacaoFim
-              ? { inicio: dataCriacaoInicio, fim: dataCriacaoFim }
-              : null
+            periodoInicio && periodoFim ? { inicio: periodoInicio, fim: periodoFim } : null
           }
         />
 
@@ -340,6 +321,18 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
         </button>
 
         <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
+          <button
+            type="button"
+            onClick={() => {
+              setRefreshSpinning(true)
+              void Promise.resolve(onRefresh()).finally(() => setRefreshSpinning(false))
+            }}
+            className="rounded-lg border border-gray-200 bg-white p-1.5 text-gray-600 shadow-sm transition-colors hover:bg-gray-50 hover:text-primary"
+            title="Atualizar listagem"
+            aria-label="Atualizar listagem do kanban"
+          >
+            <MdRefresh className={`h-5 w-5 ${refreshSpinning ? 'animate-spin' : ''}`} />
+          </button>
           <KanbanModoVendasToggle value={modoKanbanVendas} onChange={onModoKanbanVendasChange} />
           <button
             type="button"

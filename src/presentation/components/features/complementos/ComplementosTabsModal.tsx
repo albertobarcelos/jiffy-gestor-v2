@@ -21,6 +21,8 @@ interface ComplementosTabsModalProps {
   onClose: () => void
   onTabChange: (tab: TabKey) => void
   onReload?: () => void
+  /** Empilhar acima de outros painéis (ex.: modal de lançamento de produto em z-index 1400). */
+  zIndex?: number
 }
 
 export function ComplementosTabsModal({
@@ -28,6 +30,7 @@ export function ComplementosTabsModal({
   onClose,
   onTabChange,
   onReload,
+  zIndex = 1300,
 }: ComplementosTabsModalProps) {
   const ncRef = useRef<NovoComplementoHandle>(null)
 
@@ -85,6 +88,7 @@ export function ComplementosTabsModal({
         open={state.open}
         onClose={handleRequestClose}
         title={title}
+        zIndex={zIndex}
         scrollableBody={false}
         footerVariant="bar"
         panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,45vw)]"

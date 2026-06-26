@@ -28,12 +28,14 @@ import {
 } from './hooks/useVendasUnificadas'
 import {
   flattenPedidosDeliveryInfinite,
-  pedidosDeliveryInfiniteQueryKey,
   vendasUnificadasQueryParamsParaPedidosDelivery,
 } from './hooks/usePedidosDeliveryInfinite'
-import { usePedidosDeliveryKanbanSync } from './hooks/usePedidosDeliveryKanbanSync'
+import { usePedidosDeliveryKanbanColumns } from './hooks/usePedidosDeliveryKanbanColumns'
+import { usePedidosDeliveryContagemPorStatus } from './hooks/usePedidosDeliveryContagemPorStatus'
+import { combinarContagensColunasDeliveryKanban } from './utils/kanbanDeliveryColumnCounts'
 import { useVendaIdsPdvPorTerminal } from '@/src/presentation/hooks/useVendaIdsPdvPorTerminal'
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
+import { useEntregadoresQuery } from '@/src/presentation/components/features/pedidos/hooks/data/useEntregadoresQuery'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import {
   MdReceipt,
@@ -69,6 +71,7 @@ import type {
 import {
   COLUNAS_ENTREGA_OPERACIONAIS,
   COLUNAS_KANBAN_DESTINO_PIN,
+  dataOrdenacaoCardKanban,
   ordenarVendasKanbanPorCriterio,
   vendaBloqueadaParaEmissaoInterativa,
   vendaExigeEntregadorParaDespachar,
@@ -89,26 +92,35 @@ import {
   extrairVendaUnificadaDeRespostaDeliverySummary,
   patchVendaUnificadaInfiniteCache,
   replaceVendaUnificadaInfiniteCache,
-  sincronizarPedidoDeliveryKanbanEmBackground,
 } from './utils/kanbanVendaCacheUpdate'
-import { invalidarPedidoKanbanQuickViewCache } from '../delivery/kanban-panels/carregarPedidoKanbanQuickView'
+import {
+  patchVendaDeliveryKanbanColumnCaches,
+  sincronizarVendaDeliveryKanbanColumnCaches,
+} from './utils/kanbanDeliveryColumnCache'
+import {
+  DELIVERY_KANBAN_COLUMN_IDS,
+  isColunaKanbanDeliveryFiscalSplit,
+  vendaPertenceColunaDeliveryKanban,
+} from './utils/kanbanDeliveryColumnConfig'
 import {
   resolverEntregadorIdVendaKanban,
   hidratarEntregadoresKanbanDesdeApi,
   hidratarEntregadoresKanbanDesdeSummary,
   entregadorKanbanJaVerificado,
+  definirEntregadorKanbanCache,
 } from '../delivery/kanban-panels/entregadorKanbanStore'
 import {
   useFiscalEmissaoKanban,
   type VendaSelecionadaParaEmissao,
 } from './hooks/useFiscalEmissaoKanban'
 import { useImpressaoDelivery } from '../delivery/hooks/useImpressaoDelivery'
-import { validarImpressaoAntesTransicaoKanban } from '@/src/application/delivery/validarImpressaoAntesTransicaoKanban'
 import { confirmarCobrancaPendentePedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/ConfirmarCobrancaPendentePedidoDeliveryUseCase'
+import { invalidarPedidoKanbanQuickViewCache } from '../delivery/kanban-panels/carregarPedidoKanbanQuickView'
+import { validarImpressaoAntesTransicaoKanban } from '@/src/application/delivery/validarImpressaoAntesTransicaoKanban'
 import type { AcaoTransicaoGestor } from '@/src/presentation/hooks/useVendas'
 import { useKanbanColumnScrollLoadMore } from './hooks/useKanbanColumnScrollLoadMore'
 import {
-  filtrarPedidosDeliveryKanbanPorDatasToolbar,
+  filtrarVendaDeliveryKanbanColunaPorDatasToolbar,
   filtrarVendasKanbanPorModo,
   KANBAN_DELIVERY_DELTA_POLL_INTERVAL_MS,
   KANBAN_VENDAS_REFETCH_INTERVAL_MS,
@@ -125,49 +137,37 @@ export function FiscalFlowKanban() {
   const [vendaSelecionadaParaEmissao, setVendaSelecionadaParaEmissao] =
     useState<VendaSelecionadaParaEmissao | null>(null)
   const [emitirNfeModalOpen, setEmitirNfeModalOpen] = useState(false)
+  const { timezoneAgregacao, preferenciasImpressaoDelivery, empresa } = useEmpresaMe()
   const {
     searchInput,
     setSearchInput,
     searchQuery,
-    dataCriacaoInicio,
-    dataCriacaoFim,
-    dataFinalizacaoInicio,
-    dataFinalizacaoFim,
+    periodoPreset,
+    periodoInicioConsulta,
+    periodoFimConsulta,
     origemFilter,
     setOrigemFilter,
+    tipoEntregaFilter,
+    setTipoEntregaFilter,
     filtrosVisiveisMobile,
     setFiltrosVisiveisMobile,
-    modalCriacaoDatasAberto,
-    setModalCriacaoDatasAberto,
-    rascunhoCriacaoRange,
-    mesCalendarioCriacao,
-    setMesCalendarioCriacao,
-    rascunhoHoraCriacaoInicio,
-    setRascunhoHoraCriacaoInicio,
-    rascunhoHoraCriacaoFim,
-    setRascunhoHoraCriacaoFim,
-    modalFinalizacaoDatasAberto,
-    setModalFinalizacaoDatasAberto,
-    rascunhoFinalizacaoRange,
-    mesCalendarioFinalizacao,
-    setMesCalendarioFinalizacao,
-    rascunhoHoraFinalizacaoInicio,
-    setRascunhoHoraFinalizacaoInicio,
-    rascunhoHoraFinalizacaoFim,
-    setRascunhoHoraFinalizacaoFim,
+    modalPeriodoDatasAberto,
+    setModalPeriodoDatasAberto,
+    rascunhoPeriodoRange,
+    mesCalendarioPeriodo,
+    setMesCalendarioPeriodo,
+    rascunhoHoraPeriodoInicio,
+    setRascunhoHoraPeriodoInicio,
+    rascunhoHoraPeriodoFim,
+    setRascunhoHoraPeriodoFim,
     vendasUnificadasQueryParams,
     handleClearFilters,
-    abrirModalCriacaoDatas,
-    handleRascunhoCriacaoRangeChange,
-    aplicarCriacaoDatas,
-    aplicarCriacaoTodos,
-    abrirModalFinalizacaoDatas,
-    handleRascunhoFinalizacaoRangeChange,
-    aplicarFinalizacaoDatas,
-    aplicarFinalizacaoTodos,
-  } = useFiscalKanbanFilters()
-  const { timezoneAgregacao, preferenciasImpressaoDelivery, empresa } = useEmpresaMe()
+    handleRascunhoPeriodoRangeChange,
+    aplicarPeriodoDatas,
+    aplicarPeriodoPreset,
+  } = useFiscalKanbanFilters(timezoneAgregacao)
   const { auth } = useAuthStore()
+  const hasKanbanToken = !!auth?.getAccessToken()
   const queryClient = useQueryClient()
   const empresaId = useTenantEmpresaId()
   const [entregadorPorVendaId, setEntregadorPorVendaId] = useState<Record<string, string>>({})
@@ -197,7 +197,6 @@ export function FiscalFlowKanban() {
     abaDetalhesInicial?: import('../pedidos/types').AbaDetalhesPedido
   } | null>(null)
   const [draggingVenda, setDraggingVenda] = useState<Venda | null>(null)
-  const [confirmandoCobrancaIds, setConfirmandoCobrancaIds] = useState<Record<string, boolean>>({})
   const [terminalFilter, setTerminalFilter] = useState('')
   const [terminais, setTerminais] = useState<TerminalOpcao[]>([])
   const [isLoadingTerminais, setIsLoadingTerminais] = useState(false)
@@ -218,10 +217,25 @@ export function FiscalFlowKanban() {
 
   const isModoDeliveryKanban = modoKanbanVendas === 'delivery'
 
+  /** Período unificado: criação nas colunas operacionais; finalização nas colunas fiscais. */
+  const enviarFiltroCriacaoNaDeliveryApi = Boolean(
+    vendasUnificadasQueryParams.dataCriacaoInicial || vendasUnificadasQueryParams.dataCriacaoFinal
+  )
+  const enviarFiltroFinalizacaoNaDeliveryApi = Boolean(
+    vendasUnificadasQueryParams.dataFinalizacaoInicio ||
+      vendasUnificadasQueryParams.dataFinalizacaoFim
+  )
+
   const { data: meiosPagamentoInfiniteData } = useMeiosPagamentoInfinite({
     ativo: true,
     limit: 100,
     enabled: isModoDeliveryKanban,
+  })
+
+  /** Pré-carrega entregadores no cache React Query para o painel lateral do card. */
+  useEntregadoresQuery({
+    enabled: hasKanbanToken && isModoDeliveryKanban,
+    token: auth?.getAccessToken(),
   })
 
   const nomesMeiosPagamentoKanban = useMemo(() => {
@@ -243,15 +257,16 @@ export function FiscalFlowKanban() {
   const infiniteQueryKey = useMemo(
     () =>
       isModoDeliveryKanban
-        ? pedidosDeliveryInfiniteQueryKey(pedidosDeliveryQueryParams, empresaId)
+        ? ['delivery', 'pedidos', 'infinite', empresaId, 'columns'] as const
         : vendasUnificadasInfiniteQueryKey(vendasUnificadasQueryParams, empresaId),
     [
       isModoDeliveryKanban,
-      pedidosDeliveryQueryParams,
       vendasUnificadasQueryParams,
       empresaId,
     ]
   )
+
+  const getEtapaKanbanParaExibicaoRef = useRef<(v: Venda) => string>(v => v.getEtapaKanban())
 
   const loadAllTerminais = useCallback(async () => {
     const token = auth?.getAccessToken()
@@ -299,8 +314,21 @@ export function FiscalFlowKanban() {
   }, [auth])
 
   useEffect(() => {
+    if (isModoDeliveryKanban) return
     void loadAllTerminais()
-  }, [loadAllTerminais])
+  }, [isModoDeliveryKanban, loadAllTerminais])
+
+  useEffect(() => {
+    if (isModoDeliveryKanban && terminalFilter) {
+      setTerminalFilter('')
+    }
+  }, [isModoDeliveryKanban, terminalFilter])
+
+  useEffect(() => {
+    if (!isModoDeliveryKanban && tipoEntregaFilter) {
+      setTipoEntregaFilter('')
+    }
+  }, [isModoDeliveryKanban, tipoEntregaFilter, setTipoEntregaFilter])
 
   const usaFiltroTerminal = !!terminalFilter.trim() && !isModoDeliveryKanban
 
@@ -377,29 +405,40 @@ export function FiscalFlowKanban() {
     fetchNextPage: fetchNextPageUnificado,
     refetch: refetchUnificado,
   } = useVendasUnificadasInfinite(vendasUnificadasQueryParams, {
-    enabled: !isModoDeliveryKanban,
-    refetchIntervalMs: KANBAN_VENDAS_REFETCH_INTERVAL_MS,
-    refetchOnWindowFocus: true,
+    // Mantém cache do balcão ao alternar modo; polling só no modo ativo.
+    enabled: hasKanbanToken,
+    refetchIntervalMs: !isModoDeliveryKanban ? KANBAN_VENDAS_REFETCH_INTERVAL_MS : false,
+    refetchOnWindowFocus: !isModoDeliveryKanban,
   })
 
-  const {
-    data: pedidosDeliveryInfiniteData,
-    isLoading: isLoadingDelivery,
-    isFetchingNextPage: isFetchingNextPageDelivery,
-    hasNextPage: hasNextPageDelivery,
-    fetchNextPage: fetchNextPageDelivery,
-    refetch: refetchDelivery,
-  } = usePedidosDeliveryKanbanSync(pedidosDeliveryQueryParams, {
-    enabled: isModoDeliveryKanban,
-    refetchIntervalMs: KANBAN_DELIVERY_DELTA_POLL_INTERVAL_MS,
-    refetchOnWindowFocus: true,
+  const deliveryKanban = usePedidosDeliveryKanbanColumns(pedidosDeliveryQueryParams, {
+    enabled: hasKanbanToken && isModoDeliveryKanban,
+    refetchIntervalMs: isModoDeliveryKanban ? KANBAN_DELIVERY_DELTA_POLL_INTERVAL_MS : false,
+    refetchOnWindowFocus: isModoDeliveryKanban,
+    enviarFiltroCriacaoNaApi: enviarFiltroCriacaoNaDeliveryApi,
+    enviarFiltroFinalizacaoNaApi: enviarFiltroFinalizacaoNaDeliveryApi,
   })
+
+  const deliveryContagem = usePedidosDeliveryContagemPorStatus(pedidosDeliveryQueryParams, {
+    enabled: hasKanbanToken && isModoDeliveryKanban,
+    enviarFiltroCriacaoNaApi: enviarFiltroCriacaoNaDeliveryApi,
+    enviarFiltroFinalizacaoNaApi: enviarFiltroFinalizacaoNaDeliveryApi,
+  })
+
+  const isLoadingDelivery = deliveryKanban.isLoading
+  const refetchDelivery = deliveryKanban.refetch
 
   const isFetchingNextPage = isModoDeliveryKanban
-    ? isFetchingNextPageDelivery
+    ? DELIVERY_KANBAN_COLUMN_IDS.some(
+        id => deliveryKanban.columnStates[id]?.isFetchingNextPage
+      )
     : isFetchingNextPageUnificado
-  const hasNextPage = isModoDeliveryKanban ? hasNextPageDelivery : hasNextPageUnificado
-  const fetchNextPage = isModoDeliveryKanban ? fetchNextPageDelivery : fetchNextPageUnificado
+  const hasNextPage = isModoDeliveryKanban
+    ? DELIVERY_KANBAN_COLUMN_IDS.some(id => deliveryKanban.columnStates[id]?.hasNextPage)
+    : hasNextPageUnificado
+  const fetchNextPage = isModoDeliveryKanban
+    ? () => undefined
+    : fetchNextPageUnificado
 
   const {
     data: vendaIdsPdvPorTerminal,
@@ -413,49 +452,56 @@ export function FiscalFlowKanban() {
 
   const refetch = useCallback(async () => {
     if (isModoDeliveryKanban) {
-      return refetchDelivery()
+      await Promise.all([refetchDelivery(), deliveryContagem.refetch()])
+      return
     }
+    await queryClient.resetQueries({ queryKey: infiniteQueryKey, exact: true })
     const [result] = await Promise.all([
       refetchUnificado(),
       usaFiltroTerminal ? refetchIdsTerminal() : Promise.resolve(),
     ])
     return result
-  }, [isModoDeliveryKanban, usaFiltroTerminal, refetchDelivery, refetchUnificado, refetchIdsTerminal])
+  }, [
+    isModoDeliveryKanban,
+    usaFiltroTerminal,
+    refetchDelivery,
+    deliveryContagem.refetch,
+    refetchUnificado,
+    refetchIdsTerminal,
+    queryClient,
+    infiniteQueryKey,
+  ])
 
   /** Normaliza refetch do infinite query para `refetchAteMudarStatusFiscal` (espera `{ data: { items } }`). */
   const refetchParaEmissaoFiscal = useCallback(async () => {
     if (isModoDeliveryKanban) {
-      const result = await refetchDelivery()
-      const { items } = flattenPedidosDeliveryInfinite(result.data)
+      await Promise.all([refetchDelivery(), deliveryContagem.refetch()])
+      const items = deliveryKanban.flattenAllItems()
       return { data: { items } }
     }
     const result = await refetchUnificado()
     const { items } = flattenVendasUnificadasInfinite(result.data)
     return { data: { items } }
-  }, [isModoDeliveryKanban, refetchDelivery, refetchUnificado])
+  }, [isModoDeliveryKanban, refetchDelivery, deliveryContagem.refetch, deliveryKanban.flattenAllItems, refetchUnificado])
+
+  const deliveryKanbanColumnStatesKey = useMemo(
+    () => JSON.stringify(deliveryKanban.columnStates),
+    [deliveryKanban.columnStates]
+  )
+
+  const flattenAllItemsDelivery = deliveryKanban.flattenAllItems
 
   const { items: todasVendasFlattened, totalCount: totalVendasApi } = useMemo(() => {
     if (isModoDeliveryKanban) {
-      const { items, totalCount } = flattenPedidosDeliveryInfinite(pedidosDeliveryInfiniteData)
-      // Em delivery, só filtrar por data de criação quando o usuário definiu explicitamente
-      // (dataCriacaoInicio/Fim não-nulos). O padrão automático "hoje" é calculado via
-      // intervaloCriacaoPadrao no hook de filtros e não deve excluir pedidos ativos criados
-      // ontem à noite (ex.: pedido criado às 22h UTC-4 = 02h UTC do dia seguinte).
-      const filtradas = filtrarPedidosDeliveryKanbanPorDatasToolbar(items, {
-        ...vendasUnificadasQueryParams,
-        dataCriacaoInicial: dataCriacaoInicio?.toISOString() ?? undefined,
-        dataCriacaoFinal: dataCriacaoFim?.toISOString() ?? undefined,
-      })
-      return { items: filtradas, totalCount: filtradas.length || totalCount }
+      const items = flattenAllItemsDelivery()
+      return { items, totalCount: items.length }
     }
     return flattenVendasUnificadasInfinite(vendasUnificadasInfiniteData)
   }, [
     isModoDeliveryKanban,
-    pedidosDeliveryInfiniteData,
+    deliveryKanbanColumnStatesKey,
+    flattenAllItemsDelivery,
     vendasUnificadasInfiniteData,
-    vendasUnificadasQueryParams,
-    dataCriacaoInicio,
-    dataCriacaoFim,
   ])
 
   /** Lista do unificado; com terminal, só PDV cujo id está no Set do POS. */
@@ -475,28 +521,54 @@ export function FiscalFlowKanban() {
             v.isPedidoEntregaGestor() &&
             String(v.tipoVenda ?? '').trim().toLowerCase() === 'entrega'
         )
+        .filter(v =>
+          COLUNAS_ENTREGA_OPERACIONAIS.includes(
+            getEtapaKanbanParaExibicaoRef.current(v) as ColunaKanbanId
+          )
+        )
+        .filter(v => {
+          if (String(v.entregador?.id ?? '').trim()) return false
+          if (entregadorPorVendaId[v.id]?.trim()) return false
+          if (entregadorKanbanJaVerificado(v.id)) return false
+          return true
+        })
         .map(v => v.id)
         .sort()
         .join('|'),
-    [todasVendasCarregadas]
+    [todasVendasCarregadas, entregadorPorVendaId]
   )
 
   const entregadorPorVendaIdRef = useRef(entregadorPorVendaId)
   entregadorPorVendaIdRef.current = entregadorPorVendaId
 
+  const todasVendasCarregadasRef = useRef(todasVendasCarregadas)
+  todasVendasCarregadasRef.current = todasVendasCarregadas
+
+  const entregadoresHydrationEmAndamentoRef = useRef(false)
+
   useEffect(() => {
     if (modoKanbanVendas !== 'delivery') return
+    if (isLoadingDelivery) return
     const token = auth?.getAccessToken()
     if (!token || !entregadoresHydrationKey) return
+    if (entregadoresHydrationEmAndamentoRef.current) return
 
+    const idsParaHidratar = entregadoresHydrationKey.split('|').filter(Boolean)
+    if (idsParaHidratar.length === 0) return
+
+    entregadoresHydrationEmAndamentoRef.current = true
     let cancelled = false
 
     void (async () => {
-      const vendasRef = todasVendasCarregadas
+      const vendasRef = todasVendasCarregadasRef.current
         .filter(
           v =>
+            idsParaHidratar.includes(v.id) &&
             v.isPedidoEntregaGestor() &&
-            String(v.tipoVenda ?? '').trim().toLowerCase() === 'entrega'
+            String(v.tipoVenda ?? '').trim().toLowerCase() === 'entrega' &&
+            COLUNAS_ENTREGA_OPERACIONAIS.includes(
+              getEtapaKanbanParaExibicaoRef.current(v) as ColunaKanbanId
+            )
         )
         .map(v => ({
           id: v.id,
@@ -506,9 +578,24 @@ export function FiscalFlowKanban() {
           entregador: v.entregador,
         }))
 
+      if (vendasRef.length === 0) {
+        entregadoresHydrationEmAndamentoRef.current = false
+        return
+      }
+
       const updatesSummary = hidratarEntregadoresKanbanDesdeSummary(vendasRef)
       if (Object.keys(updatesSummary).length > 0) {
-        setEntregadorPorVendaId(prev => ({ ...prev, ...updatesSummary }))
+        setEntregadorPorVendaId(prev => {
+          const next = { ...prev }
+          let changed = false
+          for (const [vendaId, entregadorId] of Object.entries(updatesSummary)) {
+            if (next[vendaId] !== entregadorId) {
+              next[vendaId] = entregadorId
+              changed = true
+            }
+          }
+          return changed ? next : prev
+        })
       }
 
       const idsJaConhecidos = new Set([
@@ -529,6 +616,8 @@ export function FiscalFlowKanban() {
         idsJaConhecidos,
       })
 
+      entregadoresHydrationEmAndamentoRef.current = false
+
       if (cancelled || Object.keys(updates).length === 0) return
 
       setEntregadorPorVendaId(prev => {
@@ -547,9 +636,10 @@ export function FiscalFlowKanban() {
     return () => {
       cancelled = true
     }
-  }, [auth, modoKanbanVendas, entregadoresHydrationKey, todasVendasCarregadas])
+  }, [auth, modoKanbanVendas, entregadoresHydrationKey, isLoadingDelivery])
 
   const temMaisVendasParaCarregar = useMemo(() => {
+    if (isModoDeliveryKanban) return false
     if (hasNextPage) return true
     if (
       !usaFiltroTerminal &&
@@ -559,37 +649,101 @@ export function FiscalFlowKanban() {
       return true
     }
     return false
-  }, [hasNextPage, usaFiltroTerminal, totalVendasApi, todasVendasCarregadas.length])
+  }, [
+    isModoDeliveryKanban,
+    hasNextPage,
+    usaFiltroTerminal,
+    totalVendasApi,
+    todasVendasCarregadas.length,
+  ])
 
   const handleCarregarMaisVendas = useCallback(() => {
+    if (isModoDeliveryKanban) return
     if (isFetchingNextPage || !temMaisVendasParaCarregar) return
     void fetchNextPage()
-  }, [isFetchingNextPage, temMaisVendasParaCarregar, fetchNextPage])
+  }, [
+    isModoDeliveryKanban,
+    isFetchingNextPage,
+    temMaisVendasParaCarregar,
+    fetchNextPage,
+  ])
 
   const { onColumnScroll: onGlobalColumnScroll } =
     useKanbanColumnScrollLoadMore(handleCarregarMaisVendas)
 
+  const columnScrollTickingRef = useRef(false)
+
+  const deliveryColumnStatesRef = useRef(deliveryKanban.columnStates)
+  deliveryColumnStatesRef.current = deliveryKanban.columnStates
+
+  const fetchNextPageForColumnDelivery = deliveryKanban.fetchNextPageForColumn
+
   const handleColumnScroll = useCallback(
-    (_columnId: ColunaKanbanId, event: React.UIEvent<HTMLDivElement>) => {
+    (columnId: ColunaKanbanId, event: React.UIEvent<HTMLDivElement>) => {
+      if (isModoDeliveryKanban) {
+        const state = deliveryColumnStatesRef.current[columnId]
+        if (!state?.hasNextPage || state.isFetchingNextPage) return
+        if (columnScrollTickingRef.current) return
+        const el = event.currentTarget
+        if (!el) return
+        columnScrollTickingRef.current = true
+        requestAnimationFrame(() => {
+          columnScrollTickingRef.current = false
+          const distanciaDoFim = el.scrollHeight - el.scrollTop - el.clientHeight
+          if (distanciaDoFim <= 120) {
+            fetchNextPageForColumnDelivery(columnId)
+          }
+        })
+        return
+      }
       onGlobalColumnScroll(event)
     },
-    [onGlobalColumnScroll]
+    [isModoDeliveryKanban, fetchNextPageForColumnDelivery, onGlobalColumnScroll]
   )
 
-  // Contagem por coluna derivada dos itens já em cache — sem requisições extras.
   const deliveryColumnCounts = useMemo((): Record<string, number> => {
     if (!isModoDeliveryKanban) return {}
-    const counts: Record<string, number> = {}
-    for (const item of todasVendasFlattened) {
-      if (!item.statusEtapaOperacional) continue
-      counts[item.statusEtapaOperacional] = (counts[item.statusEtapaOperacional] ?? 0) + 1
-    }
-    return counts
-  }, [isModoDeliveryKanban, todasVendasFlattened])
 
-  const handleAtualizarListagem = useCallback(() => {
-    void refetch()
-  }, [refetch])
+    const finalizadasState = deliveryKanban.columnStates.FINALIZADAS
+    const { items: poolFinalizados } = flattenPedidosDeliveryInfinite(finalizadasState?.data)
+
+    const finalizadoTotal = Math.max(
+      deliveryContagem.finalizadoTotal,
+      finalizadasState?.totalCount ?? 0
+    )
+
+    return combinarContagensColunasDeliveryKanban(
+      deliveryContagem.operacional,
+      finalizadoTotal,
+      poolFinalizados,
+      v => getEtapaKanbanParaExibicaoRef.current(v),
+      finalizadasState?.hasNextPage ?? false,
+      deliveryKanban.columnStates
+    )
+  }, [
+    isModoDeliveryKanban,
+    deliveryContagem.operacional,
+    deliveryContagem.finalizadoTotal,
+    deliveryKanbanColumnStatesKey,
+    deliveryKanban.columnStates,
+  ])
+
+  /**
+   * Remove o card fixado no topo de uma coluna (pin de "primeiro da lista").
+   * Chamado quando o usuário escolhe explicitamente um critério/direção de ordenação,
+   * para que o card recém-movido volte a participar da ordenação normal.
+   */
+  const limparPinColuna = useCallback(
+    (columnId: string) => {
+      setPrimeiroPorColuna(prev => {
+        if (!prev[columnId]) return prev
+        const next = { ...prev }
+        delete next[columnId]
+        return next
+      })
+    },
+    [setPrimeiroPorColuna]
+  )
 
   const handleClearFiltersComTerminal = useCallback(() => {
     handleClearFilters()
@@ -603,20 +757,36 @@ export function FiscalFlowKanban() {
   const emitirNotaPdv = useEmitirNfe()
   const emitirNotaGestor = useEmitirNfeGestor()
   const emitirNotaDelivery = useEmitirNfeDelivery()
-  const transicaoPedidoDelivery = useTransicaoPedidoDelivery()
 
   const sincronizarVendaAposTransicao = useCallback(
-    (vendaId: string, respostaTransicao: unknown): boolean => {
+    (vendaId: string, respostaTransicao: unknown, colunaDestino?: ColunaKanbanId): boolean => {
+      if (isModoDeliveryKanban) {
+        const fallback =
+          todasVendasCarregadasRef.current.find(v => v.id === vendaId) ?? null
+        const ok = sincronizarVendaDeliveryKanbanColumnCaches(
+          queryClient,
+          vendaId,
+          respostaTransicao,
+          fallback,
+          colunaDestino
+        )
+        if (ok) {
+          const cardAtualizado =
+            extrairVendaUnificadaDeRespostaDeliverySummary(respostaTransicao)
+          if (cardAtualizado?.entregador?.id) {
+            definirEntregadorKanbanCache(vendaId, cardAtualizado.entregador.id)
+            setEntregadorPorVendaId(prev => ({
+              ...prev,
+              [vendaId]: cardAtualizado.entregador!.id,
+            }))
+          }
+        }
+        return ok
+      }
+
       const cardAtualizado = extrairVendaUnificadaDeRespostaDeliverySummary(respostaTransicao)
       if (cardAtualizado) {
         replaceVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, cardAtualizado)
-        if (cardAtualizado.entregador?.id) {
-          definirEntregadorKanbanCache(vendaId, cardAtualizado.entregador.id)
-          setEntregadorPorVendaId(prev => ({
-            ...prev,
-            [vendaId]: cardAtualizado.entregador!.id,
-          }))
-        }
         return true
       }
 
@@ -624,21 +794,53 @@ export function FiscalFlowKanban() {
       patchVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, vendaId, patch)
       return false
     },
-    [infiniteQueryKey, queryClient]
+    [isModoDeliveryKanban, infiniteQueryKey, queryClient]
   )
 
+  const transicaoPedidoDelivery = useTransicaoPedidoDelivery({
+    onPedidoTransicionado: sincronizarVendaAposTransicao,
+  })
+
   const agendarSincronizacaoLista = useCallback(
-    (vendaId: string) => {
+    (vendaId: string, colunaDestino?: ColunaKanbanId, onRecovered?: () => void) => {
       const token = auth?.getAccessToken()
       if (!token) return
-      void sincronizarPedidoDeliveryKanbanEmBackground(
-        queryClient,
-        infiniteQueryKey,
-        vendaId,
-        token
-      )
+      void (async () => {
+        try {
+          const response = await fetch(
+            `/api/delivery/pedidos/${encodeURIComponent(vendaId)}`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: 'application/json',
+              },
+              cache: 'no-store',
+            }
+          )
+          if (!response.ok) return
+          const data = await response.json()
+          if (isModoDeliveryKanban) {
+            const fallback =
+              todasVendasCarregadasRef.current.find(v => v.id === vendaId) ?? null
+            const ok = sincronizarVendaDeliveryKanbanColumnCaches(
+              queryClient,
+              vendaId,
+              data,
+              fallback,
+              colunaDestino
+            )
+            if (ok) onRecovered?.()
+          } else {
+            const patch = extrairPatchKanbanDeRespostaTransicao(data)
+            patchVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, vendaId, patch)
+            onRecovered?.()
+          }
+        } catch {
+          /* falha silenciosa */
+        }
+      })()
     },
-    [auth, infiniteQueryKey, queryClient]
+    [auth, isModoDeliveryKanban, infiniteQueryKey, queryClient]
   )
 
   const revalidarPagamentoAntesFinalizar = useCallback(
@@ -656,14 +858,18 @@ export function FiscalFlowKanban() {
         if (!response.ok) return false
         const data = await response.json()
         const patch = extrairPatchKanbanDeRespostaTransicao(data)
-        patchVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, vendaId, patch)
+        if (isModoDeliveryKanban) {
+          patchVendaDeliveryKanbanColumnCaches(queryClient, vendaId, patch)
+        } else {
+          patchVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, vendaId, patch)
+        }
         const status = String(patch.statusFinanceiro ?? '').trim().toLowerCase()
         return status === 'pago'
       } catch {
         return false
       }
     },
-    [auth, infiniteQueryKey, queryClient]
+    [auth, isModoDeliveryKanban, infiniteQueryKey, queryClient]
   )
 
   const abrirConfigImpressoraExpedicao = useCallback(() => {
@@ -721,14 +927,16 @@ export function FiscalFlowKanban() {
         tabelaOrigem: venda.tabelaOrigem === 'venda_gestor' ? 'venda_gestor' : 'venda',
         token,
         cacheLocal: entregadorPorVendaId,
+        // GET autoritativo: evita falso "sem entregador" quando a hidratação em background
+        // ainda não resolveu (corrida que aborta o despacho do primeiro card).
+        forcarRevalidacao: true,
       })
       return Boolean(entregadorId)
     },
     [auth, entregadorPorVendaId]
   )
 
-  const handlePagamentoPendenteAoFinalizar = useCallback((venda: Venda) => {
-    showToast.warning('Confirme o pagamento para finalizar o pedido.')
+  const abrirDetalhesPagamentoPedido = useCallback((venda: Venda) => {
     setPedidoVisualizacaoContext({
       id: venda.id,
       tabelaOrigem: venda.tabelaOrigem,
@@ -739,49 +947,48 @@ export function FiscalFlowKanban() {
     setNovoPedidoModalVisualizacaoOpen(true)
   }, [])
 
-  const handleConfirmarCobrancaKanban = useCallback(
+  const confirmarPagamentoAntesFinalizar = useCallback(
     async (venda: Venda) => {
       const token = auth?.getAccessToken()
       if (!token) {
         showToast.error('Sessão expirada.')
-        return
+        return false
       }
-
-      setConfirmandoCobrancaIds(prev => ({ ...prev, [venda.id]: true }))
       try {
         const pedidoAtualizado = await confirmarCobrancaPendentePedidoDeliveryUseCase.execute(
           venda.id,
           token
         )
-        const patch = extrairPatchKanbanDeRespostaTransicao(pedidoAtualizado)
-        patchVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, venda.id, patch)
+        if (isModoDeliveryKanban) {
+          sincronizarVendaDeliveryKanbanColumnCaches(
+            queryClient,
+            venda.id,
+            pedidoAtualizado,
+            todasVendasCarregadasRef.current.find(x => x.id === venda.id) ?? null
+          )
+        } else {
+          const patch = extrairPatchKanbanDeRespostaTransicao(pedidoAtualizado)
+          patchVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, venda.id, patch)
+        }
         invalidarPedidoKanbanQuickViewCache(venda.id)
-        showToast.success('Cobrança confirmada.')
+        return true
       } catch (error) {
         const mensagem =
-          error instanceof Error ? error.message : 'Não foi possível confirmar a cobrança.'
+          error instanceof Error ? error.message : 'Não foi possível confirmar o pagamento.'
         showToast.error(mensagem)
-        void sincronizarPedidoDeliveryKanbanEmBackground(
-          queryClient,
-          infiniteQueryKey,
-          venda.id,
-          token
-        )
-      } finally {
-        setConfirmandoCobrancaIds(prev => {
-          const next = { ...prev }
-          delete next[venda.id]
-          return next
-        })
+        return false
       }
     },
-    [auth, infiniteQueryKey, queryClient]
+    [auth, isModoDeliveryKanban, infiniteQueryKey, queryClient]
   )
+
+  const [vendaIdAbrirEntregador, setVendaIdAbrirEntregador] = useState<string | null>(null)
 
   const {
     avancandoEtapaIds,
     etapaLocalPorVendaId,
     timestampsEtapaEntregaLocal,
+    limparEstadoUiTransicao,
     handleAvancarEtapa,
     moverEntregaPorDrag,
     finalizarEntregaPorDrag,
@@ -794,9 +1001,16 @@ export function FiscalFlowKanban() {
     },
     verificarImpressaoAntesTransicoes,
     verificarEntregadorAntesDespachar,
-    onPagamentoPendenteAoFinalizar: handlePagamentoPendenteAoFinalizar,
+    onEntregadorAusenteAoDespachar: venda => setVendaIdAbrirEntregador(venda.id),
+    confirmarPagamentoAntesFinalizar,
     revalidarPagamentoAntesFinalizar,
   })
+
+  const handleAtualizarListagem = useCallback(async () => {
+    limparEstadoUiTransicao()
+    setPrimeiroPorColuna({})
+    await refetch()
+  }, [limparEstadoUiTransicao, refetch, setPrimeiroPorColuna])
 
   const { acaoFiscalEmAndamentoPorVenda, getEtapaKanbanParaExibicao: getEtapaKanbanFiscal, handleEmitirNfe } =
     useFiscalEmissaoKanban({
@@ -823,6 +1037,8 @@ export function FiscalFlowKanban() {
     },
     [acaoFiscalEmAndamentoPorVenda, etapaLocalPorVendaId, getEtapaKanbanFiscal]
   )
+
+  getEtapaKanbanParaExibicaoRef.current = getEtapaKanbanParaExibicao
 
   // REJEITADA com solicitarEmissaoFiscal false: reativa com o mesmo PATCH de "marcar emissão" (useMarcarEmissaoFiscal)
   useEffect(() => {
@@ -894,6 +1110,95 @@ export function FiscalFlowKanban() {
   }, [isModoDeliveryKanban, todasVendasCarregadas, modoKanbanVendas])
 
   const vendasPorColuna = useMemo(() => {
+    const ordenarColuna = (columnId: string, vendas: Venda[]): Venda[] => {
+      const vendasUnicas = new Map<string, Venda>()
+      vendas.forEach(venda => {
+        if (!vendasUnicas.has(venda.id)) {
+          vendasUnicas.set(venda.id, venda)
+        }
+      })
+
+      const colId = columnId as ColunaKanbanId
+      const criterio = criterioOrdenacaoPorColuna[colId] ?? ('data' as CriterioOrdenacaoKanban)
+      const direcao = direcaoOrdenacaoPorColuna[colId] ?? ('desc' as DirecaoOrdenacaoKanban)
+      let ordenadas = ordenarVendasKanbanPorCriterio(
+        Array.from(vendasUnicas.values()),
+        criterio,
+        direcao,
+        v => dataOrdenacaoCardKanban(colId, v, timestampsEtapaEntregaLocal[v.id])
+      )
+
+      const pinId = primeiroPorColuna[columnId]
+      if (pinId) {
+        const idx = ordenadas.findIndex(v => v.id === pinId)
+        if (idx > 0) {
+          const [pinned] = ordenadas.splice(idx, 1)
+          ordenadas = [pinned, ...ordenadas]
+        }
+      }
+
+      // Card em transição otimista para esta coluna vai ao topo imediatamente: durante "Avançando..."
+      // a data ainda é a antiga, então sem isso ele entraria na posição da data anterior e só "subiria"
+      // após a API atualizar a data (efeito de movimento em 2 etapas).
+      const idsEmTransicao = new Set(
+        ordenadas.filter(v => etapaLocalPorVendaId[v.id] === colId).map(v => v.id)
+      )
+      if (idsEmTransicao.size > 0) {
+        const emTransicao = ordenadas.filter(v => idsEmTransicao.has(v.id))
+        const resto = ordenadas.filter(v => !idsEmTransicao.has(v.id))
+        ordenadas = [...emTransicao, ...resto]
+      }
+
+      return ordenadas
+    }
+
+    if (isModoDeliveryKanban) {
+      const map: Partial<Record<ColunaKanbanId, Venda[]>> = {}
+      for (const columnId of DELIVERY_KANBAN_COLUMN_IDS) {
+        const state = deliveryKanban.columnStates[columnId]
+        const { items } = flattenPedidosDeliveryInfinite(state?.data)
+        let vendas = items.filter(v => {
+          if (
+            isColunaKanbanDeliveryFiscalSplit(columnId) &&
+            !vendaPertenceColunaDeliveryKanban(v, columnId, getEtapaKanbanParaExibicao)
+          ) {
+            return false
+          }
+          // Card em transição otimista sai da coluna de origem na hora (evita duplicata e dá feedback imediato de "mudou de coluna").
+          const etapaLocal = etapaLocalPorVendaId[v.id]
+          if (etapaLocal && etapaLocal !== columnId) {
+            return false
+          }
+          return filtrarVendaDeliveryKanbanColunaPorDatasToolbar(
+            v,
+            columnId,
+            vendasUnificadasQueryParams
+          )
+        })
+
+        if (!isColunaKanbanDeliveryFiscalSplit(columnId)) {
+          for (const [vendaId, colunaDestino] of Object.entries(etapaLocalPorVendaId)) {
+            if (colunaDestino !== columnId) continue
+            if (vendas.some(v => v.id === vendaId)) continue
+            const vendaTransicao = todasVendasCarregadas.find(v => v.id === vendaId)
+            if (
+              vendaTransicao &&
+              filtrarVendaDeliveryKanbanColunaPorDatasToolbar(
+                vendaTransicao,
+                columnId,
+                vendasUnificadasQueryParams
+              )
+            ) {
+              vendas = [...vendas, vendaTransicao]
+            }
+          }
+        }
+
+        map[columnId] = ordenarColuna(columnId, vendas)
+      }
+      return map
+    }
+
     const construirListaColuna = (columnId: string): Venda[] => {
       let vendas: Venda[] = []
       switch (columnId) {
@@ -918,16 +1223,9 @@ export function FiscalFlowKanban() {
           )
           break
         case 'FINALIZADAS':
-          if (modoKanbanVendas === 'delivery') {
-            vendas = todasVendas.filter((v: Venda) => {
-              const etapa = getEtapaKanbanParaExibicao(v)
-              return etapa === 'FINALIZADAS' || etapa === 'PENDENTE_EMISSAO'
-            })
-          } else {
-            vendas = todasVendas.filter(
-              (v: Venda) => getEtapaKanbanParaExibicao(v) === 'FINALIZADAS'
-            )
-          }
+          vendas = todasVendas.filter(
+            (v: Venda) => getEtapaKanbanParaExibicao(v) === 'FINALIZADAS'
+          )
           break
         case 'PENDENTE_EMISSAO':
           vendas = todasVendas.filter(
@@ -943,32 +1241,7 @@ export function FiscalFlowKanban() {
           return []
       }
 
-      const vendasUnicas = new Map<string, Venda>()
-      vendas.forEach(venda => {
-        if (!vendasUnicas.has(venda.id)) {
-          vendasUnicas.set(venda.id, venda)
-        }
-      })
-
-      const colId = columnId as ColunaKanbanId
-      const criterio = criterioOrdenacaoPorColuna[colId] ?? ('data' as CriterioOrdenacaoKanban)
-      const direcao = direcaoOrdenacaoPorColuna[colId] ?? ('desc' as DirecaoOrdenacaoKanban)
-      let ordenadas = ordenarVendasKanbanPorCriterio(
-        Array.from(vendasUnicas.values()),
-        criterio,
-        direcao
-      )
-
-      const pinId = primeiroPorColuna[columnId]
-      if (pinId) {
-        const idx = ordenadas.findIndex(v => v.id === pinId)
-        if (idx > 0) {
-          const [pinned] = ordenadas.splice(idx, 1)
-          ordenadas = [pinned, ...ordenadas]
-        }
-      }
-
-      return ordenadas
+      return ordenarColuna(columnId, vendas)
     }
 
     const ids: ColunaKanbanId[] = [
@@ -988,20 +1261,33 @@ export function FiscalFlowKanban() {
   }, [
     todasVendas,
     modoKanbanVendas,
+    isModoDeliveryKanban,
+    deliveryKanban.columnStates,
     getEtapaKanbanParaExibicao,
+    etapaLocalPorVendaId,
+    timestampsEtapaEntregaLocal,
+    todasVendasCarregadas,
     criterioOrdenacaoPorColuna,
     direcaoOrdenacaoPorColuna,
     primeiroPorColuna,
+    vendasUnificadasQueryParams,
   ])
 
   const getColumnTotalCount = useCallback(
     (columnId: ColunaKanbanId): number => {
-      if (isModoDeliveryKanban && deliveryColumnCounts[columnId] != null) {
-        return deliveryColumnCounts[columnId]
+      if (isModoDeliveryKanban) {
+        if (deliveryColumnCounts[columnId] != null) {
+          return deliveryColumnCounts[columnId]
+        }
+        const listApiTotal = deliveryKanban.columnStates[columnId]?.totalCount
+        if (typeof listApiTotal === 'number') {
+          return listApiTotal
+        }
+        return 0
       }
       return vendasPorColuna[columnId]?.length ?? 0
     },
-    [isModoDeliveryKanban, deliveryColumnCounts, vendasPorColuna]
+    [isModoDeliveryKanban, deliveryColumnCounts, deliveryKanban.columnStates, vendasPorColuna]
   )
 
   // Colunas fixas do Kanban (entrega → fiscal)
@@ -1248,15 +1534,7 @@ export function FiscalFlowKanban() {
     return []
   }
 
-  const mostrarLoadingInicial = isLoading && todasVendas.length === 0
-
-  if (mostrarLoadingInicial) {
-    return (
-      <div className="flex h-full items-center justify-center bg-gray-50">
-        <JiffyLoading />
-      </div>
-    )
-  }
+  const mostrarLoadingLista = isLoading && todasVendas.length === 0
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-gray-50">
@@ -1268,19 +1546,17 @@ export function FiscalFlowKanban() {
         onToggleFiltrosMobile={() => setFiltrosVisiveisMobile(prev => !prev)}
         origemFilter={origemFilter}
         onOrigemFilterChange={setOrigemFilter}
+        tipoEntregaFilter={tipoEntregaFilter}
+        onTipoEntregaFilterChange={setTipoEntregaFilter}
         terminalFilter={terminalFilter}
         onTerminalFilterChange={setTerminalFilter}
         terminais={terminais}
         isLoadingTerminais={isLoadingTerminais}
         origemFilterDisabled={usaFiltroTerminal}
-        dataCriacaoInicio={dataCriacaoInicio}
-        dataCriacaoFim={dataCriacaoFim}
-        onCriacaoTodos={aplicarCriacaoTodos}
-        onOpenCriacaoDatas={abrirModalCriacaoDatas}
-        dataFinalizacaoInicio={dataFinalizacaoInicio}
-        dataFinalizacaoFim={dataFinalizacaoFim}
-        onFinalizacaoTodos={aplicarFinalizacaoTodos}
-        onOpenFinalizacaoDatas={abrirModalFinalizacaoDatas}
+        periodoPreset={periodoPreset}
+        onPeriodoPresetChange={aplicarPeriodoPreset}
+        periodoInicio={periodoInicioConsulta}
+        periodoFim={periodoFimConsulta}
         onClearFilters={handleClearFiltersComTerminal}
         modoKanbanVendas={modoKanbanVendas}
         onModoKanbanVendasChange={setModoKanbanVendas}
@@ -1296,16 +1572,16 @@ export function FiscalFlowKanban() {
       ) : null}
 
       <JiffySidePanelModal
-        open={modalCriacaoDatasAberto}
-        onClose={() => setModalCriacaoDatasAberto(false)}
-        title="Escolha o período de criação"
+        open={modalPeriodoDatasAberto}
+        onClose={() => setModalPeriodoDatasAberto(false)}
+        title="Escolha o período"
         panelClassName="!bg-[#f9fafb] w-[45vw] min-w-[260px] max-w-[min(100vw-1rem,95vw)] sm:min-w-[280px]"
         scrollableBody={false}
         footerSlot={
           <button
             type="button"
-            disabled={!rascunhoCriacaoRange?.from || !rascunhoCriacaoRange?.to}
-            onClick={aplicarCriacaoDatas}
+            disabled={!rascunhoPeriodoRange?.from || !rascunhoPeriodoRange?.to}
+            onClick={aplicarPeriodoDatas}
             className="rounded-b-l-lg font-nunito flex h-full w-full items-center justify-center bg-primary text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Aplicar
@@ -1316,59 +1592,28 @@ export function FiscalFlowKanban() {
           <FaturamentoRangeCalendar
             embutidoNoModal
             embutidoFundoClaro
-            range={rascunhoCriacaoRange}
-            onRangeChange={handleRascunhoCriacaoRangeChange}
-            month={mesCalendarioCriacao}
-            onMonthChange={setMesCalendarioCriacao}
+            range={rascunhoPeriodoRange}
+            onRangeChange={handleRascunhoPeriodoRangeChange}
+            month={mesCalendarioPeriodo}
+            onMonthChange={setMesCalendarioPeriodo}
             timeZoneEmpresa={timezoneAgregacao}
-            horaInicio={rascunhoHoraCriacaoInicio}
-            horaFim={rascunhoHoraCriacaoFim}
+            horaInicio={rascunhoHoraPeriodoInicio}
+            horaFim={rascunhoHoraPeriodoFim}
             onHorariosChange={(hi, hf) => {
-              setRascunhoHoraCriacaoInicio(hi)
-              setRascunhoHoraCriacaoFim(hf)
+              setRascunhoHoraPeriodoInicio(hi)
+              setRascunhoHoraPeriodoFim(hf)
             }}
           />
         </div>
       </JiffySidePanelModal>
 
-      <JiffySidePanelModal
-        open={modalFinalizacaoDatasAberto}
-        onClose={() => setModalFinalizacaoDatasAberto(false)}
-        title="Escolha o período de finalização"
-        panelClassName="!bg-[#f9fafb] w-[45vw] min-w-[260px] max-w-[min(100vw-1rem,95vw)] sm:min-w-[280px]"
-        scrollableBody={false}
-        footerSlot={
-          <button
-            type="button"
-            disabled={!rascunhoFinalizacaoRange?.from || !rascunhoFinalizacaoRange?.to}
-            onClick={aplicarFinalizacaoDatas}
-            className="rounded-b-l-lg font-nunito flex h-full w-full items-center justify-center bg-primary text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Aplicar
-          </button>
-        }
-      >
-        <div className="flex min-h-0 w-full flex-1 flex-col items-stretch justify-start overflow-x-auto overflow-y-auto">
-          <FaturamentoRangeCalendar
-            embutidoNoModal
-            embutidoFundoClaro
-            range={rascunhoFinalizacaoRange}
-            onRangeChange={handleRascunhoFinalizacaoRangeChange}
-            month={mesCalendarioFinalizacao}
-            onMonthChange={setMesCalendarioFinalizacao}
-            timeZoneEmpresa={timezoneAgregacao}
-            horaInicio={rascunhoHoraFinalizacaoInicio}
-            horaFim={rascunhoHoraFinalizacaoFim}
-            onHorariosChange={(hi, hf) => {
-              setRascunhoHoraFinalizacaoInicio(hi)
-              setRascunhoHoraFinalizacaoFim(hf)
-            }}
-          />
-        </div>
-      </JiffySidePanelModal>
-
-      {/* Kanban Board */}
+      {/* Kanban Board — loading só na área das colunas; toolbar permanece visível */}
       <div className="scrollbar-thin mb-[10px] min-h-0 flex-1 overflow-x-auto p-2 pb-4">
+        {mostrarLoadingLista ? (
+          <div className="flex h-full min-h-[200px] items-center justify-center">
+            <JiffyLoading />
+          </div>
+        ) : (
         <DndContext
           sensors={sensors}
           onDragStart={handleDragStart}
@@ -1388,19 +1633,31 @@ export function FiscalFlowKanban() {
                   count={columnTotalCount}
                   criterioOrdenacao={criterioOrdenacaoPorColuna[colId] ?? 'data'}
                   direcaoOrdenacao={direcaoOrdenacaoPorColuna[colId] ?? 'desc'}
-                  onCriterioOrdenacaoChange={(columnId, criterio) =>
+                  onCriterioOrdenacaoChange={(columnId, criterio) => {
                     setCriterioOrdenacaoPorColuna(prev => ({
                       ...prev,
                       [columnId]: criterio,
                     }))
-                  }
-                  onToggleDirecaoOrdenacao={columnId =>
+                    limparPinColuna(columnId)
+                  }}
+                  onToggleDirecaoOrdenacao={columnId => {
                     setDirecaoOrdenacaoPorColuna(prev => ({
                       ...prev,
                       [columnId]: prev[columnId] === 'asc' ? 'desc' : 'asc',
                     }))
-                  }
+                    limparPinColuna(columnId)
+                  }}
                   onColumnScroll={handleColumnScroll}
+                  columnFooter={
+                    isModoDeliveryKanban &&
+                    deliveryKanban.columnStates[colId]?.isFetchingNextPage
+                      ? (
+                          <p className="py-2 text-center text-xs text-gray-500">
+                            Carregando mais vendas…
+                          </p>
+                        )
+                      : undefined
+                  }
                 >
                   {columnVendas.map((venda: Venda) => (
                     <FiscalKanbanVendaCard
@@ -1426,15 +1683,23 @@ export function FiscalFlowKanban() {
                       entregadorVinculadoId={
                         entregadorPorVendaId[venda.id] ?? venda.entregador?.id ?? null
                       }
+                      abrirEntregadorSolicitado={vendaIdAbrirEntregador === venda.id}
+                      onAbrirEntregadorConsumido={() => setVendaIdAbrirEntregador(null)}
                       onEntregadorAtualizado={(vendaId, entregadorId) => {
-                        setEntregadorPorVendaId(prev => ({ ...prev, [vendaId]: entregadorId }))
+                        definirEntregadorKanbanCache(vendaId, entregadorId)
+                        setEntregadorPorVendaId(prev => {
+                          if (!entregadorId) {
+                            const { [vendaId]: _removido, ...resto } = prev
+                            return resto
+                          }
+                          return { ...prev, [vendaId]: entregadorId }
+                        })
                       }}
                       onConfirmarCobranca={
                         modoKanbanVendas === 'delivery'
-                          ? vendaAtual => void handleConfirmarCobrancaKanban(vendaAtual)
+                          ? vendaAtual => abrirDetalhesPagamentoPedido(vendaAtual)
                           : undefined
                       }
-                      confirmandoCobrancaIds={confirmandoCobrancaIds}
                       nomesMeiosPagamento={nomesMeiosPagamentoKanban}
                     />
                   ))}
@@ -1446,7 +1711,8 @@ export function FiscalFlowKanban() {
             {draggingVenda ? <VendaCardDragPreview venda={draggingVenda} /> : null}
           </DragOverlay>
         </DndContext>
-        {isFetchingNextPage ? (
+        )}
+        {!mostrarLoadingLista && isFetchingNextPage && !isModoDeliveryKanban ? (
           <p className="px-2 pb-2 text-center text-xs text-gray-500">Carregando mais vendas…</p>
         ) : null}
       </div>

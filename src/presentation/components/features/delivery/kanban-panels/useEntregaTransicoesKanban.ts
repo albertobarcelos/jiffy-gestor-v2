@@ -25,9 +25,15 @@ interface UseEntregaTransicoesKanbanParams {
   /** Retorna true quando a resposta summary já atualizou o card (sem GET extra). */
   sincronizarVendaAposTransicao?: (
     vendaId: string,
-    respostaTransicao: unknown
+    respostaTransicao: unknown,
+    colunaDestino?: ColunaKanbanId
   ) => boolean | void
-  agendarSincronizacaoLista?: (vendaId: string) => void
+  /** Reconsulta lista após transição incompleta; `onRecovered` limpa UI otimista quando o cache foi corrigido. */
+  agendarSincronizacaoLista?: (
+    vendaId: string,
+    colunaDestino?: ColunaKanbanId,
+    onRecovered?: () => void
+  ) => void
   onAfterTransicaoSucesso?: (ctx: {
     venda: Venda
     acoesExecutadas: AcaoTransicaoGestor[]
@@ -38,8 +44,10 @@ interface UseEntregaTransicoesKanbanParams {
     acoes: AcaoTransicaoGestor[]
   ) => Promise<VerificarImpressaoKanbanResult>
   verificarEntregadorAntesDespachar?: (venda: Venda) => Promise<boolean>
-  /** Quando finalizar exige pagamento quitado: abrir detalhes em vez de chamar a API. */
-  onPagamentoPendenteAoFinalizar?: (venda: Venda) => void
+  /** Sem entregador ao despachar: abrir o modal de vínculo de entregador do card. */
+  onEntregadorAusenteAoDespachar?: (venda: Venda) => void
+  /** Quando finalizar exige pagamento quitado e ele ainda está pendente: confirma a cobrança automaticamente (retorna true se confirmado). */
+  confirmarPagamentoAntesFinalizar?: (venda: Venda) => Promise<boolean>
   /** Reconsulta pagamento no delivery antes de bloquear finalização (lista unificada pode estar defasada). */
   revalidarPagamentoAntesFinalizar?: (vendaId: string) => Promise<boolean>
 }
@@ -52,7 +60,8 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
     onAfterTransicaoSucesso,
     verificarImpressaoAntesTransicoes,
     verificarEntregadorAntesDespachar,
-    onPagamentoPendenteAoFinalizar,
+    onEntregadorAusenteAoDespachar,
+    confirmarPagamentoAntesFinalizar,
     revalidarPagamentoAntesFinalizar,
   } = params
 
@@ -95,15 +104,22 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
       venda: Venda,
       acoesExecutadas: AcaoTransicaoGestor[],
       respostaTransicao: unknown,
+      colunaDestino: ColunaKanbanId,
       ticketsPreload?: VendaGestorTicketsResponse
     ) => {
       marcarTransicaoLocal(venda.id)
-      const cardCompleto = sincronizarVendaAposTransicao?.(venda.id, respostaTransicao)
-      limparEtapaLocal(venda.id)
+      const cardCompleto = sincronizarVendaAposTransicao?.(
+        venda.id,
+        respostaTransicao,
+        colunaDestino
+      )
+      if (cardCompleto) {
+        limparEtapaLocal(venda.id)
+      }
       showToast.success('Etapa do pedido atualizada.')
       void onAfterTransicaoSucesso?.({ venda, acoesExecutadas, ticketsPreload })
       if (!cardCompleto) {
-        agendarSincronizacaoLista?.(venda.id)
+        agendarSincronizacaoLista?.(venda.id, colunaDestino, () => limparEtapaLocal(venda.id))
       }
     },
     [
@@ -122,6 +138,13 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
     [limparEtapaLocal]
   )
 
+  /** Limpa UI otimista de transição (etapa local, timestamps, loading) — ex.: refresh manual do Kanban. */
+  const limparEstadoUiTransicao = useCallback(() => {
+    setAvancandoEtapaIds({})
+    setTimestampsEtapaEntregaLocal({})
+    setEtapaLocalPorVendaId({})
+  }, [])
+
   const finalizarEntrega = useCallback(
     async (venda: Venda) => {
       if (vendaPrecisaConfirmarPagamentoParaFinalizar(venda)) {
@@ -129,14 +152,16 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
           ? await revalidarPagamentoAntesFinalizar(venda.id)
           : false
         if (!quitado) {
-          onPagamentoPendenteAoFinalizar?.(venda)
-          return
+          const confirmado = confirmarPagamentoAntesFinalizar
+            ? await confirmarPagamentoAntesFinalizar(venda)
+            : false
+          if (!confirmado) return
         }
       }
       iniciarTransicaoUi(venda.id, 'FINALIZADAS')
       try {
         const resposta = await executarTransicao({ id: venda.id, acao: 'finalizar' })
-        concluirTransicaoComSucesso(venda, ['finalizar'], resposta)
+        concluirTransicaoComSucesso(venda, ['finalizar'], resposta, 'FINALIZADAS')
       } catch (error) {
         reverterTransicaoUi(venda.id)
         throw error
@@ -149,7 +174,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
       executarTransicao,
       finalizarTransicaoUi,
       iniciarTransicaoUi,
-      onPagamentoPendenteAoFinalizar,
+      confirmarPagamentoAntesFinalizar,
       revalidarPagamentoAntesFinalizar,
       reverterTransicaoUi,
     ]
@@ -181,6 +206,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
           const podeDespachar = await verificarEntregadorAntesDespachar(venda)
           if (!podeDespachar) {
             showToast.error('Vincule um entregador antes de despachar para entrega.')
+            onEntregadorAusenteAoDespachar?.(venda)
             reverterTransicaoUi(venda.id)
             return
           }
@@ -191,7 +217,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
             ? await executarTransicao({ id: venda.id, acoes })
             : await executarTransicao({ id: venda.id, acao: acoes[0] })
 
-        concluirTransicaoComSucesso(venda, acoes, resposta, ticketsPreload)
+        concluirTransicaoComSucesso(venda, acoes, resposta, colunaDestino, ticketsPreload)
       } catch (error) {
         reverterTransicaoUi(venda.id)
         throw error
@@ -204,6 +230,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
       executarTransicao,
       finalizarTransicaoUi,
       iniciarTransicaoUi,
+      onEntregadorAusenteAoDespachar,
       reverterTransicaoUi,
       verificarEntregadorAntesDespachar,
       verificarImpressaoAntesTransicoes,
@@ -259,6 +286,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
     avancandoEtapaIds,
     etapaLocalPorVendaId,
     timestampsEtapaEntregaLocal,
+    limparEstadoUiTransicao,
     handleAvancarEtapa,
     moverEntregaPorDrag,
     finalizarEntregaPorDrag,

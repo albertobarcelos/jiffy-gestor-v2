@@ -24,7 +24,7 @@ export function formatarValorComplemento(
       return `- ${valorFormatado}`
     case 'nenhum':
     default:
-      return `( ${valorFormatado} )`
+      return formatarNumeroComMilhar(0)
   }
 }
 

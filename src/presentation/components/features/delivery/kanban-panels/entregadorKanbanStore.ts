@@ -2,6 +2,16 @@ import { salvarPedidoDeliveryDetalheCache } from '@/src/infrastructure/api/pedid
 
 const entregadorPorVendaId = new Map<string, string>()
 const entregadorAusentePorVendaId = new Set<string>()
+/** IDs com GET de hidratação já disparado (evita duplicata quando colunas carregam em paralelo). */
+const entregadorHydrationSolicitadaPorVendaId = new Set<string>()
+
+export function marcarEntregadorHydrationSolicitada(vendaId: string): void {
+  entregadorHydrationSolicitadaPorVendaId.add(vendaId)
+}
+
+export function entregadorHydrationJaSolicitada(vendaId: string): boolean {
+  return entregadorHydrationSolicitadaPorVendaId.has(vendaId)
+}
 
 export function definirEntregadorKanbanCache(
   vendaId: string,
@@ -34,8 +44,15 @@ export async function resolverEntregadorIdVendaKanban(args: {
   tabelaOrigem: 'venda' | 'venda_gestor'
   token: string
   cacheLocal?: Record<string, string>
+  /**
+   * Ignora caches negativos (ausente) e hidratação ainda em andamento, forçando um GET
+   * autoritativo. Usado antes de despachar: a hidratação em background pode ter marcado
+   * `hydrationJaSolicitada` mas ainda não ter resolvido o fetch, o que retornaria `null`
+   * (falso "sem entregador") e abortaria a transição.
+   */
+  forcarRevalidacao?: boolean
 }): Promise<string | null> {
-  const { vendaId, tabelaOrigem, token, cacheLocal } = args
+  const { vendaId, tabelaOrigem, token, cacheLocal, forcarRevalidacao } = args
 
   const doCacheLocal = cacheLocal?.[vendaId]?.trim()
   if (doCacheLocal) return doCacheLocal
@@ -43,9 +60,17 @@ export async function resolverEntregadorIdVendaKanban(args: {
   const doCacheGlobal = obterEntregadorKanbanCache(vendaId)
   if (doCacheGlobal) return doCacheGlobal
 
-  if (entregadorAusentePorVendaId.has(vendaId)) {
-    return null
+  if (!forcarRevalidacao) {
+    if (entregadorAusentePorVendaId.has(vendaId)) {
+      return null
+    }
+
+    if (entregadorHydrationJaSolicitada(vendaId)) {
+      return obterEntregadorKanbanCache(vendaId)
+    }
   }
+
+  marcarEntregadorHydrationSolicitada(vendaId)
 
   const url =
     tabelaOrigem === 'venda_gestor'
@@ -68,7 +93,10 @@ export async function resolverEntregadorIdVendaKanban(args: {
         },
         cache: 'no-store',
       })
-      if (!fallback.ok) return null
+      if (!fallback.ok) {
+        marcarEntregadorKanbanAusente(vendaId)
+        return null
+      }
       const fallbackData = (await fallback.json()) as Record<string, unknown>
       const entregadorIdFallback = String(fallbackData.entregadorId ?? '').trim()
       if (entregadorIdFallback) {
@@ -78,7 +106,10 @@ export async function resolverEntregadorIdVendaKanban(args: {
       marcarEntregadorKanbanAusente(vendaId)
       return null
     }
-    if (!response.ok) return null
+    if (!response.ok) {
+      marcarEntregadorKanbanAusente(vendaId)
+      return null
+    }
 
     const data = (await response.json()) as Record<string, unknown>
     if (tabelaOrigem === 'venda_gestor' && url.includes('/api/delivery/pedidos/')) {
@@ -97,16 +128,20 @@ export async function resolverEntregadorIdVendaKanban(args: {
     marcarEntregadorKanbanAusente(vendaId)
     return null
   } catch {
+    marcarEntregadorKanbanAusente(vendaId)
     return null
   }
 }
 
 export async function salvarEntregadorPedidoDelivery(args: {
   vendaId: string
-  entregadorId: string
+  /** `null` remove o entregador do pedido (envia `entregadorId: null` no PATCH). */
+  entregadorId: string | null
   token: string
-}): Promise<void> {
+}): Promise<Record<string, unknown>> {
   const { vendaId, entregadorId, token } = args
+  const entregadorIdNormalizado = entregadorId?.trim() ? entregadorId.trim() : null
+
   const response = await fetch(`/api/delivery/pedidos/${encodeURIComponent(vendaId)}`, {
     method: 'PATCH',
     headers: {
@@ -114,7 +149,7 @@ export async function salvarEntregadorPedidoDelivery(args: {
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
-    body: JSON.stringify({ entregadorId }),
+    body: JSON.stringify({ entregadorId: entregadorIdNormalizado }),
   })
 
   if (!response.ok) {
@@ -122,19 +157,28 @@ export async function salvarEntregadorPedidoDelivery(args: {
     throw new Error(
       (errorData as { error?: string; message?: string }).error ||
         (errorData as { error?: string; message?: string }).message ||
-        'Erro ao vincular entregador'
+        (entregadorIdNormalizado ? 'Erro ao vincular entregador' : 'Erro ao remover entregador')
     )
   }
 
-  definirEntregadorKanbanCache(vendaId, entregadorId)
+  const pedidoRaw = await response.json().catch(() => ({}))
+  const pedido = salvarPedidoDeliveryDetalheCache(vendaId, pedidoRaw)
+
+  if (entregadorIdNormalizado) {
+    definirEntregadorKanbanCache(vendaId, entregadorIdNormalizado)
+  } else {
+    marcarEntregadorKanbanAusente(vendaId)
+  }
+
+  return pedido
 }
 
 /** @deprecated Use `salvarEntregadorPedidoDelivery` — mantido para compatibilidade de imports. */
 export async function salvarEntregadorVendaGestor(args: {
   vendaId: string
-  entregadorId: string
+  entregadorId: string | null
   token: string
-}): Promise<void> {
+}): Promise<Record<string, unknown>> {
   return salvarEntregadorPedidoDelivery(args)
 }
 
@@ -164,6 +208,29 @@ export function hidratarEntregadoresKanbanDesdeSummary(
   }
 
   return updates
+}
+
+/** Limite de GETs paralelos ao hidratar entregadores sem summary na listagem. */
+export const ENTRAGADOR_KANBAN_HYDRATION_CONCURRENCY = 5
+
+async function executarComConcorrencia<T>(
+  items: T[],
+  concorrencia: number,
+  executar: (item: T) => Promise<void>
+): Promise<void> {
+  if (items.length === 0) return
+  const fila = [...items]
+  const workers = Array.from(
+    { length: Math.min(concorrencia, fila.length) },
+    async () => {
+      while (fila.length > 0) {
+        const item = fila.shift()
+        if (item == null) break
+        await executar(item)
+      }
+    }
+  )
+  await Promise.all(workers)
 }
 
 /**
@@ -196,11 +263,15 @@ export async function hidratarEntregadoresKanbanDesdeApi(args: {
       continue
     }
 
+    if (entregadorHydrationJaSolicitada(venda.id)) continue
+
     precisaFetch.push(venda)
   }
 
-  await Promise.all(
-    precisaFetch.map(async venda => {
+  await executarComConcorrencia(
+    precisaFetch,
+    ENTRAGADOR_KANBAN_HYDRATION_CONCURRENCY,
+    async venda => {
       const entregadorId = await resolverEntregadorIdVendaKanban({
         vendaId: venda.id,
         tabelaOrigem: venda.tabelaOrigem,
@@ -209,7 +280,7 @@ export async function hidratarEntregadoresKanbanDesdeApi(args: {
       if (entregadorId) {
         updates[venda.id] = entregadorId
       }
-    })
+    }
   )
 
   return updates

@@ -6,10 +6,12 @@ import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { abrirDocumentoFiscalPdf, tipoDocFiscalFromModelo } from '@/src/presentation/utils/abrirDocumentoFiscalPdf'
 import { showToast } from '@/src/shared/utils/toast'
 import { MdCreditCard, MdDelete } from 'react-icons/md'
-import { pagamentoComDestaqueCanceladoDetalhes } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
+// Mantido para uso futuro (pagamento efetivado e depois cancelado):
+// import { pagamentoComDestaqueCanceladoDetalhes } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import { statusFiscalEhEmitida } from '@/src/domain/services/pedido/RegrasFiscaisVenda'
 import { obterUnidadeMedidaProdutoLinha } from '../produtoCatalogoHelpers'
 import { formatarQuantidadeProdutoExibicao } from '@/src/shared/utils/quantidadeProdutoInput'
+import { formatarUnidadeMedidaProdutoExibicao } from '@/src/shared/types/unidadeMedidaProduto'
 import {
   rotuloOrigemExibicao,
   taxaEntregaTemValor,
@@ -355,9 +357,14 @@ export function PedidoDetalhesView() {
                                     Qtd
                                   </span>
                                 </div>
-                                <div className="flex-[4]">
+                                <div className="min-w-0 flex-[4]">
                                   <span className="text-xs font-semibold text-gray-700">
                                     Produto
+                                  </span>
+                                </div>
+                                <div className="w-11 shrink-0">
+                                  <span className="block text-center text-xs font-semibold text-gray-700">
+                                    Unid.
                                   </span>
                                 </div>
                                 <div className="flex flex-1 justify-end">
@@ -422,6 +429,12 @@ export function PedidoDetalhesView() {
                                             </span>
                                           ) : null}
                                         </div>
+                                        {/* Unidade de medida */}
+                                        <div className="w-11 shrink-0">
+                                          <span className="block text-center text-xs text-gray-600">
+                                            {formatarUnidadeMedidaProdutoExibicao(unidadeMedida)}
+                                          </span>
+                                        </div>
                                         {/* Desconto/Acréscimo */}
                                         <div className="flex-1">
                                           <span className="block text-right text-xs text-gray-600">
@@ -466,6 +479,7 @@ export function PedidoDetalhesView() {
                                                 {complemento.nome}
                                               </span>
                                             </div>
+                                            <div className="w-11 shrink-0" aria-hidden />
                                             {/* Espaço vazio para Desconto/Acréscimo (complementos não têm) */}
                                             <div className="flex-1"></div>
                                             {/* Valor Unitário do Complemento - Apenas exibição */}
@@ -768,34 +782,32 @@ export function PedidoDetalhesView() {
                               const Icone = meio
                                 ? obterIconeMeioPagamento(meio.getNome())
                                 : MdCreditCard
-                              const emCancelado = pagamentoComDestaqueCanceladoDetalhes(pagamento)
-                              const usuarioPagamento = emCancelado
-                                ? pagamento.canceladoPorId || pagamento.realizadoPorId
-                                : pagamento.realizadoPorId
-                              const dataPagamento = emCancelado
-                                ? pagamento.dataCancelamento || pagamento.dataCriacao
-                                : pagamento.dataCriacao
+                              // Pagamentos cancelados são ocultados nesta aba
+                              // (ver pagamentoDeveAparecerNosDetalhesPedido). A formatação de
+                              // cancelado abaixo está comentada e preservada para uso futuro:
+                              // quando houver pagamento efetivado e depois cancelado.
+                              // const emCancelado = pagamentoComDestaqueCanceladoDetalhes(pagamento)
+                              const usuarioPagamento = pagamento.realizadoPorId
+                              const dataPagamento = pagamento.dataCriacao
 
                               return (
                                 <div
                                   key={index}
-                                  className={`flex min-w-[120px] flex-col items-center justify-center gap-1 rounded-lg border-2 p-3 ${
-                                    emCancelado
-                                      ? 'border-red-400 bg-red-50'
-                                      : 'border-primary bg-white'
-                                  }`}
+                                  className="flex min-w-[120px] flex-col items-center justify-center gap-1 rounded-lg border-2 border-primary bg-white p-3"
+                                  // className={`flex min-w-[120px] flex-col items-center justify-center gap-1 rounded-lg border-2 p-3 ${
+                                  //   emCancelado
+                                  //     ? 'border-red-400 bg-red-50'
+                                  //     : 'border-primary bg-white'
+                                  // }`}
                                 >
-                                  <Icone
-                                    className={`h-8 w-8 ${emCancelado ? 'text-red-600' : 'text-primary'}`}
-                                  />
-                                  <span
-                                    className={`text-center text-xs font-medium ${emCancelado ? 'text-red-900' : ''}`}
-                                  >
+                                  <Icone className="h-8 w-8 text-primary" />
+                                  {/* <Icone className={`h-8 w-8 ${emCancelado ? 'text-red-600' : 'text-primary'}`} /> */}
+                                  <span className="text-center text-xs font-medium">
+                                    {/* className={`text-center text-xs font-medium ${emCancelado ? 'text-red-900' : ''}`} */}
                                     {nomeMeio}
                                   </span>
-                                  <span
-                                    className={`text-sm font-semibold ${emCancelado ? 'text-red-700' : 'text-primary'}`}
-                                  >
+                                  <span className="text-sm font-semibold text-primary">
+                                    {/* className={`text-sm font-semibold ${emCancelado ? 'text-red-700' : 'text-primary'}`} */}
                                     {transformarParaReal(pagamento.valor)}
                                   </span>
                                   {podeAjustarPagamentoEntregaEmAberto && (
@@ -814,38 +826,36 @@ export function PedidoDetalhesView() {
                                       Remover
                                     </button>
                                   )}
+                                  {/* Futuro: pagamento efetivado e depois cancelado
                                   {emCancelado && (
                                     <span className="text-center text-[11px] font-semibold text-red-600">
                                       Pagamento Cancelado
                                     </span>
-                                  )}
-                                  {!emCancelado && (pagamento.cobrarNaEntrega || pagamento.naoEfetivo) && (
+                                  )} */}
+                                  {(pagamento.cobrarNaEntrega || pagamento.naoEfetivo) && (
                                     <span className="text-center text-[11px] font-semibold text-amber-600">
                                       A cobrar na entrega
                                     </span>
                                   )}
-                                  {!emCancelado && !pagamento.cobrarNaEntrega && !pagamento.naoEfetivo && (
+                                  {!pagamento.cobrarNaEntrega && !pagamento.naoEfetivo && (
                                     <span className="text-center text-[11px] font-semibold text-green-600">
                                       Efetivo / Pago
                                     </span>
                                   )}
-                                  <span
-                                    className={`text-center text-[11px] ${emCancelado ? 'text-red-800/80' : 'text-gray-500'}`}
-                                  >
-                                    {emCancelado ? 'Cancelado por' : 'Por'}:{' '}
-                                    {formatarUsuarioPorId(usuarioPagamento)}
+                                  <span className="text-center text-[11px] text-gray-500">
+                                    {/* className={`text-center text-[11px] ${emCancelado ? 'text-red-800/80' : 'text-gray-500'}`} */}
+                                    {/* {emCancelado ? 'Cancelado por' : 'Por'}:{' '} */}
+                                    Por: {formatarUsuarioPorId(usuarioPagamento)}
                                   </span>
                                   {dataPagamento && (
-                                    <span
-                                      className={`text-center text-[11px] ${emCancelado ? 'text-red-800/80' : 'text-gray-500'}`}
-                                    >
+                                    <span className="text-center text-[11px] text-gray-500">
+                                      {/* className={`text-center text-[11px] ${emCancelado ? 'text-red-800/80' : 'text-gray-500'}`} */}
                                       {formatarDataDetalhePedido(dataPagamento)}
                                     </span>
                                   )}
                                   {pagamento.isTefUsed && (
-                                    <span
-                                      className={`text-center text-[11px] ${emCancelado ? 'text-red-700' : 'text-gray-500'}`}
-                                    >
+                                    <span className="text-center text-[11px] text-gray-500">
+                                      {/* className={`text-center text-[11px] ${emCancelado ? 'text-red-700' : 'text-gray-500'}`} */}
                                       TEF:{' '}
                                       {pagamento.isTefConfirmed === true
                                         ? 'Confirmado'

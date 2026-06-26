@@ -1,9 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { MdLocationOn } from 'react-icons/md'
 import { atualizarEnderecoEntregaPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/AtualizarEnderecoEntregaPedidoDeliveryUseCase'
+import { alterarTipoEntregaPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/AlterarTipoEntregaPedidoDeliveryUseCase'
+import type { TipoEntregaDeliveryApi } from '@/src/application/dto/api/pedidoDeliveryApi'
 import { formatarEnderecoEntregaMultilinha } from '@/src/application/mappers/PedidoDisplayMapper'
 import {
   Dialog,
@@ -29,12 +31,16 @@ import { showToast } from '@/src/shared/utils/toast'
 import { invalidateKanbanVendasListagens } from '@/features/kanban/hooks/kanbanListagemQueryCache'
 import { invalidateVendaDetalheCarregadaCache } from '@/src/presentation/components/features/pedidos/hooks/data/useVendaDetalheCarregadaQuery'
 import { invalidarPedidoKanbanQuickViewCache } from './carregarPedidoKanbanQuickView'
+import { salvarPedidoDeliveryDetalheCache } from '@/src/infrastructure/api/pedidoDeliveryDetalheCache'
 import {
   extrairContextoEnderecoDeVendaKanban,
   extrairContextoEnderecoPedidoDeliveryApi,
+  extrairTipoEntregaPedidoDeliveryApi,
+  normalizarTipoEntregaVendaKanban,
   pedidoDeliveryPatchUrl,
   type ContextoEnderecoPedidoKanban,
 } from './enderecoEntregaPedidoKanban'
+import { marcarEntregadorKanbanAusente } from './entregadorKanbanStore'
 import type { Venda } from '@/src/presentation/components/features/kanban/types'
 
 type ModoAlteracaoEndereco = 'morada' | 'manual'
@@ -119,6 +125,8 @@ export function EnderecoEntregaPedidoKanbanPainel({
   const [enderecoAtual, setEnderecoAtual] =
     useState<ContextoEnderecoPedidoKanban['enderecoAtual']>(null)
   const [modo, setModo] = useState<ModoAlteracaoEndereco>('morada')
+  const [tipoAtual, setTipoAtual] = useState<TipoEntregaDeliveryApi>('entrega')
+  const [tipoSelecionado, setTipoSelecionado] = useState<TipoEntregaDeliveryApi>('entrega')
   const [moradaSelecionadaId, setMoradaSelecionadaId] = useState<string | null>(null)
   const [formManual, setFormManual] = useState<FormEnderecoManual>(() =>
     formManualFromEnderecoAtual(null)
@@ -132,8 +140,16 @@ export function EnderecoEntregaPedidoKanbanPainel({
     [enderecoAtual]
   )
 
+  const abaEntregaInicializadaRef = useRef(false)
+
   const carregarPedido = useCallback(async () => {
     if (!open || !venda) return
+
+    abaEntregaInicializadaRef.current = false
+
+    const tipoDoCard = normalizarTipoEntregaVendaKanban(venda)
+    setTipoAtual(tipoDoCard)
+    setTipoSelecionado(tipoDoCard)
 
     const contextoDoCard = extrairContextoEnderecoDeVendaKanban(venda)
     if (contextoDoCard) {
@@ -167,12 +183,17 @@ export function EnderecoEntregaPedidoKanbanPainel({
         const message =
           typeof errorData.error === 'string'
             ? errorData.error
-            : 'Não foi possível carregar o endereço do pedido.'
+            : 'Não foi possível carregar o pedido.'
         showToast.error(message)
         return
       }
 
       const data = await response.json()
+      const tipoPedido = extrairTipoEntregaPedidoDeliveryApi(data)
+      setTipoAtual(tipoPedido)
+      setTipoSelecionado(tipoPedido)
+      salvarPedidoDeliveryDetalheCache(venda.id, data)
+
       const contexto = extrairContextoEnderecoPedidoDeliveryApi(data)
 
       setTelefoneCliente(contexto.telefone?.replace(/\D/g, '') || null)
@@ -182,7 +203,7 @@ export function EnderecoEntregaPedidoKanbanPainel({
       setMoradaSelecionadaId(contexto.enderecoDeliveryIdRef)
       setModo('morada')
     } catch {
-      showToast.error('Erro ao carregar endereço do pedido.')
+      showToast.error('Erro ao carregar dados do pedido.')
     } finally {
       setCarregando(false)
     }
@@ -199,34 +220,46 @@ export function EnderecoEntregaPedidoKanbanPainel({
       setEnderecoAtual(null)
       setMoradaSelecionadaId(null)
       setModo('morada')
+      setTipoAtual('entrega')
+      setTipoSelecionado('entrega')
       setFormManual(formManualFromEnderecoAtual(null))
     }
   }, [open, venda, carregarPedido])
 
+  // Define a aba inicial ao entrar em "entrega": "Morada salva" (com a última morada
+  // usada pré-selecionada) quando há moradas; "Correção manual" quando não há nenhuma.
+  // Roda só uma vez por sessão de entrega, preservando a troca de aba feita pelo operador.
   useEffect(() => {
-    if (!open || carregando || moradasQuery.isLoading) return
-    if (modo !== 'morada') return
-    if (moradaSelecionadaId && moradas.some(m => m.id === moradaSelecionadaId)) return
-    if (enderecoDeliveryIdRef && moradas.some(m => m.id === enderecoDeliveryIdRef)) {
-      setMoradaSelecionadaId(enderecoDeliveryIdRef)
+    if (tipoSelecionado !== 'entrega') {
+      abaEntregaInicializadaRef.current = false
       return
     }
+    if (!open || carregando || moradasQuery.isLoading) return
+    if (abaEntregaInicializadaRef.current) return
+    abaEntregaInicializadaRef.current = true
+
     if (moradas.length === 0) {
       setModo('manual')
-    } else if (moradas.length === 1) {
+      return
+    }
+
+    setModo('morada')
+    if (enderecoDeliveryIdRef && moradas.some(m => m.id === enderecoDeliveryIdRef)) {
+      setMoradaSelecionadaId(enderecoDeliveryIdRef)
+    } else {
       setMoradaSelecionadaId(moradas[0].id)
     }
   }, [
     carregando,
     enderecoDeliveryIdRef,
-    modo,
-    moradaSelecionadaId,
     moradas,
     moradasQuery.isLoading,
     open,
+    tipoSelecionado,
   ])
 
-  const temAlteracao = useMemo(() => {
+  const enderecoMudou = useMemo(() => {
+    if (tipoSelecionado !== 'entrega') return false
     if (modo === 'morada') {
       return Boolean(moradaSelecionadaId && moradaSelecionadaId !== enderecoDeliveryIdRef)
     }
@@ -244,7 +277,29 @@ export function EnderecoEntregaPedidoKanbanPainel({
       normalizar(formManual.estado) !== normalizar(atual?.estado) ||
       normalizar(formManual.complemento) !== normalizar(atual?.complemento)
     )
-  }, [enderecoAtual, enderecoDeliveryIdRef, formManual, modo, moradaSelecionadaId])
+  }, [
+    enderecoAtual,
+    enderecoDeliveryIdRef,
+    formManual,
+    modo,
+    moradaSelecionadaId,
+    tipoSelecionado,
+  ])
+
+  const tipoMudou = tipoSelecionado !== tipoAtual
+  const temAlteracao = tipoMudou || enderecoMudou
+
+  const enderecoEntregaValido =
+    tipoSelecionado !== 'entrega' ||
+    (modo === 'morada' ? Boolean(moradaSelecionadaId) : enderecoManualValido(formManual))
+
+  const sincronizarCachesAposSalvar = async (vendaId: string) => {
+    queryClient.invalidateQueries({ queryKey: ['vendas'] })
+    invalidateKanbanVendasListagens(queryClient)
+    queryClient.invalidateQueries({ queryKey: ['venda', vendaId] })
+    await invalidateVendaDetalheCarregadaCache(queryClient, empresaId, vendaId)
+    invalidarPedidoKanbanQuickViewCache(vendaId)
+  }
 
   const handleSalvar = async () => {
     if (!venda) return
@@ -255,24 +310,59 @@ export function EnderecoEntregaPedidoKanbanPainel({
       return
     }
 
-    if (modo === 'morada') {
-      if (!moradaSelecionadaId) {
-        showToast.error('Selecione uma morada salva do cliente.')
-        return
-      }
-    } else if (!enderecoManualValido(formManual)) {
-      showToast.error('Preencha rua, número, bairro e CEP válido.')
+    if (tipoSelecionado === 'entrega' && !enderecoEntregaValido) {
+      showToast.error(
+        modo === 'morada'
+          ? 'Selecione uma morada salva do cliente.'
+          : 'Preencha rua, número, bairro e CEP válido.'
+      )
       return
     }
 
     setSalvando(true)
     try {
-      if (modo === 'morada') {
+      if (tipoMudou) {
+        const pedido = await alterarTipoEntregaPedidoDeliveryUseCase.execute({
+          pedidoId: venda.id,
+          token,
+          tipoAtual,
+          tipoSelecionado,
+          enderecoDeliveryId: tipoSelecionado === 'entrega' ? moradaSelecionadaId : null,
+          enderecoManual:
+            tipoSelecionado === 'entrega' && modo === 'manual'
+              ? {
+                  tipoEtiqueta: formManual.tipoEtiqueta,
+                  endereco: {
+                    rua: textoEnderecoMaiusculo(formManual.rua.trim()),
+                    numero: textoEnderecoMaiusculo(formManual.numero.trim()),
+                    bairro: textoEnderecoMaiusculo(formManual.bairro.trim()),
+                    cidade: textoEnderecoMaiusculo(formManual.cidade.trim()) || undefined,
+                    estado:
+                      textoEnderecoMaiusculo(formManual.estado.trim()).slice(0, 2) || undefined,
+                    cep: normalizarDigitosCep(formManual.cep),
+                    complemento: textoEnderecoMaiusculo(formManual.complemento.trim()) || undefined,
+                  },
+                }
+              : null,
+        })
+
+        salvarPedidoDeliveryDetalheCache(venda.id, pedido)
+        if (tipoSelecionado === 'retirada') {
+          marcarEntregadorKanbanAusente(venda.id)
+        }
+
+        showToast.success(
+          tipoSelecionado === 'retirada'
+            ? 'Pedido alterado para retirada.'
+            : 'Pedido alterado para entrega.'
+        )
+      } else if (modo === 'morada') {
         await atualizarEnderecoEntregaPedidoDeliveryUseCase.execute({
           pedidoId: venda.id,
           token,
           enderecoDeliveryId: moradaSelecionadaId,
         })
+        showToast.success('Endereço de entrega atualizado.')
       } else {
         await atualizarEnderecoEntregaPedidoDeliveryUseCase.execute({
           pedidoId: venda.id,
@@ -290,19 +380,15 @@ export function EnderecoEntregaPedidoKanbanPainel({
             },
           },
         })
+        showToast.success('Endereço de entrega atualizado.')
       }
 
-      showToast.success('Endereço de entrega atualizado.')
-      queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      invalidateKanbanVendasListagens(queryClient)
-      queryClient.invalidateQueries({ queryKey: ['venda', venda.id] })
-      await invalidateVendaDetalheCarregadaCache(queryClient, empresaId, venda.id)
-      invalidarPedidoKanbanQuickViewCache(venda.id)
+      await sincronizarCachesAposSalvar(venda.id)
       onSalvo?.(venda.id)
       onClose()
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Erro ao salvar endereço de entrega.'
+        error instanceof Error ? error.message : 'Erro ao salvar alterações do pedido.'
       showToast.error(message)
     } finally {
       setSalvando(false)
@@ -312,6 +398,10 @@ export function EnderecoEntregaPedidoKanbanPainel({
   const rotuloPedido = venda
     ? `Pedido ${venda.numeroVenda}${venda.codigoVenda ? ` - #${venda.codigoVenda}` : ''}`
     : ''
+
+  const nomeCliente = venda?.cliente?.nome?.trim()
+    ? textoEnderecoMaiusculo(venda.cliente.nome.trim())
+    : null
 
   return (
     <Dialog
@@ -367,10 +457,13 @@ export function EnderecoEntregaPedidoKanbanPainel({
       >
         <div className="shrink-0 border-b border-gray-200 bg-gray-50 px-6 py-4">
           <DialogTitle className="!p-0 text-lg font-semibold text-primary-text">
-            Alterar endereço de entrega
+            Tipo de atendimento e endereço
           </DialogTitle>
           {rotuloPedido && (
             <p className="mt-1 text-sm text-secondary-text">{rotuloPedido}</p>
+          )}
+          {nomeCliente && (
+            <p className="text-sm font-medium text-primary-text">{nomeCliente}</p>
           )}
         </div>
 
@@ -379,14 +472,54 @@ export function EnderecoEntregaPedidoKanbanPainel({
             <p className="text-sm text-secondary-text">Carregando...</p>
           ) : (
             <>
+              <div className="rounded-lg border border-primary/15 bg-white p-3">
+                <p className="mb-2 text-sm font-semibold text-primary-text">Tipo de atendimento</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTipoSelecionado('entrega')}
+                    className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
+                      tipoSelecionado === 'entrega'
+                        ? 'border-secondary bg-secondary text-white'
+                        : 'border-gray-200 bg-white text-primary-text hover:border-secondary/50'
+                    }`}
+                  >
+                    Entrega
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTipoSelecionado('retirada')}
+                    className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
+                      tipoSelecionado === 'retirada'
+                        ? 'border-secondary bg-secondary text-white'
+                        : 'border-gray-200 bg-white text-primary-text hover:border-secondary/50'
+                    }`}
+                  >
+                    Retirada
+                  </button>
+                </div>
+                {tipoMudou && tipoSelecionado === 'retirada' && (
+                  <p className="mt-2 text-xs text-amber-700">
+                    Ao salvar, o endereço e o entregador serão removidos. A taxa de entrega será
+                    removida quando o pedido ainda não estiver pago.
+                  </p>
+                )}
+              </div>
+
+              {tipoSelecionado === 'entrega' ? (
+                <>
               <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
                 <p className="text-xs font-medium text-secondary">Endereço atual no pedido</p>
                 <div className="mt-1 space-y-0.5">
-                  {enderecoAtualLinhas.map((linha, index) => (
-                    <p key={`${linha}-${index}`} className="text-sm text-gray-800">
-                      {linha}
-                    </p>
-                  ))}
+                  {enderecoAtualLinhas.length > 0 ? (
+                    enderecoAtualLinhas.map((linha, index) => (
+                      <p key={`${linha}-${index}`} className="text-sm text-gray-800">
+                        {linha}
+                      </p>
+                    ))
+                  ) : (
+                    <p className="text-sm text-gray-600">Nenhum endereço vinculado.</p>
+                  )}
                 </div>
               </div>
 
@@ -537,6 +670,14 @@ export function EnderecoEntregaPedidoKanbanPainel({
                   </p>
                 </div>
               )}
+                </>
+              ) : (
+                <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
+                  <p className="text-sm text-gray-700">
+                    Pedido configurado para retirada na loja — sem endereço de entrega.
+                  </p>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -568,14 +709,13 @@ export function EnderecoEntregaPedidoKanbanPainel({
                 salvando ||
                 carregando ||
                 !temAlteracao ||
-                (modo === 'morada' && !moradaSelecionadaId) ||
-                (modo === 'manual' && !enderecoManualValido(formManual))
+                (tipoSelecionado === 'entrega' && !enderecoEntregaValido)
               }
               isLoading={salvando}
               className="h-12 min-h-12 w-full font-semibold shadow-none"
               sx={footerSavePrimaryBarSx(false)}
             >
-              Salvar endereço
+              Salvar
             </Button>
           </div>
         </div>

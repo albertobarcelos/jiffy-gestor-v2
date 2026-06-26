@@ -18,7 +18,10 @@ import type {
   OrigemPedidoDeliveryApi,
   PedidosDeliveryQueryParams,
 } from '@/src/application/dto/api/pedidoDeliveryListApi'
-import type { StatusDeliveryApi } from '@/src/application/dto/api/pedidoDeliveryApi'
+import type {
+  StatusDeliveryApi,
+  TipoEntregaDeliveryApi,
+} from '@/src/application/dto/api/pedidoDeliveryApi'
 import { PEDIDOS_DELIVERY_KANBAN_PAGE_SIZE } from '@/src/application/dto/api/pedidoDeliveryListApi'
 
 /**
@@ -40,6 +43,8 @@ export interface FiltrosKanbanParaPedidosDelivery {
   limit?: number
   /** Filtro operacional por coluna (contagem / listagem segmentada). */
   statusDelivery?: StatusDeliveryApi | StatusDeliveryApi[]
+  /** Filtro por tipo de entrega (entrega/retirada) — modo delivery. */
+  tipoEntrega?: TipoEntregaDeliveryApi | TipoEntregaDeliveryApi[]
   /** Default operacional: excluir cancelados (`cancelado=false`). */
   cancelado?: boolean
   /** Filtro delta: retorna itens com `dataUltimaModificacao >= valor`. Usado no re-poll do Kanban. */
@@ -135,6 +140,7 @@ export function montarPedidosDeliveryQueryParams(
     limit: filtros.limit ?? PEDIDOS_DELIVERY_KANBAN_PAGE_SIZE,
     q: filtros.q?.trim() || undefined,
     statusDelivery: filtros.statusDelivery,
+    tipoEntrega: filtros.tipoEntrega,
     origem: origemApi,
     dataCriacaoInicial: filtros.dataCriacaoInicial,
     dataCriacaoFinal: filtros.dataCriacaoFinal,
@@ -150,6 +156,29 @@ export function montarPedidosDeliveryQueryString(
   filtros: FiltrosKanbanParaPedidosDelivery
 ): string {
   return serializarPedidosDeliveryQueryParams(montarPedidosDeliveryQueryParams(filtros)).toString()
+}
+
+/**
+ * Params para `GET /contagem-por-status` — mesmos filtros da listagem, sem paginação nem `statusDelivery`.
+ */
+export function montarPedidosDeliveryContagemQueryParams(
+  filtros: FiltrosKanbanParaPedidosDelivery
+): Omit<PedidosDeliveryQueryParams, 'offset' | 'limit' | 'statusDelivery'> {
+  const { offset: _o, limit: _l, statusDelivery: _s, ...contagem } = montarPedidosDeliveryQueryParams({
+    ...filtros,
+    offset: 0,
+    limit: 1,
+  })
+  return contagem
+}
+
+/** Query string para contagem por status do Kanban delivery. */
+export function montarPedidosDeliveryContagemQueryString(
+  filtros: FiltrosKanbanParaPedidosDelivery
+): string {
+  return serializarPedidosDeliveryQueryParams(
+    montarPedidosDeliveryContagemQueryParams(filtros) as PedidosDeliveryQueryParams
+  ).toString()
 }
 
 function parseOptionalNumeroQuery(value: string | null): number | undefined {

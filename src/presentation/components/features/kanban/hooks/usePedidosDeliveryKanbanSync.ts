@@ -3,19 +3,18 @@
 /**
  * Estratégia de sincronização otimizada do Kanban delivery:
  *
- * CARGA INICIAL (1 requisição)
- *   GET /api/delivery/pedidos
- *     ?statusDelivery=PENDENTE&statusDelivery=EM_PREPARO&statusDelivery=PRONTO&statusDelivery=EM_ROTA
- *     &cancelado=false
- *     &limit=100
+ * CARGA INICIAL (2 requisições em paralelo)
+ *   1) Ativos: PENDENTE | EM_PREPARO | PRONTO | EM_ROTA
+ *   2) Finalizados: statusDelivery=FINALIZADO (últimos 100)
  *
- * RE-POLL (delta — só o que mudou)
- *   GET /api/delivery/pedidos
- *     ?dataUltimaModificacaoInicial=<isoTimestamp>
- *     &cancelado=false
- *     &limit=100
+ * RE-POLL (delta — ~30s + focus)
+ *   1) Ativos: refetch dos status operacionais + filtro client-side por dataUltimaModificacao
+ *   2) Finalizados: statusDelivery=FINALIZADO + dataFinalizacaoInicial=<lastPollAt>
  *
- * Filtros de data da toolbar são aplicados client-side (não vão na API).
+ * Filtros de data da toolbar (criação) são aplicados client-side na listagem.
+ *
+ * NOTA BACKEND: `dataUltimaModificacaoInicial` ainda não existe na API delivery;
+ * o delta de ativos filtra no cliente até o backend implementar o parâmetro.
  */
 
 import { useRef, useEffect, useMemo, useCallback } from 'react'
@@ -26,20 +25,10 @@ import {
   type InfiniteData,
   type QueryClient,
 } from '@tanstack/react-query'
-import {
-  montarPedidosDeliveryQueryParams,
-  serializarPedidosDeliveryQueryParams,
-} from '@/src/application/dto/api/pedidoDeliveryListQuery'
 import { KANBAN_DELIVERY_SYNC_PAGE_SIZE } from '@/src/application/dto/api/pedidoDeliveryListApi'
 import type { StatusDeliveryApi } from '@/src/application/dto/api/pedidoDeliveryApi'
-import {
-  mapPedidosDeliveryListResponseParaVendaUnificadaDTO,
-  normalizarPedidosDeliveryListResponse,
-} from '@/src/application/mappers/PedidoDeliveryListMapper'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
-import { preservarObservacoesKanbanCacheNosItems } from '../utils/kanbanVendaCacheUpdate'
 import type { VendaUnificadaDTO } from './useVendasUnificadas'
 import {
   fetchPedidosDeliveryPagina,
@@ -50,7 +39,7 @@ import {
   type PedidosDeliveryInfiniteParams,
 } from './usePedidosDeliveryInfinite'
 
-/** Statuses carregados na carga inicial (foco operacional — FINALIZADO chega pelo delta). */
+/** Statuses carregados na carga inicial (foco operacional). */
 const STATUS_ATIVOS_KANBAN_DELIVERY: StatusDeliveryApi[] = [
   'PENDENTE',
   'EM_PREPARO',
@@ -58,7 +47,7 @@ const STATUS_ATIVOS_KANBAN_DELIVERY: StatusDeliveryApi[] = [
   'EM_ROTA',
 ]
 
-/** Params para API operacional — sem datas (toolbar filtra client-side). */
+/** Params para API operacional — sem datas de toolbar (criação filtra client-side). */
 function paramsApiOperacionaisDeliveryKanban(
   params: PedidosDeliveryInfiniteParams
 ): PedidosDeliveryInfiniteParams {
@@ -73,42 +62,99 @@ function paramsApiOperacionaisDeliveryKanban(
   return rest
 }
 
-// ---------------------------------------------------------------------------
-// Funções auxiliares
-// ---------------------------------------------------------------------------
+function deduplicarItemsPorId(items: VendaUnificadaDTO[]): VendaUnificadaDTO[] {
+  const map = new Map<string, VendaUnificadaDTO>()
+  for (const item of items) {
+    map.set(item.id, item)
+  }
+  return Array.from(map.values())
+}
 
-/** Busca delta de pedidos modificados desde `dataUltimaModificacaoInicial`. */
-async function fetchDeltaPedidosDelivery(
-  dataUltimaModificacaoInicial: string,
+function itemModificadoDesde(item: VendaUnificadaDTO, desdeIso: string): boolean {
+  const desde = new Date(desdeIso).getTime()
+  if (!Number.isFinite(desde)) return true
+  const mod = new Date(item.dataUltimaModificacao ?? item.dataCriacao).getTime()
+  if (!Number.isFinite(mod)) return true
+  return mod >= desde
+}
+
+/** Params para listar finalizados na carga inicial (com filtro de período quando ativo na toolbar). */
+function paramsFinalizadosCargaInicialKanban(
+  params: PedidosDeliveryInfiniteParams,
+  enviarFiltroFinalizacaoNaApi?: boolean
+): PedidosDeliveryInfiniteParams {
+  const base = paramsApiOperacionaisDeliveryKanban(params)
+  const temFiltroFinalizacao =
+    enviarFiltroFinalizacaoNaApi &&
+    Boolean(params.dataFinalizacaoInicio || params.dataFinalizacaoFim)
+
+  return {
+    ...base,
+    statusDelivery: 'FINALIZADO',
+    cancelado: false,
+    dataFinalizacaoInicio: temFiltroFinalizacao ? params.dataFinalizacaoInicio : undefined,
+    dataFinalizacaoFim: temFiltroFinalizacao ? params.dataFinalizacaoFim : undefined,
+  }
+}
+
+async function fetchPedidosDeliveryItems(
+  params: PedidosDeliveryInfiniteParams,
   token: string,
   queryClient: QueryClient,
   signal?: AbortSignal
 ): Promise<VendaUnificadaDTO[]> {
-  const queryParams = montarPedidosDeliveryQueryParams({
-    dataUltimaModificacaoInicial,
-    cancelado: false,
+  const page = await fetchPedidosDeliveryPagina(
+    params,
+    0,
+    KANBAN_DELIVERY_SYNC_PAGE_SIZE,
+    token,
+    signal,
+    queryClient
+  )
+  return page.items
+}
+
+// ---------------------------------------------------------------------------
+// Funções auxiliares
+// ---------------------------------------------------------------------------
+
+/** Busca delta: ativos modificados + finalizados desde `lastPollAt`. */
+async function fetchDeltaPedidosDelivery(
+  lastPollAt: string,
+  token: string,
+  queryClient: QueryClient,
+  signal?: AbortSignal
+): Promise<VendaUnificadaDTO[]> {
+  const base = {
+    cancelado: false as const,
     offset: 0,
     limit: KANBAN_DELIVERY_SYNC_PAGE_SIZE,
-  })
-  const qs = serializarPedidosDeliveryQueryParams(queryParams).toString()
-
-  const response = await fetchGestorApi(`/api/delivery/pedidos?${qs}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    cache: 'no-store',
-    signal,
-  })
-
-  if (!response.ok) {
-    throw new Error(`Delta poll: ${response.status} ${response.statusText}`)
   }
 
-  const data = await response.json()
-  const normalizado = normalizarPedidosDeliveryListResponse(data)
-  const mapeado = mapPedidosDeliveryListResponseParaVendaUnificadaDTO(normalizado)
-  return preservarObservacoesKanbanCacheNosItems(queryClient, mapeado.items)
+  const [ativosRaw, finalizados] = await Promise.all([
+    fetchPedidosDeliveryItems(
+      {
+        ...base,
+        statusDelivery: STATUS_ATIVOS_KANBAN_DELIVERY,
+      },
+      token,
+      queryClient,
+      signal
+    ),
+    fetchPedidosDeliveryItems(
+      {
+        ...base,
+        statusDelivery: 'FINALIZADO',
+        dataFinalizacaoInicio: lastPollAt,
+      },
+      token,
+      queryClient,
+      signal
+    ),
+  ])
+
+  const ativosModificados = ativosRaw.filter(item => itemModificadoDesde(item, lastPollAt))
+  return deduplicarItemsPorId([...ativosModificados, ...finalizados])
 }
 
 /**
@@ -214,7 +260,7 @@ export function usePedidosDeliveryKanbanSync(
       const paramsComStatus: PedidosDeliveryInfiniteParams =
         pageParam === 0
           ? { ...paramsApi, statusDelivery: STATUS_ATIVOS_KANBAN_DELIVERY }
-          : paramsApi
+          : { ...paramsApi, statusDelivery: STATUS_ATIVOS_KANBAN_DELIVERY }
 
       const result = await fetchPedidosDeliveryPagina(
         paramsComStatus,
@@ -226,7 +272,19 @@ export function usePedidosDeliveryKanbanSync(
       )
 
       if (pageParam === 0) {
+        const finalizados = await fetchPedidosDeliveryItems(
+          paramsFinalizadosCargaInicialKanban(params),
+          tokenRef.current!,
+          queryClient,
+          signal
+        )
+        const items = deduplicarItemsPorId([...result.items, ...finalizados])
         lastPollAtRef.current = pollStartedAt
+        return {
+          ...result,
+          items,
+          count: Math.max(result.count, items.length),
+        }
       }
 
       return result

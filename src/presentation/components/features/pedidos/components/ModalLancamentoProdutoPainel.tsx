@@ -4,6 +4,7 @@ import {
   forwardRef,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactElement,
@@ -12,7 +13,7 @@ import {
 import Modal from '@mui/material/Modal'
 import Slide from '@mui/material/Slide'
 import type { TransitionProps } from '@mui/material/transitions'
-import { MdClose } from 'react-icons/md'
+import { MdAdd, MdClose, MdRemove } from 'react-icons/md'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Textarea } from '@/src/presentation/components/ui/textarea'
@@ -28,6 +29,12 @@ import {
   observacaoTextoParcialInvalido,
   observacaoTextoValidoParaEnvio,
 } from '@/src/shared/helpers/observacaoPedido'
+import {
+  formatarNumeroComMilhar,
+  formatarValorComplemento,
+  calcularTotalComplementos,
+} from '@/src/domain/services/pedido/CalculadoraPedido'
+import { transformarParaReal } from '@/src/shared/utils/formatters'
 
 const PANEL_MS = { enter: 420, exit: 380 } as const
 
@@ -116,36 +123,15 @@ interface ModalLancamentoProdutoPainelProps {
    */
   valorUnitarioInicial?: number | null
   /**
-   * Chaves `${grupoId}-${complementoId}` pré-selecionadas (ex.: edição de linha).
-   * Aplicadas só ao abrir o painel.
+   * Quantidades por chave `${grupoId}-${complementoId}` ao abrir (ex.: edição de linha no carrinho).
+   * Complementos sem entrada iniciam em 0.
    */
-  chavesComplementosIniciais?: string[]
+  quantidadesComplementosIniciais?: Record<string, number>
   /** Exibe textarea de observação do item (modo edição de linha). */
   mostrarObservacao?: boolean
   observacaoInicial?: string
-}
-
-function formatarNumeroComMilhar(valor: number): string {
-  if (valor === 0) return '0,00'
-  const partes = valor.toFixed(2).split('.')
-  const parteInteira = partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.')
-  return `${parteInteira},${partes[1]}`
-}
-
-function formatarValorComplemento(
-  valor: number,
-  tipoImpactoPreco?: 'aumenta' | 'diminui' | 'nenhum'
-): string {
-  const valorFormatado = formatarNumeroComMilhar(valor)
-  const tipo = tipoImpactoPreco || 'nenhum'
-  switch (tipo) {
-    case 'aumenta':
-      return `+ ${valorFormatado}`
-    case 'diminui':
-      return `- ${valorFormatado}`
-    default:
-      return `( ${valorFormatado} )`
-  }
+  /** Duplo clique na linha do complemento — abre edição do cadastro do complemento. */
+  onComplementoDoubleClick?: (complementoId: string) => void
 }
 
 function produtoTemComplementosVinculados(produto: Produto): boolean {
@@ -154,24 +140,40 @@ function produtoTemComplementosVinculados(produto: Produto): boolean {
   return grupos.some(grupo => grupo.complementos && grupo.complementos.length > 0)
 }
 
+function buildMapQuantidadesComplementos(
+  produto: Produto,
+  iniciais?: Record<string, number>
+): Record<string, number> {
+  const map: Record<string, number> = {}
+  for (const grupo of produto.getGruposComplementos()) {
+    for (const comp of grupo.complementos ?? []) {
+      const chave = `${grupo.id}-${comp.id}`
+      const qtd = iniciais?.[chave]
+      map[chave] =
+        qtd != null && Number.isFinite(qtd) ? Math.max(0, Math.floor(qtd)) : 0
+    }
+  }
+  return map
+}
+
 function montarComplementosSelecionados(
   produto: Produto,
-  chaves: string[]
+  quantidades: Record<string, number>
 ): ComplementoLancamentoPainelPayload[] {
   const out: ComplementoLancamentoPainelPayload[] = []
   produto.getGruposComplementos().forEach(grupo => {
     grupo.complementos.forEach(comp => {
       const chave = `${grupo.id}-${comp.id}`
-      if (chaves.includes(chave)) {
-        out.push({
-          id: comp.id,
-          grupoId: grupo.id,
-          nome: comp.nome,
-          valor: comp.valor || 0,
-          quantidade: 1,
-          tipoImpactoPreco: comp.tipoImpactoPreco || 'nenhum',
-        })
-      }
+      const quantidade = Math.max(0, Math.floor(quantidades[chave] ?? 0))
+      if (quantidade < 1) return
+      out.push({
+        id: comp.id,
+        grupoId: grupo.id,
+        nome: comp.nome,
+        valor: comp.valor || 0,
+        quantidade,
+        tipoImpactoPreco: comp.tipoImpactoPreco || 'nenhum',
+      })
     })
   })
   return out
@@ -192,13 +194,16 @@ export function ModalLancamentoProdutoPainel({
   onConfirm,
   tituloBarra = 'Lançar na venda',
   valorUnitarioInicial,
-  chavesComplementosIniciais,
+  quantidadesComplementosIniciais,
   mostrarObservacao = false,
   observacaoInicial,
+  onComplementoDoubleClick,
 }: ModalLancamentoProdutoPainelProps) {
   const [internalOpen, setInternalOpen] = useState(open)
   const [valorInput, setValorInput] = useState('')
-  const [chavesComplementos, setChavesComplementos] = useState<string[]>([])
+  const [quantidadesComplementos, setQuantidadesComplementos] = useState<Record<string, number>>(
+    {}
+  )
   const [observacaoInput, setObservacaoInput] = useState('')
   const painelJaAbertoRef = useRef(false)
 
@@ -226,9 +231,27 @@ export function ModalLancamentoProdutoPainel({
         ? valorUnitarioInicial
         : produto.getValor()
     setValorInput(formatarNumeroComMilhar(Number.isFinite(base) && base >= 0 ? base : 0))
-    setChavesComplementos(chavesComplementosIniciais ?? [])
+    setQuantidadesComplementos(
+      buildMapQuantidadesComplementos(produto, quantidadesComplementosIniciais)
+    )
     setObservacaoInput(observacaoInicial ?? '')
-  }, [open, produto, valorUnitarioInicial, chavesComplementosIniciais, observacaoInicial])
+  }, [open, produto, valorUnitarioInicial, quantidadesComplementosIniciais, observacaoInicial])
+
+  const complementosSelecionadosPreview = useMemo(() => {
+    if (!produto || !mostrarComplementos) return []
+    return montarComplementosSelecionados(produto, quantidadesComplementos)
+  }, [produto, mostrarComplementos, quantidadesComplementos])
+
+  const totalComplementosPreview = useMemo(() => {
+    if (!mostrarComplementos || complementosSelecionadosPreview.length === 0) return 0
+    return calcularTotalComplementos({
+      produtoId: '',
+      nome: '',
+      quantidade: 1,
+      valorUnitario: 0,
+      complementos: complementosSelecionadosPreview,
+    })
+  }, [mostrarComplementos, complementosSelecionadosPreview])
 
   const parseValorMoedaParaNumero = (texto: string): number | null => {
     const limpo = texto.replace(/\./g, '').replace(',', '.').trim()
@@ -287,18 +310,18 @@ export function ModalLancamentoProdutoPainel({
     }
 
     const complementos = mostrarComplementos
-      ? montarComplementosSelecionados(produto, chavesComplementos)
+      ? montarComplementosSelecionados(produto, quantidadesComplementos)
       : []
 
     onConfirm({ valorUnitario, complementos })
     onOpenChange(false)
   }
 
-  const toggleComplemento = (grupoId: string, complementoId: string) => {
-    const chave = `${grupoId}-${complementoId}`
-    setChavesComplementos(prev =>
-      prev.includes(chave) ? prev.filter(c => c !== chave) : [...prev, chave]
-    )
+  const ajustarQuantidadeComplemento = (chave: string, delta: number) => {
+    setQuantidadesComplementos(prev => {
+      const atual = Math.max(0, Math.floor(prev[chave] ?? 0))
+      return { ...prev, [chave]: Math.max(0, atual + delta) }
+    })
   }
 
   if (!internalOpen) return null
@@ -355,10 +378,11 @@ export function ModalLancamentoProdutoPainel({
             </button>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto bg-[#f9fafb] px-4 py-4">
-            <p className="font-nunito mb-2 text-lg font-medium text-primary-text">{tituloPainel}</p>
-            <div className="h-[1px] border-t-2 border-primary/70 flex-shrink-0"></div>
-            
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[#f9fafb] px-4 py-4">
+            <div className="shrink-0">
+              <p className="font-nunito mb-2 text-lg font-medium text-primary-text">{tituloPainel}</p>
+              <div className="h-[1px] border-t-2 border-primary/70 flex-shrink-0"></div>
+            </div>
 
             {mostrarAlterarPreco ? (
               <div className="w-full grid grid-cols-2 border-b border-gray-200 pb-4 items-center gap-2 mb-6 mt-4">
@@ -389,12 +413,14 @@ export function ModalLancamentoProdutoPainel({
             ) : null}
 
             {mostrarComplementos && produto ? (
-              <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
-                <h3 className="font-nunito mb-2 text-base font-semibold text-primary">Complementos</h3>
+              <div className="mt-4 flex min-h-0 flex-1 flex-col rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
+                <h3 className="font-nunito mb-2 shrink-0 text-base font-semibold text-primary">
+                  Complementos
+                </h3>
                 {carregandoComplementos ? (
                   <p className="text-sm text-secondary-text">Carregando complementos...</p>
                 ) : produtoTemComplementosVinculados(produto) ? (
-                  <div className="max-h-[min(50vh,360px)] space-y-2 overflow-y-auto pr-1">
+                  <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
                     {produto.getGruposComplementos().map(grupo => (
                       <div key={grupo.id} className="rounded-md border border-gray-100 px-2 py-1.5">
                         <h4 className="mb-1 text-sm font-semibold text-gray-800">{grupo.nome}</h4>
@@ -402,28 +428,58 @@ export function ModalLancamentoProdutoPainel({
                           <div className="space-y-0.5">
                             {grupo.complementos.map(comp => {
                               const chaveUnica = `${grupo.id}-${comp.id}`
-                              const isSel = chavesComplementos.includes(chaveUnica)
+                              const quantidade = Math.max(
+                                0,
+                                Math.floor(quantidadesComplementos[chaveUnica] ?? 0)
+                              )
                               const valor = comp.valor || 0
                               const tipoIp = comp.tipoImpactoPreco || 'nenhum'
                               return (
                                 <div
                                   key={chaveUnica}
-                                  className="flex cursor-pointer items-center justify-between rounded bg-gray-50 px-2 py-1 hover:bg-gray-100"
-                                  onClick={() => toggleComplemento(grupo.id, comp.id)}
+                                  className="flex items-center justify-between gap-2 rounded bg-gray-50 px-2 py-1"
                                 >
-                                  <div className="flex items-center gap-2">
-                                    <input
-                                      type="checkbox"
-                                      checked={isSel}
-                                      onChange={() => toggleComplemento(grupo.id, comp.id)}
-                                      onClick={e => e.stopPropagation()}
-                                      className="h-4 w-4"
-                                    />
-                                    <span className="font-nunito text-sm">{comp.nome}</span>
-                                  </div>
-                                  <span className="text-sm font-semibold text-primary">
+                                  <span
+                                    className={`font-nunito min-w-0 flex-1 truncate text-sm${
+                                      onComplementoDoubleClick ? ' cursor-pointer' : ''
+                                    }`}
+                                    title={
+                                      onComplementoDoubleClick
+                                        ? 'Duplo clique para editar o complemento'
+                                        : undefined
+                                    }
+                                    onDoubleClick={() => onComplementoDoubleClick?.(comp.id)}
+                                  >
+                                    {comp.nome}
+                                  </span>
+                                  <span className="shrink-0 text-sm font-semibold text-primary tabular-nums">
                                     {formatarValorComplemento(valor, tipoIp)}
                                   </span>
+                                  <div className="flex shrink-0 items-center justify-center gap-0.5 rounded border border-gray-200 bg-white">
+                                    <button
+                                      type="button"
+                                      aria-label="Diminuir quantidade do complemento"
+                                      disabled={quantidade <= 0}
+                                      onClick={() => ajustarQuantidadeComplemento(chaveUnica, -1)}
+                                      className="flex h-7 w-7 items-center justify-center bg-primary/10 font-normal text-gray-600 transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-40"
+                                    >
+                                      <MdRemove className="h-4 w-4" />
+                                    </button>
+                                    <span
+                                      className="min-w-[1.25rem] text-center text-sm font-normal tabular-nums text-gray-800"
+                                      aria-label="Quantidade do complemento"
+                                    >
+                                      {quantidade}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      aria-label="Aumentar quantidade do complemento"
+                                      onClick={() => ajustarQuantidadeComplemento(chaveUnica, 1)}
+                                      className="flex h-7 w-7 items-center justify-center bg-primary/10 font-normal text-gray-600 transition-colors hover:bg-primary/20"
+                                    >
+                                      <MdAdd className="h-4 w-4" />
+                                    </button>
+                                  </div>
                                 </div>
                               )
                             })}
@@ -443,7 +499,7 @@ export function ModalLancamentoProdutoPainel({
             ) : null}
 
             {mostrarObservacao ? (
-              <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
+              <div className="mt-4 shrink-0 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
                 <h3 className="font-nunito mb-2 text-base font-semibold text-primary">
                   Observação do item
                 </h3>
@@ -465,7 +521,7 @@ export function ModalLancamentoProdutoPainel({
             ) : null}
 
             {mostrarAvisoComplementosManual ? (
-              <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
+              <div className="mt-4 shrink-0 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
                 <h3 className="font-nunito mb-2 text-base font-semibold text-primary">Complementos</h3>
                 <p className="text-sm leading-relaxed text-gray-600">
                   Os complementos não abrem automaticamente ao adicionar este produto. Depois de
@@ -478,6 +534,18 @@ export function ModalLancamentoProdutoPainel({
             ) : null}
 
           </div>
+
+          {mostrarComplementos && !mostrarObservacao ? (
+            <div
+              className="flex shrink-0 items-center justify-between gap-3 border-t border-gray-200 bg-white px-4 py-2.5"
+              aria-live="polite"
+            >
+              <span className="text-sm font-medium text-gray-600">Total dos complementos</span>
+              <span className="text-base font-semibold tabular-nums text-primary">
+                {transformarParaReal(totalComplementosPreview)}
+              </span>
+            </div>
+          ) : null}
 
           {/* Rodapé em faixa — mesmo critério que `JiffySidePanelModal` footerVariant="bar" (Editar Produto / wizard) */}
           <div className="grid w-full shrink-0 border-t border-gray-200" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>

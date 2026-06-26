@@ -52,15 +52,14 @@ export function pagamentoEntregaConfirmadoNoPedido(
 }
 
 /**
- * Lista exibida no passo 4: oculta TEF não confirmado apenas em pagamento ainda ativo (cancelados seguem visíveis).
- * Igual ao `.filter` de Pagamentos Realizados em DetalhesVendas.
+ * Lista exibida no passo 4: mostra apenas pagamentos ativos/efetivados.
+ * Oculta cancelados (o backend cancela o pagamento anterior ao trocar a forma de pagamento,
+ * gerando um "cancelado" que nunca foi efetivado) e TEF não confirmado em pagamento ativo.
  */
 export function pagamentoDeveAparecerNosDetalhesPedido(p: PagamentoSelecionado): boolean {
-  const isCancelado = pagamentoEstaCancelado(p)
+  if (pagamentoEstaCancelado(p)) return false
   const usaTef = p.isTefUsed === true
-  if (usaTef && !isCancelado) {
-    if (p.isTefConfirmed !== true) return false
-  }
+  if (usaTef && p.isTefConfirmed !== true) return false
   return true
 }
 

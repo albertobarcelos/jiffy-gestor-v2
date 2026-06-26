@@ -4,9 +4,13 @@ import type { DateRange } from 'react-day-picker'
 import { formatarHoraParaInputCalendar } from '@/src/presentation/components/features/dashboard/dashboardTextHelpers'
 import { primeiroMesQuadroDuploCalendario } from '@/src/shared/utils/calendarioIntervaloFaturamento'
 import { combinarIntervaloCalendarParaDatas } from '@/src/shared/utils/intervaloCalendarioComHoras'
-import type { OrigemFiltro } from '../types'
+import type { OrigemFiltro, TipoEntregaFiltro } from '../types'
+import {
+  type KanbanFiltroDataPreset,
+  intervaloPresetKanbanFiltroData,
+} from '../utils/kanbanFiltroDataPresets'
 
-/** `periodo`: filtro por intervalo (criação usa hoje quando sem datas explícitas). `todos`: sem filtro desse tipo. */
+/** `periodo`: filtro por intervalo (default hoje quando sem datas explícitas). `todos`: sem filtro de data. */
 export type FiltroDataKanbanModo = 'periodo' | 'todos'
 
 function criarIntervaloHoje() {
@@ -17,36 +21,26 @@ function criarIntervaloHoje() {
   }
 }
 
-export function useFiscalKanbanFilters() {
+export function useFiscalKanbanFilters(timeZoneEmpresa?: string) {
   const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
-  const intervaloCriacaoPadrao = useMemo(() => criarIntervaloHoje(), [])
-  const [dataCriacaoInicio, setDataCriacaoInicio] = useState<Date | null>(null)
-  const [dataCriacaoFim, setDataCriacaoFim] = useState<Date | null>(null)
-  const [criacaoDataModo, setCriacaoDataModo] = useState<FiltroDataKanbanModo>('periodo')
-  const [dataFinalizacaoInicio, setDataFinalizacaoInicio] = useState<Date | null>(null)
-  const [dataFinalizacaoFim, setDataFinalizacaoFim] = useState<Date | null>(null)
-  const [finalizacaoDataModo, setFinalizacaoDataModo] = useState<FiltroDataKanbanModo>('todos')
+  const intervaloPeriodoPadrao = useMemo(() => criarIntervaloHoje(), [])
+  const [periodoInicio, setPeriodoInicio] = useState<Date | null>(null)
+  const [periodoFim, setPeriodoFim] = useState<Date | null>(null)
+  const [periodoDataModo, setPeriodoDataModo] = useState<FiltroDataKanbanModo>('periodo')
+  const [periodoPreset, setPeriodoPreset] = useState<KanbanFiltroDataPreset>('hoje')
   const [origemFilter, setOrigemFilter] = useState<OrigemFiltro>('')
+  const [tipoEntregaFilter, setTipoEntregaFilter] = useState<TipoEntregaFiltro>('')
   const [filtrosVisiveisMobile, setFiltrosVisiveisMobile] = useState(false)
-  const [modalCriacaoDatasAberto, setModalCriacaoDatasAberto] = useState(false)
-  const [rascunhoCriacaoRange, setRascunhoCriacaoRange] = useState<DateRange | undefined>(
+  const [modalPeriodoDatasAberto, setModalPeriodoDatasAberto] = useState(false)
+  const [rascunhoPeriodoRange, setRascunhoPeriodoRange] = useState<DateRange | undefined>(
     undefined
   )
-  const [mesCalendarioCriacao, setMesCalendarioCriacao] = useState(() =>
+  const [mesCalendarioPeriodo, setMesCalendarioPeriodo] = useState(() =>
     primeiroMesQuadroDuploCalendario(startOfDay(new Date()))
   )
-  const [rascunhoHoraCriacaoInicio, setRascunhoHoraCriacaoInicio] = useState('00:00')
-  const [rascunhoHoraCriacaoFim, setRascunhoHoraCriacaoFim] = useState('23:59')
-  const [modalFinalizacaoDatasAberto, setModalFinalizacaoDatasAberto] = useState(false)
-  const [rascunhoFinalizacaoRange, setRascunhoFinalizacaoRange] = useState<
-    DateRange | undefined
-  >(undefined)
-  const [mesCalendarioFinalizacao, setMesCalendarioFinalizacao] = useState(() =>
-    primeiroMesQuadroDuploCalendario(startOfDay(new Date()))
-  )
-  const [rascunhoHoraFinalizacaoInicio, setRascunhoHoraFinalizacaoInicio] = useState('00:00')
-  const [rascunhoHoraFinalizacaoFim, setRascunhoHoraFinalizacaoFim] = useState('23:59')
+  const [rascunhoHoraPeriodoInicio, setRascunhoHoraPeriodoInicio] = useState('00:00')
+  const [rascunhoHoraPeriodoFim, setRascunhoHoraPeriodoFim] = useState('23:59')
   const debounceSearchRef = useRef<NodeJS.Timeout | undefined>(undefined)
 
   useEffect(() => {
@@ -59,38 +53,31 @@ export function useFiscalKanbanFilters() {
     }
   }, [searchInput])
 
-  const deveUsarCriacaoPadrao =
-    criacaoDataModo === 'periodo' &&
-    !dataCriacaoInicio &&
-    !dataCriacaoFim &&
-    !dataFinalizacaoInicio &&
-    !dataFinalizacaoFim
-  const dataCriacaoInicioConsulta =
-    dataCriacaoInicio ?? (deveUsarCriacaoPadrao ? intervaloCriacaoPadrao.inicio : null)
-  const dataCriacaoFimConsulta =
-    dataCriacaoFim ?? (deveUsarCriacaoPadrao ? intervaloCriacaoPadrao.fim : null)
-  const dataCriacaoInicioISO = dataCriacaoInicioConsulta?.toISOString() ?? undefined
-  const dataCriacaoFimISO = dataCriacaoFimConsulta?.toISOString() ?? undefined
-  const dataFinalizacaoInicioISO = dataFinalizacaoInicio?.toISOString() ?? undefined
-  const dataFinalizacaoFimISO = dataFinalizacaoFim?.toISOString() ?? undefined
+  const deveUsarPeriodoPadrao =
+    periodoDataModo === 'periodo' && !periodoInicio && !periodoFim
+  const periodoInicioConsulta =
+    periodoInicio ?? (deveUsarPeriodoPadrao ? intervaloPeriodoPadrao.inicio : null)
+  const periodoFimConsulta =
+    periodoFim ?? (deveUsarPeriodoPadrao ? intervaloPeriodoPadrao.fim : null)
+  const periodoAtivoNaConsulta =
+    periodoDataModo === 'periodo' && periodoInicioConsulta != null && periodoFimConsulta != null
+  const periodoInicioISO = periodoAtivoNaConsulta
+    ? periodoInicioConsulta.toISOString()
+    : undefined
+  const periodoFimISO = periodoAtivoNaConsulta ? periodoFimConsulta.toISOString() : undefined
 
+  /** Mesmo intervalo para criação (colunas operacionais) e finalização (colunas fiscais). */
   const vendasUnificadasQueryParams = useMemo(
     () => ({
       q: searchQuery || undefined,
       origem: origemFilter || undefined,
-      dataCriacaoInicial: dataCriacaoInicioISO,
-      dataCriacaoFinal: dataCriacaoFimISO,
-      dataFinalizacaoInicio: dataFinalizacaoInicioISO,
-      dataFinalizacaoFim: dataFinalizacaoFimISO,
+      tipoEntrega: tipoEntregaFilter || undefined,
+      dataCriacaoInicial: periodoInicioISO,
+      dataCriacaoFinal: periodoFimISO,
+      dataFinalizacaoInicio: periodoInicioISO,
+      dataFinalizacaoFim: periodoFimISO,
     }),
-    [
-      searchQuery,
-      origemFilter,
-      dataCriacaoInicioISO,
-      dataCriacaoFimISO,
-      dataFinalizacaoInicioISO,
-      dataFinalizacaoFimISO,
-    ]
+    [searchQuery, origemFilter, tipoEntregaFilter, periodoInicioISO, periodoFimISO]
   )
 
   const vendasUnificadasQueryKeyFingerprint = JSON.stringify(vendasUnificadasQueryParams)
@@ -99,176 +86,127 @@ export function useFiscalKanbanFilters() {
     setSearchInput('')
     setSearchQuery('')
     const periodoHoje = criarIntervaloHoje()
-    setCriacaoDataModo('periodo')
-    setFinalizacaoDataModo('todos')
-    setDataCriacaoInicio(null)
-    setDataCriacaoFim(null)
-    setDataFinalizacaoInicio(null)
-    setDataFinalizacaoFim(null)
+    setPeriodoDataModo('periodo')
+    setPeriodoPreset('hoje')
+    setPeriodoInicio(null)
+    setPeriodoFim(null)
     setOrigemFilter('')
+    setTipoEntregaFilter('')
     const hoje = periodoHoje.inicio
-    setRascunhoCriacaoRange({ from: hoje, to: hoje })
-    setMesCalendarioCriacao(primeiroMesQuadroDuploCalendario(hoje))
-    setRascunhoHoraCriacaoInicio('00:00')
-    setRascunhoHoraCriacaoFim('23:59')
-    setRascunhoFinalizacaoRange({ from: hoje, to: hoje })
-    setMesCalendarioFinalizacao(primeiroMesQuadroDuploCalendario(hoje))
-    setRascunhoHoraFinalizacaoInicio('00:00')
-    setRascunhoHoraFinalizacaoFim('23:59')
+    setRascunhoPeriodoRange({ from: hoje, to: hoje })
+    setMesCalendarioPeriodo(primeiroMesQuadroDuploCalendario(hoje))
+    setRascunhoHoraPeriodoInicio('00:00')
+    setRascunhoHoraPeriodoFim('23:59')
   }, [])
 
-  const abrirModalCriacaoDatas = useCallback(() => {
-    if (dataCriacaoInicio && dataCriacaoFim) {
-      const fim = startOfDay(dataCriacaoFim)
-      setRascunhoCriacaoRange({
-        from: startOfDay(dataCriacaoInicio),
+  const abrirModalPeriodoDatas = useCallback(() => {
+    if (periodoInicio && periodoFim) {
+      const fim = startOfDay(periodoFim)
+      setRascunhoPeriodoRange({
+        from: startOfDay(periodoInicio),
         to: fim,
       })
-      setMesCalendarioCriacao(primeiroMesQuadroDuploCalendario(fim))
-      setRascunhoHoraCriacaoInicio(formatarHoraParaInputCalendar(dataCriacaoInicio))
-      setRascunhoHoraCriacaoFim(formatarHoraParaInputCalendar(dataCriacaoFim))
+      setMesCalendarioPeriodo(primeiroMesQuadroDuploCalendario(fim))
+      setRascunhoHoraPeriodoInicio(formatarHoraParaInputCalendar(periodoInicio))
+      setRascunhoHoraPeriodoFim(formatarHoraParaInputCalendar(periodoFim))
     } else {
       const hoje = startOfDay(new Date())
-      setRascunhoCriacaoRange({ from: hoje, to: hoje })
-      setMesCalendarioCriacao(primeiroMesQuadroDuploCalendario(hoje))
-      setRascunhoHoraCriacaoInicio('00:00')
-      setRascunhoHoraCriacaoFim('23:59')
+      setRascunhoPeriodoRange({ from: hoje, to: hoje })
+      setMesCalendarioPeriodo(primeiroMesQuadroDuploCalendario(hoje))
+      setRascunhoHoraPeriodoInicio('00:00')
+      setRascunhoHoraPeriodoFim('23:59')
     }
-    setModalCriacaoDatasAberto(true)
-  }, [dataCriacaoInicio, dataCriacaoFim])
+    setModalPeriodoDatasAberto(true)
+  }, [periodoInicio, periodoFim])
 
-  const handleRascunhoCriacaoRangeChange = useCallback((next: DateRange | undefined) => {
+  const handleRascunhoPeriodoRangeChange = useCallback((next: DateRange | undefined) => {
     if (next != null) {
-      setRascunhoCriacaoRange(next)
+      setRascunhoPeriodoRange(next)
       return
     }
     const hoje = startOfDay(new Date())
-    setRascunhoCriacaoRange({ from: hoje, to: hoje })
+    setRascunhoPeriodoRange({ from: hoje, to: hoje })
   }, [])
 
-  const aplicarCriacaoDatas = useCallback(() => {
+  const aplicarPeriodoDatas = useCallback(() => {
     const { dataInicial, dataFinal } = combinarIntervaloCalendarParaDatas(
-      rascunhoCriacaoRange,
-      rascunhoHoraCriacaoInicio,
-      rascunhoHoraCriacaoFim
+      rascunhoPeriodoRange,
+      rascunhoHoraPeriodoInicio,
+      rascunhoHoraPeriodoFim
     )
     if (!dataInicial || !dataFinal) return
-    setCriacaoDataModo('periodo')
+    setPeriodoDataModo('periodo')
     if (dataInicial.getTime() > dataFinal.getTime()) {
-      setDataCriacaoInicio(dataFinal)
-      setDataCriacaoFim(dataInicial)
+      setPeriodoInicio(dataFinal)
+      setPeriodoFim(dataInicial)
     } else {
-      setDataCriacaoInicio(dataInicial)
-      setDataCriacaoFim(dataFinal)
+      setPeriodoInicio(dataInicial)
+      setPeriodoFim(dataFinal)
     }
-    setDataFinalizacaoInicio(null)
-    setDataFinalizacaoFim(null)
-    setFinalizacaoDataModo('todos')
-    setModalCriacaoDatasAberto(false)
-  }, [rascunhoCriacaoRange, rascunhoHoraCriacaoInicio, rascunhoHoraCriacaoFim])
+    setPeriodoPreset('por_data')
+    setModalPeriodoDatasAberto(false)
+  }, [rascunhoPeriodoRange, rascunhoHoraPeriodoInicio, rascunhoHoraPeriodoFim])
 
-  const abrirModalFinalizacaoDatas = useCallback(() => {
-    if (dataFinalizacaoInicio && dataFinalizacaoFim) {
-      const fim = startOfDay(dataFinalizacaoFim)
-      setRascunhoFinalizacaoRange({
-        from: startOfDay(dataFinalizacaoInicio),
-        to: fim,
-      })
-      setMesCalendarioFinalizacao(primeiroMesQuadroDuploCalendario(fim))
-      setRascunhoHoraFinalizacaoInicio(formatarHoraParaInputCalendar(dataFinalizacaoInicio))
-      setRascunhoHoraFinalizacaoFim(formatarHoraParaInputCalendar(dataFinalizacaoFim))
-    } else {
-      const hoje = startOfDay(new Date())
-      setRascunhoFinalizacaoRange({ from: hoje, to: hoje })
-      setMesCalendarioFinalizacao(primeiroMesQuadroDuploCalendario(hoje))
-      setRascunhoHoraFinalizacaoInicio('00:00')
-      setRascunhoHoraFinalizacaoFim('23:59')
-    }
-    setModalFinalizacaoDatasAberto(true)
-  }, [dataFinalizacaoInicio, dataFinalizacaoFim])
-
-  const handleRascunhoFinalizacaoRangeChange = useCallback((next: DateRange | undefined) => {
-    if (next != null) {
-      setRascunhoFinalizacaoRange(next)
-      return
-    }
-    const hoje = startOfDay(new Date())
-    setRascunhoFinalizacaoRange({ from: hoje, to: hoje })
+  const aplicarPeriodoTodos = useCallback(() => {
+    setPeriodoDataModo('todos')
+    setPeriodoPreset('todos')
+    setPeriodoInicio(null)
+    setPeriodoFim(null)
   }, [])
 
-  const aplicarFinalizacaoDatas = useCallback(() => {
-    const { dataInicial, dataFinal } = combinarIntervaloCalendarParaDatas(
-      rascunhoFinalizacaoRange,
-      rascunhoHoraFinalizacaoInicio,
-      rascunhoHoraFinalizacaoFim
-    )
-    if (!dataInicial || !dataFinal) return
-    setFinalizacaoDataModo('periodo')
-    if (dataInicial.getTime() > dataFinal.getTime()) {
-      setDataFinalizacaoInicio(dataFinal)
-      setDataFinalizacaoFim(dataInicial)
-    } else {
-      setDataFinalizacaoInicio(dataInicial)
-      setDataFinalizacaoFim(dataFinal)
-    }
-    setDataCriacaoInicio(null)
-    setDataCriacaoFim(null)
-    setCriacaoDataModo('todos')
-    setModalFinalizacaoDatasAberto(false)
-  }, [rascunhoFinalizacaoRange, rascunhoHoraFinalizacaoInicio, rascunhoHoraFinalizacaoFim])
-
-  const aplicarCriacaoTodos = useCallback(() => {
-    setCriacaoDataModo('todos')
-    setDataCriacaoInicio(null)
-    setDataCriacaoFim(null)
-  }, [])
-
-  const aplicarFinalizacaoTodos = useCallback(() => {
-    setFinalizacaoDataModo('todos')
-    setDataFinalizacaoInicio(null)
-    setDataFinalizacaoFim(null)
-  }, [])
+  const aplicarPeriodoPreset = useCallback(
+    (preset: KanbanFiltroDataPreset) => {
+      if (preset === 'todos') {
+        aplicarPeriodoTodos()
+        return
+      }
+      if (preset === 'por_data') {
+        abrirModalPeriodoDatas()
+        return
+      }
+      const intervalo = intervaloPresetKanbanFiltroData(preset, timeZoneEmpresa ?? '')
+      if (!intervalo) return
+      setPeriodoDataModo('periodo')
+      setPeriodoPreset(preset)
+      setPeriodoInicio(intervalo.inicio)
+      setPeriodoFim(intervalo.fim)
+    },
+    [aplicarPeriodoTodos, abrirModalPeriodoDatas, timeZoneEmpresa]
+  )
 
   return {
     searchInput,
     setSearchInput,
     searchQuery,
-    dataCriacaoInicio,
-    dataCriacaoFim,
-    dataFinalizacaoInicio,
-    dataFinalizacaoFim,
+    periodoDataModo,
+    periodoPreset,
+    periodoInicio,
+    periodoFim,
+    periodoInicioConsulta,
+    periodoFimConsulta,
+    periodoAtivoNaConsulta,
     origemFilter,
     setOrigemFilter,
+    tipoEntregaFilter,
+    setTipoEntregaFilter,
     filtrosVisiveisMobile,
     setFiltrosVisiveisMobile,
-    modalCriacaoDatasAberto,
-    setModalCriacaoDatasAberto,
-    rascunhoCriacaoRange,
-    mesCalendarioCriacao,
-    setMesCalendarioCriacao,
-    rascunhoHoraCriacaoInicio,
-    setRascunhoHoraCriacaoInicio,
-    rascunhoHoraCriacaoFim,
-    setRascunhoHoraCriacaoFim,
-    modalFinalizacaoDatasAberto,
-    setModalFinalizacaoDatasAberto,
-    rascunhoFinalizacaoRange,
-    mesCalendarioFinalizacao,
-    setMesCalendarioFinalizacao,
-    rascunhoHoraFinalizacaoInicio,
-    setRascunhoHoraFinalizacaoInicio,
-    rascunhoHoraFinalizacaoFim,
-    setRascunhoHoraFinalizacaoFim,
+    modalPeriodoDatasAberto,
+    setModalPeriodoDatasAberto,
+    rascunhoPeriodoRange,
+    mesCalendarioPeriodo,
+    setMesCalendarioPeriodo,
+    rascunhoHoraPeriodoInicio,
+    setRascunhoHoraPeriodoInicio,
+    rascunhoHoraPeriodoFim,
+    setRascunhoHoraPeriodoFim,
     vendasUnificadasQueryParams,
     vendasUnificadasQueryKeyFingerprint,
     handleClearFilters,
-    abrirModalCriacaoDatas,
-    handleRascunhoCriacaoRangeChange,
-    aplicarCriacaoDatas,
-    aplicarCriacaoTodos,
-    abrirModalFinalizacaoDatas,
-    handleRascunhoFinalizacaoRangeChange,
-    aplicarFinalizacaoDatas,
-    aplicarFinalizacaoTodos,
+    abrirModalPeriodoDatas,
+    handleRascunhoPeriodoRangeChange,
+    aplicarPeriodoDatas,
+    aplicarPeriodoTodos,
+    aplicarPeriodoPreset,
   }
 }

@@ -65,7 +65,7 @@ async function waitForQzConnection(qz: QzModule, timeoutMs = 20_000): Promise<vo
       throw error
     }
   }
-  throw new Error('Timeout aguardando conexão com QZ Tray.')
+  throw new Error('Tempo esgotado ao buscar impressoras. Tente novamente ou clique em Atualizar.')
 }
 
 /**
@@ -146,14 +146,14 @@ export function mensagemErroCarregarQzTray(error: unknown): string {
     return 'Falha ao carregar o módulo de impressão (atualização da página em andamento). Recarregue (F5) e abra as configurações novamente.'
   }
   if (isQzSendDataError(error)) {
-    return 'QZ Tray ainda não estava pronto. Tente clicar em "Atualizar QZ".'
+    return 'Serviço de impressão ainda não estava pronto. Tente clicar em Atualizar.'
   }
   if (isQzConnectInProgressError(error)) {
-    return 'Conexão com QZ Tray em andamento. Aguarde ou clique em "Atualizar QZ".'
+    return 'Buscando impressoras. Aguarde ou clique em Atualizar.'
   }
   return error instanceof Error
     ? error.message
-    : 'Não foi possível conectar ao QZ Tray para listar impressoras.'
+    : 'Não foi possível listar as impressoras deste computador.'
 }
 
 async function importWithRetry<T>(
@@ -229,7 +229,7 @@ export async function ensureQzTraySecurity(qz: QzModule): Promise<void> {
         const auth = useAuthStore.getState().auth
         const token = auth?.getAccessToken()
         if (!token) {
-          throw new Error('Faça login para assinar requisições do QZ Tray.')
+          throw new Error('Faça login para conectar à impressão neste computador.')
         }
         logImpressao('qz seguranca.sign_requisicao', { bytesParaAssinar: toSign?.length ?? 0 })
         const res = await fetch('/api/gestor/qz-tray/sign', {
@@ -348,7 +348,9 @@ export async function printRawTcpQz(
     create: (printer: null, opts?: Record<string, unknown>) => unknown
   }).create(null, { host, port, jobName })
 
-  const payload = [{ type: 'raw' as const, format: 'plain' as const, data: conteudo }]
+  const payload = [
+    { type: 'raw' as const, format: 'plain' as const, flavor: 'plain' as const, data: conteudo },
+  ]
 
   for (let i = 0; i < Math.max(1, copies); i++) {
     await qz.print(config as Parameters<QzModule['print']>[0], payload)
