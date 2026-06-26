@@ -4,7 +4,7 @@ import type { DateRange } from 'react-day-picker'
 import { formatarHoraParaInputCalendar } from '@/src/presentation/components/features/dashboard/dashboardTextHelpers'
 import { primeiroMesQuadroDuploCalendario } from '@/src/shared/utils/calendarioIntervaloFaturamento'
 import { combinarIntervaloCalendarParaDatas } from '@/src/shared/utils/intervaloCalendarioComHoras'
-import type { OrigemFiltro } from '../types'
+import type { OrigemFiltro, TipoEntregaFiltro } from '../types'
 import {
   type KanbanFiltroDataPreset,
   intervaloPresetKanbanFiltroData,
@@ -30,6 +30,7 @@ export function useFiscalKanbanFilters(timeZoneEmpresa?: string) {
   const [periodoDataModo, setPeriodoDataModo] = useState<FiltroDataKanbanModo>('periodo')
   const [periodoPreset, setPeriodoPreset] = useState<KanbanFiltroDataPreset>('hoje')
   const [origemFilter, setOrigemFilter] = useState<OrigemFiltro>('')
+  const [tipoEntregaFilter, setTipoEntregaFilter] = useState<TipoEntregaFiltro>('')
   const [filtrosVisiveisMobile, setFiltrosVisiveisMobile] = useState(false)
   const [modalPeriodoDatasAberto, setModalPeriodoDatasAberto] = useState(false)
   const [rascunhoPeriodoRange, setRascunhoPeriodoRange] = useState<DateRange | undefined>(
@@ -70,12 +71,13 @@ export function useFiscalKanbanFilters(timeZoneEmpresa?: string) {
     () => ({
       q: searchQuery || undefined,
       origem: origemFilter || undefined,
+      tipoEntrega: tipoEntregaFilter || undefined,
       dataCriacaoInicial: periodoInicioISO,
       dataCriacaoFinal: periodoFimISO,
       dataFinalizacaoInicio: periodoInicioISO,
       dataFinalizacaoFim: periodoFimISO,
     }),
-    [searchQuery, origemFilter, periodoInicioISO, periodoFimISO]
+    [searchQuery, origemFilter, tipoEntregaFilter, periodoInicioISO, periodoFimISO]
   )
 
   const vendasUnificadasQueryKeyFingerprint = JSON.stringify(vendasUnificadasQueryParams)
@@ -89,6 +91,7 @@ export function useFiscalKanbanFilters(timeZoneEmpresa?: string) {
     setPeriodoInicio(null)
     setPeriodoFim(null)
     setOrigemFilter('')
+    setTipoEntregaFilter('')
     const hoje = periodoHoje.inicio
     setRascunhoPeriodoRange({ from: hoje, to: hoje })
     setMesCalendarioPeriodo(primeiroMesQuadroDuploCalendario(hoje))
@@ -184,6 +187,8 @@ export function useFiscalKanbanFilters(timeZoneEmpresa?: string) {
     periodoAtivoNaConsulta,
     origemFilter,
     setOrigemFilter,
+    tipoEntregaFilter,
+    setTipoEntregaFilter,
     filtrosVisiveisMobile,
     setFiltrosVisiveisMobile,
     modalPeriodoDatasAberto,

@@ -63,9 +63,15 @@ export function vendasUnificadasQueryParamsParaPedidosDelivery(
   const origemFiltroKanban =
     origem === 'PDV' || origem === 'GESTOR' || origem === 'DELIVERY' ? origem : undefined
 
+  const tipoEntrega =
+    params.tipoEntrega === 'entrega' || params.tipoEntrega === 'retirada'
+      ? params.tipoEntrega
+      : undefined
+
   return {
     q: params.q,
     origemFiltroKanban,
+    tipoEntrega,
     dataCriacaoInicial: params.dataCriacaoInicial ?? params.periodoInicial,
     dataCriacaoFinal: params.dataCriacaoFinal ?? params.periodoFinal,
     dataFinalizacaoInicio: params.dataFinalizacaoInicio,

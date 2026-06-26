@@ -4,6 +4,7 @@ import type { PedidosDeliveryInfinitePage } from '../hooks/usePedidosDeliveryInf
 import type { VendaUnificadaDTO } from '../hooks/useVendasUnificadas'
 import { KANBAN_PEDIDOS_DELIVERY_INFINITE_QUERY_KEY } from '../hooks/kanbanListagemQueryCache'
 import {
+  DELIVERY_KANBAN_COLUMN_IDS,
   extrairColumnIdDePedidosDeliveryKanbanQueryKey,
   vendaPertenceColunaDeliveryKanban,
 } from './kanbanDeliveryColumnConfig'
@@ -67,11 +68,25 @@ function etapaKanbanDeliveryCache(v: VendaUnificadaDTO): string {
   return v.getEtapaKanban()
 }
 
+/**
+ * `true` se o card mapeia para alguma coluna conhecida do Kanban delivery.
+ * Quando `false` (etapa ambígua/`'ABERTA'`), o card não pertence a nenhuma coluna e
+ * um upsert o removeria de todos os caches, fazendo-o "sumir" da tela até o reload.
+ */
+export function vendaPertenceAlgumaColunaDeliveryKanban(venda: VendaUnificadaDTO): boolean {
+  return DELIVERY_KANBAN_COLUMN_IDS.some(columnId =>
+    vendaPertenceColunaDeliveryKanban(venda, columnId, etapaKanbanDeliveryCache)
+  )
+}
+
 /** Substitui ou move o card entre caches de colunas após transição de status. */
 export function upsertVendaDeliveryKanbanColumnCaches(
   queryClient: QueryClient,
   venda: VendaUnificadaDTO
 ): void {
+  // Defesa: card sem coluna conhecida não deve ser removido de onde está (evita sumiço).
+  if (!vendaPertenceAlgumaColunaDeliveryKanban(venda)) return
+
   const queries = queryClient.getQueriesData<InfiniteData<PedidosDeliveryInfinitePage>>({
     queryKey: KANBAN_PEDIDOS_DELIVERY_INFINITE_QUERY_KEY,
   })

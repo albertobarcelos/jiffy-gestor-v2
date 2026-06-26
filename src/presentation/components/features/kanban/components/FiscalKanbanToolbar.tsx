@@ -10,7 +10,7 @@ import {
   MdSettings,
 } from 'react-icons/md'
 import { KanbanModoVendasToggle, type ModoKanbanVendas } from '../KanbanModoVendasToggle'
-import type { OrigemFiltro } from '../types'
+import type { OrigemFiltro, TipoEntregaFiltro } from '../types'
 import {
   KANBAN_FILTRO_DATA_PRESET_OPCOES,
   type KanbanFiltroDataPreset,
@@ -24,6 +24,8 @@ interface FiscalKanbanToolbarProps {
   onToggleFiltrosMobile: () => void
   origemFilter: OrigemFiltro
   onOrigemFilterChange: (value: OrigemFiltro) => void
+  tipoEntregaFilter: TipoEntregaFiltro
+  onTipoEntregaFilterChange: (value: TipoEntregaFiltro) => void
   terminalFilter: string
   onTerminalFilterChange: (value: string) => void
   terminais: { id: string; nome: string }[]
@@ -167,6 +169,8 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
     onToggleFiltrosMobile,
     origemFilter,
     onOrigemFilterChange,
+    tipoEntregaFilter,
+    onTipoEntregaFilterChange,
     terminalFilter,
     onTerminalFilterChange,
     terminais,
@@ -182,6 +186,8 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
     onAbrirConfiguracoesDelivery,
     onAbrirNovoPedido,
   } = props
+
+  const isModoDelivery = modoKanbanVendas === 'delivery'
 
   return (
     <div className="bg-primary-background mt-2 flex-shrink-0 rounded-b-lg rounded-t-lg">
@@ -218,6 +224,7 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
           </div>
         </div>
 
+        {!isModoDelivery ? (
         <div className="flex flex-col gap-1">
           <FormControl size="small" variant="outlined" sx={sxKanbanFiltroSelect}>
             <InputLabel id="kanban-filtro-origem-label" shrink>
@@ -238,6 +245,29 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
             </Select>
           </FormControl>
         </div>
+        ) : null}
+
+        {isModoDelivery ? (
+        <div className="flex flex-col gap-1">
+          <FormControl size="small" variant="outlined" sx={sxKanbanFiltroSelect}>
+            <InputLabel id="kanban-filtro-tipo-entrega-label" shrink>
+              Tipo de entrega
+            </InputLabel>
+            <Select
+              labelId="kanban-filtro-tipo-entrega-label"
+              label="Tipo de entrega"
+              value={tipoEntregaFilter}
+              onChange={e => onTipoEntregaFilterChange(e.target.value as TipoEntregaFiltro)}
+              displayEmpty
+              className="font-nunito"
+            >
+              <MenuItem value="">Todos</MenuItem>
+              <MenuItem value="entrega">Entrega</MenuItem>
+              <MenuItem value="retirada">Retirada</MenuItem>
+            </Select>
+          </FormControl>
+        </div>
+        ) : null}
 
         {modoKanbanVendas === 'balcao' ? (
         <div className="flex flex-col gap-1">

@@ -96,6 +96,7 @@ import {
 import {
   patchVendaDeliveryKanbanColumnCaches,
   upsertVendaDeliveryKanbanColumnCaches,
+  vendaPertenceAlgumaColunaDeliveryKanban,
 } from './utils/kanbanDeliveryColumnCache'
 import {
   DELIVERY_KANBAN_COLUMN_IDS,
@@ -147,6 +148,8 @@ export function FiscalFlowKanban() {
     periodoFimConsulta,
     origemFilter,
     setOrigemFilter,
+    tipoEntregaFilter,
+    setTipoEntregaFilter,
     filtrosVisiveisMobile,
     setFiltrosVisiveisMobile,
     modalPeriodoDatasAberto,
@@ -322,6 +325,12 @@ export function FiscalFlowKanban() {
       setTerminalFilter('')
     }
   }, [isModoDeliveryKanban, terminalFilter])
+
+  useEffect(() => {
+    if (!isModoDeliveryKanban && tipoEntregaFilter) {
+      setTipoEntregaFilter('')
+    }
+  }, [isModoDeliveryKanban, tipoEntregaFilter, setTipoEntregaFilter])
 
   const usaFiltroTerminal = !!terminalFilter.trim() && !isModoDeliveryKanban
 
@@ -739,7 +748,13 @@ export function FiscalFlowKanban() {
   const sincronizarVendaAposTransicao = useCallback(
     (vendaId: string, respostaTransicao: unknown): boolean => {
       const cardAtualizado = extrairVendaUnificadaDeRespostaDeliverySummary(respostaTransicao)
-      if (cardAtualizado) {
+      // No modo delivery, só confiamos no card do summary quando ele mapeia para alguma coluna.
+      // Se a resposta perdeu a identidade de entrega (etapa → 'ABERTA'), o upsert removeria o card
+      // de todas as colunas (sumiço até reload); nesse caso usamos o patch, que clona o card existente.
+      const cardSummaryUtilizavel =
+        cardAtualizado != null &&
+        (!isModoDeliveryKanban || vendaPertenceAlgumaColunaDeliveryKanban(cardAtualizado))
+      if (cardAtualizado && cardSummaryUtilizavel) {
         if (isModoDeliveryKanban) {
           upsertVendaDeliveryKanbanColumnCaches(queryClient, cardAtualizado)
         } else {
@@ -1496,6 +1511,8 @@ export function FiscalFlowKanban() {
         onToggleFiltrosMobile={() => setFiltrosVisiveisMobile(prev => !prev)}
         origemFilter={origemFilter}
         onOrigemFilterChange={setOrigemFilter}
+        tipoEntregaFilter={tipoEntregaFilter}
+        onTipoEntregaFilterChange={setTipoEntregaFilter}
         terminalFilter={terminalFilter}
         onTerminalFilterChange={setTerminalFilter}
         terminais={terminais}
