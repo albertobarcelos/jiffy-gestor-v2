@@ -580,12 +580,12 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
               title={
                 entregadorJaVinculado
                   ? 'Alterar entregador'
-                  : 'Vincular entregador'
+                  : 'Entregador/Taxa'
               }
               aria-label={
                 entregadorJaVinculado
                   ? 'Alterar entregador'
-                  : 'Vincular entregador'
+                  : 'Entregador/Taxa'
               }
               onClick={e => {
                 e.stopPropagation()

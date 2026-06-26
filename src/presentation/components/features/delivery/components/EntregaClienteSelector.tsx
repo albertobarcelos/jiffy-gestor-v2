@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { MdSearch, MdAddLocation, MdEdit, MdLocationOn, MdPhone, MdPerson, MdCheckCircle } from 'react-icons/md'
 import { Button } from '@/src/presentation/components/ui/button'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -243,6 +243,14 @@ export function EntregaClienteSelector({
   const [painelMoradaAberto, setPainelMoradaAberto] = useState(false)
   const [formNova, setFormNova] = useState<FormNovasMorada>(FORM_INICIAL)
   const [isLoadingCep, setIsLoadingCep] = useState(false)
+
+  const telefoneInputRef = useRef<HTMLInputElement>(null)
+
+  // Foca o campo de telefone ao montar (ex.: ao entrar na step de informações do pedido).
+  useEffect(() => {
+    const id = setTimeout(() => telefoneInputRef.current?.focus(), 100)
+    return () => clearTimeout(id)
+  }, [])
 
   const moradaHookOptions = { usarModuloDelivery: usarModuloDeliveryClientes }
 
@@ -607,6 +615,7 @@ export function EntregaClienteSelector({
             <div className="relative flex-1">
               <MdPhone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <input
+                ref={telefoneInputRef}
                 type="tel"
                 value={telefoneInput}
                 onChange={e => {
