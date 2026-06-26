@@ -20,7 +20,7 @@ import {
 interface FiscalKanbanToolbarProps {
   searchInput: string
   onSearchInputChange: (value: string) => void
-  onRefresh: () => void
+  onRefresh: () => void | Promise<void>
   filtrosVisiveisMobile: boolean
   onToggleFiltrosMobile: () => void
   origemFilter: OrigemFiltro
@@ -325,8 +325,7 @@ export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
             type="button"
             onClick={() => {
               setRefreshSpinning(true)
-              onRefresh()
-              window.setTimeout(() => setRefreshSpinning(false), 600)
+              void Promise.resolve(onRefresh()).finally(() => setRefreshSpinning(false))
             }}
             className="rounded-lg border border-gray-200 bg-white p-1.5 text-gray-600 shadow-sm transition-colors hover:bg-gray-50 hover:text-primary"
             title="Atualizar listagem"

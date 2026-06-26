@@ -429,8 +429,23 @@ export function usePedidosDeliveryKanbanColumns(
 
   const refetch = useCallback(async () => {
     lastPollAtRef.current = null
-    await Promise.all(DELIVERY_KANBAN_COLUMN_IDS.map(id => queryByColumn[id]?.refetch()))
-  }, [novosQuery, preparoQuery, prontoQuery, rotaQuery, finalizadasQuery, comNfeQuery])
+
+    await Promise.all(
+      DELIVERY_KANBAN_COLUMN_IDS.map(async columnId => {
+        const queryKey = columnQueryKeys[columnId]
+        if (!queryKey) return
+        await queryClient.resetQueries({ queryKey, exact: true })
+      })
+    )
+
+    await Promise.all(
+      DELIVERY_KANBAN_COLUMN_IDS.map(columnId =>
+        queryByColumnRef.current[columnId]?.refetch()
+      )
+    )
+
+    lastPollAtRef.current = new Date().toISOString()
+  }, [columnQueryKeys, queryClient])
 
   const fetchNextPageForColumn = useCallback((columnId: ColunaKanbanId) => {
     const query = queryByColumnRef.current[columnId]

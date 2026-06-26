@@ -138,6 +138,13 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
     [limparEtapaLocal]
   )
 
+  /** Limpa UI otimista de transição (etapa local, timestamps, loading) — ex.: refresh manual do Kanban. */
+  const limparEstadoUiTransicao = useCallback(() => {
+    setAvancandoEtapaIds({})
+    setTimestampsEtapaEntregaLocal({})
+    setEtapaLocalPorVendaId({})
+  }, [])
+
   const finalizarEntrega = useCallback(
     async (venda: Venda) => {
       if (vendaPrecisaConfirmarPagamentoParaFinalizar(venda)) {
@@ -279,6 +286,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
     avancandoEtapaIds,
     etapaLocalPorVendaId,
     timestampsEtapaEntregaLocal,
+    limparEstadoUiTransicao,
     handleAvancarEtapa,
     moverEntregaPorDrag,
     finalizarEntregaPorDrag,

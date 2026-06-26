@@ -455,6 +455,7 @@ export function FiscalFlowKanban() {
       await Promise.all([refetchDelivery(), deliveryContagem.refetch()])
       return
     }
+    await queryClient.resetQueries({ queryKey: infiniteQueryKey, exact: true })
     const [result] = await Promise.all([
       refetchUnificado(),
       usaFiltroTerminal ? refetchIdsTerminal() : Promise.resolve(),
@@ -467,6 +468,8 @@ export function FiscalFlowKanban() {
     deliveryContagem.refetch,
     refetchUnificado,
     refetchIdsTerminal,
+    queryClient,
+    infiniteQueryKey,
   ])
 
   /** Normaliza refetch do infinite query para `refetchAteMudarStatusFiscal` (espera `{ data: { items } }`). */
@@ -725,9 +728,22 @@ export function FiscalFlowKanban() {
     deliveryKanban.columnStates,
   ])
 
-  const handleAtualizarListagem = useCallback(() => {
-    void refetch()
-  }, [refetch])
+  /**
+   * Remove o card fixado no topo de uma coluna (pin de "primeiro da lista").
+   * Chamado quando o usuário escolhe explicitamente um critério/direção de ordenação,
+   * para que o card recém-movido volte a participar da ordenação normal.
+   */
+  const limparPinColuna = useCallback(
+    (columnId: string) => {
+      setPrimeiroPorColuna(prev => {
+        if (!prev[columnId]) return prev
+        const next = { ...prev }
+        delete next[columnId]
+        return next
+      })
+    },
+    [setPrimeiroPorColuna]
+  )
 
   const handleClearFiltersComTerminal = useCallback(() => {
     handleClearFilters()
@@ -972,6 +988,7 @@ export function FiscalFlowKanban() {
     avancandoEtapaIds,
     etapaLocalPorVendaId,
     timestampsEtapaEntregaLocal,
+    limparEstadoUiTransicao,
     handleAvancarEtapa,
     moverEntregaPorDrag,
     finalizarEntregaPorDrag,
@@ -988,6 +1005,12 @@ export function FiscalFlowKanban() {
     confirmarPagamentoAntesFinalizar,
     revalidarPagamentoAntesFinalizar,
   })
+
+  const handleAtualizarListagem = useCallback(async () => {
+    limparEstadoUiTransicao()
+    setPrimeiroPorColuna({})
+    await refetch()
+  }, [limparEstadoUiTransicao, refetch, setPrimeiroPorColuna])
 
   const { acaoFiscalEmAndamentoPorVenda, getEtapaKanbanParaExibicao: getEtapaKanbanFiscal, handleEmitirNfe } =
     useFiscalEmissaoKanban({
@@ -1610,18 +1633,20 @@ export function FiscalFlowKanban() {
                   count={columnTotalCount}
                   criterioOrdenacao={criterioOrdenacaoPorColuna[colId] ?? 'data'}
                   direcaoOrdenacao={direcaoOrdenacaoPorColuna[colId] ?? 'desc'}
-                  onCriterioOrdenacaoChange={(columnId, criterio) =>
+                  onCriterioOrdenacaoChange={(columnId, criterio) => {
                     setCriterioOrdenacaoPorColuna(prev => ({
                       ...prev,
                       [columnId]: criterio,
                     }))
-                  }
-                  onToggleDirecaoOrdenacao={columnId =>
+                    limparPinColuna(columnId)
+                  }}
+                  onToggleDirecaoOrdenacao={columnId => {
                     setDirecaoOrdenacaoPorColuna(prev => ({
                       ...prev,
                       [columnId]: prev[columnId] === 'asc' ? 'desc' : 'asc',
                     }))
-                  }
+                    limparPinColuna(columnId)
+                  }}
                   onColumnScroll={handleColumnScroll}
                   columnFooter={
                     isModoDeliveryKanban &&

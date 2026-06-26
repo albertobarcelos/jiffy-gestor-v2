@@ -596,23 +596,6 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
             </Button>
           )}
 
-          {exibirQuickViewEntrega && (
-            <Button
-              size="sm"
-              variant="outlined"
-              className="!min-w-0 !border-gray-300 !px-2 !text-gray-700 hover:!bg-gray-50"
-              sx={{ py: 0.375, minHeight: 'auto' }}
-              title="Ver dados da entrega"
-              aria-label="Ver dados da entrega"
-              onClick={e => {
-                e.stopPropagation()
-                setEntregaQuickViewAnchor(e.currentTarget)
-              }}
-            >
-              <MdVisibility size={16} />
-            </Button>
-          )}
-
           {deveExibirBotaoEmitirNotaNoKanban(
             column.id as ColunaKanbanId,
             venda,
@@ -645,6 +628,23 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
                 return `Emitir Nota`
               })()}
             </KanbanCardAcaoButton>
+          )}
+
+          {exibirQuickViewEntrega && (
+            <Button
+              size="sm"
+              variant="outlined"
+              className="!min-w-0 !border-gray-300 !px-2 !text-gray-700 hover:!bg-gray-50"
+              sx={{ py: 0.375, minHeight: 'auto' }}
+              title="Ver dados da entrega"
+              aria-label="Ver dados da entrega"
+              onClick={e => {
+                e.stopPropagation()
+                setEntregaQuickViewAnchor(e.currentTarget)
+              }}
+            >
+              <MdVisibility size={16} />
+            </Button>
           )}
 
           {column.id === 'COM_NFE' && venda.statusFiscal === 'INUTILIZADA' && (
