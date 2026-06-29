@@ -415,3 +415,109 @@ export function kanbanVendaUsaCupomPublicoNfce(
     v.tipoDocFiscal === 'NFCE' && ORIGENS_CUPOM_PUBLICO_NFCE.has(v.origem)
   )
 }
+
+/** Etapa do card quando emissão/reemissão está em andamento. */
+export function etapaKanbanCardComAcaoFiscal(
+  venda: Venda,
+  acaoFiscalEmAndamentoPorVenda: Record<string, 'emitindo' | 'reemitindo'>
+): ColunaKanbanId {
+  const acao = acaoFiscalEmAndamentoPorVenda[venda.id]
+  if (acao === 'reemitindo' || acao === 'emitindo') return 'COM_NFE'
+  return venda.getEtapaKanban() as ColunaKanbanId
+}
+
+/**
+ * No modo Delivery, pendente emissão aparece na coluna Finalizadas — borda/cores da etapa real.
+ */
+export function colunaParaEstiloCardKanban(
+  columnId: ColunaKanbanId,
+  etapaKanbanCard: ColunaKanbanId,
+  modoKanbanVendas: ModoKanbanVendas
+): ColunaKanbanId {
+  if (
+    modoKanbanVendas === 'delivery' &&
+    columnId === 'FINALIZADAS' &&
+    etapaKanbanCard === 'PENDENTE_EMISSAO'
+  ) {
+    return 'PENDENTE_EMISSAO'
+  }
+  return columnId
+}
+
+export function colunaPermiteEditarClienteKanban(
+  columnId: ColunaKanbanId,
+  venda: Venda,
+  modoKanbanVendas: ModoKanbanVendas,
+  acaoFiscalEmAndamentoPorVenda: Record<string, 'emitindo' | 'reemitindo'>
+): boolean {
+  if (columnId === 'FINALIZADAS' || columnId === 'PENDENTE_EMISSAO') return true
+  if (
+    columnId === 'COM_NFE' &&
+    (acaoFiscalEmAndamentoPorVenda[venda.id] === 'reemitindo' ||
+      acaoFiscalEmAndamentoPorVenda[venda.id] === 'emitindo')
+  ) {
+    return true
+  }
+  if (
+    modoKanbanVendas === 'delivery' &&
+    venda.isPedidoEntregaGestor() &&
+    COLUNAS_ENTREGA_OPERACIONAIS.includes(columnId)
+  ) {
+    return true
+  }
+  return false
+}
+
+export function podeEditarClienteNaKanbanCard(
+  columnId: ColunaKanbanId,
+  venda: Venda,
+  modoKanbanVendas: ModoKanbanVendas,
+  acaoFiscalEmAndamentoPorVenda: Record<string, 'emitindo' | 'reemitindo'>
+): boolean {
+  return (
+    colunaPermiteEditarClienteKanban(
+      columnId,
+      venda,
+      modoKanbanVendas,
+      acaoFiscalEmAndamentoPorVenda
+    ) &&
+    !vendaSemNomeCliente(venda) &&
+    Boolean(venda.cliente?.id?.trim())
+  )
+}
+
+export function exibirAtribuirEntregadorKanban(
+  modoKanbanVendas: ModoKanbanVendas,
+  venda: Venda,
+  colunaAtual: ColunaKanbanId
+): boolean {
+  const tipoVendaStr = String(venda.tipoVenda ?? '').trim().toLowerCase()
+  return (
+    modoKanbanVendas === 'delivery' &&
+    tipoVendaStr === 'entrega' &&
+    venda.isPedidoEntregaGestor() &&
+    COLUNAS_ENTREGA_OPERACIONAIS.includes(colunaAtual)
+  )
+}
+
+/** Rótulo do botão Emitir/Reemitir nota no card. */
+export function rotuloBotaoEmissaoKanban(
+  venda: Venda,
+  acaoFiscalEmAndamentoPorVenda: Record<string, 'emitindo' | 'reemitindo'>
+): string {
+  const acaoEmAndamento = acaoFiscalEmAndamentoPorVenda[venda.id]
+  if (acaoEmAndamento === 'reemitindo') return 'Reemitindo...'
+  if (acaoEmAndamento === 'emitindo') return 'Emitindo...'
+  const documentoLabel = venda.tipoDocFiscal === 'NFE' ? 'NFe' : 'NFCe'
+  const podeReemitir =
+    venda.statusFiscal === 'REJEITADA' || fiscalKanbanPodeReemitirAposCooldown(venda)
+  if (podeReemitir) {
+    if (venda.tipoDocFiscal === 'NFE' || venda.tipoDocFiscal === 'NFCE') {
+      return `Reemitir ${documentoLabel}`
+    }
+    return 'Reemitir nota'
+  }
+  if (venda.statusFiscal === 'PENDENTE_EMISSAO') return 'Aguardando...'
+  if (statusFiscalAguardandoSefaz(venda)) return 'Aguardando...'
+  return 'Emitir Nota'
+}

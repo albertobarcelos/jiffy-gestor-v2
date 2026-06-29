@@ -31,7 +31,6 @@ import {
   vendasUnificadasQueryParamsParaPedidosDelivery,
 } from './hooks/usePedidosDeliveryInfinite'
 import { usePedidosDeliveryKanbanColumns } from './hooks/usePedidosDeliveryKanbanColumns'
-import { usePedidosDeliveryContagemPorStatus } from './hooks/usePedidosDeliveryContagemPorStatus'
 import { combinarContagensColunasDeliveryKanban } from './utils/kanbanDeliveryColumnCounts'
 import { useVendaIdsPdvPorTerminal } from '@/src/presentation/hooks/useVendaIdsPdvPorTerminal'
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
@@ -104,9 +103,7 @@ import {
 } from './utils/kanbanDeliveryColumnConfig'
 import {
   resolverEntregadorIdVendaKanban,
-  hidratarEntregadoresKanbanDesdeApi,
   hidratarEntregadoresKanbanDesdeSummary,
-  entregadorKanbanJaVerificado,
   definirEntregadorKanbanCache,
 } from '../delivery/kanban-panels/entregadorKanbanStore'
 import {
@@ -419,12 +416,6 @@ export function FiscalFlowKanban() {
     enviarFiltroFinalizacaoNaApi: enviarFiltroFinalizacaoNaDeliveryApi,
   })
 
-  const deliveryContagem = usePedidosDeliveryContagemPorStatus(pedidosDeliveryQueryParams, {
-    enabled: hasKanbanToken && isModoDeliveryKanban,
-    enviarFiltroCriacaoNaApi: enviarFiltroCriacaoNaDeliveryApi,
-    enviarFiltroFinalizacaoNaApi: enviarFiltroFinalizacaoNaDeliveryApi,
-  })
-
   const isLoadingDelivery = deliveryKanban.isLoading
   const refetchDelivery = deliveryKanban.refetch
 
@@ -452,7 +443,7 @@ export function FiscalFlowKanban() {
 
   const refetch = useCallback(async () => {
     if (isModoDeliveryKanban) {
-      await Promise.all([refetchDelivery(), deliveryContagem.refetch()])
+      await refetchDelivery()
       return
     }
     await queryClient.resetQueries({ queryKey: infiniteQueryKey, exact: true })
@@ -465,7 +456,6 @@ export function FiscalFlowKanban() {
     isModoDeliveryKanban,
     usaFiltroTerminal,
     refetchDelivery,
-    deliveryContagem.refetch,
     refetchUnificado,
     refetchIdsTerminal,
     queryClient,
@@ -475,14 +465,14 @@ export function FiscalFlowKanban() {
   /** Normaliza refetch do infinite query para `refetchAteMudarStatusFiscal` (espera `{ data: { items } }`). */
   const refetchParaEmissaoFiscal = useCallback(async () => {
     if (isModoDeliveryKanban) {
-      await Promise.all([refetchDelivery(), deliveryContagem.refetch()])
+      await refetchDelivery()
       const items = deliveryKanban.flattenAllItems()
       return { data: { items } }
     }
     const result = await refetchUnificado()
     const { items } = flattenVendasUnificadasInfinite(result.data)
     return { data: { items } }
-  }, [isModoDeliveryKanban, refetchDelivery, deliveryContagem.refetch, deliveryKanban.flattenAllItems, refetchUnificado])
+  }, [isModoDeliveryKanban, refetchDelivery, deliveryKanban.flattenAllItems, refetchUnificado])
 
   const deliveryKanbanColumnStatesKey = useMemo(
     () => JSON.stringify(deliveryKanban.columnStates),
@@ -513,7 +503,7 @@ export function FiscalFlowKanban() {
     )
   }, [usaFiltroTerminal, vendaIdsPdvPorTerminal, todasVendasFlattened])
 
-  const entregadoresHydrationKey = useMemo(
+  const entregadoresSummaryKey = useMemo(
     () =>
       todasVendasCarregadas
         .filter(
@@ -526,117 +516,53 @@ export function FiscalFlowKanban() {
             getEtapaKanbanParaExibicaoRef.current(v) as ColunaKanbanId
           )
         )
-        .filter(v => {
-          if (String(v.entregador?.id ?? '').trim()) return false
-          if (entregadorPorVendaId[v.id]?.trim()) return false
-          if (entregadorKanbanJaVerificado(v.id)) return false
-          return true
-        })
-        .map(v => v.id)
+        .map(v => `${v.id}:${v.entregador?.id ?? 'null'}`)
         .sort()
         .join('|'),
-    [todasVendasCarregadas, entregadorPorVendaId]
+    [todasVendasCarregadas]
   )
-
-  const entregadorPorVendaIdRef = useRef(entregadorPorVendaId)
-  entregadorPorVendaIdRef.current = entregadorPorVendaId
 
   const todasVendasCarregadasRef = useRef(todasVendasCarregadas)
   todasVendasCarregadasRef.current = todasVendasCarregadas
 
-  const entregadoresHydrationEmAndamentoRef = useRef(false)
-
+  /** Entregador vem do summary da listagem — sem GET em lote por card. */
   useEffect(() => {
     if (modoKanbanVendas !== 'delivery') return
     if (isLoadingDelivery) return
-    const token = auth?.getAccessToken()
-    if (!token || !entregadoresHydrationKey) return
-    if (entregadoresHydrationEmAndamentoRef.current) return
+    if (!entregadoresSummaryKey) return
 
-    const idsParaHidratar = entregadoresHydrationKey.split('|').filter(Boolean)
-    if (idsParaHidratar.length === 0) return
+    const vendasRef = todasVendasCarregadasRef.current
+      .filter(
+        v =>
+          v.isPedidoEntregaGestor() &&
+          String(v.tipoVenda ?? '').trim().toLowerCase() === 'entrega' &&
+          COLUNAS_ENTREGA_OPERACIONAIS.includes(
+            getEtapaKanbanParaExibicaoRef.current(v) as ColunaKanbanId
+          )
+      )
+      .map(v => ({
+        id: v.id,
+        tabelaOrigem:
+          v.tabelaOrigem === 'venda_gestor' ? ('venda_gestor' as const) : ('venda' as const),
+        tipoVenda: v.tipoVenda,
+        entregador: v.entregador,
+      }))
 
-    entregadoresHydrationEmAndamentoRef.current = true
-    let cancelled = false
+    const updatesSummary = hidratarEntregadoresKanbanDesdeSummary(vendasRef)
+    if (Object.keys(updatesSummary).length === 0) return
 
-    void (async () => {
-      const vendasRef = todasVendasCarregadasRef.current
-        .filter(
-          v =>
-            idsParaHidratar.includes(v.id) &&
-            v.isPedidoEntregaGestor() &&
-            String(v.tipoVenda ?? '').trim().toLowerCase() === 'entrega' &&
-            COLUNAS_ENTREGA_OPERACIONAIS.includes(
-              getEtapaKanbanParaExibicaoRef.current(v) as ColunaKanbanId
-            )
-        )
-        .map(v => ({
-          id: v.id,
-          tabelaOrigem:
-            v.tabelaOrigem === 'venda_gestor' ? ('venda_gestor' as const) : ('venda' as const),
-          tipoVenda: v.tipoVenda,
-          entregador: v.entregador,
-        }))
-
-      if (vendasRef.length === 0) {
-        entregadoresHydrationEmAndamentoRef.current = false
-        return
-      }
-
-      const updatesSummary = hidratarEntregadoresKanbanDesdeSummary(vendasRef)
-      if (Object.keys(updatesSummary).length > 0) {
-        setEntregadorPorVendaId(prev => {
-          const next = { ...prev }
-          let changed = false
-          for (const [vendaId, entregadorId] of Object.entries(updatesSummary)) {
-            if (next[vendaId] !== entregadorId) {
-              next[vendaId] = entregadorId
-              changed = true
-            }
-          }
-          return changed ? next : prev
-        })
-      }
-
-      const idsJaConhecidos = new Set([
-        ...Object.keys(updatesSummary),
-        ...Object.entries(entregadorPorVendaIdRef.current)
-          .filter(([, entregadorId]) => entregadorId?.trim())
-          .map(([vendaId]) => vendaId),
-      ])
-      for (const venda of vendasRef) {
-        if (entregadorKanbanJaVerificado(venda.id)) {
-          idsJaConhecidos.add(venda.id)
+    setEntregadorPorVendaId(prev => {
+      const next = { ...prev }
+      let changed = false
+      for (const [vendaId, entregadorId] of Object.entries(updatesSummary)) {
+        if (next[vendaId] !== entregadorId) {
+          next[vendaId] = entregadorId
+          changed = true
         }
       }
-
-      const updates = await hidratarEntregadoresKanbanDesdeApi({
-        vendas: vendasRef,
-        token,
-        idsJaConhecidos,
-      })
-
-      entregadoresHydrationEmAndamentoRef.current = false
-
-      if (cancelled || Object.keys(updates).length === 0) return
-
-      setEntregadorPorVendaId(prev => {
-        const next = { ...prev }
-        let changed = false
-        for (const [vendaId, entregadorId] of Object.entries(updates)) {
-          if (next[vendaId] !== entregadorId) {
-            next[vendaId] = entregadorId
-            changed = true
-          }
-        }
-        return changed ? next : prev
-      })
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [auth, modoKanbanVendas, entregadoresHydrationKey, isLoadingDelivery])
+      return changed ? next : prev
+    })
+  }, [modoKanbanVendas, isLoadingDelivery, entregadoresSummaryKey])
 
   const temMaisVendasParaCarregar = useMemo(() => {
     if (isModoDeliveryKanban) return false
@@ -707,26 +633,19 @@ export function FiscalFlowKanban() {
     const finalizadasState = deliveryKanban.columnStates.FINALIZADAS
     const { items: poolFinalizados } = flattenPedidosDeliveryInfinite(finalizadasState?.data)
 
-    const finalizadoTotal = Math.max(
-      deliveryContagem.finalizadoTotal,
-      finalizadasState?.totalCount ?? 0
-    )
+    // Totais derivados do `count` que cada listagem de coluna já retorna (atualizado pelo delta poll),
+    // dispensando o endpoint dedicado de contagem-por-status.
+    const finalizadoTotal = finalizadasState?.totalCount ?? 0
 
     return combinarContagensColunasDeliveryKanban(
-      deliveryContagem.operacional,
+      undefined,
       finalizadoTotal,
       poolFinalizados,
       v => getEtapaKanbanParaExibicaoRef.current(v),
       finalizadasState?.hasNextPage ?? false,
       deliveryKanban.columnStates
     )
-  }, [
-    isModoDeliveryKanban,
-    deliveryContagem.operacional,
-    deliveryContagem.finalizadoTotal,
-    deliveryKanbanColumnStatesKey,
-    deliveryKanban.columnStates,
-  ])
+  }, [isModoDeliveryKanban, deliveryKanbanColumnStatesKey, deliveryKanban.columnStates])
 
   /**
    * Remove o card fixado no topo de uma coluna (pin de "primeiro da lista").

@@ -202,9 +202,16 @@ export function hidratarEntregadoresKanbanDesdeSummary(
   for (const venda of vendas) {
     if (!vendaKanbanPrecisaEntregador(venda)) continue
     const entregadorId = String(venda.entregador?.id ?? '').trim()
-    if (!entregadorId) continue
-    definirEntregadorKanbanCache(venda.id, entregadorId)
-    updates[venda.id] = entregadorId
+    if (entregadorId) {
+      definirEntregadorKanbanCache(venda.id, entregadorId)
+      updates[venda.id] = entregadorId
+      continue
+    }
+
+    // Listagem delivery já informa ausência (`entregador: null`) — não buscar detalhe por card.
+    if (venda.tabelaOrigem === 'venda_gestor') {
+      marcarEntregadorKanbanAusente(venda.id)
+    }
   }
 
   return updates
@@ -254,6 +261,11 @@ export async function hidratarEntregadoresKanbanDesdeApi(args: {
     if (doSummary) {
       definirEntregadorKanbanCache(venda.id, doSummary)
       updates[venda.id] = doSummary
+      continue
+    }
+
+    if (venda.tabelaOrigem === 'venda_gestor') {
+      marcarEntregadorKanbanAusente(venda.id)
       continue
     }
 

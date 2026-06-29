@@ -8,10 +8,17 @@ declare module 'qz-tray' {
   /** Destino: nome de impressora Windows OU conexão raw TCP `{ host, port }`. */
   type QzPrinterTarget = string | { host: string; port: string }
 
-  /** Conteúdo de impressão: objetos (pixel/html) ou strings raw ESC/POS. */
-  type QzPrintData =
-    | Array<{ type: string; format: string; flavor: string; data: string }>
-    | string[]
+  /** Item de impressão estruturado (pixel/html/image ou raw com options). */
+  interface QzPrintItem {
+    type: string
+    format: string
+    flavor: string
+    data: string
+    options?: Record<string, unknown>
+  }
+
+  /** Conteúdo de impressão: objetos (pixel/html/raw) ou strings raw ESC/POS. */
+  type QzPrintData = QzPrintItem[] | string[]
 
   interface QzConfigs {
     create(printer: QzPrinterTarget, opts?: Record<string, unknown>): QzConfig

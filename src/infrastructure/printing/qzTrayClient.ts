@@ -304,13 +304,23 @@ export function formatTcpPrinterRef(host: string, port: number | string): string
 }
 
 /**
+ * Largura de renderização (em polegadas) do cupom para rasterização ESC/POS.
+ * 58mm térmica ≈ 1.9" (384 dots @203dpi); 80mm ≈ 2.83" (576 dots @203dpi).
+ * O template gera body com `width:220px` (58mm) ou `width:300px` (80mm).
+ */
+function larguraRasterPolegadas(html: string): number {
+  if (/width:\s*220px/.test(html)) return 1.9
+  return 2.83
+}
+
+/**
  * Imprime um HTML em uma impressora térmica via raw TCP (sem instalar no Windows).
  *
  * Fluxo:
  * 1. Conecta ao WebSocket do QZ Tray
  * 2. Cria config apontando direto para IP:porta (sem nome de impressora Windows)
- * 3. Converte HTML → ESC/POS (negrito, centralizado, colunas, separadores)
- * 4. Envia como raw command via TCP
+ * 3. Envia o HTML para o QZ rasterizar em ESC/POS (igual ao caminho Windows pixel/html)
+ * 4. Fallback: se a impressora/QZ não rasterizar HTML em raw, usa o conversor ESC/POS de texto
  */
 export async function printRawTcpQz(
   qz: QzModule,
@@ -322,14 +332,37 @@ export async function printRawTcpQz(
 ): Promise<void> {
   await ensureQzWebsocketConnected(qz)
 
-  const conteudo = deliveryCupomHtmlParaEscPos(html)
+  const config = qz.configs.create({ host, port: String(port) }, { jobName })
+  const pageWidth = larguraRasterPolegadas(html)
 
-  const config = qz.configs.create(
-    { host, port: String(port) },
-    { jobName, encoding: 'Cp850' }
-  )
+  const payloadRaster = [
+    {
+      type: 'raw' as const,
+      format: 'html' as const,
+      flavor: 'plain' as const,
+      data: html,
+      options: { language: 'ESCPOS', pageWidth, dotDensity: 'double' },
+    },
+  ]
 
-  for (let i = 0; i < Math.max(1, copies); i++) {
-    await qz.print(config, [conteudo])
+  try {
+    for (let i = 0; i < Math.max(1, copies); i++) {
+      await qz.print(config, payloadRaster)
+    }
+  } catch (e) {
+    // Algumas impressoras/versões do QZ não rasterizam HTML em raw: cai no ESC/POS de texto.
+    logImpressao('printRawTcpQz.raster_falhou_fallback_escpos', {
+      mensagem: e instanceof Error ? e.message : String(e),
+      host,
+      port,
+    })
+    const configTexto = qz.configs.create(
+      { host, port: String(port) },
+      { jobName, encoding: 'Cp850' }
+    )
+    const conteudo = deliveryCupomHtmlParaEscPos(html)
+    for (let i = 0; i < Math.max(1, copies); i++) {
+      await qz.print(configTexto, [conteudo])
+    }
   }
 }

@@ -312,8 +312,23 @@ export function usePedidosDeliveryKanbanColumns(
       }
     }
 
-    const id = setInterval(() => void runDelta(), refetchIntervalMs)
-    return () => clearInterval(id)
+    // Com a aba oculta o tick é ignorado (evita polling desnecessário em estação parada).
+    const tick = () => {
+      if (typeof document !== 'undefined' && document.hidden) return
+      void runDelta()
+    }
+
+    // Ao voltar o foco para a aba, dispara um delta imediato para recuperar o atraso.
+    const handleVisibility = () => {
+      if (typeof document !== 'undefined' && !document.hidden) void runDelta()
+    }
+
+    const id = setInterval(tick, refetchIntervalMs)
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
   }, [enabled, refetchIntervalMs, columnQueryKeysStr, columnQueryKeys, queryClient, getEtapaKanban])
 
   const refetchOnWindowFocus = options?.refetchOnWindowFocus ?? false
