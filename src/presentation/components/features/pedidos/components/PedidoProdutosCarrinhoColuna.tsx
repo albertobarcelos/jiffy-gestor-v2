@@ -38,9 +38,15 @@ import { useNovoPedidoFormContext } from '../context/NovoPedidoFormContext'
 import { useNovoPedidoDetalheContext } from '../context/NovoPedidoDetalheContext'
 import { useNovoPedidoUIContext } from '../context/NovoPedidoUIContext'
 
-/** Grid compartilhado: Qtd | Produto | Unid. | Desc. | Val Unit. | Total | Ações */
+/**
+ * Grid compartilhado: Qtd | Produto | Unid. | Desc. | Val Unit. | Total | Ações.
+ * Cabeçalho e cada linha são grids independentes, então as larguras precisam ser fixas
+ * (não `auto`) para alinharem entre si. As colunas numéricas são dimensionadas para caber
+ * os maiores valores sem quebrar (Qtd decimal "0,500", Val Unit. "300.000,00",
+ * Total "R$ 300.000,00"); Produto (1fr) absorve o espaço restante.
+ */
 const CARRINHO_PRODUTOS_GRID_CLASS =
-  'grid grid-cols-[66px_minmax(0,1fr)_2.75rem_4rem_5rem_5rem_34px] gap-x-1 items-center'
+  'grid grid-cols-[4.5rem_minmax(0,1fr)_2.75rem_4rem_5.5rem_7rem_34px] gap-x-1 items-center'
 
 /** Desloca qtd/nome do complemento à direita sem mover Unid., Val Unit., Total etc. */
 const COMPLEMENTO_CARRINHO_QTD_DESLOCAMENTO_CLASS = 'justify-start pl-6'
@@ -110,7 +116,7 @@ export function PedidoProdutosCarrinhoColuna() {
               </span>
             </div>
             <div>
-              <span className="block text-right text-xs font-semibold text-gray-700 tabular-nums">
+              <span className="block whitespace-nowrap text-right text-xs font-semibold text-gray-700 tabular-nums">
                 Total
               </span>
             </div>
@@ -271,7 +277,9 @@ export function PedidoProdutosCarrinhoColuna() {
                             e.currentTarget.blur()
                           }
                         }}
-                        className="h-5 w-5 min-w-0 border-0 bg-transparent p-0 text-center text-xs tabular-nums text-gray-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary"
+                        className={`h-5 min-w-0 border-0 bg-transparent p-0 text-center text-xs tabular-nums text-gray-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary ${
+                          qtdProdutoDecimal ? 'w-10' : 'w-6'
+                        }`}
                       />
                       <button
                         type="button"
@@ -429,7 +437,7 @@ export function PedidoProdutosCarrinhoColuna() {
                     </div>
                     {/* Total */}
                     <div>
-                      <span className="block px-1 text-right text-xs font-semibold tabular-nums text-gray-900">
+                      <span className="block whitespace-nowrap px-1 text-right text-xs font-semibold tabular-nums text-gray-900">
                         R$ {formatarNumeroComMilhar(totalProdutoComComplementos)}
                       </span>
                     </div>
@@ -798,7 +806,7 @@ export function PedidoProdutosCarrinhoColuna() {
                 {observacaoPedidoVisivel ? (
                   <MdRemove className="h-4 w-4" />
                 ) : (
-                  <MdAdd className="h-4 w-4" />
+                  <MdEdit className="h-4 w-4" />
                 )}
               </button>
             </Tooltip>

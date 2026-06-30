@@ -10,7 +10,10 @@ import { NovoPedidoAuxiliaryModals } from '../NovoPedidoAuxiliaryModals'
 import { PedidoWizardStepsView } from '../PedidoWizardStepsView'
 import { PedidoDetalhesView } from '../PedidoDetalhesView'
 import { PedidoDetalhesFooter } from '../detalhes/PedidoDetalhesFooter'
+import { EdicaoProdutosFooter } from '../detalhes/EdicaoProdutosFooter'
 import type { NovoPedidoShellProps } from '../../hooks/orchestrator/types'
+import { useNovoPedidoFormContext } from '../../context/NovoPedidoFormContext'
+import { useNovoPedidoAtalhosTeclado } from '../../hooks/form/useNovoPedidoAtalhosTeclado'
 
 export function NovoPedidoModalShell(props: NovoPedidoShellProps) {
   const {
@@ -19,6 +22,9 @@ export function NovoPedidoModalShell(props: NovoPedidoShellProps) {
     handlePedidoPainelExited,
     estaNoPassoProdutos,
     modoVisualizacao,
+    modoEdicaoProdutos,
+    salvandoProdutos,
+    onSalvarProdutos,
     nomeUsuario,
     currentStep,
     isLoadingVenda,
@@ -39,6 +45,16 @@ export function NovoPedidoModalShell(props: NovoPedidoShellProps) {
     isSavingPagamentoEntrega,
     onSalvarPagamentoEntrega,
   } = props
+
+  const { setBuscaProdutoTexto } = useNovoPedidoFormContext()
+
+  useNovoPedidoAtalhosTeclado({
+    ativo: internalDialogOpen && !modoVisualizacao && !modoEdicaoProdutos,
+    currentStep,
+    setBuscaProdutoTexto,
+    onNextStep,
+    onPreviousStep,
+  })
 
   const modalPaperWidth = estaNoPassoProdutos
     ? { xs: '95vw', sm: '90vw', md: '90vw' }
@@ -109,6 +125,7 @@ export function NovoPedidoModalShell(props: NovoPedidoShellProps) {
         >
           <NovoPedidoHeader
             modoVisualizacao={modoVisualizacao}
+            modoEdicaoProdutos={modoEdicaoProdutos}
             nomeUsuario={nomeUsuario}
             currentStep={currentStep}
             isLoadingVenda={isLoadingVenda}
@@ -117,11 +134,13 @@ export function NovoPedidoModalShell(props: NovoPedidoShellProps) {
             podeExibirAbaNotaFiscal={podeExibirAbaNotaFiscal}
             podeExibirAbaDadosEntrega={podeExibirAbaDadosEntrega}
           />
-          <NovoPedidoStepper
-            currentStep={currentStep}
-            modoVisualizacao={modoVisualizacao}
-            tipoInicioPedido={tipoInicioPedido}
-          />
+          {!modoEdicaoProdutos && (
+            <NovoPedidoStepper
+              currentStep={currentStep}
+              modoVisualizacao={modoVisualizacao}
+              tipoInicioPedido={tipoInicioPedido}
+            />
+          )}
 
           <div
             style={{
@@ -144,22 +163,32 @@ export function NovoPedidoModalShell(props: NovoPedidoShellProps) {
             <PedidoDetalhesView />
           </div>
 
-          {!(modoVisualizacao && isLoadingVenda) && (
+          {modoEdicaoProdutos ? (
             <NovoPedidoFooterShell>
-              <PedidoDetalhesFooter
-                createPending={createPending}
-                canSubmit={canSubmit}
-                onSubmit={onSubmit}
-                onNextStep={onNextStep}
-                onPreviousStep={onPreviousStep}
-                onClose={onClose}
-                onSuccess={onSuccess}
-                podeExibirCancelarVendaGestor={podeExibirCancelarVendaGestor}
-                podeExibirCancelarNotaFiscal={podeExibirCancelarNotaFiscal}
-                isSavingPagamentoEntrega={isSavingPagamentoEntrega}
-                onSalvarPagamentoEntrega={onSalvarPagamentoEntrega}
+              <EdicaoProdutosFooter
+                salvando={salvandoProdutos}
+                onCancelar={onClose}
+                onSalvar={onSalvarProdutos}
               />
             </NovoPedidoFooterShell>
+          ) : (
+            !(modoVisualizacao && isLoadingVenda) && (
+              <NovoPedidoFooterShell>
+                <PedidoDetalhesFooter
+                  createPending={createPending}
+                  canSubmit={canSubmit}
+                  onSubmit={onSubmit}
+                  onNextStep={onNextStep}
+                  onPreviousStep={onPreviousStep}
+                  onClose={onClose}
+                  onSuccess={onSuccess}
+                  podeExibirCancelarVendaGestor={podeExibirCancelarVendaGestor}
+                  podeExibirCancelarNotaFiscal={podeExibirCancelarNotaFiscal}
+                  isSavingPagamentoEntrega={isSavingPagamentoEntrega}
+                  onSalvarPagamentoEntrega={onSalvarPagamentoEntrega}
+                />
+              </NovoPedidoFooterShell>
+            )
           )}
         </DialogContent>
 

@@ -5,6 +5,7 @@ import { Label } from '@/src/presentation/components/ui/label'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { MdClear, MdSearch } from 'react-icons/md'
 import { useNovoPedidoFormContext } from '../context/NovoPedidoFormContext'
+import { BUSCA_PRODUTO_INPUT_ID } from '../hooks/form/useNovoPedidoAtalhosTeclado'
 
 export function PedidoProdutosCatalogoColuna() {
   const {
@@ -35,7 +36,9 @@ export function PedidoProdutosCatalogoColuna() {
       <div className="relative shrink-0">
         <MdSearch className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
         <input
+          id={BUSCA_PRODUTO_INPUT_ID}
           type="text"
+          autoComplete="off"
           placeholder="Pesquisar produto pelo nome..."
           value={buscaProdutoTexto}
           onChange={(e) => setBuscaProdutoTexto(e.target.value)}
@@ -104,18 +107,21 @@ export function PedidoProdutosCatalogoColuna() {
                           e.currentTarget.style.borderColor = corHexGrupo
                           e.currentTarget.style.backgroundColor = '#ffffff'
                         }}
-                        className="flex h-full w-full min-h-0 cursor-pointer flex-col rounded-md border-2 px-1 py-1.5 text-left transition-all active:scale-95"
+                        className="flex h-full w-full min-h-0 cursor-pointer flex-col items-center rounded-md border-2 px-1 py-1.5 text-center transition-all active:scale-95"
                         style={{
                           borderColor: corHexGrupo,
                           backgroundColor: '#ffffff',
                         }}
                       >
-                        <span className="line-clamp-2 min-h-0 flex-1 text-center text-[10px] font-medium leading-tight text-gray-900">
-                          {produto.getNome()}
+                        <span className="flex min-h-0 w-full flex-1 items-end justify-center pb-0.5">
+                          <span className="line-clamp-2 w-full text-center text-[11px] font-medium leading-tight text-gray-900">
+                            {produto.getNome()}
+                          </span>
                         </span>
-                        <span className="mt-0.5 shrink-0 w-full text-center text-[11px] font-semibold tabular-nums text-gray-900">
+                        <span className="shrink-0 w-full text-center text-[14px] font-semibold tabular-nums text-gray-900">
                           {transformarParaReal(produto.getValor())}
                         </span>
+                        <span className="min-h-0 w-full flex-1" aria-hidden="true" />
                       </button>
                     </div>
                   )

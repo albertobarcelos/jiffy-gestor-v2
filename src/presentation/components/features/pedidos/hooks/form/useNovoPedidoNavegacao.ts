@@ -22,6 +22,8 @@ export interface UseNovoPedidoNavegacaoParams {
   clienteEntregaVinculadoId?: string
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
+  /** Edição de produtos de pedido existente: trava a navegação entre etapas. */
+  modoEdicaoProdutos?: boolean
 }
 
 export function useNovoPedidoNavegacao({
@@ -39,6 +41,7 @@ export function useNovoPedidoNavegacao({
   clienteEntregaVinculadoId,
   pedidoComEntrega,
   temEnderecoEntrega,
+  modoEdicaoProdutos,
 }: UseNovoPedidoNavegacaoParams) {
   const [modalConfirmacaoSaidaOpen, setModalConfirmacaoSaidaOpen] = useState(false)
   const [internalDialogOpen, setInternalDialogOpen] = useState(open)
@@ -95,6 +98,7 @@ export function useNovoPedidoNavegacao({
 
   const handleNextStep = useCallback(() => {
     if (vendaId && modoVisualizacao) return
+    if (modoEdicaoProdutos) return
 
     if (currentStep === 1 && canGoToStep2()) {
       setCurrentStep(tipoInicioPedido === 'entrega' ? 2 : 3)
@@ -118,17 +122,19 @@ export function useNovoPedidoNavegacao({
     tipoInicioPedido,
     setCurrentStep,
     validarInformacoesPedido,
+    modoEdicaoProdutos,
   ])
 
   const handlePreviousStep = useCallback(() => {
     if (vendaId && modoVisualizacao) return
+    if (modoEdicaoProdutos) return
 
     if (currentStep === 2) {
       setCurrentStep(1)
     } else if (currentStep === 3) {
       setCurrentStep(tipoInicioPedido === 'entrega' ? 2 : 1)
     }
-  }, [vendaId, modoVisualizacao, currentStep, tipoInicioPedido, setCurrentStep])
+  }, [vendaId, modoVisualizacao, currentStep, tipoInicioPedido, setCurrentStep, modoEdicaoProdutos])
 
   const handleDialogOpenChange = useCallback(
     (isOpen: boolean, reason?: 'backdropClick' | 'escapeKeyDown') => {

@@ -6,6 +6,12 @@ export type NovoPedidoShellProps = {
   handlePedidoPainelExited: () => void
   estaNoPassoProdutos: boolean
   modoVisualizacao: boolean | undefined
+  /** Edição de produtos de um pedido delivery existente (sem fluxo de criação). */
+  modoEdicaoProdutos: boolean
+  /** Salvando o diff de produtos (PATCH delivery). */
+  salvandoProdutos: boolean
+  /** Salva as alterações de produtos (diff add/remove). */
+  onSalvarProdutos: () => void | Promise<void>
   nomeUsuario: string
   currentStep: 1 | 2 | 3 | 4
   isLoadingVenda: boolean

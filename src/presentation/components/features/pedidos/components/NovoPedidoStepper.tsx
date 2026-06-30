@@ -76,7 +76,7 @@ export function NovoPedidoStepper({
         ]
 
   return (
-    <div className="mt-2 flex items-center justify-center gap-2">
+    <div className="mt-3 mb-4 flex items-center justify-center gap-2">
       {steps.map((item, index) => (
         <div key={item.step} className="contents">
           {index > 0 ? (
