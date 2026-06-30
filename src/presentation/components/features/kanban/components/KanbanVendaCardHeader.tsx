@@ -4,7 +4,7 @@ import Tooltip from '@mui/material/Tooltip'
 import { MdAccessTime, MdEdit, MdSync } from 'react-icons/md'
 import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
 import { StatusFiscalBadge } from '../../fiscal/StatusFiscalBadge'
-import { fiscalKanbanPodeReemitirAposCooldown } from '../rules/fiscalFlowKanban.rules'
+import { fiscalKanbanPodeReemitirAposCooldown } from '../rules/vendasKanban.rules'
 import type { TipoVendaExibicaoCard } from '../utils/kanbanVendaCardViewModel'
 import type { Venda } from '../types'
 
@@ -15,9 +15,9 @@ export interface KanbanVendaCardHeaderProps {
   prefixoLinhaOrigemCard: string
   clienteNome: string
   valorFormatado: string
-  podeEditarClienteNaVenda: boolean
+  podeEditarProdutosNaVenda: boolean
   exibirBotaoSalvarCobranca: boolean
-  onAbrirEdicaoCliente: (clienteId: string) => void
+  onEditarProdutos?: (venda: Venda) => void
   onConfirmarCobranca?: (venda: Venda) => void
   formaCobrancaKanban: string | null
   formaPagamentoKanban: string | null
@@ -86,18 +86,14 @@ function ClienteValorBlock({
   venda,
   clienteNome,
   valorFormatado,
-  podeEditarClienteNaVenda,
   exibirBotaoSalvarCobranca,
-  onAbrirEdicaoCliente,
   onConfirmarCobranca,
 }: Pick<
   KanbanVendaCardHeaderProps,
   | 'venda'
   | 'clienteNome'
   | 'valorFormatado'
-  | 'podeEditarClienteNaVenda'
   | 'exibirBotaoSalvarCobranca'
-  | 'onAbrirEdicaoCliente'
   | 'onConfirmarCobranca'
 >) {
   return (
@@ -106,21 +102,6 @@ function ClienteValorBlock({
         <span className="min-w-0 truncate text-sm font-semibold uppercase text-primary-text">
           {clienteNome}
         </span>
-        {podeEditarClienteNaVenda && venda.cliente?.id && (
-          <button
-            type="button"
-            onClick={e => {
-              e.stopPropagation()
-              onAbrirEdicaoCliente(venda.cliente!.id)
-            }}
-            onDoubleClick={e => e.stopPropagation()}
-            className="shrink-0 rounded p-0.5 text-primary transition-colors hover:bg-primary/10"
-            title="Editar dados do cliente"
-            aria-label="Editar dados do cliente"
-          >
-            <MdEdit className="h-4 w-4" />
-          </button>
-        )}
       </div>
       <div className="flex items-center gap-1">
         <span className="text-sm font-semibold text-gray-900">{valorFormatado}</span>
@@ -179,9 +160,9 @@ export function KanbanVendaCardHeader(props: KanbanVendaCardHeaderProps) {
     prefixoLinhaOrigemCard,
     clienteNome,
     valorFormatado,
-    podeEditarClienteNaVenda,
+    podeEditarProdutosNaVenda,
     exibirBotaoSalvarCobranca,
-    onAbrirEdicaoCliente,
+    onEditarProdutos,
     onConfirmarCobranca,
     formaCobrancaKanban,
     formaPagamentoKanban,
@@ -218,18 +199,39 @@ export function KanbanVendaCardHeader(props: KanbanVendaCardHeaderProps) {
     <div className="flex flex-shrink-0 flex-col items-center justify-start">{tipoVendaIconEl}</div>
   ) : null
 
+  const editarProdutosBtn =
+    podeEditarProdutosNaVenda && onEditarProdutos ? (
+      <Tooltip title="Editar produtos do pedido">
+        <button
+          type="button"
+          onClick={e => {
+            e.stopPropagation()
+            onEditarProdutos(venda)
+          }}
+          onDoubleClick={e => e.stopPropagation()}
+          className="-my-0.5 shrink-0 rounded p-0.5 text-primary transition-colors hover:bg-primary/10"
+          aria-label="Editar produtos do pedido"
+        >
+          <MdEdit className="h-4 w-4" />
+        </button>
+      </Tooltip>
+    ) : null
+
   if (exibirMetaDeliveryKanban) {
     return (
       <div className="flex gap-2 border-b border-gray-100 pb-1.5">
         <div className="min-w-0 flex-1">
-          <p className="mb-0.5 text-xs leading-tight text-gray-500">{linhaIdentificacaoVenda}</p>
+          <div className="mb-0.5 flex items-center gap-1">
+            <p className="min-w-0 truncate text-xs leading-tight text-gray-500">
+              {linhaIdentificacaoVenda}
+            </p>
+            {editarProdutosBtn}
+          </div>
           <ClienteValorBlock
             venda={venda}
             clienteNome={clienteNome}
             valorFormatado={valorFormatado}
-            podeEditarClienteNaVenda={podeEditarClienteNaVenda}
             exibirBotaoSalvarCobranca={exibirBotaoSalvarCobranca}
-            onAbrirEdicaoCliente={onAbrirEdicaoCliente}
             onConfirmarCobranca={onConfirmarCobranca}
           />
           {formaCobrancaKanban || formaPagamentoKanban ? (
@@ -262,16 +264,17 @@ export function KanbanVendaCardHeader(props: KanbanVendaCardHeaderProps) {
   return (
     <div className="flex gap-2">
       <div className="min-w-0 flex-1 border-b border-gray-100 pb-1.5">
-        <p className="mb-0.5 text-xs text-gray-500">
-          {prefixoLinhaOrigemCard} | {linhaIdentificacaoVenda}
-        </p>
+        <div className="mb-0.5 flex items-center gap-1">
+          <p className="min-w-0 truncate text-xs text-gray-500">
+            {prefixoLinhaOrigemCard} | {linhaIdentificacaoVenda}
+          </p>
+          {editarProdutosBtn}
+        </div>
         <ClienteValorBlock
           venda={venda}
           clienteNome={clienteNome}
           valorFormatado={valorFormatado}
-          podeEditarClienteNaVenda={podeEditarClienteNaVenda}
           exibirBotaoSalvarCobranca={exibirBotaoSalvarCobranca}
-          onAbrirEdicaoCliente={onAbrirEdicaoCliente}
           onConfirmarCobranca={onConfirmarCobranca}
         />
         {observacaoPedidoTexto ? (

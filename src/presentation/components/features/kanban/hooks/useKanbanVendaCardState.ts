@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { abrirDocumentoFiscalPdf } from '@/src/presentation/utils/abrirDocumentoFiscalPdf'
 import { abrirNotaFiscalPublica } from '@/src/shared/utils/notaFiscalPublicaUrl'
 import { showToast } from '@/src/shared/utils/toast'
-import { kanbanVendaUsaCupomPublicoNfce } from '../rules/fiscalFlowKanban.rules'
+import { kanbanVendaUsaCupomPublicoNfce } from '../rules/vendasKanban.rules'
 import type { Venda } from '../types'
 
 export interface UseKanbanVendaCardStateParams {

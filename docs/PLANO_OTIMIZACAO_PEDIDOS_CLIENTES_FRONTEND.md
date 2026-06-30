@@ -21,19 +21,19 @@ Trecho analisado:
 ### 1) `GET /pedidos-clientes` (aparece mais de uma vez)
 
 - Origem: rota `app/pedidos-clientes/page.tsx`.
-- A pagina carrega dinamicamente `FiscalFlowKanban`.
+- A pagina carrega dinamicamente `VendasKanban`.
 - Em dev, repeticao pode ocorrer por comportamento de compilacao/StrictMode e navegacao interna.
 
 ### 2) `GET /api/vendas/unificado?offset=0&limit=100`
 
-- Origem: hook `useVendasUnificadas` usado em `FiscalFlowKanban`.
+- Origem: hook `useVendasUnificadas` usado em `VendasKanban`.
 - Funcao: carregar o dataset principal do kanban (vendas unificadas) com filtros atuais.
 - Essa chamada e esperada no carregamento da tela.
 
 ### 3) `GET /api/grupos-produtos?ativo=true&limit=100&offset=0`
 
 - Origem: `NovoPedidoModal` (hook `useGruposProdutos`).
-- Problema atual: `NovoPedidoModal` fica montado no `FiscalFlowKanban` mesmo com `open=false`.
+- Problema atual: `NovoPedidoModal` fica montado no `VendasKanban` mesmo com `open=false`.
 - Efeito: a query roda ao entrar na pagina, antes do usuario abrir o modal.
 
 ### 4) `GET /api/meios-pagamentos?ativo=true&limit=100&offset=0`
@@ -66,7 +66,7 @@ Em termos praticos:
 
 ### 1.1 Montagem condicional de modais pesados
 
-No `FiscalFlowKanban`, renderizar modal apenas quando necessario:
+No `VendasKanban`, renderizar modal apenas quando necessario:
 
 - `NovoPedidoModal` somente quando `novoPedidoModalOpen === true` (ou modo visualizacao aberto).
 - `SeletorClienteModal` somente quando `seletorClienteVendaOpen === true`.

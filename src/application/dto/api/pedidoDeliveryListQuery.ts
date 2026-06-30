@@ -30,7 +30,7 @@ import { PEDIDOS_DELIVERY_KANBAN_PAGE_SIZE } from '@/src/application/dto/api/ped
  */
 export type OrigemFiltroKanbanListagem = '' | 'PDV' | 'GESTOR' | 'DELIVERY'
 
-/** Filtros do hook `useFiscalKanbanFilters` adaptados para a listagem delivery. */
+/** Filtros do hook `useKanbanFilters` adaptados para a listagem delivery. */
 export interface FiltrosKanbanParaPedidosDelivery {
   q?: string
   origemFiltroKanban?: OrigemFiltroKanbanListagem

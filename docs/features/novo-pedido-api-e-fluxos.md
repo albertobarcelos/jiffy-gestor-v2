@@ -2,7 +2,7 @@
 
 > **Documento de referência para migração de API.** Descreve o comportamento **atual do frontend** (`src/presentation/components/features/pedidos` e BFFs relacionados).  
 > **Reorganização de pastas:** destino `features/pedidos/` — ver [`PEDIDOS_FEATURES_REORGANIZACAO.md`](../arquitetura-jiffy/PEDIDOS_FEATURES_REORGANIZACAO.md).  
-> Complementa [`novo-pedido.md`](./novo-pedido.md) e [`fiscal-flow-kanban-e-novo-pedido.md`](../fiscal-flow-kanban-e-novo-pedido.md).
+> Complementa [`novo-pedido.md`](./novo-pedido.md) e [`vendas-kanban-e-novo-pedido.md`](../vendas-kanban-e-novo-pedido.md).
 
 **Última revisão:** 2026-06-15  
 **Componente raiz:** `NovoPedidoModal` → `useNovoPedidoOrchestrator`
@@ -388,7 +388,7 @@ Hook: `useMoradaTelefone.ts`, `useMoradasPorTelefone`, `useCriarMoradaTelefone`,
 
 ## 10. Kanban e transições operacionais
 
-O `FiscalFlowKanban` reutiliza o mesmo `NovoPedidoModal` para visualização e abre delivery com:
+O `VendasKanban` reutiliza o mesmo `NovoPedidoModal` para visualização e abre delivery com:
 
 - `tipoInicioPedido` implícito pelo card (`tipoVenda`)
 - Transições via `useTransicaoVendaGestor` (mesmos endpoints da seção 7.5)

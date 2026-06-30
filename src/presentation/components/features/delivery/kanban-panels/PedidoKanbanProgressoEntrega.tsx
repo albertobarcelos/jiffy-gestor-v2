@@ -6,7 +6,7 @@ import {
   formatarHoraPrevisaoEntrega,
 } from '@/src/application/mappers/PedidoDisplayMapper'
 import type { DetalhesEntregaPedido } from '@/src/domain/types/vendaDetalhe'
-import { COLUNAS_ENTREGA_OPERACIONAIS } from '@/src/presentation/components/features/kanban/rules/fiscalFlowKanban.rules'
+import { COLUNAS_ENTREGA_OPERACIONAIS } from '@/src/presentation/components/features/kanban/rules/vendasKanban.rules'
 import type { ColunaKanbanId } from '@/src/presentation/components/features/kanban/types'
 
 interface PedidoKanbanProgressoEntregaProps {

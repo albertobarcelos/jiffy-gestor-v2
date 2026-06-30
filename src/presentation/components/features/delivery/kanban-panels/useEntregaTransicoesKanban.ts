@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import type { AcaoTransicaoGestor } from '@/src/presentation/hooks/useVendas'
 import type { VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
 import { showToast } from '@/src/shared/utils/toast'
@@ -7,7 +7,7 @@ import {
   COLUNAS_ENTREGA_OPERACIONAIS,
   acoesTransicaoEntregaAvanco,
   vendaPrecisaConfirmarPagamentoParaFinalizar,
-} from '@/src/presentation/components/features/kanban/rules/fiscalFlowKanban.rules'
+} from '@/src/presentation/components/features/kanban/rules/vendasKanban.rules'
 
 export type ExecutarTransicaoKanbanPayload = {
   id: string
@@ -18,6 +18,11 @@ export type ExecutarTransicaoKanbanPayload = {
 export type VerificarImpressaoKanbanResult = {
   ok: boolean
   ticketsPayload?: VendaGestorTicketsResponse
+}
+
+type TransicaoUiAtiva = {
+  origem: ColunaKanbanId
+  destino: ColunaKanbanId
 }
 
 interface UseEntregaTransicoesKanbanParams {
@@ -69,9 +74,32 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
   const [timestampsEtapaEntregaLocal, setTimestampsEtapaEntregaLocal] = useState<
     Record<string, string>
   >({})
-  const [etapaLocalPorVendaId, setEtapaLocalPorVendaId] = useState<
-    Record<string, ColunaKanbanId>
+  const [transicaoUiPorVendaId, setTransicaoUiPorVendaId] = useState<
+    Record<string, TransicaoUiAtiva>
   >({})
+
+  const etapaLocalPorVendaId = useMemo((): Record<string, ColunaKanbanId> => {
+    const map: Record<string, ColunaKanbanId> = {}
+    for (const [vendaId, transicao] of Object.entries(transicaoUiPorVendaId)) {
+      map[vendaId] = transicao.destino
+    }
+    return map
+  }, [transicaoUiPorVendaId])
+
+  /**
+   * Ajuste otimista por coluna enquanto a transição está ativa: origem −1, destino +1.
+   * Permite ao badge de contagem refletir o card que já mudou de coluna na UI, mesmo quando a
+   * coluna está paginada (com paginação completa, a contagem usa direto os cards visíveis).
+   */
+  const deltaContagemColunasTransicao = useMemo((): Partial<Record<ColunaKanbanId, number>> => {
+    const deltas: Partial<Record<ColunaKanbanId, number>> = {}
+    for (const { origem, destino } of Object.values(transicaoUiPorVendaId)) {
+      if (origem === destino) continue
+      deltas[origem] = (deltas[origem] ?? 0) - 1
+      deltas[destino] = (deltas[destino] ?? 0) + 1
+    }
+    return deltas
+  }, [transicaoUiPorVendaId])
 
   const marcarTransicaoLocal = useCallback((vendaId: string) => {
     const agoraIso = new Date().toISOString()
@@ -79,17 +107,23 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
   }, [])
 
   const limparEtapaLocal = useCallback((vendaId: string) => {
-    setEtapaLocalPorVendaId(prev => {
+    setTransicaoUiPorVendaId(prev => {
       if (!(vendaId in prev)) return prev
       const { [vendaId]: _, ...rest } = prev
       return rest
     })
   }, [])
 
-  const iniciarTransicaoUi = useCallback((vendaId: string, colunaDestino: ColunaKanbanId) => {
-    setAvancandoEtapaIds(prev => ({ ...prev, [vendaId]: true }))
-    setEtapaLocalPorVendaId(prev => ({ ...prev, [vendaId]: colunaDestino }))
-  }, [])
+  const iniciarTransicaoUi = useCallback(
+    (vendaId: string, colunaOrigem: ColunaKanbanId, colunaDestino: ColunaKanbanId) => {
+      setAvancandoEtapaIds(prev => ({ ...prev, [vendaId]: true }))
+      setTransicaoUiPorVendaId(prev => ({
+        ...prev,
+        [vendaId]: { origem: colunaOrigem, destino: colunaDestino },
+      }))
+    },
+    []
+  )
 
   const finalizarTransicaoUi = useCallback((vendaId: string) => {
     setAvancandoEtapaIds(prev => {
@@ -131,22 +165,23 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
     ]
   )
 
-  const reverterTransicaoUi = useCallback(
-    (vendaId: string) => {
-      limparEtapaLocal(vendaId)
-    },
-    [limparEtapaLocal]
-  )
+  const reverterTransicaoUi = useCallback((vendaId: string) => {
+    setTransicaoUiPorVendaId(prev => {
+      if (!(vendaId in prev)) return prev
+      const { [vendaId]: _, ...rest } = prev
+      return rest
+    })
+  }, [])
 
   /** Limpa UI otimista de transição (etapa local, timestamps, loading) — ex.: refresh manual do Kanban. */
   const limparEstadoUiTransicao = useCallback(() => {
     setAvancandoEtapaIds({})
     setTimestampsEtapaEntregaLocal({})
-    setEtapaLocalPorVendaId({})
+    setTransicaoUiPorVendaId({})
   }, [])
 
   const finalizarEntrega = useCallback(
-    async (venda: Venda) => {
+    async (venda: Venda, colunaOrigem: ColunaKanbanId) => {
       if (vendaPrecisaConfirmarPagamentoParaFinalizar(venda)) {
         const quitado = revalidarPagamentoAntesFinalizar
           ? await revalidarPagamentoAntesFinalizar(venda.id)
@@ -158,7 +193,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
           if (!confirmado) return
         }
       }
-      iniciarTransicaoUi(venda.id, 'FINALIZADAS')
+      iniciarTransicaoUi(venda.id, colunaOrigem, 'FINALIZADAS')
       try {
         const resposta = await executarTransicao({ id: venda.id, acao: 'finalizar' })
         concluirTransicaoComSucesso(venda, ['finalizar'], resposta, 'FINALIZADAS')
@@ -185,10 +220,11 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
       const acoes = acoesTransicaoEntregaAvanco(origIdx, destIdx)
       if (acoes.length === 0) return
 
+      const colunaOrigem = COLUNAS_ENTREGA_OPERACIONAIS[origIdx]
       const colunaDestino = COLUNAS_ENTREGA_OPERACIONAIS[destIdx]
-      if (!colunaDestino) return
+      if (!colunaOrigem || !colunaDestino) return
 
-      iniciarTransicaoUi(venda.id, colunaDestino)
+      iniciarTransicaoUi(venda.id, colunaOrigem, colunaDestino)
 
       let ticketsPreload: VendaGestorTicketsResponse | undefined
 
@@ -245,7 +281,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
 
       try {
         if (colunaAtual === 'EM_ROTA') {
-          await finalizarEntrega(venda)
+          await finalizarEntrega(venda, colunaAtual)
           return
         }
 
@@ -274,7 +310,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
     async (venda: Venda) => {
       if (avancandoEtapaIds[venda.id]) return
       try {
-        await finalizarEntrega(venda)
+        await finalizarEntrega(venda, 'EM_ROTA')
       } catch {
         /* toast em onError do hook de transição */
       }
@@ -285,6 +321,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
   return {
     avancandoEtapaIds,
     etapaLocalPorVendaId,
+    deltaContagemColunasTransicao,
     timestampsEtapaEntregaLocal,
     limparEstadoUiTransicao,
     handleAvancarEtapa,

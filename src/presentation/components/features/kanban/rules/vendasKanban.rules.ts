@@ -23,6 +23,17 @@ export const COLUNAS_ENTREGA_OPERACIONAIS: ColunaKanbanId[] = [
   'EM_ROTA',
 ]
 
+/**
+ * Colunas onde os produtos do pedido delivery ainda podem ser alterados.
+ * O backend só permite add/remove de itens nos status PENDENTE, EM_PREPARO e PRONTO
+ * (a partir de EM_ROTA a operação é bloqueada).
+ */
+export const COLUNAS_ENTREGA_EDITAVEIS_PRODUTOS: ColunaKanbanId[] = [
+  'NOVOS_PEDIDOS',
+  'EM_PREPARO',
+  'PRONTO_ENTREGA',
+]
+
 export type AcaoAvancoEntrega = Extract<
   AcaoTransicaoGestor,
   'iniciar_preparo' | 'marcar_pronto' | 'despachar'
@@ -483,6 +494,22 @@ export function podeEditarClienteNaKanbanCard(
     ) &&
     !vendaSemNomeCliente(venda) &&
     Boolean(venda.cliente?.id?.trim())
+  )
+}
+
+/**
+ * Permite alterar os produtos do pedido delivery (botão "Editar produtos" no card).
+ * Liberado apenas nas etapas anteriores a EM_ROTA, em pedidos de entrega/retirada do gestor.
+ */
+export function podeEditarProdutosNaKanbanCard(
+  columnId: ColunaKanbanId,
+  venda: Venda,
+  modoKanbanVendas: ModoKanbanVendas
+): boolean {
+  return (
+    modoKanbanVendas === 'delivery' &&
+    venda.isPedidoEntregaGestor() &&
+    COLUNAS_ENTREGA_EDITAVEIS_PRODUTOS.includes(columnId)
   )
 }
 

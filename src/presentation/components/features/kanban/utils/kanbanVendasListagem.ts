@@ -42,8 +42,10 @@ export function filtrarPedidosDeliveryKanbanPorDatasToolbar(
 
 /**
  * Filtro de datas da toolbar por coluna delivery.
- * - Criação: todas as colunas quando o período de criação está ativo na consulta.
- * - Finalização: apenas colunas fiscais (FINALIZADAS / COM_NFE).
+ * - Operacionais: filtram por data de CRIAÇÃO (mesmo critério da API dessas colunas).
+ * - Fiscais (FINALIZADAS / COM_NFE): filtram só por data de FINALIZAÇÃO. Aplicar criação aqui
+ *   esconderia um pedido finalizado no período mas criado antes dele (ex.: criado ontem,
+ *   finalizado hoje), divergindo da contagem (que conta todos os finalizados do período).
  */
 export function filtrarVendaDeliveryKanbanColunaPorDatasToolbar(
   venda: Venda,
@@ -56,7 +58,10 @@ export function filtrarVendaDeliveryKanbanColunaPorDatasToolbar(
 
   if (!temFiltroCriacao && !temFiltroFinalizacao) return true
 
-  if (temFiltroCriacao) {
+  // Só exclui quando o card TEM a data e ela está fora do intervalo. Card sem data
+  // (ex.: recém-transicionado, cujo summary da API não devolve `dataCriacao`) não pode
+  // sumir — a API já filtrou a listagem; este filtro é apenas um fallback client-side.
+  if (temFiltroCriacao && !isColunaFiscal && venda.dataCriacao?.trim()) {
     if (
       !dentroDoIntervaloIso(
         venda.dataCriacao,
@@ -68,7 +73,7 @@ export function filtrarVendaDeliveryKanbanColunaPorDatasToolbar(
     }
   }
 
-  if (temFiltroFinalizacao && isColunaFiscal) {
+  if (temFiltroFinalizacao && isColunaFiscal && venda.dataFinalizacao?.trim()) {
     if (
       !dentroDoIntervaloIso(
         venda.dataFinalizacao,

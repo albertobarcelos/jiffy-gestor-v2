@@ -35,10 +35,10 @@ import {
   formatarDataCard,
   getCardBorderEFundoKanban,
   getLinhaTempoPedidoEntregaKanban,
-  podeEditarClienteNaKanbanCard,
-} from '../rules/fiscalFlowKanban.rules'
+  podeEditarProdutosNaKanbanCard,
+} from '../rules/vendasKanban.rules'
 
-export interface FiscalKanbanVendaCardProps {
+export interface KanbanVendaCardProps {
   venda: Venda
   column: KanbanColumn
   modoKanbanVendas: ModoKanbanVendas
@@ -46,7 +46,8 @@ export interface FiscalKanbanVendaCardProps {
   avancandoEtapaIds: Record<string, boolean>
   timestampsEtapaEntregaLocal: Record<string, string>
   onViewDetails: (venda: Venda) => void
-  onAbrirEdicaoCliente: (clienteId: string) => void
+  /** Abre o pedido em modo edição de produtos (etapas anteriores a Em Rota). */
+  onEditarProdutos?: (venda: Venda) => void
   onAvancarEtapa: (venda: Venda, colunaAtual: ColunaKanbanId) => void
   onEmitirNfe: (venda: Venda) => void
   /** Modo delivery: reimprime cupom (mesmo layout da automática). */
@@ -62,7 +63,7 @@ export interface FiscalKanbanVendaCardProps {
   nomesMeiosPagamento?: Record<string, string>
 }
 
-export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
+export function KanbanVendaCard(props: KanbanVendaCardProps) {
   const {
     venda,
     column,
@@ -71,7 +72,7 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
     avancandoEtapaIds,
     timestampsEtapaEntregaLocal,
     onViewDetails,
-    onAbrirEdicaoCliente,
+    onEditarProdutos,
     onAvancarEtapa,
     onEmitirNfe,
     onReimprimirCupomDelivery,
@@ -113,12 +114,6 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
   const valorFormatado = transformarParaReal(venda.valorFinal)
   const clienteNome = venda.cliente?.nome?.trim() ? venda.cliente.nome : LABEL_SEM_CLIENTE
   const observacaoPedidoTexto = textoFromObservacoesApi(venda.observacoes)
-  const podeEditarClienteNaVenda = podeEditarClienteNaKanbanCard(
-    colunaAtual,
-    venda,
-    modoKanbanVendas,
-    acaoFiscalEmAndamentoPorVenda
-  )
 
   const exibirQuickViewEntrega = venda.isPedidoEntregaGestor()
   const tabelaOrigemQuickView =
@@ -136,6 +131,9 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
     venda,
     modoKanbanVendas
   )
+  const exibirBotaoEditarProdutos =
+    Boolean(onEditarProdutos) &&
+    podeEditarProdutosNaKanbanCard(colunaAtual, venda, modoKanbanVendas)
   const exibirAcaoAlterarTipoPedido = deveExibirAcaoAlterarTipoPedidoKanban(
     colunaAtual,
     venda,
@@ -175,7 +173,7 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
         onClick={() => onViewDetails(venda)}
         onDoubleClick={() => onViewDetails(venda)}
       >
-        <div className={`mb-2 ${podeEditarClienteNaVenda ? 'pr-1' : ''}`}>
+        <div className={`mb-2 ${exibirBotaoEditarProdutos ? 'pr-1' : ''}`}>
           <KanbanVendaCardHeader
             venda={venda}
             exibirMetaDeliveryKanban={exibirMetaDeliveryKanban}
@@ -183,9 +181,9 @@ export function FiscalKanbanVendaCard(props: FiscalKanbanVendaCardProps) {
             prefixoLinhaOrigemCard={tipoVendaView.prefixoLinhaOrigemCard}
             clienteNome={clienteNome}
             valorFormatado={valorFormatado}
-            podeEditarClienteNaVenda={podeEditarClienteNaVenda}
+            podeEditarProdutosNaVenda={exibirBotaoEditarProdutos}
             exibirBotaoSalvarCobranca={exibirBotaoSalvarCobranca}
-            onAbrirEdicaoCliente={onAbrirEdicaoCliente}
+            onEditarProdutos={onEditarProdutos}
             onConfirmarCobranca={onConfirmarCobranca}
             formaCobrancaKanban={formaCobrancaKanban}
             formaPagamentoKanban={formaPagamentoKanban}

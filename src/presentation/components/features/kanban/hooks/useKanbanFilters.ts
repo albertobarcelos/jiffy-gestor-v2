@@ -21,7 +21,7 @@ function criarIntervaloHoje() {
   }
 }
 
-export function useFiscalKanbanFilters(timeZoneEmpresa?: string) {
+export function useKanbanFilters(timeZoneEmpresa?: string) {
   const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const intervaloPeriodoPadrao = useMemo(() => criarIntervaloHoje(), [])

@@ -16,7 +16,7 @@ import {
   rotuloBotaoEmissaoKanban,
   vendaBloqueadaParaEmissaoInterativa,
   kanbanVendaUsaCupomPublicoNfce,
-} from '../rules/fiscalFlowKanban.rules'
+} from '../rules/vendasKanban.rules'
 import { KanbanCardAcaoButton } from './KanbanCardAcaoButton'
 import type { ColunaKanbanId, KanbanColumn, Venda } from '../types'
 
@@ -122,6 +122,7 @@ export function KanbanVendaCardActions(props: KanbanVendaCardActionsProps) {
       {modoKanbanVendas === 'delivery' &&
         onReimprimirCupomDelivery &&
         venda.isPedidoEntregaGestor() &&
+        colunaAtual !== 'NOVOS_PEDIDOS' &&
         COLUNAS_ENTREGA_OPERACIONAIS.includes(colunaAtual) && (
           <Button
             size="sm"

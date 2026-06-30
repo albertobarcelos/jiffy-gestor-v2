@@ -2,7 +2,7 @@
 
 > **Documento de planejamento (backend)** — filtros de data, índices, payload enxuto para cards e modal de observação.  
 > **Última revisão:** 2026-06-15  
-> **Relacionado:** [`docs/features/kanban-listagem-vendas-unificadas-refatoracao.md`](./features/kanban-listagem-vendas-unificadas-refatoracao.md), [`docs/fiscal-flow-kanban-e-novo-pedido.md`](./fiscal-flow-kanban-e-novo-pedido.md)
+> **Relacionado:** [`docs/features/kanban-listagem-vendas-unificadas-refatoracao.md`](./features/kanban-listagem-vendas-unificadas-refatoracao.md), [`docs/vendas-kanban-e-novo-pedido.md`](./vendas-kanban-e-novo-pedido.md)
 
 ---
 
@@ -243,7 +243,7 @@ Alternativa sem `view`: sempre retornar summary enxuto na listagem; detalhe cont
 
 ### 6.3 Campos do card (referência para o time)
 
-Mínimo para `FiscalKanbanVendaCard` (delivery):
+Mínimo para `KanbanVendaCard` (delivery):
 
 - Identificação: `id`, `numeroVenda`, `codigoVenda`
 - Cliente: `cliente.id`, `cliente.nome`

@@ -17,7 +17,7 @@ import {
   type KanbanFiltroDataPreset,
 } from '../utils/kanbanFiltroDataPresets'
 
-interface FiscalKanbanToolbarProps {
+export interface KanbanToolbarProps {
   searchInput: string
   onSearchInputChange: (value: string) => void
   onRefresh: () => void | Promise<void>
@@ -161,7 +161,7 @@ function FiltroDataPresetSelect({
   )
 }
 
-export function FiscalKanbanToolbar(props: FiscalKanbanToolbarProps) {
+export function KanbanToolbar(props: KanbanToolbarProps) {
   const {
     searchInput,
     onSearchInputChange,

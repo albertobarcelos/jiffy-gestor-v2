@@ -1,4 +1,4 @@
-export { FiscalFlowKanban } from './FiscalFlowKanban'
+export { VendasKanban } from './VendasKanban'
 export {
   KanbanModoVendasToggle,
   type KanbanModoVendasToggleProps,

@@ -49,7 +49,7 @@ function primeiroStatusTextoNaoVazio(...candidatos: unknown[]): string | undefin
  * preenchido (ou a raiz vem string vazia). Ordem de prioridade:
  * 1) `statusFiscal` (raiz)  2) `status_fiscal` (raiz)  3) `resumoFiscal.status`  4) `resumoFiscal.statusFiscal`
  *
- * Depois: trim + UPPER para bater com === 'REJEITADA' no FiscalFlowKanban e StatusFiscalBadge.
+ * Depois: trim + UPPER para bater com === 'REJEITADA' no VendasKanban e StatusFiscalBadge.
  */
 function normalizarStatusFiscalUnificado(
   item: Record<string, unknown>
