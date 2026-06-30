@@ -72,25 +72,39 @@ async function waitForQzConnection(qz: QzModule, timeoutMs = 20_000): Promise<vo
 /**
  * Garante uma única conexão WebSocket ativa (evita corrida com Strict Mode / múltiplos painéis).
  * Só retorna quando o socket está pronto para `printers.*` e `print`.
+ *
+ * Sempre valida `isActive()` em vez de confiar numa promise resolvida em cache: ao fechar e
+ * reabrir o modal o socket pode cair, e uma promise antiga "resolvida" faria `printers.find` /
+ * `print` chamarem `sendData` numa conexão `null` (erro `_qz.websocket.connection is null`).
  */
 export async function ensureQzWebsocketConnected(qz: QzModule): Promise<void> {
+  // Conexão realmente ativa: nada a fazer.
+  if (qz.websocket.isActive()) return
+
+  // Reaproveita uma tentativa de conexão em andamento (corrida entre painéis / Strict Mode).
   if (qzConnectPromise) {
-    return qzConnectPromise
+    await qzConnectPromise
+    return
   }
 
   qzConnectPromise = (async () => {
-    if (!qz.websocket.isActive()) {
+    try {
       await qz.websocket.connect()
-      return
+    } catch (error) {
+      if (isQzAlreadyConnectedError(error)) return
+      if (isQzConnectInProgressError(error)) {
+        await waitForQzConnection(qz)
+        return
+      }
+      throw error
     }
-    await waitForQzConnection(qz)
   })()
 
   try {
     await qzConnectPromise
-  } catch (error) {
+  } finally {
+    // Não mantém a promise em cache: a próxima chamada decide pelo `isActive()` atual.
     qzConnectPromise = null
-    throw error
   }
 }
 
@@ -304,23 +318,18 @@ export function formatTcpPrinterRef(host: string, port: number | string): string
 }
 
 /**
- * Largura de renderização (em polegadas) do cupom para rasterização ESC/POS.
- * 58mm térmica ≈ 1.9" (384 dots @203dpi); 80mm ≈ 2.83" (576 dots @203dpi).
- * O template gera body com `width:220px` (58mm) ou `width:300px` (80mm).
- */
-function larguraRasterPolegadas(html: string): number {
-  if (/width:\s*220px/.test(html)) return 1.9
-  return 2.83
-}
-
-/**
  * Imprime um HTML em uma impressora térmica via raw TCP (sem instalar no Windows).
+ *
+ * Usa o conversor ESC/POS de texto (`deliveryCupomHtmlParaEscPos`): a rasterização
+ * de HTML (`type:'raw', format:'html'`) não é confiável em raw TCP — em muitas
+ * Bematech o `qz.print` "tem sucesso" porém a impressora não renderiza a imagem e
+ * sai a folha em branco. O conversor mapeia as classes do template para comandos
+ * ESC/POS (negrito, alinhamento, colunas, separadores), garantindo a saída formatada.
  *
  * Fluxo:
  * 1. Conecta ao WebSocket do QZ Tray
  * 2. Cria config apontando direto para IP:porta (sem nome de impressora Windows)
- * 3. Envia o HTML para o QZ rasterizar em ESC/POS (igual ao caminho Windows pixel/html)
- * 4. Fallback: se a impressora/QZ não rasterizar HTML em raw, usa o conversor ESC/POS de texto
+ * 3. Converte o HTML em ESC/POS e envia em raw
  */
 export async function printRawTcpQz(
   qz: QzModule,
@@ -330,39 +339,25 @@ export async function printRawTcpQz(
   copies = 1,
   jobName = 'Jiffy'
 ): Promise<void> {
+  const conteudo = deliveryCupomHtmlParaEscPos(html)
+
+  const enviar = async () => {
+    const config = qz.configs.create({ host, port: String(port) }, { jobName, encoding: 'Cp850' })
+    for (let i = 0; i < Math.max(1, copies); i++) {
+      await qz.print(config, [conteudo])
+    }
+  }
+
   await ensureQzWebsocketConnected(qz)
 
-  const config = qz.configs.create({ host, port: String(port) }, { jobName })
-  const pageWidth = larguraRasterPolegadas(html)
-
-  const payloadRaster = [
-    {
-      type: 'raw' as const,
-      format: 'html' as const,
-      flavor: 'plain' as const,
-      data: html,
-      options: { language: 'ESCPOS', pageWidth, dotDensity: 'double' },
-    },
-  ]
-
   try {
-    for (let i = 0; i < Math.max(1, copies); i++) {
-      await qz.print(config, payloadRaster)
-    }
-  } catch (e) {
-    // Algumas impressoras/versões do QZ não rasterizam HTML em raw: cai no ESC/POS de texto.
-    logImpressao('printRawTcpQz.raster_falhou_fallback_escpos', {
-      mensagem: e instanceof Error ? e.message : String(e),
-      host,
-      port,
-    })
-    const configTexto = qz.configs.create(
-      { host, port: String(port) },
-      { jobName, encoding: 'Cp850' }
-    )
-    const conteudo = deliveryCupomHtmlParaEscPos(html)
-    for (let i = 0; i < Math.max(1, copies); i++) {
-      await qz.print(configTexto, [conteudo])
-    }
+    await enviar()
+  } catch (error) {
+    // Socket caiu (ex.: modal fechado/reaberto): reconecta e tenta uma vez mais.
+    if (!isQzSendDataError(error)) throw error
+    qzConnectPromise = null
+    await qz.websocket.disconnect().catch(() => undefined)
+    await ensureQzWebsocketConnected(qz)
+    await enviar()
   }
 }

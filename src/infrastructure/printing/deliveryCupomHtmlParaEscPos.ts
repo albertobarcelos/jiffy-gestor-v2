@@ -225,7 +225,7 @@ function processarElemento(el: Element, b: EscPosBuilder, ctx: { indent: number 
   }
 
   if (temClasse(el, 'method')) {
-    b.bloco(() => b.texto(textoInline(el)), { align: 'center', bold: true, size: 'normal' })
+    b.bloco(() => b.texto(textoInline(el)), { align: 'center', bold: true, size: 'tall' })
     return
   }
 

@@ -14,6 +14,8 @@ export interface DeliveryCupomModeloFonteConfig {
 
 export interface DeliveryCupomTemplateConfig extends DeliveryCupomModeloFonteConfig {
   larguraMm: DeliveryCupomLargura
+  /** Margem lateral (mm) aplicada nas duas laterais do cupom — ajuste fino para evitar corte na borda imprimível. */
+  margemLateralMm: number
   densidade: DeliveryCupomDensidade
   tamanhoFonteBase: number
   fontesPorModelo: Record<DeliveryCupomModelo, DeliveryCupomModeloFonteConfig>
@@ -28,8 +30,11 @@ export interface DeliveryCupomTemplateConfig extends DeliveryCupomModeloFonteCon
   rodapeExtra: string
 }
 
+export const DELIVERY_CUPOM_MARGEM_LATERAL_MAX_MM = 10
+
 export const DEFAULT_DELIVERY_CUPOM_TEMPLATE: DeliveryCupomTemplateConfig = {
   larguraMm: 80,
+  margemLateralMm: 0,
   densidade: 'normal',
   tamanhoFonteBase: 13,
   tamanhoFonteCabecalho: null,

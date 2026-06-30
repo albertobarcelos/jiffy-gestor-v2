@@ -1,5 +1,6 @@
 import {
   DEFAULT_DELIVERY_CUPOM_TEMPLATE,
+  DELIVERY_CUPOM_MARGEM_LATERAL_MAX_MM,
   type DeliveryCupomDensidade,
   type DeliveryCupomLargura,
   type DeliveryCupomModeloFonteConfig,
@@ -75,6 +76,7 @@ export function parseDeliveryCupomTemplate(data: Record<string, unknown>): Deliv
 
   return {
     larguraMm: largura(o.larguraMm),
+    margemLateralMm: num(o.margemLateralMm, d.margemLateralMm, 0, DELIVERY_CUPOM_MARGEM_LATERAL_MAX_MM),
     densidade: densidade(o.densidade),
     tamanhoFonteBase: num(o.tamanhoFonteBase, d.tamanhoFonteBase, 10, 18),
     tamanhoFonteCabecalho: numOrNull(o.tamanhoFonteCabecalho, 8, 18),

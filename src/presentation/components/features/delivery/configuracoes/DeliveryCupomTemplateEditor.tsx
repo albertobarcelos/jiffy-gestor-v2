@@ -6,6 +6,7 @@ import { DeliveryConfigCollapsibleSection } from './DeliveryConfigCollapsibleSec
 import { larguraCupomDeliveryPx, renderDeliveryCupomHtml } from '@/src/application/delivery/renderDeliveryCupomHtml'
 import {
   DEFAULT_DELIVERY_CUPOM_TEMPLATE,
+  DELIVERY_CUPOM_MARGEM_LATERAL_MAX_MM,
   type DeliveryCupomModelo,
   type DeliveryCupomTemplateConfig,
 } from '@/src/shared/types/deliveryCupomTemplate'
@@ -379,7 +380,7 @@ export function DeliveryCupomTemplateEditor({
     >
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
         <div className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1">
               <label className="text-sm font-semibold text-primary-text">Largura</label>
               <select
@@ -392,6 +393,35 @@ export function DeliveryCupomTemplateEditor({
                 <option value={58}>58mm</option>
               </select>
             </div>
+            <div className="space-y-1">
+              <label className="text-sm font-semibold text-primary-text">Margem lateral (mm)</label>
+              <input
+                type="number"
+                min={0}
+                max={DELIVERY_CUPOM_MARGEM_LATERAL_MAX_MM}
+                step={1}
+                value={value.margemLateralMm}
+                disabled={disabled}
+                onChange={e =>
+                  onChange(
+                    update(
+                      value,
+                      'margemLateralMm',
+                      Math.min(
+                        DELIVERY_CUPOM_MARGEM_LATERAL_MAX_MM,
+                        Math.max(0, Math.floor(Number(e.target.value) || 0))
+                      )
+                    )
+                  )
+                }
+                className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none focus:border-secondary disabled:opacity-60"
+              />
+              <p className="text-[11px] text-secondary-text">
+                Aumente se o valor à direita estiver saindo cortado.
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1">
               <label className="text-sm font-semibold text-primary-text">Densidade</label>
               <select
