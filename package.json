@@ -20,6 +20,7 @@
     "@emotion/cache": "^11.14.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
+    "@fontsource/exo-2": "^5.2.8",
     "@headlessui/react": "^2.2.0",
     "@hookform/resolvers": "^3.9.1",
     "@mdi/js": "^7.4.47",
