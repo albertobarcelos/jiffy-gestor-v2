@@ -388,14 +388,23 @@ Hook: `useMoradaTelefone.ts`, `useMoradasPorTelefone`, `useCriarMoradaTelefone`,
 
 ## 10. Kanban e transições operacionais
 
-O `VendasKanban` reutiliza o mesmo `NovoPedidoModal` para visualização e abre delivery com:
+O `VendasKanban` reutiliza `NovoPedidoModal` em três contextos (montagem condicional em `KanbanModaisRenderer`):
 
-- `tipoInicioPedido` implícito pelo card (`tipoVenda`)
-- Transições via `useTransicaoVendaGestor` (mesmos endpoints da seção 7.5)
+| Contexto | Abertura | Props principais |
+|----------|----------|------------------|
+| Visualização | Clique no card | `modoVisualizacao={true}`, `vendaId` |
+| Edição de produtos | Lápis no código `#…` do card (delivery) | `modoEdicaoProdutos={true}` → PATCH add/remove via `useEdicaoProdutosDelivery` |
+| Criar | Toolbar Novo Pedido | `tipoInicioPedido` conforme modo Delivery/Balcão |
+
+Demais integrações:
+
+- Transições via `useTransicaoPedidoDelivery` / `useEntregaTransicoesKanban`
 - Entregador: `AtribuirEntregadorKanbanPainel` → PATCH `entregadorId`
 - Impressão: `useImpressaoDelivery` + GET tickets
 
 Lista unificada do Kanban: `GET /api/vendas/unificado` (não é parte do modal, mas alimenta cards).
+
+Ver também [`vendas-kanban-e-novo-pedido.md`](../vendas-kanban-e-novo-pedido.md) §9 e §12.
 
 ---
 

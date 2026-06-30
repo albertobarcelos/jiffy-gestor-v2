@@ -175,7 +175,8 @@ Substituto atual: `VendasKanban` + `kanban/DroppableColumnContent.tsx`.
 
 | Data | Alteração |
 |------|-----------|
-| 2026-06-30 | Padronização de nomes: `VendasKanban`, `KanbanToolbar`, `KanbanVendaCard`, `KanbanColuna`, `vendasKanban.rules`; doc renomeado para `vendas-kanban-e-novo-pedido.md` |
+| 2026-06-30 | Doc `vendas-kanban-e-novo-pedido.md` sincronizada com orchestrator, edição de produtos e modais condicionais |
+| 2026-06-30 | Padronização de nomes: `VendasKanban`, hooks e rules sem prefixo Fiscal legado |
 | 2026-06-15 | Limpeza: removidos stubs `presentation/hooks/` (listagem/impressão); imports → `@/features/*` |
 | 2026-06-15 | Fase 7: removido `features/nfe/`; aliases `@/features/*` em `tsconfig.json` |
 | 2026-06-15 | Fase 6: `useVendasUnificadas`, `usePedidosDeliveryInfinite`, `kanbanListagemQueryCache` → `kanban/hooks/`; `useImpressaoDelivery` → `delivery/hooks/` |

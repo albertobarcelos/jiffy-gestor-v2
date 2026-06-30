@@ -33,8 +33,8 @@ Trecho analisado:
 ### 3) `GET /api/grupos-produtos?ativo=true&limit=100&offset=0`
 
 - Origem: `NovoPedidoModal` (hook `useGruposProdutos`).
-- Problema atual: `NovoPedidoModal` fica montado no `VendasKanban` mesmo com `open=false`.
-- Efeito: a query roda ao entrar na pagina, antes do usuario abrir o modal.
+- Problema **anterior** (pré-2026-06): `NovoPedidoModal` ficava montado no kanban mesmo com `open=false`.
+- **Atual:** montagem condicional por contexto em `KanbanModaisRenderer` — ver [`vendas-kanban-e-novo-pedido.md`](./vendas-kanban-e-novo-pedido.md) §9.
 
 ### 4) `GET /api/meios-pagamentos?ativo=true&limit=100&offset=0`
 
@@ -66,10 +66,13 @@ Em termos praticos:
 
 ### 1.1 Montagem condicional de modais pesados
 
-No `VendasKanban`, renderizar modal apenas quando necessario:
+**Status:** implementado em `KanbanModaisRenderer` (2026-06) — cada `NovoPedidoModal` só monta quando existe contexto (`novoPedidoCriarContext`, `pedidoVisualizacaoContext`, `pedidoEdicaoProdutosContext`).
 
-- `NovoPedidoModal` somente quando `novoPedidoModalOpen === true` (ou modo visualizacao aberto).
-- `SeletorClienteModal` somente quando `seletorClienteVendaOpen === true`.
+No `VendasKanban` / `useKanbanModais`, renderizar modal apenas quando necessario:
+
+- `NovoPedidoModal` (criar) somente quando `novoPedidoCriarContext` existe.
+- `NovoPedidoModal` (visualização) somente quando `pedidoVisualizacaoContext` existe.
+- `NovoPedidoModal` (edição produtos) somente quando `pedidoEdicaoProdutosContext` existe.
 
 **Impacto esperado:** elimina as chamadas de clientes/meios/grupos ao apenas abrir a pagina.
 
