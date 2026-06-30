@@ -6,6 +6,7 @@ import {
 } from '@/src/infrastructure/api/fetchVendaContingenciaPublica'
 import { CupomRodapeDanfe80 } from '@/src/presentation/components/features/venda-contingencia/CupomRodapeDanfe80'
 import { formatarCnpjExibicao } from '@/src/presentation/components/features/meus-apps/utils/empresaParaMeusApp'
+import { formatarCpfCnpjExibicao } from '@/src/shared/utils/cpfCnpj'
 import { formatarCepMascara } from '@/src/shared/utils/consultaCep'
 import { normalizeTipoImpactoPreco } from '@/src/application/mappers/VendaApiNormalizer'
 import { formatarValorComplemento } from '@/src/domain/services/pedido/CalculadoraPedido'
@@ -118,6 +119,11 @@ function resolveNomeEstabelecimento(data: VendaContingenciaPublica): string {
 function resolveClienteCupomExibicao(data: VendaContingenciaPublica): string {
   const nome = data.identificacao?.trim() || data.clienteNome?.trim()
   return nome || 'Consumidor Final'
+}
+
+/** CPF/CNPJ do cliente formatado (endpoint de contingência); vazio quando ausente. */
+function resolveDocumentoClienteCupom(data: VendaContingenciaPublica): string {
+  return formatarCpfCnpjExibicao(data.documentoCpfCnpj)
 }
 
 function resolveCnpjEstabelecimento(data: VendaContingenciaPublica): string | undefined {
@@ -304,6 +310,7 @@ export function CupomFiscalContingencia({ data, rodapeDanfeSrc }: CupomFiscalCon
 
   const produtos = (data.produtosLancados || []).filter((p) => !p.removido)
   const pagamentos = (data.pagamentos || []).filter((p) => !p.cancelado)
+  const documentoCliente = resolveDocumentoClienteCupom(data)
 
   return (
     <div className="space-y-2 text-sm" style={{ fontFamily: "'Roboto Mono', 'Courier New', monospace" }}>
@@ -324,6 +331,7 @@ export function CupomFiscalContingencia({ data, rodapeDanfeSrc }: CupomFiscalCon
             {data.tipoEntrega === 'entrega' ? 'Delivery' : data.tipoEntrega === 'retirada' ? 'Retirada' : data.tipoEntrega}
           </div>
         )}
+        {documentoCliente && <div>CPF/CNPJ: {documentoCliente}</div>}
         <div>Abertura: {formatDateTime(data.dataCriacao)}</div>
         <div>Finalização: {formatDateTime(data.dataFinalizacao)}</div>
       </div>

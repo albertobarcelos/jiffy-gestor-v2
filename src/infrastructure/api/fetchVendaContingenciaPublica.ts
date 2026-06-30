@@ -51,6 +51,8 @@ export type VendaContingenciaPublica = {
   documentoFiscalId?: string | null
   nomeEmpresa?: string
   clienteNome?: string
+  /** CPF/CNPJ do cliente informado na venda (endpoint de contingência). */
+  documentoCpfCnpj?: string
   terminalNome?: string
   emitente?: {
     razaoSocial?: string
