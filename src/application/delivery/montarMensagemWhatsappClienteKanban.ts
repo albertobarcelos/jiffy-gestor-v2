@@ -1,4 +1,4 @@
-import type { PedidoKanbanQuickViewData } from '@/src/presentation/components/features/kanban/carregarPedidoKanbanQuickView'
+import type { PedidoKanbanQuickViewData } from '@/src/presentation/components/features/delivery/kanban-panels/carregarPedidoKanbanQuickView'
 import type { ColunaKanbanId } from '@/src/presentation/components/features/kanban/types'
 import type { EnderecoEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import {
