@@ -1,5 +1,14 @@
 import type { SxProps, Theme } from '@mui/material/styles'
-import type { FiltroColunaVazia, FiscalLoteDraft, PermissaoCampoChave } from './types'
+import type { FiltroColunaVazia, FiscalLoteDraft, PermissaoCampoChave, TabPainelLote } from './types'
+
+/** Título da página por aba ativa. */
+export const TITULO_ABA_LOTE: Record<TabPainelLote, string> = {
+  precos: 'Atualizar Preços em Lote',
+  impressoras: 'Atualizar Impressoras em Lote',
+  gruposComplementos: 'Atualizar Grupos de Complementos em Lote',
+  permissoes: 'Atualizar Permissões em Lote',
+  fiscal: 'Atualizar Dados Fiscais em Lote',
+}
 
 /** Tamanho de página da listagem (paginação infinita). */
 export const PRODUTOS_LOTE_PAGE_SIZE = 50
