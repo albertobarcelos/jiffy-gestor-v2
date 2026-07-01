@@ -27,11 +27,11 @@ Estes arquivos importam de `features/nfe` hoje e precisam ser atualizados nas fa
 
 | Arquivo | Import atual | Feature alvo (fase) |
 |---------|--------------|---------------------|
-| `app/(erp)/pedidos-clientes/page.tsx` | `FiscalFlowKanban` | `kanban` (Fase 4) |
+| `app/(erp)/pedidos-clientes/page.tsx` | `VendasKanban` | `kanban` (Fase 4) |
 | `app/layout.tsx` | `DocumentoFiscalPdfRetryModal` | `fiscal` (Fase 2) |
 | `src/presentation/components/features/vendas/DetalhesVendas.tsx` | `StatusFiscalBadge` | `fiscal` (Fase 2) |
 | `src/presentation/hooks/usePedidosDeliveryInfinite.ts` | `kanban/kanbanVendaCacheUpdate` | `kanban` (Fase 4) |
-| `src/presentation/hooks/useImpressaoDelivery.ts` | `kanban/types`, `fiscalFlowKanban.rules` | `kanban` + `delivery` (Fases 3–4) |
+| `src/presentation/hooks/useImpressaoDelivery.ts` | `kanban/types`, `vendasKanban.rules` | `kanban` + `delivery` (Fases 3–4) |
 | `src/shared/utils/deliveryImpressoraExpedicao.ts` | `kanban/types` | `kanban` (Fase 4) |
 | `src/application/delivery/montarMensagemWhatsapp*.ts` (3 arquivos) | `kanban/carregarPedidoKanbanQuickView`, `types` | `delivery/kanban-panels` (Fase 3) |
 | `tests/unit/presentation/kanban/*.test.ts` (2 arquivos) | `kanban/*` | `kanban` ou `delivery` (Fases 3–4) |
@@ -48,11 +48,11 @@ O restante do acoplamento é **interno** ao diretório `nfe/` (~100+ imports rel
 src/presentation/components/features/
 
 kanban/
-  FiscalFlowKanban.tsx
+  VendasKanban.tsx
   KanbanModoVendasToggle.tsx
   components/          # toolbar, column, card, drag
   hooks/               # filters, pinning, scroll load more
-  rules/               # fiscalFlowKanban.rules, storage
+  rules/               # vendasKanban.rules, storage
   utils/               # cache update, listagem, card display
   types.ts
   index.ts
@@ -91,7 +91,7 @@ pedidos/               # hoje: nfe/novo-pedido/
 | **1** | Criar pastas + `index.ts` re-exportando de `nfe/`; migrar imports externos | ✅ |
 | **2** | Mover `fiscal/` + atualizar dependentes | ✅ |
 | **3** | Mover `delivery/` (config + painéis kanban) | ✅ |
-| **4** | Mover `kanban/` + `FiscalFlowKanban` | ✅ |
+| **4** | Mover `kanban/` + `VendasKanban` | ✅ |
 | **5** | Mover `pedidos/` (`novo-pedido/` completo) | ✅ |
 | **6** | Hooks globais → features; split `useVendas` se necessário | ✅ (parcial: hooks listagem/impressão; `useVendas` mantido em `presentation/hooks`) |
 | **7** | Remover `features/nfe/`; aliases TS; rename doc | ✅ |
@@ -127,7 +127,7 @@ Hooks de listagem/impressão: importar de `@/features/kanban/hooks/*` e `@/featu
 | `NFeKanbanSimple.tsx` | Sem imports no projeto |
 | `DroppableColumn.tsx` | Usado apenas pelo `NFeKanban.tsx.disabled` |
 
-Substituto atual: `FiscalFlowKanban` + `kanban/DroppableColumnContent.tsx`.
+Substituto atual: `VendasKanban` + `kanban/DroppableColumnContent.tsx`.
 
 ---
 
@@ -137,7 +137,7 @@ Substituto atual: `FiscalFlowKanban` + `kanban/DroppableColumnContent.tsx`.
 
 | Arquivo atual | Destino |
 |---------------|---------|
-| `FiscalFlowKanban.tsx` | `kanban/` |
+| `VendasKanban.tsx` | `kanban/` |
 | `KanbanModoVendasToggle.tsx` | `kanban/` |
 | `EmitirNfeModal.tsx` | `fiscal/` |
 | `DocumentoFiscalPdfRetryModal.tsx` | `fiscal/` |
@@ -165,7 +165,7 @@ Substituto atual: `FiscalFlowKanban` + `kanban/DroppableColumnContent.tsx`.
 
 ## Documentação relacionada
 
-- Comportamento do quadro e modal: [`docs/fiscal-flow-kanban-e-novo-pedido.md`](../../fiscal-flow-kanban-e-novo-pedido.md)
+- Comportamento do quadro e modal: [`docs/vendas-kanban-e-novo-pedido.md`](../../vendas-kanban-e-novo-pedido.md)
 - APIs do novo pedido: [`docs/features/novo-pedido-api-e-fluxos.md`](../../features/novo-pedido-api-e-fluxos.md)
 - Application layer já organizada: `src/application/delivery/`, `use-cases/vendas/`
 
@@ -175,10 +175,12 @@ Substituto atual: `FiscalFlowKanban` + `kanban/DroppableColumnContent.tsx`.
 
 | Data | Alteração |
 |------|-----------|
+| 2026-06-30 | Doc `vendas-kanban-e-novo-pedido.md` sincronizada com orchestrator, edição de produtos e modais condicionais |
+| 2026-06-30 | Padronização de nomes: `VendasKanban`, hooks e rules sem prefixo Fiscal legado |
 | 2026-06-15 | Limpeza: removidos stubs `presentation/hooks/` (listagem/impressão); imports → `@/features/*` |
 | 2026-06-15 | Fase 7: removido `features/nfe/`; aliases `@/features/*` em `tsconfig.json` |
 | 2026-06-15 | Fase 6: `useVendasUnificadas`, `usePedidosDeliveryInfinite`, `kanbanListagemQueryCache` → `kanban/hooks/`; `useImpressaoDelivery` → `delivery/hooks/` |
 | 2026-06-15 | Fase 5: `novo-pedido/` → `features/pedidos/` (wizard, modais, hooks, context) |
-| 2026-06-15 | Fase 4: `FiscalFlowKanban`, `KanbanModoVendasToggle`, core `kanban/` em `features/kanban/` |
+| 2026-06-15 | Fase 4: `VendasKanban`, `KanbanModoVendasToggle`, core `kanban/` em `features/kanban/` |
 | 2026-06-15 | Fase 2: `EmitirNfeModal`, `StatusFiscalBadge`, `DocumentoFiscalPdfRetryModal` em `features/fiscal/` |
 | 2026-06-15 | Fase 1: barrels `kanban`, `pedidos`, `delivery`, `fiscal`; imports externos migrados |

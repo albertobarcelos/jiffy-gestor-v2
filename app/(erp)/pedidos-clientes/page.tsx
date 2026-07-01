@@ -6,13 +6,13 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 /**
  * Kanban carregado sob demanda (bundle separado).
  * O `loading` do dynamic cobre o download do chunk; não usar Suspense extra aqui —
- * o FiscalFlowKanban não suspende com `use()`, e Suspense+dynamic gerava dois spinners
+ * o VendasKanban não suspende com `use()`, e Suspense+dynamic gerava dois spinners
  * seguidos antes do loading interno (dados) do próprio Kanban.
  */
 const PedidosClientesKanban = dynamic(
   () =>
     import('@/features/kanban').then(mod => ({
-      default: mod.FiscalFlowKanban,
+      default: mod.VendasKanban,
     })),
   {
     ssr: false,

@@ -1,19 +1,13 @@
 import Image from 'next/image'
 import { ChevronRight } from 'lucide-react'
 import { MdOutlineMonetizationOn } from 'react-icons/md'
-import { Exo_2 } from 'next/font/google'
+import { exo2CabecalhoFaturamento } from '@/src/presentation/fonts/exo2CabecalhoFaturamento'
 import {
   tituloFaturamentoBanner,
   formatarMoeda,
   textosComparacaoPeriodoAnterior,
   prefixoSemFaturamentoNaBase,
 } from './dashboardTextHelpers'
-
-const exo2CabecalhoFaturamento = Exo_2({
-  subsets: ['latin', 'latin-ext'],
-  weight: '600',
-  display: 'swap',
-})
 
 interface FaturamentoBannerProps {
   periodoData: string

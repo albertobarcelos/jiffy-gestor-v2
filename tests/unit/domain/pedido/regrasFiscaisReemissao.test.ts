@@ -12,7 +12,7 @@ import {
   kanbanVendaUsaCupomPublicoNfce,
   statusFiscalAguardandoSefaz,
   vendaBloqueadaParaEmissaoInterativa,
-} from '@/src/presentation/components/features/kanban/rules/fiscalFlowKanban.rules'
+} from '@/src/presentation/components/features/kanban/rules/vendasKanban.rules'
 import { VendaUnificadaDTO } from '@/features/kanban/hooks/useVendasUnificadas'
 
 const RETORNO_LIMITE = 'Número máximo de tentativas excedido'
@@ -106,7 +106,7 @@ describe('RegrasFiscaisVenda — reemissão após limite de tentativas', () => {
   })
 })
 
-describe('fiscalFlowKanban.rules — desbloqueio no Kanban', () => {
+describe('vendasKanban.rules — desbloqueio no Kanban', () => {
   it('deixa de aguardar SEFAZ e desbloqueia botão após cooldown', () => {
     const agora = Date.now()
     const vendaRecente = criarVendaKanban({

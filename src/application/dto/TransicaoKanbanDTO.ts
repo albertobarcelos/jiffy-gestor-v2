@@ -6,6 +6,12 @@ export type AcaoTransicaoKanbanEntrega =
   | 'finalizar'
   | 'cancelar'
 
+export type KanbanEntregadorCachePatch = {
+  id: string
+  nome?: string | null
+  telefone?: string | null
+}
+
 export type KanbanVendaCachePatch = {
   statusEtapaOperacional?: string | null
   dataUltimaModificacao?: string | null
@@ -22,4 +28,6 @@ export type KanbanVendaCachePatch = {
   modelo?: number | null
   retornoSefaz?: string | null
   observacoes?: string[] | null
+  /** Summary do entregador no card delivery; `null` limpa o vínculo exibido. */
+  entregador?: KanbanEntregadorCachePatch | null
 }

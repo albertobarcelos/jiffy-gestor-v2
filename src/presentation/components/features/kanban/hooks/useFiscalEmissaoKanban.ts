@@ -3,7 +3,7 @@ import { resolveModeloParaEmitirNota } from './useVendasUnificadas'
 import { deveUsarModuloDeliveryParaEmissaoFiscal } from '@/src/presentation/hooks/useVendas'
 import { showToast } from '@/src/shared/utils/toast'
 import { fiscalPendentePodeReemitirAposCooldown } from '@/src/domain/services/pedido/RegrasFiscaisVenda'
-import { STATUS_FISCAL_AGUARDANDO_SEFAZ } from '../rules/fiscalFlowKanban.rules'
+import { STATUS_FISCAL_AGUARDANDO_SEFAZ } from '../rules/vendasKanban.rules'
 import type { Venda } from '../types'
 
 export type AcaoFiscalKanbanEmAndamento = 'emitindo' | 'reemitindo'

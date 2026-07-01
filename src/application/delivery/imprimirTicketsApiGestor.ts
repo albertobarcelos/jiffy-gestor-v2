@@ -7,6 +7,11 @@ import {
 import { warningRedundanteMapeamentoImpressoraWindows } from '@/src/application/delivery/deliveryTicketWarningUtils'
 import type { VendaGestorTicket, VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
 import { printDeliveryCupom } from '@/src/infrastructure/printing/printDeliveryCupom'
+import {
+  mensagemDestinoImpressoraAusente,
+  resolvePrinterDestinationForTicket,
+} from '@/src/infrastructure/printing/resolvePrinterDestinationForTicket'
+import { isTcpPrinterRef } from '@/src/infrastructure/printing/qzTrayClient'
 import { erroImpressao, logImpressao, warnImpressao } from '@/src/shared/utils/logImpressaoDelivery'
 import type { DeliveryCupomTemplateConfig } from '@/src/shared/types/deliveryCupomTemplate'
 
@@ -69,7 +74,7 @@ export function notificarWarningsTickets(
 }
 
 /**
- * Envia cada ticket ao QZ (ou fallback browser) com cópias e impressora indicadas pelo backend.
+ * Envia cada ticket ao QZ Tray (Windows ou IP/tcp). Sem fallback de PDF no navegador.
  */
 export async function imprimirTicketsApiGestor(params: {
   response: VendaGestorTicketsResponse
@@ -77,7 +82,9 @@ export async function imprimirTicketsApiGestor(params: {
   nomeEmpresa?: string
   jobNamePrefix: string
   cupomTemplate?: DeliveryCupomTemplateConfig
+  accessToken?: string
   onMensagem?: (mensagem: string) => void
+  onErro?: (mensagem: string) => void
 }): Promise<void> {
   const {
     response,
@@ -85,7 +92,9 @@ export async function imprimirTicketsApiGestor(params: {
     nomeEmpresa,
     jobNamePrefix,
     cupomTemplate,
+    accessToken,
     onMensagem,
+    onErro,
   } = params
 
   logImpressao('imprimirLote.inicio', {
@@ -96,7 +105,7 @@ export async function imprimirTicketsApiGestor(params: {
   })
 
   let impressosQz = 0
-  let impressosBrowser = 0
+  let falhas = 0
   let ignoradosSemItens = 0
   let ignoradosSemImpressora = 0
   let ignoradosFallbackProdutoSemImpressora = 0
@@ -127,24 +136,22 @@ export async function imprimirTicketsApiGestor(params: {
       nomeEmpresa,
       template: cupomTemplate,
     })
-    const printerName =
-      ticket.impressora?.nomeImpressoraWindows?.trim() ||
-      ticket.nomeImpressoraWindows?.trim() ||
-      null
+    const printerName = await resolvePrinterDestinationForTicket(ticket, accessToken)
     logImpressao('ticket.envio', {
       tipoCupom: ticket.tipoCupom,
       impressoraId: ticket.impressoraId ?? null,
       impressoraNomeLogico: ticket.impressoraNome?.slice(0, 40) ?? null,
       nomeImpressoraWindowsResolvido:
-        printerName ?? '(ausente — sem impressão até vincular estação/impressoras no ticket)',
+        printerName ?? '(ausente — configure em Configurações → Impressoras)',
+      modoTcp: printerName ? isTcpPrinterRef(printerName) : false,
       copiasTicket: ticket.copias ?? 1,
       htmlChars: html.length,
     })
     if (!printerName) {
       ignoradosSemImpressora += 1
-      const destino = ticket.impressoraNome?.trim() || ticket.impressoraId || ticket.tipoCupom
-      warnImpressao('ticket.sem_nome_windows', { destino, tipoCupom: ticket.tipoCupom })
-      onMensagem?.(`Ticket ${destino} não enviado: impressora Windows não vinculada à estação.`)
+      const msg = mensagemDestinoImpressoraAusente(ticket)
+      warnImpressao('ticket.sem_destino', { tipoCupom: ticket.tipoCupom })
+      onErro?.(msg)
       continue
     }
     const copies = Math.min(20, Math.max(1, Number(ticket.copias) || 1))
@@ -156,7 +163,7 @@ export async function imprimirTicketsApiGestor(params: {
       jobName: `${jobNamePrefix} #${response.numeroVenda}`,
     })
     if (r.ok && r.metodo === 'qz') impressosQz += 1
-    if (r.ok && r.metodo === 'browser') impressosBrowser += 1
+    if (!r.ok) falhas += 1
 
     logImpressao('ticket.resultado_print', {
       ok: r.ok,
@@ -168,15 +175,14 @@ export async function imprimirTicketsApiGestor(params: {
 
     if (!r.ok) {
       erroImpressao('ticket.print_falhou', { metodo: r.metodo, mensagem: r.mensagem ?? null })
+      onErro?.(r.mensagem ?? 'Falha ao imprimir o cupom.')
     }
-
-    if (r.ok && r.mensagem) onMensagem?.(r.mensagem)
   }
 
   logImpressao('imprimirLote.fim', {
     numeroVenda: response.numeroVenda,
     impressosQz,
-    impressosBrowser,
+    falhas,
     ignoradosSemItens,
     ignoradosSemImpressora,
     ignoradosFallbackProdutoSemImpressora,

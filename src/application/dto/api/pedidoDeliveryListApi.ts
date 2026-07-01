@@ -31,12 +31,15 @@
  * | resumoFiscal.dataEmissao | dataEmissaoFiscal              |            |
  * | resumoFiscal.modelo      | modelo / tipoDocFiscal         | 55→NFE, 65→NFCE |
  * | resumoFiscal.retornoSefaz| retornoSefaz                   |            |
+ * | entregador               | entregador                     | id, nome, telefone |
+ * | contextoEntrega          | contextoEntrega                | endereço no card (sem GET) |
+ * | cobrancas (summary)      | cobrancasDelivery              | enxuto: id, valor, meioPagamentoId, momentoCobranca, status, datas |
  *
- * Campos ausentes na listagem (defaults no mapper): entregador,
- * contextoEntrega, abertoPor, totalDesconto, totalAcrescimo, numeroMesa.
+ * Campos ausentes na listagem (defaults no mapper): abertoPor, totalDesconto, totalAcrescimo, numeroMesa.
  */
 
 import type {
+  ContextoEntregaDeliveryApi,
   MomentoCobrancaDeliveryApi,
   StatusDeliveryApi,
   TipoEntregaDeliveryApi,
@@ -57,18 +60,25 @@ export interface AtorPedidoDeliverySummaryApi {
 
 export type CobrancaPedidoDeliveryStatusApi = 'pendente' | 'paga' | 'cancelada'
 
+/** Cobrança enxuta no summary — sem criadaPor, canceladaPor ou pagamentoEfetivado. */
 export interface CobrancaPedidoDeliverySummaryApi {
   id: string
   valor: number
   meioPagamentoId: string
   momentoCobranca: MomentoCobrancaDeliveryApi
   status: CobrancaPedidoDeliveryStatusApi
-  criadaPor: AtorPedidoDeliverySummaryApi
-  canceladaPor?: AtorPedidoDeliverySummaryApi | null
   dataCriacao: string
   dataCancelamento?: string | null
-  pagamentoEfetivado?: Record<string, unknown> | null
 }
+
+export interface EntregadorPedidoDeliverySummaryApi {
+  id: string
+  nome: string | null
+  telefone: string | null
+}
+
+/** Contexto de entrega no summary — suficiente para exibir endereço no card/painel. */
+export type ContextoEntregaPedidoDeliverySummaryApi = ContextoEntregaDeliveryApi
 
 export interface ResumoFiscalPedidoDeliverySummaryApi {
   id: string
@@ -124,6 +134,8 @@ export interface PedidoDeliverySummaryApi {
   cobrancas: CobrancaPedidoDeliverySummaryApi[]
   resumoFiscal: ResumoFiscalPedidoDeliverySummaryApi | null
   observacoes?: ObservacaoPedidoDeliverySummaryApi[]
+  entregador?: EntregadorPedidoDeliverySummaryApi | null
+  contextoEntrega?: ContextoEntregaPedidoDeliverySummaryApi | null
 }
 
 /**
@@ -143,6 +155,19 @@ export interface PedidosDeliveryQueryParams {
   dataCriacaoFinal?: string
   dataFinalizacaoInicial?: string
   dataFinalizacaoFinal?: string
+  /** Filtro delta: retorna apenas itens com `dataUltimaModificacao >= valor`. Usado no re-poll do Kanban. */
+  dataUltimaModificacaoInicial?: string
+}
+
+/** Resposta de `GET /api/v1/delivery/pedidos/contagem-por-status`. */
+export interface PedidosDeliveryContagemPorStatusResponse {
+  PENDENTE: number
+  EM_PREPARO: number
+  PRONTO: number
+  EM_ROTA: number
+  FINALIZADO: number
+  CANCELADO: number
+  total: number
 }
 
 /** Resposta paginada — `PaginationResult<VendaDeliverySummaryDTO>`. */
@@ -158,3 +183,12 @@ export interface PedidosDeliveryListResponse {
 
 /** Tamanho de página no Kanban (listagem global e expansão por coluna ao rolar). */
 export const PEDIDOS_DELIVERY_KANBAN_PAGE_SIZE = 10
+
+/**
+ * Tamanho da carga inicial do Kanban delivery (sync otimizado).
+ * Cobre a grande maioria dos restaurantes em 1 requisição.
+ */
+export const KANBAN_DELIVERY_SYNC_PAGE_SIZE = 100
+
+/** Pedidos por coluna no Kanban delivery (scroll incremental por status). */
+export const KANBAN_DELIVERY_COLUMN_PAGE_SIZE = 15

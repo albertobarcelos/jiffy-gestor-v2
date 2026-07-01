@@ -1495,10 +1495,14 @@ export function useTransicaoVendaGestor() {
  * Transição operacional via módulo delivery (`PATCH /delivery/pedidos/{id}/transicao-status`).
  * Encadeia múltiplas ações com chamadas sequenciais (drag entre colunas distantes).
  */
-export function useTransicaoPedidoDelivery() {
+export function useTransicaoPedidoDelivery(options?: {
+  /** Chamado no fim do mutationFn (antes do onSuccess) para atualizar cache do Kanban. */
+  onPedidoTransicionado?: (id: string, response: unknown) => void
+}) {
   const { auth } = useAuthStore()
   const queryClient = useQueryClient()
   const token = auth?.getAccessToken()
+  const onPedidoTransicionado = options?.onPedidoTransicionado
 
   return useMutation({
     mutationFn: async ({
@@ -1564,11 +1568,12 @@ export function useTransicaoPedidoDelivery() {
         ultimaResposta = await response.json()
       }
 
+      onPedidoTransicionado?.(id, ultimaResposta)
+
       return ultimaResposta
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['vendas'], refetchType: 'none' })
-      invalidateKanbanVendasListagens(queryClient, { refetchType: 'none' })
       queryClient.invalidateQueries({ queryKey: ['venda-gestor', variables.id], refetchType: 'none' })
       queryClient.invalidateQueries({
         queryKey: ['pedido-delivery', variables.id],

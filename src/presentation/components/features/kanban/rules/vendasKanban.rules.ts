@@ -23,6 +23,17 @@ export const COLUNAS_ENTREGA_OPERACIONAIS: ColunaKanbanId[] = [
   'EM_ROTA',
 ]
 
+/**
+ * Colunas onde os produtos do pedido delivery ainda podem ser alterados.
+ * O backend só permite add/remove de itens nos status PENDENTE, EM_PREPARO e PRONTO
+ * (a partir de EM_ROTA a operação é bloqueada).
+ */
+export const COLUNAS_ENTREGA_EDITAVEIS_PRODUTOS: ColunaKanbanId[] = [
+  'NOVOS_PEDIDOS',
+  'EM_PREPARO',
+  'PRONTO_ENTREGA',
+]
+
 export type AcaoAvancoEntrega = Extract<
   AcaoTransicaoGestor,
   'iniciar_preparo' | 'marcar_pronto' | 'despachar'
@@ -267,27 +278,22 @@ export function isPedidoTipoDeliveryKanban(venda: VendaUnificadaDTO): boolean {
 }
 
 /**
- * Botão "Observação" no card:
- * - Delivery: oculto em Finalizadas, Pendente emissão e Com nota solicitada (pedido já entregue).
- * - Balcão / PDV: visível em Finalizadas; oculto em Pendente emissão e Com nota solicitada.
+ * Botão "Observação" no card — apenas no modo delivery do kanban.
+ * Oculto em Finalizadas, Pendente emissão e Com nota solicitada.
  */
 export function deveExibirBotaoObservacaoPedidoKanban(
   columnId: ColunaKanbanId,
-  venda: VendaUnificadaDTO
+  venda: VendaUnificadaDTO,
+  modoKanbanVendas: ModoKanbanVendas
 ): boolean {
-  if (isPedidoTipoDeliveryKanban(venda)) {
-    return (
-      columnId !== 'FINALIZADAS' &&
-      columnId !== 'PENDENTE_EMISSAO' &&
-      columnId !== 'COM_NFE'
-    )
-  }
+  if (modoKanbanVendas !== 'delivery') return false
+  if (!isPedidoTipoDeliveryKanban(venda)) return false
 
-  if (columnId === 'PENDENTE_EMISSAO' || columnId === 'COM_NFE') {
-    return false
-  }
-
-  return true
+  return (
+    columnId !== 'FINALIZADAS' &&
+    columnId !== 'PENDENTE_EMISSAO' &&
+    columnId !== 'COM_NFE'
+  )
 }
 
 /** Venda sem nome de cliente preenchido (nome vazio ou só espaços). */
@@ -300,38 +306,51 @@ export function vendaSemNomeCliente(v: Venda): boolean {
  * Prioridade: data de finalização → data de emissão fiscal → data de criação.
  */
 export function ordenarVendasKanbanPorDataDesc(vendas: Venda[]): Venda[] {
-  const timestampOrdenacao = (v: Venda): number => {
-    const raw =
-      v.dataFinalizacao?.trim() || v.dataEmissaoFiscal?.trim() || v.dataCriacao?.trim() || ''
-    if (!raw) return 0
-    const ms = new Date(raw).getTime()
-    return Number.isFinite(ms) ? ms : 0
-  }
-  return [...vendas].sort((a, b) => {
-    const diff = timestampOrdenacao(b) - timestampOrdenacao(a)
-    if (diff !== 0) return diff
-    return b.id.localeCompare(a.id)
-  })
+  return ordenarVendasKanbanPorCriterio(vendas, 'data', 'desc')
+}
+
+function timestampDataOrdenacaoKanban(raw: string): number {
+  if (!raw) return 0
+  const ms = new Date(raw).getTime()
+  return Number.isFinite(ms) ? ms : 0
+}
+
+/** Data padrão (fallback) usada quando não há contexto de coluna: finalização → emissão fiscal → criação. */
+function dataOrdenacaoPadraoKanban(v: Venda): string {
+  return v.dataFinalizacao?.trim() || v.dataEmissaoFiscal?.trim() || v.dataCriacao?.trim() || ''
+}
+
+/**
+ * Data usada para ordenar o card na coluna, espelhando a data exibida no próprio card:
+ * - Novos pedidos → criação ("Recebido em")
+ * - Em preparo / Pronto / Em rota → entrada na etapa ("Na etapa desde", `dataUltimaModificacao`/transição local)
+ * - Demais colunas → finalização → emissão fiscal → criação
+ */
+export function dataOrdenacaoCardKanban(
+  columnId: ColunaKanbanId,
+  v: VendaUnificadaDTO,
+  isoLocalTransicao?: string
+): string {
+  const linha = getLinhaTempoPedidoEntregaKanban(columnId, v, isoLocalTransicao)
+  if (linha?.iso?.trim()) return linha.iso
+  return dataOrdenacaoPadraoKanban(v)
 }
 
 export function ordenarVendasKanbanPorCriterio(
   vendas: Venda[],
   criterio: CriterioOrdenacaoKanban,
-  direcao: DirecaoOrdenacaoKanban
+  direcao: DirecaoOrdenacaoKanban,
+  /** Resolve a data de ordenação por venda (alinhada ao card da coluna). Usado no critério 'data'. */
+  obterDataOrdenacao?: (v: Venda) => string
 ): Venda[] {
   if (criterio === 'data') {
-    if (direcao === 'desc') return ordenarVendasKanbanPorDataDesc(vendas)
+    const dataVenda = obterDataOrdenacao ?? dataOrdenacaoPadraoKanban
     return [...vendas].sort((a, b) => {
-      const timestampOrdenacao = (v: Venda): number => {
-        const raw =
-          v.dataFinalizacao?.trim() || v.dataEmissaoFiscal?.trim() || v.dataCriacao?.trim() || ''
-        if (!raw) return 0
-        const ms = new Date(raw).getTime()
-        return Number.isFinite(ms) ? ms : 0
-      }
-      const diff = timestampOrdenacao(a) - timestampOrdenacao(b)
+      const ta = timestampDataOrdenacaoKanban(dataVenda(a))
+      const tb = timestampDataOrdenacaoKanban(dataVenda(b))
+      const diff = direcao === 'desc' ? tb - ta : ta - tb
       if (diff !== 0) return diff
-      return a.id.localeCompare(b.id)
+      return direcao === 'desc' ? b.id.localeCompare(a.id) : a.id.localeCompare(b.id)
     })
   }
 
@@ -406,4 +425,126 @@ export function kanbanVendaUsaCupomPublicoNfce(
   return (
     v.tipoDocFiscal === 'NFCE' && ORIGENS_CUPOM_PUBLICO_NFCE.has(v.origem)
   )
+}
+
+/** Etapa do card quando emissão/reemissão está em andamento. */
+export function etapaKanbanCardComAcaoFiscal(
+  venda: Venda,
+  acaoFiscalEmAndamentoPorVenda: Record<string, 'emitindo' | 'reemitindo'>
+): ColunaKanbanId {
+  const acao = acaoFiscalEmAndamentoPorVenda[venda.id]
+  if (acao === 'reemitindo' || acao === 'emitindo') return 'COM_NFE'
+  return venda.getEtapaKanban() as ColunaKanbanId
+}
+
+/**
+ * No modo Delivery, pendente emissão aparece na coluna Finalizadas — borda/cores da etapa real.
+ */
+export function colunaParaEstiloCardKanban(
+  columnId: ColunaKanbanId,
+  etapaKanbanCard: ColunaKanbanId,
+  modoKanbanVendas: ModoKanbanVendas
+): ColunaKanbanId {
+  if (
+    modoKanbanVendas === 'delivery' &&
+    columnId === 'FINALIZADAS' &&
+    etapaKanbanCard === 'PENDENTE_EMISSAO'
+  ) {
+    return 'PENDENTE_EMISSAO'
+  }
+  return columnId
+}
+
+export function colunaPermiteEditarClienteKanban(
+  columnId: ColunaKanbanId,
+  venda: Venda,
+  modoKanbanVendas: ModoKanbanVendas,
+  acaoFiscalEmAndamentoPorVenda: Record<string, 'emitindo' | 'reemitindo'>
+): boolean {
+  if (columnId === 'FINALIZADAS' || columnId === 'PENDENTE_EMISSAO') return true
+  if (
+    columnId === 'COM_NFE' &&
+    (acaoFiscalEmAndamentoPorVenda[venda.id] === 'reemitindo' ||
+      acaoFiscalEmAndamentoPorVenda[venda.id] === 'emitindo')
+  ) {
+    return true
+  }
+  if (
+    modoKanbanVendas === 'delivery' &&
+    venda.isPedidoEntregaGestor() &&
+    COLUNAS_ENTREGA_OPERACIONAIS.includes(columnId)
+  ) {
+    return true
+  }
+  return false
+}
+
+export function podeEditarClienteNaKanbanCard(
+  columnId: ColunaKanbanId,
+  venda: Venda,
+  modoKanbanVendas: ModoKanbanVendas,
+  acaoFiscalEmAndamentoPorVenda: Record<string, 'emitindo' | 'reemitindo'>
+): boolean {
+  return (
+    colunaPermiteEditarClienteKanban(
+      columnId,
+      venda,
+      modoKanbanVendas,
+      acaoFiscalEmAndamentoPorVenda
+    ) &&
+    !vendaSemNomeCliente(venda) &&
+    Boolean(venda.cliente?.id?.trim())
+  )
+}
+
+/**
+ * Permite alterar os produtos do pedido delivery (botão "Editar produtos" no card).
+ * Liberado apenas nas etapas anteriores a EM_ROTA, em pedidos de entrega/retirada do gestor.
+ */
+export function podeEditarProdutosNaKanbanCard(
+  columnId: ColunaKanbanId,
+  venda: Venda,
+  modoKanbanVendas: ModoKanbanVendas
+): boolean {
+  return (
+    modoKanbanVendas === 'delivery' &&
+    venda.isPedidoEntregaGestor() &&
+    COLUNAS_ENTREGA_EDITAVEIS_PRODUTOS.includes(columnId)
+  )
+}
+
+export function exibirAtribuirEntregadorKanban(
+  modoKanbanVendas: ModoKanbanVendas,
+  venda: Venda,
+  colunaAtual: ColunaKanbanId
+): boolean {
+  const tipoVendaStr = String(venda.tipoVenda ?? '').trim().toLowerCase()
+  return (
+    modoKanbanVendas === 'delivery' &&
+    tipoVendaStr === 'entrega' &&
+    venda.isPedidoEntregaGestor() &&
+    COLUNAS_ENTREGA_OPERACIONAIS.includes(colunaAtual)
+  )
+}
+
+/** Rótulo do botão Emitir/Reemitir nota no card. */
+export function rotuloBotaoEmissaoKanban(
+  venda: Venda,
+  acaoFiscalEmAndamentoPorVenda: Record<string, 'emitindo' | 'reemitindo'>
+): string {
+  const acaoEmAndamento = acaoFiscalEmAndamentoPorVenda[venda.id]
+  if (acaoEmAndamento === 'reemitindo') return 'Reemitindo...'
+  if (acaoEmAndamento === 'emitindo') return 'Emitindo...'
+  const documentoLabel = venda.tipoDocFiscal === 'NFE' ? 'NFe' : 'NFCe'
+  const podeReemitir =
+    venda.statusFiscal === 'REJEITADA' || fiscalKanbanPodeReemitirAposCooldown(venda)
+  if (podeReemitir) {
+    if (venda.tipoDocFiscal === 'NFE' || venda.tipoDocFiscal === 'NFCE') {
+      return `Reemitir ${documentoLabel}`
+    }
+    return 'Reemitir nota'
+  }
+  if (venda.statusFiscal === 'PENDENTE_EMISSAO') return 'Aguardando...'
+  if (statusFiscalAguardandoSefaz(venda)) return 'Aguardando...'
+  return 'Emitir Nota'
 }

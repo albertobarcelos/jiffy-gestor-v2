@@ -437,26 +437,25 @@ export function ModalLancamentoProdutoPainel({
                               return (
                                 <div
                                   key={chaveUnica}
-                                  className={`flex items-center justify-between gap-2 rounded bg-gray-50 px-2 py-1${
-                                    onComplementoDoubleClick ? ' cursor-pointer' : ''
-                                  }`}
-                                  title={
-                                    onComplementoDoubleClick
-                                      ? 'Duplo clique para editar o complemento'
-                                      : undefined
-                                  }
-                                  onDoubleClick={() => onComplementoDoubleClick?.(comp.id)}
+                                  className="flex items-center justify-between gap-2 rounded bg-gray-50 px-2 py-1"
                                 >
-                                  <span className="font-nunito min-w-0 flex-1 truncate text-sm">
+                                  <span
+                                    className={`font-nunito min-w-0 flex-1 truncate text-sm${
+                                      onComplementoDoubleClick ? ' cursor-pointer' : ''
+                                    }`}
+                                    title={
+                                      onComplementoDoubleClick
+                                        ? 'Duplo clique para editar o complemento'
+                                        : undefined
+                                    }
+                                    onDoubleClick={() => onComplementoDoubleClick?.(comp.id)}
+                                  >
                                     {comp.nome}
                                   </span>
                                   <span className="shrink-0 text-sm font-semibold text-primary tabular-nums">
                                     {formatarValorComplemento(valor, tipoIp)}
                                   </span>
-                                  <div
-                                    className="flex shrink-0 items-center justify-center gap-0.5 rounded border border-gray-200 bg-white"
-                                    onClick={e => e.stopPropagation()}
-                                  >
+                                  <div className="flex shrink-0 items-center justify-center gap-0.5 rounded border border-gray-200 bg-white">
                                     <button
                                       type="button"
                                       aria-label="Diminuir quantidade do complemento"

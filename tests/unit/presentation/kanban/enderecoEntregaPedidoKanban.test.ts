@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { deveExibirBotaoAlterarEnderecoEntregaKanban } from '@/src/presentation/components/features/kanban/enderecoEntregaPedidoKanban'
+import { deveExibirBotaoAlterarEnderecoEntregaKanban } from '@/src/presentation/components/features/delivery/kanban-panels/enderecoEntregaPedidoKanban'
 import type { Venda } from '@/src/presentation/components/features/kanban/types'
 
 function vendaMock(partial: Partial<Venda> = {}): Venda {

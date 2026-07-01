@@ -1,10 +1,10 @@
-# Quadro fiscal (Kanban) e fluxo de Novo Pedido
+# Quadro de Vendas (Kanban) e fluxo de Novo Pedido
 
-> **Documento vivo** — descreve o comportamento atual do código. Ao alterar `FiscalFlowKanban`, `NovoPedidoModal` ou módulos em `./kanban/`, atualize as seções afetadas e a data no rodapé.
+> **Documento vivo** — descreve o comportamento atual do código. Ao alterar `VendasKanban`, `NovoPedidoModal` ou módulos em `./kanban/`, atualize as seções afetadas e a data no rodapé.
 
-**Última revisão:** 2026-06-15  
+**Última revisão:** 2026-06-30 (doc sincronizada com orchestrator + edição de produtos)
 **Rota:** `/pedidos-clientes` → `app/(erp)/pedidos-clientes/page.tsx`  
-**Componente raiz:** `src/presentation/components/features/kanban/FiscalFlowKanban.tsx`
+**Componente raiz:** `src/presentation/components/features/kanban/VendasKanban.tsx`
 
 > **Pastas:** código em `features/kanban/`, `pedidos/`, `delivery/`, `fiscal/`. Inventário em [`docs/arquitetura-jiffy/PEDIDOS_FEATURES_REORGANIZACAO.md`](arquitetura-jiffy/PEDIDOS_FEATURES_REORGANIZACAO.md).
 
@@ -48,6 +48,7 @@ Funcionalidades centrais:
 - Arrastar cards entre colunas (fiscal e/ou logística).
 - Emitir / reemitir nota fiscal.
 - Ver detalhes do pedido (mesmo `NovoPedidoModal` em modo leitura, passo 4).
+- **Editar produtos** de pedido delivery em andamento (lápis ao lado do código `#…` no card → `NovoPedidoModal` com `modoEdicaoProdutos`).
 - Configurar impressão delivery (estação, template de cupom, preferências).
 
 ---
@@ -57,19 +58,38 @@ Funcionalidades centrais:
 ### Estrutura atual
 
 ```
-app/(erp)/pedidos-clientes/page.tsx    # dynamic import de features/kanban (ssr: false)
+app/(erp)/pedidos-clientes/page.tsx    # dynamic import → VendasKanban (ssr: false)
 src/presentation/components/features/
 ├── kanban/
-│   ├── FiscalFlowKanban.tsx           # Orquestrador principal
+│   ├── VendasKanban.tsx               # Composição pura (~20 linhas)
 │   ├── KanbanModoVendasToggle.tsx
-│   ├── components/                    # toolbar, column, card, drag
-│   ├── hooks/                         # listagem, filtros, pinning, emissão
-│   ├── rules/                         # fiscalFlowKanban.rules, storage
-│   └── utils/                         # cache, listagem, card display
-├── pedidos/                           # NovoPedidoModal + wizard
+│   ├── components/
+│   │   ├── KanbanToolbar.tsx          # Filtros, busca, toggle Delivery/Balcão
+│   │   ├── KanbanBoardRenderer.tsx    # DnD + colunas + cards
+│   │   ├── KanbanModaisRenderer.tsx   # Todos os modais do quadro
+│   │   ├── KanbanColuna.tsx           # Coluna (UI; tipo KanbanColumn em types.ts)
+│   │   ├── KanbanVendaCard.tsx        # Card + painéis delivery
+│   │   └── …                          # header, actions, drag preview
+│   ├── hooks/
+│   │   ├── useKanbanOrchestrator.ts   # Facade: wiring de todos os hooks abaixo
+│   │   ├── useKanbanFilters.ts        # Busca, origem, período, tipo entrega
+│   │   ├── useKanbanDataQueries.ts    # React Query (vendas unificadas / delivery)
+│   │   ├── useKanbanVendasPorColuna.ts
+│   │   ├── useKanbanPreTransicao.ts   # Validações antes de mover card
+│   │   ├── useKanbanDragDrop.ts
+│   │   ├── useKanbanModais.ts         # Estado dos modais (criar / ver / editar produtos)
+│   │   ├── useKanbanEntregadorSync.ts
+│   │   ├── useKanbanPinning.ts
+│   │   ├── useFiscalEmissaoKanban.ts
+│   │   └── useFiscalReativacaoRejeitada.ts
+│   ├── rules/                         # vendasKanban.rules.ts, vendasKanban.storage.ts
+│   └── utils/                         # kanbanColumnsConfig, cache, listagem, card display
+├── pedidos/                           # NovoPedidoModal + wizard (+ useEdicaoProdutosDelivery)
 ├── delivery/                          # config cupom, painéis kanban entrega
 └── fiscal/                            # EmitirNfeModal, badge, PDF retry
 ```
+
+**Composição do `VendasKanban`:** `useKanbanOrchestrator()` retorna `toolbarProps`, `boardProps` e `modaisProps` para três renderers — sem lógica de negócio no componente raiz.
 
 **DTO de venda no Kanban:** `VendaUnificadaDTO` em `kanban/hooks/useVendasUnificadas.ts` (alias `Venda` em `kanban/types.ts`).
 
@@ -79,27 +99,29 @@ src/presentation/components/features/
 
 - **Toggle:** `KanbanModoVendasToggle` na toolbar (`modoKanbanVendas`: `'delivery' | 'balcao'`).
 - **Persistência:** `localStorage` chave `jiffy-gestor-v2:kanban-modo-vendas` (padrão ao ler: **`delivery`**).
-- **Filtro client-side** (`FiscalFlowKanban`):
+- **Filtro client-side** (`VendasKanban`):
   - `delivery` → `v.isPedidoEntregaGestor()`
   - `balcao` → `!v.isPedidoEntregaGestor()`
 
 `isPedidoEntregaGestor()` = `tabelaOrigem === 'venda_gestor'` + `tipoVenda` ∈ `{ entrega, retirada }` + não cancelada.
 
-**Novo Pedido:** `handleAbrirNovoPedido` define:
+**Novo Pedido:** `useKanbanModais.handleAbrirNovoPedido` define contexto e abre modal:
 
 ```ts
-setTipoPedidoEscolhido(modoKanbanVendas === 'delivery' ? 'entrega' : 'balcao')
-setNovoPedidoInstanciaKey(k => k + 1)  // remonta modal = estado limpo
+setNovoPedidoCriarContext({
+  instanciaKey: Date.now(),
+  tipoInicioPedido: modoKanbanVendas === 'delivery' ? 'entrega' : 'balcao',
+})
 setNovoPedidoModalOpen(true)
 ```
 
-> **Nota:** `EscolhaTipoPedidoModal` (dois cards Balcão/Entrega) **não** é montado em `FiscalFlowKanban`. O tipo segue o modo do quadro. O modal de escolha pode ser reutilizado em outro lugar ou ficou legado.
+> **Nota:** `EscolhaTipoPedidoModal` (dois cards Balcão/Entrega) **não** é montado no Kanban. O tipo segue o modo do quadro.
 
 ---
 
 ## 4. Colunas do Kanban
 
-Definição em `getColumns()` dentro de `FiscalFlowKanban.tsx`:
+Definição em `kanbanColumnsConfig.tsx` (via `useKanbanOrchestrator`):
 
 | ID | Título | Uso principal |
 |----|--------|----------------|
@@ -116,7 +138,7 @@ Definição em `getColumns()` dentro de `FiscalFlowKanban.tsx`:
 - **Delivery:** todas **exceto** `PENDENTE_EMISSAO` (pendência fiscal aparece **dentro** de Finalizadas com estilo fiscal).
 - **Balcão:** `FINALIZADAS`, `PENDENTE_EMISSAO`, `COM_NFE` (sem as 4 operacionais).
 
-Constantes em `fiscalFlowKanban.rules.ts`:
+Constantes em `vendasKanban.rules.ts`:
 
 - `COLUNAS_ENTREGA_OPERACIONAIS` — drag logístico
 - `COLUNAS_KANBAN_DESTINO_PIN` — pin no topo após soltar: Finalizadas, Pendente, Com nota
@@ -155,7 +177,7 @@ Lógica central: `VendaUnificadaDTO.getEtapaKanban()` (`useVendasUnificadas.ts`)
 
 ## 6. Filtros e dados
 
-**Hook:** `useFiscalKanbanFilters`
+**Hook:** `useKanbanFilters`
 
 | Filtro | Comportamento |
 |--------|----------------|
@@ -167,7 +189,7 @@ Lógica central: `VendaUnificadaDTO.getEtapaKanban()` (`useVendasUnificadas.ts`)
 
 **Dados:** `useVendasUnificadasInfinite(params, { refetchIntervalMs: 60_000, refetchOnWindowFocus: true })` — primeira página de **50** vendas do dia atual; mais páginas ao rolar coluna (scroll load-more). Busca/filtros (`q`, data de criação, data de finalização e origem) vão na API e aplicam-se a **todo** o dataset. Polling a cada 60s e refetch ao focar a janela mantêm o quadro alinhado entre estações sem pré-carga silenciosa agressiva.
 
-**Efeito colateral:** vendas `REJEITADA` com `solicitarEmissaoFiscal === false` são reativadas automaticamente via `useMarcarEmissaoFiscal` (toast informativo).
+**Efeito colateral:** vendas `REJEITADA` com `solicitarEmissaoFiscal === false` são reativadas automaticamente via hook `useFiscalReativacaoRejeitada` (`useMarcarEmissaoFiscal` + toast informativo).
 
 **Ordenação por coluna:** cada coluna possui select **Ordem** (`Data`, `Nº da venda`, `Cliente`) e botão de direção crescente/decrescente. O estado fica em memória na página e reinicia no reload; o pin do último card movido continua persistido em `localStorage`.
 
@@ -207,29 +229,44 @@ Ao soltar em Finalizadas / Pendente / Com nota, `venda.id` vai para `primeiroPor
 - Abre `EmitirNfeModal` com cliente da venda quando necessário.
 - Card: botão Emitir/Reemitir, badge `StatusFiscalBadge`, PDF quando emitida.
 
-**Regras auxiliares:** `deveExibirBotaoEmitirNotaNoKanban`, `vendaBloqueadaParaEmissaoInterativa` em `fiscalFlowKanban.rules.ts`.
+**Regras auxiliares:** `deveExibirBotaoEmitirNotaNoKanban`, `vendaBloqueadaParaEmissaoInterativa` em `vendasKanban.rules.ts`.
 
 ---
 
 ## 9. Abrir Novo Pedido (integração Kanban → modal)
 
+Estado e handlers ficam em `useKanbanModais`; renderização em `KanbanModaisRenderer`.
+
+### 9.1 Criar pedido
+
 | Estado | Função |
 |--------|--------|
 | `novoPedidoModalOpen` | Controla painel |
-| `novoPedidoInstanciaKey` | `key` no `NovoPedidoModal` — nova instância a cada clique em Novo Pedido |
-| `tipoPedidoEscolhido` | `'balcao' \| 'entrega'` → prop `tipoInicioPedido` |
+| `novoPedidoCriarContext` | `{ instanciaKey, tipoInicioPedido }` — `key` no `NovoPedidoModal` remonta estado limpo |
 
-**Props passadas:**
+**Montagem condicional** (só monta quando há contexto):
 
 ```tsx
-<NovoPedidoModal
-  key={novoPedidoInstanciaKey}
-  open={novoPedidoModalOpen}
-  tipoInicioPedido={tipoPedidoEscolhido}
-  onClose={() => setNovoPedidoModalOpen(false)}
-  onSuccess={() => { setNovoPedidoModalOpen(false); refetch() }}
-/>
+{novoPedidoCriarContext && (
+  <NovoPedidoModal
+    key={novoPedidoCriarContext.instanciaKey}
+    open={novoPedidoModalOpen}
+    tipoInicioPedido={novoPedidoCriarContext.tipoInicioPedido}
+    onClose={…}
+    onSuccess={…}
+  />
+)}
 ```
+
+### 9.2 Ver detalhes e editar produtos
+
+O Kanban usa **até três instâncias** de `NovoPedidoModal` (criar / visualização / edição de produtos), cada uma montada só quando o contexto correspondente existe — evita custo de modal fechado no bundle inicial da árvore.
+
+| Contexto | Handler | Props distintivas |
+|----------|---------|-------------------|
+| Criar | `handleAbrirNovoPedido` | `tipoInicioPedido` conforme modo do quadro |
+| Visualizar | `handleViewDetails` / `abrirDetalhesPagamentoPedido` | `modoVisualizacao={true}`, `vendaId`, `abaDetalhesInicial` opcional |
+| Editar produtos | `handleEditarProdutos` | `modoEdicaoProdutos={true}`, `tipoInicioPedido="entrega"` |
 
 ---
 
@@ -290,7 +327,7 @@ Operador pode alterar status no passo Informações (balcão) ou conforme fluxo 
 
 ### 11.4 Componentes específicos entrega
 
-- `EntregaClienteSelector` — busca por telefone, moradas, criar cliente rápido.
+- `EntregaClienteSelector` — busca por telefone (automática ao completar 11 dígitos ou ao sair do campo), moradas, criar cliente rápido; overlay de carregamento durante a consulta.
 - Lista entregadores: `GET /api/usuarios-pdv/entregadores`.
 - Taxas tipo `entrega`: `useTaxasInfinite` filtrado.
 - Último entregador: `localStorage` `jiffy:delivery:last-entregador-id`.
@@ -299,7 +336,9 @@ Operador pode alterar status no passo Informações (balcão) ou conforme fluxo 
 
 ## 12. Visualização / edição de pedido existente
 
-**Abertura:** clique no card → `handleViewDetails` → segundo `NovoPedidoModal`:
+### 12.1 Ver detalhes
+
+**Abertura:** clique no card → `handleViewDetails` → `NovoPedidoModal` de visualização:
 
 | Prop | Valor |
 |------|--------|
@@ -307,11 +346,24 @@ Operador pode alterar status no passo Informações (balcão) ou conforme fluxo 
 | `tabelaOrigemVenda` | `venda` \| `venda_gestor` |
 | `statusFiscalUnificado` | do listagem (PDV pode não repetir no GET detalhe) |
 | `modoVisualizacao` | `true` → abre no **passo 4** |
+| `abaDetalhesInicial` | opcional (`'pagamentos'` ao confirmar cobrança na coluna Em Rota) |
 | `onAfterClose` | limpa `pedidoVisualizacaoContext` após animação |
 
 Passo 4: abas **Informações do pedido** e **Nota fiscal** (se aplicável).
 
-**Edição cliente no card:** ícone lápis → `ClientesTabsModal` (mesmo de Cadastros).
+### 12.2 Editar produtos (delivery)
+
+**Abertura:** ícone lápis ao lado do código do pedido (`#IUMBJYFY`) no `KanbanVendaCardHeader` → `handleEditarProdutos`.
+
+| Regra | Detalhe |
+|-------|---------|
+| Modo | Apenas **Delivery** + pedido entrega gestor |
+| Colunas permitidas | `NOVOS_PEDIDOS`, `EM_PREPARO`, `PRONTO_ENTREGA` (`podeEditarProdutosNaKanbanCard` em `vendasKanban.rules.ts`) |
+| Modal | `NovoPedidoModal` com `modoEdicaoProdutos={true}` — foco no passo de produtos |
+| Persistência | `useEdicaoProdutosDelivery` + `montarDiffProdutosPedidoDelivery` → PATCH add/remove (`AtualizarProdutosPedidoDeliveryUseCase`) |
+| Item existente | `ProdutoSelecionado.produtoLancadoId` mapeado em `VendaDetalheProdutosMapper` (necessário para `remove`) |
+
+> **Removido do card:** edição de cliente via `ClientesTabsModal` ao lado do nome. Cliente continua editável dentro do `NovoPedidoModal` (visualização / fluxo de pedido), não por ícone separado no card.
 
 ---
 
@@ -326,7 +378,7 @@ Passo 4: abas **Informações do pedido** e **Nota fiscal** (se aplicável).
 | `despachar` | Pronto → Em rota |
 | `finalizar` | Em rota → entregue / finalizada |
 
-Botão **Avançar etapa** no card (`FiscalKanbanVendaCard`) e drag entre colunas operacionais.
+Botão **Avançar etapa** no card (`KanbanVendaCard`) e drag entre colunas operacionais.
 
 ### 13.2 Impressão
 
@@ -346,15 +398,19 @@ Botão **Avançar etapa** no card (`FiscalKanbanVendaCard`) e drag entre colunas
 
 ## 14. Modais e componentes auxiliares
 
+Renderizados por `KanbanModaisRenderer` (salvo modais internos ao `NovoPedidoModal`):
+
 | Componente | Quando abre |
 |------------|-------------|
-| `NovoPedidoModal` | Novo pedido / ver detalhes |
+| `NovoPedidoModal` (criar) | Botão Novo Pedido na toolbar |
+| `NovoPedidoModal` (visualização) | Clique no card / confirmar cobrança |
+| `NovoPedidoModal` (edição produtos) | Lápis no código do pedido no card (delivery) |
 | `EmitirNfeModal` | Emitir nota a partir do card |
 | `DeliveryConfiguracoesModal` | Config delivery na toolbar |
-| `EscolheDatasModal` | Período personalizado nos filtros |
-| `ClientesTabsModal` | Editar cliente pelo card |
+| `JiffySidePanelModal` + `FaturamentoRangeCalendar` | Período personalizado nos filtros |
 | `EscolhaTipoPedidoModal` | **Não** acoplado ao Kanban atual |
 | `SeletorClienteModal` | Dentro do NovoPedido (balcão) |
+| `EntregaClienteSelector` | Dentro do NovoPedido (entrega) |
 | `ModalLancamentoProdutoPainel` | Lançar produto com complementos |
 | `PainelEdicaoProdutoLinhaPedido` | Editar linha do pedido |
 | `ProdutosTabsModal` | Cadastro rápido de produto |
@@ -365,16 +421,23 @@ Botão **Avançar etapa** no card (`FiscalKanbanVendaCard`) e drag entre colunas
 
 | Hook / endpoint | Uso |
 |-----------------|-----|
-| `useVendasUnificadas` | `GET` vendas unificadas (filtros) |
+| `useKanbanOrchestrator` | Facade do quadro (toolbar + board + modais) |
+| `useKanbanModais` | Estado/handlers dos modais do Kanban |
+| `useKanbanFilters` | Filtros da toolbar (busca, origem, período, tipo entrega) |
+| `useKanbanDataQueries` | Queries React Query + params unificados |
+| `useKanbanVendasPorColuna` | Agrupa e ordena vendas por coluna |
+| `useKanbanPreTransicao` / `useKanbanDragDrop` | Validação e DnD |
+| `useFiscalReativacaoRejeitada` | Reativação automática de notas REJEITADAS |
+| `useVendasUnificadasInfinite` | `GET` vendas unificadas (filtros + infinite scroll) |
 | `useMarcarEmissaoFiscal` / `useDesmarcarEmissaoFiscal` | Flag solicitar emissão |
 | `useEmitirNfe`, `useEmitirNfeGestor` | Emissão |
 | `useReemitirNfe`, `useReemitirNfeGestor` | Reemissão |
-| `useTransicaoVendaGestor` | Etapas delivery |
+| `useTransicaoPedidoDelivery` / `useEntregaTransicoesKanban` | Etapas delivery |
+| `useEdicaoProdutosDelivery` | Salvar diff de produtos no modal de edição |
 | `useCreateVendaGestor` | Criar pedido no modal |
-| `useFinalzarVendaGestor` | Finalizar gestor |
 | `useImpressaoDelivery` | Tickets pós-transição |
 | `useEmpresaMe` | Nome, prefs impressão, template |
-| `useKanbanColumnScrollLoadMore` | Detecta scroll próximo ao fim da coluna e chama `fetchNextPage()` |
+| `useKanbanColumnScrollLoadMore` | Scroll próximo ao fim da coluna → `fetchNextPage()` |
 
 **BFF gestor (exemplos):** rotas em `app/api/vendas/...` — ver hooks em `useVendas.ts`.
 
@@ -395,11 +458,12 @@ Botão **Avançar etapa** no card (`FiscalKanbanVendaCard`) e drag entre colunas
 ## 17. Pontos de atenção / débitos conhecidos
 
 - [ ] `EscolhaTipoPedidoModal` existe mas o Kanban **não** pergunta Balcão/Entrega — tipo vem do toggle Delivery/Balcão.
-- [ ] `getVendasDeliveryPorStatus` em `FiscalFlowKanban` está **comentado/vazio** (legado iFood?).
-- [ ] `novo-pedido/` migrado para `features/pedidos/` (concluído — ver `PEDIDOS_FEATURES_REORGANIZACAO.md`).
+- [x] Refatoração Fase 1+2: `VendasKanban` composição pura + `useKanbanOrchestrator` + `KanbanModaisRenderer` (2026-06).
+- [x] Modais `NovoPedidoModal` montados condicionalmente por contexto (criar / ver / editar produtos).
+- [x] `novo-pedido/` migrado para `features/pedidos/` (ver `PEDIDOS_FEATURES_REORGANIZACAO.md`).
 - [ ] Modo delivery esconde coluna Pendente emissão mas vendas fiscais pendentes aparecem em Finalizadas (estilo amarelo via `getCardBorderEFundoKanban`).
-- [ ] Documentação de otimização anterior: `docs/PLANO_OTIMIZACAO_PEDIDOS_CLIENTES_FRONTEND.md` (lazy mount do modal).
 - [x] Removidos na Fase 0: `NFeKanban*.disabled`, `NFeKanbanSimple`, `DroppableColumn` (legado).
+- [x] Removido do card: `ClientesTabsModal` para editar cliente ao lado do nome.
 
 ---
 
@@ -407,16 +471,18 @@ Botão **Avançar etapa** no card (`FiscalKanbanVendaCard`) e drag entre colunas
 
 | Data | Alteração |
 |------|-----------|
+| 2026-06-30 | Doc sincronizada: orchestrator, 3× NovoPedidoModal, edição de produtos no card, `useKanbanFilters`, remoção ClientesTabsModal do card |
+| 2026-06-30 | Padronização de nomes: `VendasKanban`, `KanbanToolbar`, `KanbanVendaCard`, `KanbanColuna`, `vendasKanban.rules` |
 | 2026-06-15 | Fase 0 reorganização: doc `PEDIDOS_FEATURES_REORGANIZACAO.md`, estrutura alvo §2, remoção kanban legado |
 | 2026-05-27 | Fase 3 listagem: snapshot visual removido; filtro por modo derivado do React Query; paginação só por scroll; polling 60s + refetch ao focar janela |
 | 2026-05-25 | Atualização pós-migração para `app/(erp)`: rota canônica, filtros atuais (Data criação e Data finalização por calendário personalizado, sem Status fiscal), ordenação por coluna, snapshot visual por Delivery/Balcão e carregamento incremental por scroll |
-| 2026-05-18 | Documento inicial: mapeamento FiscalFlowKanban + NovoPedido (balcão/entrega) + kanban/ + hooks |
+| 2026-05-18 | Documento inicial: mapeamento VendasKanban + NovoPedido (balcão/entrega) + kanban/ + hooks |
 
 ---
 
 ### Como manter este arquivo
 
 1. Ao mudar colunas, drag ou `getEtapaKanban`, atualize §4–§7 e §5.
-2. Ao mudar passos do modal ou payload de criação, atualize §10–§11.
+2. Ao mudar passos do modal, edição de produtos ou payload de criação, atualize §9–§12.
 3. Ao ligar/desligar `EscolhaTipoPedidoModal` no Kanban, atualize §3 e §9.
 4. Registre mudanças na tabela §18.

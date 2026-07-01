@@ -1,6 +1,7 @@
 'use client'
 
 import { logImpressao } from '@/src/shared/utils/logImpressaoDelivery'
+import { deliveryCupomHtmlParaEscPos } from '@/src/infrastructure/printing/deliveryCupomHtmlParaEscPos'
 
 /**
  * QZ Tray — configuração opcional de confiança (certificado + assinatura).
@@ -65,31 +66,45 @@ async function waitForQzConnection(qz: QzModule, timeoutMs = 20_000): Promise<vo
       throw error
     }
   }
-  throw new Error('Timeout aguardando conexão com QZ Tray.')
+  throw new Error('Tempo esgotado ao buscar impressoras. Tente novamente ou clique em Atualizar.')
 }
 
 /**
  * Garante uma única conexão WebSocket ativa (evita corrida com Strict Mode / múltiplos painéis).
  * Só retorna quando o socket está pronto para `printers.*` e `print`.
+ *
+ * Sempre valida `isActive()` em vez de confiar numa promise resolvida em cache: ao fechar e
+ * reabrir o modal o socket pode cair, e uma promise antiga "resolvida" faria `printers.find` /
+ * `print` chamarem `sendData` numa conexão `null` (erro `_qz.websocket.connection is null`).
  */
 export async function ensureQzWebsocketConnected(qz: QzModule): Promise<void> {
+  // Conexão realmente ativa: nada a fazer.
+  if (qz.websocket.isActive()) return
+
+  // Reaproveita uma tentativa de conexão em andamento (corrida entre painéis / Strict Mode).
   if (qzConnectPromise) {
-    return qzConnectPromise
+    await qzConnectPromise
+    return
   }
 
   qzConnectPromise = (async () => {
-    if (!qz.websocket.isActive()) {
+    try {
       await qz.websocket.connect()
-      return
+    } catch (error) {
+      if (isQzAlreadyConnectedError(error)) return
+      if (isQzConnectInProgressError(error)) {
+        await waitForQzConnection(qz)
+        return
+      }
+      throw error
     }
-    await waitForQzConnection(qz)
   })()
 
   try {
     await qzConnectPromise
-  } catch (error) {
+  } finally {
+    // Não mantém a promise em cache: a próxima chamada decide pelo `isActive()` atual.
     qzConnectPromise = null
-    throw error
   }
 }
 
@@ -146,14 +161,14 @@ export function mensagemErroCarregarQzTray(error: unknown): string {
     return 'Falha ao carregar o módulo de impressão (atualização da página em andamento). Recarregue (F5) e abra as configurações novamente.'
   }
   if (isQzSendDataError(error)) {
-    return 'QZ Tray ainda não estava pronto. Tente clicar em "Atualizar QZ".'
+    return 'Serviço de impressão ainda não estava pronto. Tente clicar em Atualizar.'
   }
   if (isQzConnectInProgressError(error)) {
-    return 'Conexão com QZ Tray em andamento. Aguarde ou clique em "Atualizar QZ".'
+    return 'Buscando impressoras. Aguarde ou clique em Atualizar.'
   }
   return error instanceof Error
     ? error.message
-    : 'Não foi possível conectar ao QZ Tray para listar impressoras.'
+    : 'Não foi possível listar as impressoras deste computador.'
 }
 
 async function importWithRetry<T>(
@@ -229,7 +244,7 @@ export async function ensureQzTraySecurity(qz: QzModule): Promise<void> {
         const auth = useAuthStore.getState().auth
         const token = auth?.getAccessToken()
         if (!token) {
-          throw new Error('Faça login para assinar requisições do QZ Tray.')
+          throw new Error('Faça login para conectar à impressão neste computador.')
         }
         logImpressao('qz seguranca.sign_requisicao', { bytesParaAssinar: toSign?.length ?? 0 })
         const res = await fetch('/api/gestor/qz-tray/sign', {
@@ -262,4 +277,87 @@ export async function loadQzTray(): Promise<QzModule> {
   const qz = (await importWithRetry(() => import('qz-tray'))).default
   await ensureQzTraySecurity(qz)
   return qz
+}
+
+// ─── Raw TCP (IP direto, sem spooler Windows) ──────────────────────────────
+
+/**
+ * Parseia referência de impressora TCP.
+ * Aceita: `tcp://IP:PORTA`, `IP:PORTA` ou só `IP` (porta padrão 9100).
+ */
+export function parseTcpPrinterRef(ref: string): { host: string; port: number } | null {
+  const trimmed = ref.trim()
+  if (!trimmed) return null
+
+  const tcpMatch = trimmed.match(/^tcp:\/\/([^:/\s]+):(\d{1,5})$/i)
+  if (tcpMatch) {
+    const port = parseInt(tcpMatch[2], 10)
+    if (port >= 1 && port <= 65535) return { host: tcpMatch[1], port }
+  }
+
+  const ipPortMatch = trimmed.match(/^(\d{1,3}(?:\.\d{1,3}){3}):(\d{1,5})$/)
+  if (ipPortMatch) {
+    const port = parseInt(ipPortMatch[2], 10)
+    if (port >= 1 && port <= 65535) return { host: ipPortMatch[1], port }
+  }
+
+  const ipOnlyMatch = trimmed.match(/^(\d{1,3}(?:\.\d{1,3}){3})$/)
+  if (ipOnlyMatch) return { host: ipOnlyMatch[1], port: 9100 }
+
+  return null
+}
+
+export function isTcpPrinterRef(ref: string): boolean {
+  const t = ref.trim()
+  return t.startsWith('tcp://') || parseTcpPrinterRef(t) !== null
+}
+
+/** Formata uma referência `tcp://HOST:PORTA`. */
+export function formatTcpPrinterRef(host: string, port: number | string): string {
+  return `tcp://${host.trim()}:${port}`
+}
+
+/**
+ * Imprime um HTML em uma impressora térmica via raw TCP (sem instalar no Windows).
+ *
+ * Usa o conversor ESC/POS de texto (`deliveryCupomHtmlParaEscPos`): a rasterização
+ * de HTML (`type:'raw', format:'html'`) não é confiável em raw TCP — em muitas
+ * Bematech o `qz.print` "tem sucesso" porém a impressora não renderiza a imagem e
+ * sai a folha em branco. O conversor mapeia as classes do template para comandos
+ * ESC/POS (negrito, alinhamento, colunas, separadores), garantindo a saída formatada.
+ *
+ * Fluxo:
+ * 1. Conecta ao WebSocket do QZ Tray
+ * 2. Cria config apontando direto para IP:porta (sem nome de impressora Windows)
+ * 3. Converte o HTML em ESC/POS e envia em raw
+ */
+export async function printRawTcpQz(
+  qz: QzModule,
+  host: string,
+  port: number,
+  html: string,
+  copies = 1,
+  jobName = 'Jiffy'
+): Promise<void> {
+  const conteudo = deliveryCupomHtmlParaEscPos(html)
+
+  const enviar = async () => {
+    const config = qz.configs.create({ host, port: String(port) }, { jobName, encoding: 'Cp850' })
+    for (let i = 0; i < Math.max(1, copies); i++) {
+      await qz.print(config, [conteudo])
+    }
+  }
+
+  await ensureQzWebsocketConnected(qz)
+
+  try {
+    await enviar()
+  } catch (error) {
+    // Socket caiu (ex.: modal fechado/reaberto): reconecta e tenta uma vez mais.
+    if (!isQzSendDataError(error)) throw error
+    qzConnectPromise = null
+    await qz.websocket.disconnect().catch(() => undefined)
+    await ensureQzWebsocketConnected(qz)
+    await enviar()
+  }
 }

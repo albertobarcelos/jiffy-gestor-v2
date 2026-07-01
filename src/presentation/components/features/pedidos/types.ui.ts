@@ -10,6 +10,12 @@ export interface NovoPedidoModalProps {
   onAfterClose?: () => void
   vendaId?: string
   modoVisualizacao?: boolean
+  /**
+   * Edição de produtos de um pedido delivery já existente (botão "Editar produtos" do card).
+   * Abre direto na etapa de produtos, sem fluxo de criação, e salva via PATCH (diff add/remove).
+   * Só faz sentido com `vendaId` e `tipoInicioPedido='entrega'`.
+   */
+  modoEdicaoProdutos?: boolean
   /** GET gestor vs PDV; com `incluirFiscal=true` no carregamento */
   tabelaOrigemVenda?: 'venda' | 'venda_gestor'
   /** `statusFiscal` do GET vendas unificado (Kanban) */

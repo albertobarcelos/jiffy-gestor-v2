@@ -30,6 +30,7 @@ import {
 } from '@/src/presentation/components/features/pedidos/hooks/data/useVendaDetalheCarregadaQuery'
 import { observacoesArrayFromTexto } from '@/src/shared/helpers/observacaoPedido'
 import { patchKanbanVendasListagemCache } from '@/src/presentation/components/features/kanban/utils/kanbanVendaCacheUpdate'
+import { textoFromObservacoesApi } from '@/src/shared/helpers/observacaoPedido'
 import {
   extrairObservacaoPedidoDeRespostaApi,
   observacoesPayloadPatchObservacaoPedido,
@@ -41,6 +42,8 @@ import type { Venda } from '@/src/presentation/components/features/kanban/types'
 interface ObservacaoPedidoKanbanPainelProps {
   open: boolean
   venda: Venda | null
+  /** Texto já presente no card/listagem — evita GET ao abrir quando disponível. */
+  observacaoPedidoHint?: string | null
   onClose: () => void
   onSalvo?: (vendaId: string, observacao: string) => void
 }
@@ -48,6 +51,7 @@ interface ObservacaoPedidoKanbanPainelProps {
 export function ObservacaoPedidoKanbanPainel({
   open,
   venda,
+  observacaoPedidoHint,
   onClose,
   onSalvo,
 }: ObservacaoPedidoKanbanPainelProps) {
@@ -58,8 +62,21 @@ export function ObservacaoPedidoKanbanPainel({
   const [carregando, setCarregando] = useState(false)
   const [salvando, setSalvando] = useState(false)
 
+  const resolverTextoObservacaoCache = useCallback((): string => {
+    const hint = observacaoPedidoHint?.trim()
+    if (hint) return hint
+    return textoFromObservacoesApi(venda?.observacoes)
+  }, [observacaoPedidoHint, venda?.observacoes])
+
   const carregarObservacao = useCallback(async () => {
     if (!open || !venda) return
+
+    const textoCache = resolverTextoObservacaoCache()
+    if (textoCache) {
+      setTexto(textoCache)
+      setCarregando(false)
+      return
+    }
 
     const token = auth?.getAccessToken()
     if (!token) {
@@ -97,7 +114,7 @@ export function ObservacaoPedidoKanbanPainel({
     } finally {
       setCarregando(false)
     }
-  }, [auth, open, venda])
+  }, [auth, open, resolverTextoObservacaoCache, venda])
 
   useEffect(() => {
     if (open && venda) {

@@ -282,6 +282,12 @@ function resumoPedido(root: VendaGestorTicketsResponse, ticket: VendaGestorTicke
   }
 }
 
+function rotuloNumeroPedido(root: VendaGestorTicketsResponse): string {
+  const numero = root.numeroVenda
+  if (numero === undefined || numero === null || String(numero).trim() === '') return ''
+  return `Pedido <strong>#${escapeHtml(String(numero))}</strong>`
+}
+
 function renderCabecalho(
   root: VendaGestorTicketsResponse,
   template: DeliveryCupomTemplateConfig,
@@ -290,10 +296,11 @@ function renderCabecalho(
 ): string {
   const tipoVenda = normalizarTipoVenda(root)
   const codigo = codigoPedido(root)
+  const pedido = rotuloNumeroPedido(root)
 
   return `<div class="header">
     ${template.mostrarLogoTexto ? `<div class="brand">${escapeHtml(empresa)}</div>` : ''}
-    <div class="method">${escapeHtml(tipoVenda)}${codigo ? ` <strong>${escapeHtml(codigo)}</strong>` : ''}</div>
+    <div class="method">${pedido ? `${pedido} ` : ''}${escapeHtml(tipoVenda)}${codigo ? ` <strong>${escapeHtml(codigo)}</strong>` : ''}</div>
     ${cabecalhoExtra}
   </div>
   <div class="separator"></div>`
@@ -305,7 +312,6 @@ function renderMetaPedido(root: VendaGestorTicketsResponse, incluirEntregador: b
   const entregador = incluirEntregador ? nomeEntregador(root) : ''
 
   return `<div class="section meta-section">
-    <div><strong>Pedido:</strong> #${root.numeroVenda}</div>
     ${dataPedido ? `<div><strong>Data:</strong> ${escapeHtml(dataPedido)}</div>` : ''}
     ${dataPrevista ? `<div><strong>Data Prevista:</strong> ${escapeHtml(dataPrevista)}</div>` : ''}
     ${entregador ? `<div class="separator"></div><div><strong>Entregador:</strong> ${escapeHtml(entregador)}</div>` : ''}
@@ -516,6 +522,13 @@ export function renderDeliveryCupomHtml(input: RenderDeliveryCupomHtmlInput): st
   const fontesModelo = fontesDoModelo(template, ticket.tipoCupom)
   const w = larguraPx(template.larguraMm)
   const padding = paddingPorDensidade(template.densidade)
+  // Margem lateral configurável (mm → px na mesma escala da largura) para afastar o conteúdo
+  // da borda e evitar corte do lado direito em impressoras com área imprimível menor.
+  const margemLateralPx = Math.max(
+    0,
+    Math.round((template.margemLateralMm ?? 0) * (w / template.larguraMm))
+  )
+  const paddingLateral = padding + margemLateralPx
   const valueColPx = w <= 220 ? 58 : 68
   const separatorPy = padding <= 2 ? 5 : padding >= 12 ? 16 : 12
   const lineHeight = lineHeightPorDensidade(template.densidade)
@@ -561,18 +574,20 @@ export function renderDeliveryCupomHtml(input: RenderDeliveryCupomHtmlInput): st
 <style>
   html, body { margin:0; overflow-x:hidden; }
   body { width:${w}px; max-width:100%; margin-left:auto; margin-right:auto; font-family: system-ui, -apple-system, Segoe UI, sans-serif; color:#111; }
-  .receipt { box-sizing:border-box; width:100%; max-width:100%; margin:0; padding:2px ${padding}px ${padding}px; font-size:${template.tamanhoFonteBase}px; line-height:${lineHeight}; overflow-x:hidden; }
+  .receipt { box-sizing:border-box; width:100%; max-width:100%; margin:0; padding:2px ${paddingLateral}px ${padding}px ${paddingLateral}px; font-size:${template.tamanhoFonteBase}px; line-height:${lineHeight}; overflow-x:hidden; }
   .header { text-align:center; padding-bottom:${Math.max(2, Math.floor(padding / 2))}px; margin-bottom:${Math.max(2, Math.floor(padding / 2))}px; font-size:${fonteCabecalho}px; }
-  .brand { font-weight:800; font-size:${fonteCabecalho + 3}px; letter-spacing:.02em; }
-  .method { margin-top:2px; font-weight:800; }
+  .brand { font-weight:800; font-size:${fonteCabecalho + 1}px; letter-spacing:.02em; }
+  .method { display:inline-block; margin-top:4px; padding:2px 8px; font-weight:900; font-size:${fonteCabecalho + 5}px; border:2px solid #000; border-radius:4px; }
   .section { margin:${padding}px 0; }
   .meta-section { font-size:${fontePedido}px; }
   .customer-section, .address-section { font-size:${fonteClienteEndereco}px; }
   .whatsapp-qr { margin:${Math.max(3, Math.floor(padding / 2))}px 0; display:flex; align-items:center; justify-content:flex-start; gap:6px; font-size:10px; font-weight:700; line-height:1.15; }
   .whatsapp-qr img { display:block; width:74px; height:74px; flex:0 0 auto; image-rendering:pixelated; }
   .whatsapp-qr div { max-width:130px; text-align:left; }
-  .separator { width:100%; height:0; margin:0; padding:${separatorPy}px 0; border:0; border-top:1px dashed #333; font-weight:normal; box-sizing:content-box; }
-  .double-separator { width:100%; height:0; margin:0; padding:${separatorPy}px 0; border:0; border-top:1px dashed #333; border-bottom:1px dashed #333; font-weight:normal; box-sizing:content-box; }
+  .separator { width:100%; margin:${separatorPy}px 0; padding:0; border:0; box-sizing:border-box; overflow:hidden; white-space:nowrap; line-height:1; color:#000; font-weight:900; font-size:${fonteCabecalho + 2}px; }
+  .separator::before { content:"------------------------------------------------------------------------------------------"; letter-spacing:-.5px; }
+  .double-separator { width:100%; margin:${separatorPy}px 0; padding:0; border:0; box-sizing:border-box; overflow:hidden; line-height:1.2; color:#000; font-weight:900; font-size:${fonteCabecalho + 2}px; }
+  .double-separator::before { content:"------------------------------------------------------------------------------------------\A------------------------------------------------------------------------------------------"; white-space:pre; letter-spacing:-.5px; }
   .items-title { margin:${padding}px 0 3px; font-weight:800; font-size:${fonteItens}px; }
   .item-row { padding:3px 0; font-size:${fonteItens}px; }
   .row-line { display:flex; justify-content:space-between; align-items:flex-start; gap:4px; width:100%; max-width:100%; box-sizing:border-box; }

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type SetStateAction } from 'react'
 import {
   gravarPrimeiroPorColunaNoStorage,
   lerPrimeiroPorColunaDoStorage,
-} from '../rules/fiscalFlowKanban.storage'
+} from '../rules/vendasKanban.storage'
 
 export function useKanbanPinning() {
   const [primeiroPorColuna, setPrimeiroPorColunaState] = useState<Record<string, string>>({})

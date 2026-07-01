@@ -13,6 +13,11 @@ export interface ComplementoSelecionado {
 
 export interface ProdutoSelecionado {
   produtoId: string
+  /**
+   * ID do item já lançado na venda (distinto do `produtoId` do catálogo).
+   * Necessário para remover o item via PATCH delivery (`produtos.remove`). Ausente em itens novos.
+   */
+  produtoLancadoId?: string
   nome: string
   quantidade: number
   valorUnitario: number

@@ -1,6 +1,6 @@
 import type { VendaUnificadaDTO } from '../hooks/useVendasUnificadas'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
-import { LABEL_SEM_CLIENTE } from '../rules/fiscalFlowKanban.rules'
+import { LABEL_SEM_CLIENTE } from '../rules/vendasKanban.rules'
 
 /** Preview do card durante o arraste (DragOverlay): leve inclinação via classe global `.drag-preview-card`. */
 export function VendaCardDragPreview({ venda }: { venda: VendaUnificadaDTO }) {

@@ -21,20 +21,20 @@ Trecho analisado:
 ### 1) `GET /pedidos-clientes` (aparece mais de uma vez)
 
 - Origem: rota `app/pedidos-clientes/page.tsx`.
-- A pagina carrega dinamicamente `FiscalFlowKanban`.
+- A pagina carrega dinamicamente `VendasKanban`.
 - Em dev, repeticao pode ocorrer por comportamento de compilacao/StrictMode e navegacao interna.
 
 ### 2) `GET /api/vendas/unificado?offset=0&limit=100`
 
-- Origem: hook `useVendasUnificadas` usado em `FiscalFlowKanban`.
+- Origem: hook `useVendasUnificadas` usado em `VendasKanban`.
 - Funcao: carregar o dataset principal do kanban (vendas unificadas) com filtros atuais.
 - Essa chamada e esperada no carregamento da tela.
 
 ### 3) `GET /api/grupos-produtos?ativo=true&limit=100&offset=0`
 
 - Origem: `NovoPedidoModal` (hook `useGruposProdutos`).
-- Problema atual: `NovoPedidoModal` fica montado no `FiscalFlowKanban` mesmo com `open=false`.
-- Efeito: a query roda ao entrar na pagina, antes do usuario abrir o modal.
+- Problema **anterior** (pré-2026-06): `NovoPedidoModal` ficava montado no kanban mesmo com `open=false`.
+- **Atual:** montagem condicional por contexto em `KanbanModaisRenderer` — ver [`vendas-kanban-e-novo-pedido.md`](./vendas-kanban-e-novo-pedido.md) §9.
 
 ### 4) `GET /api/meios-pagamentos?ativo=true&limit=100&offset=0`
 
@@ -66,10 +66,13 @@ Em termos praticos:
 
 ### 1.1 Montagem condicional de modais pesados
 
-No `FiscalFlowKanban`, renderizar modal apenas quando necessario:
+**Status:** implementado em `KanbanModaisRenderer` (2026-06) — cada `NovoPedidoModal` só monta quando existe contexto (`novoPedidoCriarContext`, `pedidoVisualizacaoContext`, `pedidoEdicaoProdutosContext`).
 
-- `NovoPedidoModal` somente quando `novoPedidoModalOpen === true` (ou modo visualizacao aberto).
-- `SeletorClienteModal` somente quando `seletorClienteVendaOpen === true`.
+No `VendasKanban` / `useKanbanModais`, renderizar modal apenas quando necessario:
+
+- `NovoPedidoModal` (criar) somente quando `novoPedidoCriarContext` existe.
+- `NovoPedidoModal` (visualização) somente quando `pedidoVisualizacaoContext` existe.
+- `NovoPedidoModal` (edição produtos) somente quando `pedidoEdicaoProdutosContext` existe.
 
 **Impacto esperado:** elimina as chamadas de clientes/meios/grupos ao apenas abrir a pagina.
 

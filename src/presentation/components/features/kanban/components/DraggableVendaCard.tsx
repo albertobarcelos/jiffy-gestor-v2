@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import type { VendaUnificadaDTO } from '../hooks/useVendasUnificadas'
 import type { KanbanColumn } from '../types'
-import { COLUNAS_KANBAN_DRAG_ENTREGA, COLUNAS_KANBAN_DRAG_FISCAL } from '../rules/fiscalFlowKanban.rules'
+import { COLUNAS_KANBAN_DRAG_ENTREGA, COLUNAS_KANBAN_DRAG_FISCAL } from '../rules/vendasKanban.rules'
 
 /**
  * Card draggable: fiscal (Finalizadas / Pendente emissão) ou entrega gestor (4 colunas operacionais).
