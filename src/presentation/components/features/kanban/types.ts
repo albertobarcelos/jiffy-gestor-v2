@@ -28,6 +28,9 @@ export type DirecaoOrdenacaoKanban = 'asc' | 'desc'
 
 export type OrigemFiltro = '' | 'PDV' | 'GESTOR' | 'DELIVERY'
 
+/** Filtro de tipo de entrega no modo delivery (`''` = todos). */
+export type TipoEntregaFiltro = '' | 'entrega' | 'retirada'
+
 export type PeriodoOpcao =
   | 'Todos'
   | 'Hoje'

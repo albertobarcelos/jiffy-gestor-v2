@@ -11,7 +11,7 @@ import type {
   KanbanColumn,
 } from '../types'
 
-interface FiscalKanbanColumnProps {
+interface KanbanColunaProps {
   column: KanbanColumn
   count: number
   criterioOrdenacao: CriterioOrdenacaoKanban
@@ -23,7 +23,7 @@ interface FiscalKanbanColumnProps {
   children: ReactNode
 }
 
-export function FiscalKanbanColumn(props: FiscalKanbanColumnProps) {
+export function KanbanColuna(props: KanbanColunaProps) {
   const {
     column,
     count,

@@ -95,8 +95,17 @@ export function mapProdutoDetalheVenda(prod: Record<string, unknown>): ProdutoSe
 
   const unidadeRaw = prod.unidadeMedida ?? prod.unidade_medida
 
+  // `id` é o item lançado na venda; só é distinto quando o catálogo veio em `produtoId`.
+  const produtoLancadoId =
+    prod.id != null && prod.produtoId != null && String(prod.id) !== String(prod.produtoId)
+      ? String(prod.id)
+      : prod.produtoLancadoId != null
+        ? String(prod.produtoLancadoId)
+        : undefined
+
   return {
     produtoId: String(prod.produtoId ?? prod.id ?? ''),
+    ...(produtoLancadoId ? { produtoLancadoId } : {}),
     nome: nomeProduto,
     quantidade,
     valorUnitario: Number(prod.valorUnitario) || 0,

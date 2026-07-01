@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 import { useTaxasInfinite } from '@/src/presentation/hooks/useTaxas'
 
 export type UseTaxasEntregaQueryParams = {
@@ -14,7 +14,12 @@ export function useTaxasEntregaQuery({
   modoVisualizacao,
   pedidoComEntrega,
 }: UseTaxasEntregaQueryParams) {
-  const taxasEntregaQuery = useTaxasInfinite({ limit: 100 })
+  // Só ativa a query quando o painel está aberto e o pedido envolve entrega; o cache
+  // (staleTime 5min) é compartilhado entre consumidores via mesma queryKey, evitando refetch redundante.
+  const taxasEntregaQuery = useTaxasInfinite({
+    limit: 100,
+    enabled: open && (pedidoComEntrega || modoVisualizacao),
+  })
   const refetchTaxasEntrega = taxasEntregaQuery.refetch
 
   const taxasEntrega = useMemo(() => {
@@ -22,11 +27,6 @@ export function useTaxasEntregaQuery({
       return taxa.isAtivo() && taxa.getTipo().trim().toLowerCase() === 'entrega'
     })
   }, [taxasEntregaQuery.data])
-
-  useEffect(() => {
-    if (!open || modoVisualizacao || !pedidoComEntrega) return
-    void refetchTaxasEntrega()
-  }, [open, modoVisualizacao, pedidoComEntrega, refetchTaxasEntrega])
 
   return {
     taxasEntrega,

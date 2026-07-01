@@ -53,7 +53,10 @@ export function transformarParaReal(valor: number | string | null | undefined): 
     return 'R$ 0,00'
   }
 
-  return `R$ ${numero.toFixed(2).replace('.', ',')}`
+  const [inteiro, decimal] = Math.abs(numero).toFixed(2).split('.')
+  const inteiroComMilhar = inteiro.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  const sinal = numero < 0 ? '-' : ''
+  return `R$ ${sinal}${inteiroComMilhar},${decimal}`
 }
 
 /**

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import type { AcaoTransicaoGestor } from '@/src/presentation/hooks/useVendas'
 import type { VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
 import { showToast } from '@/src/shared/utils/toast'
@@ -7,7 +7,7 @@ import {
   COLUNAS_ENTREGA_OPERACIONAIS,
   acoesTransicaoEntregaAvanco,
   vendaPrecisaConfirmarPagamentoParaFinalizar,
-} from '@/src/presentation/components/features/kanban/rules/fiscalFlowKanban.rules'
+} from '@/src/presentation/components/features/kanban/rules/vendasKanban.rules'
 
 export type ExecutarTransicaoKanbanPayload = {
   id: string
@@ -20,10 +20,25 @@ export type VerificarImpressaoKanbanResult = {
   ticketsPayload?: VendaGestorTicketsResponse
 }
 
+type TransicaoUiAtiva = {
+  origem: ColunaKanbanId
+  destino: ColunaKanbanId
+}
+
 interface UseEntregaTransicoesKanbanParams {
   executarTransicao: (payload: ExecutarTransicaoKanbanPayload) => Promise<unknown>
-  sincronizarVendaAposTransicao?: (vendaId: string, respostaTransicao: unknown) => void
-  agendarSincronizacaoLista?: (vendaId: string) => void
+  /** Retorna true quando a resposta summary já atualizou o card (sem GET extra). */
+  sincronizarVendaAposTransicao?: (
+    vendaId: string,
+    respostaTransicao: unknown,
+    colunaDestino?: ColunaKanbanId
+  ) => boolean | void
+  /** Reconsulta lista após transição incompleta; `onRecovered` limpa UI otimista quando o cache foi corrigido. */
+  agendarSincronizacaoLista?: (
+    vendaId: string,
+    colunaDestino?: ColunaKanbanId,
+    onRecovered?: () => void
+  ) => void
   onAfterTransicaoSucesso?: (ctx: {
     venda: Venda
     acoesExecutadas: AcaoTransicaoGestor[]
@@ -34,8 +49,10 @@ interface UseEntregaTransicoesKanbanParams {
     acoes: AcaoTransicaoGestor[]
   ) => Promise<VerificarImpressaoKanbanResult>
   verificarEntregadorAntesDespachar?: (venda: Venda) => Promise<boolean>
-  /** Quando finalizar exige pagamento quitado: abrir detalhes em vez de chamar a API. */
-  onPagamentoPendenteAoFinalizar?: (venda: Venda) => void
+  /** Sem entregador ao despachar: abrir o modal de vínculo de entregador do card. */
+  onEntregadorAusenteAoDespachar?: (venda: Venda) => void
+  /** Quando finalizar exige pagamento quitado e ele ainda está pendente: confirma a cobrança automaticamente (retorna true se confirmado). */
+  confirmarPagamentoAntesFinalizar?: (venda: Venda) => Promise<boolean>
   /** Reconsulta pagamento no delivery antes de bloquear finalização (lista unificada pode estar defasada). */
   revalidarPagamentoAntesFinalizar?: (vendaId: string) => Promise<boolean>
 }
@@ -48,7 +65,8 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
     onAfterTransicaoSucesso,
     verificarImpressaoAntesTransicoes,
     verificarEntregadorAntesDespachar,
-    onPagamentoPendenteAoFinalizar,
+    onEntregadorAusenteAoDespachar,
+    confirmarPagamentoAntesFinalizar,
     revalidarPagamentoAntesFinalizar,
   } = params
 
@@ -56,9 +74,32 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
   const [timestampsEtapaEntregaLocal, setTimestampsEtapaEntregaLocal] = useState<
     Record<string, string>
   >({})
-  const [etapaLocalPorVendaId, setEtapaLocalPorVendaId] = useState<
-    Record<string, ColunaKanbanId>
+  const [transicaoUiPorVendaId, setTransicaoUiPorVendaId] = useState<
+    Record<string, TransicaoUiAtiva>
   >({})
+
+  const etapaLocalPorVendaId = useMemo((): Record<string, ColunaKanbanId> => {
+    const map: Record<string, ColunaKanbanId> = {}
+    for (const [vendaId, transicao] of Object.entries(transicaoUiPorVendaId)) {
+      map[vendaId] = transicao.destino
+    }
+    return map
+  }, [transicaoUiPorVendaId])
+
+  /**
+   * Ajuste otimista por coluna enquanto a transição está ativa: origem −1, destino +1.
+   * Permite ao badge de contagem refletir o card que já mudou de coluna na UI, mesmo quando a
+   * coluna está paginada (com paginação completa, a contagem usa direto os cards visíveis).
+   */
+  const deltaContagemColunasTransicao = useMemo((): Partial<Record<ColunaKanbanId, number>> => {
+    const deltas: Partial<Record<ColunaKanbanId, number>> = {}
+    for (const { origem, destino } of Object.values(transicaoUiPorVendaId)) {
+      if (origem === destino) continue
+      deltas[origem] = (deltas[origem] ?? 0) - 1
+      deltas[destino] = (deltas[destino] ?? 0) + 1
+    }
+    return deltas
+  }, [transicaoUiPorVendaId])
 
   const marcarTransicaoLocal = useCallback((vendaId: string) => {
     const agoraIso = new Date().toISOString()
@@ -66,17 +107,23 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
   }, [])
 
   const limparEtapaLocal = useCallback((vendaId: string) => {
-    setEtapaLocalPorVendaId(prev => {
+    setTransicaoUiPorVendaId(prev => {
       if (!(vendaId in prev)) return prev
       const { [vendaId]: _, ...rest } = prev
       return rest
     })
   }, [])
 
-  const iniciarTransicaoUi = useCallback((vendaId: string, colunaDestino: ColunaKanbanId) => {
-    setAvancandoEtapaIds(prev => ({ ...prev, [vendaId]: true }))
-    setEtapaLocalPorVendaId(prev => ({ ...prev, [vendaId]: colunaDestino }))
-  }, [])
+  const iniciarTransicaoUi = useCallback(
+    (vendaId: string, colunaOrigem: ColunaKanbanId, colunaDestino: ColunaKanbanId) => {
+      setAvancandoEtapaIds(prev => ({ ...prev, [vendaId]: true }))
+      setTransicaoUiPorVendaId(prev => ({
+        ...prev,
+        [vendaId]: { origem: colunaOrigem, destino: colunaDestino },
+      }))
+    },
+    []
+  )
 
   const finalizarTransicaoUi = useCallback((vendaId: string) => {
     setAvancandoEtapaIds(prev => {
@@ -91,14 +138,23 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
       venda: Venda,
       acoesExecutadas: AcaoTransicaoGestor[],
       respostaTransicao: unknown,
+      colunaDestino: ColunaKanbanId,
       ticketsPreload?: VendaGestorTicketsResponse
     ) => {
       marcarTransicaoLocal(venda.id)
-      sincronizarVendaAposTransicao?.(venda.id, respostaTransicao)
-      limparEtapaLocal(venda.id)
+      const cardCompleto = sincronizarVendaAposTransicao?.(
+        venda.id,
+        respostaTransicao,
+        colunaDestino
+      )
+      if (cardCompleto) {
+        limparEtapaLocal(venda.id)
+      }
       showToast.success('Etapa do pedido atualizada.')
       void onAfterTransicaoSucesso?.({ venda, acoesExecutadas, ticketsPreload })
-      agendarSincronizacaoLista?.(venda.id)
+      if (!cardCompleto) {
+        agendarSincronizacaoLista?.(venda.id, colunaDestino, () => limparEtapaLocal(venda.id))
+      }
     },
     [
       agendarSincronizacaoLista,
@@ -109,28 +165,38 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
     ]
   )
 
-  const reverterTransicaoUi = useCallback(
-    (vendaId: string) => {
-      limparEtapaLocal(vendaId)
-    },
-    [limparEtapaLocal]
-  )
+  const reverterTransicaoUi = useCallback((vendaId: string) => {
+    setTransicaoUiPorVendaId(prev => {
+      if (!(vendaId in prev)) return prev
+      const { [vendaId]: _, ...rest } = prev
+      return rest
+    })
+  }, [])
+
+  /** Limpa UI otimista de transição (etapa local, timestamps, loading) — ex.: refresh manual do Kanban. */
+  const limparEstadoUiTransicao = useCallback(() => {
+    setAvancandoEtapaIds({})
+    setTimestampsEtapaEntregaLocal({})
+    setTransicaoUiPorVendaId({})
+  }, [])
 
   const finalizarEntrega = useCallback(
-    async (venda: Venda) => {
+    async (venda: Venda, colunaOrigem: ColunaKanbanId) => {
       if (vendaPrecisaConfirmarPagamentoParaFinalizar(venda)) {
         const quitado = revalidarPagamentoAntesFinalizar
           ? await revalidarPagamentoAntesFinalizar(venda.id)
           : false
         if (!quitado) {
-          onPagamentoPendenteAoFinalizar?.(venda)
-          return
+          const confirmado = confirmarPagamentoAntesFinalizar
+            ? await confirmarPagamentoAntesFinalizar(venda)
+            : false
+          if (!confirmado) return
         }
       }
-      iniciarTransicaoUi(venda.id, 'FINALIZADAS')
+      iniciarTransicaoUi(venda.id, colunaOrigem, 'FINALIZADAS')
       try {
         const resposta = await executarTransicao({ id: venda.id, acao: 'finalizar' })
-        concluirTransicaoComSucesso(venda, ['finalizar'], resposta)
+        concluirTransicaoComSucesso(venda, ['finalizar'], resposta, 'FINALIZADAS')
       } catch (error) {
         reverterTransicaoUi(venda.id)
         throw error
@@ -143,7 +209,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
       executarTransicao,
       finalizarTransicaoUi,
       iniciarTransicaoUi,
-      onPagamentoPendenteAoFinalizar,
+      confirmarPagamentoAntesFinalizar,
       revalidarPagamentoAntesFinalizar,
       reverterTransicaoUi,
     ]
@@ -154,10 +220,11 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
       const acoes = acoesTransicaoEntregaAvanco(origIdx, destIdx)
       if (acoes.length === 0) return
 
+      const colunaOrigem = COLUNAS_ENTREGA_OPERACIONAIS[origIdx]
       const colunaDestino = COLUNAS_ENTREGA_OPERACIONAIS[destIdx]
-      if (!colunaDestino) return
+      if (!colunaOrigem || !colunaDestino) return
 
-      iniciarTransicaoUi(venda.id, colunaDestino)
+      iniciarTransicaoUi(venda.id, colunaOrigem, colunaDestino)
 
       let ticketsPreload: VendaGestorTicketsResponse | undefined
 
@@ -175,6 +242,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
           const podeDespachar = await verificarEntregadorAntesDespachar(venda)
           if (!podeDespachar) {
             showToast.error('Vincule um entregador antes de despachar para entrega.')
+            onEntregadorAusenteAoDespachar?.(venda)
             reverterTransicaoUi(venda.id)
             return
           }
@@ -185,7 +253,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
             ? await executarTransicao({ id: venda.id, acoes })
             : await executarTransicao({ id: venda.id, acao: acoes[0] })
 
-        concluirTransicaoComSucesso(venda, acoes, resposta, ticketsPreload)
+        concluirTransicaoComSucesso(venda, acoes, resposta, colunaDestino, ticketsPreload)
       } catch (error) {
         reverterTransicaoUi(venda.id)
         throw error
@@ -198,6 +266,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
       executarTransicao,
       finalizarTransicaoUi,
       iniciarTransicaoUi,
+      onEntregadorAusenteAoDespachar,
       reverterTransicaoUi,
       verificarEntregadorAntesDespachar,
       verificarImpressaoAntesTransicoes,
@@ -212,7 +281,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
 
       try {
         if (colunaAtual === 'EM_ROTA') {
-          await finalizarEntrega(venda)
+          await finalizarEntrega(venda, colunaAtual)
           return
         }
 
@@ -241,7 +310,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
     async (venda: Venda) => {
       if (avancandoEtapaIds[venda.id]) return
       try {
-        await finalizarEntrega(venda)
+        await finalizarEntrega(venda, 'EM_ROTA')
       } catch {
         /* toast em onError do hook de transição */
       }
@@ -252,7 +321,9 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
   return {
     avancandoEtapaIds,
     etapaLocalPorVendaId,
+    deltaContagemColunasTransicao,
     timestampsEtapaEntregaLocal,
+    limparEstadoUiTransicao,
     handleAvancarEtapa,
     moverEntregaPorDrag,
     finalizarEntregaPorDrag,

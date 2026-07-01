@@ -7,6 +7,20 @@ type ApiErrorResponse = {
   errors?: unknown
 }
 
+/** API_TLS_SKIP_VERIFY no .env.local não altera TLS sozinho — precisa virar NODE_TLS_REJECT_UNAUTHORIZED no processo Node. */
+function deveIgnorarVerificacaoTlsApi(): boolean {
+  return process.env.API_TLS_SKIP_VERIFY?.trim().toLowerCase() === 'true'
+}
+
+function aplicarTlsSkipDevSeConfigurado(): void {
+  if (typeof window !== 'undefined') return
+  if (!deveIgnorarVerificacaoTlsApi()) return
+  if (process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0') return
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+}
+
+aplicarTlsSkipDevSeConfigurado()
+
 function mensagemErroRede(error: unknown): ApiError | null {
   if (!(error instanceof TypeError) || error.message !== 'fetch failed') {
     return null
@@ -89,6 +103,8 @@ export class ApiClient {
         status: 200,
       }
     }
+
+    aplicarTlsSkipDevSeConfigurado()
 
     const url = `${this.baseUrl}${endpoint}`
 

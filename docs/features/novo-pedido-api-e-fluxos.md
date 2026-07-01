@@ -2,7 +2,7 @@
 
 > **Documento de referência para migração de API.** Descreve o comportamento **atual do frontend** (`src/presentation/components/features/pedidos` e BFFs relacionados).  
 > **Reorganização de pastas:** destino `features/pedidos/` — ver [`PEDIDOS_FEATURES_REORGANIZACAO.md`](../arquitetura-jiffy/PEDIDOS_FEATURES_REORGANIZACAO.md).  
-> Complementa [`novo-pedido.md`](./novo-pedido.md) e [`fiscal-flow-kanban-e-novo-pedido.md`](../fiscal-flow-kanban-e-novo-pedido.md).
+> Complementa [`novo-pedido.md`](./novo-pedido.md) e [`vendas-kanban-e-novo-pedido.md`](../vendas-kanban-e-novo-pedido.md).
 
 **Última revisão:** 2026-06-15  
 **Componente raiz:** `NovoPedidoModal` → `useNovoPedidoOrchestrator`
@@ -388,14 +388,23 @@ Hook: `useMoradaTelefone.ts`, `useMoradasPorTelefone`, `useCriarMoradaTelefone`,
 
 ## 10. Kanban e transições operacionais
 
-O `FiscalFlowKanban` reutiliza o mesmo `NovoPedidoModal` para visualização e abre delivery com:
+O `VendasKanban` reutiliza `NovoPedidoModal` em três contextos (montagem condicional em `KanbanModaisRenderer`):
 
-- `tipoInicioPedido` implícito pelo card (`tipoVenda`)
-- Transições via `useTransicaoVendaGestor` (mesmos endpoints da seção 7.5)
+| Contexto | Abertura | Props principais |
+|----------|----------|------------------|
+| Visualização | Clique no card | `modoVisualizacao={true}`, `vendaId` |
+| Edição de produtos | Lápis no código `#…` do card (delivery) | `modoEdicaoProdutos={true}` → PATCH add/remove via `useEdicaoProdutosDelivery` |
+| Criar | Toolbar Novo Pedido | `tipoInicioPedido` conforme modo Delivery/Balcão |
+
+Demais integrações:
+
+- Transições via `useTransicaoPedidoDelivery` / `useEntregaTransicoesKanban`
 - Entregador: `AtribuirEntregadorKanbanPainel` → PATCH `entregadorId`
 - Impressão: `useImpressaoDelivery` + GET tickets
 
 Lista unificada do Kanban: `GET /api/vendas/unificado` (não é parte do modal, mas alimenta cards).
+
+Ver também [`vendas-kanban-e-novo-pedido.md`](../vendas-kanban-e-novo-pedido.md) §9 e §12.
 
 ---
 

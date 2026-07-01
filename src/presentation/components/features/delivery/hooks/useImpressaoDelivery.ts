@@ -13,7 +13,7 @@ import {
 } from '@/src/application/delivery/imprimirTicketsApiGestor'
 import type { AcaoTransicaoGestor } from '@/src/presentation/hooks/useVendas'
 import type { ColunaKanbanId, Venda } from '@/src/presentation/components/features/kanban/types'
-import { COLUNAS_ENTREGA_OPERACIONAIS } from '@/src/presentation/components/features/kanban/fiscalFlowKanban.rules'
+import { COLUNAS_ENTREGA_OPERACIONAIS } from '@/src/presentation/components/features/kanban/rules/vendasKanban.rules'
 import { tipoCupomParaReimpressao } from '@/src/shared/types/deliveryImpressao'
 import type { VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
 import { showToast } from '@/src/shared/utils/toast'
@@ -169,7 +169,9 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
           nomeEmpresa: empresa?.nomeExibicao,
           jobNamePrefix: 'Delivery',
           cupomTemplate: deliveryCupomTemplate,
+          accessToken: token,
           onMensagem: m => showToast.info(m),
+          onErro: m => showToast.error(m),
         })
         logImpressao('hook.imprimir_tickets_concluido', { vendaId: venda.id })
       }
@@ -273,7 +275,9 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
         nomeEmpresa: empresa?.nomeExibicao,
         jobNamePrefix: 'Reimpressão',
         cupomTemplate: deliveryCupomTemplate,
+        accessToken: token,
         onMensagem: m => showToast.info(m),
+        onErro: m => showToast.error(m),
       })
       logImpressao('hook.reimpressao_concluida', { vendaId: venda.id })
     },

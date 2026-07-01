@@ -49,6 +49,10 @@ export interface PedidosDeliveryInfiniteOptions {
   refetchIntervalMs?: number | false
   refetchOnWindowFocus?: boolean
   enabled?: boolean
+  /** Envia `dataCriacaoInicial/Final` na API quando o período está ativo (colunas operacionais). */
+  enviarFiltroCriacaoNaApi?: boolean
+  /** Envia `dataFinalizacaoInicial/Final` na API quando o período está ativo (colunas fiscais). */
+  enviarFiltroFinalizacaoNaApi?: boolean
 }
 
 /** Converte filtros compartilhados do Kanban (unificado) para listagem delivery Jiffy. */
@@ -59,9 +63,15 @@ export function vendasUnificadasQueryParamsParaPedidosDelivery(
   const origemFiltroKanban =
     origem === 'PDV' || origem === 'GESTOR' || origem === 'DELIVERY' ? origem : undefined
 
+  const tipoEntrega =
+    params.tipoEntrega === 'entrega' || params.tipoEntrega === 'retirada'
+      ? params.tipoEntrega
+      : undefined
+
   return {
     q: params.q,
     origemFiltroKanban,
+    tipoEntrega,
     dataCriacaoInicial: params.dataCriacaoInicial ?? params.periodoInicial,
     dataCriacaoFinal: params.dataCriacaoFinal ?? params.periodoFinal,
     dataFinalizacaoInicio: params.dataFinalizacaoInicio,

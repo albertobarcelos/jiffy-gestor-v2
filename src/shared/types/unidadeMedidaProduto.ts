@@ -26,5 +26,5 @@ export function produtoUsaRegraComplementoUnitario(unidade: UnidadeMedidaProduto
 export function formatarUnidadeMedidaProdutoExibicao(unidade: UnidadeMedidaProduto): string {
   if (unidade === 'KG') return 'KG'
   if (unidade === 'LT') return 'LT'
-  return 'Unit'
+  return 'UN'
 }

@@ -57,7 +57,10 @@ export interface UpdatePedidoEnderecoEntregaApi {
 
 export interface AtualizarPedidoDeliveryApiRequest {
   observacoes?: string[]
+  tipoEntrega?: TipoEntregaDeliveryApi
   enderecoEntrega?: UpdatePedidoEnderecoEntregaApi
+  taxas?: AtualizarTaxasPedidoDeliveryApi['taxas']
+  cobrancas?: AtualizarCobrancasPedidoDeliveryApi['cobrancas']
 }
 
 export interface ComplementoProdutoPedidoDeliveryApi {
@@ -103,6 +106,23 @@ export interface AtualizarCobrancasPedidoDeliveryApi {
 export interface TaxaPedidoDeliveryApi {
   taxaId: string
   quantidade?: number
+}
+
+/** PATCH pedido — adiciona/remove taxas (remove usa o `taxaId` do catálogo). */
+export interface AtualizarTaxasPedidoDeliveryApi {
+  taxas: {
+    add?: TaxaPedidoDeliveryApi[]
+    remove?: string[]
+  }
+}
+
+/**
+ * PATCH atômico para "Salvar Taxa" no Kanban: ajusta a taxa e, quando há cobrança
+ * pendente `na_entrega`, reemite a cobrança com o novo valor (cancel + add).
+ */
+export interface SalvarTaxaPedidoDeliveryApi {
+  taxas?: AtualizarTaxasPedidoDeliveryApi['taxas']
+  cobrancas?: AtualizarCobrancasPedidoDeliveryApi['cobrancas']
 }
 
 export interface CriarPedidoDeliveryApiRequest {

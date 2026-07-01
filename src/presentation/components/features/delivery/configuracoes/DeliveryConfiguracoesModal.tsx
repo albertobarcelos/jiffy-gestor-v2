@@ -29,6 +29,9 @@ import {
   listQzWindowsPrinters,
   loadQzTray,
   mensagemErroCarregarQzTray,
+  parseTcpPrinterRef,
+  formatTcpPrinterRef,
+  isTcpPrinterRef,
 } from '@/src/infrastructure/printing/qzTrayClient'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import {
@@ -93,6 +96,127 @@ function DeliveryToggleRow(props: {
   )
 }
 
+/**
+ * Campo de mapeamento de impressora: alterna entre "impressora Windows" (select)
+ * e "IP direto" (dois inputs: host + porta) sem precisar instalar no Windows.
+ * O valor armazenado em IP direto é `tcp://HOST:PORTA`.
+ */
+function ImpressoraMapeamentoInput({
+  value,
+  impressorasWindows,
+  onChange,
+}: {
+  value: string
+  impressorasWindows: string[]
+  onChange: (next: string) => void
+}) {
+  const tcpRef = parseTcpPrinterRef(value)
+  const modoIp = isTcpPrinterRef(value)
+
+  const [host, setHost] = useState(tcpRef?.host ?? '')
+  const [porta, setPorta] = useState(String(tcpRef?.port ?? 9100))
+
+  // Sincroniza campos IP quando o valor externo muda (ex: hidratação)
+  useEffect(() => {
+    const parsed = parseTcpPrinterRef(value)
+    if (parsed) {
+      setHost(parsed.host)
+      setPorta(String(parsed.port))
+    }
+  }, [value])
+
+  function toggleModo() {
+    if (modoIp) {
+      onChange('')
+    } else {
+      const ref = host.trim() ? formatTcpPrinterRef(host.trim(), porta || '9100') : 'tcp://'
+      onChange(ref)
+    }
+  }
+
+  function handleHostChange(h: string) {
+    setHost(h)
+    const portaNum = parseInt(porta, 10)
+    if (h.trim() && portaNum >= 1 && portaNum <= 65535) {
+      onChange(formatTcpPrinterRef(h.trim(), portaNum))
+    } else {
+      onChange(h.trim() ? `tcp://${h.trim()}:${porta}` : '')
+    }
+  }
+
+  function handlePortaChange(p: string) {
+    setPorta(p)
+    const portaNum = parseInt(p, 10)
+    if (host.trim() && portaNum >= 1 && portaNum <= 65535) {
+      onChange(formatTcpPrinterRef(host.trim(), portaNum))
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-1.5">
+        {modoIp ? (
+          <div className="flex flex-1 gap-1">
+            <input
+              type="text"
+              placeholder="192.168.1.x"
+              value={host}
+              onChange={e => handleHostChange(e.target.value)}
+              className="h-9 min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-2.5 text-sm outline-none transition-colors focus:border-secondary"
+            />
+            <input
+              type="number"
+              placeholder="9100"
+              value={porta}
+              min={1}
+              max={65535}
+              onChange={e => handlePortaChange(e.target.value)}
+              className="h-9 w-20 rounded-lg border border-gray-200 bg-white px-2.5 text-sm outline-none transition-colors focus:border-secondary"
+            />
+          </div>
+        ) : (
+          <select
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            className="h-9 flex-1 rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none transition-colors focus:border-secondary"
+          >
+            <option value="">Selecione a impressora Windows</option>
+            {impressorasWindows.map(printer => (
+              <option key={printer} value={printer}>
+                {printer}
+              </option>
+            ))}
+          </select>
+        )}
+
+        <button
+          type="button"
+          title={modoIp ? 'Usar impressora Windows' : 'Usar IP direto (sem instalar no Windows)'}
+          onClick={toggleModo}
+          className={`flex h-9 shrink-0 items-center gap-1 rounded-lg border px-2 text-xs font-medium transition-colors ${
+            modoIp
+              ? 'border-secondary bg-secondary/10 text-secondary'
+              : 'border-gray-200 bg-white text-secondary-text hover:border-secondary hover:text-secondary'
+          }`}
+        >
+          IP
+        </button>
+      </div>
+
+      {modoIp && (
+        <p className="text-xs text-secondary-text">
+          Imprime via raw TCP — sem instalar no Windows.{' '}
+          {value.startsWith('tcp://') && !parseTcpPrinterRef(value) ? (
+            <span className="text-amber-600">IP ou porta inválidos.</span>
+          ) : (
+            <span className="font-medium text-primary-text">{value || '—'}</span>
+          )}
+        </p>
+      )}
+    </div>
+  )
+}
+
 export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfiguracoesModalProps) {
   const { auth } = useAuthStore()
   const token = auth?.getAccessToken()
@@ -122,7 +246,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
   const [salvando, setSalvando] = useState(false)
   const [carregandoImpressoras, setCarregandoImpressoras] = useState(false)
   const [confirmSalvarSemImpressoraOpen, setConfirmSalvarSemImpressoraOpen] = useState(false)
-  const [statusQz, setStatusQz] = useState<string>('QZ Tray ainda não detectado.')
+  const [statusQz, setStatusQz] = useState<string>('Aguardando busca de impressoras.')
   const [erroQz, setErroQz] = useState<string | null>(null)
 
   const formularioHidratadoRef = useRef(false)
@@ -196,26 +320,26 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
   const carregarImpressorasWindows = useCallback(async (loadSeq: number) => {
     setCarregandoImpressoras(true)
     setErroQz(null)
-    setStatusQz('Conectando ao QZ Tray...')
+    setStatusQz('Buscando impressoras...')
     try {
       const qz = await loadQzTray()
       if (loadSeq !== qzLoadSeqRef.current) return
 
-      setStatusQz('QZ Tray conectado. Buscando impressoras do Windows...')
+      setStatusQz('Listando impressoras do Windows...')
 
       const unicas = await listQzWindowsPrinters(qz)
       if (loadSeq !== qzLoadSeqRef.current) return
 
       setImpressorasWindows(unicas)
-      setStatusQz(`${unicas.length} impressora(s) encontrada(s) pelo QZ Tray.`)
+      setStatusQz(`${unicas.length} impressora(s) encontrada(s).`)
       if (unicas.length === 0) {
-        showToast.info('Nenhuma impressora Windows encontrada pelo QZ Tray.')
+        showToast.info('Nenhuma impressora encontrada neste computador.')
       }
     } catch (error) {
       if (loadSeq !== qzLoadSeqRef.current) return
       const msg = mensagemErroCarregarQzTray(error)
       setErroQz(msg)
-      setStatusQz('Falha ao detectar QZ Tray.')
+      setStatusQz('Falha ao buscar impressoras.')
       if (!isQzChunkLoadError(error)) {
         showToast.error(msg)
       }
@@ -322,7 +446,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
       open={open}
       onClose={onClose}
       title="Configurações de Impressão Delivery"
-      subtitle="Preferências da empresa para impressão e vínculo das impressoras lógicas com este computador (QZ)"
+      subtitle="Preferências da empresa para impressão e vínculo das impressoras lógicas com este computador."
       panelClassName="w-[min(48rem,95vw)] max-w-[100vw] sm:w-[min(760px,58vw)]"
       footerVariant="bar"
       footerActions={{
@@ -505,7 +629,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
         <DeliveryConfigCollapsibleSection
           icon={<MdPrint className="h-5 w-5" aria-hidden />}
           title="Impressoras deste terminal"
-          description="Escolha, para cada impressora cadastrada no sistema, qual impressora instalada no Windows/QZ deve receber os tickets."
+          description="Escolha, para cada impressora do sistema, uma impressora do Windows."
           resetExpandedWhen={open}
           headerActions={
             <button
@@ -518,7 +642,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
               className="inline-flex h-9 items-center gap-2 rounded-lg border border-secondary px-3 text-sm font-semibold text-secondary transition-colors hover:bg-secondary/10 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <MdRefresh className={carregandoImpressoras ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
-              {carregandoImpressoras ? 'Atualizando...' : 'Atualizar QZ'}
+              {carregandoImpressoras ? 'Atualizando...' : 'Atualizar'}
             </button>
           }
         >
@@ -532,9 +656,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
               <div className="px-3 py-6 text-sm text-secondary-text">Carregando configurações...</div>
             ) : impressorasLogicas.length === 0 ? (
               <div className="px-3 py-6 text-sm text-secondary-text">
-                Nenhuma impressora lógica retornada por <code>/api/impressoras</code>. O QZ pode
-                encontrar impressoras do Windows, mas para vincular é preciso haver impressoras
-                cadastradas no sistema.
+                Nenhuma impressora cadastrada no sistema.
               </div>
             ) : (
               <div className="scrollbar-hide max-h-[350px] overflow-y-auto divide-y divide-gray-200">
@@ -544,23 +666,13 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
                       {impressora.nome}
                     </div>
                     <div className="px-3 py-2">
-                      <select
+                      <ImpressoraMapeamentoInput
                         value={mapeamentos[impressora.id] ?? ''}
-                        onChange={e =>
-                          setMapeamentos(prev => ({
-                            ...prev,
-                            [impressora.id]: e.target.value,
-                          }))
+                        impressorasWindows={impressorasWindows}
+                        onChange={next =>
+                          setMapeamentos(prev => ({ ...prev, [impressora.id]: next }))
                         }
-                        className="h-9 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none transition-colors focus:border-secondary"
-                      >
-                        <option value="">Selecione a impressora Windows</option>
-                        {impressorasWindows.map(printer => (
-                          <option key={printer} value={printer}>
-                            {printer}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </div>
                   </div>
                 ))}
@@ -569,24 +681,10 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
           </div>
 
           <div className="mt-3 rounded-lg bg-gray-50 px-3 py-2 text-sm text-secondary-text">
-            <span className="font-semibold text-primary-text">Status QZ: </span>
+            <span className="font-semibold text-primary-text">Status: </span>
             {statusQz}
             {erroQz ? <div className="mt-1 text-red-600">{erroQz}</div> : null}
-            {process.env.NEXT_PUBLIC_QZ_TRAY_SIGNING_ENABLED !== 'true' ? (
-              <p className="mt-2 text-xs leading-relaxed text-secondary-text">
-                Sem assinatura digital do site (variáveis QZ Tray), o QZ pede permissão repetidamente. Veja{' '}
-                <a
-                  href="https://qz.io/docs/signing"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium text-secondary underline"
-                >
-                  qz.io/docs/signing
-                </a>
-                — ao habilitar, use `NEXT_PUBLIC_QZ_TRAY_SIGNING_ENABLED`, certificado público na pasta{' '}
-                <code className="rounded bg-gray-100 px-1">public/qz-tray/signing/</code> e chave no servidor.
-              </p>
-            ) : null}
+            
           </div>
 
           {erroConfiguracao ? (

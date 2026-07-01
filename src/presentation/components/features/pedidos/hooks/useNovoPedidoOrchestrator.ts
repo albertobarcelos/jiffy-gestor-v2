@@ -40,6 +40,7 @@ import { useNovoPedidoCliente } from './form/useNovoPedidoCliente'
 import { useNovoPedidoEdicaoLinha } from './form/useNovoPedidoEdicaoLinha'
 import { useNovoPedidoNavegacao } from './form/useNovoPedidoNavegacao'
 import { useNovoPedidoFormState } from './orchestrator/useNovoPedidoFormState'
+import { useEdicaoProdutosDelivery } from './orchestrator/useEdicaoProdutosDelivery'
 import { useNovoPedidoGestorActions } from './orchestrator/useNovoPedidoGestorActions'
 import { useNovoPedidoOrchestratorEffects } from './orchestrator/useNovoPedidoOrchestratorEffects'
 import { createNovoPedidoResetForm } from './orchestrator/createNovoPedidoResetForm'
@@ -63,6 +64,7 @@ export function useNovoPedidoOrchestrator({
   onAfterClose,
   vendaId,
   modoVisualizacao,
+  modoEdicaoProdutos = false,
   tabelaOrigemVenda = 'venda_gestor',
   statusFiscalUnificado = null,
   tipoVendaGestor = null,
@@ -512,6 +514,19 @@ export function useNovoPedidoOrchestrator({
     clienteEntregaVinculadoId: clienteEntregaVinculado?.id,
     pedidoComEntrega,
     temEnderecoEntrega: Boolean(moradaEntregaSelecionada?.endereco),
+    modoEdicaoProdutos,
+  })
+
+  const { salvandoProdutos, handleSalvarProdutos } = useEdicaoProdutosDelivery({
+    ativo: modoEdicaoProdutos,
+    vendaId,
+    getToken: () => authRef.current?.getAccessToken(),
+    produtos,
+    observacaoPedido,
+    vendaDataUpdatedAt,
+    onSuccess,
+    onClose,
+    setInternalDialogOpen,
   })
 
   const { handleSubmit } = useNovoPedidoSubmit({
@@ -882,6 +897,9 @@ export function useNovoPedidoOrchestrator({
     handlePedidoPainelExited,
     estaNoPassoProdutos,
     modoVisualizacao,
+    modoEdicaoProdutos,
+    salvandoProdutos,
+    onSalvarProdutos: handleSalvarProdutos,
     nomeUsuario,
     currentStep,
     isLoadingVenda,

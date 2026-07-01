@@ -92,6 +92,8 @@ export function pedidoDeliverySummaryParaUnifiedRecord(
     ),
     cobrancas: summary.cobrancas,
     observacoes: summary.observacoes,
+    entregador: summary.entregador ?? null,
+    contextoEntrega: summary.contextoEntrega ?? null,
   }
 }
 
@@ -161,6 +163,24 @@ export function normalizarPedidoDeliverySummaryJson(raw: unknown): PedidoDeliver
     ? (o.observacoes as PedidoDeliverySummaryApi['observacoes'])
     : []
 
+  const entregadorRaw =
+    o.entregador && typeof o.entregador === 'object' && !Array.isArray(o.entregador)
+      ? (o.entregador as Record<string, unknown>)
+      : null
+  const entregador =
+    entregadorRaw && String(entregadorRaw.id ?? '').trim()
+      ? {
+          id: String(entregadorRaw.id),
+          nome: entregadorRaw.nome != null ? String(entregadorRaw.nome) : null,
+          telefone: entregadorRaw.telefone != null ? String(entregadorRaw.telefone) : null,
+        }
+      : null
+
+  const contextoEntregaRaw =
+    o.contextoEntrega && typeof o.contextoEntrega === 'object' && !Array.isArray(o.contextoEntrega)
+      ? (o.contextoEntrega as PedidoDeliverySummaryApi['contextoEntrega'])
+      : null
+
   return {
     id,
     numeroVenda: parseNumero(o.numeroVenda, 0),
@@ -193,6 +213,8 @@ export function normalizarPedidoDeliverySummaryJson(raw: unknown): PedidoDeliver
     cobrancas,
     resumoFiscal: resumoFiscalRaw,
     observacoes,
+    entregador,
+    contextoEntrega: contextoEntregaRaw,
   }
 }
 

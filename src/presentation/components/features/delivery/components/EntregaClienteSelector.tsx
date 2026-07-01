@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { MdSearch, MdAddLocation, MdEdit, MdLocationOn, MdPhone, MdPerson, MdCheckCircle } from 'react-icons/md'
 import { Button } from '@/src/presentation/components/ui/button'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -244,6 +244,14 @@ export function EntregaClienteSelector({
   const [formNova, setFormNova] = useState<FormNovasMorada>(FORM_INICIAL)
   const [isLoadingCep, setIsLoadingCep] = useState(false)
 
+  const telefoneInputRef = useRef<HTMLInputElement>(null)
+
+  // Foca o campo de telefone ao montar (ex.: ao entrar na step de informações do pedido).
+  useEffect(() => {
+    const id = setTimeout(() => telefoneInputRef.current?.focus(), 100)
+    return () => clearTimeout(id)
+  }, [])
+
   const moradaHookOptions = { usarModuloDelivery: usarModuloDeliveryClientes }
 
   const { data: moradas, isLoading: buscando } = useMoradasPorTelefone(telefoneBuscado, moradaHookOptions)
@@ -298,8 +306,8 @@ export function EntregaClienteSelector({
     setFormNova(formInicialComEnderecoPadrao(enderecoPadrao))
   }, [enderecoPadrao])
 
-  const handleBuscar = useCallback(async () => {
-    const digitos = extrairDigitosTelefone(telefoneInput)
+  const handleBuscar = useCallback(async (telefoneOverride?: string) => {
+    const digitos = extrairDigitosTelefone(telefoneOverride ?? telefoneInput)
     if (digitos.length < 8) {
       onAbrirSeletorCliente?.()
       return
@@ -338,6 +346,14 @@ export function EntregaClienteSelector({
     },
     [handleBuscar]
   )
+
+  /** Ao sair do campo de telefone, busca o cliente automaticamente (telefone completo e ainda não buscado). */
+  const handleTelefoneBlur = useCallback(() => {
+    const digitos = extrairDigitosTelefone(telefoneInput)
+    if (digitos.length >= 8 && digitos !== telefoneBuscado) {
+      void handleBuscar()
+    }
+  }, [telefoneInput, telefoneBuscado, handleBuscar])
 
   const handleFormChange = useCallback(
     (campo: keyof FormNovasMorada, valor: string) => {
@@ -514,7 +530,17 @@ export function EntregaClienteSelector({
   ])
 
   return (
-    <div className="space-y-3">
+    <div className="relative space-y-3">
+      {/* Bloqueia a área enquanto busca o cliente/endereços, garantindo o carregamento completo. */}
+      {(buscando || buscandoCliente) && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-white/70 backdrop-blur-[1px]">
+          <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2 shadow-md ring-1 ring-primary/10">
+            <JiffyLoading size={20} className="gap-0 py-0" />
+            <span className="text-sm font-medium text-primary">Buscando cliente...</span>
+          </div>
+        </div>
+      )}
+
       {/* Antes da validação: só telefone (linha inteira). Depois: nome à esquerda, telefone à direita */}
       <div className={buscaRealizada ? 'grid grid-cols-2 gap-2' : 'block'}>
         {/* Nome do cliente — só aparece após a validação do telefone (coluna esquerda) */}
@@ -607,11 +633,20 @@ export function EntregaClienteSelector({
             <div className="relative flex-1">
               <MdPhone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <input
+                ref={telefoneInputRef}
                 type="tel"
                 value={telefoneInput}
                 onChange={e => {
                   const formatado = formatarTelefoneExibicao(e.target.value)
                   setTelefoneInput(formatado)
+
+                  const digitos = extrairDigitosTelefone(formatado)
+                  // Número completo (celular com 11 dígitos): busca automática ao finalizar a digitação.
+                  if (digitos.length === 11) {
+                    if (digitos !== telefoneBuscado) void handleBuscar(formatado)
+                    return
+                  }
+
                   if (telefoneBuscado !== null) {
                     setTelefoneBuscado(null)
                     onMoradaSelecionada(null)
@@ -620,6 +655,7 @@ export function EntregaClienteSelector({
                   }
                 }}
                 onKeyDown={handleTelefoneKeyDown}
+                onBlur={handleTelefoneBlur}
                 placeholder="(00) 00000-0000"
                 maxLength={15}
                 className="w-full rounded-md border border-primary/30 bg-white py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-0"

@@ -18,7 +18,10 @@ import type {
   OrigemPedidoDeliveryApi,
   PedidosDeliveryQueryParams,
 } from '@/src/application/dto/api/pedidoDeliveryListApi'
-import type { StatusDeliveryApi } from '@/src/application/dto/api/pedidoDeliveryApi'
+import type {
+  StatusDeliveryApi,
+  TipoEntregaDeliveryApi,
+} from '@/src/application/dto/api/pedidoDeliveryApi'
 import { PEDIDOS_DELIVERY_KANBAN_PAGE_SIZE } from '@/src/application/dto/api/pedidoDeliveryListApi'
 
 /**
@@ -27,7 +30,7 @@ import { PEDIDOS_DELIVERY_KANBAN_PAGE_SIZE } from '@/src/application/dto/api/ped
  */
 export type OrigemFiltroKanbanListagem = '' | 'PDV' | 'GESTOR' | 'DELIVERY'
 
-/** Filtros do hook `useFiscalKanbanFilters` adaptados para a listagem delivery. */
+/** Filtros do hook `useKanbanFilters` adaptados para a listagem delivery. */
 export interface FiltrosKanbanParaPedidosDelivery {
   q?: string
   origemFiltroKanban?: OrigemFiltroKanbanListagem
@@ -40,8 +43,12 @@ export interface FiltrosKanbanParaPedidosDelivery {
   limit?: number
   /** Filtro operacional por coluna (contagem / listagem segmentada). */
   statusDelivery?: StatusDeliveryApi | StatusDeliveryApi[]
+  /** Filtro por tipo de entrega (entrega/retirada) — modo delivery. */
+  tipoEntrega?: TipoEntregaDeliveryApi | TipoEntregaDeliveryApi[]
   /** Default operacional: excluir cancelados (`cancelado=false`). */
   cancelado?: boolean
+  /** Filtro delta: retorna itens com `dataUltimaModificacao >= valor`. Usado no re-poll do Kanban. */
+  dataUltimaModificacaoInicial?: string
 }
 
 /**
@@ -86,7 +93,8 @@ function appendArrayParam(
   const items = Array.isArray(value) ? value : [value]
   const filtered = items.map(v => String(v).trim()).filter(Boolean)
   if (filtered.length === 0) return
-  params.set(key, filtered.join(','))
+  // Usa params.append para gerar ?key=A&key=B (padrão aceito pelo backend via z.array())
+  filtered.forEach(v => params.append(key, v))
 }
 
 /** Serializa `PedidosDeliveryQueryParams` para query string HTTP. */
@@ -113,6 +121,7 @@ export function serializarPedidosDeliveryQueryParams(
   appendParam(params, 'dataCriacaoFinal', query.dataCriacaoFinal)
   appendParam(params, 'dataFinalizacaoInicial', query.dataFinalizacaoInicial)
   appendParam(params, 'dataFinalizacaoFinal', query.dataFinalizacaoFinal)
+  appendParam(params, 'dataUltimaModificacaoInicial', query.dataUltimaModificacaoInicial)
 
   return params
 }
@@ -131,12 +140,14 @@ export function montarPedidosDeliveryQueryParams(
     limit: filtros.limit ?? PEDIDOS_DELIVERY_KANBAN_PAGE_SIZE,
     q: filtros.q?.trim() || undefined,
     statusDelivery: filtros.statusDelivery,
+    tipoEntrega: filtros.tipoEntrega,
     origem: origemApi,
     dataCriacaoInicial: filtros.dataCriacaoInicial,
     dataCriacaoFinal: filtros.dataCriacaoFinal,
     dataFinalizacaoInicial: filtros.dataFinalizacaoInicio,
     dataFinalizacaoFinal: filtros.dataFinalizacaoFim,
     cancelado: filtros.cancelado ?? false,
+    dataUltimaModificacaoInicial: filtros.dataUltimaModificacaoInicial,
   }
 }
 
@@ -172,6 +183,17 @@ function parseArrayQuery(value: string | null): string | string[] | undefined {
   return partes
 }
 
+/**
+ * Extrai parâmetros multi-valor enviados como params repetidos
+ * (`?key=A&key=B`) ou como valor único.
+ */
+function parseArrayQueryAll(values: string[]): string | string[] | undefined {
+  const filtered = values.map(v => v.trim()).filter(Boolean)
+  if (filtered.length === 0) return undefined
+  if (filtered.length === 1) return filtered[0]
+  return filtered
+}
+
 /** Extrai query params Jiffy a partir da URL do BFF (`GET /api/delivery/pedidos`). */
 export function extrairPedidosDeliveryQueryParamsDeSearchParams(
   searchParams: URLSearchParams
@@ -186,13 +208,13 @@ export function extrairPedidosDeliveryQueryParamsDeSearchParams(
   const q = searchParams.get('q')
   if (q?.trim()) params.q = q.trim()
 
-  const statusDelivery = parseArrayQuery(searchParams.get('statusDelivery'))
+  const statusDelivery = parseArrayQueryAll(searchParams.getAll('statusDelivery'))
   if (statusDelivery) params.statusDelivery = statusDelivery as PedidosDeliveryQueryParams['statusDelivery']
 
-  const tipoEntrega = parseArrayQuery(searchParams.get('tipoEntrega'))
+  const tipoEntrega = parseArrayQueryAll(searchParams.getAll('tipoEntrega'))
   if (tipoEntrega) params.tipoEntrega = tipoEntrega as PedidosDeliveryQueryParams['tipoEntrega']
 
-  const origem = parseArrayQuery(searchParams.get('origem'))
+  const origem = parseArrayQueryAll(searchParams.getAll('origem'))
   if (origem) params.origem = origem as PedidosDeliveryQueryParams['origem']
 
   const solicitarEmissaoFiscal = parseBooleanQuery(searchParams.get('solicitarEmissaoFiscal'))
@@ -221,6 +243,11 @@ export function extrairPedidosDeliveryQueryParamsDeSearchParams(
     params.dataFinalizacaoFinal = dataFinalizacaoFinal.trim()
   }
 
+  const dataUltimaModificacaoInicial = searchParams.get('dataUltimaModificacaoInicial')
+  if (dataUltimaModificacaoInicial?.trim()) {
+    params.dataUltimaModificacaoInicial = dataUltimaModificacaoInicial.trim()
+  }
+
   return params
 }
 
@@ -239,6 +266,7 @@ const CHAVES_QUERY_JIFFY = [
   'dataFinalizacaoFinal',
   'dataFinalizacaoInicio',
   'dataFinalizacaoFim',
+  'dataUltimaModificacaoInicial',
 ] as const
 
 /** Indica se a requisição deve usar o módulo delivery Jiffy (vs integrador legado). */

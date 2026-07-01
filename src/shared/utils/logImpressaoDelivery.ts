@@ -29,7 +29,21 @@ export function warnImpressao(etapa: string, detalhes?: Record<string, unknown>)
   console.warn(PREFIX, { ...base(etapa), ...detalhes })
 }
 
-export function erroImpressao(etapa: string, detalhes?: Record<string, unknown>): void {
+/**
+ * `cause` deve ser o objeto de exceção original (ex: o `e` capturado no `catch`).
+ * Passá-lo como argumento separado ao `console.error` garante que o DevTools
+ * exiba o stack trace real — objetos não-Error lançados pelo QZ Tray têm
+ * propriedades não-enumeráveis que o spread `{ ...e }` perde completamente.
+ */
+export function erroImpressao(
+  etapa: string,
+  detalhes?: Record<string, unknown>,
+  cause?: unknown
+): void {
   if (!logAtivo()) return
-  console.error(PREFIX, { ...base(etapa), ...detalhes })
+  if (cause !== undefined) {
+    console.error(PREFIX, { ...base(etapa), ...detalhes }, cause)
+  } else {
+    console.error(PREFIX, { ...base(etapa), ...detalhes })
+  }
 }

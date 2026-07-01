@@ -2,7 +2,7 @@
 
 > **Documento de planejamento** — descreve o problema atual, a solução proposta e o que cada time deve fazer.  
 > **Última revisão:** 2026-06-18  
-> **Relacionado:** [`docs/fiscal-flow-kanban-e-novo-pedido.md`](../fiscal-flow-kanban-e-novo-pedido.md)
+> **Relacionado:** [`docs/vendas-kanban-e-novo-pedido.md`](../vendas-kanban-e-novo-pedido.md)
 
 ---
 
@@ -25,7 +25,7 @@
 
 ## 1. Contexto
 
-A tela **Pedidos de Clientes** (`FiscalFlowKanban`) no modo **Balcão** exibe três colunas fiscais:
+A tela **Pedidos de Clientes** (`VendasKanban`) no modo **Balcão** exibe três colunas fiscais:
 
 | Coluna | ID interno |
 |--------|------------|
@@ -340,4 +340,4 @@ Refatorar o Kanban de delivery (já usa outra API de pedidos delivery). Mudança
 
 ---
 
-*Documento preparado a partir da análise do fluxo em `FiscalFlowKanban`, `useVendasUnificadas` e módulo `vendas-unificadas` do jiffy-backend.*
+*Documento preparado a partir da análise do fluxo em `VendasKanban`, `useVendasUnificadas` e módulo `vendas-unificadas` do jiffy-backend.*

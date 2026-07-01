@@ -4,6 +4,8 @@ import {
 } from '@/src/application/mappers/ContextoEntregaDeliveryMapper'
 import type { EnderecoEntregaDetalhe } from '@/src/domain/types/vendaDetalhe'
 import type { PreferenciasImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
+import type { EstacaoImpressaoMapeamento } from '@/src/infrastructure/api/estacoesImpressaoApi'
+import { isTcpPrinterRef } from '@/src/infrastructure/printing/qzTrayClient'
 import type { InstrucoesImpressaoResponse } from '@/src/shared/types/instrucoesImpressao'
 import type {
   VendaGestorTicket,
@@ -16,7 +18,6 @@ import type {
   VendaGestorTicketsResponse,
 } from '@/src/shared/types/vendaGestorTickets'
 import type { EmpresaMeResumo } from '@/src/presentation/hooks/useEmpresaMe'
-import type { EstacaoImpressaoMapeamento } from '@/src/infrastructure/api/estacoesImpressaoApi'
 
 function asRecord(v: unknown): Record<string, unknown> | null {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return null
@@ -264,6 +265,24 @@ function resolverMapeamentoWindowsParaImpressora(
 
   const fromInstrucoes = instrucoesMapeamentos.find(m => m.impressoraId === id)
   const windowsInstrucoes = fromInstrucoes?.nomeImpressoraWindows?.trim() || null
+
+  const fromEstacao = mapeamentosEstacao?.find(m => m.impressoraId === id)
+  const windowsEstacao = fromEstacao?.nomeImpressoraWindows?.trim() || null
+
+  // IP/tcp configurado neste terminal tem prioridade sobre nome Windows da API.
+  if (windowsEstacao && isTcpPrinterRef(windowsEstacao)) {
+    return {
+      nomeImpressoraWindows: windowsEstacao,
+      impressoraNome: fromEstacao?.nomeImpressora ?? fromInstrucoes?.impressoraNome ?? null,
+    }
+  }
+  if (windowsInstrucoes && isTcpPrinterRef(windowsInstrucoes)) {
+    return {
+      nomeImpressoraWindows: windowsInstrucoes,
+      impressoraNome: fromInstrucoes?.impressoraNome ?? null,
+    }
+  }
+
   if (windowsInstrucoes) {
     return {
       nomeImpressoraWindows: windowsInstrucoes,
@@ -271,8 +290,6 @@ function resolverMapeamentoWindowsParaImpressora(
     }
   }
 
-  const fromEstacao = mapeamentosEstacao?.find(m => m.impressoraId === id)
-  const windowsEstacao = fromEstacao?.nomeImpressoraWindows?.trim() || null
   if (windowsEstacao) {
     return {
       nomeImpressoraWindows: windowsEstacao,
@@ -406,7 +423,7 @@ export function montarTicketsResponseFromInstrucoes(params: {
       impressoraId: impressoraIdUnificado,
       impressoraNome: mapping?.impressoraNome ?? mapeamentoUnificado.impressoraNome,
       nomeImpressoraWindows:
-        mapping?.nomeImpressoraWindows ?? mapeamentoUnificado.nomeImpressoraWindows,
+        mapeamentoUnificado.nomeImpressoraWindows ?? mapping?.nomeImpressoraWindows,
       copias: Math.max(1, prefs.copiasCupomUnificado),
       produtosLancadosIds: ids,
       produtoPorId,

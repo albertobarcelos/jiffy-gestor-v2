@@ -182,13 +182,18 @@ export async function GET(request: NextRequest) {
 
     return await listarPedidosModuloJiffy(request)
   } catch (error) {
-    console.error('Erro ao listar pedidos delivery:', error)
     if (error instanceof ApiError) {
+      console.error('Erro ao listar pedidos delivery:', {
+        status: error.status,
+        message: error.message,
+        details: error.data,
+      })
       return NextResponse.json(
         { error: mensagemLegivelApiError(error), details: error.data },
         { status: error.status }
       )
     }
+    console.error('Erro ao listar pedidos delivery:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Erro ao listar pedidos' },
       { status: 500 }

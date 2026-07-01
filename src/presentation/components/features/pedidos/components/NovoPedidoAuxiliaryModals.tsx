@@ -91,7 +91,7 @@ export function NovoPedidoAuxiliaryModals() {
             open={seletorClienteOpen}
             onClose={() => setSeletorClienteOpen(false)}
             onSelect={handleSelectCliente}
-            title={tipoInicioPedido === 'entrega' ? 'Selecionar cliente da entrega' : undefined}
+            title={tipoInicioPedido === 'entrega' ? 'Selecionar cliente' : undefined}
           />
         )}
 
