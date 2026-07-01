@@ -24,7 +24,7 @@ export class UsuarioRepository implements IUsuarioRepository {
     total: number
   }> {
     try {
-      const { limit, offset, q = '', perfilPdvId, name, ativo } = params
+      const { limit, offset, q = '', perfilPdvId, tipoUsuarioPdv, name, ativo } = params
 
       let url = `/api/v1/pessoas/usuarios-pdv?limit=${limit}&offset=${offset}`
       if (q) {
@@ -32,6 +32,10 @@ export class UsuarioRepository implements IUsuarioRepository {
       }
       if (perfilPdvId) {
         url += `&perfilPdvId=${encodeURIComponent(perfilPdvId)}`
+      }
+      if (tipoUsuarioPdv) {
+        url += `&tipoUsuarioPdv=${encodeURIComponent(tipoUsuarioPdv)}`
+        url += `&tipoUsuario=${encodeURIComponent(tipoUsuarioPdv)}`
       }
       if (name) {
         url += `&name=${encodeURIComponent(name)}`
@@ -107,6 +111,10 @@ export class UsuarioRepository implements IUsuarioRepository {
         password: data.password || '',
         perfilPdvId: data.perfilPdvId || '',
       }
+      if (data.tipoUsuarioPdv) {
+        body.tipoUsuarioPdv = data.tipoUsuarioPdv
+        body.tipoUsuario = data.tipoUsuarioPdv
+      }
       
       // Só inclui o id se ele for fornecido (geralmente não é necessário na criação)
       if (data.id) {
@@ -149,6 +157,8 @@ export class UsuarioRepository implements IUsuarioRepository {
       if (data.ativo !== undefined) requestBody.ativo = data.ativo
       if (data.password) requestBody.password = data.password
       if (data.perfilPdvId) requestBody.perfilPdvId = data.perfilPdvId
+      if (data.tipoUsuarioPdv) requestBody.tipoUsuarioPdv = data.tipoUsuarioPdv
+      if (data.tipoUsuarioPdv) requestBody.tipoUsuario = data.tipoUsuarioPdv
 
       const response = await this.apiClient.request<any>(
         `/api/v1/pessoas/usuarios-pdv/${id}`,

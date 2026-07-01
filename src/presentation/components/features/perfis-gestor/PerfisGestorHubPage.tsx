@@ -1,9 +1,9 @@
 'use client'
 
 import { useCallback, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { ArrowLeft, Plus } from 'lucide-react'
-import { MeusAppsTopNav } from '@/src/presentation/components/features/meus-apps/components/MeusAppsTopNav'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import {
   PerfisGestorList,
@@ -11,42 +11,18 @@ import {
 } from './PerfisGestorList'
 
 export function PerfisGestorHubPage() {
+  const router = useRouter()
   const { empresa } = useEmpresaMe()
   const perfisListRef = useRef<PerfisGestorListHandle | null>(null)
 
   const nomeEmpresa = empresa?.nomeExibicao ?? ''
 
   const handleVoltar = useCallback(() => {
-    if (typeof window === 'undefined') return
-
-    try {
-      const { opener } = window
-      if (opener && !opener.closed) {
-        opener.focus()
-        window.close()
-        return
-      }
-    } catch {
-      /* opener indisponível */
-    }
-
-    window.open('/meus-apps', '_blank', 'noopener,noreferrer')
-    try {
-      window.close()
-    } catch {
-      /* noop */
-    }
-
-    window.setTimeout(() => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        window.location.assign('/meus-apps')
-      }
-    }, 250)
-  }, [])
+    router.push('/meus-apps')
+  }, [router])
 
   return (
-    <div className="flex h-full min-h-screen min-w-0 flex-col bg-[#fafafa]">
-      <MeusAppsTopNav />
+    <div className="flex min-h-0 w-full flex-col bg-[#fafafa]">
 
       <div className="mx-auto w-full max-w-6xl flex-shrink-0 px-3 pt-4 md:px-8">
         <div className="flex items-center justify-between gap-3">

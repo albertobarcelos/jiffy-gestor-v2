@@ -23,3 +23,6 @@ export type MeusAppsGridCell = MeusAppsFeedItem | { kind: 'promo'; id: string }
 /** Id estável do slot de propaganda no grid (chave React). */
 export const MEUS_APPS_PROMO_SLOT_ID = 'meus-apps-promo-slot'
 
+/** Itens do feed visíveis no grid antes de “Mostrar mais” (5 linhas × 3 colunas, sem contar o slot promo). */
+export const MEUS_APPS_GRID_PREVIEW_LIMIT = 15
+

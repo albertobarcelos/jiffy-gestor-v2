@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import localFont from 'next/font/local'
-import { Toaster } from 'react-hot-toast'
 import { AppRouterCacheProvider } from '@mui/material-nextjs/v15-appRouter'
+import { AppToaster } from '@/src/presentation/components/ui/AppToaster'
 import { ThemeProvider } from '@/src/presentation/providers/ThemeProvider'
 import { QueryProvider } from '@/src/presentation/providers/QueryProvider'
 import { AuthStorageCrossTabSync } from '@/src/presentation/components/auth/AuthStorageCrossTabSync'
@@ -9,7 +9,7 @@ import { EmpresaSessionLostGate } from '@/src/presentation/components/auth/Empre
 import { AuthGuard } from '@/src/presentation/components/auth/AuthGuard'
 import { TabSessionBootstrap } from '@/src/presentation/components/auth/TabSessionBootstrap'
 import { TenantCacheIsolation } from '@/src/presentation/components/auth/TenantCacheIsolation'
-import { DocumentoFiscalPdfRetryModal } from '@/src/presentation/components/features/nfe/DocumentoFiscalPdfRetryModal'
+import { DocumentoFiscalPdfRetryModal } from '@/src/presentation/components/features/fiscal'
 import './globals.css'
 
 /**
@@ -46,30 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 {children}
               </AuthGuard>
               <DocumentoFiscalPdfRetryModal />
-              <Toaster
-                position="top-right"
-                toastOptions={{
-                  duration: 4000,
-                  style: {
-                    background: '#fff',
-                    color: '#333',
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                  },
-                  success: {
-                    iconTheme: {
-                      primary: '#10b981',
-                      secondary: '#fff',
-                    },
-                  },
-                  error: {
-                    iconTheme: {
-                      primary: '#ef4444',
-                      secondary: '#fff',
-                    },
-                  },
-                }}
-              />
+              <AppToaster />
             </ThemeProvider>
           </QueryProvider>
         </AppRouterCacheProvider>

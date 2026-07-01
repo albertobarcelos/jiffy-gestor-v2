@@ -19,7 +19,15 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@/features/kanban": ["./src/presentation/components/features/kanban/index.ts"],
+      "@/features/kanban/*": ["./src/presentation/components/features/kanban/*"],
+      "@/features/pedidos": ["./src/presentation/components/features/pedidos/index.ts"],
+      "@/features/pedidos/*": ["./src/presentation/components/features/pedidos/*"],
+      "@/features/delivery": ["./src/presentation/components/features/delivery/index.ts"],
+      "@/features/delivery/*": ["./src/presentation/components/features/delivery/*"],
+      "@/features/fiscal": ["./src/presentation/components/features/fiscal/index.ts"],
+      "@/features/fiscal/*": ["./src/presentation/components/features/fiscal/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

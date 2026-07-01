@@ -1,6 +1,5 @@
 'use client'
 
-import { Exo_2 } from 'next/font/google'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -30,12 +29,6 @@ import {
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { FaturamentoRangeCalendar } from '@/src/presentation/components/ui/FaturamentoRangeCalendar'
 
-/** Exo 2 (Google) — o token Tailwind `font-exo` aponta para General Sans; aqui usamos a família real */
-const exo2CabecalhoFaturamento = Exo_2({
-  subsets: ['latin', 'latin-ext'],
-  weight: '600',
-  display: 'swap',
-})
 /**
  * Comparativo do período personalizado: mesma janela deslocada N dias corridos para trás
  * (início e fim, preservando horário).
@@ -79,7 +72,7 @@ function periodoV2ParaQueryRelatorios(periodoData: string): string | null {
 }
 /**
  * Nova visão geral do dashboard (layout Figma).
- * Conteúdo abaixo do TopNav — navegação global fica no layout `app/dashboard/layout.tsx`.
+ * Conteúdo abaixo do TopNav — shell global em `app/(erp)/layout.tsx` (ErpAppShell).
  */
 export default function DashboardV2() {
   const router = useRouter()

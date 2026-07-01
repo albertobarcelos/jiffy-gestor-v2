@@ -7,6 +7,20 @@ type ApiErrorResponse = {
   errors?: unknown
 }
 
+/** API_TLS_SKIP_VERIFY no .env.local não altera TLS sozinho — precisa virar NODE_TLS_REJECT_UNAUTHORIZED no processo Node. */
+function deveIgnorarVerificacaoTlsApi(): boolean {
+  return process.env.API_TLS_SKIP_VERIFY?.trim().toLowerCase() === 'true'
+}
+
+function aplicarTlsSkipDevSeConfigurado(): void {
+  if (typeof window !== 'undefined') return
+  if (!deveIgnorarVerificacaoTlsApi()) return
+  if (process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0') return
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+}
+
+aplicarTlsSkipDevSeConfigurado()
+
 function mensagemErroRede(error: unknown): ApiError | null {
   if (!(error instanceof TypeError) || error.message !== 'fetch failed') {
     return null
@@ -90,6 +104,8 @@ export class ApiClient {
       }
     }
 
+    aplicarTlsSkipDevSeConfigurado()
+
     const url = `${this.baseUrl}${endpoint}`
 
     const isFormData =
@@ -138,7 +154,10 @@ export class ApiClient {
           errorData = { message: `Erro ${response.status}: ${response.statusText}` }
         }
         throw new ApiError(
-          errorData.message || errorData.error || 'Erro na requisição',
+          textoErroCorpoApi(errorData as unknown) ||
+            errorData.message ||
+            errorData.error ||
+            'Erro na requisição',
           response.status,
           errorData
         )
@@ -217,46 +236,69 @@ export class ApiError extends Error {
 }
 
 /**
+ * Extrai mensagem útil do corpo JSON de erro (Zod `issues`, Nest `detail`, `errors[]`, etc.).
+ */
+export function textoErroCorpoApi(body: unknown): string | null {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return null
+  }
+
+  const o = body as Record<string, unknown>
+
+  const issues = o.issues
+  if (Array.isArray(issues) && issues.length > 0) {
+    const text = issues
+      .map((issue: unknown) => {
+        if (issue && typeof issue === 'object') {
+          const path = Array.isArray((issue as { path?: unknown }).path)
+            ? (issue as { path: (string | number)[] }).path.join('.')
+            : ''
+          const msg =
+            typeof (issue as { message?: unknown }).message === 'string'
+              ? (issue as { message: string }).message
+              : ''
+          return path ? `${path}: ${msg}` : msg
+        }
+        return String(issue)
+      })
+      .filter(Boolean)
+      .join('; ')
+    if (text) return text
+  }
+
+  const errorsArr = o.errors
+  if (Array.isArray(errorsArr) && errorsArr.length > 0) {
+    const first = errorsArr[0]
+    if (typeof first === 'string') return first
+    if (first && typeof first === 'object' && typeof (first as { message?: unknown }).message === 'string') {
+      const m = (first as { message: string }).message.trim()
+      if (m) return m
+    }
+  }
+
+  const detail = o.detail
+  if (typeof detail === 'string' && detail.trim()) return detail.trim()
+
+  const nestedMsg = o.message
+  if (typeof nestedMsg === 'string' && nestedMsg.trim()) return nestedMsg.trim()
+
+  const errStr = o.error
+  if (typeof errStr === 'string' && errStr.trim()) return errStr.trim()
+
+  return null
+}
+
+/**
  * Extrai texto útil do corpo JSON de erro da API externa (Zod issues, Nest detail, etc.).
  * Evita só "Erro ao criar taxa" sem contexto quando o upstream envia validações em `issues`.
  */
 export function mensagemLegivelApiError(error: ApiError): string {
+  const fromBody = textoErroCorpoApi(error.data)
+  if (fromBody) return fromBody
+
   const data = error.data
   if (data && typeof data === 'object' && !Array.isArray(data)) {
     const o = data as Record<string, unknown>
-
-    const issues = o.issues
-    if (Array.isArray(issues) && issues.length > 0) {
-      const text = issues
-        .map((issue: unknown) => {
-          if (issue && typeof issue === 'object') {
-            const path = Array.isArray((issue as { path?: unknown }).path)
-              ? (issue as { path: (string | number)[] }).path.join('.')
-              : ''
-            const msg =
-              typeof (issue as { message?: unknown }).message === 'string'
-                ? (issue as { message: string }).message
-                : ''
-            return path ? `${path}: ${msg}` : msg
-          }
-          return String(issue)
-        })
-        .filter(Boolean)
-        .join('; ')
-      if (text) return text
-    }
-
-    const detail = o.detail
-    if (typeof detail === 'string' && detail.trim()) return detail
-
-    const nestedMsg = o.message
-    if (
-      typeof nestedMsg === 'string' &&
-      nestedMsg.trim() &&
-      nestedMsg.trim() !== error.message.trim()
-    ) {
-      return nestedMsg
-    }
 
     /** Formato comum do microserviço fiscal (ex.: POST /taxas). */
     const tipoErro = o.type

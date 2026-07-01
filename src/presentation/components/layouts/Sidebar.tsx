@@ -109,6 +109,7 @@ export function Sidebar() {
           { name: 'Grupo Complementos', path: '/grupos-complementos', icon: '📋' },
           { name: 'Complementos', path: '/complementos', icon: '➕' },
           { name: 'Usuários', path: '/usuarios', icon: '👤' },
+          { name: 'Entregadores', path: '/entregadores', icon: '🛵' },
           { name: 'Perfis de Usuários', path: '/perfis-usuarios-pdv', icon: '👥' },
           { name: 'Clientes', path: '/clientes', icon: '👥' },
           { name: 'Impressoras', path: '/impressoras', icon: '🖨️' },

@@ -2,6 +2,21 @@ import { Auth } from '@/src/domain/entities/Auth'
 import { User } from '@/src/domain/entities/User'
 import type { LoginEmpresaSnapshot } from '@/src/domain/types/LoginEmpresaSnapshot'
 import { parseEmpresasLogin } from '@/src/presentation/components/features/auth/utils/parseLoginEmpresas'
+import {
+  mensagemErroRespostaNaoJson,
+  readFetchJson,
+} from '@/src/presentation/components/features/auth/utils/readFetchJson'
+
+type LoginApiPayload = {
+  success?: boolean
+  error?: string
+  data?: {
+    accessToken: string
+    expiresAt: string
+    user: { id: string; email: string; name?: string }
+    empresas?: unknown
+  }
+}
 
 export type LoginViaApiRouteResult =
   | { ok: true; auth: Auth; empresas: LoginEmpresaSnapshot[] | null }
@@ -25,7 +40,15 @@ export async function loginViaApiRoute(
     }),
   })
 
-  const data = await response.json()
+  const { data, parseFailed } = await readFetchJson<LoginApiPayload>(response)
+
+  if (parseFailed) {
+    return {
+      ok: false,
+      error: mensagemErroRespostaNaoJson(response.status),
+      needsEmailConfirmation: false,
+    }
+  }
 
   if (!response.ok || !data.success) {
     const errMsg = typeof data.error === 'string' ? data.error : ''
@@ -41,6 +64,13 @@ export async function loginViaApiRoute(
   }
 
   const authData = data.data
+  if (!authData?.accessToken || !authData.user?.id || !authData.expiresAt) {
+    return {
+      ok: false,
+      error: 'Resposta de login incompleta. Tente novamente.',
+      needsEmailConfirmation: false,
+    }
+  }
 
   const user = User.create(authData.user.id, authData.user.email, authData.user.name)
 

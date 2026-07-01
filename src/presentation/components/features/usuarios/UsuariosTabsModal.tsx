@@ -26,6 +26,8 @@ interface UsuariosTabsModalProps {
   onClose: () => void
   onTabChange: (tab: TabKey) => void
   onReload?: () => void
+  forcedTipoUsuarioPdv?: string
+  entityLabel?: string
 }
 
 export function UsuariosTabsModal({
@@ -33,6 +35,8 @@ export function UsuariosTabsModal({
   onClose,
   onTabChange,
   onReload,
+  forcedTipoUsuarioPdv,
+  entityLabel = 'Usuário',
 }: UsuariosTabsModalProps) {
   const usuarioRef = useRef<NovoUsuarioHandle>(null)
 
@@ -96,8 +100,8 @@ export function UsuariosTabsModal({
   }, [])
 
   const title = useMemo(() => {
-    return state.mode === 'edit' ? 'Editar Usuário' : 'Novo Usuário'
-  }, [state.mode])
+    return state.mode === 'edit' ? `Editar ${entityLabel}` : `Novo ${entityLabel}`
+  }, [entityLabel, state.mode])
 
   const footerActions = useMemo((): JiffySidePanelFooterActions => {
     const saving = embedFormState.isSubmitting
@@ -149,9 +153,10 @@ export function UsuariosTabsModal({
           {state.tab === 'usuario' ? (
             <NovoUsuario
               ref={usuarioRef}
-              key={`usuario-${state.usuarioId ?? 'new'}-${state.mode}-sess-${formSession}`}
+              key={`usuario-${state.usuarioId ?? 'new'}-${state.mode}-${forcedTipoUsuarioPdv ?? 'pdv'}-sess-${formSession}`}
               usuarioId={state.mode === 'edit' ? state.usuarioId : undefined}
               initialPerfilPdvId={state.initialPerfilPdvId}
+              forcedTipoUsuarioPdv={forcedTipoUsuarioPdv}
               isEmbedded
               hideEmbeddedHeader
               embeddedFormId={USUARIOS_TABS_MODAL_FORM_ID}

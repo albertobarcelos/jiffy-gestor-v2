@@ -173,6 +173,86 @@ export function useCliente(id: string) {
 }
 
 /**
+ * Busca clientes por termo de pesquisa (máximo 1 resultado).
+ * Usado para localizar cliente pelo telefone de forma imperativa (via mutate).
+ */
+export function useBuscarClientePorTelefone() {
+  const { auth } = useAuthStore()
+  const token = auth?.getAccessToken()
+
+  return useMutation({
+    mutationFn: async (q: string): Promise<Cliente | null> => {
+      if (!token) throw new Error('Token não encontrado')
+
+      const params = new URLSearchParams({ q, limit: '1', offset: '0' })
+      const response = await fetch(`/api/clientes?${params.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        throw new Error(err.message || `Erro ${response.status}`)
+      }
+
+      const data: ClientesResponse = await response.json()
+      const itens = (data.items || []).map((item: any) => Cliente.fromJSON(item))
+      return itens.length > 0 ? itens[0] : null
+    },
+  })
+}
+
+/**
+ * Cria um cliente rápido com apenas nome e telefone.
+ * Invalida cache de clientes após sucesso.
+ */
+export function useCriarClienteRapido() {
+  const { auth } = useAuthStore()
+  const queryClient = useQueryClient()
+  const token = auth?.getAccessToken()
+
+  return useMutation({
+    mutationFn: async ({
+      nome,
+      telefone,
+    }: {
+      nome: string
+      telefone: string
+    }): Promise<Cliente> => {
+      if (!token) throw new Error('Token não encontrado')
+
+      const response = await fetch('/api/clientes', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          nome,
+          telefone: telefone.replace(/\D/g, ''),
+        }),
+      })
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        throw new Error(err.error || err.message || `Erro ${response.status}`)
+      }
+
+      const data = await response.json()
+      return Cliente.fromJSON(data)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clientes'] })
+    },
+    onError: (error: Error) => {
+      showToast.error(error.message || 'Erro ao criar cliente')
+    },
+  })
+}
+
+/**
  * Hook para criar/atualizar cliente com Optimistic Updates
  */
 export function useClienteMutation() {

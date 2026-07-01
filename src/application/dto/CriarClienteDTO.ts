@@ -8,7 +8,14 @@ export const CriarClienteSchema = z.object({
   razaoSocial: z.string().optional(),
   cpf: z.string().optional(),
   cnpj: z.string().optional(),
-  telefone: z.string().optional(),
+  telefone: z
+    .string()
+    .optional()
+    .transform(v => {
+      if (v == null || v === '') return undefined
+      const digitos = v.replace(/\D/g, '')
+      return digitos.length > 0 ? digitos : undefined
+    }),
   email: z.string().email('Email inválido').optional().or(z.literal('')),
   nomeFantasia: z.string().optional(),
   /** Indicador da IE (ex.: SPED — string "1", "2", "9") */

@@ -7,6 +7,7 @@ import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 type TaxasQueryParams = {
   q?: string
   limit?: number
+  enabled?: boolean
 }
 
 type TaxasResponse = {
@@ -22,8 +23,10 @@ export function useTaxasInfinite(params: TaxasQueryParams = {}) {
   const token = auth?.getAccessToken()
   const empresaId = useTenantEmpresaId()
 
+  const { enabled = true, ...queryParams } = params
+
   return useInfiniteQuery({
-    queryKey: ['taxas', 'infinite', params, empresaId],
+    queryKey: ['taxas', 'infinite', queryParams, empresaId],
     queryFn: async ({
       pageParam = 0,
     }): Promise<{ taxas: Taxa[]; count: number; nextOffset: number | null }> => {
@@ -31,9 +34,9 @@ export function useTaxasInfinite(params: TaxasQueryParams = {}) {
         throw new Error('Token não encontrado')
       }
 
-      const limit = params.limit || 10
+      const limit = queryParams.limit || 10
       const searchParams = new URLSearchParams()
-      if (params.q) searchParams.append('q', params.q)
+      if (queryParams.q) searchParams.append('q', queryParams.q)
       searchParams.append('limit', limit.toString())
       searchParams.append('offset', pageParam.toString())
 
@@ -65,7 +68,7 @@ export function useTaxasInfinite(params: TaxasQueryParams = {}) {
         nextOffset,
       }
     },
-    enabled: !!token,
+    enabled: enabled && !!token,
     initialPageParam: 0,
     getNextPageParam: lastPage => lastPage.nextOffset,
     staleTime: 1000 * 60 * 5,
