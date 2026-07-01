@@ -8,6 +8,7 @@ import { getTokenInfo } from '@/src/shared/utils/getTokenInfo'
 interface BulkUpdateResponse {
   totalUpdated?: number
   produtosIds?: string[]
+  falhas?: Array<{ produtoId: string; message: string }>
 }
 
 /**
@@ -22,6 +23,20 @@ interface BulkUpdateResponse {
  *   impressorasIdsToRemove?: string[];
  *   gruposComplementosIds?: string[];
  *   gruposComplementosIdsToRemove?: string[];
+ *   favorito?: boolean;
+ *   permiteDesconto?: boolean;
+ *   permiteAcrescimo?: boolean;
+ *   permiteAlterarPreco?: boolean;
+ *   incideTaxa?: boolean;
+ *   abreComplementos?: boolean;
+ *   ncm?: string | null;
+ *   fiscal?: {
+ *     ncm?: string | null;
+ *     cest?: string | null;
+ *     origemMercadoria?: number | null;
+ *     tipoProduto?: string | null;
+ *     indicadorProducaoEscala?: string | null;
+ *   };
  * }>
  */
 export async function POST(req: NextRequest) {
@@ -73,13 +88,39 @@ export async function POST(req: NextRequest) {
         item.impressorasIds !== undefined ||
         item.impressorasIdsToRemove !== undefined ||
         item.gruposComplementosIds !== undefined ||
-        item.gruposComplementosIdsToRemove !== undefined
+        item.gruposComplementosIdsToRemove !== undefined ||
+        item.favorito !== undefined ||
+        item.permiteDesconto !== undefined ||
+        item.permiteAcrescimo !== undefined ||
+        item.permiteAlterarPreco !== undefined ||
+        item.incideTaxa !== undefined ||
+        item.abreComplementos !== undefined ||
+        item.ncm !== undefined ||
+        item.fiscal !== undefined
 
       if (!hasUpdate) {
         return NextResponse.json(
           { message: `Item ${i + 1}: deve ter pelo menos um campo de atualização` },
           { status: 400 }
         )
+      }
+
+      const permissoesBooleanFields = [
+        'favorito',
+        'permiteDesconto',
+        'permiteAcrescimo',
+        'permiteAlterarPreco',
+        'incideTaxa',
+        'abreComplementos',
+      ] as const
+
+      for (const field of permissoesBooleanFields) {
+        if (item[field] !== undefined && typeof item[field] !== 'boolean') {
+          return NextResponse.json(
+            { message: `Item ${i + 1}: ${field} deve ser boolean` },
+            { status: 400 }
+          )
+        }
       }
 
       // Valida tipos dos campos opcionais
@@ -117,6 +158,52 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         )
       }
+
+      if (item.ncm !== undefined && item.ncm !== null && typeof item.ncm !== 'string') {
+        return NextResponse.json(
+          { message: `Item ${i + 1}: ncm deve ser string ou null` },
+          { status: 400 }
+        )
+      }
+
+      if (item.fiscal !== undefined) {
+        if (typeof item.fiscal !== 'object' || item.fiscal === null || Array.isArray(item.fiscal)) {
+          return NextResponse.json(
+            { message: `Item ${i + 1}: fiscal deve ser um objeto` },
+            { status: 400 }
+          )
+        }
+
+        const fiscalFields = [
+          'ncm',
+          'cest',
+          'origemMercadoria',
+          'tipoProduto',
+          'indicadorProducaoEscala',
+        ] as const
+
+        for (const field of fiscalFields) {
+          const value = item.fiscal[field]
+          if (value === undefined) continue
+
+          if (field === 'origemMercadoria') {
+            if (value !== null && typeof value !== 'number') {
+              return NextResponse.json(
+                { message: `Item ${i + 1}: fiscal.origemMercadoria deve ser número ou null` },
+                { status: 400 }
+              )
+            }
+            continue
+          }
+
+          if (value !== null && typeof value !== 'string') {
+            return NextResponse.json(
+              { message: `Item ${i + 1}: fiscal.${field} deve ser string ou null` },
+              { status: 400 }
+            )
+          }
+        }
+      }
     }
 
     // Chama API externa
@@ -133,8 +220,9 @@ export async function POST(req: NextRequest) {
     // Retorna resposta
     return NextResponse.json({
       success: true,
-      totalUpdated: data.totalUpdated || body.length,
-      produtosIds: data.produtosIds || body.map((item: any) => item.produtoId),
+      totalUpdated: data.totalUpdated ?? body.length,
+      produtosIds: data.produtosIds ?? body.map((item: { produtoId: string }) => item.produtoId),
+      ...(data.falhas?.length ? { falhas: data.falhas } : {}),
     })
   } catch (error: any) {
     console.error('Erro na API de bulk-update de produtos:', error)

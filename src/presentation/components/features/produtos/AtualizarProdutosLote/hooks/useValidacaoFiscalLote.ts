@@ -6,12 +6,14 @@ import type {
   CestPorNcmItem,
   CestValidationResult,
   FiscalLoteDraft,
+  ModoFiscalLote,
   NcmValidationResult,
   TabPainelLote,
 } from '../types'
 
 interface UseValidacaoFiscalLoteParams {
   activeTab: TabPainelLote
+  modoFiscal: ModoFiscalLote
   fiscalLoteDraft: FiscalLoteDraft
   setFiscalLoteDraft: React.Dispatch<React.SetStateAction<FiscalLoteDraft>>
 }
@@ -22,6 +24,7 @@ interface UseValidacaoFiscalLoteParams {
  */
 export function useValidacaoFiscalLote({
   activeTab,
+  modoFiscal,
   fiscalLoteDraft,
   setFiscalLoteDraft,
 }: UseValidacaoFiscalLoteParams) {
@@ -40,7 +43,7 @@ export function useValidacaoFiscalLote({
 
   // Validação NCM (debounce 600ms)
   useEffect(() => {
-    if (activeTab !== 'fiscal') return
+    if (activeTab !== 'fiscal' || modoFiscal !== 'editar') return
 
     if (ncmValidationTimerRef.current) {
       clearTimeout(ncmValidationTimerRef.current)
@@ -118,11 +121,11 @@ export function useValidacaoFiscalLote({
         clearTimeout(ncmValidationTimerRef.current)
       }
     }
-  }, [fiscalLoteDraft.ncm, auth, activeTab])
+  }, [fiscalLoteDraft.ncm, auth, activeTab, modoFiscal])
 
   // Lista de CESTs compatíveis com o NCM validado
   useEffect(() => {
-    if (activeTab !== 'fiscal') return
+    if (activeTab !== 'fiscal' || modoFiscal !== 'editar') return
 
     const ncmTrimmed = fiscalLoteDraft.ncm.trim()
 
@@ -182,11 +185,11 @@ export function useValidacaoFiscalLote({
     }
 
     void fetchCests()
-  }, [ncmValidation, fiscalLoteDraft.ncm, auth, activeTab])
+  }, [ncmValidation, fiscalLoteDraft.ncm, auth, activeTab, modoFiscal])
 
   // Validação CEST (debounce 400ms)
   useEffect(() => {
-    if (activeTab !== 'fiscal') return
+    if (activeTab !== 'fiscal' || modoFiscal !== 'editar') return
 
     const cestTrimmed = fiscalLoteDraft.cest.trim()
     const ncmTrimmed = fiscalLoteDraft.ncm.trim()
@@ -284,18 +287,18 @@ export function useValidacaoFiscalLote({
       clearTimeout(timer)
       abortController.abort()
     }
-  }, [fiscalLoteDraft.cest, fiscalLoteDraft.ncm, ncmValidation, cestsDisponiveis, auth, activeTab])
+  }, [fiscalLoteDraft.cest, fiscalLoteDraft.ncm, ncmValidation, cestsDisponiveis, auth, activeTab, modoFiscal])
 
   // Com CEST preenchido, sugere indicador de escala (só reage ao CEST)
   useEffect(() => {
-    if (activeTab !== 'fiscal') return
+    if (activeTab !== 'fiscal' || modoFiscal !== 'editar') return
     setFiscalLoteDraft((d) => {
       if (d.cest.trim() !== '' && !d.indicadorProducaoEscala) {
         return { ...d, indicadorProducaoEscala: '1' }
       }
       return d
     })
-  }, [fiscalLoteDraft.cest, activeTab, setFiscalLoteDraft])
+  }, [fiscalLoteDraft.cest, activeTab, modoFiscal, setFiscalLoteDraft])
 
   const isNcmInvalidFiscal = ncmValidation != null && !ncmValidation.valido
   const isCestInvalidFiscal = cestValidation != null && !cestValidation.valido

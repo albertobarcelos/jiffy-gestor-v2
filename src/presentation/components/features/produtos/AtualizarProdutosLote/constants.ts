@@ -1,5 +1,11 @@
 import type { SxProps, Theme } from '@mui/material/styles'
-import type { FiltroColunaVazia, FiscalLoteDraft, PermissaoCampoChave, TabPainelLote } from './types'
+import type {
+  FiltroColunaVazia,
+  FiscalCampoChave,
+  FiscalLoteDraft,
+  PermissaoCampoChave,
+  TabPainelLote,
+} from './types'
 
 /** Título da página por aba ativa. */
 export const TITULO_ABA_LOTE: Record<TabPainelLote, string> = {
@@ -46,6 +52,15 @@ export const sxCheckboxListaLote: SxProps<Theme> = {
     fontSize: '1.125rem',
   },
 }
+
+/** Campos fiscais exibidos no modo "Limpar campos selecionados". */
+export const CAMPOS_FISCAL_LOTE: { chave: FiscalCampoChave; label: string }[] = [
+  { chave: 'ncm', label: 'NCM' },
+  { chave: 'cest', label: 'CEST' },
+  { chave: 'origemMercadoria', label: 'Origem da Mercadoria' },
+  { chave: 'tipoProduto', label: 'Tipo do Produto' },
+  { chave: 'indicadorProducaoEscala', label: 'Indicador Produção em Escala' },
+]
 
 export const FISCAL_LOTE_VAZIO: FiscalLoteDraft = {
   ncm: '',

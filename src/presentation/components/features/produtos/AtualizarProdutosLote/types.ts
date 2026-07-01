@@ -21,6 +21,26 @@ export type FiltroColunaVazia =
 /** Abas do painel de lote — usado para guardar destaque de linhas alteradas por aba. */
 export type TabPainelLote = 'precos' | 'impressoras' | 'gruposComplementos' | 'permissoes' | 'fiscal'
 
+/** Modo da aba fiscal: preencher valores ou limpar campos selecionados. */
+export type ModoFiscalLote = 'editar' | 'limpar'
+
+/** Chaves dos campos fiscais disponíveis para limpeza em lote. */
+export type FiscalCampoChave =
+  | 'ncm'
+  | 'cest'
+  | 'origemMercadoria'
+  | 'tipoProduto'
+  | 'indicadorProducaoEscala'
+
+/** Identificadores das colunas fiscais na grid (edição inline). */
+export type FiscalColunaGridId = 'ncm' | 'cest' | 'origem' | 'tipo' | 'indicador'
+
+/** Célula fiscal em edição inline (uma por vez). */
+export type CelulaFiscalAtiva = {
+  produtoId: string
+  coluna: FiscalColunaGridId
+}
+
 /** Rascunho fiscal aplicado em lote (PATCH parcial, objeto `fiscal` + `ncm` legado). */
 export type FiscalLoteDraft = {
   ncm: string

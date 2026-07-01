@@ -6,7 +6,10 @@ import { ProdutoActionIconsDisplay } from '@/src/presentation/components/feature
 import { MdExpandMore, MdExpandLess } from 'react-icons/md'
 import type { Produto } from '@/src/domain/entities/Produto'
 import type { TabPainelLote } from '../types'
+import type { FiscalInlineEditApi } from '../hooks/useFiscalInlineEdit'
 import { textoOuNenhum } from '../utils/produtosLoteUi'
+import { LAYOUT_GRID_FISCAL } from '../utils/fiscalLoteDisplay'
+import { LoteFiscalColunasProduto, LoteFiscalDetalhesMobile } from './LoteFiscalColunasProduto'
 
 export interface LoteProdutoRowProps {
   produto: Produto
@@ -17,6 +20,7 @@ export interface LoteProdutoRowProps {
   isExpanded: boolean
   onToggleSelecao: (produtoId: string) => void
   onToggleExpansao: (produtoId: string) => void
+  fiscalInline: FiscalInlineEditApi
 }
 
 function SelectRelacionados({
@@ -62,6 +66,7 @@ export function LoteProdutoRow({
   isExpanded,
   onToggleSelecao,
   onToggleExpansao,
+  fiscalInline,
 }: LoteProdutoRowProps) {
   const impressorasDoProduto = produto.getImpressoras()
   const gruposComplementosDoProduto = produto.getGruposComplementos()
@@ -82,7 +87,7 @@ export function LoteProdutoRow({
   return (
     <div className="flex flex-col">
       <div
-        className={`flex rounded-lg items-center md:px-4 px-2 gap-2 ${bgColor} hover:bg-primary-bg transition-colors cursor-default`}
+        className={`flex items-center md:px-4 px-2 ${activeTab === 'fiscal' ? 'gap-1.5' : 'gap-2'} ${bgColor} hover:bg-primary-bg transition-colors cursor-default`}
         style={{ minHeight: '36px' }}
       >
         <div className="flex-none md:w-10 w-6 flex justify-center">
@@ -94,11 +99,28 @@ export function LoteProdutoRow({
             className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
           />
         </div>
-        <div className="flex-1 md:w-24 font-mono text-xs text-secondary-text">
+        <div
+          className={`font-mono text-xs text-secondary-text ${
+            activeTab === 'fiscal'
+              ? `${LAYOUT_GRID_FISCAL.codigo} text-center truncate`
+              : 'flex-1 md:w-24'
+          }`}
+          title={String(produto.getCodigoProduto() ?? '')}
+        >
           {textoOuNenhum(String(produto.getCodigoProduto() ?? ''))}
         </div>
-        <div className="md:flex-[1.5] flex-[2] min-w-0 md:pr-4">
-          <p className="break-words text-xs font-normal text-primary-text md:text-sm">
+        <div
+          className={`min-w-0 ${
+            activeTab === 'fiscal'
+              ? `${LAYOUT_GRID_FISCAL.nome} md:pr-2`
+              : 'md:flex-[1.5] flex-[2] md:pr-4'
+          }`}
+        >
+          <p
+            className={`break-words text-xs font-normal text-primary-text ${
+              activeTab === 'fiscal' ? 'md:text-xs line-clamp-2' : 'md:text-sm'
+            }`}
+          >
             {produto.getNome()}
           </p>
           {activeTab === 'permissoes' ? <ProdutoActionIconsDisplay produto={produto} /> : null}
@@ -122,13 +144,15 @@ export function LoteProdutoRow({
           </div>
         ) : null}
         {activeTab === 'fiscal' ? (
-          <div className="hidden md:flex w-[80px] shrink-0 justify-center font-mono text-[11px] text-primary-text px-0.5">
-            <span className="truncate" title={produto.getNcm() || undefined}>
-              {textoOuNenhum(produto.getNcm())}
-            </span>
-          </div>
+          <LoteFiscalColunasProduto produto={produto} fiscalInline={fiscalInline} />
         ) : null}
-        <div className="flex-1 text-right font-normal md:text-sm text-xs text-primary-text">
+        <div
+          className={`text-right font-normal text-primary-text ${
+            activeTab === 'fiscal'
+              ? `${LAYOUT_GRID_FISCAL.valor} text-xs whitespace-nowrap`
+              : 'flex-1 md:text-sm text-xs'
+          }`}
+        >
           {transformarParaReal(produto.getValor())}
         </div>
         {mostrarExpansaoMobile && (
@@ -190,12 +214,7 @@ export function LoteProdutoRow({
             foiAlteradoNaSessao ? 'bg-primary-bg' : 'bg-gray-50'
           }`}
         >
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-secondary-text">NCM</label>
-            <span className="font-mono text-xs text-primary-text">
-              {textoOuNenhum(produto.getNcm())}
-            </span>
-          </div>
+          <LoteFiscalDetalhesMobile produto={produto} fiscalInline={fiscalInline} />
         </div>
       )}
     </div>

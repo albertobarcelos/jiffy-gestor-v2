@@ -119,19 +119,27 @@ export function LotePainelAcoes({
     case 'fiscal':
       return (
         <LotePainelFiscal
+          modoFiscal={fiscalLote.modoFiscal}
+          setModoFiscal={fiscalLote.setModoFiscal}
           fiscalLoteDraft={fiscalLote.fiscalLoteDraft}
           setFiscalLoteDraft={fiscalLote.setFiscalLoteDraft}
+          fiscalCamposLimparSelecionados={fiscalLote.fiscalCamposLimparSelecionados}
+          todasFiscaisLimparSelecionadas={fiscalLote.todasFiscaisLimparSelecionadas}
+          onToggleFiscalCampoLimpar={fiscalLote.toggleFiscalCampoLimpar}
+          onToggleSelecionarTodasLimpar={fiscalLote.handleToggleSelecionarTodasFiscalLimpar}
+          podeAplicarEditar={fiscalLote.podeAplicarEditar}
+          podeAplicarLimpar={fiscalLote.podeAplicarLimpar}
           ncmValidation={fiscalLote.ncmValidation}
           isValidatingNcm={fiscalLote.isValidatingNcm}
           cestsDisponiveis={fiscalLote.cestsDisponiveis}
           isLoadingCests={fiscalLote.isLoadingCests}
           cestValidation={fiscalLote.cestValidation}
           isValidatingCest={fiscalLote.isValidatingCest}
-          isNcmInvalidFiscal={fiscalLote.isNcmInvalidFiscal}
-          isCestInvalidFiscal={fiscalLote.isCestInvalidFiscal}
           isNcmValidFiscal={fiscalLote.isNcmValidFiscal}
           hasCestsDisponiveisFiscal={fiscalLote.hasCestsDisponiveisFiscal}
           onAplicar={fiscalLote.aplicarFiscalEmLote}
+          onLimparInputs={fiscalLote.limparInputsFormulario}
+          formularioFiscalTemConteudo={fiscalLote.formularioFiscalTemConteudo}
           {...busy}
         />
       )

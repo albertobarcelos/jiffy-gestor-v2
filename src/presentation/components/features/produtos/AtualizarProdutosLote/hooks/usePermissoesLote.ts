@@ -6,7 +6,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { CAMPOS_PERMISSAO_PDV } from '../constants'
 import { montarBodyPermissoesParcial } from '../rules/permissoesLote.rules'
 import type { PermissaoCampoChave } from '../types'
-import { patchProdutoLote } from '../utils/produtosLoteMutations'
+import { bulkUpdateProdutosLote } from '../utils/produtosLoteMutations'
 
 export interface UsePermissoesLoteParams {
   produtosSelecionados: Set<string>
@@ -27,10 +27,6 @@ export function usePermissoesLote({
     Set<PermissaoCampoChave>
   >(new Set())
   const [isSalvandoPermissoes, setIsSalvandoPermissoes] = useState(false)
-  const [salvandoPermissoesProgresso, setSalvandoPermissoesProgresso] = useState<{
-    atual: number
-    total: number
-  } | null>(null)
 
   const limparSelecaoPermissoes = useCallback(() => {
     setPermissoesCamposSelecionados(new Set())
@@ -67,7 +63,7 @@ export function usePermissoesLote({
     limparSelecaoPermissoes()
   }, [limparSelecaoPermissoes])
 
-  /** PATCH sequencial por produto (sem bulk-update); mesmo contrato que NovoProduto em edição. */
+  /** POST bulk-update com campos parciais de permissões PDV (1 request). */
   const vincularPermissoesEmLote = useCallback(async () => {
     if (produtosSelecionados.size === 0) {
       showToast.error('Selecione pelo menos um produto')
@@ -85,52 +81,34 @@ export function usePermissoesLote({
     }
 
     const ids = Array.from(produtosSelecionados)
-    const total = ids.length
     const valorAlvo = modoPermissao === 'ativar'
-    const body = montarBodyPermissoesParcial(permissoesCamposSelecionados, valorAlvo)
+    const permissoesParciais = montarBodyPermissoesParcial(
+      permissoesCamposSelecionados,
+      valorAlvo
+    )
+    const payload = ids.map((produtoId) => ({
+      produtoId,
+      ...permissoesParciais,
+    }))
 
     setIsSalvandoPermissoes(true)
-    setSalvandoPermissoesProgresso({ atual: 0, total })
-
-    let sucesso = 0
-    let falhas = 0
-    const idsPermissaoComSucesso: string[] = []
+    showToast.loading('Salvando permissões...')
 
     try {
-      for (let i = 0; i < ids.length; i++) {
-        const produtoId = ids[i]
-        setSalvandoPermissoesProgresso({ atual: i + 1, total })
+      await bulkUpdateProdutosLote(token, payload)
 
-        try {
-          await patchProdutoLote(token, produtoId, body)
-          sucesso += 1
-          idsPermissaoComSucesso.push(produtoId)
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : `Erro desconhecido`
-          console.error(`Permissões produto ${produtoId}:`, msg)
-          falhas += 1
-        }
-      }
-
-      marcarProdutosAlteradosNaSessao(idsPermissaoComSucesso, 'permissoes')
+      marcarProdutosAlteradosNaSessao(ids, 'permissoes')
       await buscarProdutos()
       limparSelecaoProdutos()
 
-      if (falhas === 0) {
-        const acao = modoPermissao === 'ativar' ? 'ativadas' : 'desativadas'
-        showToast.success(`Permissões ${acao} com sucesso! (${sucesso} produto(s))`)
-      } else {
-        showToast.warning(
-          `${sucesso} atualizado(s) com sucesso. ${falhas} falhou(ram). Verifique o console para detalhes.`
-        )
-      }
+      const acao = modoPermissao === 'ativar' ? 'ativadas' : 'desativadas'
+      showToast.success(`Permissões ${acao} com sucesso! (${ids.length} produto(s))`)
     } catch (error: unknown) {
       console.error('Erro ao vincular permissões em lote', error)
       const message = error instanceof Error ? error.message : 'Erro ao vincular permissões'
       showToast.error(message)
     } finally {
       setIsSalvandoPermissoes(false)
-      setSalvandoPermissoesProgresso(null)
     }
   }, [
     auth,
@@ -149,7 +127,7 @@ export function usePermissoesLote({
       permissoesCamposSelecionados,
       setPermissoesCamposSelecionados,
       isSalvandoPermissoes,
-      salvandoPermissoesProgresso,
+      salvandoPermissoesProgresso: null as { atual: number; total: number } | null,
       togglePermissaoCampo,
       todasPermissoesSelecionadas,
       handleToggleSelecionarTodasPermissoes,
@@ -164,7 +142,6 @@ export function usePermissoesLote({
       modoPermissao,
       permissoesCamposSelecionados,
       resetAoEntrarNaAba,
-      salvandoPermissoesProgresso,
       togglePermissaoCampo,
       todasPermissoesSelecionadas,
       vincularPermissoesEmLote,

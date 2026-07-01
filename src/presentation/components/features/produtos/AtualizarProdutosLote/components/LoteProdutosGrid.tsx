@@ -6,7 +6,9 @@ import { Checkbox } from '@/src/presentation/components/ui/checkbox'
 import type { Produto } from '@/src/domain/entities/Produto'
 import { FILTRO_COLUNA_TODOS, LABEL_FILTRO_COLUNA } from '../constants'
 import type { FiltroColunaVazia, TabPainelLote } from '../types'
+import type { FiscalInlineEditApi } from '../hooks/useFiscalInlineEdit'
 import { LoteProdutoRow } from './LoteProdutoRow'
+import { COLUNAS_FISCAL_GRID, LAYOUT_GRID_FISCAL } from '../utils/fiscalLoteDisplay'
 
 export interface LoteProdutosGridProps {
   listaAreaRef: RefObject<HTMLDivElement | null>
@@ -26,6 +28,7 @@ export interface LoteProdutosGridProps {
   onToggleSelecionarTodos: (checked: boolean) => void
   onToggleSelecao: (produtoId: string) => void
   onToggleExpansao: (produtoId: string) => void
+  fiscalInline: FiscalInlineEditApi
 }
 
 export function LoteProdutosGrid({
@@ -46,6 +49,7 @@ export function LoteProdutosGrid({
   onToggleSelecionarTodos,
   onToggleSelecao,
   onToggleExpansao,
+  fiscalInline,
 }: LoteProdutosGridProps) {
   return (
     <div ref={listaAreaRef} className="py-2">
@@ -66,8 +70,13 @@ export function LoteProdutosGrid({
           </p>
         </div>
       ) : (
-        <div className="bg-info rounded-lg overflow-hidden">
-          <div className="flex items-center h-11 gap-2 md:px-4 px-2 text-xs font-semibold text-primary-text uppercase tracking-wide bg-custom-2">
+        <div className={`bg-info rounded-lg overflow-hidden ${activeTab === 'fiscal' ? 'overflow-x-auto' : ''}`}>
+          <div className={activeTab === 'fiscal' ? LAYOUT_GRID_FISCAL.minWidth : undefined}>
+            <div
+              className={`flex items-center h-11 md:px-4 px-2 text-xs font-semibold text-primary-text uppercase tracking-wide bg-custom-2 ${
+                activeTab === 'fiscal' ? 'gap-1.5' : 'gap-2'
+              }`}
+            >
             <div className="flex-none md:w-10 w-6 flex justify-center">
               <Checkbox
                 checked={todosSelecionados}
@@ -76,23 +85,52 @@ export function LoteProdutosGrid({
                 className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
               />
             </div>
-            <div className="flex-1 md:w-14 text-xs">Código</div>
-            <div className="flex-[1.5] text-xs">Nome</div>
+            <div
+              className={`text-xs ${
+                activeTab === 'fiscal'
+                  ? `${LAYOUT_GRID_FISCAL.codigo} text-center`
+                  : 'flex-1 md:w-14'
+              }`}
+            >
+              Código
+            </div>
+            <div
+              className={`text-xs ${
+                activeTab === 'fiscal' ? `${LAYOUT_GRID_FISCAL.nome} min-w-0` : 'flex-[1.5]'
+              }`}
+            >
+              Nome
+            </div>
             {activeTab === 'impressoras' ? (
               <div className="flex-[1.2] text-center hidden md:flex">Impressoras</div>
             ) : null}
             {activeTab === 'gruposComplementos' ? (
               <div className="flex-[1.2] text-center hidden md:flex">Grupos Complementos</div>
             ) : null}
-            {activeTab === 'fiscal' ? (
-              <div className="hidden md:flex w-[80px] shrink-0 text-center text-xs leading-tight">
-                NCM
+            {activeTab === 'fiscal'
+              ? COLUNAS_FISCAL_GRID.map((col) => (
+                  <div
+                    key={col.id}
+                    className={`hidden md:flex shrink-0 ${col.className} ${
+                      col.align === 'left' ? 'text-left' : 'text-center'
+                    } text-xs leading-tight px-0.5`}
+                  >
+                    {col.label}
+                  </div>
+                ))
+              : null}
+            {activeTab !== 'fiscal' ? (
+              <div className="md:flex-1 text-right text-xs">Valor atual</div>
+            ) : (
+              <div
+                className={`hidden md:block text-right text-xs ${LAYOUT_GRID_FISCAL.valor}`}
+              >
+                Valor atual
               </div>
-            ) : null}
-            <div className="md:flex-1 text-right text-xs">Valor atual</div>
-          </div>
+            )}
+            </div>
 
-          <div className="flex flex-col gap-2 mt-2">
+            <div className="flex flex-col gap-2 mt-2">
             {produtosExibicao
               .slice()
               .sort((a, b) => a.getNome().localeCompare(b.getNome(), 'pt-BR'))
@@ -107,6 +145,7 @@ export function LoteProdutosGrid({
                   isExpanded={produtosExpandidos.has(produto.getId())}
                   onToggleSelecao={onToggleSelecao}
                   onToggleExpansao={onToggleExpansao}
+                  fiscalInline={fiscalInline}
                 />
               ))}
             {hasMoreProdutos ? (
@@ -117,6 +156,7 @@ export function LoteProdutosGrid({
                 <JiffyLoading />
               </div>
             ) : null}
+            </div>
           </div>
         </div>
       )}

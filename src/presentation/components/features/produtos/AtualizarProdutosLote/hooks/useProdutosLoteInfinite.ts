@@ -13,9 +13,14 @@ import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { PRODUTOS_LOTE_PAGE_SIZE } from '../constants'
 import type { ProdutosLoteFilterState } from '../types'
 import { fetchProdutosLotePage } from '../utils/produtosLoteApi'
+import {
+  applyFiscalPatchToProdutosLoteInfinite,
+  type ProdutosLoteInfinitePage,
+} from '../utils/produtosLoteCache'
 import { findScrollableAncestor } from '../utils/produtosLoteUi'
+import type { FiscalColunaGridId } from '../types'
 
-export type ProdutosLotePage = { list: Produto[]; count: number | null }
+export type ProdutosLotePage = ProdutosLoteInfinitePage
 
 const DEBOUNCE_MS = 500
 
@@ -182,6 +187,16 @@ export function useProdutosLoteInfinite(filters: ProdutosLoteFilterState) {
     await refetch()
   }, [queryClient, queryKey, refetch])
 
+  /** Atualiza um campo fiscal no cache (edição inline, sem refetch). */
+  const atualizarProdutoFiscalLocal = useCallback(
+    (produtoId: string, coluna: FiscalColunaGridId, valorNormalizado: string | null) => {
+      queryClient.setQueryData<InfiniteData<ProdutosLotePage>>(queryKey, (old) =>
+        applyFiscalPatchToProdutosLoteInfinite(old, produtoId, coluna, valorNormalizado)
+      )
+    },
+    [queryClient, queryKey]
+  )
+
   return {
     produtos,
     total,
@@ -189,6 +204,7 @@ export function useProdutosLoteInfinite(filters: ProdutosLoteFilterState) {
     isLoadingMore,
     hasMoreProdutos,
     buscarProdutos,
+    atualizarProdutoFiscalLocal,
     carregarMaisProdutos,
     listaAreaRef,
     loadMoreSentinelRef,

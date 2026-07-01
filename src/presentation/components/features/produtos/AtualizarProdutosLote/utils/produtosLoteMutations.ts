@@ -6,12 +6,33 @@ export type BulkUpdateProdutoPayloadItem = {
   impressorasIdsToRemove?: string[]
   gruposComplementosIds?: string[]
   gruposComplementosIdsToRemove?: string[]
+  favorito?: boolean
+  permiteDesconto?: boolean
+  permiteAcrescimo?: boolean
+  permiteAlterarPreco?: boolean
+  incideTaxa?: boolean
+  abreComplementos?: boolean
+  ncm?: string | null
+  fiscal?: {
+    ncm?: string | null
+    cest?: string | null
+    origemMercadoria?: number | null
+    tipoProduto?: string | null
+    indicadorProducaoEscala?: string | null
+  }
+}
+
+export type BulkUpdateProdutosLoteResponse = {
+  success?: boolean
+  totalUpdated?: number
+  produtosIds?: string[]
+  falhas?: Array<{ produtoId: string; message: string }>
 }
 
 export async function bulkUpdateProdutosLote(
   token: string,
   payload: BulkUpdateProdutoPayloadItem[]
-): Promise<void> {
+): Promise<BulkUpdateProdutosLoteResponse> {
   const response = await fetch('/api/produtos/bulk-update', {
     method: 'POST',
     headers: {
@@ -21,14 +42,19 @@ export async function bulkUpdateProdutosLote(
     body: JSON.stringify(payload),
   })
 
+  const data = (await response.json().catch(() => ({}))) as BulkUpdateProdutosLoteResponse & {
+    message?: string
+  }
+
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
     const message =
-      typeof errorData.message === 'string' && errorData.message.trim() !== ''
-        ? errorData.message
+      typeof data.message === 'string' && data.message.trim() !== ''
+        ? data.message
         : `Erro ${response.status}`
     throw new Error(message)
   }
+
+  return data
 }
 
 export async function patchProdutoLote(

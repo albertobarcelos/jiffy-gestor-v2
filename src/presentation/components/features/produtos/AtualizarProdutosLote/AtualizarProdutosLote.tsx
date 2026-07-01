@@ -12,6 +12,7 @@ import { useImpressorasLote } from './hooks/useImpressorasLote'
 import { useGruposComplementosLote } from './hooks/useGruposComplementosLote'
 import { usePermissoesLote } from './hooks/usePermissoesLote'
 import { useFiscalLote } from './hooks/useFiscalLote'
+import { useFiscalInlineEdit } from './hooks/useFiscalInlineEdit'
 import { useLoteTabNavigation } from './hooks/useLoteTabNavigation'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
@@ -54,6 +55,7 @@ export function AtualizarProdutosLote() {
     isLoadingMore,
     hasMoreProdutos,
     buscarProdutos,
+    atualizarProdutoFiscalLocal,
     listaAreaRef,
     loadMoreSentinelRef,
   } = useProdutosLoteInfinite(produtosLoteFilters)
@@ -118,10 +120,18 @@ export function AtualizarProdutosLote() {
 
   const fiscalLote = useFiscalLote({
     activeTab,
+    produtos,
     produtosSelecionados,
     limparSelecaoProdutos,
     marcarProdutosAlteradosNaSessao,
     buscarProdutos,
+  })
+
+  const fiscalInline = useFiscalInlineEdit({
+    activeTab,
+    produtos,
+    marcarProdutosAlteradosNaSessao,
+    atualizarProdutoFiscalLocal,
   })
 
   useEffect(() => {
@@ -220,6 +230,7 @@ export function AtualizarProdutosLote() {
         onToggleSelecionarTodos={handleToggleSelecionarTodos}
         onToggleSelecao={toggleSelecao}
         onToggleExpansao={toggleExpansao}
+        fiscalInline={fiscalInline}
       />
 
       <SalvandoOverlay
