@@ -25,7 +25,7 @@ export async function GET(
       )
     }
 
-    const backendUrl = (process.env.FISCAL_MICROSERVICE_BASE_URL || '').replace(/\/$/, '')
+    const backendUrl = (process.env.FISCAL_MICROSERVICE_BASE_URL || process.env.FISCAL_SERVICE_URL || '').replace(/\/$/, '')
     if (!backendUrl) {
       return NextResponse.json(
         { error: 'Configuração do servidor incompleta (FISCAL_MICROSERVICE_BASE_URL)' },
