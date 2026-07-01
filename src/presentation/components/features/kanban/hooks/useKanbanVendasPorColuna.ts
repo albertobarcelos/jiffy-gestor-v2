@@ -223,6 +223,14 @@ export function useKanbanVendasPorColuna({
           return []
       }
 
+      vendas = vendas.filter(v =>
+        filtrarVendaDeliveryKanbanColunaPorDatasToolbar(
+          v,
+          columnId as ColunaKanbanId,
+          vendasUnificadasQueryParams
+        )
+      )
+
       return ordenarColuna(columnId, vendas)
     }
 

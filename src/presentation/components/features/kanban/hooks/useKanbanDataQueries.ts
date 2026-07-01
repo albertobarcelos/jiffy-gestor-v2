@@ -21,6 +21,7 @@ import { combinarContagensColunasDeliveryKanban } from '../utils/kanbanDeliveryC
 import { DELIVERY_KANBAN_COLUMN_IDS } from '../utils/kanbanDeliveryColumnConfig'
 import { useKanbanColumnScrollLoadMore } from './useKanbanColumnScrollLoadMore'
 import {
+  KANBAN_BALCAO_MAX_PAGINAS_AUTO,
   KANBAN_DELIVERY_DELTA_POLL_INTERVAL_MS,
   KANBAN_VENDAS_REFETCH_INTERVAL_MS,
 } from '../utils/kanbanVendasListagem'
@@ -183,15 +184,22 @@ export function useKanbanDataQueries({
   const {
     data: vendasUnificadasInfiniteData,
     isLoading: isLoadingUnificado,
+    isFetching: isFetchingUnificado,
+    isPlaceholderData: isPlaceholderDataUnificado,
     isFetchingNextPage: isFetchingNextPageUnificado,
     hasNextPage: hasNextPageUnificado,
     fetchNextPage: fetchNextPageUnificado,
     refetch: refetchUnificado,
   } = useVendasUnificadasInfinite(vendasUnificadasQueryParams, {
-    enabled: hasKanbanToken,
+    enabled: hasKanbanToken && !isModoDeliveryKanban,
     refetchIntervalMs: !isModoDeliveryKanban ? KANBAN_VENDAS_REFETCH_INTERVAL_MS : false,
     refetchOnWindowFocus: !isModoDeliveryKanban,
   })
+
+  /** Evita exibir página anterior (keepPreviousData) enquanto carrega novos filtros. */
+  const vendasUnificadasDataParaListagem = isPlaceholderDataUnificado
+    ? undefined
+    : vendasUnificadasInfiniteData
 
   const deliveryKanban = usePedidosDeliveryKanbanColumns(pedidosDeliveryQueryParams, {
     enabled: hasKanbanToken && isModoDeliveryKanban,
@@ -220,7 +228,10 @@ export function useKanbanDataQueries({
 
   const isLoading = isModoDeliveryKanban
     ? isLoadingDelivery
-    : isLoadingUnificado || (usaFiltroTerminal && isLoadingIdsTerminal)
+    : isLoadingUnificado ||
+      isPlaceholderDataUnificado ||
+      (isFetchingUnificado && !vendasUnificadasDataParaListagem) ||
+      (usaFiltroTerminal && isLoadingIdsTerminal)
 
   const refetch = useCallback(async () => {
     if (isModoDeliveryKanban) {
@@ -266,12 +277,12 @@ export function useKanbanDataQueries({
       const items = flattenAllItemsDelivery()
       return { items, totalCount: items.length }
     }
-    return flattenVendasUnificadasInfinite(vendasUnificadasInfiniteData)
+    return flattenVendasUnificadasInfinite(vendasUnificadasDataParaListagem)
   }, [
     isModoDeliveryKanban,
     deliveryKanbanColumnStatesKey,
     flattenAllItemsDelivery,
-    vendasUnificadasInfiniteData,
+    vendasUnificadasDataParaListagem,
   ])
 
   const todasVendasCarregadas = useMemo(() => {
@@ -285,8 +296,11 @@ export function useKanbanDataQueries({
   const todasVendasCarregadasRef = useRef(todasVendasCarregadas)
   todasVendasCarregadasRef.current = todasVendasCarregadas
 
+  const paginasCarregadasBalcao = vendasUnificadasDataParaListagem?.pages?.length ?? 0
+
   const temMaisVendasParaCarregar = useMemo(() => {
     if (isModoDeliveryKanban) return false
+    if (paginasCarregadasBalcao >= KANBAN_BALCAO_MAX_PAGINAS_AUTO) return false
     if (hasNextPage) return true
     if (
       !usaFiltroTerminal &&
@@ -298,9 +312,31 @@ export function useKanbanDataQueries({
     return false
   }, [
     isModoDeliveryKanban,
+    paginasCarregadasBalcao,
     hasNextPage,
     usaFiltroTerminal,
     totalVendasApi,
+    todasVendasCarregadas.length,
+  ])
+
+  /** Balcão: carrega páginas seguintes em background (não depende de scroll na coluna). */
+  useEffect(() => {
+    if (isModoDeliveryKanban) return
+    if (isPlaceholderDataUnificado || isLoadingUnificado) return
+    if (isFetchingNextPageUnificado || !temMaisVendasParaCarregar) return
+
+    const frameId = requestAnimationFrame(() => {
+      void fetchNextPageUnificado()
+    })
+    return () => cancelAnimationFrame(frameId)
+  }, [
+    isModoDeliveryKanban,
+    isPlaceholderDataUnificado,
+    isLoadingUnificado,
+    isFetchingNextPageUnificado,
+    temMaisVendasParaCarregar,
+    paginasCarregadasBalcao,
+    fetchNextPageUnificado,
     todasVendasCarregadas.length,
   ])
 
@@ -385,5 +421,7 @@ export function useKanbanDataQueries({
     refetchParaEmissaoFiscal,
     handleColumnScroll,
     temMaisVendasParaCarregar,
+    totalVendasApi,
+    vendasCarregadasCount: todasVendasCarregadas.length,
   }
 }

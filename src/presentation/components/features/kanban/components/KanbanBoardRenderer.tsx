@@ -24,6 +24,11 @@ export interface KanbanBoardRendererProps {
   isFetchingNextPage: boolean
   isModoDeliveryKanban: boolean
   modoKanbanVendas: ModoKanbanVendas
+  /** Total informado pela API (balcão). */
+  totalVendasApi?: number
+  /** Itens já carregados e deduplicados (balcão). */
+  vendasCarregadasCount?: number
+  temMaisVendasParaCarregar?: boolean
   sensors: SensorDescriptor<SensorOptions>[]
   draggingVenda: Venda | null
   onDragStart: (event: import('@dnd-kit/core').DragStartEvent) => void
@@ -59,6 +64,9 @@ export function KanbanBoardRenderer({
   isFetchingNextPage,
   isModoDeliveryKanban,
   modoKanbanVendas,
+  totalVendasApi = 0,
+  vendasCarregadasCount = 0,
+  temMaisVendasParaCarregar = false,
   sensors,
   draggingVenda,
   onDragStart,
@@ -122,6 +130,10 @@ export function KanbanBoardRenderer({
                       <p className="py-2 text-center text-xs text-gray-500">
                         Carregando mais vendas…
                       </p>
+                    ) : !isModoDeliveryKanban && isFetchingNextPage ? (
+                      <p className="py-2 text-center text-xs text-gray-500">
+                        Carregando mais vendas…
+                      </p>
                     ) : undefined
                   }
                 >
@@ -161,8 +173,15 @@ export function KanbanBoardRenderer({
           </DragOverlay>
         </DndContext>
       )}
-      {!mostrarLoadingLista && isFetchingNextPage && !isModoDeliveryKanban ? (
-        <p className="px-2 pb-2 text-center text-xs text-gray-500">Carregando mais vendas…</p>
+      {!mostrarLoadingLista && !isModoDeliveryKanban && temMaisVendasParaCarregar ? (
+        <p className="px-2 pb-2 text-center text-xs text-gray-500">
+          {isFetchingNextPage ? 'Carregando mais vendas…' : 'Buscando vendas…'}
+          {totalVendasApi > vendasCarregadasCount
+            ? ` (${vendasCarregadasCount} de ${totalVendasApi})`
+            : vendasCarregadasCount > 0
+              ? ` (${vendasCarregadasCount} carregadas)`
+              : ''}
+        </p>
       ) : null}
     </div>
   )
