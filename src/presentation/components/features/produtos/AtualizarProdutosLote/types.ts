@@ -15,7 +15,6 @@ export type PermissaoCampoChave =
 export type FiltroColunaVazia =
   | 'todos'
   | 'sem_impressoras'
-  | 'sem_ncm'
   | 'sem_grupos_complementos'
 
 /** Abas do painel de lote — usado para guardar destaque de linhas alteradas por aba. */
@@ -82,4 +81,7 @@ export type ProdutosLoteFilterState = {
   ativoLocalFilter: 'Todos' | 'Sim' | 'Não'
   ativoDeliveryFilter: 'Todos' | 'Sim' | 'Não'
   grupoProdutoFilter: string
+  filtroColunaVazia: FiltroColunaVazia
+  /** NCM exato para filtrar na aba fiscal; vazio = todos. */
+  filtroNcm: string
 }

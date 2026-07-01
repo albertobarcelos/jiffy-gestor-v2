@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { FILTRO_COLUNA_TODOS } from './constants'
+import { FILTRO_COLUNA_TODOS, FILTRO_NCM_TODOS } from './constants'
 import type { FiltroColunaVazia, TabPainelLote } from './types'
 import { filtrosDisponiveisPorAba } from './rules/produtosLoteFiltros'
 import { useProdutosLoteInfinite } from './hooks/useProdutosLoteInfinite'
@@ -16,6 +16,7 @@ import { useFiscalInlineEdit } from './hooks/useFiscalInlineEdit'
 import { useLoteTabNavigation } from './hooks/useLoteTabNavigation'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
+import { useNcmsProdutosCadastrados } from './hooks/useNcmsProdutosCadastrados'
 import {
   LoteFiltros,
   LoteHeaderTabs,
@@ -35,6 +36,7 @@ export function AtualizarProdutosLote() {
   const [ativoDeliveryFilter, setAtivoDeliveryFilter] = useState<'Todos' | 'Sim' | 'Não'>('Todos')
   const [grupoProdutoFilter, setGrupoProdutoFilter] = useState('')
   const [filtroColunaVazia, setFiltroColunaVazia] = useState<FiltroColunaVazia>(FILTRO_COLUNA_TODOS)
+  const [filtroNcm, setFiltroNcm] = useState(FILTRO_NCM_TODOS)
   const [activeTab, setActiveTab] = useState<TabPainelLote>('precos')
 
   const produtosLoteFilters = useMemo(
@@ -44,8 +46,10 @@ export function AtualizarProdutosLote() {
       ativoLocalFilter,
       ativoDeliveryFilter,
       grupoProdutoFilter,
+      filtroColunaVazia,
+      filtroNcm,
     }),
-    [searchText, filterStatus, ativoLocalFilter, ativoDeliveryFilter, grupoProdutoFilter]
+    [searchText, filterStatus, ativoLocalFilter, ativoDeliveryFilter, grupoProdutoFilter, filtroColunaVazia, filtroNcm]
   )
 
   const {
@@ -70,6 +74,8 @@ export function AtualizarProdutosLote() {
   })
   const { data: gruposComplementos = [], isLoading: isLoadingGruposComplementos } =
     useGruposComplementos({ limit: 100, ativo: null })
+  const { data: ncmsCadastrados = [], isLoading: isLoadingNcmsCadastrados } =
+    useNcmsProdutosCadastrados(activeTab === 'fiscal')
 
   const {
     produtosSelecionados,
@@ -83,7 +89,7 @@ export function AtualizarProdutosLote() {
     limparSelecaoProdutos,
     marcarProdutosAlteradosNaSessao,
     handleToggleSelecionarTodos,
-  } = useSelecaoProdutosLote({ produtos, activeTab, filtroColunaVazia })
+  } = useSelecaoProdutosLote({ produtos, activeTab })
 
   const precoLote = usePrecoLote({
     produtos,
@@ -138,6 +144,9 @@ export function AtualizarProdutosLote() {
     setFiltroColunaVazia((prev) =>
       filtrosDisponiveisPorAba(activeTab).includes(prev) ? prev : FILTRO_COLUNA_TODOS
     )
+    if (activeTab !== 'fiscal') {
+      setFiltroNcm(FILTRO_NCM_TODOS)
+    }
   }, [activeTab])
 
   const isUpdating =
@@ -150,6 +159,7 @@ export function AtualizarProdutosLote() {
     setAtivoDeliveryFilter('Todos')
     setGrupoProdutoFilter('')
     setFiltroColunaVazia(FILTRO_COLUNA_TODOS)
+    setFiltroNcm(FILTRO_NCM_TODOS)
   }, [])
 
   const handleTabChange = useLoteTabNavigation(activeTab, setActiveTab, {
@@ -170,9 +180,8 @@ export function AtualizarProdutosLote() {
         activeTab={activeTab}
         total={total}
         produtosSelecionadosCount={produtosSelecionadosCount}
-        produtosExibicaoCount={produtosExibicao.length}
-        produtosCarregadosCount={produtos.length}
         filtroColunaVazia={filtroColunaVazia}
+        filtroNcm={filtroNcm}
         onTabChange={handleTabChange}
       />
 
@@ -207,6 +216,10 @@ export function AtualizarProdutosLote() {
         onGrupoProdutoFilterChange={setGrupoProdutoFilter}
         filtroColunaVazia={filtroColunaVazia}
         onFiltroColunaVaziaChange={setFiltroColunaVazia}
+        filtroNcm={filtroNcm}
+        onFiltroNcmChange={setFiltroNcm}
+        ncmsCadastrados={ncmsCadastrados}
+        isLoadingNcmsCadastrados={isLoadingNcmsCadastrados}
         gruposProdutos={gruposProdutos}
         isLoadingGruposProdutos={isLoadingGruposProdutos}
         onClearFilters={handleClearFilters}
@@ -222,6 +235,7 @@ export function AtualizarProdutosLote() {
         produtosExibicao={produtosExibicao}
         activeTab={activeTab}
         filtroColunaVazia={filtroColunaVazia}
+        filtroNcm={filtroNcm}
         produtosSelecionados={produtosSelecionados}
         produtosExpandidos={produtosExpandidos}
         produtosAlteradosPorAba={produtosAlteradosPorAba}

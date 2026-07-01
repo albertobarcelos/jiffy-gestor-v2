@@ -19,7 +19,12 @@ export interface IProdutoRepository {
     ativoDelivery?: boolean | null
     grupoProdutoId?: string
     grupoComplementosId?: string
+    semDadoEm?: 'sem_impressoras' | 'sem_grupos_complementos'
+    ncm?: string
   }): Promise<{ produtos: Produto[]; total: number }>
+
+  /** NCMs distintos já cadastrados nos produtos da empresa. */
+  listarNcmsCadastrados(): Promise<string[]>
 
   /**
    * Busca um produto por ID

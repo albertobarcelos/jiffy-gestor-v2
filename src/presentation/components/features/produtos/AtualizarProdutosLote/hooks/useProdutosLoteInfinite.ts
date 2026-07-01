@@ -79,6 +79,8 @@ function useDebouncedProdutosLoteFilters(filters: ProdutosLoteFilterState): Prod
     filters.ativoLocalFilter,
     filters.ativoDeliveryFilter,
     filters.grupoProdutoFilter,
+    filters.filtroColunaVazia,
+    filters.filtroNcm,
   ])
 
   return debounced

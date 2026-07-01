@@ -1,6 +1,7 @@
 import { Produto } from '@/src/domain/entities/Produto'
-import { PRODUTOS_LOTE_PAGE_SIZE } from '../constants'
+import { PRODUTOS_LOTE_PAGE_SIZE, FILTRO_NCM_SEM_CADASTRO } from '../constants'
 import type { ProdutosLoteFilterState } from '../types'
+import { filtroColunaVaziaParaSemDadoEm } from '../rules/produtosLoteFiltros'
 
 /** Normaliza a resposta da listagem de produtos (items/produtos/array) em entidades. */
 export function parseProdutosLoteApiResponse(data: unknown): {
@@ -63,6 +64,15 @@ export function buildProdutosLoteParams(
   }
   if (filters.grupoProdutoFilter) {
     params.append('grupoProdutoId', filters.grupoProdutoFilter)
+  }
+  if (filters.filtroNcm === FILTRO_NCM_SEM_CADASTRO) {
+    params.append('semDadoEm', 'sem_ncm')
+  } else if (filters.filtroNcm.trim()) {
+    params.append('ncm', filters.filtroNcm.trim())
+  }
+  const semDadoEm = filtroColunaVaziaParaSemDadoEm(filters.filtroColunaVazia)
+  if (semDadoEm) {
+    params.append('semDadoEm', semDadoEm)
   }
   return params
 }

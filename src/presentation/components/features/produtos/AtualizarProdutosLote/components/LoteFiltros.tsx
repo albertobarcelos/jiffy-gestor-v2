@@ -15,9 +15,31 @@ import {
   sxEntradaCompactaProdutoSelect,
 } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import type { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
-import { FILTRO_COLUNA_TODOS, LABEL_FILTRO_COLUNA } from '../constants'
+import { FILTRO_COLUNA_TODOS, FILTRO_NCM_TODOS, FILTRO_NCM_SEM_CADASTRO, LABEL_FILTRO_COLUNA, labelFiltroNcm } from '../constants'
 import { filtrosDisponiveisPorAba } from '../rules/produtosLoteFiltros'
 import type { FiltroColunaVazia, TabPainelLote } from '../types'
+
+/** Evita a borda outlined cortar o texto do label em campos estreitos. */
+const sxLoteFiltrosSelect = {
+  ...sxEntradaCompactaProdutoSelect,
+  '& .MuiInputLabel-root.MuiInputLabel-shrink': {
+    color: 'var(--color-primary-text)',
+    backgroundColor: '#fff',
+    paddingLeft: '4px',
+    paddingRight: '4px',
+  },
+} as const
+
+const sxLoteFiltrosPesquisar = {
+  ...sxEntradaCompactaProduto,
+  '& .MuiOutlinedInput-root': { backgroundColor: 'var(--color-info)' },
+  '& .MuiInputLabel-root.MuiInputLabel-shrink': {
+    color: 'var(--color-primary-text)',
+    backgroundColor: 'var(--color-info)',
+    paddingLeft: '4px',
+    paddingRight: '4px',
+  },
+} as const
 
 export interface LoteFiltrosProps {
   activeTab: TabPainelLote
@@ -33,6 +55,10 @@ export interface LoteFiltrosProps {
   onGrupoProdutoFilterChange: (value: string) => void
   filtroColunaVazia: FiltroColunaVazia
   onFiltroColunaVaziaChange: (value: FiltroColunaVazia) => void
+  filtroNcm: string
+  onFiltroNcmChange: (value: string) => void
+  ncmsCadastrados: string[]
+  isLoadingNcmsCadastrados: boolean
   gruposProdutos: GrupoProduto[]
   isLoadingGruposProdutos: boolean
   onClearFilters: () => void
@@ -52,6 +78,10 @@ export function LoteFiltros({
   onGrupoProdutoFilterChange,
   filtroColunaVazia,
   onFiltroColunaVaziaChange,
+  filtroNcm,
+  onFiltroNcmChange,
+  ncmsCadastrados,
+  isLoadingNcmsCadastrados,
   gruposProdutos,
   isLoadingGruposProdutos,
   onClearFilters,
@@ -59,10 +89,10 @@ export function LoteFiltros({
   return (
     <>
       <div className="h-[4px] border-t-2 border-primary/70" />
-      <div className="bg-white md:px-[20px] py-2 border-b border-gray-100">
-        <div className="-mx-1 overflow-x-auto px-1 md:mx-0 md:overflow-x-visible md:px-0">
-          <div className="flex min-w-max flex-nowrap items-end gap-2 md:min-w-0 md:flex-wrap md:gap-3">
-            <div className="w-[min(250px,48vw)] min-w-[152px] shrink-0">
+      <div className="bg-white md:px-[20px] pt-3 pb-2 border-b border-gray-100">
+        <div className="-mx-1 overflow-x-auto overflow-y-visible px-1 pt-1 md:mx-0 md:px-0">
+          <div className="flex min-w-max flex-nowrap items-end gap-2 md:gap-2.5">
+            <div className="w-[min(168px,40vw)] min-w-[132px] shrink-0">
               <Input
                 id="precos-search"
                 label="Pesquisar"
@@ -71,10 +101,8 @@ export function LoteFiltros({
                 onChange={(e) => onSearchTextChange(e.target.value)}
                 placeholder="Nome ou código"
                 className="bg-info"
-                sx={{
-                  ...sxEntradaCompactaProduto,
-                  '& .MuiOutlinedInput-root': { backgroundColor: 'var(--color-info)' },
-                }}
+                InputLabelProps={{ shrink: true }}
+                sx={sxLoteFiltrosPesquisar}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -86,8 +114,10 @@ export function LoteFiltros({
             </div>
 
             <div className="w-[118px] shrink-0 min-w-[108px]">
-              <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
-                <InputLabel id="lote-filter-status-label">Status</InputLabel>
+              <FormControl fullWidth size="small" variant="outlined" sx={sxLoteFiltrosSelect}>
+                <InputLabel id="lote-filter-status-label" shrink>
+                  Status
+                </InputLabel>
                 <Select
                   labelId="lote-filter-status-label"
                   label="Status"
@@ -104,8 +134,10 @@ export function LoteFiltros({
             </div>
 
             <div className="w-[132px] shrink-0 min-w-[120px]">
-              <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
-                <InputLabel id="lote-filter-local-label">Ativo no local</InputLabel>
+              <FormControl fullWidth size="small" variant="outlined" sx={sxLoteFiltrosSelect}>
+                <InputLabel id="lote-filter-local-label" shrink>
+                  Ativo no local
+                </InputLabel>
                 <Select
                   labelId="lote-filter-local-label"
                   label="Ativo no local"
@@ -122,8 +154,10 @@ export function LoteFiltros({
             </div>
 
             <div className="w-[148px] shrink-0 min-w-[136px]">
-              <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
-                <InputLabel id="lote-filter-delivery-label">Ativo no delivery</InputLabel>
+              <FormControl fullWidth size="small" variant="outlined" sx={sxLoteFiltrosSelect}>
+                <InputLabel id="lote-filter-delivery-label" shrink>
+                  Ativo no delivery
+                </InputLabel>
                 <Select
                   labelId="lote-filter-delivery-label"
                   label="Ativo no delivery"
@@ -139,15 +173,17 @@ export function LoteFiltros({
               </FormControl>
             </div>
 
-            <div className="w-[min(220px,38vw)] min-w-[160px] shrink-0 md:max-w-[260px] md:flex-1">
+            <div className="w-[176px] shrink-0 min-w-[168px]">
               <FormControl
                 fullWidth
                 size="small"
                 variant="outlined"
-                sx={sxEntradaCompactaProdutoSelect}
+                sx={sxLoteFiltrosSelect}
                 disabled={isLoadingGruposProdutos}
               >
-                <InputLabel id="lote-filter-grupo-label">Grupo de produtos</InputLabel>
+                <InputLabel id="lote-filter-grupo-label" shrink>
+                  Grupo de produtos
+                </InputLabel>
                 <Select
                   labelId="lote-filter-grupo-label"
                   label="Grupo de produtos"
@@ -169,10 +205,47 @@ export function LoteFiltros({
               </FormControl>
             </div>
 
-            {filtrosDisponiveisPorAba(activeTab).length > 1 ? (
-              <div className="w-[min(280px,88vw)] min-w-[200px] shrink-0">
-                <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
-                  <InputLabel id="lote-filter-coluna-vazia-label">Listar sem dado em</InputLabel>
+            {activeTab === 'fiscal' ? (
+              <div className="w-[min(176px,36vw)] min-w-[156px] shrink-0">
+                <FormControl
+                  fullWidth
+                  size="small"
+                  variant="outlined"
+                  sx={sxLoteFiltrosSelect}
+                  disabled={isLoadingNcmsCadastrados}
+                >
+                  <InputLabel id="lote-filter-ncm-label" shrink>
+                    Listar por NCM
+                  </InputLabel>
+                  <Select
+                    labelId="lote-filter-ncm-label"
+                    label="Listar por NCM"
+                    value={filtroNcm}
+                    onChange={(e: SelectChangeEvent<string>) => onFiltroNcmChange(e.target.value)}
+                    MenuProps={{ PaperProps: { sx: { maxHeight: 320 } } }}
+                    renderValue={(selected) => labelFiltroNcm(String(selected))}
+                  >
+                    <MenuItem value={FILTRO_NCM_TODOS}>
+                      <span className="text-secondary-text">Todos</span>
+                    </MenuItem>
+                    <MenuItem value={FILTRO_NCM_SEM_CADASTRO}>Sem NCM</MenuItem>
+                    {!isLoadingNcmsCadastrados &&
+                      ncmsCadastrados.map((ncm) => (
+                        <MenuItem key={ncm} value={ncm}>
+                          {ncm}
+                        </MenuItem>
+                      ))}
+                  </Select>
+                </FormControl>
+              </div>
+            ) : null}
+
+            {activeTab !== 'fiscal' && filtrosDisponiveisPorAba(activeTab).length > 1 ? (
+              <div className="w-[min(172px,36vw)] min-w-[156px] shrink-0">
+                <FormControl fullWidth size="small" variant="outlined" sx={sxLoteFiltrosSelect}>
+                  <InputLabel id="lote-filter-coluna-vazia-label" shrink>
+                    Listar sem dado em
+                  </InputLabel>
                   <Select
                     labelId="lote-filter-coluna-vazia-label"
                     label="Listar sem dado em"
@@ -197,11 +270,11 @@ export function LoteFiltros({
               </div>
             ) : null}
 
-            <div className="shrink-0">
+            <div className="shrink-0 pb-0.5">
               <button
                 type="button"
                 onClick={onClearFilters}
-                className="h-10 rounded-lg border border-gray-300 bg-white px-4 text-sm font-semibold text-primary-text hover:bg-gray-50"
+                className="h-10 whitespace-nowrap rounded-lg border border-gray-300 bg-white px-3 text-sm font-semibold text-primary-text hover:bg-gray-50"
               >
                 Limpar filtros
               </button>

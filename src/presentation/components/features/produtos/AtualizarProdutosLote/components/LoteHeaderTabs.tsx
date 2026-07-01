@@ -1,16 +1,15 @@
 'use client'
 
 import Link from 'next/link'
-import { FILTRO_COLUNA_TODOS, LABEL_FILTRO_COLUNA, TITULO_ABA_LOTE } from '../constants'
+import { FILTRO_COLUNA_TODOS, FILTRO_NCM_TODOS, LABEL_FILTRO_COLUNA, TITULO_ABA_LOTE, labelFiltroNcm } from '../constants'
 import type { FiltroColunaVazia, TabPainelLote } from '../types'
 
 export interface LoteHeaderTabsProps {
   activeTab: TabPainelLote
   total: number
   produtosSelecionadosCount: number
-  produtosExibicaoCount: number
-  produtosCarregadosCount: number
   filtroColunaVazia: FiltroColunaVazia
+  filtroNcm: string
   onTabChange: (tab: TabPainelLote) => void
 }
 
@@ -21,9 +20,8 @@ export function LoteHeaderTabs({
   activeTab,
   total,
   produtosSelecionadosCount,
-  produtosExibicaoCount,
-  produtosCarregadosCount,
   filtroColunaVazia,
+  filtroNcm,
   onTabChange,
 }: LoteHeaderTabsProps) {
   const tabClass = (tab: TabPainelLote) =>
@@ -43,8 +41,13 @@ export function LoteHeaderTabs({
             {filtroColunaVazia !== FILTRO_COLUNA_TODOS ? (
               <>
                 {' '}
-                | {LABEL_FILTRO_COLUNA[filtroColunaVazia]}: exibindo {produtosExibicaoCount} de{' '}
-                {produtosCarregadosCount}
+                | Filtro: {LABEL_FILTRO_COLUNA[filtroColunaVazia]}
+              </>
+            ) : null}
+            {activeTab === 'fiscal' && filtroNcm !== FILTRO_NCM_TODOS ? (
+              <>
+                {' '}
+                | NCM: {labelFiltroNcm(filtroNcm)}
               </>
             ) : null}
           </p>

@@ -4,7 +4,7 @@ import type { RefObject } from 'react'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { Checkbox } from '@/src/presentation/components/ui/checkbox'
 import type { Produto } from '@/src/domain/entities/Produto'
-import { FILTRO_COLUNA_TODOS, LABEL_FILTRO_COLUNA } from '../constants'
+import { FILTRO_COLUNA_TODOS, FILTRO_NCM_TODOS, LABEL_FILTRO_COLUNA, labelFiltroNcm } from '../constants'
 import type { FiltroColunaVazia, TabPainelLote } from '../types'
 import type { FiscalInlineEditApi } from '../hooks/useFiscalInlineEdit'
 import { LoteProdutoRow } from './LoteProdutoRow'
@@ -20,6 +20,7 @@ export interface LoteProdutosGridProps {
   produtosExibicao: Produto[]
   activeTab: TabPainelLote
   filtroColunaVazia: FiltroColunaVazia
+  filtroNcm: string
   produtosSelecionados: Set<string>
   produtosExpandidos: Set<string>
   produtosAlteradosPorAba: Record<TabPainelLote, Set<string>>
@@ -41,6 +42,7 @@ export function LoteProdutosGrid({
   produtosExibicao,
   activeTab,
   filtroColunaVazia,
+  filtroNcm,
   produtosSelecionados,
   produtosExpandidos,
   produtosAlteradosPorAba,
@@ -64,9 +66,11 @@ export function LoteProdutosGrid({
       ) : produtosExibicao.length === 0 ? (
         <div className="text-center py-12 px-4">
           <p className="text-secondary-text">
-            {filtroColunaVazia !== FILTRO_COLUNA_TODOS
-              ? `Nenhum produto entre os já carregados atende a “${LABEL_FILTRO_COLUNA[filtroColunaVazia]}”. Continue rolando para carregar mais itens ou altere os filtros da busca (filtro só na tela).`
-              : 'Nenhum produto para exibir com o filtro atual.'}
+            {filtroNcm !== FILTRO_NCM_TODOS
+              ? `Nenhum produto encontrado com o filtro “${labelFiltroNcm(filtroNcm)}”.`
+              : filtroColunaVazia !== FILTRO_COLUNA_TODOS
+                ? `Nenhum produto encontrado com o filtro “${LABEL_FILTRO_COLUNA[filtroColunaVazia]}”.`
+                : 'Nenhum produto para exibir com o filtro atual.'}
           </p>
         </div>
       ) : (

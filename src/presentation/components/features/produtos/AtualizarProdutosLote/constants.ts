@@ -22,10 +22,21 @@ export const PRODUTOS_LOTE_PAGE_SIZE = 50
 /** Valor do filtro "sem dado em…" que não restringe a listagem. */
 export const FILTRO_COLUNA_TODOS = 'todos'
 
+/** Nenhum NCM selecionado no filtro da aba fiscal. */
+export const FILTRO_NCM_TODOS = ''
+
+/** Produtos sem NCM em raiz ou fiscal (`semDadoEm=sem_ncm` no backend). */
+export const FILTRO_NCM_SEM_CADASTRO = '__sem_ncm__'
+
+export function labelFiltroNcm(valor: string): string {
+  if (valor === FILTRO_NCM_TODOS) return 'Todos'
+  if (valor === FILTRO_NCM_SEM_CADASTRO) return 'Sem NCM'
+  return valor
+}
+
 export const LABEL_FILTRO_COLUNA: Record<FiltroColunaVazia, string> = {
   [FILTRO_COLUNA_TODOS]: 'Todos',
   sem_impressoras: 'Sem impressoras',
-  sem_ncm: 'Sem NCM',
   sem_grupos_complementos: 'Sem grupos de complementos',
 }
 

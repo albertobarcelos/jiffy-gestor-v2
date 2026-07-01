@@ -1,10 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { Produto } from '@/src/domain/entities/Produto'
-import { FILTRO_COLUNA_TODOS } from '../constants'
-import type { FiltroColunaVazia, TabPainelLote } from '../types'
-import { produtoSemDadoNaColuna } from '../rules/produtosLoteFiltros'
+import type { TabPainelLote } from '../types'
 
 const PRODUTOS_ALTERADOS_INICIAL: Record<TabPainelLote, Set<string>> = {
   precos: new Set(),
@@ -17,13 +15,11 @@ const PRODUTOS_ALTERADOS_INICIAL: Record<TabPainelLote, Set<string>> = {
 export interface UseSelecaoProdutosLoteParams {
   produtos: Produto[]
   activeTab: TabPainelLote
-  filtroColunaVazia: FiltroColunaVazia
 }
 
 export function useSelecaoProdutosLote({
   produtos,
   activeTab,
-  filtroColunaVazia,
 }: UseSelecaoProdutosLoteParams) {
   const [produtosSelecionados, setProdutosSelecionados] = useState<Set<string>>(new Set())
   const [produtosExpandidos, setProdutosExpandidos] = useState<Set<string>>(new Set())
@@ -78,10 +74,7 @@ export function useSelecaoProdutosLote({
     setProdutosSelecionados(new Set())
   }, [])
 
-  const produtosExibicao = useMemo(() => {
-    if (filtroColunaVazia === FILTRO_COLUNA_TODOS) return produtos
-    return produtos.filter((p) => produtoSemDadoNaColuna(p, filtroColunaVazia))
-  }, [produtos, filtroColunaVazia])
+  const produtosExibicao = produtos
 
   const todosSelecionados =
     produtosExibicao.length > 0 &&
