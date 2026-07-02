@@ -4,6 +4,7 @@ import { DndContext, DragOverlay, type SensorDescriptor, type SensorOptions } fr
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { definirEntregadorKanbanCache } from '../../delivery/kanban-panels/entregadorKanbanStore'
 import { KanbanColuna } from './KanbanColuna'
+import { KanbanReemissaoEmLoteBar } from './KanbanReemissaoEmLoteBar'
 import { KanbanVendaCard } from './KanbanVendaCard'
 import { VendaCardDragPreview } from './VendaCardDragPreview'
 import type { ModoKanbanVendas } from '../KanbanModoVendasToggle'
@@ -15,20 +16,18 @@ import type {
   Venda,
 } from '../types'
 import type { usePedidosDeliveryKanbanColumns } from '../hooks/usePedidosDeliveryKanbanColumns'
+import type { useVendasUnificadasKanbanColumns } from '../hooks/useVendasUnificadasKanbanColumns'
+import type { useReemissaoFiscalEmLote } from '../hooks/useReemissaoFiscalEmLote'
 
 type DeliveryKanbanReturn = ReturnType<typeof usePedidosDeliveryKanbanColumns>
+type BalcaoKanbanReturn = ReturnType<typeof useVendasUnificadasKanbanColumns>
+type ReemissaoEmLoteReturn = ReturnType<typeof useReemissaoFiscalEmLote>
 
 export interface KanbanBoardRendererProps {
   columns: KanbanColumn[]
   mostrarLoadingLista: boolean
-  isFetchingNextPage: boolean
   isModoDeliveryKanban: boolean
   modoKanbanVendas: ModoKanbanVendas
-  /** Total informado pela API (balcão). */
-  totalVendasApi?: number
-  /** Itens já carregados e deduplicados (balcão). */
-  vendasCarregadasCount?: number
-  temMaisVendasParaCarregar?: boolean
   sensors: SensorDescriptor<SensorOptions>[]
   draggingVenda: Venda | null
   onDragStart: (event: import('@dnd-kit/core').DragStartEvent) => void
@@ -42,6 +41,7 @@ export interface KanbanBoardRendererProps {
   onToggleDirecaoOrdenacao: (columnId: ColunaKanbanId) => void
   onColumnScroll: (columnId: ColunaKanbanId, event: React.UIEvent<HTMLDivElement>) => void
   deliveryKanban: DeliveryKanbanReturn
+  balcaoKanban: BalcaoKanbanReturn
   acaoFiscalEmAndamentoPorVenda: Record<string, 'emitindo' | 'reemitindo'>
   avancandoEtapaIds: Record<string, boolean>
   timestampsEtapaEntregaLocal: Record<string, string>
@@ -56,17 +56,14 @@ export interface KanbanBoardRendererProps {
   onEntregadorAtualizado: (vendaId: string, entregadorId: string | null) => void
   onConfirmarCobranca?: (venda: Venda) => void
   nomesMeiosPagamento: Record<string, string>
+  reemissaoEmLote?: ReemissaoEmLoteReturn
 }
 
 export function KanbanBoardRenderer({
   columns,
   mostrarLoadingLista,
-  isFetchingNextPage,
   isModoDeliveryKanban,
   modoKanbanVendas,
-  totalVendasApi = 0,
-  vendasCarregadasCount = 0,
-  temMaisVendasParaCarregar = false,
   sensors,
   draggingVenda,
   onDragStart,
@@ -80,6 +77,7 @@ export function KanbanBoardRenderer({
   onToggleDirecaoOrdenacao,
   onColumnScroll,
   deliveryKanban,
+  balcaoKanban,
   acaoFiscalEmAndamentoPorVenda,
   avancandoEtapaIds,
   timestampsEtapaEntregaLocal,
@@ -94,21 +92,23 @@ export function KanbanBoardRenderer({
   onEntregadorAtualizado,
   onConfirmarCobranca,
   nomesMeiosPagamento,
+  reemissaoEmLote,
 }: KanbanBoardRendererProps) {
   return (
-    <div className="scrollbar-thin mb-[10px] min-h-0 flex-1 overflow-x-auto p-2 pb-4">
+    <div className="scrollbar-thin flex min-h-0 flex-1 flex-col overflow-x-auto px-2 py-2">
       {mostrarLoadingLista ? (
         <div className="flex h-full min-h-[200px] items-center justify-center">
           <JiffyLoading />
         </div>
       ) : (
-        <DndContext
-          sensors={sensors}
-          onDragStart={onDragStart}
-          onDragEnd={onDragEnd}
-          onDragCancel={onDragCancel}
-        >
-          <div className="flex h-full min-w-max gap-3">
+        <div className="flex min-h-0 flex-1 flex-col">
+          <DndContext
+            sensors={sensors}
+            onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
+            onDragCancel={onDragCancel}
+          >
+            <div className="flex h-full min-h-0 min-w-max flex-1 gap-3">
             {columns.map(column => {
               const colId = column.id as ColunaKanbanId
               const columnTotalCount = getColumnTotalCount(colId)
@@ -124,13 +124,33 @@ export function KanbanBoardRenderer({
                   onCriterioOrdenacaoChange={onCriterioOrdenacaoChange}
                   onToggleDirecaoOrdenacao={onToggleDirecaoOrdenacao}
                   onColumnScroll={onColumnScroll}
+                  columnRodape={
+                    colId === 'PENDENTE_EMISSAO' &&
+                    reemissaoEmLote?.exibirBarraReemissaoEmLote ? (
+                      <KanbanReemissaoEmLoteBar
+                        totalElegiveis={reemissaoEmLote.totalElegiveisVisiveis}
+                        progresso={reemissaoEmLote.progresso}
+                        intervaloSegundos={reemissaoEmLote.intervaloSegundos}
+                        confirmacaoAberta={reemissaoEmLote.confirmacaoAberta}
+                        onConfirmacaoAbertaChange={reemissaoEmLote.setConfirmacaoAberta}
+                        onIniciar={reemissaoEmLote.iniciar}
+                        onConfirmarInicio={reemissaoEmLote.confirmarInicio}
+                        onPausar={reemissaoEmLote.pausar}
+                        onRetomar={reemissaoEmLote.retomar}
+                        onParar={reemissaoEmLote.parar}
+                        onEncerrarResumo={reemissaoEmLote.encerrarResumo}
+                      />
+                    ) : undefined
+                  }
                   columnFooter={
                     isModoDeliveryKanban &&
                     deliveryKanban.columnStates[colId]?.isFetchingNextPage ? (
                       <p className="py-2 text-center text-xs text-gray-500">
                         Carregando mais vendas…
                       </p>
-                    ) : !isModoDeliveryKanban && isFetchingNextPage ? (
+                    ) : !isModoDeliveryKanban &&
+                      balcaoKanban.columnStates[colId as keyof typeof balcaoKanban.columnStates]
+                        ?.isFetchingNextPage ? (
                       <p className="py-2 text-center text-xs text-gray-500">
                         Carregando mais vendas…
                       </p>
@@ -172,17 +192,8 @@ export function KanbanBoardRenderer({
             {draggingVenda ? <VendaCardDragPreview venda={draggingVenda} /> : null}
           </DragOverlay>
         </DndContext>
+        </div>
       )}
-      {!mostrarLoadingLista && !isModoDeliveryKanban && temMaisVendasParaCarregar ? (
-        <p className="px-2 pb-2 text-center text-xs text-gray-500">
-          {isFetchingNextPage ? 'Carregando mais vendas…' : 'Buscando vendas…'}
-          {totalVendasApi > vendasCarregadasCount
-            ? ` (${vendasCarregadasCount} de ${totalVendasApi})`
-            : vendasCarregadasCount > 0
-              ? ` (${vendasCarregadasCount} carregadas)`
-              : ''}
-        </p>
-      ) : null}
     </div>
   )
 }

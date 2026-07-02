@@ -30,4 +30,6 @@ export type KanbanVendaCachePatch = {
   observacoes?: string[] | null
   /** Summary do entregador no card delivery; `null` limpa o vínculo exibido. */
   entregador?: KanbanEntregadorCachePatch | null
+  /** Kanban balcão: coluna resolvida no backend. */
+  etapaKanbanBalcao?: 'FINALIZADAS' | 'PENDENTE_EMISSAO' | 'COM_NFE' | null
 }
