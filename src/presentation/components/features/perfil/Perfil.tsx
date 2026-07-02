@@ -135,7 +135,7 @@ export function Perfil() {
   const handleAlterarSenha = async (e: FormEvent) => {
     e.preventDefault()
     if (!tokenPerfil) {
-      showToast.error('Sessão expirada ou indisponível. Entre novamente para alterar a senha.')
+      showToast.error('Sessão expirada ou indisponível, entre novamente.')
       return
     }
     if (!senhaGestorEhValida(novaSenha)) {

@@ -6,14 +6,14 @@ export const TOAST_IMPRESSORA_EXPEDICAO_NECESSARIA =
   'É necessário escolher uma impressora de expedição.'
 
 export const TOAST_IMPRESSORA_EXPEDICAO_MAPEAMENTO_WINDOWS =
-  'Vincule a impressora de expedição a uma impressora Windows neste terminal.'
+  'Vincule a impressora de expedição a uma impressora neste terminal.'
 
 export function TOAST_IMPRESSORA_PRODUCAO_MAPEAMENTO_WINDOWS(nomeImpressoraLogica: string): string {
-  return `Vincule a impressora "${nomeImpressoraLogica}" a uma impressora Windows neste terminal para imprimir o cupom de produção.`
+  return `Vincule a impressora "${nomeImpressoraLogica}" a uma impressora neste terminal.`
 }
 
 export const DIALOG_SALVAR_SEM_IMPRESSORA_EXPEDICAO =
-  'É necessário escolher uma impressora de expedição para imprimir o ticket de expedição nas opções de separado ou unificado.'
+  'Escolha uma impressora de expedição para imprimir o cupom nas opções de separado ou unificado.'
 
 export function temImpressoraExpedicaoConfigurada(
   impressoraExpedicaoId: string | null | undefined

@@ -1,4 +1,17 @@
+'use client'
+
+import { createElement } from 'react'
+import { TriangleAlert } from 'lucide-react'
 import toast from 'react-hot-toast'
+
+const TOAST_WARNING_COLOR = '#6424ac'
+
+const toastWarningIcon = createElement(TriangleAlert, {
+  size: 24,
+  color: TOAST_WARNING_COLOR,
+  strokeWidth: 2,
+  'aria-hidden': true,
+})
 
 /**
  * Utilitários para exibir notificações toast
@@ -37,18 +50,14 @@ export const showToast = {
    */
   warning: (message: string) => {
     toast(message, {
-      icon: '⚠️',
+      icon: toastWarningIcon,
       duration: 4000,
       style: {
         background: '#fff',
-        color: '#333',
+        color: TOAST_WARNING_COLOR,
         borderRadius: '8px',
         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-        border: '1px solid #fbbf24',
-      },
-      iconTheme: {
-        primary: '#f59e0b',
-        secondary: '#fff',
+        border: `1px solid ${TOAST_WARNING_COLOR}`,
       },
     })
   },
