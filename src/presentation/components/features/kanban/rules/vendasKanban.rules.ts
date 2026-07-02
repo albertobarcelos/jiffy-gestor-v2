@@ -527,6 +527,33 @@ export function exibirAtribuirEntregadorKanban(
   )
 }
 
+/**
+ * Venda que pode ser reenviada automaticamente no lote (sem abrir modal).
+ * Exige documento fiscal para reemissão ou modelo conhecido para emissão direta.
+ */
+export function vendaElegivelParaReemissaoAutomaticaLote(
+  venda: VendaUnificadaDTO,
+  acaoFiscalEmAndamentoPorVenda: Record<string, 'emitindo' | 'reemitindo'>
+): boolean {
+  if (vendaBloqueadaParaEmissaoInterativa(venda, acaoFiscalEmAndamentoPorVenda)) return false
+
+  const podeReemitir =
+    venda.statusFiscal === 'REJEITADA' || fiscalKanbanPodeReemitirAposCooldown(venda)
+
+  if (!podeReemitir) return false
+  if (venda.documentoFiscalId?.trim()) return true
+
+  const tipoDoc = String(venda.tipoDocFiscal ?? '')
+    .trim()
+    .toUpperCase()
+  if (tipoDoc === 'NFE' || tipoDoc === 'NF-E') {
+    return Boolean(venda.cliente?.id?.trim())
+  }
+  if (tipoDoc === 'NFCE' || tipoDoc === 'NFC-E') return true
+
+  return false
+}
+
 /** Rótulo do botão Emitir/Reemitir nota no card. */
 export function rotuloBotaoEmissaoKanban(
   venda: Venda,

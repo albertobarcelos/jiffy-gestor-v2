@@ -20,6 +20,8 @@ interface KanbanColunaProps {
   onToggleDirecaoOrdenacao: (columnId: ColunaKanbanId) => void
   onColumnScroll?: (columnId: ColunaKanbanId, event: React.UIEvent<HTMLDivElement>) => void
   columnFooter?: ReactNode
+  /** Rodapé fixo abaixo da área rolável (ex.: ações em lote). */
+  columnRodape?: ReactNode
   children: ReactNode
 }
 
@@ -33,14 +35,14 @@ export function KanbanColuna(props: KanbanColunaProps) {
     onToggleDirecaoOrdenacao,
     onColumnScroll,
     columnFooter,
+    columnRodape,
     children,
   } = props
   const colId = column.id as ColunaKanbanId
 
   return (
     <div
-      className="flex w-64 flex-shrink-0 flex-col overflow-hidden rounded-lg border border-gray-200 bg-gray-50 sm:w-60 md:w-64 lg:w-96"
-      style={{ height: 'calc(100vh - 180px)' }}
+      className="flex h-full w-64 flex-shrink-0 flex-col overflow-hidden rounded-lg border border-gray-200 bg-gray-50 sm:w-60 md:w-64 lg:w-96"
     >
       <div
         className={`px-3 py-2 ${column.color} border-b ${column.borderColor} flex flex-shrink-0 items-center justify-between`}
@@ -121,6 +123,8 @@ export function KanbanColuna(props: KanbanColunaProps) {
         )}
         {columnFooter}
       </DroppableColumnContent>
+
+      {columnRodape ? <div className="flex-shrink-0">{columnRodape}</div> : null}
     </div>
   )
 }

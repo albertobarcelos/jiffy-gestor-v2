@@ -7,16 +7,15 @@ import {
   ordenarVendasKanbanPorCriterio,
 } from '../rules/vendasKanban.rules'
 import { flattenPedidosDeliveryInfinite } from './usePedidosDeliveryInfinite'
+import { flattenVendasUnificadasInfinite } from './useVendasUnificadas'
 import {
   DELIVERY_KANBAN_COLUMN_IDS,
   isColunaKanbanDeliveryFiscalSplit,
   vendaPertenceColunaDeliveryKanban,
 } from '../utils/kanbanDeliveryColumnConfig'
-import {
-  filtrarVendaDeliveryKanbanColunaPorDatasToolbar,
-  filtrarVendasKanbanPorModo,
-} from '../utils/kanbanVendasListagem'
-import type { ModoKanbanVendas } from '../KanbanModoVendasToggle'
+import { BALCAO_KANBAN_COLUMN_IDS } from '../utils/kanbanBalcaoColumnConfig'
+import { cloneVendaUnificadaDTO } from '../utils/kanbanVendaCacheUpdate'
+import { filtrarVendaDeliveryKanbanColunaPorDatasToolbar } from '../utils/kanbanVendasListagem'
 import type {
   ColunaKanbanId,
   CriterioOrdenacaoKanban,
@@ -24,8 +23,10 @@ import type {
   Venda,
 } from '../types'
 import type { usePedidosDeliveryKanbanColumns } from './usePedidosDeliveryKanbanColumns'
+import type { useVendasUnificadasKanbanColumns } from './useVendasUnificadasKanbanColumns'
 
 type DeliveryKanbanReturn = ReturnType<typeof usePedidosDeliveryKanbanColumns>
+type BalcaoKanbanReturn = ReturnType<typeof useVendasUnificadasKanbanColumns>
 
 export interface VendasUnificadasQueryParams {
   dataCriacaoInicial?: string
@@ -36,10 +37,10 @@ export interface VendasUnificadasQueryParams {
 }
 
 export interface UseKanbanVendasPorColunaParams {
-  modoKanbanVendas: ModoKanbanVendas
   isModoDeliveryKanban: boolean
   todasVendasCarregadas: Venda[]
   deliveryKanban: DeliveryKanbanReturn
+  balcaoKanban: BalcaoKanbanReturn
   deliveryColumnCounts: Record<string, number>
   getEtapaKanbanParaExibicao: (venda: Venda) => string
   etapaLocalPorVendaId: Record<string, ColunaKanbanId>
@@ -71,10 +72,10 @@ const DIRECAO_PADRAO: Record<ColunaKanbanId, DirecaoOrdenacaoKanban> = {
 }
 
 export function useKanbanVendasPorColuna({
-  modoKanbanVendas,
   isModoDeliveryKanban,
   todasVendasCarregadas,
   deliveryKanban,
+  balcaoKanban,
   deliveryColumnCounts,
   getEtapaKanbanParaExibicao,
   etapaLocalPorVendaId,
@@ -91,9 +92,8 @@ export function useKanbanVendasPorColuna({
     useState<Record<ColunaKanbanId, DirecaoOrdenacaoKanban>>(DIRECAO_PADRAO)
 
   const todasVendas = useMemo(() => {
-    if (isModoDeliveryKanban) return todasVendasCarregadas
-    return filtrarVendasKanbanPorModo(todasVendasCarregadas, modoKanbanVendas)
-  }, [isModoDeliveryKanban, todasVendasCarregadas, modoKanbanVendas])
+    return todasVendasCarregadas
+  }, [todasVendasCarregadas])
 
   const vendasPorColuna = useMemo(() => {
     const ordenarColuna = (columnId: string, vendas: Venda[]): Venda[] => {
@@ -181,70 +181,41 @@ export function useKanbanVendasPorColuna({
       return map
     }
 
-    const construirListaColuna = (columnId: string): Venda[] => {
-      let vendas: Venda[] = []
-      switch (columnId) {
-        case 'NOVOS_PEDIDOS':
-          vendas = todasVendas.filter(
-            (v: Venda) => getEtapaKanbanParaExibicao(v) === 'NOVOS_PEDIDOS'
-          )
-          break
-        case 'EM_PREPARO':
-          vendas = todasVendas.filter(
-            (v: Venda) => getEtapaKanbanParaExibicao(v) === 'EM_PREPARO'
-          )
-          break
-        case 'PRONTO_ENTREGA':
-          vendas = todasVendas.filter(
-            (v: Venda) => getEtapaKanbanParaExibicao(v) === 'PRONTO_ENTREGA'
-          )
-          break
-        case 'EM_ROTA':
-          vendas = todasVendas.filter(
-            (v: Venda) => getEtapaKanbanParaExibicao(v) === 'EM_ROTA'
-          )
-          break
-        case 'FINALIZADAS':
-          vendas = todasVendas.filter(
-            (v: Venda) => getEtapaKanbanParaExibicao(v) === 'FINALIZADAS'
-          )
-          break
-        case 'PENDENTE_EMISSAO':
-          vendas = todasVendas.filter(
-            (v: Venda) => getEtapaKanbanParaExibicao(v) === 'PENDENTE_EMISSAO'
-          )
-          break
-        case 'COM_NFE':
-          vendas = todasVendas.filter(
-            (v: Venda) => getEtapaKanbanParaExibicao(v) === 'COM_NFE'
-          )
-          break
-        default:
-          return []
+    const map: Partial<Record<ColunaKanbanId, Venda[]>> = {}
+    for (const columnId of BALCAO_KANBAN_COLUMN_IDS) {
+      const state = balcaoKanban.columnStates[columnId]
+      const { items } = flattenVendasUnificadasInfinite(state?.data)
+      // Balcão: API já filtra por colunaKanban — não reclassificar nem refiltrar datas no client.
+      let vendas = items.filter(v => {
+        const etapaLocal = etapaLocalPorVendaId[v.id]
+        if (etapaLocal && etapaLocal !== columnId) {
+          return false
+        }
+        return true
+      })
+
+      for (const [vendaId, colunaDestino] of Object.entries(etapaLocalPorVendaId)) {
+        if (colunaDestino !== columnId) continue
+        if (vendas.some(v => v.id === vendaId)) continue
+        const vendaTransicao = todasVendasCarregadas.find(v => v.id === vendaId)
+        if (vendaTransicao) {
+          const patch =
+            colunaDestino === 'PENDENTE_EMISSAO'
+              ? { etapaKanbanBalcao: 'PENDENTE_EMISSAO' as const, solicitarEmissaoFiscal: true }
+              : colunaDestino === 'FINALIZADAS'
+                ? { etapaKanbanBalcao: 'FINALIZADAS' as const, solicitarEmissaoFiscal: false }
+                : { etapaKanbanBalcao: colunaDestino }
+          vendas = [...vendas, cloneVendaUnificadaDTO(vendaTransicao, patch)]
+        }
       }
 
-      return ordenarColuna(columnId, vendas)
-    }
-
-    const ids: ColunaKanbanId[] = [
-      'NOVOS_PEDIDOS',
-      'EM_PREPARO',
-      'PRONTO_ENTREGA',
-      'EM_ROTA',
-      'FINALIZADAS',
-      'PENDENTE_EMISSAO',
-      'COM_NFE',
-    ]
-    const map: Partial<Record<ColunaKanbanId, Venda[]>> = {}
-    for (const id of ids) {
-      map[id] = construirListaColuna(id)
+      map[columnId] = ordenarColuna(columnId, vendas)
     }
     return map
   }, [
-    todasVendas,
-    modoKanbanVendas,
     isModoDeliveryKanban,
     deliveryKanban.columnStates,
+    balcaoKanban.columnStates,
     getEtapaKanbanParaExibicao,
     etapaLocalPorVendaId,
     timestampsEtapaEntregaLocal,
@@ -274,12 +245,15 @@ export function useKanbanVendasPorColuna({
         }
         return base
       }
-      return vendasPorColuna[columnId]?.length ?? 0
+
+      const colState = balcaoKanban.columnStates[columnId as keyof typeof balcaoKanban.columnStates]
+      return typeof colState?.totalCount === 'number' ? colState.totalCount : 0
     },
     [
       isModoDeliveryKanban,
       deliveryColumnCounts,
       deliveryKanban.columnStates,
+      balcaoKanban.columnStates,
       deltaContagemColunasTransicao,
       vendasPorColuna,
     ]

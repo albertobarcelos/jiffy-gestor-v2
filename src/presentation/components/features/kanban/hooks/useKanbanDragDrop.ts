@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from 'react'
 import { DragEndEvent, DragStartEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   useMarcarEmissaoFiscal,
   useDesmarcarEmissaoFiscal,
@@ -12,6 +13,8 @@ import {
   COLUNAS_KANBAN_DESTINO_PIN,
   vendaBloqueadaParaEmissaoInterativa,
 } from '../rules/vendasKanban.rules'
+import { invalidateKanbanVendasListagens } from '../hooks/kanbanListagemQueryCache'
+import { moveVendaKanbanBalcaoEntreColunas } from '../utils/kanbanVendaCacheUpdate'
 import type { ColunaKanbanId, Venda } from '../types'
 
 export interface UseKanbanDragDropParams {
@@ -32,32 +35,72 @@ export function useKanbanDragDrop({
   handleEmitirNfe,
 }: UseKanbanDragDropParams) {
   const [draggingVenda, setDraggingVenda] = useState<Venda | null>(null)
+  const [fiscalTransicaoUi, setFiscalTransicaoUi] = useState<
+    Record<string, ColunaKanbanId>
+  >({})
 
+  const queryClient = useQueryClient()
   const marcarEmissaoFiscal = useMarcarEmissaoFiscal()
   const desmarcarEmissaoFiscal = useDesmarcarEmissaoFiscal()
+
+  const limparFiscalTransicaoUi = useCallback((vendaId: string) => {
+    setFiscalTransicaoUi(prev => {
+      if (!(vendaId in prev)) return prev
+      const { [vendaId]: _, ...rest } = prev
+      return rest
+    })
+  }, [])
+
+  const reverterTransicaoFiscal = useCallback(
+    (vendaId: string) => {
+      limparFiscalTransicaoUi(vendaId)
+      invalidateKanbanVendasListagens(queryClient)
+    },
+    [limparFiscalTransicaoUi, queryClient]
+  )
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 10 } }))
 
   const handleMarcarEmissaoFiscal = useCallback(
-    async (vendaId: string, tabelaOrigem: 'venda' | 'venda_gestor') => {
+    async (venda: Venda) => {
+      moveVendaKanbanBalcaoEntreColunas(queryClient, venda.id, 'PENDENTE_EMISSAO', {
+        solicitarEmissaoFiscal: true,
+      })
+      setFiscalTransicaoUi(prev => ({ ...prev, [venda.id]: 'PENDENTE_EMISSAO' }))
       try {
-        await marcarEmissaoFiscal.mutateAsync({ id: vendaId, tabelaOrigem })
+        await marcarEmissaoFiscal.mutateAsync({
+          id: venda.id,
+          tabelaOrigem: venda.tabelaOrigem,
+          kanbanContext: true,
+        })
+        limparFiscalTransicaoUi(venda.id)
       } catch (error) {
+        reverterTransicaoFiscal(venda.id)
         console.error('Erro ao marcar emissão fiscal:', error)
       }
     },
-    [marcarEmissaoFiscal]
+    [marcarEmissaoFiscal, queryClient, limparFiscalTransicaoUi, reverterTransicaoFiscal]
   )
 
   const handleDesmarcarEmissaoFiscal = useCallback(
-    async (vendaId: string, tabelaOrigem: 'venda' | 'venda_gestor') => {
+    async (venda: Venda) => {
+      moveVendaKanbanBalcaoEntreColunas(queryClient, venda.id, 'FINALIZADAS', {
+        solicitarEmissaoFiscal: false,
+      })
+      setFiscalTransicaoUi(prev => ({ ...prev, [venda.id]: 'FINALIZADAS' }))
       try {
-        await desmarcarEmissaoFiscal.mutateAsync({ id: vendaId, tabelaOrigem })
+        await desmarcarEmissaoFiscal.mutateAsync({
+          id: venda.id,
+          tabelaOrigem: venda.tabelaOrigem,
+          kanbanContext: true,
+        })
+        limparFiscalTransicaoUi(venda.id)
       } catch (error) {
+        reverterTransicaoFiscal(venda.id)
         console.error('Erro ao desmarcar emissão fiscal:', error)
       }
     },
-    [desmarcarEmissaoFiscal]
+    [desmarcarEmissaoFiscal, queryClient, limparFiscalTransicaoUi, reverterTransicaoFiscal]
   )
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
@@ -103,7 +146,7 @@ export function useKanbanDragDrop({
 
       if (over.id === 'PENDENTE_EMISSAO') {
         if (venda.solicitarEmissaoFiscal !== true) {
-          void handleMarcarEmissaoFiscal(venda.id, venda.tabelaOrigem)
+          void handleMarcarEmissaoFiscal(venda)
         }
       } else if (over.id === 'FINALIZADAS') {
         const fiscalRejeitada =
@@ -121,7 +164,7 @@ export function useKanbanDragDrop({
         if (emRotaGestor) {
           void finalizarEntregaPorDrag(venda)
         } else if (venda.solicitarEmissaoFiscal === true) {
-          void handleDesmarcarEmissaoFiscal(venda.id, venda.tabelaOrigem)
+          void handleDesmarcarEmissaoFiscal(venda)
         }
       } else if (over.id === 'COM_NFE') {
         if (venda.getEtapaKanban() !== 'PENDENTE_EMISSAO') {
@@ -170,6 +213,7 @@ export function useKanbanDragDrop({
   return {
     sensors,
     draggingVenda,
+    fiscalTransicaoUi,
     handleDragStart,
     handleDragEnd,
     handleDragCancel,

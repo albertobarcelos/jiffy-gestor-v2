@@ -5,13 +5,13 @@ import { useMarcarEmissaoFiscal } from '@/src/presentation/hooks/useVendas'
 import { showToast } from '@/src/shared/utils/toast'
 import type { ModoKanbanVendas } from '../KanbanModoVendasToggle'
 import type { Venda } from '../types'
-import type { VendasUnificadasQueryParams } from './useKanbanDataQueries'
+import type { VendasUnificadasQueryParamsExtended } from './useKanbanDataQueries'
 
 export interface UseFiscalReativacaoRejeitadaParams {
   isLoading: boolean
   todasVendasCarregadas: Venda[]
   modoKanbanVendas: ModoKanbanVendas
-  vendasUnificadasQueryParams: VendasUnificadasQueryParams
+  vendasUnificadasQueryParams: VendasUnificadasQueryParamsExtended
   terminalFilter: string
 }
 

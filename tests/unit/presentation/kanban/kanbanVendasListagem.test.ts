@@ -64,6 +64,12 @@ describe('filtrarVendaDeliveryKanbanColunaPorDatasToolbar', () => {
     expect(
       filtrarVendaDeliveryKanbanColunaPorDatasToolbar(fora, 'COM_NFE', params)
     ).toBe(false)
+    expect(
+      filtrarVendaDeliveryKanbanColunaPorDatasToolbar(dentro, 'PENDENTE_EMISSAO', params)
+    ).toBe(true)
+    expect(
+      filtrarVendaDeliveryKanbanColunaPorDatasToolbar(fora, 'PENDENTE_EMISSAO', params)
+    ).toBe(false)
   })
 
   it('não aplica filtro de criação em coluna fiscal (finalizado no período, criado antes)', () => {
