@@ -73,7 +73,7 @@ export function Perfil() {
         const nome = nomeFonte.getName()?.trim() || nomeFonte.getEmail() || 'Usuário'
         if (res.status === 404) {
           showToast.warning(
-            'Perfil não encontrado no servidor. Os dados exibidos podem estar desatualizados — saia e entre novamente.'
+            'Perfil não encontrado, saia e entre novamente.'
           )
         }
         setDadosExibicao({
@@ -143,7 +143,7 @@ export function Perfil() {
   const handleAlterarSenha = async (e: FormEvent) => {
     e.preventDefault()
     if (!tokenPerfil) {
-      showToast.error('Sessão expirada ou indisponível. Entre novamente para alterar a senha.')
+      showToast.error('Sessão expirada ou indisponível, entre novamente.')
       return
     }
     if (!senhaGestorEhValida(novaSenha)) {

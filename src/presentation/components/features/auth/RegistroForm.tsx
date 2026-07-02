@@ -118,8 +118,7 @@ export function RegistroForm() {
     >
       {isRegistroPorConvite ? (
         <p className="text-sm text-gray-800 rounded-lg bg-white/50 border border-white/60 p-3">
-          Você foi convidado para uma empresa na Jiffy. Complete o cadastro; em seguida entraremos e aceitaremos o
-          convite automaticamente quando possível.
+          Você foi convidado por uma empresa na Jiffy, complete seu cadastro.
         </p>
       ) : null}
 

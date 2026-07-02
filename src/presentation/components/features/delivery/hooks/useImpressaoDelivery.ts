@@ -107,7 +107,7 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
               status: ticketsFetch.status,
               mensagem: ticketsFetch.error ?? null,
             })
-            showToast.error(ticketsFetch.error || 'Não foi possível carregar os tickets do pedido.')
+            showToast.error(ticketsFetch.error || 'Não foi possível carregar os cupons do pedido.')
             continue
           }
           ticketsPayload = ticketsFetch.data
@@ -152,7 +152,7 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
         })
 
         notificarWarningsTickets(wsLista, m => showToast.info(m), {
-          ignorarCodes: [...codesIgnorados, 'MAPEAMENTO_IMPRESSORA_NAO_CONFIGURADO', 'IMPRESSORA_WINDOWS_NAO_MAPEADA'],
+          ignorarCodes: [...codesIgnorados, 'Mapeamento de impressora não configurado', 'Impressora não mapeada'],
           tickets: ticketsPayload.tickets,
           imprimeProducao,
           warningsProdutoSemImpressora: ticketsPayload.warnings,
@@ -226,7 +226,7 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
           return
         }
         erroImpressao('hook.reimpressao.fetch_erro', { status: ticketsFetch.status })
-        showToast.error(ticketsFetch.error || 'Não foi possível carregar os tickets do pedido.')
+        showToast.error(ticketsFetch.error || 'Não foi possível carregar os cupons do pedido.')
         return
       }
 
@@ -248,7 +248,7 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
       const filtrados = filtrarTicketsPorTipoDecidido(ticketsFetch.data.tickets, tipoEfetivo)
       if (filtrados.length === 0) {
         warnImpressao('hook.reimpressao.sem_tickets_no_estagio', { tipo: tipoEfetivo, colunaId })
-        showToast.info('Nenhum ticket disponível para reimpressão neste estágio.')
+        showToast.info('Nenhum cupom disponível para reimpressão neste estágio.')
         return
       }
 
@@ -262,7 +262,7 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
         codes: wsLista.map(w => (typeof w === 'string' ? w : (w as { code?: string }).code)),
       })
       notificarWarningsTickets(wsLista, m => showToast.info(m), {
-        ignorarCodes: [...codesIgnorados, 'MAPEAMENTO_IMPRESSORA_NAO_CONFIGURADO', 'IMPRESSORA_WINDOWS_NAO_MAPEADA'],
+        ignorarCodes: [...codesIgnorados, 'Mapeamento de impressora não configurado', 'Impressora não mapeada'],
         tickets: ticketsFetch.data.tickets,
         imprimeProducao,
         warningsProdutoSemImpressora: ticketsFetch.data.warnings,

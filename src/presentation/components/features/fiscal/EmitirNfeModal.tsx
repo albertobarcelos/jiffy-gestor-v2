@@ -112,7 +112,7 @@ export function EmitirNfeModal({
 
       if (modelo === 55 && !temClienteCadastrado) {
         showToast.error(
-          'Para emitir NF-e (modelo 55) é obrigatório que a venda tenha um cliente cadastrado. Vincule o cliente na origem do pedido e tente novamente.'
+          'Para emitir NF-e (modelo 55) é obrigatório que a venda tenha um cliente vinculado.'
         )
         return
       }

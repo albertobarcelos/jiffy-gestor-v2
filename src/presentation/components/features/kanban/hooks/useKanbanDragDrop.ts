@@ -112,7 +112,7 @@ export function useKanbanDragDrop({
             .toUpperCase() === 'REJEITADA'
         if (fiscalRejeitada) {
           showToast.warning(
-            'Vendas com nota rejeitada não podem ser movidas para Finalizadas. Use Reemitir na coluna Pendente Emissão.'
+            'Vendas com nota rejeitada não podem ser movidas para Finalizadas, use Reemitir.'
           )
           return
         }

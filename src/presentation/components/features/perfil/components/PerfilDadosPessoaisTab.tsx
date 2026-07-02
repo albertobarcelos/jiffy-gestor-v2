@@ -181,7 +181,7 @@ export function PerfilDadosPessoaisTab({
     }
 
     if (!tokenPerfil) {
-      showToast.error('Sessão expirada ou indisponível. Entre novamente para alterar os dados.')
+      showToast.error('Sessão expirada ou indisponível, entre novamente.')
       return
     }
 
