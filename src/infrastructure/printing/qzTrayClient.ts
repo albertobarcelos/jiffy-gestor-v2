@@ -317,24 +317,18 @@ export function formatTcpPrinterRef(host: string, port: number | string): string
   return `tcp://${host.trim()}:${port}`
 }
 
+type QzEscPosPrinterTarget = string | { host: string; port: string }
+
 /**
- * Imprime um HTML em uma impressora térmica via raw TCP (sem instalar no Windows).
+ * Envia cupom como ESC/POS raw via QZ Tray (Windows/USB ou TCP/IP).
  *
- * Usa o conversor ESC/POS de texto (`deliveryCupomHtmlParaEscPos`): a rasterização
- * de HTML (`type:'raw', format:'html'`) não é confiável em raw TCP — em muitas
- * Bematech o `qz.print` "tem sucesso" porém a impressora não renderiza a imagem e
- * sai a folha em branco. O conversor mapeia as classes do template para comandos
- * ESC/POS (negrito, alinhamento, colunas, separadores), garantindo a saída formatada.
- *
- * Fluxo:
- * 1. Conecta ao WebSocket do QZ Tray
- * 2. Cria config apontando direto para IP:porta (sem nome de impressora Windows)
- * 3. Converte o HTML em ESC/POS e envia em raw
+ * Evita `type:'pixel', format:'html'`, que falha em várias térmicas (Bematech USB):
+ * o job "tem sucesso" mas sai folha em branco ou lixo de bytes na borda.
+ * O conversor `deliveryCupomHtmlParaEscPos` mapeia o template para comandos nativos.
  */
-export async function printRawTcpQz(
+async function printRawEscPosQz(
   qz: QzModule,
-  host: string,
-  port: number,
+  target: QzEscPosPrinterTarget,
   html: string,
   copies = 1,
   jobName = 'Jiffy'
@@ -342,7 +336,7 @@ export async function printRawTcpQz(
   const conteudo = deliveryCupomHtmlParaEscPos(html)
 
   const enviar = async () => {
-    const config = qz.configs.create({ host, port: String(port) }, { jobName, encoding: 'Cp850' })
+    const config = qz.configs.create(target, { jobName, encoding: 'Cp850' })
     for (let i = 0; i < Math.max(1, copies); i++) {
       await qz.print(config, [conteudo])
     }
@@ -353,11 +347,34 @@ export async function printRawTcpQz(
   try {
     await enviar()
   } catch (error) {
-    // Socket caiu (ex.: modal fechado/reaberto): reconecta e tenta uma vez mais.
+    // Socket/spooler caiu (ex.: modal fechado/reaberto): reconecta e tenta uma vez mais.
     if (!isQzSendDataError(error)) throw error
     qzConnectPromise = null
     await qz.websocket.disconnect().catch(() => undefined)
     await ensureQzWebsocketConnected(qz)
     await enviar()
   }
+}
+
+/** Imprime via nome da impressora Windows (USB/spooler) em ESC/POS raw. */
+export async function printRawWindowsQz(
+  qz: QzModule,
+  printerName: string,
+  html: string,
+  copies = 1,
+  jobName = 'Jiffy'
+): Promise<void> {
+  await printRawEscPosQz(qz, printerName, html, copies, jobName)
+}
+
+/** Imprime via TCP direto (IP:porta) em ESC/POS raw, sem spooler Windows. */
+export async function printRawTcpQz(
+  qz: QzModule,
+  host: string,
+  port: number,
+  html: string,
+  copies = 1,
+  jobName = 'Jiffy'
+): Promise<void> {
+  await printRawEscPosQz(qz, { host, port: String(port) }, html, copies, jobName)
 }

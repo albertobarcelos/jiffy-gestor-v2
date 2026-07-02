@@ -2,8 +2,9 @@
  * Converte o HTML do cupom delivery (renderDeliveryCupomHtml) em bytes ESC/POS
  * para impressoras térmicas via TCP (Bematech, Epson, etc.).
  *
- * O QZ pixel/html não funciona em raw TCP; o conversor nativo do QZ ignora
- * nosso `<style>` com classes. Este mapeamento conhece as classes do template.
+ * O QZ pixel/html não funciona de forma confiável em térmicas (Bematech USB e raw TCP);
+ * o conversor nativo do QZ ignora nosso `<style>` com classes. Este mapeamento conhece
+ * as classes do template e gera ESC/POS para Windows/USB e IP.
  */
 
 const ESC = '\x1B'
