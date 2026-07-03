@@ -12,7 +12,11 @@ import { syncTenantAccessTokenClient } from '@/src/presentation/utils/syncTenant
 import {
   SESSION_STORAGE_HUB_LOGOUT_SELF,
   SESSION_STORAGE_TENANT_LOGOUT_SELF,
+  JIFFY_SESSION_EXPIRED_EVENT,
 } from '@/src/shared/constants/sessionCoordinator'
+
+/** Tempo máximo de espera para o refresh de token antes de forçar logout. */
+const REFRESH_TIMEOUT_MS = 5_000
 
 function isHubLogoutInitiatorTab(): boolean {
   if (typeof window === 'undefined') return false
@@ -133,6 +137,8 @@ export function AuthGuard({ children }: AuthGuardProps) {
       return
     }
     redirectingRef.current = true
+    // Limpar cookie de identidade antes de redirecionar (sem await para não bloquear o redirect)
+    void fetch('/api/auth/logout-hub', { method: 'POST', credentials: 'include' }).catch(() => { /* noop */ })
     window.location.href = '/login'
   }, [])
 
@@ -145,12 +151,13 @@ export function AuthGuard({ children }: AuthGuardProps) {
   }, [])
 
   useEffect(() => {
-    if (!isRehydrated) {
+    // Rotas públicas: liberar imediatamente, sem esperar reidratação
+    if (isPublicPath(pathname)) {
+      setAllowed(true)
       return
     }
 
-    if (isPublicPath(pathname)) {
-      setAllowed(true)
+    if (!isRehydrated) {
       return
     }
 
@@ -191,7 +198,14 @@ export function AuthGuard({ children }: AuthGuardProps) {
     if (!isAuthenticated || auth === null || auth.isExpired()) {
       let cancelled = false
       void (async () => {
-        const refreshed = await fetchTenantRefreshAccessToken()
+        // Race: refresh token vs. timeout de segurança (5 s)
+        let timeoutHandle: number | undefined
+        const timeoutPromise = new Promise<null>(resolve => {
+          timeoutHandle = window.setTimeout(() => resolve(null), REFRESH_TIMEOUT_MS)
+        })
+        const refreshed = await Promise.race([fetchTenantRefreshAccessToken(), timeoutPromise])
+        window.clearTimeout(timeoutHandle)
+
         if (cancelled) {
           return
         }
@@ -276,7 +290,12 @@ export function AuthGuard({ children }: AuthGuardProps) {
       const { isAuthenticated: ok, auth: current } = st
       if (!ok || current === null || current.isExpired()) {
         void (async () => {
-          const refreshed = await fetchTenantRefreshAccessToken()
+          let timeoutHandle: number | undefined
+          const timeoutPromise = new Promise<null>(resolve => {
+            timeoutHandle = window.setTimeout(() => resolve(null), REFRESH_TIMEOUT_MS)
+          })
+          const refreshed = await Promise.race([fetchTenantRefreshAccessToken(), timeoutPromise])
+          window.clearTimeout(timeoutHandle)
           if (refreshed) {
             try {
               syncTenantAccessTokenClient(refreshed)
@@ -320,6 +339,20 @@ export function AuthGuard({ children }: AuthGuardProps) {
     invalidateSessionToLogin,
     redirectHubSemIdentidade,
   ])
+
+  /** Listener centralizado: fetchGestorApi dispara este evento quando o refresh falha. */
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      void invalidateSessionToLogin()
+    }
+    window.addEventListener(JIFFY_SESSION_EXPIRED_EVENT, handleSessionExpired)
+    return () => window.removeEventListener(JIFFY_SESSION_EXPIRED_EVENT, handleSessionExpired)
+  }, [invalidateSessionToLogin])
+
+  // Rotas públicas: renderizar imediatamente sem checar autenticação
+  if (isPublicPath(pathname)) {
+    return <>{children}</>
+  }
 
   if (!isRehydrated || !allowed) {
     if (isHubPath(pathname)) {

@@ -3,7 +3,9 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantAccessGuard } from '@/src/presentation/hooks/useTenantAccessGuard'
 import { showToast } from '@/src/shared/utils/toast'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 
 interface PainelContadorAcessoGuardProps {
   children: React.ReactNode
@@ -15,10 +17,11 @@ interface PainelContadorAcessoGuardProps {
  */
 export function PainelContadorAcessoGuard({ children }: PainelContadorAcessoGuardProps) {
   const router = useRouter()
-  const { auth, isRehydrated, isAuthenticated } = useAuthStore()
+  const { auth } = useAuthStore()
+  const { hasAccess, isLoading } = useTenantAccessGuard()
 
   useEffect(() => {
-    if (!isRehydrated || !isAuthenticated || !auth) return
+    if (isLoading || !hasAccess || !auth) return
 
     const token = auth.getAccessToken()
     if (!token) return
@@ -34,7 +37,15 @@ export function PainelContadorAcessoGuard({ children }: PainelContadorAcessoGuar
     } catch {
       // Sem claim no JWT: mantém compatibilidade com sessões atuais
     }
-  }, [auth, isAuthenticated, isRehydrated, router])
+  }, [auth, hasAccess, isLoading, router])
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <JiffyLoading />
+      </div>
+    )
+  }
 
   return <>{children}</>
 }

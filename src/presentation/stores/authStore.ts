@@ -9,6 +9,15 @@ import { buildAuthFromAccessToken } from '@/src/shared/utils/buildAuthFromAccess
 import { SESSION_STORAGE_TENANT_TOKEN } from '@/src/shared/constants/sessionCoordinator'
 import { clearTabSession } from '@/src/shared/utils/tabSession'
 
+/**
+ * Referência ao `set` do Zustand capturada na factory.
+ * Usada em `onRehydrateStorage` para setar `isRehydrated = true` quando o estado
+ * reidratado é `null` (localStorage vazio, corrompido ou primeira visita).
+ * É seguro porque a callback de reidratação só é invocada após a inicialização
+ * do módulo, quando `_storeSet` já está preenchido.
+ */
+let _storeSet: ((partial: Partial<AuthState>) => void) | null = null
+
 type PersistedAuthJSON = {
   accessToken: string
   user: {
@@ -128,7 +137,9 @@ function restoreTenantFromSessionStorage(identityAuth: Auth | null): Auth | null
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
+    (set, get) => {
+      _storeSet = set
+      return {
       identityAuth: null,
       tenantAuth: null,
       auth: null,
@@ -291,7 +302,8 @@ export const useAuthStore = create<AuthState>()(
           }
         })
       },
-    }),
+    }
+    },
     {
       name: 'auth-storage',
       version: 2,
@@ -321,6 +333,11 @@ export const useAuthStore = create<AuthState>()(
       },
       onRehydrateStorage: () => state => {
         if (!state) {
+          // localStorage vazio (primeira visita) ou corrompido.
+          // Limpar storage inválido e marcar reidratação como concluída para
+          // não travar a aplicação em loading infinito.
+          try { localStorage.removeItem('auth-storage') } catch { /* noop */ }
+          _storeSet?.({ isRehydrated: true })
           return
         }
         const s = state as AuthState & { auth?: unknown }

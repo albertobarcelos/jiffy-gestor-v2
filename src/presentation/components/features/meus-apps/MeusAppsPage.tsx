@@ -37,6 +37,7 @@ export default function MeusAppsPage() {
   const setHubEmpresas = useAuthStore(s => s.setHubEmpresas)
   /** Sessão do hub (identidade); não usar `auth` aqui — pode ser só tenant se outra aba abriu empresa. */
   const identityAuth = useAuthStore(s => s.identityAuth)
+  const logoutHub = useAuthStore(s => s.logoutHub)
   const isRehydrated = useAuthStore(s => s.isRehydrated)
 
   const [busca, setBusca] = useState('')
@@ -65,10 +66,26 @@ export default function MeusAppsPage() {
   const reportHubSessionIssue = useCallback((message: string) => {
     setHubTokenBanner(message)
     toast.error(message, { id: HUB_SESSAO_TOAST_ID, duration: 8000 })
-  }, [])
 
-  /** Assim que o JWT expira (ou pouco depois): toast + banner, sem esperar nova requisição. */
+    // Agenda redirect imediato ao login quando o servidor rejeita o token —
+    // independente de identityAuth.isExpired() (pode estar revogado no servidor).
+    if (!hubSessaoProativaDisparadaRef.current) {
+      hubSessaoProativaDisparadaRef.current = true
+      redirectTimerRef.current = window.setTimeout(() => {
+        void logoutHub().finally(() => {
+          window.location.href = '/login'
+        })
+      }, 3000)
+    }
+  }, [logoutHub])
+
+  /**
+   * Assim que o JWT de identidade expira: mostra banner/toast brevemente e,
+   * após 3 s, chama `logoutHub()` + redireciona ao /login.
+   * Não espera o poll do AuthGuard (15 s) para dar uma resposta mais ágil ao usuário.
+   */
   const hubSessaoProativaDisparadaRef = useRef(false)
+  const redirectTimerRef = useRef<number | undefined>(undefined)
   useEffect(() => {
     if (!isRehydrated || !identityAuth) {
       return
@@ -83,6 +100,13 @@ export default function MeusAppsPage() {
       }
       hubSessaoProativaDisparadaRef.current = true
       reportHubSessionIssue(HUB_SESSAO_TOKEN_MENSAGEM)
+
+      // Redirecionar ao login após breve aviso (3 s para o usuário ler o toast)
+      redirectTimerRef.current = window.setTimeout(() => {
+        void logoutHub().finally(() => {
+          window.location.href = '/login'
+        })
+      }, 3000)
     }
 
     dispararSeExpirado()
@@ -99,8 +123,11 @@ export default function MeusAppsPage() {
       if (timeoutId !== undefined) {
         window.clearTimeout(timeoutId)
       }
+      if (redirectTimerRef.current !== undefined) {
+        window.clearTimeout(redirectTimerRef.current)
+      }
     }
-  }, [identityAuth, isRehydrated, reportHubSessionIssue])
+  }, [identityAuth, isRehydrated, reportHubSessionIssue, logoutHub])
 
   useEffect(() => {
     if (identityAuth && !identityAuth.isExpired()) {
