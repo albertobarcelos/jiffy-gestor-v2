@@ -1,7 +1,8 @@
 'use client'
 
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useQueryClient } from '@tanstack/react-query'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { showToast } from '@/src/shared/utils/toast'
 import { updateProdutoPatch } from '@/src/application/use-cases/produtos/UpdateProdutoPatchUseCase'
 import { applyPatchToInfinitePages } from '@/src/presentation/components/features/produtos/ProdutosList/utils'
@@ -55,23 +56,20 @@ function successMessage(payload: ProdutoPatchPayload): string {
  * Usa updateProdutoPatch como único use-case de infra para todos os tipos de patch.
  */
 export function useProdutoPatchMutation() {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
+  const empresaId = useTenantEmpresaId()
 
-  return useMutation<void, Error, ProdutoPatchPayload, { snapshot: [unknown, unknown][] }>({
-    mutationFn: async (payload) => {
-      const token = auth?.getAccessToken()
-      if (!token) throw new Error('Token não encontrado. Faça login novamente.')
-      return updateProdutoPatch({ produtoId: payload.produtoId, patch: payloadToPatch(payload), token })
-    },
-
+  return useSecureTenantMutation<void, ProdutoPatchPayload, { snapshot: [unknown, unknown][] }>(
+    async ({ token }, payload) =>
+      updateProdutoPatch({ produtoId: payload.produtoId, patch: payloadToPatch(payload), token }),
+    {
     onMutate: async (payload) => {
-      await queryClient.cancelQueries({ queryKey: ['produtos', 'infinite'], exact: false })
-      const snapshot = queryClient.getQueriesData<unknown>({ queryKey: ['produtos', 'infinite'] })
+      await queryClient.cancelQueries({ queryKey: ['tenant', empresaId, 'produtos', 'infinite'], exact: false })
+      const snapshot = queryClient.getQueriesData<unknown>({ queryKey: ['tenant', empresaId, 'produtos', 'infinite'] })
       const patch = payloadToPatch(payload)
 
       queryClient.setQueriesData(
-        { queryKey: ['produtos', 'infinite'], exact: false },
+        { queryKey: ['tenant', empresaId, 'produtos', 'infinite'], exact: false },
         (old) => applyPatchToInfinitePages(old, payload.produtoId, patch)
       )
 
@@ -93,10 +91,11 @@ export function useProdutoPatchMutation() {
 
     onSettled: () => {
       queryClient.invalidateQueries({
-        queryKey: ['produtos', 'infinite'],
+        queryKey: ['tenant', empresaId, 'produtos', 'infinite'],
         exact: false,
         refetchType: 'none',
       })
     },
-  })
+    }
+  )
 }

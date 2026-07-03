@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useQueryClient } from '@tanstack/react-query'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
-import { useTenantEmpresaId, useTenantQueryKey } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { resolverTimezoneAgregacaoEmpresa } from '@/src/shared/utils/timezoneAgregacaoEmpresa'
 import type { PreferenciasImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
 import { DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY } from '@/src/shared/types/deliveryImpressao'
@@ -132,22 +132,18 @@ export async function fetchEmpresaMeQueryData(token: string): Promise<EmpresaMeQ
  * Cache compartilhado via React Query — múltiplos componentes reutilizam a mesma resposta.
  */
 export function useEmpresaMe() {
-  const { auth, isAuthenticated, isRehydrated } = useAuthStore()
   const empresaId = useTenantEmpresaId()
   const queryClient = useQueryClient()
-  const queryKey = useTenantQueryKey(['empresas', 'me'])
 
-  const token = auth?.getAccessToken()
-  const enabled = isRehydrated && isAuthenticated && !!token
-
-  const query = useQuery({
-    queryKey,
-    queryFn: () => fetchEmpresaMeQueryData(token!),
-    enabled,
-    staleTime: 1000 * 60 * 5,
-    refetchOnWindowFocus: false,
-    retry: 1,
-  })
+  const query = useSecureTenantQuery(
+    ['empresas', 'me'],
+    ({ token }) => fetchEmpresaMeQueryData(token),
+    {
+      staleTime: 1000 * 60 * 5,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    }
+  )
 
   useEffect(() => {
     const onUpdated = () => {
@@ -166,7 +162,7 @@ export function useEmpresaMe() {
       data?.preferenciasImpressaoDelivery ?? DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
     deliveryCupomTemplate: data?.deliveryCupomTemplate ?? DEFAULT_DELIVERY_CUPOM_TEMPLATE,
     parametroEmpresa: data?.parametroEmpresa ?? {},
-    isLoading: enabled && query.isPending,
+    isLoading: query.isPending,
     error:
       query.error instanceof Error
         ? query.error.message

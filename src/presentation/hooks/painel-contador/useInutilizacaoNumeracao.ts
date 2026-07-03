@@ -1,19 +1,24 @@
 'use client'
 
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { createPainelContadorUseCases } from '@/src/presentation/hooks/painel-contador/fiscalPainelFactory'
 import { showToast } from '@/src/shared/utils/toast'
 import type { GapsQueryDTO } from '@/src/application/dto/painel-contador/PainelContadorDTO'
 
-export function useInutilizacaoNumeracao() {
-  const { auth } = useAuthStore()
-  const empresaId = useTenantEmpresaId()
-  const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
+function requireTenantToken(): string {
+  const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+  if (!token || useAuthStore.getState().tenantAuth?.isExpired()) {
+    throw new Error('Sessão de empresa não encontrada. Faça login novamente.')
+  }
+  return token
+}
 
-  const getUseCases = () => createPainelContadorUseCases(token!)
+export function useInutilizacaoNumeracao() {
+  const invalidate = useInvalidateTenantQueries()
+
+  const getUseCases = () => createPainelContadorUseCases(requireTenantToken())
 
   const consultarGaps = async (params: GapsQueryDTO) => {
     const { consultarGaps: uc } = getUseCases()
@@ -25,17 +30,19 @@ export function useInutilizacaoNumeracao() {
     return uc.listarInutilizacoes(modelo, serie)
   }
 
-  const inutilizarMutation = useMutation({
-    mutationFn: async (input: unknown) => {
-      const { inutilizar } = getUseCases()
+  const inutilizarMutation = useSecureTenantMutation(
+    async ({ token }, input: unknown) => {
+      const { inutilizar } = createPainelContadorUseCases(token)
       return inutilizar.execute(input)
     },
-    onSuccess: () => {
-      showToast.success('Inutilização realizada')
-      queryClient.invalidateQueries({ queryKey: ['portal-contador', empresaId] })
-    },
-    onError: (e: Error) => showToast.error(e.message),
-  })
+    {
+      onSuccess: async () => {
+        showToast.success('Inutilização realizada')
+        await invalidate(['portal-contador'])
+      },
+      onError: (e: Error) => showToast.error(e.message),
+    }
+  )
 
   return {
     consultarGaps,

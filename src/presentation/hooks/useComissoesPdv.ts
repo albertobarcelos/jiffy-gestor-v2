@@ -1,6 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import type {
   ComissaoPdvItemDTO,
   ComissoesPdvListagemResponseDTO,
@@ -174,20 +172,17 @@ export async function fetchComissoesPdvAllItemsForTaxa(
  * Relatório de comissões por usuário PDV (`taxaId` obrigatório na chamada à API; o componente pode agregar várias taxas).
  */
 export function useComissoesPdv(params: ComissoesPdvFetchParams | null) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
-  const empresaId = useTenantEmpresaId()
-  const enabled = Boolean(token && params?.taxaId?.trim())
-
-  return useQuery({
-    queryKey: ['comissoes-pdv', params, empresaId],
-    queryFn: async (): Promise<ComissoesPdvListagemResponseDTO> => {
-      if (!token || !params?.taxaId?.trim()) {
+  return useSecureTenantQuery(
+    ['comissoes-pdv', params],
+    async ({ token }): Promise<ComissoesPdvListagemResponseDTO> => {
+      if (!params?.taxaId?.trim()) {
         throw new Error('Sessão ou taxa inválida.')
       }
       return fetchComissoesPdvPage(token, params)
     },
-    enabled,
-    staleTime: 60_000,
-  })
+    {
+      enabled: Boolean(params?.taxaId?.trim()),
+      staleTime: 60_000,
+    }
+  )
 }

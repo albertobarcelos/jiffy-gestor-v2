@@ -1,6 +1,5 @@
 import { useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { DashboardMetodoPagamento } from '@/src/domain/entities/DashboardMetodoPagamento'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
@@ -32,18 +31,16 @@ export function useDashboardMetodosPagamentoDetalhadoQuery({
 }: Params) {
   const mappedPeriodo = useMemo(() => mapPeriodoToUseCaseFormat(periodo), [periodo])
   const useCustomDates = !!(periodoInicial && periodoFinal)
-  const empresaId = useTenantEmpresaId()
 
-  return useQuery({
-    queryKey: [
+  return useSecureTenantQuery(
+    [
       'dashboard',
       'metodos-pagamento-detalhado',
       mappedPeriodo,
       useCustomDates ? periodoInicial!.toISOString() : null,
       useCustomDates ? periodoFinal!.toISOString() : null,
-      empresaId,
     ],
-    queryFn: async () => {
+    async () => {
       const params = new URLSearchParams()
       if (useCustomDates) {
         params.append('periodo', 'personalizado')
@@ -52,7 +49,7 @@ export function useDashboardMetodosPagamentoDetalhadoQuery({
       } else {
         params.append('periodo', mappedPeriodo)
       }
-      
+
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
       params.append('timezone', timezone)
 
@@ -60,12 +57,16 @@ export function useDashboardMetodosPagamentoDetalhadoQuery({
       if (!response.ok) {
         throw new Error('Erro ao buscar métodos de pagamento')
       }
-      
+
       const data = await response.json()
-      
-      // Converte objetos simples de volta para a entidade se necessário, 
-      // ou apenas retorna os dados. O hook original retornava DashboardMetodoPagamento[]
-      return data.map((item: any) => DashboardMetodoPagamento.create({
+
+      return data.map((item: {
+        metodo: string
+        valor: number
+        quantidade: number
+        percentual: number
+        formaPagamentoFiscal?: string
+      }) => DashboardMetodoPagamento.create({
         metodo: item.metodo,
         valor: item.valor,
         quantidade: item.quantidade,
@@ -73,8 +74,10 @@ export function useDashboardMetodosPagamentoDetalhadoQuery({
         formaPagamentoFiscal: item.formaPagamentoFiscal
       }))
     },
-    enabled,
-    staleTime: 90_000,
-    gcTime: 10 * 60_000,
-  })
+    {
+      enabled,
+      staleTime: 90_000,
+      gcTime: 10 * 60_000,
+    }
+  )
 }

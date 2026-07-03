@@ -1,6 +1,5 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { keepPreviousData } from '@tanstack/react-query'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { DashboardTopProduto } from '@/src/domain/entities/DashboardTopProduto'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
@@ -91,25 +90,23 @@ export function useDashboardTopProdutosQuery({
   timezone,
   enabled = true,
 }: Params) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
-  const empresaId = useTenantEmpresaId()
   const resolvedTimezone = timezone?.trim() || 'America/Sao_Paulo'
 
-  return useQuery<DashboardTopProdutosQueryData>({
-    queryKey: [
+  return useSecureTenantQuery<DashboardTopProdutosQueryData>(
+    [
       'dashboard',
       'top-produtos',
       periodo,
       periodoInicial ? periodoInicial.toISOString() : null,
       periodoFinal ? periodoFinal.toISOString() : null,
-      empresaId,
       resolvedTimezone,
     ],
-    queryFn: () =>
-      fetchTopProdutos({ periodo, periodoInicial, periodoFinal, enabled, token: token!, timezone: resolvedTimezone }),
-    enabled: enabled && !!token,
-    staleTime: 30_000,
-    placeholderData: keepPreviousData,
-  })
+    ({ token }) =>
+      fetchTopProdutos({ periodo, periodoInicial, periodoFinal, token, timezone: resolvedTimezone }),
+    {
+      enabled,
+      staleTime: 30_000,
+      placeholderData: keepPreviousData,
+    }
+  )
 }

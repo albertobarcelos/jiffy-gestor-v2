@@ -1,6 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { VENDAS_UNIFICADAS_PAGE_SIZE } from '@/features/kanban/hooks/useVendasUnificadas'
 
@@ -45,21 +43,9 @@ export function useVendaIdsPdvPorTerminal(
   params: VendaIdsPdvPorTerminalParams,
   options?: { enabled?: boolean }
 ) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
-  const empresaId = useTenantEmpresaId()
-  const queryEnabled =
-    options?.enabled !== false && !!token && !!params.terminalId.trim()
-
-  const queryKey = ['venda-ids-pdv-terminal', params, empresaId]
-
-  return useQuery({
-    queryKey,
-    queryFn: async (): Promise<Set<string>> => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantQuery(
+    ['venda-ids-pdv-terminal', params],
+    async ({ token }): Promise<Set<string>> => {
       const pageSize = VENDAS_UNIFICADAS_PAGE_SIZE
       const ids = new Set<string>()
       const idsJaRecebidos = new Set<string>()
@@ -134,8 +120,10 @@ export function useVendaIdsPdvPorTerminal(
 
       return ids
     },
-    enabled: queryEnabled,
-    refetchOnReconnect: true,
-    refetchInterval: false,
-  })
+    {
+      enabled: options?.enabled !== false && !!params.terminalId.trim(),
+      refetchOnReconnect: true,
+      refetchInterval: false,
+    }
+  )
 }

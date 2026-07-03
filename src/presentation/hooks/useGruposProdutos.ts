@@ -1,9 +1,8 @@
 'use client'
 
-import { useQuery, useInfiniteQuery } from '@tanstack/react-query'
 import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
+import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecureTenantInfiniteQuery'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
@@ -33,18 +32,9 @@ interface GruposProdutosResponse {
  * Ideal para uso em formulários e dropdowns.
  */
 export function useGruposProdutos(params: GruposProdutosQueryParams = {}) {
-  const { auth, isAuthenticated } = useAuthStore()
-  const token = auth?.getAccessToken()
-  const empresaId = useTenantEmpresaId()
-  const queryEnabled = isAuthenticated && !!token && (params.enabled ?? true)
-
-  return useQuery<GrupoProduto[], ApiError>({
-    queryKey: ['grupos-produtos', params.name, params.ativo, params.limit, empresaId],
-    queryFn: async () => {
-      if (!isAuthenticated || !token) {
-        throw new Error('Usuário não autenticado ou token ausente.')
-      }
-
+  return useSecureTenantQuery<GrupoProduto[]>(
+    ['grupos-produtos', params.name, params.ativo, params.limit],
+    async ({ token }) => {
       const mapResponse = async (response: Response) => {
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}))
@@ -109,28 +99,22 @@ export function useGruposProdutos(params: GruposProdutosQueryParams = {}) {
 
       return acumulado.slice(0, desired)
     },
-    enabled: queryEnabled,
-    staleTime: 1000 * 60 * 3, // 3 minutos (balance entre performance e atualização)
-    refetchOnMount: true, // Sempre refetch ao montar para garantir dados atualizados
-    refetchOnWindowFocus: params.refetchOnWindowFocus ?? true, // Alinhado ao uso; modais podem passar false
-  })
+    {
+      enabled: params.enabled ?? true,
+      staleTime: 1000 * 60 * 3,
+      refetchOnMount: true,
+      refetchOnWindowFocus: params.refetchOnWindowFocus ?? true,
+    }
+  )
 }
 
 /**
  * Hook para buscar grupos de produtos com paginação infinita (scroll infinito)
  */
 export function useGruposProdutosInfinite(params: Omit<GruposProdutosQueryParams, 'offset'> = {}) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
-  const empresaId = useTenantEmpresaId()
-
-  return useInfiniteQuery({
-    queryKey: ['grupos-produtos', 'infinite', params, empresaId],
-    queryFn: async ({ pageParam = 0 }): Promise<{ grupos: GrupoProduto[]; count: number; nextOffset: number | null }> => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantInfiniteQuery(
+    ['grupos-produtos', 'infinite', params],
+    async ({ token }, pageParam) => {
       const limit = Math.min(params.limit || 10, GRUPOS_PRODUTOS_API_MAX_LIMIT)
       const searchParams = new URLSearchParams()
       if (params.name) searchParams.append('q', params.name)
@@ -138,7 +122,7 @@ export function useGruposProdutosInfinite(params: Omit<GruposProdutosQueryParams
         searchParams.append('ativo', params.ativo.toString())
       }
       searchParams.append('limit', limit.toString())
-      searchParams.append('offset', pageParam.toString())
+      searchParams.append('offset', String(pageParam))
 
       const response = await fetchGestorApi(`/api/grupos-produtos?${searchParams.toString()}`, {
         headers: {
@@ -169,15 +153,15 @@ export function useGruposProdutosInfinite(params: Omit<GruposProdutosQueryParams
         nextOffset,
       }
     },
-    enabled: !!token,
-    initialPageParam: 0,
-    getNextPageParam: (lastPage) => lastPage.nextOffset,
-    staleTime: 1000 * 60 * 5, // 5 minutos
-    gcTime: 1000 * 60 * 10, // 10 minutos
-    refetchOnWindowFocus: false, // Não refetch ao focar na janela
-    refetchOnMount: true, // SEMPRE refetch ao montar para garantir dados atualizados após reordenação
-    placeholderData: (previousData) => previousData, // Prefetch automático
-  })
+    {
+      enabled: params.enabled ?? true,
+      initialPageParam: 0,
+      getNextPageParam: lastPage => lastPage.nextOffset,
+      staleTime: 1000 * 60 * 5,
+      gcTime: 1000 * 60 * 10,
+      refetchOnWindowFocus: false,
+      refetchOnMount: true,
+      placeholderData: previousData => previousData,
+    }
+  )
 }
-
-

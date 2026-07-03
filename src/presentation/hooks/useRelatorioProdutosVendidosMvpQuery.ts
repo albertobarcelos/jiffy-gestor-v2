@@ -296,6 +296,10 @@ export function buildRelatorioMvpQueryKeyPrefix(
 
   return [
 
+    'tenant',
+
+    empresaId,
+
     'relatorios',
 
     'produtos-vendidos-mvp',
@@ -322,8 +326,6 @@ export function buildRelatorioMvpQueryKeyPrefix(
 
     params.buscaNome,
 
-    empresaId,
-
   ] as const
 
 }
@@ -332,9 +334,9 @@ export function buildRelatorioMvpQueryKeyPrefix(
 
 export function useRelatorioProdutosVendidosMvpQuery(params: RelatorioProdutosVendidosMvpQueryParams) {
 
-  const { auth } = useAuthStore()
+  const { isAuthenticated, isRehydrated, tenantAuth } = useAuthStore()
 
-  const token = auth?.getAccessToken()
+  const token = tenantAuth?.getAccessToken()
 
   const empresaId = useTenantEmpresaId()
 
@@ -400,7 +402,13 @@ export function useRelatorioProdutosVendidosMvpQuery(params: RelatorioProdutosVe
 
       }),
 
-    enabled: enabled && !!token,
+    enabled:
+      enabled &&
+      isRehydrated &&
+      isAuthenticated &&
+      !!token &&
+      !!empresaId &&
+      !(tenantAuth?.isExpired() ?? true),
 
     staleTime: 30_000,
 
@@ -432,9 +440,9 @@ export function useRelatorioProdutosVendidosMvpInfiniteQuery(
 
 ) {
 
-  const { auth } = useAuthStore()
+  const { isAuthenticated, isRehydrated, tenantAuth } = useAuthStore()
 
-  const token = auth?.getAccessToken()
+  const token = tenantAuth?.getAccessToken()
 
   const empresaId = useTenantEmpresaId()
 
@@ -546,7 +554,13 @@ export function useRelatorioProdutosVendidosMvpInfiniteQuery(
       return carregados
     },
 
-    enabled: enabled && !!token,
+    enabled:
+      enabled &&
+      isRehydrated &&
+      isAuthenticated &&
+      !!token &&
+      !!empresaId &&
+      !(tenantAuth?.isExpired() ?? true),
 
     staleTime: 30_000,
 
@@ -582,9 +596,9 @@ export function useRelatorioProdutosVendidosMvpComparativoQuery(
 
 ) {
 
-  const { auth } = useAuthStore()
+  const { isAuthenticated, isRehydrated, tenantAuth } = useAuthStore()
 
-  const token = auth?.getAccessToken()
+  const token = tenantAuth?.getAccessToken()
 
   const empresaId = useTenantEmpresaId()
 
@@ -648,7 +662,14 @@ export function useRelatorioProdutosVendidosMvpComparativoQuery(
 
       }),
 
-    enabled: enabled && !!token && params.dadosBaseProntos,
+    enabled:
+      enabled &&
+      isRehydrated &&
+      isAuthenticated &&
+      !!token &&
+      !!empresaId &&
+      !(tenantAuth?.isExpired() ?? true) &&
+      params.dadosBaseProntos,
 
     staleTime: 30_000,
 

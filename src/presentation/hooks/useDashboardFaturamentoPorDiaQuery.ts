@@ -1,7 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
-
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import type { DashboardEvolucaoPoint } from '@/src/presentation/hooks/useDashboardEvolucaoQuery'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
@@ -40,10 +37,6 @@ type Params = {
   enabled?: boolean
   /** Fuso IANA da empresa (ex.: America/Sao_Paulo). */
   timeZoneEmpresa?: string
-}
-
-function pad2(n: number): string {
-  return String(n).padStart(2, '0')
 }
 
 function getTimeZoneOffsetMinutes(date: Date, timeZone: string): number {
@@ -182,21 +175,18 @@ export function useDashboardFaturamentoPorDiaQuery({
   enabled = true,
   timeZoneEmpresa,
 }: Params) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
-  const empresaId = useTenantEmpresaId()
-
-  return useQuery({
-    queryKey: [
+  return useSecureTenantQuery(
+    [
       'dashboard',
       'faturamento-por-dia',
       periodoInicial.toISOString(),
       periodoFinal.toISOString(),
       timeZoneEmpresa ?? '',
-      empresaId,
     ],
-    queryFn: () => fetchFaturamentoPorDia({ periodoInicial, periodoFinal, timeZoneEmpresa, token: token! }),
-    enabled: enabled && !!token,
-    staleTime: 30_000,
-  })
+    ({ token }) => fetchFaturamentoPorDia({ periodoInicial, periodoFinal, timeZoneEmpresa, token }),
+    {
+      enabled,
+      staleTime: 30_000,
+    }
+  )
 }

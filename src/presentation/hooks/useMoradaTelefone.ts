@@ -1,6 +1,6 @@
 'use client'
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   clienteDeliveryParaMoradas,
   extrairMoradaDeClienteDeliveryResponse,
@@ -8,6 +8,8 @@ import {
   normalizarClienteDeliveryApi,
 } from '@/src/application/mappers/ClienteDeliveryMoradaMapper'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { showToast } from '@/src/shared/utils/toast'
 
 export interface MoradaTelefoneHookOptions {
@@ -15,8 +17,16 @@ export interface MoradaTelefoneHookOptions {
   usarModuloDelivery?: boolean
 }
 
-function moradasTelefoneQueryKey(telefone: string | null, usarModuloDelivery: boolean) {
-  return ['moradas-telefone', telefone, usarModuloDelivery ? 'delivery' : 'gestor'] as const
+/**
+ * `empresaId` incluso na key para evitar cross-tenant cache leak:
+ * empresas diferentes podem ter clientes com o mesmo telefone.
+ */
+function moradasTelefoneQueryKey(
+  telefone: string | null,
+  usarModuloDelivery: boolean,
+  empresaId: string | null
+) {
+  return ['moradas-telefone', empresaId, telefone, usarModuloDelivery ? 'delivery' : 'gestor'] as const
 }
 
 /** Corpo JSON comum em erros do BFF / Nest (`error`, `message`, `title`). */
@@ -198,14 +208,15 @@ export function useMoradasPorTelefone(
   telefone: string | null,
   options?: MoradaTelefoneHookOptions
 ) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
+  const { tenantAuth, isAuthenticated, isRehydrated } = useAuthStore()
+  const token = tenantAuth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
   const usarModuloDelivery = options?.usarModuloDelivery ?? false
 
   return useQuery<MoradaTelefone[]>({
-    queryKey: moradasTelefoneQueryKey(telefone, usarModuloDelivery),
+    queryKey: moradasTelefoneQueryKey(telefone, usarModuloDelivery, empresaId),
     queryFn: async () => {
-      if (!telefone || !token) return []
+      if (!telefone || !token || !empresaId) return []
 
       if (usarModuloDelivery) {
         const response = await fetch(
@@ -256,7 +267,7 @@ export function useMoradasPorTelefone(
         .filter((m: MoradaTelefone | null): m is MoradaTelefone => m != null)
       return lista
     },
-    enabled: !!telefone && !!token,
+    enabled: !!telefone && isRehydrated && isAuthenticated && !!token && !!empresaId && !(tenantAuth?.isExpired()),
     staleTime: 1000 * 60 * 2,
     refetchOnWindowFocus: false,
   })
@@ -267,15 +278,12 @@ export function useMoradasPorTelefone(
  * Invalida o cache de moradas do telefone após sucesso.
  */
 export function useCriarMoradaTelefone(options?: MoradaTelefoneHookOptions) {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
   const usarModuloDelivery = options?.usarModuloDelivery ?? false
 
-  return useMutation({
-    mutationFn: async (dto: CriarMoradaTelefoneDTO) => {
-      if (!token) throw new Error('Token não encontrado')
-
+  return useSecureTenantMutation(
+    async ({ token }, dto: CriarMoradaTelefoneDTO) => {
       if (usarModuloDelivery) {
         const enderecoPayload = moradaDtoParaEnderecoDeliveryPayload(dto)
         const telefone = dto.telefone.replace(/\D/g, '')
@@ -366,37 +374,36 @@ export function useCriarMoradaTelefone(options?: MoradaTelefoneHookOptions) {
 
       return moradaFromResponse(response, dto)
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: moradasTelefoneQueryKey(variables.telefone, usarModuloDelivery),
-      })
-      showToast.success('Endereço cadastrado com sucesso!')
-    },
-    onError: (error: Error) => {
-      showToast.error(error.message || 'Erro ao cadastrar endereço')
-    },
-  })
+    {
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries({
+          queryKey: moradasTelefoneQueryKey(variables.telefone, usarModuloDelivery, empresaId),
+        })
+        showToast.success('Endereço cadastrado com sucesso!')
+      },
+      onError: (error: Error) => {
+        showToast.error(error.message || 'Erro ao cadastrar endereço')
+      },
+    }
+  )
 }
 
 /**
  * Atualiza morada existente (PATCH gestor/morada-telefone/:id).
  */
 export function useAtualizarMoradaTelefone(options?: MoradaTelefoneHookOptions) {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
   const usarModuloDelivery = options?.usarModuloDelivery ?? false
 
-  return useMutation({
-    mutationFn: async ({
+  return useSecureTenantMutation(
+    async ({ token }, {
       id,
       dto,
     }: {
       id: string
       dto: AtualizarMoradaTelefoneDTO
     }) => {
-      if (!token) throw new Error('Token não encontrado')
-
       if (usarModuloDelivery) {
         const telefone = dto.telefone.replace(/\D/g, '')
         const enderecoPayload = moradaDtoParaEnderecoDeliveryPayload(dto)
@@ -447,16 +454,18 @@ export function useAtualizarMoradaTelefone(options?: MoradaTelefoneHookOptions) 
 
       return moradaFromResponse(response, dto)
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: moradasTelefoneQueryKey(variables.dto.telefone, usarModuloDelivery),
-      })
-      showToast.success('Endereço atualizado com sucesso!')
-    },
-    onError: (error: Error) => {
-      showToast.error(error.message || 'Erro ao atualizar endereço')
-    },
-  })
+    {
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries({
+          queryKey: moradasTelefoneQueryKey(variables.dto.telefone, usarModuloDelivery, empresaId),
+        })
+        showToast.success('Endereço atualizado com sucesso!')
+      },
+      onError: (error: Error) => {
+        showToast.error(error.message || 'Erro ao atualizar endereço')
+      },
+    }
+  )
 }
 
 /**
@@ -464,13 +473,12 @@ export function useAtualizarMoradaTelefone(options?: MoradaTelefoneHookOptions) 
  * Deve ser chamado ao selecionar um endereço; não está acoplado ao POST da venda.
  */
 export function useRegistrarUsoMoradaTelefone(options?: MoradaTelefoneHookOptions) {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
   const usarModuloDelivery = options?.usarModuloDelivery ?? false
 
-  return useMutation({
-    mutationFn: async ({
+  return useSecureTenantMutation(
+    async ({ token }, {
       id,
       telefoneDigitos,
     }: {
@@ -478,8 +486,6 @@ export function useRegistrarUsoMoradaTelefone(options?: MoradaTelefoneHookOption
       /** Mesmo valor da query `moradas-telefone` — dígitos do telefone usados na busca. */
       telefoneDigitos: string
     }) => {
-      if (!token) throw new Error('Token não encontrado')
-
       if (usarModuloDelivery) {
         return
       }
@@ -502,13 +508,15 @@ export function useRegistrarUsoMoradaTelefone(options?: MoradaTelefoneHookOption
         )
       }
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: moradasTelefoneQueryKey(variables.telefoneDigitos, usarModuloDelivery),
-      })
-    },
-    onError: (error: Error) => {
-      showToast.error(error.message || 'Não foi possível atualizar o endereço recente')
-    },
-  })
+    {
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries({
+          queryKey: moradasTelefoneQueryKey(variables.telefoneDigitos, usarModuloDelivery, empresaId),
+        })
+      },
+      onError: (error: Error) => {
+        showToast.error(error.message || 'Não foi possível atualizar o endereço recente')
+      },
+    }
+  )
 }

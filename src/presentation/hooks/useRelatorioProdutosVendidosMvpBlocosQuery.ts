@@ -124,8 +124,8 @@ async function fetchBlocoSerie(
 
 /** SPA: donut de grupos — só quando o painel está aberto. */
 export function useRelatorioProdutosVendidosMvpParticipacaoQuery(params: RelatorioMvpBlocoQueryParams) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
+  const { isAuthenticated, isRehydrated, tenantAuth } = useAuthStore()
+  const token = tenantAuth?.getAccessToken()
   const empresaId = useTenantEmpresaId()
   const resolvedTimezone = params.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
   const enabled = params.enabled !== false
@@ -141,15 +141,22 @@ export function useRelatorioProdutosVendidosMvpParticipacaoQuery(params: Relator
         token: token!,
         timezone: resolvedTimezone,
       }),
-    enabled: enabled && !!token && params.dadosBaseProntos,
+    enabled:
+      enabled &&
+      isRehydrated &&
+      isAuthenticated &&
+      !!token &&
+      !!empresaId &&
+      !(tenantAuth?.isExpired() ?? true) &&
+      params.dadosBaseProntos,
     staleTime: 30_000,
   })
 }
 
 /** SPA: distribuição ABC — só quando o modal está aberto. */
 export function useRelatorioProdutosVendidosMvpParticipacaoAbcQuery(params: RelatorioMvpBlocoQueryParams) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
+  const { isAuthenticated, isRehydrated, tenantAuth } = useAuthStore()
+  const token = tenantAuth?.getAccessToken()
   const empresaId = useTenantEmpresaId()
   const resolvedTimezone = params.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
   const enabled = params.enabled !== false
@@ -165,15 +172,22 @@ export function useRelatorioProdutosVendidosMvpParticipacaoAbcQuery(params: Rela
         token: token!,
         timezone: resolvedTimezone,
       }),
-    enabled: enabled && !!token && params.dadosBaseProntos,
+    enabled:
+      enabled &&
+      isRehydrated &&
+      isAuthenticated &&
+      !!token &&
+      !!empresaId &&
+      !(tenantAuth?.isExpired() ?? true) &&
+      params.dadosBaseProntos,
     staleTime: 30_000,
   })
 }
 
 /** SPA: série diária — só quando o painel está aberto (pode computar série no 1º fetch). */
 export function useRelatorioProdutosVendidosMvpSerieQuery(params: RelatorioMvpBlocoQueryParams) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
+  const { isAuthenticated, isRehydrated, tenantAuth } = useAuthStore()
+  const token = tenantAuth?.getAccessToken()
   const empresaId = useTenantEmpresaId()
   const resolvedTimezone = params.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
   const enabled = params.enabled !== false
@@ -189,7 +203,14 @@ export function useRelatorioProdutosVendidosMvpSerieQuery(params: RelatorioMvpBl
         token: token!,
         timezone: resolvedTimezone,
       }),
-    enabled: enabled && !!token && params.dadosBaseProntos,
+    enabled:
+      enabled &&
+      isRehydrated &&
+      isAuthenticated &&
+      !!token &&
+      !!empresaId &&
+      !(tenantAuth?.isExpired() ?? true) &&
+      params.dadosBaseProntos,
     staleTime: 30_000,
   })
 }

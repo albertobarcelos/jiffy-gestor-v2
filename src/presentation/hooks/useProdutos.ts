@@ -1,6 +1,8 @@
-import { useInfiniteQuery, useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
+import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecureTenantInfiniteQuery'
+import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { Produto } from '@/src/domain/entities/Produto'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
@@ -35,19 +37,9 @@ interface ProdutosResponse {
  * - Retry automático
  */
 export function useProdutos(params: ProdutosQueryParams = {}) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
-  const empresaId = useTenantEmpresaId()
-
-  const queryKey = ['produtos', params, empresaId]
-
-  return useQuery({
-    queryKey,
-    queryFn: async (): Promise<{ produtos: Produto[]; count: number }> => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantQuery(
+    ['produtos', params],
+    async ({ token }) => {
       const searchParams = new URLSearchParams()
       if (params.name) searchParams.append('name', params.name)
       if (params.ativo !== undefined && params.ativo !== null) {
@@ -69,58 +61,41 @@ export function useProdutos(params: ProdutosQueryParams = {}) {
       if (params.offset) searchParams.append('offset', params.offset.toString())
 
       const response = await fetchGestorApi(`/api/produtos?${searchParams.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         cache: 'no-store',
         next: { revalidate: 0 },
       })
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        const errorMessage = errorData.message || `Erro ${response.status}: ${response.statusText}`
-        throw new Error(errorMessage)
+        throw new Error(errorData.message || `Erro ${response.status}: ${response.statusText}`)
       }
 
       const data: ProdutosResponse = await response.json()
-
-      if (!data.success) {
-        throw new Error(data.message || 'Erro ao processar resposta da API')
-      }
-
-      const produtos = (data.items || []).map((item: any) => Produto.fromJSON(item))
+      if (!data.success) throw new Error(data.message || 'Erro ao processar resposta da API')
 
       return {
-        produtos,
+        produtos: (data.items || []).map((item: any) => Produto.fromJSON(item)),
         count: data.count || 0,
       }
     },
-    enabled: !!token, // Só executa se tiver token
-    // Alinhado ao QueryProvider: evita refetch ao voltar à aba/tela enquanto os dados forem recentes
-    staleTime: 1000 * 60 * 5,
-    gcTime: 1000 * 60 * 30,
-    refetchOnReconnect: true,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-  })
+    {
+      staleTime: 1000 * 60 * 5,
+      gcTime: 1000 * 60 * 30,
+      refetchOnReconnect: true,
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+    }
+  )
 }
 
 /**
  * Hook para buscar produtos com paginação infinita (scroll infinito)
  */
 export function useProdutosInfinite(params: Omit<ProdutosQueryParams, 'offset'> = {}) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
-  const empresaId = useTenantEmpresaId()
-
-  return useInfiniteQuery({
-    queryKey: ['produtos', 'infinite', params, empresaId],
-    queryFn: async ({ pageParam = 0 }): Promise<{ produtos: Produto[]; count: number; nextOffset: number | null }> => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantInfiniteQuery(
+    ['produtos', 'infinite', params],
+    async ({ token }, pageParam) => {
       const limit = params.limit || 10
       const searchParams = new URLSearchParams()
       if (params.name) searchParams.append('name', params.name)
@@ -140,7 +115,7 @@ export function useProdutosInfinite(params: Omit<ProdutosQueryParams, 'offset'> 
         searchParams.append('grupoComplementosId', params.grupoComplementosId)
       }
       searchParams.append('limit', limit.toString())
-      searchParams.append('offset', pageParam.toString())
+      searchParams.append('offset', String(pageParam))
 
       const response = await fetchGestorApi(`/api/produtos?${searchParams.toString()}`, {
         headers: {
@@ -173,19 +148,17 @@ export function useProdutosInfinite(params: Omit<ProdutosQueryParams, 'offset'> 
         nextOffset,
       }
     },
-    enabled: !!token,
-    initialPageParam: 0,
-    getNextPageParam: (lastPage) => lastPage.nextOffset,
-    // Dados frescos por 5 min: não refaz todas as páginas ao remontar a lista ou focar a janela
-    staleTime: 1000 * 60 * 5,
-    gcTime: 1000 * 60 * 30,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: true,
-    refetchOnMount: false,
-    // Mantém os dados anteriores visíveis enquanto a query com novos filtros carrega.
-    // Evita o "piscar" da lista (produtos somem e voltam) ao trocar filtro/busca.
-    placeholderData: keepPreviousData,
-  })
+    {
+      initialPageParam: 0,
+      getNextPageParam: lastPage => lastPage.nextOffset,
+      staleTime: 1000 * 60 * 5,
+      gcTime: 1000 * 60 * 30,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+      refetchOnMount: false,
+      placeholderData: keepPreviousData,
+    }
+  )
 }
 
 /**
@@ -193,22 +166,11 @@ export function useProdutosInfinite(params: Omit<ProdutosQueryParams, 'offset'> 
  * Ideal para componentes de visualização e edição.
  */
 export function useProduto(id: string) {
-  const { auth, isAuthenticated } = useAuthStore()
-  const token = auth?.getAccessToken()
-  const empresaId = useTenantEmpresaId()
-
-  return useQuery<Produto, ApiError>({
-    queryKey: ['produto', id, empresaId],
-    queryFn: async () => {
-      if (!isAuthenticated || !token) {
-        throw new Error('Usuário não autenticado ou token ausente.')
-      }
-
+  return useSecureTenantQuery<Produto>(
+    ['produto', id],
+    async ({ token }) => {
       const response = await fetchGestorApi(`/api/produtos/${id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       })
 
       if (!response.ok) {
@@ -223,26 +185,19 @@ export function useProduto(id: string) {
       const data = await response.json()
       return Produto.fromJSON(data)
     },
-    enabled: isAuthenticated && !!token && !!id,
-    staleTime: 1000 * 60 * 5, // 5 minutos
-  })
+    { enabled: !!id, staleTime: 1000 * 60 * 5 }
+  )
 }
 
 /**
  * Hook para criar/atualizar produto com Optimistic Updates
  */
 export function useProdutoMutation() {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
   const empresaId = useTenantEmpresaId()
 
-  return useMutation({
-    mutationFn: async ({ produtoId, data, isUpdate }: { produtoId?: string; data: any; isUpdate: boolean }) => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantMutation(
+    async ({ token }, { produtoId, data, isUpdate }: { produtoId?: string; data: any; isUpdate: boolean }) => {
       const url = isUpdate && produtoId ? `/api/produtos/${produtoId}` : '/api/produtos'
       const method = isUpdate ? 'PUT' : 'POST'
 
@@ -263,34 +218,30 @@ export function useProdutoMutation() {
 
       return await response.json()
     },
-    // Optimistic Update: atualiza UI antes da resposta do servidor
-    onMutate: async ({ produtoId, data, isUpdate }) => {
-      // Cancelar queries em andamento para evitar sobrescrever o optimistic update
-      await queryClient.cancelQueries({ queryKey: ['produtos'] })
+    {
+      onMutate: async ({ produtoId, data, isUpdate }) => {
+        await queryClient.cancelQueries({ queryKey: ['tenant', empresaId, 'produtos'], exact: false })
 
-      // Snapshot do valor anterior
-      const previousProdutos = queryClient.getQueryData(['produtos', 'infinite'])
+        const previousProdutos = queryClient.getQueryData(['tenant', empresaId, 'produtos', 'infinite'])
 
-      // Se for atualização, atualizar otimisticamente
-      if (isUpdate && produtoId) {
-        queryClient.setQueriesData({ queryKey: ['produto', produtoId] }, (old: any) => {
-          if (!old) return old
-          return { ...old, ...data }
-        })
-      }
+        if (isUpdate && produtoId) {
+          queryClient.setQueriesData({ queryKey: ['tenant', empresaId, 'produto', produtoId] }, (old: any) => {
+            if (!old) return old
+            return { ...old, ...data }
+          })
+        }
 
-      // Retornar contexto com snapshot para rollback
-      return { previousProdutos }
-    },
-    onSuccess: (_, variables) => {
-      // Invalidar cache de produtos para forçar refetch com dados atualizados
-      queryClient.invalidateQueries({ queryKey: ['produtos'] })
-      if (variables.produtoId) {
-        queryClient.invalidateQueries({ queryKey: ['produto', variables.produtoId] })
-      }
-      showToast.success(variables.isUpdate ? 'Produto atualizado com sucesso!' : 'Produto criado com sucesso!')
-    },
-  })
+        return { previousProdutos }
+      },
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'produtos'] })
+        if (variables.produtoId) {
+          queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'produto', variables.produtoId] })
+        }
+        showToast.success(variables.isUpdate ? 'Produto atualizado com sucesso!' : 'Produto criado com sucesso!')
+      },
+    }
+  )
 }
 
 

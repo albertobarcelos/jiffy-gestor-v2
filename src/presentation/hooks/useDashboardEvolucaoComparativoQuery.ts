@@ -1,6 +1,5 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { keepPreviousData } from '@tanstack/react-query'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import type { LinhaComparacaoChartRow } from '@/src/infrastructure/dashboard/dashboardEvolucaoComparativoCache'
 
@@ -50,16 +49,13 @@ async function fetchDashboardEvolucaoComparativo(
   return data as unknown as LinhaComparacaoChartRow[]
 }
 
-function buildEvolucaoQueryKeyPrefix(
-  empresaId: string | null,
-  params: {
-    periodo?: string
-    timezone?: string
-    periodoInicial?: Date | null
-    periodoFinal?: Date | null
-    intervaloHora?: number
-  }
-) {
+function buildEvolucaoBaseKey(params: {
+  periodo?: string
+  timezone?: string
+  periodoInicial?: Date | null
+  periodoFinal?: Date | null
+  intervaloHora?: number
+}) {
   return [
     'dashboard',
     'evolucao-comparativo',
@@ -68,7 +64,6 @@ function buildEvolucaoQueryKeyPrefix(
     params.periodo === 'personalizado' && params.periodoInicial ? params.periodoInicial.toISOString() : null,
     params.periodo === 'personalizado' && params.periodoFinal ? params.periodoFinal.toISOString() : null,
     params.intervaloHora ?? null,
-    empresaId,
   ] as const
 }
 
@@ -80,52 +75,46 @@ export function useDashboardEvolucaoComparativoQuery({
   intervaloHora,
   enabled = true,
 }: Params) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
-  const empresaId = useTenantEmpresaId()
-
-  return useQuery({
-    queryKey: [...buildEvolucaoQueryKeyPrefix(empresaId, { periodo, timezone, periodoInicial, periodoFinal, intervaloHora })],
-    queryFn: () =>
+  return useSecureTenantQuery(
+    [...buildEvolucaoBaseKey({ periodo, timezone, periodoInicial, periodoFinal, intervaloHora })],
+    ({ token }) =>
       fetchDashboardEvolucaoComparativo({
         periodo,
         timezone,
         periodoInicial,
         periodoFinal,
         intervaloHora,
-        token: token!,
+        token,
       }),
-    enabled: enabled && !!token,
-    staleTime: 30_000,
-    placeholderData: keepPreviousData,
-  })
+    {
+      enabled,
+      staleTime: 30_000,
+      placeholderData: keepPreviousData,
+    }
+  )
 }
 
 /** 2ª fase: série do período anterior (após o gráfico base ter carregado). */
 export function useDashboardEvolucaoComparativoAnteriorQuery(
   params: Params & { dadosBaseProntos: boolean }
 ) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
-  const empresaId = useTenantEmpresaId()
   const enabled = params.enabled !== false
 
-  return useQuery({
-    queryKey: [
-      ...buildEvolucaoQueryKeyPrefix(empresaId, params),
-      'comparativo',
-    ],
-    queryFn: () =>
+  return useSecureTenantQuery(
+    [...buildEvolucaoBaseKey(params), 'comparativo'],
+    ({ token }) =>
       fetchDashboardEvolucaoComparativo({
         periodo: params.periodo,
         timezone: params.timezone,
         periodoInicial: params.periodoInicial,
         periodoFinal: params.periodoFinal,
         intervaloHora: params.intervaloHora,
-        token: token!,
+        token,
         somenteComparativo: true,
       }),
-    enabled: enabled && !!token && params.dadosBaseProntos,
-    staleTime: 30_000,
-  })
+    {
+      enabled: enabled && params.dadosBaseProntos,
+      staleTime: 30_000,
+    }
+  )
 }

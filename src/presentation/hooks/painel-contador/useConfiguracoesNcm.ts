@@ -1,50 +1,50 @@
 'use client'
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
+import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { createPainelContadorUseCases } from '@/src/presentation/hooks/painel-contador/fiscalPainelFactory'
 import { showToast } from '@/src/shared/utils/toast'
 
 export function useConfiguracoesNcm() {
-  const { auth, isRehydrated, isAuthenticated } = useAuthStore()
-  const empresaId = useTenantEmpresaId()
-  const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
+  const invalidate = useInvalidateTenantQueries()
 
-  const ncmsQuery = useQuery({
-    queryKey: ['portal-contador', 'ncms', empresaId],
-    enabled: isRehydrated && isAuthenticated && !!token,
-    queryFn: async () => {
-      const { listarNcms } = createPainelContadorUseCases(token!)
+  const ncmsQuery = useSecureTenantQuery(
+    ['portal-contador', 'ncms'],
+    async ({ token }) => {
+      const { listarNcms } = createPainelContadorUseCases(token)
       return listarNcms.execute()
-    },
-  })
+    }
+  )
 
-  const salvarMutation = useMutation({
-    mutationFn: async ({ ncm, input }: { ncm: string; input: unknown }) => {
-      const { salvarNcm } = createPainelContadorUseCases(token!)
+  const salvarMutation = useSecureTenantMutation(
+    async ({ token }, { ncm, input }: { ncm: string; input: unknown }) => {
+      const { salvarNcm } = createPainelContadorUseCases(token)
       return salvarNcm.execute(ncm, input)
     },
-    onSuccess: () => {
-      showToast.success('Configuração NCM salva')
-      queryClient.invalidateQueries({ queryKey: ['portal-contador', 'ncms', empresaId] })
-      queryClient.invalidateQueries({ queryKey: ['portal-contador', 'progresso', empresaId] })
-    },
-    onError: (e: Error) => showToast.error(e.message),
-  })
+    {
+      onSuccess: async () => {
+        showToast.success('Configuração NCM salva')
+        await invalidate(['portal-contador', 'ncms'])
+        await invalidate(['portal-contador', 'progresso'])
+      },
+      onError: (e: Error) => showToast.error(e.message),
+    }
+  )
 
-  const copiarMutation = useMutation({
-    mutationFn: async ({ ncm, input }: { ncm: string; input: unknown }) => {
-      const { copiarNcm } = createPainelContadorUseCases(token!)
+  const copiarMutation = useSecureTenantMutation(
+    async ({ token }, { ncm, input }: { ncm: string; input: unknown }) => {
+      const { copiarNcm } = createPainelContadorUseCases(token)
       return copiarNcm.execute(ncm, input)
     },
-    onSuccess: () => {
-      showToast.success('Configuração copiada')
-      queryClient.invalidateQueries({ queryKey: ['portal-contador', 'ncms', empresaId] })
-    },
-    onError: (e: Error) => showToast.error(e.message),
-  })
+    {
+      onSuccess: async () => {
+        showToast.success('Configuração copiada')
+        await invalidate(['portal-contador', 'ncms'])
+      },
+      onError: (e: Error) => showToast.error(e.message),
+    }
+  )
 
   return { ncmsQuery, salvarMutation, copiarMutation }
 }

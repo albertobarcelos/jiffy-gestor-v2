@@ -1,7 +1,6 @@
 'use client'
 
-import { useMutation } from '@tanstack/react-query'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { createPainelContadorUseCases } from '@/src/presentation/hooks/painel-contador/fiscalPainelFactory'
 import { useResumoEmpresaPainel } from '@/src/presentation/hooks/painel-contador/useResumoEmpresaPainel'
 import { showToast } from '@/src/shared/utils/toast'
@@ -30,33 +29,31 @@ function baixarArquivo(blob: Blob, filename: string) {
 }
 
 export function useExportacaoXml() {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
   const { data: resumo } = useResumoEmpresaPainel()
 
-  const exportarMutation = useMutation({
-    mutationFn: async (input: ExportacaoXmlDTO) => {
-      if (!token) throw new Error('Sessão expirada')
+  const exportarMutation = useSecureTenantMutation(
+    async ({ token }, input: ExportacaoXmlDTO) => {
       const { exportarXmls } = createPainelContadorUseCases(token)
       return exportarXmls.execute(input)
     },
-    onSuccess: (result, input) => {
-      if (isExportacaoZip(result)) {
-        const nomeEmpresa = resumo?.nomeExibicao ?? 'Empresa'
-        const filename = buildExportacaoXmlFilename(nomeEmpresa, periodoExportacaoXml(input))
-        baixarArquivo(result.blob, filename)
-        showToast.success('Exportação concluída. Download iniciado.')
-        return
-      }
+    {
+      onSuccess: (result, input) => {
+        if (isExportacaoZip(result)) {
+          const nomeEmpresa = resumo?.nomeExibicao ?? 'Empresa'
+          const filename = buildExportacaoXmlFilename(nomeEmpresa, periodoExportacaoXml(input))
+          baixarArquivo(result.blob, filename)
+          showToast.success('Exportação concluída. Download iniciado.')
+          return
+        }
 
-      const total =
-        result.totalArquivos ?? result.totalDocumentos ?? '—'
-      showToast.success(`Exportação concluída. ${total} arquivo(s) no período.`)
-    },
-    onError: (error: Error) => {
-      showToast.error(error.message || 'Erro ao exportar XMLs')
-    },
-  })
+        const total = result.totalArquivos ?? result.totalDocumentos ?? '—'
+        showToast.success(`Exportação concluída. ${total} arquivo(s) no período.`)
+      },
+      onError: (error: Error) => {
+        showToast.error(error.message || 'Erro ao exportar XMLs')
+      },
+    }
+  )
 
   return {
     exportarXmls: exportarMutation.mutateAsync,
