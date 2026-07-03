@@ -15,6 +15,7 @@ import type {
   useCancelarVendaGestor,
   useCancelarNotaFiscalVendaPdv,
   useCancelarNotaFiscalVendaGestor,
+  useTransicaoPedidoDelivery,
 } from '@/src/presentation/hooks/useVendas'
 import type { ProdutosTabsModalState } from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
 import type { ClientesTabsModalState } from '@/src/presentation/components/features/clientes/ClientesTabsModal'
@@ -271,8 +272,11 @@ export interface NovoPedidoDetalheSlice {
   cancelarVendaGestor: ReturnType<typeof useCancelarVendaGestor>
   cancelarNotaFiscalVendaPdv: ReturnType<typeof useCancelarNotaFiscalVendaPdv>
   cancelarNotaFiscalVendaGestor: ReturnType<typeof useCancelarNotaFiscalVendaGestor>
-  tipoCancelamentoSelecionado: 'venda' | 'nota'
-  setTipoCancelamentoSelecionado: Dispatch<SetStateAction<'venda' | 'nota'>>
+  transicaoPedidoDelivery: ReturnType<typeof useTransicaoPedidoDelivery>
+  tipoCancelamentoSelecionado: 'venda' | 'nota' | 'pedido_delivery'
+  setTipoCancelamentoSelecionado: Dispatch<
+    SetStateAction<'venda' | 'nota' | 'pedido_delivery'>
+  >
   justificativaCancelamento: string
   setJustificativaCancelamento: Dispatch<SetStateAction<string>>
 }

@@ -2,7 +2,7 @@ import type { InfiniteData, QueryClient } from '@tanstack/react-query'
 import type { ColunaKanbanId } from '../types'
 import type { PedidosDeliveryInfinitePage } from '../hooks/usePedidosDeliveryInfinite'
 import type { VendaUnificadaDTO } from '../hooks/useVendasUnificadas'
-import { KANBAN_PEDIDOS_DELIVERY_INFINITE_QUERY_KEY } from '../hooks/kanbanListagemQueryCache'
+import { kanbanPedidosDeliveryInfiniteQueryFilter } from '../hooks/kanbanListagemQueryCache'
 import {
   DELIVERY_KANBAN_COLUMN_IDS,
   extrairColumnIdDePedidosDeliveryKanbanQueryKey,
@@ -91,9 +91,9 @@ export function upsertVendaDeliveryKanbanColumnCaches(
   // Defesa: card sem coluna conhecida não deve ser removido de onde está (evita sumiço).
   if (!vendaPertenceAlgumaColunaDeliveryKanban(venda)) return
 
-  const queries = queryClient.getQueriesData<InfiniteData<PedidosDeliveryInfinitePage>>({
-    queryKey: KANBAN_PEDIDOS_DELIVERY_INFINITE_QUERY_KEY,
-  })
+  const queries = queryClient.getQueriesData<InfiniteData<PedidosDeliveryInfinitePage>>(
+    kanbanPedidosDeliveryInfiniteQueryFilter()
+  )
 
   for (const [queryKey, data] of queries) {
     const columnId = extrairColumnIdDePedidosDeliveryKanbanQueryKey(queryKey)
@@ -126,9 +126,9 @@ export function patchVendaDeliveryKanbanColumnCaches(
   let encontrou = false
   let vendaAtualizada: VendaUnificadaDTO | null = null
 
-  const queries = queryClient.getQueriesData<InfiniteData<PedidosDeliveryInfinitePage>>({
-    queryKey: KANBAN_PEDIDOS_DELIVERY_INFINITE_QUERY_KEY,
-  })
+  const queries = queryClient.getQueriesData<InfiniteData<PedidosDeliveryInfinitePage>>(
+    kanbanPedidosDeliveryInfiniteQueryFilter()
+  )
 
   for (const [queryKey, data] of queries) {
     if (!data?.pages?.length) continue
@@ -158,9 +158,9 @@ export function encontrarVendaNasColunasDeliveryKanban(
   queryClient: QueryClient,
   vendaId: string
 ): VendaUnificadaDTO | null {
-  const queries = queryClient.getQueriesData<InfiniteData<PedidosDeliveryInfinitePage>>({
-    queryKey: KANBAN_PEDIDOS_DELIVERY_INFINITE_QUERY_KEY,
-  })
+  const queries = queryClient.getQueriesData<InfiniteData<PedidosDeliveryInfinitePage>>(
+    kanbanPedidosDeliveryInfiniteQueryFilter()
+  )
 
   for (const [, data] of queries) {
     if (!data?.pages?.length) continue

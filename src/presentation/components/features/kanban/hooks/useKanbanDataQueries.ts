@@ -104,8 +104,8 @@ export function useKanbanDataQueries({
   const infiniteQueryKey = useMemo(
     () =>
       isModoDeliveryKanban
-        ? (['delivery', 'pedidos', 'infinite', empresaId, 'columns'] as const)
-        : (['vendas-unificadas', 'infinite', empresaId, 'columns'] as const),
+        ? (['tenant', empresaId, 'delivery', 'pedidos', 'infinite', 'columns'] as const)
+        : (['tenant', empresaId, 'vendas-unificadas', 'infinite', 'columns'] as const),
     [isModoDeliveryKanban, empresaId]
   )
 

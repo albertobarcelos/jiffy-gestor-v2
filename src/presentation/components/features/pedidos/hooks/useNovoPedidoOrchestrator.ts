@@ -8,6 +8,7 @@ import {
   useCancelarVendaGestor,
   useCancelarNotaFiscalVendaPdv,
   useCancelarNotaFiscalVendaGestor,
+  useTransicaoPedidoDelivery,
 } from '@/src/presentation/hooks/useVendas'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
@@ -83,6 +84,7 @@ export function useNovoPedidoOrchestrator({
   const cancelarVendaGestor = useCancelarVendaGestor()
   const cancelarNotaFiscalVendaPdv = useCancelarNotaFiscalVendaPdv()
   const cancelarNotaFiscalVendaGestor = useCancelarNotaFiscalVendaGestor()
+  const transicaoPedidoDelivery = useTransicaoPedidoDelivery()
 
   const form = useNovoPedidoFormState(tipoInicioPedido)
   const {
@@ -392,6 +394,7 @@ export function useNovoPedidoOrchestrator({
     totalProdutos,
     totalItensPedido,
     podeExibirCancelarVendaGestor,
+    podeExibirCancelarPedidoDeliveryOperacional,
     podeExibirCancelarNotaFiscal,
     podeEditarPagamentoEntregaEmAberto,
     podeAjustarPagamentoEntregaEmAberto,
@@ -606,6 +609,7 @@ export function useNovoPedidoOrchestrator({
     cancelarVendaGestor,
     cancelarNotaFiscalVendaPdv,
     cancelarNotaFiscalVendaGestor,
+    transicaoPedidoDelivery,
     form,
     setInternalDialogOpen,
     totalProdutos,
@@ -706,6 +710,7 @@ export function useNovoPedidoOrchestrator({
     cancelarNotaFiscalVendaGestor,
     cancelarNotaFiscalVendaPdv,
     cancelarVendaGestor,
+    transicaoPedidoDelivery,
     catalogoProdutosPorId,
     clienteTabsModalEntregaState,
     clienteEntregaVinculado,
@@ -916,6 +921,7 @@ export function useNovoPedidoOrchestrator({
     onClose,
     onSuccess,
     podeExibirCancelarVendaGestor,
+    podeExibirCancelarPedidoDeliveryOperacional,
     podeExibirCancelarNotaFiscal,
     isSavingPagamentoEntrega,
     onSalvarPagamentoEntrega: handleSalvarPagamentoEntregaEmAberto,

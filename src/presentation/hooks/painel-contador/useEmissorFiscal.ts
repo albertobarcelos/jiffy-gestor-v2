@@ -1,38 +1,36 @@
 'use client'
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
+import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { createPainelContadorUseCases } from '@/src/presentation/hooks/painel-contador/fiscalPainelFactory'
 import { showToast } from '@/src/shared/utils/toast'
 
 export function useEmissorFiscal() {
-  const { auth, isRehydrated, isAuthenticated } = useAuthStore()
-  const empresaId = useTenantEmpresaId()
-  const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
+  const invalidate = useInvalidateTenantQueries()
 
-  const emissaoQuery = useQuery({
-    queryKey: ['portal-contador', 'emissao', empresaId],
-    enabled: isRehydrated && isAuthenticated && !!token,
-    queryFn: async () => {
-      const { salvarEmissao } = createPainelContadorUseCases(token!)
+  const emissaoQuery = useSecureTenantQuery(
+    ['portal-contador', 'emissao'],
+    async ({ token }) => {
+      const { salvarEmissao } = createPainelContadorUseCases(token)
       return salvarEmissao.listar()
-    },
-  })
+    }
+  )
 
-  const salvarMutation = useMutation({
-    mutationFn: async ({ modelo, input }: { modelo: 55 | 65; input: unknown }) => {
-      const { salvarEmissao } = createPainelContadorUseCases(token!)
+  const salvarMutation = useSecureTenantMutation(
+    async ({ token }, { modelo, input }: { modelo: 55 | 65; input: unknown }) => {
+      const { salvarEmissao } = createPainelContadorUseCases(token)
       return salvarEmissao.salvar(modelo, input)
     },
-    onSuccess: () => {
-      showToast.success('Configuração salva com sucesso')
-      queryClient.invalidateQueries({ queryKey: ['portal-contador', 'emissao', empresaId] })
-      queryClient.invalidateQueries({ queryKey: ['portal-contador', 'progresso', empresaId] })
-    },
-    onError: (e: Error) => showToast.error(e.message),
-  })
+    {
+      onSuccess: async () => {
+        showToast.success('Configuração salva com sucesso')
+        await invalidate(['portal-contador', 'emissao'])
+        await invalidate(['portal-contador', 'progresso'])
+      },
+      onError: (e: Error) => showToast.error(e.message),
+    }
+  )
 
   return { emissaoQuery, salvarMutation }
 }

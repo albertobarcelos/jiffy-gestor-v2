@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { buildTenantQueryKey } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 /**
@@ -12,19 +13,16 @@ import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
  */
 export function usePrefetch() {
   const queryClient = useQueryClient()
-  const { auth } = useAuthStore()
+  const tenantAuth = useAuthStore(s => s.tenantAuth)
   const empresaId = useTenantEmpresaId()
 
-  /**
-   * Prefetch de produto por ID
-   */
   const prefetchProduto = useCallback(
     (id: string) => {
-      const token = auth?.getAccessToken()
-      if (!token) return
+      const token = tenantAuth?.getAccessToken()
+      if (!token || tenantAuth?.isExpired()) return
 
       queryClient.prefetchQuery({
-        queryKey: ['produto', id, empresaId],
+        queryKey: buildTenantQueryKey(empresaId, ['produto', id]),
         queryFn: async () => {
           const response = await fetchGestorApi(`/api/produtos/${id}`, {
             headers: {
@@ -33,25 +31,21 @@ export function usePrefetch() {
             },
           })
           if (!response.ok) throw new Error('Erro ao buscar produto')
-          const data = await response.json()
-          return data
+          return response.json()
         },
         staleTime: 1000 * 60 * 5,
       })
     },
-    [queryClient, auth, empresaId]
+    [queryClient, tenantAuth, empresaId]
   )
 
-  /**
-   * Prefetch de cliente por ID
-   */
   const prefetchCliente = useCallback(
     (id: string) => {
-      const token = auth?.getAccessToken()
-      if (!token) return
+      const token = tenantAuth?.getAccessToken()
+      if (!token || tenantAuth?.isExpired()) return
 
       queryClient.prefetchQuery({
-        queryKey: ['cliente', id, empresaId],
+        queryKey: buildTenantQueryKey(empresaId, ['cliente', id]),
         queryFn: async () => {
           const response = await fetchGestorApi(`/api/clientes/${id}`, {
             headers: {
@@ -60,25 +54,21 @@ export function usePrefetch() {
             },
           })
           if (!response.ok) throw new Error('Erro ao buscar cliente')
-          const data = await response.json()
-          return data
+          return response.json()
         },
         staleTime: 1000 * 60 * 5,
       })
     },
-    [queryClient, auth, empresaId]
+    [queryClient, tenantAuth, empresaId]
   )
 
-  /**
-   * Prefetch de usuário por ID
-   */
   const prefetchUsuario = useCallback(
     (id: string) => {
-      const token = auth?.getAccessToken()
-      if (!token) return
+      const token = tenantAuth?.getAccessToken()
+      if (!token || tenantAuth?.isExpired()) return
 
       queryClient.prefetchQuery({
-        queryKey: ['usuario', id, empresaId],
+        queryKey: buildTenantQueryKey(empresaId, ['usuario', id]),
         queryFn: async () => {
           const response = await fetchGestorApi(`/api/usuarios/${id}`, {
             headers: {
@@ -87,13 +77,12 @@ export function usePrefetch() {
             },
           })
           if (!response.ok) throw new Error('Erro ao buscar usuário')
-          const data = await response.json()
-          return data
+          return response.json()
         },
         staleTime: 1000 * 60 * 5,
       })
     },
-    [queryClient, auth, empresaId]
+    [queryClient, tenantAuth, empresaId]
   )
 
   return {
@@ -102,4 +91,3 @@ export function usePrefetch() {
     prefetchUsuario,
   }
 }
-

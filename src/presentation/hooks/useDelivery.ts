@@ -1,8 +1,9 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { PedidoDelivery } from '@/src/domain/entities/PedidoDelivery'
 import { MetodoPagamento } from '@/src/domain/entities/MetodoPagamento'
 import { StatusPedido } from '@/src/domain/entities/StatusPedido'
-import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
+import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
@@ -11,28 +12,13 @@ interface ListarPedidosParams {
   dataAtualizacao?: string
 }
 
-interface DeliveryTokens {
-  bearerToken: string
-  integradorToken?: string
-}
-
 /**
- * Hook para listar pedidos de delivery
+ * Hook para listar pedidos de delivery (sessão de empresa da aba).
  */
-export function usePedidosDelivery(
-  params: ListarPedidosParams = {},
-  tokens?: DeliveryTokens
-) {
-  const empresaId = useTenantEmpresaId()
-  const queryKey = ['delivery', 'pedidos', params, empresaId]
-
-  return useQuery({
-    queryKey,
-    queryFn: async (): Promise<PedidoDelivery[]> => {
-      if (!tokens?.bearerToken) {
-        throw new Error('Token de autenticação não fornecido')
-      }
-
+export function usePedidosDelivery(params: ListarPedidosParams = {}) {
+  return useSecureTenantQuery(
+    ['delivery', 'pedidos', params],
+    async ({ token }): Promise<PedidoDelivery[]> => {
       const searchParams = new URLSearchParams()
       if (params.status !== undefined) {
         searchParams.append('status', params.status.toString())
@@ -41,19 +27,13 @@ export function usePedidosDelivery(
         searchParams.append('data_atualizacao', params.dataAtualizacao)
       }
 
-      const headers: HeadersInit = {
-        Bearer: tokens.bearerToken,
-        'Content-Type': 'application/json',
-      }
-
-      if (tokens.integradorToken) {
-        headers['integrador-token'] = tokens.integradorToken
-      }
-
       const response = await fetchGestorApi(
         `/api/delivery/pedidos?${searchParams.toString()}`,
         {
-          headers,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
         }
       )
 
@@ -67,42 +47,29 @@ export function usePedidosDelivery(
       }
 
       const data = await response.json()
-      const pedidos = (data.pedidos || []).map((p: any) =>
+      return (data.pedidos || []).map((p: Parameters<typeof PedidoDelivery.fromJSON>[0]) =>
         PedidoDelivery.fromJSON(p)
       )
-
-      return pedidos
     },
-    enabled: !!tokens?.bearerToken,
-    staleTime: 1000 * 30, // 30 segundos (pedidos mudam frequentemente)
-    refetchInterval: 1000 * 60, // Refetch a cada 1 minuto
-  })
+    {
+      staleTime: 1000 * 30,
+      refetchInterval: 1000 * 60,
+    }
+  )
 }
 
 /**
- * Hook para listar métodos de pagamento
+ * Hook para listar métodos de pagamento do delivery.
  */
-export function useMetodosPagamentoDelivery(tokens?: DeliveryTokens) {
-  const empresaId = useTenantEmpresaId()
-
-  return useQuery({
-    queryKey: ['delivery', 'metodos-pagamento', empresaId],
-    queryFn: async (): Promise<MetodoPagamento[]> => {
-      if (!tokens?.bearerToken) {
-        throw new Error('Token de autenticação não fornecido')
-      }
-
-      const headers: HeadersInit = {
-        Bearer: tokens.bearerToken,
-        'Content-Type': 'application/json',
-      }
-
-      if (tokens.integradorToken) {
-        headers['integrador-token'] = tokens.integradorToken
-      }
-
+export function useMetodosPagamentoDelivery() {
+  return useSecureTenantQuery(
+    ['delivery', 'metodos-pagamento'],
+    async ({ token }): Promise<MetodoPagamento[]> => {
       const response = await fetchGestorApi('/api/delivery/metodos-pagamento', {
-        headers,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
       })
 
       if (!response.ok) {
@@ -115,47 +82,34 @@ export function useMetodosPagamentoDelivery(tokens?: DeliveryTokens) {
       }
 
       const data = await response.json()
-      const metodos = (data.formas || []).map((f: any) =>
+      return (data.formas || []).map((f: Parameters<typeof MetodoPagamento.fromJSON>[0]) =>
         MetodoPagamento.fromJSON(f)
       )
-
-      return metodos
     },
-    enabled: !!tokens?.bearerToken,
-    staleTime: 1000 * 60 * 60, // 1 hora (métodos de pagamento mudam raramente)
-  })
+    { staleTime: 1000 * 60 * 60 }
+  )
 }
 
 /**
- * Hook para avançar status do pedido
+ * Hook para avançar status do pedido.
  */
-export function useAvancarStatusPedido(tokens?: DeliveryTokens) {
-  const queryClient = useQueryClient()
+export function useAvancarStatusPedido() {
+  const invalidate = useInvalidateTenantQueries()
 
-  return useMutation({
-    mutationFn: async (pedidoRef: string): Promise<{ status: StatusPedido }> => {
-      if (!tokens?.bearerToken) {
-        throw new Error('Token de autenticação não fornecido')
-      }
-
+  return useSecureTenantMutation(
+    async ({ token }, pedidoRef: string): Promise<{ status: StatusPedido }> => {
       if (!pedidoRef) {
         throw new Error('Referência do pedido é obrigatória')
-      }
-
-      const headers: HeadersInit = {
-        Bearer: tokens.bearerToken,
-        'Content-Type': 'application/json',
-      }
-
-      if (tokens.integradorToken) {
-        headers['integrador-token'] = tokens.integradorToken
       }
 
       const response = await fetchGestorApi(
         `/api/delivery/pedidos/${encodeURIComponent(pedidoRef)}/avancar-status`,
         {
           method: 'POST',
-          headers,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
         }
       )
 
@@ -171,47 +125,38 @@ export function useAvancarStatusPedido(tokens?: DeliveryTokens) {
       const data = await response.json()
       return { status: data.status_pedido }
     },
-    onSuccess: () => {
-      // Invalida a query de pedidos para refetch
-      queryClient.invalidateQueries({ queryKey: ['delivery', 'pedidos'] })
-      showToast.success('Status do pedido atualizado com sucesso!')
-    },
-    onError: (error) => {
-      handleApiError(error)
-    },
-  })
+    {
+      onSuccess: async () => {
+        await invalidate(['delivery', 'pedidos'])
+        showToast.success('Status do pedido atualizado com sucesso!')
+      },
+      onError: error => {
+        handleApiError(error)
+      },
+    }
+  )
 }
 
 /**
- * Hook para cancelar pedido
+ * Hook para cancelar pedido.
  */
-export function useCancelarPedido(tokens?: DeliveryTokens) {
-  const queryClient = useQueryClient()
+export function useCancelarPedido() {
+  const invalidate = useInvalidateTenantQueries()
 
-  return useMutation({
-    mutationFn: async (pedidoRef: string): Promise<{ status: StatusPedido }> => {
-      if (!tokens?.bearerToken) {
-        throw new Error('Token de autenticação não fornecido')
-      }
-
+  return useSecureTenantMutation(
+    async ({ token }, pedidoRef: string): Promise<{ status: StatusPedido }> => {
       if (!pedidoRef) {
         throw new Error('Referência do pedido é obrigatória')
-      }
-
-      const headers: HeadersInit = {
-        Bearer: tokens.bearerToken,
-        'Content-Type': 'application/json',
-      }
-
-      if (tokens.integradorToken) {
-        headers['integrador-token'] = tokens.integradorToken
       }
 
       const response = await fetchGestorApi(
         `/api/delivery/pedidos/${encodeURIComponent(pedidoRef)}/cancelar`,
         {
           method: 'POST',
-          headers,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
         }
       )
 
@@ -227,52 +172,47 @@ export function useCancelarPedido(tokens?: DeliveryTokens) {
       const data = await response.json()
       return { status: data.status_pedido }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['delivery', 'pedidos'] })
-      showToast.success('Pedido cancelado com sucesso!')
-    },
-    onError: (error) => {
-      handleApiError(error)
-    },
-  })
+    {
+      onSuccess: async () => {
+        await invalidate(['delivery', 'pedidos'])
+        showToast.success('Pedido cancelado com sucesso!')
+      },
+      onError: error => {
+        handleApiError(error)
+      },
+    }
+  )
 }
 
 /**
- * Hook para enviar pedido para serviço de motoboy
+ * Hook para enviar pedido para serviço de motoboy.
  */
-export function useEnviarParaMotoboy(tokens?: DeliveryTokens) {
-  const queryClient = useQueryClient()
+export function useEnviarParaMotoboy() {
+  const invalidate = useInvalidateTenantQueries()
 
-  return useMutation({
-    mutationFn: async ({
-      pedidoRef,
-      servico,
-    }: {
-      pedidoRef: string
-      servico?: 'Pega Express' | 'Itz Express' | 'NextLeva'
-    }): Promise<void> => {
-      if (!tokens?.bearerToken) {
-        throw new Error('Token de autenticação não fornecido')
+  return useSecureTenantMutation(
+    async (
+      { token },
+      {
+        pedidoRef,
+        servico,
+      }: {
+        pedidoRef: string
+        servico?: 'Pega Express' | 'Itz Express' | 'NextLeva'
       }
-
+    ): Promise<void> => {
       if (!pedidoRef) {
         throw new Error('Referência do pedido é obrigatória')
-      }
-
-      const headers: HeadersInit = {
-        Bearer: tokens.bearerToken,
-        'Content-Type': 'application/json',
-      }
-
-      if (tokens.integradorToken) {
-        headers['integrador-token'] = tokens.integradorToken
       }
 
       const response = await fetchGestorApi(
         `/api/delivery/pedidos/${encodeURIComponent(pedidoRef)}/enviar-motoboy`,
         {
           method: 'POST',
-          headers,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify({ servico }),
         }
       )
@@ -286,13 +226,14 @@ export function useEnviarParaMotoboy(tokens?: DeliveryTokens) {
         throw new Error(errorMessage)
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['delivery', 'pedidos'] })
-      showToast.success('Pedido enviado para o serviço de motoboy!')
-    },
-    onError: (error) => {
-      handleApiError(error)
-    },
-  })
+    {
+      onSuccess: async () => {
+        await invalidate(['delivery', 'pedidos'])
+        showToast.success('Pedido enviado para o serviço de motoboy!')
+      },
+      onError: error => {
+        handleApiError(error)
+      },
+    }
+  )
 }
-

@@ -2,6 +2,12 @@
 export const JIFFY_SESSION_BROADCAST_CHANNEL = 'jiffy-session-coordinator'
 
 /**
+ * Evento disparado quando o refresh de token falha e a sessão está morta.
+ * Ouvido pelo AuthGuard para centralizar o redirect ao /login.
+ */
+export const JIFFY_SESSION_EXPIRED_EVENT = 'jiffy:session-expired'
+
+/**
  * Marca que esta guia iniciou o logout da empresa (evita modal “desconectado” na própria guia).
  */
 export const SESSION_STORAGE_TENANT_LOGOUT_SELF = 'jiffy:tenant-logout-self'

@@ -1,6 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 export type DashboardEvolucaoPoint = {
@@ -45,24 +43,20 @@ export function useDashboardEvolucaoQuery({
   intervaloHora,
   enabled = true,
 }: Params) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
-  const empresaId = useTenantEmpresaId()
-
-  return useQuery({
-    queryKey: [
+  return useSecureTenantQuery(
+    [
       'dashboard',
       'evolucao',
       periodoInicial ? periodoInicial.toISOString() : null,
       periodoFinal ? periodoFinal.toISOString() : null,
       selectedStatuses,
       intervaloHora ?? null,
-      empresaId,
     ],
-    queryFn: () =>
-      fetchDashboardEvolucao({ periodoInicial, periodoFinal, selectedStatuses, intervaloHora, enabled, token: token! }),
-    enabled: enabled && !!token,
-    staleTime: 30_000,
-  })
+    ({ token }) =>
+      fetchDashboardEvolucao({ periodoInicial, periodoFinal, selectedStatuses, intervaloHora, token }),
+    {
+      enabled,
+      staleTime: 30_000,
+    }
+  )
 }
-

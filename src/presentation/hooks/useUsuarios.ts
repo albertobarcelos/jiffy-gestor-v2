@@ -1,6 +1,8 @@
-import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useQueryClient } from '@tanstack/react-query'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
+import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecureTenantInfiniteQuery'
+import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { Usuario } from '@/src/domain/entities/Usuario'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
@@ -25,17 +27,9 @@ interface UsuariosResponse {
  * Hook para buscar usuários com paginação infinita
  */
 export function useUsuariosInfinite(params: Omit<UsuariosQueryParams, 'offset'> = {}) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
-  const empresaId = useTenantEmpresaId()
-
-  return useInfiniteQuery({
-    queryKey: ['usuarios', 'infinite', params, empresaId],
-    queryFn: async ({ pageParam = 0 }): Promise<{ usuarios: Usuario[]; count: number; nextOffset: number | null }> => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantInfiniteQuery(
+    ['usuarios', 'infinite', params],
+    async ({ token }, pageParam) => {
       const limit = params.limit || 10
       const searchParams = new URLSearchParams()
       if (params.q) searchParams.append('q', params.q)
@@ -46,7 +40,7 @@ export function useUsuariosInfinite(params: Omit<UsuariosQueryParams, 'offset'> 
         searchParams.append('ativo', params.ativo.toString())
       }
       searchParams.append('limit', limit.toString())
-      searchParams.append('offset', pageParam.toString())
+      searchParams.append('offset', String(pageParam))
 
       const response = await fetchGestorApi(`/api/usuarios?${searchParams.toString()}`, {
         headers: {
@@ -73,11 +67,12 @@ export function useUsuariosInfinite(params: Omit<UsuariosQueryParams, 'offset'> 
         nextOffset,
       }
     },
-    enabled: !!token,
-    initialPageParam: 0,
-    getNextPageParam: (lastPage) => lastPage.nextOffset,
-    staleTime: 1000 * 60 * 5, // 5 minutos
-  })
+    {
+      initialPageParam: 0,
+      getNextPageParam: lastPage => lastPage.nextOffset,
+      staleTime: 1000 * 60 * 5,
+    }
+  )
 }
 
 /**
@@ -85,22 +80,11 @@ export function useUsuariosInfinite(params: Omit<UsuariosQueryParams, 'offset'> 
  * Ideal para componentes de visualização e edição.
  */
 export function useUsuario(id: string) {
-  const { auth, isAuthenticated } = useAuthStore()
-  const token = auth?.getAccessToken()
-  const empresaId = useTenantEmpresaId()
-
-  return useQuery<Usuario, ApiError>({
-    queryKey: ['usuario', id, empresaId],
-    queryFn: async () => {
-      if (!isAuthenticated || !token) {
-        throw new Error('Usuário não autenticado ou token ausente.')
-      }
-
+  return useSecureTenantQuery<Usuario>(
+    ['usuario', id],
+    async ({ token }) => {
       const response = await fetchGestorApi(`/api/usuarios/${id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       })
 
       if (!response.ok) {
@@ -115,26 +99,19 @@ export function useUsuario(id: string) {
       const data = await response.json()
       return Usuario.fromJSON(data)
     },
-    enabled: isAuthenticated && !!token && !!id,
-    staleTime: 1000 * 60 * 5, // 5 minutos
-  })
+    { enabled: !!id, staleTime: 1000 * 60 * 5 }
+  )
 }
 
 /**
  * Hook para criar/atualizar usuário com Optimistic Updates
  */
 export function useUsuarioMutation() {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
   const empresaId = useTenantEmpresaId()
 
-  return useMutation({
-    mutationFn: async ({ usuarioId, data, isUpdate }: { usuarioId?: string; data: any; isUpdate: boolean }) => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantMutation(
+    async ({ token }, { usuarioId, data, isUpdate }: { usuarioId?: string; data: any; isUpdate: boolean }) => {
       const url = isUpdate && usuarioId ? `/api/usuarios/${usuarioId}` : '/api/usuarios'
       const method = isUpdate ? 'PATCH' : 'POST'
 
@@ -155,29 +132,30 @@ export function useUsuarioMutation() {
 
       return await response.json()
     },
-    // Optimistic Update: atualiza UI antes da resposta do servidor
-    onMutate: async ({ usuarioId, data, isUpdate }) => {
-      await queryClient.cancelQueries({ queryKey: ['usuarios'] })
+    {
+      onMutate: async ({ usuarioId, data, isUpdate }) => {
+        await queryClient.cancelQueries({ queryKey: ['tenant', empresaId, 'usuarios'], exact: false })
 
-      const previousUsuarios = queryClient.getQueryData(['usuarios', 'infinite'])
+        const previousUsuarios = queryClient.getQueryData(['tenant', empresaId, 'usuarios', 'infinite'])
 
-      if (isUpdate && usuarioId) {
-        queryClient.setQueriesData({ queryKey: ['usuario', usuarioId] }, (old: any) => {
-          if (!old) return old
-          return { ...old, ...data }
-        })
-      }
+        if (isUpdate && usuarioId) {
+          queryClient.setQueriesData({ queryKey: ['tenant', empresaId, 'usuario', usuarioId] }, (old: any) => {
+            if (!old) return old
+            return { ...old, ...data }
+          })
+        }
 
-      return { previousUsuarios }
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['usuarios'] })
-      if (variables.usuarioId) {
-        queryClient.invalidateQueries({ queryKey: ['usuario', variables.usuarioId] })
-      }
-      showToast.success(variables.isUpdate ? 'Usuário atualizado com sucesso!' : 'Usuário criado com sucesso!')
-    },
-  })
+        return { previousUsuarios }
+      },
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'usuarios'] })
+        if (variables.usuarioId) {
+          queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'usuario', variables.usuarioId] })
+        }
+        showToast.success(variables.isUpdate ? 'Usuário atualizado com sucesso!' : 'Usuário criado com sucesso!')
+      },
+    }
+  )
 }
 
 

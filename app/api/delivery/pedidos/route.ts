@@ -3,6 +3,7 @@ import { DeliveryRepository } from '@/src/infrastructure/database/repositories/D
 import { ListarPedidosUseCase } from '@/src/application/use-cases/delivery/ListarPedidosUseCase'
 import { StatusPedido } from '@/src/domain/entities/StatusPedido'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
+import { resolveDeliveryIntegradorAuth } from '@/src/shared/utils/resolveDeliveryIntegradorAuth'
 import { ApiClient, ApiError, mensagemLegivelApiError } from '@/src/infrastructure/api/apiClient'
 import {
   extrairPedidosDeliveryQueryParamsDeSearchParams,
@@ -59,10 +60,8 @@ export async function POST(request: NextRequest) {
 }
 
 async function listarPedidosIntegradorLegado(request: NextRequest): Promise<NextResponse> {
-  const bearerToken = request.headers.get('Bearer') || request.headers.get('bearer')
-  const integradorToken = request.headers.get('integrador-token')
-
-  if (!bearerToken) {
+  const auth = resolveDeliveryIntegradorAuth(request)
+  if (!auth) {
     return NextResponse.json({ error: 'Token de autenticação não fornecido' }, { status: 401 })
   }
 
@@ -86,7 +85,7 @@ async function listarPedidosIntegradorLegado(request: NextRequest): Promise<Next
     params.dataAtualizacao = dataAtualizacao
   }
 
-  const repository = new DeliveryRepository(undefined, bearerToken, integradorToken || undefined)
+  const repository = new DeliveryRepository(undefined, auth.bearerToken, auth.integradorToken)
   const useCase = new ListarPedidosUseCase(repository)
   const pedidos = await useCase.execute(params)
 

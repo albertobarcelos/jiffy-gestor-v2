@@ -1,6 +1,5 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { keepPreviousData } from '@tanstack/react-query'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 type DashboardResumoMetricas = {
@@ -106,12 +105,8 @@ export function useDashboardResumoQuery({
   intervaloComparacaoFim,
   enabled = true,
 }: DashboardResumoParams) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
-  const empresaId = useTenantEmpresaId()
-
-  return useQuery({
-    queryKey: [
+  return useSecureTenantQuery(
+    [
       'dashboard',
       'resumo',
       periodo,
@@ -122,9 +117,8 @@ export function useDashboardResumoQuery({
       intervaloComparacaoFim ? intervaloComparacaoFim.toISOString() : null,
       periodo === 'personalizado' && periodoInicial ? periodoInicial.toISOString() : null,
       periodo === 'personalizado' && periodoFinal ? periodoFinal.toISOString() : null,
-      empresaId,
     ],
-    queryFn: () =>
+    ({ token }) =>
       fetchDashboardResumo({
         periodo,
         timezone,
@@ -134,11 +128,12 @@ export function useDashboardResumoQuery({
         intervaloAtualFim,
         intervaloComparacaoInicio,
         intervaloComparacaoFim,
-        token: token!,
+        token,
       }),
-    enabled: enabled && !!token,
-    staleTime: 30_000,
-    placeholderData: keepPreviousData,
-  })
+    {
+      enabled,
+      staleTime: 30_000,
+      placeholderData: keepPreviousData,
+    }
+  )
 }
-

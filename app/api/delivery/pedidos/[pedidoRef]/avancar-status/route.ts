@@ -1,20 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { DeliveryRepository } from '@/src/infrastructure/database/repositories/DeliveryRepository'
 import { AvancarStatusPedidoUseCase } from '@/src/application/use-cases/delivery/AvancarStatusPedidoUseCase'
+import { resolveDeliveryIntegradorAuth } from '@/src/shared/utils/resolveDeliveryIntegradorAuth'
 
 /**
  * POST /api/delivery/pedidos/[pedidoRef]/avancar-status
- * Avança o status do pedido para o próximo status disponível
+ * Avança o status do pedido para o próximo status disponível.
+ * Auth: JWT da sessão gestor (preferencial) ou header legado `Bearer`.
  */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ pedidoRef: string }> }
 ) {
   try {
-    const bearerToken = request.headers.get('Bearer') || request.headers.get('bearer')
-    const integradorToken = request.headers.get('integrador-token')
-
-    if (!bearerToken) {
+    const auth = resolveDeliveryIntegradorAuth(request)
+    if (!auth) {
       return NextResponse.json(
         { error: 'Token de autenticação não fornecido' },
         { status: 401 }
@@ -32,8 +32,8 @@ export async function POST(
 
     const repository = new DeliveryRepository(
       undefined,
-      bearerToken,
-      integradorToken || undefined
+      auth.bearerToken,
+      auth.integradorToken
     )
     const useCase = new AvancarStatusPedidoUseCase(repository)
 
@@ -52,4 +52,3 @@ export async function POST(
     )
   }
 }
-

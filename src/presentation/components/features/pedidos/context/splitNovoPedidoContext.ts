@@ -142,6 +142,7 @@ export function splitDetalheContextValue(
     cancelarVendaGestor: value.cancelarVendaGestor,
     cancelarNotaFiscalVendaPdv: value.cancelarNotaFiscalVendaPdv,
     cancelarNotaFiscalVendaGestor: value.cancelarNotaFiscalVendaGestor,
+    transicaoPedidoDelivery: value.transicaoPedidoDelivery,
     tipoCancelamentoSelecionado: value.tipoCancelamentoSelecionado,
     setTipoCancelamentoSelecionado: value.setTipoCancelamentoSelecionado,
     justificativaCancelamento: value.justificativaCancelamento,

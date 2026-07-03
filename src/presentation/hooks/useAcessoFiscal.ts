@@ -9,13 +9,13 @@ import { decodeToken } from '@/src/shared/utils/validateToken'
  * Sem claim no JWT: permite (compatibilidade com sessões antigas).
  */
 export function useAcessoFiscal(): boolean {
-  const { auth } = useAuthStore()
+  const tenantAuth = useAuthStore(s => s.tenantAuth)
 
   return useMemo(() => {
-    const token = auth?.getAccessToken()
+    const token = tenantAuth?.getAccessToken()
     if (!token) return true
     const payload = decodeToken(token)
     if (payload?.acessoFiscal === false) return false
     return true
-  }, [auth])
+  }, [tenantAuth])
 }

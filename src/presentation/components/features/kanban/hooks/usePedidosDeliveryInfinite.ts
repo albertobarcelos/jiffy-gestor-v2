@@ -2,7 +2,6 @@
 
 import {
   keepPreviousData,
-  useInfiniteQuery,
   useQueryClient,
   type InfiniteData,
   type QueryClient,
@@ -17,8 +16,8 @@ import {
   mapPedidosDeliveryListResponseParaVendaUnificadaDTO,
   normalizarPedidosDeliveryListResponse,
 } from '@/src/application/mappers/PedidoDeliveryListMapper'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecureTenantInfiniteQuery'
+import { buildTenantQueryKey } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { preservarObservacoesKanbanCacheNosItems } from '../utils/kanbanVendaCacheUpdate'
 import {
@@ -139,11 +138,16 @@ export function getNextOffsetPedidosDelivery(
   )
 }
 
+/** Base key (sem prefixo tenant) — useSecureTenantInfiniteQuery adiciona `['tenant', empresaId, ...]`. */
+export function pedidosDeliveryInfiniteBaseKey(params: PedidosDeliveryInfiniteParams) {
+  return ['delivery', 'pedidos', 'infinite', params] as const
+}
+
 export function pedidosDeliveryInfiniteQueryKey(
   params: PedidosDeliveryInfiniteParams,
   empresaId: string | null
 ) {
-  return ['delivery', 'pedidos', 'infinite', empresaId, params] as const
+  return buildTenantQueryKey(empresaId, pedidosDeliveryInfiniteBaseKey(params))
 }
 
 /**
@@ -154,42 +158,32 @@ export function usePedidosDeliveryInfinite(
   params: PedidosDeliveryInfiniteParams,
   options?: PedidosDeliveryInfiniteOptions
 ) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
-  const empresaId = useTenantEmpresaId()
   const queryClient = useQueryClient()
 
-  const queryKey = pedidosDeliveryInfiniteQueryKey(params, empresaId)
-  const enabled = options?.enabled !== false && !!token
-
-  return useInfiniteQuery<
-    PedidosDeliveryInfinitePage,
-    Error,
-    InfiniteData<PedidosDeliveryInfinitePage>,
-    readonly unknown[],
-    number
-  >({
-    queryKey,
-    placeholderData: keepPreviousData,
-    initialPageParam: 0,
-    queryFn: ({ pageParam, signal }) =>
+  return useSecureTenantInfiniteQuery(
+    pedidosDeliveryInfiniteBaseKey(params),
+    ({ token }, pageParam) =>
       fetchPedidosDeliveryPagina(
         params,
         pageParam,
         PEDIDOS_DELIVERY_KANBAN_PAGE_SIZE,
-        token!,
-        signal,
+        token,
+        undefined,
         queryClient
       ),
-    getNextPageParam: (lastPage, allPages) => getNextOffsetPedidosDelivery(lastPage, allPages),
-    enabled,
-    refetchOnReconnect: true,
-    refetchInterval: options?.refetchIntervalMs ?? false,
-    refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
-    refetchIntervalInBackground: false,
-    staleTime: 30_000,
-    gcTime: 5 * 60_000,
-  })
+    {
+      enabled: options?.enabled !== false,
+      placeholderData: keepPreviousData,
+      initialPageParam: 0,
+      getNextPageParam: (lastPage, allPages) => getNextOffsetPedidosDelivery(lastPage, allPages),
+      refetchOnReconnect: true,
+      refetchInterval: options?.refetchIntervalMs ?? false,
+      refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
+      refetchIntervalInBackground: false,
+      staleTime: 30_000,
+      gcTime: 5 * 60_000,
+    }
+  )
 }
 
 /** Achata páginas do infinite query e deduplica por id. */

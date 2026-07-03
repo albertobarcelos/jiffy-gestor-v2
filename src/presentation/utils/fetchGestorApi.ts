@@ -2,6 +2,21 @@
 
 import { fetchTenantRefreshAccessToken } from '@/src/shared/utils/fetchTenantRefreshAccessToken'
 import { syncTenantAccessTokenClient } from '@/src/presentation/utils/syncTenantAccessTokenClient'
+import { JIFFY_SESSION_EXPIRED_EVENT } from '@/src/shared/constants/sessionCoordinator'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
+
+const PUBLIC_AUTH_PATHS = [
+  '/login',
+  '/registro',
+  '/esqueci-senha',
+  '/redefinir-senha',
+  '/confirmar-email',
+  '/notas-fiscais',
+]
+
+function isPublicAuthPath(pathname: string): boolean {
+  return PUBLIC_AUTH_PATHS.some(p => pathname === p || pathname.startsWith(`${p}/`))
+}
 
 function requestPathname(input: RequestInfo | URL): string {
   if (typeof input === 'string') {
@@ -64,17 +79,36 @@ export type FetchGestorApiOptions = RequestInit & {
 }
 
 /**
- * `fetch` para rotas `/api/*` do próprio app: em **401**, tenta renovar o JWT
- * da empresa (`refresh-token` httpOnly), sincroniza Zustand/sessionStorage e
- * repete o pedido **uma vez** com `Authorization: Bearer`.
+ * `fetch` para rotas `/api/*` do próprio app.
+ *
+ * - Injeta automaticamente `Authorization: Bearer` do Zustand (token per-tab)
+ *   quando o chamador não fornecer o header. Isso garante que o BFF sempre
+ *   receba o token correto da aba ativa, ignorando o cookie `tenant-token`
+ *   global (que pode estar contaminado por outra aba).
+ * - Em **401**, tenta renovar o JWT da empresa (`refresh-token` httpOnly),
+ *   sincroniza Zustand/sessionStorage e repete o pedido **uma vez**.
  */
 export async function fetchGestorApi(
   input: RequestInfo | URL,
   init?: FetchGestorApiOptions
 ): Promise<Response> {
   const { autoRefresh = true, ...fetchInit } = init ?? {}
+
+  // Injetar token per-tab se o chamador não forneceu Authorization
+  const existingAuth = new Headers(fetchInit.headers ?? {}).get('authorization')
+  let headersComToken = fetchInit.headers
+  if (!existingAuth) {
+    const tenantToken = useAuthStore.getState().tenantAuth?.getAccessToken()
+    if (tenantToken) {
+      const h = new Headers(fetchInit.headers ?? {})
+      h.set('Authorization', `Bearer ${tenantToken}`)
+      headersComToken = h
+    }
+  }
+
   const nextInit: RequestInit = {
     ...fetchInit,
+    headers: headersComToken,
     credentials: fetchInit.credentials ?? 'include',
   }
 
@@ -91,6 +125,11 @@ export async function fetchGestorApi(
 
   const newToken = await fetchTenantRefreshAccessToken()
   if (!newToken) {
+    // Sessão morta: notificar o AuthGuard para redirecionar ao login.
+    // Evitar redirect em rotas públicas para não entrar em loop.
+    if (!isPublicAuthPath(window.location.pathname)) {
+      window.dispatchEvent(new CustomEvent(JIFFY_SESSION_EXPIRED_EVENT))
+    }
     return response
   }
 

@@ -129,13 +129,20 @@ export function vendaPertenceColunaDeliveryKanban(
   }
 }
 
+/**
+ * Extrai o id da coluna de keys no padrão:
+ * `['tenant', empresaId, 'delivery', 'pedidos', 'infinite', 'column', columnId, params]`
+ */
 export function extrairColumnIdDePedidosDeliveryKanbanQueryKey(
   queryKey: readonly unknown[]
 ): ColunaKanbanId | null {
-  if (queryKey.length < 6) return null
-  const marker = queryKey[4]
-  if (marker !== 'column') return null
-  const columnId = queryKey[5]
+  if (queryKey.length < 7) return null
+  if (queryKey[0] !== 'tenant') return null
+  if (queryKey[2] !== 'delivery' || queryKey[3] !== 'pedidos' || queryKey[4] !== 'infinite') {
+    return null
+  }
+  if (queryKey[5] !== 'column') return null
+  const columnId = queryKey[6]
   if (typeof columnId !== 'string') return null
   return columnId as ColunaKanbanId
 }
