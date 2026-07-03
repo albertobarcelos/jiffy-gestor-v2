@@ -37,6 +37,6 @@ export {
 export {
   invalidateKanbanVendasListagens,
   refetchKanbanVendasListagens,
-  KANBAN_VENDAS_UNIFICADAS_QUERY_KEY,
-  KANBAN_PEDIDOS_DELIVERY_INFINITE_QUERY_KEY,
+  kanbanVendasUnificadasInfiniteQueryFilter,
+  kanbanPedidosDeliveryInfiniteQueryFilter,
 } from './hooks/kanbanListagemQueryCache'

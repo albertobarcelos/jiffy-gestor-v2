@@ -1,11 +1,9 @@
 import {
   keepPreviousData,
-  useInfiniteQuery,
   type InfiniteData,
 } from '@tanstack/react-query'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecureTenantInfiniteQuery'
 import {
   isPedidoEntregaKanban,
 } from '@/src/shared/helpers/pedidoEntregaKanban'
@@ -808,46 +806,30 @@ export function useVendasUnificadasInfinite(
   params: VendasUnificadasQueryParams,
   options?: VendasUnificadasInfiniteOptions
 ) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
-  const empresaId = useTenantEmpresaId()
-
-  const queryKey = vendasUnificadasInfiniteQueryKey(params, empresaId)
-
-  return useInfiniteQuery<
-    VendasUnificadasResponse,
-    Error,
-    InfiniteData<VendasUnificadasResponse>,
-    readonly unknown[],
-    number
-  >({
-    queryKey,
-    placeholderData: keepPreviousData,
-    initialPageParam: 0,
-    queryFn: ({ pageParam, signal }) =>
-      fetchVendasUnificadasPagina(
-        params,
-        pageParam,
-        VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE,
-        token!,
-        signal
-      ),
-    getNextPageParam: (lastPage, allPages) => getNextOffsetVendasUnificadas(lastPage, allPages),
-    enabled: options?.enabled !== false && !!token,
-    refetchOnReconnect: true,
-    refetchInterval: options?.refetchIntervalMs ?? false,
-    refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
-    refetchIntervalInBackground: false,
-    staleTime: 30_000,
-    gcTime: 5 * 60_000,
-  })
+  return useSecureTenantInfiniteQuery<VendasUnificadasResponse, number>(
+    ['vendas-unificadas', 'infinite', params],
+    ({ token }, pageParam) =>
+      fetchVendasUnificadasPagina(params, pageParam, VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE, token),
+    {
+      placeholderData: keepPreviousData,
+      initialPageParam: 0,
+      getNextPageParam: (lastPage, allPages) => getNextOffsetVendasUnificadas(lastPage, allPages),
+      enabled: options?.enabled !== false,
+      refetchOnReconnect: true,
+      refetchInterval: options?.refetchIntervalMs ?? false,
+      refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
+      refetchIntervalInBackground: false,
+      staleTime: 30_000,
+      gcTime: 5 * 60_000,
+    }
+  )
 }
 
 export function vendasUnificadasInfiniteQueryKey(
   params: VendasUnificadasQueryParams,
   empresaId: string | null
 ) {
-  return ['vendas-unificadas', 'infinite', empresaId, params] as const
+  return ['tenant', empresaId, 'vendas-unificadas', 'infinite', params] as const
 }
 
 /** @deprecated Preferir `useVendasUnificadasInfinite` no Kanban. */

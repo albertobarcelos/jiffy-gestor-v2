@@ -7,7 +7,6 @@
 
 import { useCallback, useMemo, useRef } from 'react'
 import { useQueryClient, type InfiniteData } from '@tanstack/react-query'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import type { ColunaKanbanId } from '../types'
 import {
@@ -50,12 +49,10 @@ export function useVendasUnificadasKanbanColumns(
     enviarFiltroFinalizacaoNaApi?: boolean
   }
 ) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
   const empresaId = useTenantEmpresaId()
   const queryClient = useQueryClient()
 
-  const enabled = options?.enabled !== false && !!token
+  const enabled = options?.enabled !== false
   const columnInfiniteOptions = {
     enabled,
     enviarFiltroFinalizacaoNaApi: options?.enviarFiltroFinalizacaoNaApi,

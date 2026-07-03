@@ -1,39 +1,33 @@
 'use client'
 
 import { useMemo } from 'react'
-import {
-  keepPreviousData,
-  useInfiniteQuery,
-  useQueryClient,
-  type InfiniteData,
-} from '@tanstack/react-query'
+import { keepPreviousData, useQueryClient } from '@tanstack/react-query'
 import { KANBAN_DELIVERY_COLUMN_PAGE_SIZE } from '@/src/application/dto/api/pedidoDeliveryListApi'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecureTenantInfiniteQuery'
+import { buildTenantQueryKey } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import type { ColunaKanbanId } from '../types'
 import { buildPedidosDeliveryParamsForKanbanColumn } from '../utils/kanbanDeliveryColumnConfig'
 import {
   fetchPedidosDeliveryPagina,
   getNextOffsetPedidosDelivery,
   type PedidosDeliveryInfiniteOptions,
-  type PedidosDeliveryInfinitePage,
   type PedidosDeliveryInfiniteParams,
 } from './usePedidosDeliveryInfinite'
+
+/** Base key sem prefixo tenant. */
+export function pedidosDeliveryKanbanColumnBaseKey(
+  columnId: ColunaKanbanId,
+  params: PedidosDeliveryInfiniteParams
+) {
+  return ['delivery', 'pedidos', 'infinite', 'column', columnId, params] as const
+}
 
 export function pedidosDeliveryKanbanColumnQueryKey(
   columnId: ColunaKanbanId,
   params: PedidosDeliveryInfiniteParams,
   empresaId: string | null
 ) {
-  return [
-    'delivery',
-    'pedidos',
-    'infinite',
-    empresaId,
-    'column',
-    columnId,
-    params,
-  ] as const
+  return buildTenantQueryKey(empresaId, pedidosDeliveryKanbanColumnBaseKey(columnId, params))
 }
 
 /**
@@ -44,9 +38,6 @@ export function usePedidosDeliveryKanbanColumnInfinite(
   baseParams: PedidosDeliveryInfiniteParams,
   options?: PedidosDeliveryInfiniteOptions
 ) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
-  const empresaId = useTenantEmpresaId()
   const queryClient = useQueryClient()
 
   const columnParams = useMemo(
@@ -63,35 +54,28 @@ export function usePedidosDeliveryKanbanColumnInfinite(
     ]
   )
 
-  const queryKey = pedidosDeliveryKanbanColumnQueryKey(columnId, columnParams, empresaId)
-  const enabled = options?.enabled !== false && !!token
-
-  return useInfiniteQuery<
-    PedidosDeliveryInfinitePage,
-    Error,
-    InfiniteData<PedidosDeliveryInfinitePage>,
-    readonly unknown[],
-    number
-  >({
-    queryKey,
-    placeholderData: keepPreviousData,
-    initialPageParam: 0,
-    queryFn: ({ pageParam, signal }) =>
+  return useSecureTenantInfiniteQuery(
+    pedidosDeliveryKanbanColumnBaseKey(columnId, columnParams),
+    ({ token }, pageParam) =>
       fetchPedidosDeliveryPagina(
         columnParams,
         pageParam,
         KANBAN_DELIVERY_COLUMN_PAGE_SIZE,
-        token!,
-        signal,
+        token,
+        undefined,
         queryClient
       ),
-    getNextPageParam: (lastPage, allPages) => getNextOffsetPedidosDelivery(lastPage, allPages),
-    enabled,
-    retry: 2,
-    refetchOnReconnect: true,
-    refetchInterval: false,
-    refetchOnWindowFocus: false,
-    staleTime: Infinity,
-    gcTime: 5 * 60_000,
-  })
+    {
+      enabled: options?.enabled !== false,
+      placeholderData: keepPreviousData,
+      initialPageParam: 0,
+      getNextPageParam: (lastPage, allPages) => getNextOffsetPedidosDelivery(lastPage, allPages),
+      retry: 2,
+      refetchOnReconnect: true,
+      refetchInterval: false,
+      refetchOnWindowFocus: false,
+      staleTime: Infinity,
+      gcTime: 5 * 60_000,
+    }
+  )
 }

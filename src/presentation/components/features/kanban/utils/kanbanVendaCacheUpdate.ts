@@ -3,8 +3,8 @@ import type { KanbanVendaCachePatch } from '@/src/application/dto/TransicaoKanba
 import { extrairPatchKanbanDeRespostaTransicao } from '@/src/application/mappers/TransicaoPedidoDeliveryMapper'
 import { syncPedidoDeliveryDetalheCaches } from '@/src/infrastructure/api/pedidoDeliveryDetalheCache'
 import {
-  KANBAN_PEDIDOS_DELIVERY_INFINITE_QUERY_KEY,
-  KANBAN_VENDAS_UNIFICADAS_QUERY_KEY,
+  kanbanPedidosDeliveryInfiniteQueryFilter,
+  kanbanVendasUnificadasInfiniteQueryFilter,
 } from '../hooks/kanbanListagemQueryCache'
 
 export type { KanbanVendaCachePatch } from '@/src/application/dto/TransicaoKanbanDTO'
@@ -194,9 +194,9 @@ export function replaceKanbanVendasListagemCache(
 ): boolean {
   let encontrou = false
 
-  const queries = queryClient.getQueriesData<InfiniteData<VendasUnificadasResponse>>({
-    queryKey: KANBAN_VENDAS_UNIFICADAS_QUERY_KEY,
-  })
+  const queries = queryClient.getQueriesData<InfiniteData<VendasUnificadasResponse>>(
+    kanbanVendasUnificadasInfiniteQueryFilter()
+  )
   for (const [queryKey] of queries) {
     const replaced = replaceVendaUnificadaInfiniteCache(queryClient, queryKey, vendaAtualizada)
     if (replaced) encontrou = true
@@ -302,9 +302,9 @@ export function moveVendaKanbanBalcaoEntreColunas(
   colunaDestino: EtapaKanbanBalcao,
   patch?: KanbanVendaCachePatch
 ): boolean {
-  const queries = queryClient.getQueriesData<InfiniteData<VendasUnificadasResponse>>({
-    queryKey: KANBAN_VENDAS_UNIFICADAS_QUERY_KEY,
-  })
+  const queries = queryClient.getQueriesData<InfiniteData<VendasUnificadasResponse>>(
+    kanbanVendasUnificadasInfiniteQueryFilter()
+  )
 
   let venda: VendaUnificadaDTO | null = null
   for (const [, data] of queries) {
@@ -362,18 +362,21 @@ export function patchKanbanVendasListagemCache(
 ): boolean {
   let encontrou = false
 
-  const prefixos = [
-    KANBAN_VENDAS_UNIFICADAS_QUERY_KEY,
-    KANBAN_PEDIDOS_DELIVERY_INFINITE_QUERY_KEY,
-  ] as const
+  const queriesBalcao = queryClient.getQueriesData<InfiniteData<VendasUnificadasResponse>>(
+    kanbanVendasUnificadasInfiniteQueryFilter()
+  )
+  for (const [queryKey] of queriesBalcao) {
+    if (patchVendaUnificadaInfiniteCache(queryClient, queryKey, vendaId, patch)) {
+      encontrou = true
+    }
+  }
 
-  for (const prefix of prefixos) {
-    const queries = queryClient.getQueriesData<InfiniteData<VendasUnificadasResponse>>({
-      queryKey: prefix,
-    })
-    for (const [queryKey] of queries) {
-      const patched = patchVendaUnificadaInfiniteCache(queryClient, queryKey, vendaId, patch)
-      if (patched) encontrou = true
+  const queriesDelivery = queryClient.getQueriesData<InfiniteData<VendasUnificadasResponse>>(
+    kanbanPedidosDeliveryInfiniteQueryFilter()
+  )
+  for (const [queryKey] of queriesDelivery) {
+    if (patchVendaUnificadaInfiniteCache(queryClient, queryKey, vendaId, patch)) {
+      encontrou = true
     }
   }
 
@@ -437,11 +440,6 @@ export async function sincronizarPedidoDeliveryKanbanEmBackground(
   }
 }
 
-const PREFIXOS_LISTAGEM_KANBAN = [
-  KANBAN_VENDAS_UNIFICADAS_QUERY_KEY,
-  KANBAN_PEDIDOS_DELIVERY_INFINITE_QUERY_KEY,
-] as const
-
 /**
  * A listagem GET /delivery/pedidos (summary) não inclui `observacoes`.
  * Ao refetch, preserva observações já presentes no cache do Kanban (patch local ou unificado).
@@ -452,10 +450,9 @@ export function preservarObservacoesKanbanCacheNosItems(
 ): VendaUnificadaDTO[] {
   const observacoesPorId = new Map<string, string[]>()
 
-  for (const prefix of PREFIXOS_LISTAGEM_KANBAN) {
-    const queries = queryClient.getQueriesData<InfiniteData<VendasUnificadasResponse>>({
-      queryKey: prefix,
-    })
+  const coletarObservacoes = (
+    queries: [readonly unknown[], InfiniteData<VendasUnificadasResponse> | undefined][]
+  ) => {
     for (const [, data] of queries) {
       if (!data?.pages?.length) continue
       for (const page of data.pages) {
@@ -467,6 +464,17 @@ export function preservarObservacoesKanbanCacheNosItems(
       }
     }
   }
+
+  coletarObservacoes(
+    queryClient.getQueriesData<InfiniteData<VendasUnificadasResponse>>(
+      kanbanVendasUnificadasInfiniteQueryFilter()
+    )
+  )
+  coletarObservacoes(
+    queryClient.getQueriesData<InfiniteData<VendasUnificadasResponse>>(
+      kanbanPedidosDeliveryInfiniteQueryFilter()
+    )
+  )
 
   if (observacoesPorId.size === 0) return novosItems
 
