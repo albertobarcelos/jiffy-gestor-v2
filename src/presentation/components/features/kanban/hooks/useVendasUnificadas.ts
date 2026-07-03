@@ -273,6 +273,43 @@ function extrairStatusFinanceiro(item: Record<string, unknown>): string | null {
   return null
 }
 
+/** Coluna do Kanban balcão resolvida no backend (`GET /vendas/unificado`). */
+export type EtapaKanbanBalcao = 'FINALIZADAS' | 'PENDENTE_EMISSAO' | 'COM_NFE'
+
+function extrairEtapaKanbanBalcao(item: Record<string, unknown>): EtapaKanbanBalcao | null {
+  const raw = item.etapaKanbanBalcao ?? item.etapa_kanban_balcao
+  if (raw == null || String(raw).trim() === '') return null
+  const s = String(raw).trim().toUpperCase()
+  if (s === 'FINALIZADAS' || s === 'PENDENTE_EMISSAO' || s === 'COM_NFE') return s
+  return null
+}
+
+function normalizarOrigemUnificado(raw: unknown): VendaUnificadaDTO['origem'] {
+  const s = String(raw ?? '')
+    .trim()
+    .toUpperCase()
+  if (s === 'PDV') return 'PDV'
+  if (s === 'GESTOR') return 'GESTOR'
+  if (s === 'DELIVERY' || s === 'DELIVERY_IFOOD') return 'DELIVERY_IFOOD'
+  if (s === 'DELIVERY_UBER') return 'DELIVERY_UBER'
+  return 'GESTOR'
+}
+
+function extrairAbertoPor(item: Record<string, unknown>): VendaUnificadaDTO['abertoPor'] {
+  const abertoPor = item.abertoPor as VendaUnificadaDTO['abertoPor'] | null | undefined
+  if (abertoPor?.id) {
+    return {
+      id: String(abertoPor.id),
+      nome: String(abertoPor.nome ?? '—'),
+    }
+  }
+  const id = String(item.abertoPorId ?? '').trim()
+  return {
+    id: id || '—',
+    nome: String(item.abertoPorNome ?? '—'),
+  }
+}
+
 /**
  * DTO unificado para vendas do PDV e do Gestor (TypeScript)
  * Deve corresponder à classe VendaUnificadaDTO do backend
@@ -341,7 +378,9 @@ export class VendaUnificadaDTO {
     /** Delivery Kanban: entregador vinculado (summary). */
     public readonly entregador?: EntregadorKanbanDeliveryResumo | null,
     /** Delivery Kanban: contexto de entrega com endereço (summary). */
-    public readonly contextoEntrega?: ContextoEntregaDeliveryApi | null
+    public readonly contextoEntrega?: ContextoEntregaDeliveryApi | null,
+    /** Kanban balcão: coluna resolvida no backend (source of truth). */
+    public readonly etapaKanbanBalcao?: EtapaKanbanBalcao | null
   ) {}
 
   private possuiDocumentoFiscal(): boolean {
@@ -377,7 +416,8 @@ export class VendaUnificadaDTO {
   }
 
   isDelivery(): boolean {
-    return this.origem === 'DELIVERY_IFOOD' || this.origem === 'DELIVERY_UBER'
+    const o = String(this.origem).toUpperCase()
+    return o === 'DELIVERY' || o === 'DELIVERY_IFOOD' || o === 'DELIVERY_UBER'
   }
 
   /** Venda cancelada: por dataCancelamento ou por statusFiscal CANCELADA (API pode não enviar dataCancelamento) */
@@ -440,6 +480,7 @@ export class VendaUnificadaDTO {
   }
 
   getEtapaKanban(): string {
+    if (this.etapaKanbanBalcao) return this.etapaKanbanBalcao
     if (this.temNFeEmitida()) return 'COM_NFE'
     // Nota inutilizada: coluna "Com Nota Solicitada" — sem botão de ação
     if (this.statusFiscal === 'INUTILIZADA') return 'COM_NFE'
@@ -520,6 +561,8 @@ export interface VendasUnificadasQueryParams {
   origem?: 'PDV' | 'GESTOR' | 'DELIVERY'
   /** Filtro operacional do modo delivery (entrega/retirada). Ignorado pelo unificado/balcão. */
   tipoEntrega?: 'entrega' | 'retirada'
+  /** Kanban balcão: filtra server-side por coluna fiscal. */
+  colunaKanban?: EtapaKanbanBalcao
   statusFiscal?: string
   periodoInicial?: string
   periodoFinal?: string
@@ -527,6 +570,7 @@ export interface VendasUnificadasQueryParams {
   dataCriacaoFinal?: string
   dataFinalizacaoInicio?: string // ISO date string
   dataFinalizacaoFim?: string // ISO date string
+  terminalId?: string
   q?: string // termo de busca
 }
 
@@ -557,23 +601,23 @@ export const VENDAS_UNIFICADAS_PAGE_SIZE = VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE
 /** Converte um item bruto da API em DTO (reutilizado em cada página). */
 export function mapItemJsonParaVendaUnificadaDTO(v: Record<string, unknown>): VendaUnificadaDTO {
   return new VendaUnificadaDTO(
-    v.id as string,
-    v.numeroVenda as number,
-    v.codigoVenda as string,
-    v.tipoVenda as string | null,
-    v.origem as VendaUnificadaDTO['origem'],
-    v.tabelaOrigem as VendaUnificadaDTO['tabelaOrigem'],
-    v.valorFinal as number,
-    v.totalDesconto as number,
-    v.totalAcrescimo as number,
-    v.dataCriacao as string,
-    v.dataFinalizacao as string | null,
+    String(v.id ?? ''),
+    (v.numeroVenda as number) ?? 0,
+    String(v.codigoVenda ?? ''),
+    (v.tipoVenda as string | null) ?? null,
+    normalizarOrigemUnificado(v.origem),
+    (v.tabelaOrigem as VendaUnificadaDTO['tabelaOrigem']) ?? 'venda_gestor',
+    (v.valorFinal as number) ?? 0,
+    (v.totalDesconto as number) ?? 0,
+    (v.totalAcrescimo as number) ?? 0,
+    String(v.dataCriacao ?? ''),
+    (v.dataFinalizacao ?? null) as string | null,
     (v.dataCancelamento ?? null) as string | null,
-    v.cliente as VendaUnificadaDTO['cliente'],
+    (v.cliente as VendaUnificadaDTO['cliente']) ?? null,
     parseSolicitarEmissaoFiscal(v.solicitarEmissaoFiscal),
     normalizarStatusFiscalUnificado(v),
     (v.documentoFiscalId ?? null) as string | null,
-    v.abertoPor as VendaUnificadaDTO['abertoPor'],
+    extrairAbertoPor(v),
     extrairNumeroMesa(v),
     v.numeroFiscal as number | null | undefined,
     v.serieFiscal as string | null | undefined,
@@ -590,7 +634,8 @@ export function mapItemJsonParaVendaUnificadaDTO(v: Record<string, unknown>): Ve
     extrairFluxoPagamentoEntrega(v),
     extrairCobrancasDelivery(v),
     extrairEntregadorDelivery(v),
-    extrairContextoEntregaDelivery(v)
+    extrairContextoEntregaDelivery(v),
+    extrairEtapaKanbanBalcao(v)
   )
 }
 
@@ -634,6 +679,8 @@ export function montarSearchParamsVendasUnificadas(
 ): URLSearchParams {
   const searchParams = new URLSearchParams()
   if (params.origem) searchParams.append('origem', params.origem)
+  if (params.colunaKanban) searchParams.append('colunaKanban', params.colunaKanban)
+  if (params.terminalId?.trim()) searchParams.append('terminalId', params.terminalId.trim())
   if (params.statusFiscal) searchParams.append('statusFiscal', params.statusFiscal)
   const periodoInicial = params.periodoInicial ?? params.dataCriacaoInicial
   const periodoFinal = params.periodoFinal ?? params.dataCriacaoFinal
@@ -676,17 +723,22 @@ export async function fetchVendasUnificadasPagina(
   }
 
   const data = await response.json()
-  const rawItems = (data.items || []) as Record<string, unknown>[]
+  const pagina =
+    data?.data && typeof data.data === 'object' && !Array.isArray(data.data)
+      ? (data.data as Record<string, unknown>)
+      : (data as Record<string, unknown>)
+
+  const rawItems = (pagina.items || []) as Record<string, unknown>[]
   const items = rawItems.map(mapItemJsonParaVendaUnificadaDTO)
 
   return {
     items,
-    count: typeof data.count === 'number' ? data.count : items.length,
-    page: data.page ?? 1,
-    limit: data.limit ?? limit,
-    totalPages: data.totalPages ?? 1,
-    hasNext: data.hasNext ?? false,
-    hasPrevious: data.hasPrevious ?? false,
+    count: typeof pagina.count === 'number' ? pagina.count : items.length,
+    page: (pagina.page as number) ?? 1,
+    limit: (pagina.limit as number) ?? limit,
+    totalPages: (pagina.totalPages as number) ?? 1,
+    hasNext: (pagina.hasNext as boolean) ?? false,
+    hasPrevious: (pagina.hasPrevious as boolean) ?? false,
   }
 }
 

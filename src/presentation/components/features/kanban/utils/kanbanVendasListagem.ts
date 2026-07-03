@@ -54,7 +54,10 @@ export function filtrarVendaDeliveryKanbanColunaPorDatasToolbar(
 ): boolean {
   const temFiltroCriacao = Boolean(params.dataCriacaoInicial || params.dataCriacaoFinal)
   const temFiltroFinalizacao = Boolean(params.dataFinalizacaoInicio || params.dataFinalizacaoFim)
-  const isColunaFiscal = columnId === 'FINALIZADAS' || columnId === 'COM_NFE'
+  const isColunaFiscal =
+    columnId === 'FINALIZADAS' ||
+    columnId === 'PENDENTE_EMISSAO' ||
+    columnId === 'COM_NFE'
 
   if (!temFiltroCriacao && !temFiltroFinalizacao) return true
 
@@ -87,6 +90,9 @@ export function filtrarVendaDeliveryKanbanColunaPorDatasToolbar(
 
   return true
 }
+
+/** Máximo de páginas buscadas automaticamente no modo balcão (50 × page size). */
+export const KANBAN_BALCAO_MAX_PAGINAS_AUTO = 50
 
 /** Intervalo de polling da listagem enquanto o Kanban está aberto (multi-estação). */
 export const KANBAN_VENDAS_REFETCH_INTERVAL_MS = 60_000

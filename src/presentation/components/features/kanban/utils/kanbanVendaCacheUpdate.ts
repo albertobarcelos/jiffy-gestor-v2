@@ -15,9 +15,12 @@ export {
 
 import {
   VendaUnificadaDTO,
+  VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE,
   type EntregadorKanbanDeliveryResumo,
+  type EtapaKanbanBalcao,
   type VendasUnificadasResponse,
 } from '../hooks/useVendasUnificadas'
+import { extrairColumnIdDeVendasUnificadasKanbanQueryKey } from '../hooks/useVendasUnificadasKanbanColumnInfinite'
 
 function normalizarEntregadorKanbanPatch(
   patch: KanbanVendaCachePatch['entregador']
@@ -153,7 +156,8 @@ export function cloneVendaUnificadaDTO(
     patch.entregador !== undefined
       ? normalizarEntregadorKanbanPatch(patch.entregador)
       : venda.entregador,
-    venda.contextoEntrega
+    venda.contextoEntrega,
+    patch.etapaKanbanBalcao !== undefined ? patch.etapaKanbanBalcao : venda.etapaKanbanBalcao
   )
 }
 
@@ -181,6 +185,173 @@ export function replaceVendaUnificadaInfiniteCache(
   })
 
   return encontrou
+}
+
+/** Substitui um item em todas as listagens infinitas do Kanban balcão (queries por coluna). */
+export function replaceKanbanVendasListagemCache(
+  queryClient: QueryClient,
+  vendaAtualizada: VendaUnificadaDTO
+): boolean {
+  let encontrou = false
+
+  const queries = queryClient.getQueriesData<InfiniteData<VendasUnificadasResponse>>({
+    queryKey: KANBAN_VENDAS_UNIFICADAS_QUERY_KEY,
+  })
+  for (const [queryKey] of queries) {
+    const replaced = replaceVendaUnificadaInfiniteCache(queryClient, queryKey, vendaAtualizada)
+    if (replaced) encontrou = true
+  }
+
+  return encontrou
+}
+
+function criarCacheVazioVendasUnificadasKanban(): InfiniteData<VendasUnificadasResponse> {
+  return {
+    pages: [
+      {
+        items: [],
+        count: 0,
+        page: 0,
+        limit: VENDAS_UNIFICADAS_KANBAN_PAGE_SIZE,
+        totalPages: 0,
+        hasNext: false,
+        hasPrevious: false,
+      },
+    ],
+    pageParams: [0],
+  }
+}
+
+function upsertVendaNaColunaKanbanBalcao(
+  queryClient: QueryClient,
+  queryKey: readonly unknown[],
+  vendaId: string,
+  vendaAtualizada: VendaUnificadaDTO
+): boolean {
+  let alterou = false
+
+  queryClient.setQueryData<InfiniteData<VendasUnificadasResponse>>(queryKey, atual => {
+    const base = atual?.pages?.length ? atual : criarCacheVazioVendasUnificadasKanban()
+    const vendaJaNaColuna = base.pages.some(page => page.items.some(i => i.id === vendaId))
+
+    const pages = base.pages.map((page, pageIdx) => {
+      const jaExistia = page.items.some(i => i.id === vendaId)
+
+      if (vendaJaNaColuna) {
+        if (!jaExistia) return page
+        alterou = true
+        return {
+          ...page,
+          items: page.items.map(i => (i.id === vendaId ? vendaAtualizada : i)),
+        }
+      }
+
+      if (pageIdx !== 0) return page
+
+      alterou = true
+      return {
+        ...page,
+        items: [vendaAtualizada, ...page.items],
+        count: typeof page.count === 'number' ? page.count + 1 : page.items.length + 1,
+      }
+    })
+
+    return alterou ? { ...base, pages } : base
+  })
+
+  return alterou
+}
+
+function removerVendaDasOutrasColunasKanbanBalcao(
+  queryClient: QueryClient,
+  queries: [readonly unknown[], InfiniteData<VendasUnificadasResponse> | undefined][],
+  vendaId: string,
+  colunaDestino: EtapaKanbanBalcao
+): void {
+  for (const [queryKey] of queries) {
+    const colunaId = extrairColumnIdDeVendasUnificadasKanbanQueryKey(queryKey)
+    if (!colunaId || colunaId === colunaDestino) continue
+
+    queryClient.setQueryData<InfiniteData<VendasUnificadasResponse>>(queryKey, atual => {
+      if (!atual?.pages?.length) return atual
+
+      let alterou = false
+      const pages = atual.pages.map((page, pageIdx) => {
+        if (!page.items.some(i => i.id === vendaId)) return page
+
+        alterou = true
+        return {
+          ...page,
+          items: page.items.filter(i => i.id !== vendaId),
+          count:
+            pageIdx === 0 && typeof page.count === 'number'
+              ? Math.max(0, page.count - 1)
+              : page.count,
+        }
+      })
+
+      return alterou ? { ...atual, pages } : atual
+    })
+  }
+}
+
+/** Move card entre caches de colunas fiscais do balcão (sem refetch das 3 listagens). */
+export function moveVendaKanbanBalcaoEntreColunas(
+  queryClient: QueryClient,
+  vendaId: string,
+  colunaDestino: EtapaKanbanBalcao,
+  patch?: KanbanVendaCachePatch
+): boolean {
+  const queries = queryClient.getQueriesData<InfiniteData<VendasUnificadasResponse>>({
+    queryKey: KANBAN_VENDAS_UNIFICADAS_QUERY_KEY,
+  })
+
+  let venda: VendaUnificadaDTO | null = null
+  for (const [, data] of queries) {
+    for (const page of data?.pages ?? []) {
+      const found = page.items.find(i => i.id === vendaId)
+      if (found) {
+        venda = found
+        break
+      }
+    }
+    if (venda) break
+  }
+  if (!venda) return false
+
+  const vendaAtualizada = cloneVendaUnificadaDTO(venda, {
+    ...patch,
+    etapaKanbanBalcao: colunaDestino,
+  })
+
+  let destinoAtualizado = false
+
+  for (const [queryKey] of queries) {
+    const colunaId = extrairColumnIdDeVendasUnificadasKanbanQueryKey(queryKey)
+    if (colunaId !== colunaDestino) continue
+
+    if (upsertVendaNaColunaKanbanBalcao(queryClient, queryKey, vendaId, vendaAtualizada)) {
+      destinoAtualizado = true
+    }
+  }
+
+  if (!destinoAtualizado) {
+    for (const [queryKey] of queries) {
+      const colunaId = extrairColumnIdDeVendasUnificadasKanbanQueryKey(queryKey)
+      if (colunaId !== colunaDestino) continue
+      destinoAtualizado = upsertVendaNaColunaKanbanBalcao(
+        queryClient,
+        queryKey,
+        vendaId,
+        vendaAtualizada
+      )
+      break
+    }
+  }
+
+  removerVendaDasOutrasColunasKanbanBalcao(queryClient, queries, vendaId, colunaDestino)
+
+  return destinoAtualizado
 }
 
 /** Atualiza o item em todas as listagens infinitas do Kanban (balcão + delivery). */

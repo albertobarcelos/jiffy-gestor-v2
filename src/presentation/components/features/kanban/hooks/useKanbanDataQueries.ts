@@ -1,25 +1,22 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
-import { useVendaIdsPdvPorTerminal } from '@/src/presentation/hooks/useVendaIdsPdvPorTerminal'
 import { useEntregadoresQuery } from '@/src/presentation/components/features/pedidos/hooks/data/useEntregadoresQuery'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import {
-  flattenVendasUnificadasInfinite,
-  useVendasUnificadasInfinite,
-  vendasUnificadasInfiniteQueryKey,
+  type VendasUnificadasQueryParams,
 } from './useVendasUnificadas'
 import {
   flattenPedidosDeliveryInfinite,
   vendasUnificadasQueryParamsParaPedidosDelivery,
 } from './usePedidosDeliveryInfinite'
 import { usePedidosDeliveryKanbanColumns } from './usePedidosDeliveryKanbanColumns'
+import { useVendasUnificadasKanbanColumns } from './useVendasUnificadasKanbanColumns'
 import { combinarContagensColunasDeliveryKanban } from '../utils/kanbanDeliveryColumnCounts'
 import { DELIVERY_KANBAN_COLUMN_IDS } from '../utils/kanbanDeliveryColumnConfig'
-import { useKanbanColumnScrollLoadMore } from './useKanbanColumnScrollLoadMore'
+import { BALCAO_KANBAN_COLUMN_IDS } from '../utils/kanbanBalcaoColumnConfig'
 import {
   KANBAN_DELIVERY_DELTA_POLL_INTERVAL_MS,
   KANBAN_VENDAS_REFETCH_INTERVAL_MS,
@@ -29,7 +26,7 @@ import type { ColunaKanbanId, TipoEntregaFiltro, Venda } from '../types'
 
 type TerminalOpcao = { id: string; nome: string }
 
-export interface VendasUnificadasQueryParams {
+export interface VendasUnificadasQueryParamsExtended extends VendasUnificadasQueryParams {
   dataCriacaoInicial?: string
   dataCriacaoFinal?: string
   dataFinalizacaoInicio?: string
@@ -39,7 +36,7 @@ export interface VendasUnificadasQueryParams {
 
 export interface UseKanbanDataQueriesParams {
   modoKanbanVendas: ModoKanbanVendas
-  vendasUnificadasQueryParams: VendasUnificadasQueryParams
+  vendasUnificadasQueryParams: VendasUnificadasQueryParamsExtended
   getEtapaKanbanParaExibicaoRef: React.MutableRefObject<(v: Venda) => string>
   tipoEntregaFilter: TipoEntregaFiltro
   setTipoEntregaFilter: React.Dispatch<React.SetStateAction<TipoEntregaFiltro>>
@@ -55,7 +52,6 @@ export function useKanbanDataQueries({
   const isModoDeliveryKanban = modoKanbanVendas === 'delivery'
   const { auth } = useAuthStore()
   const hasKanbanToken = !!auth?.getAccessToken()
-  const queryClient = useQueryClient()
   const empresaId = useTenantEmpresaId()
 
   const [terminalFilter, setTerminalFilter] = useState('')
@@ -97,12 +93,20 @@ export function useKanbanDataQueries({
     [vendasUnificadasQueryParams]
   )
 
+  const balcaoQueryParams = useMemo((): VendasUnificadasQueryParams => {
+    const { tipoEntrega: _tipoEntrega, ...rest } = vendasUnificadasQueryParams
+    return {
+      ...rest,
+      terminalId: terminalFilter.trim() || undefined,
+    }
+  }, [vendasUnificadasQueryParams, terminalFilter])
+
   const infiniteQueryKey = useMemo(
     () =>
       isModoDeliveryKanban
         ? (['delivery', 'pedidos', 'infinite', empresaId, 'columns'] as const)
-        : vendasUnificadasInfiniteQueryKey(vendasUnificadasQueryParams, empresaId),
-    [isModoDeliveryKanban, vendasUnificadasQueryParams, empresaId]
+        : (['vendas-unificadas', 'infinite', empresaId, 'columns'] as const),
+    [isModoDeliveryKanban, empresaId]
   )
 
   const loadAllTerminais = useCallback(async () => {
@@ -169,28 +173,11 @@ export function useKanbanDataQueries({
 
   const usaFiltroTerminal = !!terminalFilter.trim() && !isModoDeliveryKanban
 
-  const vendaIdsPdvPorTerminalParams = useMemo(
-    () => ({
-      terminalId: terminalFilter,
-      periodoInicial: vendasUnificadasQueryParams.dataCriacaoInicial,
-      periodoFinal: vendasUnificadasQueryParams.dataCriacaoFinal,
-      dataFinalizacaoInicio: vendasUnificadasQueryParams.dataFinalizacaoInicio,
-      dataFinalizacaoFim: vendasUnificadasQueryParams.dataFinalizacaoFim,
-    }),
-    [terminalFilter, vendasUnificadasQueryParams]
-  )
-
-  const {
-    data: vendasUnificadasInfiniteData,
-    isLoading: isLoadingUnificado,
-    isFetchingNextPage: isFetchingNextPageUnificado,
-    hasNextPage: hasNextPageUnificado,
-    fetchNextPage: fetchNextPageUnificado,
-    refetch: refetchUnificado,
-  } = useVendasUnificadasInfinite(vendasUnificadasQueryParams, {
-    enabled: hasKanbanToken,
+  const balcaoKanban = useVendasUnificadasKanbanColumns(balcaoQueryParams, {
+    enabled: hasKanbanToken && !isModoDeliveryKanban,
     refetchIntervalMs: !isModoDeliveryKanban ? KANBAN_VENDAS_REFETCH_INTERVAL_MS : false,
     refetchOnWindowFocus: !isModoDeliveryKanban,
+    enviarFiltroFinalizacaoNaApi: enviarFiltroFinalizacaoNaDeliveryApi,
   })
 
   const deliveryKanban = usePedidosDeliveryKanbanColumns(pedidosDeliveryQueryParams, {
@@ -202,46 +189,61 @@ export function useKanbanDataQueries({
   })
 
   const isLoadingDelivery = deliveryKanban.isLoading
+  const isLoadingBalcao = balcaoKanban.isLoading
   const refetchDelivery = deliveryKanban.refetch
+  const refetchBalcao = balcaoKanban.refetch
+
+  const balcaoKanbanColumnStatesKey = useMemo(
+    () => JSON.stringify(balcaoKanban.columnStates),
+    [balcaoKanban.columnStates]
+  )
+
+  const deliveryKanbanColumnStatesKey = useMemo(
+    () => JSON.stringify(deliveryKanban.columnStates),
+    [deliveryKanban.columnStates]
+  )
+
+  const flattenAllItemsBalcao = balcaoKanban.flattenAllItems
+  const flattenAllItemsDelivery = deliveryKanban.flattenAllItems
+
+  const todasVendasFlattened = useMemo(() => {
+    if (isModoDeliveryKanban) {
+      return flattenAllItemsDelivery()
+    }
+    return flattenAllItemsBalcao()
+  }, [
+    isModoDeliveryKanban,
+    balcaoKanbanColumnStatesKey,
+    deliveryKanbanColumnStatesKey,
+    flattenAllItemsBalcao,
+    flattenAllItemsDelivery,
+  ])
+
+  const todasVendasCarregadas = todasVendasFlattened
+
+  const todasVendasCarregadasRef = useRef(todasVendasCarregadas)
+  todasVendasCarregadasRef.current = todasVendasCarregadas
 
   const isFetchingNextPage = isModoDeliveryKanban
     ? DELIVERY_KANBAN_COLUMN_IDS.some(id => deliveryKanban.columnStates[id]?.isFetchingNextPage)
-    : isFetchingNextPageUnificado
-  const hasNextPage = isModoDeliveryKanban
-    ? DELIVERY_KANBAN_COLUMN_IDS.some(id => deliveryKanban.columnStates[id]?.hasNextPage)
-    : hasNextPageUnificado
-  const fetchNextPage = isModoDeliveryKanban ? () => undefined : fetchNextPageUnificado
+    : BALCAO_KANBAN_COLUMN_IDS.some(id => balcaoKanban.columnStates[id]?.isFetchingNextPage)
 
-  const {
-    data: vendaIdsPdvPorTerminal,
-    isLoading: isLoadingIdsTerminal,
-    refetch: refetchIdsTerminal,
-  } = useVendaIdsPdvPorTerminal(vendaIdsPdvPorTerminalParams, { enabled: usaFiltroTerminal })
+  const fetchNextPagePendenteEmissao = useCallback(() => {
+    balcaoKanban.fetchNextPageForColumn('PENDENTE_EMISSAO')
+  }, [balcaoKanban.fetchNextPageForColumn])
 
-  const isLoading = isModoDeliveryKanban
-    ? isLoadingDelivery
-    : isLoadingUnificado || (usaFiltroTerminal && isLoadingIdsTerminal)
+  const hasNextPagePendenteEmissao =
+    balcaoKanban.columnStates.PENDENTE_EMISSAO?.hasNextPage ?? false
+
+  const isLoading = isModoDeliveryKanban ? isLoadingDelivery : isLoadingBalcao
 
   const refetch = useCallback(async () => {
     if (isModoDeliveryKanban) {
       await refetchDelivery()
       return
     }
-    await queryClient.resetQueries({ queryKey: infiniteQueryKey, exact: true })
-    const [result] = await Promise.all([
-      refetchUnificado(),
-      usaFiltroTerminal ? refetchIdsTerminal() : Promise.resolve(),
-    ])
-    return result
-  }, [
-    isModoDeliveryKanban,
-    usaFiltroTerminal,
-    refetchDelivery,
-    refetchUnificado,
-    refetchIdsTerminal,
-    queryClient,
-    infiniteQueryKey,
-  ])
+    await refetchBalcao()
+  }, [isModoDeliveryKanban, refetchDelivery, refetchBalcao])
 
   const refetchParaEmissaoFiscal = useCallback(async () => {
     if (isModoDeliveryKanban) {
@@ -249,102 +251,43 @@ export function useKanbanDataQueries({
       const items = deliveryKanban.flattenAllItems()
       return { data: { items } }
     }
-    const result = await refetchUnificado()
-    const { items } = flattenVendasUnificadasInfinite(result.data)
+    await refetchBalcao()
+    const items = balcaoKanban.flattenAllItems()
     return { data: { items } }
-  }, [isModoDeliveryKanban, refetchDelivery, deliveryKanban.flattenAllItems, refetchUnificado])
-
-  const deliveryKanbanColumnStatesKey = useMemo(
-    () => JSON.stringify(deliveryKanban.columnStates),
-    [deliveryKanban.columnStates]
-  )
-
-  const flattenAllItemsDelivery = deliveryKanban.flattenAllItems
-
-  const { items: todasVendasFlattened, totalCount: totalVendasApi } = useMemo(() => {
-    if (isModoDeliveryKanban) {
-      const items = flattenAllItemsDelivery()
-      return { items, totalCount: items.length }
-    }
-    return flattenVendasUnificadasInfinite(vendasUnificadasInfiniteData)
-  }, [
-    isModoDeliveryKanban,
-    deliveryKanbanColumnStatesKey,
-    flattenAllItemsDelivery,
-    vendasUnificadasInfiniteData,
-  ])
-
-  const todasVendasCarregadas = useMemo(() => {
-    if (!usaFiltroTerminal) return todasVendasFlattened
-    if (!vendaIdsPdvPorTerminal) return []
-    return todasVendasFlattened.filter(
-      v => v.tabelaOrigem === 'venda' && vendaIdsPdvPorTerminal.has(v.id)
-    )
-  }, [usaFiltroTerminal, vendaIdsPdvPorTerminal, todasVendasFlattened])
-
-  const todasVendasCarregadasRef = useRef(todasVendasCarregadas)
-  todasVendasCarregadasRef.current = todasVendasCarregadas
-
-  const temMaisVendasParaCarregar = useMemo(() => {
-    if (isModoDeliveryKanban) return false
-    if (hasNextPage) return true
-    if (
-      !usaFiltroTerminal &&
-      totalVendasApi > 0 &&
-      todasVendasCarregadas.length < totalVendasApi
-    ) {
-      return true
-    }
-    return false
-  }, [
-    isModoDeliveryKanban,
-    hasNextPage,
-    usaFiltroTerminal,
-    totalVendasApi,
-    todasVendasCarregadas.length,
-  ])
-
-  const handleCarregarMaisVendas = useCallback(() => {
-    if (isModoDeliveryKanban) return
-    if (isFetchingNextPage || !temMaisVendasParaCarregar) return
-    void fetchNextPage()
-  }, [
-    isModoDeliveryKanban,
-    isFetchingNextPage,
-    temMaisVendasParaCarregar,
-    fetchNextPage,
-  ])
-
-  const { onColumnScroll: onGlobalColumnScroll } =
-    useKanbanColumnScrollLoadMore(handleCarregarMaisVendas)
+  }, [isModoDeliveryKanban, refetchDelivery, refetchBalcao, deliveryKanban.flattenAllItems, balcaoKanban.flattenAllItems])
 
   const columnScrollTickingRef = useRef(false)
   const deliveryColumnStatesRef = useRef(deliveryKanban.columnStates)
   deliveryColumnStatesRef.current = deliveryKanban.columnStates
-
-  const fetchNextPageForColumnDelivery = deliveryKanban.fetchNextPageForColumn
+  const balcaoColumnStatesRef = useRef(balcaoKanban.columnStates)
+  balcaoColumnStatesRef.current = balcaoKanban.columnStates
 
   const handleColumnScroll = useCallback(
     (columnId: ColunaKanbanId, event: React.UIEvent<HTMLDivElement>) => {
-      if (isModoDeliveryKanban) {
-        const state = deliveryColumnStatesRef.current[columnId]
-        if (!state?.hasNextPage || state.isFetchingNextPage) return
-        if (columnScrollTickingRef.current) return
-        const el = event.currentTarget
-        if (!el) return
-        columnScrollTickingRef.current = true
-        requestAnimationFrame(() => {
-          columnScrollTickingRef.current = false
-          const distanciaDoFim = el.scrollHeight - el.scrollTop - el.clientHeight
-          if (distanciaDoFim <= 120) {
-            fetchNextPageForColumnDelivery(columnId)
+      const state = isModoDeliveryKanban
+        ? deliveryColumnStatesRef.current[columnId]
+        : balcaoColumnStatesRef.current[columnId as keyof typeof balcaoColumnStatesRef.current]
+
+      if (!state?.hasNextPage || state.isFetchingNextPage) return
+      if (columnScrollTickingRef.current) return
+
+      const el = event.currentTarget
+      if (!el) return
+
+      columnScrollTickingRef.current = true
+      requestAnimationFrame(() => {
+        columnScrollTickingRef.current = false
+        const distanciaDoFim = el.scrollHeight - el.scrollTop - el.clientHeight
+        if (distanciaDoFim <= 120) {
+          if (isModoDeliveryKanban) {
+            deliveryKanban.fetchNextPageForColumn(columnId)
+          } else {
+            balcaoKanban.fetchNextPageForColumn(columnId)
           }
-        })
-        return
-      }
-      onGlobalColumnScroll(event)
+        }
+      })
     },
-    [isModoDeliveryKanban, fetchNextPageForColumnDelivery, onGlobalColumnScroll]
+    [isModoDeliveryKanban, deliveryKanban.fetchNextPageForColumn, balcaoKanban.fetchNextPageForColumn]
   )
 
   const deliveryColumnCounts = useMemo((): Record<string, number> => {
@@ -363,13 +306,19 @@ export function useKanbanDataQueries({
       finalizadasState?.hasNextPage ?? false,
       deliveryKanban.columnStates
     )
-  }, [isModoDeliveryKanban, deliveryKanbanColumnStatesKey, deliveryKanban.columnStates, getEtapaKanbanParaExibicaoRef])
+  }, [
+    isModoDeliveryKanban,
+    deliveryKanbanColumnStatesKey,
+    deliveryKanban.columnStates,
+    getEtapaKanbanParaExibicaoRef,
+  ])
 
   return {
     isModoDeliveryKanban,
     isLoadingDelivery,
     infiniteQueryKey,
     deliveryKanban,
+    balcaoKanban,
     deliveryColumnCounts,
     nomesMeiosPagamentoKanban,
     terminais,
@@ -384,6 +333,7 @@ export function useKanbanDataQueries({
     refetch,
     refetchParaEmissaoFiscal,
     handleColumnScroll,
-    temMaisVendasParaCarregar,
+    fetchNextPage: fetchNextPagePendenteEmissao,
+    hasNextPage: hasNextPagePendenteEmissao,
   }
 }

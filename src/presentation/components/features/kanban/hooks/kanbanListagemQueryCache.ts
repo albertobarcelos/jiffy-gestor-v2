@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query'
 
-/** Prefixo do infinite query do Kanban em modo balcão (`useVendasUnificadasInfinite`). */
+/** Prefixo das queries infinitas do Kanban balcão (global legado + por coluna). */
 export const KANBAN_VENDAS_UNIFICADAS_QUERY_KEY = ['vendas-unificadas'] as const
 
 /** Prefixo do infinite query do Kanban em modo delivery (`usePedidosDeliveryInfinite`). */

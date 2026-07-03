@@ -10,8 +10,8 @@ import { validarImpressaoAntesTransicaoKanban } from '@/src/application/delivery
 import {
   extrairPatchKanbanDeRespostaTransicao,
   extrairVendaUnificadaDeRespostaDeliverySummary,
-  patchVendaUnificadaInfiniteCache,
-  replaceVendaUnificadaInfiniteCache,
+  patchKanbanVendasListagemCache,
+  replaceKanbanVendasListagemCache,
 } from '../utils/kanbanVendaCacheUpdate'
 import {
   patchVendaDeliveryKanbanColumnCaches,
@@ -81,12 +81,12 @@ export function useKanbanPreTransicao({
 
       const cardAtualizado = extrairVendaUnificadaDeRespostaDeliverySummary(respostaTransicao)
       if (cardAtualizado) {
-        replaceVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, cardAtualizado)
+        replaceKanbanVendasListagemCache(queryClient, cardAtualizado)
         return true
       }
 
       const patch = extrairPatchKanbanDeRespostaTransicao(respostaTransicao)
-      patchVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, vendaId, patch)
+      patchKanbanVendasListagemCache(queryClient, vendaId, patch)
       return false
     },
     [
@@ -129,7 +129,7 @@ export function useKanbanPreTransicao({
             if (ok) onRecovered?.()
           } else {
             const patch = extrairPatchKanbanDeRespostaTransicao(data)
-            patchVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, vendaId, patch)
+            patchKanbanVendasListagemCache(queryClient, vendaId, patch)
             onRecovered?.()
           }
         } catch {
@@ -158,7 +158,7 @@ export function useKanbanPreTransicao({
         if (isModoDeliveryKanban) {
           patchVendaDeliveryKanbanColumnCaches(queryClient, vendaId, patch)
         } else {
-          patchVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, vendaId, patch)
+          patchKanbanVendasListagemCache(queryClient, vendaId, patch)
         }
         const status = String(patch.statusFinanceiro ?? '').trim().toLowerCase()
         return status === 'pago'
@@ -244,7 +244,7 @@ export function useKanbanPreTransicao({
           )
         } else {
           const patch = extrairPatchKanbanDeRespostaTransicao(pedidoAtualizado)
-          patchVendaUnificadaInfiniteCache(queryClient, infiniteQueryKey, venda.id, patch)
+          patchKanbanVendasListagemCache(queryClient, venda.id, patch)
         }
         invalidarPedidoKanbanQuickViewCache(venda.id)
         return true

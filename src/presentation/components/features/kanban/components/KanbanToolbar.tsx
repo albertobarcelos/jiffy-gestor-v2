@@ -192,7 +192,7 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
   const [refreshSpinning, setRefreshSpinning] = useState(false)
 
   return (
-    <div className="bg-primary-background mt-2 flex-shrink-0 rounded-b-lg rounded-t-lg">
+    <div className="bg-primary-background mt-2 flex-shrink-0 rounded-b-lg rounded-t-lg pb-0">
       <div className="flex justify-end py-2 sm:hidden">
         <button
           type="button"

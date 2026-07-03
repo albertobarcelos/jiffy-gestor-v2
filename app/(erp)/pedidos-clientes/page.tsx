@@ -26,7 +26,7 @@ const PedidosClientesKanban = dynamic(
 
 export default function PedidosClientesPage() {
   return (
-    <div className="h-full">
+    <div className="flex h-full min-h-0 flex-col">
       <PedidosClientesKanban />
     </div>
   )

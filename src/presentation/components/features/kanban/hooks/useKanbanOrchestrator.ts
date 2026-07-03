@@ -25,6 +25,7 @@ import type { KanbanModaisRendererProps } from '../components/KanbanModaisRender
 import { useKanbanFilters } from './useKanbanFilters'
 import { useKanbanPinning } from './useKanbanPinning'
 import { useFiscalEmissaoKanban } from './useFiscalEmissaoKanban'
+import { useReemissaoFiscalEmLote } from './useReemissaoFiscalEmLote'
 import { useKanbanDataQueries } from './useKanbanDataQueries'
 import { useKanbanEntregadorSync } from './useKanbanEntregadorSync'
 import { useKanbanVendasPorColuna } from './useKanbanVendasPorColuna'
@@ -201,31 +202,6 @@ export function useKanbanOrchestrator() {
 
   getEtapaKanbanParaExibicaoRef.current = getEtapaKanbanParaExibicao
 
-  const entregador = useKanbanEntregadorSync({
-    modoKanbanVendas,
-    isLoadingDelivery: data.isLoadingDelivery,
-    todasVendasCarregadas: data.todasVendasCarregadas,
-    getEtapaKanbanParaExibicao,
-    entregadorPorVendaIdRef,
-  })
-
-  patchEntregadorFnRef.current = entregador.patchEntregadorPorVendaId
-
-  const colunas = useKanbanVendasPorColuna({
-    modoKanbanVendas,
-    isModoDeliveryKanban: data.isModoDeliveryKanban,
-    todasVendasCarregadas: data.todasVendasCarregadas,
-    deliveryKanban: data.deliveryKanban,
-    deliveryColumnCounts: data.deliveryColumnCounts,
-    getEtapaKanbanParaExibicao,
-    etapaLocalPorVendaId,
-    timestampsEtapaEntregaLocal,
-    deltaContagemColunasTransicao,
-    primeiroPorColuna,
-    setPrimeiroPorColuna,
-    vendasUnificadasQueryParams,
-  })
-
   const dnd = useKanbanDragDrop({
     getEtapaKanbanParaExibicao,
     acaoFiscalEmAndamentoPorVenda,
@@ -233,6 +209,60 @@ export function useKanbanOrchestrator() {
     moverEntregaPorDrag,
     finalizarEntregaPorDrag,
     handleEmitirNfe,
+  })
+
+  const etapaLocalEfetiva = useMemo(
+    () => ({ ...etapaLocalPorVendaId, ...dnd.fiscalTransicaoUi }),
+    [etapaLocalPorVendaId, dnd.fiscalTransicaoUi]
+  )
+
+  const getEtapaKanbanParaExibicaoComFiscal = useCallback(
+    (venda: Venda) => {
+      if (acaoFiscalEmAndamentoPorVenda[venda.id]) {
+        return getEtapaKanbanFiscal(venda)
+      }
+      const etapaLocal = etapaLocalEfetiva[venda.id]
+      if (etapaLocal) return etapaLocal
+      return getEtapaKanbanFiscal(venda)
+    },
+    [acaoFiscalEmAndamentoPorVenda, etapaLocalEfetiva, getEtapaKanbanFiscal]
+  )
+
+  getEtapaKanbanParaExibicaoRef.current = getEtapaKanbanParaExibicaoComFiscal
+
+  const entregador = useKanbanEntregadorSync({
+    modoKanbanVendas,
+    isLoadingDelivery: data.isLoadingDelivery,
+    todasVendasCarregadas: data.todasVendasCarregadas,
+    getEtapaKanbanParaExibicao: getEtapaKanbanParaExibicaoComFiscal,
+    entregadorPorVendaIdRef,
+  })
+
+  patchEntregadorFnRef.current = entregador.patchEntregadorPorVendaId
+
+  const colunas = useKanbanVendasPorColuna({
+    isModoDeliveryKanban: data.isModoDeliveryKanban,
+    todasVendasCarregadas: data.todasVendasCarregadas,
+    deliveryKanban: data.deliveryKanban,
+    balcaoKanban: data.balcaoKanban,
+    deliveryColumnCounts: data.deliveryColumnCounts,
+    getEtapaKanbanParaExibicao: getEtapaKanbanParaExibicaoComFiscal,
+    etapaLocalPorVendaId: etapaLocalEfetiva,
+    timestampsEtapaEntregaLocal,
+    deltaContagemColunasTransicao,
+    primeiroPorColuna,
+    setPrimeiroPorColuna,
+    vendasUnificadasQueryParams,
+  })
+
+  const reemissaoEmLote = useReemissaoFiscalEmLote({
+    vendasPendentesEmissao: colunas.vendasPorColuna.PENDENTE_EMISSAO ?? [],
+    acaoFiscalEmAndamentoPorVenda,
+    fetchNextPage: data.fetchNextPage,
+    hasNextPage: data.hasNextPage,
+    refetchListagem: async () => {
+      await data.refetchParaEmissaoFiscal()
+    },
   })
 
   useFiscalReativacaoRejeitada({
@@ -312,7 +342,6 @@ export function useKanbanOrchestrator() {
   const boardProps: KanbanBoardRendererProps = {
     columns,
     mostrarLoadingLista,
-    isFetchingNextPage: data.isFetchingNextPage,
     isModoDeliveryKanban: data.isModoDeliveryKanban,
     modoKanbanVendas,
     sensors: dnd.sensors,
@@ -328,6 +357,7 @@ export function useKanbanOrchestrator() {
     onToggleDirecaoOrdenacao: handleToggleDirecaoOrdenacao,
     onColumnScroll: data.handleColumnScroll,
     deliveryKanban: data.deliveryKanban,
+    balcaoKanban: data.balcaoKanban,
     acaoFiscalEmAndamentoPorVenda,
     avancandoEtapaIds,
     timestampsEtapaEntregaLocal,
@@ -351,6 +381,7 @@ export function useKanbanOrchestrator() {
         ? vendaAtual => modais.abrirDetalhesPagamentoPedido(vendaAtual)
         : undefined,
     nomesMeiosPagamento: data.nomesMeiosPagamentoKanban,
+    reemissaoEmLote: data.isModoDeliveryKanban ? undefined : reemissaoEmLote,
   }
 
   const modaisProps: KanbanModaisRendererProps = {

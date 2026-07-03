@@ -6,6 +6,7 @@ import { ApiError } from '@/src/infrastructure/api/apiClient'
 import { useCallback, useRef } from 'react'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { invalidateKanbanVendasListagens, refetchKanbanVendasListagens } from '@/features/kanban/hooks/kanbanListagemQueryCache'
+import { moveVendaKanbanBalcaoEntreColunas } from '@/features/kanban/utils/kanbanVendaCacheUpdate'
 import type { AcaoTransicaoKanbanEntrega } from '@/src/application/dto/TransicaoKanbanDTO'
 import type { TransicaoPedidoDeliveryApiRequest } from '@/src/application/dto/api/pedidoDeliveryApi'
 import {
@@ -133,7 +134,7 @@ function buildFiscalConfigCacheKey(token: string, modelo: 55 | 65): string {
   return `${modelo}:${token}`
 }
 
-async function resolveFiscalEmissionConfig(
+export async function resolveFiscalEmissionConfig(
   token: string,
   modelo: 55 | 65
 ): Promise<FiscalEmissionResolvedConfig> {
@@ -684,6 +685,8 @@ export function useMarcarEmissaoFiscal() {
       tabelaOrigem?: 'venda' | 'venda_gestor'
       /** Não exibir toast de sucesso (ex.: correção automática no Kanban) */
       silent?: boolean
+      /** Atualiza caches por coluna do Kanban balcão sem refetch das 3 listagens. */
+      kanbanContext?: boolean
     }) => {
       if (!token) {
         throw new Error('Token não encontrado')
@@ -716,7 +719,16 @@ export function useMarcarEmissaoFiscal() {
     },
     onSuccess: (_, params) => {
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      invalidateKanbanVendasListagens(queryClient)
+      if (params.kanbanContext) {
+        const moved = moveVendaKanbanBalcaoEntreColunas(queryClient, params.id, 'PENDENTE_EMISSAO', {
+          solicitarEmissaoFiscal: true,
+        })
+        if (!moved) {
+          invalidateKanbanVendasListagens(queryClient, { refetchType: 'active' })
+        }
+      } else {
+        invalidateKanbanVendasListagens(queryClient)
+      }
       queryClient.invalidateQueries({ queryKey: ['venda', params.id] })
       if (!params.silent) {
         showToast.success('Venda marcada para emissão fiscal!')
@@ -741,7 +753,11 @@ export function useDesmarcarEmissaoFiscal() {
   const token = auth?.getAccessToken()
 
   return useMutation({
-    mutationFn: async (params: { id: string; tabelaOrigem?: 'venda' | 'venda_gestor' }) => {
+    mutationFn: async (params: {
+      id: string
+      tabelaOrigem?: 'venda' | 'venda_gestor'
+      kanbanContext?: boolean
+    }) => {
       if (!token) {
         throw new Error('Token não encontrado')
       }
@@ -773,7 +789,16 @@ export function useDesmarcarEmissaoFiscal() {
     },
     onSuccess: (_, params) => {
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      invalidateKanbanVendasListagens(queryClient)
+      if (params.kanbanContext) {
+        const moved = moveVendaKanbanBalcaoEntreColunas(queryClient, params.id, 'FINALIZADAS', {
+          solicitarEmissaoFiscal: false,
+        })
+        if (!moved) {
+          invalidateKanbanVendasListagens(queryClient, { refetchType: 'active' })
+        }
+      } else {
+        invalidateKanbanVendasListagens(queryClient)
+      }
       queryClient.invalidateQueries({ queryKey: ['venda', params.id] })
       showToast.success('Venda desmarcada da emissão fiscal.')
     },

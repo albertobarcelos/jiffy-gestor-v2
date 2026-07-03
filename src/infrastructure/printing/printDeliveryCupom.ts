@@ -1,9 +1,9 @@
 import { erroImpressao, logImpressao } from '@/src/shared/utils/logImpressaoDelivery'
 import {
   loadQzTray,
-  ensureQzWebsocketConnected,
   parseTcpPrinterRef,
   printRawTcpQz,
+  printRawWindowsQz,
   isTcpPrinterRef,
 } from '@/src/infrastructure/printing/qzTrayClient'
 import {
@@ -98,28 +98,21 @@ export async function printDeliveryCupom(input: PrintDeliveryCupomInput): Promis
       return { ok: true, metodo: 'qz' }
     }
 
-    logImpressao('printDeliveryCupom.qz_inicio', {
+    logImpressao('printDeliveryCupom.qz_escpos_inicio', {
       impressoraWindows: nomeImpressora.slice(0, 80),
       copies,
       jobName: input.jobName ?? 'Jiffy Delivery',
       htmlChars: input.html.length,
+      modoEscPos: true,
     })
-    await ensureQzWebsocketConnected(qz)
-    const config = qz.configs.create(nomeImpressora, {
-      jobName: input.jobName ?? 'Jiffy Delivery',
-    })
-    const payload = [
-      {
-        type: 'pixel' as const,
-        format: 'html' as const,
-        flavor: 'plain' as const,
-        data: input.html,
-      },
-    ]
-    for (let i = 0; i < copies; i++) {
-      await qz.print(config, payload)
-    }
-    logImpressao('printDeliveryCupom.qz_sucesso', {
+    await printRawWindowsQz(
+      qz,
+      nomeImpressora,
+      input.html,
+      copies,
+      input.jobName ?? 'Jiffy Delivery'
+    )
+    logImpressao('printDeliveryCupom.qz_escpos_sucesso', {
       copies,
       impressora: nomeImpressora.slice(0, 80),
     })
