@@ -226,7 +226,6 @@ export function PedidoKanbanQuickViewConteudo({
           dados={dados}
           nomeEmpresa={nomeEmpresa}
           enderecoEmpresa={enderecoEmpresa}
-          colunaAtual={colunaAtual}
           tipoVenda={tipoVenda}
         />
       </div>

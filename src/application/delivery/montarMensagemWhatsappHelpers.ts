@@ -120,6 +120,28 @@ export function montarLinhaFormaPagamentoWhatsapp(
   return `${E.bullet} ${forma}: ${transformarParaReal(totalPedido)}`
 }
 
+/** Cabeçalho padrão (Oi + nº pedido + data) para mensagens curtas ao cliente. */
+export function montarCabecalhoPedidoClienteWhatsapp(dados: PedidoKanbanQuickViewData): string {
+  const nome = resolverNomeClienteWhatsapp(dados.clienteNome)
+  const numeroPedido = montarRotuloPedidoWhatsapp(dados.numeroVenda, dados.codigoVenda)
+  const dataPedido = formatarDataDetalhePedido(dados.dataCriacao)
+  return [
+    `Oi, ${nome}! ${E.smile}`,
+    '',
+    `${E.numbers} Nº do pedido: ${numeroPedido}`,
+    `${E.calendar} Data do pedido: ${dataPedido}`,
+    '',
+  ].join('\n')
+}
+
+export function prefixarCabecalhoPedidoClienteWhatsapp(
+  dados: PedidoKanbanQuickViewData,
+  corpo: string | string[]
+): string {
+  const linhasCorpo = Array.isArray(corpo) ? corpo : [corpo]
+  return montarCabecalhoPedidoClienteWhatsapp(dados) + linhasCorpo.join('\n')
+}
+
 export function montarDetalhesPedidoClienteWhatsapp(args: {
   dados: PedidoKanbanQuickViewData
   tipoVenda: 'entrega' | 'retirada'
