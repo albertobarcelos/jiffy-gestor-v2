@@ -41,6 +41,7 @@ export function NovoPedidoModalShell(props: NovoPedidoShellProps) {
     onClose,
     onSuccess,
     podeExibirCancelarVendaGestor,
+    podeExibirCancelarPedidoDeliveryOperacional,
     podeExibirCancelarNotaFiscal,
     isSavingPagamentoEntrega,
     onSalvarPagamentoEntrega,
@@ -183,6 +184,9 @@ export function NovoPedidoModalShell(props: NovoPedidoShellProps) {
                   onClose={onClose}
                   onSuccess={onSuccess}
                   podeExibirCancelarVendaGestor={podeExibirCancelarVendaGestor}
+                  podeExibirCancelarPedidoDeliveryOperacional={
+                    podeExibirCancelarPedidoDeliveryOperacional
+                  }
                   podeExibirCancelarNotaFiscal={podeExibirCancelarNotaFiscal}
                   isSavingPagamentoEntrega={isSavingPagamentoEntrega}
                   onSalvarPagamentoEntrega={onSalvarPagamentoEntrega}

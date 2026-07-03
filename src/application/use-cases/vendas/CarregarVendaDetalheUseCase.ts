@@ -75,6 +75,14 @@ function mapDetalhesPedidoMeta(vendaData: Record<string, unknown>): DetalhesPedi
       vendaData.dataUltimoProdutoLancado != null
         ? String(vendaData.dataUltimoProdutoLancado)
         : null,
+    statusEtapaOperacional:
+      vendaData.statusDelivery != null
+        ? String(vendaData.statusDelivery)
+        : vendaData.statusEtapaOperacional != null
+          ? String(vendaData.statusEtapaOperacional)
+          : vendaData.statusOperacional != null
+            ? String(vendaData.statusOperacional)
+            : null,
   }
 }
 

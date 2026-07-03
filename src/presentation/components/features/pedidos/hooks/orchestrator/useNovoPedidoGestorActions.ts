@@ -11,10 +11,12 @@ import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { showToast } from '@/src/shared/utils/toast'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { invalidateVendaDetalheCarregadaCache } from '../data/useVendaDetalheCarregadaQuery'
+import { invalidateKanbanVendasListagens } from '@/features/kanban/hooks/kanbanListagemQueryCache'
 import type {
   useCancelarNotaFiscalVendaGestor,
   useCancelarNotaFiscalVendaPdv,
   useCancelarVendaGestor,
+  useTransicaoPedidoDelivery,
 } from '@/src/presentation/hooks/useVendas'
 import type { Auth } from '@/src/domain/entities/Auth'
 
@@ -26,6 +28,7 @@ import type { ProdutosTabsModalState } from '@/src/presentation/components/featu
 type CancelarVendaGestor = ReturnType<typeof useCancelarVendaGestor>
 type CancelarNotaPdv = ReturnType<typeof useCancelarNotaFiscalVendaPdv>
 type CancelarNotaGestor = ReturnType<typeof useCancelarNotaFiscalVendaGestor>
+type TransicaoPedidoDelivery = ReturnType<typeof useTransicaoPedidoDelivery>
 
 export type UseNovoPedidoGestorActionsParams = {
   vendaId: string | undefined
@@ -36,6 +39,7 @@ export type UseNovoPedidoGestorActionsParams = {
   cancelarVendaGestor: CancelarVendaGestor
   cancelarNotaFiscalVendaPdv: CancelarNotaPdv
   cancelarNotaFiscalVendaGestor: CancelarNotaGestor
+  transicaoPedidoDelivery: TransicaoPedidoDelivery
   form: Pick<
     NovoPedidoFormState,
     | 'produtos'
@@ -69,6 +73,7 @@ export function useNovoPedidoGestorActions({
   cancelarVendaGestor,
   cancelarNotaFiscalVendaPdv,
   cancelarNotaFiscalVendaGestor,
+  transicaoPedidoDelivery,
   form,
   setInternalDialogOpen,
   totalProdutos,
@@ -226,7 +231,14 @@ export function useNovoPedidoGestorActions({
     }
 
     try {
-      if (tipoCancelamentoSelecionado === 'venda') {
+      if (tipoCancelamentoSelecionado === 'pedido_delivery') {
+        await transicaoPedidoDelivery.mutateAsync({
+          id: vendaId,
+          acao: 'cancelar',
+          motivo: justificativaCancelamento.trim(),
+        })
+        showToast.success('Pedido cancelado com sucesso!')
+      } else if (tipoCancelamentoSelecionado === 'venda') {
         await cancelarVendaGestor.mutateAsync({
           id: vendaId,
           motivo: justificativaCancelamento.trim(),
@@ -246,6 +258,7 @@ export function useNovoPedidoGestorActions({
       setJustificativaCancelamento('')
       setTipoCancelamentoSelecionado('venda')
       setInternalDialogOpen(false)
+      invalidateKanbanVendasListagens(queryClient)
       await invalidateVendaDetalheCarregadaCache(queryClient, empresaId, vendaId)
       onSuccess()
       onClose()
@@ -258,6 +271,7 @@ export function useNovoPedidoGestorActions({
     tipoCancelamentoSelecionado,
     tabelaOrigemVenda,
     cancelarVendaGestor,
+    transicaoPedidoDelivery,
     cancelarNotaFiscalVendaGestor,
     cancelarNotaFiscalVendaPdv,
     setModalCancelarVendaOpen,

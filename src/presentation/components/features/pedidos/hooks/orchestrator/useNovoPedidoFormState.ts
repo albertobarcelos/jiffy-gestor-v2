@@ -54,9 +54,9 @@ export function useNovoPedidoFormState(tipoInicioPedido: 'balcao' | 'entrega') {
   const [dataFinalizacaoCarregada, setDataFinalizacaoCarregada] = useState<string | null>(null)
   const [vendaGestorJaCancelada, setVendaGestorJaCancelada] = useState(false)
   const [modalCancelarVendaOpen, setModalCancelarVendaOpen] = useState(false)
-  const [tipoCancelamentoSelecionado, setTipoCancelamentoSelecionado] = useState<'venda' | 'nota'>(
-    'venda'
-  )
+  const [tipoCancelamentoSelecionado, setTipoCancelamentoSelecionado] = useState<
+    'venda' | 'nota' | 'pedido_delivery'
+  >('venda')
   const [justificativaCancelamento, setJustificativaCancelamento] = useState('')
   const [produtoTabsModalState, setProdutoTabsModalState] = useState<ProdutosTabsModalState>({
     open: false,

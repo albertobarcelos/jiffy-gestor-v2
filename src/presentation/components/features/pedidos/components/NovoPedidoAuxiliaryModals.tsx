@@ -19,6 +19,7 @@ export function NovoPedidoAuxiliaryModals() {
     cancelarNotaFiscalVendaGestor,
     cancelarNotaFiscalVendaPdv,
     cancelarVendaGestor,
+    transicaoPedidoDelivery,
     handleConfirmarCancelamentoVenda,
     handleFecharProdutoTabsModal,
     handleTabChangeProdutoModal,
@@ -276,11 +277,17 @@ export function NovoPedidoAuxiliaryModals() {
                 py: 2,
               }}
             >
-              {tipoCancelamentoSelecionado === 'venda' ? 'Cancelar Venda' : 'Cancelar Nota Fiscal'}
+              {tipoCancelamentoSelecionado === 'nota'
+                ? 'Cancelar Nota Fiscal'
+                : tipoCancelamentoSelecionado === 'pedido_delivery'
+                  ? 'Cancelar Pedido'
+                  : 'Cancelar Venda'}
             </DialogTitle>
             <div className="space-y-4 pt-2">
               <p className="text-sm text-gray-600">
-                {tipoCancelamentoSelecionado === 'venda'
+                {tipoCancelamentoSelecionado === 'pedido_delivery'
+                  ? 'Esta ação cancelará o pedido de delivery/retirada. O pedido sairá do fluxo operacional do Kanban.'
+                  : tipoCancelamentoSelecionado === 'venda'
                   ? 'Esta ação cancelará a venda e, se houver nota fiscal emitida, também a cancelará na SEFAZ.'
                   : tabelaOrigemVenda === 'venda_gestor'
                     ? 'Esta ação cancelará a nota fiscal vinculada à venda do Gestor na SEFAZ.'
@@ -310,6 +317,7 @@ export function NovoPedidoAuxiliaryModals() {
                 }}
                 disabled={
                   cancelarVendaGestor.isPending ||
+                  transicaoPedidoDelivery.isPending ||
                   cancelarNotaFiscalVendaPdv.isPending ||
                   cancelarNotaFiscalVendaGestor.isPending
                 }
@@ -322,12 +330,14 @@ export function NovoPedidoAuxiliaryModals() {
                 onClick={handleConfirmarCancelamentoVenda}
                 disabled={
                   cancelarVendaGestor.isPending ||
+                  transicaoPedidoDelivery.isPending ||
                   cancelarNotaFiscalVendaPdv.isPending ||
                   cancelarNotaFiscalVendaGestor.isPending ||
                   justificativaCancelamento.trim().length < 15
                 }
                 isLoading={
                   cancelarVendaGestor.isPending ||
+                  transicaoPedidoDelivery.isPending ||
                   cancelarNotaFiscalVendaPdv.isPending ||
                   cancelarNotaFiscalVendaGestor.isPending
                 }

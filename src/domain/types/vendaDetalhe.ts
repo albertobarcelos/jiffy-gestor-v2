@@ -74,6 +74,8 @@ export interface DetalhesPedidoMeta {
   dataCancelamento?: string | null
   dataUltimaModificacao?: string | null
   dataUltimoProdutoLancado?: string | null
+  /** Etapa operacional delivery (PENDENTE, EM_PREPARO, PRONTO, EM_ROTA, …). */
+  statusEtapaOperacional?: string | null
 }
 
 export interface ResumoFinanceiroDetalhes {

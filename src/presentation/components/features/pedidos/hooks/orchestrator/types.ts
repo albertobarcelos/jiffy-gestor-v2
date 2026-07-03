@@ -28,6 +28,7 @@ export type NovoPedidoShellProps = {
   onClose: () => void
   onSuccess: () => void
   podeExibirCancelarVendaGestor: boolean
+  podeExibirCancelarPedidoDeliveryOperacional: boolean
   podeExibirCancelarNotaFiscal: boolean
   isSavingPagamentoEntrega: boolean
   onSalvarPagamentoEntrega: () => void | Promise<void>

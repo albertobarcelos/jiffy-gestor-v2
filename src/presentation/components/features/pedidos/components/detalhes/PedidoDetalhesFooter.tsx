@@ -23,6 +23,7 @@ export interface PedidoDetalhesFooterProps {
   onClose: () => void
   onSuccess: () => void
   podeExibirCancelarVendaGestor: boolean
+  podeExibirCancelarPedidoDeliveryOperacional: boolean
   podeExibirCancelarNotaFiscal: boolean
   isSavingPagamentoEntrega: boolean
   onSalvarPagamentoEntrega: () => void
@@ -37,6 +38,7 @@ export function PedidoDetalhesFooter({
   onClose,
   onSuccess,
   podeExibirCancelarVendaGestor,
+  podeExibirCancelarPedidoDeliveryOperacional,
   podeExibirCancelarNotaFiscal,
   isSavingPagamentoEntrega,
   onSalvarPagamentoEntrega,
@@ -49,6 +51,7 @@ export function PedidoDetalhesFooter({
     cancelarVendaGestor,
     cancelarNotaFiscalVendaPdv,
     cancelarNotaFiscalVendaGestor,
+    transicaoPedidoDelivery,
     setTipoCancelamentoSelecionado,
   } = useNovoPedidoDetalheContext()
   const { pagamentos } = useNovoPedidoFormContext()
@@ -62,7 +65,9 @@ export function PedidoDetalhesFooter({
   if (currentStep === 4) {
     type ChaveRodape4 = 'cancelVenda' | 'cancelNota' | 'salvarCobranca' | 'fechar'
     const chaves: ChaveRodape4[] = []
-    if (podeExibirCancelarVendaGestor) chaves.push('cancelVenda')
+    if (podeExibirCancelarVendaGestor || podeExibirCancelarPedidoDeliveryOperacional) {
+      chaves.push('cancelVenda')
+    }
     if (podeExibirCancelarNotaFiscal) chaves.push('cancelNota')
     if (podeAjustarPagamentoEntregaEmAberto && abaDetalhesPedido === 'pagamentos') {
       chaves.push('fechar')
@@ -91,18 +96,21 @@ export function PedidoDetalhesFooter({
                   color="error"
                   disabled={
                     cancelarVendaGestor.isPending ||
+                    transicaoPedidoDelivery.isPending ||
                     cancelarNotaFiscalVendaPdv.isPending ||
                     cancelarNotaFiscalVendaGestor.isPending
                   }
                   onClick={() => {
-                    setTipoCancelamentoSelecionado('venda')
+                    setTipoCancelamentoSelecionado(
+                      podeExibirCancelarPedidoDeliveryOperacional ? 'pedido_delivery' : 'venda'
+                    )
                     setModalCancelarVendaOpen(true)
                   }}
                   className={FOOTER_BTN_CLASS}
                   sx={footerBarErrorBarSx(i === 0)}
                   fullWidth
                 >
-                  Cancelar venda
+                  {podeExibirCancelarPedidoDeliveryOperacional ? 'Cancelar pedido' : 'Cancelar venda'}
                 </Button>
               ) : null}
               {key === 'cancelNota' ? (

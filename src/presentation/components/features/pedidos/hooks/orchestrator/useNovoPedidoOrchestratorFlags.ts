@@ -11,6 +11,7 @@ import {
   podeExibirAbaDadosEntregaDetalhe,
   podeExibirAbaNotaFiscalDetalhe,
   podeExibirCancelarNotaFiscalDetalhe,
+  podeExibirCancelarPedidoDeliveryOperacional as regraPodeExibirCancelarPedidoDeliveryOperacional,
   resolverStatusFiscalExibicao,
 } from '@/src/domain/services/pedido/RegrasFluxoPedidoGestor'
 import { Taxa } from '@/src/domain/entities/Taxa'
@@ -200,6 +201,30 @@ export function useNovoPedidoOrchestratorFlags({
     [tabelaOrigemVenda, vendaId, dataFinalizacaoCarregada, vendaGestorJaCancelada, currentStep]
   )
 
+  const podeExibirCancelarPedidoDeliveryOperacional = useMemo(
+    () =>
+      regraPodeExibirCancelarPedidoDeliveryOperacional({
+        modoVisualizacao,
+        tabelaOrigemVenda,
+        tipoVenda: detalhesPedidoMeta?.tipoVenda,
+        vendaId,
+        currentStep,
+        vendaGestorJaCancelada,
+        dataFinalizacaoCarregada,
+        statusEtapaOperacional: detalhesPedidoMeta?.statusEtapaOperacional,
+      }),
+    [
+      modoVisualizacao,
+      tabelaOrigemVenda,
+      detalhesPedidoMeta?.tipoVenda,
+      detalhesPedidoMeta?.statusEtapaOperacional,
+      vendaId,
+      currentStep,
+      vendaGestorJaCancelada,
+      dataFinalizacaoCarregada,
+    ]
+  )
+
   const podeExibirCancelarNotaFiscal = useMemo(
     () =>
       (tabelaOrigemVenda === 'venda' || tabelaOrigemVenda === 'venda_gestor') &&
@@ -259,6 +284,7 @@ export function useNovoPedidoOrchestratorFlags({
     totalProdutos,
     totalItensPedido,
     podeExibirCancelarVendaGestor,
+    podeExibirCancelarPedidoDeliveryOperacional,
     podeExibirCancelarNotaFiscal,
     podeEditarPagamentoEntregaEmAberto,
     podeAjustarPagamentoEntregaEmAberto,
