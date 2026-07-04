@@ -2,11 +2,14 @@
 
 import { useCallback, useMemo, useState } from 'react'
 import { showToast } from '@/src/shared/utils/toast'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { CAMPOS_PERMISSAO_PDV } from '../constants'
 import { montarBodyPermissoesParcial } from '../rules/permissoesLote.rules'
 import type { PermissaoCampoChave } from '../types'
-import { bulkUpdateProdutosLote } from '../utils/produtosLoteMutations'
+import {
+  bulkUpdateProdutosLote,
+  type BulkUpdateProdutoPayloadItem,
+} from '../utils/produtosLoteMutations'
 
 export interface UsePermissoesLoteParams {
   produtosSelecionados: Set<string>
@@ -21,19 +24,23 @@ export function usePermissoesLote({
   marcarProdutosAlteradosNaSessao,
   buscarProdutos,
 }: UsePermissoesLoteParams) {
-  const tenantAuth = useAuthStore(s => s.tenantAuth)
   const [modoPermissao, setModoPermissao] = useState<'ativar' | 'desativar'>('ativar')
   const [permissoesCamposSelecionados, setPermissoesCamposSelecionados] = useState<
     Set<PermissaoCampoChave>
   >(new Set())
   const [isSalvandoPermissoes, setIsSalvandoPermissoes] = useState(false)
 
+  const bulkMutation = useSecureTenantMutation(
+    async ({ token }, payload: BulkUpdateProdutoPayloadItem[]) =>
+      bulkUpdateProdutosLote(token, payload)
+  )
+
   const limparSelecaoPermissoes = useCallback(() => {
     setPermissoesCamposSelecionados(new Set())
   }, [])
 
   const togglePermissaoCampo = useCallback((chave: PermissaoCampoChave) => {
-    setPermissoesCamposSelecionados((prev) => {
+    setPermissoesCamposSelecionados(prev => {
       const novo = new Set(prev)
       if (novo.has(chave)) {
         novo.delete(chave)
@@ -52,9 +59,7 @@ export function usePermissoesLote({
     if (todasPermissoesSelecionadas) {
       setPermissoesCamposSelecionados(new Set())
     } else {
-      setPermissoesCamposSelecionados(
-        new Set(CAMPOS_PERMISSAO_PDV.map((c) => c.chave))
-      )
+      setPermissoesCamposSelecionados(new Set(CAMPOS_PERMISSAO_PDV.map(c => c.chave)))
     }
   }, [todasPermissoesSelecionadas])
 
@@ -63,7 +68,6 @@ export function usePermissoesLote({
     limparSelecaoPermissoes()
   }, [limparSelecaoPermissoes])
 
-  /** POST bulk-update com campos parciais de permissões PDV (1 request). */
   const vincularPermissoesEmLote = useCallback(async () => {
     if (produtosSelecionados.size === 0) {
       showToast.error('Selecione pelo menos um produto')
@@ -74,19 +78,13 @@ export function usePermissoesLote({
       return
     }
 
-    const token = tenantAuth?.getAccessToken()
-    if (!token) {
-      showToast.error('Token não encontrado')
-      return
-    }
-
     const ids = Array.from(produtosSelecionados)
     const valorAlvo = modoPermissao === 'ativar'
     const permissoesParciais = montarBodyPermissoesParcial(
       permissoesCamposSelecionados,
       valorAlvo
     )
-    const payload = ids.map((produtoId) => ({
+    const payload = ids.map(produtoId => ({
       produtoId,
       ...permissoesParciais,
     }))
@@ -95,7 +93,7 @@ export function usePermissoesLote({
     showToast.loading('Salvando permissões...')
 
     try {
-      await bulkUpdateProdutosLote(token, payload)
+      await bulkMutation.mutateAsync(payload)
 
       marcarProdutosAlteradosNaSessao(ids, 'permissoes')
       await buscarProdutos()
@@ -111,7 +109,7 @@ export function usePermissoesLote({
       setIsSalvandoPermissoes(false)
     }
   }, [
-    tenantAuth,
+    bulkMutation,
     buscarProdutos,
     limparSelecaoProdutos,
     marcarProdutosAlteradosNaSessao,

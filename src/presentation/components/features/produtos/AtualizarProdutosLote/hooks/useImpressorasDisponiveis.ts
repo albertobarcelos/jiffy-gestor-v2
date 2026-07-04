@@ -1,10 +1,8 @@
 'use client'
 
 import { useEffect, useMemo } from 'react'
-import { useInfiniteQuery } from '@tanstack/react-query'
 import { Impressora } from '@/src/domain/entities/Impressora'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecureTenantInfiniteQuery'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
 
@@ -17,8 +15,7 @@ interface ImpressorasLotePage {
 
 async function fetchImpressorasLotePage(
   offset: number,
-  token: string,
-  signal?: AbortSignal
+  token: string
 ): Promise<ImpressorasLotePage> {
   const params = new URLSearchParams({
     limit: IMPRESSORAS_LOTE_PAGE_SIZE.toString(),
@@ -29,7 +26,6 @@ async function fetchImpressorasLotePage(
     headers: {
       Authorization: `Bearer ${token}`,
     },
-    signal,
   })
 
   if (!response.ok) {
@@ -57,9 +53,7 @@ async function fetchImpressorasLotePage(
   }
 }
 
-function flattenImpressorasLotePages(
-  pages: ImpressorasLotePage[] | undefined
-): Impressora[] {
+function flattenImpressorasLotePages(pages: ImpressorasLotePage[] | undefined): Impressora[] {
   if (!pages?.length) return []
 
   const seen = new Set<string>()
@@ -76,25 +70,19 @@ function flattenImpressorasLotePages(
   return result
 }
 
-/**
- * Carrega todas as impressoras disponíveis quando a aba de impressoras está ativa.
- * Usa paginação infinita com cache React Query (carrega todas as páginas automaticamente).
- */
 export function useImpressorasDisponiveis(enabled: boolean) {
-  const tenantAuth = useAuthStore(s => s.tenantAuth)
-  const token = tenantAuth?.getAccessToken()
-  const empresaId = useTenantEmpresaId()
-
-  const query = useInfiniteQuery({
-    queryKey: ['tenant', empresaId, 'impressoras', 'lote', 'todas'] as const,
-    initialPageParam: 0,
-    queryFn: ({ pageParam, signal }) => fetchImpressorasLotePage(pageParam, token!, signal),
-    getNextPageParam: (lastPage) => lastPage.nextOffset ?? undefined,
-    enabled: enabled && !!token,
-    staleTime: 1000 * 60 * 5,
-    gcTime: 1000 * 60 * 30,
-    refetchOnWindowFocus: false,
-  })
+  const query = useSecureTenantInfiniteQuery(
+    ['impressoras', 'lote', 'todas'],
+    ({ token }, pageParam) => fetchImpressorasLotePage(pageParam as number, token),
+    {
+      initialPageParam: 0,
+      getNextPageParam: (lastPage: ImpressorasLotePage) => lastPage.nextOffset ?? undefined,
+      enabled,
+      staleTime: 1000 * 60 * 5,
+      gcTime: 1000 * 60 * 30,
+      refetchOnWindowFocus: false,
+    }
+  )
 
   useEffect(() => {
     if (!enabled) return

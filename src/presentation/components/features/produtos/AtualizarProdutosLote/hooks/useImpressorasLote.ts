@@ -4,8 +4,11 @@ import { useCallback, useMemo, useState } from 'react'
 import type { Produto } from '@/src/domain/entities/Produto'
 import type { Impressora } from '@/src/domain/entities/Impressora'
 import { showToast } from '@/src/shared/utils/toast'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { bulkUpdateProdutosLote } from '../utils/produtosLoteMutations'
+import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
+import {
+  bulkUpdateProdutosLote,
+  type BulkUpdateProdutoPayloadItem,
+} from '../utils/produtosLoteMutations'
 
 export interface UseImpressorasLoteParams {
   produtos: Produto[]
@@ -24,17 +27,21 @@ export function useImpressorasLote({
   marcarProdutosAlteradosNaSessao,
   buscarProdutos,
 }: UseImpressorasLoteParams) {
-  const tenantAuth = useAuthStore(s => s.tenantAuth)
   const [impressorasSelecionadas, setImpressorasSelecionadas] = useState<Set<string>>(new Set())
   const [modoImpressora, setModoImpressora] = useState<'adicionar' | 'remover'>('adicionar')
   const [isUpdating, setIsUpdating] = useState(false)
+
+  const bulkMutation = useSecureTenantMutation(
+    async ({ token }, payload: BulkUpdateProdutoPayloadItem[]) =>
+      bulkUpdateProdutosLote(token, payload)
+  )
 
   const limparSelecaoImpressoras = useCallback(() => {
     setImpressorasSelecionadas(new Set())
   }, [])
 
   const toggleImpressora = useCallback((impressoraId: string) => {
-    setImpressorasSelecionadas((prev) => {
+    setImpressorasSelecionadas(prev => {
       const novo = new Set(prev)
       if (novo.has(impressoraId)) {
         novo.delete(impressoraId)
@@ -57,7 +64,7 @@ export function useImpressorasLote({
     if (todasImpressorasSelecionadas) {
       setImpressorasSelecionadas(new Set())
     } else {
-      setImpressorasSelecionadas(new Set(impressorasDisponiveis.map((i) => i.getId())))
+      setImpressorasSelecionadas(new Set(impressorasDisponiveis.map(i => i.getId())))
     }
   }, [impressorasDisponiveis, todasImpressorasSelecionadas])
 
@@ -71,21 +78,17 @@ export function useImpressorasLote({
       return
     }
 
-    const token = tenantAuth?.getAccessToken()
-    if (!token) {
-      showToast.error('Token não encontrado')
-      return
-    }
-
     setIsUpdating(true)
     showToast.loading('Vinculando impressoras...')
 
     try {
       const impressorasIdsArray = Array.from(impressorasSelecionadas)
-      const payload = Array.from(produtosSelecionados).map((produtoId) => {
-        const produto = produtos.find((p) => p.getId() === produtoId)
-        const impressorasExistentes = produto?.getImpressoras().map((i) => i.id) || []
-        const impressorasCombinadas = [...new Set([...impressorasExistentes, ...impressorasIdsArray])]
+      const payload = Array.from(produtosSelecionados).map(produtoId => {
+        const produto = produtos.find(p => p.getId() === produtoId)
+        const impressorasExistentes = produto?.getImpressoras().map(i => i.id) || []
+        const impressorasCombinadas = [
+          ...new Set([...impressorasExistentes, ...impressorasIdsArray]),
+        ]
 
         return {
           produtoId,
@@ -93,7 +96,7 @@ export function useImpressorasLote({
         }
       })
 
-      await bulkUpdateProdutosLote(token, payload)
+      await bulkMutation.mutateAsync(payload)
 
       marcarProdutosAlteradosNaSessao(Array.from(produtosSelecionados), 'impressoras')
       await buscarProdutos()
@@ -108,7 +111,7 @@ export function useImpressorasLote({
       setIsUpdating(false)
     }
   }, [
-    tenantAuth,
+    bulkMutation,
     buscarProdutos,
     impressorasSelecionadas,
     limparSelecaoImpressoras,
@@ -128,23 +131,17 @@ export function useImpressorasLote({
       return
     }
 
-    const token = tenantAuth?.getAccessToken()
-    if (!token) {
-      showToast.error('Token não encontrado')
-      return
-    }
-
     setIsUpdating(true)
     showToast.loading('Desvinculando impressoras...')
 
     try {
       const impressorasIdsArray = Array.from(impressorasSelecionadas)
-      const payload = Array.from(produtosSelecionados).map((produtoId) => ({
+      const payload = Array.from(produtosSelecionados).map(produtoId => ({
         produtoId,
         impressorasIdsToRemove: impressorasIdsArray,
       }))
 
-      await bulkUpdateProdutosLote(token, payload)
+      await bulkMutation.mutateAsync(payload)
 
       marcarProdutosAlteradosNaSessao(Array.from(produtosSelecionados), 'impressoras')
       await buscarProdutos()
@@ -159,7 +156,7 @@ export function useImpressorasLote({
       setIsUpdating(false)
     }
   }, [
-    tenantAuth,
+    bulkMutation,
     buscarProdutos,
     impressorasSelecionadas,
     limparSelecaoImpressoras,

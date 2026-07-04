@@ -4,14 +4,17 @@ import { useCallback, useState } from 'react'
 import type { Produto } from '@/src/domain/entities/Produto'
 import { brToEUA } from '@/src/shared/utils/formatters'
 import { showToast } from '@/src/shared/utils/toast'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import {
   calcularNovoValorProdutoLote,
   validarAjustePrecoLote,
   type AjustePrecoDirecao,
   type AjustePrecoModo,
 } from '../rules/precoLote.rules'
-import { bulkUpdateProdutosLote } from '../utils/produtosLoteMutations'
+import {
+  bulkUpdateProdutosLote,
+  type BulkUpdateProdutoPayloadItem,
+} from '../utils/produtosLoteMutations'
 
 export interface UsePrecoLoteParams {
   produtos: Produto[]
@@ -28,11 +31,15 @@ export function usePrecoLote({
   marcarProdutosAlteradosNaSessao,
   buscarProdutos,
 }: UsePrecoLoteParams) {
-  const tenantAuth = useAuthStore(s => s.tenantAuth)
   const [adjustMode, setAdjustMode] = useState<AjustePrecoModo>('valor')
   const [adjustAmount, setAdjustAmount] = useState('')
   const [adjustDirection, setAdjustDirection] = useState<AjustePrecoDirecao>('increase')
   const [isUpdating, setIsUpdating] = useState(false)
+
+  const bulkMutation = useSecureTenantMutation(
+    async ({ token }, payload: BulkUpdateProdutoPayloadItem[]) =>
+      bulkUpdateProdutosLote(token, payload)
+  )
 
   const limparFormulario = useCallback(() => {
     setAdjustAmount('')
@@ -45,7 +52,7 @@ export function usePrecoLote({
     }
 
     const parsedAdjust = brToEUA(adjustAmount)
-    const produtosSelecionadosDados = produtos.filter((produto) =>
+    const produtosSelecionadosDados = produtos.filter(produto =>
       produtosSelecionados.has(produto.getId())
     )
 
@@ -60,19 +67,13 @@ export function usePrecoLote({
       return
     }
 
-    const token = tenantAuth?.getAccessToken()
-    if (!token) {
-      showToast.error('Token não encontrado')
-      return
-    }
-
     const adjustValue = parsedAdjust
 
     setIsUpdating(true)
     showToast.loading('Atualizando preços...')
 
     try {
-      const payload = produtosSelecionadosDados.map((produto) => {
+      const payload = produtosSelecionadosDados.map(produto => {
         const valorAtual = produto.getValor()
         const novoValor = calcularNovoValorProdutoLote(
           valorAtual,
@@ -91,16 +92,16 @@ export function usePrecoLote({
         }
       })
 
-      await bulkUpdateProdutosLote(token, payload)
+      await bulkMutation.mutateAsync(payload)
 
       marcarProdutosAlteradosNaSessao(
-        payload.map((p) => p.produtoId),
+        payload.map(p => p.produtoId),
         'precos'
       )
 
-      await new Promise((resolve) => setTimeout(resolve, 800))
+      await new Promise(resolve => setTimeout(resolve, 800))
       await buscarProdutos()
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      await new Promise(resolve => setTimeout(resolve, 500))
 
       showToast.success(`Preços atualizados com sucesso! (${payload.length} produtos)`)
       limparSelecaoProdutos()
@@ -116,7 +117,7 @@ export function usePrecoLote({
     adjustAmount,
     adjustDirection,
     adjustMode,
-    tenantAuth,
+    bulkMutation,
     buscarProdutos,
     limparFormulario,
     limparSelecaoProdutos,

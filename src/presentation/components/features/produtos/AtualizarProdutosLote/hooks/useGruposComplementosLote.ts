@@ -4,8 +4,11 @@ import { useCallback, useMemo, useState } from 'react'
 import type { Produto } from '@/src/domain/entities/Produto'
 import type { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { showToast } from '@/src/shared/utils/toast'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { bulkUpdateProdutosLote } from '../utils/produtosLoteMutations'
+import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
+import {
+  bulkUpdateProdutosLote,
+  type BulkUpdateProdutoPayloadItem,
+} from '../utils/produtosLoteMutations'
 
 export interface UseGruposComplementosLoteParams {
   produtos: Produto[]
@@ -24,7 +27,6 @@ export function useGruposComplementosLote({
   marcarProdutosAlteradosNaSessao,
   buscarProdutos,
 }: UseGruposComplementosLoteParams) {
-  const tenantAuth = useAuthStore(s => s.tenantAuth)
   const [gruposComplementosSelecionados, setGruposComplementosSelecionados] = useState<Set<string>>(
     new Set()
   )
@@ -33,12 +35,17 @@ export function useGruposComplementosLote({
   )
   const [isUpdating, setIsUpdating] = useState(false)
 
+  const bulkMutation = useSecureTenantMutation(
+    async ({ token }, payload: BulkUpdateProdutoPayloadItem[]) =>
+      bulkUpdateProdutosLote(token, payload)
+  )
+
   const limparSelecaoGrupos = useCallback(() => {
     setGruposComplementosSelecionados(new Set())
   }, [])
 
   const toggleGrupoComplemento = useCallback((grupoId: string) => {
-    setGruposComplementosSelecionados((prev) => {
+    setGruposComplementosSelecionados(prev => {
       const novo = new Set(prev)
       if (novo.has(grupoId)) {
         novo.delete(grupoId)
@@ -61,7 +68,7 @@ export function useGruposComplementosLote({
     if (todosGruposComplementosSelecionados) {
       setGruposComplementosSelecionados(new Set())
     } else {
-      setGruposComplementosSelecionados(new Set(gruposComplementos.map((g) => g.getId())))
+      setGruposComplementosSelecionados(new Set(gruposComplementos.map(g => g.getId())))
     }
   }, [gruposComplementos, todosGruposComplementosSelecionados])
 
@@ -75,20 +82,14 @@ export function useGruposComplementosLote({
       return
     }
 
-    const token = tenantAuth?.getAccessToken()
-    if (!token) {
-      showToast.error('Token não encontrado')
-      return
-    }
-
     setIsUpdating(true)
     showToast.loading('Vinculando grupos de complementos...')
 
     try {
       const gruposIdsArray = Array.from(gruposComplementosSelecionados)
-      const payload = Array.from(produtosSelecionados).map((produtoId) => {
-        const produto = produtos.find((p) => p.getId() === produtoId)
-        const gruposExistentes = produto?.getGruposComplementos().map((g) => g.id) || []
+      const payload = Array.from(produtosSelecionados).map(produtoId => {
+        const produto = produtos.find(p => p.getId() === produtoId)
+        const gruposExistentes = produto?.getGruposComplementos().map(g => g.id) || []
         const gruposCombinados = [...new Set([...gruposExistentes, ...gruposIdsArray])]
 
         return {
@@ -97,7 +98,7 @@ export function useGruposComplementosLote({
         }
       })
 
-      await bulkUpdateProdutosLote(token, payload)
+      await bulkMutation.mutateAsync(payload)
 
       marcarProdutosAlteradosNaSessao(Array.from(produtosSelecionados), 'gruposComplementos')
       await buscarProdutos()
@@ -113,7 +114,7 @@ export function useGruposComplementosLote({
       setIsUpdating(false)
     }
   }, [
-    tenantAuth,
+    bulkMutation,
     buscarProdutos,
     gruposComplementosSelecionados,
     limparSelecaoGrupos,
@@ -133,23 +134,17 @@ export function useGruposComplementosLote({
       return
     }
 
-    const token = tenantAuth?.getAccessToken()
-    if (!token) {
-      showToast.error('Token não encontrado')
-      return
-    }
-
     setIsUpdating(true)
     showToast.loading('Desvinculando grupos de complementos...')
 
     try {
       const gruposIdsArray = Array.from(gruposComplementosSelecionados)
-      const payload = Array.from(produtosSelecionados).map((produtoId) => ({
+      const payload = Array.from(produtosSelecionados).map(produtoId => ({
         produtoId,
         gruposComplementosIdsToRemove: gruposIdsArray,
       }))
 
-      await bulkUpdateProdutosLote(token, payload)
+      await bulkMutation.mutateAsync(payload)
 
       marcarProdutosAlteradosNaSessao(Array.from(produtosSelecionados), 'gruposComplementos')
       await buscarProdutos()
@@ -165,7 +160,7 @@ export function useGruposComplementosLote({
       setIsUpdating(false)
     }
   }, [
-    tenantAuth,
+    bulkMutation,
     buscarProdutos,
     gruposComplementosSelecionados,
     limparSelecaoGrupos,

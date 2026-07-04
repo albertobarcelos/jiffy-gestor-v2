@@ -24,10 +24,6 @@ interface UseValidacaoFiscalLoteParams {
   ncmContextoSelecao?: string | null
 }
 
-/**
- * Validação fiscal em lote (NCM, CESTs por NCM e CEST) com debounce — igual NovoProduto.
- * Só executa quando a aba Fiscal está ativa.
- */
 export function useValidacaoFiscalLote({
   activeTab,
   modoFiscal,
@@ -36,6 +32,18 @@ export function useValidacaoFiscalLote({
   ncmContextoSelecao = null,
 }: UseValidacaoFiscalLoteParams) {
   const tenantAuth = useAuthStore(s => s.tenantAuth)
+  const isAuthenticated = useAuthStore(s => s.isAuthenticated)
+  const isRehydrated = useAuthStore(s => s.isRehydrated)
+
+  const sessaoTenantOk = useMemo(() => {
+    const token = tenantAuth?.getAccessToken()
+    return (
+      isRehydrated &&
+      isAuthenticated &&
+      !!token &&
+      !(tenantAuth?.isExpired() ?? true)
+    )
+  }, [isAuthenticated, isRehydrated, tenantAuth])
 
   const ncmValidationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastValidatedNcmRef = useRef<string>('')
@@ -48,9 +56,8 @@ export function useValidacaoFiscalLote({
   const [cestValidation, setCestValidation] = useState<CestValidationResult | null>(null)
   const [isValidatingCest, setIsValidatingCest] = useState(false)
 
-  // Validação NCM (debounce 600ms)
   useEffect(() => {
-    if (activeTab !== 'fiscal' || modoFiscal !== 'editar') return
+    if (activeTab !== 'fiscal' || modoFiscal !== 'editar' || !sessaoTenantOk) return
 
     if (ncmValidationTimerRef.current) {
       clearTimeout(ncmValidationTimerRef.current)
@@ -84,7 +91,7 @@ export function useValidacaoFiscalLote({
     setIsValidatingNcm(true)
     ncmValidationTimerRef.current = setTimeout(async () => {
       const token = tenantAuth?.getAccessToken()
-      if (!token) {
+      if (!token || tenantAuth?.isExpired()) {
         setIsValidatingNcm(false)
         return
       }
@@ -128,9 +135,8 @@ export function useValidacaoFiscalLote({
         clearTimeout(ncmValidationTimerRef.current)
       }
     }
-  }, [fiscalLoteDraft.ncm, tenantAuth, activeTab, modoFiscal])
+  }, [fiscalLoteDraft.ncm, tenantAuth, activeTab, modoFiscal, sessaoTenantOk])
 
-  /** NCM do formulário (validado) ou NCM comum dos produtos selecionados. */
   const ncmParaCest = useMemo(() => {
     const draftNcm = fiscalLoteDraft.ncm.replace(/\D/g, '').slice(0, 8)
     if (
@@ -144,9 +150,8 @@ export function useValidacaoFiscalLote({
     return contexto.length === 8 ? contexto : ''
   }, [fiscalLoteDraft.ncm, ncmContextoSelecao, ncmValidation])
 
-  // Lista de CESTs compatíveis com o NCM efetivo (formulário ou seleção)
   useEffect(() => {
-    if (activeTab !== 'fiscal' || modoFiscal !== 'editar') return
+    if (activeTab !== 'fiscal' || modoFiscal !== 'editar' || !sessaoTenantOk) return
 
     if (ncmParaCest.length !== 8) {
       setCestsDisponiveis([])
@@ -160,7 +165,7 @@ export function useValidacaoFiscalLote({
 
     const fetchCests = async () => {
       const token = tenantAuth?.getAccessToken()
-      if (!token) return
+      if (!token || tenantAuth?.isExpired()) return
 
       setIsLoadingCests(true)
       const controller = new AbortController()
@@ -201,11 +206,10 @@ export function useValidacaoFiscalLote({
     }
 
     void fetchCests()
-  }, [ncmParaCest, tenantAuth, activeTab, modoFiscal])
+  }, [ncmParaCest, tenantAuth, activeTab, modoFiscal, sessaoTenantOk])
 
-  // Validação CEST (debounce 400ms) — usa NCM do formulário ou da seleção
   useEffect(() => {
-    if (activeTab !== 'fiscal' || modoFiscal !== 'editar') return
+    if (activeTab !== 'fiscal' || modoFiscal !== 'editar' || !sessaoTenantOk) return
 
     const cestTrimmed = fiscalLoteDraft.cest.trim()
 
@@ -239,7 +243,7 @@ export function useValidacaoFiscalLote({
 
     const timer = setTimeout(async () => {
       const token = tenantAuth?.getAccessToken()
-      if (!token) {
+      if (!token || tenantAuth?.isExpired()) {
         setIsValidatingCest(false)
         return
       }
@@ -290,7 +294,6 @@ export function useValidacaoFiscalLote({
       } catch (error) {
         clearTimeout(timeoutId)
         if (error instanceof DOMException && error.name === 'AbortError') {
-          // Cleanup do effect ou timeout — não deixar loading preso
           return
         }
         setCestValidation(null)
@@ -311,9 +314,9 @@ export function useValidacaoFiscalLote({
     tenantAuth,
     activeTab,
     modoFiscal,
+    sessaoTenantOk,
   ])
 
-  // Com CEST preenchido, sugere indicador de escala (só reage ao CEST)
   useEffect(() => {
     if (activeTab !== 'fiscal' || modoFiscal !== 'editar') return
     setFiscalLoteDraft((d) => {
@@ -326,7 +329,6 @@ export function useValidacaoFiscalLote({
 
   const isNcmInvalidFiscal = ncmValidation != null && !ncmValidation.valido
   const isCestInvalidFiscal = cestValidation != null && !cestValidation.valido
-  /** NCM válido no formulário ou NCM comum da seleção (para UI de CEST). */
   const isNcmValidFiscal =
     (ncmValidation != null && ncmValidation.valido) || ncmParaCest.length === 8
   const hasCestsDisponiveisFiscal = cestsDisponiveis.length > 0
