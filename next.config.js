@@ -1,8 +1,62 @@
 /** @type {import('next').NextConfig} */
 const path = require('path')
 
+/** Rotas ERP migradas de `/cadastros/*` para `/*` (Fase 1). */
+const ERP_LEGACY_CADASTROS_SEGMENTS = [
+  'clientes',
+  'usuarios',
+  'entregadores',
+  'perfis-usuarios-pdv',
+  'grupos-produtos',
+  'grupos-complementos',
+  'complementos',
+  'taxas',
+  'impressoras',
+  'meios-pagamentos',
+  'convites-gestor',
+]
+
+const cadastrosLegacyRedirects = [
+  {
+    source: '/cadastros/taxas/novo',
+    destination: '/taxas?modalNovaTaxaOpen=true',
+    permanent: true,
+  },
+  ...ERP_LEGACY_CADASTROS_SEGMENTS.flatMap(segment => [
+    {
+      source: `/cadastros/${segment}`,
+      destination: `/${segment}`,
+      permanent: true,
+    },
+    {
+      source: `/cadastros/${segment}/:path*`,
+      destination: `/${segment}/:path*`,
+      permanent: true,
+    },
+  ]),
+]
+
 const nextConfig = {
   reactStrictMode: true,
+  async redirects() {
+    return [
+      {
+        source: '/cadastros/:path*',
+        destination: '/:path*',
+        permanent: true,
+      },
+      {
+        source: '/relatorios-produtos-vendidos-mvp',
+        destination: '/relatorios-produtos-vendidos',
+        permanent: true,
+      },
+      {
+        source: '/relatorios-produtos-vendidos-mvp/:path*',
+        destination: '/relatorios-produtos-vendidos/:path*',
+        permanent: true,
+      },
+    ]
+  },
   // Desabilitar ESLint durante build (apenas durante desenvolvimento)
   eslint: {
     ignoreDuringBuilds: false, // Manter ativo mas não bloquear por warnings
@@ -51,10 +105,16 @@ const nextConfig = {
     const rechartsPath = path.resolve(__dirname, 'node_modules', 'recharts')
     const radixSlotPath = path.resolve(__dirname, 'node_modules', '@radix-ui', 'react-slot')
     
+    const featuresRoot = path.resolve(__dirname, 'src/presentation/components/features')
+
     config.resolve.alias = {
       ...config.resolve.alias,
       recharts: rechartsPath,
       '@radix-ui/react-slot': radixSlotPath,
+      '@/features/kanban': path.join(featuresRoot, 'kanban'),
+      '@/features/pedidos': path.join(featuresRoot, 'pedidos'),
+      '@/features/delivery': path.join(featuresRoot, 'delivery'),
+      '@/features/fiscal': path.join(featuresRoot, 'fiscal'),
     }
     
     return config

@@ -96,6 +96,15 @@ export class ClienteRepository implements IClienteRepository {
   async criarCliente(data: CriarClienteDTO): Promise<Cliente> {
     try {
       const telDigits = (data.telefone || '').replace(/\D/g, '')
+      /** API Nest exige '1' | '2' | '9' (SPED); cadastro mínimo omitia o campo e ia como ''. */
+      const indicadorIeRaw = data.indicadorInscricaoEstadual
+      const indicadorIe =
+        indicadorIeRaw != null && String(indicadorIeRaw).trim() !== ''
+          ? String(indicadorIeRaw).trim()
+          : '9'
+      /** API rejeita IE vazia; NovoCliente usa 'ISENTO' como padrão para PF/não contribuinte. */
+      const ieTrim = (data.inscricaoEstadual ?? '').trim()
+      const inscricaoEstadual = ieTrim !== '' ? ieTrim : 'ISENTO'
       const bodyMap: any = {
         nome: data.nome,
         razaoSocial: data.razaoSocial || '',
@@ -104,8 +113,8 @@ export class ClienteRepository implements IClienteRepository {
         telefone: telDigits.length > 0 ? telDigits : null,
         email: data.email || '',
         nomeFantasia: data.nomeFantasia || '',
-        indicadorInscricaoEstadual: data.indicadorInscricaoEstadual ?? '',
-        inscricaoEstadual: data.inscricaoEstadual ?? '',
+        indicadorInscricaoEstadual: indicadorIe,
+        inscricaoEstadual,
         ativo: data.ativo !== undefined ? data.ativo : true,
       }
 

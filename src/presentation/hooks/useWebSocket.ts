@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { invalidateKanbanVendasListagens } from '@/features/kanban/hooks/kanbanListagemQueryCache'
 import { showToast } from '@/src/shared/utils/toast'
 
 interface WebSocketMessage {
@@ -25,8 +27,9 @@ interface UseWebSocketOptions {
  */
 export function useWebSocket(options: UseWebSocketOptions = {}) {
   const { enabled = true, onStatusUpdate } = options
-  const { auth } = useAuthStore()
+  const tenantAuth = useAuthStore(s => s.tenantAuth)
   const queryClient = useQueryClient()
+  const empresaId = useTenantEmpresaId()
   
   const [isConnected, setIsConnected] = useState(false)
   const [usePolling, setUsePolling] = useState(false)
@@ -35,9 +38,11 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const reconnectAttemptsRef = useRef(0)
   const maxReconnectAttempts = 5
 
-  // Obter empresaId do token
+  // Obter empresaId do token da aba (tenantAuth)
   const getEmpresaId = useCallback((): string | null => {
-    const token = auth?.getAccessToken()
+    if (empresaId) return empresaId
+
+    const token = tenantAuth?.getAccessToken()
     if (!token) return null
 
     try {
@@ -50,7 +55,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       console.error('Erro ao decodificar token:', error)
     }
     return null
-  }, [auth])
+  }, [tenantAuth, empresaId])
 
   // Conectar ao WebSocket
   const connect = useCallback(() => {
@@ -82,7 +87,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         reconnectAttemptsRef.current = 0
 
         // Autenticar
-        const token = auth?.getAccessToken()
+        const token = tenantAuth?.getAccessToken()
         if (token) {
           ws.send(JSON.stringify({
             type: 'auth',
@@ -105,18 +110,16 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
             }
           } else if (message.type === 'status_update') {
             if (message.vendaId && message.status) {
-              // Invalidar cache do React Query
-              queryClient.invalidateQueries({ 
-                queryKey: ['vendas-unificadas'] 
+              // Invalidar cache do React Query com escopo de empresa
+              invalidateKanbanVendasListagens(queryClient)
+              queryClient.invalidateQueries({
+                queryKey: ['tenant', empresaId, 'vendas']
               })
-              queryClient.invalidateQueries({ 
-                queryKey: ['vendas'] 
+              queryClient.invalidateQueries({
+                queryKey: ['tenant', empresaId, 'venda', message.vendaId]
               })
-              queryClient.invalidateQueries({ 
-                queryKey: ['venda', message.vendaId] 
-              })
-              queryClient.invalidateQueries({ 
-                queryKey: ['venda-gestor', message.vendaId] 
+              queryClient.invalidateQueries({
+                queryKey: ['tenant', empresaId, 'venda-gestor', message.vendaId]
               })
 
               // Chamar callback se fornecido
@@ -173,7 +176,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       console.error('Erro ao criar conexão WebSocket:', error)
       setUsePolling(true)
     }
-  }, [enabled, getEmpresaId, auth, queryClient, onStatusUpdate])
+  }, [enabled, getEmpresaId, tenantAuth, queryClient, onStatusUpdate])
 
   // Polling como fallback
   useEffect(() => {
@@ -181,11 +184,9 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
     const interval = setInterval(() => {
       // Refetch dados a cada 3 segundos
-      queryClient.invalidateQueries({ 
-        queryKey: ['vendas-unificadas'] 
-      })
-      queryClient.invalidateQueries({ 
-        queryKey: ['vendas'] 
+      invalidateKanbanVendasListagens(queryClient)
+      queryClient.invalidateQueries({
+        queryKey: ['tenant', empresaId, 'vendas']
       })
     }, 3000)
 

@@ -1,25 +1,32 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  forwardRef,
+  useImperativeHandle,
+} from 'react'
 import { PerfilGestor } from '@/src/domain/entities/PerfilGestor'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import { MdSearch, MdPersonAdd, MdKeyboardArrowRight, MdPerson, MdEdit } from 'react-icons/md'
+import { MdKeyboardArrowRight, MdPerson } from 'react-icons/md'
+import { useRegisterHubSearch } from '@/src/presentation/contexts/HubSearchContext'
 import {
   PerfisGestorTabsModal,
-  PerfisGestorTabKey,
-  PerfisGestorTabsModalState,
+  type PerfisGestorTabsModalState,
 } from './PerfisGestorTabsModal'
-import {
-  UsuariosGestorTabsModal,
-  UsuariosGestorTabsModalState,
-} from '../usuarios-gestor/UsuariosGestorTabsModal'
 
 interface PerfisGestorListProps {
   onReload?: () => void
+}
+
+export type PerfisGestorListHandle = {
+  openCreateModal: () => void
 }
 
 /**
@@ -27,29 +34,26 @@ interface PerfisGestorListProps {
  * Faz requisições sequenciais de 10 em 10 até carregar tudo
  * Replica exatamente o design e lógica do Flutter
  */
-export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
+export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorListProps>(
+  function PerfisGestorList({ onReload }, ref) {
   const [perfis, setPerfis] = useState<PerfilGestor[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [searchText, setSearchText] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [totalPerfis, setTotalPerfis] = useState(0)
+
+  useRegisterHubSearch({
+    value: searchText,
+    onChange: setSearchText,
+    placeholder: 'Pesquisar perfil gestor...',
+  })
   const [expandedPerfis, setExpandedPerfis] = useState<Set<string>>(new Set())
   const [usuariosPorPerfil, setUsuariosPorPerfil] = useState<Record<string, any[]>>({})
   const [contagemUsuariosPorPerfil, setContagemUsuariosPorPerfil] = useState<Record<string, number>>({})
-  const [togglingStatus, setTogglingStatus] = useState<Record<string, boolean>>({})
   const [updatingPermissions, setUpdatingPermissions] = useState<Record<string, Set<string>>>({})
   const [tabsModalState, setTabsModalState] = useState<PerfisGestorTabsModalState>({
     open: false,
-    tab: 'perfil',
     mode: 'create',
     perfilId: undefined,
-  })
-  const [usuariosTabsModalState, setUsuariosTabsModalState] = useState<UsuariosGestorTabsModalState>({
-    open: false,
-    tab: 'usuario',
-    mode: 'create',
-    usuarioId: undefined,
-    initialPerfilGestorId: undefined,
   })
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
@@ -147,7 +151,6 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
         const allPerfis: PerfilGestor[] = []
         let currentOffset = 0
         let hasMore = true
-        let totalCount = 0
 
         // Loop para carregar todas as páginas
         while (hasMore) {
@@ -181,11 +184,6 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
 
           allPerfis.push(...newPerfis)
 
-          // Atualiza o total apenas na primeira requisição
-          if (currentOffset === 0) {
-            totalCount = data.count || 0
-          }
-
           // Verifica se há mais páginas
           // Se retornou menos de 10 itens, não há mais páginas
           hasMore = newPerfis.length === 10
@@ -193,7 +191,6 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
         }
 
         setPerfis(allPerfis)
-        setTotalPerfis(totalCount)
         setExpandedPerfis(new Set())
         setUsuariosPorPerfil({})
 
@@ -300,92 +297,6 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
   }
 
   /**
-   * Atualiza o status do usuário gestor diretamente na lista
-   */
-  const handleToggleUsuarioStatus = useCallback(
-    async (usuarioId: string, novoStatus: boolean, perfilId: string) => {
-      const token = auth?.getAccessToken()
-      if (!token) {
-        showToast.error('Token não encontrado. Faça login novamente.')
-        return
-      }
-
-      setTogglingStatus((prev) => ({ ...prev, [usuarioId]: true }))
-
-      // Atualização otimista
-      setUsuariosPorPerfil((prev) => {
-        const usuarios = prev[perfilId] || []
-        return {
-          ...prev,
-          [perfilId]: usuarios.map((u: any) =>
-            u.id === usuarioId ? { ...u, ativo: novoStatus } : u
-          ),
-        }
-      })
-
-      try {
-        const response = await fetch(`/api/pessoas/usuarios-gestor/${usuarioId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ ativo: novoStatus }),
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.error || 'Erro ao atualizar usuário gestor')
-        }
-
-        showToast.success(
-          novoStatus ? 'Usuário gestor ativado com sucesso!' : 'Usuário gestor desativado com sucesso!'
-        )
-
-        // Recarrega os usuários do perfil para garantir sincronização
-        await loadUsuariosPorPerfil(perfilId)
-      } catch (error: any) {
-        console.error('Erro ao atualizar status do usuário gestor:', error)
-        showToast.error(error.message || 'Erro ao atualizar status do usuário gestor')
-
-        // Reverte a atualização otimista em caso de erro
-        const response = await fetch(`/api/pessoas/usuarios-gestor?perfilGestorId=${perfilId}&limit=100&offset=0`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          const items = data.items || []
-          
-          // Filtra no frontend também como garantia (caso a API não filtre corretamente)
-          const usuariosFiltrados = items.filter((usuario: any) => {
-            // Verifica se o usuário tem o perfilGestorId correspondente
-            // Pode estar em diferentes formatos: perfilGestorId, perfilGestor.id, perfilGestorId (string ou number)
-            const usuarioPerfilId = usuario.perfilGestorId?.toString() || usuario.perfilGestor?.id?.toString() || ''
-            return usuarioPerfilId === perfilId.toString()
-          })
-          
-          console.log(`🔍 [PerfisGestorList] Perfil ${perfilId}: ${items.length} usuários retornados, ${usuariosFiltrados.length} filtrados`)
-          
-          setUsuariosPorPerfil((prev) => ({
-            ...prev,
-            [perfilId]: usuariosFiltrados,
-          }))
-        }
-      } finally {
-        setTogglingStatus((prev) => {
-          const { [usuarioId]: _, ...rest } = prev
-          return rest
-        })
-      }
-    },
-    [auth, loadUsuariosPorPerfil]
-  )
-
-  /**
    * Atualiza uma permissão específica do perfil
    */
   const handleTogglePermission = useCallback(
@@ -485,13 +396,10 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
   const openTabsModal = useCallback((config: Partial<PerfisGestorTabsModalState> = {}) => {
     setTabsModalState(() => ({
       open: true,
-      tab: config.tab ?? 'perfil',
       mode: config.mode ?? 'create',
       perfilId: config.perfilId,
-      usuarioId: config.usuarioId,
     }))
 
-    // Adicionar um parâmetro na URL para forçar o recarregamento ao fechar o modal
     const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
     currentSearchParams.set('modalPerfilOpen', 'true')
     router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
@@ -510,8 +418,6 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
       ...prev,
       open: false,
       perfilId: undefined,
-      tab: 'perfil',
-      usuarioId: undefined,
     }))
 
     // Remover o parâmetro da URL para forçar o recarregamento da rota
@@ -523,95 +429,42 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
     onReload?.()
   }, [router, searchParams, pathname, loadAllPerfis, onReload])
 
-  const handleTabChange = useCallback((tab: PerfisGestorTabKey) => {
-    setTabsModalState((prev) => ({ ...prev, tab }))
-  }, [])
-
-  const closeUsuariosTabsModal = useCallback(() => {
-    setUsuariosTabsModalState((prev: UsuariosGestorTabsModalState) => ({
-      ...prev,
-      open: false,
-      usuarioId: undefined,
-      initialPerfilGestorId: undefined,
-    }))
-
-    // Remover o parâmetro da URL para forçar o recarregamento da rota
-    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
-    currentSearchParams.delete('modalUsuarioGestorOpen')
-    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
-    router.refresh() // Força a revalidação da rota principal
-    loadAllPerfis() // Recarrega a lista de perfis
-    onReload?.()
-  }, [router, searchParams, pathname, loadAllPerfis, onReload])
-
-  const handleUsuariosTabChange = useCallback((tab: 'usuario') => {
-    setUsuariosTabsModalState((prev) => ({ ...prev, tab }))
-  }, [])
+  useImperativeHandle(
+    ref,
+    () => ({
+      openCreateModal: () => openTabsModal({ mode: 'create' }),
+    }),
+    [openTabsModal]
+  )
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header com título e botão */}
-      <div className="md:px-[30px] px-1 pt-1 flex-shrink-0">
-        <div className="flex items-start justify-between">
-          <div className="flex flex-col w-1/2 md:pl-5">
-            <span className="text-primary md:text-lg text-sm font-semibold font-nunito">
-              Perfis Gestor Cadastrados
-            </span>
-            <span className="text-tertiary md:text-[22px] text-sm font-normal">
-              Total {perfis.length} de {totalPerfis}
-            </span>
-          </div>
-          <button
-            onClick={() => openTabsModal({ mode: 'create' })}
-            className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
-          >
-            Novo
-            <span className="text-lg">+</span>
-          </button>
-        </div>
+    <div className="mx-auto flex h-full w-full min-w-0 max-w-6xl flex-col">
+      <div className="flex-shrink-0 px-1 pt-1 md:px-0">
+        <span className="font-nunito text-sm font-semibold text-secondary md:text-lg">
+          Perfis Gestor Cadastrados
+        </span>
       </div>
 
-      <div className="h-[4px] border-t-2 border-primary/70 flex-shrink-0"></div>
-      <div className="flex gap-3 px-1 pb-2 flex-shrink-0">
-        <div className="flex-1 min-w-[180px] max-w-[360px]">
-          <div className="relative h-8">
-            <MdSearch
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text"
-              size={18}
-            />
-            <input
-              id="perfis-gestor-search"
-              type="text"
-              placeholder="Pesquisar perfil gestor..."
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Cabeçalho da tabela - Apenas Desktop */}
       {perfis.length > 0 && (
-        <div className="hidden md:block px-1 flex-shrink-0">
-          <div className="h-10 bg-custom-2 rounded-lg md:px-4 pr-1 flex items-center gap-2">
-            <div className="w-8"></div>
-            <div className="md:flex-[3] font-nunito font-semibold text-left md:text-sm text-primary-text ">
+        <div className="mt-2 hidden flex-shrink-0 md:block">
+          <div className="flex h-11 w-full min-w-0 items-center gap-[10px] border-b border-gray-200 bg-gray-50 px-3 pr-2 md:px-4">
+            <div className="w-8 shrink-0 md:h-8" aria-hidden />
+            <div className="min-w-0 truncate text-left font-nunito text-xs font-semibold text-secondary md:flex-[3] md:text-sm">
               Perfil
             </div>
-            <div className="md:flex-[1] font-nunito font-semibold text-center md:text-sm text-primary-text">
+            <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary md:flex-[1] md:text-sm">
               Qtd. Usuario
             </div>
-            <div className="md:flex-[1] font-nunito font-semibold text-center md:text-sm text-primary-text ">
+            <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary md:flex-[1] md:text-sm">
               Financeiro
             </div>
-            <div className="md:flex-[1] font-nunito font-semibold text-center md:text-sm text-primary-text ">
+            <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary md:flex-[1] md:text-sm">
               Estoque
             </div>
-            <div className="md:flex-[1] font-nunito font-semibold text-center md:text-sm text-primary-text ">
+            <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary md:flex-[1] md:text-sm">
               Fiscal
             </div>
-            <div className="md:flex-[1] font-nunito font-semibold text-center md:text-sm text-primary-text ">
+            <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary md:flex-[1] md:text-sm">
               Dashboard
             </div>
           </div>
@@ -716,22 +569,6 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
                 </button>
                 <div className="md:flex-[3] font-nunito text-left md:text-sm text-primary-text flex items-center gap-2">
                   <span className="font-normal">{perfil.getRole()}</span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      openTabsModal({
-                        tab: 'usuario',
-                        mode: 'edit',
-                        perfilId: perfil.getId(),
-                      })
-                    }}
-                    className="tooltip-hover-below tooltip-hover-below-icon flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/20"
-                    data-tooltip="Criar novo usuário para este perfil"
-                    aria-label="Criar novo usuário para este perfil"
-                  >
-                    <MdPersonAdd size={16} />
-                  </button>
                 </div>
                 <div
                   className="md:flex-[1] flex items-center justify-center font-nunito md:text-sm text-xs text-secondary-text tabular-nums"
@@ -779,41 +616,23 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
                 className="md:hidden p-3 cursor-pointer"
               >
                 {/* Cabeçalho com seta, Perfil e ícone na mesma linha */}
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        toggleExpand(perfil.getId())
-                      }}
-                      className="w-6 h-6 flex items-center justify-center text-primary-text hover:bg-secondary-bg/20 rounded transition-colors"
-                    >
-                      <span title="Exibir usuários gestor do perfil" 
-                      className={`text-lg transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
-                        <MdKeyboardArrowRight size={18} />
-                      </span>
-                    </button>
-                    <span className="text-base font-semibold text-secondary-text">Perfil:</span>
-                    <span className="font-nunito font-normal text-base text-primary-text max-w-[55%] truncate">
-                      {perfil.getRole()}
-                    </span>
-                  </div>
+                <div className="flex items-center gap-2 mb-3">
                   <button
-                    type="button"
                     onClick={(e) => {
                       e.stopPropagation()
-                      openTabsModal({
-                        tab: 'usuario',
-                        mode: 'edit',
-                        perfilId: perfil.getId(),
-                      })
+                      toggleExpand(perfil.getId())
                     }}
-                    className="tooltip-hover-below tooltip-hover-below-icon flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/20"
-                    data-tooltip="Criar novo usuário para este perfil"
-                    aria-label="Criar novo usuário para este perfil"
+                    className="w-6 h-6 flex items-center justify-center text-primary-text hover:bg-secondary-bg/20 rounded transition-colors"
                   >
-                    <MdPersonAdd size={18} />
+                    <span title="Exibir usuários gestor do perfil" 
+                    className={`text-lg transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
+                      <MdKeyboardArrowRight size={18} />
+                    </span>
                   </button>
+                  <span className="text-base font-semibold text-secondary-text">Perfil:</span>
+                  <span className="font-nunito font-normal text-base text-primary-text max-w-[55%] truncate">
+                    {perfil.getRole()}
+                  </span>
                 </div>
 
                 {/* Labels dos módulos */}
@@ -875,67 +694,11 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
                           <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
                             <span className="text-primary"><MdPerson size={22} /></span>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="font-nunito font-semibold text-sm text-primary-text">
-                                {usuario.nome}
-                              </p>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setUsuariosTabsModalState({
-                                    open: true,
-                                    tab: 'usuario',
-                                    mode: 'edit',
-                                    usuarioId: usuario.id,
-                                    initialPerfilGestorId: undefined,
-                                  })
-                                  const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
-                                  currentSearchParams.set('modalUsuarioGestorOpen', 'true')
-                                  router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
-                                }}
-                                className="tooltip-hover-below tooltip-hover-below-icon flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/20"
-                                data-tooltip="Editar usuário gestor"
-                                aria-label="Editar usuário gestor"
-                              >
-                                <MdEdit size={14} />
-                              </button>
-                              <div
-                                className="tooltip-hover-below flex items-center"
-                                onClick={(e) => e.stopPropagation()}
-                                onMouseDown={(e) => e.stopPropagation()}
-                                onTouchStart={(e) => e.stopPropagation()}
-                                data-tooltip={
-                                  usuario.ativo
-                                    ? 'Usuário gestor ativo'
-                                    : 'Usuário gestor desativado'
-                                }
-                              >
-                                <JiffyIconSwitch
-                                  checked={usuario.ativo}
-                                  onChange={(e) => {
-                                    e.stopPropagation()
-                                    handleToggleUsuarioStatus(
-                                      usuario.id,
-                                      e.target.checked,
-                                      perfil.getId()
-                                    )
-                                  }}
-                                  disabled={!!togglingStatus[usuario.id]}
-                                  bordered={false}
-                                  size="sm"
-                                  className="shrink-0 px-0 py-0"
-                                  inputProps={{
-                                    'aria-label': usuario.ativo
-                                      ? 'Desativar usuário gestor'
-                                      : 'Ativar usuário gestor',
-                                    onClick: (e) => e.stopPropagation(),
-                                  }}
-                                />
-                              </div>
-                            </div>
-                            <p className="font-nunito text-xs text-secondary-text mt-1">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-nunito text-sm font-semibold text-primary-text">
+                              {usuario.nome}
+                            </p>
+                            <p className="mt-1 font-nunito text-xs text-secondary-text">
                               {usuario.username || 'Sem e-mail'}
                             </p>
                           </div>
@@ -963,67 +726,11 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
                           <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
                             <span className="text-primary"><MdPerson size={22} /></span>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="font-nunito font-semibold text-sm text-primary-text">
-                                {usuario.nome}
-                              </p>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setUsuariosTabsModalState({
-                                    open: true,
-                                    tab: 'usuario',
-                                    mode: 'edit',
-                                    usuarioId: usuario.id,
-                                    initialPerfilGestorId: undefined,
-                                  })
-                                  const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
-                                  currentSearchParams.set('modalUsuarioGestorOpen', 'true')
-                                  router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
-                                }}
-                                className="tooltip-hover-below tooltip-hover-below-icon flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/20"
-                                data-tooltip="Editar usuário gestor"
-                                aria-label="Editar usuário gestor"
-                              >
-                                <MdEdit size={14} />
-                              </button>
-                              <div
-                                className="tooltip-hover-below flex items-center"
-                                onClick={(e) => e.stopPropagation()}
-                                onMouseDown={(e) => e.stopPropagation()}
-                                onTouchStart={(e) => e.stopPropagation()}
-                                data-tooltip={
-                                  usuario.ativo
-                                    ? 'Usuário gestor ativo'
-                                    : 'Usuário gestor desativado'
-                                }
-                              >
-                                <JiffyIconSwitch
-                                  checked={usuario.ativo}
-                                  onChange={(e) => {
-                                    e.stopPropagation()
-                                    handleToggleUsuarioStatus(
-                                      usuario.id,
-                                      e.target.checked,
-                                      perfil.getId()
-                                    )
-                                  }}
-                                  disabled={!!togglingStatus[usuario.id]}
-                                  bordered={false}
-                                  size="sm"
-                                  className="shrink-0 px-0 py-0"
-                                  inputProps={{
-                                    'aria-label': usuario.ativo
-                                      ? 'Desativar usuário gestor'
-                                      : 'Ativar usuário gestor',
-                                    onClick: (e) => e.stopPropagation(),
-                                  }}
-                                />
-                              </div>
-                            </div>
-                            <p className="font-nunito text-xs text-secondary-text mt-1">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-nunito text-sm font-semibold text-primary-text">
+                              {usuario.nome}
+                            </p>
+                            <p className="mt-1 font-nunito text-xs text-secondary-text">
                               {usuario.username || 'Sem e-mail'}
                             </p>
                           </div>
@@ -1041,30 +748,11 @@ export function PerfisGestorList({ onReload }: PerfisGestorListProps) {
       <PerfisGestorTabsModal
         state={tabsModalState}
         onClose={closeTabsModal}
-        onTabChange={handleTabChange}
         onReload={handleStatusChange}
         onPerfilGestorCreated={handlePerfilGestorCreated}
       />
-
-      <UsuariosGestorTabsModal
-        state={usuariosTabsModalState}
-        onClose={closeUsuariosTabsModal}
-        onTabChange={handleUsuariosTabChange}
-        onReload={() => {
-          // Recarrega os usuários de todos os perfis expandidos quando um usuário é editado
-          expandedPerfis.forEach((perfilId) => {
-            setUsuariosPorPerfil((prev) => {
-              const updated = { ...prev }
-              delete updated[perfilId]
-              return updated
-            })
-            loadUsuariosPorPerfil(perfilId)
-          })
-          // Recarrega a contagem de usuários e a lista de perfis
-          loadAllPerfis()
-          handleStatusChange()
-        }}
-      />
     </div>
   )
-}
+})
+
+PerfisGestorList.displayName = 'PerfisGestorList'

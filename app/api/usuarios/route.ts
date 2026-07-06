@@ -22,6 +22,8 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0', 10)
     const q = searchParams.get('q') || ''
     const perfilPdvId = searchParams.get('perfilPdvId') || undefined
+    const tipoUsuarioPdv =
+      searchParams.get('tipoUsuarioPdv') || searchParams.get('tipoUsuario') || undefined
     const name = searchParams.get('name') || undefined
     const ativoParam = searchParams.get('ativo')
     const ativo = ativoParam !== null ? ativoParam === 'true' : null
@@ -34,6 +36,7 @@ export async function GET(request: NextRequest) {
       offset,
       q,
       perfilPdvId,
+      tipoUsuarioPdv,
       name,
       ativo,
     })

@@ -2,6 +2,10 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useInutilizacaoNumeracao } from '@/src/presentation/hooks/painel-contador/useInutilizacaoNumeracao'
+import { useEmissorFiscal } from '@/src/presentation/hooks/painel-contador/useEmissorFiscal'
+import { useConfiguracaoEmpresaCompleta } from '@/src/presentation/hooks/painel-contador/useConfiguracaoEmpresaCompleta'
+import type { ConfiguracaoEmissao } from '@/src/domain/entities/painel-contador/ConfiguracaoEmissao'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Label } from '@/src/presentation/components/ui/label'
@@ -20,177 +24,183 @@ type InutilizacaoItem = {
   inutilizadoEm: string
 }
 
-type GapItem = {
+type FaixaItem = {
   numeroInicial: number
   numeroFinal: number
+  quantidadeNumeros?: number
 }
 
-type GapsResponse = {
+type NumeracaoInutilizavelResponse = {
   modelo: number
   serie: number
+  ambiente: string
   numeroInicialAnalisado: number
   numeroFinalAnalisado: number
   proximoNumeroConfigurado: number
-  totalNumerosEmitidosNaFaixa: number
-  totalFaixasInutilizadasNaFaixa: number
-  totalGaps: number
-  gaps: GapItem[]
+  totalItens: number
+  faixas: FaixaItem[]
 }
 
-type ConfigNumeracao = {
-  modelo: number
-  serie: number
+/**
+ * Seleciona o ambiente para um dado modelo+série a partir das configurações de emissão.
+ * Prioridade: ativo+PRODUCAO > ativo+HOMOLOGACAO > ativo > PRODUCAO > HOMOLOGACAO > primeiro.
+ * NUNCA usa fallback fora das configurações de emissão.
+ */
+function selecionarAmbienteEmissao(
+  emissoes: ConfiguracaoEmissao[],
+  modelo: string,
+  serie: string
+): 'HOMOLOGACAO' | 'PRODUCAO' | null {
+  const candidates = emissoes.filter(
+    (e) => String(e.modelo) === modelo && String(e.serie) === serie && e.terminalId === null
+  )
+  if (candidates.length === 0) return null
+
+  const selected =
+    candidates.find((e) => e.ativo && e.ambiente === 'PRODUCAO') ??
+    candidates.find((e) => e.ativo && e.ambiente === 'HOMOLOGACAO') ??
+    candidates.find((e) => e.ativo) ??
+    candidates.find((e) => e.ambiente === 'PRODUCAO') ??
+    candidates.find((e) => e.ambiente === 'HOMOLOGACAO') ??
+    candidates[0]
+
+  return selected?.ambiente ?? null
 }
 
-type ContextoFiscal = {
-  uf: string
-  ambiente: string
+/**
+ * Seleciona a melhor configuração disponível (modelo+série) entre todas as emissões.
+ * Prefere NFC-e (65) sobre NF-e (55) e prioriza configurações ativas em produção.
+ */
+function selecionarMelhorConfigInicial(
+  emissoes: ConfiguracaoEmissao[]
+): { modelo: '55' | '65'; serie: string } | null {
+  for (const m of [65, 55] as const) {
+    const candidates = emissoes.filter((e) => e.modelo === m && e.terminalId === null)
+    if (candidates.length === 0) continue
+
+    const selected =
+      candidates.find((e) => e.ativo && e.ambiente === 'PRODUCAO') ??
+      candidates.find((e) => e.ativo && e.ambiente === 'HOMOLOGACAO') ??
+      candidates.find((e) => e.ativo) ??
+      candidates.find((e) => e.ambiente === 'PRODUCAO') ??
+      candidates.find((e) => e.ambiente === 'HOMOLOGACAO') ??
+      candidates[0]
+
+    if (selected) return { modelo: String(m) as '55' | '65', serie: String(selected.serie) }
+  }
+  return null
 }
 
 const calcularTotalNumerosNaFaixa = (numeroInicial: number, numeroFinal: number) =>
   numeroFinal - numeroInicial + 1
 
-const descreverGap = (gap: GapItem) => {
-  if (gap.numeroInicial === gap.numeroFinal) {
-    return `Número faltante: ${gap.numeroInicial}`
+const descreverFaixa = (faixa: FaixaItem) => {
+  if (faixa.numeroInicial === faixa.numeroFinal) {
+    return `Número: ${faixa.numeroInicial}`
   }
 
-  const total = calcularTotalNumerosNaFaixa(gap.numeroInicial, gap.numeroFinal)
-  return `Faixa faltante: ${gap.numeroInicial} até ${gap.numeroFinal} (${total} números)`
+  const total =
+    faixa.quantidadeNumeros ?? calcularTotalNumerosNaFaixa(faixa.numeroInicial, faixa.numeroFinal)
+  return `Faixa: ${faixa.numeroInicial} até ${faixa.numeroFinal} (${total} números)`
 }
 
-export function Etapa5NumeracoesFiscais() {
-  const { auth, isRehydrated } = useAuthStore()
-  const [isLoading, setIsLoading] = useState(false)
+export function Etapa4InutilizarNotas() {
+  const { isRehydrated } = useAuthStore()
+  const { consultarGaps, listarInutilizacoes, inutilizarMutation } = useInutilizacaoNumeracao()
+
+  const { emissaoQuery } = useEmissorFiscal()
+  const { dadosQuery: empresaQuery } = useConfiguracaoEmpresaCompleta()
+
+  const emissoes: ConfiguracaoEmissao[] = emissaoQuery.data ?? []
+  // UF vem do endereço da empresa (EmpresaPainelResumo.getUf()) — única fonte correta
+  const uf = empresaQuery.data?.empresa?.getUf().toUpperCase() ?? ''
+
   const [isLoadingHistorico, setIsLoadingHistorico] = useState(false)
   const [isLoadingGaps, setIsLoadingGaps] = useState(false)
   const [isInutilizando, setIsInutilizando] = useState(false)
+  const [hasInitialized, setHasInitialized] = useState(false)
 
   const [modelo, setModelo] = useState<'55' | '65'>('65')
   const [serie, setSerie] = useState('1')
   const [numeroInicial, setNumeroInicial] = useState('')
   const [numeroFinal, setNumeroFinal] = useState('')
-  const [justificativa, setJustificativa] = useState('Inutilizacao de numeracao por lacuna detectada no painel.')
+  const [justificativa, setJustificativa] = useState(
+    'Inutilizacao de numeracao por lacuna detectada no painel.'
+  )
 
-  const [gapsData, setGapsData] = useState<GapsResponse | null>(null)
+  const [numeracaoData, setNumeracaoData] = useState<NumeracaoInutilizavelResponse | null>(null)
   const [historico, setHistorico] = useState<InutilizacaoItem[]>([])
-  const [seriesDisponiveis, setSeriesDisponiveis] = useState<Record<'55' | '65', string[]>>({
-    '55': [],
-    '65': [],
-  })
   const [mensagemConfiguracao, setMensagemConfiguracao] = useState<string | null>(null)
-  const [contextoFiscal, setContextoFiscal] = useState<ContextoFiscal | null>(null)
-  const [gapsSelecionados, setGapsSelecionados] = useState<string[]>([])
+  const [faixasSelecionadas, setFaixasSelecionadas] = useState<string[]>([])
   const historicoDisponivel = false
 
-  const gapsHistoricos = useMemo(() => {
-    if (!gapsData) return [] as GapItem[]
+  const faixasDisponiveis = useMemo(() => numeracaoData?.faixas ?? [], [numeracaoData])
 
-    const limiteHistorico = gapsData.proximoNumeroConfigurado - 1
-    if (limiteHistorico < 1) return [] as GapItem[]
-
-    const normalizados: GapItem[] = []
-    for (const gap of gapsData.gaps) {
-      if (gap.numeroInicial > limiteHistorico) continue
-      const numeroFinalAjustado = Math.min(gap.numeroFinal, limiteHistorico)
-      normalizados.push({
-        numeroInicial: gap.numeroInicial,
-        numeroFinal: numeroFinalAjustado,
-      })
-    }
-
-    return normalizados
-  }, [gapsData])
-
-  const carregarConfiguracoesDisponiveis = async (token: string): Promise<{ modelo: '55' | '65'; serie: string } | null> => {
-    const response = await fetch('/api/v1/fiscal/configuracoes/emissao', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}))
-      throw new Error(err?.error || 'Erro ao carregar configurações de numeração')
-    }
-
-    const data = (await response.json()) as ConfigNumeracao[]
-    const series55 = data
-      .filter((item) => item.modelo === 55)
-      .map((item) => String(item.serie))
-    const series65 = data
-      .filter((item) => item.modelo === 65)
-      .map((item) => String(item.serie))
-
-    setSeriesDisponiveis({
+  const seriesDisponiveis = useMemo(() => {
+    const series55 = emissoes
+      .filter((e) => e.modelo === 55 && e.terminalId === null)
+      .map((e) => String(e.serie))
+    const series65 = emissoes
+      .filter((e) => e.modelo === 65 && e.terminalId === null)
+      .map((e) => String(e.serie))
+    return {
       '55': Array.from(new Set(series55)),
       '65': Array.from(new Set(series65)),
-    })
-
-    const existeAtual = data.some(
-      (item) => String(item.modelo) === modelo && String(item.serie) === serie
-    )
-    if (existeAtual) {
-      return { modelo, serie }
     }
+  }, [emissoes])
 
-    if (series65.length > 0) return { modelo: '65', serie: series65[0] }
-    if (series55.length > 0) return { modelo: '55', serie: series55[0] }
-    return null
-  }
+  /**
+   * Ambiente APENAS das configurações de emissão.
+   * Sem fallback de nenhuma outra fonte.
+   */
+  const ambienteEmissao = useMemo(
+    () => selecionarAmbienteEmissao(emissoes, modelo, serie),
+    [emissoes, modelo, serie]
+  )
 
-  const carregarHistorico = async (token: string, modeloAtual: string, serieAtual: string) => {
+  const isLoadingConfigs = emissaoQuery.isLoading || empresaQuery.isLoading
+
+  const carregarHistorico = async (modeloAtual: string, serieAtual: string) => {
     setIsLoadingHistorico(true)
     try {
       if (!historicoDisponivel) {
         setHistorico([])
         return
       }
-
-      // Mantido para futura ativação quando endpoint estiver disponível no backend.
-      const params = new URLSearchParams({ modelo: modeloAtual, serie: serieAtual })
-      const response = await fetch(`/api/v1/fiscal/inutilizacoes?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!response.ok) throw new Error('Erro ao carregar histórico de inutilizações')
-      const data = await response.json()
+      const data = await listarInutilizacoes(Number(modeloAtual), Number(serieAtual))
       setHistorico(Array.isArray(data) ? data : [])
-    } catch (_error: any) {
+    } catch {
       setHistorico([])
     } finally {
       setIsLoadingHistorico(false)
     }
   }
 
-  const carregarGaps = async (token: string, modeloAtual: string, serieAtual: string) => {
+  const carregarNumeracao = async (
+    modeloAtual: string,
+    serieAtual: string,
+    ambienteAtual: 'HOMOLOGACAO' | 'PRODUCAO'
+  ) => {
     setIsLoadingGaps(true)
     try {
-      const params = new URLSearchParams({
-        modelo: modeloAtual,
-        serie: serieAtual,
+      const data = await consultarGaps({
+        modelo: Number(modeloAtual) as 55 | 65,
+        serie: Number(serieAtual),
+        ambiente: ambienteAtual,
+        numeroInicial: numeroInicial.trim() ? Number(numeroInicial.trim()) : undefined,
+        numeroFinal: numeroFinal.trim() ? Number(numeroFinal.trim()) : undefined,
       })
-      if (numeroInicial.trim()) params.set('numeroInicial', numeroInicial.trim())
-      if (numeroFinal.trim()) params.set('numeroFinal', numeroFinal.trim())
-
-      const response = await fetch(`/api/v1/fiscal/numeracao/gaps?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}))
-        const mensagem = err?.error || err?.message || ''
-        if (mensagem.includes('Configuração não encontrada')) {
-          setGapsData(null)
-          setMensagemConfiguracao(mensagem)
-          return
-        }
-        throw new Error(err?.error || 'Erro ao detectar lacunas de numeração')
+      setNumeracaoData(data)
+      setFaixasSelecionadas([])
+    } catch (error: unknown) {
+      const mensagem = error instanceof Error ? error.message : ''
+      if (mensagem.includes('Configuração não encontrada')) {
+        setNumeracaoData(null)
+        setMensagemConfiguracao(mensagem)
+        return
       }
-
-      const data = await response.json()
-      setGapsData(data)
-      setGapsSelecionados([])
-    } catch (error: any) {
-      showToast.error(error?.message || 'Erro ao detectar lacunas de numeração')
-      setGapsData(null)
+      showToast.error(mensagem || 'Erro ao listar numeração para inutilização')
+      setNumeracaoData(null)
     } finally {
       setIsLoadingGaps(false)
     }
@@ -198,150 +208,151 @@ export function Etapa5NumeracoesFiscais() {
 
   const carregarTudo = async () => {
     if (!isRehydrated) return
-    const token = auth?.getAccessToken()
-    if (!token) return
 
     if (!serie.trim()) {
       showToast.error('Informe a série para consultar numeração')
       return
     }
 
-    setMensagemConfiguracao(null)
-    setIsLoading(true)
-    await Promise.all([
-      carregarHistorico(token, modelo, serie),
-      carregarGaps(token, modelo, serie),
-    ])
-    setIsLoading(false)
-  }
-
-  const carregarContextoFiscal = async (token: string) => {
-    const response = await fetch('/api/v1/fiscal/empresas-fiscais/me', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}))
-      throw new Error(err?.error || 'Erro ao carregar contexto fiscal')
-    }
-    const data = await response.json()
-
-    const uf = String(data?.uf ?? '').trim().toUpperCase()
-    const ambiente = String(data?.ambiente ?? '').trim().toUpperCase()
-    if (!uf || !ambiente) {
-      setContextoFiscal(null)
+    if (!ambienteEmissao) {
+      showToast.error('Ambiente não configurado no emissor fiscal para este modelo/série.')
       return
     }
-    setContextoFiscal({ uf, ambiente })
+
+    setMensagemConfiguracao(null)
+    await Promise.all([
+      carregarHistorico(modelo, serie),
+      carregarNumeracao(modelo, serie, ambienteEmissao),
+    ])
   }
 
-  const toggleSelecionarGap = (gapKey: string) => {
-    setGapsSelecionados((prev) =>
-      prev.includes(gapKey) ? prev.filter((item) => item !== gapKey) : [...prev, gapKey]
+  const toggleSelecionarFaixa = (faixaKey: string) => {
+    setFaixasSelecionadas((prev) =>
+      prev.includes(faixaKey) ? prev.filter((item) => item !== faixaKey) : [...prev, faixaKey]
     )
   }
 
-  const selecionarTodosGaps = () => {
-    if (gapsHistoricos.length === 0) return
-    setGapsSelecionados(gapsHistoricos.map((gap) => `${gap.numeroInicial}-${gap.numeroFinal}`))
+  const selecionarTodasFaixas = () => {
+    if (faixasDisponiveis.length === 0) return
+    setFaixasSelecionadas(
+      faixasDisponiveis.map((faixa) => `${faixa.numeroInicial}-${faixa.numeroFinal}`)
+    )
   }
 
-  const limparSelecaoGaps = () => setGapsSelecionados([])
+  const limparSelecaoFaixas = () => setFaixasSelecionadas([])
 
   const inutilizarSelecionados = async () => {
     if (!isRehydrated) return
-    const token = auth?.getAccessToken()
-    if (!token) return
 
-    if (!contextoFiscal) {
-      showToast.error('Contexto fiscal (UF/ambiente) não carregado para inutilizar.')
+    if (!uf) {
+      showToast.error('UF não configurada. Verifique as configurações fiscais da empresa.')
       return
     }
-    if (!gapsData || gapsSelecionados.length === 0) {
-      showToast.error('Selecione ao menos um gap para inutilizar.')
+
+    if (!ambienteEmissao) {
+      showToast.error(
+        'Ambiente não configurado no emissor fiscal para este modelo/série. Configure em Configurações > Emissor Fiscal.'
+      )
       return
     }
+
+    if (!numeracaoData || faixasSelecionadas.length === 0) {
+      showToast.error('Selecione ao menos uma faixa para inutilizar.')
+      return
+    }
+
     const justificativaLimpa = justificativa.trim()
     if (justificativaLimpa.length < 15) {
       showToast.error('A justificativa deve ter ao menos 15 caracteres.')
       return
     }
 
-    const selecionados = gapsHistoricos.filter((gap) =>
-      gapsSelecionados.includes(`${gap.numeroInicial}-${gap.numeroFinal}`)
+    const selecionados = faixasDisponiveis.filter((faixa) =>
+      faixasSelecionadas.includes(`${faixa.numeroInicial}-${faixa.numeroFinal}`)
     )
     if (selecionados.length === 0) {
-      showToast.error('Os gaps selecionados não estão mais disponíveis. Refaça a consulta.')
+      showToast.error('As faixas selecionadas não estão mais disponíveis. Refaça a consulta.')
       return
     }
 
     setIsInutilizando(true)
-    try {
-      for (const gap of selecionados) {
-        const response = await fetch('/api/v1/fiscal/inutilizar', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            uf: contextoFiscal.uf,
-            ambiente: contextoFiscal.ambiente,
-            modelo: Number(modelo),
-            serie: Number(serie),
-            numeroInicial: gap.numeroInicial,
-            numeroFinal: gap.numeroFinal,
-            justificativa: justificativaLimpa,
-          }),
-        })
+    let sucesso = 0
+    const erros: string[] = []
 
-        if (!response.ok) {
-          const err = await response.json().catch(() => ({}))
-          throw new Error(
-            err?.error ||
-              `Falha ao inutilizar range ${gap.numeroInicial}-${gap.numeroFinal}`
-          )
+    try {
+      for (const faixa of selecionados) {
+        try {
+          await inutilizarMutation.mutateAsync({
+            uf,
+            ambiente: ambienteEmissao,
+            modelo: Number(modelo) as 55 | 65,
+            serie: Number(serie),
+            numeroInicial: faixa.numeroInicial,
+            numeroFinal: faixa.numeroFinal,
+            justificativa: justificativaLimpa,
+          })
+          sucesso++
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : 'Erro desconhecido'
+          erros.push(`[${faixa.numeroInicial}–${faixa.numeroFinal}]: ${msg}`)
         }
       }
 
-      showToast.success(
-        `${selecionados.length} ${selecionados.length === 1 ? 'faixa inutilizada' : 'faixas inutilizadas'} com sucesso.`
-      )
+      if (sucesso > 0) {
+        showToast.success(
+          `${sucesso} ${sucesso === 1 ? 'faixa inutilizada' : 'faixas inutilizadas'} com sucesso.`
+        )
+      }
+      if (erros.length > 0) {
+        erros.forEach((msg) => showToast.error(msg))
+      }
+
+      // Sempre recarrega para refletir o estado atual da SEFAZ
       await carregarTudo()
-    } catch (error: any) {
-      showToast.error(error?.message || 'Erro ao inutilizar gaps selecionados')
     } finally {
       setIsInutilizando(false)
     }
   }
 
+  /**
+   * Seleciona modelo/série inicial quando as emissões carregam pela primeira vez.
+   * Dispara a consulta de numeração automaticamente.
+   */
   useEffect(() => {
-    if (!isRehydrated) return
-    const token = auth?.getAccessToken()
-    if (!token) return
+    if (!isRehydrated || hasInitialized || emissaoQuery.isLoading || !emissaoQuery.data) return
 
-    void (async () => {
-      try {
-        const configuracaoInicial = await carregarConfiguracoesDisponiveis(token)
-        await carregarContextoFiscal(token)
-        if (!configuracaoInicial) {
-          setMensagemConfiguracao('Nenhuma configuração de numeração encontrada para NF-e/NFC-e.')
-          setHistorico([])
-          setGapsData(null)
-          return
-        }
+    const melhor = selecionarMelhorConfigInicial(emissaoQuery.data)
+    if (!melhor) {
+      setMensagemConfiguracao('Nenhuma configuração de numeração encontrada para NF-e/NFC-e.')
+      setHasInitialized(true)
+      return
+    }
 
-        setModelo(configuracaoInicial.modelo)
-        setSerie(configuracaoInicial.serie)
-        await Promise.all([
-          carregarHistorico(token, configuracaoInicial.modelo, configuracaoInicial.serie),
-          carregarGaps(token, configuracaoInicial.modelo, configuracaoInicial.serie),
-        ])
-      } catch (error: any) {
-        showToast.error(error?.message || 'Erro ao preparar consulta de numerações')
-      }
-    })()
+    const ambiente = selecionarAmbienteEmissao(
+      emissaoQuery.data,
+      melhor.modelo,
+      melhor.serie
+    )
+    if (!ambiente) {
+      setMensagemConfiguracao(
+        'Configuração de emissão encontrada, mas sem ambiente definido. Configure em Emissor Fiscal.'
+      )
+      setModelo(melhor.modelo)
+      setSerie(melhor.serie)
+      setHasInitialized(true)
+      return
+    }
+
+    setModelo(melhor.modelo)
+    setSerie(melhor.serie)
+    setHasInitialized(true)
+
+    void Promise.all([
+      carregarHistorico(melhor.modelo, melhor.serie),
+      carregarNumeracao(melhor.modelo, melhor.serie, ambiente),
+    ])
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRehydrated])
+  }, [isRehydrated, emissaoQuery.isLoading, emissaoQuery.data, hasInitialized])
 
   useEffect(() => {
     const seriesDoModelo = seriesDisponiveis[modelo]
@@ -351,148 +362,176 @@ export function Etapa5NumeracoesFiscais() {
   }, [modelo, serie, seriesDisponiveis])
 
   useEffect(() => {
-    setGapsSelecionados((prev) =>
-      prev.filter((key) => gapsHistoricos.some((gap) => `${gap.numeroInicial}-${gap.numeroFinal}` === key))
+    setFaixasSelecionadas((prev) =>
+      prev.filter((key) =>
+        faixasDisponiveis.some((faixa) => `${faixa.numeroInicial}-${faixa.numeroFinal}` === key)
+      )
     )
-  }, [gapsHistoricos])
+  }, [faixasDisponiveis])
+
+  const isLoading = isLoadingConfigs && !hasInitialized
 
   return (
     <div className="space-y-3 md:p-4 p-2">
-      
       <div className="rounded-lg border border-primary/20 bg-white p-3 space-y-2">
-      <h1 className="text-alternate font-exo font-semibold text-lg sm:text-xl">Inutilizar numerações fiscais</h1>
+        <h1 className="text-alternate font-exo font-semibold text-lg sm:text-xl">
+          Inutilizar numerações fiscais
+        </h1>
         <p className="font-inter text-xs lg:text-sm text-secondary-text">
-          Consulte lacunas de numeração e histórico de inutilizações por modelo/série.
+          Consulte numeração pendente de inutilização (lacunas e notas rejeitadas/denegadas) por
+          modelo/série.
         </p>
 
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <Label htmlFor="modelo-numeracao">Modelo</Label>
-            <select
-              id="modelo-numeracao"
-              value={modelo}
-              onChange={(e) => setModelo(e.target.value as '55' | '65')}
-              className="w-full rounded-md border border-primary/30 bg-white px-3 py-2 text-sm"
-            >
-              <option value="55">55 - NF-e</option>
-              <option value="65">65 - NFC-e</option>
-            </select>
-          </div>
-          <div>
-            <Label htmlFor="serie-numeracao">Série</Label>
-            {seriesDisponiveis[modelo].length > 0 ? (
-              <select
-                id="serie-numeracao"
-                value={serie}
-                onChange={(e) => setSerie(e.target.value)}
-                className="w-full rounded-md border border-primary/30 bg-white px-3 py-2 text-sm"
-              >
-                {seriesDisponiveis[modelo].map((itemSerie) => (
-                  <option key={itemSerie} value={itemSerie}>
-                    {itemSerie}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <Input
-                id="serie-numeracao"
-                type="number"
-                min={1}
-                value={serie}
-                onChange={(e) => setSerie(e.target.value)}
-                placeholder="1"
-              />
-            )}
-          </div>
-        </div>
+        {!isLoading && !uf && !empresaQuery.isLoading && (
+          <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-md px-2 py-1">
+            UF da empresa fiscal não configurada. Verifique as configurações fiscais no Passo 1.
+          </p>
+        )}
 
-        {mensagemConfiguracao ? (
+        {!isLoading && !ambienteEmissao && !emissaoQuery.isLoading && hasInitialized && (
           <p className="text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-md px-2 py-1">
-            {mensagemConfiguracao}
+            Ambiente não configurado para o modelo/série selecionado. Configure em Emissor Fiscal.
           </p>
-        ) : null}
+        )}
 
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <Label htmlFor="numero-inicial">Faixa inicial (opcional)</Label>
-            <Input
-              id="numero-inicial"
-              type="number"
-              min={1}
-              value={numeroInicial}
-              onChange={(e) => setNumeroInicial(e.target.value)}
-              placeholder="Ex: 1"
-            />
+        {isLoading ? (
+          <div className="flex justify-start py-2">
+            <JiffyLoading className="!gap-0 !py-0" size={24} />
           </div>
-          <div>
-            <Label htmlFor="numero-final">Faixa final (opcional)</Label>
-            <Input
-              id="numero-final"
-              type="number"
-              min={1}
-              value={numeroFinal}
-              onChange={(e) => setNumeroFinal(e.target.value)}
-              placeholder="Ex: 500"
-            />
-          </div>
-        </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label htmlFor="modelo-numeracao">Modelo</Label>
+                <select
+                  id="modelo-numeracao"
+                  value={modelo}
+                  onChange={(e) => setModelo(e.target.value as '55' | '65')}
+                  className="w-full rounded-md border border-primary/30 bg-white px-3 py-2 text-sm"
+                >
+                  <option value="55">55 - NF-e</option>
+                  <option value="65">65 - NFC-e</option>
+                </select>
+              </div>
+              <div>
+                <Label htmlFor="serie-numeracao">Série</Label>
+                {seriesDisponiveis[modelo].length > 0 ? (
+                  <select
+                    id="serie-numeracao"
+                    value={serie}
+                    onChange={(e) => setSerie(e.target.value)}
+                    className="w-full rounded-md border border-primary/30 bg-white px-3 py-2 text-sm"
+                  >
+                    {seriesDisponiveis[modelo].map((itemSerie) => (
+                      <option key={itemSerie} value={itemSerie}>
+                        {itemSerie}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <Input
+                    id="serie-numeracao"
+                    type="number"
+                    min={1}
+                    value={serie}
+                    onChange={(e) => setSerie(e.target.value)}
+                    placeholder="1"
+                  />
+                )}
+              </div>
+            </div>
 
-        <div>
-          <Label htmlFor="justificativa-inutilizacao">Justificativa da inutilização</Label>
-          <Input
-            id="justificativa-inutilizacao"
-            value={justificativa}
-            onChange={(e) => setJustificativa(e.target.value)}
-            placeholder="Mínimo de 15 caracteres"
-          />
-          <p className="mt-1 text-[11px] text-secondary-text">
-            Essa justificativa será enviada para cada faixa selecionada.
-          </p>
-        </div>
+            {mensagemConfiguracao ? (
+              <p className="text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-md px-2 py-1">
+                {mensagemConfiguracao}
+              </p>
+            ) : null}
 
-        <div className="flex justify-end">
-          <Button
-            onClick={() => void carregarTudo()}
-            disabled={isLoading}
-            className="rounded-lg px-4 py-2 text-white text-sm font-medium"
-            sx={{
-              backgroundColor: 'var(--color-secondary)',
-              '&:hover': { backgroundColor: 'var(--color-alternate)' },
-              '&:disabled': { backgroundColor: '#ccc', cursor: 'not-allowed' },
-            }}
-          >
-            {isLoading ? 'Consultando...' : 'Consultar numeração'}
-          </Button>
-        </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label htmlFor="numero-inicial">Faixa inicial (opcional)</Label>
+                <Input
+                  id="numero-inicial"
+                  type="number"
+                  min={1}
+                  value={numeroInicial}
+                  onChange={(e) => setNumeroInicial(e.target.value)}
+                  placeholder="Ex: 1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="numero-final">Faixa final (opcional)</Label>
+                <Input
+                  id="numero-final"
+                  type="number"
+                  min={1}
+                  value={numeroFinal}
+                  onChange={(e) => setNumeroFinal(e.target.value)}
+                  placeholder="Ex: 500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="justificativa-inutilizacao">Justificativa da inutilização</Label>
+              <Input
+                id="justificativa-inutilizacao"
+                value={justificativa}
+                onChange={(e) => setJustificativa(e.target.value)}
+                placeholder="Mínimo de 15 caracteres"
+              />
+              <p className="mt-1 text-[11px] text-secondary-text">
+                Essa justificativa será enviada para cada faixa selecionada.
+              </p>
+            </div>
+
+            <div className="flex justify-end">
+              <Button
+                onClick={() => void carregarTudo()}
+                disabled={isLoadingGaps || !ambienteEmissao}
+                className="rounded-lg px-4 py-2 text-white text-sm font-medium"
+                sx={{
+                  backgroundColor: 'var(--color-secondary)',
+                  '&:hover': { backgroundColor: 'var(--color-alternate)' },
+                  '&:disabled': { backgroundColor: '#ccc', cursor: 'not-allowed' },
+                }}
+              >
+                {isLoadingGaps ? 'Consultando...' : 'Consultar numeração'}
+              </Button>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="rounded-lg border border-primary/20 bg-white p-3">
-        <h4 className="font-exo font-semibold text-alternate text-sm mb-2">Lacunas detectadas</h4>
+        <h4 className="font-exo font-semibold text-alternate text-sm mb-2">
+          Numeração para inutilização
+        </h4>
 
         {isLoadingGaps ? (
           <div className="flex justify-start py-1">
             <JiffyLoading className="!gap-0 !py-0" size={24} />
           </div>
-        ) : !gapsData ? (
-          <p className="text-xs text-secondary-text">Faça uma consulta para ver as lacunas.</p>
+        ) : !numeracaoData ? (
+          <p className="text-xs text-secondary-text">
+            Faça uma consulta para ver a numeração disponível.
+          </p>
         ) : (
           <div className="space-y-2">
             <p className="text-xs text-secondary-text">
-              Faixa analisada: {gapsData.numeroInicialAnalisado} até {gapsData.numeroFinalAnalisado} | Próxima emissão:{' '}
-              {gapsData.proximoNumeroConfigurado}
-            </p>
-            <p className="text-xs text-secondary-text">
-              Exibindo apenas lacunas históricas (até {Math.max(gapsData.proximoNumeroConfigurado - 1, 0)}).
+              Faixa analisada: {numeracaoData.numeroInicialAnalisado} até{' '}
+              {numeracaoData.numeroFinalAnalisado} | Próxima emissão:{' '}
+              {numeracaoData.proximoNumeroConfigurado} | Total de itens: {numeracaoData.totalItens}
             </p>
 
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs text-secondary-text">
-                Selecionados: {gapsSelecionados.length}
+                Selecionados: {faixasSelecionadas.length}
               </p>
               <div className="flex gap-2">
                 <Button
-                  onClick={selecionarTodosGaps}
-                  disabled={gapsHistoricos.length === 0 || isInutilizando}
+                  onClick={selecionarTodasFaixas}
+                  disabled={faixasDisponiveis.length === 0 || isInutilizando}
                   className="rounded px-2 py-1 text-xs"
                   sx={{
                     backgroundColor: '#f3f4f6',
@@ -503,8 +542,8 @@ export function Etapa5NumeracoesFiscais() {
                   Selecionar todos
                 </Button>
                 <Button
-                  onClick={limparSelecaoGaps}
-                  disabled={gapsSelecionados.length === 0 || isInutilizando}
+                  onClick={limparSelecaoFaixas}
+                  disabled={faixasSelecionadas.length === 0 || isInutilizando}
                   className="rounded px-2 py-1 text-xs"
                   sx={{
                     backgroundColor: '#f3f4f6',
@@ -518,26 +557,28 @@ export function Etapa5NumeracoesFiscais() {
             </div>
 
             <div className="max-h-36 overflow-y-auto rounded-md border border-primary/10 p-2">
-              {gapsHistoricos.length === 0 ? (
+              {faixasDisponiveis.length === 0 ? (
                 <p className="text-xs text-secondary-text">
-                  Nenhuma lacuna histórica encontrada antes da próxima emissão.
+                  Nenhuma numeração pendente de inutilização encontrada na faixa analisada.
                 </p>
               ) : (
                 <div className="space-y-1">
-                  {gapsHistoricos.map((gap, idx) => (
+                  {faixasDisponiveis.map((faixa, idx) => (
                     <div
-                      key={`${gap.numeroInicial}-${gap.numeroFinal}-${idx}`}
+                      key={`${faixa.numeroInicial}-${faixa.numeroFinal}-${idx}`}
                       className="flex items-center gap-2 text-xs text-secondary-text"
                     >
                       <input
                         type="checkbox"
-                        checked={gapsSelecionados.includes(`${gap.numeroInicial}-${gap.numeroFinal}`)}
-                        onChange={() => toggleSelecionarGap(`${gap.numeroInicial}-${gap.numeroFinal}`)}
+                        checked={faixasSelecionadas.includes(
+                          `${faixa.numeroInicial}-${faixa.numeroFinal}`
+                        )}
+                        onChange={() =>
+                          toggleSelecionarFaixa(`${faixa.numeroInicial}-${faixa.numeroFinal}`)
+                        }
                         disabled={isInutilizando}
                       />
-                      <span>
-                        {descreverGap(gap)}
-                      </span>
+                      <span>{descreverFaixa(faixa)}</span>
                     </div>
                   ))}
                 </div>
@@ -549,15 +590,16 @@ export function Etapa5NumeracoesFiscais() {
                 onClick={() => void inutilizarSelecionados()}
                 disabled={
                   isInutilizando ||
-                  gapsSelecionados.length === 0 ||
-                  !contextoFiscal ||
+                  faixasSelecionadas.length === 0 ||
+                  !uf ||
+                  !ambienteEmissao ||
                   !justificativa.trim() ||
-                  gapsHistoricos.length === 0
+                  faixasDisponiveis.length === 0
                 }
                 className="rounded-lg px-4 py-2 text-white text-sm font-medium"
                 sx={{
-                  backgroundColor: '#b45309',
-                  '&:hover': { backgroundColor: '#92400e' },
+                  backgroundColor: '#dc2626',
+                  '&:hover': { backgroundColor: '#b91c1c' },
                   '&:disabled': { backgroundColor: '#d1d5db', cursor: 'not-allowed' },
                 }}
               >
@@ -569,7 +611,9 @@ export function Etapa5NumeracoesFiscais() {
       </div>
 
       <div className="rounded-lg border border-primary/20 bg-white p-3">
-        <h4 className="font-exo font-semibold text-alternate text-sm mb-2">Histórico de inutilizações</h4>
+        <h4 className="font-exo font-semibold text-alternate text-sm mb-2">
+          Histórico de inutilizações
+        </h4>
 
         {isLoadingHistorico ? (
           <div className="flex justify-start py-1">
@@ -582,7 +626,9 @@ export function Etapa5NumeracoesFiscais() {
         ) : (
           <div className="max-h-44 overflow-y-auto rounded-md border border-primary/10 p-2">
             {historico.length === 0 ? (
-              <p className="text-xs text-secondary-text">Nenhuma inutilização encontrada para os filtros atuais.</p>
+              <p className="text-xs text-secondary-text">
+                Nenhuma inutilização encontrada para os filtros atuais.
+              </p>
             ) : (
               <div className="space-y-2">
                 {historico.map((item) => (
@@ -596,7 +642,9 @@ export function Etapa5NumeracoesFiscais() {
                     <p className="text-xs text-secondary-text">
                       Em: {new Date(item.inutilizadoEm).toLocaleString('pt-BR')}
                     </p>
-                    <p className="text-xs text-secondary-text truncate">Justificativa: {item.justificativa}</p>
+                    <p className="text-xs text-secondary-text truncate">
+                      Justificativa: {item.justificativa}
+                    </p>
                   </div>
                 ))}
               </div>

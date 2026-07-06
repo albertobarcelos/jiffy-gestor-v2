@@ -9,12 +9,27 @@ declare global {
         {
           expiresAt: number
           items: Array<{ produto: string; quantidade: number; valorTotal: number }>
+          totaisPeriodo: { quantidadeTotal: number; valorTotal: number }
         }
       >
     | undefined
 
   // eslint-disable-next-line no-var
   var __jiffyProdutoNomeCache: Map<string, string> | undefined
+
+  /** Cache BFF: snapshot mínimo do cardápio por produtoId (nome, grupo, preço). */
+  // eslint-disable-next-line no-var
+  var __jiffyProdutoCardapioMiniCache:
+    | Map<
+        string,
+        {
+          nome: string
+          grupoId?: string
+          nomeGrupo?: string
+          valorCardapio?: number
+        }
+      >
+    | undefined
 
   // eslint-disable-next-line no-var
   var __jiffyTopGarconsCache:

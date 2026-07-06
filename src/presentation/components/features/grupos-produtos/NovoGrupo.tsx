@@ -360,7 +360,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
           onSaved?.()
           onClose?.()
         } else {
-          router.push('/cadastros/grupos-produtos')
+          router.push('/grupos-produtos')
           router.refresh() // Força a revalidação dos dados da rota para recarregar a lista
           queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false }) // Invalida todas as queries de grupos de produtos
           queryClient.invalidateQueries({ queryKey: ['produtos', 'infinite'] }) // Invalida o cache do React Query para produtos
@@ -408,7 +408,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
     if (isEmbedded) {
       onClose?.()
     } else {
-      router.push('/cadastros/grupos-produtos')
+      router.push('/grupos-produtos')
     }
   }
 

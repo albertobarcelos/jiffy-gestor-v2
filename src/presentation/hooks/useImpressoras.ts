@@ -1,8 +1,12 @@
-import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useQueryClient } from '@tanstack/react-query'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
+import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecureTenantInfiniteQuery'
+import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { Impressora } from '@/src/domain/entities/Impressora'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 interface ImpressorasQueryParams {
   q?: string
@@ -20,16 +24,9 @@ interface ImpressorasResponse {
  * Hook para buscar impressoras com paginação infinita
  */
 export function useImpressorasInfinite(params: Omit<ImpressorasQueryParams, 'offset'> = {}) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
-
-  return useInfiniteQuery({
-    queryKey: ['impressoras', 'infinite', params],
-    queryFn: async ({ pageParam = 0 }): Promise<{ impressoras: Impressora[]; count: number; nextOffset: number | null }> => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantInfiniteQuery(
+    ['impressoras', 'infinite', params],
+    async ({ token }, pageParam) => {
       const limit = params.limit || 10
       const searchParams = new URLSearchParams()
       if (params.q) searchParams.append('q', params.q)
@@ -37,9 +34,9 @@ export function useImpressorasInfinite(params: Omit<ImpressorasQueryParams, 'off
         searchParams.append('ativo', params.ativo.toString())
       }
       searchParams.append('limit', limit.toString())
-      searchParams.append('offset', pageParam.toString())
+      searchParams.append('offset', String(pageParam))
 
-      const response = await fetch(`/api/impressoras?${searchParams.toString()}`, {
+      const response = await fetchGestorApi(`/api/impressoras?${searchParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -64,11 +61,12 @@ export function useImpressorasInfinite(params: Omit<ImpressorasQueryParams, 'off
         nextOffset,
       }
     },
-    enabled: !!token,
-    initialPageParam: 0,
-    getNextPageParam: (lastPage) => lastPage.nextOffset,
-    staleTime: 1000 * 60 * 5, // 5 minutos
-  })
+    {
+      initialPageParam: 0,
+      getNextPageParam: lastPage => lastPage.nextOffset,
+      staleTime: 1000 * 60 * 5,
+    }
+  )
 }
 
 /**
@@ -76,21 +74,11 @@ export function useImpressorasInfinite(params: Omit<ImpressorasQueryParams, 'off
  * Ideal para componentes de visualização e edição.
  */
 export function useImpressora(id: string) {
-  const { auth, isAuthenticated } = useAuthStore()
-  const token = auth?.getAccessToken()
-
-  return useQuery<Impressora, ApiError>({
-    queryKey: ['impressora', id],
-    queryFn: async () => {
-      if (!isAuthenticated || !token) {
-        throw new Error('Usuário não autenticado ou token ausente.')
-      }
-
-      const response = await fetch(`/api/impressoras/${id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+  return useSecureTenantQuery<Impressora>(
+    ['impressora', id],
+    async ({ token }) => {
+      const response = await fetchGestorApi(`/api/impressoras/${id}`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       })
 
       if (!response.ok) {
@@ -105,29 +93,23 @@ export function useImpressora(id: string) {
       const data = await response.json()
       return Impressora.fromJSON(data)
     },
-    enabled: isAuthenticated && !!token && !!id,
-    staleTime: 1000 * 60 * 5, // 5 minutos
-  })
+    { staleTime: 1000 * 60 * 5, enabled: !!id }
+  )
 }
 
 /**
  * Hook para criar/atualizar impressora
  */
 export function useImpressoraMutation() {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
-  return useMutation({
-    mutationFn: async ({ impressoraId, data, isUpdate }: { impressoraId?: string; data: any; isUpdate: boolean }) => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantMutation(
+    async ({ token }, { impressoraId, data, isUpdate }: { impressoraId?: string; data: any; isUpdate: boolean }) => {
       const url = isUpdate && impressoraId ? `/api/impressoras/${impressoraId}` : '/api/impressoras'
       const method = isUpdate ? 'PUT' : 'POST'
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method,
         headers: {
           Authorization: `Bearer ${token}`,
@@ -144,11 +126,13 @@ export function useImpressoraMutation() {
 
       return await response.json()
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['impressoras'] })
-      showToast.success(variables.isUpdate ? 'Impressora atualizada com sucesso!' : 'Impressora criada com sucesso!')
-    },
-  })
+    {
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'impressoras'] })
+        showToast.success(variables.isUpdate ? 'Impressora atualizada com sucesso!' : 'Impressora criada com sucesso!')
+      },
+    }
+  )
 }
 
 

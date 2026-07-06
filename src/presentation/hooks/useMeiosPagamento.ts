@@ -1,8 +1,12 @@
-import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useQueryClient } from '@tanstack/react-query'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
+import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecureTenantInfiniteQuery'
+import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { MeioPagamento } from '@/src/domain/entities/MeioPagamento'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 interface MeiosPagamentoQueryParams {
   q?: string
@@ -23,17 +27,9 @@ interface MeiosPagamentoResponse {
  * Hook para buscar meios de pagamento com paginação infinita
  */
 export function useMeiosPagamentoInfinite(params: Omit<MeiosPagamentoQueryParams, 'offset'> = {}) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
-  const queryEnabled = !!token && (params.enabled ?? true)
-
-  return useInfiniteQuery({
-    queryKey: ['meios-pagamentos', 'infinite', params],
-    queryFn: async ({ pageParam = 0 }): Promise<{ meiosPagamento: MeioPagamento[]; count: number; nextOffset: number | null }> => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantInfiniteQuery(
+    ['meios-pagamentos', 'infinite', params],
+    async ({ token }, pageParam) => {
       const limit = params.limit || 10
       const searchParams = new URLSearchParams()
       if (params.q) searchParams.append('q', params.q)
@@ -41,9 +37,9 @@ export function useMeiosPagamentoInfinite(params: Omit<MeiosPagamentoQueryParams
         searchParams.append('ativo', params.ativo.toString())
       }
       searchParams.append('limit', limit.toString())
-      searchParams.append('offset', pageParam.toString())
+      searchParams.append('offset', String(pageParam))
 
-      const response = await fetch(`/api/meios-pagamentos?${searchParams.toString()}`, {
+      const response = await fetchGestorApi(`/api/meios-pagamentos?${searchParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -68,12 +64,14 @@ export function useMeiosPagamentoInfinite(params: Omit<MeiosPagamentoQueryParams
         nextOffset,
       }
     },
-    enabled: queryEnabled,
-    initialPageParam: 0,
-    getNextPageParam: (lastPage) => lastPage.nextOffset,
-    staleTime: 1000 * 60 * 5, // 5 minutos
-    refetchOnWindowFocus: params.refetchOnWindowFocus ?? false,
-  })
+    {
+      enabled: params.enabled ?? true,
+      initialPageParam: 0,
+      getNextPageParam: lastPage => lastPage.nextOffset,
+      staleTime: 1000 * 60 * 5,
+      refetchOnWindowFocus: params.refetchOnWindowFocus ?? false,
+    }
+  )
 }
 
 /**
@@ -81,21 +79,11 @@ export function useMeiosPagamentoInfinite(params: Omit<MeiosPagamentoQueryParams
  * Ideal para componentes de visualização e edição.
  */
 export function useMeioPagamento(id: string) {
-  const { auth, isAuthenticated } = useAuthStore()
-  const token = auth?.getAccessToken()
-
-  return useQuery<MeioPagamento, ApiError>({
-    queryKey: ['meio-pagamento', id],
-    queryFn: async () => {
-      if (!isAuthenticated || !token) {
-        throw new Error('Usuário não autenticado ou token ausente.')
-      }
-
-      const response = await fetch(`/api/meios-pagamentos/${id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+  return useSecureTenantQuery<MeioPagamento>(
+    ['meio-pagamento', id],
+    async ({ token }) => {
+      const response = await fetchGestorApi(`/api/meios-pagamentos/${id}`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       })
 
       if (!response.ok) {
@@ -110,29 +98,23 @@ export function useMeioPagamento(id: string) {
       const data = await response.json()
       return MeioPagamento.fromJSON(data)
     },
-    enabled: isAuthenticated && !!token && !!id,
-    staleTime: 1000 * 60 * 5, // 5 minutos
-  })
+    { enabled: !!id, staleTime: 1000 * 60 * 5 }
+  )
 }
 
 /**
  * Hook para criar/atualizar meio de pagamento
  */
 export function useMeioPagamentoMutation() {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
-  return useMutation({
-    mutationFn: async ({ meioPagamentoId, data, isUpdate }: { meioPagamentoId?: string; data: any; isUpdate: boolean }) => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantMutation(
+    async ({ token }, { meioPagamentoId, data, isUpdate }: { meioPagamentoId?: string; data: any; isUpdate: boolean }) => {
       const url = isUpdate && meioPagamentoId ? `/api/meios-pagamentos/${meioPagamentoId}` : '/api/meios-pagamentos'
       const method = isUpdate ? 'PUT' : 'POST'
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method,
         headers: {
           Authorization: `Bearer ${token}`,
@@ -149,11 +131,13 @@ export function useMeioPagamentoMutation() {
 
       return await response.json()
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['meios-pagamentos'] })
-      showToast.success(variables.isUpdate ? 'Meio de pagamento atualizado com sucesso!' : 'Meio de pagamento criado com sucesso!')
-    },
-  })
+    {
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'meios-pagamentos'] })
+        showToast.success(variables.isUpdate ? 'Meio de pagamento atualizado com sucesso!' : 'Meio de pagamento criado com sucesso!')
+      },
+    }
+  )
 }
 
 

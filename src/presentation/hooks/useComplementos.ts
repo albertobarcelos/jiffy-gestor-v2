@@ -1,7 +1,11 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useQueryClient } from '@tanstack/react-query'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
+import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecureTenantInfiniteQuery'
+import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { Complemento } from '@/src/domain/entities/Complemento'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 interface ComplementosQueryParams {
   q?: string
@@ -19,16 +23,9 @@ interface ComplementosResponse {
  * Hook para buscar complementos com paginação infinita
  */
 export function useComplementosInfinite(params: Omit<ComplementosQueryParams, 'offset'> = {}) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
-
-  return useInfiniteQuery({
-    queryKey: ['complementos', 'infinite', params],
-    queryFn: async ({ pageParam = 0 }): Promise<{ complementos: Complemento[]; count: number; nextOffset: number | null }> => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantInfiniteQuery(
+    ['complementos', 'infinite', params],
+    async ({ token }, pageParam) => {
       const limit = params.limit || 10
       const searchParams = new URLSearchParams()
       if (params.q) searchParams.append('q', params.q)
@@ -36,9 +33,9 @@ export function useComplementosInfinite(params: Omit<ComplementosQueryParams, 'o
         searchParams.append('ativo', params.ativo.toString())
       }
       searchParams.append('limit', limit.toString())
-      searchParams.append('offset', pageParam.toString())
+      searchParams.append('offset', String(pageParam))
 
-      const response = await fetch(`/api/complementos?${searchParams.toString()}`, {
+      const response = await fetchGestorApi(`/api/complementos?${searchParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -63,11 +60,12 @@ export function useComplementosInfinite(params: Omit<ComplementosQueryParams, 'o
         nextOffset,
       }
     },
-    enabled: !!token,
-    initialPageParam: 0,
-    getNextPageParam: (lastPage) => lastPage.nextOffset,
-    staleTime: 1000 * 60 * 5, // 5 minutos
-  })
+    {
+      initialPageParam: 0,
+      getNextPageParam: lastPage => lastPage.nextOffset,
+      staleTime: 1000 * 60 * 5,
+    }
+  )
 }
 
 /**
@@ -75,30 +73,18 @@ export function useComplementosInfinite(params: Omit<ComplementosQueryParams, 'o
  * Ideal para uso em formulários e dropdowns.
  */
 export function useComplementos(params: { ativo?: boolean; limit?: number } = {}) {
-  const { auth, isAuthenticated } = useAuthStore()
-  const token = auth?.getAccessToken()
-  // Limite alto para telas que listam o catálogo inteiro (ex.: vínculo grupo ↔ complementos)
   const normalizedLimit = Math.min(params.limit ?? 100, 2000)
 
-  return useQuery<Complemento[], Error>({
-    queryKey: ['complementos', 'simple', params.ativo, normalizedLimit],
-    queryFn: async () => {
-      if (!isAuthenticated || !token) {
-        throw new Error('Usuário não autenticado ou token ausente.')
-      }
-
+  return useSecureTenantQuery<Complemento[]>(
+    ['complementos', 'simple', params.ativo, normalizedLimit],
+    async ({ token }) => {
       const queryParams = new URLSearchParams()
-      if (params.ativo !== undefined) {
-        queryParams.append('ativo', params.ativo.toString())
-      }
+      if (params.ativo !== undefined) queryParams.append('ativo', params.ativo.toString())
       queryParams.append('limit', normalizedLimit.toString())
       queryParams.append('offset', '0')
 
-      const response = await fetch(`/api/complementos?${queryParams.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+      const response = await fetchGestorApi(`/api/complementos?${queryParams.toString()}`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       })
 
       if (!response.ok) {
@@ -107,13 +93,10 @@ export function useComplementos(params: { ativo?: boolean; limit?: number } = {}
       }
 
       const data = await response.json()
-      const complementos = (data.items || []).map((item: any) => Complemento.fromJSON(item))
-
-      return complementos
+      return (data.items || []).map((item: any) => Complemento.fromJSON(item))
     },
-    enabled: isAuthenticated && !!token,
-    staleTime: 1000 * 60 * 10, // 10 minutos (complementos mudam pouco)
-  })
+    { staleTime: 1000 * 60 * 10 }
+  )
 }
 
 /**
@@ -121,21 +104,11 @@ export function useComplementos(params: { ativo?: boolean; limit?: number } = {}
  * Ideal para componentes de visualização e edição.
  */
 export function useComplemento(id: string) {
-  const { auth, isAuthenticated } = useAuthStore()
-  const token = auth?.getAccessToken()
-
-  return useQuery<Complemento, Error>({
-    queryKey: ['complemento', id],
-    queryFn: async () => {
-      if (!isAuthenticated || !token) {
-        throw new Error('Usuário não autenticado ou token ausente.')
-      }
-
-      const response = await fetch(`/api/complementos/${id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+  return useSecureTenantQuery<Complemento>(
+    ['complemento', id],
+    async ({ token }) => {
+      const response = await fetchGestorApi(`/api/complementos/${id}`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       })
 
       if (!response.ok) {
@@ -146,29 +119,23 @@ export function useComplemento(id: string) {
       const data = await response.json()
       return Complemento.fromJSON(data)
     },
-    enabled: isAuthenticated && !!token && !!id,
-    staleTime: 1000 * 60 * 5, // 5 minutos
-  })
+    { staleTime: 1000 * 60 * 5, enabled: !!id }
+  )
 }
 
 /**
  * Hook para criar/atualizar complemento
  */
 export function useComplementoMutation() {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
-  return useMutation({
-    mutationFn: async ({ complementoId, data, isUpdate }: { complementoId?: string; data: any; isUpdate: boolean }) => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantMutation(
+    async ({ token }, { complementoId, data, isUpdate }: { complementoId?: string; data: any; isUpdate: boolean }) => {
       const url = isUpdate && complementoId ? `/api/complementos/${complementoId}` : '/api/complementos'
       const method = isUpdate ? 'PUT' : 'POST'
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method,
         headers: {
           Authorization: `Bearer ${token}`,
@@ -185,11 +152,13 @@ export function useComplementoMutation() {
 
       return await response.json()
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['complementos'] })
-      showToast.success(variables.isUpdate ? 'Complemento atualizado com sucesso!' : 'Complemento criado com sucesso!')
-    },
-  })
+    {
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'complementos'] })
+        showToast.success(variables.isUpdate ? 'Complemento atualizado com sucesso!' : 'Complemento criado com sucesso!')
+      },
+    }
+  )
 }
 
 

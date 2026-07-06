@@ -11,9 +11,8 @@ import {
 import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Label } from '@/src/presentation/components/ui/label'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
-import { extractTokenInfo } from '@/src/shared/utils/validateToken'
+import { useConfiguracoesNcm } from '@/src/presentation/hooks/painel-contador/useConfiguracoesNcm'
 
 interface ConfiguracaoImpostoNcm {
   ncm?: {
@@ -52,8 +51,8 @@ export function CopiarConfiguracaoNcmModal({
   codigoNcmOrigem,
   todasConfiguracoes,
 }: CopiarConfiguracaoNcmModalProps) {
-  const { auth } = useAuthStore()
-  const [isLoading, setIsLoading] = useState(false)
+  const { copiarMutation } = useConfiguracoesNcm()
+  const isLoading = copiarMutation.isPending
   const [ncmsDestino, setNcmsDestino] = useState<string>('')
   const [observacao, setObservacao] = useState<string>('')
 
@@ -65,12 +64,6 @@ export function CopiarConfiguracaoNcmModal({
   }, [open])
 
   const handleCopiar = async () => {
-    const token = auth?.getAccessToken()
-    if (!token) {
-      showToast.error('Token de autenticação não encontrado')
-      return
-    }
-
     // Validar e processar NCMs destino
     const ncmsList = ncmsDestino
       .split(/[,\n]/)
@@ -90,33 +83,17 @@ export function CopiarConfiguracaoNcmModal({
       return
     }
 
-    setIsLoading(true)
     try {
-      const response = await fetch(`/api/v1/fiscal/configuracoes/ncms/${codigoNcmOrigem}/impostos/copiar`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      await copiarMutation.mutateAsync({
+        ncm: codigoNcmOrigem,
+        input: {
           ncmsDestino: ncmsFiltrados,
           observacao: observacao || undefined,
-        }),
+        },
       })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || 'Erro ao copiar configuração')
-      }
-
-      const configsCriadas = await response.json()
-      showToast.success(`Configuração copiada para ${configsCriadas.length} NCM(s) com sucesso!`)
       onSuccess()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao copiar configuração:', error)
-      showToast.error(error.message || 'Erro ao copiar configuração')
-    } finally {
-      setIsLoading(false)
     }
   }
 

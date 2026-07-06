@@ -34,6 +34,11 @@ export type VendaContingenciaPublica = {
   totalAcrescimo?: number
   dataCriacao?: string
   dataFinalizacao?: string
+  /** `delivery` | `balcao` (gestor) ou tipo PDV. */
+  tipoVenda?: string
+  /** Status operacional do pedido (ex.: FINALIZADO no delivery), quando exposto pela API. */
+  statusVenda?: string | null
+  statusDelivery?: string | null
   codigoTerminal?: string
   identificacao?: string
   troco?: number
@@ -46,18 +51,40 @@ export type VendaContingenciaPublica = {
   documentoFiscalId?: string | null
   nomeEmpresa?: string
   clienteNome?: string
+  /** CPF/CNPJ do cliente informado na venda (endpoint de contingência). */
+  documentoCpfCnpj?: string
   terminalNome?: string
+  emitente?: {
+    razaoSocial?: string
+    cnpj?: string
+    endereco?: {
+      rua?: string
+      numero?: string
+      bairro?: string | null
+      cidade?: string | null
+      estado?: string | null
+      cep?: string
+      complemento?: string | null
+    }
+  }
   empresa?: { nome?: string; cnpj?: string }
   produtosLancados?: Array<{
     nomeProduto?: string
     quantidade?: number
     valorUnitario?: number
+    /** Total da linha já calculado no backend. */
+    valorFinal?: number
     desconto?: string | number
     acrescimo?: string | number
+    tipoDesconto?: string | null
+    tipoAcrescimo?: string | null
+    valorDesconto?: number | null
+    valorAcrescimo?: number | null
     complementos?: Array<{
       nomeComplemento?: string
       quantidade?: number
       valorUnitario?: number
+      tipoImpactoPreco?: string | null
     }>
     removido?: boolean
   }>
@@ -69,6 +96,14 @@ export type VendaContingenciaPublica = {
     meioPagamentoId?: string
     cancelado?: boolean
   }>
+  /** Taxas de entrega/serviço (gestor/delivery). */
+  taxasLancadas?: Array<{
+    nome?: string
+    quantidade?: number
+    valor?: number
+  }>
+  tipoEntrega?: string | null
+  origem?: string
   resumoFiscal?: ResumoFiscalPublico | null
   venda?: VendaContingenciaPublica
 }
@@ -154,6 +189,44 @@ export function deveExibirRodapeDanfe80mm(data: VendaContingenciaPublica): boole
   if (r !== '') return false
   const s = data.statusFiscal != null ? String(data.statusFiscal).trim().toUpperCase() : ''
   return STATUS_RODAPE_OK.has(s)
+}
+
+function dataFinalizacaoValida(dataFinalizacao: string | undefined): boolean {
+  if (dataFinalizacao == null || String(dataFinalizacao).trim() === '') return false
+  const d = new Date(dataFinalizacao)
+  return !Number.isNaN(d.getTime())
+}
+
+function statusIndicaVendaFinalizada(status: string | null | undefined): boolean {
+  const s = status != null ? String(status).trim().toUpperCase() : ''
+  if (!s) return false
+  return s === 'FINALIZADO' || s === 'FINALIZADA' || s.includes('FINALIZ')
+}
+
+/** Pedido Jiffy Delivery (venda_gestor com tipo delivery / origem JIFFY_DELIVERY). */
+export function vendaContingenciaEhDelivery(data: VendaContingenciaPublica): boolean {
+  const tipoVenda = data.tipoVenda?.trim().toLowerCase()
+  if (tipoVenda === 'delivery') return true
+  const origem = data.origem?.trim().toUpperCase()
+  if (origem === 'JIFFY_DELIVERY') return true
+  return Boolean(data.tipoEntrega?.trim())
+}
+
+/** Venda delivery com data de finalização ou status finalizado. */
+export function vendaContingenciaDeliveryEstaFinalizada(data: VendaContingenciaPublica): boolean {
+  if (dataFinalizacaoValida(data.dataFinalizacao)) return true
+  if (statusIndicaVendaFinalizada(data.statusVenda)) return true
+  if (statusIndicaVendaFinalizada(data.statusDelivery)) return true
+  const root = data as Record<string, unknown>
+  if (typeof root.status === 'string' && statusIndicaVendaFinalizada(root.status)) return true
+  return false
+}
+
+/**
+ * Delivery ainda em andamento: exibir aviso no rodapé em vez do QR / processamento NFC-e.
+ */
+export function deveExibirAguardoFinalizacaoDelivery(data: VendaContingenciaPublica): boolean {
+  return vendaContingenciaEhDelivery(data) && !vendaContingenciaDeliveryEstaFinalizada(data)
 }
 
 /** ID do documento fiscal para o PNG público 80mm no microserviço (`/v1/public/documentos/{id}/...`). */

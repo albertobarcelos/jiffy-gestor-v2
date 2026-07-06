@@ -8,24 +8,9 @@ import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
 import { MdEdit, MdPerson, MdReceiptLong, MdLocationOn } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { documentoClienteExibicao } from '@/src/shared/utils/cpfCnpj'
 
 // Funções de formatação
-const formatCPF = (value: string) => {
-  const numbers = value.replace(/\D/g, '')
-  if (numbers.length <= 11) {
-    return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
-  }
-  return value
-}
-
-const formatCNPJ = (value: string) => {
-  const numbers = value.replace(/\D/g, '')
-  if (numbers.length <= 14) {
-    return numbers.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')
-  }
-  return value
-}
-
 const formatTelefone = (value: string) => {
   const numbers = value.replace(/\D/g, '')
   if (numbers.length <= 11) {
@@ -190,7 +175,7 @@ export function VisualizarCliente({
                 if (onClose) {
                   onClose()
                 } else {
-                  router.push('/cadastros/clientes')
+                  router.push('/clientes')
                 }
               }}
               variant="outlined"
@@ -227,16 +212,8 @@ export function VisualizarCliente({
                 sx={inputSx}
               />
               <Input
-                label="CPF"
-                value={cliente.getCpf() ? formatCPF(cliente.getCpf()!) : '-'}
-                size="small"
-                InputLabelProps={INPUT_LABEL_PROPS}
-                InputProps={{ readOnly: true }}
-                sx={inputSx}
-              />
-              <Input
-                label="CNPJ"
-                value={cliente.getCnpj() ? formatCNPJ(cliente.getCnpj()!) : '-'}
+                label="CPF/CNPJ"
+                value={documentoClienteExibicao(cliente.getCpf(), cliente.getCnpj())}
                 size="small"
                 InputLabelProps={INPUT_LABEL_PROPS}
                 InputProps={{ readOnly: true }}
@@ -329,24 +306,34 @@ export function VisualizarCliente({
                 InputProps={{ readOnly: true }}
                 sx={inputSx}
               />
-              <Input
-                label="Estado"
-                value={endereco?.estado || '-'}
-                size="small"
-                InputLabelProps={INPUT_LABEL_PROPS}
-                InputProps={{ readOnly: true }}
-                inputProps={UPPERCASE_INPUT_PROPS}
-                sx={inputSx}
-              />
-              <Input
-                label="Cidade"
-                value={endereco?.cidade || '-'}
-                size="small"
-                InputLabelProps={INPUT_LABEL_PROPS}
-                InputProps={{ readOnly: true }}
-                inputProps={UPPERCASE_INPUT_PROPS}
-                sx={inputSx}
-              />
+              <div className="flex gap-2 items-start">
+                <Input
+                  label="Estado"
+                  value={endereco?.estado || '-'}
+                  size="small"
+                  InputLabelProps={INPUT_LABEL_PROPS}
+                  InputProps={{ readOnly: true }}
+                  inputProps={{ ...UPPERCASE_INPUT_PROPS, maxLength: 2 }}
+                  sx={{
+                    ...inputSx,
+                    width: '4.5rem',
+                    minWidth: '4.5rem',
+                    flexShrink: 0,
+                  }}
+                />
+                <div className="flex-1 min-w-0">
+                  <Input
+                    label="Cidade"
+                    value={endereco?.cidade || '-'}
+                    size="small"
+                    fullWidth
+                    InputLabelProps={INPUT_LABEL_PROPS}
+                    InputProps={{ readOnly: true }}
+                    inputProps={UPPERCASE_INPUT_PROPS}
+                    sx={inputSx}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>

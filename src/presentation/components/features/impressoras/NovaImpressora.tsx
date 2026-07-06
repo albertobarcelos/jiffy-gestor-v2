@@ -27,8 +27,11 @@ interface TerminalConfig {
   ip: string
   porta: string
   modoFicha: boolean
+  imprimirSenha: boolean
   ativo: boolean
   isHovering: boolean
+  /** Só preenchido ao editar/copiar: espelha `terminal.bloqueado` da API. Usado só para ocultar na UI; o estado completo segue em `terminaisConfig` para o PATCH. */
+  bloqueado?: boolean
 }
 
 export interface NovaImpressoraHandle {
@@ -71,9 +74,18 @@ const MODELO_REVERSE_MAP: Record<string, string> = {
 
 const MODELOS_OPTIONS = ['Genérico', 'Sunmi Integrada', 'Stone Integrada', 'Pagbank Integrada']
 
+/**
+ * Mesmo critério que `TerminaisTab` (`terminaisFiltrados`): só terminais não bloqueados.
+ */
+function terminaisAtivosParaNovaImpressora<T extends { bloqueado?: boolean | string }>(
+  items: T[]
+): T[] {
+  return items.filter(t => !(t.bloqueado === true || t.bloqueado === 'true'))
+}
+
 /** Grid desktop (cabeçalho + linhas): mesma largura de colunas e padding para alinhar títulos aos controles */
 const DESKTOP_TERMINAL_ROW_GRID =
-  'grid grid-cols-[auto_minmax(0,1fr)_7rem_7rem_3.5rem] items-center gap-3 px-2'
+  'grid grid-cols-[auto_minmax(0,1fr)_7rem_7rem_7rem_3.5rem] items-center gap-3 px-2'
 
 /** Debounce do termo enviado ao GET `/api/terminais?q=` (nova impressora — lista via API). */
 const BUSCA_TERMINAL_DEBOUNCE_MS = 480
@@ -367,7 +379,9 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
           }
 
           const data = await response.json()
-          const terminais = data.items || []
+          const rawItems = data.items || []
+          const terminais =
+            !impressoraId ? terminaisAtivosParaNovaImpressora(rawItems) : rawItems
 
           // Cria configurações padrão para cada terminal
           const newConfigs: TerminalConfig[] = terminais.map((terminal: any) => ({
@@ -378,6 +392,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
             ip: '192.168.1.100',
             porta: '9100',
             modoFicha: true,
+            imprimirSenha: true,
             ativo: true,
             isHovering: false,
           }))
@@ -405,7 +420,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
           // Não define isLoadingTerminais aqui, pois é gerenciado por loadAllTerminais
         }
       },
-      [auth]
+      [auth, impressoraId]
     )
 
     /**
@@ -461,7 +476,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
           }
 
           const data = await response.json()
-          const terminais = data.items || []
+          const terminais = terminaisAtivosParaNovaImpressora(data.items || [])
 
           // Se não retornou nenhum terminal e já fez pelo menos uma requisição, para
           if (terminais.length === 0) {
@@ -478,6 +493,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
             ip: '192.168.1.100',
             porta: '9100',
             modoFicha: true,
+            imprimirSenha: true,
             ativo: true,
             isHovering: false,
           }))
@@ -636,6 +652,11 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
 
           // Monta a configuração do terminal (seguindo o padrão do Flutter)
           const modeloDB = config.modelo || 'generico'
+          const bloqueado =
+            terminal?.bloqueado === true ||
+            terminal?.bloqueado === 'true' ||
+            false
+
           configs.push({
             terminalId: terminalId,
             nome: terminalName,
@@ -647,8 +668,13 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
               config.modoFicha === true ||
               config.modoFicha === 'true' ||
               config.modoFicha === undefined,
+            imprimirSenha:
+              config.imprimirSenha === true ||
+              config.imprimirSenha === 'true' ||
+              config.imprimirSenha === undefined,
             ativo: config.ativo === true || config.ativo === 'true' || config.ativo === undefined,
             isHovering: false,
+            bloqueado,
           })
         }
 
@@ -707,12 +733,24 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
       return () => container.removeEventListener('scroll', handleScroll)
     }, [currentPage, hasMoreTerminals, isLoadingMore, isEditing, loadTerminais])
 
-    /** Edição/cópia: filtro local por nome. Nova impressora: lista já vem filtrada da API (`q`). */
+    /**
+     * Lista para renderização. Em edição/cópia: oculta terminais bloqueados (como a lista geral),
+     * sem remover do estado — o salvamento continua a enviar todos os vínculos ao backend.
+     */
     const terminaisVisiveis = useMemo(() => {
-      if (!isEditing && !isCopyMode) return terminaisConfig
+      let base = terminaisConfig
+
+      if (isEditing || isCopyMode) {
+        base = base.filter(t => !t.bloqueado)
+      }
+
+      if (!isEditing && !isCopyMode) {
+        return base
+      }
+
       const q = buscaTerminalDraft.trim().toLowerCase()
-      if (!q) return terminaisConfig
-      return terminaisConfig.filter(t => t.nome.toLowerCase().includes(q))
+      if (!q) return base
+      return base.filter(t => t.nome.toLowerCase().includes(q))
     }, [terminaisConfig, buscaTerminalDraft, isEditing, isCopyMode])
 
     /** Nova impressora (sem impressoraId): recarrega lista com `q` após debounce. */
@@ -758,6 +796,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
           config.ip !== inicial.ip ||
           config.porta !== inicial.porta ||
           config.modoFicha !== inicial.modoFicha ||
+          config.imprimirSenha !== inicial.imprimirSenha ||
           config.ativo !== inicial.ativo
         ) {
           return true
@@ -1109,6 +1148,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
             modelo: config.modelo || 'generico',
             ativo: config.ativo !== undefined ? config.ativo : true,
             modoFicha: config.modoFicha !== undefined ? config.modoFicha : true,
+            imprimirSenha: config.imprimirSenha !== undefined ? config.imprimirSenha : true,
             tipoConexao: 'ethernet',
             ip: config.ip || '192.168.1.100',
             porta: config.porta || '9100',
@@ -1159,7 +1199,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
             onCloseAfterSave?.()
           }
         } else {
-          router.push('/cadastros/impressoras')
+          router.push('/impressoras')
         }
       } catch (error) {
         console.error('Erro ao salvar impressora:', error)
@@ -1191,7 +1231,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
               if (window.history.length > 1) {
                 router.back()
               } else {
-                router.push('/cadastros/impressoras')
+                router.push('/impressoras')
               }
             }
           }
@@ -1204,7 +1244,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
           if (window.history.length > 1) {
             router.back()
           } else {
-            router.push('/cadastros/impressoras')
+            router.push('/impressoras')
           }
         }
       }
@@ -1495,36 +1535,52 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                         <label className="font-nunito text-xs text-primary-text">
                           Ações Rápidas
                         </label>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="grid grid-cols-3 gap-2">
                           <button
                             type="button"
                             onClick={() => applyBulkUpdate('modoFicha', true)}
                             disabled={selectedTerminalIds.size === 0}
-                            className="whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 font-exo text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="w-full whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 font-exo text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             Modo Ficha ON
                           </button>
                           <button
                             type="button"
-                            onClick={() => applyBulkUpdate('modoFicha', false)}
+                            onClick={() => applyBulkUpdate('imprimirSenha', true)}
                             disabled={selectedTerminalIds.size === 0}
-                            className="whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 font-exo text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="w-full whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 font-exo text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
                           >
-                            Modo Ficha OFF
+                            Imprimir Senha ON
                           </button>
                           <button
                             type="button"
                             onClick={() => applyBulkUpdate('ativo', true)}
                             disabled={selectedTerminalIds.size === 0}
-                            className="whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 font-exo text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="w-full whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 font-exo text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             Ativar
                           </button>
                           <button
                             type="button"
+                            onClick={() => applyBulkUpdate('modoFicha', false)}
+                            disabled={selectedTerminalIds.size === 0}
+                            className="w-full whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 font-exo text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Modo Ficha OFF
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => applyBulkUpdate('imprimirSenha', false)}
+                            disabled={selectedTerminalIds.size === 0}
+                            className="w-full whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 font-exo text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Imprimir Senha OFF
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => applyBulkUpdate('ativo', false)}
                             disabled={selectedTerminalIds.size === 0}
-                            className="whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 font-exo text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="w-full whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 font-exo text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             Desativar
                           </button>
@@ -1551,6 +1607,11 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                     <div className="flex min-w-0 w-full justify-center">
                       <span className="font-nunito text-center text-sm font-semibold text-primary-text">
                         Modo Ficha
+                      </span>
+                    </div>
+                    <div className="flex min-w-0 w-full justify-center">
+                      <span className="font-nunito text-center text-sm font-semibold text-primary-text">
+                        Imprimir Senha
                       </span>
                     </div>
                     <div className="flex min-w-0 w-full justify-center">
@@ -1611,6 +1672,21 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                       </div>
                     )}
 
+                  {terminaisConfig.length > 0 &&
+                    terminaisVisiveis.length === 0 &&
+                    (isEditing || isCopyMode) &&
+                    buscaTerminalDraft.trim() === '' && (
+                      <div className="flex flex-col items-center justify-center gap-3 px-4 py-12">
+                        <p className="text-lg font-semibold text-primary-text">
+                          Nenhum terminal ativo para exibir
+                        </p>
+                        <p className="max-w-md text-center text-sm text-secondary-text">
+                          Terminais bloqueados não aparecem aqui (mesma regra da lista geral). Desbloqueie
+                          o terminal em Configurações para voltar a vê-lo nesta impressora.
+                        </p>
+                      </div>
+                    )}
+
                   {terminaisVisiveis.map((config, visibleIdx) => {
                     const index = terminaisConfig.findIndex(
                       t => t.terminalId === config.terminalId
@@ -1643,8 +1719,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                         <div
                           className={cn(
                             'hidden rounded-lg border border-transparent md:block',
-                            bgClass,
-                            isTerminalSelected(config.terminalId) && 'ring-2 ring-primary'
+                            bgClass
                           )}
                         >
                           <div
@@ -1675,6 +1750,19 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                                 className="justify-center gap-0 px-0 py-0"
                                 inputProps={{
                                   'aria-label': `Modo ficha — ${config.nome}`,
+                                }}
+                              />
+                            </div>
+                            <div className="flex min-w-0 w-full justify-center">
+                              <JiffyIconSwitch
+                                checked={config.imprimirSenha}
+                                onChange={e =>
+                                  updateTerminalConfig(index, 'imprimirSenha', e.target.checked)
+                                }
+                                size="xs"
+                                className="justify-center gap-0 px-0 py-0"
+                                inputProps={{
+                                  'aria-label': `Imprimir senha — ${config.nome}`,
                                 }}
                               />
                             </div>
@@ -1776,8 +1864,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                         <div
                           className={cn(
                             'rounded-lg border border-primary/20 md:hidden',
-                            bgClass,
-                            isTerminalSelected(config.terminalId) && 'ring-2 ring-primary'
+                            bgClass
                           )}
                         >
                           <div className="flex flex-wrap items-center gap-x-2 gap-y-2 px-3 py-2">
@@ -1804,6 +1891,22 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                                   className="justify-center gap-0 px-0 py-0"
                                   inputProps={{
                                     'aria-label': `Modo ficha — ${config.nome}`,
+                                  }}
+                                />
+                              </div>
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span className="font-nunito text-[10px] leading-none text-secondary-text">
+                                  Imprimir Senha
+                                </span>
+                                <JiffyIconSwitch
+                                  checked={config.imprimirSenha}
+                                  onChange={e =>
+                                    updateTerminalConfig(index, 'imprimirSenha', e.target.checked)
+                                  }
+                                  size="sm"
+                                  className="justify-center gap-0 px-0 py-0"
+                                  inputProps={{
+                                    'aria-label': `Imprimir senha — ${config.nome}`,
                                   }}
                                 />
                               </div>

@@ -1,6 +1,8 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { NFe, NFeStatus } from '@/src/domain/entities/NFe'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
+import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 
 interface NfesGroupedByStatus {
   PENDENTE: NFe[]
@@ -15,18 +17,11 @@ interface NfesGroupedByStatus {
  * Usa React Query para gerenciar estado e cache
  */
 export function useNfes() {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
-
-  return useQuery<NfesGroupedByStatus>({
-    queryKey: ['nfes'],
-    queryFn: async (): Promise<NfesGroupedByStatus> => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantQuery<NfesGroupedByStatus>(
+    ['nfes'],
+    async (): Promise<NfesGroupedByStatus> => {
       // TODO: Implementar chamada à API quando disponível
-      // const response = await fetch('/api/nfes', {
+      // const response = await fetchGestorApi('/api/nfes', {
       //   headers: { Authorization: `Bearer ${token}` },
       // })
       // const data = await response.json()
@@ -237,46 +232,33 @@ export function useNfes() {
 
       return nfesAgrupadas
     },
-    enabled: !!token,
-    staleTime: 1000 * 60 * 2, // 2 minutos
-    gcTime: 1000 * 60 * 5, // 5 minutos
-    refetchOnWindowFocus: true,
-    refetchOnMount: false,
-  })
+    {
+      staleTime: 1000 * 60 * 2,
+      gcTime: 1000 * 60 * 5,
+      refetchOnWindowFocus: true,
+      refetchOnMount: false,
+    }
+  )
 }
 
 /**
  * Hook para mutações de NFe (criar, atualizar status, etc)
  */
 export function useNfeMutation() {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
-  return useMutation({
-    mutationFn: async ({ nfeId, novoStatus }: { nfeId: string; novoStatus: NFeStatus }) => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantMutation(
+    async (_ctx, { nfeId, novoStatus }: { nfeId: string; novoStatus: NFeStatus }) => {
       // TODO: Implementar chamada à API quando disponível
-      // const response = await fetch(`/api/nfes/${nfeId}`, {
-      //   method: 'PATCH',
-      //   headers: {
-      //     Authorization: `Bearer ${token}`,
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: JSON.stringify({ status: novoStatus }),
-      // })
-      // return response.json()
-
       return { nfeId, novoStatus }
     },
-    onSuccess: () => {
-      // Invalidar cache para forçar refetch
-      queryClient.invalidateQueries({ queryKey: ['nfes'] })
-    },
-  })
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'nfes'] })
+      },
+    }
+  )
 }
 
 

@@ -1,8 +1,12 @@
-import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useQueryClient } from '@tanstack/react-query'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
+import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecureTenantInfiniteQuery'
+import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { PerfilUsuario } from '@/src/domain/entities/PerfilUsuario'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 interface PerfisUsuariosQueryParams {
   q?: string
@@ -20,16 +24,9 @@ interface PerfisUsuariosResponse {
  * Hook para buscar perfis de usuários com paginação infinita
  */
 export function usePerfisUsuariosInfinite(params: Omit<PerfisUsuariosQueryParams, 'offset'> = {}) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
-
-  return useInfiniteQuery({
-    queryKey: ['perfis-usuarios-pdv', 'infinite', params],
-    queryFn: async ({ pageParam = 0 }): Promise<{ perfis: PerfilUsuario[]; count: number; nextOffset: number | null }> => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantInfiniteQuery(
+    ['perfis-usuarios-pdv', 'infinite', params],
+    async ({ token }, pageParam) => {
       const limit = params.limit || 10
       const searchParams = new URLSearchParams()
       if (params.q) searchParams.append('q', params.q)
@@ -37,9 +34,9 @@ export function usePerfisUsuariosInfinite(params: Omit<PerfisUsuariosQueryParams
         searchParams.append('ativo', params.ativo.toString())
       }
       searchParams.append('limit', limit.toString())
-      searchParams.append('offset', pageParam.toString())
+      searchParams.append('offset', String(pageParam))
 
-      const response = await fetch(`/api/perfis-usuarios-pdv?${searchParams.toString()}`, {
+      const response = await fetchGestorApi(`/api/perfis-usuarios-pdv?${searchParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -64,33 +61,20 @@ export function usePerfisUsuariosInfinite(params: Omit<PerfisUsuariosQueryParams
         nextOffset,
       }
     },
-    enabled: !!token,
-    initialPageParam: 0,
-    getNextPageParam: (lastPage) => lastPage.nextOffset,
-    staleTime: 1000 * 60 * 5, // 5 minutos
-  })
+    {
+      initialPageParam: 0,
+      getNextPageParam: lastPage => lastPage.nextOffset,
+      staleTime: 1000 * 60 * 5,
+    }
+  )
 }
 
-/**
- * Hook para buscar um único perfil de usuário por ID usando React Query.
- * Ideal para componentes de visualização e edição.
- */
 export function usePerfilUsuario(id: string) {
-  const { auth, isAuthenticated } = useAuthStore()
-  const token = auth?.getAccessToken()
-
-  return useQuery<PerfilUsuario, ApiError>({
-    queryKey: ['perfil-usuario', id],
-    queryFn: async () => {
-      if (!isAuthenticated || !token) {
-        throw new Error('Usuário não autenticado ou token ausente.')
-      }
-
-      const response = await fetch(`/api/perfis-usuarios-pdv/${id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+  return useSecureTenantQuery<PerfilUsuario>(
+    ['perfil-usuario', id],
+    async ({ token }) => {
+      const response = await fetchGestorApi(`/api/perfis-usuarios-pdv/${id}`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       })
 
       if (!response.ok) {
@@ -105,29 +89,23 @@ export function usePerfilUsuario(id: string) {
       const data = await response.json()
       return PerfilUsuario.fromJSON(data)
     },
-    enabled: isAuthenticated && !!token && !!id,
-    staleTime: 1000 * 60 * 5, // 5 minutos
-  })
+    { enabled: !!id, staleTime: 1000 * 60 * 5 }
+  )
 }
 
 /**
  * Hook para criar/atualizar perfil de usuário
  */
 export function usePerfilUsuarioMutation() {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
-  return useMutation({
-    mutationFn: async ({ perfilId, data, isUpdate }: { perfilId?: string; data: any; isUpdate: boolean }) => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantMutation(
+    async ({ token }, { perfilId, data, isUpdate }: { perfilId?: string; data: any; isUpdate: boolean }) => {
       const url = isUpdate && perfilId ? `/api/perfis-usuarios-pdv/${perfilId}` : '/api/perfis-usuarios-pdv'
       const method = isUpdate ? 'PATCH' : 'POST'
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method,
         headers: {
           Authorization: `Bearer ${token}`,
@@ -144,11 +122,13 @@ export function usePerfilUsuarioMutation() {
 
       return await response.json()
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['perfis-usuarios-pdv'] })
-      showToast.success(variables.isUpdate ? 'Perfil atualizado com sucesso!' : 'Perfil criado com sucesso!')
-    },
-  })
+    {
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'perfis-usuarios-pdv'] })
+        showToast.success(variables.isUpdate ? 'Perfil atualizado com sucesso!' : 'Perfil criado com sucesso!')
+      },
+    }
+  )
 }
 
 

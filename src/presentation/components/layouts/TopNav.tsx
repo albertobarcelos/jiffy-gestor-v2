@@ -1,13 +1,16 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import type { ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { disconnectEmpresaTab } from '@/src/presentation/utils/disconnectEmpresaTab'
+import { useEmpresaUrlSync } from '@/src/presentation/hooks/useEmpresaUrlSync'
+import { EmpresaSwitcherTopNav } from './EmpresaSwitcherTopNav'
 import { useQueryClient } from '@tanstack/react-query'
-import { MdDashboard, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight, MdMenu, MdClose } from 'react-icons/md'
+import { MdDashboard, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight, MdMenu, MdClose, MdDeliveryDining } from 'react-icons/md'
 import { 
   MdInventory2, 
   MdShoppingBag, 
@@ -20,9 +23,13 @@ import {
   MdAccountBalance,
   MdHistory,
   MdPercent,
+  MdAnalytics,
 } from 'react-icons/md'
 import type { IconType } from 'react-icons'
 import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
+import { useAcessoFiscal } from '@/src/presentation/hooks/useAcessoFiscal'
+import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
+import { matchesModulePath } from '@/src/shared/utils/gestaoRoutes'
 
 /**
  * Navegação superior minimalista e clean
@@ -31,11 +38,17 @@ import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/Tip
 export function TopNav() {
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set())
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
-  const { logout, getUser } = useAuthStore()
+  const { logoutTenant, getUser } = useAuthStore()
   const queryClient = useQueryClient()
   const menuRef = useRef<HTMLDivElement>(null)
+  const notificationsRef = useRef<HTMLDivElement>(null)
+
+  useEmpresaUrlSync()
+  const temAcessoFiscal = useAcessoFiscal()
+  const { toGestao } = useGestaoPath()
   
   // Estado para controlar hidratação (evita hydration mismatch)
   const [isHydrated, setIsHydrated] = useState(false)
@@ -51,11 +64,11 @@ export function TopNav() {
   // Prefetch agressivo das rotas mais acessadas na inicialização
   useEffect(() => {
     const routesToPrefetch = [
-      '/cadastros/grupos-complementos',
-      '/cadastros/complementos',
-      '/cadastros/taxas',
+      '/grupos-complementos',
+      '/complementos',
+      '/taxas',
       '/produtos',
-      '/cadastros/grupos-produtos',
+      '/grupos-produtos',
       '/estoque',
       '/pedidos-clientes',
     ]
@@ -88,20 +101,27 @@ export function TopNav() {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setExpandedMenus(new Set())
       }
+      if (
+        notificationsRef.current &&
+        !notificationsRef.current.contains(event.target as Node)
+      ) {
+        setNotificationsOpen(false)
+      }
     }
 
-    if (expandedMenus.size > 0) {
+    if (expandedMenus.size > 0 || notificationsOpen) {
       document.addEventListener('mousedown', handleClickOutside)
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [expandedMenus, isMobileMenuOpen])
+  }, [expandedMenus, isMobileMenuOpen, notificationsOpen])
 
   // Fechar dropdown ao mudar de rota
   useEffect(() => {
     setExpandedMenus(new Set())
+    setNotificationsOpen(false)
   }, [pathname])
 
   const toggleMenu = useCallback(
@@ -133,81 +153,85 @@ export function TopNav() {
     children?: ChildMenuItem[]
   }
 
-  const menuItems: MenuItem[] = [
-    { 
-      name: 'Dashboard', 
-      path: '/dashboard', 
-      icon: MdDashboard 
-    },
-    {
-      name: 'Produtos',
-      path: '#',
-      icon: MdShoppingBag,
-      children: [
-        { name: 'Grupo de Produtos', path: '/cadastros/grupos-produtos', icon: MdCategory },
-        { name: 'Produtos', path: '/produtos', icon: MdShoppingBag },
-        { name: 'Grupo de Complementos', path: '/cadastros/grupos-complementos', icon: MdCategory },
-        { name: 'Complementos', path: '/cadastros/complementos', icon: MdAddCircle },
-      ],
-    },
-    {
-      name: 'Usuários',
-      path: '#',
-      icon: MdPeople,
-      children: [
-        { name: 'Perfis PDV', path: '/cadastros/perfis-usuarios-pdv', icon: MdGroup },
-        { name: 'Usuários PDV', path: '/cadastros/usuarios', icon: MdPerson },
-        { name: 'Perfis Gestor', path: '/cadastros/perfis-gestor', icon: MdAccountBalance },
-        { name: 'Usuários Gestor', path: '/cadastros/usuarios-gestor', icon: MdPerson },
-        { name: 'Clientes', path: '/cadastros/clientes', icon: MdPeople },
-      ],
-    },
-    {
-      name: 'Vendas',
-      path: '#',
-      icon: MdPointOfSale,
-      children: [
-        { name: 'Pedidos e Clientes', path: '/pedidos-clientes', icon: MdReceipt },
-        {
-          name: 'Mesas Abertas',
-          path: '/vendas/abertas',
-          renderIcon: () => (
-            <TipoVendaIcon
-              tipoVenda="mesa"
-              numeroMesa="#"
-              size={32}
-              containerScale={0.9}
-              corTexto="#FFFFFF"
-              corCirculoInterno="#4b5563"
-              corBorda="#4b5563"
-              corFundo="#4b5563"
-              corPrincipal="#4b5563"
-            />
-          ),
-        },
-        { name: 'Relatórios Vendas', path: '/relatorios-vendas', icon: MdAssessment },
-        { name: 'Hist. Fechamentos', path: '/historico-fechamento', icon: MdHistory },
-        { name: 'Comissões', path: '/vendas/comissoes', icon: MdPercent },
+  const menuItems: MenuItem[] = useMemo(() => {
+    const items: MenuItem[] = [
+      {
+        name: 'Dashboard',
+        path: '/dashboard',
+        icon: MdDashboard,
+      },
+      {
+        name: 'Produtos',
+        path: '#',
+        icon: MdShoppingBag,
+        children: [
+          { name: 'Grupo de Produtos', path: '/grupos-produtos', icon: MdCategory },
+          { name: 'Produtos', path: '/produtos', icon: MdShoppingBag },
+          { name: 'Grupo de Complementos', path: '/grupos-complementos', icon: MdCategory },
+          { name: 'Complementos', path: '/complementos', icon: MdAddCircle },
+        ],
+      },
+      {
+        name: 'Usuários',
+        path: '#',
+        icon: MdPeople,
+        children: [
+          { name: 'Perfis PDV', path: '/perfis-usuarios-pdv', icon: MdGroup },
+          { name: 'Usuários PDV', path: '/usuarios', icon: MdPerson },
+          { name: 'Entregadores', path: '/entregadores', icon: MdDeliveryDining },
+          { name: 'Clientes', path: '/clientes', icon: MdPeople },
+        ],
+      },
+      {
+        name: 'Vendas',
+        path: '#',
+        icon: MdPointOfSale,
+        children: [
+          { name: 'Pedidos e Clientes', path: '/pedidos-clientes', icon: MdReceipt },
+          {
+            name: 'Mesas Abertas',
+            path: '/vendas/abertas',
+            renderIcon: () => (
+              <TipoVendaIcon
+                tipoVenda="mesa"
+                numeroMesa="#"
+                size={32}
+                containerScale={0.9}
+                corTexto="#FFFFFF"
+                corCirculoInterno="#4b5563"
+                corBorda="#4b5563"
+                corFundo="#4b5563"
+                corPrincipal="#4b5563"
+              />
+            ),
+          },
+          { name: 'Relatórios Vendas', path: '/relatorios-vendas', icon: MdAssessment },
+          { name: 'Relatório Produtoss', path: '/relatorios-produtos-vendidos', icon: MdAnalytics },
+          { name: 'Hist. Fechamentos', path: '/historico-fechamento', icon: MdHistory },
+          { name: 'Comissões', path: '/vendas/comissoes', icon: MdPercent },
+        ],
+      },
+      { name: 'Portal do Contador', path: '/portal-contador', icon: MdAccountBalance },
+      { name: 'Configurações', path: '/configuracoes/empresa', icon: MdSettings },
+    ]
 
-      ],
-    },
-    { name: 'Painel do Contador', path: '/painel-contador', icon: MdAccountBalance },
-    { name: 'Configurações', path: '/configuracoes', icon: MdSettings },
-  ]
+    if (!temAcessoFiscal) {
+      return items.filter(item => item.path !== '/portal-contador')
+    }
+    return items
+  }, [temAcessoFiscal])
 
   const isMenuActive = (item: typeof menuItems[0]) => {
     if (item.path !== '#') {
-      return pathname === item.path || pathname?.startsWith(item.path + '/')
+      return matchesModulePath(pathname ?? '', item.path)
     }
     if (item.children) {
-      return item.children.some((child) => pathname === child.path || pathname?.startsWith(child.path + '/'))
+      return item.children.some(child => matchesModulePath(pathname ?? '', child.path))
     }
     return false
   }
 
-  const isChildActive = (childPath: string) => {
-    return pathname === childPath || pathname?.startsWith(childPath + '/')
-  }
+  const isChildActive = (childPath: string) => matchesModulePath(pathname ?? '', childPath)
 
   const closeSubmenus = useCallback(() => setExpandedMenus(new Set()), [])
 
@@ -221,10 +245,10 @@ export function TopNav() {
       closeSubmenus()
       setIsMobileMenuOpen(false)
       setTimeout(() => {
-        router.push(path)
+        router.push(toGestao(path))
       }, 80)
     },
-    [closeSubmenus, router]
+    [closeSubmenus, router, toGestao]
   )
 
   const handleMobileChildNavigate = useCallback(
@@ -235,15 +259,8 @@ export function TopNav() {
   )
 
   const handleLogout = useCallback(async () => {
-    try {
-      queryClient.clear()
-      await logout()
-      window.location.href = '/login'
-    } catch (error) {
-      console.error('Erro ao fazer logout:', error)
-      window.location.href = '/login'
-    }
-  }, [queryClient, logout])
+    await disconnectEmpresaTab({ queryClient, logoutTenant })
+  }, [queryClient, logoutTenant])
 
   useEffect(() => {
     if (isMobileMenuOpen) {
@@ -364,17 +381,12 @@ export function TopNav() {
               </button>
             )
           })}
+
+          <EmpresaSwitcherTopNav variant="mobile" />
         </div>
 
         <div className="mt-auto border-t border-gray-200 pt-4 flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary/80 rounded-full flex items-center justify-center text-white font-semibold">
-            {isHydrated
-              ? user?.getName()?.charAt(0).toUpperCase() ||
-                user?.getEmail()?.charAt(0).toUpperCase() ||
-                'U'
-              : 'U'}
-          </div>
-          <div className="flex-1 min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-gray-900">
               {isHydrated ? user?.getName() || user?.getEmail() || 'Usuário' : 'Usuário'}
             </p>
@@ -401,7 +413,7 @@ export function TopNav() {
       <div className="h-full flex items-center justify-between xl:px-4">
         {/* Logo */}
         <div className="flex items-center">
-          <Link href="/dashboard" className="flex items-center">
+          <Link href={toGestao('/dashboard')} className="flex items-center">
             <div className="relative ml-6 md:ml-0 w-12 h-12 sm:w-20 sm:h-16">
               <Image
                 src="/images/jiffy-100x100.gif"
@@ -464,7 +476,7 @@ export function TopNav() {
                         return (
                           <Link
                             key={child.path}
-                            href={child.path}
+                            href={toGestao(child.path)}
                             onMouseEnter={() => handleLinkHover(child.path)}
                             onClick={() => setExpandedMenus(new Set())}
                             prefetch={true}
@@ -491,7 +503,7 @@ export function TopNav() {
             return (
               <Link
                 key={item.path}
-                href={item.path}
+                href={toGestao(item.path)}
                 onMouseEnter={() => handleLinkHover(item.path)}
                 prefetch={true}
                 className={`flex items-center gap-1.5 xl:px-4 px-1 py-2 rounded-lg text-xs lg:text-sm font-medium transition-all duration-200 ${
@@ -506,6 +518,8 @@ export function TopNav() {
               </Link>
             )
           })}
+
+          <EmpresaSwitcherTopNav variant="desktop" />
         </div>
 
         {/* Mobile toggler */}
@@ -521,40 +535,50 @@ export function TopNav() {
         <div className="hidden sm:flex items-center gap-2">
           
           {/* Notifications */}
-          <button className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-            </svg>
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
-          </button>
+          <div ref={notificationsRef} className="relative">
+            <button
+              type="button"
+              className="relative rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100"
+              aria-label="Notificações"
+              aria-expanded={notificationsOpen}
+              aria-haspopup="true"
+              onClick={() => setNotificationsOpen(open => !open)}
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                />
+              </svg>
+            </button>
+            {notificationsOpen ? (
+              <div
+                role="tooltip"
+                className="absolute left-1/2 top-full z-50 mt-2 w-max max-w-[240px] -translate-x-1/2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-center text-xs text-gray-600 shadow-lg"
+              >
+                Você não tem mensagens no momento.
+              </div>
+            ) : null}
+          </div>
 
-          {/* User Profile - Agora clicável */}
-          <Link
-            href="/perfil"
-            onMouseEnter={() => handleLinkHover('/perfil')}
-            className="flex items-center gap-2 pl-3 border-l border-gray-200 hover:bg-gray-50 rounded-lg px-2 py-1 transition-colors cursor-pointer"
+          {/* Dados do usuário (perfil será acessado noutro local) */}
+          <div
+            className="flex min-w-0 max-w-[min(100%,14rem)] flex-col items-end justify-center pl-3 text-right sm:max-w-[min(100%,18rem)] xl:max-w-[min(100%,22rem)] border-l border-gray-200 px-2 py-1.5"
             title={
               isHydrated
                 ? `${user?.getName() || 'Usuário'}${user?.getEmail() ? ` • ${user.getEmail()}` : ''}`
                 : 'Usuário'
             }
           >
-            <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/80 rounded-full flex items-center justify-center">
-              <span className="text-xs font-semibold text-white">
-                {isHydrated
-                  ? user?.getName()?.charAt(0).toUpperCase() || user?.getEmail()?.charAt(0).toUpperCase() || 'U'
-                  : 'U'}
-              </span>
-            </div>
-            <div className="hidden xl:block">
-              <p className="text-sm font-medium text-gray-900">
-                {isHydrated ? user?.getName() || user?.getEmail() || 'Usuário' : 'Usuário'}
-              </p>
-              <p className="text-xs text-gray-500">
-                {isHydrated && user?.getEmail() ? user.getEmail() : 'Admin'}
-              </p>
-            </div>
-          </Link>
+            <p className="truncate text-sm font-medium text-gray-900">
+              {isHydrated ? user?.getName() || user?.getEmail() || 'Usuário' : 'Usuário'}
+            </p>
+            <p className="truncate text-xs text-gray-500">
+              {isHydrated && user?.getEmail() ? user.getEmail() : 'Admin'}
+            </p>
+          </div>
 
           {/* Logout */}
           <button

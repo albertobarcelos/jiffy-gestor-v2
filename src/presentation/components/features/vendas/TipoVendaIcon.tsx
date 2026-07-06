@@ -1,11 +1,12 @@
 'use client'
 
 import React from 'react'
-import { MdMonitor, MdPointOfSale, MdRestaurant, MdRestaurantMenu } from 'react-icons/md'
+import { MdDeliveryDining, MdPointOfSale } from 'react-icons/md'
 import { RiBeerFill } from 'react-icons/ri'
+import { TbPaperBag } from 'react-icons/tb'
 
 interface TipoVendaIconProps {
-  tipoVenda: 'mesa' | 'balcao' | 'gestor'
+  tipoVenda: 'mesa' | 'balcao' | 'gestor' | 'entrega' | 'retirada'
   numeroMesa?: number | string | null
   className?: string
   size?: number // Adicionado a prop size
@@ -20,6 +21,7 @@ interface TipoVendaIconProps {
   corFundo?: string // Cor de fundo do círculo externo - padrão: var(--color-primary-background)
   corBalcao?: string // Cor do ícone de balcão - padrão: var(--color-alternate)
   corGestor?: string // Cor do rótulo "Gestor" - padrão: var(--color-alternate)
+  corEntrega?: string // Cor do ícone/rótulo "Entrega" - padrão: var(--color-primary)
 }
 
 /**
@@ -35,8 +37,10 @@ interface TipoVendaIconProps {
  * - Texto "Balcão" abaixo
  *
  * Para Gestor:
- * - Composição MdMonitor + MdRestaurant (tela + food; não há um único glifo MD com os dois)
- * - Texto "Gestor" abaixo
+ * - MdPointOfSale + texto "Gestor"
+ *
+ * Para Entrega (mesmo ícone do EscolhaTipoPedidoModal):
+ * - MdDeliveryDining + texto "Entrega"
  */
 export function TipoVendaIcon({
   tipoVenda,
@@ -52,6 +56,7 @@ export function TipoVendaIcon({
   corFundo = 'var(--color-primary-background)',
   corBalcao = 'var(--color-alternate)',
   corGestor = 'var(--color-alternate)',
+  corEntrega = 'var(--color-primary)',
   title,
 }: TipoVendaIconProps) {
   const scale = containerScale
@@ -64,6 +69,7 @@ export function TipoVendaIcon({
   const beerIconSize = size // Tamanho do ícone da cerveja para balcão
   const balcaoTextSize = size / 5 // Tamanho da fonte do texto "Balcão"
   const gestorTextSize = size / 5 // Tamanho da fonte do texto "Gestor"
+  const entregaTextSize = size / 5
 
   if (tipoVenda === 'mesa') {
     return (
@@ -194,6 +200,46 @@ export function TipoVendaIcon({
           style={{ color: corBalcao, fontSize: `${balcaoTextSize}px`, lineHeight: 1 }}
         >
           Balcão
+        </span>
+      </div>
+    )
+  }
+
+  if (tipoVenda === 'entrega' || tipoVenda === 'retirada') {
+    return (
+      <div
+        className={`flex flex-col items-center justify-center ${title ? 'tooltip-hover' : ''} ${className}`}
+        style={{
+          height: `${iconHeight}px`,
+          width: `${outerCircleSize}px`,
+          minHeight: `${iconHeight}px`,
+          minWidth: `${outerCircleSize}px`,
+          maxHeight: `${iconHeight}px`,
+          maxWidth: `${outerCircleSize}px`,
+          flexShrink: 0,
+        }}
+        {...(title ? { 'data-tooltip': title } : {})}
+      >
+        {tipoVenda === 'retirada' ? (
+          <TbPaperBag
+            size={Math.round(beerIconSize * 0.82)}
+            color={corEntrega}
+            className="block shrink-0"
+            aria-hidden
+          />
+        ) : (
+          <MdDeliveryDining
+            size={Math.round(beerIconSize * 0.82)}
+            color={corEntrega}
+            className="block shrink-0"
+            aria-hidden
+          />
+        )}
+        <span
+          className="mt-1 whitespace-nowrap font-medium"
+          style={{ color: corEntrega, fontSize: `${entregaTextSize}px`, lineHeight: 1 }}
+        >
+          {tipoVenda === 'retirada' ? 'Retirada' : 'Entrega'}
         </span>
       </div>
     )

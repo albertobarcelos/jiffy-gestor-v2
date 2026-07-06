@@ -2,8 +2,11 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
 import { showToast } from '@/src/shared/utils/toast'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 interface PerfilPDV {
   id: string
@@ -15,21 +18,11 @@ interface PerfilPDV {
  * Ideal para uso em formulários de usuários.
  */
 export function usePerfisPDV() {
-  const { auth, isAuthenticated } = useAuthStore()
-  const token = auth?.getAccessToken()
-
-  return useQuery<PerfilPDV[], ApiError>({
-    queryKey: ['perfis-pdv'],
-    queryFn: async () => {
-      if (!isAuthenticated || !token) {
-        throw new Error('Usuário não autenticado ou token ausente.')
-      }
-
-      const response = await fetch('/api/perfis-pdv', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+  return useSecureTenantQuery<PerfilPDV[]>(
+    ['perfis-pdv'],
+    async ({ token }) => {
+      const response = await fetchGestorApi('/api/perfis-pdv', {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       })
 
       if (!response.ok) {
@@ -42,16 +35,13 @@ export function usePerfisPDV() {
       }
 
       const data = await response.json()
-      const perfis = (data.items || []).map((item: any) => ({
+      return (data.items || []).map((item: any) => ({
         id: item.id?.toString() || '',
         role: item.role?.toString() || '',
       }))
-
-      return perfis
     },
-    enabled: isAuthenticated && !!token,
-    staleTime: 1000 * 60 * 10, // 10 minutos (perfis mudam pouco)
-  })
+    { staleTime: 1000 * 60 * 10 }
+  )
 }
 
 

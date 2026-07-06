@@ -1,6 +1,6 @@
-import { useQuery } from '@tanstack/react-query'
-
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import type { DashboardEvolucaoPoint } from '@/src/presentation/hooks/useDashboardEvolucaoQuery'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 const ISO_DIA = /^\d{4}-\d{2}-\d{2}$/
 
@@ -37,10 +37,6 @@ type Params = {
   enabled?: boolean
   /** Fuso IANA da empresa (ex.: America/Sao_Paulo). */
   timeZoneEmpresa?: string
-}
-
-function pad2(n: number): string {
-  return String(n).padStart(2, '0')
 }
 
 function getTimeZoneOffsetMinutes(date: Date, timeZone: string): number {
@@ -113,7 +109,7 @@ function rangeDiaNoFusoEmpresaParaUtc(args: {
   return { inicioUtc, fimUtc }
 }
 
-async function fetchFaturamentoPorDia(params: Params): Promise<Record<string, number>> {
+async function fetchFaturamentoPorDia(params: Params & { token: string }): Promise<Record<string, number>> {
   const tz = (params.timeZoneEmpresa ?? '').trim()
 
   /**
@@ -153,7 +149,9 @@ async function fetchFaturamentoPorDia(params: Params): Promise<Record<string, nu
   search.append('dataFinalizacaoFinal', fim.toISOString())
   search.append('status', 'FINALIZADA')
 
-  const response = await fetch(`/api/dashboard/evolucao?${search.toString()}`)
+  const response = await fetchGestorApi(`/api/dashboard/evolucao?${search.toString()}`, {
+    headers: { Authorization: `Bearer ${params.token}` },
+  })
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>
   if (!response.ok) {
     const msg = typeof data.error === 'string' ? data.error : 'Erro ao carregar faturamento por dia'
@@ -177,16 +175,18 @@ export function useDashboardFaturamentoPorDiaQuery({
   enabled = true,
   timeZoneEmpresa,
 }: Params) {
-  return useQuery({
-    queryKey: [
+  return useSecureTenantQuery(
+    [
       'dashboard',
       'faturamento-por-dia',
       periodoInicial.toISOString(),
       periodoFinal.toISOString(),
       timeZoneEmpresa ?? '',
     ],
-    queryFn: () => fetchFaturamentoPorDia({ periodoInicial, periodoFinal, timeZoneEmpresa }),
-    enabled,
-    staleTime: 30_000,
-  })
+    ({ token }) => fetchFaturamentoPorDia({ periodoInicial, periodoFinal, timeZoneEmpresa, token }),
+    {
+      enabled,
+      staleTime: 30_000,
+    }
+  )
 }

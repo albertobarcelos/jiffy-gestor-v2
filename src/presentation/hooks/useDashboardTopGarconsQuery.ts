@@ -1,5 +1,7 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData } from '@tanstack/react-query'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { DashboardTopGarcom } from '@/src/domain/entities/DashboardTopGarcom'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 type ApiItem = {
   usuarioId: string
@@ -19,6 +21,7 @@ type Params = {
   limit?: number
   periodoInicial?: Date | null
   periodoFinal?: Date | null
+  timezone?: string
   enabled?: boolean
 }
 
@@ -27,16 +30,19 @@ export type DashboardTopGarconsQueryData = {
   totalUsuariosComVendas: number
 }
 
-async function fetchTopGarcons(params: Params): Promise<DashboardTopGarconsQueryData> {
+async function fetchTopGarcons(params: Params & { token: string; timezone: string }): Promise<DashboardTopGarconsQueryData> {
   const search = new URLSearchParams()
   search.append('periodo', params.periodo)
+  search.append('timezone', params.timezone)
   search.append('limit', String(params.limit ?? 10))
   if (params.periodoInicial && params.periodoFinal) {
     search.append('dataFinalizacaoInicial', params.periodoInicial.toISOString())
     search.append('dataFinalizacaoFinal', params.periodoFinal.toISOString())
   }
 
-  const response = await fetch(`/api/dashboard/top-garcons?${search.toString()}`)
+  const response = await fetchGestorApi(`/api/dashboard/top-garcons?${search.toString()}`, {
+    headers: { Authorization: `Bearer ${params.token}` },
+  })
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>
   if (!response.ok) {
     const msg = typeof data.error === 'string' ? data.error : 'Erro ao buscar top garçons.'
@@ -68,19 +74,27 @@ export function useDashboardTopGarconsQuery({
   limit = 10,
   periodoInicial,
   periodoFinal,
+  timezone,
   enabled = true,
 }: Params) {
-  return useQuery({
-    queryKey: [
+  const resolvedTimezone = timezone?.trim() || 'America/Sao_Paulo'
+
+  return useSecureTenantQuery(
+    [
       'dashboard',
       'top-garcons',
       periodo,
       limit,
       periodoInicial ? periodoInicial.toISOString() : null,
       periodoFinal ? periodoFinal.toISOString() : null,
+      resolvedTimezone,
     ],
-    queryFn: () => fetchTopGarcons({ periodo, limit, periodoInicial, periodoFinal, enabled }),
-    enabled,
-    staleTime: 30_000,
-  })
+    ({ token }) =>
+      fetchTopGarcons({ periodo, limit, periodoInicial, periodoFinal, token, timezone: resolvedTimezone }),
+    {
+      enabled,
+      staleTime: 30_000,
+      placeholderData: keepPreviousData,
+    }
+  )
 }

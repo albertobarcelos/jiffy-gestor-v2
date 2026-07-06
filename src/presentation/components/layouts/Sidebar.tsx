@@ -1,12 +1,16 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { disconnectEmpresaTab } from '@/src/presentation/utils/disconnectEmpresaTab'
 import { useQueryClient } from '@tanstack/react-query'
 import { usePrefetch } from '@/src/presentation/hooks/usePrefetch'
+import { useAcessoFiscal } from '@/src/presentation/hooks/useAcessoFiscal'
+import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
+import { matchesModulePath } from '@/src/shared/utils/gestaoRoutes'
 
 /**
  * Sidebar do dashboard
@@ -16,19 +20,35 @@ export function Sidebar() {
   const [isCompact, setIsCompact] = useState(false)
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set())
   const pathname = usePathname()
-  const searchParams = useSearchParams()
   const router = useRouter()
-  const { logout } = useAuthStore()
+  const { logoutTenant } = useAuthStore()
   const queryClient = useQueryClient()
+  const temAcessoFiscal = useAcessoFiscal()
+  const { toGestao } = useGestaoPath()
   // const { prefetchRoute } = usePrefetch() // prefetchRoute não existe mais
+
+  useEffect(() => {
+    if (
+      pathname === '/relatorios-vendas' ||
+      pathname?.startsWith('/relatorios-vendas/') ||
+      pathname === '/relatorios-produtos-vendidos' ||
+      pathname?.startsWith('/relatorios-produtos-vendidos/')
+    ) {
+      setExpandedMenus(prev => {
+        const next = new Set(prev)
+        next.add('Relatórios')
+        return next
+      })
+    }
+  }, [pathname])
 
   // Prefetch agressivo das rotas mais acessadas na inicialização
   useEffect(() => {
     const routesToPrefetch = [
-      '/cadastros/grupos-complementos',
-      '/cadastros/complementos',
+      '/grupos-complementos',
+      '/complementos',
       '/produtos',
-      '/cadastros/grupos-produtos',
+      '/grupos-produtos',
       '/estoque',
     ]
     
@@ -65,10 +85,10 @@ export function Sidebar() {
         newExpanded.add(menuName)
         // Quando expandir "Cadastros", prefetch das rotas mais acessadas
         if (menuName === 'Cadastros') {
-          // prefetchRoute('/cadastros/grupos-complementos')
-          // prefetchRoute('/cadastros/complementos')
+          // prefetchRoute('/grupos-complementos')
+          // prefetchRoute('/complementos')
           // prefetchRoute('/produtos')
-          // prefetchRoute('/cadastros/grupos-produtos')
+          // prefetchRoute('/grupos-produtos')
         }
       }
       setExpandedMenus(newExpanded)
@@ -76,60 +96,63 @@ export function Sidebar() {
     [expandedMenus]
   )
 
-  const menuItems = [
-    { name: 'Dashboard', path: '/dashboard', icon: '🏠' },
-    {
-      name: 'Cadastros',
-      path: '#',
-      icon: '📋',
-      children: [
-        { name: 'Grupo Produtos', path: '/cadastros/grupos-produtos', icon: '📦' },
-        { name: 'Produtos', path: '/produtos', icon: '🛍️' },
-        { name: 'Grupo Complementos', path: '/cadastros/grupos-complementos', icon: '📋' },
-        { name: 'Complementos', path: '/cadastros/complementos', icon: '➕' },
-        { name: 'Usuários', path: '/cadastros/usuarios', icon: '👤' },
-        { name: 'Perfis de Usuários', path: '/cadastros/perfis-usuarios', icon: '👥' },
-        { name: 'Clientes', path: '/cadastros/clientes', icon: '👥' },
-        { name: 'Impressoras', path: '/cadastros/impressoras', icon: '🖨️' },
-        {
-          name: 'Meios de Pagamentos',
-          path: '/configuracoes?tab=meios-pagamentos',
-          icon: '💳',
-        },
-      ],
-    },
-    { name: 'Estoque', path: '/estoque', icon: '📦' },
-    { name: 'Meu Caixa', path: '/meu-caixa', icon: '💼' },
-    { name: 'Pedidos e Clientes', path: '/pedidos-clientes', icon: '📄' },
-    { name: 'Painel do Contador', path: '/painel-contador', icon: '📊' },
-    { name: 'Relatórios', path: '/relatorios-vendas', icon: '📊' },
-    { name: 'Configurações', path: '/configuracoes', icon: '⚙️' },
-  ]
+  const menuItems = useMemo(() => {
+    const items = [
+      { name: 'Dashboard', path: '/dashboard', icon: '🏠' },
+      {
+        name: 'Cadastros',
+        path: '#',
+        icon: '📋',
+        children: [
+          { name: 'Grupo Produtos', path: '/grupos-produtos', icon: '📦' },
+          { name: 'Produtos', path: '/produtos', icon: '🛍️' },
+          { name: 'Grupo Complementos', path: '/grupos-complementos', icon: '📋' },
+          { name: 'Complementos', path: '/complementos', icon: '➕' },
+          { name: 'Usuários', path: '/usuarios', icon: '👤' },
+          { name: 'Entregadores', path: '/entregadores', icon: '🛵' },
+          { name: 'Perfis de Usuários', path: '/perfis-usuarios-pdv', icon: '👥' },
+          { name: 'Clientes', path: '/clientes', icon: '👥' },
+          { name: 'Impressoras', path: '/impressoras', icon: '🖨️' },
+          {
+            name: 'Meios de Pagamentos',
+            path: '/configuracoes/meios-pagamentos',
+            icon: '💳',
+          },
+        ],
+      },
+      { name: 'Estoque', path: '/estoque', icon: '📦' },
+      { name: 'Meu Caixa', path: '/meu-caixa', icon: '💼' },
+      { name: 'Pedidos e Clientes', path: '/pedidos-clientes', icon: '📄' },
+      { name: 'Portal do Contador', path: '/portal-contador', icon: '📊' },
+      {
+        name: 'Relatórios',
+        path: '#',
+        icon: '📊',
+        children: [
+          { name: 'Vendas PDV', path: '/relatorios-vendas', icon: '📄' },
+          { name: 'Produtos vendidos', path: '/relatorios-produtos-vendidos', icon: '🛒' },
+        ],
+      },
+      { name: 'Configurações', path: '/configuracoes/empresa', icon: '⚙️' },
+    ]
+
+    if (!temAcessoFiscal) {
+      return items.filter(item => item.path !== '/portal-contador')
+    }
+    return items
+  }, [temAcessoFiscal])
 
   const isMenuActive = (item: typeof menuItems[0]) => {
     if (item.path !== '#') {
-      return pathname === item.path || pathname?.startsWith(item.path + '/')
+      return matchesModulePath(pathname ?? '', item.path)
     }
-    // Para menus com children, verificar se algum filho está ativo
     if (item.children) {
-      return item.children.some((child) => pathname === child.path || pathname?.startsWith(child.path + '/'))
+      return item.children.some(child => matchesModulePath(pathname ?? '', child.path))
     }
     return false
   }
 
-  /** Considera query string (ex.: /configuracoes?tab=meios-pagamentos) para marcar item ativo */
-  const isChildActive = (childPath: string) => {
-    if (childPath.includes('?')) {
-      const [base, qs] = childPath.split('?')
-      if (pathname !== base) return false
-      const required = new URLSearchParams(qs)
-      for (const [key, value] of required.entries()) {
-        if (searchParams.get(key) !== value) return false
-      }
-      return true
-    }
-    return pathname === childPath || pathname?.startsWith(childPath + '/')
-  }
+  const isChildActive = (childPath: string) => matchesModulePath(pathname ?? '', childPath)
 
   return (
     <div
@@ -203,7 +226,7 @@ export function Sidebar() {
                             return (
                               <li key={child.path}>
                                 <Link
-                                  href={child.path}
+                                  href={toGestao(child.path)}
                                   onMouseEnter={() => handleLinkHover(child.path)}
                                   prefetch={true}
                                   className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
@@ -229,7 +252,7 @@ export function Sidebar() {
               return (
                 <li key={item.path}>
                   <Link
-                    href={item.path}
+                    href={toGestao(item.path)}
                     onMouseEnter={() => handleLinkHover(item.path)}
                     prefetch={true}
                     className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
@@ -252,20 +275,7 @@ export function Sidebar() {
         <div className="p-4 border-t border-info/20">
           <button
             onClick={async () => {
-              try {
-                // Limpar cache do React Query
-                queryClient.clear()
-                
-                // Fazer logout (limpa store, localStorage e chama API para remover cookie)
-                await logout()
-                
-                // Forçar redirecionamento com reload completo para garantir limpeza
-                window.location.href = '/login'
-              } catch (error) {
-                console.error('Erro ao fazer logout:', error)
-                // Mesmo com erro, força redirecionamento
-                window.location.href = '/login'
-              }
+              await disconnectEmpresaTab({ queryClient, logoutTenant })
             }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-info/80 hover:bg-info/10 transition-colors ${
               isCompact ? 'justify-center' : ''

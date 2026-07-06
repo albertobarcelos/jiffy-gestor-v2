@@ -23,30 +23,38 @@ export function buildInutilizacoesQuery(searchParams: URLSearchParams): URLSearc
   return params
 }
 
-export function validateGapsQuery(searchParams: URLSearchParams): {
+export function validateInutilizaveisQuery(searchParams: URLSearchParams): {
   ok: boolean
   error?: string
   params?: URLSearchParams
 } {
   const modelo = searchParams.get('modelo')
   const serie = searchParams.get('serie')
+  const ambiente = searchParams.get('ambiente')
   const numeroInicial = searchParams.get('numeroInicial')
   const numeroFinal = searchParams.get('numeroFinal')
+  const page = searchParams.get('page')
+  const size = searchParams.get('size')
 
-  if (!modelo || !serie) {
+  if (!modelo || !serie || !ambiente) {
     return {
       ok: false,
-      error: 'modelo e serie são obrigatórios',
+      error: 'modelo, serie e ambiente são obrigatórios',
     }
   }
 
-  const params = new URLSearchParams({ modelo, serie })
+  const params = new URLSearchParams({ modelo, serie, ambiente })
   if (numeroInicial) params.append('numeroInicial', numeroInicial)
   if (numeroFinal) params.append('numeroFinal', numeroFinal)
+  if (page) params.append('page', page)
+  if (size) params.append('size', size)
 
   return {
     ok: true,
     params,
   }
 }
+
+/** @deprecated Use validateInutilizaveisQuery */
+export const validateGapsQuery = validateInutilizaveisQuery
 

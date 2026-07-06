@@ -1,5 +1,7 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData } from '@tanstack/react-query'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { DashboardTopProduto } from '@/src/domain/entities/DashboardTopProduto'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 type ApiItem = {
   produto: string
@@ -9,26 +11,56 @@ type ApiItem = {
 
 type ApiResponse = {
   items: ApiItem[]
+  totaisPeriodo?: { quantidadeTotal: number; valorTotal: number }
+}
+
+export type DashboardTopProdutosTotaisPeriodo = {
+  quantidadeTotal: number
+  valorTotal: number
+}
+
+export type DashboardTopProdutosQueryData = {
+  produtos: DashboardTopProduto[]
+  totaisPeriodo: DashboardTopProdutosTotaisPeriodo
+}
+
+const totaisPeriodoVazio: DashboardTopProdutosTotaisPeriodo = {
+  quantidadeTotal: 0,
+  valorTotal: 0,
+}
+
+function normalizarTotaisPeriodo(raw: ApiResponse['totaisPeriodo']): DashboardTopProdutosTotaisPeriodo {
+  if (!raw || typeof raw !== 'object') return totaisPeriodoVazio
+  const q = raw.quantidadeTotal
+  const v = raw.valorTotal
+  return {
+    quantidadeTotal: typeof q === 'number' && Number.isFinite(q) ? q : 0,
+    valorTotal: typeof v === 'number' && Number.isFinite(v) ? v : 0,
+  }
 }
 
 type Params = {
   periodo: string
-  limit?: number
   periodoInicial?: Date | null
   periodoFinal?: Date | null
+  timezone?: string
   enabled?: boolean
 }
 
-async function fetchTopProdutos(params: Params): Promise<DashboardTopProduto[]> {
+async function fetchTopProdutos(
+  params: Params & { token: string; timezone: string }
+): Promise<DashboardTopProdutosQueryData> {
   const search = new URLSearchParams()
   search.append('periodo', params.periodo)
-  search.append('limit', String(params.limit ?? 10))
+  search.append('timezone', params.timezone)
   if (params.periodoInicial && params.periodoFinal) {
     search.append('dataFinalizacaoInicial', params.periodoInicial.toISOString())
     search.append('dataFinalizacaoFinal', params.periodoFinal.toISOString())
   }
 
-  const response = await fetch(`/api/dashboard/top-produtos?${search.toString()}`)
+  const response = await fetchGestorApi(`/api/dashboard/top-produtos?${search.toString()}`, {
+    headers: { Authorization: `Bearer ${params.token}` },
+  })
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>
   if (!response.ok) {
     const msg = typeof data.error === 'string' ? data.error : 'Erro ao buscar top produtos.'
@@ -37,7 +69,7 @@ async function fetchTopProdutos(params: Params): Promise<DashboardTopProduto[]> 
 
   const payload = data as unknown as ApiResponse
   const items = Array.isArray(payload.items) ? payload.items : []
-  return items.map((item, index) =>
+  const produtos = items.map((item, index) =>
     DashboardTopProduto.create({
       rank: index + 1,
       produto: item.produto,
@@ -45,27 +77,36 @@ async function fetchTopProdutos(params: Params): Promise<DashboardTopProduto[]> 
       valorTotal: item.valorTotal,
     })
   )
+  return {
+    produtos,
+    totaisPeriodo: normalizarTotaisPeriodo(payload.totaisPeriodo),
+  }
 }
 
 export function useDashboardTopProdutosQuery({
   periodo,
-  limit = 10,
   periodoInicial,
   periodoFinal,
+  timezone,
   enabled = true,
 }: Params) {
-  return useQuery({
-    queryKey: [
+  const resolvedTimezone = timezone?.trim() || 'America/Sao_Paulo'
+
+  return useSecureTenantQuery<DashboardTopProdutosQueryData>(
+    [
       'dashboard',
       'top-produtos',
       periodo,
-      limit,
       periodoInicial ? periodoInicial.toISOString() : null,
       periodoFinal ? periodoFinal.toISOString() : null,
+      resolvedTimezone,
     ],
-    queryFn: () => fetchTopProdutos({ periodo, limit, periodoInicial, periodoFinal, enabled }),
-    enabled,
-    staleTime: 30_000,
-  })
+    ({ token }) =>
+      fetchTopProdutos({ periodo, periodoInicial, periodoFinal, token, timezone: resolvedTimezone }),
+    {
+      enabled,
+      staleTime: 30_000,
+      placeholderData: keepPreviousData,
+    }
+  )
 }
-

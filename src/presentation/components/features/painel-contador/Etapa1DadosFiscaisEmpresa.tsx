@@ -1,118 +1,46 @@
 'use client'
 
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useTabsStore } from '@/src/presentation/stores/tabsStore'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useCertificadoDigital } from '@/src/presentation/hooks/painel-contador/useCertificadoDigital'
 import { Button } from '@/src/presentation/components/ui/button'
-import { MdSettings, MdWarning, MdDelete, MdInfo, MdCheckCircle, MdRefresh } from 'react-icons/md'
+import { MdSettings, MdWarning, MdDelete, MdCheckCircle, MdRefresh } from 'react-icons/md'
 import { CertificadoUploadModal } from './CertificadoUploadModal'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/src/presentation/components/ui/dialog'
 import { showToast } from '@/src/shared/utils/toast'
+import { InfoHint } from '@/src/presentation/components/ui/InfoHint'
+import { Etapa5TabelaIbpt, IbptInfoHint } from './Etapa5TabelaIbpt'
+
+const DADOS_FISCAIS_INFO_HINT =
+  'Informe CNPJ, Inscrição Estadual (IE), Inscrição Municipal (IM) e Regime Tributário da empresa. Esses dados são obrigatórios para emissão de notas fiscais e devem ser concluídos antes do certificado digital.'
+
+const CERTIFICADO_DIGITAL_INFO_HINT =
+  'Certificado digital A1 autentica a comunicação com a SEFAZ e é obrigatório para emitir notas fiscais eletrônicas. Cadastre-o após concluir os dados fiscais da empresa.'
 
 export function Etapa1DadosFiscaisEmpresa() {
   const { addTab } = useTabsStore()
-  const { isRehydrated } = useAuthStore()
-  const [certificado, setCertificado] = useState<any>(null)
-  const [isLoadingCertificado, setIsLoadingCertificado] = useState(true)
+  const { certificadoQuery, dadosCompletosQuery, removeMutation, refetchDadosCompletos } =
+    useCertificadoDigital()
+
+  const certificadoEntity = certificadoQuery.data?.certificado
+  const certificado = certificadoEntity
+    ? {
+        id: certificadoEntity.id,
+        ambiente: certificadoEntity.ambiente,
+        validadeCertificado: certificadoEntity.validadeCertificado?.toISOString(),
+      }
+    : null
+  const isLoadingCertificado = certificadoQuery.isLoading
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
-  const [isRemoving, setIsRemoving] = useState(false)
-  
-  // Estado para verificação de dados completos
-  const [dadosCompletos, setDadosCompletos] = useState<boolean | null>(null)
-  const [isVerificandoDados, setIsVerificandoDados] = useState(false)
 
-  // Busca dados do certificado
-  const loadCertificado = useCallback(async () => {
-    setIsLoadingCertificado(true)
-    try {
-      const response = await fetch('/api/certificado')
-      
-      const result = await response.json()
-      
-      // Se a resposta indica sucesso (mesmo que data seja null), não há erro
-      if (result.success) {
-        setCertificado(result.data) // Pode ser null se não houver certificado
-      } else {
-        // Apenas logar erro se for um erro real (não "não encontrado")
-        console.error('Erro ao carregar certificado:', result.message)
-        setCertificado(null)
-      }
-    } catch (error) {
-      console.error('Erro ao carregar certificado:', error)
-      setCertificado(null)
-    } finally {
-      setIsLoadingCertificado(false)
-    }
-  }, [])
+  const dadosCompletos = dadosCompletosQuery.data ?? null
+  const isVerificandoDados = dadosCompletosQuery.isFetching
 
-  // Função para verificar se todos os dados obrigatórios estão preenchidos
-  const verificarDadosCompletos = useCallback(async () => {
-    setIsVerificandoDados(true)
-    try {
-      // Buscar dados da empresa
-      const empresaResponse = await fetch('/api/empresas/me')
-      if (!empresaResponse.ok) {
-        setDadosCompletos(false)
-        return
-      }
+  const verificarDadosCompletos = () => {
+    void refetchDadosCompletos()
+  }
 
-      const empresaData = await empresaResponse.json()
-
-      // Buscar configuração fiscal
-      const fiscalResponse = await fetch('/api/v1/fiscal/empresas-fiscais/me')
-      let configFiscal = null
-      if (fiscalResponse.ok) {
-        configFiscal = await fiscalResponse.json()
-      }
-
-      // Verificar campos obrigatórios da empresa
-      const cnpjPreenchido = empresaData?.cnpj && empresaData.cnpj.trim().length >= 14
-      const razaoSocialPreenchida = empresaData?.razaoSocial?.trim() || empresaData?.nome?.trim()
-      const estadoPreenchido = empresaData?.endereco?.estado?.trim() || empresaData?.endereco?.uf?.trim()
-
-      // Verificar campos obrigatórios fiscais
-      const inscricaoEstadualPreenchida = configFiscal?.inscricaoEstadual === 'ISENTO' || 
-                                         (configFiscal?.inscricaoEstadual && configFiscal.inscricaoEstadual.trim().length > 0)
-      const regimeTributarioPreenchido = configFiscal?.codigoRegimeTributario && 
-                                        [1, 2, 3].includes(configFiscal.codigoRegimeTributario)
-
-      // Todos os campos obrigatórios devem estar preenchidos
-      const completo = cnpjPreenchido && 
-                      razaoSocialPreenchida && 
-                      estadoPreenchido && 
-                      inscricaoEstadualPreenchida && 
-                      regimeTributarioPreenchido
-
-      setDadosCompletos(completo)
-    } catch (error) {
-      console.error('Erro ao verificar dados completos:', error)
-      setDadosCompletos(false)
-    } finally {
-      setIsVerificandoDados(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (isRehydrated) {
-      loadCertificado()
-      verificarDadosCompletos()
-    }
-  }, [isRehydrated, loadCertificado, verificarDadosCompletos])
-
-  // Recarregar verificação quando a página receber foco (usuário voltou da configuração)
-  useEffect(() => {
-    const handleFocus = () => {
-      if (isRehydrated) {
-        verificarDadosCompletos()
-      }
-    }
-
-    window.addEventListener('focus', handleFocus)
-    return () => {
-      window.removeEventListener('focus', handleFocus)
-    }
-  }, [isRehydrated, verificarDadosCompletos])
 
   // Calcula dias restantes até expiração
   const calcularDiasRestantes = (dataValidade: string | null | undefined): number | null => {
@@ -153,41 +81,17 @@ export function Etapa1DadosFiscaisEmpresa() {
 
   const handleConfirmRemover = async () => {
     if (!certificado) return
-
-    setIsRemoving(true)
-    const toastId = showToast.loading('Removendo certificado...')
-
-    try {
-      const response = await fetch('/api/certificado', {
-        method: 'DELETE',
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || 'Erro ao remover certificado')
-      }
-
-      showToast.successLoading(toastId, 'Certificado removido com sucesso!')
-      setShowConfirmModal(false)
-      
-      // Recarregar dados (agora não terá certificado)
-      await loadCertificado()
-    } catch (error: any) {
-      console.error('Erro ao remover certificado:', error)
-      showToast.errorLoading(toastId, error.message || 'Erro ao remover certificado')
-    } finally {
-      setIsRemoving(false)
-    }
+    await removeMutation.mutateAsync()
+    setShowConfirmModal(false)
   }
 
   const handleCertificadoSuccess = async () => {
-    // Aguardar um pouco para garantir que o certificado foi salvo no banco
-    await new Promise(resolve => setTimeout(resolve, 500))
-    // Recarregar dados do certificado
-    await loadCertificado()
-    // Recarregar verificação de dados (caso tenha mudado algo)
-    await verificarDadosCompletos()
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    await certificadoQuery.refetch()
+    verificarDadosCompletos()
   }
+
+  const isRemoving = removeMutation.isPending
 
   return (
     <>
@@ -246,8 +150,8 @@ export function Etapa1DadosFiscaisEmpresa() {
             </div>
           )}
 
-          <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <p className="font-inter font-medium text-amber-800 text-sm">
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p className="font-inter font-medium text-red-800 text-sm">
               ⚠️ Após a remoção, não será mais possível emitir notas fiscais até que um novo certificado seja cadastrado.
             </p>
           </div>
@@ -283,82 +187,58 @@ export function Etapa1DadosFiscaisEmpresa() {
       </Dialog>
       
       <div className="flex flex-col gap-4 p-2 sm:p-4">
-        {/* Passo 1: Configurar Dados Fiscais */}
+        {/* Passo 1: Dados da Empresa */}
         <div className="flex flex-col gap-4 rounded-lg border-2 border-alternate/30 bg-white p-5 sm:p-6 shadow-sm">
           <div className="flex items-start gap-4">
             <div className="md:flex-shrink-0 md:flex hidden items-center justify-center w-10 h-10 rounded-full bg-alternate text-white font-semibold text-lg">
               1
             </div>
-            <div className="flex-1 flex flex-col gap-2">
+            <div className="flex-1 flex flex-col gap-3">
               <div className="flex flex-col gap-2">
-                <h3 className="font-exo font-semibold text-alternate text-lg sm:text-xl">
-                  Passo 1: Configurar Dados Fiscais da Empresa
+                <h3 className="font-exo font-semibold text-alternate text-lg sm:text-xl flex flex-wrap items-center gap-1">
+                  Passo 1: Dados da Empresa
+                  <InfoHint text={DADOS_FISCAIS_INFO_HINT} />
                 </h3>
-                <p className="font-inter font-normal text-secondary-text text-sm sm:text-base leading-relaxed">
-                  Primeiro, configure os dados fiscais da sua empresa. É necessário informar corretamente o CNPJ, 
-                  Inscrição Estadual (IE), Inscrição Municipal (IM) e o Regime Tributário para que o sistema 
-                  possa funcionar adequadamente.
-                </p>
-                <div className="flex items-start gap-2 mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <MdInfo className="text-blue-600 flex-shrink-0 mt-0.5" size={20} />
-                  <p className="font-inter font-medium text-blue-800 text-xs sm:text-sm">
-                    <strong>Importante:</strong> Complete esta etapa antes de cadastrar o certificado digital. 
-                    Os dados fiscais são essenciais para a emissão de notas fiscais.
-                  </p>
-                </div>
-                
-                {/* Status dos Dados Fiscais */}
-                {isVerificandoDados ? (
-                  <div className="flex items-start gap-2 mt-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                    <div className="w-4 h-4 border-2 border-alternate border-t-transparent rounded-full animate-spin flex-shrink-0 mt-0.5" />
-                    <p className="font-inter font-medium text-gray-700 text-xs sm:text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  {isVerificandoDados ? (
+                    <div className="inline-flex w-fit items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-700 sm:text-sm">
+                      <div className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-alternate border-t-transparent" />
                       Verificando dados fiscais...
-                    </p>
-                  </div>
-                ) : dadosCompletos === true ? (
-                  <div className="flex items-start gap-2 mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <MdCheckCircle className="text-green-600 flex-shrink-0 mt-0.5" size={20} />
-                    <div className="flex-1">
-                      <p className="font-inter font-semibold text-green-800 text-xs sm:text-sm mb-2">
-                        ✓ Todos os dados fiscais estão preenchidos corretamente. Você pode prosseguir para o cadastro do certificado digital.
-                      </p>
-                      <button
-                        onClick={verificarDadosCompletos}
-                        className="flex items-center gap-1 text-green-700 hover:text-green-900 text-xs font-medium transition-colors"
-                      >
-                        <MdRefresh size={14} />
-                        Verificar novamente
-                      </button>
                     </div>
-                  </div>
-                ) : dadosCompletos === false ? (
-                  <div className="flex items-start gap-2 mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                    <MdWarning className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
-                    <div className="flex-1">
-                      <p className="font-inter font-semibold text-amber-800 text-xs sm:text-sm mb-2">
-                        ⚠️ Alguns dados fiscais obrigatórios estão faltando. Clique em "Configurar Dados Fiscais" para completar as informações necessárias.
-                      </p>
-                      <button
-                        onClick={verificarDadosCompletos}
-                        className="flex items-center gap-1 text-amber-700 hover:text-amber-900 text-xs font-medium transition-colors"
-                      >
-                        <MdRefresh size={14} />
-                        Verificar novamente
-                      </button>
+                  ) : dadosCompletos === true ? (
+                    <div className="inline-flex w-fit items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs font-medium text-green-800 sm:text-sm">
+                      <MdCheckCircle className="shrink-0" size={18} />
+                      Dados fiscais completos
                     </div>
-                  </div>
-                ) : null}
+                  ) : dadosCompletos === false ? (
+                    <div className="inline-flex w-fit items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-800 sm:text-sm">
+                      <MdWarning className="shrink-0" size={18} />
+                      Dados fiscais incompletos
+                    </div>
+                  ) : null}
+                  {!isVerificandoDados && dadosCompletos !== null && (
+                    <button
+                      type="button"
+                      onClick={verificarDadosCompletos}
+                      className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-secondary-text transition-colors hover:bg-gray-100 hover:text-alternate"
+                      title="Verificar novamente"
+                    >
+                      <MdRefresh size={16} />
+                      Verificar
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="flex md:justify-end justify-center">
+              <div className="flex flex-row items-center gap-3">
                 <Button
                   onClick={() => {
                     addTab({
                       id: 'config-empresa-completa',
                       label: 'Configuração Completa',
-                      path: '/painel-contador/config/empresa-completa',
+                      path: '/portal-contador',
                     })
                   }}
-                  className="rounded-lg px-6 py-2.5 text-white text-sm font-medium flex items-center gap-2"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white"
                   sx={{
                     backgroundColor: 'var(--color-secondary)',
                     '&:hover': { backgroundColor: 'var(--color-alternate)' },
@@ -380,77 +260,46 @@ export function Etapa1DadosFiscaisEmpresa() {
             </div>
             <div className="flex-1 flex flex-col gap-3">
               <div className="flex flex-col gap-2">
-                <h3 className="font-exo font-semibold text-alternate text-lg sm:text-xl">
-                  Passo 2: Gerenciar Certificado Digital
+                <h3 className="font-exo font-semibold text-alternate text-lg sm:text-xl flex flex-wrap items-center gap-1">
+                  Passo 2: Gerenciar
+                  <span className="inline-flex items-center gap-1">
+                    Certificado Digital
+                    <InfoHint text={CERTIFICADO_DIGITAL_INFO_HINT} />
+                  </span>
                 </h3>
-                <p className="font-inter font-normal text-secondary-text text-sm sm:text-base leading-relaxed">
-                  Após configurar os dados fiscais, cadastre o certificado digital (A1) da empresa. O certificado 
-                  é necessário para autenticar a comunicação com a SEFAZ e permitir a emissão de notas fiscais eletrônicas.
-                </p>
-                {certificado && (
-                  <div className="flex items-start gap-2 mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <MdCheckCircle className="text-green-600 flex-shrink-0 mt-0.5" size={20} />
-                    <div className="flex-1">
-                      <p className="font-inter font-semibold text-green-800 text-xs sm:text-sm mb-1">
-                        Certificado digital cadastrado e ativo
-                      </p>
-                      <div className="flex flex-col gap-1 mt-2">
-                        <span className="font-inter font-medium text-green-700 text-xs sm:text-sm">
-                          <strong>Tipo:</strong> A1
-                        </span>
-                        <span className="font-inter font-medium text-green-700 text-xs sm:text-sm">
-                          <strong>Validade:</strong> {certificado.validadeCertificado ? formatarData(certificado.validadeCertificado) : '--'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {!certificado && (
-                  <div className="flex items-start gap-2 mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                    <MdWarning className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
-                    <p className="font-inter font-medium text-amber-800 text-xs sm:text-sm">
-                      Nenhum certificado cadastrado. Cadastre um certificado digital para habilitar a emissão de notas fiscais.
-                    </p>
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-col gap-3">
                 {certificado && certificado.validadeCertificado && (() => {
                   const diasRestantes = calcularDiasRestantes(certificado.validadeCertificado)
-                  if (diasRestantes === null) return null
-                  
-                  const isExpiringSoon = diasRestantes <= 30
-                  const isExpired = diasRestantes < 0
-                  
+                  const isExpiringSoon = diasRestantes !== null && diasRestantes <= 30
+                  const isExpired = diasRestantes !== null && diasRestantes < 0
+
                   return (
-                    <div 
-                      className={`font-medium text-sm rounded-lg px-4 py-3 text-center ${
-                        isExpired 
-                          ? 'bg-red-100 text-red-700 border border-red-300' 
-                          : isExpiringSoon 
-                          ? 'bg-amber-100 text-amber-700 border border-amber-300' 
-                          : 'bg-green-100 text-green-700 border border-green-300'
+                    <div
+                      className={`inline-flex w-fit items-center gap-2 rounded-lg px-3 py-2 text-xs sm:text-sm font-medium ${
+                        isExpired
+                          ? 'bg-red-50 text-red-800 border border-red-200'
+                          : isExpiringSoon
+                            ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                            : 'bg-green-50 text-green-800 border border-green-200'
                       }`}
                     >
-                      {isExpired 
-                        ? '⚠️ Certificado Expirado - Renove imediatamente' 
-                        : isExpiringSoon
-                        ? `⚠️ Certificado expira em ${diasRestantes} dia${diasRestantes !== 1 ? 's' : ''} - Renove em breve`
-                        : `✓ Certificado válido - Expira em ${diasRestantes} dia${diasRestantes !== 1 ? 's' : ''}`}
+                      <MdCheckCircle className="shrink-0" size={18} />
+                      <span>
+                        A1 · válido até {formatarData(certificado.validadeCertificado)}
+                        {diasRestantes !== null && (
+                          <>
+                            {' '}
+                            ({isExpired
+                              ? 'expirado'
+                              : `${diasRestantes} dia${diasRestantes !== 1 ? 's' : ''} restante${diasRestantes !== 1 ? 's' : ''}`})
+                          </>
+                        )}
+                      </span>
                     </div>
                   )
                 })()}
+              </div>
+              <div className="flex flex-col gap-3">
                 <div className="flex flex-col gap-3">
-                  {/* Mensagem de aviso se dados não estiverem completos e não houver certificado */}
-                  {!certificado && dadosCompletos === false && (
-                    <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <MdWarning className="text-red-600 flex-shrink-0 mt-0.5" size={20} />
-                      <p className="font-inter font-medium text-red-800 text-xs sm:text-sm">
-                        <strong>Atenção:</strong> Complete primeiro todos os dados fiscais da empresa (Passo 1) antes de cadastrar o certificado digital.
-                      </p>
-                    </div>
-                  )}
-                  
                   <div className="flex flex-row items-center gap-3">
                     {certificado ? (
                       <Button
@@ -490,24 +339,30 @@ export function Etapa1DadosFiscaisEmpresa() {
                         {isLoadingCertificado ? 'Carregando...' : 'Cadastrar Certificado'}
                       </Button>
                     )}
-                    {certificado && (
-                      <Button
-                        onClick={handleOpenCertificadoConfig}
-                        className="rounded-lg px-4 py-2.5 text-white text-sm font-medium flex-1 flex items-center justify-center gap-2"
-                        disabled={isLoadingCertificado}
-                        sx={{
-                          backgroundColor: 'var(--color-secondary)',
-                          '&:hover': { backgroundColor: 'var(--color-alternate)' },
-                          '&:disabled': { backgroundColor: '#cbd5e1', cursor: 'not-allowed' },
-                        }}
-                      >
-                        <MdSettings size={18} />
-                        Atualizar Certificado
-                      </Button>
-                    )}
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Passo 3: Chave IBPT */}
+        <div className="flex flex-col gap-4 rounded-lg border-2 border-alternate/30 bg-white p-5 sm:p-6 shadow-sm">
+          <div className="flex items-start gap-4">
+            <div className="md:flex-shrink-0 md:flex hidden items-center justify-center w-10 h-10 rounded-full bg-alternate text-white font-semibold text-lg">
+              3
+            </div>
+            <div className="flex-1 flex flex-col gap-3">
+              <div className="flex flex-col gap-2">
+                <h3 className="font-exo font-semibold text-alternate text-lg sm:text-xl flex flex-wrap items-center gap-1">
+                  Passo 3: Chave
+                  <span className="inline-flex items-center gap-1">
+                    IBPT
+                    <IbptInfoHint />
+                  </span>
+                </h3>
+              </div>
+              <Etapa5TabelaIbpt embedded />
             </div>
           </div>
         </div>

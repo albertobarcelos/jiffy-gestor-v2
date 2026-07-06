@@ -1,3 +1,8 @@
+import {
+  normalizarUnidadeMedidaProduto,
+  type UnidadeMedidaProduto,
+} from '@/src/shared/types/unidadeMedidaProduto'
+
 /**
  * Entidade de domínio representando um Produto
  */
@@ -20,6 +25,81 @@ interface ProdutoImpressoraResumo {
   ativo: boolean
 }
 
+function asPlainRecord(v: unknown): Record<string, unknown> {
+  if (v && typeof v === 'object' && !Array.isArray(v)) return v as Record<string, unknown>
+  return {}
+}
+
+/** Primeira string não vazia (após trim); ignora `null`, `undefined` e `''`. */
+function firstNonEmptyString(...candidates: unknown[]): string {
+  for (const c of candidates) {
+    if (c === null || c === undefined) continue
+    const s = String(c).trim()
+    if (s !== '') return s
+  }
+  return ''
+}
+
+/**
+ * Lê campos fiscais do JSON do cardápio: objeto `fiscal`, opcional `dadosFiscais`,
+ * aliases comuns (`codigoCest`, `codigoNcm`) e raiz do produto.
+ */
+function extractFiscalStrings(data: any): {
+  ncm: string
+  cest: string
+  origemMercadoria: string
+  tipoProduto: string
+  indicadorProducaoEscala: string | null
+} {
+  const d = asPlainRecord(data)
+  const fiscalNested = asPlainRecord(d.fiscal)
+  const dadosFiscais = asPlainRecord(d.dadosFiscais)
+  /** `fiscal` sobrescreve `dadosFiscais` quando ambos existem. */
+  const fiscal = { ...dadosFiscais, ...fiscalNested }
+
+  const ncm = firstNonEmptyString(
+    fiscal.ncm,
+    fiscal.codigoNcm,
+    d.ncm,
+    d.codigoNcm,
+  )
+  const cest = firstNonEmptyString(
+    fiscal.cest,
+    fiscal.codigoCest,
+    fiscal.cestCodigo,
+    d.cest,
+    d.codigoCest,
+  )
+  const origemMercadoria = firstNonEmptyString(
+    fiscal.origemMercadoria,
+    fiscal.origem,
+    d.origemMercadoria,
+    d.origem,
+  )
+  const tipoProduto = firstNonEmptyString(
+    fiscal.tipoProduto,
+    fiscal.tipoMercadoria,
+    fiscal.tipoItem,
+    d.tipoProduto,
+    d.tipoMercadoria,
+  )
+
+  const indStr = firstNonEmptyString(
+    fiscal.indicadorProducaoEscala,
+    fiscal.indicadorEscala,
+    d.indicadorProducaoEscala,
+    d.indicadorEscala,
+  )
+
+  return {
+    ncm,
+    cest,
+    origemMercadoria,
+    tipoProduto,
+    indicadorProducaoEscala: indStr === '' ? null : indStr,
+  }
+}
+
 export class Produto {
   private constructor(
     private readonly id: string,
@@ -39,7 +119,12 @@ export class Produto {
     private readonly ordem?: number,
     private readonly gruposComplementos?: ProdutoGrupoComplementoResumo[],
     private readonly impressoras?: ProdutoImpressoraResumo[],
-    private readonly descricao?: string
+    private readonly ncm?: string,
+    private readonly cest?: string,
+    private readonly origemMercadoria?: string,
+    private readonly tipoProduto?: string,
+    private readonly indicadorProducaoEscala?: string | null,
+    private readonly unidadeMedida: UnidadeMedidaProduto = 'UN'
   ) {}
 
   static create(
@@ -60,7 +145,12 @@ export class Produto {
     ordem?: number,
     gruposComplementos?: ProdutoGrupoComplementoResumo[],
     impressoras?: ProdutoImpressoraResumo[],
-    descricao?: string
+    ncm?: string,
+    cest?: string,
+    origemMercadoria?: string,
+    tipoProduto?: string,
+    indicadorProducaoEscala?: string | null,
+    unidadeMedida?: UnidadeMedidaProduto
   ): Produto {
     if (!id || !nome) {
       throw new Error('ID e nome são obrigatórios')
@@ -84,7 +174,12 @@ export class Produto {
       ordem,
       gruposComplementos,
       impressoras,
-      descricao
+      ncm,
+      cest,
+      origemMercadoria,
+      tipoProduto,
+      indicadorProducaoEscala,
+      normalizarUnidadeMedidaProduto(unidadeMedida)
     )
   }
 
@@ -98,6 +193,8 @@ export class Produto {
             ativo: imp.ativo === true || imp.ativo === 'true' || imp.ativo === undefined, // Se não tiver campo ativo, assume true
           }))
       : []
+
+    const fisc = extractFiscalStrings(data)
 
     return Produto.create(
       data.id?.toString() || '',
@@ -136,7 +233,13 @@ export class Produto {
               : [],
           }))
         : [],
-      impressorasMapeadas
+      impressorasMapeadas,
+      fisc.ncm,
+      fisc.cest,
+      fisc.origemMercadoria,
+      fisc.tipoProduto,
+      fisc.indicadorProducaoEscala,
+      normalizarUnidadeMedidaProduto(data.unidadeMedida)
     )
   }
 
@@ -208,8 +311,33 @@ export class Produto {
     return this.impressoras || []
   }
 
-  getDescricao(): string | undefined {
-    return this.descricao
+  getNcm(): string {
+    return this.ncm ?? ''
+  }
+
+  getCest(): string {
+    return this.cest ?? ''
+  }
+
+  /** Código de origem da mercadoria (ex.: `"0"`, `"1"`). */
+  getOrigemMercadoria(): string {
+    return this.origemMercadoria ?? ''
+  }
+
+  /** Código do tipo do produto (ex.: `"00"`, `"KT"`). */
+  getTipoProduto(): string {
+    return this.tipoProduto ?? ''
+  }
+
+  /** `null` ou string vazia tratados como sem indicador. */
+  getIndicadorProducaoEscala(): string | null {
+    const v = this.indicadorProducaoEscala
+    if (v === null || v === undefined || String(v).trim() === '') return null
+    return String(v).trim()
+  }
+
+  getUnidadeMedida(): UnidadeMedidaProduto {
+    return this.unidadeMedida
   }
 
   toJSON() {
@@ -231,7 +359,12 @@ export class Produto {
       ordem: this.ordem,
       gruposComplementos: this.gruposComplementos,
       impressoras: this.impressoras,
-      descricao: this.descricao,
+      ncm: this.ncm ?? '',
+      cest: this.cest ?? '',
+      origemMercadoria: this.origemMercadoria ?? '',
+      tipoProduto: this.tipoProduto ?? '',
+      indicadorProducaoEscala: this.indicadorProducaoEscala ?? null,
+      unidadeMedida: this.unidadeMedida,
     }
   }
 }

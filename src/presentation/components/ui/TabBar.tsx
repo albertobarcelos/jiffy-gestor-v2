@@ -6,23 +6,24 @@ import {
   MdBusiness,
   MdClose,
   MdDashboard,
+  MdFileDownload,
   MdNumbers,
   MdPercent,
   MdReceipt,
   MdSettings,
-  MdTableChart,
 } from 'react-icons/md'
 import type { IconType } from 'react-icons'
 import { useEffect } from 'react'
 
 /** Ícones alinhados aos botões do Portal do Contador (PainelContadorView) */
 const TAB_ICON_BY_ID: Partial<Record<string, IconType>> = {
-  'painel-contador': MdDashboard,
+  'portal-contador': MdDashboard,
   'etapa-1-dados-fiscais': MdBusiness,
   'etapa-2-emissor-fiscal': MdReceipt,
   'etapa-3-cenario-fiscal': MdAssessment,
   'etapa-4-numeracoes-fiscais': MdNumbers,
-  'etapa-5-tabela-ibpt': MdTableChart,
+  'reforma-tributaria': MdAssessment,
+  'exportar-xml': MdFileDownload,
   'config-ncm-cest': MdAssessment,
   impostos: MdPercent,
   'config-empresa-completa': MdSettings,

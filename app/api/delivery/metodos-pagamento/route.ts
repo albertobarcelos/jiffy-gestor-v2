@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { DeliveryRepository } from '@/src/infrastructure/database/repositories/DeliveryRepository'
 import { ListarMetodosPagamentoUseCase } from '@/src/application/use-cases/delivery/ListarMetodosPagamentoUseCase'
+import { resolveDeliveryIntegradorAuth } from '@/src/shared/utils/resolveDeliveryIntegradorAuth'
 
 /**
  * GET /api/delivery/metodos-pagamento
- * Lista os métodos de pagamento disponíveis na plataforma
+ * Lista os métodos de pagamento disponíveis na plataforma.
+ * Auth: JWT da sessão gestor (preferencial) ou header legado `Bearer`.
  */
 export async function GET(request: NextRequest) {
   try {
-    const bearerToken = request.headers.get('Bearer') || request.headers.get('bearer')
-    const integradorToken = request.headers.get('integrador-token')
-
-    if (!bearerToken) {
+    const auth = resolveDeliveryIntegradorAuth(request)
+    if (!auth) {
       return NextResponse.json(
         { error: 'Token de autenticação não fornecido' },
         { status: 401 }
@@ -20,8 +20,8 @@ export async function GET(request: NextRequest) {
 
     const repository = new DeliveryRepository(
       undefined,
-      bearerToken,
-      integradorToken || undefined
+      auth.bearerToken,
+      auth.integradorToken
     )
     const useCase = new ListarMetodosPagamentoUseCase(repository)
 
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       status: 'success',
       code: '200',
-      formas: metodos.map((m) => m.toJSON()),
+      formas: metodos.map(m => m.toJSON()),
     })
   } catch (error) {
     console.error('Erro ao listar métodos de pagamento:', error)
@@ -40,4 +40,3 @@ export async function GET(request: NextRequest) {
     )
   }
 }
-

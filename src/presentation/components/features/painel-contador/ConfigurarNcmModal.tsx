@@ -17,8 +17,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/src/presentation/components/ui/select'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
+import { useResumoEmpresaPainel } from '@/src/presentation/hooks/painel-contador/useResumoEmpresaPainel'
+import { useConfiguracoesNcm } from '@/src/presentation/hooks/painel-contador/useConfiguracoesNcm'
 
 interface ConfiguracaoImpostoNcm {
   ncm?: {
@@ -55,10 +56,10 @@ export function ConfigurarNcmModal({
   onSuccess,
   configuracaoImposto,
 }: ConfigurarNcmModalProps) {
-  const { auth } = useAuthStore()
-  const [isLoading, setIsLoading] = useState(false)
-  const [isLoadingRegime, setIsLoadingRegime] = useState(true)
-  const [regimeTributario, setRegimeTributario] = useState<number | null>(null)
+  const { data: resumo, isLoading: isLoadingRegime } = useResumoEmpresaPainel()
+  const { salvarMutation } = useConfiguracoesNcm()
+  const regimeTributario = resumo?.codigoRegimeTributario ?? null
+  const isLoading = salvarMutation.isPending
   const [formData, setFormData] = useState({
     ncm: '',
     cfop: '',
@@ -70,56 +71,6 @@ export function ConfigurarNcmModal({
     cofinsCst: '',
     cofinsAliquota: '',
   })
-
-  // Buscar regime tributário da empresa
-  useEffect(() => {
-    const loadRegimeTributario = async () => {
-      setIsLoadingRegime(true)
-      const token = auth?.getAccessToken()
-      if (!token) {
-        setIsLoadingRegime(false)
-        setRegimeTributario(1) // Default: Simples Nacional
-        return
-      }
-
-      try {
-        const response = await fetch('/api/v1/fiscal/empresas-fiscais/me', {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-
-        if (response.ok) {
-          const config = await response.json()
-          const codigoRegime = config?.codigoRegimeTributario
-          const regimeNumero =
-            typeof codigoRegime === 'string'
-              ? parseInt(codigoRegime, 10)
-              : (typeof codigoRegime === 'number' ? codigoRegime : null)
-
-          if (regimeNumero === 1 || regimeNumero === 2 || regimeNumero === 3) {
-            setRegimeTributario(regimeNumero)
-          } else {
-            setRegimeTributario(1) // Default: Simples Nacional
-          }
-        } else {
-          await response.text()
-          setRegimeTributario(1) // Default: Simples Nacional
-        }
-      } catch (error) {
-        console.error('Erro ao buscar regime tributário:', error)
-        setRegimeTributario(1) // Default: Simples Nacional
-      } finally {
-        setIsLoadingRegime(false)
-      }
-    }
-
-    if (open) {
-      loadRegimeTributario()
-    } else {
-      // Reset quando o modal fecha
-      setRegimeTributario(null)
-      setIsLoadingRegime(true)
-    }
-  }, [open, auth])
 
   // Determinar se é Simples Nacional (1 ou 2) ou Regime Normal (3)
   // Se regimeTributario for null (ainda carregando), não renderiza os campos até carregar
@@ -163,22 +114,12 @@ export function ConfigurarNcmModal({
       return
     }
 
-    const token = auth?.getAccessToken()
-    if (!token) {
-      showToast.error('Sessão expirada. Faça login novamente.')
-      return
-    }
-
-    setIsLoading(true)
-    const toastId = showToast.loading('Salvando configuração...')
-
     try {
-      // ✅ Arquitetura correta: Frontend → jiffy-backend → App-Services → FiscalGateway → FiscalService
       const payload = {
         cfop: formData.cfop || undefined,
         csosn: formData.csosn || undefined,
         icms: {
-          origem: 0, // TODO: Buscar origem do produto ou permitir configurar
+          origem: 0,
           cst: formData.icmsCst || undefined,
           aliquota: formData.icmsAliquota ? parseFloat(formData.icmsAliquota) : undefined,
         },
@@ -192,27 +133,10 @@ export function ConfigurarNcmModal({
         },
       }
 
-      const response = await fetch(`/api/v1/fiscal/configuracoes/ncms/${formData.ncm}/impostos`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || 'Erro ao salvar configuração')
-      }
-
-      showToast.successLoading(toastId, 'Configuração salva com sucesso!')
+      await salvarMutation.mutateAsync({ ncm: formData.ncm, input: payload })
       onSuccess()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao salvar configuração:', error)
-      showToast.errorLoading(toastId, error.message || 'Erro ao salvar configuração')
-    } finally {
-      setIsLoading(false)
     }
   }
 

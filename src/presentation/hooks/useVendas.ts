@@ -1,8 +1,21 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
+import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
 import { useCallback, useRef } from 'react'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { invalidateKanbanVendasListagens, refetchKanbanVendasListagens } from '@/features/kanban/hooks/kanbanListagemQueryCache'
+import { moveVendaKanbanBalcaoEntreColunas } from '@/features/kanban/utils/kanbanVendaCacheUpdate'
+import type { AcaoTransicaoKanbanEntrega } from '@/src/application/dto/TransicaoKanbanDTO'
+import type { TransicaoPedidoDeliveryApiRequest } from '@/src/application/dto/api/pedidoDeliveryApi'
+import {
+  mapAcaoTransicaoGestorToStatusDelivery,
+  mapAcoesTransicaoGestorToStatusDelivery,
+} from '@/src/application/mappers/TransicaoPedidoDeliveryMapper'
+import { emitirNotaPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/EmitirNotaPedidoDeliveryUseCase'
+import { deveUsarModuloDeliveryParaDetalhe } from '@/src/application/mappers/PedidoDeliveryDetalheAdapter'
 
 /**
  * Extrai o motivo de rejeição (xMotivo) do XML de retorno da SEFAZ
@@ -122,7 +135,7 @@ function buildFiscalConfigCacheKey(token: string, modelo: 55 | 65): string {
   return `${modelo}:${token}`
 }
 
-async function resolveFiscalEmissionConfig(
+export async function resolveFiscalEmissionConfig(
   token: string,
   modelo: 55 | 65
 ): Promise<FiscalEmissionResolvedConfig> {
@@ -144,7 +157,7 @@ async function resolveFiscalEmissionConfig(
       'Content-Type': 'application/json',
     }
 
-    const numeracaoResponse = await fetch(`/api/v1/fiscal/configuracoes/emissao?modelo=${modelo}`, {
+    const numeracaoResponse = await fetchGestorApi(`/api/v1/fiscal/configuracoes/emissao?modelo=${modelo}`, {
       headers: authHeaders,
     })
 
@@ -187,7 +200,7 @@ async function resolveFiscalEmissionConfig(
       }> = []
 
       for (const ambiente of ambientes) {
-        const response = await fetch(
+        const response = await fetchGestorApi(
           `/api/v1/fiscal/configuracoes/emissao/${modelo}?ambiente=${ambiente}`,
           { headers: authHeaders }
         )
@@ -233,7 +246,7 @@ async function resolveFiscalEmissionConfig(
     }
     const ambiente: FiscalEmissionResolvedConfig['ambiente'] = ambienteConfigurado
 
-    const empresaFiscalResponse = await fetch('/api/v1/fiscal/empresas-fiscais/me', {
+    const empresaFiscalResponse = await fetchGestorApi('/api/v1/fiscal/empresas-fiscais/me', {
       headers: authHeaders,
     })
 
@@ -307,18 +320,9 @@ interface VendasResponse {
  * - Retry automático
  */
 export function useVendas(params: VendasQueryParams = {}) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
-
-  const queryKey = ['vendas', params]
-
-  return useQuery({
-    queryKey,
-    queryFn: async (): Promise<{ vendas: any[]; count: number }> => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantQuery(
+    ['vendas', params],
+    async ({ token }) => {
       const searchParams = new URLSearchParams()
       if (params.q) searchParams.append('q', params.q)
       if (params.tipoVenda) searchParams.append('tipoVenda', params.tipoVenda)
@@ -344,36 +348,24 @@ export function useVendas(params: VendasQueryParams = {}) {
       if (params.limit) searchParams.append('limit', params.limit.toString())
       if (params.offset) searchParams.append('offset', params.offset.toString())
 
-      const response = await fetch(`/api/vendas?${searchParams.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+      const response = await fetchGestorApi(`/api/vendas?${searchParams.toString()}`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         cache: 'no-store',
       })
 
       if (!response.ok) {
         const errorData = (await response.json().catch(() => ({}))) as CancelamentoErrorPayload
-        const errorMessage = resolveMensagemErroCancelamento(errorData, response.status)
-        throw new Error(errorMessage)
+        throw new Error(resolveMensagemErroCancelamento(errorData, response.status))
       }
 
       const data: VendasResponse = await response.json()
-
-      // A API pode retornar items ou data
-      const vendas = data.items || data.data || []
-      const count = data.count || data.total || 0
-
       return {
-        vendas,
-        count,
+        vendas: data.items || data.data || [],
+        count: data.count || data.total || 0,
       }
     },
-    enabled: !!token,
-    staleTime: 1000 * 30, // 30 segundos
-    refetchOnWindowFocus: true,
-    refetchOnReconnect: true,
-  })
+    { staleTime: 1000 * 30, refetchOnWindowFocus: true, refetchOnReconnect: true }
+  )
 }
 
 /**
@@ -381,21 +373,11 @@ export function useVendas(params: VendasQueryParams = {}) {
  * Ideal para componentes de visualização e edição.
  */
 export function useVenda(id: string) {
-  const { auth, isAuthenticated } = useAuthStore()
-  const token = auth?.getAccessToken()
-
-  return useQuery<any, ApiError>({
-    queryKey: ['venda', id],
-    queryFn: async () => {
-      if (!isAuthenticated || !token) {
-        throw new Error('Usuário não autenticado ou token ausente.')
-      }
-
-      const response = await fetch(`/api/vendas/${id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+  return useSecureTenantQuery<any>(
+    ['venda', id],
+    async ({ token }) => {
+      const response = await fetchGestorApi(`/api/vendas/${id}`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       })
 
       if (!response.ok) {
@@ -407,34 +389,24 @@ export function useVenda(id: string) {
         )
       }
 
-      const data = await response.json()
-      return data
+      return response.json()
     },
-    enabled: isAuthenticated && !!token && !!id,
-    staleTime: 1000 * 60 * 5, // 5 minutos
-  })
+    { enabled: !!id, staleTime: 1000 * 60 * 5 }
+  )
 }
 
 /**
  * Hook para criar uma nova venda
  */
 export function useCreateVenda() {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
-  return useMutation({
-    mutationFn: async (data: any) => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
-      const response = await fetch('/api/vendas', {
+  return useSecureTenantMutation(
+    async (_, data: any) => {
+      const response = await fetchGestorApi('/api/vendas', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       })
 
@@ -457,36 +429,30 @@ export function useCreateVenda() {
 
       return await response.json()
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      showToast.success('Venda criada com sucesso!')
-    },
-    onError: (error: Error) => {
-      showToast.error(error.message || 'Erro ao criar venda')
-    },
-  })
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'] })
+        showToast.success('Venda criada com sucesso!')
+      },
+      onError: (error: Error) => {
+        showToast.error(error.message || 'Erro ao criar venda')
+      },
+    }
+  )
 }
 
 /**
  * Hook para criar uma nova venda do gestor (venda_gestor)
  */
 export function useCreateVendaGestor() {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
-  return useMutation({
-    mutationFn: async (data: any) => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
-      const response = await fetch('/api/vendas/gestor', {
+  return useSecureTenantMutation(
+    async (_, data: any) => {
+      const response = await fetchGestorApi('/api/vendas/gestor', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       })
 
@@ -504,37 +470,71 @@ export function useCreateVendaGestor() {
 
       return await response.json()
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
-      // Toast de sucesso é exibido no componente
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'] })
+        invalidateKanbanVendasListagens(queryClient)
+        // Toast de sucesso é exibido no componente
+      },
+      onError: (_error: Error) => {
+        // Toast de erro é exibido no componente
+      },
+    }
+  )
+}
+
+/**
+ * Cria pedido delivery gestor (`POST /api/delivery/pedidos` → módulo delivery Jiffy).
+ */
+export function useCreatePedidoDelivery() {
+  const queryClient = useQueryClient()
+  const empresaId = useTenantEmpresaId()
+
+  return useSecureTenantMutation(
+    async (_, data: unknown) => {
+      const response = await fetchGestorApi('/api/delivery/pedidos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = resolveDomainErrorMessage(
+          errorData,
+          `Erro ${response.status}: ${response.statusText}`
+        )
+        const error = new Error(errorMessage)
+        ;(error as { response?: { data: unknown; status: number } }).response = {
+          data: errorData,
+          status: response.status,
+        }
+        throw error
+      }
+
+      return await response.json()
     },
-    onError: (error: Error) => {
-      // Toast de erro é exibido no componente
-    },
-  })
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'] })
+        invalidateKanbanVendasListagens(queryClient)
+      },
+    }
+  )
 }
 
 /**
  * Hook para atualizar uma venda existente
  */
 export function useUpdateVenda() {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
-      const response = await fetch(`/api/vendas/${id}`, {
+  return useSecureTenantMutation(
+    async (_, { id, data }: { id: string; data: any }) => {
+      const response = await fetchGestorApi(`/api/vendas/${id}`, {
         method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       })
 
@@ -549,42 +549,36 @@ export function useUpdateVenda() {
 
       return await response.json()
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['venda', variables.id] })
-      showToast.success('Venda atualizada com sucesso!')
-    },
-    onError: (error: Error) => {
-      showToast.error(error.message || 'Erro ao atualizar venda')
-    },
-  })
+    {
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'] })
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'venda', variables.id] })
+        showToast.success('Venda atualizada com sucesso!')
+      },
+      onError: (error: Error) => {
+        showToast.error(error.message || 'Erro ao atualizar venda')
+      },
+    }
+  )
 }
 
 /**
  * Hook para duplicar uma venda
  */
 export function useDuplicateVenda() {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
-  return useMutation({
-    mutationFn: async (params: { id: string; tabelaOrigem: 'venda' | 'venda_gestor' }) => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantMutation(
+    async (_, params: { id: string; tabelaOrigem: 'venda' | 'venda_gestor' }) => {
       const path =
         params.tabelaOrigem === 'venda_gestor'
           ? `/api/vendas/gestor/${params.id}/duplicar`
           : `/api/vendas/${params.id}/duplicar`
 
-      const response = await fetch(path, {
+      const response = await fetchGestorApi(path, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
       })
 
       if (!response.ok) {
@@ -598,15 +592,17 @@ export function useDuplicateVenda() {
 
       return await response.json()
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
-      showToast.success('Venda duplicada com sucesso!')
-    },
-    onError: (error: Error) => {
-      showToast.error(error.message || 'Erro ao duplicar venda')
-    },
-  })
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'] })
+        invalidateKanbanVendasListagens(queryClient)
+        showToast.success('Venda duplicada com sucesso!')
+      },
+      onError: (error: Error) => {
+        showToast.error(error.message || 'Erro ao duplicar venda')
+      },
+    }
+  )
 }
 
 /**
@@ -615,32 +611,26 @@ export function useDuplicateVenda() {
  * Gestor: PATCH /api/vendas/gestor/:id com body { solicitarEmissaoFiscal: true }.
  */
 export function useMarcarEmissaoFiscal() {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
-  return useMutation({
-    mutationFn: async (params: {
+  return useSecureTenantMutation(
+    async (_, params: {
       id: string
       tabelaOrigem?: 'venda' | 'venda_gestor'
       /** Não exibir toast de sucesso (ex.: correção automática no Kanban) */
       silent?: boolean
+      /** Atualiza caches por coluna do Kanban balcão sem refetch das 3 listagens. */
+      kanbanContext?: boolean
     }) => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
       const url =
         params.tabelaOrigem === 'venda_gestor'
           ? `/api/vendas/gestor/${params.id}`
           : `/api/vendas/${params.id}`
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ solicitarEmissaoFiscal: true }),
       })
 
@@ -655,18 +645,30 @@ export function useMarcarEmissaoFiscal() {
 
       return await response.json()
     },
-    onSuccess: (_, params) => {
-      queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
-      queryClient.invalidateQueries({ queryKey: ['venda', params.id] })
-      if (!params.silent) {
-        showToast.success('Venda marcada para emissão fiscal!')
-      }
-    },
-    onError: (error: Error) => {
-      showToast.error(error.message || 'Erro ao marcar emissão fiscal')
-    },
-  })
+    {
+      onSuccess: (_, params) => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'] })
+        if (params.kanbanContext) {
+          const moved = moveVendaKanbanBalcaoEntreColunas(queryClient, params.id, 'PENDENTE_EMISSAO', {
+            solicitarEmissaoFiscal: true,
+          })
+          if (!moved) {
+            invalidateKanbanVendasListagens(queryClient, { refetchType: 'active' })
+          }
+        } else {
+          invalidateKanbanVendasListagens(queryClient)
+        }
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'venda', params.id] })
+        if (!params.silent) {
+          showToast.success('Venda marcada para emissão fiscal!')
+        }
+      },
+      onError: (error: Error, params) => {
+        if (params.silent) return
+        showToast.error(error.message || 'Erro ao marcar emissão fiscal')
+      },
+    }
+  )
 }
 
 /**
@@ -676,27 +678,23 @@ export function useMarcarEmissaoFiscal() {
  * Gestor: PATCH /api/vendas/gestor/:id com body { solicitarEmissaoFiscal: false }.
  */
 export function useDesmarcarEmissaoFiscal() {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
-  return useMutation({
-    mutationFn: async (params: { id: string; tabelaOrigem?: 'venda' | 'venda_gestor' }) => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantMutation(
+    async (_, params: {
+      id: string
+      tabelaOrigem?: 'venda' | 'venda_gestor'
+      kanbanContext?: boolean
+    }) => {
       const url =
         params.tabelaOrigem === 'venda_gestor'
           ? `/api/vendas/gestor/${params.id}`
           : `/api/vendas/${params.id}`
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ solicitarEmissaoFiscal: false }),
       })
 
@@ -711,16 +709,27 @@ export function useDesmarcarEmissaoFiscal() {
 
       return await response.json()
     },
-    onSuccess: (_, params) => {
-      queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
-      queryClient.invalidateQueries({ queryKey: ['venda', params.id] })
-      showToast.success('Venda desmarcada da emissão fiscal.')
-    },
-    onError: (error: Error) => {
-      showToast.error(error.message || 'Erro ao desmarcar emissão fiscal')
-    },
-  })
+    {
+      onSuccess: (_, params) => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'] })
+        if (params.kanbanContext) {
+          const moved = moveVendaKanbanBalcaoEntreColunas(queryClient, params.id, 'FINALIZADAS', {
+            solicitarEmissaoFiscal: false,
+          })
+          if (!moved) {
+            invalidateKanbanVendasListagens(queryClient, { refetchType: 'active' })
+          }
+        } else {
+          invalidateKanbanVendasListagens(queryClient)
+        }
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'venda', params.id] })
+        showToast.success('Venda desmarcada da emissão fiscal.')
+      },
+      onError: (error: Error) => {
+        showToast.error(error.message || 'Erro ao desmarcar emissão fiscal')
+      },
+    }
+  )
 }
 
 /**
@@ -731,22 +740,17 @@ export function useDesmarcarEmissaoFiscal() {
  * passar explicitamente (ex.: preservar o valor atual da venda, sem forçar `true`).
  */
 export function useVincularClienteNaVenda() {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
-  return useMutation({
-    mutationFn: async (params: {
+  return useSecureTenantMutation(
+    async (_, params: {
       vendaId: string
       clienteId: string
       tabelaOrigem?: 'venda' | 'venda_gestor'
       /** Se informado, envia o valor atual da venda (não há padrão `true`). */
       solicitarEmissaoFiscal?: boolean
     }) => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
       const origem = params.tabelaOrigem ?? 'venda_gestor'
       const url =
         origem === 'venda_gestor'
@@ -758,12 +762,9 @@ export function useVincularClienteNaVenda() {
         body.solicitarEmissaoFiscal = params.solicitarEmissaoFiscal
       }
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
 
@@ -778,16 +779,18 @@ export function useVincularClienteNaVenda() {
 
       return await response.json()
     },
-    onSuccess: (_, params) => {
-      queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
-      queryClient.invalidateQueries({ queryKey: ['venda', params.vendaId] })
-      showToast.success('Cliente vinculado à venda.')
-    },
-    onError: (error: Error) => {
-      showToast.error(error.message || 'Erro ao vincular cliente à venda')
-    },
-  })
+    {
+      onSuccess: (_, params) => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'] })
+        invalidateKanbanVendasListagens(queryClient)
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'venda', params.vendaId] })
+        showToast.success('Cliente vinculado à venda.')
+      },
+      onError: (error: Error) => {
+        showToast.error(error.message || 'Erro ao vincular cliente à venda')
+      },
+    }
+  )
 }
 
 /**
@@ -796,24 +799,16 @@ export function useVincularClienteNaVenda() {
  * A atualização final de status vem por webhook + refetch.
  */
 export function useEmitirNfe() {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
-  return useMutation({
-    mutationFn: async ({ id, modelo }: { id: string; modelo: 55 | 65 }) => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantMutation(
+    async ({ token }, { id, modelo }: { id: string; modelo: 55 | 65 }) => {
       const fiscalConfig = await resolveFiscalEmissionConfig(token, modelo)
 
-      const response = await fetch(`/api/vendas/${id}/emitir-nota`, {
+      const response = await fetchGestorApi(`/api/vendas/${id}/emitir-nota`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tipoDocumento: fiscalConfig.tipoDocumento,
           modelo,
@@ -862,29 +857,31 @@ export function useEmitirNfe() {
 
       return result
     },
-    onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
-      queryClient.invalidateQueries({ queryKey: ['venda', variables.id] })
+    {
+      onSuccess: (data, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'] })
+        invalidateKanbanVendasListagens(queryClient)
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'venda', variables.id] })
 
-      if (data?.status === 'EMITIDA') {
-        showToast.success('NFe emitida com sucesso!')
-        return
-      }
+        if (data?.status === 'EMITIDA') {
+          showToast.success('NFe emitida com sucesso!')
+          return
+        }
 
-      if (data?.status === 'REJEITADA') {
-        const motivo =
-          data?.mensagemAmigavel || data?.codigoRejeicao || 'Nota fiscal rejeitada pela SEFAZ'
-        showToast.error(motivo)
-        return
-      }
+        if (data?.status === 'REJEITADA') {
+          const motivo =
+            data?.mensagemAmigavel || data?.codigoRejeicao || 'Nota fiscal rejeitada pela SEFAZ'
+          showToast.error(motivo)
+          return
+        }
 
-      showToast.success('NFe enviada. Aguardando retorno da SEFAZ...')
-    },
-    onError: (error: Error) => {
-      showToast.error(error.message || 'Erro ao emitir NFe')
-    },
-  })
+        showToast.success('NFe enviada. Aguardando retorno da SEFAZ...')
+      },
+      onError: (error: Error) => {
+        showToast.error(error.message || 'Erro ao emitir NFe')
+      },
+    }
+  )
 }
 
 /**
@@ -893,24 +890,16 @@ export function useEmitirNfe() {
  * A atualização final de status vem por webhook + refetch.
  */
 export function useEmitirNfeGestor() {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
-  return useMutation({
-    mutationFn: async ({ id, modelo }: { id: string; modelo: 55 | 65 }) => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantMutation(
+    async ({ token }, { id, modelo }: { id: string; modelo: 55 | 65 }) => {
       const fiscalConfig = await resolveFiscalEmissionConfig(token, modelo)
 
-      const response = await fetch(`/api/vendas/gestor/${id}/emitir-nota`, {
+      const response = await fetchGestorApi(`/api/vendas/gestor/${id}/emitir-nota`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tipoDocumento: fiscalConfig.tipoDocumento,
           modelo,
@@ -948,24 +937,72 @@ export function useEmitirNfeGestor() {
 
       return result
     },
-    onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
-      queryClient.invalidateQueries({ queryKey: ['venda-gestor', variables.id] })
+    {
+      onSuccess: (data, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'] })
+        invalidateKanbanVendasListagens(queryClient)
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'venda-gestor', variables.id] })
 
-      if (data.status === 'REJEITADA') {
-        const motivo = data.mensagemAmigavel || 'Nota fiscal rejeitada pela SEFAZ'
-        showToast.error(motivo)
-      } else if (data.status === 'EMITIDA') {
-        showToast.success('NFe emitida com sucesso!')
-      } else {
-        showToast.success(`NFe processada (status: ${data.status})`)
-      }
+        if (data.status === 'REJEITADA') {
+          const motivo = data.mensagemAmigavel || 'Nota fiscal rejeitada pela SEFAZ'
+          showToast.error(motivo)
+        } else if (data.status === 'EMITIDA') {
+          showToast.success('NFe emitida com sucesso!')
+        } else {
+          showToast.success(`NFe processada (status: ${data.status})`)
+        }
+      },
+      onError: (error: Error) => {
+        showToast.error(error.message || 'Erro ao emitir NFe')
+      },
+    }
+  )
+}
+
+/**
+ * Emite NFC-e/NF-e para pedido do módulo delivery (`POST /delivery/pedidos/{id}/emitir-nota`).
+ */
+export function useEmitirNfeDelivery() {
+  const queryClient = useQueryClient()
+  const empresaId = useTenantEmpresaId()
+
+  return useSecureTenantMutation(
+    async ({ token }, { id, modelo }: { id: string; modelo: 55 | 65 }) => {
+      return emitirNotaPedidoDeliveryUseCase.execute(id, token, modelo)
     },
-    onError: (error: Error) => {
-      showToast.error(error.message || 'Erro ao emitir NFe')
-    },
-  })
+    {
+      onSuccess: (data, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'] })
+        invalidateKanbanVendasListagens(queryClient)
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'venda-gestor', variables.id] })
+
+        const status = data?.status != null ? String(data.status) : ''
+        if (status === 'REJEITADA') {
+          const motivo =
+            (data.mensagemAmigavel != null ? String(data.mensagemAmigavel) : '') ||
+            'Nota fiscal rejeitada pela SEFAZ'
+          showToast.error(motivo)
+        } else if (status === 'EMITIDA') {
+          showToast.success('NFe emitida com sucesso!')
+        } else if (status) {
+          showToast.success(`NFe processada (status: ${status})`)
+        } else {
+          showToast.success('Emissão de nota solicitada.')
+        }
+      },
+      onError: (error: Error) => {
+        showToast.error(error.message || 'Erro ao emitir NFe')
+      },
+    }
+  )
+}
+
+/** Indica se a emissão fiscal deve usar o módulo delivery (entrega/retirada gestor). */
+export function deveUsarModuloDeliveryParaEmissaoFiscal(
+  tabelaOrigem: 'venda' | 'venda_gestor',
+  tipoVenda?: string | null
+): boolean {
+  return deveUsarModuloDeliveryParaDetalhe(tabelaOrigem, tipoVenda)
 }
 
 /** Body alinhado ao contrato de reemitir-nota: `documentId` obrigatório; `numero` opcional. */
@@ -993,27 +1030,19 @@ export function montarBodyReemitirNota(params: {
  * Hook para reemitir NFe (NFC-e ou NF-e) de uma venda PDV rejeitada.
  */
 export function useReemitirNfe() {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
-  return useMutation({
-    mutationFn: async (variables: ReemitirNfeVariables) => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantMutation(
+    async (_, variables: ReemitirNfeVariables) => {
       const { id, documentId, numero } = variables
       if (!documentId?.trim()) {
         throw new Error('documentId é obrigatório para reemissão.')
       }
 
-      const response = await fetch(`/api/vendas/${id}/reemitir`, {
+      const response = await fetchGestorApi(`/api/vendas/${id}/reemitir`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(montarBodyReemitirNota({ documentId, numero })),
       })
 
@@ -1028,58 +1057,52 @@ export function useReemitirNfe() {
 
       return await response.json()
     },
-    onSuccess: async (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
-      queryClient.invalidateQueries({ queryKey: ['venda', variables.id] })
+    {
+      onSuccess: async (data, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'] })
+        invalidateKanbanVendasListagens(queryClient)
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'venda', variables.id] })
 
-      await queryClient.refetchQueries({ queryKey: ['vendas-unificadas'] })
+        await refetchKanbanVendasListagens(queryClient)
 
-      if (data?.status === 'REJEITADA') {
-        const motivo =
-          data?.mensagemAmigavel || data?.codigoRejeicao || 'Reemissão rejeitada pela SEFAZ'
-        showToast.error(motivo)
-        return
-      }
+        if (data?.status === 'REJEITADA') {
+          const motivo =
+            data?.mensagemAmigavel || data?.codigoRejeicao || 'Reemissão rejeitada pela SEFAZ'
+          showToast.error(motivo)
+          return
+        }
 
-      if (data?.status === 'EMITIDA') {
-        showToast.success('NFe reemitida com sucesso!')
-        return
-      }
+        if (data?.status === 'EMITIDA') {
+          showToast.success('NFe reemitida com sucesso!')
+          return
+        }
 
-      showToast.success('Reemissão enviada. Aguardando retorno da SEFAZ...')
-    },
-    onError: (error: Error) => {
-      showToast.error(error.message || 'Erro ao reemitir NFe')
-    },
-  })
+        showToast.success('Reemissão enviada. Aguardando retorno da SEFAZ...')
+      },
+      onError: (error: Error) => {
+        showToast.error(error.message || 'Erro ao reemitir NFe')
+      },
+    }
+  )
 }
 
 /**
  * Hook para reemitir NFe (NFC-e ou NF-e) de uma venda do gestor rejeitada.
  */
 export function useReemitirNfeGestor() {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
-  return useMutation({
-    mutationFn: async (variables: ReemitirNfeVariables) => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantMutation(
+    async (_, variables: ReemitirNfeVariables) => {
       const { id, documentId, numero } = variables
       if (!documentId?.trim()) {
         throw new Error('documentId é obrigatório para reemissão.')
       }
 
-      const response = await fetch(`/api/vendas/gestor/${id}/reemitir`, {
+      const response = await fetchGestorApi(`/api/vendas/gestor/${id}/reemitir`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(montarBodyReemitirNota({ documentId, numero })),
       })
 
@@ -1094,57 +1117,51 @@ export function useReemitirNfeGestor() {
 
       return await response.json()
     },
-    onSuccess: async (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
-      queryClient.invalidateQueries({ queryKey: ['venda-gestor', variables.id] })
+    {
+      onSuccess: async (data, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'] })
+        invalidateKanbanVendasListagens(queryClient)
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'venda-gestor', variables.id] })
 
-      await queryClient.refetchQueries({ queryKey: ['vendas-unificadas'] })
+        await refetchKanbanVendasListagens(queryClient)
 
-      if (data?.status === 'REJEITADA') {
-        const motivo =
-          data?.mensagemAmigavel || data?.codigoRejeicao || 'Reemissão rejeitada pela SEFAZ'
-        showToast.error(motivo)
-        return
-      }
+        if (data?.status === 'REJEITADA') {
+          const motivo =
+            data?.mensagemAmigavel || data?.codigoRejeicao || 'Reemissão rejeitada pela SEFAZ'
+          showToast.error(motivo)
+          return
+        }
 
-      if (data?.status === 'EMITIDA') {
-        showToast.success('NFe reemitida com sucesso!')
-        return
-      }
+        if (data?.status === 'EMITIDA') {
+          showToast.success('NFe reemitida com sucesso!')
+          return
+        }
 
-      showToast.success('Reemissão enviada. Aguardando retorno da SEFAZ...')
-    },
-    onError: (error: Error) => {
-      showToast.error(error.message || 'Erro ao reemitir NFe')
-    },
-  })
+        showToast.success('Reemissão enviada. Aguardando retorno da SEFAZ...')
+      },
+      onError: (error: Error) => {
+        showToast.error(error.message || 'Erro ao reemitir NFe')
+      },
+    }
+  )
 }
 
 /**
  * Hook para cancelar uma venda do gestor
  */
 export function useCancelarVendaGestor() {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
-  return useMutation({
-    mutationFn: async ({ id, motivo }: { id: string; motivo: string }) => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantMutation(
+    async (_, { id, motivo }: { id: string; motivo: string }) => {
       if (motivo.length < 15) {
         throw new Error('Justificativa deve ter no mínimo 15 caracteres')
       }
 
-      const response = await fetch(`/api/vendas/gestor/${id}/cancelar`, {
+      const response = await fetchGestorApi(`/api/vendas/gestor/${id}/cancelar`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ motivo }),
       })
 
@@ -1159,42 +1176,36 @@ export function useCancelarVendaGestor() {
 
       return await response.json()
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
-      queryClient.invalidateQueries({ queryKey: ['venda-gestor', variables.id] })
-      showToast.success('Venda cancelada com sucesso!')
-    },
-    onError: (error: Error) => {
-      showToast.error(error.message || 'Erro ao cancelar venda')
-    },
-  })
+    {
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'] })
+        invalidateKanbanVendasListagens(queryClient)
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'venda-gestor', variables.id] })
+        showToast.success('Venda cancelada com sucesso!')
+      },
+      onError: (error: Error) => {
+        showToast.error(error.message || 'Erro ao cancelar venda')
+      },
+    }
+  )
 }
 
 /**
  * Hook para cancelar nota fiscal de uma venda PDV
  */
 export function useCancelarNotaFiscalVendaPdv() {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
-  return useMutation({
-    mutationFn: async ({ id, justificativa }: { id: string; justificativa: string }) => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantMutation(
+    async (_, { id, justificativa }: { id: string; justificativa: string }) => {
       if (justificativa.trim().length < 15) {
         throw new Error('Justificativa deve ter no mínimo 15 caracteres')
       }
 
-      const response = await fetch(`/api/vendas/${id}/cancelar-nota`, {
+      const response = await fetchGestorApi(`/api/vendas/${id}/cancelar-nota`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ justificativa: justificativa.trim() }),
       })
 
@@ -1209,42 +1220,36 @@ export function useCancelarNotaFiscalVendaPdv() {
 
       return await response.json()
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
-      queryClient.invalidateQueries({ queryKey: ['venda', variables.id] })
-      showToast.success('Nota fiscal cancelada com sucesso!')
-    },
-    onError: (error: Error) => {
-      showToast.error(error.message || 'Erro ao cancelar nota fiscal')
-    },
-  })
+    {
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'] })
+        invalidateKanbanVendasListagens(queryClient)
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'venda', variables.id] })
+        showToast.success('Nota fiscal cancelada com sucesso!')
+      },
+      onError: (error: Error) => {
+        showToast.error(error.message || 'Erro ao cancelar nota fiscal')
+      },
+    }
+  )
 }
 
 /**
  * Hook para cancelar nota fiscal de uma venda do Gestor
  */
 export function useCancelarNotaFiscalVendaGestor() {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
-  return useMutation({
-    mutationFn: async ({ id, justificativa }: { id: string; justificativa: string }) => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantMutation(
+    async (_, { id, justificativa }: { id: string; justificativa: string }) => {
       if (justificativa.trim().length < 15) {
         throw new Error('Justificativa deve ter no mínimo 15 caracteres')
       }
 
-      const response = await fetch(`/api/vendas/gestor/${id}/cancelar-nota`, {
+      const response = await fetchGestorApi(`/api/vendas/gestor/${id}/cancelar-nota`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ justificativa: justificativa.trim() }),
       })
 
@@ -1259,16 +1264,18 @@ export function useCancelarNotaFiscalVendaGestor() {
 
       return await response.json()
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
-      queryClient.invalidateQueries({ queryKey: ['venda-gestor', variables.id] })
-      showToast.success('Nota fiscal cancelada com sucesso!')
-    },
-    onError: (error: Error) => {
-      showToast.error(error.message || 'Erro ao cancelar nota fiscal')
-    },
-  })
+    {
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'] })
+        invalidateKanbanVendasListagens(queryClient)
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'venda-gestor', variables.id] })
+        showToast.success('Nota fiscal cancelada com sucesso!')
+      },
+      onError: (error: Error) => {
+        showToast.error(error.message || 'Erro ao cancelar nota fiscal')
+      },
+    }
+  )
 }
 
 /**
@@ -1276,22 +1283,14 @@ export function useCancelarNotaFiscalVendaGestor() {
  * Regra de negócio: permitido apenas quando não há documento fiscal autorizado/cancelado.
  */
 export function useExcluirVendaGestor() {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
-  return useMutation({
-    mutationFn: async ({ id }: { id: string }) => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
-      const response = await fetch(`/api/vendas/gestor/${id}/excluir`, {
+  return useSecureTenantMutation(
+    async (_, { id }: { id: string }) => {
+      const response = await fetchGestorApi(`/api/vendas/gestor/${id}/excluir`, {
         method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
       })
 
       if (!response.ok) {
@@ -1305,14 +1304,207 @@ export function useExcluirVendaGestor() {
 
       return await response.json()
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['vendas-unificadas'] })
-      queryClient.invalidateQueries({ queryKey: ['venda-gestor', variables.id] })
-      showToast.success('Venda excluída definitivamente!')
+    {
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'] })
+        invalidateKanbanVendasListagens(queryClient)
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'venda-gestor', variables.id] })
+        showToast.success('Venda excluída definitivamente!')
+      },
+      onError: (error: Error) => {
+        showToast.error(error.message || 'Erro ao excluir venda')
+      },
+    }
+  )
+}
+
+/** Ações operacionais do Kanban entrega (gestor legado e módulo delivery). */
+export type AcaoTransicaoGestor = AcaoTransicaoKanbanEntrega
+
+/**
+ * Transição operacional da venda gestor (entrega / etapas).
+ * Para `cancelar`, enviar `motivo` obrigatório conforme API.
+ */
+export function useTransicaoVendaGestor() {
+  const queryClient = useQueryClient()
+  const empresaId = useTenantEmpresaId()
+
+  return useSecureTenantMutation(
+    async (_, {
+      id,
+      acao,
+      acoes,
+      motivo,
+    }: {
+      id: string
+      acao?: AcaoTransicaoGestor
+      acoes?: AcaoTransicaoGestor[]
+      motivo?: string
+    }) => {
+      const payload: Record<string, unknown> =
+        acoes && acoes.length > 0 ? { acoes } : { acao }
+      if (motivo != null && String(motivo).trim() !== '') {
+        payload.motivo = String(motivo).trim()
+      }
+
+      const response = await fetch(`/api/vendas/gestor/${id}/transicoes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = resolveDomainErrorMessage(
+          errorData,
+          `Erro ${response.status}: ${response.statusText}`
+        )
+        throw new Error(errorMessage)
+      }
+
+      return await response.json()
     },
-    onError: (error: Error) => {
-      showToast.error(error.message || 'Erro ao excluir venda')
+    {
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'], refetchType: 'none' })
+        invalidateKanbanVendasListagens(queryClient, { refetchType: 'none' })
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'venda-gestor', variables.id], refetchType: 'none' })
+      },
+      onError: (error: Error) => {
+        showToast.error(error.message || 'Erro ao atualizar etapa do pedido')
+      },
+    }
+  )
+}
+
+/**
+ * Transição operacional via módulo delivery (`PATCH /delivery/pedidos/{id}/transicao-status`).
+ * Encadeia múltiplas ações com chamadas sequenciais (drag entre colunas distantes).
+ */
+export function useTransicaoPedidoDelivery(options?: {
+  /** Chamado no fim do mutationFn (antes do onSuccess) para atualizar cache do Kanban. */
+  onPedidoTransicionado?: (id: string, response: unknown) => void
+}) {
+  const queryClient = useQueryClient()
+  const empresaId = useTenantEmpresaId()
+  const onPedidoTransicionado = options?.onPedidoTransicionado
+
+  return useSecureTenantMutation(
+    async ({ token }, {
+      id,
+      acao,
+      acoes,
+      motivo,
+    }: {
+      id: string
+      acao?: AcaoTransicaoGestor
+      acoes?: AcaoTransicaoGestor[]
+      motivo?: string
+    }) => {
+      const lista: AcaoTransicaoGestor[] =
+        acoes && acoes.length > 0 ? acoes : acao ? [acao] : []
+
+      if (lista.length === 0) {
+        throw new Error('Nenhuma ação de transição informada')
+      }
+
+      const statuses = mapAcoesTransicaoGestorToStatusDelivery(lista)
+      let ultimaResposta: unknown = null
+
+      for (let i = 0; i < lista.length; i++) {
+        const acaoAtual = lista[i]
+        const body: TransicaoPedidoDeliveryApiRequest = {
+          toStatus: statuses[i] ?? mapAcaoTransicaoGestorToStatusDelivery(acaoAtual),
+        }
+
+        if (acaoAtual === 'cancelar') {
+          const motivoCancelamento = String(motivo ?? '').trim()
+          if (motivoCancelamento.length < 5) {
+            throw new Error('Motivo do cancelamento deve ter pelo menos 5 caracteres')
+          }
+          body.motivoCancelamento = motivoCancelamento
+        }
+
+        const response = await fetch(
+          `/api/delivery/pedidos/${encodeURIComponent(id)}/transicao-status`,
+          {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(body),
+          }
+        )
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          const errorMessage = resolveDomainErrorMessage(
+            errorData,
+            `Erro ${response.status}: ${response.statusText}`
+          )
+          throw new Error(errorMessage)
+        }
+
+        ultimaResposta = await response.json()
+      }
+
+      onPedidoTransicionado?.(id, ultimaResposta)
+
+      return ultimaResposta
     },
-  })
+    {
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'], refetchType: 'none' })
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'venda-gestor', variables.id], refetchType: 'none' })
+        queryClient.invalidateQueries({
+          queryKey: ['tenant', empresaId, 'pedido-delivery', variables.id],
+          refetchType: 'none',
+        })
+      },
+      onError: (error: Error) => {
+        showToast.error(error.message || 'Erro ao atualizar etapa do pedido')
+      },
+    }
+  )
+}
+
+/**
+ * Hook para finalizar a etapa operacional de uma venda gestor (via BFF → POST …/transicoes com acao finalizar).
+ * Requer backend com POST /api/v1/gestor/vendas/{id}/transicoes — ainda não disponível na API atual.
+ * Pedidos balcão não devem usar este hook: o POST de criação já envia dataFinalizacao.
+ */
+export function useFinalzarVendaGestor() {
+  const queryClient = useQueryClient()
+  const empresaId = useTenantEmpresaId()
+
+  return useSecureTenantMutation(
+    async (_, { id }: { id: string }) => {
+      const response = await fetch(`/api/vendas/gestor/${id}/finalizar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = resolveDomainErrorMessage(
+          errorData,
+          `Erro ${response.status}: ${response.statusText}`
+        )
+        throw new Error(errorMessage)
+      }
+
+      return await response.json()
+    },
+    {
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'] })
+        invalidateKanbanVendasListagens(queryClient)
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'venda-gestor', variables.id] })
+      },
+      onError: (error: Error) => {
+        showToast.error(error.message || 'Erro ao finalizar venda gestor')
+      },
+    }
+  )
 }

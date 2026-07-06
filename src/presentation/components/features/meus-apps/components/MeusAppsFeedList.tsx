@@ -1,0 +1,150 @@
+'use client'
+
+import { ConviteListRow } from '@/src/presentation/components/features/convites/components/ConviteListRow'
+import type { MeusAppsFeedItem } from '../types'
+import type { MeusApp } from '../types'
+import { CardGearMenu } from '@/src/presentation/components/ui/CardGearMenu'
+import { cn } from '@/src/shared/utils/cn'
+import { buildEmpresaCardGearItems } from '../utils/buildEmpresaCardGearItems'
+import { MeusAppsConvitesSection } from './MeusAppsConvitesSection'
+
+export function MeusAppsFeedList({
+  conviteItems,
+  empresaItems,
+  onAcessar,
+  onGerenciarConvites,
+  onGerenciarPerfisGestor,
+  busyAppId,
+  onAceitarConvite,
+  onRecusarConvite,
+  loadingConviteById,
+}: {
+  conviteItems: Extract<MeusAppsFeedItem, { kind: 'convite' }>[]
+  empresaItems: Extract<MeusAppsFeedItem, { kind: 'empresa' }>[]
+  onAcessar: (appId: string) => void
+  onGerenciarConvites?: (appId: string) => void
+  onGerenciarPerfisGestor?: (appId: string) => void
+  busyAppId?: string | null
+  onAceitarConvite: (id: string) => void
+  onRecusarConvite: (id: string) => void
+  loadingConviteById: Record<string, 'aceitar' | 'recusar' | null>
+}) {
+  const locked = busyAppId != null
+  const temConvites = conviteItems.length > 0
+  const temEmpresas = empresaItems.length > 0
+
+  return (
+    <div className="flex flex-col gap-6">
+      {temConvites ? (
+        <MeusAppsConvitesSection>
+          <div className="flex flex-col gap-3">
+            {conviteItems.map(item => (
+              <ConviteListRow
+                key={`convite-${item.convite.id}`}
+                convite={item.convite}
+                onAceitar={onAceitarConvite}
+                onRecusar={onRecusarConvite}
+                loadingAction={loadingConviteById[item.convite.id] ?? null}
+              />
+            ))}
+          </div>
+        </MeusAppsConvitesSection>
+      ) : null}
+
+      {temEmpresas ? (
+        <section aria-label="Empresas vinculadas">
+          <div className="flex flex-col gap-3">
+            {empresaItems.map(item => (
+              <EmpresaListRow
+                key={`app-${item.app.id}`}
+                app={item.app}
+                onAcessar={onAcessar}
+                onGerenciarConvites={onGerenciarConvites}
+                onGerenciarPerfisGestor={onGerenciarPerfisGestor}
+                busyAppId={busyAppId}
+                locked={locked}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
+    </div>
+  )
+}
+
+function EmpresaListRow({
+  app,
+  onAcessar,
+  onGerenciarConvites,
+  onGerenciarPerfisGestor,
+  busyAppId,
+  locked,
+}: {
+  app: MeusApp
+  onAcessar: (appId: string) => void
+  onGerenciarConvites?: (appId: string) => void
+  onGerenciarPerfisGestor?: (appId: string) => void
+  busyAppId?: string | null
+  locked: boolean
+}) {
+  const bloqueado = app.status === 'inativo'
+  const isSelecting = busyAppId === app.id
+  const actionsLocked = locked && busyAppId !== app.id
+  const interactionDisabled = bloqueado || actionsLocked || isSelecting
+
+  const gearItems = buildEmpresaCardGearItems(app.id, {
+    navDisabled: interactionDisabled,
+    onGerenciarConvites,
+    onGerenciarPerfisGestor,
+  })
+
+  return (
+    <div
+      className={cn(
+        'overflow-hiddene'
+      )}
+    >
+      <div className="flex flex-col gap-3 px-4 py-2 sm:grid sm:grid-cols-[1fr_auto] sm:items-center">
+        <div className="min-w-0">
+          {/* TODO: substituir por plano real quando o backend expuser o campo */}
+          <span
+            className="mb-1 block text-[11px] font-semibold leading-none text-secondary"
+            title="Jiffy Starter"
+          >
+            Jiffy Starter
+          </span>
+          <p className="truncate text-sm font-semibold text-gray-900">{app.nome}</p>
+          {app.tipo ? (
+            <p className="truncate text-xs font-medium text-gray-500">{app.tipo}</p>
+          ) : null}
+        </div>
+        <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+          <button
+            type="button"
+            disabled={interactionDisabled}
+            onClick={() => {
+              if (!interactionDisabled) {
+                onAcessar(app.id)
+              }
+            }}
+            className={cn(
+              'inline-flex h-10 min-w-0 flex-1 items-center justify-center rounded-lg border-0 px-2 py-0 text-sm font-medium leading-none text-white transition sm:w-[180px] sm:flex-none disabled:opacity-100',
+              bloqueado || isSelecting
+                ? 'cursor-not-allowed bg-gray-400 text-white'
+                : 'bg-secondary hover:bg-alternate'
+            )}
+          >
+            {bloqueado ? 'Empresa Bloqueada' : isSelecting ? 'Abrindo…' : 'Acessar Empresa'}
+          </button>
+          <CardGearMenu
+            disabled={interactionDisabled}
+            triggerAriaLabel="Opções do aplicativo"
+            triggerTitle="Opções do aplicativo"
+            items={gearItems}
+            triggerClassName="h-10 w-10 shrink-0 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+          />
+        </div>
+      </div>
+    </div>
+  )
+}

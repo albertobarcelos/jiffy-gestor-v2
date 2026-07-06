@@ -1,10 +1,13 @@
 'use client'
 
-import { useQuery, useInfiniteQuery } from '@tanstack/react-query'
 import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
+import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecureTenantInfiniteQuery'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
-import { showToast } from '@/src/shared/utils/toast'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+
+/** Limite máximo aceito pela API `/api/v1/cardapio/grupos-produtos` (validação upstream). */
+export const GRUPOS_PRODUTOS_API_MAX_LIMIT = 100
 
 interface GruposProdutosQueryParams {
   name?: string
@@ -29,79 +32,99 @@ interface GruposProdutosResponse {
  * Ideal para uso em formulários e dropdowns.
  */
 export function useGruposProdutos(params: GruposProdutosQueryParams = {}) {
-  const { auth, isAuthenticated } = useAuthStore()
-  const token = auth?.getAccessToken()
-  const queryEnabled = isAuthenticated && !!token && (params.enabled ?? true)
-
-  return useQuery<GrupoProduto[], ApiError>({
-    queryKey: ['grupos-produtos', params.name, params.ativo],
-    queryFn: async () => {
-      if (!isAuthenticated || !token) {
-        throw new Error('Usuário não autenticado ou token ausente.')
+  return useSecureTenantQuery<GrupoProduto[]>(
+    ['grupos-produtos', params.name, params.ativo, params.limit],
+    async ({ token }) => {
+      const mapResponse = async (response: Response) => {
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new ApiError(
+            errorData.message || 'Erro ao carregar grupos de produtos',
+            response.status,
+            errorData
+          )
+        }
+        const data = await response.json()
+        const pageItems = data.items || data.grupos || []
+        return pageItems.map((item: unknown) => GrupoProduto.fromJSON(item))
       }
 
-      const queryParams = new URLSearchParams()
-      if (params.name) queryParams.append('name', params.name)
-      if (params.ativo !== null && params.ativo !== undefined) {
-        queryParams.append('ativo', params.ativo.toString())
+      const buildSearchParams = (offset: number, limit?: number) => {
+        const queryParams = new URLSearchParams()
+        if (params.name) queryParams.append('name', params.name)
+        if (params.ativo !== null && params.ativo !== undefined) {
+          queryParams.append('ativo', params.ativo.toString())
+        }
+        if (limit !== undefined) {
+          queryParams.append('limit', String(limit))
+        }
+        queryParams.append('offset', String(offset))
+        return queryParams
       }
-      if (params.limit) queryParams.append('limit', params.limit.toString())
-      queryParams.append('offset', '0')
 
-      const response = await fetch(`/api/grupos-produtos?${queryParams.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new ApiError(
-          errorData.message || 'Erro ao carregar grupos de produtos',
-          response.status,
-          errorData
+      /** Sem `limit`: mantém default da rota BFF (`limit` = 10). */
+      if (params.limit === undefined) {
+        const response = await fetchGestorApi(
+          `/api/grupos-produtos?${buildSearchParams(0).toString()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          }
         )
+        return mapResponse(response)
       }
 
-      const data = await response.json()
-      const grupos = (data.items || data.grupos || []).map((item: any) =>
-        GrupoProduto.fromJSON(item)
-      )
+      const desired = Math.min(Math.max(1, params.limit), 10_000)
+      const acumulado: GrupoProduto[] = []
+      let offset = 0
 
-      return grupos
+      while (acumulado.length < desired) {
+        const batch = Math.min(GRUPOS_PRODUTOS_API_MAX_LIMIT, desired - acumulado.length)
+        const response = await fetchGestorApi(
+          `/api/grupos-produtos?${buildSearchParams(offset, batch).toString()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        )
+        const page = await mapResponse(response)
+        acumulado.push(...page)
+        if (page.length < batch) break
+        offset += page.length
+      }
+
+      return acumulado.slice(0, desired)
     },
-    enabled: queryEnabled,
-    staleTime: 1000 * 60 * 3, // 3 minutos (balance entre performance e atualização)
-    refetchOnMount: true, // Sempre refetch ao montar para garantir dados atualizados
-    refetchOnWindowFocus: params.refetchOnWindowFocus ?? true, // Alinhado ao uso; modais podem passar false
-  })
+    {
+      enabled: params.enabled ?? true,
+      staleTime: 1000 * 60 * 3,
+      refetchOnMount: true,
+      refetchOnWindowFocus: params.refetchOnWindowFocus ?? true,
+    }
+  )
 }
 
 /**
  * Hook para buscar grupos de produtos com paginação infinita (scroll infinito)
  */
 export function useGruposProdutosInfinite(params: Omit<GruposProdutosQueryParams, 'offset'> = {}) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
-
-  return useInfiniteQuery({
-    queryKey: ['grupos-produtos', 'infinite', params],
-    queryFn: async ({ pageParam = 0 }): Promise<{ grupos: GrupoProduto[]; count: number; nextOffset: number | null }> => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
-      const limit = params.limit || 10
+  return useSecureTenantInfiniteQuery(
+    ['grupos-produtos', 'infinite', params],
+    async ({ token }, pageParam) => {
+      const limit = Math.min(params.limit || 10, GRUPOS_PRODUTOS_API_MAX_LIMIT)
       const searchParams = new URLSearchParams()
       if (params.name) searchParams.append('q', params.name)
       if (params.ativo !== undefined && params.ativo !== null) {
         searchParams.append('ativo', params.ativo.toString())
       }
       searchParams.append('limit', limit.toString())
-      searchParams.append('offset', pageParam.toString())
+      searchParams.append('offset', String(pageParam))
 
-      const response = await fetch(`/api/grupos-produtos?${searchParams.toString()}`, {
+      const response = await fetchGestorApi(`/api/grupos-produtos?${searchParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -130,15 +153,15 @@ export function useGruposProdutosInfinite(params: Omit<GruposProdutosQueryParams
         nextOffset,
       }
     },
-    enabled: !!token,
-    initialPageParam: 0,
-    getNextPageParam: (lastPage) => lastPage.nextOffset,
-    staleTime: 1000 * 60 * 5, // 5 minutos
-    gcTime: 1000 * 60 * 10, // 10 minutos
-    refetchOnWindowFocus: false, // Não refetch ao focar na janela
-    refetchOnMount: true, // SEMPRE refetch ao montar para garantir dados atualizados após reordenação
-    placeholderData: (previousData) => previousData, // Prefetch automático
-  })
+    {
+      enabled: params.enabled ?? true,
+      initialPageParam: 0,
+      getNextPageParam: lastPage => lastPage.nextOffset,
+      staleTime: 1000 * 60 * 5,
+      gcTime: 1000 * 60 * 10,
+      refetchOnWindowFocus: false,
+      refetchOnMount: true,
+      placeholderData: previousData => previousData,
+    }
+  )
 }
-
-

@@ -1,0 +1,329 @@
+Você é um arquiteto frontend senior especializado em sistemas SaaS de Business Intelligence para restaurantes, PDVs e food service.
+
+Quero que você desenvolva uma página avançada chamada:
+
+# Centro Inteligente de Performance de Produtos
+
+Essa página faz parte do Jiffy, um sistema PDV/Gestor moderno.
+
+Objetivo:
+Transformar dados de vendas em inteligência estratégica para o gestor tomar decisões comerciais, operacionais e financeiras.
+
+A página NÃO deve parecer apenas um relatório comum.
+Ela deve parecer um mini BI moderno e premium.
+
+---
+
+# Stack obrigatória
+
+* Next.js
+* React
+* TypeScript
+* TailwindCSS
+* shadcn/ui
+* TanStack Table
+* Recharts ou Nivo
+* Framer Motion
+
+---
+
+# Requisitos visuais
+
+A interface deve transmitir:
+
+* inteligência
+* tecnologia
+* performance
+* análise estratégica
+
+Inspirar-se visualmente em:
+
+* Stripe Dashboard
+* Linear
+* Notion Analytics
+* Shopify Analytics
+* Vercel Dashboard
+
+---
+
+# Estrutura geral da página
+
+# 1. Header estratégico
+
+Adicionar:
+
+* título
+* subtítulo
+* status do período analisado
+* comparação automática com período anterior
+
+Exemplo:
+"Os produtos cresceram 12% comparado ao período anterior"
+
+---
+
+# 2. Sistema avançado de filtros
+
+Criar filtros:
+
+* período
+* categoria
+* canal
+* unidade/loja
+* horário
+* dia da semana
+* produto
+* tags
+* faixa de faturamento
+
+Adicionar:
+
+* filtros rápidos
+* filtros salvos
+* presets inteligentes
+
+---
+
+# 3. KPIs avançados
+
+Criar cards premium contendo:
+
+## Receita total
+
+## Quantidade vendida
+
+## Lucro estimado
+
+## Margem média
+
+## Ticket médio
+
+## Produto líder
+
+## Produto com maior margem
+
+## Produto em queda
+
+## Produto emergente
+
+## Categoria dominante
+
+Cada card deve conter:
+
+* mini gráfico sparkline
+* comparação percentual
+* tooltip explicativa
+* tendência
+* animação
+* insights rápidos
+
+---
+
+# 4. Dashboard analítico
+
+Criar múltiplos gráficos:
+
+## Evolução temporal
+
+* linha
+* área
+* comparação entre produtos
+
+## Participação de categorias
+
+* donut chart
+
+## Heatmap de horários
+
+Mostrar:
+
+* horários de pico
+* intensidade de vendas
+
+## Curva ABC
+
+Classificar produtos:
+
+* A
+* B
+* C
+
+## Ranking visual
+
+Top:
+
+* faturamento
+* margem
+* crescimento
+* recorrência
+
+---
+
+# 5. Tabela inteligente avançada
+
+Criar tabela premium.
+
+Colunas:
+
+* Produto
+* Categoria
+* Quantidade
+* Receita
+* Margem
+* Ticket médio
+* Crescimento
+* Participação
+* Horário forte
+* Recorrência
+* Score estratégico
+
+Funcionalidades:
+
+* agrupamento
+* expansão de linha
+* filtros por coluna
+* colunas configuráveis
+* drag and drop
+* exportação
+* busca inteligente
+* virtualização
+* seleção múltipla
+* densidade compacta/confortável
+
+---
+
+# 6. Sistema de Score Estratégico
+
+Criar algoritmo mockado que gere um score do produto.
+
+Exemplo:
+Score baseado em:
+
+* vendas
+* crescimento
+* margem
+* recorrência
+* participação
+* estabilidade
+
+Exibir:
+
+* score visual
+* ranking
+* classificação
+
+---
+
+# 7. Insights inteligentes
+
+Criar seção premium de insights automáticos.
+
+Exemplos:
+
+* "Produto X cresceu 22% após promoção"
+* "Combos aumentam ticket médio em 34%"
+* "Produto Y vende melhor às sextas"
+* "Bebidas possuem alta margem e baixo destaque"
+* "Produto Z pode ser removido do cardápio"
+
+Exibir:
+
+* prioridade
+* impacto
+* categoria do insight
+
+Adicionar:
+
+* cards inteligentes
+* alertas
+* oportunidades
+
+---
+
+# 8. Sistema de comparações
+
+Permitir:
+
+* período vs período
+* loja vs loja
+* delivery vs balcão
+* almoço vs jantar
+* semana vs semana
+* feriado vs dia comum
+
+---
+
+# 9. UX premium
+
+Adicionar:
+
+* animações sofisticadas
+* microinterações
+* loading skeleton
+* estados vazios
+* transições suaves
+* navegação extremamente fluida
+* sticky sections
+* atalhos rápidos
+
+---
+
+# 10. Design System
+
+Criar:
+
+* componentes reutilizáveis
+* tokens visuais
+* padrões consistentes
+* arquitetura escalável
+
+Separar:
+
+* analytics
+* charts
+* tables
+* cards
+* insights
+* filters
+* hooks
+* services
+* mocks
+* types
+* utils
+
+---
+
+# 11. Preparação para IA
+
+Preparar estrutura para:
+
+* insights com IA
+* recomendações automáticas
+* previsões de vendas
+* detecção de anomalias
+* análise de sazonalidade
+
+Criar componentes preparados para consumir APIs futuras.
+
+---
+
+# 12. Responsividade
+
+Garantir:
+
+* desktop premium
+* tablet funcional
+* mobile utilizável
+
+---
+
+# 13. Resultado esperado
+
+Quero um dashboard com aparência de:
+
+* produto enterprise
+* BI moderno
+* analytics premium
+* sistema SaaS de alto valor
+
+O código deve parecer desenvolvido por uma equipe senior de produto.

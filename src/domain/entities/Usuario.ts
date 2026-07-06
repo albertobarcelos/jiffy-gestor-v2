@@ -8,7 +8,8 @@ export class Usuario {
     private readonly telefone?: string,
     private readonly ativo: boolean = true,
     private readonly perfilPdvId?: string,
-    private readonly perfilPdv?: any
+    private readonly perfilPdv?: any,
+    private readonly tipoUsuarioPdv?: string
   ) {}
 
   static create(
@@ -17,13 +18,14 @@ export class Usuario {
     telefone?: string,
     ativo: boolean = true,
     perfilPdvId?: string,
-    perfilPdv?: any
+    perfilPdv?: any,
+    tipoUsuarioPdv?: string
   ): Usuario {
     if (!id || !nome) {
       throw new Error('ID e nome são obrigatórios')
     }
 
-    return new Usuario(id, nome, telefone, ativo, perfilPdvId, perfilPdv)
+    return new Usuario(id, nome, telefone, ativo, perfilPdvId, perfilPdv, tipoUsuarioPdv)
   }
 
   static fromJSON(data: any): Usuario {
@@ -33,7 +35,8 @@ export class Usuario {
       data.telefone?.toString(),
       data.ativo === true || data.ativo === 'true',
       data.perfilPdvId?.toString(),
-      data.perfilPdv
+      data.perfilPdv,
+      data.tipoUsuarioPdv?.toString() || data.tipoUsuario?.toString()
     )
   }
 
@@ -61,6 +64,10 @@ export class Usuario {
     return this.perfilPdv
   }
 
+  getTipoUsuarioPdv(): string | undefined {
+    return this.tipoUsuarioPdv
+  }
+
   toJSON() {
     return {
       id: this.id,
@@ -69,6 +76,7 @@ export class Usuario {
       ativo: this.ativo,
       perfilPdvId: this.perfilPdvId,
       perfilPdv: this.perfilPdv,
+      tipoUsuarioPdv: this.tipoUsuarioPdv,
     }
   }
 }

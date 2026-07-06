@@ -1,8 +1,12 @@
-import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useQueryClient } from '@tanstack/react-query'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
+import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecureTenantInfiniteQuery'
+import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 interface GruposComplementosQueryParams {
   q?: string
@@ -20,32 +24,20 @@ interface GruposComplementosResponse {
  * Hook para buscar grupos de complementos (lista simples)
  */
 export function useGruposComplementos(params: GruposComplementosQueryParams = {}) {
-  const { auth, isAuthenticated } = useAuthStore()
-  const token = auth?.getAccessToken()
-
-  return useQuery<GrupoComplemento[], ApiError>({
-    queryKey: ['grupos-complementos', params.q, params.ativo],
-    queryFn: async () => {
-      if (!isAuthenticated || !token) {
-        throw new Error('Usuário não autenticado ou token ausente.')
-      }
-
+  return useSecureTenantQuery<GrupoComplemento[]>(
+    ['grupos-complementos', params.q, params.ativo],
+    async ({ token }) => {
       const searchParams = new URLSearchParams()
       if (params.q) searchParams.append('q', params.q)
       if (params.ativo !== null && params.ativo !== undefined) {
         searchParams.append('ativo', params.ativo.toString())
       }
-      if (params.limit) {
-        searchParams.append('limit', params.limit.toString())
-      }
+      if (params.limit) searchParams.append('limit', params.limit.toString())
       searchParams.append('offset', params.offset?.toString() ?? '0')
 
-      const response = await fetch(`/api/grupos-complementos?${searchParams.toString()}`, {
+      const response = await fetchGestorApi(`/api/grupos-complementos?${searchParams.toString()}`, {
         cache: 'no-store',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       })
 
       if (!response.ok) {
@@ -60,25 +52,17 @@ export function useGruposComplementos(params: GruposComplementosQueryParams = {}
       const data: GruposComplementosResponse = await response.json()
       return (data.items || []).map((item: any) => GrupoComplemento.fromJSON(item))
     },
-    enabled: isAuthenticated && !!token,
-    staleTime: 1000 * 60 * 5,
-  })
+    { staleTime: 1000 * 60 * 5 }
+  )
 }
 
 /**
  * Hook para buscar grupos de complementos com paginação infinita
  */
 export function useGruposComplementosInfinite(params: Omit<GruposComplementosQueryParams, 'offset'> = {}) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
-
-  return useInfiniteQuery({
-    queryKey: ['grupos-complementos', 'infinite', params],
-    queryFn: async ({ pageParam = 0 }): Promise<{ grupos: GrupoComplemento[]; count: number; nextOffset: number | null }> => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantInfiniteQuery(
+    ['grupos-complementos', 'infinite', params],
+    async ({ token }, pageParam) => {
       const limit = params.limit || 10
       const searchParams = new URLSearchParams()
       if (params.q) searchParams.append('q', params.q)
@@ -86,9 +70,9 @@ export function useGruposComplementosInfinite(params: Omit<GruposComplementosQue
         searchParams.append('ativo', params.ativo.toString())
       }
       searchParams.append('limit', limit.toString())
-      searchParams.append('offset', pageParam.toString())
+      searchParams.append('offset', String(pageParam))
 
-      const response = await fetch(`/api/grupos-complementos?${searchParams.toString()}`, {
+      const response = await fetchGestorApi(`/api/grupos-complementos?${searchParams.toString()}`, {
         cache: 'no-store',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -128,14 +112,15 @@ export function useGruposComplementosInfinite(params: Omit<GruposComplementosQue
         nextOffset,
       }
     },
-    enabled: !!token,
-    initialPageParam: 0,
-    getNextPageParam: (lastPage) => lastPage.nextOffset,
-    staleTime: 0,
-    gcTime: 0,
-    refetchOnWindowFocus: false,
-    refetchOnMount: 'always',
-  })
+    {
+      initialPageParam: 0,
+      getNextPageParam: lastPage => lastPage.nextOffset,
+      staleTime: 0,
+      gcTime: 0,
+      refetchOnWindowFocus: false,
+      refetchOnMount: 'always',
+    }
+  )
 }
 
 /**
@@ -143,21 +128,11 @@ export function useGruposComplementosInfinite(params: Omit<GruposComplementosQue
  * Ideal para componentes de visualização e edição.
  */
 export function useGrupoComplemento(id: string) {
-  const { auth, isAuthenticated } = useAuthStore()
-  const token = auth?.getAccessToken()
-
-  return useQuery<GrupoComplemento, ApiError>({
-    queryKey: ['grupo-complemento', id],
-    queryFn: async () => {
-      if (!isAuthenticated || !token) {
-        throw new Error('Usuário não autenticado ou token ausente.')
-      }
-
-      const response = await fetch(`/api/grupos-complementos/${id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+  return useSecureTenantQuery<GrupoComplemento>(
+    ['grupo-complemento', id],
+    async ({ token }) => {
+      const response = await fetchGestorApi(`/api/grupos-complementos/${id}`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       })
 
       if (!response.ok) {
@@ -172,29 +147,23 @@ export function useGrupoComplemento(id: string) {
       const data = await response.json()
       return GrupoComplemento.fromJSON(data)
     },
-    enabled: isAuthenticated && !!token && !!id,
-    staleTime: 1000 * 60 * 5, // 5 minutos
-  })
+    { staleTime: 1000 * 60 * 5, enabled: !!id }
+  )
 }
 
 /**
  * Hook para criar/atualizar grupo de complementos
  */
 export function useGrupoComplementoMutation() {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
-  const token = auth?.getAccessToken()
+  const empresaId = useTenantEmpresaId()
 
-  return useMutation({
-    mutationFn: async ({ grupoId, data, isUpdate }: { grupoId?: string; data: any; isUpdate: boolean }) => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
+  return useSecureTenantMutation(
+    async ({ token }, { grupoId, data, isUpdate }: { grupoId?: string; data: any; isUpdate: boolean }) => {
       const url = isUpdate && grupoId ? `/api/grupos-complementos/${grupoId}` : '/api/grupos-complementos'
       const method = isUpdate ? 'PUT' : 'POST'
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method,
         headers: {
           Authorization: `Bearer ${token}`,
@@ -211,11 +180,13 @@ export function useGrupoComplementoMutation() {
 
       return await response.json()
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['grupos-complementos'] })
-      showToast.success(variables.isUpdate ? 'Grupo atualizado com sucesso!' : 'Grupo criado com sucesso!')
-    },
-  })
+    {
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'grupos-complementos'] })
+        showToast.success(variables.isUpdate ? 'Grupo atualizado com sucesso!' : 'Grupo criado com sucesso!')
+      },
+    }
+  )
 }
 
 

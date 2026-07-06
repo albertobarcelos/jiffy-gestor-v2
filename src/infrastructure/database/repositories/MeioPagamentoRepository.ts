@@ -100,11 +100,16 @@ export class MeioPagamentoRepository implements IMeioPagamentoRepository {
 
   async criarMeioPagamento(data: CriarMeioPagamentoDTO): Promise<MeioPagamento> {
     try {
-      const body = {
+      const body: Record<string, unknown> = {
         nome: data.nome,
         tefAtivo: data.tefAtivo !== undefined ? data.tefAtivo : true,
         formaPagamentoFiscal: data.formaPagamentoFiscal || 'Dinheiro',
         ativo: data.ativo !== undefined ? data.ativo : true,
+        isParcelavel: data.isParcelavel !== undefined ? data.isParcelavel : false,
+      }
+
+      if (data.tipoParcelamento) {
+        body.tipoParcelamento = data.tipoParcelamento
       }
 
       const response = await this.apiClient.request<any>(
@@ -142,6 +147,8 @@ export class MeioPagamentoRepository implements IMeioPagamentoRepository {
       if (data.tefAtivo !== undefined) requestBody.tefAtivo = data.tefAtivo
       if (data.formaPagamentoFiscal !== undefined) requestBody.formaPagamentoFiscal = data.formaPagamentoFiscal
       if (data.ativo !== undefined) requestBody.ativo = data.ativo
+      if (data.isParcelavel !== undefined) requestBody.isParcelavel = data.isParcelavel
+      if (data.tipoParcelamento !== undefined) requestBody.tipoParcelamento = data.tipoParcelamento
 
       const response = await this.apiClient.request<any>(
         `/api/v1/pagamento/meios-pagamento/${id}`,

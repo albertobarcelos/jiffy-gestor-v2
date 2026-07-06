@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 export type DashboardEvolucaoPoint = {
   data: string
@@ -15,7 +16,7 @@ type Params = {
   enabled?: boolean
 }
 
-async function fetchDashboardEvolucao(params: Params): Promise<DashboardEvolucaoPoint[]> {
+async function fetchDashboardEvolucao(params: Params & { token: string }): Promise<DashboardEvolucaoPoint[]> {
   const search = new URLSearchParams()
   if (params.periodoInicial) search.append('dataFinalizacaoInicial', params.periodoInicial.toISOString())
   if (params.periodoFinal) search.append('dataFinalizacaoFinal', params.periodoFinal.toISOString())
@@ -23,7 +24,9 @@ async function fetchDashboardEvolucao(params: Params): Promise<DashboardEvolucao
 
   params.selectedStatuses.forEach(status => search.append('status', status))
 
-  const response = await fetch(`/api/dashboard/evolucao?${search.toString()}`)
+  const response = await fetchGestorApi(`/api/dashboard/evolucao?${search.toString()}`, {
+    headers: { Authorization: `Bearer ${params.token}` },
+  })
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>
   if (!response.ok) {
     const msg = typeof data.error === 'string' ? data.error : 'Erro ao carregar evolução do dashboard'
@@ -40,8 +43,8 @@ export function useDashboardEvolucaoQuery({
   intervaloHora,
   enabled = true,
 }: Params) {
-  return useQuery({
-    queryKey: [
+  return useSecureTenantQuery(
+    [
       'dashboard',
       'evolucao',
       periodoInicial ? periodoInicial.toISOString() : null,
@@ -49,10 +52,11 @@ export function useDashboardEvolucaoQuery({
       selectedStatuses,
       intervaloHora ?? null,
     ],
-    queryFn: () =>
-      fetchDashboardEvolucao({ periodoInicial, periodoFinal, selectedStatuses, intervaloHora, enabled }),
-    enabled,
-    staleTime: 30_000,
-  })
+    ({ token }) =>
+      fetchDashboardEvolucao({ periodoInicial, periodoFinal, selectedStatuses, intervaloHora, token }),
+    {
+      enabled,
+      staleTime: 30_000,
+    }
+  )
 }
-

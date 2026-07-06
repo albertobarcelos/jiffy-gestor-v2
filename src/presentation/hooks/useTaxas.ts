@@ -1,10 +1,11 @@
-import { useInfiniteQuery } from '@tanstack/react-query'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecureTenantInfiniteQuery'
 import { Taxa } from '@/src/domain/entities/Taxa'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 type TaxasQueryParams = {
   q?: string
   limit?: number
+  enabled?: boolean
 }
 
 type TaxasResponse = {
@@ -16,25 +17,18 @@ type TaxasResponse = {
  * Lista taxas com paginação infinita (mesmo contrato de complementos: items + count).
  */
 export function useTaxasInfinite(params: TaxasQueryParams = {}) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
+  const { enabled = true, ...queryParams } = params
 
-  return useInfiniteQuery({
-    queryKey: ['taxas', 'infinite', params],
-    queryFn: async ({
-      pageParam = 0,
-    }): Promise<{ taxas: Taxa[]; count: number; nextOffset: number | null }> => {
-      if (!token) {
-        throw new Error('Token não encontrado')
-      }
-
-      const limit = params.limit || 10
+  return useSecureTenantInfiniteQuery(
+    ['taxas', 'infinite', queryParams],
+    async ({ token }, pageParam) => {
+      const limit = queryParams.limit || 10
       const searchParams = new URLSearchParams()
-      if (params.q) searchParams.append('q', params.q)
+      if (queryParams.q) searchParams.append('q', queryParams.q)
       searchParams.append('limit', limit.toString())
-      searchParams.append('offset', pageParam.toString())
+      searchParams.append('offset', String(pageParam))
 
-      const response = await fetch(`/api/taxas?${searchParams.toString()}`, {
+      const response = await fetchGestorApi(`/api/taxas?${searchParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -62,9 +56,11 @@ export function useTaxasInfinite(params: TaxasQueryParams = {}) {
         nextOffset,
       }
     },
-    enabled: !!token,
-    initialPageParam: 0,
-    getNextPageParam: lastPage => lastPage.nextOffset,
-    staleTime: 1000 * 60 * 5,
-  })
+    {
+      enabled,
+      initialPageParam: 0,
+      getNextPageParam: lastPage => lastPage.nextOffset,
+      staleTime: 1000 * 60 * 5,
+    }
+  )
 }

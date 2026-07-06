@@ -1,4 +1,6 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData } from '@tanstack/react-query'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 type DashboardResumoMetricas = {
   total: {
@@ -19,26 +21,70 @@ type DashboardResumoMetricas = {
     countVendasCanceladas: number
     countProdutosVendidos: number
   }
+  mesasAbertas: number
+  totalCancelado: number
+  ticketMedio: number
+  itensPorPedido: number
 }
 
 export type DashboardResumoResponse = {
-  metricas: DashboardResumoMetricas
-  mesasAbertas: number
-  totalCancelado: number
+  atual: DashboardResumoMetricas
+  anterior: DashboardResumoMetricas
+  comparacao: {
+    totalFaturado: { percentual: number; status: 'neutro' | 'sem_base' | 'positivo' | 'negativo' }
+    countVendasEfetivadas: { percentual: number; status: 'neutro' | 'sem_base' | 'positivo' | 'negativo' }
+    countVendasCanceladas: { percentual: number; status: 'neutro' | 'sem_base' | 'positivo' | 'negativo' }
+    ticketMedio: { percentual: number; status: 'neutro' | 'sem_base' | 'positivo' | 'negativo' }
+    itensPorPedido: { percentual: number; status: 'neutro' | 'sem_base' | 'positivo' | 'negativo' }
+  }
 }
 
 type DashboardResumoParams = {
+  periodo?: string
+  timezone?: string
+  /** @deprecated Prefer `intervaloAtualInicio/Fim` (mesmo cálculo que Top produtos / Top garçons). */
   periodoInicial?: Date | null
   periodoFinal?: Date | null
+  /** Intervalo atual (UTC) já resolvido no cliente com `calcularPeriodoNoFusoEmpresa` / `assumirDateComoNoFusoEmpresaParaUtc`. */
+  intervaloAtualInicio?: Date | null
+  intervaloAtualFim?: Date | null
+  /** Período de comparação (UTC), alinhado ao card e ao gráfico. */
+  intervaloComparacaoInicio?: Date | null
+  intervaloComparacaoFim?: Date | null
   enabled?: boolean
 }
 
-async function fetchDashboardResumo(params: DashboardResumoParams): Promise<DashboardResumoResponse> {
+async function fetchDashboardResumo(params: DashboardResumoParams & { token: string }): Promise<DashboardResumoResponse> {
   const search = new URLSearchParams()
-  if (params.periodoInicial) search.append('dataFinalizacaoInicial', params.periodoInicial.toISOString())
-  if (params.periodoFinal) search.append('dataFinalizacaoFinal', params.periodoFinal.toISOString())
+  if (params.periodo) search.append('periodo', params.periodo)
+  if (params.timezone) search.append('timezone', params.timezone)
 
-  const response = await fetch(`/api/dashboard/resumo?${search.toString()}`)
+  const inicioAtual =
+    params.intervaloAtualInicio && params.intervaloAtualFim
+      ? params.intervaloAtualInicio
+      : params.periodo === 'personalizado' && params.periodoInicial && params.periodoFinal
+        ? params.periodoInicial
+        : null
+  const fimAtual =
+    params.intervaloAtualInicio && params.intervaloAtualFim
+      ? params.intervaloAtualFim
+      : params.periodo === 'personalizado' && params.periodoInicial && params.periodoFinal
+        ? params.periodoFinal
+        : null
+
+  if (inicioAtual && fimAtual) {
+    search.append('dataFinalizacaoInicial', inicioAtual.toISOString())
+    search.append('dataFinalizacaoFinal', fimAtual.toISOString())
+  }
+
+  if (params.intervaloComparacaoInicio && params.intervaloComparacaoFim) {
+    search.append('dataFinalizacaoInicialComparacao', params.intervaloComparacaoInicio.toISOString())
+    search.append('dataFinalizacaoFinalComparacao', params.intervaloComparacaoFim.toISOString())
+  }
+
+  const response = await fetchGestorApi(`/api/dashboard/resumo?${search.toString()}`, {
+    headers: { Authorization: `Bearer ${params.token}` },
+  })
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>
   if (!response.ok) {
     const msg = typeof data.error === 'string' ? data.error : 'Erro ao carregar resumo do dashboard'
@@ -48,17 +94,46 @@ async function fetchDashboardResumo(params: DashboardResumoParams): Promise<Dash
   return data as unknown as DashboardResumoResponse
 }
 
-export function useDashboardResumoQuery({ periodoInicial, periodoFinal, enabled = true }: DashboardResumoParams) {
-  return useQuery({
-    queryKey: [
+export function useDashboardResumoQuery({
+  periodo,
+  timezone,
+  periodoInicial,
+  periodoFinal,
+  intervaloAtualInicio,
+  intervaloAtualFim,
+  intervaloComparacaoInicio,
+  intervaloComparacaoFim,
+  enabled = true,
+}: DashboardResumoParams) {
+  return useSecureTenantQuery(
+    [
       'dashboard',
       'resumo',
-      periodoInicial ? periodoInicial.toISOString() : null,
-      periodoFinal ? periodoFinal.toISOString() : null,
+      periodo,
+      timezone,
+      intervaloAtualInicio ? intervaloAtualInicio.toISOString() : null,
+      intervaloAtualFim ? intervaloAtualFim.toISOString() : null,
+      intervaloComparacaoInicio ? intervaloComparacaoInicio.toISOString() : null,
+      intervaloComparacaoFim ? intervaloComparacaoFim.toISOString() : null,
+      periodo === 'personalizado' && periodoInicial ? periodoInicial.toISOString() : null,
+      periodo === 'personalizado' && periodoFinal ? periodoFinal.toISOString() : null,
     ],
-    queryFn: () => fetchDashboardResumo({ periodoInicial, periodoFinal }),
-    enabled,
-    staleTime: 30_000,
-  })
+    ({ token }) =>
+      fetchDashboardResumo({
+        periodo,
+        timezone,
+        periodoInicial,
+        periodoFinal,
+        intervaloAtualInicio,
+        intervaloAtualFim,
+        intervaloComparacaoInicio,
+        intervaloComparacaoFim,
+        token,
+      }),
+    {
+      enabled,
+      staleTime: 30_000,
+      placeholderData: keepPreviousData,
+    }
+  )
 }
-

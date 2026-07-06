@@ -33,6 +33,7 @@ interface NovoUsuarioProps {
   /** ID do `<form>` para submit pelo rodapé externo (ex.: JiffySidePanelModal) */
   embeddedFormId?: string
   hideEmbeddedFormActions?: boolean
+  forcedTipoUsuarioPdv?: string
   onEmbedFormStateChange?: (s: { isSubmitting: boolean; canSubmit: boolean }) => void
   /** Chamado após salvar com sucesso no embed (ex.: invalidar lista). */
   onSaved?: () => void
@@ -64,6 +65,7 @@ export const NovoUsuario = forwardRef<NovoUsuarioHandle, NovoUsuarioProps>(funct
     isEmbedded,
   hideEmbeddedHeader = false,
   embeddedFormId,
+  forcedTipoUsuarioPdv,
   onEmbedFormStateChange,
     onSaved,
     onCloseAfterSave,
@@ -115,10 +117,11 @@ export const NovoUsuario = forwardRef<NovoUsuarioHandle, NovoUsuarioProps>(funct
       nome: (nome || '').trim(),
       telefone: (telefone || '').trim(),
       perfilPdvId: perfilPdvId || '',
+      tipoUsuarioPdv: forcedTipoUsuarioPdv || '',
       ativo,
       password: password || '',
     })
-  }, [nome, telefone, perfilPdvId, ativo, password])
+  }, [nome, telefone, perfilPdvId, forcedTipoUsuarioPdv, ativo, password])
 
   const baselineSerializedRef = useRef('')
 
@@ -364,6 +367,9 @@ export const NovoUsuario = forwardRef<NovoUsuarioHandle, NovoUsuarioProps>(funct
         ativo,
         perfilPdvId,
       }
+      if (forcedTipoUsuarioPdv) {
+        body.tipoUsuarioPdv = forcedTipoUsuarioPdv
+      }
 
       if (!isEditing) {
         body.password = password
@@ -404,7 +410,7 @@ export const NovoUsuario = forwardRef<NovoUsuarioHandle, NovoUsuarioProps>(funct
           onCloseAfterSave?.()
         }
       } else {
-        router.push('/cadastros/usuarios')
+        router.push('/usuarios')
       }
     } catch (error) {
       console.error('Erro ao salvar usuário:', error)
@@ -419,7 +425,7 @@ export const NovoUsuario = forwardRef<NovoUsuarioHandle, NovoUsuarioProps>(funct
     if (isEmbedded) {
       onCancel?.()
     } else {
-      router.push('/cadastros/usuarios')
+      router.push('/usuarios')
     }
   }
 
