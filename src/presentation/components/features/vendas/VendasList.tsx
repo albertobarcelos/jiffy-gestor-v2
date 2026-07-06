@@ -12,6 +12,7 @@ import {
   MdPrint,
   MdFilterList,
   MdReceiptLong,
+  MdDownload,
 } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -20,8 +21,6 @@ import { GraficoVendasPorUsuarioModal } from './GraficoVendasPorUsuarioModal'
 import { FormControl, InputAdornment, InputLabel, MenuItem, Select, TextField } from '@mui/material'
 import { sxEntradaCompactaProdutoSelect } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import { TipoVendaIcon } from './TipoVendaIcon'
-import { calculatePeriodo } from '@/src/shared/utils/dateFilters' // Importar calculatePeriodo
-import { calcularPeriodoNoFusoEmpresa } from '@/src/shared/utils/periodoNoFusoEmpresa'
 import { startOfDay } from 'date-fns'
 import type { DateRange } from 'react-day-picker'
 import {
@@ -37,34 +36,18 @@ import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side
 import { FaturamentoRangeCalendar } from '@/src/presentation/components/ui/FaturamentoRangeCalendar'
 import { useDashboardFaturamentoPorDiaQuery } from '@/src/presentation/hooks/useDashboardFaturamentoPorDiaQuery'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
-// Tipos
-interface Venda {
-  id: string
-  numeroVenda: number
-  codigoVenda: string
-  numeroMesa?: number
-  valorFinal: number
-  tipoVenda: 'balcao' | 'mesa' | 'gestor'
-  abertoPorId: string
-  canceladoPorId?: string
-  codigoTerminal: string
-  terminalId: string
-  dataCriacao: string
-  dataUltimoProdutoLancado?: string
-  dataUltimaMovimentacao?: string
-  dataCancelamento?: string
-  dataFinalizacao?: string
-  metodoPagamento?: string
-  status?: string
-  totalValorProdutosRemovidos?: number
-}
-
-interface MetricasVendas {
-  totalFaturado: number
-  countVendasEfetivadas: number
-  countVendasCanceladas: number
-  countProdutosVendidos: number
-}
+import { useExportarRelatorioVendas } from '@/src/presentation/hooks/useExportarRelatorioVendas'
+import {
+  buildVendasListQueryParams,
+  filtrarVendasPorStatusCliente,
+  mapearVendaApiRow,
+} from '@/src/presentation/utils/vendas/vendasListQuery'
+import { calcularTotalCanceladoLista } from '@/src/presentation/utils/vendas/vendasListCalculos'
+import type {
+  MetricasVendas,
+  VendaListItem as Venda,
+  VendasFiltrosQuerySnapshot,
+} from '@/src/presentation/utils/vendas/vendasListTypes'
 
 interface UsuarioPDV {
   id: string
@@ -179,251 +162,6 @@ function formatarDataHoraFiltroCurta(date: Date): string {
 function formatarHoraParaInputCalendar(d: Date | null | undefined): string {
   if (!d) return '00:00'
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-}
-
-function getTimeZoneOffsetMinutes(date: Date, timeZone: string): number {
-  const dtf = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  })
-  const parts = dtf.formatToParts(date)
-  const map: Partial<Record<Intl.DateTimeFormatPartTypes, string>> = {}
-  for (const p of parts) {
-    if (p.type !== 'literal') map[p.type] = p.value
-  }
-  const year = Number(map.year)
-  const month = Number(map.month)
-  const day = Number(map.day)
-  let hour = Number(map.hour)
-  const minute = Number(map.minute)
-  const second = Number(map.second)
-  if (hour === 24) hour = 0
-  const asUTC = Date.UTC(year, month - 1, day, hour, minute, second)
-  return Math.round((asUTC - date.getTime()) / 60000)
-}
-
-function zonedLocalPartsToUtcDate(
-  dateParts: {
-    year: number
-    month: number
-    day: number
-    hour: number
-    minute: number
-    second: number
-    millisecond: number
-  },
-  timeZone: string
-): Date {
-  const { year, month, day, hour, minute, second, millisecond } = dateParts
-  const guess = Date.UTC(year, month - 1, day, hour, minute, second, millisecond)
-  const off1 = getTimeZoneOffsetMinutes(new Date(guess), timeZone)
-  const utc1 = guess - off1 * 60_000
-  const off2 = getTimeZoneOffsetMinutes(new Date(utc1), timeZone)
-  const utc2 = guess - off2 * 60_000
-  return new Date(utc2)
-}
-
-function toISOStringNoFusoEmpresa(date: Date, timeZoneEmpresa: string): string {
-  const tz = timeZoneEmpresa.trim()
-  if (!tz) return date.toISOString()
-  return zonedLocalPartsToUtcDate(
-    {
-      year: date.getFullYear(),
-      month: date.getMonth() + 1,
-      day: date.getDate(),
-      hour: date.getHours(),
-      minute: date.getMinutes(),
-      second: date.getSeconds(),
-      millisecond: date.getMilliseconds(),
-    },
-    tz
-  ).toISOString()
-}
-
-/** Snapshot dos filtros para montar a query da listagem (GET /api/vendas). */
-interface VendasFiltrosQuerySnapshot {
-  searchQuery: string
-  valorMinimo: string
-  valorMaximo: string
-  periodo: string
-  statusFilter: string | null
-  tipoVendaFilter: string | null
-  meioPagamentoFilter: string
-  usuarioAbertoPorFilter: string
-  terminalFilter: string
-  usuarioCancelouFilter: string
-  periodoInicial: Date | null
-  periodoFinal: Date | null
-}
-
-/** Normaliza string de moeda do filtro para número (mesma regra do input de valor). */
-function normalizarMoedaFiltroVLista(value: string): number | null {
-  if (!value || value.trim() === '') return null
-
-  let clean = value.replace(/[^\d,.]/g, '').trim()
-
-  if (!clean) return null
-
-  if (clean.includes(',')) {
-    clean = clean.replace(/\./g, '').replace(',', '.')
-  } else if (clean.includes('.')) {
-    if ((clean.match(/\./g) || []).length > 1) {
-      clean = clean.replace(/\./g, '')
-    }
-    const parts = clean.split('.')
-    if (parts.length === 2 && parts[1].length === 3) {
-      clean = clean.replace('.', '')
-    }
-  }
-
-  const num = parseFloat(clean)
-  return isNaN(num) ? null : num
-}
-
-/** Monta query string da listagem (sem limit/offset). */
-function buildVendasListQueryParams(
-  filters: VendasFiltrosQuerySnapshot,
-  args?: { timeZoneEmpresa?: string }
-): URLSearchParams {
-  const baseParams = new URLSearchParams()
-
-  if (filters.searchQuery) {
-    baseParams.append('q', filters.searchQuery)
-  }
-
-  if (filters.tipoVendaFilter) {
-    baseParams.append('tipoVenda', filters.tipoVendaFilter.toLowerCase())
-  }
-
-  const normalizedStatus = filters.statusFilter?.toUpperCase()
-  if (normalizedStatus && normalizedStatus !== 'ABERTA') {
-    baseParams.append('status', normalizedStatus)
-  } else {
-    baseParams.append('status', 'FINALIZADA')
-    baseParams.append('status', 'CANCELADA')
-  }
-
-  if (filters.usuarioAbertoPorFilter) {
-    baseParams.append('abertoPorId', filters.usuarioAbertoPorFilter)
-  }
-
-  if (filters.usuarioCancelouFilter) {
-    baseParams.append('canceladoPorId', filters.usuarioCancelouFilter)
-  }
-
-  const valorMin = normalizarMoedaFiltroVLista(filters.valorMinimo)
-  if (valorMin !== null && valorMin > 0) {
-    baseParams.append('valorFinalMinimo', valorMin.toString())
-  }
-
-  const valorMax = normalizarMoedaFiltroVLista(filters.valorMaximo)
-  if (valorMax !== null && valorMax > 0) {
-    baseParams.append('valorFinalMaximo', valorMax.toString())
-  }
-
-  if (filters.meioPagamentoFilter) {
-    baseParams.append('meioPagamentoId', filters.meioPagamentoFilter)
-  }
-
-  if (filters.terminalFilter) {
-    baseParams.append('terminalId', filters.terminalFilter)
-  }
-
-  let inicioFiltro: Date | null = null
-  let fimFiltro: Date | null = null
-  /** Presets (Hoje, Últimos N dias, Mês atual): mesma regra do dashboard/BFF — `calcularPeriodoNoFusoEmpresa`. */
-  let intervaloUtcJaNoFusoApi = false
-  if (filters.periodoInicial && filters.periodoFinal) {
-    inicioFiltro = filters.periodoInicial
-    fimFiltro = filters.periodoFinal
-  } else if (filters.periodo !== 'Todos') {
-    const tzParaPresets = args?.timeZoneEmpresa?.trim() || 'America/Sao_Paulo'
-    const noFuso = calcularPeriodoNoFusoEmpresa(filters.periodo, tzParaPresets)
-    if (noFuso.inicio != null && noFuso.fim != null) {
-      inicioFiltro = noFuso.inicio
-      fimFiltro = noFuso.fim
-      intervaloUtcJaNoFusoApi = true
-    } else {
-      const { inicio, fim } = calculatePeriodo(filters.periodo)
-      inicioFiltro = inicio
-      fimFiltro = fim
-    }
-  }
-  /**
-   * Backend: período por data de finalização (`dataFinalizacaoInicial`/`dataFinalizacaoFinal`).
-   * Com status apenas ABERTA não é permitido filtrar por finalização — usa-se data de criação.
-   */
-  const usarDatasCriacao = normalizedStatus === 'ABERTA'
-  const tzEmpresa = args?.timeZoneEmpresa?.trim() || ''
-  const isoInicioFiltroVendas = (): string => {
-    if (usarDatasCriacao) return inicioFiltro!.toISOString()
-    if (intervaloUtcJaNoFusoApi || !tzEmpresa) return inicioFiltro!.toISOString()
-    return toISOStringNoFusoEmpresa(inicioFiltro!, tzEmpresa)
-  }
-  const isoFimFiltroVendas = (): string => {
-    if (usarDatasCriacao) return fimFiltro!.toISOString()
-    if (intervaloUtcJaNoFusoApi || !tzEmpresa) return fimFiltro!.toISOString()
-    return toISOStringNoFusoEmpresa(fimFiltro!, tzEmpresa)
-  }
-  if (inicioFiltro) {
-    baseParams.append(
-      usarDatasCriacao ? 'dataCriacaoInicial' : 'dataFinalizacaoInicial',
-      isoInicioFiltroVendas()
-    )
-  }
-  if (fimFiltro) {
-    baseParams.append(
-      usarDatasCriacao ? 'dataCriacaoFinal' : 'dataFinalizacaoFinal',
-      isoFimFiltroVendas()
-    )
-  }
-
-  return baseParams
-}
-
-/** Mapeia linha da API para o tipo usado na lista. */
-function mapearVendaApiRow(item: any): Venda {
-  return {
-    ...item,
-    totalValorProdutosRemovidos:
-      item.totalValorProdutosRemovidos ||
-      item.totalValorProdutosRemovido ||
-      item.valorProdutosRemovidos ||
-      item.valorProdutosRemovido ||
-      0,
-  }
-}
-
-/**
- * Refina por status usando datas (quando a API retorna mistura ou caso "Aberta").
- */
-function filtrarVendasPorStatusCliente(itens: Venda[], statusFilter: string | null): Venda[] {
-  return itens.filter((v: Venda) => {
-    const normalizedStatus = statusFilter?.toUpperCase()
-
-    if (!normalizedStatus || normalizedStatus === 'ABERTA') {
-      if (normalizedStatus === 'ABERTA') {
-        return !v.dataCancelamento && !v.dataFinalizacao
-      }
-      return !!(v.dataCancelamento || v.dataFinalizacao)
-    }
-
-    if (normalizedStatus === 'CANCELADA') {
-      return !!v.dataCancelamento
-    }
-
-    if (normalizedStatus === 'FINALIZADA') {
-      return !!v.dataFinalizacao && !v.dataCancelamento
-    }
-
-    return !!(v.dataCancelamento || v.dataFinalizacao)
-  })
 }
 
 /** Borda do `Select` outlined sempre visível (o MUI deixa o repouso tão claro que parece sumir). */
@@ -544,7 +282,8 @@ const sxVendasFiltroTextFieldMoeda = {
  */
 export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   const { auth } = useAuthStore()
-  const { timezoneAgregacao } = useEmpresaMe()
+  const { timezoneAgregacao, empresa } = useEmpresaMe()
+  const { exportar: exportarRelatorio, isExportando } = useExportarRelatorioVendas()
   const router = useRouter()
   const pathname = usePathname()
 
@@ -1040,22 +779,10 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   }, [auth, buscarPaginaVendas, inferirHasMoreApi])
 
   /** Soma “Total cancelado” apenas sobre as vendas já carregadas na lista (métricas globais vêm de `metricas`). */
-  const totalCanceladoSomenteLista = useMemo(() => {
-    return vendas.reduce((total, v) => {
-      const totalRemovidos = Number(v.totalValorProdutosRemovidos) || 0
-      const valorFinal = Number(v.valorFinal) || 0
-
-      if (v.dataCancelamento) {
-        return total + totalRemovidos + valorFinal
-      }
-
-      if (v.dataFinalizacao && !v.dataCancelamento && totalRemovidos > 0) {
-        return total + totalRemovidos
-      }
-
-      return total
-    }, 0)
-  }, [vendas])
+  const totalCanceladoSomenteLista = useMemo(
+    () => calcularTotalCanceladoLista(vendas),
+    [vendas]
+  )
 
   const avisoGraficoListaParcial =
     hasMoreVendas && totalListaCount != null && vendas.length < totalListaCount
@@ -1184,6 +911,46 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     }
     router.refresh() // Força a revalidação da rota para recarregar com os filtros limpos
   }, [router, pathname])
+
+  const handleExportarRelatorio = useCallback(() => {
+    const token = auth?.getAccessToken()
+    if (!token) {
+      showToast.error('Sessão expirada. Faça login novamente.')
+      return
+    }
+
+    const usuariosPorId = new Map(usuariosPDV.map(u => [u.id, u.nome]))
+    const meiosPagamentoPorId = new Map(meiosPagamento.map(m => [m.id, m.nome]))
+    const terminaisPorId = new Map(terminais.map(t => [t.id, t.nome]))
+
+    const user = auth?.getUser()
+    const usuarioGerador =
+      user?.getName()?.trim() || user?.getEmail()?.trim() || 'Usuário não identificado'
+
+    void exportarRelatorio({
+      filters: filtersRef.current,
+      token,
+      timeZoneEmpresa: timezoneAgregacao,
+      metricas,
+      usuariosPorId,
+      meiosPagamentoPorId,
+      terminaisPorId,
+      contexto: {
+        nomeEmpresa: empresa?.nomeExibicao ?? 'Empresa',
+        cnpjEmpresa: empresa?.cnpj ?? '—',
+        usuarioGerador,
+      },
+    })
+  }, [
+    auth,
+    empresa,
+    exportarRelatorio,
+    meiosPagamento,
+    metricas,
+    terminais,
+    timezoneAgregacao,
+    usuariosPDV,
+  ])
 
   /**
    * Handle Enter nos campos de valor
@@ -1315,7 +1082,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
           className={`flex flex-col items-center gap-3 py-2 sm:flex-row ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}
         >
           {/* Campo de Pesquisa */}
-          <div className="relative w-full flex-[2]">
+          <div className="relative w-full min-w-0 flex-1 sm:max-w-sm md:max-w-md lg:max-w-lg">
             <MdSearch
               className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text"
               size={20}
@@ -1405,10 +1172,21 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             <button
               type="button"
               onClick={() => setIsDatasModalOpen(true)}
-              className="font-nunito flex h-8 items-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
+              className="font-nunito flex h-8 shrink-0 items-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
             >
               <MdCalendarToday size={18} />
               Por datas
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportarRelatorio}
+              disabled={isExportando || isLoading}
+              title="Exportar relatório em Excel (.xlsx)"
+              className="font-nunito flex h-8 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg border-2 border-primary bg-info px-4 text-sm text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <MdDownload size={18} />
+              {isExportando ? 'Exportando...' : 'Exportar XLS'}
             </button>
             {periodoInicial && periodoFinal ? (
               <div className="flex shrink-0 flex-col gap-0 text-[11px] leading-snug text-primary/85 sm:text-xs">
@@ -1574,7 +1352,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             className="font-nunito flex h-8 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
           >
             <MdFilterAltOff size={18} />
-            Limpar Filtros
+            Limpar
           </button>
         </div>
 
