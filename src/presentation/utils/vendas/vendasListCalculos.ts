@@ -103,23 +103,19 @@ export function formatarTaxasLancadasCelulaExport(taxas: VendaListTaxaLancadaIte
   const ativas = filtrarTaxasLancadasAtivas(taxas ?? [])
   if (ativas.length === 0) return '—'
 
-  const formatarMoeda = (valor: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor)
-
   return ativas
     .map(taxa => {
       const qtd = Number(taxa.quantidade) || 1
       const valorUnit = Number(taxa.valor) || 0
-      const total = Number(taxa.valorCalculado) || 0
-      const textoUnitario = tipoTaxaEhPercentual(taxa.tipo)
-        ? `${Math.round(valorUnit * 100)}%`
-        : formatarMoeda(valorUnit)
+      const sufixoPercentual = tipoTaxaEhPercentual(taxa.tipo)
+        ? ` (${Math.round(valorUnit * 100)}%)`
+        : ''
 
-      if (ativas.length === 1 && qtd === 1) {
-        return `${taxa.nome} — ${formatarMoeda(total)}`
+      if (qtd === 1) {
+        return `${taxa.nome}${sufixoPercentual}`
       }
 
-      return `${qtd}x ${taxa.nome} (${textoUnitario}) — ${formatarMoeda(total)}`
+      return `${qtd}x ${taxa.nome}${sufixoPercentual}`
     })
     .join('\n')
 }
