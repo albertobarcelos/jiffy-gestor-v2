@@ -71,7 +71,7 @@ export function formatarDataHoraRelatorioNoFuso(
 
 /** Soma `quantidade` dos produtos não removidos (mesma regra das métricas do backend). */
 export function calcularQuantidadeProdutosVendidosDetalhe(produtos: unknown[]): number {
-  return produtos.reduce((total, item) => {
+  return produtos.reduce<number>((total, item) => {
     const produto = item as Record<string, unknown>
     if (produto.removido === true) return total
     return total + (Number(produto.quantidade) || 0)
