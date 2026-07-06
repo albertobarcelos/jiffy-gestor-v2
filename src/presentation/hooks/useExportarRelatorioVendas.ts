@@ -24,9 +24,13 @@ export function useExportarRelatorioVendas() {
   const [isExportando, setIsExportando] = useState(false)
 
   const exportar = useCallback(async (input: RelatorioVendasExportInput) => {
-    if (input.filters.periodo === 'Todos' && !input.filters.periodoInicial) {
-      showToast.error('Selecione um período para exportar o relatório.')
-      return
+    const exportaPeriodoTodos =
+      input.filters.periodo === 'Todos' && !input.filters.periodoInicial
+
+    if (exportaPeriodoTodos) {
+      showToast.warning(
+        'Exportando todas as vendas. O processo pode demorar conforme a quantidade de registros.'
+      )
     }
 
     setIsExportando(true)
@@ -63,7 +67,13 @@ export function useExportarRelatorioVendas() {
       toast.loading('Buscando formas de pagamento...', { id: toastId })
 
       let metodosPagamento: Awaited<ReturnType<typeof buscarMetodosPagamentoPeriodo>> = []
-      let avisoPagamentos: string | undefined
+      const avisosRelatorio: string[] = []
+
+      if (exportaPeriodoTodos) {
+        avisosRelatorio.push(
+          'Período "Todos": o relatório inclui todo o histórico de vendas conforme os demais filtros. A exportação pode demorar conforme a quantidade de registros.'
+        )
+      }
 
       try {
         metodosPagamento = await buscarMetodosPagamentoPeriodo({
@@ -72,12 +82,22 @@ export function useExportarRelatorioVendas() {
           timeZoneEmpresa: exportInput.timeZoneEmpresa,
         })
         if (temFiltrosExtrasAlemPeriodo(exportInput.filters)) {
-          avisoPagamentos =
+          avisosRelatorio.push(
             'Formas de pagamento consideram apenas o período (vendas finalizadas), não os demais filtros da lista.'
+          )
         }
       } catch {
-        avisoPagamentos = 'Não foi possível carregar formas de pagamento para este período.'
+        avisosRelatorio.push('Não foi possível carregar formas de pagamento para este período.')
       }
+
+      if (exportaPeriodoTodos && metodosPagamento.length === 0) {
+        avisosRelatorio.push(
+          'A aba "Formas de pagamento" não é gerada para o período "Todos". Selecione um intervalo ou preset de período para incluir essa agregação.'
+        )
+      }
+
+      const avisoPagamentos =
+        avisosRelatorio.length > 0 ? avisosRelatorio.join('\n\n') : undefined
 
       toast.loading('Carregando detalhes das vendas...', { id: toastId })
 

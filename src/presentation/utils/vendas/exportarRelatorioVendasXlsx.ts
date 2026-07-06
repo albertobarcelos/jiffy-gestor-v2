@@ -85,9 +85,10 @@ function adicionarLinhasFiltros(
   const { filters, meiosPagamentoPorId, usuariosPorId, terminaisPorId, timeZoneEmpresa } = input
   const pares: Array<[string, string]> = []
 
-  if (filters.periodo !== 'Todos') {
-    pares.push(['Período', filters.periodo])
-  }
+  pares.push([
+    'Período',
+    filters.periodo === 'Todos' ? 'Todos (histórico completo)' : filters.periodo,
+  ])
 
   const { inicio, fim } = extrairPeriodoIsoDosFiltros(filters, timeZoneEmpresa)
   if (inicio && fim) {
@@ -196,7 +197,7 @@ function montarAbaResumo(
 
   if (avisoPagamentos) {
     row++
-    sheet.getCell(row, 1).value = 'Observação — formas de pagamento'
+    sheet.getCell(row, 1).value = 'Observações'
     aplicarEstiloSecao(sheet.getCell(row, 1))
     sheet.mergeCells(row, 1, row, 2)
     row++
@@ -205,7 +206,7 @@ function montarAbaResumo(
     sheet.mergeCells(row, 1, row, 2)
     avisoRow.getCell(1).alignment = { wrapText: true, vertical: 'top' }
     aplicarBordasLinha(avisoRow, 2)
-    avisoRow.height = 36
+    avisoRow.height = Math.max(36, avisoPagamentos.split('\n').length * 16 + 8)
   }
 
   ajustarLarguraColunas(sheet, { min: 14, max: 52 })

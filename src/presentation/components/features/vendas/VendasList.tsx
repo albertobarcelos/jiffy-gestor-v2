@@ -112,6 +112,9 @@ const PERIODOS_SELECT_VALIDOS = [
   'Últimos 90 Dias',
 ] as const
 
+/** Período padrão ao abrir a tela ou ao limpar filtros (sem parâmetro na URL). */
+const PERIODO_PADRAO_LISTAGEM = 'Hoje'
+
 /** Mapeia slugs do dashboard V2 / URLs antigas → rótulos do select de relatórios. */
 function mapearPeriodoUrlParaSelect(v: string): string {
   const t = v.trim()
@@ -128,7 +131,7 @@ function mapearPeriodoUrlParaSelect(v: string): string {
 }
 
 function normalizarPeriodoSelect(v: string | undefined): string {
-  if (!v) return 'Hoje'
+  if (!v) return PERIODO_PADRAO_LISTAGEM
   const mapped = mapearPeriodoUrlParaSelect(v)
   if ((PERIODOS_SELECT_VALIDOS as readonly string[]).includes(mapped)) return mapped
   return 'Todos'
@@ -867,13 +870,13 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   }, [handleScrollListaVendas])
 
   /**
-   * Limpa todos os filtros
+   * Restaura filtros ao padrão da tela (vendas de hoje, demais filtros vazios).
    */
   const handleClearFilters = useCallback(() => {
     setSearchQuery('')
     setValorMinimo('')
     setValorMaximo('')
-    setPeriodo('Todos')
+    setPeriodo(PERIODO_PADRAO_LISTAGEM)
     setStatusFilter(null)
     setTipoVendaFilter(null)
     setMeioPagamentoFilter('')
@@ -882,6 +885,21 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     setUsuarioCancelouFilter('')
     setPeriodoInicial(null)
     setPeriodoFinal(null)
+
+    filtersRef.current = {
+      searchQuery: '',
+      valorMinimo: '',
+      valorMaximo: '',
+      periodo: PERIODO_PADRAO_LISTAGEM,
+      statusFilter: null,
+      tipoVendaFilter: null,
+      meioPagamentoFilter: '',
+      usuarioAbertoPorFilter: '',
+      terminalFilter: '',
+      usuarioCancelouFilter: '',
+      periodoInicial: null,
+      periodoFinal: null,
+    }
 
     // Remove todos os parâmetros de filtro da URL
     // Verifica se estamos no cliente antes de usar window
