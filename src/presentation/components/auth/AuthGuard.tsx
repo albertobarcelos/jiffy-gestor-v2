@@ -61,6 +61,7 @@ const PUBLIC_PREFIXES = [
   '/esqueci-senha',
   '/redefinir-senha',
   '/notas-fiscais',
+  '/cardapio',
 ]
 
 function isPublicPath(p: string | null): boolean {

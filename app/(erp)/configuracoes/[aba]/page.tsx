@@ -1,10 +1,14 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { notFound } from 'next/navigation'
-import { Suspense, use } from 'react'
+import { notFound, useRouter } from 'next/navigation'
+import { Suspense, use, useEffect } from 'react'
 import { PageLoading } from '@/src/presentation/components/ui/PageLoading'
-import { isConfiguracoesTabSlug } from '@/src/shared/constants/configuracoesRoutes'
+import {
+  configuracoesTabPath,
+  isConfiguracoesTabSlug,
+  resolveConfiguracoesTabFromPath,
+} from '@/src/shared/constants/configuracoesRoutes'
 import type { ConfiguracoesTabSlug } from '@/src/shared/constants/configuracoesRoutes'
 
 const ConfiguracoesView = dynamic(
@@ -23,9 +27,25 @@ export default function ConfiguracoesTabPage({
 }: {
   params: Promise<{ aba: string }>
 }) {
+  const router = useRouter()
   const { aba } = use(params)
+  const legacyTab = resolveConfiguracoesTabFromPath(aba)
+  const isValidTab = isConfiguracoesTabSlug(aba)
 
-  if (!isConfiguracoesTabSlug(aba)) {
+  useEffect(() => {
+    if (!isValidTab && legacyTab) {
+      router.replace(configuracoesTabPath(legacyTab))
+    }
+  }, [isValidTab, legacyTab, router])
+
+  if (!isValidTab) {
+    if (legacyTab) {
+      return (
+        <div className="h-full">
+          <PageLoading />
+        </div>
+      )
+    }
     notFound()
   }
 

@@ -16,6 +16,7 @@ const GESTAO_EXCLUDED_PREFIXES = [
   '/hub',
   '/api',
   '/notas-fiscais',
+  '/cardapio',
 ] as const
 
 const EMPRESA_SLUG_PATTERN = /^.+-[a-z0-9]{8}$/i

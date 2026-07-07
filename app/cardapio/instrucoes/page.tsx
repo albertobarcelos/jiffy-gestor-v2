@@ -1,17 +1,23 @@
 'use client'
 
 /**
- * Página de instruções para acessar o cardápio
- * Exibida quando não há token ou sessão válida
+ * Instruções quando o cardápio não foi encontrado ou não há slug válido.
  */
 export default function InstrucoesPage() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
+      <div
+        className="max-w-md w-full rounded-2xl shadow-xl p-8 text-center"
+        style={{ backgroundColor: 'var(--cardapio-bg-secondary)' }}
+      >
         <div className="mb-6">
-          <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div
+            className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4"
+            style={{ backgroundColor: 'var(--cardapio-bg-elevated)' }}
+          >
             <svg
-              className="w-10 h-10 text-primary"
+              className="w-10 h-10"
+              style={{ color: 'var(--cardapio-accent-primary)' }}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -20,52 +26,40 @@ export default function InstrucoesPage() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"
+                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
               />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            Acesse o Cardápio
+          <h1
+            className="text-2xl font-bold mb-2"
+            style={{ color: 'var(--cardapio-text-primary)' }}
+          >
+            Cardápio digital
           </h1>
-          <p className="text-gray-600">
-            Escaneie o QR Code na sua mesa para acessar o cardápio digital
+          <p style={{ color: 'var(--cardapio-text-secondary)' }}>
+            Acesse o link compartilhado pelo restaurante para ver o cardápio e fazer seu pedido.
           </p>
         </div>
 
-        <div className="bg-gray-50 rounded-lg p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-3">
-            Como acessar:
+        <div
+          className="rounded-lg p-6 mb-6 text-left"
+          style={{ backgroundColor: 'var(--cardapio-bg-primary)' }}
+        >
+          <h2
+            className="text-lg font-semibold mb-3"
+            style={{ color: 'var(--cardapio-text-primary)' }}
+          >
+            Como acessar
           </h2>
-          <ol className="text-left space-y-3 text-gray-700">
-            <li className="flex items-start">
-              <span className="flex-shrink-0 w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center text-sm font-semibold mr-3">
-                1
-              </span>
-              <span>Localize o QR Code na sua mesa</span>
-            </li>
-            <li className="flex items-start">
-              <span className="flex-shrink-0 w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center text-sm font-semibold mr-3">
-                2
-              </span>
-              <span>Abra a câmera do seu celular</span>
-            </li>
-            <li className="flex items-start">
-              <span className="flex-shrink-0 w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center text-sm font-semibold mr-3">
-                3
-              </span>
-              <span>Escaneie o QR Code</span>
-            </li>
-            <li className="flex items-start">
-              <span className="flex-shrink-0 w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center text-sm font-semibold mr-3">
-                4
-              </span>
-              <span>O cardápio será aberto automaticamente</span>
-            </li>
+          <ol className="space-y-3" style={{ color: 'var(--cardapio-text-secondary)' }}>
+            <li>1. Peça ao restaurante o link do cardápio online</li>
+            <li>2. O endereço tem o formato: /cardapio/nome-da-loja</li>
+            <li>3. Escolha os itens, monte seu pedido e confirme</li>
           </ol>
         </div>
 
-        <p className="text-sm text-gray-500">
-          Precisa de ajuda? Chame um garçom
+        <p className="text-sm" style={{ color: 'var(--cardapio-text-muted)' }}>
+          Link inválido ou loja não encontrada? Verifique com o estabelecimento.
         </p>
       </div>
     </div>

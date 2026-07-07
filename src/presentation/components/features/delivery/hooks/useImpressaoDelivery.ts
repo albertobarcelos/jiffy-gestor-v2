@@ -3,6 +3,7 @@
 import { useCallback } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
+import { usePreferenciasImpressaoDelivery } from '@/src/presentation/hooks/usePreferenciasImpressaoDelivery'
 import { decidirImpressaoAposAcao } from '@/src/application/delivery/decidirImpressaoPosTransicao'
 import { fetchVendaGestorTickets } from '@/src/infrastructure/api/fetchVendaGestorTickets'
 import { filtrarTicketsPorTipoDecidido } from '@/src/application/delivery/filtrarTicketsPorTipoDecidido'
@@ -55,7 +56,8 @@ function resolverTipoCupomComFallbackProduto(
  */
 export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
   const { auth } = useAuthStore()
-  const { empresa, preferenciasImpressaoDelivery, deliveryCupomTemplate } = useEmpresaMe()
+  const { empresa, deliveryCupomTemplate } = useEmpresaMe()
+  const { preferenciasImpressaoDelivery } = usePreferenciasImpressaoDelivery()
 
   const avisarImpressoraExpedicaoNecessaria = useCallback(() => {
     showToast.warning(TOAST_IMPRESSORA_EXPEDICAO_NECESSARIA)

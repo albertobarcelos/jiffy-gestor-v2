@@ -6,8 +6,8 @@ import Image from 'next/image'
 interface ProdutoDestaque {
   id: string
   nome: string
-  imagemUrl?: string
-  descricao?: string
+  imagemUrl?: string | null
+  descricao?: string | null
   valor?: number
 }
 
@@ -32,37 +32,11 @@ export default function CarrosselProdutosDestaque({
   const containerRef = useRef<HTMLDivElement>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Produtos mockados se não houver produtos
-  const produtosExibir = produtos.length > 0 ? produtos : [
-    {
-      id: '1',
-      nome: 'Pizza',
-      descricao: 'Pizzas artesanais com ingredientes frescos e selecionados. Massa fina e crocante, recheios generosos e queijo derretido.',
-      valor: 45.90,
-      imagemUrl: '/images/pizza.jpg',
-    },
-    {
-      id: '2',
-      nome: 'Lanche',
-      descricao: 'Lanches suculentos e saborosos. Pão fresquinho, hambúrguer grelhado na chapa e acompanhamentos especiais.',
-      valor: 28.90,
-      imagemUrl: '/images/lanche.jpg',
-    },
-    {
-      id: '3',
-      nome: 'Pastel',
-      descricao: 'Pastéis crocantes e recheados. Massa fina e dourada, recheios variados e saborosos. Tradição e qualidade em cada mordida.',
-      valor: 12.90,
-      imagemUrl: '/images/pastel.jpg',
-    },
-    {
-      id: '4',
-      nome: 'Refrigerante',
-      descricao: 'Bebidas geladas e refrescantes. Variedade de sabores para acompanhar seu pedido. Sempre gelado e na temperatura ideal.',
-      valor: 8.90,
-      imagemUrl: '/images/refri.png',
-    },
-  ]
+  // Sem produtos reais: estado vazio (não exibir mocks em produção)
+  const produtosExibir =
+    produtos && produtos.length > 0
+      ? produtos
+      : []
 
   // Função para ir para slide específico
   const goToSlide = useCallback((index: number) => {
@@ -263,6 +237,16 @@ export default function CarrosselProdutosDestaque({
       document.removeEventListener('mousemove', handleGlobalMouseMove)
     }
   }, [isDragging, startX, currentX, currentIndex, produtosExibir.length])
+
+  if (produtosExibir.length === 0) {
+    return (
+      <div className="w-full h-full flex items-center justify-center px-6 text-center">
+        <p className="text-sm md:text-base" style={{ color: 'var(--cardapio-text-tertiary)' }}>
+          Nenhum destaque no momento
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div

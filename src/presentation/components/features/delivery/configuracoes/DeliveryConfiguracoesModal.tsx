@@ -10,7 +10,6 @@ import {
 } from '@/src/infrastructure/api/estacoesImpressaoApi'
 import { showToast } from '@/src/shared/utils/toast'
 import type { ModoImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
-import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
 import {
   DEFAULT_DELIVERY_CUPOM_TEMPLATE,
   type DeliveryCupomTemplateConfig,
@@ -34,6 +33,11 @@ import {
   isTcpPrinterRef,
 } from '@/src/infrastructure/printing/qzTrayClient'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
+import { usePreferenciasImpressaoDelivery } from '@/src/presentation/hooks/usePreferenciasImpressaoDelivery'
+import {
+  useAtualizarEmpresaDelivery,
+  useEmpresaDeliveryMe,
+} from '@/src/presentation/hooks/useEmpresaDeliveryMe'
 import {
   useDeliveryConfigEstacaoImpressao,
   useDeliveryConfigImpressorasLogicas,
@@ -50,20 +54,6 @@ type MapeamentosDraft = Record<string, string>
 function clampCopiasUnificado(n: number): number {
   if (!Number.isFinite(n)) return 1
   return Math.min(99, Math.max(1, Math.floor(n)))
-}
-
-async function mensagemErroHttp(res: Response): Promise<string> {
-  const raw: unknown = await res.json().catch(() => ({}))
-  return (
-    textoErroCorpoApi(raw) ||
-    (raw &&
-    typeof raw === 'object' &&
-    'error' in raw &&
-    typeof (raw as { error: unknown }).error === 'string'
-      ? (raw as { error: string }).error
-      : '') ||
-    `Erro HTTP ${res.status}`
-  )
 }
 
 function DeliveryToggleRow(props: {
@@ -218,14 +208,18 @@ function ImpressoraMapeamentoInput({
 }
 
 export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfiguracoesModalProps) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
+  const token = useAuthStore(s => s.tenantAuth?.getAccessToken() ?? null)
   const {
     empresa,
-    preferenciasImpressaoDelivery,
     deliveryCupomTemplate: cupomTemplateRemoto,
     isLoading: carregandoEmpresaMe,
   } = useEmpresaMe()
+  const {
+    preferenciasImpressaoDelivery,
+    isLoading: carregandoPreferenciasDelivery,
+  } = usePreferenciasImpressaoDelivery()
+  const empresaDeliveryQuery = useEmpresaDeliveryMe()
+  const atualizarEmpresaDelivery = useAtualizarEmpresaDelivery()
   const impressorasLogicasQuery = useDeliveryConfigImpressorasLogicas(open)
   const estacaoImpressaoQuery = useDeliveryConfigEstacaoImpressao(open)
   const invalidateDeliveryConfigQueries = useInvalidateDeliveryConfigImpressaoQueries()
@@ -259,6 +253,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
   const carregando =
     open &&
     (carregandoEmpresaMe ||
+      carregandoPreferenciasDelivery ||
       impressorasLogicasQuery.isPending ||
       estacaoImpressaoQuery.isPending)
 
@@ -274,7 +269,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
       mapeamentosHidratadosRef.current = false
       return
     }
-    if (formularioHidratadoRef.current || carregandoEmpresaMe || !empresa?.id) return
+    if (formularioHidratadoRef.current || carregandoEmpresaMe || carregandoPreferenciasDelivery || !empresa?.id) return
 
     const prefs = preferenciasImpressaoDelivery
     formularioHidratadoRef.current = true
@@ -288,6 +283,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
   }, [
     open,
     carregandoEmpresaMe,
+    carregandoPreferenciasDelivery,
     empresa?.id,
     preferenciasImpressaoDelivery,
     cupomTemplateRemoto,
@@ -379,28 +375,33 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
 
     setSalvando(true)
     try {
-      const patchRes = await fetch(`/api/empresas/${encodeURIComponent(empresaId)}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ parametroDelivery }),
-      })
-
-      if (!patchRes.ok) {
-        throw new Error(await mensagemErroHttp(patchRes))
+      let salvouPreferencias = false
+      if (empresaDeliveryQuery.data) {
+        await atualizarEmpresaDelivery.mutateAsync({ parametroDelivery })
+        salvouPreferencias = true
       }
 
+      let salvouMapeamentos = false
       if (estacaoImpressaoId && impressorasLogicas.length > 0) {
         await salvarMapeamentosEstacao(token, estacaoImpressaoId, payload)
+        salvouMapeamentos = true
       }
 
       salvarDeliveryCupomTemplateLocal(empresaId, cupomTemplate)
       invalidateDeliveryConfigQueries()
-      window.dispatchEvent(new Event('jiffy:empresa-me-updated'))
-      showToast.success('Configurações de delivery salvas.')
       setConfirmSalvarSemImpressoraOpen(false)
+
+      if (salvouPreferencias) {
+        showToast.success('Configurações de delivery salvas.')
+      } else if (salvouMapeamentos) {
+        showToast.success(
+          'Mapeamento de impressoras salvo. Configure a Empresa Delivery em Configurações → Empresa Delivery para salvar preferências de impressão.'
+        )
+      } else {
+        showToast.info(
+          'Configure a Empresa Delivery em Configurações → Empresa Delivery para salvar preferências de impressão.'
+        )
+      }
     } catch (error) {
       const msg =
         error instanceof Error ? error.message : 'Não foi possível salvar as configurações de delivery.'
@@ -422,6 +423,8 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
     mapeamentos,
     invalidateDeliveryConfigQueries,
     token,
+    empresaDeliveryQuery.data,
+    atualizarEmpresaDelivery,
   ])
 
   const handleSalvar = useCallback(() => {

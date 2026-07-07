@@ -11,6 +11,7 @@ import {
   useTransicaoPedidoDelivery,
 } from '@/src/presentation/hooks/useVendas'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
+import { usePreferenciasImpressaoDelivery } from '@/src/presentation/hooks/usePreferenciasImpressaoDelivery'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { invalidateVendaDetalheCarregadaCache } from '../../pedidos/hooks/data/useVendaDetalheCarregadaQuery'
 import { useEntregaTransicoesKanban } from '../../delivery/kanban-panels/useEntregaTransicoesKanban'
@@ -62,7 +63,8 @@ export interface KanbanToolbarProps {
 }
 
 export function useKanbanOrchestrator() {
-  const { timezoneAgregacao, preferenciasImpressaoDelivery, empresa } = useEmpresaMe()
+  const { timezoneAgregacao, empresa } = useEmpresaMe()
+  const { preferenciasImpressaoDelivery } = usePreferenciasImpressaoDelivery()
   const queryClient = useQueryClient()
   const empresaId = useTenantEmpresaId()
 

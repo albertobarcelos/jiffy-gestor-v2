@@ -12,6 +12,7 @@ import {
 } from '@/src/presentation/hooks/useVendas'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
+import { usePreferenciasImpressaoDelivery } from '@/src/presentation/hooks/usePreferenciasImpressaoDelivery'
 import { useImpressaoDelivery } from '@/features/delivery/hooks/useImpressaoDelivery'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import type { NovoPedidoModalProps } from '../types'
@@ -73,7 +74,8 @@ export function useNovoPedidoOrchestrator({
   abaDetalhesInicial,
 }: NovoPedidoModalProps) {
   const { auth } = useAuthStore()
-  const { empresa, preferenciasImpressaoDelivery } = useEmpresaMe()
+  const { empresa } = useEmpresaMe()
+  const { preferenciasImpressaoDelivery } = usePreferenciasImpressaoDelivery()
   const { processarAposTransicaoVendaGestorId } = useImpressaoDelivery()
   const empresaId = useTenantEmpresaId()
   const createVendaGestor = useCreateVendaGestor()

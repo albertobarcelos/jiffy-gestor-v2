@@ -34,5 +34,6 @@ describe('gestaoRoutes', () => {
   it('identifica módulos ERP', () => {
     expect(isGestaoScopedPath('/portal-contador')).toBe(true)
     expect(isGestaoScopedPath('/meus-apps')).toBe(false)
+    expect(isGestaoScopedPath('/cardapio/nexsyn-ltda')).toBe(false)
   })
 })
