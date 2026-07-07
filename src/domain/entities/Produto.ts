@@ -116,6 +116,7 @@ export class Produto {
     private readonly permiteDesconto?: boolean,
     private readonly permiteAlterarPreco?: boolean,
     private readonly incideTaxa?: boolean,
+    private readonly ativoDelivery?: boolean,
     private readonly ordem?: number,
     private readonly gruposComplementos?: ProdutoGrupoComplementoResumo[],
     private readonly impressoras?: ProdutoImpressoraResumo[],
@@ -142,6 +143,7 @@ export class Produto {
     permiteDesconto?: boolean,
     permiteAlterarPreco?: boolean,
     incideTaxa?: boolean,
+    ativoDelivery?: boolean,
     ordem?: number,
     gruposComplementos?: ProdutoGrupoComplementoResumo[],
     impressoras?: ProdutoImpressoraResumo[],
@@ -171,6 +173,7 @@ export class Produto {
       permiteDesconto,
       permiteAlterarPreco,
       incideTaxa,
+      ativoDelivery,
       ordem,
       gruposComplementos,
       impressoras,
@@ -211,6 +214,7 @@ export class Produto {
       data.permiteDesconto === true || data.permiteDesconto === 'true',
       data.permiteAlterarPreco === true || data.permiteAlterarPreco === 'true',
       data.incideTaxa === true || data.incideTaxa === 'true',
+      data.ativoDelivery === false ? false : true,
       (() => {
         if (typeof data.ordem === 'number' && Number.isFinite(data.ordem)) return data.ordem
         if (typeof data.ordem === 'string' && data.ordem.trim() !== '') {
@@ -299,6 +303,10 @@ export class Produto {
     return this.incideTaxa === true
   }
 
+  isAtivoDelivery(): boolean {
+    return this.ativoDelivery !== false
+  }
+
   getOrdem(): number | undefined {
     return this.ordem
   }
@@ -356,6 +364,7 @@ export class Produto {
       permiteDesconto: this.permiteDesconto,
       permiteAlterarPreco: this.permiteAlterarPreco,
       incideTaxa: this.incideTaxa,
+      ativoDelivery: this.isAtivoDelivery(),
       ordem: this.ordem,
       gruposComplementos: this.gruposComplementos,
       impressoras: this.impressoras,

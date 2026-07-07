@@ -43,6 +43,7 @@ function ProdutoListItemBase({
       abreComplementos: produto.abreComplementosAtivo(),
       permiteAlterarPreco: produto.permiteAlterarPrecoAtivo(),
       incideTaxa: produto.incideTaxaAtivo(),
+      ativoDelivery: produto.isAtivoDelivery(),
     }),
     [produto]
   )

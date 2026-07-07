@@ -34,6 +34,7 @@ interface BaselineSnapshotProduto {
   abreComplementos: boolean
   permiteAlterarPreco: boolean
   incideTaxa: boolean
+  ativoDelivery: boolean
   ativo: boolean
   grupoComplementosIds: string[]
   impressorasIds: string[]
@@ -231,6 +232,9 @@ function montarPatchParcialEdicaoProduto(
   if (!booleanIguaisParaPatch(bodyCompleto.incideTaxa, base.incideTaxa)) {
     delta.incideTaxa = bodyCompleto.incideTaxa
   }
+  if (!booleanIguaisParaPatch(bodyCompleto.ativoDelivery, base.ativoDelivery)) {
+    delta.ativoDelivery = bodyCompleto.ativoDelivery
+  }
 
   if (!arraysIdsIguais(bodyCompleto.gruposComplementosIds as unknown[], base.grupoComplementosIds)) {
     delta.gruposComplementosIds = bodyCompleto.gruposComplementosIds
@@ -334,6 +338,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
     const [abreComplementos, setAbreComplementos] = useState(false)
     const [permiteAlterarPreco, setPermiteAlterarPreco] = useState(false)
     const [incideTaxa, setIncideTaxa] = useState(false)
+    const [ativoDelivery, setAtivoDelivery] = useState(true)
     const [ativo, setAtivo] = useState(true)
     const [grupoComplementosIds, setGrupoComplementosIds] = useState<string[]>([])
     const [impressorasIds, setImpressorasIds] = useState<string[]>([])
@@ -411,6 +416,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         abreComplementos,
         permiteAlterarPreco,
         incideTaxa,
+        ativoDelivery,
         ativo,
         grupoComplementosIds: [...grupoComplementosIds].sort(),
         impressorasIds: [...impressorasIds].sort(),
@@ -433,6 +439,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       abreComplementos,
       permiteAlterarPreco,
       incideTaxa,
+      ativoDelivery,
       ativo,
       grupoComplementosIds,
       impressorasIds,
@@ -567,6 +574,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           abreComplementos: !!(produto.abreComplementos || false),
           permiteAlterarPreco: !!(produto.permiteAlterarPreco ?? false),
           incideTaxa: !!(produto.incideTaxa ?? false),
+          ativoDelivery: produto.ativoDelivery === false ? false : true,
           // Mesma semântica que `setAtivo(produto.ativo ?? true)` — unknown precisa virar boolean explícito
           ativo: produto.ativo === false ? false : true,
           grupoComplementosIds: [...gruposIds].map(id => String(id)).sort(),
@@ -675,6 +683,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
             setAbreComplementos(produto.abreComplementos || false)
             setPermiteAlterarPreco(produto.permiteAlterarPreco ?? false)
             setIncideTaxa(produto.incideTaxa ?? false)
+            setAtivoDelivery(produto.ativoDelivery ?? true)
             setAtivo(produto.ativo ?? true)
             const gruposIds = produto.gruposComplementos?.map((g: any) => g.id) || []
             setGrupoComplementosIds(gruposIds)
@@ -1338,6 +1347,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           permiteDesconto,
           permiteAlterarPreco,
           incideTaxa,
+          ativoDelivery,
           gruposComplementosIds: grupoComplementosIds,
           impressorasIds,
           // Manter ncm no body para compatibilidade (backend ainda aceita)
@@ -1704,6 +1714,8 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
               onPermiteAlterarPrecoChange={setPermiteAlterarPreco}
               incideTaxa={incideTaxa}
               onIncideTaxaChange={setIncideTaxa}
+              ativoDelivery={ativoDelivery}
+              onAtivoDeliveryChange={setAtivoDelivery}
               grupoComplementosIds={grupoComplementosIds}
               onGrupoComplementosIdsChange={setGrupoComplementosIds}
               impressorasIds={impressorasIds}

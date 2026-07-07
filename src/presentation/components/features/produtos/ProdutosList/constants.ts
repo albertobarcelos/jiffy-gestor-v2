@@ -8,6 +8,7 @@ import {
   MdLaunch,
   MdAttachMoney,
   MdPercent,
+  MdDeliveryDining,
 } from 'react-icons/md'
 import type { IconType } from 'react-icons'
 import type { ToggleField, ProdutoPatch } from '@/src/shared/types/produto'
@@ -51,6 +52,11 @@ export const toggleFieldConfig: Record<ToggleField, ToggleFieldConfig> = {
     successTrue: 'Incidência de taxa habilitada!',
     successFalse: 'Incidência de taxa desabilitada!',
   },
+  ativoDelivery: {
+    bodyKey: 'ativoDelivery',
+    successTrue: 'Produto ativado no delivery!',
+    successFalse: 'Produto desativado no delivery!',
+  },
 }
 
 export type ActionIconDef =
@@ -68,4 +74,5 @@ export const actionIconsConfig: ActionIconDef[] = [
   { key: 'abrir', label: 'Permitir abrir complementos', Icon: MdLaunch, field: 'abreComplementos' },
   { key: 'alterar-preco', label: 'Permitir alterar preço no PDV', Icon: MdAttachMoney, field: 'permiteAlterarPreco' },
   { key: 'incide-taxa', label: 'Incide taxa', Icon: MdPercent, field: 'incideTaxa' },
+  { key: 'delivery', label: 'Ativar delivery', Icon: MdDeliveryDining, field: 'ativoDelivery' },
 ]

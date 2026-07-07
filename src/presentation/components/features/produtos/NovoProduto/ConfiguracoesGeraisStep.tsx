@@ -16,6 +16,8 @@ interface ConfiguracoesGeraisStepProps {
   onPermiteAlterarPrecoChange: (value: boolean) => void
   incideTaxa: boolean
   onIncideTaxaChange: (value: boolean) => void
+  ativoDelivery: boolean
+  onAtivoDeliveryChange: (value: boolean) => void
   grupoComplementosIds: string[]
   onGrupoComplementosIdsChange: (value: string[]) => void
   impressorasIds: string[]
@@ -49,6 +51,8 @@ export function ConfiguracoesGeraisStep({
   onPermiteAlterarPrecoChange,
   incideTaxa,
   onIncideTaxaChange,
+  ativoDelivery,
+  onAtivoDeliveryChange,
   ativo,
   onAtivoChange,
   canManageAtivo = false,
@@ -65,6 +69,7 @@ export function ConfiguracoesGeraisStep({
     { label: 'Permitir Alterar Preço',checked: permiteAlterarPreco, onChange: onPermiteAlterarPrecoChange },
     { label: 'Incide Taxa',           checked: incideTaxa,          onChange: onIncideTaxaChange },
     { label: 'Abre Complementos',     checked: abreComplementos,    onChange: onAbreComplementosChange },
+    { label: 'Ativar Delivery',       checked: ativoDelivery,       onChange: onAtivoDeliveryChange },
   ]
 
   return (

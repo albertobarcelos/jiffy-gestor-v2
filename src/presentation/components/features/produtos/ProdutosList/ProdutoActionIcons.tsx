@@ -21,9 +21,9 @@ const ICON_SIZE: Record<ProdutoActionIconsProps['variant'], string> = {
 }
 
 const VARIANT_SLICE: Record<ProdutoActionIconsProps['variant'], [number, number]> = {
-  desktop: [0, 9],
+  desktop: [0, 10],
   'mobile-row1': [0, 3],
-  'mobile-row2': [3, 9],
+  'mobile-row2': [3, 10],
 }
 
 export function ProdutoActionIcons({

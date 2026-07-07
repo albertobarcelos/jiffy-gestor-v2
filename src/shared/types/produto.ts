@@ -10,6 +10,7 @@ export type ProdutoPatch = Partial<{
   abreComplementos: boolean
   permiteAlterarPreco: boolean
   incideTaxa: boolean
+  ativoDelivery: boolean
 }>
 
 /**
@@ -22,3 +23,4 @@ export type ToggleField =
   | 'abreComplementos'
   | 'permiteAlterarPreco'
   | 'incideTaxa'
+  | 'ativoDelivery'
