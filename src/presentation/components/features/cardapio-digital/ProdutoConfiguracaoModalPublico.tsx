@@ -7,6 +7,7 @@ import type {
   CatalogoPublicoProdutoDTO,
 } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import {
+  useEnsureComplementosCatalogo,
   usePublicDeliveryComplementosStore,
 } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import {
@@ -28,10 +29,9 @@ interface ProdutoConfiguracaoModalPublicoProps {
 }
 
 function resolveGruposComplementos(
-  slug: string,
+  cache: { gruposComplementos: CatalogoPublicoGrupoComplementoDTO[]; complementos: CatalogoPublicoComplementoDTO[] } | null,
   produto: CatalogoPublicoProdutoDTO
 ): GrupoComplementoResolvido[] {
-  const cache = usePublicDeliveryComplementosStore.getState().obter(slug)
   if (!cache || !produto.abreComplementos) return []
 
   const complementoMap = new Map(cache.complementos.map(c => [c.id, c]))
@@ -56,6 +56,13 @@ export default function ProdutoConfiguracaoModalPublico({
   onAdicionado,
 }: ProdutoConfiguracaoModalPublicoProps) {
   const adicionarItem = useCardapioCarrinhoStore(s => s.adicionarItem)
+  const cacheComplementos = usePublicDeliveryComplementosStore(s => s.porSlug[slug] ?? null)
+  const precisaComplementos = produto.abreComplementos && produto.grupoComplementosIds.length > 0
+  const { isLoading: carregandoComplementos } = useEnsureComplementosCatalogo(
+    slug,
+    precisaComplementos && !cacheComplementos
+  )
+
   const [quantidade, setQuantidade] = useState(1)
   const [observacao, setObservacao] = useState('')
   const [adicionando, setAdicionando] = useState(false)
@@ -64,17 +71,16 @@ export default function ProdutoConfiguracaoModalPublico({
   >({})
 
   const grupos = useMemo(
-    () => resolveGruposComplementos(slug, produto),
-    [slug, produto]
+    () => resolveGruposComplementos(cacheComplementos, produto),
+    [cacheComplementos, produto]
   )
 
   const formatarPreco = (valor: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor)
 
   const complementosSelecionados: CarrinhoComplementoPublico[] = useMemo(() => {
-    const cache = usePublicDeliveryComplementosStore.getState().obter(slug)
-    if (!cache) return []
-    const map = new Map(cache.complementos.map(c => [c.id, c]))
+    if (!cacheComplementos) return []
+    const map = new Map(cacheComplementos.complementos.map(c => [c.id, c]))
     return Object.values(selecionados).flatMap(sel => {
       const comp = map.get(sel.complementoId)
       if (!comp) return []
@@ -87,7 +93,7 @@ export default function ProdutoConfiguracaoModalPublico({
         tipoImpactoPreco: comp.tipoImpactoPreco,
       }]
     })
-  }, [selecionados, slug])
+  }, [selecionados, cacheComplementos])
 
   const valorComplementosUnitario = complementosSelecionados.reduce((acc, c) => {
     if (c.tipoImpactoPreco === 'aumenta') return acc + c.valor * c.quantidade
@@ -140,6 +146,10 @@ export default function ProdutoConfiguracaoModalPublico({
   }
 
   const handleAdicionar = () => {
+    if (precisaComplementos && !cacheComplementos) {
+      showToast.error('Aguarde o carregamento das opções do produto')
+      return
+    }
     if (grupos.length > 0 && !validarGrupos()) return
 
     setAdicionando(true)
@@ -166,10 +176,10 @@ export default function ProdutoConfiguracaoModalPublico({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} aria-hidden />
       <div
-        className="relative w-full md:max-w-lg max-h-[90vh] overflow-y-auto rounded-t-2xl md:rounded-2xl shadow-xl p-5"
+        className="relative w-full sm:max-w-lg max-h-[92dvh] sm:max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl shadow-xl p-4 sm:p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
         style={{ backgroundColor: 'var(--cardapio-bg-secondary)' }}
       >
         <div className="flex items-start justify-between gap-3 mb-4">
@@ -195,6 +205,12 @@ export default function ProdutoConfiguracaoModalPublico({
         {produto.descricao && (
           <p className="text-sm mb-4" style={{ color: 'var(--cardapio-text-secondary)' }}>
             {produto.descricao}
+          </p>
+        )}
+
+        {precisaComplementos && carregandoComplementos && !cacheComplementos && (
+          <p className="text-sm mb-4" style={{ color: 'var(--cardapio-text-secondary)' }}>
+            Carregando opções...
           </p>
         )}
 
@@ -282,7 +298,7 @@ export default function ProdutoConfiguracaoModalPublico({
 
         <button
           type="button"
-          disabled={adicionando}
+          disabled={adicionando || (precisaComplementos && carregandoComplementos && !cacheComplementos)}
           onClick={handleAdicionar}
           className="w-full py-3 rounded-xl font-semibold disabled:opacity-60"
           style={{

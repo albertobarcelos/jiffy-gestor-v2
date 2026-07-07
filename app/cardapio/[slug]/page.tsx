@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import CardapioHomeScreen from '@/src/presentation/components/features/cardapio-digital/CardapioHomeScreen'
 import {
   flattenCatalogoGrupos,
   listarProdutosFavoritos,
-  usePublicDeliveryCatalogPage,
+  useAutoFetchCatalogoGrupos,
+  usePublicDeliveryCatalogInfinite,
 } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import { PublicDeliveryApiError, isPublicDeliverySlugNotFound } from '@/src/infrastructure/api/publicDeliveryApi'
 
@@ -15,16 +16,30 @@ export default function CardapioSlugHomePage() {
   const router = useRouter()
   const slug = (params.slug as string)?.trim() ?? ''
 
-  const { data, isLoading, isError, error } = usePublicDeliveryCatalogPage(slug, {
-    offset: 0,
-    limit: 20,
-  })
+  const catalogQuery = usePublicDeliveryCatalogInfinite(slug)
+  useAutoFetchCatalogoGrupos(catalogQuery)
+
+  const { data, isLoading, isError, error } = catalogQuery
 
   useEffect(() => {
     if (isError && isPublicDeliverySlugNotFound(error)) {
       router.replace('/cardapio/instrucoes')
     }
   }, [isError, error, router])
+
+  const empresa = data?.pages[0]?.empresa ?? null
+
+  const produtosDestaque = useMemo(() => {
+    if (!data?.pages) return []
+    const grupos = flattenCatalogoGrupos(data.pages)
+    return listarProdutosFavoritos(grupos).map(p => ({
+      id: p.id,
+      nome: p.nome,
+      imagemUrl: p.imagemUrl,
+      descricao: p.descricao,
+      valor: p.valor,
+    }))
+  }, [data?.pages])
 
   if (!slug || isLoading) {
     return (
@@ -62,21 +77,12 @@ export default function CardapioSlugHomePage() {
     )
   }
 
-  if (!data) return null
-
-  const grupos = flattenCatalogoGrupos([data])
-  const produtosDestaque = listarProdutosFavoritos(grupos).map(p => ({
-    id: p.id,
-    nome: p.nome,
-    imagemUrl: p.imagemUrl,
-    descricao: p.descricao,
-    valor: p.valor,
-  }))
+  if (!empresa) return null
 
   return (
     <CardapioHomeScreen
       slug={slug}
-      empresa={data.empresa}
+      empresa={empresa}
       produtosDestaque={produtosDestaque}
     />
   )

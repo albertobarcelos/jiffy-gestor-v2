@@ -1,6 +1,6 @@
 /**
  * Sistema de Temas para Cardápio Digital
- * 3 paletas: Dark Food UI, Clean Premium Food UI, Dark Gourmet Food
+ * 2 paletas: Dark Food UI e Normal (claro)
  */
 
 /* ============================================
@@ -58,9 +58,9 @@
 }
 
 /* ============================================
-   TEMA: CLEAN PREMIUM FOOD UI (Limpo Premium)
+   TEMA: NORMAL (claro)
    ============================================ */
-[data-cardapio-theme='clean'] {
+[data-cardapio-theme='normal'] {
   /* Fundos */
   --cardapio-bg-primary: #F8F9FA;
   --cardapio-bg-secondary: #FFFFFF;
@@ -109,63 +109,6 @@
   --cardapio-gradient-primary: linear-gradient(135deg, #F8F9FA 0%, #FFFFFF 100%);
   --cardapio-gradient-secondary: linear-gradient(135deg, #FFFFFF 0%, #E9ECEF 100%);
   --cardapio-gradient-accent: linear-gradient(135deg, #D62828 0%, #B01E1E 100%);
-}
-
-/* ============================================
-   TEMA: DARK GOURMET FOOD (Escuro Gourmet)
-   ============================================ */
-[data-cardapio-theme='colors'] {
-  /* Fundos */
-  --cardapio-bg-primary: #121212;
-  --cardapio-bg-secondary: #181818;
-  --cardapio-bg-tertiary: #1E1E1E;
-  --cardapio-bg-elevated: #1E1E1E;
-  --cardapio-bg-hover: #2A2A2A;
-
-  /* Textos */
-  --cardapio-text-primary: #FFFFFF;
-  --cardapio-text-secondary: #B3B3B3;
-  --cardapio-text-tertiary: #B3B3B3;
-  --cardapio-text-muted: #808080;
-
-  /* Bordas e Divisores */
-  --cardapio-border: #2A2A2A;
-  --cardapio-border-hover: #404040;
-  --cardapio-divider: #2A2A2A;
-
-  /* Acentos */
-  --cardapio-accent-primary: #E63946; /* Vermelho - cor principal de ação */
-  --cardapio-accent-secondary: #F4A261; /* Laranja - preços e destaques */
-  --cardapio-accent-tertiary: #F4A261;
-  --cardapio-accent-quaternary: #F4A261;
-  --cardapio-accent-success: #2ECC71;
-  --cardapio-accent-warning: #F59E0B;
-  --cardapio-accent-error: #E63946;
-
-  /* Cards e Superfícies */
-  --cardapio-card-bg: #1E1E1E;
-  --cardapio-card-border: #2A2A2A;
-  --cardapio-card-hover: #252525;
-  --cardapio-card-shadow: rgba(0, 0, 0, 0.5);
-
-  /* Menu Lateral */
-  --cardapio-menu-bg: #121212;
-  --cardapio-menu-item: #181818;
-  --cardapio-menu-item-hover: #2A2A2A;
-  --cardapio-menu-item-active: #E63946;
-
-  /* Botões */
-  --cardapio-btn-primary: #E63946;
-  --cardapio-btn-primary-text: #FFFFFF;
-  --cardapio-btn-secondary: #1E1E1E;
-  --cardapio-btn-secondary-text: #FFFFFF;
-  --cardapio-btn-hover: #D62828; /* Vermelho mais escuro para hover */
-
-  /* Gradientes */
-  --cardapio-gradient-primary: linear-gradient(135deg, #121212 0%, #181818 100%);
-  --cardapio-gradient-secondary: linear-gradient(135deg, #181818 0%, #1E1E1E 100%);
-  --cardapio-gradient-tertiary: linear-gradient(135deg, #1E1E1E 0%, #2A2A2A 100%);
-  --cardapio-gradient-accent: linear-gradient(135deg, #E63946 0%, #D62828 100%);
 }
 
 /* ============================================

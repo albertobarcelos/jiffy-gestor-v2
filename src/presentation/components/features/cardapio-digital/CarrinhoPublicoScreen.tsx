@@ -194,9 +194,12 @@ export default function CarrinhoPublicoScreen({ slug }: CarrinhoPublicoScreenPro
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'var(--cardapio-bg-primary)' }}>
-      <div
-        className="border-b px-4 py-3 flex items-center gap-3"
+    <div
+      className="min-h-[100dvh] flex flex-col"
+      style={{ backgroundColor: 'var(--cardapio-bg-primary)' }}
+    >
+      <header
+        className="border-b px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-3 flex-shrink-0 sticky top-0 z-10"
         style={{
           backgroundColor: 'var(--cardapio-bg-secondary)',
           borderColor: 'var(--cardapio-border)',
@@ -205,17 +208,17 @@ export default function CarrinhoPublicoScreen({ slug }: CarrinhoPublicoScreenPro
         <button
           type="button"
           onClick={() => router.push(`/cardapio/${slug}/catalogo`)}
-          className="flex items-center gap-1 text-sm font-medium"
+          className="flex items-center gap-1 text-sm font-medium min-h-[44px] px-1"
           style={{ color: 'var(--cardapio-text-primary)' }}
         >
           <MdArrowBack /> Voltar
         </button>
-        <h1 className="font-bold text-lg" style={{ color: 'var(--cardapio-text-primary)' }}>
+        <h1 className="font-bold text-base sm:text-lg" style={{ color: 'var(--cardapio-text-primary)' }}>
           Seu pedido
         </h1>
-      </div>
+      </header>
 
-      <div className="max-w-2xl mx-auto p-4 space-y-6">
+      <div className="flex-1 w-full max-w-2xl mx-auto p-3 sm:p-4 space-y-4 sm:space-y-6 pb-32 sm:pb-6">
         {resumo.itens.length === 0 ? (
           <div className="text-center py-16">
             <p style={{ color: 'var(--cardapio-text-tertiary)' }}>Carrinho vazio</p>
@@ -341,7 +344,7 @@ export default function CarrinhoPublicoScreen({ slug }: CarrinhoPublicoScreenPro
               )}
             </div>
 
-            <div className="flex items-center justify-between text-lg font-bold">
+            <div className="hidden sm:flex items-center justify-between text-lg font-bold pt-2">
               <span style={{ color: 'var(--cardapio-text-primary)' }}>Total</span>
               <span style={{ color: 'var(--cardapio-accent-primary)' }}>
                 {formatarPreco(resumo.total)}
@@ -352,7 +355,7 @@ export default function CarrinhoPublicoScreen({ slug }: CarrinhoPublicoScreenPro
               type="button"
               disabled={enviando}
               onClick={handleEnviarPedido}
-              className="w-full py-3 rounded-xl font-semibold disabled:opacity-60"
+              className="hidden sm:block w-full py-3 rounded-xl font-semibold disabled:opacity-60"
               style={{
                 backgroundColor: 'var(--cardapio-btn-primary)',
                 color: 'var(--cardapio-btn-primary-text)',
@@ -363,6 +366,38 @@ export default function CarrinhoPublicoScreen({ slug }: CarrinhoPublicoScreenPro
           </>
         )}
       </div>
+
+      {resumo.itens.length > 0 && (
+        <div
+          className="sm:hidden fixed bottom-0 left-0 right-0 z-20 border-t px-4 py-3 flex items-center gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.15)]"
+          style={{
+            backgroundColor: 'var(--cardapio-bg-secondary)',
+            borderColor: 'var(--cardapio-border)',
+            paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
+          }}
+        >
+          <div className="flex-1 min-w-0">
+            <p className="text-xs" style={{ color: 'var(--cardapio-text-secondary)' }}>
+              Total
+            </p>
+            <p className="text-lg font-bold truncate" style={{ color: 'var(--cardapio-accent-primary)' }}>
+              {formatarPreco(resumo.total)}
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={enviando}
+            onClick={handleEnviarPedido}
+            className="flex-shrink-0 px-5 py-3 rounded-xl font-semibold disabled:opacity-60 min-h-[48px]"
+            style={{
+              backgroundColor: 'var(--cardapio-btn-primary)',
+              color: 'var(--cardapio-btn-primary-text)',
+            }}
+          >
+            {enviando ? 'Enviando...' : 'Confirmar'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

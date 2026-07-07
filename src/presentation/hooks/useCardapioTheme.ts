@@ -2,10 +2,20 @@
 
 import { useState, useEffect } from 'react'
 
-export type CardapioTheme = 'dark' | 'clean' | 'colors'
+export type CardapioTheme = 'dark' | 'normal'
 
 const THEME_STORAGE_KEY = 'cardapio_theme'
 const DEFAULT_THEME: CardapioTheme = 'dark'
+const VALID_THEMES: CardapioTheme[] = ['dark', 'normal']
+
+/** Migra ids legados salvos antes da simplificação de temas. */
+function normalizeStoredTheme(raw: string | null): CardapioTheme | null {
+  if (!raw) return null
+  if (raw === 'clean') return 'normal'
+  if (raw === 'colors') return 'dark'
+  if (VALID_THEMES.includes(raw as CardapioTheme)) return raw as CardapioTheme
+  return null
+}
 
 /**
  * Hook para gerenciar o tema do cardápio digital
@@ -19,11 +29,12 @@ export function useCardapioTheme() {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    const savedTheme = sessionStorage.getItem(THEME_STORAGE_KEY) as CardapioTheme | null
+    const savedTheme = normalizeStoredTheme(sessionStorage.getItem(THEME_STORAGE_KEY))
 
-    if (savedTheme && ['dark', 'clean', 'colors'].includes(savedTheme)) {
+    if (savedTheme) {
       setThemeState(savedTheme)
       applyTheme(savedTheme)
+      sessionStorage.setItem(THEME_STORAGE_KEY, savedTheme)
     } else {
       applyTheme(DEFAULT_THEME)
     }
@@ -41,7 +52,7 @@ export function useCardapioTheme() {
 
   // Função para trocar tema
   const setTheme = (newTheme: CardapioTheme) => {
-    if (!['dark', 'clean', 'colors'].includes(newTheme)) {
+    if (!VALID_THEMES.includes(newTheme)) {
       console.warn(`Tema inválido: ${newTheme}. Usando tema padrão.`)
       newTheme = DEFAULT_THEME
     }
@@ -59,6 +70,6 @@ export function useCardapioTheme() {
     theme,
     setTheme,
     isInitialized,
-    themes: ['dark', 'clean', 'colors'] as const,
+    themes: VALID_THEMES,
   }
 }
