@@ -280,6 +280,59 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     [auth, localGrupos]
   )
 
+  const handleToggleGrupoAtivoDelivery = useCallback(
+    async (grupoId: string, ativoDelivery: boolean) => {
+      const token = auth?.getAccessToken()
+      if (!token) return
+
+      const previousState = [...localGrupos]
+      setLocalGrupos((prev) =>
+        prev.map((grupo) => {
+          if (grupo.getId() === grupoId) {
+            return GrupoProduto.create({
+              id: grupo.getId(),
+              nome: grupo.getNome(),
+              corHex: grupo.getCorHex(),
+              iconName: grupo.getIconName(),
+              ativo: grupo.isAtivo(),
+              ativoDelivery,
+              ativoLocal: grupo.isAtivoLocal(),
+              ordem: grupo.getOrdem(),
+            })
+          }
+          return grupo
+        })
+      )
+
+      try {
+        const response = await fetch(`/api/grupos-produtos/${grupoId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ ativoDelivery }),
+        })
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}))
+          throw new Error(error.message || 'Erro ao atualizar grupo')
+        }
+
+        showToast.success(
+          ativoDelivery
+            ? 'Grupo ativado no delivery!'
+            : 'Grupo desativado no delivery!'
+        )
+      } catch (error) {
+        console.error('Erro ao atualizar ativo delivery do grupo:', error)
+        setLocalGrupos(previousState)
+        showToast.error('Não foi possível atualizar o delivery do grupo.')
+      }
+    },
+    [auth, localGrupos]
+  )
+
   const openTabsModal = useCallback(
     (config: Partial<GruposProdutosTabsModalState>) => {
       setTabsModalState((prev) => ({
@@ -511,6 +564,9 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
             Nome
           </div>
           <div className="flex-[2] md:text-end text-right font-nunito font-semibold md:text-sm text-[10px] text-primary-text">
+            Delivery
+          </div>
+          <div className="flex-[2] md:text-end text-right font-nunito font-semibold md:text-sm text-[10px] text-primary-text">
             Status
           </div>
         </div>
@@ -552,6 +608,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
                 grupo={grupo}
                 index={index}
                 onToggleStatus={handleToggleGrupoStatus}
+                onToggleAtivoDelivery={handleToggleGrupoAtivoDelivery}
                 onCreateProduto={(grupoId) => handleOpenProdutoModal(grupoId)}
                 onEdit={(g) =>
                   openTabsModal({

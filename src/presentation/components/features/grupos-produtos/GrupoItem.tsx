@@ -13,6 +13,7 @@ interface GrupoItemProps {
   index: number
   onStatusChanged?: () => void
   onToggleStatus?: (grupoId: string, novoStatus: boolean) => void
+  onToggleAtivoDelivery?: (grupoId: string, ativoDelivery: boolean) => void
   onEdit?: (grupo: GrupoProduto) => void
   onEditProdutos?: (grupo: GrupoProduto) => void // Abre edição na aba de produtos vinculados
   onCreateProduto?: (grupoId: string) => void
@@ -26,6 +27,7 @@ export const GrupoItem = memo(function GrupoItem({
   index,
   onStatusChanged,
   onToggleStatus,
+  onToggleAtivoDelivery,
   onEdit,
   onEditProdutos,
   onCreateProduto,
@@ -49,6 +51,7 @@ export const GrupoItem = memo(function GrupoItem({
   const iconName = useMemo(() => grupo.getIconName(), [grupo])
   const nome = useMemo(() => grupo.getNome(), [grupo])
   const isAtivo = useMemo(() => grupo.isAtivo(), [grupo])
+  const isAtivoDelivery = useMemo(() => grupo.isAtivoDelivery(), [grupo])
   
   // Handler para abrir edição ao clicar na área clicável
   const handleRowClick = useMemo(() => {
@@ -139,12 +142,42 @@ export const GrupoItem = memo(function GrupoItem({
         </div>
       </div>
 
+      {/* Delivery: switch ativo delivery */}
+      <div
+        onClick={handleRowClick}
+        className="flex-[2] flex cursor-pointer items-end justify-end"
+      >
+        <div
+          className="flex items-end justify-center"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+        >
+          <JiffyIconSwitch
+            checked={isAtivoDelivery}
+            onChange={(e) => {
+              e.stopPropagation()
+              onToggleAtivoDelivery?.(grupo.getId(), e.target.checked)
+            }}
+            bordered={false}
+            size="sm"
+            className="shrink-0"
+            inputProps={{
+              'aria-label': isAtivoDelivery
+                ? 'Desativar grupo no delivery'
+                : 'Ativar grupo no delivery',
+            }}
+          />
+        </div>
+      </div>
+
       {/* Status: switch padrão; cliques no switch não abrem a edição da linha */}
       <div
         onClick={handleRowClick}
         className="flex-[2] flex cursor-pointer items-end justify-end"
       >
-        <div className="flex items-end justify-center"
+        <div
+          className="flex items-end justify-center"
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           onTouchStart={(e) => e.stopPropagation()}
