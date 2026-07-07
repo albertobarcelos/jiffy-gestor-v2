@@ -13,11 +13,12 @@ import {
   useAutoFetchCatalogoGrupos,
   usePublicDeliveryCatalogInfinite,
 } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
-import { useCardapioCarrinhoStore } from '@/src/presentation/stores/cardapioCarrinhoStore'
+import { useCardapioCarrinhoTotalItens } from '@/src/presentation/stores/cardapioCarrinhoStore'
 import ProdutoConfiguracaoModalPublico from './ProdutoConfiguracaoModalPublico'
 import CarrosselProdutosDestaque from './CarrosselProdutosDestaque'
 import ThemeSelector from './ThemeSelector'
 import BannerPromocoesVertical from './BannerPromocoesVertical'
+import { CardapioHomeBanner } from './CardapioHomeBanner'
 import { isPublicDeliverySlugNotFound } from '@/src/infrastructure/api/publicDeliveryApi'
 
 interface CardapioCatalogoScreenProps {
@@ -26,7 +27,7 @@ interface CardapioCatalogoScreenProps {
 
 export default function CardapioCatalogoScreen({ slug }: CardapioCatalogoScreenProps) {
   const router = useRouter()
-  const carrinhoCount = useCardapioCarrinhoStore(s => s.getResumo(slug).totalItens)
+  const carrinhoCount = useCardapioCarrinhoTotalItens(slug)
   const [mostrarDestaques, setMostrarDestaques] = useState(false)
   const [grupoSelecionadoId, setGrupoSelecionadoId] = useState<string | null>(null)
   const [produtoSelecionado, setProdutoSelecionado] =
@@ -72,14 +73,29 @@ export default function CardapioCatalogoScreen({ slug }: CardapioCatalogoScreenP
   const formatarPreco = (valor: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor)
 
-  const toggleDescricao = (produtoId: string, e: React.MouseEvent) => {
+  const toggleDescricao = (produtoId: string, e: React.SyntheticEvent) => {
     e.stopPropagation()
+    e.preventDefault()
     setDescricoesExpandidas(prev => {
       const next = new Set(prev)
       if (next.has(produtoId)) next.delete(produtoId)
       else next.add(produtoId)
       return next
     })
+  }
+
+  const abrirProduto = (produto: CatalogoPublicoProdutoDTO) => {
+    setProdutoSelecionado(produto)
+  }
+
+  const handleProdutoCardKeyDown = (
+    e: React.KeyboardEvent,
+    produto: CatalogoPublicoProdutoDTO
+  ) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      abrirProduto(produto)
+    }
   }
 
   if (isLoading) {
@@ -154,6 +170,12 @@ export default function CardapioCatalogoScreen({ slug }: CardapioCatalogoScreenP
         </div>
       </header>
 
+      {/* Banner — mobile apenas, logo após o topnav */}
+      <CardapioHomeBanner
+        bannerUrl={empresa.bannerUrl}
+        className="lg:hidden flex-shrink-0"
+      />
+
       <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Navegação de categorias — coluna estreita no mobile */}
         <nav
@@ -172,12 +194,14 @@ export default function CardapioCatalogoScreen({ slug }: CardapioCatalogoScreenP
                   setMostrarDestaques(true)
                   setGrupoSelecionadoId(null)
                 }}
-                className="w-full text-center px-1 sm:px-3 py-2 sm:py-2.5 rounded-lg text-[10px] sm:text-xs font-semibold min-h-[44px]"
+                className="w-full text-center uppercase px-1 sm:px-3 py-2 sm:py-2.5 rounded-lg text-[10px] sm:text-xs font-semibold min-h-[44px]"
                 style={{
                   backgroundColor: mostrarDestaques
                     ? 'var(--cardapio-menu-item-active)'
-                    : 'var(--cardapio-accent-primary)',
-                  color: 'var(--cardapio-text-primary)',
+                    : 'var(--cardapio-menu-item)',
+                  color: mostrarDestaques
+                    ? 'var(--cardapio-menu-item-active-text)'
+                    : 'var(--cardapio-menu-item-text)',
                 }}
               >
                 DESTAQUES
@@ -193,12 +217,14 @@ export default function CardapioCatalogoScreen({ slug }: CardapioCatalogoScreenP
                       setMostrarDestaques(false)
                       setGrupoSelecionadoId(grupo.id)
                     }}
-                    className={`w-full px-1 sm:px-3 py-1.5 sm:py-2 rounded-lg text-center min-h-[44px] ${isSelected ? 'font-semibold' : ''}`}
+                    className={`w-full uppercase px-1 sm:px-3 py-1.5 sm:py-2 rounded-lg text-center min-h-[44px] ${isSelected ? 'font-semibold' : ''}`}
                     style={{
                       backgroundColor: isSelected
                         ? 'var(--cardapio-menu-item-active)'
                         : 'var(--cardapio-menu-item)',
-                      color: 'var(--cardapio-text-primary)',
+                      color: isSelected
+                        ? 'var(--cardapio-menu-item-active-text)'
+                        : 'var(--cardapio-menu-item-text)',
                     }}
                   >
                     {grupo.imagemUrl ? (
@@ -241,13 +267,13 @@ export default function CardapioCatalogoScreen({ slug }: CardapioCatalogoScreenP
 
         <main
           className="flex-1 flex flex-col overflow-hidden min-w-0"
-          style={{ backgroundColor: 'var(--cardapio-bg-tertiary)' }}
+          style={{ backgroundColor: 'var(--cardapio-bg-primary)' }}
         >
           <div className="flex-1 overflow-y-auto scrollbar-hide overscroll-contain">
             {mostrarDestaques ? (
               <div
                 className="h-[min(55vh,28rem)] md:h-full md:min-h-0 p-2 sm:p-4"
-                style={{ background: 'var(--cardapio-gradient-secondary)' }}
+                style={{ backgroundColor: 'var(--cardapio-bg-primary)' }}
               >
                 <CarrosselProdutosDestaque
                   produtos={produtosDestaque.map(p => ({
@@ -270,11 +296,13 @@ export default function CardapioCatalogoScreen({ slug }: CardapioCatalogoScreenP
             ) : (
               <div className="p-2 sm:p-3 lg:p-4 space-y-2 sm:space-y-3 pb-4">
                 {produtos.map(produto => (
-                  <button
+                  <div
                     key={produto.id}
-                    type="button"
-                    onClick={() => setProdutoSelecionado(produto)}
-                    className="w-full rounded-xl p-3 sm:p-4 text-left flex flex-col sm:flex-row gap-3 sm:gap-4 border active:scale-[0.99] transition-transform"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => abrirProduto(produto)}
+                    onKeyDown={e => handleProdutoCardKeyDown(e, produto)}
+                    className="w-full rounded-xl p-3 sm:p-4 text-left flex flex-col sm:flex-row gap-3 sm:gap-4 border active:scale-[0.99] transition-transform cursor-pointer"
                     style={{
                       backgroundColor: 'var(--cardapio-card-bg)',
                       borderColor: 'var(--cardapio-card-border)',
@@ -298,7 +326,7 @@ export default function CardapioCatalogoScreen({ slug }: CardapioCatalogoScreenP
                       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 sm:gap-2">
                         <h3
                           className="font-bold text-base sm:text-lg leading-snug"
-                          style={{ color: 'var(--cardapio-text-primary)' }}
+                          style={{ color: 'var(--cardapio-card-text)' }}
                         >
                           {produto.nome}
                         </h3>
@@ -313,7 +341,7 @@ export default function CardapioCatalogoScreen({ slug }: CardapioCatalogoScreenP
                         <div className="mt-0.5 sm:mt-1">
                           <p
                             className="hidden sm:block text-sm line-clamp-2 md:line-clamp-3"
-                            style={{ color: 'var(--cardapio-text-secondary)' }}
+                            style={{ color: 'var(--cardapio-card-text-secondary)' }}
                           >
                             {produto.descricao}
                           </p>
@@ -322,7 +350,7 @@ export default function CardapioCatalogoScreen({ slug }: CardapioCatalogoScreenP
                               <>
                                 <p
                                   className="text-sm"
-                                  style={{ color: 'var(--cardapio-text-secondary)' }}
+                                  style={{ color: 'var(--cardapio-card-text-secondary)' }}
                                 >
                                   {produto.descricao}
                                 </p>
@@ -349,7 +377,7 @@ export default function CardapioCatalogoScreen({ slug }: CardapioCatalogoScreenP
                         </div>
                       )}
                     </div>
-                  </button>
+                  </div>
                 ))}
               </div>
             )}

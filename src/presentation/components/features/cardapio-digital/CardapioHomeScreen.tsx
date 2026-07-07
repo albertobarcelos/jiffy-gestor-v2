@@ -2,12 +2,12 @@
 
 import { useRouter } from 'next/navigation'
 import { MdMenuBook, MdShoppingCart } from 'react-icons/md'
-import { useCardapioTheme } from '@/src/presentation/hooks/useCardapioTheme'
 import CarrosselProdutosDestaque from './CarrosselProdutosDestaque'
+import { CardapioHomeBanner } from './CardapioHomeBanner'
 import ThemeSelector from './ThemeSelector'
 import FloatingCircles from './FloatingCircles'
 import type { EmpresaPublicaDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
-import { useCardapioCarrinhoStore } from '@/src/presentation/stores/cardapioCarrinhoStore'
+import { useCardapioCarrinhoTotalItens } from '@/src/presentation/stores/cardapioCarrinhoStore'
 
 /** TODO: substituir por horário vindo do backend por empresa */
 const HORARIO_ABERTURA = '09:00'
@@ -17,8 +17,8 @@ function BadgeHorarioAbertura() {
     <p
       className="inline-block w-fit text-sm font-medium mb-2 px-3 py-1.5 rounded-lg"
       style={{
-        backgroundColor: 'var(--cardapio-accent-primary)',
-        color: '#FFFFFF',
+        backgroundColor: 'var(--cardapio-btn-primary)',
+        color: 'var(--cardapio-btn-primary-text)',
       }}
     >
       Aberto a partir das {HORARIO_ABERTURA}
@@ -44,24 +44,24 @@ export default function CardapioHomeScreen({
   produtosDestaque,
 }: CardapioHomeScreenProps) {
   const router = useRouter()
-  const { theme } = useCardapioTheme()
-  const carrinhoCount = useCardapioCarrinhoStore(s => s.getResumo(slug).totalItens)
+  const carrinhoCount = useCardapioCarrinhoTotalItens(slug)
 
-  const borderColorCircles =
-    theme === 'normal' ? 'rgba(100, 100, 100, 0.3)' : 'rgba(255, 255, 255, 0.15)'
+  const borderColorCircles = 'rgba(255, 255, 255, 0.15)'
+
+  const headerBarStyle = {
+    backgroundColor: 'var(--cardapio-bg-secondary)',
+    borderColor: 'var(--cardapio-border)',
+  } as const
 
   return (
     <div
-      className="min-h-[100dvh] flex flex-col lg:flex-row"
+      className="h-[100dvh] flex flex-col overflow-hidden"
       style={{ backgroundColor: 'var(--cardapio-bg-primary)' }}
     >
       {/* Barra superior — mobile */}
       <header
         className="lg:hidden sticky top-0 z-30 flex-shrink-0 border-b px-3 py-2 flex items-center gap-2"
-        style={{
-          backgroundColor: 'var(--cardapio-bg-secondary)',
-          borderColor: 'var(--cardapio-border)',
-        }}
+        style={headerBarStyle}
       >
         {empresa.logoUrl ? (
           <div className="h-9 w-9 flex-shrink-0 rounded-md overflow-hidden bg-white/5">
@@ -111,11 +111,18 @@ export default function CardapioHomeScreen({
         </button>
       </header>
 
+      <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden">
       {/* Destaques — hero / carrossel */}
       <section
-        className="w-full lg:w-2/3 relative flex-shrink-0 flex flex-col lg:h-screen lg:min-h-0 overflow-hidden"
+        className="w-full lg:w-2/3 relative flex-shrink-0 flex flex-col lg:min-h-0 lg:flex-1 overflow-hidden"
         style={{ background: 'var(--cardapio-gradient-secondary)' }}
       >
+        {/* Banner — mobile: antes do card de destaques */}
+        <CardapioHomeBanner
+          bannerUrl={empresa.bannerUrl}
+          className="lg:hidden flex-shrink-0"
+        />
+
         <div className="lg:hidden px-4 pt-3 pb-1 flex-shrink-0">
           <h2
             className="text-xs font-semibold uppercase tracking-wider"
@@ -126,17 +133,6 @@ export default function CardapioHomeScreen({
         </div>
 
         <div className="relative flex-1 min-h-[280px] h-[52vh] sm:min-h-[320px] sm:h-[55vh] lg:h-full lg:min-h-0">
-          {empresa.bannerUrl && (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={empresa.bannerUrl}
-                alt=""
-                className="absolute inset-0 w-full h-full object-cover hidden lg:block"
-              />
-              <div className="absolute inset-0 bg-black/30 hidden lg:block" />
-            </>
-          )}
           <div className="absolute inset-0">
             <CarrosselProdutosDestaque produtos={produtosDestaque} />
           </div>
@@ -231,9 +227,9 @@ export default function CardapioHomeScreen({
               onClick={() => router.push(`/cardapio/${slug}/carrinho`)}
               className="hidden lg:flex w-full border-2 rounded-xl px-4 py-4 items-center gap-4 active:scale-[0.98] transition-all duration-200"
               style={{
-                backgroundColor: 'var(--cardapio-bg-elevated)',
+                backgroundColor: 'var(--cardapio-btn-secondary)',
                 borderColor: 'var(--cardapio-border)',
-                color: 'var(--cardapio-text-primary)',
+                color: 'var(--cardapio-btn-secondary-text)',
               }}
             >
               <div className="relative flex-shrink-0">
@@ -247,6 +243,7 @@ export default function CardapioHomeScreen({
           )}
         </div>
       </aside>
+      </div>
     </div>
   )
 }

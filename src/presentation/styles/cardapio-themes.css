@@ -1,114 +1,177 @@
 /**
  * Sistema de Temas para Cardápio Digital
- * 2 paletas: Dark Food UI e Normal (claro)
+ * 2 paletas: Dark (roxo secondary) e Normal (azul primary do ERP)
  */
+
+/* Tokens compartilhados de tipografia por superfície */
+[data-cardapio-theme='dark'],
+[data-cardapio-theme='normal'] {
+  --cardapio-menu-item-text: var(--cardapio-text-primary);
+  --cardapio-menu-item-active-text: var(--cardapio-text-primary);
+  --cardapio-card-text: var(--cardapio-text-primary);
+  --cardapio-card-text-secondary: var(--cardapio-text-secondary);
+  --cardapio-surface-muted: var(--cardapio-text-muted);
+  --cardapio-elevated-text: var(--cardapio-text-primary);
+  --cardapio-elevated-text-secondary: var(--cardapio-text-secondary);
+}
 
 /* ============================================
    TEMA: DARK FOOD UI (Escuro Moderno)
    ============================================ */
 [data-cardapio-theme='dark'] {
-  /* Fundos */
-  --cardapio-bg-primary: #121212;
-  --cardapio-bg-secondary: #1E1E1E;
-  --cardapio-bg-tertiary: #1E1E1E;
-  --cardapio-bg-elevated: #1E1E1E;
-  --cardapio-bg-hover: #2A2A2A;
+  /* Marca — roxo secondary (#530CA3) */
+  --cardapio-brand: #530CA3;
+  --cardapio-brand-hover: #420889;
+  --cardapio-brand-light: #8338EC;
+  /* Fundos — base roxa (secondary do ERP) */
+  --cardapio-bg-primary: var(--cardapio-brand);
+  --cardapio-bg-secondary: var(--cardapio-brand);
+  --cardapio-bg-tertiary: var(--cardapio-brand-hover);
+  --cardapio-bg-elevated: #FFFFFF;
+  --cardapio-bg-hover: #F3EDFC;
 
-  /* Textos */
+  /* Textos — brancos sobre fundo roxo */
   --cardapio-text-primary: #FFFFFF;
-  --cardapio-text-secondary: #B3B3B3;
-  --cardapio-text-tertiary: #B3B3B3;
-  --cardapio-text-muted: #808080;
+  --cardapio-text-secondary: rgba(255, 255, 255, 0.88);
+  --cardapio-text-tertiary: rgba(255, 255, 255, 0.78);
+  --cardapio-text-muted: rgba(255, 255, 255, 0.65);
+
+  /* Textos sobre superfícies claras (cards, botões do menu) */
+  --cardapio-menu-item-text: var(--cardapio-brand);
+  --cardapio-menu-item-active-text: var(--cardapio-brand);
+  --cardapio-card-text: var(--cardapio-brand);
+  --cardapio-card-text-secondary: #5C4A7A;
+  --cardapio-surface-muted: rgba(83, 12, 163, 0.55);
+  --cardapio-elevated-text: var(--cardapio-brand);
+  --cardapio-elevated-text-secondary: #5C4A7A;
 
   /* Bordas e Divisores */
-  --cardapio-border: #2A2A2A;
-  --cardapio-border-hover: #404040;
-  --cardapio-divider: #2A2A2A;
+  --cardapio-border: rgba(255, 255, 255, 0.22);
+  --cardapio-border-hover: rgba(255, 255, 255, 0.35);
+  --cardapio-divider: rgba(255, 255, 255, 0.28);
 
   /* Acentos */
-  --cardapio-accent-primary: #FF7A00; /* Laranja - cor principal */
-  --cardapio-accent-secondary: #E53935; /* Vermelho - destaques/promoções */
+  --cardapio-accent-primary: var(--cardapio-brand);
+  --cardapio-accent-secondary: #E53935;
   --cardapio-accent-success: #2ECC71;
   --cardapio-accent-warning: #F59E0B;
   --cardapio-accent-error: #E53935;
 
-  /* Cards e Superfícies */
-  --cardapio-card-bg: #1E1E1E;
-  --cardapio-card-border: #2A2A2A;
-  --cardapio-card-hover: #252525;
-  --cardapio-card-shadow: rgba(0, 0, 0, 0.5);
+  /* Cards e Superfícies — branco sobre roxo */
+  --cardapio-card-bg: #FFFFFF;
+  --cardapio-card-border: rgba(83, 12, 163, 0.14);
+  --cardapio-card-hover: #F8F5FC;
+  --cardapio-card-shadow: rgba(66, 8, 137, 0.25);
 
-  /* Menu Lateral */
-  --cardapio-menu-bg: #121212;
-  --cardapio-menu-item: #1E1E1E;
-  --cardapio-menu-item-hover: #2A2A2A;
-  --cardapio-menu-item-active: #FF7A00;
+  /* Menu Lateral — itens brancos com texto roxo */
+  --cardapio-menu-bg: var(--cardapio-brand);
+  --cardapio-menu-item: #FFFFFF;
+  --cardapio-menu-item-hover: #F3EDFC;
+  --cardapio-menu-item-active: #FFFFFF;
 
-  /* Botões */
-  --cardapio-btn-primary: #FF7A00;
-  --cardapio-btn-primary-text: #FFFFFF;
-  --cardapio-btn-secondary: #1E1E1E;
-  --cardapio-btn-secondary-text: #FFFFFF;
-  --cardapio-btn-hover: #E66A00; /* Laranja mais escuro para hover */
+  /* Botões principais — branco com texto roxo */
+  --cardapio-btn-primary: #FFFFFF;
+  --cardapio-btn-primary-text: var(--cardapio-brand);
+  --cardapio-btn-secondary: #FFFFFF;
+  --cardapio-btn-secondary-text: var(--cardapio-brand);
+  --cardapio-btn-hover: #F3EDFC;
 
   /* Gradientes */
-  --cardapio-gradient-primary: linear-gradient(135deg, #121212 0%, #1E1E1E 100%);
-  --cardapio-gradient-secondary: linear-gradient(135deg, #1E1E1E 0%, #2A2A2A 100%);
-  --cardapio-gradient-accent: linear-gradient(135deg, #FF7A00 0%, #E66A00 100%);
+  --cardapio-gradient-primary: linear-gradient(
+    135deg,
+    var(--cardapio-brand) 0%,
+    var(--cardapio-brand-hover) 100%
+  );
+  --cardapio-gradient-secondary: linear-gradient(
+    135deg,
+    var(--cardapio-brand) 0%,
+    #5A14B8 100%
+  );
+  --cardapio-gradient-accent: linear-gradient(
+    135deg,
+    #FFFFFF 0%,
+    #F3EDFC 100%
+  );
 }
 
 /* ============================================
-   TEMA: NORMAL (claro)
+   TEMA: NORMAL (azul primary — espelha estrutura do dark)
    ============================================ */
 [data-cardapio-theme='normal'] {
-  /* Fundos */
-  --cardapio-bg-primary: #F8F9FA;
-  --cardapio-bg-secondary: #FFFFFF;
-  --cardapio-bg-tertiary: #FFFFFF;
-  --cardapio-bg-elevated: #FFFFFF;
-  --cardapio-bg-hover: #E9ECEF;
+  /* Marca — azul primary (#003366) */
+  --cardapio-brand: #003366;
+  --cardapio-brand-hover: #002244;
+  --cardapio-brand-light: #006699;
 
-  /* Textos */
-  --cardapio-text-primary: #1F1F1F;
-  --cardapio-text-secondary: #6C757D;
-  --cardapio-text-tertiary: #6C757D;
-  --cardapio-text-muted: #ADB5BD;
+  /* Fundos — base azul */
+  --cardapio-bg-primary: var(--cardapio-brand);
+  --cardapio-bg-secondary: var(--cardapio-brand);
+  --cardapio-bg-tertiary: var(--cardapio-brand-hover);
+  --cardapio-bg-elevated: #FFFFFF;
+  --cardapio-bg-hover: #E8EEF4;
+
+  /* Textos — brancos sobre fundo azul */
+  --cardapio-text-primary: #FFFFFF;
+  --cardapio-text-secondary: rgba(255, 255, 255, 0.88);
+  --cardapio-text-tertiary: rgba(255, 255, 255, 0.78);
+  --cardapio-text-muted: rgba(255, 255, 255, 0.65);
+
+  /* Textos sobre superfícies brancas */
+  --cardapio-menu-item-text: var(--cardapio-brand);
+  --cardapio-menu-item-active-text: var(--cardapio-brand);
+  --cardapio-card-text: #1F1F1F;
+  --cardapio-card-text-secondary: #6C757D;
+  --cardapio-surface-muted: rgba(0, 51, 102, 0.45);
+  --cardapio-elevated-text: var(--cardapio-brand);
+  --cardapio-elevated-text-secondary: #5A6B7D;
 
   /* Bordas e Divisores */
-  --cardapio-border: #E9ECEF;
-  --cardapio-border-hover: #DEE2E6;
-  --cardapio-divider: #E9ECEF;
+  --cardapio-border: rgba(255, 255, 255, 0.22);
+  --cardapio-border-hover: rgba(255, 255, 255, 0.35);
+  --cardapio-divider: rgba(255, 255, 255, 0.28);
 
   /* Acentos */
-  --cardapio-accent-primary: #D62828; /* Vermelho - cor principal */
-  --cardapio-accent-secondary: #F77F00; /* Laranja - destaques secundários */
+  --cardapio-accent-primary: var(--cardapio-brand);
+  --cardapio-accent-secondary: #F77F00;
   --cardapio-accent-success: #2A9D8F;
   --cardapio-accent-warning: #FFC107;
   --cardapio-accent-error: #D62828;
 
-  /* Cards e Superfícies */
+  /* Cards — branco sobre azul; nomes de produto em preto via card-text */
   --cardapio-card-bg: #FFFFFF;
-  --cardapio-card-border: #E9ECEF;
-  --cardapio-card-hover: #F8F9FA;
-  --cardapio-card-shadow: rgba(0, 0, 0, 0.08);
+  --cardapio-card-border: rgba(0, 51, 102, 0.12);
+  --cardapio-card-hover: #F4F7FA;
+  --cardapio-card-shadow: rgba(0, 34, 68, 0.2);
 
-  /* Menu Lateral */
-  --cardapio-menu-bg: #F8F9FA;
+  /* Menu lateral — itens brancos com texto azul */
+  --cardapio-menu-bg: var(--cardapio-brand);
   --cardapio-menu-item: #FFFFFF;
-  --cardapio-menu-item-hover: #E9ECEF;
-  --cardapio-menu-item-active: #D62828;
+  --cardapio-menu-item-hover: #E8EEF4;
+  --cardapio-menu-item-active: #FFFFFF;
 
-  /* Botões */
-  --cardapio-btn-primary: #D62828;
-  --cardapio-btn-primary-text: #FFFFFF;
-  --cardapio-btn-secondary: #6C757D;
-  --cardapio-btn-secondary-text: #FFFFFF;
-  --cardapio-btn-hover: #B01E1E; /* Vermelho mais escuro para hover */
+  /* Botões principais — branco com texto azul */
+  --cardapio-btn-primary: #FFFFFF;
+  --cardapio-btn-primary-text: var(--cardapio-brand);
+  --cardapio-btn-secondary: #FFFFFF;
+  --cardapio-btn-secondary-text: var(--cardapio-brand);
+  --cardapio-btn-hover: #E8EEF4;
 
   /* Gradientes */
-  --cardapio-gradient-primary: linear-gradient(135deg, #F8F9FA 0%, #FFFFFF 100%);
-  --cardapio-gradient-secondary: linear-gradient(135deg, #FFFFFF 0%, #E9ECEF 100%);
-  --cardapio-gradient-accent: linear-gradient(135deg, #D62828 0%, #B01E1E 100%);
+  --cardapio-gradient-primary: linear-gradient(
+    135deg,
+    var(--cardapio-brand) 0%,
+    var(--cardapio-brand-hover) 100%
+  );
+  --cardapio-gradient-secondary: linear-gradient(
+    135deg,
+    var(--cardapio-brand) 0%,
+    #004080 100%
+  );
+  --cardapio-gradient-accent: linear-gradient(
+    135deg,
+    #FFFFFF 0%,
+    #E8EEF4 100%
+  );
 }
 
 /* ============================================

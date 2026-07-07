@@ -33,9 +33,35 @@ function calcularTotais(itens: CarrinhoItemPublico[]) {
   return { totalItens, total, subtotal: total }
 }
 
+const CARRINHO_VAZIO: CarrinhoItemPublico[] = []
+
+/** Itens do carrinho por slug — referência estável quando vazio (evita loop no React 19). */
+export function useCardapioCarrinhoItens(slug: string): CarrinhoItemPublico[] {
+  return useCardapioCarrinhoStore(s => s.carrinhos[slug] ?? CARRINHO_VAZIO)
+}
+
+/** Total de unidades no carrinho (primitivo — seguro como selector). */
+export function useCardapioCarrinhoTotalItens(slug: string): number {
+  return useCardapioCarrinhoStore(s => {
+    const itens = s.carrinhos[slug]
+    if (!itens?.length) return 0
+    return itens.reduce((acc, item) => acc + item.quantidade, 0)
+  })
+}
+
+/** Valor total do carrinho (primitivo — seguro como selector). */
+export function useCardapioCarrinhoTotal(slug: string): number {
+  return useCardapioCarrinhoStore(s => {
+    const itens = s.carrinhos[slug]
+    if (!itens?.length) return 0
+    return itens.reduce((acc, item) => acc + item.valorTotal, 0)
+  })
+}
+
 interface CardapioCarrinhoState {
   carrinhos: CarrinhosPorSlug
   getItens: (slug: string) => CarrinhoItemPublico[]
+  /** Apenas fora de selectors React — retorna novo objeto a cada chamada. */
   getResumo: (slug: string) => { itens: CarrinhoItemPublico[]; totalItens: number; total: number; subtotal: number }
   adicionarItem: (
     slug: string,
@@ -63,10 +89,10 @@ export const useCardapioCarrinhoStore = create<CardapioCarrinhoState>()(
     (set, get) => ({
       carrinhos: {},
 
-      getItens: slug => get().carrinhos[slug] ?? [],
+      getItens: slug => get().carrinhos[slug] ?? CARRINHO_VAZIO,
 
       getResumo: slug => {
-        const itens = get().carrinhos[slug] ?? []
+        const itens = get().carrinhos[slug] ?? CARRINHO_VAZIO
         const { totalItens, total, subtotal } = calcularTotais(itens)
         return { itens, totalItens, total, subtotal }
       },
@@ -118,9 +144,10 @@ export const useCardapioCarrinhoStore = create<CardapioCarrinhoState>()(
         }),
 
       limpar: slug =>
-        set(state => ({
-          carrinhos: { ...state.carrinhos, [slug]: [] },
-        })),
+        set(state => {
+          const { [slug]: _removed, ...restantes } = state.carrinhos
+          return { carrinhos: restantes }
+        }),
     }),
     {
       name: 'cardapio-publico-carrinhos',

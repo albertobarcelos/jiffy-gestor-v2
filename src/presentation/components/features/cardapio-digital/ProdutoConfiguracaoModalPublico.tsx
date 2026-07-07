@@ -238,7 +238,7 @@ export default function ProdutoConfiguracaoModalPublico({
                         : 'var(--cardapio-card-bg)',
                     }}
                   >
-                    <span style={{ color: 'var(--cardapio-text-primary)' }}>{comp.nome}</span>
+                    <span style={{ color: 'var(--cardapio-card-text)' }}>{comp.nome}</span>
                     {comp.valor > 0 && (
                       <span style={{ color: 'var(--cardapio-accent-primary)' }}>
                         + {formatarPreco(comp.valor)}

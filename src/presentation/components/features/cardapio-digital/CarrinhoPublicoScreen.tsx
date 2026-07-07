@@ -4,7 +4,9 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MdArrowBack, MdDelete, MdAdd, MdRemove } from 'react-icons/md'
 import {
+  useCardapioCarrinhoItens,
   useCardapioCarrinhoStore,
+  useCardapioCarrinhoTotal,
   type CarrinhoItemPublico,
 } from '@/src/presentation/stores/cardapioCarrinhoStore'
 import {
@@ -20,7 +22,8 @@ interface CarrinhoPublicoScreenProps {
 
 export default function CarrinhoPublicoScreen({ slug }: CarrinhoPublicoScreenProps) {
   const router = useRouter()
-  const resumo = useCardapioCarrinhoStore(s => s.getResumo(slug))
+  const itens = useCardapioCarrinhoItens(slug)
+  const total = useCardapioCarrinhoTotal(slug)
   const atualizarQuantidade = useCardapioCarrinhoStore(s => s.atualizarQuantidade)
   const removerItem = useCardapioCarrinhoStore(s => s.removerItem)
   const limpar = useCardapioCarrinhoStore(s => s.limpar)
@@ -46,7 +49,7 @@ export default function CarrinhoPublicoScreen({ slug }: CarrinhoPublicoScreenPro
       showToast.error('Informe um telefone válido')
       return null
     }
-    if (resumo.itens.length === 0) {
+    if (itens.length === 0) {
       showToast.error('Carrinho vazio')
       return null
     }
@@ -55,7 +58,7 @@ export default function CarrinhoPublicoScreen({ slug }: CarrinhoPublicoScreenPro
       return null
     }
 
-    const produtos = resumo.itens.map(item => ({
+    const produtos = itens.map(item => ({
       produtoId: item.produtoId,
       quantidade: item.quantidade,
       observacoes: item.observacoes,
@@ -95,7 +98,7 @@ export default function CarrinhoPublicoScreen({ slug }: CarrinhoPublicoScreenPro
       payload.cobrancas = [
         {
           meioPagamentoId,
-          valor: resumo.total,
+          valor: total,
           momentoCobranca: 'na_entrega',
         },
       ]
@@ -133,11 +136,11 @@ export default function CarrinhoPublicoScreen({ slug }: CarrinhoPublicoScreenPro
       }}
     >
       <div className="flex-1 min-w-0">
-        <p className="font-semibold" style={{ color: 'var(--cardapio-text-primary)' }}>
+        <p className="font-semibold" style={{ color: 'var(--cardapio-card-text)' }}>
           {item.produtoNome}
         </p>
         {item.complementos.length > 0 && (
-          <ul className="text-xs mt-1" style={{ color: 'var(--cardapio-text-secondary)' }}>
+          <ul className="text-xs mt-1" style={{ color: 'var(--cardapio-card-text-secondary)' }}>
             {item.complementos.map(c => (
               <li key={`${c.complementoId}-${c.grupoComplementoId}`}>
                 + {c.nome} {c.quantidade > 1 ? `(x${c.quantidade})` : ''}
@@ -159,16 +162,27 @@ export default function CarrinhoPublicoScreen({ slug }: CarrinhoPublicoScreenPro
                 : atualizarQuantidade(slug, item.id, item.quantidade - 1)
             }
             className="p-1 rounded"
-            style={{ backgroundColor: 'var(--cardapio-bg-elevated)' }}
+            style={{
+              backgroundColor: 'var(--cardapio-bg-elevated)',
+              color: 'var(--cardapio-menu-item-text)',
+            }}
           >
             <MdRemove />
           </button>
-          <span className="w-6 text-center font-medium">{item.quantidade}</span>
+          <span
+            className="w-6 text-center font-medium"
+            style={{ color: 'var(--cardapio-card-text)' }}
+          >
+            {item.quantidade}
+          </span>
           <button
             type="button"
             onClick={() => atualizarQuantidade(slug, item.id, item.quantidade + 1)}
             className="p-1 rounded"
-            style={{ backgroundColor: 'var(--cardapio-bg-elevated)' }}
+            style={{
+              backgroundColor: 'var(--cardapio-bg-elevated)',
+              color: 'var(--cardapio-menu-item-text)',
+            }}
           >
             <MdAdd />
           </button>
@@ -219,7 +233,7 @@ export default function CarrinhoPublicoScreen({ slug }: CarrinhoPublicoScreenPro
       </header>
 
       <div className="flex-1 w-full max-w-2xl mx-auto p-3 sm:p-4 space-y-4 sm:space-y-6 pb-32 sm:pb-6">
-        {resumo.itens.length === 0 ? (
+        {itens.length === 0 ? (
           <div className="text-center py-16">
             <p style={{ color: 'var(--cardapio-text-tertiary)' }}>Carrinho vazio</p>
             <button
@@ -236,7 +250,7 @@ export default function CarrinhoPublicoScreen({ slug }: CarrinhoPublicoScreenPro
           </div>
         ) : (
           <>
-            <div className="space-y-3">{resumo.itens.map(renderItem)}</div>
+            <div className="space-y-3">{itens.map(renderItem)}</div>
 
             <div
               className="rounded-xl border p-4 space-y-4"
@@ -262,6 +276,10 @@ export default function CarrinhoPublicoScreen({ slug }: CarrinhoPublicoScreenPro
                         tipoEntrega === tipo
                           ? 'var(--cardapio-menu-item-active)'
                           : 'transparent',
+                      color:
+                        tipoEntrega === tipo
+                          ? 'var(--cardapio-menu-item-text)'
+                          : 'var(--cardapio-text-primary)',
                     }}
                   >
                     {tipo}
@@ -347,7 +365,7 @@ export default function CarrinhoPublicoScreen({ slug }: CarrinhoPublicoScreenPro
             <div className="hidden sm:flex items-center justify-between text-lg font-bold pt-2">
               <span style={{ color: 'var(--cardapio-text-primary)' }}>Total</span>
               <span style={{ color: 'var(--cardapio-accent-primary)' }}>
-                {formatarPreco(resumo.total)}
+                {formatarPreco(total)}
               </span>
             </div>
 
@@ -367,7 +385,7 @@ export default function CarrinhoPublicoScreen({ slug }: CarrinhoPublicoScreenPro
         )}
       </div>
 
-      {resumo.itens.length > 0 && (
+      {itens.length > 0 && (
         <div
           className="sm:hidden fixed bottom-0 left-0 right-0 z-20 border-t px-4 py-3 flex items-center gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.15)]"
           style={{
@@ -381,7 +399,7 @@ export default function CarrinhoPublicoScreen({ slug }: CarrinhoPublicoScreenPro
               Total
             </p>
             <p className="text-lg font-bold truncate" style={{ color: 'var(--cardapio-accent-primary)' }}>
-              {formatarPreco(resumo.total)}
+              {formatarPreco(total)}
             </p>
           </div>
           <button
