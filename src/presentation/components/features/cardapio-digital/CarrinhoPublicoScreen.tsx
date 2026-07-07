@@ -12,6 +12,11 @@ import {
 import {
   usePublicDeliveryMeiosPagamento,
 } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
+import { normalizeTipoImpactoPreco } from '@/src/application/mappers/VendaApiNormalizer'
+import {
+  calcularTotalComplementos,
+  formatarValorComplemento,
+} from '@/src/domain/services/pedido/CalculadoraPedido'
 import { criarPedidoPublico } from '@/src/infrastructure/api/publicDeliveryApi'
 import type { CreatePedidoPublicoInput } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { showToast } from '@/src/shared/utils/toast'
@@ -42,6 +47,28 @@ export default function CarrinhoPublicoScreen({ slug }: CarrinhoPublicoScreenPro
 
   const formatarPreco = (valor: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor)
+
+  const valorUnitarioBaseProduto = (item: CarrinhoItemPublico) => {
+    if (item.complementos.length === 0) return item.valorUnitario
+    const impactoComplementos = calcularTotalComplementos({
+      produtoId: item.produtoId,
+      nome: item.produtoNome,
+      quantidade: 1,
+      valorUnitario: 0,
+      complementos: item.complementos.map(c => ({
+        id: c.complementoId,
+        grupoId: c.grupoComplementoId,
+        nome: c.nome,
+        valor: c.valor,
+        quantidade: c.quantidade,
+        tipoImpactoPreco: normalizeTipoImpactoPreco(c.tipoImpactoPreco),
+      })),
+    })
+    return item.valorUnitario - impactoComplementos
+  }
+
+  const observacaoItem = (item: CarrinhoItemPublico) =>
+    item.observacoes.map(o => o.trim()).filter(Boolean).join(' · ')
 
   const montarPedido = (): CreatePedidoPublicoInput | null => {
     const tel = telefone.replace(/\D/g, '')
@@ -126,78 +153,134 @@ export default function CarrinhoPublicoScreen({ slug }: CarrinhoPublicoScreenPro
     }
   }
 
-  const renderItem = (item: CarrinhoItemPublico) => (
-    <div
-      key={item.id}
-      className="rounded-xl border p-4 flex gap-3"
-      style={{
-        borderColor: 'var(--cardapio-border)',
-        backgroundColor: 'var(--cardapio-card-bg)',
-      }}
-    >
-      <div className="flex-1 min-w-0">
-        <p className="font-semibold" style={{ color: 'var(--cardapio-card-text)' }}>
-          {item.produtoNome}
-        </p>
-        {item.complementos.length > 0 && (
-          <ul className="text-xs mt-1" style={{ color: 'var(--cardapio-card-text-secondary)' }}>
-            {item.complementos.map(c => (
-              <li key={`${c.complementoId}-${c.grupoComplementoId}`}>
-                + {c.nome} {c.quantidade > 1 ? `(x${c.quantidade})` : ''}
-              </li>
-            ))}
-          </ul>
-        )}
-        <p className="font-bold mt-2" style={{ color: 'var(--cardapio-accent-primary)' }}>
-          {formatarPreco(item.valorTotal)}
-        </p>
-      </div>
-      <div className="flex flex-col items-end gap-2">
-        <div className="flex items-center gap-2">
+  const renderItem = (item: CarrinhoItemPublico) => {
+    const obs = observacaoItem(item)
+
+    return (
+      <div
+        key={item.id}
+        className="rounded-xl border p-4 flex gap-3 items-stretch"
+        style={{
+          borderColor: 'var(--cardapio-card-border)',
+          backgroundColor: 'var(--cardapio-card-bg)',
+        }}
+      >
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex items-baseline justify-between gap-2">
+            <p
+              className="min-w-0 flex-1 truncate font-semibold"
+              style={{ color: 'var(--cardapio-card-text)' }}
+            >
+              {item.produtoNome}
+            </p>
+            <span
+              className="shrink-0 text-sm font-medium tabular-nums pr-2"
+              style={{ color: 'var(--cardapio-accent-primary)' }}
+            >
+              {formatarPreco(valorUnitarioBaseProduto(item))}
+            </span>
+          </div>
+
+          {item.complementos.length > 0 && (
+            <ul className="mt-1.5 space-y-1">
+              {item.complementos.map(c => (
+                <li
+                  key={`${c.complementoId}-${c.grupoComplementoId}`}
+                  className="flex items-center gap-2 text-xs"
+                >
+                  <span
+                    className="w-5 shrink-0 text-right font-medium tabular-nums"
+                    style={{ color: 'var(--cardapio-card-text-secondary)' }}
+                  >
+                    {c.quantidade}
+                  </span>
+                  <span
+                    className="min-w-0 flex-1 truncate"
+                    style={{ color: 'var(--cardapio-card-text-secondary)' }}
+                    title={c.nome}
+                  >
+                    {c.nome}
+                  </span>
+                  <span
+                    className="shrink-0 tabular-nums font-medium pr-2"
+                    style={{ color: 'var(--cardapio-accent-primary)' }}
+                  >
+                    {formatarValorComplemento(
+                      c.valor,
+                      normalizeTipoImpactoPreco(c.tipoImpactoPreco)
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {obs && (
+            <p
+              className="mt-2 text-xs leading-snug"
+              style={{ color: 'var(--cardapio-card-text-secondary)' }}
+            >
+              <span className="font-semibold">Obs:</span> {obs}
+            </p>
+          )}
+
+          <p
+            className="mt-auto pt-2 text-base font-bold tabular-nums"
+            style={{ color: 'var(--cardapio-accent-primary)' }}
+          >
+            {formatarPreco(item.valorTotal)}
+          </p>
+        </div>
+
+        <div className="flex shrink-0 flex-col items-end justify-between">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                item.quantidade <= 1
+                  ? removerItem(slug, item.id)
+                  : atualizarQuantidade(slug, item.id, item.quantidade - 1)
+              }
+              className="p-1 rounded"
+              style={{
+                backgroundColor: 'var(--cardapio-brand)',
+                color: '#FFFFFF',
+              }}
+              aria-label="Diminuir quantidade"
+            >
+              <MdRemove />
+            </button>
+            <span
+              className="min-w-[1.5rem] rounded bg-white px-1 text-center font-medium tabular-nums"
+              style={{ color: 'var(--cardapio-card-text)' }}
+            >
+              {item.quantidade}
+            </span>
+            <button
+              type="button"
+              onClick={() => atualizarQuantidade(slug, item.id, item.quantidade + 1)}
+              className="p-1 rounded"
+              style={{
+                backgroundColor: 'var(--cardapio-brand)',
+                color: '#FFFFFF',
+              }}
+              aria-label="Aumentar quantidade"
+            >
+              <MdAdd />
+            </button>
+          </div>
           <button
             type="button"
-            onClick={() =>
-              item.quantidade <= 1
-                ? removerItem(slug, item.id)
-                : atualizarQuantidade(slug, item.id, item.quantidade - 1)
-            }
-            className="p-1 rounded"
-            style={{
-              backgroundColor: 'var(--cardapio-bg-elevated)',
-              color: 'var(--cardapio-menu-item-text)',
-            }}
+            onClick={() => removerItem(slug, item.id)}
+            className="mt-2 p-1 text-red-500"
+            aria-label="Remover item"
           >
-            <MdRemove />
-          </button>
-          <span
-            className="w-6 text-center font-medium"
-            style={{ color: 'var(--cardapio-card-text)' }}
-          >
-            {item.quantidade}
-          </span>
-          <button
-            type="button"
-            onClick={() => atualizarQuantidade(slug, item.id, item.quantidade + 1)}
-            className="p-1 rounded"
-            style={{
-              backgroundColor: 'var(--cardapio-bg-elevated)',
-              color: 'var(--cardapio-menu-item-text)',
-            }}
-          >
-            <MdAdd />
+            <MdDelete className="h-5 w-5" />
           </button>
         </div>
-        <button
-          type="button"
-          onClick={() => removerItem(slug, item.id)}
-          className="text-red-500 p-1"
-          aria-label="Remover"
-        >
-          <MdDelete />
-        </button>
       </div>
-    </div>
-  )
+    )
+  }
 
   const inputClass =
     'w-full rounded-lg border px-3 py-2 text-sm'

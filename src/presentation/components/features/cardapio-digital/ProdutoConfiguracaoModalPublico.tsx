@@ -6,6 +6,11 @@ import type {
   CatalogoPublicoGrupoComplementoDTO,
   CatalogoPublicoProdutoDTO,
 } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import { normalizeTipoImpactoPreco } from '@/src/application/mappers/VendaApiNormalizer'
+import {
+  calcularTotalComplementos,
+  formatarValorComplemento,
+} from '@/src/domain/services/pedido/CalculadoraPedido'
 import {
   useEnsureComplementosCatalogo,
   usePublicDeliveryComplementosStore,
@@ -49,6 +54,24 @@ function resolveGruposComplementos(
     .sort((a, b) => a.ordem - b.ordem)
 }
 
+function chaveComplemento(grupoId: string, complementoId: string) {
+  return `${grupoId}-${complementoId}`
+}
+
+function somarQuantidadeNoGrupo(
+  quantidades: Record<string, number>,
+  grupoId: string,
+  override?: { key: string; quantidade: number }
+): number {
+  let total = 0
+  const prefix = `${grupoId}-`
+  for (const [key, qtd] of Object.entries(quantidades)) {
+    if (!key.startsWith(prefix)) continue
+    total += override?.key === key ? override.quantidade : Math.max(0, Math.floor(qtd))
+  }
+  return total
+}
+
 export default function ProdutoConfiguracaoModalPublico({
   slug,
   produto,
@@ -66,9 +89,7 @@ export default function ProdutoConfiguracaoModalPublico({
   const [quantidade, setQuantidade] = useState(1)
   const [observacao, setObservacao] = useState('')
   const [adicionando, setAdicionando] = useState(false)
-  const [selecionados, setSelecionados] = useState<
-    Record<string, { complementoId: string; grupoComplementoId: string; quantidade: number }>
-  >({})
+  const [quantidadesComplementos, setQuantidadesComplementos] = useState<Record<string, number>>({})
 
   const grupos = useMemo(
     () => resolveGruposComplementos(cacheComplementos, produto),
@@ -79,66 +100,78 @@ export default function ProdutoConfiguracaoModalPublico({
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor)
 
   const complementosSelecionados: CarrinhoComplementoPublico[] = useMemo(() => {
-    if (!cacheComplementos) return []
-    const map = new Map(cacheComplementos.complementos.map(c => [c.id, c]))
-    return Object.values(selecionados).flatMap(sel => {
-      const comp = map.get(sel.complementoId)
-      if (!comp) return []
-      return [{
-        complementoId: sel.complementoId,
-        grupoComplementoId: sel.grupoComplementoId,
-        quantidade: sel.quantidade,
-        nome: comp.nome,
-        valor: comp.valor,
-        tipoImpactoPreco: comp.tipoImpactoPreco,
-      }]
-    })
-  }, [selecionados, cacheComplementos])
+    return grupos.flatMap(grupo =>
+      grupo.complementos.flatMap(comp => {
+        const key = chaveComplemento(grupo.id, comp.id)
+        const qtd = Math.max(0, Math.floor(quantidadesComplementos[key] ?? 0))
+        if (qtd < 1) return []
+        return [{
+          complementoId: comp.id,
+          grupoComplementoId: grupo.id,
+          quantidade: qtd,
+          nome: comp.nome,
+          valor: comp.valor,
+          tipoImpactoPreco: normalizeTipoImpactoPreco(comp.tipoImpactoPreco),
+        }]
+      })
+    )
+  }, [quantidadesComplementos, grupos])
 
-  const valorComplementosUnitario = complementosSelecionados.reduce((acc, c) => {
-    if (c.tipoImpactoPreco === 'aumenta') return acc + c.valor * c.quantidade
-    return acc
-  }, 0)
+  const valorComplementosUnitario = useMemo(() => {
+    if (complementosSelecionados.length === 0) return 0
+    return calcularTotalComplementos({
+      produtoId: produto.id,
+      nome: produto.nome,
+      quantidade: 1,
+      valorUnitario: produto.valor,
+      complementos: complementosSelecionados.map(c => ({
+        id: c.complementoId,
+        grupoId: c.grupoComplementoId,
+        nome: c.nome,
+        valor: c.valor,
+        quantidade: c.quantidade,
+        tipoImpactoPreco: normalizeTipoImpactoPreco(c.tipoImpactoPreco),
+      })),
+    })
+  }, [complementosSelecionados, produto.id, produto.nome, produto.valor])
 
   const valorUnitario = produto.valor + valorComplementosUnitario
   const valorTotal = valorUnitario * quantidade
 
-  const toggleComplemento = (
+  const ajustarQuantidadeComplemento = (
     grupo: GrupoComplementoResolvido,
-    complementoId: string
+    complementoId: string,
+    delta: number
   ) => {
-    setSelecionados(prev => {
-      const key = complementoId
-      if (prev[key]) {
+    const key = chaveComplemento(grupo.id, complementoId)
+    setQuantidadesComplementos(prev => {
+      const atual = Math.max(0, Math.floor(prev[key] ?? 0))
+      const nova = Math.max(0, atual + delta)
+
+      if (delta > 0 && grupo.qtdMaxima > 0) {
+        const totalNoGrupo = somarQuantidadeNoGrupo(prev, grupo.id, { key, quantidade: nova })
+        if (totalNoGrupo > grupo.qtdMaxima) {
+          showToast.error(`Máximo de ${grupo.qtdMaxima} opção(ões) em ${grupo.nome}`)
+          return prev
+        }
+      }
+
+      if (nova === 0) {
         const next = { ...prev }
         delete next[key]
         return next
       }
-      const totalNoGrupo = Object.values(prev).filter(
-        s => s.grupoComplementoId === grupo.id
-      ).length
-      if (grupo.qtdMaxima > 0 && totalNoGrupo >= grupo.qtdMaxima) {
-        showToast.error(`Máximo de ${grupo.qtdMaxima} opção(ões) em ${grupo.nome}`)
-        return prev
-      }
-      return {
-        ...prev,
-        [key]: { complementoId, grupoComplementoId: grupo.id, quantidade: 1 },
-      }
+
+      return { ...prev, [key]: nova }
     })
   }
 
   const validarGrupos = (): boolean => {
     for (const grupo of grupos) {
-      const qtd = Object.values(selecionados).filter(
-        s => s.grupoComplementoId === grupo.id
-      ).length
-      if (grupo.obrigatorio && qtd < Math.max(grupo.qtdMinima, 1)) {
-        showToast.error(`Selecione opções em "${grupo.nome}"`)
-        return false
-      }
-      if (grupo.qtdMinima > 0 && qtd < grupo.qtdMinima) {
-        showToast.error(`Selecione pelo menos ${grupo.qtdMinima} em "${grupo.nome}"`)
+      const qtd = somarQuantidadeNoGrupo(quantidadesComplementos, grupo.id)
+      const minimo = grupo.obrigatorio ? Math.max(grupo.qtdMinima, 1) : grupo.qtdMinima
+      if (minimo > 0 && qtd < minimo) {
+        showToast.error(`Selecione pelo menos ${minimo} em "${grupo.nome}"`)
         return false
       }
     }
@@ -208,48 +241,123 @@ export default function ProdutoConfiguracaoModalPublico({
           </p>
         )}
 
+        {grupos.length > 0 && (
+          <div
+            className="mb-4 rounded-lg border p-3"
+            style={{
+              borderColor: 'var(--cardapio-card-border)',
+              backgroundColor: 'var(--cardapio-card-bg)',
+            }}
+          >
+            <p
+              className="font-semibold mb-3"
+              style={{ color: 'var(--cardapio-card-text)' }}
+            >
+              Complementos
+            </p>
+            <div className="space-y-3">
+              {grupos.map(grupo => (
+                <div
+                  key={grupo.id}
+                  className="rounded-md border px-2 py-1.5"
+                  style={{ borderColor: 'var(--cardapio-card-border)' }}
+                >
+                  <p
+                    className="mb-1.5 text-sm font-semibold uppercase tracking-wide"
+                    style={{ color: 'var(--cardapio-card-text)' }}
+                  >
+                    {grupo.nome}
+                    {grupo.obrigatorio && <span className="text-red-500 ml-1">*</span>}
+                  </p>
+                  <div className="space-y-1">
+                    {grupo.complementos.map(comp => {
+                      const key = chaveComplemento(grupo.id, comp.id)
+                      const qtdComp = Math.max(0, Math.floor(quantidadesComplementos[key] ?? 0))
+                      const tipoIp = normalizeTipoImpactoPreco(comp.tipoImpactoPreco)
+
+                      return (
+                        <div
+                          key={comp.id}
+                          className="flex items-center justify-between gap-2 rounded px-2 py-1.5"
+                          style={{ backgroundColor: 'var(--cardapio-card-hover)' }}
+                        >
+                          <span
+                            className="min-w-0 flex-1 truncate text-sm font-medium"
+                            style={{ color: 'var(--cardapio-card-text)' }}
+                            title={comp.nome}
+                          >
+                            {comp.nome}
+                          </span>
+                          <span
+                            className="shrink-0 text-sm font-semibold tabular-nums"
+                            style={{ color: 'var(--cardapio-accent-primary)' }}
+                          >
+                            {formatarValorComplemento(comp.valor, tipoIp)}
+                          </span>
+                          <div
+                            className="flex shrink-0 items-center rounded border overflow-hidden"
+                            style={{
+                              borderColor: 'var(--cardapio-card-border)',
+                              backgroundColor: '#FFFFFF',
+                            }}
+                          >
+                            <button
+                              type="button"
+                              aria-label={`Diminuir quantidade de ${comp.nome}`}
+                              disabled={qtdComp <= 0}
+                              onClick={() => ajustarQuantidadeComplemento(grupo, comp.id, -1)}
+                              className="flex h-8 w-8 items-center justify-center transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                              style={{
+                                backgroundColor: 'var(--cardapio-brand)',
+                                color: '#FFFFFF',
+                              }}
+                            >
+                              <MdRemove className="h-4 w-4" />
+                            </button>
+                            <span
+                              className="min-w-[1.75rem] px-1 text-center text-sm font-medium tabular-nums bg-white"
+                              style={{ color: 'var(--cardapio-card-text)' }}
+                              aria-label="Quantidade do complemento"
+                            >
+                              {qtdComp}
+                            </span>
+                            <button
+                              type="button"
+                              aria-label={`Aumentar quantidade de ${comp.nome}`}
+                              onClick={() => ajustarQuantidadeComplemento(grupo, comp.id, 1)}
+                              className="flex h-8 w-8 items-center justify-center transition-colors"
+                              style={{
+                                backgroundColor: 'var(--cardapio-brand)',
+                                color: '#FFFFFF',
+                              }}
+                            >
+                              <MdAdd className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p
+              className="mt-3 text-sm font-medium text-right"
+              style={{ color: 'var(--cardapio-card-text-secondary)' }}
+            >
+              Total dos complementos:{' '}
+              <span style={{ color: 'var(--cardapio-accent-primary)' }}>
+                {formatarPreco(valorComplementosUnitario)}
+              </span>
+            </p>
+          </div>
+        )}
+
         {precisaComplementos && carregandoComplementos && !cacheComplementos && (
           <p className="text-sm mb-4" style={{ color: 'var(--cardapio-text-secondary)' }}>
             Carregando opções...
           </p>
         )}
-
-        {grupos.map(grupo => (
-          <div key={grupo.id} className="mb-4">
-            <p className="font-semibold mb-2" style={{ color: 'var(--cardapio-text-primary)' }}>
-              {grupo.nome}
-              {grupo.obrigatorio && <span className="text-red-500 ml-1">*</span>}
-            </p>
-            <div className="space-y-2">
-              {grupo.complementos.map(comp => {
-                const selected = !!selecionados[comp.id]
-                return (
-                  <button
-                    key={comp.id}
-                    type="button"
-                    onClick={() => toggleComplemento(grupo, comp.id)}
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-lg border text-left"
-                    style={{
-                      borderColor: selected
-                        ? 'var(--cardapio-accent-primary)'
-                        : 'var(--cardapio-border)',
-                      backgroundColor: selected
-                        ? 'var(--cardapio-menu-item-active)'
-                        : 'var(--cardapio-card-bg)',
-                    }}
-                  >
-                    <span style={{ color: 'var(--cardapio-card-text)' }}>{comp.nome}</span>
-                    {comp.valor > 0 && (
-                      <span style={{ color: 'var(--cardapio-accent-primary)' }}>
-                        + {formatarPreco(comp.valor)}
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        ))}
 
         <div className="mb-4">
           <label
@@ -275,23 +383,39 @@ export default function ProdutoConfiguracaoModalPublico({
 
         <div className="flex items-center justify-between mb-4">
           <span style={{ color: 'var(--cardapio-text-secondary)' }}>Quantidade</span>
-          <div className="flex items-center gap-3">
+          <div
+            className="flex items-center rounded-lg border overflow-hidden"
+            style={{ borderColor: 'var(--cardapio-border)' }}
+          >
             <button
               type="button"
               onClick={() => setQuantidade(q => Math.max(1, q - 1))}
-              className="p-2 rounded-lg"
-              style={{ backgroundColor: 'var(--cardapio-bg-elevated)' }}
+              className="flex h-9 w-9 items-center justify-center"
+              style={{
+                backgroundColor: 'var(--cardapio-brand)',
+                color: '#FFFFFF',
+              }}
+              aria-label="Diminuir quantidade do produto"
             >
-              <MdRemove />
+              <MdRemove className="h-4 w-4" />
             </button>
-            <span className="font-bold w-6 text-center">{quantidade}</span>
+            <span
+              className="min-w-[2rem] px-2 text-center font-bold tabular-nums bg-white"
+              style={{ color: 'var(--cardapio-card-text)' }}
+            >
+              {quantidade}
+            </span>
             <button
               type="button"
               onClick={() => setQuantidade(q => q + 1)}
-              className="p-2 rounded-lg"
-              style={{ backgroundColor: 'var(--cardapio-bg-elevated)' }}
+              className="flex h-9 w-9 items-center justify-center"
+              style={{
+                backgroundColor: 'var(--cardapio-brand)',
+                color: '#FFFFFF',
+              }}
+              aria-label="Aumentar quantidade do produto"
             >
-              <MdAdd />
+              <MdAdd className="h-4 w-4" />
             </button>
           </div>
         </div>

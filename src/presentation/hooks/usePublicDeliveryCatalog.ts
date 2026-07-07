@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import {
   useInfiniteQuery,
   useQuery,
+  type InfiniteData,
   type UseInfiniteQueryResult,
 } from '@tanstack/react-query'
 import {
@@ -147,7 +148,7 @@ export function usePublicDeliveryCatalogInfinite(slug: string, enabled = true) {
     if (slug) hidratarDoStorage(slug)
   }, [slug, hidratarDoStorage])
 
-  return useInfiniteQuery({
+  return useInfiniteQuery<GetCatalogoPublicoResponseDTO, Error>({
     queryKey: publicDeliveryCatalogInfiniteQueryKey(slug),
     queryFn: async ({ pageParam }) => {
       const offset = pageParam as number
@@ -175,7 +176,7 @@ export function usePublicDeliveryCatalogInfinite(slug: string, enabled = true) {
  */
 export function useAutoFetchCatalogoGrupos(
   query: Pick<
-    UseInfiniteQueryResult<GetCatalogoPublicoResponseDTO, Error>,
+    UseInfiniteQueryResult<InfiniteData<GetCatalogoPublicoResponseDTO>, Error>,
     'hasNextPage' | 'isFetchingNextPage' | 'fetchNextPage' | 'isSuccess' | 'isError'
   >
 ) {
