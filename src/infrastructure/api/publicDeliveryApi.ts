@@ -32,6 +32,17 @@ async function parseErrorMessage(res: Response): Promise<string> {
   }
 }
 
+export async function fetchEmpresaPublicaMidia(slug: string): Promise<{
+  logoUrl: string | null
+  bannerUrl: string | null
+}> {
+  const data = await fetchCatalogoPublico(slug, { limit: 1, offset: 0 })
+  return {
+    logoUrl: data.empresa.logoUrl ?? null,
+    bannerUrl: data.empresa.bannerUrl ?? null,
+  }
+}
+
 export async function fetchCatalogoPublico(
   slug: string,
   params?: { offset?: number; limit?: number }

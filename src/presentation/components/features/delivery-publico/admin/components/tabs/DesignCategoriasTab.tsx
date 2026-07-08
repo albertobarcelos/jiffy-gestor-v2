@@ -27,7 +27,7 @@ export function DesignCategoriasTab({ config, onChange }: DesignCategoriasTabPro
   }, [config.categorias.iconesPorGrupoId, selectedCategory])
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
         <h3 className="text-base font-semibold text-primary">Categorias</h3>
         <JiffyIconSwitch
@@ -44,8 +44,8 @@ export function DesignCategoriasTab({ config, onChange }: DesignCategoriasTabPro
         />
       </div>
 
-      <div className="flex flex-col gap-6 lg:flex-row">
-        <ul className="w-full shrink-0 space-y-2 lg:max-w-[220px]">
+      <div className="flex flex-col gap-4 lg:flex-row">
+        <ul className="w-full shrink-0 space-y-1.5 lg:max-w-[220px]">
           {PREVIEW_DESIGN_CATEGORIES.map(cat => {
             const iconName = config.categorias.iconesPorGrupoId[cat.id] ?? cat.iconName
             const isSelected = cat.id === selectedCategoryId
@@ -55,7 +55,7 @@ export function DesignCategoriasTab({ config, onChange }: DesignCategoriasTabPro
                   type="button"
                   onClick={() => setSelectedCategoryId(cat.id)}
                   className={cn(
-                    'flex w-full items-center gap-3 rounded-lg border-2 px-3 py-2 text-left text-sm font-semibold transition-colors',
+                    'flex w-full items-center gap-3 rounded-lg border-2 px-3 py-1.5 text-left text-sm font-semibold transition-colors',
                     isSelected
                       ? 'border-secondary bg-secondary/5 text-primary-text'
                       : 'border-gray-200 text-primary-text hover:border-gray-300'
@@ -69,12 +69,12 @@ export function DesignCategoriasTab({ config, onChange }: DesignCategoriasTabPro
           })}
         </ul>
 
-        <div className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white p-4">
+        <div className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white p-3">
           <p className="text-sm font-semibold text-primary-text">
             Ícone · {selectedCategory?.nome ?? '—'}
           </p>
 
-          <div className="mt-4 flex gap-2">
+          <div className="mt-2 flex gap-2">
             {(['linha', 'preenchimento'] as CategoryIconStyle[]).map(estilo => (
               <button
                 key={estilo}
@@ -100,7 +100,7 @@ export function DesignCategoriasTab({ config, onChange }: DesignCategoriasTabPro
           <button
             type="button"
             onClick={() => setIconPickerOpen(true)}
-            className="mt-4 flex w-full items-center gap-3 rounded-lg border border-dashed border-gray-300 p-4 text-left transition-colors hover:border-secondary hover:bg-secondary/5"
+            className="mt-2 flex w-full items-center gap-3 rounded-lg border border-dashed border-gray-300 p-3 text-left transition-colors hover:border-secondary hover:bg-secondary/5"
           >
             <div
               className="flex h-12 w-12 items-center justify-center rounded-full"

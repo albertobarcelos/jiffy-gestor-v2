@@ -63,7 +63,10 @@ export function DeliveryThemeScope({
 
   return (
     <DeliveryThemeContext.Provider value={{ config, themeStyle }}>
-      <div className={`delivery-theme min-h-screen ${className ?? ''}`.trim()} style={themeStyle}>
+      <div
+        className={`delivery-theme @container min-h-screen w-full ${className ?? ''}`.trim()}
+        style={themeStyle}
+      >
         {children}
       </div>
     </DeliveryThemeContext.Provider>

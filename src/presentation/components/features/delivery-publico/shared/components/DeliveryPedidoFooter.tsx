@@ -21,7 +21,7 @@ export function DeliveryPedidoFooter({ total, interactive = false, onClick }: De
       <button
         type="button"
         onClick={onClick}
-        className="mx-4 mb-4 flex w-[calc(100%-2rem)] items-center justify-between rounded-xl px-4 py-3.5 text-sm font-semibold text-white sm:text-base"
+        className="mx-4 mb-4 flex w-[calc(100%-2rem)] items-center justify-between rounded-xl px-4 py-3.5 text-sm font-semibold text-white @sm:text-base"
         style={{ backgroundColor: 'var(--delivery-primary)' }}
       >
         {content}
@@ -31,7 +31,7 @@ export function DeliveryPedidoFooter({ total, interactive = false, onClick }: De
 
   return (
     <div
-      className="mx-4 mb-4 flex items-center justify-between rounded-xl px-4 py-3.5 text-sm font-semibold text-white sm:text-base"
+      className="mx-4 mb-4 flex items-center justify-between rounded-xl px-4 py-3.5 text-sm font-semibold text-white @sm:text-base"
       style={{ backgroundColor: 'var(--delivery-primary)' }}
     >
       {content}

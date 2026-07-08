@@ -55,9 +55,9 @@ function LayoutWireframe({ layoutId }: { layoutId: DeliveryLayoutId }) {
 
 export function DesignModelosTab({ config, onChange }: DesignModelosTabProps) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       <h3 className="text-base font-semibold text-primary">Modelos</h3>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
         {LAYOUT_MODELS.map(modelo => (
           <DesignSelectableCard
             key={modelo.id}

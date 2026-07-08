@@ -1,5 +1,6 @@
 'use client'
 
+import '@/src/presentation/components/features/delivery-publico/shared/theme/delivery-publico-theme.css'
 import type { DeliveryPublicoDesignConfig } from '../../shared/types/deliveryPublicoDesignConfig'
 import { applyDesignConfig } from '../../shared/theme/applyDesignPreviewTheme'
 import { buildMockDeliveryViewModel } from '../../shared/mappers/buildMockViewModel'
@@ -17,16 +18,20 @@ export function DeliveryMobilePreviewFrame({ config }: DeliveryMobilePreviewFram
   const LayoutHome = resolveDeliveryLayoutHome(config.layoutId)
 
   return (
-    <div className="flex flex-col items-center">
-      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-secondary-text">
+    <div className="mx-auto flex w-full max-w-[23.75rem] flex-col items-center lg:max-w-none">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-secondary-text">
         Preview · {layoutNome}
       </p>
       <div
-        className="relative w-[280px] overflow-hidden rounded-[2rem] border-8 border-gray-900 bg-white shadow-xl"
+        className="delivery-preview-shell relative overflow-hidden rounded-[2rem] border-8 border-gray-900 bg-white shadow-xl"
         style={themeStyle}
       >
-        <div className="max-h-[520px] overflow-y-auto scrollbar-hide">
-          <LayoutHome config={config} viewModel={viewModel} interactive={false} />
+        <div className="delivery-preview-viewport mx-auto overflow-y-auto scrollbar-hide">
+          <div className="delivery-preview-scale-host">
+            <div className="delivery-theme @container w-full min-w-0">
+              <LayoutHome config={config} viewModel={viewModel} interactive={false} />
+            </div>
+          </div>
         </div>
       </div>
     </div>

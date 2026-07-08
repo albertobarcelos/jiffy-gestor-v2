@@ -13,11 +13,11 @@ type DesignTipografiasTabProps = {
 function TypographyPreview({ presetId }: { presetId: TypographyPresetId }) {
   const preset = TYPOGRAPHY_PRESETS.find(p => p.id === presetId)!
   return (
-    <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+    <div className="rounded-lg border border-gray-100 bg-gray-50 p-2.5">
       <p className="text-sm font-bold text-primary-text" style={{ fontFamily: preset.titleFontFamily }}>
         Água mineral
       </p>
-      <p className="mt-1 text-xs text-secondary-text" style={{ fontFamily: preset.bodyFontFamily }}>
+      <p className="mt-0.5 text-xs text-secondary-text" style={{ fontFamily: preset.bodyFontFamily }}>
         Garrafa de 500 ml
       </p>
     </div>
@@ -26,9 +26,9 @@ function TypographyPreview({ presetId }: { presetId: TypographyPresetId }) {
 
 export function DesignTipografiasTab({ config, onChange }: DesignTipografiasTabProps) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       <h3 className="text-base font-semibold text-primary">Tipografias sugeridas</h3>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2">
         {TYPOGRAPHY_PRESETS.map(preset => (
           <DesignSelectableCard
             key={preset.id}

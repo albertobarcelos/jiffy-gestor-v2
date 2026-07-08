@@ -42,7 +42,7 @@ export function DeliveryTipoEntregaToggle({
   }
 
   const baseClass =
-    'rounded-full px-4 py-1.5 text-xs font-semibold transition-colors sm:text-sm'
+    'rounded-full px-4 py-1.5 text-xs font-semibold transition-colors @sm:text-sm'
 
   const renderButton = (tipo: 'entrega' | 'retirada', label: string) => {
     const active = value === tipo

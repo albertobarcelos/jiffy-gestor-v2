@@ -14,12 +14,12 @@ const cardClassName =
   'flex h-full w-full overflow-hidden rounded-xl border text-left transition-colors'
 
 const textClassName =
-  'min-w-0 flex-1 py-3.5 pl-3.5 pr-3 sm:py-3 sm:pl-3 sm:pr-2.5 lg:py-4 lg:pl-4 lg:pr-3'
+  'min-w-0 flex-1 py-3.5 pl-3.5 pr-3 @sm:py-3 @sm:pl-3 @sm:pr-2.5 @lg:py-4 @lg:pl-4 @lg:pr-3'
 
 function ProdutoThumb({ imagemUrl }: { imagemUrl: string | null }) {
   return (
     <div
-      className="relative w-28 min-h-28 shrink-0 self-stretch lg:w-36 lg:min-h-36 xl:w-40 xl:min-h-40"
+      className="relative w-28 min-h-28 shrink-0 self-stretch @lg:w-36 @lg:min-h-36 @xl:w-40 @xl:min-h-40"
       style={{ backgroundColor: 'var(--delivery-surface-muted)' }}
     >
       {imagemUrl ? (
@@ -28,7 +28,7 @@ function ProdutoThumb({ imagemUrl }: { imagemUrl: string | null }) {
       ) : (
         <div className="absolute inset-0 flex items-center justify-center">
           <Camera
-            className="h-8 w-8 lg:h-9 lg:w-9"
+            className="h-8 w-8 @lg:h-9 @lg:w-9"
             style={{ color: 'var(--delivery-text-muted)' }}
             aria-hidden
           />
@@ -52,7 +52,7 @@ export function DeliveryProdutoListItem({
     <>
       <div className={textClassName}>
         <p
-          className="text-base font-semibold leading-snug lg:text-lg"
+          className="text-base font-semibold leading-snug @lg:text-lg"
           style={{
             color: 'var(--delivery-text)',
             fontFamily: 'var(--delivery-font-title)',
@@ -61,12 +61,12 @@ export function DeliveryProdutoListItem({
           {produto.nome}
         </p>
         {produto.descricao ? (
-          <p className="delivery-text-secondary mt-0.5 line-clamp-2 text-xs leading-snug lg:mt-1 lg:text-sm">
+          <p className="delivery-text-secondary mt-0.5 line-clamp-2 text-xs leading-snug @lg:mt-1 @lg:text-sm">
             {produto.descricao}
           </p>
         ) : null}
         <p
-          className="mt-1 text-sm font-medium lg:mt-1.5 lg:text-base"
+          className="mt-1 text-sm font-medium @lg:mt-1.5 @lg:text-base"
           style={{
             color: 'var(--delivery-primary)',
             fontFamily: 'var(--delivery-font-body)',

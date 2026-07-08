@@ -50,36 +50,36 @@ export function DeliveryGrupoChips({
           const content = (
             <>
               <div
-                className="flex h-14 w-14 items-center justify-center rounded-full sm:h-11 sm:w-11 lg:h-16 lg:w-16 xl:h-[4.5rem] xl:w-[4.5rem]"
+                className="flex h-14 w-14 items-center justify-center rounded-full @sm:h-11 @sm:w-11 @lg:h-16 @lg:w-16 @xl:h-[4.5rem] @xl:w-[4.5rem]"
                 style={{ backgroundColor: 'var(--delivery-primary)' }}
               >
                 <DinamicIcon
                   iconName={iconName}
                   color="#FFFFFF"
                   size={26}
-                  className="sm:hidden"
+                  className="@sm:hidden"
                 />
                 <DinamicIcon
                   iconName={iconName}
                   color="#FFFFFF"
                   size={20}
-                  className="hidden sm:block lg:hidden"
+                  className="hidden @sm:block @lg:hidden"
                 />
                 <DinamicIcon
                   iconName={iconName}
                   color="#FFFFFF"
                   size={28}
-                  className="hidden lg:block xl:hidden"
+                  className="hidden @lg:block @xl:hidden"
                 />
                 <DinamicIcon
                   iconName={iconName}
                   color="#FFFFFF"
                   size={32}
-                  className="hidden xl:block"
+                  className="hidden @xl:block"
                 />
               </div>
               <span
-                className="line-clamp-2 w-full text-center text-[11px] font-medium leading-tight sm:text-xs lg:text-sm xl:text-base"
+                className="line-clamp-2 w-full text-center text-[11px] font-medium leading-tight @sm:text-xs @lg:text-sm @xl:text-base"
                 style={{
                   color: 'var(--delivery-text)',
                   fontFamily: 'var(--delivery-font-body)',
@@ -96,7 +96,7 @@ export function DeliveryGrupoChips({
                 key={grupo.id}
                 type="button"
                 onClick={() => onGrupoClick(grupo.id)}
-                className="flex snap-start flex-col items-center gap-1.5 lg:gap-2"
+                className="flex snap-start flex-col items-center gap-1.5 @lg:gap-2"
                 style={chipStyle}
               >
                 {content}
@@ -107,7 +107,7 @@ export function DeliveryGrupoChips({
           return (
             <div
               key={grupo.id}
-              className="flex snap-start flex-col items-center gap-1.5 lg:gap-2"
+              className="flex snap-start flex-col items-center gap-1.5 @lg:gap-2"
               style={chipStyle}
             >
               {content}

@@ -31,7 +31,7 @@ export function DesignSelectableCard({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'relative flex flex-col rounded-xl border-2 bg-white p-4 text-left transition-colors',
+        'relative flex flex-col rounded-xl border-2 bg-white p-3 text-left transition-colors',
         selected ? 'border-secondary shadow-sm' : 'border-gray-200 hover:border-gray-300',
         disabled && 'cursor-not-allowed opacity-70',
         className
@@ -41,7 +41,7 @@ export function DesignSelectableCard({
         <DesignPremiumBadge className="absolute right-3 top-3" />
       ) : null}
       {children}
-      <span className="mt-2 text-sm font-semibold text-primary-text">{title}</span>
+      <span className="mt-1.5 text-sm font-semibold text-primary-text">{title}</span>
       {description ? <span className="mt-0.5 text-xs text-secondary-text">{description}</span> : null}
     </button>
   )

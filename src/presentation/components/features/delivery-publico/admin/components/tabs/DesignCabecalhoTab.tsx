@@ -1,38 +1,46 @@
 'use client'
 
-import { useCallback } from 'react'
-import { DeliveryImageUploadField } from '@/src/presentation/components/ui/DeliveryImageUploadField'
 import type { DeliveryPublicoDesignConfig } from '../../../shared/types/deliveryPublicoDesignConfig'
 import { CABECALHO_NOME_MAX_LENGTH } from '../../../shared/constants/defaultDesignConfig'
+import { DeliveryImageUploadField } from '@/src/presentation/components/ui/DeliveryImageUploadField'
+import { useDesignCabecalhoMidia } from '../../hooks/useDesignCabecalhoMidia'
 
 type DesignCabecalhoTabProps = {
   config: DeliveryPublicoDesignConfig
+  slug?: string
+  hasEmpresaDelivery: boolean
   onChange: (updater: (current: DeliveryPublicoDesignConfig) => DeliveryPublicoDesignConfig) => void
 }
 
-function readFileAsObjectUrl(file: File): string {
-  return URL.createObjectURL(file)
-}
-
-export function DesignCabecalhoTab({ config, onChange }: DesignCabecalhoTabProps) {
+export function DesignCabecalhoTab({
+  config,
+  slug,
+  hasEmpresaDelivery,
+  onChange,
+}: DesignCabecalhoTabProps) {
   const { cabecalho } = config
 
-  const handleImage = useCallback(
-    (field: 'logoUrl' | 'capaUrl') => async (file: File) => {
-      const url = readFileAsObjectUrl(file)
-      onChange(current => ({
-        ...current,
-        cabecalho: { ...current.cabecalho, [field]: url },
-      }))
-    },
-    [onChange]
-  )
+  const {
+    isUploadingLogo,
+    isUploadingBanner,
+    handleLogoUpload,
+    handleBannerUpload,
+    clearLogo,
+    clearBanner,
+    canUpload,
+  } = useDesignCabecalhoMidia({
+    slug,
+    hasEmpresaDelivery,
+    logoUrl: cabecalho.logoUrl,
+    capaUrl: cabecalho.capaUrl,
+    onChange,
+  })
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       <section>
         <h3 className="text-base font-semibold text-primary">Dados do negócio</h3>
-        <div className="mt-4">
+        <div className="mt-2">
           <label htmlFor="design-nome-negocio" className="text-sm font-semibold text-primary-text">
             Nome do seu negócio
           </label>
@@ -50,34 +58,36 @@ export function DesignCabecalhoTab({ config, onChange }: DesignCabecalhoTabProps
                 },
               }))
             }
-            className="mt-2 w-full max-w-md rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-primary"
+            className="mt-1 w-full max-w-md rounded-lg border border-gray-200 px-3 py-1.5 text-sm outline-none focus:border-primary"
           />
-          <p className="mt-1 text-xs text-secondary-text">
+          <p className="mt-0.5 text-xs text-secondary-text">
             {cabecalho.nomeExibicao.length}/{CABECALHO_NOME_MAX_LENGTH}
           </p>
         </div>
       </section>
 
+      {!canUpload ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Configure a Empresa Delivery (slug) em Configurações antes de enviar logo e capa.
+        </p>
+      ) : null}
+
       <section>
         <h3 className="text-base font-semibold text-primary">Logo</h3>
-        <div className="mt-4 max-w-md">
+        <div className="mt-2">
           <DeliveryImageUploadField
-            label=""
+            variant="logo"
             previewUrl={cabecalho.logoUrl}
             helperText="Máx. 5 MB · PNG, JPG ou WebP"
-            emptyHint="Arraste e solte a imagem aqui ou Selecionar arquivo"
-            onFileSelected={handleImage('logoUrl')}
-            onClearPreview={() =>
-              onChange(current => ({
-                ...current,
-                cabecalho: { ...current.cabecalho, logoUrl: null },
-              }))
-            }
+            busy={isUploadingLogo}
+            disabled={!canUpload}
+            onFileSelected={handleLogoUpload}
+            onClearPreview={clearLogo}
           />
         </div>
-        <fieldset className="mt-4">
+        <fieldset className="mt-2">
           <legend className="text-sm font-semibold text-primary-text">Forma</legend>
-          <div className="mt-2 flex gap-4">
+          <div className="mt-1 flex gap-4">
             {(['circular', 'quadrada'] as const).map(formato => (
               <label key={formato} className="flex cursor-pointer items-center gap-2 text-sm">
                 <input
@@ -92,7 +102,9 @@ export function DesignCabecalhoTab({ config, onChange }: DesignCabecalhoTabProps
                   }
                   className="text-secondary focus:ring-secondary"
                 />
-                <span className="capitalize text-primary-text">{formato === 'circular' ? 'Circular' : 'Quadrada'}</span>
+                <span className="capitalize text-primary-text">
+                  {formato === 'circular' ? 'Circular' : 'Quadrada'}
+                </span>
               </label>
             ))}
           </div>
@@ -101,19 +113,16 @@ export function DesignCabecalhoTab({ config, onChange }: DesignCabecalhoTabProps
 
       <section>
         <h3 className="text-base font-semibold text-primary">Capa</h3>
-        <div className="mt-4 max-w-md">
+        <div className="mt-2 max-w-md">
           <DeliveryImageUploadField
-            label=""
+            variant="banner"
             previewUrl={cabecalho.capaUrl}
             helperText="Máx. 5 MB · PNG, JPG ou WebP"
             emptyHint="Arraste e solte a imagem aqui ou Selecionar arquivo"
-            onFileSelected={handleImage('capaUrl')}
-            onClearPreview={() =>
-              onChange(current => ({
-                ...current,
-                cabecalho: { ...current.cabecalho, capaUrl: null },
-              }))
-            }
+            busy={isUploadingBanner}
+            disabled={!canUpload}
+            onFileSelected={handleBannerUpload}
+            onClearPreview={clearBanner}
           />
         </div>
       </section>

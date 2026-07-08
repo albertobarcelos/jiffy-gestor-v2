@@ -33,9 +33,9 @@ function PaletteSwatches({ paletteId }: { paletteId: ColorPaletteId }) {
 
 export function DesignCoresTab({ config, onChange }: DesignCoresTabProps) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       <h3 className="text-base font-semibold text-primary">Cores sugeridas</h3>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {COLOR_PALETTES.map(paleta => (
           <DesignSelectableCard
             key={paleta.id}

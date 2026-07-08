@@ -49,8 +49,8 @@ export function DeliveryDesignCustomizerScreen() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-white">
-      <header className="shrink-0 border-b border-gray-200 px-4 py-4 md:px-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <header className="shrink-0 border-b border-gray-200 px-4 pb-2 pt-2 md:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <Link
             href="/configuracoes/empresa-delivery"
             className="inline-flex items-center gap-1 text-sm font-semibold text-primary-text transition-colors hover:text-primary"
@@ -64,7 +64,7 @@ export function DeliveryDesignCustomizerScreen() {
               type="button"
               onClick={handleRestore}
               disabled={!isDirty}
-              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-primary-text transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold text-primary-text transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <MdRefresh className="h-4 w-4" aria-hidden />
               Restaurar design
@@ -72,23 +72,28 @@ export function DeliveryDesignCustomizerScreen() {
             <button
               type="button"
               onClick={handlePublish}
-              className="inline-flex h-10 items-center rounded-lg bg-secondary px-5 text-sm font-semibold text-white transition-colors hover:bg-secondary/90"
+              className="inline-flex h-9 items-center rounded-lg bg-secondary px-5 text-sm font-semibold text-white transition-colors hover:bg-secondary/90"
             >
               Publicar
             </button>
           </div>
         </div>
 
-        <h1 className="mt-4 text-2xl font-bold text-primary">Design</h1>
-        <div className="mt-4">
+        <h1 className="mt-1.5 text-xl font-bold text-primary">Design</h1>
+        <div className="mt-2">
           <DesignTabNav activeTab={activeTab} onTabChange={setActiveTab} />
         </div>
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
-        <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
+        <div className="min-h-0 flex-1 overflow-y-auto p-3 md:p-4">
           {activeTab === 'cabecalho' && (
-            <DesignCabecalhoTab config={draft} onChange={updateDraft} />
+            <DesignCabecalhoTab
+              config={draft}
+              slug={empresaDelivery?.slug}
+              hasEmpresaDelivery={Boolean(empresaDelivery)}
+              onChange={updateDraft}
+            />
           )}
           {activeTab === 'modelos' && <DesignModelosTab config={draft} onChange={updateDraft} />}
           {activeTab === 'cores' && <DesignCoresTab config={draft} onChange={updateDraft} />}
@@ -103,7 +108,7 @@ export function DeliveryDesignCustomizerScreen() {
           )}
         </div>
 
-        <aside className="shrink-0 border-t border-gray-200 bg-gray-50 p-4 lg:w-[360px] lg:border-l lg:border-t-0 lg:p-6">
+        <aside className="flex shrink-0 justify-center border-t border-gray-200 bg-gray-50 p-3 lg:sticky lg:top-0 lg:w-[min(100%,26.25rem)] lg:max-w-[26.25rem] lg:self-start lg:border-l lg:border-t-0 lg:p-4 xl:w-[min(100%,27.5rem)] xl:max-w-[27.5rem]">
           <DeliveryMobilePreviewFrame config={draft} />
         </aside>
       </div>

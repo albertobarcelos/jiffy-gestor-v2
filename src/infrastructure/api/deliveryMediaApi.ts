@@ -173,6 +173,20 @@ export async function uploadProdutoImagem(
   )
 }
 
+export async function uploadEmpresaDeliveryLogo(
+  file: File,
+  token: string
+): Promise<ConfirmImageUploadIntentResponseDTO> {
+  return uploadDeliveryImage('/api/delivery/empresas/me/logo/upload-intent', file, token)
+}
+
+export async function uploadEmpresaDeliveryBanner(
+  file: File,
+  token: string
+): Promise<ConfirmImageUploadIntentResponseDTO> {
+  return uploadDeliveryImage('/api/delivery/empresas/me/banner/upload-intent', file, token)
+}
+
 export async function fetchGrupoProdutoImagemUrl(
   grupoProdutoId: string,
   token: string

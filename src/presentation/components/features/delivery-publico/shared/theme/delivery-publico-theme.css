@@ -45,3 +45,37 @@
   color: var(--delivery-text);
   font-family: var(--delivery-font-title);
 }
+
+/**
+ * Preview mobile do designer — shell responsivo + conteúdo escalado.
+ * --preview-inner: largura útil da tela; --preview-scale: densidade do UI.
+ */
+.delivery-preview-shell {
+  --preview-inner: clamp(16.5rem, 28vw, 21rem);
+  --preview-scale: 0.9;
+  width: calc(var(--preview-inner) + 2rem);
+  max-width: 100%;
+}
+
+.delivery-preview-viewport {
+  width: var(--preview-inner);
+  max-height: clamp(28rem, 72vh, 42rem);
+}
+
+.delivery-preview-scale-host {
+  width: calc(var(--preview-inner) / var(--preview-scale));
+  transform: scale(var(--preview-scale));
+  transform-origin: top left;
+  margin-left: calc(var(--preview-inner) * (1 - var(--preview-scale)) / 2);
+  margin-bottom: calc(var(--preview-inner) * (var(--preview-scale) - 1) * 0.15);
+}
+
+@supports (zoom: 1) {
+  .delivery-preview-scale-host {
+    width: var(--preview-inner);
+    transform: none;
+    margin-left: 0;
+    margin-bottom: 0;
+    zoom: var(--preview-scale);
+  }
+}

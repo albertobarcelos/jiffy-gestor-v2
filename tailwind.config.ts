@@ -1,5 +1,6 @@
 import type { Config } from 'tailwindcss'
 import colors from 'tailwindcss/colors'
+import containerQueries from '@tailwindcss/container-queries'
 import formsPlugin from '@tailwindcss/forms'
 import { tailwindColors } from './src/shared/theme/colors'
 
@@ -153,6 +154,7 @@ const config: Config = {
     },
   },
   plugins: [
+    containerQueries,
     // strategy 'class': não altera inputs nativos globalmente; Tremor aplica classes onde precisa
     formsPlugin({
       strategy: 'class',

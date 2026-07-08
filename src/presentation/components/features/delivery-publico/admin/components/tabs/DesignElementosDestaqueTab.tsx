@@ -39,10 +39,10 @@ export function DesignElementosDestaqueTab({ config, onChange }: DesignElementos
   )
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       <section>
         <h3 className="text-base font-semibold text-primary">Cor de fundo</h3>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div className="mt-2 grid gap-3 sm:grid-cols-2">
           <button
             type="button"
             onClick={() =>
@@ -52,7 +52,7 @@ export function DesignElementosDestaqueTab({ config, onChange }: DesignElementos
               }))
             }
             className={cn(
-              'flex items-center gap-3 rounded-xl border-2 p-4 text-left',
+              'flex items-center gap-3 rounded-xl border-2 p-3 text-left',
               elementosDestaque.corFundoModo === 'principal'
                 ? 'border-secondary bg-secondary/5'
                 : 'border-gray-200'
@@ -74,7 +74,7 @@ export function DesignElementosDestaqueTab({ config, onChange }: DesignElementos
               }))
             }
             className={cn(
-              'flex items-center gap-3 rounded-xl border-2 p-4 text-left',
+              'flex items-center gap-3 rounded-xl border-2 p-3 text-left',
               elementosDestaque.corFundoModo === 'personalizada'
                 ? 'border-secondary bg-secondary/5'
                 : 'border-gray-200'
@@ -106,7 +106,7 @@ export function DesignElementosDestaqueTab({ config, onChange }: DesignElementos
           <h3 className="text-base font-semibold text-primary">Carrossel de imagens</h3>
           <DesignPremiumBadge label="Mais" />
         </div>
-        <div className="mt-4">
+        <div className="mt-2">
           <JiffyIconSwitch
             size="sm"
             label="Ativar carrossel"
@@ -120,8 +120,8 @@ export function DesignElementosDestaqueTab({ config, onChange }: DesignElementos
 
       <section>
         <h3 className="text-base font-semibold text-primary">Imagens para computadores</h3>
-        <p className="mt-1 text-xs text-secondary-text">Tamanho recomendado: 1920px × 900px</p>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <p className="mt-0.5 text-xs text-secondary-text">Tamanho recomendado: 1920px × 900px</p>
+        <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: DESKTOP_SLOTS }, (_, index) => (
             <DeliveryImageUploadField
               key={index}
@@ -166,7 +166,7 @@ export function DesignElementosDestaqueTab({ config, onChange }: DesignElementos
           Carregar outras imagens para celular
         </label>
         {elementosDestaque.usarImagensMobileDistintas ? (
-          <p className="mt-2 text-xs text-secondary-text">Tamanho recomendado: 820px × 1000px</p>
+          <p className="mt-1 text-xs text-secondary-text">Tamanho recomendado: 820px × 1000px</p>
         ) : null}
       </section>
     </div>
