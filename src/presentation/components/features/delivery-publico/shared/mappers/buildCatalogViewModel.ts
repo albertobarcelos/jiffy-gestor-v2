@@ -12,6 +12,7 @@ export function buildCatalogViewModel(
       produtos: grupo.produtos.map(produto => ({
         id: produto.id,
         nome: produto.nome,
+        descricao: produto.descricao,
         preco: produto.valor,
         imagemUrl: produto.imagemUrl,
         grupoId: grupo.id,

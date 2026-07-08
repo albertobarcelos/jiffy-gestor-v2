@@ -13,6 +13,12 @@ export const PREVIEW_DESIGN_CATEGORIES: PreviewDesignCategory[] = [
 ]
 
 export const PREVIEW_DESIGN_PRODUTOS = [
-  { id: 'suco', nome: 'Suco', preco: 10, grupoId: 'bebidas' },
+  {
+    id: 'suco',
+    nome: 'Suco',
+    descricao: 'Suco natural da fruta, gelado',
+    preco: 10,
+    grupoId: 'bebidas',
+  },
   { id: 'agua', nome: 'Água Mineral 500 cm³', preco: 10, grupoId: 'bebidas' },
 ]

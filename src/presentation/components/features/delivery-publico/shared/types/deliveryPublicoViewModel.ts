@@ -1,6 +1,7 @@
 export type DeliveryPublicoProdutoViewModel = {
   id: string
   nome: string
+  descricao: string | null
   preco: number
   imagemUrl: string | null
   grupoId: string

@@ -18,23 +18,18 @@ export function DeliverySecaoGrupo({
 
   return (
     <section className="mt-5 px-4" id={`grupo-${grupo.id}`}>
-      <h2
-        className="mb-2 text-base font-bold sm:text-lg"
-        style={{
-          color: 'var(--delivery-text)',
-          fontFamily: 'var(--delivery-font-title)',
-        }}
-      >
+      <h2 className="delivery-grupo-title -mx-4 mb-2 px-4 py-2 text-base font-bold sm:text-lg lg:text-xl xl:text-2xl">
         {grupo.nome}
       </h2>
-      <div className="space-y-2">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-4">
         {grupo.produtos.map(produto => (
-          <DeliveryProdutoListItem
-            key={produto.id}
-            produto={produto}
-            interactive={interactive}
-            onClick={onProdutoClick}
-          />
+          <div key={produto.id} className="min-w-0">
+            <DeliveryProdutoListItem
+              produto={produto}
+              interactive={interactive}
+              onClick={onProdutoClick}
+            />
+          </div>
         ))}
       </div>
     </section>

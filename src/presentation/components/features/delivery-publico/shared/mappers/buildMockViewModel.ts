@@ -13,6 +13,7 @@ export function buildMockDeliveryViewModel(
     produtos: PREVIEW_DESIGN_PRODUTOS.filter(p => p.grupoId === cat.id).map(p => ({
       id: p.id,
       nome: p.nome,
+      descricao: p.descricao ?? null,
       preco: p.preco,
       imagemUrl: null,
       grupoId: p.grupoId,

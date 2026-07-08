@@ -39,3 +39,9 @@
 .delivery-text-accent {
   color: var(--delivery-primary);
 }
+
+.delivery-grupo-title {
+  background-color: color-mix(in srgb, var(--delivery-primary) 40%, transparent);
+  color: var(--delivery-text);
+  font-family: var(--delivery-font-title);
+}
