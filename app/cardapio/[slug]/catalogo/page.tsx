@@ -1,10 +1,30 @@
 'use client'
 
-import { useParams } from 'next/navigation'
-import CardapioCatalogoScreen from '@/src/presentation/components/features/cardapio-digital/CardapioCatalogoScreen'
+import { useEffect } from 'react'
+import { useParams, useRouter } from 'next/navigation'
 
-export default function CardapioCatalogoPage() {
+/**
+ * Rota legada — redireciona para a home pública do slug.
+ */
+export default function CardapioCatalogoRedirectPage() {
   const params = useParams()
+  const router = useRouter()
   const slug = (params.slug as string)?.trim() ?? ''
-  return <CardapioCatalogoScreen slug={slug} />
+
+  useEffect(() => {
+    if (slug) {
+      router.replace(`/cardapio/${encodeURIComponent(slug)}`)
+      return
+    }
+    router.replace('/cardapio/instrucoes')
+  }, [slug, router])
+
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div
+        className="animate-spin rounded-full h-12 w-12 border-b-2"
+        style={{ borderColor: 'var(--cardapio-accent-primary)' }}
+      />
+    </div>
+  )
 }

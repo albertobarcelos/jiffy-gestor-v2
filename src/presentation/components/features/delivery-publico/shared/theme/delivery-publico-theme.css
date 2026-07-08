@@ -1,0 +1,41 @@
+/**
+ * Tokens derivados do design publicado (--delivery-* injetados via applyDesignConfig).
+ * Escopo `.delivery-theme` — modal, carrinho e telas públicas.
+ */
+.delivery-theme {
+  color: var(--delivery-text);
+  font-family: var(--delivery-font-body);
+  background-color: var(--delivery-bg, var(--delivery-surface));
+
+  --delivery-text-secondary: color-mix(in srgb, var(--delivery-text) 72%, transparent);
+  --delivery-text-muted: color-mix(in srgb, var(--delivery-text) 55%, transparent);
+  --delivery-border: color-mix(in srgb, var(--delivery-primary) 14%, transparent);
+  --delivery-surface-muted: color-mix(in srgb, var(--delivery-primary) 8%, var(--delivery-surface));
+  --delivery-card-border: color-mix(in srgb, var(--delivery-primary-dark) 14%, transparent);
+  --delivery-card-hover: color-mix(in srgb, var(--delivery-primary) 6%, var(--delivery-surface));
+  --delivery-overlay: rgba(0, 0, 0, 0.5);
+}
+
+.delivery-font-title {
+  font-family: var(--delivery-font-title);
+}
+
+.delivery-font-body {
+  font-family: var(--delivery-font-body);
+}
+
+.delivery-text-primary {
+  color: var(--delivery-text);
+}
+
+.delivery-text-secondary {
+  color: var(--delivery-text-secondary);
+}
+
+.delivery-text-muted {
+  color: var(--delivery-text-muted);
+}
+
+.delivery-text-accent {
+  color: var(--delivery-primary);
+}

@@ -3,6 +3,7 @@
 import { ReactNode } from 'react'
 import { useCardapioTheme } from '@/src/presentation/hooks/useCardapioTheme'
 import '@/src/presentation/styles/cardapio-themes.css'
+import '@/src/presentation/components/features/delivery-publico/shared/theme/delivery-publico-theme.css'
 
 /**
  * Layout isolado do cardápio digital

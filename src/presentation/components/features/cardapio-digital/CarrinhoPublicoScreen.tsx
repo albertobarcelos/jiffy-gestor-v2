@@ -304,7 +304,7 @@ export default function CarrinhoPublicoScreen({ slug }: CarrinhoPublicoScreenPro
       >
         <button
           type="button"
-          onClick={() => router.push(`/cardapio/${slug}/catalogo`)}
+          onClick={() => router.push(`/cardapio/${encodeURIComponent(slug)}`)}
           className="flex items-center gap-1 text-sm font-medium min-h-[44px] px-1"
           style={{ color: 'var(--cardapio-text-primary)' }}
         >
@@ -321,7 +321,7 @@ export default function CarrinhoPublicoScreen({ slug }: CarrinhoPublicoScreenPro
             <p style={{ color: 'var(--cardapio-text-tertiary)' }}>Carrinho vazio</p>
             <button
               type="button"
-              onClick={() => router.push(`/cardapio/${slug}/catalogo`)}
+              onClick={() => router.push(`/cardapio/${encodeURIComponent(slug)}`)}
               className="mt-4 px-6 py-2 rounded-lg font-medium"
               style={{
                 backgroundColor: 'var(--cardapio-btn-primary)',

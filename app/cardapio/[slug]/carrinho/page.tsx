@@ -1,10 +1,11 @@
 'use client'
 
 import { useParams } from 'next/navigation'
-import CarrinhoPublicoScreen from '@/src/presentation/components/features/cardapio-digital/CarrinhoPublicoScreen'
+import { DeliveryPublicoCarrinhoScreen } from '@/src/presentation/components/features/delivery-publico/public/screens/DeliveryPublicoCarrinhoScreen'
 
-export default function CardapioCarrinhoPage() {
+export default function DeliveryPublicoCarrinhoPage() {
   const params = useParams()
   const slug = (params.slug as string)?.trim() ?? ''
-  return <CarrinhoPublicoScreen slug={slug} />
+
+  return <DeliveryPublicoCarrinhoScreen slug={slug} />
 }
