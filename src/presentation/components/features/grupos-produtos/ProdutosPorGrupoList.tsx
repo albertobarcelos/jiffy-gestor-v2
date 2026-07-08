@@ -22,7 +22,7 @@ import { useInfiniteQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
-import { ProdutosTabsModal, ProdutosTabsModalState } from '../produtos/ProdutosTabsModal'
+import { ProdutosTabsModal, ProdutosTabsModalState, type ProdutosTabsModalTab } from '../produtos/ProdutosTabsModal'
 import { Produto } from '@/src/domain/entities/Produto'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { MdEdit } from 'react-icons/md'
@@ -230,7 +230,7 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
   }, [refetch])
 
   const handleTabsModalTabChange = useCallback(
-    (tab: 'produto' | 'complementos' | 'impressoras' | 'grupo') => {
+    (tab: ProdutosTabsModalTab) => {
       setTabsModalState((prev) => ({
         ...prev,
         tab,

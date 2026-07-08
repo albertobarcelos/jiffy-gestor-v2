@@ -19,6 +19,7 @@ import CarrosselProdutosDestaque from './CarrosselProdutosDestaque'
 import ThemeSelector from './ThemeSelector'
 import BannerPromocoesVertical from './BannerPromocoesVertical'
 import { CardapioHomeBanner } from './CardapioHomeBanner'
+import CardapioGrupoMenuButton from './CardapioGrupoMenuButton'
 import { isPublicDeliverySlugNotFound } from '@/src/infrastructure/api/publicDeliveryApi'
 
 interface CardapioCatalogoScreenProps {
@@ -179,7 +180,7 @@ export default function CardapioCatalogoScreen({ slug }: CardapioCatalogoScreenP
       <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Navegação de categorias — coluna estreita no mobile */}
         <nav
-          className="w-[5.5rem] sm:w-32 md:w-44 lg:w-64 border-r flex flex-col overflow-hidden flex-shrink-0"
+          className="w-[7rem] sm:w-32 md:w-44 lg:w-64 border-r flex flex-col overflow-hidden flex-shrink-0"
           style={{
             backgroundColor: 'var(--cardapio-menu-bg)',
             borderColor: 'var(--cardapio-border)',
@@ -188,57 +189,29 @@ export default function CardapioCatalogoScreen({ slug }: CardapioCatalogoScreenP
         >
           <div className="flex-1 overflow-y-auto scrollbar-hide p-1.5 sm:p-2 lg:p-4">
             <div className="space-y-1.5 sm:space-y-2">
-              <button
-                type="button"
+              <CardapioGrupoMenuButton
+                nome="DESTAQUES"
+                selected={mostrarDestaques}
+                solid
                 onClick={() => {
                   setMostrarDestaques(true)
                   setGrupoSelecionadoId(null)
                 }}
-                className="w-full text-center uppercase px-1 sm:px-3 py-2 sm:py-2.5 rounded-lg text-[10px] sm:text-xs font-semibold min-h-[44px]"
-                style={{
-                  backgroundColor: mostrarDestaques
-                    ? 'var(--cardapio-menu-item-active)'
-                    : 'var(--cardapio-menu-item)',
-                  color: mostrarDestaques
-                    ? 'var(--cardapio-menu-item-active-text)'
-                    : 'var(--cardapio-menu-item-text)',
-                }}
-              >
-                DESTAQUES
-              </button>
+              />
 
               {grupos.map(grupo => {
                 const isSelected = grupo.id === grupoSelecionadoId && !mostrarDestaques
                 return (
-                  <button
+                  <CardapioGrupoMenuButton
                     key={grupo.id}
-                    type="button"
+                    nome={grupo.nome}
+                    imagemUrl={grupo.imagemUrl}
+                    selected={isSelected}
                     onClick={() => {
                       setMostrarDestaques(false)
                       setGrupoSelecionadoId(grupo.id)
                     }}
-                    className={`w-full uppercase px-1 sm:px-3 py-1.5 sm:py-2 rounded-lg text-center min-h-[44px] ${isSelected ? 'font-semibold' : ''}`}
-                    style={{
-                      backgroundColor: isSelected
-                        ? 'var(--cardapio-menu-item-active)'
-                        : 'var(--cardapio-menu-item)',
-                      color: isSelected
-                        ? 'var(--cardapio-menu-item-active-text)'
-                        : 'var(--cardapio-menu-item-text)',
-                    }}
-                  >
-                    {grupo.imagemUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={grupo.imagemUrl}
-                        alt=""
-                        className="w-full h-10 sm:h-14 md:h-16 object-cover rounded-lg mb-0.5 sm:mb-1"
-                      />
-                    ) : null}
-                    <p className="text-[10px] sm:text-xs lg:text-sm line-clamp-2 leading-tight">
-                      {grupo.nome}
-                    </p>
-                  </button>
+                  />
                 )
               })}
 

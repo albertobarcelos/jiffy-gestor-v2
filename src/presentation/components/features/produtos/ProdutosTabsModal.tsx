@@ -10,11 +10,19 @@ import { Produto } from '@/src/domain/entities/Produto'
 import { NovoProduto, type NovoProdutoHandle } from './NovoProduto'
 import { ComplementosMultiSelectDialog } from './ComplementosMultiSelectDialog'
 import { ProdutoImpressorasDialog } from './ProdutoImpressorasDialog'
+import { ProdutoImagemPanel } from './ProdutoImagemPanel'
 import { NovoGrupo, type NovoGrupoHandle } from '../grupos-produtos/NovoGrupo'
 import { GRUPO_PRODUTOS_MODAL_FORM_ID } from '../grupos-produtos/grupoProdutosModalConstants'
 import { cn } from '@/src/shared/utils/cn'
 
-type TabKey = 'produto' | 'complementos' | 'impressoras' | 'grupo'
+export type ProdutosTabsModalTab =
+  | 'produto'
+  | 'complementos'
+  | 'impressoras'
+  | 'imagem'
+  | 'grupo'
+
+type TabKey = ProdutosTabsModalTab
 
 export interface ProdutosTabsModalState {
   open: boolean
@@ -156,6 +164,7 @@ export function ProdutosTabsModal({
   const [mountedProduto, setMountedProduto] = useState(false)
   const [mountedComplementos, setMountedComplementos] = useState(false)
   const [mountedImpressoras, setMountedImpressoras] = useState(false)
+  const [mountedImagem, setMountedImagem] = useState(false)
   const [mountedGrupo, setMountedGrupo] = useState(false)
 
   useEffect(() => {
@@ -163,12 +172,14 @@ export function ProdutosTabsModal({
       setMountedProduto(false)
       setMountedComplementos(false)
       setMountedImpressoras(false)
+      setMountedImagem(false)
       setMountedGrupo(false)
       return
     }
     if (state.tab === 'produto') setMountedProduto(true)
     if (state.tab === 'complementos' && produtoId) setMountedComplementos(true)
     if (state.tab === 'impressoras' && produtoId) setMountedImpressoras(true)
+    if (state.tab === 'imagem' && produtoId) setMountedImagem(true)
     if (state.tab === 'grupo' && state.grupoId) setMountedGrupo(true)
   }, [state.open, state.tab, produtoId, state.grupoId])
 
@@ -177,6 +188,8 @@ export function ProdutosTabsModal({
     state.open && !!produtoId && (mountedComplementos || state.tab === 'complementos')
   const showImpressorasPanel =
     state.open && !!produtoId && (mountedImpressoras || state.tab === 'impressoras')
+  const showImagemPanel =
+    state.open && !!produtoId && (mountedImagem || state.tab === 'imagem')
   const showGrupoPanel = state.open && !!state.grupoId && (mountedGrupo || state.tab === 'grupo')
 
   useEffect(() => {
@@ -214,6 +227,9 @@ export function ProdutosTabsModal({
     }
     if (state.tab === 'impressoras') {
       return 'Impressoras de'
+    }
+    if (state.tab === 'imagem') {
+      return 'Imagem de'
     }
     return state.grupoId ? 'Grupo Produtos de' : 'Grupo Produtos'
   }, [state])
@@ -312,7 +328,7 @@ export function ProdutosTabsModal({
 
   const footerActions = useMemo(() => {
     if (state.tab === 'produto') return footerProduto
-    if (state.tab === 'complementos' || state.tab === 'impressoras')
+    if (state.tab === 'complementos' || state.tab === 'impressoras' || state.tab === 'imagem')
       return footerComplementosOuImpressoras
     if (state.tab === 'grupo' && !state.grupoId) {
       return footerComplementosOuImpressoras
@@ -341,6 +357,7 @@ export function ProdutosTabsModal({
                 { key: 'grupo' as const, label: 'Grupo', disabled: !state.grupoId },
                 { key: 'complementos' as const, label: 'Complementos', disabled: !produtoId },
                 { key: 'impressoras' as const, label: 'Impressoras', disabled: !produtoId },
+                { key: 'imagem' as const, label: 'Imagem', disabled: !produtoId },
               ] as const
             ).map(tab => (
               <button
@@ -438,6 +455,27 @@ export function ProdutosTabsModal({
           ) : state.open && state.tab === 'impressoras' && !produtoId ? (
             <div className="flex h-full min-h-0 flex-1 items-center justify-center text-sm text-secondary-text">
               Selecione um produto para gerenciar impressoras.
+            </div>
+          ) : null}
+
+          {showImagemPanel ? (
+            <div
+              className={cn(
+                'flex min-h-0 flex-1 flex-col overflow-hidden',
+                state.tab !== 'imagem' && 'hidden'
+              )}
+              aria-hidden={state.tab !== 'imagem'}
+            >
+              <ProdutoImagemPanel
+                open={state.open}
+                produtoId={produtoId}
+                produtoNome={state.produto?.getNome()}
+                onReload={() => onReload?.(produtoId)}
+              />
+            </div>
+          ) : state.open && state.tab === 'imagem' && !produtoId ? (
+            <div className="flex h-full min-h-0 flex-1 items-center justify-center text-sm text-secondary-text">
+              Salve o produto para enviar a imagem.
             </div>
           ) : null}
 

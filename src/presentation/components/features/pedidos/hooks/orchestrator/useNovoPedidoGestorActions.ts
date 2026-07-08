@@ -23,7 +23,7 @@ import type { Auth } from '@/src/domain/entities/Auth'
 type AuthState = Auth | null
 import type { FluxoPagamentoEntrega, PagamentoSelecionado } from '../../types'
 import type { NovoPedidoFormState } from './useNovoPedidoFormState'
-import type { ProdutosTabsModalState } from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
+import type { ProdutosTabsModalState, ProdutosTabsModalTab } from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
 
 type CancelarVendaGestor = ReturnType<typeof useCancelarVendaGestor>
 type CancelarNotaPdv = ReturnType<typeof useCancelarNotaFiscalVendaPdv>
@@ -216,7 +216,7 @@ export function useNovoPedidoGestorActions({
   }, [setProdutoTabsModalState])
 
   const handleTabChangeProdutoModal = useCallback(
-    (tab: 'produto' | 'complementos' | 'impressoras' | 'grupo') => {
+    (tab: ProdutosTabsModalTab) => {
       setProdutoTabsModalState((prev: ProdutosTabsModalState) => ({ ...prev, tab }))
     },
     [setProdutoTabsModalState]

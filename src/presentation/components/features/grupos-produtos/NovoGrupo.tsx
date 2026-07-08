@@ -23,6 +23,13 @@ import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitc
 import { Input } from '@/src/presentation/components/ui/input'
 import { cn } from '@/src/shared/utils/cn'
 import { showToast } from '@/src/shared/utils/toast'
+import { DeliveryImageUploadField } from '@/src/presentation/components/ui/DeliveryImageUploadField'
+import {
+  mensagemLegivelDeliveryMediaError,
+  uploadGrupoProdutoImagem,
+  fetchGrupoProdutoImagemUrl,
+} from '@/src/infrastructure/api/deliveryMediaApi'
+import { validateDeliveryImageFile } from '@/src/shared/constants/deliveryImageUpload'
 
 /** Labels outlined em preto — igual NovoGrupoComplemento */
 const sxOutlinedLabelTextoEscuro = {
@@ -136,6 +143,9 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
   const [ativoLocal, setAtivoLocal] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(false)
+  const [isUploadingImagem, setIsUploadingImagem] = useState(false)
+  const [serverImagemUrl, setServerImagemUrl] = useState<string | null>(null)
+  const [imagemPreviewUrl, setImagemPreviewUrl] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState(initialTab)
   const [isIconPickerOpen, setIsIconPickerOpen] = useState(false)
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false)
@@ -198,6 +208,14 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
     [normalizeColor]
   )
 
+  const applyImagemUrl = useCallback((url: string | null) => {
+    setServerImagemUrl(url)
+    setImagemPreviewUrl(prev => {
+      if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+      return url
+    })
+  }, [])
+
   /** Snapshot só dos campos persistidos — aba interna não entra (PADRAO_MODAL_SAIR_SEM_SALVAR). */
   const getFormSnapshot = useCallback(() => {
     return JSON.stringify({
@@ -223,6 +241,14 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
   useEffect(() => {
     setActiveTab(initialTab)
   }, [initialTab])
+
+  useEffect(() => {
+    setServerImagemUrl(null)
+    setImagemPreviewUrl(prev => {
+      if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+      return null
+    })
+  }, [effectiveGrupoId])
 
   // Baseline inicial em modo criação (estado padrão aplicado)
   useEffect(() => {
@@ -273,6 +299,9 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
         setAtivoDelivery(grupo.isAtivoDelivery())
         setAtivoLocal(grupo.isAtivoLocal())
 
+        const deliveryImagemUrl = await fetchGrupoProdutoImagemUrl(effectiveGrupoId, token)
+        applyImagemUrl(deliveryImagemUrl ?? grupo.getImagemUrl() ?? null)
+
         hasLoadedGrupoRef.current = true
         loadedGrupoIdRef.current = effectiveGrupoId
 
@@ -288,7 +317,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
     }
 
     loadGrupo()
-  }, [isEditMode, effectiveGrupoId, auth, normalizeColor])
+  }, [isEditMode, effectiveGrupoId, auth, normalizeColor, applyImagemUrl])
 
   const handleSave = useCallback(
     async (opts?: { keepModalOpen?: boolean }) => {
@@ -411,6 +440,59 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
       router.push('/grupos-produtos')
     }
   }
+
+  const handleImagemUpload = useCallback(
+    async (file: File) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado')
+        return
+      }
+      if (!effectiveGrupoId) {
+        showToast.error('Salve o grupo antes de enviar uma imagem.')
+        return
+      }
+
+      const validationError = validateDeliveryImageFile(file)
+      if (validationError) {
+        showToast.error(validationError)
+        return
+      }
+
+      const preview = URL.createObjectURL(file)
+      setImagemPreviewUrl(prev => {
+        if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+        return preview
+      })
+
+      setIsUploadingImagem(true)
+      const toastId = showToast.loading('Enviando imagem...')
+
+      try {
+        await uploadGrupoProdutoImagem(effectiveGrupoId, file, token)
+        const persistedUrl = await fetchGrupoProdutoImagemUrl(effectiveGrupoId, token)
+        applyImagemUrl(persistedUrl ?? preview)
+        showToast.successLoading(toastId, 'Imagem enviada com sucesso!')
+        onReload?.()
+      } catch (error) {
+        setImagemPreviewUrl(prev => {
+          if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+          return serverImagemUrl
+        })
+        showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
+      } finally {
+        setIsUploadingImagem(false)
+      }
+    },
+    [auth, effectiveGrupoId, onReload, serverImagemUrl, applyImagemUrl]
+  )
+
+  const handleClearImagemPreview = useCallback(() => {
+    setImagemPreviewUrl(prev => {
+      if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+      return serverImagemUrl
+    })
+  }, [serverImagemUrl])
 
   const handleFormSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -651,6 +733,30 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                         </button>
                       </div>
                     </div>
+
+                    <DeliveryImageUploadField
+                      label="Imagem do grupo (cardápio digital)"
+                      disabled={!isEditMode}
+                      busy={isUploadingImagem}
+                      previewUrl={imagemPreviewUrl}
+                      helperText={
+                        isEditMode
+                          ? 'A imagem aparece no cardápio digital público após o upload.'
+                          : 'Salve o grupo para habilitar o envio de imagem.'
+                      }
+                      emptyHint={
+                        isEditMode
+                          ? 'Arraste uma imagem ou clique para selecionar'
+                          : 'Disponível após salvar o grupo'
+                      }
+                      onFileSelected={handleImagemUpload}
+                      onClearPreview={
+                        imagemPreviewUrl?.startsWith('blob:') &&
+                        imagemPreviewUrl !== serverImagemUrl
+                          ? handleClearImagemPreview
+                          : undefined
+                      }
+                    />
 
                     {/* Ativo Delivery e Local */}
                     <div className="grid grid-cols-2 gap-2">

@@ -31,7 +31,7 @@ import {
   GruposProdutosTabsModal,
   GruposProdutosTabsModalState,
 } from './GruposProdutosTabsModal'
-import { ProdutosTabsModal, ProdutosTabsModalState } from '../produtos/ProdutosTabsModal'
+import { ProdutosTabsModal, ProdutosTabsModalState, type ProdutosTabsModalTab } from '../produtos/ProdutosTabsModal'
 
 interface GruposProdutosListProps {
   onReload?: () => void
@@ -411,7 +411,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
   }, [router, searchParams, queryClient, pathname])
 
   const handleProdutoTabChange = useCallback(
-    (tab: 'produto' | 'complementos' | 'impressoras' | 'grupo') => {
+    (tab: ProdutosTabsModalTab) => {
       setProdutoTabsState((prev) => ({
         ...prev,
         tab,

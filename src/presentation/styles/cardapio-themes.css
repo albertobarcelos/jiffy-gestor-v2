@@ -13,6 +13,8 @@
   --cardapio-surface-muted: var(--cardapio-text-muted);
   --cardapio-elevated-text: var(--cardapio-text-primary);
   --cardapio-elevated-text-secondary: var(--cardapio-text-secondary);
+  --cardapio-menu-tile-label-bg: color-mix(in srgb, var(--cardapio-accent-primary) 72%, transparent);
+  --cardapio-menu-tile-label-text: #ffffff;
 }
 
 /* ============================================
