@@ -107,6 +107,7 @@ export class Produto {
     private readonly nome: string,
     private readonly valor: number,
     private readonly ativo: boolean,
+    private readonly descricao?: string,
     private readonly nomeGrupo?: string,
     private readonly grupoId?: string,
     private readonly estoque?: number | string,
@@ -117,6 +118,7 @@ export class Produto {
     private readonly permiteAlterarPreco?: boolean,
     private readonly incideTaxa?: boolean,
     private readonly ativoDelivery?: boolean,
+    private readonly ativoLocal?: boolean,
     private readonly ordem?: number,
     private readonly gruposComplementos?: ProdutoGrupoComplementoResumo[],
     private readonly impressoras?: ProdutoImpressoraResumo[],
@@ -134,6 +136,7 @@ export class Produto {
     nome: string,
     valor: number,
     ativo: boolean,
+    descricao?: string,
     nomeGrupo?: string,
     grupoId?: string,
     estoque?: number | string,
@@ -144,6 +147,7 @@ export class Produto {
     permiteAlterarPreco?: boolean,
     incideTaxa?: boolean,
     ativoDelivery?: boolean,
+    ativoLocal?: boolean,
     ordem?: number,
     gruposComplementos?: ProdutoGrupoComplementoResumo[],
     impressoras?: ProdutoImpressoraResumo[],
@@ -164,6 +168,7 @@ export class Produto {
       nome,
       valor,
       ativo,
+      descricao?.trim() || undefined,
       nomeGrupo,
       grupoId,
       estoque,
@@ -174,6 +179,7 @@ export class Produto {
       permiteAlterarPreco,
       incideTaxa,
       ativoDelivery,
+      ativoLocal,
       ordem,
       gruposComplementos,
       impressoras,
@@ -205,6 +211,7 @@ export class Produto {
       data.nome?.toString() || '',
       typeof data.valor === 'number' ? data.valor : parseFloat(data.valor) || 0,
       data.ativo === true || data.ativo === 'true',
+      data.descricao?.toString(),
       data.nomeGrupo?.toString(),
       data.grupoId?.toString(),
       data.estoque,
@@ -215,6 +222,7 @@ export class Produto {
       data.permiteAlterarPreco === true || data.permiteAlterarPreco === 'true',
       data.incideTaxa === true || data.incideTaxa === 'true',
       data.ativoDelivery === false ? false : true,
+      data.ativoLocal === true || data.ativoLocal === 'true',
       (() => {
         if (typeof data.ordem === 'number' && Number.isFinite(data.ordem)) return data.ordem
         if (typeof data.ordem === 'string' && data.ordem.trim() !== '') {
@@ -267,6 +275,10 @@ export class Produto {
     return this.ativo
   }
 
+  getDescricao(): string | undefined {
+    return this.descricao
+  }
+
   getNomeGrupo(): string | undefined {
     return this.nomeGrupo
   }
@@ -305,6 +317,10 @@ export class Produto {
 
   isAtivoDelivery(): boolean {
     return this.ativoDelivery !== false
+  }
+
+  isAtivoLocal(): boolean {
+    return this.ativoLocal === true
   }
 
   getOrdem(): number | undefined {
@@ -355,6 +371,7 @@ export class Produto {
       nome: this.nome,
       valor: this.valor,
       ativo: this.ativo,
+      descricao: this.descricao,
       nomeGrupo: this.nomeGrupo,
       grupoId: this.grupoId,
       estoque: this.estoque,
@@ -365,6 +382,7 @@ export class Produto {
       permiteAlterarPreco: this.permiteAlterarPreco,
       incideTaxa: this.incideTaxa,
       ativoDelivery: this.isAtivoDelivery(),
+      ativoLocal: this.isAtivoLocal(),
       ordem: this.ordem,
       gruposComplementos: this.gruposComplementos,
       impressoras: this.impressoras,

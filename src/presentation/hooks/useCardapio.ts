@@ -94,7 +94,7 @@ export function useCardapioProdutosPorGrupo(grupoId: string) {
       const produtos = items.map((item: any) => Produto.fromJSON(item))
 
       // Filtrar apenas produtos ativos para local
-      const produtosAtivos = produtos.filter((p: Produto) => p.isAtivoLocal?.() ?? false)
+      const produtosAtivos = produtos.filter((p: Produto) => p.isAtivoLocal())
 
       // Ordenar por nome
       produtosAtivos.sort((a: Produto, b: Produto) => a.getNome().localeCompare(b.getNome()))
