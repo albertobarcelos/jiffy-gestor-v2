@@ -60,31 +60,51 @@ async function fetchCatalogoPagina(
   return response.data?.catalogo ?? null
 }
 
-export async function resolveGrupoProdutoImagemUrlFromDeliveryCatalog(
+export async function resolveGruposProdutoImagemUrlsFromDeliveryCatalog(
   apiClient: ApiClient,
   token: string,
-  grupoProdutoId: string
-): Promise<string | null> {
+  grupoProdutoIds: string[]
+): Promise<Record<string, string | null>> {
+  const uniqueIds = [...new Set(grupoProdutoIds.map(id => id.trim()).filter(Boolean))]
+  const result: Record<string, string | null> = Object.fromEntries(
+    uniqueIds.map(id => [id, null])
+  )
+
+  if (uniqueIds.length === 0) return result
+
+  const pending = new Set(uniqueIds)
   const slug = await resolveEmpresaDeliverySlug(apiClient, token)
-  if (!slug) return null
+  if (!slug) return result
 
   const limit = DELIVERY_CATALOGO_PAGE_LIMIT
   let offset = 0
 
-  for (let page = 0; page < 50; page += 1) {
+  for (let page = 0; page < 50 && pending.size > 0; page += 1) {
     const catalogo = await fetchCatalogoPagina(apiClient, slug, offset, limit)
-    if (!catalogo) return null
+    if (!catalogo) break
 
-    const grupo = catalogo.gruposProdutos?.find(item => item.id === grupoProdutoId)
-    if (grupo) {
-      return grupo.imagemUrl ?? null
+    for (const grupo of catalogo.gruposProdutos ?? []) {
+      if (!pending.has(grupo.id)) continue
+      result[grupo.id] = grupo.imagemUrl ?? null
+      pending.delete(grupo.id)
     }
 
     if (!catalogo.paginacao?.hasNext) break
     offset += limit
   }
 
-  return null
+  return result
+}
+
+export async function resolveGrupoProdutoImagemUrlFromDeliveryCatalog(
+  apiClient: ApiClient,
+  token: string,
+  grupoProdutoId: string
+): Promise<string | null> {
+  const map = await resolveGruposProdutoImagemUrlsFromDeliveryCatalog(apiClient, token, [
+    grupoProdutoId,
+  ])
+  return map[grupoProdutoId.trim()] ?? null
 }
 
 export async function resolveGrupoComplementoImagemUrlFromDeliveryCatalog(

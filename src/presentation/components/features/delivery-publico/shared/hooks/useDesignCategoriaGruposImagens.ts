@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { fetchGrupoProdutoImagemUrl } from '@/src/infrastructure/api/deliveryMediaApi'
+import { fetchGruposProdutoImagemUrlsBatch } from '@/src/infrastructure/api/deliveryMediaApi'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import type { DesignCategoriaGrupo } from '../types/designCategoriaGrupo'
 
@@ -47,16 +47,17 @@ export function useDesignCategoriaGruposImagens({
 
       try {
         const currentGrupos = gruposRef.current
-        const enriched = await Promise.all(
-          currentGrupos.map(async grupo => {
-            const deliveryUrl = await fetchGrupoProdutoImagemUrl(grupo.id, token)
-            const resolvedUrl = deliveryUrl?.trim() || grupo.imagemUrl?.trim() || null
-            return {
-              ...grupo,
-              imagemUrl: resolvedUrl,
-            }
-          })
-        )
+        const ids = currentGrupos.map(grupo => grupo.id)
+        const imagensPorGrupoId = await fetchGruposProdutoImagemUrlsBatch(ids, token)
+
+        const enriched = currentGrupos.map(grupo => {
+          const resolvedUrl =
+            imagensPorGrupoId[grupo.id]?.trim() || grupo.imagemUrl?.trim() || null
+          return {
+            ...grupo,
+            imagemUrl: resolvedUrl,
+          }
+        })
 
         if (!cancelled) {
           onResolvedRef.current(enriched)

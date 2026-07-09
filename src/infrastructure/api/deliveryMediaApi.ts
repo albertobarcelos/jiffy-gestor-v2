@@ -216,20 +216,56 @@ export async function fetchGrupoProdutoImagemUrl(
   grupoProdutoId: string,
   token: string
 ): Promise<string | null> {
-  const response = await fetch(
-    `/api/delivery/grupos-produto/${encodeURIComponent(grupoProdutoId)}/imagem-url`,
-    {
-      method: 'GET',
+  const map = await fetchGruposProdutoImagemUrlsBatch([grupoProdutoId], token)
+  return map[grupoProdutoId.trim()] ?? null
+}
+
+let batchInFlight: Promise<Record<string, string | null>> | null = null
+let batchInFlightKey = ''
+
+export async function fetchGruposProdutoImagemUrlsBatch(
+  grupoProdutoIds: string[],
+  token: string
+): Promise<Record<string, string | null>> {
+  const ids = [...new Set(grupoProdutoIds.map(id => id.trim()).filter(Boolean))]
+  if (ids.length === 0) return {}
+
+  const cacheKey = ids.slice().sort().join('|')
+  if (batchInFlight && batchInFlightKey === cacheKey) {
+    return batchInFlight
+  }
+
+  batchInFlightKey = cacheKey
+  batchInFlight = (async () => {
+    const response = await fetch('/api/delivery/grupos-produto/imagem-urls', {
+      method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/json',
+        'Content-Type': 'application/json',
       },
-    }
-  )
+      body: JSON.stringify({ ids }),
+    })
 
-  if (!response.ok) return null
-  const data = (await response.json().catch(() => ({}))) as { imagemUrl?: string | null }
-  return typeof data.imagemUrl === 'string' && data.imagemUrl.trim() ? data.imagemUrl : null
+    if (!response.ok) return Object.fromEntries(ids.map(id => [id, null]))
+
+    const data = (await response.json().catch(() => ({}))) as {
+      imagensPorGrupoId?: Record<string, string | null>
+    }
+
+    const resolved = data.imagensPorGrupoId ?? {}
+    return Object.fromEntries(
+      ids.map(id => {
+        const url = resolved[id]
+        return [id, typeof url === 'string' && url.trim() ? url.trim() : null] as const
+      })
+    )
+  })().finally(() => {
+    batchInFlight = null
+    batchInFlightKey = ''
+  })
+
+  return batchInFlight
 }
 
 export async function fetchGrupoComplementoImagemUrl(
