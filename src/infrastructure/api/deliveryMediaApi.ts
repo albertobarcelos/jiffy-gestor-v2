@@ -98,6 +98,19 @@ export async function createProdutoUploadIntent(
   )
 }
 
+export async function createComplementoUploadIntent(
+  complementoId: string,
+  file: File,
+  token: string
+): Promise<CreateImageUploadIntentResponseDTO> {
+  return createUploadIntent(
+    `/api/delivery/complementos/${encodeURIComponent(complementoId)}/upload-intent`,
+    file,
+    token,
+    await resolveMimeOrThrow(file)
+  )
+}
+
 async function createUploadIntent(
   intentUrl: string,
   file: File,
@@ -193,6 +206,18 @@ export async function uploadProdutoImagem(
 ): Promise<ConfirmImageUploadIntentResponseDTO> {
   return uploadDeliveryImage(
     `/api/delivery/produtos/${encodeURIComponent(produtoId)}/upload-intent`,
+    file,
+    token
+  )
+}
+
+export async function uploadComplementoImagem(
+  complementoId: string,
+  file: File,
+  token: string
+): Promise<ConfirmImageUploadIntentResponseDTO> {
+  return uploadDeliveryImage(
+    `/api/delivery/complementos/${encodeURIComponent(complementoId)}/upload-intent`,
     file,
     token
   )
@@ -294,6 +319,26 @@ export async function fetchProdutoImagemUrl(
 ): Promise<string | null> {
   const response = await fetch(
     `/api/delivery/produtos/${encodeURIComponent(produtoId)}/imagem-url`,
+    {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      },
+    }
+  )
+
+  if (!response.ok) return null
+  const data = (await response.json().catch(() => ({}))) as { imagemUrl?: string | null }
+  return typeof data.imagemUrl === 'string' && data.imagemUrl.trim() ? data.imagemUrl : null
+}
+
+export async function fetchComplementoImagemUrl(
+  complementoId: string,
+  token: string
+): Promise<string | null> {
+  const response = await fetch(
+    `/api/delivery/complementos/${encodeURIComponent(complementoId)}/imagem-url`,
     {
       method: 'GET',
       headers: {

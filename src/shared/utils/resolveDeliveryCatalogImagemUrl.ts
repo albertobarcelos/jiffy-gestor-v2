@@ -11,6 +11,7 @@ type CatalogoPaginaResponse = {
       produtos?: Array<{ id: string; imagemUrl: string | null }> | null
     }> | null
     gruposComplementos?: Array<{ id: string; imagemUrl: string | null }> | null
+    complementos?: Array<{ id: string; imagemUrl: string | null }> | null
     paginacao?: {
       hasNext?: boolean
     }
@@ -140,6 +141,33 @@ export async function resolveProdutoImagemUrlFromDeliveryCatalog(
       if (produto) {
         return produto.imagemUrl ?? null
       }
+    }
+
+    if (!catalogo.paginacao?.hasNext) break
+    offset += limit
+  }
+
+  return null
+}
+
+export async function resolveComplementoImagemUrlFromDeliveryCatalog(
+  apiClient: ApiClient,
+  token: string,
+  complementoId: string
+): Promise<string | null> {
+  const slug = await resolveEmpresaDeliverySlug(apiClient, token)
+  if (!slug) return null
+
+  const limit = DELIVERY_CATALOGO_PAGE_LIMIT
+  let offset = 0
+
+  for (let page = 0; page < 50; page += 1) {
+    const catalogo = await fetchCatalogoPagina(apiClient, slug, offset, limit)
+    if (!catalogo) return null
+
+    const complemento = catalogo.complementos?.find(item => item.id === complementoId)
+    if (complemento) {
+      return complemento.imagemUrl ?? null
     }
 
     if (!catalogo.paginacao?.hasNext) break

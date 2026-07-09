@@ -16,7 +16,14 @@ import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { DeliveryImageUploadField } from '@/src/presentation/components/ui/DeliveryImageUploadField'
 import { showToast } from '@/src/shared/utils/toast'
+import { validateDeliveryImageFile } from '@/src/shared/constants/deliveryImageUpload'
+import {
+  fetchComplementoImagemUrl,
+  mensagemLegivelDeliveryMediaError,
+  uploadComplementoImagem,
+} from '@/src/infrastructure/api/deliveryMediaApi'
 
 /** Labels outlined em preto (MUI usa cinza por padrão) */
 const sxOutlinedLabelTextoEscuro = {
@@ -120,7 +127,26 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
   // Estados de loading
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingComplemento, setIsLoadingComplemento] = useState(false)
+  const [isUploadingImagem, setIsUploadingImagem] = useState(false)
+  const [serverImagemUrl, setServerImagemUrl] = useState<string | null>(null)
+  const [imagemPreviewUrl, setImagemPreviewUrl] = useState<string | null>(null)
   const baselineSerializedRef = useRef<string>('')
+
+  const applyImagemUrl = useCallback((url: string | null) => {
+    setServerImagemUrl(url)
+    setImagemPreviewUrl(prev => {
+      if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+      return url
+    })
+  }, [])
+
+  useEffect(() => {
+    setServerImagemUrl(null)
+    setImagemPreviewUrl(prev => {
+      if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+      return null
+    })
+  }, [complementoId])
 
   const emitEmbedFormState = useCallback(() => {
     onEmbedFormStateChange?.({
@@ -226,6 +252,9 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
           setTipoImpactoPreco(tipoNormalizado)
           setAtivo(complemento.isAtivo())
 
+          const deliveryImagemUrl = await fetchComplementoImagemUrl(complementoId, accessToken)
+          applyImagemUrl(deliveryImagemUrl)
+
           window.setTimeout(() => {
             commitBaselineLatestRef.current()
           }, 100)
@@ -246,7 +275,59 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
     return () => {
       cancelled = true
     }
-  }, [isEditing, complementoId, accessToken])
+  }, [isEditing, complementoId, accessToken, applyImagemUrl])
+
+  const handleImagemUpload = useCallback(
+    async (file: File) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado')
+        return
+      }
+      if (!complementoId) {
+        showToast.error('Salve o complemento antes de enviar uma imagem.')
+        return
+      }
+
+      const validationError = await validateDeliveryImageFile(file)
+      if (validationError) {
+        showToast.error(validationError)
+        return
+      }
+
+      const preview = URL.createObjectURL(file)
+      setImagemPreviewUrl(prev => {
+        if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+        return preview
+      })
+
+      setIsUploadingImagem(true)
+      const toastId = showToast.loading('Enviando imagem...')
+
+      try {
+        await uploadComplementoImagem(complementoId, file, token)
+        const persistedUrl = await fetchComplementoImagemUrl(complementoId, token)
+        applyImagemUrl(persistedUrl ?? preview)
+        showToast.successLoading(toastId, 'Imagem enviada com sucesso!')
+      } catch (error) {
+        setImagemPreviewUrl(prev => {
+          if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+          return serverImagemUrl
+        })
+        showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
+      } finally {
+        setIsUploadingImagem(false)
+      }
+    },
+    [auth, complementoId, serverImagemUrl, applyImagemUrl]
+  )
+
+  const handleClearImagemPreview = useCallback(() => {
+    setImagemPreviewUrl(prev => {
+      if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+      return serverImagemUrl
+    })
+  }, [serverImagemUrl])
 
   const persistComplemento = useCallback(async () => {
     const token = auth?.getAccessToken()
@@ -496,6 +577,30 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
                   </FormControl>
                 </div>
               </div>
+
+              <DeliveryImageUploadField
+                label="Imagem do complemento (cardápio digital)"
+                disabled={!isEditing}
+                busy={isUploadingImagem}
+                previewUrl={imagemPreviewUrl}
+                helperText={
+                  isEditing
+                    ? 'A imagem aparece no cardápio digital público após o upload.'
+                    : 'Salve o complemento para habilitar o envio de imagem.'
+                }
+                emptyHint={
+                  isEditing
+                    ? 'Arraste uma imagem ou clique para selecionar'
+                    : 'Disponível após salvar o complemento'
+                }
+                onFileSelected={handleImagemUpload}
+                onClearPreview={
+                  imagemPreviewUrl?.startsWith('blob:') &&
+                  imagemPreviewUrl !== serverImagemUrl
+                    ? handleClearImagemPreview
+                    : undefined
+                }
+              />
             </div>
           </div>
 
