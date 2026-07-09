@@ -19,7 +19,7 @@ export function createDefaultDesignConfig(nomeExibicao = ''): DeliveryPublicoDes
     },
     categorias: {
       mostrar: true,
-      usarImagensGrupo: false,
+      usarImagensGrupo: true,
       estiloIcone: 'linha',
       iconesPorGrupoId: {},
     },
