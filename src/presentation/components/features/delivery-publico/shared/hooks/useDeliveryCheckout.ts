@@ -80,7 +80,6 @@ export function useDeliveryCheckout(slug: string) {
       showToast.error(resultado.error)
       return
     }
-    if (!confirm('Confirmar envio do pedido?')) return
 
     setEnviando(true)
     try {

@@ -1,6 +1,7 @@
 'use client'
 
 import type { MeioPagamentoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import { formatarTelefoneBr } from '@/src/shared/utils/telefoneBr'
 import type { CheckoutFormData } from '../../shared/utils/montarPedidoPublico'
 import { DeliveryInput, DeliverySelect } from '../../shared/components/DeliveryInput'
 import { DeliveryTipoEntregaToggle } from '../../shared/components/DeliveryTipoEntregaToggle'
@@ -36,9 +37,10 @@ export function DeliveryCheckoutForm({
         variant="checkout"
         placeholder="Telefone *"
         value={form.telefone}
-        onChange={e => onChange('telefone', e.target.value)}
+        onChange={e => onChange('telefone', formatarTelefoneBr(e.target.value))}
         inputMode="tel"
         autoComplete="tel"
+        maxLength={15}
       />
       <DeliveryInput
         variant="checkout"
@@ -97,7 +99,7 @@ export function DeliveryCheckoutForm({
             <option value="">Selecionar na entrega</option>
             {meiosPagamento.map(m => (
               <option key={m.id} value={m.id}>
-                {m.nome} — {m.formaPagamentoFiscalLabel}
+                {m.nome}
               </option>
             ))}
           </DeliverySelect>

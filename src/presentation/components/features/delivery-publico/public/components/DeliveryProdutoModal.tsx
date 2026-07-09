@@ -1,13 +1,13 @@
 'use client'
 
 import { useState } from 'react'
+import { Camera } from 'lucide-react'
 import { MdClose } from 'react-icons/md'
 import type { CatalogoPublicoProdutoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { normalizeTipoImpactoPreco } from '@/src/application/mappers/VendaApiNormalizer'
 import { formatarValorComplemento } from '@/src/domain/services/pedido/CalculadoraPedido'
 import { showToast } from '@/src/shared/utils/toast'
 import { DeliveryButton } from '../../shared/components/DeliveryButton'
-import { DeliveryCard } from '../../shared/components/DeliveryCard'
 import { DeliveryTextarea } from '../../shared/components/DeliveryInput'
 import { DeliveryQuantidadeStepper } from '../../shared/components/DeliveryQuantidadeStepper'
 import { useProdutoComplementos } from '../../shared/hooks/useProdutoComplementos'
@@ -19,6 +19,29 @@ type DeliveryProdutoModalProps = {
   produto: CatalogoPublicoProdutoDTO
   onClose: () => void
   onAdicionado?: () => void
+}
+
+function ComplementoThumb({ imagemUrl, nome }: { imagemUrl: string | null; nome: string }) {
+  return (
+    <div
+      className="relative h-8 w-8 shrink-0 overflow-hidden rounded-md"
+      style={{ backgroundColor: 'var(--delivery-surface-muted)' }}
+    >
+      {imagemUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={imagemUrl} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center">
+          <Camera
+            className="h-3.5 w-3.5"
+            style={{ color: 'var(--delivery-text-muted)' }}
+            aria-hidden
+          />
+        </div>
+      )}
+      <span className="sr-only">{nome}</span>
+    </div>
+  )
 }
 
 export function DeliveryProdutoModal({
@@ -107,22 +130,18 @@ export function DeliveryProdutoModal({
         ) : null}
 
         {grupos.length > 0 ? (
-          <DeliveryCard className="mb-4">
+          <div className="mb-4">
             <p className="delivery-font-title mb-3 font-semibold delivery-text-primary">
               Complementos
             </p>
-            <div className="space-y-3">
+            <div className="space-y-4">
               {grupos.map(grupo => (
-                <div
-                  key={grupo.id}
-                  className="rounded-md border px-2 py-1.5"
-                  style={{ borderColor: 'var(--delivery-card-border)' }}
-                >
+                <div key={grupo.id}>
                   <p className="delivery-font-title mb-1.5 text-sm font-semibold uppercase tracking-wide delivery-text-primary">
                     {grupo.nome}
                     {grupo.obrigatorio ? <span className="ml-1 text-red-500">*</span> : null}
                   </p>
-                  <div className="space-y-1">
+                  <div>
                     {grupo.complementos.map(comp => {
                       const qtdComp = getQuantidadeComplemento(grupo.id, comp.id)
                       const tipoIp = normalizeTipoImpactoPreco(comp.tipoImpactoPreco)
@@ -130,15 +149,17 @@ export function DeliveryProdutoModal({
                       return (
                         <div
                           key={comp.id}
-                          className="flex items-center justify-between gap-2 rounded px-2 py-1.5"
-                          style={{ backgroundColor: 'var(--delivery-card-hover)' }}
+                          className="flex items-center justify-between gap-2 py-1.5"
                         >
-                          <span
-                            className="min-w-0 flex-1 truncate text-sm font-medium delivery-text-primary"
-                            title={comp.nome}
-                          >
-                            {comp.nome}
-                          </span>
+                          <div className="flex min-w-0 flex-1 items-center gap-2">
+                            <ComplementoThumb imagemUrl={comp.imagemUrl} nome={comp.nome} />
+                            <span
+                              className="min-w-0 flex-1 truncate text-sm font-medium delivery-text-primary"
+                              title={comp.nome}
+                            >
+                              {comp.nome}
+                            </span>
+                          </div>
                           <span className="shrink-0 text-sm font-semibold tabular-nums delivery-text-accent">
                             {formatarValorComplemento(comp.valor, tipoIp)}
                           </span>
@@ -165,7 +186,7 @@ export function DeliveryProdutoModal({
                 {formatDeliveryCurrency(valorComplementosUnitario)}
               </span>
             </p>
-          </DeliveryCard>
+          </div>
         ) : null}
 
         {precisaComplementos && carregandoComplementos && !cacheComplementos ? (
