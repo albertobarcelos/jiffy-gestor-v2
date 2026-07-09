@@ -1,8 +1,10 @@
 'use client'
 
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
+import { resolveMdiIconNameForStyle } from '@/src/shared/utils/mdiIcons'
 import { cn } from '@/src/shared/utils/cn'
 import type { DeliveryPublicoDesignConfig } from '../types/deliveryPublicoDesignConfig'
+import { getColorPaletteById } from '../constants/colorPalettes'
 
 type GrupoCategoriaVisualSource = {
   id: string
@@ -13,22 +15,18 @@ type GrupoCategoriaVisualSource = {
 type DeliveryGrupoCategoriaVisualProps = {
   config: DeliveryPublicoDesignConfig
   grupo: GrupoCategoriaVisualSource
-  /** Cor do ícone quando exibido sobre fundo primary (lista lateral do designer). */
-  iconColor?: string
-  /** Cor de fundo do círculo quando exibe ícone. */
-  iconBackgroundColor?: string
   size?: 'sm' | 'md' | 'lg'
   className?: string
 }
 
 const SIZE_CLASSES = {
-  sm: 'h-5 w-5',
+  sm: 'h-8 w-8',
   md: 'h-12 w-12',
   lg: 'h-14 w-14 @sm:h-11 @sm:w-11 @lg:h-16 @lg:w-16 @xl:h-[4.5rem] @xl:w-[4.5rem]',
 } as const
 
 const ICON_SIZES = {
-  sm: 20,
+  sm: 18,
   md: 24,
   lg: 26,
 } as const
@@ -50,21 +48,45 @@ function shouldUseGrupoImagem(
   return config.categorias.usarImagensGrupo && Boolean(grupo.imagemUrl?.trim())
 }
 
+function resolveIconPresentation(config: DeliveryPublicoDesignConfig): {
+  backgroundColor: string
+  border: string | undefined
+  iconColor: string
+} {
+  const primaryColor = getColorPaletteById(config.cores.paletaId).colors.primary
+
+  if (config.categorias.estiloIcone === 'linha') {
+    return {
+      backgroundColor: 'transparent',
+      border: `2px solid ${primaryColor}`,
+      iconColor: primaryColor,
+    }
+  }
+
+  return {
+    backgroundColor: primaryColor,
+    border: undefined,
+    iconColor: '#FFFFFF',
+  }
+}
+
 export function DeliveryGrupoCategoriaVisual({
   config,
   grupo,
-  iconColor = '#FFFFFF',
-  iconBackgroundColor = 'var(--delivery-primary)',
   size = 'md',
   className,
 }: DeliveryGrupoCategoriaVisualProps) {
   const sizeClass = SIZE_CLASSES[size]
   const iconName = resolveIconName(config, grupo)
+  const displayIconName = resolveMdiIconNameForStyle(iconName, config.categorias.estiloIcone)
+  const { backgroundColor, border, iconColor } = resolveIconPresentation(config)
+  const primaryColor = getColorPaletteById(config.cores.paletaId).colors.primary
 
   if (shouldUseGrupoImagem(config, grupo)) {
     return (
       <div
-        className={cn('shrink-0 overflow-hidden rounded-full', sizeClass, className)}
+        className={cn('box-border shrink-0 overflow-hidden rounded-full', sizeClass, className)}
+        style={{ border: `1px solid ${primaryColor}` }}
       >
         <img
           src={grupo.imagemUrl!}
@@ -78,13 +100,13 @@ export function DeliveryGrupoCategoriaVisual({
   return (
     <div
       className={cn(
-        'flex shrink-0 items-center justify-center rounded-full',
+        'box-border flex shrink-0 items-center justify-center rounded-full',
         sizeClass,
         className
       )}
-      style={{ backgroundColor: iconBackgroundColor }}
+      style={{ backgroundColor, border }}
     >
-      <DinamicIcon iconName={iconName} color={iconColor} size={ICON_SIZES[size]} />
+      <DinamicIcon iconName={displayIconName} color={iconColor} size={ICON_SIZES[size]} />
     </div>
   )
 }

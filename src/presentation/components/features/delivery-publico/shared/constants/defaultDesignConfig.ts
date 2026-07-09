@@ -23,13 +23,5 @@ export function createDefaultDesignConfig(nomeExibicao = ''): DeliveryPublicoDes
       estiloIcone: 'linha',
       iconesPorGrupoId: {},
     },
-    elementosDestaque: {
-      corFundoModo: 'principal',
-      corFundoPersonalizada: '#171A1C',
-      carrosselAtivo: false,
-      imagensDesktop: [],
-      imagensMobile: [],
-      usarImagensMobileDistintas: false,
-    },
   }
 }

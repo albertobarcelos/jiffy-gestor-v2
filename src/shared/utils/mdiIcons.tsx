@@ -125,6 +125,16 @@ export const mdiIconMap: Record<string, string> = {
   shoppingMusic: mdiIcons.mdiShoppingMusic,
 }
 
+/** Prefer variante Outline quando o estilo da categoria é "linha". */
+export function resolveMdiIconNameForStyle(
+  iconName: string,
+  estilo: 'linha' | 'preenchimento'
+): string {
+  if (estilo !== 'linha' || iconName.endsWith('Outline')) return iconName
+  const outlineName = `${iconName}Outline`
+  return mdiIconMap[outlineName] ? outlineName : iconName
+}
+
 export const getMdiReactIcon = (iconName: string, size: number = 1, color: string = 'currentColor') => {
   const path = mdiIconMap[iconName]
   if (!path) {

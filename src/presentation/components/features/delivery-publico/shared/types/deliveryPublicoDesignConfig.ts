@@ -18,15 +18,12 @@ export type TypographyPresetId = 'urbana' | 'moderna' | 'classica' | 'elegante'
 
 export type CategoryIconStyle = 'linha' | 'preenchimento'
 
-export type ElementosDestaqueCorFundoModo = 'principal' | 'personalizada'
-
 export type DesignTabId =
   | 'cabecalho'
   | 'modelos'
   | 'cores'
   | 'tipografias'
   | 'categorias'
-  | 'elementos-destaque'
 
 export type DeliveryPublicoDesignConfig = {
   layoutId: DeliveryLayoutId
@@ -48,14 +45,6 @@ export type DeliveryPublicoDesignConfig = {
     usarImagensGrupo: boolean
     estiloIcone: CategoryIconStyle
     iconesPorGrupoId: Record<string, string>
-  }
-  elementosDestaque: {
-    corFundoModo: ElementosDestaqueCorFundoModo
-    corFundoPersonalizada: string
-    carrosselAtivo: boolean
-    imagensDesktop: string[]
-    imagensMobile: string[]
-    usarImagensMobileDistintas: boolean
   }
 }
 

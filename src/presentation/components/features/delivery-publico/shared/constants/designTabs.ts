@@ -11,5 +11,4 @@ export const DESIGN_TABS: DesignTabDefinition[] = [
   { id: 'cores', label: 'Cores' },
   { id: 'tipografias', label: 'Tipografias' },
   { id: 'categorias', label: 'Categorias' },
-  { id: 'elementos-destaque', label: 'Elementos em destaque' },
 ]

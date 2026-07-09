@@ -23,7 +23,6 @@ import { DesignModelosTab } from '../components/tabs/DesignModelosTab'
 import { DesignCoresTab } from '../components/tabs/DesignCoresTab'
 import { DesignTipografiasTab } from '../components/tabs/DesignTipografiasTab'
 import { DesignCategoriasTab } from '../components/tabs/DesignCategoriasTab'
-import { DesignElementosDestaqueTab } from '../components/tabs/DesignElementosDestaqueTab'
 
 export function DeliveryDesignCustomizerScreen() {
   const { empresa, isLoading: empresaLoading } = useEmpresaMe()
@@ -135,9 +134,6 @@ export function DeliveryDesignCustomizerScreen() {
               onChange={updateDraft}
               onGruposChange={setPreviewCategoriasGrupos}
             />
-          )}
-          {activeTab === 'elementos-destaque' && (
-            <DesignElementosDestaqueTab config={draft} onChange={updateDraft} />
           )}
         </div>
 

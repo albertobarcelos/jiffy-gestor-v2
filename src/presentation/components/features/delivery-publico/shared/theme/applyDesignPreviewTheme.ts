@@ -7,11 +7,6 @@ export function applyDesignConfig(config: DeliveryPublicoDesignConfig): CSSPrope
   const palette = getColorPaletteById(config.cores.paletaId)
   const typography = getTypographyPresetById(config.tipografia.presetId)
 
-  const heroBackground =
-    config.elementosDestaque.corFundoModo === 'personalizada'
-      ? config.elementosDestaque.corFundoPersonalizada
-      : palette.colors.primary
-
   return {
     ['--delivery-primary' as string]: palette.colors.primary,
     ['--delivery-primary-dark' as string]: palette.colors.primaryDark,
@@ -21,7 +16,7 @@ export function applyDesignConfig(config: DeliveryPublicoDesignConfig): CSSPrope
     ['--delivery-btn-text' as string]: '#FFFFFF',
     ['--delivery-font-title' as string]: typography.titleFontFamily,
     ['--delivery-font-body' as string]: typography.bodyFontFamily,
-    ['--delivery-hero-bg' as string]: heroBackground,
+    ['--delivery-hero-bg' as string]: palette.colors.primary,
   }
 }
 

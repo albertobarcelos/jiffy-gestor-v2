@@ -21,7 +21,6 @@ import { IconPickerPanel } from '@/src/presentation/components/features/grupos-p
 import { DeliveryImageUploadField } from '@/src/presentation/components/ui/DeliveryImageUploadField'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
-import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { showToast } from '@/src/shared/utils/toast'
 import { cn } from '@/src/shared/utils/cn'
 import type {
@@ -301,7 +300,6 @@ export function DesignCategoriasTab({
                       key={cat.id}
                       grupo={cat}
                       config={config}
-                      iconColor={palette.colors.primary}
                       isSelected={cat.id === selectedCategoryId}
                       disabled={isReordering}
                       onSelect={setSelectedCategoryId}
@@ -341,13 +339,13 @@ export function DesignCategoriasTab({
                   <p className="text-sm font-semibold text-primary-text">
                     Ícone · {selectedCategory?.nome ?? '—'}
                   </p>
-                  <div
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
-                    style={{ backgroundColor: palette.colors.primary }}
-                    title="Ícone atual"
-                  >
-                    <DinamicIcon iconName={selectedIconName} color="#FFFFFF" size={20} />
-                  </div>
+                  {selectedCategory ? (
+                    <DeliveryGrupoCategoriaVisual
+                      config={config}
+                      grupo={selectedCategory}
+                      size="md"
+                    />
+                  ) : null}
                 </div>
 
                 <div className="mt-2 flex gap-2">

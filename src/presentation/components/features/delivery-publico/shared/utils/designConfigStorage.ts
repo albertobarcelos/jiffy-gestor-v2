@@ -19,9 +19,14 @@ function mergeConfig(
   fallback: DeliveryPublicoDesignConfig
 ): DeliveryPublicoDesignConfig {
   if (!partial) return fallback
+
+  const { elementosDestaque: _legacy, ...partialWithoutLegacy } = partial as Partial<
+    DeliveryPublicoDesignConfig
+  > & { elementosDestaque?: unknown }
+
   return {
     ...fallback,
-    ...partial,
+    ...partialWithoutLegacy,
     cabecalho: { ...fallback.cabecalho, ...partial.cabecalho },
     cores: { ...fallback.cores, ...partial.cores },
     tipografia: { ...fallback.tipografia, ...partial.tipografia },
@@ -33,7 +38,6 @@ function mergeConfig(
         ...partial.categorias?.iconesPorGrupoId,
       },
     },
-    elementosDestaque: { ...fallback.elementosDestaque, ...partial.elementosDestaque },
   }
 }
 

@@ -10,7 +10,6 @@ import { DeliveryGrupoCategoriaVisual } from '../../shared/components/DeliveryGr
 type DesignCategoriaGrupoSortableItemProps = {
   grupo: DesignCategoriaGrupo
   config: DeliveryPublicoDesignConfig
-  iconColor: string
   isSelected: boolean
   disabled?: boolean
   onSelect: (grupoId: string) => void
@@ -19,7 +18,6 @@ type DesignCategoriaGrupoSortableItemProps = {
 export function DesignCategoriaGrupoSortableItem({
   grupo,
   config,
-  iconColor,
   isSelected,
   disabled = false,
   onSelect,
@@ -63,13 +61,7 @@ export function DesignCategoriaGrupoSortableItem({
           onClick={() => onSelect(grupo.id)}
           className="flex min-w-0 flex-1 items-center gap-3 py-1.5 pr-3 text-left text-sm font-semibold"
         >
-          <DeliveryGrupoCategoriaVisual
-            config={config}
-            grupo={grupo}
-            size="sm"
-            iconColor={iconColor}
-            iconBackgroundColor="transparent"
-          />
+          <DeliveryGrupoCategoriaVisual config={config} grupo={grupo} size="sm" />
           <span className="truncate">{grupo.nome}</span>
         </button>
       </div>
