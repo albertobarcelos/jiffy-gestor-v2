@@ -7,12 +7,14 @@ import { DeliveryBuscaProdutos } from '../../../shared/components/DeliveryBuscaP
 import { DeliveryGrupoChips } from '../../../shared/components/DeliveryGrupoChips'
 import { DeliverySecaoGrupo } from '../../../shared/components/DeliverySecaoGrupo'
 import { DeliveryPedidoFooter } from '../../../shared/components/DeliveryPedidoFooter'
+import { DeliveryPublicoLojaFooter } from '../../../shared/components/DeliveryPublicoLojaFooter'
 import { filterViewModelByBusca } from '../../../shared/utils/filterViewModelByBusca'
 import type { DeliveryLayoutHomeProps } from '../DeliveryLayoutHomeProps'
 
 export function BasicoLayoutHome({
   config,
   viewModel,
+  enderecoTexto,
   interactive = false,
   onTipoEntregaChange,
   onBuscaChange,
@@ -58,7 +60,13 @@ export function BasicoLayoutHome({
         ))}
       </div>
       {viewModel.carrinho.quantidadeItens > 0 ? (
-        <div className="sticky bottom-0 mt-4 bg-white/95 pt-2 backdrop-blur-sm">
+        <div
+          className="sticky bottom-0 z-30 mt-4 pt-2 backdrop-blur-sm"
+          style={{
+            backgroundColor:
+              'color-mix(in srgb, var(--delivery-bg, var(--delivery-surface)) 95%, transparent)',
+          }}
+        >
           <DeliveryPedidoFooter
             total={viewModel.carrinho.total}
             interactive={interactive}
@@ -66,6 +74,12 @@ export function BasicoLayoutHome({
           />
         </div>
       ) : null}
+
+      <DeliveryPublicoLojaFooter
+        config={config}
+        enderecoTexto={enderecoTexto}
+        horarioTexto={viewModel.horarioTexto}
+      />
     </div>
   )
 }

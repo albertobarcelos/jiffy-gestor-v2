@@ -5,7 +5,10 @@ export type LayoutModelDefinition = {
   nome: string
   descricao: string
   premium: boolean
+  /** Layout totalmente implementado no app público (false = stub "em breve"). */
   disponivel: boolean
+  /** Pode ser publicado no cardápio público (demais modelos: preview no designer apenas). */
+  publicavel: boolean
 }
 
 export const LAYOUT_MODELS: LayoutModelDefinition[] = [
@@ -15,26 +18,34 @@ export const LAYOUT_MODELS: LayoutModelDefinition[] = [
     descricao: 'Design simples e funcional',
     premium: false,
     disponivel: true,
+    publicavel: true,
   },
   {
     id: 'vitrine',
     nome: 'Vitrine',
     descricao: 'Fotos grandes',
     premium: true,
-    disponivel: false,
+    disponivel: true,
+    publicavel: false,
   },
   {
     id: 'grade',
     nome: 'Grade',
     descricao: 'Estrutura em blocos',
     premium: true,
-    disponivel: false,
+    disponivel: true,
+    publicavel: false,
   },
   {
     id: 'catalogo',
     nome: 'Catálogo',
     descricao: 'Navegação fluida',
     premium: true,
-    disponivel: false,
+    disponivel: true,
+    publicavel: false,
   },
 ]
+
+export function canPublishLayout(layoutId: DeliveryLayoutId): boolean {
+  return LAYOUT_MODELS.find(m => m.id === layoutId)?.publicavel ?? false
+}

@@ -8,6 +8,7 @@ import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { useEmpresaDeliveryMe } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
 import { showToast } from '@/src/shared/utils/toast'
 import type { DesignTabId } from '../../shared/types/deliveryPublicoDesignConfig'
+import { canPublishLayout } from '../../shared/constants/layoutModels'
 import { useDeliveryDesignDraft } from '../../shared/hooks/useDeliveryDesignDraft'
 import { DesignTabNav } from '../components/DesignTabNav'
 import { DeliveryMobilePreviewFrame } from '../components/DeliveryMobilePreviewFrame'
@@ -29,10 +30,13 @@ export function DeliveryDesignCustomizerScreen() {
     nomeExibicaoFallback: empresa?.nomeExibicao ?? '',
   })
 
+  const canPublish = canPublishLayout(draft.layoutId)
+
   const handlePublish = useCallback(() => {
+    if (!canPublishLayout(draft.layoutId)) return
     publish()
     showToast.success('Design publicado!')
-  }, [publish])
+  }, [draft.layoutId, publish])
 
   const handleRestore = useCallback(() => {
     restore()
@@ -72,7 +76,13 @@ export function DeliveryDesignCustomizerScreen() {
             <button
               type="button"
               onClick={handlePublish}
-              className="inline-flex h-9 items-center rounded-lg bg-secondary px-5 text-sm font-semibold text-white transition-colors hover:bg-secondary/90"
+              disabled={!canPublish}
+              title={
+                canPublish
+                  ? undefined
+                  : 'Somente o modelo Básico pode ser publicado no momento'
+              }
+              className="inline-flex h-9 items-center rounded-lg bg-secondary px-5 text-sm font-semibold text-white transition-colors hover:bg-secondary/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Publicar
             </button>

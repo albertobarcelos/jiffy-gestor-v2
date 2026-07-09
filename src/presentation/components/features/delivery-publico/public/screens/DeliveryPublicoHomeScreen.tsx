@@ -22,6 +22,7 @@ import {
 } from '../../shared/stores/deliveryCarrinhoStore'
 import { buildCatalogViewModel } from '../../shared/mappers/buildCatalogViewModel'
 import { findCatalogoProdutoById } from '../../shared/utils/findCatalogoProdutoById'
+import { formatEmpresaPublicaEndereco } from '../../shared/utils/formatEmpresaPublicaEndereco'
 import { resolveDeliveryLayoutHome } from '../layouts/DeliveryPublicoLayoutRegistry'
 import type { DeliveryPublicoViewModel } from '../../shared/types/deliveryPublicoViewModel'
 import { DeliveryProdutoModal } from '../components/DeliveryProdutoModal'
@@ -104,6 +105,7 @@ export function DeliveryPublicoHomeScreen({ slug }: DeliveryPublicoHomeScreenPro
       <DeliveryPublicoHomeContent
         slug={slug}
         grupos={grupos}
+        empresa={empresa}
         termoBusca={termoBusca}
         tipoEntrega={tipoEntrega}
         carrinhoTotal={carrinhoTotal}
@@ -126,6 +128,7 @@ export function DeliveryPublicoHomeScreen({ slug }: DeliveryPublicoHomeScreenPro
 type DeliveryPublicoHomeContentProps = {
   slug: string
   grupos: ReturnType<typeof flattenCatalogoGrupos>
+  empresa: EmpresaPublicaDTO | null
   termoBusca: string
   tipoEntrega: 'entrega' | 'retirada'
   carrinhoTotal: number
@@ -145,6 +148,7 @@ type DeliveryPublicoHomeContentProps = {
 function DeliveryPublicoHomeContent({
   slug,
   grupos,
+  empresa,
   termoBusca,
   tipoEntrega,
   carrinhoTotal,
@@ -173,6 +177,7 @@ function DeliveryPublicoHomeContent({
   )
 
   const LayoutHome = resolveDeliveryLayoutHome(config.layoutId)
+  const enderecoTexto = formatEmpresaPublicaEndereco(empresa?.endereco ?? null)
 
   if (isCatalogLoading) {
     return (
@@ -190,6 +195,7 @@ function DeliveryPublicoHomeContent({
       <LayoutHome
         config={config}
         viewModel={viewModel}
+        enderecoTexto={enderecoTexto}
         interactive
         onTipoEntregaChange={onTipoEntregaChange}
         onBuscaChange={onBuscaChange}

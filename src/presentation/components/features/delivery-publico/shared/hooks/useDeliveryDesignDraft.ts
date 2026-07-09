@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { DeliveryPublicoDesignConfig } from '../types/deliveryPublicoDesignConfig'
 import { createDefaultDesignConfig } from '../constants/defaultDesignConfig'
+import { canPublishLayout } from '../constants/layoutModels'
 import {
   isDesignConfigEqual,
   readDesignStorage,
@@ -59,6 +60,7 @@ export function useDeliveryDesignDraft({
   )
 
   const publish = useCallback(() => {
+    if (!canPublishLayout(draft.layoutId)) return
     setPublished(draft)
     if (empresaId) {
       writeDesignStorage(empresaId, { published: draft, draft })

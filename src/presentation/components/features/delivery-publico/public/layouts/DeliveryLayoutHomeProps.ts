@@ -5,6 +5,8 @@ import type { DeliveryPublicoViewModel } from '../../shared/types/deliveryPublic
 export type DeliveryLayoutHomeProps = {
   config: DeliveryPublicoDesignConfig
   viewModel: DeliveryPublicoViewModel
+  /** Endereço formatado da loja (footer do layout Vitrine). */
+  enderecoTexto?: string | null
   interactive?: boolean
   onTipoEntregaChange?: (tipo: 'entrega' | 'retirada') => void
   onBuscaChange?: (termo: string) => void
