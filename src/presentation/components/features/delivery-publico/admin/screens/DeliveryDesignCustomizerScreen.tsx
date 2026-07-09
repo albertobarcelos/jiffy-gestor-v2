@@ -8,7 +8,10 @@ import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { useEmpresaDeliveryMe } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
 import { showToast } from '@/src/shared/utils/toast'
 import type { DesignTabId } from '../../shared/types/deliveryPublicoDesignConfig'
-import { canPublishLayout } from '../../shared/constants/layoutModels'
+import {
+  canPublishDesign,
+  getPublishDisabledReason,
+} from '../../shared/constants/designPublishRules'
 import { useDeliveryDesignDraft } from '../../shared/hooks/useDeliveryDesignDraft'
 import { DesignTabNav } from '../components/DesignTabNav'
 import { DeliveryMobilePreviewFrame } from '../components/DeliveryMobilePreviewFrame'
@@ -30,13 +33,13 @@ export function DeliveryDesignCustomizerScreen() {
     nomeExibicaoFallback: empresa?.nomeExibicao ?? '',
   })
 
-  const canPublish = canPublishLayout(draft.layoutId)
+  const canPublish = canPublishDesign(draft)
 
   const handlePublish = useCallback(() => {
-    if (!canPublishLayout(draft.layoutId)) return
+    if (!canPublishDesign(draft)) return
     publish()
     showToast.success('Design publicado!')
-  }, [draft.layoutId, publish])
+  }, [draft, publish])
 
   const handleRestore = useCallback(() => {
     restore()
@@ -77,11 +80,7 @@ export function DeliveryDesignCustomizerScreen() {
               type="button"
               onClick={handlePublish}
               disabled={!canPublish}
-              title={
-                canPublish
-                  ? undefined
-                  : 'Somente o modelo Básico pode ser publicado no momento'
-              }
+              title={getPublishDisabledReason(draft)}
               className="inline-flex h-9 items-center rounded-lg bg-secondary px-5 text-sm font-semibold text-white transition-colors hover:bg-secondary/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Publicar
