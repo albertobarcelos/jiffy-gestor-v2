@@ -6,6 +6,8 @@ type DeliveryTipoEntregaToggleProps = {
   onChange?: (value: 'entrega' | 'retirada') => void
   /** chips = home do catálogo; segmented = checkout full-width */
   variant?: 'chips' | 'segmented'
+  /** Ajusta contraste do segmented sobre o card de checkout (fundo claro da paleta). */
+  segmentedTone?: 'default' | 'checkout'
 }
 
 export function DeliveryTipoEntregaToggle({
@@ -13,8 +15,11 @@ export function DeliveryTipoEntregaToggle({
   interactive = false,
   onChange,
   variant = 'chips',
+  segmentedTone = 'default',
 }: DeliveryTipoEntregaToggleProps) {
   if (variant === 'segmented') {
+    const isCheckoutTone = segmentedTone === 'checkout'
+
     return (
       <div className="flex gap-2">
         {(['retirada', 'entrega'] as const).map(tipo => {
@@ -27,11 +32,23 @@ export function DeliveryTipoEntregaToggle({
               disabled={!interactive}
               onClick={() => interactive && onChange?.(tipo)}
               className="flex-1 rounded-lg border py-2 text-sm font-medium capitalize transition-colors disabled:cursor-default"
-              style={{
-                borderColor: active ? 'var(--delivery-primary)' : 'var(--delivery-border)',
-                backgroundColor: active ? 'var(--delivery-surface-muted)' : 'transparent',
-                color: active ? 'var(--delivery-primary-dark)' : 'var(--delivery-text)',
-              }}
+              style={
+                isCheckoutTone
+                  ? {
+                      borderColor: active
+                        ? 'var(--delivery-primary)'
+                        : 'color-mix(in srgb, var(--delivery-primary) 18%, transparent)',
+                      backgroundColor: active
+                        ? 'var(--delivery-primary)'
+                        : 'var(--delivery-surface-muted)',
+                      color: active ? '#ffffff' : 'var(--delivery-primary-dark)',
+                    }
+                  : {
+                      borderColor: active ? 'var(--delivery-primary)' : 'var(--delivery-border)',
+                      backgroundColor: active ? 'var(--delivery-surface-muted)' : 'transparent',
+                      color: active ? 'var(--delivery-primary-dark)' : 'var(--delivery-text)',
+                    }
+              }
             >
               {label}
             </button>

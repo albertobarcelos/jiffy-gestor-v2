@@ -1,5 +1,6 @@
 'use client'
 
+import { useRef } from 'react'
 import { DeliveryLojaHeader } from '../../../shared/components/DeliveryLojaHeader'
 import { DeliveryTipoEntregaToggle } from '../../../shared/components/DeliveryTipoEntregaToggle'
 import { DeliveryStatusHorario } from '../../../shared/components/DeliveryStatusHorario'
@@ -10,6 +11,7 @@ import { DeliveryPedidoFooter } from '../../../shared/components/DeliveryPedidoF
 import { DeliveryPublicoLojaFooter } from '../../../shared/components/DeliveryPublicoLojaFooter'
 import { filterViewModelByBusca } from '../../../shared/utils/filterViewModelByBusca'
 import type { DeliveryLayoutHomeProps } from '../DeliveryLayoutHomeProps'
+import { DeliveryBasicoCatalogStickyNav } from './DeliveryBasicoCatalogStickyNav'
 
 export function BasicoLayoutHome({
   config,
@@ -23,9 +25,10 @@ export function BasicoLayoutHome({
   onPedidoClick,
 }: DeliveryLayoutHomeProps) {
   const filtered = filterViewModelByBusca(viewModel)
+  const catalogRootRef = useRef<HTMLDivElement>(null)
 
   return (
-    <div className="flex min-h-full flex-col pb-2">
+    <div ref={catalogRootRef} className="delivery-basico-catalog-root flex min-h-full flex-col pb-2">
       <DeliveryLojaHeader config={config} />
       <div className="mt-3">
         <DeliveryTipoEntregaToggle
@@ -38,23 +41,30 @@ export function BasicoLayoutHome({
         disponivel={viewModel.disponivel}
         horarioTexto={viewModel.horarioTexto}
       />
-      <DeliveryBuscaProdutos
-        value={viewModel.termoBusca}
-        interactive={interactive}
-        onChange={onBuscaChange}
-      />
-      <DeliveryGrupoChips
-        config={config}
-        grupos={filtered.grupos}
-        interactive={interactive}
-        onGrupoClick={onGrupoClick}
-      />
+      <DeliveryBasicoCatalogStickyNav catalogRootRef={catalogRootRef}>
+        <div className="space-y-2 pb-3 pt-3">
+          <DeliveryBuscaProdutos
+            value={viewModel.termoBusca}
+            interactive={interactive}
+            embedded
+            onChange={onBuscaChange}
+          />
+          <DeliveryGrupoChips
+            config={config}
+            grupos={filtered.grupos}
+            interactive={interactive}
+            embedded
+            onGrupoClick={onGrupoClick}
+          />
+        </div>
+      </DeliveryBasicoCatalogStickyNav>
       <div className="flex-1">
         {filtered.grupos.map(grupo => (
           <DeliverySecaoGrupo
             key={grupo.id}
             grupo={grupo}
             interactive={interactive}
+            stickyTitle
             onProdutoClick={onProdutoClick}
           />
         ))}

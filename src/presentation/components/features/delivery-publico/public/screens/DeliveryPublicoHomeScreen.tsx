@@ -20,6 +20,11 @@ import {
   useDeliveryCarrinhoTotal,
   useDeliveryCarrinhoTotalItens,
 } from '../../shared/stores/deliveryCarrinhoStore'
+import {
+  useDeliveryPreferenciaEntregaStore,
+  useDeliveryTipoEntrega,
+  type DeliveryTipoEntrega,
+} from '../../shared/stores/deliveryPreferenciaEntregaStore'
 import { buildCatalogViewModel } from '../../shared/mappers/buildCatalogViewModel'
 import { findCatalogoProdutoById } from '../../shared/utils/findCatalogoProdutoById'
 import { formatEmpresaPublicaEndereco } from '../../shared/utils/formatEmpresaPublicaEndereco'
@@ -34,7 +39,8 @@ type DeliveryPublicoHomeScreenProps = {
 export function DeliveryPublicoHomeScreen({ slug }: DeliveryPublicoHomeScreenProps) {
   const router = useRouter()
   const [termoBusca, setTermoBusca] = useState('')
-  const [tipoEntrega, setTipoEntrega] = useState<'entrega' | 'retirada'>('entrega')
+  const tipoEntrega = useDeliveryTipoEntrega(slug)
+  const setTipoEntregaPreferencia = useDeliveryPreferenciaEntregaStore(s => s.setTipoEntrega)
   const [produtoSelecionado, setProdutoSelecionado] = useState<CatalogoPublicoProdutoDTO | null>(
     null
   )
@@ -59,9 +65,12 @@ export function DeliveryPublicoHomeScreen({ slug }: DeliveryPublicoHomeScreenPro
     [data?.pages]
   )
 
-  const handleTipoEntregaChange = useCallback((tipo: 'entrega' | 'retirada') => {
-    setTipoEntrega(tipo)
-  }, [])
+  const handleTipoEntregaChange = useCallback(
+    (tipo: DeliveryTipoEntrega) => {
+      setTipoEntregaPreferencia(slug, tipo)
+    },
+    [slug, setTipoEntregaPreferencia]
+  )
 
   const handleBuscaChange = useCallback((termo: string) => {
     setTermoBusca(termo)
@@ -130,13 +139,13 @@ type DeliveryPublicoHomeContentProps = {
   grupos: ReturnType<typeof flattenCatalogoGrupos>
   empresa: EmpresaPublicaDTO | null
   termoBusca: string
-  tipoEntrega: 'entrega' | 'retirada'
+  tipoEntrega: DeliveryTipoEntrega
   carrinhoTotal: number
   carrinhoQuantidade: number
   isCatalogLoading: boolean
   isFetchingNextPage: boolean
   produtoSelecionado: CatalogoPublicoProdutoDTO | null
-  onTipoEntregaChange: (tipo: 'entrega' | 'retirada') => void
+  onTipoEntregaChange: (tipo: DeliveryTipoEntrega) => void
   onBuscaChange: (termo: string) => void
   onGrupoClick: (grupoId: string) => void
   onProdutoClick: (produtoId: string) => void

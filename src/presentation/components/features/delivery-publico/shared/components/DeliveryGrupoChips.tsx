@@ -12,6 +12,7 @@ type DeliveryGrupoChipsProps = {
   config: DeliveryPublicoDesignConfig
   grupos: DeliveryPublicoGrupoViewModel[]
   interactive?: boolean
+  embedded?: boolean
   onGrupoClick?: (grupoId: string) => void
 }
 
@@ -25,17 +26,19 @@ export function DeliveryGrupoChips({
   config,
   grupos,
   interactive = false,
+  embedded = false,
   onGrupoClick,
 }: DeliveryGrupoChipsProps) {
   if (!config.categorias.mostrar || grupos.length === 0) return null
 
   const chipWidth = resolveChipWidth(grupos.length)
   const chipStyle = { flex: `0 0 ${chipWidth}` } as const
+  const wrapperClass = embedded
+    ? 'w-full snap-x snap-mandatory overflow-x-auto scrollbar-hide [container-type:inline-size]'
+    : 'mt-3 w-full snap-x snap-mandatory overflow-x-auto scrollbar-hide [container-type:inline-size]'
 
   return (
-    <div
-      className="mt-3 w-full snap-x snap-mandatory overflow-x-auto scrollbar-hide [container-type:inline-size]"
-    >
+    <div className={wrapperClass}>
       <div className="flex w-max min-w-full gap-2 px-4">
         {grupos.map(grupo => {
           const content = (

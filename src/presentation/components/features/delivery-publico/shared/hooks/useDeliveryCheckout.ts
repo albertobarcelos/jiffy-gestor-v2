@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { criarPedidoPublico } from '@/src/infrastructure/api/publicDeliveryApi'
 import { usePublicDeliveryMeiosPagamento } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
@@ -11,19 +11,25 @@ import {
   useDeliveryCarrinhoTotal,
 } from '../stores/deliveryCarrinhoStore'
 import {
+  useDeliveryPreferenciaEntregaStore,
+  type DeliveryTipoEntrega,
+} from '../stores/deliveryPreferenciaEntregaStore'
+import {
   montarPedidoPublico,
   type CheckoutFormData,
 } from '../utils/montarPedidoPublico'
 
-const INITIAL_FORM: CheckoutFormData = {
-  tipoEntrega: 'retirada',
-  telefone: '',
-  nome: '',
-  rua: '',
-  numero: '',
-  bairro: '',
-  cidade: '',
-  meioPagamentoId: '',
+function createInitialForm(tipoEntrega: DeliveryTipoEntrega): CheckoutFormData {
+  return {
+    tipoEntrega,
+    telefone: '',
+    nome: '',
+    rua: '',
+    numero: '',
+    bairro: '',
+    cidade: '',
+    meioPagamentoId: '',
+  }
 }
 
 export function useDeliveryCheckout(slug: string) {
@@ -31,15 +37,42 @@ export function useDeliveryCheckout(slug: string) {
   const itens = useDeliveryCarrinhoItens(slug)
   const total = useDeliveryCarrinhoTotal(slug)
   const limpar = useDeliveryCarrinhoStore(s => s.limpar)
+  const setTipoEntregaPreferencia = useDeliveryPreferenciaEntregaStore(s => s.setTipoEntrega)
 
   const { data: meiosData, isLoading: loadingMeios } = usePublicDeliveryMeiosPagamento(slug)
 
-  const [form, setForm] = useState<CheckoutFormData>(INITIAL_FORM)
+  const [form, setForm] = useState<CheckoutFormData>(() =>
+    createInitialForm(
+      useDeliveryPreferenciaEntregaStore.getState().getTipoEntrega(slug)
+    )
+  )
   const [enviando, setEnviando] = useState(false)
 
-  const updateForm = useCallback(<K extends keyof CheckoutFormData>(key: K, value: CheckoutFormData[K]) => {
-    setForm(prev => ({ ...prev, [key]: value }))
-  }, [])
+  useEffect(() => {
+    const syncTipoEntregaFromStore = () => {
+      setForm(prev => ({
+        ...prev,
+        tipoEntrega: useDeliveryPreferenciaEntregaStore.getState().getTipoEntrega(slug),
+      }))
+    }
+
+    if (useDeliveryPreferenciaEntregaStore.persist.hasHydrated()) {
+      syncTipoEntregaFromStore()
+      return
+    }
+
+    return useDeliveryPreferenciaEntregaStore.persist.onFinishHydration(syncTipoEntregaFromStore)
+  }, [slug])
+
+  const updateForm = useCallback(
+    <K extends keyof CheckoutFormData>(key: K, value: CheckoutFormData[K]) => {
+      setForm(prev => ({ ...prev, [key]: value }))
+      if (key === 'tipoEntrega') {
+        setTipoEntregaPreferencia(slug, value as DeliveryTipoEntrega)
+      }
+    },
+    [slug, setTipoEntregaPreferencia]
+  )
 
   const enviarPedido = useCallback(async () => {
     const resultado = montarPedidoPublico({ slug, itens, total, form })

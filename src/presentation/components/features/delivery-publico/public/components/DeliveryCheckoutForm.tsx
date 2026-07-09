@@ -2,7 +2,6 @@
 
 import type { MeioPagamentoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { CheckoutFormData } from '../../shared/utils/montarPedidoPublico'
-import { DeliveryCard } from '../../shared/components/DeliveryCard'
 import { DeliveryInput, DeliverySelect } from '../../shared/components/DeliveryInput'
 import { DeliveryTipoEntregaToggle } from '../../shared/components/DeliveryTipoEntregaToggle'
 
@@ -20,19 +19,21 @@ export function DeliveryCheckoutForm({
   onChange,
 }: DeliveryCheckoutFormProps) {
   return (
-    <DeliveryCard className="space-y-4 !p-4 rounded-xl">
-      <h2 className="delivery-font-title font-semibold delivery-text-primary">
-        Dados para entrega
+    <div className="delivery-checkout-form-card space-y-4 rounded-xl border p-4">
+      <h2 className="delivery-checkout-form-title delivery-font-title text-base font-semibold sm:text-lg">
+        {form.tipoEntrega === 'entrega' ? 'Dados para entrega' : 'Dados para retirada'}
       </h2>
 
       <DeliveryTipoEntregaToggle
         variant="segmented"
+        segmentedTone="checkout"
         value={form.tipoEntrega}
         interactive
         onChange={value => onChange('tipoEntrega', value)}
       />
 
       <DeliveryInput
+        variant="checkout"
         placeholder="Telefone *"
         value={form.telefone}
         onChange={e => onChange('telefone', e.target.value)}
@@ -40,6 +41,7 @@ export function DeliveryCheckoutForm({
         autoComplete="tel"
       />
       <DeliveryInput
+        variant="checkout"
         placeholder="Nome (opcional)"
         value={form.nome}
         onChange={e => onChange('nome', e.target.value)}
@@ -49,6 +51,7 @@ export function DeliveryCheckoutForm({
       {form.tipoEntrega === 'entrega' ? (
         <>
           <DeliveryInput
+            variant="checkout"
             placeholder="Rua *"
             value={form.rua}
             onChange={e => onChange('rua', e.target.value)}
@@ -56,17 +59,20 @@ export function DeliveryCheckoutForm({
           />
           <div className="grid grid-cols-2 gap-2">
             <DeliveryInput
+              variant="checkout"
               placeholder="Número *"
               value={form.numero}
               onChange={e => onChange('numero', e.target.value)}
             />
             <DeliveryInput
+              variant="checkout"
               placeholder="Bairro *"
               value={form.bairro}
               onChange={e => onChange('bairro', e.target.value)}
             />
           </div>
           <DeliveryInput
+            variant="checkout"
             placeholder="Cidade"
             value={form.cidade}
             onChange={e => onChange('cidade', e.target.value)}
@@ -77,10 +83,14 @@ export function DeliveryCheckoutForm({
 
       {!loadingMeios && meiosPagamento.length > 0 ? (
         <div>
-          <label className="delivery-text-secondary mb-1 block text-sm">
+          <label
+            className="mb-1 block text-sm font-medium"
+            style={{ color: 'var(--delivery-primary)' }}
+          >
             Forma de pagamento (opcional)
           </label>
           <DeliverySelect
+            variant="checkout"
             value={form.meioPagamentoId}
             onChange={e => onChange('meioPagamentoId', e.target.value)}
           >
@@ -93,6 +103,6 @@ export function DeliveryCheckoutForm({
           </DeliverySelect>
         </div>
       ) : null}
-    </DeliveryCard>
+    </div>
   )
 }

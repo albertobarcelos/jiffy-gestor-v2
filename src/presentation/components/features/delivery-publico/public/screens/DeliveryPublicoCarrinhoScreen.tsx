@@ -71,7 +71,7 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
           </div>
         ) : (
           <>
-            <div className="space-y-3">
+            <div className="divide-y divide-[var(--delivery-border)]">
               {itens.map(item => (
                 <DeliveryCarrinhoItemCard
                   key={item.id}

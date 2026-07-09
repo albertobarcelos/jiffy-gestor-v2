@@ -47,6 +47,36 @@
 }
 
 /**
+ * Layout Básico — busca + chips fixos no topo; títulos de grupo sticky abaixo da barra.
+ */
+.delivery-basico-catalog-root {
+  --delivery-sticky-toolbar-h: 0px;
+}
+
+.delivery-basico-sticky-nav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background-color: var(--delivery-bg, var(--delivery-surface));
+  border-bottom: 1px solid var(--delivery-border);
+}
+
+.delivery-basico-grupo-section {
+  scroll-margin-top: var(--delivery-sticky-toolbar-h);
+}
+
+.delivery-basico-grupo-title-sticky {
+  position: sticky;
+  top: var(--delivery-sticky-toolbar-h);
+  z-index: 20;
+  background-color: color-mix(
+    in srgb,
+    var(--delivery-primary) 40%,
+    var(--delivery-bg, var(--delivery-surface))
+  );
+}
+
+/**
  * Preview mobile do designer — conteúdo ocupa 100% da largura útil do frame.
  */
 .delivery-preview-shell {
@@ -63,4 +93,27 @@
 
 .delivery-preview-scale-host {
   width: 100%;
+}
+
+/**
+ * Formulário de checkout — card com tinta clara da paleta; campos brancos com texto na cor primária.
+ */
+.delivery-checkout-form-card {
+  background-color: var(--delivery-surface-muted);
+  border-color: color-mix(in srgb, var(--delivery-primary) 12%, transparent);
+}
+
+.delivery-checkout-form-card .delivery-checkout-field {
+  background-color: #ffffff;
+  color: var(--delivery-primary);
+  border-color: color-mix(in srgb, var(--delivery-primary) 22%, transparent);
+}
+
+.delivery-checkout-form-card .delivery-checkout-field::placeholder {
+  color: var(--delivery-primary);
+  opacity: 0.72;
+}
+
+.delivery-checkout-form-title {
+  color: var(--delivery-primary-dark);
 }

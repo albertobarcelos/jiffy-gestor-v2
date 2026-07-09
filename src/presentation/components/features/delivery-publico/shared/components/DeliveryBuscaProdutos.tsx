@@ -3,17 +3,21 @@
 type DeliveryBuscaProdutosProps = {
   value: string
   interactive?: boolean
+  embedded?: boolean
   onChange?: (value: string) => void
 }
 
 export function DeliveryBuscaProdutos({
   value,
   interactive = false,
+  embedded = false,
   onChange,
 }: DeliveryBuscaProdutosProps) {
+  const wrapperClass = embedded ? 'px-4' : 'mt-3 px-4'
+
   if (interactive && onChange) {
     return (
-      <div className="mt-3 px-4">
+      <div className={wrapperClass}>
         <input
           type="search"
           value={value}
@@ -27,7 +31,7 @@ export function DeliveryBuscaProdutos({
   }
 
   return (
-    <div className="mt-3 px-4">
+    <div className={wrapperClass}>
       <div className="rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-500">
         Pesquisar por produtos
       </div>
