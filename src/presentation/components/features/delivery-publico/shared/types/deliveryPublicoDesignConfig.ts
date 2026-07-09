@@ -44,6 +44,8 @@ export type DeliveryPublicoDesignConfig = {
   }
   categorias: {
     mostrar: boolean
+    /** Quando true, exibe a imagem do grupo; quando false, exibe ícones personalizáveis. */
+    usarImagensGrupo: boolean
     estiloIcone: CategoryIconStyle
     iconesPorGrupoId: Record<string, string>
   }

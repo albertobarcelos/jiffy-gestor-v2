@@ -2,6 +2,11 @@ import type {
   ConfirmImageUploadIntentResponseDTO,
   CreateImageUploadIntentResponseDTO,
 } from '@/src/application/dto/api/deliveryMediaApi'
+import {
+  type DeliveryImageMimeType,
+  resolveDeliveryImageMimeTypeForUpload,
+  validateDeliveryImageFile,
+} from '@/src/shared/constants/deliveryImageUpload'
 
 export class DeliveryMediaApiError extends Error {
   constructor(
@@ -40,6 +45,20 @@ function authHeaders(token: string): Record<string, string> {
   }
 }
 
+async function resolveMimeOrThrow(file: File): Promise<DeliveryImageMimeType> {
+  const validationError = await validateDeliveryImageFile(file)
+  if (validationError) {
+    throw new DeliveryMediaApiError(validationError, 400)
+  }
+
+  const mimeType = await resolveDeliveryImageMimeTypeForUpload(file)
+  if (!mimeType) {
+    throw new DeliveryMediaApiError('Formato inválido. Use JPEG, PNG ou WebP.', 400)
+  }
+
+  return mimeType
+}
+
 export async function createGrupoComplementoUploadIntent(
   grupoComplementoId: string,
   file: File,
@@ -48,7 +67,8 @@ export async function createGrupoComplementoUploadIntent(
   return createUploadIntent(
     `/api/delivery/grupos-complemento/${encodeURIComponent(grupoComplementoId)}/upload-intent`,
     file,
-    token
+    token,
+    await resolveMimeOrThrow(file)
   )
 }
 
@@ -60,7 +80,8 @@ export async function createGrupoProdutoUploadIntent(
   return createUploadIntent(
     `/api/delivery/grupos-produto/${encodeURIComponent(grupoProdutoId)}/upload-intent`,
     file,
-    token
+    token,
+    await resolveMimeOrThrow(file)
   )
 }
 
@@ -72,21 +93,23 @@ export async function createProdutoUploadIntent(
   return createUploadIntent(
     `/api/delivery/produtos/${encodeURIComponent(produtoId)}/upload-intent`,
     file,
-    token
+    token,
+    await resolveMimeOrThrow(file)
   )
 }
 
 async function createUploadIntent(
   intentUrl: string,
   file: File,
-  token: string
+  token: string,
+  mimeType: DeliveryImageMimeType
 ): Promise<CreateImageUploadIntentResponseDTO> {
   const response = await fetch(intentUrl, {
     method: 'POST',
     headers: authHeaders(token),
     body: JSON.stringify({
       fileName: file.name,
-      mimeType: file.type,
+      mimeType,
       sizeInBytes: file.size,
     }),
   })
@@ -97,11 +120,13 @@ async function createUploadIntent(
 export async function putFileToPresignedUrl(
   uploadUrl: string,
   file: File,
-  token: string
+  token: string,
+  mimeType: DeliveryImageMimeType
 ): Promise<void> {
   const formData = new FormData()
   formData.append('file', file)
   formData.append('uploadUrl', uploadUrl)
+  formData.append('mimeType', mimeType)
 
   const response = await fetch('/api/media/presigned-put', {
     method: 'POST',
@@ -252,8 +277,9 @@ async function uploadDeliveryImage(
   file: File,
   token: string
 ): Promise<ConfirmImageUploadIntentResponseDTO> {
-  const intent = await createUploadIntent(intentUrl, file, token)
-  await putFileToPresignedUrl(intent.uploadUrl, file, token)
+  const mimeType = await resolveMimeOrThrow(file)
+  const intent = await createUploadIntent(intentUrl, file, token, mimeType)
+  await putFileToPresignedUrl(intent.uploadUrl, file, token, mimeType)
   return confirmImageUploadIntent(intent.uploadIntentId, token)
 }
 
@@ -261,6 +287,9 @@ export function mensagemLegivelDeliveryMediaError(error: unknown): string {
   if (error instanceof DeliveryMediaApiError) {
     if (error.status === 404) {
       return 'Item não encontrado no cardápio delivery. Configure o cardápio digital em Configurações.'
+    }
+    if (/INVALID_MIME_TYPE/i.test(error.message)) {
+      return 'O conteúdo da imagem não corresponde ao formato informado. Salve novamente como JPEG, PNG ou WebP.'
     }
     return error.message
   }

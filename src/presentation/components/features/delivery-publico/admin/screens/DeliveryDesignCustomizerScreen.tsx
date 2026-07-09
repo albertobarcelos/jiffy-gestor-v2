@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { MdArrowBack, MdRefresh } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -13,6 +13,9 @@ import {
   getPublishDisabledReason,
 } from '../../shared/constants/designPublishRules'
 import { useDeliveryDesignDraft } from '../../shared/hooks/useDeliveryDesignDraft'
+import { useDesignCategoriaGrupos } from '../../shared/hooks/useDesignCategoriaGrupos'
+import type { DesignCategoriaGrupo } from '../../shared/types/designCategoriaGrupo'
+import { mergeDesignCategoriaGrupos } from '../../shared/utils/mergeDesignCategoriaGrupos'
 import { DesignTabNav } from '../components/DesignTabNav'
 import { DeliveryMobilePreviewFrame } from '../components/DeliveryMobilePreviewFrame'
 import { DesignCabecalhoTab } from '../components/tabs/DesignCabecalhoTab'
@@ -32,6 +35,20 @@ export function DeliveryDesignCustomizerScreen() {
     slug: empresaDelivery?.slug,
     nomeExibicaoFallback: empresa?.nomeExibicao ?? '',
   })
+
+  const {
+    grupos: categoriasGrupos,
+    isLoading: categoriasGruposLoading,
+    isError: categoriasGruposError,
+  } = useDesignCategoriaGrupos(Boolean(empresa?.id))
+
+  const [previewCategoriasGrupos, setPreviewCategoriasGrupos] = useState<DesignCategoriaGrupo[]>([])
+
+  useEffect(() => {
+    setPreviewCategoriasGrupos(previous =>
+      mergeDesignCategoriaGrupos(categoriasGrupos, previous)
+    )
+  }, [categoriasGrupos])
 
   const canPublish = canPublishDesign(draft)
 
@@ -110,7 +127,14 @@ export function DeliveryDesignCustomizerScreen() {
             <DesignTipografiasTab config={draft} onChange={updateDraft} />
           )}
           {activeTab === 'categorias' && (
-            <DesignCategoriasTab config={draft} onChange={updateDraft} />
+            <DesignCategoriasTab
+              config={draft}
+              grupos={previewCategoriasGrupos}
+              isLoading={categoriasGruposLoading}
+              isError={categoriasGruposError}
+              onChange={updateDraft}
+              onGruposChange={setPreviewCategoriasGrupos}
+            />
           )}
           {activeTab === 'elementos-destaque' && (
             <DesignElementosDestaqueTab config={draft} onChange={updateDraft} />
@@ -118,7 +142,7 @@ export function DeliveryDesignCustomizerScreen() {
         </div>
 
         <aside className="flex shrink-0 justify-center border-t border-gray-200 bg-gray-50 p-3 lg:sticky lg:top-0 lg:w-[min(100%,26.25rem)] lg:max-w-[26.25rem] lg:self-start lg:border-l lg:border-t-0 lg:p-4 xl:w-[min(100%,27.5rem)] xl:max-w-[27.5rem]">
-          <DeliveryMobilePreviewFrame config={draft} />
+          <DeliveryMobilePreviewFrame config={draft} categoriasGrupos={previewCategoriasGrupos} />
         </aside>
       </div>
     </div>

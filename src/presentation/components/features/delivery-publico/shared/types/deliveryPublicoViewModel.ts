@@ -10,6 +10,9 @@ export type DeliveryPublicoProdutoViewModel = {
 export type DeliveryPublicoGrupoViewModel = {
   id: string
   nome: string
+  /** Ícone padrão do grupo no ERP (fallback quando não há override no design). */
+  iconName?: string | null
+  imagemUrl?: string | null
   produtos: DeliveryPublicoProdutoViewModel[]
 }
 

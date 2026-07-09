@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
+import {
+  DELIVERY_IMAGE_MIME_TYPES,
+  detectDeliveryImageMimeFromBytes,
+  type DeliveryImageMimeType,
+} from '@/src/shared/constants/deliveryImageUpload'
 
 function isAllowedPresignedUploadUrl(url: string): boolean {
   try {
@@ -31,6 +36,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const file = formData.get('file')
     const uploadUrl = formData.get('uploadUrl')
+    const mimeTypeField = formData.get('mimeType')
 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: 'Arquivo é obrigatório' }, { status: 400 })
@@ -40,12 +46,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'URL de upload é obrigatória' }, { status: 400 })
     }
 
+    const mimeTypeCandidate =
+      typeof mimeTypeField === 'string' && mimeTypeField.trim()
+        ? mimeTypeField.trim().toLowerCase()
+        : file.type?.trim().toLowerCase() || ''
+
+    const buffer = Buffer.from(await file.arrayBuffer())
+    const sniffedMimeType = detectDeliveryImageMimeFromBytes(new Uint8Array(buffer.subarray(0, 16)))
+
+    const contentType = (sniffedMimeType ??
+      (DELIVERY_IMAGE_MIME_TYPES.includes(mimeTypeCandidate as DeliveryImageMimeType)
+        ? (mimeTypeCandidate as DeliveryImageMimeType)
+        : null)) as DeliveryImageMimeType | null
+
+    if (!contentType) {
+      return NextResponse.json(
+        {
+          error:
+            'Arquivo não é uma imagem JPEG, PNG ou WebP válida. Exporte ou salve a imagem novamente.',
+        },
+        { status: 400 }
+      )
+    }
+
     if (!isAllowedPresignedUploadUrl(uploadUrl)) {
       return NextResponse.json({ error: 'URL de upload não permitida' }, { status: 400 })
     }
-
-    const buffer = Buffer.from(await file.arrayBuffer())
-    const contentType = file.type?.trim() || 'application/octet-stream'
 
     const upstream = await fetch(uploadUrl.trim(), {
       method: 'PUT',

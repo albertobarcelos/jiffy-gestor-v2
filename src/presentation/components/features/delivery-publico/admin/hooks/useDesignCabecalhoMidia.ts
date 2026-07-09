@@ -123,7 +123,7 @@ export function useDesignCabecalhoMidia({
         return
       }
 
-      const validationError = validateDeliveryImageFile(file)
+      const validationError = await validateDeliveryImageFile(file)
       if (validationError) {
         showToast.error(validationError)
         return

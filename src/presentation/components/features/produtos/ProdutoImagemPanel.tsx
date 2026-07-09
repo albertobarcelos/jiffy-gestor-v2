@@ -85,7 +85,7 @@ export function ProdutoImagemPanel({
         return
       }
 
-      const validationError = validateDeliveryImageFile(file)
+      const validationError = await validateDeliveryImageFile(file)
       if (validationError) {
         showToast.error(validationError)
         return

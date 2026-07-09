@@ -1,8 +1,10 @@
 'use client'
 
-import { showToast } from '@/src/shared/utils/toast'
 import type { DeliveryPublicoDesignConfig, TypographyPresetId } from '../../../shared/types/deliveryPublicoDesignConfig'
-import { TYPOGRAPHY_PRESETS } from '../../../shared/constants/typographyPresets'
+import {
+  TYPOGRAPHY_PRESETS,
+  getPublishableTypographyLabel,
+} from '../../../shared/constants/typographyPresets'
 import { DesignSelectableCard } from '../DesignSelectableCard'
 
 type DesignTipografiasTabProps = {
@@ -28,24 +30,23 @@ export function DesignTipografiasTab({ config, onChange }: DesignTipografiasTabP
   return (
     <div className="space-y-2">
       <h3 className="text-base font-semibold text-primary">Tipografias sugeridas</h3>
+      <p className="text-sm text-secondary-text">
+        Teste qualquer tipografia no preview. Por enquanto, apenas a tipografia{' '}
+        {getPublishableTypographyLabel()} pode ser publicada.
+      </p>
       <div className="grid gap-3 sm:grid-cols-2">
         {TYPOGRAPHY_PRESETS.map(preset => (
           <DesignSelectableCard
             key={preset.id}
             selected={config.tipografia.presetId === preset.id}
             premium={preset.premium}
-            disabled={preset.premium}
             title={preset.nome}
-            onClick={() => {
-              if (preset.premium) {
-                showToast.info('Esta tipografia estará disponível em breve.')
-                return
-              }
+            onClick={() =>
               onChange(current => ({
                 ...current,
                 tipografia: { presetId: preset.id },
               }))
-            }}
+            }
           >
             <TypographyPreview presetId={preset.id} />
           </DesignSelectableCard>

@@ -1,20 +1,35 @@
 'use client'
 
+import { useMemo } from 'react'
 import '@/src/presentation/components/features/delivery-publico/shared/theme/delivery-publico-theme.css'
 import type { DeliveryPublicoDesignConfig } from '../../shared/types/deliveryPublicoDesignConfig'
+import type { DesignCategoriaGrupo } from '../../shared/types/designCategoriaGrupo'
 import { applyDesignConfig } from '../../shared/theme/applyDesignPreviewTheme'
-import { buildMockDeliveryViewModel } from '../../shared/mappers/buildMockViewModel'
+import {
+  buildMockDeliveryViewModel,
+  buildPreviewViewModelFromGrupos,
+} from '../../shared/mappers/buildMockViewModel'
 import { LAYOUT_MODELS } from '../../shared/constants/layoutModels'
 import { resolveDeliveryLayoutHome } from '../../public/layouts/DeliveryPublicoLayoutRegistry'
 
 type DeliveryMobilePreviewFrameProps = {
   config: DeliveryPublicoDesignConfig
+  categoriasGrupos?: DesignCategoriaGrupo[]
 }
 
-export function DeliveryMobilePreviewFrame({ config }: DeliveryMobilePreviewFrameProps) {
+export function DeliveryMobilePreviewFrame({
+  config,
+  categoriasGrupos = [],
+}: DeliveryMobilePreviewFrameProps) {
   const layoutNome = LAYOUT_MODELS.find(m => m.id === config.layoutId)?.nome ?? 'Básico'
   const themeStyle = applyDesignConfig(config)
-  const viewModel = buildMockDeliveryViewModel()
+  const viewModel = useMemo(
+    () =>
+      categoriasGrupos.length > 0
+        ? buildPreviewViewModelFromGrupos(categoriasGrupos)
+        : buildMockDeliveryViewModel(),
+    [categoriasGrupos]
+  )
   const LayoutHome = resolveDeliveryLayoutHome(config.layoutId)
 
   return (

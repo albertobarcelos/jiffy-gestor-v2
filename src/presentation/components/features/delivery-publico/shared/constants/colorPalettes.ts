@@ -36,7 +36,7 @@ export const COLOR_PALETTES: ColorPaletteDefinition[] = [
     id: 'mirtilo',
     nome: 'Mirtilo',
     premium: true,
-    publicavel: false,
+    publicavel: true,
     colors: {
       primary: colors.tertiary, // #006699 — azul médio (derivado da família do primary)
       primaryDark: colors.primary, // #003366 — azul escuro do projeto
@@ -108,4 +108,10 @@ export function getColorPaletteById(id: ColorPaletteId): ColorPaletteDefinition 
 
 export function canPublishPalette(paletteId: ColorPaletteId): boolean {
   return COLOR_PALETTES.find(p => p.id === paletteId)?.publicavel ?? false
+}
+
+export function getPublishablePaletteLabel(): string {
+  const names = COLOR_PALETTES.filter(p => p.publicavel).map(p => p.nome)
+  if (names.length <= 1) return names[0] ?? 'Lavanda'
+  return `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`
 }

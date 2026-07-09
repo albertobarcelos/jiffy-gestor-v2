@@ -49,7 +49,11 @@ export class GrupoProduto {
       json.ativoDelivery ?? false,
       json.ativoLocal ?? false,
       json.ordem,
-      typeof json.imagemUrl === 'string' ? json.imagemUrl : json.imagemUrl ?? null
+      typeof json.imagemUrl === 'string'
+        ? json.imagemUrl
+        : typeof json.imageURL === 'string'
+          ? json.imageURL
+          : json.imagemUrl ?? null
     )
   }
 
