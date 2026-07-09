@@ -71,46 +71,47 @@ export function DeliveryDesignCustomizerScreen() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-white">
-      <header className="shrink-0 border-b border-gray-200 px-4 pb-2 pt-2 md:px-6">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <Link
-            href="/configuracoes/empresa-delivery"
-            className="inline-flex items-center gap-1 text-sm font-semibold text-primary-text transition-colors hover:text-primary"
-          >
-            <MdArrowBack className="h-4 w-4" aria-hidden />
-            Voltar
-          </Link>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white lg:flex-row">
+      {/* Painel esquerdo: ações, abas e formulário */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:border-r lg:border-gray-200">
+        <header className="shrink-0 border-b border-gray-200 px-4 pt-2 md:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Link
+              href="/configuracoes/empresa-delivery"
+              className="inline-flex items-center gap-1 text-sm font-semibold text-primary-text transition-colors hover:text-primary"
+            >
+              <MdArrowBack className="h-4 w-4" aria-hidden />
+              Voltar
+            </Link>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={handleRestore}
-              disabled={!isDirty}
-              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold text-primary-text transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <MdRefresh className="h-4 w-4" aria-hidden />
-              Restaurar design
-            </button>
-            <button
-              type="button"
-              onClick={handlePublish}
-              disabled={!canPublish}
-              title={getPublishDisabledReason(draft)}
-              className="inline-flex h-9 items-center rounded-lg bg-secondary px-5 text-sm font-semibold text-white transition-colors hover:bg-secondary/90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Publicar
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleRestore}
+                disabled={!isDirty}
+                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold text-primary-text transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <MdRefresh className="h-4 w-4" aria-hidden />
+                Restaurar design
+              </button>
+              <button
+                type="button"
+                onClick={handlePublish}
+                disabled={!canPublish}
+                title={getPublishDisabledReason(draft)}
+                className="inline-flex h-9 items-center rounded-lg bg-secondary px-5 text-sm font-semibold text-white transition-colors hover:bg-secondary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Publicar
+              </button>
+            </div>
           </div>
-        </div>
 
-        <h1 className="mt-1.5 text-xl font-bold text-primary">Design</h1>
-        <div className="mt-2">
-          <DesignTabNav activeTab={activeTab} onTabChange={setActiveTab} />
-        </div>
-      </header>
+          <h1 className="mt-1 text-xl font-bold text-primary">Design</h1>
+          <div className="mt-1">
+            <DesignTabNav activeTab={activeTab} onTabChange={setActiveTab} />
+          </div>
+        </header>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         <div className="min-h-0 flex-1 overflow-y-auto p-3 md:p-4">
           {activeTab === 'cabecalho' && (
             <DesignCabecalhoTab
@@ -136,11 +137,12 @@ export function DeliveryDesignCustomizerScreen() {
             />
           )}
         </div>
-
-        <aside className="flex shrink-0 justify-center border-t border-gray-200 bg-gray-50 p-3 lg:sticky lg:top-0 lg:w-[min(100%,26.25rem)] lg:max-w-[26.25rem] lg:self-start lg:border-l lg:border-t-0 lg:p-4 xl:w-[min(100%,27.5rem)] xl:max-w-[27.5rem]">
-          <DeliveryMobilePreviewFrame config={draft} categoriasGrupos={previewCategoriasGrupos} />
-        </aside>
       </div>
+
+      {/* Preview: altura total da tela, coluna direita fixa (desktop) */}
+      <aside className="flex min-h-0 flex-1 flex-col overflow-hidden border-t border-gray-200 bg-gray-50 p-3 lg:w-[min(100%,26.25rem)] lg:max-w-[26.25rem] lg:flex-none lg:shrink-0 lg:border-l lg:border-t-0 lg:p-4 xl:w-[min(100%,27.5rem)] xl:max-w-[27.5rem]">
+        <DeliveryMobilePreviewFrame config={draft} categoriasGrupos={previewCategoriasGrupos} />
+      </aside>
     </div>
   )
 }

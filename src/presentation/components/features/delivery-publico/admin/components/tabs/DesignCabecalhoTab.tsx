@@ -1,7 +1,6 @@
 'use client'
 
 import type { DeliveryPublicoDesignConfig } from '../../../shared/types/deliveryPublicoDesignConfig'
-import { CABECALHO_NOME_MAX_LENGTH } from '../../../shared/constants/defaultDesignConfig'
 import { DeliveryImageUploadField } from '@/src/presentation/components/ui/DeliveryImageUploadField'
 import { useDesignCabecalhoMidia } from '../../hooks/useDesignCabecalhoMidia'
 
@@ -47,21 +46,14 @@ export function DesignCabecalhoTab({
           <input
             id="design-nome-negocio"
             type="text"
-            maxLength={CABECALHO_NOME_MAX_LENGTH}
+            readOnly
+            aria-readonly="true"
             value={cabecalho.nomeExibicao}
-            onChange={e =>
-              onChange(current => ({
-                ...current,
-                cabecalho: {
-                  ...current.cabecalho,
-                  nomeExibicao: e.target.value.slice(0, CABECALHO_NOME_MAX_LENGTH),
-                },
-              }))
-            }
-            className="mt-1 w-full max-w-md rounded-lg border border-gray-200 px-3 py-1.5 text-sm outline-none focus:border-primary"
+            title="Nome vindo do cadastro da empresa"
+            className="mt-1 w-full max-w-md cursor-not-allowed rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-primary-text outline-none"
           />
           <p className="mt-0.5 text-xs text-secondary-text">
-            {cabecalho.nomeExibicao.length}/{CABECALHO_NOME_MAX_LENGTH}
+            Nome fantasia da empresa, conforme cadastro.
           </p>
         </div>
       </section>

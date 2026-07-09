@@ -33,15 +33,15 @@ export function DeliveryMobilePreviewFrame({
   const LayoutHome = resolveDeliveryLayoutHome(config.layoutId)
 
   return (
-    <div className="flex w-full flex-col items-stretch">
-      <p className="mb-2 text-center text-xs font-semibold uppercase tracking-wide text-secondary-text">
+    <div className="flex h-full min-h-0 w-full flex-col items-stretch">
+      <p className="mb-2 shrink-0 text-center text-xs font-semibold uppercase tracking-wide text-secondary-text">
         Preview · {layoutNome}
       </p>
       <div
-        className="delivery-preview-shell relative overflow-hidden rounded-[2rem] border-8 border-gray-900 bg-white shadow-xl box-border"
+        className="delivery-preview-shell relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[2rem] border-8 border-gray-900 bg-white shadow-xl box-border"
         style={themeStyle}
       >
-        <div className="delivery-preview-viewport overflow-y-auto scrollbar-hide">
+        <div className="delivery-preview-viewport min-h-0 flex-1 overflow-y-auto scrollbar-hide">
           <div className="delivery-preview-scale-host">
             <div className="delivery-theme @container w-full min-w-0 overflow-x-hidden">
               <LayoutHome

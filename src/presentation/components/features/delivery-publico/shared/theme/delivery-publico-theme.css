@@ -53,11 +53,12 @@
   width: 100%;
   max-width: 24rem;
   margin-inline: auto;
+  min-height: 0;
 }
 
 .delivery-preview-viewport {
   width: 100%;
-  max-height: clamp(28rem, 72vh, 42rem);
+  min-height: 0;
 }
 
 .delivery-preview-scale-host {
