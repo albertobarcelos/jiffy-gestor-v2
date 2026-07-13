@@ -36,12 +36,12 @@ export function DeliveryTipoEntregaToggle({
                 isCheckoutTone
                   ? {
                       borderColor: active
-                        ? 'var(--delivery-primary)'
+                        ? 'var(--delivery-primary-dark)'
                         : 'color-mix(in srgb, var(--delivery-primary) 18%, transparent)',
                       backgroundColor: active
-                        ? 'var(--delivery-primary)'
+                        ? 'var(--delivery-primary-dark)'
                         : 'var(--delivery-surface-muted)',
-                      color: active ? '#ffffff' : 'var(--delivery-primary-dark)',
+                      color: active ? 'var(--delivery-btn-text, #ffffff)' : 'var(--delivery-primary-dark)',
                     }
                   : {
                       borderColor: active ? 'var(--delivery-primary)' : 'var(--delivery-border)',

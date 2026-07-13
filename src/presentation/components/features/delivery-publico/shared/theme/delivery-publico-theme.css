@@ -41,8 +41,8 @@
 }
 
 .delivery-grupo-title {
-  background-color: color-mix(in srgb, var(--delivery-primary) 40%, transparent);
-  color: var(--delivery-text);
+  background-color: var(--delivery-primary-dark);
+  color: var(--delivery-btn-text, #ffffff);
   font-family: var(--delivery-font-title);
 }
 
@@ -69,11 +69,8 @@
   position: sticky;
   top: var(--delivery-sticky-toolbar-h);
   z-index: 20;
-  background-color: color-mix(
-    in srgb,
-    var(--delivery-primary) 40%,
-    var(--delivery-bg, var(--delivery-surface))
-  );
+  background-color: var(--delivery-primary-dark);
+  color: var(--delivery-btn-text, #ffffff);
 }
 
 /**

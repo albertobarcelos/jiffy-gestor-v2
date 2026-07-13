@@ -17,7 +17,16 @@ export function DeliveryCheckoutFooter({ total, enviando, onConfirm }: DeliveryC
         <span className="delivery-text-accent">{formatDeliveryCurrency(total)}</span>
       </div>
 
-      <DeliveryButton fullWidth disabled={enviando} onClick={onConfirm} className="hidden sm:block">
+      <DeliveryButton
+        fullWidth
+        disabled={enviando}
+        onClick={onConfirm}
+        className="hidden sm:block"
+        style={{
+          backgroundColor: 'var(--delivery-primary-dark)',
+          color: 'var(--delivery-btn-text, #ffffff)',
+        }}
+      >
         {enviando ? 'Enviando...' : 'Confirmar pedido'}
       </DeliveryButton>
 
@@ -39,6 +48,10 @@ export function DeliveryCheckoutFooter({ total, enviando, onConfirm }: DeliveryC
           disabled={enviando}
           onClick={onConfirm}
           className="min-h-[48px] flex-shrink-0 px-5 py-3"
+          style={{
+            backgroundColor: 'var(--delivery-primary-dark)',
+            color: 'var(--delivery-btn-text, #ffffff)',
+          }}
         >
           {enviando ? 'Enviando...' : 'Confirmar'}
         </DeliveryButton>

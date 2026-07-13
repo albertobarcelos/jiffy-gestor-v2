@@ -18,7 +18,24 @@ import {
   type GrupoComplementoResolvido,
 } from '../utils/produtoComplementosUtils'
 
-export function useProdutoComplementos(slug: string, produto: CatalogoPublicoProdutoDTO) {
+function buildInitialQuantidades(
+  complementos?: DeliveryCarrinhoComplemento[]
+): Record<string, number> {
+  if (!complementos?.length) return {}
+  const map: Record<string, number> = {}
+  for (const c of complementos) {
+    const qtd = Math.max(0, Math.floor(c.quantidade))
+    if (qtd < 1) continue
+    map[chaveComplemento(c.grupoComplementoId, c.complementoId)] = qtd
+  }
+  return map
+}
+
+export function useProdutoComplementos(
+  slug: string,
+  produto: CatalogoPublicoProdutoDTO,
+  initialComplementos?: DeliveryCarrinhoComplemento[]
+) {
   const cacheComplementos = usePublicDeliveryComplementosStore(s => s.porSlug[slug] ?? null)
   const precisaComplementos = produto.abreComplementos && produto.grupoComplementosIds.length > 0
   const { isLoading: carregandoComplementos } = useEnsureComplementosCatalogo(
@@ -26,7 +43,9 @@ export function useProdutoComplementos(slug: string, produto: CatalogoPublicoPro
     precisaComplementos && !cacheComplementos
   )
 
-  const [quantidadesComplementos, setQuantidadesComplementos] = useState<Record<string, number>>({})
+  const [quantidadesComplementos, setQuantidadesComplementos] = useState<Record<string, number>>(
+    () => buildInitialQuantidades(initialComplementos)
+  )
 
   const grupos = useMemo(
     () => resolveGruposComplementos(cacheComplementos, produto),

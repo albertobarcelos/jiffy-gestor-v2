@@ -12,7 +12,7 @@ export function createDefaultDesignConfig(nomeExibicao = ''): DeliveryPublicoDes
       capaUrl: null,
     },
     cores: {
-      paletaId: 'lavanda',
+      paletaId: 'carvao',
     },
     tipografia: {
       presetId: 'urbana',

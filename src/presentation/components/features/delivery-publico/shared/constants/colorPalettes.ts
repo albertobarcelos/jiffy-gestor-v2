@@ -17,9 +17,16 @@ export type ColorPaletteDefinition = {
 
 /**
  * Paletas sugeridas do customizador Design.
- * Lavanda (padrão) usa exatamente `alternate` (roxo claro) e `secondary` (roxo escuro) do tema Jiffy.
+ * Carvão é o padrão temporário; Lavanda usa `alternate`/`secondary` do tema Jiffy.
  */
 export const COLOR_PALETTES: ColorPaletteDefinition[] = [
+  {
+    id: 'carvao',
+    nome: 'Carvão',
+    premium: false,
+    publicavel: true,
+    colors: { primary: '#525252', primaryDark: '#171717', surface: '#F5F5F5', text: '#171A1C' },
+  },
   {
     id: 'lavanda',
     nome: 'Lavanda',
@@ -93,13 +100,6 @@ export const COLOR_PALETTES: ColorPaletteDefinition[] = [
     publicavel: false,
     colors: { primary: '#EAB308', primaryDark: '#854D0E', surface: '#FFFFFF', text: '#171A1C' },
   },
-  {
-    id: 'carvao',
-    nome: 'Carvão',
-    premium: true,
-    publicavel: false,
-    colors: { primary: '#525252', primaryDark: '#171717', surface: '#F5F5F5', text: '#171A1C' },
-  },
 ]
 
 export function getColorPaletteById(id: ColorPaletteId): ColorPaletteDefinition {
@@ -112,6 +112,6 @@ export function canPublishPalette(paletteId: ColorPaletteId): boolean {
 
 export function getPublishablePaletteLabel(): string {
   const names = COLOR_PALETTES.filter(p => p.publicavel).map(p => p.nome)
-  if (names.length <= 1) return names[0] ?? 'Lavanda'
+  if (names.length <= 1) return names[0] ?? 'Carvão'
   return `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`
 }

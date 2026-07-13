@@ -11,7 +11,11 @@ import { DeliveryButton } from '../../shared/components/DeliveryButton'
 import { DeliveryTextarea } from '../../shared/components/DeliveryInput'
 import { DeliveryQuantidadeStepper } from '../../shared/components/DeliveryQuantidadeStepper'
 import { useProdutoComplementos } from '../../shared/hooks/useProdutoComplementos'
-import { useDeliveryCarrinhoStore } from '../../shared/stores/deliveryCarrinhoStore'
+import {
+  useDeliveryCarrinhoStore,
+  type DeliveryCarrinhoItem,
+} from '../../shared/stores/deliveryCarrinhoStore'
+import { observacaoItemCarrinho } from '../../shared/utils/deliveryCarrinhoItemUtils'
 import { formatDeliveryCurrency } from '../../shared/utils/formatDeliveryCurrency'
 
 type DeliveryProdutoModalProps = {
@@ -19,12 +23,14 @@ type DeliveryProdutoModalProps = {
   produto: CatalogoPublicoProdutoDTO
   onClose: () => void
   onAdicionado?: () => void
+  /** Quando informado, atualiza o item do carrinho em vez de adicionar um novo. */
+  itemEdicao?: DeliveryCarrinhoItem
 }
 
 function ComplementoThumb({ imagemUrl, nome }: { imagemUrl: string | null; nome: string }) {
   return (
     <div
-      className="relative h-8 w-8 shrink-0 overflow-hidden rounded-md"
+      className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md"
       style={{ backgroundColor: 'var(--delivery-surface-muted)' }}
     >
       {imagemUrl ? (
@@ -33,7 +39,7 @@ function ComplementoThumb({ imagemUrl, nome }: { imagemUrl: string | null; nome:
       ) : (
         <div className="flex h-full w-full items-center justify-center">
           <Camera
-            className="h-3.5 w-3.5"
+            className="h-4 w-4"
             style={{ color: 'var(--delivery-text-muted)' }}
             aria-hidden
           />
@@ -49,11 +55,17 @@ export function DeliveryProdutoModal({
   produto,
   onClose,
   onAdicionado,
+  itemEdicao,
 }: DeliveryProdutoModalProps) {
   const adicionarItem = useDeliveryCarrinhoStore(s => s.adicionarItem)
-  const [quantidade, setQuantidade] = useState(1)
-  const [observacao, setObservacao] = useState('')
-  const [adicionando, setAdicionando] = useState(false)
+  const substituirItem = useDeliveryCarrinhoStore(s => s.substituirItem)
+  const isEdicao = Boolean(itemEdicao)
+
+  const [quantidade, setQuantidade] = useState(itemEdicao?.quantidade ?? 1)
+  const [observacao, setObservacao] = useState(
+    itemEdicao ? observacaoItemCarrinho(itemEdicao) : ''
+  )
+  const [salvando, setSalvando] = useState(false)
 
   const {
     grupos,
@@ -65,23 +77,22 @@ export function DeliveryProdutoModal({
     ajustarQuantidadeComplemento,
     getQuantidadeComplemento,
     validar,
-  } = useProdutoComplementos(slug, produto)
+  } = useProdutoComplementos(slug, produto, itemEdicao?.complementos)
 
   const valorUnitario = produto.valor + valorComplementosUnitario
   const valorTotal = valorUnitario * quantidade
 
-  const handleAdicionar = () => {
+  const handleSalvar = () => {
     if (precisaComplementos && !cacheComplementos) {
       showToast.error('Aguarde o carregamento das opções do produto')
       return
     }
     if (grupos.length > 0 && !validar()) return
 
-    setAdicionando(true)
+    setSalvando(true)
     try {
       const observacoes = observacao.trim().length >= 3 ? [observacao.trim()] : []
-
-      adicionarItem(slug, {
+      const payload = {
         produtoId: produto.id,
         produtoNome: produto.nome,
         produtoImagemUrl: produto.imagemUrl,
@@ -90,12 +101,19 @@ export function DeliveryProdutoModal({
         valorTotal,
         observacoes,
         complementos: complementosSelecionados,
-      })
-      showToast.success('Produto adicionado ao carrinho!')
-      onAdicionado?.()
+      }
+
+      if (itemEdicao) {
+        substituirItem(slug, itemEdicao.id, payload)
+        showToast.success('Item atualizado!')
+      } else {
+        adicionarItem(slug, payload)
+        showToast.success('Produto adicionado ao carrinho!')
+        onAdicionado?.()
+      }
       onClose()
     } finally {
-      setAdicionando(false)
+      setSalvando(false)
     }
   }
 
@@ -137,10 +155,21 @@ export function DeliveryProdutoModal({
             <div className="space-y-4">
               {grupos.map(grupo => (
                 <div key={grupo.id}>
-                  <p className="delivery-font-title mb-1.5 text-sm font-semibold uppercase tracking-wide delivery-text-primary">
-                    {grupo.nome}
-                    {grupo.obrigatorio ? <span className="ml-1 text-red-500">*</span> : null}
-                  </p>
+                  <div
+                    className="mb-1.5 flex items-baseline justify-between gap-2 rounded-md px-2.5 py-1.5"
+                    style={{
+                      backgroundColor: 'var(--delivery-primary-dark)',
+                      color: 'var(--delivery-btn-text, #ffffff)',
+                    }}
+                  >
+                    <p className="delivery-font-title min-w-0 text-sm font-semibold uppercase tracking-wide">
+                      {grupo.nome}
+                      {grupo.obrigatorio ? <span className="ml-1 text-red-400">*</span> : null}
+                    </p>
+                    <span className="shrink-0 text-xs font-medium tabular-nums opacity-90">
+                      Min: {grupo.qtdMinima} - Max: {grupo.qtdMaxima}
+                    </span>
+                  </div>
                   <div>
                     {grupo.complementos.map(comp => {
                       const qtdComp = getQuantidadeComplemento(grupo.id, comp.id)
@@ -149,20 +178,22 @@ export function DeliveryProdutoModal({
                       return (
                         <div
                           key={comp.id}
-                          className="flex items-center justify-between gap-2 py-1.5"
+                          className="flex items-center justify-between gap-3 py-1.5"
                         >
-                          <div className="flex min-w-0 flex-1 items-center gap-2">
+                          <div className="flex min-w-0 flex-1 items-start gap-2.5">
                             <ComplementoThumb imagemUrl={comp.imagemUrl} nome={comp.nome} />
-                            <span
-                              className="min-w-0 flex-1 truncate text-sm font-medium delivery-text-primary"
-                              title={comp.nome}
-                            >
-                              {comp.nome}
-                            </span>
+                            <div className="min-w-0 flex-1 pt-0.5">
+                              <p
+                                className="truncate text-sm font-medium leading-snug delivery-text-primary"
+                                title={comp.nome}
+                              >
+                                {comp.nome}
+                              </p>
+                              <p className="mt-0.5 text-xs font-semibold tabular-nums delivery-text-accent sm:text-sm">
+                                {formatarValorComplemento(comp.valor, tipoIp)}
+                              </p>
+                            </div>
                           </div>
-                          <span className="shrink-0 text-sm font-semibold tabular-nums delivery-text-accent">
-                            {formatarValorComplemento(comp.valor, tipoIp)}
-                          </span>
                           <DeliveryQuantidadeStepper
                             size="sm"
                             value={qtdComp}
@@ -220,10 +251,18 @@ export function DeliveryProdutoModal({
 
         <DeliveryButton
           fullWidth
-          disabled={adicionando || (precisaComplementos && carregandoComplementos && !cacheComplementos)}
-          onClick={handleAdicionar}
+          disabled={salvando || (precisaComplementos && carregandoComplementos && !cacheComplementos)}
+          onClick={handleSalvar}
+          style={{
+            backgroundColor: 'var(--delivery-primary-dark)',
+            color: 'var(--delivery-btn-text, #ffffff)',
+          }}
         >
-          {adicionando ? 'Adicionando...' : `Adicionar · ${formatDeliveryCurrency(valorTotal)}`}
+          {salvando
+            ? isEdicao
+              ? 'Salvando...'
+              : 'Adicionando...'
+            : `${isEdicao ? 'Salvar' : 'Adicionar'} · ${formatDeliveryCurrency(valorTotal)}`}
         </DeliveryButton>
       </div>
     </div>
