@@ -1,5 +1,10 @@
 import type { Produto } from '@/src/domain/entities/Produto'
-import type { FiscalCampoChave, FiscalLoteDraft } from '../types'
+import { CAMPOS_FISCAL_LOTE } from '../constants'
+import type {
+  FiscalCampoChave,
+  FiscalLoteDraft,
+  FiscalLoteFalhaExibida,
+} from '../types'
 
 export type FiscalLoteAlteracoes = {
   ncm?: string | null
@@ -113,4 +118,44 @@ export function ncmComumDosProdutosSelecionados(
   }
 
   return comum
+}
+
+function labelCampoFiscal(campo?: string): string | undefined {
+  if (!campo?.trim()) return undefined
+  const chave = campo.trim() as FiscalCampoChave
+  return CAMPOS_FISCAL_LOTE.find(c => c.chave === chave)?.label ?? chave
+}
+
+/**
+ * Converte `errosDetalhe` da API em itens exibíveis (com nome do produto quando disponível).
+ */
+export function mapearErrosDetalheFiscalLote(
+  errosDetalhe: Array<{ produtoId?: string; mensagem?: string; campo?: string }>,
+  produtos: Produto[]
+): FiscalLoteFalhaExibida[] {
+  const porId = new Map(produtos.map(p => [p.getId(), p]))
+  const falhas: FiscalLoteFalhaExibida[] = []
+
+  for (const erro of errosDetalhe) {
+    const produtoId = typeof erro.produtoId === 'string' ? erro.produtoId.trim() : ''
+    if (!produtoId) continue
+    const mensagem =
+      typeof erro.mensagem === 'string' && erro.mensagem.trim() !== ''
+        ? erro.mensagem.trim()
+        : 'Não foi possível atualizar este produto.'
+    const campo =
+      typeof erro.campo === 'string' && erro.campo.trim() !== ''
+        ? erro.campo.trim()
+        : undefined
+    const produto = porId.get(produtoId)
+    falhas.push({
+      produtoId,
+      nomeProduto: produto?.getNome().trim() || produtoId,
+      mensagem,
+      campo,
+      labelCampo: labelCampoFiscal(campo),
+    })
+  }
+
+  return falhas
 }

@@ -79,6 +79,7 @@ export function AtualizarProdutosLote() {
 
   const {
     produtosSelecionados,
+    setProdutosSelecionados,
     produtosExpandidos,
     produtosAlteradosPorAba,
     produtosExibicao,
@@ -128,7 +129,7 @@ export function AtualizarProdutosLote() {
     activeTab,
     produtos,
     produtosSelecionados,
-    limparSelecaoProdutos,
+    setProdutosSelecionados,
     marcarProdutosAlteradosNaSessao,
     buscarProdutos,
   })

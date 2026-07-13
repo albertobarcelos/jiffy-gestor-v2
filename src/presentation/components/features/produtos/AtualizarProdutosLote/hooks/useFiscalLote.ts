@@ -6,6 +6,7 @@ import { showToast } from '@/src/shared/utils/toast'
 import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { CAMPOS_FISCAL_LOTE, FISCAL_LOTE_VAZIO } from '../constants'
 import {
+  mapearErrosDetalheFiscalLote,
   montarPayloadFiscalLote,
   montarPayloadLimparFiscalLote,
   ncmComumDosProdutosSelecionados,
@@ -13,7 +14,12 @@ import {
   produtosSelecionadosSemNcm,
   type FiscalLoteRequestPayload,
 } from '../rules/fiscalLote.rules'
-import type { FiscalCampoChave, ModoFiscalLote, TabPainelLote } from '../types'
+import type {
+  FiscalCampoChave,
+  FiscalLoteFalhaExibida,
+  ModoFiscalLote,
+  TabPainelLote,
+} from '../types'
 import {
   atualizarFiscalProdutosLote,
   type FiscalLoteApiResponse,
@@ -24,39 +30,58 @@ export interface UseFiscalLoteParams {
   activeTab: TabPainelLote
   produtos: Produto[]
   produtosSelecionados: Set<string>
-  limparSelecaoProdutos: () => void
+  setProdutosSelecionados: (ids: Set<string>) => void
   marcarProdutosAlteradosNaSessao: (ids: string[], aba: 'fiscal') => void
   buscarProdutos: () => Promise<unknown>
 }
 
-async function processarResultadoFiscalLote(
-  status: number,
-  data: FiscalLoteApiResponse,
-  marcarProdutosAlteradosNaSessao: (ids: string[], aba: 'fiscal') => void,
-  buscarProdutos: () => Promise<unknown>,
-  limparSelecaoProdutos: () => void,
+type ProcessarResultadoParams = {
+  status: number
+  data: FiscalLoteApiResponse
+  produtos: Produto[]
+  marcarProdutosAlteradosNaSessao: (ids: string[], aba: 'fiscal') => void
+  setProdutosSelecionados: (ids: Set<string>) => void
+  buscarProdutos: () => Promise<unknown>
   mensagemSucesso: string
-) {
+  onFalhas: (falhas: FiscalLoteFalhaExibida[]) => void
+}
+
+async function processarResultadoFiscalLote({
+  status,
+  data,
+  produtos,
+  marcarProdutosAlteradosNaSessao,
+  setProdutosSelecionados,
+  buscarProdutos,
+  mensagemSucesso,
+  onFalhas,
+}: ProcessarResultadoParams) {
   const produtosOk = Array.isArray(data.produtos) ? data.produtos : []
-  const errosDetalhe = Array.isArray(data.errosDetalhe) ? data.errosDetalhe : []
+  const errosDetalheRaw = Array.isArray(data.errosDetalhe) ? data.errosDetalhe : []
+  const falhasExibidas = mapearErrosDetalheFiscalLote(errosDetalheRaw, produtos)
   const idsComSucesso = produtosOk
     .map(p => p.produtoId)
     .filter((id): id is string => typeof id === 'string' && id.trim() !== '')
 
   const sucesso = idsComSucesso.length
-  const falhas = typeof data.erros === 'number' ? data.erros : errosDetalhe.length
+  const falhas =
+    typeof data.erros === 'number' && data.erros > 0
+      ? data.erros
+      : falhasExibidas.length
 
   if (idsComSucesso.length > 0) {
     marcarProdutosAlteradosNaSessao(idsComSucesso, 'fiscal')
   }
 
   await buscarProdutos()
-  limparSelecaoProdutos()
 
-  if (errosDetalhe.length > 0) {
-    errosDetalhe.forEach(f =>
-      console.error(`Fiscal produto ${f.produtoId ?? '?'}:`, f.mensagem ?? 'erro')
-    )
+  // Mantém selecionados só os que falharam (facilita retentar / corrigir NCM).
+  if (falhasExibidas.length > 0) {
+    setProdutosSelecionados(new Set(falhasExibidas.map(f => f.produtoId)))
+    onFalhas(falhasExibidas)
+  } else {
+    setProdutosSelecionados(new Set())
+    onFalhas([])
   }
 
   if (status >= 200 && status < 300 && falhas === 0) {
@@ -65,7 +90,7 @@ async function processarResultadoFiscalLote(
   }
 
   if (sucesso > 0) {
-    const primeiraMsg = errosDetalhe[0]?.mensagem?.trim()
+    const primeiraMsg = falhasExibidas[0]?.mensagem
     showToast.warning(
       primeiraMsg
         ? `${sucesso} atualizado(s). ${falhas} falhou(ram): ${primeiraMsg}`
@@ -75,7 +100,7 @@ async function processarResultadoFiscalLote(
   }
 
   const msgErro =
-    errosDetalhe[0]?.mensagem?.trim() ||
+    falhasExibidas[0]?.mensagem ||
     (typeof data.message === 'string' && data.message.trim() !== ''
       ? data.message.trim()
       : 'Não foi possível atualizar os dados fiscais.')
@@ -86,7 +111,7 @@ export function useFiscalLote({
   activeTab,
   produtos,
   produtosSelecionados,
-  limparSelecaoProdutos,
+  setProdutosSelecionados,
   marcarProdutosAlteradosNaSessao,
   buscarProdutos,
 }: UseFiscalLoteParams) {
@@ -96,6 +121,7 @@ export function useFiscalLote({
     Set<FiscalCampoChave>
   >(new Set())
   const [isSalvandoFiscal, setIsSalvandoFiscal] = useState(false)
+  const [falhasFiscalLote, setFalhasFiscalLote] = useState<FiscalLoteFalhaExibida[]>([])
 
   const fiscalLoteMutation = useSecureTenantMutation(
     async ({ token }, payload: FiscalLoteRequestPayload) =>
@@ -120,6 +146,10 @@ export function useFiscalLote({
 
   const limparSelecaoCamposLimpar = useCallback(() => {
     setFiscalCamposLimparSelecionados(new Set())
+  }, [])
+
+  const fecharFalhasFiscalLote = useCallback(() => {
+    setFalhasFiscalLote([])
   }, [])
 
   const setModoFiscal = useCallback((modo: ModoFiscalLote) => {
@@ -160,6 +190,7 @@ export function useFiscalLote({
     setModoFiscalState('editar')
     setFiscalLoteDraft(FISCAL_LOTE_VAZIO)
     setFiscalCamposLimparSelecionados(new Set())
+    setFalhasFiscalLote([])
   }, [])
 
   /** Limpa apenas os campos do formulário (não altera produtos). */
@@ -246,14 +277,16 @@ export function useFiscalLote({
     setIsSalvandoFiscal(true)
     try {
       const { status, data } = await fiscalLoteMutation.mutateAsync(payload)
-      await processarResultadoFiscalLote(
+      await processarResultadoFiscalLote({
         status,
         data,
+        produtos,
         marcarProdutosAlteradosNaSessao,
+        setProdutosSelecionados,
         buscarProdutos,
-        limparSelecaoProdutos,
-        'Dados fiscais atualizados!'
-      )
+        mensagemSucesso: 'Dados fiscais atualizados!',
+        onFalhas: setFalhasFiscalLote,
+      })
     } catch (error: unknown) {
       console.error('Erro ao aplicar fiscal em lote', error)
       const message = error instanceof Error ? error.message : 'Erro ao aplicar dados fiscais'
@@ -268,11 +301,11 @@ export function useFiscalLote({
     fiscalLoteMutation,
     isValidatingCest,
     isValidatingNcm,
-    limparSelecaoProdutos,
     marcarProdutosAlteradosNaSessao,
     ncmValidation,
     produtos,
     produtosSelecionados,
+    setProdutosSelecionados,
   ])
 
   const aplicarLimparFiscal = useCallback(async () => {
@@ -291,14 +324,16 @@ export function useFiscalLote({
     setIsSalvandoFiscal(true)
     try {
       const { status, data } = await fiscalLoteMutation.mutateAsync(payload)
-      await processarResultadoFiscalLote(
+      await processarResultadoFiscalLote({
         status,
         data,
+        produtos,
         marcarProdutosAlteradosNaSessao,
+        setProdutosSelecionados,
         buscarProdutos,
-        limparSelecaoProdutos,
-        'Campos fiscais limpos!'
-      )
+        mensagemSucesso: 'Campos fiscais limpos!',
+        onFalhas: setFalhasFiscalLote,
+      })
     } catch (error: unknown) {
       console.error('Erro ao limpar fiscal em lote', error)
       const message = error instanceof Error ? error.message : 'Erro ao limpar dados fiscais'
@@ -310,9 +345,10 @@ export function useFiscalLote({
     buscarProdutos,
     fiscalCamposLimparSelecionados,
     fiscalLoteMutation,
-    limparSelecaoProdutos,
     marcarProdutosAlteradosNaSessao,
+    produtos,
     produtosSelecionados,
+    setProdutosSelecionados,
   ])
 
   const aplicarFiscalEmLote = useCallback(async () => {
@@ -397,6 +433,8 @@ export function useFiscalLote({
     formularioFiscalTemConteudo,
     limparInputsFormulario,
     resetDraft,
+    falhasFiscalLote,
+    fecharFalhasFiscalLote,
     ...validacao,
   }
 }

@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import type { Impressora } from '@/src/domain/entities/Impressora'
 import type { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import type { TabPainelLote } from '../types'
@@ -8,6 +9,7 @@ import type { useGruposComplementosLote } from '../hooks/useGruposComplementosLo
 import type { useImpressorasLote } from '../hooks/useImpressorasLote'
 import type { usePermissoesLote } from '../hooks/usePermissoesLote'
 import type { usePrecoLote } from '../hooks/usePrecoLote'
+import { LoteFiscalFalhasDialog } from './LoteFiscalFalhasDialog'
 import { LotePainelFiscal } from './LotePainelFiscal'
 import { LotePainelGruposComplementos } from './LotePainelGruposComplementos'
 import { LotePainelImpressoras } from './LotePainelImpressoras'
@@ -56,9 +58,11 @@ export function LotePainelAcoes({
     produtosSelecionadosCount,
   }
 
+  let painel: ReactNode = null
+
   switch (activeTab) {
     case 'precos':
-      return (
+      painel = (
         <LotePainelPrecos
           adjustMode={precoLote.adjustMode}
           setAdjustMode={precoLote.setAdjustMode}
@@ -70,8 +74,9 @@ export function LotePainelAcoes({
           {...busy}
         />
       )
+      break
     case 'impressoras':
-      return (
+      painel = (
         <LotePainelImpressoras
           modoImpressora={impressorasLote.modoImpressora}
           setModoImpressora={impressorasLote.setModoImpressora}
@@ -86,8 +91,9 @@ export function LotePainelAcoes({
           {...busy}
         />
       )
+      break
     case 'gruposComplementos':
-      return (
+      painel = (
         <LotePainelGruposComplementos
           modoGrupoComplemento={gruposLote.modoGrupoComplemento}
           setModoGrupoComplemento={gruposLote.setModoGrupoComplemento}
@@ -102,8 +108,9 @@ export function LotePainelAcoes({
           {...busy}
         />
       )
+      break
     case 'permissoes':
-      return (
+      painel = (
         <LotePainelPermissoes
           modoPermissao={permissoesLote.modoPermissao}
           setModoPermissao={permissoesLote.setModoPermissao}
@@ -116,8 +123,9 @@ export function LotePainelAcoes({
           {...busy}
         />
       )
+      break
     case 'fiscal':
-      return (
+      painel = (
         <LotePainelFiscal
           modoFiscal={fiscalLote.modoFiscal}
           setModoFiscal={fiscalLote.setModoFiscal}
@@ -143,7 +151,18 @@ export function LotePainelAcoes({
           {...busy}
         />
       )
+      break
     default:
-      return null
+      painel = null
   }
+
+  return (
+    <>
+      {painel}
+      <LoteFiscalFalhasDialog
+        falhas={fiscalLote.falhasFiscalLote}
+        onClose={fiscalLote.fecharFalhasFiscalLote}
+      />
+    </>
+  )
 }

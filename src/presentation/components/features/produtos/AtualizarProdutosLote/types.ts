@@ -74,6 +74,15 @@ export interface CestPorNcmItem {
   numeroAnexo?: string
 }
 
+/** Falha de um item no PATCH fiscal em lote, enriquecida para exibição. */
+export interface FiscalLoteFalhaExibida {
+  produtoId: string
+  nomeProduto: string
+  mensagem: string
+  campo?: string
+  labelCampo?: string
+}
+
 /** Filtros da listagem de produtos no fluxo de lote (enviados à API). */
 export type ProdutosLoteFilterState = {
   searchText: string
