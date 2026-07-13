@@ -207,6 +207,9 @@ export function LotePainelFiscal({
               })}
             </div>
           </div>
+          <p className="text-xs text-secondary-text">
+            NCM não pode ser removido após o cadastro.
+          </p>
         </div>
       ) : (
         <>

@@ -55,7 +55,15 @@ export function validarCampoFiscalInlineLocal(
   const trimmed = valorBruto.trim()
 
   if (coluna === 'ncm') {
-    if (trimmed === '') return { ok: true, valorNormalizado: null }
+    if (trimmed === '') {
+      if (produto.getNcm().trim() !== '') {
+        return {
+          ok: false,
+          mensagem: 'NCM cadastrado não pode ser removido.',
+        }
+      }
+      return { ok: true, valorNormalizado: null }
+    }
     const ncmT = trimmed.replace(/\D/g, '').slice(0, 8)
     if (ncmT.length !== 8) {
       return { ok: false, mensagem: 'O código NCM deve conter exatamente 8 dígitos numéricos.' }

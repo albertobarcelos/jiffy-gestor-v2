@@ -64,13 +64,24 @@ export const sxCheckboxListaLote: SxProps<Theme> = {
   },
 }
 
-/** Campos fiscais exibidos no modo "Limpar campos selecionados". */
+/** Labels dos campos fiscais (exibição de erros e formulários). */
+export const LABELS_CAMPO_FISCAL: Record<FiscalCampoChave, string> = {
+  ncm: 'NCM',
+  cest: 'CEST',
+  origemMercadoria: 'Origem da Mercadoria',
+  tipoProduto: 'Tipo do Produto',
+  indicadorProducaoEscala: 'Indicador Produção em Escala',
+}
+
+/**
+ * Campos fiscais no modo "Limpar campos selecionados".
+ * NCM fica de fora: o fiscal não aceita remoção após cadastrado.
+ */
 export const CAMPOS_FISCAL_LOTE: { chave: FiscalCampoChave; label: string }[] = [
-  { chave: 'ncm', label: 'NCM' },
-  { chave: 'cest', label: 'CEST' },
-  { chave: 'origemMercadoria', label: 'Origem da Mercadoria' },
-  { chave: 'tipoProduto', label: 'Tipo do Produto' },
-  { chave: 'indicadorProducaoEscala', label: 'Indicador Produção em Escala' },
+  { chave: 'cest', label: LABELS_CAMPO_FISCAL.cest },
+  { chave: 'origemMercadoria', label: LABELS_CAMPO_FISCAL.origemMercadoria },
+  { chave: 'tipoProduto', label: LABELS_CAMPO_FISCAL.tipoProduto },
+  { chave: 'indicadorProducaoEscala', label: LABELS_CAMPO_FISCAL.indicadorProducaoEscala },
 ]
 
 export const FISCAL_LOTE_VAZIO: FiscalLoteDraft = {

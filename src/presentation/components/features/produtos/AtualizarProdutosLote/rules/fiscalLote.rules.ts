@@ -1,5 +1,5 @@
 import type { Produto } from '@/src/domain/entities/Produto'
-import { CAMPOS_FISCAL_LOTE } from '../constants'
+import { LABELS_CAMPO_FISCAL } from '../constants'
 import type {
   FiscalCampoChave,
   FiscalLoteDraft,
@@ -60,11 +60,13 @@ export function montarPayloadLimparFiscalLote(
   if (campos.size === 0) return null
 
   const alteracoes: FiscalLoteAlteracoes = {}
-  if (campos.has('ncm')) alteracoes.ncm = null
+  // NCM não pode ser limpo: o fiscal rejeita remoção após cadastro.
   if (campos.has('cest')) alteracoes.cest = null
   if (campos.has('origemMercadoria')) alteracoes.origemMercadoria = null
   if (campos.has('tipoProduto')) alteracoes.tipoProduto = null
   if (campos.has('indicadorProducaoEscala')) alteracoes.indicadorProducaoEscala = null
+
+  if (Object.keys(alteracoes).length === 0) return null
 
   return { produtoIds, alteracoes }
 }
@@ -123,7 +125,7 @@ export function ncmComumDosProdutosSelecionados(
 function labelCampoFiscal(campo?: string): string | undefined {
   if (!campo?.trim()) return undefined
   const chave = campo.trim() as FiscalCampoChave
-  return CAMPOS_FISCAL_LOTE.find(c => c.chave === chave)?.label ?? chave
+  return LABELS_CAMPO_FISCAL[chave] ?? chave
 }
 
 /**
