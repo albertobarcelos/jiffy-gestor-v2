@@ -1,8 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { criarPedidoPublico } from '@/src/infrastructure/api/publicDeliveryApi'
+import type { ClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import {
+  buscarClienteDeliveryPublico,
+  criarPedidoPublico,
+} from '@/src/infrastructure/api/publicDeliveryApi'
 import { usePublicDeliveryMeiosPagamento } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import { showToast } from '@/src/shared/utils/toast'
 import {
@@ -15,22 +19,58 @@ import {
   type DeliveryTipoEntrega,
 } from '../stores/deliveryPreferenciaEntregaStore'
 import {
+  garantirEnderecoEntregaPublico,
+  normalizarClienteDeliveryPublico,
+} from '../utils/garantirEnderecoClientePublico'
+import {
   montarPedidoPublico,
   type CheckoutFormData,
 } from '../utils/montarPedidoPublico'
+
+export type ClienteLookupStatus =
+  | 'idle'
+  | 'loading'
+  | 'encontrado'
+  | 'nao_encontrado'
+  | 'erro'
+
+export type ClienteLookupState = {
+  status: ClienteLookupStatus
+  telefoneConsultado: string | null
+  cliente: ClienteDeliveryPublicoDTO | null
+  mensagemErro: string | null
+}
 
 function createInitialForm(tipoEntrega: DeliveryTipoEntrega): CheckoutFormData {
   return {
     tipoEntrega,
     telefone: '',
     nome: '',
+    modoEndereco: 'novo',
+    enderecoIdSelecionado: '',
     rua: '',
     numero: '',
     bairro: '',
     cidade: '',
+    estado: '',
     meioPagamentoId: '',
   }
 }
+
+function createInitialLookup(): ClienteLookupState {
+  return {
+    status: 'idle',
+    telefoneConsultado: null,
+    cliente: null,
+    mensagemErro: null,
+  }
+}
+
+function onlyDigits(value: string): string {
+  return value.replace(/\D/g, '')
+}
+
+const LOOKUP_DEBOUNCE_MS = 450
 
 export function useDeliveryCheckout(slug: string) {
   const router = useRouter()
@@ -46,7 +86,18 @@ export function useDeliveryCheckout(slug: string) {
       useDeliveryPreferenciaEntregaStore.getState().getTipoEntrega(slug)
     )
   )
+  const [clienteLookup, setClienteLookup] = useState<ClienteLookupState>(createInitialLookup)
   const [enviando, setEnviando] = useState(false)
+
+  const lookupSeqRef = useRef(0)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const telefoneDigitsRef = useRef('')
+  /** Escolha explícita do usuário; não pode ser sobrescrita pelo lookup. */
+  const preferirNovoEnderecoRef = useRef(false)
+  const formRef = useRef(form)
+  formRef.current = form
+  const clienteLookupRef = useRef(clienteLookup)
+  clienteLookupRef.current = clienteLookup
 
   useEffect(() => {
     const syncTipoEntregaFromStore = () => {
@@ -64,25 +115,275 @@ export function useDeliveryCheckout(slug: string) {
     return useDeliveryPreferenciaEntregaStore.persist.onFinishHydration(syncTipoEntregaFromStore)
   }, [slug])
 
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [])
+
+  const aplicarClienteNoForm = useCallback((cliente: ClienteDeliveryPublicoDTO | null) => {
+    setForm(prev => {
+      const enderecos = cliente?.enderecos ?? []
+      const primeiro = enderecos[0]
+      const nomeApi = cliente?.nome?.trim() ?? ''
+      const nome = nomeApi || prev.nome.trim() || ''
+
+      // Só atualiza nome; modo de endereço fica com a escolha do usuário.
+      if (preferirNovoEnderecoRef.current) {
+        return {
+          ...prev,
+          nome,
+          modoEndereco: 'novo',
+          enderecoIdSelecionado: '',
+        }
+      }
+
+      if (enderecos.length > 0 && primeiro) {
+        // Mantém endereço já escolhido se ainda existir no cadastro.
+        const idAtual = prev.enderecoIdSelecionado.trim()
+        const idValido =
+          idAtual && enderecos.some(e => e.id === idAtual) ? idAtual : primeiro.id
+
+        return {
+          ...prev,
+          nome,
+          modoEndereco: 'existente',
+          enderecoIdSelecionado: idValido,
+        }
+      }
+
+      return {
+        ...prev,
+        nome,
+        modoEndereco: 'novo',
+        enderecoIdSelecionado: '',
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    if (clienteLookup.status !== 'encontrado') return
+    const nomeApi = clienteLookup.cliente?.nome?.trim()
+    if (!nomeApi) return
+    const telConsultado = clienteLookup.telefoneConsultado
+    if (!telConsultado) return
+    if (onlyDigits(formRef.current.telefone) !== telConsultado) return
+
+    setForm(prev => {
+      if (prev.nome.trim()) return prev
+      return { ...prev, nome: nomeApi }
+    })
+  }, [
+    clienteLookup.status,
+    clienteLookup.cliente,
+    clienteLookup.telefoneConsultado,
+  ])
+
+  const consultarClientePorTelefone = useCallback(
+    async (telefoneDigits: string) => {
+      const tel = onlyDigits(telefoneDigits)
+      telefoneDigitsRef.current = tel
+
+      if (tel.length < 10) {
+        preferirNovoEnderecoRef.current = false
+        setClienteLookup(createInitialLookup())
+        setForm(prev => ({
+          ...prev,
+          modoEndereco: 'novo',
+          enderecoIdSelecionado: '',
+        }))
+        return
+      }
+
+      const lookupAtual = clienteLookupRef.current
+      if (
+        lookupAtual.telefoneConsultado === tel &&
+        (lookupAtual.status === 'encontrado' ||
+          lookupAtual.status === 'nao_encontrado')
+      ) {
+        return
+      }
+
+      const seq = ++lookupSeqRef.current
+      // Não troca para loading se já temos cliente na tela — evita “piscar” o form.
+      setClienteLookup(prev => {
+        if (prev.cliente && prev.telefoneConsultado === tel) {
+          return { ...prev, mensagemErro: null }
+        }
+        return {
+          ...prev,
+          status: 'loading',
+          mensagemErro: null,
+        }
+      })
+
+      try {
+        const raw = await buscarClienteDeliveryPublico(tel)
+        if (seq !== lookupSeqRef.current) return
+
+        if (!raw) {
+          preferirNovoEnderecoRef.current = false
+          setClienteLookup({
+            status: 'nao_encontrado',
+            telefoneConsultado: tel,
+            cliente: null,
+            mensagemErro: null,
+          })
+          aplicarClienteNoForm(null)
+          return
+        }
+
+        const cliente = normalizarClienteDeliveryPublico(raw)
+        if (!cliente) {
+          setClienteLookup({
+            status: 'erro',
+            telefoneConsultado: tel,
+            cliente: null,
+            mensagemErro: 'Resposta inválida ao buscar cliente',
+          })
+          return
+        }
+
+        setClienteLookup({
+          status: 'encontrado',
+          telefoneConsultado: tel,
+          cliente,
+          mensagemErro: null,
+        })
+        aplicarClienteNoForm(cliente)
+      } catch (error) {
+        if (seq !== lookupSeqRef.current) return
+        const message =
+          error instanceof Error ? error.message : 'Erro ao consultar cadastro'
+        setClienteLookup({
+          status: 'erro',
+          telefoneConsultado: tel,
+          cliente: null,
+          mensagemErro: message,
+        })
+      }
+    },
+    [aplicarClienteNoForm]
+  )
+
+  const agendarConsultaTelefone = useCallback(
+    (telefoneMasked: string) => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+      const tel = onlyDigits(telefoneMasked)
+      telefoneDigitsRef.current = tel
+
+      if (tel.length < 10) {
+        lookupSeqRef.current += 1
+        preferirNovoEnderecoRef.current = false
+        setClienteLookup(createInitialLookup())
+        setForm(prev => ({
+          ...prev,
+          modoEndereco: 'novo',
+          enderecoIdSelecionado: '',
+        }))
+        return
+      }
+
+      if (clienteLookupRef.current.telefoneConsultado !== tel) {
+        preferirNovoEnderecoRef.current = false
+      }
+
+      debounceRef.current = setTimeout(() => {
+        void consultarClientePorTelefone(tel)
+      }, LOOKUP_DEBOUNCE_MS)
+    },
+    [consultarClientePorTelefone]
+  )
+
   const updateForm = useCallback(
     <K extends keyof CheckoutFormData>(key: K, value: CheckoutFormData[K]) => {
+      if (key === 'telefone') {
+        telefoneDigitsRef.current = onlyDigits(String(value))
+      }
       setForm(prev => ({ ...prev, [key]: value }))
       if (key === 'tipoEntrega') {
         setTipoEntregaPreferencia(slug, value as DeliveryTipoEntrega)
       }
+      if (key === 'telefone') {
+        agendarConsultaTelefone(String(value))
+      }
     },
-    [slug, setTipoEntregaPreferencia]
+    [slug, setTipoEntregaPreferencia, agendarConsultaTelefone]
   )
 
+  const selecionarEnderecoExistente = useCallback((enderecoId: string) => {
+    preferirNovoEnderecoRef.current = false
+    setForm(prev => ({
+      ...prev,
+      modoEndereco: 'existente',
+      enderecoIdSelecionado: enderecoId,
+    }))
+  }, [])
+
+  const usarNovoEndereco = useCallback(() => {
+    preferirNovoEnderecoRef.current = true
+    setForm(prev => ({
+      ...prev,
+      modoEndereco: 'novo',
+      enderecoIdSelecionado: '',
+    }))
+  }, [])
+
+  const consultarTelefoneAtual = useCallback(() => {
+    const tel =
+      telefoneDigitsRef.current || onlyDigits(formRef.current.telefone)
+    telefoneDigitsRef.current = tel
+    void consultarClientePorTelefone(tel)
+  }, [consultarClientePorTelefone])
+
   const enviarPedido = useCallback(async () => {
-    const resultado = montarPedidoPublico({ slug, itens, total, form })
-    if (!resultado.ok) {
-      showToast.error(resultado.error)
+    const tel = onlyDigits(form.telefone)
+    if (tel.length < 10) {
+      showToast.error('Informe um telefone válido')
       return
     }
 
+    if (itens.length === 0) {
+      showToast.error('Carrinho vazio')
+      return
+    }
+
+    const nomeEfetivo =
+      form.nome.trim() || clienteLookup.cliente?.nome?.trim() || null
+
     setEnviando(true)
     try {
+      let enderecoIdEntrega: string | null = null
+
+      if (form.tipoEntrega === 'entrega') {
+        enderecoIdEntrega = await garantirEnderecoEntregaPublico({
+          telefone: tel,
+          nome: nomeEfetivo,
+          modoEndereco: form.modoEndereco,
+          enderecoIdSelecionado: form.enderecoIdSelecionado || null,
+          clienteLookup: clienteLookup.cliente,
+          enderecoNovo: {
+            rua: form.rua,
+            numero: form.numero,
+            bairro: form.bairro,
+            cidade: form.cidade,
+            estado: form.estado,
+          },
+        })
+      }
+
+      const resultado = montarPedidoPublico({
+        slug,
+        itens,
+        total,
+        form: { ...form, nome: nomeEfetivo ?? '' },
+        enderecoIdEntrega,
+      })
+      if (!resultado.ok) {
+        showToast.error(resultado.error)
+        return
+      }
+
       await criarPedidoPublico(resultado.payload)
       limpar(slug)
       showToast.success('Pedido enviado com sucesso!')
@@ -93,13 +394,18 @@ export function useDeliveryCheckout(slug: string) {
     } finally {
       setEnviando(false)
     }
-  }, [slug, itens, total, form, limpar, router])
+  }, [slug, itens, total, form, clienteLookup.cliente, limpar, router])
 
   return {
     itens,
     total,
     form,
     updateForm,
+    clienteLookup,
+    selecionarEnderecoExistente,
+    usarNovoEndereco,
+    consultarClientePorTelefone,
+    consultarTelefoneAtual,
     meiosPagamento: meiosData?.meiosPagamento ?? [],
     loadingMeios,
     enviando,

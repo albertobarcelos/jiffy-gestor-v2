@@ -52,3 +52,30 @@ export async function proxyPublicDeliveryPost(
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
   }
 }
+
+export async function proxyPublicDeliveryPatch(
+  upstreamPath: string,
+  body: unknown
+): Promise<NextResponse> {
+  try {
+    const apiClient = new ApiClient()
+    const response = await apiClient.request<unknown>(upstreamPath, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(body),
+    })
+    return NextResponse.json(response.data ?? {}, { status: response.status || 200 })
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return NextResponse.json(
+        { error: mensagemLegivelApiError(error), details: error.data },
+        { status: error.status }
+      )
+    }
+    console.error('Erro no proxy delivery público PATCH:', error)
+    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
+  }
+}

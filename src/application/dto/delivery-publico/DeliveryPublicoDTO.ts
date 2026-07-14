@@ -117,9 +117,49 @@ export type EnderecoDeliveryPublicoInput = {
   complemento?: string | null
 }
 
+export type EnderecoClienteDeliveryPublicoDTO = {
+  id: string
+  etiqueta: string
+  rua: string
+  numero: string
+  bairro: string
+  cidade: string | null
+  estado: string | null
+  cep: string | null
+  complemento: string | null
+  ultimaUtilizacaoEm?: string | null
+}
+
+export type ClienteDeliveryPublicoDTO = {
+  telefone: string
+  nome: string | null
+  cpf: string | null
+  clienteIdVinculado: string | null
+  enderecos: EnderecoClienteDeliveryPublicoDTO[]
+}
+
+export type CriarClienteDeliveryPublicoInput = {
+  telefone: string
+  nome?: string | null
+  cpf?: string | null
+  enderecos?: EnderecoDeliveryPublicoInput[]
+}
+
+export type AtualizarClienteDeliveryPublicoInput = {
+  nome?: string | null
+  cpf?: string | null
+  enderecos?: {
+    create?: EnderecoDeliveryPublicoInput[]
+    update?: Array<EnderecoDeliveryPublicoInput & { id: string }>
+    delete?: string[]
+  }
+}
+
 export type ClientePedidoPublicoInput = {
   telefone: string
   nome?: string | null
+  /** Obrigatório quando o cliente já possui 2+ endereços. */
+  enderecoIdEntrega?: string | null
   enderecos?: EnderecoDeliveryPublicoInput[]
 }
 

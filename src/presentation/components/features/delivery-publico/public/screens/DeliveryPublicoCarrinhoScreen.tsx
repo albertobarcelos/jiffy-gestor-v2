@@ -47,6 +47,10 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
     total,
     form,
     updateForm,
+    clienteLookup,
+    selecionarEnderecoExistente,
+    usarNovoEndereco,
+    consultarTelefoneAtual,
     meiosPagamento,
     loadingMeios,
     enviando,
@@ -139,12 +143,20 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
 
             <DeliveryCheckoutForm
               form={form}
+              clienteLookup={clienteLookup}
               meiosPagamento={meiosPagamento}
               loadingMeios={loadingMeios}
               onChange={updateForm}
+              onSelecionarEnderecoExistente={selecionarEnderecoExistente}
+              onUsarNovoEndereco={usarNovoEndereco}
+              onTelefoneBlur={consultarTelefoneAtual}
             />
 
-            <DeliveryCheckoutFooter total={total} enviando={enviando} onConfirm={enviarPedido} />
+            <DeliveryCheckoutFooter
+              total={total}
+              enviando={enviando}
+              onConfirm={enviarPedido}
+            />
           </>
         )}
       </div>

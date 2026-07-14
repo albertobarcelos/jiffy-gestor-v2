@@ -1,5 +1,8 @@
 import type {
+  AtualizarClienteDeliveryPublicoInput,
+  ClienteDeliveryPublicoDTO,
   CreatePedidoPublicoInput,
+  CriarClienteDeliveryPublicoInput,
   GetCatalogoPublicoResponseDTO,
   GetMeiosPagamentoPublicosResponseDTO,
 } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
@@ -79,6 +82,58 @@ export async function criarPedidoPublico(
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify(input),
   })
+  if (!res.ok) {
+    throw new PublicDeliveryApiError(await parseErrorMessage(res), res.status)
+  }
+  return res.json()
+}
+
+/**
+ * Busca cliente delivery por telefone (rota pública).
+ * Retorna `null` em 404 (cliente ainda não cadastrado).
+ */
+export async function buscarClienteDeliveryPublico(
+  telefone: string
+): Promise<ClienteDeliveryPublicoDTO | null> {
+  const tel = telefone.replace(/\D/g, '')
+  const res = await fetch(
+    `/api/public/delivery/clientes/${encodeURIComponent(tel)}`,
+    { cache: 'no-store', headers: { Accept: 'application/json' } }
+  )
+  if (res.status === 404) return null
+  if (!res.ok) {
+    throw new PublicDeliveryApiError(await parseErrorMessage(res), res.status)
+  }
+  return res.json()
+}
+
+export async function criarClienteDeliveryPublico(
+  input: CriarClienteDeliveryPublicoInput
+): Promise<ClienteDeliveryPublicoDTO> {
+  const res = await fetch('/api/public/delivery/clientes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!res.ok) {
+    throw new PublicDeliveryApiError(await parseErrorMessage(res), res.status)
+  }
+  return res.json()
+}
+
+export async function atualizarClienteDeliveryPublico(
+  telefone: string,
+  input: AtualizarClienteDeliveryPublicoInput
+): Promise<ClienteDeliveryPublicoDTO> {
+  const tel = telefone.replace(/\D/g, '')
+  const res = await fetch(
+    `/api/public/delivery/clientes/${encodeURIComponent(tel)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(input),
+    }
+  )
   if (!res.ok) {
     throw new PublicDeliveryApiError(await parseErrorMessage(res), res.status)
   }

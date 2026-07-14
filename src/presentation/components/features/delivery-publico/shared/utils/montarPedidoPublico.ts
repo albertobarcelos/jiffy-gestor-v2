@@ -5,10 +5,14 @@ export type CheckoutFormData = {
   tipoEntrega: 'entrega' | 'retirada'
   telefone: string
   nome: string
+  /** Como o usuário quer resolver o endereço quando já existem cadastros. */
+  modoEndereco: 'existente' | 'novo'
+  enderecoIdSelecionado: string
   rua: string
   numero: string
   bairro: string
   cidade: string
+  estado: string
   meioPagamentoId: string
 }
 
@@ -17,6 +21,8 @@ type MontarPedidoParams = {
   itens: DeliveryCarrinhoItem[]
   total: number
   form: CheckoutFormData
+  /** Preenchido após garantir o endereço no cadastro (fluxo de entrega). */
+  enderecoIdEntrega?: string | null
 }
 
 export type MontarPedidoResult =
@@ -28,6 +34,7 @@ export function montarPedidoPublico({
   itens,
   total,
   form,
+  enderecoIdEntrega,
 }: MontarPedidoParams): MontarPedidoResult {
   const tel = form.telefone.replace(/\D/g, '')
   if (tel.length < 10) {
@@ -36,11 +43,15 @@ export function montarPedidoPublico({
   if (itens.length === 0) {
     return { ok: false, error: 'Carrinho vazio' }
   }
-  if (
-    form.tipoEntrega === 'entrega' &&
-    (!form.rua.trim() || !form.numero.trim() || !form.bairro.trim())
-  ) {
-    return { ok: false, error: 'Preencha o endereço de entrega' }
+
+  if (form.tipoEntrega === 'entrega') {
+    if (form.modoEndereco === 'existente') {
+      if (!form.enderecoIdSelecionado.trim() && !enderecoIdEntrega?.trim()) {
+        return { ok: false, error: 'Selecione um endereço de entrega' }
+      }
+    } else if (!form.rua.trim() || !form.numero.trim() || !form.bairro.trim()) {
+      return { ok: false, error: 'Preencha o endereço de entrega' }
+    }
   }
 
   const produtos = itens.map(item => ({
@@ -60,15 +71,11 @@ export function montarPedidoPublico({
   }
 
   if (form.tipoEntrega === 'entrega') {
-    cliente.enderecos = [
-      {
-        etiqueta: 'casa',
-        rua: form.rua.trim(),
-        numero: form.numero.trim(),
-        bairro: form.bairro.trim(),
-        cidade: form.cidade.trim() || null,
-      },
-    ]
+    const idEntrega = (enderecoIdEntrega ?? form.enderecoIdSelecionado).trim()
+    if (!idEntrega) {
+      return { ok: false, error: 'Endereço de entrega não resolvido' }
+    }
+    cliente.enderecoIdEntrega = idEntrega
   }
 
   const payload: CreatePedidoPublicoInput = {
