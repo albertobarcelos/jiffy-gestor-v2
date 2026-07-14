@@ -42,7 +42,7 @@ export function BasicoLayoutHome({
         horarioTexto={viewModel.horarioTexto}
       />
       <DeliveryBasicoCatalogStickyNav catalogRootRef={catalogRootRef}>
-        <div className="space-y-2 pb-3 pt-3">
+        <div className="min-w-0 space-y-2 pb-3 pt-3">
           <DeliveryBuscaProdutos
             value={viewModel.termoBusca}
             interactive={interactive}

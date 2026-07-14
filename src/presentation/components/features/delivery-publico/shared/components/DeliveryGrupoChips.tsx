@@ -1,12 +1,13 @@
 'use client'
 
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import type { DeliveryPublicoDesignConfig } from '../types/deliveryPublicoDesignConfig'
 import type { DeliveryPublicoGrupoViewModel } from '../types/deliveryPublicoViewModel'
 import { DeliveryGrupoCategoriaVisual } from './DeliveryGrupoCategoriaVisual'
 
 const MOBILE_COLUMNS_MAX = 5
-const CHIP_GAP_REM = 0.5
-const HORIZONTAL_PADDING_REM = 2
+const CHIP_GAP_PX = 8
+const HORIZONTAL_PADDING_PX = 32
 
 type DeliveryGrupoChipsProps = {
   config: DeliveryPublicoDesignConfig
@@ -16,10 +17,11 @@ type DeliveryGrupoChipsProps = {
   onGrupoClick?: (grupoId: string) => void
 }
 
-function resolveChipWidth(grupoCount: number): string {
-  const columnsVisible = Math.min(grupoCount, MOBILE_COLUMNS_MAX)
-  const gapTotalRem = (columnsVisible - 1) * CHIP_GAP_REM
-  return `calc((100cqw - ${HORIZONTAL_PADDING_REM}rem - ${gapTotalRem}rem) / ${columnsVisible})`
+function computeChipWidthPx(railWidth: number, grupoCount: number): number {
+  const columnsVisible = Math.min(Math.max(grupoCount, 1), MOBILE_COLUMNS_MAX)
+  const gaps = (columnsVisible - 1) * CHIP_GAP_PX
+  const usable = Math.max(railWidth - HORIZONTAL_PADDING_PX - gaps, columnsVisible * 48)
+  return usable / columnsVisible
 }
 
 export function DeliveryGrupoChips({
@@ -29,57 +31,147 @@ export function DeliveryGrupoChips({
   embedded = false,
   onGrupoClick,
 }: DeliveryGrupoChipsProps) {
+  const railRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const dragRef = useRef<{
+    pointerId: number
+    startX: number
+    startScrollLeft: number
+    moved: boolean
+  } | null>(null)
+  const suppressClickRef = useRef(false)
+  const [chipWidthPx, setChipWidthPx] = useState(0)
+
+  useEffect(() => {
+    const rail = railRef.current
+    if (!rail) return
+
+    const update = () => {
+      setChipWidthPx(computeChipWidthPx(rail.clientWidth, grupos.length))
+    }
+
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(rail)
+    return () => observer.disconnect()
+  }, [grupos.length])
+
   if (!config.categorias.mostrar || grupos.length === 0) return null
 
-  const chipWidth = resolveChipWidth(grupos.length)
-  const chipStyle = { flex: `0 0 ${chipWidth}` } as const
-  const wrapperClass = embedded
-    ? 'w-full snap-x snap-mandatory overflow-x-auto scrollbar-hide [container-type:inline-size]'
-    : 'mt-3 w-full snap-x snap-mandatory overflow-x-auto scrollbar-hide [container-type:inline-size]'
+  const marginClass = embedded ? '' : 'mt-3'
+  const chipStyle = {
+    flex: `0 0 ${chipWidthPx || 72}px`,
+    width: `${chipWidthPx || 72}px`,
+    minWidth: `${chipWidthPx || 72}px`,
+  } as const
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch') return
+    const scroller = scrollRef.current
+    if (!scroller || scroller.scrollWidth <= scroller.clientWidth + 1) return
+
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startScrollLeft: scroller.scrollLeft,
+      moved: false,
+    }
+    scroller.setPointerCapture(event.pointerId)
+  }
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current
+    const scroller = scrollRef.current
+    if (!drag || !scroller || drag.pointerId !== event.pointerId) return
+
+    const delta = event.clientX - drag.startX
+    if (Math.abs(delta) > 4) {
+      drag.moved = true
+      suppressClickRef.current = true
+    }
+    scroller.scrollLeft = drag.startScrollLeft - delta
+  }
+
+  const endDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current
+    const scroller = scrollRef.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+
+    if (scroller?.hasPointerCapture(event.pointerId)) {
+      scroller.releasePointerCapture(event.pointerId)
+    }
+    dragRef.current = null
+  }
+
+  const handleGrupoActivate = (grupoId: string) => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false
+      return
+    }
+    onGrupoClick?.(grupoId)
+  }
 
   return (
-    <div className={wrapperClass}>
-      <div className="flex w-max min-w-full gap-2 px-4">
-        {grupos.map(grupo => {
-          const content = (
-            <>
-              <DeliveryGrupoCategoriaVisual config={config} grupo={grupo} size="lg" />
-              <span
-                className="line-clamp-2 w-full text-center text-[11px] font-medium leading-tight @sm:text-xs @lg:text-sm @xl:text-base"
-                style={{
-                  color: 'var(--delivery-text)',
-                  fontFamily: 'var(--delivery-font-body)',
-                }}
-              >
-                {grupo.nome}
-              </span>
-            </>
-          )
+    <div ref={railRef} className={`w-full max-w-full min-w-0 ${marginClass}`.trim()}>
+      <div
+        ref={scrollRef}
+        className="w-full max-w-full min-w-0 cursor-grab touch-pan-x overflow-x-auto overflow-y-hidden active:cursor-grabbing [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+      >
+        <div
+          className="flex"
+          style={{
+            width: 'max-content',
+            gap: `${CHIP_GAP_PX}px`,
+            paddingLeft: HORIZONTAL_PADDING_PX / 2,
+            paddingRight: HORIZONTAL_PADDING_PX / 2,
+          }}
+        >
+          {grupos.map(grupo => {
+            const content = (
+              <>
+                <DeliveryGrupoCategoriaVisual config={config} grupo={grupo} size="lg" />
+                <span
+                  className="line-clamp-2 w-full text-center text-[11px] font-medium leading-tight @sm:text-xs @lg:text-sm @xl:text-base"
+                  style={{
+                    color: 'var(--delivery-text)',
+                    fontFamily: 'var(--delivery-font-body)',
+                  }}
+                >
+                  {grupo.nome}
+                </span>
+              </>
+            )
 
-          if (interactive && onGrupoClick) {
+            if (interactive && onGrupoClick) {
+              return (
+                <button
+                  key={grupo.id}
+                  type="button"
+                  onClick={() => handleGrupoActivate(grupo.id)}
+                  className="flex flex-col items-center gap-1.5 @lg:gap-2"
+                  style={chipStyle}
+                >
+                  {content}
+                </button>
+              )
+            }
+
             return (
-              <button
+              <div
                 key={grupo.id}
-                type="button"
-                onClick={() => onGrupoClick(grupo.id)}
-                className="flex snap-start flex-col items-center gap-1.5 @lg:gap-2"
+                className="flex flex-col items-center gap-1.5 @lg:gap-2"
                 style={chipStyle}
               >
                 {content}
-              </button>
+              </div>
             )
-          }
-
-          return (
-            <div
-              key={grupo.id}
-              className="flex snap-start flex-col items-center gap-1.5 @lg:gap-2"
-              style={chipStyle}
-            >
-              {content}
-            </div>
-          )
-        })}
+          })}
+        </div>
       </div>
     </div>
   )

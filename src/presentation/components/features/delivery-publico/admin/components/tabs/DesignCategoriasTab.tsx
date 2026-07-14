@@ -28,7 +28,7 @@ import type {
   DeliveryPublicoDesignConfig,
 } from '../../../shared/types/deliveryPublicoDesignConfig'
 import type { DesignCategoriaGrupo } from '../../../shared/types/designCategoriaGrupo'
-import { getColorPaletteById } from '../../../shared/constants/colorPalettes'
+import { resolveDesignPaletteColors } from '../../../shared/constants/colorPalettes'
 import { DeliveryGrupoCategoriaVisual } from '../../../shared/components/DeliveryGrupoCategoriaVisual'
 import { DesignCategoriaGrupoSortableItem } from '../DesignCategoriaGrupoSortableItem'
 import { useDesignCategoriaGrupoActions } from '../../hooks/useDesignCategoriaGrupoActions'
@@ -66,7 +66,7 @@ export function DesignCategoriasTab({
     updatingIconGrupoId,
   } = useDesignCategoriaGrupoActions()
 
-  const palette = getColorPaletteById(config.cores.paletaId)
+  const palette = resolveDesignPaletteColors(config)
   const selectedCategory = localGrupos.find(c => c.id === selectedCategoryId)
   const usarImagensGrupo = config.categorias.usarImagensGrupo
   const isUploadingSelected = uploadingGrupoId === selectedCategoryId
@@ -377,7 +377,7 @@ export function DesignCategoriasTab({
 
                 <IconPickerPanel
                   enabled={Boolean(selectedCategory)}
-                  selectedColor={palette.colors.primary}
+                  selectedColor={palette.primary}
                   selectedIconName={selectedIconName}
                   disabled={!selectedCategory || isUpdatingIconSelected}
                   variant="inline"

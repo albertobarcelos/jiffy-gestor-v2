@@ -3,6 +3,7 @@ import type {
   DeliveryPublicoDesignConfig,
 } from '../types/deliveryPublicoDesignConfig'
 import { createDefaultDesignConfig } from '../constants/defaultDesignConfig'
+import { resolveCustomPaletteColors } from '../constants/colorPalettes'
 
 const STORAGE_PREFIX = 'jiffy:delivery-design'
 
@@ -28,7 +29,13 @@ function mergeConfig(
     ...fallback,
     ...partialWithoutLegacy,
     cabecalho: { ...fallback.cabecalho, ...partial.cabecalho },
-    cores: { ...fallback.cores, ...partial.cores },
+    cores: {
+      ...fallback.cores,
+      ...partial.cores,
+      personalizadas: partial.cores?.personalizadas
+        ? resolveCustomPaletteColors(partial.cores.personalizadas)
+        : fallback.cores.personalizadas,
+    },
     tipografia: { ...fallback.tipografia, ...partial.tipografia },
     categorias: {
       ...fallback.categorias,

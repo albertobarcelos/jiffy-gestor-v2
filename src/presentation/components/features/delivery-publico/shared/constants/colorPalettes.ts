@@ -1,18 +1,25 @@
 import { colors } from '@/src/shared/theme/colors'
-import type { ColorPaletteId } from '../types/deliveryPublicoDesignConfig'
+import type {
+  ColorPaletteId,
+  DeliveryPublicoDesignConfig,
+  DesignCustomColors,
+} from '../types/deliveryPublicoDesignConfig'
 
 export type ColorPaletteDefinition = {
-  id: ColorPaletteId
+  id: Exclude<ColorPaletteId, 'personalizada'>
   nome: string
   premium: boolean
   /** Pode ser publicada no cardápio público (demais paletas: preview no designer apenas). */
   publicavel: boolean
-  colors: {
-    primary: string
-    primaryDark: string
-    surface: string
-    text: string
-  }
+  colors: DesignCustomColors
+}
+
+/** Defaults da paleta personalizada (base Carvão). */
+export const CUSTOM_PALETTE_DEFAULTS: DesignCustomColors = {
+  primary: '#525252',
+  primaryDark: '#171717',
+  surface: '#F5F5F5',
+  text: '#171A1C',
 }
 
 /**
@@ -103,15 +110,39 @@ export const COLOR_PALETTES: ColorPaletteDefinition[] = [
 ]
 
 export function getColorPaletteById(id: ColorPaletteId): ColorPaletteDefinition {
+  if (id === 'personalizada') return COLOR_PALETTES[0]
   return COLOR_PALETTES.find(p => p.id === id) ?? COLOR_PALETTES[0]
 }
 
+export function resolveCustomPaletteColors(
+  personalizadas?: DesignCustomColors | null
+): DesignCustomColors {
+  return {
+    ...CUSTOM_PALETTE_DEFAULTS,
+    ...personalizadas,
+  }
+}
+
+/** Cores efetivas do design (preset ou personalizada). */
+export function resolveDesignPaletteColors(
+  config: Pick<DeliveryPublicoDesignConfig, 'cores'>
+): DesignCustomColors {
+  if (config.cores.paletaId === 'personalizada') {
+    return resolveCustomPaletteColors(config.cores.personalizadas)
+  }
+  return getColorPaletteById(config.cores.paletaId).colors
+}
+
 export function canPublishPalette(paletteId: ColorPaletteId): boolean {
+  if (paletteId === 'personalizada') return true
   return COLOR_PALETTES.find(p => p.id === paletteId)?.publicavel ?? false
 }
 
 export function getPublishablePaletteLabel(): string {
-  const names = COLOR_PALETTES.filter(p => p.publicavel).map(p => p.nome)
+  const names = [
+    ...COLOR_PALETTES.filter(p => p.publicavel).map(p => p.nome),
+    'Personalizada',
+  ]
   if (names.length <= 1) return names[0] ?? 'Carvão'
   return `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`
 }

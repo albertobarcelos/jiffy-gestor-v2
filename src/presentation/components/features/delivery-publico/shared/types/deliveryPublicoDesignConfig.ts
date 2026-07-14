@@ -13,6 +13,14 @@ export type ColorPaletteId =
   | 'chocolate'
   | 'mostarda'
   | 'carvao'
+  | 'personalizada'
+
+export type DesignCustomColors = {
+  primary: string
+  primaryDark: string
+  surface: string
+  text: string
+}
 
 export type TypographyPresetId = 'urbana' | 'moderna' | 'classica' | 'elegante'
 
@@ -35,6 +43,8 @@ export type DeliveryPublicoDesignConfig = {
   }
   cores: {
     paletaId: ColorPaletteId
+    /** Usado quando `paletaId` é `personalizada`. */
+    personalizadas?: DesignCustomColors
   }
   tipografia: {
     presetId: TypographyPresetId

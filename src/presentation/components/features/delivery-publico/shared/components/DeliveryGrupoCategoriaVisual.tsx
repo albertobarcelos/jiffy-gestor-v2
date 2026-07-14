@@ -4,7 +4,7 @@ import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { resolveMdiIconNameForStyle } from '@/src/shared/utils/mdiIcons'
 import { cn } from '@/src/shared/utils/cn'
 import type { DeliveryPublicoDesignConfig } from '../types/deliveryPublicoDesignConfig'
-import { getColorPaletteById } from '../constants/colorPalettes'
+import { resolveDesignPaletteColors } from '../constants/colorPalettes'
 
 type GrupoCategoriaVisualSource = {
   id: string
@@ -53,7 +53,7 @@ function resolveIconPresentation(config: DeliveryPublicoDesignConfig): {
   border: string | undefined
   iconColor: string
 } {
-  const primaryColor = getColorPaletteById(config.cores.paletaId).colors.primary
+  const primaryColor = resolveDesignPaletteColors(config).primary
 
   if (config.categorias.estiloIcone === 'linha') {
     return {
@@ -80,7 +80,7 @@ export function DeliveryGrupoCategoriaVisual({
   const iconName = resolveIconName(config, grupo)
   const displayIconName = resolveMdiIconNameForStyle(iconName, config.categorias.estiloIcone)
   const { backgroundColor, border, iconColor } = resolveIconPresentation(config)
-  const primaryColor = getColorPaletteById(config.cores.paletaId).colors.primary
+  const primaryColor = resolveDesignPaletteColors(config).primary
 
   if (shouldUseGrupoImagem(config, grupo)) {
     return (
