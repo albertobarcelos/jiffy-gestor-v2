@@ -40,7 +40,7 @@ export function ProdutosHeader({
                 type="text"
                 placeholder="Pesquisar produto..."
                 value={searchText}
-                onChange={(e) => onSearchChange(e.target.value)}
+                onChange={e => onSearchChange(e.target.value)}
                 className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
               />
             </div>

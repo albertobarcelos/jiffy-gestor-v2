@@ -1,16 +1,23 @@
 'use client'
 
-import { memo, useMemo } from 'react'
+import { memo, useMemo, useRef } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
-import { MdAddCircle, MdLink } from 'react-icons/md'
+import { MdAddCircle, MdLink, MdPhotoCamera } from 'react-icons/md'
+import { DELIVERY_IMAGE_ACCEPT } from '@/src/shared/constants/deliveryImageUpload'
+
+export type GrupoProdutoVisualMode = 'icones' | 'imagens'
 
 interface GrupoItemProps {
   grupo: GrupoProduto
   index: number
+  visualMode?: GrupoProdutoVisualMode
+  imagemUrl?: string | null
+  isUploadingImagem?: boolean
+  onUploadImagem?: (grupoId: string, file: File) => void
   onStatusChanged?: () => void
   onToggleStatus?: (grupoId: string, novoStatus: boolean) => void
   onToggleAtivoDelivery?: (grupoId: string, ativoDelivery: boolean) => void
@@ -19,12 +26,76 @@ interface GrupoItemProps {
   onCreateProduto?: (grupoId: string) => void
 }
 
+function GrupoImagemThumb({
+  nome,
+  imagemUrl,
+  isUploading,
+  onSelectFile,
+}: {
+  nome: string
+  imagemUrl?: string | null
+  isUploading?: boolean
+  onSelectFile: (file: File) => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const hasImage = Boolean(imagemUrl)
+  const label = hasImage ? `Trocar imagem de ${nome}` : `Inserir imagem de ${nome}`
+
+  return (
+    <button
+      type="button"
+      onClick={e => {
+        e.stopPropagation()
+        if (isUploading) return
+        inputRef.current?.click()
+      }}
+      disabled={isUploading}
+      aria-label={label}
+      title={label}
+      className="relative h-7 w-7 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-gray-50 transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-60 md:h-[45px] md:w-[45px]"
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept={DELIVERY_IMAGE_ACCEPT}
+        className="hidden"
+        onChange={e => {
+          const file = e.target.files?.[0]
+          e.target.value = ''
+          if (file) onSelectFile(file)
+        }}
+      />
+      {imagemUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={imagemUrl}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <MdPhotoCamera className="h-4 w-4 text-secondary-text/70 md:h-5 md:w-5" />
+        </div>
+      )}
+      {isUploading ? (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/35">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+        </div>
+      ) : null}
+    </button>
+  )
+}
+
 /**
  * Item reordenável da lista de grupos (memoizado para evitar re-renders desnecessários)
  */
 export const GrupoItem = memo(function GrupoItem({
   grupo,
   index,
+  visualMode = 'icones',
+  imagemUrl = null,
+  isUploadingImagem,
+  onUploadImagem,
   onStatusChanged,
   onToggleStatus,
   onToggleAtivoDelivery,
@@ -102,12 +173,21 @@ export const GrupoItem = memo(function GrupoItem({
         <span>{index + 1}</span>
       </div>
 
-      {/* Ícone - área clicável */}
+      {/* Ícone ou imagem - área clicável */}
       <div 
-        onClick={handleRowClick}
+        onClick={visualMode === 'icones' ? handleRowClick : undefined}
         className="flex-[2] flex items-center cursor-pointer"
       >
-        {renderIcon}
+        {visualMode === 'imagens' ? (
+          <GrupoImagemThumb
+            nome={nome}
+            imagemUrl={imagemUrl}
+            isUploading={isUploadingImagem}
+            onSelectFile={file => onUploadImagem?.(grupo.getId(), file)}
+          />
+        ) : (
+          renderIcon
+        )}
       </div>
 
       {/* Nome - área clicável */}
@@ -200,4 +280,3 @@ export const GrupoItem = memo(function GrupoItem({
     </div>
   )
 })
-

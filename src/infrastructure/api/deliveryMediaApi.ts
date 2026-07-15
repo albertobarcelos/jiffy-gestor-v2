@@ -293,64 +293,172 @@ export async function fetchGruposProdutoImagemUrlsBatch(
   return batchInFlight
 }
 
+let gruposComplementoBatchInFlight: Promise<Record<string, string | null>> | null = null
+let gruposComplementoBatchInFlightKey = ''
+
+export async function fetchGruposComplementoImagemUrlsBatch(
+  grupoComplementoIds: string[],
+  token: string
+): Promise<Record<string, string | null>> {
+  const ids = [...new Set(grupoComplementoIds.map(id => id.trim()).filter(Boolean))]
+  if (ids.length === 0) return {}
+
+  const cacheKey = ids.slice().sort().join('|')
+  if (gruposComplementoBatchInFlight && gruposComplementoBatchInFlightKey === cacheKey) {
+    return gruposComplementoBatchInFlight
+  }
+
+  gruposComplementoBatchInFlightKey = cacheKey
+  gruposComplementoBatchInFlight = (async () => {
+    const response = await fetch('/api/delivery/grupos-complemento/imagem-urls', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ids }),
+    })
+
+    if (!response.ok) return Object.fromEntries(ids.map(id => [id, null]))
+
+    const data = (await response.json().catch(() => ({}))) as {
+      imagensPorGrupoComplementoId?: Record<string, string | null>
+    }
+
+    const resolved = data.imagensPorGrupoComplementoId ?? {}
+    return Object.fromEntries(
+      ids.map(id => {
+        const url = resolved[id]
+        return [id, typeof url === 'string' && url.trim() ? url.trim() : null] as const
+      })
+    )
+  })().finally(() => {
+    gruposComplementoBatchInFlight = null
+    gruposComplementoBatchInFlightKey = ''
+  })
+
+  return gruposComplementoBatchInFlight
+}
+
 export async function fetchGrupoComplementoImagemUrl(
   grupoComplementoId: string,
   token: string
 ): Promise<string | null> {
-  const response = await fetch(
-    `/api/delivery/grupos-complemento/${encodeURIComponent(grupoComplementoId)}/imagem-url`,
-    {
-      method: 'GET',
+  const map = await fetchGruposComplementoImagemUrlsBatch([grupoComplementoId], token)
+  return map[grupoComplementoId.trim()] ?? null
+}
+
+let produtosBatchInFlight: Promise<Record<string, string | null>> | null = null
+let produtosBatchInFlightKey = ''
+
+export async function fetchProdutosImagemUrlsBatch(
+  produtoIds: string[],
+  token: string
+): Promise<Record<string, string | null>> {
+  const ids = [...new Set(produtoIds.map(id => id.trim()).filter(Boolean))]
+  if (ids.length === 0) return {}
+
+  const cacheKey = ids.slice().sort().join('|')
+  if (produtosBatchInFlight && produtosBatchInFlightKey === cacheKey) {
+    return produtosBatchInFlight
+  }
+
+  produtosBatchInFlightKey = cacheKey
+  produtosBatchInFlight = (async () => {
+    const response = await fetch('/api/delivery/produtos/imagem-urls', {
+      method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/json',
+        'Content-Type': 'application/json',
       },
-    }
-  )
+      body: JSON.stringify({ ids }),
+    })
 
-  if (!response.ok) return null
-  const data = (await response.json().catch(() => ({}))) as { imagemUrl?: string | null }
-  return typeof data.imagemUrl === 'string' && data.imagemUrl.trim() ? data.imagemUrl : null
+    if (!response.ok) return Object.fromEntries(ids.map(id => [id, null]))
+
+    const data = (await response.json().catch(() => ({}))) as {
+      imagensPorProdutoId?: Record<string, string | null>
+    }
+
+    const resolved = data.imagensPorProdutoId ?? {}
+    return Object.fromEntries(
+      ids.map(id => {
+        const url = resolved[id]
+        return [id, typeof url === 'string' && url.trim() ? url.trim() : null] as const
+      })
+    )
+  })().finally(() => {
+    produtosBatchInFlight = null
+    produtosBatchInFlightKey = ''
+  })
+
+  return produtosBatchInFlight
 }
 
 export async function fetchProdutoImagemUrl(
   produtoId: string,
   token: string
 ): Promise<string | null> {
-  const response = await fetch(
-    `/api/delivery/produtos/${encodeURIComponent(produtoId)}/imagem-url`,
-    {
-      method: 'GET',
+  const map = await fetchProdutosImagemUrlsBatch([produtoId], token)
+  return map[produtoId.trim()] ?? null
+}
+
+let complementosBatchInFlight: Promise<Record<string, string | null>> | null = null
+let complementosBatchInFlightKey = ''
+
+export async function fetchComplementosImagemUrlsBatch(
+  complementoIds: string[],
+  token: string
+): Promise<Record<string, string | null>> {
+  const ids = [...new Set(complementoIds.map(id => id.trim()).filter(Boolean))]
+  if (ids.length === 0) return {}
+
+  const cacheKey = ids.slice().sort().join('|')
+  if (complementosBatchInFlight && complementosBatchInFlightKey === cacheKey) {
+    return complementosBatchInFlight
+  }
+
+  complementosBatchInFlightKey = cacheKey
+  complementosBatchInFlight = (async () => {
+    const response = await fetch('/api/delivery/complementos/imagem-urls', {
+      method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/json',
+        'Content-Type': 'application/json',
       },
-    }
-  )
+      body: JSON.stringify({ ids }),
+    })
 
-  if (!response.ok) return null
-  const data = (await response.json().catch(() => ({}))) as { imagemUrl?: string | null }
-  return typeof data.imagemUrl === 'string' && data.imagemUrl.trim() ? data.imagemUrl : null
+    if (!response.ok) return Object.fromEntries(ids.map(id => [id, null]))
+
+    const data = (await response.json().catch(() => ({}))) as {
+      imagensPorComplementoId?: Record<string, string | null>
+    }
+
+    const resolved = data.imagensPorComplementoId ?? {}
+    return Object.fromEntries(
+      ids.map(id => {
+        const url = resolved[id]
+        return [id, typeof url === 'string' && url.trim() ? url.trim() : null] as const
+      })
+    )
+  })().finally(() => {
+    complementosBatchInFlight = null
+    complementosBatchInFlightKey = ''
+  })
+
+  return complementosBatchInFlight
 }
 
 export async function fetchComplementoImagemUrl(
   complementoId: string,
   token: string
 ): Promise<string | null> {
-  const response = await fetch(
-    `/api/delivery/complementos/${encodeURIComponent(complementoId)}/imagem-url`,
-    {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
-      },
-    }
-  )
-
-  if (!response.ok) return null
-  const data = (await response.json().catch(() => ({}))) as { imagemUrl?: string | null }
-  return typeof data.imagemUrl === 'string' && data.imagemUrl.trim() ? data.imagemUrl : null
+  const map = await fetchComplementosImagemUrlsBatch([complementoId], token)
+  return map[complementoId.trim()] ?? null
 }
 
 async function uploadDeliveryImage(

@@ -18,15 +18,22 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
-import { GrupoItem } from './GrupoItem'
+import { GrupoItem, type GrupoProdutoVisualMode } from './GrupoItem'
 import { useGruposProdutosInfinite } from '@/src/presentation/hooks/useGruposProdutos'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useQueryClient } from '@tanstack/react-query'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
-import { MdSearch } from 'react-icons/md'
+import { MdImage, MdSearch } from 'react-icons/md'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import { validateDeliveryImageFile } from '@/src/shared/constants/deliveryImageUpload'
+import {
+  fetchGrupoProdutoImagemUrl,
+  fetchGruposProdutoImagemUrlsBatch,
+  mensagemLegivelDeliveryMediaError,
+  uploadGrupoProdutoImagem,
+} from '@/src/infrastructure/api/deliveryMediaApi'
 import {
   GruposProdutosTabsModal,
   GruposProdutosTabsModalState,
@@ -36,6 +43,8 @@ import { ProdutosTabsModal, ProdutosTabsModalState, type ProdutosTabsModalTab } 
 interface GruposProdutosListProps {
   onReload?: () => void
 }
+
+const VISUAL_MODE_STORAGE_KEY = 'grupos-produtos-lista-visual-mode'
 
 /**
  * Lista de grupos de produtos com scroll infinito e drag and drop
@@ -68,6 +77,32 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     grupoId: undefined,
   })
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
+  const [visualMode, setVisualMode] = useState<GrupoProdutoVisualMode>('icones')
+  const [imagensPorGrupoId, setImagensPorGrupoId] = useState<Record<string, string | null>>({})
+  const [uploadingImagemGrupoId, setUploadingImagemGrupoId] = useState<string | null>(null)
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(VISUAL_MODE_STORAGE_KEY)
+      if (stored === 'imagens' || stored === 'icones') {
+        setVisualMode(stored)
+      }
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  const handleToggleVisualMode = useCallback(() => {
+    setVisualMode(prev => {
+      const next: GrupoProdutoVisualMode = prev === 'icones' ? 'imagens' : 'icones'
+      try {
+        window.localStorage.setItem(VISUAL_MODE_STORAGE_KEY, next)
+      } catch {
+        // ignore
+      }
+      return next
+    })
+  }, [])
 
   // Sensores para drag and drop
   // TouchSensor para mobile - delay curto para melhor UX, tolerance para evitar conflito com scroll
@@ -148,6 +183,63 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     setLocalGrupos(serverGrupos)
   }, [serverGrupos])
 
+  useEffect(() => {
+    if (visualMode !== 'imagens') return
+
+    const idsFaltantes = localGrupos
+      .map(g => g.getId())
+      .filter(id => !(id in imagensPorGrupoId))
+
+    if (idsFaltantes.length === 0) return
+
+    let cancelled = false
+    const token = auth?.getAccessToken()
+    if (!token) return
+
+    void fetchGruposProdutoImagemUrlsBatch(idsFaltantes, token).then(resolved => {
+      if (cancelled) return
+      setImagensPorGrupoId(prev => ({ ...prev, ...resolved }))
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [auth, visualMode, localGrupos, imagensPorGrupoId])
+
+  const handleUploadImagem = useCallback(
+    async (grupoId: string, file: File) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado')
+        return
+      }
+
+      const validationError = await validateDeliveryImageFile(file)
+      if (validationError) {
+        showToast.error(validationError)
+        return
+      }
+
+      setUploadingImagemGrupoId(grupoId)
+      const toastId = showToast.loading('Enviando imagem...')
+
+      try {
+        await uploadGrupoProdutoImagem(grupoId, file, token)
+        const persistedUrl = await fetchGrupoProdutoImagemUrl(grupoId, token)
+        setImagensPorGrupoId(prev => ({
+          ...prev,
+          [grupoId]: persistedUrl,
+        }))
+        showToast.successLoading(toastId, 'Imagem salva com sucesso!')
+      } catch (error) {
+        showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
+      } finally {
+        setUploadingImagemGrupoId(null)
+      }
+    },
+    [auth]
+  )
+
   const totalGrupos = useMemo(() => {
     return data?.pages[0]?.count || 0
   }, [data])
@@ -220,6 +312,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
   // Função removida - não é mais necessária pois usamos atualização otimista
 
   const handleTabsModalReload = useCallback(() => {
+    setImagensPorGrupoId({})
     queryClient.invalidateQueries({ queryKey: ['grupos-produtos'] })
     onReload?.()
   }, [onReload, queryClient])
@@ -496,7 +589,19 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
               </p>
             </div>
             <div className="flex-1 flex gap-2 items-center justify-end flex-wrap md:flex-nowrap">
-              
+              <button
+                type="button"
+                onClick={handleToggleVisualMode}
+                aria-pressed={visualMode === 'imagens'}
+                className={`h-8 px-4 rounded-lg font-semibold font-exo text-sm inline-flex items-center gap-2 border transition-colors ${
+                  visualMode === 'imagens'
+                    ? 'bg-primary text-info border-primary hover:bg-primary/90'
+                    : 'bg-info text-primary-text border-primary/50 hover:bg-primary/10'
+                }`}
+              >
+                <MdImage className="h-4 w-4" aria-hidden />
+                {visualMode === 'imagens' ? 'Exibir ícones' : 'Exibir imagens'}
+              </button>
               <button
                 onClick={() =>
                   openTabsModal({
@@ -558,7 +663,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
             Ordem
           </div>
           <div className="flex-[2] font-nunito font-semibold md:text-sm text-[10px] text-primary-text">
-            Ícones do Grupo
+            {visualMode === 'imagens' ? 'Imagem do Grupo' : 'Ícones do Grupo'}
           </div>
           <div className="flex-[4] font-nunito font-semibold md:text-sm text-[10px] text-primary-text">
             Nome
@@ -607,6 +712,10 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
                 key={grupo.getId()}
                 grupo={grupo}
                 index={index}
+                visualMode={visualMode}
+                imagemUrl={imagensPorGrupoId[grupo.getId()] ?? null}
+                isUploadingImagem={uploadingImagemGrupoId === grupo.getId()}
+                onUploadImagem={handleUploadImagem}
                 onToggleStatus={handleToggleGrupoStatus}
                 onToggleAtivoDelivery={handleToggleGrupoAtivoDelivery}
                 onCreateProduto={(grupoId) => handleOpenProdutoModal(grupoId)}

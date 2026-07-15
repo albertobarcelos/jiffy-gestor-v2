@@ -12,11 +12,22 @@ import {
   MdAddCircle,
   MdKeyboardArrowUp,
   MdKeyboardArrowDown,
+  MdPhotoCamera,
 } from 'react-icons/md'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useQueryClient } from '@tanstack/react-query'
 import { showToast } from '@/src/shared/utils/toast'
+import {
+  DELIVERY_IMAGE_ACCEPT,
+  validateDeliveryImageFile,
+} from '@/src/shared/constants/deliveryImageUpload'
+import {
+  fetchGrupoComplementoImagemUrl,
+  fetchGruposComplementoImagemUrlsBatch,
+  mensagemLegivelDeliveryMediaError,
+  uploadGrupoComplementoImagem,
+} from '@/src/infrastructure/api/deliveryMediaApi'
 import {
   GruposComplementosTabsModal,
   GruposComplementosTabsModalState,
@@ -24,6 +35,66 @@ import {
 
 interface GruposComplementosListProps {
   onReload?: () => void
+}
+
+function GrupoImagemThumb({
+  nome,
+  imagemUrl,
+  isUploading,
+  onSelectFile,
+}: {
+  nome: string
+  imagemUrl?: string | null
+  isUploading?: boolean
+  onSelectFile: (file: File) => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const hasImage = Boolean(imagemUrl)
+  const label = hasImage ? `Trocar imagem de ${nome}` : `Inserir imagem de ${nome}`
+
+  return (
+    <button
+      type="button"
+      onClick={e => {
+        e.stopPropagation()
+        if (isUploading) return
+        inputRef.current?.click()
+      }}
+      disabled={isUploading}
+      aria-label={label}
+      title={label}
+      className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-gray-50 transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-60 md:h-12 md:w-12"
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept={DELIVERY_IMAGE_ACCEPT}
+        className="hidden"
+        onChange={e => {
+          const file = e.target.files?.[0]
+          e.target.value = ''
+          if (file) onSelectFile(file)
+        }}
+      />
+      {imagemUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={imagemUrl}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <MdPhotoCamera className="h-5 w-5 text-secondary-text/70" />
+        </div>
+      )}
+      {isUploading ? (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/35">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+        </div>
+      ) : null}
+    </button>
+  )
 }
 
 /**
@@ -39,6 +110,9 @@ const GrupoItem = memo(function GrupoItem({
   isChangingQuantidade,
   ordemPosicional,
   rowIndex,
+  imagemUrl,
+  isUploadingImagem,
+  onUploadImagem,
 }: {
   grupo: GrupoComplemento
   onToggleStatus?: (grupoId: string, novoStatus: boolean) => void
@@ -49,6 +123,9 @@ const GrupoItem = memo(function GrupoItem({
   isChangingQuantidade?: boolean
   ordemPosicional: number
   rowIndex: number
+  imagemUrl?: string | null
+  isUploadingImagem?: boolean
+  onUploadImagem?: (grupoId: string, file: File) => void
 }) {
   const complementos = useMemo(() => grupo.getComplementos() || [], [grupo])
   const ordem = useMemo(() => {
@@ -87,8 +164,14 @@ const GrupoItem = memo(function GrupoItem({
             {ordemPosicional}
           </span>
         </div>
-        <div className="md:flex-[3] flex-[2] min-w-0 flex items-start">
-          <div className="flex flex-col md:flex-row gap-1">
+        <div className="md:flex-[3] flex-[2] min-w-0 flex items-center gap-2">
+          <GrupoImagemThumb
+            nome={grupo.getNome()}
+            imagemUrl={imagemUrl}
+            isUploading={isUploadingImagem}
+            onSelectFile={file => onUploadImagem?.(grupo.getId(), file)}
+          />
+          <div className="flex min-w-0 flex-col gap-1 md:flex-row">
             <span className="flex items-center gap-2 truncate font-normal md:text-sm text-xs text-primary-text">
               {grupo.getNome()}
             </span>
@@ -332,10 +415,67 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
 
   const { auth } = useAuthStore()
   const [updatingQuantidadeId, setUpdatingQuantidadeId] = useState<string | null>(null)
+  const [imagensPorGrupoId, setImagensPorGrupoId] = useState<Record<string, string | null>>({})
+  const [uploadingImagemGrupoId, setUploadingImagemGrupoId] = useState<string | null>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const queryClient = useQueryClient() // Declarar queryClient aqui
+
+  useEffect(() => {
+    const idsFaltantes = grupos
+      .map(g => g.getId())
+      .filter(id => !(id in imagensPorGrupoId))
+
+    if (idsFaltantes.length === 0) return
+
+    let cancelled = false
+    const token = auth?.getAccessToken()
+    if (!token) return
+
+    void fetchGruposComplementoImagemUrlsBatch(idsFaltantes, token).then(resolved => {
+      if (cancelled) return
+      setImagensPorGrupoId(prev => ({ ...prev, ...resolved }))
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [auth, grupos, imagensPorGrupoId])
+
+  const handleUploadImagem = useCallback(
+    async (grupoId: string, file: File) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado')
+        return
+      }
+
+      const validationError = await validateDeliveryImageFile(file)
+      if (validationError) {
+        showToast.error(validationError)
+        return
+      }
+
+      setUploadingImagemGrupoId(grupoId)
+      const toastId = showToast.loading('Enviando imagem...')
+
+      try {
+        await uploadGrupoComplementoImagem(grupoId, file, token)
+        const persistedUrl = await fetchGrupoComplementoImagemUrl(grupoId, token)
+        setImagensPorGrupoId(prev => ({
+          ...prev,
+          [grupoId]: persistedUrl,
+        }))
+        showToast.successLoading(toastId, 'Imagem salva com sucesso!')
+      } catch (error) {
+        showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
+      } finally {
+        setUploadingImagemGrupoId(null)
+      }
+    },
+    [auth]
+  )
 
   const [tabsModalState, setTabsModalState] = useState<GruposComplementosTabsModalState>({
     open: false,
@@ -419,6 +559,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
   }, [router, searchParams, pathname, refetch])
 
   const handleTabsModalReload = useCallback(async () => {
+    setImagensPorGrupoId({})
     await handleActionsReload()
   }, [handleActionsReload])
 
@@ -628,6 +769,9 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
             isChangingQuantidade={updatingQuantidadeId === grupo.getId()}
             ordemPosicional={index + 1}
             rowIndex={index}
+            imagemUrl={imagensPorGrupoId[grupo.getId()] ?? null}
+            isUploadingImagem={uploadingImagemGrupoId === grupo.getId()}
+            onUploadImagem={handleUploadImagem}
           />
         ))}
 

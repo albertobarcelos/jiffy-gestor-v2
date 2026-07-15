@@ -108,38 +108,72 @@ export async function resolveGrupoProdutoImagemUrlFromDeliveryCatalog(
   return map[grupoProdutoId.trim()] ?? null
 }
 
+export async function resolveGruposComplementoImagemUrlsFromDeliveryCatalog(
+  apiClient: ApiClient,
+  token: string,
+  grupoComplementoIds: string[]
+): Promise<Record<string, string | null>> {
+  const uniqueIds = [...new Set(grupoComplementoIds.map(id => id.trim()).filter(Boolean))]
+  const result: Record<string, string | null> = Object.fromEntries(
+    uniqueIds.map(id => [id, null])
+  )
+
+  if (uniqueIds.length === 0) return result
+
+  const slug = await resolveEmpresaDeliverySlug(apiClient, token)
+  if (!slug) return result
+
+  // gruposComplementos só vêm na primeira página do catálogo público
+  const catalogo = await fetchCatalogoPagina(apiClient, slug, 0, DELIVERY_CATALOGO_PAGE_LIMIT)
+  for (const grupo of catalogo?.gruposComplementos ?? []) {
+    if (!(grupo.id in result)) continue
+    result[grupo.id] = grupo.imagemUrl ?? null
+  }
+
+  return result
+}
+
 export async function resolveGrupoComplementoImagemUrlFromDeliveryCatalog(
   apiClient: ApiClient,
   token: string,
   grupoComplementoId: string
 ): Promise<string | null> {
-  const slug = await resolveEmpresaDeliverySlug(apiClient, token)
-  if (!slug) return null
-
-  const catalogo = await fetchCatalogoPagina(apiClient, slug, 0, DELIVERY_CATALOGO_PAGE_LIMIT)
-  const grupo = catalogo?.gruposComplementos?.find(item => item.id === grupoComplementoId)
-  return grupo?.imagemUrl ?? null
+  const map = await resolveGruposComplementoImagemUrlsFromDeliveryCatalog(
+    apiClient,
+    token,
+    [grupoComplementoId]
+  )
+  return map[grupoComplementoId.trim()] ?? null
 }
 
-export async function resolveProdutoImagemUrlFromDeliveryCatalog(
+export async function resolveProdutosImagemUrlsFromDeliveryCatalog(
   apiClient: ApiClient,
   token: string,
-  produtoId: string
-): Promise<string | null> {
+  produtoIds: string[]
+): Promise<Record<string, string | null>> {
+  const uniqueIds = [...new Set(produtoIds.map(id => id.trim()).filter(Boolean))]
+  const result: Record<string, string | null> = Object.fromEntries(
+    uniqueIds.map(id => [id, null])
+  )
+
+  if (uniqueIds.length === 0) return result
+
+  const pending = new Set(uniqueIds)
   const slug = await resolveEmpresaDeliverySlug(apiClient, token)
-  if (!slug) return null
+  if (!slug) return result
 
   const limit = DELIVERY_CATALOGO_PAGE_LIMIT
   let offset = 0
 
-  for (let page = 0; page < 50; page += 1) {
+  for (let page = 0; page < 50 && pending.size > 0; page += 1) {
     const catalogo = await fetchCatalogoPagina(apiClient, slug, offset, limit)
-    if (!catalogo) return null
+    if (!catalogo) break
 
     for (const grupo of catalogo.gruposProdutos ?? []) {
-      const produto = grupo.produtos?.find(item => item.id === produtoId)
-      if (produto) {
-        return produto.imagemUrl ?? null
+      for (const produto of grupo.produtos ?? []) {
+        if (!pending.has(produto.id)) continue
+        result[produto.id] = produto.imagemUrl ?? null
+        pending.delete(produto.id)
       }
     }
 
@@ -147,7 +181,41 @@ export async function resolveProdutoImagemUrlFromDeliveryCatalog(
     offset += limit
   }
 
-  return null
+  return result
+}
+
+export async function resolveProdutoImagemUrlFromDeliveryCatalog(
+  apiClient: ApiClient,
+  token: string,
+  produtoId: string
+): Promise<string | null> {
+  const map = await resolveProdutosImagemUrlsFromDeliveryCatalog(apiClient, token, [produtoId])
+  return map[produtoId.trim()] ?? null
+}
+
+export async function resolveComplementosImagemUrlsFromDeliveryCatalog(
+  apiClient: ApiClient,
+  token: string,
+  complementoIds: string[]
+): Promise<Record<string, string | null>> {
+  const uniqueIds = [...new Set(complementoIds.map(id => id.trim()).filter(Boolean))]
+  const result: Record<string, string | null> = Object.fromEntries(
+    uniqueIds.map(id => [id, null])
+  )
+
+  if (uniqueIds.length === 0) return result
+
+  const slug = await resolveEmpresaDeliverySlug(apiClient, token)
+  if (!slug) return result
+
+  // complementos só vêm na primeira página do catálogo público
+  const catalogo = await fetchCatalogoPagina(apiClient, slug, 0, DELIVERY_CATALOGO_PAGE_LIMIT)
+  for (const complemento of catalogo?.complementos ?? []) {
+    if (!(complemento.id in result)) continue
+    result[complemento.id] = complemento.imagemUrl ?? null
+  }
+
+  return result
 }
 
 export async function resolveComplementoImagemUrlFromDeliveryCatalog(
@@ -155,24 +223,8 @@ export async function resolveComplementoImagemUrlFromDeliveryCatalog(
   token: string,
   complementoId: string
 ): Promise<string | null> {
-  const slug = await resolveEmpresaDeliverySlug(apiClient, token)
-  if (!slug) return null
-
-  const limit = DELIVERY_CATALOGO_PAGE_LIMIT
-  let offset = 0
-
-  for (let page = 0; page < 50; page += 1) {
-    const catalogo = await fetchCatalogoPagina(apiClient, slug, offset, limit)
-    if (!catalogo) return null
-
-    const complemento = catalogo.complementos?.find(item => item.id === complementoId)
-    if (complemento) {
-      return complemento.imagemUrl ?? null
-    }
-
-    if (!catalogo.paginacao?.hasNext) break
-    offset += limit
-  }
-
-  return null
+  const map = await resolveComplementosImagemUrlsFromDeliveryCatalog(apiClient, token, [
+    complementoId,
+  ])
+  return map[complementoId.trim()] ?? null
 }

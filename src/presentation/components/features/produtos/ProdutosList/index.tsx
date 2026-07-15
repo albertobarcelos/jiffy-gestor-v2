@@ -11,6 +11,15 @@ import { useProdutoPatchMutation, isSavingOf } from '@/src/presentation/hooks/us
 import { useGrupoProdutoPatchMutation } from '@/src/presentation/hooks/useGrupoProdutoPatchMutation'
 import { useProdutosFilters } from '@/src/presentation/hooks/useProdutosFilters'
 import { useIsMobile } from '@/src/presentation/hooks/useIsMobile'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
+import {
+  fetchProdutoImagemUrl,
+  fetchProdutosImagemUrlsBatch,
+  mensagemLegivelDeliveryMediaError,
+  uploadProdutoImagem,
+} from '@/src/infrastructure/api/deliveryMediaApi'
+import { validateDeliveryImageFile } from '@/src/shared/constants/deliveryImageUpload'
+import { showToast } from '@/src/shared/utils/toast'
 
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { ProdutosTabsModal, type ProdutosTabsModalState } from '../ProdutosTabsModal'
@@ -52,12 +61,18 @@ export function ProdutosList() {
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const isMobile = useIsMobile()
+  const { auth } = useAuthStore()
 
   const { state: filters, actions, queryParams, filterStatus } = useProdutosFilters()
 
   // Sempre inicia como `false` para coincidir com o SSR; corrigido após hidratação via useIsMobile.
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(false)
   useEffect(() => { setFiltrosVisiveis(!isMobile) }, [isMobile])
+
+  const [imagensPorProdutoId, setImagensPorProdutoId] = useState<Record<string, string | null>>(
+    {}
+  )
+  const [uploadingImagemProdutoId, setUploadingImagemProdutoId] = useState<string | null>(null)
 
   // Indexado por grupoId (ou '__sem_grupo__') para evitar colisões de nome normalizado.
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
@@ -93,6 +108,61 @@ export function ProdutosList() {
   const totalProdutos = useMemo(() => data?.pages?.[0]?.count ?? 0, [data])
 
   const produtosSorted = useMemo(() => sortProdutosAlphabetically(produtos), [produtos])
+
+  useEffect(() => {
+    const idsFaltantes = produtos
+      .map(p => p.getId())
+      .filter(id => !(id in imagensPorProdutoId))
+
+    if (idsFaltantes.length === 0) return
+
+    let cancelled = false
+    const token = auth?.getAccessToken()
+    if (!token) return
+
+    void fetchProdutosImagemUrlsBatch(idsFaltantes, token).then(resolved => {
+      if (cancelled) return
+      setImagensPorProdutoId(prev => ({ ...prev, ...resolved }))
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [auth, produtos, imagensPorProdutoId])
+
+  const handleUploadImagem = useCallback(
+    async (produtoId: string, file: File) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado')
+        return
+      }
+
+      const validationError = await validateDeliveryImageFile(file)
+      if (validationError) {
+        showToast.error(validationError)
+        return
+      }
+
+      setUploadingImagemProdutoId(produtoId)
+      const toastId = showToast.loading('Enviando imagem...')
+
+      try {
+        await uploadProdutoImagem(produtoId, file, token)
+        const persistedUrl = await fetchProdutoImagemUrl(produtoId, token)
+        setImagensPorProdutoId(prev => ({
+          ...prev,
+          [produtoId]: persistedUrl,
+        }))
+        showToast.successLoading(toastId, 'Imagem salva com sucesso!')
+      } catch (error) {
+        showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
+      } finally {
+        setUploadingImagemProdutoId(null)
+      }
+    },
+    [auth]
+  )
 
   const produtosAgrupados = useMemo(() => {
     const map = new Map<string, Produto[]>()
@@ -219,10 +289,20 @@ export function ProdutosList() {
   const handleTabsModalReload = useCallback((produtoId?: string, produtoData?: unknown) => {
     if (produtoId && produtoData) {
       updateProdutoInCache(produtoId, produtoData)
-    } else {
-      void queryClient.invalidateQueries({ queryKey: ['produtos', 'infinite'], exact: false, refetchType: 'active' })
-      void queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false, refetchType: 'active' })
     }
+
+    if (produtoId) {
+      setImagensPorProdutoId(prev => {
+        const next = { ...prev }
+        delete next[produtoId]
+        return next
+      })
+      return
+    }
+
+    void queryClient.invalidateQueries({ queryKey: ['produtos', 'infinite'], exact: false, refetchType: 'active' })
+    void queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false, refetchType: 'active' })
+    setImagensPorProdutoId({})
   }, [queryClient, updateProdutoInCache])
 
   // Handlers de produto — recebem produtoId como arg, sem closure por item
@@ -393,6 +473,8 @@ export function ProdutosList() {
                             produto={produto}
                             isSavingValor={isSavingOf(patchMutation, produto.getId(), 'valor')}
                             isSavingStatus={isSavingOf(patchMutation, produto.getId(), 'status')}
+                            isUploadingImagem={uploadingImagemProdutoId === produto.getId()}
+                            imagemUrl={imagensPorProdutoId[produto.getId()] ?? null}
                             onValorChange={handleValorChange}
                             onSwitchToggle={handleStatusToggle}
                             onToggleBoolean={handleToggleBooleanField}
@@ -400,6 +482,7 @@ export function ProdutosList() {
                             onOpenImpressorasModal={handleOpenImpressorasModal}
                             onEditProduto={handleEditProduto}
                             onCopyProduto={handleCopyProduto}
+                            onUploadImagem={handleUploadImagem}
                           />
                         </div>
                       ))}

@@ -4,12 +4,22 @@ import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { Complemento } from '@/src/domain/entities/Complemento'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import { MdSearch } from 'react-icons/md'
+import { MdPhotoCamera, MdSearch } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useComplementosInfinite } from '@/src/presentation/hooks/useComplementos'
 import { useQueryClient } from '@tanstack/react-query'
+import {
+  DELIVERY_IMAGE_ACCEPT,
+  validateDeliveryImageFile,
+} from '@/src/shared/constants/deliveryImageUpload'
+import {
+  fetchComplementoImagemUrl,
+  fetchComplementosImagemUrlsBatch,
+  mensagemLegivelDeliveryMediaError,
+  uploadComplementoImagem,
+} from '@/src/infrastructure/api/deliveryMediaApi'
 import {
   ComplementosTabsModal,
   ComplementosTabsModalState,
@@ -17,6 +27,66 @@ import {
 
 interface ComplementosListProps {
   onReload?: () => void
+}
+
+function ComplementoImagemThumb({
+  nome,
+  imagemUrl,
+  isUploading,
+  onSelectFile,
+}: {
+  nome: string
+  imagemUrl?: string | null
+  isUploading?: boolean
+  onSelectFile: (file: File) => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const hasImage = Boolean(imagemUrl)
+  const label = hasImage ? `Trocar imagem de ${nome}` : `Inserir imagem de ${nome}`
+
+  return (
+    <button
+      type="button"
+      onClick={e => {
+        e.stopPropagation()
+        if (isUploading) return
+        inputRef.current?.click()
+      }}
+      disabled={isUploading}
+      aria-label={label}
+      title={label}
+      className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-gray-50 transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-60 md:h-12 md:w-12"
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept={DELIVERY_IMAGE_ACCEPT}
+        className="hidden"
+        onChange={e => {
+          const file = e.target.files?.[0]
+          e.target.value = ''
+          if (file) onSelectFile(file)
+        }}
+      />
+      {imagemUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={imagemUrl}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <MdPhotoCamera className="h-5 w-5 text-secondary-text/70" />
+        </div>
+      )}
+      {isUploading ? (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/35">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+        </div>
+      ) : null}
+    </button>
+  )
 }
 
 /**
@@ -36,6 +106,9 @@ const ComplementoRow = memo(function ComplementoRow({
   savingValor,
   savingTipo,
   togglingStatus,
+  imagemUrl,
+  isUploadingImagem,
+  onUploadImagem,
 }: {
   complemento: Complemento
   index: number
@@ -50,6 +123,9 @@ const ComplementoRow = memo(function ComplementoRow({
   savingValor: boolean
   savingTipo: boolean
   togglingStatus: boolean
+  imagemUrl?: string | null
+  isUploadingImagem?: boolean
+  onUploadImagem?: (complementoId: string, file: File) => void
 }) {
   const isZebraEven = index % 2 === 0
   const bgClass = isZebraEven ? 'bg-gray-50' : 'bg-white'
@@ -59,8 +135,14 @@ const ComplementoRow = memo(function ComplementoRow({
       onClick={() => onRowClick(complemento)}
       className={`${bgClass} rounded-lg md:px-4 px-1 py-3 flex items-center md:gap-[10px] gap-1 hover:bg-secondary-bg/15 cursor-pointer`}
     >
-      <div className="md:flex-[3] flex-[2] font-normal md:text-sm text-[10px] text-primary-text flex items-center gap-1">
-        <span># {complemento.getNome()}</span>
+      <div className="md:flex-[3] flex-[2] font-normal md:text-sm text-[10px] text-primary-text flex min-w-0 items-center gap-2">
+        <ComplementoImagemThumb
+          nome={complemento.getNome()}
+          imagemUrl={imagemUrl}
+          isUploading={isUploadingImagem}
+          onSelectFile={file => onUploadImagem?.(complemento.getId(), file)}
+        />
+        <span className="truncate"># {complemento.getNome()}</span>
       </div>
       <div className="flex-[3] text-sm text-secondary-text hidden md:flex">
         {complemento.getDescricao() || 'Nenhuma'}
@@ -191,6 +273,68 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
   }, [data])
 
   const totalComplementos = useMemo(() => data?.pages[0]?.count ?? 0, [data])
+
+  const [imagensPorComplementoId, setImagensPorComplementoId] = useState<
+    Record<string, string | null>
+  >({})
+  const [uploadingImagemComplementoId, setUploadingImagemComplementoId] = useState<string | null>(
+    null
+  )
+
+  useEffect(() => {
+    const idsFaltantes = complementos
+      .map(c => c.getId())
+      .filter(id => !(id in imagensPorComplementoId))
+
+    if (idsFaltantes.length === 0) return
+
+    let cancelled = false
+    const token = auth?.getAccessToken()
+    if (!token) return
+
+    void fetchComplementosImagemUrlsBatch(idsFaltantes, token).then(resolved => {
+      if (cancelled) return
+      setImagensPorComplementoId(prev => ({ ...prev, ...resolved }))
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [auth, complementos, imagensPorComplementoId])
+
+  const handleUploadImagem = useCallback(
+    async (complementoId: string, file: File) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado')
+        return
+      }
+
+      const validationError = await validateDeliveryImageFile(file)
+      if (validationError) {
+        showToast.error(validationError)
+        return
+      }
+
+      setUploadingImagemComplementoId(complementoId)
+      const toastId = showToast.loading('Enviando imagem...')
+
+      try {
+        await uploadComplementoImagem(complementoId, file, token)
+        const persistedUrl = await fetchComplementoImagemUrl(complementoId, token)
+        setImagensPorComplementoId(prev => ({
+          ...prev,
+          [complementoId]: persistedUrl,
+        }))
+        showToast.successLoading(toastId, 'Imagem salva com sucesso!')
+      } catch (error) {
+        showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
+      } finally {
+        setUploadingImagemComplementoId(null)
+      }
+    },
+    [auth]
+  )
 
   // Debounce da busca (500ms) — igual GruposComplementosList
   useEffect(() => {
@@ -536,6 +680,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
   }, [router, searchParams, pathname, queryClient])
 
   const handleTabsModalReload = useCallback(async () => {
+    setImagensPorComplementoId({})
     await handleActionsReload()
   }, [handleActionsReload])
 
@@ -681,6 +826,9 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
             savingValor={!!savingValorMap[complemento.getId()]}
             savingTipo={!!savingTipoMap[complemento.getId()]}
             togglingStatus={!!togglingStatus[complemento.getId()]}
+            imagemUrl={imagensPorComplementoId[complemento.getId()] ?? null}
+            isUploadingImagem={uploadingImagemComplementoId === complemento.getId()}
+            onUploadImagem={handleUploadImagem}
           />
         ))}
 
