@@ -20,8 +20,8 @@ export function DeliveryCatalogoProdutoCard({
       <div
         className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl border"
         style={{
-          backgroundColor: 'var(--delivery-surface-muted)',
-          borderColor: 'var(--delivery-card-border)',
+          backgroundColor: '#ffffff',
+          borderColor: '#e5e7eb',
         }}
       >
         {produto.imagemUrl ? (

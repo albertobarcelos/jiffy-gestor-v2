@@ -4,11 +4,12 @@ import type { ReactNode } from 'react'
 import { Camera, MapPin, Pencil, Bike, UserRound } from 'lucide-react'
 import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { MeioPagamentoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
-import { formatarTelefoneBr } from '@/src/shared/utils/telefoneBr'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import type { DeliveryCarrinhoItem } from '../../../shared/stores/deliveryCarrinhoStore'
 import type { DeliveryTipoEntrega } from '../../../shared/stores/deliveryPreferenciaEntregaStore'
+import { DELIVERY_PAIS_TELEFONE_PADRAO } from '../../../shared/constants/deliveryPaisesTelefone'
 import { formatDeliveryCurrency } from '../../../shared/utils/formatDeliveryCurrency'
+import { formatarTelefoneExibicao } from '../../../shared/utils/deliveryTelefonePais'
 import { obterIconeMeioPagamento } from '../../../shared/utils/obterIconeMeioPagamento'
 import { DeliveryCheckoutStepModal } from './DeliveryCheckoutStepModal'
 
@@ -16,6 +17,7 @@ type DeliveryCheckoutRevisaoModalProps = {
   tipoEntrega: DeliveryTipoEntrega
   nome: string
   telefone: string
+  telefonePaisIso2?: string
   enderecoCliente: EnderecoClienteDeliveryPublicoDTO | null
   enderecoEmpresaTexto: string | null
   itens: DeliveryCarrinhoItem[]
@@ -109,6 +111,7 @@ export function DeliveryCheckoutRevisaoModal({
   tipoEntrega,
   nome,
   telefone,
+  telefonePaisIso2 = DELIVERY_PAIS_TELEFONE_PADRAO,
   enderecoCliente,
   enderecoEmpresaTexto,
   itens,
@@ -127,7 +130,7 @@ export function DeliveryCheckoutRevisaoModal({
   onEnviar,
 }: DeliveryCheckoutRevisaoModalProps) {
   const telefoneExibicao = telefone.trim()
-    ? formatarTelefoneBr(telefone)
+    ? formatarTelefoneExibicao(telefone, telefonePaisIso2)
     : 'Não informado'
   const nomeExibicao = nome.trim() || 'Não informado'
   const IconePagamento = obterIconeMeioPagamento(meioPagamento?.nome ?? '')

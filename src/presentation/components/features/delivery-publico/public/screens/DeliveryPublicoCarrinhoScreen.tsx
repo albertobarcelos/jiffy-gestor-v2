@@ -12,6 +12,7 @@ import { showToast } from '@/src/shared/utils/toast'
 import { DeliveryThemeScope } from '../../shared/components/DeliveryThemeScope'
 import { DeliveryCarrinhoItemCard } from '../../shared/components/DeliveryCarrinhoItemCard'
 import { DeliveryButton } from '../../shared/components/DeliveryButton'
+import { useDeliveryBodyScrollLock } from '../../shared/hooks/useDeliveryBodyScrollLock'
 import { useDeliveryCheckout } from '../../shared/hooks/useDeliveryCheckout'
 import {
   useDeliveryCarrinhoStore,
@@ -20,6 +21,7 @@ import {
 import { findCatalogoProdutoById } from '../../shared/utils/findCatalogoProdutoById'
 import { itemSemComplemento } from '../../shared/utils/deliveryCarrinhoItemUtils'
 import { formatEmpresaPublicaEndereco } from '../../shared/utils/formatEmpresaPublicaEndereco'
+import { telefoneNacionalValido } from '../../shared/utils/deliveryTelefonePais'
 import { DeliveryProdutoModal } from '../components/DeliveryProdutoModal'
 import { DeliveryCarrinhoEnderecoTopo } from '../components/checkout/DeliveryCarrinhoEnderecoTopo'
 import { DeliveryCheckoutIdentifiqueSeModal } from '../components/checkout/DeliveryCheckoutIdentifiqueSeModal'
@@ -148,6 +150,7 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
 
   const voltar = () => router.push(`/cardapio/${encodeURIComponent(slug)}`)
   const carregandoEdicao = Boolean(itemEditando) && !produtoEdicao
+  useDeliveryBodyScrollLock(carregandoEdicao)
 
   const handleToggleTipoEntrega = () => {
     updateForm('tipoEntrega', form.tipoEntrega === 'entrega' ? 'retirada' : 'entrega')
@@ -172,8 +175,7 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
       )
       return
     }
-    const tel = form.telefone.replace(/\D/g, '')
-    if (tel.length < 10) {
+    if (!telefoneNacionalValido(form.telefone, form.telefonePaisIso2)) {
       setVoltarParaRevisao(false)
       setCheckoutStep('telefone')
       return
@@ -397,7 +399,9 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
       {checkoutStep === 'telefone' ? (
         <DeliveryCheckoutIdentifiqueSeModal
           telefone={form.telefone}
+          telefonePaisIso2={form.telefonePaisIso2}
           onChangeTelefone={value => updateForm('telefone', value)}
+          onChangeTelefonePais={iso2 => updateForm('telefonePaisIso2', iso2)}
           onClose={fecharOuRevisao}
           onContinuar={handleTelefoneContinuar}
         />
@@ -464,6 +468,7 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
           tipoEntrega={form.tipoEntrega}
           nome={nomeClienteExibicao}
           telefone={form.telefone}
+          telefonePaisIso2={form.telefonePaisIso2}
           enderecoCliente={enderecoClienteSelecionado}
           enderecoEmpresaTexto={enderecoEmpresaTexto}
           itens={itens}
@@ -496,7 +501,7 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
       ) : null}
 
       {carregandoEdicao ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex overscroll-none items-center justify-center">
           <div
             className="absolute inset-0"
             style={{ backgroundColor: 'var(--delivery-overlay)' }}

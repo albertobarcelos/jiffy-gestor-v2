@@ -228,7 +228,7 @@ export async function garantirEnderecoEntregaPublico(
   params: GarantirEnderecoEntregaParams
 ): Promise<string> {
   const telefone = params.telefone.replace(/\D/g, '')
-  if (telefone.length < 10) {
+  if (telefone.length < 8) {
     throw new Error('Informe um telefone válido')
   }
 

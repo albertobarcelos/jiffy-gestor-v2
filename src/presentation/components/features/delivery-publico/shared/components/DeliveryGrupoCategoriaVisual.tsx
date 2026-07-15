@@ -22,7 +22,8 @@ type DeliveryGrupoCategoriaVisualProps = {
 const SIZE_CLASSES = {
   sm: 'h-8 w-8',
   md: 'h-12 w-12',
-  lg: 'h-14 w-14 @sm:h-11 @sm:w-11 @lg:h-16 @lg:w-16 @xl:h-[4.5rem] @xl:w-[4.5rem]',
+  /** Desktop (@lg+): ~50% maior que o tamanho base mobile (h-14 → 5.25rem). */
+  lg: 'h-14 w-14 @sm:h-11 @sm:w-11 @lg:h-[5.25rem] @lg:w-[5.25rem]',
 } as const
 
 const ICON_SIZES = {
@@ -106,7 +107,12 @@ export function DeliveryGrupoCategoriaVisual({
       )}
       style={{ backgroundColor, border }}
     >
-      <DinamicIcon iconName={displayIconName} color={iconColor} size={ICON_SIZES[size]} />
+      <DinamicIcon
+        iconName={displayIconName}
+        color={iconColor}
+        size={ICON_SIZES[size]}
+        className={size === 'lg' ? '@lg:scale-150' : undefined}
+      />
     </div>
   )
 }

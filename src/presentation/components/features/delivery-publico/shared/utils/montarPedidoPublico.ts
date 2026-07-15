@@ -1,9 +1,13 @@
 import type { CreatePedidoPublicoInput } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import { DELIVERY_PAIS_TELEFONE_PADRAO } from '../constants/deliveryPaisesTelefone'
 import type { DeliveryCarrinhoItem } from '../stores/deliveryCarrinhoStore'
+import { comporTelefoneApi, telefoneNacionalValido } from './deliveryTelefonePais'
 
 export type CheckoutFormData = {
   tipoEntrega: 'entrega' | 'retirada'
   telefone: string
+  /** ISO 3166-1 alpha-2 do país do celular (ex.: BR). */
+  telefonePaisIso2: string
   nome: string
   /** Como o usuário quer resolver o endereço quando já existem cadastros. */
   modoEndereco: 'existente' | 'novo'
@@ -44,10 +48,11 @@ export function montarPedidoPublico({
   form,
   enderecoIdEntrega,
 }: MontarPedidoParams): MontarPedidoResult {
-  const tel = form.telefone.replace(/\D/g, '')
-  if (tel.length < 10) {
+  const paisIso2 = form.telefonePaisIso2 || DELIVERY_PAIS_TELEFONE_PADRAO
+  if (!telefoneNacionalValido(form.telefone, paisIso2)) {
     return { ok: false, error: 'Informe um telefone válido' }
   }
+  const tel = comporTelefoneApi(form.telefone, paisIso2)
   if (itens.length === 0) {
     return { ok: false, error: 'Carrinho vazio' }
   }

@@ -6,6 +6,9 @@ import type { DeliveryPublicoGrupoViewModel } from '../types/deliveryPublicoView
 import { DeliveryGrupoCategoriaVisual } from './DeliveryGrupoCategoriaVisual'
 
 const MOBILE_COLUMNS_MAX = 5
+/** Largura mínima alinhada a `md` / container `@3xl` (~768px) para encaixar 8 itens. */
+const DESKTOP_COLUMNS_MIN_WIDTH_PX = 768
+const DESKTOP_COLUMNS_MAX = 8
 const CHIP_GAP_PX = 8
 const HORIZONTAL_PADDING_PX = 32
 
@@ -17,10 +20,16 @@ type DeliveryGrupoChipsProps = {
   onGrupoClick?: (grupoId: string) => void
 }
 
+function resolveColumnsMax(railWidth: number): number {
+  return railWidth >= DESKTOP_COLUMNS_MIN_WIDTH_PX ? DESKTOP_COLUMNS_MAX : MOBILE_COLUMNS_MAX
+}
+
 function computeChipWidthPx(railWidth: number, grupoCount: number): number {
-  const columnsVisible = Math.min(Math.max(grupoCount, 1), MOBILE_COLUMNS_MAX)
+  const columnsMax = resolveColumnsMax(railWidth)
+  const columnsVisible = Math.min(Math.max(grupoCount, 1), columnsMax)
   const gaps = (columnsVisible - 1) * CHIP_GAP_PX
-  const usable = Math.max(railWidth - HORIZONTAL_PADDING_PX - gaps, columnsVisible * 48)
+  const minChip = columnsMax === DESKTOP_COLUMNS_MAX ? 72 : 48
+  const usable = Math.max(railWidth - HORIZONTAL_PADDING_PX - gaps, columnsVisible * minChip)
   return usable / columnsVisible
 }
 

@@ -20,8 +20,8 @@ export function DeliveryGradeProdutoCard({
       <div
         className="relative aspect-square w-full rounded-xl border"
         style={{
-          backgroundColor: 'var(--delivery-surface-muted)',
-          borderColor: 'var(--delivery-card-border)',
+          backgroundColor: '#ffffff',
+          borderColor: '#e5e7eb',
         }}
       >
         {produto.imagemUrl ? (

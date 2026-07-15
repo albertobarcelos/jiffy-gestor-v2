@@ -23,8 +23,8 @@ export function DeliveryVitrineProdutoCard({
   const content = (
     <>
       <div
-        className="relative aspect-[4/3] w-full"
-        style={{ backgroundColor: 'var(--delivery-surface-muted)' }}
+        className="relative aspect-[4/3] w-full border-b"
+        style={{ backgroundColor: '#ffffff', borderColor: '#e5e7eb' }}
       >
         {produto.imagemUrl ? (
           // eslint-disable-next-line @next/next/no-img-element

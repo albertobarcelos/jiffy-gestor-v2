@@ -10,6 +10,7 @@ import { showToast } from '@/src/shared/utils/toast'
 import { DeliveryButton } from '../../shared/components/DeliveryButton'
 import { DeliveryTextarea } from '../../shared/components/DeliveryInput'
 import { DeliveryQuantidadeStepper } from '../../shared/components/DeliveryQuantidadeStepper'
+import { useDeliveryBodyScrollLock } from '../../shared/hooks/useDeliveryBodyScrollLock'
 import { useProdutoComplementos } from '../../shared/hooks/useProdutoComplementos'
 import {
   useDeliveryCarrinhoStore,
@@ -68,6 +69,8 @@ export function DeliveryProdutoModal({
   const scrollRef = useRef<HTMLDivElement>(null)
   const bannerComplementosRef = useRef<HTMLDivElement>(null)
   const [alturaPrimeiraDobra, setAlturaPrimeiraDobra] = useState<number | null>(null)
+
+  useDeliveryBodyScrollLock()
 
   const [quantidade, setQuantidade] = useState(itemEdicao?.quantidade ?? 1)
   const [observacao, setObservacao] = useState(
@@ -156,7 +159,7 @@ export function DeliveryProdutoModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch justify-center sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-50 flex overscroll-none items-stretch justify-center sm:items-center sm:p-4">
       <div
         className="absolute inset-0 hidden sm:block"
         style={{ backgroundColor: 'var(--delivery-overlay)' }}
@@ -165,7 +168,7 @@ export function DeliveryProdutoModal({
       />
 
       <div
-        className="relative flex h-[100dvh] w-full flex-col overflow-hidden sm:h-auto sm:max-h-[90vh] sm:max-w-lg sm:rounded-2xl sm:shadow-xl"
+        className="relative flex h-[100dvh] w-full flex-col overflow-hidden overscroll-none sm:h-auto sm:max-h-[90vh] sm:max-w-lg sm:rounded-2xl sm:shadow-xl"
         style={{ backgroundColor: 'var(--delivery-surface)' }}
         role="dialog"
         aria-modal="true"
@@ -192,7 +195,7 @@ export function DeliveryProdutoModal({
           </button>
         </div>
 
-        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain touch-pan-y">
           <div className="flex flex-col">
             {/* Primeira dobra: ocupa a área scroll visível menos a mensagem */}
             <div

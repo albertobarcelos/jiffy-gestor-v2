@@ -44,6 +44,7 @@
   background-color: var(--delivery-primary-dark);
   color: var(--delivery-btn-text, #ffffff);
   font-family: var(--delivery-font-title);
+  overflow: hidden;
 }
 
 /**

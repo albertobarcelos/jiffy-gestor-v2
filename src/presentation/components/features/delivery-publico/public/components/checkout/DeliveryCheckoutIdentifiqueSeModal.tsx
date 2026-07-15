@@ -1,31 +1,52 @@
 'use client'
 
-import { useState } from 'react'
-import { formatarTelefoneBr, extrairDigitosTelefone } from '@/src/shared/utils/telefoneBr'
+import { useEffect, useState } from 'react'
 import { showToast } from '@/src/shared/utils/toast'
+import { DeliveryPaisTelefoneSelect } from '../../../shared/components/DeliveryPaisTelefoneSelect'
+import { DELIVERY_PAIS_TELEFONE_PADRAO } from '../../../shared/constants/deliveryPaisesTelefone'
+import {
+  comporTelefoneApi,
+  formatarTelefonePorPais,
+  telefoneNacionalValido,
+} from '../../../shared/utils/deliveryTelefonePais'
 import { DeliveryCheckoutStepModal } from './DeliveryCheckoutStepModal'
 
 type DeliveryCheckoutIdentifiqueSeModalProps = {
   telefone: string
+  telefonePaisIso2?: string
   onChangeTelefone: (value: string) => void
+  onChangeTelefonePais?: (iso2: string) => void
   onClose: () => void
   onContinuar: (telefoneDigits: string) => Promise<void>
 }
 
 export function DeliveryCheckoutIdentifiqueSeModal({
   telefone,
+  telefonePaisIso2 = DELIVERY_PAIS_TELEFONE_PADRAO,
   onChangeTelefone,
+  onChangeTelefonePais,
   onClose,
   onContinuar,
 }: DeliveryCheckoutIdentifiqueSeModalProps) {
   const [enviando, setEnviando] = useState(false)
+  const [paisIso2, setPaisIso2] = useState(telefonePaisIso2)
+
+  useEffect(() => {
+    setPaisIso2(telefonePaisIso2)
+  }, [telefonePaisIso2])
+
+  const handleChangePais = (iso2: string) => {
+    setPaisIso2(iso2)
+    onChangeTelefone('')
+    onChangeTelefonePais?.(iso2)
+  }
 
   const handleContinuar = async () => {
-    const digits = extrairDigitosTelefone(telefone)
-    if (digits.length < 10) {
+    if (!telefoneNacionalValido(telefone, paisIso2)) {
       showToast.error('Informe um celular válido')
       return
     }
+    const digits = comporTelefoneApi(telefone, paisIso2)
     setEnviando(true)
     try {
       await onContinuar(digits)
@@ -33,6 +54,8 @@ export function DeliveryCheckoutIdentifiqueSeModal({
       setEnviando(false)
     }
   }
+
+  const placeholder = paisIso2 === 'BR' ? '(99) 99999-9999' : '999 999 999'
 
   return (
     <DeliveryCheckoutStepModal
@@ -80,17 +103,18 @@ export function DeliveryCheckoutIdentifiqueSeModal({
           className="flex items-center gap-2 rounded-xl border px-3 py-3"
           style={{ borderColor: 'var(--delivery-border)' }}
         >
-          <span className="shrink-0 text-sm font-medium delivery-text-primary" title="Brasil">
-            🇧🇷 ▾
-          </span>
+          <DeliveryPaisTelefoneSelect
+            value={paisIso2}
+            onChange={handleChangePais}
+            disabled={enviando}
+          />
           <input
             type="tel"
             inputMode="tel"
-            autoComplete="tel"
-            maxLength={15}
-            placeholder="(99) 99999-9999"
+            autoComplete="tel-national"
+            placeholder={placeholder}
             value={telefone}
-            onChange={e => onChangeTelefone(formatarTelefoneBr(e.target.value))}
+            onChange={e => onChangeTelefone(formatarTelefonePorPais(e.target.value, paisIso2))}
             className="min-w-0 flex-1 bg-transparent text-sm outline-none delivery-text-primary"
           />
         </div>

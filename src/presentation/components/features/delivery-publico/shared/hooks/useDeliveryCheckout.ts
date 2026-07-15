@@ -22,6 +22,7 @@ import {
   garantirEnderecoEntregaPublico,
   normalizarClienteDeliveryPublico,
 } from '../utils/garantirEnderecoClientePublico'
+import { comporTelefoneApi } from '../utils/deliveryTelefonePais'
 import {
   montarPedidoPublico,
   type CheckoutFormData,
@@ -45,6 +46,7 @@ function createInitialForm(tipoEntrega: DeliveryTipoEntrega): CheckoutFormData {
   return {
     tipoEntrega,
     telefone: '',
+    telefonePaisIso2: 'BR',
     nome: '',
     modoEndereco: 'novo',
     enderecoIdSelecionado: '',
@@ -174,7 +176,13 @@ export function useDeliveryCheckout(slug: string) {
     if (!nomeApi) return
     const telConsultado = clienteLookup.telefoneConsultado
     if (!telConsultado) return
-    if (onlyDigits(formRef.current.telefone) !== telConsultado) return
+    const telForm = comporTelefoneApi(
+      formRef.current.telefone,
+      formRef.current.telefonePaisIso2
+    )
+    if (telForm !== telConsultado && telefoneDigitsRef.current !== telConsultado) {
+      return
+    }
 
     setForm(prev => {
       if (prev.nome.trim()) return prev
@@ -196,7 +204,7 @@ export function useDeliveryCheckout(slug: string) {
       const tel = onlyDigits(telefoneDigits)
       telefoneDigitsRef.current = tel
 
-      if (tel.length < 10) {
+      if (tel.length < 8) {
         preferirNovoEnderecoRef.current = false
         setClienteLookup(createInitialLookup())
         setForm(prev => ({
@@ -279,13 +287,20 @@ export function useDeliveryCheckout(slug: string) {
     [aplicarClienteNoForm]
   )
 
+  const resolveTelefoneApi = useCallback((formData: CheckoutFormData) => {
+    return (
+      telefoneDigitsRef.current ||
+      comporTelefoneApi(formData.telefone, formData.telefonePaisIso2)
+    )
+  }, [])
+
   const agendarConsultaTelefone = useCallback(
-    (telefoneMasked: string) => {
+    (telefoneMasked: string, paisIso2: string) => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
-      const tel = onlyDigits(telefoneMasked)
+      const tel = comporTelefoneApi(telefoneMasked, paisIso2)
       telefoneDigitsRef.current = tel
 
-      if (tel.length < 10) {
+      if (tel.length < 8) {
         lookupSeqRef.current += 1
         preferirNovoEnderecoRef.current = false
         setClienteLookup(createInitialLookup())
@@ -310,15 +325,20 @@ export function useDeliveryCheckout(slug: string) {
 
   const updateForm = useCallback(
     <K extends keyof CheckoutFormData>(key: K, value: CheckoutFormData[K]) => {
-      if (key === 'telefone') {
-        telefoneDigitsRef.current = onlyDigits(String(value))
+      const next = { ...formRef.current, [key]: value }
+      if (key === 'telefone' || key === 'telefonePaisIso2') {
+        telefoneDigitsRef.current = comporTelefoneApi(
+          next.telefone,
+          next.telefonePaisIso2
+        )
       }
-      setForm(prev => ({ ...prev, [key]: value }))
+      formRef.current = next
+      setForm(next)
       if (key === 'tipoEntrega') {
         setTipoEntregaPreferencia(slug, value as DeliveryTipoEntrega)
       }
-      if (key === 'telefone') {
-        agendarConsultaTelefone(String(value))
+      if (key === 'telefone' || key === 'telefonePaisIso2') {
+        agendarConsultaTelefone(next.telefone, next.telefonePaisIso2)
       }
     },
     [slug, setTipoEntregaPreferencia, agendarConsultaTelefone]
@@ -343,15 +363,15 @@ export function useDeliveryCheckout(slug: string) {
   }, [])
 
   const consultarTelefoneAtual = useCallback(() => {
-    const tel =
-      telefoneDigitsRef.current || onlyDigits(formRef.current.telefone)
+    const tel = resolveTelefoneApi(formRef.current)
     telefoneDigitsRef.current = tel
     void consultarClientePorTelefone(tel)
-  }, [consultarClientePorTelefone])
+  }, [consultarClientePorTelefone, resolveTelefoneApi])
 
   const confirmarNovoEndereco = useCallback(async (): Promise<string> => {
-    const tel = onlyDigits(formRef.current.telefone)
     const f = formRef.current
+    const tel = resolveTelefoneApi(f)
+    telefoneDigitsRef.current = tel
     const nomeEfetivo =
       f.nome.trim() || clienteLookupRef.current.cliente?.nome?.trim() || null
 
@@ -394,11 +414,12 @@ export function useDeliveryCheckout(slug: string) {
     }))
 
     return enderecoId
-  }, [])
+  }, [resolveTelefoneApi])
 
   const enviarPedido = useCallback(async () => {
-    const tel = onlyDigits(form.telefone)
-    if (tel.length < 10) {
+    const tel = resolveTelefoneApi(form)
+    telefoneDigitsRef.current = tel
+    if (tel.length < 8) {
       showToast.error('Informe um telefone válido')
       return
     }
@@ -458,7 +479,7 @@ export function useDeliveryCheckout(slug: string) {
     } finally {
       setEnviando(false)
     }
-  }, [slug, itens, total, form, clienteLookup.cliente, limpar, router])
+  }, [slug, itens, total, form, clienteLookup.cliente, limpar, router, resolveTelefoneApi])
 
   return {
     itens,

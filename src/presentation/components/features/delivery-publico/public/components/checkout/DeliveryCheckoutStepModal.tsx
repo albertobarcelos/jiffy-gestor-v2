@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { MdClose } from 'react-icons/md'
+import { useDeliveryBodyScrollLock } from '../../../shared/hooks/useDeliveryBodyScrollLock'
 
 type DeliveryCheckoutStepModalProps = {
   title: string
@@ -24,12 +25,14 @@ export function DeliveryCheckoutStepModal({
   onBack,
   fullScreen = false,
 }: DeliveryCheckoutStepModalProps) {
+  useDeliveryBodyScrollLock()
+
   return (
     <div
       className={
         fullScreen
-          ? 'fixed inset-0 z-[60] flex'
-          : 'fixed inset-0 z-[60] flex items-start justify-center px-4 pt-[8vh] sm:items-center sm:pt-0'
+          ? 'fixed inset-0 z-[60] flex overscroll-none'
+          : 'fixed inset-0 z-[60] flex overscroll-none items-start justify-center px-4 pt-[8vh] sm:items-center sm:pt-0'
       }
     >
       {!fullScreen ? (
@@ -97,7 +100,9 @@ export function DeliveryCheckoutStepModal({
           )}
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain touch-pan-y px-4 py-4">
+          {children}
+        </div>
 
         {footer ? (
           <div

@@ -1,6 +1,7 @@
 'use client'
 
 import { Check } from 'lucide-react'
+import { useDeliveryBodyScrollLock } from '../../shared/hooks/useDeliveryBodyScrollLock'
 
 type DeliveryAdicionadoCarrinhoDialogProps = {
   produtoNome: string
@@ -13,8 +14,10 @@ export function DeliveryAdicionadoCarrinhoDialog({
   onContinuarComprando,
   onIrParaCarrinho,
 }: DeliveryAdicionadoCarrinhoDialogProps) {
+  useDeliveryBodyScrollLock()
+
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center px-4 pt-[12vh] sm:pt-[10vh]">
+    <div className="fixed inset-0 z-[60] flex overscroll-none items-start justify-center px-4 pt-[12vh] sm:pt-[10vh]">
       <div
         className="absolute inset-0"
         style={{ backgroundColor: 'var(--delivery-overlay, rgba(0, 0, 0, 0.55))' }}
