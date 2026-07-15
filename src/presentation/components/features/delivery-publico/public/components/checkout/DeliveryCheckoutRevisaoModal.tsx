@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Camera, MapPin, Pencil, Bike, UserRound } from 'lucide-react'
 import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { MeioPagamentoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
@@ -32,7 +32,7 @@ type DeliveryCheckoutRevisaoModalProps = {
   onEditarEndereco: () => void
   onEditarPedido: () => void
   onEditarPagamento: () => void
-  onEditarObservacoes: () => void
+  onChangeObservacaoPedido: (value: string) => void
   onEnviar: () => void
 }
 
@@ -126,15 +126,25 @@ export function DeliveryCheckoutRevisaoModal({
   onEditarEndereco,
   onEditarPedido,
   onEditarPagamento,
-  onEditarObservacoes,
+  onChangeObservacaoPedido,
   onEnviar,
 }: DeliveryCheckoutRevisaoModalProps) {
+  const [adicionarObservacao, setAdicionarObservacao] = useState(
+    () => observacaoPedido.trim().length > 0
+  )
   const telefoneExibicao = telefone.trim()
     ? formatarTelefoneExibicao(telefone, telefonePaisIso2)
     : 'Não informado'
   const nomeExibicao = nome.trim() || 'Não informado'
   const IconePagamento = obterIconeMeioPagamento(meioPagamento?.nome ?? '')
   const isEntrega = tipoEntrega === 'entrega'
+
+  const handleToggleObservacao = (checked: boolean) => {
+    setAdicionarObservacao(checked)
+    if (!checked) {
+      onChangeObservacaoPedido('')
+    }
+  }
 
   return (
     <DeliveryCheckoutStepModal
@@ -143,6 +153,7 @@ export function DeliveryCheckoutRevisaoModal({
       showBack
       onBack={onVoltar}
       fullScreen
+      headerTone="dark"
       footer={
         <button
           type="button"
@@ -160,9 +171,7 @@ export function DeliveryCheckoutRevisaoModal({
     >
       <div>
         <LinhaSecao
-          icone={
-            <UserRound className="h-5 w-5" style={{ color: 'var(--delivery-text-muted)' }} />
-          }
+          icone={<UserRound className="h-5 w-5 text-black" />}
           label={isEntrega ? 'Entregue a:' : 'Pedido de:'}
           onEditar={onEditarCliente}
           editLabel="Editar cliente"
@@ -174,9 +183,9 @@ export function DeliveryCheckoutRevisaoModal({
         <LinhaSecao
           icone={
             isEntrega ? (
-              <Bike className="h-5 w-5" style={{ color: 'var(--delivery-text-muted)' }} />
+              <Bike className="h-5 w-5 text-black" />
             ) : (
-              <MapPin className="h-5 w-5" style={{ color: 'var(--delivery-text-muted)' }} />
+              <MapPin className="h-5 w-5 text-black" />
             )
           }
           label={isEntrega ? 'Seu endereço:' : 'Retirada no local:'}
@@ -209,12 +218,7 @@ export function DeliveryCheckoutRevisaoModal({
         </LinhaSecao>
 
         <LinhaSecao
-          icone={
-            <IconePagamento
-              className="h-5 w-5"
-              style={{ color: 'var(--delivery-text-muted)' }}
-            />
-          }
+          icone={<IconePagamento className="h-5 w-5 text-black" />}
           label="Pagamento:"
           onEditar={onEditarPagamento}
           editLabel="Editar pagamento"
@@ -255,15 +259,69 @@ export function DeliveryCheckoutRevisaoModal({
           ))}
         </ul>
 
-        <LinhaSecao
-          label="Observações:"
-          onEditar={onEditarObservacoes}
-          editLabel="Editar observações"
+        <div
+          className="space-y-3 border-b py-3"
+          style={{ borderColor: 'var(--delivery-border)' }}
         >
-          <p className="text-sm delivery-text-secondary whitespace-pre-wrap">
-            {observacaoPedido.trim() || 'Nenhuma observação'}
-          </p>
-        </LinhaSecao>
+          <div
+            className="flex items-center justify-between gap-3 rounded-xl px-3 py-2"
+            style={{ backgroundColor: '#000000', color: '#ffffff' }}
+          >
+            <span className="min-w-0 text-sm font-medium text-white">
+              Deseja adicionar observação?
+            </span>
+            <div
+              className="flex shrink-0 rounded-full p-0.5"
+              style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)' }}
+              role="group"
+              aria-label="Adicionar observação"
+            >
+              <button
+                type="button"
+                onClick={() => handleToggleObservacao(true)}
+                aria-pressed={adicionarObservacao}
+                className="min-w-[3.25rem] rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors"
+                style={
+                  adicionarObservacao
+                    ? { backgroundColor: '#ffffff', color: '#000000' }
+                    : { backgroundColor: 'transparent', color: '#ffffff' }
+                }
+              >
+                Sim
+              </button>
+              <button
+                type="button"
+                onClick={() => handleToggleObservacao(false)}
+                aria-pressed={!adicionarObservacao}
+                className="min-w-[3.25rem] rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors"
+                style={
+                  !adicionarObservacao
+                    ? { backgroundColor: '#ffffff', color: '#000000' }
+                    : { backgroundColor: 'transparent', color: '#ffffff' }
+                }
+              >
+                Não
+              </button>
+            </div>
+          </div>
+
+          {adicionarObservacao ? (
+            <div className="space-y-2">
+              <textarea
+                className="min-h-[110px] w-full resize-y rounded-xl border bg-transparent px-3 py-3 text-sm outline-none delivery-text-primary"
+                style={{ borderColor: 'var(--delivery-border)' }}
+                placeholder="Ex.: sem cebola, tocar a campainha, etc."
+                value={observacaoPedido}
+                onChange={e => onChangeObservacaoPedido(e.target.value)}
+                maxLength={500}
+                rows={4}
+              />
+              <p className="text-right text-[11px] delivery-text-secondary">
+                {observacaoPedido.length}/500
+              </p>
+            </div>
+          ) : null}
+        </div>
 
         <div className="space-y-2 pt-3">
           <div className="flex items-center justify-between text-sm">

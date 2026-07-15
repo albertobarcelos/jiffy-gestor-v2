@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { MdContentCopy, MdOpenInNew, MdPalette, MdStorefront } from 'react-icons/md'
+import { MdOpenInNew, MdPalette, MdShare, MdStorefront } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
 import {
@@ -15,6 +15,7 @@ import {
   normalizeDeliverySlug,
   validateDeliverySlug,
 } from '@/src/shared/utils/slugDelivery'
+import { compartilharLinkDelivery } from '@/src/presentation/components/features/delivery-publico/shared/utils/compartilharProdutoDelivery'
 
 export function CardapioDigitalTab() {
   const { empresa } = useEmpresaMe()
@@ -69,17 +70,16 @@ export function CardapioDigitalTab() {
     setSlugErro(validateDeliverySlug(normalizado))
   }, [slug])
 
-  const copiarLink = useCallback(async () => {
+  const compartilharLink = useCallback(async () => {
     if (!linkPublico) {
-      showToast.error('Informe um slug válido antes de copiar o link.')
+      showToast.error('Informe um slug válido antes de compartilhar o link.')
       return
     }
-    try {
-      await navigator.clipboard.writeText(linkPublico)
-      showToast.success('Link público copiado!')
-    } catch {
-      showToast.error('Não foi possível copiar o link.')
-    }
+    await compartilharLinkDelivery({
+      title: 'Cardápio digital',
+      text: 'Confira nosso cardápio online',
+      url: linkPublico,
+    })
   }, [linkPublico])
 
   const handleSalvar = useCallback(async () => {
@@ -189,12 +189,12 @@ export function CardapioDigitalTab() {
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => void copiarLink()}
+                    onClick={() => void compartilharLink()}
                     disabled={carregando}
                     className="inline-flex h-9 items-center gap-2 rounded-lg border border-secondary px-3 text-sm font-semibold text-secondary transition-colors hover:bg-secondary/10 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    <MdContentCopy className="h-4 w-4" aria-hidden />
-                    Copiar link
+                    <MdShare className="h-4 w-4" aria-hidden />
+                    Compartilhar link
                   </button>
                   <a
                     href={linkPublico}

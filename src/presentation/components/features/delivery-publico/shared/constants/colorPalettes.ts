@@ -18,7 +18,7 @@ export type ColorPaletteDefinition = {
 export const CUSTOM_PALETTE_DEFAULTS: DesignCustomColors = {
   primary: '#525252',
   primaryDark: '#171717',
-  surface: '#F5F5F5',
+  surface: '#FFFFFF',
   text: '#171A1C',
 }
 
@@ -32,7 +32,7 @@ export const COLOR_PALETTES: ColorPaletteDefinition[] = [
     nome: 'Carvão',
     premium: false,
     publicavel: true,
-    colors: { primary: '#525252', primaryDark: '#171717', surface: '#F5F5F5', text: '#171A1C' },
+    colors: { primary: '#525252', primaryDark: '#171717', surface: '#FFFFFF', text: '#171A1C' },
   },
   {
     id: 'lavanda',

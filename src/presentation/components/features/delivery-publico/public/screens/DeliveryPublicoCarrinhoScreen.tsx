@@ -29,7 +29,6 @@ import { DeliveryCheckoutNomeModal } from '../components/checkout/DeliveryChecko
 import { DeliveryCheckoutEnderecosModal } from '../components/checkout/DeliveryCheckoutEnderecosModal'
 import { DeliveryCheckoutEnderecoFormModal } from '../components/checkout/DeliveryCheckoutEnderecoFormModal'
 import { DeliveryCheckoutPagamentoModal } from '../components/checkout/DeliveryCheckoutPagamentoModal'
-import { DeliveryCheckoutObservacoesModal } from '../components/checkout/DeliveryCheckoutObservacoesModal'
 import { DeliveryCheckoutRevisaoModal } from '../components/checkout/DeliveryCheckoutRevisaoModal'
 
 type DeliveryPublicoCarrinhoScreenProps = {
@@ -42,7 +41,6 @@ type CheckoutStep =
   | 'enderecos'
   | 'enderecoForm'
   | 'pagamento'
-  | 'observacoes'
   | 'revisao'
   | null
 
@@ -185,14 +183,6 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
   }
 
   const handlePagamentoContinuar = () => {
-    if (voltarParaRevisao) {
-      setCheckoutStep('revisao')
-      return
-    }
-    setCheckoutStep('observacoes')
-  }
-
-  const handleObservacoesContinuar = () => {
     setVoltarParaRevisao(false)
     setCheckoutStep('revisao')
   }
@@ -451,18 +441,6 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
         />
       ) : null}
 
-      {checkoutStep === 'observacoes' ? (
-        <DeliveryCheckoutObservacoesModal
-          observacaoPedido={form.observacaoPedido}
-          onChangeObservacao={value => updateForm('observacaoPedido', value)}
-          onClose={fecharOuRevisao}
-          onVoltar={() =>
-            setCheckoutStep(voltarParaRevisao ? 'revisao' : 'pagamento')
-          }
-          onContinuar={handleObservacoesContinuar}
-        />
-      ) : null}
-
       {checkoutStep === 'revisao' ? (
         <DeliveryCheckoutRevisaoModal
           tipoEntrega={form.tipoEntrega}
@@ -483,7 +461,7 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
           }}
           onVoltar={() => {
             setVoltarParaRevisao(false)
-            setCheckoutStep('observacoes')
+            setCheckoutStep('pagamento')
           }}
           onEditarCliente={() => abrirStepDaRevisao('telefone')}
           onEditarEndereco={() => {
@@ -495,7 +473,7 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
             setCheckoutStep(null)
           }}
           onEditarPagamento={() => abrirStepDaRevisao('pagamento')}
-          onEditarObservacoes={() => abrirStepDaRevisao('observacoes')}
+          onChangeObservacaoPedido={value => updateForm('observacaoPedido', value)}
           onEnviar={() => void enviarPedido()}
         />
       ) : null}

@@ -14,6 +14,8 @@ type DeliveryCheckoutStepModalProps = {
   onBack?: () => void
   /** Ocupa 100% da viewport (ex.: revisão do pedido). */
   fullScreen?: boolean
+  /** Header preto com texto/ícones brancos (ex.: revisão). */
+  headerTone?: 'default' | 'dark'
 }
 
 export function DeliveryCheckoutStepModal({
@@ -24,8 +26,12 @@ export function DeliveryCheckoutStepModal({
   showBack = false,
   onBack,
   fullScreen = false,
+  headerTone = 'default',
 }: DeliveryCheckoutStepModalProps) {
   useDeliveryBodyScrollLock()
+
+  const isDarkHeader = headerTone === 'dark'
+  const headerFg = isDarkHeader ? '#ffffff' : 'var(--delivery-text-primary)'
 
   return (
     <div
@@ -56,24 +62,33 @@ export function DeliveryCheckoutStepModal({
         aria-label={title}
       >
         <div
-          className="flex shrink-0 items-center gap-2 border-b px-4 py-3"
-          style={{ borderColor: 'var(--delivery-border)' }}
+          className={`relative flex shrink-0 items-center gap-2 border-b px-4 ${
+            isDarkHeader ? 'py-2' : 'py-3'
+          }`}
+          style={{
+            borderColor: isDarkHeader ? '#000000' : 'var(--delivery-border)',
+            backgroundColor: isDarkHeader ? '#000000' : undefined,
+            color: headerFg,
+          }}
         >
           {showBack ? (
             <button
               type="button"
               onClick={onBack ?? onClose}
               aria-label="Voltar"
-              className="flex h-9 w-9 items-center justify-center rounded-full"
-              style={{ color: 'var(--delivery-text-primary)' }}
+              className={`flex items-center justify-center rounded-full ${
+                isDarkHeader ? 'h-8 w-8' : 'h-9 w-9'
+              }`}
+              style={{ color: headerFg }}
             >
               <span className="text-lg leading-none">‹</span>
             </button>
           ) : null}
           <h2
-            className={`delivery-font-title min-w-0 flex-1 text-base font-semibold delivery-text-primary ${
+            className={`delivery-font-title min-w-0 flex-1 text-base font-semibold ${
               showBack ? 'text-center pr-9' : ''
             }`}
+            style={{ color: headerFg }}
           >
             {title}
           </h2>
@@ -82,20 +97,24 @@ export function DeliveryCheckoutStepModal({
               type="button"
               onClick={onClose}
               aria-label="Fechar"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
-              style={{ color: 'var(--delivery-text-primary)' }}
+              className={`flex shrink-0 items-center justify-center rounded-full ${
+                isDarkHeader ? 'h-8 w-8' : 'h-9 w-9'
+              }`}
+              style={{ color: headerFg }}
             >
-              <MdClose className="h-5 w-5" />
+              <MdClose className={isDarkHeader ? 'h-4 w-4' : 'h-5 w-5'} />
             </button>
           ) : (
             <button
               type="button"
               onClick={onClose}
               aria-label="Fechar"
-              className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full"
-              style={{ color: 'var(--delivery-text-primary)' }}
+              className={`absolute right-3 top-1/2 flex -translate-y-1/2 items-center justify-center rounded-full ${
+                isDarkHeader ? 'h-8 w-8' : 'h-9 w-9'
+              }`}
+              style={{ color: headerFg }}
             >
-              <MdClose className="h-5 w-5" />
+              <MdClose className={isDarkHeader ? 'h-4 w-4' : 'h-5 w-5'} />
             </button>
           )}
         </div>
