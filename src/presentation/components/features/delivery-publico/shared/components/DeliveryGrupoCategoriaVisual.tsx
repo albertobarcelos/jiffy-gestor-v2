@@ -16,21 +16,30 @@ type DeliveryGrupoCategoriaVisualProps = {
   config: DeliveryPublicoDesignConfig
   grupo: GrupoCategoriaVisualSource
   size?: 'sm' | 'md' | 'lg'
+  /** Diâmetro explícito em px (sobrescreve `size` quando informado). */
+  diameterPx?: number
   className?: string
 }
 
 const SIZE_CLASSES = {
   sm: 'h-8 w-8',
   md: 'h-12 w-12',
-  /** Desktop (@lg+): ~50% maior que o tamanho base mobile (h-14 → 5.25rem). */
-  lg: 'h-14 w-14 @sm:h-11 @sm:w-11 @lg:h-[5.25rem] @lg:w-[5.25rem]',
+  /** Mobile base ~4.2rem; desktop (@lg+) ~5.25rem. */
+  lg: 'h-[4.2rem] w-[4.2rem] @lg:h-[5.25rem] @lg:w-[5.25rem]',
 } as const
 
 const ICON_SIZES = {
   sm: 18,
   md: 24,
-  lg: 26,
+  lg: 31,
 } as const
+
+function resolveIconSizePx(size: 'sm' | 'md' | 'lg', diameterPx?: number): number {
+  if (typeof diameterPx === 'number' && diameterPx > 0) {
+    return Math.max(14, Math.round(diameterPx * 0.45))
+  }
+  return ICON_SIZES[size]
+}
 
 function resolveIconName(
   config: DeliveryPublicoDesignConfig,
@@ -75,9 +84,14 @@ export function DeliveryGrupoCategoriaVisual({
   config,
   grupo,
   size = 'md',
+  diameterPx,
   className,
 }: DeliveryGrupoCategoriaVisualProps) {
-  const sizeClass = SIZE_CLASSES[size]
+  const hasDiameter = typeof diameterPx === 'number' && diameterPx > 0
+  const sizeClass = hasDiameter ? undefined : SIZE_CLASSES[size]
+  const diameterStyle = hasDiameter
+    ? { width: diameterPx, height: diameterPx, minWidth: diameterPx, minHeight: diameterPx }
+    : undefined
   const iconName = resolveIconName(config, grupo)
   const displayIconName = resolveMdiIconNameForStyle(iconName, config.categorias.estiloIcone)
   const { backgroundColor, border, iconColor } = resolveIconPresentation(config)
@@ -87,7 +101,7 @@ export function DeliveryGrupoCategoriaVisual({
     return (
       <div
         className={cn('box-border shrink-0 overflow-hidden rounded-full', sizeClass, className)}
-        style={{ border: `1px solid ${primaryColor}` }}
+        style={{ border: `1px solid ${primaryColor}`, ...diameterStyle }}
       >
         <img
           src={grupo.imagemUrl!}
@@ -105,13 +119,13 @@ export function DeliveryGrupoCategoriaVisual({
         sizeClass,
         className
       )}
-      style={{ backgroundColor, border }}
+      style={{ backgroundColor, border, ...diameterStyle }}
     >
       <DinamicIcon
         iconName={displayIconName}
         color={iconColor}
-        size={ICON_SIZES[size]}
-        className={size === 'lg' ? '@lg:scale-150' : undefined}
+        size={resolveIconSizePx(size, diameterPx)}
+        className={!hasDiameter && size === 'lg' ? '@lg:scale-150' : undefined}
       />
     </div>
   )

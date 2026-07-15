@@ -11,6 +11,12 @@ const DESKTOP_COLUMNS_MIN_WIDTH_PX = 768
 const DESKTOP_COLUMNS_MAX = 8
 const CHIP_GAP_PX = 8
 const HORIZONTAL_PADDING_PX = 32
+/** Teto da imagem no mobile (~tamanho ideal em ~375px), para não encostar/sobrepor. */
+const MOBILE_IMAGE_MAX_PX = 67
+/** Folga dentro do chip para a borda não encostar no vizinho. */
+const CHIP_IMAGE_INSET_PX = 4
+/** Teto da imagem no desktop (~5.25rem). */
+const DESKTOP_IMAGE_MAX_PX = 84
 
 type DeliveryGrupoChipsProps = {
   config: DeliveryPublicoDesignConfig
@@ -24,12 +30,18 @@ function resolveColumnsMax(railWidth: number): number {
   return railWidth >= DESKTOP_COLUMNS_MIN_WIDTH_PX ? DESKTOP_COLUMNS_MAX : MOBILE_COLUMNS_MAX
 }
 
+function resolveHorizontalPaddingPx(railWidth: number): number {
+  // Mobile: padding lateral menor para caber imagem ~20% maior mantendo 5 colunas.
+  return resolveColumnsMax(railWidth) === DESKTOP_COLUMNS_MAX ? HORIZONTAL_PADDING_PX : 16
+}
+
 function computeChipWidthPx(railWidth: number, grupoCount: number): number {
   const columnsMax = resolveColumnsMax(railWidth)
   const columnsVisible = Math.min(Math.max(grupoCount, 1), columnsMax)
   const gaps = (columnsVisible - 1) * CHIP_GAP_PX
-  const minChip = columnsMax === DESKTOP_COLUMNS_MAX ? 72 : 48
-  const usable = Math.max(railWidth - HORIZONTAL_PADDING_PX - gaps, columnsVisible * minChip)
+  const horizontalPadding = resolveHorizontalPaddingPx(railWidth)
+  const minChip = columnsMax === DESKTOP_COLUMNS_MAX ? 72 : 56
+  const usable = Math.max(railWidth - horizontalPadding - gaps, columnsVisible * minChip)
   return usable / columnsVisible
 }
 
@@ -50,14 +62,26 @@ export function DeliveryGrupoChips({
   } | null>(null)
   const suppressClickRef = useRef(false)
   const [chipWidthPx, setChipWidthPx] = useState(0)
+  const [sidePaddingPx, setSidePaddingPx] = useState(HORIZONTAL_PADDING_PX / 2)
+  const [imageDiameterPx, setImageDiameterPx] = useState(MOBILE_IMAGE_MAX_PX)
 
   useEffect(() => {
     const rail = railRef.current
     if (!rail) return
 
     const update = () => {
-      const next = Math.round(computeChipWidthPx(rail.clientWidth, grupos.length) * 100) / 100
-      setChipWidthPx(prev => (Math.abs(prev - next) < 0.5 ? prev : next))
+      const width = rail.clientWidth
+      const nextChip = Math.round(computeChipWidthPx(width, grupos.length) * 100) / 100
+      const nextSidePadding = resolveHorizontalPaddingPx(width) / 2
+      const isDesktop = resolveColumnsMax(width) === DESKTOP_COLUMNS_MAX
+      const maxImage = isDesktop ? DESKTOP_IMAGE_MAX_PX : MOBILE_IMAGE_MAX_PX
+      const nextDiameter = Math.round(
+        Math.min(maxImage, Math.max(36, nextChip - CHIP_IMAGE_INSET_PX))
+      )
+
+      setChipWidthPx(prev => (Math.abs(prev - nextChip) < 0.5 ? prev : nextChip))
+      setSidePaddingPx(prev => (prev === nextSidePadding ? prev : nextSidePadding))
+      setImageDiameterPx(prev => (prev === nextDiameter ? prev : nextDiameter))
     }
 
     update()
@@ -137,14 +161,19 @@ export function DeliveryGrupoChips({
           style={{
             width: 'max-content',
             gap: `${CHIP_GAP_PX}px`,
-            paddingLeft: HORIZONTAL_PADDING_PX / 2,
-            paddingRight: HORIZONTAL_PADDING_PX / 2,
+            paddingLeft: sidePaddingPx,
+            paddingRight: sidePaddingPx,
           }}
         >
           {grupos.map(grupo => {
             const content = (
               <>
-                <DeliveryGrupoCategoriaVisual config={config} grupo={grupo} size="lg" />
+                <DeliveryGrupoCategoriaVisual
+                  config={config}
+                  grupo={grupo}
+                  size="lg"
+                  diameterPx={imageDiameterPx}
+                />
                 <span
                   className="line-clamp-2 w-full text-center text-[11px] font-medium leading-tight @sm:text-xs @lg:text-sm @xl:text-base"
                   style={{
