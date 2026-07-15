@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Camera } from 'lucide-react'
+import { useLayoutEffect, useRef, useState } from 'react'
+import { Camera, List, Share2 } from 'lucide-react'
 import { MdClose } from 'react-icons/md'
 import type { CatalogoPublicoProdutoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { normalizeTipoImpactoPreco } from '@/src/application/mappers/VendaApiNormalizer'
@@ -15,6 +15,10 @@ import {
   useDeliveryCarrinhoStore,
   type DeliveryCarrinhoItem,
 } from '../../shared/stores/deliveryCarrinhoStore'
+import {
+  buildProdutoShareUrl,
+  compartilharLinkDelivery,
+} from '../../shared/utils/compartilharProdutoDelivery'
 import { observacaoItemCarrinho } from '../../shared/utils/deliveryCarrinhoItemUtils'
 import { formatDeliveryCurrency } from '../../shared/utils/formatDeliveryCurrency'
 
@@ -22,7 +26,8 @@ type DeliveryProdutoModalProps = {
   slug: string
   produto: CatalogoPublicoProdutoDTO
   onClose: () => void
-  onAdicionado?: () => void
+  /** Chamado após adicionar item novo (não edição). Recebe o nome do produto. */
+  onAdicionado?: (produtoNome: string) => void
   /** Quando informado, atualiza o item do carrinho em vez de adicionar um novo. */
   itemEdicao?: DeliveryCarrinhoItem
 }
@@ -60,6 +65,9 @@ export function DeliveryProdutoModal({
   const adicionarItem = useDeliveryCarrinhoStore(s => s.adicionarItem)
   const substituirItem = useDeliveryCarrinhoStore(s => s.substituirItem)
   const isEdicao = Boolean(itemEdicao)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const bannerComplementosRef = useRef<HTMLDivElement>(null)
+  const [alturaPrimeiraDobra, setAlturaPrimeiraDobra] = useState<number | null>(null)
 
   const [quantidade, setQuantidade] = useState(itemEdicao?.quantidade ?? 1)
   const [observacao, setObservacao] = useState(
@@ -81,6 +89,36 @@ export function DeliveryProdutoModal({
 
   const valorUnitario = produto.valor + valorComplementosUnitario
   const valorTotal = valorUnitario * quantidade
+
+  useLayoutEffect(() => {
+    const scrollEl = scrollRef.current
+    if (!scrollEl) return
+
+    const atualizarAltura = () => {
+      const bannerH = bannerComplementosRef.current?.offsetHeight ?? 0
+      setAlturaPrimeiraDobra(Math.max(0, scrollEl.clientHeight - bannerH))
+    }
+
+    atualizarAltura()
+    const observer = new ResizeObserver(atualizarAltura)
+    observer.observe(scrollEl)
+    if (bannerComplementosRef.current) {
+      observer.observe(bannerComplementosRef.current)
+    }
+    return () => observer.disconnect()
+  }, [precisaComplementos, produto.nome])
+
+  const handleIrParaComplementos = () => {
+    bannerComplementosRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const handleCompartilhar = () => {
+    void compartilharLinkDelivery({
+      title: produto.nome,
+      text: `Confira ${produto.nome}`,
+      url: buildProdutoShareUrl(slug, produto.id),
+    })
+  }
 
   const handleSalvar = () => {
     if (precisaComplementos && !cacheComplementos) {
@@ -106,139 +144,257 @@ export function DeliveryProdutoModal({
       if (itemEdicao) {
         substituirItem(slug, itemEdicao.id, payload)
         showToast.success('Item atualizado!')
+        onClose()
       } else {
         adicionarItem(slug, payload)
-        showToast.success('Produto adicionado ao carrinho!')
-        onAdicionado?.()
+        onAdicionado?.(produto.nome)
+        onClose()
       }
-      onClose()
     } finally {
       setSalvando(false)
     }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-stretch justify-center sm:items-center sm:p-4">
       <div
-        className="absolute inset-0"
+        className="absolute inset-0 hidden sm:block"
         style={{ backgroundColor: 'var(--delivery-overlay)' }}
         onClick={onClose}
         aria-hidden
       />
+
       <div
-        className="relative max-h-[92dvh] w-full overflow-y-auto rounded-t-2xl p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-xl sm:max-h-[90vh] sm:max-w-lg sm:rounded-2xl sm:p-5"
+        className="relative flex h-[100dvh] w-full flex-col overflow-hidden sm:h-auto sm:max-h-[90vh] sm:max-w-lg sm:rounded-2xl sm:shadow-xl"
         style={{ backgroundColor: 'var(--delivery-surface)' }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Detalhes do produto"
       >
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <h2 className="delivery-font-title text-xl font-bold delivery-text-primary">
-              {produto.nome}
-            </h2>
-            <p className="mt-1 text-lg font-semibold delivery-text-accent">
-              {formatDeliveryCurrency(produto.valor)}
-            </p>
-          </div>
-          <button type="button" onClick={onClose} aria-label="Fechar">
-            <MdClose className="h-6 w-6 delivery-text-secondary" />
+        <div
+          className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3"
+          style={{
+            borderColor: 'var(--delivery-border)',
+            backgroundColor: 'var(--delivery-surface)',
+          }}
+        >
+          <h1 className="delivery-font-title text-base font-semibold delivery-text-primary">
+            Detalhes do produto
+          </h1>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fechar"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+            style={{ color: 'var(--delivery-text-primary)' }}
+          >
+            <MdClose className="h-5 w-5" />
           </button>
         </div>
 
-        {produto.descricao ? (
-          <p className="delivery-text-secondary mb-4 text-sm">{produto.descricao}</p>
-        ) : null}
-
-        {grupos.length > 0 ? (
-          <div className="mb-4">
-            <p className="delivery-font-title mb-3 font-semibold delivery-text-primary">
-              Complementos
-            </p>
-            <div className="space-y-4">
-              {grupos.map(grupo => (
-                <div key={grupo.id}>
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+          <div className="flex flex-col">
+            {/* Primeira dobra: ocupa a área scroll visível menos a mensagem */}
+            <div
+              className="flex flex-col"
+              style={
+                alturaPrimeiraDobra != null
+                  ? { minHeight: alturaPrimeiraDobra }
+                  : { minHeight: '100%' }
+              }
+            >
+              <div className="relative w-full shrink-0 overflow-hidden aspect-square">
+                {produto.imagemUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={produto.imagemUrl}
+                    alt=""
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                ) : (
                   <div
-                    className="mb-1.5 flex items-baseline justify-between gap-2 rounded-md px-2.5 py-1.5"
+                    className="absolute inset-0 flex items-center justify-center"
+                    style={{ backgroundColor: 'var(--delivery-surface-muted)' }}
+                  >
+                    <Camera
+                      className="h-16 w-16"
+                      style={{ color: 'var(--delivery-text-muted)' }}
+                      aria-hidden
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-1 flex-col px-4 pt-4">
+                <h2 className="delivery-font-title text-xl font-bold delivery-text-primary">
+                  {produto.nome}
+                </h2>
+
+                {produto.descricao ? (
+                  <p className="delivery-text-secondary mt-2 text-sm leading-relaxed">
+                    {produto.descricao}
+                  </p>
+                ) : null}
+
+                <p className="mt-2 text-lg font-semibold delivery-text-primary">
+                  {formatDeliveryCurrency(produto.valor)}
+                </p>
+
+                <div className="mt-4 flex items-center gap-2">
+                  {precisaComplementos ? (
+                    <button
+                      type="button"
+                      onClick={handleIrParaComplementos}
+                      className="flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold uppercase tracking-wide delivery-text-primary"
+                      style={{
+                        borderColor: 'var(--delivery-border)',
+                        backgroundColor: 'var(--delivery-surface)',
+                      }}
+                    >
+                      <List className="h-4 w-4 shrink-0" aria-hidden />
+                      Complementos
+                    </button>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    onClick={handleCompartilhar}
+                    aria-label="Compartilhar produto"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border"
                     style={{
-                      backgroundColor: 'var(--delivery-primary-dark)',
-                      color: 'var(--delivery-btn-text, #ffffff)',
+                      borderColor: 'var(--delivery-border)',
+                      backgroundColor: 'var(--delivery-surface)',
+                      color: 'var(--delivery-text-primary)',
                     }}
                   >
-                    <p className="delivery-font-title min-w-0 text-sm font-semibold uppercase tracking-wide">
-                      {grupo.nome}
-                      {grupo.obrigatorio ? <span className="ml-1 text-red-400">*</span> : null}
-                    </p>
-                    <span className="shrink-0 text-xs font-medium tabular-nums opacity-90">
-                      Min: {grupo.qtdMinima} - Max: {grupo.qtdMaxima}
-                    </span>
-                  </div>
-                  <div>
-                    {grupo.complementos.map(comp => {
-                      const qtdComp = getQuantidadeComplemento(grupo.id, comp.id)
-                      const tipoIp = normalizeTipoImpactoPreco(comp.tipoImpactoPreco)
-
-                      return (
-                        <div
-                          key={comp.id}
-                          className="flex items-center justify-between gap-3 py-1.5"
-                        >
-                          <div className="flex min-w-0 flex-1 items-start gap-2.5">
-                            <ComplementoThumb imagemUrl={comp.imagemUrl} nome={comp.nome} />
-                            <div className="min-w-0 flex-1 pt-0.5">
-                              <p
-                                className="truncate text-sm font-medium leading-snug delivery-text-primary"
-                                title={comp.nome}
-                              >
-                                {comp.nome}
-                              </p>
-                              <p className="mt-0.5 text-xs font-semibold tabular-nums delivery-text-accent sm:text-sm">
-                                {formatarValorComplemento(comp.valor, tipoIp)}
-                              </p>
-                            </div>
-                          </div>
-                          <DeliveryQuantidadeStepper
-                            size="sm"
-                            value={qtdComp}
-                            min={0}
-                            disabledDecrease={qtdComp <= 0}
-                            decreaseLabel={`Diminuir quantidade de ${comp.nome}`}
-                            increaseLabel={`Aumentar quantidade de ${comp.nome}`}
-                            onDecrease={() => ajustarQuantidadeComplemento(grupo, comp.id, -1)}
-                            onIncrease={() => ajustarQuantidadeComplemento(grupo, comp.id, 1)}
-                          />
-                        </div>
-                      )
-                    })}
-                  </div>
+                    <Share2 className="h-4 w-4" aria-hidden />
+                  </button>
                 </div>
-              ))}
+              </div>
             </div>
-            <p className="delivery-text-secondary mt-3 text-right text-sm font-medium">
-              Total dos complementos:{' '}
-              <span className="delivery-text-accent">
-                {formatDeliveryCurrency(valorComplementosUnitario)}
-              </span>
-            </p>
+
+            {precisaComplementos ? (
+              <div
+                ref={bannerComplementosRef}
+                className="sticky top-0 z-10 px-4 py-3"
+                style={{ backgroundColor: 'var(--delivery-surface-muted)' }}
+              >
+                <p className="delivery-font-title text-sm font-bold delivery-text-primary">
+                  Melhore ainda mais seu {produto.nome}!
+                </p>
+                <p className="delivery-text-secondary mt-0.5 text-sm">
+                  escolha os complementos abaixo.
+                </p>
+              </div>
+            ) : (
+              <div
+                ref={bannerComplementosRef}
+                className="px-4 py-3"
+                style={{ backgroundColor: 'var(--delivery-surface-muted)' }}
+              >
+                <p className="delivery-font-title text-sm font-bold delivery-text-primary">
+                  Esta é uma ótima escolha!
+                </p>
+              </div>
+            )}
+
+            {/* Lista sempre no DOM / abaixo da dobra — só aparece ao rolar ou no botão */}
+            {precisaComplementos && carregandoComplementos && !cacheComplementos ? (
+              <p className="delivery-text-secondary px-4 pt-4 text-sm">Carregando opções...</p>
+            ) : null}
+
+            {grupos.length > 0 ? (
+              <div className="space-y-4 px-4 pt-4">
+                {grupos.map(grupo => (
+                  <div key={grupo.id}>
+                    <div
+                      className="mb-1.5 flex items-baseline justify-between gap-2 rounded-md px-2.5 py-1.5"
+                      style={{
+                        backgroundColor: 'var(--delivery-primary-dark)',
+                        color: 'var(--delivery-btn-text, #ffffff)',
+                      }}
+                    >
+                      <p className="delivery-font-title min-w-0 text-sm font-semibold uppercase tracking-wide">
+                        {grupo.nome}
+                        {grupo.obrigatorio ? <span className="ml-1 text-red-400">*</span> : null}
+                      </p>
+                      <span className="shrink-0 text-xs font-medium tabular-nums opacity-90">
+                        Min: {grupo.qtdMinima} - Max: {grupo.qtdMaxima}
+                      </span>
+                    </div>
+                    <div>
+                      {grupo.complementos.map(comp => {
+                        const qtdComp = getQuantidadeComplemento(grupo.id, comp.id)
+                        const tipoIp = normalizeTipoImpactoPreco(comp.tipoImpactoPreco)
+
+                        return (
+                          <div
+                            key={comp.id}
+                            className="flex items-center justify-between gap-3 py-1.5"
+                          >
+                            <div className="flex min-w-0 flex-1 items-start gap-2.5">
+                              <ComplementoThumb imagemUrl={comp.imagemUrl} nome={comp.nome} />
+                              <div className="min-w-0 flex-1 pt-0.5">
+                                <p
+                                  className="truncate text-sm font-medium leading-snug delivery-text-primary"
+                                  title={comp.nome}
+                                >
+                                  {comp.nome}
+                                </p>
+                                <p className="mt-0.5 text-xs font-semibold tabular-nums delivery-text-accent sm:text-sm">
+                                  {formatarValorComplemento(comp.valor, tipoIp)}
+                                </p>
+                              </div>
+                            </div>
+                            <DeliveryQuantidadeStepper
+                              size="sm"
+                              value={qtdComp}
+                              min={0}
+                              disabledDecrease={qtdComp <= 0}
+                              decreaseLabel={`Diminuir quantidade de ${comp.nome}`}
+                              increaseLabel={`Aumentar quantidade de ${comp.nome}`}
+                              onDecrease={() =>
+                                ajustarQuantidadeComplemento(grupo, comp.id, -1)
+                              }
+                              onIncrease={() =>
+                                ajustarQuantidadeComplemento(grupo, comp.id, 1)
+                              }
+                            />
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+                <p className="delivery-text-secondary text-right text-sm font-medium">
+                  Total dos complementos:{' '}
+                  <span className="delivery-text-accent">
+                    {formatDeliveryCurrency(valorComplementosUnitario)}
+                  </span>
+                </p>
+              </div>
+            ) : null}
+
+            <div className="px-4 pb-6 pt-4">
+              <DeliveryTextarea
+                value={observacao}
+                onChange={e => setObservacao(e.target.value)}
+                rows={3}
+                maxLength={100}
+                placeholder="Deseja adicionar alguma observação para este item?, escreva aqui..."
+              />
+            </div>
           </div>
-        ) : null}
-
-        {precisaComplementos && carregandoComplementos && !cacheComplementos ? (
-          <p className="delivery-text-secondary mb-4 text-sm">Carregando opções...</p>
-        ) : null}
-
-        <div className="mb-4">
-          <label className="delivery-text-secondary mb-1 block text-sm font-medium">
-            Observação (opcional)
-          </label>
-          <DeliveryTextarea
-            value={observacao}
-            onChange={e => setObservacao(e.target.value)}
-            rows={2}
-            maxLength={100}
-            placeholder="Ex.: sem cebola"
-          />
         </div>
 
-        <div className="mb-4 flex items-center justify-between">
-          <span className="delivery-text-secondary">Quantidade</span>
+        <div
+          className="flex shrink-0 items-center gap-3 border-t px-4 py-3"
+          style={{
+            borderColor: 'var(--delivery-border)',
+            backgroundColor: 'var(--delivery-surface)',
+            paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
+          }}
+        >
           <DeliveryQuantidadeStepper
             value={quantidade}
             min={1}
@@ -247,23 +403,24 @@ export function DeliveryProdutoModal({
             onDecrease={() => setQuantidade(q => Math.max(1, q - 1))}
             onIncrease={() => setQuantidade(q => q + 1)}
           />
+          <DeliveryButton
+            className="min-h-[48px] flex-1"
+            disabled={
+              salvando || (precisaComplementos && carregandoComplementos && !cacheComplementos)
+            }
+            onClick={handleSalvar}
+            style={{
+              backgroundColor: 'var(--delivery-primary-dark)',
+              color: 'var(--delivery-btn-text, #ffffff)',
+            }}
+          >
+            {salvando
+              ? isEdicao
+                ? 'Salvando...'
+                : 'Adicionando...'
+              : `${isEdicao ? 'Salvar' : 'Adicionar'}  ${formatDeliveryCurrency(valorTotal)}`}
+          </DeliveryButton>
         </div>
-
-        <DeliveryButton
-          fullWidth
-          disabled={salvando || (precisaComplementos && carregandoComplementos && !cacheComplementos)}
-          onClick={handleSalvar}
-          style={{
-            backgroundColor: 'var(--delivery-primary-dark)',
-            color: 'var(--delivery-btn-text, #ffffff)',
-          }}
-        >
-          {salvando
-            ? isEdicao
-              ? 'Salvando...'
-              : 'Adicionando...'
-            : `${isEdicao ? 'Salvar' : 'Adicionar'} · ${formatDeliveryCurrency(valorTotal)}`}
-        </DeliveryButton>
       </div>
     </div>
   )

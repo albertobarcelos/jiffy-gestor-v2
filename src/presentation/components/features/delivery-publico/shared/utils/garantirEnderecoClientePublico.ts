@@ -49,6 +49,10 @@ export type EnderecoFormPublico = {
   bairro: string
   cidade: string
   estado: string
+  cep?: string
+  complemento?: string
+  pontoReferencia?: string
+  etiqueta?: 'casa' | 'trabalho' | 'outro'
 }
 
 function asStr(v: unknown): string {
@@ -165,13 +169,19 @@ export function formatarResumoEnderecoPublico(
 
 function montarEnderecoPayload(form: EnderecoFormPublico): EnderecoDeliveryPublicoInput {
   const estado = form.estado.trim().toUpperCase().slice(0, 2)
+  const cep = (form.cep ?? '').replace(/\D/g, '').slice(0, 8)
+  const complementoParts = [form.complemento?.trim(), form.pontoReferencia?.trim()]
+    .filter(Boolean)
+    .join(' | ')
   return {
-    etiqueta: 'casa',
+    etiqueta: form.etiqueta ?? 'casa',
     rua: form.rua.trim(),
     numero: form.numero.trim(),
     bairro: form.bairro.trim(),
     cidade: form.cidade.trim() || null,
     estado: estado || null,
+    ...(cep.length === 8 ? { cep } : {}),
+    ...(complementoParts.length > 0 ? { complemento: complementoParts } : {}),
   }
 }
 

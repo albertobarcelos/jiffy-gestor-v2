@@ -12,6 +12,7 @@ export function DeliveryBasicoCatalogStickyNav({
   catalogRootRef,
 }: DeliveryBasicoCatalogStickyNavProps) {
   const navRef = useRef<HTMLDivElement>(null)
+  const lastHeightRef = useRef<number | null>(null)
 
   useEffect(() => {
     const nav = navRef.current
@@ -19,7 +20,10 @@ export function DeliveryBasicoCatalogStickyNav({
     if (!nav || !root) return
 
     const syncToolbarHeight = () => {
-      root.style.setProperty('--delivery-sticky-toolbar-h', `${nav.offsetHeight}px`)
+      const next = Math.round(nav.offsetHeight)
+      if (lastHeightRef.current === next) return
+      lastHeightRef.current = next
+      root.style.setProperty('--delivery-sticky-toolbar-h', `${next}px`)
     }
 
     syncToolbarHeight()

@@ -13,7 +13,15 @@ export type CheckoutFormData = {
   bairro: string
   cidade: string
   estado: string
+  cep: string
+  complemento: string
+  pontoReferencia: string
+  etiquetaEndereco: 'casa' | 'trabalho' | 'outro'
+  apelidoEndereco: string
   meioPagamentoId: string
+  /** Valor informado para troco (dinheiro). `null` = sem troco. */
+  trocoPara: number | null
+  observacaoPedido: string
 }
 
 type MontarPedidoParams = {
@@ -94,6 +102,23 @@ export function montarPedidoPublico({
         momentoCobranca: 'na_entrega',
       },
     ]
+  }
+
+  const observacoes: string[] = []
+  if (form.trocoPara != null && form.trocoPara > 0) {
+    observacoes.push(
+      `Troco para ${new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+      }).format(form.trocoPara)}`
+    )
+  }
+  const obsPedido = form.observacaoPedido.trim()
+  if (obsPedido) {
+    observacoes.push(obsPedido)
+  }
+  if (observacoes.length > 0) {
+    payload.observacoes = observacoes
   }
 
   return { ok: true, payload }

@@ -47,7 +47,8 @@ export function DeliveryGrupoChips({
     if (!rail) return
 
     const update = () => {
-      setChipWidthPx(computeChipWidthPx(rail.clientWidth, grupos.length))
+      const next = Math.round(computeChipWidthPx(rail.clientWidth, grupos.length) * 100) / 100
+      setChipWidthPx(prev => (Math.abs(prev - next) < 0.5 ? prev : next))
     }
 
     update()

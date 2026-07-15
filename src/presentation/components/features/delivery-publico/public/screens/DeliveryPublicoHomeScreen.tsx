@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type {
   CatalogoPublicoProdutoDTO,
   EmpresaPublicaDTO,
@@ -31,6 +31,7 @@ import { formatEmpresaPublicaEndereco } from '../../shared/utils/formatEmpresaPu
 import { resolveDeliveryLayoutHome } from '../layouts/DeliveryPublicoLayoutRegistry'
 import type { DeliveryPublicoViewModel } from '../../shared/types/deliveryPublicoViewModel'
 import { DeliveryProdutoModal } from '../components/DeliveryProdutoModal'
+import { DeliveryAdicionadoCarrinhoDialog } from '../components/DeliveryAdicionadoCarrinhoDialog'
 
 type DeliveryPublicoHomeScreenProps = {
   slug: string
@@ -38,12 +39,14 @@ type DeliveryPublicoHomeScreenProps = {
 
 export function DeliveryPublicoHomeScreen({ slug }: DeliveryPublicoHomeScreenProps) {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [termoBusca, setTermoBusca] = useState('')
   const tipoEntrega = useDeliveryTipoEntrega(slug)
   const setTipoEntregaPreferencia = useDeliveryPreferenciaEntregaStore(s => s.setTipoEntrega)
-  const [produtoSelecionado, setProdutoSelecionado] = useState<CatalogoPublicoProdutoDTO | null>(
-    null
-  )
+  /** Fecha o modal na hora, sem esperar o router.replace limpar ?produto= */
+  const [fechandoProduto, setFechandoProduto] = useState(false)
+  const [produtoAdicionadoNome, setProdutoAdicionadoNome] = useState<string | null>(null)
 
   const catalogQuery = usePublicDeliveryCatalogInfinite(slug)
   useAutoFetchCatalogoGrupos(catalogQuery)
@@ -53,6 +56,24 @@ export function DeliveryPublicoHomeScreen({ slug }: DeliveryPublicoHomeScreenPro
 
   const carrinhoTotal = useDeliveryCarrinhoTotal(slug)
   const carrinhoQuantidade = useDeliveryCarrinhoTotalItens(slug)
+
+  const syncProdutoQuery = useCallback(
+    (produtoId: string | null) => {
+      const params = new URLSearchParams(searchParams.toString())
+      if (produtoId) {
+        params.set('produto', produtoId)
+      } else {
+        params.delete('produto')
+      }
+      const query = params.toString()
+      const nextUrl = query ? `${pathname}?${query}` : pathname
+      const currentQuery = searchParams.toString()
+      const currentUrl = currentQuery ? `${pathname}?${currentQuery}` : pathname
+      if (nextUrl === currentUrl) return
+      router.replace(nextUrl, { scroll: false })
+    },
+    [pathname, router, searchParams]
+  )
 
   useEffect(() => {
     if (isError && isPublicDeliverySlugNotFound(error)) {
@@ -64,6 +85,17 @@ export function DeliveryPublicoHomeScreen({ slug }: DeliveryPublicoHomeScreenPro
     () => (data?.pages ? flattenCatalogoGrupos(data.pages) : []),
     [data?.pages]
   )
+
+  const produtoIdQuery = searchParams.get('produto')
+
+  useEffect(() => {
+    if (!produtoIdQuery) setFechandoProduto(false)
+  }, [produtoIdQuery])
+
+  const produtoSelecionado = useMemo(() => {
+    if (fechandoProduto || !produtoIdQuery || grupos.length === 0) return null
+    return findCatalogoProdutoById(grupos, produtoIdQuery)
+  }, [fechandoProduto, grupos, produtoIdQuery])
 
   const handleTipoEntregaChange = useCallback(
     (tipo: DeliveryTipoEntrega) => {
@@ -82,13 +114,31 @@ export function DeliveryPublicoHomeScreen({ slug }: DeliveryPublicoHomeScreenPro
 
   const handleProdutoClick = useCallback(
     (produtoId: string) => {
-      const produto = findCatalogoProdutoById(grupos, produtoId)
-      if (produto) setProdutoSelecionado(produto)
+      setFechandoProduto(false)
+      syncProdutoQuery(produtoId)
     },
-    [grupos]
+    [syncProdutoQuery]
   )
 
+  const handleCloseProduto = useCallback(() => {
+    setFechandoProduto(true)
+    syncProdutoQuery(null)
+  }, [syncProdutoQuery])
+
+  const handleProdutoAdicionado = useCallback((produtoNome: string) => {
+    setProdutoAdicionadoNome(produtoNome)
+  }, [])
+
+  const handleContinuarComprando = useCallback(() => {
+    setProdutoAdicionadoNome(null)
+  }, [])
+
   const handlePedidoClick = useCallback(() => {
+    router.push(`/cardapio/${encodeURIComponent(slug)}/carrinho`)
+  }, [router, slug])
+
+  const handleIrParaCarrinhoAposAdicionar = useCallback(() => {
+    setProdutoAdicionadoNome(null)
     router.push(`/cardapio/${encodeURIComponent(slug)}/carrinho`)
   }, [router, slug])
 
@@ -127,8 +177,11 @@ export function DeliveryPublicoHomeScreen({ slug }: DeliveryPublicoHomeScreenPro
         onGrupoClick={handleGrupoClick}
         onProdutoClick={handleProdutoClick}
         onPedidoClick={handlePedidoClick}
-        onCloseProduto={() => setProdutoSelecionado(null)}
-        onProdutoAdicionado={() => setProdutoSelecionado(null)}
+        onCloseProduto={handleCloseProduto}
+        onProdutoAdicionado={handleProdutoAdicionado}
+        produtoAdicionadoNome={produtoAdicionadoNome}
+        onContinuarComprando={handleContinuarComprando}
+        onIrParaCarrinhoAposAdicionar={handleIrParaCarrinhoAposAdicionar}
       />
     </DeliveryThemeScope>
   )
@@ -151,7 +204,10 @@ type DeliveryPublicoHomeContentProps = {
   onProdutoClick: (produtoId: string) => void
   onPedidoClick: () => void
   onCloseProduto: () => void
-  onProdutoAdicionado: () => void
+  onProdutoAdicionado: (produtoNome: string) => void
+  produtoAdicionadoNome: string | null
+  onContinuarComprando: () => void
+  onIrParaCarrinhoAposAdicionar: () => void
 }
 
 function DeliveryPublicoHomeContent({
@@ -172,6 +228,9 @@ function DeliveryPublicoHomeContent({
   onPedidoClick,
   onCloseProduto,
   onProdutoAdicionado,
+  produtoAdicionadoNome,
+  onContinuarComprando,
+  onIrParaCarrinhoAposAdicionar,
 }: DeliveryPublicoHomeContentProps) {
   const { config } = useDeliveryThemeContext()
 
@@ -218,6 +277,13 @@ function DeliveryPublicoHomeContent({
           produto={produtoSelecionado}
           onClose={onCloseProduto}
           onAdicionado={onProdutoAdicionado}
+        />
+      ) : null}
+      {produtoAdicionadoNome ? (
+        <DeliveryAdicionadoCarrinhoDialog
+          produtoNome={produtoAdicionadoNome}
+          onContinuarComprando={onContinuarComprando}
+          onIrParaCarrinho={onIrParaCarrinhoAposAdicionar}
         />
       ) : null}
       {isFetchingNextPage ? (
