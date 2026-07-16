@@ -26,7 +26,8 @@ export interface ReemissaoFiscalLoteProgresso {
 }
 
 interface UseReemissaoFiscalEmLoteParams {
-  vendasPendentesEmissao: Venda[]
+  /** Vendas da coluna/filtro Rejeitadas (fonte do lote). */
+  vendasRejeitadas: Venda[]
   acaoFiscalEmAndamentoPorVenda: Record<string, 'emitindo' | 'reemitindo'>
   fetchNextPage: () => void | Promise<unknown>
   hasNextPage: boolean
@@ -40,7 +41,7 @@ function rotuloVendaKanban(venda: Venda): string {
 }
 
 export function useReemissaoFiscalEmLote({
-  vendasPendentesEmissao,
+  vendasRejeitadas,
   acaoFiscalEmAndamentoPorVenda,
   fetchNextPage,
   hasNextPage,
@@ -60,11 +61,11 @@ export function useReemissaoFiscalEmLote({
   const processadasRef = useRef(new Set<string>())
   const cancelarRef = useRef(false)
   const pausadoRef = useRef(false)
-  const vendasRef = useRef(vendasPendentesEmissao)
+  const vendasRef = useRef(vendasRejeitadas)
   const acaoFiscalRef = useRef(acaoFiscalEmAndamentoPorVenda)
   const hasNextPageRef = useRef(hasNextPage)
 
-  vendasRef.current = vendasPendentesEmissao
+  vendasRef.current = vendasRejeitadas
   acaoFiscalRef.current = acaoFiscalEmAndamentoPorVenda
   hasNextPageRef.current = hasNextPage
 
@@ -80,10 +81,10 @@ export function useReemissaoFiscalEmLote({
 
   const totalElegiveisVisiveis = useMemo(
     () =>
-      vendasPendentesEmissao.filter(v =>
+      vendasRejeitadas.filter(v =>
         vendaElegivelParaReemissaoAutomaticaLote(v, acaoFiscalEmAndamentoPorVenda)
       ).length,
-    [vendasPendentesEmissao, acaoFiscalEmAndamentoPorVenda]
+    [vendasRejeitadas, acaoFiscalEmAndamentoPorVenda]
   )
 
   const exibirBarraReemissaoEmLote = useMemo(

@@ -33,7 +33,6 @@ import { useKanbanVendasPorColuna } from './useKanbanVendasPorColuna'
 import { useKanbanPreTransicao } from './useKanbanPreTransicao'
 import { useKanbanDragDrop } from './useKanbanDragDrop'
 import { useKanbanModais } from './useKanbanModais'
-import { useFiscalReativacaoRejeitada } from './useFiscalReativacaoRejeitada'
 import { getVisibleKanbanColumns } from '../utils/kanbanColumnsConfig'
 
 export interface KanbanToolbarProps {
@@ -46,6 +45,8 @@ export interface KanbanToolbarProps {
   onOrigemFilterChange: ReturnType<typeof useKanbanFilters>['setOrigemFilter']
   tipoEntregaFilter: ReturnType<typeof useKanbanFilters>['tipoEntregaFilter']
   onTipoEntregaFilterChange: ReturnType<typeof useKanbanFilters>['setTipoEntregaFilter']
+  colunaKanbanFiltro: ReturnType<typeof useKanbanFilters>['colunaKanbanFiltro']
+  onColunaKanbanFiltroChange: ReturnType<typeof useKanbanFilters>['setColunaKanbanFiltro']
   terminalFilter: string
   onTerminalFilterChange: (value: string) => void
   terminais: { id: string; nome: string }[]
@@ -76,6 +77,8 @@ export function useKanbanOrchestrator() {
     setOrigemFilter,
     tipoEntregaFilter,
     setTipoEntregaFilter,
+    colunaKanbanFiltro,
+    setColunaKanbanFiltro,
     filtrosVisiveisMobile,
     setFiltrosVisiveisMobile,
     modalPeriodoDatasAberto,
@@ -120,6 +123,7 @@ export function useKanbanOrchestrator() {
     getEtapaKanbanParaExibicaoRef,
     tipoEntregaFilter,
     setTipoEntregaFilter,
+    colunaKanbanFiltro,
   })
 
   const modais = useKanbanModais(modoKanbanVendas)
@@ -183,7 +187,6 @@ export function useKanbanOrchestrator() {
       emitirNotaPdv: payload => emitirNotaPdv.mutateAsync(payload),
       emitirNotaGestor: payload => emitirNotaGestor.mutateAsync(payload),
       emitirNotaDelivery: payload => emitirNotaDelivery.mutateAsync(payload),
-      refetch: () => data.refetchParaEmissaoFiscal(),
       setPrimeiroPorColuna,
       setVendaSelecionadaParaEmissao: modais.setVendaSelecionadaParaEmissao,
       setSelectedVendaId: modais.setSelectedVendaId,
@@ -258,21 +261,13 @@ export function useKanbanOrchestrator() {
   })
 
   const reemissaoEmLote = useReemissaoFiscalEmLote({
-    vendasPendentesEmissao: colunas.vendasPorColuna.PENDENTE_EMISSAO ?? [],
+    vendasRejeitadas: colunas.vendasPorColuna.REJEITADAS ?? [],
     acaoFiscalEmAndamentoPorVenda,
     fetchNextPage: data.fetchNextPage,
     hasNextPage: data.hasNextPage,
     refetchListagem: async () => {
       await data.refetchParaEmissaoFiscal()
     },
-  })
-
-  useFiscalReativacaoRejeitada({
-    isLoading: data.isLoading,
-    todasVendasCarregadas: data.todasVendasCarregadas,
-    modoKanbanVendas,
-    vendasUnificadasQueryParams,
-    terminalFilter: data.terminalFilter,
   })
 
   const handleClearFiltersComTerminal = useCallback(() => {
@@ -287,8 +282,8 @@ export function useKanbanOrchestrator() {
   }, [limparEstadoUiTransicao, data.refetch, setPrimeiroPorColuna])
 
   const columns = useMemo(
-    () => getVisibleKanbanColumns(modoKanbanVendas),
-    [modoKanbanVendas]
+    () => getVisibleKanbanColumns(modoKanbanVendas, colunaKanbanFiltro),
+    [modoKanbanVendas, colunaKanbanFiltro]
   )
 
   const mostrarLoadingLista = data.isLoading && colunas.todasVendas.length === 0
@@ -325,6 +320,8 @@ export function useKanbanOrchestrator() {
     onOrigemFilterChange: setOrigemFilter,
     tipoEntregaFilter,
     onTipoEntregaFilterChange: setTipoEntregaFilter,
+    colunaKanbanFiltro,
+    onColunaKanbanFiltroChange: setColunaKanbanFiltro,
     terminalFilter: data.terminalFilter,
     onTerminalFilterChange: data.setTerminalFilter,
     terminais: data.terminais,

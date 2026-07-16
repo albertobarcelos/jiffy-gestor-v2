@@ -12,8 +12,10 @@ type StatusFiscal =
   | 'CONTINGENCIA'
   | 'EMITIDA'
   | 'REJEITADA'
+  | 'DENEGADA'
   | 'CANCELADA'
   | 'INUTILIZADA'
+  | 'UNKNOWN'
 
 interface StatusFiscalBadgeProps {
   status: StatusFiscal | string | null | undefined
@@ -34,7 +36,7 @@ export function StatusFiscalBadge({ status, className, tone = 'default' }: Statu
     switch (status) {
       case 'PENDENTE':
         return {
-          label: 'Aguardando SEFAZ...',
+          label: 'Em emissão',
           color: '#3B82F6', // Azul
           bgColor: '#DBEAFE',
           icon: <CircularProgress size={12} sx={{ color: '#3B82F6' }} />,
@@ -48,14 +50,14 @@ export function StatusFiscalBadge({ status, className, tone = 'default' }: Statu
         }
       case 'EMITINDO':
         return {
-          label: 'Emitindo...',
+          label: 'Em emissão',
           color: '#3B82F6', // Azul
           bgColor: '#DBEAFE',
           icon: <CircularProgress size={12} sx={{ color: '#3B82F6' }} />,
         }
       case 'PENDENTE_AUTORIZACAO':
         return {
-          label: 'Aguardando SEFAZ...',
+          label: 'Em emissão',
           color: '#3B82F6', // Azul
           bgColor: '#DBEAFE',
           icon: <CircularProgress size={12} sx={{ color: '#3B82F6' }} />,
@@ -78,6 +80,13 @@ export function StatusFiscalBadge({ status, className, tone = 'default' }: Statu
         return {
           label: 'Rejeitada',
           color: '#EF4444', // Vermelho
+          bgColor: '#FEE2E2',
+          icon: <MdError className="h-3.5 w-3.5" />,
+        }
+      case 'DENEGADA':
+        return {
+          label: 'Denegada',
+          color: '#EF4444',
           bgColor: '#FEE2E2',
           icon: <MdError className="h-3.5 w-3.5" />,
         }

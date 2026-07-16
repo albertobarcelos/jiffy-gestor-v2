@@ -307,6 +307,9 @@ export function ConfigurarNcmModal({
               size="small"
             />
             <p className="text-xs text-secondary-text/70">8 dígitos</p>
+            {configuracaoImposto?.ncm?.descricao?.trim() ? (
+              <p className="text-sm text-secondary-text">{configuracaoImposto.ncm.descricao.trim()}</p>
+            ) : null}
           </div>
 
           <div className="grid md:grid-cols-2 grid-cols-1 gap-4">

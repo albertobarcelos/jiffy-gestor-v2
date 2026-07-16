@@ -226,6 +226,7 @@ export function usePedidosDeliveryKanbanColumns(
     FINALIZADAS: finalizadasQuery,
     PENDENTE_EMISSAO: finalizadasQuery,
     COM_NFE: comNfeQuery,
+    REJEITADAS: comNfeQuery,
   }
 
   const queryByColumnRef = useRef(queryByColumn)

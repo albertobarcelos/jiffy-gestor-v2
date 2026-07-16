@@ -246,6 +246,9 @@ export function MapearProdutosView() {
                       <th className="px-4 py-3 text-left text-sm font-semibold text-alternate uppercase">
                         NCM
                       </th>
+                      <th className="min-w-[12rem] px-4 py-3 text-left text-sm font-semibold text-alternate uppercase">
+                        Descrição
+                      </th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-alternate uppercase">
                         CFOP
                       </th>
@@ -272,8 +275,16 @@ export function MapearProdutosView() {
                           index % 2 === 0 ? 'bg-white' : 'bg-alternate/5'
                         }`}
                       >
-                        <td className="px-4 py-3 text-sm text-secondary-text font-mono">
+                        <td className="px-4 py-3 text-sm text-secondary-text font-mono whitespace-nowrap">
                           {config.ncm?.codigo || '--'}
+                        </td>
+                        <td
+                          className="max-w-xs px-4 py-3 text-sm text-secondary-text"
+                          title={config.ncm?.descricao?.trim() || undefined}
+                        >
+                          <span className="line-clamp-2">
+                            {config.ncm?.descricao?.trim() || '--'}
+                          </span>
                         </td>
                         <td className="px-4 py-3 text-sm text-secondary-text font-mono">
                           {config.cfop || '--'}
@@ -353,6 +364,11 @@ export function MapearProdutosView() {
                         <p className="break-all font-mono text-base font-medium text-secondary-text">
                           {config.ncm?.codigo || '--'}
                         </p>
+                        {config.ncm?.descricao?.trim() ? (
+                          <p className="mt-1 line-clamp-2 text-xs text-secondary-text/80">
+                            {config.ncm.descricao.trim()}
+                          </p>
+                        ) : null}
                       </div>
                       <button
                         type="button"

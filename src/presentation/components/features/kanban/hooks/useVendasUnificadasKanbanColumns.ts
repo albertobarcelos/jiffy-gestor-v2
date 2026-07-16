@@ -2,15 +2,17 @@
 
 /**
  * Kanban balcão com paginação por coluna fiscal (50 itens iniciais + scroll incremental).
- * Espelha `usePedidosDeliveryKanbanColumns` — 1 query por coluna com `colunaKanban` na API.
+ * Padrão: COM_NFE + FINALIZADAS. Filtros PENDENTE_EMISSAO / REJEITADAS sob demanda.
  */
 
 import { useCallback, useMemo, useRef } from 'react'
 import { useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
-import type { ColunaKanbanId } from '../types'
+import type { ColunaKanbanFiltroExtra, ColunaKanbanId } from '../types'
 import {
+  BALCAO_KANBAN_COLUNAS_PADRAO,
   BALCAO_KANBAN_COLUMN_IDS,
+  balcaoKanbanColunasAtivas,
   buildVendasUnificadasParamsForKanbanColumn,
   type ColunaKanbanBalcaoApi,
 } from '../utils/kanbanBalcaoColumnConfig'
@@ -47,10 +49,14 @@ export function useVendasUnificadasKanbanColumns(
   params: VendasUnificadasQueryParams,
   options?: VendasUnificadasInfiniteOptions & {
     enviarFiltroFinalizacaoNaApi?: boolean
+    /** Filtro toolbar: monta query extra PENDENTE_EMISSAO | REJEITADAS. */
+    colunaKanbanFiltro?: ColunaKanbanFiltroExtra | null
   }
 ) {
   const empresaId = useTenantEmpresaId()
   const queryClient = useQueryClient()
+  const filtroExtra = options?.colunaKanbanFiltro ?? ''
+  const colunasAtivas = useMemo(() => balcaoKanbanColunasAtivas(filtroExtra), [filtroExtra])
 
   const enabled = options?.enabled !== false
   const columnInfiniteOptions = {
@@ -60,6 +66,11 @@ export function useVendasUnificadasKanbanColumns(
     refetchOnWindowFocus: options?.refetchOnWindowFocus,
   }
 
+  const comNfeQuery = useVendasUnificadasKanbanColumnInfinite(
+    'COM_NFE',
+    params,
+    columnInfiniteOptions
+  )
   const finalizadasQuery = useVendasUnificadasKanbanColumnInfinite(
     'FINALIZADAS',
     params,
@@ -68,14 +79,26 @@ export function useVendasUnificadasKanbanColumns(
   const pendenteQuery = useVendasUnificadasKanbanColumnInfinite(
     'PENDENTE_EMISSAO',
     params,
-    columnInfiniteOptions
+    {
+      ...columnInfiniteOptions,
+      enabled:
+        enabled && (filtroExtra === 'PENDENTE_EMISSAO' || filtroExtra === 'TODAS'),
+    }
   )
-  const comNfeQuery = useVendasUnificadasKanbanColumnInfinite('COM_NFE', params, columnInfiniteOptions)
+  const rejeitadasQuery = useVendasUnificadasKanbanColumnInfinite(
+    'REJEITADAS',
+    params,
+    {
+      ...columnInfiniteOptions,
+      enabled: enabled && (filtroExtra === 'REJEITADAS' || filtroExtra === 'TODAS'),
+    }
+  )
 
   const queryByColumn: Record<ColunaKanbanBalcaoApi, typeof finalizadasQuery> = {
+    COM_NFE: comNfeQuery,
     FINALIZADAS: finalizadasQuery,
     PENDENTE_EMISSAO: pendenteQuery,
-    COM_NFE: comNfeQuery,
+    REJEITADAS: rejeitadasQuery,
   }
 
   const queryByColumnRef = useRef(queryByColumn)
@@ -83,14 +106,14 @@ export function useVendasUnificadasKanbanColumns(
 
   const columnQueryKeys = useMemo(() => {
     const keys: Partial<Record<ColunaKanbanBalcaoApi, readonly unknown[]>> = {}
-    for (const columnId of BALCAO_KANBAN_COLUMN_IDS) {
+    for (const columnId of colunasAtivas) {
       const columnParams = buildVendasUnificadasParamsForKanbanColumn(columnId, params, {
         enviarFiltroFinalizacaoNaApi: options?.enviarFiltroFinalizacaoNaApi,
       })
       keys[columnId] = vendasUnificadasKanbanColumnQueryKey(columnId, columnParams, empresaId)
     }
     return keys
-  }, [params, empresaId, options?.enviarFiltroFinalizacaoNaApi])
+  }, [params, empresaId, options?.enviarFiltroFinalizacaoNaApi, colunasAtivas])
 
   const columnStates = useMemo((): Partial<
     Record<ColunaKanbanBalcaoApi, VendasUnificadasKanbanColumnState>
@@ -99,12 +122,15 @@ export function useVendasUnificadasKanbanColumns(
 
     for (const columnId of BALCAO_KANBAN_COLUMN_IDS) {
       const query = queryByColumn[columnId]
+      const ativa = colunasAtivas.includes(columnId)
+      if (!ativa && !query.data) continue
+
       const { totalCount } = flattenVendasUnificadasInfinite(query.data)
       const apiCount = query.data?.pages?.[0]?.count ?? totalCount
 
       map[columnId] = {
         data: query.data,
-        isLoading: query.isLoading,
+        isLoading: ativa ? query.isLoading : false,
         isFetchingNextPage: query.isFetchingNextPage,
         hasNextPage: query.hasNextPage ?? false,
         fetchNextPage: query.fetchNextPage,
@@ -114,6 +140,11 @@ export function useVendasUnificadasKanbanColumns(
 
     return map
   }, [
+    colunasAtivas,
+    comNfeQuery.data,
+    comNfeQuery.isLoading,
+    comNfeQuery.isFetchingNextPage,
+    comNfeQuery.hasNextPage,
     finalizadasQuery.data,
     finalizadasQuery.isLoading,
     finalizadasQuery.isFetchingNextPage,
@@ -122,26 +153,36 @@ export function useVendasUnificadasKanbanColumns(
     pendenteQuery.isLoading,
     pendenteQuery.isFetchingNextPage,
     pendenteQuery.hasNextPage,
-    comNfeQuery.data,
-    comNfeQuery.isLoading,
-    comNfeQuery.isFetchingNextPage,
-    comNfeQuery.hasNextPage,
+    rejeitadasQuery.data,
+    rejeitadasQuery.isLoading,
+    rejeitadasQuery.isFetchingNextPage,
+    rejeitadasQuery.hasNextPage,
   ])
 
-  const isLoading = BALCAO_KANBAN_COLUMN_IDS.some(id => queryByColumn[id]?.isLoading)
+  const isLoading =
+    BALCAO_KANBAN_COLUNAS_PADRAO.some(id => queryByColumn[id]?.isLoading) ||
+    ((filtroExtra === 'PENDENTE_EMISSAO' || filtroExtra === 'TODAS') &&
+      pendenteQuery.isLoading) ||
+    ((filtroExtra === 'REJEITADAS' || filtroExtra === 'TODAS') && rejeitadasQuery.isLoading)
 
   const flattenAllItems = useCallback((): VendaUnificadaDTO[] => {
     const all: VendaUnificadaDTO[] = []
-    for (const columnId of BALCAO_KANBAN_COLUMN_IDS) {
+    for (const columnId of colunasAtivas) {
       const { items } = flattenVendasUnificadasInfinite(queryByColumn[columnId]?.data)
       all.push(...items)
     }
     return deduplicarItemsPorId(all)
-  }, [finalizadasQuery.data, pendenteQuery.data, comNfeQuery.data])
+  }, [
+    colunasAtivas,
+    comNfeQuery.data,
+    finalizadasQuery.data,
+    pendenteQuery.data,
+    rejeitadasQuery.data,
+  ])
 
   const refetch = useCallback(async () => {
     await Promise.all(
-      BALCAO_KANBAN_COLUMN_IDS.map(async columnId => {
+      colunasAtivas.map(async columnId => {
         const queryKey = columnQueryKeys[columnId]
         if (!queryKey) return
         await queryClient.resetQueries({ queryKey, exact: true })
@@ -149,9 +190,9 @@ export function useVendasUnificadasKanbanColumns(
     )
 
     await Promise.all(
-      BALCAO_KANBAN_COLUMN_IDS.map(columnId => queryByColumnRef.current[columnId]?.refetch())
+      colunasAtivas.map(columnId => queryByColumnRef.current[columnId]?.refetch())
     )
-  }, [columnQueryKeys, queryClient])
+  }, [columnQueryKeys, queryClient, colunasAtivas])
 
   const fetchNextPageForColumn = useCallback((columnId: ColunaKanbanId) => {
     if (!(BALCAO_KANBAN_COLUMN_IDS as readonly ColunaKanbanId[]).includes(columnId)) return
@@ -168,7 +209,16 @@ export function useVendasUnificadasKanbanColumns(
       refetch,
       flattenAllItems,
       fetchNextPageForColumn,
+      colunasAtivas,
     }),
-    [columnStates, columnQueryKeys, isLoading, refetch, flattenAllItems, fetchNextPageForColumn]
+    [
+      columnStates,
+      columnQueryKeys,
+      isLoading,
+      refetch,
+      flattenAllItems,
+      fetchNextPageForColumn,
+      colunasAtivas,
+    ]
   )
 }

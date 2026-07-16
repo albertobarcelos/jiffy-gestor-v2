@@ -14,16 +14,18 @@ export class ConfiguracaoNcmImpostos {
   ) {}
 
   static fromApiResponse(data: Record<string, unknown>): ConfiguracaoNcmImpostos | null {
-    const codigo = String(data.codigo ?? '').trim()
+    const ncmNested =
+      data.ncm && typeof data.ncm === 'object' && !Array.isArray(data.ncm)
+        ? (data.ncm as Record<string, unknown>)
+        : null
+
+    const codigo = String(data.codigo ?? ncmNested?.codigo ?? '').trim()
     if (codigo.length !== 8) return null
 
     const impostos = (data.impostos as ImpostosNcm | undefined) ?? {}
+    const descricao = String(data.descricao ?? ncmNested?.descricao ?? '').trim()
 
-    return new ConfiguracaoNcmImpostos(
-      codigo,
-      String(data.descricao ?? '').trim(),
-      impostos
-    )
+    return new ConfiguracaoNcmImpostos(codigo, descricao, impostos)
   }
 
   temConfiguracaoObrigatoria(isSimplesNacional: boolean): boolean {

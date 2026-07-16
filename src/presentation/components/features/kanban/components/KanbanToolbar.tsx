@@ -11,7 +11,7 @@ import {
   MdSettings,
 } from 'react-icons/md'
 import { KanbanModoVendasToggle, type ModoKanbanVendas } from '../KanbanModoVendasToggle'
-import type { OrigemFiltro, TipoEntregaFiltro } from '../types'
+import type { ColunaKanbanFiltroExtra, OrigemFiltro, TipoEntregaFiltro } from '../types'
 import {
   KANBAN_FILTRO_DATA_PRESET_OPCOES,
   type KanbanFiltroDataPreset,
@@ -27,6 +27,9 @@ export interface KanbanToolbarProps {
   onOrigemFilterChange: (value: OrigemFiltro) => void
   tipoEntregaFilter: TipoEntregaFiltro
   onTipoEntregaFilterChange: (value: TipoEntregaFiltro) => void
+  /** Filtro extra balcão: Emitidas / Pendentes / Rejeitadas / Todas (`colunaKanban`). */
+  colunaKanbanFiltro?: ColunaKanbanFiltroExtra
+  onColunaKanbanFiltroChange?: (value: ColunaKanbanFiltroExtra) => void
   terminalFilter: string
   onTerminalFilterChange: (value: string) => void
   terminais: { id: string; nome: string }[]
@@ -172,6 +175,8 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
     onOrigemFilterChange,
     tipoEntregaFilter,
     onTipoEntregaFilterChange,
+    colunaKanbanFiltro: colunaKanbanFiltroProp,
+    onColunaKanbanFiltroChange,
     terminalFilter,
     onTerminalFilterChange,
     terminais,
@@ -190,6 +195,8 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
 
   const isModoDelivery = modoKanbanVendas === 'delivery'
   const [refreshSpinning, setRefreshSpinning] = useState(false)
+  const colunaKanbanFiltro = colunaKanbanFiltroProp ?? ''
+  const onColunaKanbanFiltro = onColunaKanbanFiltroChange ?? (() => undefined)
 
   return (
     <div className="bg-primary-background mt-2 flex-shrink-0 rounded-b-lg rounded-t-lg pb-0">
@@ -242,7 +249,7 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
               className="font-nunito"
             >
               <MenuItem value="">Todos</MenuItem>
-              <MenuItem value="PDV">PDV</MenuItem>
+              <MenuItem value="PDV">POS</MenuItem>
               <MenuItem value="GESTOR">Gestor</MenuItem>
             </Select>
           </FormControl>
@@ -266,6 +273,31 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
               <MenuItem value="">Todos</MenuItem>
               <MenuItem value="entrega">Entrega</MenuItem>
               <MenuItem value="retirada">Retirada</MenuItem>
+            </Select>
+          </FormControl>
+        </div>
+        ) : null}
+
+        {modoKanbanVendas === 'balcao' ? (
+        <div className="flex flex-col gap-1">
+          <FormControl size="small" variant="outlined" sx={sxKanbanFiltroSelect}>
+            <InputLabel id="kanban-filtro-coluna-fiscal-label" shrink>
+              Filtro
+            </InputLabel>
+            <Select
+              labelId="kanban-filtro-coluna-fiscal-label"
+              label="Filtro"
+              value={colunaKanbanFiltro}
+              onChange={e =>
+                onColunaKanbanFiltro(e.target.value as ColunaKanbanFiltroExtra)
+              }
+              displayEmpty
+              className="font-nunito"
+            >
+              <MenuItem value="">Emitidas</MenuItem>
+              <MenuItem value="PENDENTE_EMISSAO">Pendentes</MenuItem>
+              <MenuItem value="REJEITADAS">Rejeitadas</MenuItem>
+              <MenuItem value="TODAS">Todas</MenuItem>
             </Select>
           </FormControl>
         </div>

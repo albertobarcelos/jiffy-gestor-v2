@@ -91,6 +91,16 @@ export function ProdutosList() {
   const { data: gruposProdutos = [], isLoading: isLoadingGruposProdutos } = useGruposProdutos({ limit: 100, ativo: null })
   const { data: gruposComplementos = [], isLoading: isLoadingGruposComplementos } = useGruposComplementos({ limit: 100, ativo: null })
 
+  const gruposProdutosFiltrados = useMemo(() => {
+    if (filters.statusGrupoFilter === 'Ativo') {
+      return gruposProdutos.filter((g) => g.isAtivo())
+    }
+    if (filters.statusGrupoFilter === 'Desativado') {
+      return gruposProdutos.filter((g) => !g.isAtivo())
+    }
+    return gruposProdutos
+  }, [gruposProdutos, filters.statusGrupoFilter])
+
   const { data, fetchNextPage, hasNextPage, isFetching, isFetchingNextPage, isLoading, error } =
     useProdutosInfinite(queryParams)
 
@@ -195,7 +205,7 @@ export function ProdutosList() {
 
   /** Grupos ordenados por `ordem` (API), fallback por nome do grupo. */
   const produtosAgrupadosOrdenados = useMemo(() => {
-    return [...produtosAgrupados].sort((a, b) => {
+    const ordenados = [...produtosAgrupados].sort((a, b) => {
       const grupoIdA = a.items[0]?.getGrupoId()
       const grupoIdB = b.items[0]?.getGrupoId()
 
@@ -213,7 +223,20 @@ export function ProdutosList() {
       if (labelCmp !== 0) return labelCmp
       return a.groupKey.localeCompare(b.groupKey)
     })
-  }, [produtosAgrupados, grupoProdutoMap])
+
+    if (filters.statusGrupoFilter === 'Todos') return ordenados
+
+    return ordenados.filter(({ items }) => {
+      const grupoId = items[0]?.getGrupoId()
+      if (!grupoId) {
+        // "Sem grupo" só aparece quando o filtro de status do grupo é Ativo/Todos
+        return filters.statusGrupoFilter === 'Ativo'
+      }
+      const ativo = grupoProdutoMap.get(grupoId)?.ativo
+      if (typeof ativo !== 'boolean') return filters.statusGrupoFilter === 'Ativo'
+      return filters.statusGrupoFilter === 'Ativo' ? ativo : !ativo
+    })
+  }, [produtosAgrupados, grupoProdutoMap, filters.statusGrupoFilter])
 
   // Inicializar grupos expandidos quando novos grupos aparecem
   useEffect(() => {
@@ -387,13 +410,15 @@ export function ProdutosList() {
         onToggleFiltros={() => setFiltrosVisiveis((v) => !v)}
         filterStatus={filters.filterStatus}
         onFilterStatusChange={actions.setStatus}
+        statusGrupoFilter={filters.statusGrupoFilter}
+        onStatusGrupoChange={actions.setStatusGrupo}
         ativoLocalFilter={filters.ativoLocalFilter}
         onAtivoLocalChange={actions.setAtivoLocal}
         ativoDeliveryFilter={filters.ativoDeliveryFilter}
         onAtivoDeliveryChange={actions.setAtivoDelivery}
         grupoProdutoFilter={filters.grupoProdutoFilter}
         onGrupoProdutoChange={actions.setGrupoProduto}
-        gruposProdutos={gruposProdutos}
+        gruposProdutos={gruposProdutosFiltrados}
         isLoadingGruposProdutos={isLoadingGruposProdutos}
         grupoComplementoFilter={filters.grupoComplementoFilter}
         onGrupoComplementoChange={actions.setGrupoComplemento}
