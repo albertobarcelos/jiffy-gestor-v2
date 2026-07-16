@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { MdCheck, MdKeyboardArrowDown } from 'react-icons/md'
 import { Produto } from '@/src/domain/entities/Produto'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import {
@@ -33,18 +34,24 @@ type CestPorNcmItem = {
 type ProdutoFiscalCelulasEditaveisProps = {
   produto: Produto
   variant: 'desktop' | 'mobile'
+  draft: FiscalLinhaDraft
+  onDraftChange: (campo: FiscalCampoLinha, valor: string) => void
   disabled?: boolean
   salvando?: boolean
-  onSalvarCampo: (produto: Produto, campo: FiscalCampoLinha, valor: string) => Promise<boolean>
+  dirty?: boolean
+  onConfirmar?: () => void
 }
 
 const LABEL_OPCAO_MAX = 30
 
 const inputClass =
-  'h-9 w-full rounded-lg border border-secondary/20 bg-white px-2 font-mono text-xs text-primary-text shadow-sm transition-colors placeholder:text-secondary-text/50 hover:border-alternate/40 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:opacity-60'
+  'h-9 w-full rounded-md border border-secondary/20 bg-white px-2 text-xs text-primary-text shadow-sm transition-colors placeholder:text-secondary-text/50 hover:border-alternate/40 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:opacity-60'
 
 const selectClass =
-  'h-9 w-full truncate rounded-lg border border-secondary/20 bg-white px-2 text-xs text-primary-text shadow-sm transition-colors hover:border-alternate/40 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:opacity-60'
+  'h-9 w-full truncate appearance-none rounded-md border border-secondary/20 bg-white pl-2 pr-8 text-xs text-primary-text shadow-sm transition-colors hover:border-alternate/40 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:opacity-60'
+
+const okButtonClass =
+  'inline-flex h-9 min-w-[52px] items-center justify-center gap-1 rounded-md border border-primary bg-primary px-3 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:border-gray-300 disabled:bg-gray-200 disabled:text-gray-500'
 
 /** NCM 8 dígitos → `XXXX.XX.XX` */
 export function formatarNcmExibicao(raw: string): string {
@@ -66,6 +73,39 @@ export function formatarCestExibicao(raw: string): string {
   return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5)}`
 }
 
+export function fiscalLinhaDraftFromProduto(produto: Produto): FiscalLinhaDraft {
+  return {
+    ncm: produto.getNcm(),
+    cest: produto.getCest(),
+    origemMercadoria: produto.getOrigemMercadoria(),
+    tipoProduto: produto.getTipoProduto(),
+    indicadorProducaoEscala: produto.getIndicadorProducaoEscala() ?? '',
+  }
+}
+
+function normalizarNcm8(ncmRaw: string): string {
+  return String(ncmRaw ?? '')
+    .replace(/\D/g, '')
+    .slice(0, 8)
+}
+
+function normalizarCest7(cestRaw: string): string {
+  return String(cestRaw ?? '')
+    .replace(/\D/g, '')
+    .slice(0, 7)
+}
+
+export function fiscalLinhaDraftDirty(produto: Produto, draft: FiscalLinhaDraft): boolean {
+  const base = fiscalLinhaDraftFromProduto(produto)
+  return (
+    normalizarNcm8(draft.ncm) !== normalizarNcm8(base.ncm) ||
+    normalizarCest7(draft.cest) !== normalizarCest7(base.cest) ||
+    draft.origemMercadoria !== base.origemMercadoria ||
+    draft.tipoProduto !== base.tipoProduto ||
+    draft.indicadorProducaoEscala.trim() !== base.indicadorProducaoEscala.trim()
+  )
+}
+
 function truncarLabelOpcao(label: string, max: number | null = LABEL_OPCAO_MAX): string {
   const t = label.trim()
   if (max == null || max <= 0 || t.length <= max) return t
@@ -77,18 +117,18 @@ function labelCestOpcao(item: CestPorNcmItem): string {
   return truncarLabelOpcao(base, 40)
 }
 
-function valorCampo(produto: Produto, campo: FiscalCampoLinha): string {
+function valorCampoDraft(draft: FiscalLinhaDraft, campo: FiscalCampoLinha): string {
   switch (campo) {
     case 'ncm':
-      return produto.getNcm()
+      return draft.ncm
     case 'cest':
-      return produto.getCest()
+      return draft.cest
     case 'origemMercadoria':
-      return produto.getOrigemMercadoria()
+      return draft.origemMercadoria
     case 'tipoProduto':
-      return produto.getTipoProduto()
+      return draft.tipoProduto
     case 'indicadorProducaoEscala':
-      return produto.getIndicadorProducaoEscala() ?? ''
+      return draft.indicadorProducaoEscala
   }
 }
 
@@ -151,10 +191,6 @@ async function buscarCestsPorNcm(ncm: string, token: string): Promise<CestPorNcm
   return promise
 }
 
-/**
- * Máscara visual: estado interno só com dígitos (evita perder caracteres ao digitar).
- * Commit no blur apenas se completo ou se limpou; parcial restaura o valor anterior.
- */
 function DigitosMascaradosInput({
   value,
   maxLength,
@@ -162,7 +198,7 @@ function DigitosMascaradosInput({
   ariaLabel,
   formatar,
   placeholder,
-  onCommit,
+  onChange,
 }: {
   value: string
   maxLength: number
@@ -170,7 +206,7 @@ function DigitosMascaradosInput({
   ariaLabel: string
   formatar: (digits: string) => string
   placeholder?: string
-  onCommit: (valor: string) => void
+  onChange: (valor: string) => void
 }) {
   const [digits, setDigits] = useState(() => soDigitos(value, maxLength))
 
@@ -193,8 +229,8 @@ function DigitosMascaradosInput({
     }
 
     setDigits(digitado)
-    onCommit(digitado)
-  }, [digits, maxLength, onCommit, value])
+    onChange(digitado)
+  }, [digits, maxLength, onChange, value])
 
   return (
     <input
@@ -231,47 +267,51 @@ function SelectFiscal({
   ariaLabel,
   emptyLabel = '—',
   maxLabelLength = LABEL_OPCAO_MAX,
-  onCommit,
+  onChange,
 }: {
   value: string
   options: { value: string; label: string; title?: string }[]
   disabled?: boolean
   ariaLabel: string
   emptyLabel?: string
-  /** `null` = texto completo (igual cadastro). */
   maxLabelLength?: number | null
-  onCommit: (valor: string) => void
+  onChange: (valor: string) => void
 }) {
   const selecionada = options.find(o => o.value === value)
-  const valorSelect =
-    value && !options.some(o => o.value === value) ? value : value
+  const valorSelect = value && !options.some(o => o.value === value) ? value : value
 
   return (
-    <select
-      aria-label={ariaLabel}
-      value={valorSelect}
-      disabled={disabled}
-      title={selecionada?.title || selecionada?.label || emptyLabel}
-      className={selectClass}
-      onClick={e => e.stopPropagation()}
-      onChange={e => {
-        const next = e.target.value
-        if (next === value) return
-        void onCommit(next)
-      }}
-    >
-      <option value="">{emptyLabel}</option>
-      {value && !options.some(o => o.value === value) ? (
-        <option value={value} title={value}>
-          {formatarCestExibicao(value)}
-        </option>
-      ) : null}
-      {options.map(opt => (
-        <option key={opt.value} value={opt.value} title={opt.title || opt.label}>
-          {truncarLabelOpcao(opt.label, maxLabelLength)}
-        </option>
-      ))}
-    </select>
+    <div className="relative w-full">
+      <select
+        aria-label={ariaLabel}
+        value={valorSelect}
+        disabled={disabled}
+        title={selecionada?.title || selecionada?.label || emptyLabel}
+        className={selectClass}
+        onClick={e => e.stopPropagation()}
+        onChange={e => {
+          const next = e.target.value
+          if (next === value) return
+          onChange(next)
+        }}
+      >
+        <option value="">{emptyLabel}</option>
+        {value && !options.some(o => o.value === value) ? (
+          <option value={value} title={value}>
+            {formatarCestExibicao(value)}
+          </option>
+        ) : null}
+        {options.map(opt => (
+          <option key={opt.value} value={opt.value} title={opt.title || opt.label}>
+            {truncarLabelOpcao(opt.label, maxLabelLength)}
+          </option>
+        ))}
+      </select>
+      <MdKeyboardArrowDown
+        className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500"
+        aria-hidden
+      />
+    </div>
   )
 }
 
@@ -320,18 +360,20 @@ function useCestsPorNcm(ncmRaw: string) {
 }
 
 function CestCampoLinha({
-  produto,
+  ncm,
+  cest,
+  nomeProduto,
   busy,
-  onSalvar,
+  onChange,
   wide = false,
 }: {
-  produto: Produto
+  ncm: string
+  cest: string
+  nomeProduto: string
   busy: boolean
-  onSalvar: (valor: string) => void
+  onChange: (valor: string) => void
   wide?: boolean
 }) {
-  const ncm = produto.getNcm()
-  const cest = produto.getCest()
   const { cests, loading, ncmValido } = useCestsPorNcm(ncm)
   const temLista = cests.length > 0
 
@@ -347,8 +389,8 @@ function CestCampoLinha({
           }`,
         }))}
         disabled={busy || !ncmValido}
-        ariaLabel={`CEST do produto ${produto.getNome()}`}
-        onCommit={onSalvar}
+        ariaLabel={`CEST do produto ${nomeProduto}`}
+        onChange={onChange}
       />
     )
   }
@@ -358,12 +400,12 @@ function CestCampoLinha({
       value={cest}
       maxLength={7}
       disabled={busy || loading || !ncmValido}
-      ariaLabel={`CEST do produto ${produto.getNome()}`}
+      ariaLabel={`CEST do produto ${nomeProduto}`}
       formatar={formatarCestExibicao}
       placeholder={
         loading ? '...' : !ncmValido ? 'NCM primeiro' : wide ? '00.000.00' : '00.000.00'
       }
-      onCommit={onSalvar}
+      onChange={onChange}
     />
   )
 }
@@ -385,69 +427,121 @@ function CampoMobile({
   )
 }
 
+function BotaoConfirmarLinha({
+  dirty,
+  salvando,
+  disabled,
+  onConfirmar,
+  className = '',
+}: {
+  dirty?: boolean
+  salvando?: boolean
+  disabled?: boolean
+  onConfirmar?: () => void
+  className?: string
+}) {
+  return (
+    <button
+      type="button"
+      className={`${okButtonClass} ${className}`}
+      disabled={disabled || salvando || !dirty || !onConfirmar}
+      onClick={e => {
+        e.stopPropagation()
+        onConfirmar?.()
+      }}
+      aria-label="Salvar alterações fiscais da linha"
+    >
+      {salvando ? (
+        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+      ) : (
+        <>
+          <MdCheck size={14} />
+          OK
+        </>
+      )}
+    </button>
+  )
+}
+
 export function ProdutoFiscalCelulasEditaveis({
   produto,
   variant,
+  draft,
+  onDraftChange,
   disabled = false,
   salvando = false,
-  onSalvarCampo,
+  dirty = false,
+  onConfirmar,
 }: ProdutoFiscalCelulasEditaveisProps) {
   const busy = disabled || salvando
+  const nome = produto.getNome()
 
-  const salvar = useCallback(
-    (campo: FiscalCampoLinha, valor: string) => onSalvarCampo(produto, campo, valor),
-    [onSalvarCampo, produto]
+  const alterar = useCallback(
+    (campo: FiscalCampoLinha, valor: string) => onDraftChange(campo, valor),
+    [onDraftChange]
   )
 
   if (variant === 'mobile') {
     return (
-      <div className="grid gap-3 sm:grid-cols-2">
-        <CampoMobile label="NCM">
-          <DigitosMascaradosInput
-            value={valorCampo(produto, 'ncm')}
-            maxLength={8}
-            disabled={busy}
-            ariaLabel={`NCM do produto ${produto.getNome()}`}
-            formatar={formatarNcmExibicao}
-            onCommit={v => void salvar('ncm', v)}
+      <div className="flex flex-col gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <CampoMobile label="NCM">
+            <DigitosMascaradosInput
+              value={valorCampoDraft(draft, 'ncm')}
+              maxLength={8}
+              disabled={busy}
+              ariaLabel={`NCM do produto ${nome}`}
+              formatar={formatarNcmExibicao}
+              onChange={v => alterar('ncm', v)}
+            />
+          </CampoMobile>
+          <CampoMobile label="CEST">
+            <CestCampoLinha
+              ncm={draft.ncm}
+              cest={draft.cest}
+              nomeProduto={nome}
+              busy={busy}
+              wide
+              onChange={v => alterar('cest', v)}
+            />
+          </CampoMobile>
+          <CampoMobile label="Origem">
+            <SelectFiscal
+              value={valorCampoDraft(draft, 'origemMercadoria')}
+              options={origensMercadoria}
+              disabled={busy}
+              ariaLabel={`Origem do produto ${nome}`}
+              onChange={v => alterar('origemMercadoria', v)}
+            />
+          </CampoMobile>
+          <CampoMobile label="Tipo">
+            <SelectFiscal
+              value={valorCampoDraft(draft, 'tipoProduto')}
+              options={tiposProduto}
+              disabled={busy}
+              ariaLabel={`Tipo do produto ${nome}`}
+              onChange={v => alterar('tipoProduto', v)}
+            />
+          </CampoMobile>
+          <CampoMobile label="Indicador">
+            <SelectFiscal
+              value={valorCampoDraft(draft, 'indicadorProducaoEscala')}
+              options={indicadoresProducao}
+              disabled={busy}
+              ariaLabel={`Indicador de produção do produto ${nome}`}
+              maxLabelLength={null}
+              onChange={v => alterar('indicadorProducaoEscala', v)}
+            />
+          </CampoMobile>
+        </div>
+        <div className="flex justify-end">
+          <BotaoConfirmarLinha
+            dirty={dirty}
+            salvando={salvando}
+            disabled={disabled}
+            onConfirmar={onConfirmar}
           />
-        </CampoMobile>
-        <CampoMobile label="CEST">
-          <CestCampoLinha
-            produto={produto}
-            busy={busy}
-            wide
-            onSalvar={v => void salvar('cest', v)}
-          />
-        </CampoMobile>
-        <CampoMobile label="Origem">
-          <SelectFiscal
-            value={valorCampo(produto, 'origemMercadoria')}
-            options={origensMercadoria}
-            disabled={busy}
-            ariaLabel={`Origem do produto ${produto.getNome()}`}
-            onCommit={v => void salvar('origemMercadoria', v)}
-          />
-        </CampoMobile>
-        <CampoMobile label="Tipo">
-          <SelectFiscal
-            value={valorCampo(produto, 'tipoProduto')}
-            options={tiposProduto}
-            disabled={busy}
-            ariaLabel={`Tipo do produto ${produto.getNome()}`}
-            onCommit={v => void salvar('tipoProduto', v)}
-          />
-        </CampoMobile>
-        <CampoMobile label="Indicador">
-          <SelectFiscal
-            value={valorCampo(produto, 'indicadorProducaoEscala')}
-            options={indicadoresProducao}
-            disabled={busy}
-            ariaLabel={`Indicador de produção do produto ${produto.getNome()}`}
-            maxLabelLength={null}
-            onCommit={v => void salvar('indicadorProducaoEscala', v)}
-          />
-        </CampoMobile>
+        </div>
       </div>
     )
   }
@@ -456,47 +550,58 @@ export function ProdutoFiscalCelulasEditaveis({
     <>
       <div className="hidden md:flex w-[108px] shrink-0 px-0.5">
         <DigitosMascaradosInput
-          value={valorCampo(produto, 'ncm')}
+          value={valorCampoDraft(draft, 'ncm')}
           maxLength={8}
           disabled={busy}
-          ariaLabel={`NCM do produto ${produto.getNome()}`}
+          ariaLabel={`NCM do produto ${nome}`}
           formatar={formatarNcmExibicao}
-          onCommit={v => void salvar('ncm', v)}
+          onChange={v => alterar('ncm', v)}
         />
       </div>
       <div className="hidden lg:flex w-[168px] shrink-0 px-0.5">
         <CestCampoLinha
-          produto={produto}
+          ncm={draft.ncm}
+          cest={draft.cest}
+          nomeProduto={nome}
           busy={busy}
-          onSalvar={v => void salvar('cest', v)}
+          onChange={v => alterar('cest', v)}
         />
       </div>
       <div className="hidden lg:flex w-[200px] shrink-0 px-0.5">
         <SelectFiscal
-          value={valorCampo(produto, 'origemMercadoria')}
+          value={valorCampoDraft(draft, 'origemMercadoria')}
           options={origensMercadoria}
           disabled={busy}
-          ariaLabel={`Origem do produto ${produto.getNome()}`}
-          onCommit={v => void salvar('origemMercadoria', v)}
+          ariaLabel={`Origem do produto ${nome}`}
+          onChange={v => alterar('origemMercadoria', v)}
         />
       </div>
       <div className="hidden lg:flex w-[200px] shrink-0 px-0.5">
         <SelectFiscal
-          value={valorCampo(produto, 'tipoProduto')}
+          value={valorCampoDraft(draft, 'tipoProduto')}
           options={tiposProduto}
           disabled={busy}
-          ariaLabel={`Tipo do produto ${produto.getNome()}`}
-          onCommit={v => void salvar('tipoProduto', v)}
+          ariaLabel={`Tipo do produto ${nome}`}
+          onChange={v => alterar('tipoProduto', v)}
         />
       </div>
-      <div className="hidden lg:flex w-[240px] shrink-0 px-0.5">
+      <div className="hidden lg:flex w-[220px] shrink-0 px-0.5">
         <SelectFiscal
-          value={valorCampo(produto, 'indicadorProducaoEscala')}
+          value={valorCampoDraft(draft, 'indicadorProducaoEscala')}
           options={indicadoresProducao}
           disabled={busy}
-          ariaLabel={`Indicador de produção do produto ${produto.getNome()}`}
+          ariaLabel={`Indicador de produção do produto ${nome}`}
           maxLabelLength={null}
-          onCommit={v => void salvar('indicadorProducaoEscala', v)}
+          onChange={v => alterar('indicadorProducaoEscala', v)}
+        />
+      </div>
+      <div className="hidden md:flex w-[64px] shrink-0 justify-end px-0.5">
+        <BotaoConfirmarLinha
+          dirty={dirty}
+          salvando={salvando}
+          disabled={disabled}
+          onConfirmar={onConfirmar}
+          className="min-w-[52px] px-2"
         />
       </div>
     </>

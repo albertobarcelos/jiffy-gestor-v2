@@ -35,7 +35,10 @@ import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplem
 import { ProdutoActionIconsDisplay } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoActionIconsDisplay'
 import {
   ProdutoFiscalCelulasEditaveis,
+  fiscalLinhaDraftDirty,
+  fiscalLinhaDraftFromProduto,
   type FiscalCampoLinha,
+  type FiscalLinhaDraft,
 } from '@/src/presentation/components/features/produtos/AtualizarProdutosLote/ProdutoFiscalCelulasEditaveis'
 import { MdSearch, MdExpandMore, MdExpandLess, MdCheckCircle, MdError } from 'react-icons/md'
 
@@ -256,54 +259,16 @@ function montarBodyFiscalLote(d: FiscalLoteDraft): Record<string, unknown> | nul
   return body
 }
 
-/** PATCH de um campo na linha — permite limpar selects com `null`. */
-function montarBodyFiscalCampoLinha(
-  campo: FiscalCampoLinha,
-  valor: string
-): Record<string, unknown> | null {
-  const fiscal: Record<string, unknown> = {}
-  const v = valor.trim()
+function normalizarNcm8(ncmRaw: string): string {
+  return String(ncmRaw ?? '')
+    .replace(/\D/g, '')
+    .slice(0, 8)
+}
 
-  if (campo === 'ncm') {
-    const ncmT = v.replace(/\D/g, '').slice(0, 8)
-    if (ncmT.length !== 8) return null
-    fiscal.ncm = ncmT
-    return { fiscal, ncm: ncmT }
-  }
-
-  if (campo === 'cest') {
-    const cestT = v.replace(/\D/g, '').slice(0, 7)
-    if (cestT === '') {
-      fiscal.cest = null
-      return { fiscal }
-    }
-    if (cestT.length !== 7) return null
-    fiscal.cest = cestT
-    return { fiscal }
-  }
-
-  if (campo === 'origemMercadoria') {
-    if (v === '') {
-      fiscal.origemMercadoria = null
-    } else {
-      const om = parseInt(v, 10)
-      if (Number.isNaN(om)) return null
-      fiscal.origemMercadoria = om
-    }
-    return { fiscal }
-  }
-
-  if (campo === 'tipoProduto') {
-    fiscal.tipoProduto = v === '' ? null : v
-    return { fiscal }
-  }
-
-  if (campo === 'indicadorProducaoEscala') {
-    fiscal.indicadorProducaoEscala = v === '' ? null : v
-    return { fiscal }
-  }
-
-  return null
+function normalizarCest7(cestRaw: string): string {
+  return String(cestRaw ?? '')
+    .replace(/\D/g, '')
+    .slice(0, 7)
 }
 
 /**
@@ -359,6 +324,7 @@ export function AtualizarPrecoLote() {
     total: number
   } | null>(null)
   const [salvandoFiscalLinhaId, setSalvandoFiscalLinhaId] = useState<string | null>(null)
+  const [fiscalLinhaDrafts, setFiscalLinhaDrafts] = useState<Record<string, FiscalLinhaDraft>>({})
   const [ncmValidation, setNcmValidation] = useState<NcmValidationResult | null>(null)
   const [isValidatingNcm, setIsValidatingNcm] = useState(false)
   const ncmValidationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -393,6 +359,21 @@ export function AtualizarPrecoLote() {
 
   useEffect(() => {
     produtosRef.current = produtos
+  }, [produtos])
+
+  useEffect(() => {
+    setFiscalLinhaDrafts(prev => {
+      let mudou = false
+      const next = { ...prev }
+      for (const p of produtos) {
+        const id = p.getId()
+        if (!next[id]) {
+          next[id] = fiscalLinhaDraftFromProduto(p)
+          mudou = true
+        }
+      }
+      return mudou ? next : prev
+    })
   }, [produtos])
 
   useEffect(() => {
@@ -1450,32 +1431,88 @@ export function AtualizarPrecoLote() {
     }
   }
 
-  /** PATCH de um único campo fiscal na linha (edição 1 a 1). */
-  const salvarCampoFiscalLinha = useCallback(
-    async (produto: Produto, campo: FiscalCampoLinha, valor: string): Promise<boolean> => {
+  const atualizarDraftFiscalLinha = useCallback(
+    (produtoId: string, campo: FiscalCampoLinha, valor: string) => {
+      setFiscalLinhaDrafts(prev => {
+        const produto = produtosRef.current.find(p => p.getId() === produtoId)
+        const base = prev[produtoId] ?? (produto ? fiscalLinhaDraftFromProduto(produto) : null)
+        if (!base) return prev
+
+        const nextDraft: FiscalLinhaDraft = { ...base, [campo]: valor }
+
+        if (campo === 'ncm') {
+          const ncmNovo = normalizarNcm8(valor)
+          if (ncmNovo !== normalizarNcm8(base.ncm)) {
+            nextDraft.cest = ''
+          }
+          // Igual NovoProduto: ao informar NCM válido, sugere origem/tipo padrão se vazios
+          if (ncmNovo.length === 8) {
+            if (!String(nextDraft.origemMercadoria ?? '').trim()) {
+              nextDraft.origemMercadoria = '0'
+            }
+            if (!String(nextDraft.tipoProduto ?? '').trim()) {
+              nextDraft.tipoProduto = '00'
+            }
+          }
+        }
+
+        if (campo === 'cest') {
+          const cestNovo = normalizarCest7(valor)
+          // Igual NovoProduto: CEST preenchido → indicador "1" se ainda vazio
+          if (cestNovo.length === 7 && !String(nextDraft.indicadorProducaoEscala ?? '').trim()) {
+            nextDraft.indicadorProducaoEscala = '1'
+          }
+        }
+
+        return { ...prev, [produtoId]: nextDraft }
+      })
+    },
+    []
+  )
+
+  /** PATCH fiscal da linha inteira (um request por produto ao clicar OK). */
+  const salvarFiscalLinha = useCallback(
+    async (produto: Produto): Promise<boolean> => {
       const token = auth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado')
         return false
       }
 
-      let valorNormalizado = valor
+      const produtoId = produto.getId()
+      const draft = fiscalLinhaDrafts[produtoId] ?? fiscalLinhaDraftFromProduto(produto)
 
-      if (campo === 'ncm') {
-        const ncm = valor.replace(/\D/g, '').slice(0, 8)
-        if (ncm === '') {
-          showToast.error('Informe um NCM com 8 dígitos para salvar.')
-          return false
-        }
-        if (!/^\d{8}$/.test(ncm)) {
-          showToast.error('O código NCM deve conter exatamente 8 dígitos numéricos.')
-          return false
-        }
+      if (!fiscalLinhaDraftDirty(produto, draft)) {
+        showToast.info('Nenhuma alteração fiscal nesta linha.')
+        return false
+      }
+
+      const draftParaSalvar: FiscalLinhaDraft = { ...draft }
+      const ncmT = normalizarNcm8(draftParaSalvar.ncm)
+      const cestT = normalizarCest7(draftParaSalvar.cest)
+      const temCest = cestT.length === 7
+      const temOutrosCampos =
+        draftParaSalvar.origemMercadoria !== '' ||
+        draftParaSalvar.tipoProduto !== '' ||
+        draftParaSalvar.indicadorProducaoEscala.trim() !== '' ||
+        temCest
+
+      if (ncmT.length > 0 && ncmT.length !== 8) {
+        showToast.error('O código NCM deve conter exatamente 8 dígitos numéricos.')
+        return false
+      }
+
+      if (temOutrosCampos && ncmT.length !== 8) {
+        showToast.error('Informe o NCM (8 dígitos) antes de salvar os demais campos fiscais.')
+        return false
+      }
+
+      if (ncmT.length === 8) {
         try {
           const controller = new AbortController()
           const timeoutId = setTimeout(() => controller.abort(), 8000)
           const response = await fetch(
-            `/api/v1/fiscal/configuracoes/ncms/validar/${encodeURIComponent(ncm)}`,
+            `/api/v1/fiscal/configuracoes/ncms/validar/${encodeURIComponent(ncmT)}`,
             {
               headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
               signal: controller.signal,
@@ -1492,79 +1529,64 @@ export function AtualizarPrecoLote() {
         } catch {
           /* segue com PATCH se o validador estiver indisponível */
         }
-        valorNormalizado = ncm
+        draftParaSalvar.ncm = ncmT
       }
 
-      if (campo === 'cest') {
-        const cest = valor.replace(/\D/g, '').slice(0, 7)
-        if (cest === '') {
-          valorNormalizado = ''
-        } else if (!/^\d{7}$/.test(cest)) {
-          showToast.error('O código CEST deve conter exatamente 7 dígitos numéricos.')
-          return false
-        } else {
-          const ncmAtual = produto.getNcm().replace(/\D/g, '')
-          try {
-            const controller = new AbortController()
-            const timeoutId = setTimeout(() => controller.abort(), 8000)
-            const url =
-              ncmAtual.length === 8
-                ? `/api/v1/fiscal/configuracoes/cests/validar/${encodeURIComponent(cest)}/ncm/${encodeURIComponent(ncmAtual)}`
-                : `/api/v1/fiscal/configuracoes/cests/validar/${encodeURIComponent(cest)}`
-            const response = await fetch(url, {
+      if (temCest) {
+        try {
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 8000)
+          const response = await fetch(
+            `/api/v1/fiscal/configuracoes/cests/validar/${encodeURIComponent(cestT)}/ncm/${encodeURIComponent(ncmT)}`,
+            {
               headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
               signal: controller.signal,
-            })
-            clearTimeout(timeoutId)
-            if (response.ok) {
-              const data = (await response.json()) as {
-                valido?: boolean
-                compativel?: boolean
-                mensagem?: string
-              }
-              const ok =
-                data.valido !== false &&
-                (data.compativel === undefined || data.compativel === true)
-              if (!ok) {
-                showToast.error(data.mensagem || 'O código CEST informado não é válido.')
-                return false
-              }
             }
-          } catch {
-            /* segue com PATCH se o validador estiver indisponível */
-          }
-          valorNormalizado = cest
-        }
-      }
-
-      if (campo === 'indicadorProducaoEscala' && valor.trim() !== '') {
-        const cestAtual = produto.getCest().trim()
-        if (!cestAtual) {
-          showToast.error(
-            'Preencha o CEST antes de informar a produção em escala relevante neste produto.'
           )
-          return false
+          clearTimeout(timeoutId)
+          if (response.ok) {
+            const data = (await response.json()) as {
+              valido?: boolean
+              compativel?: boolean
+              mensagem?: string
+            }
+            const ok =
+              data.valido !== false &&
+              (data.compativel === undefined || data.compativel === true)
+            if (!ok) {
+              showToast.error(data.mensagem || 'O código CEST informado não é válido.')
+              return false
+            }
+          }
+        } catch {
+          /* segue com PATCH se o validador estiver indisponível */
         }
+        draftParaSalvar.cest = cestT
+      } else {
+        draftParaSalvar.cest = ''
       }
 
-      const body = montarBodyFiscalCampoLinha(campo, valorNormalizado)
-      if (!body) {
-        showToast.error('Nenhum dado fiscal para salvar.')
+      if (draftParaSalvar.indicadorProducaoEscala.trim() !== '' && !cestT) {
+        showToast.error(
+          'Preencha o CEST antes de informar a produção em escala relevante neste produto.'
+        )
         return false
       }
 
-      /** Igual NovoProduto: CEST preenchido sugere indicador "1" se ainda estiver vazio. */
-      const sugerirIndicadorPorCest =
-        campo === 'cest' &&
-        valorNormalizado !== '' &&
+      if (
+        temCest &&
+        !draftParaSalvar.indicadorProducaoEscala.trim() &&
         !produto.getIndicadorProducaoEscala()
-
-      if (sugerirIndicadorPorCest) {
-        const fiscal = body.fiscal as Record<string, unknown>
-        fiscal.indicadorProducaoEscala = '1'
+      ) {
+        draftParaSalvar.indicadorProducaoEscala = '1'
       }
 
-      const produtoId = produto.getId()
+      const body = montarBodyFiscalLote(draftParaSalvar)
+      if (!body) {
+        showToast.error('Preencha ao menos um campo fiscal.')
+        return false
+      }
+
       setSalvandoFiscalLinhaId(produtoId)
 
       try {
@@ -1587,39 +1609,42 @@ export function AtualizarPrecoLote() {
           return false
         }
 
-        const partial: {
-          ncm?: string
-          cest?: string
-          origemMercadoria?: string
-          tipoProduto?: string
-          indicadorProducaoEscala?: string | null
-        } = {}
-        if (campo === 'ncm') partial.ncm = valorNormalizado
-        if (campo === 'cest') {
-          partial.cest = valorNormalizado
-          if (sugerirIndicadorPorCest) partial.indicadorProducaoEscala = '1'
-        }
-        if (campo === 'origemMercadoria') partial.origemMercadoria = valorNormalizado
-        if (campo === 'tipoProduto') partial.tipoProduto = valorNormalizado
-        if (campo === 'indicadorProducaoEscala') {
-          partial.indicadorProducaoEscala =
-            valorNormalizado.trim() === '' ? null : valorNormalizado
+        const partial = {
+          ncm: ncmT.length === 8 ? ncmT : draftParaSalvar.ncm,
+          cest: cestT,
+          origemMercadoria: draftParaSalvar.origemMercadoria,
+          tipoProduto: draftParaSalvar.tipoProduto,
+          indicadorProducaoEscala:
+            draftParaSalvar.indicadorProducaoEscala.trim() === ''
+              ? null
+              : draftParaSalvar.indicadorProducaoEscala,
         }
 
         setProdutos(prev =>
           prev.map(p => (p.getId() === produtoId ? p.withDadosFiscais(partial) : p))
         )
+        setFiscalLinhaDrafts(prev => ({
+          ...prev,
+          [produtoId]: {
+            ncm: partial.ncm ?? '',
+            cest: partial.cest ?? '',
+            origemMercadoria: partial.origemMercadoria ?? '',
+            tipoProduto: partial.tipoProduto ?? '',
+            indicadorProducaoEscala: partial.indicadorProducaoEscala ?? '',
+          },
+        }))
         marcarProdutosAlteradosNaSessao([produtoId], 'fiscal')
+        showToast.success('Dados fiscais salvos.')
         return true
       } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : 'Erro ao salvar campo fiscal'
+        const msg = error instanceof Error ? error.message : 'Erro ao salvar dados fiscais'
         showToast.error(msg)
         return false
       } finally {
         setSalvandoFiscalLinhaId(null)
       }
     },
-    [auth, marcarProdutosAlteradosNaSessao]
+    [auth, fiscalLinhaDrafts, marcarProdutosAlteradosNaSessao]
   )
 
   /** PATCH sequencial com objeto `fiscal` (sem bulk-update). */
@@ -2470,8 +2495,8 @@ export function AtualizarPrecoLote() {
                     <div className="h-px min-w-[40px] flex-1 bg-primary/70" />
                   </div>
                   <p className="font-nunito text-xs text-secondary-text md:text-sm">
-                    Preencha as informações fiscais. Serão aplicadas aos produtos selecionados na lista
-                    abaixo (um PATCH por produto).
+                    Edite os campos fiscais na linha de cada produto e confirme com OK (um PATCH
+                    por produto). Use o painel acima para aplicar o mesmo valor a vários selecionados.
                   </p>
                 </div>
                 <div className="shrink-0">
@@ -2510,7 +2535,17 @@ export function AtualizarPrecoLote() {
                     value={fiscalLoteDraft.ncm}
                     onChange={(e) => {
                       const v = e.target.value.replace(/\D/g, '').slice(0, 8)
-                      setFiscalLoteDraft((d) => ({ ...d, ncm: v }))
+                      setFiscalLoteDraft((d) => {
+                        const next = { ...d, ncm: v }
+                        if (normalizarNcm8(v) !== normalizarNcm8(d.ncm)) {
+                          next.cest = ''
+                        }
+                        if (normalizarNcm8(v).length === 8) {
+                          if (!next.origemMercadoria.trim()) next.origemMercadoria = '0'
+                          if (!next.tipoProduto.trim()) next.tipoProduto = '00'
+                        }
+                        return next
+                      })
                     }}
                     placeholder="8 dígitos"
                     className="bg-white"
@@ -2892,7 +2927,7 @@ export function AtualizarPrecoLote() {
           >
             <div
               className={`flex items-center h-11 gap-2 md:px-4 px-2 text-xs font-semibold text-primary-text uppercase tracking-wide bg-custom-2 ${
-                activeTab === 'fiscal' ? 'min-w-[1180px]' : ''
+                activeTab === 'fiscal' ? 'min-w-[1060px]' : ''
               }`}
             >
               <div className="flex-none md:w-10 w-6 flex justify-center">
@@ -2931,15 +2966,20 @@ export function AtualizarPrecoLote() {
                   <div className="hidden lg:flex w-[200px] shrink-0 text-center text-xs leading-tight">
                     Tipo
                   </div>
-                  <div className="hidden lg:flex w-[240px] shrink-0 text-center text-xs leading-tight">
+                  <div className="hidden lg:flex w-[220px] shrink-0 text-center text-xs leading-tight">
                     Indic.
+                  </div>
+                  <div className="hidden md:flex w-[64px] shrink-0 text-center text-xs leading-tight">
+                    OK
                   </div>
                 </>
               ) : null}
-              <div className="md:flex-1 text-right text-xs">Valor atual</div>
+              {activeTab !== 'fiscal' ? (
+                <div className="md:flex-1 text-right text-xs">Valor atual</div>
+              ) : null}
             </div>
 
-            <div className={`flex flex-col gap-2 mt-2 ${activeTab === 'fiscal' ? 'min-w-[1180px]' : ''}`}>
+            <div className={`flex flex-col gap-2 mt-2 ${activeTab === 'fiscal' ? 'min-w-[1060px]' : ''}`}>
               {produtosExibicao
                 .slice()
                 .sort((a, b) => a.getNome().localeCompare(b.getNome(), 'pt-BR'))
@@ -2963,6 +3003,9 @@ export function AtualizarPrecoLote() {
                 const hoverRow = 'hover:bg-primary-bg'
                 const isExpanded = produtosExpandidos.has(produto.getId())
                 const salvandoEstaLinha = salvandoFiscalLinhaId === produto.getId()
+                const fiscalDraft =
+                  fiscalLinhaDrafts[produto.getId()] ?? fiscalLinhaDraftFromProduto(produto)
+                const fiscalDirty = fiscalLinhaDraftDirty(produto, fiscalDraft)
                 return (
                   <div key={produto.getId()} className="flex flex-col">
                     {/* Linha principal do produto */}
@@ -3046,14 +3089,21 @@ export function AtualizarPrecoLote() {
                         <ProdutoFiscalCelulasEditaveis
                           produto={produto}
                           variant="desktop"
+                          draft={fiscalDraft}
+                          onDraftChange={(campo, valor) =>
+                            atualizarDraftFiscalLinha(produto.getId(), campo, valor)
+                          }
                           disabled={isSalvandoFiscal}
                           salvando={salvandoEstaLinha}
-                          onSalvarCampo={salvarCampoFiscalLinha}
+                          dirty={fiscalDirty}
+                          onConfirmar={() => void salvarFiscalLinha(produto)}
                         />
                       ) : null}
-                      <div className="flex-1 text-right font-normal md:text-sm text-xs text-primary-text">
-                        {transformarParaReal(produto.getValor())}
-                      </div>
+                      {activeTab !== 'fiscal' ? (
+                        <div className="flex-1 text-right font-normal md:text-sm text-xs text-primary-text">
+                          {transformarParaReal(produto.getValor())}
+                        </div>
+                      ) : null}
                       {(activeTab === 'impressoras' ||
                         activeTab === 'gruposComplementos' ||
                         activeTab === 'fiscal') && (
@@ -3150,9 +3200,14 @@ export function AtualizarPrecoLote() {
                           <ProdutoFiscalCelulasEditaveis
                             produto={produto}
                             variant="mobile"
+                            draft={fiscalDraft}
+                            onDraftChange={(campo, valor) =>
+                              atualizarDraftFiscalLinha(produto.getId(), campo, valor)
+                            }
                             disabled={isSalvandoFiscal}
                             salvando={salvandoEstaLinha}
-                            onSalvarCampo={salvarCampoFiscalLinha}
+                            dirty={fiscalDirty}
+                            onConfirmar={() => void salvarFiscalLinha(produto)}
                           />
                         </div>
                       )}
@@ -3168,9 +3223,14 @@ export function AtualizarPrecoLote() {
                         <ProdutoFiscalCelulasEditaveis
                           produto={produto}
                           variant="mobile"
+                          draft={fiscalDraft}
+                          onDraftChange={(campo, valor) =>
+                            atualizarDraftFiscalLinha(produto.getId(), campo, valor)
+                          }
                           disabled={isSalvandoFiscal}
                           salvando={salvandoEstaLinha}
-                          onSalvarCampo={salvarCampoFiscalLinha}
+                          dirty={fiscalDirty}
+                          onConfirmar={() => void salvarFiscalLinha(produto)}
                         />
                       </div>
                     ) : null}
