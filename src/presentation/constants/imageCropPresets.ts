@@ -13,7 +13,7 @@ function createDeliverySquarePreset(
     title,
     descriptionLines: [
       'Arraste a imagem, use o zoom e ajuste a moldura quadrada.',
-      'A saída é limitada a 280×280 px (JPEG). Imagens menores não são ampliadas.',
+      'A saída é limitada a 280×280 px (JPEG, PNG ou WebP — mantém o formato do ficheiro). Imagens menores não são ampliadas.',
       'Prefira imagens entre 100 KB e 600 KB (máximo 1 MB).',
     ],
     maxOutputWidth: 280,
@@ -28,6 +28,7 @@ function createDeliverySquarePreset(
     outputMimeType: 'image/jpeg',
     outputQuality: 0.9,
     outputFileName: `${id}.jpg`,
+    preserveSourceMimeType: true,
     maxSourceBytes: DELIVERY_CROP_MAX_SOURCE_BYTES,
     acceptedMimeTypes: DELIVERY_SQUARE_ACCEPT,
   }

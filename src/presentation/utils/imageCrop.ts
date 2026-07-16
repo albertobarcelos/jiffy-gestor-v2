@@ -20,12 +20,47 @@ export type ImageCropPreset = {
   frameMinHeight: number
   /** Se true, a moldura mantém o aspect de maxOutput. */
   lockAspectRatio: boolean
+  /** MIME de fallback (e quando preserveSourceMimeType é false). */
   outputMimeType: ImageCropOutputMime
   outputQuality: number
+  /** Nome de fallback; com preserveSourceMimeType usa o nome da fonte + extensão correta. */
   outputFileName: string
+  /**
+   * Se true, a saída mantém JPEG/PNG/WebP do ficheiro original
+   * (em vez de forçar outputMimeType).
+   */
+  preserveSourceMimeType?: boolean
   maxSourceBytes: number
   acceptedMimeTypes: readonly string[]
   footerHint?: string
+}
+
+export function resolveCropOutputMime(
+  sourceMimeType: string | undefined,
+  preset: ImageCropPreset
+): ImageCropOutputMime {
+  if (
+    preset.preserveSourceMimeType &&
+    (sourceMimeType === 'image/jpeg' ||
+      sourceMimeType === 'image/png' ||
+      sourceMimeType === 'image/webp')
+  ) {
+    return sourceMimeType
+  }
+  return preset.outputMimeType
+}
+
+export function resolveCropOutputFileName(
+  sourceFileName: string | undefined,
+  mimeType: ImageCropOutputMime,
+  preset: ImageCropPreset
+): string {
+  const ext =
+    mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg'
+  const baseFromSource = sourceFileName?.replace(/\.[^.]+$/, '').trim()
+  if (baseFromSource) return `${baseFromSource}.${ext}`
+  const baseFromPreset = preset.outputFileName.replace(/\.[^.]+$/, '')
+  return `${baseFromPreset || preset.id}.${ext}`
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -188,11 +223,17 @@ export function estimateOutputSizeFromCropFrame(
   })
 }
 
+export type CropImageWithPresetOptions = {
+  sourceMimeType?: string
+  sourceFileName?: string
+}
+
 export async function cropImageWithPreset(
   imageSrc: string,
   cropFrameSize: CropFrameSize,
   naturalArea: { x: number; y: number; width: number; height: number },
-  preset: ImageCropPreset
+  preset: ImageCropPreset,
+  options?: CropImageWithPresetOptions
 ): Promise<File> {
   const image = await loadImage(imageSrc)
   const { x, y, width, height } = naturalArea
@@ -215,6 +256,12 @@ export async function cropImageWithPreset(
   if (!cropCtx) {
     throw new Error('Não foi possível processar a imagem.')
   }
+  // Fundo branco só para JPEG (sem alpha); PNG/WebP preservam transparência.
+  const outputMime = resolveCropOutputMime(options?.sourceMimeType, preset)
+  if (outputMime === 'image/jpeg') {
+    cropCtx.fillStyle = '#ffffff'
+    cropCtx.fillRect(0, 0, width, height)
+  }
   cropCtx.drawImage(image, x, y, width, height, 0, 0, width, height)
 
   const outCanvas = document.createElement('canvas')
@@ -226,11 +273,21 @@ export async function cropImageWithPreset(
   }
   outCtx.imageSmoothingEnabled = true
   outCtx.imageSmoothingQuality = 'high'
+  if (outputMime === 'image/jpeg') {
+    outCtx.fillStyle = '#ffffff'
+    outCtx.fillRect(0, 0, outW, outH)
+  }
   if (outW === width && outH === height) {
     outCtx.drawImage(cropCanvas, 0, 0)
   } else {
     outCtx.drawImage(cropCanvas, 0, 0, width, height, 0, 0, outW, outH)
   }
+
+  const outputFileName = resolveCropOutputFileName(
+    options?.sourceFileName,
+    outputMime,
+    preset
+  )
 
   const blob = await new Promise<Blob>((resolve, reject) => {
     outCanvas.toBlob(
@@ -238,12 +295,12 @@ export async function cropImageWithPreset(
         if (result) resolve(result)
         else reject(new Error('Falha ao gerar a imagem recortada.'))
       },
-      preset.outputMimeType,
-      preset.outputQuality
+      outputMime,
+      outputMime === 'image/png' ? undefined : preset.outputQuality
     )
   })
 
-  return new File([blob], preset.outputFileName, { type: preset.outputMimeType })
+  return new File([blob], outputFileName, { type: outputMime })
 }
 
 export function validateImageCropSourceFile(

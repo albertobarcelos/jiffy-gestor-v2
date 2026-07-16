@@ -18,6 +18,8 @@ type UseImageCropFlowOptions = {
 export function useImageCropFlow({ preset, onCropped }: UseImageCropFlowOptions) {
   const [open, setOpen] = useState(false)
   const [imageSrc, setImageSrc] = useState<string | null>(null)
+  const [sourceMimeType, setSourceMimeType] = useState<string | undefined>()
+  const [sourceFileName, setSourceFileName] = useState<string | undefined>()
 
   useEffect(() => {
     return () => {
@@ -27,6 +29,8 @@ export function useImageCropFlow({ preset, onCropped }: UseImageCropFlowOptions)
 
   const close = useCallback(() => {
     setOpen(false)
+    setSourceMimeType(undefined)
+    setSourceFileName(undefined)
     setImageSrc(prev => {
       if (prev) URL.revokeObjectURL(prev)
       return null
@@ -41,6 +45,8 @@ export function useImageCropFlow({ preset, onCropped }: UseImageCropFlowOptions)
         return false
       }
 
+      setSourceMimeType(file.type || undefined)
+      setSourceFileName(file.name || undefined)
       setImageSrc(prev => {
         if (prev) URL.revokeObjectURL(prev)
         return URL.createObjectURL(file)
@@ -63,6 +69,8 @@ export function useImageCropFlow({ preset, onCropped }: UseImageCropFlowOptions)
     <ImageCropModal
       open={open}
       imageSrc={imageSrc}
+      sourceMimeType={sourceMimeType}
+      sourceFileName={sourceFileName}
       preset={preset}
       onClose={close}
       onConfirm={handleConfirm}

@@ -30,6 +30,9 @@ export type ImageCropModalProps = {
   open: boolean
   imageSrc: string | null
   preset: ImageCropPreset
+  /** MIME do ficheiro original — usado quando preset.preserveSourceMimeType. */
+  sourceMimeType?: string
+  sourceFileName?: string
   onClose: () => void
   onConfirm: (file: File) => void
 }
@@ -38,6 +41,8 @@ export function ImageCropModal({
   open,
   imageSrc,
   preset,
+  sourceMimeType,
+  sourceFileName,
   onClose,
   onConfirm,
 }: ImageCropModalProps) {
@@ -115,7 +120,10 @@ export function ImageCropModal({
     setIsApplying(true)
     try {
       const naturalArea = getCropNaturalArea(crop, media, cropFrameSize, zoom)
-      const file = await cropImageWithPreset(imageSrc, cropFrameSize, naturalArea, preset)
+      const file = await cropImageWithPreset(imageSrc, cropFrameSize, naturalArea, preset, {
+        sourceMimeType,
+        sourceFileName,
+      })
       onConfirm(file)
     } catch (e) {
       console.error('Erro ao recortar imagem:', e)
