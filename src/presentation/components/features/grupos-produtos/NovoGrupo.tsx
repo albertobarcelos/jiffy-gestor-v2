@@ -24,12 +24,12 @@ import { Input } from '@/src/presentation/components/ui/input'
 import { cn } from '@/src/shared/utils/cn'
 import { showToast } from '@/src/shared/utils/toast'
 import { DeliveryImageUploadField } from '@/src/presentation/components/ui/DeliveryImageUploadField'
+import { DELIVERY_GRUPO_PRODUTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
 import {
   mensagemLegivelDeliveryMediaError,
   uploadGrupoProdutoImagem,
   fetchGrupoProdutoImagemUrl,
 } from '@/src/infrastructure/api/deliveryMediaApi'
-import { validateDeliveryImageFile } from '@/src/shared/constants/deliveryImageUpload'
 
 /** Labels outlined em preto — igual NovoGrupoComplemento */
 const sxOutlinedLabelTextoEscuro = {
@@ -209,9 +209,13 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
   )
 
   const applyImagemUrl = useCallback((url: string | null) => {
-    setServerImagemUrl(url)
+    setServerImagemUrl(prevServer => {
+      if (url === null) return null
+      if (url.startsWith('blob:')) return prevServer
+      return url
+    })
     setImagemPreviewUrl(prev => {
-      if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+      if (prev?.startsWith('blob:') && prev !== url) URL.revokeObjectURL(prev)
       return url
     })
   }, [])
@@ -453,12 +457,6 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
         return
       }
 
-      const validationError = await validateDeliveryImageFile(file)
-      if (validationError) {
-        showToast.error(validationError)
-        return
-      }
-
       const preview = URL.createObjectURL(file)
       setImagemPreviewUrl(prev => {
         if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
@@ -470,13 +468,20 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
 
       try {
         await uploadGrupoProdutoImagem(effectiveGrupoId, file, token)
-        const persistedUrl = await fetchGrupoProdutoImagemUrl(effectiveGrupoId, token)
+        let persistedUrl = await fetchGrupoProdutoImagemUrl(effectiveGrupoId, token)
+        if (!persistedUrl) {
+          await new Promise(resolve => setTimeout(resolve, 400))
+          persistedUrl = await fetchGrupoProdutoImagemUrl(effectiveGrupoId, token)
+        }
+        // Catálogo público só expõe grupos com delivery ativo; se a URL ainda
+        // não vier, mantém o preview local (blob) — o upload já foi confirmado.
         applyImagemUrl(persistedUrl ?? preview)
         showToast.successLoading(toastId, 'Imagem enviada com sucesso!')
-        onReload?.()
       } catch (error) {
         setImagemPreviewUrl(prev => {
-          if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+          if (prev?.startsWith('blob:') && prev !== serverImagemUrl) {
+            URL.revokeObjectURL(prev)
+          }
           return serverImagemUrl
         })
         showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
@@ -484,7 +489,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
         setIsUploadingImagem(false)
       }
     },
-    [auth, effectiveGrupoId, onReload, serverImagemUrl, applyImagemUrl]
+    [auth, effectiveGrupoId, serverImagemUrl, applyImagemUrl]
   )
 
   const handleClearImagemPreview = useCallback(() => {
@@ -739,9 +744,10 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                       disabled={!isEditMode}
                       busy={isUploadingImagem}
                       previewUrl={imagemPreviewUrl}
+                      cropPreset={DELIVERY_GRUPO_PRODUTO_CROP_PRESET}
                       helperText={
                         isEditMode
-                          ? 'A imagem aparece no cardápio digital público após o upload.'
+                          ? 'Após escolher o arquivo, ajuste o recorte (máx. 280×280). A imagem aparece no cardápio digital após o upload.'
                           : 'Salve o grupo para habilitar o envio de imagem.'
                       }
                       emptyHint={

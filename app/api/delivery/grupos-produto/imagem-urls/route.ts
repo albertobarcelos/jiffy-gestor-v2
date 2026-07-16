@@ -6,6 +6,7 @@ import { resolveGruposProdutoImagemUrlsFromDeliveryCatalog } from '@/src/shared/
 /**
  * POST /api/delivery/grupos-produto/imagem-urls
  * Resolve imagemUrl de vários grupos com uma única varredura do catálogo delivery.
+ * (Somente grupos com ativoDelivery no catálogo público.)
  */
 export async function POST(request: NextRequest) {
   const validation = validateRequest(request)

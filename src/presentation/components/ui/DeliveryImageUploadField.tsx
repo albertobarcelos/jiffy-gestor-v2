@@ -1,9 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined'
 import { DELIVERY_IMAGE_ACCEPT } from '@/src/shared/constants/deliveryImageUpload'
+import { DELIVERY_PRODUTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
+import { useImageCropFlow } from '@/src/presentation/hooks/useImageCropFlow'
+import type { ImageCropPreset } from '@/src/presentation/utils/imageCrop'
 import { cn } from '@/src/shared/utils/cn'
 
 type DeliveryImageUploadVariant = 'default' | 'logo' | 'banner'
@@ -16,6 +19,8 @@ interface DeliveryImageUploadFieldProps {
   previewUrl?: string | null
   helperText?: string
   emptyHint?: string
+  /** Se informado, abre o modal de crop antes de chamar onFileSelected. */
+  cropPreset?: ImageCropPreset
   onFileSelected: (file: File) => void | Promise<void>
   onClearPreview?: () => void
 }
@@ -44,6 +49,16 @@ const VARIANT_STYLES: Record<
   },
 }
 
+const CROP_DROPZONE_PX = 280
+
+/** Dropzone alinhado ao crop delivery (máx. 280×280). */
+const CROP_SQUARE_STYLES = {
+  dropzone: 'box-border shrink-0',
+  previewImage: 'max-h-full max-w-full object-contain',
+  emptyIcon: 32,
+  emptyPadding: 'px-3 py-3',
+} as const
+
 export function DeliveryImageUploadField({
   label,
   variant = 'default',
@@ -52,36 +67,58 @@ export function DeliveryImageUploadField({
   previewUrl,
   helperText,
   emptyHint = 'Arraste uma imagem ou clique para selecionar',
+  cropPreset,
   onFileSelected,
   onClearPreview,
 }: DeliveryImageUploadFieldProps) {
-  const styles = VARIANT_STYLES[variant]
+  const styles = cropPreset ? CROP_SQUARE_STYLES : VARIANT_STYLES[variant]
   const isLogo = variant === 'logo'
+  const isCropSquare = Boolean(cropPreset)
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragActive, setDragActive] = useState(false)
+  const onFileSelectedRef = useRef(onFileSelected)
+  onFileSelectedRef.current = onFileSelected
 
   const isDisabled = disabled || busy
+
+  const { openWithFile, cropModal } = useImageCropFlow({
+    // Hook sempre precisa de preset; só usamos openWithFile quando cropPreset existe.
+    preset: cropPreset ?? DELIVERY_PRODUTO_CROP_PRESET,
+    onCropped: file => {
+      void onFileSelectedRef.current(file)
+    },
+  })
 
   const handleFiles = useCallback(
     async (files: FileList | null) => {
       const file = files?.[0]
       if (!file || isDisabled) return
+      if (cropPreset) {
+        openWithFile(file)
+        return
+      }
       await onFileSelected(file)
     },
-    [isDisabled, onFileSelected]
+    [isDisabled, cropPreset, openWithFile, onFileSelected]
   )
 
-  useEffect(() => {
-    return () => {
-      if (previewUrl?.startsWith('blob:')) {
-        URL.revokeObjectURL(previewUrl)
-      }
-    }
-  }, [previewUrl])
-
   return (
-    <div className="space-y-1">
-      {label ? <label className="block text-sm font-medium text-gray-700">{label}</label> : null}
+    <div
+      className={cn(
+        'space-y-1',
+        isCropSquare && 'flex w-full flex-col items-center'
+      )}
+    >
+      {label ? (
+        <label
+          className={cn(
+            'block text-sm font-medium text-gray-700',
+            isCropSquare && 'w-full text-center'
+          )}
+        >
+          {label}
+        </label>
+      ) : null}
 
       <input
         ref={inputRef}
@@ -131,10 +168,21 @@ export function DeliveryImageUploadField({
           setDragActive(false)
           void handleFiles(e.dataTransfer.files)
         }}
+        style={
+          isCropSquare
+            ? {
+                width: CROP_DROPZONE_PX,
+                height: CROP_DROPZONE_PX,
+                maxWidth: 'min(280px, 100%)',
+                maxHeight: 'min(280px, 100%)',
+              }
+            : undefined
+        }
         className={cn(
           'relative flex flex-col overflow-hidden rounded-lg border-2 border-dashed transition-colors',
           previewUrl ? 'p-1.5' : '',
           styles.dropzone,
+          isCropSquare && 'aspect-square',
           dragActive ? 'border-primary bg-primary/10' : 'border-neutral-400/80 bg-white/50',
           isDisabled ? 'pointer-events-none opacity-60' : 'cursor-pointer'
         )}
@@ -153,7 +201,7 @@ export function DeliveryImageUploadField({
                   }}
                   className="absolute right-0 top-0 z-10 inline-flex h-6 w-6 items-center justify-center rounded-md bg-white/90 text-neutral-600 shadow-sm ring-1 ring-black/5 transition-colors hover:bg-red-50 hover:text-red-700"
                 >
-                  <DeleteOutlineRoundedIcon sx={{ fontSize: isLogo ? 16 : 20 }} />
+                  <DeleteOutlineRoundedIcon sx={{ fontSize: isLogo || isCropSquare ? 16 : 20 }} />
                 </button>
               ) : null}
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -163,9 +211,14 @@ export function DeliveryImageUploadField({
                 className={cn('mx-auto rounded-md object-contain', styles.previewImage)}
               />
             </div>
-            {!isLogo ? (
+            {!isLogo && !isCropSquare ? (
               <p className="text-center text-xs text-neutral-500">
                 {busy ? 'Enviando imagem...' : 'Clique ou arraste para substituir'}
+              </p>
+            ) : null}
+            {isCropSquare && busy ? (
+              <p className="absolute bottom-1 left-0 right-0 text-center text-[10px] text-neutral-500">
+                Enviando imagem...
               </p>
             ) : null}
           </div>
@@ -177,17 +230,34 @@ export function DeliveryImageUploadField({
             )}
           >
             <ImageOutlinedIcon sx={{ fontSize: styles.emptyIcon, color: 'var(--color-primary)' }} />
-            <p className={cn('text-neutral-600', isLogo ? 'text-[10px] leading-tight' : 'text-sm')}>
+            <p
+              className={cn(
+                'text-neutral-600',
+                isLogo || isCropSquare ? 'text-[10px] leading-tight px-1' : 'text-sm'
+              )}
+            >
               {isLogo ? 'Selecionar' : emptyHint}
             </p>
             {!isLogo ? (
-              <p className="text-xs text-neutral-500">JPEG, PNG ou WebP — máx. 5 MB</p>
+              <p className="text-xs text-neutral-500">
+                JPEG, PNG ou WebP — máx. {cropPreset ? '1 MB' : '5 MB'}
+              </p>
             ) : null}
           </div>
         )}
       </div>
 
-      {helperText ? <p className="text-xs text-neutral-500">{helperText}</p> : null}
+      {helperText ? (
+        <p
+          className={cn(
+            'text-xs text-neutral-500',
+            isCropSquare && 'w-full max-w-[280px] text-center'
+          )}
+        >
+          {helperText}
+        </p>
+      ) : null}
+      {cropPreset ? cropModal : null}
     </div>
   )
 }

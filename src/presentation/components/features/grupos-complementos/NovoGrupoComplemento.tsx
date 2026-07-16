@@ -18,12 +18,12 @@ import { showToast, handleApiError } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { DeliveryImageUploadField } from '@/src/presentation/components/ui/DeliveryImageUploadField'
+import { DELIVERY_GRUPO_COMPLEMENTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
 import {
   mensagemLegivelDeliveryMediaError,
   uploadGrupoComplementoImagem,
   fetchGrupoComplementoImagemUrl,
 } from '@/src/infrastructure/api/deliveryMediaApi'
-import { validateDeliveryImageFile } from '@/src/shared/constants/deliveryImageUpload'
 
 /** Labels outlined em preto (MUI usa cinza por padrão) — igual NovoComplemento */
 const sxOutlinedLabelTextoEscuro = {
@@ -415,12 +415,6 @@ export const NovoGrupoComplemento = forwardRef<
         return
       }
 
-      const validationError = await validateDeliveryImageFile(file)
-      if (validationError) {
-        showToast.error(validationError)
-        return
-      }
-
       const preview = URL.createObjectURL(file)
       setImagemPreviewUrl(prev => {
         if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
@@ -539,9 +533,10 @@ export const NovoGrupoComplemento = forwardRef<
                 disabled={!isEditing}
                 busy={isUploadingImagem}
                 previewUrl={imagemPreviewUrl}
+                cropPreset={DELIVERY_GRUPO_COMPLEMENTO_CROP_PRESET}
                 helperText={
                   isEditing
-                    ? 'A imagem aparece no cardápio digital público após o upload.'
+                    ? 'Após escolher o arquivo, ajuste o recorte (máx. 280×280). A imagem aparece no cardápio digital após o upload.'
                     : 'Salve o grupo para habilitar o envio de imagem.'
                 }
                 emptyHint={

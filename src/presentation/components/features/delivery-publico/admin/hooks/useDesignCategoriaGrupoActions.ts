@@ -8,7 +8,6 @@ import {
   mensagemLegivelDeliveryMediaError,
   uploadGrupoProdutoImagem,
 } from '@/src/infrastructure/api/deliveryMediaApi'
-import { validateDeliveryImageFile } from '@/src/shared/constants/deliveryImageUpload'
 import { showToast } from '@/src/shared/utils/toast'
 import type { DesignCategoriaGrupo } from '../../shared/types/designCategoriaGrupo'
 
@@ -61,12 +60,6 @@ export function useDesignCategoriaGrupoActions() {
       if (!token) {
         showToast.error('Token não encontrado')
         throw new Error('Token não encontrado')
-      }
-
-      const validationError = await validateDeliveryImageFile(file)
-      if (validationError) {
-        showToast.error(validationError)
-        throw new Error(validationError)
       }
 
       setUploadingGrupoId(grupoId)

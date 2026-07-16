@@ -18,16 +18,15 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useQueryClient } from '@tanstack/react-query'
 import { showToast } from '@/src/shared/utils/toast'
-import {
-  DELIVERY_IMAGE_ACCEPT,
-  validateDeliveryImageFile,
-} from '@/src/shared/constants/deliveryImageUpload'
+import { DELIVERY_IMAGE_ACCEPT } from '@/src/shared/constants/deliveryImageUpload'
 import {
   fetchGrupoComplementoImagemUrl,
   fetchGruposComplementoImagemUrlsBatch,
   mensagemLegivelDeliveryMediaError,
   uploadGrupoComplementoImagem,
 } from '@/src/infrastructure/api/deliveryMediaApi'
+import { DELIVERY_GRUPO_COMPLEMENTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
+import { useEntityImageCropUpload } from '@/src/presentation/hooks/useEntityImageCropUpload'
 import {
   GruposComplementosTabsModal,
   GruposComplementosTabsModalState,
@@ -451,12 +450,6 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
         return
       }
 
-      const validationError = await validateDeliveryImageFile(file)
-      if (validationError) {
-        showToast.error(validationError)
-        return
-      }
-
       setUploadingImagemGrupoId(grupoId)
       const toastId = showToast.loading('Enviando imagem...')
 
@@ -476,6 +469,12 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
     },
     [auth]
   )
+
+  const { selectForEntity: selectGrupoComplementoImagem, cropModal: grupoComplementoCropModal } =
+    useEntityImageCropUpload({
+      preset: DELIVERY_GRUPO_COMPLEMENTO_CROP_PRESET,
+      upload: handleUploadImagem,
+    })
 
   const [tabsModalState, setTabsModalState] = useState<GruposComplementosTabsModalState>({
     open: false,
@@ -771,7 +770,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
             rowIndex={index}
             imagemUrl={imagensPorGrupoId[grupo.getId()] ?? null}
             isUploadingImagem={uploadingImagemGrupoId === grupo.getId()}
-            onUploadImagem={handleUploadImagem}
+            onUploadImagem={selectGrupoComplementoImagem}
           />
         ))}
 
@@ -787,6 +786,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
         onReload={handleTabsModalReload}
         onTabChange={handleTabsModalTabChange}
       />
+      {grupoComplementoCropModal}
     </div>
   )
 }

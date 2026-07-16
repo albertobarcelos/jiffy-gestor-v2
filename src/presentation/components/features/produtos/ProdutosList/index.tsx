@@ -18,7 +18,8 @@ import {
   mensagemLegivelDeliveryMediaError,
   uploadProdutoImagem,
 } from '@/src/infrastructure/api/deliveryMediaApi'
-import { validateDeliveryImageFile } from '@/src/shared/constants/deliveryImageUpload'
+import { DELIVERY_PRODUTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
+import { useEntityImageCropUpload } from '@/src/presentation/hooks/useEntityImageCropUpload'
 import { showToast } from '@/src/shared/utils/toast'
 
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -138,12 +139,6 @@ export function ProdutosList() {
         return
       }
 
-      const validationError = await validateDeliveryImageFile(file)
-      if (validationError) {
-        showToast.error(validationError)
-        return
-      }
-
       setUploadingImagemProdutoId(produtoId)
       const toastId = showToast.loading('Enviando imagem...')
 
@@ -163,6 +158,12 @@ export function ProdutosList() {
     },
     [auth]
   )
+
+  const { selectForEntity: selectProdutoImagem, cropModal: produtoCropModal } =
+    useEntityImageCropUpload({
+      preset: DELIVERY_PRODUTO_CROP_PRESET,
+      upload: handleUploadImagem,
+    })
 
   const produtosAgrupados = useMemo(() => {
     const map = new Map<string, Produto[]>()
@@ -482,7 +483,7 @@ export function ProdutosList() {
                             onOpenImpressorasModal={handleOpenImpressorasModal}
                             onEditProduto={handleEditProduto}
                             onCopyProduto={handleCopyProduto}
-                            onUploadImagem={handleUploadImagem}
+                            onUploadImagem={selectProdutoImagem}
                           />
                         </div>
                       ))}
@@ -507,6 +508,7 @@ export function ProdutosList() {
         onReload={handleTabsModalReload}
         onTabChange={(tab) => setTabsModalState((prev) => ({ ...prev, tab }))}
       />
+      {produtoCropModal}
     </div>
   )
 }

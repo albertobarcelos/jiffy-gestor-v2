@@ -272,7 +272,8 @@ export async function fetchGruposProdutoImagemUrlsBatch(
       body: JSON.stringify({ ids }),
     })
 
-    if (!response.ok) return Object.fromEntries(ids.map(id => [id, null]))
+    // Em erro de rede/rota, devolve vazio (não marca ids como null) para permitir retry.
+    if (!response.ok) return {}
 
     const data = (await response.json().catch(() => ({}))) as {
       imagensPorGrupoId?: Record<string, string | null>

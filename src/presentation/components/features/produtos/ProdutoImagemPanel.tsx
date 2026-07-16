@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { DeliveryImageUploadField } from '@/src/presentation/components/ui/DeliveryImageUploadField'
-import { validateDeliveryImageFile } from '@/src/shared/constants/deliveryImageUpload'
+import { DELIVERY_PRODUTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
 import {
   fetchProdutoImagemUrl,
   mensagemLegivelDeliveryMediaError,
@@ -85,12 +85,6 @@ export function ProdutoImagemPanel({
         return
       }
 
-      const validationError = await validateDeliveryImageFile(file)
-      if (validationError) {
-        showToast.error(validationError)
-        return
-      }
-
       const preview = URL.createObjectURL(file)
       setPreviewUrl(prev => {
         if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
@@ -144,8 +138,8 @@ export function ProdutoImagemPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-4 sm:px-6">
-      <div className="mx-auto w-full max-w-lg space-y-4">
-        <div>
+      <div className="mx-auto flex w-full max-w-lg flex-col items-center space-y-4">
+        <div className="w-full text-center">
           <h2 className="text-base font-semibold text-primary-text">Imagem do produto</h2>
           <p className="mt-1 text-sm text-secondary-text">
             {produtoNome
@@ -158,7 +152,8 @@ export function ProdutoImagemPanel({
           label="Imagem (cardápio digital)"
           busy={isUploading}
           previewUrl={previewUrl}
-          helperText="Formatos aceitos: JPEG, PNG ou WebP. Tamanho máximo: 5 MB."
+          cropPreset={DELIVERY_PRODUTO_CROP_PRESET}
+          helperText="Após escolher o arquivo, ajuste o recorte (máx. 280×280). JPEG, PNG ou WebP até 1 MB."
           emptyHint="Arraste uma imagem ou clique para selecionar"
           onFileSelected={handleImagemUpload}
           onClearPreview={

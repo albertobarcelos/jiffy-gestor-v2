@@ -10,16 +10,15 @@ import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitc
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useComplementosInfinite } from '@/src/presentation/hooks/useComplementos'
 import { useQueryClient } from '@tanstack/react-query'
-import {
-  DELIVERY_IMAGE_ACCEPT,
-  validateDeliveryImageFile,
-} from '@/src/shared/constants/deliveryImageUpload'
+import { DELIVERY_IMAGE_ACCEPT } from '@/src/shared/constants/deliveryImageUpload'
 import {
   fetchComplementoImagemUrl,
   fetchComplementosImagemUrlsBatch,
   mensagemLegivelDeliveryMediaError,
   uploadComplementoImagem,
 } from '@/src/infrastructure/api/deliveryMediaApi'
+import { DELIVERY_COMPLEMENTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
+import { useEntityImageCropUpload } from '@/src/presentation/hooks/useEntityImageCropUpload'
 import {
   ComplementosTabsModal,
   ComplementosTabsModalState,
@@ -310,12 +309,6 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         return
       }
 
-      const validationError = await validateDeliveryImageFile(file)
-      if (validationError) {
-        showToast.error(validationError)
-        return
-      }
-
       setUploadingImagemComplementoId(complementoId)
       const toastId = showToast.loading('Enviando imagem...')
 
@@ -335,6 +328,12 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
     },
     [auth]
   )
+
+  const { selectForEntity: selectComplementoImagem, cropModal: complementoCropModal } =
+    useEntityImageCropUpload({
+      preset: DELIVERY_COMPLEMENTO_CROP_PRESET,
+      upload: handleUploadImagem,
+    })
 
   // Debounce da busca (500ms) — igual GruposComplementosList
   useEffect(() => {
@@ -828,7 +827,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
             togglingStatus={!!togglingStatus[complemento.getId()]}
             imagemUrl={imagensPorComplementoId[complemento.getId()] ?? null}
             isUploadingImagem={uploadingImagemComplementoId === complemento.getId()}
-            onUploadImagem={handleUploadImagem}
+            onUploadImagem={selectComplementoImagem}
           />
         ))}
 
@@ -845,6 +844,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         onReload={handleTabsModalReload}
         onTabChange={handleTabsModalTabChange}
       />
+      {complementoCropModal}
     </div>
   )
 }

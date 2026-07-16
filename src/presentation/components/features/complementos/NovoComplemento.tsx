@@ -17,8 +17,8 @@ import { Button } from '@/src/presentation/components/ui/button'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { DeliveryImageUploadField } from '@/src/presentation/components/ui/DeliveryImageUploadField'
+import { DELIVERY_COMPLEMENTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
 import { showToast } from '@/src/shared/utils/toast'
-import { validateDeliveryImageFile } from '@/src/shared/constants/deliveryImageUpload'
 import {
   fetchComplementoImagemUrl,
   mensagemLegivelDeliveryMediaError,
@@ -286,12 +286,6 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
       }
       if (!complementoId) {
         showToast.error('Salve o complemento antes de enviar uma imagem.')
-        return
-      }
-
-      const validationError = await validateDeliveryImageFile(file)
-      if (validationError) {
-        showToast.error(validationError)
         return
       }
 
@@ -583,9 +577,10 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
                 disabled={!isEditing}
                 busy={isUploadingImagem}
                 previewUrl={imagemPreviewUrl}
+                cropPreset={DELIVERY_COMPLEMENTO_CROP_PRESET}
                 helperText={
                   isEditing
-                    ? 'A imagem aparece no cardápio digital público após o upload.'
+                    ? 'Após escolher o arquivo, ajuste o recorte (máx. 280×280). A imagem aparece no cardápio digital após o upload.'
                     : 'Salve o complemento para habilitar o envio de imagem.'
                 }
                 emptyHint={

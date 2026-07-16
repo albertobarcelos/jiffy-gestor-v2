@@ -27,13 +27,14 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
 import { MdImage, MdSearch } from 'react-icons/md'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import { validateDeliveryImageFile } from '@/src/shared/constants/deliveryImageUpload'
 import {
   fetchGrupoProdutoImagemUrl,
   fetchGruposProdutoImagemUrlsBatch,
   mensagemLegivelDeliveryMediaError,
   uploadGrupoProdutoImagem,
 } from '@/src/infrastructure/api/deliveryMediaApi'
+import { DELIVERY_GRUPO_PRODUTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
+import { useEntityImageCropUpload } from '@/src/presentation/hooks/useEntityImageCropUpload'
 import {
   GruposProdutosTabsModal,
   GruposProdutosTabsModalState,
@@ -183,6 +184,14 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     setLocalGrupos(serverGrupos)
   }, [serverGrupos])
 
+  // Ao entrar no modo imagens, limpa cache para forçar nova resolução (evita nulls
+  // “presos” de uma falha anterior da API).
+  useEffect(() => {
+    if (visualMode === 'imagens') {
+      setImagensPorGrupoId({})
+    }
+  }, [visualMode])
+
   useEffect(() => {
     if (visualMode !== 'imagens') return
 
@@ -198,7 +207,25 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
 
     void fetchGruposProdutoImagemUrlsBatch(idsFaltantes, token).then(resolved => {
       if (cancelled) return
-      setImagensPorGrupoId(prev => ({ ...prev, ...resolved }))
+      // Resposta vazia = falha transitória; não marca ids como null.
+      if (Object.keys(resolved).length === 0) return
+
+      setImagensPorGrupoId(prev => {
+        const next = { ...prev }
+        for (const [id, url] of Object.entries(resolved)) {
+          const existing = prev[id]
+          // Não sobrescreve URL/blob já conhecido com null (race do batch / catálogo).
+          if (
+            typeof existing === 'string' &&
+            existing.length > 0 &&
+            (url == null || url === '')
+          ) {
+            continue
+          }
+          next[id] = url
+        }
+        return next
+      })
     })
 
     return () => {
@@ -214,22 +241,27 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
         return
       }
 
-      const validationError = await validateDeliveryImageFile(file)
-      if (validationError) {
-        showToast.error(validationError)
-        return
-      }
-
       setUploadingImagemGrupoId(grupoId)
       const toastId = showToast.loading('Enviando imagem...')
 
       try {
         await uploadGrupoProdutoImagem(grupoId, file, token)
-        const persistedUrl = await fetchGrupoProdutoImagemUrl(grupoId, token)
-        setImagensPorGrupoId(prev => ({
-          ...prev,
-          [grupoId]: persistedUrl,
-        }))
+        let persistedUrl = await fetchGrupoProdutoImagemUrl(grupoId, token)
+        if (!persistedUrl) {
+          await new Promise(resolve => setTimeout(resolve, 400))
+          persistedUrl = await fetchGrupoProdutoImagemUrl(grupoId, token)
+        }
+        const displayUrl = persistedUrl ?? URL.createObjectURL(file)
+        setImagensPorGrupoId(prev => {
+          const previous = prev[grupoId]
+          if (
+            previous?.startsWith('blob:') &&
+            previous !== displayUrl
+          ) {
+            URL.revokeObjectURL(previous)
+          }
+          return { ...prev, [grupoId]: displayUrl }
+        })
         showToast.successLoading(toastId, 'Imagem salva com sucesso!')
       } catch (error) {
         showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
@@ -239,6 +271,12 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     },
     [auth]
   )
+
+  const { selectForEntity: selectGrupoImagem, cropModal: grupoCropModal } =
+    useEntityImageCropUpload({
+      preset: DELIVERY_GRUPO_PRODUTO_CROP_PRESET,
+      upload: handleUploadImagem,
+    })
 
   const totalGrupos = useMemo(() => {
     return data?.pages[0]?.count || 0
@@ -312,7 +350,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
   // Função removida - não é mais necessária pois usamos atualização otimista
 
   const handleTabsModalReload = useCallback(() => {
-    setImagensPorGrupoId({})
+    // Mantém URLs já conhecidas; só revalida a lista (evitar apagar thumbs após upload).
     queryClient.invalidateQueries({ queryKey: ['grupos-produtos'] })
     onReload?.()
   }, [onReload, queryClient])
@@ -715,7 +753,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
                 visualMode={visualMode}
                 imagemUrl={imagensPorGrupoId[grupo.getId()] ?? null}
                 isUploadingImagem={uploadingImagemGrupoId === grupo.getId()}
-                onUploadImagem={handleUploadImagem}
+                onUploadImagem={selectGrupoImagem}
                 onToggleStatus={handleToggleGrupoStatus}
                 onToggleAtivoDelivery={handleToggleGrupoAtivoDelivery}
                 onCreateProduto={(grupoId) => handleOpenProdutoModal(grupoId)}
@@ -773,6 +811,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       }}
       onTabChange={handleProdutoTabChange}
     />
+    {grupoCropModal}
     </>
   )
 }

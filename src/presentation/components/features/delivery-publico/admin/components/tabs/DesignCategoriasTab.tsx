@@ -19,6 +19,7 @@ import {
 } from '@dnd-kit/sortable'
 import { IconPickerPanel } from '@/src/presentation/components/features/grupos-produtos/IconPickerPanel'
 import { DeliveryImageUploadField } from '@/src/presentation/components/ui/DeliveryImageUploadField'
+import { DELIVERY_GRUPO_PRODUTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
@@ -321,7 +322,8 @@ export function DesignCategoriasTab({
                     disabled={!selectedCategory}
                     busy={isUploadingSelected}
                     previewUrl={imagemPreviewUrl}
-                    helperText="A imagem é salva no grupo via cardápio delivery. Grupos sem imagem exibem o ícone padrão."
+                    cropPreset={DELIVERY_GRUPO_PRODUTO_CROP_PRESET}
+                    helperText="Após o recorte (máx. 280×280), a imagem é salva no grupo. Sem imagem, exibe o ícone padrão."
                     emptyHint="Arraste uma imagem ou clique para selecionar"
                     onFileSelected={handleImagemUpload}
                     onClearPreview={
