@@ -37,13 +37,13 @@ export function DeliveryMobilePreviewFrame({
       <p className="mb-2 shrink-0 text-center text-xs font-semibold uppercase tracking-wide text-secondary-text">
         Preview · {layoutNome}
       </p>
-      <div
-        className="delivery-preview-shell relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[2rem] border-8 border-gray-900 bg-white shadow-xl box-border"
-        style={themeStyle}
-      >
+      <div className="delivery-preview-shell relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[2rem] border-8 border-gray-900 bg-white shadow-xl box-border">
         <div className="delivery-preview-viewport min-h-0 flex-1 overflow-y-auto scrollbar-hide">
           <div className="delivery-preview-scale-host">
-            <div className="delivery-theme @container w-full min-w-0 overflow-x-clip">
+            <div
+              className="delivery-theme @container w-full min-w-0 overflow-x-clip"
+              style={themeStyle}
+            >
               <LayoutHome
                 config={config}
                 viewModel={viewModel}

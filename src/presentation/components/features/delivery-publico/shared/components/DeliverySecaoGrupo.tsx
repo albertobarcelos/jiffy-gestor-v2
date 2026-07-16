@@ -26,11 +26,13 @@ export function DeliverySecaoGrupo({
       id={`grupo-${grupo.id}`}
     >
       <h2
-        className={`delivery-grupo-title relative mb-2 flex min-h-12 items-center overflow-hidden rounded-xl px-4 py-2.5 text-base font-bold uppercase tracking-wide @sm:min-h-14 @sm:text-lg @lg:min-h-16 @lg:text-xl @xl:text-2xl${
+        className={`delivery-grupo-title relative mb-2 flex min-h-12 items-center overflow-hidden rounded-xl px-4 py-2.5 text-base font-bold uppercase tracking-wide bg-[color:var(--delivery-primary-dark,#171717)] text-[color:var(--delivery-btn-text,#ffffff)] @sm:min-h-14 @sm:text-lg @lg:min-h-16 @lg:text-xl @xl:text-2xl${
           stickyTitle ? ' delivery-basico-grupo-title-sticky' : ''
         }${imagemUrl ? ' pr-28 @sm:pr-36 @lg:pr-44' : ''}`}
       >
-        <span className="relative z-10 min-w-0 leading-tight">{grupo.nome}</span>
+        <span className="relative z-10 min-w-0 leading-tight text-[color:var(--delivery-btn-text,#ffffff)]">
+          {grupo.nome}
+        </span>
 
         {imagemUrl ? (
           <span
@@ -38,7 +40,7 @@ export function DeliverySecaoGrupo({
             aria-hidden
           >
             <span className="delivery-grupo-title-image-smoke" />
-            <span className="relative block h-full w-full overflow-hidden rounded-full">
+            <span className="delivery-grupo-title-image-photo">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={imagemUrl} alt="" className="h-full w-full object-cover" />
             </span>

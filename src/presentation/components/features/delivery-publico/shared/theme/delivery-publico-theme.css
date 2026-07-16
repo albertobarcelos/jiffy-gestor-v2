@@ -41,39 +41,49 @@
 }
 
 .delivery-grupo-title {
-  background-color: var(--delivery-primary-dark);
+  background-color: var(--delivery-primary-dark, #171717);
   color: var(--delivery-btn-text, #ffffff);
   font-family: var(--delivery-font-title);
   overflow: hidden;
 }
 
 /**
- * Halo branco suave ao redor da imagem do grupo (efeito fumaça).
- * Camada de blur atrás + drop-shadow no contorno circular.
+ * Fumaça branca ao redor da imagem do grupo (sobre o fundo da barra).
+ * box-shadow no círculo + blob suave atrás — overflow da barra corta o que sair.
  */
-.delivery-grupo-title-image {
-  filter:
-    drop-shadow(0 0 6px rgba(255, 255, 255, 0.75))
-    drop-shadow(0 0 14px rgba(255, 255, 255, 0.45))
-    drop-shadow(0 0 28px rgba(255, 255, 255, 0.28));
-}
-
 .delivery-grupo-title-image-smoke {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 125%;
-  height: 125%;
+  width: 135%;
+  height: 135%;
   translate: -50% -50%;
   border-radius: 9999px;
   background: radial-gradient(
     circle,
-    rgba(255, 255, 255, 0.55) 0%,
-    rgba(255, 255, 255, 0.22) 42%,
+    rgba(255, 255, 255, 0.7) 0%,
+    rgba(255, 255, 255, 0.35) 38%,
+    rgba(255, 255, 255, 0.12) 58%,
     rgba(255, 255, 255, 0) 72%
   );
-  filter: blur(10px);
+  filter: blur(12px);
   pointer-events: none;
+  z-index: 0;
+}
+
+.delivery-grupo-title-image-photo {
+  position: relative;
+  z-index: 1;
+  display: block;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 9999px;
+  box-shadow:
+    0 0 8px 2px rgba(255, 255, 255, 0.75),
+    0 0 18px 6px rgba(255, 255, 255, 0.45),
+    0 0 36px 14px rgba(255, 255, 255, 0.28),
+    0 0 56px 22px rgba(255, 255, 255, 0.14);
 }
 
 /**
@@ -100,7 +110,7 @@
   position: sticky;
   top: var(--delivery-sticky-toolbar-h);
   z-index: 20;
-  background-color: var(--delivery-primary-dark);
+  background-color: var(--delivery-primary-dark, #171717);
   color: var(--delivery-btn-text, #ffffff);
 }
 

@@ -14,6 +14,7 @@ import {
 } from '../../shared/constants/designPublishRules'
 import { useDeliveryDesignDraft } from '../../shared/hooks/useDeliveryDesignDraft'
 import { useDesignCategoriaGrupos } from '../../shared/hooks/useDesignCategoriaGrupos'
+import { useDesignCategoriaGruposImagens } from '../../shared/hooks/useDesignCategoriaGruposImagens'
 import type { DesignCategoriaGrupo } from '../../shared/types/designCategoriaGrupo'
 import { mergeDesignCategoriaGrupos } from '../../shared/utils/mergeDesignCategoriaGrupos'
 import { DesignTabNav } from '../components/DesignTabNav'
@@ -48,6 +49,19 @@ export function DeliveryDesignCustomizerScreen() {
       mergeDesignCategoriaGrupos(categoriasGrupos, previous)
     )
   }, [categoriasGrupos])
+
+  const handlePreviewImagensResolved = useCallback((resolved: DesignCategoriaGrupo[]) => {
+    setPreviewCategoriasGrupos(previous => mergeDesignCategoriaGrupos(resolved, previous))
+  }, [])
+
+  useDesignCategoriaGruposImagens({
+    grupos: previewCategoriasGrupos,
+    enabled:
+      Boolean(draft.categorias.usarImagensGrupo) &&
+      hydrated &&
+      previewCategoriasGrupos.length > 0,
+    onResolved: handlePreviewImagensResolved,
+  })
 
   const canPublish = canPublishDesign(draft)
 
