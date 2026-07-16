@@ -34,11 +34,14 @@ export function DeliverySecaoGrupo({
 
         {imagemUrl ? (
           <span
-            className="pointer-events-none absolute right-3 top-1/2 z-0 aspect-square h-[170%] -translate-y-1/2 overflow-hidden rounded-full @sm:right-4"
+            className="delivery-grupo-title-image pointer-events-none absolute right-3 top-1/2 z-0 aspect-square h-[170%] -translate-y-1/2 @sm:right-4"
             aria-hidden
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={imagemUrl} alt="" className="h-full w-full object-cover" />
+            <span className="delivery-grupo-title-image-smoke" />
+            <span className="relative block h-full w-full overflow-hidden rounded-full">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={imagemUrl} alt="" className="h-full w-full object-cover" />
+            </span>
           </span>
         ) : null}
       </h2>

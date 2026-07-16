@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useRef, useState, type CSSProperties } from 'react'
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined'
 import { DELIVERY_IMAGE_ACCEPT } from '@/src/shared/constants/deliveryImageUpload'
@@ -49,15 +49,29 @@ const VARIANT_STYLES: Record<
   },
 }
 
-const CROP_DROPZONE_PX = 280
-
-/** Dropzone alinhado ao crop delivery (máx. 280×280). */
-const CROP_SQUARE_STYLES = {
+/** Dropzone alinhado ao crop (proporção do preset). */
+const CROP_FIELD_STYLES = {
   dropzone: 'box-border shrink-0',
   previewImage: 'max-h-full max-w-full object-contain',
   emptyIcon: 32,
   emptyPadding: 'px-3 py-3',
 } as const
+
+const CROP_DROPZONE_MAX_W = 360
+const CROP_DROPZONE_MAX_H = 280
+
+function getCropDropzoneStyle(preset: ImageCropPreset): CSSProperties {
+  let w = preset.displayFrameWidth
+  let h = preset.displayFrameHeight
+  const scale = Math.min(CROP_DROPZONE_MAX_W / w, CROP_DROPZONE_MAX_H / h, 1)
+  w = Math.max(1, Math.round(w * scale))
+  h = Math.max(1, Math.round(h * scale))
+  return {
+    width: w,
+    height: h,
+    maxWidth: '100%',
+  }
+}
 
 export function DeliveryImageUploadField({
   label,
@@ -71,9 +85,14 @@ export function DeliveryImageUploadField({
   onFileSelected,
   onClearPreview,
 }: DeliveryImageUploadFieldProps) {
-  const styles = cropPreset ? CROP_SQUARE_STYLES : VARIANT_STYLES[variant]
+  const styles = cropPreset ? CROP_FIELD_STYLES : VARIANT_STYLES[variant]
   const isLogo = variant === 'logo'
-  const isCropSquare = Boolean(cropPreset)
+  const hasCrop = Boolean(cropPreset)
+  const isCropSquare =
+    hasCrop &&
+    cropPreset != null &&
+    cropPreset.maxOutputWidth === cropPreset.maxOutputHeight
+  const cropDropzoneStyle = cropPreset ? getCropDropzoneStyle(cropPreset) : undefined
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragActive, setDragActive] = useState(false)
   const onFileSelectedRef = useRef(onFileSelected)
@@ -106,14 +125,14 @@ export function DeliveryImageUploadField({
     <div
       className={cn(
         'space-y-1',
-        isCropSquare && 'flex w-full flex-col items-center'
+        hasCrop && 'flex w-full flex-col items-center'
       )}
     >
       {label ? (
         <label
           className={cn(
             'block text-sm font-medium text-gray-700',
-            isCropSquare && 'w-full text-center'
+            hasCrop && 'w-full text-center'
           )}
         >
           {label}
@@ -168,28 +187,18 @@ export function DeliveryImageUploadField({
           setDragActive(false)
           void handleFiles(e.dataTransfer.files)
         }}
-        style={
-          isCropSquare
-            ? {
-                width: CROP_DROPZONE_PX,
-                height: CROP_DROPZONE_PX,
-                maxWidth: 'min(280px, 100%)',
-                maxHeight: 'min(280px, 100%)',
-              }
-            : undefined
-        }
+        style={cropDropzoneStyle}
         className={cn(
           'relative flex flex-col overflow-hidden rounded-lg border-2 border-dashed transition-colors',
           previewUrl ? 'p-1.5' : '',
           styles.dropzone,
-          isCropSquare && 'aspect-square',
           dragActive ? 'border-primary bg-primary/10' : 'border-neutral-400/80 bg-white/50',
           isDisabled ? 'pointer-events-none opacity-60' : 'cursor-pointer'
         )}
       >
         {previewUrl ? (
           <div className="relative flex h-full w-full flex-col items-center justify-center gap-0.5">
-            <div className="relative flex w-full items-center justify-center">
+            <div className="relative flex h-full w-full items-center justify-center">
               {onClearPreview ? (
                 <button
                   type="button"
@@ -201,7 +210,7 @@ export function DeliveryImageUploadField({
                   }}
                   className="absolute right-0 top-0 z-10 inline-flex h-6 w-6 items-center justify-center rounded-md bg-white/90 text-neutral-600 shadow-sm ring-1 ring-black/5 transition-colors hover:bg-red-50 hover:text-red-700"
                 >
-                  <DeleteOutlineRoundedIcon sx={{ fontSize: isLogo || isCropSquare ? 16 : 20 }} />
+                  <DeleteOutlineRoundedIcon sx={{ fontSize: isLogo || hasCrop ? 16 : 20 }} />
                 </button>
               ) : null}
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -211,12 +220,12 @@ export function DeliveryImageUploadField({
                 className={cn('mx-auto rounded-md object-contain', styles.previewImage)}
               />
             </div>
-            {!isLogo && !isCropSquare ? (
+            {!isLogo && !hasCrop ? (
               <p className="text-center text-xs text-neutral-500">
                 {busy ? 'Enviando imagem...' : 'Clique ou arraste para substituir'}
               </p>
             ) : null}
-            {isCropSquare && busy ? (
+            {hasCrop && busy ? (
               <p className="absolute bottom-1 left-0 right-0 text-center text-[10px] text-neutral-500">
                 Enviando imagem...
               </p>
@@ -233,7 +242,7 @@ export function DeliveryImageUploadField({
             <p
               className={cn(
                 'text-neutral-600',
-                isLogo || isCropSquare ? 'text-[10px] leading-tight px-1' : 'text-sm'
+                isLogo || hasCrop ? 'text-[10px] leading-tight px-1' : 'text-sm'
               )}
             >
               {isLogo ? 'Selecionar' : emptyHint}
@@ -251,7 +260,9 @@ export function DeliveryImageUploadField({
         <p
           className={cn(
             'text-xs text-neutral-500',
-            isCropSquare && 'w-full max-w-[280px] text-center'
+            hasCrop && 'w-full text-center',
+            hasCrop && isCropSquare && 'max-w-[280px]',
+            hasCrop && !isCropSquare && 'max-w-[360px]'
           )}
         >
           {helperText}

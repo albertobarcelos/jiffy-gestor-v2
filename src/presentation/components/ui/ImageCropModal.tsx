@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Cropper, { type MediaSize } from 'react-easy-crop'
+import Cropper, { type Area, type MediaSize } from 'react-easy-crop'
 import {
   Dialog,
   DialogContent,
@@ -13,8 +13,7 @@ import {
 import {
   clampCropFrameSize,
   cropImageWithPreset,
-  estimateOutputSizeFromCropFrame,
-  getCropNaturalArea,
+  getCropOutputDimensions,
   getInitialCropFrameSize,
   type CropFrameSize,
   type ImageCropPreset,
@@ -58,6 +57,7 @@ export function ImageCropModal({
   const cropContainerRef = useRef<HTMLDivElement>(null)
   const maxCropFrameSize = useMaxCropFrameSize(cropContainerRef, open && !!imageSrc, preset)
   const mediaSizeRef = useRef<MediaSize | null>(null)
+  const croppedAreaPixelsRef = useRef<Area | null>(null)
 
   useEffect(() => {
     if (!open) {
@@ -67,6 +67,7 @@ export function ImageCropModal({
       setIsApplying(false)
       setOutputSizeLabel(null)
       mediaSizeRef.current = null
+      croppedAreaPixelsRef.current = null
       return
     }
   }, [open, imageSrc])
@@ -83,26 +84,27 @@ export function ImageCropModal({
     setCropFrameSize(prev => clampCropFrameSize(prev, maxCropFrameSize, preset))
   }, [maxCropFrameSize.width, maxCropFrameSize.height, preset])
 
-  const refreshOutputLabel = useCallback(() => {
-    const media = mediaSizeRef.current
-    if (!media) {
-      setOutputSizeLabel(null)
-      return
-    }
-    const { width, height } = estimateOutputSizeFromCropFrame(
-      crop,
-      media,
-      cropFrameSize,
-      zoom,
-      preset
-    )
-    setOutputSizeLabel(`${width} × ${height} px`)
-  }, [crop, cropFrameSize, zoom, preset])
+  const refreshOutputLabel = useCallback(
+    (naturalArea?: Area | null) => {
+      const area = naturalArea ?? croppedAreaPixelsRef.current
+      const media = mediaSizeRef.current
+      if (!area || !media) {
+        setOutputSizeLabel(null)
+        return
+      }
+      const { width, height } = getCropOutputDimensions(cropFrameSize, area, preset, {
+        width: media.naturalWidth,
+        height: media.naturalHeight,
+      })
+      setOutputSizeLabel(`${width} × ${height} px`)
+    },
+    [cropFrameSize, preset]
+  )
 
   useEffect(() => {
-    if (!open || !imageSrc || !mediaSizeRef.current) return
+    if (!open || !imageSrc) return
     refreshOutputLabel()
-  }, [open, imageSrc, crop, cropFrameSize, zoom, refreshOutputLabel])
+  }, [open, imageSrc, cropFrameSize, zoom, refreshOutputLabel])
 
   const handleMediaLoaded = useCallback(
     (media: MediaSize) => {
@@ -114,12 +116,21 @@ export function ImageCropModal({
     [maxCropFrameSize, preset]
   )
 
+  const handleCropAreaChange = useCallback(
+    (_croppedArea: Area, croppedAreaPixels: Area) => {
+      croppedAreaPixelsRef.current = croppedAreaPixels
+      setCropAreaReady(true)
+      refreshOutputLabel(croppedAreaPixels)
+    },
+    [refreshOutputLabel]
+  )
+
   const handleApply = async () => {
     const media = mediaSizeRef.current
-    if (!imageSrc || !media) return
+    const naturalArea = croppedAreaPixelsRef.current
+    if (!imageSrc || !media || !naturalArea) return
     setIsApplying(true)
     try {
-      const naturalArea = getCropNaturalArea(crop, media, cropFrameSize, zoom)
       const file = await cropImageWithPreset(imageSrc, cropFrameSize, naturalArea, preset, {
         sourceMimeType,
         sourceFileName,
@@ -176,8 +187,8 @@ export function ImageCropModal({
                 onCropChange={setCrop}
                 onZoomChange={setZoom}
                 onMediaLoaded={handleMediaLoaded}
-                onCropAreaChange={() => setCropAreaReady(true)}
-                onCropComplete={() => setCropAreaReady(true)}
+                onCropAreaChange={handleCropAreaChange}
+                onCropComplete={handleCropAreaChange}
                 objectFit="contain"
                 showGrid
                 style={{

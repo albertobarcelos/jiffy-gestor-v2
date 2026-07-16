@@ -144,29 +144,30 @@ export function getInitialCropFrameSize(
   maxFrame: CropFrameSize,
   preset: ImageCropPreset
 ): CropFrameSize {
+  // Moldura inicial = máxima visual do contentor (CSS).
+  // Não misturar maxOutput/natural px com CSS — isso travava a saída em 280
+  // quando displayFrame < maxOutput (logo 500, capa 1200).
   if (preset.lockAspectRatio) {
     const aspect = getCropPresetAspect(preset)
-    const sideCap = Math.min(
-      maxFrame.width,
-      maxFrame.height,
-      media.naturalWidth,
-      media.naturalHeight,
-      preset.maxOutputWidth,
-      preset.maxOutputHeight
-    )
-    let width = sideCap
-    let height = Math.round(sideCap / aspect)
+    let width = maxFrame.width
+    let height = Math.round(width / aspect)
     if (height > maxFrame.height) {
       height = maxFrame.height
       width = Math.round(height * aspect)
+    }
+    // Em imagens menores que a moldura, encaixa sem ultrapassar o media renderizado.
+    const mediaSide = Math.min(media.width, media.height)
+    if (mediaSide > 0 && width > mediaSide) {
+      width = Math.floor(mediaSide)
+      height = Math.round(width / aspect)
     }
     return clampCropFrameSize({ width, height }, maxFrame, preset)
   }
 
   return clampCropFrameSize(
     {
-      width: Math.min(maxFrame.width, media.naturalWidth, preset.maxOutputWidth),
-      height: Math.min(maxFrame.height, media.naturalHeight, preset.maxOutputHeight),
+      width: Math.min(maxFrame.width, media.width || maxFrame.width),
+      height: Math.min(maxFrame.height, media.height || maxFrame.height),
     },
     maxFrame,
     preset
@@ -174,8 +175,11 @@ export function getInitialCropFrameSize(
 }
 
 /**
- * Tamanho final: moldura, limites do preset, recorte e imagem original.
- * Nunca amplia — só reduz quando a moldura ou o máximo exigem.
+ * Tamanho final em pixels.
+ *
+ * - Moldura CSS cheia (`displayFrame`) mapeia para `maxOutput` (ex.: 280 CSS → 500 px).
+ * - Ao redimensionar a moldura, o estimado sobe/desce de forma previsível.
+ * - Nunca amplia além dos pixels reais do recorte na imagem fonte.
  */
 export function getCropOutputDimensions(
   cropFrameSize: CropFrameSize,
@@ -183,15 +187,19 @@ export function getCropOutputDimensions(
   preset: ImageCropPreset,
   naturalImageSize?: { width: number; height: number }
 ): { width: number; height: number } {
-  const capW = naturalImageSize
-    ? Math.min(preset.maxOutputWidth, naturalImageSize.width)
-    : preset.maxOutputWidth
-  const capH = naturalImageSize
-    ? Math.min(preset.maxOutputHeight, naturalImageSize.height)
-    : preset.maxOutputHeight
+  const displayW = Math.max(1, preset.displayFrameWidth)
+  const displayH = Math.max(1, preset.displayFrameHeight)
 
-  let width = Math.min(cropFrameSize.width, capW, naturalCrop.width)
-  let height = Math.min(cropFrameSize.height, capH, naturalCrop.height)
+  let width = Math.round((cropFrameSize.width / displayW) * preset.maxOutputWidth)
+  let height = Math.round((cropFrameSize.height / displayH) * preset.maxOutputHeight)
+
+  width = Math.min(width, preset.maxOutputWidth, naturalCrop.width)
+  height = Math.min(height, preset.maxOutputHeight, naturalCrop.height)
+
+  if (naturalImageSize) {
+    width = Math.min(width, naturalImageSize.width)
+    height = Math.min(height, naturalImageSize.height)
+  }
 
   if (preset.lockAspectRatio) {
     const aspect = getCropPresetAspect(preset)

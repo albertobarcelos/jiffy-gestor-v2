@@ -48,6 +48,35 @@
 }
 
 /**
+ * Halo branco suave ao redor da imagem do grupo (efeito fumaça).
+ * Camada de blur atrás + drop-shadow no contorno circular.
+ */
+.delivery-grupo-title-image {
+  filter:
+    drop-shadow(0 0 6px rgba(255, 255, 255, 0.75))
+    drop-shadow(0 0 14px rgba(255, 255, 255, 0.45))
+    drop-shadow(0 0 28px rgba(255, 255, 255, 0.28));
+}
+
+.delivery-grupo-title-image-smoke {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 125%;
+  height: 125%;
+  translate: -50% -50%;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(255, 255, 255, 0.22) 42%,
+    rgba(255, 255, 255, 0) 72%
+  );
+  filter: blur(10px);
+  pointer-events: none;
+}
+
+/**
  * Layout Básico — busca + chips fixos no topo; títulos de grupo sticky abaixo da barra.
  */
 .delivery-basico-catalog-root {

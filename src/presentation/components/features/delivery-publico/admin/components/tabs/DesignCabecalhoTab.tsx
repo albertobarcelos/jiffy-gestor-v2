@@ -2,6 +2,10 @@
 
 import type { DeliveryPublicoDesignConfig } from '../../../shared/types/deliveryPublicoDesignConfig'
 import { DeliveryImageUploadField } from '@/src/presentation/components/ui/DeliveryImageUploadField'
+import {
+  DELIVERY_CAPA_CROP_PRESET,
+  DELIVERY_LOGO_CROP_PRESET,
+} from '@/src/presentation/constants/imageCropPresets'
 import { useDesignCabecalhoMidia } from '../../hooks/useDesignCabecalhoMidia'
 
 type DesignCabecalhoTabProps = {
@@ -70,7 +74,8 @@ export function DesignCabecalhoTab({
           <DeliveryImageUploadField
             variant="logo"
             previewUrl={cabecalho.logoUrl}
-            helperText="Máx. 5 MB · PNG, JPG ou WebP"
+            cropPreset={DELIVERY_LOGO_CROP_PRESET}
+            helperText="Após escolher o arquivo, ajuste o recorte (máx. 500×500). JPEG, PNG ou WebP até 1 MB."
             busy={isUploadingLogo}
             disabled={!canUpload}
             onFileSelected={handleLogoUpload}
@@ -109,7 +114,8 @@ export function DesignCabecalhoTab({
           <DeliveryImageUploadField
             variant="banner"
             previewUrl={cabecalho.capaUrl}
-            helperText="Máx. 5 MB · PNG, JPG ou WebP"
+            cropPreset={DELIVERY_CAPA_CROP_PRESET}
+            helperText="Após escolher o arquivo, ajuste o recorte (máx. 1200×400 · 3:1). Mantenha o foco no centro. JPEG, PNG ou WebP até 1 MB."
             emptyHint="Arraste e solte a imagem aqui ou Selecionar arquivo"
             busy={isUploadingBanner}
             disabled={!canUpload}
