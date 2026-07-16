@@ -1,10 +1,12 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   COLUNAS_ENTREGA_OPERACIONAIS,
   dataOrdenacaoCardKanban,
+  normalizarTermoBuscaKanban,
   ordenarVendasKanbanPorCriterio,
+  vendaAtendeBuscaKanban,
 } from '../rules/vendasKanban.rules'
 import { flattenPedidosDeliveryInfinite } from './usePedidosDeliveryInfinite'
 import { flattenVendasUnificadasInfinite } from './useVendasUnificadas'
@@ -13,7 +15,10 @@ import {
   isColunaKanbanDeliveryFiscalSplit,
   vendaPertenceColunaDeliveryKanban,
 } from '../utils/kanbanDeliveryColumnConfig'
-import { BALCAO_KANBAN_COLUMN_IDS } from '../utils/kanbanBalcaoColumnConfig'
+import {
+  BALCAO_KANBAN_COLUMN_IDS,
+  vendaPertenceColunaBalcaoKanban,
+} from '../utils/kanbanBalcaoColumnConfig'
 import { cloneVendaUnificadaDTO } from '../utils/kanbanVendaCacheUpdate'
 import { filtrarVendaDeliveryKanbanColunaPorDatasToolbar } from '../utils/kanbanVendasListagem'
 import type {
@@ -33,6 +38,8 @@ export interface VendasUnificadasQueryParams {
   dataCriacaoFinal?: string
   dataFinalizacaoInicio?: string
   dataFinalizacaoFim?: string
+  statusFiscal?: string
+  q?: string
   [key: string]: unknown
 }
 
@@ -59,6 +66,7 @@ const CRITERIO_PADRAO: Record<ColunaKanbanId, CriterioOrdenacaoKanban> = {
   FINALIZADAS: 'data',
   PENDENTE_EMISSAO: 'data',
   COM_NFE: 'data',
+  REJEITADAS: 'data',
 }
 
 const DIRECAO_PADRAO: Record<ColunaKanbanId, DirecaoOrdenacaoKanban> = {
@@ -69,6 +77,7 @@ const DIRECAO_PADRAO: Record<ColunaKanbanId, DirecaoOrdenacaoKanban> = {
   FINALIZADAS: 'desc',
   PENDENTE_EMISSAO: 'desc',
   COM_NFE: 'desc',
+  REJEITADAS: 'desc',
 }
 
 export function useKanbanVendasPorColuna({
@@ -91,11 +100,18 @@ export function useKanbanVendasPorColuna({
   const [direcaoOrdenacaoPorColuna, setDirecaoOrdenacaoPorColuna] =
     useState<Record<ColunaKanbanId, DirecaoOrdenacaoKanban>>(DIRECAO_PADRAO)
 
+  /** Páginas auto-carregadas em Finalizadas quando o refiltro esvazia a 1ª página. */
+  const finalizadasAutoFetchPagesRef = useRef(0)
+  const MAX_AUTO_FETCH_FINALIZADAS = 25
+
   const todasVendas = useMemo(() => {
     return todasVendasCarregadas
   }, [todasVendasCarregadas])
 
   const vendasPorColuna = useMemo(() => {
+    const termoBuscaRaw = String(vendasUnificadasQueryParams.q ?? '')
+    const termoBusca = normalizarTermoBuscaKanban(termoBuscaRaw)
+
     const ordenarColuna = (columnId: string, vendas: Venda[]): Venda[] => {
       const vendasUnicas = new Map<string, Venda>()
       vendas.forEach(venda => {
@@ -104,11 +120,16 @@ export function useKanbanVendasPorColuna({
         }
       })
 
+      let lista = Array.from(vendasUnicas.values())
+      if (termoBusca) {
+        lista = lista.filter(v => vendaAtendeBuscaKanban(v, termoBusca, termoBuscaRaw))
+      }
+
       const colId = columnId as ColunaKanbanId
       const criterio = criterioOrdenacaoPorColuna[colId] ?? ('data' as CriterioOrdenacaoKanban)
       const direcao = direcaoOrdenacaoPorColuna[colId] ?? ('desc' as DirecaoOrdenacaoKanban)
       let ordenadas = ordenarVendasKanbanPorCriterio(
-        Array.from(vendasUnicas.values()),
+        lista,
         criterio,
         direcao,
         v => dataOrdenacaoCardKanban(colId, v, timestampsEtapaEntregaLocal[v.id])
@@ -182,17 +203,33 @@ export function useKanbanVendasPorColuna({
     }
 
     const map: Partial<Record<ColunaKanbanId, Venda[]>> = {}
-    for (const columnId of BALCAO_KANBAN_COLUMN_IDS) {
+    const colunasBalcao =
+      balcaoKanban.colunasAtivas ?? [...BALCAO_KANBAN_COLUMN_IDS]
+
+    for (const columnId of colunasBalcao) {
       const state = balcaoKanban.columnStates[columnId]
       const { items } = flattenVendasUnificadasInfinite(state?.data)
-      // Balcão: API já filtra por colunaKanban — não reclassificar nem refiltrar datas no client.
+      // Paliativo: a API pode devolver a mesma venda em mais de uma coluna.
+      // Reclassifica no client com getEtapaKanban (prefere etapaKanbanBalcao).
       let vendas = items.filter(v => {
         const etapaLocal = etapaLocalPorVendaId[v.id]
         if (etapaLocal && etapaLocal !== columnId) {
           return false
         }
-        return true
+        if (etapaLocal === columnId) {
+          return true
+        }
+        return vendaPertenceColunaBalcaoKanban(v, columnId, getEtapaKanbanParaExibicao)
       })
+
+      for (const venda of todasVendasCarregadas) {
+        if (vendas.some(v => v.id === venda.id)) continue
+        const etapaLocal = etapaLocalPorVendaId[venda.id]
+        if (etapaLocal && etapaLocal !== columnId) continue
+        if (vendaPertenceColunaBalcaoKanban(venda, columnId, getEtapaKanbanParaExibicao)) {
+          vendas = [...vendas, venda]
+        }
+      }
 
       for (const [vendaId, colunaDestino] of Object.entries(etapaLocalPorVendaId)) {
         if (colunaDestino !== columnId) continue
@@ -204,7 +241,9 @@ export function useKanbanVendasPorColuna({
               ? { etapaKanbanBalcao: 'PENDENTE_EMISSAO' as const, solicitarEmissaoFiscal: true }
               : colunaDestino === 'FINALIZADAS'
                 ? { etapaKanbanBalcao: 'FINALIZADAS' as const, solicitarEmissaoFiscal: false }
-                : { etapaKanbanBalcao: colunaDestino }
+                : colunaDestino === 'REJEITADAS'
+                  ? { etapaKanbanBalcao: 'REJEITADAS' as const }
+                  : { etapaKanbanBalcao: colunaDestino as 'COM_NFE' }
           vendas = [...vendas, cloneVendaUnificadaDTO(vendaTransicao, patch)]
         }
       }
@@ -216,6 +255,7 @@ export function useKanbanVendasPorColuna({
     isModoDeliveryKanban,
     deliveryKanban.columnStates,
     balcaoKanban.columnStates,
+    balcaoKanban.colunasAtivas,
     getEtapaKanbanParaExibicao,
     etapaLocalPorVendaId,
     timestampsEtapaEntregaLocal,
@@ -224,6 +264,35 @@ export function useKanbanVendasPorColuna({
     direcaoOrdenacaoPorColuna,
     primeiroPorColuna,
     vendasUnificadasQueryParams,
+  ])
+
+  // A API de FINALIZADAS mistura vendas já EMITIDA; o refiltro client remove essas da 1ª página
+  // e a coluna fica vazia sem scrollbar — o infinite scroll nunca dispara. Prefetch automático
+  // até achar cards da etapa FINALIZADAS (ou esgotar páginas / limite de segurança).
+  useEffect(() => {
+    finalizadasAutoFetchPagesRef.current = 0
+  }, [vendasUnificadasQueryParams, isModoDeliveryKanban])
+
+  useEffect(() => {
+    if (isModoDeliveryKanban) return
+
+    const state = balcaoKanban.columnStates.FINALIZADAS
+    if (!state?.hasNextPage || state.isFetchingNextPage || state.isLoading) return
+
+    const visible = vendasPorColuna.FINALIZADAS?.length ?? 0
+    if (visible > 0) return
+
+    const { items } = flattenVendasUnificadasInfinite(state.data)
+    if (items.length === 0) return
+    if (finalizadasAutoFetchPagesRef.current >= MAX_AUTO_FETCH_FINALIZADAS) return
+
+    finalizadasAutoFetchPagesRef.current += 1
+    balcaoKanban.fetchNextPageForColumn('FINALIZADAS')
+  }, [
+    isModoDeliveryKanban,
+    balcaoKanban.columnStates.FINALIZADAS,
+    balcaoKanban.fetchNextPageForColumn,
+    vendasPorColuna.FINALIZADAS,
   ])
 
   const getColumnTotalCount = useCallback(
@@ -247,6 +316,11 @@ export function useKanbanVendasPorColuna({
       }
 
       const colState = balcaoKanban.columnStates[columnId as keyof typeof balcaoKanban.columnStates]
+      // Preferir `count` da API (mesmo where dos items) enquanto há páginas.
+      // Quando esgotou páginas, usa o tamanho já filtrado da coluna.
+      if (colState && !colState.hasNextPage) {
+        return vendasPorColuna[columnId]?.length ?? 0
+      }
       return typeof colState?.totalCount === 'number' ? colState.totalCount : 0
     },
     [

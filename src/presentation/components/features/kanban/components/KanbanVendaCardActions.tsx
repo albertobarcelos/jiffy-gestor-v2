@@ -192,6 +192,7 @@ export function KanbanVendaCardActions(props: KanbanVendaCardActionsProps) {
       )}
 
       {column.id === 'COM_NFE' &&
+        !acaoFiscalEmAndamentoPorVenda[venda.id] &&
         venda.documentoFiscalId &&
         (venda.statusFiscal === 'EMITIDA' || venda.statusFiscal === 'CANCELADA') && (
           <Button

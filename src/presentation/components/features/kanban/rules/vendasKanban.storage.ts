@@ -1,7 +1,16 @@
 import type { ModoKanbanVendas } from '../KanbanModoVendasToggle'
+import type { ColunaKanbanFiltroExtra } from '../types'
 
 export const KANBAN_PRIMEIRO_POR_COLUNA_KEY = 'jiffy-gestor-v2:kanban-primeiro-por-coluna'
 export const KANBAN_MODO_VENDAS_STORAGE_KEY = 'jiffy-gestor-v2:kanban-modo-vendas'
+export const KANBAN_FILTRO_COLUNA_STORAGE_KEY = 'jiffy-gestor-v2:kanban-filtro-coluna'
+
+const FILTROS_COLUNA_VALIDOS: readonly ColunaKanbanFiltroExtra[] = [
+  '',
+  'PENDENTE_EMISSAO',
+  'REJEITADAS',
+  'TODAS',
+]
 
 export function lerModoKanbanVendasDoStorage(): ModoKanbanVendas {
   if (typeof window === 'undefined') return 'delivery'
@@ -12,6 +21,28 @@ export function lerModoKanbanVendasDoStorage(): ModoKanbanVendas {
     /* storage indisponível */
   }
   return 'delivery'
+}
+
+/** Preferência do filtro Emitidas/Pendentes/Rejeitadas/Todas (default: TODAS). */
+export function lerFiltroColunaKanbanDoStorage(): ColunaKanbanFiltroExtra {
+  if (typeof window === 'undefined') return 'TODAS'
+  try {
+    const raw = localStorage.getItem(KANBAN_FILTRO_COLUNA_STORAGE_KEY)
+    if (raw != null && (FILTROS_COLUNA_VALIDOS as readonly string[]).includes(raw)) {
+      return raw as ColunaKanbanFiltroExtra
+    }
+  } catch {
+    /* storage indisponível */
+  }
+  return 'TODAS'
+}
+
+export function gravarFiltroColunaKanbanNoStorage(filtro: ColunaKanbanFiltroExtra) {
+  try {
+    window.localStorage.setItem(KANBAN_FILTRO_COLUNA_STORAGE_KEY, filtro)
+  } catch {
+    /* quota, modo privado, etc. */
+  }
 }
 
 /** Lê mapa colunaId → vendaId que deve aparecer primeiro (localStorage). */

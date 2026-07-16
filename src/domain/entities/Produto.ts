@@ -340,6 +340,44 @@ export class Produto {
     return this.unidadeMedida
   }
 
+  /** Retorna cópia com campos fiscais atualizados (edição inline / lote). */
+  withDadosFiscais(partial: {
+    ncm?: string
+    cest?: string
+    origemMercadoria?: string
+    tipoProduto?: string
+    indicadorProducaoEscala?: string | null
+  }): Produto {
+    return Produto.fromJSON({
+      ...this.toJSON(),
+      ncm: partial.ncm !== undefined ? partial.ncm : this.ncm,
+      cest: partial.cest !== undefined ? partial.cest : this.cest,
+      origemMercadoria:
+        partial.origemMercadoria !== undefined
+          ? partial.origemMercadoria
+          : this.origemMercadoria,
+      tipoProduto: partial.tipoProduto !== undefined ? partial.tipoProduto : this.tipoProduto,
+      indicadorProducaoEscala:
+        partial.indicadorProducaoEscala !== undefined
+          ? partial.indicadorProducaoEscala
+          : this.indicadorProducaoEscala,
+      fiscal: {
+        ncm: partial.ncm !== undefined ? partial.ncm : this.ncm,
+        cest: partial.cest !== undefined ? partial.cest : this.cest,
+        origemMercadoria:
+          partial.origemMercadoria !== undefined
+            ? partial.origemMercadoria
+            : this.origemMercadoria,
+        tipoProduto:
+          partial.tipoProduto !== undefined ? partial.tipoProduto : this.tipoProduto,
+        indicadorProducaoEscala:
+          partial.indicadorProducaoEscala !== undefined
+            ? partial.indicadorProducaoEscala
+            : this.indicadorProducaoEscala,
+      },
+    })
+  }
+
   toJSON() {
     return {
       id: this.id,

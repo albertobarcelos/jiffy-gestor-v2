@@ -14,6 +14,9 @@ interface ProdutosFiltersProps {
   filterStatus: StatusFilter
   onFilterStatusChange: (v: StatusFilter) => void
 
+  statusGrupoFilter: StatusFilter
+  onStatusGrupoChange: (v: StatusFilter) => void
+
   ativoLocalFilter: TriState
   onAtivoLocalChange: (v: TriState) => void
 
@@ -39,6 +42,8 @@ export function ProdutosFilters({
   onToggleFiltros,
   filterStatus,
   onFilterStatusChange,
+  statusGrupoFilter,
+  onStatusGrupoChange,
   ativoLocalFilter,
   onAtivoLocalChange,
   ativoDeliveryFilter,
@@ -79,6 +84,19 @@ export function ProdutosFilters({
           <select
             value={filterStatus}
             onChange={(e) => onFilterStatusChange(e.target.value as StatusFilter)}
+            className={selectClass}
+          >
+            <option value="Todos">Todos</option>
+            <option value="Ativo">Ativo</option>
+            <option value="Desativado">Desativado</option>
+          </select>
+        </div>
+
+        <div className="w-full sm:w-[160px]">
+          <label className="text-xs font-semibold text-secondary-text mb-1 block">Status grupo</label>
+          <select
+            value={statusGrupoFilter}
+            onChange={(e) => onStatusGrupoChange(e.target.value as StatusFilter)}
             className={selectClass}
           >
             <option value="Todos">Todos</option>

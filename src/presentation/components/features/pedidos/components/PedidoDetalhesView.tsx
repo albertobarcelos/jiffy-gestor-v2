@@ -85,6 +85,8 @@ export function PedidoDetalhesView() {
                   <PedidoDetalhesNotaFiscal
                     role="tabpanel"
                     aria-labelledby="tab-detalhes-nota-fiscal"
+                    documentoFiscalId={resumoFiscal?.documentoFiscalId}
+                    statusFiscal={resumoFiscal?.status ?? statusFiscalUnificado}
                   >
                     <div className="flex flex-col gap-3 rounded-lg border-2 border-primary/20 bg-gray-50/90 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                       <h3 className="font-nunito text-lg font-semibold text-primary">

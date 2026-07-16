@@ -10,7 +10,6 @@ import {
 import type { FluxoPagamentoEntrega } from '@/src/domain/types/vendaDetalhe'
 import type { ContextoEntregaDeliveryApi } from '@/src/application/dto/api/pedidoDeliveryApi'
 import { derivarFluxoPagamentoEntregaDeliverySummary } from '@/src/application/mappers/DeliveryFluxoPagamentoMapper'
-import { fiscalPendentePodeReemitirAposCooldown } from '@/src/domain/services/pedido/RegrasFiscaisVenda'
 
 /** Cobrança resumida da listagem delivery (Kanban). */
 export type CobrancaKanbanDeliveryResumo = {
@@ -272,13 +271,24 @@ function extrairStatusFinanceiro(item: Record<string, unknown>): string | null {
 }
 
 /** Coluna do Kanban balcão resolvida no backend (`GET /vendas/unificado`). */
-export type EtapaKanbanBalcao = 'FINALIZADAS' | 'PENDENTE_EMISSAO' | 'COM_NFE'
+export type EtapaKanbanBalcao =
+  | 'FINALIZADAS'
+  | 'PENDENTE_EMISSAO'
+  | 'COM_NFE'
+  | 'REJEITADAS'
 
 function extrairEtapaKanbanBalcao(item: Record<string, unknown>): EtapaKanbanBalcao | null {
   const raw = item.etapaKanbanBalcao ?? item.etapa_kanban_balcao
   if (raw == null || String(raw).trim() === '') return null
   const s = String(raw).trim().toUpperCase()
-  if (s === 'FINALIZADAS' || s === 'PENDENTE_EMISSAO' || s === 'COM_NFE') return s
+  if (
+    s === 'FINALIZADAS' ||
+    s === 'PENDENTE_EMISSAO' ||
+    s === 'COM_NFE' ||
+    s === 'REJEITADAS'
+  ) {
+    return s
+  }
   return null
 }
 
@@ -291,6 +301,24 @@ function normalizarOrigemUnificado(raw: unknown): VendaUnificadaDTO['origem'] {
   if (s === 'DELIVERY' || s === 'DELIVERY_IFOOD') return 'DELIVERY_IFOOD'
   if (s === 'DELIVERY_UBER') return 'DELIVERY_UBER'
   return 'GESTOR'
+}
+
+/** Resolve tabelaOrigem do unificado; se ausente/ambíguo, deriva da origem. */
+function normalizarTabelaOrigemUnificado(
+  item: Record<string, unknown>
+): VendaUnificadaDTO['tabelaOrigem'] {
+  const raw = String(item.tabelaOrigem ?? item.tabela_origem ?? '')
+    .trim()
+    .toLowerCase()
+  if (raw === 'venda' || raw === 'pdv' || raw === 'operacao_pdv' || raw === 'operacao-pdv') {
+    return 'venda'
+  }
+  if (raw === 'venda_gestor' || raw === 'gestor' || raw === 'venda-gestor') {
+    return 'venda_gestor'
+  }
+
+  const origem = normalizarOrigemUnificado(item.origem)
+  return origem === 'PDV' ? 'venda' : 'venda_gestor'
 }
 
 function extrairAbertoPor(item: Record<string, unknown>): VendaUnificadaDTO['abertoPor'] {
@@ -340,8 +368,10 @@ export class VendaUnificadaDTO {
       | 'CONTINGENCIA'
       | 'EMITIDA'
       | 'REJEITADA'
+      | 'DENEGADA'
       | 'CANCELADA'
       | 'INUTILIZADA'
+      | 'UNKNOWN'
       | null,
     public readonly documentoFiscalId: string | null,
     public readonly abertoPor: {
@@ -478,41 +508,28 @@ export class VendaUnificadaDTO {
   }
 
   getEtapaKanban(): string {
-    if (this.etapaKanbanBalcao) return this.etapaKanbanBalcao
-    if (this.temNFeEmitida()) return 'COM_NFE'
-    // Nota inutilizada: coluna "Com Nota Solicitada" — sem botão de ação
-    if (this.statusFiscal === 'INUTILIZADA') return 'COM_NFE'
-    // Rejeitada: coluna "Pendente Emissão Fiscal" para reenvio/reemissão (botão vira "Reemitir NFe/NFCe")
-    if (this.statusFiscal === 'REJEITADA') return 'PENDENTE_EMISSAO'
-    if (
-      (this.statusFiscal === 'PENDENTE' || this.statusFiscal === 'PENDENTE_AUTORIZACAO') &&
-      fiscalPendentePodeReemitirAposCooldown({
-        statusFiscal: this.statusFiscal,
-        retornoSefaz: this.retornoSefaz,
-        documentoFiscalId: this.documentoFiscalId,
-        numeroFiscal: this.numeroFiscal,
-        dataUltimaModificacao: this.dataUltimaModificacao,
-        dataEmissaoFiscal: this.dataEmissaoFiscal,
-        dataFinalizacao: this.dataFinalizacao,
-        dataCriacao: this.dataCriacao,
-      })
-    ) {
-      return 'PENDENTE_EMISSAO'
-    }
-    // Aguardando retorno da SEFAZ (badge "Aguardando SEFAZ...") — só em "Com Nota Solicitada"
-    if (this.statusFiscal === 'PENDENTE' || this.statusFiscal === 'PENDENTE_AUTORIZACAO') {
-      return 'COM_NFE'
-    }
-    // Delivery operacional: status da logística tem prioridade sobre pendência fiscal.
-    // Pedido ativo (PENDENTE/EM_PREPARO/PRONTO/EM_ROTA) nunca deve cair em PENDENTE_EMISSAO
-    // só porque solicitarEmissaoFiscal=true; isso jogaria o card em "Finalizadas" no modo delivery.
+    // Delivery operacional: logística tem prioridade sobre buckets fiscais do balcão.
     if (this.isPedidoEntregaGestor()) {
       const colunaOp = this.resolverEtapaKanbanOperacionalEntrega()
       if (colunaOp !== null) return colunaOp
-      // colunaOp === null → FINALIZADO/ENTREGUE → aplica regras fiscais abaixo
     }
 
-    if (this.isPendenteEmissao()) return 'PENDENTE_EMISSAO'
+    // Source of truth do backend quando presente (inclui REJEITADAS / EMITINDO→COM_NFE).
+    if (this.etapaKanbanBalcao) return this.etapaKanbanBalcao
+
+    // Fallback client-side (espelha regras do backend) quando etapaKanbanBalcao é null.
+    const sf = String(this.statusFiscal ?? '')
+      .trim()
+      .toUpperCase()
+
+    if (sf === 'REJEITADA' || sf === 'DENEGADA') return 'REJEITADAS'
+
+    if (sf && sf !== 'PENDENTE_EMISSAO') {
+      // Qualquer statusFiscal não nulo e não rejeitado → COM_NFE (EMITINDO, PENDENTE, EMITIDA…).
+      return 'COM_NFE'
+    }
+
+    if (this.isPendenteEmissao() || sf === 'PENDENTE_EMISSAO') return 'PENDENTE_EMISSAO'
 
     const statusOp = String(this.statusEtapaOperacional ?? '')
       .trim()
@@ -604,7 +621,7 @@ export function mapItemJsonParaVendaUnificadaDTO(v: Record<string, unknown>): Ve
     String(v.codigoVenda ?? ''),
     (v.tipoVenda as string | null) ?? null,
     normalizarOrigemUnificado(v.origem),
-    (v.tabelaOrigem as VendaUnificadaDTO['tabelaOrigem']) ?? 'venda_gestor',
+    normalizarTabelaOrigemUnificado(v),
     (v.valorFinal as number) ?? 0,
     (v.totalDesconto as number) ?? 0,
     (v.totalAcrescimo as number) ?? 0,
@@ -688,7 +705,10 @@ export function montarSearchParamsVendasUnificadas(
     searchParams.append('dataFinalizacaoInicio', params.dataFinalizacaoInicio)
   if (params.dataFinalizacaoFim)
     searchParams.append('dataFinalizacaoFim', params.dataFinalizacaoFim)
-  if (params.q?.trim()) searchParams.append('q', params.q.trim())
+  if (params.q?.trim()) {
+    const q = params.q.trim().replace(/^#+/, '').trim()
+    if (q) searchParams.append('q', q)
+  }
   searchParams.append('offset', String(offset))
   searchParams.append('limit', String(limit))
   return searchParams

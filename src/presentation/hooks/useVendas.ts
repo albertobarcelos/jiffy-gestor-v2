@@ -6,7 +6,7 @@ import { showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
 import { useCallback, useRef } from 'react'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
-import { invalidateKanbanVendasListagens, refetchKanbanVendasListagens } from '@/features/kanban/hooks/kanbanListagemQueryCache'
+import { invalidateKanbanVendasListagens } from '@/features/kanban/hooks/kanbanListagemQueryCache'
 import { moveVendaKanbanBalcaoEntreColunas } from '@/features/kanban/utils/kanbanVendaCacheUpdate'
 import type { AcaoTransicaoKanbanEntrega } from '@/src/application/dto/TransicaoKanbanDTO'
 import type { TransicaoPedidoDeliveryApiRequest } from '@/src/application/dto/api/pedidoDeliveryApi'
@@ -623,27 +623,42 @@ export function useMarcarEmissaoFiscal() {
       /** Atualiza caches por coluna do Kanban balcão sem refetch das 3 listagens. */
       kanbanContext?: boolean
     }) => {
-      const url =
+      const urls =
         params.tabelaOrigem === 'venda_gestor'
-          ? `/api/vendas/gestor/${params.id}`
-          : `/api/vendas/${params.id}`
+          ? [`/api/vendas/gestor/${params.id}`]
+          : params.tabelaOrigem === 'venda'
+            ? [`/api/vendas/${params.id}`, `/api/vendas/gestor/${params.id}`]
+            : [`/api/vendas/gestor/${params.id}`, `/api/vendas/${params.id}`]
 
-      const response = await fetchGestorApi(url, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ solicitarEmissaoFiscal: true }),
-      })
+      let lastError: Error | null = null
+      for (const url of urls) {
+        const response = await fetchGestorApi(url, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ solicitarEmissaoFiscal: true }),
+        })
 
-      if (!response.ok) {
+        if (response.ok) {
+          return await response.json()
+        }
+
         const errorData = await response.json().catch(() => ({}))
         const errorMessage = resolveDomainErrorMessage(
           errorData,
           `Erro ${response.status}: ${response.statusText}`
         )
-        throw new Error(errorMessage)
+        lastError = new Error(errorMessage)
+
+        const msg = errorMessage.toLowerCase()
+        const naoEncontrada =
+          response.status === 404 ||
+          msg.includes('buscar venda por id') ||
+          msg.includes('não encontr') ||
+          msg.includes('nao encontr')
+        if (!naoEncontrada || urls.length === 1) break
       }
 
-      return await response.json()
+      throw lastError ?? new Error('Erro ao marcar emissão fiscal')
     },
     {
       onSuccess: (_, params) => {
@@ -687,27 +702,42 @@ export function useDesmarcarEmissaoFiscal() {
       tabelaOrigem?: 'venda' | 'venda_gestor'
       kanbanContext?: boolean
     }) => {
-      const url =
+      const urls =
         params.tabelaOrigem === 'venda_gestor'
-          ? `/api/vendas/gestor/${params.id}`
-          : `/api/vendas/${params.id}`
+          ? [`/api/vendas/gestor/${params.id}`]
+          : params.tabelaOrigem === 'venda'
+            ? [`/api/vendas/${params.id}`, `/api/vendas/gestor/${params.id}`]
+            : [`/api/vendas/gestor/${params.id}`, `/api/vendas/${params.id}`]
 
-      const response = await fetchGestorApi(url, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ solicitarEmissaoFiscal: false }),
-      })
+      let lastError: Error | null = null
+      for (const url of urls) {
+        const response = await fetchGestorApi(url, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ solicitarEmissaoFiscal: false }),
+        })
 
-      if (!response.ok) {
+        if (response.ok) {
+          return await response.json()
+        }
+
         const errorData = await response.json().catch(() => ({}))
         const errorMessage = resolveDomainErrorMessage(
           errorData,
           `Erro ${response.status}: ${response.statusText}`
         )
-        throw new Error(errorMessage)
+        lastError = new Error(errorMessage)
+
+        const msg = errorMessage.toLowerCase()
+        const naoEncontrada =
+          response.status === 404 ||
+          msg.includes('buscar venda por id') ||
+          msg.includes('não encontr') ||
+          msg.includes('nao encontr')
+        if (!naoEncontrada || urls.length === 1) break
       }
 
-      return await response.json()
+      throw lastError ?? new Error('Erro ao desmarcar emissão fiscal')
     },
     {
       onSuccess: (_, params) => {
@@ -860,7 +890,7 @@ export function useEmitirNfe() {
     {
       onSuccess: (data, variables) => {
         queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'] })
-        invalidateKanbanVendasListagens(queryClient)
+        invalidateKanbanVendasListagens(queryClient, { refetchType: 'none' })
         queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'venda', variables.id] })
 
         if (data?.status === 'EMITIDA') {
@@ -940,7 +970,7 @@ export function useEmitirNfeGestor() {
     {
       onSuccess: (data, variables) => {
         queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'] })
-        invalidateKanbanVendasListagens(queryClient)
+        invalidateKanbanVendasListagens(queryClient, { refetchType: 'none' })
         queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'venda-gestor', variables.id] })
 
         if (data.status === 'REJEITADA') {
@@ -973,7 +1003,7 @@ export function useEmitirNfeDelivery() {
     {
       onSuccess: (data, variables) => {
         queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'] })
-        invalidateKanbanVendasListagens(queryClient)
+        invalidateKanbanVendasListagens(queryClient, { refetchType: 'none' })
         queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'venda-gestor', variables.id] })
 
         const status = data?.status != null ? String(data.status) : ''
@@ -1060,10 +1090,9 @@ export function useReemitirNfe() {
     {
       onSuccess: async (data, variables) => {
         queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'] })
-        invalidateKanbanVendasListagens(queryClient)
+        // Kanban atualiza o card via patch/move — evita refetch das 3 colunas.
+        invalidateKanbanVendasListagens(queryClient, { refetchType: 'none' })
         queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'venda', variables.id] })
-
-        await refetchKanbanVendasListagens(queryClient)
 
         if (data?.status === 'REJEITADA') {
           const motivo =
@@ -1120,10 +1149,8 @@ export function useReemitirNfeGestor() {
     {
       onSuccess: async (data, variables) => {
         queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'] })
-        invalidateKanbanVendasListagens(queryClient)
+        invalidateKanbanVendasListagens(queryClient, { refetchType: 'none' })
         queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'venda-gestor', variables.id] })
-
-        await refetchKanbanVendasListagens(queryClient)
 
         if (data?.status === 'REJEITADA') {
           const motivo =

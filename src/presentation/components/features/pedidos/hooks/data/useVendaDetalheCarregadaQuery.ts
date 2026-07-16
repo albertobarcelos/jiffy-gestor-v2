@@ -77,6 +77,93 @@ export function patchVendaDetalheObservacaoPedidoCache(
   )
 }
 
+export type VendaDetalheResumoFiscalPatch = {
+  statusFiscal?: string | null
+  documentoFiscalId?: string | null
+  numeroFiscal?: number | null
+  serieFiscal?: number | string | null
+  dataEmissaoFiscal?: string | null
+  modelo?: number | null
+  retornoSefaz?: string | null
+}
+
+function temCampoFiscalNoPatch(patch: VendaDetalheResumoFiscalPatch): boolean {
+  return (
+    patch.statusFiscal !== undefined ||
+    patch.documentoFiscalId !== undefined ||
+    patch.numeroFiscal !== undefined ||
+    patch.serieFiscal !== undefined ||
+    patch.dataEmissaoFiscal !== undefined ||
+    patch.modelo !== undefined ||
+    patch.retornoSefaz !== undefined
+  )
+}
+
+/**
+ * Atualiza resumoFiscal/statusFiscal no cache do detalhe (aba Fiscal do modal)
+ * após emitir/reemitir no Kanban — sem esperar invalidate/refetch.
+ */
+export function patchVendaDetalheResumoFiscalCache(
+  queryClient: QueryClient,
+  vendaId: string,
+  patch: VendaDetalheResumoFiscalPatch,
+  empresaId?: string | null
+) {
+  if (!temCampoFiscalNoPatch(patch)) return
+
+  const filter =
+    empresaId != null && empresaId !== ''
+      ? { queryKey: ['tenant', empresaId, 'venda-detalhe-carregada', vendaId] as const }
+      : {
+          predicate: (query: { queryKey: readonly unknown[] }) => {
+            const key = query.queryKey
+            return (
+              Array.isArray(key) &&
+              key[0] === 'tenant' &&
+              key[2] === 'venda-detalhe-carregada' &&
+              key[3] === vendaId
+            )
+          },
+        }
+
+  queryClient.setQueriesData<VendaDetalheCarregadaDTO>(filter, atual => {
+    if (!atual) return atual
+
+    const base = atual.resumoFiscal ?? {}
+    const serie =
+      patch.serieFiscal !== undefined
+        ? patch.serieFiscal == null || String(patch.serieFiscal).trim() === ''
+          ? null
+          : String(patch.serieFiscal).trim()
+        : (base.serie ?? null)
+
+    return {
+      ...atual,
+      statusFiscal:
+        patch.statusFiscal !== undefined ? patch.statusFiscal : atual.statusFiscal,
+      resumoFiscal: {
+        ...base,
+        status:
+          patch.statusFiscal !== undefined ? patch.statusFiscal : (base.status ?? null),
+        retornoSefaz:
+          patch.retornoSefaz !== undefined ? patch.retornoSefaz : (base.retornoSefaz ?? null),
+        documentoFiscalId:
+          patch.documentoFiscalId !== undefined
+            ? patch.documentoFiscalId
+            : (base.documentoFiscalId ?? null),
+        numero:
+          patch.numeroFiscal !== undefined ? patch.numeroFiscal : (base.numero ?? null),
+        serie,
+        dataEmissao:
+          patch.dataEmissaoFiscal !== undefined
+            ? patch.dataEmissaoFiscal
+            : (base.dataEmissao ?? null),
+        modelo: patch.modelo !== undefined ? patch.modelo : (base.modelo ?? null),
+      },
+    }
+  })
+}
+
 const useCase = new CarregarVendaDetalheUseCase()
 
 export function useVendaDetalheCarregadaQuery({

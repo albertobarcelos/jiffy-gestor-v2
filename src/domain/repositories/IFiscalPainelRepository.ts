@@ -13,7 +13,11 @@ import type {
   AtualizarEmpresaDTO,
   SalvarFiscalDTO,
   ExportacaoXmlDTO,
-  ExportacaoXmlResumoDTO,
+  ExportacaoXmlIniciadaDTO,
+  ExportacaoXmlStatusDTO,
+  PaginaExportacaoHistoricoDTO,
+  AgendamentoExportacaoXmlDTO,
+  AgendamentoExportacaoXmlResponseDTO,
 } from '@/src/application/dto/painel-contador/PainelContadorDTO'
 
 export interface CertificadoApiResult {
@@ -87,7 +91,13 @@ export interface IFiscalPainelRepository {
   validarCidade(cidade: string, uf: string): Promise<boolean>
   listarReformaTributaria(): Promise<ReformaTributariaItem[]>
   salvarReformaTributaria(ncm: string, input: { cst: string; codigoClassificacaoFiscal: string }): Promise<void>
-  exportarXmls(
-    input: ExportacaoXmlDTO
-  ): Promise<{ blob: Blob; filename: string } | ExportacaoXmlResumoDTO>
+  iniciarExportacaoXmls(input: ExportacaoXmlDTO): Promise<ExportacaoXmlIniciadaDTO>
+  consultarStatusExportacaoXml(exportacaoId: string): Promise<ExportacaoXmlStatusDTO>
+  obterUrlDownloadExportacaoXml(exportacaoId: string): Promise<{ url: string }>
+  listarHistoricoExportacaoXml(page: number, size: number): Promise<PaginaExportacaoHistoricoDTO>
+  buscarAgendamentoExportacaoXml(): Promise<AgendamentoExportacaoXmlResponseDTO | null>
+  salvarAgendamentoExportacaoXml(
+    input: AgendamentoExportacaoXmlDTO
+  ): Promise<AgendamentoExportacaoXmlResponseDTO>
+  desativarAgendamentoExportacaoXml(): Promise<void>
 }
