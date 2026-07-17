@@ -9,6 +9,8 @@ import { resolveDesignPaletteColors } from '../constants/colorPalettes'
 type GrupoCategoriaVisualSource = {
   id: string
   iconName?: string | null
+  /** Cor hex do grupo; quando presente, prevalece sobre a cor primária do tema. */
+  cor?: string | null
   imagemUrl?: string | null
 }
 
@@ -58,23 +60,35 @@ function shouldUseGrupoImagem(
   return config.categorias.usarImagensGrupo && Boolean(grupo.imagemUrl?.trim())
 }
 
-function resolveIconPresentation(config: DeliveryPublicoDesignConfig): {
+function resolveAccentColor(
+  config: DeliveryPublicoDesignConfig,
+  grupo: GrupoCategoriaVisualSource
+): string {
+  const grupoCor = grupo.cor?.trim()
+  if (grupoCor) return grupoCor
+  return resolveDesignPaletteColors(config).primary
+}
+
+function resolveIconPresentation(
+  config: DeliveryPublicoDesignConfig,
+  grupo: GrupoCategoriaVisualSource
+): {
   backgroundColor: string
   border: string | undefined
   iconColor: string
 } {
-  const primaryColor = resolveDesignPaletteColors(config).primary
+  const accentColor = resolveAccentColor(config, grupo)
 
   if (config.categorias.estiloIcone === 'linha') {
     return {
       backgroundColor: 'transparent',
-      border: `2px solid ${primaryColor}`,
-      iconColor: primaryColor,
+      border: `2px solid ${accentColor}`,
+      iconColor: accentColor,
     }
   }
 
   return {
-    backgroundColor: primaryColor,
+    backgroundColor: accentColor,
     border: undefined,
     iconColor: '#FFFFFF',
   }
@@ -94,14 +108,14 @@ export function DeliveryGrupoCategoriaVisual({
     : undefined
   const iconName = resolveIconName(config, grupo)
   const displayIconName = resolveMdiIconNameForStyle(iconName, config.categorias.estiloIcone)
-  const { backgroundColor, border, iconColor } = resolveIconPresentation(config)
-  const primaryColor = resolveDesignPaletteColors(config).primary
+  const { backgroundColor, border, iconColor } = resolveIconPresentation(config, grupo)
+  const accentColor = resolveAccentColor(config, grupo)
 
   if (shouldUseGrupoImagem(config, grupo)) {
     return (
       <div
         className={cn('box-border shrink-0 overflow-hidden rounded-full', sizeClass, className)}
-        style={{ border: `1px solid ${primaryColor}`, ...diameterStyle }}
+        style={{ border: `1px solid ${accentColor}`, ...diameterStyle }}
       >
         <img
           src={grupo.imagemUrl!}

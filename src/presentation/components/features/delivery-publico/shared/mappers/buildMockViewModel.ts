@@ -59,6 +59,7 @@ export function buildPreviewViewModelFromGrupos(
     id: grupo.id,
     nome: grupo.nome,
     iconName: grupo.iconName,
+    cor: grupo.cor,
     imagemUrl: grupo.imagemUrl?.trim() || null,
     produtos: [previewProdutoExemplo(grupo.id)],
   }))

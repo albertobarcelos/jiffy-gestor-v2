@@ -12,6 +12,8 @@ export type DeliveryPublicoGrupoViewModel = {
   nome: string
   /** Ícone padrão do grupo no ERP (fallback quando não há override no design). */
   iconName?: string | null
+  /** Cor hex do ícone do grupo (catálogo público). */
+  cor?: string | null
   imagemUrl?: string | null
   produtos: DeliveryPublicoProdutoViewModel[]
 }

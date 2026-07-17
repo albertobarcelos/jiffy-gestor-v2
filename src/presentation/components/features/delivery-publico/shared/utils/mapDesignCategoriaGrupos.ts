@@ -16,6 +16,7 @@ export function mapGruposProdutoToDesignCategorias(
       id: grupo.getId(),
       nome: grupo.getNome(),
       iconName: grupo.getIconName() || 'restaurant',
+      cor: grupo.getCorHex() || '#CCCCCC',
       imagemUrl: grupo.getImagemUrl()?.trim() || null,
     }))
 }

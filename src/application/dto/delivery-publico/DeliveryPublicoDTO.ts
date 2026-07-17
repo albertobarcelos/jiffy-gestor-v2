@@ -37,6 +37,10 @@ export type CatalogoPublicoGrupoProdutoDTO = {
   id: string
   nome: string
   imagemUrl: string | null
+  /** Cor hex pré-definida do grupo (ex.: `#FF5722`). */
+  cor: string
+  /** Nome do ícone Material Design do grupo. */
+  icone: string
   ordem: number
   produtos: CatalogoPublicoProdutoDTO[]
 }
