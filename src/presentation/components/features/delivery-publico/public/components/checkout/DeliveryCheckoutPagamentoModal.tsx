@@ -20,6 +20,8 @@ type DeliveryCheckoutPagamentoModalProps = {
   onChangeMeioPagamentoId: (value: string) => void
   onChangeTrocoPara: (value: number | null) => void
   onClose: () => void
+  /** Voltar do passo (default = onClose). */
+  onBack?: () => void
   onContinuar: () => void
 }
 
@@ -32,6 +34,7 @@ export function DeliveryCheckoutPagamentoModal({
   onChangeMeioPagamentoId,
   onChangeTrocoPara,
   onClose,
+  onBack,
   onContinuar,
 }: DeliveryCheckoutPagamentoModalProps) {
   const meioSelecionado = useMemo(
@@ -87,7 +90,7 @@ export function DeliveryCheckoutPagamentoModal({
       title="Pagamento"
       onClose={onClose}
       showBack
-      onBack={onClose}
+      onBack={onBack ?? onClose}
       footer={
         <button
           type="button"

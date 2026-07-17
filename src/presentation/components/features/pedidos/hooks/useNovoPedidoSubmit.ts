@@ -128,6 +128,8 @@ export function useNovoPedidoSubmit({
       clienteEntregaVinculadoId: input.clienteEntregaVinculado?.id,
       pedidoComEntrega: validacao.pedidoComEntrega,
       temEnderecoEntrega: validacao.temEnderecoEntrega,
+      modoTempo: input.modoTempo,
+      slotInicio: input.slotInicio,
       pedidoGestorComPagamentoNoPasso3: validacao.pedidoGestorComPagamentoNoPasso3,
       pedidoEntregaAceitaPagamentoPendente: validacao.pedidoEntregaAceitaPagamentoPendente,
       pagamentosCount: input.pagamentos.length,

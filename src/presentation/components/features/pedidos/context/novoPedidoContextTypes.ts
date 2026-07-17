@@ -185,6 +185,14 @@ export interface NovoPedidoEntregaSlice {
   setTelefoneBuscadoEntrega: Dispatch<SetStateAction<string | null>>
   tempoPrevistoMinutos: number
   setTempoPrevistoMinutos: Dispatch<SetStateAction<number>>
+  modoTempo: 'imediato' | 'agendado'
+  setModoTempo: Dispatch<SetStateAction<'imediato' | 'agendado'>>
+  slotInicio: string
+  setSlotInicio: Dispatch<SetStateAction<string>>
+  slotFim: string
+  setSlotFim: Dispatch<SetStateAction<string>>
+  slotLabel: string
+  setSlotLabel: Dispatch<SetStateAction<string>>
   taxaEntregaId: string
   setTaxaEntregaId: Dispatch<SetStateAction<string>>
   taxaEntregaSelecionada: Taxa | null

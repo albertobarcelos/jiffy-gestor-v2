@@ -132,6 +132,11 @@ export interface CriarPedidoDeliveryApiRequest {
   produtos: ProdutoPedidoDeliveryApi[]
   tipoVenda?: string
   entregadorId?: string | null
+  /** `imediato` | `agendado` — omitido = imediato (compat). */
+  modoTempo?: 'imediato' | 'agendado'
+  /** ISO datetime — obrigatório se `modoTempo === 'agendado'`. */
+  slotInicio?: string
+  slotFim?: string
   tempoTotalEstimadoSegundos?: number | null
   observacoes?: string[]
   cobrancas?: CobrancaPedidoDeliveryApi[]

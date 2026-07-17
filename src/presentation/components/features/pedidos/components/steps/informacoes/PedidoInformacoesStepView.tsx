@@ -1,17 +1,16 @@
 'use client'
 
+import { useCallback } from 'react'
 import { Label } from '@/src/presentation/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/presentation/components/ui/select'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
-import { MdAccessTime, MdAttachMoney, MdPersonOutline, MdStore } from 'react-icons/md'
+import { MdAttachMoney, MdPersonOutline, MdStore } from 'react-icons/md'
 import { EntregaClienteSelector } from '@/src/presentation/components/features/delivery/components/EntregaClienteSelector'
 import { PedidoInformacoesStep } from '../../PedidoInformacoesStep'
-import {
-  SEM_TAXA_ENTREGA_VALUE,
-  TEMPOS_PREVISTOS_ENTREGA,
-} from '@/src/shared/constants/pedidoForm'
+import { SEM_TAXA_ENTREGA_VALUE } from '@/src/shared/constants/pedidoForm'
 import { useNovoPedidoFormContext } from '../../../context/NovoPedidoFormContext'
 import { useNovoPedidoUIContext } from '../../../context/NovoPedidoUIContext'
+import { PedidoQuandoDeliveryField } from './PedidoQuandoDeliveryField'
 
 export function PedidoInformacoesStepView() {
   const {
@@ -30,13 +29,36 @@ export function PedidoInformacoesStepView() {
     setTelefoneBuscadoEntrega,
     tempoPrevistoMinutos,
     setTempoPrevistoMinutos,
+    modoTempo,
+    setModoTempo,
+    slotInicio,
+    setSlotInicio,
+    setSlotFim,
+    setSlotLabel,
     taxaEntregaId,
     setTaxaEntregaId,
     taxasEntrega,
     taxasEntregaQuery,
   } = useNovoPedidoFormContext()
 
+  const tipoAtendimentoDelivery = pedidoComRetirada ? 'retirada' : 'entrega'
+
   const { empresa, setSeletorClienteOpen } = useNovoPedidoUIContext()
+
+  const handleChangeSlot = useCallback(
+    (slot: { inicio: string; fim: string; label: string } | null) => {
+      if (!slot) {
+        setSlotInicio('')
+        setSlotFim('')
+        setSlotLabel('')
+        return
+      }
+      setSlotInicio(slot.inicio)
+      setSlotFim(slot.fim)
+      setSlotLabel(slot.label)
+    },
+    [setSlotInicio, setSlotFim, setSlotLabel]
+  )
 
   return (
     <PedidoInformacoesStep>
@@ -108,61 +130,54 @@ export function PedidoInformacoesStepView() {
             necessários.
           </div>
         ) : null}
-        {pedidoComEntrega && (
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            <div className="rounded-lg border border-primary/15 bg-white p-3">
-              <div className="mb-2 flex items-center gap-2">
-                <MdAccessTime className="h-5 w-5 text-primary" />
-                <Label className="text-sm font-semibold text-primary-text">Tempo previsto</Label>
-              </div>
-              <Select
-                value={String(tempoPrevistoMinutos)}
-                onValueChange={value => setTempoPrevistoMinutos(Number(value) || 30)}
-              >
-                <SelectTrigger className="border-primary/30 bg-white">
-                  <SelectValue placeholder="Selecione o tempo" />
-                </SelectTrigger>
-                <SelectContent>
-                  {TEMPOS_PREVISTOS_ENTREGA.map(minutos => (
-                    <SelectItem key={minutos} value={String(minutos)}>
-                      {minutos} minutos
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
 
-            <div className="rounded-lg border border-primary/15 bg-white p-3">
-              <div className="mb-2 flex items-center gap-2">
-                <MdAttachMoney className="h-5 w-5 text-primary" />
-                <Label className="text-sm font-semibold text-primary-text">Taxa de entrega</Label>
+        {pedidoDeliveryGestor ? (
+          <div
+            className={`mt-3 grid gap-3 ${pedidoComEntrega ? 'md:grid-cols-2' : ''}`}
+          >
+            <PedidoQuandoDeliveryField
+              tipoAtendimento={tipoAtendimentoDelivery}
+              modoTempo={modoTempo}
+              slotInicio={slotInicio}
+              tempoPrevistoMinutos={tempoPrevistoMinutos}
+              onChangeModoTempo={setModoTempo}
+              onChangeSlot={handleChangeSlot}
+              onChangeTempoPrevistoMinutos={setTempoPrevistoMinutos}
+            />
+
+            {pedidoComEntrega ? (
+              <div className="rounded-lg border border-primary/15 bg-white p-3">
+                <div className="mb-2 flex items-center gap-2">
+                  <MdAttachMoney className="h-5 w-5 text-primary" />
+                  <Label className="text-sm font-semibold text-primary-text">Taxa de entrega</Label>
+                </div>
+                <Select
+                  value={taxaEntregaId || SEM_TAXA_ENTREGA_VALUE}
+                  onValueChange={value =>
+                    setTaxaEntregaId(value === SEM_TAXA_ENTREGA_VALUE ? '' : value)
+                  }
+                  disabled={taxasEntregaQuery.isLoading}
+                >
+                  <SelectTrigger className="border-primary/30 bg-white">
+                    <SelectValue
+                      placeholder={
+                        taxasEntregaQuery.isLoading ? 'Carregando taxas...' : 'Selecionar taxa'
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={SEM_TAXA_ENTREGA_VALUE}>Sem taxa de entrega</SelectItem>
+                    {taxasEntrega.map(taxa => (
+                      <SelectItem key={taxa.getId()} value={taxa.getId()}>
+                        {taxa.getNome()} - {transformarParaReal(taxa.getValor())}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <Select
-                value={taxaEntregaId || SEM_TAXA_ENTREGA_VALUE}
-                onValueChange={value =>
-                  setTaxaEntregaId(value === SEM_TAXA_ENTREGA_VALUE ? '' : value)
-                }
-                disabled={taxasEntregaQuery.isLoading}
-              >
-                <SelectTrigger className="border-primary/30 bg-white">
-                  <SelectValue
-                    placeholder={
-                      taxasEntregaQuery.isLoading ? 'Carregando taxas...' : 'Selecionar taxa'
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={SEM_TAXA_ENTREGA_VALUE}>Sem taxa de entrega</SelectItem>
-                  {taxasEntrega.map(taxa => (
-                    <SelectItem key={taxa.getId()} value={taxa.getId()}>
-                      {taxa.getNome()} - {transformarParaReal(taxa.getValor())}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            ) : null}
           </div>
-        )}
+        ) : null}
       </div>
     </PedidoInformacoesStep>
   )

@@ -35,13 +35,36 @@ describe('kanbanDeliveryCardDisplay', () => {
       previsaoEntregaEm: '2026-06-15T10:45:00.000Z',
       tempoTotalEstimadoSegundos: 1800,
     })
-    expect(formatarPrevisaoEntregaKanbanCard(comIso)).toMatch(/\d{2}:\d{2}/)
+    const iso = formatarPrevisaoEntregaKanbanCard(comIso)
+    expect(iso?.kind).toBe('texto')
+    if (iso?.kind === 'texto') {
+      expect(iso.texto).toMatch(/\d{2}:\d{2}/)
+    }
 
     const soMinutos = criarVendaDelivery({
       previsaoEntregaEm: null,
       tempoTotalEstimadoSegundos: 1800,
     })
-    expect(formatarPrevisaoEntregaKanbanCard(soMinutos)).toBe('30 min')
+    expect(formatarPrevisaoEntregaKanbanCard(soMinutos)).toEqual({
+      kind: 'texto',
+      texto: '30 min',
+    })
+  })
+
+  it('formata badge de pedido agendado com data e janela no timezone da empresa', () => {
+    // 22:00 UTC = 19:00 America/Sao_Paulo
+    const agendado = criarVendaDelivery({
+      pedidoAgendado: true,
+      slotInicio: '2026-07-17T22:00:00.000Z',
+      slotFim: '2026-07-17T22:15:00.000Z',
+      previsaoEntregaEm: '2026-07-17T22:00:00.000Z',
+    })
+    const result = formatarPrevisaoEntregaKanbanCard(agendado, 'America/Sao_Paulo')
+    expect(result).toEqual({
+      kind: 'agendado',
+      data: '17-07',
+      horario: '19:00–19:15',
+    })
   })
 
   it('rotula forma de cobrança por fluxo e tipo de atendimento', () => {

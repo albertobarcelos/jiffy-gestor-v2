@@ -23,6 +23,10 @@ export interface CriarVendaGestorInputDTO {
   clienteEntregaVinculado?: { id: string; nome: string } | null
   tipoAtendimentoDelivery: TipoAtendimentoDelivery
   tempoPrevistoMinutos: number
+  /** Timing delivery: imediato (ETA) ou agendado (slot). */
+  modoTempo?: 'imediato' | 'agendado'
+  slotInicio?: string
+  slotFim?: string
   pedidoComEntrega: boolean
   taxaEntregaSelecionada?: { getId(): string } | null
   valorTaxaEntrega: number

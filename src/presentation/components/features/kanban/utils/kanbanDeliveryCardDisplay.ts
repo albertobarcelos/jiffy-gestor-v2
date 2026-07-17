@@ -5,18 +5,80 @@ import type {
   VendaUnificadaDTO,
 } from '../hooks/useVendasUnificadas'
 
+/** Previsão compacta no card delivery (imediato = texto; agendado = data + janela). */
+export type PrevisaoEntregaKanbanCard =
+  | { kind: 'agendado'; data: string; horario: string }
+  | { kind: 'texto'; texto: string }
+
+const TIMEZONE_PADRAO_BR = 'America/Sao_Paulo'
+
+function formatarHoraEmTimezone(iso: string, timeZone: string): string | null {
+  try {
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return null
+    return new Intl.DateTimeFormat('pt-BR', {
+      timeZone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(d)
+  } catch {
+    return null
+  }
+}
+
+function formatarDataDiaMesEmTimezone(iso: string, timeZone: string): string | null {
+  try {
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return null
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone,
+      day: '2-digit',
+      month: '2-digit',
+    }).formatToParts(d)
+    const day = parts.find(p => p.type === 'day')?.value
+    const month = parts.find(p => p.type === 'month')?.value
+    if (!day || !month) return null
+    return `${day}-${month}`
+  } catch {
+    return null
+  }
+}
+
 /** Hora ou minutos previstos para exibição compacta no card delivery. */
-export function formatarPrevisaoEntregaKanbanCard(venda: VendaUnificadaDTO): string | null {
+export function formatarPrevisaoEntregaKanbanCard(
+  venda: VendaUnificadaDTO,
+  timeZoneEmpresa: string = TIMEZONE_PADRAO_BR
+): PrevisaoEntregaKanbanCard | null {
+  const timeZone = timeZoneEmpresa.trim() || TIMEZONE_PADRAO_BR
+
+  if (venda.pedidoAgendado) {
+    const inicio = venda.slotInicio?.trim() || venda.previsaoEntregaEm?.trim()
+    const fim = venda.slotFim?.trim()
+    if (!inicio) return null
+
+    const data = formatarDataDiaMesEmTimezone(inicio, timeZone)
+    const hInicio = formatarHoraEmTimezone(inicio, timeZone)
+    if (!data || !hInicio) return null
+
+    const hFim = fim ? formatarHoraEmTimezone(fim, timeZone) : null
+    const horario = hFim ? `${hInicio}–${hFim}` : hInicio
+
+    return { kind: 'agendado', data, horario }
+  }
+
   const previsao = venda.previsaoEntregaEm?.trim()
   if (previsao) {
+    const horaTz = formatarHoraEmTimezone(previsao, timeZone)
+    if (horaTz) return { kind: 'texto', texto: horaTz }
     const hora = formatarHoraPrevisaoEntrega(previsao, venda.dataCriacao)
-    return hora !== '—' ? hora : null
+    return hora !== '—' ? { kind: 'texto', texto: hora } : null
   }
 
   const segundos = venda.tempoTotalEstimadoSegundos
   if (segundos != null && segundos > 0) {
     const minutos = Math.round(segundos / 60)
-    return minutos > 0 ? `${minutos} min` : null
+    return minutos > 0 ? { kind: 'texto', texto: `${minutos} min` } : null
   }
 
   return null

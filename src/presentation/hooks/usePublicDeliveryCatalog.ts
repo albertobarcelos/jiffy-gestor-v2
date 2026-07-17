@@ -9,8 +9,12 @@ import {
 } from '@tanstack/react-query'
 import {
   fetchCatalogoPublico,
+  fetchDisponibilidadePublica,
+  fetchHorarioFuncionamentoPublico,
   fetchMeiosPagamentoPublicos,
 } from '@/src/infrastructure/api/publicDeliveryApi'
+import type { DisponibilidadeDeliveryDTO } from '@/src/application/dto/delivery-publico/DisponibilidadeDeliveryDTO'
+import type { HorarioFuncionamentoPublicoDTO } from '@/src/application/dto/delivery-publico/HorarioFuncionamentoPublicoDTO'
 import type {
   CatalogoPublicoComplementoDTO,
   CatalogoPublicoGrupoComplementoDTO,
@@ -222,6 +226,41 @@ export function usePublicDeliveryMeiosPagamento(slug: string, enabled = true) {
   return useQuery({
     queryKey: publicDeliveryMeiosPagamentoQueryKey(slug),
     queryFn: () => fetchMeiosPagamentoPublicos(slug),
+    enabled: enabled && !!slug,
+    staleTime: 60_000,
+  })
+}
+
+export function publicDeliveryDisponibilidadeQueryKey(
+  slug: string,
+  tipoEntrega: 'entrega' | 'retirada',
+  data: string
+) {
+  return ['public-delivery', 'disponibilidade', slug, tipoEntrega, data] as const
+}
+
+export function usePublicDeliveryDisponibilidade(
+  slug: string,
+  tipoEntrega: 'entrega' | 'retirada',
+  data: string,
+  enabled = true
+) {
+  return useQuery<DisponibilidadeDeliveryDTO>({
+    queryKey: publicDeliveryDisponibilidadeQueryKey(slug, tipoEntrega, data),
+    queryFn: () => fetchDisponibilidadePublica(slug, { tipoEntrega, data }),
+    enabled: enabled && !!slug && !!tipoEntrega && !!data,
+    staleTime: 30_000,
+  })
+}
+
+export function publicDeliveryHorarioFuncionamentoQueryKey(slug: string) {
+  return ['public-delivery', 'horario-funcionamento', slug] as const
+}
+
+export function usePublicDeliveryHorarioFuncionamento(slug: string, enabled = true) {
+  return useQuery<HorarioFuncionamentoPublicoDTO>({
+    queryKey: publicDeliveryHorarioFuncionamentoQueryKey(slug),
+    queryFn: () => fetchHorarioFuncionamentoPublico(slug),
     enabled: enabled && !!slug,
     staleTime: 60_000,
   })

@@ -7,6 +7,8 @@ export type CanSubmitNovoPedidoParams = {
   clienteEntregaVinculadoId?: string
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
+  modoTempo?: 'imediato' | 'agendado'
+  slotInicio?: string
   pedidoEntregaAceitaPagamentoPendente: boolean
   entregaComCobrancaPeloEntregador: boolean
   produtosCount: number
@@ -30,6 +32,8 @@ export function validarNovoPedidoSubmit(
     clienteEntregaVinculadoId: params.clienteEntregaVinculadoId,
     pedidoComEntrega: params.pedidoComEntrega,
     temEnderecoEntrega: params.temEnderecoEntrega,
+    modoTempo: params.modoTempo,
+    slotInicio: params.slotInicio,
     pedidoGestorComPagamentoNoPasso3: params.pedidoGestorComPagamentoNoPasso3,
     pedidoEntregaAceitaPagamentoPendente: params.pedidoEntregaAceitaPagamentoPendente,
     pagamentosCount: params.pagamentos.length,

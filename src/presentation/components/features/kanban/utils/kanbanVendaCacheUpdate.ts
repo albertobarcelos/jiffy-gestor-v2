@@ -158,6 +158,9 @@ export function cloneVendaUnificadaDTO(
       ? normalizarEntregadorKanbanPatch(patch.entregador)
       : venda.entregador,
     venda.contextoEntrega,
+    venda.pedidoAgendado,
+    venda.slotInicio,
+    venda.slotFim,
     patch.etapaKanbanBalcao !== undefined ? patch.etapaKanbanBalcao : venda.etapaKanbanBalcao
   )
 }

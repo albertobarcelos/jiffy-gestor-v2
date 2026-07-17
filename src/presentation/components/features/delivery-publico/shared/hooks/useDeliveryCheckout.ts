@@ -60,6 +60,10 @@ function createInitialForm(tipoEntrega: DeliveryTipoEntrega): CheckoutFormData {
     pontoReferencia: '',
     etiquetaEndereco: 'casa',
     apelidoEndereco: 'Casa',
+    modoTempo: '',
+    slotInicio: '',
+    slotFim: '',
+    slotLabel: '',
     meioPagamentoId: '',
     trocoPara: null,
     observacaoPedido: '',
@@ -325,18 +329,23 @@ export function useDeliveryCheckout(slug: string) {
 
   const updateForm = useCallback(
     <K extends keyof CheckoutFormData>(key: K, value: CheckoutFormData[K]) => {
-      const next = { ...formRef.current, [key]: value }
+      const next: CheckoutFormData = { ...formRef.current, [key]: value }
       if (key === 'telefone' || key === 'telefonePaisIso2') {
         telefoneDigitsRef.current = comporTelefoneApi(
           next.telefone,
           next.telefonePaisIso2
         )
       }
-      formRef.current = next
-      setForm(next)
       if (key === 'tipoEntrega') {
         setTipoEntregaPreferencia(slug, value as DeliveryTipoEntrega)
+        // Troca entrega ↔ retirada invalida o slot escolhido.
+        next.modoTempo = ''
+        next.slotInicio = ''
+        next.slotFim = ''
+        next.slotLabel = ''
       }
+      formRef.current = next
+      setForm(next)
       if (key === 'telefone' || key === 'telefonePaisIso2') {
         agendarConsultaTelefone(next.telefone, next.telefonePaisIso2)
       }

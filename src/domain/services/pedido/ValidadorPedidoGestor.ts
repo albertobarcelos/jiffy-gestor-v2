@@ -15,6 +15,8 @@ export type ValidarPedidoGestorInput = {
   clienteEntregaVinculadoId?: string
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
+  modoTempo?: 'imediato' | 'agendado'
+  slotInicio?: string
   pedidoGestorComPagamentoNoPasso3: boolean
   pedidoEntregaAceitaPagamentoPendente: boolean
   pagamentosCount: number
@@ -38,6 +40,8 @@ export function validarInformacoesPedidoEntrega(params: {
   clienteEntregaVinculadoId?: string
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
+  modoTempo?: 'imediato' | 'agendado'
+  slotInicio?: string
 }): ValidacaoErroPedido | null {
   if (!params.pedidoDeliveryGestor) return null
 
@@ -47,6 +51,13 @@ export function validarInformacoesPedidoEntrega(params: {
 
   if (params.pedidoComEntrega && !params.temEnderecoEntrega) {
     return { message: 'Selecione ou cadastre o endereço de entrega.', goToStep: 2 }
+  }
+
+  if (params.modoTempo === 'agendado' && !params.slotInicio?.trim()) {
+    return {
+      message: 'Selecione um horário para o pedido agendado.',
+      goToStep: 2,
+    }
   }
 
   return null
@@ -175,6 +186,8 @@ export function validarPedidoGestor(
     clienteEntregaVinculadoId: input.clienteEntregaVinculadoId,
     pedidoComEntrega: input.pedidoComEntrega,
     temEnderecoEntrega: input.temEnderecoEntrega,
+    modoTempo: input.modoTempo,
+    slotInicio: input.slotInicio,
   })
   if (erroEntrega) erros.push(erroEntrega)
 

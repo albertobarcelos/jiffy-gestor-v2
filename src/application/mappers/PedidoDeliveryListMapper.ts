@@ -86,6 +86,9 @@ export function pedidoDeliverySummaryParaUnifiedRecord(
     ),
     previsaoEntregaEm: summary.previsaoEntregaEm,
     tempoTotalEstimadoSegundos: summary.tempoTotalEstimadoSegundos,
+    pedidoAgendado: summary.pedidoAgendado === true,
+    slotInicio: summary.slotInicio ?? null,
+    slotFim: summary.slotFim ?? null,
     fluxoPagamentoEntrega: derivarFluxoPagamentoEntregaDeliverySummary(
       summary.totalFaltaPagar,
       summary.cobrancas
@@ -190,6 +193,9 @@ export function normalizarPedidoDeliverySummaryJson(raw: unknown): PedidoDeliver
     tempoTotalEstimadoSegundos:
       o.tempoTotalEstimadoSegundos == null ? null : parseNumero(o.tempoTotalEstimadoSegundos, 0),
     previsaoEntregaEm: o.previsaoEntregaEm != null ? String(o.previsaoEntregaEm) : null,
+    pedidoAgendado: o.pedidoAgendado === true,
+    slotInicio: o.slotInicio != null ? String(o.slotInicio) : null,
+    slotFim: o.slotFim != null ? String(o.slotFim) : null,
     origem: String(o.origem ?? 'GESTOR'),
     statusDelivery,
     valorFinal: parseNumero(o.valorFinal, 0),

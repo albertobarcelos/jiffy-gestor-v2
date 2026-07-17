@@ -24,7 +24,10 @@ export type DeliveryPublicoCarrinhoViewModel = {
 export type DeliveryPublicoViewModel = {
   grupos: DeliveryPublicoGrupoViewModel[]
   disponivel: boolean
+  /** Texto curto do header (horário de hoje). */
   horarioTexto: string
+  /** Grade semanal para o rodapé. */
+  horarioSemanalTexto: string
   tipoEntrega: 'entrega' | 'retirada'
   termoBusca: string
   carrinho: DeliveryPublicoCarrinhoViewModel

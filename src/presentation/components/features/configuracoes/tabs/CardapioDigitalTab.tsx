@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { MdOpenInNew, MdPalette, MdShare, MdStorefront } from 'react-icons/md'
+import { MdOpenInNew, MdPalette, MdSchedule, MdShare, MdStorefront } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
 import {
@@ -210,21 +210,46 @@ export function CardapioDigitalTab() {
             ) : null}
 
             {configurado ? (
-              <div className="rounded-lg border border-gray-200 bg-white p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-primary">Personalizar loja online</p>
-                    <p className="mt-0.5 text-xs text-secondary-text">
-                      Ajuste layout, cores, tipografia e categorias do app público.
-                    </p>
+              <div className="space-y-3">
+                <div className="rounded-lg border border-gray-200 bg-white p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-primary">
+                        Personalizar loja online
+                      </p>
+                      <p className="mt-0.5 text-xs text-secondary-text">
+                        Ajuste layout, cores, tipografia e categorias do app público.
+                      </p>
+                    </div>
+                    <Link
+                      href="/configuracoes/empresa-delivery/design"
+                      className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-secondary px-4 text-sm font-semibold text-secondary transition-colors hover:bg-secondary/10"
+                    >
+                      <MdPalette className="h-4 w-4" aria-hidden />
+                      Design
+                    </Link>
                   </div>
-                  <Link
-                    href="/configuracoes/empresa-delivery/design"
-                    className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-secondary px-4 text-sm font-semibold text-secondary transition-colors hover:bg-secondary/10"
-                  >
-                    <MdPalette className="h-4 w-4" aria-hidden />
-                    Design
-                  </Link>
+                </div>
+
+                <div className="rounded-lg border border-gray-200 bg-white p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-primary">
+                        Horários e agendamento
+                      </p>
+                      <p className="mt-0.5 text-xs text-secondary-text">
+                        Defina turnos de funcionamento, lead time e janelas para pedidos
+                        agendados.
+                      </p>
+                    </div>
+                    <Link
+                      href="/configuracoes/empresa-delivery/agendamento"
+                      className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-secondary px-4 text-sm font-semibold text-secondary transition-colors hover:bg-secondary/10"
+                    >
+                      <MdSchedule className="h-4 w-4" aria-hidden />
+                      Configurar
+                    </Link>
+                  </div>
                 </div>
               </div>
             ) : null}

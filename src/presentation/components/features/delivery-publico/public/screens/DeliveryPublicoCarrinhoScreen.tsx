@@ -28,6 +28,7 @@ import { DeliveryCheckoutIdentifiqueSeModal } from '../components/checkout/Deliv
 import { DeliveryCheckoutNomeModal } from '../components/checkout/DeliveryCheckoutNomeModal'
 import { DeliveryCheckoutEnderecosModal } from '../components/checkout/DeliveryCheckoutEnderecosModal'
 import { DeliveryCheckoutEnderecoFormModal } from '../components/checkout/DeliveryCheckoutEnderecoFormModal'
+import { DeliveryCheckoutQuandoModal } from '../components/checkout/DeliveryCheckoutQuandoModal'
 import { DeliveryCheckoutPagamentoModal } from '../components/checkout/DeliveryCheckoutPagamentoModal'
 import { DeliveryCheckoutRevisaoModal } from '../components/checkout/DeliveryCheckoutRevisaoModal'
 
@@ -40,6 +41,7 @@ type CheckoutStep =
   | 'nome'
   | 'enderecos'
   | 'enderecoForm'
+  | 'quando'
   | 'pagamento'
   | 'revisao'
   | null
@@ -179,6 +181,14 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
       return
     }
     setVoltarParaRevisao(false)
+    setCheckoutStep('quando')
+  }
+
+  const handleQuandoContinuar = () => {
+    if (voltarParaRevisao) {
+      setCheckoutStep('revisao')
+      return
+    }
     setCheckoutStep('pagamento')
   }
 
@@ -215,7 +225,7 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
       if (voltarParaRevisao) {
         setCheckoutStep('revisao')
       } else {
-        setCheckoutStep('pagamento')
+        setCheckoutStep('quando')
       }
       return
     }
@@ -241,7 +251,7 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
       if (voltarParaRevisao) {
         setCheckoutStep('revisao')
       } else {
-        setCheckoutStep('pagamento')
+        setCheckoutStep('quando')
       }
       return
     }
@@ -427,6 +437,24 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
         />
       ) : null}
 
+      {checkoutStep === 'quando' ? (
+        <DeliveryCheckoutQuandoModal
+          slug={slug}
+          tipoEntrega={form.tipoEntrega}
+          modoTempo={form.modoTempo}
+          slotInicio={form.slotInicio}
+          slotLabel={form.slotLabel}
+          onChangeModoTempo={value => updateForm('modoTempo', value)}
+          onChangeSlot={slot => {
+            updateForm('slotInicio', slot?.inicio ?? '')
+            updateForm('slotFim', slot?.fim ?? '')
+            updateForm('slotLabel', slot?.label ?? '')
+          }}
+          onClose={fecharOuRevisao}
+          onContinuar={handleQuandoContinuar}
+        />
+      ) : null}
+
       {checkoutStep === 'pagamento' ? (
         <DeliveryCheckoutPagamentoModal
           total={total}
@@ -437,6 +465,13 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
           onChangeMeioPagamentoId={value => updateForm('meioPagamentoId', value)}
           onChangeTrocoPara={value => updateForm('trocoPara', value)}
           onClose={fecharOuRevisao}
+          onBack={() => {
+            if (voltarParaRevisao) {
+              setCheckoutStep('revisao')
+              return
+            }
+            setCheckoutStep('quando')
+          }}
           onContinuar={handlePagamentoContinuar}
         />
       ) : null}
@@ -454,6 +489,8 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
           meioPagamento={meioPagamentoSelecionado}
           trocoPara={form.trocoPara}
           observacaoPedido={form.observacaoPedido}
+          modoTempo={form.modoTempo}
+          slotLabel={form.slotLabel}
           enviando={enviando}
           onClose={() => {
             setVoltarParaRevisao(false)
@@ -472,6 +509,7 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
             setVoltarParaRevisao(false)
             setCheckoutStep(null)
           }}
+          onEditarQuando={() => abrirStepDaRevisao('quando')}
           onEditarPagamento={() => abrirStepDaRevisao('pagamento')}
           onChangeObservacaoPedido={value => updateForm('observacaoPedido', value)}
           onEnviar={() => void enviarPedido()}

@@ -5,6 +5,7 @@ import { MdAccessTime, MdEdit, MdSync } from 'react-icons/md'
 import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
 import { StatusFiscalBadge } from '../../fiscal/StatusFiscalBadge'
 import { fiscalKanbanPodeReemitirAposCooldown } from '../rules/vendasKanban.rules'
+import type { PrevisaoEntregaKanbanCard } from '../utils/kanbanDeliveryCardDisplay'
 import type { TipoVendaExibicaoCard } from '../utils/kanbanVendaCardViewModel'
 import type { Venda } from '../types'
 
@@ -22,7 +23,7 @@ export interface KanbanVendaCardHeaderProps {
   formaCobrancaKanban: string | null
   formaPagamentoKanban: string | null
   observacaoPedidoTexto: string
-  previsaoEntregaKanban: string | null
+  previsaoEntregaKanban: PrevisaoEntregaKanbanCard | null
   tipoVendaExibicao: TipoVendaExibicaoCard
   exibirColunaTipoVenda: boolean
   exibirAcaoAlterarTipoPedido: boolean
@@ -186,13 +187,30 @@ export function KanbanVendaCardHeader(props: KanbanVendaCardHeaderProps) {
 
   const previsaoEntregaKanbanBadge =
     exibirMetaDeliveryKanban && previsaoEntregaKanban ? (
-      <div
-        className="flex items-center gap-1 text-sm font-semibold tabular-nums leading-none text-gray-700"
-        title="Previsão de entrega"
-      >
-        <MdAccessTime className="h-[18px] w-[18px] shrink-0 text-primary" aria-hidden />
-        <span>{previsaoEntregaKanban}</span>
-      </div>
+      previsaoEntregaKanban.kind === 'agendado' ? (
+        <div
+          className="flex flex-col items-end text-right leading-tight text-gray-700"
+          title={`Pedido agendado ${previsaoEntregaKanban.data} ${previsaoEntregaKanban.horario}`}
+        >
+          <div className="flex items-center justify-end gap-1 text-sm font-semibold">
+            <MdAccessTime className="h-[18px] w-[18px] shrink-0 text-primary" aria-hidden />
+            <span>
+              Agenda: <span className="tabular-nums">{previsaoEntregaKanban.data}</span>
+            </span>
+          </div>
+          <span className="mt-0.5 text-sm font-semibold tabular-nums">
+            {previsaoEntregaKanban.horario}
+          </span>
+        </div>
+      ) : (
+        <div
+          className="flex items-center gap-1 text-sm font-semibold tabular-nums leading-none text-gray-700"
+          title="Previsão de entrega"
+        >
+          <MdAccessTime className="h-[18px] w-[18px] shrink-0 text-primary" aria-hidden />
+          <span>{previsaoEntregaKanban.texto}</span>
+        </div>
+      )
     ) : null
 
   const colunaTipoVendaIcon = tipoVendaIconEl ? (
@@ -253,7 +271,7 @@ export function KanbanVendaCardHeader(props: KanbanVendaCardHeaderProps) {
           ) : null}
           <BlocoStatusFiscal venda={venda} />
         </div>
-        <div className="flex flex-shrink-0 flex-col items-center self-start">
+        <div className="flex flex-shrink-0 flex-col items-end gap-1 self-start">
           {previsaoEntregaKanbanBadge}
           {tipoVendaIconEl}
         </div>

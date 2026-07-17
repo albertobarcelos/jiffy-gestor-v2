@@ -173,6 +173,11 @@ export type CreatePedidoPublicoInput = {
   slug: string
   origem: 'JIFFY_DELIVERY'
   tipoEntrega: 'entrega' | 'retirada'
+  /** Quando omitido, o backend assume imediato (compatibilidade). */
+  modoTempo?: 'imediato' | 'agendado'
+  /** ISO datetime do início do slot (obrigatório se `modoTempo === 'agendado'`). */
+  slotInicio?: string
+  slotFim?: string
   cliente: ClientePedidoPublicoInput
   produtos: ProdutoPedidoPublicoInput[]
   cobrancas?: CobrancaPedidoPublicoInput[]

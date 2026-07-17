@@ -113,6 +113,9 @@ export interface PedidoDeliverySummaryApi {
   tipoEntrega: TipoEntregaDeliveryApi
   tempoTotalEstimadoSegundos: number | null
   previsaoEntregaEm: string | null
+  pedidoAgendado?: boolean
+  slotInicio?: string | null
+  slotFim?: string | null
   origem: OrigemPedidoDeliveryApi | string
   statusDelivery: StatusDeliveryApi
   valorFinal: number

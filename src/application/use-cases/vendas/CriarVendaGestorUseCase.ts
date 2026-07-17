@@ -28,6 +28,8 @@ export interface ValidarCriarVendaParams {
   clienteEntregaVinculadoId?: string
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
+  modoTempo?: 'imediato' | 'agendado'
+  slotInicio?: string
   pedidoGestorComPagamentoNoPasso3: boolean
   pedidoEntregaAceitaPagamentoPendente: boolean
   pagamentosCount: number
@@ -45,6 +47,8 @@ export function validarInformacoesPedido(params: {
   clienteEntregaVinculadoId?: string
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
+  modoTempo?: 'imediato' | 'agendado'
+  slotInicio?: string
   exibirToast?: boolean
   onError?: (message: string) => void
 }): boolean {
@@ -53,6 +57,8 @@ export function validarInformacoesPedido(params: {
     clienteEntregaVinculadoId: params.clienteEntregaVinculadoId,
     pedidoComEntrega: params.pedidoComEntrega,
     temEnderecoEntrega: params.temEnderecoEntrega,
+    modoTempo: params.modoTempo,
+    slotInicio: params.slotInicio,
   })
   if (!erro) return true
   if (params.exibirToast) {

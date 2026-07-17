@@ -88,7 +88,7 @@ export function BasicoLayoutHome({
       <DeliveryPublicoLojaFooter
         config={config}
         enderecoTexto={enderecoTexto}
-        horarioTexto={viewModel.horarioTexto}
+        horarioTexto={viewModel.horarioSemanalTexto}
       />
     </div>
   )

@@ -147,4 +147,27 @@ describe('CriarPedidoDeliveryPayloadMapper', () => {
       },
     ])
   })
+
+  it('envia modoTempo imediato com tempo estimado', () => {
+    const payload = buildCriarPedidoDeliveryPayload(
+      baseInput({ modoTempo: 'imediato', tempoPrevistoMinutos: 45 })
+    )
+    expect(payload.modoTempo).toBe('imediato')
+    expect(payload.tempoTotalEstimadoSegundos).toBe(2700)
+    expect(payload.slotInicio).toBeUndefined()
+  })
+
+  it('envia modoTempo agendado com slots e sem tempo estimado', () => {
+    const payload = buildCriarPedidoDeliveryPayload(
+      baseInput({
+        modoTempo: 'agendado',
+        slotInicio: '2026-06-15T22:00:00.000Z',
+        slotFim: '2026-06-15T22:15:00.000Z',
+      })
+    )
+    expect(payload.modoTempo).toBe('agendado')
+    expect(payload.slotInicio).toBe('2026-06-15T22:00:00.000Z')
+    expect(payload.slotFim).toBe('2026-06-15T22:15:00.000Z')
+    expect(payload.tempoTotalEstimadoSegundos).toBeUndefined()
+  })
 })

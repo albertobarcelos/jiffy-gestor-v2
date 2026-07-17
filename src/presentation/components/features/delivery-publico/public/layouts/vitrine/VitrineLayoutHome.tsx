@@ -97,7 +97,7 @@ export function VitrineLayoutHome({
       <DeliveryPublicoLojaFooter
         config={config}
         enderecoTexto={enderecoTexto}
-        horarioTexto={viewModel.horarioTexto}
+        horarioTexto={viewModel.horarioSemanalTexto}
       />
     </div>
   )

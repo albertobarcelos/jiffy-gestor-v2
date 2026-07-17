@@ -4,6 +4,11 @@ export interface ParametroDeliveryDTO {
   imprimirAoReceber: boolean
   imprimirAoFicarPronto: boolean
   autoIniciarPreparoNovosPedidos: boolean
+  timezone?: string
+  aceitaAgendamento?: boolean
+  intervaloSlotMinutos?: 15 | 30
+  leadTimeMinutos?: number
+  diasAntecedenciaMax?: number
   impressoraExpedicaoId: string | null
 }
 

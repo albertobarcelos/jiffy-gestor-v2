@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import { Camera, MapPin, Pencil, Bike, UserRound } from 'lucide-react'
+import { Camera, Clock, MapPin, Pencil, Bike, UserRound } from 'lucide-react'
 import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { MeioPagamentoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
@@ -25,12 +25,15 @@ type DeliveryCheckoutRevisaoModalProps = {
   meioPagamento: MeioPagamentoPublicoDTO | null
   trocoPara: number | null
   observacaoPedido: string
+  modoTempo: 'imediato' | 'agendado' | ''
+  slotLabel: string
   enviando: boolean
   onClose: () => void
   onVoltar: () => void
   onEditarCliente: () => void
   onEditarEndereco: () => void
   onEditarPedido: () => void
+  onEditarQuando: () => void
   onEditarPagamento: () => void
   onChangeObservacaoPedido: (value: string) => void
   onEnviar: () => void
@@ -119,12 +122,15 @@ export function DeliveryCheckoutRevisaoModal({
   meioPagamento,
   trocoPara,
   observacaoPedido,
+  modoTempo,
+  slotLabel,
   enviando,
   onClose,
   onVoltar,
   onEditarCliente,
   onEditarEndereco,
   onEditarPedido,
+  onEditarQuando,
   onEditarPagamento,
   onChangeObservacaoPedido,
   onEnviar,
@@ -213,6 +219,28 @@ export function DeliveryCheckoutRevisaoModal({
           {!isEntrega ? (
             <p className="text-sm font-semibold delivery-text-primary">
               {enderecoEmpresaTexto || 'Endereço da loja indisponível'}
+            </p>
+          ) : null}
+        </LinhaSecao>
+
+        <LinhaSecao
+          icone={<Clock className="h-5 w-5 text-black" />}
+          label="Quando:"
+          onEditar={onEditarQuando}
+          editLabel="Editar horário"
+        >
+          <p className="text-sm font-semibold delivery-text-primary">
+            {modoTempo === 'imediato'
+              ? 'O mais rápido possível'
+              : modoTempo === 'agendado' && slotLabel
+                ? slotLabel
+                : 'Não informado'}
+          </p>
+          {modoTempo === 'agendado' ? (
+            <p className="text-xs delivery-text-secondary">
+              {isEntrega
+                ? 'Horário de saída para entrega'
+                : 'Horário pronto para retirada'}
             </p>
           ) : null}
         </LinhaSecao>

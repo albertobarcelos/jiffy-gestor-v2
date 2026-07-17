@@ -191,6 +191,20 @@ function extrairTempoTotalEstimadoSegundos(item: Record<string, unknown>): numbe
   return Number.isFinite(n) ? n : null
 }
 
+function extrairPedidoAgendado(item: Record<string, unknown>): boolean {
+  return item.pedidoAgendado === true || item.pedido_agendado === true
+}
+
+function extrairSlotIso(
+  item: Record<string, unknown>,
+  camel: string,
+  snake: string
+): string | null {
+  const raw = item[camel] ?? item[snake]
+  if (raw == null || String(raw).trim() === '') return null
+  return String(raw).trim()
+}
+
 function extrairFluxoPagamentoEntrega(item: Record<string, unknown>): FluxoPagamentoEntrega | null {
   const direct = item.fluxoPagamentoEntrega ?? item.fluxo_pagamento_entrega
   if (direct === 'cobrar_entregador' || direct === 'ja_pago') return direct
@@ -407,6 +421,12 @@ export class VendaUnificadaDTO {
     public readonly entregador?: EntregadorKanbanDeliveryResumo | null,
     /** Delivery Kanban: contexto de entrega com endereço (summary). */
     public readonly contextoEntrega?: ContextoEntregaDeliveryApi | null,
+    /** Delivery Kanban: pedido com janela de agendamento. */
+    public readonly pedidoAgendado?: boolean,
+    /** Delivery Kanban: início da janela (ISO). */
+    public readonly slotInicio?: string | null,
+    /** Delivery Kanban: fim da janela (ISO). */
+    public readonly slotFim?: string | null,
     /** Kanban balcão: coluna resolvida no backend (source of truth). */
     public readonly etapaKanbanBalcao?: EtapaKanbanBalcao | null
   ) {}
@@ -650,6 +670,9 @@ export function mapItemJsonParaVendaUnificadaDTO(v: Record<string, unknown>): Ve
     extrairCobrancasDelivery(v),
     extrairEntregadorDelivery(v),
     extrairContextoEntregaDelivery(v),
+    extrairPedidoAgendado(v),
+    extrairSlotIso(v, 'slotInicio', 'slot_inicio'),
+    extrairSlotIso(v, 'slotFim', 'slot_fim'),
     extrairEtapaKanbanBalcao(v)
   )
 }

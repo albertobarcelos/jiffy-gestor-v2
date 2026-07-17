@@ -10,7 +10,9 @@ import {
   flattenCatalogoGrupos,
   useAutoFetchCatalogoGrupos,
   usePublicDeliveryCatalogInfinite,
+  usePublicDeliveryHorarioFuncionamento,
 } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
+import { resolverExibicaoHorarioHome } from '../../shared/utils/formatarHorarioFuncionamentoPublico'
 import { isPublicDeliverySlugNotFound } from '@/src/infrastructure/api/publicDeliveryApi'
 import {
   DeliveryThemeScope,
@@ -50,9 +52,14 @@ export function DeliveryPublicoHomeScreen({ slug }: DeliveryPublicoHomeScreenPro
 
   const catalogQuery = usePublicDeliveryCatalogInfinite(slug)
   useAutoFetchCatalogoGrupos(catalogQuery)
+  const horarioQuery = usePublicDeliveryHorarioFuncionamento(slug)
 
   const { data, isLoading, isError, error, isFetchingNextPage } = catalogQuery
   const empresa: EmpresaPublicaDTO | null = data?.pages[0]?.empresa ?? null
+  const exibicaoHorario = useMemo(
+    () => resolverExibicaoHorarioHome(horarioQuery.data),
+    [horarioQuery.data]
+  )
 
   const carrinhoTotal = useDeliveryCarrinhoTotal(slug)
   const carrinhoQuantidade = useDeliveryCarrinhoTotalItens(slug)
@@ -167,6 +174,9 @@ export function DeliveryPublicoHomeScreen({ slug }: DeliveryPublicoHomeScreenPro
         empresa={empresa}
         termoBusca={termoBusca}
         tipoEntrega={tipoEntrega}
+        disponivel={exibicaoHorario.disponivel}
+        horarioTexto={exibicaoHorario.horarioTexto}
+        horarioSemanalTexto={exibicaoHorario.horarioSemanalTexto}
         carrinhoTotal={carrinhoTotal}
         carrinhoQuantidade={carrinhoQuantidade}
         isCatalogLoading={isCatalogLoading}
@@ -193,6 +203,9 @@ type DeliveryPublicoHomeContentProps = {
   empresa: EmpresaPublicaDTO | null
   termoBusca: string
   tipoEntrega: DeliveryTipoEntrega
+  disponivel: boolean
+  horarioTexto: string
+  horarioSemanalTexto: string
   carrinhoTotal: number
   carrinhoQuantidade: number
   isCatalogLoading: boolean
@@ -216,6 +229,9 @@ function DeliveryPublicoHomeContent({
   empresa,
   termoBusca,
   tipoEntrega,
+  disponivel,
+  horarioTexto,
+  horarioSemanalTexto,
   carrinhoTotal,
   carrinhoQuantidade,
   isCatalogLoading,
@@ -239,9 +255,21 @@ function DeliveryPublicoHomeContent({
       buildCatalogViewModel(grupos, {
         termoBusca,
         tipoEntrega,
+        disponivel,
+        horarioTexto,
+        horarioSemanalTexto,
         carrinho: { total: carrinhoTotal, quantidadeItens: carrinhoQuantidade },
       }),
-    [grupos, termoBusca, tipoEntrega, carrinhoTotal, carrinhoQuantidade]
+    [
+      grupos,
+      termoBusca,
+      tipoEntrega,
+      disponivel,
+      horarioTexto,
+      horarioSemanalTexto,
+      carrinhoTotal,
+      carrinhoQuantidade,
+    ]
   )
 
   const LayoutHome = resolveDeliveryLayoutHome(config.layoutId)

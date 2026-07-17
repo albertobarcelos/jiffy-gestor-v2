@@ -124,12 +124,26 @@ export function buildCriarPedidoDeliveryPayload(
   const cobrancas = buildCobrancasPedidoDeliveryPayload(input)
   const taxas = buildTaxasPedidoDeliveryPayload(input)
 
+  const modoTempo = input.modoTempo ?? 'imediato'
+
   const payload: CriarPedidoDeliveryApiRequest = {
     origem: 'GESTOR',
     tipoEntrega: input.tipoAtendimentoDelivery,
     cliente: buildClientePedidoDeliveryPayload(input),
     produtos: mapProdutosPedidoDeliveryPayload(input.produtos),
-    tempoTotalEstimadoSegundos: Math.max(0, Math.round(input.tempoPrevistoMinutos * 60)),
+    modoTempo,
+  }
+
+  if (modoTempo === 'agendado') {
+    const slotInicio = input.slotInicio?.trim()
+    if (slotInicio) payload.slotInicio = slotInicio
+    const slotFim = input.slotFim?.trim()
+    if (slotFim) payload.slotFim = slotFim
+  } else {
+    payload.tempoTotalEstimadoSegundos = Math.max(
+      0,
+      Math.round(input.tempoPrevistoMinutos * 60)
+    )
   }
 
   if (observacoesPedido) {

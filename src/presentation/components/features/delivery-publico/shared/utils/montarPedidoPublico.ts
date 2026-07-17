@@ -22,6 +22,12 @@ export type CheckoutFormData = {
   pontoReferencia: string
   etiquetaEndereco: 'casa' | 'trabalho' | 'outro'
   apelidoEndereco: string
+  /** Timing do pedido (step "Quando?"). */
+  modoTempo: 'imediato' | 'agendado' | ''
+  slotInicio: string
+  slotFim: string
+  /** Label amigável da janela (só UI / revisão). */
+  slotLabel: string
   meioPagamentoId: string
   /** Valor informado para troco (dinheiro). `null` = sem troco. */
   trocoPara: number | null
@@ -91,12 +97,27 @@ export function montarPedidoPublico({
     cliente.enderecoIdEntrega = idEntrega
   }
 
+  if (!form.modoTempo) {
+    return { ok: false, error: 'Informe quando deseja o pedido' }
+  }
+  if (form.modoTempo === 'agendado' && !form.slotInicio.trim()) {
+    return { ok: false, error: 'Selecione um horário para agendar' }
+  }
+
   const payload: CreatePedidoPublicoInput = {
     slug,
     origem: 'JIFFY_DELIVERY',
     tipoEntrega: form.tipoEntrega,
+    modoTempo: form.modoTempo,
     cliente,
     produtos,
+  }
+
+  if (form.modoTempo === 'agendado') {
+    payload.slotInicio = form.slotInicio
+    if (form.slotFim.trim()) {
+      payload.slotFim = form.slotFim
+    }
   }
 
   if (form.meioPagamentoId) {

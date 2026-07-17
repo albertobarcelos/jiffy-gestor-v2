@@ -42,6 +42,10 @@ export function useNovoPedidoFormState(tipoInicioPedido: 'balcao' | 'entrega') {
   const [telefoneBuscaEntrega, setTelefoneBuscaEntrega] = useState('')
   const [telefoneBuscadoEntrega, setTelefoneBuscadoEntrega] = useState<string | null>(null)
   const [tempoPrevistoMinutos, setTempoPrevistoMinutos] = useState<number>(45)
+  const [modoTempo, setModoTempo] = useState<'imediato' | 'agendado'>('imediato')
+  const [slotInicio, setSlotInicio] = useState('')
+  const [slotFim, setSlotFim] = useState('')
+  const [slotLabel, setSlotLabel] = useState('')
   const [taxaEntregaId, setTaxaEntregaId] = useState<string>('')
   const [clienteEntregaVinculado, setClienteEntregaVinculado] = useState<{
     id: string
@@ -113,6 +117,14 @@ export function useNovoPedidoFormState(tipoInicioPedido: 'balcao' | 'entrega') {
     setTelefoneBuscadoEntrega,
     tempoPrevistoMinutos,
     setTempoPrevistoMinutos,
+    modoTempo,
+    setModoTempo,
+    slotInicio,
+    setSlotInicio,
+    slotFim,
+    setSlotFim,
+    slotLabel,
+    setSlotLabel,
     taxaEntregaId,
     setTaxaEntregaId,
     clienteEntregaVinculado,

@@ -22,6 +22,8 @@ export interface UseNovoPedidoNavegacaoParams {
   clienteEntregaVinculadoId?: string
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
+  modoTempo?: 'imediato' | 'agendado'
+  slotInicio?: string
   /** Edição de produtos de pedido existente: trava a navegação entre etapas. */
   modoEdicaoProdutos?: boolean
 }
@@ -41,6 +43,8 @@ export function useNovoPedidoNavegacao({
   clienteEntregaVinculadoId,
   pedidoComEntrega,
   temEnderecoEntrega,
+  modoTempo,
+  slotInicio,
   modoEdicaoProdutos,
 }: UseNovoPedidoNavegacaoParams) {
   const [modalConfirmacaoSaidaOpen, setModalConfirmacaoSaidaOpen] = useState(false)
@@ -81,10 +85,19 @@ export function useNovoPedidoNavegacao({
         clienteEntregaVinculadoId,
         pedidoComEntrega,
         temEnderecoEntrega,
+        modoTempo,
+        slotInicio,
         exibirToast,
         onError: showToast.error,
       }),
-    [pedidoDeliveryGestor, clienteEntregaVinculadoId, pedidoComEntrega, temEnderecoEntrega]
+    [
+      pedidoDeliveryGestor,
+      clienteEntregaVinculadoId,
+      pedidoComEntrega,
+      temEnderecoEntrega,
+      modoTempo,
+      slotInicio,
+    ]
   )
 
   const canGoToStep2 = useCallback(() => {

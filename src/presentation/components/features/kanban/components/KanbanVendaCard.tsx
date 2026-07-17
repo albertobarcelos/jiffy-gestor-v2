@@ -11,6 +11,7 @@ import {
   formatarPrevisaoEntregaKanbanCard,
   rotuloFormaCobrancaKanbanCard,
 } from '../utils/kanbanDeliveryCardDisplay'
+import { useEmpresaDeliveryMe } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
 import {
   derivarTipoVendaCardKanban,
   linhaIdentificacaoVendaKanban,
@@ -146,8 +147,12 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
   )
   const exibirMetaDeliveryKanban =
     modoKanbanVendas === 'delivery' && venda.isPedidoEntregaGestor()
+  const empresaDeliveryQuery = useEmpresaDeliveryMe()
+  const timeZoneDelivery =
+    empresaDeliveryQuery.data?.parametroDelivery?.timezone?.trim() ||
+    'America/Sao_Paulo'
   const previsaoEntregaKanban = exibirMetaDeliveryKanban
-    ? formatarPrevisaoEntregaKanbanCard(venda)
+    ? formatarPrevisaoEntregaKanbanCard(venda, timeZoneDelivery)
     : null
   const formaCobrancaKanban = exibirMetaDeliveryKanban
     ? rotuloFormaCobrancaKanbanCard(venda.tipoVenda, venda.fluxoPagamentoEntrega)

@@ -6,6 +6,8 @@ import type {
   GetCatalogoPublicoResponseDTO,
   GetMeiosPagamentoPublicosResponseDTO,
 } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import type { DisponibilidadeDeliveryDTO } from '@/src/application/dto/delivery-publico/DisponibilidadeDeliveryDTO'
+import type { HorarioFuncionamentoPublicoDTO } from '@/src/application/dto/delivery-publico/HorarioFuncionamentoPublicoDTO'
 
 export class PublicDeliveryApiError extends Error {
   constructor(
@@ -67,6 +69,32 @@ export async function fetchMeiosPagamentoPublicos(
   slug: string
 ): Promise<GetMeiosPagamentoPublicosResponseDTO> {
   const url = `/api/public/delivery/meios-pagamento/${encodeURIComponent(slug)}`
+  const res = await fetch(url, { cache: 'no-store' })
+  if (!res.ok) {
+    throw new PublicDeliveryApiError(await parseErrorMessage(res), res.status)
+  }
+  return res.json()
+}
+
+export async function fetchDisponibilidadePublica(
+  slug: string,
+  params: { tipoEntrega: 'entrega' | 'retirada'; data?: string }
+): Promise<DisponibilidadeDeliveryDTO> {
+  const search = new URLSearchParams()
+  search.set('tipoEntrega', params.tipoEntrega)
+  if (params.data) search.set('data', params.data)
+  const url = `/api/public/delivery/disponibilidade/${encodeURIComponent(slug)}?${search.toString()}`
+  const res = await fetch(url, { cache: 'no-store' })
+  if (!res.ok) {
+    throw new PublicDeliveryApiError(await parseErrorMessage(res), res.status)
+  }
+  return res.json()
+}
+
+export async function fetchHorarioFuncionamentoPublico(
+  slug: string
+): Promise<HorarioFuncionamentoPublicoDTO> {
+  const url = `/api/public/delivery/horario-funcionamento/${encodeURIComponent(slug)}`
   const res = await fetch(url, { cache: 'no-store' })
   if (!res.ok) {
     throw new PublicDeliveryApiError(await parseErrorMessage(res), res.status)
