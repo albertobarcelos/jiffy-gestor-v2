@@ -2,7 +2,7 @@
 
 /**
  * Kanban balcão com paginação por coluna fiscal (50 itens iniciais + scroll incremental).
- * Padrão: COM_NFE + FINALIZADAS. Filtros PENDENTE_EMISSAO / REJEITADAS sob demanda.
+ * Padrão: COM_FISCAL + FINALIZADAS. Filtros PENDENTE_EMISSAO / REJEITADAS sob demanda.
  */
 
 import { useCallback, useMemo, useRef } from 'react'
@@ -66,8 +66,8 @@ export function useVendasUnificadasKanbanColumns(
     refetchOnWindowFocus: options?.refetchOnWindowFocus,
   }
 
-  const comNfeQuery = useVendasUnificadasKanbanColumnInfinite(
-    'COM_NFE',
+  const comFiscalQuery = useVendasUnificadasKanbanColumnInfinite(
+    'COM_FISCAL',
     params,
     columnInfiniteOptions
   )
@@ -95,7 +95,7 @@ export function useVendasUnificadasKanbanColumns(
   )
 
   const queryByColumn: Record<ColunaKanbanBalcaoApi, typeof finalizadasQuery> = {
-    COM_NFE: comNfeQuery,
+    COM_FISCAL: comFiscalQuery,
     FINALIZADAS: finalizadasQuery,
     PENDENTE_EMISSAO: pendenteQuery,
     REJEITADAS: rejeitadasQuery,
@@ -141,10 +141,10 @@ export function useVendasUnificadasKanbanColumns(
     return map
   }, [
     colunasAtivas,
-    comNfeQuery.data,
-    comNfeQuery.isLoading,
-    comNfeQuery.isFetchingNextPage,
-    comNfeQuery.hasNextPage,
+    comFiscalQuery.data,
+    comFiscalQuery.isLoading,
+    comFiscalQuery.isFetchingNextPage,
+    comFiscalQuery.hasNextPage,
     finalizadasQuery.data,
     finalizadasQuery.isLoading,
     finalizadasQuery.isFetchingNextPage,
@@ -174,7 +174,7 @@ export function useVendasUnificadasKanbanColumns(
     return deduplicarItemsPorId(all)
   }, [
     colunasAtivas,
-    comNfeQuery.data,
+    comFiscalQuery.data,
     finalizadasQuery.data,
     pendenteQuery.data,
     rejeitadasQuery.data,

@@ -288,7 +288,7 @@ function extrairStatusFinanceiro(item: Record<string, unknown>): string | null {
 export type EtapaKanbanBalcao =
   | 'FINALIZADAS'
   | 'PENDENTE_EMISSAO'
-  | 'COM_NFE'
+  | 'COM_FISCAL'
   | 'REJEITADAS'
 
 function extrairEtapaKanbanBalcao(item: Record<string, unknown>): EtapaKanbanBalcao | null {
@@ -298,7 +298,7 @@ function extrairEtapaKanbanBalcao(item: Record<string, unknown>): EtapaKanbanBal
   if (
     s === 'FINALIZADAS' ||
     s === 'PENDENTE_EMISSAO' ||
-    s === 'COM_NFE' ||
+    s === 'COM_FISCAL' ||
     s === 'REJEITADAS'
   ) {
     return s
@@ -534,7 +534,7 @@ export class VendaUnificadaDTO {
       if (colunaOp !== null) return colunaOp
     }
 
-    // Source of truth do backend quando presente (inclui REJEITADAS / EMITINDO→COM_NFE).
+    // Source of truth do backend quando presente (inclui REJEITADAS / EMITINDO→COM_FISCAL).
     if (this.etapaKanbanBalcao) return this.etapaKanbanBalcao
 
     // Fallback client-side (espelha regras do backend) quando etapaKanbanBalcao é null.
@@ -545,8 +545,8 @@ export class VendaUnificadaDTO {
     if (sf === 'REJEITADA' || sf === 'DENEGADA') return 'REJEITADAS'
 
     if (sf && sf !== 'PENDENTE_EMISSAO') {
-      // Qualquer statusFiscal não nulo e não rejeitado → COM_NFE (EMITINDO, PENDENTE, EMITIDA…).
-      return 'COM_NFE'
+      // Qualquer statusFiscal não nulo e não rejeitado → COM_FISCAL (EMITINDO, PENDENTE, EMITIDA…).
+      return 'COM_FISCAL'
     }
 
     if (this.isPendenteEmissao() || sf === 'PENDENTE_EMISSAO') return 'PENDENTE_EMISSAO'

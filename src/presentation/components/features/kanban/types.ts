@@ -21,7 +21,7 @@ export type ColunaKanbanId =
   | 'EM_ROTA'
   | 'FINALIZADAS'
   | 'PENDENTE_EMISSAO'
-  | 'COM_NFE'
+  | 'COM_FISCAL'
   | 'REJEITADAS'
 
 export type CriterioOrdenacaoKanban = 'data' | 'numero'

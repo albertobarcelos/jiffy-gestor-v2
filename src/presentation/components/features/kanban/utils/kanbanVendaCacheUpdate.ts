@@ -574,7 +574,7 @@ export function extrairPatchFiscalKanban(data: unknown): KanbanVendaCachePatch {
   const etapaKanbanBalcao: KanbanVendaCachePatch['etapaKanbanBalcao'] =
     etapaNorm === 'FINALIZADAS' ||
     etapaNorm === 'PENDENTE_EMISSAO' ||
-    etapaNorm === 'COM_NFE' ||
+    etapaNorm === 'COM_FISCAL' ||
     etapaNorm === 'REJEITADAS'
       ? etapaNorm
       : undefined
@@ -628,7 +628,7 @@ function encontrarVendaNasListagensKanban(
 const COLUNAS_FISCAIS_BALCAO: EtapaKanbanBalcao[] = [
   'FINALIZADAS',
   'PENDENTE_EMISSAO',
-  'COM_NFE',
+  'COM_FISCAL',
   'REJEITADAS',
 ]
 

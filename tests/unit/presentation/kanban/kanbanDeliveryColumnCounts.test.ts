@@ -41,20 +41,20 @@ describe('derivarContagensColunasFiscaisKanban', () => {
     const pool = [
       vendaMock('FINALIZADAS'),
       vendaMock('PENDENTE_EMISSAO'),
-      vendaMock('COM_NFE'),
+      vendaMock('COM_FISCAL'),
     ]
 
     expect(
       derivarContagensColunasFiscaisKanban(10, pool, getEtapa, false)
-    ).toEqual({ FINALIZADAS: 2, COM_NFE: 1 })
+    ).toEqual({ FINALIZADAS: 2, COM_FISCAL: 1 })
   })
 
   it('com próxima página estima proporção do total FINALIZADO da API', () => {
-    const pool = [vendaMock('FINALIZADAS'), vendaMock('COM_NFE')]
+    const pool = [vendaMock('FINALIZADAS'), vendaMock('COM_FISCAL')]
 
     expect(
       derivarContagensColunasFiscaisKanban(100, pool, getEtapa, true)
-    ).toEqual({ FINALIZADAS: 50, COM_NFE: 50 })
+    ).toEqual({ FINALIZADAS: 50, COM_FISCAL: 50 })
   })
 })
 
@@ -90,7 +90,7 @@ describe('combinarContagensColunasDeliveryKanban', () => {
       NOVOS_PEDIDOS: 42,
       EM_PREPARO: 7,
       FINALIZADAS: 0,
-      COM_NFE: 0,
+      COM_FISCAL: 0,
     })
   })
 
@@ -98,7 +98,7 @@ describe('combinarContagensColunasDeliveryKanban', () => {
     const counts = combinarContagensColunasDeliveryKanban(
       contagemOperacional,
       4,
-      [vendaMock('FINALIZADAS'), vendaMock('COM_NFE'), vendaMock('COM_NFE')],
+      [vendaMock('FINALIZADAS'), vendaMock('COM_FISCAL'), vendaMock('COM_FISCAL')],
       v => v.getEtapaKanban(),
       false
     )
@@ -109,7 +109,7 @@ describe('combinarContagensColunasDeliveryKanban', () => {
       PRONTO_ENTREGA: 2,
       EM_ROTA: 1,
       FINALIZADAS: 1,
-      COM_NFE: 2,
+      COM_FISCAL: 2,
     })
   })
 })

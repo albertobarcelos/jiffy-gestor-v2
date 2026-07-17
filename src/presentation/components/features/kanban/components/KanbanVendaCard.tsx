@@ -31,7 +31,6 @@ import {
   colunaParaEstiloCardKanban,
   deveExibirBotaoObservacaoPedidoKanban,
   deveExibirBotaoSalvarCobrancaKanban,
-  etapaKanbanCardComAcaoFiscal,
   exibirAtribuirEntregadorKanban,
   formatarDataCard,
   getCardBorderEFundoKanban,
@@ -87,7 +86,7 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
 
   const colunaAtual = column.id as ColunaKanbanId
   const tipoVendaView = derivarTipoVendaCardKanban(venda)
-  const etapaKanbanCard = etapaKanbanCardComAcaoFiscal(venda, acaoFiscalEmAndamentoPorVenda)
+  const etapaKanbanCard = venda.getEtapaKanban() as ColunaKanbanId
   const colunaIdParaEstiloCard = colunaParaEstiloCardKanban(
     colunaAtual,
     etapaKanbanCard,
