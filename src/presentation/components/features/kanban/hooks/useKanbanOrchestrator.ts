@@ -32,6 +32,7 @@ import { useKanbanVendasPorColuna } from './useKanbanVendasPorColuna'
 import { useKanbanPreTransicao } from './useKanbanPreTransicao'
 import { useKanbanDragDrop } from './useKanbanDragDrop'
 import { useKanbanModais } from './useKanbanModais'
+import { invalidateKanbanVendasListagens } from './kanbanListagemQueryCache'
 import { getVisibleKanbanColumns } from '../utils/kanbanColumnsConfig'
 
 export interface KanbanToolbarProps {
@@ -435,7 +436,8 @@ export function useKanbanOrchestrator() {
     onAfterCloseVisualizacao: () => modais.setPedidoVisualizacaoContext(null),
     onSuccessVisualizacao: () => {
       modais.setNovoPedidoModalVisualizacaoOpen(false)
-      void data.refetch()
+      // Atualiza em background sem resetar o quadro (mantém páginas e scroll).
+      invalidateKanbanVendasListagens(queryClient)
     },
     modoKanbanVendas,
   }
