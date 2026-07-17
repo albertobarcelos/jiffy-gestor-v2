@@ -64,7 +64,7 @@ export const COLUNAS_KANBAN_DRAG_ENTREGA = new Set<string>(COLUNAS_ENTREGA_OPERA
 export const COLUNAS_KANBAN_DESTINO_PIN = new Set([
   'FINALIZADAS',
   'PENDENTE_EMISSAO',
-  'COM_NFE',
+  'COM_FISCAL',
 ])
 
 /**
@@ -226,7 +226,7 @@ export function getCardBorderEFundoKanban(
     return { borderClass: 'border-l-yellow-400', cardBgClass: 'bg-white' }
   }
 
-  if (columnId === 'COM_NFE') {
+  if (columnId === 'COM_FISCAL') {
     return { borderClass: 'border-l-green-400', cardBgClass: 'bg-white' }
   }
 
@@ -260,8 +260,9 @@ export function deveExibirBotaoEmitirNotaNoKanban(
   const acao = acaoFiscalEmAndamentoPorVenda[venda.id]
   if (acao === 'reemitindo' || acao === 'emitindo') return true
   if (columnId === 'PENDENTE_EMISSAO') return true
+  if (columnId === 'REJEITADAS') return true
   if (
-    columnId === 'COM_NFE' &&
+    columnId === 'COM_FISCAL' &&
     (venda.statusFiscal === 'REJEITADA' ||
       venda.statusFiscal === 'DENEGADA' ||
       fiscalKanbanPodeReemitirAposCooldown(venda))
@@ -292,7 +293,7 @@ export function deveExibirBotaoObservacaoPedidoKanban(
   return (
     columnId !== 'FINALIZADAS' &&
     columnId !== 'PENDENTE_EMISSAO' &&
-    columnId !== 'COM_NFE'
+    columnId !== 'COM_FISCAL'
   )
 }
 
@@ -488,14 +489,6 @@ export function kanbanVendaUsaCupomPublicoNfce(
   )
 }
 
-/** Etapa do card — ação fiscal em andamento não muda a coluna (só loading no botão). */
-export function etapaKanbanCardComAcaoFiscal(
-  venda: Venda,
-  _acaoFiscalEmAndamentoPorVenda: Record<string, 'emitindo' | 'reemitindo'>
-): ColunaKanbanId {
-  return venda.getEtapaKanban() as ColunaKanbanId
-}
-
 /**
  * No modo Delivery, pendente emissão aparece na coluna Finalizadas — borda/cores da etapa real.
  */
@@ -522,7 +515,7 @@ export function colunaPermiteEditarClienteKanban(
 ): boolean {
   if (columnId === 'FINALIZADAS' || columnId === 'PENDENTE_EMISSAO') return true
   if (
-    columnId === 'COM_NFE' &&
+    columnId === 'COM_FISCAL' &&
     (acaoFiscalEmAndamentoPorVenda[venda.id] === 'reemitindo' ||
       acaoFiscalEmAndamentoPorVenda[venda.id] === 'emitindo')
   ) {

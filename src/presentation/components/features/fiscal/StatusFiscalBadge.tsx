@@ -50,7 +50,7 @@ export function StatusFiscalBadge({ status, className, tone = 'default' }: Statu
         }
       case 'EMITINDO':
         return {
-          label: 'Em emissão',
+          label: 'Emitindo…',
           color: '#3B82F6', // Azul
           bgColor: '#DBEAFE',
           icon: <CircularProgress size={12} sx={{ color: '#3B82F6' }} />,

@@ -7,16 +7,16 @@ import {
 import type { VendaUnificadaDTO } from '@/src/presentation/components/features/kanban/hooks/useVendasUnificadas'
 
 describe('balcaoKanbanColunasAtivas', () => {
-  it('padrão / Emitidas: FINALIZADAS à esquerda + COM_NFE', () => {
-    expect(balcaoKanbanColunasAtivas('')).toEqual(['FINALIZADAS', 'COM_NFE'])
-    expect(balcaoKanbanColunasAtivas(null)).toEqual(['FINALIZADAS', 'COM_NFE'])
+  it('padrão / Emitidas: FINALIZADAS à esquerda + COM_FISCAL', () => {
+    expect(balcaoKanbanColunasAtivas('')).toEqual(['FINALIZADAS', 'COM_FISCAL'])
+    expect(balcaoKanbanColunasAtivas(null)).toEqual(['FINALIZADAS', 'COM_FISCAL'])
   })
 
   it('filtro pendente no meio: Finalizadas → Pendente → Com NF', () => {
     expect(balcaoKanbanColunasAtivas('PENDENTE_EMISSAO')).toEqual([
       'FINALIZADAS',
       'PENDENTE_EMISSAO',
-      'COM_NFE',
+      'COM_FISCAL',
     ])
   })
 
@@ -24,7 +24,7 @@ describe('balcaoKanbanColunasAtivas', () => {
     expect(balcaoKanbanColunasAtivas('REJEITADAS')).toEqual([
       'FINALIZADAS',
       'REJEITADAS',
-      'COM_NFE',
+      'COM_FISCAL',
     ])
   })
 
@@ -32,16 +32,16 @@ describe('balcaoKanbanColunasAtivas', () => {
     expect(balcaoKanbanColunasAtivas('TODAS')).toEqual([
       'FINALIZADAS',
       'PENDENTE_EMISSAO',
-      'COM_NFE',
+      'COM_FISCAL',
       'REJEITADAS',
     ])
   })
 
-  it('valor inválido/legado cai no padrão: FINALIZADAS + COM_NFE', () => {
+  it('valor inválido/legado cai no padrão: FINALIZADAS + COM_FISCAL', () => {
     // @ts-expect-error — testando runtime com valor legado inesperado
-    expect(balcaoKanbanColunasAtivas('FILTRO_INEXISTENTE')).toEqual(['FINALIZADAS', 'COM_NFE'])
+    expect(balcaoKanbanColunasAtivas('FILTRO_INEXISTENTE')).toEqual(['FINALIZADAS', 'COM_FISCAL'])
     // @ts-expect-error — testando runtime com valor legado inesperado
-    expect(balcaoKanbanColunasAtivas('status_fiscal')).toEqual(['FINALIZADAS', 'COM_NFE'])
+    expect(balcaoKanbanColunasAtivas('status_fiscal')).toEqual(['FINALIZADAS', 'COM_FISCAL'])
   })
 })
 
@@ -57,11 +57,11 @@ describe('buildVendasUnificadasParamsForKanbanColumn', () => {
   }
 
   it('adiciona colunaKanban e remove filtros de criação', () => {
-    const params = buildVendasUnificadasParamsForKanbanColumn('COM_NFE', base, {
+    const params = buildVendasUnificadasParamsForKanbanColumn('COM_FISCAL', base, {
       enviarFiltroFinalizacaoNaApi: true,
     })
 
-    expect(params.colunaKanban).toBe('COM_NFE')
+    expect(params.colunaKanban).toBe('COM_FISCAL')
     expect(params.origem).toBe('PDV')
     expect(params.q).toBeUndefined()
     expect(params.terminalId).toBe('term-1')
@@ -82,7 +82,7 @@ describe('buildVendasUnificadasParamsForKanbanColumn', () => {
   })
 
   it('remove tipoEntrega (só delivery)', () => {
-    const params = buildVendasUnificadasParamsForKanbanColumn('COM_NFE', {
+    const params = buildVendasUnificadasParamsForKanbanColumn('COM_FISCAL', {
       ...base,
       tipoEntrega: 'entrega',
     })
@@ -92,7 +92,7 @@ describe('buildVendasUnificadasParamsForKanbanColumn', () => {
 
   it('nunca combina colunaKanban com statusFiscal', () => {
     const comNfe = buildVendasUnificadasParamsForKanbanColumn(
-      'COM_NFE',
+      'COM_FISCAL',
       { ...base, statusFiscal: 'REJEITADA' },
       { enviarFiltroFinalizacaoNaApi: true }
     )
@@ -132,9 +132,9 @@ describe('buildVendasUnificadasParamsForKanbanColumn', () => {
 describe('vendaPertenceColunaBalcaoKanban', () => {
   const venda = {} as VendaUnificadaDTO
 
-  it('em FINALIZADAS exclui COM_NFE, PENDENTE_EMISSAO e REJEITADAS', () => {
+  it('em FINALIZADAS exclui COM_FISCAL, PENDENTE_EMISSAO e REJEITADAS', () => {
     expect(
-      vendaPertenceColunaBalcaoKanban(venda, 'FINALIZADAS', () => 'COM_NFE')
+      vendaPertenceColunaBalcaoKanban(venda, 'FINALIZADAS', () => 'COM_FISCAL')
     ).toBe(false)
     expect(
       vendaPertenceColunaBalcaoKanban(venda, 'FINALIZADAS', () => 'PENDENTE_EMISSAO')
@@ -158,13 +158,13 @@ describe('vendaPertenceColunaBalcaoKanban', () => {
 
   it('nas demais colunas exige etapa exatamente igual', () => {
     expect(
-      vendaPertenceColunaBalcaoKanban(venda, 'COM_NFE', () => 'COM_NFE')
+      vendaPertenceColunaBalcaoKanban(venda, 'COM_FISCAL', () => 'COM_FISCAL')
     ).toBe(true)
     expect(
       vendaPertenceColunaBalcaoKanban(venda, 'REJEITADAS', () => 'REJEITADAS')
     ).toBe(true)
     expect(
-      vendaPertenceColunaBalcaoKanban(venda, 'COM_NFE', () => 'FINALIZADAS')
+      vendaPertenceColunaBalcaoKanban(venda, 'COM_FISCAL', () => 'FINALIZADAS')
     ).toBe(false)
   })
 })

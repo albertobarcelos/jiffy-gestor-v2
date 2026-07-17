@@ -218,7 +218,7 @@ describe('PedidoDeliveryListMapper — summary → VendaUnificadaDTO', () => {
     expect(dto.getEtapaKanban()).toBe('PENDENTE_EMISSAO')
   })
 
-  it('nota emitida vai para coluna COM_NFE', () => {
+  it('nota emitida vai para coluna COM_FISCAL', () => {
     const dto = mapPedidoDeliverySummaryParaVendaUnificadaDTO(
       criarSummary({
         statusDelivery: 'FINALIZADO',
@@ -244,7 +244,7 @@ describe('PedidoDeliveryListMapper — summary → VendaUnificadaDTO', () => {
     )
 
     expect(dto.temNFeEmitida()).toBe(true)
-    expect(dto.getEtapaKanban()).toBe('COM_NFE')
+    expect(dto.getEtapaKanban()).toBe('COM_FISCAL')
     expect(dto.documentoFiscalId).toBe('doc-1')
     expect(dto.numeroFiscal).toBe(123)
   })
