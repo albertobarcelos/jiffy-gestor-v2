@@ -124,7 +124,7 @@ describe('vendasKanban.rules — desbloqueio no Kanban', () => {
     expect(statusFiscalAguardandoSefaz(vendaAposCooldown)).toBe(false)
     expect(vendaBloqueadaParaEmissaoInterativa(vendaAposCooldown, {})).toBe(false)
     expect(
-      deveExibirBotaoEmitirNotaNoKanban('COM_NFE', vendaAposCooldown, {})
+      deveExibirBotaoEmitirNotaNoKanban('COM_FISCAL', vendaAposCooldown, {})
     ).toBe(true)
   })
 
@@ -139,7 +139,7 @@ describe('vendasKanban.rules — desbloqueio no Kanban', () => {
     })
 
     expect(fiscalKanbanPodeReemitirAposCooldown(venda)).toBe(true)
-    expect(deveExibirBotaoEmitirNotaNoKanban('COM_NFE', venda, {})).toBe(true)
+    expect(deveExibirBotaoEmitirNotaNoKanban('COM_FISCAL', venda, {})).toBe(true)
   })
 
   it('move card para pendente emissão após cooldown', () => {
@@ -159,7 +159,7 @@ describe('vendasKanban.rules — desbloqueio no Kanban', () => {
       numeroFiscal: 333,
       serieFiscal: '2',
     })
-    expect(deveExibirBotaoEmitirNotaNoKanban('COM_NFE', venda, {})).toBe(true)
+    expect(deveExibirBotaoEmitirNotaNoKanban('COM_FISCAL', venda, {})).toBe(true)
   })
 })
 
@@ -171,7 +171,7 @@ describe('getEtapaKanban — REJEITADA com numeração', () => {
       serieFiscal: '2',
       retornoSefaz: null,
     })
-    expect(venda.getEtapaKanban()).toBe('COM_NFE')
+    expect(venda.getEtapaKanban()).toBe('COM_FISCAL')
   })
 
   it('mantém REJEITADA sem numeração em Pendente Emissão', () => {

@@ -65,7 +65,7 @@ const CRITERIO_PADRAO: Record<ColunaKanbanId, CriterioOrdenacaoKanban> = {
   EM_ROTA: 'data',
   FINALIZADAS: 'data',
   PENDENTE_EMISSAO: 'data',
-  COM_NFE: 'data',
+  COM_FISCAL: 'data',
   REJEITADAS: 'data',
 }
 
@@ -76,7 +76,7 @@ const DIRECAO_PADRAO: Record<ColunaKanbanId, DirecaoOrdenacaoKanban> = {
   EM_ROTA: 'desc',
   FINALIZADAS: 'desc',
   PENDENTE_EMISSAO: 'desc',
-  COM_NFE: 'desc',
+  COM_FISCAL: 'desc',
   REJEITADAS: 'desc',
 }
 
@@ -243,7 +243,7 @@ export function useKanbanVendasPorColuna({
                 ? { etapaKanbanBalcao: 'FINALIZADAS' as const, solicitarEmissaoFiscal: false }
                 : colunaDestino === 'REJEITADAS'
                   ? { etapaKanbanBalcao: 'REJEITADAS' as const }
-                  : { etapaKanbanBalcao: colunaDestino as 'COM_NFE' }
+                  : { etapaKanbanBalcao: colunaDestino as 'COM_FISCAL' }
           vendas = [...vendas, cloneVendaUnificadaDTO(vendaTransicao, patch)]
         }
       }

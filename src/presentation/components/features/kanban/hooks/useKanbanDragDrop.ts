@@ -166,7 +166,7 @@ export function useKanbanDragDrop({
         } else if (venda.solicitarEmissaoFiscal === true) {
           void handleDesmarcarEmissaoFiscal(venda)
         }
-      } else if (over.id === 'COM_NFE') {
+      } else if (over.id === 'COM_FISCAL') {
         if (venda.getEtapaKanban() !== 'PENDENTE_EMISSAO') {
           showToast.info(
             'Arraste para esta coluna apenas vendas que estão em Pendente emissão fiscal.'
