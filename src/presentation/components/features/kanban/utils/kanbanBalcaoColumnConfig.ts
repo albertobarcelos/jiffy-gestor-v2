@@ -5,14 +5,14 @@ import type { VendaUnificadaDTO, VendasUnificadasQueryParams } from '../hooks/us
 export const BALCAO_KANBAN_COLUMN_IDS = [
   'FINALIZADAS',
   'PENDENTE_EMISSAO',
-  'COM_NFE',
+  'COM_FISCAL',
   'REJEITADAS',
 ] as const satisfies readonly ColunaKanbanId[]
 
 /** Sempre visíveis / sempre consultadas ao abrir o quadro (esquerda → direita). */
 export const BALCAO_KANBAN_COLUNAS_PADRAO = [
   'FINALIZADAS',
-  'COM_NFE',
+  'COM_FISCAL',
 ] as const satisfies readonly ColunaKanbanId[]
 
 /** Filtros opcionais — só montam query quando o filtro da toolbar está ativo. */
@@ -39,10 +39,10 @@ export function balcaoKanbanColunasAtivas(
 ): ColunaKanbanBalcaoApi[] {
   const filtro = String(filtroExtra ?? '').trim().toUpperCase()
   if (filtro === 'TODAS') {
-    return ['FINALIZADAS', 'PENDENTE_EMISSAO', 'COM_NFE', 'REJEITADAS']
+    return ['FINALIZADAS', 'PENDENTE_EMISSAO', 'COM_FISCAL', 'REJEITADAS']
   }
   if (filtro === 'PENDENTE_EMISSAO' || filtro === 'REJEITADAS') {
-    return ['FINALIZADAS', filtro, 'COM_NFE']
+    return ['FINALIZADAS', filtro, 'COM_FISCAL']
   }
   return [...BALCAO_KANBAN_COLUNAS_PADRAO]
 }
@@ -94,7 +94,7 @@ export function vendaPertenceColunaBalcaoKanban(
 
   if (columnId === 'FINALIZADAS') {
     if (
-      etapa === 'COM_NFE' ||
+      etapa === 'COM_FISCAL' ||
       etapa === 'PENDENTE_EMISSAO' ||
       etapa === 'REJEITADAS'
     ) {

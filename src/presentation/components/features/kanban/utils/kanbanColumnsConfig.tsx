@@ -63,8 +63,8 @@ export function getKanbanColumnsConfig(): KanbanColumn[] {
       placeholder: 'Vendas aguardando emissão de NFe',
     },
     {
-      id: 'COM_NFE',
-      title: 'Com Nota Fiscal Solicitada',
+      id: 'COM_FISCAL',
+      title: 'Com NF Solicitada',
       color: 'bg-green-50',
       borderColor: 'border-green-400',
       icon: <MdCheckCircle className="h-4 w-4 text-green-600" />,
@@ -88,7 +88,7 @@ export function getVisibleKanbanColumns(
   const todasColunasKanban = getKanbanColumnsConfig()
 
   if (modoKanbanVendas === 'delivery') {
-    // Delivery: colunas operacionais + COM_NFE + FINALIZADAS (sem Pendente/Rejeitadas fixas).
+    // Delivery: colunas operacionais + COM_FISCAL + FINALIZADAS (sem Pendente/Rejeitadas fixas).
     return todasColunasKanban.filter(
       c =>
         c.id !== 'PENDENTE_EMISSAO' &&
