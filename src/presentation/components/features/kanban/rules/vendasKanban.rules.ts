@@ -260,6 +260,7 @@ export function deveExibirBotaoEmitirNotaNoKanban(
   const acao = acaoFiscalEmAndamentoPorVenda[venda.id]
   if (acao === 'reemitindo' || acao === 'emitindo') return true
   if (columnId === 'PENDENTE_EMISSAO') return true
+  if (columnId === 'REJEITADAS') return true
   if (
     columnId === 'COM_FISCAL' &&
     (venda.statusFiscal === 'REJEITADA' ||
