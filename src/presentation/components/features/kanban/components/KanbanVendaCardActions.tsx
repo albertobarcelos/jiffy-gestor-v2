@@ -185,13 +185,13 @@ export function KanbanVendaCardActions(props: KanbanVendaCardActionsProps) {
         </Button>
       )}
 
-      {column.id === 'COM_NFE' && venda.statusFiscal === 'INUTILIZADA' && (
+      {column.id === 'COM_FISCAL' && venda.statusFiscal === 'INUTILIZADA' && (
         <div className="flex-1 rounded border border-gray-200 bg-gray-50 px-2 py-1 text-center text-xs text-gray-500">
           Venda com Nota Inutilizada
         </div>
       )}
 
-      {column.id === 'COM_NFE' &&
+      {column.id === 'COM_FISCAL' &&
         !acaoFiscalEmAndamentoPorVenda[venda.id] &&
         venda.documentoFiscalId &&
         (venda.statusFiscal === 'EMITIDA' || venda.statusFiscal === 'CANCELADA') && (

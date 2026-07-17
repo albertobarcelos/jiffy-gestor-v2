@@ -229,14 +229,8 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
         }
 
         if (deveEncerrarPollComStatus(status, statusAnterior, viuAguardando)) {
-          aplicarPatchFiscalKanbanSemRefetch(queryClient, venda.id, {
-            ...patch,
-            etapaKanbanBalcao:
-              normalizarStatusFiscal(status) === 'REJEITADA' ||
-              normalizarStatusFiscal(status) === 'DENEGADA'
-                ? 'REJEITADAS'
-                : 'COM_NFE',
-          })
+          // Classificação de coluna vem do backend (etapaKanbanBalcao no patch).
+          aplicarPatchFiscalKanbanSemRefetch(queryClient, venda.id, patch)
           return true
         }
       }
@@ -286,33 +280,12 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
         const statusResposta = normalizarStatusFiscal(patchResposta.statusFiscal)
         const anterior = normalizarStatusFiscal(statusAnterior)
 
-        // Backend persiste EMITINDO e move para COM_NFE — UI usa statusFiscal, não flag local.
-        const statusParaCache =
-          statusResposta || (acao === 'emitindo' || acao === 'reemitindo' ? 'EMITINDO' : '')
-        if (statusParaCache && !deveEncerrarPollComStatus(statusParaCache, anterior, false)) {
-          aplicarPatchFiscalKanbanSemRefetch(queryClient, venda.id, {
-            ...patchResposta,
-            statusFiscal: statusParaCache,
-            etapaKanbanBalcao:
-              statusParaCache === 'REJEITADA' || statusParaCache === 'DENEGADA'
-                ? 'REJEITADAS'
-                : 'COM_NFE',
-          })
+        // Backend responde com statusFiscal (EMITINDO…) e etapaKanbanBalcao — aplica direto.
+        if (patchResposta.statusFiscal || patchResposta.etapaKanbanBalcao) {
+          aplicarPatchFiscalKanbanSemRefetch(queryClient, venda.id, patchResposta)
         }
 
-        if (deveEncerrarPollComStatus(statusResposta, anterior, false)) {
-          aplicarPatchFiscalKanbanSemRefetch(queryClient, venda.id, {
-            ...patchResposta,
-            etapaKanbanBalcao:
-              statusResposta === 'REJEITADA' || statusResposta === 'DENEGADA'
-                ? 'REJEITADAS'
-                : statusResposta === 'EMITIDA' ||
-                    statusResposta === 'CANCELADA' ||
-                    statusResposta === 'INUTILIZADA'
-                  ? 'COM_NFE'
-                  : patchResposta.etapaKanbanBalcao,
-          })
-        } else {
+        if (!deveEncerrarPollComStatus(statusResposta, anterior, false)) {
           const resolvido = await pollStatusFiscalAteResolver(
             venda,
             statusAnterior,
@@ -416,7 +389,7 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
         }
       }
 
-      setPrimeiroPorColuna(prev => ({ ...prev, COM_NFE: venda.id }))
+      setPrimeiroPorColuna(prev => ({ ...prev, COM_FISCAL: venda.id }))
       setVendaSelecionadaParaEmissao({
         id: venda.id,
         tabelaOrigem: venda.tabelaOrigem,

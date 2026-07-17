@@ -54,9 +54,9 @@ function makeVenda(overrides: {
 }
 
 describe('VendaUnificadaDTO.getEtapaKanban — backend source of truth', () => {
-  it('retorna etapaKanbanBalcao do backend quando presente (COM_NFE)', () => {
-    const venda = makeVenda({ etapaKanbanBalcao: 'COM_NFE' })
-    expect(venda.getEtapaKanban()).toBe('COM_NFE')
+  it('retorna etapaKanbanBalcao do backend quando presente (COM_FISCAL)', () => {
+    const venda = makeVenda({ etapaKanbanBalcao: 'COM_FISCAL' })
+    expect(venda.getEtapaKanban()).toBe('COM_FISCAL')
   })
 
   it('retorna FINALIZADAS quando backend envia essa etapa', () => {
@@ -75,8 +75,8 @@ describe('VendaUnificadaDTO.getEtapaKanban — backend source of truth', () => {
   })
 
   it('etapaKanbanBalcao tem prioridade sobre statusFiscal', () => {
-    const venda = makeVenda({ etapaKanbanBalcao: 'COM_NFE', statusFiscal: 'REJEITADA' })
-    expect(venda.getEtapaKanban()).toBe('COM_NFE')
+    const venda = makeVenda({ etapaKanbanBalcao: 'COM_FISCAL', statusFiscal: 'REJEITADA' })
+    expect(venda.getEtapaKanban()).toBe('COM_FISCAL')
   })
 })
 
@@ -91,24 +91,24 @@ describe('VendaUnificadaDTO.getEtapaKanban — fallback client-side (etapaKanban
     expect(venda.getEtapaKanban()).toBe('REJEITADAS')
   })
 
-  it('EMITINDO → COM_NFE', () => {
+  it('EMITINDO → COM_FISCAL', () => {
     const venda = makeVenda({ statusFiscal: 'EMITINDO', dataFinalizacao: null })
-    expect(venda.getEtapaKanban()).toBe('COM_NFE')
+    expect(venda.getEtapaKanban()).toBe('COM_FISCAL')
   })
 
-  it('EMITIDA → COM_NFE', () => {
+  it('EMITIDA → COM_FISCAL', () => {
     const venda = makeVenda({ statusFiscal: 'EMITIDA', dataFinalizacao: null })
-    expect(venda.getEtapaKanban()).toBe('COM_NFE')
+    expect(venda.getEtapaKanban()).toBe('COM_FISCAL')
   })
 
-  it('PENDENTE → COM_NFE', () => {
+  it('PENDENTE → COM_FISCAL', () => {
     const venda = makeVenda({ statusFiscal: 'PENDENTE', dataFinalizacao: null })
-    expect(venda.getEtapaKanban()).toBe('COM_NFE')
+    expect(venda.getEtapaKanban()).toBe('COM_FISCAL')
   })
 
-  it('CANCELADA → COM_NFE', () => {
+  it('CANCELADA → COM_FISCAL', () => {
     const venda = makeVenda({ statusFiscal: 'CANCELADA', dataFinalizacao: null })
-    expect(venda.getEtapaKanban()).toBe('COM_NFE')
+    expect(venda.getEtapaKanban()).toBe('COM_FISCAL')
   })
 
   it('sem statusFiscal + solicitarEmissaoFiscal=true → PENDENTE_EMISSAO', () => {

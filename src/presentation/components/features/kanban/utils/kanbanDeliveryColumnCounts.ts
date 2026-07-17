@@ -52,29 +52,29 @@ export function derivarContagensColunasFiscaisKanban(
   poolItems: VendaUnificadaDTO[],
   getEtapaKanban: (v: VendaUnificadaDTO) => string,
   hasNextPage: boolean
-): { FINALIZADAS: number; COM_NFE: number } {
-  let comNfeLoaded = 0
+): { FINALIZADAS: number; COM_FISCAL: number } {
+  let comFiscalLoaded = 0
   let finalizadasLoaded = 0
 
   for (const venda of poolItems) {
     const etapa = getEtapaKanban(venda)
-    if (etapa === 'COM_NFE') comNfeLoaded += 1
+    if (etapa === 'COM_FISCAL') comFiscalLoaded += 1
     else if (etapa === 'FINALIZADAS' || etapa === 'PENDENTE_EMISSAO') finalizadasLoaded += 1
   }
 
   const poolLoaded = poolItems.length
 
   if (!hasNextPage) {
-    return { FINALIZADAS: finalizadasLoaded, COM_NFE: comNfeLoaded }
+    return { FINALIZADAS: finalizadasLoaded, COM_FISCAL: comFiscalLoaded }
   }
 
   if (poolLoaded === 0 || finalizadoApiCount <= 0) {
-    return { FINALIZADAS: 0, COM_NFE: 0 }
+    return { FINALIZADAS: 0, COM_FISCAL: 0 }
   }
 
-  const comNfe = Math.round((finalizadoApiCount * comNfeLoaded) / poolLoaded)
-  const finalizadas = Math.max(0, finalizadoApiCount - comNfe)
-  return { FINALIZADAS: finalizadas, COM_NFE: comNfe }
+  const comFiscal = Math.round((finalizadoApiCount * comFiscalLoaded) / poolLoaded)
+  const finalizadas = Math.max(0, finalizadoApiCount - comFiscal)
+  return { FINALIZADAS: finalizadas, COM_FISCAL: comFiscal }
 }
 
 export function combinarContagensColunasDeliveryKanban(
@@ -100,7 +100,7 @@ export function combinarContagensColunasDeliveryKanban(
     hasNextPageFinalizados
   )
   counts.FINALIZADAS = fiscal.FINALIZADAS
-  counts.COM_NFE = fiscal.COM_NFE
+  counts.COM_FISCAL = fiscal.COM_FISCAL
 
   return counts
 }
