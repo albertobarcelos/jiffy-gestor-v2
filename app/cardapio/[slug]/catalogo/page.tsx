@@ -23,7 +23,7 @@ export default function CardapioCatalogoRedirectPage() {
     <div className="min-h-screen flex items-center justify-center">
       <div
         className="animate-spin rounded-full h-12 w-12 border-b-2"
-        style={{ borderColor: 'var(--cardapio-accent-primary)' }}
+        style={{ borderColor: 'var(--delivery-primary, #333)' }}
       />
     </div>
   )

@@ -8,16 +8,21 @@ export default function InstrucoesPage() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div
         className="max-w-md w-full rounded-2xl shadow-xl p-8 text-center"
-        style={{ backgroundColor: 'var(--cardapio-bg-secondary)' }}
+        style={{
+          backgroundColor: 'var(--delivery-surface, #ffffff)',
+          color: 'var(--delivery-text, #171717)',
+        }}
       >
         <div className="mb-6">
           <div
             className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4"
-            style={{ backgroundColor: 'var(--cardapio-bg-elevated)' }}
+            style={{
+              backgroundColor: 'var(--delivery-surface-muted, #f3f4f6)',
+            }}
           >
             <svg
               className="w-10 h-10"
-              style={{ color: 'var(--cardapio-accent-primary)' }}
+              style={{ color: 'var(--delivery-primary, #333333)' }}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -32,33 +37,41 @@ export default function InstrucoesPage() {
           </div>
           <h1
             className="text-2xl font-bold mb-2"
-            style={{ color: 'var(--cardapio-text-primary)' }}
+            style={{
+              color: 'var(--delivery-text, #171717)',
+              fontFamily: 'var(--delivery-font-title, inherit)',
+            }}
           >
             Cardápio digital
           </h1>
-          <p style={{ color: 'var(--cardapio-text-secondary)' }}>
+          <p style={{ color: 'var(--delivery-text-secondary, #525252)' }}>
             Acesse o link compartilhado pelo restaurante para ver o cardápio e fazer seu pedido.
           </p>
         </div>
 
         <div
           className="rounded-lg p-6 mb-6 text-left"
-          style={{ backgroundColor: 'var(--cardapio-bg-primary)' }}
+          style={{
+            backgroundColor: 'var(--delivery-surface-muted, #f3f4f6)',
+          }}
         >
           <h2
             className="text-lg font-semibold mb-3"
-            style={{ color: 'var(--cardapio-text-primary)' }}
+            style={{ color: 'var(--delivery-text, #171717)' }}
           >
             Como acessar
           </h2>
-          <ol className="space-y-3" style={{ color: 'var(--cardapio-text-secondary)' }}>
+          <ol
+            className="space-y-3"
+            style={{ color: 'var(--delivery-text-secondary, #525252)' }}
+          >
             <li>1. Peça ao restaurante o link do cardápio online</li>
             <li>2. O endereço tem o formato: /cardapio/nome-da-loja</li>
             <li>3. Escolha os itens, monte seu pedido e confirme</li>
           </ol>
         </div>
 
-        <p className="text-sm" style={{ color: 'var(--cardapio-text-muted)' }}>
+        <p className="text-sm" style={{ color: 'var(--delivery-text-muted, #737373)' }}>
           Link inválido ou loja não encontrada? Verifique com o estabelecimento.
         </p>
       </div>
