@@ -26,6 +26,7 @@ export function normalizeStatusVenda(venda: VendaGestorApiResponse): StatusVenda
 
 const ORIGEM_API_MAP: Record<string, OrigemVenda> = {
   GESTOR: 'GESTOR',
+  JIFFY_DELIVERY: 'JIFFY_DELIVERY',
   IFOOD: 'IFOOD',
   DELIVERY_IFOOD: 'IFOOD',
   RAPPI: 'RAPPI',
@@ -41,9 +42,35 @@ export function normalizeOrigemApi(raw: string | null | undefined): OrigemVenda 
   return ORIGEM_API_MAP[key] ?? 'OUTROS'
 }
 
+function tipoVendaNormalizado(tipoVenda?: string | null): string {
+  return String(tipoVenda ?? '')
+    .trim()
+    .toLowerCase()
+}
+
+function tipoVendaEhDelivery(tipoVenda?: string | null): boolean {
+  const tipo = tipoVendaNormalizado(tipoVenda)
+  return tipo === 'entrega' || tipo === 'retirada'
+}
+
+function tipoVendaEhBalcao(tipoVenda?: string | null): boolean {
+  return tipoVendaNormalizado(tipoVenda) === 'balcao'
+}
+
+function rotuloOrigemGestor(tipoVenda?: string | null): string {
+  if (tipoVendaEhDelivery(tipoVenda)) return 'Delivery Gestor'
+  if (tipoVendaEhBalcao(tipoVenda)) return 'Balcão Gestor'
+  return 'Gestor'
+}
+
 /** Rótulo de exibição para origem (UI). */
-export function rotuloOrigemParaExibicao(origem: OrigemVenda | null, origemBrutaApi?: string | null): string {
-  if (origem === 'GESTOR') return 'Gestor'
+export function rotuloOrigemParaExibicao(
+  origem: OrigemVenda | null,
+  origemBrutaApi?: string | null,
+  tipoVenda?: string | null
+): string {
+  if (origem === 'JIFFY_DELIVERY') return 'Delivery público'
+  if (origem === 'GESTOR') return rotuloOrigemGestor(tipoVenda)
   if (origem === 'IFOOD') return 'iFood'
   if (origem === 'RAPPI') return 'Rappi'
   if (origem === 'OUTROS') return 'Outros'
@@ -52,6 +79,8 @@ export function rotuloOrigemParaExibicao(origem: OrigemVenda | null, origemBruta
   }
   const o = String(origemBrutaApi).trim().toUpperCase()
   if (o === 'PDV') return 'PDV'
+  if (o === 'JIFFY_DELIVERY') return 'Delivery público'
+  if (o === 'GESTOR') return rotuloOrigemGestor(tipoVenda)
   return String(origemBrutaApi).trim()
 }
 

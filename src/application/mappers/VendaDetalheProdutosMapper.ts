@@ -118,9 +118,15 @@ export function mapProdutoDetalheVenda(prod: Record<string, unknown>): ProdutoSe
     tipoAcrescimo: tipoAcrescimoFinal,
     valorAcrescimo: valorAcrescimoFinal,
     valorFinal: valorFinalProduto,
-    lancadoPorId: prod.lancadoPorId != null ? String(prod.lancadoPorId) : undefined,
+    lancadoPorId:
+      prod.lancadoPorId != null && String(prod.lancadoPorId).trim() !== ''
+        ? String(prod.lancadoPorId).trim()
+        : undefined,
     removido: Boolean(prod.removido),
-    removidoPorId: prod.removidoPorId != null ? String(prod.removidoPorId) : undefined,
+    removidoPorId:
+      prod.removidoPorId != null && String(prod.removidoPorId).trim() !== ''
+        ? String(prod.removidoPorId).trim()
+        : undefined,
     dataLancamento: prod.dataLancamento != null ? String(prod.dataLancamento) : undefined,
     dataRemocao: prod.dataRemocao != null ? String(prod.dataRemocao) : undefined,
     ncm: prod.ncm != null ? String(prod.ncm) : undefined,

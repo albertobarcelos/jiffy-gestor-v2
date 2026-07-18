@@ -14,11 +14,33 @@ function isoString(value: unknown): string | null {
   return s || null
 }
 
+/**
+ * Só mapeia ator de usuário gestor para lookup em `/usuarios-gestor`.
+ * Pedidos públicos usam `CLIENTE_DELIVERY` com telefone em `sourceReference` — não é id de gestor.
+ */
 function atorUsuarioId(ator: unknown): string | null {
   if (!ator || typeof ator !== 'object') return null
   const a = ator as Record<string, unknown>
+  const type = String(a.type ?? a.tipo ?? '')
+    .trim()
+    .toUpperCase()
+  if (type !== 'USUARIO_GESTOR') return null
   const ref = String(a.sourceReference ?? a.id ?? '').trim()
   return ref || null
+}
+
+/** Normaliza produto delivery: `lancadoPorId` flat pode ser telefone do cliente. */
+function mapProdutoLancadoDelivery(raw: unknown): ProdutoLancadoApiItem | null {
+  if (!raw || typeof raw !== 'object') return null
+  const p = raw as Record<string, unknown>
+  const lancadoPorId = atorUsuarioId(p.lancadoPor)
+  const removidoPorId = atorUsuarioId(p.removidoPor)
+
+  return {
+    ...(p as ProdutoLancadoApiItem),
+    lancadoPorId: lancadoPorId ?? null,
+    removidoPorId: removidoPorId ?? null,
+  }
 }
 
 function mapCobrancaDeliveryToPagamento(raw: unknown): PagamentoApiItem | null {
@@ -155,7 +177,9 @@ export function adaptPedidoDeliveryToVendaGestorApiResponse(
     .filter((p): p is PagamentoApiItem => p != null)
 
   const produtosLancados = Array.isArray(registro.produtosLancados)
-    ? (registro.produtosLancados as ProdutoLancadoApiItem[])
+    ? registro.produtosLancados
+        .map(mapProdutoLancadoDelivery)
+        .filter((p): p is ProdutoLancadoApiItem => p != null)
     : []
 
   const dataFinalizacao = isoString(registro.dataFinalizacao)
@@ -196,6 +220,10 @@ export function adaptPedidoDeliveryToVendaGestorApiResponse(
     pagamentos,
     observacoes: Array.isArray(registro.observacoes) ? registro.observacoes : [],
     previsaoEntrega: isoString(registro.previsaoEntregaEm ?? registro.previsaoEntrega),
+    previsaoEntregaEm: isoString(registro.previsaoEntregaEm ?? registro.previsaoEntrega),
+    pedidoAgendado: registro.pedidoAgendado === true || registro.pedido_agendado === true,
+    slotInicio: isoString(registro.slotInicio ?? registro.slot_inicio),
+    slotFim: isoString(registro.slotFim ?? registro.slot_fim),
     dataPronto: isoString(registro.dataFinalizacaoPreparo),
     dataInicioPreparo: isoString(registro.dataInicioPreparo),
     dataSaidaEntrega: isoString(registro.dataSaidaEntrega),

@@ -16,6 +16,8 @@ import {
   rotuloOrigemExibicao,
   taxaEntregaTemValor,
 } from '@/src/application/mappers/PedidoDisplayMapper'
+import { formatarAgendaSlotDelivery } from '@/src/presentation/components/features/kanban/utils/kanbanDeliveryCardDisplay'
+import { useEmpresaDeliveryMe } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
 import { PedidoDetalhesInfo } from './PedidoDetalhesInfo'
 import { PedidoDetalhesNotaFiscal } from './PedidoDetalhesNotaFiscal'
 import { PedidoDetalhesPagamentos } from './PedidoDetalhesPagamentos'
@@ -76,6 +78,16 @@ export function PedidoDetalhesView() {
     dataVenda,
     clienteNome,
   } = useNovoPedidoFormContext()
+  const { data: empresaDelivery } = useEmpresaDeliveryMe()
+  const agendaPedido = formatarAgendaSlotDelivery(
+    {
+      pedidoAgendado: detalhesEntregaPedido?.pedidoAgendado,
+      slotInicio: detalhesEntregaPedido?.slotInicio,
+      slotFim: detalhesEntregaPedido?.slotFim,
+      previsaoEntregaEm: detalhesEntregaPedido?.previsaoEntrega,
+    },
+    empresaDelivery?.parametroDelivery?.timezone ?? 'America/Sao_Paulo'
+  )
 
   return (
     <>            {/* STEP 4: Detalhes da Venda (visualização ou após criar pedido) */}
@@ -213,8 +225,16 @@ export function PedidoDetalhesView() {
                       >
                         <h3 className="text-lg font-semibold">Informações do Pedido</h3>
                         <div className="flex flex-col gap-3 text-sm">
+                          {agendaPedido ? (
+                            <div className="flex justify-between rounded-lg bg-primary px-1 py-1.5 text-white">
+                              <span>Agendado para:</span>
+                              <span className="font-medium tabular-nums">
+                                {agendaPedido.data} · {agendaPedido.horario}
+                              </span>
+                            </div>
+                          ) : null}
                           <div className="flex justify-between rounded-lg bg-white px-1">
-                            <span className="text-gray-600">Data:</span>
+                            <span className="text-gray-600">Data do pedido:</span>
                             <span className="font-medium">
                               {(dataVenda ? new Date(dataVenda) : new Date()).toLocaleString(
                                 'pt-BR',
@@ -231,7 +251,11 @@ export function PedidoDetalhesView() {
                           <div className="flex justify-between px-1">
                             <span className="text-gray-600">Origem:</span>
                             <span className="font-medium">
-                              {rotuloOrigemExibicao(origem)}
+                              {rotuloOrigemExibicao(
+                                origem,
+                                undefined,
+                                detalhesPedidoMeta?.tipoVenda
+                              )}
                             </span>
                           </div>
                           <div className="flex justify-between rounded-lg bg-white px-1">
@@ -251,28 +275,30 @@ export function PedidoDetalhesView() {
                               {totalItensPedido} {totalItensPedido === 1 ? 'produto' : 'produtos'}
                             </span>
                           </div>
-                          <div className="flex justify-between px-1">
-                            <span className="text-gray-600">Aberto por:</span>
-                            <span className="font-medium">
-                              {formatarUsuarioPorId(detalhesPedidoMeta?.abertoPorId)}
-                            </span>
-                          </div>
-                          {detalhesPedidoMeta?.ultimoResponsavelId && (
+                          {detalhesPedidoMeta?.abertoPorId ? (
+                            <div className="flex justify-between px-1">
+                              <span className="text-gray-600">Aberto por:</span>
+                              <span className="font-medium">
+                                {formatarUsuarioPorId(detalhesPedidoMeta.abertoPorId)}
+                              </span>
+                            </div>
+                          ) : null}
+                          {detalhesPedidoMeta?.ultimoResponsavelId ? (
                             <div className="flex justify-between rounded-lg bg-white px-1">
                               <span className="text-gray-600">Última alteração por:</span>
                               <span className="font-medium">
                                 {formatarUsuarioPorId(detalhesPedidoMeta.ultimoResponsavelId)}
                               </span>
                             </div>
-                          )}
-                          {detalhesPedidoMeta?.canceladoPorId && (
+                          ) : null}
+                          {detalhesPedidoMeta?.canceladoPorId ? (
                             <div className="flex justify-between px-1">
                               <span className="text-gray-600">Cancelado por:</span>
                               <span className="font-medium text-red-600">
                                 {formatarUsuarioPorId(detalhesPedidoMeta.canceladoPorId)}
                               </span>
                             </div>
-                          )}
+                          ) : null}
                           {detalhesPedidoMeta?.codigoTerminal && (
                             <div className="flex justify-between rounded-lg bg-white px-1">
                               <span className="text-gray-600">Código do terminal:</span>
@@ -500,7 +526,9 @@ export function PedidoDetalhesView() {
                                       })}
                                       <div className="flex justify-start px-6 pb-1 text-[11px] text-gray-500">
                                         <span>
-                                          Por: {formatarUsuarioPorId(produto.lancadoPorId)} -{' '}
+                                          {produto.lancadoPorId
+                                            ? `Por: ${formatarUsuarioPorId(produto.lancadoPorId)} - `
+                                            : null}
                                           {formatarDataDetalhePedido(
                                             produto.dataLancamento || null
                                           )}

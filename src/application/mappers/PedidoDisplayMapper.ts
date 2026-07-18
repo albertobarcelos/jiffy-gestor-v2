@@ -60,16 +60,20 @@ export function rotuloModeloNfe(modelo: number | null | undefined): string {
 }
 
 /** Compat: aceita texto bruto da API (PDV sem `origem`). */
-export function rotuloOrigemParaExibicao(origemBrutaApi: string | null): string {
+export function rotuloOrigemParaExibicao(
+  origemBrutaApi: string | null,
+  tipoVenda?: string | null
+): string {
   const origem = normalizeOrigemApi(origemBrutaApi)
-  return rotuloOrigemNormalizado(origem, origemBrutaApi)
+  return rotuloOrigemNormalizado(origem, origemBrutaApi, tipoVenda)
 }
 
 export function rotuloOrigemExibicao(
   origem: OrigemVenda | null,
-  origemBrutaApi?: string | null
+  origemBrutaApi?: string | null,
+  tipoVenda?: string | null
 ): string {
-  return rotuloOrigemNormalizado(origem, origemBrutaApi)
+  return rotuloOrigemNormalizado(origem, origemBrutaApi, tipoVenda)
 }
 
 export function rotuloCobrancaEntrega(fluxo: FluxoPagamentoEntrega | null | undefined): string {

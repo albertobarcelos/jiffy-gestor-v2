@@ -10,6 +10,18 @@ export type PrevisaoEntregaKanbanCard =
   | { kind: 'agendado'; data: string; horario: string }
   | { kind: 'texto'; texto: string }
 
+export type AgendaSlotDeliveryInput = {
+  pedidoAgendado?: boolean
+  slotInicio?: string | null
+  slotFim?: string | null
+  previsaoEntregaEm?: string | null
+}
+
+export type AgendaSlotDeliveryFormatado = {
+  data: string
+  horario: string
+}
+
 const TIMEZONE_PADRAO_BR = 'America/Sao_Paulo'
 
 function formatarHoraEmTimezone(iso: string, timeZone: string): string | null {
@@ -45,6 +57,28 @@ function formatarDataDiaMesEmTimezone(iso: string, timeZone: string): string | n
   }
 }
 
+/** Data + janela de slot para pedido agendado (Kanban e Info Pedidos). */
+export function formatarAgendaSlotDelivery(
+  input: AgendaSlotDeliveryInput,
+  timeZoneEmpresa: string = TIMEZONE_PADRAO_BR
+): AgendaSlotDeliveryFormatado | null {
+  if (!input.pedidoAgendado) return null
+
+  const timeZone = timeZoneEmpresa.trim() || TIMEZONE_PADRAO_BR
+  const inicio = input.slotInicio?.trim() || input.previsaoEntregaEm?.trim()
+  const fim = input.slotFim?.trim()
+  if (!inicio) return null
+
+  const data = formatarDataDiaMesEmTimezone(inicio, timeZone)
+  const hInicio = formatarHoraEmTimezone(inicio, timeZone)
+  if (!data || !hInicio) return null
+
+  const hFim = fim ? formatarHoraEmTimezone(fim, timeZone) : null
+  const horario = hFim ? `${hInicio}–${hFim}` : hInicio
+
+  return { data, horario }
+}
+
 /** Hora ou minutos previstos para exibição compacta no card delivery. */
 export function formatarPrevisaoEntregaKanbanCard(
   venda: VendaUnificadaDTO,
@@ -52,19 +86,17 @@ export function formatarPrevisaoEntregaKanbanCard(
 ): PrevisaoEntregaKanbanCard | null {
   const timeZone = timeZoneEmpresa.trim() || TIMEZONE_PADRAO_BR
 
-  if (venda.pedidoAgendado) {
-    const inicio = venda.slotInicio?.trim() || venda.previsaoEntregaEm?.trim()
-    const fim = venda.slotFim?.trim()
-    if (!inicio) return null
-
-    const data = formatarDataDiaMesEmTimezone(inicio, timeZone)
-    const hInicio = formatarHoraEmTimezone(inicio, timeZone)
-    if (!data || !hInicio) return null
-
-    const hFim = fim ? formatarHoraEmTimezone(fim, timeZone) : null
-    const horario = hFim ? `${hInicio}–${hFim}` : hInicio
-
-    return { kind: 'agendado', data, horario }
+  const agenda = formatarAgendaSlotDelivery(
+    {
+      pedidoAgendado: venda.pedidoAgendado,
+      slotInicio: venda.slotInicio,
+      slotFim: venda.slotFim,
+      previsaoEntregaEm: venda.previsaoEntregaEm,
+    },
+    timeZone
+  )
+  if (agenda) {
+    return { kind: 'agendado', data: agenda.data, horario: agenda.horario }
   }
 
   const previsao = venda.previsaoEntregaEm?.trim()

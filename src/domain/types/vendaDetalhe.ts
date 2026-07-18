@@ -1,6 +1,11 @@
 /** Tipos de detalhe de venda/pedido gestor (contrato domain ↔ application). */
 
-export type OrigemVenda = 'GESTOR' | 'IFOOD' | 'RAPPI' | 'OUTROS'
+export type OrigemVenda =
+  | 'GESTOR'
+  | 'JIFFY_DELIVERY'
+  | 'IFOOD'
+  | 'RAPPI'
+  | 'OUTROS'
 
 export type FluxoPagamentoEntrega = 'cobrar_entregador' | 'ja_pago'
 
@@ -42,6 +47,10 @@ export interface DetalhesEntregaPedido {
   enderecoEntrega?: EnderecoEntregaDetalhe | null
   observacaoPedido?: string | null
   previsaoEntrega?: string | null
+  /** Pedido delivery com janela de agendamento. */
+  pedidoAgendado?: boolean
+  slotInicio?: string | null
+  slotFim?: string | null
   dataInicioPreparo?: string | null
   dataPronto?: string | null
   dataSaidaEntrega?: string | null

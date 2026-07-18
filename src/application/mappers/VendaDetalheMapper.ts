@@ -82,7 +82,23 @@ export function mapDetalhesEntregaFromVendaApi(vendaData: Record<string, unknown
     previsaoEntrega:
       vendaData.previsaoEntrega != null
         ? String(vendaData.previsaoEntrega)
-        : null,
+        : vendaData.previsaoEntregaEm != null
+          ? String(vendaData.previsaoEntregaEm)
+          : null,
+    pedidoAgendado:
+      vendaData.pedidoAgendado === true || vendaData.pedido_agendado === true,
+    slotInicio:
+      vendaData.slotInicio != null
+        ? String(vendaData.slotInicio).trim() || null
+        : vendaData.slot_inicio != null
+          ? String(vendaData.slot_inicio).trim() || null
+          : null,
+    slotFim:
+      vendaData.slotFim != null
+        ? String(vendaData.slotFim).trim() || null
+        : vendaData.slot_fim != null
+          ? String(vendaData.slot_fim).trim() || null
+          : null,
     dataInicioPreparo:
       vendaData.dataInicioPreparo != null ? String(vendaData.dataInicioPreparo) : null,
     dataPronto: vendaData.dataPronto != null ? String(vendaData.dataPronto) : null,
