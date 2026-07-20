@@ -80,6 +80,7 @@ export function BasicoLayoutHome({
         >
           <DeliveryPedidoFooter
             total={viewModel.carrinho.total}
+            quantidadeItens={viewModel.carrinho.quantidadeItens}
             interactive={interactive}
             onClick={onPedidoClick}
           />

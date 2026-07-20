@@ -1,124 +1,72 @@
 'use client'
 
-import { ArrowLeftRight, Bike, MapPin, Pencil } from 'lucide-react'
-import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
-import type { DeliveryTipoEntrega } from '../../../shared/stores/deliveryPreferenciaEntregaStore'
-import { formatarResumoEnderecoPublico } from '../../../shared/utils/garantirEnderecoClientePublico'
+import { useDeliveryThemeContext } from '../../../shared/components/DeliveryThemeScope'
 
 type DeliveryCarrinhoEnderecoTopoProps = {
-  tipoEntrega: DeliveryTipoEntrega
-  enderecoCliente: EnderecoClienteDeliveryPublicoDTO | null
-  enderecoEmpresaTexto: string | null
-  onInformar: () => void
-  onAlterarEndereco: () => void
-  onToggleTipoEntrega: () => void
+  /** Fallback se o design não tiver nome (ex.: API pública). */
+  nomeEmpresaFallback?: string
+  /** Fallback se o design não tiver logo. */
+  logoUrlFallback?: string | null
+  /** Fallback se o design não tiver capa. */
+  capaUrlFallback?: string | null
+  /**
+   * Cola a faixa no topo do conteúdo (compensa padding do modal, ex.: revisão).
+   * Só faz sentido com capa em full-bleed.
+   */
+  colarNoTopo?: boolean
 }
 
+/** Topo do carrinho: logo + nome da empresa Delivery. */
 export function DeliveryCarrinhoEnderecoTopo({
-  tipoEntrega,
-  enderecoCliente,
-  enderecoEmpresaTexto,
-  onInformar,
-  onAlterarEndereco,
-  onToggleTipoEntrega,
+  nomeEmpresaFallback = '',
+  logoUrlFallback = null,
+  capaUrlFallback = null,
+  colarNoTopo = false,
 }: DeliveryCarrinhoEnderecoTopoProps) {
-  const isEntrega = tipoEntrega === 'entrega'
-  const temEnderecoCliente = Boolean(enderecoCliente)
+  const { config } = useDeliveryThemeContext()
+  const nomeLoja =
+    config.cabecalho.nomeExibicao.trim() || nomeEmpresaFallback.trim() || 'Sua loja'
+  const logoUrl = config.cabecalho.logoUrl || logoUrlFallback
+  const capaUrl = config.cabecalho.capaUrl || capaUrlFallback
+  const logoRadius = config.cabecalho.logoFormato === 'circular' ? '9999px' : '8px'
+  const comCapa = Boolean(capaUrl)
 
   return (
     <div
-      className="space-y-2 rounded-xl p-3"
-      style={{ backgroundColor: 'var(--delivery-surface-muted)' }}
+      className="relative flex min-h-[5.5rem] items-center gap-3 overflow-hidden px-4 py-5"
+      style={{
+        width: '100vw',
+        marginLeft: 'calc(50% - 50vw)',
+        ...(colarNoTopo ? { marginTop: '-1rem' } : {}),
+        backgroundColor: 'var(--delivery-primary-dark)',
+        color: 'var(--delivery-btn-text, #ffffff)',
+        backgroundImage: comCapa ? `url(${capaUrl})` : undefined,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}
     >
-      <div className="flex items-start gap-3">
-        <div
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
-          style={{ backgroundColor: 'var(--delivery-surface)' }}
-        >
-          {isEntrega ? (
-            <Bike className="h-5 w-5" style={{ color: 'var(--delivery-text-muted)' }} aria-hidden />
-          ) : (
-            <MapPin className="h-5 w-5" style={{ color: 'var(--delivery-text-muted)' }} aria-hidden />
-          )}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          {isEntrega && !temEnderecoCliente ? (
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-medium delivery-text-primary">Seu endereço</p>
-              <button
-                type="button"
-                onClick={onInformar}
-                className="shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-wide delivery-text-primary"
-                style={{
-                  borderColor: 'var(--delivery-border)',
-                  backgroundColor: 'var(--delivery-surface)',
-                }}
-              >
-                Informar
-              </button>
-            </div>
-          ) : null}
-
-          {isEntrega && enderecoCliente ? (
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-xs delivery-text-secondary">Seu endereço:</p>
-                <p className="text-sm font-semibold delivery-text-primary">
-                  {enderecoCliente.rua}, {enderecoCliente.numero}
-                </p>
-                <p className="text-xs delivery-text-secondary">
-                  {[enderecoCliente.bairro, etiquetaLabel(enderecoCliente.etiqueta)]
-                    .filter(Boolean)
-                    .join(' - ')}
-                </p>
-                <p className="sr-only">{formatarResumoEnderecoPublico(enderecoCliente)}</p>
-              </div>
-              <button
-                type="button"
-                onClick={onAlterarEndereco}
-                aria-label="Alterar endereço"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-              >
-                <Pencil className="h-4 w-4" style={{ color: 'var(--delivery-text-muted)' }} />
-              </button>
-            </div>
-          ) : null}
-
-          {!isEntrega ? (
-            <div>
-              <p className="text-xs delivery-text-secondary">Retirada no local:</p>
-              <p className="text-sm font-semibold delivery-text-primary">
-                {enderecoEmpresaTexto || 'Endereço da loja indisponível'}
-              </p>
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      <button
-        type="button"
-        onClick={onToggleTipoEntrega}
-        className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-left text-sm"
-        style={{ backgroundColor: 'var(--delivery-surface)' }}
+      <div
+        className="relative z-[1] flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden border-2 border-white bg-white/15"
+        style={{ borderRadius: logoRadius }}
       >
-        <span className="delivery-text-primary">
-          Mudar para{' '}
-          <span className="font-semibold">{isEntrega ? 'retirada' : 'entrega'}</span>
-        </span>
-        <ArrowLeftRight
-          className="h-4 w-4 shrink-0"
-          style={{ color: 'var(--delivery-text-muted)' }}
-          aria-hidden
-        />
-      </button>
+        {logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={logoUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <span
+            className="text-lg font-semibold text-white"
+            style={{ textShadow: '0 1px 2px rgba(0,0,0,0.55)' }}
+          >
+            {(nomeLoja[0] ?? '?').toUpperCase()}
+          </span>
+        )}
+      </div>
+      <p
+        className="relative z-[1] min-w-0 flex-1 truncate text-base font-semibold text-white"
+        style={{ textShadow: comCapa ? '0 1px 3px rgba(0,0,0,0.65)' : undefined }}
+      >
+        {nomeLoja}
+      </p>
     </div>
   )
-}
-
-function etiquetaLabel(etiqueta: string): string {
-  const e = etiqueta.toLowerCase()
-  if (e === 'casa') return 'Casa'
-  if (e === 'trabalho') return 'Trabalho'
-  return etiqueta
 }

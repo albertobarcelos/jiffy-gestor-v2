@@ -26,6 +26,8 @@ export type CheckoutFormData = {
   /** Valor informado para troco (dinheiro). `null` = sem troco. */
   trocoPara: number | null
   observacaoPedido: string
+  /** Timing do pedido (tela de tipo de entrega). Ainda não enviado ao backend nesta etapa. */
+  modoTempo: 'imediato' | 'agendado'
 }
 
 type MontarPedidoParams = {

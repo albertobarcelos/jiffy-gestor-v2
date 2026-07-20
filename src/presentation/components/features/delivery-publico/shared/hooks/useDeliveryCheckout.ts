@@ -64,6 +64,7 @@ function createInitialForm(tipoEntrega: DeliveryTipoEntrega): CheckoutFormData {
     meioPagamentoId: '',
     trocoPara: null,
     observacaoPedido: '',
+    modoTempo: 'imediato',
   }
 }
 

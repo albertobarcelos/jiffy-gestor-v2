@@ -12,6 +12,7 @@ import { formatDeliveryCurrency } from '../../../shared/utils/formatDeliveryCurr
 import { formatarTelefoneExibicao } from '../../../shared/utils/deliveryTelefonePais'
 import { obterIconeMeioPagamento } from '../../../shared/utils/obterIconeMeioPagamento'
 import { DeliveryCheckoutStepModal } from './DeliveryCheckoutStepModal'
+import { DeliveryCarrinhoEnderecoTopo } from './DeliveryCarrinhoEnderecoTopo'
 
 type DeliveryCheckoutRevisaoModalProps = {
   tipoEntrega: DeliveryTipoEntrega
@@ -20,6 +21,9 @@ type DeliveryCheckoutRevisaoModalProps = {
   telefonePaisIso2?: string
   enderecoCliente: EnderecoClienteDeliveryPublicoDTO | null
   enderecoEmpresaTexto: string | null
+  nomeEmpresaFallback?: string
+  logoUrlFallback?: string | null
+  capaUrlFallback?: string | null
   itens: DeliveryCarrinhoItem[]
   total: number
   meioPagamento: MeioPagamentoPublicoDTO | null
@@ -114,6 +118,9 @@ export function DeliveryCheckoutRevisaoModal({
   telefonePaisIso2 = DELIVERY_PAIS_TELEFONE_PADRAO,
   enderecoCliente,
   enderecoEmpresaTexto,
+  nomeEmpresaFallback = '',
+  logoUrlFallback = null,
+  capaUrlFallback = null,
   itens,
   total,
   meioPagamento,
@@ -153,7 +160,6 @@ export function DeliveryCheckoutRevisaoModal({
       showBack
       onBack={onVoltar}
       fullScreen
-      headerTone="dark"
       footer={
         <button
           type="button"
@@ -170,6 +176,15 @@ export function DeliveryCheckoutRevisaoModal({
       }
     >
       <div>
+        <div className="mb-4">
+          <DeliveryCarrinhoEnderecoTopo
+            nomeEmpresaFallback={nomeEmpresaFallback}
+            logoUrlFallback={logoUrlFallback}
+            capaUrlFallback={capaUrlFallback}
+            colarNoTopo
+          />
+        </div>
+
         <LinhaSecao
           icone={<UserRound className="h-5 w-5 text-black" />}
           label={isEntrega ? 'Entregue a:' : 'Pedido de:'}
