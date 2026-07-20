@@ -33,6 +33,13 @@ import {
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
 import { ProdutoActionIconsDisplay } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoActionIconsDisplay'
+import {
+  ProdutoFiscalCelulasEditaveis,
+  fiscalLinhaDraftDirty,
+  fiscalLinhaDraftFromProduto,
+  type FiscalCampoLinha,
+  type FiscalLinhaDraft,
+} from '@/src/presentation/components/features/produtos/AtualizarProdutosLote/ProdutoFiscalCelulasEditaveis'
 import { MdSearch, MdExpandMore, MdExpandLess, MdCheckCircle, MdError } from 'react-icons/md'
 
 /** Chaves de permissão PDV no PATCH (alinhado a NovoProduto / cardápio). */
@@ -54,22 +61,20 @@ type FiltroColunaVazia =
   | 'sem_impressoras'
   | 'sem_ncm'
   | 'sem_grupos_complementos'
-  /* Colunas CEST / origem / tipo / indicador: backend ainda não devolve na listagem — descomente quando o GET /api/produtos incluir:
   | 'sem_cest'
   | 'sem_origem'
   | 'sem_tipo'
   | 'sem_indicador'
-  */
 
 const LABEL_FILTRO_COLUNA: Record<FiltroColunaVazia, string> = {
   [FILTRO_COLUNA_TODOS]: 'Todos',
   sem_impressoras: 'Sem impressoras',
   sem_ncm: 'Sem NCM',
   sem_grupos_complementos: 'Sem grupos de complementos',
-  /* sem_cest: 'Sem CEST',
+  sem_cest: 'Sem CEST',
   sem_origem: 'Sem origem da mercadoria',
   sem_tipo: 'Sem tipo de produto',
-  sem_indicador: 'Sem indicador de produção', */
+  sem_indicador: 'Sem indicador de produção',
 }
 
 function produtoSemDadoNaColuna(p: Produto, filtro: FiltroColunaVazia): boolean {
@@ -81,7 +86,7 @@ function produtoSemDadoNaColuna(p: Produto, filtro: FiltroColunaVazia): boolean 
       return !p.getNcm().trim()
     case 'sem_grupos_complementos':
       return p.getGruposComplementos().length === 0
-    /* case 'sem_cest':
+    case 'sem_cest':
       return !p.getCest().trim()
     case 'sem_origem':
       return !p.getOrigemMercadoria().trim()
@@ -90,7 +95,7 @@ function produtoSemDadoNaColuna(p: Produto, filtro: FiltroColunaVazia): boolean 
     case 'sem_indicador': {
       const v = p.getIndicadorProducaoEscala()
       return v === null || String(v).trim() === ''
-    } */
+    }
     default:
       return true
   }
@@ -139,27 +144,6 @@ function textoOuNenhum(v: string | null | undefined): string {
   const t = v === null || v === undefined ? '' : String(v).trim()
   return t === '' ? 'Nenhum' : t
 }
-
-/* Usados nas colunas da grade quando CEST/origem/tipo/indicador vierem do backend na listagem:
-function labelListaFiscal(
-  value: string | null | undefined,
-  options: { value: string; label: string }[],
-): { curto: string; title: string } {
-  const v = value === null || value === undefined ? '' : String(value).trim()
-  if (v === '') return { curto: 'Nenhum', title: '' }
-  const opt = options.find((o) => o.value === v)
-  if (opt) return { curto: opt.value, title: opt.label }
-  return { curto: v, title: v }
-}
-
-function celulaFiscalIndicador(v: string | null | undefined): { curto: string; title: string } {
-  const s = v === null || v === undefined ? '' : String(v).trim()
-  if (s === '') return { curto: 'Nenhum', title: '' }
-  const opt = indicadoresProducao.find((o) => o.value === s)
-  if (opt) return { curto: s, title: opt.label }
-  return { curto: s, title: s }
-}
-*/
 
 const CAMPOS_PERMISSAO_PDV: { chave: PermissaoCampoChave; label: string }[] = [
   { chave: 'favorito', label: 'Favorito' },
@@ -248,7 +232,9 @@ function filtrosDisponiveisPorAba(tab: TabPainelLote): FiltroColunaVazia[] {
   const r: FiltroColunaVazia[] = [FILTRO_COLUNA_TODOS]
   if (tab === 'impressoras') r.push('sem_impressoras')
   if (tab === 'gruposComplementos') r.push('sem_grupos_complementos')
-  if (tab === 'fiscal') r.push('sem_ncm')
+  if (tab === 'fiscal') {
+    r.push('sem_ncm', 'sem_cest', 'sem_origem', 'sem_tipo', 'sem_indicador')
+  }
   return r
 }
 
@@ -273,6 +259,18 @@ function montarBodyFiscalLote(d: FiscalLoteDraft): Record<string, unknown> | nul
   return body
 }
 
+function normalizarNcm8(ncmRaw: string): string {
+  return String(ncmRaw ?? '')
+    .replace(/\D/g, '')
+    .slice(0, 8)
+}
+
+function normalizarCest7(cestRaw: string): string {
+  return String(cestRaw ?? '')
+    .replace(/\D/g, '')
+    .slice(0, 7)
+}
+
 /**
  * Componente para atualizar preço de múltiplos produtos em lote
  * Replica a funcionalidade do Flutter update_price_produtos_widget.dart
@@ -292,6 +290,15 @@ export function AtualizarPrecoLote() {
   const [grupoProdutoFilter, setGrupoProdutoFilter] = useState('')
   /** Mostrar apenas produtos sem dado na coluna escolhida (filtro só no front). */
   const [filtroColunaVazia, setFiltroColunaVazia] = useState<FiltroColunaVazia>(FILTRO_COLUNA_TODOS)
+  /**
+   * IDs congelados do filtro “Listar sem dado em”.
+   * Congela na seleção do filtro e ao carregar mais itens; não remove a linha
+   * quando o usuário preenche o campo (ex.: NCM) e ainda precisa editar CEST/origem.
+   */
+  const [idsFiltroColunaCongelados, setIdsFiltroColunaCongelados] = useState<Set<string> | null>(
+    null
+  )
+  const filtroColunaAnteriorRef = useRef<FiltroColunaVazia>(FILTRO_COLUNA_TODOS)
   const [adjustMode, setAdjustMode] = useState<'valor' | 'percentual'>('valor')
   const [adjustAmount, setAdjustAmount] = useState('')
   const [adjustDirection, setAdjustDirection] = useState<'increase' | 'decrease'>('increase')
@@ -316,6 +323,8 @@ export function AtualizarPrecoLote() {
     atual: number
     total: number
   } | null>(null)
+  const [salvandoFiscalLinhaId, setSalvandoFiscalLinhaId] = useState<string | null>(null)
+  const [fiscalLinhaDrafts, setFiscalLinhaDrafts] = useState<Record<string, FiscalLinhaDraft>>({})
   const [ncmValidation, setNcmValidation] = useState<NcmValidationResult | null>(null)
   const [isValidatingNcm, setIsValidatingNcm] = useState(false)
   const ncmValidationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -350,6 +359,21 @@ export function AtualizarPrecoLote() {
 
   useEffect(() => {
     produtosRef.current = produtos
+  }, [produtos])
+
+  useEffect(() => {
+    setFiscalLinhaDrafts(prev => {
+      let mudou = false
+      const next = { ...prev }
+      for (const p of produtos) {
+        const id = p.getId()
+        if (!next[id]) {
+          next[id] = fiscalLinhaDraftFromProduto(p)
+          mudou = true
+        }
+      }
+      return mudou ? next : prev
+    })
   }, [produtos])
 
   useEffect(() => {
@@ -1407,6 +1431,222 @@ export function AtualizarPrecoLote() {
     }
   }
 
+  const atualizarDraftFiscalLinha = useCallback(
+    (produtoId: string, campo: FiscalCampoLinha, valor: string) => {
+      setFiscalLinhaDrafts(prev => {
+        const produto = produtosRef.current.find(p => p.getId() === produtoId)
+        const base = prev[produtoId] ?? (produto ? fiscalLinhaDraftFromProduto(produto) : null)
+        if (!base) return prev
+
+        const nextDraft: FiscalLinhaDraft = { ...base, [campo]: valor }
+
+        if (campo === 'ncm') {
+          const ncmNovo = normalizarNcm8(valor)
+          if (ncmNovo !== normalizarNcm8(base.ncm)) {
+            nextDraft.cest = ''
+          }
+          // Igual NovoProduto: ao informar NCM válido, sugere origem/tipo padrão se vazios
+          if (ncmNovo.length === 8) {
+            if (!String(nextDraft.origemMercadoria ?? '').trim()) {
+              nextDraft.origemMercadoria = '0'
+            }
+            if (!String(nextDraft.tipoProduto ?? '').trim()) {
+              nextDraft.tipoProduto = '00'
+            }
+          }
+        }
+
+        if (campo === 'cest') {
+          const cestNovo = normalizarCest7(valor)
+          // Igual NovoProduto: CEST preenchido → indicador "1" se ainda vazio
+          if (cestNovo.length === 7 && !String(nextDraft.indicadorProducaoEscala ?? '').trim()) {
+            nextDraft.indicadorProducaoEscala = '1'
+          }
+        }
+
+        return { ...prev, [produtoId]: nextDraft }
+      })
+    },
+    []
+  )
+
+  /** PATCH fiscal da linha inteira (um request por produto ao clicar OK). */
+  const salvarFiscalLinha = useCallback(
+    async (produto: Produto): Promise<boolean> => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado')
+        return false
+      }
+
+      const produtoId = produto.getId()
+      const draft = fiscalLinhaDrafts[produtoId] ?? fiscalLinhaDraftFromProduto(produto)
+
+      if (!fiscalLinhaDraftDirty(produto, draft)) {
+        showToast.info('Nenhuma alteração fiscal nesta linha.')
+        return false
+      }
+
+      const draftParaSalvar: FiscalLinhaDraft = { ...draft }
+      const ncmT = normalizarNcm8(draftParaSalvar.ncm)
+      const cestT = normalizarCest7(draftParaSalvar.cest)
+      const temCest = cestT.length === 7
+      const temOutrosCampos =
+        draftParaSalvar.origemMercadoria !== '' ||
+        draftParaSalvar.tipoProduto !== '' ||
+        draftParaSalvar.indicadorProducaoEscala.trim() !== '' ||
+        temCest
+
+      if (ncmT.length > 0 && ncmT.length !== 8) {
+        showToast.error('O código NCM deve conter exatamente 8 dígitos numéricos.')
+        return false
+      }
+
+      if (temOutrosCampos && ncmT.length !== 8) {
+        showToast.error('Informe o NCM (8 dígitos) antes de salvar os demais campos fiscais.')
+        return false
+      }
+
+      if (ncmT.length === 8) {
+        try {
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 8000)
+          const response = await fetch(
+            `/api/v1/fiscal/configuracoes/ncms/validar/${encodeURIComponent(ncmT)}`,
+            {
+              headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+              signal: controller.signal,
+            }
+          )
+          clearTimeout(timeoutId)
+          if (response.ok) {
+            const data = (await response.json()) as { valido?: boolean; mensagem?: string }
+            if (data.valido === false) {
+              showToast.error(data.mensagem || 'O código NCM informado não é válido.')
+              return false
+            }
+          }
+        } catch {
+          /* segue com PATCH se o validador estiver indisponível */
+        }
+        draftParaSalvar.ncm = ncmT
+      }
+
+      if (temCest) {
+        try {
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 8000)
+          const response = await fetch(
+            `/api/v1/fiscal/configuracoes/cests/validar/${encodeURIComponent(cestT)}/ncm/${encodeURIComponent(ncmT)}`,
+            {
+              headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+              signal: controller.signal,
+            }
+          )
+          clearTimeout(timeoutId)
+          if (response.ok) {
+            const data = (await response.json()) as {
+              valido?: boolean
+              compativel?: boolean
+              mensagem?: string
+            }
+            const ok =
+              data.valido !== false &&
+              (data.compativel === undefined || data.compativel === true)
+            if (!ok) {
+              showToast.error(data.mensagem || 'O código CEST informado não é válido.')
+              return false
+            }
+          }
+        } catch {
+          /* segue com PATCH se o validador estiver indisponível */
+        }
+        draftParaSalvar.cest = cestT
+      } else {
+        draftParaSalvar.cest = ''
+      }
+
+      if (draftParaSalvar.indicadorProducaoEscala.trim() !== '' && !cestT) {
+        showToast.error(
+          'Preencha o CEST antes de informar a produção em escala relevante neste produto.'
+        )
+        return false
+      }
+
+      if (
+        temCest &&
+        !draftParaSalvar.indicadorProducaoEscala.trim() &&
+        !produto.getIndicadorProducaoEscala()
+      ) {
+        draftParaSalvar.indicadorProducaoEscala = '1'
+      }
+
+      const body = montarBodyFiscalLote(draftParaSalvar)
+      if (!body) {
+        showToast.error('Preencha ao menos um campo fiscal.')
+        return false
+      }
+
+      setSalvandoFiscalLinhaId(produtoId)
+
+      try {
+        const response = await fetch(`/api/produtos/${produtoId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(body),
+        })
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}))
+          const msg =
+            typeof error.message === 'string' && error.message.trim() !== ''
+              ? error.message
+              : `Erro ${response.status}`
+          showToast.error(msg)
+          return false
+        }
+
+        const partial = {
+          ncm: ncmT.length === 8 ? ncmT : draftParaSalvar.ncm,
+          cest: cestT,
+          origemMercadoria: draftParaSalvar.origemMercadoria,
+          tipoProduto: draftParaSalvar.tipoProduto,
+          indicadorProducaoEscala:
+            draftParaSalvar.indicadorProducaoEscala.trim() === ''
+              ? null
+              : draftParaSalvar.indicadorProducaoEscala,
+        }
+
+        setProdutos(prev =>
+          prev.map(p => (p.getId() === produtoId ? p.withDadosFiscais(partial) : p))
+        )
+        setFiscalLinhaDrafts(prev => ({
+          ...prev,
+          [produtoId]: {
+            ncm: partial.ncm ?? '',
+            cest: partial.cest ?? '',
+            origemMercadoria: partial.origemMercadoria ?? '',
+            tipoProduto: partial.tipoProduto ?? '',
+            indicadorProducaoEscala: partial.indicadorProducaoEscala ?? '',
+          },
+        }))
+        marcarProdutosAlteradosNaSessao([produtoId], 'fiscal')
+        showToast.success('Dados fiscais salvos.')
+        return true
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : 'Erro ao salvar dados fiscais'
+        showToast.error(msg)
+        return false
+      } finally {
+        setSalvandoFiscalLinhaId(null)
+      }
+    },
+    [auth, fiscalLinhaDrafts, marcarProdutosAlteradosNaSessao]
+  )
+
   /** PATCH sequencial com objeto `fiscal` (sem bulk-update). */
   const aplicarFiscalEmLote = async () => {
     if (produtosSelecionados.size === 0) {
@@ -1532,7 +1772,51 @@ export function AtualizarPrecoLote() {
 
   const produtosExibicao = useMemo(() => {
     if (filtroColunaVazia === FILTRO_COLUNA_TODOS) return produtos
-    return produtos.filter((p) => produtoSemDadoNaColuna(p, filtroColunaVazia))
+    if (!idsFiltroColunaCongelados) {
+      return produtos.filter(p => produtoSemDadoNaColuna(p, filtroColunaVazia))
+    }
+    return produtos.filter(p => idsFiltroColunaCongelados.has(p.getId()))
+  }, [produtos, filtroColunaVazia, idsFiltroColunaCongelados])
+
+  /** Congela IDs ao selecionar o filtro; só inclui novos matches ao carregar mais — não remove ao editar. */
+  useEffect(() => {
+    if (filtroColunaVazia === FILTRO_COLUNA_TODOS) {
+      filtroColunaAnteriorRef.current = FILTRO_COLUNA_TODOS
+      setIdsFiltroColunaCongelados(null)
+      return
+    }
+
+    const filtroMudou = filtroColunaAnteriorRef.current !== filtroColunaVazia
+    filtroColunaAnteriorRef.current = filtroColunaVazia
+
+    setIdsFiltroColunaCongelados(prev => {
+      const idsNaLista = new Set(produtos.map(p => p.getId()))
+      const next = new Set<string>()
+
+      if (!filtroMudou && prev) {
+        for (const id of prev) {
+          if (idsNaLista.has(id)) next.add(id)
+        }
+      }
+
+      for (const p of produtos) {
+        if (produtoSemDadoNaColuna(p, filtroColunaVazia)) {
+          next.add(p.getId())
+        }
+      }
+
+      if (prev && prev.size === next.size) {
+        let iguais = true
+        for (const id of next) {
+          if (!prev.has(id)) {
+            iguais = false
+            break
+          }
+        }
+        if (iguais) return prev
+      }
+      return next
+    })
   }, [produtos, filtroColunaVazia])
 
   const todosSelecionados =
@@ -1555,6 +1839,8 @@ export function AtualizarPrecoLote() {
     setAtivoDeliveryFilter('Todos')
     setGrupoProdutoFilter('')
     setFiltroColunaVazia(FILTRO_COLUNA_TODOS)
+    setIdsFiltroColunaCongelados(null)
+    filtroColunaAnteriorRef.current = FILTRO_COLUNA_TODOS
   }, [])
 
   return (
@@ -2209,8 +2495,8 @@ export function AtualizarPrecoLote() {
                     <div className="h-px min-w-[40px] flex-1 bg-primary/70" />
                   </div>
                   <p className="font-nunito text-xs text-secondary-text md:text-sm">
-                    Preencha as informações fiscais. Serão aplicadas aos produtos selecionados na lista
-                    abaixo (um PATCH por produto).
+                    Edite os campos fiscais na linha de cada produto e confirme com OK (um PATCH
+                    por produto). Use o painel acima para aplicar o mesmo valor a vários selecionados.
                   </p>
                 </div>
                 <div className="shrink-0">
@@ -2249,7 +2535,17 @@ export function AtualizarPrecoLote() {
                     value={fiscalLoteDraft.ncm}
                     onChange={(e) => {
                       const v = e.target.value.replace(/\D/g, '').slice(0, 8)
-                      setFiscalLoteDraft((d) => ({ ...d, ncm: v }))
+                      setFiscalLoteDraft((d) => {
+                        const next = { ...d, ncm: v }
+                        if (normalizarNcm8(v) !== normalizarNcm8(d.ncm)) {
+                          next.cest = ''
+                        }
+                        if (normalizarNcm8(v).length === 8) {
+                          if (!next.origemMercadoria.trim()) next.origemMercadoria = '0'
+                          if (!next.tipoProduto.trim()) next.tipoProduto = '00'
+                        }
+                        return next
+                      })
                     }}
                     placeholder="8 dígitos"
                     className="bg-white"
@@ -2624,8 +2920,16 @@ export function AtualizarPrecoLote() {
             </p>
           </div>
         ) : (
-          <div className="bg-info rounded-lg overflow-hidden">
-            <div className="flex items-center h-11 gap-2 md:px-4 px-2 text-xs font-semibold text-primary-text uppercase tracking-wide bg-custom-2">
+          <div
+            className={`bg-info rounded-lg ${
+              activeTab === 'fiscal' ? 'overflow-x-auto' : 'overflow-hidden'
+            }`}
+          >
+            <div
+              className={`flex items-center h-11 gap-2 md:px-4 px-2 text-xs font-semibold text-primary-text uppercase tracking-wide bg-custom-2 ${
+                activeTab === 'fiscal' ? 'min-w-[1060px]' : ''
+              }`}
+            >
               <div className="flex-none md:w-10 w-6 flex justify-center">
                 <Checkbox
                   checked={todosSelecionados}
@@ -2649,20 +2953,33 @@ export function AtualizarPrecoLote() {
                 <div className="flex-[1.2] text-center hidden md:flex">Grupos Complementos</div>
               ) : null}
               {activeTab === 'fiscal' ? (
-                <div className="hidden md:flex w-[80px] shrink-0 text-center text-xs leading-tight">NCM</div>
+                <>
+                  <div className="hidden md:flex w-[108px] shrink-0 text-center text-xs leading-tight">
+                    NCM
+                  </div>
+                  <div className="hidden lg:flex w-[168px] shrink-0 text-center text-xs leading-tight">
+                    CEST
+                  </div>
+                  <div className="hidden lg:flex w-[200px] shrink-0 text-center text-xs leading-tight">
+                    Origem
+                  </div>
+                  <div className="hidden lg:flex w-[200px] shrink-0 text-center text-xs leading-tight">
+                    Tipo
+                  </div>
+                  <div className="hidden lg:flex w-[220px] shrink-0 text-center text-xs leading-tight">
+                    Indic.
+                  </div>
+                  <div className="hidden md:flex w-[64px] shrink-0 text-center text-xs leading-tight">
+                    OK
+                  </div>
+                </>
               ) : null}
-              {/* Colunas CEST / Origem / Tipo / Indic. produção — ocultas até o backend retornar esses campos na listagem (descomente junto com filtros e células abaixo).
-              <div className="hidden lg:flex w-[64px] shrink-0 text-center text-xs leading-tight">CEST</div>
-              <div className="hidden lg:flex w-[52px] shrink-0 text-center text-xs leading-tight">Origem</div>
-              <div className="hidden lg:flex w-[40px] shrink-0 text-center text-xs leading-tight">Tipo</div>
-              <div className="hidden lg:flex min-w-0 w-[120px] shrink-0 text-center text-[10px] leading-tight px-0.5">
-                Indic. produção
-              </div>
-              */}
-              <div className="md:flex-1 text-right text-xs">Valor atual</div>
+              {activeTab !== 'fiscal' ? (
+                <div className="md:flex-1 text-right text-xs">Valor atual</div>
+              ) : null}
             </div>
 
-            <div className="flex flex-col gap-2 mt-2">
+            <div className={`flex flex-col gap-2 mt-2 ${activeTab === 'fiscal' ? 'min-w-[1060px]' : ''}`}>
               {produtosExibicao
                 .slice()
                 .sort((a, b) => a.getNome().localeCompare(b.getNome(), 'pt-BR'))
@@ -2673,9 +2990,6 @@ export function AtualizarPrecoLote() {
                 const impressorasDoProduto = produto.getImpressoras()
                 // Usar diretamente os grupos de complementos que vêm do produto
                 const gruposComplementosDoProduto = produto.getGruposComplementos()
-                /* const fiscalOrigem = labelListaFiscal(produto.getOrigemMercadoria(), origensMercadoria)
-                const fiscalTipo = labelListaFiscal(produto.getTipoProduto(), tiposProduto)
-                const fiscalInd = celulaFiscalIndicador(produto.getIndicadorProducaoEscala()) */
                 // Cor: selecionado > alterado nesta aba (mesmo tom do hover da lista) > zebra
                 const bgColor = isSelected
                   ? foiAlteradoNaSessao
@@ -2688,6 +3002,10 @@ export function AtualizarPrecoLote() {
                       : 'bg-white'
                 const hoverRow = 'hover:bg-primary-bg'
                 const isExpanded = produtosExpandidos.has(produto.getId())
+                const salvandoEstaLinha = salvandoFiscalLinhaId === produto.getId()
+                const fiscalDraft =
+                  fiscalLinhaDrafts[produto.getId()] ?? fiscalLinhaDraftFromProduto(produto)
+                const fiscalDirty = fiscalLinhaDraftDirty(produto, fiscalDraft)
                 return (
                   <div key={produto.getId()} className="flex flex-col">
                     {/* Linha principal do produto */}
@@ -2768,46 +3086,24 @@ export function AtualizarPrecoLote() {
                         </div>
                       ) : null}
                       {activeTab === 'fiscal' ? (
-                        <div className="hidden md:flex w-[80px] shrink-0 justify-center font-mono text-[11px] text-primary-text px-0.5">
-                          <span className="truncate" title={produto.getNcm() || undefined}>
-                            {textoOuNenhum(produto.getNcm())}
-                          </span>
+                        <ProdutoFiscalCelulasEditaveis
+                          produto={produto}
+                          variant="desktop"
+                          draft={fiscalDraft}
+                          onDraftChange={(campo, valor) =>
+                            atualizarDraftFiscalLinha(produto.getId(), campo, valor)
+                          }
+                          disabled={isSalvandoFiscal}
+                          salvando={salvandoEstaLinha}
+                          dirty={fiscalDirty}
+                          onConfirmar={() => void salvarFiscalLinha(produto)}
+                        />
+                      ) : null}
+                      {activeTab !== 'fiscal' ? (
+                        <div className="flex-1 text-right font-normal md:text-sm text-xs text-primary-text">
+                          {transformarParaReal(produto.getValor())}
                         </div>
                       ) : null}
-                      {/* CEST / Origem / Tipo / Indic. — ver cabeçalho da grade
-                      <div className="hidden lg:flex w-[64px] shrink-0 justify-center font-mono text-[11px] text-primary-text px-0.5">
-                        <span className="truncate" title={produto.getCest() || undefined}>
-                          {textoOuNenhum(produto.getCest())}
-                        </span>
-                      </div>
-                      <div className="hidden lg:flex w-[52px] shrink-0 justify-center px-0.5">
-                        <span
-                          className="truncate text-center text-[11px] text-primary-text"
-                          title={fiscalOrigem.title || undefined}
-                        >
-                          {fiscalOrigem.curto}
-                        </span>
-                      </div>
-                      <div className="hidden lg:flex w-[40px] shrink-0 justify-center px-0.5">
-                        <span
-                          className="truncate text-center text-[11px] text-primary-text"
-                          title={fiscalTipo.title || undefined}
-                        >
-                          {fiscalTipo.curto}
-                        </span>
-                      </div>
-                      <div className="hidden lg:flex min-w-0 w-[120px] shrink-0 justify-center px-0.5">
-                        <span
-                          className="truncate text-center text-[11px] text-primary-text"
-                          title={fiscalInd.title || undefined}
-                        >
-                          {fiscalInd.curto}
-                        </span>
-                      </div>
-                      */}
-                      <div className="flex-1 text-right font-normal md:text-sm text-xs text-primary-text">
-                        {transformarParaReal(produto.getValor())}
-                      </div>
                       {(activeTab === 'impressoras' ||
                         activeTab === 'gruposComplementos' ||
                         activeTab === 'fiscal') && (
@@ -2897,18 +3193,47 @@ export function AtualizarPrecoLote() {
                     {isExpanded &&
                       activeTab === 'fiscal' && (
                         <div
-                          className={`md:hidden px-2 pb-2 pt-1 border-b border-gray-200 ${
+                          className={`px-2 pb-2 pt-1 border-b border-gray-200 md:hidden ${
                             foiAlteradoNaSessao ? 'bg-primary-bg' : 'bg-gray-50'
                           }`}
                         >
-                          <div className="flex flex-col gap-1">
-                            <label className="text-xs font-semibold text-secondary-text">NCM</label>
-                            <span className="font-mono text-xs text-primary-text">
-                              {textoOuNenhum(produto.getNcm())}
-                            </span>
-                          </div>
+                          <ProdutoFiscalCelulasEditaveis
+                            produto={produto}
+                            variant="mobile"
+                            draft={fiscalDraft}
+                            onDraftChange={(campo, valor) =>
+                              atualizarDraftFiscalLinha(produto.getId(), campo, valor)
+                            }
+                            disabled={isSalvandoFiscal}
+                            salvando={salvandoEstaLinha}
+                            dirty={fiscalDirty}
+                            onConfirmar={() => void salvarFiscalLinha(produto)}
+                          />
                         </div>
                       )}
+                    {isExpanded && activeTab === 'fiscal' ? (
+                      <div
+                        className={`hidden md:block lg:hidden px-4 pb-2 pt-1 border-b border-gray-200 ${
+                          foiAlteradoNaSessao ? 'bg-primary-bg' : 'bg-gray-50'
+                        }`}
+                      >
+                        <p className="mb-2 text-xs text-secondary-text">
+                          CEST, origem, tipo e indicador:
+                        </p>
+                        <ProdutoFiscalCelulasEditaveis
+                          produto={produto}
+                          variant="mobile"
+                          draft={fiscalDraft}
+                          onDraftChange={(campo, valor) =>
+                            atualizarDraftFiscalLinha(produto.getId(), campo, valor)
+                          }
+                          disabled={isSalvandoFiscal}
+                          salvando={salvandoEstaLinha}
+                          dirty={fiscalDirty}
+                          onConfirmar={() => void salvarFiscalLinha(produto)}
+                        />
+                      </div>
+                    ) : null}
                   </div>
                 )
               })}

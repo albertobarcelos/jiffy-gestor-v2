@@ -1,7 +1,4 @@
-import {
-  fiscalPendentePodeReemitirAposCooldown,
-  fiscalPendenteTravadoLimiteTentativas,
-} from '@/src/domain/services/pedido/RegrasFiscaisVenda'
+import { fiscalPendentePodeReemitirAposCooldown } from '@/src/domain/services/pedido/RegrasFiscaisVenda'
 import {
   isPedidoEntregaComEntregador,
   isPedidoEntregaKanban,
@@ -67,7 +64,7 @@ export const COLUNAS_KANBAN_DRAG_ENTREGA = new Set<string>(COLUNAS_ENTREGA_OPERA
 export const COLUNAS_KANBAN_DESTINO_PIN = new Set([
   'FINALIZADAS',
   'PENDENTE_EMISSAO',
-  'COM_NFE',
+  'COM_FISCAL',
 ])
 
 /**
@@ -160,10 +157,6 @@ export function fiscalKanbanPodeReemitirAposCooldown(v: VendaUnificadaDTO): bool
   return fiscalPendentePodeReemitirAposCooldown(dadosFiscalVendaKanban(v))
 }
 
-export function fiscalKanbanPendenteTravadoLimiteTentativas(v: VendaUnificadaDTO): boolean {
-  return fiscalPendenteTravadoLimiteTentativas(dadosFiscalVendaKanban(v))
-}
-
 export function statusFiscalAguardandoSefaz(v: VendaUnificadaDTO): boolean {
   if (fiscalKanbanPodeReemitirAposCooldown(v)) return false
   const sf = String(v.statusFiscal ?? '')
@@ -217,7 +210,7 @@ export function getCardBorderEFundoKanban(
   if (sf === 'INUTILIZADA') {
     return { borderClass: 'border-l-gray-400', cardBgClass: 'bg-gray-50' }
   }
-  if (sf === 'REJEITADA' || fiscalKanbanPodeReemitirAposCooldown(v)) {
+  if (sf === 'REJEITADA' || sf === 'DENEGADA' || fiscalKanbanPodeReemitirAposCooldown(v)) {
     return { borderClass: 'border-l-red-500', cardBgClass: 'bg-white' }
   }
 
@@ -233,7 +226,7 @@ export function getCardBorderEFundoKanban(
     return { borderClass: 'border-l-yellow-400', cardBgClass: 'bg-white' }
   }
 
-  if (columnId === 'COM_NFE') {
+  if (columnId === 'COM_FISCAL') {
     return { borderClass: 'border-l-green-400', cardBgClass: 'bg-white' }
   }
 
@@ -267,7 +260,15 @@ export function deveExibirBotaoEmitirNotaNoKanban(
   const acao = acaoFiscalEmAndamentoPorVenda[venda.id]
   if (acao === 'reemitindo' || acao === 'emitindo') return true
   if (columnId === 'PENDENTE_EMISSAO') return true
-  if (columnId === 'COM_NFE' && fiscalKanbanPodeReemitirAposCooldown(venda)) return true
+  if (columnId === 'REJEITADAS') return true
+  if (
+    columnId === 'COM_FISCAL' &&
+    (venda.statusFiscal === 'REJEITADA' ||
+      venda.statusFiscal === 'DENEGADA' ||
+      fiscalKanbanPodeReemitirAposCooldown(venda))
+  ) {
+    return true
+  }
   if (columnId === 'FINALIZADAS' && venda.isPedidoEntregaGestor()) return true
   return false
 }
@@ -292,7 +293,7 @@ export function deveExibirBotaoObservacaoPedidoKanban(
   return (
     columnId !== 'FINALIZADAS' &&
     columnId !== 'PENDENTE_EMISSAO' &&
-    columnId !== 'COM_NFE'
+    columnId !== 'COM_FISCAL'
   )
 }
 
@@ -354,35 +355,96 @@ export function ordenarVendasKanbanPorCriterio(
     })
   }
 
-  if (criterio === 'numero') {
-    return [...vendas].sort((a, b) => {
-      const diff =
-        direcao === 'desc' ? b.numeroVenda - a.numeroVenda : a.numeroVenda - b.numeroVenda
-      if (diff !== 0) return diff
-      return direcao === 'desc' ? b.id.localeCompare(a.id) : a.id.localeCompare(b.id)
-    })
-  }
-
   return [...vendas].sort((a, b) => {
-    const nomeA = a.cliente?.nome?.trim() ? a.cliente.nome.trim() : LABEL_SEM_CLIENTE
-    const nomeB = b.cliente?.nome?.trim() ? b.cliente.nome.trim() : LABEL_SEM_CLIENTE
-    const diff = nomeA.localeCompare(nomeB, 'pt-BR', { sensitivity: 'base' })
-    const diffFinal = direcao === 'desc' ? -diff : diff
-    if (diffFinal !== 0) return diffFinal
+    const diff =
+      direcao === 'desc' ? b.numeroVenda - a.numeroVenda : a.numeroVenda - b.numeroVenda
+    if (diff !== 0) return diff
     return direcao === 'desc' ? b.id.localeCompare(a.id) : a.id.localeCompare(b.id)
   })
 }
 
 export function filtrarPorBusca(vendas: Venda[], termo: string): Venda[] {
-  const t = termo.trim().toLowerCase()
+  const t = normalizarTermoBuscaKanban(termo)
   if (!t) return vendas
-  return vendas.filter(v => {
-    if (v.codigoVenda?.toLowerCase().includes(t)) return true
-    if (String(v.numeroVenda).includes(t)) return true
-    if (v.cliente?.nome?.toLowerCase().includes(t)) return true
-    if (v.id?.toLowerCase().includes(t)) return true
-    return false
-  })
+  return vendas.filter(v => vendaAtendeBuscaKanban(v, t, termo))
+}
+
+/** Remove `#` e espaços — card exibe `#ULUGSBYD`, API guarda `ULUGSBYD`. */
+export function normalizarTermoBuscaKanban(termo: string): string {
+  return String(termo ?? '')
+    .trim()
+    .replace(/^#+/, '')
+    .trim()
+    .toLowerCase()
+}
+
+/**
+ * Interpreta termo de busca como valor monetário (ex.: `4,00`, `4.00`, `R$ 1.234,56`).
+ * Retorna `null` se não for um valor.
+ */
+export function parseValorBuscaKanban(termo: string): number | null {
+  const t = String(termo ?? '')
+    .trim()
+    .replace(/^r\$\s*/i, '')
+    .replace(/\s/g, '')
+  if (!t) return null
+
+  // pt-BR: 1.234,56 ou 4,00
+  if (/^\d{1,3}(\.\d{3})*,\d{1,2}$/.test(t) || /^\d+,\d{1,2}$/.test(t)) {
+    const n = Number(t.replace(/\./g, '').replace(',', '.'))
+    return Number.isFinite(n) ? n : null
+  }
+
+  // 4.00 ou 4
+  if (/^\d+(\.\d{1,2})?$/.test(t)) {
+    const n = Number(t)
+    return Number.isFinite(n) ? n : null
+  }
+
+  return null
+}
+
+export function isTermoBuscaValorKanban(termo: string): boolean {
+  return parseValorBuscaKanban(termo) != null
+}
+
+export function vendaAtendeBuscaKanban(
+  venda: Pick<Venda, 'id' | 'numeroVenda' | 'codigoVenda' | 'cliente' | 'valorFinal'>,
+  termoNormalizado: string,
+  termoOriginal?: string
+): boolean {
+  const t = termoNormalizado.trim().toLowerCase()
+  if (!t) return true
+
+  const valorBusca = parseValorBuscaKanban(termoOriginal ?? termoNormalizado)
+  if (valorBusca != null) {
+    const valor = Number(venda.valorFinal)
+    if (Number.isFinite(valor) && Math.abs(valor - valorBusca) < 0.005) return true
+  }
+
+  const codigo = String(venda.codigoVenda ?? '')
+    .trim()
+    .replace(/^#+/, '')
+    .toLowerCase()
+  if (codigo && codigo.includes(t)) return true
+
+  const numero = String(venda.numeroVenda ?? '').trim()
+  if (numero && numero.includes(t)) return true
+
+  // Busca por valor não deve misturar com match parcial de nome/código confuso.
+  if (valorBusca != null) return false
+
+  const nome = String(venda.cliente?.nome ?? '')
+    .trim()
+    .toLowerCase()
+  if (nome && nome.includes(t)) return true
+
+  const id = String(venda.id ?? '')
+    .trim()
+    .toLowerCase()
+  if (id && id.includes(t)) return true
+
+  return false
 }
 
 export function formatarDataCard(dataISO: string | null | undefined): string {
@@ -427,16 +489,6 @@ export function kanbanVendaUsaCupomPublicoNfce(
   )
 }
 
-/** Etapa do card quando emissão/reemissão está em andamento. */
-export function etapaKanbanCardComAcaoFiscal(
-  venda: Venda,
-  acaoFiscalEmAndamentoPorVenda: Record<string, 'emitindo' | 'reemitindo'>
-): ColunaKanbanId {
-  const acao = acaoFiscalEmAndamentoPorVenda[venda.id]
-  if (acao === 'reemitindo' || acao === 'emitindo') return 'COM_NFE'
-  return venda.getEtapaKanban() as ColunaKanbanId
-}
-
 /**
  * No modo Delivery, pendente emissão aparece na coluna Finalizadas — borda/cores da etapa real.
  */
@@ -463,7 +515,7 @@ export function colunaPermiteEditarClienteKanban(
 ): boolean {
   if (columnId === 'FINALIZADAS' || columnId === 'PENDENTE_EMISSAO') return true
   if (
-    columnId === 'COM_NFE' &&
+    columnId === 'COM_FISCAL' &&
     (acaoFiscalEmAndamentoPorVenda[venda.id] === 'reemitindo' ||
       acaoFiscalEmAndamentoPorVenda[venda.id] === 'emitindo')
   ) {
@@ -528,8 +580,8 @@ export function exibirAtribuirEntregadorKanban(
 }
 
 /**
- * Venda que pode ser reenviada automaticamente no lote (sem abrir modal).
- * Exige documento fiscal para reemissão ou modelo conhecido para emissão direta.
+ * Venda da coluna Rejeitadas que pode ser reenviada automaticamente no lote.
+ * Exige REJEITADA/DENEGADA + documento fiscal (ou modelo conhecido para emissão direta).
  */
 export function vendaElegivelParaReemissaoAutomaticaLote(
   venda: VendaUnificadaDTO,
@@ -537,10 +589,11 @@ export function vendaElegivelParaReemissaoAutomaticaLote(
 ): boolean {
   if (vendaBloqueadaParaEmissaoInterativa(venda, acaoFiscalEmAndamentoPorVenda)) return false
 
-  const podeReemitir =
-    venda.statusFiscal === 'REJEITADA' || fiscalKanbanPodeReemitirAposCooldown(venda)
+  const sf = String(venda.statusFiscal ?? '')
+    .trim()
+    .toUpperCase()
+  if (sf !== 'REJEITADA' && sf !== 'DENEGADA') return false
 
-  if (!podeReemitir) return false
   if (venda.documentoFiscalId?.trim()) return true
 
   const tipoDoc = String(venda.tipoDocFiscal ?? '')
@@ -560,18 +613,20 @@ export function rotuloBotaoEmissaoKanban(
   acaoFiscalEmAndamentoPorVenda: Record<string, 'emitindo' | 'reemitindo'>
 ): string {
   const acaoEmAndamento = acaoFiscalEmAndamentoPorVenda[venda.id]
-  if (acaoEmAndamento === 'reemitindo') return 'Reemitindo...'
-  if (acaoEmAndamento === 'emitindo') return 'Emitindo...'
+  if (acaoEmAndamento === 'reemitindo') return 'Em emissão'
+  if (acaoEmAndamento === 'emitindo') return 'Em emissão'
   const documentoLabel = venda.tipoDocFiscal === 'NFE' ? 'NFe' : 'NFCe'
   const podeReemitir =
-    venda.statusFiscal === 'REJEITADA' || fiscalKanbanPodeReemitirAposCooldown(venda)
+    venda.statusFiscal === 'REJEITADA' ||
+    venda.statusFiscal === 'DENEGADA' ||
+    fiscalKanbanPodeReemitirAposCooldown(venda)
   if (podeReemitir) {
     if (venda.tipoDocFiscal === 'NFE' || venda.tipoDocFiscal === 'NFCE') {
       return `Reemitir ${documentoLabel}`
     }
     return 'Reemitir nota'
   }
-  if (venda.statusFiscal === 'PENDENTE_EMISSAO') return 'Aguardando...'
-  if (statusFiscalAguardandoSefaz(venda)) return 'Aguardando...'
+  if (venda.statusFiscal === 'PENDENTE_EMISSAO') return 'Em emissão'
+  if (statusFiscalAguardandoSefaz(venda)) return 'Em emissão'
   return 'Emitir Nota'
 }

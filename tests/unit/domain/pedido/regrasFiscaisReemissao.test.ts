@@ -124,7 +124,7 @@ describe('vendasKanban.rules — desbloqueio no Kanban', () => {
     expect(statusFiscalAguardandoSefaz(vendaAposCooldown)).toBe(false)
     expect(vendaBloqueadaParaEmissaoInterativa(vendaAposCooldown, {})).toBe(false)
     expect(
-      deveExibirBotaoEmitirNotaNoKanban('COM_NFE', vendaAposCooldown, {})
+      deveExibirBotaoEmitirNotaNoKanban('COM_FISCAL', vendaAposCooldown, {})
     ).toBe(true)
   })
 
@@ -139,7 +139,7 @@ describe('vendasKanban.rules — desbloqueio no Kanban', () => {
     })
 
     expect(fiscalKanbanPodeReemitirAposCooldown(venda)).toBe(true)
-    expect(deveExibirBotaoEmitirNotaNoKanban('COM_NFE', venda, {})).toBe(true)
+    expect(deveExibirBotaoEmitirNotaNoKanban('COM_FISCAL', venda, {})).toBe(true)
   })
 
   it('move card para pendente emissão após cooldown', () => {
@@ -151,6 +151,37 @@ describe('vendasKanban.rules — desbloqueio no Kanban', () => {
     Date.now = () => new Date('2026-06-08T12:11:00.000Z').getTime()
     expect(venda.getEtapaKanban()).toBe('PENDENTE_EMISSAO')
     Date.now = agoraAnterior
+  })
+
+  it('exibe botão reemitir em Com Nota Solicitada para REJEITADA', () => {
+    const venda = criarVendaKanban({
+      statusFiscal: 'REJEITADA',
+      numeroFiscal: 333,
+      serieFiscal: '2',
+    })
+    expect(deveExibirBotaoEmitirNotaNoKanban('COM_FISCAL', venda, {})).toBe(true)
+  })
+})
+
+describe('getEtapaKanban — REJEITADA com numeração', () => {
+  it('coloca REJEITADA com número e série em Com Nota Solicitada', () => {
+    const venda = criarVendaKanban({
+      statusFiscal: 'REJEITADA',
+      numeroFiscal: 333,
+      serieFiscal: '2',
+      retornoSefaz: null,
+    })
+    expect(venda.getEtapaKanban()).toBe('COM_FISCAL')
+  })
+
+  it('mantém REJEITADA sem numeração em Pendente Emissão', () => {
+    const venda = criarVendaKanban({
+      statusFiscal: 'REJEITADA',
+      numeroFiscal: null,
+      serieFiscal: null,
+      retornoSefaz: null,
+    })
+    expect(venda.getEtapaKanban()).toBe('PENDENTE_EMISSAO')
   })
 })
 

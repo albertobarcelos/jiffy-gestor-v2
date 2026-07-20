@@ -2,6 +2,7 @@ import type { InfiniteData, QueryClient } from '@tanstack/react-query'
 import type { KanbanVendaCachePatch } from '@/src/application/dto/TransicaoKanbanDTO'
 import { extrairPatchKanbanDeRespostaTransicao } from '@/src/application/mappers/TransicaoPedidoDeliveryMapper'
 import { syncPedidoDeliveryDetalheCaches } from '@/src/infrastructure/api/pedidoDeliveryDetalheCache'
+import { patchVendaDetalheResumoFiscalCache } from '../../pedidos/hooks/data/useVendaDetalheCarregadaQuery'
 import {
   kanbanPedidosDeliveryInfiniteQueryFilter,
   kanbanVendasUnificadasInfiniteQueryFilter,
@@ -383,6 +384,20 @@ export function patchKanbanVendasListagemCache(
   return encontrou
 }
 
+/**
+ * Atualiza listagem do Kanban e o cache do modal de detalhes (aba Fiscal),
+ * para rejeições/autorizações refletirem sem reload da página.
+ */
+export function patchKanbanVendasListagemEDetalheFiscal(
+  queryClient: QueryClient,
+  vendaId: string,
+  patch: KanbanVendaCachePatch
+): boolean {
+  const encontrou = patchKanbanVendasListagemCache(queryClient, vendaId, patch)
+  patchVendaDetalheResumoFiscalCache(queryClient, vendaId, patch)
+  return encontrou
+}
+
 /** Atualiza um item no cache infinito do Kanban sem refetch da lista inteira. */
 export function patchVendaUnificadaInfiniteCache(
   queryClient: QueryClient,
@@ -512,5 +527,183 @@ export async function sincronizarVendaGestorKanbanEmBackground(
     )
   } catch {
     /* falha silenciosa — cache otimista + patch da transição já atualizaram a UI */
+  }
+}
+
+function isoOuNull(valor: unknown): string | null {
+  if (valor == null) return null
+  const texto = String(valor).trim()
+  return texto || null
+}
+
+function numeroOuNull(valor: unknown): number | null {
+  if (valor == null || valor === '') return null
+  const n = Number(valor)
+  return Number.isFinite(n) ? n : null
+}
+
+/** Extrai campos fiscais de GET venda/pedido (incluirFiscal) ou resposta de emitir/reemitir. */
+export function extrairPatchFiscalKanban(data: unknown): KanbanVendaCachePatch {
+  const root = data && typeof data === 'object' ? (data as Record<string, unknown>) : {}
+  const rf =
+    root.resumoFiscal && typeof root.resumoFiscal === 'object' && !Array.isArray(root.resumoFiscal)
+      ? (root.resumoFiscal as Record<string, unknown>)
+      : null
+
+  const statusRaw =
+    isoOuNull(root.statusFiscal) ??
+    isoOuNull(root.status) ??
+    isoOuNull(rf?.status) ??
+    isoOuNull(rf?.statusFiscal)
+
+  const modeloRaw = numeroOuNull(root.modelo) ?? numeroOuNull(rf?.modelo)
+  const tipoDocRaw = isoOuNull(root.tipoDocFiscal) ?? isoOuNull(root.tipoDocumento)
+  let tipoDocFiscal: string | null | undefined = tipoDocRaw ?? undefined
+  if (!tipoDocFiscal && (modeloRaw === 55 || modeloRaw === 65)) {
+    tipoDocFiscal = modeloRaw === 55 ? 'NFE' : 'NFCE'
+  }
+
+  const etapaRaw =
+    isoOuNull(root.etapaKanbanBalcao) ?? isoOuNull(root.etapa_kanban_balcao)
+  const etapaNorm = String(etapaRaw ?? '')
+    .trim()
+    .toUpperCase()
+  const etapaKanbanBalcao: KanbanVendaCachePatch['etapaKanbanBalcao'] =
+    etapaNorm === 'FINALIZADAS' ||
+    etapaNorm === 'PENDENTE_EMISSAO' ||
+    etapaNorm === 'COM_FISCAL' ||
+    etapaNorm === 'REJEITADAS'
+      ? etapaNorm
+      : undefined
+
+  return {
+    statusFiscal: statusRaw,
+    documentoFiscalId:
+      isoOuNull(root.documentoFiscalId) ?? isoOuNull(rf?.documentoFiscalId) ?? undefined,
+    numeroFiscal: numeroOuNull(root.numeroFiscal) ?? numeroOuNull(rf?.numero) ?? undefined,
+    serieFiscal:
+      numeroOuNull(root.serieFiscal) ??
+      numeroOuNull(root.serie) ??
+      numeroOuNull(rf?.serie) ??
+      undefined,
+    dataEmissaoFiscal:
+      isoOuNull(root.dataEmissaoFiscal) ?? isoOuNull(rf?.dataEmissao) ?? undefined,
+    tipoDocFiscal: tipoDocFiscal ?? undefined,
+    modelo: modeloRaw ?? undefined,
+    retornoSefaz:
+      isoOuNull(root.retornoSefaz) ??
+      isoOuNull(root.mensagemSefaz) ??
+      isoOuNull(root.mensagemAmigavel) ??
+      isoOuNull(rf?.retornoSefaz) ??
+      undefined,
+    ...(etapaKanbanBalcao ? { etapaKanbanBalcao } : {}),
+  }
+}
+
+function encontrarVendaNasListagensKanban(
+  queryClient: QueryClient,
+  vendaId: string
+): VendaUnificadaDTO | null {
+  const queries = [
+    ...queryClient.getQueriesData<InfiniteData<VendasUnificadasResponse>>(
+      kanbanVendasUnificadasInfiniteQueryFilter()
+    ),
+    ...queryClient.getQueriesData<InfiniteData<VendasUnificadasResponse>>(
+      kanbanPedidosDeliveryInfiniteQueryFilter()
+    ),
+  ]
+
+  for (const [, data] of queries) {
+    for (const page of data?.pages ?? []) {
+      const found = page.items.find(i => i.id === vendaId)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+const COLUNAS_FISCAIS_BALCAO: EtapaKanbanBalcao[] = [
+  'FINALIZADAS',
+  'PENDENTE_EMISSAO',
+  'COM_FISCAL',
+  'REJEITADAS',
+]
+
+/**
+ * Atualiza status fiscal no cache e move o card entre colunas do balcão
+ * sem refetch das listagens.
+ */
+export function aplicarPatchFiscalKanbanSemRefetch(
+  queryClient: QueryClient,
+  vendaId: string,
+  patch: KanbanVendaCachePatch
+): boolean {
+  const venda = encontrarVendaNasListagensKanban(queryClient, vendaId)
+  let atualizouListagem = false
+
+  if (!venda) {
+    atualizouListagem = patchKanbanVendasListagemCache(queryClient, vendaId, patch)
+  } else {
+    const atualizada = cloneVendaUnificadaDTO(venda, patch)
+    const etapa = atualizada.getEtapaKanban()
+    if ((COLUNAS_FISCAIS_BALCAO as string[]).includes(etapa)) {
+      atualizouListagem = moveVendaKanbanBalcaoEntreColunas(
+        queryClient,
+        vendaId,
+        etapa as EtapaKanbanBalcao,
+        patch
+      )
+    } else {
+      atualizouListagem = patchKanbanVendasListagemCache(queryClient, vendaId, patch)
+    }
+  }
+
+  patchVendaDetalheResumoFiscalCache(queryClient, vendaId, patch)
+  return atualizouListagem
+}
+
+/** GET leve com fiscal para sincronizar um card após emitir/reemitir. */
+export async function sincronizarStatusFiscalVendaKanban(
+  queryClient: QueryClient,
+  venda: Pick<VendaUnificadaDTO, 'id' | 'tabelaOrigem' | 'tipoVenda'>,
+  token: string,
+  options?: { atualizarCache?: boolean; moverColuna?: boolean }
+): Promise<KanbanVendaCachePatch | null> {
+  try {
+    const tipo = String(venda.tipoVenda ?? '')
+      .trim()
+      .toLowerCase()
+    const usarDelivery =
+      venda.tabelaOrigem === 'venda_gestor' && (tipo === 'entrega' || tipo === 'retirada')
+
+    const url = usarDelivery
+      ? `/api/delivery/pedidos/${encodeURIComponent(venda.id)}`
+      : venda.tabelaOrigem === 'venda_gestor'
+        ? `/api/vendas/gestor/${encodeURIComponent(venda.id)}?incluirFiscal=true`
+        : `/api/vendas/${encodeURIComponent(venda.id)}?incluirFiscal=true`
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      },
+      cache: 'no-store',
+    })
+    if (!response.ok) return null
+
+    const data = await response.json()
+    const patch = extrairPatchFiscalKanban(data)
+    if (!patch.statusFiscal && patch.documentoFiscalId === undefined) return null
+
+    if (options?.atualizarCache !== false) {
+      if (options?.moverColuna === false) {
+        patchKanbanVendasListagemEDetalheFiscal(queryClient, venda.id, patch)
+      } else {
+        aplicarPatchFiscalKanbanSemRefetch(queryClient, venda.id, patch)
+      }
+    }
+    return patch
+  } catch {
+    return null
   }
 }

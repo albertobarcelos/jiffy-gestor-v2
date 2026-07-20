@@ -6,10 +6,11 @@ import {
   MdRestaurant,
   MdLocalShipping,
   MdRoute,
+  MdError,
 } from 'react-icons/md'
-import { COLUNAS_ENTREGA_OPERACIONAIS } from '../rules/vendasKanban.rules'
-import type { KanbanColumn } from '../types'
+import type { ColunaKanbanFiltroExtra, KanbanColumn } from '../types'
 import type { ModoKanbanVendas } from '../KanbanModoVendasToggle'
+import { balcaoKanbanColunasAtivas } from './kanbanBalcaoColumnConfig'
 
 export function getKanbanColumnsConfig(): KanbanColumn[] {
   return [
@@ -55,28 +56,48 @@ export function getKanbanColumnsConfig(): KanbanColumn[] {
     },
     {
       id: 'PENDENTE_EMISSAO',
-      title: 'Pendente Emissão Fiscal',
+      title: 'Pendente de Emissão',
       color: 'bg-yellow-50',
       borderColor: 'border-yellow-400',
       icon: <MdSchedule className="h-4 w-4 text-yellow-600" />,
       placeholder: 'Vendas aguardando emissão de NFe',
     },
     {
-      id: 'COM_NFE',
-      title: 'Com Nota Solicitada',
+      id: 'COM_FISCAL',
+      title: 'Com NF Solicitada',
       color: 'bg-green-50',
       borderColor: 'border-green-400',
       icon: <MdCheckCircle className="h-4 w-4 text-green-600" />,
       placeholder: 'Vendas com nota fiscal solicitada',
     },
+    {
+      id: 'REJEITADAS',
+      title: 'Rejeitadas',
+      color: 'bg-red-50',
+      borderColor: 'border-red-400',
+      icon: <MdError className="h-4 w-4 text-red-600" />,
+      placeholder: 'Vendas com nota rejeitada ou denegada',
+    },
   ]
 }
 
-export function getVisibleKanbanColumns(modoKanbanVendas: ModoKanbanVendas): KanbanColumn[] {
+export function getVisibleKanbanColumns(
+  modoKanbanVendas: ModoKanbanVendas,
+  filtroExtraBalcao?: ColunaKanbanFiltroExtra | null
+): KanbanColumn[] {
   const todasColunasKanban = getKanbanColumnsConfig()
-  return modoKanbanVendas === 'delivery'
-    ? todasColunasKanban.filter(c => c.id !== 'PENDENTE_EMISSAO')
-    : todasColunasKanban.filter(
-        c => !COLUNAS_ENTREGA_OPERACIONAIS.includes(c.id as (typeof COLUNAS_ENTREGA_OPERACIONAIS)[number])
-      )
+
+  if (modoKanbanVendas === 'delivery') {
+    // Delivery: colunas operacionais + COM_FISCAL + FINALIZADAS (sem Pendente/Rejeitadas fixas).
+    return todasColunasKanban.filter(
+      c =>
+        c.id !== 'PENDENTE_EMISSAO' &&
+        c.id !== 'REJEITADAS'
+    )
+  }
+
+  const idsAtivos = balcaoKanbanColunasAtivas(filtroExtraBalcao)
+  // Ordem explícita de balcaoKanbanColunasAtivas (Finalizadas → filtro → Com NF).
+  const porId = new Map(todasColunasKanban.map(c => [c.id, c]))
+  return idsAtivos.map(id => porId.get(id)).filter((c): c is KanbanColumn => Boolean(c))
 }

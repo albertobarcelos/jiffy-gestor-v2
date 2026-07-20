@@ -20,7 +20,11 @@ import type {
   AtualizarEmpresaDTO,
   SalvarFiscalDTO,
   ExportacaoXmlDTO,
-  ExportacaoXmlResumoDTO,
+  ExportacaoXmlIniciadaDTO,
+  ExportacaoXmlStatusDTO,
+  PaginaExportacaoHistoricoDTO,
+  AgendamentoExportacaoXmlDTO,
+  AgendamentoExportacaoXmlResponseDTO,
 } from '@/src/application/dto/painel-contador/PainelContadorDTO'
 import { EmpresaPainelResumo } from '@/src/domain/entities/painel-contador/EmpresaPainelResumo'
 import { ConfiguracaoFiscalEmpresa } from '@/src/domain/entities/painel-contador/ConfiguracaoFiscalEmpresa'
@@ -293,45 +297,109 @@ export class FiscalPainelApiRepository implements IFiscalPainelRepository {
     }
   }
 
-  async exportarXmls(
-    input: ExportacaoXmlDTO
-  ): Promise<{ blob: Blob; filename: string } | ExportacaoXmlResumoDTO> {
-    const response = await fetchGestorApi('/api/v1/fiscal/exportacao/xmls', {
-      method: 'POST',
-      cache: 'no-store',
-      headers: authHeaders(this.token),
-      body: JSON.stringify(input),
-    })
+  async iniciarExportacaoXmls(input: ExportacaoXmlDTO): Promise<ExportacaoXmlIniciadaDTO> {
+    const response = await this.mutate('/api/v1/fiscal/exportacao/xmls', 'POST', input)
+    const data = await parseJson<ExportacaoXmlIniciadaDTO & { error?: string; message?: string }>(
+      response
+    )
+    if (!response.ok) {
+      throw new Error(data.error || data.message || 'Erro ao iniciar exportação de XMLs')
+    }
+    if (!data.exportacaoId) {
+      throw new Error('Resposta inválida: exportacaoId ausente')
+    }
+    return data
+  }
+
+  async consultarStatusExportacaoXml(exportacaoId: string): Promise<ExportacaoXmlStatusDTO> {
+    return this.get<ExportacaoXmlStatusDTO>(
+      `/api/v1/fiscal/exportacao/xmls/${encodeURIComponent(exportacaoId)}/status`
+    )
+  }
+
+  async obterUrlDownloadExportacaoXml(exportacaoId: string): Promise<{ url: string }> {
+    const response = await fetchGestorApi(
+      `/api/v1/fiscal/exportacao/xmls/${encodeURIComponent(exportacaoId)}/download`,
+      {
+        cache: 'no-store',
+        headers: authHeaders(this.token),
+        redirect: 'manual',
+      }
+    )
+
+    if (response.status === 410) {
+      throw new Error('Link expirado. Exporte novamente.')
+    }
+
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('Location') || response.headers.get('location')
+      if (location) return { url: location }
+    }
 
     const contentType = response.headers.get('content-type') ?? ''
+    if (contentType.includes('application/json')) {
+      const data = await parseJson<{ url?: string; error?: string; message?: string }>(response)
+      if (response.ok && data.url) return { url: data.url }
+      throw new Error(data.error || data.message || 'Erro ao obter link de download')
+    }
 
     if (!response.ok) {
-      const errorData = contentType.includes('application/json')
-        ? await response.json().catch(() => ({}))
-        : { error: await response.text().catch(() => '') }
-      throw new Error(
-        String(
-          (errorData as { error?: string; message?: string }).error ||
-            (errorData as { message?: string }).message ||
-            'Erro ao exportar XMLs'
-        )
-      )
+      throw new Error(`Erro ao obter download: ${response.status}`)
     }
 
-    if (contentType.includes('application/json')) {
-      return (await response.json()) as ExportacaoXmlResumoDTO
+    throw new Error('Link de download não disponível')
+  }
+
+  async listarHistoricoExportacaoXml(
+    page: number,
+    size: number
+  ): Promise<PaginaExportacaoHistoricoDTO> {
+    const params = new URLSearchParams({
+      page: String(page),
+      size: String(size),
+    })
+    return this.get<PaginaExportacaoHistoricoDTO>(
+      `/api/v1/fiscal/exportacao/xmls/historico?${params.toString()}`
+    )
+  }
+
+  async buscarAgendamentoExportacaoXml(): Promise<AgendamentoExportacaoXmlResponseDTO | null> {
+    const response = await fetchGestorApi('/api/v1/fiscal/exportacao/xmls/agendamento', {
+      cache: 'no-store',
+      headers: authHeaders(this.token),
+    })
+    if (response.status === 404) return null
+    if (!response.ok) {
+      const data = await parseJson<{ error?: string; message?: string }>(response)
+      throw new Error(data.error || data.message || 'Erro ao buscar agendamento')
     }
+    const data = await parseJson<AgendamentoExportacaoXmlResponseDTO | null>(response)
+    if (!data || !data.id) return null
+    return data
+  }
 
-    const blob = await response.blob()
-    const disposition = response.headers.get('content-disposition')
-    const filenameMatch = disposition
-      ? /filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i.exec(disposition)
-      : null
-    const rawName = filenameMatch?.[1] ?? filenameMatch?.[2]
-    const filename = rawName
-      ? decodeURIComponent(rawName)
-      : `xmls-fiscais-${input.mes ?? input.dataInicial}.zip`
+  async salvarAgendamentoExportacaoXml(
+    input: AgendamentoExportacaoXmlDTO
+  ): Promise<AgendamentoExportacaoXmlResponseDTO> {
+    const response = await this.mutate(
+      '/api/v1/fiscal/exportacao/xmls/agendamento',
+      'PUT',
+      input
+    )
+    const data = await parseJson<
+      AgendamentoExportacaoXmlResponseDTO & { error?: string; message?: string }
+    >(response)
+    if (!response.ok) {
+      throw new Error(data.error || data.message || 'Erro ao salvar agendamento')
+    }
+    return data
+  }
 
-    return { blob, filename }
+  async desativarAgendamentoExportacaoXml(): Promise<void> {
+    const response = await this.mutate('/api/v1/fiscal/exportacao/xmls/agendamento', 'DELETE')
+    if (!response.ok) {
+      const data = await parseJson<{ error?: string; message?: string }>(response)
+      throw new Error(data.error || data.message || 'Erro ao desativar agendamento')
+    }
   }
 }
