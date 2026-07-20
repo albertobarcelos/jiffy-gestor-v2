@@ -11,7 +11,8 @@ Documento vivo de planejamento e acompanhamento do novo fluxo público de delive
 
 Construir do zero o fluxo público de pedidos online (delivery), acessível via link com slug da empresa, sem login do cliente.
 
-**URL pública atual:** `/cardapio/{slug}`
+**URL pública atual:** `/delivery/{slug}`  
+**Redirect legado:** `/cardapio/{slug}` → `/delivery/{slug}`
 
 O lojista configura **qual layout visual** o app público usa; o cliente final vê o catálogo nesse layout.
 
@@ -34,7 +35,7 @@ O lojista configura **qual layout visual** o app público usa; o cliente final v
 ### Premissas técnicas
 
 - Código da feature em: `src/presentation/components/features/delivery-publico/`
-- Rotas públicas em: `app/cardapio/`
+- Rotas públicas em: `app/delivery/` (legado `app/cardapio/` redireciona)
 - APIs públicas existentes (BFF): `app/api/public/delivery/*`
 - DTOs: `src/application/dto/delivery-publico/`
 - **Mesmos dados, layouts diferentes:** empresa, grupos, produtos, carrinho, tipo de entrega e horário alimentam todos os modelos
@@ -301,8 +302,8 @@ Blocos identificados no mockup (de cima para baixo):
 | # | Tela | Rota (proposta) | Público | Status |
 |---|------|-----------------|---------|--------|
 | 1 | Customizador Design (6 abas) | `/configuracoes/empresa-delivery/design` | Lojista (ERP) | 🚧 em implementação |
-| 2 | App público — layout Básico | `/cardapio/{slug}` | Cliente final | 📋 planejado |
-| 3 | Em construção (temporário) | `/cardapio/{slug}` | Cliente final | ✅ placeholder atual |
+| 2 | App público — layout Básico | `/delivery/{slug}` | Cliente final | 📋 planejado |
+| 3 | Em construção (temporário) | `/delivery/{slug}` | Cliente final | ✅ placeholder atual |
 
 ### 4.13 Fluxo do lojista (admin)
 
@@ -320,13 +321,13 @@ Configurações → Empresa Delivery (slug já configurado)
        ├─ Restaurar design → reverte rascunho para último publicado
        │
        └─ Publicar → persiste `DeliveryPublicoDesignConfig` (mock local → API futura)
-              └─ Link /cardapio/{slug} passa a usar design publicado
+              └─ Link /delivery/{slug} passa a usar design publicado
 ```
 
 ### 4.14 Fluxo do cliente (público)
 
 ```
-Acessa /cardapio/{slug}
+Acessa /delivery/{slug}
        │
        ▼
 Carrega design publicado da empresa (layout + tema + cabeçalho + categorias…)
@@ -503,10 +504,11 @@ function renderDeliveryLayout(id: DeliveryLayoutId, props: LayoutHomeProps) {
 
 | Rota | Componente | Descrição |
 |------|------------|-----------|
-| `/cardapio/{slug}` | `DeliveryPublicoHomeScreen` | App público (layout dinâmico) |
+| `/delivery/{slug}` | `DeliveryPublicoHomeScreen` | App público (layout dinâmico) |
 | `/configuracoes/empresa-delivery/design` | `DeliveryDesignCustomizerScreen` | Customizador Design (6 abas) |
-| `/cardapio/{slug}/catalogo` | redirect → home | Legado |
-| `/cardapio/{slug}/carrinho` | redirect → home | Legado |
+| `/delivery/{slug}/catalogo` | redirect → home | Legado |
+| `/delivery/{slug}/carrinho` | checkout | Checkout |
+| `/cardapio/{slug}…` | redirect → `/delivery/{slug}…` | Compatibilidade |
 
 ### 5.7 Integrações backend
 
@@ -528,7 +530,7 @@ function renderDeliveryLayout(id: DeliveryLayoutId, props: LayoutHomeProps) {
 
 - [x] Pasta `delivery-publico` criada
 - [x] Página placeholder “em construção”
-- [x] Rota `/cardapio/{slug}` apontando para o novo fluxo
+- [x] Rota `/delivery/{slug}` apontando para o novo fluxo
 - [x] Rotas legadas redirecionando para home do slug
 
 ### Fase 1 — Planejamento ✅ (parcial)
@@ -553,7 +555,7 @@ function renderDeliveryLayout(id: DeliveryLayoutId, props: LayoutHomeProps) {
 
 - [x] Implementar `BasicoLayoutHome` fiel ao mockup
 - [x] Implementar `DeliveryPublicoLayoutRegistry`
-- [x] Substituir placeholder por `DeliveryPublicoHomeScreen` em `/cardapio/{slug}`
+- [x] Substituir placeholder por `DeliveryPublicoHomeScreen` em `/delivery/{slug}`
 - [x] Stubs visuais para Vitrine, Grade, Catálogo (card "em breve" no preview)
 
 ### Fase 4 — Tela admin Delivery Próprio (Design) ✅
@@ -573,7 +575,7 @@ function renderDeliveryLayout(id: DeliveryLayoutId, props: LayoutHomeProps) {
 - [ ] Persistir `designConfig` via API empresa delivery
 - [ ] Implementar layouts premium (Vitrine, Grade, Catálogo)
 - [x] Modal de produto + adicionar ao carrinho (`DeliveryProdutoModal`)
-- [x] Rota `/cardapio/{slug}/carrinho` com checkout (`DeliveryPublicoCarrinhoScreen`)
+- [x] Rota `/delivery/{slug}/carrinho` com checkout (`DeliveryPublicoCarrinhoScreen`)
 - [ ] Migrar visual do carrinho/checkout para tema delivery-publico
 
 ---
@@ -600,6 +602,7 @@ Componentes a extrair do mockup (reutilizáveis em outros layouts):
 | 2026-03-08 | Novo fluxo em `delivery-publico`; legado `cardapio-digital` como referência | Recomeço limpo |
 | 2026-07-17 | Remoção do legado `cardapio-digital` e dependências órfãs | Fluxo vivo só em `delivery-publico` |
 | 2026-03-08 | Manter URL `/cardapio/{slug}` | Links já compartilhados |
+| 2026-07-20 | Renomear URL canônica para `/delivery/{slug}` | Liberar `/cardapio` para vitrine; redirects legados |
 | 2026-03-08 | Mesmos dados para todos os layouts; diferença só na apresentação | Requisito do produto |
 | 2026-03-08 | v1 com modelos fictícios; só **Básico** funcional | Backend de layout ainda não existe |
 | 2026-03-08 | Preview admin e app público usam o mesmo registry + mesmo `DesignConfig` | WYSIWYG real, sem duplicar UI |

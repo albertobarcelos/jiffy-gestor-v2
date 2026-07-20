@@ -30,6 +30,7 @@ import { DeliveryCheckoutEnderecosModal } from '../components/checkout/DeliveryC
 import { DeliveryCheckoutEnderecoFormModal } from '../components/checkout/DeliveryCheckoutEnderecoFormModal'
 import { DeliveryCheckoutPagamentoModal } from '../components/checkout/DeliveryCheckoutPagamentoModal'
 import { DeliveryCheckoutRevisaoModal } from '../components/checkout/DeliveryCheckoutRevisaoModal'
+import { deliveryPublicoHomePath } from '../../shared/utils/deliveryPublicoRoutes'
 
 type DeliveryPublicoCarrinhoScreenProps = {
   slug: string
@@ -146,7 +147,7 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
     catalogQuery.hasNextPage,
   ])
 
-  const voltar = () => router.push(`/cardapio/${encodeURIComponent(slug)}`)
+  const voltar = () => router.push(deliveryPublicoHomePath(slug))
   const carregandoEdicao = Boolean(itemEditando) && !produtoEdicao
   useDeliveryBodyScrollLock(carregandoEdicao)
 

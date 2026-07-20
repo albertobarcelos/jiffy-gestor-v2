@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation'
 import { deliveryPublicoInstrucoesPath } from '@/src/presentation/components/features/delivery-publico/shared/utils/deliveryPublicoRoutes'
 
 /**
- * Redirect legado: `/cardapio/instrucoes` → `/delivery/instrucoes`.
+ * Entrada do delivery público — redireciona para instruções.
+ * O acesso válido é via /delivery/{slug} compartilhado pela loja.
  */
-export default function CardapioInstrucoesLegacyPage() {
+export default function DeliveryPage() {
   const router = useRouter()
 
   useEffect(() => {
@@ -16,7 +17,10 @@ export default function CardapioInstrucoesLegacyPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-400" />
+      <div
+        className="animate-spin rounded-full h-12 w-12 border-b-2"
+        style={{ borderColor: 'var(--delivery-primary, #333)' }}
+      />
     </div>
   )
 }

@@ -28,7 +28,9 @@ Tratar cada um como **módulo** distinto no frontend e no produto, mesmo compart
 
 ### 2.1 URL e identificação
 
-- URL pública de pedidos: `/cardapio/{slug}`
+- URL pública de pedidos: **`/delivery/{slug}`** (canônica)
+- Redirect legado: `/cardapio/{slug}` → `/delivery/{slug}`
+- Prefixo **`/cardapio`** reservado para a **vitrine** (só visualização) futura
 - Slug configurado em **Empresa Delivery** (ERP → Configurações → Empresa Delivery)
 - Persistido em `empresa_delivery.slug` (único por empresa)
 
@@ -36,10 +38,11 @@ Tratar cada um como **módulo** distinto no frontend e no produto, mesmo compart
 
 | Rota | Função |
 |------|--------|
-| `app/cardapio/[slug]/page.tsx` | Home delivery (pedido) |
-| `app/cardapio/[slug]/carrinho/page.tsx` | Checkout |
-| `app/cardapio/[slug]/catalogo/page.tsx` | Redirect legado → home |
-| `app/cardapio/instrucoes` | Sem slug / link inválido |
+| `app/delivery/[slug]/page.tsx` | Home delivery (pedido) |
+| `app/delivery/[slug]/carrinho/page.tsx` | Checkout |
+| `app/delivery/[slug]/catalogo/page.tsx` | Redirect legado → home |
+| `app/delivery/instrucoes` | Sem slug / link inválido |
+| `app/cardapio/*` | Redirect → equivalentes em `/delivery` (compatibilidade) |
 
 Feature: `src/presentation/components/features/delivery-publico/`
 
@@ -99,7 +102,7 @@ O módulo Cardápio Público deve:
 flowchart TB
   subgraph publico [Superfície pública]
     slug["Slug EmpresaDelivery"]
-    delivery["Módulo Delivery Público\n/cardapio/{slug}"]
+    delivery["Módulo Delivery Público\n/delivery/{slug}"]
     menu["Módulo Cardápio Público\nsó visualização"]
   end
 
@@ -194,14 +197,13 @@ Viável depois; fora do escopo da v1 (DNS, cookies, deploy).
 
 ### Recomendação (documentada)
 
-1. **Manter** Delivery em `/cardapio/{slug}` (não quebrar links existentes).
-2. **Cardápio só visualização** em **Opção A**: `/cardapio/{slug}/vitrine`  
-   - Alternativa aceitável: Opção B `/menu/{slug}` se o produto quiser nome de módulo mais explícito.
+1. **Delivery (pedidos)** em **`/delivery/{slug}`** (já implementado; redirects de `/cardapio/*` para compatibilidade).
+2. **Cardápio só visualização (vitrine)** em **`/cardapio/{slug}`** (prefixo liberado pelo rename).
 3. No ERP (`CardapioDigitalTab` / Empresa Delivery), exibir **dois links** quando ambos os módulos estiverem habilitados:
-   - “Link para pedidos (Delivery)”
-   - “Link para cardápio (somente visualização)”
+   - “Link para pedidos (Delivery)” → `/delivery/{slug}`
+   - “Link para cardápio (somente visualização)” → `/cardapio/{slug}`
 
-Assim atende “mesmo slug da empresa” sem forçar a mesma path do checkout.
+Assim atende “mesmo slug da empresa” com paths de módulo distintos.
 
 ---
 
@@ -249,8 +251,8 @@ Assim atende “mesmo slug da empresa” sem forçar a mesma path do checkout.
 | D1 | Módulos separados no frontend | Sim — `delivery-publico` ≠ `cardapio-publico` |
 | D2 | Endpoint de produtos | Reutilizar `GET .../catalogo/:slug` |
 | D3 | Slug | Mesmo `EmpresaDelivery.slug` |
-| D4 | URL vitrine v1 | `/cardapio/{slug}/vitrine` |
-| D5 | URL delivery | Permanecer `/cardapio/{slug}` |
+| D4 | URL vitrine v1 | `/cardapio/{slug}` |
+| D5 | URL delivery | `/delivery/{slug}` (canônica; legado `/cardapio` redireciona) |
 | D6 | Backend novo na v1 | Não (exceto flags de produto, se necessário) |
 | D7 | Design v1 | Reutilizar design publicado / subset |
 
@@ -281,4 +283,4 @@ Assim atende “mesmo slug da empresa” sem forçar a mesma path do checkout.
 
 ## 11. Resumo executivo
 
-É **viável** criar o módulo público de **cardápio somente visualização** separado do delivery, **reutilizando o mesmo endpoint de catálogo e o mesmo slug**, sem backend novo na v1. A URL recomendada é um **subpath** (`/cardapio/{slug}/vitrine`) para não quebrar o delivery em `/cardapio/{slug}` e manter a identificação da empresa pelo slug.
+É **viável** criar o módulo público de **cardápio somente visualização** separado do delivery, **reutilizando o mesmo endpoint de catálogo e o mesmo slug**, sem backend novo na v1. A URL recomendada da vitrine é **`/cardapio/{slug}`**; o delivery de pedidos fica em **`/delivery/{slug}`**.

@@ -80,7 +80,7 @@ export function writeDesignStorage(empresaId: string, storage: DeliveryDesignSto
   window.localStorage.setItem(storageKeyByEmpresa(empresaId), JSON.stringify(storage))
 }
 
-/** Design publicado consumido pelo app em `/cardapio/{slug}`. */
+/** Design publicado consumido pelo app em `/delivery/{slug}`. */
 export function readPublishedDesignBySlug(
   slug: string,
   nomeExibicaoFallback = ''

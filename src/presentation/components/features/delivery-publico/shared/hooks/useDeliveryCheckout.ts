@@ -27,6 +27,7 @@ import {
   montarPedidoPublico,
   type CheckoutFormData,
 } from '../utils/montarPedidoPublico'
+import { deliveryPublicoHomePath } from '../utils/deliveryPublicoRoutes'
 
 export type ClienteLookupStatus =
   | 'idle'
@@ -472,7 +473,7 @@ export function useDeliveryCheckout(slug: string) {
       await criarPedidoPublico(resultado.payload)
       limpar(slug)
       showToast.success('Pedido enviado com sucesso!')
-      router.push(`/cardapio/${encodeURIComponent(slug)}`)
+      router.push(deliveryPublicoHomePath(slug))
     } catch (error) {
       console.error(error)
       showToast.error(error instanceof Error ? error.message : 'Erro ao enviar pedido')

@@ -1,25 +1,14 @@
 'use client'
 
 import { ReactNode } from 'react'
-import '@/src/presentation/components/features/delivery-publico/shared/theme/delivery-publico-theme.css'
 
 /**
- * Layout isolado do delivery público (`/cardapio/*`).
- * Não inclui TopNav administrativo.
+ * Layout mínimo para redirects legados `/cardapio/*` → `/delivery/*`.
  */
-export default function CardapioLayout({
+export default function CardapioLegacyLayout({
   children,
 }: {
   children: ReactNode
 }) {
-  return (
-    <div
-      className="min-h-screen"
-      style={{
-        backgroundColor: 'var(--delivery-bg, var(--delivery-surface, #f5f5f5))',
-      }}
-    >
-      <main className="w-full">{children}</main>
-    </div>
-  )
+  return <>{children}</>
 }

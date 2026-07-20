@@ -35,5 +35,6 @@ describe('gestaoRoutes', () => {
     expect(isGestaoScopedPath('/portal-contador')).toBe(true)
     expect(isGestaoScopedPath('/meus-apps')).toBe(false)
     expect(isGestaoScopedPath('/cardapio/nexsyn-ltda')).toBe(false)
+    expect(isGestaoScopedPath('/delivery/nexsyn-ltda')).toBe(false)
   })
 })

@@ -32,6 +32,10 @@ import { resolveDeliveryLayoutHome } from '../layouts/DeliveryPublicoLayoutRegis
 import type { DeliveryPublicoViewModel } from '../../shared/types/deliveryPublicoViewModel'
 import { DeliveryProdutoModal } from '../components/DeliveryProdutoModal'
 import { DeliveryAdicionadoCarrinhoDialog } from '../components/DeliveryAdicionadoCarrinhoDialog'
+import {
+  deliveryPublicoCarrinhoPath,
+  deliveryPublicoInstrucoesPath,
+} from '../../shared/utils/deliveryPublicoRoutes'
 
 type DeliveryPublicoHomeScreenProps = {
   slug: string
@@ -77,7 +81,7 @@ export function DeliveryPublicoHomeScreen({ slug }: DeliveryPublicoHomeScreenPro
 
   useEffect(() => {
     if (isError && isPublicDeliverySlugNotFound(error)) {
-      router.replace('/cardapio/instrucoes')
+      router.replace(deliveryPublicoInstrucoesPath())
     }
   }, [isError, error, router])
 
@@ -134,12 +138,12 @@ export function DeliveryPublicoHomeScreen({ slug }: DeliveryPublicoHomeScreenPro
   }, [])
 
   const handlePedidoClick = useCallback(() => {
-    router.push(`/cardapio/${encodeURIComponent(slug)}/carrinho`)
+    router.push(deliveryPublicoCarrinhoPath(slug))
   }, [router, slug])
 
   const handleIrParaCarrinhoAposAdicionar = useCallback(() => {
     setProdutoAdicionadoNome(null)
-    router.push(`/cardapio/${encodeURIComponent(slug)}/carrinho`)
+    router.push(deliveryPublicoCarrinhoPath(slug))
   }, [router, slug])
 
   const isCatalogLoading = isLoading && !data
