@@ -33,6 +33,7 @@ export function EmpresaSessionLostGate() {
       '/confirmar-email',
       '/notas-fiscais',
       '/cardapio',
+      '/delivery',
     ]
     if (publicPrefixes.some(p => pathname === p || pathname.startsWith(`${p}/`))) {
       try {

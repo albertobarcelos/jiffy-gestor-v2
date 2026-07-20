@@ -62,6 +62,7 @@ export function BasicoLayoutHome({
         {filtered.grupos.map(grupo => (
           <DeliverySecaoGrupo
             key={grupo.id}
+            config={config}
             grupo={grupo}
             interactive={interactive}
             stickyTitle

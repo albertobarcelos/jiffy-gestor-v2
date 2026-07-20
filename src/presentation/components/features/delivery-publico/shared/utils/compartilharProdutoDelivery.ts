@@ -1,8 +1,9 @@
 import { showToast } from '@/src/shared/utils/toast'
+import { deliveryPublicoHomePath } from './deliveryPublicoRoutes'
 
 export function buildProdutoShareUrl(slug: string, produtoId: string): string {
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
-  const path = `/cardapio/${encodeURIComponent(slug)}`
+  const path = deliveryPublicoHomePath(slug)
   const url = new URL(path, origin || 'http://localhost')
   url.searchParams.set('produto', produtoId)
   return url.toString()

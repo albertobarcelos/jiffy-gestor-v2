@@ -49,6 +49,8 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/api/public/notas-fiscais-consumidor') ||
     pathname === '/cardapio' ||
     pathname.startsWith('/cardapio/') ||
+    pathname === '/delivery' ||
+    pathname.startsWith('/delivery/') ||
     pathname.startsWith('/api/public/delivery/')
   ) {
     return NextResponse.next()

@@ -77,9 +77,6 @@ export function useDeliveryCarrinhoItens(slug: string): DeliveryCarrinhoItem[] {
   return useDeliveryCarrinhoStore(s => s.carrinhos[slug] ?? CARRINHO_VAZIO)
 }
 
-/** @deprecated Use useDeliveryCarrinhoItens */
-export const useCardapioCarrinhoItens = useDeliveryCarrinhoItens
-
 /** Total de unidades no carrinho (primitivo — seguro como selector). */
 export function useDeliveryCarrinhoTotalItens(slug: string): number {
   return useDeliveryCarrinhoStore(s => {
@@ -89,9 +86,6 @@ export function useDeliveryCarrinhoTotalItens(slug: string): number {
   })
 }
 
-/** @deprecated Use useDeliveryCarrinhoTotalItens */
-export const useCardapioCarrinhoTotalItens = useDeliveryCarrinhoTotalItens
-
 /** Valor total do carrinho (primitivo — seguro como selector). */
 export function useDeliveryCarrinhoTotal(slug: string): number {
   return useDeliveryCarrinhoStore(s => {
@@ -100,9 +94,6 @@ export function useDeliveryCarrinhoTotal(slug: string): number {
     return itens.reduce((acc, item) => acc + item.valorTotal, 0)
   })
 }
-
-/** @deprecated Use useDeliveryCarrinhoTotal */
-export const useCardapioCarrinhoTotal = useDeliveryCarrinhoTotal
 
 interface DeliveryCarrinhoState {
   carrinhos: CarrinhosPorSlug
@@ -199,6 +190,3 @@ export const useDeliveryCarrinhoStore = create<DeliveryCarrinhoState>()(
     }
   )
 )
-
-/** @deprecated Use useDeliveryCarrinhoStore */
-export const useCardapioCarrinhoStore = useDeliveryCarrinhoStore

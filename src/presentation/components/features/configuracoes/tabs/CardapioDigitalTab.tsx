@@ -16,6 +16,7 @@ import {
   validateDeliverySlug,
 } from '@/src/shared/utils/slugDelivery'
 import { compartilharLinkDelivery } from '@/src/presentation/components/features/delivery-publico/shared/utils/compartilharProdutoDelivery'
+import { deliveryPublicoHomePath } from '@/src/presentation/components/features/delivery-publico/shared/utils/deliveryPublicoRoutes'
 
 export function CardapioDigitalTab() {
   const { empresa } = useEmpresaMe()
@@ -35,8 +36,9 @@ export function CardapioDigitalTab() {
 
   const linkPublico = useMemo(() => {
     if (!slug.trim()) return ''
-    if (typeof window === 'undefined') return `/cardapio/${slug.trim()}`
-    return `${window.location.origin}/cardapio/${slug.trim()}`
+    const path = deliveryPublicoHomePath(slug.trim())
+    if (typeof window === 'undefined') return path
+    return `${window.location.origin}${path}`
   }, [slug])
 
   useEffect(() => {
@@ -159,7 +161,7 @@ export function CardapioDigitalTab() {
               </p>
               <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
                 <div className="flex min-w-0 flex-1 items-center rounded-lg border border-gray-200 bg-gray-50">
-                  <span className="shrink-0 pl-3 text-sm text-secondary-text">/cardapio/</span>
+                  <span className="shrink-0 pl-3 text-sm text-secondary-text">/delivery/</span>
                   <input
                     id="empresa-delivery-slug"
                     type="text"
