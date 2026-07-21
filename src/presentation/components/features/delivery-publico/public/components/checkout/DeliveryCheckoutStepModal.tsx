@@ -1,8 +1,19 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import {
+  CalendarClock,
+  ClipboardCheck,
+  DollarSign,
+  MapPin,
+  PackageCheck,
+  UserRound,
+  type LucideIcon,
+} from 'lucide-react'
 import { MdClose } from 'react-icons/md'
 import { useDeliveryBodyScrollLock } from '../../../shared/hooks/useDeliveryBodyScrollLock'
+import { useDeliveryCheckoutProgress } from './DeliveryCheckoutProgressContext'
+import type { DeliveryCheckoutStep } from './deliveryCheckoutProgress'
 
 type DeliveryCheckoutStepModalProps = {
   title: string
@@ -12,10 +23,71 @@ type DeliveryCheckoutStepModalProps = {
   /** Título centralizado com seta de voltar à esquerda (ex.: form endereço). */
   showBack?: boolean
   onBack?: () => void
-  /** Ocupa 100% da viewport (ex.: revisão do pedido). */
+  /** Ocupa 100% da viewport; padrão para todas as etapas do checkout. */
   fullScreen?: boolean
   /** Header preto com texto/ícones brancos (ex.: revisão). */
   headerTone?: 'default' | 'dark'
+}
+
+const STEP_ICONS: Record<Exclude<DeliveryCheckoutStep, null>, LucideIcon> = {
+  telefone: UserRound,
+  tipoEntrega: PackageCheck,
+  enderecos: MapPin,
+  enderecoForm: MapPin,
+  quando: CalendarClock,
+  pagamento: DollarSign,
+  revisao: ClipboardCheck,
+}
+
+function DeliveryCheckoutProgressIndicator() {
+  const progress = useDeliveryCheckoutProgress()
+  if (!progress) return null
+
+  const StepIcon = STEP_ICONS[progress.step]
+  const radius = 16
+  const circumference = 2 * Math.PI * radius
+  const dashOffset = circumference * (1 - progress.percentage / 100)
+
+  return (
+    <div
+      role="progressbar"
+      aria-label="Progresso do pedido"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={progress.percentage}
+      aria-valuetext={progress.label}
+      title={progress.label}
+      className="relative flex h-9 w-9 shrink-0 items-center justify-center"
+    >
+      <svg className="absolute inset-0 h-full w-full -rotate-90" viewBox="0 0 36 36" aria-hidden>
+        <circle
+          cx="18"
+          cy="18"
+          r={radius}
+          fill="none"
+          stroke="var(--delivery-border)"
+          strokeWidth="2.5"
+        />
+        <circle
+          cx="18"
+          cy="18"
+          r={radius}
+          fill="none"
+          stroke="var(--delivery-primary)"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
+          className="transition-[stroke-dashoffset] duration-300"
+        />
+      </svg>
+      <StepIcon
+        className="h-4 w-4"
+        style={{ color: 'var(--delivery-primary)' }}
+        aria-hidden
+      />
+    </div>
+  )
 }
 
 export function DeliveryCheckoutStepModal({
@@ -25,10 +97,11 @@ export function DeliveryCheckoutStepModal({
   footer,
   showBack = false,
   onBack,
-  fullScreen = false,
+  fullScreen = true,
   headerTone = 'default',
 }: DeliveryCheckoutStepModalProps) {
   useDeliveryBodyScrollLock()
+  const progress = useDeliveryCheckoutProgress()
 
   const isDarkHeader = headerTone === 'dark'
   const headerFg = isDarkHeader ? '#ffffff' : 'var(--delivery-text-primary)'
@@ -38,7 +111,7 @@ export function DeliveryCheckoutStepModal({
       className={
         fullScreen
           ? 'fixed inset-0 z-[60] flex overscroll-none'
-          : 'fixed inset-0 z-[60] flex overscroll-none items-start justify-center px-4 pt-[8vh] sm:items-center sm:pt-0'
+          : 'fixed inset-0 z-[60] flex items-start justify-center overscroll-none px-4 pt-[8vh] sm:items-center sm:pt-0'
       }
     >
       {!fullScreen ? (
@@ -85,14 +158,15 @@ export function DeliveryCheckoutStepModal({
             </button>
           ) : null}
           <h2
-            className={`delivery-font-title min-w-0 flex-1 text-base font-semibold ${
-              showBack ? 'text-center pr-9' : ''
+            className={`delivery-font-title absolute left-1/2 -translate-x-1/2 truncate text-center text-base font-semibold ${
+              progress ? 'max-w-[calc(100%_-_10rem)]' : 'max-w-[calc(100%_-_6rem)]'
             }`}
             style={{ color: headerFg }}
           >
             {title}
           </h2>
-          {!showBack ? (
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            <DeliveryCheckoutProgressIndicator />
             <button
               type="button"
               onClick={onClose}
@@ -104,22 +178,10 @@ export function DeliveryCheckoutStepModal({
             >
               <MdClose className={isDarkHeader ? 'h-4 w-4' : 'h-5 w-5'} />
             </button>
-          ) : (
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Fechar"
-              className={`absolute right-3 top-1/2 flex -translate-y-1/2 items-center justify-center rounded-full ${
-                isDarkHeader ? 'h-8 w-8' : 'h-9 w-9'
-              }`}
-              style={{ color: headerFg }}
-            >
-              <MdClose className={isDarkHeader ? 'h-4 w-4' : 'h-5 w-5'} />
-            </button>
-          )}
+          </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain touch-pan-y px-4 py-4">
+        <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-y-contain px-4 py-4">
           {children}
         </div>
 
@@ -128,9 +190,7 @@ export function DeliveryCheckoutStepModal({
             className="shrink-0 border-t px-4 py-3"
             style={{
               borderColor: 'var(--delivery-border)',
-              paddingBottom: fullScreen
-                ? 'max(0.75rem, env(safe-area-inset-bottom))'
-                : undefined,
+              paddingBottom: fullScreen ? 'max(0.75rem, env(safe-area-inset-bottom))' : undefined,
             }}
           >
             {footer}

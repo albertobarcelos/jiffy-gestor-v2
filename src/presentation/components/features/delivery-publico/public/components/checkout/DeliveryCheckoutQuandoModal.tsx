@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Clock } from 'lucide-react'
+import { CalendarDays, Clock } from 'lucide-react'
 import { showToast } from '@/src/shared/utils/toast'
 import { usePublicDeliveryDisponibilidade } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import { DeliveryCheckoutStepModal } from './DeliveryCheckoutStepModal'
@@ -35,29 +35,18 @@ function addCivilDays(ymd: string, days: number): string {
   return `${utc.getUTCFullYear()}-${String(utc.getUTCMonth() + 1).padStart(2, '0')}-${String(utc.getUTCDate()).padStart(2, '0')}`
 }
 
-function formatDataExibicao(ymd: string): string {
+function formatDataDiaMes(ymd: string): string {
+  const [, mes, dia] = ymd.split('-')
+  return `${dia}-${mes}`
+}
+
+function formatDiaSemana(ymd: string): string {
   const [y, m, d] = ymd.split('-').map(Number)
   return new Intl.DateTimeFormat('pt-BR', {
     weekday: 'short',
-    day: '2-digit',
-    month: 'short',
-  }).format(new Date(y, m - 1, d))
-}
-
-function formatProximaAbertura(iso: string | null, timeZone: string): string {
-  if (!iso) return ''
-  try {
-    return new Intl.DateTimeFormat('pt-BR', {
-      timeZone,
-      weekday: 'short',
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(new Date(iso))
-  } catch {
-    return ''
-  }
+  })
+    .format(new Date(y, m - 1, d))
+    .replace('.', '')
 }
 
 function dataInicialDoSlot(slotInicio: string): string {
@@ -95,7 +84,6 @@ export function DeliveryCheckoutQuandoModal({
   const timezone = disponibilidade?.timezone || 'America/Sao_Paulo'
   const hoje = civilDateInTz(new Date(), timezone)
   const diasMax = disponibilidade?.diasAntecedenciaMax ?? 3
-  const permiteImediato = disponibilidade?.permiteImediato ?? false
   const aceitaAgendamento = disponibilidade?.aceitaAgendamento ?? true
   const slots = disponibilidade?.slots ?? []
 
@@ -127,7 +115,7 @@ export function DeliveryCheckoutQuandoModal({
 
   const hintModo =
     tipoEntrega === 'entrega'
-      ? 'Horário em que o pedido sai para entrega (não é o horário de chegada na sua casa).'
+      ? 'Horário em que o pedido sairá para entrega.'
       : 'Horário em que o pedido estará pronto para retirada.'
 
   const podeContinuar =
@@ -187,24 +175,6 @@ export function DeliveryCheckoutQuandoModal({
           </p>
         ) : null}
 
-        {disponibilidade && !permiteImediato ? (
-          <div
-            className="rounded-xl border px-3 py-3 text-sm"
-            style={{
-              borderColor: 'var(--delivery-border)',
-              backgroundColor: 'var(--delivery-surface-muted)',
-            }}
-          >
-            <p className="font-semibold delivery-text-primary">Loja fechada no momento</p>
-            <p className="mt-1 text-xs delivery-text-secondary">
-              Pedidos imediatos não estão disponíveis.
-              {disponibilidade.proximaAbertura
-                ? ` Próxima abertura: ${formatProximaAbertura(disponibilidade.proximaAbertura, timezone)}.`
-                : ''}
-            </p>
-          </div>
-        ) : null}
-
         {disponibilidade && !aceitaAgendamento ? (
           <p
             className="rounded-xl border px-3 py-3 text-sm delivery-text-secondary"
@@ -220,7 +190,7 @@ export function DeliveryCheckoutQuandoModal({
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide delivery-text-secondary">
                 Data
               </p>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex gap-2 overflow-x-auto pb-2">
                 {datasOpcoes.map(data => {
                   const ativo = data === dataSelecionada
                   return (
@@ -231,17 +201,26 @@ export function DeliveryCheckoutQuandoModal({
                         setDataSelecionada(data)
                         onChangeSlot(null)
                       }}
-                      className="rounded-lg px-3 py-2 text-xs font-semibold"
+                      className="flex min-w-[72px] shrink-0 flex-col items-center rounded-xl border px-3 py-2.5"
                       style={{
+                        borderColor: ativo
+                          ? 'var(--delivery-primary-dark)'
+                          : 'var(--delivery-border)',
                         backgroundColor: ativo
                           ? 'var(--delivery-primary-dark)'
-                          : 'var(--delivery-surface-muted)',
+                          : 'var(--delivery-surface)',
                         color: ativo
                           ? 'var(--delivery-btn-text, #ffffff)'
                           : 'var(--delivery-text-primary)',
                       }}
                     >
-                      {formatDataExibicao(data)}
+                      <span className="text-lg font-bold leading-tight">
+                        {formatDataDiaMes(data)}
+                      </span>
+                      <span className="mt-1 flex items-center gap-1 text-xs font-normal leading-none">
+                        <CalendarDays className="h-3 w-3" aria-hidden />
+                        {formatDiaSemana(data)}
+                      </span>
                     </button>
                   )
                 })}
@@ -249,8 +228,7 @@ export function DeliveryCheckoutQuandoModal({
             </div>
 
             <div>
-              <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide delivery-text-secondary">
-                <Clock className="h-3.5 w-3.5" aria-hidden />
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide delivery-text-secondary">
                 Horários
               </p>
               {loading ? (
@@ -261,7 +239,7 @@ export function DeliveryCheckoutQuandoModal({
                   Nenhum horário disponível neste dia. Escolha outra data.
                 </p>
               ) : null}
-              <div className="flex flex-wrap gap-2">
+              <div className="space-y-2">
                 {slots.map(slot => {
                   const ativo = slot.inicio === slotInicio
                   return (
@@ -275,17 +253,21 @@ export function DeliveryCheckoutQuandoModal({
                           label: slot.label,
                         })
                       }
-                      className="rounded-lg px-3 py-2 text-xs font-semibold"
+                      className="flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left text-base font-normal"
                       style={{
+                        borderColor: ativo
+                          ? 'var(--delivery-primary-dark)'
+                          : 'var(--delivery-border)',
                         backgroundColor: ativo
                           ? 'var(--delivery-primary-dark)'
-                          : 'var(--delivery-surface-muted)',
+                          : 'var(--delivery-surface)',
                         color: ativo
                           ? 'var(--delivery-btn-text, #ffffff)'
                           : 'var(--delivery-text-primary)',
                       }}
                     >
-                      {slot.label}
+                      <Clock className="h-4 w-4 shrink-0" aria-hidden />
+                      <span>{slot.label}</span>
                     </button>
                   )
                 })}

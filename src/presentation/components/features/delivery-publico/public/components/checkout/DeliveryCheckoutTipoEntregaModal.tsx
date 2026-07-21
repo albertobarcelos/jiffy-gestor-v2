@@ -40,6 +40,22 @@ function hojeEmSaoPaulo(): string {
   }).format(new Date())
 }
 
+function formatarProximaAbertura(iso: string | null, timeZone: string): string {
+  if (!iso) return ''
+  try {
+    return new Intl.DateTimeFormat('pt-BR', {
+      timeZone,
+      weekday: 'short',
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(iso))
+  } catch {
+    return ''
+  }
+}
+
 const OPCOES: Array<{
   key: string
   label: string
@@ -172,6 +188,27 @@ export function DeliveryCheckoutTipoEntregaModal({
         <p className="mt-3 text-sm delivery-text-secondary">
           Não foi possível consultar a disponibilidade. Tente novamente.
         </p>
+      ) : null}
+
+      {disponibilidadeAtual.data && !disponibilidadeAtual.data.permiteImediato ? (
+        <div
+          className="mt-3 rounded-xl border px-3 py-3 text-sm"
+          style={{
+            borderColor: 'var(--delivery-border)',
+            backgroundColor: 'var(--delivery-surface-muted)',
+          }}
+        >
+          <p className="font-semibold delivery-text-primary">Loja fechada no momento</p>
+          <p className="mt-1 text-xs delivery-text-secondary">
+            Pedidos imediatos não estão disponíveis.
+            {disponibilidadeAtual.data.proximaAbertura
+              ? ` Próxima abertura: ${formatarProximaAbertura(
+                  disponibilidadeAtual.data.proximaAbertura,
+                  disponibilidadeAtual.data.timezone
+                )}.`
+              : ''}
+          </p>
+        </div>
       ) : null}
 
       <div

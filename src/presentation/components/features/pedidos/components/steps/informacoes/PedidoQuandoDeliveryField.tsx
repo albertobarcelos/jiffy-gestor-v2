@@ -145,7 +145,7 @@ export function PedidoQuandoDeliveryField({
 
   const hint =
     tipoAtendimento === 'entrega'
-      ? 'Horário em que o pedido sai para entrega (não é a chegada na casa do cliente).'
+      ? 'Horário em que o pedido sairá para entrega.'
       : 'Horário em que o pedido estará pronto para retirada.'
 
   if (empresaQuery.isLoading) {
