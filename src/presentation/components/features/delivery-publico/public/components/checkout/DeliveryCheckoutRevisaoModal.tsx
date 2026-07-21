@@ -12,6 +12,7 @@ import { formatDeliveryCurrency } from '../../../shared/utils/formatDeliveryCurr
 import { formatarTelefoneExibicao } from '../../../shared/utils/deliveryTelefonePais'
 import { obterIconeMeioPagamento } from '../../../shared/utils/obterIconeMeioPagamento'
 import { DeliveryCheckoutStepModal } from './DeliveryCheckoutStepModal'
+import { DeliveryCarrinhoEnderecoTopo } from './DeliveryCarrinhoEnderecoTopo'
 
 type DeliveryCheckoutRevisaoModalProps = {
   tipoEntrega: DeliveryTipoEntrega
@@ -20,12 +21,16 @@ type DeliveryCheckoutRevisaoModalProps = {
   telefonePaisIso2?: string
   enderecoCliente: EnderecoClienteDeliveryPublicoDTO | null
   enderecoEmpresaTexto: string | null
+  nomeEmpresaFallback?: string
+  logoUrlFallback?: string | null
+  capaUrlFallback?: string | null
   itens: DeliveryCarrinhoItem[]
   total: number
   meioPagamento: MeioPagamentoPublicoDTO | null
   trocoPara: number | null
   observacaoPedido: string
   modoTempo: 'imediato' | 'agendado' | ''
+  slotInicio: string
   slotLabel: string
   enviando: boolean
   onClose: () => void
@@ -110,6 +115,19 @@ function ProdutoThumb({ imagemUrl, nome }: { imagemUrl: string | null; nome: str
   )
 }
 
+function formatarAgendamento(slotInicio: string, slotLabel: string): string {
+  if (!slotInicio.trim()) return slotLabel || 'Não informado'
+  const data = new Date(slotInicio)
+  if (Number.isNaN(data.getTime())) return slotLabel || 'Não informado'
+  const dataLabel = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+  }).format(data)
+  return slotLabel ? `${dataLabel}, ${slotLabel}` : dataLabel
+}
+
 export function DeliveryCheckoutRevisaoModal({
   tipoEntrega,
   nome,
@@ -117,12 +135,16 @@ export function DeliveryCheckoutRevisaoModal({
   telefonePaisIso2 = DELIVERY_PAIS_TELEFONE_PADRAO,
   enderecoCliente,
   enderecoEmpresaTexto,
+  nomeEmpresaFallback = '',
+  logoUrlFallback = null,
+  capaUrlFallback = null,
   itens,
   total,
   meioPagamento,
   trocoPara,
   observacaoPedido,
   modoTempo,
+  slotInicio,
   slotLabel,
   enviando,
   onClose,
@@ -159,7 +181,6 @@ export function DeliveryCheckoutRevisaoModal({
       showBack
       onBack={onVoltar}
       fullScreen
-      headerTone="dark"
       footer={
         <button
           type="button"
@@ -176,6 +197,15 @@ export function DeliveryCheckoutRevisaoModal({
       }
     >
       <div>
+        <div className="mb-4">
+          <DeliveryCarrinhoEnderecoTopo
+            nomeEmpresaFallback={nomeEmpresaFallback}
+            logoUrlFallback={logoUrlFallback}
+            capaUrlFallback={capaUrlFallback}
+            colarNoTopo
+          />
+        </div>
+
         <LinhaSecao
           icone={<UserRound className="h-5 w-5 text-black" />}
           label={isEntrega ? 'Entregue a:' : 'Pedido de:'}
@@ -232,8 +262,8 @@ export function DeliveryCheckoutRevisaoModal({
           <p className="text-sm font-semibold delivery-text-primary">
             {modoTempo === 'imediato'
               ? 'O mais rápido possível'
-              : modoTempo === 'agendado' && slotLabel
-                ? slotLabel
+              : modoTempo === 'agendado'
+                ? formatarAgendamento(slotInicio, slotLabel)
                 : 'Não informado'}
           </p>
           {modoTempo === 'agendado' ? (

@@ -3,17 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Clock } from 'lucide-react'
 import { showToast } from '@/src/shared/utils/toast'
-import type { ModoTempoEntrega } from '@/src/application/dto/delivery-publico/DisponibilidadeDeliveryDTO'
 import { usePublicDeliveryDisponibilidade } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import { DeliveryCheckoutStepModal } from './DeliveryCheckoutStepModal'
 
 type DeliveryCheckoutQuandoModalProps = {
   slug: string
   tipoEntrega: 'entrega' | 'retirada'
-  modoTempo: ModoTempoEntrega | ''
   slotInicio: string
   slotLabel: string
-  onChangeModoTempo: (value: ModoTempoEntrega) => void
   onChangeSlot: (slot: {
     inicio: string
     fim: string
@@ -63,21 +60,28 @@ function formatProximaAbertura(iso: string | null, timeZone: string): string {
   }
 }
 
+function dataInicialDoSlot(slotInicio: string): string {
+  if (!slotInicio.trim()) {
+    return civilDateInTz(new Date(), 'America/Sao_Paulo')
+  }
+  const date = new Date(slotInicio)
+  return Number.isNaN(date.getTime())
+    ? civilDateInTz(new Date(), 'America/Sao_Paulo')
+    : civilDateInTz(date, 'America/Sao_Paulo')
+}
+
 export function DeliveryCheckoutQuandoModal({
   slug,
   tipoEntrega,
-  modoTempo,
   slotInicio,
   slotLabel,
-  onChangeModoTempo,
   onChangeSlot,
   onClose,
   onContinuar,
 }: DeliveryCheckoutQuandoModalProps) {
   const [dataSelecionada, setDataSelecionada] = useState(() =>
-    civilDateInTz(new Date(), 'America/Sao_Paulo')
+    dataInicialDoSlot(slotInicio)
   )
-  const defaultsAplicadosRef = useRef(false)
 
   const disponibilidadeQuery = usePublicDeliveryDisponibilidade(
     slug,
@@ -107,71 +111,32 @@ export function DeliveryCheckoutQuandoModal({
   useEffect(() => {
     if (!disponibilidade?.timezone || timezoneAplicadoRef.current) return
     timezoneAplicadoRef.current = true
-    setDataSelecionada(civilDateInTz(new Date(), disponibilidade.timezone))
-  }, [disponibilidade?.timezone])
+    const slotDate = slotInicio.trim() ? new Date(slotInicio) : null
+    setDataSelecionada(
+      slotDate && !Number.isNaN(slotDate.getTime())
+        ? civilDateInTz(slotDate, disponibilidade.timezone)
+        : civilDateInTz(new Date(), disponibilidade.timezone)
+    )
+  }, [disponibilidade?.timezone, slotInicio])
 
   useEffect(() => {
-    if (!disponibilidade || defaultsAplicadosRef.current) return
-    defaultsAplicadosRef.current = true
-
-    if (!aceitaAgendamento) {
-      if (permiteImediato) {
-        onChangeModoTempo('imediato')
-        onChangeSlot(null)
-      }
-      return
-    }
-
-    if (!permiteImediato) {
-      onChangeModoTempo('agendado')
-      return
-    }
-
-    if (!modoTempo) {
-      onChangeModoTempo('imediato')
-    }
-  }, [
-    disponibilidade,
-    aceitaAgendamento,
-    permiteImediato,
-    modoTempo,
-    onChangeModoTempo,
-    onChangeSlot,
-  ])
+    if (!disponibilidade || loading || !slotInicio.trim()) return
+    if (slots.some(slot => slot.inicio === slotInicio)) return
+    onChangeSlot(null)
+  }, [disponibilidade, loading, onChangeSlot, slotInicio, slots])
 
   const hintModo =
     tipoEntrega === 'entrega'
       ? 'Horário em que o pedido sai para entrega (não é o horário de chegada na sua casa).'
       : 'Horário em que o pedido estará pronto para retirada.'
 
-  const semOpcaoDisponivel = !permiteImediato && !aceitaAgendamento
   const podeContinuar =
-    !semOpcaoDisponivel &&
+    aceitaAgendamento &&
     !(loading && !disponibilidade) &&
     !disponibilidadeQuery.isError &&
-    ((modoTempo === 'imediato' && permiteImediato) ||
-      (modoTempo === 'agendado' && aceitaAgendamento && Boolean(slotInicio.trim())))
+    Boolean(slotInicio.trim())
 
   const handleContinuar = () => {
-    if (semOpcaoDisponivel) {
-      showToast.error(
-        'A loja está fechada e o agendamento está desabilitado. Tente novamente no horário de funcionamento.'
-      )
-      return
-    }
-    if (!modoTempo) {
-      showToast.error('Escolha quando deseja receber o pedido')
-      return
-    }
-    if (modoTempo === 'imediato') {
-      if (!permiteImediato) {
-        showToast.error('A loja está fechada. Escolha um horário para agendar.')
-        return
-      }
-      onChangeSlot(null)
-      onContinuar()
-      return
-    }
     if (!aceitaAgendamento) {
       showToast.error('Agendamento não está disponível no momento')
       return
@@ -240,62 +205,16 @@ export function DeliveryCheckoutQuandoModal({
           </div>
         ) : null}
 
-        <div className="space-y-2">
-          <label
-            className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 ${
-              !permiteImediato ? 'opacity-50' : ''
-            }`}
+        {disponibilidade && !aceitaAgendamento ? (
+          <p
+            className="rounded-xl border px-3 py-3 text-sm delivery-text-secondary"
             style={fieldStyle}
           >
-            <input
-              type="radio"
-              name="modoTempo"
-              className="mt-1 accent-[var(--delivery-primary)]"
-              checked={modoTempo === 'imediato'}
-              disabled={!permiteImediato}
-              onChange={() => {
-                onChangeModoTempo('imediato')
-                onChangeSlot(null)
-              }}
-            />
-            <span className="min-w-0">
-              <span className="block text-sm font-semibold delivery-text-primary">
-                O mais rápido possível
-              </span>
-              <span className="mt-0.5 block text-xs delivery-text-secondary">
-                {permiteImediato
-                  ? `Previsão a partir de ~${disponibilidade?.leadTimeMinutos ?? 45} min`
-                  : 'Indisponível enquanto a loja estiver fechada'}
-              </span>
-            </span>
-          </label>
+            O agendamento não está disponível para este tipo de recebimento.
+          </p>
+        ) : null}
 
-          <label
-            className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 ${
-              !aceitaAgendamento ? 'opacity-50' : ''
-            }`}
-            style={fieldStyle}
-          >
-            <input
-              type="radio"
-              name="modoTempo"
-              className="mt-1 accent-[var(--delivery-primary)]"
-              checked={modoTempo === 'agendado'}
-              disabled={!aceitaAgendamento}
-              onChange={() => onChangeModoTempo('agendado')}
-            />
-            <span className="min-w-0">
-              <span className="block text-sm font-semibold delivery-text-primary">
-                Agendar horário
-              </span>
-              <span className="mt-0.5 block text-xs delivery-text-secondary">
-                Escolha data e janela de horário
-              </span>
-            </span>
-          </label>
-        </div>
-
-        {modoTempo === 'agendado' && aceitaAgendamento ? (
+        {aceitaAgendamento ? (
           <div className="space-y-3">
             <div>
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide delivery-text-secondary">

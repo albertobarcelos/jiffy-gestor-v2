@@ -104,6 +104,7 @@ export function CatalogoLayoutHome({
         >
           <DeliveryPedidoFooter
             total={viewModel.carrinho.total}
+            quantidadeItens={viewModel.carrinho.quantidadeItens}
             interactive={interactive}
             onClick={onPedidoClick}
           />

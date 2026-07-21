@@ -354,6 +354,23 @@ export function useDeliveryCheckout(slug: string) {
     [slug, setTipoEntregaPreferencia, agendarConsultaTelefone]
   )
 
+  const selecionarOpcaoEntrega = useCallback(
+    (tipoEntrega: DeliveryTipoEntrega, modoTempo: 'imediato' | 'agendado') => {
+      const next: CheckoutFormData = {
+        ...formRef.current,
+        tipoEntrega,
+        modoTempo,
+        slotInicio: '',
+        slotFim: '',
+        slotLabel: '',
+      }
+      formRef.current = next
+      setForm(next)
+      setTipoEntregaPreferencia(slug, tipoEntrega)
+    },
+    [slug, setTipoEntregaPreferencia]
+  )
+
   const selecionarEnderecoExistente = useCallback((enderecoId: string) => {
     preferirNovoEnderecoRef.current = false
     setForm(prev => ({
@@ -496,6 +513,7 @@ export function useDeliveryCheckout(slug: string) {
     total,
     form,
     updateForm,
+    selecionarOpcaoEntrega,
     clienteLookup,
     selecionarEnderecoExistente,
     usarNovoEndereco,

@@ -21,14 +21,17 @@ import {
 import { findCatalogoProdutoById } from '../../shared/utils/findCatalogoProdutoById'
 import { itemSemComplemento } from '../../shared/utils/deliveryCarrinhoItemUtils'
 import { formatEmpresaPublicaEndereco } from '../../shared/utils/formatEmpresaPublicaEndereco'
-import { telefoneNacionalValido } from '../../shared/utils/deliveryTelefonePais'
+import { formatDeliveryCurrency } from '../../shared/utils/formatDeliveryCurrency'
 import { DeliveryProdutoModal } from '../components/DeliveryProdutoModal'
 import { DeliveryCarrinhoEnderecoTopo } from '../components/checkout/DeliveryCarrinhoEnderecoTopo'
 import { DeliveryCheckoutIdentifiqueSeModal } from '../components/checkout/DeliveryCheckoutIdentifiqueSeModal'
-import { DeliveryCheckoutNomeModal } from '../components/checkout/DeliveryCheckoutNomeModal'
 import { DeliveryCheckoutEnderecosModal } from '../components/checkout/DeliveryCheckoutEnderecosModal'
 import { DeliveryCheckoutEnderecoFormModal } from '../components/checkout/DeliveryCheckoutEnderecoFormModal'
 import { DeliveryCheckoutQuandoModal } from '../components/checkout/DeliveryCheckoutQuandoModal'
+import {
+  DeliveryCheckoutTipoEntregaModal,
+  type ModoEntregaOpcao,
+} from '../components/checkout/DeliveryCheckoutTipoEntregaModal'
 import { DeliveryCheckoutPagamentoModal } from '../components/checkout/DeliveryCheckoutPagamentoModal'
 import { DeliveryCheckoutRevisaoModal } from '../components/checkout/DeliveryCheckoutRevisaoModal'
 import { deliveryPublicoHomePath } from '../../shared/utils/deliveryPublicoRoutes'
@@ -39,20 +42,16 @@ type DeliveryPublicoCarrinhoScreenProps = {
 
 type CheckoutStep =
   | 'telefone'
-  | 'nome'
   | 'enderecos'
   | 'enderecoForm'
+  | 'tipoEntrega'
   | 'quando'
   | 'pagamento'
   | 'revisao'
   | null
 
 export function DeliveryPublicoCarrinhoScreen({ slug }: DeliveryPublicoCarrinhoScreenProps) {
-  return (
-    <DeliveryThemeScope slug={slug}>
-      <DeliveryPublicoCarrinhoContent slug={slug} />
-    </DeliveryThemeScope>
-  )
+  return <DeliveryPublicoCarrinhoContent slug={slug} />
 }
 
 function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
@@ -64,12 +63,15 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
   const [checkoutStep, setCheckoutStep] = useState<CheckoutStep>(null)
   /** Quando true, concluir um step intermediário volta para a revisão. */
   const [voltarParaRevisao, setVoltarParaRevisao] = useState(false)
+  /** Quando true, concluir endereço volta para a tela das 4 opções. */
+  const [voltarParaTipoEntrega, setVoltarParaTipoEntrega] = useState(false)
 
   const {
     itens,
     total,
     form,
     updateForm,
+    selecionarOpcaoEntrega,
     clienteLookup,
     selecionarEnderecoExistente,
     usarNovoEndereco,
@@ -80,6 +82,11 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
     enviando,
     enviarPedido,
   } = useDeliveryCheckout(slug)
+
+  const quantidadeItens = useMemo(
+    () => itens.reduce((acc, item) => acc + item.quantidade, 0),
+    [itens]
+  )
 
   const catalogQuery = usePublicDeliveryCatalogInfinite(slug)
   useAutoFetchCatalogoGrupos(catalogQuery)
@@ -98,16 +105,14 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
   }, [itemEditando, grupos])
 
   const enderecoClienteSelecionado = useMemo(() => {
-    if (form.tipoEntrega !== 'entrega' || form.modoEndereco !== 'existente') return null
+    if (form.modoEndereco !== 'existente') return null
     const id = form.enderecoIdSelecionado.trim()
     if (!id) return null
     return clienteLookup.cliente?.enderecos.find(e => e.id === id) ?? null
-  }, [
-    form.tipoEntrega,
-    form.modoEndereco,
-    form.enderecoIdSelecionado,
-    clienteLookup.cliente?.enderecos,
-  ])
+  }, [form.modoEndereco, form.enderecoIdSelecionado, clienteLookup.cliente?.enderecos])
+
+  const enderecoParaRevisao =
+    form.tipoEntrega === 'entrega' ? enderecoClienteSelecionado : null
 
   const meioPagamentoSelecionado = useMemo(
     () => meiosPagamento.find(m => m.id === form.meioPagamentoId) ?? null,
@@ -117,19 +122,33 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
   const nomeClienteExibicao =
     form.nome.trim() || clienteLookup.cliente?.nome?.trim() || ''
 
-  const podeContinuar =
-    form.tipoEntrega === 'retirada' || Boolean(enderecoClienteSelecionado)
+  const fecharCheckout = () => {
+    setVoltarParaRevisao(false)
+    setVoltarParaTipoEntrega(false)
+    setCheckoutStep(null)
+  }
 
   const fecharOuRevisao = () => {
     if (voltarParaRevisao) {
       setCheckoutStep('revisao')
       return
     }
+    if (voltarParaTipoEntrega) {
+      setCheckoutStep('tipoEntrega')
+      return
+    }
     setCheckoutStep(null)
+  }
+
+  const irParaTipoEntrega = () => {
+    setVoltarParaRevisao(false)
+    setVoltarParaTipoEntrega(false)
+    setCheckoutStep('tipoEntrega')
   }
 
   const abrirStepDaRevisao = (step: CheckoutStep) => {
     setVoltarParaRevisao(true)
+    setVoltarParaTipoEntrega(false)
     setCheckoutStep(step)
   }
 
@@ -153,13 +172,22 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
   const carregandoEdicao = Boolean(itemEditando) && !produtoEdicao
   useDeliveryBodyScrollLock(carregandoEdicao)
 
-  const handleToggleTipoEntrega = () => {
-    updateForm('tipoEntrega', form.tipoEntrega === 'entrega' ? 'retirada' : 'entrega')
-  }
-
   const handleSelecionarEndereco = (enderecoId: string) => {
     selecionarEnderecoExistente(enderecoId)
-    fecharOuRevisao()
+    if (voltarParaTipoEntrega) {
+      setVoltarParaTipoEntrega(false)
+      setCheckoutStep('tipoEntrega')
+      return
+    }
+    if (form.modoTempo === 'agendado' && !form.slotInicio.trim()) {
+      setCheckoutStep('quando')
+      return
+    }
+    if (voltarParaRevisao) {
+      setCheckoutStep('revisao')
+      return
+    }
+    setCheckoutStep(form.modoTempo === 'agendado' ? 'quando' : 'pagamento')
   }
 
   const handleUsarNovoEndereco = () => {
@@ -168,21 +196,36 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
   }
 
   const handleContinuarCheckout = () => {
-    if (!podeContinuar) {
-      showToast.error(
-        form.tipoEntrega === 'entrega'
-          ? 'Informe o endereço de entrega'
-          : 'Selecione a retirada'
-      )
-      return
-    }
-    if (!telefoneNacionalValido(form.telefone, form.telefonePaisIso2)) {
-      setVoltarParaRevisao(false)
-      setCheckoutStep('telefone')
-      return
-    }
     setVoltarParaRevisao(false)
-    setCheckoutStep('quando')
+    setVoltarParaTipoEntrega(false)
+    setCheckoutStep('telefone')
+  }
+
+  const abrirFluxoEndereco = () => {
+    const enderecos = clienteLookup.cliente?.enderecos ?? []
+    if (enderecos.length > 0) {
+      setCheckoutStep('enderecos')
+      return
+    }
+    usarNovoEndereco()
+    setCheckoutStep('enderecoForm')
+  }
+
+  const handleTipoEntregaContinuar = () => {
+    if (form.tipoEntrega === 'entrega' && !enderecoClienteSelecionado) {
+      setVoltarParaTipoEntrega(false)
+      abrirFluxoEndereco()
+      return
+    }
+    if (form.modoTempo === 'agendado' && !form.slotInicio.trim()) {
+      setCheckoutStep('quando')
+      return
+    }
+    if (voltarParaRevisao) {
+      setCheckoutStep('revisao')
+      return
+    }
+    setCheckoutStep(form.modoTempo === 'agendado' ? 'quando' : 'pagamento')
   }
 
   const handleQuandoContinuar = () => {
@@ -198,17 +241,23 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
     setCheckoutStep('revisao')
   }
 
-  const handleAlterarEndereco = () => {
-    const enderecos = clienteLookup.cliente?.enderecos ?? []
-    if (enderecos.length > 0) {
-      setCheckoutStep('enderecos')
-      return
+  const handleAlterarEndereco = (origem: 'tipoEntrega' | 'revisao' = 'tipoEntrega') => {
+    if (origem === 'revisao') {
+      setVoltarParaRevisao(true)
+      setVoltarParaTipoEntrega(false)
+    } else {
+      setVoltarParaTipoEntrega(true)
+      setVoltarParaRevisao(false)
     }
-    setCheckoutStep('enderecoForm')
+    abrirFluxoEndereco()
+  }
+
+  const handleChangeOpcaoEntrega = (opcao: ModoEntregaOpcao) => {
+    selecionarOpcaoEntrega(opcao.tipoEntrega, opcao.modoTempo)
   }
 
   const handleTelefoneContinuar = async (digits: string) => {
-    const { status, cliente } = await consultarClientePorTelefone(digits)
+    const { status } = await consultarClientePorTelefone(digits)
     if (status === 'invalido') {
       showToast.error('Informe um celular válido')
       return
@@ -217,59 +266,32 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
       showToast.error(clienteLookup.mensagemErro || 'Erro ao consultar cadastro')
       return
     }
-    if (status === 'nao_encontrado') {
-      setCheckoutStep('nome')
-      return
-    }
 
-    if (form.tipoEntrega === 'retirada') {
-      if (voltarParaRevisao) {
-        setCheckoutStep('revisao')
-      } else {
-        setCheckoutStep('quando')
-      }
-      return
-    }
-
-    if (cliente && cliente.enderecos.length > 0) {
-      if (voltarParaRevisao) {
-        const idAtual = form.enderecoIdSelecionado.trim()
-        const aindaValido = Boolean(idAtual && cliente.enderecos.some(e => e.id === idAtual))
-        if (aindaValido) {
-          setCheckoutStep('revisao')
-          return
-        }
-      }
-      setCheckoutStep('enderecos')
-      return
-    }
-    usarNovoEndereco()
-    setCheckoutStep('enderecoForm')
-  }
-
-  const handleNomeContinuar = () => {
-    if (form.tipoEntrega === 'retirada') {
-      if (voltarParaRevisao) {
-        setCheckoutStep('revisao')
-      } else {
-        setCheckoutStep('quando')
-      }
-      return
-    }
-    if (voltarParaRevisao && form.enderecoIdSelecionado.trim()) {
+    if (voltarParaRevisao) {
       setCheckoutStep('revisao')
       return
     }
-    usarNovoEndereco()
-    setCheckoutStep('enderecoForm')
+
+    irParaTipoEntrega()
   }
 
   const handleConfirmarEnderecoForm = async () => {
     await confirmarNovoEndereco()
-    fecharOuRevisao()
-    if (!voltarParaRevisao) {
-      showToast.success('Endereço salvo!')
+    showToast.success('Endereço salvo!')
+    if (voltarParaTipoEntrega) {
+      setVoltarParaTipoEntrega(false)
+      setCheckoutStep('tipoEntrega')
+      return
     }
+    if (form.modoTempo === 'agendado' && !form.slotInicio.trim()) {
+      setCheckoutStep('quando')
+      return
+    }
+    if (voltarParaRevisao) {
+      setCheckoutStep('revisao')
+      return
+    }
+    setCheckoutStep(form.modoTempo === 'agendado' ? 'quando' : 'pagamento')
   }
 
   const handleCancelarEnderecoForm = () => {
@@ -278,269 +300,277 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
       setCheckoutStep('enderecos')
       return
     }
-    fecharOuRevisao()
+    setVoltarParaTipoEntrega(false)
+    setCheckoutStep('tipoEntrega')
   }
 
   return (
-    <div className="flex min-h-[100dvh] flex-col" style={{ backgroundColor: 'var(--delivery-bg)' }}>
-      <header
-        className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3"
-        style={{
-          backgroundColor: 'var(--delivery-surface)',
-          borderColor: 'var(--delivery-border)',
-        }}
-      >
-        <h1 className="delivery-font-title text-base font-semibold uppercase tracking-wide delivery-text-primary">
-          Carrinho
-        </h1>
-        <button
-          type="button"
-          onClick={voltar}
-          aria-label="Fechar"
-          className="flex h-9 w-9 items-center justify-center rounded-full"
-          style={{ color: 'var(--delivery-text-primary)' }}
-        >
-          <MdClose className="h-5 w-5" />
-        </button>
-      </header>
-
-      <div className="mx-auto w-full max-w-2xl flex-1 space-y-4 p-3 pb-36 sm:space-y-5 sm:p-4">
-        {itens.length === 0 ? (
-          <div className="py-16 text-center">
-            <p className="delivery-text-muted">Carrinho vazio</p>
-            <DeliveryButton onClick={voltar} className="mt-4 px-6 py-2">
-              Ver cardápio
-            </DeliveryButton>
-          </div>
-        ) : (
-          <>
-            <DeliveryCarrinhoEnderecoTopo
-              tipoEntrega={form.tipoEntrega}
-              enderecoCliente={enderecoClienteSelecionado}
-              enderecoEmpresaTexto={enderecoEmpresaTexto}
-              onInformar={() => {
-                setVoltarParaRevisao(false)
-                setCheckoutStep('telefone')
-              }}
-              onAlterarEndereco={() => {
-                setVoltarParaRevisao(false)
-                handleAlterarEndereco()
-              }}
-              onToggleTipoEntrega={handleToggleTipoEntrega}
-            />
-
-            <div className="divide-y divide-[var(--delivery-border)]">
-              {itens.map(item => (
-                <DeliveryCarrinhoItemCard
-                  key={item.id}
-                  item={item}
-                  onDecrease={() =>
-                    item.quantidade <= 1
-                      ? removerItem(slug, item.id)
-                      : atualizarQuantidade(slug, item.id, item.quantidade - 1)
-                  }
-                  onIncrease={() => atualizarQuantidade(slug, item.id, item.quantidade + 1)}
-                  onRemove={() => removerItem(slug, item.id)}
-                  onEdit={() => setItemEditando(item)}
-                  onRemoveComplemento={(complementoId, grupoComplementoId) =>
-                    substituirItem(
-                      slug,
-                      item.id,
-                      itemSemComplemento(item, complementoId, grupoComplementoId)
-                    )
-                  }
-                />
-              ))}
-            </div>
-
-            <button
-              type="button"
-              onClick={voltar}
-              className="flex min-h-[48px] w-full items-center justify-center rounded-xl text-sm font-semibold uppercase tracking-wide delivery-text-primary"
-              style={{ backgroundColor: 'var(--delivery-surface-muted)' }}
-            >
-              Adicionar mais produtos
-            </button>
-          </>
-        )}
-      </div>
-
-      {itens.length > 0 ? (
-        <div
-          className="fixed bottom-0 left-0 right-0 z-20 flex gap-2 border-t px-4 py-3"
+    <DeliveryThemeScope
+      slug={slug}
+      nomeExibicaoFallback={empresa?.nomeFantasia ?? ''}
+      empresa={empresa}
+    >
+      <div className="flex min-h-[100dvh] flex-col" style={{ backgroundColor: 'var(--delivery-bg)' }}>
+        <header
+          className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3"
           style={{
             backgroundColor: 'var(--delivery-surface)',
             borderColor: 'var(--delivery-border)',
-            paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
           }}
         >
+          <h1 className="delivery-font-title text-base font-semibold uppercase tracking-wide delivery-text-primary">
+            Carrinho
+          </h1>
           <button
             type="button"
             onClick={voltar}
-            className="flex min-h-[48px] shrink-0 items-center gap-1 rounded-xl border px-4 text-sm font-semibold uppercase"
-            style={{ borderColor: 'var(--delivery-border)', color: 'var(--delivery-text-primary)' }}
+            aria-label="Fechar"
+            className="flex h-9 w-9 items-center justify-center rounded-full"
+            style={{ color: 'var(--delivery-text-primary)' }}
           >
-            ‹ Voltar
+            <MdClose className="h-5 w-5" />
           </button>
-          <button
-            type="button"
-            disabled={!podeContinuar}
-            onClick={handleContinuarCheckout}
-            className="min-h-[48px] flex-1 rounded-xl text-sm font-semibold uppercase tracking-wide disabled:opacity-50"
+        </header>
+
+        <div className="mx-auto w-full max-w-2xl flex-1 space-y-4 p-3 pb-36 sm:space-y-5 sm:p-4">
+          {itens.length === 0 ? (
+            <div className="py-16 text-center">
+              <p className="delivery-text-muted">Carrinho vazio</p>
+              <DeliveryButton onClick={voltar} className="mt-4 px-6 py-2">
+                Ver cardápio
+              </DeliveryButton>
+            </div>
+          ) : (
+            <>
+              <DeliveryCarrinhoEnderecoTopo
+                nomeEmpresaFallback={empresa?.nomeFantasia ?? ''}
+                logoUrlFallback={empresa?.logoUrl ?? null}
+                capaUrlFallback={empresa?.bannerUrl ?? null}
+              />
+
+              <div className="divide-y divide-[var(--delivery-border)]">
+                {itens.map(item => (
+                  <DeliveryCarrinhoItemCard
+                    key={item.id}
+                    item={item}
+                    onDecrease={() =>
+                      item.quantidade <= 1
+                        ? removerItem(slug, item.id)
+                        : atualizarQuantidade(slug, item.id, item.quantidade - 1)
+                    }
+                    onIncrease={() => atualizarQuantidade(slug, item.id, item.quantidade + 1)}
+                    onRemove={() => removerItem(slug, item.id)}
+                    onEdit={() => setItemEditando(item)}
+                    onRemoveComplemento={(complementoId, grupoComplementoId) =>
+                      substituirItem(
+                        slug,
+                        item.id,
+                        itemSemComplemento(item, complementoId, grupoComplementoId)
+                      )
+                    }
+                  />
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={voltar}
+                className="flex min-h-[48px] w-full items-center justify-center rounded-xl text-sm font-semibold uppercase tracking-wide delivery-text-primary"
+                style={{ backgroundColor: 'var(--delivery-surface-muted)' }}
+              >
+                Adicionar mais produtos
+              </button>
+            </>
+          )}
+        </div>
+
+        {itens.length > 0 ? (
+          <div
+            className="fixed bottom-0 left-0 right-0 z-20 flex items-center justify-between gap-3 border-t border-neutral-200 bg-white px-5 py-3"
             style={{
-              backgroundColor: 'var(--delivery-primary-dark)',
-              color: 'var(--delivery-btn-text, #ffffff)',
+              paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
             }}
           >
-            Continuar
-          </button>
-        </div>
-      ) : null}
+            <div className="flex min-w-0 flex-col items-start gap-0.5 text-left font-normal">
+              <span className="text-sm leading-tight text-neutral-900">Total da compra</span>
+              <span className="text-sm leading-tight text-neutral-900">
+                {formatDeliveryCurrency(total)}
+                <span className="text-neutral-400">
+                  {' '}
+                  / {quantidadeItens === 1 ? '1 item' : `${quantidadeItens} itens`}
+                </span>
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleContinuarCheckout}
+              className="shrink-0 rounded-lg bg-black px-5 py-2.5 text-sm font-normal text-white"
+            >
+              Continuar
+            </button>
+          </div>
+        ) : null}
 
-      {checkoutStep === 'telefone' ? (
-        <DeliveryCheckoutIdentifiqueSeModal
-          telefone={form.telefone}
-          telefonePaisIso2={form.telefonePaisIso2}
-          onChangeTelefone={value => updateForm('telefone', value)}
-          onChangeTelefonePais={iso2 => updateForm('telefonePaisIso2', iso2)}
-          onClose={fecharOuRevisao}
-          onContinuar={handleTelefoneContinuar}
-        />
-      ) : null}
+        {checkoutStep === 'telefone' ? (
+          <DeliveryCheckoutIdentifiqueSeModal
+            telefone={form.telefone}
+            telefonePaisIso2={form.telefonePaisIso2}
+            nome={form.nome}
+            nomeCadastro={clienteLookup.cliente?.nome ?? null}
+            lookupStatus={clienteLookup.status}
+            onChangeTelefone={value => updateForm('telefone', value)}
+            onChangeTelefonePais={iso2 => updateForm('telefonePaisIso2', iso2)}
+            onChangeNome={value => updateForm('nome', value)}
+            onClose={fecharOuRevisao}
+            onContinuar={handleTelefoneContinuar}
+          />
+        ) : null}
 
-      {checkoutStep === 'nome' ? (
-        <DeliveryCheckoutNomeModal
-          nome={form.nome}
-          onChangeNome={value => updateForm('nome', value)}
-          onClose={fecharOuRevisao}
-          onVoltar={() => setCheckoutStep('telefone')}
-          onContinuar={handleNomeContinuar}
-        />
-      ) : null}
+        {checkoutStep === 'enderecos' ? (
+          <DeliveryCheckoutEnderecosModal
+            enderecos={clienteLookup.cliente?.enderecos ?? []}
+            enderecoIdSelecionado={form.enderecoIdSelecionado}
+            onClose={fecharOuRevisao}
+            onSelecionar={handleSelecionarEndereco}
+            onUsarNovoEndereco={handleUsarNovoEndereco}
+          />
+        ) : null}
 
-      {checkoutStep === 'enderecos' ? (
-        <DeliveryCheckoutEnderecosModal
-          enderecos={clienteLookup.cliente?.enderecos ?? []}
-          enderecoIdSelecionado={form.enderecoIdSelecionado}
-          onClose={fecharOuRevisao}
-          onSelecionar={handleSelecionarEndereco}
-          onUsarNovoEndereco={handleUsarNovoEndereco}
-        />
-      ) : null}
+        {checkoutStep === 'enderecoForm' ? (
+          <DeliveryCheckoutEnderecoFormModal
+            form={form}
+            onChange={updateForm}
+            onClose={fecharOuRevisao}
+            onCancelar={handleCancelarEnderecoForm}
+            onConfirmar={handleConfirmarEnderecoForm}
+          />
+        ) : null}
 
-      {checkoutStep === 'enderecoForm' ? (
-        <DeliveryCheckoutEnderecoFormModal
-          form={form}
-          onChange={updateForm}
-          onClose={fecharOuRevisao}
-          onCancelar={handleCancelarEnderecoForm}
-          onConfirmar={handleConfirmarEnderecoForm}
-        />
-      ) : null}
+        {checkoutStep === 'tipoEntrega' ? (
+          <DeliveryCheckoutTipoEntregaModal
+            slug={slug}
+            tipoEntrega={form.tipoEntrega}
+            modoTempo={form.modoTempo}
+            enderecoCliente={enderecoClienteSelecionado}
+            temEnderecosCadastrados={(clienteLookup.cliente?.enderecos?.length ?? 0) > 0}
+            enderecoEmpresaTexto={enderecoEmpresaTexto}
+            onChangeOpcao={handleChangeOpcaoEntrega}
+            onEditarEndereco={() => handleAlterarEndereco('tipoEntrega')}
+            onCadastrarEndereco={() => handleAlterarEndereco('tipoEntrega')}
+            onClose={fecharCheckout}
+            onContinuar={handleTipoEntregaContinuar}
+          />
+        ) : null}
 
-      {checkoutStep === 'quando' ? (
-        <DeliveryCheckoutQuandoModal
-          slug={slug}
-          tipoEntrega={form.tipoEntrega}
-          modoTempo={form.modoTempo}
-          slotInicio={form.slotInicio}
-          slotLabel={form.slotLabel}
-          onChangeModoTempo={value => updateForm('modoTempo', value)}
-          onChangeSlot={slot => {
-            updateForm('slotInicio', slot?.inicio ?? '')
-            updateForm('slotFim', slot?.fim ?? '')
-            updateForm('slotLabel', slot?.label ?? '')
-          }}
-          onClose={fecharOuRevisao}
-          onContinuar={handleQuandoContinuar}
-        />
-      ) : null}
+        {checkoutStep === 'quando' ? (
+          <DeliveryCheckoutQuandoModal
+            slug={slug}
+            tipoEntrega={form.tipoEntrega}
+            slotInicio={form.slotInicio}
+            slotLabel={form.slotLabel}
+            onChangeSlot={slot => {
+              updateForm('slotInicio', slot?.inicio ?? '')
+              updateForm('slotFim', slot?.fim ?? '')
+              updateForm('slotLabel', slot?.label ?? '')
+            }}
+            onClose={() => {
+              if (voltarParaRevisao) {
+                setCheckoutStep('revisao')
+                return
+              }
+              setCheckoutStep('tipoEntrega')
+            }}
+            onContinuar={handleQuandoContinuar}
+          />
+        ) : null}
 
-      {checkoutStep === 'pagamento' ? (
-        <DeliveryCheckoutPagamentoModal
-          total={total}
-          meiosPagamento={meiosPagamento}
-          loadingMeios={loadingMeios}
-          meioPagamentoId={form.meioPagamentoId}
-          trocoPara={form.trocoPara}
-          onChangeMeioPagamentoId={value => updateForm('meioPagamentoId', value)}
-          onChangeTrocoPara={value => updateForm('trocoPara', value)}
-          onClose={fecharOuRevisao}
-          onBack={() => {
-            if (voltarParaRevisao) {
-              setCheckoutStep('revisao')
-              return
+        {checkoutStep === 'pagamento' ? (
+          <DeliveryCheckoutPagamentoModal
+            total={total}
+            meiosPagamento={meiosPagamento}
+            loadingMeios={loadingMeios}
+            meioPagamentoId={form.meioPagamentoId}
+            trocoPara={form.trocoPara}
+            onChangeMeioPagamentoId={value => updateForm('meioPagamentoId', value)}
+            onChangeTrocoPara={value => updateForm('trocoPara', value)}
+            onClose={fecharOuRevisao}
+            onBack={() => {
+              if (voltarParaRevisao) {
+                setCheckoutStep('revisao')
+                return
+              }
+              setCheckoutStep(form.modoTempo === 'agendado' ? 'quando' : 'tipoEntrega')
+            }}
+            onContinuar={handlePagamentoContinuar}
+          />
+        ) : null}
+
+        {checkoutStep === 'revisao' ? (
+          <DeliveryCheckoutRevisaoModal
+            tipoEntrega={form.tipoEntrega}
+            nome={nomeClienteExibicao}
+            telefone={form.telefone}
+            telefonePaisIso2={form.telefonePaisIso2}
+            enderecoCliente={enderecoParaRevisao}
+            enderecoEmpresaTexto={enderecoEmpresaTexto}
+            nomeEmpresaFallback={empresa?.nomeFantasia ?? ''}
+            logoUrlFallback={empresa?.logoUrl ?? null}
+            capaUrlFallback={empresa?.bannerUrl ?? null}
+            itens={itens}
+            total={total}
+            meioPagamento={meioPagamentoSelecionado}
+            trocoPara={form.trocoPara}
+            observacaoPedido={form.observacaoPedido}
+            modoTempo={form.modoTempo}
+            slotInicio={form.slotInicio}
+            slotLabel={form.slotLabel}
+            enviando={enviando}
+            onClose={fecharCheckout}
+            onVoltar={() => {
+              setVoltarParaRevisao(false)
+              setCheckoutStep('pagamento')
+            }}
+            onEditarCliente={() => abrirStepDaRevisao('telefone')}
+            onEditarEndereco={() => handleAlterarEndereco('revisao')}
+            onEditarPedido={() => {
+              setVoltarParaRevisao(false)
+              setVoltarParaTipoEntrega(false)
+              setCheckoutStep(null)
+            }}
+            onEditarQuando={() =>
+              abrirStepDaRevisao(form.modoTempo === 'agendado' ? 'quando' : 'tipoEntrega')
             }
-            setCheckoutStep('quando')
-          }}
-          onContinuar={handlePagamentoContinuar}
-        />
-      ) : null}
-
-      {checkoutStep === 'revisao' ? (
-        <DeliveryCheckoutRevisaoModal
-          tipoEntrega={form.tipoEntrega}
-          nome={nomeClienteExibicao}
-          telefone={form.telefone}
-          telefonePaisIso2={form.telefonePaisIso2}
-          enderecoCliente={enderecoClienteSelecionado}
-          enderecoEmpresaTexto={enderecoEmpresaTexto}
-          itens={itens}
-          total={total}
-          meioPagamento={meioPagamentoSelecionado}
-          trocoPara={form.trocoPara}
-          observacaoPedido={form.observacaoPedido}
-          modoTempo={form.modoTempo}
-          slotLabel={form.slotLabel}
-          enviando={enviando}
-          onClose={() => {
-            setVoltarParaRevisao(false)
-            setCheckoutStep(null)
-          }}
-          onVoltar={() => {
-            setVoltarParaRevisao(false)
-            setCheckoutStep('pagamento')
-          }}
-          onEditarCliente={() => abrirStepDaRevisao('telefone')}
-          onEditarEndereco={() => {
-            setVoltarParaRevisao(true)
-            handleAlterarEndereco()
-          }}
-          onEditarPedido={() => {
-            setVoltarParaRevisao(false)
-            setCheckoutStep(null)
-          }}
-          onEditarQuando={() => abrirStepDaRevisao('quando')}
-          onEditarPagamento={() => abrirStepDaRevisao('pagamento')}
-          onChangeObservacaoPedido={value => updateForm('observacaoPedido', value)}
-          onEnviar={() => void enviarPedido()}
-        />
-      ) : null}
-
-      {carregandoEdicao ? (
-        <div className="fixed inset-0 z-50 flex overscroll-none items-center justify-center">
-          <div
-            className="absolute inset-0"
-            style={{ backgroundColor: 'var(--delivery-overlay)' }}
-            onClick={() => setItemEditando(null)}
-            aria-hidden
+            onEditarPagamento={() => abrirStepDaRevisao('pagamento')}
+            onChangeObservacaoPedido={value => updateForm('observacaoPedido', value)}
+            onEnviar={() => void enviarPedido()}
           />
-          <div
-            className="h-10 w-10 animate-spin rounded-full border-b-2"
-            style={{ borderColor: 'var(--delivery-primary)' }}
-          />
-        </div>
-      ) : null}
+        ) : null}
 
-      {itemEditando && produtoEdicao ? (
-        <DeliveryProdutoModal
-          key={itemEditando.id}
-          slug={slug}
-          produto={produtoEdicao}
-          itemEdicao={itemEditando}
-          onClose={() => setItemEditando(null)}
-        />
-      ) : null}
-    </div>
+        {carregandoEdicao ? (
+          <div className="fixed inset-0 z-50 flex overscroll-none items-center justify-center">
+            <div
+              className="absolute inset-0"
+              style={{ backgroundColor: 'var(--delivery-overlay)' }}
+              onClick={() => setItemEditando(null)}
+              aria-hidden
+            />
+            <div
+              className="h-10 w-10 animate-spin rounded-full border-b-2"
+              style={{ borderColor: 'var(--delivery-primary)' }}
+            />
+          </div>
+        ) : null}
+
+        {itemEditando && produtoEdicao ? (
+          <DeliveryProdutoModal
+            key={itemEditando.id}
+            slug={slug}
+            produto={produtoEdicao}
+            itemEdicao={itemEditando}
+            onClose={() => setItemEditando(null)}
+          />
+        ) : null}
+      </div>
+    </DeliveryThemeScope>
   )
 }

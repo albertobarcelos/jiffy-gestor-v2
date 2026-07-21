@@ -88,6 +88,7 @@ export function VitrineLayoutHome({
         <div className="sticky bottom-0 z-30 bg-white/95 pt-2 backdrop-blur-sm">
           <DeliveryPedidoFooter
             total={viewModel.carrinho.total}
+            quantidadeItens={viewModel.carrinho.quantidadeItens}
             interactive={interactive}
             onClick={onPedidoClick}
           />
