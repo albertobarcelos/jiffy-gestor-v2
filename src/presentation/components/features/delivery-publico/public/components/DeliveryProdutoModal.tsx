@@ -27,8 +27,12 @@ type DeliveryProdutoModalProps = {
   slug: string
   produto: CatalogoPublicoProdutoDTO
   onClose: () => void
-  /** Chamado após adicionar item novo (não edição). Recebe o nome do produto. */
-  onAdicionado?: (produtoNome: string) => void
+  /** Chamado após adicionar item novo (não edição). */
+  onAdicionado?: (payload: {
+    produtoId: string
+    nome: string
+    imagemUrl: string | null
+  }) => void
   /** Quando informado, atualiza o item do carrinho em vez de adicionar um novo. */
   itemEdicao?: DeliveryCarrinhoItem
 }
@@ -150,7 +154,11 @@ export function DeliveryProdutoModal({
         onClose()
       } else {
         adicionarItem(slug, payload)
-        onAdicionado?.(produto.nome)
+        onAdicionado?.({
+          produtoId: produto.id,
+          nome: produto.nome,
+          imagemUrl: produto.imagemUrl,
+        })
         onClose()
       }
     } finally {

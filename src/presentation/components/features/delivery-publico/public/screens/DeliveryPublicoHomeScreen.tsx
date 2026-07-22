@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type {
   CatalogoPublicoProdutoDTO,
@@ -17,6 +17,7 @@ import {
   useDeliveryThemeContext,
 } from '../../shared/components/DeliveryThemeScope'
 import {
+  useDeliveryCarrinhoItens,
   useDeliveryCarrinhoTotal,
   useDeliveryCarrinhoTotalItens,
 } from '../../shared/stores/deliveryCarrinhoStore'
@@ -32,6 +33,8 @@ import { resolveDeliveryLayoutHome } from '../layouts/DeliveryPublicoLayoutRegis
 import type { DeliveryPublicoViewModel } from '../../shared/types/deliveryPublicoViewModel'
 import { DeliveryProdutoModal } from '../components/DeliveryProdutoModal'
 import { DeliveryAdicionadoCarrinhoDialog } from '../components/DeliveryAdicionadoCarrinhoDialog'
+import { useFlyToCart } from '../../shared/hooks/useFlyToCart'
+import type { DeliveryCarrinhoThumb } from '../../shared/components/DeliveryPedidoFooter'
 import {
   deliveryPublicoCarrinhoPath,
   deliveryPublicoInstrucoesPath,
@@ -39,6 +42,31 @@ import {
 
 type DeliveryPublicoHomeScreenProps = {
   slug: string
+}
+
+type ProdutoAdicionadoPayload = {
+  produtoId: string
+  nome: string
+  imagemUrl: string | null
+}
+
+const MAX_FOOTER_THUMBS = 5
+
+function buildCarrinhoThumbsFromItens(
+  itens: { produtoId: string; produtoImagemUrl: string | null; adicionadoEm: string }[]
+): DeliveryCarrinhoThumb[] {
+  const thumbs: DeliveryCarrinhoThumb[] = []
+  const seen = new Set<string>()
+
+  for (let i = itens.length - 1; i >= 0 && thumbs.length < MAX_FOOTER_THUMBS; i -= 1) {
+    const item = itens[i]
+    const imagemUrl = item.produtoImagemUrl?.trim()
+    if (!imagemUrl || seen.has(item.produtoId)) continue
+    seen.add(item.produtoId)
+    thumbs.unshift({ produtoId: item.produtoId, imagemUrl })
+  }
+
+  return thumbs
 }
 
 export function DeliveryPublicoHomeScreen({ slug }: DeliveryPublicoHomeScreenProps) {
@@ -51,6 +79,11 @@ export function DeliveryPublicoHomeScreen({ slug }: DeliveryPublicoHomeScreenPro
   /** Fecha o modal na hora, sem esperar o router.replace limpar ?produto= */
   const [fechandoProduto, setFechandoProduto] = useState(false)
   const [produtoAdicionadoNome, setProdutoAdicionadoNome] = useState<string | null>(null)
+  const [pendingFly, setPendingFly] = useState<ProdutoAdicionadoPayload | null>(null)
+  const [flyingProdutoId, setFlyingProdutoId] = useState<string | null>(null)
+  const [carrinhoThumbsBounceKey, setCarrinhoThumbsBounceKey] = useState(0)
+  const carrinhoThumbsTargetRef = useRef<HTMLDivElement>(null)
+  const { flyToCart, flyingNode } = useFlyToCart()
 
   const catalogQuery = usePublicDeliveryCatalogInfinite(slug)
   useAutoFetchCatalogoGrupos(catalogQuery)
@@ -58,8 +91,15 @@ export function DeliveryPublicoHomeScreen({ slug }: DeliveryPublicoHomeScreenPro
   const { data, isLoading, isError, error, isFetchingNextPage } = catalogQuery
   const empresa: EmpresaPublicaDTO | null = data?.pages[0]?.empresa ?? null
 
+  const carrinhoItens = useDeliveryCarrinhoItens(slug)
   const carrinhoTotal = useDeliveryCarrinhoTotal(slug)
   const carrinhoQuantidade = useDeliveryCarrinhoTotalItens(slug)
+  const carrinhoThumbs = useMemo(() => {
+    const thumbs = buildCarrinhoThumbsFromItens(carrinhoItens)
+    if (!flyingProdutoId) return thumbs
+    // Evita miniatura duplicada enquanto a cópia ainda está voando.
+    return thumbs.filter(thumb => thumb.produtoId !== flyingProdutoId)
+  }, [carrinhoItens, flyingProdutoId])
 
   const syncProdutoQuery = useCallback(
     (produtoId: string | null) => {
@@ -113,7 +153,9 @@ export function DeliveryPublicoHomeScreen({ slug }: DeliveryPublicoHomeScreenPro
   }, [])
 
   const handleGrupoClick = useCallback((grupoId: string) => {
-    document.getElementById(`grupo-${grupoId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    document
+      .getElementById(`grupo-${grupoId}`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [])
 
   const handleProdutoClick = useCallback(
@@ -129,9 +171,56 @@ export function DeliveryPublicoHomeScreen({ slug }: DeliveryPublicoHomeScreenPro
     syncProdutoQuery(null)
   }, [syncProdutoQuery])
 
-  const handleProdutoAdicionado = useCallback((produtoNome: string) => {
-    setProdutoAdicionadoNome(produtoNome)
+  const handleProdutoAdicionado = useCallback((payload: ProdutoAdicionadoPayload) => {
+    if (payload.imagemUrl?.trim()) {
+      setPendingFly(payload)
+      return
+    }
+    setProdutoAdicionadoNome(payload.nome)
   }, [])
+
+  useEffect(() => {
+    if (!pendingFly) return
+
+    let cancelled = false
+    let attempts = 0
+
+    const tryStart = () => {
+      if (cancelled) return
+
+      const target = carrinhoThumbsTargetRef.current
+      if (!target && attempts < 30) {
+        attempts += 1
+        requestAnimationFrame(tryStart)
+        return
+      }
+
+      const { nome, imagemUrl, produtoId } = pendingFly
+      setPendingFly(null)
+
+      if (!imagemUrl?.trim() || !target) {
+        setProdutoAdicionadoNome(nome)
+        return
+      }
+
+      setFlyingProdutoId(produtoId)
+      flyToCart({
+        imageUrl: imagemUrl,
+        targetElement: target,
+        onFinish: () => {
+          setFlyingProdutoId(null)
+          setCarrinhoThumbsBounceKey(key => key + 1)
+          setProdutoAdicionadoNome(nome)
+        },
+      })
+    }
+
+    tryStart()
+
+    return () => {
+      cancelled = true
+    }
+  }, [pendingFly, flyToCart, carrinhoQuantidade])
 
   const handleContinuarComprando = useCallback(() => {
     setProdutoAdicionadoNome(null)
@@ -186,6 +275,10 @@ export function DeliveryPublicoHomeScreen({ slug }: DeliveryPublicoHomeScreenPro
         produtoAdicionadoNome={produtoAdicionadoNome}
         onContinuarComprando={handleContinuarComprando}
         onIrParaCarrinhoAposAdicionar={handleIrParaCarrinhoAposAdicionar}
+        carrinhoThumbs={carrinhoThumbs}
+        carrinhoThumbsBounceKey={carrinhoThumbsBounceKey}
+        carrinhoThumbsTargetRef={carrinhoThumbsTargetRef}
+        flyingNode={flyingNode}
       />
     </DeliveryThemeScope>
   )
@@ -208,10 +301,14 @@ type DeliveryPublicoHomeContentProps = {
   onProdutoClick: (produtoId: string) => void
   onPedidoClick: () => void
   onCloseProduto: () => void
-  onProdutoAdicionado: (produtoNome: string) => void
+  onProdutoAdicionado: (payload: ProdutoAdicionadoPayload) => void
   produtoAdicionadoNome: string | null
   onContinuarComprando: () => void
   onIrParaCarrinhoAposAdicionar: () => void
+  carrinhoThumbs: DeliveryCarrinhoThumb[]
+  carrinhoThumbsBounceKey: number
+  carrinhoThumbsTargetRef: RefObject<HTMLDivElement | null>
+  flyingNode: ReactNode
 }
 
 function DeliveryPublicoHomeContent({
@@ -235,6 +332,10 @@ function DeliveryPublicoHomeContent({
   produtoAdicionadoNome,
   onContinuarComprando,
   onIrParaCarrinhoAposAdicionar,
+  carrinhoThumbs,
+  carrinhoThumbsBounceKey,
+  carrinhoThumbsTargetRef,
+  flyingNode,
 }: DeliveryPublicoHomeContentProps) {
   const { config } = useDeliveryThemeContext()
 
@@ -274,6 +375,9 @@ function DeliveryPublicoHomeContent({
         onGrupoClick={onGrupoClick}
         onProdutoClick={onProdutoClick}
         onPedidoClick={onPedidoClick}
+        carrinhoThumbs={carrinhoThumbs}
+        carrinhoThumbsBounceKey={carrinhoThumbsBounceKey}
+        carrinhoThumbsTargetRef={carrinhoThumbsTargetRef}
       />
       {produtoSelecionado ? (
         <DeliveryProdutoModal
@@ -290,6 +394,7 @@ function DeliveryPublicoHomeContent({
           onIrParaCarrinho={onIrParaCarrinhoAposAdicionar}
         />
       ) : null}
+      {flyingNode}
       {isFetchingNextPage ? (
         <div className="flex justify-center py-4">
           <div

@@ -20,6 +20,9 @@ export function VitrineLayoutHome({
   onGrupoClick,
   onProdutoClick,
   onPedidoClick,
+  carrinhoThumbs,
+  carrinhoThumbsBounceKey,
+  carrinhoThumbsTargetRef,
 }: DeliveryLayoutHomeProps) {
   const filtered = filterViewModelByBusca(viewModel)
   const [buscaAberta, setBuscaAberta] = useState(false)
@@ -46,7 +49,7 @@ export function VitrineLayoutHome({
   const stickyFooterVisible = viewModel.carrinho.quantidadeItens > 0
 
   return (
-    <div className="flex min-h-full flex-col pb-2">
+    <div className="flex min-h-full flex-col pb-24">
       <DeliveryVitrineHeader
         config={config}
         disponivel={viewModel.disponivel}
@@ -85,12 +88,15 @@ export function VitrineLayoutHome({
       </div>
 
       {stickyFooterVisible ? (
-        <div className="sticky bottom-0 z-30 bg-white/95 pt-2 backdrop-blur-sm">
+        <div className="fixed inset-x-0 bottom-0 z-40 bg-white/95 pt-2 backdrop-blur-sm">
           <DeliveryPedidoFooter
             total={viewModel.carrinho.total}
             quantidadeItens={viewModel.carrinho.quantidadeItens}
             interactive={interactive}
             onClick={onPedidoClick}
+            thumbs={carrinhoThumbs}
+            thumbsBounceKey={carrinhoThumbsBounceKey}
+            thumbsTargetRef={carrinhoThumbsTargetRef}
           />
         </div>
       ) : null}
