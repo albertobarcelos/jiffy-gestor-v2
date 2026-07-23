@@ -23,12 +23,15 @@ export function BasicoLayoutHome({
   onGrupoClick,
   onProdutoClick,
   onPedidoClick,
+  carrinhoThumbs,
+  carrinhoThumbsBounceKey,
+  carrinhoThumbsTargetRef,
 }: DeliveryLayoutHomeProps) {
   const filtered = filterViewModelByBusca(viewModel)
   const catalogRootRef = useRef<HTMLDivElement>(null)
 
   return (
-    <div ref={catalogRootRef} className="delivery-basico-catalog-root flex min-h-full flex-col pb-2">
+    <div ref={catalogRootRef} className="delivery-basico-catalog-root flex min-h-full flex-col pb-24">
       <DeliveryLojaHeader config={config} />
       <div className="mt-3">
         <DeliveryTipoEntregaToggle
@@ -72,7 +75,7 @@ export function BasicoLayoutHome({
       </div>
       {viewModel.carrinho.quantidadeItens > 0 ? (
         <div
-          className="sticky bottom-0 z-30 mt-4 pt-2 backdrop-blur-sm"
+          className="fixed inset-x-0 bottom-0 z-40 pt-2 backdrop-blur-sm"
           style={{
             backgroundColor:
               'color-mix(in srgb, var(--delivery-bg, var(--delivery-surface)) 95%, transparent)',
@@ -83,6 +86,9 @@ export function BasicoLayoutHome({
             quantidadeItens={viewModel.carrinho.quantidadeItens}
             interactive={interactive}
             onClick={onPedidoClick}
+            thumbs={carrinhoThumbs}
+            thumbsBounceKey={carrinhoThumbsBounceKey}
+            thumbsTargetRef={carrinhoThumbsTargetRef}
           />
         </div>
       ) : null}

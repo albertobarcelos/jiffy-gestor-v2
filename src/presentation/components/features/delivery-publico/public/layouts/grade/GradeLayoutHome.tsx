@@ -20,6 +20,9 @@ export function GradeLayoutHome({
   onGrupoClick,
   onProdutoClick,
   onPedidoClick,
+  carrinhoThumbs,
+  carrinhoThumbsBounceKey,
+  carrinhoThumbsTargetRef,
 }: DeliveryLayoutHomeProps) {
   const filtered = filterViewModelByBusca(viewModel)
   const stickyFooterVisible = viewModel.carrinho.quantidadeItens > 0
@@ -31,7 +34,7 @@ export function GradeLayoutHome({
 
   return (
     <div
-      className="flex min-h-full flex-col"
+      className="flex min-h-full flex-col pb-24"
       style={{ backgroundColor: 'var(--delivery-primary-dark)' }}
     >
       <DeliveryGradeHeader config={config} disponivel={viewModel.disponivel} />
@@ -68,14 +71,20 @@ export function GradeLayoutHome({
 
         {stickyFooterVisible ? (
           <div
-            className="sticky bottom-0 z-30 pt-2 backdrop-blur-sm"
-            style={{ backgroundColor: 'color-mix(in srgb, var(--delivery-bg, var(--delivery-surface)) 95%, transparent)' }}
+            className="fixed inset-x-0 bottom-0 z-40 pt-2 backdrop-blur-sm"
+            style={{
+              backgroundColor:
+                'color-mix(in srgb, var(--delivery-bg, var(--delivery-surface)) 95%, transparent)',
+            }}
           >
             <DeliveryPedidoFooter
               total={viewModel.carrinho.total}
               quantidadeItens={viewModel.carrinho.quantidadeItens}
               interactive={interactive}
               onClick={onPedidoClick}
+              thumbs={carrinhoThumbs}
+              thumbsBounceKey={carrinhoThumbsBounceKey}
+              thumbsTargetRef={carrinhoThumbsTargetRef}
             />
           </div>
         ) : null}
