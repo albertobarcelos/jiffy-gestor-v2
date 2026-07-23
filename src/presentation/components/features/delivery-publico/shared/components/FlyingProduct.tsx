@@ -5,16 +5,25 @@ import { createPortal } from 'react-dom'
 import { motion, useAnimationControls } from 'framer-motion'
 
 const START_SIZE = 168
-const END_SIZE = 52
+/** Tamanho no centro, antes de cair (ótimo visual atual). */
+const MID_SIZE = 72
+/** Tamanho final = miniatura do footer (h-10 / 40px). */
+const FOOTER_SIZE = 40
 const EASE = [0.22, 1, 0.36, 1] as const
 
 export type FlyingProductProps = {
   imageUrl: string
   targetElement: HTMLElement
+  onArrive: () => void
   onFinish: () => void
 }
 
-export function FlyingProduct({ imageUrl, targetElement, onFinish }: FlyingProductProps) {
+export function FlyingProduct({
+  imageUrl,
+  targetElement,
+  onArrive,
+  onFinish,
+}: FlyingProductProps) {
   const controls = useAnimationControls()
   const [mounted, setMounted] = useState(false)
 
@@ -38,7 +47,8 @@ export function FlyingProduct({ imageUrl, targetElement, onFinish }: FlyingProdu
       const endY = target.top + target.height / 2 - START_SIZE / 2
       const midX = (startX + endX) / 2
       const midY = Math.min(startY, endY) - Math.max(60, Math.abs(endY - startY) * 0.25)
-      const endScale = END_SIZE / START_SIZE
+      const midScale = MID_SIZE / START_SIZE
+      const footerScale = FOOTER_SIZE / START_SIZE
 
       await controls.set({
         x: startX,
@@ -51,7 +61,7 @@ export function FlyingProduct({ imageUrl, targetElement, onFinish }: FlyingProdu
       if (cancelled) return
 
       await controls.start({
-        scale: endScale,
+        scale: midScale,
         transition: { duration: 0.55, ease: EASE, delay: 0.18 },
       })
 
@@ -61,8 +71,8 @@ export function FlyingProduct({ imageUrl, targetElement, onFinish }: FlyingProdu
         x: [startX, midX, endX],
         y: [startY, midY, endY],
         rotate: [0, -14, 10],
-        scale: endScale,
-        opacity: [1, 1, 0],
+        scale: [midScale, midScale, footerScale],
+        opacity: 1,
         transition: {
           duration: 0.9,
           ease: EASE,
@@ -72,7 +82,14 @@ export function FlyingProduct({ imageUrl, targetElement, onFinish }: FlyingProdu
 
       if (cancelled) return
 
-      await controls.set({ opacity: 0 })
+      // Miniatura entra no footer no instante do pouso.
+      onArrive()
+
+      await controls.start({
+        opacity: 0,
+        transition: { duration: 0.12, ease: 'easeOut' },
+      })
+
       if (!cancelled) onFinish()
     }
 
@@ -81,7 +98,7 @@ export function FlyingProduct({ imageUrl, targetElement, onFinish }: FlyingProdu
     return () => {
       cancelled = true
     }
-  }, [controls, mounted, onFinish, targetElement])
+  }, [controls, mounted, onArrive, onFinish, targetElement])
 
   if (!mounted) return null
 

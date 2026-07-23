@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { MdClose } from 'react-icons/md'
 import {
   flattenCatalogoGrupos,
@@ -9,8 +9,8 @@ import {
   usePublicDeliveryCatalogInfinite,
 } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import { showToast } from '@/src/shared/utils/toast'
-import { DeliveryThemeScope } from '../../shared/components/DeliveryThemeScope'
 import { DeliveryCarrinhoItemCard } from '../../shared/components/DeliveryCarrinhoItemCard'
+import { DeliveryCarrinhoSwipeableItem } from '../../shared/components/DeliveryCarrinhoSwipeableItem'
 import { DeliveryButton } from '../../shared/components/DeliveryButton'
 import { useDeliveryBodyScrollLock } from '../../shared/hooks/useDeliveryBodyScrollLock'
 import { useDeliveryCheckout } from '../../shared/hooks/useDeliveryCheckout'
@@ -33,10 +33,11 @@ import {
 } from '../components/checkout/DeliveryCheckoutTipoEntregaModal'
 import { DeliveryCheckoutPagamentoModal } from '../components/checkout/DeliveryCheckoutPagamentoModal'
 import { DeliveryCheckoutRevisaoModal } from '../components/checkout/DeliveryCheckoutRevisaoModal'
-import { deliveryPublicoHomePath } from '../../shared/utils/deliveryPublicoRoutes'
 
 type DeliveryPublicoCarrinhoScreenProps = {
   slug: string
+  /** Chamado após a animação de fechamento (overlay sobre a home). */
+  onClose: () => void
 }
 
 type CheckoutStep =
@@ -48,12 +49,10 @@ type CheckoutStep =
   | 'revisao'
   | null
 
-export function DeliveryPublicoCarrinhoScreen({ slug }: DeliveryPublicoCarrinhoScreenProps) {
-  return <DeliveryPublicoCarrinhoContent slug={slug} />
-}
-
-function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
-  const router = useRouter()
+export function DeliveryPublicoCarrinhoScreen({
+  slug,
+  onClose,
+}: DeliveryPublicoCarrinhoScreenProps) {
   const atualizarQuantidade = useDeliveryCarrinhoStore(s => s.atualizarQuantidade)
   const removerItem = useDeliveryCarrinhoStore(s => s.removerItem)
   const substituirItem = useDeliveryCarrinhoStore(s => s.substituirItem)
@@ -63,6 +62,28 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
   const [voltarParaRevisao, setVoltarParaRevisao] = useState(false)
   /** Quando true, concluir endereço volta para a tela das 4 opções. */
   const [voltarParaTipoEntrega, setVoltarParaTipoEntrega] = useState(false)
+  const [aberto, setAberto] = useState(true)
+  const [removingIds, setRemovingIds] = useState<Set<string>>(() => new Set())
+
+  const requestClose = () => setAberto(false)
+
+  const requestRemoveItem = useCallback(
+    (itemId: string) => {
+      setRemovingIds(prev => {
+        if (prev.has(itemId)) return prev
+        return new Set(prev).add(itemId)
+      })
+      window.setTimeout(() => {
+        removerItem(slug, itemId)
+        setRemovingIds(prev => {
+          const next = new Set(prev)
+          next.delete(itemId)
+          return next
+        })
+      }, 380)
+    },
+    [removerItem, slug]
+  )
 
   const {
     itens,
@@ -83,6 +104,11 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
   const quantidadeItens = useMemo(
     () => itens.reduce((acc, item) => acc + item.quantidade, 0),
     [itens]
+  )
+
+  const itensVisiveis = useMemo(
+    () => itens.filter(item => !removingIds.has(item.id)),
+    [itens, removingIds]
   )
 
   const catalogQuery = usePublicDeliveryCatalogInfinite(slug)
@@ -165,9 +191,9 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
     catalogQuery.hasNextPage,
   ])
 
-  const voltar = () => router.push(deliveryPublicoHomePath(slug))
+  const voltar = () => requestClose()
   const carregandoEdicao = Boolean(itemEditando) && !produtoEdicao
-  useDeliveryBodyScrollLock(carregandoEdicao)
+  useDeliveryBodyScrollLock(aberto)
 
   const handleSelecionarEndereco = (enderecoId: string) => {
     selecionarEnderecoExistente(enderecoId)
@@ -284,12 +310,21 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
   }
 
   return (
-    <DeliveryThemeScope
-      slug={slug}
-      nomeExibicaoFallback={empresa?.nomeFantasia ?? ''}
-      empresa={empresa}
-    >
-      <div className="flex min-h-[100dvh] flex-col" style={{ backgroundColor: 'var(--delivery-bg)' }}>
+    <AnimatePresence onExitComplete={onClose}>
+      {aberto ? (
+        <motion.div
+          key="delivery-carrinho"
+          className="fixed inset-0 z-50 flex flex-col overflow-hidden"
+          style={{
+            backgroundColor: 'var(--delivery-bg)',
+            originX: 0.5,
+            originY: 0.5,
+          }}
+          initial={{ opacity: 0, scale: 0.55 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.55 }}
+          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+        >
         <header
           className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3"
           style={{
@@ -311,7 +346,7 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
           </button>
         </header>
 
-        <div className="mx-auto w-full max-w-2xl flex-1 space-y-4 p-3 pb-36 sm:space-y-5 sm:p-4">
+        <div className="mx-auto min-h-0 w-full max-w-2xl flex-1 space-y-4 overflow-y-auto overscroll-y-contain p-3 pb-36 max-sm:scrollbar-hide sm:space-y-5 sm:p-4">
           {itens.length === 0 ? (
             <div className="py-16 text-center">
               <p className="delivery-text-muted">Carrinho vazio</p>
@@ -327,28 +362,37 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
                 capaUrlFallback={empresa?.bannerUrl ?? null}
               />
 
-              <div className="divide-y divide-[var(--delivery-border)]">
-                {itens.map(item => (
-                  <DeliveryCarrinhoItemCard
-                    key={item.id}
-                    item={item}
-                    onDecrease={() =>
-                      item.quantidade <= 1
-                        ? removerItem(slug, item.id)
-                        : atualizarQuantidade(slug, item.id, item.quantidade - 1)
-                    }
-                    onIncrease={() => atualizarQuantidade(slug, item.id, item.quantidade + 1)}
-                    onRemove={() => removerItem(slug, item.id)}
-                    onEdit={() => setItemEditando(item)}
-                    onRemoveComplemento={(complementoId, grupoComplementoId) =>
-                      substituirItem(
-                        slug,
-                        item.id,
-                        itemSemComplemento(item, complementoId, grupoComplementoId)
-                      )
-                    }
-                  />
-                ))}
+              <div className="overflow-x-hidden divide-y divide-[var(--delivery-border)]">
+                <AnimatePresence initial={false}>
+                  {itensVisiveis.map(item => (
+                    <DeliveryCarrinhoSwipeableItem
+                      key={item.id}
+                      itemId={item.id}
+                      onSwipeRemove={() => requestRemoveItem(item.id)}
+                    >
+                      <DeliveryCarrinhoItemCard
+                        item={item}
+                        onDecrease={() =>
+                          item.quantidade <= 1
+                            ? requestRemoveItem(item.id)
+                            : atualizarQuantidade(slug, item.id, item.quantidade - 1)
+                        }
+                        onIncrease={() =>
+                          atualizarQuantidade(slug, item.id, item.quantidade + 1)
+                        }
+                        onRemove={() => requestRemoveItem(item.id)}
+                        onEdit={() => setItemEditando(item)}
+                        onRemoveComplemento={(complementoId, grupoComplementoId) =>
+                          substituirItem(
+                            slug,
+                            item.id,
+                            itemSemComplemento(item, complementoId, grupoComplementoId)
+                          )
+                        }
+                      />
+                    </DeliveryCarrinhoSwipeableItem>
+                  ))}
+                </AnimatePresence>
               </div>
 
               <button
@@ -513,7 +557,8 @@ function DeliveryPublicoCarrinhoContent({ slug }: { slug: string }) {
             onClose={() => setItemEditando(null)}
           />
         ) : null}
-      </div>
-    </DeliveryThemeScope>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   )
 }

@@ -33,15 +33,19 @@ import { resolveDeliveryLayoutHome } from '../layouts/DeliveryPublicoLayoutRegis
 import type { DeliveryPublicoViewModel } from '../../shared/types/deliveryPublicoViewModel'
 import { DeliveryProdutoModal } from '../components/DeliveryProdutoModal'
 import { DeliveryAdicionadoCarrinhoDialog } from '../components/DeliveryAdicionadoCarrinhoDialog'
+import { DeliveryPublicoCarrinhoScreen } from './DeliveryPublicoCarrinhoScreen'
 import { useFlyToCart } from '../../shared/hooks/useFlyToCart'
 import type { DeliveryCarrinhoThumb } from '../../shared/components/DeliveryPedidoFooter'
 import {
   deliveryPublicoCarrinhoPath,
+  deliveryPublicoHomePath,
   deliveryPublicoInstrucoesPath,
 } from '../../shared/utils/deliveryPublicoRoutes'
 
 type DeliveryPublicoHomeScreenProps = {
   slug: string
+  /** Abre o carrinho como overlay (ex.: acesso direto em /carrinho). */
+  carrinhoInicialAberto?: boolean
 }
 
 type ProdutoAdicionadoPayload = {
@@ -55,21 +59,26 @@ const MAX_FOOTER_THUMBS = 5
 function buildCarrinhoThumbsFromItens(
   itens: { produtoId: string; produtoImagemUrl: string | null; adicionadoEm: string }[]
 ): DeliveryCarrinhoThumb[] {
-  const thumbs: DeliveryCarrinhoThumb[] = []
-  const seen = new Set<string>()
+  const byId = new Map<string, DeliveryCarrinhoThumb>()
+  const order: string[] = []
 
-  for (let i = itens.length - 1; i >= 0 && thumbs.length < MAX_FOOTER_THUMBS; i -= 1) {
-    const item = itens[i]
+  const sorted = [...itens].sort((a, b) => a.adicionadoEm.localeCompare(b.adicionadoEm))
+  for (const item of sorted) {
     const imagemUrl = item.produtoImagemUrl?.trim()
-    if (!imagemUrl || seen.has(item.produtoId)) continue
-    seen.add(item.produtoId)
-    thumbs.unshift({ produtoId: item.produtoId, imagemUrl })
+    if (!imagemUrl) continue
+    if (!byId.has(item.produtoId)) {
+      order.push(item.produtoId)
+    }
+    byId.set(item.produtoId, { produtoId: item.produtoId, imagemUrl })
   }
 
-  return thumbs
+  return order.slice(-MAX_FOOTER_THUMBS).map(id => byId.get(id)!)
 }
 
-export function DeliveryPublicoHomeScreen({ slug }: DeliveryPublicoHomeScreenProps) {
+export function DeliveryPublicoHomeScreen({
+  slug,
+  carrinhoInicialAberto = false,
+}: DeliveryPublicoHomeScreenProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -82,6 +91,7 @@ export function DeliveryPublicoHomeScreen({ slug }: DeliveryPublicoHomeScreenPro
   const [pendingFly, setPendingFly] = useState<ProdutoAdicionadoPayload | null>(null)
   const [flyingProdutoId, setFlyingProdutoId] = useState<string | null>(null)
   const [carrinhoThumbsBounceKey, setCarrinhoThumbsBounceKey] = useState(0)
+  const [carrinhoAberto, setCarrinhoAberto] = useState(carrinhoInicialAberto)
   const carrinhoThumbsTargetRef = useRef<HTMLDivElement>(null)
   const { flyToCart, flyingNode } = useFlyToCart()
 
@@ -97,7 +107,7 @@ export function DeliveryPublicoHomeScreen({ slug }: DeliveryPublicoHomeScreenPro
   const carrinhoThumbs = useMemo(() => {
     const thumbs = buildCarrinhoThumbsFromItens(carrinhoItens)
     if (!flyingProdutoId) return thumbs
-    // Evita miniatura duplicada enquanto a cópia ainda está voando.
+    // Só oculta se for a 1ª aparição do produto (evita buraco ao readicionar o mesmo item).
     return thumbs.filter(thumb => thumb.produtoId !== flyingProdutoId)
   }, [carrinhoItens, flyingProdutoId])
 
@@ -110,13 +120,18 @@ export function DeliveryPublicoHomeScreen({ slug }: DeliveryPublicoHomeScreenPro
         params.delete('produto')
       }
       const query = params.toString()
-      const nextUrl = query ? `${pathname}?${query}` : pathname
+      const homePath = deliveryPublicoHomePath(slug)
+      const nextUrl = query ? `${homePath}?${query}` : homePath
       const currentQuery = searchParams.toString()
-      const currentUrl = currentQuery ? `${pathname}?${currentQuery}` : pathname
+      const currentPath =
+        typeof window !== 'undefined' && window.location.pathname.endsWith('/carrinho')
+          ? deliveryPublicoHomePath(slug)
+          : pathname.replace(/\/carrinho\/?$/, '') || homePath
+      const currentUrl = currentQuery ? `${currentPath}?${currentQuery}` : currentPath
       if (nextUrl === currentUrl) return
       router.replace(nextUrl, { scroll: false })
     },
-    [pathname, router, searchParams]
+    [pathname, router, searchParams, slug]
   )
 
   useEffect(() => {
@@ -203,13 +218,22 @@ export function DeliveryPublicoHomeScreen({ slug }: DeliveryPublicoHomeScreenPro
         return
       }
 
-      setFlyingProdutoId(produtoId)
+      const quantidadeDesteProduto = carrinhoItens.filter(item => item.produtoId === produtoId)
+        .length
+      const isNovaMiniatura = quantidadeDesteProduto <= 1
+
+      if (isNovaMiniatura) {
+        setFlyingProdutoId(produtoId)
+      }
+
       flyToCart({
         imageUrl: imagemUrl,
         targetElement: target,
-        onFinish: () => {
+        onArrive: () => {
           setFlyingProdutoId(null)
           setCarrinhoThumbsBounceKey(key => key + 1)
+        },
+        onFinish: () => {
           setProdutoAdicionadoNome(nome)
         },
       })
@@ -220,20 +244,44 @@ export function DeliveryPublicoHomeScreen({ slug }: DeliveryPublicoHomeScreenPro
     return () => {
       cancelled = true
     }
-  }, [pendingFly, flyToCart, carrinhoQuantidade])
+  }, [pendingFly, flyToCart, carrinhoQuantidade, carrinhoItens])
 
   const handleContinuarComprando = useCallback(() => {
     setProdutoAdicionadoNome(null)
   }, [])
 
+  const abrirCarrinho = useCallback(() => {
+    setProdutoAdicionadoNome(null)
+    setCarrinhoAberto(true)
+    const cartPath = deliveryPublicoCarrinhoPath(slug)
+    if (typeof window !== 'undefined' && window.location.pathname !== cartPath) {
+      window.history.pushState({ deliveryCarrinho: true }, '', cartPath)
+    }
+  }, [slug])
+
+  const fecharCarrinho = useCallback(() => {
+    setCarrinhoAberto(false)
+    const homePath = deliveryPublicoHomePath(slug)
+    if (typeof window !== 'undefined' && window.location.pathname.endsWith('/carrinho')) {
+      window.history.pushState({ deliveryCarrinho: false }, '', homePath)
+    }
+  }, [slug])
+
+  useEffect(() => {
+    const onPopState = () => {
+      setCarrinhoAberto(window.location.pathname.endsWith('/carrinho'))
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
   const handlePedidoClick = useCallback(() => {
-    router.push(deliveryPublicoCarrinhoPath(slug))
-  }, [router, slug])
+    abrirCarrinho()
+  }, [abrirCarrinho])
 
   const handleIrParaCarrinhoAposAdicionar = useCallback(() => {
-    setProdutoAdicionadoNome(null)
-    router.push(deliveryPublicoCarrinhoPath(slug))
-  }, [router, slug])
+    abrirCarrinho()
+  }, [abrirCarrinho])
 
   const isCatalogLoading = isLoading && !data
 
@@ -280,6 +328,9 @@ export function DeliveryPublicoHomeScreen({ slug }: DeliveryPublicoHomeScreenPro
         carrinhoThumbsTargetRef={carrinhoThumbsTargetRef}
         flyingNode={flyingNode}
       />
+      {carrinhoAberto ? (
+        <DeliveryPublicoCarrinhoScreen slug={slug} onClose={fecharCarrinho} />
+      ) : null}
     </DeliveryThemeScope>
   )
 }

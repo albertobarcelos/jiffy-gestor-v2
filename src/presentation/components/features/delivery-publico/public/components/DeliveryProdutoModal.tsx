@@ -1,6 +1,7 @@
 'use client'
 
 import { useLayoutEffect, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Camera, List, Share2 } from 'lucide-react'
 import { MdClose } from 'react-icons/md'
 import type { CatalogoPublicoProdutoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
@@ -81,6 +82,9 @@ export function DeliveryProdutoModal({
     itemEdicao ? observacaoItemCarrinho(itemEdicao) : ''
   )
   const [salvando, setSalvando] = useState(false)
+  const [aberto, setAberto] = useState(true)
+
+  const requestClose = () => setAberto(false)
 
   const {
     grupos,
@@ -151,7 +155,7 @@ export function DeliveryProdutoModal({
       if (itemEdicao) {
         substituirItem(slug, itemEdicao.id, payload)
         showToast.success('Item atualizado!')
-        onClose()
+        requestClose()
       } else {
         adicionarItem(slug, payload)
         onAdicionado?.({
@@ -159,7 +163,7 @@ export function DeliveryProdutoModal({
           nome: produto.nome,
           imagemUrl: produto.imagemUrl,
         })
-        onClose()
+        requestClose()
       }
     } finally {
       setSalvando(false)
@@ -167,21 +171,38 @@ export function DeliveryProdutoModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex overscroll-none items-stretch justify-center sm:items-center sm:p-4">
-      <div
-        className="absolute inset-0 hidden sm:block"
-        style={{ backgroundColor: 'var(--delivery-overlay)' }}
-        onClick={onClose}
-        aria-hidden
-      />
+    <AnimatePresence onExitComplete={onClose}>
+      {aberto ? (
+        <motion.div
+          key="delivery-produto-modal"
+          className="fixed inset-0 z-50 flex overscroll-none items-stretch justify-center sm:items-center sm:p-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <div
+            className="absolute inset-0 hidden sm:block"
+            style={{ backgroundColor: 'var(--delivery-overlay)' }}
+            onClick={requestClose}
+            aria-hidden
+          />
 
-      <div
-        className="relative flex h-[100dvh] w-full flex-col overflow-hidden overscroll-none sm:h-auto sm:max-h-[90vh] sm:max-w-lg sm:rounded-2xl sm:shadow-xl"
-        style={{ backgroundColor: 'var(--delivery-surface)' }}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Detalhes do produto"
-      >
+          <motion.div
+            className="relative flex h-[100dvh] w-full flex-col overflow-hidden overscroll-none sm:h-auto sm:max-h-[90vh] sm:max-w-lg sm:rounded-2xl sm:shadow-xl"
+            style={{
+              backgroundColor: 'var(--delivery-surface)',
+              originX: 0.5,
+              originY: 0.5,
+            }}
+            initial={{ scale: 0.55 }}
+            animate={{ scale: 1 }}
+            exit={{ scale: 0.55 }}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Detalhes do produto"
+          >
         <div
           className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3"
           style={{
@@ -192,18 +213,21 @@ export function DeliveryProdutoModal({
           <h1 className="delivery-font-title text-base font-semibold delivery-text-primary">
             Detalhes do produto
           </h1>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Fechar"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
-            style={{ color: 'var(--delivery-text-primary)' }}
-          >
-            <MdClose className="h-5 w-5" />
-          </button>
+            <button
+              type="button"
+              onClick={requestClose}
+              aria-label="Fechar"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+              style={{ color: 'var(--delivery-text-primary)' }}
+            >
+              <MdClose className="h-5 w-5" />
+            </button>
         </div>
 
-        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain touch-pan-y">
+        <div
+          ref={scrollRef}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain touch-pan-y max-sm:scrollbar-hide"
+        >
           <div className="flex flex-col">
             {/* Primeira dobra: ocupa a área scroll visível menos a mensagem */}
             <div
@@ -432,7 +456,9 @@ export function DeliveryProdutoModal({
               : `${isEdicao ? 'Salvar' : 'Adicionar'}  ${formatDeliveryCurrency(valorTotal)}`}
           </DeliveryButton>
         </div>
-      </div>
-    </div>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   )
 }
