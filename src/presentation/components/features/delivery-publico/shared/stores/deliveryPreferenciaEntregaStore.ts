@@ -43,11 +43,3 @@ export const useDeliveryPreferenciaEntregaStore = create<DeliveryPreferenciaEntr
     }
   )
 )
-
-/** Preferência de entrega/retirada persistida por slug da loja. */
-export function useDeliveryTipoEntrega(slug: string): DeliveryTipoEntrega {
-  const trimmed = slug.trim()
-  return useDeliveryPreferenciaEntregaStore(
-    s => s.preferencias[trimmed] ?? DEFAULT_DELIVERY_TIPO_ENTREGA
-  )
-}

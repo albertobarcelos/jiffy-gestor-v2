@@ -6,7 +6,6 @@ import { DeliveryPublicoLojaFooter } from '../../../shared/components/DeliveryPu
 import { filterViewModelByBusca } from '../../../shared/utils/filterViewModelByBusca'
 import type { DeliveryLayoutHomeProps } from '../DeliveryLayoutHomeProps'
 import { DeliveryGradeHeader } from './components/DeliveryGradeHeader'
-import { DeliveryGradeDeliverySelector } from './components/DeliveryGradeDeliverySelector'
 import { DeliveryGradeToolbar } from './components/DeliveryGradeToolbar'
 import { DeliveryGradeSecaoGrupo } from './components/DeliveryGradeSecaoGrupo'
 
@@ -15,7 +14,6 @@ export function GradeLayoutHome({
   viewModel,
   enderecoTexto,
   interactive = false,
-  onTipoEntregaChange,
   onBuscaChange,
   onGrupoClick,
   onProdutoClick,
@@ -43,12 +41,6 @@ export function GradeLayoutHome({
         className="-mt-1 flex flex-1 flex-col rounded-t-[1.75rem] pb-2 pt-4"
         style={{ backgroundColor: 'var(--delivery-bg, var(--delivery-surface))' }}
       >
-        <DeliveryGradeDeliverySelector
-          tipoEntrega={viewModel.tipoEntrega}
-          interactive={interactive}
-          onChange={onTipoEntregaChange}
-        />
-
         <DeliveryGradeToolbar
           termoBusca={viewModel.termoBusca}
           carrinhoQuantidade={viewModel.carrinho.quantidadeItens}

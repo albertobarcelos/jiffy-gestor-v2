@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { ChevronLeft } from 'lucide-react'
 import { MdClose } from 'react-icons/md'
 import {
   flattenCatalogoGrupos,
@@ -409,28 +410,37 @@ export function DeliveryPublicoCarrinhoScreen({
 
         {itens.length > 0 ? (
           <div
-            className="fixed bottom-0 left-0 right-0 z-20 flex items-center justify-between gap-3 border-t border-neutral-200 bg-white px-5 py-3"
+            className="fixed bottom-0 left-0 right-0 z-20 border-t border-neutral-200 bg-white"
             style={{
-              paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
+              paddingBottom: 'max(0px, env(safe-area-inset-bottom))',
             }}
           >
-            <div className="flex min-w-0 flex-col items-start gap-0.5 text-left font-normal">
-              <span className="text-sm leading-tight text-neutral-900">Total da compra</span>
-              <span className="text-sm leading-tight text-neutral-900">
-                {formatDeliveryCurrency(total)}
-                <span className="text-neutral-400">
-                  {' '}
-                  / {quantidadeItens === 1 ? '1 item' : `${quantidadeItens} itens`}
-                </span>
+            <p className="px-5 pt-3 pb-2 text-base leading-tight text-neutral-900 @sm:text-lg">
+              <span className="font-semibold">Total da compra:</span>{' '}
+              {formatDeliveryCurrency(total)}
+              <span className="text-neutral-400">
+                {' '}
+                / {quantidadeItens === 1 ? '1 item' : `${quantidadeItens} itens`}
               </span>
+            </p>
+
+            <div className="flex min-h-[3.5rem] w-full items-stretch">
+              <button
+                type="button"
+                onClick={voltar}
+                className="inline-flex shrink-0 items-center justify-center gap-1.5 border border-neutral-300 bg-white px-5 text-base font-semibold text-black"
+              >
+                <ChevronLeft className="h-5 w-5" aria-hidden />
+                Voltar
+              </button>
+              <button
+                type="button"
+                onClick={handleContinuarCheckout}
+                className="flex min-w-0 flex-1 items-center justify-center border-0 bg-black px-5 text-base font-semibold text-white"
+              >
+                Continuar
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={handleContinuarCheckout}
-              className="shrink-0 rounded-lg bg-black px-5 py-2.5 text-sm font-normal text-white"
-            >
-              Continuar
-            </button>
           </div>
         ) : null}
 

@@ -1,59 +1,31 @@
 'use client'
 
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react'
 import type { DeliveryPublicoDesignConfig } from '../types/deliveryPublicoDesignConfig'
 import type { DeliveryPublicoGrupoViewModel } from '../types/deliveryPublicoViewModel'
-import { DeliveryGrupoCategoriaVisual } from './DeliveryGrupoCategoriaVisual'
 
-const MOBILE_COLUMNS_MAX = 5
-/** Largura mínima alinhada a `md` / container `@3xl` (~768px) para encaixar 8 itens. */
-const DESKTOP_COLUMNS_MIN_WIDTH_PX = 768
-const DESKTOP_COLUMNS_MAX = 8
 const CHIP_GAP_PX = 8
-const HORIZONTAL_PADDING_PX = 32
-/** Teto da imagem no mobile (~tamanho ideal em ~375px), para não encostar/sobrepor. */
-const MOBILE_IMAGE_MAX_PX = 67
-/** Folga dentro do chip para a borda não encostar no vizinho. */
-const CHIP_IMAGE_INSET_PX = 4
-/** Teto da imagem no desktop (~5.25rem). */
-const DESKTOP_IMAGE_MAX_PX = 84
+const SIDE_PADDING_PX = 16
 
 type DeliveryGrupoChipsProps = {
   config: DeliveryPublicoDesignConfig
   grupos: DeliveryPublicoGrupoViewModel[]
+  activeGrupoId?: string | null
   interactive?: boolean
   embedded?: boolean
   onGrupoClick?: (grupoId: string) => void
 }
 
-function resolveColumnsMax(railWidth: number): number {
-  return railWidth >= DESKTOP_COLUMNS_MIN_WIDTH_PX ? DESKTOP_COLUMNS_MAX : MOBILE_COLUMNS_MAX
-}
-
-function resolveHorizontalPaddingPx(railWidth: number): number {
-  // Mobile: padding lateral menor para caber imagem ~20% maior mantendo 5 colunas.
-  return resolveColumnsMax(railWidth) === DESKTOP_COLUMNS_MAX ? HORIZONTAL_PADDING_PX : 16
-}
-
-function computeChipWidthPx(railWidth: number, grupoCount: number): number {
-  const columnsMax = resolveColumnsMax(railWidth)
-  const columnsVisible = Math.min(Math.max(grupoCount, 1), columnsMax)
-  const gaps = (columnsVisible - 1) * CHIP_GAP_PX
-  const horizontalPadding = resolveHorizontalPaddingPx(railWidth)
-  const minChip = columnsMax === DESKTOP_COLUMNS_MAX ? 72 : 56
-  const usable = Math.max(railWidth - horizontalPadding - gaps, columnsVisible * minChip)
-  return usable / columnsVisible
-}
-
 export function DeliveryGrupoChips({
   config,
   grupos,
+  activeGrupoId = null,
   interactive = false,
   embedded = false,
   onGrupoClick,
 }: DeliveryGrupoChipsProps) {
-  const railRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const activeChipRef = useRef<HTMLElement | null>(null)
   const dragRef = useRef<{
     pointerId: number
     startX: number
@@ -61,43 +33,19 @@ export function DeliveryGrupoChips({
     moved: boolean
   } | null>(null)
   const suppressClickRef = useRef(false)
-  const [chipWidthPx, setChipWidthPx] = useState(0)
-  const [sidePaddingPx, setSidePaddingPx] = useState(HORIZONTAL_PADDING_PX / 2)
-  const [imageDiameterPx, setImageDiameterPx] = useState(MOBILE_IMAGE_MAX_PX)
 
   useEffect(() => {
-    const rail = railRef.current
-    if (!rail) return
-
-    const update = () => {
-      const width = rail.clientWidth
-      const nextChip = Math.round(computeChipWidthPx(width, grupos.length) * 100) / 100
-      const nextSidePadding = resolveHorizontalPaddingPx(width) / 2
-      const isDesktop = resolveColumnsMax(width) === DESKTOP_COLUMNS_MAX
-      const maxImage = isDesktop ? DESKTOP_IMAGE_MAX_PX : MOBILE_IMAGE_MAX_PX
-      const nextDiameter = Math.round(
-        Math.min(maxImage, Math.max(36, nextChip - CHIP_IMAGE_INSET_PX))
-      )
-
-      setChipWidthPx(prev => (Math.abs(prev - nextChip) < 0.5 ? prev : nextChip))
-      setSidePaddingPx(prev => (prev === nextSidePadding ? prev : nextSidePadding))
-      setImageDiameterPx(prev => (prev === nextDiameter ? prev : nextDiameter))
-    }
-
-    update()
-    const observer = new ResizeObserver(update)
-    observer.observe(rail)
-    return () => observer.disconnect()
-  }, [grupos.length])
+    if (!activeGrupoId) return
+    activeChipRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      inline: 'center',
+      block: 'nearest',
+    })
+  }, [activeGrupoId])
 
   if (!config.categorias.mostrar || grupos.length === 0) return null
 
   const marginClass = embedded ? '' : 'mt-3'
-  const chipStyle = {
-    flex: `0 0 ${chipWidthPx || 72}px`,
-    width: `${chipWidthPx || 72}px`,
-    minWidth: `${chipWidthPx || 72}px`,
-  } as const
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.pointerType === 'touch') return
@@ -146,7 +94,7 @@ export function DeliveryGrupoChips({
   }
 
   return (
-    <div ref={railRef} className={`w-full max-w-full min-w-0 ${marginClass}`.trim()}>
+    <div className={`w-full max-w-full min-w-0 ${marginClass}`.trim()}>
       <div
         ref={scrollRef}
         className="w-full max-w-full min-w-0 cursor-grab touch-pan-x overflow-x-auto overflow-y-hidden active:cursor-grabbing [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -161,41 +109,35 @@ export function DeliveryGrupoChips({
           style={{
             width: 'max-content',
             gap: `${CHIP_GAP_PX}px`,
-            paddingLeft: sidePaddingPx,
-            paddingRight: sidePaddingPx,
+            paddingLeft: SIDE_PADDING_PX,
+            paddingRight: SIDE_PADDING_PX,
           }}
         >
           {grupos.map(grupo => {
-            const content = (
-              <>
-                <DeliveryGrupoCategoriaVisual
-                  config={config}
-                  grupo={grupo}
-                  size="lg"
-                  diameterPx={imageDiameterPx}
-                />
-                <span
-                  className="line-clamp-2 w-full text-center text-[11px] font-medium leading-tight @sm:text-xs @lg:text-sm @xl:text-base"
-                  style={{
-                    color: 'var(--delivery-text)',
-                    fontFamily: 'var(--delivery-font-body)',
-                  }}
-                >
-                  {grupo.nome}
-                </span>
-              </>
-            )
+            const active = grupo.id === activeGrupoId
+            const className =
+              'shrink-0 rounded-lg border-2 px-3 py-1.5 text-center text-xs font-medium leading-tight transition-[border-color,color] duration-150 @sm:px-3.5 @sm:text-sm @lg:text-base'
+            const style = {
+              color: active ? 'var(--delivery-primary-dark)' : 'var(--delivery-text)',
+              fontFamily: 'var(--delivery-font-body)',
+              borderColor: active
+                ? 'var(--delivery-primary-dark)'
+                : 'var(--delivery-border)',
+              backgroundColor: 'var(--delivery-surface)',
+            } as const
 
             if (interactive && onGrupoClick) {
               return (
                 <button
                   key={grupo.id}
+                  ref={active ? el => { activeChipRef.current = el } : undefined}
                   type="button"
+                  aria-pressed={active}
                   onClick={() => handleGrupoActivate(grupo.id)}
-                  className="flex flex-col items-center gap-1.5 @lg:gap-2"
-                  style={chipStyle}
+                  className={className}
+                  style={style}
                 >
-                  {content}
+                  {grupo.nome}
                 </button>
               )
             }
@@ -203,10 +145,11 @@ export function DeliveryGrupoChips({
             return (
               <div
                 key={grupo.id}
-                className="flex flex-col items-center gap-1.5 @lg:gap-2"
-                style={chipStyle}
+                ref={active ? el => { activeChipRef.current = el } : undefined}
+                className={className}
+                style={style}
               >
-                {content}
+                {grupo.nome}
               </div>
             )
           })}

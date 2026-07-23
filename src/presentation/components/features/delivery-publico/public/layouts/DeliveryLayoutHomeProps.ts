@@ -9,7 +9,6 @@ export type DeliveryLayoutHomeProps = {
   /** Endereço formatado da loja (footer do layout Vitrine). */
   enderecoTexto?: string | null
   interactive?: boolean
-  onTipoEntregaChange?: (tipo: 'entrega' | 'retirada') => void
   onBuscaChange?: (termo: string) => void
   onGrupoClick?: (grupoId: string) => void
   onProdutoClick?: (produtoId: string) => void

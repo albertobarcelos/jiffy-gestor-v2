@@ -27,7 +27,6 @@ export type DeliveryPublicoViewModel = {
   grupos: DeliveryPublicoGrupoViewModel[]
   disponivel: boolean
   horarioTexto: string
-  tipoEntrega: 'entrega' | 'retirada'
   termoBusca: string
   carrinho: DeliveryPublicoCarrinhoViewModel
 }

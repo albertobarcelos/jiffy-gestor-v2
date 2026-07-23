@@ -5,7 +5,6 @@ import { DeliveryPedidoFooter } from '../../../shared/components/DeliveryPedidoF
 import { DeliveryPublicoLojaFooter } from '../../../shared/components/DeliveryPublicoLojaFooter'
 import { filterViewModelByBusca } from '../../../shared/utils/filterViewModelByBusca'
 import type { DeliveryLayoutHomeProps } from '../DeliveryLayoutHomeProps'
-import { DeliveryGradeDeliverySelector } from '../grade/components/DeliveryGradeDeliverySelector'
 import { DeliveryCatalogoHeader } from './components/DeliveryCatalogoHeader'
 import { DeliveryCatalogoSearch } from './components/DeliveryCatalogoSearch'
 import { DeliveryCatalogoCategoriaTabs } from './components/DeliveryCatalogoCategoriaTabs'
@@ -16,7 +15,6 @@ export function CatalogoLayoutHome({
   viewModel,
   enderecoTexto,
   interactive = false,
-  onTipoEntregaChange,
   onBuscaChange,
   onGrupoClick,
   onProdutoClick,
@@ -63,12 +61,6 @@ export function CatalogoLayoutHome({
       />
 
       <div className="mt-2 space-y-3">
-        <DeliveryGradeDeliverySelector
-          tipoEntrega={viewModel.tipoEntrega}
-          interactive={interactive}
-          onChange={onTipoEntregaChange}
-        />
-
         <DeliveryCatalogoSearch
           termoBusca={viewModel.termoBusca}
           interactive={interactive}

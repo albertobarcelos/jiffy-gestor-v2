@@ -44,58 +44,18 @@
   background-color: var(--delivery-primary-dark, #171717);
   color: var(--delivery-btn-text, #ffffff);
   font-family: var(--delivery-font-title);
-  overflow: hidden;
 }
-
-/**
- * Fumaça branca ao redor da imagem do grupo (sobre o fundo da barra).
- * box-shadow no círculo + blob suave atrás — overflow da barra corta o que sair.
- */
-.delivery-grupo-title-image-smoke {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 135%;
-  height: 135%;
-  translate: -50% -50%;
-  border-radius: 9999px;
-  background: radial-gradient(
-    circle,
-    rgba(255, 255, 255, 0.7) 0%,
-    rgba(255, 255, 255, 0.35) 38%,
-    rgba(255, 255, 255, 0.12) 58%,
-    rgba(255, 255, 255, 0) 72%
-  );
-  filter: blur(12px);
-  pointer-events: none;
-  z-index: 0;
-}
-
-.delivery-grupo-title-image-photo {
-  position: relative;
-  z-index: 1;
-  display: block;
-  height: 100%;
-  width: 100%;
-  overflow: hidden;
-  border-radius: 9999px;
-  box-shadow:
-    0 0 8px 2px rgba(255, 255, 255, 0.75),
-    0 0 18px 6px rgba(255, 255, 255, 0.45),
-    0 0 36px 14px rgba(255, 255, 255, 0.28),
-    0 0 56px 22px rgba(255, 255, 255, 0.14);
-}
-
 /**
  * Layout Básico — busca + chips fixos no topo; títulos de grupo sticky abaixo da barra.
  */
 .delivery-basico-catalog-root {
+  --delivery-basico-topnav-h: 0px;
   --delivery-sticky-toolbar-h: 0px;
 }
 
 .delivery-basico-sticky-nav {
   position: sticky;
-  top: 0;
+  top: var(--delivery-basico-topnav-h);
   z-index: 40;
   min-width: 0;
   background-color: var(--delivery-bg, var(--delivery-surface));
@@ -103,12 +63,12 @@
 }
 
 .delivery-basico-grupo-section {
-  scroll-margin-top: var(--delivery-sticky-toolbar-h);
+  scroll-margin-top: calc(var(--delivery-basico-topnav-h) + var(--delivery-sticky-toolbar-h));
 }
 
 .delivery-basico-grupo-title-sticky {
   position: sticky;
-  top: var(--delivery-sticky-toolbar-h);
+  top: calc(var(--delivery-basico-topnav-h) + var(--delivery-sticky-toolbar-h));
   z-index: 20;
   background-color: var(--delivery-primary-dark, #171717);
   color: var(--delivery-btn-text, #ffffff);
@@ -116,12 +76,14 @@
 
 /**
  * Preview mobile do designer — conteúdo ocupa 100% da largura útil do frame.
+ * `transform` cria containing block para `position: fixed` (footer do carrinho etc.).
  */
 .delivery-preview-shell {
   width: 100%;
   max-width: 24rem;
   margin-inline: auto;
   min-height: 0;
+  transform: translateZ(0);
 }
 
 .delivery-preview-viewport {

@@ -1,31 +1,19 @@
 'use client'
 
-import { ChevronDown, User } from 'lucide-react'
+import { User } from 'lucide-react'
 import type { DeliveryPublicoDesignConfig } from '../../../../shared/types/deliveryPublicoDesignConfig'
 
 type DeliveryVitrineHeaderProps = {
   config: DeliveryPublicoDesignConfig
   disponivel: boolean
-  tipoEntrega: 'entrega' | 'retirada'
-  interactive?: boolean
-  onTipoEntregaChange?: (tipo: 'entrega' | 'retirada') => void
 }
 
 export function DeliveryVitrineHeader({
   config,
   disponivel,
-  tipoEntrega,
-  interactive = false,
-  onTipoEntregaChange,
 }: DeliveryVitrineHeaderProps) {
   const nomeLoja = config.cabecalho.nomeExibicao.trim() || 'Sua loja'
   const logoRadius = config.cabecalho.logoFormato === 'circular' ? '9999px' : '12px'
-  const tipoLabel = tipoEntrega === 'entrega' ? 'Delivery' : 'Para retirar'
-
-  const handleTipoClick = () => {
-    if (!interactive || !onTipoEntregaChange) return
-    onTipoEntregaChange(tipoEntrega === 'entrega' ? 'retirada' : 'entrega')
-  }
 
   return (
     <header className="relative">
@@ -65,7 +53,7 @@ export function DeliveryVitrineHeader({
           <User className="h-5 w-5" aria-hidden />
         </button>
 
-        <div className="absolute inset-x-0 bottom-14 px-4 @sm:bottom-16">
+        <div className="absolute inset-x-0 bottom-4 px-4 @sm:bottom-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <h1
@@ -89,21 +77,6 @@ export function DeliveryVitrineHeader({
               {disponivel ? 'Disponível' : 'Indisponível'}
             </span>
           </div>
-        </div>
-
-        <div className="absolute inset-x-4 bottom-3 @sm:bottom-4">
-          <button
-            type="button"
-            disabled={!interactive}
-            onClick={handleTipoClick}
-            className="flex w-full items-center justify-between rounded-xl border border-white/40 bg-black/35 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur-sm disabled:cursor-default"
-          >
-            <span className="flex items-center gap-2">
-              <span aria-hidden>🛵</span>
-              {tipoLabel}
-            </span>
-            <ChevronDown className="h-4 w-4 opacity-90" aria-hidden />
-          </button>
         </div>
       </div>
     </header>

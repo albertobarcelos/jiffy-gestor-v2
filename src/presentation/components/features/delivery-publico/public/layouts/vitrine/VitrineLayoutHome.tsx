@@ -15,7 +15,6 @@ export function VitrineLayoutHome({
   viewModel,
   enderecoTexto,
   interactive = false,
-  onTipoEntregaChange,
   onBuscaChange,
   onGrupoClick,
   onProdutoClick,
@@ -53,9 +52,6 @@ export function VitrineLayoutHome({
       <DeliveryVitrineHeader
         config={config}
         disponivel={viewModel.disponivel}
-        tipoEntrega={viewModel.tipoEntrega}
-        interactive={interactive}
-        onTipoEntregaChange={onTipoEntregaChange}
       />
 
       {mostrarCategorias ? (
