@@ -10,7 +10,7 @@ import { disconnectEmpresaTab } from '@/src/presentation/utils/disconnectEmpresa
 import { useEmpresaUrlSync } from '@/src/presentation/hooks/useEmpresaUrlSync'
 import { EmpresaSwitcherTopNav } from './EmpresaSwitcherTopNav'
 import { useQueryClient } from '@tanstack/react-query'
-import { MdDashboard, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight, MdMenu, MdClose, MdDeliveryDining } from 'react-icons/md'
+import { MdDashboard, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight, MdMenu, MdClose, MdDeliveryDining, MdApps } from 'react-icons/md'
 import { 
   MdInventory2, 
   MdShoppingBag, 
@@ -258,7 +258,7 @@ export function TopNav() {
     [handleMobileNavigate]
   )
 
-  const handleLogout = useCallback(async () => {
+  const handleVoltarPortal = useCallback(async () => {
     await disconnectEmpresaTab({ queryClient, logoutTenant })
   }, [queryClient, logoutTenant])
 
@@ -394,10 +394,19 @@ export function TopNav() {
               {isHydrated && user?.getEmail() ? user.getEmail() : 'Admin'}
             </p>
           </div>
+          <button
+            type="button"
+            onClick={() => void handleVoltarPortal()}
+            className="shrink-0 p-2.5 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
+            title="Portal de aplicativos"
+            aria-label="Ir para o portal de aplicativos"
+          >
+            <MdApps className="w-6 h-6" />
+          </button>
           {/* Logout no mobile: ações do usuário ficam em `hidden sm:flex` na barra superior */}
           <button
             type="button"
-            onClick={() => void handleLogout()}
+            onClick={() => void handleVoltarPortal()}
             className="shrink-0 p-2.5 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
             aria-label="Sair da conta"
           >
@@ -533,7 +542,17 @@ export function TopNav() {
 
         {/* User Actions */}
         <div className="hidden sm:flex items-center gap-2">
-          
+          {/* Portal de aplicativos */}
+          <button
+            type="button"
+            onClick={() => void handleVoltarPortal()}
+            className="rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100"
+            title="Portal de aplicativos"
+            aria-label="Ir para o portal de aplicativos"
+          >
+            <MdApps className="h-5 w-5" aria-hidden />
+          </button>
+
           {/* Notifications */}
           <div ref={notificationsRef} className="relative">
             <button
@@ -583,7 +602,7 @@ export function TopNav() {
           {/* Logout */}
           <button
             type="button"
-            onClick={() => void handleLogout()}
+            onClick={() => void handleVoltarPortal()}
             className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
             title="Logout"
             aria-label="Sair da conta"
