@@ -29,14 +29,28 @@ export function DeliveryBasicoTopNav({
     if (!nav || !root) return
 
     const syncHeight = () => {
+      const keyboardOpen = document.documentElement.classList.contains('delivery-keyboard-open')
+      if (keyboardOpen) {
+        root.style.setProperty('--delivery-basico-topnav-h', '0px')
+        return
+      }
       root.style.setProperty('--delivery-basico-topnav-h', `${Math.round(nav.offsetHeight)}px`)
     }
 
     syncHeight()
-    const observer = new ResizeObserver(syncHeight)
-    observer.observe(nav)
+
+    const resizeObserver = new ResizeObserver(syncHeight)
+    resizeObserver.observe(nav)
+
+    const mutationObserver = new MutationObserver(syncHeight)
+    mutationObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    })
+
     return () => {
-      observer.disconnect()
+      resizeObserver.disconnect()
+      mutationObserver.disconnect()
       root.style.removeProperty('--delivery-basico-topnav-h')
     }
   }, [catalogRootRef])

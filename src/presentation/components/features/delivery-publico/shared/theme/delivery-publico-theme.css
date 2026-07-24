@@ -62,6 +62,11 @@
   box-shadow: 0 1px 0 var(--delivery-border);
 }
 
+/** Com teclado aberto, libera altura útil — topnav some e a toolbar sobe para o topo. */
+html.delivery-keyboard-open .delivery-basico-topnav {
+  display: none;
+}
+
 .delivery-basico-grupo-section {
   scroll-margin-top: calc(var(--delivery-basico-topnav-h) + var(--delivery-sticky-toolbar-h));
 }
@@ -87,11 +92,12 @@ body.delivery-publico-ios-lock {
 
 .delivery-publico-shell {
   position: fixed;
-  inset: 0;
+  top: var(--delivery-vv-offset-top, 0px);
+  left: 0;
+  right: 0;
   z-index: 0;
   width: 100%;
-  height: 100%;
-  height: 100dvh;
+  height: var(--delivery-vv-height, 100dvh);
   overflow: hidden;
   overscroll-behavior: none;
   background-color: var(--delivery-bg, var(--delivery-surface, #f5f5f5));
@@ -104,6 +110,21 @@ body.delivery-publico-ios-lock {
   overscroll-behavior-x: none;
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
+}
+
+/**
+ * Overlays full-screen (checkout, produto) — mesma altura útil do teclado.
+ */
+.delivery-vv-overlay {
+  position: fixed;
+  top: var(--delivery-vv-offset-top, 0px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  width: 100%;
+  height: var(--delivery-vv-height, 100dvh);
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 /**

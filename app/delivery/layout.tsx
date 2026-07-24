@@ -1,36 +1,27 @@
-'use client'
-
-import { ReactNode, useEffect } from 'react'
+import type { ReactNode } from 'react'
+import type { Viewport } from 'next'
 import '@/src/presentation/components/features/delivery-publico/shared/theme/delivery-publico-theme.css'
+import { DeliveryPublicoShell } from '@/src/presentation/components/features/delivery-publico/public/components/DeliveryPublicoShell'
 
-const IOS_LOCK_CLASS = 'delivery-publico-ios-lock'
+/**
+ * No Chrome Android, `interactiveWidget: 'resizes-content'` faz a viewport
+ * encolher com o teclado. No iOS o shell ainda depende de visualViewport (JS).
+ */
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  interactiveWidget: 'resizes-content',
+}
 
 /**
  * Layout isolado do delivery público (`/delivery/*`).
  * Não inclui TopNav administrativo.
- *
- * Shell de viewport fixo + scroll interno para conter overscroll/rubber-band do Safari iOS.
  */
 export default function DeliveryLayout({
   children,
 }: {
   children: ReactNode
 }) {
-  useEffect(() => {
-    const html = document.documentElement
-    const body = document.body
-    html.classList.add(IOS_LOCK_CLASS)
-    body.classList.add(IOS_LOCK_CLASS)
-
-    return () => {
-      html.classList.remove(IOS_LOCK_CLASS)
-      body.classList.remove(IOS_LOCK_CLASS)
-    }
-  }, [])
-
-  return (
-    <div className="delivery-publico-shell">
-      <main className="delivery-publico-scroll w-full">{children}</main>
-    </div>
-  )
+  return <DeliveryPublicoShell>{children}</DeliveryPublicoShell>
 }

@@ -315,7 +315,7 @@ export function DeliveryPublicoCarrinhoScreen({
       {aberto ? (
         <motion.div
           key="delivery-carrinho"
-          className="fixed inset-0 z-50 flex flex-col overflow-hidden"
+          className="delivery-vv-overlay z-50 flex flex-col"
           style={{
             backgroundColor: 'var(--delivery-bg)',
             originX: 0.5,
