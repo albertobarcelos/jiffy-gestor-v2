@@ -72,11 +72,18 @@ html.delivery-keyboard-open .delivery-basico-topnav {
 }
 
 .delivery-basico-grupo-title-sticky {
-  position: sticky;
-  top: calc(var(--delivery-basico-topnav-h) + var(--delivery-sticky-toolbar-h));
-  z-index: 20;
-  background-color: var(--delivery-primary-dark, #171717);
-  color: var(--delivery-btn-text, #ffffff);
+  /* Mobile: título rola com a lista. Desktop (md+): fica sticky no topo. */
+  position: static;
+}
+
+@media (min-width: 768px) {
+  .delivery-basico-grupo-title-sticky {
+    position: sticky;
+    top: calc(var(--delivery-basico-topnav-h) + var(--delivery-sticky-toolbar-h));
+    z-index: 20;
+    background-color: var(--delivery-primary-dark, #171717);
+    color: var(--delivery-btn-text, #ffffff);
+  }
 }
 
 /**
