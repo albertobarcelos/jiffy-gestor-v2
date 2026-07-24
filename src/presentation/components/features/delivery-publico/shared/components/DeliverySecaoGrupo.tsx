@@ -26,13 +26,13 @@ export function DeliverySecaoGrupo({
       id={`grupo-${grupo.id}`}
     >
       <h2
-        className={`delivery-grupo-title mb-2 flex min-h-12 items-center rounded-lg px-4 py-2.5 text-base font-bold uppercase tracking-wide @sm:min-h-14 @sm:text-lg @lg:min-h-16 @lg:text-xl @xl:text-2xl${
+        className={`delivery-grupo-title mb-2 flex min-h-12 items-center rounded-lg px-4 py-2.5 text-base uppercase tracking-wide @sm:min-h-14 @sm:text-lg @lg:min-h-16 @lg:text-xl @xl:text-2xl${
           stickyTitle ? ' delivery-basico-grupo-title-sticky' : ''
         }`}
       >
         <span className="min-w-0 leading-tight">{grupo.nome}</span>
       </h2>
-      <div className="grid grid-cols-1 gap-3 @lg:grid-cols-2 @lg:gap-4">
+      <div className="grid grid-cols-1 gap-3 @lg:grid-cols-1 @3xl:grid-cols-2 @lg:gap-4">
         {grupo.produtos.map(produto => (
           <div key={produto.id} className="min-w-0">
             <DeliveryProdutoListItem

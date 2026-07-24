@@ -36,11 +36,23 @@ export function DeliveryGrupoChips({
 
   useEffect(() => {
     if (!activeGrupoId) return
-    activeChipRef.current?.scrollIntoView({
-      behavior: 'smooth',
-      inline: 'center',
-      block: 'nearest',
-    })
+    const scroller = scrollRef.current
+    const chip = activeChipRef.current
+    if (!scroller || !chip) return
+
+    // Só mexe no scrollLeft da barra — scrollIntoView no chip
+    // pode alterar o scroll vertical da página (micro-saltos).
+    const scrollerRect = scroller.getBoundingClientRect()
+    const chipRect = chip.getBoundingClientRect()
+    const chipOffset =
+      chipRect.left - scrollerRect.left + scroller.scrollLeft
+    const target = chipOffset - (scroller.clientWidth - chipRect.width) / 2
+    const maxScroll = Math.max(0, scroller.scrollWidth - scroller.clientWidth)
+    const nextLeft = Math.max(0, Math.min(target, maxScroll))
+
+    if (Math.abs(scroller.scrollLeft - nextLeft) < 1) return
+    // Instantâneo: smooth na barra durante o scroll-spy compete com o dedo.
+    scroller.scrollTo({ left: nextLeft, behavior: 'auto' })
   }, [activeGrupoId])
 
   if (!config.categorias.mostrar || grupos.length === 0) return null

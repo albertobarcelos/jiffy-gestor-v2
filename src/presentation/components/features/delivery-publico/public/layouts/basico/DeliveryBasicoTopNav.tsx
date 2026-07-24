@@ -1,6 +1,5 @@
 'use client'
 
-import { useEffect, useRef, type RefObject } from 'react'
 import { Menu, ShoppingCart } from 'lucide-react'
 import type { DeliveryPublicoDesignConfig } from '../../../shared/types/deliveryPublicoDesignConfig'
 
@@ -8,57 +7,22 @@ type DeliveryBasicoTopNavProps = {
   config: DeliveryPublicoDesignConfig
   carrinhoQuantidade: number
   interactive?: boolean
-  catalogRootRef: RefObject<HTMLDivElement | null>
   onPedidoClick?: () => void
 }
 
+/** Topnav da loja — rola com a página (não fica sticky). */
 export function DeliveryBasicoTopNav({
   config,
   carrinhoQuantidade,
   interactive = false,
-  catalogRootRef,
   onPedidoClick,
 }: DeliveryBasicoTopNavProps) {
-  const navRef = useRef<HTMLElement>(null)
   const nomeLoja = config.cabecalho.nomeExibicao.trim() || 'Sua loja'
   const logoRadius = config.cabecalho.logoFormato === 'circular' ? '9999px' : '8px'
 
-  useEffect(() => {
-    const nav = navRef.current
-    const root = catalogRootRef.current
-    if (!nav || !root) return
-
-    const syncHeight = () => {
-      const keyboardOpen = document.documentElement.classList.contains('delivery-keyboard-open')
-      if (keyboardOpen) {
-        root.style.setProperty('--delivery-basico-topnav-h', '0px')
-        return
-      }
-      root.style.setProperty('--delivery-basico-topnav-h', `${Math.round(nav.offsetHeight)}px`)
-    }
-
-    syncHeight()
-
-    const resizeObserver = new ResizeObserver(syncHeight)
-    resizeObserver.observe(nav)
-
-    const mutationObserver = new MutationObserver(syncHeight)
-    mutationObserver.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class'],
-    })
-
-    return () => {
-      resizeObserver.disconnect()
-      mutationObserver.disconnect()
-      root.style.removeProperty('--delivery-basico-topnav-h')
-    }
-  }, [catalogRootRef])
-
   return (
     <header
-      ref={navRef}
-      className="delivery-basico-topnav sticky top-0 z-50 flex items-center gap-3 px-3 py-3.5 @sm:px-4 @sm:py-4"
+      className="delivery-basico-topnav relative z-10 flex items-center gap-3 px-3 py-3.5 @sm:px-4 @sm:py-4"
       style={{
         backgroundColor: 'var(--delivery-primary-dark, #171717)',
         color: 'var(--delivery-btn-text, #ffffff)',

@@ -94,7 +94,7 @@ export function DeliveryProdutoListItem({
           className={`${textClassName} text-left`}
         >
           <p
-            className="text-base font-semibold leading-snug @lg:text-lg"
+            className="text-base font-medium leading-snug @lg:text-lg"
             style={{
               color: 'var(--delivery-text)',
               fontFamily: 'var(--delivery-font-title)',
@@ -110,7 +110,7 @@ export function DeliveryProdutoListItem({
           <p
             className="mt-1 text-sm font-medium @lg:mt-1.5 @lg:text-base"
             style={{
-              color: 'var(--delivery-primary)',
+              color: 'var(--delivery-text)',
               fontFamily: 'var(--delivery-font-body)',
             }}
           >
