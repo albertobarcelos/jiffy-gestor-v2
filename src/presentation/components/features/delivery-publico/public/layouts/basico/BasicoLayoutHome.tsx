@@ -13,6 +13,12 @@ import type { DeliveryLayoutHomeProps } from '../DeliveryLayoutHomeProps'
 import { DeliveryBasicoCatalogStickyNav } from './DeliveryBasicoCatalogStickyNav'
 import { DeliveryBasicoTopNav } from './DeliveryBasicoTopNav'
 
+function readCssPx(el: HTMLElement, varName: string): number {
+  const raw = getComputedStyle(el).getPropertyValue(varName).trim()
+  const value = Number.parseFloat(raw)
+  return Number.isFinite(value) ? value : 0
+}
+
 export function BasicoLayoutHome({
   config,
   viewModel,
@@ -37,6 +43,65 @@ export function BasicoLayoutHome({
       setActiveGrupoId(filtered.grupos[0]?.id ?? null)
     }
   }, [filtered.grupos, activeGrupoId])
+
+  useEffect(() => {
+    const root = catalogRootRef.current
+    if (!root) return
+
+    const grupoIds = filtered.grupos.map(grupo => grupo.id)
+    if (grupoIds.length === 0) return
+
+    let rafId = 0
+
+    const scrollRoot = root.closest('.delivery-preview-viewport')
+
+    const syncActiveGrupoFromScroll = () => {
+      const sections = grupoIds
+        .map(id => document.getElementById(`grupo-${id}`))
+        .filter((el): el is HTMLElement => Boolean(el))
+
+      if (sections.length === 0) return
+
+      const viewportTop = scrollRoot
+        ? scrollRoot.getBoundingClientRect().top
+        : 0
+      const stickyLine =
+        viewportTop +
+        readCssPx(root, '--delivery-basico-topnav-h') +
+        readCssPx(root, '--delivery-sticky-toolbar-h') +
+        12
+
+      let nextId = sections[0].id.replace(/^grupo-/, '')
+      for (const section of sections) {
+        if (section.getBoundingClientRect().top <= stickyLine) {
+          nextId = section.id.replace(/^grupo-/, '')
+        } else {
+          break
+        }
+      }
+
+      setActiveGrupoId(prev => (prev === nextId ? prev : nextId))
+    }
+
+    const onScroll = () => {
+      if (rafId) return
+      rafId = window.requestAnimationFrame(() => {
+        rafId = 0
+        syncActiveGrupoFromScroll()
+      })
+    }
+
+    const scrollTarget = scrollRoot ?? window
+    scrollTarget.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll)
+    syncActiveGrupoFromScroll()
+
+    return () => {
+      scrollTarget.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+      if (rafId) window.cancelAnimationFrame(rafId)
+    }
+  }, [filtered.grupos])
 
   const handleGrupoClick = useCallback(
     (grupoId: string) => {
