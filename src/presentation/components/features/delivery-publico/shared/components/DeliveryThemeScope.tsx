@@ -64,7 +64,7 @@ export function DeliveryThemeScope({
   return (
     <DeliveryThemeContext.Provider value={{ config, themeStyle }}>
       <div
-        className={`delivery-theme @container min-h-dvh w-full ${className ?? ''}`.trim()}
+        className={`delivery-theme @container min-h-full w-full min-w-0 overflow-x-clip ${className ?? ''}`.trim()}
         style={themeStyle}
       >
         {children}

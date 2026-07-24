@@ -53,7 +53,9 @@ export function BasicoLayoutHome({
 
     let rafId = 0
 
-    const scrollRoot = root.closest('.delivery-preview-viewport')
+    const scrollRoot =
+      root.closest('.delivery-preview-viewport') ??
+      root.closest('.delivery-publico-scroll')
 
     const syncActiveGrupoFromScroll = () => {
       const sections = grupoIds
