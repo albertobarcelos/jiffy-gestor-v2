@@ -34,21 +34,17 @@ import {
 } from '../components/checkout/DeliveryCheckoutTipoEntregaModal'
 import { DeliveryCheckoutPagamentoModal } from '../components/checkout/DeliveryCheckoutPagamentoModal'
 import { DeliveryCheckoutRevisaoModal } from '../components/checkout/DeliveryCheckoutRevisaoModal'
+import { DeliveryCheckoutProgressProvider } from '../components/checkout/DeliveryCheckoutProgressContext'
+import {
+  calculateDeliveryCheckoutProgress,
+  type DeliveryCheckoutStep,
+} from '../components/checkout/deliveryCheckoutProgress'
 
 type DeliveryPublicoCarrinhoScreenProps = {
   slug: string
   /** Chamado após a animação de fechamento (overlay sobre a home). */
   onClose: () => void
 }
-
-type CheckoutStep =
-  | 'telefone'
-  | 'enderecos'
-  | 'enderecoForm'
-  | 'tipoEntrega'
-  | 'pagamento'
-  | 'revisao'
-  | null
 
 export function DeliveryPublicoCarrinhoScreen({
   slug,
@@ -58,7 +54,8 @@ export function DeliveryPublicoCarrinhoScreen({
   const removerItem = useDeliveryCarrinhoStore(s => s.removerItem)
   const substituirItem = useDeliveryCarrinhoStore(s => s.substituirItem)
   const [itemEditando, setItemEditando] = useState<DeliveryCarrinhoItem | null>(null)
-  const [checkoutStep, setCheckoutStep] = useState<CheckoutStep>(null)
+  const [checkoutStep, setCheckoutStep] = useState<DeliveryCheckoutStep>(null)
+  const [highestCheckoutPercentage, setHighestCheckoutPercentage] = useState(0)
   /** Quando true, concluir um step intermediário volta para a revisão. */
   const [voltarParaRevisao, setVoltarParaRevisao] = useState(false)
   /** Quando true, concluir endereço volta para a tela das 4 opções. */
@@ -146,7 +143,43 @@ export function DeliveryPublicoCarrinhoScreen({
   const nomeClienteExibicao =
     form.nome.trim() || clienteLookup.cliente?.nome?.trim() || ''
 
+  const currentCheckoutProgress = useMemo(
+    () =>
+      calculateDeliveryCheckoutProgress({
+        checkoutStep,
+        tipoEntrega: form.tipoEntrega,
+        preserveCompleted: voltarParaRevisao,
+      }),
+    [checkoutStep, form.tipoEntrega, voltarParaRevisao]
+  )
+
+  useEffect(() => {
+    if (!currentCheckoutProgress) return
+    setHighestCheckoutPercentage(current =>
+      Math.max(current, currentCheckoutProgress.percentage)
+    )
+  }, [currentCheckoutProgress])
+
+  const checkoutProgress = useMemo(() => {
+    if (!currentCheckoutProgress) return null
+
+    const percentage = Math.max(
+      currentCheckoutProgress.percentage,
+      highestCheckoutPercentage
+    )
+
+    return {
+      ...currentCheckoutProgress,
+      percentage,
+      label:
+        percentage === 100
+          ? 'Etapas do pedido concluídas'
+          : `${percentage}% das etapas concluídas`,
+    }
+  }, [currentCheckoutProgress, highestCheckoutPercentage])
+
   const fecharCheckout = () => {
+    setHighestCheckoutPercentage(0)
     setVoltarParaRevisao(false)
     setVoltarParaTipoEntrega(false)
     setCheckoutStep(null)
@@ -170,7 +203,7 @@ export function DeliveryPublicoCarrinhoScreen({
     setCheckoutStep('tipoEntrega')
   }
 
-  const abrirStepDaRevisao = (step: CheckoutStep) => {
+  const abrirStepDaRevisao = (step: DeliveryCheckoutStep) => {
     setVoltarParaRevisao(true)
     setVoltarParaTipoEntrega(false)
     setCheckoutStep(step)
@@ -216,6 +249,7 @@ export function DeliveryPublicoCarrinhoScreen({
   }
 
   const handleContinuarCheckout = () => {
+    setHighestCheckoutPercentage(0)
     setVoltarParaRevisao(false)
     setVoltarParaTipoEntrega(false)
     setCheckoutStep('telefone')
@@ -311,7 +345,8 @@ export function DeliveryPublicoCarrinhoScreen({
   }
 
   return (
-    <AnimatePresence onExitComplete={onClose}>
+    <DeliveryCheckoutProgressProvider value={checkoutProgress}>
+      <AnimatePresence onExitComplete={onClose}>
       {aberto ? (
         <motion.div
           key="delivery-carrinho"
@@ -569,6 +604,7 @@ export function DeliveryPublicoCarrinhoScreen({
         ) : null}
         </motion.div>
       ) : null}
-    </AnimatePresence>
+      </AnimatePresence>
+    </DeliveryCheckoutProgressProvider>
   )
 }
