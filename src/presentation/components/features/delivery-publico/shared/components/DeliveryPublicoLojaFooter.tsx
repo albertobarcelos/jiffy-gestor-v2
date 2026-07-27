@@ -19,7 +19,7 @@ export function DeliveryPublicoLojaFooter({
 
   return (
     <footer
-      className="px-4 py-8 text-white"
+      className="px-4 mx-4 py-8 text-white"
       style={{ backgroundColor: 'var(--delivery-primary-dark)' }}
     >
       <div className="flex items-center gap-3">
