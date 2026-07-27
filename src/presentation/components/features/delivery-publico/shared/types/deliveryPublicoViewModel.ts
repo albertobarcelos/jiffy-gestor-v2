@@ -5,6 +5,8 @@ export type DeliveryPublicoProdutoViewModel = {
   preco: number
   imagemUrl: string | null
   grupoId: string
+  /** Quando true, não exibe atalho "+" — deve abrir detalhes. */
+  temComplementos: boolean
 }
 
 export type DeliveryPublicoGrupoViewModel = {

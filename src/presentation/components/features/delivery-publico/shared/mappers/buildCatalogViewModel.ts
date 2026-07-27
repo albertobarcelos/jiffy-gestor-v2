@@ -1,5 +1,6 @@
 import type { CatalogoPublicoGrupoProdutoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { DeliveryPublicoViewModel } from '../types/deliveryPublicoViewModel'
+import { produtoTemComplementosAtivos } from '../utils/produtoComplementosUtils'
 
 export function buildCatalogViewModel(
   grupos: CatalogoPublicoGrupoProdutoDTO[],
@@ -19,6 +20,7 @@ export function buildCatalogViewModel(
         preco: produto.valor,
         imagemUrl: produto.imagemUrl,
         grupoId: grupo.id,
+        temComplementos: produtoTemComplementosAtivos(produto),
       })),
     })),
     disponivel: true,

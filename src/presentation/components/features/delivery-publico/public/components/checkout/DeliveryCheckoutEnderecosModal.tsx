@@ -3,7 +3,7 @@
 import { Home, MapPin, Pencil, Plus, Trash2 } from 'lucide-react'
 import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { formatarResumoEnderecoPublico } from '../../../shared/utils/garantirEnderecoClientePublico'
-import { DeliveryCheckoutStepModal } from './DeliveryCheckoutStepModal'
+import { DeliveryCheckoutShellHeader } from './DeliveryCheckoutShell'
 
 type DeliveryCheckoutEnderecosModalProps = {
   enderecos: EnderecoClienteDeliveryPublicoDTO[]
@@ -34,7 +34,13 @@ export function DeliveryCheckoutEnderecosModal({
   })
 
   return (
-    <DeliveryCheckoutStepModal title="Endereço de entrega" onClose={onClose}>
+    <>
+      <DeliveryCheckoutShellHeader
+        title="Endereço de entrega"
+        showBack
+        onBack={onClose}
+      />
+
       <p className="mb-3 text-sm delivery-text-secondary">Último endereço utilizado</p>
 
       <div className="space-y-3">
@@ -102,6 +108,6 @@ export function DeliveryCheckoutEnderecosModal({
         <Plus className="h-4 w-4" aria-hidden />
         Use um novo endereço
       </button>
-    </DeliveryCheckoutStepModal>
+    </>
   )
 }

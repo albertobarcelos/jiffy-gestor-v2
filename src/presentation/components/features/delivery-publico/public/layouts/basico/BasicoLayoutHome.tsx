@@ -19,7 +19,9 @@ export function BasicoLayoutHome({
   onBuscaChange,
   onGrupoClick,
   onProdutoClick,
+  onProdutoAddRapido,
   onPedidoClick,
+  quantidadePorProduto,
   carrinhoThumbs,
   carrinhoThumbsBounceKey,
   carrinhoThumbsTargetRef,
@@ -60,7 +62,10 @@ export function BasicoLayoutHome({
               grupo={grupo}
               interactive={interactive}
               stickyTitle
+              quantidadePorProduto={quantidadePorProduto}
               onProdutoClick={onProdutoClick}
+              onProdutoAddRapido={onProdutoAddRapido}
+              onAbrirCarrinho={onPedidoClick}
             />
           ))}
         </div>

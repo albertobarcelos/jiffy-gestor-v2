@@ -11,7 +11,10 @@ import { obterEnderecoPorGps } from '@/src/shared/utils/geolocalizacaoEndereco'
 import { showToast } from '@/src/shared/utils/toast'
 import type { CheckoutFormData } from '../../../shared/utils/montarPedidoPublico'
 import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
-import { DeliveryCheckoutStepModal } from './DeliveryCheckoutStepModal'
+import {
+  DeliveryCheckoutShellFooter,
+  DeliveryCheckoutShellHeader,
+} from './DeliveryCheckoutShell'
 
 type DeliveryCheckoutEnderecoFormModalProps = {
   form: CheckoutFormData
@@ -24,7 +27,7 @@ type DeliveryCheckoutEnderecoFormModalProps = {
 export function DeliveryCheckoutEnderecoFormModal({
   form,
   onChange,
-  onClose,
+  onClose: _onClose,
   onCancelar,
   onConfirmar,
 }: DeliveryCheckoutEnderecoFormModalProps) {
@@ -98,12 +101,13 @@ export function DeliveryCheckoutEnderecoFormModal({
   const fieldStyle = { borderColor: 'var(--delivery-border)' } as const
 
   return (
-    <DeliveryCheckoutStepModal
-      title="Confirme seu endereço"
-      onClose={onClose}
-      showBack
-      onBack={onCancelar}
-      footer={
+    <>
+      <DeliveryCheckoutShellHeader
+        title="Confirme seu endereço"
+        showBack
+        onBack={onCancelar}
+      />
+      <DeliveryCheckoutShellFooter>
         <DeliveryCheckoutFooterActions
           onVoltar={onCancelar}
           onContinuar={() => void handleConfirmar()}
@@ -112,8 +116,8 @@ export function DeliveryCheckoutEnderecoFormModal({
           voltarDisabled={salvando}
           continuarDisabled={salvando}
         />
-      }
-    >
+      </DeliveryCheckoutShellFooter>
+
       <div className="space-y-3">
         <button
           type="button"
@@ -282,6 +286,6 @@ export function DeliveryCheckoutEnderecoFormModal({
           </div>
         </div>
       </div>
-    </DeliveryCheckoutStepModal>
+    </>
   )
 }

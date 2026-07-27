@@ -9,14 +9,20 @@ type DeliverySecaoGrupoProps = {
   grupo: DeliveryPublicoGrupoViewModel
   interactive?: boolean
   stickyTitle?: boolean
+  quantidadePorProduto?: Record<string, number>
   onProdutoClick?: (produtoId: string) => void
+  onProdutoAddRapido?: (produtoId: string) => void
+  onAbrirCarrinho?: () => void
 }
 
 export function DeliverySecaoGrupo({
   grupo,
   interactive = false,
   stickyTitle = false,
+  quantidadePorProduto,
   onProdutoClick,
+  onProdutoAddRapido,
+  onAbrirCarrinho,
 }: DeliverySecaoGrupoProps) {
   if (grupo.produtos.length === 0) return null
 
@@ -38,7 +44,10 @@ export function DeliverySecaoGrupo({
             <DeliveryProdutoListItem
               produto={produto}
               interactive={interactive}
+              quantidadeNoCarrinho={quantidadePorProduto?.[produto.id] ?? 0}
               onClick={onProdutoClick}
+              onAddRapido={onProdutoAddRapido}
+              onAbrirCarrinho={onAbrirCarrinho}
             />
           </div>
         ))}

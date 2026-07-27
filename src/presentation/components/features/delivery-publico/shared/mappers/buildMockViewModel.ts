@@ -17,6 +17,7 @@ function previewProdutoExemplo(grupoId: string) {
     preco: 10,
     imagemUrl: null as string | null,
     grupoId,
+    temComplementos: false,
   }
 }
 
@@ -29,6 +30,7 @@ function buildMockGruposFromPreviewCatalog(): DeliveryPublicoGrupoViewModel[] {
       preco: p.preco,
       imagemUrl: null as string | null,
       grupoId: p.grupoId,
+      temComplementos: false,
     }))
 
     return {

@@ -6,7 +6,10 @@ import type { DeliveryTipoEntrega } from '../../../shared/stores/deliveryPrefere
 import { formatDeliveryCurrency } from '../../../shared/utils/formatDeliveryCurrency'
 import { formatarResumoEnderecoPublico } from '../../../shared/utils/garantirEnderecoClientePublico'
 import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
-import { DeliveryCheckoutStepModal } from './DeliveryCheckoutStepModal'
+import {
+  DeliveryCheckoutShellFooter,
+  DeliveryCheckoutShellHeader,
+} from './DeliveryCheckoutShell'
 
 /** Taxa fictícia até existir endpoint de frete. */
 export const TAXA_ENTREGA_FICTICIA = 5.9
@@ -66,7 +69,7 @@ export function DeliveryCheckoutTipoEntregaModal({
   onChangeOpcao,
   onEditarEndereco,
   onCadastrarEndereco,
-  onClose,
+  onClose: _onClose,
   onVoltar,
   onContinuar,
 }: DeliveryCheckoutTipoEntregaModalProps) {
@@ -77,15 +80,16 @@ export function DeliveryCheckoutTipoEntregaModal({
   const precisaCadastrarEndereco = isEntrega && !enderecoCliente && !temEnderecosCadastrados
 
   return (
-    <DeliveryCheckoutStepModal
-      title="Como deseja receber?"
-      onClose={onClose}
-      showBack
-      onBack={onVoltar}
-      footer={
+    <>
+      <DeliveryCheckoutShellHeader
+        title="Como deseja receber?"
+        showBack
+        onBack={onVoltar}
+      />
+      <DeliveryCheckoutShellFooter>
         <DeliveryCheckoutFooterActions onVoltar={onVoltar} onContinuar={onContinuar} />
-      }
-    >
+      </DeliveryCheckoutShellFooter>
+
       <div className="grid grid-cols-2 gap-3">
         {OPCOES.map(({ key, label, tipoEntrega: tipo, modoTempo: modo, Icon }) => {
           const selected = tipoEntrega === tipo && modoTempo === modo
@@ -228,6 +232,6 @@ export function DeliveryCheckoutTipoEntregaModal({
           </div>
         )}
       </div>
-    </DeliveryCheckoutStepModal>
+    </>
   )
 }

@@ -1,11 +1,13 @@
 'use client'
 
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react'
-import { motion, useMotionValue } from 'framer-motion'
+import { animate, motion, useMotionValue } from 'framer-motion'
+import { Trash2 } from 'lucide-react'
 
-const LONG_PRESS_MS = 500
-const REMOVE_OFFSET_PX = -88
-const ARM_MOVE_CANCEL_PX = 10
+/** Área da lixeira = 1/4 da largura do card (modal mobile full / desktop ~40%). */
+const ACTION_WIDTH_RATIO = 0.25
+const DIRECTION_LOCK_PX = 8
+const EXIT_TRANSITION = { duration: 0.35, ease: [0.22, 1, 0.36, 1] as const }
 
 type DeliveryCarrinhoSwipeableItemProps = {
   itemId: string
@@ -18,129 +20,148 @@ export function DeliveryCarrinhoSwipeableItem({
   onSwipeRemove,
   children,
 }: DeliveryCarrinhoSwipeableItemProps) {
-  const [armed, setArmed] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const [actionWidth, setActionWidth] = useState(72)
+  const [open, setOpen] = useState(false)
+  const [dragging, setDragging] = useState(false)
   const x = useMotionValue(0)
   const startRef = useRef<{ x: number; y: number } | null>(null)
-  const armedRef = useRef(false)
-  const removedRef = useRef(false)
   const offsetRef = useRef(0)
-  const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const axisLockRef = useRef<'x' | 'y' | null>(null)
+  const openRef = useRef(false)
+  const draggingRef = useRef(false)
+  const actionWidthRef = useRef(actionWidth)
 
-  const clearPressTimer = () => {
-    if (pressTimerRef.current) {
-      clearTimeout(pressTimerRef.current)
-      pressTimerRef.current = null
+  openRef.current = open
+  actionWidthRef.current = actionWidth
+
+  useEffect(() => {
+    const el = rootRef.current
+    if (!el) return
+
+    const updateWidth = () => {
+      const next = Math.max(56, Math.round(el.clientWidth * ACTION_WIDTH_RATIO))
+      setActionWidth(next)
+      actionWidthRef.current = next
+      if (openRef.current) {
+        offsetRef.current = -next
+        x.set(-next)
+      }
     }
+
+    updateWidth()
+    const observer = new ResizeObserver(updateWidth)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [x])
+
+  const snapTo = (target: number, nextOpen: boolean) => {
+    offsetRef.current = target
+    setOpen(nextOpen)
+    void animate(x, target, { type: 'spring', stiffness: 420, damping: 32 })
   }
 
-  const resetGesture = () => {
-    clearPressTimer()
+  const resetPointer = () => {
     startRef.current = null
-    armedRef.current = false
-    offsetRef.current = 0
-    setArmed(false)
-    x.set(0)
+    axisLockRef.current = null
+    draggingRef.current = false
+    setDragging(false)
   }
-
-  useEffect(() => () => clearPressTimer(), [])
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return
     const target = event.target as HTMLElement | null
+    if (target?.closest('[data-carrinho-swipe-action]')) return
     if (target?.closest('button, a, input, textarea, select')) return
 
-    removedRef.current = false
-    offsetRef.current = 0
-    armedRef.current = false
-    setArmed(false)
-    x.set(0)
     startRef.current = { x: event.clientX, y: event.clientY }
+    axisLockRef.current = null
+    offsetRef.current = openRef.current ? -actionWidthRef.current : 0
 
     try {
       event.currentTarget.setPointerCapture(event.pointerId)
     } catch {
       // ignore
     }
-
-    clearPressTimer()
-    pressTimerRef.current = setTimeout(() => {
-      armedRef.current = true
-      setArmed(true)
-    }, LONG_PRESS_MS)
   }
 
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    if (!startRef.current || removedRef.current) return
+    if (!startRef.current) return
 
     const dx = event.clientX - startRef.current.x
     const dy = event.clientY - startRef.current.y
+    const width = actionWidthRef.current
 
-    if (!armedRef.current) {
-      if (Math.abs(dx) > ARM_MOVE_CANCEL_PX || Math.abs(dy) > ARM_MOVE_CANCEL_PX) {
-        clearPressTimer()
+    if (!axisLockRef.current) {
+      if (Math.abs(dx) < DIRECTION_LOCK_PX && Math.abs(dy) < DIRECTION_LOCK_PX) return
+      axisLockRef.current = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y'
+      if (axisLockRef.current === 'y') {
+        resetPointer()
+        return
       }
-      return
+      draggingRef.current = true
+      setDragging(true)
     }
 
-    // Só permite arrastar para a esquerda.
-    const nextX = Math.min(0, dx)
+    if (axisLockRef.current !== 'x') return
+
+    const base = openRef.current ? -width : 0
+    const nextX = Math.min(0, Math.max(-width, base + dx))
     offsetRef.current = nextX
     x.set(nextX)
-
-    if (Math.abs(dx) > Math.abs(dy)) {
-      event.preventDefault()
-    }
+    event.preventDefault()
   }
 
   const finishGesture = () => {
-    clearPressTimer()
-    startRef.current = null
+    if (!startRef.current && !draggingRef.current) return
 
-    if (removedRef.current) return
-
-    if (armedRef.current && offsetRef.current <= REMOVE_OFFSET_PX) {
-      removedRef.current = true
-      armedRef.current = false
-      setArmed(false)
-      onSwipeRemove()
-      return
-    }
-
-    resetGesture()
+    const width = actionWidthRef.current
+    const shouldOpen = offsetRef.current <= -(width * 0.4)
+    snapTo(shouldOpen ? -width : 0, shouldOpen)
+    resetPointer()
   }
 
   return (
     <motion.div
+      ref={rootRef}
       layout
       initial={false}
-      style={{ x, touchAction: armed ? 'none' : 'pan-y' }}
-      animate={
-        armed
-          ? {
-              scale: 1.04,
-              y: -6,
-              boxShadow: '0 10px 28px rgba(0,0,0,0.14)',
-            }
-          : {
-              scale: 1,
-              y: 0,
-              boxShadow: '0 0 0 rgba(0,0,0,0)',
-            }
-      }
-      transition={{ type: 'spring', stiffness: 420, damping: 26 }}
-      exit={{ x: '-110%', opacity: 0, transition: { duration: 0.35, ease: [0.22, 1, 0.36, 1] } }}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={finishGesture}
-      onPointerCancel={finishGesture}
-      className={
-        armed
-          ? 'relative z-[2] rounded-xl bg-[var(--delivery-surface)]'
-          : 'relative z-0 rounded-xl'
-      }
+      // Exit no root: card + lixeira (absoluta) saem juntos.
+      exit={{ x: '-110%', transition: EXIT_TRANSITION }}
+      className="relative overflow-hidden border-b"
+      style={{ borderColor: 'var(--delivery-border)' }}
       data-carrinho-item={itemId}
     >
-      {children}
+      <div
+        className="absolute inset-y-0 right-0 z-0 flex items-center justify-center"
+        style={{
+          width: actionWidth,
+          backgroundColor: '#ffffff',
+        }}
+        aria-hidden={!open}
+      >
+        <button
+          type="button"
+          data-carrinho-swipe-action
+          onClick={onSwipeRemove}
+          aria-label="Remover item"
+          className="flex h-full w-full items-center justify-center bg-white text-red-500"
+        >
+          <Trash2 className="h-14 w-14" strokeWidth={1.75} aria-hidden />
+        </button>
+      </div>
+
+      <motion.div
+        initial={false}
+        style={{ x, touchAction: dragging ? 'none' : 'pan-y' }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={finishGesture}
+        onPointerCancel={finishGesture}
+        className="relative z-[1] bg-[var(--delivery-bg,var(--delivery-surface,#ffffff))] pr-3"
+      >
+        {children}
+      </motion.div>
     </motion.div>
   )
 }

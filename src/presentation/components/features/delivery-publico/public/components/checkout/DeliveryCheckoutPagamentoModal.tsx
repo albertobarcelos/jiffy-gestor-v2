@@ -10,7 +10,10 @@ import {
 import { showToast } from '@/src/shared/utils/toast'
 import { isMeioPagamentoDinheiro } from '../../../shared/utils/isMeioPagamentoDinheiro'
 import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
-import { DeliveryCheckoutStepModal } from './DeliveryCheckoutStepModal'
+import {
+  DeliveryCheckoutShellFooter,
+  DeliveryCheckoutShellHeader,
+} from './DeliveryCheckoutShell'
 
 type DeliveryCheckoutPagamentoModalProps = {
   total: number
@@ -34,7 +37,7 @@ export function DeliveryCheckoutPagamentoModal({
   trocoPara,
   onChangeMeioPagamentoId,
   onChangeTrocoPara,
-  onClose,
+  onClose: _onClose,
   onVoltar,
   onContinuar,
 }: DeliveryCheckoutPagamentoModalProps) {
@@ -47,6 +50,7 @@ export function DeliveryCheckoutPagamentoModal({
   const [trocoInput, setTrocoInput] = useState(() =>
     trocoPara != null && trocoPara > 0 ? formatBRLFromMaskedInput(trocoPara) : ''
   )
+  const [semTrocoSelecionado, setSemTrocoSelecionado] = useState(false)
 
   const handleSelectMeio = (id: string) => {
     onChangeMeioPagamentoId(id)
@@ -54,6 +58,7 @@ export function DeliveryCheckoutPagamentoModal({
     if (!isMeioPagamentoDinheiro(meio)) {
       onChangeTrocoPara(null)
       setTrocoInput('')
+      setSemTrocoSelecionado(false)
     }
   }
 
@@ -62,12 +67,21 @@ export function DeliveryCheckoutPagamentoModal({
     setTrocoInput(masked)
     const parsed = parseBRLToNumber(masked)
     onChangeTrocoPara(parsed != null && parsed > 0 ? parsed : null)
+    setSemTrocoSelecionado(false)
   }
 
   const handleSemTroco = () => {
     onChangeTrocoPara(null)
     setTrocoInput('')
-    showToast.success('Sem troco')
+    setSemTrocoSelecionado(true)
+  }
+
+  const handleToggleSemTroco = () => {
+    if (semTrocoSelecionado) {
+      setSemTrocoSelecionado(false)
+      return
+    }
+    handleSemTroco()
   }
 
   const handleContinuar = () => {
@@ -87,15 +101,12 @@ export function DeliveryCheckoutPagamentoModal({
   const fieldStyle = { borderColor: 'var(--delivery-border)' } as const
 
   return (
-    <DeliveryCheckoutStepModal
-      title="Pagamento"
-      onClose={onClose}
-      showBack
-      onBack={onVoltar}
-      footer={
+    <>
+      <DeliveryCheckoutShellHeader title="Pagamento" showBack onBack={onVoltar} />
+      <DeliveryCheckoutShellFooter>
         <DeliveryCheckoutFooterActions onVoltar={onVoltar} onContinuar={handleContinuar} />
-      }
-    >
+      </DeliveryCheckoutShellFooter>
+
       <div className="space-y-4">
         <div
           className="space-y-2 rounded-xl border px-3 py-3"
@@ -150,7 +161,7 @@ export function DeliveryCheckoutPagamentoModal({
           >
             <p className="text-sm font-semibold delivery-text-primary">Precisa de troco?</p>
             <p className="text-xs delivery-text-secondary">
-              Informe o valor da nota que você vai pagar. Total do pedido:{' '}
+              Informe o valor que você vai pagar. Total do pedido:{' '}
               {transformarParaReal(total)}
             </p>
             <input
@@ -167,17 +178,38 @@ export function DeliveryCheckoutPagamentoModal({
                 Troco a receber: {transformarParaReal(trocoPara - total)}
               </p>
             ) : null}
-            <button
-              type="button"
-              onClick={handleSemTroco}
-              className="min-h-[44px] w-full rounded-xl border text-sm font-semibold uppercase tracking-wide delivery-text-primary"
-              style={{ borderColor: 'var(--delivery-border)' }}
+            <label
+              className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-xl border px-3 text-sm font-semibold"
+              style={
+                semTrocoSelecionado
+                  ? {
+                      borderColor: '#000000',
+                      backgroundColor: '#000000',
+                      color: '#ffffff',
+                    }
+                  : {
+                      borderColor: 'var(--delivery-border)',
+                      backgroundColor: 'transparent',
+                      color: 'var(--delivery-text)',
+                    }
+              }
             >
+              <input
+                type="checkbox"
+                checked={semTrocoSelecionado}
+                onChange={handleToggleSemTroco}
+                className="h-4 w-4 shrink-0 accent-white"
+                style={
+                  semTrocoSelecionado
+                    ? { accentColor: '#ffffff' }
+                    : { accentColor: '#000000' }
+                }
+              />
               Não preciso de troco
-            </button>
+            </label>
           </div>
         ) : null}
       </div>
-    </DeliveryCheckoutStepModal>
+    </>
   )
 }

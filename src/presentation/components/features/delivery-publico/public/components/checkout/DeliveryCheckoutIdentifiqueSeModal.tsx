@@ -11,7 +11,10 @@ import {
 } from '../../../shared/utils/deliveryTelefonePais'
 import type { ClienteLookupStatus } from '../../../shared/hooks/useDeliveryCheckout'
 import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
-import { DeliveryCheckoutStepModal } from './DeliveryCheckoutStepModal'
+import {
+  DeliveryCheckoutShellFooter,
+  DeliveryCheckoutShellHeader,
+} from './DeliveryCheckoutShell'
 
 type DeliveryCheckoutIdentifiqueSeModalProps = {
   telefone: string
@@ -107,10 +110,13 @@ export function DeliveryCheckoutIdentifiqueSeModal({
   const placeholder = paisIso2 === 'BR' ? '(99) 99999-9999' : '999 999 999'
 
   return (
-    <DeliveryCheckoutStepModal
-      title="Identifique-se"
-      onClose={onClose}
-      footer={
+    <>
+      <DeliveryCheckoutShellHeader
+        title="Identifique-se"
+        showBack
+        onBack={onClose}
+      />
+      <DeliveryCheckoutShellFooter>
         <DeliveryCheckoutFooterActions
           onVoltar={onClose}
           onContinuar={() => void handleContinuar()}
@@ -124,8 +130,8 @@ export function DeliveryCheckoutIdentifiqueSeModal({
             </p>
           }
         />
-      }
-    >
+      </DeliveryCheckoutShellFooter>
+
       <div className="space-y-4">
         <label className="relative block">
           <span className="absolute -top-2 left-3 z-10 bg-[var(--delivery-surface,#fff)] px-1 text-xs delivery-text-secondary">
@@ -186,6 +192,6 @@ export function DeliveryCheckoutIdentifiqueSeModal({
           </label>
         ) : null}
       </div>
-    </DeliveryCheckoutStepModal>
+    </>
   )
 }

@@ -1,7 +1,6 @@
 'use client'
 
 import { Camera } from 'lucide-react'
-import { MdDelete } from 'react-icons/md'
 import type { DeliveryCarrinhoItem } from '../stores/deliveryCarrinhoStore'
 import {
   observacaoItemCarrinho,
@@ -54,7 +53,7 @@ export function DeliveryCarrinhoItemCard({
   const obs = observacaoItemCarrinho(item)
 
   return (
-    <article className="py-4 first:pt-0">
+    <article className="py-4">
       <div className="flex items-start gap-2.5">
         <CarrinhoProdutoThumb imagemUrl={item.produtoImagemUrl} nome={item.produtoNome} />
 
@@ -73,25 +72,17 @@ export function DeliveryCarrinhoItemCard({
             </span>
           </div>
 
-          <div className="flex shrink-0 flex-col items-end">
-            <DeliveryQuantidadeStepper
-              size="sm"
-              value={item.quantidade}
-              min={1}
-              decreaseLabel="Diminuir quantidade"
-              increaseLabel="Aumentar quantidade"
-              onDecrease={onDecrease}
-              onIncrease={onIncrease}
-            />
-            <button
-              type="button"
-              onClick={onRemove}
-              className="mt-2 p-1 text-red-500"
-              aria-label="Remover item"
-            >
-              <MdDelete className="h-5 w-5" />
-            </button>
-          </div>
+          <DeliveryQuantidadeStepper
+            size="sm"
+            value={item.quantidade}
+            min={1}
+            removeAtMin
+            decreaseLabel="Diminuir quantidade"
+            increaseLabel="Aumentar quantidade"
+            removeLabel="Remover item"
+            onDecrease={item.quantidade <= 1 ? onRemove : onDecrease}
+            onIncrease={onIncrease}
+          />
         </div>
       </div>
 

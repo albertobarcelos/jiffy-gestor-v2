@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import { Camera, MapPin, Pencil, Bike, UserRound } from 'lucide-react'
+import { Camera, MapPin, Pencil, UserRound } from 'lucide-react'
+import { MdDeliveryDining } from 'react-icons/md'
+import { TbPaperBag } from 'react-icons/tb'
 import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { MeioPagamentoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
@@ -12,8 +14,10 @@ import { formatDeliveryCurrency } from '../../../shared/utils/formatDeliveryCurr
 import { formatarTelefoneExibicao } from '../../../shared/utils/deliveryTelefonePais'
 import { obterIconeMeioPagamento } from '../../../shared/utils/obterIconeMeioPagamento'
 import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
-import { DeliveryCheckoutStepModal } from './DeliveryCheckoutStepModal'
-import { DeliveryCarrinhoEnderecoTopo } from './DeliveryCarrinhoEnderecoTopo'
+import {
+  DeliveryCheckoutShellFooter,
+  DeliveryCheckoutShellHeader,
+} from './DeliveryCheckoutShell'
 
 type DeliveryCheckoutRevisaoModalProps = {
   tipoEntrega: DeliveryTipoEntrega
@@ -22,9 +26,6 @@ type DeliveryCheckoutRevisaoModalProps = {
   telefonePaisIso2?: string
   enderecoCliente: EnderecoClienteDeliveryPublicoDTO | null
   enderecoEmpresaTexto: string | null
-  nomeEmpresaFallback?: string
-  logoUrlFallback?: string | null
-  capaUrlFallback?: string | null
   itens: DeliveryCarrinhoItem[]
   total: number
   meioPagamento: MeioPagamentoPublicoDTO | null
@@ -33,6 +34,7 @@ type DeliveryCheckoutRevisaoModalProps = {
   enviando: boolean
   onClose: () => void
   onVoltar: () => void
+  onEditarTipoEntrega: () => void
   onEditarCliente: () => void
   onEditarEndereco: () => void
   onEditarPedido: () => void
@@ -119,17 +121,15 @@ export function DeliveryCheckoutRevisaoModal({
   telefonePaisIso2 = DELIVERY_PAIS_TELEFONE_PADRAO,
   enderecoCliente,
   enderecoEmpresaTexto,
-  nomeEmpresaFallback = '',
-  logoUrlFallback = null,
-  capaUrlFallback = null,
   itens,
   total,
   meioPagamento,
   trocoPara,
   observacaoPedido,
   enviando,
-  onClose,
+  onClose: _onClose,
   onVoltar,
+  onEditarTipoEntrega,
   onEditarCliente,
   onEditarEndereco,
   onEditarPedido,
@@ -155,30 +155,39 @@ export function DeliveryCheckoutRevisaoModal({
   }
 
   return (
-    <DeliveryCheckoutStepModal
-      title="Revise seu pedido"
-      onClose={onClose}
-      showBack
-      onBack={onVoltar}
-      fullScreen
-      footer={
+    <>
+      <DeliveryCheckoutShellHeader
+        title="Revise seu pedido"
+        showBack
+        onBack={onVoltar}
+        headerTone="dark"
+      />
+      <DeliveryCheckoutShellFooter>
         <DeliveryCheckoutFooterActions
           onVoltar={onVoltar}
           onContinuar={onEnviar}
           continuarDisabled={enviando}
           continuarLabel={enviando ? 'Enviando...' : 'Enviar pedido'}
         />
-      }
-    >
+      </DeliveryCheckoutShellFooter>
+
       <div>
-        <div className="mb-4">
-          <DeliveryCarrinhoEnderecoTopo
-            nomeEmpresaFallback={nomeEmpresaFallback}
-            logoUrlFallback={logoUrlFallback}
-            capaUrlFallback={capaUrlFallback}
-            colarNoTopo
-          />
-        </div>
+        <LinhaSecao
+          icone={
+            isEntrega ? (
+              <MdDeliveryDining className="h-5 w-5 text-black" aria-hidden />
+            ) : (
+              <TbPaperBag className="h-5 w-5 text-black" aria-hidden />
+            )
+          }
+          label="Tipo de Pedido:"
+          onEditar={onEditarTipoEntrega}
+          editLabel="Editar tipo de pedido"
+        >
+          <p className="text-sm font-semibold delivery-text-primary">
+            {isEntrega ? 'Entrega' : 'Retirada'}
+          </p>
+        </LinhaSecao>
 
         <LinhaSecao
           icone={<UserRound className="h-5 w-5 text-black" />}
@@ -191,13 +200,7 @@ export function DeliveryCheckoutRevisaoModal({
         </LinhaSecao>
 
         <LinhaSecao
-          icone={
-            isEntrega ? (
-              <Bike className="h-5 w-5 text-black" />
-            ) : (
-              <MapPin className="h-5 w-5 text-black" />
-            )
-          }
+          icone={<MapPin className="h-5 w-5 text-black" />}
           label={isEntrega ? 'Seu endereço:' : 'Retirada no local:'}
           onEditar={isEntrega ? onEditarEndereco : undefined}
           editLabel="Editar endereço"
@@ -346,7 +349,7 @@ export function DeliveryCheckoutRevisaoModal({
           </div>
         </div>
       </div>
-    </DeliveryCheckoutStepModal>
+    </>
   )
 }
 

@@ -18,12 +18,14 @@ import {
 } from '../../shared/components/DeliveryThemeScope'
 import {
   useDeliveryCarrinhoItens,
+  useDeliveryCarrinhoStore,
   useDeliveryCarrinhoTotal,
   useDeliveryCarrinhoTotalItens,
 } from '../../shared/stores/deliveryCarrinhoStore'
 import { buildCatalogViewModel } from '../../shared/mappers/buildCatalogViewModel'
 import { findCatalogoProdutoById } from '../../shared/utils/findCatalogoProdutoById'
 import { formatEmpresaPublicaEndereco } from '../../shared/utils/formatEmpresaPublicaEndereco'
+import { produtoTemComplementosAtivos } from '../../shared/utils/produtoComplementosUtils'
 import { resolveDeliveryLayoutHome } from '../layouts/DeliveryPublicoLayoutRegistry'
 import type { DeliveryPublicoViewModel } from '../../shared/types/deliveryPublicoViewModel'
 import { DeliveryProdutoModal } from '../components/DeliveryProdutoModal'
@@ -47,6 +49,8 @@ type ProdutoAdicionadoPayload = {
   produtoId: string
   nome: string
   imagemUrl: string | null
+  /** Se false, só anima o fly-to-cart (atalho "+"); padrão true abre o modal. */
+  abrirDialogo?: boolean
 }
 
 const MAX_FOOTER_THUMBS = 5
@@ -113,12 +117,21 @@ export function DeliveryPublicoHomeScreen({
   const carrinhoItens = useDeliveryCarrinhoItens(slug)
   const carrinhoTotal = useDeliveryCarrinhoTotal(slug)
   const carrinhoQuantidade = useDeliveryCarrinhoTotalItens(slug)
+  const adicionarItem = useDeliveryCarrinhoStore(s => s.adicionarItem)
   const carrinhoThumbs = useMemo(() => {
     const thumbs = buildCarrinhoThumbsFromItens(carrinhoItens)
     if (!flyingProdutoId) return thumbs
     // Só oculta se for a 1ª aparição do produto (evita buraco ao readicionar o mesmo item).
     return thumbs.filter(thumb => thumb.produtoId !== flyingProdutoId)
   }, [carrinhoItens, flyingProdutoId])
+
+  const quantidadePorProduto = useMemo(() => {
+    const map: Record<string, number> = {}
+    for (const item of carrinhoItens) {
+      map[item.produtoId] = (map[item.produtoId] ?? 0) + item.quantidade
+    }
+    return map
+  }, [carrinhoItens])
 
   const syncProdutoQuery = useCallback(
     (produtoId: string | null) => {
@@ -193,8 +206,41 @@ export function DeliveryPublicoHomeScreen({
       setPendingFly(payload)
       return
     }
-    setProdutoAdicionadoNome(payload.nome)
+    if (payload.abrirDialogo !== false) {
+      setProdutoAdicionadoNome(payload.nome)
+    }
   }, [])
+
+  const handleProdutoAddRapido = useCallback(
+    (produtoId: string) => {
+      const produto = findCatalogoProdutoById(grupos, produtoId)
+      if (!produto) return
+
+      if (produtoTemComplementosAtivos(produto)) {
+        handleProdutoClick(produtoId)
+        return
+      }
+
+      adicionarItem(slug, {
+        produtoId: produto.id,
+        produtoNome: produto.nome,
+        produtoImagemUrl: produto.imagemUrl,
+        quantidade: 1,
+        valorUnitario: produto.valor,
+        valorTotal: produto.valor,
+        observacoes: [],
+        complementos: [],
+      })
+
+      handleProdutoAdicionado({
+        produtoId: produto.id,
+        nome: produto.nome,
+        imagemUrl: produto.imagemUrl,
+        abrirDialogo: false,
+      })
+    },
+    [adicionarItem, grupos, handleProdutoAdicionado, handleProdutoClick, slug]
+  )
 
   useEffect(() => {
     if (!pendingFly) return
@@ -212,11 +258,11 @@ export function DeliveryPublicoHomeScreen({
         return
       }
 
-      const { nome, imagemUrl, produtoId } = pendingFly
+      const { nome, imagemUrl, produtoId, abrirDialogo = true } = pendingFly
       setPendingFly(null)
 
       if (!imagemUrl?.trim() || !target) {
-        setProdutoAdicionadoNome(nome)
+        if (abrirDialogo) setProdutoAdicionadoNome(nome)
         return
       }
 
@@ -236,7 +282,7 @@ export function DeliveryPublicoHomeScreen({
           setCarrinhoThumbsBounceKey(key => key + 1)
         },
         onFinish: () => {
-          setProdutoAdicionadoNome(nome)
+          if (abrirDialogo) setProdutoAdicionadoNome(nome)
         },
       })
     }
@@ -317,12 +363,14 @@ export function DeliveryPublicoHomeScreen({
         onBuscaChange={handleBuscaChange}
         onGrupoClick={handleGrupoClick}
         onProdutoClick={handleProdutoClick}
+        onProdutoAddRapido={handleProdutoAddRapido}
         onPedidoClick={handlePedidoClick}
         onCloseProduto={handleCloseProduto}
         onProdutoAdicionado={handleProdutoAdicionado}
         produtoAdicionadoNome={produtoAdicionadoNome}
         onContinuarComprando={handleContinuarComprando}
         onIrParaCarrinhoAposAdicionar={handleIrParaCarrinhoAposAdicionar}
+        quantidadePorProduto={quantidadePorProduto}
         carrinhoThumbs={carrinhoThumbs}
         carrinhoThumbsBounceKey={carrinhoThumbsBounceKey}
         carrinhoThumbsTargetRef={carrinhoThumbsTargetRef}
@@ -348,12 +396,14 @@ type DeliveryPublicoHomeContentProps = {
   onBuscaChange: (termo: string) => void
   onGrupoClick: (grupoId: string) => void
   onProdutoClick: (produtoId: string) => void
+  onProdutoAddRapido: (produtoId: string) => void
   onPedidoClick: () => void
   onCloseProduto: () => void
   onProdutoAdicionado: (payload: ProdutoAdicionadoPayload) => void
   produtoAdicionadoNome: string | null
   onContinuarComprando: () => void
   onIrParaCarrinhoAposAdicionar: () => void
+  quantidadePorProduto: Record<string, number>
   carrinhoThumbs: DeliveryCarrinhoThumb[]
   carrinhoThumbsBounceKey: number
   carrinhoThumbsTargetRef: RefObject<HTMLDivElement | null>
@@ -373,12 +423,14 @@ function DeliveryPublicoHomeContent({
   onBuscaChange,
   onGrupoClick,
   onProdutoClick,
+  onProdutoAddRapido,
   onPedidoClick,
   onCloseProduto,
   onProdutoAdicionado,
   produtoAdicionadoNome,
   onContinuarComprando,
   onIrParaCarrinhoAposAdicionar,
+  quantidadePorProduto,
   carrinhoThumbs,
   carrinhoThumbsBounceKey,
   carrinhoThumbsTargetRef,
@@ -419,7 +471,9 @@ function DeliveryPublicoHomeContent({
         onBuscaChange={onBuscaChange}
         onGrupoClick={onGrupoClick}
         onProdutoClick={onProdutoClick}
+        onProdutoAddRapido={onProdutoAddRapido}
         onPedidoClick={onPedidoClick}
+        quantidadePorProduto={quantidadePorProduto}
         carrinhoThumbs={carrinhoThumbs}
         carrinhoThumbsBounceKey={carrinhoThumbsBounceKey}
         carrinhoThumbsTargetRef={carrinhoThumbsTargetRef}
