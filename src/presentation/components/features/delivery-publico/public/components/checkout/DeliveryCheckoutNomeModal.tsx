@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { showToast } from '@/src/shared/utils/toast'
+import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
 import { DeliveryCheckoutStepModal } from './DeliveryCheckoutStepModal'
 
 type DeliveryCheckoutNomeModalProps = {
@@ -36,34 +37,17 @@ export function DeliveryCheckoutNomeModal({
       title="Novo cadastro"
       onClose={onClose}
       footer={
-        <div className="flex flex-col gap-3">
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={onVoltar}
-              className="min-h-[44px] rounded-full border px-5 text-sm font-semibold uppercase tracking-wide delivery-text-primary"
-              style={{ borderColor: 'var(--delivery-border)' }}
-            >
-              Voltar
-            </button>
-            <button
-              type="button"
-              onClick={handleContinuar}
-              className="min-h-[44px] rounded-full px-5 text-sm font-semibold uppercase tracking-wide"
-              style={{
-                backgroundColor: 'var(--delivery-primary-dark)',
-                color: 'var(--delivery-btn-text, #ffffff)',
-              }}
-            >
-              Continuar
-            </button>
-          </div>
-          <p className="text-center text-[11px] leading-relaxed delivery-text-secondary">
-            Ao prosseguir, confirmo que li e aceito os{' '}
-            <span className="underline">Termos de uso</span> e{' '}
-            <span className="underline">Política de privacidade</span>.
-          </p>
-        </div>
+        <DeliveryCheckoutFooterActions
+          onVoltar={onVoltar}
+          onContinuar={handleContinuar}
+          top={
+            <p className="text-center text-[11px] leading-relaxed delivery-text-secondary">
+              Ao prosseguir, confirmo que li e aceito os{' '}
+              <span className="underline">Termos de uso</span> e{' '}
+              <span className="underline">Política de privacidade</span>.
+            </p>
+          }
+        />
       }
     >
       <input

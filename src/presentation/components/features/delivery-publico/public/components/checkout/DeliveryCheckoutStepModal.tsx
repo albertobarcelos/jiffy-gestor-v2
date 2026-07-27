@@ -1,6 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import { motion } from 'framer-motion'
 import {
   ClipboardCheck,
   DollarSign,
@@ -22,7 +23,10 @@ type DeliveryCheckoutStepModalProps = {
   /** Título centralizado com seta de voltar à esquerda (ex.: form endereço). */
   showBack?: boolean
   onBack?: () => void
-  /** Ocupa 100% da viewport; padrão para todas as etapas do checkout. */
+  /**
+   * @deprecated Mantido por compatibilidade. O checkout sempre usa o drawer
+   * (tela cheia no mobile, 40% no desktop), alinhado ao carrinho.
+   */
   fullScreen?: boolean
   /** Header preto com texto/ícones brancos (ex.: revisão). */
   headerTone?: 'default' | 'dark'
@@ -36,6 +40,8 @@ const STEP_ICONS: Record<Exclude<DeliveryCheckoutStep, null>, LucideIcon> = {
   pagamento: DollarSign,
   revisao: ClipboardCheck,
 }
+
+const SLIDE_TRANSITION = { duration: 0.35, ease: [0.22, 1, 0.36, 1] as const }
 
 function DeliveryCheckoutProgressIndicator() {
   const progress = useDeliveryCheckoutProgress()
@@ -95,7 +101,6 @@ export function DeliveryCheckoutStepModal({
   footer,
   showBack = false,
   onBack,
-  fullScreen = true,
   headerTone = 'default',
 }: DeliveryCheckoutStepModalProps) {
   useDeliveryBodyScrollLock()
@@ -105,37 +110,30 @@ export function DeliveryCheckoutStepModal({
   const headerFg = isDarkHeader ? '#ffffff' : 'var(--delivery-text-primary)'
 
   return (
-    <div
-      className={
-        fullScreen
-          ? 'delivery-vv-overlay z-[60] flex'
-          : 'delivery-vv-overlay z-[60] flex items-start justify-center px-4 pt-[8vh] sm:items-center sm:pt-0'
-      }
-    >
-      {!fullScreen ? (
-        <div
-          className="absolute inset-0"
-          style={{ backgroundColor: 'var(--delivery-overlay, rgba(0, 0, 0, 0.55))' }}
-          onClick={onClose}
-          aria-hidden
-        />
-      ) : null}
+    <>
+      <motion.div
+        className="delivery-vv-overlay z-[60]"
+        style={{ backgroundColor: 'rgba(0, 0, 0, 0.45)' }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.25 }}
+        onClick={onClose}
+        aria-hidden
+      />
 
-      <div
-        className={
-          fullScreen
-            ? 'relative flex h-full w-full flex-col overflow-hidden'
-            : 'relative flex w-full max-w-md flex-col overflow-hidden rounded-2xl shadow-xl'
-        }
-        style={{
-          backgroundColor: 'var(--delivery-surface, #ffffff)',
-          maxHeight: fullScreen
-            ? undefined
-            : 'min(720px, calc(var(--delivery-vv-height, 100dvh) * 0.92))',
-        }}
+      <motion.aside
         role="dialog"
         aria-modal="true"
         aria-label={title}
+        className="fixed right-0 z-[60] flex w-full flex-col overflow-hidden overscroll-none shadow-2xl lg:w-[40%]"
+        style={{
+          top: 'var(--delivery-vv-offset-top, 0px)',
+          height: 'var(--delivery-vv-height, 100dvh)',
+          backgroundColor: 'var(--delivery-surface, #ffffff)',
+        }}
+        initial={{ x: '100%' }}
+        animate={{ x: 0 }}
+        transition={SLIDE_TRANSITION}
       >
         <div
           className={`relative flex shrink-0 items-center gap-2 border-b px-4 ${
@@ -190,18 +188,13 @@ export function DeliveryCheckoutStepModal({
 
         {footer ? (
           <div
-            className="shrink-0 border-t px-4 py-3"
-            style={{
-              borderColor: 'var(--delivery-border)',
-              paddingBottom: fullScreen
-                ? 'max(0.75rem, env(safe-area-inset-bottom))'
-                : undefined,
-            }}
+            className="shrink-0 border-t border-neutral-200 bg-white"
+            style={{ borderColor: 'var(--delivery-border)' }}
           >
             {footer}
           </div>
         ) : null}
-      </div>
-    </div>
+      </motion.aside>
+    </>
   )
 }

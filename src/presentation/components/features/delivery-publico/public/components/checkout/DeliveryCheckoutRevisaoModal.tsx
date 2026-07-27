@@ -11,6 +11,7 @@ import { DELIVERY_PAIS_TELEFONE_PADRAO } from '../../../shared/constants/deliver
 import { formatDeliveryCurrency } from '../../../shared/utils/formatDeliveryCurrency'
 import { formatarTelefoneExibicao } from '../../../shared/utils/deliveryTelefonePais'
 import { obterIconeMeioPagamento } from '../../../shared/utils/obterIconeMeioPagamento'
+import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
 import { DeliveryCheckoutStepModal } from './DeliveryCheckoutStepModal'
 import { DeliveryCarrinhoEnderecoTopo } from './DeliveryCarrinhoEnderecoTopo'
 
@@ -161,18 +162,12 @@ export function DeliveryCheckoutRevisaoModal({
       onBack={onVoltar}
       fullScreen
       footer={
-        <button
-          type="button"
-          disabled={enviando}
-          onClick={onEnviar}
-          className="min-h-[48px] w-full rounded-xl text-sm font-semibold uppercase tracking-wide disabled:opacity-60"
-          style={{
-            backgroundColor: 'var(--delivery-primary-dark)',
-            color: 'var(--delivery-btn-text, #ffffff)',
-          }}
-        >
-          {enviando ? 'Enviando...' : 'Enviar pedido'}
-        </button>
+        <DeliveryCheckoutFooterActions
+          onVoltar={onVoltar}
+          onContinuar={onEnviar}
+          continuarDisabled={enviando}
+          continuarLabel={enviando ? 'Enviando...' : 'Enviar pedido'}
+        />
       }
     >
       <div>

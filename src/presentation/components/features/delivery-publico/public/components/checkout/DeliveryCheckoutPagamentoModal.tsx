@@ -9,6 +9,7 @@ import {
 } from '@/src/shared/utils/formatters'
 import { showToast } from '@/src/shared/utils/toast'
 import { isMeioPagamentoDinheiro } from '../../../shared/utils/isMeioPagamentoDinheiro'
+import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
 import { DeliveryCheckoutStepModal } from './DeliveryCheckoutStepModal'
 
 type DeliveryCheckoutPagamentoModalProps = {
@@ -20,6 +21,8 @@ type DeliveryCheckoutPagamentoModalProps = {
   onChangeMeioPagamentoId: (value: string) => void
   onChangeTrocoPara: (value: number | null) => void
   onClose: () => void
+  /** Volta ao passo anterior do fluxo (tipo de entrega). */
+  onVoltar: () => void
   onContinuar: () => void
 }
 
@@ -32,6 +35,7 @@ export function DeliveryCheckoutPagamentoModal({
   onChangeMeioPagamentoId,
   onChangeTrocoPara,
   onClose,
+  onVoltar,
   onContinuar,
 }: DeliveryCheckoutPagamentoModalProps) {
   const meioSelecionado = useMemo(
@@ -87,19 +91,9 @@ export function DeliveryCheckoutPagamentoModal({
       title="Pagamento"
       onClose={onClose}
       showBack
-      onBack={onClose}
+      onBack={onVoltar}
       footer={
-        <button
-          type="button"
-          onClick={handleContinuar}
-          className="min-h-[48px] w-full rounded-xl text-sm font-semibold uppercase tracking-wide"
-          style={{
-            backgroundColor: 'var(--delivery-primary-dark)',
-            color: 'var(--delivery-btn-text, #ffffff)',
-          }}
-        >
-          Continuar
-        </button>
+        <DeliveryCheckoutFooterActions onVoltar={onVoltar} onContinuar={handleContinuar} />
       }
     >
       <div className="space-y-4">

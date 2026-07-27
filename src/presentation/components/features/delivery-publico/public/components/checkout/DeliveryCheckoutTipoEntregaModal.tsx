@@ -5,6 +5,7 @@ import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/de
 import type { DeliveryTipoEntrega } from '../../../shared/stores/deliveryPreferenciaEntregaStore'
 import { formatDeliveryCurrency } from '../../../shared/utils/formatDeliveryCurrency'
 import { formatarResumoEnderecoPublico } from '../../../shared/utils/garantirEnderecoClientePublico'
+import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
 import { DeliveryCheckoutStepModal } from './DeliveryCheckoutStepModal'
 
 /** Taxa fictícia até existir endpoint de frete. */
@@ -26,6 +27,8 @@ type DeliveryCheckoutTipoEntregaModalProps = {
   onEditarEndereco: () => void
   onCadastrarEndereco: () => void
   onClose: () => void
+  /** Volta ao passo anterior do fluxo (identificação). */
+  onVoltar: () => void
   onContinuar: () => void
 }
 
@@ -64,6 +67,7 @@ export function DeliveryCheckoutTipoEntregaModal({
   onEditarEndereco,
   onCadastrarEndereco,
   onClose,
+  onVoltar,
   onContinuar,
 }: DeliveryCheckoutTipoEntregaModalProps) {
   const isEntrega = tipoEntrega === 'entrega'
@@ -77,19 +81,9 @@ export function DeliveryCheckoutTipoEntregaModal({
       title="Como deseja receber?"
       onClose={onClose}
       showBack
-      onBack={onClose}
+      onBack={onVoltar}
       footer={
-        <button
-          type="button"
-          onClick={onContinuar}
-          className="min-h-[48px] w-full rounded-xl text-sm font-semibold uppercase tracking-wide"
-          style={{
-            backgroundColor: 'var(--delivery-primary-dark)',
-            color: 'var(--delivery-btn-text, #ffffff)',
-          }}
-        >
-          Continuar
-        </button>
+        <DeliveryCheckoutFooterActions onVoltar={onVoltar} onContinuar={onContinuar} />
       }
     >
       <div className="grid grid-cols-2 gap-3">

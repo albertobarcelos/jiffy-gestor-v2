@@ -10,6 +10,7 @@ import {
   telefoneNacionalValido,
 } from '../../../shared/utils/deliveryTelefonePais'
 import type { ClienteLookupStatus } from '../../../shared/hooks/useDeliveryCheckout'
+import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
 import { DeliveryCheckoutStepModal } from './DeliveryCheckoutStepModal'
 
 type DeliveryCheckoutIdentifiqueSeModalProps = {
@@ -110,35 +111,19 @@ export function DeliveryCheckoutIdentifiqueSeModal({
       title="Identifique-se"
       onClose={onClose}
       footer={
-        <div className="flex flex-col gap-3">
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="min-h-[44px] flex-1 rounded-xl border px-3 text-sm font-semibold uppercase tracking-wide delivery-text-primary"
-              style={{ borderColor: 'var(--delivery-border)' }}
-            >
-              Voltar
-            </button>
-            <button
-              type="button"
-              disabled={enviando || lookupStatus === 'loading'}
-              onClick={() => void handleContinuar()}
-              className="min-h-[44px] flex-1 rounded-xl px-3 text-sm font-semibold uppercase tracking-wide disabled:opacity-60"
-              style={{
-                backgroundColor: 'var(--delivery-primary-dark)',
-                color: 'var(--delivery-btn-text, #ffffff)',
-              }}
-            >
-              {enviando || lookupStatus === 'loading' ? '...' : 'Continuar'}
-            </button>
-          </div>
-          <p className="text-center text-[11px] leading-relaxed delivery-text-secondary">
-            Ao prosseguir, confirmo que li e aceito os{' '}
-            <span className="underline">Termos de uso</span> e{' '}
-            <span className="underline">Política de privacidade</span>.
-          </p>
-        </div>
+        <DeliveryCheckoutFooterActions
+          onVoltar={onClose}
+          onContinuar={() => void handleContinuar()}
+          continuarDisabled={enviando || lookupStatus === 'loading'}
+          continuarLabel={enviando || lookupStatus === 'loading' ? '...' : 'Continuar'}
+          top={
+            <p className="text-center text-[11px] leading-relaxed delivery-text-secondary">
+              Ao prosseguir, confirmo que li e aceito os{' '}
+              <span className="underline">Termos de uso</span> e{' '}
+              <span className="underline">Política de privacidade</span>.
+            </p>
+          }
+        />
       }
     >
       <div className="space-y-4">
