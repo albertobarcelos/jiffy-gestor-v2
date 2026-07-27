@@ -23,11 +23,6 @@ import {
   useDeliveryCarrinhoTotal,
   useDeliveryCarrinhoTotalItens,
 } from '../../shared/stores/deliveryCarrinhoStore'
-import {
-  useDeliveryPreferenciaEntregaStore,
-  useDeliveryTipoEntrega,
-  type DeliveryTipoEntrega,
-} from '../../shared/stores/deliveryPreferenciaEntregaStore'
 import { buildCatalogViewModel } from '../../shared/mappers/buildCatalogViewModel'
 import { findCatalogoProdutoById } from '../../shared/utils/findCatalogoProdutoById'
 import { formatEmpresaPublicaEndereco } from '../../shared/utils/formatEmpresaPublicaEndereco'
@@ -59,7 +54,12 @@ type ProdutoAdicionadoPayload = {
 const MAX_FOOTER_THUMBS = 5
 
 function buildCarrinhoThumbsFromItens(
-  itens: { produtoId: string; produtoImagemUrl: string | null; adicionadoEm: string }[]
+  itens: {
+    produtoId: string
+    produtoImagemUrl: string | null
+    quantidade: number
+    adicionadoEm: string
+  }[]
 ): DeliveryCarrinhoThumb[] {
   const byId = new Map<string, DeliveryCarrinhoThumb>()
   const order: string[] = []
@@ -68,10 +68,21 @@ function buildCarrinhoThumbsFromItens(
   for (const item of sorted) {
     const imagemUrl = item.produtoImagemUrl?.trim()
     if (!imagemUrl) continue
-    if (!byId.has(item.produtoId)) {
+    const existente = byId.get(item.produtoId)
+    if (!existente) {
       order.push(item.produtoId)
+      byId.set(item.produtoId, {
+        produtoId: item.produtoId,
+        imagemUrl,
+        quantidade: item.quantidade,
+      })
+      continue
     }
-    byId.set(item.produtoId, { produtoId: item.produtoId, imagemUrl })
+    byId.set(item.produtoId, {
+      ...existente,
+      imagemUrl,
+      quantidade: existente.quantidade + item.quantidade,
+    })
   }
 
   return order.slice(-MAX_FOOTER_THUMBS).map(id => byId.get(id)!)
@@ -85,8 +96,6 @@ export function DeliveryPublicoHomeScreen({
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [termoBusca, setTermoBusca] = useState('')
-  const tipoEntrega = useDeliveryTipoEntrega(slug)
-  const setTipoEntregaPreferencia = useDeliveryPreferenciaEntregaStore(s => s.setTipoEntrega)
   /** Fecha o modal na hora, sem esperar o router.replace limpar ?produto= */
   const [fechandoProduto, setFechandoProduto] = useState(false)
   const [produtoAdicionadoNome, setProdutoAdicionadoNome] = useState<string | null>(null)
@@ -162,13 +171,6 @@ export function DeliveryPublicoHomeScreen({
     if (fechandoProduto || !produtoIdQuery || grupos.length === 0) return null
     return findCatalogoProdutoById(grupos, produtoIdQuery)
   }, [fechandoProduto, grupos, produtoIdQuery])
-
-  const handleTipoEntregaChange = useCallback(
-    (tipo: DeliveryTipoEntrega) => {
-      setTipoEntregaPreferencia(slug, tipo)
-    },
-    [slug, setTipoEntregaPreferencia]
-  )
 
   const handleBuscaChange = useCallback((termo: string) => {
     setTermoBusca(termo)
@@ -314,7 +316,6 @@ export function DeliveryPublicoHomeScreen({
         grupos={grupos}
         empresa={empresa}
         termoBusca={termoBusca}
-        tipoEntrega={tipoEntrega}
         disponivel={exibicaoHorario.disponivel}
         horarioTexto={exibicaoHorario.horarioTexto}
         horarioSemanalTexto={exibicaoHorario.horarioSemanalTexto}
@@ -323,7 +324,6 @@ export function DeliveryPublicoHomeScreen({
         isCatalogLoading={isCatalogLoading}
         isFetchingNextPage={isFetchingNextPage}
         produtoSelecionado={produtoSelecionado}
-        onTipoEntregaChange={handleTipoEntregaChange}
         onBuscaChange={handleBuscaChange}
         onGrupoClick={handleGrupoClick}
         onProdutoClick={handleProdutoClick}
@@ -350,7 +350,6 @@ type DeliveryPublicoHomeContentProps = {
   grupos: ReturnType<typeof flattenCatalogoGrupos>
   empresa: EmpresaPublicaDTO | null
   termoBusca: string
-  tipoEntrega: DeliveryTipoEntrega
   disponivel: boolean
   horarioTexto: string
   horarioSemanalTexto: string
@@ -359,7 +358,6 @@ type DeliveryPublicoHomeContentProps = {
   isCatalogLoading: boolean
   isFetchingNextPage: boolean
   produtoSelecionado: CatalogoPublicoProdutoDTO | null
-  onTipoEntregaChange: (tipo: DeliveryTipoEntrega) => void
   onBuscaChange: (termo: string) => void
   onGrupoClick: (grupoId: string) => void
   onProdutoClick: (produtoId: string) => void
@@ -380,7 +378,6 @@ function DeliveryPublicoHomeContent({
   grupos,
   empresa,
   termoBusca,
-  tipoEntrega,
   disponivel,
   horarioTexto,
   horarioSemanalTexto,
@@ -389,7 +386,6 @@ function DeliveryPublicoHomeContent({
   isCatalogLoading,
   isFetchingNextPage,
   produtoSelecionado,
-  onTipoEntregaChange,
   onBuscaChange,
   onGrupoClick,
   onProdutoClick,
@@ -410,7 +406,6 @@ function DeliveryPublicoHomeContent({
     () =>
       buildCatalogViewModel(grupos, {
         termoBusca,
-        tipoEntrega,
         disponivel,
         horarioTexto,
         horarioSemanalTexto,
@@ -419,7 +414,6 @@ function DeliveryPublicoHomeContent({
     [
       grupos,
       termoBusca,
-      tipoEntrega,
       disponivel,
       horarioTexto,
       horarioSemanalTexto,
@@ -449,7 +443,6 @@ function DeliveryPublicoHomeContent({
         viewModel={viewModel}
         enderecoTexto={enderecoTexto}
         interactive
-        onTipoEntregaChange={onTipoEntregaChange}
         onBuscaChange={onBuscaChange}
         onGrupoClick={onGrupoClick}
         onProdutoClick={onProdutoClick}

@@ -1,53 +1,36 @@
 'use client'
 
-import type { DeliveryPublicoDesignConfig } from '../../shared/types/deliveryPublicoDesignConfig'
+import type { DeliveryPublicoDesignConfig } from '../types/deliveryPublicoDesignConfig'
 
 type DeliveryLojaHeaderProps = {
   config: DeliveryPublicoDesignConfig
 }
 
+/** Altura fluida da capa: cresce com a largura, com teto no desktop. */
+const CAPA_HEIGHT = 'clamp(7rem, 28vw, 16rem)'
+
+/** Capa da loja (sem logo/nome — esses ficam no topnav do layout básico). */
 export function DeliveryLojaHeader({ config }: DeliveryLojaHeaderProps) {
-  const nomeLoja = config.cabecalho.nomeExibicao.trim() || 'Sua loja'
-  const logoRadius = config.cabecalho.logoFormato === 'circular' ? '9999px' : '8px'
+  const capaUrl = config.cabecalho.capaUrl
 
   return (
     <div
-      className="relative h-40 bg-cover bg-center @sm:h-40 @lg:h-48 @xl:h-52"
+      className="relative mt-5 w-full overflow-hidden lg:rounded-2xl"
       style={{
+        height: CAPA_HEIGHT,
         backgroundColor: 'var(--delivery-hero-bg)',
-        backgroundImage: config.cabecalho.capaUrl ? `url(${config.cabecalho.capaUrl})` : undefined,
       }}
+      role="img"
+      aria-label="Capa da loja"
     >
-      <div className="absolute inset-0 flex items-end justify-between gap-3 px-4 pb-3 @lg:gap-4 @lg:px-6 @lg:pb-4 @xl:pb-5">
-        <div className="min-w-0 flex-1">
-          <h1
-            className="truncate text-xl font-bold @sm:text-2xl @lg:text-3xl @xl:text-4xl"
-            style={{
-              color: 'var(--delivery-btn-text)',
-              fontFamily: 'var(--delivery-font-title)',
-            }}
-          >
-            {nomeLoja}
-          </h1>
-        </div>
-
-        <div
-          className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden border-2 border-white bg-gray-100 @sm:h-16 @sm:w-16 @lg:h-20 @lg:w-20 @xl:h-24 @xl:w-24"
-          style={{ borderRadius: logoRadius }}
-        >
-          {config.cabecalho.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={config.cabecalho.logoUrl} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <span
-              className="text-3xl font-bold @sm:text-xl @lg:text-2xl @xl:text-3xl"
-              style={{ color: 'var(--delivery-primary)' }}
-            >
-              {(nomeLoja[0] ?? '?').toUpperCase()}
-            </span>
-          )}
-        </div>
-      </div>
+      {capaUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={capaUrl}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover object-center"
+        />
+      ) : null}
     </div>
   )
 }

@@ -24,7 +24,6 @@ export function buildCatalogViewModel(
     disponivel: true,
     horarioTexto: 'Horário não informado',
     horarioSemanalTexto: 'Horário não informado',
-    tipoEntrega: 'entrega',
     termoBusca: '',
     carrinho: { total: 0, quantidadeItens: 0 },
     ...overrides,

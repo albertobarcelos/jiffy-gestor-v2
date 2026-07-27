@@ -110,8 +110,8 @@ export function DeliveryCheckoutStepModal({
     <div
       className={
         fullScreen
-          ? 'fixed inset-0 z-[60] flex overscroll-none'
-          : 'fixed inset-0 z-[60] flex items-start justify-center overscroll-none px-4 pt-[8vh] sm:items-center sm:pt-0'
+          ? 'delivery-vv-overlay z-[60] flex'
+          : 'delivery-vv-overlay z-[60] flex items-start justify-center px-4 pt-[8vh] sm:items-center sm:pt-0'
       }
     >
       {!fullScreen ? (
@@ -126,10 +126,15 @@ export function DeliveryCheckoutStepModal({
       <div
         className={
           fullScreen
-            ? 'relative flex h-[100dvh] w-full flex-col overflow-hidden'
-            : 'relative flex max-h-[min(92dvh,720px)] w-full max-w-md flex-col overflow-hidden rounded-2xl shadow-xl'
+            ? 'relative flex h-full w-full flex-col overflow-hidden'
+            : 'relative flex w-full max-w-md flex-col overflow-hidden rounded-2xl shadow-xl'
         }
-        style={{ backgroundColor: 'var(--delivery-surface, #ffffff)' }}
+        style={{
+          backgroundColor: 'var(--delivery-surface, #ffffff)',
+          maxHeight: fullScreen
+            ? undefined
+            : 'min(720px, calc(var(--delivery-vv-height, 100dvh) * 0.92))',
+        }}
         role="dialog"
         aria-modal="true"
         aria-label={title}

@@ -11,7 +11,7 @@ type DeliveryProdutoListItemProps = {
 }
 
 const cardClassName =
-  'flex h-full w-full overflow-hidden rounded-xl border text-left transition-colors'
+  'flex h-full w-full overflow-hidden rounded-lg border text-left transition-colors'
 
 const textClassName =
   'min-w-0 flex-1 py-3.5 pl-3.5 pr-3 @sm:py-3 @sm:pl-3 @sm:pr-2.5 @lg:py-4 @lg:pl-4 @lg:pr-3'
@@ -94,7 +94,7 @@ export function DeliveryProdutoListItem({
           className={`${textClassName} text-left`}
         >
           <p
-            className="text-base font-semibold leading-snug @lg:text-lg"
+            className="text-base font-medium leading-snug @lg:text-lg"
             style={{
               color: 'var(--delivery-text)',
               fontFamily: 'var(--delivery-font-title)',
@@ -110,7 +110,7 @@ export function DeliveryProdutoListItem({
           <p
             className="mt-1 text-sm font-medium @lg:mt-1.5 @lg:text-base"
             style={{
-              color: 'var(--delivery-primary)',
+              color: 'var(--delivery-text)',
               fontFamily: 'var(--delivery-font-body)',
             }}
           >

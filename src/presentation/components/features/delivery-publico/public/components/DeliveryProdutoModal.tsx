@@ -175,7 +175,7 @@ export function DeliveryProdutoModal({
       {aberto ? (
         <motion.div
           key="delivery-produto-modal"
-          className="fixed inset-0 z-50 flex overscroll-none items-stretch justify-center sm:items-center sm:p-4"
+          className="delivery-vv-overlay z-50 flex items-stretch justify-center sm:items-center sm:p-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -189,7 +189,7 @@ export function DeliveryProdutoModal({
           />
 
           <motion.div
-            className="relative flex h-[100dvh] w-full flex-col overflow-hidden overscroll-none sm:h-auto sm:max-h-[90vh] sm:max-w-lg sm:rounded-2xl sm:shadow-xl"
+            className="relative flex h-full w-full flex-col overflow-hidden overscroll-none sm:h-auto sm:max-h-[90vh] sm:max-w-lg sm:rounded-2xl sm:shadow-xl"
             style={{
               backgroundColor: 'var(--delivery-surface)',
               originX: 0.5,

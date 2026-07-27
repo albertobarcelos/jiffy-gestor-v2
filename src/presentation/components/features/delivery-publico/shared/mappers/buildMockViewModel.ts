@@ -75,9 +75,8 @@ export function buildMockDeliveryViewModel(
   return {
     grupos,
     disponivel: true,
-    horarioTexto: '00:00 às 23:59',
+    horarioTexto: '09:00 às 23:30',
     horarioSemanalTexto: 'Seg–Dom 00:00–23:59',
-    tipoEntrega: 'entrega',
     termoBusca: '',
     carrinho: { total: 80, quantidadeItens: 8 },
     ...overrides,

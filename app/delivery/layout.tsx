@@ -1,7 +1,18 @@
-'use client'
-
-import { ReactNode } from 'react'
+import type { ReactNode } from 'react'
+import type { Viewport } from 'next'
 import '@/src/presentation/components/features/delivery-publico/shared/theme/delivery-publico-theme.css'
+import { DeliveryPublicoShell } from '@/src/presentation/components/features/delivery-publico/public/components/DeliveryPublicoShell'
+
+/**
+ * No Chrome Android, `interactiveWidget: 'resizes-content'` faz a viewport
+ * encolher com o teclado. No iOS o shell ainda depende de visualViewport (JS).
+ */
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  interactiveWidget: 'resizes-content',
+}
 
 /**
  * Layout isolado do delivery público (`/delivery/*`).
@@ -12,14 +23,5 @@ export default function DeliveryLayout({
 }: {
   children: ReactNode
 }) {
-  return (
-    <div
-      className="min-h-screen"
-      style={{
-        backgroundColor: 'var(--delivery-bg, var(--delivery-surface, #f5f5f5))',
-      }}
-    >
-      <main className="w-full">{children}</main>
-    </div>
-  )
+  return <DeliveryPublicoShell>{children}</DeliveryPublicoShell>
 }

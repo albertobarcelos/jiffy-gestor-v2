@@ -30,7 +30,6 @@ export type DeliveryPublicoViewModel = {
   horarioTexto: string
   /** Grade semanal para o rodapé. */
   horarioSemanalTexto: string
-  tipoEntrega: 'entrega' | 'retirada'
   termoBusca: string
   carrinho: DeliveryPublicoCarrinhoViewModel
 }

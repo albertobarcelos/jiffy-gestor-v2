@@ -2,23 +2,20 @@
 
 import { useRef } from 'react'
 import { DeliveryLojaHeader } from '../../../shared/components/DeliveryLojaHeader'
-import { DeliveryTipoEntregaToggle } from '../../../shared/components/DeliveryTipoEntregaToggle'
 import { DeliveryStatusHorario } from '../../../shared/components/DeliveryStatusHorario'
-import { DeliveryBuscaProdutos } from '../../../shared/components/DeliveryBuscaProdutos'
-import { DeliveryGrupoChips } from '../../../shared/components/DeliveryGrupoChips'
 import { DeliverySecaoGrupo } from '../../../shared/components/DeliverySecaoGrupo'
 import { DeliveryPedidoFooter } from '../../../shared/components/DeliveryPedidoFooter'
 import { DeliveryPublicoLojaFooter } from '../../../shared/components/DeliveryPublicoLojaFooter'
 import { filterViewModelByBusca } from '../../../shared/utils/filterViewModelByBusca'
 import type { DeliveryLayoutHomeProps } from '../DeliveryLayoutHomeProps'
-import { DeliveryBasicoCatalogStickyNav } from './DeliveryBasicoCatalogStickyNav'
+import { DeliveryBasicoCatalogToolbar } from './DeliveryBasicoCatalogToolbar'
+import { DeliveryBasicoTopNav } from './DeliveryBasicoTopNav'
 
 export function BasicoLayoutHome({
   config,
   viewModel,
   enderecoTexto,
   interactive = false,
-  onTipoEntregaChange,
   onBuscaChange,
   onGrupoClick,
   onProdutoClick,
@@ -32,64 +29,68 @@ export function BasicoLayoutHome({
 
   return (
     <div ref={catalogRootRef} className="delivery-basico-catalog-root flex min-h-full flex-col pb-24">
-      <DeliveryLojaHeader config={config} />
-      <div className="mt-3">
-        <DeliveryTipoEntregaToggle
-          value={viewModel.tipoEntrega}
+      <DeliveryBasicoTopNav
+        config={config}
+        carrinhoQuantidade={viewModel.carrinho.quantidadeItens}
+        interactive={interactive}
+        onPedidoClick={onPedidoClick}
+      />
+
+      <div className="delivery-basico-content-column flex min-h-0 w-full flex-1 flex-col">
+        <DeliveryLojaHeader config={config} />
+        <DeliveryStatusHorario
+          disponivel={viewModel.disponivel}
+          horarioTexto={viewModel.horarioTexto}
           interactive={interactive}
-          onChange={onTipoEntregaChange}
+        />
+        <DeliveryBasicoCatalogToolbar
+          config={config}
+          grupos={filtered.grupos}
+          termoBusca={viewModel.termoBusca}
+          interactive={interactive}
+          catalogRootRef={catalogRootRef}
+          onBuscaChange={onBuscaChange}
+          onGrupoClick={onGrupoClick}
+        />
+        <div className="flex-1">
+          {filtered.grupos.map(grupo => (
+            <DeliverySecaoGrupo
+              key={grupo.id}
+              config={config}
+              grupo={grupo}
+              interactive={interactive}
+              stickyTitle
+              onProdutoClick={onProdutoClick}
+            />
+          ))}
+        </div>
+
+        <DeliveryPublicoLojaFooter
+          config={config}
+          enderecoTexto={enderecoTexto}
+          horarioTexto={viewModel.horarioTexto}
         />
       </div>
-      <DeliveryStatusHorario
-        disponivel={viewModel.disponivel}
-        horarioTexto={viewModel.horarioTexto}
-      />
-      <DeliveryBasicoCatalogStickyNav catalogRootRef={catalogRootRef}>
-        <div className="min-w-0 space-y-2 pb-3 pt-3">
-          <DeliveryBuscaProdutos
-            value={viewModel.termoBusca}
-            interactive={interactive}
-            embedded
-            onChange={onBuscaChange}
-          />
-          <DeliveryGrupoChips
-            config={config}
-            grupos={filtered.grupos}
-            interactive={interactive}
-            embedded
-            onGrupoClick={onGrupoClick}
-          />
-        </div>
-      </DeliveryBasicoCatalogStickyNav>
-      <div className="flex-1">
-        {filtered.grupos.map(grupo => (
-          <DeliverySecaoGrupo
-            key={grupo.id}
-            config={config}
-            grupo={grupo}
-            interactive={interactive}
-            stickyTitle
-            onProdutoClick={onProdutoClick}
-          />
-        ))}
-      </div>
+
       {viewModel.carrinho.quantidadeItens > 0 ? (
-        <div
-          className="fixed inset-x-0 bottom-0 z-40 pt-2 backdrop-blur-sm"
-          style={{
-            backgroundColor:
-              'color-mix(in srgb, var(--delivery-bg, var(--delivery-surface)) 95%, transparent)',
-          }}
-        >
-          <DeliveryPedidoFooter
-            total={viewModel.carrinho.total}
-            quantidadeItens={viewModel.carrinho.quantidadeItens}
-            interactive={interactive}
-            onClick={onPedidoClick}
-            thumbs={carrinhoThumbs}
-            thumbsBounceKey={carrinhoThumbsBounceKey}
-            thumbsTargetRef={carrinhoThumbsTargetRef}
-          />
+        <div className="fixed inset-x-0 bottom-0 z-40">
+          <div
+            className="delivery-basico-content-column pt-2 backdrop-blur-sm"
+            style={{
+              backgroundColor:
+                'color-mix(in srgb, var(--delivery-bg, var(--delivery-surface)) 95%, transparent)',
+            }}
+          >
+            <DeliveryPedidoFooter
+              total={viewModel.carrinho.total}
+              quantidadeItens={viewModel.carrinho.quantidadeItens}
+              interactive={interactive}
+              onClick={onPedidoClick}
+              thumbs={carrinhoThumbs}
+              thumbsBounceKey={carrinhoThumbsBounceKey}
+              thumbsTargetRef={carrinhoThumbsTargetRef}
+            />
+          </div>
         </div>
       ) : null}
 
