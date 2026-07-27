@@ -60,7 +60,7 @@ export function PerfilConfiguracoesTab({
           <div className="px-6 py-5">
             <p className={sessaoIndisponivelClassName}>
               Não há token de sessão válido para alterar o nome neste momento. Faça login novamente em{' '}
-              <strong>Meus Aplicativos</strong> ou na empresa.
+              <strong>Meu Jiffy</strong> ou na empresa.
             </p>
           </div>
         ) : (
@@ -105,7 +105,7 @@ export function PerfilConfiguracoesTab({
           <div className="px-6 py-5">
             <p className={sessaoIndisponivelSenhaClassName}>
               Não há token de sessão válido para alterar a senha neste momento. Faça login novamente em{' '}
-              <strong>Meus Aplicativos</strong> ou na empresa.
+              <strong>Meu Jiffy</strong> ou na empresa.
             </p>
           </div>
         ) : (

@@ -12,6 +12,8 @@ import {
 interface FaturamentoBannerProps {
   periodoData: string
   carregandoResumo: boolean
+  /** Troca de período em andamento (isFetching) — dados anteriores ainda visíveis */
+  atualizandoResumo: boolean
   erroResumo: boolean
   totalFaturadoPeriodo: number
   comparacaoPeriodoAnterior: {
@@ -25,6 +27,7 @@ interface FaturamentoBannerProps {
 export function FaturamentoBanner({
   periodoData,
   carregandoResumo,
+  atualizandoResumo,
   erroResumo,
   totalFaturadoPeriodo,
   comparacaoPeriodoAnterior,
@@ -46,7 +49,7 @@ export function FaturamentoBanner({
             </div>
             <p
               className={`font-exo text-2xl font-semibold text-white md:text-[40px] ${
-                carregandoResumo ? 'animate-pulse opacity-80' : ''
+                carregandoResumo ? 'animate-pulse opacity-80' : atualizandoResumo ? 'animate-pulse opacity-50' : ''
               }`}
             >
               {erroResumo
@@ -55,7 +58,11 @@ export function FaturamentoBanner({
                   ? '…'
                   : formatarMoeda(totalFaturadoPeriodo)}
             </p>
-            <div className="font-regular mt-3 inline-flex flex-wrap items-center gap-1 py-1 text-base text-white/90">
+            <div
+              className={`font-regular mt-3 inline-flex flex-wrap items-center gap-1 py-1 text-base text-white/90 transition-opacity duration-300 ${
+                atualizandoResumo && !carregandoResumo ? 'opacity-50' : ''
+              }`}
+            >
               {comparacaoPeriodoAnterior.status === 'carregando' ? (
                 <span className="text-sm opacity-80">Carregando comparação…</span>
               ) : comparacaoPeriodoAnterior.status === 'erro' ? (
@@ -88,7 +95,11 @@ export function FaturamentoBanner({
               )}
             </div>
           </div>
-          <div className="col-span-2 flex flex-col items-start gap-4 text-white/90 lg:items-center lg:text-center">
+          <div
+            className={`col-span-2 flex flex-col items-start gap-4 text-white/90 transition-opacity duration-300 lg:items-center lg:text-center ${
+              atualizandoResumo && !carregandoResumo ? 'opacity-50' : ''
+            }`}
+          >
             {comparacaoPeriodoAnterior.status === 'carregando' ? (
               <span className="text-lg font-semibold tracking-wide opacity-80">…</span>
             ) : comparacaoPeriodoAnterior.status === 'erro' ? (

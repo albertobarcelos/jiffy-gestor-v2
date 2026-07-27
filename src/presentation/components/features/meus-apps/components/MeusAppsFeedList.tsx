@@ -134,7 +134,7 @@ function EmpresaListRow({
                 : 'bg-secondary hover:bg-alternate'
             )}
           >
-            {bloqueado ? 'Empresa Bloqueada' : isSelecting ? 'Abrindo…' : 'Acessar Empresa'}
+            {bloqueado ? 'Empresa Bloqueada' : isSelecting ? 'Abrindo…' : 'Acesse sua empresa'}
           </button>
           <CardGearMenu
             disabled={interactionDisabled}

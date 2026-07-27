@@ -45,7 +45,7 @@ export default function MeusAppsPage() {
   useRegisterHubSearch({
     value: busca,
     onChange: setBusca,
-    placeholder: 'Busque sua empresa',
+    placeholder: 'Buscar por nome ou CNPJ',
   })
   const [viewMode, setViewMode] = useState<MeusAppsViewMode>('grid')
   const [feedFiltro, setFeedFiltro] = useState<MeusAppsFeedFiltro>('tudo')
@@ -518,8 +518,11 @@ export default function MeusAppsPage() {
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0">
               <h1 className="font-exo text-2xl font-semibold text-gray-900 md:text-3xl">
-                Meus aplicativos
+                Suas empresas
               </h1>
+              <p className="mt-1 text-sm text-gray-600 md:text-base">
+                Escolha a empresa que deseja acessar.
+              </p>
             </div>
           </div>
 
@@ -547,9 +550,6 @@ export default function MeusAppsPage() {
               onModeChange={setViewMode}
               feedFiltro={feedFiltro}
               onFeedFiltroChange={setFeedFiltro}
-              onOpenFilters={() => {
-                console.log('Abrir filtros')
-              }}
             />
           </div>
         </header>

@@ -204,6 +204,7 @@ export default function DashboardV2() {
   const {
     data: dadosResumo,
     isLoading: carregandoResumo,
+    isFetching: atualizandoResumo,
     isError: erroResumo,
     refetch: refetchResumo,
   } = useDashboardResumoQuery({
@@ -257,6 +258,7 @@ export default function DashboardV2() {
       <FaturamentoBanner
         periodoData={periodoData}
         carregandoResumo={carregandoResumo}
+        atualizandoResumo={atualizandoResumo}
         erroResumo={erroResumo}
         totalFaturadoPeriodo={totalFaturadoPeriodo}
         comparacaoPeriodoAnterior={
@@ -276,6 +278,7 @@ export default function DashboardV2() {
         periodoData={periodoData}
         dadosResumo={dadosResumo}
         carregandoResumo={carregandoResumo}
+        atualizandoResumo={atualizandoResumo}
         erroResumo={erroResumo}
       />
 

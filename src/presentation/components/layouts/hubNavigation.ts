@@ -1,16 +1,16 @@
-import AppsIcon from '@mui/icons-material/Apps'
+import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined'
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
 import SchoolIcon from '@mui/icons-material/School'
 
 export type HubMenuItem = {
   label: string
   href: string
-  /** Ícones Material (`@mui/icons-material`), mesma família que `AppsIcon`. */
-  Icon: typeof AppsIcon
+  /** Ícones Material (`@mui/icons-material`), mesma família que `DashboardOutlinedIcon`. */
+  Icon: typeof DashboardOutlinedIcon
 }
 
 export const HUB_MENU_ITEMS: HubMenuItem[] = [
-  { label: 'Meus Aplicativos', href: '/meus-apps', Icon: AppsIcon },
+  { label: 'Meu Jiffy', href: '/meus-apps', Icon: DashboardOutlinedIcon },
   { label: 'Extrato Financeiro', href: '/meus-apps/extrato-financeiro', Icon: ReceiptLongIcon },
   { label: 'Treinamentos', href: '/meus-apps/treinamentos', Icon: SchoolIcon },
 ]

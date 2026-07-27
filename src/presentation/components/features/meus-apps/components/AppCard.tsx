@@ -152,7 +152,7 @@ export function AppCard({
                 : 'bg-secondary hover:bg-alternate'
             )}
           >
-            {bloqueado ? 'Empresa Bloqueada' : isSelecting ? 'Abrindo…' : 'Acessar Empresa'}
+            {bloqueado ? 'Empresa Bloqueada' : isSelecting ? 'Abrindo…' : 'Acesse sua empresa'}
           </button>
         </div>
       </div>

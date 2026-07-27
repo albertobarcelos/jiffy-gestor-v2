@@ -1,6 +1,6 @@
 'use client'
 
-import { Building2, Layers, LayoutGrid, List, Mail, SlidersHorizontal } from 'lucide-react'
+import { LayoutGrid, List, Mail } from 'lucide-react'
 import { cn } from '@/src/shared/utils/cn'
 
 export type MeusAppsViewMode = 'grid' | 'list'
@@ -43,13 +43,11 @@ export function ViewControls({
   onModeChange,
   feedFiltro,
   onFeedFiltroChange,
-  onOpenFilters,
 }: {
   mode: MeusAppsViewMode
   onModeChange: (m: MeusAppsViewMode) => void
   feedFiltro: MeusAppsFeedFiltro
   onFeedFiltroChange: (f: MeusAppsFeedFiltro) => void
-  onOpenFilters?: () => void
 }) {
   return (
     <div className="flex flex-wrap items-center gap-1">
@@ -61,31 +59,12 @@ export function ViewControls({
       </IconButton>
       <span className="mx-1 hidden h-5 w-px bg-gray-200 sm:inline-block" aria-hidden />
       <IconButton
-        label="Exibir convites e empresas"
-        active={feedFiltro === 'tudo'}
-        onClick={() => onFeedFiltroChange('tudo')}
-      >
-        <Layers className="h-4 w-4" aria-hidden />
-      </IconButton>
-      <IconButton
         label="Exibir somente convites pendentes"
         active={feedFiltro === 'convites'}
-        onClick={() => onFeedFiltroChange('convites')}
+        onClick={() => onFeedFiltroChange(feedFiltro === 'convites' ? 'tudo' : 'convites')}
       >
         <Mail className="h-4 w-4" aria-hidden />
-      </IconButton>
-      <IconButton
-        label="Exibir somente empresas vinculadas"
-        active={feedFiltro === 'empresas'}
-        onClick={() => onFeedFiltroChange('empresas')}
-      >
-        <Building2 className="h-4 w-4" aria-hidden />
-      </IconButton>
-      <span className="mx-1 h-5 w-px bg-gray-200" aria-hidden />
-      <IconButton label="Filtros" onClick={() => onOpenFilters?.()}>
-        <SlidersHorizontal className="h-4 w-4" aria-hidden />
       </IconButton>
     </div>
   )
 }
-

@@ -6,7 +6,7 @@ import { cn } from '@/src/shared/utils/cn'
 export function SearchBar({
   value,
   onChange,
-  placeholder = 'Busque sua empresa',
+  placeholder = 'Buscar por nome ou CNPJ',
   className,
 }: {
   value: string

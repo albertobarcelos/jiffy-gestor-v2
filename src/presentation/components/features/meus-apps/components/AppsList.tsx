@@ -70,7 +70,7 @@ export function AppsList({
                     : 'bg-sky-500 text-white hover:bg-sky-600'
                 )}
               >
-                {bloqueado ? 'Empresa Bloqueada' : isSelecting ? 'Abrindo…' : 'Acessar Empresa'}
+                {bloqueado ? 'Empresa Bloqueada' : isSelecting ? 'Abrindo…' : 'Acesse sua empresa'}
               </button>
             </div>
           </div>
