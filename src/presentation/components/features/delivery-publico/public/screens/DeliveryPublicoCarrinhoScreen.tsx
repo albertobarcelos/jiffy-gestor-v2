@@ -103,6 +103,7 @@ export function DeliveryPublicoCarrinhoScreen({
     loadingMeios,
     enviando,
     enviarPedido,
+    salvarNomeCliente,
   } = useDeliveryCheckout(slug)
 
   const quantidadeItens = useMemo(
@@ -141,9 +142,13 @@ export function DeliveryPublicoCarrinhoScreen({
   const enderecoParaRevisao =
     form.tipoEntrega === 'entrega' ? enderecoClienteSelecionado : null
 
-  const meioPagamentoSelecionado = useMemo(
-    () => meiosPagamento.find(m => m.id === form.meioPagamentoId) ?? null,
-    [meiosPagamento, form.meioPagamentoId]
+  const pagamentosRevisao = useMemo(
+    () =>
+      form.pagamentos.map(p => ({
+        ...p,
+        meio: meiosPagamento.find(m => m.id === p.meioPagamentoId) ?? null,
+      })),
+    [form.pagamentos, meiosPagamento]
   )
 
   const nomeClienteExibicao =
@@ -269,6 +274,13 @@ export function DeliveryPublicoCarrinhoScreen({
     catalogQuery.isFetchingNextPage,
     catalogQuery.hasNextPage,
   ])
+
+  const handleEnviarPedido = async () => {
+    const enviado = await enviarPedido()
+    if (!enviado) return
+    fecharCheckout()
+    requestClose()
+  }
 
   const voltar = () => requestClose()
   const carregandoEdicao = Boolean(itemEditando) && !produtoEdicao
@@ -563,10 +575,16 @@ export function DeliveryPublicoCarrinhoScreen({
             telefonePaisIso2={form.telefonePaisIso2}
             nome={form.nome}
             nomeCadastro={clienteLookup.cliente?.nome ?? null}
+            telefoneConfirmadoDigits={
+              clienteLookup.status === 'encontrado'
+                ? clienteLookup.telefoneConsultado
+                : null
+            }
             lookupStatus={clienteLookup.status}
             onChangeTelefone={value => updateForm('telefone', value)}
             onChangeTelefonePais={iso2 => updateForm('telefonePaisIso2', iso2)}
             onChangeNome={value => updateForm('nome', value)}
+            onSalvarNome={salvarNomeCliente}
             onClose={fecharOuRevisao}
             onContinuar={handleTelefoneContinuar}
           />
@@ -613,10 +631,8 @@ export function DeliveryPublicoCarrinhoScreen({
             total={total}
             meiosPagamento={meiosPagamento}
             loadingMeios={loadingMeios}
-            meioPagamentoId={form.meioPagamentoId}
-            trocoPara={form.trocoPara}
-            onChangeMeioPagamentoId={value => updateForm('meioPagamentoId', value)}
-            onChangeTrocoPara={value => updateForm('trocoPara', value)}
+            pagamentos={form.pagamentos}
+            onChangePagamentos={value => updateForm('pagamentos', value)}
             onClose={fecharOuRevisao}
             onVoltar={voltarDoPagamento}
             onContinuar={handlePagamentoContinuar}
@@ -633,9 +649,9 @@ export function DeliveryPublicoCarrinhoScreen({
             enderecoEmpresaTexto={enderecoEmpresaTexto}
             itens={itens}
             total={total}
-            meioPagamento={meioPagamentoSelecionado}
-            trocoPara={form.trocoPara}
+            pagamentos={pagamentosRevisao}
             observacaoPedido={form.observacaoPedido}
+            cpfNotaFiscal={form.cpfNotaFiscal}
             enviando={enviando}
             onClose={fecharCheckout}
             onVoltar={() => {
@@ -652,7 +668,8 @@ export function DeliveryPublicoCarrinhoScreen({
             }}
             onEditarPagamento={() => abrirStepDaRevisao('pagamento')}
             onChangeObservacaoPedido={value => updateForm('observacaoPedido', value)}
-            onEnviar={() => void enviarPedido()}
+            onChangeCpfNotaFiscal={value => updateForm('cpfNotaFiscal', value)}
+            onEnviar={() => void handleEnviarPedido()}
           />
         ) : null}
       </DeliveryCheckoutShell>

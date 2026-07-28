@@ -162,6 +162,8 @@ export type AtualizarClienteDeliveryPublicoInput = {
 export type ClientePedidoPublicoInput = {
   telefone: string
   nome?: string | null
+  /** CPF com 11 dígitos, sem máscara. Opcional. */
+  cpf?: string | null
   /** Obrigatório quando o cliente já possui 2+ endereços. */
   enderecoIdEntrega?: string | null
   enderecos?: EnderecoDeliveryPublicoInput[]
@@ -178,6 +180,8 @@ export type CreatePedidoPublicoInput = {
   origem: 'JIFFY_DELIVERY'
   tipoEntrega: 'entrega' | 'retirada'
   cliente: ClientePedidoPublicoInput
+  /** Documento da venda (CPF/CNPJ). Opcional. */
+  documentoCpfCnpj?: string | null
   produtos: ProdutoPedidoPublicoInput[]
   cobrancas?: CobrancaPedidoPublicoInput[]
   observacoes?: string[]

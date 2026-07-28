@@ -6,6 +6,8 @@ import { Trash2 } from 'lucide-react'
 
 /** Área da lixeira = 1/4 da largura do card (modal mobile full / desktop ~40%). */
 const ACTION_WIDTH_RATIO = 0.25
+/** Soltar a partir desta fração do swipe completo remove o item. */
+const DELETE_THRESHOLD_RATIO = 0.85
 const DIRECTION_LOCK_PX = 8
 const EXIT_TRANSITION = { duration: 0.35, ease: [0.22, 1, 0.36, 1] as const }
 
@@ -116,8 +118,15 @@ export function DeliveryCarrinhoSwipeableItem({
     if (!startRef.current && !draggingRef.current) return
 
     const width = actionWidthRef.current
-    const shouldOpen = offsetRef.current <= -(width * 0.4)
-    snapTo(shouldOpen ? -width : 0, shouldOpen)
+    const shouldDelete = offsetRef.current <= -(width * DELETE_THRESHOLD_RATIO)
+
+    if (shouldDelete) {
+      resetPointer()
+      onSwipeRemove()
+      return
+    }
+
+    snapTo(0, false)
     resetPointer()
   }
 

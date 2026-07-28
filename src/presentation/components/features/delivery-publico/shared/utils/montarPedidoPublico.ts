@@ -1,7 +1,10 @@
 import type { CreatePedidoPublicoInput } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { DELIVERY_PAIS_TELEFONE_PADRAO } from '../constants/deliveryPaisesTelefone'
 import type { DeliveryCarrinhoItem } from '../stores/deliveryCarrinhoStore'
+import type { CheckoutPagamentoItem } from './checkoutPagamentosUtils'
 import { comporTelefoneApi, telefoneNacionalValido } from './deliveryTelefonePais'
+
+export type { CheckoutPagamentoItem }
 
 export type CheckoutFormData = {
   tipoEntrega: 'entrega' | 'retirada'
@@ -22,10 +25,13 @@ export type CheckoutFormData = {
   pontoReferencia: string
   etiquetaEndereco: 'casa' | 'trabalho' | 'outro'
   apelidoEndereco: string
-  meioPagamentoId: string
-  /** Valor informado para troco (dinheiro). `null` = sem troco. */
-  trocoPara: number | null
+  pagamentos: CheckoutPagamentoItem[]
   observacaoPedido: string
+  /**
+   * CPF para nota fiscal (máscara UI).
+   * Vazio = não solicitou NF. Enviado no pedido quando completo (11 dígitos).
+   */
+  cpfNotaFiscal: string
   /** Timing do pedido (tela de tipo de entrega). Ainda não enviado ao backend nesta etapa. */
   modoTempo: 'imediato' | 'agendado'
 }
@@ -37,24 +43,46 @@ type MontarPedidoParams = {
   form: CheckoutFormData
   /** Preenchido após garantir o endereço no cadastro (fluxo de entrega). */
   enderecoIdEntrega?: string | null
+  /**
+   * Telefone já resolvido (dígitos API). Use quando o input Celular foi limpo
+   * após encontrar o cliente.
+   */
+  telefoneApi?: string | null
 }
 
 export type MontarPedidoResult =
   | { ok: true; payload: CreatePedidoPublicoInput }
   | { ok: false; error: string }
 
+function extrairCpfPedido(cpfMascarado: string): { ok: true; cpf: string | null } | { ok: false; error: string } {
+  const digits = cpfMascarado.replace(/\D/g, '').slice(0, 11)
+  if (!digits) return { ok: true, cpf: null }
+  if (digits.length !== 11) {
+    return { ok: false, error: 'Informe um CPF completo com 11 dígitos' }
+  }
+  return { ok: true, cpf: digits }
+}
+
 export function montarPedidoPublico({
   slug,
   itens,
-  total,
+  total: _total,
   form,
   enderecoIdEntrega,
+  telefoneApi,
 }: MontarPedidoParams): MontarPedidoResult {
   const paisIso2 = form.telefonePaisIso2 || DELIVERY_PAIS_TELEFONE_PADRAO
-  if (!telefoneNacionalValido(form.telefone, paisIso2)) {
+  const telResolvido = (telefoneApi ?? '').replace(/\D/g, '')
+  const tel =
+    telResolvido.length >= 8
+      ? telResolvido
+      : telefoneNacionalValido(form.telefone, paisIso2)
+        ? comporTelefoneApi(form.telefone, paisIso2)
+        : ''
+
+  if (tel.length < 8) {
     return { ok: false, error: 'Informe um telefone válido' }
   }
-  const tel = comporTelefoneApi(form.telefone, paisIso2)
   if (itens.length === 0) {
     return { ok: false, error: 'Carrinho vazio' }
   }
@@ -68,6 +96,9 @@ export function montarPedidoPublico({
       return { ok: false, error: 'Preencha o endereço de entrega' }
     }
   }
+
+  const cpfResult = extrairCpfPedido(form.cpfNotaFiscal)
+  if (!cpfResult.ok) return cpfResult
 
   const produtos = itens.map(item => ({
     produtoId: item.produtoId,
@@ -83,6 +114,10 @@ export function montarPedidoPublico({
   const cliente: CreatePedidoPublicoInput['cliente'] = {
     telefone: tel,
     nome: form.nome.trim() || null,
+  }
+
+  if (cpfResult.cpf) {
+    cliente.cpf = cpfResult.cpf
   }
 
   if (form.tipoEntrega === 'entrega') {
@@ -101,31 +136,21 @@ export function montarPedidoPublico({
     produtos,
   }
 
-  if (form.meioPagamentoId) {
-    payload.cobrancas = [
-      {
-        meioPagamentoId: form.meioPagamentoId,
-        valor: total,
-        momentoCobranca: 'na_entrega',
-      },
-    ]
+  if (cpfResult.cpf) {
+    payload.documentoCpfCnpj = cpfResult.cpf
   }
 
-  const observacoes: string[] = []
-  if (form.trocoPara != null && form.trocoPara > 0) {
-    observacoes.push(
-      `Troco para ${new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: 'BRL',
-      }).format(form.trocoPara)}`
-    )
+  if (form.pagamentos.length > 0) {
+    payload.cobrancas = form.pagamentos.map(p => ({
+      meioPagamentoId: p.meioPagamentoId,
+      valor: p.valor,
+      momentoCobranca: 'na_entrega',
+    }))
   }
+
   const obsPedido = form.observacaoPedido.trim()
   if (obsPedido) {
-    observacoes.push(obsPedido)
-  }
-  if (observacoes.length > 0) {
-    payload.observacoes = observacoes
+    payload.observacoes = [obsPedido]
   }
 
   return { ok: true, payload }
