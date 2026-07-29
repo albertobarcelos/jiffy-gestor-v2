@@ -22,7 +22,6 @@ import { DELIVERY_GRUPO_BANNER_CROP_PRESET } from '@/src/presentation/constants/
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
-import { cn } from '@/src/shared/utils/cn'
 import type { DeliveryPublicoDesignConfig } from '../../../shared/types/deliveryPublicoDesignConfig'
 import type { DesignCategoriaGrupo } from '../../../shared/types/designCategoriaGrupo'
 import { resolveDesignPaletteColors } from '../../../shared/constants/colorPalettes'
@@ -62,9 +61,12 @@ export function DesignCategoriasTab({
   const palette = resolveDesignPaletteColors(config)
   const selectedCategory = localGrupos.find(c => c.id === selectedCategoryId)
   const usarBannerImagem = config.categorias.tituloGrupoFundo === 'imagem'
-  const corBarraEfetiva = config.categorias.corBarraTitulo ?? palette.primaryDark
-  /** Texto do título no tema público usa `--delivery-btn-text` (branco). */
-  const corTextoEfetiva = config.categorias.corTextoTitulo ?? '#FFFFFF'
+  const corTemaBarra = palette.primaryDark.toUpperCase()
+  const corTemaTexto = '#FFFFFF'
+  const corBarraEfetiva = (config.categorias.corBarraTitulo ?? corTemaBarra).toUpperCase()
+  const corTextoEfetiva = (config.categorias.corTextoTitulo ?? corTemaTexto).toUpperCase()
+  const usaTemaBarra = config.categorias.corBarraTitulo == null
+  const usaTemaTexto = config.categorias.corTextoTitulo == null
   const isUploadingSelected = uploadingGrupoId === selectedCategoryId
   const isReordering = reorderingGrupoId != null
 
@@ -203,16 +205,10 @@ export function DesignCategoriasTab({
       <h3 className="text-base font-semibold text-primary">Categorias</h3>
 
       <div className="space-y-2 rounded-xl border border-gray-200 bg-white p-2">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-primary-text">Cor da barra do título</p>
-            <p className="mt-0.5 text-xs text-secondary-text">
-              Fundo para todos os grupos. Sem personalização, usa a cor escura do tema.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 flex-1 items-start gap-2">
             <label
-              className="relative flex h-9 w-9 cursor-pointer overflow-hidden rounded-lg border border-gray-200"
+              className="relative mt-0.5 flex h-9 w-9 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-gray-200"
               title={`Cor da barra: ${corBarraEfetiva}`}
             >
               <span className="absolute inset-0" style={{ backgroundColor: corBarraEfetiva }} />
@@ -221,68 +217,46 @@ export function DesignCategoriasTab({
                 value={corBarraEfetiva}
                 aria-label="Escolher cor da barra do título"
                 className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                onChange={e =>
+                onChange={e => {
+                  const next = e.target.value.toUpperCase()
                   onChange(current => ({
                     ...current,
                     categorias: {
                       ...current.categorias,
-                      corBarraTitulo: e.target.value.toUpperCase(),
+                      // Mesma cor do tema → permanece no modo tema (null).
+                      corBarraTitulo: next === corTemaBarra ? null : next,
                     },
                   }))
-                }
+                }}
               />
             </label>
-            {config.categorias.corBarraTitulo ? (
-              <button
-                type="button"
-                className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-secondary hover:bg-gray-100"
-                onClick={() =>
-                  onChange(current => ({
-                    ...current,
-                    categorias: { ...current.categorias, corBarraTitulo: null },
-                  }))
-                }
-              >
-                Usar tema
-              </button>
-            ) : (
-              <span className="text-xs text-secondary-text">Tema</span>
-            )}
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-primary-text">Cor da barra do título</p>
+              <p className="mt-0.5 text-xs text-secondary-text">
+                Fundo para todos os grupos. Sem personalização, usa a cor escura do tema.
+              </p>
+            </div>
           </div>
+          <JiffyIconSwitch
+            size="xs"
+            label={usaTemaBarra ? 'Tema' : 'Usar Tema'}
+            labelPosition="start"
+            checked={usaTemaBarra}
+            disabled={usaTemaBarra}
+            onChange={e => {
+              if (!e.target.checked) return
+              onChange(current => ({
+                ...current,
+                categorias: { ...current.categorias, corBarraTitulo: null },
+              }))
+            }}
+          />
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-3">
-              <p className="text-sm font-semibold text-primary-text">Cor do nome do grupo</p>
-              <JiffyIconSwitch
-                size="sm"
-                label="Exibir"
-                labelPosition="start"
-                checked={config.categorias.mostrarNomeTitulo}
-                onChange={e =>
-                  onChange(current => ({
-                    ...current,
-                    categorias: {
-                      ...current.categorias,
-                      mostrarNomeTitulo: e.target.checked,
-                    },
-                  }))
-                }
-              />
-            </div>
-            <p className="mt-0.5 text-xs text-secondary-text">
-              Texto na barra para todos os grupos. Desligue se o banner já mostrar o nome.
-            </p>
-          </div>
-          <div
-            className={cn(
-              'flex items-center gap-2',
-              !config.categorias.mostrarNomeTitulo && 'pointer-events-none opacity-40'
-            )}
-          >
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-1">
+          <div className="flex min-w-0 flex-1 items-start gap-2">
             <label
-              className="relative flex h-9 w-9 cursor-pointer overflow-hidden rounded-lg border border-gray-200"
+              className="relative mt-0.5 flex h-9 w-9 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-gray-200"
               title={`Cor do texto: ${corTextoEfetiva}`}
             >
               <span className="absolute inset-0" style={{ backgroundColor: corTextoEfetiva }} />
@@ -291,38 +265,42 @@ export function DesignCategoriasTab({
                 value={corTextoEfetiva}
                 aria-label="Escolher cor do nome do grupo"
                 className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                disabled={!config.categorias.mostrarNomeTitulo}
-                onChange={e =>
+                onChange={e => {
+                  const next = e.target.value.toUpperCase()
                   onChange(current => ({
                     ...current,
                     categorias: {
                       ...current.categorias,
-                      corTextoTitulo: e.target.value.toUpperCase(),
+                      corTextoTitulo: next === corTemaTexto ? null : next,
                     },
                   }))
-                }
+                }}
               />
             </label>
-            {config.categorias.corTextoTitulo ? (
-              <button
-                type="button"
-                className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-secondary hover:bg-gray-100"
-                onClick={() =>
-                  onChange(current => ({
-                    ...current,
-                    categorias: { ...current.categorias, corTextoTitulo: null },
-                  }))
-                }
-              >
-                Usar tema
-              </button>
-            ) : (
-              <span className="text-xs text-secondary-text">Tema</span>
-            )}
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-primary-text">Cor do nome do grupo</p>
+              <p className="mt-0.5 text-xs text-secondary-text">
+                Texto na barra para todos os grupos. Sem personalização, usa a cor do tema.
+              </p>
+            </div>
           </div>
+          <JiffyIconSwitch
+            size="xs"
+            label={usaTemaTexto ? 'Tema' : 'Usar Tema'}
+            labelPosition="start"
+            checked={usaTemaTexto}
+            disabled={usaTemaTexto}
+            onChange={e => {
+              if (!e.target.checked) return
+              onChange(current => ({
+                ...current,
+                categorias: { ...current.categorias, corTextoTitulo: null },
+              }))
+            }}
+          />
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-1">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-primary-text">
               Usar imagem como fundo do título
@@ -333,8 +311,8 @@ export function DesignCategoriasTab({
             </p>
           </div>
           <JiffyIconSwitch
-            size="sm"
-            label="Ativar"
+            size="xs"
+            label={usarBannerImagem ? 'ON' : 'OFF'}
             labelPosition="start"
             checked={usarBannerImagem}
             onChange={e =>
@@ -349,7 +327,31 @@ export function DesignCategoriasTab({
           />
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-1">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-primary-text">Exibir nome do grupo</p>
+            <p className="mt-0.5 text-xs text-secondary-text">
+              Mostra o nome na barra. Desligue se o banner já trouxer o nome personalizado.
+            </p>
+          </div>
+          <JiffyIconSwitch
+            size="xs"
+            label={config.categorias.mostrarNomeTitulo ? 'ON' : 'OFF'}
+            labelPosition="start"
+            checked={config.categorias.mostrarNomeTitulo}
+            onChange={e =>
+              onChange(current => ({
+                ...current,
+                categorias: {
+                  ...current.categorias,
+                  mostrarNomeTitulo: e.target.checked,
+                },
+              }))
+            }
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-1">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-primary-text">Grupo Sugestões da Casa</p>
             <p className="mt-0.5 text-xs text-secondary-text">
@@ -357,8 +359,8 @@ export function DesignCategoriasTab({
             </p>
           </div>
           <JiffyIconSwitch
-            size="sm"
-            label="Exibir"
+            size="xs"
+            label={config.categorias.mostrarSugestoesDaCasa ? 'ON' : 'OFF'}
             labelPosition="start"
             checked={config.categorias.mostrarSugestoesDaCasa}
             onChange={e =>
