@@ -9,6 +9,7 @@ import { DeliveryVitrineHeader } from './components/DeliveryVitrineHeader'
 import { DeliveryVitrineCategoriaTabs } from './components/DeliveryVitrineCategoriaTabs'
 import { DeliveryVitrineSecaoGrupo } from './components/DeliveryVitrineSecaoGrupo'
 import { DeliveryPublicoLojaFooter } from '../../../shared/components/DeliveryPublicoLojaFooter'
+import { DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID } from '../../../shared/constants/deliveryPublicoSugestoes'
 
 export function VitrineLayoutHome({
   config,
@@ -73,11 +74,15 @@ export function VitrineLayoutHome({
       ) : null}
 
       <div className="flex-1 pb-4">
-        {filtered.grupos.map(grupo => (
+        {filtered.grupos.map((grupo, index) => (
           <DeliveryVitrineSecaoGrupo
             key={grupo.id}
             grupo={grupo}
             interactive={interactive}
+            denseTop={
+              index > 0 &&
+              filtered.grupos[index - 1]?.id === DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID
+            }
             onProdutoClick={onProdutoClick}
           />
         ))}

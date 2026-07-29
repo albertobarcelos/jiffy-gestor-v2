@@ -473,7 +473,7 @@ export function DeliveryProdutoModal({
               ? isEdicao
                 ? 'Salvando...'
                 : 'Adicionando...'
-              : `${isEdicao ? 'Salvar' : 'Adicionar'}  ${formatDeliveryCurrency(valorTotal)}`}
+              : `${isEdicao ? 'Atualizar' : 'Adicionar'}  ${formatDeliveryCurrency(valorTotal)}`}
           </DeliveryButton>
         </div>
           </motion.div>

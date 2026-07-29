@@ -1,6 +1,8 @@
 'use client'
 
+import { DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID } from '../constants/deliveryPublicoSugestoes'
 import { DeliveryProdutoListItem } from './DeliveryProdutoListItem'
+import { DeliverySecaoSugestoes } from './DeliverySecaoSugestoes'
 import type { DeliveryPublicoDesignConfig } from '../types/deliveryPublicoDesignConfig'
 import type { DeliveryPublicoGrupoViewModel } from '../types/deliveryPublicoViewModel'
 
@@ -9,6 +11,8 @@ type DeliverySecaoGrupoProps = {
   grupo: DeliveryPublicoGrupoViewModel
   interactive?: boolean
   stickyTitle?: boolean
+  /** Reduz o espaço acima (ex.: grupo logo após Sugestões). */
+  denseTop?: boolean
   quantidadePorProduto?: Record<string, number>
   onProdutoClick?: (produtoId: string) => void
   onProdutoAddRapido?: (produtoId: string) => void
@@ -16,9 +20,11 @@ type DeliverySecaoGrupoProps = {
 }
 
 export function DeliverySecaoGrupo({
+  config: _config,
   grupo,
   interactive = false,
   stickyTitle = false,
+  denseTop = false,
   quantidadePorProduto,
   onProdutoClick,
   onProdutoAddRapido,
@@ -26,9 +32,25 @@ export function DeliverySecaoGrupo({
 }: DeliverySecaoGrupoProps) {
   if (grupo.produtos.length === 0) return null
 
+  if (grupo.id === DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID) {
+    return (
+      <DeliverySecaoSugestoes
+        grupo={grupo}
+        interactive={interactive}
+        stickyTitle={stickyTitle}
+        quantidadePorProduto={quantidadePorProduto}
+        onProdutoClick={onProdutoClick}
+        onProdutoAddRapido={onProdutoAddRapido}
+        onAbrirCarrinho={onAbrirCarrinho}
+      />
+    )
+  }
+
+  const topClass = denseTop ? 'mt-2' : 'mt-5'
+
   return (
     <section
-      className={`mt-5${stickyTitle ? ' delivery-basico-grupo-section px-4' : ' px-4'}`}
+      className={`${topClass}${stickyTitle ? ' delivery-basico-grupo-section px-4' : ' px-4'}`}
       id={`grupo-${grupo.id}`}
     >
       <h2

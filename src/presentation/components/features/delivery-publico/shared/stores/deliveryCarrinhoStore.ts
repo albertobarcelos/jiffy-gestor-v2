@@ -63,6 +63,8 @@ function mesclarQuantidade(
     valorUnitario,
     quantidade,
     valorTotal: valorUnitario * quantidade,
+    // Último lançamento — miniaturas do footer seguem esta ordem.
+    adicionadoEm: new Date().toISOString(),
   }
 }
 

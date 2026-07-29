@@ -9,6 +9,7 @@ import { DeliveryCatalogoHeader } from './components/DeliveryCatalogoHeader'
 import { DeliveryCatalogoSearch } from './components/DeliveryCatalogoSearch'
 import { DeliveryCatalogoCategoriaTabs } from './components/DeliveryCatalogoCategoriaTabs'
 import { DeliveryCatalogoSecaoGrupo } from './components/DeliveryCatalogoSecaoGrupo'
+import { DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID } from '../../../shared/constants/deliveryPublicoSugestoes'
 
 export function CatalogoLayoutHome({
   config,
@@ -79,11 +80,15 @@ export function CatalogoLayoutHome({
       ) : null}
 
       <div className="flex-1 pb-4">
-        {filtered.grupos.map(grupo => (
+        {filtered.grupos.map((grupo, index) => (
           <DeliveryCatalogoSecaoGrupo
             key={grupo.id}
             grupo={grupo}
             interactive={interactive}
+            denseTop={
+              index > 0 &&
+              filtered.grupos[index - 1]?.id === DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID
+            }
             onProdutoClick={onProdutoClick}
           />
         ))}

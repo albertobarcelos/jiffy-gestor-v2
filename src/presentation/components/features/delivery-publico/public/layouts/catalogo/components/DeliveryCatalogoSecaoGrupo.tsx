@@ -1,23 +1,37 @@
 'use client'
 
+import { DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID } from '../../../../shared/constants/deliveryPublicoSugestoes'
+import { DeliverySecaoSugestoes } from '../../../../shared/components/DeliverySecaoSugestoes'
 import { DeliveryCatalogoProdutoCard } from './DeliveryCatalogoProdutoCard'
 import type { DeliveryPublicoGrupoViewModel } from '../../../../shared/types/deliveryPublicoViewModel'
 
 type DeliveryCatalogoSecaoGrupoProps = {
   grupo: DeliveryPublicoGrupoViewModel
   interactive?: boolean
+  denseTop?: boolean
   onProdutoClick?: (produtoId: string) => void
 }
 
 export function DeliveryCatalogoSecaoGrupo({
   grupo,
   interactive = false,
+  denseTop = false,
   onProdutoClick,
 }: DeliveryCatalogoSecaoGrupoProps) {
   if (grupo.produtos.length === 0) return null
 
+  if (grupo.id === DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID) {
+    return (
+      <DeliverySecaoSugestoes
+        grupo={grupo}
+        interactive={interactive}
+        onProdutoClick={onProdutoClick}
+      />
+    )
+  }
+
   return (
-    <section className="mt-5" id={`grupo-${grupo.id}`}>
+    <section className={`${denseTop ? 'mt-2' : 'mt-5'}`} id={`grupo-${grupo.id}`}>
       <h2
         className="mb-3 px-4 text-lg font-bold @sm:text-xl"
         style={{

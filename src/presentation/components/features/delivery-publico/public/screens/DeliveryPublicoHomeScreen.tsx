@@ -1,6 +1,15 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type {
   CatalogoPublicoProdutoDTO,
@@ -33,6 +42,7 @@ import { DeliveryAdicionadoCarrinhoDialog } from '../components/DeliveryAdiciona
 import { DeliveryPublicoCarrinhoScreen } from './DeliveryPublicoCarrinhoScreen'
 import { useFlyToCart } from '../../shared/hooks/useFlyToCart'
 import type { DeliveryCarrinhoThumb } from '../../shared/components/DeliveryPedidoFooter'
+import { buildCarrinhoThumbsFromItens } from '../../shared/utils/buildCarrinhoThumbsFromItens'
 import {
   deliveryPublicoCarrinhoPath,
   deliveryPublicoHomePath,
@@ -53,43 +63,6 @@ type ProdutoAdicionadoPayload = {
   abrirDialogo?: boolean
 }
 
-const MAX_FOOTER_THUMBS = 5
-
-function buildCarrinhoThumbsFromItens(
-  itens: {
-    produtoId: string
-    produtoImagemUrl: string | null
-    quantidade: number
-    adicionadoEm: string
-  }[]
-): DeliveryCarrinhoThumb[] {
-  const byId = new Map<string, DeliveryCarrinhoThumb>()
-  const order: string[] = []
-
-  const sorted = [...itens].sort((a, b) => a.adicionadoEm.localeCompare(b.adicionadoEm))
-  for (const item of sorted) {
-    const imagemUrl = item.produtoImagemUrl?.trim()
-    if (!imagemUrl) continue
-    const existente = byId.get(item.produtoId)
-    if (!existente) {
-      order.push(item.produtoId)
-      byId.set(item.produtoId, {
-        produtoId: item.produtoId,
-        imagemUrl,
-        quantidade: item.quantidade,
-      })
-      continue
-    }
-    byId.set(item.produtoId, {
-      ...existente,
-      imagemUrl,
-      quantidade: existente.quantidade + item.quantidade,
-    })
-  }
-
-  return order.slice(-MAX_FOOTER_THUMBS).map(id => byId.get(id)!)
-}
-
 export function DeliveryPublicoHomeScreen({
   slug,
   carrinhoInicialAberto = false,
@@ -102,10 +75,18 @@ export function DeliveryPublicoHomeScreen({
   const [fechandoProduto, setFechandoProduto] = useState(false)
   const [produtoAdicionadoNome, setProdutoAdicionadoNome] = useState<string | null>(null)
   const [pendingFly, setPendingFly] = useState<ProdutoAdicionadoPayload | null>(null)
+  /** 1ª aparição: oculta a thumb até a imagem chegar no footer. */
   const [flyingProdutoId, setFlyingProdutoId] = useState<string | null>(null)
+  /**
+   * Relançamento: congela ordem/quantidade antiga até onArrive
+   * (evita sumir ou “pular” enquanto a cópia voa).
+   */
+  const [thumbsCongeladas, setThumbsCongeladas] = useState<DeliveryCarrinhoThumb[] | null>(null)
   const [carrinhoThumbsBounceKey, setCarrinhoThumbsBounceKey] = useState(0)
   const [carrinhoAberto, setCarrinhoAberto] = useState(carrinhoInicialAberto)
   const carrinhoThumbsTargetRef = useRef<HTMLDivElement>(null)
+  /** Últimas thumbs já exibidas (antes do add atual). */
+  const thumbsCommitadasRef = useRef<DeliveryCarrinhoThumb[]>([])
   const { flyToCart, flyingNode } = useFlyToCart()
 
   const catalogQuery = usePublicDeliveryCatalogInfinite(slug)
@@ -118,12 +99,22 @@ export function DeliveryPublicoHomeScreen({
   const carrinhoTotal = useDeliveryCarrinhoTotal(slug)
   const carrinhoQuantidade = useDeliveryCarrinhoTotalItens(slug)
   const adicionarItem = useDeliveryCarrinhoStore(s => s.adicionarItem)
+  const thumbsAoVivo = useMemo(
+    () => buildCarrinhoThumbsFromItens(carrinhoItens),
+    [carrinhoItens]
+  )
+
+  useLayoutEffect(() => {
+    // Não sobrescreve o snapshot enquanto há fly pendente/em curso.
+    if (pendingFly || flyingProdutoId || thumbsCongeladas) return
+    thumbsCommitadasRef.current = thumbsAoVivo
+  }, [thumbsAoVivo, pendingFly, flyingProdutoId, thumbsCongeladas])
+
   const carrinhoThumbs = useMemo(() => {
-    const thumbs = buildCarrinhoThumbsFromItens(carrinhoItens)
-    if (!flyingProdutoId) return thumbs
-    // Só oculta se for a 1ª aparição do produto (evita buraco ao readicionar o mesmo item).
-    return thumbs.filter(thumb => thumb.produtoId !== flyingProdutoId)
-  }, [carrinhoItens, flyingProdutoId])
+    if (thumbsCongeladas) return thumbsCongeladas
+    if (!flyingProdutoId) return thumbsAoVivo
+    return thumbsAoVivo.filter(thumb => thumb.produtoId !== flyingProdutoId)
+  }, [thumbsAoVivo, flyingProdutoId, thumbsCongeladas])
 
   const quantidadePorProduto = useMemo(() => {
     const map: Record<string, number> = {}
@@ -266,11 +257,15 @@ export function DeliveryPublicoHomeScreen({
         return
       }
 
-      const quantidadeDesteProduto = carrinhoItens.filter(item => item.produtoId === produtoId)
-        .length
-      const isNovaMiniatura = quantidadeDesteProduto <= 1
+      const jaTinhaMiniatura = thumbsCommitadasRef.current.some(
+        thumb => thumb.produtoId === produtoId
+      )
 
-      if (isNovaMiniatura) {
+      if (jaTinhaMiniatura) {
+        // Mantém posição e badge antigos até a imagem chegar.
+        setThumbsCongeladas(thumbsCommitadasRef.current)
+      } else {
+        // Produto novo: só aparece na barra no momento do arrive.
         setFlyingProdutoId(produtoId)
       }
 
@@ -279,6 +274,7 @@ export function DeliveryPublicoHomeScreen({
         targetElement: target,
         onArrive: () => {
           setFlyingProdutoId(null)
+          setThumbsCongeladas(null)
           setCarrinhoThumbsBounceKey(key => key + 1)
         },
         onFinish: () => {
@@ -292,7 +288,7 @@ export function DeliveryPublicoHomeScreen({
     return () => {
       cancelled = true
     }
-  }, [pendingFly, flyToCart, carrinhoQuantidade, carrinhoItens])
+  }, [pendingFly, flyToCart])
 
   const handleContinuarComprando = useCallback(() => {
     setProdutoAdicionadoNome(null)
