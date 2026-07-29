@@ -55,4 +55,13 @@ describe('applySugestoesDaCasaVisibility', () => {
     const result = applySugestoesDaCasaVisibility(comSugestoes, config)
     expect(result.grupos.every(g => g.id !== DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID)).toBe(true)
   })
+
+  it('aplica banner de Sugestões do design no grupo injetado', () => {
+    const config = createDefaultDesignConfig()
+    config.categorias.sugestoesDaCasaImagemUrl = 'https://cdn.example/sugestoes.jpg'
+    const result = applySugestoesDaCasaVisibility(baseViewModel, config, {
+      injectPreviewFallback: true,
+    })
+    expect(result.grupos[0]?.imagemUrl).toBe('https://cdn.example/sugestoes.jpg')
+  })
 })

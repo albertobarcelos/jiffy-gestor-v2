@@ -80,6 +80,7 @@ export function CatalogoLayoutHome({
         {filtered.grupos.map((grupo, index) => (
           <DeliveryCatalogoSecaoGrupo
             key={grupo.id}
+            config={config}
             grupo={grupo}
             interactive={interactive}
             denseTop={

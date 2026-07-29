@@ -13,6 +13,10 @@ function isGrupoSugestoes(grupo: DeliveryPublicoGrupoViewModel): boolean {
   return grupo.id === DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID
 }
 
+function resolveSugestoesImagemUrl(config: DeliveryPublicoDesignConfig): string | null {
+  return config.categorias.sugestoesDaCasaImagemUrl?.trim() || null
+}
+
 /** Remove o grupo sintético Sugestões da Casa da lista. */
 export function omitGrupoSugestoes(
   grupos: DeliveryPublicoGrupoViewModel[]
@@ -25,7 +29,8 @@ export function omitGrupoSugestoes(
  * (amostra dos primeiros produtos dos grupos reais/mock).
  */
 export function buildPreviewGrupoSugestoes(
-  grupos: DeliveryPublicoGrupoViewModel[]
+  grupos: DeliveryPublicoGrupoViewModel[],
+  imagemUrl: string | null = null
 ): DeliveryPublicoGrupoViewModel {
   const base = omitGrupoSugestoes(grupos)
   const amostras = base.flatMap(grupo => grupo.produtos).slice(0, 4)
@@ -49,13 +54,24 @@ export function buildPreviewGrupoSugestoes(
     nome: DELIVERY_PUBLICO_GRUPO_SUGESTOES_NOME,
     iconName: DELIVERY_PUBLICO_GRUPO_SUGESTOES_ICON,
     cor: null,
-    imagemUrl: null,
+    imagemUrl,
     produtos,
+  }
+}
+
+function withSugestoesImagem(
+  grupo: DeliveryPublicoGrupoViewModel,
+  config: DeliveryPublicoDesignConfig
+): DeliveryPublicoGrupoViewModel {
+  return {
+    ...grupo,
+    imagemUrl: resolveSugestoesImagemUrl(config),
   }
 }
 
 /**
  * Garante Sugestões no início da lista (preview) ou remove conforme o design.
+ * Aplica o banner configurado em `categorias.sugestoesDaCasaImagemUrl`.
  */
 export function applySugestoesDaCasaVisibility(
   viewModel: DeliveryPublicoViewModel,
@@ -73,7 +89,7 @@ export function applySugestoesDaCasaVisibility(
   if (existente) {
     return {
       ...viewModel,
-      grupos: [existente, ...semSugestoes],
+      grupos: [withSugestoesImagem(existente, config), ...semSugestoes],
     }
   }
 
@@ -83,6 +99,9 @@ export function applySugestoesDaCasaVisibility(
 
   return {
     ...viewModel,
-    grupos: [buildPreviewGrupoSugestoes(semSugestoes), ...semSugestoes],
+    grupos: [
+      buildPreviewGrupoSugestoes(semSugestoes, resolveSugestoesImagemUrl(config)),
+      ...semSugestoes,
+    ],
   }
 }

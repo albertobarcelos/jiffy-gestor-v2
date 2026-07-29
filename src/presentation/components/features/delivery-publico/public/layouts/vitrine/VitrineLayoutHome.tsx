@@ -73,6 +73,7 @@ export function VitrineLayoutHome({
         {filtered.grupos.map((grupo, index) => (
           <DeliveryVitrineSecaoGrupo
             key={grupo.id}
+            config={config}
             grupo={grupo}
             interactive={interactive}
             denseTop={

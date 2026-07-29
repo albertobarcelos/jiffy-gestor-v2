@@ -36,6 +36,7 @@ export function DeliverySecaoGrupo({
   if (grupo.id === DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID) {
     return (
       <DeliverySecaoSugestoes
+        config={config}
         grupo={grupo}
         interactive={interactive}
         stickyTitle={stickyTitle}
@@ -60,7 +61,7 @@ export function DeliverySecaoGrupo({
       id={`grupo-${grupo.id}`}
     >
       <h2
-        className={`delivery-grupo-title mb-2 flex min-h-12 items-center rounded-lg px-4 py-2.5 text-base uppercase tracking-wide @sm:min-h-14 @sm:text-lg @lg:min-h-16 @lg:text-xl @xl:text-2xl${
+        className={`delivery-grupo-title mb-2 flex min-h-12 items-center rounded-lg px-4 py-2.5 text-base uppercase tracking-wide @sm:min-h-14 @sm:text-lg @lg:min-h-20 @lg:py-4 @lg:text-xl @xl:min-h-20 @xl:text-2xl${
           stickyTitle ? ' delivery-basico-grupo-title-sticky' : ''
         }`}
         style={tituloStyle}

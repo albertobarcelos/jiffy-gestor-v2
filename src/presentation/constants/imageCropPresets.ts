@@ -135,24 +135,24 @@ export const DELIVERY_LOGO_CROP_PRESET: ImageCropPreset = {
   footerHint: 'Máx. 500×500 px',
 }
 
-/** Capa/banner do delivery público (Design → Cabeçalho). Proporção 12:5 (1200×500). */
+/** Capa/banner do delivery público (Design → Cabeçalho). Proporção 4:1 (1200×300). */
 export const DELIVERY_CAPA_CROP_PRESET: ImageCropPreset = {
   id: 'delivery-capa',
   title: 'Ajustar capa',
   descriptionLines: [
-    'Arraste a imagem, use o zoom e ajuste a moldura (proporção 12:5).',
-    'A saída é limitada a 1200×500 px (JPEG, PNG ou WebP — mantém o formato do ficheiro). Imagens menores não são ampliadas.',
-    'Mantenha o conteúdo importante no centro — em telas largas o topo e a base podem ser cortados.',
+    'Arraste a imagem, use o zoom e ajuste a moldura (proporção 4:1).',
+    'A saída é limitada a 1200×300 px (JPEG, PNG ou WebP — mantém o formato do ficheiro). Imagens menores não são ampliadas.',
+    'Mantenha o conteúdo importante no centro da moldura.',
     'Prefira imagens até 1 MB.',
   ],
   maxOutputWidth: 1200,
-  maxOutputHeight: 500,
+  maxOutputHeight: 300,
   displayFrameWidth: 360,
-  displayFrameHeight: 150,
+  displayFrameHeight: 90,
   containerWidth: 420,
-  containerHeight: 250,
+  containerHeight: 180,
   frameMinWidth: 96,
-  frameMinHeight: 40,
+  frameMinHeight: 24,
   lockAspectRatio: true,
   outputMimeType: 'image/jpeg',
   outputQuality: 0.9,
@@ -160,5 +160,5 @@ export const DELIVERY_CAPA_CROP_PRESET: ImageCropPreset = {
   preserveSourceMimeType: true,
   maxSourceBytes: DELIVERY_CROP_MAX_SOURCE_BYTES,
   acceptedMimeTypes: DELIVERY_SQUARE_ACCEPT,
-  footerHint: 'Máx. 1200×500 px · foque o centro',
+  footerHint: 'Máx. 1200×300 px · foque o centro',
 }

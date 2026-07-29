@@ -8,9 +8,12 @@ import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/de
 import type { MeioPagamentoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { formatarCpfCnpjInput } from '@/src/shared/utils/cpfCnpj'
+import { formatarValorComplemento } from '@/src/domain/services/pedido/CalculadoraPedido'
+import { normalizeTipoImpactoPreco } from '@/src/application/mappers/VendaApiNormalizer'
 import type { DeliveryCarrinhoItem } from '../../../shared/stores/deliveryCarrinhoStore'
 import type { DeliveryTipoEntrega } from '../../../shared/stores/deliveryPreferenciaEntregaStore'
 import { DELIVERY_PAIS_TELEFONE_PADRAO } from '../../../shared/constants/deliveryPaisesTelefone'
+import { observacaoItemCarrinho } from '../../../shared/utils/deliveryCarrinhoItemUtils'
 import { formatDeliveryCurrency } from '../../../shared/utils/formatDeliveryCurrency'
 import { formatarTelefoneExibicao } from '../../../shared/utils/deliveryTelefonePais'
 import { calcularTrocoCheckout } from '../../../shared/utils/checkoutPagamentosUtils'
@@ -305,21 +308,54 @@ export function DeliveryCheckoutRevisaoModal({
         </div>
 
         <ul>
-          {itens.map(item => (
-            <li
-              key={item.id}
-              className="flex items-center gap-2.5 border-b py-3"
-              style={{ borderColor: 'var(--delivery-border)' }}
-            >
-              <ProdutoThumb imagemUrl={item.produtoImagemUrl} nome={item.produtoNome} />
-              <span className="min-w-0 flex-1 text-sm delivery-text-primary">
-                <span className="font-semibold">{item.quantidade}x</span> {item.produtoNome}
-              </span>
-              <span className="shrink-0 text-sm tabular-nums delivery-text-primary">
-                {formatDeliveryCurrency(item.valorTotal)}
-              </span>
-            </li>
-          ))}
+          {itens.map(item => {
+            const obsItem = observacaoItemCarrinho(item)
+            return (
+              <li
+                key={item.id}
+                className="border-b py-3"
+                style={{ borderColor: 'var(--delivery-border)' }}
+              >
+                <div className="flex items-center gap-2.5">
+                  <ProdutoThumb imagemUrl={item.produtoImagemUrl} nome={item.produtoNome} />
+                  <span className="min-w-0 flex-1 text-sm delivery-text-primary">
+                    <span className="font-semibold">{item.quantidade}x</span> {item.produtoNome}
+                  </span>
+                  <span className="shrink-0 text-sm tabular-nums delivery-text-primary">
+                    {formatDeliveryCurrency(item.valorTotal)}
+                  </span>
+                </div>
+
+                {item.complementos.length > 0 ? (
+                  <ul className="mt-2 space-y-0.5 pl-[3.625rem]">
+                    {item.complementos.map(c => (
+                      <li
+                        key={`${c.complementoId}-${c.grupoComplementoId}`}
+                        className="flex items-center gap-2 text-xs delivery-text-secondary"
+                      >
+                        <span className="min-w-0 flex-1 truncate">
+                          <span className="font-medium tabular-nums">{c.quantidade}x</span>{' '}
+                          {c.nome}
+                        </span>
+                        <span className="shrink-0 tabular-nums delivery-text-accent">
+                          {formatarValorComplemento(
+                            c.valor,
+                            normalizeTipoImpactoPreco(c.tipoImpactoPreco)
+                          )}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+
+                {obsItem ? (
+                  <p className="mt-1.5 pl-[3.625rem] text-xs delivery-text-secondary">
+                    <span className="font-semibold">Obs:</span> {obsItem}
+                  </p>
+                ) : null}
+              </li>
+            )
+          })}
         </ul>
 
         <div

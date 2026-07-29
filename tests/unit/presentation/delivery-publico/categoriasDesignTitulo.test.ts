@@ -29,7 +29,16 @@ describe('mergeCategoriasDesignConfig', () => {
       corTextoTitulo: null,
       mostrarNomeTitulo: true,
       mostrarSugestoesDaCasa: true,
+      sugestoesDaCasaImagemUrl: null,
     })
+  })
+
+  it('aplica sugestoesDaCasaImagemUrl', () => {
+    const merged = mergeCategoriasDesignConfig(
+      { sugestoesDaCasaImagemUrl: ' data:image/jpeg;base64,abc ' },
+      fallback
+    )
+    expect(merged.sugestoesDaCasaImagemUrl).toBe('data:image/jpeg;base64,abc')
   })
 
   it('aplica corTextoTitulo personalizada', () => {
@@ -77,7 +86,7 @@ describe('resolveGrupoTituloBarStyle', () => {
       imagemUrl: 'https://cdn.example/banner.jpg',
     })
     expect(style.backgroundColor).toBe('var(--delivery-primary-dark, #171717)')
-    expect(style.backgroundImage).toContain('url(https://cdn.example/banner.jpg)')
+    expect(style.backgroundImage).toBe('url(https://cdn.example/banner.jpg)')
     expect(style.backgroundSize).toBe('cover')
     expect(style.color).toBe('#EEEEEE')
   })

@@ -16,8 +16,8 @@ export function DeliveryCarrinhoComplementoRow({
 }: DeliveryCarrinhoComplementoRowProps) {
   return (
     <li className="flex items-center gap-2 py-0.5 text-xs">
-      <span className="w-5 shrink-0 text-right font-medium tabular-nums delivery-text-secondary">
-        {complemento.quantidade}
+      <span className="w-6 shrink-0 text-right font-medium tabular-nums delivery-text-secondary">
+        {complemento.quantidade}x
       </span>
       <span
         className="min-w-0 flex-1 truncate delivery-text-secondary"

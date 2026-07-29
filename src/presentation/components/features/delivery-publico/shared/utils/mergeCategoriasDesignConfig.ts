@@ -11,12 +11,20 @@ type CategoriasLegacyPartial = {
   corTextoTitulo?: string | null
   mostrarNomeTitulo?: boolean
   mostrarSugestoesDaCasa?: boolean
+  sugestoesDaCasaImagemUrl?: string | null
   /** Legado: chips on/off — ignorado (chips sempre visíveis). */
   mostrar?: boolean
   /** Legado: imagem vs ícone nos chips — não mapeia para banner. */
   usarImagensGrupo?: boolean
   estiloIcone?: unknown
   iconesPorGrupoId?: unknown
+}
+
+function normalizeImagemUrl(value: unknown): string | null {
+  if (value == null || value === '') return null
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
 }
 
 function normalizeHexColor(value: unknown): string | null {
@@ -59,5 +67,9 @@ export function mergeCategoriasDesignConfig(
       typeof partial.mostrarSugestoesDaCasa === 'boolean'
         ? partial.mostrarSugestoesDaCasa
         : fallback.mostrarSugestoesDaCasa,
+    sugestoesDaCasaImagemUrl:
+      partial.sugestoesDaCasaImagemUrl !== undefined
+        ? normalizeImagemUrl(partial.sugestoesDaCasaImagemUrl)
+        : fallback.sugestoesDaCasaImagemUrl,
   }
 }

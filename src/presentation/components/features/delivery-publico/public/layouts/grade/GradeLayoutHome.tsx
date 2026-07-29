@@ -55,6 +55,7 @@ export function GradeLayoutHome({
           {filtered.grupos.map((grupo, index) => (
             <DeliveryGradeSecaoGrupo
               key={grupo.id}
+              config={config}
               grupo={grupo}
               interactive={interactive}
               denseTop={

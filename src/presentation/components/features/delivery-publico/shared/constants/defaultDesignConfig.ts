@@ -23,6 +23,7 @@ export function createDefaultDesignConfig(nomeExibicao = ''): DeliveryPublicoDes
       corTextoTitulo: null,
       mostrarNomeTitulo: true,
       mostrarSugestoesDaCasa: true,
+      sugestoesDaCasaImagemUrl: null,
     },
   }
 }

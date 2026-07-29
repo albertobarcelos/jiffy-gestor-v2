@@ -6,20 +6,14 @@ type DeliveryLojaHeaderProps = {
   config: DeliveryPublicoDesignConfig
 }
 
-/** Altura fluida da capa: cresce com a largura, com teto no desktop. */
-const CAPA_HEIGHT = 'clamp(7rem, 28vw, 16rem)'
-
 /** Capa da loja (sem logo/nome — esses ficam no topnav do layout básico). */
 export function DeliveryLojaHeader({ config }: DeliveryLojaHeaderProps) {
   const capaUrl = config.cabecalho.capaUrl
 
   return (
     <div
-      className="delivery-loja-capa relative mt-5 w-full overflow-hidden lg:rounded-2xl"
-      style={{
-        height: CAPA_HEIGHT,
-        backgroundColor: 'var(--delivery-hero-bg)',
-      }}
+      className="delivery-loja-capa relative mt-5 h-auto w-full overflow-hidden lg:rounded-2xl"
+      style={{ backgroundColor: 'var(--delivery-hero-bg)' }}
       role="img"
       aria-label="Capa da loja"
     >

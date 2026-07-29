@@ -3,9 +3,11 @@
 import { DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID } from '../../../../shared/constants/deliveryPublicoSugestoes'
 import { DeliverySecaoSugestoes } from '../../../../shared/components/DeliverySecaoSugestoes'
 import { DeliveryGradeProdutoCard } from './DeliveryGradeProdutoCard'
+import type { DeliveryPublicoDesignConfig } from '../../../../shared/types/deliveryPublicoDesignConfig'
 import type { DeliveryPublicoGrupoViewModel } from '../../../../shared/types/deliveryPublicoViewModel'
 
 type DeliveryGradeSecaoGrupoProps = {
+  config: DeliveryPublicoDesignConfig
   grupo: DeliveryPublicoGrupoViewModel
   interactive?: boolean
   denseTop?: boolean
@@ -13,6 +15,7 @@ type DeliveryGradeSecaoGrupoProps = {
 }
 
 export function DeliveryGradeSecaoGrupo({
+  config,
   grupo,
   interactive = false,
   denseTop = false,
@@ -23,6 +26,7 @@ export function DeliveryGradeSecaoGrupo({
   if (grupo.id === DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID) {
     return (
       <DeliverySecaoSugestoes
+        config={config}
         grupo={grupo}
         interactive={interactive}
         onProdutoClick={onProdutoClick}

@@ -26,13 +26,6 @@ export function DeliverySugestoesProdutoCard({
 }: DeliverySugestoesProdutoCardProps) {
   const podeAddRapido = interactive && !produto.temComplementos && Boolean(onAddRapido)
   const handleOpen = () => onClick?.(produto.id)
-  const handleAdd = () => {
-    if (produto.temComplementos) {
-      onClick?.(produto.id)
-      return
-    }
-    onAddRapido?.(produto.id)
-  }
 
   return (
     <article className="w-[7.25rem] shrink-0 snap-start @sm:w-32 @lg:w-[8.5rem]">
@@ -80,12 +73,12 @@ export function DeliverySugestoesProdutoCard({
           </button>
         ) : null}
 
-        {interactive && (podeAddRapido || onClick) ? (
+        {podeAddRapido ? (
           <button
             type="button"
             onClick={e => {
               e.stopPropagation()
-              handleAdd()
+              onAddRapido?.(produto.id)
             }}
             aria-label={`Adicionar ${produto.nome} ao carrinho`}
             className="absolute bottom-1.5 right-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full shadow-sm transition-transform active:scale-95"

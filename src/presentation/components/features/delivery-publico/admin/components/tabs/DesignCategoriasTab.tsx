@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   DndContext,
   KeyboardSensor,
@@ -21,9 +21,14 @@ import { DeliveryImageUploadField } from '@/src/presentation/components/ui/Deliv
 import { DELIVERY_GRUPO_BANNER_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { cn } from '@/src/shared/utils/cn'
 import { showToast } from '@/src/shared/utils/toast'
 import type { DeliveryPublicoDesignConfig } from '../../../shared/types/deliveryPublicoDesignConfig'
 import type { DesignCategoriaGrupo } from '../../../shared/types/designCategoriaGrupo'
+import {
+  DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID,
+  DELIVERY_PUBLICO_GRUPO_SUGESTOES_NOME,
+} from '../../../shared/constants/deliveryPublicoSugestoes'
 import { resolveDesignPaletteColors } from '../../../shared/constants/colorPalettes'
 import { DesignCategoriaGrupoSortableItem } from '../DesignCategoriaGrupoSortableItem'
 import { useDesignCategoriaGrupoActions } from '../../hooks/useDesignCategoriaGrupoActions'
@@ -38,6 +43,15 @@ type DesignCategoriasTabProps = {
   onGruposChange?: (grupos: DesignCategoriaGrupo[]) => void
 }
 
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(new Error('Falha ao ler a imagem'))
+    reader.readAsDataURL(file)
+  })
+}
+
 export function DesignCategoriasTab({
   config,
   grupos,
@@ -49,6 +63,7 @@ export function DesignCategoriasTab({
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
   const [localGrupos, setLocalGrupos] = useState(grupos)
   const [imagemPreviewUrl, setImagemPreviewUrl] = useState<string | null>(null)
+  const [isUploadingSugestoes, setIsUploadingSugestoes] = useState(false)
 
   const {
     reordenarGrupo,
@@ -59,7 +74,17 @@ export function DesignCategoriasTab({
   } = useDesignCategoriaGrupoActions()
 
   const palette = resolveDesignPaletteColors(config)
-  const selectedCategory = localGrupos.find(c => c.id === selectedCategoryId)
+  const mostrarSugestoes = config.categorias.mostrarSugestoesDaCasa !== false
+  const isSugestoesSelected = selectedCategoryId === DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID
+  const selectedCategory = isSugestoesSelected
+    ? null
+    : localGrupos.find(c => c.id === selectedCategoryId)
+  const selectedNome = isSugestoesSelected
+    ? DELIVERY_PUBLICO_GRUPO_SUGESTOES_NOME
+    : (selectedCategory?.nome ?? '—')
+  const selectedImagemUrl = isSugestoesSelected
+    ? config.categorias.sugestoesDaCasaImagemUrl
+    : (selectedCategory?.imagemUrl ?? null)
   const usarBannerImagem = config.categorias.tituloGrupoFundo === 'imagem'
   const corTemaBarra = palette.primaryDark.toUpperCase()
   const corTemaTexto = '#FFFFFF'
@@ -67,8 +92,16 @@ export function DesignCategoriasTab({
   const corTextoEfetiva = (config.categorias.corTextoTitulo ?? corTemaTexto).toUpperCase()
   const usaTemaBarra = config.categorias.corBarraTitulo == null
   const usaTemaTexto = config.categorias.corTextoTitulo == null
-  const isUploadingSelected = uploadingGrupoId === selectedCategoryId
+  const isUploadingSelected =
+    (isSugestoesSelected && isUploadingSugestoes) || uploadingGrupoId === selectedCategoryId
   const isReordering = reorderingGrupoId != null
+
+  const hasListaGrupos = mostrarSugestoes || localGrupos.length > 0
+
+  const selectableIds = useMemo(() => {
+    const ids = localGrupos.map(g => g.id)
+    return mostrarSugestoes ? [DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID, ...ids] : ids
+  }, [localGrupos, mostrarSugestoes])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -102,26 +135,32 @@ export function DesignCategoriasTab({
   }, [grupos])
 
   useEffect(() => {
-    if (localGrupos.length === 0) {
+    if (selectableIds.length === 0) {
       setSelectedCategoryId('')
       return
     }
-    if (!localGrupos.some(g => g.id === selectedCategoryId)) {
-      setSelectedCategoryId(localGrupos[0].id)
+    if (!selectableIds.includes(selectedCategoryId)) {
+      setSelectedCategoryId(selectableIds[0])
     }
-  }, [localGrupos, selectedCategoryId])
+  }, [selectableIds, selectedCategoryId])
 
   useEffect(() => {
     setImagemPreviewUrl(prev => {
       if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
-      return selectedCategory?.imagemUrl ?? null
+      return selectedImagemUrl ?? null
     })
-  }, [selectedCategory?.id, selectedCategory?.imagemUrl])
+  }, [selectedCategoryId, selectedImagemUrl])
 
   const handleDragEnd = useCallback(
     async (event: DragEndEvent) => {
       const { active, over } = event
       if (!over || active.id === over.id || isReordering) return
+      if (
+        active.id === DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID ||
+        over.id === DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID
+      ) {
+        return
+      }
 
       const oldIndex = localGrupos.findIndex(g => g.id === active.id)
       const newIndex = localGrupos.findIndex(g => g.id === over.id)
@@ -152,6 +191,38 @@ export function DesignCategoriasTab({
         return preview
       })
 
+      if (selectedCategoryId === DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID) {
+        setIsUploadingSugestoes(true)
+        const toastId = showToast.loading('Salvando banner…')
+        try {
+          const dataUrl = await fileToDataUrl(file)
+          onChange(current => ({
+            ...current,
+            categorias: {
+              ...current.categorias,
+              sugestoesDaCasaImagemUrl: dataUrl,
+            },
+          }))
+          setImagemPreviewUrl(prev => {
+            if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+            return dataUrl
+          })
+          showToast.successLoading(toastId, 'Banner de Sugestões salvo!')
+        } catch (error) {
+          setImagemPreviewUrl(prev => {
+            if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+            return config.categorias.sugestoesDaCasaImagemUrl ?? null
+          })
+          showToast.errorLoading(
+            toastId,
+            error instanceof Error ? error.message : 'Erro ao salvar banner'
+          )
+        } finally {
+          setIsUploadingSugestoes(false)
+        }
+        return
+      }
+
       try {
         const imagemUrl = await uploadImagemGrupo(selectedCategoryId, file)
         const nextGrupos = patchGrupoImagemUrl(localGrupos, selectedCategoryId, imagemUrl)
@@ -168,7 +239,9 @@ export function DesignCategoriasTab({
       }
     },
     [
+      config.categorias.sugestoesDaCasaImagemUrl,
       localGrupos,
+      onChange,
       patchGrupoImagemUrl,
       selectedCategory?.imagemUrl,
       selectedCategoryId,
@@ -180,9 +253,9 @@ export function DesignCategoriasTab({
   const handleClearImagemPreview = useCallback(() => {
     setImagemPreviewUrl(prev => {
       if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
-      return selectedCategory?.imagemUrl ?? null
+      return selectedImagemUrl ?? null
     })
-  }, [selectedCategory?.imagemUrl])
+  }, [selectedImagemUrl])
 
   if (isLoading) {
     return (
@@ -223,7 +296,6 @@ export function DesignCategoriasTab({
                     ...current,
                     categorias: {
                       ...current.categorias,
-                      // Mesma cor do tema → permanece no modo tema (null).
                       corBarraTitulo: next === corTemaBarra ? null : next,
                     },
                   }))
@@ -360,9 +432,9 @@ export function DesignCategoriasTab({
           </div>
           <JiffyIconSwitch
             size="xs"
-            label={config.categorias.mostrarSugestoesDaCasa ? 'ON' : 'OFF'}
+            label={mostrarSugestoes ? 'ON' : 'OFF'}
             labelPosition="start"
-            checked={config.categorias.mostrarSugestoesDaCasa}
+            checked={mostrarSugestoes}
             onChange={e =>
               onChange(current => ({
                 ...current,
@@ -376,7 +448,7 @@ export function DesignCategoriasTab({
         </div>
       </div>
 
-      {localGrupos.length === 0 ? (
+      {!hasListaGrupos ? (
         <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
           <p className="text-sm font-semibold text-primary-text">Nenhum grupo no delivery</p>
           <p className="mt-1 text-xs text-secondary-text">
@@ -392,48 +464,81 @@ export function DesignCategoriasTab({
                 ? 'Carregando banners dos grupos…'
                 : 'Arraste para definir a ordem'}
             </p>
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              <SortableContext
-                items={localGrupos.map(g => g.id)}
-                strategy={verticalListSortingStrategy}
-              >
-                <ul className="space-y-1.5">
-                  {localGrupos.map(cat => (
-                    <DesignCategoriaGrupoSortableItem
-                      key={cat.id}
-                      grupo={cat}
-                      isSelected={cat.id === selectedCategoryId}
-                      disabled={isReordering}
-                      onSelect={setSelectedCategoryId}
-                    />
-                  ))}
-                </ul>
-              </SortableContext>
-            </DndContext>
+            <ul className="space-y-1.5">
+              {mostrarSugestoes ? (
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategoryId(DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID)}
+                    className={cn(
+                      'flex w-full items-center gap-2 rounded-lg border-2 px-3 py-2.5 text-left text-sm font-semibold transition-colors',
+                      isSugestoesSelected
+                        ? 'border-secondary bg-secondary/5 text-primary-text'
+                        : 'border-gray-200 text-primary-text hover:border-gray-300'
+                    )}
+                  >
+                    <span className="min-w-0 flex-1 truncate">
+                      {DELIVERY_PUBLICO_GRUPO_SUGESTOES_NOME}
+                    </span>
+                    <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-secondary-text">
+                      Fixo
+                    </span>
+                  </button>
+                </li>
+              ) : null}
+
+              {localGrupos.length > 0 ? (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={localGrupos.map(g => g.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {localGrupos.map(cat => (
+                      <DesignCategoriaGrupoSortableItem
+                        key={cat.id}
+                        grupo={cat}
+                        isSelected={cat.id === selectedCategoryId}
+                        disabled={isReordering}
+                        onSelect={setSelectedCategoryId}
+                      />
+                    ))}
+                  </SortableContext>
+                </DndContext>
+              ) : null}
+            </ul>
           </div>
 
           <div className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white p-3">
             {usarBannerImagem ? (
               <>
                 <p className="text-sm font-semibold text-primary-text">
-                  Banner · {selectedCategory?.nome ?? '—'}
+                  Banner · {selectedNome}
                 </p>
                 <p className="mt-0.5 text-xs text-secondary-text">
-                  Fundo da barra com o nome do grupo no layout Básico. Sem banner, usa a cor
-                  definida acima.
+                  {isSugestoesSelected
+                    ? 'Fundo da barra do grupo fixo Sugestões da Casa. Sem banner, usa a cor definida acima.'
+                    : 'Fundo da barra com o nome do grupo no layout Básico. Sem banner, usa a cor definida acima.'}
                 </p>
                 <div className="mt-3">
                   <DeliveryImageUploadField
-                    disabled={!selectedCategory}
+                    disabled={!selectedCategoryId}
                     busy={isUploadingSelected}
                     previewUrl={imagemPreviewUrl}
                     cropPreset={DELIVERY_GRUPO_BANNER_CROP_PRESET}
-                    helperText="Após o recorte (máx. 1200×150), a imagem é salva no grupo."
+                    helperText={
+                      isSugestoesSelected
+                        ? 'Após o recorte (máx. 1200×150), o banner é salvo no design. Publique para aplicar na loja.'
+                        : 'Após o recorte (máx. 1200×150), a imagem é salva no grupo.'
+                    }
                     emptyHint="Arraste uma imagem ou clique para selecionar"
                     onFileSelected={handleImagemUpload}
                     onClearPreview={
                       imagemPreviewUrl?.startsWith('blob:') &&
-                      imagemPreviewUrl !== selectedCategory?.imagemUrl
+                      imagemPreviewUrl !== selectedImagemUrl
                         ? handleClearImagemPreview
                         : undefined
                     }

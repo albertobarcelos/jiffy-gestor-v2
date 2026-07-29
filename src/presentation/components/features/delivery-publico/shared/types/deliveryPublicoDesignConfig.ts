@@ -70,6 +70,11 @@ export type DeliveryPublicoDesignConfig = {
     mostrarNomeTitulo: boolean
     /** Exibe o grupo fixo "Sugestões da Casa" no início do cardápio. */
     mostrarSugestoesDaCasa: boolean
+    /**
+     * Banner do grupo fixo Sugestões da Casa (modo imagem).
+     * Armazenado no design — não há entidade de grupo no cardápio.
+     */
+    sugestoesDaCasaImagemUrl: string | null
   }
 }
 

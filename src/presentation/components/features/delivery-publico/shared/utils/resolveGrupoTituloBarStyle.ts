@@ -31,7 +31,7 @@ export function resolveGrupoTituloBarStyle({
 
   return {
     backgroundColor,
-    backgroundImage: `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url(${imagemUrl!.trim()})`,
+    backgroundImage: `url(${imagemUrl!.trim()})`,
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     color,
