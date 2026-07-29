@@ -159,6 +159,30 @@ body.delivery-publico-ios-lock {
 }
 
 /**
+ * Preview do Design — barra de título do grupo mais baixa (só visualização).
+ * No delivery público real mantém a altura normal.
+ * `!important` necessário para vencer `min-h-*` / `@sm:min-h-*` do componente.
+ */
+.delivery-preview-shell .delivery-grupo-title {
+  min-height: 2rem !important;
+  padding-top: 0.35rem !important;
+  padding-bottom: 0.35rem !important;
+  font-size: 0.75rem !important;
+  line-height: 1.15 !important;
+}
+
+.delivery-preview-shell .delivery-grupo-title[style*='background-image'] {
+  min-height: 2.35rem !important;
+}
+
+/** Preview — capa do topo mais baixa (só Design). Sem radius: preview simula mobile. */
+.delivery-preview-shell .delivery-loja-capa {
+  height: clamp(4.5rem, 18vw, 7.5rem) !important;
+  margin-top: 0.75rem !important;
+  border-radius: 0 !important;
+}
+
+/**
  * Formulário de checkout — card com tinta clara da paleta; campos brancos com texto na cor primária.
  */
 .delivery-checkout-form-card {

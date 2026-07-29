@@ -36,7 +36,6 @@ export function CatalogoLayoutHome({
   }, [filtered.grupos, activeGrupoId])
 
   const stickyFooterVisible = viewModel.carrinho.quantidadeItens > 0
-  const mostrarCategorias = config.categorias.mostrar
 
   const handleGrupoClick = useCallback(
     (grupoId: string) => {
@@ -69,15 +68,13 @@ export function CatalogoLayoutHome({
         />
       </div>
 
-      {mostrarCategorias ? (
-        <DeliveryCatalogoCategoriaTabs
-          grupos={filtered.grupos}
-          activeGrupoId={activeGrupoId}
-          interactive={interactive}
-          onGrupoClick={handleGrupoClick}
-          onMenuClick={handleMenuClick}
-        />
-      ) : null}
+      <DeliveryCatalogoCategoriaTabs
+        grupos={filtered.grupos}
+        activeGrupoId={activeGrupoId}
+        interactive={interactive}
+        onGrupoClick={handleGrupoClick}
+        onMenuClick={handleMenuClick}
+      />
 
       <div className="flex-1 pb-4">
         {filtered.grupos.map((grupo, index) => (

@@ -64,10 +64,39 @@ export const DELIVERY_PRODUTO_CROP_PRESET = createDeliverySquarePreset(
   'Ajustar imagem do produto'
 )
 
+/** @deprecated Preferir `DELIVERY_GRUPO_BANNER_CROP_PRESET` no Design (banner 1200×150). */
 export const DELIVERY_GRUPO_PRODUTO_CROP_PRESET = createDeliverySquarePreset(
   'delivery-grupo-produto',
   'Ajustar imagem do grupo'
 )
+
+/** Banner de fundo do título do grupo (Design → Categorias). Proporção 8:1. */
+export const DELIVERY_GRUPO_BANNER_CROP_PRESET: ImageCropPreset = {
+  id: 'delivery-grupo-banner',
+  title: 'Ajustar banner do grupo',
+  descriptionLines: [
+    'Arraste a imagem, use o zoom e ajuste a moldura (proporção 8:1).',
+    'A saída é limitada a 1200×150 px (JPEG, PNG ou WebP — mantém o formato do ficheiro). Imagens menores não são ampliadas.',
+    'O banner aparece como fundo da barra com o nome do grupo no delivery público.',
+    'Prefira imagens até 1 MB.',
+  ],
+  maxOutputWidth: 1200,
+  maxOutputHeight: 150,
+  displayFrameWidth: 360,
+  displayFrameHeight: 45,
+  containerWidth: 420,
+  containerHeight: 160,
+  frameMinWidth: 120,
+  frameMinHeight: 15,
+  lockAspectRatio: true,
+  outputMimeType: 'image/jpeg',
+  outputQuality: 0.9,
+  outputFileName: 'delivery-grupo-banner.jpg',
+  preserveSourceMimeType: true,
+  maxSourceBytes: DELIVERY_CROP_MAX_SOURCE_BYTES,
+  acceptedMimeTypes: DELIVERY_SQUARE_ACCEPT,
+  footerHint: 'Máx. 1200×150 px',
+}
 
 export const DELIVERY_COMPLEMENTO_CROP_PRESET = createDeliverySquarePreset(
   'delivery-complemento',

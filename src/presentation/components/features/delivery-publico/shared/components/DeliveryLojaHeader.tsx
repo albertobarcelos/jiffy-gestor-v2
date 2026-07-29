@@ -15,7 +15,7 @@ export function DeliveryLojaHeader({ config }: DeliveryLojaHeaderProps) {
 
   return (
     <div
-      className="relative mt-5 w-full overflow-hidden lg:rounded-2xl"
+      className="delivery-loja-capa relative mt-5 w-full overflow-hidden lg:rounded-2xl"
       style={{
         height: CAPA_HEIGHT,
         backgroundColor: 'var(--delivery-hero-bg)',

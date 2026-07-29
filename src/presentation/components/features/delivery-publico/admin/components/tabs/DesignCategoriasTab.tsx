@@ -17,20 +17,15 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
-import { IconPickerPanel } from '@/src/presentation/components/features/grupos-produtos/IconPickerPanel'
 import { DeliveryImageUploadField } from '@/src/presentation/components/ui/DeliveryImageUploadField'
-import { DELIVERY_GRUPO_PRODUTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
+import { DELIVERY_GRUPO_BANNER_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
 import { cn } from '@/src/shared/utils/cn'
-import type {
-  CategoryIconStyle,
-  DeliveryPublicoDesignConfig,
-} from '../../../shared/types/deliveryPublicoDesignConfig'
+import type { DeliveryPublicoDesignConfig } from '../../../shared/types/deliveryPublicoDesignConfig'
 import type { DesignCategoriaGrupo } from '../../../shared/types/designCategoriaGrupo'
 import { resolveDesignPaletteColors } from '../../../shared/constants/colorPalettes'
-import { DeliveryGrupoCategoriaVisual } from '../../../shared/components/DeliveryGrupoCategoriaVisual'
 import { DesignCategoriaGrupoSortableItem } from '../DesignCategoriaGrupoSortableItem'
 import { useDesignCategoriaGrupoActions } from '../../hooks/useDesignCategoriaGrupoActions'
 import { useDesignCategoriaGruposImagens } from '../../../shared/hooks/useDesignCategoriaGruposImagens'
@@ -59,19 +54,18 @@ export function DesignCategoriasTab({
   const {
     reordenarGrupo,
     uploadImagemGrupo,
-    atualizarIconeGrupo,
     patchGrupoImagemUrl,
-    patchGrupoIconName,
     uploadingGrupoId,
     reorderingGrupoId,
-    updatingIconGrupoId,
   } = useDesignCategoriaGrupoActions()
 
   const palette = resolveDesignPaletteColors(config)
   const selectedCategory = localGrupos.find(c => c.id === selectedCategoryId)
-  const usarImagensGrupo = config.categorias.usarImagensGrupo
+  const usarBannerImagem = config.categorias.tituloGrupoFundo === 'imagem'
+  const corBarraEfetiva = config.categorias.corBarraTitulo ?? palette.primaryDark
+  /** Texto do título no tema público usa `--delivery-btn-text` (branco). */
+  const corTextoEfetiva = config.categorias.corTextoTitulo ?? '#FFFFFF'
   const isUploadingSelected = uploadingGrupoId === selectedCategoryId
-  const isUpdatingIconSelected = updatingIconGrupoId === selectedCategoryId
   const isReordering = reorderingGrupoId != null
 
   const sensors = useSensors(
@@ -97,7 +91,7 @@ export function DesignCategoriasTab({
 
   const { isResolvingImagens } = useDesignCategoriaGruposImagens({
     grupos: localGrupos,
-    enabled: usarImagensGrupo && localGrupos.length > 0,
+    enabled: usarBannerImagem && localGrupos.length > 0,
     onResolved: handleImagensResolved,
   })
 
@@ -121,8 +115,6 @@ export function DesignCategoriasTab({
       return selectedCategory?.imagemUrl ?? null
     })
   }, [selectedCategory?.id, selectedCategory?.imagemUrl])
-
-  const selectedIconName = selectedCategory?.iconName || 'restaurant'
 
   const handleDragEnd = useCallback(
     async (event: DragEndEvent) => {
@@ -190,43 +182,6 @@ export function DesignCategoriasTab({
     })
   }, [selectedCategory?.imagemUrl])
 
-  const handleIconSelect = useCallback(
-    async (iconName: string) => {
-      if (!selectedCategoryId) return
-
-      const previous = localGrupos
-      const nextGrupos = patchGrupoIconName(localGrupos, selectedCategoryId, iconName)
-      updateGrupos(nextGrupos)
-
-      try {
-        await atualizarIconeGrupo(selectedCategoryId, iconName)
-        onChange(current => {
-          if (!(selectedCategoryId in current.categorias.iconesPorGrupoId)) {
-            return current
-          }
-          const { [selectedCategoryId]: _removed, ...iconesPorGrupoId } =
-            current.categorias.iconesPorGrupoId
-          return {
-            ...current,
-            categorias: { ...current.categorias, iconesPorGrupoId },
-          }
-        })
-        showToast.success('Ícone salvo no grupo!')
-      } catch (error) {
-        updateGrupos(previous)
-        showToast.error(error instanceof Error ? error.message : 'Erro ao salvar ícone do grupo')
-      }
-    },
-    [
-      atualizarIconeGrupo,
-      localGrupos,
-      onChange,
-      patchGrupoIconName,
-      selectedCategoryId,
-      updateGrupos,
-    ]
-  )
-
   if (isLoading) {
     return (
       <div className="flex min-h-[240px] items-center justify-center">
@@ -244,35 +199,180 @@ export function DesignCategoriasTab({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <h3 className="text-base font-semibold text-primary">Categorias</h3>
-        <JiffyIconSwitch
-          size="sm"
-          label="Mostrar"
-          labelPosition="start"
-          checked={config.categorias.mostrar}
-          onChange={e =>
-            onChange(current => ({
-              ...current,
-              categorias: { ...current.categorias, mostrar: e.target.checked },
-            }))
-          }
-        />
-      </div>
+    <div className="space-y-2">
+      <h3 className="text-base font-semibold text-primary">Categorias</h3>
 
-      <JiffyIconSwitch
-        size="sm"
-        label="Usar imagens do grupo"
-        labelPosition="start"
-        checked={usarImagensGrupo}
-        onChange={e =>
-          onChange(current => ({
-            ...current,
-            categorias: { ...current.categorias, usarImagensGrupo: e.target.checked },
-          }))
-        }
-      />
+      <div className="space-y-2 rounded-xl border border-gray-200 bg-white p-2">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-primary-text">Cor da barra do título</p>
+            <p className="mt-0.5 text-xs text-secondary-text">
+              Fundo para todos os grupos. Sem personalização, usa a cor escura do tema.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <label
+              className="relative flex h-9 w-9 cursor-pointer overflow-hidden rounded-lg border border-gray-200"
+              title={`Cor da barra: ${corBarraEfetiva}`}
+            >
+              <span className="absolute inset-0" style={{ backgroundColor: corBarraEfetiva }} />
+              <input
+                type="color"
+                value={corBarraEfetiva}
+                aria-label="Escolher cor da barra do título"
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                onChange={e =>
+                  onChange(current => ({
+                    ...current,
+                    categorias: {
+                      ...current.categorias,
+                      corBarraTitulo: e.target.value.toUpperCase(),
+                    },
+                  }))
+                }
+              />
+            </label>
+            {config.categorias.corBarraTitulo ? (
+              <button
+                type="button"
+                className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-secondary hover:bg-gray-100"
+                onClick={() =>
+                  onChange(current => ({
+                    ...current,
+                    categorias: { ...current.categorias, corBarraTitulo: null },
+                  }))
+                }
+              >
+                Usar tema
+              </button>
+            ) : (
+              <span className="text-xs text-secondary-text">Tema</span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-sm font-semibold text-primary-text">Cor do nome do grupo</p>
+              <JiffyIconSwitch
+                size="sm"
+                label="Exibir"
+                labelPosition="start"
+                checked={config.categorias.mostrarNomeTitulo}
+                onChange={e =>
+                  onChange(current => ({
+                    ...current,
+                    categorias: {
+                      ...current.categorias,
+                      mostrarNomeTitulo: e.target.checked,
+                    },
+                  }))
+                }
+              />
+            </div>
+            <p className="mt-0.5 text-xs text-secondary-text">
+              Texto na barra para todos os grupos. Desligue se o banner já mostrar o nome.
+            </p>
+          </div>
+          <div
+            className={cn(
+              'flex items-center gap-2',
+              !config.categorias.mostrarNomeTitulo && 'pointer-events-none opacity-40'
+            )}
+          >
+            <label
+              className="relative flex h-9 w-9 cursor-pointer overflow-hidden rounded-lg border border-gray-200"
+              title={`Cor do texto: ${corTextoEfetiva}`}
+            >
+              <span className="absolute inset-0" style={{ backgroundColor: corTextoEfetiva }} />
+              <input
+                type="color"
+                value={corTextoEfetiva}
+                aria-label="Escolher cor do nome do grupo"
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                disabled={!config.categorias.mostrarNomeTitulo}
+                onChange={e =>
+                  onChange(current => ({
+                    ...current,
+                    categorias: {
+                      ...current.categorias,
+                      corTextoTitulo: e.target.value.toUpperCase(),
+                    },
+                  }))
+                }
+              />
+            </label>
+            {config.categorias.corTextoTitulo ? (
+              <button
+                type="button"
+                className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-secondary hover:bg-gray-100"
+                onClick={() =>
+                  onChange(current => ({
+                    ...current,
+                    categorias: { ...current.categorias, corTextoTitulo: null },
+                  }))
+                }
+              >
+                Usar tema
+              </button>
+            ) : (
+              <span className="text-xs text-secondary-text">Tema</span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-primary-text">
+              Usar imagem como fundo do título
+            </p>
+            <p className="mt-0.5 text-xs text-secondary-text">
+              Com a opção ligada, o banner do grupo aparece na barra. Sem imagem, mantém a cor
+              sólida.
+            </p>
+          </div>
+          <JiffyIconSwitch
+            size="sm"
+            label="Ativar"
+            labelPosition="start"
+            checked={usarBannerImagem}
+            onChange={e =>
+              onChange(current => ({
+                ...current,
+                categorias: {
+                  ...current.categorias,
+                  tituloGrupoFundo: e.target.checked ? 'imagem' : 'cor',
+                },
+              }))
+            }
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-primary-text">Grupo Sugestões da Casa</p>
+            <p className="mt-0.5 text-xs text-secondary-text">
+              Grupo fixo no início do cardápio com produtos marcados como favoritos.
+            </p>
+          </div>
+          <JiffyIconSwitch
+            size="sm"
+            label="Exibir"
+            labelPosition="start"
+            checked={config.categorias.mostrarSugestoesDaCasa}
+            onChange={e =>
+              onChange(current => ({
+                ...current,
+                categorias: {
+                  ...current.categorias,
+                  mostrarSugestoesDaCasa: e.target.checked,
+                },
+              }))
+            }
+          />
+        </div>
+      </div>
 
       {localGrupos.length === 0 ? (
         <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
@@ -286,8 +386,8 @@ export function DesignCategoriasTab({
         <div className="flex flex-col gap-4 lg:flex-row">
           <div className="w-full shrink-0 lg:max-w-[240px]">
             <p className="mb-1.5 text-xs text-secondary-text">
-              {usarImagensGrupo && isResolvingImagens
-                ? 'Carregando imagens dos grupos…'
+              {usarBannerImagem && isResolvingImagens
+                ? 'Carregando banners dos grupos…'
                 : 'Arraste para definir a ordem'}
             </p>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -300,7 +400,6 @@ export function DesignCategoriasTab({
                     <DesignCategoriaGrupoSortableItem
                       key={cat.id}
                       grupo={cat}
-                      config={config}
                       isSelected={cat.id === selectedCategoryId}
                       disabled={isReordering}
                       onSelect={setSelectedCategoryId}
@@ -312,18 +411,22 @@ export function DesignCategoriasTab({
           </div>
 
           <div className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white p-3">
-            {usarImagensGrupo ? (
+            {usarBannerImagem ? (
               <>
                 <p className="text-sm font-semibold text-primary-text">
-                  Imagem · {selectedCategory?.nome ?? '—'}
+                  Banner · {selectedCategory?.nome ?? '—'}
+                </p>
+                <p className="mt-0.5 text-xs text-secondary-text">
+                  Fundo da barra com o nome do grupo no layout Básico. Sem banner, usa a cor
+                  definida acima.
                 </p>
                 <div className="mt-3">
                   <DeliveryImageUploadField
                     disabled={!selectedCategory}
                     busy={isUploadingSelected}
                     previewUrl={imagemPreviewUrl}
-                    cropPreset={DELIVERY_GRUPO_PRODUTO_CROP_PRESET}
-                    helperText="Após o recorte (máx. 280×280), a imagem é salva no grupo. Sem imagem, exibe o ícone padrão."
+                    cropPreset={DELIVERY_GRUPO_BANNER_CROP_PRESET}
+                    helperText="Após o recorte (máx. 1200×150), a imagem é salva no grupo."
                     emptyHint="Arraste uma imagem ou clique para selecionar"
                     onFileSelected={handleImagemUpload}
                     onClearPreview={
@@ -336,56 +439,10 @@ export function DesignCategoriasTab({
                 </div>
               </>
             ) : (
-              <>
-                <div className="flex flex-wrap items-center gap-3">
-                  <p className="text-sm font-semibold text-primary-text">
-                    Ícone · {selectedCategory?.nome ?? '—'}
-                  </p>
-                  {selectedCategory ? (
-                    <DeliveryGrupoCategoriaVisual
-                      config={config}
-                      grupo={selectedCategory}
-                      size="md"
-                    />
-                  ) : null}
-                </div>
-
-                <div className="mt-2 flex gap-2">
-                  {(['linha', 'preenchimento'] as CategoryIconStyle[]).map(estilo => (
-                    <button
-                      key={estilo}
-                      type="button"
-                      onClick={() =>
-                        onChange(current => ({
-                          ...current,
-                          categorias: { ...current.categorias, estiloIcone: estilo },
-                        }))
-                      }
-                      className={cn(
-                        'rounded-lg px-3 py-1.5 text-xs font-semibold capitalize transition-colors',
-                        config.categorias.estiloIcone === estilo
-                          ? 'bg-secondary text-white'
-                          : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
-                      )}
-                    >
-                      {estilo === 'linha' ? 'Linha' : 'Preenchimento'}
-                    </button>
-                  ))}
-                </div>
-
-                {isUpdatingIconSelected ? (
-                  <p className="text-xs text-secondary-text">Salvando ícone no grupo…</p>
-                ) : null}
-
-                <IconPickerPanel
-                  enabled={Boolean(selectedCategory)}
-                  selectedColor={palette.primary}
-                  selectedIconName={selectedIconName}
-                  disabled={!selectedCategory || isUpdatingIconSelected}
-                  variant="inline"
-                  onSelect={handleIconSelect}
-                />
-              </>
+              <div className="rounded-lg bg-gray-50 px-3 py-4 text-sm text-secondary-text">
+                Modo cor sólida ativo. Ative &quot;Usar imagem como fundo do título&quot; para
+                enviar um banner por grupo.
+              </div>
             )}
           </div>
         </div>

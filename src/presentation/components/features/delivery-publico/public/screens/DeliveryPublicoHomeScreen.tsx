@@ -32,6 +32,7 @@ import {
   useDeliveryCarrinhoTotalItens,
 } from '../../shared/stores/deliveryCarrinhoStore'
 import { buildCatalogViewModel } from '../../shared/mappers/buildCatalogViewModel'
+import { applySugestoesDaCasaVisibility } from '../../shared/utils/applySugestoesDaCasaVisibility'
 import { findCatalogoProdutoById } from '../../shared/utils/findCatalogoProdutoById'
 import { formatEmpresaPublicaEndereco } from '../../shared/utils/formatEmpresaPublicaEndereco'
 import { produtoTemComplementosAtivos } from '../../shared/utils/produtoComplementosUtils'
@@ -434,14 +435,13 @@ function DeliveryPublicoHomeContent({
 }: DeliveryPublicoHomeContentProps) {
   const { config } = useDeliveryThemeContext()
 
-  const viewModel: DeliveryPublicoViewModel = useMemo(
-    () =>
-      buildCatalogViewModel(grupos, {
-        termoBusca,
-        carrinho: { total: carrinhoTotal, quantidadeItens: carrinhoQuantidade },
-      }),
-    [grupos, termoBusca, carrinhoTotal, carrinhoQuantidade]
-  )
+  const viewModel: DeliveryPublicoViewModel = useMemo(() => {
+    const base = buildCatalogViewModel(grupos, {
+      termoBusca,
+      carrinho: { total: carrinhoTotal, quantidadeItens: carrinhoQuantidade },
+    })
+    return applySugestoesDaCasaVisibility(base, config)
+  }, [grupos, termoBusca, carrinhoTotal, carrinhoQuantidade, config])
 
   const LayoutHome = resolveDeliveryLayoutHome(config.layoutId)
   const enderecoTexto = formatEmpresaPublicaEndereco(empresa?.endereco ?? null)

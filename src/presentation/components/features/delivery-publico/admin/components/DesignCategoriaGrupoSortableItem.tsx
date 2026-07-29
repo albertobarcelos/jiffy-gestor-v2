@@ -3,13 +3,10 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { cn } from '@/src/shared/utils/cn'
-import type { DeliveryPublicoDesignConfig } from '../../shared/types/deliveryPublicoDesignConfig'
 import type { DesignCategoriaGrupo } from '../../shared/types/designCategoriaGrupo'
-import { DeliveryGrupoCategoriaVisual } from '../../shared/components/DeliveryGrupoCategoriaVisual'
 
 type DesignCategoriaGrupoSortableItemProps = {
   grupo: DesignCategoriaGrupo
-  config: DeliveryPublicoDesignConfig
   isSelected: boolean
   disabled?: boolean
   onSelect: (grupoId: string) => void
@@ -17,7 +14,6 @@ type DesignCategoriaGrupoSortableItemProps = {
 
 export function DesignCategoriaGrupoSortableItem({
   grupo,
-  config,
   isSelected,
   disabled = false,
   onSelect,
@@ -59,9 +55,8 @@ export function DesignCategoriaGrupoSortableItem({
         <button
           type="button"
           onClick={() => onSelect(grupo.id)}
-          className="flex min-w-0 flex-1 items-center gap-3 py-1.5 pr-3 text-left text-sm font-semibold"
+          className="flex min-w-0 flex-1 items-center py-2.5 pr-3 text-left text-sm font-semibold"
         >
-          <DeliveryGrupoCategoriaVisual config={config} grupo={grupo} size="sm" />
           <span className="truncate">{grupo.nome}</span>
         </button>
       </div>

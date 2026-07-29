@@ -36,7 +36,7 @@ export function VitrineLayoutHome({
     }
   }, [filtered.grupos, activeGrupoId])
 
-  const mostrarCategorias = config.categorias.mostrar
+  const stickyFooterVisible = viewModel.carrinho.quantidadeItens > 0
 
   const handleGrupoClick = useCallback(
     (grupoId: string) => {
@@ -46,8 +46,6 @@ export function VitrineLayoutHome({
     [onGrupoClick]
   )
 
-  const stickyFooterVisible = viewModel.carrinho.quantidadeItens > 0
-
   return (
     <div className="flex min-h-full flex-col pb-24">
       <DeliveryVitrineHeader
@@ -55,15 +53,13 @@ export function VitrineLayoutHome({
         disponivel={viewModel.disponivel}
       />
 
-      {mostrarCategorias ? (
-        <DeliveryVitrineCategoriaTabs
-          grupos={filtered.grupos}
-          activeGrupoId={activeGrupoId}
-          interactive={interactive}
-          onGrupoClick={handleGrupoClick}
-          onSearchToggle={() => setBuscaAberta(current => !current)}
-        />
-      ) : null}
+      <DeliveryVitrineCategoriaTabs
+        grupos={filtered.grupos}
+        activeGrupoId={activeGrupoId}
+        interactive={interactive}
+        onGrupoClick={handleGrupoClick}
+        onSearchToggle={() => setBuscaAberta(current => !current)}
+      />
 
       {buscaAberta ? (
         <DeliveryBuscaProdutos

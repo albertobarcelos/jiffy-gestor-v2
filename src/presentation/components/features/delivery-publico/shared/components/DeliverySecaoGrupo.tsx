@@ -5,6 +5,7 @@ import { DeliveryProdutoListItem } from './DeliveryProdutoListItem'
 import { DeliverySecaoSugestoes } from './DeliverySecaoSugestoes'
 import type { DeliveryPublicoDesignConfig } from '../types/deliveryPublicoDesignConfig'
 import type { DeliveryPublicoGrupoViewModel } from '../types/deliveryPublicoViewModel'
+import { resolveGrupoTituloBarStyle } from '../utils/resolveGrupoTituloBarStyle'
 
 type DeliverySecaoGrupoProps = {
   config: DeliveryPublicoDesignConfig
@@ -20,7 +21,7 @@ type DeliverySecaoGrupoProps = {
 }
 
 export function DeliverySecaoGrupo({
-  config: _config,
+  config,
   grupo,
   interactive = false,
   stickyTitle = false,
@@ -47,6 +48,11 @@ export function DeliverySecaoGrupo({
   }
 
   const topClass = denseTop ? 'mt-2' : 'mt-5'
+  const tituloStyle = resolveGrupoTituloBarStyle({
+    config,
+    imagemUrl: grupo.imagemUrl,
+  })
+  const mostrarNome = config.categorias.mostrarNomeTitulo !== false
 
   return (
     <section
@@ -57,8 +63,10 @@ export function DeliverySecaoGrupo({
         className={`delivery-grupo-title mb-2 flex min-h-12 items-center rounded-lg px-4 py-2.5 text-base uppercase tracking-wide @sm:min-h-14 @sm:text-lg @lg:min-h-16 @lg:text-xl @xl:text-2xl${
           stickyTitle ? ' delivery-basico-grupo-title-sticky' : ''
         }`}
+        style={tituloStyle}
+        aria-label={grupo.nome}
       >
-        <span className="min-w-0 leading-tight">{grupo.nome}</span>
+        {mostrarNome ? <span className="min-w-0 leading-tight">{grupo.nome}</span> : null}
       </h2>
       <div className="grid grid-cols-1 gap-3 @lg:grid-cols-1 @3xl:grid-cols-2 @lg:gap-4">
         {grupo.produtos.map(produto => (
