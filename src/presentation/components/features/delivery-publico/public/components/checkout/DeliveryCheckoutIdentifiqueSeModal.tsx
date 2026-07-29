@@ -13,6 +13,7 @@ import {
 } from '../../../shared/utils/deliveryTelefonePais'
 import type { ClienteLookupStatus } from '../../../shared/hooks/useDeliveryCheckout'
 import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
+import { isNomeCompletoCheckoutValido } from './deliveryCheckoutProgress'
 import {
   DeliveryCheckoutShellFooter,
   DeliveryCheckoutShellHeader,
@@ -33,11 +34,6 @@ type DeliveryCheckoutIdentifiqueSeModalProps = {
   onSalvarNome: (nome: string) => Promise<void>
   onClose: () => void
   onContinuar: (telefoneDigits: string) => Promise<void>
-}
-
-function nomeCompletoValido(nome: string): boolean {
-  const trimmed = nome.trim()
-  return trimmed.length >= 3 && trimmed.includes(' ')
 }
 
 export function DeliveryCheckoutIdentifiqueSeModal({
@@ -108,7 +104,7 @@ export function DeliveryCheckoutIdentifiqueSeModal({
   }
 
   const handleSalvarNome = async () => {
-    if (!nomeCompletoValido(nome)) {
+    if (!isNomeCompletoCheckoutValido(nome)) {
       setTentouNome(true)
       showToast.error('Informe nome e sobrenome')
       return
@@ -139,13 +135,13 @@ export function DeliveryCheckoutIdentifiqueSeModal({
       showToast.error('Erro ao consultar cadastro. Tente novamente.')
       return
     }
-    if (precisaNome && !nomeCompletoValido(nome)) {
+    if (precisaNome && !isNomeCompletoCheckoutValido(nome)) {
       setTentouNome(true)
       showToast.error('Informe nome e sobrenome')
       return
     }
     if (clienteEncontrado && nomeAlterado) {
-      if (!nomeCompletoValido(nome)) {
+      if (!isNomeCompletoCheckoutValido(nome)) {
         setTentouNome(true)
         showToast.error('Informe nome e sobrenome')
         return
@@ -235,7 +231,7 @@ export function DeliveryCheckoutIdentifiqueSeModal({
                 className="flex min-h-[44px] items-center gap-2 rounded-xl border bg-white px-3 py-2"
                 style={{
                   borderColor:
-                    tentouNome && !nomeCompletoValido(nome)
+                    tentouNome && !isNomeCompletoCheckoutValido(nome)
                       ? '#f87171'
                       : 'var(--delivery-border)',
                 }}
@@ -309,7 +305,7 @@ export function DeliveryCheckoutIdentifiqueSeModal({
               value={nome}
               onChange={e => onChangeNome(e.target.value)}
               className={`w-full rounded-xl border bg-white px-3 py-2 text-sm outline-none delivery-text-primary ${
-                tentouNome && !nomeCompletoValido(nome) ? 'border-red-400' : ''
+                tentouNome && !isNomeCompletoCheckoutValido(nome) ? 'border-red-400' : ''
               }`}
               style={{ borderColor: 'var(--delivery-border)' }}
             />

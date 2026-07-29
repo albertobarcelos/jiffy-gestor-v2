@@ -1,4 +1,5 @@
 import type { CatalogoPublicoGrupoProdutoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import { DELIVERY_PUBLICO_HORARIO_PLACEHOLDER } from '../constants/deliveryPublicoPlaceholders'
 import type { DeliveryPublicoViewModel } from '../types/deliveryPublicoViewModel'
 import { produtoTemComplementosAtivos } from '../utils/produtoComplementosUtils'
 
@@ -24,7 +25,7 @@ export function buildCatalogViewModel(
       })),
     })),
     disponivel: true,
-    horarioTexto: '09:00 às 23:30',
+    horarioTexto: DELIVERY_PUBLICO_HORARIO_PLACEHOLDER,
     termoBusca: '',
     carrinho: { total: 0, quantidadeItens: 0 },
     ...overrides,

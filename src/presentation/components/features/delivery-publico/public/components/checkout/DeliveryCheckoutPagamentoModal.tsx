@@ -9,7 +9,7 @@ import {
   transformarParaReal,
 } from '@/src/shared/utils/formatters'
 import { showToast } from '@/src/shared/utils/toast'
-import { useHorizontalDragScroll } from '@/src/presentation/components/features/pedidos/hooks/useHorizontalDragScroll'
+import { useHorizontalDragScroll } from '@/src/presentation/hooks/useHorizontalDragScroll'
 import type { CheckoutPagamentoItem } from '../../../shared/utils/checkoutPagamentosUtils'
 import {
   calcularTrocoCheckout,

@@ -6,10 +6,10 @@ import {
   restantePagamentoCheckout,
   resolverAdicaoPagamentoCheckout,
   somaPagamentosCheckout,
-} from '@/src/presentation/components/features/delivery-publico/shared/utils/checkoutPagamentosUtils'
-import { montarPedidoPublico } from '@/src/presentation/components/features/delivery-publico/shared/utils/montarPedidoPublico'
+} from '@/src/application/services/delivery-publico/checkoutPagamentos'
+import { montarPedidoPublico } from '@/src/application/mappers/MontarPedidoPublicoMapper'
+import type { CheckoutFormData } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
 import type { DeliveryCarrinhoItem } from '@/src/presentation/components/features/delivery-publico/shared/stores/deliveryCarrinhoStore'
-import type { CheckoutFormData } from '@/src/presentation/components/features/delivery-publico/shared/utils/montarPedidoPublico'
 
 const itemCarrinho: DeliveryCarrinhoItem = {
   id: 'i1',

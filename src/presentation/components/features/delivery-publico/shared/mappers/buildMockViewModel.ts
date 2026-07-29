@@ -3,6 +3,7 @@ import {
   PREVIEW_DESIGN_PRODUTOS,
   previewGrupoFallbackImagemUrl,
 } from '../constants/previewCatalogMock'
+import { DELIVERY_PUBLICO_HORARIO_PLACEHOLDER } from '../constants/deliveryPublicoPlaceholders'
 import type { DesignCategoriaGrupo } from '../types/designCategoriaGrupo'
 import type {
   DeliveryPublicoGrupoViewModel,
@@ -77,7 +78,7 @@ export function buildMockDeliveryViewModel(
   return {
     grupos,
     disponivel: true,
-    horarioTexto: '09:00 às 23:30',
+    horarioTexto: DELIVERY_PUBLICO_HORARIO_PLACEHOLDER,
     termoBusca: '',
     carrinho: { total: 80, quantidadeItens: 8 },
     ...overrides,

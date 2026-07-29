@@ -1,14 +1,18 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { CheckoutFormData } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
 import type { ClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import { normalizarClienteDeliveryPublico } from '@/src/application/mappers/ClienteDeliveryPublicoMapper'
+import { enviarPedidoPublicoUseCase } from '@/src/application/use-cases/delivery-publico/EnviarPedidoPublicoUseCase'
+import { garantirEnderecoEntregaPublicoUseCase } from '@/src/application/use-cases/delivery-publico/GarantirEnderecoEntregaPublicoUseCase'
 import {
-  buscarClienteDeliveryPublico,
-  criarPedidoPublico,
   atualizarClienteDeliveryPublico,
+  buscarClienteDeliveryPublico,
 } from '@/src/infrastructure/api/publicDeliveryApi'
 import { usePublicDeliveryMeiosPagamento } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import { showToast } from '@/src/shared/utils/toast'
+import { comporTelefoneApi } from '@/src/shared/utils/deliveryTelefonePais'
 import {
   useDeliveryCarrinhoStore,
   useDeliveryCarrinhoItens,
@@ -18,15 +22,6 @@ import {
   useDeliveryPreferenciaEntregaStore,
   type DeliveryTipoEntrega,
 } from '../stores/deliveryPreferenciaEntregaStore'
-import {
-  garantirEnderecoEntregaPublico,
-  normalizarClienteDeliveryPublico,
-} from '../utils/garantirEnderecoClientePublico'
-import { comporTelefoneApi } from '../utils/deliveryTelefonePais'
-import {
-  montarPedidoPublico,
-  type CheckoutFormData,
-} from '../utils/montarPedidoPublico'
 
 export type ClienteLookupStatus =
   | 'idle'
@@ -409,7 +404,7 @@ export function useDeliveryCheckout(slug: string) {
 
     preferirNovoEnderecoRef.current = true
 
-    const enderecoId = await garantirEnderecoEntregaPublico({
+    const enderecoId = await garantirEnderecoEntregaPublicoUseCase.execute({
       telefone: tel,
       nome: nomeEfetivo,
       modoEndereco: 'novo',
@@ -466,75 +461,31 @@ export function useDeliveryCheckout(slug: string) {
 
     setEnviando(true)
     try {
-      let enderecoIdEntrega: string | null = null
-
-      if (form.tipoEntrega === 'entrega') {
-        enderecoIdEntrega = await garantirEnderecoEntregaPublico({
-          telefone: tel,
-          nome: nomeEfetivo,
-          modoEndereco: form.modoEndereco,
-          enderecoIdSelecionado: form.enderecoIdSelecionado || null,
-          clienteLookup: clienteLookup.cliente,
-          enderecoNovo: {
-            rua: form.rua,
-            numero: form.numero,
-            bairro: form.bairro,
-            cidade: form.cidade,
-            estado: form.estado,
-            cep: form.cep,
-            complemento: form.complemento,
-            pontoReferencia: form.pontoReferencia,
-            etiqueta: form.etiquetaEndereco,
-          },
-        })
-      }
-
-      const resultado = montarPedidoPublico({
+      const resultado = await enviarPedidoPublicoUseCase.execute({
         slug,
+        telefoneApi: tel,
+        nomeEfetivo,
         itens,
         total,
-        form: { ...form, nome: nomeEfetivo ?? '' },
-        enderecoIdEntrega,
-        telefoneApi: tel,
+        form,
+        clienteLookup: clienteLookup.cliente,
       })
+
       if (!resultado.ok) {
         showToast.error(resultado.error)
         return false
       }
 
-      const cpfPedido = resultado.payload.cliente.cpf?.replace(/\D/g, '') ?? ''
-      if (cpfPedido.length === 11) {
-        // Create reutiliza cliente existente sem atualizar CPF — garante no cadastro via PATCH.
-        const rawAtual = await buscarClienteDeliveryPublico(tel)
-        const cpfAtual = rawAtual?.cpf?.replace(/\D/g, '') ?? ''
-        if (rawAtual && !cpfAtual) {
-          try {
-            const atualizadoRaw = await atualizarClienteDeliveryPublico(tel, {
-              cpf: cpfPedido,
-            })
-            const cliente = normalizarClienteDeliveryPublico(atualizadoRaw)
-            if (cliente) {
-              setClienteLookup(prev => ({
-                ...prev,
-                status: 'encontrado',
-                telefoneConsultado: tel,
-                cliente,
-                mensagemErro: null,
-              }))
-            }
-          } catch (error) {
-            console.error(error)
-            showToast.error(
-              error instanceof Error
-                ? error.message
-                : 'Não foi possível salvar o CPF no cadastro'
-            )
-            return false
-          }
-        }
+      if (resultado.clienteAtualizado) {
+        setClienteLookup(prev => ({
+          ...prev,
+          status: 'encontrado',
+          telefoneConsultado: tel,
+          cliente: resultado.clienteAtualizado,
+          mensagemErro: null,
+        }))
       }
 
-      await criarPedidoPublico(resultado.payload)
       limpar(slug)
       showToast.success('Pedido enviado com sucesso!')
       return true

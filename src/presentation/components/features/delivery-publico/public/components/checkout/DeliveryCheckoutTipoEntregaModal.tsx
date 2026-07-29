@@ -5,14 +5,15 @@ import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/de
 import type { DeliveryTipoEntrega } from '../../../shared/stores/deliveryPreferenciaEntregaStore'
 import { formatDeliveryCurrency } from '../../../shared/utils/formatDeliveryCurrency'
 import { formatarResumoEnderecoPublico } from '../../../shared/utils/garantirEnderecoClientePublico'
+import { DELIVERY_PUBLICO_TAXA_ENTREGA_PLACEHOLDER } from '../../../shared/constants/deliveryPublicoPlaceholders'
 import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
 import {
   DeliveryCheckoutShellFooter,
   DeliveryCheckoutShellHeader,
 } from './DeliveryCheckoutShell'
 
-/** Taxa fictícia até existir endpoint de frete. */
-export const TAXA_ENTREGA_FICTICIA = 5.9
+/** @deprecated Preferir `DELIVERY_PUBLICO_TAXA_ENTREGA_PLACEHOLDER`. */
+export const TAXA_ENTREGA_FICTICIA = DELIVERY_PUBLICO_TAXA_ENTREGA_PLACEHOLDER
 
 export type ModoEntregaOpcao = {
   tipoEntrega: DeliveryTipoEntrega

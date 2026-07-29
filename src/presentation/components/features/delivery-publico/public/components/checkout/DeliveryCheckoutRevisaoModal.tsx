@@ -14,6 +14,7 @@ import { DELIVERY_PAIS_TELEFONE_PADRAO } from '../../../shared/constants/deliver
 import { formatDeliveryCurrency } from '../../../shared/utils/formatDeliveryCurrency'
 import { formatarTelefoneExibicao } from '../../../shared/utils/deliveryTelefonePais'
 import { calcularTrocoCheckout } from '../../../shared/utils/checkoutPagamentosUtils'
+import { etiquetaEnderecoPublicoLabel } from '../../../shared/utils/etiquetaEnderecoPublicoLabel'
 import { isMeioPagamentoDinheiro } from '../../../shared/utils/isMeioPagamentoDinheiro'
 import { obterIconeMeioPagamento } from '../../../shared/utils/obterIconeMeioPagamento'
 import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
@@ -246,7 +247,7 @@ export function DeliveryCheckoutRevisaoModal({
               <p className="text-sm delivery-text-secondary">
                 {[
                   enderecoCliente.bairro,
-                  etiquetaLabel(enderecoCliente.etiqueta),
+                  etiquetaEnderecoPublicoLabel(enderecoCliente.etiqueta),
                 ]
                   .filter(Boolean)
                   .join(' - ')}
@@ -465,11 +466,4 @@ export function DeliveryCheckoutRevisaoModal({
       </div>
     </>
   )
-}
-
-function etiquetaLabel(etiqueta: string): string {
-  const e = etiqueta.toLowerCase()
-  if (e === 'casa') return 'Casa'
-  if (e === 'trabalho') return 'Trabalho'
-  return etiqueta
 }
