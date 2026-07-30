@@ -62,7 +62,7 @@ export function FlyingProduct({
 
       await controls.start({
         scale: midScale,
-        transition: { duration: 0.55, ease: EASE, delay: 0.18 },
+        transition: { duration: 0.32, ease: EASE, delay: 0.08 },
       })
 
       if (cancelled) return
@@ -74,7 +74,7 @@ export function FlyingProduct({
         scale: [midScale, midScale, footerScale],
         opacity: 1,
         transition: {
-          duration: 0.9,
+          duration: 0.55,
           ease: EASE,
           times: [0, 0.55, 1],
         },
@@ -87,7 +87,7 @@ export function FlyingProduct({
 
       await controls.start({
         opacity: 0,
-        transition: { duration: 0.12, ease: 'easeOut' },
+        transition: { duration: 0.08, ease: 'easeOut' },
       })
 
       if (!cancelled) onFinish()
@@ -103,10 +103,21 @@ export function FlyingProduct({
   if (!mounted) return null
 
   return createPortal(
-    <div className="pointer-events-none fixed inset-0 z-[80]" aria-hidden>
+    <div
+      className="fixed inset-0 z-[80] touch-none"
+      role="presentation"
+      aria-busy="true"
+      aria-label="Adicionando item ao carrinho"
+      // Captura cliques/toques para ninguém navegar ou adicionar outro item no meio do fly.
+      onPointerDown={e => e.preventDefault()}
+      onClick={e => {
+        e.preventDefault()
+        e.stopPropagation()
+      }}
+    >
       <motion.div
         animate={controls}
-        className="fixed left-0 top-0 overflow-hidden rounded-2xl shadow-xl"
+        className="pointer-events-none fixed left-0 top-0 overflow-hidden rounded-2xl shadow-xl"
         style={{
           width: START_SIZE,
           height: START_SIZE,

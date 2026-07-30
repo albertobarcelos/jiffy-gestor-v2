@@ -407,7 +407,7 @@ export function DeliveryCheckoutRevisaoModal({
           {adicionarObservacao ? (
             <div className="space-y-2">
               <textarea
-                className="min-h-[110px] w-full resize-y rounded-xl border bg-transparent px-3 py-3 text-sm outline-none delivery-text-primary"
+                className="min-h-[110px] w-full resize-y rounded-xl border bg-transparent px-3 py-3 text-base outline-none delivery-text-primary"
                 style={{ borderColor: 'var(--delivery-border)' }}
                 placeholder="Ex.: sem cebola, tocar a campainha, etc."
                 value={observacaoPedido}
@@ -470,7 +470,7 @@ export function DeliveryCheckoutRevisaoModal({
               </label>
               <input
                 id="cpf-nota-fiscal"
-                className="w-full rounded-xl border bg-transparent px-3 py-3 text-sm outline-none delivery-text-primary"
+                className="w-full rounded-xl border bg-transparent px-3 py-3 text-base outline-none delivery-text-primary"
                 style={{ borderColor: 'var(--delivery-border)' }}
                 inputMode="numeric"
                 autoComplete="off"

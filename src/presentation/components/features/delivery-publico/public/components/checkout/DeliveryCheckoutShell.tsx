@@ -206,10 +206,8 @@ export function DeliveryCheckoutShell({
             role="dialog"
             aria-modal="true"
             aria-label={header.title || 'Checkout'}
-            className="fixed right-0 z-[60] flex w-full flex-col overflow-hidden overscroll-none shadow-2xl lg:w-[40%]"
+            className="delivery-vv-panel z-[60] flex flex-col shadow-2xl"
             style={{
-              top: 'var(--delivery-vv-offset-top, 0px)',
-              height: 'var(--delivery-vv-height, 100dvh)',
               backgroundColor: 'var(--delivery-surface, #ffffff)',
             }}
             initial={{ x: '100%' }}
@@ -277,7 +275,7 @@ export function DeliveryCheckoutShell({
                     animate="center"
                     exit="exit"
                     transition={SLIDE_TRANSITION}
-                    className="absolute inset-0 touch-pan-y overflow-y-auto overscroll-y-contain px-4 py-4"
+                    className="absolute inset-0 max-w-full touch-pan-y overflow-x-hidden overflow-y-auto overscroll-y-contain px-4 py-4"
                   >
                     {children}
                   </motion.div>

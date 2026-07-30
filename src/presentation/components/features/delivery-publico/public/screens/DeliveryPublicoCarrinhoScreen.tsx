@@ -404,10 +404,8 @@ export function DeliveryPublicoCarrinhoScreen({
             role="dialog"
             aria-modal="true"
             aria-label="Carrinho"
-            className="fixed right-0 z-50 flex w-full flex-col overflow-hidden overscroll-none shadow-2xl lg:w-[40%]"
+            className="delivery-vv-panel z-50 flex flex-col shadow-2xl"
             style={{
-              top: 'var(--delivery-vv-offset-top, 0px)',
-              height: 'var(--delivery-vv-height, 100dvh)',
               backgroundColor: 'var(--delivery-bg)',
             }}
             initial={{ x: '100%' }}

@@ -257,7 +257,7 @@ export function DeliveryCheckoutIdentifiqueSeModal({
                 placeholder={placeholder}
                 value={telefone}
                 onChange={e => onChangeTelefone(formatarTelefonePorPais(e.target.value, paisIso2))}
-                className="min-w-0 flex-1 bg-transparent text-sm outline-none delivery-text-primary"
+                className="min-w-0 flex-1 bg-transparent text-base outline-none delivery-text-primary"
               />
             </div>
           </label>
@@ -289,7 +289,7 @@ export function DeliveryCheckoutIdentifiqueSeModal({
                   value={nome}
                   readOnly={nomeSomenteLeitura}
                   onChange={e => onChangeNome(e.target.value)}
-                  className="min-w-0 flex-1 bg-transparent text-sm outline-none delivery-text-primary"
+                  className="min-w-0 flex-1 bg-transparent text-base outline-none delivery-text-primary"
                 />
                 {temNomeNoCadastro && !editandoNome ? (
                   <button
@@ -361,7 +361,7 @@ export function DeliveryCheckoutIdentifiqueSeModal({
                 placeholder="Nome + Sobrenome"
                 value={nome}
                 onChange={e => onChangeNome(e.target.value)}
-                className={`w-full rounded-xl border bg-white px-3 py-2 text-sm outline-none delivery-text-primary ${
+                className={`w-full rounded-xl border bg-white px-3 py-2 text-base outline-none delivery-text-primary ${
                   tentouNome && !isNomeCompletoCheckoutValido(nome) ? 'border-red-400' : ''
                 }`}
                 style={{ borderColor: 'var(--delivery-border)' }}

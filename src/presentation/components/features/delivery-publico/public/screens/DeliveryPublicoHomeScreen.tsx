@@ -10,6 +10,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react'
+import { createPortal } from 'react-dom'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type {
   CatalogoPublicoProdutoDTO,
@@ -42,6 +43,7 @@ import { DeliveryProdutoModal } from '../components/DeliveryProdutoModal'
 import { DeliveryAdicionadoCarrinhoDialog } from '../components/DeliveryAdicionadoCarrinhoDialog'
 import { DeliveryPublicoCarrinhoScreen } from './DeliveryPublicoCarrinhoScreen'
 import { useFlyToCart } from '../../shared/hooks/useFlyToCart'
+import { useDeliveryBodyScrollLock } from '../../shared/hooks/useDeliveryBodyScrollLock'
 import type { DeliveryCarrinhoThumb } from '../../shared/components/DeliveryPedidoFooter'
 import { buildCarrinhoThumbsFromItens } from '../../shared/utils/buildCarrinhoThumbsFromItens'
 import {
@@ -88,7 +90,10 @@ export function DeliveryPublicoHomeScreen({
   const carrinhoThumbsTargetRef = useRef<HTMLDivElement>(null)
   /** Últimas thumbs já exibidas (antes do add atual). */
   const thumbsCommitadasRef = useRef<DeliveryCarrinhoThumb[]>([])
-  const { flyToCart, flyingNode } = useFlyToCart()
+  const { flyToCart, flyingNode, isFlying } = useFlyToCart()
+  /** Bloqueia UI desde o pending até o fim do fly (evita add/navegação no meio). */
+  const bloquearUiFlyToCart = Boolean(pendingFly) || isFlying
+  useDeliveryBodyScrollLock(bloquearUiFlyToCart)
 
   const catalogQuery = usePublicDeliveryCatalogInfinite(slug)
   useAutoFetchCatalogoGrupos(catalogQuery)
@@ -372,6 +377,7 @@ export function DeliveryPublicoHomeScreen({
         carrinhoThumbsBounceKey={carrinhoThumbsBounceKey}
         carrinhoThumbsTargetRef={carrinhoThumbsTargetRef}
         flyingNode={flyingNode}
+        bloquearUiFlyToCart={bloquearUiFlyToCart}
       />
       {carrinhoAberto ? (
         <DeliveryPublicoCarrinhoScreen slug={slug} onClose={fecharCarrinho} />
@@ -405,6 +411,7 @@ type DeliveryPublicoHomeContentProps = {
   carrinhoThumbsBounceKey: number
   carrinhoThumbsTargetRef: RefObject<HTMLDivElement | null>
   flyingNode: ReactNode
+  bloquearUiFlyToCart: boolean
 }
 
 function DeliveryPublicoHomeContent({
@@ -432,6 +439,7 @@ function DeliveryPublicoHomeContent({
   carrinhoThumbsBounceKey,
   carrinhoThumbsTargetRef,
   flyingNode,
+  bloquearUiFlyToCart,
 }: DeliveryPublicoHomeContentProps) {
   const { config } = useDeliveryThemeContext()
 
@@ -463,7 +471,7 @@ function DeliveryPublicoHomeContent({
         config={config}
         viewModel={viewModel}
         enderecoTexto={enderecoTexto}
-        interactive
+        interactive={!bloquearUiFlyToCart}
         onBuscaChange={onBuscaChange}
         onGrupoClick={onGrupoClick}
         onProdutoClick={onProdutoClick}
@@ -489,6 +497,22 @@ function DeliveryPublicoHomeContent({
           onIrParaCarrinho={onIrParaCarrinhoAposAdicionar}
         />
       ) : null}
+      {bloquearUiFlyToCart && typeof document !== 'undefined'
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[75] touch-none"
+              role="presentation"
+              aria-busy="true"
+              aria-label="Adicionando item ao carrinho"
+              onPointerDown={e => e.preventDefault()}
+              onClick={e => {
+                e.preventDefault()
+                e.stopPropagation()
+              }}
+            />,
+            document.body
+          )
+        : null}
       {flyingNode}
       {isFetchingNextPage ? (
         <div className="flex justify-center py-4">
