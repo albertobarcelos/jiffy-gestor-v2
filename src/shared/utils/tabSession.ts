@@ -4,6 +4,7 @@ import {
   SESSION_STORAGE_EMPRESA_SLUG,
 } from '@/src/shared/constants/sessionCoordinator'
 import { empresaNomeParaSlugUrl } from '@/src/shared/utils/empresaNomeParaSlugUrl'
+import { generateUuid } from '@/src/shared/utils/generateUuid'
 import {
   buildGestaoPath,
   isGestaoScopedPath,
@@ -35,7 +36,7 @@ export function prepareTabSession(
   empresaNome: string,
   empresaId: string
 ): { nonce: string; empParam: string } {
-  const nonce = crypto.randomUUID()
+  const nonce = generateUuid()
   const empParam = buildEmpresaUrlParam(empresaNome, empresaId)
 
   const key = `jiffy:pending-session:${nonce}`
@@ -203,7 +204,7 @@ export function extractEmpresaIdPrefix(empParam: string | null): string | null {
  * Gera um nonce, grava no sessionStorage e retorna.
  */
 export function bootstrapTabSessionManually(accessToken: string, empParam: string): void {
-  const nonce = crypto.randomUUID()
+  const nonce = generateUuid()
   try {
     sessionStorage.setItem(SESSION_STORAGE_TENANT_TOKEN, accessToken)
     sessionStorage.setItem(SESSION_STORAGE_SESSION_NONCE, nonce)

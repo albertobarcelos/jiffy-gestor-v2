@@ -9,6 +9,7 @@ import {
   extractEmpresaIdPrefix,
   bootstrapTabSessionManually,
 } from '@/src/shared/utils/tabSession'
+import { generateUuid } from '@/src/shared/utils/generateUuid'
 import { parseEmpresaSlugFromPath, parseEmpresaSlugFromSearch } from '@/src/shared/utils/gestaoRoutes'
 import {
   SESSION_STORAGE_SESSION_NONCE,
@@ -79,7 +80,7 @@ export function TabSessionBootstrap() {
 
     didRunRef.current = true
 
-    const tempNonce = crypto.randomUUID()
+    const tempNonce = generateUuid()
     try {
       sessionStorage.setItem(SESSION_STORAGE_SESSION_NONCE, tempNonce)
       sessionStorage.setItem(SESSION_STORAGE_EMPRESA_SLUG, emp!)
