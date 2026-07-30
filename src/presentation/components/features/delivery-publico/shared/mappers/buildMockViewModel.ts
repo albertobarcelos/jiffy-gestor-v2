@@ -3,6 +3,7 @@ import {
   PREVIEW_DESIGN_PRODUTOS,
   previewGrupoFallbackImagemUrl,
 } from '../constants/previewCatalogMock'
+import { DELIVERY_PUBLICO_HORARIO_PLACEHOLDER } from '../constants/deliveryPublicoPlaceholders'
 import type { DesignCategoriaGrupo } from '../types/designCategoriaGrupo'
 import type {
   DeliveryPublicoGrupoViewModel,
@@ -17,6 +18,7 @@ function previewProdutoExemplo(grupoId: string) {
     preco: 10,
     imagemUrl: null as string | null,
     grupoId,
+    temComplementos: false,
   }
 }
 
@@ -29,6 +31,7 @@ function buildMockGruposFromPreviewCatalog(): DeliveryPublicoGrupoViewModel[] {
       preco: p.preco,
       imagemUrl: null as string | null,
       grupoId: p.grupoId,
+      temComplementos: false,
     }))
 
     return {
@@ -75,7 +78,7 @@ export function buildMockDeliveryViewModel(
   return {
     grupos,
     disponivel: true,
-    horarioTexto: '09:00 às 23:30',
+    horarioTexto: DELIVERY_PUBLICO_HORARIO_PLACEHOLDER,
     horarioSemanalTexto: 'Seg–Dom 00:00–23:59',
     termoBusca: '',
     carrinho: { total: 80, quantidadeItens: 8 },

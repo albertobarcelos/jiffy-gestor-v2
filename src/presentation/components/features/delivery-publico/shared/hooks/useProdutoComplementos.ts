@@ -12,6 +12,7 @@ import type { DeliveryCarrinhoComplemento } from '../stores/deliveryCarrinhoStor
 import { showToast } from '@/src/shared/utils/toast'
 import {
   chaveComplemento,
+  produtoTemComplementosAtivos,
   resolveGruposComplementos,
   somarQuantidadeNoGrupo,
   validarGruposComplementos,
@@ -37,7 +38,7 @@ export function useProdutoComplementos(
   initialComplementos?: DeliveryCarrinhoComplemento[]
 ) {
   const cacheComplementos = usePublicDeliveryComplementosStore(s => s.porSlug[slug] ?? null)
-  const precisaComplementos = produto.abreComplementos && produto.grupoComplementosIds.length > 0
+  const precisaComplementos = produtoTemComplementosAtivos(produto)
   const { isLoading: carregandoComplementos } = useEnsureComplementosCatalogo(
     slug,
     precisaComplementos && !cacheComplementos

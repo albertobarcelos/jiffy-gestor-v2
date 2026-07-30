@@ -2,6 +2,8 @@
 
 import { create } from 'zustand'
 import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware'
+import { generateUuid } from '@/src/shared/utils/generateUuid'
+import { encontrarItemIgual } from '../utils/deliveryCarrinhoItemUtils'
 
 export type DeliveryCarrinhoComplemento = {
   complementoId: string
@@ -45,10 +47,23 @@ function calcularTotais(itens: DeliveryCarrinhoItem[]) {
 }
 
 function gerarIdItem(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID()
+  return generateUuid()
+}
+
+function mesclarQuantidade(
+  existente: DeliveryCarrinhoItem,
+  quantidadeExtra: number,
+  valorUnitario: number
+): DeliveryCarrinhoItem {
+  const quantidade = existente.quantidade + quantidadeExtra
+  return {
+    ...existente,
+    valorUnitario,
+    quantidade,
+    valorTotal: valorUnitario * quantidade,
+    // Último lançamento — miniaturas do footer seguem esta ordem.
+    adicionadoEm: new Date().toISOString(),
   }
-  return `item-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 }
 
 const deliveryCarrinhoStorage: StateStorage = {
@@ -134,6 +149,20 @@ export const useDeliveryCarrinhoStore = create<DeliveryCarrinhoState>()(
       adicionarItem: (slug, item) =>
         set(state => {
           const atuais = state.carrinhos[slug] ?? []
+          const igual = encontrarItemIgual(atuais, item)
+          if (igual) {
+            return {
+              carrinhos: {
+                ...state.carrinhos,
+                [slug]: atuais.map(existing =>
+                  existing.id === igual.id
+                    ? mesclarQuantidade(existing, item.quantidade, item.valorUnitario)
+                    : existing
+                ),
+              },
+            }
+          }
+
           const novo: DeliveryCarrinhoItem = {
             ...item,
             id: gerarIdItem(),
@@ -166,6 +195,20 @@ export const useDeliveryCarrinhoStore = create<DeliveryCarrinhoState>()(
       substituirItem: (slug, itemId, item) =>
         set(state => {
           const atuais = state.carrinhos[slug] ?? []
+          const igual = encontrarItemIgual(atuais, item, itemId)
+
+          if (igual) {
+            const mesclado = mesclarQuantidade(igual, item.quantidade, item.valorUnitario)
+            return {
+              carrinhos: {
+                ...state.carrinhos,
+                [slug]: atuais
+                  .filter(existing => existing.id !== itemId)
+                  .map(existing => (existing.id === igual.id ? mesclado : existing)),
+              },
+            }
+          }
+
           const itens = atuais.map(existing => {
             if (existing.id !== itemId) return existing
             return {

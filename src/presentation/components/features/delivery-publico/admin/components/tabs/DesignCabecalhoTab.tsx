@@ -115,7 +115,7 @@ export function DesignCabecalhoTab({
             variant="banner"
             previewUrl={cabecalho.capaUrl}
             cropPreset={DELIVERY_CAPA_CROP_PRESET}
-            helperText="Após escolher o arquivo, ajuste o recorte (máx. 1200×400 · 3:1). Mantenha o foco no centro. JPEG, PNG ou WebP até 1 MB."
+            helperText="Após escolher o arquivo, ajuste o recorte (máx. 1200×300 · 4:1). Mantenha o foco no centro. JPEG, PNG ou WebP até 1 MB."
             emptyHint="Arraste e solte a imagem aqui ou Selecionar arquivo"
             busy={isUploadingBanner}
             disabled={!canUpload}

@@ -104,7 +104,6 @@ export function FlyingProduct({
 
   return createPortal(
     <div className="pointer-events-none fixed inset-0 z-[80]" aria-hidden>
-      <div className="absolute inset-0 bg-black/25" />
       <motion.div
         animate={controls}
         className="fixed left-0 top-0 overflow-hidden rounded-2xl shadow-xl"

@@ -3,7 +3,8 @@
 import { Home, MapPin, Pencil, Plus, Trash2 } from 'lucide-react'
 import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { formatarResumoEnderecoPublico } from '../../../shared/utils/garantirEnderecoClientePublico'
-import { DeliveryCheckoutStepModal } from './DeliveryCheckoutStepModal'
+import { etiquetaEnderecoPublicoLabel } from '../../../shared/utils/etiquetaEnderecoPublicoLabel'
+import { DeliveryCheckoutShellHeader } from './DeliveryCheckoutShell'
 
 type DeliveryCheckoutEnderecosModalProps = {
   enderecos: EnderecoClienteDeliveryPublicoDTO[]
@@ -11,13 +12,6 @@ type DeliveryCheckoutEnderecosModalProps = {
   onClose: () => void
   onSelecionar: (enderecoId: string) => void
   onUsarNovoEndereco: () => void
-}
-
-function etiquetaLabel(etiqueta: string): string {
-  const e = etiqueta.toLowerCase()
-  if (e === 'casa') return 'Casa'
-  if (e === 'trabalho') return 'Trabalho'
-  return etiqueta.charAt(0).toUpperCase() + etiqueta.slice(1)
 }
 
 export function DeliveryCheckoutEnderecosModal({
@@ -34,7 +28,13 @@ export function DeliveryCheckoutEnderecosModal({
   })
 
   return (
-    <DeliveryCheckoutStepModal title="Endereço de entrega" onClose={onClose}>
+    <>
+      <DeliveryCheckoutShellHeader
+        title="Endereço de entrega"
+        showBack
+        onBack={onClose}
+      />
+
       <p className="mb-3 text-sm delivery-text-secondary">Último endereço utilizado</p>
 
       <div className="space-y-3">
@@ -69,7 +69,7 @@ export function DeliveryCheckoutEnderecosModal({
                     style={{ backgroundColor: 'var(--delivery-surface-muted)' }}
                   >
                     <Home className="h-3 w-3" aria-hidden />
-                    {etiquetaLabel(endereco.etiqueta)}
+                    {etiquetaEnderecoPublicoLabel(endereco.etiqueta)}
                   </span>
                   <p className="text-sm font-semibold delivery-text-primary">
                     {endereco.rua}, {endereco.numero}
@@ -102,6 +102,6 @@ export function DeliveryCheckoutEnderecosModal({
         <Plus className="h-4 w-4" aria-hidden />
         Use um novo endereço
       </button>
-    </DeliveryCheckoutStepModal>
+    </>
   )
 }

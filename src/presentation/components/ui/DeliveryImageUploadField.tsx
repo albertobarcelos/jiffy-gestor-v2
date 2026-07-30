@@ -60,7 +60,20 @@ const CROP_FIELD_STYLES = {
 const CROP_DROPZONE_MAX_W = 360
 const CROP_DROPZONE_MAX_H = 280
 
+function isWideCropPreset(preset: ImageCropPreset): boolean {
+  return preset.maxOutputWidth / Math.max(1, preset.maxOutputHeight) >= 3
+}
+
 function getCropDropzoneStyle(preset: ImageCropPreset): CSSProperties {
+  // Banners panorâmicos: ocupam toda a largura útil da área.
+  if (isWideCropPreset(preset)) {
+    return {
+      width: '100%',
+      height: 'auto',
+      aspectRatio: `${preset.maxOutputWidth} / ${preset.maxOutputHeight}`,
+    }
+  }
+
   let w = preset.displayFrameWidth
   let h = preset.displayFrameHeight
   const scale = Math.min(CROP_DROPZONE_MAX_W / w, CROP_DROPZONE_MAX_H / h, 1)
@@ -88,6 +101,7 @@ export function DeliveryImageUploadField({
   const styles = cropPreset ? CROP_FIELD_STYLES : VARIANT_STYLES[variant]
   const isLogo = variant === 'logo'
   const hasCrop = Boolean(cropPreset)
+  const isWideCrop = cropPreset != null && isWideCropPreset(cropPreset)
   const isCropSquare =
     hasCrop &&
     cropPreset != null &&
@@ -125,14 +139,16 @@ export function DeliveryImageUploadField({
     <div
       className={cn(
         'space-y-1',
-        hasCrop && 'flex w-full flex-col items-center'
+        hasCrop && 'flex w-full flex-col',
+        hasCrop && !isWideCrop && 'items-center'
       )}
     >
       {label ? (
         <label
           className={cn(
             'block text-sm font-medium text-gray-700',
-            hasCrop && 'w-full text-center'
+            hasCrop && !isWideCrop && 'w-full text-center',
+            isWideCrop && 'w-full'
           )}
         >
           {label}

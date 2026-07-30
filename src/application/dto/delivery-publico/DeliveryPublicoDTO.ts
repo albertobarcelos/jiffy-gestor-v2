@@ -97,30 +97,6 @@ export type GetMeiosPagamentoPublicosResponseDTO = {
   meiosPagamento: MeioPagamentoPublicoDTO[]
 }
 
-export type ComplementoPedidoPublicoInput = {
-  complementoId: string
-  grupoComplementoId: string
-  quantidade: number
-}
-
-export type ProdutoPedidoPublicoInput = {
-  produtoId: string
-  quantidade: number
-  observacoes?: string[]
-  complementos?: ComplementoPedidoPublicoInput[]
-}
-
-export type EnderecoDeliveryPublicoInput = {
-  etiqueta: 'casa' | 'trabalho' | 'outro'
-  rua: string
-  numero: string
-  bairro: string
-  cidade?: string | null
-  estado?: string | null
-  cep?: string
-  complemento?: string | null
-}
-
 export type EnderecoClienteDeliveryPublicoDTO = {
   id: string
   etiqueta: string
@@ -142,48 +118,24 @@ export type ClienteDeliveryPublicoDTO = {
   enderecos: EnderecoClienteDeliveryPublicoDTO[]
 }
 
-export type CriarClienteDeliveryPublicoInput = {
-  telefone: string
-  nome?: string | null
-  cpf?: string | null
-  enderecos?: EnderecoDeliveryPublicoInput[]
-}
+export {
+  AtualizarClienteDeliveryPublicoInputSchema,
+  ClientePedidoPublicoInputSchema,
+  CobrancaPedidoPublicoInputSchema,
+  ComplementoPedidoPublicoInputSchema,
+  CreatePedidoPublicoInputSchema,
+  CriarClienteDeliveryPublicoInputSchema,
+  EnderecoDeliveryPublicoInputSchema,
+  ProdutoPedidoPublicoInputSchema,
+} from './DeliveryPublicoInputSchemas'
 
-export type AtualizarClienteDeliveryPublicoInput = {
-  nome?: string | null
-  cpf?: string | null
-  enderecos?: {
-    create?: EnderecoDeliveryPublicoInput[]
-    update?: Array<EnderecoDeliveryPublicoInput & { id: string }>
-    delete?: string[]
-  }
-}
-
-export type ClientePedidoPublicoInput = {
-  telefone: string
-  nome?: string | null
-  /** Obrigatório quando o cliente já possui 2+ endereços. */
-  enderecoIdEntrega?: string | null
-  enderecos?: EnderecoDeliveryPublicoInput[]
-}
-
-export type CobrancaPedidoPublicoInput = {
-  meioPagamentoId: string
-  valor: number
-  momentoCobranca: 'na_entrega'
-}
-
-export type CreatePedidoPublicoInput = {
-  slug: string
-  origem: 'JIFFY_DELIVERY'
-  tipoEntrega: 'entrega' | 'retirada'
-  /** Quando omitido, o backend assume imediato (compatibilidade). */
-  modoTempo?: 'imediato' | 'agendado'
-  /** ISO datetime do início do slot (obrigatório se `modoTempo === 'agendado'`). */
-  slotInicio?: string
-  slotFim?: string
-  cliente: ClientePedidoPublicoInput
-  produtos: ProdutoPedidoPublicoInput[]
-  cobrancas?: CobrancaPedidoPublicoInput[]
-  observacoes?: string[]
-}
+export type {
+  AtualizarClienteDeliveryPublicoInput,
+  ClientePedidoPublicoInput,
+  CobrancaPedidoPublicoInput,
+  ComplementoPedidoPublicoInput,
+  CreatePedidoPublicoInput,
+  CriarClienteDeliveryPublicoInput,
+  EnderecoDeliveryPublicoInput,
+  ProdutoPedidoPublicoInput,
+} from './DeliveryPublicoInputSchemas'

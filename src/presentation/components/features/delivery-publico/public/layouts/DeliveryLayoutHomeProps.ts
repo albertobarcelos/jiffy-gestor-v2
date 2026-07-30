@@ -12,7 +12,11 @@ export type DeliveryLayoutHomeProps = {
   onBuscaChange?: (termo: string) => void
   onGrupoClick?: (grupoId: string) => void
   onProdutoClick?: (produtoId: string) => void
+  /** Atalho "+" na lista: add direto (produtos sem complemento). */
+  onProdutoAddRapido?: (produtoId: string) => void
   onPedidoClick?: () => void
+  /** Quantidade total no carrinho por produtoId. */
+  quantidadePorProduto?: Record<string, number>
   /** Miniaturas recentes do fly-to-cart (somente UI, uma por produto). */
   carrinhoThumbs?: DeliveryCarrinhoThumb[]
   carrinhoThumbsBounceKey?: number

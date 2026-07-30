@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   buildDeliveryCheckoutPath,
   calculateDeliveryCheckoutProgress,
+  isIdentificacaoCheckoutCompleta,
+  isNomeCompletoCheckoutValido,
 } from '@/src/presentation/components/features/delivery-publico/public/components/checkout/deliveryCheckoutProgress'
 
 describe('deliveryCheckoutProgress', () => {
@@ -117,5 +119,59 @@ describe('deliveryCheckoutProgress', () => {
         modoTempo: '',
       })
     ).toBeNull()
+  })
+
+  it('na identificação incompleta percentual fica em 0', () => {
+    const progress = calculateDeliveryCheckoutProgress({
+      checkoutStep: 'telefone',
+      tipoEntrega: 'entrega',
+      modoTempo: 'imediato',
+      identificacaoCompleta: false,
+    })
+    expect(progress?.current).toBe(1)
+    expect(progress?.percentage).toBe(0)
+  })
+
+  it('na identificação completa sobe a barra (passo 1)', () => {
+    const progress = calculateDeliveryCheckoutProgress({
+      checkoutStep: 'telefone',
+      tipoEntrega: 'entrega',
+      modoTempo: 'imediato',
+      identificacaoCompleta: true,
+    })
+    expect(progress?.percentage).toBe(25)
+    expect(progress?.current).toBe(2)
+  })
+
+  it('valida nome e sobrenome', () => {
+    expect(isNomeCompletoCheckoutValido('Andre')).toBe(false)
+    expect(isNomeCompletoCheckoutValido('Andre Silva')).toBe(true)
+  })
+
+  it('identificação completa com cliente cadastrado e nome', () => {
+    expect(
+      isIdentificacaoCheckoutCompleta({
+        lookupStatus: 'encontrado',
+        nomeCadastro: 'Andre Silva',
+        nomeDigitado: '',
+      })
+    ).toBe(true)
+  })
+
+  it('identificação completa só com nome+sobrenome se cliente novo', () => {
+    expect(
+      isIdentificacaoCheckoutCompleta({
+        lookupStatus: 'nao_encontrado',
+        nomeCadastro: null,
+        nomeDigitado: 'Andre',
+      })
+    ).toBe(false)
+    expect(
+      isIdentificacaoCheckoutCompleta({
+        lookupStatus: 'nao_encontrado',
+        nomeCadastro: null,
+        nomeDigitado: 'Andre Silva',
+      })
+    ).toBe(true)
   })
 })

@@ -24,7 +24,8 @@ export type DesignCustomColors = {
 
 export type TypographyPresetId = 'urbana' | 'moderna' | 'classica' | 'elegante'
 
-export type CategoryIconStyle = 'linha' | 'preenchimento'
+/** Fundo da barra de título do grupo (layout Básico). */
+export type GrupoTituloFundoMode = 'cor' | 'imagem'
 
 export type DesignTabId =
   | 'cabecalho'
@@ -50,11 +51,30 @@ export type DeliveryPublicoDesignConfig = {
     presetId: TypographyPresetId
   }
   categorias: {
-    mostrar: boolean
-    /** Quando true, exibe a imagem do grupo; quando false, exibe ícones personalizáveis. */
-    usarImagensGrupo: boolean
-    estiloIcone: CategoryIconStyle
-    iconesPorGrupoId: Record<string, string>
+    /**
+     * `cor` = fundo sólido (tema ou `corBarraTitulo`).
+     * `imagem` = banner do grupo (`imagemUrl`); sem imagem, usa a cor.
+     */
+    tituloGrupoFundo: GrupoTituloFundoMode
+    /**
+     * Cor global da barra de título. `null` = usar `--delivery-primary-dark` do tema.
+     */
+    corBarraTitulo: string | null
+    /**
+     * Cor global do nome do grupo na barra. `null` = usar `--delivery-btn-text` do tema.
+     */
+    corTextoTitulo: string | null
+    /**
+     * Se false, oculta o texto do nome na barra (útil quando o banner já traz o nome).
+     */
+    mostrarNomeTitulo: boolean
+    /** Exibe o grupo fixo "Sugestões da Casa" no início do cardápio. */
+    mostrarSugestoesDaCasa: boolean
+    /**
+     * Banner do grupo fixo Sugestões da Casa (modo imagem).
+     * Armazenado no design — não há entidade de grupo no cardápio.
+     */
+    sugestoesDaCasaImagemUrl: string | null
   }
 }
 

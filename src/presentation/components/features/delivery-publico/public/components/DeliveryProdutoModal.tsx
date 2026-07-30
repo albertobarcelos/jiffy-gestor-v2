@@ -1,6 +1,6 @@
 'use client'
 
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Camera, List, Share2 } from 'lucide-react'
 import { MdClose } from 'react-icons/md'
@@ -83,8 +83,28 @@ export function DeliveryProdutoModal({
   )
   const [salvando, setSalvando] = useState(false)
   const [aberto, setAberto] = useState(true)
+  /** Evita fechar no click sintético / remount (Strict Mode) logo após abrir. */
+  const fechamentoIntencionalRef = useRef(false)
+  const [podeFecharPorOverlay, setPodeFecharPorOverlay] = useState(false)
 
-  const requestClose = () => setAberto(false)
+  useEffect(() => {
+    const t = window.setTimeout(() => setPodeFecharPorOverlay(true), 400)
+    return () => window.clearTimeout(t)
+  }, [])
+
+  const requestClose = () => {
+    fechamentoIntencionalRef.current = true
+    setAberto(false)
+  }
+
+  const handleExitComplete = () => {
+    if (fechamentoIntencionalRef.current) onClose()
+  }
+
+  const handleOverlayClick = () => {
+    if (!podeFecharPorOverlay) return
+    requestClose()
+  }
 
   const {
     grupos,
@@ -171,7 +191,7 @@ export function DeliveryProdutoModal({
   }
 
   return (
-    <AnimatePresence onExitComplete={onClose}>
+    <AnimatePresence onExitComplete={handleExitComplete}>
       {aberto ? (
         <motion.div
           key="delivery-produto-modal"
@@ -179,12 +199,12 @@ export function DeliveryProdutoModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.225, ease: [0.22, 1, 0.36, 1] }}
         >
           <div
             className="absolute inset-0 hidden sm:block"
             style={{ backgroundColor: 'var(--delivery-overlay)' }}
-            onClick={requestClose}
+            onClick={handleOverlayClick}
             aria-hidden
           />
 
@@ -198,7 +218,7 @@ export function DeliveryProdutoModal({
             initial={{ scale: 0.55 }}
             animate={{ scale: 1 }}
             exit={{ scale: 0.55 }}
-            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
             role="dialog"
             aria-modal="true"
             aria-label="Detalhes do produto"
@@ -453,7 +473,7 @@ export function DeliveryProdutoModal({
               ? isEdicao
                 ? 'Salvando...'
                 : 'Adicionando...'
-              : `${isEdicao ? 'Salvar' : 'Adicionar'}  ${formatDeliveryCurrency(valorTotal)}`}
+              : `${isEdicao ? 'Atualizar' : 'Adicionar'}  ${formatDeliveryCurrency(valorTotal)}`}
           </DeliveryButton>
         </div>
           </motion.div>

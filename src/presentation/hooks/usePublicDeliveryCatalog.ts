@@ -285,7 +285,7 @@ export function listarProdutosFavoritos(
   grupos: import('@/src/application/dto/delivery-publico/DeliveryPublicoDTO').CatalogoPublicoGrupoProdutoDTO[]
 ) {
   return grupos
-    .flatMap(g => g.produtos.map(p => ({ ...p, grupoNome: g.nome })))
+    .flatMap(g => g.produtos.map(p => ({ ...p, grupoId: g.id, grupoNome: g.nome })))
     .filter(p => p.favorito)
     .sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome))
 }

@@ -7,7 +7,13 @@ import type { DeliveryPublicoProdutoViewModel } from '../types/deliveryPublicoVi
 type DeliveryProdutoListItemProps = {
   produto: DeliveryPublicoProdutoViewModel
   interactive?: boolean
+  /** Unidades deste produto já no carrinho (soma de linhas). */
+  quantidadeNoCarrinho?: number
   onClick?: (produtoId: string) => void
+  /** Atalho: adiciona direto ao carrinho (só produtos sem complemento). */
+  onAddRapido?: (produtoId: string) => void
+  /** Clique na bolinha de quantidade → abre o carrinho. */
+  onAbrirCarrinho?: () => void
 }
 
 const cardClassName =
@@ -20,29 +26,44 @@ function ProdutoThumb({
   imagemUrl,
   produtoNome,
   interactive,
+  onOpenClick,
   onAddClick,
 }: {
   imagemUrl: string | null
   produtoNome: string
   interactive: boolean
+  onOpenClick?: () => void
   onAddClick?: () => void
 }) {
+  const media = imagemUrl ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={imagemUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+  ) : (
+    <div className="absolute inset-0 flex items-center justify-center">
+      <Camera
+        className="h-8 w-8 @lg:h-9 @lg:w-9"
+        style={{ color: 'var(--delivery-text-muted)' }}
+        aria-hidden
+      />
+    </div>
+  )
+
   return (
     <div
       className="relative w-28 min-h-28 shrink-0 self-stretch border-l @lg:w-36 @lg:min-h-36 @xl:w-40 @xl:min-h-40"
       style={{ backgroundColor: '#ffffff', borderColor: '#e5e7eb' }}
     >
-      {imagemUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={imagemUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+      {interactive && onOpenClick ? (
+        <button
+          type="button"
+          onClick={onOpenClick}
+          aria-label={`Ver detalhes de ${produtoNome}`}
+          className="absolute inset-0"
+        >
+          {media}
+        </button>
       ) : (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Camera
-            className="h-8 w-8 @lg:h-9 @lg:w-9"
-            style={{ color: 'var(--delivery-text-muted)' }}
-            aria-hidden
-          />
-        </div>
+        media
       )}
 
       {interactive && onAddClick ? (
@@ -52,7 +73,7 @@ function ProdutoThumb({
             e.stopPropagation()
             onAddClick()
           }}
-          aria-label={`Adicionar ${produtoNome}`}
+          aria-label={`Adicionar ${produtoNome} ao carrinho`}
           className="absolute bottom-2 right-2 z-10 flex h-8 w-8 items-center justify-center rounded-full shadow-sm transition-transform active:scale-95 @lg:h-9 @lg:w-9"
           style={{ backgroundColor: 'rgba(255, 255, 255, 0.8)' }}
         >
@@ -68,10 +89,52 @@ function ProdutoThumb({
   )
 }
 
+function QuantidadeCarrinhoBadge({
+  quantidade,
+  produtoNome,
+  onClick,
+}: {
+  quantidade: number
+  produtoNome: string
+  onClick?: () => void
+}) {
+  if (quantidade <= 0) return null
+
+  const className =
+    'absolute bottom-2.5 left-3.5 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold leading-none text-white shadow-sm transition-transform active:scale-95 @lg:bottom-3 @lg:left-4 @lg:h-6 @lg:min-w-6 @lg:text-xs'
+  const label = `${quantidade} no carrinho — editar ${produtoNome}`
+  const content = quantidade > 99 ? '99+' : quantidade
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={e => {
+          e.stopPropagation()
+          onClick()
+        }}
+        aria-label={label}
+        className={className}
+      >
+        {content}
+      </button>
+    )
+  }
+
+  return (
+    <span className={`${className} pointer-events-none`} aria-label={`${quantidade} no carrinho`}>
+      {content}
+    </span>
+  )
+}
+
 export function DeliveryProdutoListItem({
   produto,
   interactive = false,
+  quantidadeNoCarrinho = 0,
   onClick,
+  onAddRapido,
+  onAbrirCarrinho,
 }: DeliveryProdutoListItemProps) {
   const cardStyle = {
     backgroundColor: 'var(--delivery-surface)',
@@ -82,16 +145,18 @@ export function DeliveryProdutoListItem({
     onClick?.(produto.id)
   }
 
+  const podeAddRapido = interactive && !produto.temComplementos && Boolean(onAddRapido)
+
   if (interactive && onClick) {
     return (
       <div
-        className={`${cardClassName} hover:border-[color-mix(in_srgb,var(--delivery-primary)_24%,transparent)]`}
+        className={`relative ${cardClassName} hover:border-[color-mix(in_srgb,var(--delivery-primary)_24%,transparent)]`}
         style={cardStyle}
       >
         <button
           type="button"
           onClick={handleOpenProduto}
-          className={`${textClassName} text-left`}
+          className={`${textClassName} text-left${quantidadeNoCarrinho > 0 ? ' pb-9 @lg:pb-10' : ''}`}
         >
           <p
             className="text-base font-medium leading-snug @lg:text-lg"
@@ -117,18 +182,24 @@ export function DeliveryProdutoListItem({
             {formatDeliveryCurrency(produto.preco)}
           </p>
         </button>
+        <QuantidadeCarrinhoBadge
+          quantidade={quantidadeNoCarrinho}
+          produtoNome={produto.nome}
+          onClick={onAbrirCarrinho}
+        />
         <ProdutoThumb
           imagemUrl={produto.imagemUrl}
           produtoNome={produto.nome}
           interactive
-          onAddClick={handleOpenProduto}
+          onOpenClick={handleOpenProduto}
+          onAddClick={podeAddRapido ? () => onAddRapido?.(produto.id) : undefined}
         />
       </div>
     )
   }
 
   return (
-    <div className={cardClassName} style={cardStyle}>
+    <div className={`relative ${cardClassName}`} style={cardStyle}>
       <div className={textClassName}>
         <p
           className="text-base font-semibold leading-snug @lg:text-lg"
@@ -154,6 +225,7 @@ export function DeliveryProdutoListItem({
           {formatDeliveryCurrency(produto.preco)}
         </p>
       </div>
+      <QuantidadeCarrinhoBadge quantidade={quantidadeNoCarrinho} produtoNome={produto.nome} />
       <ProdutoThumb
         imagemUrl={produto.imagemUrl}
         produtoNome={produto.nome}

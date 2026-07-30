@@ -9,6 +9,7 @@ import { DeliveryCatalogoHeader } from './components/DeliveryCatalogoHeader'
 import { DeliveryCatalogoSearch } from './components/DeliveryCatalogoSearch'
 import { DeliveryCatalogoCategoriaTabs } from './components/DeliveryCatalogoCategoriaTabs'
 import { DeliveryCatalogoSecaoGrupo } from './components/DeliveryCatalogoSecaoGrupo'
+import { DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID } from '../../../shared/constants/deliveryPublicoSugestoes'
 
 export function CatalogoLayoutHome({
   config,
@@ -35,7 +36,6 @@ export function CatalogoLayoutHome({
   }, [filtered.grupos, activeGrupoId])
 
   const stickyFooterVisible = viewModel.carrinho.quantidadeItens > 0
-  const mostrarCategorias = config.categorias.mostrar
 
   const handleGrupoClick = useCallback(
     (grupoId: string) => {
@@ -68,22 +68,25 @@ export function CatalogoLayoutHome({
         />
       </div>
 
-      {mostrarCategorias ? (
-        <DeliveryCatalogoCategoriaTabs
-          grupos={filtered.grupos}
-          activeGrupoId={activeGrupoId}
-          interactive={interactive}
-          onGrupoClick={handleGrupoClick}
-          onMenuClick={handleMenuClick}
-        />
-      ) : null}
+      <DeliveryCatalogoCategoriaTabs
+        grupos={filtered.grupos}
+        activeGrupoId={activeGrupoId}
+        interactive={interactive}
+        onGrupoClick={handleGrupoClick}
+        onMenuClick={handleMenuClick}
+      />
 
       <div className="flex-1 pb-4">
-        {filtered.grupos.map(grupo => (
+        {filtered.grupos.map((grupo, index) => (
           <DeliveryCatalogoSecaoGrupo
             key={grupo.id}
+            config={config}
             grupo={grupo}
             interactive={interactive}
+            denseTop={
+              index > 0 &&
+              filtered.grupos[index - 1]?.id === DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID
+            }
             onProdutoClick={onProdutoClick}
           />
         ))}

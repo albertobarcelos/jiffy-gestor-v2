@@ -6,6 +6,7 @@ import { DeliveryStatusHorario } from '../../../shared/components/DeliveryStatus
 import { DeliverySecaoGrupo } from '../../../shared/components/DeliverySecaoGrupo'
 import { DeliveryPedidoFooter } from '../../../shared/components/DeliveryPedidoFooter'
 import { DeliveryPublicoLojaFooter } from '../../../shared/components/DeliveryPublicoLojaFooter'
+import { DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID } from '../../../shared/constants/deliveryPublicoSugestoes'
 import { filterViewModelByBusca } from '../../../shared/utils/filterViewModelByBusca'
 import type { DeliveryLayoutHomeProps } from '../DeliveryLayoutHomeProps'
 import { DeliveryBasicoCatalogToolbar } from './DeliveryBasicoCatalogToolbar'
@@ -19,7 +20,9 @@ export function BasicoLayoutHome({
   onBuscaChange,
   onGrupoClick,
   onProdutoClick,
+  onProdutoAddRapido,
   onPedidoClick,
+  quantidadePorProduto,
   carrinhoThumbs,
   carrinhoThumbsBounceKey,
   carrinhoThumbsTargetRef,
@@ -53,14 +56,21 @@ export function BasicoLayoutHome({
           onGrupoClick={onGrupoClick}
         />
         <div className="flex-1">
-          {filtered.grupos.map(grupo => (
+          {filtered.grupos.map((grupo, index) => (
             <DeliverySecaoGrupo
               key={grupo.id}
               config={config}
               grupo={grupo}
               interactive={interactive}
               stickyTitle
+              denseTop={
+                index > 0 &&
+                filtered.grupos[index - 1]?.id === DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID
+              }
+              quantidadePorProduto={quantidadePorProduto}
               onProdutoClick={onProdutoClick}
+              onProdutoAddRapido={onProdutoAddRapido}
+              onAbrirCarrinho={onPedidoClick}
             />
           ))}
         </div>

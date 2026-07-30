@@ -4,7 +4,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarDays, Clock } from 'lucide-react'
 import { showToast } from '@/src/shared/utils/toast'
 import { usePublicDeliveryDisponibilidade } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
-import { DeliveryCheckoutStepModal } from './DeliveryCheckoutStepModal'
+import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
+import {
+  DeliveryCheckoutShellFooter,
+  DeliveryCheckoutShellHeader,
+} from './DeliveryCheckoutShell'
 
 type DeliveryCheckoutQuandoModalProps = {
   slug: string
@@ -17,6 +21,7 @@ type DeliveryCheckoutQuandoModalProps = {
     label: string
   } | null) => void
   onClose: () => void
+  onVoltar: () => void
   onContinuar: () => void
 }
 
@@ -65,7 +70,8 @@ export function DeliveryCheckoutQuandoModal({
   slotInicio,
   slotLabel,
   onChangeSlot,
-  onClose,
+  onClose: _onClose,
+  onVoltar,
   onContinuar,
 }: DeliveryCheckoutQuandoModalProps) {
   const [dataSelecionada, setDataSelecionada] = useState(() =>
@@ -139,26 +145,16 @@ export function DeliveryCheckoutQuandoModal({
   const fieldStyle = { borderColor: 'var(--delivery-border)' } as const
 
   return (
-    <DeliveryCheckoutStepModal
-      title="Quando?"
-      onClose={onClose}
-      showBack
-      onBack={onClose}
-      footer={
-        <button
-          type="button"
-          onClick={handleContinuar}
-          disabled={!podeContinuar}
-          className="min-h-[48px] w-full rounded-xl text-sm font-semibold uppercase tracking-wide disabled:cursor-not-allowed disabled:opacity-50"
-          style={{
-            backgroundColor: 'var(--delivery-primary-dark)',
-            color: 'var(--delivery-btn-text, #ffffff)',
-          }}
-        >
-          Continuar
-        </button>
-      }
-    >
+    <>
+      <DeliveryCheckoutShellHeader title="Quando?" showBack onBack={onVoltar} />
+      <DeliveryCheckoutShellFooter>
+        <DeliveryCheckoutFooterActions
+          onVoltar={onVoltar}
+          onContinuar={handleContinuar}
+          continuarDisabled={!podeContinuar}
+        />
+      </DeliveryCheckoutShellFooter>
+
       <div className="space-y-4">
         <p className="text-xs delivery-text-secondary">{hintModo}</p>
 
@@ -281,6 +277,6 @@ export function DeliveryCheckoutQuandoModal({
           </div>
         ) : null}
       </div>
-    </DeliveryCheckoutStepModal>
+    </>
   )
 }

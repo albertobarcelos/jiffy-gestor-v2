@@ -57,7 +57,7 @@ export function DeliveryDesignCustomizerScreen() {
   useDesignCategoriaGruposImagens({
     grupos: previewCategoriasGrupos,
     enabled:
-      Boolean(draft.categorias.usarImagensGrupo) &&
+      Boolean(draft.categorias.tituloGrupoFundo === 'imagem') &&
       hydrated &&
       previewCategoriasGrupos.length > 0,
     onResolved: handlePreviewImagensResolved,

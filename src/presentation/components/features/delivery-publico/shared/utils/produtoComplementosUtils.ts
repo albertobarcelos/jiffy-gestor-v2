@@ -17,6 +17,13 @@ export function chaveComplemento(grupoId: string, complementoId: string): string
   return `${grupoId}-${complementoId}`
 }
 
+/** Produto com ao menos um grupo de complemento ativo (abre tela de detalhes). */
+export function produtoTemComplementosAtivos(
+  produto: Pick<CatalogoPublicoProdutoDTO, 'abreComplementos' | 'grupoComplementosIds'>
+): boolean {
+  return produto.abreComplementos && produto.grupoComplementosIds.length > 0
+}
+
 export function resolveGruposComplementos(
   cache: ComplementosCatalogoCache | null,
   produto: CatalogoPublicoProdutoDTO

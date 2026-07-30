@@ -1,16 +1,23 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { Pencil } from 'lucide-react'
 import { showToast } from '@/src/shared/utils/toast'
 import { DeliveryPaisTelefoneSelect } from '../../../shared/components/DeliveryPaisTelefoneSelect'
 import { DELIVERY_PAIS_TELEFONE_PADRAO } from '../../../shared/constants/deliveryPaisesTelefone'
 import {
   comporTelefoneApi,
+  formatarTelefoneExibicao,
   formatarTelefonePorPais,
   telefoneNacionalValido,
 } from '../../../shared/utils/deliveryTelefonePais'
 import type { ClienteLookupStatus } from '../../../shared/hooks/useDeliveryCheckout'
-import { DeliveryCheckoutStepModal } from './DeliveryCheckoutStepModal'
+import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
+import { isNomeCompletoCheckoutValido } from './deliveryCheckoutProgress'
+import {
+  DeliveryCheckoutShellFooter,
+  DeliveryCheckoutShellHeader,
+} from './DeliveryCheckoutShell'
 
 type DeliveryCheckoutIdentifiqueSeModalProps = {
   telefone: string
@@ -18,17 +25,15 @@ type DeliveryCheckoutIdentifiqueSeModalProps = {
   nome: string
   /** Nome já salvo no cadastro (API). Vazio = cliente sem nome. */
   nomeCadastro: string | null
+  /** Telefone consultado com sucesso (dígitos). Usado quando o input Celular fica vazio. */
+  telefoneConfirmadoDigits: string | null
   lookupStatus: ClienteLookupStatus
   onChangeTelefone: (value: string) => void
   onChangeTelefonePais?: (iso2: string) => void
   onChangeNome: (value: string) => void
+  onSalvarNome: (nome: string) => Promise<void>
   onClose: () => void
   onContinuar: (telefoneDigits: string) => Promise<void>
-}
-
-function nomeCompletoValido(nome: string): boolean {
-  const trimmed = nome.trim()
-  return trimmed.length >= 3 && trimmed.includes(' ')
 }
 
 export function DeliveryCheckoutIdentifiqueSeModal({
@@ -36,24 +41,35 @@ export function DeliveryCheckoutIdentifiqueSeModal({
   telefonePaisIso2 = DELIVERY_PAIS_TELEFONE_PADRAO,
   nome,
   nomeCadastro,
+  telefoneConfirmadoDigits,
   lookupStatus,
   onChangeTelefone,
   onChangeTelefonePais,
   onChangeNome,
+  onSalvarNome,
   onClose,
   onContinuar,
 }: DeliveryCheckoutIdentifiqueSeModalProps) {
   const [enviando, setEnviando] = useState(false)
+  const [salvandoNome, setSalvandoNome] = useState(false)
   const [paisIso2, setPaisIso2] = useState(telefonePaisIso2)
   const [tentouNome, setTentouNome] = useState(false)
+  const [editandoNome, setEditandoNome] = useState(false)
 
   useEffect(() => {
     setPaisIso2(telefonePaisIso2)
   }, [telefonePaisIso2])
 
+  useEffect(() => {
+    if (lookupStatus !== 'encontrado') {
+      setEditandoNome(false)
+    }
+  }, [lookupStatus])
+
   const telefoneOk = telefoneNacionalValido(telefone, paisIso2)
+  const clienteEncontrado = lookupStatus === 'encontrado'
   const consultaPronta =
-    telefoneOk &&
+    (telefoneOk || Boolean(telefoneConfirmadoDigits)) &&
     (lookupStatus === 'encontrado' ||
       lookupStatus === 'nao_encontrado' ||
       lookupStatus === 'erro')
@@ -63,20 +79,51 @@ export function DeliveryCheckoutIdentifiqueSeModal({
     lookupStatus === 'nao_encontrado' ||
     (lookupStatus === 'encontrado' && !temNomeNoCadastro)
 
-  const mostrarCampoNome =
-    consultaPronta && (precisaNome || lookupStatus === 'encontrado')
+  const nomeAlterado =
+    clienteEncontrado && nome.trim() !== (nomeCadastro?.trim() ?? '')
 
-  const nomeSomenteLeitura = lookupStatus === 'encontrado' && temNomeNoCadastro
+  const mostrarCampoNomeNovo =
+    lookupStatus === 'nao_encontrado' && consultaPronta
 
   const handleChangePais = (iso2: string) => {
     setPaisIso2(iso2)
     onChangeTelefone('')
     onChangeTelefonePais?.(iso2)
     setTentouNome(false)
+    setEditandoNome(false)
+  }
+
+  const resolverTelefoneDigits = (): string | null => {
+    if (clienteEncontrado && telefoneConfirmadoDigits) {
+      return telefoneConfirmadoDigits
+    }
+    if (telefoneNacionalValido(telefone, paisIso2)) {
+      return comporTelefoneApi(telefone, paisIso2)
+    }
+    return null
+  }
+
+  const handleSalvarNome = async () => {
+    if (!isNomeCompletoCheckoutValido(nome)) {
+      setTentouNome(true)
+      showToast.error('Informe nome e sobrenome')
+      return
+    }
+    setSalvandoNome(true)
+    try {
+      await onSalvarNome(nome.trim())
+      setEditandoNome(false)
+      showToast.success('Nome atualizado')
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : 'Erro ao salvar nome')
+    } finally {
+      setSalvandoNome(false)
+    }
   }
 
   const handleContinuar = async () => {
-    if (!telefoneNacionalValido(telefone, paisIso2)) {
+    const digits = resolverTelefoneDigits()
+    if (!digits || digits.length < 8) {
       showToast.error('Informe um celular válido')
       return
     }
@@ -88,66 +135,69 @@ export function DeliveryCheckoutIdentifiqueSeModal({
       showToast.error('Erro ao consultar cadastro. Tente novamente.')
       return
     }
-    if (precisaNome && !nomeCompletoValido(nome)) {
+    if (precisaNome && !isNomeCompletoCheckoutValido(nome)) {
       setTentouNome(true)
       showToast.error('Informe nome e sobrenome')
       return
     }
+    if (clienteEncontrado && nomeAlterado) {
+      if (!isNomeCompletoCheckoutValido(nome)) {
+        setTentouNome(true)
+        showToast.error('Informe nome e sobrenome')
+        return
+      }
+    }
 
-    const digits = comporTelefoneApi(telefone, paisIso2)
     setEnviando(true)
     try {
+      if (clienteEncontrado && nomeAlterado) {
+        await onSalvarNome(nome.trim())
+      }
       await onContinuar(digits)
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : 'Erro ao continuar')
     } finally {
       setEnviando(false)
     }
   }
 
   const placeholder = paisIso2 === 'BR' ? '(99) 99999-9999' : '999 999 999'
+  const telefoneConfirmadoExibicao = telefoneConfirmadoDigits
+    ? formatarTelefoneExibicao(telefoneConfirmadoDigits, paisIso2)
+    : ''
+
+  const nomeSomenteLeitura = clienteEncontrado && temNomeNoCadastro && !editandoNome
 
   return (
-    <DeliveryCheckoutStepModal
-      title="Identifique-se"
-      onClose={onClose}
-      footer={
-        <div className="flex flex-col gap-3">
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="min-h-[44px] flex-1 rounded-xl border px-3 text-sm font-semibold uppercase tracking-wide delivery-text-primary"
-              style={{ borderColor: 'var(--delivery-border)' }}
-            >
-              Voltar
-            </button>
-            <button
-              type="button"
-              disabled={enviando || lookupStatus === 'loading'}
-              onClick={() => void handleContinuar()}
-              className="min-h-[44px] flex-1 rounded-xl px-3 text-sm font-semibold uppercase tracking-wide disabled:opacity-60"
-              style={{
-                backgroundColor: 'var(--delivery-primary-dark)',
-                color: 'var(--delivery-btn-text, #ffffff)',
-              }}
-            >
-              {enviando || lookupStatus === 'loading' ? '...' : 'Continuar'}
-            </button>
-          </div>
-          <p className="text-center text-[11px] leading-relaxed delivery-text-secondary">
-            Ao prosseguir, confirmo que li e aceito os{' '}
-            <span className="underline">Termos de uso</span> e{' '}
-            <span className="underline">Política de privacidade</span>.
-          </p>
-        </div>
-      }
-    >
+    <>
+      <DeliveryCheckoutShellHeader
+        title="Identifique-se"
+        showBack
+        onBack={onClose}
+      />
+      <DeliveryCheckoutShellFooter>
+        <DeliveryCheckoutFooterActions
+          onVoltar={onClose}
+          onContinuar={() => void handleContinuar()}
+          continuarDisabled={enviando || salvandoNome || lookupStatus === 'loading'}
+          continuarLabel={enviando || lookupStatus === 'loading' ? '...' : 'Continuar'}
+          top={
+            <p className="text-center text-[11px] leading-relaxed delivery-text-secondary">
+              Ao prosseguir, confirmo que li e aceito os{' '}
+              <span className="underline">Termos de uso</span> e{' '}
+              <span className="underline">Política de privacidade</span>.
+            </p>
+          }
+        />
+      </DeliveryCheckoutShellFooter>
+
       <div className="space-y-4">
         <label className="relative block">
           <span className="absolute -top-2 left-3 z-10 bg-[var(--delivery-surface,#fff)] px-1 text-xs delivery-text-secondary">
             Celular
           </span>
           <div
-            className="flex items-center gap-2 rounded-xl border px-3 py-3"
+            className="flex items-center gap-2 rounded-xl border bg-white px-3 py-2"
             style={{ borderColor: 'var(--delivery-border)' }}
           >
             <DeliveryPaisTelefoneSelect
@@ -171,7 +221,79 @@ export function DeliveryCheckoutIdentifiqueSeModal({
           <p className="text-xs delivery-text-secondary">Consultando cadastro...</p>
         ) : null}
 
-        {mostrarCampoNome ? (
+        {clienteEncontrado ? (
+          <div className="space-y-3">
+            <label className="relative block">
+              <span className="absolute -top-2 left-3 z-10 bg-[var(--delivery-surface,#fff)] px-1 text-xs delivery-text-secondary">
+                Nome
+              </span>
+              <div
+                className="flex min-h-[44px] items-center gap-2 rounded-xl border bg-white px-3 py-2"
+                style={{
+                  borderColor:
+                    tentouNome && !isNomeCompletoCheckoutValido(nome)
+                      ? '#f87171'
+                      : 'var(--delivery-border)',
+                }}
+              >
+                <input
+                  type="text"
+                  autoComplete="name"
+                  placeholder="Nome + Sobrenome"
+                  value={nome}
+                  readOnly={nomeSomenteLeitura}
+                  onChange={e => onChangeNome(e.target.value)}
+                  className="min-w-0 flex-1 bg-transparent text-sm outline-none delivery-text-primary"
+                />
+                {temNomeNoCadastro && !editandoNome ? (
+                  <button
+                    type="button"
+                    onClick={() => setEditandoNome(true)}
+                    aria-label="Editar nome"
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
+                    style={{ color: 'var(--delivery-text-muted)' }}
+                  >
+                    <Pencil className="h-4 w-4" strokeWidth={1.75} />
+                  </button>
+                ) : null}
+              </div>
+              {!temNomeNoCadastro ? (
+                <p className="mt-1.5 text-xs delivery-text-secondary">
+                  Informe seu nome completo para continuar.
+                </p>
+              ) : null}
+            </label>
+
+            {nomeAlterado ? (
+              <button
+                type="button"
+                onClick={() => void handleSalvarNome()}
+                disabled={salvandoNome}
+                className="min-h-[44px] w-full rounded-xl bg-black text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {salvandoNome ? 'Salvando...' : 'Salvar nome'}
+              </button>
+            ) : null}
+
+            {telefoneConfirmadoExibicao ? (
+              <div className="relative block">
+                <span className="absolute -top-2 left-3 z-10 bg-[var(--delivery-surface,#fff)] px-1 text-xs delivery-text-secondary">
+                  Telefone
+                </span>
+                <div
+                  className="flex min-h-[44px] items-center rounded-xl border bg-white px-3 py-2"
+                  style={{ borderColor: 'var(--delivery-border)' }}
+                >
+                  <p className="text-sm font-medium delivery-text-primary">
+                    {telefoneConfirmadoExibicao}
+                  </p>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {mostrarCampoNomeNovo ? (
           <label className="relative block">
             <span className="absolute -top-2 left-3 z-10 bg-[var(--delivery-surface,#fff)] px-1 text-xs delivery-text-secondary">
               Nome
@@ -182,25 +304,17 @@ export function DeliveryCheckoutIdentifiqueSeModal({
               placeholder="Nome + Sobrenome"
               value={nome}
               onChange={e => onChangeNome(e.target.value)}
-              readOnly={nomeSomenteLeitura}
-              className={`w-full rounded-xl border px-4 py-3 text-sm outline-none delivery-text-primary ${
-                tentouNome && precisaNome && !nomeCompletoValido(nome) ? 'border-red-400' : ''
+              className={`w-full rounded-xl border bg-white px-3 py-2 text-sm outline-none delivery-text-primary ${
+                tentouNome && !isNomeCompletoCheckoutValido(nome) ? 'border-red-400' : ''
               }`}
-              style={{
-                borderColor: 'var(--delivery-border)',
-                backgroundColor: nomeSomenteLeitura
-                  ? 'var(--delivery-surface-muted)'
-                  : undefined,
-              }}
+              style={{ borderColor: 'var(--delivery-border)' }}
             />
-            {precisaNome ? (
-              <p className="mt-1.5 text-xs delivery-text-secondary">
-                Informe seu nome completo para continuar.
-              </p>
-            ) : null}
+            <p className="mt-1.5 text-xs delivery-text-secondary">
+              Informe seu nome completo para continuar.
+            </p>
           </label>
         ) : null}
       </div>
-    </DeliveryCheckoutStepModal>
+    </>
   )
 }

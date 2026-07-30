@@ -9,6 +9,7 @@ import {
   buildMockDeliveryViewModel,
   buildPreviewViewModelFromGrupos,
 } from '../../shared/mappers/buildMockViewModel'
+import { applySugestoesDaCasaVisibility } from '../../shared/utils/applySugestoesDaCasaVisibility'
 import { LAYOUT_MODELS } from '../../shared/constants/layoutModels'
 import { resolveDeliveryLayoutHome } from '../../public/layouts/DeliveryPublicoLayoutRegistry'
 
@@ -23,13 +24,13 @@ export function DeliveryMobilePreviewFrame({
 }: DeliveryMobilePreviewFrameProps) {
   const layoutNome = LAYOUT_MODELS.find(m => m.id === config.layoutId)?.nome ?? 'Básico'
   const themeStyle = applyDesignConfig(config)
-  const viewModel = useMemo(
-    () =>
+  const viewModel = useMemo(() => {
+    const base =
       categoriasGrupos.length > 0
         ? buildPreviewViewModelFromGrupos(categoriasGrupos)
-        : buildMockDeliveryViewModel(),
-    [categoriasGrupos]
-  )
+        : buildMockDeliveryViewModel()
+    return applySugestoesDaCasaVisibility(base, config, { injectPreviewFallback: true })
+  }, [categoriasGrupos, config])
   const LayoutHome = resolveDeliveryLayoutHome(config.layoutId)
 
   return (

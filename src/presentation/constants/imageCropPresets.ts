@@ -64,10 +64,39 @@ export const DELIVERY_PRODUTO_CROP_PRESET = createDeliverySquarePreset(
   'Ajustar imagem do produto'
 )
 
+/** @deprecated Preferir `DELIVERY_GRUPO_BANNER_CROP_PRESET` no Design (banner 1200×150). */
 export const DELIVERY_GRUPO_PRODUTO_CROP_PRESET = createDeliverySquarePreset(
   'delivery-grupo-produto',
   'Ajustar imagem do grupo'
 )
+
+/** Banner de fundo do título do grupo (Design → Categorias). Proporção 8:1. */
+export const DELIVERY_GRUPO_BANNER_CROP_PRESET: ImageCropPreset = {
+  id: 'delivery-grupo-banner',
+  title: 'Ajustar banner do grupo',
+  descriptionLines: [
+    'Arraste a imagem, use o zoom e ajuste a moldura (proporção 8:1).',
+    'A saída é limitada a 1200×150 px (JPEG, PNG ou WebP — mantém o formato do ficheiro). Imagens menores não são ampliadas.',
+    'O banner aparece como fundo da barra com o nome do grupo no delivery público.',
+    'Prefira imagens até 1 MB.',
+  ],
+  maxOutputWidth: 1200,
+  maxOutputHeight: 150,
+  displayFrameWidth: 360,
+  displayFrameHeight: 45,
+  containerWidth: 420,
+  containerHeight: 160,
+  frameMinWidth: 120,
+  frameMinHeight: 15,
+  lockAspectRatio: true,
+  outputMimeType: 'image/jpeg',
+  outputQuality: 0.9,
+  outputFileName: 'delivery-grupo-banner.jpg',
+  preserveSourceMimeType: true,
+  maxSourceBytes: DELIVERY_CROP_MAX_SOURCE_BYTES,
+  acceptedMimeTypes: DELIVERY_SQUARE_ACCEPT,
+  footerHint: 'Máx. 1200×150 px',
+}
 
 export const DELIVERY_COMPLEMENTO_CROP_PRESET = createDeliverySquarePreset(
   'delivery-complemento',
@@ -106,24 +135,24 @@ export const DELIVERY_LOGO_CROP_PRESET: ImageCropPreset = {
   footerHint: 'Máx. 500×500 px',
 }
 
-/** Capa/banner do delivery público (Design → Cabeçalho). Proporção 3:1. */
+/** Capa/banner do delivery público (Design → Cabeçalho). Proporção 4:1 (1200×300). */
 export const DELIVERY_CAPA_CROP_PRESET: ImageCropPreset = {
   id: 'delivery-capa',
   title: 'Ajustar capa',
   descriptionLines: [
-    'Arraste a imagem, use o zoom e ajuste a moldura (proporção 3:1).',
-    'A saída é limitada a 1200×400 px (JPEG, PNG ou WebP — mantém o formato do ficheiro). Imagens menores não são ampliadas.',
-    'Mantenha o conteúdo importante no centro — em telas largas o topo e a base podem ser cortados.',
+    'Arraste a imagem, use o zoom e ajuste a moldura (proporção 4:1).',
+    'A saída é limitada a 1200×300 px (JPEG, PNG ou WebP — mantém o formato do ficheiro). Imagens menores não são ampliadas.',
+    'Mantenha o conteúdo importante no centro da moldura.',
     'Prefira imagens até 1 MB.',
   ],
   maxOutputWidth: 1200,
-  maxOutputHeight: 400,
+  maxOutputHeight: 300,
   displayFrameWidth: 360,
-  displayFrameHeight: 120,
+  displayFrameHeight: 90,
   containerWidth: 420,
-  containerHeight: 220,
+  containerHeight: 180,
   frameMinWidth: 96,
-  frameMinHeight: 32,
+  frameMinHeight: 24,
   lockAspectRatio: true,
   outputMimeType: 'image/jpeg',
   outputQuality: 0.9,
@@ -131,5 +160,5 @@ export const DELIVERY_CAPA_CROP_PRESET: ImageCropPreset = {
   preserveSourceMimeType: true,
   maxSourceBytes: DELIVERY_CROP_MAX_SOURCE_BYTES,
   acceptedMimeTypes: DELIVERY_SQUARE_ACCEPT,
-  footerHint: 'Máx. 1200×400 px · foque o centro',
+  footerHint: 'Máx. 1200×300 px · foque o centro',
 }

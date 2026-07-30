@@ -8,6 +8,7 @@ import type { DeliveryLayoutHomeProps } from '../DeliveryLayoutHomeProps'
 import { DeliveryGradeHeader } from './components/DeliveryGradeHeader'
 import { DeliveryGradeToolbar } from './components/DeliveryGradeToolbar'
 import { DeliveryGradeSecaoGrupo } from './components/DeliveryGradeSecaoGrupo'
+import { DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID } from '../../../shared/constants/deliveryPublicoSugestoes'
 
 export function GradeLayoutHome({
   config,
@@ -51,11 +52,16 @@ export function GradeLayoutHome({
         />
 
         <div className="flex-1 pb-4">
-          {filtered.grupos.map(grupo => (
+          {filtered.grupos.map((grupo, index) => (
             <DeliveryGradeSecaoGrupo
               key={grupo.id}
+              config={config}
               grupo={grupo}
               interactive={interactive}
+              denseTop={
+                index > 0 &&
+                filtered.grupos[index - 1]?.id === DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID
+              }
               onProdutoClick={onProdutoClick}
             />
           ))}

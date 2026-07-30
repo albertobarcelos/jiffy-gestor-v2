@@ -18,10 +18,12 @@ export function createDefaultDesignConfig(nomeExibicao = ''): DeliveryPublicoDes
       presetId: 'urbana',
     },
     categorias: {
-      mostrar: true,
-      usarImagensGrupo: true,
-      estiloIcone: 'linha',
-      iconesPorGrupoId: {},
+      tituloGrupoFundo: 'cor',
+      corBarraTitulo: null,
+      corTextoTitulo: null,
+      mostrarNomeTitulo: true,
+      mostrarSugestoesDaCasa: true,
+      sugestoesDaCasaImagemUrl: null,
     },
   }
 }

@@ -1,14 +1,18 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import type { CheckoutFormData } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
 import type { ClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import { normalizarClienteDeliveryPublico } from '@/src/application/mappers/ClienteDeliveryPublicoMapper'
+import { enviarPedidoPublicoUseCase } from '@/src/application/use-cases/delivery-publico/EnviarPedidoPublicoUseCase'
+import { garantirEnderecoEntregaPublicoUseCase } from '@/src/application/use-cases/delivery-publico/GarantirEnderecoEntregaPublicoUseCase'
 import {
+  atualizarClienteDeliveryPublico,
   buscarClienteDeliveryPublico,
-  criarPedidoPublico,
 } from '@/src/infrastructure/api/publicDeliveryApi'
 import { usePublicDeliveryMeiosPagamento } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import { showToast } from '@/src/shared/utils/toast'
+import { comporTelefoneApi } from '@/src/shared/utils/deliveryTelefonePais'
 import {
   useDeliveryCarrinhoStore,
   useDeliveryCarrinhoItens,
@@ -18,16 +22,6 @@ import {
   useDeliveryPreferenciaEntregaStore,
   type DeliveryTipoEntrega,
 } from '../stores/deliveryPreferenciaEntregaStore'
-import {
-  garantirEnderecoEntregaPublico,
-  normalizarClienteDeliveryPublico,
-} from '../utils/garantirEnderecoClientePublico'
-import { comporTelefoneApi } from '../utils/deliveryTelefonePais'
-import {
-  montarPedidoPublico,
-  type CheckoutFormData,
-} from '../utils/montarPedidoPublico'
-import { deliveryPublicoHomePath } from '../utils/deliveryPublicoRoutes'
 
 export type ClienteLookupStatus =
   | 'idle'
@@ -61,13 +55,13 @@ function createInitialForm(tipoEntrega: DeliveryTipoEntrega): CheckoutFormData {
     pontoReferencia: '',
     etiquetaEndereco: 'casa',
     apelidoEndereco: 'Casa',
+    pagamentos: [],
+    observacaoPedido: '',
+    cpfNotaFiscal: '',
     modoTempo: '',
     slotInicio: '',
     slotFim: '',
     slotLabel: '',
-    meioPagamentoId: '',
-    trocoPara: null,
-    observacaoPedido: '',
   }
 }
 
@@ -87,7 +81,6 @@ function onlyDigits(value: string): string {
 const LOOKUP_DEBOUNCE_MS = 450
 
 export function useDeliveryCheckout(slug: string) {
-  const router = useRouter()
   const itens = useDeliveryCarrinhoItens(slug)
   const total = useDeliveryCarrinhoTotal(slug)
   const limpar = useDeliveryCarrinhoStore(s => s.limpar)
@@ -268,6 +261,7 @@ export function useDeliveryCheckout(slug: string) {
           return { status: 'erro', cliente: null }
         }
 
+        telefoneDigitsRef.current = tel
         setClienteLookup({
           status: 'encontrado',
           telefoneConsultado: tel,
@@ -275,6 +269,8 @@ export function useDeliveryCheckout(slug: string) {
           mensagemErro: null,
         })
         aplicarClienteNoForm(cliente)
+        // Libera o input Celular; o número confirmado fica em telefoneConsultado / ref.
+        setForm(prev => ({ ...prev, telefone: '' }))
         return { status: 'encontrado', cliente }
       } catch (error) {
         if (seq !== lookupSeqRef.current) return { status: 'idle', cliente: null }
@@ -395,6 +391,35 @@ export function useDeliveryCheckout(slug: string) {
     void consultarClientePorTelefone(tel)
   }, [consultarClientePorTelefone, resolveTelefoneApi])
 
+  const salvarNomeCliente = useCallback(async (nomeInformado: string) => {
+    const tel =
+      telefoneDigitsRef.current ||
+      clienteLookupRef.current.telefoneConsultado ||
+      ''
+    if (tel.length < 8) {
+      throw new Error('Informe um telefone válido')
+    }
+    const nome = nomeInformado.trim()
+    if (!nome) {
+      throw new Error('Informe o nome')
+    }
+
+    const atualizadoRaw = await atualizarClienteDeliveryPublico(tel, { nome })
+    const cliente = normalizarClienteDeliveryPublico(atualizadoRaw)
+    if (!cliente) {
+      throw new Error('Não foi possível atualizar o nome')
+    }
+
+    setClienteLookup(prev => ({
+      ...prev,
+      status: 'encontrado',
+      telefoneConsultado: tel,
+      cliente,
+      mensagemErro: null,
+    }))
+    setForm(prev => ({ ...prev, nome: cliente.nome?.trim() || nome }))
+  }, [])
+
   const confirmarNovoEndereco = useCallback(async (): Promise<string> => {
     const f = formRef.current
     const tel = resolveTelefoneApi(f)
@@ -404,7 +429,7 @@ export function useDeliveryCheckout(slug: string) {
 
     preferirNovoEnderecoRef.current = true
 
-    const enderecoId = await garantirEnderecoEntregaPublico({
+    const enderecoId = await garantirEnderecoEntregaPublicoUseCase.execute({
       telefone: tel,
       nome: nomeEfetivo,
       modoEndereco: 'novo',
@@ -443,17 +468,17 @@ export function useDeliveryCheckout(slug: string) {
     return enderecoId
   }, [resolveTelefoneApi])
 
-  const enviarPedido = useCallback(async () => {
+  const enviarPedido = useCallback(async (): Promise<boolean> => {
     const tel = resolveTelefoneApi(form)
     telefoneDigitsRef.current = tel
     if (tel.length < 8) {
       showToast.error('Informe um telefone válido')
-      return
+      return false
     }
 
     if (itens.length === 0) {
       showToast.error('Carrinho vazio')
-      return
+      return false
     }
 
     const nomeEfetivo =
@@ -461,52 +486,42 @@ export function useDeliveryCheckout(slug: string) {
 
     setEnviando(true)
     try {
-      let enderecoIdEntrega: string | null = null
-
-      if (form.tipoEntrega === 'entrega') {
-        enderecoIdEntrega = await garantirEnderecoEntregaPublico({
-          telefone: tel,
-          nome: nomeEfetivo,
-          modoEndereco: form.modoEndereco,
-          enderecoIdSelecionado: form.enderecoIdSelecionado || null,
-          clienteLookup: clienteLookup.cliente,
-          enderecoNovo: {
-            rua: form.rua,
-            numero: form.numero,
-            bairro: form.bairro,
-            cidade: form.cidade,
-            estado: form.estado,
-            cep: form.cep,
-            complemento: form.complemento,
-            pontoReferencia: form.pontoReferencia,
-            etiqueta: form.etiquetaEndereco,
-          },
-        })
-      }
-
-      const resultado = montarPedidoPublico({
+      const resultado = await enviarPedidoPublicoUseCase.execute({
         slug,
+        telefoneApi: tel,
+        nomeEfetivo,
         itens,
         total,
-        form: { ...form, nome: nomeEfetivo ?? '' },
-        enderecoIdEntrega,
+        form,
+        clienteLookup: clienteLookup.cliente,
       })
+
       if (!resultado.ok) {
         showToast.error(resultado.error)
-        return
+        return false
       }
 
-      await criarPedidoPublico(resultado.payload)
+      if (resultado.clienteAtualizado) {
+        setClienteLookup(prev => ({
+          ...prev,
+          status: 'encontrado',
+          telefoneConsultado: tel,
+          cliente: resultado.clienteAtualizado,
+          mensagemErro: null,
+        }))
+      }
+
       limpar(slug)
       showToast.success('Pedido enviado com sucesso!')
-      router.push(deliveryPublicoHomePath(slug))
+      return true
     } catch (error) {
       console.error(error)
       showToast.error(error instanceof Error ? error.message : 'Erro ao enviar pedido')
+      return false
     } finally {
       setEnviando(false)
     }
-  }, [slug, itens, total, form, clienteLookup.cliente, limpar, router, resolveTelefoneApi])
+  }, [slug, itens, total, form, clienteLookup.cliente, limpar, resolveTelefoneApi])
 
   return {
     itens,
@@ -520,6 +535,7 @@ export function useDeliveryCheckout(slug: string) {
     consultarClientePorTelefone,
     consultarTelefoneAtual,
     confirmarNovoEndereco,
+    salvarNomeCliente,
     meiosPagamento: meiosData?.meiosPagamento ?? [],
     loadingMeios,
     enviando,

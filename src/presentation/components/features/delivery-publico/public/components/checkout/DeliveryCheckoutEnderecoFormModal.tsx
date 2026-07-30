@@ -10,7 +10,11 @@ import {
 import { obterEnderecoPorGps } from '@/src/shared/utils/geolocalizacaoEndereco'
 import { showToast } from '@/src/shared/utils/toast'
 import type { CheckoutFormData } from '../../../shared/utils/montarPedidoPublico'
-import { DeliveryCheckoutStepModal } from './DeliveryCheckoutStepModal'
+import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
+import {
+  DeliveryCheckoutShellFooter,
+  DeliveryCheckoutShellHeader,
+} from './DeliveryCheckoutShell'
 
 type DeliveryCheckoutEnderecoFormModalProps = {
   form: CheckoutFormData
@@ -23,7 +27,7 @@ type DeliveryCheckoutEnderecoFormModalProps = {
 export function DeliveryCheckoutEnderecoFormModal({
   form,
   onChange,
-  onClose,
+  onClose: _onClose,
   onCancelar,
   onConfirmar,
 }: DeliveryCheckoutEnderecoFormModalProps) {
@@ -97,37 +101,23 @@ export function DeliveryCheckoutEnderecoFormModal({
   const fieldStyle = { borderColor: 'var(--delivery-border)' } as const
 
   return (
-    <DeliveryCheckoutStepModal
-      title="Confirme seu endereço"
-      onClose={onClose}
-      showBack
-      onBack={onCancelar}
-      footer={
-        <div className="flex gap-2">
-          <button
-            type="button"
-            disabled={salvando}
-            onClick={onCancelar}
-            className="min-h-[48px] flex-1 rounded-xl border px-3 text-sm font-semibold uppercase tracking-wide delivery-text-primary disabled:opacity-60"
-            style={{ borderColor: 'var(--delivery-border)' }}
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            disabled={salvando}
-            onClick={() => void handleConfirmar()}
-            className="min-h-[48px] flex-1 rounded-xl px-3 text-sm font-semibold uppercase tracking-wide disabled:opacity-60"
-            style={{
-              backgroundColor: 'var(--delivery-primary-dark)',
-              color: 'var(--delivery-btn-text, #ffffff)',
-            }}
-          >
-            {salvando ? 'Salvando...' : 'Confirmar'}
-          </button>
-        </div>
-      }
-    >
+    <>
+      <DeliveryCheckoutShellHeader
+        title="Confirme seu endereço"
+        showBack
+        onBack={onCancelar}
+      />
+      <DeliveryCheckoutShellFooter>
+        <DeliveryCheckoutFooterActions
+          onVoltar={onCancelar}
+          onContinuar={() => void handleConfirmar()}
+          voltarLabel="Cancelar"
+          continuarLabel={salvando ? 'Salvando...' : 'Confirmar'}
+          voltarDisabled={salvando}
+          continuarDisabled={salvando}
+        />
+      </DeliveryCheckoutShellFooter>
+
       <div className="space-y-3">
         <button
           type="button"
@@ -296,6 +286,6 @@ export function DeliveryCheckoutEnderecoFormModal({
           </div>
         </div>
       </div>
-    </DeliveryCheckoutStepModal>
+    </>
   )
 }

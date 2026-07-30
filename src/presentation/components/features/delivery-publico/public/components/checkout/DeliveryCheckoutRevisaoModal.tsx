@@ -1,18 +1,30 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import { Camera, Clock, MapPin, Pencil, Bike, UserRound } from 'lucide-react'
+import { Camera, Clock, MapPin, Pencil, UserRound } from 'lucide-react'
+import { MdDeliveryDining } from 'react-icons/md'
+import { TbPaperBag } from 'react-icons/tb'
 import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { MeioPagamentoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
+import { formatarCpfCnpjInput } from '@/src/shared/utils/cpfCnpj'
+import { formatarValorComplemento } from '@/src/domain/services/pedido/CalculadoraPedido'
+import { normalizeTipoImpactoPreco } from '@/src/application/mappers/VendaApiNormalizer'
 import type { DeliveryCarrinhoItem } from '../../../shared/stores/deliveryCarrinhoStore'
 import type { DeliveryTipoEntrega } from '../../../shared/stores/deliveryPreferenciaEntregaStore'
 import { DELIVERY_PAIS_TELEFONE_PADRAO } from '../../../shared/constants/deliveryPaisesTelefone'
+import { observacaoItemCarrinho } from '../../../shared/utils/deliveryCarrinhoItemUtils'
 import { formatDeliveryCurrency } from '../../../shared/utils/formatDeliveryCurrency'
 import { formatarTelefoneExibicao } from '../../../shared/utils/deliveryTelefonePais'
+import { calcularTrocoCheckout } from '../../../shared/utils/checkoutPagamentosUtils'
+import { etiquetaEnderecoPublicoLabel } from '../../../shared/utils/etiquetaEnderecoPublicoLabel'
+import { isMeioPagamentoDinheiro } from '../../../shared/utils/isMeioPagamentoDinheiro'
 import { obterIconeMeioPagamento } from '../../../shared/utils/obterIconeMeioPagamento'
-import { DeliveryCheckoutStepModal } from './DeliveryCheckoutStepModal'
-import { DeliveryCarrinhoEnderecoTopo } from './DeliveryCarrinhoEnderecoTopo'
+import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
+import {
+  DeliveryCheckoutShellFooter,
+  DeliveryCheckoutShellHeader,
+} from './DeliveryCheckoutShell'
 
 type DeliveryCheckoutRevisaoModalProps = {
   tipoEntrega: DeliveryTipoEntrega
@@ -21,26 +33,29 @@ type DeliveryCheckoutRevisaoModalProps = {
   telefonePaisIso2?: string
   enderecoCliente: EnderecoClienteDeliveryPublicoDTO | null
   enderecoEmpresaTexto: string | null
-  nomeEmpresaFallback?: string
-  logoUrlFallback?: string | null
-  capaUrlFallback?: string | null
   itens: DeliveryCarrinhoItem[]
   total: number
-  meioPagamento: MeioPagamentoPublicoDTO | null
-  trocoPara: number | null
+  pagamentos: Array<{
+    meioPagamentoId: string
+    valor: number
+    meio: MeioPagamentoPublicoDTO | null
+  }>
   observacaoPedido: string
   modoTempo: 'imediato' | 'agendado' | ''
   slotInicio: string
   slotLabel: string
+  cpfNotaFiscal: string
   enviando: boolean
   onClose: () => void
   onVoltar: () => void
+  onEditarTipoEntrega: () => void
   onEditarCliente: () => void
   onEditarEndereco: () => void
   onEditarPedido: () => void
   onEditarQuando: () => void
   onEditarPagamento: () => void
   onChangeObservacaoPedido: (value: string) => void
+  onChangeCpfNotaFiscal: (value: string) => void
   onEnviar: () => void
 }
 
@@ -135,36 +150,47 @@ export function DeliveryCheckoutRevisaoModal({
   telefonePaisIso2 = DELIVERY_PAIS_TELEFONE_PADRAO,
   enderecoCliente,
   enderecoEmpresaTexto,
-  nomeEmpresaFallback = '',
-  logoUrlFallback = null,
-  capaUrlFallback = null,
   itens,
   total,
-  meioPagamento,
-  trocoPara,
+  pagamentos,
   observacaoPedido,
   modoTempo,
   slotInicio,
   slotLabel,
+  cpfNotaFiscal,
   enviando,
-  onClose,
+  onClose: _onClose,
   onVoltar,
+  onEditarTipoEntrega,
   onEditarCliente,
   onEditarEndereco,
   onEditarPedido,
   onEditarQuando,
   onEditarPagamento,
   onChangeObservacaoPedido,
+  onChangeCpfNotaFiscal,
   onEnviar,
 }: DeliveryCheckoutRevisaoModalProps) {
   const [adicionarObservacao, setAdicionarObservacao] = useState(
     () => observacaoPedido.trim().length > 0
   )
+  const [desejaNotaFiscal, setDesejaNotaFiscal] = useState(
+    () => cpfNotaFiscal.replace(/\D/g, '').length > 0
+  )
   const telefoneExibicao = telefone.trim()
     ? formatarTelefoneExibicao(telefone, telefonePaisIso2)
     : 'Não informado'
   const nomeExibicao = nome.trim() || 'Não informado'
-  const IconePagamento = obterIconeMeioPagamento(meioPagamento?.nome ?? '')
+  const trocoReceber = calcularTrocoCheckout(
+    total,
+    pagamentos.map(p => ({ meioPagamentoId: p.meioPagamentoId, valor: p.valor })),
+    meioPagamentoId =>
+      isMeioPagamentoDinheiro(
+        pagamentos.find(p => p.meioPagamentoId === meioPagamentoId)?.meio ?? null
+      )
+  )
+  const primeiroMeioNome = pagamentos[0]?.meio?.nome ?? ''
+  const IconePagamento = obterIconeMeioPagamento(primeiroMeioNome)
   const isEntrega = tipoEntrega === 'entrega'
 
   const handleToggleObservacao = (checked: boolean) => {
@@ -174,37 +200,52 @@ export function DeliveryCheckoutRevisaoModal({
     }
   }
 
+  const handleToggleNotaFiscal = (checked: boolean) => {
+    setDesejaNotaFiscal(checked)
+    if (!checked) {
+      onChangeCpfNotaFiscal('')
+    }
+  }
+
+  const handleCpfChange = (raw: string) => {
+    const apenasDigitos = raw.replace(/\D/g, '').slice(0, 11)
+    onChangeCpfNotaFiscal(formatarCpfCnpjInput(apenasDigitos))
+  }
+
   return (
-    <DeliveryCheckoutStepModal
-      title="Revise seu pedido"
-      onClose={onClose}
-      showBack
-      onBack={onVoltar}
-      fullScreen
-      footer={
-        <button
-          type="button"
-          disabled={enviando}
-          onClick={onEnviar}
-          className="min-h-[48px] w-full rounded-xl text-sm font-semibold uppercase tracking-wide disabled:opacity-60"
-          style={{
-            backgroundColor: 'var(--delivery-primary-dark)',
-            color: 'var(--delivery-btn-text, #ffffff)',
-          }}
-        >
-          {enviando ? 'Enviando...' : 'Enviar pedido'}
-        </button>
-      }
-    >
+    <>
+      <DeliveryCheckoutShellHeader
+        title="Revise seu pedido"
+        showBack
+        onBack={onVoltar}
+        headerTone="dark"
+      />
+      <DeliveryCheckoutShellFooter>
+        <DeliveryCheckoutFooterActions
+          onVoltar={onVoltar}
+          onContinuar={onEnviar}
+          continuarDisabled={enviando}
+          continuarLabel={enviando ? 'Enviando...' : 'Enviar pedido'}
+        />
+      </DeliveryCheckoutShellFooter>
+
       <div>
-        <div className="mb-4">
-          <DeliveryCarrinhoEnderecoTopo
-            nomeEmpresaFallback={nomeEmpresaFallback}
-            logoUrlFallback={logoUrlFallback}
-            capaUrlFallback={capaUrlFallback}
-            colarNoTopo
-          />
-        </div>
+        <LinhaSecao
+          icone={
+            isEntrega ? (
+              <MdDeliveryDining className="h-5 w-5 text-black" aria-hidden />
+            ) : (
+              <TbPaperBag className="h-5 w-5 text-black" aria-hidden />
+            )
+          }
+          label="Tipo de Pedido:"
+          onEditar={onEditarTipoEntrega}
+          editLabel="Editar tipo de pedido"
+        >
+          <p className="text-sm font-semibold delivery-text-primary">
+            {isEntrega ? 'Entrega' : 'Retirada'}
+          </p>
+        </LinhaSecao>
 
         <LinhaSecao
           icone={<UserRound className="h-5 w-5 text-black" />}
@@ -217,13 +258,7 @@ export function DeliveryCheckoutRevisaoModal({
         </LinhaSecao>
 
         <LinhaSecao
-          icone={
-            isEntrega ? (
-              <Bike className="h-5 w-5 text-black" />
-            ) : (
-              <MapPin className="h-5 w-5 text-black" />
-            )
-          }
+          icone={<MapPin className="h-5 w-5 text-black" />}
           label={isEntrega ? 'Seu endereço:' : 'Retirada no local:'}
           onEditar={isEntrega ? onEditarEndereco : undefined}
           editLabel="Editar endereço"
@@ -236,7 +271,7 @@ export function DeliveryCheckoutRevisaoModal({
               <p className="text-sm delivery-text-secondary">
                 {[
                   enderecoCliente.bairro,
-                  etiquetaLabel(enderecoCliente.etiqueta),
+                  etiquetaEnderecoPublicoLabel(enderecoCliente.etiqueta),
                 ]
                   .filter(Boolean)
                   .join(' - ')}
@@ -281,12 +316,28 @@ export function DeliveryCheckoutRevisaoModal({
           onEditar={onEditarPagamento}
           editLabel="Editar pagamento"
         >
-          <p className="text-sm font-semibold delivery-text-primary">
-            {meioPagamento?.nome ?? 'Não selecionado'}
-          </p>
-          {trocoPara != null && trocoPara > 0 ? (
-            <p className="text-sm delivery-text-secondary">
-              Troco para {transformarParaReal(trocoPara)}
+          {pagamentos.length === 0 ? (
+            <p className="text-sm font-semibold delivery-text-primary">Não selecionado</p>
+          ) : (
+            <ul className="space-y-0.5">
+              {pagamentos.map((pagamento, index) => (
+                <li
+                  key={`${pagamento.meioPagamentoId}-${index}`}
+                  className="flex items-baseline justify-between gap-2 text-sm"
+                >
+                  <span className="min-w-0 font-semibold delivery-text-primary">
+                    {pagamento.meio?.nome ?? 'Pagamento'}
+                  </span>
+                  <span className="shrink-0 tabular-nums delivery-text-primary">
+                    {transformarParaReal(pagamento.valor)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {trocoReceber > 0 ? (
+            <p className="text-sm font-semibold text-green-700">
+              Troco a receber: {transformarParaReal(trocoReceber)}
             </p>
           ) : null}
         </LinhaSecao>
@@ -300,21 +351,54 @@ export function DeliveryCheckoutRevisaoModal({
         </div>
 
         <ul>
-          {itens.map(item => (
-            <li
-              key={item.id}
-              className="flex items-center gap-2.5 border-b py-3"
-              style={{ borderColor: 'var(--delivery-border)' }}
-            >
-              <ProdutoThumb imagemUrl={item.produtoImagemUrl} nome={item.produtoNome} />
-              <span className="min-w-0 flex-1 text-sm delivery-text-primary">
-                <span className="font-semibold">{item.quantidade}x</span> {item.produtoNome}
-              </span>
-              <span className="shrink-0 text-sm tabular-nums delivery-text-primary">
-                {formatDeliveryCurrency(item.valorTotal)}
-              </span>
-            </li>
-          ))}
+          {itens.map(item => {
+            const obsItem = observacaoItemCarrinho(item)
+            return (
+              <li
+                key={item.id}
+                className="border-b py-3"
+                style={{ borderColor: 'var(--delivery-border)' }}
+              >
+                <div className="flex items-center gap-2.5">
+                  <ProdutoThumb imagemUrl={item.produtoImagemUrl} nome={item.produtoNome} />
+                  <span className="min-w-0 flex-1 text-sm delivery-text-primary">
+                    <span className="font-semibold">{item.quantidade}x</span> {item.produtoNome}
+                  </span>
+                  <span className="shrink-0 text-sm tabular-nums delivery-text-primary">
+                    {formatDeliveryCurrency(item.valorTotal)}
+                  </span>
+                </div>
+
+                {item.complementos.length > 0 ? (
+                  <ul className="mt-2 space-y-0.5 pl-[3.625rem]">
+                    {item.complementos.map(c => (
+                      <li
+                        key={`${c.complementoId}-${c.grupoComplementoId}`}
+                        className="flex items-center gap-2 text-xs delivery-text-secondary"
+                      >
+                        <span className="min-w-0 flex-1 truncate">
+                          <span className="font-medium tabular-nums">{c.quantidade}x</span>{' '}
+                          {c.nome}
+                        </span>
+                        <span className="shrink-0 tabular-nums delivery-text-accent">
+                          {formatarValorComplemento(
+                            c.valor,
+                            normalizeTipoImpactoPreco(c.tipoImpactoPreco)
+                          )}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+
+                {obsItem ? (
+                  <p className="mt-1.5 pl-[3.625rem] text-xs delivery-text-secondary">
+                    <span className="font-semibold">Obs:</span> {obsItem}
+                  </p>
+                ) : null}
+              </li>
+            )
+          })}
         </ul>
 
         <div
@@ -379,6 +463,71 @@ export function DeliveryCheckoutRevisaoModal({
               </p>
             </div>
           ) : null}
+
+          <div
+            className="flex items-center justify-between gap-3 rounded-xl px-3 py-2"
+            style={{ backgroundColor: '#000000', color: '#ffffff' }}
+          >
+            <span className="min-w-0 text-sm font-medium text-white">
+              Deseja Nota fiscal?
+            </span>
+            <div
+              className="flex shrink-0 rounded-full p-0.5"
+              style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)' }}
+              role="group"
+              aria-label="Deseja nota fiscal"
+            >
+              <button
+                type="button"
+                onClick={() => handleToggleNotaFiscal(true)}
+                aria-pressed={desejaNotaFiscal}
+                className="min-w-[3.25rem] rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors"
+                style={
+                  desejaNotaFiscal
+                    ? { backgroundColor: '#ffffff', color: '#000000' }
+                    : { backgroundColor: 'transparent', color: '#ffffff' }
+                }
+              >
+                Sim
+              </button>
+              <button
+                type="button"
+                onClick={() => handleToggleNotaFiscal(false)}
+                aria-pressed={!desejaNotaFiscal}
+                className="min-w-[3.25rem] rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors"
+                style={
+                  !desejaNotaFiscal
+                    ? { backgroundColor: '#ffffff', color: '#000000' }
+                    : { backgroundColor: 'transparent', color: '#ffffff' }
+                }
+              >
+                Não
+              </button>
+            </div>
+          </div>
+
+          {desejaNotaFiscal ? (
+            <div className="space-y-2">
+              <label className="block text-sm font-medium delivery-text-primary" htmlFor="cpf-nota-fiscal">
+                CPF
+              </label>
+              <input
+                id="cpf-nota-fiscal"
+                className="w-full rounded-xl border bg-transparent px-3 py-3 text-sm outline-none delivery-text-primary"
+                style={{ borderColor: 'var(--delivery-border)' }}
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="000.000.000-00"
+                value={cpfNotaFiscal}
+                onChange={e => handleCpfChange(e.target.value)}
+                maxLength={14}
+                aria-label="CPF para nota fiscal"
+              />
+              <p className="text-right text-[11px] delivery-text-secondary">
+                {cpfNotaFiscal.replace(/\D/g, '').length}/11
+              </p>
+            </div>
+          ) : null}
         </div>
 
         <div className="space-y-2 pt-3">
@@ -394,13 +543,6 @@ export function DeliveryCheckoutRevisaoModal({
           </div>
         </div>
       </div>
-    </DeliveryCheckoutStepModal>
+    </>
   )
-}
-
-function etiquetaLabel(etiqueta: string): string {
-  const e = etiqueta.toLowerCase()
-  if (e === 'casa') return 'Casa'
-  if (e === 'trabalho') return 'Trabalho'
-  return etiqueta
 }

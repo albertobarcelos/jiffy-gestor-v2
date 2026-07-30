@@ -9,6 +9,7 @@ import { DeliveryVitrineHeader } from './components/DeliveryVitrineHeader'
 import { DeliveryVitrineCategoriaTabs } from './components/DeliveryVitrineCategoriaTabs'
 import { DeliveryVitrineSecaoGrupo } from './components/DeliveryVitrineSecaoGrupo'
 import { DeliveryPublicoLojaFooter } from '../../../shared/components/DeliveryPublicoLojaFooter'
+import { DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID } from '../../../shared/constants/deliveryPublicoSugestoes'
 
 export function VitrineLayoutHome({
   config,
@@ -35,7 +36,7 @@ export function VitrineLayoutHome({
     }
   }, [filtered.grupos, activeGrupoId])
 
-  const mostrarCategorias = config.categorias.mostrar
+  const stickyFooterVisible = viewModel.carrinho.quantidadeItens > 0
 
   const handleGrupoClick = useCallback(
     (grupoId: string) => {
@@ -45,8 +46,6 @@ export function VitrineLayoutHome({
     [onGrupoClick]
   )
 
-  const stickyFooterVisible = viewModel.carrinho.quantidadeItens > 0
-
   return (
     <div className="flex min-h-full flex-col pb-24">
       <DeliveryVitrineHeader
@@ -54,15 +53,13 @@ export function VitrineLayoutHome({
         disponivel={viewModel.disponivel}
       />
 
-      {mostrarCategorias ? (
-        <DeliveryVitrineCategoriaTabs
-          grupos={filtered.grupos}
-          activeGrupoId={activeGrupoId}
-          interactive={interactive}
-          onGrupoClick={handleGrupoClick}
-          onSearchToggle={() => setBuscaAberta(current => !current)}
-        />
-      ) : null}
+      <DeliveryVitrineCategoriaTabs
+        grupos={filtered.grupos}
+        activeGrupoId={activeGrupoId}
+        interactive={interactive}
+        onGrupoClick={handleGrupoClick}
+        onSearchToggle={() => setBuscaAberta(current => !current)}
+      />
 
       {buscaAberta ? (
         <DeliveryBuscaProdutos
@@ -73,11 +70,16 @@ export function VitrineLayoutHome({
       ) : null}
 
       <div className="flex-1 pb-4">
-        {filtered.grupos.map(grupo => (
+        {filtered.grupos.map((grupo, index) => (
           <DeliveryVitrineSecaoGrupo
             key={grupo.id}
+            config={config}
             grupo={grupo}
             interactive={interactive}
+            denseTop={
+              index > 0 &&
+              filtered.grupos[index - 1]?.id === DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID
+            }
             onProdutoClick={onProdutoClick}
           />
         ))}

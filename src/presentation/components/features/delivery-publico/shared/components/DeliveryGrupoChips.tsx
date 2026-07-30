@@ -17,7 +17,7 @@ type DeliveryGrupoChipsProps = {
 }
 
 export function DeliveryGrupoChips({
-  config,
+  config: _config,
   grupos,
   activeGrupoId = null,
   interactive = false,
@@ -55,7 +55,7 @@ export function DeliveryGrupoChips({
     scroller.scrollTo({ left: nextLeft, behavior: 'auto' })
   }, [activeGrupoId])
 
-  if (!config.categorias.mostrar || grupos.length === 0) return null
+  if (grupos.length === 0) return null
 
   const marginClass = embedded ? '' : 'mt-3'
 

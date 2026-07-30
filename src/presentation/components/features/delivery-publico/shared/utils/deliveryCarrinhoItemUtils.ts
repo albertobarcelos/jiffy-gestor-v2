@@ -28,6 +28,48 @@ export function observacaoItemCarrinho(item: DeliveryCarrinhoItem): string {
   return item.observacoes.map(o => o.trim()).filter(Boolean).join(' · ')
 }
 
+type LinhaCarrinhoComparable = Pick<
+  DeliveryCarrinhoItem,
+  'produtoId' | 'complementos' | 'observacoes'
+>
+
+function normalizarObservacaoLinha(observacoes: string[]): string {
+  return observacoes
+    .map(o => o.trim())
+    .filter(Boolean)
+    .join(' · ')
+}
+
+function assinaturaComplementos(complementos: DeliveryCarrinhoComplemento[]): string {
+  return [...complementos]
+    .map(c => `${c.grupoComplementoId}:${c.complementoId}:${c.quantidade}`)
+    .sort()
+    .join('|')
+}
+
+/** Chave estável: mesmo produto + mesmos complementos (qtd) + mesma observação. */
+export function chaveLinhaCarrinho(item: LinhaCarrinhoComparable): string {
+  return [
+    item.produtoId,
+    assinaturaComplementos(item.complementos),
+    normalizarObservacaoLinha(item.observacoes),
+  ].join('::')
+}
+
+/** Retorna o item existente com a mesma chave, opcionalmente ignorando um id (ex.: linha em edição). */
+export function encontrarItemIgual(
+  itens: DeliveryCarrinhoItem[],
+  candidato: LinhaCarrinhoComparable,
+  ignoreItemId?: string
+): DeliveryCarrinhoItem | null {
+  const chave = chaveLinhaCarrinho(candidato)
+  for (const item of itens) {
+    if (ignoreItemId && item.id === ignoreItemId) continue
+    if (chaveLinhaCarrinho(item) === chave) return item
+  }
+  return null
+}
+
 function impactoComplementos(
   item: Pick<DeliveryCarrinhoItem, 'produtoId' | 'produtoNome'>,
   complementos: DeliveryCarrinhoComplemento[]

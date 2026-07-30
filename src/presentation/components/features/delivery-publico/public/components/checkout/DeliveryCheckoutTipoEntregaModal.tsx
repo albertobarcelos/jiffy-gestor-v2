@@ -6,10 +6,15 @@ import { usePublicDeliveryDisponibilidade } from '@/src/presentation/hooks/usePu
 import type { DeliveryTipoEntrega } from '../../../shared/stores/deliveryPreferenciaEntregaStore'
 import { formatDeliveryCurrency } from '../../../shared/utils/formatDeliveryCurrency'
 import { formatarResumoEnderecoPublico } from '../../../shared/utils/garantirEnderecoClientePublico'
-import { DeliveryCheckoutStepModal } from './DeliveryCheckoutStepModal'
+import { DELIVERY_PUBLICO_TAXA_ENTREGA_PLACEHOLDER } from '../../../shared/constants/deliveryPublicoPlaceholders'
+import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
+import {
+  DeliveryCheckoutShellFooter,
+  DeliveryCheckoutShellHeader,
+} from './DeliveryCheckoutShell'
 
-/** Taxa fictícia até existir endpoint de frete. */
-export const TAXA_ENTREGA_FICTICIA = 5.9
+/** @deprecated Preferir `DELIVERY_PUBLICO_TAXA_ENTREGA_PLACEHOLDER`. */
+export const TAXA_ENTREGA_FICTICIA = DELIVERY_PUBLICO_TAXA_ENTREGA_PLACEHOLDER
 
 export type ModoEntregaOpcao = {
   tipoEntrega: DeliveryTipoEntrega
@@ -28,6 +33,8 @@ type DeliveryCheckoutTipoEntregaModalProps = {
   onEditarEndereco: () => void
   onCadastrarEndereco: () => void
   onClose: () => void
+  /** Volta ao passo anterior do fluxo (identificação). */
+  onVoltar: () => void
   onContinuar: () => void
 }
 
@@ -91,7 +98,8 @@ export function DeliveryCheckoutTipoEntregaModal({
   onChangeOpcao,
   onEditarEndereco,
   onCadastrarEndereco,
-  onClose,
+  onClose: _onClose,
+  onVoltar,
   onContinuar,
 }: DeliveryCheckoutTipoEntregaModalProps) {
   const hoje = hojeEmSaoPaulo()
@@ -121,31 +129,25 @@ export function DeliveryCheckoutTipoEntregaModal({
   }
 
   return (
-    <DeliveryCheckoutStepModal
-      title="Como deseja receber?"
-      onClose={onClose}
-      showBack
-      onBack={onClose}
-      footer={
-        <button
-          type="button"
-          onClick={handleContinuar}
-          disabled={
+    <>
+      <DeliveryCheckoutShellHeader
+        title="Como deseja receber?"
+        showBack
+        onBack={onVoltar}
+      />
+      <DeliveryCheckoutShellFooter>
+        <DeliveryCheckoutFooterActions
+          onVoltar={onVoltar}
+          onContinuar={handleContinuar}
+          continuarDisabled={
             !modoTempo ||
             consultandoDisponibilidade ||
             disponibilidadeAtual.isError ||
             !opcaoDisponivel
           }
-          className="min-h-[48px] w-full rounded-xl text-sm font-semibold uppercase tracking-wide disabled:cursor-not-allowed disabled:opacity-50"
-          style={{
-            backgroundColor: 'var(--delivery-primary-dark)',
-            color: 'var(--delivery-btn-text, #ffffff)',
-          }}
-        >
-          Continuar
-        </button>
-      }
-    >
+        />
+      </DeliveryCheckoutShellFooter>
+
       <div className="grid grid-cols-2 gap-3">
         {OPCOES.map(({ key, label, tipoEntrega: tipo, modoTempo: modo, Icon }) => {
           const selected = tipoEntrega === tipo && modoTempo === modo
@@ -324,6 +326,6 @@ export function DeliveryCheckoutTipoEntregaModal({
           </div>
         )}
       </div>
-    </DeliveryCheckoutStepModal>
+    </>
   )
 }
