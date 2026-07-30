@@ -7,10 +7,9 @@ import {
 } from '@/src/presentation/components/features/delivery-publico/public/components/checkout/deliveryCheckoutProgress'
 
 describe('deliveryCheckoutProgress', () => {
-  it('monta path de entrega sem etapa de horário', () => {
+  it('monta path de entrega sem etapa separada de tipo de entrega', () => {
     expect(buildDeliveryCheckoutPath('entrega')).toEqual([
       'identificacao',
-      'recebimento',
       'endereco',
       'pagamento',
       'revisao',
@@ -20,7 +19,6 @@ describe('deliveryCheckoutProgress', () => {
   it('monta path de retirada sem endereço', () => {
     expect(buildDeliveryCheckoutPath('retirada')).toEqual([
       'identificacao',
-      'recebimento',
       'pagamento',
       'revisao',
     ])
@@ -33,17 +31,29 @@ describe('deliveryCheckoutProgress', () => {
       identificacaoCompleta: false,
     })
     expect(progress?.current).toBe(1)
+    expect(progress?.total).toBe(4)
     expect(progress?.percentage).toBe(0)
   })
 
-  it('na identificação completa sobe a barra (passo 1)', () => {
+  it('na identificação completa sobe a barra (1 de 3 transições na entrega)', () => {
     const progress = calculateDeliveryCheckoutProgress({
       checkoutStep: 'telefone',
       tipoEntrega: 'entrega',
       identificacaoCompleta: true,
     })
-    expect(progress?.percentage).toBe(25)
+    expect(progress?.percentage).toBe(33)
     expect(progress?.current).toBe(2)
+    expect(progress?.total).toBe(4)
+  })
+
+  it('na identificação completa na retirada sobe a barra (1 de 2 transições)', () => {
+    const progress = calculateDeliveryCheckoutProgress({
+      checkoutStep: 'telefone',
+      tipoEntrega: 'retirada',
+      identificacaoCompleta: true,
+    })
+    expect(progress?.percentage).toBe(50)
+    expect(progress?.total).toBe(3)
   })
 
   it('marca 100% na revisão', () => {

@@ -14,7 +14,6 @@ import {
   ClipboardCheck,
   DollarSign,
   MapPin,
-  PackageCheck,
   UserRound,
   type LucideIcon,
 } from 'lucide-react'
@@ -39,7 +38,6 @@ const DeliveryCheckoutShellSlotsContext = createContext<ShellSlotsContextValue |
 
 const STEP_ICONS: Record<Exclude<DeliveryCheckoutStep, null>, LucideIcon> = {
   telefone: UserRound,
-  tipoEntrega: PackageCheck,
   enderecos: MapPin,
   enderecoForm: MapPin,
   pagamento: DollarSign,
@@ -51,7 +49,6 @@ const SLIDE_TRANSITION = { duration: 0.32, ease: [0.22, 1, 0.36, 1] as const }
 /** Ordem visual para calcular direção do slide (frente / voltar). */
 export const DELIVERY_CHECKOUT_STEP_ORDER: Exclude<DeliveryCheckoutStep, null>[] = [
   'telefone',
-  'tipoEntrega',
   'enderecos',
   'enderecoForm',
   'pagamento',

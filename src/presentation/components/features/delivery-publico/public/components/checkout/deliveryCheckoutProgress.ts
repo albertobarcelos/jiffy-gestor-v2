@@ -2,7 +2,6 @@ export type DeliveryCheckoutStep =
   | 'telefone'
   | 'enderecos'
   | 'enderecoForm'
-  | 'tipoEntrega'
   | 'pagamento'
   | 'revisao'
   | null
@@ -15,12 +14,7 @@ export type DeliveryCheckoutProgress = {
   label: string
 }
 
-type LogicalCheckoutStep =
-  | 'identificacao'
-  | 'recebimento'
-  | 'endereco'
-  | 'pagamento'
-  | 'revisao'
+type LogicalCheckoutStep = 'identificacao' | 'endereco' | 'pagamento' | 'revisao'
 
 export type ClienteLookupStatusForProgress =
   | 'idle'
@@ -34,19 +28,18 @@ type CalculateDeliveryCheckoutProgressParams = {
   tipoEntrega: 'entrega' | 'retirada'
   preserveCompleted?: boolean
   /**
-   * Identificação concluída na tela de telefone (cliente com nome no cadastro
+   * Identificação concluída na tela unificada (cliente com nome no cadastro
    * ou nome+sobrenome válidos). Só afeta o passo `telefone`.
    */
   identificacaoCompleta?: boolean
 }
 
-/** Path visual do checkout nesta branch (sem etapa de horário/agendamento). */
+/** Path visual do checkout (identificação já inclui tipo de entrega/retirada). */
 export function buildDeliveryCheckoutPath(
   tipoEntrega: 'entrega' | 'retirada'
 ): LogicalCheckoutStep[] {
   return [
     'identificacao',
-    'recebimento',
     ...(tipoEntrega === 'entrega' ? (['endereco'] as const) : []),
     'pagamento',
     'revisao',
@@ -55,7 +48,6 @@ export function buildDeliveryCheckoutPath(
 
 const STEP_TO_LOGICAL_STEP: Record<Exclude<DeliveryCheckoutStep, null>, LogicalCheckoutStep> = {
   telefone: 'identificacao',
-  tipoEntrega: 'recebimento',
   enderecos: 'endereco',
   enderecoForm: 'endereco',
   pagamento: 'pagamento',
@@ -109,7 +101,7 @@ export function calculateDeliveryCheckoutProgress({
   if (preserveCompleted || checkoutStep === 'revisao') {
     completedIndex = path.length - 1
   } else if (checkoutStep === 'telefone') {
-    // Ainda na identificação: barra só sobe quando o passo está completo.
+    // Ainda na identificação unificada: barra só sobe quando o passo está completo.
     completedIndex = identificacaoCompleta ? 1 : 0
   } else {
     completedIndex = currentIndex
