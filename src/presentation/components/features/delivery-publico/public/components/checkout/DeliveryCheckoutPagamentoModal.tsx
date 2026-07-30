@@ -152,35 +152,64 @@ export function DeliveryCheckoutPagamentoModal({
     setValorInput(masked)
   }
 
+  const tentarAdicionarPagamentoPendente = (options?: {
+    /** No Continuar: dinheiro sem resposta de troco → assume “não”. */
+    assumirSemTrocoQuandoIndefinido?: boolean
+  }):
+    | { ok: true; nextPagamentos: CheckoutPagamentoItem[] }
+    | { ok: false; error: string } => {
+    if (!meioSelecionadoId || !meioSelecionado) {
+      return { ok: true, nextPagamentos: pagamentos }
+    }
+
+    const assumirSemTroco =
+      Boolean(options?.assumirSemTrocoQuandoIndefinido) &&
+      ehDinheiro &&
+      precisaTroco === null
+
+    if (ehDinheiro && precisaTroco === null && !assumirSemTroco) {
+      return { ok: false, error: 'Informe se precisa de troco' }
+    }
+
+    const precisaTrocoEfetivo = ehDinheiro && precisaTroco === true
+    const valorPagamentoEfetivo = precisaTrocoEfetivo
+      ? restante
+      : valorPagamento != null && valorPagamento > 0
+        ? valorPagamento
+        : assumirSemTroco
+          ? restante
+          : valorPagamento
+
+    const resolved = resolverAdicaoPagamentoCheckout({
+      restante,
+      valorPagamento: valorPagamentoEfetivo,
+      ehDinheiro,
+      precisaTroco: precisaTrocoEfetivo,
+      valorCedula,
+    })
+    if (!resolved.ok) {
+      return { ok: false, error: resolved.error }
+    }
+
+    const nextPagamentos = [
+      ...pagamentos,
+      { meioPagamentoId: meioSelecionadoId, valor: resolved.valorLancamento },
+    ]
+    onChangePagamentos(nextPagamentos)
+    limparSelecao()
+    return { ok: true, nextPagamentos }
+  }
+
   const handleAdicionar = () => {
     if (!meioSelecionadoId || !meioSelecionado) {
       showToast.error('Escolha a forma de pagamento')
       return
     }
 
-    if (ehDinheiro && precisaTroco === null) {
-      showToast.error('Informe se precisa de troco')
-      return
+    const result = tentarAdicionarPagamentoPendente()
+    if (!result.ok) {
+      showToast.error(result.error)
     }
-
-    const resolved = resolverAdicaoPagamentoCheckout({
-      restante,
-      valorPagamento: ehDinheiro && precisaTroco === true ? restante : valorPagamento,
-      ehDinheiro,
-      precisaTroco: ehDinheiro && precisaTroco === true,
-      valorCedula,
-    })
-    if (!resolved.ok) {
-      showToast.error(resolved.error)
-      return
-    }
-
-    onChangePagamentos([
-      ...pagamentos,
-      { meioPagamentoId: meioSelecionadoId, valor: resolved.valorLancamento },
-    ])
-
-    limparSelecao()
   }
 
   const handleRemover = (index: number) => {
@@ -188,18 +217,24 @@ export function DeliveryCheckoutPagamentoModal({
   }
 
   const handleContinuar = () => {
-    if (meioSelecionadoId) {
-      showToast.error('Adicione ou cancele o pagamento em andamento')
+    const result = tentarAdicionarPagamentoPendente({
+      assumirSemTrocoQuandoIndefinido: true,
+    })
+    if (!result.ok) {
+      showToast.error(result.error)
       return
     }
-    if (!pagamentosCobremTotalCheckout(total, pagamentos, isDinheiroId)) {
+
+    const listaFinal = result.nextPagamentos
+    if (!pagamentosCobremTotalCheckout(total, listaFinal, isDinheiroId)) {
       showToast.error(
-        pagamentos.length === 0
+        listaFinal.length === 0
           ? 'Adicione ao menos uma forma de pagamento'
           : 'Complete o valor restante do pagamento'
       )
       return
     }
+
     onContinuar()
   }
 

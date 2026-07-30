@@ -97,7 +97,14 @@ export function DeliveryPedidoFooter({
 
   const cartButtonLabel = (
     <>
-      <ShoppingCart className="h-5 w-5 shrink-0 @sm:h-6 @sm:w-6" aria-hidden />
+      <span className="relative inline-flex shrink-0">
+        <ShoppingCart className="h-5 w-5 @sm:h-6 @sm:w-6" aria-hidden />
+        {quantidadeItens > 0 ? (
+          <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold leading-none text-white shadow-sm">
+            {quantidadeItens > 99 ? '99+' : quantidadeItens}
+          </span>
+        ) : null}
+      </span>
       Ver carrinho
     </>
   )
