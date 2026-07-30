@@ -2,6 +2,8 @@ import {
   DELIVERY_PUBLICO_GRUPO_SUGESTOES_ICON,
   DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID,
   DELIVERY_PUBLICO_GRUPO_SUGESTOES_NOME,
+  findGrupoSugestoesDaCasaCarrier,
+  omitGrupoSugestoesDaCasaCarrier,
 } from '../constants/deliveryPublicoSugestoes'
 import type { DeliveryPublicoDesignConfig } from '../types/deliveryPublicoDesignConfig'
 import type {
@@ -9,19 +11,22 @@ import type {
   DeliveryPublicoViewModel,
 } from '../types/deliveryPublicoViewModel'
 
-function isGrupoSugestoes(grupo: DeliveryPublicoGrupoViewModel): boolean {
+function isGrupoSugestoesSintetico(grupo: DeliveryPublicoGrupoViewModel): boolean {
   return grupo.id === DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID
 }
 
-function resolveSugestoesImagemUrl(config: DeliveryPublicoDesignConfig): string | null {
-  return config.categorias.sugestoesDaCasaImagemUrl?.trim() || null
-}
-
-/** Remove o grupo sintético Sugestões da Casa da lista. */
+/** Remove o grupo sintético e o grupo real portador da lista. */
 export function omitGrupoSugestoes(
   grupos: DeliveryPublicoGrupoViewModel[]
 ): DeliveryPublicoGrupoViewModel[] {
-  return grupos.filter(grupo => !isGrupoSugestoes(grupo))
+  return omitGrupoSugestoesDaCasaCarrier(grupos).filter(grupo => !isGrupoSugestoesSintetico(grupo))
+}
+
+function grupoSugestoesDisponivel(grupos: DeliveryPublicoGrupoViewModel[]): boolean {
+  return (
+    Boolean(findGrupoSugestoesDaCasaCarrier(grupos)) ||
+    grupos.some(isGrupoSugestoesSintetico)
+  )
 }
 
 /**
@@ -59,49 +64,47 @@ export function buildPreviewGrupoSugestoes(
   }
 }
 
-function withSugestoesImagem(
-  grupo: DeliveryPublicoGrupoViewModel,
-  config: DeliveryPublicoDesignConfig
-): DeliveryPublicoGrupoViewModel {
-  return {
-    ...grupo,
-    imagemUrl: resolveSugestoesImagemUrl(config),
-  }
-}
-
 /**
- * Garante Sugestões no início da lista (preview) ou remove conforme o design.
- * Aplica o banner configurado em `categorias.sugestoesDaCasaImagemUrl`.
+ * Garante Sugestões no início da lista ou remove conforme o design.
+ * Exige grupo real "Sugestões da Casa" no cardápio (além do switch).
+ * A imagem da barra vem do `imagemUrl` desse grupo real (CDN).
  */
 export function applySugestoesDaCasaVisibility(
   viewModel: DeliveryPublicoViewModel,
   config: DeliveryPublicoDesignConfig,
   options?: { injectPreviewFallback?: boolean }
 ): DeliveryPublicoViewModel {
-  const mostrar = config.categorias.mostrarSugestoesDaCasa !== false
+  const carrier = findGrupoSugestoesDaCasaCarrier(viewModel.grupos)
+  const disponivel = grupoSugestoesDisponivel(viewModel.grupos)
   const semSugestoes = omitGrupoSugestoes(viewModel.grupos)
+  const imagemUrl = carrier?.imagemUrl?.trim() || null
+
+  const mostrar = config.categorias.mostrarSugestoesDaCasa !== false && disponivel
 
   if (!mostrar) {
     return { ...viewModel, grupos: semSugestoes }
   }
 
-  const existente = viewModel.grupos.find(isGrupoSugestoes)
+  const existente = viewModel.grupos.find(isGrupoSugestoesSintetico)
   if (existente) {
     return {
       ...viewModel,
-      grupos: [withSugestoesImagem(existente, config), ...semSugestoes],
+      grupos: [
+        {
+          ...existente,
+          imagemUrl: existente.imagemUrl?.trim() || imagemUrl,
+        },
+        ...semSugestoes,
+      ],
     }
   }
 
-  if (!options?.injectPreviewFallback) {
-    return viewModel
+  if (!options?.injectPreviewFallback || !carrier) {
+    return { ...viewModel, grupos: semSugestoes }
   }
 
   return {
     ...viewModel,
-    grupos: [
-      buildPreviewGrupoSugestoes(semSugestoes, resolveSugestoesImagemUrl(config)),
-      ...semSugestoes,
-    ],
+    grupos: [buildPreviewGrupoSugestoes(semSugestoes, imagemUrl), ...semSugestoes],
   }
 }

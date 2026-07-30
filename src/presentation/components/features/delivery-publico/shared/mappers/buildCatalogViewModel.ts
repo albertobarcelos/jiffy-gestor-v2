@@ -5,6 +5,8 @@ import {
   DELIVERY_PUBLICO_GRUPO_SUGESTOES_ICON,
   DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID,
   DELIVERY_PUBLICO_GRUPO_SUGESTOES_NOME,
+  findGrupoSugestoesDaCasaCarrier,
+  omitGrupoSugestoesDaCasaCarrier,
 } from '../constants/deliveryPublicoSugestoes'
 import type {
   DeliveryPublicoGrupoViewModel,
@@ -34,7 +36,8 @@ function mapGrupoToViewModel(
 }
 
 function buildGrupoSugestoes(
-  grupos: CatalogoPublicoGrupoProdutoDTO[]
+  grupos: CatalogoPublicoGrupoProdutoDTO[],
+  imagemUrl: string | null
 ): DeliveryPublicoGrupoViewModel | null {
   const favoritos = listarProdutosFavoritos(grupos)
   if (favoritos.length === 0) return null
@@ -44,7 +47,7 @@ function buildGrupoSugestoes(
     nome: DELIVERY_PUBLICO_GRUPO_SUGESTOES_NOME,
     iconName: DELIVERY_PUBLICO_GRUPO_SUGESTOES_ICON,
     cor: null,
-    imagemUrl: null,
+    imagemUrl,
     produtos: favoritos.map(produto => ({
       id: produto.id,
       nome: produto.nome,
@@ -57,12 +60,21 @@ function buildGrupoSugestoes(
   }
 }
 
+/**
+ * Monta o view-model do cardápio público.
+ * Sugestões só entra se existir o grupo real "Sugestões da Casa" e houver favoritos.
+ * O grupo real não aparece como seção normal — só como fonte da imagem.
+ */
 export function buildCatalogViewModel(
   grupos: CatalogoPublicoGrupoProdutoDTO[],
   overrides: Partial<DeliveryPublicoViewModel> = {}
 ): DeliveryPublicoViewModel {
-  const gruposMapeados = grupos.map(mapGrupoToViewModel)
-  const sugestoes = buildGrupoSugestoes(grupos)
+  const carrier = findGrupoSugestoesDaCasaCarrier(grupos)
+  const gruposVisiveis = omitGrupoSugestoesDaCasaCarrier(grupos)
+  const gruposMapeados = gruposVisiveis.map(mapGrupoToViewModel)
+  const sugestoes = carrier
+    ? buildGrupoSugestoes(grupos, carrier.imagemUrl?.trim() || null)
+    : null
 
   return {
     grupos: sugestoes ? [sugestoes, ...gruposMapeados] : gruposMapeados,
