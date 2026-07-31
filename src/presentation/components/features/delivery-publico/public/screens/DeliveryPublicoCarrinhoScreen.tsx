@@ -12,6 +12,7 @@ import { showToast } from '@/src/shared/utils/toast'
 import { DeliveryCarrinhoItemCard } from '../../shared/components/DeliveryCarrinhoItemCard'
 import { DeliveryCarrinhoSwipeableItem } from '../../shared/components/DeliveryCarrinhoSwipeableItem'
 import { DeliveryButton } from '../../shared/components/DeliveryButton'
+import { DELIVERY_MSG_CELULAR_COMPLETO } from '../../shared/constants/deliveryPublicoPlaceholders'
 import { useDeliveryBodyScrollLock } from '../../shared/hooks/useDeliveryBodyScrollLock'
 import { useDeliveryCheckout } from '../../shared/hooks/useDeliveryCheckout'
 import {
@@ -104,6 +105,7 @@ export function DeliveryPublicoCarrinhoScreen({
     enviarPedido,
     salvarNomeCliente,
     limparIdentificacaoCliente,
+    consultarTelefoneAtual,
   } = useDeliveryCheckout(slug)
 
   const quantidadeItens = useMemo(
@@ -382,7 +384,7 @@ export function DeliveryPublicoCarrinhoScreen({
   const handleTelefoneContinuar = async (digits: string) => {
     const { status } = await consultarClientePorTelefone(digits)
     if (status === 'invalido') {
-      showToast.error('Informe um celular válido')
+      showToast.error(DELIVERY_MSG_CELULAR_COMPLETO)
       return
     }
     if (status === 'erro' || status === 'idle') {
@@ -600,6 +602,7 @@ export function DeliveryPublicoCarrinhoScreen({
             enderecoEmpresaTexto={enderecoEmpresaTexto}
             onChangeTelefone={value => updateForm('telefone', value)}
             onChangeTelefonePais={iso2 => updateForm('telefonePaisIso2', iso2)}
+            onConsultarTelefone={consultarTelefoneAtual}
             onChangeNome={value => updateForm('nome', value)}
             onChangeOpcaoEntrega={handleChangeOpcaoEntrega}
             onEditarEndereco={() => handleAlterarEndereco('identificacao')}

@@ -6,12 +6,15 @@ import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/de
 import { showToast } from '@/src/shared/utils/toast'
 import { DeliveryPaisTelefoneSelect } from '../../../shared/components/DeliveryPaisTelefoneSelect'
 import { DELIVERY_PAIS_TELEFONE_PADRAO } from '../../../shared/constants/deliveryPaisesTelefone'
+import {
+  DELIVERY_CELULAR_BR_DIGITOS,
+  DELIVERY_MSG_CELULAR_COMPLETO,
+} from '../../../shared/constants/deliveryPublicoPlaceholders'
 import type { DeliveryTipoEntrega } from '../../../shared/stores/deliveryPreferenciaEntregaStore'
 import {
   comporTelefoneApi,
   formatarTelefoneExibicao,
   formatarTelefonePorPais,
-  telefoneNacionalValido,
 } from '../../../shared/utils/deliveryTelefonePais'
 import type { ClienteLookupStatus } from '../../../shared/hooks/useDeliveryCheckout'
 import { usePublicDeliveryDisponibilidade } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
@@ -44,6 +47,8 @@ type DeliveryCheckoutIdentifiqueSeModalProps = {
   enderecoEmpresaTexto: string | null
   onChangeTelefone: (value: string) => void
   onChangeTelefonePais?: (iso2: string) => void
+  /** Busca manual se ainda não disparou (blur do input ou Enter/OK). */
+  onConsultarTelefone?: () => void
   onChangeNome: (value: string) => void
   onChangeOpcaoEntrega: (opcao: ModoEntregaOpcao) => void
   onEditarEndereco: () => void
@@ -67,7 +72,7 @@ function hojeEmSaoPaulo(): string {
 export function DeliveryCheckoutIdentifiqueSeModal({
   slug,
   telefone,
-  telefonePaisIso2 = DELIVERY_PAIS_TELEFONE_PADRAO,
+  telefonePaisIso2: _telefonePaisIso2 = DELIVERY_PAIS_TELEFONE_PADRAO,
   nome,
   nomeCadastro,
   telefoneConfirmadoDigits,
@@ -78,7 +83,7 @@ export function DeliveryCheckoutIdentifiqueSeModal({
   temEnderecosCadastrados,
   enderecoEmpresaTexto,
   onChangeTelefone,
-  onChangeTelefonePais,
+  onConsultarTelefone,
   onChangeNome,
   onChangeOpcaoEntrega,
   onEditarEndereco,
@@ -90,7 +95,7 @@ export function DeliveryCheckoutIdentifiqueSeModal({
 }: DeliveryCheckoutIdentifiqueSeModalProps) {
   const [enviando, setEnviando] = useState(false)
   const [salvandoNome, setSalvandoNome] = useState(false)
-  const [paisIso2, setPaisIso2] = useState(telefonePaisIso2)
+  const paisIso2 = DELIVERY_PAIS_TELEFONE_PADRAO
   const [tentouNome, setTentouNome] = useState(false)
   const [editandoNome, setEditandoNome] = useState(false)
 
@@ -98,16 +103,13 @@ export function DeliveryCheckoutIdentifiqueSeModal({
   const disponibilidadeAtual = usePublicDeliveryDisponibilidade(slug, tipoEntrega, hoje)
 
   useEffect(() => {
-    setPaisIso2(telefonePaisIso2)
-  }, [telefonePaisIso2])
-
-  useEffect(() => {
     if (lookupStatus !== 'encontrado') {
       setEditandoNome(false)
     }
   }, [lookupStatus])
 
-  const telefoneOk = telefoneNacionalValido(telefone, paisIso2)
+  const telefoneDigits = telefone.replace(/\D/g, '')
+  const telefoneOk = telefoneDigits.length === DELIVERY_CELULAR_BR_DIGITOS
   const clienteEncontrado = lookupStatus === 'encontrado'
   const consultaPronta =
     (telefoneOk || Boolean(telefoneConfirmadoDigits)) &&
@@ -143,19 +145,24 @@ export function DeliveryCheckoutIdentifiqueSeModal({
     mostrarOpcoesEntrega &&
     (disponibilidadeAtual.isLoading || disponibilidadeAtual.isFetching)
 
-  const handleChangePais = (iso2: string) => {
-    setPaisIso2(iso2)
-    onChangeTelefone('')
-    onChangeTelefonePais?.(iso2)
-    setTentouNome(false)
-    setEditandoNome(false)
+  const alertarCelularIncompleto = () => {
+    showToast.error(DELIVERY_MSG_CELULAR_COMPLETO)
+  }
+
+  const tentarConsultaConfirmada = () => {
+    if (telefoneDigits.length === 0) return
+    if (telefoneDigits.length < DELIVERY_CELULAR_BR_DIGITOS) {
+      alertarCelularIncompleto()
+      return
+    }
+    onConsultarTelefone?.()
   }
 
   const resolverTelefoneDigits = (): string | null => {
     if (clienteEncontrado && telefoneConfirmadoDigits) {
       return telefoneConfirmadoDigits
     }
-    if (telefoneNacionalValido(telefone, paisIso2)) {
+    if (telefoneDigits.length === DELIVERY_CELULAR_BR_DIGITOS) {
       return comporTelefoneApi(telefone, paisIso2)
     }
     return null
@@ -181,8 +188,8 @@ export function DeliveryCheckoutIdentifiqueSeModal({
 
   const handleContinuar = async () => {
     const digits = resolverTelefoneDigits()
-    if (!digits || digits.length < 8) {
-      showToast.error('Informe um celular válido')
+    if (!digits || digits.length < DELIVERY_CELULAR_BR_DIGITOS) {
+      alertarCelularIncompleto()
       return
     }
     if (lookupStatus === 'loading' || lookupStatus === 'idle') {
@@ -230,14 +237,11 @@ export function DeliveryCheckoutIdentifiqueSeModal({
   const placeholder = paisIso2 === 'BR' ? '(99) 99999-9999' : '999 999 999'
   const telefoneConfirmadoExibicao = telefoneConfirmadoDigits
     ? formatarTelefoneExibicao(telefoneConfirmadoDigits, paisIso2)
-    : telefone.trim()
-      ? formatarTelefoneExibicao(
-          telefoneNacionalValido(telefone, paisIso2)
-            ? comporTelefoneApi(telefone, paisIso2)
-            : telefone,
-          paisIso2
-        )
-      : ''
+    : telefoneDigits.length === DELIVERY_CELULAR_BR_DIGITOS
+      ? formatarTelefoneExibicao(comporTelefoneApi(telefone, paisIso2), paisIso2)
+      : telefone.trim()
+        ? formatarTelefoneExibicao(telefone, paisIso2)
+        : ''
 
   const nomeSomenteLeitura = clienteEncontrado && temNomeNoCadastro && !editandoNome
   /** Após busca, some o input de celular; fica só nome/telefone confirmados + X. */
@@ -292,19 +296,34 @@ export function DeliveryCheckoutIdentifiqueSeModal({
             >
               <DeliveryPaisTelefoneSelect
                 value={paisIso2}
-                onChange={handleChangePais}
+                onChange={() => {
+                  /* País travado em BR até o backend persistir. */
+                }}
                 disabled={enviando}
+                locked
               />
               <input
                 type="tel"
                 inputMode="tel"
+                enterKeyHint="done"
                 autoComplete="tel-national"
                 placeholder={placeholder}
                 value={telefone}
                 onChange={e => onChangeTelefone(formatarTelefonePorPais(e.target.value, paisIso2))}
+                onBlur={tentarConsultaConfirmada}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    // Só o blur dispara a validação — evita toast duplicado.
+                    ;(e.currentTarget as HTMLInputElement).blur()
+                  }
+                }}
                 className="min-w-0 flex-1 bg-transparent text-base outline-none delivery-text-primary"
               />
             </div>
+            <p className="mt-1.5 text-xs delivery-text-secondary">
+              Celular com DDD — 11 dígitos, ex.: (99) 99999-9999
+            </p>
           </label>
         ) : null}
 

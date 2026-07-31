@@ -15,6 +15,11 @@ type DeliveryPaisTelefoneSelectProps = {
   value: string
   onChange: (iso2: string) => void
   disabled?: boolean
+  /**
+   * Só exibe a bandeira/DDI, sem dropdown.
+   * Usado enquanto o backend não persiste país (fixado em BR).
+   */
+  locked?: boolean
 }
 
 type DropdownPosition = {
@@ -76,6 +81,7 @@ export function DeliveryPaisTelefoneSelect({
   value,
   onChange,
   disabled = false,
+  locked = false,
 }: DeliveryPaisTelefoneSelectProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -105,7 +111,7 @@ export function DeliveryPaisTelefoneSelect({
   }, [])
 
   useLayoutEffect(() => {
-    if (!aberto || !triggerRef.current) {
+    if (locked || !aberto || !triggerRef.current) {
       setPosition(null)
       return
     }
@@ -122,10 +128,10 @@ export function DeliveryPaisTelefoneSelect({
       window.removeEventListener('resize', updatePosition)
       window.removeEventListener('scroll', updatePosition, true)
     }
-  }, [aberto])
+  }, [aberto, locked])
 
   useEffect(() => {
-    if (!aberto) return
+    if (locked || !aberto) return
 
     const handlePointerDown = (event: MouseEvent | TouchEvent) => {
       const target = event.target as Node | null
@@ -154,12 +160,27 @@ export function DeliveryPaisTelefoneSelect({
       document.removeEventListener('keydown', handleKeyDown)
       window.clearTimeout(focusTimer)
     }
-  }, [aberto])
+  }, [aberto, locked])
 
   const handleSelect = (pais: DeliveryPaisTelefone) => {
     onChange(pais.iso2)
     setAberto(false)
     setBusca('')
+  }
+
+  if (locked) {
+    return (
+      <div
+        className="flex shrink-0 items-center gap-1.5 pr-1"
+        title={`${selecionado.nome} (+${selecionado.ddi})`}
+        aria-label={`País fixo: ${selecionado.nome}`}
+      >
+        <PaisBandeira iso2={selecionado.iso2} />
+        <span className="text-sm font-medium tabular-nums delivery-text-primary">
+          +{selecionado.ddi}
+        </span>
+      </div>
+    )
   }
 
   const dropdown =

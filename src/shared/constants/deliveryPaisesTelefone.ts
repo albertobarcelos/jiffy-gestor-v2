@@ -11,7 +11,7 @@ export type DeliveryPaisTelefone = {
 
 /** Países mais usados no delivery BR + vizinhos e fluxos comuns. */
 export const DELIVERY_PAISES_TELEFONE: DeliveryPaisTelefone[] = [
-  { iso2: 'BR', nome: 'Brasil', ddi: '55', nationalMin: 10, nationalMax: 11, mascara: 'br' },
+  { iso2: 'BR', nome: 'Brasil', ddi: '55', nationalMin: 11, nationalMax: 11, mascara: 'br' },
   { iso2: 'AR', nome: 'Argentina', ddi: '54', nationalMin: 10, nationalMax: 11, mascara: 'generica' },
   { iso2: 'PY', nome: 'Paraguai', ddi: '595', nationalMin: 9, nationalMax: 10, mascara: 'generica' },
   { iso2: 'UY', nome: 'Uruguai', ddi: '598', nationalMin: 8, nationalMax: 9, mascara: 'generica' },
