@@ -2,7 +2,6 @@ export type DeliveryCheckoutStep =
   | 'telefone'
   | 'enderecos'
   | 'enderecoForm'
-  | 'tipoEntrega'
   | 'quando'
   | 'pagamento'
   | 'revisao'
@@ -16,13 +15,8 @@ export type DeliveryCheckoutProgress = {
   label: string
 }
 
-type LogicalCheckoutStep =
-  | 'identificacao'
-  | 'recebimento'
-  | 'endereco'
-  | 'horario'
-  | 'pagamento'
-  | 'revisao'
+/** Identificação já inclui tipo de entrega; `horario` só entra se agendado. */
+type LogicalCheckoutStep = 'identificacao' | 'endereco' | 'horario' | 'pagamento' | 'revisao'
 
 export type ClienteLookupStatusForProgress =
   | 'idle'
@@ -37,7 +31,7 @@ type CalculateDeliveryCheckoutProgressParams = {
   modoTempo: 'imediato' | 'agendado' | ''
   preserveCompleted?: boolean
   /**
-   * Identificação concluída na tela de telefone (cliente com nome no cadastro
+   * Identificação concluída na tela unificada (cliente com nome no cadastro
    * ou nome+sobrenome válidos). Só afeta o passo `telefone`.
    */
   identificacaoCompleta?: boolean
@@ -45,13 +39,13 @@ type CalculateDeliveryCheckoutProgressParams = {
 
 const MAXIMUM_PATH: LogicalCheckoutStep[] = [
   'identificacao',
-  'recebimento',
   'endereco',
   'horario',
   'pagamento',
   'revisao',
 ]
 
+/** Path visual do checkout (identificação já inclui tipo de entrega/retirada). */
 export function buildDeliveryCheckoutPath(
   tipoEntrega: 'entrega' | 'retirada',
   modoTempo: 'imediato' | 'agendado' | ''
@@ -60,7 +54,6 @@ export function buildDeliveryCheckoutPath(
 
   return [
     'identificacao',
-    'recebimento',
     ...(tipoEntrega === 'entrega' ? (['endereco'] as const) : []),
     ...(modoTempo === 'agendado' ? (['horario'] as const) : []),
     'pagamento',
@@ -70,7 +63,6 @@ export function buildDeliveryCheckoutPath(
 
 const STEP_TO_LOGICAL_STEP: Record<Exclude<DeliveryCheckoutStep, null>, LogicalCheckoutStep> = {
   telefone: 'identificacao',
-  tipoEntrega: 'recebimento',
   enderecos: 'endereco',
   enderecoForm: 'endereco',
   quando: 'horario',
@@ -126,6 +118,7 @@ export function calculateDeliveryCheckoutProgress({
   if (preserveCompleted || checkoutStep === 'revisao') {
     completedIndex = path.length - 1
   } else if (checkoutStep === 'telefone') {
+    // Ainda na identificação unificada: barra só sobe quando o passo está completo.
     completedIndex = identificacaoCompleta ? 1 : 0
   } else {
     completedIndex = currentIndex

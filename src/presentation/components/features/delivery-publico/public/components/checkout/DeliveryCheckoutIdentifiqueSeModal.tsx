@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Pencil } from 'lucide-react'
+import { Pencil, X } from 'lucide-react'
+import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { showToast } from '@/src/shared/utils/toast'
 import { DeliveryPaisTelefoneSelect } from '../../../shared/components/DeliveryPaisTelefoneSelect'
 import { DELIVERY_PAIS_TELEFONE_PADRAO } from '../../../shared/constants/deliveryPaisesTelefone'
+import type { DeliveryTipoEntrega } from '../../../shared/stores/deliveryPreferenciaEntregaStore'
 import {
   comporTelefoneApi,
   formatarTelefoneExibicao,
@@ -12,14 +14,21 @@ import {
   telefoneNacionalValido,
 } from '../../../shared/utils/deliveryTelefonePais'
 import type { ClienteLookupStatus } from '../../../shared/hooks/useDeliveryCheckout'
+import { usePublicDeliveryDisponibilidade } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
 import { isNomeCompletoCheckoutValido } from './deliveryCheckoutProgress'
 import {
   DeliveryCheckoutShellFooter,
   DeliveryCheckoutShellHeader,
 } from './DeliveryCheckoutShell'
+import {
+  DeliveryCheckoutTipoEntregaOpcoes,
+  isOpcaoEntregaDisponivel,
+  type ModoEntregaOpcao,
+} from './DeliveryCheckoutTipoEntregaOpcoes'
 
 type DeliveryCheckoutIdentifiqueSeModalProps = {
+  slug: string
   telefone: string
   telefonePaisIso2?: string
   nome: string
@@ -28,25 +37,54 @@ type DeliveryCheckoutIdentifiqueSeModalProps = {
   /** Telefone consultado com sucesso (dígitos). Usado quando o input Celular fica vazio. */
   telefoneConfirmadoDigits: string | null
   lookupStatus: ClienteLookupStatus
+  tipoEntrega: DeliveryTipoEntrega
+  modoTempo: 'imediato' | 'agendado' | ''
+  enderecoCliente: EnderecoClienteDeliveryPublicoDTO | null
+  temEnderecosCadastrados: boolean
+  enderecoEmpresaTexto: string | null
   onChangeTelefone: (value: string) => void
   onChangeTelefonePais?: (iso2: string) => void
   onChangeNome: (value: string) => void
+  onChangeOpcaoEntrega: (opcao: ModoEntregaOpcao) => void
+  onEditarEndereco: () => void
+  onCadastrarEndereco: () => void
   onSalvarNome: (nome: string) => Promise<void>
+  /** Remove cliente/lookup e reabre o input para buscar outro número. */
+  onLimparIdentificacao: () => void
   onClose: () => void
   onContinuar: (telefoneDigits: string) => Promise<void>
 }
 
+function hojeEmSaoPaulo(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date())
+}
+
 export function DeliveryCheckoutIdentifiqueSeModal({
+  slug,
   telefone,
   telefonePaisIso2 = DELIVERY_PAIS_TELEFONE_PADRAO,
   nome,
   nomeCadastro,
   telefoneConfirmadoDigits,
   lookupStatus,
+  tipoEntrega,
+  modoTempo,
+  enderecoCliente,
+  temEnderecosCadastrados,
+  enderecoEmpresaTexto,
   onChangeTelefone,
   onChangeTelefonePais,
   onChangeNome,
+  onChangeOpcaoEntrega,
+  onEditarEndereco,
+  onCadastrarEndereco,
   onSalvarNome,
+  onLimparIdentificacao,
   onClose,
   onContinuar,
 }: DeliveryCheckoutIdentifiqueSeModalProps) {
@@ -55,6 +93,9 @@ export function DeliveryCheckoutIdentifiqueSeModal({
   const [paisIso2, setPaisIso2] = useState(telefonePaisIso2)
   const [tentouNome, setTentouNome] = useState(false)
   const [editandoNome, setEditandoNome] = useState(false)
+
+  const hoje = hojeEmSaoPaulo()
+  const disponibilidadeAtual = usePublicDeliveryDisponibilidade(slug, tipoEntrega, hoje)
 
   useEffect(() => {
     setPaisIso2(telefonePaisIso2)
@@ -84,6 +125,23 @@ export function DeliveryCheckoutIdentifiqueSeModal({
 
   const mostrarCampoNomeNovo =
     lookupStatus === 'nao_encontrado' && consultaPronta
+
+  /** Opções de entrega/retirada só após busca (encontrado ou não). */
+  const mostrarOpcoesEntrega =
+    lookupStatus === 'encontrado' || lookupStatus === 'nao_encontrado'
+
+  const opcaoEntregaOk =
+    !mostrarOpcoesEntrega ||
+    isOpcaoEntregaDisponivel({
+      modoTempo,
+      permiteImediato: disponibilidadeAtual.data?.permiteImediato,
+      aceitaAgendamento: disponibilidadeAtual.data?.aceitaAgendamento,
+      isError: disponibilidadeAtual.isError,
+    })
+
+  const consultandoDisponibilidade =
+    mostrarOpcoesEntrega &&
+    (disponibilidadeAtual.isLoading || disponibilidadeAtual.isFetching)
 
   const handleChangePais = (iso2: string) => {
     setPaisIso2(iso2)
@@ -140,6 +198,14 @@ export function DeliveryCheckoutIdentifiqueSeModal({
       showToast.error('Informe nome e sobrenome')
       return
     }
+    if (mostrarOpcoesEntrega && !modoTempo) {
+      showToast.error('Escolha como deseja receber o pedido')
+      return
+    }
+    if (mostrarOpcoesEntrega && !opcaoEntregaOk) {
+      showToast.error('Essa forma de recebimento não está disponível no momento')
+      return
+    }
     if (clienteEncontrado && nomeAlterado) {
       if (!isNomeCompletoCheckoutValido(nome)) {
         setTentouNome(true)
@@ -164,9 +230,24 @@ export function DeliveryCheckoutIdentifiqueSeModal({
   const placeholder = paisIso2 === 'BR' ? '(99) 99999-9999' : '999 999 999'
   const telefoneConfirmadoExibicao = telefoneConfirmadoDigits
     ? formatarTelefoneExibicao(telefoneConfirmadoDigits, paisIso2)
-    : ''
+    : telefone.trim()
+      ? formatarTelefoneExibicao(
+          telefoneNacionalValido(telefone, paisIso2)
+            ? comporTelefoneApi(telefone, paisIso2)
+            : telefone,
+          paisIso2
+        )
+      : ''
 
   const nomeSomenteLeitura = clienteEncontrado && temNomeNoCadastro && !editandoNome
+  /** Após busca, some o input de celular; fica só nome/telefone confirmados + X. */
+  const ocultarInputBusca = mostrarOpcoesEntrega
+
+  const handleLimparIdentificacao = () => {
+    setTentouNome(false)
+    setEditandoNome(false)
+    onLimparIdentificacao()
+  }
 
   return (
     <>
@@ -179,8 +260,16 @@ export function DeliveryCheckoutIdentifiqueSeModal({
         <DeliveryCheckoutFooterActions
           onVoltar={onClose}
           onContinuar={() => void handleContinuar()}
-          continuarDisabled={enviando || salvandoNome || lookupStatus === 'loading'}
-          continuarLabel={enviando || lookupStatus === 'loading' ? '...' : 'Continuar'}
+          continuarDisabled={
+            enviando ||
+            salvandoNome ||
+            lookupStatus === 'loading' ||
+            consultandoDisponibilidade ||
+            (mostrarOpcoesEntrega && !opcaoEntregaOk)
+          }
+          continuarLabel={
+            enviando || lookupStatus === 'loading' || consultandoDisponibilidade ? '...' : 'Continuar'
+          }
           top={
             <p className="text-center text-[11px] leading-relaxed delivery-text-secondary">
               Ao prosseguir, confirmo que li e aceito os{' '}
@@ -192,30 +281,32 @@ export function DeliveryCheckoutIdentifiqueSeModal({
       </DeliveryCheckoutShellFooter>
 
       <div className="space-y-4">
-        <label className="relative block">
-          <span className="absolute -top-2 left-3 z-10 bg-[var(--delivery-surface,#fff)] px-1 text-xs delivery-text-secondary">
-            Celular
-          </span>
-          <div
-            className="flex items-center gap-2 rounded-xl border bg-white px-3 py-2"
-            style={{ borderColor: 'var(--delivery-border)' }}
-          >
-            <DeliveryPaisTelefoneSelect
-              value={paisIso2}
-              onChange={handleChangePais}
-              disabled={enviando}
-            />
-            <input
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel-national"
-              placeholder={placeholder}
-              value={telefone}
-              onChange={e => onChangeTelefone(formatarTelefonePorPais(e.target.value, paisIso2))}
-              className="min-w-0 flex-1 bg-transparent text-sm outline-none delivery-text-primary"
-            />
-          </div>
-        </label>
+        {!ocultarInputBusca ? (
+          <label className="relative block">
+            <span className="absolute -top-2 left-3 z-10 bg-[var(--delivery-surface,#fff)] px-1 text-xs delivery-text-secondary">
+              Celular
+            </span>
+            <div
+              className="flex items-center gap-2 rounded-xl border bg-white px-3 py-2"
+              style={{ borderColor: 'var(--delivery-border)' }}
+            >
+              <DeliveryPaisTelefoneSelect
+                value={paisIso2}
+                onChange={handleChangePais}
+                disabled={enviando}
+              />
+              <input
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel-national"
+                placeholder={placeholder}
+                value={telefone}
+                onChange={e => onChangeTelefone(formatarTelefonePorPais(e.target.value, paisIso2))}
+                className="min-w-0 flex-1 bg-transparent text-base outline-none delivery-text-primary"
+              />
+            </div>
+          </label>
+        ) : null}
 
         {lookupStatus === 'loading' && telefoneOk ? (
           <p className="text-xs delivery-text-secondary">Consultando cadastro...</p>
@@ -243,7 +334,7 @@ export function DeliveryCheckoutIdentifiqueSeModal({
                   value={nome}
                   readOnly={nomeSomenteLeitura}
                   onChange={e => onChangeNome(e.target.value)}
-                  className="min-w-0 flex-1 bg-transparent text-sm outline-none delivery-text-primary"
+                  className="min-w-0 flex-1 bg-transparent text-base outline-none delivery-text-primary"
                 />
                 {temNomeNoCadastro && !editandoNome ? (
                   <button
@@ -281,12 +372,22 @@ export function DeliveryCheckoutIdentifiqueSeModal({
                   Telefone
                 </span>
                 <div
-                  className="flex min-h-[44px] items-center rounded-xl border bg-white px-3 py-2"
+                  className="flex min-h-[44px] items-center gap-2 rounded-xl border bg-white px-3 py-2"
                   style={{ borderColor: 'var(--delivery-border)' }}
                 >
-                  <p className="text-sm font-medium delivery-text-primary">
+                  <p className="min-w-0 flex-1 text-sm font-medium delivery-text-primary">
                     {telefoneConfirmadoExibicao}
                   </p>
+                  <button
+                    type="button"
+                    onClick={handleLimparIdentificacao}
+                    aria-label="Buscar outro número"
+                    title="Buscar outro número"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+                    style={{ color: 'var(--delivery-text-muted)' }}
+                  >
+                    <X className="h-4 w-4" strokeWidth={2} />
+                  </button>
                 </div>
               </div>
             ) : null}
@@ -294,25 +395,67 @@ export function DeliveryCheckoutIdentifiqueSeModal({
         ) : null}
 
         {mostrarCampoNomeNovo ? (
-          <label className="relative block">
-            <span className="absolute -top-2 left-3 z-10 bg-[var(--delivery-surface,#fff)] px-1 text-xs delivery-text-secondary">
-              Nome
-            </span>
-            <input
-              type="text"
-              autoComplete="name"
-              placeholder="Nome + Sobrenome"
-              value={nome}
-              onChange={e => onChangeNome(e.target.value)}
-              className={`w-full rounded-xl border bg-white px-3 py-2 text-sm outline-none delivery-text-primary ${
-                tentouNome && !isNomeCompletoCheckoutValido(nome) ? 'border-red-400' : ''
-              }`}
-              style={{ borderColor: 'var(--delivery-border)' }}
-            />
-            <p className="mt-1.5 text-xs delivery-text-secondary">
-              Informe seu nome completo para continuar.
-            </p>
-          </label>
+          <div className="space-y-3">
+            <label className="relative block">
+              <span className="absolute -top-2 left-3 z-10 bg-[var(--delivery-surface,#fff)] px-1 text-xs delivery-text-secondary">
+                Nome
+              </span>
+              <input
+                type="text"
+                autoComplete="name"
+                placeholder="Nome + Sobrenome"
+                value={nome}
+                onChange={e => onChangeNome(e.target.value)}
+                className={`w-full rounded-xl border bg-white px-3 py-2 text-base outline-none delivery-text-primary ${
+                  tentouNome && !isNomeCompletoCheckoutValido(nome) ? 'border-red-400' : ''
+                }`}
+                style={{ borderColor: 'var(--delivery-border)' }}
+              />
+              <p className="mt-1.5 text-xs delivery-text-secondary">
+                Informe seu nome completo para continuar.
+              </p>
+            </label>
+
+            {telefoneConfirmadoExibicao ? (
+              <div className="relative block">
+                <span className="absolute -top-2 left-3 z-10 bg-[var(--delivery-surface,#fff)] px-1 text-xs delivery-text-secondary">
+                  Telefone
+                </span>
+                <div
+                  className="flex min-h-[44px] items-center gap-2 rounded-xl border bg-white px-3 py-2"
+                  style={{ borderColor: 'var(--delivery-border)' }}
+                >
+                  <p className="min-w-0 flex-1 text-sm font-medium delivery-text-primary">
+                    {telefoneConfirmadoExibicao}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleLimparIdentificacao}
+                    aria-label="Buscar outro número"
+                    title="Buscar outro número"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+                    style={{ color: 'var(--delivery-text-muted)' }}
+                  >
+                    <X className="h-4 w-4" strokeWidth={2} />
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {mostrarOpcoesEntrega ? (
+          <DeliveryCheckoutTipoEntregaOpcoes
+            slug={slug}
+            tipoEntrega={tipoEntrega}
+            modoTempo={modoTempo}
+            enderecoCliente={enderecoCliente}
+            temEnderecosCadastrados={temEnderecosCadastrados}
+            enderecoEmpresaTexto={enderecoEmpresaTexto}
+            onChangeOpcao={onChangeOpcaoEntrega}
+            onEditarEndereco={onEditarEndereco}
+            onCadastrarEndereco={onCadastrarEndereco}
+          />
         ) : null}
       </div>
     </>

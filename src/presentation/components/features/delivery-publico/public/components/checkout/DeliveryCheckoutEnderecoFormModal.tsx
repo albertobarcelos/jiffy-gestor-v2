@@ -97,7 +97,7 @@ export function DeliveryCheckoutEnderecoFormModal({
   }
 
   const fieldClass =
-    'w-full rounded-xl border bg-transparent px-3 py-3 text-sm outline-none delivery-text-primary'
+    'w-full rounded-xl border bg-transparent px-3 py-3 text-base outline-none delivery-text-primary'
   const fieldStyle = { borderColor: 'var(--delivery-border)' } as const
 
   return (
@@ -277,7 +277,7 @@ export function DeliveryCheckoutEnderecoFormModal({
                 const labels = { casa: 'Casa', trabalho: 'Trabalho', outro: 'Outro' } as const
                 onChange('apelidoEndereco', labels[etiqueta])
               }}
-              className="min-w-0 flex-1 bg-transparent text-sm outline-none delivery-text-primary"
+              className="min-w-0 flex-1 bg-transparent text-base outline-none delivery-text-primary"
             >
               <option value="casa">Casa</option>
               <option value="trabalho">Trabalho</option>

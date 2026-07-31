@@ -28,10 +28,7 @@ import { DeliveryCheckoutIdentifiqueSeModal } from '../components/checkout/Deliv
 import { DeliveryCheckoutEnderecosModal } from '../components/checkout/DeliveryCheckoutEnderecosModal'
 import { DeliveryCheckoutEnderecoFormModal } from '../components/checkout/DeliveryCheckoutEnderecoFormModal'
 import { DeliveryCheckoutQuandoModal } from '../components/checkout/DeliveryCheckoutQuandoModal'
-import {
-  DeliveryCheckoutTipoEntregaModal,
-  type ModoEntregaOpcao,
-} from '../components/checkout/DeliveryCheckoutTipoEntregaModal'
+import type { ModoEntregaOpcao } from '../components/checkout/DeliveryCheckoutTipoEntregaOpcoes'
 import { DeliveryCheckoutPagamentoModal } from '../components/checkout/DeliveryCheckoutPagamentoModal'
 import { DeliveryCheckoutRevisaoModal } from '../components/checkout/DeliveryCheckoutRevisaoModal'
 import { DeliveryCheckoutProgressProvider } from '../components/checkout/DeliveryCheckoutProgressContext'
@@ -65,8 +62,8 @@ export function DeliveryPublicoCarrinhoScreen({
   const [highestCheckoutPercentage, setHighestCheckoutPercentage] = useState(0)
   /** Quando true, concluir um step intermediário volta para a revisão. */
   const [voltarParaRevisao, setVoltarParaRevisao] = useState(false)
-  /** Quando true, concluir endereço volta para a tela das 4 opções. */
-  const [voltarParaTipoEntrega, setVoltarParaTipoEntrega] = useState(false)
+  /** Quando true, concluir endereço volta ao modal unificado (identificação + tipo). */
+  const [voltarParaIdentificacao, setVoltarParaIdentificacao] = useState(false)
   const [aberto, setAberto] = useState(true)
   const [removingIds, setRemovingIds] = useState<Set<string>>(() => new Set())
 
@@ -106,6 +103,7 @@ export function DeliveryPublicoCarrinhoScreen({
     enviando,
     enviarPedido,
     salvarNomeCliente,
+    limparIdentificacaoCliente,
   } = useDeliveryCheckout(slug)
 
   const quantidadeItens = useMemo(
@@ -220,7 +218,7 @@ export function DeliveryPublicoCarrinhoScreen({
   const fecharCheckout = () => {
     setHighestCheckoutPercentage(0)
     setVoltarParaRevisao(false)
-    setVoltarParaTipoEntrega(false)
+    setVoltarParaIdentificacao(false)
     prevCheckoutStepRef.current = null
     setCheckoutStep(null)
   }
@@ -230,19 +228,11 @@ export function DeliveryPublicoCarrinhoScreen({
       goToCheckoutStep('revisao')
       return
     }
-    if (voltarParaTipoEntrega) {
-      goToCheckoutStep('tipoEntrega')
+    if (voltarParaIdentificacao) {
+      goToCheckoutStep('telefone')
       return
     }
     fecharCheckout()
-  }
-
-  const voltarDoTipoEntrega = () => {
-    if (voltarParaRevisao) {
-      goToCheckoutStep('revisao')
-      return
-    }
-    goToCheckoutStep('telefone')
   }
 
   const voltarDoQuando = () => {
@@ -250,7 +240,7 @@ export function DeliveryPublicoCarrinhoScreen({
       goToCheckoutStep('revisao')
       return
     }
-    goToCheckoutStep('tipoEntrega')
+    goToCheckoutStep('telefone')
   }
 
   const voltarDoPagamento = () => {
@@ -258,7 +248,7 @@ export function DeliveryPublicoCarrinhoScreen({
       goToCheckoutStep('revisao')
       return
     }
-    goToCheckoutStep(form.modoTempo === 'agendado' ? 'quando' : 'tipoEntrega')
+    goToCheckoutStep(form.modoTempo === 'agendado' ? 'quando' : 'telefone')
   }
 
   const irParaProximoAposEndereco = () => {
@@ -273,15 +263,9 @@ export function DeliveryPublicoCarrinhoScreen({
     goToCheckoutStep('pagamento')
   }
 
-  const irParaTipoEntrega = () => {
-    setVoltarParaRevisao(false)
-    setVoltarParaTipoEntrega(false)
-    goToCheckoutStep('tipoEntrega')
-  }
-
   const abrirStepDaRevisao = (step: DeliveryCheckoutStep) => {
     setVoltarParaRevisao(true)
-    setVoltarParaTipoEntrega(false)
+    setVoltarParaIdentificacao(false)
     goToCheckoutStep(step)
   }
 
@@ -314,9 +298,13 @@ export function DeliveryPublicoCarrinhoScreen({
 
   const handleSelecionarEndereco = (enderecoId: string) => {
     selecionarEnderecoExistente(enderecoId)
-    if (voltarParaTipoEntrega) {
-      setVoltarParaTipoEntrega(false)
-      goToCheckoutStep('tipoEntrega')
+    if (voltarParaRevisao) {
+      goToCheckoutStep('revisao')
+      return
+    }
+    if (voltarParaIdentificacao) {
+      setVoltarParaIdentificacao(false)
+      goToCheckoutStep('telefone')
       return
     }
     irParaProximoAposEndereco()
@@ -330,7 +318,7 @@ export function DeliveryPublicoCarrinhoScreen({
   const handleContinuarCheckout = () => {
     setHighestCheckoutPercentage(0)
     setVoltarParaRevisao(false)
-    setVoltarParaTipoEntrega(false)
+    setVoltarParaIdentificacao(false)
     prevCheckoutStepRef.current = null
     goToCheckoutStep('telefone')
   }
@@ -345,9 +333,10 @@ export function DeliveryPublicoCarrinhoScreen({
     goToCheckoutStep('enderecoForm')
   }
 
-  const handleTipoEntregaContinuar = () => {
+  const avancarAposIdentificacao = () => {
     if (form.tipoEntrega === 'entrega' && !enderecoClienteSelecionado) {
-      setVoltarParaTipoEntrega(false)
+      setVoltarParaIdentificacao(false)
+      setVoltarParaRevisao(false)
       abrirFluxoEndereco()
       return
     }
@@ -375,12 +364,12 @@ export function DeliveryPublicoCarrinhoScreen({
     goToCheckoutStep('revisao')
   }
 
-  const handleAlterarEndereco = (origem: 'tipoEntrega' | 'revisao' = 'tipoEntrega') => {
+  const handleAlterarEndereco = (origem: 'identificacao' | 'revisao' = 'identificacao') => {
     if (origem === 'revisao') {
       setVoltarParaRevisao(true)
-      setVoltarParaTipoEntrega(false)
+      setVoltarParaIdentificacao(false)
     } else {
-      setVoltarParaTipoEntrega(true)
+      setVoltarParaIdentificacao(true)
       setVoltarParaRevisao(false)
     }
     abrirFluxoEndereco()
@@ -401,20 +390,19 @@ export function DeliveryPublicoCarrinhoScreen({
       return
     }
 
-    if (voltarParaRevisao) {
-      goToCheckoutStep('revisao')
-      return
-    }
-
-    irParaTipoEntrega()
+    avancarAposIdentificacao()
   }
 
   const handleConfirmarEnderecoForm = async () => {
     await confirmarNovoEndereco()
     showToast.success('Endereço salvo!')
-    if (voltarParaTipoEntrega) {
-      setVoltarParaTipoEntrega(false)
-      goToCheckoutStep('tipoEntrega')
+    if (voltarParaRevisao) {
+      goToCheckoutStep('revisao')
+      return
+    }
+    if (voltarParaIdentificacao) {
+      setVoltarParaIdentificacao(false)
+      goToCheckoutStep('telefone')
       return
     }
     irParaProximoAposEndereco()
@@ -426,8 +414,8 @@ export function DeliveryPublicoCarrinhoScreen({
       goToCheckoutStep('enderecos')
       return
     }
-    setVoltarParaTipoEntrega(false)
-    goToCheckoutStep('tipoEntrega')
+    setVoltarParaIdentificacao(false)
+    goToCheckoutStep('telefone')
   }
 
   return (
@@ -453,10 +441,8 @@ export function DeliveryPublicoCarrinhoScreen({
             role="dialog"
             aria-modal="true"
             aria-label="Carrinho"
-            className="fixed right-0 z-50 flex w-full flex-col overflow-hidden overscroll-none shadow-2xl lg:w-[40%]"
+            className="delivery-vv-panel z-50 flex flex-col shadow-2xl"
             style={{
-              top: 'var(--delivery-vv-offset-top, 0px)',
-              height: 'var(--delivery-vv-height, 100dvh)',
               backgroundColor: 'var(--delivery-bg)',
             }}
             initial={{ x: '100%' }}
@@ -591,28 +577,35 @@ export function DeliveryPublicoCarrinhoScreen({
         open={checkoutStep != null}
         stepKey={checkoutStep ?? 'telefone'}
         direction={checkoutDirection}
-        onClose={
-          checkoutStep === 'tipoEntrega' || checkoutStep === 'revisao'
-            ? fecharCheckout
-            : fecharOuRevisao
-        }
+        onClose={checkoutStep === 'revisao' ? fecharCheckout : fecharOuRevisao}
       >
         {checkoutStep === 'telefone' ? (
           <DeliveryCheckoutIdentifiqueSeModal
+            slug={slug}
             telefone={form.telefone}
             telefonePaisIso2={form.telefonePaisIso2}
             nome={form.nome}
             nomeCadastro={clienteLookup.cliente?.nome ?? null}
             telefoneConfirmadoDigits={
-              clienteLookup.status === 'encontrado'
+              clienteLookup.status === 'encontrado' ||
+              clienteLookup.status === 'nao_encontrado'
                 ? clienteLookup.telefoneConsultado
                 : null
             }
             lookupStatus={clienteLookup.status}
+            tipoEntrega={form.tipoEntrega}
+            modoTempo={form.modoTempo}
+            enderecoCliente={enderecoClienteSelecionado}
+            temEnderecosCadastrados={(clienteLookup.cliente?.enderecos?.length ?? 0) > 0}
+            enderecoEmpresaTexto={enderecoEmpresaTexto}
             onChangeTelefone={value => updateForm('telefone', value)}
             onChangeTelefonePais={iso2 => updateForm('telefonePaisIso2', iso2)}
             onChangeNome={value => updateForm('nome', value)}
+            onChangeOpcaoEntrega={handleChangeOpcaoEntrega}
+            onEditarEndereco={() => handleAlterarEndereco('identificacao')}
+            onCadastrarEndereco={() => handleAlterarEndereco('identificacao')}
             onSalvarNome={salvarNomeCliente}
+            onLimparIdentificacao={limparIdentificacaoCliente}
             onClose={fecharOuRevisao}
             onContinuar={handleTelefoneContinuar}
           />
@@ -635,23 +628,6 @@ export function DeliveryPublicoCarrinhoScreen({
             onClose={fecharOuRevisao}
             onCancelar={handleCancelarEnderecoForm}
             onConfirmar={handleConfirmarEnderecoForm}
-          />
-        ) : null}
-
-        {checkoutStep === 'tipoEntrega' ? (
-          <DeliveryCheckoutTipoEntregaModal
-            slug={slug}
-            tipoEntrega={form.tipoEntrega}
-            modoTempo={form.modoTempo}
-            enderecoCliente={enderecoClienteSelecionado}
-            temEnderecosCadastrados={(clienteLookup.cliente?.enderecos?.length ?? 0) > 0}
-            enderecoEmpresaTexto={enderecoEmpresaTexto}
-            onChangeOpcao={handleChangeOpcaoEntrega}
-            onEditarEndereco={() => handleAlterarEndereco('tipoEntrega')}
-            onCadastrarEndereco={() => handleAlterarEndereco('tipoEntrega')}
-            onClose={fecharCheckout}
-            onVoltar={voltarDoTipoEntrega}
-            onContinuar={handleTipoEntregaContinuar}
           />
         ) : null}
 
@@ -707,16 +683,16 @@ export function DeliveryPublicoCarrinhoScreen({
               setVoltarParaRevisao(false)
               goToCheckoutStep('pagamento')
             }}
-            onEditarTipoEntrega={() => abrirStepDaRevisao('tipoEntrega')}
+            onEditarTipoEntrega={() => abrirStepDaRevisao('telefone')}
             onEditarCliente={() => abrirStepDaRevisao('telefone')}
             onEditarEndereco={() => handleAlterarEndereco('revisao')}
             onEditarPedido={() => {
               setVoltarParaRevisao(false)
-              setVoltarParaTipoEntrega(false)
+              setVoltarParaIdentificacao(false)
               fecharCheckout()
             }}
             onEditarQuando={() =>
-              abrirStepDaRevisao(form.modoTempo === 'agendado' ? 'quando' : 'tipoEntrega')
+              abrirStepDaRevisao(form.modoTempo === 'agendado' ? 'quando' : 'telefone')
             }
             onEditarPagamento={() => abrirStepDaRevisao('pagamento')}
             onChangeObservacaoPedido={value => updateForm('observacaoPedido', value)}

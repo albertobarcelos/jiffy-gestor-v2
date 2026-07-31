@@ -391,6 +391,22 @@ export function useDeliveryCheckout(slug: string) {
     void consultarClientePorTelefone(tel)
   }, [consultarClientePorTelefone, resolveTelefoneApi])
 
+  /** Limpa cliente/lookup e volta ao input de celular para nova busca. */
+  const limparIdentificacaoCliente = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    lookupSeqRef.current += 1
+    preferirNovoEnderecoRef.current = false
+    telefoneDigitsRef.current = ''
+    setClienteLookup(createInitialLookup())
+    setForm(prev => ({
+      ...prev,
+      telefone: '',
+      nome: '',
+      modoEndereco: 'novo',
+      enderecoIdSelecionado: '',
+    }))
+  }, [])
+
   const salvarNomeCliente = useCallback(async (nomeInformado: string) => {
     const tel =
       telefoneDigitsRef.current ||
@@ -534,6 +550,7 @@ export function useDeliveryCheckout(slug: string) {
     usarNovoEndereco,
     consultarClientePorTelefone,
     consultarTelefoneAtual,
+    limparIdentificacaoCliente,
     confirmarNovoEndereco,
     salvarNomeCliente,
     meiosPagamento: meiosData?.meiosPagamento ?? [],

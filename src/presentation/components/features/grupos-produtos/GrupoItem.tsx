@@ -54,21 +54,22 @@ export const GrupoItem = memo(function GrupoItem({
   const isAtivoDelivery = grupo.isAtivoDelivery()
   const corHex = grupo.getCorHex() || '#6B7280'
   const iconName = grupo.getIconName() || 'restaurant'
-  const bgColor = index % 2 === 0 ? 'bg-info' : 'bg-custom-2'
+  // Zebra bem clara (como antes do ajuste de Design Categorias).
+  const bgColor = index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
 
   const handleRowClick = () => {
     onEdit?.(grupo)
   }
 
+  // Ícone colorido em fundo claro (não fundo preenchido com ícone branco).
   const renderIcon = (
     <div
-      className="flex h-7 w-7 items-center justify-center rounded-lg border-2 md:h-[45px] md:w-[45px]"
+      className="flex h-7 w-7 items-center justify-center rounded-lg border-2 bg-info md:h-[45px] md:w-[45px]"
       style={{
-        backgroundColor: corHex,
         borderColor: corHex,
       }}
     >
-      <DinamicIcon iconName={iconName} color="#FFFFFF" size={22} />
+      <DinamicIcon iconName={iconName} color={corHex} size={24} />
     </div>
   )
 

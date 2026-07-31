@@ -243,7 +243,7 @@ export function DeliveryCheckoutPagamentoModal({
     (!ehDinheiro || precisaTroco !== null)
 
   const fieldClass =
-    'w-full rounded-xl border bg-transparent px-3 py-3 text-sm outline-none delivery-text-primary'
+    'w-full rounded-xl border bg-transparent px-3 py-3 text-base outline-none delivery-text-primary'
   const fieldStyle = { borderColor: 'var(--delivery-border)' } as const
 
   return (

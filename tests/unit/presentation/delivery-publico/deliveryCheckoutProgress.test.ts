@@ -11,22 +11,22 @@ describe('deliveryCheckoutProgress', () => {
     {
       tipoEntrega: 'retirada' as const,
       modoTempo: 'imediato' as const,
-      path: ['identificacao', 'recebimento', 'pagamento', 'revisao'],
+      path: ['identificacao', 'pagamento', 'revisao'],
     },
     {
       tipoEntrega: 'retirada' as const,
       modoTempo: 'agendado' as const,
-      path: ['identificacao', 'recebimento', 'horario', 'pagamento', 'revisao'],
+      path: ['identificacao', 'horario', 'pagamento', 'revisao'],
     },
     {
       tipoEntrega: 'entrega' as const,
       modoTempo: 'imediato' as const,
-      path: ['identificacao', 'recebimento', 'endereco', 'pagamento', 'revisao'],
+      path: ['identificacao', 'endereco', 'pagamento', 'revisao'],
     },
     {
       tipoEntrega: 'entrega' as const,
       modoTempo: 'agendado' as const,
-      path: ['identificacao', 'recebimento', 'endereco', 'horario', 'pagamento', 'revisao'],
+      path: ['identificacao', 'endereco', 'horario', 'pagamento', 'revisao'],
     },
   ])('monta o caminho de $tipoEntrega $modoTempo', ({ tipoEntrega, modoTempo, path }) => {
     expect(buildDeliveryCheckoutPath(tipoEntrega, modoTempo)).toEqual(path)
@@ -35,7 +35,6 @@ describe('deliveryCheckoutProgress', () => {
   it('usa o caminho máximo antes da escolha do recebimento', () => {
     expect(buildDeliveryCheckoutPath('retirada', '')).toEqual([
       'identificacao',
-      'recebimento',
       'endereco',
       'horario',
       'pagamento',
@@ -44,14 +43,15 @@ describe('deliveryCheckoutProgress', () => {
 
     expect(
       calculateDeliveryCheckoutProgress({
-        checkoutStep: 'tipoEntrega',
+        checkoutStep: 'telefone',
         tipoEntrega: 'retirada',
         modoTempo: '',
+        identificacaoCompleta: true,
       })
     ).toMatchObject({
       current: 2,
-      total: 6,
-      percentage: 20,
+      total: 5,
+      percentage: 25,
     })
   })
 
@@ -71,14 +71,14 @@ describe('deliveryCheckoutProgress', () => {
     })
 
     expect(selecao).toMatchObject({
-      current: 3,
-      total: 6,
-      percentage: 40,
+      current: 2,
+      total: 5,
+      percentage: 25,
     })
     expect(cadastro).toMatchObject({
-      current: 3,
-      total: 6,
-      percentage: 40,
+      current: 2,
+      total: 5,
+      percentage: 25,
     })
   })
 
@@ -90,8 +90,8 @@ describe('deliveryCheckoutProgress', () => {
         modoTempo: 'imediato',
       })
     ).toMatchObject({
-      current: 4,
-      total: 4,
+      current: 3,
+      total: 3,
       percentage: 100,
     })
   })
@@ -105,8 +105,8 @@ describe('deliveryCheckoutProgress', () => {
         preserveCompleted: true,
       })
     ).toMatchObject({
-      current: 6,
-      total: 6,
+      current: 5,
+      total: 5,
       percentage: 100,
     })
   })
@@ -129,18 +129,31 @@ describe('deliveryCheckoutProgress', () => {
       identificacaoCompleta: false,
     })
     expect(progress?.current).toBe(1)
+    expect(progress?.total).toBe(4)
     expect(progress?.percentage).toBe(0)
   })
 
-  it('na identificação completa sobe a barra (passo 1)', () => {
+  it('na identificação completa sobe a barra (1 de 3 transições na entrega)', () => {
     const progress = calculateDeliveryCheckoutProgress({
       checkoutStep: 'telefone',
       tipoEntrega: 'entrega',
       modoTempo: 'imediato',
       identificacaoCompleta: true,
     })
-    expect(progress?.percentage).toBe(25)
+    expect(progress?.percentage).toBe(33)
     expect(progress?.current).toBe(2)
+    expect(progress?.total).toBe(4)
+  })
+
+  it('na identificação completa na retirada sobe a barra (1 de 2 transições)', () => {
+    const progress = calculateDeliveryCheckoutProgress({
+      checkoutStep: 'telefone',
+      tipoEntrega: 'retirada',
+      modoTempo: 'imediato',
+      identificacaoCompleta: true,
+    })
+    expect(progress?.percentage).toBe(50)
+    expect(progress?.total).toBe(3)
   })
 
   it('valida nome e sobrenome', () => {

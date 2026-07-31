@@ -98,15 +98,30 @@ body.delivery-publico-ios-lock {
   overflow: hidden;
   overscroll-behavior: none;
   height: 100%;
+  width: 100%;
+  max-width: 100%;
+  /* Impede pan horizontal residual após zoom do teclado no iOS. */
+  position: relative;
+  left: 0;
+}
+
+/**
+ * Safari iOS dá zoom no foco se o input tiver fonte < 16px; o layout fica
+ * “estourado” e contamina as telas seguintes do checkout.
+ */
+html.delivery-publico-ios-lock input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']),
+html.delivery-publico-ios-lock textarea,
+html.delivery-publico-ios-lock select {
+  font-size: 16px !important;
 }
 
 .delivery-publico-shell {
   position: fixed;
   top: var(--delivery-vv-offset-top, 0px);
-  left: 0;
-  right: 0;
+  left: var(--delivery-vv-offset-left, 0px);
   z-index: 0;
-  width: 100%;
+  width: var(--delivery-vv-width, 100%);
+  max-width: 100%;
   height: var(--delivery-vv-height, 100dvh);
   overflow: hidden;
   overscroll-behavior: none;
@@ -115,6 +130,8 @@ body.delivery-publico-ios-lock {
 
 .delivery-publico-scroll {
   height: 100%;
+  width: 100%;
+  max-width: 100%;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior-x: none;
@@ -123,18 +140,42 @@ body.delivery-publico-ios-lock {
 }
 
 /**
- * Overlays full-screen (checkout, produto) — mesma altura útil do teclado.
+ * Overlays full-screen (checkout, produto) — mesma altura/largura útil do teclado.
  */
 .delivery-vv-overlay {
   position: fixed;
   top: var(--delivery-vv-offset-top, 0px);
-  left: 0;
-  right: 0;
+  left: var(--delivery-vv-offset-left, 0px);
   z-index: 50;
-  width: 100%;
+  width: var(--delivery-vv-width, 100%);
+  max-width: 100%;
   height: var(--delivery-vv-height, 100dvh);
   overflow: hidden;
   overscroll-behavior: none;
+}
+
+/**
+ * Painéis laterais (carrinho / checkout) — mesmos bounds da visualViewport no mobile.
+ */
+.delivery-vv-panel {
+  position: fixed;
+  top: var(--delivery-vv-offset-top, 0px);
+  left: var(--delivery-vv-offset-left, 0px);
+  z-index: 50;
+  width: var(--delivery-vv-width, 100%);
+  max-width: 100%;
+  height: var(--delivery-vv-height, 100dvh);
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+@media (min-width: 1024px) {
+  .delivery-vv-panel {
+    left: auto;
+    right: 0;
+    width: 40%;
+    max-width: 40%;
+  }
 }
 
 /**
