@@ -12,7 +12,10 @@ import {
 } from '@/src/infrastructure/api/publicDeliveryApi'
 import { usePublicDeliveryMeiosPagamento } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import { showToast } from '@/src/shared/utils/toast'
-import { comporTelefoneApi } from '@/src/shared/utils/deliveryTelefonePais'
+import {
+  comporTelefoneApi,
+  formatarTelefonePorPais,
+} from '@/src/shared/utils/deliveryTelefonePais'
 import {
   useDeliveryCarrinhoStore,
   useDeliveryCarrinhoItens,
@@ -386,16 +389,24 @@ export function useDeliveryCheckout(slug: string) {
     void consultarClientePorTelefone(tel)
   }, [consultarClientePorTelefone])
 
-  /** Limpa cliente/lookup e volta ao input de celular para nova busca. */
+  /** Limpa cliente/lookup e volta ao input de celular, mantendo o número para correção. */
   const limparIdentificacaoCliente = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
     lookupSeqRef.current += 1
     preferirNovoEnderecoRef.current = false
-    telefoneDigitsRef.current = ''
+
+    const tel =
+      onlyDigits(
+        clienteLookupRef.current.telefoneConsultado ||
+          telefoneDigitsRef.current ||
+          comporTelefoneApi(formRef.current.telefone, 'BR')
+      ) || ''
+    telefoneDigitsRef.current = tel
+
     setClienteLookup(createInitialLookup())
     setForm(prev => ({
       ...prev,
-      telefone: '',
+      telefone: tel ? formatarTelefonePorPais(tel, 'BR') : prev.telefone,
       nome: '',
       modoEndereco: 'novo',
       enderecoIdSelecionado: '',
