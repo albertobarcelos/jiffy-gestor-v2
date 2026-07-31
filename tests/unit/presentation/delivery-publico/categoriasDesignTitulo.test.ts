@@ -61,6 +61,7 @@ describe('mergeCategoriasDesignConfig', () => {
 describe('resolveGrupoTituloBarStyle', () => {
   it('modo cor usa variáveis do tema quando não há personalização', () => {
     const config = createDefaultDesignConfig()
+    config.categorias.tituloGrupoFundo = 'cor'
     expect(resolveGrupoTituloBarStyle({ config, imagemUrl: '/x.jpg' })).toEqual({
       backgroundColor: 'var(--delivery-primary-dark, #171717)',
       color: 'var(--delivery-btn-text, #ffffff)',
@@ -69,6 +70,7 @@ describe('resolveGrupoTituloBarStyle', () => {
 
   it('modo cor com personalização aplica backgroundColor e color', () => {
     const config = createDefaultDesignConfig()
+    config.categorias.tituloGrupoFundo = 'cor'
     config.categorias.corBarraTitulo = '#FF0000'
     config.categorias.corTextoTitulo = '#00FF00'
     expect(resolveGrupoTituloBarStyle({ config })).toEqual({
@@ -77,14 +79,14 @@ describe('resolveGrupoTituloBarStyle', () => {
     })
   })
 
-  it('modo imagem com URL aplica banner por cima do fundo sólido', () => {
+  it('default (imagem) com URL aplica banner por cima do fundo sólido', () => {
     const config = createDefaultDesignConfig()
-    config.categorias.tituloGrupoFundo = 'imagem'
     config.categorias.corTextoTitulo = '#EEEEEE'
     const style = resolveGrupoTituloBarStyle({
       config,
       imagemUrl: 'https://cdn.example/banner.jpg',
     })
+    expect(config.categorias.tituloGrupoFundo).toBe('imagem')
     expect(style.backgroundColor).toBe('var(--delivery-primary-dark, #171717)')
     expect(style.backgroundImage).toBe('url(https://cdn.example/banner.jpg)')
     expect(style.backgroundSize).toBe('cover')
@@ -93,7 +95,6 @@ describe('resolveGrupoTituloBarStyle', () => {
 
   it('modo imagem sem URL mantém fundo sólido (tema ou personalizado)', () => {
     const config = createDefaultDesignConfig()
-    config.categorias.tituloGrupoFundo = 'imagem'
     config.categorias.corBarraTitulo = '#00AA00'
     expect(resolveGrupoTituloBarStyle({ config, imagemUrl: null })).toEqual({
       backgroundColor: '#00AA00',

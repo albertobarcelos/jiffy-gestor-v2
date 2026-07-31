@@ -18,7 +18,7 @@ export function createDefaultDesignConfig(nomeExibicao = ''): DeliveryPublicoDes
       presetId: 'urbana',
     },
     categorias: {
-      tituloGrupoFundo: 'cor',
+      tituloGrupoFundo: 'imagem',
       corBarraTitulo: null,
       corTextoTitulo: null,
       mostrarNomeTitulo: true,

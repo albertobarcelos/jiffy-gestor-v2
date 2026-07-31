@@ -54,6 +54,7 @@ export type DeliveryPublicoDesignConfig = {
     /**
      * `cor` = fundo sólido (tema ou `corBarraTitulo`).
      * `imagem` = banner do grupo (`imagemUrl`); sem imagem, usa a cor.
+     * Default: `imagem` (switch inicia ON; app sem localStorage também).
      */
     tituloGrupoFundo: GrupoTituloFundoMode
     /**
