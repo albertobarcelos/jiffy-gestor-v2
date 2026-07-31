@@ -76,6 +76,24 @@ function onlyDigits(value: string): string {
 }
 
 const LOOKUP_DEBOUNCE_MS = 450
+/** BR: celular completo = DDD + 9 dígitos. Backend só aceita 11. */
+const BR_CELULAR_DIGITOS = 11
+
+function limparLookupEstadoIncompleto(
+  setClienteLookup: (value: ClienteLookupState | ((prev: ClienteLookupState) => ClienteLookupState)) => void,
+  setForm: (value: CheckoutFormData | ((prev: CheckoutFormData) => CheckoutFormData)) => void,
+  lookupSeqRef: { current: number },
+  preferirNovoEnderecoRef: { current: boolean }
+) {
+  lookupSeqRef.current += 1
+  preferirNovoEnderecoRef.current = false
+  setClienteLookup(createInitialLookup())
+  setForm(prev => ({
+    ...prev,
+    modoEndereco: 'novo',
+    enderecoIdSelecionado: '',
+  }))
+}
 
 export function useDeliveryCheckout(slug: string) {
   const itens = useDeliveryCarrinhoItens(slug)
@@ -199,7 +217,7 @@ export function useDeliveryCheckout(slug: string) {
       const tel = onlyDigits(telefoneDigits)
       telefoneDigitsRef.current = tel
 
-      if (tel.length < 8) {
+      if (tel.length < BR_CELULAR_DIGITOS) {
         preferirNovoEnderecoRef.current = false
         setClienteLookup(createInitialLookup())
         setForm(prev => ({
@@ -293,20 +311,19 @@ export function useDeliveryCheckout(slug: string) {
   }, [])
 
   const agendarConsultaTelefone = useCallback(
-    (telefoneMasked: string, paisIso2: string) => {
+    (telefoneMasked: string) => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
-      const tel = comporTelefoneApi(telefoneMasked, paisIso2)
+      // País ainda não persiste no backend — sempre trata como BR.
+      const tel = comporTelefoneApi(telefoneMasked, 'BR')
       telefoneDigitsRef.current = tel
 
-      if (tel.length < 8) {
-        lookupSeqRef.current += 1
-        preferirNovoEnderecoRef.current = false
-        setClienteLookup(createInitialLookup())
-        setForm(prev => ({
-          ...prev,
-          modoEndereco: 'novo',
-          enderecoIdSelecionado: '',
-        }))
+      if (tel.length < BR_CELULAR_DIGITOS) {
+        limparLookupEstadoIncompleto(
+          setClienteLookup,
+          setForm,
+          lookupSeqRef,
+          preferirNovoEnderecoRef
+        )
         return
       }
 
@@ -324,11 +341,10 @@ export function useDeliveryCheckout(slug: string) {
   const updateForm = useCallback(
     <K extends keyof CheckoutFormData>(key: K, value: CheckoutFormData[K]) => {
       const next = { ...formRef.current, [key]: value }
+      // Trava país em BR até o backend persistir a preferência.
+      next.telefonePaisIso2 = 'BR'
       if (key === 'telefone' || key === 'telefonePaisIso2') {
-        telefoneDigitsRef.current = comporTelefoneApi(
-          next.telefone,
-          next.telefonePaisIso2
-        )
+        telefoneDigitsRef.current = comporTelefoneApi(next.telefone, 'BR')
       }
       formRef.current = next
       setForm(next)
@@ -336,7 +352,7 @@ export function useDeliveryCheckout(slug: string) {
         setTipoEntregaPreferencia(slug, value as DeliveryTipoEntrega)
       }
       if (key === 'telefone' || key === 'telefonePaisIso2') {
-        agendarConsultaTelefone(next.telefone, next.telefonePaisIso2)
+        agendarConsultaTelefone(next.telefone)
       }
     },
     [slug, setTipoEntregaPreferencia, agendarConsultaTelefone]
@@ -361,10 +377,14 @@ export function useDeliveryCheckout(slug: string) {
   }, [])
 
   const consultarTelefoneAtual = useCallback(() => {
-    const tel = resolveTelefoneApi(formRef.current)
+    const tel = onlyDigits(
+      telefoneDigitsRef.current ||
+        comporTelefoneApi(formRef.current.telefone, 'BR')
+    )
     telefoneDigitsRef.current = tel
+    if (tel.length < BR_CELULAR_DIGITOS) return
     void consultarClientePorTelefone(tel)
-  }, [consultarClientePorTelefone, resolveTelefoneApi])
+  }, [consultarClientePorTelefone])
 
   /** Limpa cliente/lookup e volta ao input de celular para nova busca. */
   const limparIdentificacaoCliente = useCallback(() => {
