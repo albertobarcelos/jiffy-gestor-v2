@@ -29,6 +29,18 @@ export async function GET(req: NextRequest) {
     const ativoDeliveryParam = searchParams.get('ativoDelivery')
     const grupoProdutoId = searchParams.get('grupoProdutoId') || undefined
     const grupoComplementosId = searchParams.get('grupoComplementosId') || undefined
+    const semDadoEmParam = searchParams.get('semDadoEm')
+    const semDadoEmValidos = [
+      'sem_impressoras',
+      'sem_ncm',
+      'sem_grupos_complementos',
+    ] as const
+    const semDadoEm =
+      semDadoEmParam &&
+      semDadoEmValidos.includes(semDadoEmParam as (typeof semDadoEmValidos)[number])
+        ? (semDadoEmParam as (typeof semDadoEmValidos)[number])
+        : undefined
+    const ncmParam = searchParams.get('ncm')?.trim() || undefined
 
     let ativo: boolean | null = null
     if (ativoParam === 'true') {
@@ -59,6 +71,8 @@ export async function GET(req: NextRequest) {
       ativoDelivery,
       grupoProdutoId,
       grupoComplementosId,
+      semDadoEm,
+      ncm: ncmParam,
     })
 
     return NextResponse.json(
