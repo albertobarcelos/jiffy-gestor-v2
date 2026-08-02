@@ -19,6 +19,8 @@ type ApiResponse = {
 type Params = {
   periodo: string
   limit?: number
+  /** Ranking: produtos vendidos (`quantidade`) ou faturamento (`valor`). */
+  ordenarPor?: 'quantidade' | 'valor'
   periodoInicial?: Date | null
   periodoFinal?: Date | null
   timezone?: string
@@ -35,6 +37,7 @@ async function fetchTopGarcons(params: Params & { token: string; timezone: strin
   search.append('periodo', params.periodo)
   search.append('timezone', params.timezone)
   search.append('limit', String(params.limit ?? 10))
+  search.append('ordenarPor', params.ordenarPor ?? 'valor')
   if (params.periodoInicial && params.periodoFinal) {
     search.append('dataFinalizacaoInicial', params.periodoInicial.toISOString())
     search.append('dataFinalizacaoFinal', params.periodoFinal.toISOString())
@@ -72,6 +75,7 @@ async function fetchTopGarcons(params: Params & { token: string; timezone: strin
 export function useDashboardTopGarconsQuery({
   periodo,
   limit = 10,
+  ordenarPor = 'valor',
   periodoInicial,
   periodoFinal,
   timezone,
@@ -85,12 +89,21 @@ export function useDashboardTopGarconsQuery({
       'top-garcons',
       periodo,
       limit,
+      ordenarPor,
       periodoInicial ? periodoInicial.toISOString() : null,
       periodoFinal ? periodoFinal.toISOString() : null,
       resolvedTimezone,
     ],
     ({ token }) =>
-      fetchTopGarcons({ periodo, limit, periodoInicial, periodoFinal, token, timezone: resolvedTimezone }),
+      fetchTopGarcons({
+        periodo,
+        limit,
+        ordenarPor,
+        periodoInicial,
+        periodoFinal,
+        token,
+        timezone: resolvedTimezone,
+      }),
     {
       enabled,
       staleTime: 30_000,

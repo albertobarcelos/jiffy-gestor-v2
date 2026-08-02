@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   periodoFetchFaturamentoCalendarioDoisMeses,
+  periodoFetchFaturamentoCalendarioUmMes,
 } from '@/src/shared/utils/calendarioIntervaloFaturamento'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
@@ -27,7 +28,10 @@ import {
   permiteOpcoesIntervaloPorHoraNoFuso,
 } from '@/src/shared/utils/periodoNoFusoEmpresa'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
-import { FaturamentoRangeCalendar } from '@/src/presentation/components/ui/FaturamentoRangeCalendar'
+import {
+  FaturamentoRangeCalendar,
+  type VisualizacaoCalendarioFaturamento,
+} from '@/src/presentation/components/ui/FaturamentoRangeCalendar'
 
 /**
  * Comparativo do período personalizado: mesma janela deslocada N dias corridos para trás
@@ -46,8 +50,8 @@ function periodoSelectV2ParaOpcaoCalculatePeriodo(periodoData: string): string {
       return 'Ontem'
     case 'semana':
       return 'Últimos 7 Dias'
-    case '30dias':
-      return 'Últimos 30 Dias'
+    case 'mes':
+      return 'Mês Atual'
     case 'personalizado':
       return 'Hoje'
     default:
@@ -64,8 +68,8 @@ function periodoV2ParaQueryRelatorios(periodoData: string): string | null {
       return 'Hoje'
     case 'semana':
       return 'Últimos 7 Dias'
-    case '30dias':
-      return 'Últimos 30 Dias'
+    case 'mes':
+      return 'Mês Atual'
     default:
       return null
   }
@@ -95,17 +99,24 @@ export default function DashboardV2() {
     setRascunhoHoraInicio,
     rascunhoHoraFim,
     setRascunhoHoraFim,
+    rascunhoIntervaloValido,
     handleLimparFiltroPeriodo,
     handlePeriodoDataChange,
+    abrirModalPeriodoPersonalizado,
     handleRascunhoIntervaloRangeChange,
     handleAplicarIntervaloPersonalizadoModal,
   } = useDashboardPeriodo()
 
   const [granularidade, setGranularidade] = useState<AgregacaoGraficoV2>('intervalo_30')
+  const [visualizacaoCalendario, setVisualizacaoCalendario] =
+    useState<VisualizacaoCalendarioFaturamento>('um_mes')
 
   const periodoFaturamentoCalendarioModal = useMemo(
-    () => periodoFetchFaturamentoCalendarioDoisMeses(mesCalendarioIntervalo),
-    [mesCalendarioIntervalo]
+    () =>
+      visualizacaoCalendario === 'um_mes'
+        ? periodoFetchFaturamentoCalendarioUmMes(mesCalendarioIntervalo)
+        : periodoFetchFaturamentoCalendarioDoisMeses(mesCalendarioIntervalo),
+    [mesCalendarioIntervalo, visualizacaoCalendario]
   )
 
   const {
@@ -121,6 +132,7 @@ export default function DashboardV2() {
 
   /** Momento em que os dados do dashboard foram considerados atualizados (mock: montagem; com API: após fetch bem-sucedido) */
   const [dadosAtualizadosEm, setDadosAtualizadosEm] = useState(() => Date.now())
+  const [atualizandoDashboard, setAtualizandoDashboard] = useState(false)
   const [, setTickRelogio] = useState(0)
 
   useEffect(() => {
@@ -220,14 +232,20 @@ export default function DashboardV2() {
   const subtituloAtualizacao = textoUltimaAtualizacao(dadosAtualizadosEm)
 
   const handleAtualizarDashboard = () => {
+    if (atualizandoDashboard) return
+    setAtualizandoDashboard(true)
     void queryClient.invalidateQueries({ queryKey: ['dashboard', 'evolucao'] })
     void queryClient.invalidateQueries({ queryKey: ['dashboard', 'metodos-pagamento-detalhado'] })
     void queryClient.invalidateQueries({ queryKey: ['dashboard', 'top-produtos'] })
     void queryClient.invalidateQueries({ queryKey: ['dashboard', 'top-garcons'] })
-    void Promise.all([refetchEmpresa(), refetchResumo()]).then(() => {
-      setDadosAtualizadosEm(Date.now())
-      setTickRelogio(n => n + 1)
-    })
+    void Promise.all([refetchEmpresa(), refetchResumo()])
+      .then(() => {
+        setDadosAtualizadosEm(Date.now())
+        setTickRelogio(n => n + 1)
+      })
+      .finally(() => {
+        setAtualizandoDashboard(false)
+      })
   }
 
   /** Restaura o filtro global de período para Hoje (como ao carregar a página). */
@@ -241,17 +259,19 @@ export default function DashboardV2() {
   }
 
   return (
-    <div className="font-nunito min-h-0 w-full bg-gray-50 pb-8 pt-2">
+    <div className="font-nunito min-h-0 w-full bg-gray-50 pb-8 pt-1">
       {/* Cabeçalho + filtros */}
       <DashboardFiltros
         subtituloAtualizacao={subtituloAtualizacao}
         handleAtualizarDashboard={handleAtualizarDashboard}
-        carregandoEmpresa={carregandoEmpresa}
+        atualizando={atualizandoDashboard || carregandoEmpresa}
         periodoData={periodoData}
         handlePeriodoDataChange={handlePeriodoDataChange}
+        onAbrirPeriodoPersonalizado={abrirModalPeriodoPersonalizado}
         periodoPersonalizadoInicio={periodoPersonalizadoInicio}
         periodoPersonalizadoFim={periodoPersonalizadoFim}
         handleLimparFiltroPeriodo={handleLimparFiltroPeriodo}
+        timeZoneEmpresa={timezoneAgregacao ?? 'America/Sao_Paulo'}
       />
 
       {/* Faixa roxa: altura só do grid de 2 colunas; mascote em absolute (não entra no fluxo) */}
@@ -325,12 +345,13 @@ export default function DashboardV2() {
         open={modalIntervaloPersonalizadoAberto}
         onClose={() => setModalIntervaloPersonalizadoAberto(false)}
         title="Escolha o período"
+        zIndex={1500}
         panelClassName="!bg-[#f9fafb] w-[45vw] min-w-[260px] max-w-[min(100vw-1rem,95vw)] sm:min-w-[280px]"
         scrollableBody={false}
         footerSlot={
           <button
             type="button"
-            disabled={!rascunhoIntervaloRange?.from || !rascunhoIntervaloRange?.to}
+            disabled={!rascunhoIntervaloValido}
             onClick={handleAplicarIntervaloPersonalizadoModal}
             className="rounded-b-l-lg font-nunito flex h-full w-full items-center justify-center bg-primary text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
@@ -346,6 +367,7 @@ export default function DashboardV2() {
             onRangeChange={handleRascunhoIntervaloRangeChange}
             month={mesCalendarioIntervalo}
             onMonthChange={setMesCalendarioIntervalo}
+            onVisualizacaoChange={setVisualizacaoCalendario}
             faturamentoPorDia={faturamentoPorDiaCalendario ?? {}}
             faturamentoCarregando={faturamentoCalendarioPending || faturamentoCalendarioFetching}
             timeZoneEmpresa={timezoneAgregacao}

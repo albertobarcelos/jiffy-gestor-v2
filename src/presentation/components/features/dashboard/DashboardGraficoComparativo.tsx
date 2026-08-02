@@ -80,8 +80,8 @@ function rotuloLinhaGraficoPeriodoAtual(periodoData: string): string {
       return 'Ontem'
     case 'semana':
       return 'Últimos 7 dias'
-    case '30dias':
-      return 'Últimos 30 dias'
+    case 'mes':
+      return 'Mês atual'
     case 'personalizado':
       return 'Período escolhido'
     default:
@@ -97,8 +97,8 @@ function rotuloLinhaGraficoPeriodoAnterior(periodoData: string): string {
       return 'Ante-ontem'
     case 'semana':
       return '7 dias anteriores'
-    case '30dias':
-      return '30 dias anteriores'
+    case 'mes':
+      return 'Mês passado'
     case 'personalizado':
       return `30 dias antes (mesmo intervalo)`
     default:

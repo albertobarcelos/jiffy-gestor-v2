@@ -56,6 +56,19 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/meus-apps', request.url))
   }
 
+  /**
+   * Hub (Meus Apps / perfil): o AuthGuard valida a identidade no cliente.
+   * Não exigir cookie aqui — após logout da empresa o `tenant-token` some e o
+   * `identity-token` pode ainda estar só no Zustand até o sync no disconnect.
+   */
+  const isHubRoute =
+    pathname.startsWith('/meus-apps') ||
+    pathname === '/perfil' ||
+    pathname.startsWith('/perfil/')
+  if (isHubRoute) {
+    return NextResponse.next()
+  }
+
   // Antiga URL /dashboard/v2 → /dashboard
   if (pathname === '/dashboard/v2' || pathname === '/dashboard/v2/') {
     return NextResponse.redirect(new URL('/dashboard', request.url))

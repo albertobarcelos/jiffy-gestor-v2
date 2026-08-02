@@ -20,16 +20,39 @@ import {
   MdCategory,
   MdAddCircle,
   MdReceipt,
+  MdTableBar,
   MdAccountBalance,
   MdHistory,
   MdPercent,
   MdAnalytics,
 } from 'react-icons/md'
 import type { IconType } from 'react-icons'
-import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
 import { useAcessoFiscal } from '@/src/presentation/hooks/useAcessoFiscal'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import { matchesModulePath } from '@/src/shared/utils/gestaoRoutes'
+
+const MENU_ICON_PARENT =
+  'inline-flex h-5 w-5 shrink-0 items-center justify-center [&>svg]:h-5 [&>svg]:w-5'
+const MENU_ICON_CHILD =
+  'inline-flex h-4 w-4 shrink-0 items-center justify-center [&>svg]:h-4 [&>svg]:w-4'
+
+function renderNavIcon(
+  item: { icon?: IconType; renderIcon?: () => ReactNode },
+  slotClass: string
+): ReactNode {
+  if (item.renderIcon) {
+    return <span className={slotClass}>{item.renderIcon()}</span>
+  }
+  if (item.icon) {
+    const Icon = item.icon
+    return (
+      <span className={slotClass}>
+        <Icon aria-hidden />
+      </span>
+    )
+  }
+  return null
+}
 
 /**
  * Navegação superior minimalista e clean
@@ -161,7 +184,7 @@ export function TopNav() {
         icon: MdDashboard,
       },
       {
-        name: 'Produtos',
+        name: 'Cardápio',
         path: '#',
         icon: MdShoppingBag,
         children: [
@@ -188,25 +211,9 @@ export function TopNav() {
         icon: MdPointOfSale,
         children: [
           { name: 'Pedidos e Clientes', path: '/pedidos-clientes', icon: MdReceipt },
-          {
-            name: 'Mesas Abertas',
-            path: '/vendas/abertas',
-            renderIcon: () => (
-              <TipoVendaIcon
-                tipoVenda="mesa"
-                numeroMesa="#"
-                size={32}
-                containerScale={0.9}
-                corTexto="#FFFFFF"
-                corCirculoInterno="#4b5563"
-                corBorda="#4b5563"
-                corFundo="#4b5563"
-                corPrincipal="#4b5563"
-              />
-            ),
-          },
-          { name: 'Relatórios Vendas', path: '/relatorios-vendas', icon: MdAssessment },
-          { name: 'Relatório Produtoss', path: '/relatorios-produtos-vendidos', icon: MdAnalytics },
+          { name: 'Mesas Abertas', path: '/vendas/abertas', icon: MdTableBar },
+          { name: 'Relatório de Vendas', path: '/relatorios-vendas', icon: MdAssessment },
+          { name: 'Relatório de Produtos', path: '/relatorios-produtos-vendidos', icon: MdAnalytics },
           { name: 'Hist. Fechamentos', path: '/historico-fechamento', icon: MdHistory },
           { name: 'Comissões', path: '/vendas/comissoes', icon: MdPercent },
         ],
@@ -308,12 +315,7 @@ export function TopNav() {
         <div className="flex flex-col gap-2">
           {menuItems.map((item) => {
             const isActive = isMenuActive(item)
-            const Icon = item.icon
-            const renderedIcon = item.renderIcon
-              ? item.renderIcon()
-              : Icon
-              ? <Icon className="w-5 h-5" />
-              : null
+            const renderedIcon = renderNavIcon(item, MENU_ICON_PARENT)
 
             if (item.children) {
               return (
@@ -338,12 +340,7 @@ export function TopNav() {
                   {expandedMenus.has(item.name) && (
                     <div className="pl-6 py-2 flex flex-col gap-1">
                       {item.children.map((child) => {
-                        const ChildIcon = child.icon
-                        const renderedChildIcon = child.renderIcon
-                          ? child.renderIcon()
-                          : ChildIcon
-                          ? <ChildIcon className="w-4 h-4" />
-                          : null
+                        const renderedChildIcon = renderNavIcon(child, MENU_ICON_CHILD)
                         const activeChild = isChildActive(child.path)
                         return (
                           <button
@@ -444,12 +441,7 @@ export function TopNav() {
           {menuItems.map((item) => {
             const isActive = isMenuActive(item)
             const isExpanded = expandedMenus.has(item.name)
-            const Icon = item.icon
-            const renderedIcon = item.renderIcon
-              ? item.renderIcon()
-              : Icon
-              ? <Icon className="w-5 h-5" />
-              : null
+            const renderedIcon = renderNavIcon(item, MENU_ICON_PARENT)
 
             if (item.children) {
               return (
@@ -475,12 +467,7 @@ export function TopNav() {
                   {isExpanded && (
                     <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
                       {item.children.map((child) => {
-                        const ChildIcon = child.icon
-                        const renderedChildIcon = child.renderIcon
-                          ? child.renderIcon()
-                          : ChildIcon
-                          ? <ChildIcon className="w-4 h-4" />
-                          : null
+                        const renderedChildIcon = renderNavIcon(child, MENU_ICON_CHILD)
                         const childIsActive = isChildActive(child.path)
                         return (
                           <Link

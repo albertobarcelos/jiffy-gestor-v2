@@ -672,7 +672,7 @@ export function JiffySidePanelModal({
           ) : (
             <div
               className={cn(
-                'flex shrink-0 items-start justify-between gap-3 px-4 py-3 md:px-6',
+                'relative z-10 flex shrink-0 items-start justify-between gap-3 px-4 py-3 md:px-6',
                 isGlass ? 'border-b border-white/25 bg-transparent' : 'border-b border-gray-200'
               )}
             >
@@ -693,7 +693,7 @@ export function JiffySidePanelModal({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="shrink-0 text-secondary-text hover:bg-gray-100 hover:text-primary-text"
+                className="relative z-10 shrink-0 text-secondary-text hover:bg-gray-100 hover:text-primary-text"
                 aria-label="Fechar"
                 onClick={requestClose}
               >

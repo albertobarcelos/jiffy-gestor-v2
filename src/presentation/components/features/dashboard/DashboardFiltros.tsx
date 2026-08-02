@@ -7,165 +7,190 @@ import {
 } from '@/src/presentation/components/ui/select'
 import { CalendarDays, FilterX, RefreshCw } from 'lucide-react'
 import { Tooltip as MuiTooltip } from '@mui/material'
-import { labelDataHoje } from './dashboardTextHelpers'
+import { labelFaixaDatasPeriodoPreset } from './dashboardTextHelpers'
 import { formatarDataHoraIntervaloCurta } from '@/src/shared/utils/intervaloCalendarioComHoras'
 
 interface DashboardFiltrosProps {
   subtituloAtualizacao: string
   handleAtualizarDashboard: () => void
-  carregandoEmpresa?: boolean
+  atualizando?: boolean
   periodoData: string
   handlePeriodoDataChange: (val: string) => void
+  /** Reabre o modal quando “Por datas” já está ativo (Select não dispara onValueChange). */
+  onAbrirPeriodoPersonalizado: () => void
   periodoPersonalizadoInicio: Date | null
   periodoPersonalizadoFim: Date | null
   handleLimparFiltroPeriodo: () => void
+  /** Fuso da empresa para exibir a faixa de datas dos presets. */
+  timeZoneEmpresa?: string
+}
+
+function RotuloPeriodoComDatas({
+  titulo,
+  faixa,
+}: {
+  titulo: string
+  faixa: string | null
+}) {
+  return (
+    <span className="inline-flex items-baseline gap-x-1 whitespace-nowrap">
+      <span className="text-sm font-semibold">{titulo}</span>
+      {faixa ? (
+        <span className="text-[10px] font-normal opacity-90">· {faixa}</span>
+      ) : null}
+    </span>
+  )
 }
 
 export function DashboardFiltros({
   subtituloAtualizacao,
   handleAtualizarDashboard,
-  carregandoEmpresa = false,
+  atualizando = false,
   periodoData,
   handlePeriodoDataChange,
+  onAbrirPeriodoPersonalizado,
   periodoPersonalizadoInicio,
   periodoPersonalizadoFim,
   handleLimparFiltroPeriodo,
+  timeZoneEmpresa = 'America/Sao_Paulo',
 }: DashboardFiltrosProps) {
+  const mostrarLimparFiltro = periodoData !== 'hoje'
+  const faixaHoje = labelFaixaDatasPeriodoPreset('hoje', timeZoneEmpresa)
+  const faixaOntem = labelFaixaDatasPeriodoPreset('ontem', timeZoneEmpresa)
+  const faixaSemana = labelFaixaDatasPeriodoPreset('semana', timeZoneEmpresa)
+  const faixaMes = labelFaixaDatasPeriodoPreset('mes', timeZoneEmpresa)
+
   return (
-    <div className="mb-2 flex flex-col justify-start px-2 md:flex-row md:items-end md:px-4">
-      <div>
-        <h1 className="font-exo text-xl font-semibold text-primary-text md:text-xl">
-          Visão Geral
-        </h1>
-        <p className="font-regular mt-1 flex flex-wrap items-center gap-2 text-sm text-primary-text">
-          {subtituloAtualizacao}
-        </p>
-      </div>
-      <span className="ml-2 mr-8 inline-flex shrink-0 items-center gap-1">
-        <MuiTooltip
-          title="Atualizar dados"
-          placement="bottom"
-          slotProps={{
-            tooltip: {
-              sx: {
-                bgcolor: '#ffffff',
-                color: '#111827',
-                border: '1px solid #e5e7eb',
-                boxShadow: 2,
-                fontSize: '0.5625rem',
-              },
-            },
-          }}
-        >
-          <span>
-            <button
-              type="button"
-              onClick={handleAtualizarDashboard}
-              disabled={carregandoEmpresa}
-              className="inline-flex h-[22px] w-[22px] items-center justify-center text-primary shadow-sm transition hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
-              aria-label="Atualizar dados do dashboard"
+    <div className="relative z-30 mb-2 flex flex-nowrap items-center gap-x-3 overflow-x-auto px-2 pt-2 md:px-4">
+      <h1 className="font-exo shrink-0 text-xl font-semibold text-primary-text">Visão Geral</h1>
+
+      <div className="flex shrink-0 items-center gap-1.5">
+        <div className="relative w-fit max-w-[min(100%,28rem)]">
+          <label htmlFor="dashboard-periodo-data" className="sr-only">
+            Período
+          </label>
+          <CalendarDays
+            className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-primary"
+            aria-hidden
+          />
+          <Select value={periodoData} onValueChange={handlePeriodoDataChange}>
+            <SelectTrigger
+              id="dashboard-periodo-data"
+              className="!h-9 !w-fit max-w-full gap-2 rounded-lg bg-primary/5 py-0 pl-9 pr-2 text-left text-sm font-medium text-primary shadow-none ring-offset-0 focus:outline-none focus:ring-2 focus:ring-primary/35 focus:ring-offset-0 data-[state=open]:border-primary [&>span]:min-w-0 [&>span]:truncate [&>svg]:shrink-0 [&>svg]:text-primary"
             >
-              <RefreshCw className={`h-3 w-3 ${carregandoEmpresa ? 'animate-spin' : ''}`} aria-hidden />
-            </button>
-          </span>
-        </MuiTooltip>
-      </span>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="inline-flex h-2 w-2 shrink-0 rounded-full bg-secondary" aria-hidden />
-          <div className="relative min-w-[200px]">
-            <label htmlFor="dashboard-periodo-data" className="sr-only">
-              Período
-            </label>
-            <CalendarDays
-              className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-primary"
-              aria-hidden
-            />
-            <Select value={periodoData} onValueChange={handlePeriodoDataChange}>
-              <SelectTrigger
-                id="dashboard-periodo-data"
-                className="h-auto min-h-[42px] w-full items-start rounded-lg bg-primary/5 py-2 pl-10 pr-3 text-left text-sm font-medium text-primary shadow-none ring-offset-0 focus:outline-none focus:ring-2 focus:ring-primary/35 focus:ring-offset-0 data-[state=open]:border-primary [&>span]:line-clamp-none [&>span]:min-w-0 [&>span]:whitespace-normal [&>svg]:text-primary"
+              <SelectValue placeholder="Período" />
+            </SelectTrigger>
+            <SelectContent className="w-auto max-w-[calc(100vw-2rem)] rounded-lg border-gray-200 bg-white">
+              <SelectItem
+                value="hoje"
+                className="cursor-pointer focus:!bg-primary focus:!text-white data-[highlighted]:rounded-lg data-[state=checked]:rounded-lg data-[highlighted]:!bg-primary data-[state=checked]:bg-primary/10 data-[highlighted]:!text-white data-[state=checked]:text-primary"
               >
-                <SelectValue placeholder="Período" />
-              </SelectTrigger>
-              <SelectContent className="rounded-lg border-gray-200 bg-white">
-                <SelectItem
-                  value="hoje"
-                  className="cursor-pointer focus:!bg-primary focus:!text-white data-[highlighted]:rounded-lg data-[state=checked]:rounded-lg data-[highlighted]:!bg-primary data-[state=checked]:bg-primary/10 data-[highlighted]:!text-white data-[state=checked]:text-primary"
-                >
-                  <span className="inline-flex flex-wrap items-baseline gap-x-1">
-                    <span className="text-sm font-semibold">Hoje</span>
-                    <span className="text-[10px] font-normal opacity-90">· {labelDataHoje()}</span>
-                  </span>
-                </SelectItem>
-                <SelectItem
-                  value="ontem"
-                  className="cursor-pointer focus:!bg-primary focus:!text-white data-[highlighted]:rounded-lg data-[state=checked]:rounded-lg data-[highlighted]:!bg-primary data-[state=checked]:bg-primary/10 data-[highlighted]:!text-white data-[state=checked]:text-primary"
-                >
-                  Ontem
-                </SelectItem>
-                <SelectItem
-                  value="semana"
-                  className="cursor-pointer focus:!bg-primary focus:!text-white data-[highlighted]:rounded-lg data-[state=checked]:rounded-lg data-[highlighted]:!bg-primary data-[state=checked]:bg-primary/10 data-[highlighted]:!text-white data-[state=checked]:text-primary"
-                >
-                  Últimos 7 dias
-                </SelectItem>
-                <SelectItem
-                  value="30dias"
-                  className="cursor-pointer focus:!bg-primary focus:!text-white data-[highlighted]:rounded-lg data-[state=checked]:rounded-lg data-[highlighted]:!bg-primary data-[state=checked]:bg-primary/10 data-[highlighted]:!text-white data-[state=checked]:text-primary"
-                >
-                  Últimos 30 dias
-                </SelectItem>
-                <SelectItem
-                  value="personalizado"
-                  className="cursor-pointer focus:!bg-primary focus:!text-white data-[highlighted]:rounded-lg data-[state=checked]:rounded-lg data-[highlighted]:!bg-primary data-[state=checked]:bg-primary/10 data-[highlighted]:!text-white data-[state=checked]:text-primary"
-                >
-                  {periodoPersonalizadoInicio && periodoPersonalizadoFim ? (
-                    <span className="inline-flex min-w-0 flex-wrap items-baseline gap-x-1">
-                      <span className="text-sm font-semibold">Por datas</span>
-                      <span className="break-words text-[10px] font-normal opacity-90">
-                        · {formatarDataHoraIntervaloCurta(periodoPersonalizadoInicio)} —{' '}
-                        {formatarDataHoraIntervaloCurta(periodoPersonalizadoFim)}
-                      </span>
-                    </span>
-                  ) : (
-                    <span className="inline-flex flex-wrap items-baseline gap-x-1">
-                      <span className="text-sm font-semibold">Por datas</span>
-                      <span className="text-[10px] font-normal opacity-90">…</span>
-                    </span>
-                  )}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+                <RotuloPeriodoComDatas titulo="Hoje" faixa={faixaHoje} />
+              </SelectItem>
+              <SelectItem
+                value="ontem"
+                className="cursor-pointer focus:!bg-primary focus:!text-white data-[highlighted]:rounded-lg data-[state=checked]:rounded-lg data-[highlighted]:!bg-primary data-[state=checked]:bg-primary/10 data-[highlighted]:!text-white data-[state=checked]:text-primary"
+              >
+                <RotuloPeriodoComDatas titulo="Ontem" faixa={faixaOntem} />
+              </SelectItem>
+              <SelectItem
+                value="semana"
+                className="cursor-pointer focus:!bg-primary focus:!text-white data-[highlighted]:rounded-lg data-[state=checked]:rounded-lg data-[highlighted]:!bg-primary data-[state=checked]:bg-primary/10 data-[highlighted]:!text-white data-[state=checked]:text-primary"
+              >
+                <RotuloPeriodoComDatas titulo="Últimos 7 dias" faixa={faixaSemana} />
+              </SelectItem>
+              <SelectItem
+                value="mes"
+                className="cursor-pointer focus:!bg-primary focus:!text-white data-[highlighted]:rounded-lg data-[state=checked]:rounded-lg data-[highlighted]:!bg-primary data-[state=checked]:bg-primary/10 data-[highlighted]:!text-white data-[state=checked]:text-primary"
+              >
+                <RotuloPeriodoComDatas titulo="Mês atual" faixa={faixaMes} />
+              </SelectItem>
+              <SelectItem
+                value="personalizado"
+                onPointerDown={() => {
+                  if (periodoData === 'personalizado') {
+                    onAbrirPeriodoPersonalizado()
+                  }
+                }}
+                className="cursor-pointer focus:!bg-primary focus:!text-white data-[highlighted]:rounded-lg data-[state=checked]:rounded-lg data-[highlighted]:!bg-primary data-[state=checked]:bg-primary/10 data-[highlighted]:!text-white data-[state=checked]:text-primary"
+              >
+                {periodoPersonalizadoInicio && periodoPersonalizadoFim ? (
+                  <RotuloPeriodoComDatas
+                    titulo="Por datas"
+                    faixa={`${formatarDataHoraIntervaloCurta(periodoPersonalizadoInicio)} — ${formatarDataHoraIntervaloCurta(periodoPersonalizadoFim)}`}
+                  />
+                ) : (
+                  <RotuloPeriodoComDatas titulo="Por datas" faixa="…" />
+                )}
+              </SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <MuiTooltip
-          title="Limpar filtro e voltar para Hoje"
-          placement="bottom"
-          slotProps={{
-            tooltip: {
-              sx: {
-                bgcolor: '#ffffff',
-                color: '#111827',
-                border: '1px solid #e5e7eb',
-                boxShadow: 2,
-                fontSize: '0.8125rem',
+
+        {mostrarLimparFiltro ? (
+          <MuiTooltip
+            title="Limpar filtro e voltar para Hoje"
+            placement="bottom"
+            slotProps={{
+              tooltip: {
+                sx: {
+                  bgcolor: '#ffffff',
+                  color: '#111827',
+                  border: '1px solid #e5e7eb',
+                  boxShadow: 2,
+                  fontSize: '0.8125rem',
+                },
               },
-            },
-          }}
-        >
-          <span>
-            <button
-              type="button"
-              onClick={handleLimparFiltroPeriodo}
-              disabled={periodoData === 'hoje'}
-              className="inline-flex h-[22px] w-[22px] items-center justify-center text-primary shadow-sm transition hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Limpar filtro de período e usar Hoje"
-            >
-              <FilterX className="h-4 w-4" aria-hidden />
-            </button>
-          </span>
-        </MuiTooltip>
+            }}
+          >
+            <span>
+              <button
+                type="button"
+                onClick={handleLimparFiltroPeriodo}
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-primary transition hover:bg-primary/5"
+                aria-label="Limpar filtro de período e usar Hoje"
+              >
+                <FilterX className="h-4 w-4" aria-hidden />
+              </button>
+            </span>
+          </MuiTooltip>
+        ) : null}
+
+        <div className="flex shrink-0 items-center gap-1">
+          <p className="whitespace-nowrap text-sm text-primary-text/60">
+            {atualizando ? 'Atualizando…' : subtituloAtualizacao}
+          </p>
+          <MuiTooltip
+            title="Atualizar dados"
+            placement="bottom"
+            slotProps={{
+              tooltip: {
+                sx: {
+                  bgcolor: '#ffffff',
+                  color: '#111827',
+                  border: '1px solid #e5e7eb',
+                  boxShadow: 2,
+                  fontSize: '0.75rem',
+                },
+              },
+            }}
+          >
+            <span>
+              <button
+                type="button"
+                onClick={handleAtualizarDashboard}
+                disabled={atualizando}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-primary transition hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label="Atualizar dados do dashboard"
+              >
+                <RefreshCw
+                  className={`h-3.5 w-3.5 ${atualizando ? 'animate-spin' : ''}`}
+                  aria-hidden
+                />
+              </button>
+            </span>
+          </MuiTooltip>
+        </div>
       </div>
     </div>
   )

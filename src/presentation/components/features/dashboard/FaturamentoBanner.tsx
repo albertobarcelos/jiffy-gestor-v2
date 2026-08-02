@@ -36,7 +36,7 @@ export function FaturamentoBanner({
   const copyComparacao = textosComparacaoPeriodoAnterior(periodoData)
 
   return (
-    <div className="relative z-0 mx-2 mb-2 overflow-visible md:mx-4">
+    <div className="relative z-0 mx-2 mb-2 overflow-visible pt-1.5 md:mx-4">
       <div className="relative overflow-visible rounded-2xl bg-secondary bg-gradient-to-br px-3 py-2 pr-24 sm:pr-28 md:px-5 md:py-4 md:pr-32 lg:pr-[min(300px,32vw)]">
         {/* Duas colunas — definem a altura da faixa */}
         <div className="relative z-10 grid grid-cols-1 items-center gap-6 lg:grid-cols-3 lg:gap-8">

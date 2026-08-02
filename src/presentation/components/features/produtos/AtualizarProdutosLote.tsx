@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Produto } from '@/src/domain/entities/Produto'
 import { Impressora } from '@/src/domain/entities/Impressora'
-import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { transformarParaReal, brToEUA } from '@/src/shared/utils/formatters'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
@@ -12,15 +11,12 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Checkbox } from '@/src/presentation/components/ui/checkbox'
-import { FixedRowsScrollArea } from '@/src/presentation/components/ui/FixedRowsScrollArea'
 import {
   FormControl,
   InputAdornment,
   InputLabel,
-  ListSubheader,
   MenuItem,
   Select,
-  TextField,
   type SelectChangeEvent,
 } from '@mui/material'
 import type { SxProps, Theme } from '@mui/material/styles'
@@ -44,27 +40,7 @@ import {
   type FiscalCampoLinha,
   type FiscalLinhaDraft,
 } from '@/src/presentation/components/features/produtos/AtualizarProdutosLote/ProdutoFiscalCelulasEditaveis'
-import {
-  ProdutosTabsModal,
-  type ProdutosTabsModalState,
-} from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
 import { MdSearch, MdExpandMore, MdExpandLess, MdCheckCircle, MdError } from 'react-icons/md'
-import {
-  uniaoIdsVinculosDosAlvos,
-  TEXTOS_VINCULO_IMPRESSORAS,
-  TEXTOS_VINCULO_GRUPOS_COMPLEMENTOS,
-} from '@/src/shared/helpers/filtroVinculoLote'
-import { useListaVinculoLote } from '@/src/presentation/hooks/useListaVinculoLote'
-
-const getProdutoId = (produto: Produto) => produto.getId()
-const getProdutoImpressoraIds = (produto: Produto) =>
-  produto.getImpressoras().map((impressora) => impressora.id)
-const getProdutoGrupoComplementoIds = (produto: Produto) =>
-  produto.getGruposComplementos().map((grupo) => grupo.id)
-const getImpressoraId = (impressora: Impressora) => impressora.getId()
-const getImpressoraNome = (impressora: Impressora) => impressora.getNome()
-const getGrupoComplementoId = (grupo: GrupoComplemento) => grupo.getId()
-const getGrupoComplementoNome = (grupo: GrupoComplemento) => grupo.getNome()
 
 /** Chaves de permissão PDV no PATCH (alinhado a NovoProduto / cardápio). */
 type PermissaoCampoChave =
@@ -148,6 +124,19 @@ function parseProdutosLoteApiResponse(data: unknown): { list: Produto[]; count: 
 
   const count = typeof d.count === 'number' ? d.count : null
   return { list, count }
+}
+
+/** Ancestor com overflow de rolagem (ex.: `main` do layout de produtos). */
+function findScrollableAncestor(start: HTMLElement | null): HTMLElement | null {
+  let el: HTMLElement | null = start
+  while (el) {
+    const { overflowY } = window.getComputedStyle(el)
+    if (/(auto|scroll|overlay)/.test(overflowY) && el.scrollHeight > el.clientHeight + 1) {
+      return el
+    }
+    el = el.parentElement
+  }
+  return null
 }
 
 /** Texto único para célula sem dado (alinha com o filtro “sem …”). */
@@ -249,51 +238,26 @@ function filtrosDisponiveisPorAba(tab: TabPainelLote): FiltroColunaVazia[] {
   return r
 }
 
-/** Payload `alteracoes` do PATCH /produtos-fiscais/lote (só campos informados). */
-function montarAlteracoesFiscalLote(d: FiscalLoteDraft): Record<string, unknown> | null {
-  const alteracoes: Record<string, unknown> = {}
+function montarBodyFiscalLote(d: FiscalLoteDraft): Record<string, unknown> | null {
+  const fiscal: Record<string, unknown> = {}
   const ncmT = d.ncm.replace(/\D/g, '').slice(0, 8)
   const cestT = d.cest.replace(/\D/g, '').slice(0, 7)
-  if (ncmT.length === 8) alteracoes.ncm = ncmT
-  if (cestT.length === 7) alteracoes.cest = cestT
+  // Só envia NCM/CEST completos (evita PATCH com código parcial)
+  if (ncmT.length === 8) fiscal.ncm = ncmT
+  if (cestT.length === 7) fiscal.cest = cestT
   if (d.origemMercadoria !== '') {
     const om = parseInt(d.origemMercadoria, 10)
-    if (!Number.isNaN(om)) alteracoes.origemMercadoria = om
+    if (!Number.isNaN(om)) fiscal.origemMercadoria = om
   }
   const tipoT = d.tipoProduto.trim()
-  if (tipoT) alteracoes.tipoProduto = tipoT
+  if (tipoT) fiscal.tipoProduto = tipoT
   const indT = d.indicadorProducaoEscala.trim()
-  if (indT) alteracoes.indicadorProducaoEscala = indT
-  return Object.keys(alteracoes).length > 0 ? alteracoes : null
+  if (indT) fiscal.indicadorProducaoEscala = indT
+  if (Object.keys(fiscal).length === 0) return null
+  const body: Record<string, unknown> = { fiscal }
+  if (ncmT.length === 8) body.ncm = ncmT
+  return body
 }
-
-type ProdutoFiscalDtoApi = {
-  produtoId?: string
-  ncm?: string | null
-  cest?: string | null
-  origemMercadoria?: number | string | null
-  tipoProduto?: string | null
-  indicadorProducaoEscala?: string | null
-}
-
-function partialFiscalFromDto(dto: ProdutoFiscalDtoApi) {
-  const origem =
-    dto.origemMercadoria === null || dto.origemMercadoria === undefined || dto.origemMercadoria === ''
-      ? ''
-      : String(dto.origemMercadoria)
-  return {
-    ncm: dto.ncm ? String(dto.ncm) : '',
-    cest: dto.cest ? String(dto.cest) : '',
-    origemMercadoria: origem,
-    tipoProduto: dto.tipoProduto ? String(dto.tipoProduto) : '',
-    indicadorProducaoEscala:
-      dto.indicadorProducaoEscala === null || dto.indicadorProducaoEscala === undefined
-        ? null
-        : String(dto.indicadorProducaoEscala),
-  }
-}
-
-const FISCAL_BATCH_CHUNK = 100
 
 function normalizarNcm8(ncmRaw: string): string {
   return String(ncmRaw ?? '')
@@ -324,7 +288,6 @@ export function AtualizarPrecoLote() {
   const [ativoLocalFilter, setAtivoLocalFilter] = useState<'Todos' | 'Sim' | 'Não'>('Todos')
   const [ativoDeliveryFilter, setAtivoDeliveryFilter] = useState<'Todos' | 'Sim' | 'Não'>('Todos')
   const [grupoProdutoFilter, setGrupoProdutoFilter] = useState('')
-  const [buscaGrupoProduto, setBuscaGrupoProduto] = useState('')
   /** Mostrar apenas produtos sem dado na coluna escolhida (filtro só no front). */
   const [filtroColunaVazia, setFiltroColunaVazia] = useState<FiltroColunaVazia>(FILTRO_COLUNA_TODOS)
   /**
@@ -362,13 +325,6 @@ export function AtualizarPrecoLote() {
   } | null>(null)
   const [salvandoFiscalLinhaId, setSalvandoFiscalLinhaId] = useState<string | null>(null)
   const [fiscalLinhaDrafts, setFiscalLinhaDrafts] = useState<Record<string, FiscalLinhaDraft>>({})
-  const [tabsModalState, setTabsModalState] = useState<ProdutosTabsModalState>({
-    open: false,
-    tab: 'produto',
-    mode: 'edit',
-  })
-  const fiscalEnrichAttemptedRef = useRef<Set<string>>(new Set())
-  const fiscalEnrichInflightRef = useRef<Set<string>>(new Set())
   const [ncmValidation, setNcmValidation] = useState<NcmValidationResult | null>(null)
   const [isValidatingNcm, setIsValidatingNcm] = useState(false)
   const ncmValidationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -392,8 +348,7 @@ export function AtualizarPrecoLote() {
   }))
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const produtosRef = useRef<Produto[]>([])
-  /** Área rolável do `FixedRowsScrollArea` (infinite scroll interno). */
-  const listaScrollRef = useRef<HTMLDivElement>(null)
+  const listaAreaRef = useRef<HTMLDivElement>(null)
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null)
   const hasMoreProdutosRef = useRef(false)
   const isLoadingRef = useRef(false)
@@ -412,123 +367,14 @@ export function AtualizarPrecoLote() {
       const next = { ...prev }
       for (const p of produtos) {
         const id = p.getId()
-        const fromProduto = fiscalLinhaDraftFromProduto(p)
         if (!next[id]) {
-          next[id] = fromProduto
-          mudou = true
-          continue
-        }
-        // Preenche campos vazios do draft quando o produto ganha dados (ex.: enrich GET /id)
-        const atual = next[id]
-        const mesclado: FiscalLinhaDraft = {
-          ncm: atual.ncm.trim() ? atual.ncm : fromProduto.ncm,
-          cest: atual.cest.trim() ? atual.cest : fromProduto.cest,
-          origemMercadoria: atual.origemMercadoria.trim()
-            ? atual.origemMercadoria
-            : fromProduto.origemMercadoria,
-          tipoProduto: atual.tipoProduto.trim() ? atual.tipoProduto : fromProduto.tipoProduto,
-          indicadorProducaoEscala: atual.indicadorProducaoEscala.trim()
-            ? atual.indicadorProducaoEscala
-            : fromProduto.indicadorProducaoEscala,
-        }
-        if (
-          mesclado.ncm !== atual.ncm ||
-          mesclado.cest !== atual.cest ||
-          mesclado.origemMercadoria !== atual.origemMercadoria ||
-          mesclado.tipoProduto !== atual.tipoProduto ||
-          mesclado.indicadorProducaoEscala !== atual.indicadorProducaoEscala
-        ) {
-          next[id] = mesclado
+          next[id] = fiscalLinhaDraftFromProduto(p)
           mudou = true
         }
       }
       return mudou ? next : prev
     })
   }, [produtos])
-
-  /** Aba fiscal: 1× POST batch (em vez de N× GET /produtos/:id). */
-  useEffect(() => {
-    if (activeTab !== 'fiscal' || isLoading) return
-    const token = auth?.getAccessToken()
-    if (!token) return
-
-    const pendentes = produtos.filter(p => {
-      const id = p.getId()
-      if (fiscalEnrichAttemptedRef.current.has(id)) return false
-      if (fiscalEnrichInflightRef.current.has(id)) return false
-      return (
-        !p.getNcm().trim() ||
-        !p.getOrigemMercadoria().trim() ||
-        !p.getTipoProduto().trim() ||
-        !(p.getIndicadorProducaoEscala() ?? '').trim()
-      )
-    })
-
-    if (pendentes.length === 0) return
-
-    const lote = pendentes.slice(0, FISCAL_BATCH_CHUNK)
-    const ids = lote.map(p => p.getId())
-    for (const id of ids) {
-      fiscalEnrichInflightRef.current.add(id)
-    }
-
-    let cancelled = false
-
-    void (async () => {
-      try {
-        const response = await fetch('/api/v1/fiscal/produtos-fiscais/batch', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ produtoIds: ids }),
-        })
-
-        if (!response.ok) {
-          for (const id of ids) fiscalEnrichAttemptedRef.current.add(id)
-          return
-        }
-
-        const data = (await response.json()) as { produtos?: ProdutoFiscalDtoApi[] }
-        if (cancelled) return
-
-        const porId = new Map<string, ProdutoFiscalDtoApi>()
-        for (const item of data.produtos ?? []) {
-          if (item?.produtoId) porId.set(String(item.produtoId), item)
-        }
-
-        setProdutos(prev =>
-          prev.map(p => {
-            const dto = porId.get(p.getId())
-            if (!dto) return p
-            const partial = partialFiscalFromDto(dto)
-            return p.withDadosFiscais({
-              ncm: partial.ncm || p.getNcm(),
-              cest: partial.cest || p.getCest(),
-              origemMercadoria: partial.origemMercadoria || p.getOrigemMercadoria(),
-              tipoProduto: partial.tipoProduto || p.getTipoProduto(),
-              indicadorProducaoEscala:
-                partial.indicadorProducaoEscala ?? p.getIndicadorProducaoEscala(),
-            })
-          })
-        )
-
-        for (const id of ids) fiscalEnrichAttemptedRef.current.add(id)
-      } catch (error) {
-        console.error('Erro ao buscar produtos fiscais em batch', error)
-        if (!cancelled) {
-          for (const id of ids) fiscalEnrichAttemptedRef.current.add(id)
-        }
-      } finally {
-        for (const id of ids) fiscalEnrichInflightRef.current.delete(id)
-      }
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [activeTab, auth, isLoading, produtos])
 
   useEffect(() => {
     hasMoreProdutosRef.current = hasMoreProdutos
@@ -560,41 +406,6 @@ export function AtualizarPrecoLote() {
       return { ...prev, [aba]: novoSet }
     })
   }, [])
-
-  /** Atualiza só as linhas afetadas (mantém scroll e itens já carregados). */
-  const aplicarImpressorasNasLinhas = useCallback(
-    (produtoIds: string[], impressorasIds: string[], modo: 'adicionar' | 'remover') => {
-      const idsAlvo = new Set(produtoIds)
-      const resumoPorId = new Map(
-        impressorasDisponiveis.map((imp) => [
-          imp.getId(),
-          { id: imp.getId(), nome: imp.getNome(), ativo: imp.isAtivo() },
-        ])
-      )
-
-      setProdutos((prev) =>
-        prev.map((produto) => {
-          if (!idsAlvo.has(produto.getId())) return produto
-
-          if (modo === 'adicionar') {
-            const porId = new Map(produto.getImpressoras().map((i) => [i.id, i]))
-            for (const id of impressorasIds) {
-              if (porId.has(id)) continue
-              const resumo = resumoPorId.get(id)
-              if (resumo) porId.set(id, resumo)
-            }
-            return produto.withImpressoras(Array.from(porId.values()))
-          }
-
-          const remover = new Set(impressorasIds)
-          return produto.withImpressoras(
-            produto.getImpressoras().filter((i) => !remover.has(i.id))
-          )
-        })
-      )
-    },
-    [impressorasDisponiveis]
-  )
   const {
     data: gruposProdutos = [],
     isLoading: isLoadingGruposProdutos,
@@ -603,14 +414,6 @@ export function AtualizarPrecoLote() {
     data: gruposComplementos = [],
     isLoading: isLoadingGruposComplementos,
   } = useGruposComplementos({ limit: 100, ativo: null })
-
-  const gruposProdutosFiltrados = useMemo(() => {
-    const termo = buscaGrupoProduto.trim().toLowerCase()
-    if (!termo) return gruposProdutos
-    return gruposProdutos.filter((grupo) =>
-      grupo.getNome().toLowerCase().includes(termo)
-    )
-  }, [gruposProdutos, buscaGrupoProduto])
 
   const buildProdutosLoteParams = useCallback(
     (offset: number) => {
@@ -643,17 +446,15 @@ export function AtualizarPrecoLote() {
     [searchText, filterStatus, ativoLocalFilter, ativoDeliveryFilter, grupoProdutoFilter],
   )
 
-  const buscarProdutos = useCallback(async () => {
+  const buscarProdutos = useCallback(async (): Promise<Produto[]> => {
     const token = auth?.getAccessToken()
-    if (!token) return
+    if (!token) return []
 
     loadMoreLockRef.current = false
     setIsLoading(true)
     setProdutos([])
     setHasMoreProdutos(false)
     setIsLoadingMore(false)
-    fiscalEnrichAttemptedRef.current = new Set()
-    fiscalEnrichInflightRef.current = new Set()
     // Mantém produtosSelecionados: a seleção persiste entre buscas até ação manual ou após salvar em lote
 
     try {
@@ -678,8 +479,10 @@ export function AtualizarPrecoLote() {
         produtosParsed.length === PRODUTOS_LOTE_PAGE_SIZE &&
         (count !== null ? produtosParsed.length < count : true)
       setHasMoreProdutos(produtosParsed.length > 0 && hasMore)
+      return produtosParsed
     } catch (error: unknown) {
       console.error('Erro ao buscar produtos', error)
+      return []
     } finally {
       setIsLoading(false)
     }
@@ -753,14 +556,14 @@ export function AtualizarPrecoLote() {
     carregarMaisProdutosRef.current = carregarMaisProdutos
   }, [carregarMaisProdutos])
 
-  /** Rolagem no container fixo (~10 linhas): dispara “carregar mais” perto do fim. */
+  /** Rolagem no `main` (layout produtos): dispara “carregar mais” perto do fim. */
   useEffect(() => {
-    const scrollEl = listaScrollRef.current
-    if (!scrollEl || !hasMoreProdutos || isLoading) return
+    const scrollEl = findScrollableAncestor(listaAreaRef.current)
+    if (!scrollEl) return
 
     const onScroll = () => {
       const { scrollTop, clientHeight, scrollHeight } = scrollEl
-      if (scrollHeight - scrollTop - clientHeight < 120) {
+      if (scrollHeight - scrollTop - clientHeight < 280) {
         void carregarMaisProdutosRef.current()
       }
     }
@@ -771,10 +574,11 @@ export function AtualizarPrecoLote() {
 
   useEffect(() => {
     const sentinel = loadMoreSentinelRef.current
-    const root = listaScrollRef.current
-    if (!sentinel || !root || !hasMoreProdutos || isLoading) {
+    if (!sentinel || !hasMoreProdutos || isLoading) {
       return
     }
+
+    const root = findScrollableAncestor(sentinel)
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -783,21 +587,11 @@ export function AtualizarPrecoLote() {
           void carregarMaisProdutosRef.current()
         }
       },
-      { root, rootMargin: '80px', threshold: 0 },
+      { root: root ?? null, rootMargin: '200px', threshold: 0 },
     )
     observer.observe(sentinel)
     return () => observer.disconnect()
   }, [hasMoreProdutos, isLoading, produtos.length])
-
-  /** Se a lista ainda não preenche a área fixa e há mais páginas, carrega automaticamente. */
-  useEffect(() => {
-    if (!hasMoreProdutos || isLoading || isLoadingMore) return
-    const scrollEl = listaScrollRef.current
-    if (!scrollEl) return
-    if (scrollEl.scrollHeight <= scrollEl.clientHeight + 8) {
-      void carregarMaisProdutosRef.current()
-    }
-  }, [hasMoreProdutos, isLoading, isLoadingMore, produtos.length])
 
   // Debounce na busca e filtros
   useEffect(() => {
@@ -1328,12 +1122,11 @@ export function AtualizarPrecoLote() {
     }
 
     setIsUpdating(true)
-    const toastId = showToast.loading('Vinculando impressoras...')
+    showToast.loading('Vinculando impressoras...')
 
     try {
       const impressorasIdsArray = Array.from(impressorasSelecionadas)
-      const produtoIds = Array.from(produtosSelecionados)
-      const payload = produtoIds.map((produtoId) => {
+      const payload = Array.from(produtosSelecionados).map((produtoId) => {
         const produto = produtos.find((p) => p.getId() === produtoId)
         const impressorasExistentes = produto?.getImpressoras().map((i) => i.id) || []
         const impressorasCombinadas = [...new Set([...impressorasExistentes, ...impressorasIdsArray])]
@@ -1358,14 +1151,15 @@ export function AtualizarPrecoLote() {
         throw new Error(errorData.message || `Erro ${response.status}`)
       }
 
-      marcarProdutosAlteradosNaSessao(produtoIds, 'impressoras')
-      aplicarImpressorasNasLinhas(produtoIds, impressorasIdsArray, 'adicionar')
-      showToast.successLoading(toastId, 'Impressoras vinculadas com sucesso!')
+      marcarProdutosAlteradosNaSessao(Array.from(produtosSelecionados), 'impressoras')
+
+      await buscarProdutos()
+      showToast.success(`Impressoras vinculadas com sucesso!`)
       setImpressorasSelecionadas(new Set())
       setProdutosSelecionados(new Set())
     } catch (error: any) {
       console.error('Erro ao vincular impressoras', error)
-      showToast.errorLoading(toastId, error.message || 'Erro ao vincular impressoras')
+      showToast.error(error.message || 'Erro ao vincular impressoras')
     } finally {
       setIsUpdating(false)
     }
@@ -1389,12 +1183,11 @@ export function AtualizarPrecoLote() {
     }
 
     setIsUpdating(true)
-    const toastId = showToast.loading('Desvinculando impressoras...')
+    showToast.loading('Desvinculando impressoras...')
 
     try {
       const impressorasIdsArray = Array.from(impressorasSelecionadas)
-      const produtoIds = Array.from(produtosSelecionados)
-      const payload = produtoIds.map((produtoId) => ({
+      const payload = Array.from(produtosSelecionados).map((produtoId) => ({
         produtoId,
         impressorasIdsToRemove: impressorasIdsArray,
       }))
@@ -1413,14 +1206,15 @@ export function AtualizarPrecoLote() {
         throw new Error(errorData.message || `Erro ${response.status}`)
       }
 
-      marcarProdutosAlteradosNaSessao(produtoIds, 'impressoras')
-      aplicarImpressorasNasLinhas(produtoIds, impressorasIdsArray, 'remover')
-      showToast.successLoading(toastId, 'Impressoras desvinculadas com sucesso!')
+      marcarProdutosAlteradosNaSessao(Array.from(produtosSelecionados), 'impressoras')
+
+      await buscarProdutos()
+      showToast.success(`Impressoras desvinculadas com sucesso!`)
       setImpressorasSelecionadas(new Set())
       setProdutosSelecionados(new Set())
     } catch (error: any) {
       console.error('Erro ao desvincular impressoras', error)
-      showToast.errorLoading(toastId, error.message || 'Erro ao desvincular impressoras')
+      showToast.error(error.message || 'Erro ao desvincular impressoras')
     } finally {
       setIsUpdating(false)
     }
@@ -1789,8 +1583,8 @@ export function AtualizarPrecoLote() {
         draftParaSalvar.indicadorProducaoEscala = '1'
       }
 
-      const alteracoes = montarAlteracoesFiscalLote(draftParaSalvar)
-      if (!alteracoes) {
+      const body = montarBodyFiscalLote(draftParaSalvar)
+      if (!body) {
         showToast.error('Preencha ao menos um campo fiscal.')
         return false
       }
@@ -1798,16 +1592,13 @@ export function AtualizarPrecoLote() {
       setSalvandoFiscalLinhaId(produtoId)
 
       try {
-        const response = await fetch('/api/v1/fiscal/produtos-fiscais/lote', {
+        const response = await fetch(`/api/produtos/${produtoId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({
-            produtoIds: [produtoId],
-            alteracoes,
-          }),
+          body: JSON.stringify(body),
         })
 
         if (!response.ok) {
@@ -1820,31 +1611,16 @@ export function AtualizarPrecoLote() {
           return false
         }
 
-        const result = (await response.json().catch(() => ({}))) as {
-          erros?: number
-          errosDetalhe?: { produtoId?: string; mensagem?: string }[]
-          produtos?: ProdutoFiscalDtoApi[]
+        const partial = {
+          ncm: ncmT.length === 8 ? ncmT : draftParaSalvar.ncm,
+          cest: cestT,
+          origemMercadoria: draftParaSalvar.origemMercadoria,
+          tipoProduto: draftParaSalvar.tipoProduto,
+          indicadorProducaoEscala:
+            draftParaSalvar.indicadorProducaoEscala.trim() === ''
+              ? null
+              : draftParaSalvar.indicadorProducaoEscala,
         }
-
-        if ((result.erros ?? 0) > 0) {
-          const detalhe = result.errosDetalhe?.[0]?.mensagem
-          showToast.error(detalhe || 'Erro ao salvar dados fiscais da linha.')
-          return false
-        }
-
-        const dto = result.produtos?.find(p => p.produtoId === produtoId)
-        const partial = dto
-          ? partialFiscalFromDto(dto)
-          : {
-              ncm: ncmT.length === 8 ? ncmT : draftParaSalvar.ncm,
-              cest: cestT,
-              origemMercadoria: draftParaSalvar.origemMercadoria,
-              tipoProduto: draftParaSalvar.tipoProduto,
-              indicadorProducaoEscala:
-                draftParaSalvar.indicadorProducaoEscala.trim() === ''
-                  ? null
-                  : draftParaSalvar.indicadorProducaoEscala,
-            }
 
         setProdutos(prev =>
           prev.map(p => (p.getId() === produtoId ? p.withDadosFiscais(partial) : p))
@@ -1873,15 +1649,15 @@ export function AtualizarPrecoLote() {
     [auth, fiscalLinhaDrafts, marcarProdutosAlteradosNaSessao]
   )
 
-  /** 1× PATCH /produtos-fiscais/lote (em vez de N× PATCH /produtos/:id). */
+  /** PATCH sequencial com objeto `fiscal` (sem bulk-update). */
   const aplicarFiscalEmLote = async () => {
     if (produtosSelecionados.size === 0) {
       showToast.error('Selecione pelo menos um produto')
       return
     }
 
-    const alteracoes = montarAlteracoesFiscalLote(fiscalLoteDraft)
-    if (!alteracoes) {
+    const body = montarBodyFiscalLote(fiscalLoteDraft)
+    if (!body) {
       showToast.error('Preencha ao menos um campo fiscal')
       return
     }
@@ -1938,123 +1714,86 @@ export function AtualizarPrecoLote() {
     setIsSalvandoFiscal(true)
     setSalvandoFiscalProgresso({ atual: 0, total: totalIds })
 
+    let sucesso = 0
+    let falhas = 0
+    const idsFiscalComSucesso: string[] = []
+
     try {
-      const response = await fetch('/api/v1/fiscal/produtos-fiscais/lote', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          produtoIds: ids,
-          alteracoes,
-        }),
-      })
+      for (let i = 0; i < ids.length; i++) {
+        const produtoId = ids[i]
+        setSalvandoFiscalProgresso({ atual: i + 1, total: totalIds })
 
-      setSalvandoFiscalProgresso({ atual: totalIds, total: totalIds })
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}))
-        const msg =
-          typeof error.message === 'string' && error.message.trim() !== ''
-            ? error.message
-            : `Erro ${response.status}`
-        throw new Error(msg)
-      }
-
-      const result = (await response.json()) as {
-        total?: number
-        criados?: number
-        atualizados?: number
-        erros?: number
-        produtos?: ProdutoFiscalDtoApi[]
-        errosDetalhe?: { produtoId?: string; mensagem?: string }[]
-      }
-
-      const sucessoIds = new Set(
-        (result.produtos ?? [])
-          .map(p => p.produtoId)
-          .filter((id): id is string => typeof id === 'string' && id.length > 0)
-      )
-
-      // Fallback: se a API não devolver a lista, assume sucesso nos IDs sem erro
-      if (sucessoIds.size === 0 && (result.erros ?? 0) === 0) {
-        for (const id of ids) sucessoIds.add(id)
-      }
-
-      const partialAplicado = {
-        ncm: typeof alteracoes.ncm === 'string' ? alteracoes.ncm : undefined,
-        cest: typeof alteracoes.cest === 'string' ? alteracoes.cest : undefined,
-        origemMercadoria:
-          alteracoes.origemMercadoria !== undefined
-            ? String(alteracoes.origemMercadoria)
-            : undefined,
-        tipoProduto:
-          typeof alteracoes.tipoProduto === 'string' ? alteracoes.tipoProduto : undefined,
-        indicadorProducaoEscala:
-          typeof alteracoes.indicadorProducaoEscala === 'string'
-            ? alteracoes.indicadorProducaoEscala
-            : undefined,
-      }
-
-      setProdutos(prev =>
-        prev.map(p => {
-          if (!sucessoIds.has(p.getId())) return p
-          const dto = result.produtos?.find(x => x.produtoId === p.getId())
-          if (dto) return p.withDadosFiscais(partialFiscalFromDto(dto))
-          return p.withDadosFiscais({
-            ncm: partialAplicado.ncm ?? p.getNcm(),
-            cest: partialAplicado.cest ?? p.getCest(),
-            origemMercadoria: partialAplicado.origemMercadoria ?? p.getOrigemMercadoria(),
-            tipoProduto: partialAplicado.tipoProduto ?? p.getTipoProduto(),
-            indicadorProducaoEscala:
-              partialAplicado.indicadorProducaoEscala ?? p.getIndicadorProducaoEscala(),
-          })
+        const response = await fetch(`/api/produtos/${produtoId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(body),
         })
-      )
 
-      setFiscalLinhaDrafts(prev => {
-        const next = { ...prev }
-        for (const id of sucessoIds) {
-          const produto = produtosRef.current.find(p => p.getId() === id)
-          const dto = result.produtos?.find(x => x.produtoId === id)
-          if (dto) {
-            const partial = partialFiscalFromDto(dto)
-            next[id] = {
-              ncm: partial.ncm,
-              cest: partial.cest,
-              origemMercadoria: partial.origemMercadoria,
-              tipoProduto: partial.tipoProduto,
-              indicadorProducaoEscala: partial.indicadorProducaoEscala ?? '',
-            }
-          } else if (produto) {
-            const base = next[id] ?? fiscalLinhaDraftFromProduto(produto)
-            next[id] = {
-              ncm: partialAplicado.ncm ?? base.ncm,
-              cest: partialAplicado.cest ?? base.cest,
-              origemMercadoria: partialAplicado.origemMercadoria ?? base.origemMercadoria,
-              tipoProduto: partialAplicado.tipoProduto ?? base.tipoProduto,
-              indicadorProducaoEscala:
-                partialAplicado.indicadorProducaoEscala ?? base.indicadorProducaoEscala,
-            }
-          }
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}))
+          const msg =
+            typeof error.message === 'string' && error.message.trim() !== ''
+              ? error.message
+              : `Erro ${response.status}`
+          console.error(`Fiscal produto ${produtoId}:`, msg)
+          falhas += 1
+        } else {
+          sucesso += 1
+          idsFiscalComSucesso.push(produtoId)
         }
-        return next
-      })
+      }
 
-      const idsSucesso = Array.from(sucessoIds)
-      marcarProdutosAlteradosNaSessao(idsSucesso, 'fiscal')
+      marcarProdutosAlteradosNaSessao(idsFiscalComSucesso, 'fiscal')
+
+      // Optimistic: aplica campos do painel nas linhas com sucesso.
+      if (idsFiscalComSucesso.length > 0) {
+        const sucessoSet = new Set(idsFiscalComSucesso)
+        const ncmOk = ncmTrimmed.length === 8 ? ncmTrimmed : undefined
+        const cestOk = cestTrimmed.length === 7 ? cestTrimmed : undefined
+        const origemOk = fiscalLoteDraft.origemMercadoria.trim() || undefined
+        const tipoOk = fiscalLoteDraft.tipoProduto.trim() || undefined
+        const indicadorOk = indTrimmed || undefined
+
+        setProdutos(prev =>
+          prev.map(p => {
+            if (!sucessoSet.has(p.getId())) return p
+            return p.withDadosFiscais({
+              ncm: ncmOk ?? p.getNcm(),
+              cest: cestOk ?? p.getCest(),
+              origemMercadoria: origemOk ?? p.getOrigemMercadoria(),
+              tipoProduto: tipoOk ?? p.getTipoProduto(),
+              indicadorProducaoEscala:
+                indicadorOk !== undefined ? indicadorOk : p.getIndicadorProducaoEscala(),
+            })
+          })
+        )
+      }
+
+      const produtosAtualizados = await buscarProdutos()
+
+      // Re-sincroniza drafts com o resultado do refetch (não usa produtosRef — ainda pode estar stale).
+      if (idsFiscalComSucesso.length > 0) {
+        const sucessoSet = new Set(idsFiscalComSucesso)
+        const porId = new Map(produtosAtualizados.map(p => [p.getId(), p]))
+        setFiscalLinhaDrafts(prev => {
+          const next = { ...prev }
+          for (const id of sucessoSet) {
+            const produto = porId.get(id)
+            if (produto) next[id] = fiscalLinhaDraftFromProduto(produto)
+            else delete next[id]
+          }
+          return next
+        })
+      }
+
       setProdutosSelecionados(new Set())
-
-      const falhas = result.erros ?? Math.max(0, totalIds - idsSucesso.length)
-      const sucesso = idsSucesso.length
 
       if (falhas === 0) {
         showToast.success(`Dados fiscais atualizados! (${sucesso} produto(s))`)
       } else {
-        for (const err of result.errosDetalhe ?? []) {
-          console.error(`Fiscal produto ${err.produtoId}:`, err.mensagem)
-        }
         showToast.warning(
           `${sucesso} atualizado(s) com sucesso. ${falhas} falhou(ram). Verifique o console para detalhes.`
         )
@@ -2072,6 +1811,7 @@ export function AtualizarPrecoLote() {
   const isCestInvalidFiscal = cestValidation != null && !cestValidation.valido
   const isNcmValidFiscal = ncmValidation != null && ncmValidation.valido
   const hasCestsDisponiveisFiscal = cestsDisponiveis.length > 0
+  const fiscalLoteBodyPronto = montarBodyFiscalLote(fiscalLoteDraft) != null
 
   const produtosExibicao = useMemo(() => {
     if (filtroColunaVazia === FILTRO_COLUNA_TODOS) return produtos
@@ -2080,56 +1820,6 @@ export function AtualizarPrecoLote() {
     }
     return produtos.filter(p => idsFiltroColunaCongelados.has(p.getId()))
   }, [produtos, filtroColunaVazia, idsFiltroColunaCongelados])
-
-  /**
-   * Listas de vínculo em lote (impressoras / grupos): ver
-   * docs/arquitetura-jiffy/5.presentation/3.FLUXO_VINCULO_LOTE.md
-   */
-  const idsImpressorasVinculadas = useMemo(
-    () =>
-      uniaoIdsVinculosDosAlvos(
-        produtos,
-        produtosSelecionados,
-        getProdutoId,
-        getProdutoImpressoraIds
-      ),
-    [produtos, produtosSelecionados]
-  )
-
-  const idsGruposComplementosVinculados = useMemo(
-    () =>
-      uniaoIdsVinculosDosAlvos(
-        produtos,
-        produtosSelecionados,
-        getProdutoId,
-        getProdutoGrupoComplementoIds
-      ),
-    [produtos, produtosSelecionados]
-  )
-
-  const listaImpressorasVinculo = useListaVinculoLote({
-    catalogo: impressorasDisponiveis,
-    getId: getImpressoraId,
-    getNome: getImpressoraNome,
-    idsJaVinculados: idsImpressorasVinculadas,
-    modo: modoImpressora,
-    temAlvosSelecionados: produtosSelecionados.size > 0,
-    selecionados: impressorasSelecionadas,
-    setSelecionados: setImpressorasSelecionadas,
-    textos: TEXTOS_VINCULO_IMPRESSORAS,
-  })
-
-  const listaGruposComplementosVinculo = useListaVinculoLote({
-    catalogo: gruposComplementos,
-    getId: getGrupoComplementoId,
-    getNome: getGrupoComplementoNome,
-    idsJaVinculados: idsGruposComplementosVinculados,
-    modo: modoGrupoComplemento,
-    temAlvosSelecionados: produtosSelecionados.size > 0,
-    selecionados: gruposComplementosSelecionados,
-    setSelecionados: setGruposComplementosSelecionados,
-    textos: TEXTOS_VINCULO_GRUPOS_COMPLEMENTOS,
-  })
 
   /** Congela IDs ao selecionar o filtro; só inclui novos matches ao carregar mais — não remove ao editar. */
   useEffect(() => {
@@ -2177,57 +1867,13 @@ export function AtualizarPrecoLote() {
     produtosExibicao.every((p) => produtosSelecionados.has(p.getId()))
   const algunsSelecionadosLista =
     produtosExibicao.some((p) => produtosSelecionados.has(p.getId())) && !todosSelecionados
+  const todasImpressorasSelecionadas = impressorasDisponiveis.length > 0 && impressorasSelecionadas.size === impressorasDisponiveis.length
+  const algumasImpressorasSelecionadas = impressorasSelecionadas.size > 0 && impressorasSelecionadas.size < impressorasDisponiveis.length
+  const todosGruposComplementosSelecionados = gruposComplementos.length > 0 && gruposComplementosSelecionados.size === gruposComplementos.length
+  const algunsGruposComplementosSelecionados = gruposComplementosSelecionados.size > 0 && gruposComplementosSelecionados.size < gruposComplementos.length
   const todasPermissoesSelecionadas =
     CAMPOS_PERMISSAO_PDV.length > 0 &&
     permissoesCamposSelecionados.size === CAMPOS_PERMISSAO_PDV.length
-
-  const openEdicaoProduto = useCallback(
-    (produto: Produto) => {
-      setTabsModalState({
-        open: true,
-        tab: 'produto',
-        mode: 'edit',
-        produto,
-        grupoId: produto.getGrupoId(),
-        initialStepProduto: activeTab === 'fiscal' ? 2 : 0,
-      })
-    },
-    [activeTab]
-  )
-
-  const closeEdicaoProduto = useCallback(() => {
-    setTabsModalState({ open: false, tab: 'produto', mode: 'edit' })
-  }, [])
-
-  const handleEdicaoProdutoReload = useCallback(
-    (produtoId?: string, produtoData?: unknown) => {
-      if (!produtoId || !produtoData) return
-      try {
-        const atualizado = Produto.fromJSON(produtoData)
-        setProdutos(prev =>
-          prev.map(p =>
-            p.getId() === produtoId
-              ? p.withDadosFiscais({
-                  ncm: atualizado.getNcm(),
-                  cest: atualizado.getCest(),
-                  origemMercadoria: atualizado.getOrigemMercadoria(),
-                  tipoProduto: atualizado.getTipoProduto(),
-                  indicadorProducaoEscala: atualizado.getIndicadorProducaoEscala(),
-                })
-              : p
-          )
-        )
-        setFiscalLinhaDrafts(prev => ({
-          ...prev,
-          [produtoId]: fiscalLinhaDraftFromProduto(atualizado),
-        }))
-        marcarProdutosAlteradosNaSessao([produtoId], 'fiscal')
-      } catch (error) {
-        console.error('Erro ao aplicar produto editado na lista em lote', error)
-      }
-    },
-    [marcarProdutosAlteradosNaSessao]
-  )
 
   const handleClearFilters = useCallback(() => {
     setSearchText('')
@@ -2494,8 +2140,9 @@ export function AtualizarPrecoLote() {
           </>
         ) : activeTab === 'impressoras' ? (
           <>
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <div className="flex flex-col gap-1">
+              {/* Modo de operação: Adicionar ou Remover */}
+              <div className="flex items-center gap-2">
                 <label className="block text-xs font-semibold text-secondary-text">
                   Modo de operação:
                 </label>
@@ -2505,7 +2152,6 @@ export function AtualizarPrecoLote() {
                     onClick={() => {
                       setModoImpressora('adicionar')
                       setImpressorasSelecionadas(new Set())
-                      listaImpressorasVinculo.limparBusca()
                     }}
                     className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
                       modoImpressora === 'adicionar'
@@ -2520,7 +2166,6 @@ export function AtualizarPrecoLote() {
                     onClick={() => {
                       setModoImpressora('remover')
                       setImpressorasSelecionadas(new Set())
-                      listaImpressorasVinculo.limparBusca()
                     }}
                     className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
                       modoImpressora === 'remover'
@@ -2531,65 +2176,27 @@ export function AtualizarPrecoLote() {
                     Desvincular
                   </button>
                 </div>
-                <span className="text-[11px] text-secondary-text">
-                  {listaImpressorasVinculo.hintModo}
-                </span>
               </div>
-
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-2 min-w-0">
-                  <label className="block text-xs font-semibold text-secondary-text whitespace-nowrap">
-                    {modoImpressora === 'adicionar'
-                      ? 'Selecionar Impressoras'
-                      : 'Selecionar Impressoras para Remover'}
-                    {' '}
-                    ({impressorasSelecionadas.size} selecionada
-                    {impressorasSelecionadas.size !== 1 ? 's' : ''}
-                    {listaImpressorasVinculo.paraExibir.length > 0
-                      ? ` · ${listaImpressorasVinculo.filtradas.length}/${listaImpressorasVinculo.paraExibir.length}`
-                      : ''}
-                    )
-                  </label>
-                  {listaImpressorasVinculo.exibirBusca && (
-                    <div className="w-[min(200px,100%)]">
-                      <Input
-                        size="small"
-                        value={listaImpressorasVinculo.busca}
-                        onChange={(e) => listaImpressorasVinculo.setBusca(e.target.value)}
-                        placeholder="Pesquisar impressora..."
-                        aria-label="Pesquisar impressora"
-                        sx={{
-                          ...sxEntradaCompactaProduto,
-                          '& .MuiOutlinedInput-root': {
-                            backgroundColor: '#fff',
-                            minHeight: 32,
-                          },
-                          '& .MuiOutlinedInput-input': {
-                            padding: '6px 10px',
-                            fontSize: '0.75rem',
-                          },
-                        }}
-                        InputProps={{
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              <MdSearch size={16} className="text-secondary-text" aria-hidden />
-                            </InputAdornment>
-                          ),
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
+                <label className="block text-xs font-semibold text-secondary-text">
+                  {modoImpressora === 'adicionar' ? 'Selecionar Impressoras' : 'Selecionar Impressoras para Remover'} ({impressorasSelecionadas.size} selecionada{impressorasSelecionadas.size !== 1 ? 's' : ''})
+                </label>
                 <div className="flex items-center gap-4">
-                  {listaImpressorasVinculo.filtradas.length > 0 && (
+                  {impressorasDisponiveis.length > 0 && (
                     <button
                       type="button"
-                      onClick={listaImpressorasVinculo.toggleSelecaoTodasVisiveis}
-                      className="text-xs text-primary hover:underline whitespace-nowrap"
+                      onClick={() => {
+                        if (todasImpressorasSelecionadas) {
+                          setImpressorasSelecionadas(new Set())
+                        } else {
+                          setImpressorasSelecionadas(
+                            new Set(impressorasDisponiveis.map((i) => i.getId()))
+                          )
+                        }
+                      }}
+                      className="text-xs text-primary hover:underline"
                     >
-                      {listaImpressorasVinculo.todasSelecionadas
-                        ? 'Desmarcar todas'
-                        : 'Selecionar todas'}
+                      {todasImpressorasSelecionadas ? 'Desmarcar todas' : 'Selecionar todas'}
                     </button>
                   )}
                   <div className="flex justify-end max-w-4xl">
@@ -2625,28 +2232,16 @@ export function AtualizarPrecoLote() {
                 <div className="flex items-center justify-center py-4">
                   <span className="text-sm text-secondary-text">Nenhuma impressora disponível</span>
                 </div>
-              ) : listaImpressorasVinculo.paraExibir.length === 0 ? (
-                <div className="flex items-center justify-center py-4">
-                  <span className="text-sm text-secondary-text">
-                    {listaImpressorasVinculo.emptyModo}
-                  </span>
-                </div>
-              ) : listaImpressorasVinculo.filtradas.length === 0 ? (
-                <div className="flex items-center justify-center py-4">
-                  <span className="text-sm text-secondary-text">
-                    Nenhuma impressora encontrada para “{listaImpressorasVinculo.busca.trim()}”
-                  </span>
-                </div>
               ) : (
                 <div className="w-full">
-                  <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg bg-white p-1.5">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5">
-                      {listaImpressorasVinculo.filtradas.map((impressora) => {
+                  <div className="max-h-36 overflow-y-auto border border-gray-200 rounded-lg bg-white p-1">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-1">
+                      {impressorasDisponiveis.map((impressora) => {
                         const isSelected = impressorasSelecionadas.has(impressora.getId())
                         return (
                           <label
                             key={impressora.getId()}
-                            className={`flex min-h-0 items-center gap-1 rounded-lg border px-1.5 py-1 cursor-pointer transition-colors ${
+                            className={`flex min-h-0 items-center gap-0.5 rounded-lg border p-1 cursor-pointer transition-colors ${
                               isSelected
                                 ? 'bg-primary/10 border-primary'
                                 : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
@@ -2661,10 +2256,7 @@ export function AtualizarPrecoLote() {
                               className="data-[state=checked]:bg-primary data-[state=checked]:border-primary flex-shrink-0"
                               sx={sxCheckboxListaLote}
                             />
-                            <span
-                              className="md:text-sm text-xs font-medium text-primary-text truncate"
-                              title={impressora.getNome()}
-                            >
+                            <span className="md:text-sm text-xs font-medium text-primary-text truncate">
                               {impressora.getNome()}
                             </span>
                           </label>
@@ -2674,12 +2266,15 @@ export function AtualizarPrecoLote() {
                   </div>
                 </div>
               )}
+              
             </div>
+            
           </>
         ) : activeTab === 'gruposComplementos' ? (
           <>
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <div className="flex flex-col gap-1">
+              {/* Modo de operação: Adicionar ou Remover */}
+              <div className="flex items-center gap-2">
                 <label className="block text-xs font-semibold text-secondary-text">
                   Modo de operação:
                 </label>
@@ -2689,7 +2284,6 @@ export function AtualizarPrecoLote() {
                     onClick={() => {
                       setModoGrupoComplemento('adicionar')
                       setGruposComplementosSelecionados(new Set())
-                      listaGruposComplementosVinculo.limparBusca()
                     }}
                     className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
                       modoGrupoComplemento === 'adicionar'
@@ -2704,7 +2298,6 @@ export function AtualizarPrecoLote() {
                     onClick={() => {
                       setModoGrupoComplemento('remover')
                       setGruposComplementosSelecionados(new Set())
-                      listaGruposComplementosVinculo.limparBusca()
                     }}
                     className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
                       modoGrupoComplemento === 'remover'
@@ -2715,65 +2308,27 @@ export function AtualizarPrecoLote() {
                     Desvincular
                   </button>
                 </div>
-                <span className="text-[11px] text-secondary-text">
-                  {listaGruposComplementosVinculo.hintModo}
-                </span>
               </div>
-
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-2 min-w-0">
-                  <label className="block text-xs font-semibold text-secondary-text whitespace-nowrap">
-                    {modoGrupoComplemento === 'adicionar'
-                      ? 'Selecionar Grupos de Complementos'
-                      : 'Selecionar Grupos de Complementos para Remover'}
-                    {' '}
-                    ({gruposComplementosSelecionados.size} selecionado
-                    {gruposComplementosSelecionados.size !== 1 ? 's' : ''}
-                    {listaGruposComplementosVinculo.paraExibir.length > 0
-                      ? ` · ${listaGruposComplementosVinculo.filtradas.length}/${listaGruposComplementosVinculo.paraExibir.length}`
-                      : ''}
-                    )
-                  </label>
-                  {listaGruposComplementosVinculo.exibirBusca && (
-                    <div className="w-[min(200px,100%)]">
-                      <Input
-                        size="small"
-                        value={listaGruposComplementosVinculo.busca}
-                        onChange={(e) => listaGruposComplementosVinculo.setBusca(e.target.value)}
-                        placeholder="Pesquisar grupo..."
-                        aria-label="Pesquisar grupo de complementos"
-                        sx={{
-                          ...sxEntradaCompactaProduto,
-                          '& .MuiOutlinedInput-root': {
-                            backgroundColor: '#fff',
-                            minHeight: 32,
-                          },
-                          '& .MuiOutlinedInput-input': {
-                            padding: '6px 10px',
-                            fontSize: '0.75rem',
-                          },
-                        }}
-                        InputProps={{
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              <MdSearch size={16} className="text-secondary-text" aria-hidden />
-                            </InputAdornment>
-                          ),
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
+                <label className="block text-xs font-semibold text-secondary-text">
+                  {modoGrupoComplemento === 'adicionar' ? 'Selecionar Grupos de Complementos' : 'Selecionar Grupos de Complementos para Remover'} ({gruposComplementosSelecionados.size} selecionado{gruposComplementosSelecionados.size !== 1 ? 's' : ''})
+                </label>
                 <div className="flex items-center gap-4">
-                  {listaGruposComplementosVinculo.filtradas.length > 0 && (
+                  {gruposComplementos.length > 0 && (
                     <button
                       type="button"
-                      onClick={listaGruposComplementosVinculo.toggleSelecaoTodasVisiveis}
-                      className="text-xs text-primary hover:underline whitespace-nowrap"
+                      onClick={() => {
+                        if (todosGruposComplementosSelecionados) {
+                          setGruposComplementosSelecionados(new Set())
+                        } else {
+                          setGruposComplementosSelecionados(
+                            new Set(gruposComplementos.map((g) => g.getId()))
+                          )
+                        }
+                      }}
+                      className="text-xs text-primary hover:underline"
                     >
-                      {listaGruposComplementosVinculo.todasSelecionadas
-                        ? 'Desmarcar todos'
-                        : 'Selecionar todos'}
+                      {todosGruposComplementosSelecionados ? 'Desmarcar todos' : 'Selecionar todos'}
                     </button>
                   )}
                   <div className="flex justify-end max-w-4xl">
@@ -2803,38 +2358,22 @@ export function AtualizarPrecoLote() {
               </div>
               {isLoadingGruposComplementos ? (
                 <div className="flex items-center justify-center py-4">
-                  <span className="text-sm text-secondary-text">
-                    Carregando grupos de complementos...
-                  </span>
+                  <span className="text-sm text-secondary-text">Carregando grupos de complementos...</span>
                 </div>
               ) : gruposComplementos.length === 0 ? (
                 <div className="flex items-center justify-center py-4">
-                  <span className="text-sm text-secondary-text">
-                    Nenhum grupo de complementos disponível
-                  </span>
-                </div>
-              ) : listaGruposComplementosVinculo.paraExibir.length === 0 ? (
-                <div className="flex items-center justify-center py-4">
-                  <span className="text-sm text-secondary-text">
-                    {listaGruposComplementosVinculo.emptyModo}
-                  </span>
-                </div>
-              ) : listaGruposComplementosVinculo.filtradas.length === 0 ? (
-                <div className="flex items-center justify-center py-4">
-                  <span className="text-sm text-secondary-text">
-                    Nenhum grupo encontrado para “{listaGruposComplementosVinculo.busca.trim()}”
-                  </span>
+                  <span className="text-sm text-secondary-text">Nenhum grupo de complementos disponível</span>
                 </div>
               ) : (
                 <div className="w-full">
-                  <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg bg-white p-1.5">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5">
-                      {listaGruposComplementosVinculo.filtradas.map((grupo) => {
+                  <div className="max-h-36 overflow-y-auto border border-gray-200 rounded-lg bg-white p-1">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-1">
+                      {gruposComplementos.map((grupo) => {
                         const isSelected = gruposComplementosSelecionados.has(grupo.getId())
                         return (
                           <label
                             key={grupo.getId()}
-                            className={`flex min-h-0 items-center gap-1 rounded-lg border px-1.5 py-1 cursor-pointer transition-colors ${
+                            className={`flex min-h-0 items-center gap-0.5 rounded-lg border p-1 cursor-pointer transition-colors ${
                               isSelected
                                 ? 'bg-primary/10 border-primary'
                                 : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
@@ -2849,10 +2388,7 @@ export function AtualizarPrecoLote() {
                               className="data-[state=checked]:bg-primary data-[state=checked]:border-primary flex-shrink-0"
                               sx={sxCheckboxListaLote}
                             />
-                            <span
-                              className="md:text-sm text-xs font-medium text-primary-text truncate"
-                              title={grupo.getNome()}
-                            >
+                            <span className="md:text-sm text-xs font-medium text-primary-text truncate">
                               {grupo.getNome()}
                             </span>
                           </label>
@@ -2862,7 +2398,9 @@ export function AtualizarPrecoLote() {
                   </div>
                 </div>
               )}
+             
             </div>
+            
           </>
         ) : activeTab === 'permissoes' ? (
           <>
@@ -3013,6 +2551,7 @@ export function AtualizarPrecoLote() {
                       isSalvandoPermissoes ||
                       isSalvandoFiscal ||
                       produtosSelecionados.size === 0 ||
+                      !fiscalLoteBodyPronto ||
                       isNcmInvalidFiscal ||
                       isCestInvalidFiscal ||
                       isValidatingNcm ||
@@ -3345,88 +2884,17 @@ export function AtualizarPrecoLote() {
                   label="Grupo de produtos"
                   value={grupoProdutoFilter}
                   onChange={(e: SelectChangeEvent<string>) => setGrupoProdutoFilter(e.target.value)}
-                  onClose={() => setBuscaGrupoProduto('')}
-                  MenuProps={{
-                    autoFocus: false,
-                    PaperProps: {
-                      sx: {
-                        maxHeight: 360,
-                        '& .MuiList-root': { pt: 0 },
-                      },
-                    },
-                  }}
-                  renderValue={(selected) => {
-                    if (!selected) {
-                      return isLoadingGruposProdutos ? 'Carregando...' : 'Todos'
-                    }
-                    const grupo = gruposProdutos.find((g) => g.getId() === selected)
-                    return grupo?.getNome() ?? selected
-                  }}
                 >
-                  <ListSubheader
-                    sx={{
-                      position: 'sticky',
-                      top: 0,
-                      zIndex: 1,
-                      bgcolor: 'background.paper',
-                      lineHeight: 'normal',
-                      py: 1,
-                      px: 1.5,
-                      borderBottom: '1px solid',
-                      borderColor: 'divider',
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <TextField
-                      size="small"
-                      fullWidth
-                      autoFocus
-                      placeholder="Pesquisar grupo..."
-                      value={buscaGrupoProduto}
-                      onChange={(e) => setBuscaGrupoProduto(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key !== 'Escape') e.stopPropagation()
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <MdSearch className="text-secondary-text" size={18} />
-                          </InputAdornment>
-                        ),
-                      }}
-                      sx={{
-                        '& .MuiOutlinedInput-root': {
-                          bgcolor: '#fff',
-                          fontSize: '0.875rem',
-                        },
-                      }}
-                    />
-                  </ListSubheader>
                   <MenuItem value="">
                     <span className="text-secondary-text">
                       {isLoadingGruposProdutos ? 'Carregando...' : 'Todos'}
                     </span>
                   </MenuItem>
                   {!isLoadingGruposProdutos &&
-                    (gruposProdutosFiltrados.length === 0 ? (
-                      <ListSubheader
-                        sx={{
-                          py: 1.5,
-                          px: 2,
-                          color: 'text.secondary',
-                          fontStyle: 'italic',
-                          lineHeight: 1.4,
-                        }}
-                      >
-                        Nenhum grupo encontrado
-                      </ListSubheader>
-                    ) : (
-                      gruposProdutosFiltrados.map((grupo) => (
-                        <MenuItem key={grupo.getId()} value={grupo.getId()}>
-                          {grupo.getNome()}
-                        </MenuItem>
-                      ))
+                    gruposProdutos.map((grupo) => (
+                      <MenuItem key={grupo.getId()} value={grupo.getId()}>
+                        {grupo.getNome()}
+                      </MenuItem>
                     ))}
                 </Select>
               </FormControl>
@@ -3477,9 +2945,8 @@ export function AtualizarPrecoLote() {
         </div>
       </div>
 
-      {/* Conteúdo — lista com base fixa; padding inferior para o scroll da página
-          chegar ao fim nítido do quadro antes de usar só o scroll interno. */}
-      <div className="px-1 pt-2 pb-8 md:px-2 md:pb-10">
+      {/* Conteúdo */}
+      <div ref={listaAreaRef} className="py-2">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-12 gap-2">
             <JiffyLoading />
@@ -3492,75 +2959,71 @@ export function AtualizarPrecoLote() {
           <div className="text-center py-12 px-4">
             <p className="text-secondary-text">
               {filtroColunaVazia !== FILTRO_COLUNA_TODOS
-                ? `Nenhum produto entre os já carregados atende a “${LABEL_FILTRO_COLUNA[filtroColunaVazia]}”. Role a lista para carregar mais itens ou altere os filtros da busca (filtro só na tela).`
+                ? `Nenhum produto entre os já carregados atende a “${LABEL_FILTRO_COLUNA[filtroColunaVazia]}”. Continue rolando para carregar mais itens ou altere os filtros da busca (filtro só na tela).`
                 : 'Nenhum produto para exibir com o filtro atual.'}
             </p>
           </div>
         ) : (
-          <FixedRowsScrollArea
-            ref={listaScrollRef}
-            visibleRows={12}
-            rowHeightPx={44}
-            className={activeTab === 'fiscal' ? 'overflow-x-auto' : undefined}
-            header={
-              <div
-                className={`flex items-center h-11 gap-2 md:px-4 px-2 text-xs font-semibold text-primary-text uppercase tracking-wide bg-custom-2 ${
-                  activeTab === 'fiscal' ? 'min-w-[1060px]' : ''
-                }`}
-              >
-                <div className="flex-none md:w-10 w-6 flex justify-center">
-                  <Checkbox
-                    checked={todosSelecionados}
-                    indeterminate={algunsSelecionadosLista}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setProdutosSelecionados(new Set(produtosExibicao.map((p) => p.getId())))
-                      } else {
-                        setProdutosSelecionados(new Set())
-                      }
-                    }}
-                    className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                  />
-                </div>
-                <div className="flex-1 md:w-14 text-xs">Código</div>
-                <div className="flex-[1.5] text-xs">Nome</div>
-                {activeTab === 'impressoras' ? (
-                  <div className="flex-[1.2] text-left hidden md:flex">Impressoras</div>
-                ) : null}
-                {activeTab === 'gruposComplementos' ? (
-                  <div className="flex-[1.2] text-center hidden md:flex">Grupos Complementos</div>
-                ) : null}
-                {activeTab === 'fiscal' ? (
-                  <>
-                    <div className="hidden md:flex w-[108px] shrink-0 text-center text-xs leading-tight">
-                      NCM
-                    </div>
-                    <div className="hidden lg:flex w-[168px] shrink-0 text-center text-xs leading-tight">
-                      CEST
-                    </div>
-                    <div className="hidden lg:flex w-[200px] shrink-0 text-center text-xs leading-tight">
-                      Origem
-                    </div>
-                    <div className="hidden lg:flex w-[200px] shrink-0 text-center text-xs leading-tight">
-                      Tipo
-                    </div>
-                    <div className="hidden lg:flex w-[220px] shrink-0 text-center text-xs leading-tight">
-                      Indic.
-                    </div>
-                    <div className="hidden md:flex w-[64px] shrink-0 text-center text-xs leading-tight">
-                      OK
-                    </div>
-                  </>
-                ) : null}
-                {activeTab !== 'fiscal' ? (
-                  <div className="md:flex-1 text-right text-xs">Valor atual</div>
-                ) : null}
-              </div>
-            }
+          <div
+            className={`bg-info rounded-lg ${
+              activeTab === 'fiscal' ? 'overflow-x-auto' : 'overflow-hidden'
+            }`}
           >
             <div
-              className={`flex flex-col gap-2 p-2 ${activeTab === 'fiscal' ? 'min-w-[1060px]' : ''}`}
+              className={`flex items-center h-11 gap-2 md:px-4 px-2 text-xs font-semibold text-primary-text uppercase tracking-wide bg-custom-2 ${
+                activeTab === 'fiscal' ? 'min-w-[1060px]' : ''
+              }`}
             >
+              <div className="flex-none md:w-10 w-6 flex justify-center">
+                <Checkbox
+                  checked={todosSelecionados}
+                  indeterminate={algunsSelecionadosLista}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setProdutosSelecionados(new Set(produtosExibicao.map((p) => p.getId())))
+                    } else {
+                      setProdutosSelecionados(new Set())
+                    }
+                  }}
+                  className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                />
+              </div>
+              <div className="flex-1 md:w-14 text-xs">Código</div>
+              <div className="flex-[1.5] text-xs">Nome</div>
+              {activeTab === 'impressoras' ? (
+                <div className="flex-[1.2] text-center hidden md:flex">Impressoras</div>
+              ) : null}
+              {activeTab === 'gruposComplementos' ? (
+                <div className="flex-[1.2] text-center hidden md:flex">Grupos Complementos</div>
+              ) : null}
+              {activeTab === 'fiscal' ? (
+                <>
+                  <div className="hidden md:flex w-[108px] shrink-0 text-center text-xs leading-tight">
+                    NCM
+                  </div>
+                  <div className="hidden lg:flex w-[168px] shrink-0 text-center text-xs leading-tight">
+                    CEST
+                  </div>
+                  <div className="hidden lg:flex w-[200px] shrink-0 text-center text-xs leading-tight">
+                    Origem
+                  </div>
+                  <div className="hidden lg:flex w-[200px] shrink-0 text-center text-xs leading-tight">
+                    Tipo
+                  </div>
+                  <div className="hidden lg:flex w-[220px] shrink-0 text-center text-xs leading-tight">
+                    Indic.
+                  </div>
+                  <div className="hidden md:flex w-[64px] shrink-0 text-center text-xs leading-tight">
+                    OK
+                  </div>
+                </>
+              ) : null}
+              {activeTab !== 'fiscal' ? (
+                <div className="md:flex-1 text-right text-xs">Valor atual</div>
+              ) : null}
+            </div>
+
+            <div className={`flex flex-col gap-2 mt-2 ${activeTab === 'fiscal' ? 'min-w-[1060px]' : ''}`}>
               {produtosExibicao
                 .slice()
                 .sort((a, b) => a.getNome().localeCompare(b.getNome(), 'pt-BR'))
@@ -3609,66 +3072,60 @@ export function AtualizarPrecoLote() {
                         {textoOuNenhum(String(produto.getCodigoProduto() ?? ''))}
                       </div>
                       <div className="md:flex-[1.5] flex-[2] min-w-0 md:pr-4">
-                        {activeTab === 'fiscal' ? (
-                          <button
-                            type="button"
-                            onClick={e => {
-                              e.stopPropagation()
-                              openEdicaoProduto(produto)
-                            }}
-                            className="break-words text-left text-xs font-normal text-primary-text underline-offset-2 hover:text-primary hover:underline md:text-sm"
-                            title="Abrir edição do produto"
-                          >
-                            {produto.getNome()}
-                          </button>
-                        ) : (
-                          <p className="break-words text-xs font-normal text-primary-text md:text-sm">
-                            {produto.getNome()}
-                          </p>
-                        )}
+                        <p className="break-words text-xs font-normal text-primary-text md:text-sm">
+                          {produto.getNome()}
+                        </p>
                         {activeTab === 'permissoes' ? (
                           <ProdutoActionIconsDisplay produto={produto} />
                         ) : null}
                       </div>
                       {activeTab === 'impressoras' ? (
-                        <div className="flex-[1.2] hidden min-w-0 md:flex md:items-center">
+                        <div className="flex-[1.2] justify-center hidden md:flex">
                           {impressorasDoProduto.length === 0 ? (
                             <span className="text-xs text-secondary-text">Nenhum</span>
                           ) : (
-                            <div
-                              className="flex w-full min-w-0 flex-wrap gap-1"
-                              title={impressorasDoProduto.map((i) => i.nome).join(', ')}
+                            <select
+                              className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary cursor-pointer"
+                              defaultValue=""
+                              onChange={(event) => {
+                                event.currentTarget.value = ''
+                              }}
+                              onClick={(e) => e.stopPropagation()}
                             >
+                              <option value="" disabled>
+                                {impressorasDoProduto.length} impressora{impressorasDoProduto.length !== 1 ? 's' : ''}
+                              </option>
                               {impressorasDoProduto.map((impressora) => (
-                                <span
-                                  key={impressora.id}
-                                  className="inline-flex max-w-full truncate rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium leading-tight text-primary-text"
-                                >
+                                <option key={impressora.id} value={impressora.id}>
                                   {impressora.nome}
-                                </span>
+                                </option>
                               ))}
-                            </div>
+                            </select>
                           )}
                         </div>
                       ) : null}
                       {activeTab === 'gruposComplementos' ? (
-                        <div className="flex-[1.2] hidden min-w-0 md:flex md:items-center">
+                        <div className="flex-[1.2] justify-center hidden md:flex">
                           {gruposComplementosDoProduto.length === 0 ? (
                             <span className="text-xs text-secondary-text">Nenhum</span>
                           ) : (
-                            <div
-                              className="flex w-full min-w-0 flex-wrap gap-1"
-                              title={gruposComplementosDoProduto.map((g) => g.nome).join(', ')}
+                            <select
+                              className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary cursor-pointer"
+                              defaultValue=""
+                              onChange={(event) => {
+                                event.currentTarget.value = ''
+                              }}
+                              onClick={(e) => e.stopPropagation()}
                             >
+                              <option value="" disabled>
+                                {gruposComplementosDoProduto.length} grupo{gruposComplementosDoProduto.length !== 1 ? 's' : ''}
+                              </option>
                               {gruposComplementosDoProduto.map((grupo) => (
-                                <span
-                                  key={grupo.id}
-                                  className="inline-flex max-w-full truncate rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium leading-tight text-primary-text"
-                                >
+                                <option key={grupo.id} value={grupo.id}>
                                   {grupo.nome}
-                                </span>
+                                </option>
                               ))}
-                            </div>
+                            </select>
                           )}
                         </div>
                       ) : null}
@@ -3700,7 +3157,9 @@ export function AtualizarPrecoLote() {
                             e.stopPropagation()
                             toggleExpansao(produto.getId())
                           }}
-                          className="md:hidden flex items-center justify-center w-8 h-8 rounded-lg hover:bg-primary/10 transition-colors"
+                          className={`flex items-center justify-center w-8 h-8 rounded-lg hover:bg-primary/10 transition-colors ${
+                            activeTab === 'fiscal' ? 'lg:hidden' : 'md:hidden'
+                          }`}
                           aria-label={isExpanded ? 'Ocultar detalhes' : 'Expandir detalhes'}
                         >
                           {isExpanded ? (
@@ -3723,16 +3182,23 @@ export function AtualizarPrecoLote() {
                             {impressorasDoProduto.length === 0 ? (
                               <span className="text-xs text-secondary-text">Nenhum</span>
                             ) : (
-                              <div className="flex flex-wrap gap-1">
+                              <select
+                                className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary cursor-pointer"
+                                defaultValue=""
+                                onChange={(event) => {
+                                  event.currentTarget.value = ''
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <option value="" disabled>
+                                  {impressorasDoProduto.length} impressora{impressorasDoProduto.length !== 1 ? 's' : ''}
+                                </option>
                                 {impressorasDoProduto.map((impressora) => (
-                                  <span
-                                    key={impressora.id}
-                                    className="inline-flex max-w-full truncate rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium leading-tight text-primary-text"
-                                  >
+                                  <option key={impressora.id} value={impressora.id}>
                                     {impressora.nome}
-                                  </span>
+                                  </option>
                                 ))}
-                              </div>
+                              </select>
                             )}
                           </div>
                         </div>
@@ -3745,22 +3211,27 @@ export function AtualizarPrecoLote() {
                           }`}
                         >
                           <div className="flex flex-col gap-1">
-                            <label className="text-xs font-semibold text-secondary-text">
-                              Grupos de Complementos
-                            </label>
+                            <label className="text-xs font-semibold text-secondary-text">Grupos de Complementos</label>
                             {gruposComplementosDoProduto.length === 0 ? (
                               <span className="text-xs text-secondary-text">Nenhum</span>
                             ) : (
-                              <div className="flex flex-wrap gap-1">
+                              <select
+                                className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary cursor-pointer"
+                                defaultValue=""
+                                onChange={(event) => {
+                                  event.currentTarget.value = ''
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <option value="" disabled>
+                                  {gruposComplementosDoProduto.length} grupo{gruposComplementosDoProduto.length !== 1 ? 's' : ''}
+                                </option>
                                 {gruposComplementosDoProduto.map((grupo) => (
-                                  <span
-                                    key={grupo.id}
-                                    className="inline-flex max-w-full truncate rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium leading-tight text-primary-text"
-                                  >
+                                  <option key={grupo.id} value={grupo.id}>
                                     {grupo.nome}
-                                  </span>
+                                  </option>
                                 ))}
-                              </div>
+                              </select>
                             )}
                           </div>
                         </div>
@@ -3821,7 +3292,7 @@ export function AtualizarPrecoLote() {
                 </div>
               ) : null}
             </div>
-          </FixedRowsScrollArea>
+          </div>
         )}
       </div>
 
@@ -3844,13 +3315,6 @@ export function AtualizarPrecoLote() {
           </p>
         </div>
       ) : null}
-
-      <ProdutosTabsModal
-        state={tabsModalState}
-        onClose={closeEdicaoProduto}
-        onReload={handleEdicaoProdutoReload}
-        onTabChange={tab => setTabsModalState(prev => ({ ...prev, tab }))}
-      />
     </div>
   )
 }

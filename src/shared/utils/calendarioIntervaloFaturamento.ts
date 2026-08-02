@@ -21,3 +21,15 @@ export function periodoFetchFaturamentoCalendarioDoisMeses(
   const fim = min([fimMesSegundo, endOfDay(agora)])
   return { inicio, fim }
 }
+
+/**
+ * Intervalo [inicio, fim] para um único mês visível (modo faturamento nas células).
+ */
+export function periodoFetchFaturamentoCalendarioUmMes(
+  mesPainel: Date,
+  agora: Date = new Date()
+): { inicio: Date; fim: Date } {
+  const inicio = startOfMonth(mesPainel)
+  const fim = min([endOfMonth(mesPainel), endOfDay(agora)])
+  return { inicio, fim }
+}
