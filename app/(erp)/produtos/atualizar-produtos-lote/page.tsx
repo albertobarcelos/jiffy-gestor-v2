@@ -5,10 +5,10 @@ import { Suspense } from 'react'
 import { PageLoading } from '@/src/presentation/components/ui/PageLoading'
 
 // Dynamic import para code-splitting
-const AtualizarProdutosLote = dynamic(
+const AtualizarPrecoLote = dynamic(
   () =>
     import('@/src/presentation/components/features/produtos/AtualizarProdutosLote').then(mod => ({
-      default: mod.AtualizarProdutosLote,
+      default: mod.AtualizarPrecoLote,
     })),
   {
     ssr: false,
@@ -19,7 +19,7 @@ const AtualizarProdutosLote = dynamic(
 export default function AtualizarProdutosLotePage() {
   return (
     <Suspense fallback={<PageLoading />}>
-      <AtualizarProdutosLote />
+      <AtualizarPrecoLote />
     </Suspense>
   )
 }

@@ -10,8 +10,6 @@ interface BuscarProdutosParams {
   ativoDelivery?: boolean | null
   grupoProdutoId?: string
   grupoComplementosId?: string
-  semDadoEm?: 'sem_impressoras' | 'sem_ncm' | 'sem_grupos_complementos'
-  ncm?: string
 }
 
 /**

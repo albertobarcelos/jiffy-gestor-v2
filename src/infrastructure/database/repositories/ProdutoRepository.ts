@@ -28,8 +28,6 @@ export class ProdutoRepository implements IProdutoRepository {
     ativoDelivery?: boolean | null
     grupoProdutoId?: string
     grupoComplementosId?: string
-    semDadoEm?: 'sem_impressoras' | 'sem_ncm' | 'sem_grupos_complementos'
-    ncm?: string
   }): Promise<{ produtos: Produto[]; total: number }> {
     try {
       const {
@@ -41,8 +39,6 @@ export class ProdutoRepository implements IProdutoRepository {
         ativoDelivery,
         grupoProdutoId,
         grupoComplementosId,
-        semDadoEm,
-        ncm,
       } = params
 
       // Constrói a URL exatamente como no Flutter
@@ -61,12 +57,6 @@ export class ProdutoRepository implements IProdutoRepository {
       }
       if (grupoComplementosId) {
         url += `&grupoComplementosId=${encodeURIComponent(grupoComplementosId)}`
-      }
-      if (semDadoEm) {
-        url += `&semDadoEm=${encodeURIComponent(semDadoEm)}`
-      }
-      if (ncm) {
-        url += `&ncm=${encodeURIComponent(ncm)}`
       }
       // Impressoras + fiscal (quando a API suportar o include; senão ignora)
       url += `&include=impressoras,fiscal`
@@ -93,29 +83,6 @@ export class ProdutoRepository implements IProdutoRepository {
       }
     } catch (error) {
       // Preserva ApiError para manter o status code (ex: 504 para timeout)
-      if (error instanceof ApiError) {
-        throw error
-      }
-      throw error
-    }
-  }
-
-  async listarNcmsCadastrados(): Promise<string[]> {
-    try {
-      const response = await this.apiClient.request<{ ncms: string[] }>(
-        '/api/v1/cardapio/produtos/ncms-cadastrados',
-        {
-          method: 'GET',
-          headers: this.token
-            ? {
-                Authorization: `Bearer ${this.token}`,
-              }
-            : {},
-        }
-      )
-
-      return Array.isArray(response.data.ncms) ? response.data.ncms : []
-    } catch (error) {
       if (error instanceof ApiError) {
         throw error
       }
