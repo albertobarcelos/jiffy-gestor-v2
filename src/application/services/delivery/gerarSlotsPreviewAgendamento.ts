@@ -2,6 +2,7 @@ import type {
   IntervaloSlotMinutos,
   TurnoHorarioFuncionamentoDTO,
 } from '@/src/application/dto/delivery/AgendamentoDeliveryDTO'
+import { civilDateInTz } from '@/src/shared/utils/civilDateTimezone'
 
 export type SlotPreview = {
   inicioLabel: string
@@ -22,15 +23,6 @@ function formatHm(totalMin: number): string {
 
 function cruzaMeiaNoite(horaInicio: string, horaFim: string): boolean {
   return parseHm(horaFim) <= parseHm(horaInicio)
-}
-
-function civilDateInTz(date: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date)
 }
 
 function weekdayInTz(date: Date, timeZone: string): number {
@@ -75,7 +67,7 @@ export function gerarSlotsPreviewHoje(input: {
 }): SlotPreview[] {
   const agora = input.agora ?? new Date()
   const timezone = input.timezone || 'America/Sao_Paulo'
-  const hoje = civilDateInTz(agora, timezone)
+  void civilDateInTz(agora, timezone)
   const weekday = weekdayInTz(agora, timezone)
   const weekdayPrev = (weekday + 6) % 7
   const minutosAgora = minutesNowInTz(agora, timezone)
@@ -124,7 +116,6 @@ export function gerarSlotsPreviewHoje(input: {
     }
   }
 
-  void hoje
   slots.sort((a, b) => parseHm(a.inicioLabel) - parseHm(b.inicioLabel))
   return slots
 }

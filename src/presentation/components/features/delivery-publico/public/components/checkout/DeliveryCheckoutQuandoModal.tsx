@@ -4,6 +4,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarDays, Clock } from 'lucide-react'
 import { showToast } from '@/src/shared/utils/toast'
 import { usePublicDeliveryDisponibilidade } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
+import {
+  addCivilDays,
+  civilDateInTz,
+  TIMEZONE_BRASIL_PADRAO,
+} from '@/src/shared/utils/civilDateTimezone'
 import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
 import {
   DeliveryCheckoutShellFooter,
@@ -25,21 +30,6 @@ type DeliveryCheckoutQuandoModalProps = {
   onContinuar: () => void
 }
 
-function civilDateInTz(date: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date)
-}
-
-function addCivilDays(ymd: string, days: number): string {
-  const [y, m, d] = ymd.split('-').map(Number)
-  const utc = new Date(Date.UTC(y, m - 1, d + days))
-  return `${utc.getUTCFullYear()}-${String(utc.getUTCMonth() + 1).padStart(2, '0')}-${String(utc.getUTCDate()).padStart(2, '0')}`
-}
-
 function formatDataDiaMes(ymd: string): string {
   const [, mes, dia] = ymd.split('-')
   return `${dia}-${mes}`
@@ -56,12 +46,12 @@ function formatDiaSemana(ymd: string): string {
 
 function dataInicialDoSlot(slotInicio: string): string {
   if (!slotInicio.trim()) {
-    return civilDateInTz(new Date(), 'America/Sao_Paulo')
+    return civilDateInTz(new Date(), TIMEZONE_BRASIL_PADRAO)
   }
   const date = new Date(slotInicio)
   return Number.isNaN(date.getTime())
-    ? civilDateInTz(new Date(), 'America/Sao_Paulo')
-    : civilDateInTz(date, 'America/Sao_Paulo')
+    ? civilDateInTz(new Date(), TIMEZONE_BRASIL_PADRAO)
+    : civilDateInTz(date, TIMEZONE_BRASIL_PADRAO)
 }
 
 export function DeliveryCheckoutQuandoModal({
@@ -87,7 +77,7 @@ export function DeliveryCheckoutQuandoModal({
 
   const disponibilidade = disponibilidadeQuery.data
   const loading = disponibilidadeQuery.isLoading || disponibilidadeQuery.isFetching
-  const timezone = disponibilidade?.timezone || 'America/Sao_Paulo'
+  const timezone = disponibilidade?.timezone || TIMEZONE_BRASIL_PADRAO
   const hoje = civilDateInTz(new Date(), timezone)
   const diasMax = disponibilidade?.diasAntecedenciaMax ?? 3
   const aceitaAgendamento = disponibilidade?.aceitaAgendamento ?? true

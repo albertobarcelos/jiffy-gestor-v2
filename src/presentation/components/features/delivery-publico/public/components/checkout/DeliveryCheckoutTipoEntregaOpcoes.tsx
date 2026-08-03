@@ -7,6 +7,7 @@ import type { DeliveryTipoEntrega } from '../../../shared/stores/deliveryPrefere
 import { formatDeliveryCurrency } from '../../../shared/utils/formatDeliveryCurrency'
 import { formatarResumoEnderecoPublico } from '../../../shared/utils/garantirEnderecoClientePublico'
 import { DELIVERY_PUBLICO_TAXA_ENTREGA_PLACEHOLDER } from '../../../shared/constants/deliveryPublicoPlaceholders'
+import { hojeCivilNoTimezone } from '@/src/shared/utils/civilDateTimezone'
 
 /** @deprecated Preferir `DELIVERY_PUBLICO_TAXA_ENTREGA_PLACEHOLDER`. */
 export const TAXA_ENTREGA_FICTICIA = DELIVERY_PUBLICO_TAXA_ENTREGA_PLACEHOLDER
@@ -55,12 +56,7 @@ const OPCOES: Array<{
 ]
 
 function hojeEmSaoPaulo(): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Sao_Paulo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date())
+  return hojeCivilNoTimezone()
 }
 
 function formatarProximaAbertura(iso: string | null, timeZone: string): string {

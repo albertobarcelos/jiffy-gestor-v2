@@ -8,6 +8,11 @@ import { TEMPOS_PREVISTOS_ENTREGA } from '@/src/shared/constants/pedidoForm'
 import { useEmpresaDeliveryMe } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
 import { usePublicDeliveryDisponibilidade } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import type { ModoTempoEntrega } from '@/src/application/dto/delivery-publico/DisponibilidadeDeliveryDTO'
+import {
+  addCivilDays,
+  civilDateInTz,
+  TIMEZONE_BRASIL_PADRAO,
+} from '@/src/shared/utils/civilDateTimezone'
 
 type PedidoQuandoDeliveryFieldProps = {
   tipoAtendimento: 'entrega' | 'retirada'
@@ -17,21 +22,6 @@ type PedidoQuandoDeliveryFieldProps = {
   onChangeModoTempo: (value: ModoTempoEntrega) => void
   onChangeSlot: (slot: { inicio: string; fim: string; label: string } | null) => void
   onChangeTempoPrevistoMinutos: (minutos: number) => void
-}
-
-function civilDateInTz(date: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date)
-}
-
-function addCivilDays(ymd: string, days: number): string {
-  const [y, m, d] = ymd.split('-').map(Number)
-  const utc = new Date(Date.UTC(y, m - 1, d + days))
-  return `${utc.getUTCFullYear()}-${String(utc.getUTCMonth() + 1).padStart(2, '0')}-${String(utc.getUTCDate()).padStart(2, '0')}`
 }
 
 function formatDataExibicao(ymd: string): string {
@@ -71,7 +61,7 @@ export function PedidoQuandoDeliveryField({
   const empresaQuery = useEmpresaDeliveryMe()
   const slug = empresaQuery.data?.slug?.trim() ?? ''
   const [dataSelecionada, setDataSelecionada] = useState(() =>
-    civilDateInTz(new Date(), 'America/Sao_Paulo')
+    civilDateInTz(new Date(), TIMEZONE_BRASIL_PADRAO)
   )
   const defaultsAplicadosRef = useRef(false)
   const tipoAnteriorRef = useRef(tipoAtendimento)
@@ -85,7 +75,7 @@ export function PedidoQuandoDeliveryField({
 
   const disponibilidade = disponibilidadeQuery.data
   const loading = disponibilidadeQuery.isLoading || disponibilidadeQuery.isFetching
-  const timezone = disponibilidade?.timezone || 'America/Sao_Paulo'
+  const timezone = disponibilidade?.timezone || TIMEZONE_BRASIL_PADRAO
   const hoje = civilDateInTz(new Date(), timezone)
   const diasMax = disponibilidade?.diasAntecedenciaMax ?? 3
   const permiteImediato = disponibilidade?.permiteImediato ?? false

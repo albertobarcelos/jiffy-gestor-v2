@@ -1,23 +1,45 @@
+import { z } from 'zod'
+
+const horaHmValidator = z
+  .string()
+  .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Hora deve estar no formato HH:mm')
+
+export const turnoHorarioFuncionamentoSchema = z
+  .object({
+    id: z.string().optional(),
+    diaSemana: z.number().int().min(0).max(6),
+    horaInicio: horaHmValidator,
+    horaFim: horaHmValidator,
+    ativo: z.boolean(),
+  })
+  .strict()
+
+export const agendamentoDeliveryConfigSchema = z
+  .object({
+    timezone: z.string().min(1),
+    aceitaAgendamento: z.boolean(),
+    intervaloSlotMinutos: z.union([z.literal(15), z.literal(30)]),
+    leadTimeMinutos: z.number().int().nonnegative(),
+    diasAntecedenciaMax: z.number().int().min(1).max(7),
+    turnos: z.array(turnoHorarioFuncionamentoSchema),
+  })
+  .strict()
+
+export const updateAgendamentoDeliveryConfigSchema =
+  agendamentoDeliveryConfigSchema
+
 export type IntervaloSlotMinutos = 15 | 30
 
-export interface TurnoHorarioFuncionamentoDTO {
-  id?: string
-  diaSemana: number
-  horaInicio: string
-  horaFim: string
-  ativo: boolean
-}
+export type TurnoHorarioFuncionamentoDTO = z.infer<
+  typeof turnoHorarioFuncionamentoSchema
+>
 
-export interface AgendamentoDeliveryConfigDTO {
-  timezone: string
-  aceitaAgendamento: boolean
-  intervaloSlotMinutos: IntervaloSlotMinutos
-  leadTimeMinutos: number
-  diasAntecedenciaMax: number
-  turnos: TurnoHorarioFuncionamentoDTO[]
-}
+export type AgendamentoDeliveryConfigDTO = z.infer<
+  typeof agendamentoDeliveryConfigSchema
+>
 
-export type UpdateAgendamentoDeliveryConfigInput = AgendamentoDeliveryConfigDTO
+export type UpdateAgendamentoDeliveryConfigInput =
+  AgendamentoDeliveryConfigDTO
 
 export const DIAS_SEMANA_LABELS = [
   'Domingo',

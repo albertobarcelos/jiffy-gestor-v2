@@ -17,8 +17,8 @@ import {
   useSalvarAgendamentoDeliveryConfig,
 } from '@/src/presentation/hooks/useAgendamentoDeliveryConfig'
 import { useEmpresaDeliveryMe } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
-import { gerarSlotsPreviewHoje } from './gerarSlotsPreviewLocal'
-import { validarTurnosAgendamento } from './validarTurnosAgendamento'
+import { gerarSlotsPreviewHoje } from '@/src/application/services/delivery/gerarSlotsPreviewAgendamento'
+import { validarConfigAgendamentoDelivery } from '@/src/application/services/delivery/validarConfigAgendamentoDelivery'
 
 const DEFAULT_FORM: AgendamentoDeliveryConfigDTO = {
   timezone: 'America/Sao_Paulo',
@@ -129,30 +129,14 @@ export function AgendamentoDeliveryConfigScreen() {
   }
 
   const handleSalvar = async () => {
-    if (form.leadTimeMinutos < 0) {
-      showToast.error('Lead time não pode ser negativo.')
-      return
-    }
-    if (form.diasAntecedenciaMax < 1 || form.diasAntecedenciaMax > 7) {
-      showToast.error('Antecedência máxima deve ser entre 1 e 7 dias.')
-      return
-    }
-
-    const erroTurnos = validarTurnosAgendamento(form.turnos)
-    if (erroTurnos) {
-      showToast.error(erroTurnos)
+    const validacao = validarConfigAgendamentoDelivery(form)
+    if (!validacao.ok) {
+      showToast.error(validacao.error)
       return
     }
 
     try {
-      const salvo = await salvarMutation.mutateAsync({
-        timezone: form.timezone,
-        aceitaAgendamento: form.aceitaAgendamento,
-        intervaloSlotMinutos: form.intervaloSlotMinutos,
-        leadTimeMinutos: form.leadTimeMinutos,
-        diasAntecedenciaMax: form.diasAntecedenciaMax,
-        turnos: form.turnos.map(({ id: _id, ...turno }) => turno),
-      })
+      const salvo = await salvarMutation.mutateAsync(validacao.data)
       setForm({
         ...salvo,
         turnos: salvo.turnos.map(t => ({ ...t })),

@@ -18,6 +18,7 @@ import {
 } from '../../../shared/utils/deliveryTelefonePais'
 import type { ClienteLookupStatus } from '../../../shared/hooks/useDeliveryCheckout'
 import { usePublicDeliveryDisponibilidade } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
+import { hojeCivilNoTimezone } from '@/src/shared/utils/civilDateTimezone'
 import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
 import { isNomeCompletoCheckoutValido } from './deliveryCheckoutProgress'
 import {
@@ -61,12 +62,7 @@ type DeliveryCheckoutIdentifiqueSeModalProps = {
 }
 
 function hojeEmSaoPaulo(): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Sao_Paulo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date())
+  return hojeCivilNoTimezone()
 }
 
 export function DeliveryCheckoutIdentifiqueSeModal({
