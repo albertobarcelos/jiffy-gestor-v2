@@ -39,7 +39,7 @@ export function ActionDropdown({ label, disabled, children }: ActionDropdownProp
         disabled={disabled}
         onClick={() => setOpen(prev => !prev)}
         className={cn(
-          'flex w-full items-center justify-between gap-1 rounded bg-secondary px-2.5 py-1 font-nunito text-xs font-normal text-white md:text-sm',
+          'flex w-full items-center justify-between gap-1 rounded bg-secondary px-2.5 py-1 text-xs font-normal text-white md:text-sm',
           disabled && 'opacity-50'
         )}
       >

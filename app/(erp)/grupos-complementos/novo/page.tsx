@@ -8,7 +8,7 @@ export default function NovoGrupoComplementoPage() {
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/25 text-primary">
             <span className="text-2xl">👤</span>
           </div>
-          <h1 className="font-exo text-lg font-semibold text-primary">Novo Grupo de Complementos</h1>
+          <h1 className="text-lg font-semibold text-primary">Novo Grupo de Complementos</h1>
         </div>
       </div>
       <div className="min-h-0 flex-1">

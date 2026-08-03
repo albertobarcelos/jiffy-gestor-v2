@@ -475,7 +475,7 @@ export const NovoUsuario = forwardRef<NovoUsuarioHandle, NovoUsuarioProps>(funct
                   <MdPerson />
                 </span>
               </div>
-              <h1 className="text-primary text-lg font-semibold font-exo">
+              <h1 className="text-primary text-lg font-semibold ">
                 {isEditing ? 'Editar Usuário' : 'Novo Usuário'}
               </h1>
             </div>
@@ -494,7 +494,7 @@ export const NovoUsuario = forwardRef<NovoUsuarioHandle, NovoUsuarioProps>(funct
         <form id={formId} onSubmit={handleSubmit} className="space-y-6" autoComplete="off">
           <div className="bg-white">
             <div className="mb-4 flex items-center gap-5">
-              <h2 className="shrink-0 font-exo text-sm font-semibold text-primary md:text-xl">
+              <h2 className="shrink-0 text-sm font-semibold text-primary md:text-xl">
                 Dados do Usuário
               </h2>
               <div className="h-px min-w-0 flex-1 bg-primary/70" aria-hidden />
@@ -594,7 +594,7 @@ export const NovoUsuario = forwardRef<NovoUsuarioHandle, NovoUsuarioProps>(funct
                           const id = String(selected)
                           const p = perfisPDV.find((x) => x.id === id)
                           return (
-                            <span className="font-nunito">
+                            <span className="">
                               {p ? p.role : id}
                             </span>
                           )

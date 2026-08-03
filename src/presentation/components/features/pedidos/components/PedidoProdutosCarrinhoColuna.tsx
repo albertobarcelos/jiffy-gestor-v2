@@ -752,7 +752,7 @@ export function PedidoProdutosCarrinhoColuna() {
                 className="object-contain"
               />
             </div>
-            <p className="font-nunito text-base leading-snug text-gray-600">
+            <p className="text-base leading-snug text-gray-600">
               Selecione um grupo
               <br />
               e um produto

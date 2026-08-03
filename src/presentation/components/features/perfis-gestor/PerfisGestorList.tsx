@@ -440,7 +440,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
   return (
     <div className="mx-auto flex h-full w-full min-w-0 max-w-6xl flex-col">
       <div className="flex-shrink-0 px-1 pt-1 md:px-0">
-        <span className="font-nunito text-sm font-semibold text-secondary md:text-lg">
+        <span className="text-sm font-semibold text-secondary md:text-lg">
           Perfis Gestor Cadastrados
         </span>
       </div>
@@ -449,22 +449,22 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
         <div className="mt-2 hidden flex-shrink-0 md:block">
           <div className="flex h-11 w-full min-w-0 items-center gap-[10px] border-b border-gray-200 bg-gray-50 px-3 pr-2 md:px-4">
             <div className="w-8 shrink-0 md:h-8" aria-hidden />
-            <div className="min-w-0 truncate text-left font-nunito text-xs font-semibold text-secondary md:flex-[3] md:text-sm">
+            <div className="min-w-0 truncate text-left text-xs font-semibold text-secondary md:flex-[3] md:text-sm">
               Perfil
             </div>
-            <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary md:flex-[1] md:text-sm">
+            <div className="min-w-0 truncate text-center text-xs font-semibold text-secondary md:flex-[1] md:text-sm">
               Qtd. Usuario
             </div>
-            <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary md:flex-[1] md:text-sm">
+            <div className="min-w-0 truncate text-center text-xs font-semibold text-secondary md:flex-[1] md:text-sm">
               Financeiro
             </div>
-            <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary md:flex-[1] md:text-sm">
+            <div className="min-w-0 truncate text-center text-xs font-semibold text-secondary md:flex-[1] md:text-sm">
               Estoque
             </div>
-            <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary md:flex-[1] md:text-sm">
+            <div className="min-w-0 truncate text-center text-xs font-semibold text-secondary md:flex-[1] md:text-sm">
               Fiscal
             </div>
-            <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary md:flex-[1] md:text-sm">
+            <div className="min-w-0 truncate text-center text-xs font-semibold text-secondary md:flex-[1] md:text-sm">
               Dashboard
             </div>
           </div>
@@ -567,11 +567,11 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
                     <MdKeyboardArrowRight size={18} />
                   </span>
                 </button>
-                <div className="md:flex-[3] font-nunito text-left md:text-sm text-primary-text flex items-center gap-2">
+                <div className="md:flex-[3] text-left md:text-sm text-primary-text flex items-center gap-2">
                   <span className="font-normal">{perfil.getRole()}</span>
                 </div>
                 <div
-                  className="md:flex-[1] flex items-center justify-center font-nunito md:text-sm text-xs text-secondary-text tabular-nums"
+                  className="md:flex-[1] flex items-center justify-center md:text-sm text-xs text-secondary-text tabular-nums"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {contagemUsuarios} usuário(s)
@@ -630,7 +630,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
                     </span>
                   </button>
                   <span className="text-base font-semibold text-secondary-text">Perfil:</span>
-                  <span className="font-nunito font-normal text-base text-primary-text max-w-[55%] truncate">
+                  <span className="font-normal text-base text-primary-text max-w-[55%] truncate">
                     {perfil.getRole()}
                   </span>
                 </div>
@@ -671,7 +671,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
                   />
                 </div>
                 <div className="text-center mt-2">
-                  <span className="font-nunito text-xs text-secondary-text tabular-nums">
+                  <span className="text-xs text-secondary-text tabular-nums">
                     Qtd. User: {contagemUsuarios}
                   </span>
                 </div>
@@ -695,10 +695,10 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
                             <span className="text-primary"><MdPerson size={22} /></span>
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="font-nunito text-sm font-semibold text-primary-text">
+                            <p className="text-sm font-semibold text-primary-text">
                               {usuario.nome}
                             </p>
-                            <p className="mt-1 font-nunito text-xs text-secondary-text">
+                            <p className="mt-1 text-xs text-secondary-text">
                               {usuario.username || 'Sem e-mail'}
                             </p>
                           </div>
@@ -727,10 +727,10 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
                             <span className="text-primary"><MdPerson size={22} /></span>
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="font-nunito text-sm font-semibold text-primary-text">
+                            <p className="text-sm font-semibold text-primary-text">
                               {usuario.nome}
                             </p>
-                            <p className="mt-1 font-nunito text-xs text-secondary-text">
+                            <p className="mt-1 text-xs text-secondary-text">
                               {usuario.username || 'Sem e-mail'}
                             </p>
                           </div>

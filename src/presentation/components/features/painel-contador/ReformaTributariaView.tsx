@@ -89,7 +89,7 @@ export function ReformaTributariaView() {
                         onDoubleClick={() => handleDoubleClick(config)}
                         className="hover:bg-secondary/5 cursor-pointer transition-colors"
                       >
-                        <td className="px-4 py-3 text-sm text-secondary-text font-mono">
+                        <td className="px-4 py-3 text-sm text-secondary-text ">
                           {config.ncm?.codigo || '--'}
                         </td>
                         <td className="px-4 py-3 text-sm text-secondary-text">{config.cst || '--'}</td>

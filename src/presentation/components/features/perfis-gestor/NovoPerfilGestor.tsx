@@ -326,7 +326,7 @@ export const NovoPerfilGestor = forwardRef<NovoPerfilGestorHandle, NovoPerfilGes
                   <MdPerson />
                 </span>
               </div>
-              <h1 className="font-exo text-sm font-semibold text-primary md:text-lg">
+              <h1 className="text-sm font-semibold text-primary md:text-lg">
                 {isEditing ? 'Editar Perfil Gestor' : 'Novo Perfil Gestor'}
               </h1>
             </div>

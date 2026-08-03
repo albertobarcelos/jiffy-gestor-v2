@@ -64,7 +64,7 @@ export const DialogTitle = React.forwardRef<HTMLHeadingElement, DialogTitleProps
     return (
       <MuiDialogTitle
         ref={ref}
-        sx={{ p: 0, fontFamily: 'Exo, sans-serif', fontWeight: 600, ...sx }}
+        sx={{ p: 0, fontFamily: 'var(--font-general-sans), system-ui, sans-serif', fontWeight: 600, ...sx }}
         {...props}
       >
         {children}
@@ -88,7 +88,7 @@ export const DialogDescription = React.forwardRef<HTMLDivElement, DialogDescript
         variant="body2"
         color="text.secondary"
         className={className}
-        sx={{ mt: 1, fontFamily: 'Nunito, sans-serif', ...sx }}
+        sx={{ mt: 1, fontFamily: 'var(--font-general-sans), system-ui, sans-serif', ...sx }}
         {...props}
       >
         {children}

@@ -283,6 +283,7 @@ export async function GET(request: NextRequest) {
         ontem: 'Ontem',
         semana: 'Últimos 7 Dias',
         '30dias': 'Últimos 30 Dias',
+        mes: 'Mês Atual',
       }
       const opcao = mapOpcao[periodo] || 'Hoje'
       const atual = calcularPeriodoNoFusoEmpresa(opcao, timezone)

@@ -111,13 +111,13 @@ export function CopiarConfiguracaoNcmModal({
     >
       <DialogContent>
         <DialogHeader>
-          <h1 className="text-alternate font-exo font-semibold text-lg sm:text-xl">Copiar Configuração de Impostos</h1>
+          <h1 className="text-alternate font-semibold text-lg sm:text-xl">Copiar Configuração de Impostos</h1>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           <div>
             <Label className="text-sm font-semibold text-secondary-text">
-              NCM Origem: <span className="font-mono">{codigoNcmOrigem}</span>
+              NCM Origem: <span className="">{codigoNcmOrigem}</span>
             </Label>
           </div>
 
@@ -130,7 +130,7 @@ export function CopiarConfiguracaoNcmModal({
               value={ncmsDestino}
               onChange={(e) => setNcmsDestino(e.target.value)}
               placeholder="12345678, 87654321, 11223344"
-              className="font-mono"
+              className=""
             />
             <p className="text-xs text-secondary-text/70 mt-1">
               Informe os códigos NCM (8 dígitos) para os quais a configuração será copiada
@@ -153,7 +153,7 @@ export function CopiarConfiguracaoNcmModal({
                         setNcmsDestino([...atual, ncm].join(', '))
                       }
                     }}
-                    className="px-2 py-1 text-xs bg-alternate/10 text-alternate rounded hover:bg-alternate/20 transition-colors font-mono"
+                    className="px-2 py-1 text-xs bg-alternate/10 text-alternate rounded hover:bg-alternate/20 transition-colors "
                   >
                     {ncm}
                   </button>

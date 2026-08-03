@@ -452,7 +452,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
                     grupoId: undefined,
                   })
                 }
-                className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+                className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
               >
                 Novo
                 <span className="text-lg">+</span>
@@ -472,7 +472,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
                 placeholder="Pesquisar grupo..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
-                className="w-full h-full px-5 pl-12 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+                className="w-full h-full px-5 pl-12 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm "
               />
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
                 <MdSearch size={18} />
@@ -489,7 +489,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
               onChange={(e) =>
                 setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Inativo')
               }
-              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm "
             >
               <option value="Todos">Todos</option>
               <option value="Ativo">Ativo</option>
@@ -501,16 +501,16 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       {/* Cabeçalho da tabela */}
       <div className="px-1">
         <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px]">
-          <div className="flex-[1] font-nunito font-semibold md:text-sm text-[10px] text-primary-text">
+          <div className="flex-[1] font-semibold md:text-sm text-[10px] text-primary-text">
             Ordem
           </div>
-          <div className="flex-[2] font-nunito font-semibold md:text-sm text-[10px] text-primary-text">
+          <div className="flex-[2] font-semibold md:text-sm text-[10px] text-primary-text">
             Ícones do Grupo
           </div>
-          <div className="flex-[4] font-nunito font-semibold md:text-sm text-[10px] text-primary-text">
+          <div className="flex-[4] font-semibold md:text-sm text-[10px] text-primary-text">
             Nome
           </div>
-          <div className="flex-[2] md:text-end text-right font-nunito font-semibold md:text-sm text-[10px] text-primary-text">
+          <div className="flex-[2] md:text-end text-right font-semibold md:text-sm text-[10px] text-primary-text">
             Status
           </div>
         </div>

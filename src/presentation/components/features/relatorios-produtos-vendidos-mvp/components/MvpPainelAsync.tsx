@@ -24,14 +24,14 @@ export function MvpPainelAsync(props: {
       className={`m-1 rounded-lg border border-primary/10 bg-info p-3 ${shellMin}`.trim()}
     >
       {titulo ? (
-        <p className="font-nunito mb-2 text-xs font-medium text-secondary-text">{titulo}</p>
+        <p className="mb-2 text-xs font-medium text-secondary-text">{titulo}</p>
       ) : null}
       {loading ? (
         <div className={`flex items-center justify-center py-4 ${loadingMin}`}>
           <JiffyLoading />
         </div>
       ) : error ? (
-        <p className="font-nunito py-2 text-center text-sm text-red-600">
+        <p className="py-2 text-center text-sm text-red-600">
           {error.message || 'Erro ao carregar este painel.'}
         </p>
       ) : (

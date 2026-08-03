@@ -532,10 +532,10 @@ export function UsuariosList({
       <div className="md:px-[30px] px-1 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="w-1/2 md:pl-5">
-            <p className="text-primary md:text-lg text-sm font-semibold font-nunito">
+            <p className="text-primary md:text-lg text-sm font-semibold ">
               {title}
             </p>
-            <p className="text-tertiary md:text-[22px] text-sm font-normal font-nunito">
+            <p className="text-tertiary md:text-[22px] text-sm font-normal ">
               Total {usuarios.length} de {totalUsuarios}
             </p>
           </div>
@@ -546,7 +546,7 @@ export function UsuariosList({
                 usuarioId: undefined,
               })
             }}
-            className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+            className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
           >
             {createLabel}
             <span className="text-lg">+</span>
@@ -568,7 +568,7 @@ export function UsuariosList({
                 placeholder="Pesquisar usuário..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
-                className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+                className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm "
               />
             </div>
           </div>
@@ -582,7 +582,7 @@ export function UsuariosList({
               onChange={(e) =>
                 setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')
               }
-              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm "
             >
               <option value="Todos">Todos</option>
               <option value="Ativo">Ativo</option>
@@ -594,19 +594,19 @@ export function UsuariosList({
       {/* Cabeçalho da tabela */}
       <div className="mt-0 flex-shrink-0">
         <div className="h-10 bg-custom-2 rounded-lg md:px-4 px-1 flex items-center md:gap-[10px] gap-1">
-          <div className="md:flex-[3] flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text">
+          <div className="md:flex-[3] flex-[2] font-semibold md:text-sm text-xs text-primary-text">
             Nome
           </div>
-          <div className="md:flex-[2] flex-[1] font-nunito font-semibold md:text-sm text-xs text-primary-text hidden md:flex">
+          <div className="md:flex-[2] flex-[1] font-semibold md:text-sm text-xs text-primary-text hidden md:flex">
             Telefone
           </div>
-          <div className="md:flex-[2] flex-[1] font-nunito font-semibold md:text-sm text-xs text-primary-text">
+          <div className="md:flex-[2] flex-[1] font-semibold md:text-sm text-xs text-primary-text">
             Perfil
           </div>
-          <div className="md:flex-[2] flex-[1] md:text-center text-right font-nunito font-semibold md:text-sm text-xs text-primary-text">
+          <div className="md:flex-[2] flex-[1] md:text-center text-right font-semibold md:text-sm text-xs text-primary-text">
             Status
           </div>
-          <div className="flex-[1] text-right font-nunito font-semibold md:text-sm text-xs text-primary-text">
+          <div className="flex-[1] text-right font-semibold md:text-sm text-xs text-primary-text">
             Ações
           </div>
         </div>
@@ -652,7 +652,7 @@ export function UsuariosList({
               <div className="md:flex-[3] flex-[2] font-normal md:text-sm text-[10px] text-primary-text flex items-center gap-2">
                 {usuario.getNome()}
               </div>
-              <div className="md:flex-[2] flex-[1] font-nunito md:text-sm text-[10px] text-secondary-text hidden md:flex">
+              <div className="md:flex-[2] flex-[1] md:text-sm text-[10px] text-secondary-text hidden md:flex">
                 {usuario.getTelefone() || '-'}
               </div>
               <div className="md:flex-[2] flex-[1]" onClick={(e) => e.stopPropagation()}>

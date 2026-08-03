@@ -575,7 +575,7 @@ export function GrupoComplementoComplementosModal({
         <div className="flex min-h-0 flex-1 flex-col rounded-[12px] bg-info md:p-5 p-3">
           {/* Mesmo padrão visual da aba Grupo: título primary + linha + ação */}
           <div className="mb-2 flex flex-wrap items-center gap-3 md:gap-5">
-            <h2 className="shrink-0 text-primary md:text-xl text-sm font-semibold font-exo">
+            <h2 className="shrink-0 text-primary md:text-xl text-sm font-semibold ">
               Complementos do Grupo
             </h2>
             <div className="h-px min-h-0 min-w-[2rem] flex-1 bg-primary/70" aria-hidden />

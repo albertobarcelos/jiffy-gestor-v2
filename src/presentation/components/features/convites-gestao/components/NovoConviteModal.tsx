@@ -143,7 +143,7 @@ export function NovoConviteModal({
       <div className="flex h-full min-h-0 flex-col">
         <div className="flex-1 overflow-y-auto px-5 py-4 scrollbar-hide md:px-6">
           <form id={CONVITE_FORM_ID} onSubmit={handleSubmit} className="space-y-6">
-            <p className="font-['Nunito',sans-serif] text-sm text-secondary-text">
+            <p className="text-sm text-secondary-text">
               Informe o e-mail do convidado e o perfil gestor vinculado ao convite.
             </p>
 

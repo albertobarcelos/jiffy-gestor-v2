@@ -289,7 +289,7 @@ export function CupomFiscalContingencia({ data, rodapeDanfeSrc }: CupomFiscalCon
         <div className="my-2 h-px bg-slate-300" />
         <pre
           className="whitespace-pre-wrap break-words text-sm leading-relaxed"
-          style={{ fontFamily: "'Roboto Mono', 'Courier New', monospace" }}
+          style={{ fontFamily: 'var(--font-general-sans), system-ui, sans-serif' }}
         >
           {textoPuro}
         </pre>
@@ -313,7 +313,7 @@ export function CupomFiscalContingencia({ data, rodapeDanfeSrc }: CupomFiscalCon
   const documentoCliente = resolveDocumentoClienteCupom(data)
 
   return (
-    <div className="space-y-2 text-sm" style={{ fontFamily: "'Roboto Mono', 'Courier New', monospace" }}>
+    <div className="space-y-2 text-sm" style={{ fontFamily: 'var(--font-general-sans), system-ui, sans-serif' }}>
       <CabecalhoCupom data={data} />
       <div className="my-2 h-px bg-slate-300" />
 

@@ -15,7 +15,7 @@ import {
   JIFFY_SESSION_EXPIRED_EVENT,
 } from '@/src/shared/constants/sessionCoordinator'
 
-/** Tempo máximo de espera para o refresh de token antes de forçar logout. */
+/** Tempo máximo de espera para o refresh de token antes de encerrar a sessão da empresa. */
 const REFRESH_TIMEOUT_MS = 5_000
 
 function isHubLogoutInitiatorTab(): boolean {
@@ -47,12 +47,13 @@ const SESSAO_TIMEOUT_MAX_MS = 1000 * 60 * 60 * 24 * 14
 
 /**
  * Proteção de rotas no cliente: exige sessão válida e não expirada.
- * Chama logout (limpa cookie httpOnly + estado) antes de redirecionar ao login.
- * Aguarda reidratação do Zustand para evitar falsos positivos após reload.
+ *
+ * - Sessão da **empresa** morta com identidade do hub ok → `logoutTenant` + `/meus-apps`
+ * - Identidade do hub também morta → `logout` completo + `/login`
  *
  * Além da checagem na montagem/atualização do store, faz **poll** e **timeout** na data
  * de `expiresAt` — assim, se o JWT expira com o usuário parado na mesma página, ainda
- * redireciona ao login (o efeito do Zustand sozinho não reexecuta só pelo passar do tempo).
+ * redireciona (o efeito do Zustand sozinho não reexecuta só pelo passar do tempo).
  */
 const PUBLIC_PREFIXES = [
   '/login',
@@ -103,9 +104,9 @@ function isTenantSessionAlive(): boolean {
   return getActiveTenantAuthOrNull() !== null
 }
 
-/** ERP: sessão da empresa (tenant JWT) é independente da identidade do hub. */
-function isTenantSessionValid(t: ReturnType<typeof useAuthStore.getState>['tenantAuth']): boolean {
-  return t !== null && !t.isExpired()
+function identityHubStillValid(): boolean {
+  const identity = useAuthStore.getState().identityAuth
+  return identity !== null && !identity.isExpired()
 }
 
 export function AuthGuard({ children }: AuthGuardProps) {
@@ -116,21 +117,46 @@ export function AuthGuard({ children }: AuthGuardProps) {
   const tenantAuth = useAuthStore(s => s.tenantAuth)
   const isRehydrated = useAuthStore(s => s.isRehydrated)
   const logout = useAuthStore(s => s.logout)
+  const logoutTenant = useAuthStore(s => s.logoutTenant)
   const [allowed, setAllowed] = useState(false)
   const redirectingRef = useRef(false)
 
-  const invalidateSessionToLogin = useCallback(async () => {
+  /**
+   * Sessão da empresa indisponível (expirada / refresh falhou).
+   * Mantém o hub e vai para Minhas Empresas quando a identidade ainda é válida.
+   */
+  const endTenantSessionOrFullLogout = useCallback(async () => {
     if (redirectingRef.current) {
       return
     }
+    /** Disconnect explícito para Minhas Empresas: não disparar logout completo em race. */
+    if (isTenantLogoutInProgress()) {
+      return
+    }
     redirectingRef.current = true
+
+    if (identityHubStillValid()) {
+      try {
+        sessionStorage.setItem(SESSION_STORAGE_TENANT_LOGOUT_SELF, '1')
+      } catch {
+        /* noop */
+      }
+      try {
+        await logoutTenant()
+      } catch (error) {
+        console.error('AuthGuard: erro ao encerrar sessão da empresa:', error)
+      }
+      window.location.href = '/meus-apps'
+      return
+    }
+
     try {
       await logout()
     } catch (error) {
       console.error('AuthGuard: erro ao encerrar sessão antes do login:', error)
     }
     window.location.href = '/login'
-  }, [logout])
+  }, [logout, logoutTenant])
 
   const redirectHubSemIdentidade = useCallback(() => {
     if (redirectingRef.current) {
@@ -138,7 +164,9 @@ export function AuthGuard({ children }: AuthGuardProps) {
     }
     redirectingRef.current = true
     // Limpar cookie de identidade antes de redirecionar (sem await para não bloquear o redirect)
-    void fetch('/api/auth/logout-hub', { method: 'POST', credentials: 'include' }).catch(() => { /* noop */ })
+    void fetch('/api/auth/logout-hub', { method: 'POST', credentials: 'include' }).catch(() => {
+      /* noop */
+    })
     window.location.href = '/login'
   }, [])
 
@@ -162,6 +190,25 @@ export function AuthGuard({ children }: AuthGuardProps) {
     }
 
     const isHub = isHubPath(pathname)
+
+    if (isTenantLogoutInProgress()) {
+      if (isHub) {
+        try {
+          sessionStorage.removeItem(SESSION_STORAGE_TENANT_LOGOUT_SELF)
+        } catch {
+          /* noop */
+        }
+        if ((identityAuth !== null && !identityAuth.isExpired()) || isTenantSessionAlive()) {
+          redirectingRef.current = false
+          setAllowed(true)
+          return
+        }
+        redirectHubSemIdentidade()
+        return
+      }
+      /** Ainda na rota ERP durante disconnect → aguardar `location.assign('/meus-apps')`. */
+      return
+    }
 
     if (isHub) {
       const tenantAlive = isTenantSessionAlive()
@@ -196,6 +243,14 @@ export function AuthGuard({ children }: AuthGuardProps) {
     }
 
     if (!isAuthenticated || auth === null || auth.isExpired()) {
+      if (isTenantLogoutInProgress()) {
+        return
+      }
+      /** Sem tenant: se a identidade do hub ainda vale, ir ao portal — não tentar refresh da empresa. */
+      if (identityHubStillValid()) {
+        redirectToMeusApps()
+        return
+      }
       let cancelled = false
       void (async () => {
         // Race: refresh token vs. timeout de segurança (5 s)
@@ -215,11 +270,11 @@ export function AuthGuard({ children }: AuthGuardProps) {
             redirectingRef.current = false
             setAllowed(true)
           } catch {
-            void invalidateSessionToLogin()
+            void endTenantSessionOrFullLogout()
           }
           return
         }
-        void invalidateSessionToLogin()
+        void endTenantSessionOrFullLogout()
       })()
       return () => {
         cancelled = true
@@ -227,15 +282,10 @@ export function AuthGuard({ children }: AuthGuardProps) {
     }
 
     if (!tenantAuth && !hasSessionNonce()) {
-      if (isTenantLogoutInProgress()) {
-        try {
-          sessionStorage.removeItem(SESSION_STORAGE_TENANT_LOGOUT_SELF)
-        } catch { /* noop */ }
-      }
-      if (identityAuth) {
+      if (identityHubStillValid() || identityAuth) {
         redirectToMeusApps()
       } else {
-        void invalidateSessionToLogin()
+        void endTenantSessionOrFullLogout()
       }
       return
     }
@@ -249,7 +299,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     tenantAuth,
     pathname,
     isRehydrated,
-    invalidateSessionToLogin,
+    endTenantSessionOrFullLogout,
     redirectHubSemIdentidade,
     redirectToMeusApps,
   ])
@@ -266,6 +316,9 @@ export function AuthGuard({ children }: AuthGuardProps) {
     const isHub = isHubPath(pathname)
 
     const checkExpired = () => {
+      if (isTenantLogoutInProgress()) {
+        return
+      }
       const st = useAuthStore.getState()
       if (isHub) {
         if (isHubLogoutInitiatorTab()) {
@@ -300,11 +353,11 @@ export function AuthGuard({ children }: AuthGuardProps) {
             try {
               syncTenantAccessTokenClient(refreshed)
             } catch {
-              void invalidateSessionToLogin()
+              void endTenantSessionOrFullLogout()
             }
             return
           }
-          void invalidateSessionToLogin()
+          void endTenantSessionOrFullLogout()
         })()
       }
     }
@@ -336,18 +389,21 @@ export function AuthGuard({ children }: AuthGuardProps) {
     identityAuth,
     tenantAuth,
     pathname,
-    invalidateSessionToLogin,
+    endTenantSessionOrFullLogout,
     redirectHubSemIdentidade,
   ])
 
-  /** Listener centralizado: fetchGestorApi dispara este evento quando o refresh falha. */
+  /** Listener: fetchGestorApi dispara quando o refresh do tenant falha após 401. */
   useEffect(() => {
     const handleSessionExpired = () => {
-      void invalidateSessionToLogin()
+      if (isTenantLogoutInProgress()) {
+        return
+      }
+      void endTenantSessionOrFullLogout()
     }
     window.addEventListener(JIFFY_SESSION_EXPIRED_EVENT, handleSessionExpired)
     return () => window.removeEventListener(JIFFY_SESSION_EXPIRED_EVENT, handleSessionExpired)
-  }, [invalidateSessionToLogin])
+  }, [endTenantSessionOrFullLogout])
 
   // Rotas públicas: renderizar imediatamente sem checar autenticação
   if (isPublicPath(pathname)) {
@@ -367,4 +423,3 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
   return <>{children}</>
 }
-

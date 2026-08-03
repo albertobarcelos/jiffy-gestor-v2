@@ -5,8 +5,8 @@ import type { Produto } from '@/src/domain/entities/Produto'
 import type { ToggleField } from '@/src/shared/types/produto'
 import { actionIconsConfig } from './constants'
 
-/** Na lista de lote não exibimos copiar, complementos nem impressoras (já há colunas próprias). */
-const CHAVES_OCULTAS_LOTE = new Set(['copiar', 'complementos', 'impressora'])
+/** Na lista de lote não exibimos copiar (já há fluxo próprio). */
+const CHAVES_OCULTAS_LOTE = new Set(['copiar'])
 
 function permissaoAtivaNoProduto(produto: Produto, field: ToggleField): boolean {
   switch (field) {
@@ -26,7 +26,7 @@ function permissaoAtivaNoProduto(produto: Produto, field: ToggleField): boolean 
 }
 
 /**
- * Ícones da lista de produtos (actionIconsConfig), somente leitura, sem copiar/complementos/impressora.
+ * Ícones da lista de produtos (actionIconsConfig), somente leitura, sem copiar.
  * Cores: ativo = primary-text; inativo = cinza médio.
  */
 export function ProdutoActionIconsDisplay({ produto }: { produto: Produto }) {

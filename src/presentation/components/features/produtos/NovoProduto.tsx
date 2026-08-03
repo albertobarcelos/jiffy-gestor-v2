@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import {
   useState,
@@ -1570,13 +1570,13 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
                   <MdImage className="text-2xl" />
                 </div>*/}
                     <div>
-                      <p className="font-exo text-sm font-semibold uppercase tracking-wide text-primary">
+                      <p className="text-sm font-semibold uppercase tracking-wide text-primary">
                         {getPageTitle()}
                       </p>
-                      <h2 className="font-exo text-lg font-bold leading-tight text-primary md:text-xl">
+                      <h2 className="text-lg font-bold leading-tight text-primary md:text-xl">
                         {displayNome}
                       </h2>
-                      <p className="font-nunito text-xs text-secondary-text md:text-sm">
+                      <p className="text-xs text-secondary-text md:text-sm">
                         {displayDescricao}
                       </p>
                     </div>
@@ -1590,7 +1590,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
                         className="flex h-8 items-center gap-1 rounded-lg border border-[#D4D8EB] bg-info px-1.5 py-1 shadow-sm transition-colors hover:border-primary/40 md:px-3"
                       >
                         <span className="text-xs font-semibold text-secondary-text md:text-sm">
-                          Visível no PDV
+                          Visível no Jiffy POS
                         </span>
                         <span
                           className={`relative inline-flex h-5 w-12 items-center rounded-full transition-colors ${
@@ -1607,7 +1607,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
                     )}
                     <button
                       onClick={handleCancel}
-                      className="h-8 rounded-lg border border-[#D7DBEC] bg-white px-4 font-exo text-xs font-semibold text-primary shadow-sm transition-colors hover:bg-[#f4f6ff] md:px-8 md:text-sm"
+                      className="h-8 rounded-lg border border-[#D7DBEC] bg-white px-4 text-xs font-semibold text-primary shadow-sm transition-colors hover:bg-[#f4f6ff] md:px-8 md:text-sm"
                     >
                       Cancelar
                     </button>
@@ -1625,7 +1625,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
               type="button"
               onClick={() => setSelectedPage(0)}
               title="Ir para Informações"
-              className={`flex h-9 w-9 items-center justify-center rounded-full font-exo text-base font-bold transition-all hover:scale-110 hover:shadow-md ${
+              className={`flex h-9 w-9 items-center justify-center rounded-full text-base font-bold transition-all hover:scale-110 hover:shadow-md ${
                 selectedPage >= 0 ? 'bg-[#B7E246] text-primary' : 'bg-[#CEDCF8] text-primary'
               }`}
             >
@@ -1640,7 +1640,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
               type="button"
               onClick={() => setSelectedPage(1)}
               title="Ir para Configurações"
-              className={`flex h-9 w-9 items-center justify-center rounded-full font-exo text-base font-bold transition-all hover:scale-110 hover:shadow-md ${
+              className={`flex h-9 w-9 items-center justify-center rounded-full text-base font-bold transition-all hover:scale-110 hover:shadow-md ${
                 selectedPage >= 1 ? 'bg-[#B7E246] text-primary' : 'bg-[#CEDCF8] text-[#1D3B53]'
               }`}
             >
@@ -1655,7 +1655,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
               type="button"
               onClick={() => setSelectedPage(2)}
               title="Ir para Configuração Fiscal"
-              className={`flex h-9 w-9 items-center justify-center rounded-full font-exo text-base font-bold transition-all hover:scale-110 hover:shadow-md ${
+              className={`flex h-9 w-9 items-center justify-center rounded-full text-base font-bold transition-all hover:scale-110 hover:shadow-md ${
                 selectedPage >= 2 ? 'bg-[#B7E246] text-primary' : 'bg-[#CEDCF8] text-[#1D3B53]'
               }`}
             >

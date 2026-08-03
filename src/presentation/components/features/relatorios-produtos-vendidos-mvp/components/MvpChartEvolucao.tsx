@@ -110,10 +110,10 @@ function LegendaEvolucaoFixa({ items }: { items: LegendaEvolucaoItem[] }) {
 
   return (
     <aside
-      className="font-nunito shrink-0 border-t border-primary/10 pt-4 lg:w-56 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0 xl:w-60"
+      className="shrink-0 border-t border-primary/10 pt-4 lg:w-56 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0 xl:w-60"
       aria-label="Legenda dos produtos"
     >
-      <p className="font-exo mb-2 text-xs font-semibold uppercase tracking-wide text-secondary-text">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-secondary-text">
         Produtos
       </p>
       <ul className="scrollbar-thin flex max-h-[min(22rem,55vh)] flex-col gap-2 overflow-y-auto pr-1">
@@ -173,7 +173,7 @@ function EvolucaoTooltipContent({
   const rotuloPeriodo = granularidade === 'hora' ? 'Hora' : 'Dia'
 
   return (
-    <div className="font-nunito" style={tooltipContainerStyle}>
+    <div className="" style={tooltipContainerStyle}>
       <p className="mb-1.5 text-xs font-semibold text-primary-text">
         {rotuloPeriodo} {label}
       </p>
@@ -341,7 +341,7 @@ export function MvpChartEvolucao(props: {
 
   if (!chartRows.length || !temAlgumValor) {
     return (
-      <div className="font-nunito rounded-lg border-2 border-dashed border-custom-2 bg-info p-6 text-center text-sm text-secondary-text">
+      <div className="rounded-lg border-2 border-dashed border-custom-2 bg-info p-6 text-center text-sm text-secondary-text">
         {serieGranularidade === 'hora'
           ? 'Sem vendas por hora nos produtos destacados neste dia.'
           : 'Sem pontos para o gráfico: não há valores diários nos produtos destacados neste período.'}
@@ -363,14 +363,14 @@ export function MvpChartEvolucao(props: {
     <div className="rounded-lg border-2 bg-info p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <h3 className="font-exo text-sm font-semibold text-primary">{tituloGrafico}</h3>
+          <h3 className="text-sm font-semibold text-primary">{tituloGrafico}</h3>
           {serieSimplificada ? (
-            <p className="font-nunito mt-1 text-xs text-warning">
+            <p className="mt-1 text-xs text-warning">
               Pode não haver data de finalização nas vendas detalhadas — verifique períodos grandes ou
               buracos nos metadados.
             </p>
           ) : (
-            <p className="font-nunito mt-1 text-xs text-secondary-text">{subtituloCartesiano}</p>
+            <p className="mt-1 text-xs text-secondary-text">{subtituloCartesiano}</p>
           )}
         </div>
         <MvpChartTipoSelect

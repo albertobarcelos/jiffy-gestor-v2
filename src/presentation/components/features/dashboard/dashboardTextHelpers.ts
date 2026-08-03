@@ -1,3 +1,5 @@
+import { calcularPeriodoNoFusoEmpresa } from '@/src/shared/utils/periodoNoFusoEmpresa'
+
 export function formatarHoraParaInputCalendar(d: Date | null | undefined): string {
   if (!d) return '00:00'
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
@@ -21,13 +23,71 @@ export function formatarItensPorPedido(n: number): string {
   })
 }
 
-export function labelDataHoje() {
+export function labelDataHoje(timeZone?: string) {
   const d = new Date()
   return d.toLocaleDateString('pt-BR', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
+    ...(timeZone ? { timeZone } : {}),
   })
+}
+
+function formatarDataCivilCurta(date: Date, timeZone: string): string {
+  return date.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    timeZone,
+  })
+}
+
+function formatarHoraCurta(date: Date, timeZone: string): string {
+  return date.toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone,
+  })
+}
+
+function formatarDataHoraCurtaNoFuso(date: Date, timeZone: string): string {
+  return `${formatarDataCivilCurta(date, timeZone)}, ${formatarHoraCurta(date, timeZone)}`
+}
+
+/** Mesmo dia: `02/08/2026 · 00:00 — 23:59`; senão data+hora em cada extremo. */
+function formatarResumoPeriodoPresetNoFuso(
+  inicio: Date,
+  fim: Date,
+  timeZone: string
+): string {
+  const ymd = (d: Date) => d.toLocaleDateString('en-CA', { timeZone })
+  if (ymd(inicio) === ymd(fim)) {
+    return `${formatarDataCivilCurta(inicio, timeZone)} · ${formatarHoraCurta(inicio, timeZone)} — ${formatarHoraCurta(fim, timeZone)}`
+  }
+  return `${formatarDataHoraCurtaNoFuso(inicio, timeZone)} — ${formatarDataHoraCurtaNoFuso(fim, timeZone)}`
+}
+
+const PERIODO_PRESET_PARA_OPCAO: Record<string, string> = {
+  hoje: 'Hoje',
+  ontem: 'Ontem',
+  semana: 'Últimos 7 Dias',
+  mes: 'Mês Atual',
+}
+
+/**
+ * Faixa data/hora do preset (ao lado do rótulo no select), no fuso da empresa.
+ * Ex.: "02/08/2026 · 00:00 — 23:59" ou "27/07/2026, 00:00 — 02/08/2026, 23:59".
+ */
+export function labelFaixaDatasPeriodoPreset(
+  periodoData: string,
+  timeZoneEmpresa: string
+): string | null {
+  const opcao = PERIODO_PRESET_PARA_OPCAO[periodoData]
+  if (!opcao) return null
+  const tz = timeZoneEmpresa.trim() || 'America/Sao_Paulo'
+  const { inicio, fim } = calcularPeriodoNoFusoEmpresa(opcao, tz)
+  if (!inicio || !fim) return null
+  return formatarResumoPeriodoPresetNoFuso(inicio, fim, tz)
 }
 
 export function tituloFaturamentoBanner(periodoData: string): string {
@@ -38,8 +98,8 @@ export function tituloFaturamentoBanner(periodoData: string): string {
       return 'Ontem você faturou'
     case 'semana':
       return 'Nos últimos 7 dias você faturou'
-    case '30dias':
-      return 'Nos últimos 30 dias você faturou'
+    case 'mes':
+      return 'Neste mês você faturou'
     case 'personalizado':
       return 'No período escolhido você faturou'
     default:
@@ -55,8 +115,8 @@ export function rotuloRodapeComparacaoCards(periodoData: string): string {
       return 'Ante-ontem'
     case 'semana':
       return '7 dias anteriores'
-    case '30dias':
-      return '30 dias anteriores'
+    case 'mes':
+      return 'Mês passado'
     case 'personalizado':
       return `30 dias antes`
     default:
@@ -72,8 +132,8 @@ export function rotuloPeriodoTituloCard(periodoData: string): string | null {
       return 'ontem'
     case 'semana':
       return '7 dias'
-    case '30dias':
-      return '30 dias'
+    case 'mes':
+      return 'mês atual'
     case 'personalizado':
       return 'período escolhido'
     default:
@@ -109,12 +169,12 @@ export function textosComparacaoPeriodoAnterior(periodoData: string): {
         abaixoResto: 'dos 7 dias anteriores',
         alinhadoCom: 'os 7 dias anteriores',
       }
-    case '30dias':
+    case 'mes':
       return {
-        sufixoVs: 'nos 30 dias anteriores',
-        acimaResto: 'dos 30 dias anteriores',
-        abaixoResto: 'dos 30 dias anteriores',
-        alinhadoCom: 'os 30 dias anteriores',
+        sufixoVs: 'no mês passado',
+        acimaResto: 'do mês passado',
+        abaixoResto: 'do mês passado',
+        alinhadoCom: 'o mês passado',
       }
     case 'personalizado':
       return {
@@ -141,8 +201,8 @@ export function prefixoSemFaturamentoNaBase(periodoData: string): string {
       return 'Ante-ontem não houve faturamento'
     case 'semana':
       return 'Nos 7 dias anteriores não houve faturamento'
-    case '30dias':
-      return 'Nos 30 dias anteriores não houve faturamento'
+    case 'mes':
+      return 'No mês passado não houve faturamento'
     case 'personalizado':
       return `Na janela 30 dias antes não houve faturamento`
     default:
@@ -153,7 +213,7 @@ export function prefixoSemFaturamentoNaBase(periodoData: string): string {
 export function textoUltimaAtualizacao(ultimaAtualizacaoMs: number): string {
   const diffMs = Math.max(0, Date.now() - ultimaAtualizacaoMs)
   const segundos = Math.floor(diffMs / 1000)
-  if (segundos < 45) return 'Atualizado agora há pouco'
+  if (segundos < 45) return 'Atualizado há pouco'
   if (segundos < 90) return 'Atualizado há 1 minuto'
   const minutos = Math.floor(segundos / 60)
   if (minutos < 60) {

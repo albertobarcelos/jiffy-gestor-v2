@@ -52,7 +52,7 @@ export default function ConvitesGestaoPage() {
           <button
             type="button"
             onClick={handleVoltar}
-            className="flex h-8 shrink-0 items-center gap-2 rounded-lg bg-secondary px-5 font-exo text-sm font-semibold text-info transition-colors hover:bg-alternate"
+            className="flex h-8 shrink-0 items-center gap-2 rounded-lg bg-secondary px-5 text-sm font-semibold text-info transition-colors hover:bg-alternate"
           >
             <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
             Voltar
@@ -60,7 +60,7 @@ export default function ConvitesGestaoPage() {
           <button
             type="button"
             onClick={() => setModalOpen(true)}
-            className="flex h-8 items-center gap-2 rounded-lg bg-secondary px-[30px] font-exo text-sm font-semibold text-info transition-colors hover:bg-alternate"
+            className="flex h-8 items-center gap-2 rounded-lg bg-secondary px-[30px] text-sm font-semibold text-info transition-colors hover:bg-alternate"
           >
             Convidar
             <Plus className="h-4 w-4 shrink-0" strokeWidth={2.5} aria-hidden />

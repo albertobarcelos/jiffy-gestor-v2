@@ -504,7 +504,7 @@ export function ProdutoImpressorasDialog({
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Buscar impressora..."
-              className="font-nunito h-9 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-xs text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+              className="h-9 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-xs text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
             />
           </div>
           <div className="scrollbar-hide max-h-[280px] min-h-0 overflow-y-auto overscroll-y-contain rounded-lg border border-gray-100 bg-gray-50/50 md:max-h-[360px]">
@@ -520,7 +520,7 @@ export function ProdutoImpressorasDialog({
                     >
                       <div className="min-w-0 flex-1 py-2">
                         <div className="flex items-center gap-2">
-                          <p className="font-nunito truncate text-xs font-medium text-primary-text">
+                          <p className="truncate text-xs font-medium text-primary-text">
                             {impressora.nome || 'Impressora'}
                           </p>
                           <button
@@ -539,7 +539,7 @@ export function ProdutoImpressorasDialog({
                           impressora.tipoConexao ||
                           impressora.ip ||
                           impressora.porta) && (
-                          <p className="font-nunito mt-0.5 text-xs leading-snug text-secondary-text">
+                          <p className="mt-0.5 text-xs leading-snug text-secondary-text">
                             {[
                               impressora.modelo && `Modelo: ${impressora.modelo}`,
                               impressora.local && `Local: ${impressora.local}`,
@@ -583,7 +583,7 @@ export function ProdutoImpressorasDialog({
             ) : (
               <div className="flex flex-col items-center justify-center space-y-2 py-12 text-center">
                 <MdPrint className="text-3xl text-secondary-text" />
-                <p className="font-nunito text-xs text-secondary-text">
+                <p className="text-xs text-secondary-text">
                   {allImpressoras.length === 0
                     ? 'Nenhuma impressora cadastrada.'
                     : `Nenhuma impressora encontrada${searchQuery.trim() ? ` para "${searchQuery.trim()}"` : ''}.`}
@@ -602,7 +602,7 @@ export function ProdutoImpressorasDialog({
     <div className="px-6 py-3">
       {/* Mesmo padrão de ComplementosMultiSelectDialog (aba embutida) */}
       <div className="flex min-w-0 flex-wrap items-center gap-3 md:gap-5">
-        <h2 className="min-w-0 break-words font-exo text-lg font-semibold text-primary md:text-xl">
+        <h2 className="min-w-0 break-words text-lg font-semibold text-primary md:text-xl">
           Impressoras Vinculadas
         </h2>
         <div className="h-px min-w-8 flex-1 bg-primary/70" />
@@ -616,7 +616,7 @@ export function ProdutoImpressorasDialog({
           Nova impressora
         </button>
       </div>
-      <p className="font-nunito text-sm text-secondary-text">
+      <p className="text-sm text-secondary-text">
         {impressoras.length} impressora{impressoras.length === 1 ? '' : 's'} vinculadas
       </p>
     </div>
