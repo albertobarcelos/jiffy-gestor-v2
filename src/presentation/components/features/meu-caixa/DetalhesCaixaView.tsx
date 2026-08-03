@@ -102,11 +102,11 @@ export function DetalhesCaixaView({ caixaRef, conferenciaCaixaRef }: DetalhesCai
         {/* Header com data de abertura */}
         <div className="mb-6">
           <div className="h-10 bg-white rounded-tl-[16px] rounded-br-[6px] rounded-bl-[6px] rounded-tr-[6px] flex items-center px-5">
-            <p className="text-secondary-text text-base font-semibold font-nunito">
+            <p className="text-secondary-text text-base font-semibold ">
               Abertura: {formatarData(caixa.getDataAbertura())}
             </p>
             {caixa.getDataFechamento() && (
-              <p className="text-secondary-text text-base font-semibold font-nunito ml-4">
+              <p className="text-secondary-text text-base font-semibold ml-4">
                 | Fechamento: {formatarData(caixa.getDataFechamento() || new Date())}
               </p>
             )}
@@ -118,12 +118,12 @@ export function DetalhesCaixaView({ caixaRef, conferenciaCaixaRef }: DetalhesCai
           <div className="h-[120px] bg-info rounded-[10px] p-3 flex flex-col">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-2xl">💰</span>
-              <p className="text-primary-text text-sm font-semibold font-exo">
+              <p className="text-primary-text text-sm font-semibold ">
                 Saldo em Caixa
               </p>
             </div>
             <div className="flex-1 flex items-center justify-center">
-              <p className="text-tertiary text-xl font-semibold font-exo">
+              <p className="text-tertiary text-xl font-semibold ">
                 {formatarMoeda(saldoCaixa)}
               </p>
             </div>
@@ -132,12 +132,12 @@ export function DetalhesCaixaView({ caixaRef, conferenciaCaixaRef }: DetalhesCai
           <div className="h-[120px] bg-info rounded-[10px] p-3 flex flex-col">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-2xl">⬇️</span>
-              <p className="text-primary-text text-sm font-semibold font-exo">
+              <p className="text-primary-text text-sm font-semibold ">
                 Suprimentos
               </p>
             </div>
             <div className="flex-1 flex items-center justify-center">
-              <p className="text-success text-xl font-semibold font-exo">
+              <p className="text-success text-xl font-semibold ">
                 {formatarMoeda(somaSuprimentos)}
               </p>
             </div>
@@ -146,12 +146,12 @@ export function DetalhesCaixaView({ caixaRef, conferenciaCaixaRef }: DetalhesCai
           <div className="h-[120px] bg-info rounded-[10px] p-3 flex flex-col">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-2xl">⬆️</span>
-              <p className="text-primary-text text-sm font-semibold font-exo">
+              <p className="text-primary-text text-sm font-semibold ">
                 Sangrias
               </p>
             </div>
             <div className="flex-1 flex items-center justify-center">
-              <p className="text-error text-xl font-semibold font-exo">
+              <p className="text-error text-xl font-semibold ">
                 {formatarMoeda(somaSangrias)}
               </p>
             </div>
@@ -161,7 +161,7 @@ export function DetalhesCaixaView({ caixaRef, conferenciaCaixaRef }: DetalhesCai
         {/* Seção de Gráfico de Faturamento */}
         <div className="mb-6">
           <div className="bg-info rounded-[10px] p-5">
-            <h3 className="text-secondary text-xl font-semibold font-exo mb-4">
+            <h3 className="text-secondary text-xl font-semibold mb-4">
               Gráfico de Faturamento
             </h3>
             <div className="h-[300px] flex items-center justify-center border-2 border-dashed border-secondary rounded-lg">
@@ -173,7 +173,7 @@ export function DetalhesCaixaView({ caixaRef, conferenciaCaixaRef }: DetalhesCai
         {/* Seção de Resumo de Valores */}
         <div className="mb-6">
           <div className="bg-info rounded-[10px] p-5">
-            <h3 className="text-secondary text-xl font-semibold font-exo mb-4">
+            <h3 className="text-secondary text-xl font-semibold mb-4">
               Resumo de Valores
             </h3>
             <div className="space-y-3">
@@ -208,7 +208,7 @@ export function DetalhesCaixaView({ caixaRef, conferenciaCaixaRef }: DetalhesCai
         {/* Histórico de Operações */}
         <div className="mb-6">
           <div className="flex items-center gap-5 mb-5">
-            <h3 className="text-secondary text-sm font-semibold font-exo">
+            <h3 className="text-secondary text-sm font-semibold ">
               Histórico de Operações
             </h3>
             <div className="flex-1 h-[1px] bg-alternate"></div>

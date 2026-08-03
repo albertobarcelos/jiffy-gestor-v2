@@ -136,7 +136,7 @@ export function ConfiguracaoImpostosView() {
           <Box sx={{ minWidth: 0, flex: 1 }}>
             <Typography
               sx={{
-                fontFamily: "'Exo 2', sans-serif",
+                fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
                 fontWeight: 700,
                 fontSize: { xs: '20px', sm: '24px', md: '32px' },
                 color: '#ffffff',
@@ -148,7 +148,7 @@ export function ConfiguracaoImpostosView() {
             </Typography>
             <Typography
               sx={{
-                fontFamily: "'Inter', sans-serif",
+                fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
                 fontWeight: 400,
                 fontSize: { xs: '12px', sm: '13px', md: '15px' },
                 color: 'rgba(255, 255, 255, 0.9)',
@@ -232,7 +232,7 @@ export function ConfiguracaoImpostosView() {
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Typography
                   sx={{
-                    fontFamily: "'Inter', sans-serif",
+                    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
                     fontWeight: 500,
                     fontSize: { xs: '11px', sm: '12px' },
                     color: '#6b7280',
@@ -245,7 +245,7 @@ export function ConfiguracaoImpostosView() {
                 </Typography>
                 <Typography
                   sx={{
-                    fontFamily: "'Exo 2', sans-serif",
+                    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
                     fontWeight: 700,
                     fontSize: { xs: '22px', sm: '28px', md: '36px' },
                     color: '#1f2937',
@@ -257,7 +257,7 @@ export function ConfiguracaoImpostosView() {
                 </Typography>
                 <Typography
                   sx={{
-                    fontFamily: "'Inter', sans-serif",
+                    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
                     fontWeight: 400,
                     fontSize: { xs: '13px', sm: '14px', md: '15px' },
                     color: '#6b7280',
@@ -282,7 +282,7 @@ export function ConfiguracaoImpostosView() {
                 <MdCheckCircle size={16} color="#1f2937" style={{ fontSize: 'clamp(14px, 2vw, 18px)' }} />
                 <Typography
                   sx={{
-                    fontFamily: "'Inter', sans-serif",
+                    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
                     fontWeight: 600,
                     fontSize: { xs: '12px', sm: '13px' },
                     color: '#1f2937',
@@ -314,7 +314,7 @@ export function ConfiguracaoImpostosView() {
             }}>
               <Typography
                 sx={{
-                  fontFamily: "'Inter', sans-serif",
+                  fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
                   fontWeight: 600,
                   fontSize: { xs: '16px', sm: '18px', md: '20px' },
                   color: '#1f2937',
@@ -338,7 +338,7 @@ export function ConfiguracaoImpostosView() {
               >
                 <Typography
                   sx={{
-                    fontFamily: "'Inter', sans-serif",
+                    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
                     fontWeight: 600,
                     fontSize: { xs: '12px', sm: '13px', md: '14px' },
                     color: '#530ca3',
@@ -397,7 +397,7 @@ export function ConfiguracaoImpostosView() {
                       label={
                         <Typography
                           sx={{
-                            fontFamily: "'Inter', sans-serif",
+                            fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
                             fontWeight: 500,
                             fontSize: { xs: '13px', sm: '14px', md: '15px' },
                             color: '#374151',
@@ -426,7 +426,7 @@ export function ConfiguracaoImpostosView() {
           >
             <Typography
               sx={{
-                fontFamily: "'Inter', sans-serif",
+                fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
                 fontWeight: 600,
                 fontSize: { xs: '16px', sm: '18px', md: '20px' },
                 color: '#1f2937',
@@ -460,7 +460,7 @@ export function ConfiguracaoImpostosView() {
                         py: { xs: 2, sm: 2.5, md: 3 },
                         px: { xs: 2, sm: 2.5 },
                         textTransform: 'none',
-                        fontFamily: "'Inter', sans-serif",
+                        fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
                         fontWeight: 500,
                         fontSize: { xs: '12px', sm: '13px', md: '14px' },
                         borderRadius: { xs: '12px', sm: '14px' },
@@ -527,7 +527,7 @@ export function ConfiguracaoImpostosView() {
               </Box>
               <Typography
                 sx={{
-                  fontFamily: "'Inter', sans-serif",
+                  fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
                   fontWeight: 600,
                   fontSize: { xs: '16px', sm: '17px', md: '18px' },
                   color: '#1f2937',
@@ -540,7 +540,7 @@ export function ConfiguracaoImpostosView() {
               <Box>
                 <Typography
                   sx={{
-                    fontFamily: "'Inter', sans-serif",
+                    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
                     fontWeight: 500,
                     fontSize: { xs: '11px', sm: '12px' },
                     color: '#6b7280',
@@ -551,7 +551,7 @@ export function ConfiguracaoImpostosView() {
                 </Typography>
                 <Typography
                   sx={{
-                    fontFamily: "'Inter', sans-serif",
+                    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
                     fontWeight: 500,
                     fontSize: { xs: '13px', sm: '14px' },
                     color: '#1f2937',
@@ -564,7 +564,7 @@ export function ConfiguracaoImpostosView() {
               <Box>
                 <Typography
                   sx={{
-                    fontFamily: "'Inter', sans-serif",
+                    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
                     fontWeight: 500,
                     fontSize: { xs: '11px', sm: '12px' },
                     color: '#6b7280',
@@ -575,7 +575,7 @@ export function ConfiguracaoImpostosView() {
                 </Typography>
                 <Typography
                   sx={{
-                    fontFamily: "'Inter', sans-serif",
+                    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
                     fontWeight: 500,
                     fontSize: { xs: '13px', sm: '14px' },
                     color: '#1f2937',
@@ -587,7 +587,7 @@ export function ConfiguracaoImpostosView() {
               <Box>
                 <Typography
                   sx={{
-                    fontFamily: "'Inter', sans-serif",
+                    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
                     fontWeight: 500,
                     fontSize: { xs: '11px', sm: '12px' },
                     color: '#6b7280',
@@ -598,7 +598,7 @@ export function ConfiguracaoImpostosView() {
                 </Typography>
                 <Typography
                   sx={{
-                    fontFamily: "'Inter', sans-serif",
+                    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
                     fontWeight: 500,
                     fontSize: { xs: '13px', sm: '14px' },
                     color: '#1f2937',
@@ -610,7 +610,7 @@ export function ConfiguracaoImpostosView() {
               <Box>
                 <Typography
                   sx={{
-                    fontFamily: "'Inter', sans-serif",
+                    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
                     fontWeight: 500,
                     fontSize: { xs: '11px', sm: '12px' },
                     color: '#6b7280',
@@ -621,7 +621,7 @@ export function ConfiguracaoImpostosView() {
                 </Typography>
                 <Typography
                   sx={{
-                    fontFamily: "'Inter', sans-serif",
+                    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
                     fontWeight: 500,
                     fontSize: { xs: '13px', sm: '14px' },
                     color: '#1f2937',
@@ -660,7 +660,7 @@ export function ConfiguracaoImpostosView() {
               </Box>
               <Typography
                 sx={{
-                  fontFamily: "'Inter', sans-serif",
+                  fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
                   fontWeight: 600,
                   fontSize: { xs: '16px', sm: '17px', md: '18px' },
                   color: '#1f2937',
@@ -692,7 +692,7 @@ export function ConfiguracaoImpostosView() {
                       textTransform: 'none',
                       color: '#374151',
                       borderColor: '#e5e7eb',
-                      fontFamily: "'Inter', sans-serif",
+                      fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
                       fontWeight: 500,
                       fontSize: { xs: '12px', sm: '13px', md: '14px' },
                       py: { xs: 1.25, sm: 1.5, md: 1.75 },
@@ -725,7 +725,7 @@ export function ConfiguracaoImpostosView() {
                 color: '#dc2626',
                 borderColor: '#fecaca',
                 backgroundColor: '#fef2f2',
-                fontFamily: "'Inter', sans-serif",
+                fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
                 fontWeight: 500,
                 fontSize: { xs: '12px', sm: '13px', md: '14px' },
                 py: { xs: 1.25, sm: 1.5 },

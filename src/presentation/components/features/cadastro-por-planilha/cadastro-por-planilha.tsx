@@ -387,7 +387,7 @@ export function CadastroPorPlanilha() {
           {[0, 1, 2, 3].map((step) => (
             <div key={step} className="flex items-center flex-shrink-0">
               <div
-                className={`w-7 h-7 md:w-9 md:h-9 rounded-full flex items-center justify-center text-xs md:text-base font-semibold font-exo transition-colors ${
+                className={`w-7 h-7 md:w-9 md:h-9 rounded-full flex items-center justify-center text-xs md:text-base font-semibold transition-colors ${
                   selectedStep === step
                     ? 'bg-[#B7E246] text-primary'
                     : selectedStep > step
@@ -471,7 +471,7 @@ function Step1Download({
           </h3>
           <div className="hidden md:flex flex-1 h-[1px] bg-primary/50" />
         </div>
-        <p className="text-xs md:text-sm text-secondary-text font-nunito">
+        <p className="text-xs md:text-sm text-secondary-text ">
           Baixe a planilha modelo e a planilha de descrição para entender o formato dos dados
         </p>
       </div>
@@ -487,7 +487,7 @@ function Step1Download({
         </button>
         <button
           onClick={onDownloadDescricao}
-          className="flex items-center justify-center gap-2 md:gap-3 h-12 md:h-14 px-4 md:px-6 rounded-lg border-2 border-primary bg-white text-primary font-semibold font-nunito text-xs md:text-sm transition-all hover:bg-primary/10"
+          className="flex items-center justify-center gap-2 md:gap-3 h-12 md:h-14 px-4 md:px-6 rounded-lg border-2 border-primary bg-white text-primary font-semibold text-xs md:text-sm transition-all hover:bg-primary/10"
         >
           <MdDownload size={18} className="md:w-5 md:h-5" />
           <span className="truncate">Download Planilha de Descrição</span>
@@ -499,7 +499,7 @@ function Step1Download({
         <h4 className="text-primary-text font-medium text-sm md:text-base mb-3">
           Como funciona o sistema de importação
         </h4>
-        <div className="space-y-2 text-xs md:text-sm text-secondary-text font-nunito">
+        <div className="space-y-2 text-xs md:text-sm text-secondary-text ">
           <p>
             <span className="text-primary-text text-medium">1. Download:</span> Baixe a planilha modelo e a
             planilha de descrição para entender o formato dos dados.
@@ -528,7 +528,7 @@ function Step1Download({
       <div className="flex justify-end pt-4 md:pt-6">
         <button
           onClick={onNext}
-          className="h-8 px-6 md:px-10 rounded-lg bg-primary text-white font-semibold font-exo text-xs md:text-sm hover:bg-primary/90 transition-colors flex items-center gap-2"
+          className="h-8 px-6 md:px-10 rounded-lg bg-primary text-white font-semibold text-xs md:text-sm hover:bg-primary/90 transition-colors flex items-center gap-2"
         >
           Próximo
           <MdArrowForward size={16} className="md:w-[18px] md:h-[18px]" />
@@ -559,17 +559,17 @@ function Step2Upload({
       {/* Título */}
       <div className="flex flex-col gap-2 mb-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <h3 className="text-primary text-base md:text-xl font-semibold font-exo">Upload do Arquivo</h3>
+          <h3 className="text-primary text-base md:text-xl font-semibold ">Upload do Arquivo</h3>
           <div className="hidden md:flex flex-1 h-[2px] bg-primary/50" />
         </div>
-        <p className="text-xs md:text-sm text-secondary-text font-nunito">
+        <p className="text-xs md:text-sm text-secondary-text ">
           Faça upload da planilha preenchida com os dados para cadastro
         </p>
       </div>
 
       {/* Área de upload */}
       <div className="mb-6">
-        <label className="block text-xs md:text-sm font-semibold font-nunito mb-2 text-primary-text">
+        <label className="block text-xs md:text-sm font-semibold mb-2 text-primary-text">
           Arquivo XLSX
         </label>
         <div className="border-2 border-dashed border-[#CBD0E3] rounded-lg md:p-8 p-4 text-center hover:border-primary transition-colors">
@@ -594,10 +594,10 @@ function Step2Upload({
           >
             <MdDescription className="text-3xl md:text-4xl text-secondary-text" />
             <div>
-              <p className="text-xs md:text-sm font-semibold text-primary-text font-nunito break-words">
+              <p className="text-xs md:text-sm font-semibold text-primary-text break-words">
                 {arquivo ? arquivo.name : 'Clique para selecionar ou arraste o arquivo'}
               </p>
-              <p className="text-xs text-secondary-text font-nunito mt-1">
+              <p className="text-xs text-secondary-text mt-1">
                 Apenas arquivos .xlsx ou .xls
               </p>
             </div>
@@ -636,7 +636,7 @@ function Step2Upload({
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between pt-4 md:pt-6 border-t border-dashed border-[#E4E7F4] mt-4">
         <button
           onClick={onBack}
-          className="h-8 px-6 md:px-10 rounded-lg border-2 border-primary bg-white text-primary font-semibold font-exo text-xs md:text-sm hover:bg-primary/10 transition-colors flex items-center justify-center gap-2"
+          className="h-8 px-6 md:px-10 rounded-lg border-2 border-primary bg-white text-primary font-semibold text-xs md:text-sm hover:bg-primary/10 transition-colors flex items-center justify-center gap-2"
         >
           <MdArrowBack size={16} className="md:w-[18px] md:h-[18px]" />
           Voltar
@@ -644,7 +644,7 @@ function Step2Upload({
         <button
           onClick={onUpload}
           disabled={!arquivo || isUploading}
-          className="h-8 px-6 md:px-10 rounded-lg bg-primary text-white font-semibold font-exo text-xs md:text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="h-8 px-6 md:px-10 rounded-lg bg-primary text-white font-semibold text-xs md:text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {isUploading ? (
             <>
@@ -867,10 +867,10 @@ function Step3Resultado({
       {/* Título */}
       <div className="flex flex-col gap-2 mb-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <h3 className="text-primary text-base md:text-xl font-semibold font-exo">Resultado da Análise</h3>
+          <h3 className="text-primary text-base md:text-xl font-semibold ">Resultado da Análise</h3>
           <div className="hidden md:flex flex-1 h-[2px] bg-primary/50" />
         </div>
-        <p className="text-xs md:text-sm text-secondary-text font-nunito">
+        <p className="text-xs md:text-sm text-secondary-text ">
           Revise os resultados da importação e os erros encontrados
         </p>
       </div>
@@ -878,7 +878,7 @@ function Step3Resultado({
       {/* Resumo por Worksheet com Tabelas Expansíveis */}
       {resultadoAnalise.worksheetResults && resultadoAnalise.worksheetResults.length > 0 && (
         <div className="mb-6 rounded-lg border border-[#E6E9F4] bg-gradient-to-br from-[#F9FAFF] to-white md:p-4 p-3">
-          <h4 className="text-primary-text font-semibold font-exo text-sm md:text-base mb-3">
+          <h4 className="text-primary-text font-semibold text-sm md:text-base mb-3">
             Resumo por Worksheet
           </h4>
           <div className="space-y-3">
@@ -913,11 +913,11 @@ function Step3Resultado({
                             )}
                           </div>
                         )}
-                        <span className="font-semibold text-primary-text font-exo text-xs md:text-sm truncate">
+                        <span className="font-semibold text-primary-text text-xs md:text-sm truncate">
                           {worksheet.worksheet}
                         </span>
                       </div>
-                      <div className="flex flex-col md:flex-row gap-1 md:gap-4 text-xs font-nunito flex-shrink-0">
+                      <div className="flex flex-col md:flex-row gap-1 md:gap-4 text-xs flex-shrink-0">
                         {worksheet.successCount > 0 && (
                           <span className="text-green-600 font-semibold whitespace-nowrap">
                             ✓ {worksheet.successCount} sucesso(s)
@@ -938,14 +938,14 @@ function Step3Resultado({
                       {loadingWorksheets.has(worksheet.worksheet) ? (
                         <div className="text-center py-6 md:py-8">
                           <div className="inline-block w-5 h-5 md:w-6 md:h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-2" />
-                          <p className="text-xs md:text-sm text-secondary-text font-nunito">
+                          <p className="text-xs md:text-sm text-secondary-text ">
                             Carregando dados do arquivo...
                           </p>
                         </div>
                       ) : worksheetData[worksheet.worksheet] && worksheetData[worksheet.worksheet].length > 0 ? (
                         <>
                           <div className="overflow-x-auto max-h-64 md:max-h-96 overflow-y-auto scrollbar-hide">
-                            <table className="w-full text-xs md:text-sm font-nunito border-collapse min-w-full">
+                            <table className="w-full text-xs md:text-sm border-collapse min-w-full">
                               <thead className="sticky top-0 bg-white z-10">
                                 <tr className="border-b-2 border-[#E6E9F4]">
                                   <th className="text-left py-1 md:py-2 px-2 md:px-3 font-semibold text-primary-text text-[10px] md:text-xs uppercase whitespace-nowrap">
@@ -990,12 +990,12 @@ function Step3Resultado({
                               </tbody>
                             </table>
                           </div>
-                          <div className="mt-2 text-[10px] md:text-xs text-secondary-text font-nunito text-center">
+                          <div className="mt-2 text-[10px] md:text-xs text-secondary-text text-center">
                             Total: {worksheetData[worksheet.worksheet].length} registro(s) exibido(s)
                           </div>
                         </>
                       ) : (
-                        <div className="text-center py-4 text-secondary-text font-nunito text-xs md:text-sm">
+                        <div className="text-center py-4 text-secondary-text text-xs md:text-sm">
                           <p className="mb-2">
                             {worksheet.successCount} registro(s) cadastrado(s) com sucesso.
                           </p>
@@ -1027,12 +1027,12 @@ function Step3Resultado({
               <MdError className="text-red-600 text-xl md:text-2xl flex-shrink-0 mt-0.5" />
             )}
             <div className="flex-1 min-w-0">
-              <h4 className={`font-semibold font-exo text-xs md:text-sm mb-2 ${
+              <h4 className={`font-semibold text-xs md:text-sm mb-2 ${
                 resultadoAnalise.sucesso ? 'text-green-800' : 'text-red-800'
               }`}>
                 {resultadoAnalise.sucesso ? 'Processamento Concluído' : 'Erro no Processamento'}
               </h4>
-              <ul className={`space-y-1 text-xs md:text-sm font-nunito ${
+              <ul className={`space-y-1 text-xs md:text-sm ${
                 resultadoAnalise.sucesso ? 'text-green-700' : 'text-red-700'
               }`}>
                 {resultadoAnalise.mensagens.map((msg, index) => (
@@ -1050,7 +1050,7 @@ function Step3Resultado({
           <div className="flex items-start gap-2 md:gap-3">
             <MdError className="text-red-600 text-xl md:text-2xl flex-shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
-              <h4 className="text-red-800 font-semibold font-exo text-xs md:text-sm mb-2">
+              <h4 className="text-red-800 font-semibold text-xs md:text-sm mb-2">
                 Erros Encontrados ({resultadoAnalise.erros.length})
                 {resultadoAnalise.totalErrorCount !== undefined && (
                   <span className="text-[10px] md:text-xs font-normal ml-1 md:ml-2">
@@ -1062,7 +1062,7 @@ function Step3Resultado({
                 {resultadoAnalise.erros.map((erro, index) => (
                   <div
                     key={index}
-                    className="text-xs md:text-sm text-red-700 font-nunito bg-white rounded md:p-2 p-1.5 border border-red-100"
+                    className="text-xs md:text-sm text-red-700 bg-white rounded md:p-2 p-1.5 border border-red-100"
                   >
                     <p className="font-semibold break-words">
                       Linha {erro.linha} - Campo: {erro.campo}
@@ -1080,14 +1080,14 @@ function Step3Resultado({
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between pt-4 md:pt-6 border-t border-dashed border-[#E4E7F4] mt-4">
         <button
           onClick={onBack}
-          className="h-8 px-6 md:px-10 rounded-lg border-2 border-primary bg-white text-primary font-semibold font-exo text-xs md:text-sm hover:bg-primary/10 transition-colors flex items-center justify-center gap-2"
+          className="h-8 px-6 md:px-10 rounded-lg border-2 border-primary bg-white text-primary font-semibold text-xs md:text-sm hover:bg-primary/10 transition-colors flex items-center justify-center gap-2"
         >
           <MdArrowBack size={16} className="md:w-[18px] md:h-[18px]" />
           Voltar
         </button>
         <button
           onClick={onNext}
-          className="h-8 px-6 md:px-10 rounded-lg bg-primary text-white font-semibold font-exo text-xs md:text-sm hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+          className="h-8 px-6 md:px-10 rounded-lg bg-primary text-white font-semibold text-xs md:text-sm hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
         >
           Continuar
           <MdArrowForward size={16} className="md:w-[18px] md:h-[18px]" />
@@ -1117,10 +1117,10 @@ function Step4Finalizacao({
       {/* Título */}
       <div className="flex flex-col gap-2 mb-4 md:mb-6">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <h3 className="text-primary text-base md:text-xl font-semibold font-exo">Processo Finalizado</h3>
+          <h3 className="text-primary text-base md:text-xl font-semibold ">Processo Finalizado</h3>
           <div className="hidden md:flex flex-1 h-[2px] bg-primary/50" />
         </div>
-        <p className="text-xs md:text-sm text-secondary-text font-nunito">
+        <p className="text-xs md:text-sm text-secondary-text ">
           O processo de importação foi concluído com sucesso
         </p>
       </div>
@@ -1128,10 +1128,10 @@ function Step4Finalizacao({
       {/* Mensagem de sucesso */}
       <div className="rounded-lg border border-green-200 bg-green-50 md:p-6 p-4 mb-6 text-center">
         <MdCheckCircle className="text-green-600 text-4xl md:text-5xl mx-auto mb-3 md:mb-4" />
-        <h4 className="text-green-800 font-semibold font-exo text-base md:text-lg mb-2">
+        <h4 className="text-green-800 font-semibold text-base md:text-lg mb-2">
           Importação Concluída!
         </h4>
-        <p className="text-xs md:text-sm text-green-700 font-nunito break-words">
+        <p className="text-xs md:text-sm text-green-700 break-words">
           {resultadoAnalise?.mensagens.join(' ') ||
             'Os dados foram processados e cadastrados no sistema.'}
         </p>
@@ -1140,11 +1140,11 @@ function Step4Finalizacao({
       {/* Listagem de dados cadastrados (se houver) */}
       {resultadoAnalise?.dadosCadastrados && resultadoAnalise.dadosCadastrados.length > 0 && (
         <div className="mb-6">
-          <h4 className="text-primary-text font-semibold font-exo text-sm md:text-base mb-3">
+          <h4 className="text-primary-text font-semibold text-sm md:text-base mb-3">
             Dados Cadastrados
           </h4>
           <div className="rounded-lg border border-[#E6E9F4] bg-gray-50 md:p-4 p-3 max-h-64 md:max-h-96 overflow-y-auto">
-            <p className="text-xs md:text-sm text-secondary-text font-nunito">
+            <p className="text-xs md:text-sm text-secondary-text ">
               Listagem de dados cadastrados será implementada aqui
             </p>
           </div>
@@ -1155,7 +1155,7 @@ function Step4Finalizacao({
       <div className="flex justify-center pt-4 md:pt-6 border-t border-dashed border-[#E4E7F4] mt-4">
         <button
           onClick={onFinalizar}
-          className="h-8 px-6 md:px-10 rounded-lg bg-primary text-white font-semibold font-exo text-xs md:text-sm hover:bg-primary/90 transition-colors"
+          className="h-8 px-6 md:px-10 rounded-lg bg-primary text-white font-semibold text-xs md:text-sm hover:bg-primary/90 transition-colors"
         >
           Finalizar
         </button>

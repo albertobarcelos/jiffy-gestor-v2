@@ -517,7 +517,7 @@ export default function MeusAppsPage() {
         <header className="mb-4 flex flex-col gap-3">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0">
-              <h1 className="font-exo text-2xl font-semibold text-gray-900 md:text-3xl">
+              <h1 className="text-2xl font-semibold text-gray-900 md:text-3xl">
                 Suas empresas
               </h1>
               <p className="mt-1 text-sm text-gray-600 md:text-base">

@@ -44,7 +44,7 @@ function StatusBadge({ status }: { status: string }) {
   return (
     <span
       className={cn(
-        'inline-flex items-center justify-center rounded px-2.5 py-0.5 font-nunito text-xs font-normal text-white',
+        'inline-flex items-center justify-center rounded px-2.5 py-0.5 text-xs font-normal text-white',
         bg
       )}
       title={status}
@@ -92,7 +92,7 @@ function PerfilRadioList({
             >
               {selected && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
             </span>
-            <span className="truncate font-nunito text-sm text-primary-text">
+            <span className="truncate text-sm text-primary-text">
               {p.role}
             </span>
           </button>
@@ -177,7 +177,7 @@ export function ConviteGestaoRow({
                     className={cn(actionItem, 'text-red-600 hover:bg-red-50')}
                   >
                     <MdClose size={16} className="shrink-0" />
-                    <span className="font-nunito">
+                    <span className="">
                       Cancelar o acesso de{' '}
                       <span className="font-semibold">{nomeUsuario ?? 'usuário'}</span>
                     </span>
@@ -193,7 +193,7 @@ export function ConviteGestaoRow({
                     className={cn(actionItem, 'justify-center border-t border-gray-200 text-primary-text hover:bg-gray-50')}
                   >
                     <MdEdit size={14} className="shrink-0" />
-                    <span className="font-nunito">Editar Perfis</span>
+                    <span className="">Editar Perfis</span>
                   </button>
                 )}
               </div>
@@ -221,7 +221,7 @@ export function ConviteGestaoRow({
                 )}
               >
                 <MdForwardToInbox size={18} className="shrink-0" />
-                <span className="font-nunito">Reenviar convite</span>
+                <span className="">Reenviar convite</span>
               </button>
               <button
                 type="button"
@@ -236,7 +236,7 @@ export function ConviteGestaoRow({
                 )}
               >
                 <MdHighlightOff size={18} className="shrink-0" />
-                <span className="font-nunito">Cancelar convite</span>
+                <span className="">Cancelar convite</span>
               </button>
               {onEditarGrupos && (
                 <button
@@ -248,7 +248,7 @@ export function ConviteGestaoRow({
                   className={cn(actionItem, 'justify-center border-t border-gray-200 text-primary-text hover:bg-gray-50')}
                 >
                   <MdEdit size={14} className="shrink-0" />
-                  <span className="font-nunito">Editar Perfis</span>
+                  <span className="">Editar Perfis</span>
                 </button>
               )}
             </div>
@@ -258,7 +258,7 @@ export function ConviteGestaoRow({
     }
 
     return (
-      <span className="inline-flex w-full items-center justify-center rounded bg-secondary px-2.5 py-1 font-nunito text-xs font-normal text-white md:text-sm" title={perfilNome}>
+      <span className="inline-flex w-full items-center justify-center rounded bg-secondary px-2.5 py-1 text-xs font-normal text-white md:text-sm" title={perfilNome}>
         {perfilNome}
       </span>
     )
@@ -268,7 +268,7 @@ export function ConviteGestaoRow({
     <div className="overflow-visible transition-colors hover:bg-gray-50/80">
       {/* Desktop — grid: email | status | grupo */}
       <div className="relative hidden min-h-[52px] w-full min-w-0 grid-cols-[minmax(180px,280px)_80px_160px] items-center gap-[10px] px-3 py-2 md:grid md:px-4">
-        <div className="min-w-0 font-nunito text-left text-sm text-primary-text">
+        <div className="min-w-0 text-left text-sm text-primary-text">
           {nomeUsuario ? (
             <>
               <span className="block truncate font-medium" title={nomeUsuario}>
@@ -292,7 +292,7 @@ export function ConviteGestaoRow({
         <div className="flex min-w-0 justify-start">
           <StatusBadge status={convite.status} />
         </div>
-        <div className="flex min-w-0 items-center justify-start font-nunito text-sm text-primary-text">
+        <div className="flex min-w-0 items-center justify-start text-sm text-primary-text">
           {grupoCell}
         </div>
       </div>
@@ -302,15 +302,15 @@ export function ConviteGestaoRow({
         <div className="min-w-0">
           {nomeUsuario ? (
             <>
-              <p className="font-nunito text-sm font-medium text-primary-text">
+              <p className="text-sm font-medium text-primary-text">
                 {nomeUsuario}
               </p>
-              <p className="font-nunito text-xs text-secondary-text break-all">
+              <p className="text-xs text-secondary-text break-all">
                 {convite.email}
               </p>
             </>
           ) : (
-            <p className="font-nunito text-sm font-normal text-primary-text break-all">
+            <p className="text-sm font-normal text-primary-text break-all">
               {convite.email}
             </p>
           )}
@@ -321,7 +321,7 @@ export function ConviteGestaoRow({
             </div>
           </div>
           {pendente && (
-            <p className="mt-1 font-nunito text-xs text-secondary-text">
+            <p className="mt-1 text-xs text-secondary-text">
               Expira: {formatarDataHora(convite.expiraEm)}
             </p>
           )}

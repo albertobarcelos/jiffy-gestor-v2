@@ -298,7 +298,7 @@ export function MvpProdutosTable(props: {
   if (!rows.length) {
     return (
       <div className={`${shellClass} min-h-[10rem] items-center justify-center py-10`}>
-        <p className="font-nunito text-secondary-text">Nenhum produto encontrado para os filtros selecionados.</p>
+        <p className="text-secondary-text">Nenhum produto encontrado para os filtros selecionados.</p>
       </div>
     )
   }
@@ -311,7 +311,7 @@ export function MvpProdutosTable(props: {
         ref={scrollContainerRef}
         className="scrollbar-thin max-h-[calc(min(90vh,32rem)-2.75rem)] overflow-auto overscroll-contain"
       >
-        <table className="font-nunito w-max min-w-full border-collapse bg-white text-sm">
+        <table className="w-max min-w-full border-collapse bg-white text-sm">
           <thead className="sticky top-0 z-10">
             <tr>
               {colunas.map(id => {
@@ -375,7 +375,7 @@ export function MvpProdutosTable(props: {
       </div>
 
       {exibirRodapeContagem && totalFiltrado > 0 ? (
-        <p className="font-nunito shrink-0 border-t border-[#d0d7de] bg-[#f9fafb] px-3 py-2 text-xs text-secondary-text">
+        <p className="shrink-0 border-t border-[#d0d7de] bg-[#f9fafb] px-3 py-2 text-xs text-secondary-text">
           Exibindo {rows.length} de {totalFiltrado} produtos
           {hasNextPage ? ' — role para carregar mais' : ''}
         </p>

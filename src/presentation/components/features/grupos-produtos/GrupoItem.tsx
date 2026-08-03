@@ -91,7 +91,7 @@ export const GrupoItem = memo(function GrupoItem({
       <div
         {...attributes}
         {...listeners}
-        className="flex-[1] font-nunito font-normal text-sm text-primary-text flex items-center gap-2 cursor-grab active:cursor-grabbing select-none hover:bg-primary-bg/30 active:bg-primary-bg/50 rounded-lg md:px-2 px-2 py-2 min-h-[44px] touch-manipulation"
+        className="flex-[1] font-normal text-sm text-primary-text flex items-center gap-2 cursor-grab active:cursor-grabbing select-none hover:bg-primary-bg/30 active:bg-primary-bg/50 rounded-lg md:px-2 px-2 py-2 min-h-[44px] touch-manipulation"
         title="Arraste para reordenar"
         style={{ touchAction: 'none' }}
       >
@@ -110,7 +110,7 @@ export const GrupoItem = memo(function GrupoItem({
       {/* Nome - área clicável */}
       <div 
         onClick={handleRowClick}
-        className="flex-[4] font-nunito font-normal text-xs md:text-sm text-primary-text cursor-pointer flex flex-col md:flex-row items-start md:items-center justify-start gap-2"
+        className="flex-[4] font-normal text-xs md:text-sm text-primary-text cursor-pointer flex flex-col md:flex-row items-start md:items-center justify-start gap-2"
       >
         <span>{nome}</span>
         <div className="flex items-center gap-1">

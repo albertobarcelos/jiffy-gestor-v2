@@ -196,7 +196,7 @@ export function DashboardTopProdutos({
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-5">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-        <h2 className="shrink-0 font-exo text-lg font-semibold text-primary-text md:text-xl">
+        <h2 className="shrink-0 text-lg font-semibold text-primary-text md:text-xl">
           Top Produtos
         </h2>
         <div className="inline-flex self-start rounded-lg bg-violet-100/90 p-0.5 sm:self-auto">

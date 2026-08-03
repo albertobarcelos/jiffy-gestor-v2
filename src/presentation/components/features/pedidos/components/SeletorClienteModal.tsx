@@ -245,7 +245,7 @@ export function SeletorClienteModal({
             <Button
               type="button"
               onClick={handleOpenNovoCliente}
-              className="font-nunito flex h-8 items-center gap-2 rounded-lg px-4 text-sm font-semibold"
+              className="flex h-8 items-center gap-2 rounded-lg px-4 text-sm font-semibold"
               sx={{
                 backgroundColor: 'var(--color-primary)',
                 color: 'white',
@@ -298,7 +298,7 @@ export function SeletorClienteModal({
                   value={searchText}
                   onChange={e => setSearchText(e.target.value)}
                   placeholder="Pesquisar por nome..."
-                  className="font-nunito w-full rounded-lg border border-gray-200 bg-info text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+                  className="w-full rounded-lg border border-gray-200 bg-info text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
                   sx={{
                     '& .MuiOutlinedInput-root': {
                       height: '32px',
@@ -323,7 +323,7 @@ export function SeletorClienteModal({
               <select
                 value={filterStatus}
                 onChange={e => setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')}
-                className="font-nunito h-8 w-full rounded-lg border border-gray-200 bg-info px-5 text-sm text-primary-text focus:border-primary focus:outline-none"
+                className="h-8 w-full rounded-lg border border-gray-200 bg-info px-5 text-sm text-primary-text focus:border-primary focus:outline-none"
               >
                 <option value="Todos">Todos</option>
                 <option value="Ativo">Ativo</option>
@@ -341,7 +341,7 @@ export function SeletorClienteModal({
             {/* Barra de título */}
             {!isLoading && !error && (
               <div className="mb-2 rounded-lg bg-primary/15 px-4 py-2">
-                <p className="font-nunito text-sm font-semibold text-primary-text">
+                <p className="text-sm font-semibold text-primary-text">
                   Nome do Cliente
                 </p>
               </div>

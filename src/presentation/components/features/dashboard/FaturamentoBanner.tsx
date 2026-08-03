@@ -1,7 +1,6 @@
 import Image from 'next/image'
 import { ChevronRight } from 'lucide-react'
 import { MdOutlineMonetizationOn } from 'react-icons/md'
-import { exo2CabecalhoFaturamento } from '@/src/presentation/fonts/exo2CabecalhoFaturamento'
 import {
   tituloFaturamentoBanner,
   formatarMoeda,
@@ -43,12 +42,12 @@ export function FaturamentoBanner({
           <div>
             <div className="mb-2 flex items-center gap-1 text-white/90">
               <MdOutlineMonetizationOn className="h-8 w-8 text-[#F59E0B]" size={30} />
-              <span className={`${exo2CabecalhoFaturamento.className} text-lg`}>
+              <span className="text-lg font-semibold">
                 {tituloFaturamentoBanner(periodoData)}
               </span>
             </div>
             <p
-              className={`font-exo text-2xl font-semibold text-white md:text-[40px] ${
+              className={`text-2xl font-semibold text-white md:text-[40px] ${
                 carregandoResumo ? 'animate-pulse opacity-80' : atualizandoResumo ? 'animate-pulse opacity-50' : ''
               }`}
             >

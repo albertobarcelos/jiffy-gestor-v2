@@ -454,7 +454,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
               type="button"
               onClick={() => setActiveTab(0)}
               className={cn(
-                'rounded-t-lg px-4 py-2 font-nunito text-xs font-semibold transition-colors md:text-sm',
+                'rounded-t-lg px-4 py-2 text-xs font-semibold transition-colors md:text-sm',
                 activeTab === 0
                   ? 'bg-primary text-white'
                   : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
@@ -466,7 +466,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
               type="button"
               onClick={() => setActiveTab(1)}
               className={cn(
-                'rounded-t-lg px-4 py-2 font-nunito text-xs font-semibold transition-colors md:text-sm',
+                'rounded-t-lg px-4 py-2 text-xs font-semibold transition-colors md:text-sm',
                 activeTab === 1
                   ? 'bg-primary text-white'
                   : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
@@ -509,10 +509,10 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                         )}
                       </div>
                       <div>
-                        <h2 className="text-primary-text md:text-lg text-sm font-nunito font-semibold">
+                        <h2 className="text-primary-text md:text-lg text-sm font-semibold">
                           {nome.trim() ? nome : 'Nome do Grupo'}
                         </h2>
-                        <p className="text-secondary-text md:text-sm text-xs font-nunito">
+                        <p className="text-secondary-text md:text-sm text-xs ">
                           {iconName ? `Ícone selecionado: ${iconName}` : 'Definição do Ícone do Grupo'}
                         </p>
                       </div>
@@ -550,7 +550,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                     <div className="grid grid-cols-2 gap-2">
                       {/* Cor */}
                       <div>
-                        <label className="block text-primary-text md:text-sm text-xs font-nunito font-semibold mb-2">
+                        <label className="block text-primary-text md:text-sm text-xs font-semibold mb-2">
                           Cor do Grupo
                         </label>
                         <div className="flex flex-col gap-2">
@@ -566,7 +566,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                             <button
                               type="button"
                               onClick={() => setIsColorPickerOpen(true)}
-                              className="px-2 py-3 bg-primary text-info rounded-lg font-nunito md:text-sm text-xs font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
+                              className="px-2 py-3 bg-primary text-info rounded-lg md:text-sm text-xs font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
                             >
                               Escolher cor
                             </button>
@@ -577,7 +577,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
 
                       {/* Ícone */}
                       <div>
-                        <label className="block text-primary-text md:text-sm text-xs font-nunito font-semibold mb-2">
+                        <label className="block text-primary-text md:text-sm text-xs font-semibold mb-2">
                           Ícone do Grupo
                         </label>
                         <div className="flex items-center gap-2">
@@ -596,7 +596,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                           <button
                             type="button"
                             onClick={() => setIsIconPickerOpen(true)}
-                            className="px-2 py-3 bg-primary text-info rounded-lg font-nunito md:text-sm text-xs font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
+                            className="px-2 py-3 bg-primary text-info rounded-lg md:text-sm text-xs font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
                           >
                             Escolher Ícone
                           </button>
@@ -606,7 +606,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
 
                     {/* Preview do ícone */}
                     <div>
-                      <label className="block text-primary-text md:text-sm text-xs font-nunito font-semibold mb-2">
+                      <label className="block text-primary-text md:text-sm text-xs font-semibold mb-2">
                         Preview do Ícone
                       </label>
                       <div className="flex items-center gap-4">
@@ -663,7 +663,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                             className="w-5 h-5 rounded border-primary/60 text-primary focus:ring-primary"
                             style={{ accentColor: 'var(--color-primary)' }}
                           />
-                          <span className="text-primary-text md:text-sm text-xs font-nunito">
+                          <span className="text-primary-text md:text-sm text-xs ">
                             Ativo para Delivery
                           </span>
                         </label>
@@ -677,7 +677,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                             className="w-5 h-5 rounded border-primary/60 text-primary focus:ring-primary"
                             style={{ accentColor: 'var(--color-primary)' }}
                           />
-                          <span className="text-primary-text md:text-sm text-xs font-nunito">
+                          <span className="text-primary-text md:text-sm text-xs ">
                             Ativo para Local
                           </span>
                         </label>
@@ -696,7 +696,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                 <ProdutosPorGrupoList grupoProdutoId={effectiveGrupoId} />
               ) : (
                 <div className="text-center py-12">
-                  <p className="text-secondary-text font-nunito">
+                  <p className="text-secondary-text ">
                     A lista de produtos vinculados aparece no modo de edição.
                   </p>
                 </div>

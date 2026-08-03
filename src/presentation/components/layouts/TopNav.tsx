@@ -395,8 +395,8 @@ export function TopNav() {
             type="button"
             onClick={() => void handleVoltarPortal()}
             className="shrink-0 p-2.5 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
-            title="Portal de aplicativos"
-            aria-label="Ir para o portal de aplicativos"
+            title="Meu Jiffy"
+            aria-label="Ir para Meu Jiffy"
           >
             <MdApps className="w-6 h-6" />
           </button>
@@ -438,7 +438,9 @@ export function TopNav() {
           ref={menuRef}
           className="hidden sm:flex flex-1 items-center justify-start gap-1 pl-2"
         >
-          {menuItems.map((item) => {
+          {menuItems
+            .filter(item => item.name !== 'Configurações')
+            .map((item) => {
             const isActive = isMenuActive(item)
             const isExpanded = expandedMenus.has(item.name)
             const renderedIcon = renderNavIcon(item, MENU_ICON_PARENT)
@@ -507,10 +509,9 @@ export function TopNav() {
                     ? 'bg-gray-100 text-gray-900'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 }`}
-                title={item.name === 'Configurações' ? item.name : undefined}
               >
                 {renderedIcon}
-                {item.name !== 'Configurações' && <span className="text-xs lg:text-sm">{item.name}</span>}
+                <span className="text-xs lg:text-sm">{item.name}</span>
               </Link>
             )
           })}
@@ -529,13 +530,13 @@ export function TopNav() {
 
         {/* User Actions */}
         <div className="hidden sm:flex items-center gap-2">
-          {/* Portal de aplicativos */}
+          {/* Meu Jiffy */}
           <button
             type="button"
             onClick={() => void handleVoltarPortal()}
             className="rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100"
-            title="Portal de aplicativos"
-            aria-label="Ir para o portal de aplicativos"
+            title="Meu Jiffy"
+            aria-label="Ir para Meu Jiffy"
           >
             <MdApps className="h-5 w-5" aria-hidden />
           </button>
@@ -568,6 +569,21 @@ export function TopNav() {
               </div>
             ) : null}
           </div>
+
+          <Link
+            href={toGestao('/configuracoes/empresa')}
+            onMouseEnter={() => handleLinkHover('/configuracoes/empresa')}
+            prefetch={true}
+            className={`rounded-lg p-2 transition-colors hover:bg-gray-100 ${
+              matchesModulePath(pathname ?? '', '/configuracoes/empresa')
+                ? 'bg-gray-100 text-gray-900'
+                : 'text-gray-600'
+            }`}
+            title="Configurações"
+            aria-label="Configurações"
+          >
+            <MdSettings className="h-5 w-5" aria-hidden />
+          </Link>
 
           {/* Dados do usuário (perfil será acessado noutro local) */}
           <div

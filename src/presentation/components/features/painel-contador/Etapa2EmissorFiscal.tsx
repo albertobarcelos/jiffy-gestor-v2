@@ -448,14 +448,14 @@ export function Etapa2EmissorFiscal() {
 
   return (
     <div className="p-2 sm:p-4">
-      <h2 className="font-exo font-semibold text-alternate text-lg sm:text-xl mb-4">
+      <h2 className="font-semibold text-alternate text-lg sm:text-xl mb-4">
         Configurar modelo de Emissor Fiscal
       </h2>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">
         {/* NF-e */}
         <div className="flex h-full min-h-0 flex-col rounded-lg border border-alternate/20 bg-white p-2 sm:p-3">
           <div className="flex shrink-0 items-center justify-between">
-            <h4 className="font-exo font-semibold text-alternate text-base">
+            <h4 className="font-semibold text-alternate text-base">
               NF-e (Nota Fiscal Eletrônica)
             </h4>
             <div className="flex items-center gap-1">
@@ -567,7 +567,7 @@ export function Etapa2EmissorFiscal() {
         {/* NFC-e */}
         <div className="flex h-full min-h-0 flex-col rounded-lg border border-alternate/20 bg-white p-2 sm:p-3">
           <div className="flex shrink-0 items-center justify-between">
-            <h4 className="font-exo font-semibold text-alternate text-base">
+            <h4 className="font-semibold text-alternate text-base">
               NFC-e (Nota Fiscal de Consumidor Eletrônica)
             </h4>
             <div className="flex items-center gap-1">

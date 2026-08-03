@@ -28,7 +28,7 @@ function TogglePainelBtn({
       onClick={onClick}
       disabled={disabled}
       aria-pressed={active}
-      className={`font-nunito flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm ${
+      className={`flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm ${
         active
           ? 'border-primary bg-primary/15 text-primary'
           : 'border-primary/25 bg-info text-primary-text hover:border-primary/50'
@@ -69,7 +69,7 @@ export function MvpRelatorioToolbarActions(props: {
   } = props
 
   return (
-    <div className="font-nunito ml-1 flex shrink-0 flex-wrap items-center gap-1.5 border-l border-primary/20 pl-2">
+    <div className="ml-1 flex shrink-0 flex-wrap items-center gap-1.5 border-l border-primary/20 pl-2">
       <TogglePainelBtn
         active={kpisVisivel}
         onClick={onToggleKpis}
@@ -97,7 +97,7 @@ export function MvpRelatorioToolbarActions(props: {
       <button
         type="button"
         onClick={onPersonalizar}
-        className="font-nunito flex h-8 items-center gap-1.5 rounded-lg border border-primary/25 bg-info px-2.5 text-xs font-medium text-primary-text hover:border-primary/50 sm:text-sm"
+        className="flex h-8 items-center gap-1.5 rounded-lg border border-primary/25 bg-info px-2.5 text-xs font-medium text-primary-text hover:border-primary/50 sm:text-sm"
       >
         <MdTune size={18} />
         <span className="hidden sm:inline">Personalizar</span>
@@ -108,7 +108,7 @@ export function MvpRelatorioToolbarActions(props: {
         disabled={atualizando}
         aria-label="Atualizar"
         title="Atualizar"
-        className="font-nunito flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-black transition-colors hover:bg-black/5 disabled:opacity-50"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-black transition-colors hover:bg-black/5 disabled:opacity-50"
       >
         <MdRefresh size={20} className={atualizando ? 'animate-spin' : ''} aria-hidden />
       </button>

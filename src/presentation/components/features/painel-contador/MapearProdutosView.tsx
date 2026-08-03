@@ -275,7 +275,7 @@ export function MapearProdutosView() {
                           index % 2 === 0 ? 'bg-white' : 'bg-alternate/5'
                         }`}
                       >
-                        <td className="px-4 py-3 text-sm text-secondary-text font-mono whitespace-nowrap">
+                        <td className="px-4 py-3 text-sm text-secondary-text whitespace-nowrap">
                           {config.ncm?.codigo || '--'}
                         </td>
                         <td
@@ -286,7 +286,7 @@ export function MapearProdutosView() {
                             {config.ncm?.descricao?.trim() || '--'}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-secondary-text font-mono">
+                        <td className="px-4 py-3 text-sm text-secondary-text ">
                           {config.cfop || '--'}
                         </td>
                         <td className="px-4 py-3 text-sm text-secondary-text">
@@ -361,7 +361,7 @@ export function MapearProdutosView() {
                         title="Duplo toque/clique no NCM para configurar"
                       >
                         <p className="text-xs font-semibold uppercase text-alternate">NCM</p>
-                        <p className="break-all font-mono text-base font-medium text-secondary-text">
+                        <p className="break-all text-base font-medium text-secondary-text">
                           {config.ncm?.codigo || '--'}
                         </p>
                         {config.ncm?.descricao?.trim() ? (

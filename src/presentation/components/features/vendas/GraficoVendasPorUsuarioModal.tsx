@@ -221,7 +221,7 @@ export function GraficoVendasPorUsuarioConteudo({
 
           <div className="flex-1">
             <div className="rounded-lg bg-gray-50 p-3">
-              <h3 className="mb-3 font-exo text-sm font-semibold text-primary-text">Resumo</h3>
+              <h3 className="mb-3 text-sm font-semibold text-primary-text">Resumo</h3>
               <div className="space-y-1.5">
                 {chartData.map((item, index) => {
                   const percentual = formatPercentual(item.value, totalGeral)
@@ -235,10 +235,10 @@ export function GraficoVendasPorUsuarioConteudo({
                           className="h-3 w-3 rounded-full"
                           style={{ backgroundColor: COLORS[index % COLORS.length] }}
                         />
-                        <span className="font-nunito text-xs text-primary-text">{item.name}</span>
+                        <span className="text-xs text-primary-text">{item.name}</span>
                       </div>
                       <div className="flex flex-col items-end">
-                        <span className="font-nunito text-xs font-semibold text-primary">
+                        <span className="text-xs font-semibold text-primary">
                           {formatCurrency(item.value)}
                         </span>
                         <span className="text-xs text-secondary-text">{percentual}%</span>
@@ -248,8 +248,8 @@ export function GraficoVendasPorUsuarioConteudo({
                 })}
                 <div className="mt-3 border-t-2 border-primary pt-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-exo text-sm font-semibold text-primary-text">TOTAL</span>
-                    <span className="font-exo text-sm font-semibold text-primary">
+                    <span className="text-sm font-semibold text-primary-text">TOTAL</span>
+                    <span className="text-sm font-semibold text-primary">
                       {formatCurrency(totalGeral)}
                     </span>
                   </div>
@@ -306,7 +306,7 @@ export function GraficoVendasPorUsuarioModal({
               {tipo === 'canceladas' ? 'Vendas Canceladas por Usuário' : 'Vendas por Usuário'}
               {avisoListaParcial ? (
                 <span
-                  className="mt-1 block font-nunito text-xs font-normal text-amber-800"
+                  className="mt-1 block text-xs font-normal text-amber-800"
                   style={{ fontWeight: 400 }}
                 >
                   {avisoListaParcial}

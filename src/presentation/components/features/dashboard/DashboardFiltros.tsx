@@ -62,7 +62,7 @@ export function DashboardFiltros({
 
   return (
     <div className="relative z-30 mb-2 flex flex-nowrap items-center gap-x-3 overflow-x-auto px-2 pt-2 md:px-4">
-      <h1 className="font-exo shrink-0 text-xl font-semibold text-primary-text">Visão Geral</h1>
+      <h1 className="shrink-0 text-xl font-semibold text-primary-text">Visão Geral</h1>
 
       <div className="flex shrink-0 items-center gap-1.5">
         <div className="relative w-fit max-w-[min(100%,28rem)]">

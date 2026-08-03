@@ -462,16 +462,16 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
       <div className="md:px-[30px] px-1 pt-1 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex flex-col w-1/2 md:pl-5">
-            <span className="text-primary md:text-lg text-sm font-semibold font-nunito">
+            <span className="text-primary md:text-lg text-sm font-semibold ">
               Perfis Cadastrados
             </span>
-            <span className="text-tertiary md:text-[22px] text-sm font-normal font-nunito">
+            <span className="text-tertiary md:text-[22px] text-sm font-normal ">
               Total {perfis.length} de {totalPerfis}
             </span>
           </div>
           <button
             onClick={() => openTabsModal({ mode: 'create' })}
-            className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+            className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
           >
             Novo
             <span className="text-lg">+</span>
@@ -493,7 +493,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
               placeholder="Pesquisar perfil de usuário..."
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
-              className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm "
             />
           </div>
         </div>
@@ -504,10 +504,10 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
         <div className="px-1 flex-shrink-0">
           <div className="h-10 bg-custom-2 rounded-lg pr-1 flex items-center gap-2">
             <div className="w-8"></div>
-            <div className="md:flex-[3] flex-[2] font-nunito font-semibold text-left md:text-sm text-xs text-primary-text ">
+            <div className="md:flex-[3] flex-[2] font-semibold text-left md:text-sm text-xs text-primary-text ">
               Perfil
             </div>
-            <div className="md:flex-[2] flex-[1] md:text-center mr-3 text-right font-nunito font-semibold md:text-sm text-xs text-primary-text ">
+            <div className="md:flex-[2] flex-[1] md:text-center mr-3 text-right font-semibold md:text-sm text-xs text-primary-text ">
               Qtd Usuários
             </div>
           </div>
@@ -595,7 +595,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
                     <MdPersonAdd size={16} />
                   </button>
                 </div>
-                <div className="md:flex-[2] flex-[1] mr-3 md:text-center text-right font-nunito md:text-sm text-xs text-secondary-text">
+                <div className="md:flex-[2] flex-[1] mr-3 md:text-center text-right md:text-sm text-xs text-secondary-text">
                   {contagemUsuarios} usuário(s)
                 </div>
               </div>
@@ -640,7 +640,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
                                 <MdEdit size={14} />
                               </button>
                             </div>
-                            <p className="font-nunito text-xs text-secondary-text">
+                            <p className="text-xs text-secondary-text">
                               {usuario.telefone || 'Sem telefone'}
                             </p>
                           </div>

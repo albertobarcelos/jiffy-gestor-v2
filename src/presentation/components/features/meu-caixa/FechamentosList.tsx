@@ -132,13 +132,13 @@ export function FechamentosList() {
         {/* Header com filtro */}
         <div className="mb-6">
           <div className="h-[42px] bg-white/20 flex items-center justify-between px-4">
-            <p className="text-primary text-sm font-semibold font-exo">
+            <p className="text-primary text-sm font-semibold ">
               Fechamentos | {filtroPeriodo}
             </p>
             <select
               value={filtroPeriodo}
               onChange={(e) => setFiltroPeriodo(e.target.value as any)}
-              className="h-9 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text text-sm font-nunito focus:outline-none focus:border-primary"
+              className="h-9 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text text-sm focus:outline-none focus:border-primary"
             >
               <option value="Semana">Semana</option>
               <option value="15 Dias">15 Dias</option>

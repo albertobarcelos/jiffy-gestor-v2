@@ -364,7 +364,7 @@ export function ModalLancamentoProdutoPainel({
           <div className="flex shrink-0 items-center justify-between gap-2 border-b border-gray-200 px-4 py-3">
             <h2
               id="modal-lancamento-produto-titulo"
-              className="font-exo min-w-0 flex-1 text-lg font-semibold text-primary-text sm:text-xl"
+              className="min-w-0 flex-1 text-lg font-semibold text-primary-text sm:text-xl"
             >
               {tituloBarra}
             </h2>
@@ -380,7 +380,7 @@ export function ModalLancamentoProdutoPainel({
 
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[#f9fafb] px-4 py-4">
             <div className="shrink-0">
-              <p className="font-nunito mb-2 text-lg font-medium text-primary-text">{tituloPainel}</p>
+              <p className="mb-2 text-lg font-medium text-primary-text">{tituloPainel}</p>
               <div className="h-[1px] border-t-2 border-primary/70 flex-shrink-0"></div>
             </div>
 
@@ -414,7 +414,7 @@ export function ModalLancamentoProdutoPainel({
 
             {mostrarComplementos && produto ? (
               <div className="mt-4 flex min-h-0 flex-1 flex-col rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
-                <h3 className="font-nunito mb-2 shrink-0 text-base font-semibold text-primary">
+                <h3 className="mb-2 shrink-0 text-base font-semibold text-primary">
                   Complementos
                 </h3>
                 {carregandoComplementos ? (
@@ -440,7 +440,7 @@ export function ModalLancamentoProdutoPainel({
                                   className="flex items-center justify-between gap-2 rounded bg-gray-50 px-2 py-1"
                                 >
                                   <span
-                                    className={`font-nunito min-w-0 flex-1 truncate text-sm${
+                                    className={`min-w-0 flex-1 truncate text-sm${
                                       onComplementoDoubleClick ? ' cursor-pointer' : ''
                                     }`}
                                     title={
@@ -500,7 +500,7 @@ export function ModalLancamentoProdutoPainel({
 
             {mostrarObservacao ? (
               <div className="mt-4 shrink-0 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
-                <h3 className="font-nunito mb-2 text-base font-semibold text-primary">
+                <h3 className="mb-2 text-base font-semibold text-primary">
                   Observação do item
                 </h3>
                 <Textarea
@@ -522,7 +522,7 @@ export function ModalLancamentoProdutoPainel({
 
             {mostrarAvisoComplementosManual ? (
               <div className="mt-4 shrink-0 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
-                <h3 className="font-nunito mb-2 text-base font-semibold text-primary">Complementos</h3>
+                <h3 className="mb-2 text-base font-semibold text-primary">Complementos</h3>
                 <p className="text-sm leading-relaxed text-gray-600">
                   Os complementos não abrem automaticamente ao adicionar este produto. Depois de
                   incluí-lo no pedido, toque nos{' '}

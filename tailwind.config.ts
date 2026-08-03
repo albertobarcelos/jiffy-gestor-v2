@@ -145,10 +145,6 @@ const config: Config = {
       fontFamily: {
         sans: ['var(--font-general-sans)', 'system-ui', 'sans-serif'],
         heading: ['var(--font-general-sans)', 'system-ui', 'sans-serif'],
-        /** Legado: antes Exo 2 — agora General Sans */
-        exo: ['var(--font-general-sans)', 'system-ui', 'sans-serif'],
-        /** Legado: antes Manrope — agora General Sans */
-        manrope: ['var(--font-general-sans)', 'system-ui', 'sans-serif'],
       },
     },
   },

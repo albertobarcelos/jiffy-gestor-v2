@@ -189,7 +189,7 @@ export function DashboardGraficoComparativo({
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-6 lg:col-span-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="min-w-0 font-exo text-lg font-semibold text-primary-text md:text-xl">
+        <h2 className="min-w-0 text-lg font-semibold text-primary-text md:text-xl">
           Comparativo de vendas
         </h2>
         <div className="relative min-w-[160px] shrink-0">

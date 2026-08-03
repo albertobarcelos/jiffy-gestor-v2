@@ -186,10 +186,10 @@ export function IconPickerModal({
             </div>
           ) : filteredIcons.length === 0 ? (
             <div className="flex min-h-[40vh] flex-col items-center justify-center text-center">
-              <p className="font-nunito mb-2 font-medium text-secondary-text">
+              <p className="mb-2 font-medium text-secondary-text">
                 Nenhum ícone encontrado
               </p>
-              <p className="font-nunito text-sm text-tertiary">
+              <p className="text-sm text-tertiary">
                 {searchText
                   ? 'Tente uma busca diferente'
                   : 'Nenhum ícone disponível nesta categoria'}
@@ -242,7 +242,7 @@ function IconCard({ icon, selectedColor, onSelect }: IconCardProps) {
       }}
     >
       <DinamicIcon iconName={icon.name} color={iconColor} size={32} className="mb-2" />
-      <span className="font-nunito line-clamp-2 text-center text-xs" style={{ color: iconColor }}>
+      <span className="line-clamp-2 text-center text-xs" style={{ color: iconColor }}>
         {(icon.tags.length > 0 ? icon.tags[0] : icon.name).toLocaleUpperCase('pt-BR')}
       </span>
     </button>

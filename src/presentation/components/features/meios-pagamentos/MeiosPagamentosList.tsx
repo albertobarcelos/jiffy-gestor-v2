@@ -601,7 +601,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
       <div className="md:px-6 px-1 pt-1 flex-shrink-0">
         <div className="flex items-start justify-between">
           <div className="w-1/2">
-            <p className="text-primary text-xl font-semibold font-nunito">
+            <p className="text-primary text-xl font-semibold ">
               Meios de Pagamento Cadastrados
             </p>
             <p className="text-tertiary md:text-[22px] text-sm font-medium">
@@ -610,7 +610,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
           </div>
           <button
             onClick={() => openTabsModal({ mode: 'create' })}
-            className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+            className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
           >
             Novo
             <span className="text-lg">+</span>
@@ -630,7 +630,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
                 placeholder="Pesquisar..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
-                className="w-full h-full md:pl-11 pl-5 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+                className="w-full h-full md:pl-11 pl-5 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm "
               />
             </div>
           </div>
@@ -645,7 +645,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
                   e.target.value as 'Todos' | 'Ativo' | 'Desativado'
                 )
               }
-              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm "
             >
               <option value="Todos">Todos</option>
               <option value="Ativo">Ativo</option>
@@ -658,25 +658,25 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
       {/* Cabeçalho da tabela */}
       <div className="md:px-[30px] px-1 mt-0 flex-shrink-0">
         <div className="h-10 bg-custom-2 rounded-lg md:px-4 px-1 flex items-center gap-[10px]">
-          <div className="flex-[3] font-nunito font-semibold md:text-sm text-xs text-primary-text">
+          <div className="flex-[3] font-semibold md:text-sm text-xs text-primary-text">
             Nome
           </div>
-          <div className="flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text hidden md:flex">
+          <div className="flex-[2] font-semibold md:text-sm text-xs text-primary-text hidden md:flex">
             Forma Fiscal
           </div>
-          <div className="md:flex-[2] flex-[1] text-center font-nunito font-semibold md:text-sm text-xs text-primary-text">
+          <div className="md:flex-[2] flex-[1] text-center font-semibold md:text-sm text-xs text-primary-text">
             TEF Ativo
           </div>
-          <div className="md:flex-[2] flex-[1] text-center font-nunito font-semibold md:text-sm text-xs text-primary-text">
+          <div className="md:flex-[2] flex-[1] text-center font-semibold md:text-sm text-xs text-primary-text">
             Permite Parcela
           </div>
-          <div className="md:flex-[2] flex-[1] text-center font-nunito font-semibold md:text-sm text-xs text-primary-text hidden md:flex">
+          <div className="md:flex-[2] flex-[1] text-center font-semibold md:text-sm text-xs text-primary-text hidden md:flex">
             Tipo parcelamento
           </div>
-          <div className="md:flex-[2] flex-[1] text-center font-nunito font-semibold md:text-sm text-xs text-primary-text">
+          <div className="md:flex-[2] flex-[1] text-center font-semibold md:text-sm text-xs text-primary-text">
             Status
           </div>
-          <div className="md:flex-[2] flex-[1] text-right font-nunito font-semibold md:text-sm text-xs text-primary-text">
+          <div className="md:flex-[2] flex-[1] text-right font-semibold md:text-sm text-xs text-primary-text">
             Ações
           </div>
         </div>
@@ -782,7 +782,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
                       )
                     }}
                     aria-label={`Tipo de parcelamento — ${meioPagamento.getNome()}`}
-                    className="font-nunito h-8 max-w-full rounded-lg border border-gray-200 bg-info px-2 text-xs text-primary-text focus:border-primary focus:outline-none disabled:opacity-60"
+                    className="h-8 max-w-full rounded-lg border border-gray-200 bg-info px-2 text-xs text-primary-text focus:border-primary focus:outline-none disabled:opacity-60"
                   >
                     {TIPOS_PARCELAMENTO_OPCOES.map((opcao) => (
                       <option key={opcao.value} value={opcao.value}>

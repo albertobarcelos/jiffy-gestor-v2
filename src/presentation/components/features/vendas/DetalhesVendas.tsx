@@ -1348,10 +1348,10 @@ export function DetalhesVendas({
               />
             )}
             <div className="flex flex-col" id="detalhes-vendas-titulo-appbar">
-              <span className="font-exo text-xl font-semibold text-white">
+              <span className="text-xl font-semibold text-white">
                 Venda Nº. {venda?.numeroVenda}
               </span>
-              <span className="font-nunito text-lg text-white">#{venda?.codigoVenda}</span>
+              <span className="text-lg text-white">#{venda?.codigoVenda}</span>
             </div>
           </div>
           <button
@@ -1408,7 +1408,7 @@ export function DetalhesVendas({
                 <>
                   {/* Card Informações da Venda */}
                   <div className="mb-2 p-2">
-                    <h2 className="font-exo text-lg font-semibold text-primary-text">
+                    <h2 className="text-lg font-semibold text-primary-text">
                       Informações da Venda
                     </h2>
                 <div className="mb-2 border-t border-dashed border-gray-400"></div>
@@ -1416,20 +1416,20 @@ export function DetalhesVendas({
                 <div className="space-y-2 md:px-2">
                   {/* Status */}
                   <div
-                    className={`flex justify-between rounded-lg px-3 py-2 ${statusColor} font-nunito text-xs text-white md:text-sm`}
+                    className={`flex justify-between rounded-lg px-3 py-2 ${statusColor} text-xs text-white md:text-sm`}
                   >
                     Status: <span className="font-semibold">{statusVenda}</span>
                   </div>
 
                   {/* Aberto por */}
-                  <div className="font-nunito flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm">
+                  <div className="flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm">
                     <span>Aberto por:</span>
                     <span>{nomesUsuarios[venda.abertoPorId] || venda.abertoPorId}</span>
                   </div>
 
                   {/* Última Alteração por - Só exibe quando statusMesa estiver aberta */}
                   {venda.ultimoResponsavelId && venda.statusMesa === 'aberta' && (
-                    <div className="font-nunito flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm">
+                    <div className="flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm">
                       <span>Última Alteração por:</span>
                       <span>
                         {nomesUsuarios[venda.ultimoResponsavelId] || venda.ultimoResponsavelId}
@@ -1441,7 +1441,7 @@ export function DetalhesVendas({
                   {venda.ultimoResponsavelId &&
                     !venda.canceladoPorId &&
                     venda.statusMesa !== 'aberta' && (
-                      <div className="font-nunito flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm">
+                      <div className="flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm">
                         <span>Finalizado Por:</span>
                         <span>
                           {nomesUsuarios[venda.ultimoResponsavelId] || venda.ultimoResponsavelId}
@@ -1451,7 +1451,7 @@ export function DetalhesVendas({
 
                   {/* Cancelado Por */}
                   {venda.canceladoPorId && (
-                    <div className="font-nunito flex justify-between rounded-lg bg-white px-1 text-xs text-error md:text-sm">
+                    <div className="flex justify-between rounded-lg bg-white px-1 text-xs text-error md:text-sm">
                       <span>Cancelado Por:</span>
                       <span className="font-semibold">
                         {nomesUsuarios[venda.canceladoPorId] || venda.canceladoPorId}
@@ -1461,7 +1461,7 @@ export function DetalhesVendas({
 
                   {/* Data/Hora de Cancelamento */}
                   {venda.dataCancelamento && (
-                    <div className="font-nunito flex justify-between rounded-lg bg-white px-1 text-xs text-error md:text-sm">
+                    <div className="flex justify-between rounded-lg bg-white px-1 text-xs text-error md:text-sm">
                       <span>Cancelado em:</span>
                       <span className="font-semibold">
                         {formatDateTime(venda.dataCancelamento)}
@@ -1471,21 +1471,21 @@ export function DetalhesVendas({
 
                   {/* Código do Terminal */}
                   {venda.codigoTerminal && (
-                    <div className="font-nunito flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm">
+                    <div className="flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm">
                       <span>Código do Terminal:</span>
                       <span>#{venda.codigoTerminal}</span>
                     </div>
                   )}
 
                   {/* Data/Hora de Criação */}
-                  <div className="font-nunito flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm">
+                  <div className="flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm">
                     <span>Data/Hora Abertura:</span>
                     <span>{formatDateTime(venda.dataCriacao)}</span>
                   </div>
 
                   {/* Data/Hora de Finalização */}
                   {venda.dataFinalizacao && (
-                    <div className="font-nunito flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm">
+                    <div className="flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm">
                       <span>Data/Hora Finalização:</span>
                       <span>{formatDateTime(venda.dataFinalizacao)}</span>
                     </div>
@@ -1493,7 +1493,7 @@ export function DetalhesVendas({
 
                   {/* Cliente Vinculado */}
                   {venda.clienteId && nomeCliente && (
-                    <div className="font-nunito flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm">
+                    <div className="flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm">
                       <span>Cliente Vinculado:</span>
                       <span>{nomeCliente}</span>
                     </div>
@@ -1501,7 +1501,7 @@ export function DetalhesVendas({
 
                   {/* Identificação da Venda */}
                   {venda.identificacao && (
-                    <div className="font-nunito flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm">
+                    <div className="flex justify-between rounded-lg bg-white px-1 text-xs text-primary-text md:text-sm">
                       <span>Identificação da Venda:</span>
                       <span>{venda.identificacao}</span>
                     </div>
@@ -1509,7 +1509,7 @@ export function DetalhesVendas({
 
                   {/* Origem da Venda */}
                   {venda.origem && (
-                    <div className="font-nunito flex justify-between rounded-lg bg-white px-3 text-sm text-primary-text">
+                    <div className="flex justify-between rounded-lg bg-white px-3 text-sm text-primary-text">
                       <span>Origem:</span>
                       <span>{venda.origem}</span>
                     </div>
@@ -1517,7 +1517,7 @@ export function DetalhesVendas({
 
                   {/* Status Fiscal */}
                   {venda.statusFiscal && (
-                    <div className="font-nunito flex items-center justify-between rounded-lg bg-white px-3 text-sm text-primary-text">
+                    <div className="flex items-center justify-between rounded-lg bg-white px-3 text-sm text-primary-text">
                       <span>Status Fiscal:</span>
                       <StatusFiscalBadge status={venda.statusFiscal} />
                     </div>
@@ -1525,16 +1525,16 @@ export function DetalhesVendas({
 
                   {/* Documento Fiscal ID */}
                   {venda.documentoFiscalId && (
-                    <div className="font-nunito flex justify-between rounded-lg bg-green-50 px-3 text-sm text-primary-text">
+                    <div className="flex justify-between rounded-lg bg-green-50 px-3 text-sm text-primary-text">
                       <span>Documento Fiscal ID:</span>
-                      <span className="font-mono text-xs">{venda.documentoFiscalId}</span>
+                      <span className="text-xs">{venda.documentoFiscalId}</span>
                     </div>
                   )}
 
                   {/* Retorno SEFAZ (motivo da rejeição/autorização) */}
                   {venda.retornoSefaz && (
                     <div
-                      className={`font-nunito rounded-lg px-3 py-2 text-sm ${
+                      className={`rounded-lg px-3 py-2 text-sm ${
                         venda.statusFiscal === 'REJEITADA'
                           ? 'bg-red-50 text-red-700'
                           : 'bg-blue-50 text-primary-text'
@@ -1549,7 +1549,7 @@ export function DetalhesVendas({
 
               {/* Card Produtos Lançados */}
               <div className="mb-2 p-2">
-                <h2 className="font-exo text-lg font-semibold text-primary-text">Produtos Lançados</h2>
+                <h2 className="text-lg font-semibold text-primary-text">Produtos Lançados</h2>
                 <div className="mb-2 border-t border-dashed border-gray-400"></div>
 
                 <div className="space-y-2">
@@ -1601,13 +1601,13 @@ export function DetalhesVendas({
                           {/* Linha do produto principal */}
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex-2 items-center gap-2">
-                              <span className="font-nunito text-xs font-semibold text-primary-text md:text-sm">
+                              <span className="text-xs font-semibold text-primary-text md:text-sm">
                                 {produto.quantidade}x {produto.nomeProduto} (
                                 {formatNumber(produto.valorUnitario)})
                               </span>
                             </div>
                             {/* Exibe acréscimo e/ou desconto se existirem */}
-                            <div className="font-nunito flex flex-1 flex-col justify-start gap-1 text-xs text-secondary-text md:flex-row md:text-sm">
+                            <div className="flex flex-1 flex-col justify-start gap-1 text-xs text-secondary-text md:flex-row md:text-sm">
                               {(() => {
                                 // Tenta obter acréscimo de diferentes possíveis campos
                                 const acrescimoRaw =
@@ -1692,7 +1692,7 @@ export function DetalhesVendas({
                               })()}
                             </div>
                             <div
-                              className={`font-nunito flex flex-1 items-center justify-end text-sm font-semibold text-primary-text ${isCancelado ? 'line-through' : ''}`}
+                              className={`flex flex-1 items-center justify-end text-sm font-semibold text-primary-text ${isCancelado ? 'line-through' : ''}`}
                             >
                               {formatCurrency(valorTotal)}
                             </div>
@@ -1721,13 +1721,13 @@ export function DetalhesVendas({
                                     key={compIndex}
                                     className="flex items-center justify-between gap-2"
                                   >
-                                    <span className="font-nunito text-xs text-secondary-text">
+                                    <span className="text-xs text-secondary-text">
                                       {complemento.quantidade}x {complemento.nomeComplemento}
                                       {temImpactoPreco &&
                                         ` (${formatNumber(complemento.valorUnitario)})`}
                                     </span>
                                     <div
-                                      className={`font-nunito text-xs font-semibold text-secondary-text ${isCancelado ? 'line-through' : ''}`}
+                                      className={`text-xs font-semibold text-secondary-text ${isCancelado ? 'line-through' : ''}`}
                                     >
                                       {temImpactoPreco
                                         ? `${prefix}${formatCurrency(valorTotalComplemento)}`
@@ -1767,7 +1767,7 @@ export function DetalhesVendas({
                   {(venda.taxasLancadas?.length ?? 0) > 0 && (
                     <>
                       <div className="my-2 border-t border-dashed border-gray-400" />
-                      <p className="font-nunito mb-1 text-lg font-semibold text-primary-text">
+                      <p className="mb-1 text-lg font-semibold text-primary-text">
                         Taxas Lançadas
                       </p>
                       {(venda.taxasLancadas ?? []).map(taxa => {
@@ -1790,11 +1790,11 @@ export function DetalhesVendas({
                           >
                             <div className="flex flex-col gap-1">
                               <div className="flex items-center justify-between gap-2">
-                                <span className="font-nunito min-w-0 flex-1 text-xs font-semibold text-primary-text md:text-sm">
+                                <span className="min-w-0 flex-1 text-xs font-semibold text-primary-text md:text-sm">
                                   {qtdTaxa}x {taxa.nome} ({textoUnitarioTaxa})
                                 </span>
                                 <span
-                                  className={`font-nunito shrink-0 text-sm font-semibold text-primary-text ${isCanceladoTaxa ? 'line-through' : ''}`}
+                                  className={`shrink-0 text-sm font-semibold text-primary-text ${isCanceladoTaxa ? 'line-through' : ''}`}
                                 >
                                   {formatCurrency(totalTaxa)}
                                 </span>
@@ -1833,18 +1833,18 @@ export function DetalhesVendas({
                   {ajustesTotaisVenda.mostrarSecao && (
                     <>
                       <div className="my-2 border-t border-dashed border-gray-400" />
-                      <p className="font-nunito mb-1 text-lg font-semibold text-primary-text">
+                      <p className="mb-1 text-lg font-semibold text-primary-text">
                         Acréscimo/Desconto na Venda
                       </p>
                       {ajustesTotaisVenda.temDesconto && (
                         <div className="rounded-lg bg-white px-1 md:px-3">
                           <div className="flex flex-col gap-1">
                             <div className="flex items-center justify-between gap-3">
-                              <span className="font-nunito min-w-0 flex-1 text-xs font-semibold text-primary-text md:text-sm">
+                              <span className="min-w-0 flex-1 text-xs font-semibold text-primary-text md:text-sm">
                                 Desconto na venda
                                 {sufixoTituloAjusteVenda(venda.tipoDesconto, venda.valorDesconto)}
                               </span>
-                              <span className="font-nunito shrink-0 text-sm font-semibold text-error">
+                              <span className="shrink-0 text-sm font-semibold text-error">
                                 -{formatCurrency(ajustesTotaisVenda.valorDescontoExibir ?? 0)}
                               </span>
                             </div>
@@ -1855,11 +1855,11 @@ export function DetalhesVendas({
                         <div className="rounded-lg bg-white px-1 md:px-3">
                           <div className="flex flex-col gap-1">
                             <div className="flex items-center justify-between gap-3">
-                              <span className="font-nunito min-w-0 flex-1 text-xs font-semibold text-primary-text md:text-sm">
+                              <span className="min-w-0 flex-1 text-xs font-semibold text-primary-text md:text-sm">
                                 Acréscimo na venda
                                 {sufixoTituloAjusteVenda(venda.tipoAcrescimo, venda.valorAcrescimo)}
                               </span>
-                              <span className="font-nunito shrink-0 text-sm font-semibold text-primary-text">
+                              <span className="shrink-0 text-sm font-semibold text-primary-text">
                                 {formatCurrency(ajustesTotaisVenda.valorAcrescimoExibir ?? 0)}
                               </span>
                             </div>
@@ -1872,11 +1872,11 @@ export function DetalhesVendas({
                   {/* Total da Venda */}
                   <div className="rounded-lg border-2 border-primary bg-primary/10 px-3 py-2">
                     <div className="flex items-center justify-between">
-                      <span className="font-nunito text-base font-semibold text-primary-text">
+                      <span className="text-base font-semibold text-primary-text">
                         Total da Venda:
                       </span>
                       <span
-                        className={`font-nunito text-base font-semibold text-primary ${statusVenda === 'CANCELADA' ? 'line-through' : ''}`}
+                        className={`text-base font-semibold text-primary ${statusVenda === 'CANCELADA' ? 'line-through' : ''}`}
                       >
                         {formatCurrency(totalVendaCalculado)}
                       </span>
@@ -1887,7 +1887,7 @@ export function DetalhesVendas({
 
               {/* Card Pagamentos Realizados */}
               <div className="mb-4 px-2">
-                <h2 className="mb-2 font-exo text-lg font-semibold text-primary-text">
+                <h2 className="mb-2 text-lg font-semibold text-primary-text">
                   Pagamentos Realizados
                 </h2>
                 <div className="mb-3 border-t border-dashed border-gray-400"></div>
@@ -1945,7 +1945,7 @@ export function DetalhesVendas({
                             <span className="text-2xl text-white">{getIcon()}</span>
                           </div>
                           <div className="flex-1">
-                            <div className="font-nunito text-sm font-semibold text-primary-text">
+                            <div className="text-sm font-semibold text-primary-text">
                               {meio?.nome || 'Meio de pagamento desconhecido'}
                               {isCancelado && (
                                 <span className="ml-2 text-xs font-semibold text-error">
@@ -1953,25 +1953,25 @@ export function DetalhesVendas({
                                 </span>
                               )}
                             </div>
-                            <div className="font-nunito text-xs text-secondary-text">
+                            <div className="text-xs text-secondary-text">
                               {formatDateTime(pagamento.dataCriacao)}
                             </div>
-                            <div className="font-nunito text-sm font-semibold text-primary-text">
+                            <div className="text-sm font-semibold text-primary-text">
                               {formatCurrency(pagamento.valor)}
                             </div>
-                            <div className="font-nunito text-xs text-secondary-text">
+                            <div className="text-xs text-secondary-text">
                               PDV Resp.:{' '}
                               {nomesUsuarios[pagamento.realizadoPorId] || pagamento.realizadoPorId}
                             </div>
                             {isCancelado && pagamento.canceladoPorId && (
-                              <div className="font-nunito mt-1 text-xs text-error">
+                              <div className="mt-1 text-xs text-error">
                                 Cancelado por:{' '}
                                 {nomesUsuarios[pagamento.canceladoPorId] ||
                                   pagamento.canceladoPorId}
                               </div>
                             )}
                             {isCancelado && pagamento.dataCancelamento && (
-                              <div className="font-nunito text-xs text-error">
+                              <div className="text-xs text-error">
                                 Cancelado em: {formatDateTime(pagamento.dataCancelamento)}
                               </div>
                             )}
@@ -1983,7 +1983,7 @@ export function DetalhesVendas({
                   {/* Troco - Código original comentado (vem da API) */}
                   {/* {venda.troco != null && Number(venda.troco) > 0 && (
                     <div className="px-3 py-2 rounded-lg bg-white shadow-sm">
-                      <span className="text-sm font-semibold text-primary-text font-nunito">
+                      <span className="text-sm font-semibold text-primary-text ">
                         Troco: {formatCurrency(venda.troco)}
                       </span>
                     </div>
@@ -1992,7 +1992,7 @@ export function DetalhesVendas({
                   {/* Troco calculado no frontend */}
                   {trocoCalculado > 0 && (
                     <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
-                      <span className="font-nunito text-sm font-semibold text-primary-text">
+                      <span className="text-sm font-semibold text-primary-text">
                         Troco: {formatCurrency(trocoCalculado)}
                       </span>
                     </div>
@@ -2002,7 +2002,7 @@ export function DetalhesVendas({
 
               {/* Card Resumo Financeiro */}
               <div className="mb-4 px-2">
-                <h2 className="mb-2 font-exo text-sm font-semibold text-primary-text">
+                <h2 className="mb-2 text-sm font-semibold text-primary-text">
                   Resumo Financeiro
                 </h2>
                 <div className="border-t border-dashed border-gray-400"></div>
@@ -2010,46 +2010,46 @@ export function DetalhesVendas({
                 <div className="space-y-1.5 rounded-lg px-4 py-2">
                   {/* A: todos os produtos lançados (inclui cancelados / removidos) */}
                   <div className="flex items-center justify-between">
-                    <span className="font-nunito text-xs font-medium text-gray-800">
+                    <span className="text-xs font-medium text-gray-800">
                       A - Total itens lançados (+)
                     </span>
-                    <span className="font-nunito text-right text-xs font-semibold tabular-nums text-gray-800">
+                    <span className="text-right text-xs font-semibold tabular-nums text-gray-800">
                       {formatNumber(resumoFinanceiro.totalItensLancados)}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="font-nunito text-xs font-medium text-gray-800">
+                    <span className="text-xs font-medium text-gray-800">
                      B - Itens cancelados (-)
                     </span>
-                    <span className="font-nunito text-right text-xs font-semibold tabular-nums text-gray-800 line-through">
+                    <span className="text-right text-xs font-semibold tabular-nums text-gray-800 line-through">
                       {formatNumber(resumoFinanceiro.totalItensCancelados)}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="font-nunito text-xs font-medium text-gray-800">
+                    <span className="text-xs font-medium text-gray-800">
                       C - Total taxas (+)
                     </span>
-                    <span className="font-nunito text-right text-xs font-semibold tabular-nums text-gray-800">
+                    <span className="text-right text-xs font-semibold tabular-nums text-gray-800">
                       {formatNumber(resumoFinanceiro.totalTaxas)}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="font-nunito text-xs font-medium text-gray-800">
+                    <span className="text-xs font-medium text-gray-800">
                       D - Total acréscimos à venda (+)
                     </span>
-                    <span className="font-nunito text-right text-xs font-semibold tabular-nums text-gray-800">
+                    <span className="text-right text-xs font-semibold tabular-nums text-gray-800">
                       {formatNumber(resumoFinanceiro.totalAcrescimoVenda)}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="font-nunito text-xs font-medium text-gray-800">
+                    <span className="text-xs font-medium text-gray-800">
                       E - Total descontos à venda (-)
                     </span>
-                    <span className="font-nunito text-right text-xs font-semibold tabular-nums text-gray-800">
+                    <span className="text-right text-xs font-semibold tabular-nums text-gray-800">
                       {resumoFinanceiro.totalDescontoVenda > 0
                         ? `-${formatNumber(resumoFinanceiro.totalDescontoVenda)}`
                         : formatNumber(resumoFinanceiro.totalDescontoVenda)}
@@ -2057,10 +2057,10 @@ export function DetalhesVendas({
                   </div>
 
                   <div className="mt-1 flex items-center justify-between border-t border-gray-400 pt-1.5">
-                    <span className="font-nunito text-xs font-medium text-gray-800">
+                    <span className="text-xs font-medium text-gray-800">
                       F - Total (A − B + C + D − E)
                     </span>
-                    <span className="font-nunito text-right text-xs font-semibold tabular-nums text-gray-800">
+                    <span className="text-right text-xs font-semibold tabular-nums text-gray-800">
                       {formatNumber(resumoFinanceiro.totalResumo)}
                     </span>
                   </div>
@@ -2074,7 +2074,7 @@ export function DetalhesVendas({
                 resumoFiscalParaExibicao && (
                   <div className="mb-4 p-2">
                     <div className="flex flex-col gap-3 bg-gray-50/90 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                      <h2 className="font-exo text-lg font-semibold text-primary-text">
+                      <h2 className="text-lg font-semibold text-primary-text">
                         Resumo Fiscal
                       </h2>
                       {Boolean(
@@ -2194,7 +2194,7 @@ export function DetalhesVendas({
                         return (
                           <div
                             key={label}
-                            className={`font-nunito flex items-start justify-between gap-2 rounded-lg px-1 py-1.5 text-xs md:px-2 md:text-sm ${zebra} ${
+                            className={`flex items-start justify-between gap-2 rounded-lg px-1 py-1.5 text-xs md:px-2 md:text-sm ${zebra} ${
                               rowClassName ? 'text-inherit' : 'text-primary-text'
                             }`}
                           >
@@ -2238,18 +2238,18 @@ export function DetalhesVendas({
           sx={{
             backgroundColor: 'var(--color-error)',
             color: 'white',
-            fontFamily: 'Exo, sans-serif',
+            fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
           }}
         >
           Cancelar Venda
         </DialogTitle>
         <MuiDialogContent sx={{ p: 3, backgroundColor: 'var(--color-info)' }}>
           <div className="space-y-4 pt-4">
-            <p className="font-nunito text-sm text-secondary-text">
+            <p className="text-sm text-secondary-text">
               Esta ação cancelará a venda e, se houver nota fiscal emitida, também a cancelará na
               SEFAZ.
             </p>
-            <p className="font-nunito text-sm font-semibold text-error">
+            <p className="text-sm font-semibold text-error">
               Esta ação não pode ser desfeita!
             </p>
             <TextField

@@ -1,7 +1,5 @@
-import {
+﻿import {
   MdContentCopy,
-  MdExtension,
-  MdPrint,
   MdStarBorder,
   MdAddCircleOutline,
   MdRemoveCircleOutline,
@@ -43,8 +41,8 @@ export const toggleFieldConfig: Record<ToggleField, ToggleFieldConfig> = {
   },
   permiteAlterarPreco: {
     bodyKey: 'permiteAlterarPreco',
-    successTrue: 'Alteração de preço no PDV habilitada!',
-    successFalse: 'Alteração de preço no PDV desabilitada!',
+    successTrue: 'Alteração de preço no Jiffy POS habilitada!',
+    successFalse: 'Alteração de preço no Jiffy POS desabilitada!',
   },
   incideTaxa: {
     bodyKey: 'incideTaxa',
@@ -59,13 +57,11 @@ export type ActionIconDef =
   | { key: 'copiar'; label: string; Icon: IconType; action: 'copy'; field?: never; modal?: never }
 
 export const actionIconsConfig: ActionIconDef[] = [
-  { key: 'copiar', label: 'Copiar produto', Icon: MdContentCopy, action: 'copy' },
-  { key: 'complementos', label: 'Complementos vinculados', Icon: MdExtension, modal: 'complementos' },
-  { key: 'impressora', label: 'Impressoras vinculadas', Icon: MdPrint, modal: 'impressoras' },
   { key: 'favorito', label: 'Favoritar produto', Icon: MdStarBorder, field: 'favorito' },
   { key: 'acrescentar', label: 'Permitir acréscimo', Icon: MdAddCircleOutline, field: 'permiteAcrescimo' },
   { key: 'diminuir', label: 'Permitir desconto', Icon: MdRemoveCircleOutline, field: 'permiteDesconto' },
   { key: 'abrir', label: 'Permitir abrir complementos', Icon: MdLaunch, field: 'abreComplementos' },
-  { key: 'alterar-preco', label: 'Permitir alterar preço no PDV', Icon: MdAttachMoney, field: 'permiteAlterarPreco' },
+  { key: 'alterar-preco', label: 'Permitir alterar preço no Jiffy POS', Icon: MdAttachMoney, field: 'permiteAlterarPreco' },
   { key: 'incide-taxa', label: 'Incide taxa', Icon: MdPercent, field: 'incideTaxa' },
+  { key: 'copiar', label: 'Copiar produto', Icon: MdContentCopy, action: 'copy' },
 ]

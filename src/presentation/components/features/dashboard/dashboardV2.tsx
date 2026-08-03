@@ -259,7 +259,7 @@ export default function DashboardV2() {
   }
 
   return (
-    <div className="font-nunito min-h-0 w-full bg-gray-50 pb-8 pt-1">
+    <div className="min-h-0 w-full bg-gray-50 pb-8 pt-1">
       {/* Cabeçalho + filtros */}
       <DashboardFiltros
         subtituloAtualizacao={subtituloAtualizacao}
@@ -353,7 +353,7 @@ export default function DashboardV2() {
             type="button"
             disabled={!rascunhoIntervaloValido}
             onClick={handleAplicarIntervaloPersonalizadoModal}
-            className="rounded-b-l-lg font-nunito flex h-full w-full items-center justify-center bg-primary text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-b-l-lg flex h-full w-full items-center justify-center bg-primary text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Aplicar
           </button>
