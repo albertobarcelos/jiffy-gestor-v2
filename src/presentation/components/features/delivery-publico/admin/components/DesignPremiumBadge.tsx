@@ -7,11 +7,11 @@ type DesignPremiumBadgeProps = {
   label?: string
 }
 
-export function DesignPremiumBadge({ className, label = 'Mais+' }: DesignPremiumBadgeProps) {
+export function DesignPremiumBadge({ className, label = 'Em breve' }: DesignPremiumBadgeProps) {
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white',
+        'inline-flex items-center rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white',
         className
       )}
     >

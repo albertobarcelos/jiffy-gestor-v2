@@ -24,6 +24,11 @@ type DeliveryThemeScopeProps = {
   slug: string
   nomeExibicaoFallback?: string
   empresa?: EmpresaPublicaDTO | null
+  /**
+   * Quando `false`, mostra loading até o catálogo trazer `empresa.design`
+   * (evita flash de tema default).
+   */
+  designReady?: boolean
   className?: string
   children: ReactNode
   loadingFallback?: ReactNode
@@ -47,6 +52,7 @@ export function DeliveryThemeScope({
   slug,
   nomeExibicaoFallback,
   empresa,
+  designReady = false,
   className,
   children,
   loadingFallback,
@@ -55,6 +61,7 @@ export function DeliveryThemeScope({
     slug,
     nomeExibicaoFallback,
     empresa,
+    designReady,
   })
 
   if (!hydrated) {

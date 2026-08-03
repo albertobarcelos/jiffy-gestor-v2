@@ -1,27 +1,43 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { DeliveryPublicoDesignMeResponseDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDesignDTO'
 import type { DeliveryPublicoDesignConfig } from '../types/deliveryPublicoDesignConfig'
 import { createDefaultDesignConfig } from '../constants/defaultDesignConfig'
 import { canPublishDesign } from '../constants/designPublishRules'
 import {
   isDesignConfigEqual,
-  readDesignStorage,
-  writeDesignStorage,
-  writePublishedDesignBySlug,
 } from '../utils/designConfigStorage'
+import {
+  apiDesignConfigToUi,
+  uiDesignConfigToApi,
+} from '../utils/mapDeliveryDesignConfig'
+import {
+  useDeliveryDesignMe,
+  usePublicarDesignDelivery,
+  useSalvarDraftDesignDelivery,
+} from '@/src/presentation/hooks/useDeliveryDesignMe'
+
+const AUTOSAVE_DEBOUNCE_MS = 700
 
 type UseDeliveryDesignDraftOptions = {
   empresaId: string | undefined
   slug?: string
   nomeExibicaoFallback?: string
+  /** Quando false, não dispara a query (ex.: empresa ainda carregando). */
+  enabled?: boolean
 }
 
 export function useDeliveryDesignDraft({
   empresaId,
-  slug,
+  slug: _slug,
   nomeExibicaoFallback = '',
+  enabled = true,
 }: UseDeliveryDesignDraftOptions) {
+  const designQuery = useDeliveryDesignMe(Boolean(empresaId) && enabled)
+  const salvarDraftMutation = useSalvarDraftDesignDelivery()
+  const publicarMutation = usePublicarDesignDelivery()
+
   const [draft, setDraft] = useState<DeliveryPublicoDesignConfig>(() =>
     createDefaultDesignConfig(nomeExibicaoFallback)
   )
@@ -29,55 +45,122 @@ export function useDeliveryDesignDraft({
     createDefaultDesignConfig(nomeExibicaoFallback)
   )
   const [hydrated, setHydrated] = useState(false)
+  const skipAutosaveRef = useRef(true)
+  const lockAutosaveRef = useRef(false)
+  const hydratedEmpresaIdRef = useRef<string | undefined>(undefined)
 
+  // Reset local quando troca de empresa
   useEffect(() => {
-    if (!empresaId) return
-    const storage = readDesignStorage(empresaId, nomeExibicaoFallback)
-    setPublished(storage.published)
-    setDraft(storage.draft)
-    setHydrated(true)
-  }, [empresaId, nomeExibicaoFallback])
+    if (empresaId !== hydratedEmpresaIdRef.current) {
+      setHydrated(false)
+      hydratedEmpresaIdRef.current = undefined
+      skipAutosaveRef.current = true
+    }
+  }, [empresaId])
 
-  const persist = useCallback(
-    (nextPublished: DeliveryPublicoDesignConfig, nextDraft: DeliveryPublicoDesignConfig) => {
-      if (!empresaId) return
-      writeDesignStorage(empresaId, { published: nextPublished, draft: nextDraft })
-    },
-    [empresaId]
-  )
+  // Hidrata uma vez a partir da API
+  useEffect(() => {
+    if (!empresaId || !designQuery.data || hydrated) return
+
+    const uiDraft = apiDesignConfigToUi(
+      designQuery.data.draft,
+      nomeExibicaoFallback
+    )
+    const uiPublished = apiDesignConfigToUi(
+      designQuery.data.published,
+      nomeExibicaoFallback
+    )
+    setPublished(uiPublished)
+    setDraft(uiDraft)
+    setHydrated(true)
+    hydratedEmpresaIdRef.current = empresaId
+    skipAutosaveRef.current = true
+  }, [empresaId, designQuery.data, hydrated, nomeExibicaoFallback])
+
+  // Autosave do draft (debounce)
+  useEffect(() => {
+    if (!hydrated || !empresaId) return
+    if (skipAutosaveRef.current) {
+      skipAutosaveRef.current = false
+      return
+    }
+    if (lockAutosaveRef.current) return
+
+    const handle = window.setTimeout(() => {
+      if (lockAutosaveRef.current) return
+      const payload = uiDesignConfigToApi(draft)
+      salvarDraftMutation.mutate(payload)
+    }, AUTOSAVE_DEBOUNCE_MS)
+
+    return () => window.clearTimeout(handle)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- autosave só quando draft muda
+  }, [draft, hydrated, empresaId])
 
   const updateDraft = useCallback(
     (updater: (current: DeliveryPublicoDesignConfig) => DeliveryPublicoDesignConfig) => {
-      setDraft(current => {
-        const next = updater(current)
-        if (empresaId) {
-          writeDesignStorage(empresaId, { published, draft: next })
-        }
-        return next
-      })
+      setDraft(current => updater(current))
     },
-    [empresaId, published]
+    []
   )
 
-  const publish = useCallback(() => {
-    if (!canPublishDesign(draft)) return
-    setPublished(draft)
-    if (empresaId) {
-      writeDesignStorage(empresaId, { published: draft, draft })
+  const publish = useCallback(async () => {
+    if (!canPublishDesign(draft)) {
+      throw new Error(
+        'Somente o modelo Básico, as paletas publicáveis e a tipografia Urbana podem ser publicados no momento'
+      )
     }
-    if (slug?.trim()) {
-      writePublishedDesignBySlug(slug.trim(), draft)
-    }
-  }, [draft, empresaId, slug])
 
-  const restore = useCallback(() => {
-    setDraft(published)
-    if (empresaId) {
-      writeDesignStorage(empresaId, { published, draft: published })
-    }
-  }, [empresaId, published])
+    const payload = uiDesignConfigToApi(draft)
+    lockAutosaveRef.current = true
 
-  const isDirty = useMemo(() => !isDesignConfigEqual(draft, published), [draft, published])
+    try {
+      await salvarDraftMutation.mutateAsync(payload)
+      const result = await publicarMutation.mutateAsync(payload)
+
+      const uiPublished = apiDesignConfigToUi(
+        result.published,
+        nomeExibicaoFallback
+      )
+      const uiDraft = apiDesignConfigToUi(result.draft, nomeExibicaoFallback)
+      skipAutosaveRef.current = true
+      setPublished(uiPublished)
+      setDraft(uiDraft)
+    } finally {
+      lockAutosaveRef.current = false
+    }
+  }, [
+    draft,
+    nomeExibicaoFallback,
+    publicarMutation,
+    salvarDraftMutation,
+  ])
+
+  const restore = useCallback(async () => {
+    lockAutosaveRef.current = true
+    try {
+      skipAutosaveRef.current = true
+      setDraft(published)
+      const payload = uiDesignConfigToApi(published)
+      await salvarDraftMutation.mutateAsync(payload)
+    } finally {
+      lockAutosaveRef.current = false
+    }
+  }, [published, salvarDraftMutation])
+
+  const replaceFromMe = useCallback(
+    (me: DeliveryPublicoDesignMeResponseDTO) => {
+      skipAutosaveRef.current = true
+      lockAutosaveRef.current = false
+      setPublished(apiDesignConfigToUi(me.published, nomeExibicaoFallback))
+      setDraft(apiDesignConfigToUi(me.draft, nomeExibicaoFallback))
+    },
+    [nomeExibicaoFallback]
+  )
+
+  const isDirty = useMemo(
+    () => !isDesignConfigEqual(draft, published),
+    [draft, published]
+  )
 
   return {
     draft,
@@ -87,6 +170,15 @@ export function useDeliveryDesignDraft({
     updateDraft,
     publish,
     restore,
-    persist,
+    replaceFromMe,
+    salvarDraftAsync: salvarDraftMutation.mutateAsync,
+    publicarAsync: publicarMutation.mutateAsync,
+    serverPublishedAt: designQuery.data?.publishedAt ?? null,
+    isLoading: designQuery.isPending || (Boolean(empresaId) && !hydrated && !designQuery.isError),
+    isError: designQuery.isError,
+    error: designQuery.error,
+    refetch: designQuery.refetch,
+    isSavingDraft: salvarDraftMutation.isPending,
+    isPublishing: publicarMutation.isPending,
   }
 }

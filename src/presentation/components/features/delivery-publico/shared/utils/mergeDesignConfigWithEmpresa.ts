@@ -2,9 +2,22 @@ import type { EmpresaPublicaDTO } from '@/src/application/dto/delivery-publico/D
 import type { DeliveryPublicoDesignConfig } from '../types/deliveryPublicoDesignConfig'
 import { CABECALHO_NOME_MAX_LENGTH } from '../constants/defaultDesignConfig'
 
+function resolveMidiaUrl(
+  preferida: string | null | undefined,
+  espelho: string | null | undefined
+): string | null {
+  for (const candidate of [preferida, espelho]) {
+    if (typeof candidate !== 'string') continue
+    const trimmed = candidate.trim()
+    if (!trimmed || trimmed.startsWith('blob:')) continue
+    return trimmed
+  }
+  return null
+}
+
 /**
- * Preenche cabeçalho do design com dados da API quando o admin não personalizou.
- * Design publicado tem prioridade sobre a API.
+ * Preenche cabeçalho com dados da empresa (FK/CDN = fonte de verdade).
+ * Espelhos no design só entram se a API não trouxer URL.
  */
 export function mergeDesignConfigWithEmpresa(
   design: DeliveryPublicoDesignConfig,
@@ -20,8 +33,8 @@ export function mergeDesignConfigWithEmpresa(
     cabecalho: {
       ...design.cabecalho,
       nomeExibicao: (nomeDesign || nomeApi).slice(0, CABECALHO_NOME_MAX_LENGTH),
-      logoUrl: design.cabecalho.logoUrl ?? empresa.logoUrl,
-      capaUrl: design.cabecalho.capaUrl ?? empresa.bannerUrl,
+      logoUrl: resolveMidiaUrl(empresa.logoUrl, design.cabecalho.logoUrl),
+      capaUrl: resolveMidiaUrl(empresa.bannerUrl, design.cabecalho.capaUrl),
     },
   }
 }

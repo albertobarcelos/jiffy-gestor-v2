@@ -1,9 +1,9 @@
 # Persistência do Design do Delivery Público
 
-Documento de especificação e plano de implementação para migrar as preferências visuais do cardápio digital (hoje só em `localStorage`) para o backend, com leitura pública por slug.
+Documento de especificação e plano de implementação para migrar as preferências visuais do cardápio digital (antes só em `localStorage`) para o backend, com leitura pública por slug.
 
-**Status:** planejamento  
-**Branches sugeridas:** `feat/design-delivery-persistencia` (backend) · `feat/design-delivery-persistencia-gestor` (frontend)  
+**Status:** **implementação concluída** (Fases 0–7)  
+**Branches:** `feat/design-delivery-persistencia` (backend) · `feat/design-delivery-persistencia-gestor` (frontend)  
 **Arquitetura:** seguir `docs/arquitetura-jiffy/` em **backend** e **frontend** (Clean Architecture, DDD, SOLID — dependências para dentro).
 
 ### Progresso das fases
@@ -11,13 +11,15 @@ Documento de especificação e plano de implementação para migrar as preferên
 | Fase | Escopo | Status |
 |------|--------|--------|
 | **0** | Inventário + decisões de produto/técnicas (este doc) | **Feita** |
-| **1** | Backend: schema/migration + domain validators | Pendente |
-| **2** | Backend: ports/repos + use cases + rotas + Swagger | Pendente |
-| **3** | Frontend: DTOs/Zod + API infra + use cases | Pendente |
-| **4** | Frontend: Design admin (draft/publish via API) | Pendente |
-| **5** | Frontend: cardápio público lê design publicado da API | Pendente |
-| **6** | Migração localStorage → backend + limpeza | Pendente |
-| **7** | Testes + checklist arquitetura-jiffy | Pendente |
+| **1** | Backend: schema/migration + domain validators | **Feita** |
+| **2** | Backend: ports/repos + use cases + rotas + Swagger | **Feita** |
+| **3** | Frontend: DTOs/Zod + API infra + use cases | **Feita** |
+| **4** | Frontend: Design admin (draft/publish via API) | **Feita** |
+| **5** | Frontend: cardápio público lê design publicado da API | **Feita** |
+| **6** | Migração localStorage → backend + limpeza | **Feita** |
+| **7** | Testes + checklist arquitetura-jiffy | **Feita** |
+
+**Local (backend):** `npx prisma migrate deploy` + `npx prisma generate` (parar o processo se `EPERM` no DLL).
 
 ---
 
@@ -380,17 +382,15 @@ Se `design` ausente → front aplica defaults (compatibilidade).
 
 ## 8. Migração localStorage → backend
 
-### Estratégia one-shot (fase 6)
+### Estratégia one-shot (fase 6) — **implementada**
 
-1. Admin abre Design com feature ligada.
-2. `GET /me/design` retorna defaults (ou `publishedAt == null` e configs iguais ao default).
-3. Front lê `jiffy:delivery-design:empresa:{id}`.
-4. Se local `published`/`draft` ≠ default:
-   - **Opção A (recomendada):** modal “Encontramos um design salvo neste aparelho. Importar para a conta?”
-   - **Opção B:** import automático silencioso 1x (flag `migratedAt` em localStorage).
-5. `PUT draft` + opcional `POST publish` se o local published for publicável.
-6. Marcar chave local `jiffy:delivery-design:migrated:{empresaId}=1`.
-7. Após N releases: remover escrita contínua no localStorage; depois remover leitura.
+1. Admin abre Design.
+2. `GET /me/design` com `publishedAt == null` e draft/published essencialmente default.
+3. Front lê `jiffy:delivery-design:empresa:{id}` (se ainda não houver marker `migrated`).
+4. Se local ≠ default → modal “Design salvo neste aparelho… Importar?”.
+5. Import: `PUT draft` + opcional `POST publish` se published local for publicável; restaura draft local se diferente.
+6. Marca `jiffy:delivery-design:migrated:{empresaId}` = `imported` | `dismissed` e limpa chaves empresa/slug.
+7. Desligar offer: `NEXT_PUBLIC_DESIGN_MIGRATE_LOCAL=0`.
 
 ### Cardápio público
 
@@ -400,66 +400,59 @@ Não migrar localStorage do visitante. Só API.
 
 ## 9. Fases de implementação (detalhe)
 
-### Fase 1 — Backend schema
-- Migration tabela/colunas + backfill defaults.
-- Prisma models.
-- Domain entity + Zod domain validators + `ValidarPublicacaoDesignDelivery`.
+### Fase 1 — Backend schema — **feita**
+- Prisma: `EmpresaDeliveryDesign` + migration `20260803140000_cria_empresa_delivery_design` (backfill defaults).
+- Domain validators, defaults, entity (`create` / `withDraft` / `publish`).
+- `ValidarPublicacaoDesignDelivery` + testes de entidade.
 
-### Fase 2 — Backend API
-- Port + Prisma repository.
-- Use cases Get / UpdateDraft / Publish.
-- Controller + rotas + rate limit público no catálogo.
-- Incluir `design` no mapper do catálogo público.
-- Swagger.
+### Fase 2 — Backend API — **feita**
+- Port + Prisma repository; use cases Get / UpdateDraft / Publish.
+- Rotas JWT `/empresas/me/design`, `/draft`, `/publish`.
+- Catálogo público: `empresa.design` published enriquecido.
+- Swagger (`Delivery - Design`).
 
-### Fase 3 — Frontend application/infra
-- DTO Zod espelhando backend.
-- `deliveryDesignApi.ts`.
-- Use cases Buscar / SalvarDraft / Publicar.
-- Testes unitários do gate e do parse.
+### Fase 3 — Frontend application/infra — **feita**
+- DTO Zod `DeliveryPublicoDesignDTO.ts`; `deliveryDesignApi.ts` + BFF Next.
+- Use cases Buscar / SalvarDraft / Publicar; `validarPublicacaoDesign` / `validarDraftDesign`.
+- Testes: `deliveryPublicoDesign.test.ts`.
 
-### Fase 4 — Frontend admin Design
-- Refatorar `useDeliveryDesignDraft` para React Query + use cases.
-- Manter UX das 5 abas.
-- Tratar erros de publish do BE.
-- Loading/empty/error states.
+### Fase 4 — Frontend admin Design — **feita**
+- `useDeliveryDesignMe` + `useDeliveryDesignDraft` (autosave + publish via API).
+- Mapper UI ↔ DTO; loading / empty / error / toasts de publish.
 
-### Fase 5 — Frontend público
-- `useDeliveryPublicoTheme` / `usePublishedDesignBySlug` consomem `empresa.design` do catálogo.
-- Remover path feliz localStorage.
-- Garantir SSR/hydration sem flash errado (já há padrão “após mount”).
+### Fase 5 — Frontend público — **feita**
+- `EmpresaPublicaDTO.design`; tema lê catálogo (`designReady` evita flash).
+- Sem path feliz localStorage na leitura pública.
 
-### Fase 6 — Migração
-- Fluxo import localStorage.
-- Feature flag `NEXT_PUBLIC_DESIGN_API=1` se quiser rollout gradual.
-- Docs internas de QA.
+### Fase 6 — Migração — **feita**
+- Modal one-shot + `importDesignLocalToApi`; marker migrated; QA no doc.
 
-### Fase 7 — Qualidade
-- Testes BE: validators, publish gate, mapper.
-- Testes FE: merge config, publish rules, use case save.
-- Checklist PR `arquitetura-jiffy` (abaixo).
+### Fase 7 — Qualidade — **feita**
+- BE: `EmpresaDeliveryDesign.test.ts`, `EmpresaDeliveryDesignMapper.test.ts`.
+- FE (30 testes design): parse/gate, mapper, merge, publish rules, offer/import migration.
+- Checklist `arquitetura-jiffy` abaixo marcado.
 
 ---
 
 ## 10. Checklist `arquitetura-jiffy` (aceite)
 
 ### Backend
-- [ ] Regra de publish no **domain**, não no controller
-- [ ] Validators de borda em `application/validators`; domínio em `domain/validators`
-- [ ] Prisma só no repository
-- [ ] Use cases com `execute` + DI por construtor
-- [ ] Mapper entity/JSON → DTO; não vazar entidade
-- [ ] Rotas `/me` com JWT middleware; público só published
-- [ ] Swagger alinhado aos Zod schemas
-- [ ] Erros de domínio mapeados (`AppValidationError` / `ValidationDomainError`)
+- [x] Regra de publish no **domain**, não no controller
+- [x] Validators de borda em `application/validators`; domínio em `domain/validators`
+- [x] Prisma só no repository
+- [x] Use cases com `execute` + DI por construtor
+- [x] Mapper entity/JSON → DTO; não vazar entidade
+- [x] Rotas `/me` com JWT middleware; público só published
+- [x] Swagger alinhado aos Zod schemas
+- [x] Erros de domínio mapeados (`AppValidationError` / `ValidationDomainError`)
 
 ### Frontend
-- [ ] HTTP em `infrastructure`; hooks não montam `fetch` solto
-- [ ] Use cases na `application` para get/save/publish
-- [ ] DTO com Zod (`z.infer`), sem cast cego
-- [ ] Presentation só orquestra UI + chama use cases/hooks
-- [ ] Gate de publish no front é UX; BE rejeita se inválido
-- [ ] Sem regra de negócio nova em componentes de aba
+- [x] HTTP em `infrastructure`; hooks não montam `fetch` solto
+- [x] Use cases na `application` para get/save/publish
+- [x] DTO com Zod (`z.infer`), sem cast cego
+- [x] Presentation só orquestra UI + chama use cases/hooks
+- [x] Gate de publish no front é UX; BE rejeita se inválido
+- [x] Sem regra de negócio nova em componentes de aba
 
 ---
 
@@ -490,32 +483,35 @@ Não migrar localStorage do visitante. Só API.
 ## 13. Referências de código
 
 ### Frontend
-- Tipos: `src/presentation/.../shared/types/deliveryPublicoDesignConfig.ts`
-- Storage: `.../shared/utils/designConfigStorage.ts`
-- Draft hook: `.../shared/hooks/useDeliveryDesignDraft.ts`
-- Publish rules: `.../shared/constants/designPublishRules.ts`
+- DTO: `src/application/dto/delivery-publico/DeliveryPublicoDesignDTO.ts`
+- API: `src/infrastructure/api/deliveryDesignApi.ts` + BFF `app/api/delivery/empresas/me/design/**`
+- Use cases: `src/application/use-cases/delivery-publico/design/`
+- Hooks: `useDeliveryDesignMe`, `useDeliveryDesignDraft`, `usePublishedDesignBySlug`
+- Mapper UI↔API: `.../shared/utils/mapDeliveryDesignConfig.ts`
+- Migração: `shouldOfferDesignLocalMigration.ts`, `importDesignLocalToApi.ts`
 - Screen: `.../admin/screens/DeliveryDesignCustomizerScreen.tsx`
-- Público: `DeliveryThemeScope` / `usePublishedDesignBySlug`
+- Público: `DeliveryThemeScope` + `empresa.design` do catálogo
+- Testes: `tests/unit/application/delivery/deliveryPublicoDesign.test.ts`, `tests/unit/presentation/delivery-publico/*Design*`
 
 ### Backend
-- `EmpresaDelivery` + logo/banner: `prisma/schema/delivery.prisma`
-- Catálogo público: use case/mapper de catálogo
-- Upload: `CompanyLogoImageTargetBinder` / banner
+- Prisma: `EmpresaDeliveryDesign` em `prisma/schema/delivery.prisma`
+- Domain: entity, validators, `ValidarPublicacaoDesignDelivery`
+- Application: mapper, use cases design, catálogo com `empresa.design`
+- Presentation: `EmpresaDeliveryDesignController` + rotas `/me/design*`
+- Testes: `tests/modules/delivery/domain/entities/EmpresaDeliveryDesign.test.ts`, `.../mappers/EmpresaDeliveryDesignMapper.test.ts`
 - **Não** misturar com `ParametrosDelivery`
 
 ### Arquitetura
 - Backend: `jiffy-backend/docs/arquitetura-jiffy/`
 - Frontend: `jiffy-gestor-v2/docs/arquitetura-jiffy/`
-- Precedente semelhante: agendamento (`GET/PUT .../me/agendamento` + exposição pública)
+- Precedente: agendamento (`GET/PUT .../me/agendamento`)
 
 ---
 
-## 14. Próximo passo sugerido
+## 14. Encerramento
 
-1. ~~Fechar decisão tabela vs coluna~~ → **tabela `empresa_delivery_design` confirmada.**
-2. (Opcional) Fechar detalhes restantes da §3: import automático vs modal; `published_at` no backfill de defaults.
-3. Abrir branches e implementar **Fase 1 + 2** no backend (migration + entity + APIs).
-4. Em paralelo, frontend **Fase 3** (contratos Zod + infra).
-5. Só então ligar a UI (Fases 4–5) e migração (Fase 6).
+Implementação das Fases 0–7 concluída no código. Próximos passos operacionais:
 
-Quando iniciar a implementação, atualizar o **Status** deste doc para “em implementação” e marcar as fases conforme o progresso.
+1. Aplicar migration + `prisma generate` no ambiente.
+2. Smoke QA: publicar no Design → abrir `/delivery/{slug}` em outro browser; testar modal de import se houver localStorage antigo.
+3. Abrir PRs backend/frontend quando pronto para review.

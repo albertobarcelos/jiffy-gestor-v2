@@ -1,5 +1,7 @@
 /** DTOs espelhando o catálogo público delivery do backend (sem auth). */
 
+import type { DeliveryPublicoDesignConfigDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDesignDTO'
+
 export type CatalogoPublicoComplementoDTO = {
   id: string
   nome: string
@@ -69,6 +71,11 @@ export type EmpresaPublicaDTO = {
   segmento: string | null
   logoUrl: string | null
   bannerUrl: string | null
+  /**
+   * Design publicado do cardápio (backend Fase 2+).
+   * Ausente só em respostas legadas; o tema público usa defaults nesse caso.
+   */
+  design?: DeliveryPublicoDesignConfigDTO | null
   endereco: {
     rua: string
     numero: string

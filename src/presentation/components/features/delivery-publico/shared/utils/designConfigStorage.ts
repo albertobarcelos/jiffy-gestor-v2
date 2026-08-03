@@ -8,12 +8,25 @@ import { mergeCategoriasDesignConfig } from './mergeCategoriasDesignConfig'
 
 const STORAGE_PREFIX = 'jiffy:delivery-design'
 
+function getLocalStorage(): Storage | null {
+  try {
+    if (typeof localStorage === 'undefined') return null
+    return localStorage
+  } catch {
+    return null
+  }
+}
+
 function storageKeyByEmpresa(empresaId: string): string {
   return `${STORAGE_PREFIX}:empresa:${empresaId}`
 }
 
 function storageKeyBySlug(slug: string): string {
   return `${STORAGE_PREFIX}:slug:${slug.trim().toLowerCase()}`
+}
+
+function storageKeyMigrated(empresaId: string): string {
+  return `${STORAGE_PREFIX}:migrated:${empresaId}`
 }
 
 function mergeConfig(
@@ -42,17 +55,86 @@ function mergeConfig(
   }
 }
 
+/** Assinatura visual (ignora espelhos de nome/URL) para comparar com defaults. */
+export function designConfigSignature(config: DeliveryPublicoDesignConfig): string {
+  return JSON.stringify({
+    layoutId: config.layoutId,
+    logoFormato: config.cabecalho.logoFormato,
+    cores: config.cores,
+    tipografia: config.tipografia,
+    categorias: {
+      tituloGrupoFundo: config.categorias.tituloGrupoFundo,
+      corBarraTitulo: config.categorias.corBarraTitulo,
+      corTextoTitulo: config.categorias.corTextoTitulo,
+      mostrarNomeTitulo: config.categorias.mostrarNomeTitulo,
+      mostrarSugestoesDaCasa: config.categorias.mostrarSugestoesDaCasa,
+      sugestoesDaCasaImagemUrl: config.categorias.sugestoesDaCasaImagemUrl ?? null,
+    },
+  })
+}
+
+export function isEssentiallyDefaultDesign(
+  config: DeliveryPublicoDesignConfig,
+  nomeExibicaoFallback = ''
+): boolean {
+  return (
+    designConfigSignature(config) ===
+    designConfigSignature(createDefaultDesignConfig(nomeExibicaoFallback))
+  )
+}
+
+export function hasDesignStorage(empresaId: string): boolean {
+  const storage = getLocalStorage()
+  if (!storage) return false
+  return storage.getItem(storageKeyByEmpresa(empresaId)) != null
+}
+
+export type DesignMigrationMarker = 'imported' | 'dismissed'
+
+export function getDesignMigrationMarker(
+  empresaId: string
+): DesignMigrationMarker | null {
+  const storage = getLocalStorage()
+  if (!storage) return null
+  const raw = storage.getItem(storageKeyMigrated(empresaId))
+  if (raw === 'imported' || raw === 'dismissed') return raw
+  if (raw === '1') return 'imported'
+  return null
+}
+
+export function markDesignMigrated(
+  empresaId: string,
+  marker: DesignMigrationMarker = 'imported'
+): void {
+  const storage = getLocalStorage()
+  if (!storage) return
+  storage.setItem(storageKeyMigrated(empresaId), marker)
+}
+
+export function clearDesignStorageForEmpresa(
+  empresaId: string,
+  slug?: string
+): void {
+  const storage = getLocalStorage()
+  if (!storage) return
+  storage.removeItem(storageKeyByEmpresa(empresaId))
+  if (slug?.trim()) {
+    storage.removeItem(storageKeyBySlug(slug.trim()))
+  }
+}
+
 export function readDesignStorage(
   empresaId: string,
   nomeExibicaoFallback = ''
 ): DeliveryDesignStorage {
-  if (typeof window === 'undefined') {
+  const storage = getLocalStorage()
+  if (!storage) {
     const defaults = createDefaultDesignConfig(nomeExibicaoFallback)
     return { published: defaults, draft: defaults }
   }
 
   try {
-    const raw = window.localStorage.getItem(storageKeyByEmpresa(empresaId))
+    const raw = storage.getItem(storageKeyByEmpresa(empresaId))
     if (!raw) {
       const defaults = createDefaultDesignConfig(nomeExibicaoFallback)
       return { published: defaults, draft: defaults }
@@ -69,22 +151,23 @@ export function readDesignStorage(
   }
 }
 
-export function writeDesignStorage(empresaId: string, storage: DeliveryDesignStorage): void {
-  if (typeof window === 'undefined') return
-  window.localStorage.setItem(storageKeyByEmpresa(empresaId), JSON.stringify(storage))
+export function writeDesignStorage(empresaId: string, storageData: DeliveryDesignStorage): void {
+  const storage = getLocalStorage()
+  if (!storage) return
+  storage.setItem(storageKeyByEmpresa(empresaId), JSON.stringify(storageData))
 }
 
-/** Design publicado consumido pelo app em `/delivery/{slug}`. */
+/** Design publicado legado por slug (só migração / compat). */
 export function readPublishedDesignBySlug(
   slug: string,
   nomeExibicaoFallback = ''
 ): DeliveryPublicoDesignConfig {
   const fallback = createDefaultDesignConfig(nomeExibicaoFallback)
-
-  if (typeof window === 'undefined') return fallback
+  const storage = getLocalStorage()
+  if (!storage) return fallback
 
   try {
-    const raw = window.localStorage.getItem(storageKeyBySlug(slug))
+    const raw = storage.getItem(storageKeyBySlug(slug))
     if (!raw) return fallback
     const parsed = JSON.parse(raw) as Partial<DeliveryPublicoDesignConfig>
     return mergeConfig(parsed, fallback)
@@ -97,8 +180,9 @@ export function writePublishedDesignBySlug(
   slug: string,
   config: DeliveryPublicoDesignConfig
 ): void {
-  if (typeof window === 'undefined') return
-  window.localStorage.setItem(storageKeyBySlug(slug.trim().toLowerCase()), JSON.stringify(config))
+  const storage = getLocalStorage()
+  if (!storage) return
+  storage.setItem(storageKeyBySlug(slug.trim().toLowerCase()), JSON.stringify(config))
 }
 
 export function isDesignConfigEqual(

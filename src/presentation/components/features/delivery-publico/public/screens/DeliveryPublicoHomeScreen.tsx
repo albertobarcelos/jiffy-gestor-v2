@@ -341,6 +341,7 @@ export function DeliveryPublicoHomeScreen({
   }, [abrirCarrinho])
 
   const isCatalogLoading = isLoading && !data
+  const designReady = Boolean(data) || (isError && !isLoading)
 
   if (isError && !isPublicDeliverySlugNotFound(error)) {
     return (
@@ -358,6 +359,7 @@ export function DeliveryPublicoHomeScreen({
       slug={slug}
       nomeExibicaoFallback={empresa?.nomeFantasia ?? ''}
       empresa={empresa}
+      designReady={designReady}
     >
       <DeliveryPublicoHomeContent
         slug={slug}
