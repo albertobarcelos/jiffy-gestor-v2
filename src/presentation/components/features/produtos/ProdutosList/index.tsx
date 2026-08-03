@@ -11,6 +11,7 @@ import { useProdutoPatchMutation, isSavingOf } from '@/src/presentation/hooks/us
 import { useGrupoProdutoPatchMutation } from '@/src/presentation/hooks/useGrupoProdutoPatchMutation'
 import { useProdutosFilters } from '@/src/presentation/hooks/useProdutosFilters'
 import { useIsMobile } from '@/src/presentation/hooks/useIsMobile'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { ProdutosTabsModal, type ProdutosTabsModalState } from '../ProdutosTabsModal'
@@ -48,6 +49,7 @@ interface InfinitePagesData {
 
 export function ProdutosList() {
   const queryClient = useQueryClient()
+  const empresaId = useTenantEmpresaId()
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -217,8 +219,9 @@ export function ProdutosList() {
   }, [router, searchParams, pathname])
 
   const updateProdutoInCache = useCallback((produtoId: string, produtoData: unknown) => {
+    if (!empresaId) return
     queryClient.setQueriesData<InfinitePagesData>(
-      { queryKey: ['produtos', 'infinite'], exact: false },
+      { queryKey: ['tenant', empresaId, 'produtos', 'infinite'], exact: false },
       (oldData) => {
         if (!oldData?.pages) return oldData
         return {
@@ -237,16 +240,25 @@ export function ProdutosList() {
         }
       }
     )
-  }, [queryClient])
+  }, [queryClient, empresaId])
 
   const handleTabsModalReload = useCallback((produtoId?: string, produtoData?: unknown) => {
     if (produtoId && produtoData) {
       updateProdutoInCache(produtoId, produtoData)
-    } else {
-      void queryClient.invalidateQueries({ queryKey: ['produtos', 'infinite'], exact: false, refetchType: 'active' })
-      void queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false, refetchType: 'active' })
+      return
     }
-  }, [queryClient, updateProdutoInCache])
+    if (!empresaId) return
+    void queryClient.invalidateQueries({
+      queryKey: ['tenant', empresaId, 'produtos', 'infinite'],
+      exact: false,
+      refetchType: 'active',
+    })
+    void queryClient.invalidateQueries({
+      queryKey: ['tenant', empresaId, 'grupos-produtos'],
+      exact: false,
+      refetchType: 'active',
+    })
+  }, [queryClient, empresaId, updateProdutoInCache])
 
   // Handlers de produto — recebem produtoId como arg, sem closure por item
   const handleValorChange = useCallback((produtoId: string, novoValor: number) => {
@@ -272,14 +284,6 @@ export function ProdutosList() {
     if (!produto) return
     openTabsModal({ tab: 'produto', mode: 'copy', produto, grupoId: produto.getGrupoId() })
   }, [produtos, openTabsModal])
-
-  const handleOpenComplementosModal = useCallback((produto: Produto) => {
-    openTabsModal({ tab: 'complementos', mode: 'edit', produto, grupoId: produto.getGrupoId() })
-  }, [openTabsModal])
-
-  const handleOpenImpressorasModal = useCallback((produto: Produto) => {
-    openTabsModal({ tab: 'impressoras', mode: 'edit', produto, grupoId: produto.getGrupoId() })
-  }, [openTabsModal])
 
   // Handlers de grupo — todos estáveis, recebem IDs como argumento
   const handleToggleExpand = useCallback((groupKey: string) => {
@@ -421,8 +425,6 @@ export function ProdutosList() {
                             onValorChange={handleValorChange}
                             onSwitchToggle={handleStatusToggle}
                             onToggleBoolean={handleToggleBooleanField}
-                            onOpenComplementosModal={handleOpenComplementosModal}
-                            onOpenImpressorasModal={handleOpenImpressorasModal}
                             onEditProduto={handleEditProduto}
                             onCopyProduto={handleCopyProduto}
                           />

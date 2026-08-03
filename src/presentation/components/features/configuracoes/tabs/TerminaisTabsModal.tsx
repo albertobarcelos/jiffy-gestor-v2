@@ -120,7 +120,7 @@ export function TerminaisTabsModal({
         <button
           type="button"
           onClick={() => onTabChange('terminal')}
-          className={`font-nunito rounded-t-lg px-4 py-2 text-xs font-semibold md:text-sm ${
+          className={`rounded-t-lg px-4 py-2 text-xs font-semibold md:text-sm ${
             state.tab === 'terminal'
               ? 'bg-primary text-white'
               : 'bg-gray-100 text-secondary-text hover:bg-gray-200'

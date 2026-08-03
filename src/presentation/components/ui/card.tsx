@@ -35,7 +35,7 @@ export const CardTitle = React.forwardRef<HTMLHeadingElement, React.HTMLAttribut
         ref={ref}
         variant="h5"
         component="h3"
-        sx={{ fontWeight: 600, fontFamily: 'Exo, sans-serif' }}
+        sx={{ fontWeight: 600, fontFamily: 'var(--font-general-sans), system-ui, sans-serif' }}
         {...props}
       >
         {children}
@@ -55,7 +55,7 @@ export const CardDescription = React.forwardRef<
       ref={ref}
       variant="body2"
       color="text.secondary"
-      sx={{ fontFamily: 'Nunito, sans-serif' }}
+      sx={{ fontFamily: 'var(--font-general-sans), system-ui, sans-serif' }}
       {...props}
     >
       {children}

@@ -37,27 +37,27 @@ export const EstoqueView = React.memo(function EstoqueView() {
         <div className="flex items-start justify-between">
           {/* Seção Movimentação */}
           <div className="flex-1">
-            <p className="text-primary text-sm font-semibold font-nunito mb-2">
+            <p className="text-primary text-sm font-semibold mb-2">
               Movimentação
             </p>
             <div className="flex gap-3">
               <button
                 onClick={handleNavigateEntrada}
-                className="h-[38px] px-[26px] bg-primary text-info rounded-[40px] font-medium font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+                className="h-[38px] px-[26px] bg-primary text-info rounded-[40px] font-medium text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
               >
                 <span className="text-lg">📥</span>
                 Entrada
               </button>
               <button
                 onClick={handleNavigateInventario}
-                className="h-[38px] px-[26px] bg-primary text-info rounded-[40px] font-medium font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+                className="h-[38px] px-[26px] bg-primary text-info rounded-[40px] font-medium text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
               >
                 <span className="text-base">📦</span>
                 Inventário
               </button>
               <button
                 onClick={handleNavigateSaida}
-                className="h-[38px] px-[26px] bg-primary text-info rounded-[40px] font-medium font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+                className="h-[38px] px-[26px] bg-primary text-info rounded-[40px] font-medium text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
               >
                 <span className="text-base">📤</span>
                 Saída
@@ -67,12 +67,12 @@ export const EstoqueView = React.memo(function EstoqueView() {
 
           {/* Seção Produtos */}
           <div className="flex-1 flex flex-col items-end">
-            <p className="text-primary text-sm font-semibold font-nunito mb-2">
+            <p className="text-primary text-sm font-semibold mb-2">
               Produtos
             </p>
             <button
               onClick={handleNavigateProdutos}
-              className="h-[38px] px-[26px] bg-primary text-info rounded-[40px] font-medium font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+              className="h-[38px] px-[26px] bg-primary text-info rounded-[40px] font-medium text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
             >
               <span className="text-lg">📊</span>
               Conferir
@@ -93,7 +93,7 @@ export const EstoqueView = React.memo(function EstoqueView() {
                 placeholder="Pesquisar..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
-                className="w-full h-full px-5 pl-12 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-secondary font-nunito text-sm"
+                className="w-full h-full px-5 pl-12 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-secondary text-sm"
               />
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
                 🔍
@@ -103,7 +103,7 @@ export const EstoqueView = React.memo(function EstoqueView() {
 
           {/* Botão Filtrar */}
           <div className="flex-1">
-            <button className="h-[40px] px-[30px] rounded-[40px] border-[0.6px] border-secondary bg-info text-secondary font-medium font-exo text-sm flex items-center gap-2 hover:bg-primary-bg transition-colors">
+            <button className="h-[40px] px-[30px] rounded-[40px] border-[0.6px] border-secondary bg-info text-secondary font-medium text-sm flex items-center gap-2 hover:bg-primary-bg transition-colors">
               <span>🔽</span>
               Filtrar
             </button>
@@ -119,7 +119,7 @@ export const EstoqueView = React.memo(function EstoqueView() {
             <div className="flex">
               <button
                 onClick={() => setActiveTab('entrada')}
-                className={`px-6 py-3 font-medium font-exo text-sm transition-colors ${
+                className={`px-6 py-3 font-medium text-sm transition-colors ${
                   activeTab === 'entrada'
                     ? 'text-alternate border-b-2 border-alternate'
                     : 'text-primary'
@@ -129,7 +129,7 @@ export const EstoqueView = React.memo(function EstoqueView() {
               </button>
               <button
                 onClick={() => setActiveTab('saida')}
-                className={`px-6 py-3 font-medium font-exo text-sm transition-colors ${
+                className={`px-6 py-3 font-medium text-sm transition-colors ${
                   activeTab === 'saida'
                     ? 'text-alternate border-b-2 border-alternate'
                     : 'text-primary'
@@ -139,7 +139,7 @@ export const EstoqueView = React.memo(function EstoqueView() {
               </button>
               <button
                 onClick={() => setActiveTab('inventario')}
-                className={`px-6 py-3 font-medium font-exo text-sm transition-colors ${
+                className={`px-6 py-3 font-medium text-sm transition-colors ${
                   activeTab === 'inventario'
                     ? 'text-alternate border-b-2 border-alternate'
                     : 'text-primary'

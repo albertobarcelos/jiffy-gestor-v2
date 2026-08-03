@@ -1,13 +1,14 @@
-'use client'
+﻿'use client'
 
 import type { ReactNode } from 'react'
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { empresaNomeParaSlugUrl } from '@/src/shared/utils/empresaNomeParaSlugUrl'
+import { hubGerenciarUsuariosPath } from '@/src/shared/constants/hubRoutes'
 
 /**
- * Mantém a URL canônica `/meus-apps/gerenciar-usuarios/<slug>` alinhada ao nome da empresa da sessão.
+ * Mantém a URL canônica `{@link hubGerenciarUsuariosPath}(slug)` alinhada ao nome da empresa da sessão.
  */
 export function GerenciarUsuariosSlugSync({
   routeSlug,
@@ -25,7 +26,7 @@ export function GerenciarUsuariosSlugSync({
     }
     const esperado = empresaNomeParaSlugUrl(empresa.nomeExibicao)
     if (esperado !== routeSlug) {
-      router.replace(`/meus-apps/gerenciar-usuarios/${esperado}`)
+      router.replace(hubGerenciarUsuariosPath(esperado))
     }
   }, [empresa, isLoading, routeSlug, router])
 

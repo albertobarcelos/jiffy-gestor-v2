@@ -167,7 +167,7 @@ export function Etapa5TabelaIbpt({ embedded = false }: Etapa5TabelaIbptProps) {
       >
         {!embedded && (
           <div>
-            <h1 className="font-exo font-semibold text-alternate text-base mb-2">
+            <h1 className="font-semibold text-alternate text-base mb-2">
               Chave de acesso IBPT
             </h1>
             <p className="text-sm text-secondary-text leading-relaxed">

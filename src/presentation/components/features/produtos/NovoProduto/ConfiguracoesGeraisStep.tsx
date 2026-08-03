@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { Button } from '@/src/presentation/components/ui/button'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
@@ -72,16 +72,16 @@ export function ConfiguracoesGeraisStep({
       <div className="flex min-h-0 flex-1 flex-col rounded-[10px] bg-info p-2 md:p-4">
         <div className="mb-4 flex shrink-0 flex-col gap-2">
           <div className="flex items-center gap-5">
-            <h2 className="font-exo text-xl font-semibold text-primary">Configurações Gerais</h2>
+            <h2 className="text-xl font-semibold text-primary">Configurações Gerais</h2>
             <div className="h-px flex-1 bg-primary/70" />
           </div>
-          <p className="font-nunito text-sm text-secondary-text">
-            Ajuste como o produto se comporta no PDV.
+          <p className="text-sm text-secondary-text">
+            Ajuste como o produto se comporta no Jiffy POS.
           </p>
         </div>
 
         <div className="rounded-lg border border-[#E6E9F4] bg-gradient-to-b from-[#F9FAFF] to-white px-3 py-2 shadow-[0_10px_30px_rgba(15,23,42,0.08)]">
-          <h4 className="mb-3 font-exo text-sm font-semibold text-primary-text">Geral</h4>
+          <h4 className="mb-3 text-sm font-semibold text-primary-text">Geral</h4>
           <div className="flex flex-col gap-2">
             {toggles.map(toggle => (
               <JiffyIconSwitch
@@ -89,7 +89,7 @@ export function ConfiguracoesGeraisStep({
                 checked={toggle.checked}
                 onChange={e => toggle.onChange(e.target.checked)}
                 label={
-                  <span className="font-nunito text-sm font-medium text-primary-text">
+                  <span className="text-sm font-medium text-primary-text">
                     {toggle.label}
                   </span>
                 }
@@ -108,7 +108,7 @@ export function ConfiguracoesGeraisStep({
           <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <Button
               onClick={onBack}
-              className="h-8 rounded-lg border-2 px-10 font-exo text-sm font-semibold hover:bg-primary/20"
+              className="h-8 rounded-lg border-2 px-10 text-sm font-semibold hover:bg-primary/20"
               sx={{
                 backgroundColor: 'var(--color-info)',
                 color: 'var(--color-primary)',
@@ -122,7 +122,7 @@ export function ConfiguracoesGeraisStep({
               <Button
                 type="button"
                 onClick={onSaveAndClose}
-                className="h-8 rounded-lg border-2 px-6 font-exo text-sm font-semibold hover:bg-primary/10 sm:px-8"
+                className="h-8 rounded-lg border-2 px-6 text-sm font-semibold hover:bg-primary/10 sm:px-8"
                 sx={{
                   backgroundColor: 'var(--color-info)',
                   color: 'var(--color-primary)',
@@ -134,7 +134,7 @@ export function ConfiguracoesGeraisStep({
               </Button>
               <Button
                 onClick={onSave}
-                className="h-8 rounded-lg px-10 font-exo text-sm font-semibold text-white hover:bg-primary/90"
+                className="h-8 rounded-lg px-10 text-sm font-semibold text-white hover:bg-primary/90"
                 sx={{ backgroundColor: 'var(--color-primary)' }}
               >
                 {saveButtonText}

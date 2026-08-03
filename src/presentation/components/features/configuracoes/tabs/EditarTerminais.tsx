@@ -526,7 +526,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-custom-2">
                   <MdPhone className="text-primary" size={20} />
                 </div>
-                <span className="font-nunito text-base font-semibold text-primary-text">
+                <span className="text-base font-semibold text-primary-text">
                   {nomeTerminal || 'Nome do Terminal'}
                 </span>
               </div>
@@ -584,10 +584,10 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                       onChange={e => setCompartilhaValue(e.target.checked)}
                       label={
                         <span className="flex max-w-[min(100%,20rem)] flex-col gap-0.5 text-left">
-                          <span className="font-exo text-sm font-semibold text-primary-text">
+                          <span className="text-sm font-semibold text-primary-text">
                             Compartilhamento
                           </span>
-                          <span className="font-nunito text-xs font-normal text-secondary-text">
+                          <span className="text-xs font-normal text-secondary-text">
                             Habilita o compartilhamento de mesas
                           </span>
                         </span>
@@ -606,7 +606,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                         p: 1.5,
                       }}
                     >
-                      <p className="font-nunito text-xs font-medium text-warning">
+                      <p className="text-xs font-medium text-warning">
                         O compartilhamento de mesas só funcionará com internet.
                       </p>
                     </Box>
@@ -619,10 +619,10 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                     onChange={e => setFiscalAtivoValue(e.target.checked)}
                     label={
                       <span className="flex max-w-[min(100%,20rem)] flex-col gap-0.5 text-left">
-                        <span className="font-exo text-sm font-semibold text-primary-text">
+                        <span className="text-sm font-semibold text-primary-text">
                           Fiscal ativo
                         </span>
-                        <span className="font-nunito text-xs font-normal text-secondary-text">
+                        <span className="text-xs font-normal text-secondary-text">
                           Habilita operações fiscais neste terminal PDV
                         </span>
                       </span>
@@ -639,10 +639,10 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                     onChange={e => setLeitorCodigoBarrasValue(e.target.checked)}
                     label={
                       <span className="flex max-w-[min(100%,20rem)] flex-col gap-0.5 text-left">
-                        <span className="font-exo text-sm font-semibold text-primary-text">
+                        <span className="text-sm font-semibold text-primary-text">
                           Leitor Código de Barras
                         </span>
-                        <span className="font-nunito text-xs font-normal text-secondary-text">
+                        <span className="text-xs font-normal text-secondary-text">
                           Habilita o leitor de código de barras neste terminal
                         </span>
                       </span>
@@ -656,7 +656,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
 
               <div className="mt-6 w-full">
                 <div className="mb-3 flex items-center gap-5">
-                  <h3 className="shrink-0 font-exo text-sm font-semibold text-primary-text">
+                  <h3 className="shrink-0 text-sm font-semibold text-primary-text">
                     Configurar senha
                   </h3>
                   <div className="h-px min-w-0 flex-1 bg-primary/40" aria-hidden />
@@ -752,7 +752,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                 className="h-8 rounded-lg px-[26px] hover:bg-primary/90"
                 sx={{
                   textTransform: 'none',
-                  fontFamily: 'Nunito, sans-serif',
+                  fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
                   color: 'var(--color-info)',
                   borderColor: 'var(--color-primary)',
                   backgroundColor: 'var(--color-primary)',

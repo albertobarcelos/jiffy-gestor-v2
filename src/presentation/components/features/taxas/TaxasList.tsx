@@ -483,7 +483,7 @@ export function TaxasList() {
           <button
             type="button"
             onClick={abrirModalNovaTaxa}
-            className="font-exo flex h-8 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-info transition-colors hover:bg-primary/90 md:px-[30px]"
+            className="flex h-8 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-info transition-colors hover:bg-primary/90 md:px-[30px]"
           >
             Novo
             <span className="text-lg leading-none">+</span>

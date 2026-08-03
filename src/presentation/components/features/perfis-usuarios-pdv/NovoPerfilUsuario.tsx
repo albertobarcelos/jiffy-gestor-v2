@@ -1013,7 +1013,7 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
                   <MdPerson />
                 </span>
               </div>
-              <h1 className="text-primary md:text-lg text-sm font-semibold font-exo">
+              <h1 className="text-primary md:text-lg text-sm font-semibold ">
                 {isEditing ? 'Editar Perfil de Usuário' : 'Novo Perfil de Usuário'}
               </h1>
             </div>
@@ -1064,7 +1064,7 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
 
               <div className="mt-4 space-y-2">
                 <div className="mb-2 flex items-center gap-5">
-                  <h2 className="shrink-0 text-primary md:text-base text-sm font-semibold font-exo">
+                  <h2 className="shrink-0 text-primary md:text-base text-sm font-semibold ">
                     Meios de Pagamento *
                   </h2>
                   <div className="h-px min-w-0 flex-1 bg-primary/70" aria-hidden />
@@ -1081,7 +1081,7 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
                       placeholder="Buscar meio de pagamento..."
                       value={searchMeioPagamento}
                       onChange={(e) => setSearchMeioPagamento(e.target.value)}
-                      className="font-nunito h-8 w-full rounded-lg border border-gray-300 bg-info pl-10 pr-4 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+                      className="h-8 w-full rounded-lg border border-gray-300 bg-info pl-10 pr-4 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
                     />
                   </div>
                   <Button

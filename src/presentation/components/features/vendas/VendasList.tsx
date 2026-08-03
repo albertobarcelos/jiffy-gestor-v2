@@ -460,7 +460,7 @@ const sxVendasFiltroSelectBase = {
     color: 'var(--color-secondary-text)',
     fontWeight: 300,
     fontSize: '0.975rem',
-    fontFamily: '"Nunito", sans-serif',
+    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
   },
   '& .MuiInputLabel-root.Mui-focused': {
     color: 'var(--color-secondary-text)',
@@ -502,7 +502,7 @@ const sxVendasFiltroTextFieldMoeda = {
   '& .MuiOutlinedInput-root': {
     ...sxVendasFiltroOutlinedInputRoot,
     backgroundColor: 'var(--color-info)',
-    fontFamily: '"Nunito", sans-serif',
+    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
     height: 30,
     minHeight: 30,
     paddingLeft: 2,
@@ -514,7 +514,7 @@ const sxVendasFiltroTextFieldMoeda = {
     color: 'var(--color-secondary-text)',
     fontWeight: 300,
     fontSize: '0.975rem',
-    fontFamily: '"Nunito", sans-serif',
+    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
   },
   '& .MuiInputLabel-root.Mui-focused': {
     color: 'var(--color-secondary-text)',
@@ -1302,7 +1302,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
           <button
             type="button"
             onClick={() => setFiltrosVisiveisMobile(prev => !prev)}
-            className="font-nunito flex items-center gap-2 rounded-md bg-primary px-3 py-1 text-sm text-white shadow-sm"
+            className="flex items-center gap-2 rounded-md bg-primary px-3 py-1 text-sm text-white shadow-sm"
             aria-expanded={filtrosVisiveisMobile}
           >
             {filtrosVisiveisMobile ? <MdFilterAltOff size={18} /> : <MdFilterList size={18} />}
@@ -1330,7 +1330,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                   fetchVendas()
                 }
               }}
-              className="font-nunito h-8 w-full rounded-lg border bg-info pl-10 pr-4 text-sm shadow-sm"
+              className="h-8 w-full rounded-lg border bg-info pl-10 pr-4 text-sm shadow-sm"
             />
           </div>
 
@@ -1371,7 +1371,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
           </div>
 
           {/* Label Período */}
-          <span className="font-exo text-sm text-primary">Período:</span>
+          <span className="text-sm text-primary">Período:</span>
           <div className="flex flex-row items-center gap-3">
             {/* Dropdown Período */}
             <FormControl size="small" sx={{ minWidth: 150 }}>
@@ -1405,7 +1405,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             <button
               type="button"
               onClick={() => setIsDatasModalOpen(true)}
-              className="font-nunito flex h-8 items-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
+              className="flex h-8 items-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
             >
               <MdCalendarToday size={18} />
               Por datas
@@ -1437,7 +1437,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               value={statusFilter || ''}
               onChange={e => setStatusFilter(e.target.value || null)}
               displayEmpty
-              className="font-nunito"
+              className=""
             >
               <MenuItem value="">
                 <span className="text-secondary-text">Selecione...</span>
@@ -1457,7 +1457,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               value={tipoVendaFilter || ''}
               onChange={e => setTipoVendaFilter(e.target.value || null)}
               displayEmpty
-              className="font-nunito"
+              className=""
             >
               <MenuItem value="">
                 <span className="text-secondary-text">Selecione...</span>
@@ -1482,7 +1482,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               disabled={isLoadingMeiosPagamento}
               displayEmpty
               MenuProps={menuPropsVendasFiltroListaLonga}
-              className="font-nunito"
+              className=""
             >
               <MenuItem value="">
                 <span className="text-secondary-text">Selecione...</span>
@@ -1506,7 +1506,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               onChange={e => setUsuarioAbertoPorFilter(e.target.value)}
               displayEmpty
               MenuProps={menuPropsVendasFiltroListaLonga}
-              className="font-nunito"
+              className=""
             >
               <MenuItem value="">
                 <span className="text-secondary-text">Selecione...</span>
@@ -1531,7 +1531,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               disabled={isLoadingTerminais}
               displayEmpty
               MenuProps={menuPropsVendasFiltroListaLonga}
-              className="font-nunito"
+              className=""
             >
               <MenuItem value="">
                 <span className="text-secondary-text">Selecione...</span>
@@ -1555,7 +1555,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               onChange={e => setUsuarioCancelouFilter(e.target.value)}
               displayEmpty
               MenuProps={menuPropsVendasFiltroListaLonga}
-              className="font-nunito"
+              className=""
             >
               <MenuItem value="">
                 <span className="text-secondary-text">Selecione...</span>
@@ -1571,7 +1571,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
           {/* Botão Limpar Filtros */}
           <button
             onClick={handleClearFilters}
-            className="font-nunito flex h-8 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
+            className="flex h-8 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
           >
             <MdFilterAltOff size={18} />
             Limpar Filtros
@@ -1590,10 +1590,10 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               <span className="text-xl text-info">🛒</span>
             </div>
             <div className="flex flex-1 flex-col items-end">
-              <span className="font-nunito text-xs text-secondary-text">
+              <span className="text-xs text-secondary-text">
                 {statusFilter === 'Aberta' ? 'Vendas em Aberto' : 'Vendas Finalizadas'}
               </span>
-              <span className="font-exo text-[22px] text-primary">
+              <span className="text-[22px] text-primary">
                 {metricas?.countVendasEfetivadas || 0}
               </span>
             </div>
@@ -1609,8 +1609,8 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               <span className="text-xl text-info">✕</span>
             </div>
             <div className="flex flex-1 flex-col items-end">
-              <span className="font-nunito text-xs text-secondary-text">Vendas Canceladas</span>
-              <span className="font-exo text-[22px] text-primary">
+              <span className="text-xs text-secondary-text">Vendas Canceladas</span>
+              <span className="text-[22px] text-primary">
                 {metricas?.countVendasCanceladas || 0}
               </span>
             </div>
@@ -1624,8 +1624,8 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               </span>
             </div>
             <div className="flex flex-1 flex-col items-end">
-              <span className="font-nunito text-xs text-secondary-text">Produtos Vendidos</span>
-              <span className="font-exo text-[22px] text-primary">
+              <span className="text-xs text-secondary-text">Produtos Vendidos</span>
+              <span className="text-[22px] text-primary">
                 {metricas?.countProdutosVendidos || 0}
               </span>
             </div>
@@ -1639,12 +1639,12 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               </span>
             </div>
             <div className="flex flex-1 flex-col items-end">
-              <span className="font-nunito text-xs text-secondary-text">Total Cancelado</span>
-              <span className="font-exo text-[22px] text-primary">
+              <span className="text-xs text-secondary-text">Total Cancelado</span>
+              <span className="text-[22px] text-primary">
                 {formatCurrency(totalCanceladoSomenteLista)}
               </span>
               {hasMoreVendas ? (
-                <span className="font-nunito max-w-[10rem] text-right text-[10px] leading-tight text-secondary-text">
+                <span className="max-w-[10rem] text-right text-[10px] leading-tight text-secondary-text">
                   Parcial: Vendas carregadas na lista.
                 </span>
               ) : null}
@@ -1659,8 +1659,8 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               </span>
             </div>
             <div className="flex flex-1 flex-col items-end">
-              <span className="font-nunito text-xs text-secondary-text">Total Faturado</span>
-              <span className="font-exo text-[22px] text-primary">
+              <span className="text-xs text-secondary-text">Total Faturado</span>
+              <span className="text-[22px] text-primary">
                 {metricas?.totalFaturado ? formatCurrency(metricas.totalFaturado) : 'R$ 0,00'}
               </span>
             </div>
@@ -1670,7 +1670,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         {/* Tabela de Vendas */}
         <div className="overflow-hidden rounded-lg bg-info">
           {/* Cabeçalho */}
-          <div className="font-nunito flex items-center gap-2 rounded-t-lg bg-custom-2 py-2 text-sm font-semibold text-primary-text md:px-3">
+          <div className="flex items-center gap-2 rounded-t-lg bg-custom-2 py-2 text-sm font-semibold text-primary-text md:px-3">
             <div className="hidden flex-1 md:flex">Código Venda</div>
             <div className="flex-1 text-center text-xs md:text-sm">Data Abertura</div>
             <div className="hidden flex-1 text-center text-xs md:flex md:text-sm">
@@ -1839,7 +1839,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             type="button"
             disabled={!rascunhoIntervaloRange?.from || !rascunhoIntervaloRange?.to}
             onClick={handleAplicarIntervaloDatasVendas}
-            className="rounded-b-l-lg font-nunito flex h-full w-full items-center justify-center bg-primary text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-b-l-lg flex h-full w-full items-center justify-center bg-primary text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Aplicar
           </button>

@@ -53,7 +53,7 @@ function XmlBloco({
           ) : (
             <MdExpandMore className="h-5 w-5 shrink-0 text-primary" aria-hidden />
           )}
-          <span className="font-nunito text-sm font-semibold text-primary">{titulo}</span>
+          <span className="text-sm font-semibold text-primary">{titulo}</span>
         </button>
         <Button
           type="button"
@@ -69,7 +69,7 @@ function XmlBloco({
         </Button>
       </div>
       {aberto && (
-        <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-all bg-slate-950 px-3 py-3 font-mono text-[11px] leading-relaxed text-slate-100">
+        <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-all bg-slate-950 px-3 py-3 text-[11px] leading-relaxed text-slate-100">
           {xml}
         </pre>
       )}
@@ -101,7 +101,7 @@ export function PedidoDetalhesNotaFiscal({
 
       {documentoFiscalId ? (
         <div className="space-y-3 pt-1">
-          <h4 className="font-nunito text-sm font-semibold text-gray-700">XMLs do documento</h4>
+          <h4 className="text-sm font-semibold text-gray-700">XMLs do documento</h4>
 
           {isLoading && (
             <div className="flex justify-center py-4">
@@ -110,7 +110,7 @@ export function PedidoDetalhesNotaFiscal({
           )}
 
           {isError && (
-            <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 font-nunito text-xs text-red-800">
+            <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
               {error?.message || 'Não foi possível carregar os XMLs do documento.'}
             </p>
           )}
@@ -120,7 +120,7 @@ export function PedidoDetalhesNotaFiscal({
               {xmlEnvio ? (
                 <XmlBloco titulo="XML de envio" xml={xmlEnvio} defaultOpen />
               ) : (
-                <p className="font-nunito text-xs text-gray-500">
+                <p className="text-xs text-gray-500">
                   XML de envio não disponível para este documento.
                 </p>
               )}

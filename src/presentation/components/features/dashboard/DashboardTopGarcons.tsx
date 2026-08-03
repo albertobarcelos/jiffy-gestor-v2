@@ -1,41 +1,18 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { FaMedal, FaTrophy } from 'react-icons/fa'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { formatarMoeda, formatarContagemPedidos } from './dashboardTextHelpers'
 import { useDashboardTopGarconsQuery } from '@/src/presentation/hooks/useDashboardTopGarconsQuery'
 import { assumirDateComoNoFusoEmpresaParaUtc, calcularPeriodoNoFusoEmpresa } from '@/src/shared/utils/periodoNoFusoEmpresa'
-import { FiltroPeriodoTopTabelasV2, periodoTopoV2ParaFiltroTabelas } from './DashboardTopProdutos'
+import {
+  periodoGlobalParaApiTopTabelas,
+  periodoGlobalParaOpcaoCalculatePeriodo,
+} from './DashboardTopProdutos'
 
-/** Ranking fixo: sempre os 10 garçons com maior valor vendido (BFF com limit=10). */
+/** Ranking fixo: sempre os 10 garçons (BFF com limit=10). */
 const LIMITE_TOP_GARCONS_V2 = 10
-
-/** Select local do card Top garçons (V2) → rótulo de `calculatePeriodo` (datas na API). */
-function filtroTopGarcomV2ParaOpcaoCalculatePeriodo(filtro: string): string {
-  switch (filtro) {
-    case 'hoje': return 'Hoje'
-    case 'ontem': return 'Ontem'
-    case 'semana': return 'Últimos 7 Dias'
-    case '30dias': return 'Últimos 30 Dias'
-    case 'mes': return 'Mês Atual'
-    case 'personalizado': return 'Hoje'
-    default: return 'Hoje'
-  }
-}
-
-/** Mapeia filtro local do card Top garçons → parâmetro `periodo` da API `/dashboard/top-garcons`. */
-function filtroTopGarcomV2ParaApiPeriodo(filtro: string): string {
-  switch (filtro) {
-    case 'hoje': return 'hoje'
-    case 'ontem': return 'ontem'
-    case 'semana': return 'semana'
-    case '30dias': return '30dias'
-    case 'mes': return 'mes'
-    case 'personalizado': return 'personalizado'
-    default: return 'hoje'
-  }
-}
 
 /** 1º–3º: troféu/medalhas; 4º em diante: número da posição. */
 function IconeColocacaoTopGarcom({ rank }: { rank: number }) {
@@ -79,21 +56,17 @@ export function DashboardTopGarcons({
   timezoneAgregacao,
   dadosAtualizadosEm,
 }: DashboardTopGarconsProps) {
-  const [filtroTopGarcom, setFiltroTopGarcom] = useState<FiltroPeriodoTopTabelasV2>('hoje')
+  const [modoTopGarcom, setModoTopGarcom] = useState<'quantidade' | 'valor'>('quantidade')
 
-  useEffect(() => {
-    setFiltroTopGarcom(periodoTopoV2ParaFiltroTabelas(periodoData))
-  }, [periodoData, periodoPersonalizadoInicio, periodoPersonalizadoFim])
-
-  const opcaoPeriodoTopGarcom = useMemo(
-    () => filtroTopGarcomV2ParaOpcaoCalculatePeriodo(filtroTopGarcom),
-    [filtroTopGarcom]
+  const opcaoPeriodo = useMemo(
+    () => periodoGlobalParaOpcaoCalculatePeriodo(periodoData),
+    [periodoData]
   )
 
   const { inicio: inicioTopGarcom, fim: fimTopGarcom } = useMemo(() => {
     const tzEmpresa = timezoneAgregacao?.trim() || 'America/Sao_Paulo'
     if (
-      filtroTopGarcom === 'personalizado' &&
+      periodoData === 'personalizado' &&
       periodoPersonalizadoInicio &&
       periodoPersonalizadoFim
     ) {
@@ -102,28 +75,26 @@ export function DashboardTopGarcons({
         fim: assumirDateComoNoFusoEmpresaParaUtc(periodoPersonalizadoFim, tzEmpresa),
       }
     }
-    return calcularPeriodoNoFusoEmpresa(opcaoPeriodoTopGarcom, tzEmpresa)
+    return calcularPeriodoNoFusoEmpresa(opcaoPeriodo, tzEmpresa)
   }, [
-    filtroTopGarcom,
-    opcaoPeriodoTopGarcom,
+    periodoData,
+    opcaoPeriodo,
     periodoPersonalizadoInicio,
     periodoPersonalizadoFim,
     dadosAtualizadosEm,
     timezoneAgregacao,
   ])
 
-  const periodoApiTopGarcom = useMemo(
-    () => filtroTopGarcomV2ParaApiPeriodo(filtroTopGarcom),
-    [filtroTopGarcom]
-  )
+  const periodoApi = useMemo(() => periodoGlobalParaApiTopTabelas(periodoData), [periodoData])
 
   const {
     data: dadosTopGarconsQuery,
     isLoading: carregandoTopGarcons,
     isError: erroTopGarcons,
   } = useDashboardTopGarconsQuery({
-    periodo: periodoApiTopGarcom,
+    periodo: periodoApi,
     limit: LIMITE_TOP_GARCONS_V2,
+    ordenarPor: modoTopGarcom,
     periodoInicial: inicioTopGarcom,
     periodoFinal: fimTopGarcom,
     timezone: timezoneAgregacao,
@@ -169,27 +140,33 @@ export function DashboardTopGarcons({
 
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-5">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="font-exo text-lg font-semibold text-primary-text md:text-xl">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+        <h2 className="shrink-0 text-lg font-semibold text-primary-text md:text-xl">
           Top Garçons
         </h2>
-        <div className="relative min-w-[120px] self-end sm:self-auto">
-          <select
-            value={filtroTopGarcom}
-            onChange={e => setFiltroTopGarcom(e.target.value as FiltroPeriodoTopTabelasV2)}
-            className="w-full appearance-none rounded-lg border border-gray-200 bg-gray-50 py-2 pl-3 pr-9 text-sm font-medium text-primary-text focus:border-secondary"
-            aria-label="Período do ranking de garçons"
+        <div className="inline-flex self-start rounded-lg bg-violet-100/90 p-0.5 sm:self-auto">
+          <button
+            type="button"
+            onClick={() => setModoTopGarcom('quantidade')}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium transition md:px-4 md:text-sm ${
+              modoTopGarcom === 'quantidade'
+                ? 'bg-secondary text-white shadow-sm'
+                : 'text-primary-text hover:bg-white/60'
+            }`}
           >
-            <option value="hoje">Hoje</option>
-            <option value="ontem">Ontem</option>
-            <option value="semana">Últimos 7 dias</option>
-            <option value="30dias">Últimos 30 dias</option>
-            <option value="mes">Mês</option>
-            <option value="personalizado" disabled={periodoData !== 'personalizado'}>
-              Por datas (filtro global)
-            </option>
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary-text" />
+            Quantidade
+          </button>
+          <button
+            type="button"
+            onClick={() => setModoTopGarcom('valor')}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium transition md:px-4 md:text-sm ${
+              modoTopGarcom === 'valor'
+                ? 'bg-secondary text-white shadow-sm'
+                : 'text-primary-text hover:bg-white/60'
+            }`}
+          >
+            Valor Total
+          </button>
         </div>
       </div>
 

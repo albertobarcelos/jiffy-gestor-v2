@@ -533,7 +533,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
                 grupo: undefined,
               })
             }
-            className="h-8 md:px-[30px] px-4 bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+            className="h-8 md:px-[30px] px-4 bg-primary text-info rounded-lg font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
           >
             Novo
             <span className="text-lg">+</span>

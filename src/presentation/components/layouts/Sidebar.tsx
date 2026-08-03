@@ -5,7 +5,6 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { disconnectEmpresaTab } from '@/src/presentation/utils/disconnectEmpresaTab'
 import { useQueryClient } from '@tanstack/react-query'
 import { usePrefetch } from '@/src/presentation/hooks/usePrefetch'
 import { useAcessoFiscal } from '@/src/presentation/hooks/useAcessoFiscal'
@@ -21,7 +20,7 @@ export function Sidebar() {
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set())
   const pathname = usePathname()
   const router = useRouter()
-  const { logoutTenant } = useAuthStore()
+  const { logout } = useAuthStore()
   const queryClient = useQueryClient()
   const temAcessoFiscal = useAcessoFiscal()
   const { toGestao } = useGestaoPath()
@@ -108,7 +107,7 @@ export function Sidebar() {
           { name: 'Produtos', path: '/produtos', icon: '🛍️' },
           { name: 'Grupo Complementos', path: '/grupos-complementos', icon: '📋' },
           { name: 'Complementos', path: '/complementos', icon: '➕' },
-          { name: 'Usuários', path: '/usuarios', icon: '👤' },
+          { name: 'Usuários PDV', path: '/usuarios', icon: '👤' },
           { name: 'Entregadores', path: '/entregadores', icon: '🛵' },
           { name: 'Perfis de Usuários', path: '/perfis-usuarios-pdv', icon: '👥' },
           { name: 'Clientes', path: '/clientes', icon: '👥' },
@@ -275,7 +274,13 @@ export function Sidebar() {
         <div className="p-4 border-t border-info/20">
           <button
             onClick={async () => {
-              await disconnectEmpresaTab({ queryClient, logoutTenant })
+              try {
+                queryClient.clear()
+                await logout()
+              } catch (e) {
+                console.error('Sidebar: erro ao sair da conta', e)
+              }
+              window.location.assign('/login')
             }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-info/80 hover:bg-info/10 transition-colors ${
               isCompact ? 'justify-center' : ''

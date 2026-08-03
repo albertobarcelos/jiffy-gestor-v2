@@ -1,4 +1,4 @@
-# Fluxo de Login (ATUAL) — para ser substituído
+﻿# Fluxo de Login (ATUAL) — para ser substituído
 
 Este documento descreve **como o login funciona hoje** (UI → API interna → API externa → sessão/cookie → navegação), incluindo **endpoints utilizados** e **o fluxo após autenticação**.
 
@@ -155,7 +155,7 @@ Arquivo: `middleware.ts`
   - `/api/consulta-cep*`
   - `/notas-fiscais*`
   - `/api/public/notas-fiscais-consumidor*`
-- `/` redireciona para `/meus-apps`
+- `/` redireciona para `/minhas-empresas`
 - validação mínima:
   - se **não** houver token em cookie `auth-token` **ou** header `Authorization: Bearer ...`
     - páginas: redirect `/login`
@@ -176,7 +176,7 @@ Arquivo: `src/presentation/components/auth/AuthGuard.tsx`
 
 Hoje, após login, a UI sempre manda para:
 
-- **`/meus-apps`**
+- **`/minhas-empresas`**
 
 E essa rota está protegida por `app/dashboard/layout.tsx`:
 
@@ -189,7 +189,7 @@ E essa rota está protegida por `app/dashboard/layout.tsx`:
 - **API interna chama API externa**: login `legacy` ou `multi_empresa`
 - **API interna seta cookie httpOnly**: `auth-token`
 - **UI salva sessão no Zustand (localStorage)**: `auth-storage`
-- **UI navega para**: `/meus-apps`
+- **UI navega para**: `/minhas-empresas`
 - **Proteções**:
   - middleware exige token presente
   - `AuthGuard` exige store reidratado + `auth` válido e não expirado
@@ -272,12 +272,12 @@ O Swagger menciona que, para convites pendentes, deve-se chamar:
 
 ---
 
-## 8) Novo fluxo (definido) — hub único `/meus-apps` + convites + estratégia de tokens por aba
+## 8) Novo fluxo (definido) — hub único `/minhas-empresas` + convites + estratégia de tokens por aba
 
 ### 8.1) Rotas (frontend) definidas
 
-- **Após login** (sempre): **`/meus-apps`** (`LoginForm` faz `router.replace('/meus-apps')`; sem modal de escolha).
-- **Hub pós-login**: **`/meus-apps`** — na mesma tela:
+- **Após login** (sempre): **`/minhas-empresas`** (`LoginForm` faz `router.replace('/minhas-empresas')`; sem modal de escolha).
+- **Hub pós-login**: **`/minhas-empresas`** — na mesma tela:
   - **Convites pendentes** no topo: UI chama `GET /api/convites/me` (BFF) e exibe cards com aceitar/recusar.
   - **Empresas já vinculadas** abaixo: lista vem do array `empresas` retornado no `POST /api/auth/login`, persistido em `hubEmpresas` no Zustand (não há segundo GET de empresas na página).
 - **Rota dedicada `/convites`**: removida; convites não têm página própria.
@@ -358,16 +358,16 @@ Exemplo (Swagger):
 
 #### 8.4.1) Página hub (App Router)
 
-- Rota `app/meus-apps/`:
-  - `app/meus-apps/layout.tsx` + `app/meus-apps/page.tsx`
-  - feature: `src/presentation/components/features/meus-apps/MeusAppsPage.tsx` — convites (`ConviteCard`) + grid/lista de empresas.
+- Rota `app/minhas-empresas/`:
+  - `app/minhas-empresas/layout.tsx` + `app/minhas-empresas/page.tsx`
+  - feature: `src/presentation/components/features/minhas-empresas/MinhasEmpresasPage.tsx` — convites (`ConviteCard`) + grid/lista de empresas.
 - Feature compartilhada de convites (somente componentes reutilizados):
   - `src/presentation/components/features/convites/components/ConviteCard.tsx`
   - `src/presentation/components/features/convites/types.ts`
 
 #### 8.4.2) Login (identidade) e redirecionamento
 
-- Após login bem-sucedido: **`router.replace('/meus-apps')`**.
+- Após login bem-sucedido: **`router.replace('/minhas-empresas')`**.
 - A listagem de convites ocorre **na página Meus Apps** (`GET /api/convites/me` no mount), não no momento do login.
 - `meus-apps` é o hub pós-login; o ERP interno continua em `/dashboard` após escolher empresa (ex.: fluxo “Acessar”).
 
@@ -395,7 +395,7 @@ Requisito: **cada empresa em uma aba** (tokens diferentes ao mesmo tempo), e pod
 
 - **Identity token**:
   - armazenar em **cookie httpOnly** separado (ex.: `auth-identity-token`)
-  - uso: **`/meus-apps`** (hub: convites + empresas) e chamadas “pré-empresa” (ex.: escolher empresa)
+  - uso: **`/minhas-empresas`** (hub: convites + empresas) e chamadas “pré-empresa” (ex.: escolher empresa)
   - vantagem: mais seguro (não acessível via JS), e é global do usuário (ok ser compartilhado)
 
 - **Access/Refresh token (por empresa / por aba)**:
@@ -412,7 +412,7 @@ Requisito: **cada empresa em uma aba** (tokens diferentes ao mesmo tempo), e pod
 #### 8.5.3) Como não interferir nas páginas antigas
 
 - Manter o cookie atual `auth-token` e o `useAuthStore` como **legado** para as rotas já existentes.
-- A rota **`/meus-apps`** deve usar o token de identidade/sessão gestor para listar convites/empresas; tokens por aba (`sessionStorage`) quando “abrir empresa” e navegar para rotas internas da empresa (evolução futura documentada acima).
+- A rota **`/minhas-empresas`** deve usar o token de identidade/sessão gestor para listar convites/empresas; tokens por aba (`sessionStorage`) quando “abrir empresa” e navegar para rotas internas da empresa (evolução futura documentada acima).
 
 > Resultado: o resto do sistema continua funcionando com o `auth-token` atual, enquanto o novo fluxo convive em paralelo.
 
@@ -420,7 +420,7 @@ Requisito: **cada empresa em uma aba** (tokens diferentes ao mesmo tempo), e pod
 
 #### Etapa 1 — Estrutura de rotas + features
 
-- Manter `app/meus-apps/page.tsx` e `app/meus-apps/layout.tsx`
+- Manter `app/minhas-empresas/page.tsx` e `app/minhas-empresas/layout.tsx`
 - Integrar convites na mesma feature Meus Apps (sem rota `app/convites/`)
 
 #### Etapa 2 — BFF (API interna Next) para convites e escolher empresa
@@ -431,15 +431,15 @@ Requisito: **cada empresa em uma aba** (tokens diferentes ao mesmo tempo), e pod
 
 #### Etapa 3 — Auth v2 (identity) + roteamento pós-login
 
-- `LoginForm`: receber `identityToken` + `empresas[]`, persistir no cookie/store, **`router.replace('/meus-apps')`**
-- Em `/meus-apps`: carregar convites via BFF e exibir junto com empresas vinculadas
+- `LoginForm`: receber `identityToken` + `empresas[]`, persistir no cookie/store, **`router.replace('/minhas-empresas')`**
+- Em `/minhas-empresas`: carregar convites via BFF e exibir junto com empresas vinculadas
 
 #### Etapa 4 — Tokens por aba (empresa)
 
 - Implementar utilitário/serviço “TabSession” (sessionStorage) para:
   - set/get/clear tokens e empresaId da aba
   - usar em hooks/clients de API das páginas internas da empresa
-- Integrar “abrir empresa” na tela `/meus-apps`:
+- Integrar “abrir empresa” na tela `/minhas-empresas`:
   - ao clicar “Acessar”, chamar `/api/auth/escolher-empresa`
   - salvar tokens no sessionStorage
   - abrir nova aba (se necessário) ou navegar para rota da empresa
@@ -447,6 +447,6 @@ Requisito: **cada empresa em uma aba** (tokens diferentes ao mesmo tempo), e pod
 #### Etapa 5 — Guard/Middleware segmentado
 
 - Criar guard específico para rotas do novo fluxo (identity/sessionStorage)
-- Ajustar `middleware.ts` para não bloquear `/meus-apps` usando apenas o cookie `auth-token` legado.
+- Ajustar `middleware.ts` para não bloquear `/minhas-empresas` usando apenas o cookie `auth-token` legado.
 
 

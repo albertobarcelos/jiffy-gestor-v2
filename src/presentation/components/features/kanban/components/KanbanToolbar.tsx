@@ -55,7 +55,7 @@ const sxKanbanFiltroSelect = {
     minHeight: 32,
     borderRadius: '8px',
     backgroundColor: 'var(--color-info)',
-    fontFamily: '"Nunito", sans-serif',
+    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
     '& .MuiOutlinedInput-notchedOutline': {
       borderColor: 'rgba(0, 0, 0, 0.23)',
       borderWidth: 1,
@@ -70,7 +70,7 @@ const sxKanbanFiltroSelect = {
   },
   '& .MuiInputLabel-root': {
     color: 'var(--color-secondary-text)',
-    fontFamily: '"Nunito", sans-serif',
+    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
     fontSize: '0.875rem',
     fontWeight: 300,
   },
@@ -147,7 +147,7 @@ function FiltroDataPresetSelect({
             label={label}
             value={preset}
             onChange={e => onPresetChange(e.target.value as KanbanFiltroDataPreset)}
-            className="font-nunito"
+            className=""
           >
             {KANBAN_FILTRO_DATA_PRESET_OPCOES.map(opcao => (
               <MenuItem key={opcao.value} value={opcao.value}>
@@ -204,7 +204,7 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
         <button
           type="button"
           onClick={onToggleFiltrosMobile}
-          className="font-nunito flex items-center gap-2 rounded-md px-3 py-1 text-sm text-white shadow-sm"
+          className="flex items-center gap-2 rounded-md px-3 py-1 text-sm text-white shadow-sm"
           style={{ backgroundColor: KANBAN_BUTTON_COLOR }}
           aria-expanded={filtrosVisiveisMobile}
         >
@@ -228,7 +228,7 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
               value={searchInput}
               onChange={e => onSearchInputChange(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && onRefresh()}
-              className="font-nunito h-8 w-full rounded-lg border bg-info pl-6 pr-4 text-sm shadow-sm"
+              className="h-8 w-full rounded-lg border bg-info pl-6 pr-4 text-sm shadow-sm"
             />
           </div>
         </div>
@@ -246,7 +246,7 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
               onChange={e => onOrigemFilterChange(e.target.value as OrigemFiltro)}
               displayEmpty
               disabled={origemFilterDisabled}
-              className="font-nunito"
+              className=""
             >
               <MenuItem value="">Todos</MenuItem>
               <MenuItem value="PDV">POS</MenuItem>
@@ -268,7 +268,7 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
               value={tipoEntregaFilter}
               onChange={e => onTipoEntregaFilterChange(e.target.value as TipoEntregaFiltro)}
               displayEmpty
-              className="font-nunito"
+              className=""
             >
               <MenuItem value="">Todos</MenuItem>
               <MenuItem value="entrega">Entrega</MenuItem>
@@ -292,7 +292,7 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
                 onColunaKanbanFiltro(e.target.value as ColunaKanbanFiltroExtra)
               }
               displayEmpty
-              className="font-nunito"
+              className=""
             >
               <MenuItem value="">Emitidas</MenuItem>
               <MenuItem value="PENDENTE_EMISSAO">Pendentes</MenuItem>
@@ -320,7 +320,7 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
               onChange={e => onTerminalFilterChange(e.target.value)}
               displayEmpty
               disabled={isLoadingTerminais}
-              className="font-nunito"
+              className=""
             >
               <MenuItem value="">Todos</MenuItem>
               {terminais.map(terminal => (
@@ -345,7 +345,7 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
 
         <button
           onClick={onClearFilters}
-          className="font-nunito flex h-8 items-center justify-center gap-1 rounded-lg border px-1 text-sm transition-colors"
+          className="flex h-8 items-center justify-center gap-1 rounded-lg border px-1 text-sm transition-colors"
           style={{ borderColor: KANBAN_BUTTON_COLOR, color: KANBAN_BUTTON_COLOR }}
         >
           <MdFilterAltOff size={16} />

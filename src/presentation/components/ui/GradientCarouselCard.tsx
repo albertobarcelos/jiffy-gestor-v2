@@ -112,7 +112,7 @@ export function GradientCarouselCard({
           {slide.titulo ? (
             <h3
               className={cn(
-                'font-exo text-center text-lg font-bold leading-snug text-white drop-shadow-sm',
+                'text-center text-lg font-bold leading-snug text-white drop-shadow-sm',
                 titleClassName
               )}
             >

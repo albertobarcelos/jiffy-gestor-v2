@@ -1,9 +1,10 @@
-'use client'
+﻿'use client'
 
 import type { ReactNode } from 'react'
 import { TopNav } from '@/src/presentation/components/layouts/TopNav'
 import { ErpTenantAccessGuard } from '@/src/presentation/components/layouts/ErpTenantAccessGuard'
 import { useDetectCacheLeaks } from '@/src/presentation/hooks/useDetectCacheLeaks'
+import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 
 function ErpAppShellInner({ children }: { children: ReactNode }) {
   useDetectCacheLeaks()
@@ -22,7 +23,7 @@ function ErpAppShellInner({ children }: { children: ReactNode }) {
 /**
  * Shell único do ERP: TopNav montado uma vez por sessão de navegação entre rotas irmãs em `app/(erp)/`.
  * Padrão visual: coluna 100dvh, TopNav fixo, `main` com scroll (ex-layout dashboard).
- * Protegido por ErpTenantAccessGuard: redireciona para /login ou /meus-apps se a sessão de empresa for inválida.
+ * Protegido por ErpTenantAccessGuard: redireciona para /login ou {@link HUB_PATH} se a sessão de empresa for inválida.
  */
 export function ErpAppShell({ children }: { children: ReactNode }) {
   return (

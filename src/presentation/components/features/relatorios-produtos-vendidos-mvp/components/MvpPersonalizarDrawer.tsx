@@ -82,7 +82,7 @@ export function MvpPersonalizarDrawer(props: {
         sx: { width: { xs: '100%', sm: 400 }, maxWidth: '100vw' },
       }}
     >
-      <Box className="font-nunito flex h-full flex-col bg-info p-4">
+      <Box className="flex h-full flex-col bg-info p-4">
         <h2 className="text-lg font-semibold text-primary-text">Personalizar relatório</h2>
         <p className="mt-1 text-xs text-secondary-text">
           Escolha as colunas da tabela para exibição no relatório. 

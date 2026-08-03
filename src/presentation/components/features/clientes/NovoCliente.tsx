@@ -836,7 +836,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
                   <MdPerson />
                 </span>
               </div>
-              <h1 className="text-primary text-lg font-semibold font-exo">
+              <h1 className="text-primary text-lg font-semibold ">
                 {isEditing ? 'Editar Cliente' : 'Novo Cliente'}
               </h1>
             </div>
@@ -875,7 +875,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
           <div className="bg-info rounded-lg md:px-5 py-2 space-y-4">
             <div className="flex items-center gap-1">
               <MdPerson className="text-primary text-2xl" />
-              <h2 className="text-primary text-base font-semibold font-nunito">
+              <h2 className="text-primary text-base font-semibold ">
                 Dados Pessoais
               </h2>
               <div className="flex-1" aria-hidden />
@@ -1063,7 +1063,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
           {/* Fiscal (antes do endereço — mesmo nível do payload da API) */}
           <div className="mt-2 rounded-lg bg-info md:px-5 px-1 py-2 space-y-4">
             <div className="flex items-center gap-3">
-              <h2 className="text-primary text-base font-semibold font-nunito flex items-center gap-2">
+              <h2 className="text-primary text-base font-semibold flex items-center gap-2">
                 <span className="text-xl text-primary">
                   <MdReceiptLong />
                 </span>
@@ -1146,7 +1146,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
             <div className="bg-info md:px-5 py-1 space-y-4">
               <div className="flex items-center gap-1">
               <MdLocationOn className="text-primary text-2xl" />
-                <h2 className="text-primary text-base font-semibold font-nunito">
+                <h2 className="text-primary text-base font-semibold ">
                   Endereço
                 </h2>
                 <div className="flex-1 border-t border-primary/40" aria-hidden />

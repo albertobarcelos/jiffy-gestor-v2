@@ -769,10 +769,10 @@ export function TerminaisTab() {
       <div className="md:px-6 px-1 flex-shrink-0">
         <div className="flex items-center justify-between border-b-2 border-primary/70 pb-2">
           <div className="flex flex-col">
-            <span className="text-primary text-lg md:text-xl font-semibold font-exo">
+            <span className="text-primary text-lg md:text-xl font-semibold ">
               Terminais Cadastrados
             </span>
-            <span className="text-tertiary text-sm md:text-[20px] font-medium font-nunito">
+            <span className="text-tertiary text-sm md:text-[20px] font-medium ">
               Total {terminaisFiltrados.length}
               {totalItems > 0 ? ` de ${terminaisFiltrados.length}` : ''}
             </span>
@@ -795,7 +795,7 @@ export function TerminaisTab() {
               placeholder="Pesquisar..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm "
             />
           </div>
         </div>
@@ -806,31 +806,31 @@ export function TerminaisTab() {
         {/* Barra de títulos das colunas - sticky dentro do scroll */}
         {terminaisFiltrados.length > 0 && (
           <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px] sticky top-0 z-10 mb-2">
-            <div className="flex-[2] font-nunito font-semibold text-xs text-primary-text uppercase hidden md:block">
+            <div className="flex-[2] font-semibold text-xs text-primary-text uppercase hidden md:block">
               Código do Terminal
             </div>
-            <div className="flex-[2] font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
+            <div className="flex-[2] font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Nome do Terminal
             </div>
-            <div className="flex-[2] font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
+            <div className="flex-[2] font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Modelo Dispositivo
             </div>
-            <div className="flex-[1.5] font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
+            <div className="flex-[1.5] font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Versão APK
             </div>
-            <div className="flex-[2] font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase hidden md:flex">
+            <div className="flex-[2] font-semibold md:text-xs text-[10px] text-primary-text uppercase hidden md:flex">
               Imp. Finalização
             </div>
-            <div className="flex-[1.5] text-center font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
+            <div className="flex-[1.5] text-center font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Comp. Mesas
             </div>
-            <div className="flex-[1.5] text-center font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
+            <div className="flex-[1.5] text-center font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Fiscal ativo
             </div>
-            <div className="flex-[1.5] text-center font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
+            <div className="flex-[1.5] text-center font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Leitor C. Barras
             </div>
-            <div className="md:flex-[1.5] flex-[1] text-center font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
+            <div className="md:flex-[1.5] flex-[1] text-center font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Remover
             </div>
           </div>
@@ -893,16 +893,16 @@ export function TerminaisTab() {
                  # {codigo}
                 </span>
               </div>
-              <div className="flex-[2] flex items-center gap-1 md:text-sm text-[10px] text-primary-text font-nunito">
+              <div className="flex-[2] flex items-center gap-1 md:text-sm text-[10px] text-primary-text ">
                 {nome}
               </div>
-              <div className="flex-[2] md:text-sm text-[10px] text-secondary-text font-nunito">
+              <div className="flex-[2] md:text-sm text-[10px] text-secondary-text ">
                 {modelo}
               </div>
-              <div className="flex-[1.5] md:text-sm text-[10px] text-secondary-text font-nunito">
+              <div className="flex-[1.5] md:text-sm text-[10px] text-secondary-text ">
                 {versao}
               </div>
-              <div className="flex-[2] md:text-sm text-[10px] text-secondary-text font-nunito hidden md:flex">
+              <div className="flex-[2] md:text-sm text-[10px] text-secondary-text hidden md:flex">
                 {preferencesLoaded ? (
                   <select
                     value={prefs.impressoraFinalizacaoId ?? ''}
