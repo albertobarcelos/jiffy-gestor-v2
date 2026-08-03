@@ -3,7 +3,7 @@ export const JIFFY_SESSION_BROADCAST_CHANNEL = 'jiffy-session-coordinator'
 
 /**
  * Evento disparado quando o refresh do token da empresa falha.
- * Ouvido pelo AuthGuard: se o hub ainda for válido → `/meus-apps`; senão → `/login`.
+ * Ouvido pelo AuthGuard: se o hub ainda for válido → hub root; senão → `/login`.
  */
 export const JIFFY_SESSION_EXPIRED_EVENT = 'jiffy:session-expired'
 

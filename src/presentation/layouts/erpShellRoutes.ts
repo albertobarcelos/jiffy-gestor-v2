@@ -3,6 +3,8 @@
  * Route group `app/(erp)/` não altera URLs — apenas agrupa layout com TopNav único.
  */
 
+import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
+
 /** Prefixos de pathname que usam ErpAppShell (TopNav + main). */
 export const ERP_ROUTE_PREFIXES = [
   '/dashboard',
@@ -37,7 +39,7 @@ export const NON_ERP_ROUTE_PREFIXES = [
   '/confirmar-email',
   '/esqueci-senha',
   '/redefinir-senha',
-  '/meus-apps',
+  HUB_PATH,
   '/perfil',
   '/hub',
   '/convites-gestor',

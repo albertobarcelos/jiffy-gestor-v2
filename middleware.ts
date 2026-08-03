@@ -5,6 +5,10 @@ import {
   AUTH_COOKIE_LEGACY,
   AUTH_COOKIE_TENANT,
 } from '@/src/shared/utils/authCookies'
+import {
+  HUB_PATH,
+  isHubPathname,
+} from '@/src/shared/constants/hubRoutes'
 import { queryRegistroConviteNovoUsuarioFromLoginSearch } from '@/src/presentation/components/features/auth/utils/inviteLoginPayload'
 import {
   buildGestaoPath,
@@ -51,18 +55,18 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Raiz → dashboard (rota canônica)
+  // Raiz → hub (rota canônica)
   if (pathname === '/') {
-    return NextResponse.redirect(new URL('/meus-apps', request.url))
+    return NextResponse.redirect(new URL(HUB_PATH, request.url))
   }
 
   /**
-   * Hub (Meus Apps / perfil): o AuthGuard valida a identidade no cliente.
+   * Hub (Minhas Empresas / perfil): o AuthGuard valida a identidade no cliente.
    * Não exigir cookie aqui — após logout da empresa o `tenant-token` some e o
    * `identity-token` pode ainda estar só no Zustand até o sync no disconnect.
    */
   const isHubRoute =
-    pathname.startsWith('/meus-apps') ||
+    isHubPathname(pathname) ||
     pathname === '/perfil' ||
     pathname.startsWith('/perfil/')
   if (isHubRoute) {

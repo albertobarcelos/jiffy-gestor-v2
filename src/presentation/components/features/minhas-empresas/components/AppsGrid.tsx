@@ -1,6 +1,6 @@
 'use client'
 
-import type { MeusApp } from '../types'
+import type { MinhasEmpresa } from '../types'
 import { AppCard } from './AppCard'
 
 export function AppsGrid({
@@ -8,7 +8,7 @@ export function AppsGrid({
   onAcessar,
   busyAppId,
 }: {
-  apps: MeusApp[]
+  apps: MinhasEmpresa[]
   onAcessar: (appId: string) => void
   /** Durante POST escolher-empresa; bloqueia outros cards e mostra estado no selecionado */
   busyAppId?: string | null

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { usePathname } from 'next/navigation'
 import { useEffect, useRef } from 'react'
@@ -7,6 +7,7 @@ import {
   SESSION_STORAGE_HUB_LOGOUT_SELF,
   SESSION_STORAGE_TENANT_LOGOUT_SELF,
 } from '@/src/shared/constants/sessionCoordinator'
+import { HUB_PATH, isHubPathname } from '@/src/shared/constants/hubRoutes'
 
 /**
  * Outra guia encerrou a sessão da empresa (tenant): avisa e fecha esta guia (com fallback).
@@ -19,7 +20,7 @@ export function EmpresaSessionLostGate() {
   const skipInitialSync = useRef(true)
 
   useEffect(() => {
-    if (!pathname || pathname.startsWith('/meus-apps') || pathname === '/perfil' || pathname.startsWith('/perfil/')) {
+    if (!pathname || isHubPathname(pathname) || pathname === '/perfil' || pathname.startsWith('/perfil/')) {
       prevTenant.current = tenantAuth
       skipInitialSync.current = true
       return
@@ -68,7 +69,7 @@ export function EmpresaSessionLostGate() {
           return
         }
         if (identityAuth) {
-          window.location.assign('/meus-apps')
+          window.location.assign(HUB_PATH)
         } else {
           window.location.assign('/login')
         }

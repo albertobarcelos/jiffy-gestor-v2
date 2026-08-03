@@ -1,0 +1,98 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { Auth } from '@/src/domain/entities/Auth'
+import { User } from '@/src/domain/entities/User'
+import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
+
+const mockGetState = vi.fn()
+const mockSetState = vi.fn()
+const mockRestore = vi.fn()
+
+vi.mock('@/src/presentation/stores/authStore', () => ({
+  useAuthStore: {
+    getState: () => mockGetState(),
+    setState: (...args: unknown[]) => mockSetState(...args),
+  },
+}))
+
+vi.mock('@/src/presentation/utils/restoreIdentityFromCookie', () => ({
+  restoreIdentityFromCookie: () => mockRestore(),
+}))
+
+vi.mock('react-hot-toast', () => ({
+  default: { error: vi.fn() },
+}))
+
+import { disconnectEmpresaTab } from '@/src/presentation/utils/disconnectEmpresaTab'
+import toast from 'react-hot-toast'
+
+function makeAuth(expiresInMs: number): Auth {
+  return Auth.createWithExpiration(
+    't.ok.en',
+    User.create('u1', 'a@b.com', 'User'),
+    new Date(Date.now() + expiresInMs)
+  )
+}
+
+describe('disconnectEmpresaTab', () => {
+  const logoutTenant = vi.fn()
+  const logout = vi.fn()
+  const queryClient = { clear: vi.fn() } as unknown as import('@tanstack/react-query').QueryClient
+  const assign = vi.fn()
+  let previousWindow: unknown
+
+  beforeEach(() => {
+    vi.resetAllMocks()
+    logoutTenant.mockResolvedValue(undefined)
+    logout.mockResolvedValue(undefined)
+    previousWindow = (globalThis as Record<string, unknown>).window
+    ;(globalThis as Record<string, unknown>).window = {
+      location: { assign },
+    }
+    ;(globalThis as Record<string, unknown>).sessionStorage = {
+      store: {} as Record<string, string>,
+      setItem(key: string, value: string) {
+        this.store[key] = value
+      },
+      getItem(key: string) {
+        return this.store[key] ?? null
+      },
+      removeItem(key: string) {
+        delete this.store[key]
+      },
+      clear() {
+        this.store = {}
+      },
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }))
+    )
+  })
+
+  afterEach(() => {
+    ;(globalThis as Record<string, unknown>).window = previousWindow
+    vi.unstubAllGlobals()
+  })
+
+  it('vai ao hub quando a identidade é recuperável', async () => {
+    mockRestore.mockResolvedValue(true)
+    mockGetState.mockReturnValue({ identityAuth: makeAuth(60_000) })
+
+    await disconnectEmpresaTab({ queryClient, logoutTenant, logout })
+
+    expect(logoutTenant).toHaveBeenCalled()
+    expect(logout).not.toHaveBeenCalled()
+    expect(assign).toHaveBeenCalledWith(HUB_PATH)
+  })
+
+  it('faz logout completo e vai ao login se não houver identidade', async () => {
+    mockRestore.mockResolvedValue(false)
+
+    await disconnectEmpresaTab({ queryClient, logoutTenant, logout })
+
+    expect(logout).toHaveBeenCalled()
+    expect(logoutTenant).not.toHaveBeenCalled()
+    expect(toast.error).toHaveBeenCalled()
+    expect(assign).toHaveBeenCalledWith('/login')
+  })
+})

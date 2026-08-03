@@ -1,14 +1,14 @@
 'use client'
 
 import { ConviteListRow } from '@/src/presentation/components/features/convites/components/ConviteListRow'
-import type { MeusAppsFeedItem } from '../types'
-import type { MeusApp } from '../types'
+import type { MinhasEmpresasFeedItem } from '../types'
+import type { MinhasEmpresa } from '../types'
 import { CardGearMenu } from '@/src/presentation/components/ui/CardGearMenu'
 import { cn } from '@/src/shared/utils/cn'
 import { buildEmpresaCardGearItems } from '../utils/buildEmpresaCardGearItems'
-import { MeusAppsConvitesSection } from './MeusAppsConvitesSection'
+import { MinhasEmpresasConvitesSection } from './MinhasEmpresasConvitesSection'
 
-export function MeusAppsFeedList({
+export function MinhasEmpresasFeedList({
   conviteItems,
   empresaItems,
   onAcessar,
@@ -19,8 +19,8 @@ export function MeusAppsFeedList({
   onRecusarConvite,
   loadingConviteById,
 }: {
-  conviteItems: Extract<MeusAppsFeedItem, { kind: 'convite' }>[]
-  empresaItems: Extract<MeusAppsFeedItem, { kind: 'empresa' }>[]
+  conviteItems: Extract<MinhasEmpresasFeedItem, { kind: 'convite' }>[]
+  empresaItems: Extract<MinhasEmpresasFeedItem, { kind: 'empresa' }>[]
   onAcessar: (appId: string) => void
   onGerenciarConvites?: (appId: string) => void
   onGerenciarPerfisGestor?: (appId: string) => void
@@ -36,7 +36,7 @@ export function MeusAppsFeedList({
   return (
     <div className="flex flex-col gap-6">
       {temConvites ? (
-        <MeusAppsConvitesSection>
+        <MinhasEmpresasConvitesSection>
           <div className="flex flex-col gap-3">
             {conviteItems.map(item => (
               <ConviteListRow
@@ -48,7 +48,7 @@ export function MeusAppsFeedList({
               />
             ))}
           </div>
-        </MeusAppsConvitesSection>
+        </MinhasEmpresasConvitesSection>
       ) : null}
 
       {temEmpresas ? (
@@ -80,7 +80,7 @@ function EmpresaListRow({
   busyAppId,
   locked,
 }: {
-  app: MeusApp
+  app: MinhasEmpresa
   onAcessar: (appId: string) => void
   onGerenciarConvites?: (appId: string) => void
   onGerenciarPerfisGestor?: (appId: string) => void

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -7,6 +7,7 @@ import { ArrowLeft, Plus } from 'lucide-react'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { empresaNomeParaSlugUrl } from '@/src/shared/utils/empresaNomeParaSlugUrl'
 import { getEmpresaSlugParam } from '@/src/shared/utils/tabSession'
+import { HUB_PATH, hubPerfisGestorPath } from '@/src/shared/constants/hubRoutes'
 import { useConvitesGestao } from './hooks/useConvitesGestao'
 import { ConvitesGestaoList } from './ConvitesGestaoList'
 import { NovoConviteModal } from './components/NovoConviteModal'
@@ -37,11 +38,11 @@ export default function ConvitesGestaoPage() {
     if (!nomeEmpresa) return
     const slug = empresaNomeParaSlugUrl(nomeEmpresa)
     const emp = getEmpresaSlugParam()
-    router.push(`/meus-apps/perfis-gestor/${slug}${emp ? `?${emp}` : ''}`)
+    router.push(`${hubPerfisGestorPath(slug)}${emp ? `?${emp}` : ''}`)
   }, [nomeEmpresa, router])
 
   const handleVoltar = useCallback(() => {
-    router.push('/meus-apps')
+    router.push(HUB_PATH)
   }, [router])
 
   return (

@@ -3440,7 +3440,7 @@ export function AtualizarPrecoLote() {
             className={activeTab === 'fiscal' ? 'overflow-x-auto' : undefined}
             header={
               <div
-                className={`flex items-center h-11 gap-2 md:px-4 px-2 text-xs font-semibold text-primary-text uppercase tracking-wide bg-custom-2 ${
+                className={`flex items-center h-11 gap-3 md:px-4 px-2 text-xs font-semibold text-primary-text uppercase tracking-wide bg-custom-2 ${
                   activeTab === 'fiscal' ? 'min-w-[1180px]' : ''
                 }`}
               >
@@ -3458,14 +3458,19 @@ export function AtualizarPrecoLote() {
                   className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                 />
               </div>
-              <div className="flex-1 md:w-14 text-xs ">Código</div>
-              <div className="flex-[1.5] text-xs ">Nome</div>
-              <div className="flex-[1.1] text-xs hidden md:flex">Grupo</div>
+              <div className="w-14 shrink-0 text-xs md:w-16">Código</div>
+              <div className="min-w-0 flex-[1.4] text-xs">Nome</div>
+              {activeTab === 'permissoes' ? (
+                <div className="hidden w-[13.75rem] shrink-0 text-xs sm:block">Permissões</div>
+              ) : null}
+              <div className="hidden min-w-0 flex-1 text-xs md:block">Grupo</div>
               {activeTab === 'impressoras' ? (
-                <div className="flex-[1.2] text-center text-xs hidden md:flex">Impressoras</div>
+                <div className="hidden min-w-0 flex-[1.2] text-center text-xs md:block">Impressoras</div>
               ) : null}
               {activeTab === 'gruposComplementos' ? (
-                <div className="flex-[1.2] text-center text-xs hidden md:flex">Grupos Complementos</div>
+                <div className="hidden min-w-0 flex-[1.2] text-center text-xs md:block">
+                  Grupos Complementos
+                </div>
               ) : null}
               {activeTab === 'fiscal' ? (
                 <>
@@ -3490,7 +3495,7 @@ export function AtualizarPrecoLote() {
                 </>
               ) : null}
               {activeTab !== 'fiscal' ? (
-                <div className="md:flex-1 text-right text-xs ">Valor atual</div>
+                <div className="w-24 shrink-0 text-right text-xs md:w-28">Valor atual</div>
               ) : null}
               </div>
             }
@@ -3530,7 +3535,7 @@ export function AtualizarPrecoLote() {
                   <div key={produto.getId()} className="flex flex-col">
                     {/* Linha principal do produto */}
                     <div
-                      className={`flex rounded-lg items-center md:px-4 px-2 gap-2 ${bgColor} ${hoverRow} transition-colors cursor-default`}
+                      className={`flex rounded-lg items-center md:px-4 px-2 gap-3 ${bgColor} ${hoverRow} transition-colors cursor-default`}
                       style={{ minHeight: '36px' }}
                     >
                       <div className="flex-none md:w-10 w-6 flex justify-center">
@@ -3544,10 +3549,10 @@ export function AtualizarPrecoLote() {
                           className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                         />
                       </div>
-                      <div className="flex-1 md:w-24 text-xs text-secondary-text">
+                      <div className="w-14 shrink-0 text-xs text-secondary-text md:w-16">
                         {textoOuNenhum(String(produto.getCodigoProduto() ?? ''))}
                       </div>
-                      <div className="md:flex-[1.5] flex-[2] min-w-0 md:pr-4">
+                      <div className="min-w-0 flex-[1.4]">
                         {activeTab === 'fiscal' ? (
                           <button
                             type="button"
@@ -3561,7 +3566,7 @@ export function AtualizarPrecoLote() {
                             {produto.getNome()}
                           </button>
                         ) : (
-                          <p className="break-words text-xs font-normal text-primary-text md:text-sm">
+                          <p className="truncate text-xs font-normal text-primary-text md:text-sm">
                             {produto.getNome()}
                           </p>
                         )}
@@ -3572,10 +3577,17 @@ export function AtualizarPrecoLote() {
                           {textoOuNenhum(nomeGrupoProduto)}
                         </p>
                         {activeTab === 'permissoes' ? (
-                          <ProdutoActionIconsDisplay produto={produto} />
+                          <div className="mt-1 sm:hidden">
+                            <ProdutoActionIconsDisplay produto={produto} />
+                          </div>
                         ) : null}
                       </div>
-                      <div className="flex-[1.1] hidden min-w-0 md:flex md:items-center">
+                      {activeTab === 'permissoes' ? (
+                        <div className="hidden w-[13.75rem] shrink-0 items-center sm:flex">
+                          <ProdutoActionIconsDisplay produto={produto} />
+                        </div>
+                      ) : null}
+                      <div className="hidden min-w-0 flex-1 items-center md:flex">
                         <span
                           className="truncate text-xs text-primary-text"
                           title={nomeGrupoProduto || undefined}
@@ -3640,7 +3652,7 @@ export function AtualizarPrecoLote() {
                         />
                       ) : null}
                       {activeTab !== 'fiscal' ? (
-                        <div className="flex-1 text-right font-normal md:text-sm text-xs text-primary-text">
+                        <div className="w-24 shrink-0 text-right text-xs font-normal text-primary-text md:w-28 md:text-sm">
                           {transformarParaReal(produto.getValor())}
                         </div>
                       ) : null}

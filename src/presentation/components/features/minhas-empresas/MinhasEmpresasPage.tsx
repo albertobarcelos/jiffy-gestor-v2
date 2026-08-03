@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -9,29 +9,30 @@ import { prepareTabSession } from '@/src/shared/utils/tabSession'
 import { fetchAccessTokenEscolherEmpresa } from '@/src/presentation/utils/escolherEmpresaApi'
 import type { ConvitePendente } from '@/src/presentation/components/features/convites/types'
 import { useRegisterHubSearch } from '@/src/presentation/contexts/HubSearchContext'
-import { MeusAppsFeedGrid } from './components/MeusAppsFeedGrid'
-import { MEUS_APPS_GRID_PREVIEW_LIMIT, type MeusAppsFeedItem } from './types'
-import { buildMeusAppsGridCells } from './utils/buildMeusAppsGridCells'
-import { MeusAppsFeedList } from './components/MeusAppsFeedList'
+import { MinhasEmpresasFeedGrid } from './components/MinhasEmpresasFeedGrid'
+import { MINHAS_EMPRESAS_GRID_PREVIEW_LIMIT, type MinhasEmpresasFeedItem } from './types'
+import { buildMinhasEmpresasGridCells } from './utils/buildMinhasEmpresasGridCells'
+import { MinhasEmpresasFeedList } from './components/MinhasEmpresasFeedList'
 import {
   ViewControls,
-  type MeusAppsFeedFiltro,
-  type MeusAppsViewMode,
+  type MinhasEmpresasFeedFiltro,
+  type MinhasEmpresasViewMode,
 } from './components/ViewControls'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
-import { empresaParaMeusApp } from './utils/empresaParaMeusApp'
+import { empresaParaMinhasEmpresas } from './utils/empresaParaMinhasEmpresas'
 import { conviteParaEmpresaSnapshot } from '@/src/presentation/components/features/convites/utils/conviteParaEmpresaSnapshot'
 import {
   HUB_SESSAO_TOKEN_MENSAGEM,
   isLikelyHubSessionTokenError,
   isLikelyVinculoRemovidoError,
 } from './utils/hubSessionTokenFeedback'
-import { appEmpresaCorrespondeBusca, conviteCorrespondeBusca } from './utils/meusAppsBusca'
+import { appEmpresaCorrespondeBusca, conviteCorrespondeBusca } from './utils/minhasEmpresasBusca'
 import { activateHubEmpresaSessionAndBuildUrl } from './utils/activateHubEmpresaSession'
+import { HUB_ROUTES } from '@/src/shared/constants/hubRoutes'
 
-const HUB_SESSAO_TOAST_ID = 'meus-apps-sessao-token'
+const HUB_SESSAO_TOAST_ID = 'minhas-empresas-sessao-token'
 
-export default function MeusAppsPage() {
+export default function MinhasEmpresasPage() {
   const router = useRouter()
   const hubEmpresas = useAuthStore(s => s.hubEmpresas)
   const setHubEmpresas = useAuthStore(s => s.setHubEmpresas)
@@ -47,8 +48,8 @@ export default function MeusAppsPage() {
     onChange: setBusca,
     placeholder: 'Buscar por nome ou CNPJ',
   })
-  const [viewMode, setViewMode] = useState<MeusAppsViewMode>('grid')
-  const [feedFiltro, setFeedFiltro] = useState<MeusAppsFeedFiltro>('tudo')
+  const [viewMode, setViewMode] = useState<MinhasEmpresasViewMode>('grid')
+  const [feedFiltro, setFeedFiltro] = useState<MinhasEmpresasFeedFiltro>('tudo')
   const [busyAppId, setBusyAppId] = useState<string | null>(null)
   const [acessoErro, setAcessoErro] = useState<string | null>(null)
   /** Sessão/token inválido: banner fixo no topo + toast (id único evita spam ao clicar várias vezes). */
@@ -279,7 +280,7 @@ export default function MeusAppsPage() {
   )
 
   const appsBase = useMemo(
-    () => (hubEmpresas ?? []).map(empresaParaMeusApp),
+    () => (hubEmpresas ?? []).map(empresaParaMinhasEmpresas),
     [hubEmpresas]
   )
 
@@ -304,12 +305,12 @@ export default function MeusAppsPage() {
   }, [convitesCarregadosFlag, convites, busca])
 
   /** Convites primeiro; depois empresas — ou só um tipo conforme `feedFiltro`. */
-  const feedItems = useMemo((): MeusAppsFeedItem[] => {
-    const conv: MeusAppsFeedItem[] = convitesFiltrados.map(c => ({
+  const feedItems = useMemo((): MinhasEmpresasFeedItem[] => {
+    const conv: MinhasEmpresasFeedItem[] = convitesFiltrados.map(c => ({
       kind: 'convite',
       convite: c,
     }))
-    const emp: MeusAppsFeedItem[] = appsFiltrados.map(a => ({
+    const emp: MinhasEmpresasFeedItem[] = appsFiltrados.map(a => ({
       kind: 'empresa',
       app: a,
     }))
@@ -323,12 +324,12 @@ export default function MeusAppsPage() {
   }, [convitesFiltrados, appsFiltrados, feedFiltro])
 
   const conviteFeedItems = useMemo(
-    () => feedItems.filter((item): item is Extract<MeusAppsFeedItem, { kind: 'convite' }> => item.kind === 'convite'),
+    () => feedItems.filter((item): item is Extract<MinhasEmpresasFeedItem, { kind: 'convite' }> => item.kind === 'convite'),
     [feedItems]
   )
 
   const empresaFeedItems = useMemo(
-    () => feedItems.filter((item): item is Extract<MeusAppsFeedItem, { kind: 'empresa' }> => item.kind === 'empresa'),
+    () => feedItems.filter((item): item is Extract<MinhasEmpresasFeedItem, { kind: 'empresa' }> => item.kind === 'empresa'),
     [feedItems]
   )
 
@@ -337,14 +338,14 @@ export default function MeusAppsPage() {
   const gridExpandidoEfetivo = feedGridExpandido || buscaAtiva
 
   const feedItemsParaGrid = useMemo(
-    () => (gridExpandidoEfetivo ? feedItems : feedItems.slice(0, MEUS_APPS_GRID_PREVIEW_LIMIT)),
+    () => (gridExpandidoEfetivo ? feedItems : feedItems.slice(0, MINHAS_EMPRESAS_GRID_PREVIEW_LIMIT)),
     [feedItems, gridExpandidoEfetivo]
   )
 
   const conviteFeedItemsGrid = useMemo(
     () =>
       feedItemsParaGrid.filter(
-        (item): item is Extract<MeusAppsFeedItem, { kind: 'convite' }> => item.kind === 'convite'
+        (item): item is Extract<MinhasEmpresasFeedItem, { kind: 'convite' }> => item.kind === 'convite'
       ),
     [feedItemsParaGrid]
   )
@@ -352,13 +353,13 @@ export default function MeusAppsPage() {
   const empresaFeedItemsGrid = useMemo(
     () =>
       feedItemsParaGrid.filter(
-        (item): item is Extract<MeusAppsFeedItem, { kind: 'empresa' }> => item.kind === 'empresa'
+        (item): item is Extract<MinhasEmpresasFeedItem, { kind: 'empresa' }> => item.kind === 'empresa'
       ),
     [feedItemsParaGrid]
   )
 
   const gridEmpresaCells = useMemo(
-    () => buildMeusAppsGridCells(empresaFeedItemsGrid, { expandido: true }),
+    () => buildMinhasEmpresasGridCells(empresaFeedItemsGrid, { expandido: true }),
     [empresaFeedItemsGrid]
   )
 
@@ -436,7 +437,7 @@ export default function MeusAppsPage() {
         token,
         app.nome,
         appId,
-        '/meus-apps/gerenciar-usuarios'
+        HUB_ROUTES.gerenciarUsuarios
       )
       router.push(url)
     } catch (e) {
@@ -458,7 +459,7 @@ export default function MeusAppsPage() {
         token,
         app.nome,
         appId,
-        '/meus-apps/perfis-gestor'
+        HUB_ROUTES.perfisGestor
       )
       router.push(url)
     } catch (e) {
@@ -508,7 +509,7 @@ export default function MeusAppsPage() {
     convitesCarregados &&
     !feedVazio &&
     viewMode === 'grid' &&
-    feedItems.length > MEUS_APPS_GRID_PREVIEW_LIMIT &&
+    feedItems.length > MINHAS_EMPRESAS_GRID_PREVIEW_LIMIT &&
     !buscaAtiva
 
   return (
@@ -573,7 +574,7 @@ export default function MeusAppsPage() {
                 <p className="mt-2 text-sm text-gray-600">{mensagemFeedVazioSubtitulo}</p>
               </div>
             ) : viewMode === 'grid' ? (
-              <MeusAppsFeedGrid
+              <MinhasEmpresasFeedGrid
                 conviteItems={conviteFeedItemsGrid}
                 empresaCells={gridEmpresaCells}
                 onAcessar={handleAcessar}
@@ -585,7 +586,7 @@ export default function MeusAppsPage() {
                 loadingConviteById={loadingConviteById}
               />
             ) : (
-              <MeusAppsFeedList
+              <MinhasEmpresasFeedList
                 conviteItems={conviteFeedItems}
                 empresaItems={empresaFeedItems}
                 onAcessar={handleAcessar}
@@ -611,7 +612,7 @@ export default function MeusAppsPage() {
             </button>
             {!feedGridExpandido ? (
               <p className="max-w-md text-center text-xs text-gray-500">
-                Existem mais convites ou empresas além dos {MEUS_APPS_GRID_PREVIEW_LIMIT} primeiros
+                Existem mais convites ou empresas além dos {MINHAS_EMPRESAS_GRID_PREVIEW_LIMIT} primeiros
                 desta lista.
               </p>
             ) : null}

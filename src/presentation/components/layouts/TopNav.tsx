@@ -29,6 +29,7 @@ import {
 import type { IconType } from 'react-icons'
 import { useAcessoFiscal } from '@/src/presentation/hooks/useAcessoFiscal'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
+import { useHubIdentityExpiryWarning } from '@/src/presentation/hooks/useHubIdentityExpiryWarning'
 import { matchesModulePath } from '@/src/shared/utils/gestaoRoutes'
 
 const MENU_ICON_PARENT =
@@ -64,12 +65,13 @@ export function TopNav() {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
-  const { logoutTenant, getUser } = useAuthStore()
+  const { logoutTenant, logout, getUser } = useAuthStore()
   const queryClient = useQueryClient()
   const menuRef = useRef<HTMLDivElement>(null)
   const notificationsRef = useRef<HTMLDivElement>(null)
 
   useEmpresaUrlSync()
+  useHubIdentityExpiryWarning(true)
   const temAcessoFiscal = useAcessoFiscal()
   const { toGestao } = useGestaoPath()
   
@@ -195,7 +197,7 @@ export function TopNav() {
         ],
       },
       {
-        name: 'Usuários',
+        name: 'Pessoas',
         path: '#',
         icon: MdPeople,
         children: [
@@ -266,8 +268,18 @@ export function TopNav() {
   )
 
   const handleVoltarPortal = useCallback(async () => {
-    await disconnectEmpresaTab({ queryClient, logoutTenant })
-  }, [queryClient, logoutTenant])
+    await disconnectEmpresaTab({ queryClient, logoutTenant, logout })
+  }, [queryClient, logoutTenant, logout])
+
+  const handleLogout = useCallback(async () => {
+    try {
+      queryClient.clear()
+      await logout()
+    } catch (e) {
+      console.error('TopNav: erro ao sair da conta', e)
+    }
+    window.location.assign('/login')
+  }, [queryClient, logout])
 
   useEffect(() => {
     if (isMobileMenuOpen) {
@@ -403,7 +415,7 @@ export function TopNav() {
           {/* Logout no mobile: ações do usuário ficam em `hidden sm:flex` na barra superior */}
           <button
             type="button"
-            onClick={() => void handleVoltarPortal()}
+            onClick={() => void handleLogout()}
             className="shrink-0 p-2.5 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
             aria-label="Sair da conta"
           >
@@ -605,7 +617,7 @@ export function TopNav() {
           {/* Logout */}
           <button
             type="button"
-            onClick={() => void handleVoltarPortal()}
+            onClick={() => void handleLogout()}
             className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
             title="Logout"
             aria-label="Sair da conta"

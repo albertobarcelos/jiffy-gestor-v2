@@ -1,11 +1,11 @@
-import { Fragment } from 'react'
+﻿import { Fragment } from 'react'
 import type { VendaContingenciaPublica } from '@/src/infrastructure/api/fetchVendaContingenciaPublica'
 import {
   deveExibirAguardoFinalizacaoDelivery,
   deveExibirRodapeDanfe80mm,
 } from '@/src/infrastructure/api/fetchVendaContingenciaPublica'
 import { CupomRodapeDanfe80 } from '@/src/presentation/components/features/venda-contingencia/CupomRodapeDanfe80'
-import { formatarCnpjExibicao } from '@/src/presentation/components/features/meus-apps/utils/empresaParaMeusApp'
+import { formatarCnpjExibicao } from '@/src/presentation/components/features/minhas-empresas/utils/empresaParaMinhasEmpresas'
 import { formatarCpfCnpjExibicao } from '@/src/shared/utils/cpfCnpj'
 import { formatarCepMascara } from '@/src/shared/utils/consultaCep'
 import { normalizeTipoImpactoPreco } from '@/src/application/mappers/VendaApiNormalizer'

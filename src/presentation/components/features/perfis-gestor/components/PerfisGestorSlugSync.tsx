@@ -1,13 +1,14 @@
-'use client'
+﻿'use client'
 
 import type { ReactNode } from 'react'
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { empresaNomeParaSlugUrl } from '@/src/shared/utils/empresaNomeParaSlugUrl'
+import { hubPerfisGestorPath } from '@/src/shared/constants/hubRoutes'
 
 /**
- * Mantém a URL canônica `/meus-apps/perfis-gestor/<slug>` alinhada ao nome da empresa da sessão.
+ * Mantém a URL canônica `{@link hubPerfisGestorPath}(slug)` alinhada ao nome da empresa da sessão.
  */
 export function PerfisGestorSlugSync({
   routeSlug,
@@ -25,7 +26,7 @@ export function PerfisGestorSlugSync({
     }
     const esperado = empresaNomeParaSlugUrl(empresa.nomeExibicao)
     if (esperado !== routeSlug) {
-      router.replace(`/meus-apps/perfis-gestor/${esperado}`)
+      router.replace(hubPerfisGestorPath(esperado))
     }
   }, [empresa, isLoading, routeSlug, router])
 

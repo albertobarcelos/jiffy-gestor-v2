@@ -1,8 +1,8 @@
 import type { ConvitePendente } from '@/src/presentation/components/features/convites/types'
-import type { MeusApp } from '../types'
+import type { MinhasEmpresa } from '../types'
 
 /** Nome, sigla, CNPJ formatado ou trecho numérico do CNPJ. */
-export function appEmpresaCorrespondeBusca(app: MeusApp, buscaRaw: string): boolean {
+export function appEmpresaCorrespondeBusca(app: MinhasEmpresa, buscaRaw: string): boolean {
   const q = buscaRaw.trim().toLowerCase()
   if (!q) {
     return true
