@@ -14,8 +14,6 @@ export interface ProdutoListItemProps {
   onValorChange: (produtoId: string, valor: number) => void
   onSwitchToggle: (produtoId: string, status: boolean) => void
   onToggleBoolean: (produtoId: string, field: ToggleField, value: boolean) => void
-  onOpenComplementosModal: (produto: Produto) => void
-  onOpenImpressorasModal: (produto: Produto) => void
   onEditProduto: (produtoId: string) => void
   onCopyProduto: (produtoId: string) => void
 }
@@ -27,8 +25,6 @@ function ProdutoListItemBase({
   onValorChange,
   onSwitchToggle,
   onToggleBoolean,
-  onOpenComplementosModal,
-  onOpenImpressorasModal,
   onEditProduto,
   onCopyProduto,
 }: ProdutoListItemProps) {
@@ -46,15 +42,6 @@ function ProdutoListItemBase({
     }),
     [produto]
   )
-
-  const sharedIconProps = {
-    produto,
-    toggleStates,
-    onToggleBoolean,
-    onOpenComplementosModal,
-    onOpenImpressorasModal,
-    onCopyProduto,
-  }
 
   const nomeCompleto = produto.getNome()
   const nomeExibicao =
@@ -80,12 +67,23 @@ function ProdutoListItemBase({
         className="flex items-center gap-1 md:gap-1.5"
         onClick={e => e.stopPropagation()}
       >
-        <div className="contents md:hidden">
-          <ProdutoActionIcons {...sharedIconProps} variant="mobile-row1" />
-          <ProdutoActionIcons {...sharedIconProps} variant="mobile-row2" />
+        <div className="md:hidden">
+          <ProdutoActionIcons
+            produto={produto}
+            toggleStates={toggleStates}
+            variant="mobile"
+            onToggleBoolean={onToggleBoolean}
+            onCopyProduto={onCopyProduto}
+          />
         </div>
-        <div className="hidden md:contents">
-          <ProdutoActionIcons {...sharedIconProps} variant="desktop" />
+        <div className="hidden md:block">
+          <ProdutoActionIcons
+            produto={produto}
+            toggleStates={toggleStates}
+            variant="desktop"
+            onToggleBoolean={onToggleBoolean}
+            onCopyProduto={onCopyProduto}
+          />
         </div>
       </div>
 
@@ -120,8 +118,6 @@ function arePropsEqual(prev: ProdutoListItemProps, next: ProdutoListItemProps): 
     prev.onValorChange === next.onValorChange &&
     prev.onSwitchToggle === next.onSwitchToggle &&
     prev.onToggleBoolean === next.onToggleBoolean &&
-    prev.onOpenComplementosModal === next.onOpenComplementosModal &&
-    prev.onOpenImpressorasModal === next.onOpenImpressorasModal &&
     prev.onEditProduto === next.onEditProduto &&
     prev.onCopyProduto === next.onCopyProduto
   )

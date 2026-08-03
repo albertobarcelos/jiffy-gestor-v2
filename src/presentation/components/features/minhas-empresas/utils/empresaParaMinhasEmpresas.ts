@@ -1,5 +1,5 @@
 import type { LoginEmpresaSnapshot } from '@/src/domain/types/LoginEmpresaSnapshot'
-import type { MeusApp } from '../types'
+import type { MinhasEmpresa } from '../types'
 
 /** Formata CNPJ numérico (14 dígitos) para exibição; se inválido, devolve o original. */
 export function formatarCnpjExibicao(cnpj: string): string {
@@ -19,7 +19,7 @@ function siglaDeNomeFantasia(nomeFantasia: string): string {
 }
 
 /** Mapeia snapshot do login para o modelo exibido nos cards do hub. */
-export function empresaParaMeusApp(e: LoginEmpresaSnapshot): MeusApp {
+export function empresaParaMinhasEmpresas(e: LoginEmpresaSnapshot): MinhasEmpresa {
   return {
     id: e.id,
     nome: e.nomeFantasia,

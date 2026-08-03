@@ -44,9 +44,9 @@ const SLIDES: GradientCarouselSlide[] = [
 ].map(slide => ({ ...slide, badge: 'Destaque' }))
 
 /**
- * Card promocional no grid “Meus aplicativos”: mesma altura dos cards de empresa/convite (`h-52`).
+ * Card promocional no grid “Minhas empresas”: mesma altura dos cards de empresa/convite (`h-52`).
  */
-export function MeusAppsPromoCarouselCard({ className }: { className?: string }) {
+export function MinhasEmpresasPromoCarouselCard({ className }: { className?: string }) {
   return (
     <GradientCarouselCard
       slides={SLIDES}

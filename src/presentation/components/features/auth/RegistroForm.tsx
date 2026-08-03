@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { FormEvent, useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -11,6 +11,7 @@ import { AuthEmailField } from '@/src/presentation/components/features/auth/comp
 import { AuthNameField } from '@/src/presentation/components/features/auth/components/AuthNameField'
 import { GestorPasswordField } from '@/src/presentation/components/features/auth/components/GestorPasswordField'
 import { PasswordFieldPressReveal } from '@/src/presentation/components/features/auth/components/PasswordFieldPressReveal'
+import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 
 export function RegistroForm() {
   const router = useRouter()
@@ -94,7 +95,7 @@ export function RegistroForm() {
           setHubEmpresas,
           getHubEmpresas: () => useAuthStore.getState().hubEmpresas,
           onPrecisaConfirmarEmail: () => router.push('/registro/sucesso'),
-          onConcluido: () => router.replace('/meus-apps'),
+          onConcluido: () => router.replace(HUB_PATH),
         })
         return
       }

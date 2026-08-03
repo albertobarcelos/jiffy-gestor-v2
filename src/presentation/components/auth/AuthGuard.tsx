@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
@@ -9,11 +9,13 @@ import { buildAuthFromAccessToken } from '@/src/shared/utils/buildAuthFromAccess
 import { getTabTenantToken, hasSessionNonce } from '@/src/shared/utils/tabSession'
 import { fetchTenantRefreshAccessToken } from '@/src/shared/utils/fetchTenantRefreshAccessToken'
 import { syncTenantAccessTokenClient } from '@/src/presentation/utils/syncTenantAccessTokenClient'
+import { restoreIdentityFromCookie } from '@/src/presentation/utils/restoreIdentityFromCookie'
 import {
   SESSION_STORAGE_HUB_LOGOUT_SELF,
   SESSION_STORAGE_TENANT_LOGOUT_SELF,
   JIFFY_SESSION_EXPIRED_EVENT,
 } from '@/src/shared/constants/sessionCoordinator'
+import { HUB_PATH, isHubPathname } from '@/src/shared/constants/hubRoutes'
 
 /** Tempo máximo de espera para o refresh de token antes de encerrar a sessão da empresa. */
 const REFRESH_TIMEOUT_MS = 5_000
@@ -48,7 +50,7 @@ const SESSAO_TIMEOUT_MAX_MS = 1000 * 60 * 60 * 24 * 14
 /**
  * Proteção de rotas no cliente: exige sessão válida e não expirada.
  *
- * - Sessão da **empresa** morta com identidade do hub ok → `logoutTenant` + `/meus-apps`
+ * - Sessão da **empresa** morta com identidade do hub ok → `logoutTenant` + {@link HUB_PATH}
  * - Identidade do hub também morta → `logout` completo + `/login`
  *
  * Além da checagem na montagem/atualização do store, faz **poll** e **timeout** na data
@@ -73,7 +75,7 @@ function isHubPath(p: string | null): boolean {
   if (!p) return false
   /** Perfil da conta: só identidade de hub (como Meus Apps), sem empresa nesta aba. */
   if (p === '/perfil' || p.startsWith('/perfil/')) return true
-  return p.startsWith('/meus-apps')
+  return isHubPathname(p)
 }
 
 /**
@@ -146,7 +148,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
       } catch (error) {
         console.error('AuthGuard: erro ao encerrar sessão da empresa:', error)
       }
-      window.location.href = '/meus-apps'
+      window.location.href = HUB_PATH
       return
     }
 
@@ -170,12 +172,12 @@ export function AuthGuard({ children }: AuthGuardProps) {
     window.location.href = '/login'
   }, [])
 
-  const redirectToMeusApps = useCallback(() => {
+  const redirectToHub = useCallback(() => {
     if (redirectingRef.current) {
       return
     }
     redirectingRef.current = true
-    window.location.href = '/meus-apps'
+    window.location.href = HUB_PATH
   }, [])
 
   useEffect(() => {
@@ -193,20 +195,40 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
     if (isTenantLogoutInProgress()) {
       if (isHub) {
-        try {
-          sessionStorage.removeItem(SESSION_STORAGE_TENANT_LOGOUT_SELF)
-        } catch {
-          /* noop */
-        }
         if ((identityAuth !== null && !identityAuth.isExpired()) || isTenantSessionAlive()) {
+          try {
+            sessionStorage.removeItem(SESSION_STORAGE_TENANT_LOGOUT_SELF)
+          } catch {
+            /* noop */
+          }
           redirectingRef.current = false
           setAllowed(true)
           return
         }
-        redirectHubSemIdentidade()
-        return
+        /** Memória sem identidade: tentar cookie `identity-token` antes de matar o hub. */
+        let cancelled = false
+        void (async () => {
+          const restored = await restoreIdentityFromCookie()
+          if (cancelled) {
+            return
+          }
+          try {
+            sessionStorage.removeItem(SESSION_STORAGE_TENANT_LOGOUT_SELF)
+          } catch {
+            /* noop */
+          }
+          if (restored || identityHubStillValid()) {
+            redirectingRef.current = false
+            setAllowed(true)
+            return
+          }
+          redirectHubSemIdentidade()
+        })()
+        return () => {
+          cancelled = true
+        }
       }
-      /** Ainda na rota ERP durante disconnect → aguardar `location.assign('/meus-apps')`. */
+      /** Ainda na rota ERP durante disconnect → aguardar `location.assign(HUB_PATH)`. */
       return
     }
 
@@ -221,8 +243,22 @@ export function AuthGuard({ children }: AuthGuardProps) {
         setAllowed(true)
         return
       }
-      redirectHubSemIdentidade()
-      return
+      let cancelled = false
+      void (async () => {
+        const restored = await restoreIdentityFromCookie()
+        if (cancelled) {
+          return
+        }
+        if (restored || identityHubStillValid()) {
+          redirectingRef.current = false
+          setAllowed(true)
+          return
+        }
+        redirectHubSemIdentidade()
+      })()
+      return () => {
+        cancelled = true
+      }
     }
 
     /**
@@ -248,7 +284,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
       }
       /** Sem tenant: se a identidade do hub ainda vale, ir ao portal — não tentar refresh da empresa. */
       if (identityHubStillValid()) {
-        redirectToMeusApps()
+        redirectToHub()
         return
       }
       let cancelled = false
@@ -283,7 +319,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
     if (!tenantAuth && !hasSessionNonce()) {
       if (identityHubStillValid() || identityAuth) {
-        redirectToMeusApps()
+        redirectToHub()
       } else {
         void endTenantSessionOrFullLogout()
       }
@@ -301,7 +337,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     isRehydrated,
     endTenantSessionOrFullLogout,
     redirectHubSemIdentidade,
-    redirectToMeusApps,
+    redirectToHub,
   ])
 
   useEffect(() => {

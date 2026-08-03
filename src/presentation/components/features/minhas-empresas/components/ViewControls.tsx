@@ -3,10 +3,10 @@
 import { LayoutGrid, List, Mail } from 'lucide-react'
 import { cn } from '@/src/shared/utils/cn'
 
-export type MeusAppsViewMode = 'grid' | 'list'
+export type MinhasEmpresasViewMode = 'grid' | 'list'
 
 /** O que entra no feed: ambos, só convites ou só empresas vinculadas. */
-export type MeusAppsFeedFiltro = 'tudo' | 'convites' | 'empresas'
+export type MinhasEmpresasFeedFiltro = 'tudo' | 'convites' | 'empresas'
 
 function IconButton({
   label,
@@ -44,10 +44,10 @@ export function ViewControls({
   feedFiltro,
   onFeedFiltroChange,
 }: {
-  mode: MeusAppsViewMode
-  onModeChange: (m: MeusAppsViewMode) => void
-  feedFiltro: MeusAppsFeedFiltro
-  onFeedFiltroChange: (f: MeusAppsFeedFiltro) => void
+  mode: MinhasEmpresasViewMode
+  onModeChange: (m: MinhasEmpresasViewMode) => void
+  feedFiltro: MinhasEmpresasFeedFiltro
+  onFeedFiltroChange: (f: MinhasEmpresasFeedFiltro) => void
 }) {
   return (
     <div className="flex flex-wrap items-center gap-1">

@@ -1,10 +1,10 @@
 'use client'
 
 import { ConviteCard } from '@/src/presentation/components/features/convites/components/ConviteCard'
-import type { MeusAppsFeedItem, MeusAppsGridCell } from '../types'
+import type { MinhasEmpresasFeedItem, MinhasEmpresasGridCell } from '../types'
 import { AppCard } from './AppCard'
-import { MeusAppsConvitesSection } from './MeusAppsConvitesSection'
-import { MeusAppsPromoCarouselCard } from './MeusAppsPromoCarouselCard'
+import { MinhasEmpresasConvitesSection } from './MinhasEmpresasConvitesSection'
+import { MinhasEmpresasPromoCarouselCard } from './MinhasEmpresasPromoCarouselCard'
 
 function FeedGrid({
   cells,
@@ -17,7 +17,7 @@ function FeedGrid({
   loadingConviteById,
   locked,
 }: {
-  cells: MeusAppsGridCell[]
+  cells: MinhasEmpresasGridCell[]
   onAcessar: (appId: string) => void
   onGerenciarConvites?: (appId: string) => void
   onGerenciarPerfisGestor?: (appId: string) => void
@@ -31,7 +31,7 @@ function FeedGrid({
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {cells.map(cell =>
         cell.kind === 'promo' ? (
-          <MeusAppsPromoCarouselCard key={`promo-${cell.id}`} />
+          <MinhasEmpresasPromoCarouselCard key={`promo-${cell.id}`} />
         ) : cell.kind === 'convite' ? (
           <ConviteCard
             key={`convite-${cell.convite.id}`}
@@ -56,7 +56,7 @@ function FeedGrid({
   )
 }
 
-export function MeusAppsFeedGrid({
+export function MinhasEmpresasFeedGrid({
   conviteItems,
   empresaCells,
   onAcessar,
@@ -67,8 +67,8 @@ export function MeusAppsFeedGrid({
   onRecusarConvite,
   loadingConviteById,
 }: {
-  conviteItems: Extract<MeusAppsFeedItem, { kind: 'convite' }>[]
-  empresaCells: MeusAppsGridCell[]
+  conviteItems: Extract<MinhasEmpresasFeedItem, { kind: 'convite' }>[]
+  empresaCells: MinhasEmpresasGridCell[]
   onAcessar: (appId: string) => void
   onGerenciarConvites?: (appId: string) => void
   onGerenciarPerfisGestor?: (appId: string) => void
@@ -81,12 +81,12 @@ export function MeusAppsFeedGrid({
   const temConvites = conviteItems.length > 0
   const temEmpresas = empresaCells.length > 0
 
-  const conviteCells: MeusAppsGridCell[] = conviteItems
+  const conviteCells: MinhasEmpresasGridCell[] = conviteItems
 
   return (
     <div className="flex flex-col gap-4">
       {temConvites ? (
-        <MeusAppsConvitesSection>
+        <MinhasEmpresasConvitesSection>
           <FeedGrid
             cells={conviteCells}
             onAcessar={onAcessar}
@@ -98,7 +98,7 @@ export function MeusAppsFeedGrid({
             loadingConviteById={loadingConviteById}
             locked={locked}
           />
-        </MeusAppsConvitesSection>
+        </MinhasEmpresasConvitesSection>
       ) : null}
 
       {temEmpresas ? (

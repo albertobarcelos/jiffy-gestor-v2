@@ -7,6 +7,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantAccessGuard } from '@/src/presentation/hooks/useTenantAccessGuard'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { SESSION_STORAGE_TENANT_LOGOUT_SELF } from '@/src/shared/constants/sessionCoordinator'
+import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 
 interface ErpTenantAccessGuardProps {
   children: ReactNode
@@ -17,8 +18,8 @@ interface ErpTenantAccessGuardProps {
  * Integrado em ErpAppShell para proteger todas as rotas sob app/(erp)/.
  *
  * - Loading: exibe JiffyLoading enquanto a reidratação do store não concluiu.
- * - Sessão da empresa expirada com hub ok: `logoutTenant` → `/meus-apps`.
- * - Sem sessão de empresa: `/meus-apps`.
+ * - Sessão da empresa expirada com hub ok: `logoutTenant` → {@link HUB_PATH}.
+ * - Sem sessão de empresa: {@link HUB_PATH}.
  * - Hub também inválido: `/login`.
  * - Sessão válida: renderiza children.
  */
@@ -52,7 +53,7 @@ export function ErpTenantAccessGuard({ children }: ErpTenantAccessGuardProps) {
           } catch {
             /* noop */
           }
-          window.location.assign('/meus-apps')
+          window.location.assign(HUB_PATH)
         })()
         return
       }
@@ -62,7 +63,7 @@ export function ErpTenantAccessGuard({ children }: ErpTenantAccessGuardProps) {
 
     const identity = useAuthStore.getState().identityAuth
     if (identity && !identity.isExpired()) {
-      router.replace('/meus-apps')
+      router.replace(HUB_PATH)
       return
     }
     router.replace('/login')

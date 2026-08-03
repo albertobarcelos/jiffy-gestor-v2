@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -6,6 +6,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantAccessGuard } from '@/src/presentation/hooks/useTenantAccessGuard'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 
 interface PainelContadorAcessoGuardProps {
   children: React.ReactNode
@@ -32,7 +33,7 @@ export function PainelContadorAcessoGuard({ children }: PainelContadorAcessoGuar
       }
       if (payload.acessoFiscal === false) {
         showToast.warning('Seu perfil não possui acesso ao Painel do Contador.')
-        router.replace('/meus-apps')
+        router.replace(HUB_PATH)
       }
     } catch {
       // Sem claim no JWT: mantém compatibilidade com sessões atuais

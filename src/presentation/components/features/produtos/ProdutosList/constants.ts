@@ -5,10 +5,10 @@
   MdRemoveCircleOutline,
   MdLaunch,
   MdAttachMoney,
-  MdPercent,
 } from 'react-icons/md'
-import type { IconType } from 'react-icons'
+import type { ComponentType } from 'react'
 import type { ToggleField, ProdutoPatch } from '@/src/shared/types/produto'
+import { TaxasIcon } from './TaxasIcon'
 
 export type { ToggleField }
 
@@ -51,17 +51,83 @@ export const toggleFieldConfig: Record<ToggleField, ToggleFieldConfig> = {
   },
 }
 
+export type ActionIconComponent = ComponentType<{ className?: string }>
+
 export type ActionIconDef =
-  | { key: string; label: string; Icon: IconType; field: ToggleField; modal?: never; action?: never }
-  | { key: string; label: string; Icon: IconType; modal: 'complementos' | 'impressoras'; field?: never; action?: never }
-  | { key: 'copiar'; label: string; Icon: IconType; action: 'copy'; field?: never; modal?: never }
+  | {
+      key: string
+      /** Texto curto para aria-label */
+      ariaLabel: string
+      /** Texto completo do tooltip */
+      label: string
+      Icon: ActionIconComponent
+      field: ToggleField
+      action?: never
+    }
+  | {
+      key: 'copiar'
+      ariaLabel: string
+      label: string
+      Icon: ActionIconComponent
+      action: 'copy'
+      field?: never
+    }
 
 export const actionIconsConfig: ActionIconDef[] = [
-  { key: 'favorito', label: 'Favoritar produto', Icon: MdStarBorder, field: 'favorito' },
-  { key: 'acrescentar', label: 'Permitir acréscimo', Icon: MdAddCircleOutline, field: 'permiteAcrescimo' },
-  { key: 'diminuir', label: 'Permitir desconto', Icon: MdRemoveCircleOutline, field: 'permiteDesconto' },
-  { key: 'abrir', label: 'Permitir abrir complementos', Icon: MdLaunch, field: 'abreComplementos' },
-  { key: 'alterar-preco', label: 'Permitir alterar preço no Jiffy POS', Icon: MdAttachMoney, field: 'permiteAlterarPreco' },
-  { key: 'incide-taxa', label: 'Incide taxa', Icon: MdPercent, field: 'incideTaxa' },
-  { key: 'copiar', label: 'Copiar produto', Icon: MdContentCopy, action: 'copy' },
+  {
+    key: 'favorito',
+    ariaLabel: 'Destacar no cardápio digital',
+    label:
+      'Destacar este produto no cardápio digital aumenta sua visibilidade e facilita o acesso dos consumidores.',
+    Icon: MdStarBorder,
+    field: 'favorito',
+  },
+  {
+    key: 'acrescentar',
+    ariaLabel: 'Permitir acréscimo',
+    label:
+      'Permite que o operador acrescente valor ao produto no Jiffy POS, útil para personalizações cobradas à parte.',
+    Icon: MdAddCircleOutline,
+    field: 'permiteAcrescimo',
+  },
+  {
+    key: 'diminuir',
+    ariaLabel: 'Permitir desconto',
+    label:
+      'Permite aplicar desconto neste produto no Jiffy POS, sem alterar o preço base cadastrado.',
+    Icon: MdRemoveCircleOutline,
+    field: 'permiteDesconto',
+  },
+  {
+    key: 'abrir',
+    ariaLabel: 'Abrir complementos automaticamente',
+    label:
+      'Ao selecionar o produto no Jiffy POS, abre automaticamente a tela de complementos para o cliente escolher.',
+    Icon: MdLaunch,
+    field: 'abreComplementos',
+  },
+  {
+    key: 'alterar-preco',
+    ariaLabel: 'Permitir alterar preço no Jiffy POS',
+    label:
+      'Permite que o operador altere o preço deste produto no momento da venda no Jiffy POS.',
+    Icon: MdAttachMoney,
+    field: 'permiteAlterarPreco',
+  },
+  {
+    key: 'incide-taxa',
+    ariaLabel: 'Incide taxa',
+    label:
+      'Quando ativo, este produto entra no cálculo das taxas configuradas (serviço, couvert, etc.) no pedido.',
+    Icon: TaxasIcon,
+    field: 'incideTaxa',
+  },
+  {
+    key: 'copiar',
+    ariaLabel: 'Copiar produto',
+    label:
+      'Essa função cria uma cópia do produto, mantendo suas informações e imagens. Ideal para produtos similares.',
+    Icon: MdContentCopy,
+    action: 'copy',
+  },
 ]

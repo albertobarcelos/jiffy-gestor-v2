@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, FormEvent, useEffect } from 'react'
 import Link from 'next/link'
@@ -10,6 +10,7 @@ import { decodeInvitePayloadFromLoginSearch } from '@/src/presentation/component
 import { AuthEnvelopeIcon, AuthLockIcon } from '@/src/presentation/components/features/auth/components/auth-input-icons'
 import { authFluid } from '@/src/presentation/components/features/auth/components/auth-input-fluid'
 import { cn } from '@/src/shared/utils/cn'
+import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 
 /**
  * Componente de formulário de login
@@ -86,7 +87,7 @@ export function LoginForm() {
 
       loginWithHubEmpresas(resultado.auth, resultado.empresas)
 
-      router.replace('/meus-apps')
+      router.replace(HUB_PATH)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao fazer login'
       setError(message)

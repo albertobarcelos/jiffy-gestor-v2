@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
@@ -9,6 +9,7 @@ import {
   PerfisGestorList,
   type PerfisGestorListHandle,
 } from './PerfisGestorList'
+import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 
 export function PerfisGestorHubPage() {
   const router = useRouter()
@@ -18,7 +19,7 @@ export function PerfisGestorHubPage() {
   const nomeEmpresa = empresa?.nomeExibicao ?? ''
 
   const handleVoltar = useCallback(() => {
-    router.push('/meus-apps')
+    router.push(HUB_PATH)
   }, [router])
 
   return (

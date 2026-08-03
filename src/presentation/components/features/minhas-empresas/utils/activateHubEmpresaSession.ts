@@ -1,9 +1,8 @@
-import { useAuthStore } from '@/src/presentation/stores/authStore'
+﻿import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { buildAuthFromAccessToken } from '@/src/shared/utils/buildAuthFromAccessToken'
 import { bootstrapTabSessionManually, buildEmpresaUrlParam } from '@/src/shared/utils/tabSession'
 import { empresaNomeParaSlugUrl } from '@/src/shared/utils/empresaNomeParaSlugUrl'
-
-type HubEmpresaSubRoute = '/meus-apps/gerenciar-usuarios' | '/meus-apps/perfis-gestor'
+import type { HubEmpresaSubRoute } from '@/src/shared/constants/hubRoutes'
 
 /**
  * Ativa sessão tenant na aba atual (sem `window.open`) e devolve a URL do sub-módulo hub.

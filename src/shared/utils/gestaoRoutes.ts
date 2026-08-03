@@ -3,6 +3,8 @@
  * Ex.: `/gestao/nexsyn-cmc6u1ef/portal-contador`
  */
 
+import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
+
 export const GESTAO_PREFIX = '/gestao'
 
 /** Rotas que não recebem prefixo `/gestao/{empresaSlug}` (hub, auth, APIs públicas). */
@@ -12,7 +14,7 @@ const GESTAO_EXCLUDED_PREFIXES = [
   '/confirmar-email',
   '/esqueci-senha',
   '/redefinir-senha',
-  '/meus-apps',
+  HUB_PATH,
   '/hub',
   '/api',
   '/notas-fiscais',

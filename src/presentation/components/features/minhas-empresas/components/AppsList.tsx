@@ -1,9 +1,9 @@
 'use client'
 
-import type { MeusApp } from '../types'
+import type { MinhasEmpresa } from '../types'
 import { cn } from '@/src/shared/utils/cn'
 
-function StatusPill({ status }: { status: MeusApp['status'] }) {
+function StatusPill({ status }: { status: MinhasEmpresa['status'] }) {
   return (
     <span
       className={cn(
@@ -23,7 +23,7 @@ export function AppsList({
   onAcessar,
   busyAppId,
 }: {
-  apps: MeusApp[]
+  apps: MinhasEmpresa[]
   onAcessar: (appId: string) => void
   busyAppId?: string | null
 }) {

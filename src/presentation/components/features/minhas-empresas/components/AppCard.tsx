@@ -4,7 +4,7 @@ import { useRef } from 'react'
 import { Heart } from 'lucide-react'
 import { CardGearMenu } from '@/src/presentation/components/ui/CardGearMenu'
 import { cn } from '@/src/shared/utils/cn'
-import type { MeusApp } from '../types'
+import type { MinhasEmpresa } from '../types'
 import { buildEmpresaCardGearItems } from '../utils/buildEmpresaCardGearItems'
 
 function AppAvatar({ nome, sigla }: { nome: string; sigla?: string }) {
@@ -24,7 +24,7 @@ export function AppCard({
   isSelecting = false,
   actionsLocked = false,
 }: {
-  app: MeusApp
+  app: MinhasEmpresa
   onAcessar: (appId: string) => void
   onGerenciarConvites?: (appId: string) => void
   onGerenciarPerfisGestor?: (appId: string) => void
