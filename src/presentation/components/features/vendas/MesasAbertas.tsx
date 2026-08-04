@@ -612,7 +612,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
               Todas as Mesas Abertas
             </p>
             <div className="flex items-center justify-end gap-2">
-          <label className="font-nunito flex items-center gap-2 text-xs text-primary-text md:text-sm">
+          <label className="flex items-center gap-2 text-xs text-primary-text md:text-sm">
             <input
               type="checkbox"
               checked={apenasSemMovimentacao}
@@ -642,10 +642,10 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
               />
             </div>
             <div className="flex flex-1 flex-col items-center justify-between md:items-end">
-              <span className="font-nunito text-center text-[10px] text-secondary-text md:text-end md:text-xs">
+              <span className="text-center text-[10px] text-secondary-text md:text-end md:text-xs">
                 Mesas Abertas
               </span>
-              <span className="font-exo text-lg text-primary md:text-[22px]">
+              <span className="text-lg text-primary md:text-[22px]">
                 {metricas?.countVendasEfetivadas || 0}
               </span>
             </div>
@@ -659,10 +659,10 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
               </span>
             </div>
             <div className="flex flex-1 flex-col items-center justify-between md:items-end">
-              <span className="font-nunito text-center text-[10px] text-secondary-text md:text-xs">
+              <span className="text-center text-[10px] text-secondary-text md:text-xs">
                 Total de Produtos vendidos
               </span>
-              <span className="font-exo text-lg text-primary md:text-[22px]">
+              <span className="text-lg text-primary md:text-[22px]">
                 {metricas?.countProdutosVendidos || 0}
               </span>
             </div>
@@ -676,10 +676,10 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
               </span>
             </div>
             <div className="flex flex-1 flex-col items-center justify-between md:items-end">
-              <span className="font-nunito text-center text-[10px] text-secondary-text md:text-xs">
+              <span className="text-center text-[10px] text-secondary-text md:text-xs">
                 Total à faturar
               </span>
-              <span className="font-exo text-lg text-primary md:text-[22px]">
+              <span className="text-lg text-primary md:text-[22px]">
                 {metricas?.totalFaturado ? formatCurrency(metricas.totalFaturado) : 'R$ 0,00'}
               </span>
             </div>
@@ -818,22 +818,22 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
                       title={movimentoTooltip}
                     />
                     {clienteNome ? (
-                      <span className="font-nunito text-xs font-semibold text-primary-text">
+                      <span className="text-xs font-semibold text-primary-text">
                         {clienteNome}
                       </span>
                     ) : (
-                      <span className="font-nunito text-xs text-info">-</span>
+                      <span className="text-xs text-info">-</span>
                     )}
                   </div>
 
                   <div className="mb-4 flex w-full flex-col items-start px-2">
                     <div className="flex flex-col items-start md:flex-row md:items-center">
-                      <span className="font-nunito text-xs font-semibold text-primary-text">
+                      <span className="text-xs font-semibold text-primary-text">
                         Usuário
                       </span>{' '}
                       <span className="text-xs font-normal">: {usuarioNome}</span>
                     </div>
-                    <div className="font-nunito mt-1 flex w-full justify-between text-xs text-primary-text">
+                    <div className="mt-1 flex w-full justify-between text-xs text-primary-text">
                       <div className="flex flex-col items-start">
                         <span className="font-semibold">Valor atual</span>
                         <span>{formatCurrency(venda.valorFinal)}</span>

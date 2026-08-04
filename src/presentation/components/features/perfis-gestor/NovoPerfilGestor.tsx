@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import {
   useState,
@@ -18,6 +18,7 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { showToast } from '@/src/shared/utils/toast'
 import { MdPerson } from 'react-icons/md'
+import { HUB_ROUTES } from '@/src/shared/constants/hubRoutes'
 
 interface NovoPerfilGestorProps {
   perfilId?: string
@@ -268,7 +269,7 @@ export const NovoPerfilGestor = forwardRef<NovoPerfilGestorHandle, NovoPerfilGes
             ? 'Perfil gestor atualizado com sucesso!'
             : 'Perfil gestor criado com sucesso!'
         )
-        router.push('/meus-apps/perfis-gestor')
+        router.push(HUB_ROUTES.perfisGestor)
       }
     } catch (error) {
       showToast.error(
@@ -284,7 +285,7 @@ export const NovoPerfilGestor = forwardRef<NovoPerfilGestorHandle, NovoPerfilGes
     if (isEmbedded) {
       onCancel?.()
     } else {
-      router.push('/meus-apps/perfis-gestor')
+      router.push(HUB_ROUTES.perfisGestor)
     }
   }
 
@@ -326,7 +327,7 @@ export const NovoPerfilGestor = forwardRef<NovoPerfilGestorHandle, NovoPerfilGes
                   <MdPerson />
                 </span>
               </div>
-              <h1 className="font-exo text-sm font-semibold text-primary md:text-lg">
+              <h1 className="text-sm font-semibold text-primary md:text-lg">
                 {isEditing ? 'Editar Perfil Gestor' : 'Novo Perfil Gestor'}
               </h1>
             </div>

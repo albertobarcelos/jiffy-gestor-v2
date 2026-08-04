@@ -444,7 +444,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
         <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[20px] shadow-md md:px-[30px] px-2 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <h1 className="text-primary md:text-lg text-sm font-semibold font-exo">
+              <h1 className="text-primary md:text-lg text-sm font-semibold ">
                 {isEditing
                   ? `Editar Complemento: ${nome || ''}`
                   : `Novo Complemento: ${nome || ''}`}
@@ -471,7 +471,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
           {/* Dados */}
           <div className="bg-info rounded-[10px] p-2">
             <div className="flex items-center gap-5 mb-2">
-              <h2 className="text-primary text-xl font-semibold font-exo">
+              <h2 className="text-primary text-xl font-semibold ">
                 Dados do Complemento
               </h2>
               <div className="flex-1 h-px bg-primary/70"></div>

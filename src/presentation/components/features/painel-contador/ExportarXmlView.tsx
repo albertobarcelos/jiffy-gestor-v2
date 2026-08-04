@@ -162,10 +162,10 @@ function ExportacaoProgressoBar({
   return (
     <div className="mt-4 rounded-md border border-alternate/20 bg-alternate/5 p-4">
       <div className="mb-2 flex items-center justify-between gap-3">
-        <p className="font-exo text-sm text-alternate">
+        <p className="text-sm text-alternate">
           {textoFaseExportacao(status, fase, pct)}
         </p>
-        <span className="font-exo text-sm font-semibold text-secondary">{pct}%</span>
+        <span className="text-sm font-semibold text-secondary">{pct}%</span>
       </div>
       <div
         className="h-2.5 w-full overflow-hidden rounded-full bg-alternate/20"
@@ -180,7 +180,7 @@ function ExportacaoProgressoBar({
         />
       </div>
       {typeof totalEncontrados === 'number' && (
-        <p className="mt-2 font-exo text-xs text-alternate/80">
+        <p className="mt-2 text-xs text-alternate/80">
           {totalEncontrados} arquivo(s) encontrado(s)
         </p>
       )}
@@ -204,7 +204,7 @@ function HistoricoExportacaoSection({
     <section className="rounded-lg border border-alternate/30 bg-white p-4 sm:p-5 h-fit">
       <div className="mb-4 flex items-center gap-2">
         <MdHistory className="h-5 w-5 text-secondary" aria-hidden />
-        <h3 className="font-manrope text-lg font-semibold text-secondary">Histórico</h3>
+        <h3 className="text-lg font-semibold text-secondary">Histórico</h3>
         {isFetching && !isLoading && (
           <JiffyLoading className="!gap-0 !py-0 ml-auto" size={18} />
         )}
@@ -215,25 +215,25 @@ function HistoricoExportacaoSection({
           <JiffyLoading size={28} />
         </div>
       ) : itens.length === 0 ? (
-        <p className="font-exo text-sm text-alternate">Nenhuma exportação registrada ainda.</p>
+        <p className="text-sm text-alternate">Nenhuma exportação registrada ainda.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b border-alternate/20">
-                <th className="pb-2 pr-3 text-left font-exo text-[11px] font-semibold uppercase tracking-wide text-alternate">
+                <th className="pb-2 pr-3 text-left text-[11px] font-semibold uppercase tracking-wide text-alternate">
                   Período
                 </th>
-                <th className="pb-2 px-2 text-center font-exo text-[11px] font-semibold uppercase tracking-wide text-alternate">
+                <th className="pb-2 px-2 text-center text-[11px] font-semibold uppercase tracking-wide text-alternate">
                   Status
                 </th>
-                <th className="pb-2 px-2 text-center font-exo text-[11px] font-semibold uppercase tracking-wide text-alternate">
+                <th className="pb-2 px-2 text-center text-[11px] font-semibold uppercase tracking-wide text-alternate">
                   Origem
                 </th>
-                <th className="pb-2 px-2 text-center font-exo text-[11px] font-semibold uppercase tracking-wide text-alternate">
+                <th className="pb-2 px-2 text-center text-[11px] font-semibold uppercase tracking-wide text-alternate">
                   Tipos
                 </th>
-                <th className="pb-2 pl-2 text-center font-exo text-[11px] font-semibold uppercase tracking-wide text-alternate">
+                <th className="pb-2 pl-2 text-center text-[11px] font-semibold uppercase tracking-wide text-alternate">
                   Ação
                 </th>
               </tr>
@@ -245,19 +245,19 @@ function HistoricoExportacaoSection({
                 return (
                   <tr key={item.exportacaoId} className="border-b border-alternate/10">
                     <td className="py-3 pr-2 align-middle text-left">
-                      <p className="font-exo text-sm font-semibold text-secondary">{item.periodo}</p>
-                      <p className="mt-0.5 font-exo text-[11px] leading-tight text-alternate">
+                      <p className="text-sm font-semibold text-secondary">{item.periodo}</p>
+                      <p className="mt-0.5 text-[11px] leading-tight text-alternate">
                         {formatarDataHora(item.criadoEm)}
                       </p>
                     </td>
                     <td className="py-3 px-1 align-middle text-center">
                       <span
-                        className={`inline-flex rounded px-2 py-0.5 font-exo text-[11px] font-medium ${statusClass(item.status)}`}
+                        className={`inline-flex rounded px-2 py-0.5 text-[11px] font-medium ${statusClass(item.status)}`}
                       >
                         {labelStatus(item.status)}
                       </span>
                     </td>
-                    <td className="py-3 px-1 align-middle text-center font-exo text-xs text-alternate">
+                    <td className="py-3 px-1 align-middle text-center text-xs text-alternate">
                       {item.tipoDisparo === 'AGENDADO' ? 'Agendado' : 'Manual'}
                     </td>
                     <td className="py-3 px-2 align-middle">
@@ -266,14 +266,14 @@ function HistoricoExportacaoSection({
                           {TIPOS_XML.filter((tipo) => tipos.includes(tipo.id)).map((tipo) => (
                             <span
                               key={tipo.id}
-                              className="inline-flex rounded-full border border-secondary/20 bg-secondary/5 px-2.5 py-0.5 font-exo text-[11px] font-medium text-secondary"
+                              className="inline-flex rounded-full border border-secondary/20 bg-secondary/5 px-2.5 py-0.5 text-[11px] font-medium text-secondary"
                             >
                               {tipo.label}
                             </span>
                           ))}
                         </div>
                       ) : (
-                        <p className="text-center font-exo text-xs text-alternate/60">—</p>
+                        <p className="text-center text-xs text-alternate/60">—</p>
                       )}
                     </td>
                     <td className="py-3 pl-2 align-middle text-center">
@@ -289,7 +289,7 @@ function HistoricoExportacaoSection({
                           Baixar
                         </Button>
                       ) : (
-                        <span className="font-exo text-xs text-alternate/60">—</span>
+                        <span className="text-xs text-alternate/60">—</span>
                       )}
                     </td>
                   </tr>
@@ -310,7 +310,7 @@ function HistoricoExportacaoSection({
           >
             Anterior
           </Button>
-          <span className="font-exo text-xs text-alternate">
+          <span className="text-xs text-alternate">
             {page + 1} / {totalPages}
           </span>
           <Button
@@ -489,14 +489,14 @@ function AgendamentoExportacaoSection({
     <section className="rounded-lg border border-alternate/30 bg-white p-4 sm:p-5 h-fit">
       <div className="mb-2 flex items-center gap-2">
         <MdSchedule className="h-5 w-5 text-secondary" aria-hidden />
-        <h3 className="font-manrope text-lg font-semibold text-secondary">
+        <h3 className="text-lg font-semibold text-secondary">
           Exportação mensal por e-mail
         </h3>
       </div>
-      <p className="font-exo text-sm text-alternate">
+      <p className="text-sm text-alternate">
         Configure e-mails para receber automaticamente o ZIP do mês anterior.
       </p>
-      <p className="mb-4 mt-1 font-exo text-xs text-primary font-medium">
+      <p className="mb-4 mt-1 text-xs text-primary font-medium">
         O envio é feito automaticamente todo dia 01 de cada mês.
       </p>
 
@@ -518,21 +518,21 @@ function AgendamentoExportacaoSection({
               disabled={isSalvando}
               autoComplete="off"
             />
-            <p className="font-exo text-xs text-alternate/70">
+            <p className="text-xs text-alternate/70">
               Digite o e-mail e pressione vírgula (ou Enter) para adicionar. Depois clique em salvar.
             </p>
           </div>
 
           {emailsVinculados.length > 0 && (
             <div className="mt-3">
-              <p className="mb-2 font-exo text-xs font-medium text-alternate">
+              <p className="mb-2 text-xs font-medium text-alternate">
                 E-mails vinculados
               </p>
               <div className="flex flex-wrap gap-2">
                 {emailsVinculados.map((email) => (
                   <span
                     key={email}
-                    className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-secondary/20 bg-secondary/5 px-3 py-1.5 font-exo text-xs text-secondary"
+                    className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-secondary/20 bg-secondary/5 px-3 py-1.5 text-xs text-secondary"
                   >
                     <span className="truncate">{email}</span>
                     <button
@@ -556,7 +556,7 @@ function AgendamentoExportacaoSection({
               {TIPOS_XML.map((item) => (
                 <label
                   key={item.id}
-                  className="flex items-center gap-2 font-exo text-sm text-alternate"
+                  className="flex items-center gap-2 text-sm text-alternate"
                 >
                   <input
                     type="checkbox"
@@ -659,8 +659,8 @@ export function ExportarXmlView() {
           <MdFileDownload className="h-6 w-6" aria-hidden />
         </div>
         <div>
-          <h2 className="font-manrope text-2xl font-semibold text-secondary">Exportar XMLs</h2>
-          <p className="font-exo text-sm text-alternate">
+          <h2 className="text-2xl font-semibold text-secondary">Exportar XMLs</h2>
+          <p className="text-sm text-alternate">
             Exporte XMLs autorizados, cancelados e inutilizados. Gere o arquivo na hora ou configure o envio automático mensal.
           </p>
         </div>
@@ -670,7 +670,7 @@ export function ExportarXmlView() {
         {/* Coluna da Esquerda: Ações */}
         <div className="flex flex-col gap-6 xl:col-span-5">
           <div className="rounded-lg border border-alternate/30 bg-white p-4 sm:p-5">
-            <h3 className="mb-4 font-manrope text-lg font-semibold text-secondary">Exportação Manual</h3>
+            <h3 className="mb-4 text-lg font-semibold text-secondary">Exportação Manual</h3>
             <div className="mb-4 flex flex-wrap gap-2">
           <Button
             type="button"
@@ -695,7 +695,7 @@ export function ExportarXmlView() {
             <div className="grid gap-2">
               <Label htmlFor="ano-exportacao">Ano</Label>
               <Select value={ano} onValueChange={setAno} disabled={isExportando}>
-                <SelectTrigger id="ano-exportacao" className="font-exo">
+                <SelectTrigger id="ano-exportacao" className="">
                   <SelectValue placeholder="Selecione o ano" />
                 </SelectTrigger>
                 <SelectContent>
@@ -710,7 +710,7 @@ export function ExportarXmlView() {
             <div className="grid gap-2">
               <Label htmlFor="mes-exportacao">Mês</Label>
               <Select value={mesNum} onValueChange={setMesNum} disabled={isExportando}>
-                <SelectTrigger id="mes-exportacao" className="font-exo">
+                <SelectTrigger id="mes-exportacao" className="">
                   <SelectValue placeholder="Selecione o mês" />
                 </SelectTrigger>
                 <SelectContent>
@@ -759,7 +759,7 @@ export function ExportarXmlView() {
           <Label>Tipos de XML</Label>
           <div className="flex flex-wrap gap-3">
             {TIPOS_XML.map((item) => (
-              <label key={item.id} className="flex items-center gap-2 font-exo text-sm text-alternate">
+              <label key={item.id} className="flex items-center gap-2 text-sm text-alternate">
                 <input
                   type="checkbox"
                   checked={tipos.includes(item.id)}
@@ -773,7 +773,7 @@ export function ExportarXmlView() {
           </div>
         </div>
 
-        <p className="mt-4 font-exo text-xs text-alternate/80">
+        <p className="mt-4 text-xs text-alternate/80">
           Fuso horário da empresa: {timezone}
         </p>
 

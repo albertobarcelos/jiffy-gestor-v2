@@ -88,14 +88,14 @@ export function DocumentoFiscalPdfRetryModal() {
             >
               <Typography
                 variant="body2"
-                sx={{ fontFamily: 'Nunito, sans-serif', color: 'text.primary', lineHeight: 1.6 }}
+                sx={{ fontFamily: 'var(--font-general-sans), system-ui, sans-serif', color: 'text.primary', lineHeight: 1.6 }}
               >
                 {errorMessage}
               </Typography>
             </Paper>
             <Typography
               variant="caption"
-              sx={{ display: 'block', mt: 2, color: 'text.secondary', fontFamily: 'Nunito, sans-serif' }}
+              sx={{ display: 'block', mt: 2, color: 'text.secondary', fontFamily: 'var(--font-general-sans), system-ui, sans-serif' }}
             >
               Escolha como deseja prosseguir:
             </Typography>
@@ -120,10 +120,10 @@ export function DocumentoFiscalPdfRetryModal() {
                     <MdAutorenew size={22} />
                   </Box>
                   <Box>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600, fontFamily: 'Exo, sans-serif' }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, fontFamily: 'var(--font-general-sans), system-ui, sans-serif' }}>
                       Regenerar {documentoLabel} agora
                     </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontFamily: 'Nunito, sans-serif' }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontFamily: 'var(--font-general-sans), system-ui, sans-serif' }}>
                       Solicita uma nova geração do PDF ao backend e, em seguida, tenta abrir automaticamente.
                     </Typography>
                   </Box>
@@ -149,10 +149,10 @@ export function DocumentoFiscalPdfRetryModal() {
                     <MdHourglassEmpty size={22} />
                   </Box>
                   <Box>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600, fontFamily: 'Exo, sans-serif' }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, fontFamily: 'var(--font-general-sans), system-ui, sans-serif' }}>
                       Aguardar e tentar de novo
                     </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontFamily: 'Nunito, sans-serif' }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontFamily: 'var(--font-general-sans), system-ui, sans-serif' }}>
                       O sistema consulta o servidor algumas vezes (a cada poucos segundos) até o PDF ficar pronto.
                     </Typography>
                   </Box>

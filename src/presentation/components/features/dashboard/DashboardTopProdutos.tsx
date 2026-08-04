@@ -1,6 +1,6 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { FaMedal, FaTrophy } from 'react-icons/fa'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { formatarMoeda } from './dashboardTextHelpers'
@@ -9,30 +9,9 @@ import { assumirDateComoNoFusoEmpresaParaUtc, calcularPeriodoNoFusoEmpresa } fro
 
 const LIMITE_LINHAS_TOP_PRODUTOS = 10
 
-/** Valores do `<select>` de período em Top produtos / Top garçons (espelham o filtro global quando sincronizados). */
-export type FiltroPeriodoTopTabelasV2 = 'hoje' | 'ontem' | 'semana' | '30dias' | 'mes' | 'personalizado'
-
-/** Filtro global do topo → valor inicial/alinhado dos selects das tabelas inferiores. */
-export function periodoTopoV2ParaFiltroTabelas(periodoData: string): FiltroPeriodoTopTabelasV2 {
+/** Filtro global do dashboard → rótulo de `calcularPeriodoNoFusoEmpresa`. */
+export function periodoGlobalParaOpcaoCalculatePeriodo(periodoData: string): string {
   switch (periodoData) {
-    case 'hoje':
-      return 'hoje'
-    case 'ontem':
-      return 'ontem'
-    case 'semana':
-      return 'semana'
-    case '30dias':
-      return '30dias'
-    case 'personalizado':
-      return 'personalizado'
-    default:
-      return 'hoje'
-  }
-}
-
-/** Select local do card Top produtos (V2) → rótulo de `calculatePeriodo` (datas na API). */
-function filtroTopProdutoV2ParaOpcaoCalculatePeriodo(filtro: string): string {
-  switch (filtro) {
     case 'hoje':
       return 'Hoje'
     case 'ontem':
@@ -47,6 +26,21 @@ function filtroTopProdutoV2ParaOpcaoCalculatePeriodo(filtro: string): string {
       return 'Hoje'
     default:
       return 'Hoje'
+  }
+}
+
+/** Filtro global → parâmetro `periodo` das APIs top-produtos / top-garçons. */
+export function periodoGlobalParaApiTopTabelas(periodoData: string): string {
+  switch (periodoData) {
+    case 'hoje':
+    case 'ontem':
+    case 'semana':
+    case '30dias':
+    case 'mes':
+    case 'personalizado':
+      return periodoData
+    default:
+      return 'hoje'
   }
 }
 
@@ -77,26 +71,6 @@ function IconeColocacaoTopProduto({ rank }: { rank: number }) {
   return <span className="tabular-nums text-secondary-text">{rank}</span>
 }
 
-/** Mapeia filtro local do card Top produtos → parâmetro `periodo` da API `/dashboard/top-produtos`. */
-function filtroTopProdutoV2ParaApiPeriodo(filtro: string): string {
-  switch (filtro) {
-    case 'hoje':
-      return 'hoje'
-    case 'ontem':
-      return 'ontem'
-    case 'semana':
-      return 'semana'
-    case '30dias':
-      return '30dias'
-    case 'mes':
-      return 'mes'
-    case 'personalizado':
-      return 'personalizado'
-    default:
-      return 'hoje'
-  }
-}
-
 interface DashboardTopProdutosProps {
   periodoData: string
   periodoPersonalizadoInicio: Date | null
@@ -118,21 +92,16 @@ export function DashboardTopProdutos({
   dadosAtualizadosEm,
 }: DashboardTopProdutosProps) {
   const [modoTopProduto, setModoTopProduto] = useState<'quantidade' | 'valor'>('quantidade')
-  const [filtroTopProduto, setFiltroTopProduto] = useState<FiltroPeriodoTopTabelasV2>('hoje')
 
-  useEffect(() => {
-    setFiltroTopProduto(periodoTopoV2ParaFiltroTabelas(periodoData))
-  }, [periodoData, periodoPersonalizadoInicio, periodoPersonalizadoFim])
-
-  const opcaoPeriodoTopProduto = useMemo(
-    () => filtroTopProdutoV2ParaOpcaoCalculatePeriodo(filtroTopProduto),
-    [filtroTopProduto]
+  const opcaoPeriodo = useMemo(
+    () => periodoGlobalParaOpcaoCalculatePeriodo(periodoData),
+    [periodoData]
   )
 
   const { inicio: inicioTopProduto, fim: fimTopProduto } = useMemo(() => {
     const tzEmpresa = timezoneAgregacao?.trim() || 'America/Sao_Paulo'
     if (
-      filtroTopProduto === 'personalizado' &&
+      periodoData === 'personalizado' &&
       periodoPersonalizadoInicio &&
       periodoPersonalizadoFim
     ) {
@@ -141,27 +110,24 @@ export function DashboardTopProdutos({
         fim: assumirDateComoNoFusoEmpresaParaUtc(periodoPersonalizadoFim, tzEmpresa),
       }
     }
-    return calcularPeriodoNoFusoEmpresa(opcaoPeriodoTopProduto, tzEmpresa)
+    return calcularPeriodoNoFusoEmpresa(opcaoPeriodo, tzEmpresa)
   }, [
-    filtroTopProduto,
-    opcaoPeriodoTopProduto,
+    periodoData,
+    opcaoPeriodo,
     periodoPersonalizadoInicio,
     periodoPersonalizadoFim,
     dadosAtualizadosEm,
     timezoneAgregacao,
   ])
 
-  const periodoApiTopProduto = useMemo(
-    () => filtroTopProdutoV2ParaApiPeriodo(filtroTopProduto),
-    [filtroTopProduto]
-  )
+  const periodoApi = useMemo(() => periodoGlobalParaApiTopTabelas(periodoData), [periodoData])
 
   const {
     data: payloadTopProdutos,
     isLoading: carregandoTopProdutos,
     isError: erroTopProdutos,
   } = useDashboardTopProdutosQuery({
-    periodo: periodoApiTopProduto,
+    periodo: periodoApi,
     periodoInicial: inicioTopProduto,
     periodoFinal: fimTopProduto,
     timezone: timezoneAgregacao,
@@ -229,53 +195,33 @@ export function DashboardTopProdutos({
 
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-5">
-      <div className="mb-4 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between xl:gap-3">
-        <h2 className="shrink-0 font-exo text-lg font-semibold text-primary-text md:text-xl">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+        <h2 className="shrink-0 text-lg font-semibold text-primary-text md:text-xl">
           Top Produtos
         </h2>
-        <div className="flex flex-1 flex-wrap items-center justify-center gap-2 xl:justify-center">
-          <div className="inline-flex rounded-lg bg-violet-100/90 p-0.5">
-            <button
-              type="button"
-              onClick={() => setModoTopProduto('quantidade')}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition md:px-4 md:text-sm ${
-                modoTopProduto === 'quantidade'
-                  ? 'bg-secondary text-white shadow-sm'
-                  : 'text-primary-text hover:bg-white/60'
-              }`}
-            >
-              Quantidade
-            </button>
-            <button
-              type="button"
-              onClick={() => setModoTopProduto('valor')}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition md:px-4 md:text-sm ${
-                modoTopProduto === 'valor'
-                  ? 'bg-secondary text-white shadow-sm'
-                  : 'text-primary-text hover:bg-white/60'
-              }`}
-            >
-              Valor Total
-            </button>
-          </div>
-        </div>
-        <div className="relative min-w-[120px] shrink-0 self-end xl:self-auto">
-          <select
-            value={filtroTopProduto}
-            onChange={e => setFiltroTopProduto(e.target.value as FiltroPeriodoTopTabelasV2)}
-            className="w-full appearance-none rounded-lg border border-gray-200 bg-gray-50 py-2 pl-3 pr-9 text-sm font-medium text-primary-text focus:border-secondary"
-            aria-label="Período do ranking de produtos"
+        <div className="inline-flex self-start rounded-lg bg-violet-100/90 p-0.5 sm:self-auto">
+          <button
+            type="button"
+            onClick={() => setModoTopProduto('quantidade')}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium transition md:px-4 md:text-sm ${
+              modoTopProduto === 'quantidade'
+                ? 'bg-secondary text-white shadow-sm'
+                : 'text-primary-text hover:bg-white/60'
+            }`}
           >
-            <option value="hoje">Hoje</option>
-            <option value="ontem">Ontem</option>
-            <option value="semana">Últimos 7 dias</option>
-            <option value="30dias">Últimos 30 dias</option>
-            <option value="mes">Mês</option>
-            <option value="personalizado" disabled={periodoData !== 'personalizado'}>
-              Por datas (filtro global)
-            </option>
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary-text" />
+            Quantidade
+          </button>
+          <button
+            type="button"
+            onClick={() => setModoTopProduto('valor')}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium transition md:px-4 md:text-sm ${
+              modoTopProduto === 'valor'
+                ? 'bg-secondary text-white shadow-sm'
+                : 'text-primary-text hover:bg-white/60'
+            }`}
+          >
+            Valor Total
+          </button>
         </div>
       </div>
 

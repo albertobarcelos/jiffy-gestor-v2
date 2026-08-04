@@ -101,7 +101,7 @@ export function PedidoDetalhesView() {
                     statusFiscal={resumoFiscal?.status ?? statusFiscalUnificado}
                   >
                     <div className="flex flex-col gap-3 rounded-lg border-2 border-primary/20 bg-gray-50/90 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                      <h3 className="font-nunito text-lg font-semibold text-primary">
+                      <h3 className="text-lg font-semibold text-primary">
                         Resumo da Nota Fiscal modelo: {rotuloModeloNfe(resumoFiscal?.modelo)}
                       </h3>
                       {resumoFiscal?.documentoFiscalId &&
@@ -127,7 +127,7 @@ export function PedidoDetalhesView() {
 
                     {!resumoFiscal ? (
                       <div className="rounded-lg border border-dashed border-amber-300/80 bg-amber-50/90 px-6 py-10 text-center">
-                        <p className="font-nunito text-sm leading-relaxed text-amber-950/90">
+                        <p className="text-sm leading-relaxed text-amber-950/90">
                           Nenhum resumo fiscal disponível para esta venda. Isso pode ocorrer se
                           ainda não houver nota emitida ou se o backend não retornou o objeto{' '}
                           <span className="font-semibold">resumoFiscal</span>.
@@ -195,8 +195,8 @@ export function PedidoDetalhesView() {
                                 {row.label}
                               </span>
                               <span
-                                className={`font-nunito break-words text-right text-sm text-gray-900 sm:max-w-[min(100%,28rem)] sm:text-left ${
-                                  'monospace' in row && row.monospace ? 'font-mono text-sm' : ''
+                                className={`break-words text-right text-sm text-gray-900 sm:max-w-[min(100%,28rem)] sm:text-left ${
+                                  'monospace' in row && row.monospace ? 'text-sm' : ''
                                 } ${
                                   'multiline' in row && row.multiline ? 'whitespace-pre-wrap' : ''
                                 }`}

@@ -111,7 +111,7 @@ function ProdutosGroupHeaderInner({
         <button
           type="button"
           onClick={() => onAddProduto(grupo, grupoId)}
-          className="h-8 md:px-[20px] px-2 bg-info border border-primary/50 text-primary rounded-lg font-semibold font-exo md:text-sm text-xs flex items-center md:gap-2 hover:bg-primary/10 transition-colors"
+          className="h-8 md:px-[20px] px-2 bg-info border border-primary/50 text-primary rounded-lg font-semibold md:text-sm text-xs flex items-center md:gap-2 hover:bg-primary/10 transition-colors"
         >
           Adicionar produto
           <span className="text-sm">+</span>

@@ -373,7 +373,7 @@ export function RelatoriosProdutosVendidosMvpPage() {
             <JiffyLoading />
           </div>
         ) : isError ? (
-          <div className="font-nunito m-4 rounded-lg border-2 border-red-200 bg-red-50 px-4 py-6 text-center text-sm text-red-700">
+          <div className="m-4 rounded-lg border-2 border-red-200 bg-red-50 px-4 py-6 text-center text-sm text-red-700">
             {error instanceof Error ? error.message : 'Erro ao carregar relatório.'}
           </div>
         ) : (

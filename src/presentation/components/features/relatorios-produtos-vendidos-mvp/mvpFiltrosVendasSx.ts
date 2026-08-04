@@ -29,7 +29,7 @@ export const sxRelatorioFiltroSelectBase = {
     color: 'var(--color-secondary-text)',
     fontWeight: 300,
     fontSize: '0.975rem',
-    fontFamily: '"Nunito", sans-serif',
+    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
   },
   '& .MuiInputLabel-root.Mui-focused': {
     color: 'var(--color-secondary-text)',
@@ -48,7 +48,7 @@ export const sxRelatorioFiltroSelectPeriodo = {
     backgroundColor: 'var(--color-primary)',
     color: 'white',
     fontSize: '13px',
-    fontFamily: '"Nunito", sans-serif',
+    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
     '& .MuiOutlinedInput-notchedOutline': {
       borderColor: 'var(--color-primary)',
     },
@@ -65,7 +65,7 @@ export const sxRelatorioFiltroTextFieldMoeda = {
   '& .MuiOutlinedInput-root': {
     ...sxVendasFiltroOutlinedInputRoot,
     backgroundColor: 'var(--color-info)',
-    fontFamily: '"Nunito", sans-serif',
+    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
     height: 30,
     minHeight: 30,
     paddingLeft: 2,
@@ -77,7 +77,7 @@ export const sxRelatorioFiltroTextFieldMoeda = {
     color: 'var(--color-secondary-text)',
     fontWeight: 300,
     fontSize: '0.975rem',
-    fontFamily: '"Nunito", sans-serif',
+    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
   },
   '& .MuiInputLabel-root.Mui-focused': {
     color: 'var(--color-secondary-text)',
@@ -110,7 +110,7 @@ export const sxRelatorioFiltroTextFieldNumero = {
   '& .MuiOutlinedInput-root': {
     ...sxVendasFiltroOutlinedInputRoot,
     backgroundColor: 'var(--color-info)',
-    fontFamily: '"Nunito", sans-serif',
+    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
     height: 30,
     minHeight: 30,
   },
@@ -118,7 +118,7 @@ export const sxRelatorioFiltroTextFieldNumero = {
     color: 'var(--color-secondary-text)',
     fontWeight: 300,
     fontSize: '0.875rem',
-    fontFamily: '"Nunito", sans-serif',
+    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
   },
   '& .MuiInputBase-input': {
     fontSize: '0.875rem',

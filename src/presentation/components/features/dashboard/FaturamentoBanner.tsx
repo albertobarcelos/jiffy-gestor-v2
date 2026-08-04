@@ -1,7 +1,6 @@
 import Image from 'next/image'
 import { ChevronRight } from 'lucide-react'
 import { MdOutlineMonetizationOn } from 'react-icons/md'
-import { exo2CabecalhoFaturamento } from '@/src/presentation/fonts/exo2CabecalhoFaturamento'
 import {
   tituloFaturamentoBanner,
   formatarMoeda,
@@ -12,6 +11,8 @@ import {
 interface FaturamentoBannerProps {
   periodoData: string
   carregandoResumo: boolean
+  /** Troca de período em andamento (isFetching) — dados anteriores ainda visíveis */
+  atualizandoResumo: boolean
   erroResumo: boolean
   totalFaturadoPeriodo: number
   comparacaoPeriodoAnterior: {
@@ -25,6 +26,7 @@ interface FaturamentoBannerProps {
 export function FaturamentoBanner({
   periodoData,
   carregandoResumo,
+  atualizandoResumo,
   erroResumo,
   totalFaturadoPeriodo,
   comparacaoPeriodoAnterior,
@@ -33,20 +35,20 @@ export function FaturamentoBanner({
   const copyComparacao = textosComparacaoPeriodoAnterior(periodoData)
 
   return (
-    <div className="relative z-0 mx-2 mb-2 overflow-visible md:mx-4">
+    <div className="relative z-0 mx-2 mb-2 overflow-visible pt-1.5 md:mx-4">
       <div className="relative overflow-visible rounded-2xl bg-secondary bg-gradient-to-br px-3 py-2 pr-24 sm:pr-28 md:px-5 md:py-4 md:pr-32 lg:pr-[min(300px,32vw)]">
         {/* Duas colunas — definem a altura da faixa */}
         <div className="relative z-10 grid grid-cols-1 items-center gap-6 lg:grid-cols-3 lg:gap-8">
           <div>
             <div className="mb-2 flex items-center gap-1 text-white/90">
               <MdOutlineMonetizationOn className="h-8 w-8 text-[#F59E0B]" size={30} />
-              <span className={`${exo2CabecalhoFaturamento.className} text-lg`}>
+              <span className="text-lg font-semibold">
                 {tituloFaturamentoBanner(periodoData)}
               </span>
             </div>
             <p
-              className={`font-exo text-2xl font-semibold text-white md:text-[40px] ${
-                carregandoResumo ? 'animate-pulse opacity-80' : ''
+              className={`text-2xl font-semibold text-white md:text-[40px] ${
+                carregandoResumo ? 'animate-pulse opacity-80' : atualizandoResumo ? 'animate-pulse opacity-50' : ''
               }`}
             >
               {erroResumo
@@ -55,7 +57,11 @@ export function FaturamentoBanner({
                   ? '…'
                   : formatarMoeda(totalFaturadoPeriodo)}
             </p>
-            <div className="font-regular mt-3 inline-flex flex-wrap items-center gap-1 py-1 text-base text-white/90">
+            <div
+              className={`font-regular mt-3 inline-flex flex-wrap items-center gap-1 py-1 text-base text-white/90 transition-opacity duration-300 ${
+                atualizandoResumo && !carregandoResumo ? 'opacity-50' : ''
+              }`}
+            >
               {comparacaoPeriodoAnterior.status === 'carregando' ? (
                 <span className="text-sm opacity-80">Carregando comparação…</span>
               ) : comparacaoPeriodoAnterior.status === 'erro' ? (
@@ -88,7 +94,11 @@ export function FaturamentoBanner({
               )}
             </div>
           </div>
-          <div className="col-span-2 flex flex-col items-start gap-4 text-white/90 lg:items-center lg:text-center">
+          <div
+            className={`col-span-2 flex flex-col items-start gap-4 text-white/90 transition-opacity duration-300 lg:items-center lg:text-center ${
+              atualizandoResumo && !carregandoResumo ? 'opacity-50' : ''
+            }`}
+          >
             {comparacaoPeriodoAnterior.status === 'carregando' ? (
               <span className="text-lg font-semibold tracking-wide opacity-80">…</span>
             ) : comparacaoPeriodoAnterior.status === 'erro' ? (

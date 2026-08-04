@@ -3,7 +3,8 @@
 import * as React from 'react'
 import type { ComponentProps } from 'react'
 import { startOfDay, startOfMonth } from 'date-fns'
-import { Clock } from 'lucide-react'
+import { Calendar as CalendarIcon, CalendarRange, Clock, Loader2 } from 'lucide-react'
+import { Tooltip as MuiTooltip } from '@mui/material'
 import { DateLib, DayButton, type DateLibOptions, type DateRange } from 'react-day-picker'
 import { ptBR } from 'react-day-picker/locale'
 
@@ -14,7 +15,8 @@ import { Calendar } from '@/src/presentation/components/ui/calendar'
 import { primeiroMesQuadroDuploCalendario } from '@/src/shared/utils/calendarioIntervaloFaturamento'
 import {
   combinarIntervaloCalendarParaDatas,
-  formatarDataHoraIntervaloCurta,
+  formatarResumoPeriodoSelecionado,
+  intervaloPersonalizadoEhValido,
 } from '@/src/shared/utils/intervaloCalendarioComHoras'
 import {
   formatIsoDiaCivilEmFusoIANA,
@@ -38,37 +40,45 @@ function formatCaptionMesInicialMaiuscula(
 
 /**
  * Faturamento exibido na célula do calendário (valor alinhado ao banco em pt-BR).
- * - Até 9.999: inteiro formatado (ex.: $ 153, $ 1.234, $ 9.456).
- * - 10.000 … 999.999: compacto em milhares (ex.: $ 10k+, $ 100k+).
- * - 1.000.000 ou mais: milhões com sufixo kk (ex.: $ 1kk+, $ 2kk+).
+ * - Até 9.999: inteiro formatado (ex.: R$ 153, R$ 1.234).
+ * - 10.000 … 999.999: compacto em milhares (ex.: R$ 10k+).
+ * - 1.000.000 ou mais: milhões (ex.: R$ 1mi+).
  */
 export function formatarFaturamentoValorCelulaCalendario(valor: number): string {
   const n = Math.trunc(Number(valor))
-  if (!Number.isFinite(n)) return '$ —'
+  if (!Number.isFinite(n)) return 'R$ —'
   if (n < 0) {
-    return `$ ${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(n)}`
+    return `R$ ${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(n)}`
   }
   if (n <= 9_999) {
-    return `$ ${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(n)}`
+    return `R$ ${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(n)}`
   }
   if (n < 1_000_000) {
-    return `$ ${Math.floor(n / 1000)}k+`
+    return `R$ ${Math.floor(n / 1000)}k+`
   }
-  return `$ ${Math.floor(n / 1_000_000)}kk+`
+  return `R$ ${Math.floor(n / 1_000_000)}mi+`
 }
 
 type DayButtonProps = ComponentProps<typeof DayButton>
+
+export type VisualizacaoCalendarioFaturamento = 'dois_meses' | 'um_mes'
 
 type FaturamentoDayButtonProps = DayButtonProps & {
   resolverValor: (isoDate: string, foraDoMes: boolean) => number | null
   /** Células maiores no painel lateral (modal) — proporcional ao --rdp-day_* ampliado. */
   celulasAmpliadas?: boolean
+  /** Exibe R$ sob o dia (modo um mês). */
+  mostrarFaturamento?: boolean
+  /** Tipografia maior do valor (modo um mês). */
+  faturamentoDestaque?: boolean
+  /** Skeleton sob o dia enquanto o mapa de faturamento carrega. */
+  faturamentoCarregando?: boolean
   /** Fuso da empresa — mesma regra dos buckets em GET /api/dashboard/evolucao. */
   timeZoneEmpresa?: string
 }
 
 /**
- * Botão do dia com número + linha de faturamento.
+ * Botão do dia com número + linha de faturamento (opcional).
  */
 function FaturamentoDayButton({
   day,
@@ -77,6 +87,9 @@ function FaturamentoDayButton({
   children,
   resolverValor,
   celulasAmpliadas = false,
+  mostrarFaturamento = true,
+  faturamentoDestaque = false,
+  faturamentoCarregando = false,
   timeZoneEmpresa,
   ...rest
 }: FaturamentoDayButtonProps) {
@@ -96,7 +109,10 @@ function FaturamentoDayButton({
   const chaveMapa = timeZoneEmpresa?.trim()
     ? formatIsoDiaCivilEmFusoIANA(instanteDiaDoGrid, timeZoneEmpresa.trim())
     : day.isoDate
-  const valor = resolverValor(chaveMapa, foraDoMes)
+  const valor =
+    mostrarFaturamento && !faturamentoCarregando
+      ? resolverValor(chaveMapa, foraDoMes)
+      : null
 
   return (
     <button
@@ -105,18 +121,37 @@ function FaturamentoDayButton({
       className={cn(
         'flex flex-col items-center justify-center leading-none',
         celulasAmpliadas ? 'min-h-0 gap-0.5' : 'min-h-[2.75rem] gap-0.5',
+        faturamentoDestaque && 'gap-1',
         className
       )}
       {...rest}
     >
-      <span className={cn('font-semibold', celulasAmpliadas ? 'text-xs' : 'text-sm')}>
+      <span
+        className={cn(
+          'font-semibold',
+          faturamentoDestaque ? 'text-sm md:text-base' : celulasAmpliadas ? 'text-xs' : 'text-sm'
+        )}
+      >
         {children}
       </span>
+      {mostrarFaturamento && faturamentoCarregando && !foraDoMes ? (
+        <span
+          className={cn(
+            'mt-0.5 block animate-pulse rounded-sm bg-current/20',
+            faturamentoDestaque ? 'h-2.5 w-10' : 'h-2 w-8'
+          )}
+          aria-hidden
+        />
+      ) : null}
       {valor != null && (
         <span
           className={cn(
             'truncate font-medium tabular-nums opacity-85',
-            celulasAmpliadas ? 'max-w-[3rem] text-[0.625rem]' : 'max-w-[3.75rem] text-[0.625rem]'
+            faturamentoDestaque
+              ? 'max-w-[4.5rem] text-[0.7rem] md:text-xs'
+              : celulasAmpliadas
+                ? 'max-w-[3rem] text-[0.625rem]'
+                : 'max-w-[3.75rem] text-[0.625rem]'
           )}
           style={{ color: 'inherit' }}
         >
@@ -157,6 +192,11 @@ export type FaturamentoRangeCalendarProps = {
    * Com `embutidoNoModal`: modal com fundo claro (#f9fafb) — ajusta bordas, texto e grid do DayPicker.
    */
   embutidoFundoClaro?: boolean
+  /**
+   * Notifica o pai ao alternar 1×2 meses (para alinhar o fetch de faturamento).
+   * Só emite no modal; cartão roxo permanece em dois meses.
+   */
+  onVisualizacaoChange?: (visualizacao: VisualizacaoCalendarioFaturamento) => void
 }
 
 /**
@@ -167,8 +207,8 @@ export function FaturamentoRangeCalendar({
   defaultRange,
   range: rangeControlled,
   onRangeChange,
-  defaultHoraInicio = '10:30',
-  defaultHoraFim = '12:30',
+  defaultHoraInicio = '00:00',
+  defaultHoraFim = '23:59',
   horaInicio: horaInicioControlled,
   horaFim: horaFimControlled,
   onHorariosChange,
@@ -179,8 +219,16 @@ export function FaturamentoRangeCalendar({
   onMonthChange,
   embutidoNoModal = false,
   embutidoFundoClaro = false,
+  onVisualizacaoChange,
 }: FaturamentoRangeCalendarProps) {
   const fundoModalClaro = embutidoNoModal && embutidoFundoClaro
+  /** Um mês com R$ (padrão no modal) | dois meses sem R$. */
+  const [visualizacao, setVisualizacao] =
+    React.useState<VisualizacaoCalendarioFaturamento>('um_mes')
+  const modoUmMes = fundoModalClaro && visualizacao === 'um_mes'
+  const numeroMeses = modoUmMes ? 1 : 2
+  /** No modal: R$ só no modo um mês. Fora do modal (cartão): mantém R$ como antes. */
+  const mostrarFaturamentoNasCelulas = fundoModalClaro ? modoUmMes : true
   const [rangeUncontrolled, setRangeUncontrolled] = React.useState<DateRange | undefined>(() => {
     if (defaultRange !== undefined) return defaultRange
     const hoje = startOfDay(new Date())
@@ -202,7 +250,7 @@ export function FaturamentoRangeCalendar({
   const horaInicio = horaInicioControlled ?? horaInicioUncontrolled
   const horaFim = horaFimControlled ?? horaFimUncontrolled
 
-  /** Mesmo texto do item “Por datas” no select do dashboard (prévia antes de aplicar). */
+  /** Prévia do intervalo (sem o prefixo “Por datas” — já está no contexto do modal/select). */
   const textoPeriodoSelecionado = React.useMemo(() => {
     const { dataInicial, dataFinal } = combinarIntervaloCalendarParaDatas(
       range,
@@ -210,8 +258,13 @@ export function FaturamentoRangeCalendar({
       horaFim
     )
     if (!dataInicial || !dataFinal) return null
-    return `Por datas: ${formatarDataHoraIntervaloCurta(dataInicial)} — ${formatarDataHoraIntervaloCurta(dataFinal)}`
+    return formatarResumoPeriodoSelecionado(dataInicial, dataFinal)
   }, [range, horaInicio, horaFim])
+
+  const aguardandoFimDoIntervalo = Boolean(range?.from && !range?.to)
+  const horarioInvalido =
+    Boolean(range?.from && range?.to) &&
+    !intervaloPersonalizadoEhValido(range, horaInicio, horaFim)
 
   const resolverValor = React.useCallback(
     (isoDate: string, foraDoMes: boolean): number | null => {
@@ -229,10 +282,20 @@ export function FaturamentoRangeCalendar({
         {...props}
         resolverValor={resolverValor}
         celulasAmpliadas={fundoModalClaro}
+        mostrarFaturamento={mostrarFaturamentoNasCelulas}
+        faturamentoDestaque={modoUmMes}
+        faturamentoCarregando={faturamentoCarregando}
         timeZoneEmpresa={timeZoneEmpresa}
       />
     ),
-    [resolverValor, fundoModalClaro, timeZoneEmpresa]
+    [
+      resolverValor,
+      fundoModalClaro,
+      mostrarFaturamentoNasCelulas,
+      modoUmMes,
+      faturamentoCarregando,
+      timeZoneEmpresa,
+    ]
   )
 
   const formattersRdp = React.useMemo(
@@ -244,13 +307,15 @@ export function FaturamentoRangeCalendar({
 
   /** Referência para qual mês fica à direita: fim do intervalo ou início (período só retroativo). */
   const dataRefQuadro = range?.to ?? range?.from ?? new Date()
-  const defaultMonthDuplo = primeiroMesQuadroDuploCalendario(dataRefQuadro)
+  const defaultMonthVisivel = modoUmMes
+    ? startOfMonth(dataRefQuadro)
+    : primeiroMesQuadroDuploCalendario(dataRefQuadro)
 
   const isMonthControlled = monthControlled !== undefined
-  const [monthLocal, setMonthLocal] = React.useState(defaultMonthDuplo)
+  const [monthLocal, setMonthLocal] = React.useState(defaultMonthVisivel)
   React.useEffect(() => {
-    if (!isMonthControlled) setMonthLocal(defaultMonthDuplo)
-  }, [defaultMonthDuplo, isMonthControlled])
+    if (!isMonthControlled) setMonthLocal(defaultMonthVisivel)
+  }, [defaultMonthVisivel, isMonthControlled])
 
   const monthPicker = isMonthControlled ? monthControlled : monthLocal
   const handleMonthChange = React.useCallback(
@@ -259,6 +324,19 @@ export function FaturamentoRangeCalendar({
       onMonthChange?.(next)
     },
     [isMonthControlled, onMonthChange]
+  )
+
+  const alternarVisualizacao = React.useCallback(
+    (proxima: VisualizacaoCalendarioFaturamento) => {
+      setVisualizacao(proxima)
+      onVisualizacaoChange?.(proxima)
+      if (proxima === 'um_mes') {
+        handleMonthChange(startOfMonth(dataRefQuadro))
+      } else {
+        handleMonthChange(primeiroMesQuadroDuploCalendario(dataRefQuadro))
+      }
+    },
+    [dataRefQuadro, handleMonthChange, onVisualizacaoChange]
   )
 
   /** Só permite escolher até o dia de hoje (nada no futuro). */
@@ -424,6 +502,23 @@ export function FaturamentoRangeCalendar({
           border: 1px solid rgba(51, 4, 104, 0.4) !important;
           border-radius: var(--rdp-day_button-border-radius) !important;
         }
+
+        /* Um mês + R$ maior: células mais amplas (7 colunas na largura do painel). */
+        .faturamento-rdp-scope.faturamento-rdp-mes-unico .rdp-root {
+          --rdp-day-width: clamp(2.35rem, calc((100cqw - 2 * var(--fat-pad)) / 7), 4.75rem);
+          --rdp-day_button-width: clamp(2.2rem, calc((100cqw - 2 * var(--fat-pad)) / 7 - 0.1rem), 4.5rem);
+          --rdp-day-height: clamp(2.85rem, calc(var(--rdp-day-width) * 1.15), 5.25rem);
+          --rdp-day_button-height: var(--rdp-day-height);
+          --rdp-nav-height: clamp(2.25rem, 9cqw, 3.35rem);
+        }
+        .faturamento-rdp-scope.faturamento-rdp-mes-unico .rdp-months {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .faturamento-rdp-scope.faturamento-rdp-mes-unico .rdp-month {
+          width: 100%;
+          max-width: 100%;
+        }
       `
     : `
         /* Cartão roxo (dashboard): mesmo modelo fluido por container */
@@ -550,6 +645,7 @@ export function FaturamentoRangeCalendar({
         fundoModalClaro
           ? 'faturamento-rdp-modal flex min-h-0 w-full flex-1 flex-col text-gray-900'
           : 'w-full min-w-0 max-w-full text-white',
+        modoUmMes && 'faturamento-rdp-mes-unico',
         embutidoNoModal
           ? 'px-2'
           : 'rounded-xl border border-white/20 bg-secondary bg-gradient-to-br from-secondary to-[#451090] px-4 shadow-lg',
@@ -589,47 +685,61 @@ export function FaturamentoRangeCalendar({
          */
         ${estiloEscopoClaro}
       `}</style>
+
       {/* showOutsideDays=false: não mostra células do mês anterior/seguinte (evita duplicar datas e confundir com o intervalo). */}
       {/* navLayout=around: seta « no 1º mês (esq.) e seta » no último mês (dir.). */}
-      <div className={cn(fundoModalClaro ? 'flex min-h-0 flex-1 flex-col' : '')}>
-        <div className={cn(fundoModalClaro ? 'flex min-h-0 flex-1 flex-col justify-center' : '')}>
-          {/*
-            Não usar timeZone no DayPicker: o mês exibido deixava de bater com o `month` (Date no fuso local).
-            O fuso da empresa entra só na chave yyyy-MM-dd do mapa de faturamento em FaturamentoDayButton.
-          */}
-          <Calendar
-            mode="range"
-            locale={ptBR}
-            numberOfMonths={2}
-            month={monthPicker}
-            onMonthChange={handleMonthChange}
-            endMonth={limiteMesNavegacao}
-            disabled={desabilitarDiasFuturos}
-            selected={range}
-            onSelect={setRange}
-            showOutsideDays={false}
-            navLayout="around"
-            formatters={formattersRdp}
+      <div className={cn(fundoModalClaro ? 'flex shrink-0 flex-col' : '')}>
+        {mostrarFaturamentoNasCelulas && faturamentoCarregando ? (
+          <div
             className={cn(
-              'rounded-lg [&_.rdp-caption_label]:font-medium',
+              'mb-1.5 flex items-center gap-2 rounded-md px-2 py-1.5 text-xs',
               fundoModalClaro
-                ? 'w-full max-w-none border border-gray-200 bg-white px-2 text-primary-text xl:p-3 2xl:p-4 [&_.rdp-caption_label]:text-secondary 2xl:[&_.rdp-caption_label]:text-base 2xl:[&_.rdp-day_button>span:first-child]:text-base 2xl:[&_.rdp-day_button>span:last-child]:text-xs [&_.rdp-dropdown]:text-[#330468] [&_.rdp-nav_button]:text-secondary [&_.rdp-selected]:!text-xs [&_.rdp-weekday]:py-1 [&_.rdp-weekday]:text-gray-500 2xl:[&_.rdp-weekday]:text-xs'
-                : 'w-full min-w-0 max-w-full border border-white/15 bg-white/5 p-2 text-accent1 [--rdp-nav-height:2.75rem] [&_.rdp-caption_label]:text-accent1 [&_.rdp-dropdown]:text-[#330468] [&_.rdp-nav_button]:text-white [&_.rdp-selected]:!text-sm [&_.rdp-weekday]:text-white/80'
+                ? 'bg-primary/5 text-primary-text/75'
+                : 'bg-white/10 text-white/85'
             )}
-            components={{
-              DayButton: dayButtonRenderer,
-            }}
-          />
-        </div>
+            role="status"
+            aria-live="polite"
+          >
+            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" aria-hidden />
+            <span>Carregando faturamento do período…</span>
+          </div>
+        ) : null}
+        {/*
+          Não usar timeZone no DayPicker: o mês exibido deixava de bater com o `month` (Date no fuso local).
+          O fuso da empresa entra só na chave yyyy-MM-dd do mapa de faturamento em FaturamentoDayButton.
+        */}
+        <Calendar
+          mode="range"
+          locale={ptBR}
+          numberOfMonths={numeroMeses}
+          month={monthPicker}
+          onMonthChange={handleMonthChange}
+          endMonth={limiteMesNavegacao}
+          disabled={desabilitarDiasFuturos}
+          selected={range}
+          onSelect={setRange}
+          showOutsideDays={false}
+          navLayout="around"
+          formatters={formattersRdp}
+          className={cn(
+            'rounded-lg [&_.rdp-caption_label]:font-medium',
+            fundoModalClaro
+              ? 'w-full max-w-none border border-gray-200 bg-white px-2 text-primary-text xl:p-3 2xl:p-4 [&_.rdp-caption_label]:text-secondary 2xl:[&_.rdp-caption_label]:text-base 2xl:[&_.rdp-day_button>span:first-child]:text-base 2xl:[&_.rdp-day_button>span:last-child]:text-xs [&_.rdp-dropdown]:text-[#330468] [&_.rdp-nav_button]:text-secondary [&_.rdp-selected]:!text-xs [&_.rdp-weekday]:py-1 [&_.rdp-weekday]:text-gray-500 2xl:[&_.rdp-weekday]:text-xs'
+              : 'w-full min-w-0 max-w-full border border-white/15 bg-white/5 p-2 text-accent1 [--rdp-nav-height:2.75rem] [&_.rdp-caption_label]:text-accent1 [&_.rdp-dropdown]:text-[#330468] [&_.rdp-nav_button]:text-white [&_.rdp-selected]:!text-sm [&_.rdp-weekday]:text-white/80'
+          )}
+          components={{
+            DayButton: dayButtonRenderer,
+          }}
+        />
       </div>
 
       <div
         className={cn(
-          'mt-1 border-t pt-1',
-          fundoModalClaro ? 'shrink-0 border-gray-200' : 'border-white/20'
+          'mt-1.5 shrink-0 border-t pt-1.5',
+          fundoModalClaro ? 'border-gray-200' : 'border-white/20'
         )}
       >
-        <div className="fat-time-grid mx-2 grid grid-cols-1 gap-2 xl:gap-4 2xl:gap-8">
+        <div className="fat-time-grid mx-2 grid grid-cols-1 gap-2 xl:gap-4 2xl:gap-6">
           <div className="flex flex-col gap-1">
             <label
               htmlFor="faturamento-range-hora-inicio"
@@ -688,6 +798,7 @@ export function FaturamentoRangeCalendar({
                   fundoModalClaro
                     ? 'border-gray-300 bg-white text-primary-text'
                     : 'border-[#530CA3]/40 bg-[#F5F3FF] text-[#330468]',
+                  horarioInvalido && 'border-red-400 focus:ring-red-300',
                   'appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none'
                 )}
               />
@@ -704,30 +815,111 @@ export function FaturamentoRangeCalendar({
 
         <div
           className={cn(
-            'mt-1 border-t pt-2',
+            'mx-2 mt-1.5 rounded-lg border px-3 py-2',
             fundoModalClaro
-              ? 'rounded-lg border-gray-200 bg-primary/10 p-2 2xl:p-6'
-              : 'border-white/20'
+              ? 'border-primary/15 bg-white shadow-sm'
+              : 'border-white/20 bg-white/5'
           )}
         >
-          <p
-            className={cn(
-              'text-sm font-medium',
-              fundoModalClaro ? 'text-primary-text' : 'text-white/80'
-            )}
-          >
-            Período selecionado
-          </p>
-          <p
-            className={cn(
-              'break-words py-1 text-sm leading-snug',
-              fundoModalClaro ? 'text-primary' : 'text-white',
-              !textoPeriodoSelecionado && 'italic opacity-80'
-            )}
-          >
-            {textoPeriodoSelecionado ??
-              'Selecione o intervalo no calendário e as horas de início e término.'}
-          </p>
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p
+                className={cn(
+                  'text-[11px] font-semibold uppercase tracking-wide',
+                  fundoModalClaro ? 'text-primary-text/55' : 'text-white/70'
+                )}
+              >
+                Período selecionado
+              </p>
+              <p
+                className={cn(
+                  'mt-0.5 break-words text-sm font-semibold leading-snug tabular-nums',
+                  fundoModalClaro ? 'text-primary' : 'text-white',
+                  (!textoPeriodoSelecionado || aguardandoFimDoIntervalo) &&
+                    'font-normal italic opacity-80'
+                )}
+              >
+                {aguardandoFimDoIntervalo
+                  ? 'Selecione a data final no calendário.'
+                  : (textoPeriodoSelecionado ??
+                    'Selecione o intervalo no calendário e as horas.')}
+              </p>
+              {horarioInvalido ? (
+                <p className="mt-1 text-xs font-medium text-red-600" role="alert">
+                  A hora de término deve ser igual ou posterior à de início.
+                </p>
+              ) : null}
+            </div>
+
+            {fundoModalClaro ? (
+              <div
+                className="flex shrink-0 items-center gap-0.5 rounded-lg border border-gray-200 bg-gray-50 p-0.5"
+                role="group"
+                aria-label="Visualização do calendário"
+              >
+                <MuiTooltip
+                  title="Um mês (com faturamento R$)"
+                  placement="top"
+                  slotProps={{
+                    tooltip: {
+                      sx: {
+                        bgcolor: '#ffffff',
+                        color: '#111827',
+                        border: '1px solid #e5e7eb',
+                        boxShadow: 2,
+                        fontSize: '0.75rem',
+                      },
+                    },
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => alternarVisualizacao('um_mes')}
+                    className={cn(
+                      'inline-flex h-7 w-7 items-center justify-center rounded-md transition',
+                      modoUmMes
+                        ? 'bg-primary text-white shadow-sm'
+                        : 'text-primary-text/60 hover:bg-white hover:text-primary'
+                    )}
+                    aria-label="Visualização em um mês com faturamento"
+                    aria-pressed={modoUmMes}
+                  >
+                    <CalendarIcon className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                </MuiTooltip>
+                <MuiTooltip
+                  title="Dois meses (sem faturamento nas células)"
+                  placement="top"
+                  slotProps={{
+                    tooltip: {
+                      sx: {
+                        bgcolor: '#ffffff',
+                        color: '#111827',
+                        border: '1px solid #e5e7eb',
+                        boxShadow: 2,
+                        fontSize: '0.75rem',
+                      },
+                    },
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => alternarVisualizacao('dois_meses')}
+                    className={cn(
+                      'inline-flex h-7 w-7 items-center justify-center rounded-md transition',
+                      visualizacao === 'dois_meses'
+                        ? 'bg-primary text-white shadow-sm'
+                        : 'text-primary-text/60 hover:bg-white hover:text-primary'
+                    )}
+                    aria-label="Visualização em dois meses"
+                    aria-pressed={visualizacao === 'dois_meses'}
+                  >
+                    <CalendarRange className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                </MuiTooltip>
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>

@@ -193,6 +193,27 @@ export function calcularPeriodoAnteriorParaComparacaoNoFusoEmpresa(
   if (opcao === 'Últimos 90 Dias') {
     return deslocarPeriodoEmDiasCorridosUtc(atual.inicio, atual.fim, 90)
   }
+  if (opcao === 'Mês Atual') {
+    const tz = timeZoneEmpresa.trim()
+    const hojeYmd = ymdNoFuso(agora, tz)
+    const mesAnterior = hojeYmd.month === 1 ? 12 : hojeYmd.month - 1
+    const anoAnterior = hojeYmd.month === 1 ? hojeYmd.year - 1 : hojeYmd.year
+    const ultimoDiaMesAnterior = new Date(Date.UTC(anoAnterior, mesAnterior, 0)).getUTCDate()
+    const diaFimComparacao = Math.min(hojeYmd.day, ultimoDiaMesAnterior)
+    const inicioUtc = rangeDiaNoFusoParaUtc({
+      year: anoAnterior,
+      month: mesAnterior,
+      day: 1,
+      timeZone: tz,
+    }).inicioUtc
+    const fimUtc = rangeDiaNoFusoParaUtc({
+      year: anoAnterior,
+      month: mesAnterior,
+      day: diaFimComparacao,
+      timeZone: tz,
+    }).fimUtc
+    return { inicio: inicioUtc, fim: fimUtc }
+  }
   return null
 }
 

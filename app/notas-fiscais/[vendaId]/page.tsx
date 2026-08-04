@@ -70,7 +70,7 @@ export default async function NotaFiscalPublicPage({ params }: PageProps) {
       <CupomPublicoShell
         className="max-w-lg"
         style={{
-          fontFamily: "'Roboto Mono', 'Courier New', monospace",
+          fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
           color: '#0f172a',
         }}
       >

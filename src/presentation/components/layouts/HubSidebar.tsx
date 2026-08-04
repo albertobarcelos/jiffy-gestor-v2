@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import Link from 'next/link'
 import Image from 'next/image'
@@ -9,6 +9,7 @@ import { cn } from '@/src/shared/utils/cn'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { disconnectHubTab } from '@/src/presentation/utils/disconnectHubTab'
 import { HUB_MENU_ITEMS, isHubMenuActive } from './hubNavigation'
+import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 
 type HubSidebarProps = {
   mobileOpen: boolean
@@ -27,7 +28,7 @@ export function HubSidebar({ mobileOpen, onMobileClose }: HubSidebarProps) {
   const navContent = (
     <div className="flex h-full flex-col">
       <div className="flex shrink-0 items-center justify-center px-4 pb-2 pt-5">
-        <Link href="/meus-apps" className="relative h-28 w-28" onClick={onMobileClose}>
+        <Link href={HUB_PATH} className="relative h-28 w-28" onClick={onMobileClose}>
           <Image src="/images/jiffy-acenando.png" alt="Jiffy" fill sizes="112px" className="object-contain" />
         </Link>
       </div>

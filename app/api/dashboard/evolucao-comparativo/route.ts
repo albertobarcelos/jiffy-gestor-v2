@@ -10,6 +10,7 @@ import {
   Status,
   obterFusoAgregacaoDaEmpresaLogada,
   fetchEvolucaoPoints,
+  partesDataHoraNoFuso,
 } from '../evolucao/evolucaoService'
 import {
   buildEvolucaoComparativoCacheKey,
@@ -19,21 +20,29 @@ import {
   type LinhaComparacaoChartRow,
 } from '@/src/infrastructure/dashboard/dashboardEvolucaoComparativoCache'
 
-function enumerarDiasCalendario(inicio: Date, fim: Date): Date[] {
+/** Dias civis inclusivos no fuso (meia-noite UTC do calendário civil, estável p/ rótulo/chave). */
+function enumerarDiasCalendarioNoFuso(inicio: Date, fim: Date, timeZone: string): Date[] {
+  const pi = partesDataHoraNoFuso(inicio, timeZone)
+  const pf = partesDataHoraNoFuso(fim, timeZone)
   const out: Date[] = []
-  const cursor = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate())
-  const end = new Date(fim.getFullYear(), fim.getMonth(), fim.getDate())
-  while (cursor.getTime() <= end.getTime()) {
-    out.push(new Date(cursor))
-    cursor.setDate(cursor.getDate() + 1)
+  let y = pi.year
+  let m = pi.month
+  let d = pi.day
+  const endKey = pf.year * 10_000 + pf.month * 100 + pf.day
+  while (y * 10_000 + m * 100 + d <= endKey) {
+    out.push(new Date(Date.UTC(y, m - 1, d, 12, 0, 0)))
+    const next = new Date(Date.UTC(y, m - 1, d + 1, 12, 0, 0))
+    y = next.getUTCFullYear()
+    m = next.getUTCMonth() + 1
+    d = next.getUTCDate()
   }
   return out
 }
 
 function chaveDiaISO(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
+  const y = d.getUTCFullYear()
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(d.getUTCDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
 }
 
@@ -87,8 +96,8 @@ function uniaoSlotsOrdenada(
 }
 
 function formatarDiaMesEixo(d: Date): string {
-  const day = String(d.getDate()).padStart(2, '0')
-  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getUTCDate()).padStart(2, '0')
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0')
   return `${day}/${month}`
 }
 
@@ -107,10 +116,11 @@ function mergePontosEvolucaoComparacao(
   inicioAtual: Date,
   fimAtual: Date,
   inicioAnterior: Date,
-  fimAnterior: Date
+  fimAnterior: Date,
+  timeZone: string
 ): LinhaComparacaoChartRow[] {
-  const diasA = enumerarDiasCalendario(inicioAtual, fimAtual)
-  const diasB = enumerarDiasCalendario(inicioAnterior, fimAnterior)
+  const diasA = enumerarDiasCalendarioNoFuso(inicioAtual, fimAtual, timeZone)
+  const diasB = enumerarDiasCalendarioNoFuso(inicioAnterior, fimAnterior, timeZone)
   const n = Math.min(diasA.length, diasB.length)
 
   if (modo === 'dia' && diasA.length === 1 && n === 1) {
@@ -195,6 +205,7 @@ function resolverIntervalos(searchParams: URLSearchParams, periodo: string, time
       ontem: 'Ontem',
       semana: 'Últimos 7 Dias',
       '30dias': 'Últimos 30 Dias',
+      mes: 'Mês Atual',
     }
     const opcao = mapOpcao[periodo] || 'Hoje'
     const atual = calcularPeriodoNoFusoEmpresa(opcao, timezone)
@@ -340,7 +351,8 @@ export async function GET(request: NextRequest) {
       inicioAtual,
       fimAtual,
       inicioAnterior,
-      fimAnterior
+      fimAnterior,
+      timezone
     )
 
     setEvolucaoComparativoCache(cacheKey, {

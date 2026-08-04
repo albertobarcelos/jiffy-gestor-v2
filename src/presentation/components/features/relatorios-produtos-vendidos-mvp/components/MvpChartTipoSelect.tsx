@@ -28,7 +28,7 @@ export function MvpChartTipoSelect(props: {
         label="Tipo de gráfico"
         value={value}
         onChange={e => onChange(e.target.value as MvpChartTipo)}
-        className="font-nunito"
+        className=""
       >
         {opcoes.map(op => (
           <MenuItem key={op.value} value={op.value}>

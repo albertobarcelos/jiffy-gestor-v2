@@ -6,6 +6,7 @@ import {
   stripGestaoEmpresaSlugFromPath,
   isGestaoScopedPath,
 } from '@/src/shared/utils/gestaoRoutes'
+import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 
 describe('gestaoRoutes', () => {
   const empresaSlug = 'nexsyn-cmc6u1ef'
@@ -33,7 +34,7 @@ describe('gestaoRoutes', () => {
 
   it('identifica módulos ERP', () => {
     expect(isGestaoScopedPath('/portal-contador')).toBe(true)
-    expect(isGestaoScopedPath('/meus-apps')).toBe(false)
+    expect(isGestaoScopedPath(HUB_PATH)).toBe(false)
     expect(isGestaoScopedPath('/cardapio/nexsyn-ltda')).toBe(false)
     expect(isGestaoScopedPath('/delivery/nexsyn-ltda')).toBe(false)
   })

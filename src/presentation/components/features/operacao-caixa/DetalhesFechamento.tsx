@@ -221,7 +221,7 @@ export function DetalhesFechamento({ idOperacaoCaixa, open, onClose }: DetalhesF
           margin: { xs: 0, sm: '0 auto' },
           maxHeight: '90vh',
           backgroundColor: '#FFFFD9',
-          fontFamily: "'Roboto Mono', 'Courier New', monospace",
+          fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
           color: '#000000',
         },
       }}
@@ -240,7 +240,7 @@ export function DetalhesFechamento({ idOperacaoCaixa, open, onClose }: DetalhesF
         {/* Conteúdo */}
         <div
           className="flex-1 overflow-y-auto px-4 pb-4 bg-[#FFFFD9] text-xs md:text-sm"
-          style={{ fontFamily: "'Roboto Mono', 'Courier New', monospace" }}
+          style={{ fontFamily: 'var(--font-general-sans), system-ui, sans-serif' }}
         >
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-12">

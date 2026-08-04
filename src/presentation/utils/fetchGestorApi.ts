@@ -125,7 +125,7 @@ export async function fetchGestorApi(
 
   const newToken = await fetchTenantRefreshAccessToken()
   if (!newToken) {
-    // Sessão morta: notificar o AuthGuard para redirecionar ao login.
+    // Sessão da empresa morta: AuthGuard encerra só o tenant (→ hub root) se o hub ainda for válido.
     // Evitar redirect em rotas públicas para não entrar em loop.
     if (!isPublicAuthPath(window.location.pathname)) {
       window.dispatchEvent(new CustomEvent(JIFFY_SESSION_EXPIRED_EVENT))

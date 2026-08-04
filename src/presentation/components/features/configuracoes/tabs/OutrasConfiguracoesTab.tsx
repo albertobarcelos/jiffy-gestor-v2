@@ -25,17 +25,17 @@ export function OutrasConfiguracoesTab() {
       <div className="bg-info rounded-[10px] p-[18px] space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-primary text-base font-semibold font-exo mb-1">
+            <h3 className="text-primary text-base font-semibold mb-1">
               Vendas PDV
             </h3>
-            <p className="text-secondary-text text-sm font-nunito">
+            <p className="text-secondary-text text-sm ">
               Altere as configurações das vendas realizadas no Ponto de Venda
             </p>
           </div>
           {!isEditingVendasPDV && (
             <button
               onClick={() => setIsEditingVendasPDV(true)}
-              className="h-9 px-4 bg-alternate text-white rounded-[50px] text-sm font-medium font-exo hover:bg-alternate/90 transition-colors"
+              className="h-9 px-4 bg-alternate text-white rounded-[50px] text-sm font-medium hover:bg-alternate/90 transition-colors"
             >
               Editar
             </button>
@@ -47,7 +47,7 @@ export function OutrasConfiguracoesTab() {
                 // TODO: Salvar configurações
                 alert('Configurações salvas!')
               }}
-              className="h-9 px-4 bg-alternate text-white rounded-[50px] text-sm font-medium font-exo hover:bg-alternate/90 transition-colors flex items-center gap-2"
+              className="h-9 px-4 bg-alternate text-white rounded-[50px] text-sm font-medium hover:bg-alternate/90 transition-colors flex items-center gap-2"
             >
               <span>✓</span> Salvar
             </button>
@@ -55,7 +55,7 @@ export function OutrasConfiguracoesTab() {
         </div>
 
         <div className="border-t border-[#B9CCD8] pt-6 space-y-4">
-          <h4 className="text-secondary text-sm font-semibold font-nunito">
+          <h4 className="text-secondary text-sm font-semibold ">
             Identificação
           </h4>
 
@@ -153,17 +153,17 @@ export function OutrasConfiguracoesTab() {
       <div className="bg-info rounded-[10px] p-[18px] space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-primary text-base font-semibold font-exo mb-1">
+            <h3 className="text-primary text-base font-semibold mb-1">
               Impressões
             </h3>
-            <p className="text-secondary-text text-sm font-nunito">
+            <p className="text-secondary-text text-sm ">
               Configure as impressões do sistema
             </p>
           </div>
           {!isEditingImpressoes && (
             <button
               onClick={() => setIsEditingImpressoes(true)}
-              className="h-9 px-4 bg-alternate text-white rounded-[50px] text-sm font-medium font-exo hover:bg-alternate/90 transition-colors"
+              className="h-9 px-4 bg-alternate text-white rounded-[50px] text-sm font-medium hover:bg-alternate/90 transition-colors"
             >
               Editar
             </button>
@@ -175,7 +175,7 @@ export function OutrasConfiguracoesTab() {
                 // TODO: Salvar configurações
                 alert('Configurações de impressões salvas!')
               }}
-              className="h-9 px-4 bg-alternate text-white rounded-[50px] text-sm font-medium font-exo hover:bg-alternate/90 transition-colors flex items-center gap-2"
+              className="h-9 px-4 bg-alternate text-white rounded-[50px] text-sm font-medium hover:bg-alternate/90 transition-colors flex items-center gap-2"
             >
               <span>✓</span> Salvar
             </button>

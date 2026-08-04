@@ -139,7 +139,7 @@ export function DateTimeRangePicker({
   return (
     <div className="flex flex-col">
       <div className="flex items-center justify-between rounded-t-lg border-b border-gray-200 bg-white px-4 py-3">
-        <h2 className="font-exo text-lg font-semibold text-primary-text">{title}</h2>
+        <h2 className="text-lg font-semibold text-primary-text">{title}</h2>
         <button
           type="button"
           onClick={handleClose}
@@ -153,7 +153,7 @@ export function DateTimeRangePicker({
       <div className="bg-white px-4 py-4">
         <div className="space-y-4">
           <div className="flex flex-col gap-1">
-            <label className="font-nunito text-sm text-primary-text">Data Inicial</label>
+            <label className="text-sm text-primary-text">Data Inicial</label>
             <div className="flex flex-col gap-2 md:flex-row">
               <div className="relative flex-1">
                 <MdCalendarToday
@@ -165,7 +165,7 @@ export function DateTimeRangePicker({
                   value={dataInicialStr}
                   onChange={e => setDataInicialStr(e.target.value)}
                   placeholder="Escolha..."
-                  className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-4 font-nunito text-sm text-primary-text focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-4 text-sm text-primary-text focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               <div className="relative flex-1">
@@ -178,14 +178,14 @@ export function DateTimeRangePicker({
                   value={horaInicialStr}
                   onChange={e => setHoraInicialStr(e.target.value)}
                   placeholder="HH:mm"
-                  className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-4 font-nunito text-sm text-primary-text focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-4 text-sm text-primary-text focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
             </div>
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="font-nunito text-sm text-primary-text">Data Final</label>
+            <label className="text-sm text-primary-text">Data Final</label>
             <div className="flex flex-col gap-2 md:flex-row">
               <div className="relative flex-1">
                 <MdCalendarToday
@@ -198,7 +198,7 @@ export function DateTimeRangePicker({
                   onChange={e => setDataFinalStr(e.target.value)}
                   min={minDataFinal}
                   placeholder="Escolha..."
-                  className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-4 font-nunito text-sm text-primary-text focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-4 text-sm text-primary-text focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               <div className="relative flex-1">
@@ -211,7 +211,7 @@ export function DateTimeRangePicker({
                   value={horaFinalStr}
                   onChange={e => setHoraFinalStr(e.target.value)}
                   placeholder="HH:mm"
-                  className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-4 font-nunito text-sm text-primary-text focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-4 text-sm text-primary-text focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
             </div>
@@ -223,7 +223,7 @@ export function DateTimeRangePicker({
         <button
           type="button"
           onClick={handleConfirm}
-          className="flex h-10 w-full items-center justify-center rounded-lg bg-primary font-nunito text-sm text-white transition-colors hover:bg-primary/90"
+          className="flex h-10 w-full items-center justify-center rounded-lg bg-primary text-sm text-white transition-colors hover:bg-primary/90"
         >
           {confirmText}
         </button>

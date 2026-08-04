@@ -52,15 +52,7 @@ async function reemitirNotaSilenciosa(token: string, venda: Venda): Promise<void
     throw new Error('Documento fiscal não encontrado para reemissão.')
   }
 
-  const numeroNotaRejeitada =
-    venda.numeroFiscal != null && Number.isFinite(Number(venda.numeroFiscal))
-      ? Number(venda.numeroFiscal)
-      : undefined
-
-  const body = montarBodyReemitirNota({
-    documentId: docId,
-    ...(numeroNotaRejeitada != null ? { numero: numeroNotaRejeitada } : {}),
-  })
+  const body = montarBodyReemitirNota({ documentId: docId })
 
   const path =
     venda.tabelaOrigem === 'venda_gestor'
@@ -97,10 +89,6 @@ export async function enviarReemissaoFiscalKanban(
   const modelo = resolveModeloParaEmitirNota(venda)
 
   if (docId) {
-    if (usarDelivery && modelo !== null) {
-      await emitirNotaPedidoDeliveryUseCase.execute(venda.id, token, modelo)
-      return
-    }
     await reemitirNotaSilenciosa(token, venda)
     return
   }

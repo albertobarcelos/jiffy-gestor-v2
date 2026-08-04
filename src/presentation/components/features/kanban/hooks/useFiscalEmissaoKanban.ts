@@ -325,11 +325,6 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
     async (venda: Venda) => {
       if (emissaoFiscalLock.isLocked(venda.id)) return
 
-      const numeroNotaRejeitada =
-        venda.numeroFiscal != null && Number.isFinite(Number(venda.numeroFiscal))
-          ? Number(venda.numeroFiscal)
-          : undefined
-
       const podeReemitirInterativo =
         venda.statusFiscal === 'REJEITADA' ||
         venda.statusFiscal === 'DENEGADA' ||
@@ -350,21 +345,12 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
           const payload = {
             id: venda.id,
             documentId: docId,
-            ...(numeroNotaRejeitada != null ? { numero: numeroNotaRejeitada } : {}),
           }
-          const usarDelivery = deveUsarModuloDeliveryParaEmissaoFiscal(
-            venda.tabelaOrigem,
-            venda.tipoVenda
-          )
-          const modeloReemitir = resolveModeloParaEmitirNota(venda)
           await executarAcaoFiscalComLock(
             venda,
             'reemitindo',
             venda.statusFiscal,
             async () => {
-              if (usarDelivery && modeloReemitir !== null) {
-                return emitirNotaDelivery({ id: venda.id, modelo: modeloReemitir })
-              }
               if (venda.tabelaOrigem === 'venda_gestor') {
                 return reemitirNfeGestor(payload)
               }

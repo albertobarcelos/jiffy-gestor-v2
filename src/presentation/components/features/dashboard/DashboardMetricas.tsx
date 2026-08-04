@@ -20,6 +20,7 @@ function MetricCard({
   badge,
   rodape,
   badgePositivo,
+  atualizando,
 }: {
   tituloBase: string
   /** Ex.: "7 dias"; null = só o título base */
@@ -29,6 +30,8 @@ function MetricCard({
   badge: string
   rodape: string
   badgePositivo: boolean
+  /** Troca de período em andamento — pulsa os valores sem limpar o conteúdo */
+  atualizando?: boolean
 }) {
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-2">
@@ -45,19 +48,23 @@ function MetricCard({
               <span className="text-sm font-normal text-primary-text/90"> ({tituloPeriodo})</span>
             ) : null}
           </p>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-2xl font-semibold tracking-tight text-primary-text md:text-[32px]">
-              {valor}
-            </span>
-            <span
-              className={`mr-4 rounded-md px-2 py-0.5 text-sm font-medium text-white ${
-                badgePositivo ? 'bg-[#00B074]' : 'bg-[#D92D20]'
-              }`}
-            >
-              {badge}
-            </span>
+          <div
+            className={`transition-opacity duration-300 ${atualizando ? 'animate-pulse opacity-40' : 'opacity-100'}`}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-2xl font-semibold tracking-tight text-primary-text md:text-[32px]">
+                {valor}
+              </span>
+              <span
+                className={`mr-4 rounded-md px-2 py-0.5 text-sm font-medium text-white ${
+                  badgePositivo ? 'bg-[#00B074]' : 'bg-[#D92D20]'
+                }`}
+              >
+                {badge}
+              </span>
+            </div>
+            <p className="mt-1 text-xs leading-snug text-[#006699] md:text-sm">{rodape}</p>
           </div>
-          <p className="mt-1 text-xs leading-snug text-[#006699] md:text-sm">{rodape}</p>
         </div>
       </div>
     </div>
@@ -68,11 +75,14 @@ export function DashboardMetricas({
   periodoData,
   dadosResumo,
   carregandoResumo,
+  atualizandoResumo,
   erroResumo,
 }: {
   periodoData: string
   dadosResumo: DashboardResumoResponse | undefined
   carregandoResumo: boolean
+  /** Troca de período em andamento (isFetching) — dados anteriores ainda visíveis */
+  atualizandoResumo: boolean
   erroResumo: boolean
 }) {
   const rotuloRodapeCards = rotuloRodapeComparacaoCards(periodoData)
@@ -219,6 +229,7 @@ export function DashboardMetricas({
         badge={cardPedidosHojeProps.badge}
         rodape={cardPedidosHojeProps.rodape}
         badgePositivo={cardPedidosHojeProps.badgePositivo}
+        atualizando={atualizandoResumo}
       />
       <MetricCard
         tituloBase="Ticket médio"
@@ -228,6 +239,7 @@ export function DashboardMetricas({
         badge={cardTicketMedioProps.badge}
         rodape={cardTicketMedioProps.rodape}
         badgePositivo={cardTicketMedioProps.badgePositivo}
+        atualizando={atualizandoResumo}
       />
       <MetricCard
         tituloBase="Itens por pedido"
@@ -237,6 +249,7 @@ export function DashboardMetricas({
         badge={cardItensPorPedidoProps.badge}
         rodape={cardItensPorPedidoProps.rodape}
         badgePositivo={cardItensPorPedidoProps.badgePositivo}
+        atualizando={atualizandoResumo}
       />
       <MetricCard
         tituloBase="Cancelamentos"
@@ -256,6 +269,7 @@ export function DashboardMetricas({
         badge={cardCancelamentosProps.badge}
         rodape={cardCancelamentosProps.rodape}
         badgePositivo={cardCancelamentosProps.badgePositivo}
+        atualizando={atualizandoResumo}
       />
     </div>
   )
