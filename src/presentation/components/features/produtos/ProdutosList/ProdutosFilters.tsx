@@ -2,9 +2,27 @@
 
 import type { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import type { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
+import {
+  Autocomplete,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+  TextField,
+  type SelectChangeEvent,
+} from '@mui/material'
+import {
+  sxEntradaCompactaProduto,
+  sxEntradaCompactaProdutoSelect,
+} from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 
 export type StatusFilter = 'Todos' | 'Ativo' | 'Desativado'
 export type TriState = 'Todos' | 'Sim' | 'Não'
+
+type OpcaoGrupoComplemento = {
+  id: string
+  nome: string
+}
 
 interface ProdutosFiltersProps {
   filtrosVisiveis: boolean
@@ -58,16 +76,21 @@ export function ProdutosFilters({
   isLoadingGruposComplementos,
   onClearFilters,
 }: ProdutosFiltersProps) {
-  const selectClass =
-    'w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito'
+  const opcoesGrupoComplemento: OpcaoGrupoComplemento[] = [
+    { id: '__none__', nome: 'Nenhum' },
+    ...gruposComplementos.map(grupo => ({
+      id: grupo.getId(),
+      nome: grupo.getNome(),
+    })),
+  ]
 
   return (
-    <div className="bg-white px-1 md:py-2 border-b border-gray-100 flex-shrink-0">
-      <div className="flex w-full sm:hidden justify-end items-center mt-2">
+    <div className="flex-shrink-0 border-b border-gray-100 bg-white px-1 md:py-2">
+      <div className="mt-2 flex w-full items-center justify-end sm:hidden">
         <button
           type="button"
           onClick={onToggleFiltros}
-          className="px-3 py-1 rounded-md bg-primary text-white text-xs font-nunito shadow-sm"
+          className="rounded-md bg-primary px-3 py-1 text-xs text-white shadow-sm"
           aria-expanded={filtrosVisiveis}
         >
           {filtrosVisiveis ? 'Ocultar filtros' : 'Mostrar filtros'}
@@ -75,108 +98,153 @@ export function ProdutosFilters({
       </div>
 
       <div
-        className={`hidden sm:flex flex-wrap items-end gap-2 ${
+        className={`hidden flex-wrap items-center gap-2 sm:flex ${
           isMobile && filtrosVisiveis ? '!flex' : ''
         }`}
       >
-        <div className="w-full sm:w-[160px]">
-          <label className="text-xs font-semibold text-secondary-text mb-1 block">Status</label>
-          <select
-            value={filterStatus}
-            onChange={(e) => onFilterStatusChange(e.target.value as StatusFilter)}
-            className={selectClass}
-          >
-            <option value="Todos">Todos</option>
-            <option value="Ativo">Ativo</option>
-            <option value="Desativado">Desativado</option>
-          </select>
+        <div className="w-full min-w-[120px] sm:w-[132px]">
+          <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
+            <InputLabel id="produtos-filter-status-label">Status</InputLabel>
+            <Select
+              labelId="produtos-filter-status-label"
+              label="Status"
+              value={filterStatus}
+              onChange={(e: SelectChangeEvent<string>) =>
+                onFilterStatusChange(e.target.value as StatusFilter)
+              }
+            >
+              <MenuItem value="Todos">Todos</MenuItem>
+              <MenuItem value="Ativo">Ativo</MenuItem>
+              <MenuItem value="Desativado">Desativado</MenuItem>
+            </Select>
+          </FormControl>
         </div>
 
-        <div className="w-full sm:w-[160px]">
-          <label className="text-xs font-semibold text-secondary-text mb-1 block">Status grupo</label>
-          <select
-            value={statusGrupoFilter}
-            onChange={(e) => onStatusGrupoChange(e.target.value as StatusFilter)}
-            className={selectClass}
-          >
-            <option value="Todos">Todos</option>
-            <option value="Ativo">Ativo</option>
-            <option value="Desativado">Desativado</option>
-          </select>
+        <div className="w-full min-w-[120px] sm:w-[132px]">
+          <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
+            <InputLabel id="produtos-filter-status-grupo-label">Status grupo</InputLabel>
+            <Select
+              labelId="produtos-filter-status-grupo-label"
+              label="Status grupo"
+              value={statusGrupoFilter}
+              onChange={(e: SelectChangeEvent<string>) =>
+                onStatusGrupoChange(e.target.value as StatusFilter)
+              }
+            >
+              <MenuItem value="Todos">Todos</MenuItem>
+              <MenuItem value="Ativo">Ativo</MenuItem>
+              <MenuItem value="Desativado">Desativado</MenuItem>
+            </Select>
+          </FormControl>
         </div>
 
-        <div className="w-full sm:w-[160px]">
-          <label className="text-xs font-semibold text-secondary-text mb-1 block">Ativo no local</label>
-          <select
-            value={ativoLocalFilter}
-            onChange={(e) => onAtivoLocalChange(e.target.value as TriState)}
-            className={selectClass}
-          >
-            <option value="Todos">Todos</option>
-            <option value="Sim">Sim</option>
-            <option value="Não">Não</option>
-          </select>
+        <div className="w-full min-w-[120px] sm:w-[140px]">
+          <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
+            <InputLabel id="produtos-filter-local-label">Ativo no local</InputLabel>
+            <Select
+              labelId="produtos-filter-local-label"
+              label="Ativo no local"
+              value={ativoLocalFilter}
+              onChange={(e: SelectChangeEvent<string>) =>
+                onAtivoLocalChange(e.target.value as TriState)
+              }
+            >
+              <MenuItem value="Todos">Todos</MenuItem>
+              <MenuItem value="Sim">Sim</MenuItem>
+              <MenuItem value="Não">Não</MenuItem>
+            </Select>
+          </FormControl>
         </div>
 
-        <div className="w-full sm:w-[160px]">
-          <label className="text-xs font-semibold text-secondary-text mb-1 block">Ativo no delivery</label>
-          <select
-            value={ativoDeliveryFilter}
-            onChange={(e) => onAtivoDeliveryChange(e.target.value as TriState)}
-            className={selectClass}
-          >
-            <option value="Todos">Todos</option>
-            <option value="Sim">Sim</option>
-            <option value="Não">Não</option>
-          </select>
+        <div className="w-full min-w-[136px] sm:w-[156px]">
+          <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
+            <InputLabel id="produtos-filter-delivery-label">Ativo no delivery</InputLabel>
+            <Select
+              labelId="produtos-filter-delivery-label"
+              label="Ativo no delivery"
+              value={ativoDeliveryFilter}
+              onChange={(e: SelectChangeEvent<string>) =>
+                onAtivoDeliveryChange(e.target.value as TriState)
+              }
+            >
+              <MenuItem value="Todos">Todos</MenuItem>
+              <MenuItem value="Sim">Sim</MenuItem>
+              <MenuItem value="Não">Não</MenuItem>
+            </Select>
+          </FormControl>
         </div>
 
-        <div className="w-full sm:w-[220px]">
-          <label className="text-xs font-semibold text-secondary-text mb-1 block">
-            Grupo de produtos
-          </label>
-          <select
-            value={grupoProdutoFilter}
-            onChange={(e) => onGrupoProdutoChange(e.target.value)}
+        <div className="relative z-20 w-full min-w-[180px] sm:w-[220px]">
+          <Autocomplete
+            id="produtos-filter-grupo-searchable"
+            size="small"
+            options={gruposProdutos}
+            loading={isLoadingGruposProdutos}
             disabled={isLoadingGruposProdutos}
-            className={`${selectClass} disabled:opacity-60 disabled:cursor-not-allowed`}
-          >
-            <option value="">{isLoadingGruposProdutos ? 'Carregando...' : 'Todos'}</option>
-            {!isLoadingGruposProdutos &&
-              gruposProdutos.map((grupo) => (
-                <option key={grupo.getId()} value={grupo.getId()}>
-                  {grupo.getNome()}
-                </option>
-              ))}
-          </select>
+            loadingText="Carregando..."
+            noOptionsText="Nenhum grupo encontrado"
+            getOptionLabel={grupo => grupo.getNome()}
+            isOptionEqualToValue={(a, b) => a.getId() === b.getId()}
+            value={gruposProdutos.find(g => g.getId() === grupoProdutoFilter) ?? null}
+            onChange={(_, grupo) => onGrupoProdutoChange(grupo?.getId() ?? '')}
+            renderInput={params => (
+              <TextField
+                {...params}
+                label="Grupo de produtos"
+                placeholder="Pesquise ou Selecione"
+                InputLabelProps={{
+                  ...params.InputLabelProps,
+                  shrink: true,
+                }}
+                sx={{
+                  ...sxEntradaCompactaProduto,
+                  '& .MuiOutlinedInput-root': {
+                    backgroundColor: '#fff',
+                  },
+                }}
+              />
+            )}
+          />
         </div>
 
-        <div className="w-full sm:w-[220px]">
-          <label className="text-xs font-semibold text-secondary-text mb-1 block">
-            Grupo de complementos
-          </label>
-          <select
-            value={grupoComplementoFilter}
-            onChange={(e) => onGrupoComplementoChange(e.target.value)}
+        <div className="relative z-10 w-full min-w-[180px] sm:w-[220px]">
+          <Autocomplete
+            id="produtos-filter-grupo-complemento-searchable"
+            size="small"
+            options={opcoesGrupoComplemento}
+            loading={isLoadingGruposComplementos}
             disabled={isLoadingGruposComplementos}
-            className={`${selectClass} disabled:opacity-60 disabled:cursor-not-allowed`}
-          >
-            <option value="">{isLoadingGruposComplementos ? 'Carregando...' : 'Todos'}</option>
-            <option value="__none__">Nenhum</option>
-            {!isLoadingGruposComplementos &&
-              gruposComplementos.map((grupo) => (
-                <option key={grupo.getId()} value={grupo.getId()}>
-                  {grupo.getNome()}
-                </option>
-              ))}
-          </select>
+            loadingText="Carregando..."
+            noOptionsText="Nenhum grupo encontrado"
+            getOptionLabel={opcao => opcao.nome}
+            isOptionEqualToValue={(a, b) => a.id === b.id}
+            value={opcoesGrupoComplemento.find(o => o.id === grupoComplementoFilter) ?? null}
+            onChange={(_, opcao) => onGrupoComplementoChange(opcao?.id ?? '')}
+            renderInput={params => (
+              <TextField
+                {...params}
+                label="Grupo de complementos"
+                placeholder="Pesquise ou Selecione"
+                InputLabelProps={{
+                  ...params.InputLabelProps,
+                  shrink: true,
+                }}
+                sx={{
+                  ...sxEntradaCompactaProduto,
+                  '& .MuiOutlinedInput-root': {
+                    backgroundColor: '#fff',
+                  },
+                }}
+              />
+            )}
+          />
         </div>
 
-        <div className="w-full sm:w-auto">
+        <div className="flex w-full items-center sm:w-auto">
           <button
             type="button"
             onClick={onClearFilters}
-            className="h-8 px-5 rounded-lg border border-primary/50 text-sm font-semibold text-primary-text bg-white hover:bg-primary/10 transition-colors"
+            className="flex h-8 items-center rounded-lg border border-primary/50 bg-white px-5 text-sm font-semibold text-primary-text transition-colors hover:bg-primary/10"
           >
             Limpar filtros
           </button>

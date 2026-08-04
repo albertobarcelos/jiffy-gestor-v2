@@ -46,7 +46,7 @@ export function RelatoriosView() {
           <div className="flex border-b-2 items-center justify-center md:justify-start border-primary/70">
             <button
               onClick={() => setActiveTab('vendas')}
-              className={`md:px-5 text-xl font-semibold font-exo transition-colors ${
+              className={`md:px-5 text-xl font-semibold transition-colors ${
                 activeTab === 'vendas'
                   ? 'text-primary'
                   : 'text-secondary-text hover:text-primary'
@@ -56,7 +56,7 @@ export function RelatoriosView() {
             </button>
             {/*<button
               onClick={() => setActiveTab('faturamento')}
-              className={`px-5 py-2 text-sm font-semibold font-exo transition-colors ${
+              className={`px-5 py-2 text-sm font-semibold transition-colors ${
                 activeTab === 'faturamento'
                   ? 'text-primary border-b-2 border-tertiary'
                   : 'text-secondary-text hover:text-primary'
@@ -75,7 +75,7 @@ export function RelatoriosView() {
               />
             ) : (
               <div className="space-y-4">
-                <h3 className="text-primary text-base font-semibold font-exo">
+                <h3 className="text-primary text-base font-semibold ">
                   Relatório de Faturamento
                 </h3>
                 <div className="text-center py-12">

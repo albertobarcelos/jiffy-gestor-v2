@@ -124,7 +124,7 @@ const sxHistoricoFiltroLabel = {
     color: 'var(--color-secondary-text)',
     fontWeight: 300,
     fontSize: '0.975rem',
-    fontFamily: '"Nunito", sans-serif',
+    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
   },
   '& .MuiInputLabel-root.Mui-focused': {
     color: 'var(--color-secondary-text)',
@@ -169,7 +169,7 @@ const sxHistoricoFiltroTextFieldDate = {
   '& .MuiOutlinedInput-root': {
     ...sxHistoricoFiltroOutlinedInputRoot,
     backgroundColor: '#fff',
-    fontFamily: '"Nunito", sans-serif',
+    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
     height: 35,
     minHeight: 35,
     alignItems: 'center',
@@ -179,7 +179,7 @@ const sxHistoricoFiltroTextFieldDate = {
     fontSize: '0.875rem',
     lineHeight: 1,
     padding: '6px 4px',
-    fontFamily: '"Nunito", sans-serif',
+    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
   },
   '& .MuiInputAdornment-root': {
     height: 35,
@@ -804,14 +804,14 @@ export function HistoricoFechamento() {
       <div className="bg-primary-background rounded-b-lg rounded-t-lg">
         {/* Título */}
         <div className="flex flex-col items-center justify-between py-1 md:flex-row md:px-[30px]">
-          <h1 className="font-exo text-lg font-semibold text-primary">
+          <h1 className="text-lg font-semibold text-primary">
             Histórico - Fechamento de Caixa
           </h1>
           <div className="flex w-full flex-row items-end justify-end gap-2 md:w-auto">
             <button
               type="button"
               onClick={() => setFiltrosVisiveis(prev => !prev)}
-              className="font-nunito flex items-center gap-2 rounded-md bg-primary px-3 py-1 text-xs text-white shadow-sm md:text-sm"
+              className="flex items-center gap-2 rounded-md bg-primary px-3 py-1 text-xs text-white shadow-sm md:text-sm"
               aria-expanded={filtrosVisiveis}
             >
               {filtrosVisiveis ? <MdFilterAltOff size={18} /> : <MdFilterList size={18} />}
@@ -834,7 +834,7 @@ export function HistoricoFechamento() {
               placeholder="Digite o Código ou Terminal..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="font-nunito h-9 w-full rounded-lg border bg-info pl-10 pr-4 text-sm shadow-sm"
+              className="h-9 w-full rounded-lg border bg-info pl-10 pr-4 text-sm shadow-sm"
             />
           </div>
           {/* Status — outlined, rótulo na borda (padrão VendasList) */}
@@ -848,7 +848,7 @@ export function HistoricoFechamento() {
               value={statusFilter || ''}
               onChange={e => setStatusFilter(e.target.value || null)}
               displayEmpty
-              className="font-nunito"
+              className=""
             >
               <MenuItem value="">
                 <span className="text-secondary-text">Selecione...</span>
@@ -870,7 +870,7 @@ export function HistoricoFechamento() {
               onChange={e => setTerminalFilter(e.target.value || null)}
               disabled={isLoadingTerminais}
               displayEmpty
-              className="font-nunito"
+              className=""
             >
               <MenuItem value="">
                 <span className="text-secondary-text">Selecione...</span>
@@ -928,7 +928,7 @@ export function HistoricoFechamento() {
           />
           {/* Dropdown Período */}
           <div className="flex flex-row flex-wrap items-center gap-3">
-            <span className="font-exo text-sm text-primary">Período:</span>
+            <span className="text-sm text-primary">Período:</span>
             <FormControl size="small" sx={{ minWidth: 120 }}>
               <Select
                 value={periodo}
@@ -960,7 +960,7 @@ export function HistoricoFechamento() {
             <button
               type="button"
               onClick={() => setIsDatasModalOpen(true)}
-              className="font-nunito flex h-8 items-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
+              className="flex h-8 items-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
             >
               <MdCalendarToday size={18} />
               Por datas
@@ -979,7 +979,7 @@ export function HistoricoFechamento() {
           {/* Botão Limpar Filtros */}
           <button
             onClick={handleClearFilters}
-            className="font-nunito flex h-8 items-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
+            className="flex h-8 items-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
           >
             <MdFilterAltOff size={18} />
             Limpar Filtros
@@ -987,7 +987,7 @@ export function HistoricoFechamento() {
         </div>
 
         {/* Cabeçalho da Tabela */}
-        <div className="font-nunito mt-2 flex items-center bg-custom-2 px-3 py-2 text-sm font-semibold text-primary-text">
+        <div className="mt-2 flex items-center bg-custom-2 px-3 py-2 text-sm font-semibold text-primary-text">
           <div className="hidden flex-1 md:flex">Cód. Terminal</div>
           <div className="flex-[1.5] text-[11px] md:text-sm">Terminal</div>
           <div className="hidden flex-[2] md:block">Fechado por</div>
@@ -1033,7 +1033,7 @@ export function HistoricoFechamento() {
                     }}
                     className={`cursor-pointer rounded-lg p-2 transition-all md:mx-2 md:p-3 ${isZebraEven ? 'bg-white hover:bg-primary/10' : 'bg-gray-50 hover:bg-primary/10'}`}
                   >
-                    <div className="font-nunito flex items-center text-sm text-primary-text">
+                    <div className="flex items-center text-sm text-primary-text">
                       <div className="hidden flex-1 md:block">{operacao.codigoTerminal || '-'}</div>
                       <div className="flex-[1.5] text-[11px] md:text-sm">
                         {operacao.nomeTerminal || '-'}
@@ -1088,7 +1088,7 @@ export function HistoricoFechamento() {
             type="button"
             disabled={!rascunhoIntervaloRange?.from || !rascunhoIntervaloRange?.to}
             onClick={handleAplicarIntervaloHistorico}
-            className="rounded-b-l-lg font-nunito flex h-full w-full items-center justify-center bg-primary text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-b-l-lg flex h-full w-full items-center justify-center bg-primary text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Aplicar
           </button>

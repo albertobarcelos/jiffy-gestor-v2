@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
@@ -15,6 +15,7 @@ import {
   SESSION_STORAGE_SESSION_NONCE,
   SESSION_STORAGE_EMPRESA_SLUG,
 } from '@/src/shared/constants/sessionCoordinator'
+import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 
 type FallbackPending = { empresaId: string; empParam: string; tempNonce: string }
 
@@ -38,7 +39,7 @@ function getEmpParam(): string | null {
  *    - Ou prepara fallback escrevendo nonce temporário (URL colada)
  * 2. `useEffect` (assíncrono):
  *    - Se fallback foi preparado, chama `escolher-empresa` para obter token
- *    - Se falhar, redireciona para `/meus-apps`
+ *    - Se falhar, redireciona para {@link HUB_PATH}
  *
  * O `useLayoutEffect` garante que o nonce esteja no sessionStorage antes do
  * `AuthGuard` (que usa `useEffect`) verificar — evitando redirect prematuro.
@@ -126,7 +127,7 @@ export function TabSessionBootstrap() {
             sessionStorage.removeItem(SESSION_STORAGE_EMPRESA_SLUG)
           }
         } catch { /* ignore */ }
-        window.location.href = '/meus-apps'
+        window.location.href = HUB_PATH
       }
     })()
   }, [identityAuth, setTenantAuth])

@@ -150,7 +150,7 @@ export function DashboardFormasPagamento({
 
   return (
     <section className="flex h-full flex-col rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-6 lg:col-span-4">
-      <h2 className="mb-4 font-exo text-lg font-semibold text-primary-text md:text-xl">
+      <h2 className="mb-4 text-lg font-semibold text-primary-text md:text-xl">
         Formas de Pagamento
       </h2>
       {carregandoMetodosPagamento ? (

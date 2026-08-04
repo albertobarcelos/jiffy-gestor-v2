@@ -71,7 +71,7 @@ const BUSCA_TERMINAL_DEBOUNCE_MS = 480
 
 /** Botões de ação em lote na grade 4×2 (Config. por Terminal). */
 const BULK_TERMINAL_BTN_CLASS =
-  'w-full rounded-lg border border-primary/70 bg-primary/10 px-1.5 py-1.5 font-exo text-[11px] font-semibold leading-tight text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50 sm:px-2 sm:text-xs'
+  'w-full rounded-lg border border-primary/70 bg-primary/10 px-1.5 py-1.5 text-[11px] font-semibold leading-tight text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50 sm:px-2 sm:text-xs'
 
 const DEFAULT_CFG = {
   ativo: true,
@@ -736,7 +736,7 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
       {!(isEmbedded && hideEmbeddedHeader) ? (
         <div className="sticky top-0 z-10 shrink-0 rounded-tl-[20px] bg-primary-bg py-4 shadow-md md:px-[30px] px-2">
           <div className="flex items-center justify-between">
-            <h1 className="font-exo text-sm font-semibold text-primary md:text-lg">
+            <h1 className="text-sm font-semibold text-primary md:text-lg">
               {taxaEditId ? 'Editar taxa' : 'Nova taxa'}
             </h1>
             <Button
@@ -765,7 +765,7 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
           {/* Dados gerais até NCM */}
           <div className="shrink-0 rounded-[10px] bg-info px-2 md:px-3">
             <div className="mb-2 flex items-center gap-5">
-              <h2 className="font-exo text-xl font-semibold text-primary">Dados da taxa</h2>
+              <h2 className="text-xl font-semibold text-primary">Dados da taxa</h2>
               <div className="h-px flex-1 bg-primary/70" />
             </div>
 
@@ -845,12 +845,12 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
           {/* Config. por Terminal — ocupa o restante da altura (modal), rolagem só na lista */}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg bg-info md:w-full">
             <div className="shrink-0 border-b border-primary px-4">
-              <h2 className="font-exo text-lg font-semibold text-primary">Config. por Terminal</h2>
+              <h2 className="text-lg font-semibold text-primary">Config. por Terminal</h2>
             </div>
 
             <div className="shrink-0 border-b border-primary px-2 py-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="min-w-0 flex-1 font-nunito text-sm font-medium text-primary-text">
+                <span className="min-w-0 flex-1 text-sm font-medium text-primary-text">
                   {selectedTerminalIds.size === 0
                     ? 'Nenhum terminal selecionado'
                     : `${selectedTerminalIds.size} terminal(is) selecionado(s)`}
@@ -867,7 +867,7 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
                       onChange={e => setBuscaTerminalDraft(e.target.value)}
                       placeholder="Buscar terminal por nome..."
                       autoComplete="off"
-                      className="font-nunito h-8 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+                      className="h-8 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
                       aria-label="Buscar terminal por nome"
                     />
                   </div>
@@ -875,7 +875,7 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
                     <button
                       type="button"
                       onClick={clearSelection}
-                      className="shrink-0 rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 font-exo text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
+                      className="shrink-0 rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
                     >
                       Limpar seleção
                     </button>
@@ -964,26 +964,26 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
                     aria-label="Selecionar todos os terminais"
                   />
                 </div>
-                <div className="min-w-0 font-nunito text-sm font-semibold text-primary-text">
+                <div className="min-w-0 text-sm font-semibold text-primary-text">
                   Terminal
                 </div>
                 <div className="flex w-full justify-center">
-                  <span className="font-nunito text-center text-xs font-semibold text-primary-text">
+                  <span className="text-center text-xs font-semibold text-primary-text">
                     Ativo
                   </span>
                 </div>
                 <div className="flex w-full justify-center">
-                  <span className="font-nunito text-center text-xs font-semibold text-primary-text">
+                  <span className="text-center text-xs font-semibold text-primary-text">
                     Automático
                   </span>
                 </div>
                 <div className="flex w-full justify-center">
-                  <span className="font-nunito text-center text-xs font-semibold text-primary-text">
+                  <span className="text-center text-xs font-semibold text-primary-text">
                     Mesa
                   </span>
                 </div>
                 <div className="flex w-full justify-center">
-                  <span className="font-nunito text-center text-xs font-semibold text-primary-text">
+                  <span className="text-center text-xs font-semibold text-primary-text">
                     Balcão
                   </span>
                 </div>
@@ -1042,7 +1042,7 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
                             aria-label={`Selecionar ${row.nome}`}
                           />
                         </div>
-                        <div className="font-nunito min-w-0 truncate text-sm text-primary-text">
+                        <div className="min-w-0 truncate text-sm text-primary-text">
                           {row.nome}
                         </div>
                         <div className="flex w-full justify-center">
@@ -1103,13 +1103,13 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
                           onChange={() => toggleTerminalSelection(row.terminalId)}
                           className="h-4 w-4 shrink-0 cursor-pointer rounded border-primary bg-info text-primary focus:ring-2 focus:ring-primary"
                         />
-                        <span className="font-nunito min-w-0 flex-1 truncate text-sm font-medium text-primary-text">
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-primary-text">
                           {row.nome}
                         </span>
                       </div>
                       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
                         <label className="flex flex-col items-center gap-1">
-                          <span className="font-nunito text-[10px] text-secondary-text">Ativo</span>
+                          <span className="text-[10px] text-secondary-text">Ativo</span>
                           <JiffyIconSwitch
                             checked={cfg.ativo}
                             onChange={e =>
@@ -1119,7 +1119,7 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
                           />
                         </label>
                         <label className="flex flex-col items-center gap-1">
-                          <span className="font-nunito text-[10px] text-secondary-text">Automático</span>
+                          <span className="text-[10px] text-secondary-text">Automático</span>
                           <JiffyIconSwitch
                             checked={cfg.automatico}
                             onChange={e =>
@@ -1129,7 +1129,7 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
                           />
                         </label>
                         <label className="flex flex-col items-center gap-1">
-                          <span className="font-nunito text-[10px] text-secondary-text">Mesa</span>
+                          <span className="text-[10px] text-secondary-text">Mesa</span>
                           <JiffyIconSwitch
                             checked={cfg.mesa}
                             onChange={e =>
@@ -1139,7 +1139,7 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
                           />
                         </label>
                         <label className="flex flex-col items-center gap-1">
-                          <span className="font-nunito text-[10px] text-secondary-text">Balcão</span>
+                          <span className="text-[10px] text-secondary-text">Balcão</span>
                           <JiffyIconSwitch
                             checked={cfg.balcao}
                             onChange={e =>

@@ -1,4 +1,4 @@
-# Guia Oficial: Implementação Segura Multi-Tenant — Jiffy Gestor
+﻿# Guia Oficial: Implementação Segura Multi-Tenant — Jiffy Gestor
 
 ## 1. Visão geral
 
@@ -115,7 +115,7 @@ Comportamento do `ErpTenantAccessGuard`:
 
 - Loading → `JiffyLoading`
 - Sessão expirada → redirect `/login`
-- Sem sessão de empresa (identidade ok) → redirect `/meus-apps`
+- Sem sessão de empresa (identidade ok) → redirect `/minhas-empresas`
 
 Arquivos:
 
@@ -356,7 +356,7 @@ flowchart TD
   A[Login identity] --> B[Selecionar empresa no hub]
   B --> C[tenantAuth na aba sessionStorage]
   C --> D[ErpTenantAccessGuard]
-  D -->|Sem acesso| E[Redirect login ou meus-apps]
+  D -->|Sem acesso| E[Redirect login ou minhas-empresas]
   D -->|OK| F[useSecureTenantQuery / Mutation]
   F --> G[fetchGestorApi com Bearer tenantAuth]
   G --> H[BFF valida JWT e empresaId]

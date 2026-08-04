@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { FormControl, InputLabel, MenuItem, Select } from '@mui/material'
 import { Input } from '@/src/presentation/components/ui/input'
@@ -89,12 +89,12 @@ export function InformacoesProdutoStep({
   return (
     <div className="rounded-[10px] bg-info p-2 md:p-4">
       <div className="mb-2 flex items-center gap-5">
-        <h2 className="font-exo text-xl font-semibold text-primary">Informações</h2>
+        <h2 className="text-xl font-semibold text-primary">Informações</h2>
         <div className="h-px flex-1 bg-primary/70" />
       </div>
-      <p className="font-nunito mb-4 text-sm text-secondary-text">
+      <p className="mb-4 text-sm text-secondary-text">
         Preencha os dados principais do produto. Essas informações serão usadas para identificação e
-        exibição no PDV.
+        exibição no Jiffy POS.
       </p>
 
       <div className="space-y-4">
@@ -107,7 +107,7 @@ export function InformacoesProdutoStep({
             type="text"
             value={nomeProduto}
             onChange={e => onNomeProdutoChange(e.target.value.toLocaleUpperCase('pt-BR'))}
-            placeholder="Nome que Aparecerá no PDV"
+            placeholder="Nome que Aparecerá no Jiffy POS"
             className="bg-white"
             sx={sxEntradaCompactaProduto}
             InputLabelProps={{ required: true }}
@@ -228,7 +228,7 @@ export function InformacoesProdutoStep({
             <Button
               type="button"
               onClick={onSaveAndClose}
-              className="h-8 rounded-lg border-2 px-6 font-exo text-sm font-semibold hover:bg-primary/10 sm:px-8"
+              className="h-8 rounded-lg border-2 px-6 text-sm font-semibold hover:bg-primary/10 sm:px-8"
               sx={{
                 backgroundColor: 'var(--color-info)',
                 color: 'var(--color-primary)',
@@ -241,7 +241,7 @@ export function InformacoesProdutoStep({
             <Button
               type="button"
               onClick={onNext}
-              className="h-8 rounded-lg px-10 font-exo text-sm font-semibold text-white hover:bg-primary/90"
+              className="h-8 rounded-lg px-10 text-sm font-semibold text-white hover:bg-primary/90"
               sx={{
                 backgroundColor: 'var(--color-primary)',
               }}

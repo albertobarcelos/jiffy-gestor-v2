@@ -1,11 +1,11 @@
-'use client'
+﻿'use client'
 
 import { Menu, LogOut } from 'lucide-react'
 import { cn } from '@/src/shared/utils/cn'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { disconnectHubTab } from '@/src/presentation/utils/disconnectHubTab'
 import { useHubSearchSlot } from '@/src/presentation/contexts/HubSearchContext'
-import { SearchBar } from '@/src/presentation/components/features/meus-apps/components/SearchBar'
+import { SearchBar } from '@/src/presentation/components/features/minhas-empresas/components/SearchBar'
 
 type HubTopBarProps = {
   onMenuClick: () => void

@@ -48,7 +48,7 @@ export function useTenantAccessGuard(): TenantAccessGuard {
     if (!isAuthenticated || !tenantAuth) {
       accessError = 'Sessão não encontrada. Faça login.'
     } else if (tenantAuth.isExpired()) {
-      accessError = 'Sessão expirada. Faça login novamente.'
+      accessError = 'Sessão da empresa expirada. Selecione novamente em Minhas Empresas.'
     } else if (!empresaId) {
       accessError = 'Empresa não identificada no token.'
     } else {

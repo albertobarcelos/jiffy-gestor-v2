@@ -18,8 +18,6 @@ export interface ProdutoListItemProps {
   onValorChange: (produtoId: string, valor: number) => void
   onSwitchToggle: (produtoId: string, status: boolean) => void
   onToggleBoolean: (produtoId: string, field: ToggleField, value: boolean) => void
-  onOpenComplementosModal: (produto: Produto) => void
-  onOpenImpressorasModal: (produto: Produto) => void
   onEditProduto: (produtoId: string) => void
   onCopyProduto: (produtoId: string) => void
   onUploadImagem: (produtoId: string, file: File) => void
@@ -51,7 +49,7 @@ function ProdutoListItemThumb({
       disabled={isUploading}
       aria-label={label}
       title={label}
-      className="relative mr-2 w-12 shrink-0 self-stretch overflow-hidden rounded-lg border border-gray-200 bg-gray-50 transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-60 md:mr-3 md:w-14"
+      className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-gray-50 transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-60 md:h-12 md:w-12"
     >
       <input
         ref={inputRef}
@@ -73,7 +71,7 @@ function ProdutoListItemThumb({
         />
       ) : (
         <div className="absolute inset-0 flex items-center justify-center">
-          <MdPhotoCamera className="h-5 w-5 text-secondary-text/70 md:h-6 md:w-6" />
+          <MdPhotoCamera className="h-4 w-4 text-secondary-text/70 md:h-5 md:w-5" />
         </div>
       )}
       {isUploading ? (
@@ -94,8 +92,6 @@ function ProdutoListItemBase({
   onValorChange,
   onSwitchToggle,
   onToggleBoolean,
-  onOpenComplementosModal,
-  onOpenImpressorasModal,
   onEditProduto,
   onCopyProduto,
   onUploadImagem,
@@ -116,58 +112,61 @@ function ProdutoListItemBase({
     [produto]
   )
 
-  const sharedIconProps = {
-    produto,
-    toggleStates,
-    onToggleBoolean,
-    onOpenComplementosModal,
-    onOpenImpressorasModal,
-    onCopyProduto,
-  }
+  const nomeCompleto = produto.getNome()
+  const nomeExibicao =
+    nomeCompleto.length > 30 ? `${nomeCompleto.slice(0, 30)}…` : nomeCompleto
 
   return (
     <div
       onClick={() => onEditProduto(produtoId)}
-      className="flex cursor-pointer items-stretch border border-gray-200 bg-white px-2 py-1 hover:bg-secondary-text/10 md:px-4 md:py-2"
+      className="grid cursor-pointer items-center gap-x-2 border border-gray-200 bg-white px-2 py-1 hover:bg-secondary-text/10 md:gap-x-3 md:px-4 md:py-2 [grid-template-columns:auto_minmax(0,30ch)_5.25rem_auto_minmax(0,1fr)_auto]"
     >
       <ProdutoListItemThumb
-        nome={produto.getNome()}
+        nome={nomeCompleto}
         imagemUrl={imagemUrl}
         isUploading={isUploadingImagem}
         onSelectFile={file => onUploadImagem(produtoId, file)}
       />
 
-      <div className="min-w-0 flex-1">
-        {/* Nome e código */}
-        <div className="flex flex-wrap items-center gap-3">
-          <p className="flex flex-col-reverse items-start text-sm font-normal text-primary-text md:flex-row md:items-center md:gap-2 md:text-base">
-            <span className="tracking-wide">{produto.getNome()}</span>
-            <span className="inline-flex items-center gap-1 text-sm text-secondary-text md:ml-2">
-              <span className="text-xs">Cód. </span>
-              <span className="font-normal">{produto.getCodigoProduto()}</span>
-            </span>
-          </p>
-        </div>
+      <span
+        className="min-w-0 truncate text-sm font-normal tracking-wide text-primary-text md:text-base"
+        title={nomeCompleto.length > 30 ? nomeCompleto : undefined}
+      >
+        {nomeExibicao}
+      </span>
 
-        {/* Mobile: linha 1 (3 ícones) */}
-        <div className="mt-1.5 inline-grid w-fit grid-cols-3 gap-1 md:hidden">
-          <ProdutoActionIcons {...sharedIconProps} variant="mobile-row1" />
-        </div>
+      <span className="inline-flex w-full items-center justify-center rounded-md border border-primary/50 bg-info px-1.5 py-px text-[10px] font-medium leading-tight text-primary">
+        COD. {produto.getCodigoProduto() ?? '—'}
+      </span>
 
-        {/* Mobile: linha 2 (6 ícones restantes) */}
-        <div className="mt-1.5 inline-grid w-fit grid-cols-3 gap-1 md:hidden">
-          <ProdutoActionIcons {...sharedIconProps} variant="mobile-row2" />
+      <div
+        className="flex items-center gap-1 md:gap-1.5"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="md:hidden">
+          <ProdutoActionIcons
+            produto={produto}
+            toggleStates={toggleStates}
+            variant="mobile"
+            onToggleBoolean={onToggleBoolean}
+            onCopyProduto={onCopyProduto}
+          />
         </div>
-
-        {/* Desktop: linha única */}
-        <div className="mt-1.5 hidden items-center gap-1.5 md:flex">
-          <ProdutoActionIcons {...sharedIconProps} variant="desktop" />
+        <div className="hidden md:block">
+          <ProdutoActionIcons
+            produto={produto}
+            toggleStates={toggleStates}
+            variant="desktop"
+            onToggleBoolean={onToggleBoolean}
+            onCopyProduto={onCopyProduto}
+          />
         </div>
       </div>
 
-      {/* Lado direito: valor + toggle */}
+      <div className="min-w-0" aria-hidden />
+
       <div
-        className="flex flex-col-reverse flex-wrap items-end justify-end gap-4 md:mr-16 md:flex-row md:items-center"
+        className="flex flex-col-reverse flex-wrap items-end justify-end gap-3 md:mr-8 md:flex-row md:items-center md:gap-4"
         onClick={e => e.stopPropagation()}
       >
         <div className="relative">
@@ -197,8 +196,6 @@ function arePropsEqual(prev: ProdutoListItemProps, next: ProdutoListItemProps): 
     prev.onValorChange === next.onValorChange &&
     prev.onSwitchToggle === next.onSwitchToggle &&
     prev.onToggleBoolean === next.onToggleBoolean &&
-    prev.onOpenComplementosModal === next.onOpenComplementosModal &&
-    prev.onOpenImpressorasModal === next.onOpenImpressorasModal &&
     prev.onEditProduto === next.onEditProduto &&
     prev.onCopyProduto === next.onCopyProduto &&
     prev.onUploadImagem === next.onUploadImagem

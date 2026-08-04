@@ -26,7 +26,7 @@ function SectionBox({ title, children }: SectionBoxProps) {
   return (
     <div className="relative flex flex-col gap-3 border border-alternate/50 rounded-lg pt-4 pb-3 px-3">
       <div className="absolute -top-4 left-4 right-4 flex items-center justify-center">
-        <h3 className="font-exo font-semibold text-alternate text-xs sm:text-sm md:text-lg whitespace-nowrap px-2 bg-white">
+        <h3 className="font-semibold text-alternate text-xs sm:text-sm md:text-lg whitespace-nowrap px-2 bg-white">
           {title}
         </h3>
       </div>
@@ -145,31 +145,31 @@ export function PainelContadorView() {
               />
             </div>
             <div className="flex flex-col gap-3 sm:gap-4">
-              <h1 className="font-manrope font-semibold text-white text-2xl sm:text-3xl md:text-4xl lg:text-6xl">
+              <h1 className="font-semibold text-white text-2xl sm:text-3xl md:text-4xl lg:text-6xl">
                 Portal do <p className="md:py-2">Contador</p>
               </h1>
               <div className="flex flex-col">
                 <div className="flex flex-wrap items-start sm:items-center gap-2">
-                  <span className="font-exo font-semibold text-white text-xs sm:text-lg md:text-xl lg:text-2xl">
+                  <span className="font-semibold text-white text-xs sm:text-lg md:text-xl lg:text-2xl">
                     Empresa:
                   </span>
-                  <span className="font-exo font-normal text-white text-xs sm:text-lg md:text-xl lg:text-2xl">
+                  <span className="font-normal text-white text-xs sm:text-lg md:text-xl lg:text-2xl">
                     {resumo?.nomeExibicao ?? 'Empresa'}
                   </span>
                 </div>
                 <div className="flex flex-wrap items-start sm:items-center gap-2">
-                  <span className="font-exo font-medium text-white text-xs sm:text-lg md:text-xl lg:text-2xl">
+                  <span className="font-medium text-white text-xs sm:text-lg md:text-xl lg:text-2xl">
                     CNPJ:
                   </span>
-                  <span className="font-exo font-normal text-white text-xs sm:text-lg md:text-xl lg:text-2xl">
+                  <span className="font-normal text-white text-xs sm:text-lg md:text-xl lg:text-2xl">
                     {resumo?.cnpj ?? '--'}
                   </span>
                 </div>
                 <div className="flex flex-wrap items-start sm:items-center gap-2">
-                  <span className="font-exo font-medium text-white text-xs sm:text-lg md:text-xl lg:text-2xl">
+                  <span className="font-medium text-white text-xs sm:text-lg md:text-xl lg:text-2xl">
                     Regime:
                   </span>
-                  <span className="font-exo font-normal text-white text-xs sm:text-lg md:text-xl lg:text-2xl">
+                  <span className="font-normal text-white text-xs sm:text-lg md:text-xl lg:text-2xl">
                     {resumo?.regimeLabel ?? 'Não informado'}
                   </span>
                 </div>
@@ -179,7 +179,7 @@ export function PainelContadorView() {
         </div>
 
         <div className="mx-4 mt-4 flex flex-col">
-          <h2 className="font-manrope font-semibold text-white text-[clamp(12px,2.5vw,16px)] sm:text-[clamp(14px,3vw,18px)] md:text-[clamp(16px,3.5vw,22px)] lg:text-[24px] tracking-[-0.32px] leading-[1.4] md:leading-[1.3] mb-1.5 sm:mb-1.75 md:mb-2 break-words">
+          <h2 className="font-semibold text-white text-[clamp(12px,2.5vw,16px)] sm:text-[clamp(14px,3vw,18px)] md:text-[clamp(16px,3.5vw,22px)] lg:text-[24px] tracking-[-0.32px] leading-[1.4] md:leading-[1.3] mb-1.5 sm:mb-1.75 md:mb-2 break-words">
             Configuração Contábil: {totalConcluidas} de 3 Etapas concluídas
           </h2>
           <div className="w-full max-w-[947px] h-[18px] sm:h-[20px] md:h-[22px] lg:h-[26px] bg-[#f5f8fa] rounded-xl relative overflow-hidden mb-2 sm:mb-2.25 md:mb-2.5 lg:mb-3 flex-shrink-0">
@@ -216,7 +216,7 @@ export function PainelContadorView() {
                           <div className="flex-shrink-0 w-4 h-4 rounded-full border-2 border-white/50 group-hover:border-white transition-colors" />
                         )}
                         <span
-                          className={`font-manrope font-semibold text-white text-[clamp(10px,1.8vw,12px)] sm:text-[clamp(11px,2vw,13px)] md:text-[clamp(12px,2.2vw,14px)] lg:text-lg tracking-[-0.2px] leading-[1.3] ${
+                          className={`font-semibold text-white text-[clamp(10px,1.8vw,12px)] sm:text-[clamp(11px,2vw,13px)] md:text-[clamp(12px,2.2vw,14px)] lg:text-lg tracking-[-0.2px] leading-[1.3] ${
                             estaConcluida ? '' : 'opacity-75'
                           } ${estaHabilitada ? 'group-hover:underline' : ''}`}
                         >
@@ -255,12 +255,12 @@ export function PainelContadorView() {
                     : 'opacity-50 cursor-not-allowed'
                 }`}
               >
-                <span className="absolute top-3 left-3 sm:top-4 sm:left-4 font-exo font-medium text-alternate text-sm sm:text-base md:text-lg rounded-full bg-white w-8 h-8 flex items-center justify-center">
+                <span className="absolute top-3 left-3 sm:top-4 sm:left-4 font-medium text-alternate text-sm sm:text-base md:text-lg rounded-full bg-white w-8 h-8 flex items-center justify-center">
                   {etapa.step}
                 </span>
                 <div className="flex flex-col items-center justify-center gap-2">
                   <IconComponent className={corConteudo} size={52} />
-                  <span className={`font-exo font-medium text-sm sm:text-base md:text-lg ${corConteudo}`}>
+                  <span className={`font-medium text-sm sm:text-base md:text-lg ${corConteudo}`}>
                     {etapa.title}
                   </span>
                 </div>
@@ -282,12 +282,12 @@ export function PainelContadorView() {
                 onClick={() => handleOpenEtapa(etapa.id, etapa.label)}
                 className={`relative w-full rounded-[16px] border-2 border-alternate ${bgColor} hover:scale-105 active:scale-100 transition-transform duration-200 p-4 sm:p-5 shadow-sm hover:shadow-md text-center group flex flex-col items-center gap-3`}
               >
-                <span className="absolute top-3 left-3 sm:top-4 sm:left-4 font-exo font-medium text-alternate text-sm sm:text-base md:text-lg rounded-full bg-white w-8 h-8 flex items-center justify-center">
+                <span className="absolute top-3 left-3 sm:top-4 sm:left-4 font-medium text-alternate text-sm sm:text-base md:text-lg rounded-full bg-white w-8 h-8 flex items-center justify-center">
                   {etapa.step}
                 </span>
                 <div className="flex flex-col items-center justify-center gap-2">
                   <IconComponent className={corConteudo} size={52} />
-                  <span className={`font-exo font-medium text-sm sm:text-base md:text-lg ${corConteudo}`}>
+                  <span className={`font-medium text-sm sm:text-base md:text-lg ${corConteudo}`}>
                     {etapa.title}
                   </span>
                 </div>

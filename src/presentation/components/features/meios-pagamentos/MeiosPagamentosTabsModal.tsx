@@ -123,7 +123,7 @@ export function MeiosPagamentosTabsModal({
         <button
           type="button"
           onClick={() => onTabChange('meio-pagamento')}
-          className="font-nunito rounded-t-lg bg-primary px-4 py-2 text-xs font-semibold text-white md:text-sm"
+          className="rounded-t-lg bg-primary px-4 py-2 text-xs font-semibold text-white md:text-sm"
           aria-current="page"
         >
           Meio de Pagamento

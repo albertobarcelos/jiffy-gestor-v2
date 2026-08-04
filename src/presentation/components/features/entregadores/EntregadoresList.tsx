@@ -247,7 +247,7 @@ export function EntregadoresList() {
             <button
               type="button"
               onClick={abrirCriar}
-              className="flex h-8 items-center gap-2 rounded-lg bg-primary px-[30px] font-exo text-sm font-semibold text-info transition-colors hover:bg-primary/90"
+              className="flex h-8 items-center gap-2 rounded-lg bg-primary px-[30px] text-sm font-semibold text-info transition-colors hover:bg-primary/90"
             >
               Novo
               <span className="text-lg">+</span>
@@ -271,7 +271,7 @@ export function EntregadoresList() {
               placeholder="Pesquisar entregador..."
               value={searchText}
               onChange={e => setSearchText(e.target.value)}
-              className="h-full w-full rounded-lg border border-gray-200 bg-info pl-11 pr-4 font-nunito text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+              className="h-full w-full rounded-lg border border-gray-200 bg-info pl-11 pr-4 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
             />
           </div>
         </div>
@@ -283,7 +283,7 @@ export function EntregadoresList() {
             onChange={e =>
               setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')
             }
-            className="h-8 w-full rounded-lg border border-gray-200 bg-info px-5 font-nunito text-sm text-primary-text focus:border-primary focus:outline-none"
+            className="h-8 w-full rounded-lg border border-gray-200 bg-info px-5 text-sm text-primary-text focus:border-primary focus:outline-none"
           >
             <option value="Todos">Todos</option>
             <option value="Ativo">Ativo</option>
@@ -294,13 +294,13 @@ export function EntregadoresList() {
 
       <div className="mt-0 flex-shrink-0 md:px-[0px]">
         <div className="flex h-10 items-center gap-2 rounded-lg bg-custom-2 px-4">
-          <div className="flex-[2] font-nunito text-xs font-semibold text-primary-text md:text-sm">
+          <div className="flex-[2] text-xs font-semibold text-primary-text md:text-sm">
             Nome
           </div>
-          <div className="flex-[2] font-nunito text-xs font-semibold text-primary-text md:text-sm">
+          <div className="flex-[2] text-xs font-semibold text-primary-text md:text-sm">
             Telefone
           </div>
-          <div className="flex w-16 shrink-0 justify-end font-nunito text-xs font-semibold text-primary-text md:text-sm">
+          <div className="flex w-16 shrink-0 justify-end text-xs font-semibold text-primary-text md:text-sm">
             Remover
           </div>
         </div>
@@ -333,10 +333,10 @@ export function EntregadoresList() {
               onClick={() => abrirEditar(entregador.id)}
               className={`${bgClass} mb-1 flex cursor-pointer items-center rounded-lg py-2 hover:bg-secondary-bg/15 md:px-4`}
             >
-              <div className="flex-[2] flex items-center font-nunito text-xs font-normal text-primary-text md:text-sm">
+              <div className="flex-[2] flex items-center text-xs font-normal text-primary-text md:text-sm">
                 <span>{entregador.nome?.trim() || '-'}</span>
               </div>
-              <div className="flex-[2] font-nunito text-xs text-secondary-text md:text-sm">
+              <div className="flex-[2] text-xs text-secondary-text md:text-sm">
                 {telefoneListaExibicao(entregador.telefone)}
               </div>
               <div

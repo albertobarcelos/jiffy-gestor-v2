@@ -17,7 +17,7 @@ export function JiffySidePanelModalDemo() {
 
   return (
     <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6">
-      <p className="mb-3 font-['Nunito',sans-serif] text-sm text-secondary-text">
+      <p className="mb-3 text-sm text-secondary-text">
         Pré-visualização do <strong>JiffySidePanelModal</strong> (efeito lateral + rodapé padrão).
       </p>
       <Button type="button" variant="contained" color="primary" onClick={() => setOpen(true)}>
@@ -66,7 +66,7 @@ export function JiffySidePanelModalDemo() {
           },
         }}
       >
-        <div className="space-y-3 font-['Nunito',sans-serif] text-sm text-primary-text">
+        <div className="space-y-3 text-sm text-primary-text">
           <p>
             Conteúdo da aba <strong>{tab === 'a' ? 'A' : 'B'}</strong> — passo simulado:{' '}
             <strong>{step}</strong>/3

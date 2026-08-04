@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
   const periodo = searchParams.get('periodo') || 'hoje'
   const timezone = searchParams.get('timezone') || 'America/Sao_Paulo'
   const limit = Math.min(Math.max(Number(searchParams.get('limit') || '10'), 1), 500)
+  const ordenarPor = searchParams.get('ordenarPor') === 'quantidade' ? 'quantidade' : 'valor'
 
   const validation = validateRequest(request)
   if (!validation.valid || !validation.tokenInfo) {
@@ -121,6 +122,11 @@ export async function GET(request: NextRequest) {
     const ordenadosFull = Array.from(porUsuario.entries())
       .map(([usuarioId, agg]) => ({ usuarioId, ...agg }))
       .sort((a, b) => {
+        if (ordenarPor === 'quantidade') {
+          if (b.qtdProdutos !== a.qtdProdutos) return b.qtdProdutos - a.qtdProdutos
+          if (b.valorTotal !== a.valorTotal) return b.valorTotal - a.valorTotal
+          return b.qtdVendas - a.qtdVendas
+        }
         if (b.valorTotal !== a.valorTotal) return b.valorTotal - a.valorTotal
         if (b.qtdVendas !== a.qtdVendas) return b.qtdVendas - a.qtdVendas
         return b.qtdProdutos - a.qtdProdutos

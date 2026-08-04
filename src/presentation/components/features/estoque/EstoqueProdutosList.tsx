@@ -17,16 +17,16 @@ const ProdutoEstoqueItem = React.memo(({ produto }: { produto: Produto }) => {
     <div
       className="h-[50px] px-4 flex items-center gap-[10px] border-t border-alternate/20"
     >
-      <div className="w-[10%] font-nunito text-sm text-primary-text">
+      <div className="w-[10%] text-sm text-primary-text">
         {produto.getCodigoProduto() || '-'}
       </div>
-      <div className="w-[30%] font-nunito font-semibold text-sm text-primary-text">
+      <div className="w-[30%] font-semibold text-sm text-primary-text">
         {produto.getNome()}
       </div>
-      <div className="w-[16%] font-nunito text-sm text-secondary-text">
+      <div className="w-[16%] text-sm text-secondary-text">
         {produto.getNomeGrupo() || '-'}
       </div>
-      <div className="w-[16%] font-nunito text-sm text-secondary-text">
+      <div className="w-[16%] text-sm text-secondary-text">
         {typeof produto.getEstoque() === 'number'
           ? produto.getEstoque()
           : typeof produto.getEstoque() === 'string'
@@ -35,7 +35,7 @@ const ProdutoEstoqueItem = React.memo(({ produto }: { produto: Produto }) => {
       </div>
       <div className="w-[16%]">
         <div
-          className={`w-[80px] px-3 py-1 rounded-[24px] text-center text-sm font-nunito font-medium ${
+          className={`w-[80px] px-3 py-1 rounded-[24px] text-center text-sm font-medium ${
             produto.isAtivo()
               ? 'bg-success/20 text-success'
               : 'bg-error/20 text-secondary-text'
@@ -44,7 +44,7 @@ const ProdutoEstoqueItem = React.memo(({ produto }: { produto: Produto }) => {
           {produto.isAtivo() ? 'Ativo' : 'Desativado'}
         </div>
       </div>
-      <div className="w-[16%] font-nunito font-semibold text-sm text-primary-text">
+      <div className="w-[16%] font-semibold text-sm text-primary-text">
         {new Intl.NumberFormat('pt-BR', {
           style: 'currency',
           currency: 'BRL',
@@ -149,7 +149,7 @@ export function EstoqueProdutosList() {
       {/* Header */}
       <div className="px-[35px] pt-0 pb-0">
         <div className="h-[90px] flex items-center justify-between">
-          <h1 className="text-primary text-2xl font-semibold font-exo">
+          <h1 className="text-primary text-2xl font-semibold ">
             Estoque
           </h1>
           <div className="flex items-center gap-[10px]">
@@ -161,7 +161,7 @@ export function EstoqueProdutosList() {
                   placeholder="Pesquisar..."
                   value={searchText}
                   onChange={(e) => setSearchText(e.target.value)}
-                  className="w-full h-full px-5 pl-12 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-secondary font-nunito text-sm"
+                  className="w-full h-full px-5 pl-12 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-secondary text-sm"
                 />
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
                   🔍
@@ -190,11 +190,11 @@ export function EstoqueProdutosList() {
         <div className="px-[30px] pt-[30px] pb-[10px]">
           <div className="flex items-start justify-between">
             <div className="pl-5">
-              <p className="text-primary text-sm font-semibold font-nunito mb-2">
+              <p className="text-primary text-sm font-semibold mb-2">
                 Produtos Cadastrados
               </p>
               <div className="flex items-center gap-2">
-                <p className="text-tertiary text-[26px] font-medium font-nunito">
+                <p className="text-tertiary text-[26px] font-medium ">
                   {produtos.length}
                 </p>
                 <div className="w-10 h-10 flex items-center justify-center text-secondary-text">
@@ -215,7 +215,7 @@ export function EstoqueProdutosList() {
               {/* Botão Movimentar */}
               <button
                 onClick={() => window.location.href = '/estoque'}
-                className="h-10 px-[30px] bg-primary text-info rounded-[30px] font-medium font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+                className="h-10 px-[30px] bg-primary text-info rounded-[30px] font-medium text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
               >
                 Movimentar
                 <span className="text-base">→</span>
@@ -236,7 +236,7 @@ export function EstoqueProdutosList() {
                   placeholder="Pesquisar..."
                   value={searchText}
                   onChange={(e) => setSearchText(e.target.value)}
-                  className="w-full h-full px-5 pl-12 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-secondary font-nunito text-sm"
+                  className="w-full h-full px-5 pl-12 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-secondary text-sm"
                 />
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
                   🔍
@@ -246,7 +246,7 @@ export function EstoqueProdutosList() {
 
             {/* Botão Filtrar */}
             <div className="flex-1">
-              <button className="h-[40px] px-[30px] rounded-[40px] border-[0.6px] border-secondary bg-info text-secondary font-medium font-exo text-sm flex items-center gap-2 hover:bg-primary-bg transition-colors">
+              <button className="h-[40px] px-[30px] rounded-[40px] border-[0.6px] border-secondary bg-info text-secondary font-medium text-sm flex items-center gap-2 hover:bg-primary-bg transition-colors">
                 <span>🔽</span>
                 Filtrar
               </button>
@@ -259,25 +259,25 @@ export function EstoqueProdutosList() {
           <div className="bg-info rounded-lg overflow-hidden">
             {/* Cabeçalho da tabela */}
             <div className="h-10 bg-custom-2 px-4 flex items-center gap-[10px]">
-              <div className="w-[10%] font-nunito font-semibold text-sm text-primary-text">
+              <div className="w-[10%] font-semibold text-sm text-primary-text">
                 Código
               </div>
-              <div className="w-[30%] font-nunito font-semibold text-sm text-primary-text">
+              <div className="w-[30%] font-semibold text-sm text-primary-text">
                 Nome
               </div>
-              <div className="w-[16%] font-nunito font-semibold text-sm text-primary-text">
+              <div className="w-[16%] font-semibold text-sm text-primary-text">
                 Grupo
               </div>
-              <div className="w-[16%] font-nunito font-semibold text-sm text-primary-text">
+              <div className="w-[16%] font-semibold text-sm text-primary-text">
                 Estoque
               </div>
-              <div className="w-[16%] font-nunito font-semibold text-sm text-primary-text">
+              <div className="w-[16%] font-semibold text-sm text-primary-text">
                 Status
               </div>
-              <div className="w-[16%] font-nunito font-semibold text-sm text-primary-text">
+              <div className="w-[16%] font-semibold text-sm text-primary-text">
                 Valor
               </div>
-              <div className="w-[10%] text-right font-nunito font-semibold text-sm text-primary-text">
+              <div className="w-[10%] text-right font-semibold text-sm text-primary-text">
                 Ações
               </div>
             </div>

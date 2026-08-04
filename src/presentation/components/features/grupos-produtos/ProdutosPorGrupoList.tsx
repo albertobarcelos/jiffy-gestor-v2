@@ -346,7 +346,7 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
   if (!isLoading && localProdutos.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-secondary-text text-sm font-nunito">
+        <p className="text-secondary-text text-sm ">
           Nenhum produto associado a este grupo.
         </p>
       </div>
@@ -368,7 +368,7 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
               <button
                 type="button"
                 onClick={handleOpenNovoProdutoModal}
-                className="md:h-8 md:px-[10px] px-2 py-1 md:py-0 bg-primary text-info rounded-lg font-semibold font-exo md:text-sm text-xs flex items-center gap-2 hover:bg-primary/90 transition-colors"
+                className="md:h-8 md:px-[10px] px-2 py-1 md:py-0 bg-primary text-info rounded-lg font-semibold md:text-sm text-xs flex items-center gap-2 hover:bg-primary/90 transition-colors"
               >
                 Novo produto
               </button>

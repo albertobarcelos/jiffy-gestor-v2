@@ -536,7 +536,7 @@ export function EnderecoEntregaPedidoKanbanPainel({
                   aria-controls="tabpanel-endereco-morada-salva"
                   disabled={moradas.length === 0 && moradasQuery.isLoading}
                   onClick={() => setModo('morada')}
-                  className={`font-nunito rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                  className={`rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                     modo === 'morada'
                       ? 'bg-primary text-white'
                       : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
@@ -551,7 +551,7 @@ export function EnderecoEntregaPedidoKanbanPainel({
                   id="tab-endereco-correcao-manual"
                   aria-controls="tabpanel-endereco-correcao-manual"
                   onClick={() => setModo('manual')}
-                  className={`font-nunito rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                  className={`rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors ${
                     modo === 'manual'
                       ? 'bg-primary text-white'
                       : 'bg-gray-100 text-secondary-text hover:bg-gray-200'

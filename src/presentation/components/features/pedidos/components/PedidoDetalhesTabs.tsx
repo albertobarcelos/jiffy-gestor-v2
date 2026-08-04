@@ -41,7 +41,7 @@ export function PedidoDetalhesTabs({
           aria-selected={abaSelecionada === aba.id}
           id={aba.tabId}
           onClick={() => onAbaChange(aba.id)}
-          className={`font-nunito -mb-px border-b-2 px-4 py-2 text-sm font-semibold transition-colors ${
+          className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold transition-colors ${
             abaSelecionada === aba.id
               ? 'border-primary text-primary'
               : 'border-transparent text-gray-500 hover:text-gray-800'

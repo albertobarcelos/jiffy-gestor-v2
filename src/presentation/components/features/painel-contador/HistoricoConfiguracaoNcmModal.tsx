@@ -150,7 +150,7 @@ export function HistoricoConfiguracaoNcmModal({
       >
         <DialogHeader>
           <div className="flex items-center justify-between">
-          <h1 className="text-alternate font-exo font-semibold text-sm sm:text-xl">Histórico de Alterações - NCM {codigoNcm}</h1>
+          <h1 className="text-alternate font-semibold text-sm sm:text-xl">Histórico de Alterações - NCM {codigoNcm}</h1>
           <Button 
             onClick={onClose} 
             variant="outlined"

@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantAccessGuard } from '@/src/presentation/hooks/useTenantAccessGuard'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { SESSION_STORAGE_TENANT_LOGOUT_SELF } from '@/src/shared/constants/sessionCoordinator'
+import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 
 interface ErpTenantAccessGuardProps {
   children: ReactNode
@@ -16,8 +18,9 @@ interface ErpTenantAccessGuardProps {
  * Integrado em ErpAppShell para proteger todas as rotas sob app/(erp)/.
  *
  * - Loading: exibe JiffyLoading enquanto a reidratação do store não concluiu.
- * - Sessão expirada: redireciona para /login.
- * - Sem sessão de empresa (acesso não autorizado): redireciona para /meus-apps.
+ * - Sessão da empresa expirada com hub ok: `logoutTenant` → {@link HUB_PATH}.
+ * - Sem sessão de empresa: {@link HUB_PATH}.
+ * - Hub também inválido: `/login`.
  * - Sessão válida: renderiza children.
  */
 export function ErpTenantAccessGuard({ children }: ErpTenantAccessGuardProps) {
@@ -28,11 +31,42 @@ export function ErpTenantAccessGuard({ children }: ErpTenantAccessGuardProps) {
   useEffect(() => {
     if (isLoading || hasAccess) return
 
-    if (tenantAuth?.isExpired()) {
-      router.replace('/login')
-    } else {
-      router.replace('/meus-apps')
+    try {
+      if (sessionStorage.getItem(SESSION_STORAGE_TENANT_LOGOUT_SELF) === '1') {
+        return
+      }
+    } catch {
+      /* noop */
     }
+
+    if (tenantAuth?.isExpired()) {
+      const identity = useAuthStore.getState().identityAuth
+      if (identity && !identity.isExpired()) {
+        void (async () => {
+          try {
+            sessionStorage.setItem(SESSION_STORAGE_TENANT_LOGOUT_SELF, '1')
+          } catch {
+            /* noop */
+          }
+          try {
+            await useAuthStore.getState().logoutTenant()
+          } catch {
+            /* noop */
+          }
+          window.location.assign(HUB_PATH)
+        })()
+        return
+      }
+      router.replace('/login')
+      return
+    }
+
+    const identity = useAuthStore.getState().identityAuth
+    if (identity && !identity.isExpired()) {
+      router.replace(HUB_PATH)
+      return
+    }
+    router.replace('/login')
   }, [hasAccess, isLoading, router, tenantAuth])
 
   if (isLoading || !hasAccess) {

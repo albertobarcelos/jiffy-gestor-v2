@@ -812,12 +812,12 @@ export function ComplementosMultiSelectDialog({
               value={catalogSearch}
               onChange={e => setCatalogSearch(e.target.value)}
               placeholder="Buscar grupo..."
-              className="font-nunito h-9 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-xs text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+              className="h-9 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-xs text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
             />
           </div>
           <div className="scrollbar-hide max-h-[280px] min-h-0 overflow-y-auto rounded-lg border border-gray-100 bg-gray-50/50 md:max-h-[360px]">
             {isLoadingSelectableGroups ? (
-              <p className="font-nunito py-8 text-center text-xs text-secondary-text">
+              <p className="py-8 text-center text-xs text-secondary-text">
                 Carregando grupos...
               </p>
             ) : gruposCatalogoParaLista.length ? (
@@ -864,7 +864,7 @@ export function ComplementosMultiSelectDialog({
                               aria-expanded={expandido}
                               aria-controls={`grupo-comp-list-${grupo.id}`}
                             >
-                              <p className="font-nunito truncate text-xs font-medium text-primary-text">
+                              <p className="truncate text-xs font-medium text-primary-text">
                                 {grupo.nome || 'Grupo'}
                               </p>
                               {grupo.obrigatorio ? (
@@ -984,7 +984,7 @@ export function ComplementosMultiSelectDialog({
                 })}
               </ul>
             ) : (
-              <p className="font-nunito py-8 text-center text-xs text-secondary-text">
+              <p className="py-8 text-center text-xs text-secondary-text">
                 {allSelectableGroups.length === 0
                   ? 'Nenhum grupo de complementos cadastrado.'
                   : 'Nenhum grupo encontrado para a busca.'}
@@ -1005,7 +1005,7 @@ export function ComplementosMultiSelectDialog({
           <div className="px-6 py-3">
             {/* Mesmo padrão de NovoComplemento (&quot;Dados do Complemento&quot;): título + linha + ação na mesma linha */}
             <div className="flex min-w-0 flex-wrap items-center gap-3 md:gap-5">
-              <h2 className="min-w-0 break-words font-exo text-lg font-semibold text-primary md:text-xl">
+              <h2 className="min-w-0 break-words text-lg font-semibold text-primary md:text-xl">
                 Complementos Vinculados
               </h2>
               <div className="h-px min-w-8 flex-1 bg-primary/70" />
@@ -1019,7 +1019,7 @@ export function ComplementosMultiSelectDialog({
                 Criar novo grupo
               </button>
             </div>
-            <p className="font-nunito text-sm text-secondary-text">
+            <p className="text-sm text-secondary-text">
               {groups.length} grupo{groups.length === 1 ? '' : 's'} vinculados
             </p>
           </div>

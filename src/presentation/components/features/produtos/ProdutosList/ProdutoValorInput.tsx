@@ -49,7 +49,7 @@ export function ProdutoValorInput({ valor, disabled = false, onCommit }: Produto
         if (e.key === 'Enter') e.currentTarget.blur()
       }}
       disabled={disabled}
-      className="p-2 rounded-xl border border-gray-200 focus:border-primary focus:outline-none md:text-sm text-xs font-normal text-primary-text w-24 disabled:opacity-60 disabled:cursor-not-allowed"
+      className="w-24 rounded-lg border border-primary/50 bg-info p-2 text-center text-xs font-normal text-primary-text focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 md:text-sm"
     />
   )
 }
