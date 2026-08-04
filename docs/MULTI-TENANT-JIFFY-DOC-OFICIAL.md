@@ -36,6 +36,10 @@ Cada aba do browser pode estar em uma empresa diferente. O `tenantAuth` fica em 
 
 - Aba A (Empresa X) não compartilha token com Aba B (Empresa Y)
 - O cookie global `tenant-token` **não** deve ser a fonte de verdade no cliente; o BFF deve preferir o `Authorization: Bearer` enviado pelo frontend
+- A **URL (slug + prefixo de `empresaId`)** é canônica: se divergir do token da aba, o bootstrap faz rebind via `escolher-empresa`
+- O BFF guarda `refresh-token-map` por `empresaId`; o cookie `refresh-token` legado fica como “última empresa” / ponte do hub
+
+Ver: `docs/arquitetura-jiffy/5.presentation/6.INVARIANTES_SESSAO_MULTI_ABA.md`
 
 ### 2.3 Reidratação
 

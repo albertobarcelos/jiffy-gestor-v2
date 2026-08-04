@@ -132,6 +132,8 @@ export class ApiClient {
     try {
       const response = await fetch(url, {
         ...options,
+        // Multi-tenant BFF: nunca cachear por URL — o Authorization muda por empresa/aba.
+        cache: 'no-store',
         headers: {
           ...defaultHeaders,
           ...options.headers,

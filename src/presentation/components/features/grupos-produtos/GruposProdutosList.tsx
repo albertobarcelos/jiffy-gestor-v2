@@ -21,12 +21,12 @@ import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { GrupoItem } from './GrupoItem'
 import { useGruposProdutosInfinite } from '@/src/presentation/hooks/useGruposProdutos'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { useQueryClient } from '@tanstack/react-query'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
 import { MdSearch } from 'react-icons/md'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import {
   GruposProdutosTabsModal,
   GruposProdutosTabsModalState,
@@ -49,10 +49,15 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const loadMoreRef = useRef<HTMLDivElement>(null)
   const { auth } = useAuthStore()
-  const queryClient = useQueryClient()
+  const invalidate = useInvalidateTenantQueries()
   const router = useRouter() // Obter a instância do router
   const searchParams = useSearchParams() // Obter os search params da URL
   const pathname = usePathname() // Obter o pathname da URL
+
+  const invalidateListas = useCallback(async () => {
+    await invalidate(['grupos-produtos'])
+    await invalidate(['produtos', 'infinite'])
+  }, [invalidate])
   const [tabsModalState, setTabsModalState] = useState<GruposProdutosTabsModalState>({
     open: false,
     tab: 'grupo',
@@ -220,9 +225,9 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
   // Função removida - não é mais necessária pois usamos atualização otimista
 
   const handleTabsModalReload = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['grupos-produtos'] })
+    void invalidateListas()
     onReload?.()
-  }, [onReload, queryClient])
+  }, [onReload, invalidateListas])
 
   const handleToggleGrupoStatus = useCallback(
     async (grupoId: string, novoStatus: boolean) => {
@@ -309,9 +314,8 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     currentSearchParams.delete('modalGrupoOpen')
     router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
     router.refresh() // Força a revalidação da rota principal
-    queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false }) // Invalida todas as queries de grupos de produtos
-    queryClient.invalidateQueries({ queryKey: ['produtos', 'infinite'] }) // Invalida o cache do React Query para produtos
-  }, [router, searchParams, pathname, queryClient])
+    void invalidateListas()
+  }, [router, searchParams, pathname, invalidateListas])
 
   const handleTabsModalTabChange = useCallback((tab: 'grupo') => {
     setTabsModalState((prev) => ({
@@ -353,9 +357,8 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     currentSearchParams.delete('modalProdutoOpen')
     router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
     router.refresh() // Força a revalidação da rota principal
-    queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false }) // Invalida todas as queries de grupos de produtos
-    queryClient.invalidateQueries({ queryKey: ['produtos', 'infinite'] }) // Invalida o cache do React Query para produtos
-  }, [router, searchParams, queryClient, pathname])
+    void invalidateListas()
+  }, [router, searchParams, invalidateListas, pathname])
 
   const handleProdutoTabChange = useCallback(
     (tab: 'produto' | 'complementos' | 'impressoras' | 'grupo') => {
@@ -417,15 +420,15 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       }
 
       showToast.success('Ordem atualizada com sucesso!')
-      // Invalidar cache do React Query para atualizar outras telas que usam os grupos
-      queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false })
+      // Invalidação com escopo tenant (lista + dropdowns em outras telas)
+      void invalidate(['grupos-produtos'])
     } catch (error: any) {
       console.error('Erro ao reordenar grupo:', error)
       // Reverte feedback otimista
       setLocalGrupos(previousState)
       showToast.error(error.message || 'Erro ao atualizar ordem do grupo')
     }
-  }, [localGrupos, auth, queryClient])
+  }, [localGrupos, auth, invalidate])
 
   return (
     <>

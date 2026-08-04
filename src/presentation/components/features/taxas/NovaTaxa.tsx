@@ -10,7 +10,7 @@ import {
   useState,
 } from 'react'
 import { useRouter } from 'next/navigation'
-import { useQueryClient } from '@tanstack/react-query'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { FormControl, InputLabel, MenuItem, Select } from '@mui/material'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Input } from '@/src/presentation/components/ui/input'
@@ -164,7 +164,7 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
   ref
 ) {
   const router = useRouter()
-  const queryClient = useQueryClient()
+  const invalidate = useInvalidateTenantQueries()
   const { auth, isAuthenticated } = useAuthStore()
   const token = auth?.getAccessToken()
 
@@ -626,7 +626,7 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
       }
 
       commitBaselineLatestRef.current()
-      await queryClient.invalidateQueries({ queryKey: ['taxas'], exact: false })
+      await invalidate(['taxas'])
       clearSelection()
       if (isEmbedded) {
         onSaved?.()
@@ -655,7 +655,7 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
     ncm,
     terminaisLista,
     porTerminal,
-    queryClient,
+    invalidate,
     isEmbedded,
     onSaved,
     router,

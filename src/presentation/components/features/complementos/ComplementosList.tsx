@@ -9,7 +9,7 @@ import { showToast } from '@/src/shared/utils/toast'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useComplementosInfinite } from '@/src/presentation/hooks/useComplementos'
-import { useQueryClient } from '@tanstack/react-query'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import {
   ComplementosTabsModal,
   ComplementosTabsModalState,
@@ -159,7 +159,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
-  const queryClient = useQueryClient()
+  const invalidate = useInvalidateTenantQueries()
 
   const ativoFilter = useMemo<boolean | null>(() => {
     return filterStatus === 'Ativo' ? true : filterStatus === 'Inativo' ? false : null
@@ -532,8 +532,8 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
     currentSearchParams.delete('modalComplementoOpen')
     router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
     router.refresh()
-    await queryClient.invalidateQueries({ queryKey: ['complementos'], exact: false })
-  }, [router, searchParams, pathname, queryClient])
+    await invalidate(['complementos'])
+  }, [router, searchParams, pathname, invalidate])
 
   const handleTabsModalReload = useCallback(async () => {
     await handleActionsReload()

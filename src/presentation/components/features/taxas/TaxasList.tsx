@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useQueryClient } from '@tanstack/react-query'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { TaxasNovaModal } from '@/src/presentation/components/features/taxas/TaxasNovaModal'
 import { Taxa } from '@/src/domain/entities/Taxa'
 import { MdDeleteOutline, MdSearch } from 'react-icons/md'
@@ -199,7 +199,7 @@ export function TaxasList() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const queryClient = useQueryClient()
+  const invalidate = useInvalidateTenantQueries()
   const { auth } = useAuthStore()
 
   /** Evita PATCH concorrentes (ref); estado só para feedback visual na linha. */
@@ -310,7 +310,7 @@ export function TaxasList() {
         }
 
         showToast.success(novoAtivo ? 'Taxa ativada.' : 'Taxa desativada.')
-        await queryClient.invalidateQueries({ queryKey: ['taxas'], exact: false })
+        await invalidate(['taxas'])
       } catch (e) {
         console.error('salvarToggleAtivoTaxa:', e)
         showToast.error(e instanceof Error ? e.message : 'Erro ao atualizar taxa.')
@@ -319,7 +319,7 @@ export function TaxasList() {
         setSavingAtivoParaId(null)
       }
     },
-    [auth, queryClient]
+    [auth, invalidate]
   )
 
   const abrirConfirmacaoExclusaoTaxa = useCallback((taxa: Taxa) => {
@@ -354,7 +354,7 @@ export function TaxasList() {
 
       if (res.status === 204 || res.ok) {
         showToast.success('Taxa removida.')
-        await queryClient.invalidateQueries({ queryKey: ['taxas'], exact: false })
+        await invalidate(['taxas'])
         setConfirmDeleteOpen(false)
         setTaxaParaExcluir(null)
         return
@@ -374,7 +374,7 @@ export function TaxasList() {
       setIsDeletingTaxa(false)
       setExcluindoTaxaId(null)
     }
-  }, [taxaParaExcluir, auth, queryClient])
+  }, [taxaParaExcluir, auth, invalidate])
 
   const [searchText, setSearchText] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -576,7 +576,7 @@ export function TaxasList() {
       taxaEditId={taxaEditId || undefined}
       onClose={fecharModalNovaTaxa}
       onReload={() => {
-        void queryClient.invalidateQueries({ queryKey: ['taxas'], exact: false })
+        void invalidate(['taxas'])
       }}
     />
 

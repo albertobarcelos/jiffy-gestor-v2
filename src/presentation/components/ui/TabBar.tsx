@@ -31,7 +31,6 @@ const TAB_ICON_BY_ID: Partial<Record<string, IconType>> = {
 
 /**
  * Barra de abas minimalista e clean
- * Inspirado no design do Omie
  */
 export function TabBar() {
   const { tabs, activeTabId, setActiveTab, removeTab } = useTabsStore()

@@ -294,9 +294,9 @@ export function EnderecoEntregaPedidoKanbanPainel({
     (modo === 'morada' ? Boolean(moradaSelecionadaId) : enderecoManualValido(formManual))
 
   const sincronizarCachesAposSalvar = async (vendaId: string) => {
-    queryClient.invalidateQueries({ queryKey: ['vendas'] })
+    queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'] })
     invalidateKanbanVendasListagens(queryClient)
-    queryClient.invalidateQueries({ queryKey: ['venda', vendaId] })
+    queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'venda', vendaId] })
     await invalidateVendaDetalheCarregadaCache(queryClient, empresaId, vendaId)
     invalidarPedidoKanbanQuickViewCache(vendaId)
   }

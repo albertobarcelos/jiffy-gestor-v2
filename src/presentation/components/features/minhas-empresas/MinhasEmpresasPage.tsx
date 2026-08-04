@@ -29,6 +29,7 @@ import {
 import { appEmpresaCorrespondeBusca, conviteCorrespondeBusca } from './utils/minhasEmpresasBusca'
 import { activateHubEmpresaSessionAndBuildUrl } from './utils/activateHubEmpresaSession'
 import { HUB_ROUTES } from '@/src/shared/constants/hubRoutes'
+import { ensureHubBearerToken } from '@/src/presentation/utils/ensureHubBearerToken'
 
 const HUB_SESSAO_TOAST_ID = 'minhas-empresas-sessao-token'
 
@@ -38,10 +39,13 @@ export default function MinhasEmpresasPage() {
   const setHubEmpresas = useAuthStore(s => s.setHubEmpresas)
   /** Sessão do hub (identidade); não usar `auth` aqui — pode ser só tenant se outra aba abriu empresa. */
   const identityAuth = useAuthStore(s => s.identityAuth)
-  const logoutHub = useAuthStore(s => s.logoutHub)
+  const logout = useAuthStore(s => s.logout)
   const isRehydrated = useAuthStore(s => s.isRehydrated)
 
   const [busca, setBusca] = useState('')
+  /** Bearer resolvido (identity ou access via refresh) — fonte única das APIs do hub. */
+  const [hubBearer, setHubBearer] = useState<string | null>(null)
+  const [hubBearerReady, setHubBearerReady] = useState(false)
 
   useRegisterHubSearch({
     value: busca,
@@ -64,81 +68,62 @@ export default function MinhasEmpresasPage() {
   /** No grid, primeira linha pode incluir card promocional; “Mostrar mais” expande o feed completo. */
   const [feedGridExpandido, setFeedGridExpandido] = useState(false)
 
-  const reportHubSessionIssue = useCallback((message: string) => {
-    setHubTokenBanner(message)
-    toast.error(message, { id: HUB_SESSAO_TOAST_ID, duration: 8000 })
-
-    // Agenda redirect imediato ao login quando o servidor rejeita o token —
-    // independente de identityAuth.isExpired() (pode estar revogado no servidor).
-    if (!hubSessaoProativaDisparadaRef.current) {
-      hubSessaoProativaDisparadaRef.current = true
-      redirectTimerRef.current = window.setTimeout(() => {
-        void logoutHub().finally(() => {
-          window.location.href = '/login'
-        })
-      }, 3000)
-    }
-  }, [logoutHub])
-
-  /**
-   * Assim que o JWT de identidade expira: mostra banner/toast brevemente e,
-   * após 3 s, chama `logoutHub()` + redireciona ao /login.
-   * Não espera o poll do AuthGuard (15 s) para dar uma resposta mais ágil ao usuário.
-   */
   const hubSessaoProativaDisparadaRef = useRef(false)
   const redirectTimerRef = useRef<number | undefined>(undefined)
+
+  const irParaLogin = useCallback(() => {
+    void logout().finally(() => {
+      window.location.href = '/login'
+    })
+  }, [logout])
+
+  const reportHubSessionIssue = useCallback(
+    (message: string) => {
+      setHubTokenBanner(message)
+      toast.error(message, { id: HUB_SESSAO_TOAST_ID, duration: 8000 })
+
+      if (!hubSessaoProativaDisparadaRef.current) {
+        hubSessaoProativaDisparadaRef.current = true
+        redirectTimerRef.current = window.setTimeout(() => {
+          irParaLogin()
+        }, 3000)
+      }
+    },
+    [irParaLogin]
+  )
+
+  /** Bootstrap: identity → access da aba → refresh cookie. */
   useEffect(() => {
-    if (!isRehydrated || !identityAuth) {
+    if (!isRehydrated) {
       return
     }
-
-    const dispararSeExpirado = () => {
-      if (!identityAuth.isExpired()) {
+    let cancelado = false
+    void (async () => {
+      const bearer = await ensureHubBearerToken()
+      if (cancelado) {
         return
       }
-      if (hubSessaoProativaDisparadaRef.current) {
+      if (!bearer) {
+        setHubBearer(null)
+        setHubBearerReady(true)
+        reportHubSessionIssue(HUB_SESSAO_TOKEN_MENSAGEM)
         return
       }
-      hubSessaoProativaDisparadaRef.current = true
-      reportHubSessionIssue(HUB_SESSAO_TOKEN_MENSAGEM)
-
-      // Redirecionar ao login após breve aviso (3 s para o usuário ler o toast)
-      redirectTimerRef.current = window.setTimeout(() => {
-        void logoutHub().finally(() => {
-          window.location.href = '/login'
-        })
-      }, 3000)
-    }
-
-    dispararSeExpirado()
-    const intervalo = window.setInterval(dispararSeExpirado, 15_000)
-
-    const msAteExp = identityAuth.getExpiresAt().getTime() - Date.now()
-    let timeoutId: number | undefined
-    if (msAteExp > 0 && msAteExp < 1000 * 60 * 60 * 72) {
-      timeoutId = window.setTimeout(dispararSeExpirado, msAteExp + 750)
-    }
-
+      setHubBearer(bearer.token)
+      setHubBearerReady(true)
+      setHubTokenBanner(null)
+      hubSessaoProativaDisparadaRef.current = false
+    })()
     return () => {
-      window.clearInterval(intervalo)
-      if (timeoutId !== undefined) {
-        window.clearTimeout(timeoutId)
-      }
+      cancelado = true
       if (redirectTimerRef.current !== undefined) {
         window.clearTimeout(redirectTimerRef.current)
       }
     }
-  }, [identityAuth, isRehydrated, reportHubSessionIssue, logoutHub])
+  }, [isRehydrated, identityAuth, reportHubSessionIssue])
 
   useEffect(() => {
-    if (identityAuth && !identityAuth.isExpired()) {
-      hubSessaoProativaDisparadaRef.current = false
-      setHubTokenBanner(null)
-    }
-  }, [identityAuth])
-
-  useEffect(() => {
-    if (!isRehydrated || !identityAuth) {
+    if (!isRehydrated || !hubBearerReady || !hubBearer) {
       return
     }
 
@@ -147,12 +132,11 @@ export default function MinhasEmpresasPage() {
     void (async () => {
       try {
         setConvitesErro(null)
-        const token = identityAuth.getAccessToken()
         const res = await fetch('/api/convites/me', {
           method: 'GET',
           credentials: 'include',
           headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            Authorization: `Bearer ${hubBearer}`,
           },
         })
         const data = await res.json().catch(() => null)
@@ -185,7 +169,7 @@ export default function MinhasEmpresasPage() {
     return () => {
       cancelado = true
     }
-  }, [identityAuth, isRehydrated, reportHubSessionIssue])
+  }, [hubBearer, hubBearerReady, isRehydrated, reportHubSessionIssue])
 
   const setConviteLoading = useCallback((id: string, action: 'aceitar' | 'recusar' | null) => {
     setLoadingConviteById(prev => ({ ...prev, [id]: action }))
@@ -205,7 +189,7 @@ export default function MinhasEmpresasPage() {
 
   const handleAceitarConvite = useCallback(
     async (id: string) => {
-      const token = identityAuth?.getAccessToken()
+      const token = hubBearer
       const conviteSnapshot = convites?.find(c => c.id === id)
       setConviteLoading(id, 'aceitar')
       try {
@@ -240,12 +224,12 @@ export default function MinhasEmpresasPage() {
         setConviteLoading(id, null)
       }
     },
-    [identityAuth, convites, mergeEmpresaAceita, reportHubSessionIssue, setConviteLoading]
+    [hubBearer, convites, mergeEmpresaAceita, reportHubSessionIssue, setConviteLoading]
   )
 
   const handleRecusarConvite = useCallback(
     async (id: string) => {
-      const token = identityAuth?.getAccessToken()
+      const token = hubBearer
       setConviteLoading(id, 'recusar')
       try {
         const res = await fetch(`/api/convites/me/${encodeURIComponent(id)}/recusar`, {
@@ -276,7 +260,7 @@ export default function MinhasEmpresasPage() {
         setConviteLoading(id, null)
       }
     },
-    [identityAuth, reportHubSessionIssue, setConviteLoading]
+    [hubBearer, reportHubSessionIssue, setConviteLoading]
   )
 
   const appsBase = useMemo(
@@ -368,10 +352,14 @@ export default function MinhasEmpresasPage() {
     setFeedGridExpandido(false)
   }, [busca, feedFiltro])
 
-  /** Mesmo fluxo que “Acessar”: POST escolher-empresa (cookie de identidade) + token da empresa. */
-  const obterTokenEmpresa = useCallback(async (appId: string): Promise<string> => {
-    return fetchAccessTokenEscolherEmpresa(appId)
-  }, [])
+  /** Mesmo fluxo que “Acessar”: POST escolher-empresa com Bearer do hub (identity ou access). */
+  const obterTokenEmpresa = useCallback(
+    async (appId: string): Promise<string> => {
+      const bearer = hubBearer ?? (await ensureHubBearerToken())?.token ?? null
+      return fetchAccessTokenEscolherEmpresa(appId, bearer)
+    },
+    [hubBearer]
+  )
 
   const removerEmpresaDesvinculada = useCallback(
     (appId: string) => {
@@ -414,7 +402,7 @@ export default function MinhasEmpresasPage() {
 
     try {
       const token = await obterTokenEmpresa(appId)
-      const { empParam } = prepareTabSession(token, app?.nome ?? '', appId)
+      const empParam = prepareTabSession(token, app?.nome ?? '', appId)
       window.open(`/gestao/${empParam}/dashboard`, '_blank')
     } catch (e) {
       reportErroAcessoEmpresa(e, appId)

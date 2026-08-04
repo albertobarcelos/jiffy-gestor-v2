@@ -24,13 +24,13 @@ export const SESSION_STORAGE_HUB_LOGOUT_SELF = 'jiffy:hub-logout-self'
 export const SESSION_STORAGE_TENANT_TOKEN = 'jiffy:tenant-token'
 
 /**
- * Nonce gerado pelo hub ao abrir aba de empresa. Usado pelo AuthGuard para
- * rejeitar abas abertas via digitação direta de URL (sem passar pelo hub).
- */
-export const SESSION_STORAGE_SESSION_NONCE = 'jiffy:session-nonce'
-
-/**
  * Slug da empresa na URL (ex: `nexsyn-ab12cd34` em `/gestao/nexsyn-ab12cd34/dashboard`).
  * Gravado ao consumir sessão; lido por `useEmpresaUrlSync` para manter o path.
  */
 export const SESSION_STORAGE_EMPRESA_SLUG = 'jiffy:empresa-slug'
+
+/**
+ * UUID completo da empresa desta aba.
+ * Fonte de verdade canônica para anti-mix (URL/token/refresh).
+ */
+export const SESSION_STORAGE_EMPRESA_ID = 'jiffy:empresa-id'

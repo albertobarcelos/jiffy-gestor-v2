@@ -173,8 +173,8 @@ export function ObservacaoPedidoKanbanPainel({
       patchKanbanVendasListagemCache(queryClient, venda.id, {
         observacoes: observacoesArrayFromTexto(observacaoSalva) ?? [],
       })
-      queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['venda', venda.id] })
+      queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'] })
+      queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'venda', venda.id] })
       await invalidateVendaDetalheCarregadaCache(queryClient, empresaId, venda.id)
       invalidarPedidoKanbanQuickViewCache(venda.id)
       onSalvo?.(venda.id, observacaoSalva)

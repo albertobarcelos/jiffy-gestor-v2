@@ -6,7 +6,7 @@ import {
   periodoFetchFaturamentoCalendarioDoisMeses,
   periodoFetchFaturamentoCalendarioUmMes,
 } from '@/src/shared/utils/calendarioIntervaloFaturamento'
-import { useQueryClient } from '@tanstack/react-query'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { useDashboardResumoQuery } from '@/src/presentation/hooks/useDashboardResumoQuery'
 import { useDashboardFaturamentoPorDiaQuery } from '@/src/presentation/hooks/useDashboardFaturamentoPorDiaQuery'
@@ -80,7 +80,7 @@ function periodoV2ParaQueryRelatorios(periodoData: string): string | null {
  */
 export default function DashboardV2() {
   const router = useRouter()
-  const queryClient = useQueryClient()
+  const invalidate = useInvalidateTenantQueries()
   const {
     timezoneAgregacao,
     isLoading: carregandoEmpresa,
@@ -234,10 +234,10 @@ export default function DashboardV2() {
   const handleAtualizarDashboard = () => {
     if (atualizandoDashboard) return
     setAtualizandoDashboard(true)
-    void queryClient.invalidateQueries({ queryKey: ['dashboard', 'evolucao'] })
-    void queryClient.invalidateQueries({ queryKey: ['dashboard', 'metodos-pagamento-detalhado'] })
-    void queryClient.invalidateQueries({ queryKey: ['dashboard', 'top-produtos'] })
-    void queryClient.invalidateQueries({ queryKey: ['dashboard', 'top-garcons'] })
+    void invalidate(['dashboard', 'evolucao'])
+    void invalidate(['dashboard', 'metodos-pagamento-detalhado'])
+    void invalidate(['dashboard', 'top-produtos'])
+    void invalidate(['dashboard', 'top-garcons'])
     void Promise.all([refetchEmpresa(), refetchResumo()])
       .then(() => {
         setDadosAtualizadosEm(Date.now())

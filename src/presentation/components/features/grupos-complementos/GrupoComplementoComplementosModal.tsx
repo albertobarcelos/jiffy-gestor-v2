@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { MdSearch, MdAdd } from 'react-icons/md'
 import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { Complemento } from '@/src/domain/entities/Complemento'
@@ -59,7 +59,7 @@ export function GrupoComplementoComplementosModal({
   onDraftLinkedIdsChange,
 }: GrupoComplementoComplementosModalProps) {
   const { auth } = useAuthStore()
-  const queryClient = useQueryClient()
+  const invalidate = useInvalidateTenantQueries()
   const isDraftMode = mode === 'draft'
   const [searchTerm, setSearchTerm] = useState('')
   const [isLoadingGrupoComplementos, setIsLoadingGrupoComplementos] = useState(false)
@@ -346,8 +346,8 @@ export function GrupoComplementoComplementosModal({
 
         showToast.success('Valor atualizado com sucesso!')
         // Invalida cache do React Query para refletir mudanças em outras telas
-        queryClient.invalidateQueries({ queryKey: ['complementos'], exact: false })
-        queryClient.invalidateQueries({ queryKey: ['complemento', complementoId] })
+        void invalidate(['complementos'])
+        void invalidate(['complemento', complementoId])
       } catch (error: any) {
         console.error('Erro ao atualizar valor do complemento:', error)
         const message = handleApiError(error)
@@ -365,7 +365,7 @@ export function GrupoComplementoComplementosModal({
         })
       }
     },
-    [auth, valorInputs, parseValorToNumber, todosComplementos, formatValorFromNumber, queryClient]
+    [auth, valorInputs, parseValorToNumber, todosComplementos, formatValorFromNumber, invalidate]
   )
 
   // Handler para atualizar descrição
@@ -410,8 +410,8 @@ export function GrupoComplementoComplementosModal({
 
         showToast.success('Descrição atualizada com sucesso!')
         // Invalida cache do React Query para refletir mudanças em outras telas
-        queryClient.invalidateQueries({ queryKey: ['complementos'], exact: false })
-        queryClient.invalidateQueries({ queryKey: ['complemento', complementoId] })
+        void invalidate(['complementos'])
+        void invalidate(['complemento', complementoId])
       } catch (error: any) {
         console.error('Erro ao atualizar descrição do complemento:', error)
         const message = handleApiError(error)
@@ -429,7 +429,7 @@ export function GrupoComplementoComplementosModal({
         })
       }
     },
-    [auth, descricaoInputs, todosComplementos, queryClient]
+    [auth, descricaoInputs, todosComplementos, invalidate]
   )
 
   // Handler para atualizar status ativo
@@ -473,8 +473,8 @@ export function GrupoComplementoComplementosModal({
           novoStatus ? 'Complemento ativado com sucesso!' : 'Complemento desativado com sucesso!'
         )
         // Invalida cache do React Query para refletir mudanças em outras telas
-        queryClient.invalidateQueries({ queryKey: ['complementos'], exact: false })
-        queryClient.invalidateQueries({ queryKey: ['complemento', complementoId] })
+        void invalidate(['complementos'])
+        void invalidate(['complemento', complementoId])
       } catch (error: any) {
         console.error('Erro ao atualizar status do complemento:', error)
         const message = handleApiError(error)
@@ -486,7 +486,7 @@ export function GrupoComplementoComplementosModal({
         })
       }
     },
-    [auth, todosComplementos, queryClient]
+    [auth, todosComplementos, invalidate]
   )
 
   // Handler para atualizar tipoImpactoPreco
@@ -530,8 +530,8 @@ export function GrupoComplementoComplementosModal({
 
         showToast.success('Tipo de impacto atualizado com sucesso!')
         // Invalida cache do React Query para refletir mudanças em outras telas
-        queryClient.invalidateQueries({ queryKey: ['complementos'], exact: false })
-        queryClient.invalidateQueries({ queryKey: ['complemento', complementoId] })
+        void invalidate(['complementos'])
+        void invalidate(['complemento', complementoId])
       } catch (error: any) {
         console.error('Erro ao atualizar tipo de impacto:', error)
         const message = handleApiError(error)
@@ -544,7 +544,7 @@ export function GrupoComplementoComplementosModal({
         })
       }
     },
-    [auth, todosComplementos, normalizeTipoImpacto, queryClient]
+    [auth, todosComplementos, normalizeTipoImpacto, invalidate]
   )
 
   // Sincroniza inputs com o catálogo (React Query)

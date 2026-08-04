@@ -4,6 +4,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
+import {
+  buildTenantQueryKey,
+  useInvalidateTenantQueries,
+} from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { createPainelContadorUseCases } from '@/src/presentation/hooks/painel-contador/fiscalPainelFactory'
 import { showToast } from '@/src/shared/utils/toast'
 import type {
@@ -40,7 +45,7 @@ function percentualExportacao(status: ExportacaoXmlStatusDTO): number {
 }
 
 export function useExportacaoXml() {
-  const queryClient = useQueryClient()
+  const invalidate = useInvalidateTenantQueries()
   const [exportacaoIdAtiva, setExportacaoIdAtiva] = useState<string | null>(null)
   const [progressoLocal, setProgressoLocal] = useState(0)
   const downloadDisparadoRef = useRef<string | null>(null)
@@ -56,7 +61,7 @@ export function useExportacaoXml() {
         setProgressoLocal(0)
         setExportacaoIdAtiva(result.exportacaoId)
         showToast.success('Exportação iniciada. Acompanhe o progresso.')
-        void queryClient.invalidateQueries({ queryKey: [...HISTORICO_QUERY_KEY] })
+        void invalidate([...HISTORICO_QUERY_KEY])
       },
       onError: (error: Error) => {
         showToast.error(error.message || 'Erro ao iniciar exportação de XMLs')
@@ -97,11 +102,11 @@ export function useExportacaoXml() {
       onSuccess: (result) => {
         abrirDownload(result.url)
         showToast.success('Download iniciado.')
-        void queryClient.invalidateQueries({ queryKey: [...HISTORICO_QUERY_KEY] })
+        void invalidate([...HISTORICO_QUERY_KEY])
       },
       onError: (error: Error) => {
         showToast.error(error.message || 'Erro ao baixar ZIP')
-        void queryClient.invalidateQueries({ queryKey: [...HISTORICO_QUERY_KEY] })
+        void invalidate([...HISTORICO_QUERY_KEY])
       },
     }
   )
@@ -115,7 +120,7 @@ export function useExportacaoXml() {
     if (status.status === 'ERRO') {
       showToast.error(status.mensagemErro || 'Falha na exportação de XMLs')
       setExportacaoIdAtiva(null)
-      void queryClient.invalidateQueries({ queryKey: [...HISTORICO_QUERY_KEY] })
+      void invalidate([...HISTORICO_QUERY_KEY])
       return
     }
 
@@ -129,10 +134,10 @@ export function useExportacaoXml() {
         .catch(() => undefined)
         .finally(() => {
           setExportacaoIdAtiva(null)
-          void queryClient.invalidateQueries({ queryKey: [...HISTORICO_QUERY_KEY] })
+          void invalidate([...HISTORICO_QUERY_KEY])
         })
     }
-  }, [statusQuery.data, exportacaoIdAtiva, baixarMutateAsync, queryClient])
+  }, [statusQuery.data, exportacaoIdAtiva, baixarMutateAsync, invalidate])
 
   const exportarXmls = useCallback(
     async (input: ExportacaoXmlDTO) => {
@@ -187,6 +192,8 @@ export function useHistoricoExportacaoXml(page = 0, size = 10) {
 
 export function useAgendamentoExportacaoXml() {
   const queryClient = useQueryClient()
+  const empresaId = useTenantEmpresaId()
+  const invalidate = useInvalidateTenantQueries()
 
   const query = useSecureTenantQuery(
     [...AGENDAMENTO_QUERY_KEY],
@@ -207,8 +214,11 @@ export function useAgendamentoExportacaoXml() {
     {
       onSuccess: (data) => {
         showToast.success('Agendamento mensal salvo.')
-        queryClient.setQueriesData({ queryKey: [...AGENDAMENTO_QUERY_KEY] }, data)
-        void queryClient.invalidateQueries({ queryKey: [...AGENDAMENTO_QUERY_KEY] })
+        queryClient.setQueriesData(
+          { queryKey: buildTenantQueryKey(empresaId, [...AGENDAMENTO_QUERY_KEY]) },
+          data
+        )
+        void invalidate([...AGENDAMENTO_QUERY_KEY])
       },
       onError: (error: Error) => {
         showToast.error(error.message || 'Erro ao salvar agendamento')
@@ -224,7 +234,7 @@ export function useAgendamentoExportacaoXml() {
     {
       onSuccess: () => {
         showToast.success('Agendamento desativado.')
-        void queryClient.invalidateQueries({ queryKey: [...AGENDAMENTO_QUERY_KEY] })
+        void invalidate([...AGENDAMENTO_QUERY_KEY])
       },
       onError: (error: Error) => {
         showToast.error(error.message || 'Erro ao desativar agendamento')

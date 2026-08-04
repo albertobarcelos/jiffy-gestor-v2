@@ -17,12 +17,12 @@ import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { IconPickerModal } from './IconPickerModal'
 import { ColorPickerModal } from './ColorPickerModal'
 import { ProdutosPorGrupoList } from './ProdutosPorGrupoList'
-import { useQueryClient } from '@tanstack/react-query'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { Input } from '@/src/presentation/components/ui/input'
 import { cn } from '@/src/shared/utils/cn'
 import { showToast } from '@/src/shared/utils/toast'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 
 /** Labels outlined em preto — igual NovoGrupoComplemento */
 const sxOutlinedLabelTextoEscuro = {
@@ -126,7 +126,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
   const router = useRouter()
   const searchParams = useSearchParams()
   const { auth } = useAuthStore()
-  const queryClient = useQueryClient() // Obter a instância do queryClient
+  const invalidate = useInvalidateTenantQueries()
 
   const [nome, setNome] = useState('')
   const [ativo, setAtivo] = useState(true)
@@ -343,14 +343,14 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
           throw new Error(error.message || 'Erro ao salvar grupo')
         }
 
-        // Sucesso — mesmo cache que na página avulsa (lista de produtos depende dos dois)
+        // Sucesso — invalidação com escopo tenant (MULTI-TENANT-JIFFY-DOC-OFICIAL)
+        const invalidateListas = async () => {
+          await invalidate(['grupos-produtos'])
+          await invalidate(['produtos', 'infinite'])
+        }
+
         if (isEmbedded) {
-          void queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false })
-          void queryClient.invalidateQueries({
-            queryKey: ['produtos', 'infinite'],
-            exact: false,
-            refetchType: 'active',
-          })
+          await invalidateListas()
           commitBaselineLatestRef.current()
           if (opts?.keepModalOpen) {
             onReload?.()
@@ -360,10 +360,9 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
           onSaved?.()
           onClose?.()
         } else {
+          await invalidateListas()
           router.push('/grupos-produtos')
-          router.refresh() // Força a revalidação dos dados da rota para recarregar a lista
-          queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false }) // Invalida todas as queries de grupos de produtos
-          queryClient.invalidateQueries({ queryKey: ['produtos', 'infinite'] }) // Invalida o cache do React Query para produtos
+          router.refresh()
         }
       } catch (error: any) {
         console.error('Erro ao salvar grupo:', error)
@@ -383,7 +382,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
       ativoLocal,
       auth,
       isEmbedded,
-      queryClient,
+      invalidate,
       router,
       onReload,
       onSaved,
