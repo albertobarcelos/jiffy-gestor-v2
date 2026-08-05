@@ -203,16 +203,33 @@ export function ProdutosList() {
   // Modal helpers
   const openTabsModal = useCallback(
     (config: Partial<ProdutosTabsModalState>) => {
-      setTabsModalState({ open: true, tab: 'produto', mode: 'create', ...config })
+      const grupoId = config.grupoId
+      const initialGrupo =
+        config.initialGrupo ??
+        (grupoId ? gruposProdutos.find(g => g.getId() === grupoId) : undefined)
+      setTabsModalState({
+        open: true,
+        tab: 'produto',
+        mode: 'create',
+        ...config,
+        initialGrupo,
+      })
       const params = new URLSearchParams(Array.from(searchParams.entries()))
       params.set('modalOpen', 'true')
       router.replace(`${pathname}?${params.toString()}`, { scroll: false })
     },
-    [router, searchParams, pathname]
+    [router, searchParams, pathname, gruposProdutos]
   )
 
   const closeTabsModal = useCallback(() => {
-    setTabsModalState({ open: false, tab: 'produto', mode: 'create', prefillGrupoProdutoId: undefined, grupoId: undefined })
+    setTabsModalState({
+      open: false,
+      tab: 'produto',
+      mode: 'create',
+      prefillGrupoProdutoId: undefined,
+      grupoId: undefined,
+      initialGrupo: undefined,
+    })
     const params = new URLSearchParams(Array.from(searchParams.entries()))
     params.delete('modalOpen')
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })

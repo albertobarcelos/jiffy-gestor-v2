@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { MdAttachMoney, MdSportsMotorsports } from 'react-icons/md'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { listarEntregadoresDeliveryUseCase } from '@/src/application/use-cases/delivery/ListarEntregadoresDeliveryUseCase'
 import {
   adaptPedidoDeliveryToVendaGestorApiResponse,
@@ -34,6 +35,7 @@ import {
   SelectValue,
 } from '@/src/presentation/components/ui/select'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { showToast } from '@/src/shared/utils/toast'
 import {
@@ -113,7 +115,7 @@ async function buscarPedidoDeliveryKanban(
     if (cached) return cached
   }
 
-  const response = await fetch(`/api/delivery/pedidos/${encodeURIComponent(vendaId)}`, {
+  const response = await fetchGestorApi(`/api/delivery/pedidos/${encodeURIComponent(vendaId)}`, {
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: 'application/json',
@@ -146,7 +148,6 @@ export function AtribuirEntregadorKanbanPainel({
   onClose,
   onSalvo,
 }: AtribuirEntregadorKanbanPainelProps) {
-  const { auth } = useAuthStore()
   const queryClient = useQueryClient()
   const [entregadorId, setEntregadorId] = useState('')
   const [entregadorInicialId, setEntregadorInicialId] = useState('')
@@ -193,17 +194,16 @@ export function AtribuirEntregadorKanbanPainel({
   const taxaMudouEEditavel = taxaMudou && !pedidoPago
   const temAlteracao = entregadorMudou || taxaMudouEEditavel
 
-  const entregadoresQuery = useQuery({
-    queryKey: ['delivery-entregadores', { ativo: true }],
-    queryFn: async (): Promise<UsuarioPdvEntregadorOption[]> => {
-      const token = auth?.getAccessToken()
-      if (!token) return []
+  const entregadoresQuery = useSecureTenantQuery(
+    ['delivery-entregadores', { ativo: true }],
+    async ({ token }): Promise<UsuarioPdvEntregadorOption[]> => {
       return listarEntregadoresDeliveryUseCase.execute(token)
     },
-    enabled: open,
-    staleTime: 1000 * 60 * 5,
-    refetchOnWindowFocus: false,
-  })
+    {
+      enabled: open,
+      staleTime: 1000 * 60 * 5,
+    }
+  )
 
   const entregadores = entregadoresQuery.data ?? []
 
@@ -220,7 +220,7 @@ export function AtribuirEntregadorKanbanPainel({
   const carregarDadosVenda = useCallback(async () => {
     if (!open || !venda) return
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Sessão expirada. Faça login novamente.')
       return
@@ -275,7 +275,7 @@ export function AtribuirEntregadorKanbanPainel({
         showToast.error('Erro ao carregar entregador do pedido.')
       }
     }
-  }, [aplicarEntregadorId, auth, carregarTaxaEntrega, entregadorVinculadoId, open, venda])
+  }, [aplicarEntregadorId, carregarTaxaEntrega, entregadorVinculadoId, open, venda])
 
   useEffect(() => {
     if (!open) {
@@ -298,7 +298,7 @@ export function AtribuirEntregadorKanbanPainel({
       return
     }
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Sessão expirada. Faça login novamente.')
       return

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MdPrint, MdRefresh, MdTune } from 'react-icons/md'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import {
   salvarMapeamentosEstacao,
   type ImpressoraLogica,
@@ -217,9 +218,7 @@ function ImpressoraMapeamentoInput({
   )
 }
 
-export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfiguracoesModalProps) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
+export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfiguracoesModalProps) {  const token = useAuthStore.getState().tenantAuth?.getAccessToken()
   const {
     empresa,
     preferenciasImpressaoDelivery,
@@ -379,7 +378,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
 
     setSalvando(true)
     try {
-      const patchRes = await fetch(`/api/empresas/${encodeURIComponent(empresaId)}`, {
+      const patchRes = await fetchGestorApi(`/api/empresas/${encodeURIComponent(empresaId)}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

@@ -1,3 +1,4 @@
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import type { InstrucoesImpressaoResponse } from '@/src/shared/types/instrucoesImpressao'
 import { getEstacaoImpressaoId } from '@/src/infrastructure/printing/estacaoImpressaoStorage'
 import {
@@ -82,7 +83,7 @@ export async function fetchInstrucoesImpressaoPedido(
     estacaoDigits: estacao.slice(0, 8) + '…',
   })
 
-  const res = await fetch(
+  const res = await fetchGestorApi(
     `/api/delivery/pedidos/${encodeURIComponent(vendaId)}/instrucoes-impressao?${params}`,
     {
       headers: {

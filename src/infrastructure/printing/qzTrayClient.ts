@@ -1,5 +1,7 @@
 'use client'
 
+import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { logImpressao } from '@/src/shared/utils/logImpressaoDelivery'
 import { deliveryCupomHtmlParaEscPos } from '@/src/infrastructure/printing/deliveryCupomHtmlParaEscPos'
 
@@ -242,12 +244,12 @@ export async function ensureQzTraySecurity(qz: QzModule): Promise<void> {
       qz.security.setSignaturePromise(async (toSign: string) => {
         const { useAuthStore } = await import('@/src/presentation/stores/authStore')
         const auth = useAuthStore.getState().auth
-        const token = auth?.getAccessToken()
+        const token = useAuthStore.getState().tenantAuth?.getAccessToken()
         if (!token) {
           throw new Error('Faça login para conectar à impressão neste computador.')
         }
         logImpressao('qz seguranca.sign_requisicao', { bytesParaAssinar: toSign?.length ?? 0 })
-        const res = await fetch('/api/gestor/qz-tray/sign', {
+        const res = await fetchGestorApi('/api/gestor/qz-tray/sign', {
           method: 'POST',
           headers: {
             'Content-Type': 'text/plain;charset=UTF-8',

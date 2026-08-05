@@ -56,9 +56,7 @@ export function ObservacaoPedidoKanbanPainel({
   onSalvo,
 }: ObservacaoPedidoKanbanPainelProps) {
   const queryClient = useQueryClient()
-  const empresaId = useTenantEmpresaId()
-  const { auth } = useAuthStore()
-  const [texto, setTexto] = useState('')
+  const empresaId = useTenantEmpresaId()  const [texto, setTexto] = useState('')
   const [carregando, setCarregando] = useState(false)
   const [salvando, setSalvando] = useState(false)
 
@@ -78,7 +76,7 @@ export function ObservacaoPedidoKanbanPainel({
       return
     }
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Sessão expirada. Faça login novamente.')
       return
@@ -114,7 +112,7 @@ export function ObservacaoPedidoKanbanPainel({
     } finally {
       setCarregando(false)
     }
-  }, [auth, open, resolverTextoObservacaoCache, venda])
+  }, [ open, resolverTextoObservacaoCache, venda])
 
   useEffect(() => {
     if (open && venda) {
@@ -134,7 +132,7 @@ export function ObservacaoPedidoKanbanPainel({
       return
     }
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Sessão expirada. Faça login novamente.')
       return
@@ -173,8 +171,8 @@ export function ObservacaoPedidoKanbanPainel({
       patchKanbanVendasListagemCache(queryClient, venda.id, {
         observacoes: observacoesArrayFromTexto(observacaoSalva) ?? [],
       })
-      queryClient.invalidateQueries({ queryKey: ['vendas'] })
-      queryClient.invalidateQueries({ queryKey: ['venda', venda.id] })
+      queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'vendas'] })
+      queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'venda', venda.id] })
       await invalidateVendaDetalheCarregadaCache(queryClient, empresaId, venda.id)
       invalidarPedidoKanbanQuickViewCache(venda.id)
       onSalvo?.(venda.id, observacaoSalva)

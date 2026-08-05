@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { MdCheck, MdKeyboardArrowDown } from 'react-icons/md'
 import { Produto } from '@/src/domain/entities/Produto'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import {
   indicadoresProducao,
   origensMercadoria,
@@ -152,7 +153,7 @@ async function buscarCestsPorNcm(ncm: string, token: string): Promise<CestPorNcm
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 8000)
     try {
-      const response = await fetch(
+      const response = await fetchGestorApi(
         `/api/v1/fiscal/configuracoes/cests/por-ncm/${encodeURIComponent(ncm)}`,
         {
           headers: {
@@ -315,9 +316,7 @@ function SelectFiscal({
   )
 }
 
-function useCestsPorNcm(ncmRaw: string) {
-  const { auth } = useAuthStore()
-  const ncm = soDigitos(ncmRaw, 8)
+function useCestsPorNcm(ncmRaw: string) {  const ncm = soDigitos(ncmRaw, 8)
   const [cests, setCests] = useState<CestPorNcmItem[]>(() =>
     ncm.length === 8 ? cestsPorNcmCache.get(ncm) ?? [] : []
   )
@@ -337,7 +336,7 @@ function useCestsPorNcm(ncmRaw: string) {
       return
     }
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       setCests([])
       return
@@ -354,7 +353,7 @@ function useCestsPorNcm(ncmRaw: string) {
     return () => {
       cancelled = true
     }
-  }, [ncm, auth])
+  }, [ncm])
 
   return { cests, loading, ncmValido: ncm.length === 8 }
 }

@@ -1,3 +1,4 @@
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { salvarPedidoDeliveryDetalheCache } from '@/src/infrastructure/api/pedidoDeliveryDetalheCache'
 
 const entregadorPorVendaId = new Map<string, string>()
@@ -78,7 +79,7 @@ export async function resolverEntregadorIdVendaKanban(args: {
       : `/api/vendas/${vendaId}?incluirFiscal=false`
 
   try {
-    const response = await fetch(url, {
+    const response = await fetchGestorApi(url, {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/json',
@@ -86,7 +87,7 @@ export async function resolverEntregadorIdVendaKanban(args: {
       cache: 'no-store',
     })
     if (!response.ok && tabelaOrigem === 'venda_gestor') {
-      const fallback = await fetch(`/api/vendas/gestor/${vendaId}?incluirFiscal=false`, {
+      const fallback = await fetchGestorApi(`/api/vendas/gestor/${vendaId}?incluirFiscal=false`, {
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: 'application/json',
@@ -142,7 +143,7 @@ export async function salvarEntregadorPedidoDelivery(args: {
   const { vendaId, entregadorId, token } = args
   const entregadorIdNormalizado = entregadorId?.trim() ? entregadorId.trim() : null
 
-  const response = await fetch(`/api/delivery/pedidos/${encodeURIComponent(vendaId)}`, {
+  const response = await fetchGestorApi(`/api/delivery/pedidos/${encodeURIComponent(vendaId)}`, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${token}`,

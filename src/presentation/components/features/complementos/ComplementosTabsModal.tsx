@@ -21,6 +21,8 @@ interface ComplementosTabsModalProps {
   onClose: () => void
   onTabChange: (tab: TabKey) => void
   onReload?: () => void
+  /** Chamado ao criar um novo complemento — passa o id para quem precisar auto-vincular. */
+  onCreated?: (id: string) => void
   /** Empilhar acima de outros painéis (ex.: modal de lançamento de produto em z-index 1400). */
   zIndex?: number
 }
@@ -30,6 +32,7 @@ export function ComplementosTabsModal({
   onClose,
   onTabChange,
   onReload,
+  onCreated,
   zIndex = 1300,
 }: ComplementosTabsModalProps) {
   const ncRef = useRef<NovoComplementoHandle>(null)
@@ -126,7 +129,10 @@ export function ComplementosTabsModal({
               embeddedFormId={COMPLEMENTO_TABS_FORM_ID}
               hideEmbeddedFormActions
               onEmbedFormStateChange={setEmbedFormState}
-              onSaved={() => {
+              onSaved={(savedId) => {
+                if (state.mode === 'create' && savedId) {
+                  onCreated?.(savedId)
+                }
                 onReload?.()
                 onClose()
               }}

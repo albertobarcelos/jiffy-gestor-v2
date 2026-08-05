@@ -1,5 +1,6 @@
 'use client'
 
+import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { atualizarCobrancasPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/AtualizarCobrancasPedidoDeliveryUseCase'
@@ -18,9 +19,6 @@ import type {
   useCancelarVendaGestor,
   useTransicaoPedidoDelivery,
 } from '@/src/presentation/hooks/useVendas'
-import type { Auth } from '@/src/domain/entities/Auth'
-
-type AuthState = Auth | null
 import type { FluxoPagamentoEntrega, PagamentoSelecionado } from '../../types'
 import type { NovoPedidoFormState } from './useNovoPedidoFormState'
 import type { ProdutosTabsModalState } from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
@@ -35,7 +33,6 @@ export type UseNovoPedidoGestorActionsParams = {
   tabelaOrigemVenda: 'venda' | 'venda_gestor'
   onSuccess: () => void
   onClose: () => void
-  auth: AuthState
   cancelarVendaGestor: CancelarVendaGestor
   cancelarNotaFiscalVendaPdv: CancelarNotaPdv
   cancelarNotaFiscalVendaGestor: CancelarNotaGestor
@@ -69,7 +66,6 @@ export function useNovoPedidoGestorActions({
   tabelaOrigemVenda,
   onSuccess,
   onClose,
-  auth,
   cancelarVendaGestor,
   cancelarNotaFiscalVendaPdv,
   cancelarNotaFiscalVendaGestor,
@@ -108,7 +104,7 @@ export function useNovoPedidoGestorActions({
       return
     }
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado. Faça login novamente.')
       return
@@ -170,7 +166,6 @@ export function useNovoPedidoGestorActions({
     vendaId,
     tabelaOrigemVenda,
     pagamentos,
-    auth,
     fluxoPagamentoEntrega,
     trocoLancamento,
     totalProdutos,

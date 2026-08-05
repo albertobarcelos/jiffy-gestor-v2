@@ -276,7 +276,7 @@ export function ConfiguracaoFiscalStep({
           <div className="h-px flex-1 bg-primary/70" />
         </div>
         <p className="text-sm text-secondary-text">
-          Preencha as informações fiscais do produto. Essas informações serão usadas para emissão de notas fiscais.
+          Essas informações serão usadas para emissão de notas fiscais.
         </p>
       </div>
 

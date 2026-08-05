@@ -1,7 +1,7 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
 import { listarEntregadoresDeliveryUseCase } from '@/src/application/use-cases/delivery/ListarEntregadoresDeliveryUseCase'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import type { UsuarioPdvEntregadorOption } from '../../types'
 
 export type UseEntregadoresQueryParams = {
@@ -10,17 +10,17 @@ export type UseEntregadoresQueryParams = {
 }
 
 export function useEntregadoresQuery({ enabled, token }: UseEntregadoresQueryParams) {
-  const query = useQuery({
-    queryKey: ['delivery-entregadores', { ativo: true }],
-    queryFn: async (): Promise<UsuarioPdvEntregadorOption[]> => {
-      if (!token) return []
-      return listarEntregadoresDeliveryUseCase.execute(token)
+  const query = useSecureTenantQuery(
+    ['delivery-entregadores', { ativo: true }],
+    async ({ token: tenantToken }): Promise<UsuarioPdvEntregadorOption[]> => {
+      return listarEntregadoresDeliveryUseCase.execute(tenantToken)
     },
-    enabled: enabled && !!token,
-    staleTime: 1000 * 60 * 5,
-    retry: 1,
-    refetchOnWindowFocus: false,
-  })
+    {
+      enabled: enabled && !!token,
+      staleTime: 1000 * 60 * 5,
+      retry: 1,
+    }
+  )
 
   return {
     entregadores: query.data ?? [],

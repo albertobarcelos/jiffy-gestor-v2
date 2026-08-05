@@ -46,9 +46,7 @@ export function useReemissaoFiscalEmLote({
   fetchNextPage,
   hasNextPage,
   refetchListagem,
-}: UseReemissaoFiscalEmLoteParams) {
-  const { auth } = useAuthStore()
-  const queryClient = useQueryClient()
+}: UseReemissaoFiscalEmLoteParams) {  const queryClient = useQueryClient()
 
   const [progresso, setProgresso] = useState<ReemissaoFiscalLoteProgresso>({
     status: 'idle',
@@ -108,7 +106,7 @@ export function useReemissaoFiscalEmLote({
   }, [queryClient, refetchListagem])
 
   const executarLoop = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Sessão expirada. Faça login novamente.')
       setProgresso(prev => ({ ...prev, status: 'idle' }))
@@ -186,7 +184,7 @@ export function useReemissaoFiscalEmLote({
         `Lote concluído: ${enviadas} enviada(s)${erros > 0 ? `, ${erros} erro(s)` : ''}.`
       )
     }
-  }, [auth, fetchNextPage, invalidarListagemKanban, listarElegiveisPendentes])
+  }, [ fetchNextPage, invalidarListagemKanban, listarElegiveisPendentes])
 
   const iniciar = useCallback(() => {
     if (totalElegiveisVisiveis === 0) {

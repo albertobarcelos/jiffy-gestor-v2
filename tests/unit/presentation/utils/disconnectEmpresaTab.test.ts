@@ -4,18 +4,21 @@ import { User } from '@/src/domain/entities/User'
 import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 
 const mockGetState = vi.fn()
-const mockSetState = vi.fn()
+const mockEnsure = vi.fn()
 const mockRestore = vi.fn()
 
 vi.mock('@/src/presentation/stores/authStore', () => ({
   useAuthStore: {
     getState: () => mockGetState(),
-    setState: (...args: unknown[]) => mockSetState(...args),
   },
 }))
 
 vi.mock('@/src/presentation/utils/restoreIdentityFromCookie', () => ({
   restoreIdentityFromCookie: () => mockRestore(),
+}))
+
+vi.mock('@/src/presentation/utils/ensureHubBearerToken', () => ({
+  ensureHubBearerToken: () => mockEnsure(),
 }))
 
 vi.mock('react-hot-toast', () => ({
@@ -44,6 +47,7 @@ describe('disconnectEmpresaTab', () => {
     vi.resetAllMocks()
     logoutTenant.mockResolvedValue(undefined)
     logout.mockResolvedValue(undefined)
+    mockRestore.mockResolvedValue(false)
     previousWindow = (globalThis as Record<string, unknown>).window
     ;(globalThis as Record<string, unknown>).window = {
       location: { assign },
@@ -74,8 +78,8 @@ describe('disconnectEmpresaTab', () => {
     vi.unstubAllGlobals()
   })
 
-  it('vai ao hub quando a identidade é recuperável', async () => {
-    mockRestore.mockResolvedValue(true)
+  it('vai ao hub quando há identity recuperável', async () => {
+    mockEnsure.mockResolvedValue({ token: 'id.tok', source: 'identity' })
     mockGetState.mockReturnValue({ identityAuth: makeAuth(60_000) })
 
     await disconnectEmpresaTab({ queryClient, logoutTenant, logout })
@@ -85,8 +89,20 @@ describe('disconnectEmpresaTab', () => {
     expect(assign).toHaveBeenCalledWith(HUB_PATH)
   })
 
-  it('faz logout completo e vai ao login se não houver identidade', async () => {
-    mockRestore.mockResolvedValue(false)
+  it('vai ao hub quando identity morreu mas o refresh/access ainda vale', async () => {
+    mockEnsure.mockResolvedValue({ token: 'access.tok', source: 'access' })
+
+    await disconnectEmpresaTab({ queryClient, logoutTenant, logout })
+
+    expect(logoutTenant).toHaveBeenCalled()
+    expect(logout).not.toHaveBeenCalled()
+    expect(toast.error).not.toHaveBeenCalled()
+    expect(assign).toHaveBeenCalledWith(HUB_PATH)
+  })
+
+  it('faz logout completo e vai ao login se não houver identity nem refresh', async () => {
+    mockEnsure.mockResolvedValue(null)
+    mockGetState.mockReturnValue({ logout })
 
     await disconnectEmpresaTab({ queryClient, logoutTenant, logout })
 

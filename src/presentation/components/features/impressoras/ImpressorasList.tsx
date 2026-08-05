@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { Impressora } from '@/src/domain/entities/Impressora'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { MdSearch, MdPrint, MdDelete, MdContentCopy } from 'react-icons/md'
 import {
   ImpressorasTabsModal,
@@ -43,7 +44,7 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
-  const { auth, isAuthenticated } = useAuthStore()
+  const { isAuthenticated } = useAuthStore()
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -61,7 +62,7 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
    */
   const loadAllImpressoras = useCallback(
     async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         return
       }
@@ -85,7 +86,7 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
             params.append('q', searchTextRef.current)
           }
 
-          const response = await fetch(`/api/impressoras?${params.toString()}`, {
+          const response = await fetchGestorApi(`/api/impressoras?${params.toString()}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -128,12 +129,12 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
         setIsLoading(false)
       }
     },
-    [auth]
+    []
   )
 
   // Debounce da busca
   useEffect(() => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     if (debounceTimerRef.current) {
@@ -149,13 +150,13 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
         clearTimeout(debounceTimerRef.current)
       }
     }
-  }, [searchText, auth, loadAllImpressoras])
+  }, [searchText, loadAllImpressoras])
 
   // Carrega impressoras iniciais apenas quando o token estiver disponível
   useEffect(() => {
     if (!isAuthenticated || hasLoadedInitialRef.current) return
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     hasLoadedInitialRef.current = true
@@ -229,12 +230,12 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
     setIsDeleting(true)
 
     try {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         throw new Error('Token não encontrado')
       }
 
-      const response = await fetch(`/api/impressoras/${impressoraToDelete}`, {
+      const response = await fetchGestorApi(`/api/impressoras/${impressoraToDelete}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -260,7 +261,7 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
     } finally {
       setIsDeleting(false)
     }
-  }, [impressoraToDelete, auth, loadAllImpressoras, onReload])
+  }, [impressoraToDelete, loadAllImpressoras, onReload])
 
   /**
    * Gera código abreviado do ID (primeiros 6 caracteres em maiúsculas)
