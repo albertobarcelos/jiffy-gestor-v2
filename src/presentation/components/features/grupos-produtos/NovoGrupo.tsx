@@ -52,6 +52,11 @@ const sxEntradaNomeGrupoProduto = {
 
 interface NovoGrupoProps {
   grupoId?: string
+  /**
+   * Dados já conhecidos (ex.: lista de produtos) para hidratar o form sem spinner.
+   * O fetch ainda confirma/atualiza delivery/local etc. em background.
+   */
+  initialGrupo?: GrupoProduto
   isEmbedded?: boolean
   /** `id` do `<form>` para o rodapé do `JiffySidePanelModal` usar `form="..."` no Salvar */
   embeddedFormId?: string
@@ -110,6 +115,7 @@ function GrupoDetalhesFormShell({
 export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function NovoGrupo(
   {
     grupoId,
+    initialGrupo,
     isEmbedded = false,
     embeddedFormId,
     hideEmbeddedFormActions,
@@ -128,12 +134,24 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
   const { auth } = useAuthStore()
   const invalidate = useInvalidateTenantQueries()
 
-  const [nome, setNome] = useState('')
-  const [ativo, setAtivo] = useState(true)
-  const [corHex, setCorHex] = useState('#530CA3')
-  const [iconName, setIconName] = useState('')
-  const [ativoDelivery, setAtivoDelivery] = useState(false)
-  const [ativoLocal, setAtivoLocal] = useState(false)
+  const effectiveGrupoId = grupoId || searchParams.get('id') || null
+  const seedMatches =
+    !!initialGrupo && !!effectiveGrupoId && initialGrupo.getId() === effectiveGrupoId
+
+  const [nome, setNome] = useState(() => (seedMatches ? initialGrupo!.getNome() : ''))
+  const [ativo, setAtivo] = useState(() => (seedMatches ? initialGrupo!.isAtivo() : true))
+  const [corHex, setCorHex] = useState(() =>
+    seedMatches ? initialGrupo!.getCorHex() : '#530CA3'
+  )
+  const [iconName, setIconName] = useState(() =>
+    seedMatches ? initialGrupo!.getIconName() : ''
+  )
+  const [ativoDelivery, setAtivoDelivery] = useState(() =>
+    seedMatches ? initialGrupo!.isAtivoDelivery() : false
+  )
+  const [ativoLocal, setAtivoLocal] = useState(() =>
+    seedMatches ? initialGrupo!.isAtivoLocal() : false
+  )
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(false)
   const [activeTab, setActiveTab] = useState(initialTab)
@@ -147,8 +165,6 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
     onGrupoNomeChange?.(nome)
   }, [nome, onGrupoNomeChange])
 
-  // Determina se está editando ou criando
-  const effectiveGrupoId = grupoId || searchParams.get('id') || null
   const isEditMode = !!effectiveGrupoId
 
   /** Cabeçalho próprio só fora do painel padronizado (ou embed sem delegar ao modal) */
@@ -234,7 +250,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
     return () => window.clearTimeout(t)
   }, [isLoadingData, isEditMode, effectiveGrupoId])
 
-  // Carrega dados do grupo para edição
+  // Carrega dados do grupo para edição (em embed com seed: sem spinner — SPA)
   useEffect(() => {
     if (!isEditMode || !effectiveGrupoId) return
 
@@ -249,8 +265,13 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
       return
     }
 
+    const hasSeed =
+      !!initialGrupo && initialGrupo.getId() === effectiveGrupoId
+    /** Em painel embutido (ou com seed da lista) não bloqueia a UI com spinner full-screen. */
+    const blockUi = !isEmbedded && !hasSeed
+
     const loadGrupo = async () => {
-      setIsLoadingData(true)
+      if (blockUi) setIsLoadingData(true)
       try {
         const response = await fetch(`/api/grupos-produtos/${effectiveGrupoId}`, {
           headers: {
@@ -281,14 +302,29 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
         }, 100)
       } catch (error) {
         console.error('Erro ao carregar grupo:', error)
-        alert('Erro ao carregar dados do grupo')
+        if (!hasSeed) {
+          alert('Erro ao carregar dados do grupo')
+        }
       } finally {
-        setIsLoadingData(false)
+        if (blockUi) setIsLoadingData(false)
       }
     }
 
-    loadGrupo()
-  }, [isEditMode, effectiveGrupoId, auth, normalizeColor])
+    // Seed imediato (lista já tinha o grupo) + baseline provisório até o fetch confirmar
+    if (hasSeed && !hasLoadedGrupoRef.current) {
+      setNome(initialGrupo!.getNome())
+      setAtivo(initialGrupo!.isAtivo())
+      setCorHex(normalizeColor(initialGrupo!.getCorHex()))
+      setIconName(initialGrupo!.getIconName())
+      setAtivoDelivery(initialGrupo!.isAtivoDelivery())
+      setAtivoLocal(initialGrupo!.isAtivoLocal())
+      window.setTimeout(() => {
+        commitBaselineLatestRef.current()
+      }, 50)
+    }
+
+    void loadGrupo()
+  }, [isEditMode, effectiveGrupoId, auth, normalizeColor, isEmbedded, initialGrupo])
 
   const handleSave = useCallback(
     async (opts?: { keepModalOpen?: boolean }) => {
@@ -511,9 +547,11 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                         <h2 className="text-primary-text md:text-lg text-sm font-semibold">
                           {nome.trim() ? nome : 'Nome do Grupo'}
                         </h2>
-                        <p className="text-secondary-text md:text-sm text-xs ">
-                          {iconName ? `Ícone selecionado: ${iconName}` : 'Definição do Ícone do Grupo'}
-                        </p>
+                        {!iconName ? (
+                          <p className="text-secondary-text md:text-sm text-xs">
+                            Definição do Ícone do Grupo
+                          </p>
+                        ) : null}
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-2">

@@ -65,11 +65,11 @@ export function GrupoComplementoComplementosModal({
   const [isLoadingGrupoComplementos, setIsLoadingGrupoComplementos] = useState(false)
   const [linkedIds, setLinkedIds] = useState<string[]>([])
   const [vinculoLoadingId, setVinculoLoadingId] = useState<string | null>(null)
+  const [filterTab, setFilterTab] = useState<'todos' | 'vinculados' | 'catalogo'>('vinculados')
 
   // Estados para edição inline
   const [valorInputs, setValorInputs] = useState<Record<string, string>>({})
-  const [descricaoInputs, setDescricaoInputs] = useState<Record<string, string>>({})
-  const [savingMap, setSavingMap] = useState<Record<string, { valor?: boolean; descricao?: boolean; tipo?: boolean }>>({})
+  const [savingMap, setSavingMap] = useState<Record<string, { valor?: boolean; tipo?: boolean }>>({})
   const [togglingStatus, setTogglingStatus] = useState<Record<string, boolean>>({})
 
   const {
@@ -125,8 +125,12 @@ export function GrupoComplementoComplementosModal({
   const isVisible = isEmbedded ? Boolean(grupo) || isDraftMode : open
   const effectiveLinkedIds = isDraftMode ? draftLinkedIds : linkedIds
 
+  // Usar o ID (primitivo) como dep em vez do objeto `grupo` inteiro — evita loop se o
+  // pai recriar o objeto a cada render sem mudar o ID.
+  const grupoId = grupo?.getId() ?? null
+
   useEffect(() => {
-    if (!isVisible || isDraftMode || !grupo) {
+    if (!isVisible || isDraftMode || !grupoId || !grupo) {
       return
     }
 
@@ -135,26 +139,53 @@ export function GrupoComplementoComplementosModal({
     if (idsDoProps.length > 0) {
       setLinkedIds(idsDoProps)
     } else {
-      carregarComplementos(grupo.getId())
+      carregarComplementos(grupoId)
     }
-  }, [isVisible, isDraftMode, grupo, carregarComplementos])
+    // `grupo` é lido mas excluído das deps propositalmente — só nos importa o grupoId mudar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVisible, isDraftMode, grupoId, carregarComplementos])
 
   const catalogo = useMemo(() => todosComplementos as Complemento[], [todosComplementos])
 
+  /** Totais absolutos por aba (sem busca) — bate com as regras de cada filtro. */
+  const filterCounts = useMemo(() => {
+    let vinculados = 0
+    let catalogoAtivos = 0
+    for (const c of catalogo) {
+      const linked = effectiveLinkedIds.includes(c.getId())
+      if (linked && c.isAtivo()) vinculados += 1
+      if (!linked && c.isAtivo()) catalogoAtivos += 1
+    }
+    return {
+      vinculados,
+      catalogo: catalogoAtivos,
+      todos: catalogo.length,
+    }
+  }, [catalogo, effectiveLinkedIds])
+
   const filteredComplementos = useMemo(() => {
     const term = searchTerm.trim().toLowerCase()
-    if (!term) {
-      return catalogo
+    const bySearch = !term
+      ? catalogo
+      : catalogo.filter((c) => {
+          const nome = c.getNome()?.toLowerCase() || ''
+          const descricao = c.getDescricao()?.toLowerCase() || ''
+          return nome.includes(term) || descricao.includes(term)
+        })
+
+    // Neste grupo / Disponíveis: só ativos. Todos: inclui inativos (com coluna Ativo).
+    if (filterTab === 'vinculados') {
+      return bySearch.filter((c) => effectiveLinkedIds.includes(c.getId()) && c.isAtivo())
     }
-    return catalogo.filter((c) => {
-      const nome = c.getNome()?.toLowerCase() || ''
-      const descricao = c.getDescricao()?.toLowerCase() || ''
-      return nome.includes(term) || descricao.includes(term)
-    })
-  }, [catalogo, searchTerm])
+    if (filterTab === 'catalogo') {
+      return bySearch.filter((c) => !effectiveLinkedIds.includes(c.getId()) && c.isAtivo())
+    }
+    return bySearch
+  }, [catalogo, searchTerm, filterTab, effectiveLinkedIds])
 
   /** Vinculados ao grupo primeiro; não vinculados abaixo (ordem dentro de cada bloco = filtro atual) */
   const complementosOrdenados = useMemo(() => {
+    if (filterTab !== 'todos') return filteredComplementos
     const vinculados: Complemento[] = []
     const naoVinculados: Complemento[] = []
     for (const c of filteredComplementos) {
@@ -165,7 +196,7 @@ export function GrupoComplementoComplementosModal({
       }
     }
     return [...vinculados, ...naoVinculados]
-  }, [filteredComplementos, effectiveLinkedIds])
+  }, [filteredComplementos, effectiveLinkedIds, filterTab])
 
   const updateGrupoComplementos = useCallback(
     async (novosIds: string[], successMessage: string) => {
@@ -233,6 +264,24 @@ export function GrupoComplementoComplementosModal({
     [grupo, isDraftMode, effectiveLinkedIds, onDraftLinkedIdsChange, updateGrupoComplementos]
   )
 
+  /**
+   * Após criar um novo complemento no modal, vincula-o automaticamente ao grupo
+   * e recarrega o catálogo para exibir o item recém-criado.
+   */
+  const handleComplementoCreated = useCallback(
+    async (newId: string) => {
+      const next = Array.from(new Set([...effectiveLinkedIds, newId]))
+      if (isDraftMode) {
+        onDraftLinkedIdsChange?.(next)
+        await refetchComplementos()
+        return
+      }
+      await refetchComplementos()
+      await updateGrupoComplementos(next, 'Complemento criado e vinculado ao grupo!')
+    },
+    [effectiveLinkedIds, isDraftMode, onDraftLinkedIdsChange, refetchComplementos, updateGrupoComplementos]
+  )
+
   const openComplementoCreateModal = useCallback(() => {
     setComplementosTabsState((prev) => ({
       ...prev,
@@ -240,6 +289,16 @@ export function GrupoComplementoComplementosModal({
       tab: 'complemento',
       mode: 'create',
       complementoId: undefined,
+    }))
+  }, [])
+
+  const openComplementoEditModal = useCallback((id: string) => {
+    setComplementosTabsState((prev) => ({
+      ...prev,
+      open: true,
+      tab: 'complemento',
+      mode: 'edit',
+      complementoId: id,
     }))
   }, [])
 
@@ -368,70 +427,6 @@ export function GrupoComplementoComplementosModal({
     [auth, valorInputs, parseValorToNumber, todosComplementos, formatValorFromNumber, invalidate]
   )
 
-  // Handler para atualizar descrição
-  const handleUpdateDescricao = useCallback(
-    async (complementoId: string) => {
-      const token = auth?.getAccessToken()
-      if (!token) {
-        showToast.error('Token não encontrado. Faça login novamente.')
-        return
-      }
-
-      const novaDescricao = descricaoInputs[complementoId] ?? ''
-
-      const lista = todosComplementos as Complemento[]
-      const complementoAtual = lista.find((c) => c.getId() === complementoId)
-      if (!complementoAtual) {
-        showToast.error('Complemento não encontrado.')
-        return
-      }
-
-      const descricaoAtual = complementoAtual.getDescricao() || ''
-      if (novaDescricao === descricaoAtual) {
-        return
-      }
-
-      setSavingMap((prev) => ({ ...prev, [complementoId]: { ...prev[complementoId], descricao: true } }))
-
-      try {
-        const response = await fetch(`/api/complementos/${complementoId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ descricao: novaDescricao || null }),
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.message || errorData.error || 'Erro ao atualizar descrição')
-        }
-
-        showToast.success('Descrição atualizada com sucesso!')
-        // Invalida cache do React Query para refletir mudanças em outras telas
-        void invalidate(['complementos'])
-        void invalidate(['complemento', complementoId])
-      } catch (error: any) {
-        console.error('Erro ao atualizar descrição do complemento:', error)
-        const message = handleApiError(error)
-        showToast.error(message)
-        // Restaura descrição anterior
-        setDescricaoInputs((prev) => ({
-          ...prev,
-          [complementoId]: complementoAtual.getDescricao() || '',
-        }))
-      } finally {
-        setSavingMap((prev) => {
-          const current = prev[complementoId] || {}
-          const { descricao: _, ...rest } = current
-          return { ...prev, [complementoId]: rest }
-        })
-      }
-    },
-    [auth, descricaoInputs, todosComplementos, invalidate]
-  )
-
   // Handler para atualizar status ativo
   const handleToggleAtivo = useCallback(
     async (complementoId: string, novoStatus: boolean) => {
@@ -547,23 +542,26 @@ export function GrupoComplementoComplementosModal({
     [auth, todosComplementos, normalizeTipoImpacto, invalidate]
   )
 
-  // Sincroniza inputs com o catálogo (React Query)
+  // Sincroniza inputs de valor com o catálogo (React Query)
   useEffect(() => {
     const novosValorInputs: Record<string, string> = {}
-    const novasDescricaoInputs: Record<string, string> = {}
     todosComplementos.forEach((c) => {
       const comp = c as Complemento
-      const id = comp.getId()
-      novosValorInputs[id] = formatValorFromNumber(comp.getValor())
-      novasDescricaoInputs[id] = comp.getDescricao() || ''
+      novosValorInputs[comp.getId()] = formatValorFromNumber(comp.getValor())
     })
     setValorInputs((prev) => ({ ...prev, ...novosValorInputs }))
-    setDescricaoInputs((prev) => ({ ...prev, ...novasDescricaoInputs }))
   }, [todosComplementos, formatValorFromNumber])
 
   if (!isVisible || (!grupo && !isDraftMode)) {
     return null
   }
+
+  const showAtivoColumn = filterTab === 'todos'
+  // Todos: só nome + Ativo. Outras abas: Preço + Impacto + Vínculo.
+  const showDetailColumns = filterTab !== 'todos'
+  const gridCols = showAtivoColumn
+    ? 'minmax(0,1fr) 3.25rem'
+    : 'minmax(0,1fr) 5.5rem 6.5rem 3.25rem'
 
   const content = (
     <div
@@ -573,9 +571,9 @@ export function GrupoComplementoComplementosModal({
         className={`flex min-h-0 flex-1 flex-col ${isEmbedded ? 'overflow-hidden' : ''}`}
       >
         <div className="flex min-h-0 flex-1 flex-col rounded-[12px] bg-info md:p-5 p-3">
-          {/* Mesmo padrão visual da aba Grupo: título primary + linha + ação */}
+          {/* Cabeçalho */}
           <div className="mb-2 flex flex-wrap items-center gap-3 md:gap-5">
-            <h2 className="shrink-0 text-primary md:text-xl text-sm font-semibold ">
+            <h2 className="shrink-0 text-primary md:text-xl text-sm font-semibold">
               Complementos do Grupo
             </h2>
             <div className="h-px min-h-0 min-w-[2rem] flex-1 bg-primary/70" aria-hidden />
@@ -589,179 +587,290 @@ export function GrupoComplementoComplementosModal({
               Novo complemento
             </button>
           </div>
-          <p className="mb-2 text-xs font-semibold text-primary-text md:text-lg">
+          <p className="mb-3 text-xs font-semibold text-primary-text md:text-lg">
             {grupo?.getNome() || draftGrupoNome || 'Novo grupo'}
           </p>
 
-          <div className="mb-2">
-            <label className="mb-1 block text-xs font-semibold text-secondary-text">
-              Buscar complemento
-            </label>
-            <div className="relative">
+          {/* Busca + filtros */}
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[180px]">
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Digite para filtrar..."
-                className="h-8 w-full min-w-0 rounded-lg border border-gray-200 pl-11 pr-4 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none md:min-w-[350px]"
+                placeholder="Buscar..."
+                className="h-8 w-full min-w-0 rounded-lg border border-gray-200 pl-9 pr-4 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
               />
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
-                <MdSearch size={18} />
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text">
+                <MdSearch size={16} />
               </span>
+            </div>
+            <div className="flex h-8 shrink-0 overflow-hidden rounded-lg border border-gray-200 text-xs font-medium">
+              {(['vinculados', 'catalogo', 'todos'] as const).map((tab) => {
+                const labels = { vinculados: 'Neste grupo', catalogo: 'Disponíveis', todos: 'Todos' }
+                const count = filterCounts[tab]
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setFilterTab(tab)}
+                    className={`flex h-full items-center gap-1.5 px-3 transition-colors ${
+                      filterTab === tab
+                        ? 'bg-primary text-white'
+                        : 'bg-white text-secondary-text hover:bg-gray-50'
+                    }`}
+                  >
+                    <span>{labels[tab]}</span>
+                    <span
+                      className={`tabular-nums ${
+                        filterTab === tab ? 'text-white/80' : 'text-secondary-text/80'
+                      }`}
+                    >
+                      ({count})
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           </div>
 
+          {/* Lista */}
           <div className="min-h-0 flex-1 overflow-y-auto pr-0.5">
-        {isLoadingTodosComplementos || isLoadingGrupoComplementos ? (
-          <div className="flex justify-center py-10">
-            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : catalogo.length === 0 ? (
-          <p className="text-center text-secondary-text text-sm">
-            Nenhum complemento cadastrado no sistema.
-          </p>
-        ) : filteredComplementos.length === 0 ? (
-          <p className="text-center text-secondary-text text-sm">
-            Nenhum complemento encontrado com esse filtro.
-          </p>
-        ) : (
-          <>
-            <div
-              className="sticky top-0 z-[1] grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-b border-gray-200 bg-info px-2 py-2"
-              role="row"
-            >
-              <span className="text-left text-sm font-semibold tracking-wide text-primary-text">
-                Complementos
-              </span>
-              <span className="text-right text-sm font-semibold tracking-wide text-primary-text">
-                Vínculo
-              </span>
-            </div>
-            {complementosOrdenados.map((item) => {
-            const comp = item as Complemento
-            const id = comp.getId()
-            const isLinked = effectiveLinkedIds.includes(id)
-            return (
-              <div
-                key={id}
-                className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-b border-gray-200 p-2 transition-colors hover:bg-primary-bg/60"
-              >
-                <div className="min-w-0">
-                  {isLinked ? (
+            {isLoadingTodosComplementos || isLoadingGrupoComplementos ? (
+              <div className="flex justify-center py-10">
+                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : catalogo.length === 0 ? (
+              <p className="text-center text-secondary-text text-sm py-6">
+                Nenhum complemento cadastrado no sistema.
+              </p>
+            ) : complementosOrdenados.length === 0 ? (
+              <p className="text-center text-secondary-text text-sm py-6">
+                Nenhum complemento encontrado.
+              </p>
+            ) : (
+              <>
+                {/* Cabeçalho sticky acima dos switches (transform cria stacking context) */}
+                <div
+                  className="sticky top-0 z-20 hidden sm:grid items-center gap-3 border-b border-gray-200 bg-info px-2 py-1.5 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]"
+                  style={{ gridTemplateColumns: gridCols }}
+                  role="row"
+                >
+                  <span className="text-xs font-semibold text-secondary-text">Complemento</span>
+                  {showDetailColumns ? (
                     <>
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="flex min-w-0 flex-wrap items-center gap-2">
-                          <p className="text-sm font-normal text-primary-text">{comp.getNome()}</p>
+                      <span className="text-center text-xs font-semibold text-secondary-text">Preço</span>
+                      <span className="text-center text-xs font-semibold text-secondary-text">Impacto</span>
+                      <span className="text-center text-xs font-semibold text-secondary-text">Vínculo</span>
+                    </>
+                  ) : null}
+                  {showAtivoColumn ? (
+                    <span className="text-center text-xs font-semibold text-secondary-text">Ativo</span>
+                  ) : null}
+                </div>
+
+                {complementosOrdenados.map((item) => {
+                  const comp = item as Complemento
+                  const id = comp.getId()
+                  const isLinked = effectiveLinkedIds.includes(id)
+                  const descricao = comp.getDescricao()?.trim()
+
+                  return (
+                    <div
+                      key={id}
+                      className={`relative z-0 border-b border-gray-100 px-2 py-2 transition-colors hover:bg-primary-bg/40 ${
+                        isLinked || showAtivoColumn ? '' : 'opacity-70'
+                      }`}
+                    >
+                      {/* Layout desktop */}
+                      <div
+                        className="hidden sm:grid items-center gap-3"
+                        style={{ gridTemplateColumns: gridCols }}
+                      >
+                        {/* Nome + descrição */}
+                        <div className="min-w-0">
+                          <button
+                            type="button"
+                            onClick={() => openComplementoEditModal(id)}
+                            className="block truncate text-left text-sm font-medium text-primary-text hover:text-primary hover:underline focus:outline-none"
+                            title="Editar complemento"
+                          >
+                            {comp.getNome()}
+                          </button>
+                          {descricao && (
+                            <p className="truncate text-xs text-secondary-text">{descricao}</p>
+                          )}
+                        </div>
+
+                        {showDetailColumns ? (
+                          <>
+                            {/* Preço inline */}
+                            {isLinked ? (
+                              <input
+                                type="text"
+                                value={valorInputs[id] ?? formatValorFromNumber(comp.getValor())}
+                                onChange={(e) =>
+                                  setValorInputs((prev) => ({
+                                    ...prev,
+                                    [id]: formatValorInput(e.target.value),
+                                  }))
+                                }
+                                onFocus={(e) => e.target.select()}
+                                onBlur={() => handleUpdateValor(id)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                                disabled={!!savingMap[id]?.valor}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-full rounded border border-gray-200 px-2 py-1 text-center text-xs text-primary-text focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                              />
+                            ) : (
+                              <span className="block text-center text-xs text-secondary-text">
+                                {formatValorFromNumber(comp.getValor())}
+                              </span>
+                            )}
+
+                            {/* Impacto inline */}
+                            {isLinked ? (
+                              <select
+                                value={normalizeTipoImpacto(comp.getTipoImpactoPreco())}
+                                onChange={(e) =>
+                                  handleUpdateTipoImpacto(
+                                    id,
+                                    e.target.value as 'nenhum' | 'aumenta' | 'diminui'
+                                  )
+                                }
+                                disabled={!!savingMap[id]?.tipo}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-full rounded border border-gray-200 px-1.5 py-1 text-[11px] text-primary-text focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <option value="nenhum">Nenhum</option>
+                                <option value="aumenta">Aumenta</option>
+                                <option value="diminui">Diminui</option>
+                              </select>
+                            ) : (
+                              <span className="block text-center text-[11px] capitalize text-secondary-text">
+                                {normalizeTipoImpacto(comp.getTipoImpactoPreco())}
+                              </span>
+                            )}
+
+                            {/* Switch Vínculo */}
+                            <div className="flex justify-center">
+                              <JiffyIconSwitch
+                                checked={isLinked}
+                                onChange={(e) => {
+                                  e.stopPropagation()
+                                  void handleToggleVinculo(id, e.target.checked)
+                                }}
+                                disabled={vinculoLoadingId === id}
+                                bordered={false}
+                                size="sm"
+                                inputProps={{ 'aria-label': isLinked ? 'Desvincular' : 'Vincular' }}
+                              />
+                            </div>
+                          </>
+                        ) : null}
+
+                        {/* Switch Ativo — só na aba Todos */}
+                        {showAtivoColumn ? (
+                          <div className="flex justify-center">
+                            <JiffyIconSwitch
+                              size="xs"
+                              checked={comp.isAtivo()}
+                              onChange={(e) => {
+                                e.stopPropagation()
+                                handleToggleAtivo(id, e.target.checked)
+                              }}
+                              disabled={!!togglingStatus[id]}
+                              bordered={false}
+                              inputProps={{ 'aria-label': comp.isAtivo() ? 'Desativar' : 'Ativar' }}
+                            />
+                          </div>
+                        ) : null}
+                      </div>
+
+                      {/* Layout mobile */}
+                      <div className="sm:hidden flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <button
+                            type="button"
+                            onClick={() => openComplementoEditModal(id)}
+                            className="block truncate text-left text-sm font-medium text-primary-text hover:text-primary"
+                          >
+                            {comp.getNome()}
+                          </button>
+                          {descricao && (
+                            <p className="truncate text-xs text-secondary-text">{descricao}</p>
+                          )}
+                          {showDetailColumns && isLinked ? (
+                            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                              <input
+                                type="text"
+                                value={valorInputs[id] ?? formatValorFromNumber(comp.getValor())}
+                                onChange={(e) =>
+                                  setValorInputs((prev) => ({
+                                    ...prev,
+                                    [id]: formatValorInput(e.target.value),
+                                  }))
+                                }
+                                onFocus={(e) => e.target.select()}
+                                onBlur={() => handleUpdateValor(id)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                                disabled={!!savingMap[id]?.valor}
+                                className="w-[90px] rounded border border-gray-200 px-2 py-1 text-xs text-primary-text focus:border-primary focus:outline-none disabled:opacity-50"
+                              />
+                              <select
+                                value={normalizeTipoImpacto(comp.getTipoImpactoPreco())}
+                                onChange={(e) =>
+                                  handleUpdateTipoImpacto(
+                                    id,
+                                    e.target.value as 'nenhum' | 'aumenta' | 'diminui'
+                                  )
+                                }
+                                disabled={!!savingMap[id]?.tipo}
+                                className="min-w-[5.5rem] rounded border border-gray-200 px-1.5 py-1 text-[11px] text-primary-text focus:outline-none disabled:opacity-50"
+                              >
+                                <option value="nenhum">Nenhum</option>
+                                <option value="aumenta">Aumenta</option>
+                                <option value="diminui">Diminui</option>
+                              </select>
+                            </div>
+                          ) : null}
+                          {showAtivoColumn ? (
+                            <div className="mt-1.5">
+                              <JiffyIconSwitch
+                                size="xs"
+                                checked={comp.isAtivo()}
+                                onChange={(e) => {
+                                  e.stopPropagation()
+                                  handleToggleAtivo(id, e.target.checked)
+                                }}
+                                disabled={!!togglingStatus[id]}
+                                label={comp.isAtivo() ? 'Ativo' : 'Inativo'}
+                                labelPosition="end"
+                                bordered={false}
+                                inputProps={{ 'aria-label': comp.isAtivo() ? 'Desativar' : 'Ativar' }}
+                              />
+                            </div>
+                          ) : null}
+                        </div>
+                        {showDetailColumns ? (
                           <JiffyIconSwitch
-                            size="xs"
-                            checked={comp.isAtivo()}
+                            checked={isLinked}
                             onChange={(e) => {
                               e.stopPropagation()
-                              handleToggleAtivo(id, e.target.checked)
+                              void handleToggleVinculo(id, e.target.checked)
                             }}
-                            disabled={!!togglingStatus[id]}
-                            label={comp.isAtivo() ? 'Ativo' : 'Inativo'}
-                            labelPosition="end"
+                            disabled={vinculoLoadingId === id}
                             bordered={false}
-                            className="shrink-0"
-                            inputProps={{
-                              'aria-label': comp.isAtivo()
-                                ? 'Desativar complemento'
-                                : 'Ativar complemento',
-                            }}
+                            size="sm"
+                            inputProps={{ 'aria-label': isLinked ? 'Desvincular' : 'Vincular' }}
                           />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            value={valorInputs[id] ?? formatValorFromNumber(comp.getValor())}
-                            onChange={(e) => {
-                              setValorInputs((prev) => ({
-                                ...prev,
-                                [id]: formatValorInput(e.target.value),
-                              }))
-                            }}
-                            onFocus={(e) => e.target.select()}
-                            onBlur={() => handleUpdateValor(id)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.currentTarget.blur()
-                              }
-                            }}
-                            disabled={!!savingMap[id]?.valor}
-                            onClick={(e) => e.stopPropagation()}
-                            className="min-w-[100px] rounded border border-gray-200 px-2 py-1 text-xs font-normal text-primary-text focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                          />
-                        </div>
+                        ) : null}
                       </div>
-                      <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
-                        <input
-                          type="text"
-                          value={descricaoInputs[id] ?? comp.getDescricao() ?? ''}
-                          onChange={(e) => {
-                            setDescricaoInputs((prev) => ({
-                              ...prev,
-                              [id]: e.target.value,
-                            }))
-                          }}
-                          onFocus={(e) => e.target.select()}
-                          onBlur={() => handleUpdateDescricao(id)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.currentTarget.blur()
-                            }
-                          }}
-                          disabled={!!savingMap[id]?.descricao}
-                          onClick={(e) => e.stopPropagation()}
-                          placeholder="Sem descrição"
-                          className="max-w-[200px] min-w-0 flex-1 rounded border border-gray-200 px-2 py-1 text-xs text-secondary-text focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                        />
-                        <select
-                          value={normalizeTipoImpacto(comp.getTipoImpactoPreco())}
-                          onChange={(e) => {
-                            const novoValor = e.target.value as 'nenhum' | 'aumenta' | 'diminui'
-                            handleUpdateTipoImpacto(id, novoValor)
-                          }}
-                          disabled={!!savingMap[id]?.tipo}
-                          onClick={(e) => e.stopPropagation()}
-                          className="rounded border border-gray-200 px-2 py-1 text-[11px] font-normal uppercase tracking-wide text-primary-text focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          <option value="nenhum">Nenhum</option>
-                          <option value="aumenta">Aumenta</option>
-                          <option value="diminui">Diminui</option>
-                        </select>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="pr-1">
-                      <p className="text-sm font-normal text-primary-text">{comp.getNome()}</p>
-                      <p className="mt-0.5 line-clamp-2 text-xs text-secondary-text">
-                        {comp.getDescricao()?.trim() ? comp.getDescricao() : 'Sem descrição'}
-                      </p>
                     </div>
-                  )}
-                </div>
-                <div className="flex min-w-0 justify-end self-start pt-0.5">
-                  <JiffyIconSwitch
-                    checked={isLinked}
-                    onChange={(e) => {
-                      e.stopPropagation()
-                      void handleToggleVinculo(id, e.target.checked)
-                    }}
-                    disabled={vinculoLoadingId === id}
-                    bordered={false}
-                    size="sm"
-                    className="shrink-0"
-                    inputProps={{
-                      'aria-label': isLinked ? 'Desvincular do grupo' : 'Vincular ao grupo',
-                    }}
-                  />
-                </div>
-              </div>
-            )
-          })}
-          </>
-        )}
+                  )
+                })}
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -794,6 +903,7 @@ export function GrupoComplementoComplementosModal({
           onClose={closeComplementosTabsModal}
           onTabChange={handleComplementosTabChange}
           onReload={handleComplementosTabsReload}
+          onCreated={handleComplementoCreated}
         />
       </>
     )
@@ -809,6 +919,7 @@ export function GrupoComplementoComplementosModal({
         onClose={closeComplementosTabsModal}
         onTabChange={handleComplementosTabChange}
         onReload={handleComplementosTabsReload}
+        onCreated={handleComplementoCreated}
       />
     </>
   )

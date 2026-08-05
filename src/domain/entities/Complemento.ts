@@ -28,13 +28,20 @@ export class Complemento {
     return new Complemento(id, nome, descricao, valor, ativo, tipoImpactoPreco, ordem)
   }
 
+  static parseAtivo(value: unknown): boolean {
+    if (value === null || value === undefined) return true
+    if (value === true || value === 'true' || value === 1 || value === '1') return true
+    if (value === false || value === 'false' || value === 0 || value === '0') return false
+    return true
+  }
+
   static fromJSON(data: any): Complemento {
     return Complemento.create(
       data.id?.toString() || '',
       data.nome?.toString() || '',
       data.descricao?.toString(),
       typeof data.valor === 'number' ? data.valor : parseFloat(data.valor) || 0,
-      data.ativo === true || data.ativo === 'true',
+      Complemento.parseAtivo(data.ativo),
       data.tipoImpactoPreco?.toString(),
       data.ordem ? parseInt(data.ordem.toString(), 10) : undefined
     )

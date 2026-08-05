@@ -77,7 +77,8 @@ interface NovoComplementoProps {
     isSubmitting: boolean
     canSubmit: boolean
   }) => void
-  onSaved?: () => void
+  /** Chamado após salvar; passa o id do complemento criado/editado. */
+  onSaved?: (id?: string) => void
   onCancel?: () => void
 }
 
@@ -290,10 +291,12 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
         throw new Error(errorData.error || 'Erro ao salvar complemento')
       }
 
+      const savedData = (await response.json().catch(() => ({}))) as { id?: string }
+      const savedId = savedData?.id?.toString()
       showToast.success(isEditing ? 'Complemento atualizado com sucesso!' : 'Complemento criado com sucesso!')
       commitBaselineLatestRef.current()
       if (isEmbedded) {
-        onSaved?.()
+        onSaved?.(savedId)
       } else {
         router.push('/complementos')
       }
@@ -403,26 +406,29 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
             </div>
 
             <div className="space-y-6">
-              <JiffyIconSwitch
-                checked={ativo}
-                onChange={e => setAtivo(e.target.checked)}
-                label={ativo ? 'Ativo' : 'Inativo'}
-                bordered={false}
-                size="sm"
-                className="justify-end"
-              />
-
-              <Input
-                label="Nome do Complemento"
-                value={nome}
-                onChange={e => setNome(e.target.value.toUpperCase())}
-                required
-                size="small"
-                placeholder="Nome do Complemento"
-                className="bg-white"
-                sx={sxCampoTextoMaiusculo}
-                InputLabelProps={{ required: true }}
-              />
+              <div className="flex items-start gap-3">
+                <div className="min-w-0 flex-1">
+                  <Input
+                    label="Nome do Complemento"
+                    value={nome}
+                    onChange={e => setNome(e.target.value.toUpperCase())}
+                    required
+                    size="small"
+                    placeholder="Nome do Complemento"
+                    className="bg-white"
+                    sx={sxCampoTextoMaiusculo}
+                    InputLabelProps={{ required: true }}
+                  />
+                </div>
+                <JiffyIconSwitch
+                  checked={ativo}
+                  onChange={e => setAtivo(e.target.checked)}
+                  label={ativo ? 'Ativo' : 'Inativo'}
+                  bordered={false}
+                  size="sm"
+                  className="mt-1.5 shrink-0"
+                />
+              </div>
 
               <Input
                 label="Descrição"
@@ -463,7 +469,6 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
                       ...sxEntradaCompactaComplemento,
                       '& .MuiSelect-select': {
                         ...entradaCompactaSelect,
-                        textTransform: 'uppercase',
                       },
                     }}
                   >
@@ -483,15 +488,9 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
                         )
                       }}
                     >
-                      <MenuItem value="nenhum" sx={{ textTransform: 'uppercase' }}>
-                        Nenhum
-                      </MenuItem>
-                      <MenuItem value="aumenta" sx={{ textTransform: 'uppercase' }}>
-                        Aumenta
-                      </MenuItem>
-                      <MenuItem value="diminui" sx={{ textTransform: 'uppercase' }}>
-                        Diminui
-                      </MenuItem>
+                      <MenuItem value="nenhum">Nenhum</MenuItem>
+                      <MenuItem value="aumenta">Aumenta</MenuItem>
+                      <MenuItem value="diminui">Diminui</MenuItem>
                     </Select>
                   </FormControl>
                 </div>

@@ -117,6 +117,8 @@ export const NovoGrupoComplemento = forwardRef<
   const [qtdMinima, setQtdMinima] = useState('0')
   const [qtdMaxima, setQtdMaxima] = useState('0')
   const [ativo, setAtivo] = useState(true)
+  /** Contagem de vínculos (edição: GET do grupo; criação: draft do pai). */
+  const [vinculadosCount, setVinculadosCount] = useState(0)
 
   // Estados de loading e dados
   const [isLoading, setIsLoading] = useState(false)
@@ -223,6 +225,8 @@ export const NovoGrupoComplemento = forwardRef<
             setQtdMinima(grupo.getQtdMinima().toString())
             setQtdMaxima(grupo.getQtdMaxima().toString())
             setAtivo(grupo.isAtivo())
+            const ids = grupo.getComplementosIds() ?? []
+            setVinculadosCount(ids.length || (grupo.getComplementos()?.length ?? 0))
 
             window.setTimeout(() => {
               commitBaselineLatestRef.current()
@@ -396,23 +400,21 @@ export const NovoGrupoComplemento = forwardRef<
         >
           {/* Informações */}
             <div className="bg-info rounded-[12px] md:p-5">
-              <div className="mb-2 flex items-center gap-5">
+              <div className="mb-4 flex flex-wrap items-center gap-3 md:gap-5">
                 <h2 className="shrink-0 text-primary md:text-xl text-sm font-semibold">
-                  Dados Do Grupo De Complementos
+                  Dados do grupo
                 </h2>
-                <div className="h-px min-w-0 flex-1 bg-primary/70" aria-hidden />
+                <div className="h-px min-w-[2rem] flex-1 bg-primary/70" aria-hidden />
+                <JiffyIconSwitch
+                  checked={ativo}
+                  onChange={e => setAtivo(e.target.checked)}
+                  label="Ativo"
+                  bordered={false}
+                  size="sm"
+                  className="shrink-0"
+                />
               </div>
-                <div className="flex my-6 justify-end">
-            <JiffyIconSwitch
-              checked={ativo}
-              onChange={e => setAtivo(e.target.checked)}
-              label="Ativo"
-              bordered={false}
-              size="sm"
-              className="mb-6 justify-end"
-            />
-            </div>
-            <div className="space-y-8">
+            <div className="space-y-4">
               <Input
                 label="Nome do Grupo"
                 value={nome}
@@ -425,35 +427,41 @@ export const NovoGrupoComplemento = forwardRef<
               />
 
               <div className="grid grid-cols-2 gap-4">
-                <Input
-                  label="Quantidade Mínima"
-                  type="number"
-                  value={qtdMinima}
-                  onChange={(e) => setQtdMinima(e.target.value)}
-                  required
-                  size="small"
-                  min={0}
-                  placeholder="0"
-                  className="bg-info"
-                  sx={sxEntradaCompactaGrupo}
-                />
-                <Input
-                  label="Quantidade Máxima"
-                  type="number"
-                  value={qtdMaxima}
-                  onChange={(e) => setQtdMaxima(e.target.value)}
-                  required
-                  size="small"
-                  min={0}
-                  placeholder="0"
-                  className="bg-info"
-                  sx={sxEntradaCompactaGrupo}
-                />
+                <div>
+                  <Input
+                    label="Quantidade Mínima"
+                    type="number"
+                    value={qtdMinima}
+                    onChange={(e) => setQtdMinima(e.target.value)}
+                    required
+                    size="small"
+                    min={0}
+                    placeholder="0"
+                    className="bg-info"
+                    sx={sxEntradaCompactaGrupo}
+                  />
+                  <p className="mt-1 text-[11px] text-secondary-text">0 = sem mínimo</p>
+                </div>
+                <div>
+                  <Input
+                    label="Quantidade Máxima"
+                    type="number"
+                    value={qtdMaxima}
+                    onChange={(e) => setQtdMaxima(e.target.value)}
+                    required
+                    size="small"
+                    min={0}
+                    placeholder="0"
+                    className="bg-info"
+                    sx={sxEntradaCompactaGrupo}
+                  />
+                  <p className="mt-1 text-[11px] text-secondary-text">0 = sem limite</p>
+                </div>
               </div>
 
               {/* Complementos: a gestão de vínculos acontece exclusivamente na aba Complementos. */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="mb-2 block text-sm font-medium text-gray-700">
                   Complementos
                 </label>
                 <button
@@ -462,10 +470,15 @@ export const NovoGrupoComplemento = forwardRef<
                     onGoToComplementosTab?.()
                   }}
                   disabled={!onGoToComplementosTab}
-                  className="inline-flex items-center h-8 text-sm md:text-lg gap-2 px-5 py-2 rounded-lg bg-primary text-info font-medium shadow hover:bg-primary/90 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex h-8 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-medium text-info shadow transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 md:text-base"
                 >
-                  <MdAdd className="md:text-lg text-sm" />
-                  Vincular Complementos
+                  <MdAdd className="text-sm md:text-lg" />
+                  {isEditing ? 'Gerenciar complementos' : 'Ir para Complementos'}
+                  {(isEditing ? vinculadosCount : complementosIdsDraft.length) > 0 ? (
+                    <span className="rounded-md bg-white/20 px-1.5 py-0.5 text-xs font-semibold tabular-nums">
+                      {isEditing ? vinculadosCount : complementosIdsDraft.length}
+                    </span>
+                  ) : null}
                 </button>
               </div>
 

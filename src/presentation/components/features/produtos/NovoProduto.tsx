@@ -17,6 +17,7 @@ import { ConfiguracaoFiscalStep } from './NovoProduto/ConfiguracaoFiscalStep'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast, handleApiError } from '@/src/shared/utils/toast'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
+import { Produto } from '@/src/domain/entities/Produto'
 import { MdImage } from 'react-icons/md'
 import { cn } from '@/src/shared/utils/cn'
 
@@ -42,6 +43,44 @@ interface BaselineSnapshotProduto {
   origemMercadoria: string | null
   tipoProduto: string | null
   indicadorProducaoEscala: string | null
+}
+
+/** Formata valor para o input de preço (mesmo formato do load da API). */
+function formatCurrencyValue(value: number | string): string {
+  const numericValue =
+    typeof value === 'number'
+      ? value
+      : Number(
+          value
+            .toString()
+            .replace(/[^\d,.-]/g, '')
+            .replace(',', '.')
+        ) || 0
+
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(numericValue)
+}
+
+/** Hidrata o form com o produto da lista — evita inputs vazios enquanto o GET responde. */
+function seedFormFromProduto(produto: Produto, isCopy: boolean) {
+  const nome = produto.getNome() || ''
+  return {
+    nomeProduto: isCopy ? (nome ? `${nome} - Cópia` : 'Cópia ') : nome,
+    precoVenda: produto.getValor() ? formatCurrencyValue(produto.getValor()) : '',
+    unidadeProduto: (produto.getUnidadeMedida() as string | null) || null,
+    grupoProduto: produto.getGrupoId() || null,
+    favorito: produto.isFavorito(),
+    permiteDesconto: produto.permiteDescontoAtivo(),
+    permiteAcrescimo: produto.permiteAcrescimoAtivo(),
+    abreComplementos: produto.abreComplementosAtivo(),
+    permiteAlterarPreco: produto.permiteAlterarPrecoAtivo(),
+    incideTaxa: produto.incideTaxaAtivo(),
+    ativo: produto.isAtivo(),
+    grupoComplementosIds: produto.getGruposComplementos().map(g => g.id),
+    impressorasIds: produto.getImpressoras().map(i => i.id),
+  }
 }
 
 function parsePrecoFormParaNumero(preco: string): number {
@@ -277,6 +316,11 @@ export interface NovoProdutoHandle {
 
 export interface NovoProdutoProps {
   produtoId?: string
+  /**
+   * Produto já conhecido (lista / modal) — hidrata o form na abertura sem esperar o GET.
+   * O fetch ainda confirma descrição, EAN, fiscal etc. em background.
+   */
+  initialProduto?: Produto
   isCopyMode?: boolean
   defaultGrupoProdutoId?: string
   initialStep?: 0 | 1 | 2
@@ -300,6 +344,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
   function NovoProdutoContent(
     {
       produtoId,
+      initialProduto,
       isCopyMode = false,
       defaultGrupoProdutoId,
       initialStep = 0,
@@ -321,24 +366,48 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
     // Estado do step atual (0 = Informações, 1 = Configurações, 2 = Configuração Fiscal)
     const [selectedPage, setSelectedPage] = useState<0 | 1 | 2>(initialStep)
 
-    // Estados do formulário
-    const [nomeProduto, setNomeProduto] = useState('')
+    const formSeed =
+      initialProduto && produtoId && initialProduto.getId() === produtoId
+        ? seedFormFromProduto(initialProduto, isCopyMode)
+        : null
+    const hasFormSeedRef = useRef(Boolean(formSeed))
+
+    // Estados do formulário (seed da lista evita inputs brancos com backend lento)
+    const [nomeProduto, setNomeProduto] = useState(() => formSeed?.nomeProduto ?? '')
     const [descricaoProduto, setDescricaoProduto] = useState('')
-    const [precoVenda, setPrecoVenda] = useState('')
-    const [unidadeProduto, setUnidadeProduto] = useState<string | null>(null)
-    const [grupoProduto, setGrupoProduto] = useState<string | null>(null)
+    const [precoVenda, setPrecoVenda] = useState(() => formSeed?.precoVenda ?? '')
+    const [unidadeProduto, setUnidadeProduto] = useState<string | null>(
+      () => formSeed?.unidadeProduto ?? null
+    )
+    const [grupoProduto, setGrupoProduto] = useState<string | null>(
+      () => formSeed?.grupoProduto ?? defaultGrupoProdutoId ?? null
+    )
     const [codigoEanBarras, setCodigoEanBarras] = useState('')
-    const [favorito, setFavorito] = useState(false)
-    const [permiteDesconto, setPermiteDesconto] = useState(false)
-    const [permiteAcrescimo, setPermiteAcrescimo] = useState(false)
-    const [abreComplementos, setAbreComplementos] = useState(false)
-    const [permiteAlterarPreco, setPermiteAlterarPreco] = useState(false)
-    const [incideTaxa, setIncideTaxa] = useState(false)
-    const [ativo, setAtivo] = useState(true)
-    const [grupoComplementosIds, setGrupoComplementosIds] = useState<string[]>([])
-    const [impressorasIds, setImpressorasIds] = useState<string[]>([])
+    const [favorito, setFavorito] = useState(() => formSeed?.favorito ?? false)
+    const [permiteDesconto, setPermiteDesconto] = useState(
+      () => formSeed?.permiteDesconto ?? false
+    )
+    const [permiteAcrescimo, setPermiteAcrescimo] = useState(
+      () => formSeed?.permiteAcrescimo ?? false
+    )
+    const [abreComplementos, setAbreComplementos] = useState(
+      () => formSeed?.abreComplementos ?? false
+    )
+    const [permiteAlterarPreco, setPermiteAlterarPreco] = useState(
+      () => formSeed?.permiteAlterarPreco ?? false
+    )
+    const [incideTaxa, setIncideTaxa] = useState(() => formSeed?.incideTaxa ?? false)
+    const [ativo, setAtivo] = useState(() => formSeed?.ativo ?? true)
+    const [grupoComplementosIds, setGrupoComplementosIds] = useState<string[]>(
+      () => formSeed?.grupoComplementosIds ?? []
+    )
+    const [impressorasIds, setImpressorasIds] = useState<string[]>(
+      () => formSeed?.impressorasIds ?? []
+    )
     // Guardar os grupos originais para comparar na remoção
-    const [originalGrupoComplementosIds, setOriginalGrupoComplementosIds] = useState<string[]>([])
+    const [originalGrupoComplementosIds, setOriginalGrupoComplementosIds] = useState<string[]>(
+      () => formSeed?.grupoComplementosIds ?? []
+    )
 
     // Estados fiscais
     const [ncm, setNcm] = useState('')
@@ -387,7 +456,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
     const baselineSerializedRef = useRef<string | null>(null)
     const createBaselineCommittedRef = useRef(false)
     /** grupoId do último GET bem-sucedido (ou após salvar) — diff de grupo não usa só o snapshot JSON. */
-    const grupoProdutoIdCarregadoRef = useRef<string | null>(null)
+    const grupoProdutoIdCarregadoRef = useRef<string | null>(formSeed?.grupoProduto ?? null)
 
     // Verificar se é modo cópia via query param
     // Extrair o valor uma vez e usar como string estável
@@ -506,20 +575,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
 
     // Carregar grupos de produtos usando React Query (com cache)
     const formatCurrency = useCallback((value: number | string) => {
-      const numericValue =
-        typeof value === 'number'
-          ? value
-          : Number(
-              value
-                .toString()
-                .replace(/[^\d,.-]/g, '')
-                .replace(',', '.')
-            ) || 0
-
-      return new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: 'BRL',
-      }).format(numericValue)
+      return formatCurrencyValue(value)
     }, [])
 
     /**
@@ -646,7 +702,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           return
         }
 
-        setIsLoadingProduto(true)
+        setIsLoadingProduto(!hasFormSeedRef.current)
         try {
           const response = await fetch(`/api/produtos/${currentEffectiveProdutoId}`, {
             headers: {
