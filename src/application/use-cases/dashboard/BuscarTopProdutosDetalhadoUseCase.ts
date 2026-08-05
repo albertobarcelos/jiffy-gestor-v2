@@ -1,3 +1,4 @@
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { DashboardTopProduto } from '@/src/domain/entities/DashboardTopProduto'
 
 interface TopProdutoApiItem {
@@ -27,7 +28,7 @@ export class BuscarTopProdutosDetalhadoUseCase {
       params.append('dataFinalizacaoFinal', periodoFinalCustom.toISOString())
     }
 
-    const response = await fetch(`/api/dashboard/top-produtos?${params.toString()}`, {
+    const response = await fetchGestorApi(`/api/dashboard/top-produtos?${params.toString()}`, {
       credentials: 'include',
     })
 

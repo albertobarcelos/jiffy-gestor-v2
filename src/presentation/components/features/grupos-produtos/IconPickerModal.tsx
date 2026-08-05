@@ -5,6 +5,7 @@ import { Icon } from '@mdi/react'
 import { mdiMagnify } from '@mdi/js'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { cn } from '@/src/shared/utils/cn'
@@ -38,14 +39,12 @@ export function IconPickerModal({
   const [activeTab, setActiveTab] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [groups, setGroups] = useState<string[]>([])
-  const { auth } = useAuthStore()
-
+  const [groups, setGroups] = useState<string[]>([])
   const loadIcons = useCallback(async () => {
     setIsLoading(true)
     setError(null)
     try {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         setError('Sessão inválida. Faça login novamente.')
         setIcons([])
@@ -54,7 +53,7 @@ export function IconPickerModal({
         return
       }
 
-      const response = await fetch('/api/icones', {
+      const response = await fetchGestorApi('/api/icones', {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -81,7 +80,7 @@ export function IconPickerModal({
     } finally {
       setIsLoading(false)
     }
-  }, [auth])
+  }, [])
 
   useEffect(() => {
     if (!isOpen) return

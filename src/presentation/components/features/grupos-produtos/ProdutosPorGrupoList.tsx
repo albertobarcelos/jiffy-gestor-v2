@@ -18,13 +18,14 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { useInfiniteQuery } from '@tanstack/react-query'
+import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecureTenantInfiniteQuery'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { ProdutosTabsModal, ProdutosTabsModalState } from '../produtos/ProdutosTabsModal'
 import { Produto } from '@/src/domain/entities/Produto'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { MdKeyboardArrowDown, MdKeyboardArrowUp } from 'react-icons/md'
 
 interface ProdutoGrupo {
@@ -49,7 +50,6 @@ interface ProdutosPorGrupoListProps {
 const PAGE_SIZE = 10
 
 export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListProps) {
-  const { auth } = useAuthStore()
   const [localProdutos, setLocalProdutos] = useState<ProdutoGrupo[]>([])
   const [tabsModalState, setTabsModalState] = useState<ProdutosTabsModalState>({
     open: false,
@@ -94,12 +94,10 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
     isLoading,
     error,
     refetch,
-  } = useInfiniteQuery<ProdutosResponse>({
-    queryKey: ['produtos-por-grupo', grupoProdutoId],
-    initialPageParam: 0,
-    enabled: !!grupoProdutoId,
-    queryFn: async ({ pageParam }) => {
-      const res = await fetch(
+  } = useSecureTenantInfiniteQuery<ProdutosResponse, number>(
+    ['produtos-por-grupo', grupoProdutoId],
+    async (_ctx, pageParam) => {
+      const res = await fetchGestorApi(
         `/api/grupos-produtos/${grupoProdutoId}/produtos?limit=${PAGE_SIZE}&offset=${pageParam}`
       )
 
@@ -110,11 +108,15 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
 
       return res.json()
     },
-    getNextPageParam: (lastPage) =>
-      lastPage.hasMore && typeof lastPage.nextOffset === 'number'
-        ? lastPage.nextOffset
-        : undefined,
-  })
+    {
+      initialPageParam: 0,
+      enabled: !!grupoProdutoId,
+      getNextPageParam: lastPage =>
+        lastPage.hasMore && typeof lastPage.nextOffset === 'number'
+          ? lastPage.nextOffset
+          : undefined,
+    }
+  )
 
   const serverProdutos = useMemo(() => {
     return data?.pages.flatMap((page) => page.items || []) ?? []
@@ -241,14 +243,14 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
 
   const handleEditProduto = useCallback(
     async (produtoId: string) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
       }
 
       try {
-        const response = await fetch(`/api/produtos/${produtoId}`, {
+        const response = await fetchGestorApi(`/api/produtos/${produtoId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -276,7 +278,7 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
         showToast.error(err instanceof Error ? err.message : 'Erro ao carregar produto')
       }
     },
-    [auth]
+    []
   )
 
   const persistNovaOrdem = useCallback(
@@ -285,7 +287,7 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
       previousLocalProdutosRef.current = updatedState
 
       try {
-        const response = await fetch(`/api/produtos/${movedId}/reordena-produto`, {
+        const response = await fetchGestorApi(`/api/produtos/${movedId}/reordena-produto`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',

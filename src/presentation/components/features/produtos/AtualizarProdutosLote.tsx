@@ -5,6 +5,7 @@ import { Produto } from '@/src/domain/entities/Produto'
 import { Impressora } from '@/src/domain/entities/Impressora'
 import { transformarParaReal, brToEUA } from '@/src/shared/utils/formatters'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -399,9 +400,7 @@ export function AtualizarPrecoLote() {
   const isLoadingRef = useRef(false)
   const isLoadingMoreRef = useRef(false)
   const loadMoreLockRef = useRef(false)
-  const carregarMaisProdutosRef = useRef<() => Promise<void>>(async () => {})
-  const { auth } = useAuthStore()
-
+  const carregarMaisProdutosRef = useRef<() => Promise<void>>(async () => {})
   useEffect(() => {
     produtosRef.current = produtos
   }, [produtos])
@@ -471,7 +470,7 @@ export function AtualizarPrecoLote() {
   /** Aba fiscal: 1× POST batch (em vez de N× GET /produtos/:id). */
   useEffect(() => {
     if (activeTab !== 'fiscal' || isLoading) return
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     const pendentes = produtos.filter(p => {
@@ -498,7 +497,7 @@ export function AtualizarPrecoLote() {
 
     void (async () => {
       try {
-        const response = await fetch('/api/v1/fiscal/produtos-fiscais/batch', {
+        const response = await fetchGestorApi('/api/v1/fiscal/produtos-fiscais/batch', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -550,7 +549,7 @@ export function AtualizarPrecoLote() {
     return () => {
       cancelled = true
     }
-  }, [activeTab, auth, isLoading, produtos])
+  }, [activeTab, isLoading, produtos])
 
 
   const marcarProdutosAlteradosNaSessao = useCallback((ids: string[], aba: TabPainelLote) => {
@@ -602,7 +601,7 @@ export function AtualizarPrecoLote() {
   )
 
   const buscarProdutos = useCallback(async (): Promise<Produto[]> => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return []
 
     loadMoreLockRef.current = false
@@ -616,7 +615,7 @@ export function AtualizarPrecoLote() {
 
     try {
       const params = buildProdutosLoteParams(0)
-      const response = await fetch(`/api/produtos?${params.toString()}`, {
+      const response = await fetchGestorApi(`/api/produtos?${params.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -643,10 +642,10 @@ export function AtualizarPrecoLote() {
     } finally {
       setIsLoading(false)
     }
-  }, [auth, buildProdutosLoteParams])
+  }, [ buildProdutosLoteParams])
 
   const carregarMaisProdutos = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
     if (
       loadMoreLockRef.current ||
@@ -663,7 +662,7 @@ export function AtualizarPrecoLote() {
 
     try {
       const params = buildProdutosLoteParams(offset)
-      const response = await fetch(`/api/produtos?${params.toString()}`, {
+      const response = await fetchGestorApi(`/api/produtos?${params.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -707,7 +706,7 @@ export function AtualizarPrecoLote() {
       loadMoreLockRef.current = false
       setIsLoadingMore(false)
     }
-  }, [auth, buildProdutosLoteParams])
+  }, [ buildProdutosLoteParams])
 
   useEffect(() => {
     carregarMaisProdutosRef.current = carregarMaisProdutos
@@ -842,7 +841,7 @@ export function AtualizarPrecoLote() {
 
   // Carregar todas as impressoras
   const loadAllImpressoras = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     setIsLoadingImpressoras(true)
@@ -858,7 +857,7 @@ export function AtualizarPrecoLote() {
           offset: currentOffset.toString(),
         })
 
-        const response = await fetch(`/api/impressoras?${params.toString()}`, {
+        const response = await fetchGestorApi(`/api/impressoras?${params.toString()}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -894,7 +893,7 @@ export function AtualizarPrecoLote() {
     } finally {
       setIsLoadingImpressoras(false)
     }
-  }, [auth])
+  }, [])
 
   // Carregar impressoras quando tab de impressoras estiver ativa
   useEffect(() => {
@@ -938,7 +937,7 @@ export function AtualizarPrecoLote() {
 
     setIsValidatingNcm(true)
     ncmValidationTimerRef.current = setTimeout(async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         setIsValidatingNcm(false)
         return
@@ -948,7 +947,7 @@ export function AtualizarPrecoLote() {
       const timeoutId = setTimeout(() => controller.abort(), 5000)
 
       try {
-        const response = await fetch(`/api/v1/fiscal/configuracoes/ncms/validar/${ncmTrimmed}`, {
+        const response = await fetchGestorApi(`/api/v1/fiscal/configuracoes/ncms/validar/${ncmTrimmed}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -983,7 +982,7 @@ export function AtualizarPrecoLote() {
         clearTimeout(ncmValidationTimerRef.current)
       }
     }
-  }, [fiscalLoteDraft.ncm, auth, activeTab])
+  }, [fiscalLoteDraft.ncm, activeTab])
 
   // Lista de CESTs compatíveis com o NCM validado
   useEffect(() => {
@@ -1008,7 +1007,7 @@ export function AtualizarPrecoLote() {
     }
 
     const fetchCests = async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return
 
       setIsLoadingCests(true)
@@ -1016,7 +1015,7 @@ export function AtualizarPrecoLote() {
       const timeoutId = setTimeout(() => controller.abort(), 5000)
 
       try {
-        const response = await fetch(`/api/v1/fiscal/configuracoes/cests/por-ncm/${ncmTrimmed}`, {
+        const response = await fetchGestorApi(`/api/v1/fiscal/configuracoes/cests/por-ncm/${ncmTrimmed}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -1047,7 +1046,7 @@ export function AtualizarPrecoLote() {
     }
 
     void fetchCests()
-  }, [ncmValidation, fiscalLoteDraft.ncm, auth, activeTab])
+  }, [ncmValidation, fiscalLoteDraft.ncm, activeTab])
 
   // Validação CEST (debounce 400ms) — igual NovoProduto
   useEffect(() => {
@@ -1085,7 +1084,7 @@ export function AtualizarPrecoLote() {
     setIsValidatingCest(true)
 
     const timer = setTimeout(async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         setIsValidatingCest(false)
         return
@@ -1099,7 +1098,7 @@ export function AtualizarPrecoLote() {
           ? `/api/v1/fiscal/configuracoes/cests/validar/${cestTrimmed}/ncm/${ncmTrimmed}`
           : `/api/v1/fiscal/configuracoes/cests/validar/${cestTrimmed}`
 
-        const response = await fetch(url, {
+        const response = await fetchGestorApi(url, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -1149,7 +1148,7 @@ export function AtualizarPrecoLote() {
       clearTimeout(timer)
       abortController.abort()
     }
-  }, [fiscalLoteDraft.cest, fiscalLoteDraft.ncm, ncmValidation, cestsDisponiveis, auth, activeTab])
+  }, [fiscalLoteDraft.cest, fiscalLoteDraft.ncm, ncmValidation, cestsDisponiveis, activeTab])
 
   // Com CEST preenchido, sugere indicador de escala (igual NovoProduto — só reage ao CEST)
   useEffect(() => {
@@ -1180,7 +1179,7 @@ export function AtualizarPrecoLote() {
       return
     }
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado')
       return
@@ -1233,7 +1232,7 @@ export function AtualizarPrecoLote() {
       })
 
       // Chama API de bulk-update
-      const response = await fetch('/api/produtos/bulk-update', {
+      const response = await fetchGestorApi('/api/produtos/bulk-update', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1317,7 +1316,7 @@ export function AtualizarPrecoLote() {
       return
     }
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado')
       return
@@ -1340,7 +1339,7 @@ export function AtualizarPrecoLote() {
         }
       })
 
-      const response = await fetch('/api/produtos/bulk-update', {
+      const response = await fetchGestorApi('/api/produtos/bulk-update', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1378,7 +1377,7 @@ export function AtualizarPrecoLote() {
       return
     }
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado')
       return
@@ -1394,7 +1393,7 @@ export function AtualizarPrecoLote() {
         impressorasIdsToRemove: impressorasIdsArray,
       }))
 
-      const response = await fetch('/api/produtos/bulk-update', {
+      const response = await fetchGestorApi('/api/produtos/bulk-update', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1445,7 +1444,7 @@ export function AtualizarPrecoLote() {
       return
     }
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado')
       return
@@ -1467,7 +1466,7 @@ export function AtualizarPrecoLote() {
         }
       })
 
-      const response = await fetch('/api/produtos/bulk-update', {
+      const response = await fetchGestorApi('/api/produtos/bulk-update', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1506,7 +1505,7 @@ export function AtualizarPrecoLote() {
       return
     }
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado')
       return
@@ -1522,7 +1521,7 @@ export function AtualizarPrecoLote() {
         gruposComplementosIdsToRemove: gruposIdsArray,
       }))
 
-      const response = await fetch('/api/produtos/bulk-update', {
+      const response = await fetchGestorApi('/api/produtos/bulk-update', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1570,7 +1569,7 @@ export function AtualizarPrecoLote() {
       return
     }
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado')
       return
@@ -1593,7 +1592,7 @@ export function AtualizarPrecoLote() {
         const produtoId = ids[i]
         setSalvandoPermissoesProgresso({ atual: i + 1, total })
 
-        const response = await fetch(`/api/produtos/${produtoId}`, {
+        const response = await fetchGestorApi(`/api/produtos/${produtoId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -1680,7 +1679,7 @@ export function AtualizarPrecoLote() {
   /** PATCH fiscal da linha inteira (um request por produto ao clicar OK). */
   const salvarFiscalLinha = useCallback(
     async (produto: Produto): Promise<boolean> => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado')
         return false
@@ -1718,7 +1717,7 @@ export function AtualizarPrecoLote() {
         try {
           const controller = new AbortController()
           const timeoutId = setTimeout(() => controller.abort(), 8000)
-          const response = await fetch(
+          const response = await fetchGestorApi(
             `/api/v1/fiscal/configuracoes/ncms/validar/${encodeURIComponent(ncmT)}`,
             {
               headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
@@ -1743,7 +1742,7 @@ export function AtualizarPrecoLote() {
         try {
           const controller = new AbortController()
           const timeoutId = setTimeout(() => controller.abort(), 8000)
-          const response = await fetch(
+          const response = await fetchGestorApi(
             `/api/v1/fiscal/configuracoes/cests/validar/${encodeURIComponent(cestT)}/ncm/${encodeURIComponent(ncmT)}`,
             {
               headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
@@ -1797,7 +1796,7 @@ export function AtualizarPrecoLote() {
       setSalvandoFiscalLinhaId(produtoId)
 
       try {
-        const response = await fetch('/api/v1/fiscal/produtos-fiscais/lote', {
+        const response = await fetchGestorApi('/api/v1/fiscal/produtos-fiscais/lote', {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -1869,7 +1868,7 @@ export function AtualizarPrecoLote() {
         setSalvandoFiscalLinhaId(null)
       }
     },
-    [auth, fiscalLinhaDrafts, marcarProdutosAlteradosNaSessao]
+    [ fiscalLinhaDrafts, marcarProdutosAlteradosNaSessao]
   )
 
   /** 1× PATCH /produtos-fiscais/lote (em vez de N× PATCH /produtos/:id). */
@@ -1925,7 +1924,7 @@ export function AtualizarPrecoLote() {
       return
     }
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado')
       return
@@ -1938,7 +1937,7 @@ export function AtualizarPrecoLote() {
     setSalvandoFiscalProgresso({ atual: 0, total: totalIds })
 
     try {
-      const response = await fetch('/api/v1/fiscal/produtos-fiscais/lote', {
+      const response = await fetchGestorApi('/api/v1/fiscal/produtos-fiscais/lote', {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { PerfilUsuario } from '@/src/domain/entities/PerfilUsuario'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
@@ -54,7 +55,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
-  const { auth, isAuthenticated } = useAuthStore()
+  const { isAuthenticated } = useAuthStore()
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -71,7 +72,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
    */
   const loadContagemUsuariosPorPerfil = useCallback(
     async (perfilIds: string[]) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token || perfilIds.length === 0) return
 
       try {
@@ -79,7 +80,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
         const contagens = await Promise.all(
           perfilIds.map(async (perfilId) => {
             try {
-              const response = await fetch(
+              const response = await fetchGestorApi(
                 `/api/usuarios?perfilPdvId=${perfilId}&limit=${USUARIOS_PAGE_LIMIT}&offset=0`,
                 {
                   headers: {
@@ -112,7 +113,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
         console.error('Erro ao carregar contagem de usuários:', error)
       }
     },
-    [auth]
+    []
   )
 
   /**
@@ -121,7 +122,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
    */
   const loadAllPerfis = useCallback(
     async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         return
       }
@@ -145,7 +146,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
             params.append('q', searchTextRef.current)
           }
 
-          const response = await fetch(`/api/perfis-usuarios-pdv?${params.toString()}`, {
+          const response = await fetchGestorApi(`/api/perfis-usuarios-pdv?${params.toString()}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -192,16 +193,16 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
         setIsLoading(false)
       }
     },
-    [auth, loadContagemUsuariosPorPerfil]
+    [ loadContagemUsuariosPorPerfil]
   )
 
   const loadUsuariosPorPerfil = useCallback(
     async (perfilId: string) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token || usuariosPorPerfil[perfilId]) return
 
       try {
-        const response = await fetch(
+        const response = await fetchGestorApi(
           `/api/usuarios?perfilPdvId=${perfilId}&limit=${USUARIOS_PAGE_LIMIT}&offset=0`,
           {
             headers: {
@@ -222,7 +223,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
         console.error('Erro ao carregar usuários do perfil:', error)
       }
     },
-    [auth, usuariosPorPerfil]
+    [ usuariosPorPerfil]
   )
 
   const toggleExpand = (perfilId: string) => {
@@ -241,7 +242,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
    */
   const handleToggleUsuarioStatus = useCallback(
     async (usuarioId: string, novoStatus: boolean, perfilId: string) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -261,7 +262,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
       })
 
       try {
-        const response = await fetch(`/api/usuarios/${usuarioId}`, {
+        const response = await fetchGestorApi(`/api/usuarios/${usuarioId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -286,7 +287,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
         showToast.error(error.message || 'Erro ao atualizar status do usuário')
 
         // Reverte a atualização otimista em caso de erro
-        const response = await fetch(
+        const response = await fetchGestorApi(
           `/api/usuarios?perfilPdvId=${perfilId}&limit=${USUARIOS_PAGE_LIMIT}&offset=0`,
           {
             headers: {
@@ -310,7 +311,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
         })
       }
     },
-    [auth, loadUsuariosPorPerfil]
+    [ loadUsuariosPorPerfil]
   )
 
   // Debounce da busca
@@ -338,7 +339,7 @@ export function PerfisUsuariosList({ onReload }: PerfisUsuariosListProps) {
   useEffect(() => {
     if (!isAuthenticated || hasLoadedInitialRef.current) return
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     hasLoadedInitialRef.current = true

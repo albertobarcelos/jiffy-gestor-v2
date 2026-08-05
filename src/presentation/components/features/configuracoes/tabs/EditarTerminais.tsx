@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, forwardRef, useImperativeHandle } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
 import { showToast } from '@/src/shared/utils/toast'
@@ -140,9 +141,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
       onCloseAfterSave,
     },
     ref
-  ) {
-  const { auth } = useAuthStore()
-  const formId = embeddedFormId ?? 'editar-terminal-form'
+  ) {  const formId = embeddedFormId ?? 'editar-terminal-form'
 
   // Estados do formulário
   const [nomeTerminal, setNomeTerminal] = useState('')
@@ -202,7 +201,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
    * Carrega todas as impressoras com paginação completa
    */
   const loadAllImpressoras = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       return
     }
@@ -222,7 +221,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
           offset: currentOffset.toString(),
         })
 
-        const response = await fetch(`/api/impressoras?${params.toString()}`, {
+        const response = await fetchGestorApi(`/api/impressoras?${params.toString()}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -256,13 +255,13 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
     } finally {
       setLoadingImpressoras(false)
     }
-  }, [auth])
+  }, [])
 
   /**
    * Carrega detalhes do terminal
    */
   const loadTerminalDetails = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token || !terminalId) {
       return
     }
@@ -270,7 +269,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
     setIsLoadingTerminal(true)
 
     try {
-      const response = await fetch(`/api/terminais/${terminalId}/detalhes`, {
+      const response = await fetchGestorApi(`/api/terminais/${terminalId}/detalhes`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -297,19 +296,19 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
         commitBaselineLatestRef.current()
       }, 120)
     }
-  }, [auth, terminalId])
+  }, [ terminalId])
 
   /**
    * Carrega preferências do terminal
    */
   const loadTerminalPreferences = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token || !terminalId) {
       return
     }
 
     try {
-      const response = await fetch(`/api/preferencias-terminal/${terminalId}`, {
+      const response = await fetchGestorApi(`/api/preferencias-terminal/${terminalId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -340,7 +339,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
       console.error('Erro ao carregar preferências:', error)
       showToast.error('Erro ao carregar preferências do terminal')
     }
-  }, [auth, terminalId])
+  }, [ terminalId])
 
   // Carrega dados quando o componente monta
   useEffect(() => {
@@ -383,7 +382,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
       return
     }
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado. Faça login novamente.')
       return
@@ -393,7 +392,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
 
     try {
       // 1. Atualizar terminal primeiro
-      const terminalResponse = await fetch(`/api/terminais/${terminalId}`, {
+      const terminalResponse = await fetchGestorApi(`/api/terminais/${terminalId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -428,7 +427,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
         fields.impressoraFinalizacaoId = impressoraSelecionadaId
       }
 
-      const preferencesResponse = await fetch(`/api/preferencias-terminal`, {
+      const preferencesResponse = await fetchGestorApi(`/api/preferencias-terminal`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

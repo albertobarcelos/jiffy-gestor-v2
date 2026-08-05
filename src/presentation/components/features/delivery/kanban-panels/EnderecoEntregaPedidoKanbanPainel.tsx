@@ -115,9 +115,7 @@ export function EnderecoEntregaPedidoKanbanPainel({
   onSalvo,
 }: EnderecoEntregaPedidoKanbanPainelProps) {
   const queryClient = useQueryClient()
-  const empresaId = useTenantEmpresaId()
-  const { auth } = useAuthStore()
-
+  const empresaId = useTenantEmpresaId()
   const [carregando, setCarregando] = useState(false)
   const [salvando, setSalvando] = useState(false)
   const [telefoneCliente, setTelefoneCliente] = useState<string | null>(null)
@@ -162,7 +160,7 @@ export function EnderecoEntregaPedidoKanbanPainel({
       return
     }
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Sessão expirada. Faça login novamente.')
       return
@@ -207,7 +205,7 @@ export function EnderecoEntregaPedidoKanbanPainel({
     } finally {
       setCarregando(false)
     }
-  }, [auth, open, venda])
+  }, [ open, venda])
 
   useEffect(() => {
     if (open && venda) {
@@ -304,7 +302,7 @@ export function EnderecoEntregaPedidoKanbanPainel({
   const handleSalvar = async () => {
     if (!venda) return
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Sessão expirada. Faça login novamente.')
       return

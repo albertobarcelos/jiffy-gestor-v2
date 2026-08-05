@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { Complemento } from '@/src/domain/entities/Complemento'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { MdSearch } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
@@ -153,10 +154,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const valorDebounceTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
-  const handleValorSubmitRef = useRef<((complementoId: string) => Promise<void>) | null>(null)
-
-  const { auth } = useAuthStore()
-  const router = useRouter()
+  const handleValorSubmitRef = useRef<((complementoId: string) => Promise<void>) | null>(null)  const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const invalidate = useInvalidateTenantQueries()
@@ -333,7 +331,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
   const handleValorSubmit = useCallback(
     async (complementoId: string) => {
       clearValorDebounceTimer(complementoId)
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -359,7 +357,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
       setSavingValorMap(prev => ({ ...prev, [complementoId]: true }))
 
       try {
-        const response = await fetch(`/api/complementos/${complementoId}`, {
+        const response = await fetchGestorApi(`/api/complementos/${complementoId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -392,7 +390,6 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
       }
     },
     [
-      auth,
       valorInputs,
       parseValorToNumber,
       complementos,
@@ -409,7 +406,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
 
   const handleTipoImpactoChange = useCallback(
     async (complementoId: string, novoTipo: 'nenhum' | 'aumenta' | 'diminui') => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -430,7 +427,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
 
       try {
         const payloadTipo = novoTipo.toLowerCase()
-        const response = await fetch(`/api/complementos/${complementoId}`, {
+        const response = await fetchGestorApi(`/api/complementos/${complementoId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -459,12 +456,12 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         })
       }
     },
-    [auth, complementos, refetch, onReload]
+    [ complementos, refetch, onReload]
   )
 
   const handleToggleComplementoStatus = useCallback(
     async (complemento: Complemento, novoStatus: boolean) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -474,7 +471,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
       setTogglingStatus(prev => ({ ...prev, [complementoId]: true }))
 
       try {
-        const response = await fetch(`/api/complementos/${complementoId}`, {
+        const response = await fetchGestorApi(`/api/complementos/${complementoId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -504,7 +501,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         })
       }
     },
-    [auth, handleActionsReload]
+    [ handleActionsReload]
   )
 
   const openTabsModal = useCallback(

@@ -72,7 +72,6 @@ export function useNovoPedidoOrchestrator({
   tipoInicioPedido = 'balcao',
   abaDetalhesInicial,
 }: NovoPedidoModalProps) {
-  const { auth } = useAuthStore()
   const { empresa, preferenciasImpressaoDelivery } = useEmpresaMe()
   const { processarAposTransicaoVendaGestorId } = useImpressaoDelivery()
   const empresaId = useTenantEmpresaId()
@@ -206,7 +205,7 @@ export function useNovoPedidoOrchestrator({
     hasMovedRef: hasMovedMeiosPagamentoRef,
     handleMouseDown: handleMouseDownMeiosPagamento,
   } = useHorizontalDragScroll<HTMLDivElement>()
-  const token = auth?.getAccessToken()
+  const token = useAuthStore.getState().tenantAuth?.getAccessToken()
 
   const {
     grupos,
@@ -320,7 +319,7 @@ export function useNovoPedidoOrchestrator({
     setMoradaEntregaSelecionada,
     setTaxaEntregaId,
     setTipoAtendimentoDelivery,
-    getAccessToken: () => auth?.getAccessToken(),
+    getAccessToken: () => useAuthStore.getState().tenantAuth?.getAccessToken(),
   })
 
   // Buscar meios de pagamento
@@ -408,8 +407,9 @@ export function useNovoPedidoOrchestrator({
   // Refs estáveis: evitam que `carregarVendaExistente` mude quando queries atualizam ao focar a aba
   const meiosPagamentoRef = useRef(meiosPagamento)
   meiosPagamentoRef.current = meiosPagamento
-  const authRef = useRef(auth)
-  authRef.current = auth
+  const tenantAuth = useAuthStore(s => s.tenantAuth)
+  const tenantAuthRef = useRef(tenantAuth)
+  tenantAuthRef.current = tenantAuth
 
   const tipoVendaParaDetalhe =
     tipoVendaGestor ??
@@ -424,7 +424,7 @@ export function useNovoPedidoOrchestrator({
     tabelaOrigemVenda,
     tipoVendaGestor: tipoVendaParaDetalhe,
     meiosPagamentoRef,
-    getToken: () => authRef.current?.getAccessToken(),
+    getToken: () => tenantAuthRef.current?.getAccessToken(),
     onClose,
     handlers: {
       setDetalhesPedidoMeta,
@@ -523,7 +523,7 @@ export function useNovoPedidoOrchestrator({
   const { salvandoProdutos, handleSalvarProdutos } = useEdicaoProdutosDelivery({
     ativo: modoEdicaoProdutos,
     vendaId,
-    getToken: () => authRef.current?.getAccessToken(),
+    getToken: () => tenantAuthRef.current?.getAccessToken(),
     produtos,
     observacaoPedido,
     vendaDataUpdatedAt,
@@ -584,7 +584,7 @@ export function useNovoPedidoOrchestrator({
     tipoInicioPedido,
     processarAposTransicaoVendaGestorId,
     preferenciasAutoIniciarPreparo: preferenciasImpressaoDelivery.autoIniciarPreparoNovosPedidos,
-    accessToken: auth?.getAccessToken(),
+    accessToken: useAuthStore.getState().tenantAuth?.getAccessToken(),
   })
 
   const formatarDataDetalhePedido = useCallback(
@@ -605,7 +605,6 @@ export function useNovoPedidoOrchestrator({
     tabelaOrigemVenda,
     onSuccess,
     onClose,
-    auth,
     cancelarVendaGestor,
     cancelarNotaFiscalVendaPdv,
     cancelarNotaFiscalVendaGestor,
@@ -637,7 +636,6 @@ export function useNovoPedidoOrchestrator({
     tipoInicioPedido,
     abaDetalhesInicial,
     vendaDataUpdatedAt,
-    auth,
     currentStep,
     abaDetalhesPedido,
     podeExibirAbaNotaFiscal,

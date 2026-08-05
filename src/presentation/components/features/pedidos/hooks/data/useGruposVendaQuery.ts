@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import type { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import {
   fetchGrupoIdsComProdutosAtivosVenda,
   type CanalVendaNovoPedido,
@@ -37,16 +37,16 @@ export function useGruposVendaQuery({
     data: grupoIdsComProdutosAtivos,
     isLoading: isLoadingGruposComProdutos,
     isError: erroGruposComProdutos,
-  } = useQuery({
-    queryKey: ['novo-pedido-grupos-com-produtos', empresaId, canal],
-    queryFn: async () => {
-      if (!token) throw new Error('Token não encontrado')
-      return fetchGrupoIdsComProdutosAtivosVenda(token, canal)
+  } = useSecureTenantQuery(
+    ['novo-pedido-grupos-com-produtos', canal],
+    async ({ token: tenantToken }) => {
+      return fetchGrupoIdsComProdutosAtivosVenda(tenantToken, canal)
     },
-    enabled: enabled && !!token,
-    staleTime: 1000 * 60 * 5,
-    refetchOnWindowFocus: false,
-  })
+    {
+      enabled: enabled && !!token,
+      staleTime: 1000 * 60 * 5,
+    }
+  )
 
   const gruposOrdenados = useMemo(() => {
     if (!gruposData) return []

@@ -33,7 +33,7 @@ export function useConvitesGestao() {
   const [busyById, setBusyById] = useState<Record<string, 'cancelar' | 'reenviar' | null>>({})
   const didFetch = useRef(false)
 
-  const getToken = useCallback(() => auth?.getAccessToken() ?? null, [auth])
+  const getToken = useCallback(() => useAuthStore.getState().tenantAuth?.getAccessToken() ?? null, [])
 
   const setBusy = useCallback((id: string, action: 'cancelar' | 'reenviar' | null) => {
     setBusyById(prev => ({ ...prev, [id]: action }))
@@ -70,12 +70,12 @@ export function useConvitesGestao() {
   }, [getToken])
 
   useEffect(() => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
     if (didFetch.current) return
     didFetch.current = true
     void fetchAll()
-  }, [auth, fetchAll])
+  }, [ fetchAll])
 
   const handleCriar = useCallback(
     async (payload: { email: string; perfilGestorId: string }) => {

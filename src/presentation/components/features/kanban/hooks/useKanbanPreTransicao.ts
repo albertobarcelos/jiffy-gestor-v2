@@ -3,6 +3,7 @@
 import { useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { useImpressaoDelivery } from '../../delivery/hooks/useImpressaoDelivery'
 import { confirmarCobrancaPendentePedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/ConfirmarCobrancaPendentePedidoDeliveryUseCase'
 import { invalidarPedidoKanbanQuickViewCache } from '../../delivery/kanban-panels/carregarPedidoKanbanQuickView'
@@ -48,9 +49,7 @@ export function useKanbanPreTransicao({
   preferenciasImpressaoDelivery,
   empresa,
   onAbrirConfigImpressoraExpedicao,
-}: UseKanbanPreTransicaoParams) {
-  const { auth } = useAuthStore()
-  const queryClient = useQueryClient()
+}: UseKanbanPreTransicaoParams) {  const queryClient = useQueryClient()
 
   const { processarAposTransicoes, reimprimirCupomEntrega } = useImpressaoDelivery({
     onImpressoraExpedicaoNecessaria: onAbrirConfigImpressoraExpedicao,
@@ -100,11 +99,11 @@ export function useKanbanPreTransicao({
 
   const agendarSincronizacaoLista = useCallback(
     (vendaId: string, colunaDestino?: ColunaKanbanId, onRecovered?: () => void) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return
       void (async () => {
         try {
-          const response = await fetch(
+          const response = await fetchGestorApi(
             `/api/delivery/pedidos/${encodeURIComponent(vendaId)}`,
             {
               headers: {
@@ -137,15 +136,15 @@ export function useKanbanPreTransicao({
         }
       })()
     },
-    [auth, isModoDeliveryKanban, infiniteQueryKey, queryClient, todasVendasCarregadasRef]
+    [ isModoDeliveryKanban, infiniteQueryKey, queryClient, todasVendasCarregadasRef]
   )
 
   const revalidarPagamentoAntesFinalizar = useCallback(
     async (vendaId: string) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return false
       try {
-        const response = await fetch(`/api/delivery/pedidos/${encodeURIComponent(vendaId)}`, {
+        const response = await fetchGestorApi(`/api/delivery/pedidos/${encodeURIComponent(vendaId)}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             Accept: 'application/json',
@@ -166,12 +165,12 @@ export function useKanbanPreTransicao({
         return false
       }
     },
-    [auth, isModoDeliveryKanban, infiniteQueryKey, queryClient]
+    [ isModoDeliveryKanban, infiniteQueryKey, queryClient]
   )
 
   const verificarImpressaoAntesTransicoes = useCallback(
     async (venda: Venda, acoes: AcaoTransicaoGestor[]) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Sessão expirada.')
         return { ok: false }
@@ -201,7 +200,7 @@ export function useKanbanPreTransicao({
       }
       return { ok: false }
     },
-    [auth, empresa, onAbrirConfigImpressoraExpedicao, preferenciasImpressaoDelivery]
+    [ empresa, onAbrirConfigImpressoraExpedicao, preferenciasImpressaoDelivery]
   )
 
   const verificarEntregadorAntesDespachar = useCallback(
@@ -209,7 +208,7 @@ export function useKanbanPreTransicao({
       if (!vendaExigeEntregadorParaDespachar(venda)) {
         return true
       }
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return false
       const entregadorId = await resolverEntregadorIdVendaKanban({
         vendaId: venda.id,
@@ -220,12 +219,12 @@ export function useKanbanPreTransicao({
       })
       return Boolean(entregadorId)
     },
-    [auth, entregadorPorVendaIdRef]
+    [ entregadorPorVendaIdRef]
   )
 
   const confirmarPagamentoAntesFinalizar = useCallback(
     async (venda: Venda) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Sessão expirada.')
         return false
@@ -255,7 +254,7 @@ export function useKanbanPreTransicao({
         return false
       }
     },
-    [auth, isModoDeliveryKanban, infiniteQueryKey, queryClient, todasVendasCarregadasRef]
+    [ isModoDeliveryKanban, infiniteQueryKey, queryClient, todasVendasCarregadasRef]
   )
 
   return {

@@ -21,6 +21,7 @@ import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { GrupoItem } from './GrupoItem'
 import { useGruposProdutosInfinite } from '@/src/presentation/hooks/useGruposProdutos'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
@@ -47,9 +48,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Inativo'>('Ativo')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const loadMoreRef = useRef<HTMLDivElement>(null)
-  const { auth } = useAuthStore()
-  const invalidate = useInvalidateTenantQueries()
+  const loadMoreRef = useRef<HTMLDivElement>(null)  const invalidate = useInvalidateTenantQueries()
   const router = useRouter() // Obter a instância do router
   const searchParams = useSearchParams() // Obter os search params da URL
   const pathname = usePathname() // Obter o pathname da URL
@@ -231,7 +230,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
 
   const handleToggleGrupoStatus = useCallback(
     async (grupoId: string, novoStatus: boolean) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return
 
       // Atualização otimista: atualiza UI imediatamente
@@ -256,7 +255,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       )
 
       try {
-        const response = await fetch(`/api/grupos-produtos/${grupoId}`, {
+        const response = await fetchGestorApi(`/api/grupos-produtos/${grupoId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -282,7 +281,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
         showToast.error('Não foi possível atualizar o status do grupo.')
       }
     },
-    [auth, localGrupos]
+    [ localGrupos]
   )
 
   const openTabsModal = useCallback(
@@ -397,12 +396,12 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
 
     // Envia requisição para o backend
     try {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         throw new Error('Token não encontrado')
       }
 
-      const response = await fetch(
+      const response = await fetchGestorApi(
         `/api/grupos-produtos/${grupoId}/reordena-grupo`,
         {
           method: 'PATCH',
@@ -428,7 +427,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       setLocalGrupos(previousState)
       showToast.error(error.message || 'Erro ao atualizar ordem do grupo')
     }
-  }, [localGrupos, auth, invalidate])
+  }, [localGrupos, invalidate])
 
   return (
     <>

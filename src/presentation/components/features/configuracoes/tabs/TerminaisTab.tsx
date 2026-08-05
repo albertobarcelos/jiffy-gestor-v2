@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { Terminal } from '@/src/domain/entities/Terminal'
 import { MdDelete, MdPhone, MdSearch } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
@@ -70,9 +71,7 @@ function resolvePreferencesForTerminal(
   return map[terminalId] ?? DEFAULT_TERMINAL_PREFERENCES
 }
 
-export function TerminaisTab() {
-  const { auth } = useAuthStore()
-  const [terminais, setTerminais] = useState<TerminalData[]>([])
+export function TerminaisTab() {  const [terminais, setTerminais] = useState<TerminalData[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [totalItems, setTotalItems] = useState(0)
@@ -105,7 +104,7 @@ export function TerminaisTab() {
    */
   const loadAllTerminais = useCallback(
     async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         setIsLoading(false)
         setPreferencesLoaded(true)
@@ -133,7 +132,7 @@ export function TerminaisTab() {
             params.append('q', searchQueryRef.current)
           }
 
-          const response = await fetch(`/api/terminais?${params.toString()}`, {
+          const response = await fetchGestorApi(`/api/terminais?${params.toString()}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -208,7 +207,7 @@ export function TerminaisTab() {
               pParams.append('q', q)
             }
 
-            const listResp = await fetch(`/api/preferencias-terminal?${pParams.toString()}`, {
+            const listResp = await fetchGestorApi(`/api/preferencias-terminal?${pParams.toString()}`, {
               headers: {
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',
@@ -240,7 +239,7 @@ export function TerminaisTab() {
             const prefsEntries = await Promise.all(
               allTerminais.map(async (item) => {
                 try {
-                  const resp = await fetch(`/api/preferencias-terminal/${item.terminal.getId()}`, {
+                  const resp = await fetchGestorApi(`/api/preferencias-terminal/${item.terminal.getId()}`, {
                     headers: {
                       Authorization: `Bearer ${token}`,
                       'Content-Type': 'application/json',
@@ -282,11 +281,11 @@ export function TerminaisTab() {
         setPreferencesLoaded(true)
       }
     },
-    [auth]
+    []
   )
 
   const loadAllImpressoras = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     setLoadingImpressoras(true)
@@ -302,7 +301,7 @@ export function TerminaisTab() {
           offset: currentOffset.toString(),
         })
 
-        const resp = await fetch(`/api/impressoras?${params.toString()}`, {
+        const resp = await fetchGestorApi(`/api/impressoras?${params.toString()}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -332,7 +331,7 @@ export function TerminaisTab() {
     } finally {
       setLoadingImpressoras(false)
     }
-  }, [auth])
+  }, [])
 
   // Debounce para busca
   useEffect(() => {
@@ -356,7 +355,7 @@ export function TerminaisTab() {
    */
   const handleToggleTerminalStatus = useCallback(
     async (terminalId: string, novoBloqueado: boolean) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -386,7 +385,7 @@ export function TerminaisTab() {
       )
 
       try {
-        const response = await fetch(`/api/terminais/${terminalId}`, {
+        const response = await fetchGestorApi(`/api/terminais/${terminalId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -421,12 +420,12 @@ export function TerminaisTab() {
         })
       }
     },
-    [auth, terminais, loadAllTerminais]
+    [ terminais, loadAllTerminais]
   )
 
   const handleToggleCompartilhar = useCallback(
     async (terminalId: string, novoValor: boolean) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -445,7 +444,7 @@ export function TerminaisTab() {
       }))
 
       try {
-        const response = await fetch(`/api/preferencias-terminal`, {
+        const response = await fetchGestorApi(`/api/preferencias-terminal`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -466,7 +465,7 @@ export function TerminaisTab() {
 
         // Busca as preferências atualizadas do backend para garantir sincronização
         try {
-          const prefsResponse = await fetch(`/api/preferencias-terminal/${terminalId}`, {
+          const prefsResponse = await fetchGestorApi(`/api/preferencias-terminal/${terminalId}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -507,12 +506,12 @@ export function TerminaisTab() {
         })
       }
     },
-    [auth]
+    []
   )
 
   const handleToggleFiscalAtivo = useCallback(
     async (terminalId: string, novoValor: boolean) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -531,7 +530,7 @@ export function TerminaisTab() {
       }))
 
       try {
-        const response = await fetch(`/api/preferencias-terminal`, {
+        const response = await fetchGestorApi(`/api/preferencias-terminal`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -551,7 +550,7 @@ export function TerminaisTab() {
         }
 
         try {
-          const prefsResponse = await fetch(`/api/preferencias-terminal/${terminalId}`, {
+          const prefsResponse = await fetchGestorApi(`/api/preferencias-terminal/${terminalId}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -590,12 +589,12 @@ export function TerminaisTab() {
         })
       }
     },
-    [auth]
+    []
   )
 
   const handleToggleLeitorCodigoBarras = useCallback(
     async (terminalId: string, novoValor: boolean) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -614,7 +613,7 @@ export function TerminaisTab() {
       }))
 
       try {
-        const response = await fetch(`/api/preferencias-terminal`, {
+        const response = await fetchGestorApi(`/api/preferencias-terminal`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -634,7 +633,7 @@ export function TerminaisTab() {
         }
 
         try {
-          const prefsResponse = await fetch(`/api/preferencias-terminal/${terminalId}`, {
+          const prefsResponse = await fetchGestorApi(`/api/preferencias-terminal/${terminalId}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -673,12 +672,12 @@ export function TerminaisTab() {
         })
       }
     },
-    [auth]
+    []
   )
 
   const handleChangeImpressora = useCallback(
     async (terminalId: string, impressoraId: string) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -701,7 +700,7 @@ export function TerminaisTab() {
       }))
 
       try {
-        const response = await fetch(`/api/preferencias-terminal`, {
+        const response = await fetchGestorApi(`/api/preferencias-terminal`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -745,7 +744,7 @@ export function TerminaisTab() {
         })
       }
     },
-    [auth, impressoras]
+    [ impressoras]
   )
 
   // Carrega dados iniciais

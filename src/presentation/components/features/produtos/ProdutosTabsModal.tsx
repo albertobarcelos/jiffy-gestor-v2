@@ -73,6 +73,23 @@ export function ProdutosTabsModal({
     isSaving: false,
   })
 
+  const handleEmbedComplementosChange = useCallback(
+    (next: { isDirty: boolean; isSaving: boolean }) => {
+      setEmbedComplementos(prev =>
+        prev.isDirty === next.isDirty && prev.isSaving === next.isSaving ? prev : next
+      )
+    },
+    []
+  )
+  const handleEmbedImpressorasChange = useCallback(
+    (next: { isDirty: boolean; isSaving: boolean }) => {
+      setEmbedImpressoras(prev =>
+        prev.isDirty === next.isDirty && prev.isSaving === next.isSaving ? prev : next
+      )
+    },
+    []
+  )
+
   /** Confirmação ao fechar o painel com produto em edição e alterações não salvas */
   const [confirmExitOpen, setConfirmExitOpen] = useState(false)
 
@@ -503,7 +520,7 @@ export function ProdutosTabsModal({
                 initialGruposResumo={state.produto?.getGruposComplementos()}
                 onClose={handleRequestClose}
                 isEmbedded
-                onEmbedStateChange={setEmbedComplementos}
+                onEmbedStateChange={handleEmbedComplementosChange}
               />
             </div>
           ) : state.open && state.tab === 'complementos' && !produtoId ? (
@@ -528,7 +545,7 @@ export function ProdutosTabsModal({
                 initialImpressorasResumo={state.produto?.getImpressoras()}
                 onClose={handleRequestClose}
                 isEmbedded
-                onEmbedStateChange={setEmbedImpressoras}
+                onEmbedStateChange={handleEmbedImpressorasChange}
               />
             </div>
           ) : state.open && state.tab === 'impressoras' && !produtoId ? (

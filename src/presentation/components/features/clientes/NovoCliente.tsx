@@ -10,6 +10,7 @@ import {
 } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
@@ -108,9 +109,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
   },
   ref
 ) {
-  const router = useRouter()
-  const { auth } = useAuthStore()
-  const isEditing = !!clienteId
+  const router = useRouter()  const isEditing = !!clienteId
 
   // Estados do formulário
   const [nome, setNome] = useState('')
@@ -238,14 +237,14 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
     if (!isEditing || hasLoadedClienteRef.current) return
 
     const loadCliente = async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return
 
       setIsLoadingCliente(true)
       hasLoadedClienteRef.current = true
 
       try {
-        const response = await fetch(`/api/clientes/${clienteId}`, {
+        const response = await fetchGestorApi(`/api/clientes/${clienteId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -408,7 +407,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
 
     try {
       // Usa rota API do Next.js para fazer a requisição pelo servidor
-      const response = await fetch(`/api/consulta-cnpj?cnpj=${rawCNPJ}`, {
+      const response = await fetchGestorApi(`/api/consulta-cnpj?cnpj=${rawCNPJ}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -578,7 +577,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
     const shouldClosePanel = embeddedCloseAfterSaveRef.current
     embeddedCloseAfterSaveRef.current = false
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado')
       return
@@ -612,7 +611,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
       // Se ainda não foi validada, validar agora
       if (cidadeValida === null) {
         try {
-          const response = await fetch(
+          const response = await fetchGestorApi(
             `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(cidade)}&uf=${estado}`
           )
           if (response.ok) {
@@ -703,7 +702,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
         : '/api/clientes'
       const method = isEditing ? 'PATCH' : 'POST'
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method,
         headers: {
           'Content-Type': 'application/json',

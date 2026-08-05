@@ -1,3 +1,4 @@
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { pagamentoEstaCancelado } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import { textoFromObservacoesApi } from '@/src/shared/helpers/observacaoPedido'
 import {
@@ -320,7 +321,7 @@ export async function enrichTaxaEntregaDetalhe(
   }
 
   try {
-    const response = await fetch(`/api/taxas/${encodeURIComponent(taxaId)}`, {
+    const response = await fetchGestorApi(`/api/taxas/${encodeURIComponent(taxaId)}`, {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -395,7 +396,7 @@ export async function resolverTaxaEntregaDetalhe(
     const taxaId = inferida?.taxaId
     if (taxaId && !inferida?.nome?.trim()) {
       try {
-        const response = await fetch(`/api/taxas/${encodeURIComponent(taxaId)}`, {
+        const response = await fetchGestorApi(`/api/taxas/${encodeURIComponent(taxaId)}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -424,7 +425,7 @@ export type TaxaEntregaCatalogoRef = {
 
 async function fetchTaxasEntregaCatalogo(token: string): Promise<TaxaEntregaCatalogoRef[]> {
   try {
-    const response = await fetch('/api/taxas?limit=100&offset=0', {
+    const response = await fetchGestorApi('/api/taxas?limit=100&offset=0', {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/json',

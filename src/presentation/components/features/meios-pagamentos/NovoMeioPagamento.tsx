@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHand
 import { useRouter } from 'next/navigation'
 import { MenuItem } from '@mui/material'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { MeioPagamento, type TipoParcelamento } from '@/src/domain/entities/MeioPagamento'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
@@ -87,9 +88,7 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
     },
     ref
   ) {
-  const router = useRouter()
-  const { auth } = useAuthStore()
-  const isEditing = !!meioPagamentoId
+  const router = useRouter()  const isEditing = !!meioPagamentoId
   const formId = embeddedFormId ?? 'novo-meio-pagamento-form'
 
   // Estados do formulário
@@ -186,14 +185,14 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
     if (hasLoadedMeioPagamentoRef.current) return
 
     const loadMeioPagamento = async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return
 
       setIsLoadingMeioPagamento(true)
       hasLoadedMeioPagamentoRef.current = true
 
       try {
-        const response = await fetch(`/api/meios-pagamentos/${meioPagamentoId}`, {
+        const response = await fetchGestorApi(`/api/meios-pagamentos/${meioPagamentoId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -246,7 +245,7 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
     const shouldClosePanel = embeddedCloseAfterSaveRef.current
     embeddedCloseAfterSaveRef.current = false
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       alert('Token não encontrado')
       return
@@ -270,7 +269,7 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
         : '/api/meios-pagamentos'
       const method = isEditing ? 'PATCH' : 'POST'
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method,
         headers: {
           'Content-Type': 'application/json',

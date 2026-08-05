@@ -19,6 +19,7 @@ import {
 import { Complemento } from '@/src/domain/entities/Complemento'
 import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { MdClose, MdSearch, MdAdd, MdKeyboardArrowDown } from 'react-icons/md'
@@ -199,7 +200,6 @@ export const ComplementosMultiSelectDialog = forwardRef<
   },
   ref
 ) {
-  const { auth } = useAuthStore()
   const [groups, setGroups] = useState<GrupoComplementoItem[]>(() =>
     mapResumoToGrupos(initialGruposResumo)
   )
@@ -245,10 +245,11 @@ export const ComplementosMultiSelectDialog = forwardRef<
   const [sessionOrderTick, setSessionOrderTick] = useState(0)
 
   const loadGroups = useCallback(
-    async (options?: { silent?: boolean }) => {
+    async (options?: { silent?: boolean; signal?: AbortSignal }) => {
       if (!open || !produtoId) return
 
-      const token = auth?.getAccessToken()
+      /** Token via getState + tenantAuth (ERP): evita deps reativas na store e token de identidade do hub. */
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         setGroups([])
         return
@@ -256,17 +257,19 @@ export const ComplementosMultiSelectDialog = forwardRef<
 
       /** Evita que um PATCH recoloque a lista inteira em modo loading (todos os switches “somem”). */
       const silent = options?.silent === true
+      const signal = options?.signal
       if (!silent) {
         setIsLoading(true)
       }
       setError(null)
       try {
-        const response = await fetch(`/api/produtos/${produtoId}`, {
+        const response = await fetchGestorApi(`/api/produtos/${produtoId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
           cache: 'no-store',
+          signal,
         })
 
         if (!response.ok) {
@@ -293,19 +296,22 @@ export const ComplementosMultiSelectDialog = forwardRef<
           isDirtyRef.current = false
         }
       } catch (err) {
+        if (signal?.aborted || (err instanceof DOMException && err.name === 'AbortError')) {
+          return
+        }
         console.error(err)
         setError(err instanceof Error ? err.message : 'Erro ao carregar complementos')
       } finally {
-        if (!silent) {
+        if (!silent && !signal?.aborted) {
           setIsLoading(false)
         }
       }
     },
-    [open, produtoId, auth]
+    [open, produtoId]
   )
 
-  const loadSelectableGroups = useCallback(async () => {
-    const token = auth?.getAccessToken()
+  const loadSelectableGroups = useCallback(async (signal?: AbortSignal) => {
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       setAllSelectableGroups([])
       return
@@ -319,13 +325,16 @@ export const ComplementosMultiSelectDialog = forwardRef<
       const collected: GrupoCatalogoItem[] = []
 
       while (hasMore) {
-        const response = await fetch(
+        if (signal?.aborted) return
+
+        const response = await fetchGestorApi(
           `/api/grupos-complementos?ativo=true&limit=${limit}&offset=${offset}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
             },
             cache: 'no-store',
+            signal,
           }
         )
 
@@ -360,29 +369,39 @@ export const ComplementosMultiSelectDialog = forwardRef<
 
       setAllSelectableGroups(collected)
     } catch (err) {
+      if (signal?.aborted || (err instanceof DOMException && err.name === 'AbortError')) {
+        return
+      }
       console.error(err)
       showToast.error(
         err instanceof Error ? err.message : 'Erro ao carregar grupos de complementos.'
       )
     } finally {
-      setIsLoadingSelectableGroups(false)
+      if (!signal?.aborted) {
+        setIsLoadingSelectableGroups(false)
+      }
     }
-  }, [auth])
+  }, [])
 
   useEffect(() => {
-    if (open) {
-      setCatalogSearch('')
-      // Em embed (ou com seed da lista): não bloqueia a UI com spinner full-card.
-      const silentInitial =
-        isEmbedded || baselineGruposIdsRef.current.length > 0 || groups.length > 0
-      void Promise.all([
-        loadGroups({ silent: silentInitial }),
-        loadSelectableGroups(),
-      ])
-    }
+    if (!open || !produtoId) return
+
+    const ac = new AbortController()
+    setCatalogSearch('')
+    // Em embed (ou com seed da lista): não bloqueia a UI com spinner full-card.
     // groups.length / baseline só no momento da abertura — não reexecutar a cada toggle.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- só ao abrir / mudar loaders
-  }, [open, loadGroups, loadSelectableGroups, isEmbedded])
+    const silentInitial =
+      isEmbedded || baselineGruposIdsRef.current.length > 0 || groups.length > 0
+    void Promise.all([
+      loadGroups({ silent: silentInitial, signal: ac.signal }),
+      loadSelectableGroups(ac.signal),
+    ])
+
+    return () => {
+      ac.abort()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- groups só no momento da abertura
+  }, [open, produtoId, isEmbedded, loadGroups, loadSelectableGroups])
 
   useEffect(() => {
     if (!open) {
@@ -459,10 +478,10 @@ export const ComplementosMultiSelectDialog = forwardRef<
   /** Um único GET por grupo — reutilizado ao expandir catálogo e após vínculo (substitui GET produto inteiro). */
   const fetchGrupoComplementoPorId = useCallback(
     async (grupoId: string): Promise<GrupoComplementoItem | null> => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return null
       try {
-        const response = await fetch(`/api/grupos-complementos/${grupoId}`, {
+        const response = await fetchGestorApi(`/api/grupos-complementos/${grupoId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -476,12 +495,12 @@ export const ComplementosMultiSelectDialog = forwardRef<
         return null
       }
     },
-    [auth]
+    []
   )
 
   const carregarComplementosDoGrupo = useCallback(
     async (grupoId: string) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -503,7 +522,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
         setLoadingDetalheGrupoId(null)
       }
     },
-    [fetchGrupoComplementoPorId, auth]
+    [fetchGrupoComplementoPorId]
   )
 
   const toggleGrupoExpanded = useCallback((grupoId: string) => {
@@ -594,7 +613,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
         return false
       }
 
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return false
@@ -610,7 +629,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
           // vínculo via DELETE para desvincular todos os grupos do produto.
           const resultados = await Promise.allSettled(
             removedIds.map(grupoId =>
-              fetch(`/api/produtos/${produtoId}/grupos-complementos/${grupoId}`, {
+              fetchGestorApi(`/api/produtos/${produtoId}/grupos-complementos/${grupoId}`, {
                 method: 'DELETE',
                 headers: {
                   Authorization: `Bearer ${token}`,
@@ -626,7 +645,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
             throw new Error('Erro ao remover grupos de complementos')
           }
         } else {
-          const response = await fetch(`/api/produtos/${produtoId}`, {
+          const response = await fetchGestorApi(`/api/produtos/${produtoId}`, {
             method: 'PATCH',
             headers: {
               'Content-Type': 'application/json',
@@ -689,7 +708,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
         return false
       }
     },
-    [produtoId, auth, groups, fetchGrupoComplementoPorId, loadGroups]
+    [produtoId, groups, fetchGrupoComplementoPorId, loadGroups]
   )
 
   /** Liga/desliga vínculo só no estado local — PATCH ocorre no Salvar. */
@@ -815,7 +834,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
       const complementoId = comp.getId()
       if (comp.isAtivo() === novoAtivo) return
 
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -823,7 +842,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
 
       setTogglingComplementoId(complementoId)
       try {
-        const response = await fetch(`/api/complementos/${complementoId}`, {
+        const response = await fetchGestorApi(`/api/complementos/${complementoId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -864,7 +883,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
         setTogglingComplementoId(null)
       }
     },
-    [auth]
+    []
   )
 
   const handleClose = () => {
@@ -912,7 +931,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
     async (grupoId: string, grupoNome?: string) => {
       if (isSaving || abrindoGrupoComplementosId !== null) return
 
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -920,7 +939,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
 
       setAbrindoGrupoComplementosId(grupoId)
       try {
-        const response = await fetch(`/api/grupos-complementos/${grupoId}`, {
+        const response = await fetchGestorApi(`/api/grupos-complementos/${grupoId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -951,7 +970,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
         setAbrindoGrupoComplementosId(null)
       }
     },
-    [auth, isSaving, abrindoGrupoComplementosId]
+    [isSaving, abrindoGrupoComplementosId]
   )
 
   const handleCloseGruposTabsModal = useCallback(() => {

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
 import * as XLSX from 'xlsx'
 import {
@@ -125,14 +126,11 @@ export function CadastroPorPlanilha() {
         errorMessages: string[]
       }>
     }>
-  } | null>(null)
-
-  const { auth } = useAuthStore()
-
+  } | null>(null)
   // Função para download da planilha modelo
   const handleDownloadModelo = async () => {
     try {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado')
         return
@@ -140,7 +138,7 @@ export function CadastroPorPlanilha() {
 
       const toastId = showToast.loading('Baixando planilha modelo...')
 
-      const response = await fetch('/api/importacao/modelo', {
+      const response = await fetchGestorApi('/api/importacao/modelo', {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -181,7 +179,7 @@ export function CadastroPorPlanilha() {
   // Função para download da planilha de descrição
   const handleDownloadDescricao = async () => {
     try {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado')
         return
@@ -189,7 +187,7 @@ export function CadastroPorPlanilha() {
 
       const toastId = showToast.loading('Baixando planilha de descrição...')
 
-      const response = await fetch('/api/importacao/descricao', {
+      const response = await fetchGestorApi('/api/importacao/descricao', {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -238,7 +236,7 @@ export function CadastroPorPlanilha() {
     setIsUploading(true)
 
     try {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.errorLoading(toastId, 'Token não encontrado')
         return
@@ -247,7 +245,7 @@ export function CadastroPorPlanilha() {
       const formData = new FormData()
       formData.append('file', arquivo)
 
-      const response = await fetch('/api/importacao/xlsx', {
+      const response = await fetchGestorApi('/api/importacao/xlsx', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,

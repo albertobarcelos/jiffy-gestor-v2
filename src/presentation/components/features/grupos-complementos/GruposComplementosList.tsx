@@ -15,6 +15,7 @@ import {
 } from 'react-icons/md'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { showToast } from '@/src/shared/utils/toast'
 import {
@@ -328,10 +329,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
     if (error) {
       console.error('Erro ao carregar grupos de complementos:', error)
     }
-  }, [error])
-
-  const { auth } = useAuthStore()
-  const [updatingQuantidadeId, setUpdatingQuantidadeId] = useState<string | null>(null)
+  }, [error])  const [updatingQuantidadeId, setUpdatingQuantidadeId] = useState<string | null>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -351,14 +349,14 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
 
   const toggleGroupStatus = useCallback(
     async (grupoId: string, novoStatus: boolean) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
       }
 
       try {
-        const response = await fetch(`/api/grupos-complementos/${grupoId}`, {
+        const response = await fetchGestorApi(`/api/grupos-complementos/${grupoId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -383,7 +381,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
         showToast.error(error.message || 'Erro ao atualizar status do grupo')
       }
     },
-    [auth, handleActionsReload]
+    [ handleActionsReload]
   )
 
   const openTabsModal = useCallback(
@@ -458,7 +456,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
 
   const handleChangeQuantidade = useCallback(
     async (grupo: GrupoComplemento, tipo: 'min' | 'max', delta: number) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -486,7 +484,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
       setUpdatingQuantidadeId(grupo.getId())
 
       try {
-        const response = await fetch(`/api/grupos-complementos/${grupo.getId()}`, {
+        const response = await fetchGestorApi(`/api/grupos-complementos/${grupo.getId()}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -509,7 +507,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
         setUpdatingQuantidadeId(null)
       }
     },
-    [auth, handleActionsReload]
+    [ handleActionsReload]
   )
 
   return (

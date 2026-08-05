@@ -1,3 +1,4 @@
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 export interface UpdateGrupoProdutoStatusInput {
   grupoId: string
   novoStatus: boolean
@@ -5,7 +6,7 @@ export interface UpdateGrupoProdutoStatusInput {
 }
 
 export async function updateGrupoProdutoStatus({ grupoId, novoStatus, token }: UpdateGrupoProdutoStatusInput): Promise<void> {
-  const response = await fetch(`/api/grupos-produtos/${grupoId}`, {
+  const response = await fetchGestorApi(`/api/grupos-produtos/${grupoId}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',

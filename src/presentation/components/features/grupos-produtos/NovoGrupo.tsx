@@ -13,6 +13,7 @@ import {
 import { useRouter, useSearchParams } from 'next/navigation'
 import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { IconPickerModal } from './IconPickerModal'
 import { ColorPickerModal } from './ColorPickerModal'
@@ -130,9 +131,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
   ref
 ) {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const { auth } = useAuthStore()
-  const invalidate = useInvalidateTenantQueries()
+  const searchParams = useSearchParams()  const invalidate = useInvalidateTenantQueries()
 
   const effectiveGrupoId = grupoId || searchParams.get('id') || null
   const seedMatches =
@@ -254,7 +253,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
   useEffect(() => {
     if (!isEditMode || !effectiveGrupoId) return
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     // Evita carregar múltiplas vezes o mesmo grupo
@@ -273,7 +272,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
     const loadGrupo = async () => {
       if (blockUi) setIsLoadingData(true)
       try {
-        const response = await fetch(`/api/grupos-produtos/${effectiveGrupoId}`, {
+        const response = await fetchGestorApi(`/api/grupos-produtos/${effectiveGrupoId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -324,7 +323,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
     }
 
     void loadGrupo()
-  }, [isEditMode, effectiveGrupoId, auth, normalizeColor, isEmbedded, initialGrupo])
+  }, [isEditMode, effectiveGrupoId, normalizeColor, isEmbedded, initialGrupo])
 
   const handleSave = useCallback(
     async (opts?: { keepModalOpen?: boolean }) => {
@@ -333,7 +332,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
         return
       }
 
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         alert('Token não encontrado')
         return
@@ -365,7 +364,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
               ativoLocal,
             }
 
-        const response = await fetch(url, {
+        const response = await fetchGestorApi(url, {
           method,
           headers: {
             'Content-Type': 'application/json',
@@ -416,7 +415,6 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
       iconName,
       ativoDelivery,
       ativoLocal,
-      auth,
       isEmbedded,
       invalidate,
       router,

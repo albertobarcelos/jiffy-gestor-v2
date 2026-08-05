@@ -10,6 +10,7 @@ import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitc
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useTaxasInfinite } from '@/src/presentation/hooks/useTaxas'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
 import { cn } from '@/src/shared/utils/cn'
 import {
@@ -199,9 +200,7 @@ export function TaxasList() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const invalidate = useInvalidateTenantQueries()
-  const { auth } = useAuthStore()
-
+  const invalidate = useInvalidateTenantQueries()
   /** Evita PATCH concorrentes (ref); estado só para feedback visual na linha. */
   const savingAtivoLockRef = useRef(false)
   const [savingAtivoParaId, setSavingAtivoParaId] = useState<string | null>(null)
@@ -244,7 +243,7 @@ export function TaxasList() {
   const salvarToggleAtivoTaxa = useCallback(
     async (taxaId: string, novoAtivo: boolean) => {
       if (savingAtivoLockRef.current) return
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Sessão inválida. Faça login novamente.')
         return
@@ -253,7 +252,7 @@ export function TaxasList() {
       savingAtivoLockRef.current = true
       setSavingAtivoParaId(taxaId)
       try {
-        const getRes = await fetch(`/api/taxas/${encodeURIComponent(taxaId)}`, {
+        const getRes = await fetchGestorApi(`/api/taxas/${encodeURIComponent(taxaId)}`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         if (!getRes.ok) {
@@ -282,7 +281,7 @@ export function TaxasList() {
             ? null
             : String(ncmRaw)
 
-        const patchRes = await fetch(`/api/taxas/${encodeURIComponent(taxaId)}`, {
+        const patchRes = await fetchGestorApi(`/api/taxas/${encodeURIComponent(taxaId)}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -319,7 +318,7 @@ export function TaxasList() {
         setSavingAtivoParaId(null)
       }
     },
-    [auth, invalidate]
+    [ invalidate]
   )
 
   const abrirConfirmacaoExclusaoTaxa = useCallback((taxa: Taxa) => {
@@ -337,7 +336,7 @@ export function TaxasList() {
     const taxa = taxaParaExcluir
     if (!taxa || excluirTaxaLockRef.current) return
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Sessão inválida. Faça login novamente.')
       return
@@ -347,7 +346,7 @@ export function TaxasList() {
     setIsDeletingTaxa(true)
     setExcluindoTaxaId(taxa.getId())
     try {
-      const res = await fetch(`/api/taxas/${encodeURIComponent(taxa.getId())}`, {
+      const res = await fetchGestorApi(`/api/taxas/${encodeURIComponent(taxa.getId())}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -374,7 +373,7 @@ export function TaxasList() {
       setIsDeletingTaxa(false)
       setExcluindoTaxaId(null)
     }
-  }, [taxaParaExcluir, auth, invalidate])
+  }, [taxaParaExcluir, invalidate])
 
   const [searchText, setSearchText] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')

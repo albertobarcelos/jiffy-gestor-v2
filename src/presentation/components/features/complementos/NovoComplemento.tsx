@@ -10,6 +10,7 @@ import {
 } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { Complemento } from '@/src/domain/entities/Complemento'
 import { FormControl, InputLabel, MenuItem, Select } from '@mui/material'
 import { Input } from '@/src/presentation/components/ui/input'
@@ -107,8 +108,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
     ref
   ) {
   const router = useRouter()
-  const { auth } = useAuthStore()
-  const accessToken = auth?.getAccessToken()
+  const accessToken = useAuthStore.getState().tenantAuth?.getAccessToken()
   const isEditing = !!complementoId
 
   // Estados do formulário
@@ -205,7 +205,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
 
     const loadComplemento = async () => {
       try {
-        const response = await fetch(`/api/complementos/${complementoId}`, {
+        const response = await fetchGestorApi(`/api/complementos/${complementoId}`, {
           headers: {
             Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
@@ -250,7 +250,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
   }, [isEditing, complementoId, accessToken])
 
   const persistComplemento = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       alert('Token não encontrado')
       return
@@ -277,7 +277,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
         : '/api/complementos'
       const method = isEditing ? 'PATCH' : 'POST'
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
@@ -307,7 +307,6 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
       setIsLoading(false)
     }
   }, [
-    auth,
     isEditing,
     complementoId,
     nome,

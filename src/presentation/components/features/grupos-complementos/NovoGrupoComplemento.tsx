@@ -11,6 +11,7 @@ import {
 import { useRouter } from 'next/navigation'
 import { MdAdd } from 'react-icons/md'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
@@ -109,7 +110,6 @@ export const NovoGrupoComplemento = forwardRef<
   ref
 ) {
   const router = useRouter()
-  const { auth } = useAuthStore()
   const isEditing = !!grupoId
 
   // Estados do formulário
@@ -202,14 +202,14 @@ export const NovoGrupoComplemento = forwardRef<
     if (!isEditing || hasLoadedGrupoRef.current) return
 
     const loadGrupo = async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return
 
       setIsLoadingGrupo(true)
       hasLoadedGrupoRef.current = true
 
       try {
-        const response = await fetch(`/api/grupos-complementos/${grupoId}`, {
+        const response = await fetchGestorApi(`/api/grupos-complementos/${grupoId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -253,7 +253,7 @@ export const NovoGrupoComplemento = forwardRef<
   }, [isEditing, grupoId])
 
   const persistGrupo = useCallback(async (opts?: { keepModalOpen?: boolean }) => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado')
       return
@@ -295,7 +295,7 @@ export const NovoGrupoComplemento = forwardRef<
         : '/api/grupos-complementos'
       const method = isEditing ? 'PATCH' : 'POST'
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
@@ -336,7 +336,6 @@ export const NovoGrupoComplemento = forwardRef<
       setIsLoading(false)
     }
   }, [
-    auth,
     isEditing,
     grupoId,
     nome,

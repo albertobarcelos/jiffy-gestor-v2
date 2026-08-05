@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter, usePathname } from 'next/navigation' // Importar useRouter e usePathname
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import {
   MdSearch,
   MdAttachMoney,
@@ -542,9 +543,7 @@ const sxVendasFiltroTextFieldMoeda = {
  * Componente de listagem de vendas
  * Implementa scroll infinito, filtros avançados e cards de métricas
  */
-export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
-  const { auth } = useAuthStore()
-  const { timezoneAgregacao } = useEmpresaMe()
+export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {  const { timezoneAgregacao } = useEmpresaMe()
   const router = useRouter()
   const pathname = usePathname()
 
@@ -759,7 +758,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
    * Carrega todos os usuários PDV
    */
   const loadAllUsuariosPDV = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     try {
@@ -775,7 +774,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
           ativo: 'true',
         })
 
-        const response = await fetch(`/api/usuarios?${params.toString()}`, {
+        const response = await fetchGestorApi(`/api/usuarios?${params.toString()}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -799,13 +798,13 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     } catch (error) {
       console.error('Erro ao carregar usuários PDV:', error)
     }
-  }, [auth])
+  }, [])
 
   /**
    * Carrega todos os meios de pagamento
    */
   const loadAllMeiosPagamento = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     setIsLoadingMeiosPagamento(true)
@@ -823,7 +822,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
           ativo: 'true',
         })
 
-        const response = await fetch(`/api/meios-pagamentos?${params.toString()}`, {
+        const response = await fetchGestorApi(`/api/meios-pagamentos?${params.toString()}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -849,13 +848,13 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     } finally {
       setIsLoadingMeiosPagamento(false)
     }
-  }, [auth])
+  }, [])
 
   /**
    * Carrega todos os terminais
    */
   const loadAllTerminais = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     setIsLoadingTerminais(true)
@@ -872,7 +871,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
           offset: currentOffset.toString(),
         })
 
-        const response = await fetch(`/api/terminais?${params.toString()}`, {
+        const response = await fetchGestorApi(`/api/terminais?${params.toString()}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -898,7 +897,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     } finally {
       setIsLoadingTerminais(false)
     }
-  }, [auth])
+  }, [])
 
   /**
    * Indica se a API provavelmente tem próxima página (com base em count/totalPages ou página cheia).
@@ -938,7 +937,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
       params.append('limit', String(pageSize))
       params.append('offset', String(offset))
 
-      const response = await fetch(`/api/vendas?${params.toString()}`, {
+      const response = await fetchGestorApi(`/api/vendas?${params.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -971,7 +970,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
    * Primeira página: reseta lista, métricas e offset; filtros vão na query (backend).
    */
   const fetchVendas = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     const seq = ++vendasFetchSeqRef.current
@@ -1007,13 +1006,13 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         setIsLoading(false)
       }
     }
-  }, [auth, buscarPaginaVendas, inferirHasMoreApi])
+  }, [ buscarPaginaVendas, inferirHasMoreApi])
 
   /**
    * Próximas páginas (scroll infinito / botão).
    */
   const loadMoreVendas = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
     if (!hasMoreVendasRef.current || isLoadingRef.current || isLoadingMoreRef.current) return
 
@@ -1037,7 +1036,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
       // Sempre encerra: um reset de filtros pode invalidar `seq` e outra busca já zerou o estado
       setIsLoadingMore(false)
     }
-  }, [auth, buscarPaginaVendas, inferirHasMoreApi])
+  }, [ buscarPaginaVendas, inferirHasMoreApi])
 
   /** Soma “Total cancelado” apenas sobre as vendas já carregadas na lista (métricas globais vêm de `metricas`). */
   const totalCanceladoSomenteLista = useMemo(() => {
@@ -1238,7 +1237,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
 
   const handleVerNfce = useCallback(
     async (vendaId: string) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -1247,7 +1246,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
       setIsAbrindoNfce(prev => ({ ...prev, [vendaId]: true }))
       try {
         const queryFiscal = new URLSearchParams({ incluirFiscal: 'true' }).toString()
-        const response = await fetch(`/api/vendas/${encodeURIComponent(vendaId)}?${queryFiscal}`, {
+        const response = await fetchGestorApi(`/api/vendas/${encodeURIComponent(vendaId)}?${queryFiscal}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -1286,7 +1285,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         })
       }
     },
-    [auth]
+    []
   )
 
   return (

@@ -1,3 +1,4 @@
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 /**
  * Cache em memória (sessão do browser) produtoId → IDs de impressoras.
  *
@@ -47,7 +48,7 @@ export async function prefetchProdutosImpressorasCatalogo(accessToken: string): 
         offset: String(offset),
         ativo: 'true',
       })
-      const res = await fetch(`/api/produtos?${params}`, {
+      const res = await fetchGestorApi(`/api/produtos?${params}`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           Accept: 'application/json',

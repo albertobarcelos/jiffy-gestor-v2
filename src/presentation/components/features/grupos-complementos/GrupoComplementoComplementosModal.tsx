@@ -7,6 +7,7 @@ import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { Complemento } from '@/src/domain/entities/Complemento'
 import { useComplementos } from '@/src/presentation/hooks/useComplementos'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import {
@@ -58,7 +59,6 @@ export function GrupoComplementoComplementosModal({
   draftLinkedIds = [],
   onDraftLinkedIdsChange,
 }: GrupoComplementoComplementosModalProps) {
-  const { auth } = useAuthStore()
   const invalidate = useInvalidateTenantQueries()
   const isDraftMode = mode === 'draft'
   const [searchTerm, setSearchTerm] = useState('')
@@ -87,14 +87,14 @@ export function GrupoComplementoComplementosModal({
 
   const carregarComplementos = useCallback(
     async (grupoId: string) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
       }
       setIsLoadingGrupoComplementos(true)
       try {
-        const response = await fetch(`/api/grupos-complementos/${grupoId}`, {
+        const response = await fetchGestorApi(`/api/grupos-complementos/${grupoId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -119,7 +119,7 @@ export function GrupoComplementoComplementosModal({
         setIsLoadingGrupoComplementos(false)
       }
     },
-    [auth]
+    []
   )
 
   const isVisible = isEmbedded ? Boolean(grupo) || isDraftMode : open
@@ -201,14 +201,14 @@ export function GrupoComplementoComplementosModal({
   const updateGrupoComplementos = useCallback(
     async (novosIds: string[], successMessage: string) => {
       if (!grupo) return
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
       }
       const toastId = showToast.loading('Atualizando complementos...')
       try {
-        const response = await fetch(`/api/grupos-complementos/${grupo.getId()}`, {
+        const response = await fetchGestorApi(`/api/grupos-complementos/${grupo.getId()}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -233,7 +233,7 @@ export function GrupoComplementoComplementosModal({
         showToast.errorLoading(toastId, message)
       }
     },
-    [auth, grupo, onUpdated]
+    [ grupo, onUpdated]
   )
 
   const handleToggleVinculo = useCallback(
@@ -361,7 +361,7 @@ export function GrupoComplementoComplementosModal({
   // Handler para atualizar valor
   const handleUpdateValor = useCallback(
     async (complementoId: string) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -389,7 +389,7 @@ export function GrupoComplementoComplementosModal({
       setSavingMap((prev) => ({ ...prev, [complementoId]: { ...prev[complementoId], valor: true } }))
 
       try {
-        const response = await fetch(`/api/complementos/${complementoId}`, {
+        const response = await fetchGestorApi(`/api/complementos/${complementoId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -424,13 +424,13 @@ export function GrupoComplementoComplementosModal({
         })
       }
     },
-    [auth, valorInputs, parseValorToNumber, todosComplementos, formatValorFromNumber, invalidate]
+    [ valorInputs, parseValorToNumber, todosComplementos, formatValorFromNumber, invalidate]
   )
 
   // Handler para atualizar status ativo
   const handleToggleAtivo = useCallback(
     async (complementoId: string, novoStatus: boolean) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -450,7 +450,7 @@ export function GrupoComplementoComplementosModal({
       setTogglingStatus((prev) => ({ ...prev, [complementoId]: true }))
 
       try {
-        const response = await fetch(`/api/complementos/${complementoId}`, {
+        const response = await fetchGestorApi(`/api/complementos/${complementoId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -481,13 +481,13 @@ export function GrupoComplementoComplementosModal({
         })
       }
     },
-    [auth, todosComplementos, invalidate]
+    [ todosComplementos, invalidate]
   )
 
   // Handler para atualizar tipoImpactoPreco
   const handleUpdateTipoImpacto = useCallback(
     async (complementoId: string, novoTipo: 'nenhum' | 'aumenta' | 'diminui') => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -509,7 +509,7 @@ export function GrupoComplementoComplementosModal({
 
       try {
         const payloadTipo = novoTipo.toLowerCase()
-        const response = await fetch(`/api/complementos/${complementoId}`, {
+        const response = await fetchGestorApi(`/api/complementos/${complementoId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -539,7 +539,7 @@ export function GrupoComplementoComplementosModal({
         })
       }
     },
-    [auth, todosComplementos, normalizeTipoImpacto, invalidate]
+    [ todosComplementos, normalizeTipoImpacto, invalidate]
   )
 
   // Sincroniza inputs de valor com o catálogo (React Query)

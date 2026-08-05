@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { FormControl, InputLabel, MenuItem, Select } from '@mui/material'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
@@ -165,8 +166,8 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
 ) {
   const router = useRouter()
   const invalidate = useInvalidateTenantQueries()
-  const { auth, isAuthenticated } = useAuthStore()
-  const token = auth?.getAccessToken()
+  const { isAuthenticated } = useAuthStore()
+  const token = useAuthStore.getState().tenantAuth?.getAccessToken()
 
   const formId = embeddedFormId ?? 'nova-taxa-form'
 
@@ -276,7 +277,7 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
         params.set('q', q)
       }
 
-      const response = await fetch(`/api/terminais?${params.toString()}`, {
+      const response = await fetchGestorApi(`/api/terminais?${params.toString()}`, {
         headers: {
           Authorization: `Bearer ${bearerToken}`,
           'Content-Type': 'application/json',
@@ -311,7 +312,7 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
    * Carrega todos os terminais com paginação — mesmo critério de NovaImpressora.loadAllTerminais.
    */
   const loadAllTerminais = useCallback(async () => {
-    const t = auth?.getAccessToken()
+    const t = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!t) {
       setCarregandoTerminais(false)
       hasLoadedTerminaisRef.current = true
@@ -341,12 +342,12 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
       setCarregandoTerminais(false)
       hasLoadedTerminaisRef.current = true
     }
-  }, [auth, fetchListaTerminais])
+  }, [ fetchListaTerminais])
 
   /** GET /api/taxas/:id em paralelo com a lista de PDVs — preenche o formulário e `terminaisConfig`. */
   const carregarEdicaoTaxa = useCallback(
     async (editId: string) => {
-      const t = auth?.getAccessToken()
+      const t = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!t) {
         setCarregandoTaxaEdit(false)
         hasLoadedTerminaisRef.current = true
@@ -362,7 +363,7 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
       try {
         const [lista, taxaRes] = await Promise.all([
           fetchListaTerminais(t),
-          fetch(`/api/taxas/${encodeURIComponent(editId)}`, {
+          fetchGestorApi(`/api/taxas/${encodeURIComponent(editId)}`, {
             headers: {
               Authorization: `Bearer ${t}`,
               'Content-Type': 'application/json',
@@ -444,7 +445,7 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
         setCarregandoTerminais(false)
       }
     },
-    [auth, fetchListaTerminais, formatValorInput]
+    [ fetchListaTerminais, formatValorInput]
   )
 
   useEffect(() => {
@@ -564,7 +565,7 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
     setEnviando(true)
     try {
       if (taxaEditId) {
-        const response = await fetch(`/api/taxas/${encodeURIComponent(taxaEditId)}`, {
+        const response = await fetchGestorApi(`/api/taxas/${encodeURIComponent(taxaEditId)}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -598,7 +599,7 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
         }
         showToast.success('Taxa atualizada com sucesso!')
       } else {
-        const response = await fetch('/api/taxas', {
+        const response = await fetchGestorApi('/api/taxas', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

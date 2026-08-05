@@ -11,6 +11,7 @@ import {
 } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { Impressora } from '@/src/domain/entities/Impressora'
 import { showToast } from '@/src/shared/utils/toast'
 import { cn } from '@/src/shared/utils/cn'
@@ -135,7 +136,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
     ref
   ) {
     const router = useRouter()
-    const { auth, isAuthenticated } = useAuthStore()
+    const { isAuthenticated } = useAuthStore()
     // Em modo cópia, não é edição (sempre cria nova)
     const isEditing = !!impressoraId && !isCopyMode
 
@@ -352,7 +353,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
      */
     const loadTerminais = useCallback(
       async (offset: number, reset: boolean = false) => {
-        const token = auth?.getAccessToken()
+        const token = useAuthStore.getState().tenantAuth?.getAccessToken()
         if (!token) return
 
         setIsLoadingMore(true)
@@ -367,7 +368,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
             params.set('q', qBusca)
           }
 
-          const response = await fetch(`/api/terminais?${params.toString()}`, {
+          const response = await fetchGestorApi(`/api/terminais?${params.toString()}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -420,7 +421,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
           // Não define isLoadingTerminais aqui, pois é gerenciado por loadAllTerminais
         }
       },
-      [auth, impressoraId]
+      [ impressoraId]
     )
 
     /**
@@ -435,7 +436,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
       setCurrentPage(0)
       setHasMoreTerminals(true)
 
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         setIsLoadingTerminais(false)
         hasLoadedTerminaisRef.current = true
@@ -463,7 +464,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
             params.set('q', qBusca)
           }
 
-          const response = await fetch(`/api/terminais?${params.toString()}`, {
+          const response = await fetchGestorApi(`/api/terminais?${params.toString()}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -532,7 +533,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
         setIsLoadingTerminais(false)
         hasLoadedTerminaisRef.current = true
       }
-    }, [isEditing, auth, pageSize])
+    }, [isEditing, pageSize])
 
     /**
      * Carrega dados da impressora (para edição ou cópia)
@@ -541,14 +542,14 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
       // Em modo cópia ou edição, carrega os dados
       if ((!isEditing && !isCopyMode) || !impressoraId || hasLoadedImpressoraRef.current) return
 
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return
 
       setIsLoadingImpressora(true)
       hasLoadedImpressoraRef.current = true
 
       try {
-        const response = await fetch(`/api/impressoras/${impressoraId}`, {
+        const response = await fetchGestorApi(`/api/impressoras/${impressoraId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -599,7 +600,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
           let offset = 0
           let hasMore = true
           while (hasMore) {
-            const terminalResponse = await fetch(`/api/terminais?limit=100&offset=${offset}`, {
+            const terminalResponse = await fetchGestorApi(`/api/terminais?limit=100&offset=${offset}`, {
               headers: {
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',
@@ -688,7 +689,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
       } finally {
         setIsLoadingImpressora(false)
       }
-    }, [isEditing, isCopyMode, impressoraId, auth])
+    }, [isEditing, isCopyMode, impressoraId])
 
     // Carrega dados iniciais
     useEffect(() => {
@@ -1088,7 +1089,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
       const shouldClosePanel = embeddedCloseAfterSaveRef.current
       embeddedCloseAfterSaveRef.current = false
 
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado')
         return
@@ -1119,7 +1120,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
             dataAtualizacao: formattedDate,
           }
 
-          const createResponse = await fetch('/api/impressoras', {
+          const createResponse = await fetchGestorApi('/api/impressoras', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -1162,7 +1163,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
           terminais,
         }
 
-        const updateResponse = await fetch(`/api/impressoras/${impressoraIdToUse}`, {
+        const updateResponse = await fetchGestorApi(`/api/impressoras/${impressoraIdToUse}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',

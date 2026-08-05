@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from '@/src/presentation/components/ui/dialog'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { MdAdd, MdClose, MdPrint, MdSearch, MdEdit } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
@@ -135,7 +136,7 @@ export const ProdutoImpressorasDialog = forwardRef<
     async (signal?: AbortSignal) => {
       if (!produtoId) return
 
-      const token = useAuthStore.getState().auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         setError('Token não encontrado. Faça login novamente.')
         setImpressoras([])
@@ -149,7 +150,7 @@ export const ProdutoImpressorasDialog = forwardRef<
       }
       setError(null)
       try {
-        const response = await fetch(`/api/produtos/${produtoId}`, {
+        const response = await fetchGestorApi(`/api/produtos/${produtoId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -206,7 +207,7 @@ export const ProdutoImpressorasDialog = forwardRef<
   )
 
   const loadAllImpressoras = useCallback(async () => {
-    const token = useAuthStore.getState().auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       setAllImpressoras([])
       return
@@ -220,7 +221,7 @@ export const ProdutoImpressorasDialog = forwardRef<
       const collected: ProdutoImpressora[] = []
 
       while (hasMore) {
-        const response = await fetch(`/api/impressoras?limit=${limit}&offset=${offset}`, {
+        const response = await fetchGestorApi(`/api/impressoras?limit=${limit}&offset=${offset}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -455,14 +456,14 @@ export const ProdutoImpressorasDialog = forwardRef<
         return false
       }
 
-      const token = useAuthStore.getState().auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return false
       }
 
       try {
-        const response = await fetch(`/api/produtos/${produtoId}`, {
+        const response = await fetchGestorApi(`/api/produtos/${produtoId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',

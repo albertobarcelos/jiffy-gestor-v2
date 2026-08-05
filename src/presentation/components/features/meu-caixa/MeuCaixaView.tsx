@@ -11,9 +11,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
  * Replica o design e funcionalidades do Flutter
  */
 export function MeuCaixaView() {
-  const router = useRouter()
-  const { auth } = useAuthStore()
-  const [caixaAtual, setCaixaAtual] = useState<Caixa | null>(null)
+  const router = useRouter()  const [caixaAtual, setCaixaAtual] = useState<Caixa | null>(null)
   const [operacoes, setOperacoes] = useState<OperacaoCaixa[]>([])
   const [saldoCaixa, setSaldoCaixa] = useState(0)
   const [somaSuprimentos, setSomaSuprimentos] = useState(0)
@@ -26,7 +24,7 @@ export function MeuCaixaView() {
   // Buscar dados do caixa
   useEffect(() => {
     const buscarCaixa = async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return
 
       setIsLoading(true)
@@ -60,7 +58,7 @@ export function MeuCaixaView() {
     }
 
     buscarCaixa()
-  }, [auth, operacoes, somaSuprimentos, somaSangrias])
+  }, [ operacoes, somaSuprimentos, somaSangrias])
 
   const formatarData = (data: Date) => {
     return data.toLocaleDateString('pt-BR', {

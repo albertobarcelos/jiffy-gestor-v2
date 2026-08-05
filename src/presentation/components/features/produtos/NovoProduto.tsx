@@ -15,6 +15,7 @@ import { InformacoesProdutoStep } from './NovoProduto/InformacoesProdutoStep'
 import { ConfiguracoesGeraisStep } from './NovoProduto/ConfiguracoesGeraisStep'
 import { ConfiguracaoFiscalStep } from './NovoProduto/ConfiguracaoFiscalStep'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast, handleApiError } from '@/src/shared/utils/toast'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { Produto } from '@/src/domain/entities/Produto'
@@ -360,9 +361,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
     ref
   ) {
     const router = useRouter()
-    const searchParams = useSearchParams()
-    const { auth } = useAuthStore()
-
+    const searchParams = useSearchParams()
     // Estado do step atual (0 = Informações, 1 = Configurações, 2 = Configuração Fiscal)
     const [selectedPage, setSelectedPage] = useState<0 | 1 | 2>(initialStep)
 
@@ -693,7 +692,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       loadedProdutoIdRef.current = cacheKey
 
       const loadProduto = async () => {
-        const token = auth?.getAccessToken()
+        const token = useAuthStore.getState().tenantAuth?.getAccessToken()
         if (!token) {
           // Se não tem token, reseta as flags
           hasLoadedProdutoRef.current = false
@@ -704,7 +703,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
 
         setIsLoadingProduto(!hasFormSeedRef.current)
         try {
-          const response = await fetch(`/api/produtos/${currentEffectiveProdutoId}`, {
+          const response = await fetchGestorApi(`/api/produtos/${currentEffectiveProdutoId}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -823,12 +822,12 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       } else if (effectiveProdutoId) {
         // Se não temos dados fiscais armazenados mas estamos editando, buscar do produto
         // Isso pode acontecer se o usuário navegou diretamente para o passo 3
-        const token = auth?.getAccessToken()
+        const token = useAuthStore.getState().tenantAuth?.getAccessToken()
         if (!token) return
 
         const loadFiscalData = async () => {
           try {
-            const response = await fetch(`/api/produtos/${effectiveProdutoId}`, {
+            const response = await fetchGestorApi(`/api/produtos/${effectiveProdutoId}`, {
               headers: {
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',
@@ -862,7 +861,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
 
         loadFiscalData()
       }
-    }, [selectedPage, effectiveProdutoId, auth])
+    }, [selectedPage, effectiveProdutoId])
 
     // Validação do NCM via API do backend (com debounce de 600ms)
     // IMPORTANTE: Só valida se estivermos no passo 3 (ConfiguracaoFiscalStep) para evitar chamadas desnecessárias
@@ -914,7 +913,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       // Debounce: aguardar 600ms após parar de digitar
       setIsValidatingNcm(true)
       ncmValidationTimerRef.current = setTimeout(async () => {
-        const token = auth?.getAccessToken()
+        const token = useAuthStore.getState().tenantAuth?.getAccessToken()
         if (!token) {
           setIsValidatingNcm(false)
           return
@@ -925,7 +924,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         const timeoutId = setTimeout(() => controller.abort(), 5000)
 
         try {
-          const response = await fetch(`/api/v1/fiscal/configuracoes/ncms/validar/${ncmTrimmed}`, {
+          const response = await fetchGestorApi(`/api/v1/fiscal/configuracoes/ncms/validar/${ncmTrimmed}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -964,7 +963,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           clearTimeout(ncmValidationTimerRef.current)
         }
       }
-    }, [ncm, auth, selectedPage])
+    }, [ncm, selectedPage])
 
     // Buscar CESTs compatíveis quando o NCM é validado com sucesso
     // Fluxo: Frontend → Backend → Microserviço Fiscal (frontend nunca se comunica diretamente com o fiscal)
@@ -997,7 +996,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       }
 
       const fetchCests = async () => {
-        const token = auth?.getAccessToken()
+        const token = useAuthStore.getState().tenantAuth?.getAccessToken()
         if (!token) return
 
         setIsLoadingCests(true)
@@ -1006,7 +1005,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         const timeoutId = setTimeout(() => controller.abort(), 5000)
 
         try {
-          const response = await fetch(`/api/v1/fiscal/configuracoes/cests/por-ncm/${ncmTrimmed}`, {
+          const response = await fetchGestorApi(`/api/v1/fiscal/configuracoes/cests/por-ncm/${ncmTrimmed}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -1040,7 +1039,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       }
 
       fetchCests()
-    }, [ncmValidation, ncm, auth, selectedPage])
+    }, [ncmValidation, ncm, selectedPage])
 
     // Validar CEST selecionado via API do backend (com debounce de 400ms)
     // Inclui validação de compatibilidade CEST x NCM quando o NCM está disponível.
@@ -1088,7 +1087,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       setIsValidatingCest(true)
 
       const timer = setTimeout(async () => {
-        const token = auth?.getAccessToken()
+        const token = useAuthStore.getState().tenantAuth?.getAccessToken()
         if (!token) {
           setIsValidatingCest(false)
           return
@@ -1104,7 +1103,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
             ? `/api/v1/fiscal/configuracoes/cests/validar/${cestTrimmed}/ncm/${ncmTrimmed}`
             : `/api/v1/fiscal/configuracoes/cests/validar/${cestTrimmed}`
 
-          const response = await fetch(url, {
+          const response = await fetchGestorApi(url, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -1160,7 +1159,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         clearTimeout(timer)
         abortController.abort()
       }
-    }, [cest, ncm, ncmValidation, cestsDisponiveis, auth, selectedPage])
+    }, [cest, ncm, ncmValidation, cestsDisponiveis, selectedPage])
 
     // Preencher automaticamente o Indicador de Produção em Escala Relevante quando CEST for preenchido
     useEffect(() => {
@@ -1184,11 +1183,11 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
 
       if (!currentEffectiveProdutoId) return
 
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return
 
       setIsLoadingProduto(true)
-      fetch(`/api/produtos/${currentEffectiveProdutoId}`, {
+      fetchGestorApi(`/api/produtos/${currentEffectiveProdutoId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -1222,7 +1221,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         .finally(() => {
           setIsLoadingProduto(false)
         })
-    }, [produtoId, isCopyMode, searchParams, auth])
+    }, [produtoId, isCopyMode, searchParams])
 
     const handleNext = () => {
       if (selectedPage < 2) {
@@ -1340,7 +1339,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       onWizardSavingChange?.(true)
 
       try {
-        const token = auth?.getAccessToken()
+        const token = useAuthStore.getState().tenantAuth?.getAccessToken()
         if (!token) {
           showToast.errorLoading(toastId, 'Token não encontrado')
           return false
@@ -1452,7 +1451,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           return true
         }
 
-        const response = await fetch(url, {
+        const response = await fetchGestorApi(url, {
           method,
           headers: {
             'Content-Type': 'application/json',
@@ -1473,7 +1472,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           try {
             // Remover cada grupo individualmente usando DELETE
             const deletePromises = originalGrupoComplementosIds.map(grupoId =>
-              fetch(`/api/produtos/${effectiveProdutoId}/grupos-complementos/${grupoId}`, {
+              fetchGestorApi(`/api/produtos/${effectiveProdutoId}/grupos-complementos/${grupoId}`, {
                 method: 'DELETE',
                 headers: {
                   Authorization: `Bearer ${token}`,
@@ -1503,7 +1502,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         let produtoAtualizado = null
         if (isEditMode && precisaSalvarProduto) {
           try {
-            const produtoResponse = await fetch(`/api/produtos/${effectiveProdutoId}`, {
+            const produtoResponse = await fetchGestorApi(`/api/produtos/${effectiveProdutoId}`, {
               headers: {
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',

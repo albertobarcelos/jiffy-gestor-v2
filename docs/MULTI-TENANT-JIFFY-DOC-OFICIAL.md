@@ -1,5 +1,10 @@
 ﻿# Guia Oficial: Implementação Segura Multi-Tenant — Jiffy Gestor
 
+> **Fonte da verdade** para sessão e HTTP no ERP. Complementos:  
+> - Hub / Meu Jiffy → [`arquitetura-jiffy/5.presentation/4.FLUXO_VOLTAR_AO_MEU_JIFFY.md`](./arquitetura-jiffy/5.presentation/4.FLUXO_VOLTAR_AO_MEU_JIFFY.md)  
+> - Invariantes multi-aba → [`arquitetura-jiffy/5.presentation/6.INVARIANTES_SESSAO_MULTI_ABA.md`](./arquitetura-jiffy/5.presentation/6.INVARIANTES_SESSAO_MULTI_ABA.md)  
+> - Login / identidade → [`FLUXO_LOGIN_ATUAL.md`](./FLUXO_LOGIN_ATUAL.md)
+
 ## 1. Visão geral
 
 Este documento define a arquitetura e os **padrões obrigatórios** para implementação segura de funcionalidades multi-tenant no **Jiffy Gestor**. O guia estabelece **5 camadas de segurança** que garantem isolamento de dados entre empresas (tenants), prevenindo vazamento de cache entre abas e uso de token incorreto no frontend.
