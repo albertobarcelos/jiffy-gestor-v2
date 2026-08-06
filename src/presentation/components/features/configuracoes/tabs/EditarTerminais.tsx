@@ -164,13 +164,13 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
   const [nomeTerminal, setNomeTerminal] = useState('')
   const [modeloDispositivo, setModeloDispositivo] = useState('')
   const [versaoApk, setVersaoApk] = useState('')
-  const [compartilhaValue, setCompartilhaValue] = useState(
+  const [compartilhaValue, setCompartilhaValue] = useState<boolean>(
     isCreate ? CREATE_DEFAULT_PREFS.compartilharMesas : false
   )
-  const [fiscalAtivoValue, setFiscalAtivoValue] = useState(
+  const [fiscalAtivoValue, setFiscalAtivoValue] = useState<boolean>(
     isCreate ? CREATE_DEFAULT_PREFS.fiscalAtivo : false
   )
-  const [leitorCodigoBarrasValue, setLeitorCodigoBarrasValue] = useState(
+  const [leitorCodigoBarrasValue, setLeitorCodigoBarrasValue] = useState<boolean>(
     isCreate ? CREATE_DEFAULT_PREFS.leitorHabilitado : false
   )
   const [senhaNumeroMin, setSenhaNumeroMin] = useState(
