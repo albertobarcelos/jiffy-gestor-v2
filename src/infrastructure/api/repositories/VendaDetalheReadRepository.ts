@@ -1,3 +1,4 @@
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import type { VendaGestorApiResponse } from '@/src/application/dto/api/vendaGestorApi'
 import {
   adaptPedidoDeliveryToVendaGestorApiResponse,
@@ -12,7 +13,7 @@ import type { TabelaOrigemVenda } from '@/src/domain/types/vendaDetalhe'
 
 async function fetchJson<T>(url: string, token: string): Promise<T | null> {
   try {
-    const response = await fetch(url, {
+    const response = await fetchGestorApi(url, {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -30,7 +31,7 @@ export class VendaDetalheReadRepository implements IVendaDetalheReadRepository {
     vendaId: string,
     token: string
   ): Promise<VendaGestorApiResponse | null> {
-    const response = await fetch(`/api/delivery/pedidos/${encodeURIComponent(vendaId)}`, {
+    const response = await fetchGestorApi(`/api/delivery/pedidos/${encodeURIComponent(vendaId)}`, {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/json',
@@ -57,7 +58,7 @@ export class VendaDetalheReadRepository implements IVendaDetalheReadRepository {
     incluirFiscal: boolean
   ): Promise<VendaGestorApiResponse> {
     const fiscalQuery = incluirFiscal ? 'true' : 'false'
-    const response = await fetch(
+    const response = await fetchGestorApi(
       `/api/vendas/gestor/${vendaId}?incluirFiscal=${fiscalQuery}`,
       {
         headers: {
@@ -89,7 +90,7 @@ export class VendaDetalheReadRepository implements IVendaDetalheReadRepository {
 
     if (tabelaOrigem === 'venda') {
       const url = `/api/vendas/${vendaId}?incluirFiscal=${incluirFiscal ? 'true' : 'false'}`
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',

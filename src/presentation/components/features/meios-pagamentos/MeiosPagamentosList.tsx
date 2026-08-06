@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { MeioPagamento, type TipoParcelamento } from '@/src/domain/entities/MeioPagamento'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { MdSearch, MdDelete } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -93,7 +94,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
-  const { auth, isAuthenticated } = useAuthStore()
+  const { isAuthenticated } = useAuthStore()
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -117,7 +118,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
   }, [filterStatus])
 
   const loadMeiosPagamento = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token || isLoadingRef.current) {
       return
     }
@@ -154,7 +155,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
           params.append('ativo', ativoFilter.toString())
         }
 
-        const response = await fetch(`/api/meios-pagamentos?${params.toString()}`, {
+        const response = await fetchGestorApi(`/api/meios-pagamentos?${params.toString()}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -205,11 +206,11 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
       setIsLoading(false)
       isLoadingRef.current = false
     }
-  }, [auth])
+  }, [])
 
   // Debounce da busca
   useEffect(() => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     if (debounceTimerRef.current) {
@@ -225,11 +226,11 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
         clearTimeout(debounceTimerRef.current)
       }
     }
-  }, [searchText, auth, loadMeiosPagamento])
+  }, [searchText, loadMeiosPagamento])
 
   // Recarrega ao trocar filtro de status
   useEffect(() => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     loadMeiosPagamento()
@@ -240,7 +241,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
   useEffect(() => {
     if (!isAuthenticated || hasLoadedInitialRef.current) return
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     hasLoadedInitialRef.current = true
@@ -306,12 +307,12 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
     setIsDeleting(true)
 
     try {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         throw new Error('Token não encontrado')
       }
 
-      const response = await fetch(`/api/meios-pagamentos/${meioPagamentoToDelete}`, {
+      const response = await fetchGestorApi(`/api/meios-pagamentos/${meioPagamentoToDelete}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -339,12 +340,12 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
     } finally {
       setIsDeleting(false)
     }
-  }, [meioPagamentoToDelete, auth, loadMeiosPagamento, onReload])
+  }, [meioPagamentoToDelete, loadMeiosPagamento, onReload])
 
 
   const handleToggleTefAtivo = useCallback(
     async (meioPagamento: MeioPagamento, novoStatus: boolean) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         return
       }
@@ -363,7 +364,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
       )
 
       try {
-        const response = await fetch(`/api/meios-pagamentos/${meioPagamentoId}`, {
+        const response = await fetchGestorApi(`/api/meios-pagamentos/${meioPagamentoId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -398,12 +399,12 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
         })
       }
     },
-    [auth, loadMeiosPagamento, onReload]
+    [ loadMeiosPagamento, onReload]
   )
 
   const handleToggleParcelavel = useCallback(
     async (meioPagamento: MeioPagamento, novoStatus: boolean) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         return
       }
@@ -428,7 +429,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
       )
 
       try {
-        const response = await fetch(`/api/meios-pagamentos/${meioPagamentoId}`, {
+        const response = await fetchGestorApi(`/api/meios-pagamentos/${meioPagamentoId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -469,12 +470,12 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
         })
       }
     },
-    [auth, onReload]
+    [ onReload]
   )
 
   const handleChangeTipoParcelamento = useCallback(
     async (meioPagamento: MeioPagamento, novoTipo: TipoParcelamento) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         return
       }
@@ -492,7 +493,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
       )
 
       try {
-        const response = await fetch(`/api/meios-pagamentos/${meioPagamentoId}`, {
+        const response = await fetchGestorApi(`/api/meios-pagamentos/${meioPagamentoId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -533,12 +534,12 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
         })
       }
     },
-    [auth, onReload]
+    [ onReload]
   )
 
   const handleToggleAtivo = useCallback(
     async (meioPagamento: MeioPagamento, novoStatus: boolean) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         return
       }
@@ -557,7 +558,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
       )
 
       try {
-        const response = await fetch(`/api/meios-pagamentos/${meioPagamentoId}`, {
+        const response = await fetchGestorApi(`/api/meios-pagamentos/${meioPagamentoId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -592,7 +593,7 @@ export function MeiosPagamentosList({ onReload }: MeiosPagamentosListProps) {
         })
       }
     },
-    [auth, loadMeiosPagamento, onReload]
+    [ loadMeiosPagamento, onReload]
   )
 
   return (

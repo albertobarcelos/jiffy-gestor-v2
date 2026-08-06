@@ -170,7 +170,7 @@ export function useCriarClienteRapido() {
 
   return useSecureTenantMutation(
     async ({ token }, { nome, telefone }: { nome: string; telefone: string }): Promise<Cliente> => {
-      const response = await fetch('/api/clientes', {
+      const response = await fetchGestorApi('/api/clientes', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,

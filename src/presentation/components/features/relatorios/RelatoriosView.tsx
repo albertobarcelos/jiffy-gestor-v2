@@ -10,9 +10,7 @@ import { VendasList } from '@/src/presentation/components/features/vendas/Vendas
  * Componente principal de Relatórios
  * Replica o design e funcionalidades do Flutter
  */
-export function RelatoriosView() {
-  const { auth } = useAuthStore()
-  const searchParams = useSearchParams() // Obter search params da URL
+export function RelatoriosView() {  const searchParams = useSearchParams() // Obter search params da URL
   const initialPeriodo = searchParams.get('periodo') || 'Todos' // Período vindo da URL
   const initialStatus = searchParams.get('status') || null // Status vindo da URL
 
@@ -23,7 +21,7 @@ export function RelatoriosView() {
 
   const loadFaturamentos = useCallback(
     async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return
 
       try {
@@ -35,7 +33,7 @@ export function RelatoriosView() {
         console.error('Erro ao carregar faturamentos:', error)
       }
     },
-    [auth]
+    []
   )
 
   return (

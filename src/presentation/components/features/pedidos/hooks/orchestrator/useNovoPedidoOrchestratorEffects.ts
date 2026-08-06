@@ -2,10 +2,8 @@
 
 import { useEffect } from 'react'
 import { statusPadraoNovoPedido } from '@/src/domain/services/pedido/RegrasStatusPedido'
-import type { Auth } from '@/src/domain/entities/Auth'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
 import type { AbaDetalhesPedido } from '../../types'
-
-type AuthState = Auth | null
 
 export type UseNovoPedidoOrchestratorEffectsParams = {
   open: boolean
@@ -14,7 +12,6 @@ export type UseNovoPedidoOrchestratorEffectsParams = {
   tipoInicioPedido: 'balcao' | 'entrega'
   abaDetalhesInicial?: AbaDetalhesPedido
   vendaDataUpdatedAt?: number
-  auth: AuthState
   currentStep: 1 | 2 | 3 | 4
   abaDetalhesPedido: AbaDetalhesPedido
   podeExibirAbaNotaFiscal: boolean
@@ -35,7 +32,6 @@ export function useNovoPedidoOrchestratorEffects({
   tipoInicioPedido,
   abaDetalhesInicial,
   vendaDataUpdatedAt,
-  auth,
   currentStep,
   abaDetalhesPedido,
   podeExibirAbaNotaFiscal,
@@ -48,6 +44,7 @@ export function useNovoPedidoOrchestratorEffects({
   longPressTimeoutRef,
   longPressComplementoTimeoutRef,
 }: UseNovoPedidoOrchestratorEffectsParams) {
+  const tenantAuth = useAuthStore(s => s.tenantAuth)
   useEffect(() => {
     if (currentStep === 4 && abaDetalhesPedido === 'notaFiscal' && !podeExibirAbaNotaFiscal) {
       setAbaDetalhesPedido('infoPedido')
@@ -104,12 +101,12 @@ export function useNovoPedidoOrchestratorEffects({
       setNomeUsuario('')
       return
     }
-    if (!auth) {
+    if (!tenantAuth) {
       setNomeUsuario('')
       return
     }
-    setNomeUsuario(auth.getUser()?.getName()?.trim() ?? '')
-  }, [open, auth, setNomeUsuario])
+    setNomeUsuario(tenantAuth.getUser()?.getName()?.trim() ?? '')
+  }, [open, tenantAuth, setNomeUsuario])
 
   useEffect(() => {
     return () => {

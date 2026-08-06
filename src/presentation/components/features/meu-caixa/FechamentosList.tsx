@@ -10,9 +10,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
  * Replica o design e funcionalidades do Flutter
  */
 export function FechamentosList() {
-  const router = useRouter()
-  const { auth } = useAuthStore()
-  const [fechamentos, setFechamentos] = useState<FechamentoCaixa[]>([])
+  const router = useRouter()  const [fechamentos, setFechamentos] = useState<FechamentoCaixa[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [hasNextPage, setHasNextPage] = useState(true)
   const [offset, setOffset] = useState(0)
@@ -39,7 +37,7 @@ export function FechamentosList() {
 
   const loadFechamentos = useCallback(
     async (reset: boolean = false) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return
 
       if (isLoadingRef.current || (!hasNextPageRef.current && !reset)) return
@@ -77,7 +75,7 @@ export function FechamentosList() {
         isLoadingRef.current = false
       }
     },
-    [auth, filtroPeriodo]
+    [ filtroPeriodo]
   )
 
   // Scroll infinito
@@ -103,7 +101,7 @@ export function FechamentosList() {
 
   // Carrega fechamentos quando o filtro muda
   useEffect(() => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
     loadFechamentos(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps

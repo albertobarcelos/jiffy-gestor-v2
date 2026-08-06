@@ -15,7 +15,7 @@ export interface TenantAccessGuard {
 }
 
 /**
- * Guard de acesso multi-tenant por página (estilo Omie).
+ * Guard de acesso multi-tenant por página.
  *
  * Valida se existe sessão de empresa ativa e não expirada nesta aba.
  * Deve ser usado em todas as páginas ERP antes de renderizar conteúdo sensível.

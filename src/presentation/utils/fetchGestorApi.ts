@@ -133,9 +133,12 @@ export async function fetchGestorApi(
     return response
   }
 
-  try {
-    syncTenantAccessTokenClient(newToken)
-  } catch {
+  const synced = syncTenantAccessTokenClient(newToken)
+  if (!synced) {
+    // Refresh cookie é de outra empresa — não sobrescrever esta aba.
+    if (!isPublicAuthPath(window.location.pathname)) {
+      window.dispatchEvent(new CustomEvent(JIFFY_SESSION_EXPIRED_EVENT))
+    }
     return response
   }
 

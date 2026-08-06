@@ -6,8 +6,11 @@ import { Auth } from '@/src/domain/entities/Auth'
 import { User } from '@/src/domain/entities/User'
 import type { LoginEmpresaSnapshot } from '@/src/domain/types/LoginEmpresaSnapshot'
 import { buildAuthFromAccessToken } from '@/src/shared/utils/buildAuthFromAccessToken'
-import { SESSION_STORAGE_TENANT_TOKEN } from '@/src/shared/constants/sessionCoordinator'
-import { clearTabSession } from '@/src/shared/utils/tabSession'
+import {
+  SESSION_STORAGE_TENANT_TOKEN,
+} from '@/src/shared/constants/sessionCoordinator'
+import { clearTabSession, getTabEmpresaId, setTabEmpresaId } from '@/src/shared/utils/tabSession'
+import { extractTokenInfo } from '@/src/shared/utils/validateToken'
 
 /**
  * Referência ao `set` do Zustand capturada na factory.
@@ -45,6 +48,12 @@ interface AuthState {
   isAuthenticated: boolean
   isLoading: boolean
   isRehydrated: boolean
+  /**
+   * `true` após `TabSessionBootstrap` alinhar URL ↔ token (ou concluir rebind).
+   * Enquanto `false`, `useSecureTenantQuery` não dispara — evita queries durante
+   * o rebind assíncrono (`escolher-empresa`).
+   */
+  isTabVerified: boolean
   error: string | null
   login: (auth: Auth) => void
   /** Login hub + empresas num único `set` (evita race no persist cross-tab). */
@@ -57,6 +66,7 @@ interface AuthState {
   logoutTenant: () => Promise<void>
   /** Logout completo (identidade + tenant). */
   logout: () => Promise<void>
+  setTabVerified: (verified: boolean) => void
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
   getUser: () => User | null
@@ -101,14 +111,22 @@ function asPersistedAuthJson(raw: unknown): PersistedAuthJSON | null {
 }
 
 /**
- * Descarta empresas do hub se `hubEmpresasUserId` não bater com o JWT de identidade.
+ * Descarta empresas do hub se o dono não bater com a identidade.
+ * Sem identity (hub via access/refresh), mantém a lista se `hubEmpresasUserId` existir.
  */
 export function sanitizeHubEmpresasForIdentity(
   identityAuth: Auth | null,
   hubEmpresas: LoginEmpresaSnapshot[] | null,
   hubEmpresasUserId: string | null | undefined
 ): { hubEmpresas: LoginEmpresaSnapshot[] | null; hubEmpresasUserId: string | null } {
-  if (!identityAuth || !hubEmpresas?.length) {
+  if (!hubEmpresas?.length) {
+    return { hubEmpresas: null, hubEmpresasUserId: null }
+  }
+
+  if (!identityAuth) {
+    if (hubEmpresasUserId) {
+      return { hubEmpresas, hubEmpresasUserId }
+    }
     return { hubEmpresas: null, hubEmpresasUserId: null }
   }
 
@@ -125,6 +143,23 @@ function restoreTenantFromSessionStorage(identityAuth: Auth | null): Auth | null
   try {
     const token = sessionStorage.getItem(SESSION_STORAGE_TENANT_TOKEN)
     if (!token) return null
+
+    const storedEmpresaId = getTabEmpresaId()
+    const { empresaId: tokenEmpresaId } = extractTokenInfo(token)
+
+    if (storedEmpresaId) {
+      if (tokenEmpresaId && tokenEmpresaId !== storedEmpresaId) {
+        try {
+          sessionStorage.removeItem(SESSION_STORAGE_TENANT_TOKEN)
+        } catch {
+          /* ignore */
+        }
+        return null
+      }
+    } else if (tokenEmpresaId) {
+      setTabEmpresaId(tokenEmpresaId)
+    }
+
     const prev = identityAuth?.getUser()
     return buildAuthFromAccessToken(
       token,
@@ -148,6 +183,7 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       isLoading: false,
       isRehydrated: false,
+      isTabVerified: false,
       error: null,
 
       login: (authSession: Auth) => {
@@ -194,7 +230,8 @@ export const useAuthStore = create<AuthState>()(
       },
 
       setHubEmpresas: (empresas: LoginEmpresaSnapshot[] | null) => {
-        const userId = get().identityAuth?.getUser().getId() ?? null
+        const userId =
+          get().identityAuth?.getUser().getId() ?? get().hubEmpresasUserId ?? null
         set({
           hubEmpresas: empresas,
           hubEmpresasUserId: empresas === null || empresas.length === 0 ? null : userId,
@@ -235,7 +272,9 @@ export const useAuthStore = create<AuthState>()(
         set(state => ({
           tenantAuth: null,
           auth: state.identityAuth ?? null,
-          isAuthenticated: !!state.identityAuth,
+          /** Mantém autenticado se identity existir; hub via refresh é liberado no AuthGuard. */
+          isAuthenticated: !!(state.identityAuth || state.isAuthenticated),
+          isTabVerified: false,
           error: null,
         }))
       },
@@ -259,6 +298,7 @@ export const useAuthStore = create<AuthState>()(
           hubEmpresas: null,
           hubEmpresasUserId: null,
           isAuthenticated: false,
+          isTabVerified: false,
           error: null,
         })
 
@@ -268,6 +308,10 @@ export const useAuthStore = create<AuthState>()(
         } catch (error) {
           console.error('Erro ao limpar localStorage:', error)
         }
+      },
+
+      setTabVerified: (verified: boolean) => {
+        set({ isTabVerified: verified })
       },
 
       setLoading: (loading: boolean) => {

@@ -1,3 +1,4 @@
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { DashboardVendas } from '@/src/domain/entities/DashboardVendas'
 
 interface PeriodoDates {
@@ -95,7 +96,7 @@ export class BuscarVendasDashboardUseCase {
 
     const url = `/api/vendas?${params.toString()}`
 
-    const response = await fetch(url)
+    const response = await fetchGestorApi(url)
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))

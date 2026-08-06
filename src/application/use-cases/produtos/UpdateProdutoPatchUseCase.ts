@@ -1,3 +1,4 @@
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import type { ProdutoPatch } from '@/src/shared/types/produto'
 
 export interface UpdateProdutoPatchInput {
@@ -11,7 +12,7 @@ export async function updateProdutoPatch({ produtoId, patch, token }: UpdateProd
     throw new Error('Informe um valor válido para o produto.')
   }
 
-  const response = await fetch(`/api/produtos/${produtoId}`, {
+  const response = await fetchGestorApi(`/api/produtos/${produtoId}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',

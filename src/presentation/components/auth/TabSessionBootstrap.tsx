@@ -6,18 +6,20 @@ import { buildAuthFromAccessToken } from '@/src/shared/utils/buildAuthFromAccess
 import {
   consumeTabSession,
   getTabTenantToken,
-  extractEmpresaIdPrefix,
   bootstrapTabSessionManually,
+  clearTabSession,
 } from '@/src/shared/utils/tabSession'
-import { generateUuid } from '@/src/shared/utils/generateUuid'
 import { parseEmpresaSlugFromPath, parseEmpresaSlugFromSearch } from '@/src/shared/utils/gestaoRoutes'
 import {
-  SESSION_STORAGE_SESSION_NONCE,
   SESSION_STORAGE_EMPRESA_SLUG,
+  SESSION_STORAGE_EMPRESA_ID,
+  SESSION_STORAGE_TENANT_TOKEN,
 } from '@/src/shared/constants/sessionCoordinator'
 import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
+import { extractTokenInfo } from '@/src/shared/utils/validateToken'
+import { decideTabSessionBootstrap } from '@/src/presentation/utils/decideTabSessionBootstrap'
 
-type FallbackPending = { empresaId: string; empParam: string; tempNonce: string }
+type RebindPending = { empresaId: string; empParam: string }
 
 function getEmpParam(): string | null {
   try {
@@ -29,108 +31,129 @@ function getEmpParam(): string | null {
   }
 }
 
+function activateTenantToken(
+  token: string,
+  setTenantAuth: ReturnType<typeof useAuthStore.getState>['setTenantAuth'],
+  setTabVerified: ReturnType<typeof useAuthStore.getState>['setTabVerified']
+): void {
+  const prev = useAuthStore.getState().getUser()
+  const auth = buildAuthFromAccessToken(
+    token,
+    prev ? { id: prev.getId(), email: prev.getEmail(), name: prev.getName() } : undefined
+  )
+  setTenantAuth(auth)
+  setTabVerified(true)
+}
+
+async function rebindViaEscolherEmpresa(
+  pending: RebindPending,
+  handlers: {
+    setTenantAuth: ReturnType<typeof useAuthStore.getState>['setTenantAuth']
+    setTabVerified: ReturnType<typeof useAuthStore.getState>['setTabVerified']
+  }
+): Promise<void> {
+  const { setTenantAuth, setTabVerified } = handlers
+  try {
+    const res = await fetch('/api/auth/escolher-empresa', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ empresaId: pending.empresaId }),
+    })
+
+    if (!res.ok) throw new Error('escolher-empresa failed')
+
+    const data = (await res.json()) as { accessToken?: string }
+    if (!data.accessToken) throw new Error('no accessToken')
+
+    bootstrapTabSessionManually(data.accessToken, pending.empParam, pending.empresaId)
+    activateTenantToken(data.accessToken, setTenantAuth, setTabVerified)
+  } catch {
+    clearTabSession()
+    window.location.href = HUB_PATH
+  }
+}
+
 /**
- * Montado no root layout. Restaura a sessão per-tab da empresa.
+ * Restaura a sessão per-tab (URL canônica + mint/`escolher-empresa`).
  *
- * Fluxo:
- * 1. `useLayoutEffect` (síncrono, roda ANTES de qualquer `useEffect`):
- *    - Consome pending session do localStorage (aba aberta pelo hub)
- *    - Ou restaura do sessionStorage (F5 / reload)
- *    - Ou prepara fallback escrevendo nonce temporário (URL colada)
- * 2. `useEffect` (assíncrono):
- *    - Se fallback foi preparado, chama `escolher-empresa` para obter token
- *    - Se falhar, redireciona para {@link HUB_PATH}
- *
- * O `useLayoutEffect` garante que o nonce esteja no sessionStorage antes do
- * `AuthGuard` (que usa `useEffect`) verificar — evitando redirect prematuro.
+ * Decisão: {@link decideTabSessionBootstrap}.
+ * `isTabVerified` fica false só durante rebind assíncrono (bloqueia queries).
  */
 export function TabSessionBootstrap() {
   const setTenantAuth = useAuthStore(s => s.setTenantAuth)
-  const identityAuth = useAuthStore(s => s.identityAuth)
+  const setTabVerified = useAuthStore(s => s.setTabVerified)
   const hubEmpresas = useAuthStore(s => s.hubEmpresas)
   const isRehydrated = useAuthStore(s => s.isRehydrated)
+
   const didRunRef = useRef(false)
-  const fallbackRef = useRef<FallbackPending | null>(null)
+  const rebindRef = useRef<RebindPending | null>(null)
 
   useLayoutEffect(() => {
     if (typeof window === 'undefined' || !isRehydrated || didRunRef.current) return
 
     const emp = getEmpParam()
+    const pendingToken = consumeTabSession(emp)
+    const existingToken = pendingToken ? null : getTabTenantToken()
 
-    const consumed = consumeTabSession(emp)
-    const token = consumed || getTabTenantToken()
-
-    if (token) {
-      didRunRef.current = true
-      const prev = identityAuth?.getUser()
-      const auth = buildAuthFromAccessToken(
-        token,
-        prev ? { id: prev.getId(), email: prev.getEmail(), name: prev.getName() } : undefined
-      )
-      setTenantAuth(auth)
-      return
+    let storedEmpresaId: string | null = null
+    try {
+      storedEmpresaId = sessionStorage.getItem(SESSION_STORAGE_EMPRESA_ID)
+    } catch {
+      /* ignore */
     }
 
-    const idPrefix = extractEmpresaIdPrefix(emp)
-    if (!idPrefix || !identityAuth || !hubEmpresas?.length) return
+    const decision = decideTabSessionBootstrap({
+      empParam: emp,
+      pendingToken,
+      existingToken,
+      hubEmpresas,
+      storedEmpresaId,
+    })
 
-    const empresa = hubEmpresas.find(
-      e => e.id.replace(/-/g, '').startsWith(idPrefix)
-    )
-    if (!empresa) return
+    if (decision.type === 'wait') return
 
     didRunRef.current = true
 
-    const tempNonce = generateUuid()
-    try {
-      sessionStorage.setItem(SESSION_STORAGE_SESSION_NONCE, tempNonce)
-      sessionStorage.setItem(SESSION_STORAGE_EMPRESA_SLUG, emp!)
-    } catch { /* ignore */ }
+    if (decision.type === 'activate') {
+      try {
+        if (emp) sessionStorage.setItem(SESSION_STORAGE_EMPRESA_SLUG, emp)
+        const eid = extractTokenInfo(decision.token).empresaId
+        if (eid) sessionStorage.setItem(SESSION_STORAGE_EMPRESA_ID, eid)
+      } catch {
+        /* ignore */
+      }
+      activateTenantToken(decision.token, setTenantAuth, setTabVerified)
+      return
+    }
 
-    fallbackRef.current = { empresaId: empresa.id, empParam: emp!, tempNonce }
-  }, [isRehydrated, identityAuth, hubEmpresas, setTenantAuth])
+    if (decision.type === 'redirect-hub') {
+      try {
+        sessionStorage.removeItem(SESSION_STORAGE_TENANT_TOKEN)
+      } catch {
+        /* ignore */
+      }
+      window.location.href = HUB_PATH
+      return
+    }
+
+    // rebind
+    try {
+      sessionStorage.removeItem(SESSION_STORAGE_TENANT_TOKEN)
+      sessionStorage.setItem(SESSION_STORAGE_EMPRESA_SLUG, decision.empParam)
+      sessionStorage.setItem(SESSION_STORAGE_EMPRESA_ID, decision.empresaId)
+    } catch {
+      /* ignore */
+    }
+    rebindRef.current = { empresaId: decision.empresaId, empParam: decision.empParam }
+  }, [isRehydrated, hubEmpresas, setTenantAuth, setTabVerified])
 
   useEffect(() => {
-    const pending = fallbackRef.current
+    const pending = rebindRef.current
     if (!pending) return
-    fallbackRef.current = null
-
-    void (async () => {
-      try {
-        const res = await fetch('/api/auth/escolher-empresa', {
-          method: 'POST',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ empresaId: pending.empresaId }),
-        })
-
-        if (!res.ok) throw new Error('escolher-empresa failed')
-
-        const data = (await res.json()) as { accessToken?: string }
-        if (!data.accessToken) throw new Error('no accessToken')
-
-        bootstrapTabSessionManually(data.accessToken, pending.empParam)
-
-        const prev = useAuthStore.getState().getUser()
-        const auth = buildAuthFromAccessToken(
-          data.accessToken,
-          prev ? { id: prev.getId(), email: prev.getEmail(), name: prev.getName() } : undefined
-        )
-        setTenantAuth(auth)
-      } catch {
-        try {
-          const current = sessionStorage.getItem(SESSION_STORAGE_SESSION_NONCE)
-          if (current === pending.tempNonce) {
-            sessionStorage.removeItem(SESSION_STORAGE_SESSION_NONCE)
-            sessionStorage.removeItem(SESSION_STORAGE_EMPRESA_SLUG)
-          }
-        } catch { /* ignore */ }
-        window.location.href = HUB_PATH
-      }
-    })()
-  }, [identityAuth, setTenantAuth])
+    rebindRef.current = null
+    void rebindViaEscolherEmpresa(pending, { setTenantAuth, setTabVerified })
+  }, [isRehydrated, hubEmpresas, setTenantAuth, setTabVerified])
 
   return null
 }

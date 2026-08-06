@@ -1,14 +1,12 @@
 import {
   SESSION_STORAGE_TENANT_TOKEN,
-  SESSION_STORAGE_SESSION_NONCE,
   SESSION_STORAGE_EMPRESA_SLUG,
+  SESSION_STORAGE_EMPRESA_ID,
 } from '@/src/shared/constants/sessionCoordinator'
 import { empresaNomeParaSlugUrl } from '@/src/shared/utils/empresaNomeParaSlugUrl'
-import { generateUuid } from '@/src/shared/utils/generateUuid'
 import {
   buildGestaoPath,
   isGestaoScopedPath,
-  parseEmpresaSlugFromPath,
   parseEmpresaSlugFromSearch,
   stripEmpresaSlugFromSearch,
   stripGestaoEmpresaSlugFromPath,
@@ -25,37 +23,48 @@ export function buildEmpresaUrlParam(empresaNome: string, empresaId: string): st
 }
 
 /**
- * Grava access token + nome da empresa no localStorage temporário para que a
- * nova aba (aberta com `noopener`) possa consumir no boot.
- *
- * Retorna `{ nonce, empParam }` — o `empParam` já formatado para a URL
- * (ex: `nexsyn-ab12cd34`), usando os 8 primeiros caracteres do ID da empresa.
+ * Decodifica o claim `empresaId` do JWT sem verificar assinatura.
+ * Leve — usa apenas `atob`/base64; sem dependência de `jsonwebtoken`.
+ */
+function extractEmpresaIdFromJwt(token: string): string | null {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
+    const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const payload = JSON.parse(atob(b64)) as Record<string, unknown>
+    return typeof payload.empresaId === 'string' ? payload.empresaId : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Grava access token + empresa no localStorage temporário para a nova aba consumir no boot.
+ * Retorna o segmento de URL da empresa (`empParam`).
  */
 export function prepareTabSession(
   accessToken: string,
   empresaNome: string,
   empresaId: string
-): { nonce: string; empParam: string } {
-  const nonce = generateUuid()
+): string {
+  const pendingId = crypto.randomUUID()
   const empParam = buildEmpresaUrlParam(empresaNome, empresaId)
 
-  const key = `jiffy:pending-session:${nonce}`
+  const key = `jiffy:pending-session:${pendingId}`
   try {
     localStorage.setItem(
       key,
-      JSON.stringify({ accessToken, empParam, ts: Date.now() })
+      JSON.stringify({ accessToken, empParam, empresaId, ts: Date.now() })
     )
-  } catch { /* localStorage cheio */ }
+  } catch {
+    /* localStorage cheio */
+  }
 
-  return { nonce, empParam }
+  return empParam
 }
 
 /**
- * Na aba recém-aberta, resolve o nonce a partir do valor de `emp` na URL,
- * consome o pending session do localStorage e o move para sessionStorage.
- *
- * @param empParam  valor do query param `emp` (ex: `nexsyn-ab12cd34`)
- * @returns accessToken se encontrado, `null` caso contrário
+ * Na aba recém-aberta, consome pending session do localStorage → sessionStorage.
  */
 export function consumeTabSession(empParam: string | null): string | null {
   if (!empParam) return null
@@ -74,6 +83,7 @@ export function consumeTabSession(empParam: string | null): string | null {
       const data = JSON.parse(raw) as {
         accessToken?: string
         empParam?: string
+        empresaId?: string
         ts?: number
       }
 
@@ -83,10 +93,14 @@ export function consumeTabSession(empParam: string | null): string | null {
       const age = Date.now() - (data.ts ?? 0)
       if (age > 30_000 || !data.accessToken) return null
 
-      const nonce = key.replace('jiffy:pending-session:', '')
+      const resolvedEmpresaId =
+        data.empresaId ?? extractEmpresaIdFromJwt(data.accessToken)
+
       sessionStorage.setItem(SESSION_STORAGE_TENANT_TOKEN, data.accessToken)
-      sessionStorage.setItem(SESSION_STORAGE_SESSION_NONCE, nonce)
       sessionStorage.setItem(SESSION_STORAGE_EMPRESA_SLUG, empParam)
+      if (resolvedEmpresaId) {
+        sessionStorage.setItem(SESSION_STORAGE_EMPRESA_ID, resolvedEmpresaId)
+      }
       return data.accessToken
     }
   } catch {
@@ -105,28 +119,41 @@ export function getTabTenantToken(): string | null {
   }
 }
 
+/** Lê o UUID completo da empresa desta aba (fonte de verdade canônica). */
+export function getTabEmpresaId(): string | null {
+  try {
+    return sessionStorage.getItem(SESSION_STORAGE_EMPRESA_ID)
+  } catch {
+    return null
+  }
+}
+
 /** Grava/atualiza o access token per-tab (ex: após refresh). */
 export function setTabTenantToken(token: string): void {
   try {
     sessionStorage.setItem(SESSION_STORAGE_TENANT_TOKEN, token)
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Grava o UUID completo da empresa no sessionStorage per-tab. */
+export function setTabEmpresaId(empresaId: string): void {
+  try {
+    sessionStorage.setItem(SESSION_STORAGE_EMPRESA_ID, empresaId)
+  } catch {
+    /* ignore */
+  }
 }
 
 /** Remove sessão per-tab (logout da empresa). */
 export function clearTabSession(): void {
   try {
     sessionStorage.removeItem(SESSION_STORAGE_TENANT_TOKEN)
-    sessionStorage.removeItem(SESSION_STORAGE_SESSION_NONCE)
     sessionStorage.removeItem(SESSION_STORAGE_EMPRESA_SLUG)
-  } catch { /* ignore */ }
-}
-
-/** Verifica se esta aba foi aberta via hub (tem nonce). */
-export function hasSessionNonce(): boolean {
-  try {
-    return Boolean(sessionStorage.getItem(SESSION_STORAGE_SESSION_NONCE))
+    sessionStorage.removeItem(SESSION_STORAGE_EMPRESA_ID)
   } catch {
-    return false
+    /* ignore */
   }
 }
 
@@ -137,17 +164,6 @@ export function getEmpresaSlugParam(): string | null {
   } catch {
     return null
   }
-}
-
-/**
- * Chaves que são o token de empresa na query (`{nome-url}-{8chars}`), como em `TabSessionBootstrap.getEmpParam`.
- * O sufixo são os 8 primeiros caracteres do id **sem hífen** (não é só hex — UUID pode gerar letras como `u`).
- * `URLSearchParams` serializa valor vazio como `chave=`; o nome da chave nunca contém `=`.
- */
-function isEmpresaSlugQueryKey(key: string, sessionSlug: string): boolean {
-  if (!key || key.includes('=')) return false
-  if (key === sessionSlug) return true
-  return /^.+-[a-z0-9]{8}$/i.test(key)
 }
 
 /**
@@ -185,14 +201,9 @@ export function syncEmpresaUrlPathFromSession(): void {
   window.history.replaceState(null, '', url.toString())
 }
 
-/** @deprecated Use `syncEmpresaUrlPathFromSession` — alias de compatibilidade. */
-export function syncEmpresaUrlQueryFromSession(): void {
-  syncEmpresaUrlPathFromSession()
-}
-
 /**
- * Extrai os 8 caracteres do ID da empresa do `empParam` (sufixo após último hífen).
- * Retorna `null` se o formato for inválido.
+ * Extrai os 8 caracteres do ID da empresa do slug da URL (sufixo após último hífen).
+ * Usado para alinhar URL canônica ↔ `empresaId` do token.
  */
 export function extractEmpresaIdPrefix(empParam: string | null): string | null {
   if (!empParam || empParam.length < 9) return null
@@ -200,14 +211,21 @@ export function extractEmpresaIdPrefix(empParam: string | null): string | null {
 }
 
 /**
- * Configura a sessão per-tab manualmente (fallback quando não há pending session).
- * Gera um nonce, grava no sessionStorage e retorna.
+ * Grava token + slug + empresaId no sessionStorage desta aba (após escolher-empresa / troca).
  */
-export function bootstrapTabSessionManually(accessToken: string, empParam: string): void {
-  const nonce = generateUuid()
+export function bootstrapTabSessionManually(
+  accessToken: string,
+  empParam: string,
+  empresaId?: string
+): void {
+  const resolvedEmpresaId = empresaId ?? extractEmpresaIdFromJwt(accessToken)
   try {
     sessionStorage.setItem(SESSION_STORAGE_TENANT_TOKEN, accessToken)
-    sessionStorage.setItem(SESSION_STORAGE_SESSION_NONCE, nonce)
     sessionStorage.setItem(SESSION_STORAGE_EMPRESA_SLUG, empParam)
-  } catch { /* ignore */ }
+    if (resolvedEmpresaId) {
+      sessionStorage.setItem(SESSION_STORAGE_EMPRESA_ID, resolvedEmpresaId)
+    }
+  } catch {
+    /* ignore */
+  }
 }

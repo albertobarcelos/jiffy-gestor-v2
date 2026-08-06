@@ -6,10 +6,11 @@ import type { Auth } from '@/src/domain/entities/Auth'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { buildAuthFromAccessToken } from '@/src/shared/utils/buildAuthFromAccessToken'
-import { getTabTenantToken, hasSessionNonce } from '@/src/shared/utils/tabSession'
+import { getTabTenantToken } from '@/src/shared/utils/tabSession'
 import { fetchTenantRefreshAccessToken } from '@/src/shared/utils/fetchTenantRefreshAccessToken'
 import { syncTenantAccessTokenClient } from '@/src/presentation/utils/syncTenantAccessTokenClient'
 import { restoreIdentityFromCookie } from '@/src/presentation/utils/restoreIdentityFromCookie'
+import { ensureHubBearerToken } from '@/src/presentation/utils/ensureHubBearerToken'
 import {
   SESSION_STORAGE_HUB_LOGOUT_SELF,
   SESSION_STORAGE_TENANT_LOGOUT_SELF,
@@ -120,6 +121,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
   const identityAuth = useAuthStore(s => s.identityAuth)
   const tenantAuth = useAuthStore(s => s.tenantAuth)
   const isRehydrated = useAuthStore(s => s.isRehydrated)
+  const isTabVerified = useAuthStore(s => s.isTabVerified)
   const logout = useAuthStore(s => s.logout)
   const logoutTenant = useAuthStore(s => s.logoutTenant)
   const [allowed, setAllowed] = useState(false)
@@ -154,6 +156,23 @@ export function AuthGuard({ children }: AuthGuardProps) {
       return
     }
 
+    /** Sem identity: se o refresh ainda vale, o hub consegue continuar com access. */
+    const hubBearer = await ensureHubBearerToken()
+    if (hubBearer) {
+      try {
+        sessionStorage.setItem(SESSION_STORAGE_TENANT_LOGOUT_SELF, '1')
+      } catch {
+        /* noop */
+      }
+      try {
+        await logoutTenant()
+      } catch (error) {
+        console.error('AuthGuard: erro ao encerrar sessão da empresa:', error)
+      }
+      window.location.href = HUB_PATH
+      return
+    }
+
     try {
       await logout()
     } catch (error) {
@@ -162,12 +181,23 @@ export function AuthGuard({ children }: AuthGuardProps) {
     window.location.href = '/login'
   }, [logout, logoutTenant])
 
+  const allowHubOrRedirectLogin = useCallback(async (): Promise<boolean> => {
+    if (identityHubStillValid() || isTenantSessionAlive()) {
+      return true
+    }
+    const restored = await restoreIdentityFromCookie()
+    if (restored || identityHubStillValid()) {
+      return true
+    }
+    const hubBearer = await ensureHubBearerToken()
+    return hubBearer !== null
+  }, [])
+
   const redirectHubSemIdentidade = useCallback(() => {
     if (redirectingRef.current) {
       return
     }
     redirectingRef.current = true
-    // Limpar cookie de identidade antes de redirecionar (sem await para não bloquear o redirect)
     void fetch('/api/auth/logout-hub', { method: 'POST', credentials: 'include' }).catch(() => {
       /* noop */
     })
@@ -195,6 +225,12 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
     const isHub = isHubPath(pathname)
 
+    // Enquanto o bootstrap da aba (URL ↔ token / rebind) não confirmou a sessão,
+    // não tentar refresh ou redirect — TabSessionBootstrap reestabelece se necessário.
+    if (!isHub && !isTabVerified) {
+      return
+    }
+
     if (isTenantLogoutInProgress()) {
       if (isHub) {
         if ((identityAuth !== null && !identityAuth.isExpired()) || isTenantSessionAlive()) {
@@ -207,10 +243,9 @@ export function AuthGuard({ children }: AuthGuardProps) {
           setAllowed(true)
           return
         }
-        /** Memória sem identidade: tentar cookie `identity-token` antes de matar o hub. */
         let cancelled = false
         void (async () => {
-          const restored = await restoreIdentityFromCookie()
+          const ok = await allowHubOrRedirectLogin()
           if (cancelled) {
             return
           }
@@ -219,7 +254,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
           } catch {
             /* noop */
           }
-          if (restored || identityHubStillValid()) {
+          if (ok) {
             redirectingRef.current = false
             setAllowed(true)
             return
@@ -247,11 +282,11 @@ export function AuthGuard({ children }: AuthGuardProps) {
       }
       let cancelled = false
       void (async () => {
-        const restored = await restoreIdentityFromCookie()
+        const ok = await allowHubOrRedirectLogin()
         if (cancelled) {
           return
         }
-        if (restored || identityHubStillValid()) {
+        if (ok) {
           redirectingRef.current = false
           setAllowed(true)
           return
@@ -304,7 +339,10 @@ export function AuthGuard({ children }: AuthGuardProps) {
         }
         if (refreshed) {
           try {
-            syncTenantAccessTokenClient(refreshed)
+            if (!syncTenantAccessTokenClient(refreshed)) {
+              void endTenantSessionOrFullLogout()
+              return
+            }
             redirectingRef.current = false
             setAllowed(true)
           } catch {
@@ -319,7 +357,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
       }
     }
 
-    if (!tenantAuth && !hasSessionNonce()) {
+    if (!tenantAuth) {
       if (identityHubStillValid() || identityAuth) {
         redirectToHub()
       } else {
@@ -337,9 +375,11 @@ export function AuthGuard({ children }: AuthGuardProps) {
     tenantAuth,
     pathname,
     isRehydrated,
+    isTabVerified,
     endTenantSessionOrFullLogout,
     redirectHubSemIdentidade,
     redirectToHub,
+    allowHubOrRedirectLogin,
   ])
 
   useEffect(() => {
@@ -366,9 +406,15 @@ export function AuthGuard({ children }: AuthGuardProps) {
           return
         }
         const id = st.identityAuth
-        if (id === null || id.isExpired()) {
-          redirectHubSemIdentidade()
+        if (id !== null && !id.isExpired()) {
+          return
         }
+        void (async () => {
+          const ok = await allowHubOrRedirectLogin()
+          if (!ok) {
+            redirectHubSemIdentidade()
+          }
+        })()
         return
       }
       if (isTenantSessionAlive()) {
@@ -389,7 +435,9 @@ export function AuthGuard({ children }: AuthGuardProps) {
           window.clearTimeout(timeoutHandle)
           if (refreshed) {
             try {
-              syncTenantAccessTokenClient(refreshed)
+              if (!syncTenantAccessTokenClient(refreshed)) {
+                void endTenantSessionOrFullLogout()
+              }
             } catch {
               void endTenantSessionOrFullLogout()
             }
@@ -429,6 +477,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     pathname,
     endTenantSessionOrFullLogout,
     redirectHubSemIdentidade,
+    allowHubOrRedirectLogin,
   ])
 
   /** Listener: fetchGestorApi dispara quando o refresh do tenant falha após 401. */

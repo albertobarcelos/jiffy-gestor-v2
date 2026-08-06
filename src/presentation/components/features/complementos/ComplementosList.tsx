@@ -1,15 +1,16 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { Complemento } from '@/src/domain/entities/Complemento'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { MdPhotoCamera, MdSearch } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useComplementosInfinite } from '@/src/presentation/hooks/useComplementos'
-import { useQueryClient } from '@tanstack/react-query'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { DELIVERY_IMAGE_ACCEPT } from '@/src/shared/constants/deliveryImageUpload'
 import {
   fetchComplementoImagemUrl,
@@ -236,11 +237,10 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
   const valorDebounceTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
   const handleValorSubmitRef = useRef<((complementoId: string) => Promise<void>) | null>(null)
 
-  const { auth } = useAuthStore()
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
-  const queryClient = useQueryClient()
+  const invalidate = useInvalidateTenantQueries()
 
   const ativoFilter = useMemo<boolean | null>(() => {
     return filterStatus === 'Ativo' ? true : filterStatus === 'Inativo' ? false : null
@@ -288,7 +288,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
     if (idsFaltantes.length === 0) return
 
     let cancelled = false
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     void fetchComplementosImagemUrlsBatch(idsFaltantes, token).then(resolved => {
@@ -299,11 +299,11 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
     return () => {
       cancelled = true
     }
-  }, [auth, complementos, imagensPorComplementoId])
+  }, [complementos, imagensPorComplementoId])
 
   const handleUploadImagem = useCallback(
     async (complementoId: string, file: File) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado')
         return
@@ -326,7 +326,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         setUploadingImagemComplementoId(null)
       }
     },
-    [auth]
+    []
   )
 
   const { selectForEntity: selectComplementoImagem, cropModal: complementoCropModal } =
@@ -476,7 +476,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
   const handleValorSubmit = useCallback(
     async (complementoId: string) => {
       clearValorDebounceTimer(complementoId)
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -502,7 +502,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
       setSavingValorMap(prev => ({ ...prev, [complementoId]: true }))
 
       try {
-        const response = await fetch(`/api/complementos/${complementoId}`, {
+        const response = await fetchGestorApi(`/api/complementos/${complementoId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -552,7 +552,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
 
   const handleTipoImpactoChange = useCallback(
     async (complementoId: string, novoTipo: 'nenhum' | 'aumenta' | 'diminui') => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -573,7 +573,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
 
       try {
         const payloadTipo = novoTipo.toLowerCase()
-        const response = await fetch(`/api/complementos/${complementoId}`, {
+        const response = await fetchGestorApi(`/api/complementos/${complementoId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -607,7 +607,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
 
   const handleToggleComplementoStatus = useCallback(
     async (complemento: Complemento, novoStatus: boolean) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -617,7 +617,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
       setTogglingStatus(prev => ({ ...prev, [complementoId]: true }))
 
       try {
-        const response = await fetch(`/api/complementos/${complementoId}`, {
+        const response = await fetchGestorApi(`/api/complementos/${complementoId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -675,8 +675,8 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
     currentSearchParams.delete('modalComplementoOpen')
     router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
     router.refresh()
-    await queryClient.invalidateQueries({ queryKey: ['complementos'], exact: false })
-  }, [router, searchParams, pathname, queryClient])
+    await invalidate(['complementos'])
+  }, [router, searchParams, pathname, invalidate])
 
   const handleTabsModalReload = useCallback(async () => {
     setImagensPorComplementoId({})

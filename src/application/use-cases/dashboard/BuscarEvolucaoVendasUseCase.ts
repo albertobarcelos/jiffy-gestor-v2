@@ -1,3 +1,4 @@
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { DashboardEvolucao } from '@/src/domain/entities/DashboardEvolucao'
 
 interface PeriodoDates {
@@ -86,7 +87,7 @@ export class BuscarEvolucaoVendasUseCase {
       currentParams.append('limit', limitPerPage.toString())
       currentParams.append('offset', (currentPage * limitPerPage).toString())
 
-      const response = await fetch(`/api/vendas?${currentParams.toString()}`)
+      const response = await fetchGestorApi(`/api/vendas?${currentParams.toString()}`)
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))

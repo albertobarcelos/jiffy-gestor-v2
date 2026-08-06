@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import TextField from '@mui/material/TextField'
 import MenuItem from '@mui/material/MenuItem'
 import {
@@ -48,7 +49,7 @@ export function NovoConviteModal({
       return
     }
     let cancelado = false
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       setPerfis([])
       return
@@ -56,7 +57,7 @@ export function NovoConviteModal({
     setLoadingPerfis(true)
     void (async () => {
       try {
-        const res = await fetch('/api/pessoas/perfis-gestor?limit=100&offset=0', {
+        const res = await fetchGestorApi('/api/pessoas/perfis-gestor?limit=100&offset=0', {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -86,7 +87,7 @@ export function NovoConviteModal({
     return () => {
       cancelado = true
     }
-  }, [open, auth])
+  }, [open])
 
   const emailTrim = email.trim()
   const canSubmit =

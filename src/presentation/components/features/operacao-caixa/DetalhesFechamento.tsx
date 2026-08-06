@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
 import { MdClose } from 'react-icons/md'
 import { CircularProgress } from '@mui/material'
@@ -75,9 +76,7 @@ interface DetalhesFechamentoProps {
  * Modal de detalhes de fechamento de caixa
  * Exibe informações completas em formato de cupom fiscal
  */
-export function DetalhesFechamento({ idOperacaoCaixa, open, onClose }: DetalhesFechamentoProps) {
-  const { auth } = useAuthStore()
-  const [operacaoCaixa, setOperacaoCaixa] = useState<OperacaoCaixaDetalhada | null>(null)
+export function DetalhesFechamento({ idOperacaoCaixa, open, onClose }: DetalhesFechamentoProps) {  const [operacaoCaixa, setOperacaoCaixa] = useState<OperacaoCaixaDetalhada | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
   /**
@@ -151,13 +150,13 @@ export function DetalhesFechamento({ idOperacaoCaixa, open, onClose }: DetalhesF
   const fetchDetalhesOperacaoCaixa = async () => {
     if (!idOperacaoCaixa || !open) return
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     setIsLoading(true)
 
     try {
-      const response = await fetch(
+      const response = await fetchGestorApi(
         `/api/caixa/operacao-caixa-terminal/${idOperacaoCaixa}?tipoRetorno=detalhado`,
         {
           headers: {

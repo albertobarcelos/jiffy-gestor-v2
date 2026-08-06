@@ -1,4 +1,4 @@
-Ôªø'use client'
+'use client'
 
 import { useMemo, useRef, useCallback } from 'react'
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
@@ -12,7 +12,6 @@ import {
 } from '@/src/presentation/hooks/useVendas'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
-import { usePreferenciasImpressaoDelivery } from '@/src/presentation/hooks/usePreferenciasImpressaoDelivery'
 import { useImpressaoDelivery } from '@/features/delivery/hooks/useImpressaoDelivery'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import type { NovoPedidoModalProps } from '../types'
@@ -73,9 +72,7 @@ export function useNovoPedidoOrchestrator({
   tipoInicioPedido = 'balcao',
   abaDetalhesInicial,
 }: NovoPedidoModalProps) {
-  const { auth } = useAuthStore()
-  const { empresa } = useEmpresaMe()
-  const { preferenciasImpressaoDelivery } = usePreferenciasImpressaoDelivery()
+  const { empresa, preferenciasImpressaoDelivery } = useEmpresaMe()
   const { processarAposTransicaoVendaGestorId } = useImpressaoDelivery()
   const empresaId = useTenantEmpresaId()
   const createVendaGestor = useCreateVendaGestor()
@@ -189,7 +186,7 @@ export function useNovoPedidoOrchestrator({
   const pedidoBalcao = tipoInicioPedido !== 'entrega'
   const canalVendaNovoPedido: CanalVendaNovoPedido =
     tipoInicioPedido === 'entrega' ? 'entrega' : 'balcao'
-  /** Balc√£o e delivery: passo de produtos √© sempre o step 1 na cria√ß√£o. */
+  /** Balc„o e delivery: passo de produtos È sempre o step 1 na criaÁ„o. */
   const estaNoPassoProdutos = open && !modoVisualizacao && currentStep === 1
 
   const {
@@ -208,7 +205,7 @@ export function useNovoPedidoOrchestrator({
     hasMovedRef: hasMovedMeiosPagamentoRef,
     handleMouseDown: handleMouseDownMeiosPagamento,
   } = useHorizontalDragScroll<HTMLDivElement>()
-  const token = auth?.getAccessToken()
+  const token = useAuthStore.getState().tenantAuth?.getAccessToken()
 
   const {
     grupos,
@@ -322,7 +319,7 @@ export function useNovoPedidoOrchestrator({
     setMoradaEntregaSelecionada,
     setTaxaEntregaId,
     setTipoAtendimentoDelivery,
-    getAccessToken: () => auth?.getAccessToken(),
+    getAccessToken: () => useAuthStore.getState().tenantAuth?.getAccessToken(),
   })
 
   // Buscar meios de pagamento
@@ -403,15 +400,16 @@ export function useNovoPedidoOrchestrator({
     pagamentoEntregaConfirmado,
   } = flags
 
-  /** Primeira carga ou fetch sem cache ainda ‚Äî evita √°rea vazia sem feedback */
+  /** Primeira carga ou fetch sem cache ainda ó evita ·rea vazia sem feedback */
   const mostrarLoadingFormasPagamento =
     isPendingMeiosPagamento || (isFetchingMeiosPagamento && meiosPagamentoData === undefined)
 
-  // Refs est√°veis: evitam que `carregarVendaExistente` mude quando queries atualizam ao focar a aba
+  // Refs est·veis: evitam que `carregarVendaExistente` mude quando queries atualizam ao focar a aba
   const meiosPagamentoRef = useRef(meiosPagamento)
   meiosPagamentoRef.current = meiosPagamento
-  const authRef = useRef(auth)
-  authRef.current = auth
+  const tenantAuth = useAuthStore(s => s.tenantAuth)
+  const tenantAuthRef = useRef(tenantAuth)
+  tenantAuthRef.current = tenantAuth
 
   const tipoVendaParaDetalhe =
     tipoVendaGestor ??
@@ -426,7 +424,7 @@ export function useNovoPedidoOrchestrator({
     tabelaOrigemVenda,
     tipoVendaGestor: tipoVendaParaDetalhe,
     meiosPagamentoRef,
-    getToken: () => authRef.current?.getAccessToken(),
+    getToken: () => tenantAuthRef.current?.getAccessToken(),
     onClose,
     handlers: {
       setDetalhesPedidoMeta,
@@ -525,7 +523,7 @@ export function useNovoPedidoOrchestrator({
   const { salvandoProdutos, handleSalvarProdutos } = useEdicaoProdutosDelivery({
     ativo: modoEdicaoProdutos,
     vendaId,
-    getToken: () => authRef.current?.getAccessToken(),
+    getToken: () => tenantAuthRef.current?.getAccessToken(),
     produtos,
     observacaoPedido,
     vendaDataUpdatedAt,
@@ -586,7 +584,7 @@ export function useNovoPedidoOrchestrator({
     tipoInicioPedido,
     processarAposTransicaoVendaGestorId,
     preferenciasAutoIniciarPreparo: preferenciasImpressaoDelivery.autoIniciarPreparoNovosPedidos,
-    accessToken: auth?.getAccessToken(),
+    accessToken: useAuthStore.getState().tenantAuth?.getAccessToken(),
   })
 
   const formatarDataDetalhePedido = useCallback(
@@ -607,7 +605,6 @@ export function useNovoPedidoOrchestrator({
     tabelaOrigemVenda,
     onSuccess,
     onClose,
-    auth,
     cancelarVendaGestor,
     cancelarNotaFiscalVendaPdv,
     cancelarNotaFiscalVendaGestor,
@@ -639,7 +636,6 @@ export function useNovoPedidoOrchestrator({
     tipoInicioPedido,
     abaDetalhesInicial,
     vendaDataUpdatedAt,
-    auth,
     currentStep,
     abaDetalhesPedido,
     podeExibirAbaNotaFiscal,

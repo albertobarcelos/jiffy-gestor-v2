@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
@@ -16,7 +16,8 @@ import {
 } from 'react-icons/md'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { useQueryClient } from '@tanstack/react-query'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { showToast } from '@/src/shared/utils/toast'
 import { DELIVERY_IMAGE_ACCEPT } from '@/src/shared/constants/deliveryImageUpload'
 import {
@@ -412,14 +413,13 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
     }
   }, [error])
 
-  const { auth } = useAuthStore()
   const [updatingQuantidadeId, setUpdatingQuantidadeId] = useState<string | null>(null)
   const [imagensPorGrupoId, setImagensPorGrupoId] = useState<Record<string, string | null>>({})
   const [uploadingImagemGrupoId, setUploadingImagemGrupoId] = useState<string | null>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
-  const queryClient = useQueryClient() // Declarar queryClient aqui
+  const invalidate = useInvalidateTenantQueries()
 
   useEffect(() => {
     const idsFaltantes = grupos
@@ -429,7 +429,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
     if (idsFaltantes.length === 0) return
 
     let cancelled = false
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     void fetchGruposComplementoImagemUrlsBatch(idsFaltantes, token).then(resolved => {
@@ -440,11 +440,11 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
     return () => {
       cancelled = true
     }
-  }, [auth, grupos, imagensPorGrupoId])
+  }, [grupos, imagensPorGrupoId])
 
   const handleUploadImagem = useCallback(
     async (grupoId: string, file: File) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado')
         return
@@ -467,7 +467,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
         setUploadingImagemGrupoId(null)
       }
     },
-    [auth]
+    []
   )
 
   const { selectForEntity: selectGrupoComplementoImagem, cropModal: grupoComplementoCropModal } =
@@ -490,14 +490,14 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
 
   const toggleGroupStatus = useCallback(
     async (grupoId: string, novoStatus: boolean) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
       }
 
       try {
-        const response = await fetch(`/api/grupos-complementos/${grupoId}`, {
+        const response = await fetchGestorApi(`/api/grupos-complementos/${grupoId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -554,7 +554,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
     router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
     router.refresh() // Força a revalidação da rota principal
     // Invalida o cache do React Query para grupos de complementos
-    await queryClient.invalidateQueries({ queryKey: ['grupos-complementos'], exact: false })
+    await invalidate(['grupos-complementos'])
   }, [router, searchParams, pathname, refetch])
 
   const handleTabsModalReload = useCallback(async () => {
@@ -598,7 +598,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
 
   const handleChangeQuantidade = useCallback(
     async (grupo: GrupoComplemento, tipo: 'min' | 'max', delta: number) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -626,7 +626,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
       setUpdatingQuantidadeId(grupo.getId())
 
       try {
-        const response = await fetch(`/api/grupos-complementos/${grupo.getId()}`, {
+        const response = await fetchGestorApi(`/api/grupos-complementos/${grupo.getId()}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',

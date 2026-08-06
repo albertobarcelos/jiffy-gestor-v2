@@ -29,7 +29,6 @@ import {
 import type { IconType } from 'react-icons'
 import { useAcessoFiscal } from '@/src/presentation/hooks/useAcessoFiscal'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
-import { useHubIdentityExpiryWarning } from '@/src/presentation/hooks/useHubIdentityExpiryWarning'
 import { matchesModulePath } from '@/src/shared/utils/gestaoRoutes'
 
 const MENU_ICON_PARENT =
@@ -71,7 +70,6 @@ export function TopNav() {
   const notificationsRef = useRef<HTMLDivElement>(null)
 
   useEmpresaUrlSync()
-  useHubIdentityExpiryWarning(true)
   const temAcessoFiscal = useAcessoFiscal()
   const { toGestao } = useGestaoPath()
   

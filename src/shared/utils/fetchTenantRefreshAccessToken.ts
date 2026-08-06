@@ -1,17 +1,21 @@
 /**
- * Renova o JWT da empresa via BFF (`POST /api/auth/refresh-token`), usando o
- * cookie httpOnly `refresh-token` gravado em `escolher-empresa`.
- *
- * Não renova o JWT de identidade do hub — esse fluxo não persiste refresh de hub no app.
+ * Renova o JWT da empresa via BFF (`POST /api/auth/refresh-token`).
+ * Envia `empresaId` da aba para o BFF usar **somente** o refresh do mapa.
+ * Sem `empresaId` (hub), o BFF usa o cookie legado last-wins.
  */
 
-let inFlight: Promise<string | null> | null = null
+import { getTabEmpresaId } from '@/src/shared/utils/tabSession'
 
-async function doFetch(): Promise<string | null> {
+let inFlight: Promise<string | null> | null = null
+let inFlightEmpresaId: string | null | undefined
+
+async function doFetch(empresaId: string | null): Promise<string | null> {
   try {
     const res = await fetch('/api/auth/refresh-token', {
       method: 'POST',
       credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(empresaId ? { empresaId } : {}),
     })
     if (!res.ok) {
       return null
@@ -24,12 +28,24 @@ async function doFetch(): Promise<string | null> {
   }
 }
 
-/** Chamadas simultâneas partilham a mesma promise (poll + efeito). */
+/** Chamadas simultâneas da mesma empresa partilham a mesma promise. */
 export function fetchTenantRefreshAccessToken(): Promise<string | null> {
-  if (!inFlight) {
-    inFlight = doFetch().finally(() => {
-      inFlight = null
-    })
+  const empresaId = (() => {
+    try {
+      return getTabEmpresaId()
+    } catch {
+      return null
+    }
+  })()
+
+  if (inFlight && inFlightEmpresaId === empresaId) {
+    return inFlight
   }
+
+  inFlightEmpresaId = empresaId
+  inFlight = doFetch(empresaId).finally(() => {
+    inFlight = null
+    inFlightEmpresaId = undefined
+  })
   return inFlight
 }
