@@ -60,7 +60,9 @@ const sxEntradaTerminal = {
 const maiusculasPt = (valor: string) => valor.toLocaleUpperCase('pt-BR')
 
 interface EditarTerminaisProps {
-  terminalId: string
+  /** Obrigatório em `mode: 'edit'`; omitido em `create`. */
+  terminalId?: string
+  mode?: 'create' | 'edit'
   isEmbedded?: boolean
   /** `id` do `<form>` para o rodapé do `JiffySidePanelModal` (botão Salvar externo) */
   embeddedFormId?: string
@@ -69,6 +71,19 @@ interface EditarTerminaisProps {
   /** Embutido: fechar o painel após "Salvar e fechar" com sucesso. */
   onCloseAfterSave?: () => void
 }
+
+/** Preferências padrão alinhadas ao CreateTerminalUseCase do backend. */
+const CREATE_DEFAULT_PREFS = {
+  compartilharMesas: true,
+  fiscalAtivo: true,
+  leitorHabilitado: false,
+  senhaNumeroMin: '1',
+  senhaNumeroMax: '1000',
+  senhaProximoNumero: '1',
+} as const
+
+/** Limite do validator do backend (`nome` max 20). */
+const NOME_TERMINAL_MAX = 20
 
 /** API imperativa — confirmação ao fechar o painel (`PADRAO_MODAL_SAIR_SEM_SALVAR`). */
 export interface EditarTerminaisHandle {
@@ -127,13 +142,13 @@ function formatSenhaNumeroFromApi(valor: number | undefined | null): string {
 }
 
 /**
- * Componente para editar terminal
- * Replica o design e funcionalidades do Flutter
+ * Formulário de criar/editar terminal (mesmas seções do Flutter / painel lateral).
  */
 export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminaisProps>(
   function EditarTerminais(
     {
       terminalId,
+      mode = 'edit',
       isEmbedded = false,
       embeddedFormId,
       onEmbedFormStateChange,
@@ -141,18 +156,32 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
       onCloseAfterSave,
     },
     ref
-  ) {  const formId = embeddedFormId ?? 'editar-terminal-form'
+  ) {
+  const isCreate = mode === 'create'
+  const formId = embeddedFormId ?? (isCreate ? 'novo-terminal-form' : 'editar-terminal-form')
 
   // Estados do formulário
   const [nomeTerminal, setNomeTerminal] = useState('')
   const [modeloDispositivo, setModeloDispositivo] = useState('')
   const [versaoApk, setVersaoApk] = useState('')
-  const [compartilhaValue, setCompartilhaValue] = useState(false)
-  const [fiscalAtivoValue, setFiscalAtivoValue] = useState(false)
-  const [leitorCodigoBarrasValue, setLeitorCodigoBarrasValue] = useState(false)
-  const [senhaNumeroMin, setSenhaNumeroMin] = useState('')
-  const [senhaNumeroMax, setSenhaNumeroMax] = useState('')
-  const [senhaProximoNumero, setSenhaProximoNumero] = useState('')
+  const [compartilhaValue, setCompartilhaValue] = useState(
+    isCreate ? CREATE_DEFAULT_PREFS.compartilharMesas : false
+  )
+  const [fiscalAtivoValue, setFiscalAtivoValue] = useState(
+    isCreate ? CREATE_DEFAULT_PREFS.fiscalAtivo : false
+  )
+  const [leitorCodigoBarrasValue, setLeitorCodigoBarrasValue] = useState(
+    isCreate ? CREATE_DEFAULT_PREFS.leitorHabilitado : false
+  )
+  const [senhaNumeroMin, setSenhaNumeroMin] = useState(
+    isCreate ? CREATE_DEFAULT_PREFS.senhaNumeroMin : ''
+  )
+  const [senhaNumeroMax, setSenhaNumeroMax] = useState(
+    isCreate ? CREATE_DEFAULT_PREFS.senhaNumeroMax : ''
+  )
+  const [senhaProximoNumero, setSenhaProximoNumero] = useState(
+    isCreate ? CREATE_DEFAULT_PREFS.senhaProximoNumero : ''
+  )
   const [impressoraSelecionadaId, setImpressoraSelecionadaId] = useState<string>('')
 
   // Estados de UI
@@ -262,7 +291,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
    */
   const loadTerminalDetails = useCallback(async () => {
     const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-    if (!token || !terminalId) {
+    if (!token || !terminalId || isCreate) {
       return
     }
 
@@ -296,14 +325,14 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
         commitBaselineLatestRef.current()
       }, 120)
     }
-  }, [ terminalId])
+  }, [terminalId, isCreate])
 
   /**
    * Carrega preferências do terminal
    */
   const loadTerminalPreferences = useCallback(async () => {
     const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-    if (!token || !terminalId) {
+    if (!token || !terminalId || isCreate) {
       return
     }
 
@@ -339,14 +368,20 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
       console.error('Erro ao carregar preferências:', error)
       showToast.error('Erro ao carregar preferências do terminal')
     }
-  }, [ terminalId])
+  }, [terminalId, isCreate])
 
   // Carrega dados quando o componente monta
   useEffect(() => {
-    loadAllImpressoras()
-    loadTerminalDetails()
-    loadTerminalPreferences()
-  }, [loadAllImpressoras, loadTerminalDetails, loadTerminalPreferences])
+    void loadAllImpressoras()
+    if (isCreate) {
+      window.setTimeout(() => {
+        commitBaselineLatestRef.current()
+      }, 120)
+      return
+    }
+    void loadTerminalDetails()
+    void loadTerminalPreferences()
+  }, [isCreate, loadAllImpressoras, loadTerminalDetails, loadTerminalPreferences])
 
   const emitEmbedFormState = useCallback(() => {
     onEmbedFormStateChange?.({
@@ -367,11 +402,35 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
       showToast.error('Nome do terminal é obrigatório')
       return false
     }
+    if (nomeTerminal.trim().length > NOME_TERMINAL_MAX) {
+      showToast.error(`Nome deve ter no máximo ${NOME_TERMINAL_MAX} caracteres`)
+      return false
+    }
     return true
   }
 
+  const buildPreferenciasFields = (): Record<string, unknown> => {
+    const fields: Record<string, unknown> = {
+      compartilharMesas: compartilhaValue,
+      fiscalAtivo: fiscalAtivoValue,
+      leitorHabilitado: leitorCodigoBarrasValue,
+    }
+    const min = parseSenhaNumeroInput(senhaNumeroMin)
+    const max = parseSenhaNumeroInput(senhaNumeroMax)
+    const proximo = parseSenhaNumeroInput(senhaProximoNumero)
+    if (min !== null) fields.senhaNumeroMin = min
+    if (max !== null) fields.senhaNumeroMax = max
+    if (proximo !== null) fields.senhaProximoNumero = proximo
+    if (impressoraSelecionadaId) {
+      fields.impressoraFinalizacaoId = impressoraSelecionadaId
+    } else if (isCreate) {
+      fields.impressoraFinalizacaoId = null
+    }
+    return fields
+  }
+
   /**
-   * Submete o formulário
+   * Submete o formulário (cria ou atualiza)
    */
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault()
@@ -391,60 +450,113 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
     setIsSubmitting(true)
 
     try {
-      // 1. Atualizar terminal primeiro
-      const terminalResponse = await fetchGestorApi(`/api/terminais/${terminalId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          nome: nomeTerminal,
-          modeloDispositivo,
-          versaoApk,
-          bloqueado: false, // Sempre false pois não temos switch de status aqui
-        }),
-      })
+      if (isCreate) {
+        const newId = crypto.randomUUID()
+        const createResponse = await fetchGestorApi(`/api/terminais`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            id: newId,
+            nome: nomeTerminal.trim(),
+            modeloDispositivo: 'GESTOR',
+            versaoApk: '0.0.0',
+          }),
+        })
 
-      if (!terminalResponse.ok) {
-        const errorData = await terminalResponse.json().catch(() => ({}))
-        throw new Error(errorData.error || 'Erro ao atualizar terminal')
+        if (!createResponse.ok) {
+          const errorData = await createResponse.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Erro ao cadastrar terminal')
+        }
+
+        // Backend já cria preferências padrão no CreateTerminalUseCase.
+        // Só atualiza se o usuário alterou algo no formulário.
+        const prefsChangedFromCreateDefaults =
+          compartilhaValue !== CREATE_DEFAULT_PREFS.compartilharMesas ||
+          fiscalAtivoValue !== CREATE_DEFAULT_PREFS.fiscalAtivo ||
+          leitorCodigoBarrasValue !== CREATE_DEFAULT_PREFS.leitorHabilitado ||
+          senhaNumeroMin !== CREATE_DEFAULT_PREFS.senhaNumeroMin ||
+          senhaNumeroMax !== CREATE_DEFAULT_PREFS.senhaNumeroMax ||
+          senhaProximoNumero !== CREATE_DEFAULT_PREFS.senhaProximoNumero ||
+          Boolean(impressoraSelecionadaId)
+
+        if (prefsChangedFromCreateDefaults) {
+          const preferencesResponse = await fetchGestorApi(`/api/preferencias-terminal`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              terminaisId: newId,
+              fields: buildPreferenciasFields(),
+            }),
+          })
+
+          if (!preferencesResponse.ok) {
+            // Terminal já existe — não deixar o usuário retentar e duplicar.
+            const errorData = await preferencesResponse.json().catch(() => ({}))
+            showToast.error(
+              errorData.error ||
+                'Terminal criado, mas falhou ao salvar preferências. Ajuste na edição.'
+            )
+            window.setTimeout(() => {
+              commitBaselineLatestRef.current()
+            }, 0)
+            onSaved?.()
+            if (isEmbedded && shouldClosePanel) {
+              onCloseAfterSave?.()
+            }
+            return
+          }
+        }
+
+        showToast.success('Terminal cadastrado com sucesso!')
+      } else {
+        if (!terminalId) {
+          throw new Error('ID do terminal não encontrado')
+        }
+
+        const terminalResponse = await fetchGestorApi(`/api/terminais/${terminalId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            nome: nomeTerminal,
+            modeloDispositivo,
+            versaoApk,
+            bloqueado: false,
+          }),
+        })
+
+        if (!terminalResponse.ok) {
+          const errorData = await terminalResponse.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Erro ao atualizar terminal')
+        }
+
+        const preferencesResponse = await fetchGestorApi(`/api/preferencias-terminal`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            terminaisId: terminalId,
+            fields: buildPreferenciasFields(),
+          }),
+        })
+
+        if (!preferencesResponse.ok) {
+          const errorData = await preferencesResponse.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Erro ao atualizar preferências')
+        }
+
+        showToast.success('Terminal atualizado com sucesso!')
       }
-
-      // 2. Atualizar preferências
-      const fields: Record<string, unknown> = {
-        compartilharMesas: compartilhaValue,
-        fiscalAtivo: fiscalAtivoValue,
-        leitorHabilitado: leitorCodigoBarrasValue,
-      }
-      const min = parseSenhaNumeroInput(senhaNumeroMin)
-      const max = parseSenhaNumeroInput(senhaNumeroMax)
-      const proximo = parseSenhaNumeroInput(senhaProximoNumero)
-      if (min !== null) fields.senhaNumeroMin = min
-      if (max !== null) fields.senhaNumeroMax = max
-      if (proximo !== null) fields.senhaProximoNumero = proximo
-      if (impressoraSelecionadaId) {
-        fields.impressoraFinalizacaoId = impressoraSelecionadaId
-      }
-
-      const preferencesResponse = await fetchGestorApi(`/api/preferencias-terminal`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          terminaisId: terminalId,
-          fields,
-        }),
-      })
-
-      if (!preferencesResponse.ok) {
-        const errorData = await preferencesResponse.json().catch(() => ({}))
-        throw new Error(errorData.error || 'Erro ao atualizar preferências')
-      }
-
-      showToast.success('Terminal atualizado com sucesso!')
 
       window.setTimeout(() => {
         commitBaselineLatestRef.current()
@@ -459,8 +571,13 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
         onSaved?.()
       }
     } catch (error: unknown) {
-      console.error('Erro ao atualizar terminal:', error)
-      const msg = error instanceof Error ? error.message : 'Erro ao atualizar terminal'
+      console.error(isCreate ? 'Erro ao cadastrar terminal:' : 'Erro ao atualizar terminal:', error)
+      const msg =
+        error instanceof Error
+          ? error.message
+          : isCreate
+            ? 'Erro ao cadastrar terminal'
+            : 'Erro ao atualizar terminal'
       showToast.error(msg)
     } finally {
       setIsSubmitting(false)
@@ -534,10 +651,13 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                 <Input
                   label="Nome do Terminal"
                   value={nomeTerminal}
-                  onChange={e => setNomeTerminal(maiusculasPt(e.target.value))}
+                  onChange={e =>
+                    setNomeTerminal(maiusculasPt(e.target.value).slice(0, NOME_TERMINAL_MAX))
+                  }
                   placeholder="Digite o nome do Terminal"
                   size="small"
                   required
+                  inputProps={{ maxLength: NOME_TERMINAL_MAX }}
                   className="bg-info"
                   sx={sxEntradaTerminal}
                   InputLabelProps={{ required: true }}
@@ -546,18 +666,18 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                 <div className="flex flex-col gap-6 md:flex-row">
                   <Input
                     label="Modelo do Dispositivo"
-                    value={modeloDispositivo}
+                    value={isCreate ? '' : modeloDispositivo}
                     disabled
-                    placeholder="—"
+                    placeholder={isCreate ? 'Definido no 1º login do PDV' : '—'}
                     size="small"
                     className="bg-info flex-1"
                     sx={sxEntradaTerminal}
                   />
                   <Input
                     label="Versão APK"
-                    value={versaoApk}
+                    value={isCreate ? '' : versaoApk}
                     disabled
-                    placeholder="—"
+                    placeholder={isCreate ? 'Definido no 1º login do PDV' : '—'}
                     size="small"
                     className="bg-info flex-1"
                     sx={sxEntradaTerminal}
@@ -757,7 +877,13 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
                   backgroundColor: 'var(--color-primary)',
                 }}
               >
-                {isSubmitting ? 'Salvando...' : 'Salvar'}
+                {isSubmitting
+                  ? isCreate
+                    ? 'Cadastrando...'
+                    : 'Salvando...'
+                  : isCreate
+                    ? 'Cadastrar'
+                    : 'Salvar'}
               </Button>
             </div>
           ) : null}

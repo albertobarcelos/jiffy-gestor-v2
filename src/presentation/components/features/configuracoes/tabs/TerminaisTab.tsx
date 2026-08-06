@@ -71,7 +71,8 @@ function resolvePreferencesForTerminal(
   return map[terminalId] ?? DEFAULT_TERMINAL_PREFERENCES
 }
 
-export function TerminaisTab() {  const [terminais, setTerminais] = useState<TerminalData[]>([])
+export function TerminaisTab() {
+  const [terminais, setTerminais] = useState<TerminalData[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [totalItems, setTotalItems] = useState(0)
@@ -766,7 +767,7 @@ export function TerminaisTab() {  const [terminais, setTerminais] = useState<Te
     <div className="flex flex-col h-full overflow-hidden py-1">
       {/* Header fixo */}
       <div className="md:px-6 px-1 flex-shrink-0">
-        <div className="flex items-center justify-between border-b-2 border-primary/70 pb-2">
+        <div className="flex items-start justify-between border-b-2 border-primary/70 pb-2">
           <div className="flex flex-col">
             <span className="text-primary text-lg md:text-xl font-semibold ">
               Terminais Cadastrados
@@ -776,7 +777,21 @@ export function TerminaisTab() {  const [terminais, setTerminais] = useState<Te
               {totalItems > 0 ? ` de ${terminaisFiltrados.length}` : ''}
             </span>
           </div>
-          
+          <button
+            type="button"
+            onClick={() =>
+              setTabsModalState({
+                open: true,
+                tab: 'terminal',
+                mode: 'create',
+                terminalId: undefined,
+              })
+            }
+            className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+          >
+            Novo
+            <span className="text-lg">+</span>
+          </button>
         </div>
       </div>
 
@@ -841,9 +856,24 @@ export function TerminaisTab() {  const [terminais, setTerminais] = useState<Te
             <p className="text-primary-text font-semibold text-lg mb-2">
               Nenhum terminal cadastrado
             </p>
-            <p className="text-secondary-text text-sm text-center max-w-md">
+            <p className="text-secondary-text text-sm text-center max-w-md mb-4">
               Não há terminais cadastrados no sistema. Cadastre um terminal para começar a utilizá-lo.
             </p>
+            <button
+              type="button"
+              onClick={() =>
+                setTabsModalState({
+                  open: true,
+                  tab: 'terminal',
+                  mode: 'create',
+                  terminalId: undefined,
+                })
+              }
+              className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+            >
+              Novo
+              <span className="text-lg">+</span>
+            </button>
           </div>
         )}
 
