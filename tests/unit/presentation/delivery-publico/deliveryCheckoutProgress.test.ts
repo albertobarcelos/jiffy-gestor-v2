@@ -64,6 +64,24 @@ describe('deliveryCheckoutProgress', () => {
     expect(progress?.percentage).toBe(100)
   })
 
+  it('omite progresso no step de sucesso', () => {
+    expect(
+      calculateDeliveryCheckoutProgress({
+        checkoutStep: 'sucesso',
+        tipoEntrega: 'entrega',
+      })
+    ).toBeNull()
+  })
+
+  it('omite progresso no step de detalhes do pedido', () => {
+    expect(
+      calculateDeliveryCheckoutProgress({
+        checkoutStep: 'pedidoDetalhe',
+        tipoEntrega: 'retirada',
+      })
+    ).toBeNull()
+  })
+
   it('valida nome e sobrenome', () => {
     expect(isNomeCompletoCheckoutValido('Andre')).toBe(false)
     expect(isNomeCompletoCheckoutValido('Andre Silva')).toBe(true)

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CheckoutFormData } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
+import type { CreatePedidoPublicoResponseDTO } from '@/src/application/dto/delivery-publico/CreatePedidoPublicoResponseDTO'
 import type { ClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { normalizarClienteDeliveryPublico } from '@/src/application/mappers/ClienteDeliveryPublicoMapper'
 import { enviarPedidoPublicoUseCase } from '@/src/application/use-cases/delivery-publico/EnviarPedidoPublicoUseCase'
@@ -490,17 +491,19 @@ export function useDeliveryCheckout(slug: string) {
     return enderecoId
   }, [resolveTelefoneApi])
 
-  const enviarPedido = useCallback(async (): Promise<boolean> => {
+  const enviarPedido = useCallback(async (): Promise<
+    { ok: true; pedido: CreatePedidoPublicoResponseDTO } | { ok: false }
+  > => {
     const tel = resolveTelefoneApi(form)
     telefoneDigitsRef.current = tel
     if (tel.length < 8) {
       showToast.error('Informe um telefone válido')
-      return false
+      return { ok: false }
     }
 
     if (itens.length === 0) {
       showToast.error('Carrinho vazio')
-      return false
+      return { ok: false }
     }
 
     const nomeEfetivo =
@@ -520,7 +523,7 @@ export function useDeliveryCheckout(slug: string) {
 
       if (!resultado.ok) {
         showToast.error(resultado.error)
-        return false
+        return { ok: false }
       }
 
       if (resultado.clienteAtualizado) {
@@ -534,12 +537,11 @@ export function useDeliveryCheckout(slug: string) {
       }
 
       limpar(slug)
-      showToast.success('Pedido enviado com sucesso!')
-      return true
+      return { ok: true, pedido: resultado.pedido }
     } catch (error) {
       console.error(error)
       showToast.error(error instanceof Error ? error.message : 'Erro ao enviar pedido')
-      return false
+      return { ok: false }
     } finally {
       setEnviando(false)
     }

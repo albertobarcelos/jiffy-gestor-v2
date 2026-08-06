@@ -2,10 +2,12 @@ import type {
   AtualizarClienteDeliveryPublicoInput,
   ClienteDeliveryPublicoDTO,
   CreatePedidoPublicoInput,
+  CreatePedidoPublicoResponseDTO,
   CriarClienteDeliveryPublicoInput,
   GetCatalogoPublicoResponseDTO,
   GetMeiosPagamentoPublicosResponseDTO,
 } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import { parseCreatePedidoPublicoResponse } from '@/src/application/dto/delivery-publico/CreatePedidoPublicoResponseDTO'
 
 export class PublicDeliveryApiError extends Error {
   constructor(
@@ -76,7 +78,7 @@ export async function fetchMeiosPagamentoPublicos(
 
 export async function criarPedidoPublico(
   input: CreatePedidoPublicoInput
-): Promise<unknown> {
+): Promise<CreatePedidoPublicoResponseDTO> {
   const res = await fetch('/api/public/delivery/pedidos', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -85,7 +87,7 @@ export async function criarPedidoPublico(
   if (!res.ok) {
     throw new PublicDeliveryApiError(await parseErrorMessage(res), res.status)
   }
-  return res.json()
+  return parseCreatePedidoPublicoResponse(await res.json())
 }
 
 /**

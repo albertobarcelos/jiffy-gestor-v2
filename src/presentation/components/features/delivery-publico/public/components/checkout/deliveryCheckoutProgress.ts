@@ -4,6 +4,8 @@ export type DeliveryCheckoutStep =
   | 'enderecoForm'
   | 'pagamento'
   | 'revisao'
+  | 'sucesso'
+  | 'pedidoDetalhe'
   | null
 
 export type DeliveryCheckoutProgress = {
@@ -52,6 +54,9 @@ const STEP_TO_LOGICAL_STEP: Record<Exclude<DeliveryCheckoutStep, null>, LogicalC
   enderecoForm: 'endereco',
   pagamento: 'pagamento',
   revisao: 'revisao',
+  /** Terminal — progresso é omitido em `calculateDeliveryCheckoutProgress`. */
+  sucesso: 'revisao',
+  pedidoDetalhe: 'revisao',
 }
 
 /** Nome + sobrenome: ao menos 3 chars e duas palavras separadas por espaço. */
@@ -91,6 +96,8 @@ export function calculateDeliveryCheckoutProgress({
   identificacaoCompleta = false,
 }: CalculateDeliveryCheckoutProgressParams): DeliveryCheckoutProgress | null {
   if (!checkoutStep) return null
+  // Telas pós-envio: sem anel de progresso (pedido já concluído).
+  if (checkoutStep === 'sucesso' || checkoutStep === 'pedidoDetalhe') return null
 
   const path = buildDeliveryCheckoutPath(tipoEntrega)
   const logicalStep = STEP_TO_LOGICAL_STEP[checkoutStep]

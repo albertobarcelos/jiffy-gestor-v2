@@ -27,6 +27,8 @@ import {
 } from './DeliveryCheckoutShell'
 
 type DeliveryCheckoutRevisaoModalProps = {
+  /** `somenteLeitura` = pós-confirmação (sem editar / sem enviar). */
+  modo?: 'edicao' | 'somenteLeitura'
   tipoEntrega: DeliveryTipoEntrega
   nome: string
   telefone: string
@@ -42,17 +44,19 @@ type DeliveryCheckoutRevisaoModalProps = {
   }>
   observacaoPedido: string
   cpfNotaFiscal: string
-  enviando: boolean
-  onClose: () => void
+  enviando?: boolean
+  onClose?: () => void
   onVoltar: () => void
-  onEditarTipoEntrega: () => void
-  onEditarCliente: () => void
-  onEditarEndereco: () => void
-  onEditarPedido: () => void
-  onEditarPagamento: () => void
-  onChangeObservacaoPedido: (value: string) => void
-  onChangeCpfNotaFiscal: (value: string) => void
-  onEnviar: () => void
+  onEditarTipoEntrega?: () => void
+  onEditarCliente?: () => void
+  onEditarEndereco?: () => void
+  onEditarPedido?: () => void
+  onEditarPagamento?: () => void
+  onChangeObservacaoPedido?: (value: string) => void
+  onChangeCpfNotaFiscal?: (value: string) => void
+  onEnviar?: () => void
+  /** Exibido no header em modo leitura (ex.: código do pedido). */
+  codigoVenda?: string | null
 }
 
 function IconeCaixa({ children }: { children: ReactNode }) {
@@ -127,6 +131,7 @@ function ProdutoThumb({ imagemUrl, nome }: { imagemUrl: string | null; nome: str
 }
 
 export function DeliveryCheckoutRevisaoModal({
+  modo = 'edicao',
   tipoEntrega,
   nome,
   telefone,
@@ -138,7 +143,7 @@ export function DeliveryCheckoutRevisaoModal({
   pagamentos,
   observacaoPedido,
   cpfNotaFiscal,
-  enviando,
+  enviando = false,
   onClose: _onClose,
   onVoltar,
   onEditarTipoEntrega,
@@ -149,7 +154,9 @@ export function DeliveryCheckoutRevisaoModal({
   onChangeObservacaoPedido,
   onChangeCpfNotaFiscal,
   onEnviar,
+  codigoVenda = null,
 }: DeliveryCheckoutRevisaoModalProps) {
+  const somenteLeitura = modo === 'somenteLeitura'
   const [adicionarObservacao, setAdicionarObservacao] = useState(
     () => observacaoPedido.trim().length > 0
   )
@@ -171,8 +178,11 @@ export function DeliveryCheckoutRevisaoModal({
   const primeiroMeioNome = pagamentos[0]?.meio?.nome ?? ''
   const IconePagamento = obterIconeMeioPagamento(primeiroMeioNome)
   const isEntrega = tipoEntrega === 'entrega'
+  const observacaoTrim = observacaoPedido.trim()
+  const cpfTrim = cpfNotaFiscal.replace(/\D/g, '')
 
   const handleToggleObservacao = (checked: boolean) => {
+    if (somenteLeitura || !onChangeObservacaoPedido) return
     setAdicionarObservacao(checked)
     if (!checked) {
       onChangeObservacaoPedido('')
@@ -180,6 +190,7 @@ export function DeliveryCheckoutRevisaoModal({
   }
 
   const handleToggleNotaFiscal = (checked: boolean) => {
+    if (somenteLeitura || !onChangeCpfNotaFiscal) return
     setDesejaNotaFiscal(checked)
     if (!checked) {
       onChangeCpfNotaFiscal('')
@@ -187,6 +198,7 @@ export function DeliveryCheckoutRevisaoModal({
   }
 
   const handleCpfChange = (raw: string) => {
+    if (somenteLeitura || !onChangeCpfNotaFiscal) return
     const apenasDigitos = raw.replace(/\D/g, '').slice(0, 11)
     onChangeCpfNotaFiscal(formatarCpfCnpjInput(apenasDigitos))
   }
@@ -194,21 +206,46 @@ export function DeliveryCheckoutRevisaoModal({
   return (
     <>
       <DeliveryCheckoutShellHeader
-        title="Revise seu pedido"
+        title={somenteLeitura ? 'Detalhes do pedido' : 'Revise seu pedido'}
         showBack
         onBack={onVoltar}
         headerTone="dark"
       />
       <DeliveryCheckoutShellFooter>
-        <DeliveryCheckoutFooterActions
-          onVoltar={onVoltar}
-          onContinuar={onEnviar}
-          continuarDisabled={enviando}
-          continuarLabel={enviando ? 'Enviando...' : 'Enviar pedido'}
-        />
+        {somenteLeitura ? (
+          <div
+            className="px-4 pt-3"
+            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+          >
+            <button
+              type="button"
+              onClick={onVoltar}
+              className="flex min-h-[3rem] w-full items-center justify-center rounded-xl bg-black text-base font-semibold text-white"
+            >
+              Voltar
+            </button>
+          </div>
+        ) : (
+          <DeliveryCheckoutFooterActions
+            onVoltar={onVoltar}
+            onContinuar={() => onEnviar?.()}
+            continuarDisabled={enviando}
+            continuarLabel={enviando ? 'Enviando...' : 'Enviar pedido'}
+          />
+        )}
       </DeliveryCheckoutShellFooter>
 
       <div>
+        {somenteLeitura && codigoVenda ? (
+          <div
+            className="mb-1 border-b pb-3"
+            style={{ borderColor: 'var(--delivery-border)' }}
+          >
+            <p className="text-xs delivery-text-secondary">Código do pedido</p>
+            <p className="text-base font-semibold delivery-text-primary">{codigoVenda}</p>
+          </div>
+        ) : null}
+
         <LinhaSecao
           icone={
             isEntrega ? (
@@ -218,7 +255,7 @@ export function DeliveryCheckoutRevisaoModal({
             )
           }
           label="Tipo de Pedido:"
-          onEditar={onEditarTipoEntrega}
+          onEditar={somenteLeitura ? undefined : onEditarTipoEntrega}
           editLabel="Editar tipo de pedido"
         >
           <p className="text-sm font-semibold delivery-text-primary">
@@ -229,7 +266,7 @@ export function DeliveryCheckoutRevisaoModal({
         <LinhaSecao
           icone={<UserRound className="h-5 w-5 text-black" />}
           label={isEntrega ? 'Entregue a:' : 'Pedido de:'}
-          onEditar={onEditarCliente}
+          onEditar={somenteLeitura ? undefined : onEditarCliente}
           editLabel="Editar cliente"
         >
           <p className="text-sm font-semibold delivery-text-primary">{nomeExibicao}</p>
@@ -239,7 +276,7 @@ export function DeliveryCheckoutRevisaoModal({
         <LinhaSecao
           icone={<MapPin className="h-5 w-5 text-black" />}
           label={isEntrega ? 'Seu endereço:' : 'Retirada no local:'}
-          onEditar={isEntrega ? onEditarEndereco : undefined}
+          onEditar={somenteLeitura || !isEntrega ? undefined : onEditarEndereco}
           editLabel="Editar endereço"
         >
           {isEntrega && enderecoCliente ? (
@@ -270,7 +307,7 @@ export function DeliveryCheckoutRevisaoModal({
         <LinhaSecao
           icone={<IconePagamento className="h-5 w-5 text-black" />}
           label="Pagamento:"
-          onEditar={onEditarPagamento}
+          onEditar={somenteLeitura ? undefined : onEditarPagamento}
           editLabel="Editar pagamento"
         >
           {pagamentos.length === 0 ? (
@@ -304,7 +341,9 @@ export function DeliveryCheckoutRevisaoModal({
           style={{ borderColor: 'var(--delivery-border)' }}
         >
           <h3 className="text-sm font-semibold delivery-text-primary">Seu pedido</h3>
-          <BotaoEditarLapiz onClick={onEditarPedido} label="Editar pedido" />
+          {!somenteLeitura && onEditarPedido ? (
+            <BotaoEditarLapiz onClick={onEditarPedido} label="Editar pedido" />
+          ) : null}
         </div>
 
         <ul>
@@ -358,134 +397,159 @@ export function DeliveryCheckoutRevisaoModal({
           })}
         </ul>
 
-        <div
-          className="space-y-3 border-b py-3"
-          style={{ borderColor: 'var(--delivery-border)' }}
-        >
+        {somenteLeitura ? (
           <div
-            className="flex items-center justify-between gap-3 rounded-xl px-3 py-2"
-            style={{ backgroundColor: '#000000', color: '#ffffff' }}
+            className="space-y-3 border-b py-3"
+            style={{ borderColor: 'var(--delivery-border)' }}
           >
-            <span className="min-w-0 text-sm font-medium text-white">
-              Deseja adicionar observação?
-            </span>
-            <div
-              className="flex shrink-0 rounded-full p-0.5"
-              style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)' }}
-              role="group"
-              aria-label="Adicionar observação"
-            >
-              <button
-                type="button"
-                onClick={() => handleToggleObservacao(true)}
-                aria-pressed={adicionarObservacao}
-                className="min-w-[3.25rem] rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors"
-                style={
-                  adicionarObservacao
-                    ? { backgroundColor: '#ffffff', color: '#000000' }
-                    : { backgroundColor: 'transparent', color: '#ffffff' }
-                }
-              >
-                Sim
-              </button>
-              <button
-                type="button"
-                onClick={() => handleToggleObservacao(false)}
-                aria-pressed={!adicionarObservacao}
-                className="min-w-[3.25rem] rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors"
-                style={
-                  !adicionarObservacao
-                    ? { backgroundColor: '#ffffff', color: '#000000' }
-                    : { backgroundColor: 'transparent', color: '#ffffff' }
-                }
-              >
-                Não
-              </button>
-            </div>
+            {observacaoTrim ? (
+              <div>
+                <p className="text-xs delivery-text-secondary">Observação</p>
+                <p className="mt-0.5 text-sm delivery-text-primary">{observacaoTrim}</p>
+              </div>
+            ) : null}
+            {cpfTrim.length === 11 ? (
+              <div>
+                <p className="text-xs delivery-text-secondary">CPF na nota fiscal</p>
+                <p className="mt-0.5 text-sm delivery-text-primary">
+                  {formatarCpfCnpjInput(cpfTrim)}
+                </p>
+              </div>
+            ) : null}
           </div>
-
-          {adicionarObservacao ? (
-            <div className="space-y-2">
-              <textarea
-                className="min-h-[110px] w-full resize-y rounded-xl border bg-transparent px-3 py-3 text-base outline-none delivery-text-primary"
-                style={{ borderColor: 'var(--delivery-border)' }}
-                placeholder="Ex.: sem cebola, tocar a campainha, etc."
-                value={observacaoPedido}
-                onChange={e => onChangeObservacaoPedido(e.target.value)}
-                maxLength={500}
-                rows={4}
-              />
-              <p className="text-right text-[11px] delivery-text-secondary">
-                {observacaoPedido.length}/500
-              </p>
-            </div>
-          ) : null}
-
+        ) : (
           <div
-            className="flex items-center justify-between gap-3 rounded-xl px-3 py-2"
-            style={{ backgroundColor: '#000000', color: '#ffffff' }}
+            className="space-y-3 border-b py-3"
+            style={{ borderColor: 'var(--delivery-border)' }}
           >
-            <span className="min-w-0 text-sm font-medium text-white">
-              Deseja Nota fiscal?
-            </span>
             <div
-              className="flex shrink-0 rounded-full p-0.5"
-              style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)' }}
-              role="group"
-              aria-label="Deseja nota fiscal"
+              className="flex items-center justify-between gap-3 rounded-xl px-3 py-2"
+              style={{ backgroundColor: '#000000', color: '#ffffff' }}
             >
-              <button
-                type="button"
-                onClick={() => handleToggleNotaFiscal(true)}
-                aria-pressed={desejaNotaFiscal}
-                className="min-w-[3.25rem] rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors"
-                style={
-                  desejaNotaFiscal
-                    ? { backgroundColor: '#ffffff', color: '#000000' }
-                    : { backgroundColor: 'transparent', color: '#ffffff' }
-                }
+              <span className="min-w-0 text-sm font-medium text-white">
+                Deseja adicionar observação?
+              </span>
+              <div
+                className="flex shrink-0 rounded-full p-0.5"
+                style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)' }}
+                role="group"
+                aria-label="Adicionar observação"
               >
-                Sim
-              </button>
-              <button
-                type="button"
-                onClick={() => handleToggleNotaFiscal(false)}
-                aria-pressed={!desejaNotaFiscal}
-                className="min-w-[3.25rem] rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors"
-                style={
-                  !desejaNotaFiscal
-                    ? { backgroundColor: '#ffffff', color: '#000000' }
-                    : { backgroundColor: 'transparent', color: '#ffffff' }
-                }
-              >
-                Não
-              </button>
+                <button
+                  type="button"
+                  onClick={() => handleToggleObservacao(true)}
+                  aria-pressed={adicionarObservacao}
+                  className="min-w-[3.25rem] rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors"
+                  style={
+                    adicionarObservacao
+                      ? { backgroundColor: '#ffffff', color: '#000000' }
+                      : { backgroundColor: 'transparent', color: '#ffffff' }
+                  }
+                >
+                  Sim
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleToggleObservacao(false)}
+                  aria-pressed={!adicionarObservacao}
+                  className="min-w-[3.25rem] rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors"
+                  style={
+                    !adicionarObservacao
+                      ? { backgroundColor: '#ffffff', color: '#000000' }
+                      : { backgroundColor: 'transparent', color: '#ffffff' }
+                  }
+                >
+                  Não
+                </button>
+              </div>
             </div>
-          </div>
 
-          {desejaNotaFiscal ? (
-            <div className="space-y-2">
-              <label className="block text-sm font-medium delivery-text-primary" htmlFor="cpf-nota-fiscal">
-                CPF
-              </label>
-              <input
-                id="cpf-nota-fiscal"
-                className="w-full rounded-xl border bg-transparent px-3 py-3 text-base outline-none delivery-text-primary"
-                style={{ borderColor: 'var(--delivery-border)' }}
-                inputMode="numeric"
-                autoComplete="off"
-                placeholder="000.000.000-00"
-                value={cpfNotaFiscal}
-                onChange={e => handleCpfChange(e.target.value)}
-                maxLength={14}
-                aria-label="CPF para nota fiscal"
-              />
-              <p className="text-right text-[11px] delivery-text-secondary">
-                {cpfNotaFiscal.replace(/\D/g, '').length}/11
-              </p>
+            {adicionarObservacao ? (
+              <div className="space-y-2">
+                <textarea
+                  className="min-h-[110px] w-full resize-y rounded-xl border bg-transparent px-3 py-3 text-base outline-none delivery-text-primary"
+                  style={{ borderColor: 'var(--delivery-border)' }}
+                  placeholder="Ex.: sem cebola, tocar a campainha, etc."
+                  value={observacaoPedido}
+                  onChange={e => onChangeObservacaoPedido?.(e.target.value)}
+                  maxLength={500}
+                  rows={4}
+                />
+                <p className="text-right text-[11px] delivery-text-secondary">
+                  {observacaoPedido.length}/500
+                </p>
+              </div>
+            ) : null}
+
+            <div
+              className="flex items-center justify-between gap-3 rounded-xl px-3 py-2"
+              style={{ backgroundColor: '#000000', color: '#ffffff' }}
+            >
+              <span className="min-w-0 text-sm font-medium text-white">
+                Deseja Nota fiscal?
+              </span>
+              <div
+                className="flex shrink-0 rounded-full p-0.5"
+                style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)' }}
+                role="group"
+                aria-label="Deseja nota fiscal"
+              >
+                <button
+                  type="button"
+                  onClick={() => handleToggleNotaFiscal(true)}
+                  aria-pressed={desejaNotaFiscal}
+                  className="min-w-[3.25rem] rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors"
+                  style={
+                    desejaNotaFiscal
+                      ? { backgroundColor: '#ffffff', color: '#000000' }
+                      : { backgroundColor: 'transparent', color: '#ffffff' }
+                  }
+                >
+                  Sim
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleToggleNotaFiscal(false)}
+                  aria-pressed={!desejaNotaFiscal}
+                  className="min-w-[3.25rem] rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors"
+                  style={
+                    !desejaNotaFiscal
+                      ? { backgroundColor: '#ffffff', color: '#000000' }
+                      : { backgroundColor: 'transparent', color: '#ffffff' }
+                  }
+                >
+                  Não
+                </button>
+              </div>
             </div>
-          ) : null}
-        </div>
+
+            {desejaNotaFiscal ? (
+              <div className="space-y-2">
+                <label
+                  className="block text-sm font-medium delivery-text-primary"
+                  htmlFor="cpf-nota-fiscal"
+                >
+                  CPF
+                </label>
+                <input
+                  id="cpf-nota-fiscal"
+                  className="w-full rounded-xl border bg-transparent px-3 py-3 text-base outline-none delivery-text-primary"
+                  style={{ borderColor: 'var(--delivery-border)' }}
+                  inputMode="numeric"
+                  autoComplete="off"
+                  placeholder="000.000.000-00"
+                  value={cpfNotaFiscal}
+                  onChange={e => handleCpfChange(e.target.value)}
+                  maxLength={14}
+                  aria-label="CPF para nota fiscal"
+                />
+                <p className="text-right text-[11px] delivery-text-secondary">
+                  {cpfNotaFiscal.replace(/\D/g, '').length}/11
+                </p>
+              </div>
+            ) : null}
+          </div>
+        )}
 
         <div className="space-y-2 pt-3">
           <div className="flex items-center justify-between text-sm">

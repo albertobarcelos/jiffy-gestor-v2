@@ -19,6 +19,11 @@ import {
   useDeliveryCarrinhoStore,
   type DeliveryCarrinhoItem,
 } from '../../shared/stores/deliveryCarrinhoStore'
+import {
+  mapPedidoPublicoCriadoParaConfirmado,
+  type PedidoPublicoConfirmadoSnapshot,
+} from '@/src/application/mappers/PedidoPublicoConfirmadoMapper'
+import { DELIVERY_PAIS_TELEFONE_PADRAO } from '../../shared/constants/deliveryPaisesTelefone'
 import { findCatalogoProdutoById } from '../../shared/utils/findCatalogoProdutoById'
 import { itemSemComplemento } from '../../shared/utils/deliveryCarrinhoItemUtils'
 import { formatEmpresaPublicaEndereco } from '../../shared/utils/formatEmpresaPublicaEndereco'
@@ -31,6 +36,7 @@ import { DeliveryCheckoutEnderecoFormModal } from '../components/checkout/Delive
 import type { ModoEntregaOpcao } from '../components/checkout/DeliveryCheckoutTipoEntregaOpcoes'
 import { DeliveryCheckoutPagamentoModal } from '../components/checkout/DeliveryCheckoutPagamentoModal'
 import { DeliveryCheckoutRevisaoModal } from '../components/checkout/DeliveryCheckoutRevisaoModal'
+import { DeliveryCheckoutSucessoModal } from '../components/checkout/DeliveryCheckoutSucessoModal'
 import { DeliveryCheckoutProgressProvider } from '../components/checkout/DeliveryCheckoutProgressContext'
 import {
   DeliveryCheckoutShell,
@@ -66,6 +72,8 @@ export function DeliveryPublicoCarrinhoScreen({
   const [voltarParaIdentificacao, setVoltarParaIdentificacao] = useState(false)
   const [aberto, setAberto] = useState(true)
   const [removingIds, setRemovingIds] = useState<Set<string>>(() => new Set())
+  const [pedidoConfirmado, setPedidoConfirmado] =
+    useState<PedidoPublicoConfirmadoSnapshot | null>(null)
 
   const requestClose = () => setAberto(false)
 
@@ -261,11 +269,40 @@ export function DeliveryPublicoCarrinhoScreen({
     catalogQuery.hasNextPage,
   ])
 
-  const handleEnviarPedido = async () => {
-    const enviado = await enviarPedido()
-    if (!enviado) return
+  const concluirAposSucesso = () => {
+    setPedidoConfirmado(null)
     fecharCheckout()
     requestClose()
+  }
+
+  const handleEnviarPedido = async () => {
+    // Fallback local capturado antes do limpar do carrinho no use case.
+    const fallback = {
+      tipoEntrega: form.tipoEntrega,
+      modoTempo: form.modoTempo,
+      nome: nomeClienteExibicao,
+      telefone: form.telefone,
+      telefonePaisIso2: form.telefonePaisIso2 || DELIVERY_PAIS_TELEFONE_PADRAO,
+      enderecoCliente: enderecoParaRevisao,
+      enderecoEmpresaTexto,
+      itensCarrinho: itens.map(item => ({
+        ...item,
+        complementos: [...item.complementos],
+      })),
+      total,
+      pagamentos: pagamentosRevisao.map(p => ({ ...p })),
+      observacaoPedido: form.observacaoPedido,
+      cpfNotaFiscal: form.cpfNotaFiscal,
+      meiosPagamento,
+    }
+
+    const resultado = await enviarPedido()
+    if (!resultado.ok) return
+
+    setPedidoConfirmado(mapPedidoPublicoCriadoParaConfirmado(resultado.pedido, fallback))
+    setVoltarParaRevisao(false)
+    setVoltarParaIdentificacao(false)
+    goToCheckoutStep('sucesso')
   }
 
   const voltar = () => requestClose()
@@ -542,7 +579,15 @@ export function DeliveryPublicoCarrinhoScreen({
         open={checkoutStep != null}
         stepKey={checkoutStep ?? 'telefone'}
         direction={checkoutDirection}
-        onClose={checkoutStep === 'revisao' ? fecharCheckout : fecharOuRevisao}
+        onClose={
+          checkoutStep === 'sucesso'
+            ? concluirAposSucesso
+            : checkoutStep === 'pedidoDetalhe'
+              ? () => goToCheckoutStep('sucesso')
+              : checkoutStep === 'revisao'
+                ? fecharCheckout
+                : fecharOuRevisao
+        }
       >
         {checkoutStep === 'telefone' ? (
           <DeliveryCheckoutIdentifiqueSeModal
@@ -640,6 +685,40 @@ export function DeliveryPublicoCarrinhoScreen({
             onChangeObservacaoPedido={value => updateForm('observacaoPedido', value)}
             onChangeCpfNotaFiscal={value => updateForm('cpfNotaFiscal', value)}
             onEnviar={() => void handleEnviarPedido()}
+          />
+        ) : null}
+
+        {checkoutStep === 'sucesso' && pedidoConfirmado ? (
+          <DeliveryCheckoutSucessoModal
+            nomeCliente={pedidoConfirmado.nome}
+            tipoEntrega={pedidoConfirmado.tipoEntrega}
+            modoTempo={pedidoConfirmado.modoTempo}
+            enderecoCliente={pedidoConfirmado.enderecoCliente}
+            enderecoEmpresaTexto={pedidoConfirmado.enderecoEmpresaTexto}
+            telefoneEmpresa={empresa?.telefone ?? null}
+            nomeEmpresa={empresa?.nomeFantasia ?? null}
+            codigoVenda={pedidoConfirmado.codigoVenda}
+            onVerPedido={() => goToCheckoutStep('pedidoDetalhe')}
+            onVoltarAoCardapio={concluirAposSucesso}
+          />
+        ) : null}
+
+        {checkoutStep === 'pedidoDetalhe' && pedidoConfirmado ? (
+          <DeliveryCheckoutRevisaoModal
+            modo="somenteLeitura"
+            tipoEntrega={pedidoConfirmado.tipoEntrega}
+            nome={pedidoConfirmado.nome}
+            telefone={pedidoConfirmado.telefone}
+            telefonePaisIso2={pedidoConfirmado.telefonePaisIso2}
+            enderecoCliente={pedidoConfirmado.enderecoCliente}
+            enderecoEmpresaTexto={pedidoConfirmado.enderecoEmpresaTexto}
+            itens={pedidoConfirmado.itens}
+            total={pedidoConfirmado.total}
+            pagamentos={pedidoConfirmado.pagamentos}
+            observacaoPedido={pedidoConfirmado.observacaoPedido}
+            cpfNotaFiscal={pedidoConfirmado.cpfNotaFiscal}
+            codigoVenda={pedidoConfirmado.codigoVenda}
+            onVoltar={() => goToCheckoutStep('sucesso')}
           />
         ) : null}
       </DeliveryCheckoutShell>

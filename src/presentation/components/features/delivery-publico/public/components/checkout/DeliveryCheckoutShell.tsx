@@ -11,6 +11,7 @@ import {
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
+  CheckCircle2,
   ClipboardCheck,
   DollarSign,
   MapPin,
@@ -42,6 +43,8 @@ const STEP_ICONS: Record<Exclude<DeliveryCheckoutStep, null>, LucideIcon> = {
   enderecoForm: MapPin,
   pagamento: DollarSign,
   revisao: ClipboardCheck,
+  sucesso: CheckCircle2,
+  pedidoDetalhe: ClipboardCheck,
 }
 
 const SLIDE_TRANSITION = { duration: 0.32, ease: [0.22, 1, 0.36, 1] as const }
@@ -53,6 +56,8 @@ export const DELIVERY_CHECKOUT_STEP_ORDER: Exclude<DeliveryCheckoutStep, null>[]
   'enderecoForm',
   'pagamento',
   'revisao',
+  'sucesso',
+  'pedidoDetalhe',
 ]
 
 export function getCheckoutSlideDirection(
@@ -221,8 +226,12 @@ export function DeliveryCheckoutShell({
                   isDarkHeader ? 'py-2' : 'py-3'
                 }`}
                 style={{
-                  borderColor: isDarkHeader ? '#000000' : 'var(--delivery-border)',
-                  backgroundColor: isDarkHeader ? '#000000' : undefined,
+                  borderColor: isDarkHeader
+                    ? 'var(--delivery-primary-dark, #171717)'
+                    : 'var(--delivery-border)',
+                  backgroundColor: isDarkHeader
+                    ? 'var(--delivery-primary-dark, #171717)'
+                    : undefined,
                   color: headerFg,
                 }}
               >
