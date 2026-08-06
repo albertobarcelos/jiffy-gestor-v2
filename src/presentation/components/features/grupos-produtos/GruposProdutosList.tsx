@@ -21,12 +21,13 @@ import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { GrupoItem } from './GrupoItem'
 import { useGruposProdutosInfinite } from '@/src/presentation/hooks/useGruposProdutos'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { useQueryClient } from '@tanstack/react-query'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
 import { MdSearch } from 'react-icons/md'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import {
   GruposProdutosTabsModal,
   GruposProdutosTabsModalState,
@@ -47,12 +48,15 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Inativo'>('Ativo')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const loadMoreRef = useRef<HTMLDivElement>(null)
-  const { auth } = useAuthStore()
-  const queryClient = useQueryClient()
+  const loadMoreRef = useRef<HTMLDivElement>(null)  const invalidate = useInvalidateTenantQueries()
   const router = useRouter() // Obter a instância do router
   const searchParams = useSearchParams() // Obter os search params da URL
   const pathname = usePathname() // Obter o pathname da URL
+
+  const invalidateListas = useCallback(async () => {
+    await invalidate(['grupos-produtos'])
+    await invalidate(['produtos', 'infinite'])
+  }, [invalidate])
   const [tabsModalState, setTabsModalState] = useState<GruposProdutosTabsModalState>({
     open: false,
     tab: 'grupo',
@@ -220,13 +224,13 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
   // Função removida - não é mais necessária pois usamos atualização otimista
 
   const handleTabsModalReload = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['grupos-produtos'] })
+    void invalidateListas()
     onReload?.()
-  }, [onReload, queryClient])
+  }, [onReload, invalidateListas])
 
   const handleToggleGrupoStatus = useCallback(
     async (grupoId: string, novoStatus: boolean) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return
 
       // Atualização otimista: atualiza UI imediatamente
@@ -251,7 +255,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       )
 
       try {
-        const response = await fetch(`/api/grupos-produtos/${grupoId}`, {
+        const response = await fetchGestorApi(`/api/grupos-produtos/${grupoId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -277,7 +281,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
         showToast.error('Não foi possível atualizar o status do grupo.')
       }
     },
-    [auth, localGrupos]
+    [ localGrupos]
   )
 
   const openTabsModal = useCallback(
@@ -309,9 +313,8 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     currentSearchParams.delete('modalGrupoOpen')
     router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
     router.refresh() // Força a revalidação da rota principal
-    queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false }) // Invalida todas as queries de grupos de produtos
-    queryClient.invalidateQueries({ queryKey: ['produtos', 'infinite'] }) // Invalida o cache do React Query para produtos
-  }, [router, searchParams, pathname, queryClient])
+    void invalidateListas()
+  }, [router, searchParams, pathname, invalidateListas])
 
   const handleTabsModalTabChange = useCallback((tab: 'grupo') => {
     setTabsModalState((prev) => ({
@@ -353,9 +356,8 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     currentSearchParams.delete('modalProdutoOpen')
     router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
     router.refresh() // Força a revalidação da rota principal
-    queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false }) // Invalida todas as queries de grupos de produtos
-    queryClient.invalidateQueries({ queryKey: ['produtos', 'infinite'] }) // Invalida o cache do React Query para produtos
-  }, [router, searchParams, queryClient, pathname])
+    void invalidateListas()
+  }, [router, searchParams, invalidateListas, pathname])
 
   const handleProdutoTabChange = useCallback(
     (tab: 'produto' | 'complementos' | 'impressoras' | 'grupo') => {
@@ -394,12 +396,12 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
 
     // Envia requisição para o backend
     try {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         throw new Error('Token não encontrado')
       }
 
-      const response = await fetch(
+      const response = await fetchGestorApi(
         `/api/grupos-produtos/${grupoId}/reordena-grupo`,
         {
           method: 'PATCH',
@@ -417,15 +419,15 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       }
 
       showToast.success('Ordem atualizada com sucesso!')
-      // Invalidar cache do React Query para atualizar outras telas que usam os grupos
-      queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false })
+      // Invalidação com escopo tenant (lista + dropdowns em outras telas)
+      void invalidate(['grupos-produtos'])
     } catch (error: any) {
       console.error('Erro ao reordenar grupo:', error)
       // Reverte feedback otimista
       setLocalGrupos(previousState)
       showToast.error(error.message || 'Erro ao atualizar ordem do grupo')
     }
-  }, [localGrupos, auth, queryClient])
+  }, [localGrupos, invalidate])
 
   return (
     <>
@@ -452,7 +454,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
                     grupoId: undefined,
                   })
                 }
-                className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+                className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
               >
                 Novo
                 <span className="text-lg">+</span>
@@ -472,7 +474,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
                 placeholder="Pesquisar grupo..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
-                className="w-full h-full px-5 pl-12 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+                className="w-full h-full px-5 pl-12 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm "
               />
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
                 <MdSearch size={18} />
@@ -489,7 +491,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
               onChange={(e) =>
                 setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Inativo')
               }
-              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm "
             >
               <option value="Todos">Todos</option>
               <option value="Ativo">Ativo</option>
@@ -501,16 +503,16 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       {/* Cabeçalho da tabela */}
       <div className="px-1">
         <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px]">
-          <div className="flex-[1] font-nunito font-semibold md:text-sm text-[10px] text-primary-text">
+          <div className="flex-[1] font-semibold md:text-sm text-[10px] text-primary-text">
             Ordem
           </div>
-          <div className="flex-[2] font-nunito font-semibold md:text-sm text-[10px] text-primary-text">
+          <div className="flex-[2] font-semibold md:text-sm text-[10px] text-primary-text">
             Ícones do Grupo
           </div>
-          <div className="flex-[4] font-nunito font-semibold md:text-sm text-[10px] text-primary-text">
+          <div className="flex-[4] font-semibold md:text-sm text-[10px] text-primary-text">
             Nome
           </div>
-          <div className="flex-[2] md:text-end text-right font-nunito font-semibold md:text-sm text-[10px] text-primary-text">
+          <div className="flex-[2] md:text-end text-right font-semibold md:text-sm text-[10px] text-primary-text">
             Status
           </div>
         </div>

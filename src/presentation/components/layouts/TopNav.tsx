@@ -10,7 +10,7 @@ import { disconnectEmpresaTab } from '@/src/presentation/utils/disconnectEmpresa
 import { useEmpresaUrlSync } from '@/src/presentation/hooks/useEmpresaUrlSync'
 import { EmpresaSwitcherTopNav } from './EmpresaSwitcherTopNav'
 import { useQueryClient } from '@tanstack/react-query'
-import { MdDashboard, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight, MdMenu, MdClose, MdDeliveryDining } from 'react-icons/md'
+import { MdDashboard, MdPointOfSale, MdAssessment, MdSettings, MdLogout, MdExpandMore, MdChevronRight, MdMenu, MdClose, MdDeliveryDining, MdApps } from 'react-icons/md'
 import { 
   MdInventory2, 
   MdShoppingBag, 
@@ -20,16 +20,39 @@ import {
   MdCategory,
   MdAddCircle,
   MdReceipt,
+  MdTableBar,
   MdAccountBalance,
   MdHistory,
   MdPercent,
   MdAnalytics,
 } from 'react-icons/md'
 import type { IconType } from 'react-icons'
-import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
 import { useAcessoFiscal } from '@/src/presentation/hooks/useAcessoFiscal'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import { matchesModulePath } from '@/src/shared/utils/gestaoRoutes'
+
+const MENU_ICON_PARENT =
+  'inline-flex h-5 w-5 shrink-0 items-center justify-center [&>svg]:h-5 [&>svg]:w-5'
+const MENU_ICON_CHILD =
+  'inline-flex h-4 w-4 shrink-0 items-center justify-center [&>svg]:h-4 [&>svg]:w-4'
+
+function renderNavIcon(
+  item: { icon?: IconType; renderIcon?: () => ReactNode },
+  slotClass: string
+): ReactNode {
+  if (item.renderIcon) {
+    return <span className={slotClass}>{item.renderIcon()}</span>
+  }
+  if (item.icon) {
+    const Icon = item.icon
+    return (
+      <span className={slotClass}>
+        <Icon aria-hidden />
+      </span>
+    )
+  }
+  return null
+}
 
 /**
  * Navegação superior minimalista e clean
@@ -41,7 +64,7 @@ export function TopNav() {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
-  const { logoutTenant, getUser } = useAuthStore()
+  const { logoutTenant, logout, getUser } = useAuthStore()
   const queryClient = useQueryClient()
   const menuRef = useRef<HTMLDivElement>(null)
   const notificationsRef = useRef<HTMLDivElement>(null)
@@ -161,7 +184,7 @@ export function TopNav() {
         icon: MdDashboard,
       },
       {
-        name: 'Produtos',
+        name: 'Cardápio',
         path: '#',
         icon: MdShoppingBag,
         children: [
@@ -172,7 +195,7 @@ export function TopNav() {
         ],
       },
       {
-        name: 'Usuários',
+        name: 'Pessoas',
         path: '#',
         icon: MdPeople,
         children: [
@@ -188,25 +211,9 @@ export function TopNav() {
         icon: MdPointOfSale,
         children: [
           { name: 'Pedidos e Clientes', path: '/pedidos-clientes', icon: MdReceipt },
-          {
-            name: 'Mesas Abertas',
-            path: '/vendas/abertas',
-            renderIcon: () => (
-              <TipoVendaIcon
-                tipoVenda="mesa"
-                numeroMesa="#"
-                size={32}
-                containerScale={0.9}
-                corTexto="#FFFFFF"
-                corCirculoInterno="#4b5563"
-                corBorda="#4b5563"
-                corFundo="#4b5563"
-                corPrincipal="#4b5563"
-              />
-            ),
-          },
-          { name: 'Relatórios Vendas', path: '/relatorios-vendas', icon: MdAssessment },
-          { name: 'Relatório Produtoss', path: '/relatorios-produtos-vendidos', icon: MdAnalytics },
+          { name: 'Mesas Abertas', path: '/vendas/abertas', icon: MdTableBar },
+          { name: 'Relatório de Vendas', path: '/relatorios-vendas', icon: MdAssessment },
+          { name: 'Relatório de Produtos', path: '/relatorios-produtos-vendidos', icon: MdAnalytics },
           { name: 'Hist. Fechamentos', path: '/historico-fechamento', icon: MdHistory },
           { name: 'Comissões', path: '/vendas/comissoes', icon: MdPercent },
         ],
@@ -258,9 +265,19 @@ export function TopNav() {
     [handleMobileNavigate]
   )
 
+  const handleVoltarPortal = useCallback(async () => {
+    await disconnectEmpresaTab({ queryClient, logoutTenant, logout })
+  }, [queryClient, logoutTenant, logout])
+
   const handleLogout = useCallback(async () => {
-    await disconnectEmpresaTab({ queryClient, logoutTenant })
-  }, [queryClient, logoutTenant])
+    try {
+      queryClient.clear()
+      await logout()
+    } catch (e) {
+      console.error('TopNav: erro ao sair da conta', e)
+    }
+    window.location.assign('/login')
+  }, [queryClient, logout])
 
   useEffect(() => {
     if (isMobileMenuOpen) {
@@ -308,12 +325,7 @@ export function TopNav() {
         <div className="flex flex-col gap-2">
           {menuItems.map((item) => {
             const isActive = isMenuActive(item)
-            const Icon = item.icon
-            const renderedIcon = item.renderIcon
-              ? item.renderIcon()
-              : Icon
-              ? <Icon className="w-5 h-5" />
-              : null
+            const renderedIcon = renderNavIcon(item, MENU_ICON_PARENT)
 
             if (item.children) {
               return (
@@ -338,12 +350,7 @@ export function TopNav() {
                   {expandedMenus.has(item.name) && (
                     <div className="pl-6 py-2 flex flex-col gap-1">
                       {item.children.map((child) => {
-                        const ChildIcon = child.icon
-                        const renderedChildIcon = child.renderIcon
-                          ? child.renderIcon()
-                          : ChildIcon
-                          ? <ChildIcon className="w-4 h-4" />
-                          : null
+                        const renderedChildIcon = renderNavIcon(child, MENU_ICON_CHILD)
                         const activeChild = isChildActive(child.path)
                         return (
                           <button
@@ -394,6 +401,15 @@ export function TopNav() {
               {isHydrated && user?.getEmail() ? user.getEmail() : 'Admin'}
             </p>
           </div>
+          <button
+            type="button"
+            onClick={() => void handleVoltarPortal()}
+            className="shrink-0 p-2.5 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
+            title="Meu Jiffy"
+            aria-label="Ir para Meu Jiffy"
+          >
+            <MdApps className="w-6 h-6" />
+          </button>
           {/* Logout no mobile: ações do usuário ficam em `hidden sm:flex` na barra superior */}
           <button
             type="button"
@@ -432,15 +448,12 @@ export function TopNav() {
           ref={menuRef}
           className="hidden sm:flex flex-1 items-center justify-start gap-1 pl-2"
         >
-          {menuItems.map((item) => {
+          {menuItems
+            .filter(item => item.name !== 'Configurações')
+            .map((item) => {
             const isActive = isMenuActive(item)
             const isExpanded = expandedMenus.has(item.name)
-            const Icon = item.icon
-            const renderedIcon = item.renderIcon
-              ? item.renderIcon()
-              : Icon
-              ? <Icon className="w-5 h-5" />
-              : null
+            const renderedIcon = renderNavIcon(item, MENU_ICON_PARENT)
 
             if (item.children) {
               return (
@@ -466,12 +479,7 @@ export function TopNav() {
                   {isExpanded && (
                     <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
                       {item.children.map((child) => {
-                        const ChildIcon = child.icon
-                        const renderedChildIcon = child.renderIcon
-                          ? child.renderIcon()
-                          : ChildIcon
-                          ? <ChildIcon className="w-4 h-4" />
-                          : null
+                        const renderedChildIcon = renderNavIcon(child, MENU_ICON_CHILD)
                         const childIsActive = isChildActive(child.path)
                         return (
                           <Link
@@ -511,10 +519,9 @@ export function TopNav() {
                     ? 'bg-gray-100 text-gray-900'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 }`}
-                title={item.name === 'Configurações' ? item.name : undefined}
               >
                 {renderedIcon}
-                {item.name !== 'Configurações' && <span className="text-xs lg:text-sm">{item.name}</span>}
+                <span className="text-xs lg:text-sm">{item.name}</span>
               </Link>
             )
           })}
@@ -533,7 +540,17 @@ export function TopNav() {
 
         {/* User Actions */}
         <div className="hidden sm:flex items-center gap-2">
-          
+          {/* Meu Jiffy */}
+          <button
+            type="button"
+            onClick={() => void handleVoltarPortal()}
+            className="rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100"
+            title="Meu Jiffy"
+            aria-label="Ir para Meu Jiffy"
+          >
+            <MdApps className="h-5 w-5" aria-hidden />
+          </button>
+
           {/* Notifications */}
           <div ref={notificationsRef} className="relative">
             <button
@@ -562,6 +579,21 @@ export function TopNav() {
               </div>
             ) : null}
           </div>
+
+          <Link
+            href={toGestao('/configuracoes/empresa')}
+            onMouseEnter={() => handleLinkHover('/configuracoes/empresa')}
+            prefetch={true}
+            className={`rounded-lg p-2 transition-colors hover:bg-gray-100 ${
+              matchesModulePath(pathname ?? '', '/configuracoes/empresa')
+                ? 'bg-gray-100 text-gray-900'
+                : 'text-gray-600'
+            }`}
+            title="Configurações"
+            aria-label="Configurações"
+          >
+            <MdSettings className="h-5 w-5" aria-hidden />
+          </Link>
 
           {/* Dados do usuário (perfil será acessado noutro local) */}
           <div

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { Terminal } from '@/src/domain/entities/Terminal'
 import { MdDelete, MdPhone, MdSearch } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
@@ -71,7 +72,6 @@ function resolvePreferencesForTerminal(
 }
 
 export function TerminaisTab() {
-  const { auth } = useAuthStore()
   const [terminais, setTerminais] = useState<TerminalData[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -105,7 +105,7 @@ export function TerminaisTab() {
    */
   const loadAllTerminais = useCallback(
     async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         setIsLoading(false)
         setPreferencesLoaded(true)
@@ -133,7 +133,7 @@ export function TerminaisTab() {
             params.append('q', searchQueryRef.current)
           }
 
-          const response = await fetch(`/api/terminais?${params.toString()}`, {
+          const response = await fetchGestorApi(`/api/terminais?${params.toString()}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -208,7 +208,7 @@ export function TerminaisTab() {
               pParams.append('q', q)
             }
 
-            const listResp = await fetch(`/api/preferencias-terminal?${pParams.toString()}`, {
+            const listResp = await fetchGestorApi(`/api/preferencias-terminal?${pParams.toString()}`, {
               headers: {
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',
@@ -240,7 +240,7 @@ export function TerminaisTab() {
             const prefsEntries = await Promise.all(
               allTerminais.map(async (item) => {
                 try {
-                  const resp = await fetch(`/api/preferencias-terminal/${item.terminal.getId()}`, {
+                  const resp = await fetchGestorApi(`/api/preferencias-terminal/${item.terminal.getId()}`, {
                     headers: {
                       Authorization: `Bearer ${token}`,
                       'Content-Type': 'application/json',
@@ -282,11 +282,11 @@ export function TerminaisTab() {
         setPreferencesLoaded(true)
       }
     },
-    [auth]
+    []
   )
 
   const loadAllImpressoras = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     setLoadingImpressoras(true)
@@ -302,7 +302,7 @@ export function TerminaisTab() {
           offset: currentOffset.toString(),
         })
 
-        const resp = await fetch(`/api/impressoras?${params.toString()}`, {
+        const resp = await fetchGestorApi(`/api/impressoras?${params.toString()}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -332,7 +332,7 @@ export function TerminaisTab() {
     } finally {
       setLoadingImpressoras(false)
     }
-  }, [auth])
+  }, [])
 
   // Debounce para busca
   useEffect(() => {
@@ -356,7 +356,7 @@ export function TerminaisTab() {
    */
   const handleToggleTerminalStatus = useCallback(
     async (terminalId: string, novoBloqueado: boolean) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -386,7 +386,7 @@ export function TerminaisTab() {
       )
 
       try {
-        const response = await fetch(`/api/terminais/${terminalId}`, {
+        const response = await fetchGestorApi(`/api/terminais/${terminalId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -421,12 +421,12 @@ export function TerminaisTab() {
         })
       }
     },
-    [auth, terminais, loadAllTerminais]
+    [ terminais, loadAllTerminais]
   )
 
   const handleToggleCompartilhar = useCallback(
     async (terminalId: string, novoValor: boolean) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -445,7 +445,7 @@ export function TerminaisTab() {
       }))
 
       try {
-        const response = await fetch(`/api/preferencias-terminal`, {
+        const response = await fetchGestorApi(`/api/preferencias-terminal`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -466,7 +466,7 @@ export function TerminaisTab() {
 
         // Busca as preferências atualizadas do backend para garantir sincronização
         try {
-          const prefsResponse = await fetch(`/api/preferencias-terminal/${terminalId}`, {
+          const prefsResponse = await fetchGestorApi(`/api/preferencias-terminal/${terminalId}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -507,12 +507,12 @@ export function TerminaisTab() {
         })
       }
     },
-    [auth]
+    []
   )
 
   const handleToggleFiscalAtivo = useCallback(
     async (terminalId: string, novoValor: boolean) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -531,7 +531,7 @@ export function TerminaisTab() {
       }))
 
       try {
-        const response = await fetch(`/api/preferencias-terminal`, {
+        const response = await fetchGestorApi(`/api/preferencias-terminal`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -551,7 +551,7 @@ export function TerminaisTab() {
         }
 
         try {
-          const prefsResponse = await fetch(`/api/preferencias-terminal/${terminalId}`, {
+          const prefsResponse = await fetchGestorApi(`/api/preferencias-terminal/${terminalId}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -590,12 +590,12 @@ export function TerminaisTab() {
         })
       }
     },
-    [auth]
+    []
   )
 
   const handleToggleLeitorCodigoBarras = useCallback(
     async (terminalId: string, novoValor: boolean) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -614,7 +614,7 @@ export function TerminaisTab() {
       }))
 
       try {
-        const response = await fetch(`/api/preferencias-terminal`, {
+        const response = await fetchGestorApi(`/api/preferencias-terminal`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -634,7 +634,7 @@ export function TerminaisTab() {
         }
 
         try {
-          const prefsResponse = await fetch(`/api/preferencias-terminal/${terminalId}`, {
+          const prefsResponse = await fetchGestorApi(`/api/preferencias-terminal/${terminalId}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -673,12 +673,12 @@ export function TerminaisTab() {
         })
       }
     },
-    [auth]
+    []
   )
 
   const handleChangeImpressora = useCallback(
     async (terminalId: string, impressoraId: string) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -701,7 +701,7 @@ export function TerminaisTab() {
       }))
 
       try {
-        const response = await fetch(`/api/preferencias-terminal`, {
+        const response = await fetchGestorApi(`/api/preferencias-terminal`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -745,7 +745,7 @@ export function TerminaisTab() {
         })
       }
     },
-    [auth, impressoras]
+    [ impressoras]
   )
 
   // Carrega dados iniciais
@@ -767,17 +767,31 @@ export function TerminaisTab() {
     <div className="flex flex-col h-full overflow-hidden py-1">
       {/* Header fixo */}
       <div className="md:px-6 px-1 flex-shrink-0">
-        <div className="flex items-center justify-between border-b-2 border-primary/70 pb-2">
+        <div className="flex items-start justify-between border-b-2 border-primary/70 pb-2">
           <div className="flex flex-col">
-            <span className="text-primary text-lg md:text-xl font-semibold font-exo">
+            <span className="text-primary text-lg md:text-xl font-semibold ">
               Terminais Cadastrados
             </span>
-            <span className="text-tertiary text-sm md:text-[20px] font-medium font-nunito">
+            <span className="text-tertiary text-sm md:text-[20px] font-medium ">
               Total {terminaisFiltrados.length}
               {totalItems > 0 ? ` de ${terminaisFiltrados.length}` : ''}
             </span>
           </div>
-          
+          <button
+            type="button"
+            onClick={() =>
+              setTabsModalState({
+                open: true,
+                tab: 'terminal',
+                mode: 'create',
+                terminalId: undefined,
+              })
+            }
+            className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+          >
+            Novo
+            <span className="text-lg">+</span>
+          </button>
         </div>
       </div>
 
@@ -795,7 +809,7 @@ export function TerminaisTab() {
               placeholder="Pesquisar..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm "
             />
           </div>
         </div>
@@ -806,31 +820,31 @@ export function TerminaisTab() {
         {/* Barra de títulos das colunas - sticky dentro do scroll */}
         {terminaisFiltrados.length > 0 && (
           <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px] sticky top-0 z-10 mb-2">
-            <div className="flex-[2] font-nunito font-semibold text-xs text-primary-text uppercase hidden md:block">
+            <div className="flex-[2] font-semibold text-xs text-primary-text uppercase hidden md:block">
               Código do Terminal
             </div>
-            <div className="flex-[2] font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
+            <div className="flex-[2] font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Nome do Terminal
             </div>
-            <div className="flex-[2] font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
+            <div className="flex-[2] font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Modelo Dispositivo
             </div>
-            <div className="flex-[1.5] font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
+            <div className="flex-[1.5] font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Versão APK
             </div>
-            <div className="flex-[2] font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase hidden md:flex">
+            <div className="flex-[2] font-semibold md:text-xs text-[10px] text-primary-text uppercase hidden md:flex">
               Imp. Finalização
             </div>
-            <div className="flex-[1.5] text-center font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
+            <div className="flex-[1.5] text-center font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Comp. Mesas
             </div>
-            <div className="flex-[1.5] text-center font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
+            <div className="flex-[1.5] text-center font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Fiscal ativo
             </div>
-            <div className="flex-[1.5] text-center font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
+            <div className="flex-[1.5] text-center font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Leitor C. Barras
             </div>
-            <div className="md:flex-[1.5] flex-[1] text-center font-nunito font-semibold md:text-xs text-[10px] text-primary-text uppercase">
+            <div className="md:flex-[1.5] flex-[1] text-center font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Remover
             </div>
           </div>
@@ -842,9 +856,24 @@ export function TerminaisTab() {
             <p className="text-primary-text font-semibold text-lg mb-2">
               Nenhum terminal cadastrado
             </p>
-            <p className="text-secondary-text text-sm text-center max-w-md">
+            <p className="text-secondary-text text-sm text-center max-w-md mb-4">
               Não há terminais cadastrados no sistema. Cadastre um terminal para começar a utilizá-lo.
             </p>
+            <button
+              type="button"
+              onClick={() =>
+                setTabsModalState({
+                  open: true,
+                  tab: 'terminal',
+                  mode: 'create',
+                  terminalId: undefined,
+                })
+              }
+              className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+            >
+              Novo
+              <span className="text-lg">+</span>
+            </button>
           </div>
         )}
 
@@ -893,16 +922,16 @@ export function TerminaisTab() {
                  # {codigo}
                 </span>
               </div>
-              <div className="flex-[2] flex items-center gap-1 md:text-sm text-[10px] text-primary-text font-nunito">
+              <div className="flex-[2] flex items-center gap-1 md:text-sm text-[10px] text-primary-text ">
                 {nome}
               </div>
-              <div className="flex-[2] md:text-sm text-[10px] text-secondary-text font-nunito">
+              <div className="flex-[2] md:text-sm text-[10px] text-secondary-text ">
                 {modelo}
               </div>
-              <div className="flex-[1.5] md:text-sm text-[10px] text-secondary-text font-nunito">
+              <div className="flex-[1.5] md:text-sm text-[10px] text-secondary-text ">
                 {versao}
               </div>
-              <div className="flex-[2] md:text-sm text-[10px] text-secondary-text font-nunito hidden md:flex">
+              <div className="flex-[2] md:text-sm text-[10px] text-secondary-text hidden md:flex">
                 {preferencesLoaded ? (
                   <select
                     value={prefs.impressoraFinalizacaoId ?? ''}

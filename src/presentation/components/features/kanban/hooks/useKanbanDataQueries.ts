@@ -5,6 +5,7 @@ import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPaga
 import { useEntregadoresQuery } from '@/src/presentation/components/features/pedidos/hooks/data/useEntregadoresQuery'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import {
   type VendasUnificadasQueryParams,
 } from './useVendasUnificadas'
@@ -22,7 +23,7 @@ import {
   KANBAN_VENDAS_REFETCH_INTERVAL_MS,
 } from '../utils/kanbanVendasListagem'
 import type { ModoKanbanVendas } from '../KanbanModoVendasToggle'
-import type { ColunaKanbanId, TipoEntregaFiltro, Venda } from '../types'
+import type { ColunaKanbanFiltroExtra, ColunaKanbanId, TipoEntregaFiltro, Venda } from '../types'
 
 type TerminalOpcao = { id: string; nome: string }
 
@@ -40,6 +41,7 @@ export interface UseKanbanDataQueriesParams {
   getEtapaKanbanParaExibicaoRef: React.MutableRefObject<(v: Venda) => string>
   tipoEntregaFilter: TipoEntregaFiltro
   setTipoEntregaFilter: React.Dispatch<React.SetStateAction<TipoEntregaFiltro>>
+  colunaKanbanFiltro?: ColunaKanbanFiltroExtra
 }
 
 export function useKanbanDataQueries({
@@ -48,10 +50,9 @@ export function useKanbanDataQueries({
   getEtapaKanbanParaExibicaoRef,
   tipoEntregaFilter,
   setTipoEntregaFilter,
+  colunaKanbanFiltro = '',
 }: UseKanbanDataQueriesParams) {
-  const isModoDeliveryKanban = modoKanbanVendas === 'delivery'
-  const { auth } = useAuthStore()
-  const hasKanbanToken = !!auth?.getAccessToken()
+  const isModoDeliveryKanban = modoKanbanVendas === 'delivery'  const hasKanbanToken = !!useAuthStore.getState().tenantAuth?.getAccessToken()
   const empresaId = useTenantEmpresaId()
 
   const [terminalFilter, setTerminalFilter] = useState('')
@@ -74,7 +75,7 @@ export function useKanbanDataQueries({
 
   useEntregadoresQuery({
     enabled: hasKanbanToken && isModoDeliveryKanban,
-    token: auth?.getAccessToken(),
+    token: useAuthStore.getState().tenantAuth?.getAccessToken(),
   })
 
   const nomesMeiosPagamentoKanban = useMemo(() => {
@@ -110,7 +111,7 @@ export function useKanbanDataQueries({
   )
 
   const loadAllTerminais = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     setIsLoadingTerminais(true)
@@ -126,7 +127,7 @@ export function useKanbanDataQueries({
           offset: currentOffset.toString(),
         })
 
-        const response = await fetch(`/api/terminais?${params.toString()}`, {
+        const response = await fetchGestorApi(`/api/terminais?${params.toString()}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -152,7 +153,7 @@ export function useKanbanDataQueries({
     } finally {
       setIsLoadingTerminais(false)
     }
-  }, [auth])
+  }, [])
 
   useEffect(() => {
     if (isModoDeliveryKanban) return
@@ -178,6 +179,7 @@ export function useKanbanDataQueries({
     refetchIntervalMs: !isModoDeliveryKanban ? KANBAN_VENDAS_REFETCH_INTERVAL_MS : false,
     refetchOnWindowFocus: !isModoDeliveryKanban,
     enviarFiltroFinalizacaoNaApi: enviarFiltroFinalizacaoNaDeliveryApi,
+    colunaKanbanFiltro,
   })
 
   const deliveryKanban = usePedidosDeliveryKanbanColumns(pedidosDeliveryQueryParams, {
@@ -228,12 +230,11 @@ export function useKanbanDataQueries({
     ? DELIVERY_KANBAN_COLUMN_IDS.some(id => deliveryKanban.columnStates[id]?.isFetchingNextPage)
     : BALCAO_KANBAN_COLUMN_IDS.some(id => balcaoKanban.columnStates[id]?.isFetchingNextPage)
 
-  const fetchNextPagePendenteEmissao = useCallback(() => {
-    balcaoKanban.fetchNextPageForColumn('PENDENTE_EMISSAO')
+  const fetchNextPageRejeitadas = useCallback(() => {
+    balcaoKanban.fetchNextPageForColumn('REJEITADAS')
   }, [balcaoKanban.fetchNextPageForColumn])
 
-  const hasNextPagePendenteEmissao =
-    balcaoKanban.columnStates.PENDENTE_EMISSAO?.hasNextPage ?? false
+  const hasNextPageRejeitadas = balcaoKanban.columnStates.REJEITADAS?.hasNextPage ?? false
 
   const isLoading = isModoDeliveryKanban ? isLoadingDelivery : isLoadingBalcao
 
@@ -333,7 +334,7 @@ export function useKanbanDataQueries({
     refetch,
     refetchParaEmissaoFiscal,
     handleColumnScroll,
-    fetchNextPage: fetchNextPagePendenteEmissao,
-    hasNextPage: hasNextPagePendenteEmissao,
+    fetchNextPage: fetchNextPageRejeitadas,
+    hasNextPage: hasNextPageRejeitadas,
   }
 }

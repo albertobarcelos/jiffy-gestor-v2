@@ -1,3 +1,4 @@
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { Produto } from '@/src/domain/entities/Produto'
 import type {
   CanalVendaCatalogo,
@@ -9,7 +10,7 @@ import type { UsuarioPdvEntregadorOption } from '@/src/domain/types/vendaDetalhe
 const PRODUTOS_POR_PAGINA = 100
 
 async function fetchJson<T>(url: string, token: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, {
+  const response = await fetchGestorApi(url, {
     ...init,
     headers: {
       Authorization: `Bearer ${token}`,

@@ -195,7 +195,7 @@ export function Etapa1DadosFiscaisEmpresa() {
             </div>
             <div className="flex-1 flex flex-col gap-3">
               <div className="flex flex-col gap-2">
-                <h3 className="font-exo font-semibold text-alternate text-lg sm:text-xl flex flex-wrap items-center gap-1">
+                <h3 className="font-semibold text-alternate text-lg sm:text-xl flex flex-wrap items-center gap-1">
                   Passo 1: Dados da Empresa
                   <InfoHint text={DADOS_FISCAIS_INFO_HINT} />
                 </h3>
@@ -260,7 +260,7 @@ export function Etapa1DadosFiscaisEmpresa() {
             </div>
             <div className="flex-1 flex flex-col gap-3">
               <div className="flex flex-col gap-2">
-                <h3 className="font-exo font-semibold text-alternate text-lg sm:text-xl flex flex-wrap items-center gap-1">
+                <h3 className="font-semibold text-alternate text-lg sm:text-xl flex flex-wrap items-center gap-1">
                   Passo 2: Gerenciar
                   <span className="inline-flex items-center gap-1">
                     Certificado Digital
@@ -354,7 +354,7 @@ export function Etapa1DadosFiscaisEmpresa() {
             </div>
             <div className="flex-1 flex flex-col gap-3">
               <div className="flex flex-col gap-2">
-                <h3 className="font-exo font-semibold text-alternate text-lg sm:text-xl flex flex-wrap items-center gap-1">
+                <h3 className="font-semibold text-alternate text-lg sm:text-xl flex flex-wrap items-center gap-1">
                   Passo 3: Chave
                   <span className="inline-flex items-center gap-1">
                     IBPT

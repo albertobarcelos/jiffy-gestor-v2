@@ -99,7 +99,7 @@ export function ConvitesGestaoList({
     <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-4">
       {linhasVisiveis.length === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-300 bg-white px-6 py-12 text-center">
-          <p className="font-nunito text-sm text-secondary-text">
+          <p className="text-sm text-secondary-text">
             {listaVazia
               ? 'Nenhum usuário gestor nem convite pendente encontrado.'
               : 'Nenhum resultado para esta busca.'}
@@ -109,13 +109,13 @@ export function ConvitesGestaoList({
         <div className="overflow-visible rounded-lg border border-gray-200 bg-white shadow-sm">
           <div className="hidden min-w-0 flex-shrink-0 md:block">
             <div className="grid h-11 w-full min-w-0 grid-cols-[minmax(180px,280px)_80px_160px] items-center gap-[10px] border-b border-gray-200 bg-gray-50 px-3 pr-2 md:px-4">
-              <div className="min-w-0 truncate text-left font-nunito text-xs font-semibold text-secondary md:text-sm">
+              <div className="min-w-0 truncate text-left text-xs font-semibold text-secondary md:text-sm">
                 Convites pendentes / Usuários ativos
               </div>
-              <div className="min-w-0 truncate text-left font-nunito text-xs font-semibold text-secondary md:text-sm">
+              <div className="min-w-0 truncate text-left text-xs font-semibold text-secondary md:text-sm">
                 Situação
               </div>
-              <div className="min-w-0 truncate text-left font-nunito text-xs font-semibold text-secondary md:text-sm">
+              <div className="min-w-0 truncate text-left text-xs font-semibold text-secondary md:text-sm">
                 Perfil
               </div>
             </div>

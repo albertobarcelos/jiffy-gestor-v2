@@ -5,6 +5,7 @@ import { Icon } from '@mdi/react'
 import { mdiMagnify } from '@mdi/js'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { cn } from '@/src/shared/utils/cn'
@@ -38,14 +39,12 @@ export function IconPickerModal({
   const [activeTab, setActiveTab] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [groups, setGroups] = useState<string[]>([])
-  const { auth } = useAuthStore()
-
+  const [groups, setGroups] = useState<string[]>([])
   const loadIcons = useCallback(async () => {
     setIsLoading(true)
     setError(null)
     try {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         setError('Sessão inválida. Faça login novamente.')
         setIcons([])
@@ -54,7 +53,7 @@ export function IconPickerModal({
         return
       }
 
-      const response = await fetch('/api/icones', {
+      const response = await fetchGestorApi('/api/icones', {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -81,7 +80,7 @@ export function IconPickerModal({
     } finally {
       setIsLoading(false)
     }
-  }, [auth])
+  }, [])
 
   useEffect(() => {
     if (!isOpen) return
@@ -186,10 +185,10 @@ export function IconPickerModal({
             </div>
           ) : filteredIcons.length === 0 ? (
             <div className="flex min-h-[40vh] flex-col items-center justify-center text-center">
-              <p className="font-nunito mb-2 font-medium text-secondary-text">
+              <p className="mb-2 font-medium text-secondary-text">
                 Nenhum ícone encontrado
               </p>
-              <p className="font-nunito text-sm text-tertiary">
+              <p className="text-sm text-tertiary">
                 {searchText
                   ? 'Tente uma busca diferente'
                   : 'Nenhum ícone disponível nesta categoria'}
@@ -242,7 +241,7 @@ function IconCard({ icon, selectedColor, onSelect }: IconCardProps) {
       }}
     >
       <DinamicIcon iconName={icon.name} color={iconColor} size={32} className="mb-2" />
-      <span className="font-nunito line-clamp-2 text-center text-xs" style={{ color: iconColor }}>
+      <span className="line-clamp-2 text-center text-xs" style={{ color: iconColor }}>
         {(icon.tags.length > 0 ? icon.tags[0] : icon.name).toLocaleUpperCase('pt-BR')}
       </span>
     </button>

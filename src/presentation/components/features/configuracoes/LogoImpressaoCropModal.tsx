@@ -198,7 +198,7 @@ export function LogoImpressaoCropModal({
             </>
           ) : null}
         </div>
-        <p className="mt-2 text-center font-nunito text-[10px] text-secondary-text">
+        <p className="mt-2 text-center text-[10px] text-secondary-text">
           Moldura até {maxCropFrameSize.width} × {maxCropFrameSize.height} px (máx. cupom{' '}
           {LOGO_CROP_DISPLAY_WIDTH}×{LOGO_CROP_DISPLAY_HEIGHT})
           {outputSizeLabel ? (
@@ -211,7 +211,7 @@ export function LogoImpressaoCropModal({
 
         <div className="mt-4">
           <div className="flex items-center gap-3">
-            <span className="w-28 shrink-0 font-nunito text-xs text-secondary-text">Zoom</span>
+            <span className="w-28 shrink-0 text-xs text-secondary-text">Zoom</span>
             <input
               type="range"
               min={LOGO_CROP_MIN_ZOOM}
@@ -223,7 +223,7 @@ export function LogoImpressaoCropModal({
               aria-label="Zoom da imagem"
             />
           </div>
-          <p className="mt-2 font-nunito text-[10px] text-secondary-text">
+          <p className="mt-2 text-[10px] text-secondary-text">
             Moldura atual: {cropFrameSize.width} × {cropFrameSize.height} px — arraste as alças
             brancas nas bordas.
           </p>
@@ -235,7 +235,7 @@ export function LogoImpressaoCropModal({
           type="button"
           onClick={onClose}
           disabled={isApplying}
-          className="h-9 rounded-lg border border-primary bg-primary/10 px-4 font-exo text-sm font-medium text-primary hover:bg-primary/15 disabled:opacity-50"
+          className="h-9 rounded-lg border border-primary bg-primary/10 px-4 text-sm font-medium text-primary hover:bg-primary/15 disabled:opacity-50"
         >
           Cancelar
         </button>
@@ -243,7 +243,7 @@ export function LogoImpressaoCropModal({
           type="button"
           onClick={() => void handleApply()}
           disabled={isApplying || !imageSrc || !cropAreaReady}
-          className="h-9 rounded-lg bg-primary px-4 font-exo text-sm font-medium text-white hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+          className="h-9 rounded-lg bg-primary px-4 text-sm font-medium text-white hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isApplying ? 'A processar…' : 'Aplicar'}
         </button>

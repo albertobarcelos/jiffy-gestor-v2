@@ -2,8 +2,8 @@
 export const JIFFY_SESSION_BROADCAST_CHANNEL = 'jiffy-session-coordinator'
 
 /**
- * Evento disparado quando o refresh de token falha e a sessão está morta.
- * Ouvido pelo AuthGuard para centralizar o redirect ao /login.
+ * Evento disparado quando o refresh do token da empresa falha.
+ * Ouvido pelo AuthGuard: se o hub ainda for válido → hub root; senão → `/login`.
  */
 export const JIFFY_SESSION_EXPIRED_EVENT = 'jiffy:session-expired'
 
@@ -24,13 +24,13 @@ export const SESSION_STORAGE_HUB_LOGOUT_SELF = 'jiffy:hub-logout-self'
 export const SESSION_STORAGE_TENANT_TOKEN = 'jiffy:tenant-token'
 
 /**
- * Nonce gerado pelo hub ao abrir aba de empresa. Usado pelo AuthGuard para
- * rejeitar abas abertas via digitação direta de URL (sem passar pelo hub).
- */
-export const SESSION_STORAGE_SESSION_NONCE = 'jiffy:session-nonce'
-
-/**
  * Slug da empresa na URL (ex: `nexsyn-ab12cd34` em `/gestao/nexsyn-ab12cd34/dashboard`).
  * Gravado ao consumir sessão; lido por `useEmpresaUrlSync` para manter o path.
  */
 export const SESSION_STORAGE_EMPRESA_SLUG = 'jiffy:empresa-slug'
+
+/**
+ * UUID completo da empresa desta aba.
+ * Fonte de verdade canônica para anti-mix (URL/token/refresh).
+ */
+export const SESSION_STORAGE_EMPRESA_ID = 'jiffy:empresa-id'

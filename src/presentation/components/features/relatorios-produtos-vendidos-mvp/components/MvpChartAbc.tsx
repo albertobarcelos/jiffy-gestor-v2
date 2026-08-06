@@ -45,10 +45,10 @@ function montarChartDataAbc(
 function LegendaAbc({ dados }: { dados: RelatorioParticipacaoAbcDTO[] }) {
   return (
     <aside
-      className="font-nunito shrink-0 border-t border-primary/10 pt-4 lg:w-64 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0"
+      className="shrink-0 border-t border-primary/10 pt-4 lg:w-64 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0"
       aria-label="Legenda das classes ABC"
     >
-      <p className="font-exo mb-2 text-xs font-semibold uppercase tracking-wide text-secondary-text">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-secondary-text">
         Classes ABC
       </p>
       <ul className="flex flex-col gap-3">
@@ -87,7 +87,7 @@ function ToggleMetricaAbc(props: {
 }) {
   const { metrica, onChange } = props
   const btnClass = (ativo: boolean) =>
-    `font-nunito rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+    `rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
       ativo ? 'bg-primary text-white' : 'bg-info text-primary-text hover:bg-primary/10'
     }`
 
@@ -114,7 +114,7 @@ export function MvpChartAbc(props: { dados: RelatorioParticipacaoAbcDTO[] | unde
 
   if (!chartData.length) {
     return (
-      <div className="font-nunito rounded-lg border-2 border-dashed border-custom-2 bg-info p-6 text-center text-sm text-secondary-text">
+      <div className="rounded-lg border-2 border-dashed border-custom-2 bg-info p-6 text-center text-sm text-secondary-text">
         Sem dados suficientes para montar o gráfico ABC nos filtros atuais.
       </div>
     )
@@ -136,8 +136,8 @@ export function MvpChartAbc(props: { dados: RelatorioParticipacaoAbcDTO[] | unde
     <div className="rounded-lg border-2 bg-info p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="font-exo text-sm font-semibold text-primary">Distribuição ABC</h3>
-          <p className="font-nunito mt-1 text-xs text-secondary-text">
+          <h3 className="text-sm font-semibold text-primary">Distribuição ABC</h3>
+          <p className="mt-1 text-xs text-secondary-text">
             Curva de Pareto no faturamento filtrado: A até ~80%, B até ~95%, C o restante.
           </p>
         </div>

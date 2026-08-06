@@ -102,7 +102,7 @@ export const ExportacaoXmlSchema = z
       .optional(),
     tipos: z.array(ExportacaoXmlTipoSchema).min(1, 'Selecione ao menos um tipo de XML'),
     timezone: z.string().optional(),
-    formato: z.enum(['completo', 'resumido']).default('completo'),
+    emailsNotificacao: z.array(z.string().email('E-mail inválido')).optional(),
   })
   .refine(
     (data) => {
@@ -115,11 +115,91 @@ export const ExportacaoXmlSchema = z
 
 export type ExportacaoXmlDTO = z.infer<typeof ExportacaoXmlSchema>
 
-export interface ExportacaoXmlResumoDTO {
-  totalArquivos?: number
-  totalDocumentos?: number
-  periodo?: string
+export type ExportacaoXmlStatusEnum = 'PROCESSANDO' | 'CONCLUIDO' | 'ERRO'
+
+/** Fase interna do job — usar para texto da UI; download só quando status === CONCLUIDO. */
+export type ExportacaoXmlFaseEnum =
+  | 'PROCESSANDO_XMLS'
+  | 'FINALIZANDO_ZIP'
+  | 'CONCLUIDO'
+  | 'ERRO'
+
+export interface ExportacaoXmlIniciadaDTO {
+  exportacaoId: string
+  status?: ExportacaoXmlStatusEnum
   [key: string]: unknown
+}
+
+export interface ExportacaoXmlStatusDTO {
+  exportacaoId: string
+  status: ExportacaoXmlStatusEnum
+  /** Quantidade de XMLs já processados (não é percentual 0–100). */
+  progresso: number
+  totalEncontrados?: number
+  fase?: ExportacaoXmlFaseEnum | string | null
+  mensagemErro?: string | null
+}
+
+export type ExportacaoTipoDisparo = 'MANUAL' | 'AGENDADO'
+
+export type NotificacaoEmailStatus =
+  | 'PENDENTE'
+  | 'ENVIADO'
+  | 'ENTREGUE'
+  | 'BOUNCE'
+  | 'FALHOU'
+
+export interface ExportacaoNotificacaoDTO {
+  email: string
+  status: NotificacaoEmailStatus
+  enviadoEm?: string | null
+  entregueEm?: string | null
+  mensagemErro?: string | null
+}
+
+export interface ExportacaoHistoricoItemDTO {
+  exportacaoId: string
+  periodo: string
+  tipoDisparo: ExportacaoTipoDisparo
+  status: ExportacaoXmlStatusEnum
+  criadoEm: string
+  concluidoEm?: string | null
+  totalEncontrados?: number
+  totalExportados?: number
+  downloadDisponivel: boolean
+  notificacoes?: ExportacaoNotificacaoDTO[]
+  /** Tipos solicitados na exportação (quando a API enviar). */
+  tipos?: Array<'AUTORIZADO' | 'CANCELADO' | 'INUTILIZADO' | string>
+}
+
+export interface PaginaExportacaoHistoricoDTO {
+  content: ExportacaoHistoricoItemDTO[]
+  totalElements: number
+  totalPages: number
+  page: number
+  size: number
+  hasNext?: boolean
+  hasPrevious?: boolean
+}
+
+export const AgendamentoExportacaoXmlSchema = z.object({
+  emails: z.array(z.string().email('E-mail inválido')).min(1, 'Informe ao menos um e-mail'),
+  tipos: z.array(ExportacaoXmlTipoSchema).min(1, 'Selecione ao menos um tipo de XML'),
+  timezone: z.string().optional(),
+})
+
+export type AgendamentoExportacaoXmlDTO = z.infer<typeof AgendamentoExportacaoXmlSchema>
+
+export interface AgendamentoExportacaoXmlResponseDTO {
+  id: string
+  empresaId?: string
+  emails: string[]
+  tipos: string[]
+  timezone?: string
+  ativo: boolean
+  criadoEm?: string
+  atualizadoEm?: string
+  ultimaExecucao?: string | null
 }
 
 export interface PaginaNcmDTO {

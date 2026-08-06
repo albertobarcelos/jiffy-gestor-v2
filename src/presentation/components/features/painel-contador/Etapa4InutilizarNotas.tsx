@@ -374,7 +374,7 @@ export function Etapa4InutilizarNotas() {
   return (
     <div className="space-y-3 md:p-4 p-2">
       <div className="rounded-lg border border-primary/20 bg-white p-3 space-y-2">
-        <h1 className="text-alternate font-exo font-semibold text-lg sm:text-xl">
+        <h1 className="text-alternate font-semibold text-lg sm:text-xl">
           Inutilizar numerações fiscais
         </h1>
         <p className="font-inter text-xs lg:text-sm text-secondary-text">
@@ -504,7 +504,7 @@ export function Etapa4InutilizarNotas() {
       </div>
 
       <div className="rounded-lg border border-primary/20 bg-white p-3">
-        <h4 className="font-exo font-semibold text-alternate text-sm mb-2">
+        <h4 className="font-semibold text-alternate text-sm mb-2">
           Numeração para inutilização
         </h4>
 
@@ -611,7 +611,7 @@ export function Etapa4InutilizarNotas() {
       </div>
 
       <div className="rounded-lg border border-primary/20 bg-white p-3">
-        <h4 className="font-exo font-semibold text-alternate text-sm mb-2">
+        <h4 className="font-semibold text-alternate text-sm mb-2">
           Histórico de inutilizações
         </h4>
 

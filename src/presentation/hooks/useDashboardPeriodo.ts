@@ -1,62 +1,91 @@
-import { useState, useCallback } from 'react'
-import { startOfDay } from 'date-fns'
+import { useState, useCallback, useMemo } from 'react'
+import { startOfDay, startOfMonth } from 'date-fns'
 import type { DateRange } from 'react-day-picker'
-import { primeiroMesQuadroDuploCalendario } from '@/src/shared/utils/calendarioIntervaloFaturamento'
 import { formatarHoraParaInputCalendar } from '@/src/presentation/components/features/dashboard/dashboardTextHelpers'
-import { combinarIntervaloCalendarParaDatas } from '@/src/shared/utils/intervaloCalendarioComHoras'
+import {
+  combinarIntervaloCalendarParaDatas,
+  intervaloPersonalizadoEhValido,
+} from '@/src/shared/utils/intervaloCalendarioComHoras'
 
+function rascunhoPadraoHoje(): {
+  range: DateRange
+  mes: Date
+  horaInicio: string
+  horaFim: string
+} {
+  const hoje = startOfDay(new Date())
+  return {
+    range: { from: hoje, to: hoje },
+    /** Modal abre em visualização de um mês por padrão. */
+    mes: startOfMonth(hoje),
+    horaInicio: '00:00',
+    horaFim: '23:59',
+  }
+}
+
+/**
+ * Estado e orquestração do filtro de período do dashboard V2
+ * (presets + modal “Por datas”).
+ */
 export function useDashboardPeriodo() {
   const [periodoData, setPeriodoData] = useState('hoje')
   const [periodoPersonalizadoInicio, setPeriodoPersonalizadoInicio] = useState<Date | null>(null)
   const [periodoPersonalizadoFim, setPeriodoPersonalizadoFim] = useState<Date | null>(null)
-  
+
   const [modalIntervaloPersonalizadoAberto, setModalIntervaloPersonalizadoAberto] = useState(false)
-  const [rascunhoIntervaloRange, setRascunhoIntervaloRange] = useState<DateRange | undefined>(undefined)
+  const [rascunhoIntervaloRange, setRascunhoIntervaloRange] = useState<DateRange | undefined>(
+    undefined
+  )
   const [mesCalendarioIntervalo, setMesCalendarioIntervalo] = useState(() =>
-    primeiroMesQuadroDuploCalendario(startOfDay(new Date()))
+    startOfMonth(startOfDay(new Date()))
   )
   const [rascunhoHoraInicio, setRascunhoHoraInicio] = useState('00:00')
   const [rascunhoHoraFim, setRascunhoHoraFim] = useState('23:59')
 
+  /** Sincroniza rascunho com o filtro aplicado (ou hoje) e abre o modal. */
+  const abrirModalPeriodoPersonalizado = useCallback(() => {
+    if (periodoPersonalizadoInicio && periodoPersonalizadoFim) {
+      const fim = startOfDay(periodoPersonalizadoFim)
+      setRascunhoIntervaloRange({
+        from: startOfDay(periodoPersonalizadoInicio),
+        to: fim,
+      })
+      setMesCalendarioIntervalo(startOfMonth(fim))
+      setRascunhoHoraInicio(formatarHoraParaInputCalendar(periodoPersonalizadoInicio))
+      setRascunhoHoraFim(formatarHoraParaInputCalendar(periodoPersonalizadoFim))
+    } else {
+      const padrao = rascunhoPadraoHoje()
+      setRascunhoIntervaloRange(padrao.range)
+      setMesCalendarioIntervalo(padrao.mes)
+      setRascunhoHoraInicio(padrao.horaInicio)
+      setRascunhoHoraFim(padrao.horaFim)
+    }
+    setModalIntervaloPersonalizadoAberto(true)
+  }, [periodoPersonalizadoInicio, periodoPersonalizadoFim])
+
   const handleLimparFiltroPeriodo = useCallback(() => {
-    const hoje = startOfDay(new Date())
+    const padrao = rascunhoPadraoHoje()
     setPeriodoData('hoje')
     setPeriodoPersonalizadoInicio(null)
     setPeriodoPersonalizadoFim(null)
     setModalIntervaloPersonalizadoAberto(false)
-    setRascunhoIntervaloRange({ from: hoje, to: hoje })
-    setMesCalendarioIntervalo(primeiroMesQuadroDuploCalendario(hoje))
-    setRascunhoHoraInicio('00:00')
-    setRascunhoHoraFim('23:59')
+    setRascunhoIntervaloRange(padrao.range)
+    setMesCalendarioIntervalo(padrao.mes)
+    setRascunhoHoraInicio(padrao.horaInicio)
+    setRascunhoHoraFim(padrao.horaFim)
   }, [])
 
   const handlePeriodoDataChange = useCallback(
     (v: string) => {
       if (v === 'personalizado') {
-        if (periodoPersonalizadoInicio && periodoPersonalizadoFim) {
-          const fim = startOfDay(periodoPersonalizadoFim)
-          setRascunhoIntervaloRange({
-            from: startOfDay(periodoPersonalizadoInicio),
-            to: fim,
-          })
-          setMesCalendarioIntervalo(primeiroMesQuadroDuploCalendario(fim))
-          setRascunhoHoraInicio(formatarHoraParaInputCalendar(periodoPersonalizadoInicio))
-          setRascunhoHoraFim(formatarHoraParaInputCalendar(periodoPersonalizadoFim))
-        } else {
-          const hoje = startOfDay(new Date())
-          setRascunhoIntervaloRange({ from: hoje, to: hoje })
-          setMesCalendarioIntervalo(primeiroMesQuadroDuploCalendario(hoje))
-          setRascunhoHoraInicio('00:00')
-          setRascunhoHoraFim('23:59')
-        }
-        setModalIntervaloPersonalizadoAberto(true)
+        abrirModalPeriodoPersonalizado()
         return
       }
       setPeriodoData(v)
       setPeriodoPersonalizadoInicio(null)
       setPeriodoPersonalizadoFim(null)
     },
-    [periodoPersonalizadoInicio, periodoPersonalizadoFim]
+    [abrirModalPeriodoPersonalizado]
   )
 
   const handleConfirmarIntervaloPersonalizado = useCallback(
@@ -81,11 +110,22 @@ export function useDashboardPeriodo() {
       setRascunhoIntervaloRange(next)
       return
     }
-    const hoje = startOfDay(new Date())
-    setRascunhoIntervaloRange({ from: hoje, to: hoje })
+    const padrao = rascunhoPadraoHoje()
+    setRascunhoIntervaloRange(padrao.range)
   }, [])
 
+  const rascunhoIntervaloValido = useMemo(
+    () =>
+      intervaloPersonalizadoEhValido(rascunhoIntervaloRange, rascunhoHoraInicio, rascunhoHoraFim),
+    [rascunhoIntervaloRange, rascunhoHoraInicio, rascunhoHoraFim]
+  )
+
   const handleAplicarIntervaloPersonalizadoModal = useCallback(() => {
+    if (
+      !intervaloPersonalizadoEhValido(rascunhoIntervaloRange, rascunhoHoraInicio, rascunhoHoraFim)
+    ) {
+      return
+    }
     const { dataInicial, dataFinal } = combinarIntervaloCalendarParaDatas(
       rascunhoIntervaloRange,
       rascunhoHoraInicio,
@@ -114,8 +154,10 @@ export function useDashboardPeriodo() {
     setRascunhoHoraInicio,
     rascunhoHoraFim,
     setRascunhoHoraFim,
+    rascunhoIntervaloValido,
     handleLimparFiltroPeriodo,
     handlePeriodoDataChange,
+    abrirModalPeriodoPersonalizado,
     handleRascunhoIntervaloRangeChange,
     handleAplicarIntervaloPersonalizadoModal,
   }

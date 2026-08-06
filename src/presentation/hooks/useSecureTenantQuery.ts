@@ -29,7 +29,7 @@ export type UseSecureTenantQueryOptions<T> = Omit<
 /**
  * Hook obrigatório para consultas de dados por empresa (ERP).
  *
- * Segue a mesma filosofia do modelo Omie multi-tenant por aba:
+ * Modelo multi-tenant por aba:
  * - Bloqueia execução quando não há sessão de empresa válida nesta aba
  * - Inclui `empresaId` automaticamente na query key (isolamento de cache por empresa)
  * - Compatível com `fetchGestorApi` para refresh transparente de token em 401
@@ -51,12 +51,14 @@ export function useSecureTenantQuery<T>(
   const tenantAuth = useAuthStore(s => s.tenantAuth)
   const isAuthenticated = useAuthStore(s => s.isAuthenticated)
   const isRehydrated = useAuthStore(s => s.isRehydrated)
+  const isTabVerified = useAuthStore(s => s.isTabVerified)
   const empresaId = useTenantEmpresaId()
   const queryKey = useTenantQueryKey(baseKey)
 
   const token = tenantAuth?.getAccessToken() ?? null
   const securityEnabled =
     isRehydrated &&
+    isTabVerified &&
     isAuthenticated &&
     !!token &&
     !!empresaId &&

@@ -1,0 +1,70 @@
+'use client'
+
+import { LayoutGrid, List, Mail } from 'lucide-react'
+import { cn } from '@/src/shared/utils/cn'
+
+export type MinhasEmpresasViewMode = 'grid' | 'list'
+
+/** O que entra no feed: ambos, só convites ou só empresas vinculadas. */
+export type MinhasEmpresasFeedFiltro = 'tudo' | 'convites' | 'empresas'
+
+function IconButton({
+  label,
+  active,
+  onClick,
+  children,
+}: {
+  label: string
+  active?: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'inline-flex h-9 w-9 items-center justify-center rounded-full border text-secondary shadow-sm transition-colors',
+        active
+          ? 'border-secondary/35 bg-secondary/10'
+          : 'border-transparent bg-transparent hover:bg-gray-100 hover:text-alternate'
+      )}
+      aria-pressed={active ? 'true' : 'false'}
+      aria-label={label}
+      title={label}
+    >
+      {children}
+    </button>
+  )
+}
+
+export function ViewControls({
+  mode,
+  onModeChange,
+  feedFiltro,
+  onFeedFiltroChange,
+}: {
+  mode: MinhasEmpresasViewMode
+  onModeChange: (m: MinhasEmpresasViewMode) => void
+  feedFiltro: MinhasEmpresasFeedFiltro
+  onFeedFiltroChange: (f: MinhasEmpresasFeedFiltro) => void
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      <IconButton label="Visualização em grade" active={mode === 'grid'} onClick={() => onModeChange('grid')}>
+        <LayoutGrid className="h-4 w-4" aria-hidden />
+      </IconButton>
+      <IconButton label="Visualização em lista" active={mode === 'list'} onClick={() => onModeChange('list')}>
+        <List className="h-4 w-4" aria-hidden />
+      </IconButton>
+      <span className="mx-1 hidden h-5 w-px bg-gray-200 sm:inline-block" aria-hidden />
+      <IconButton
+        label="Exibir somente convites pendentes"
+        active={feedFiltro === 'convites'}
+        onClick={() => onFeedFiltroChange(feedFiltro === 'convites' ? 'tudo' : 'convites')}
+      >
+        <Mail className="h-4 w-4" aria-hidden />
+      </IconButton>
+    </div>
+  )
+}

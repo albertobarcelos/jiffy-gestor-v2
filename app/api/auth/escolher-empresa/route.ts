@@ -3,11 +3,14 @@ import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 import {
   AUTH_COOKIE_IDENTITY,
   AUTH_COOKIE_LEGACY,
-  AUTH_COOKIE_REFRESH,
   AUTH_COOKIE_TENANT,
   cookieOptsMaxAge,
 } from '@/src/shared/utils/authCookies'
-import { decodeToken } from '@/src/shared/utils/validateToken'
+import {
+  applyRefreshTokenMap,
+  readRefreshTokenMap,
+} from '@/src/shared/utils/refreshTokenMap'
+import { decodeToken, isTokenExpired } from '@/src/shared/utils/validateToken'
 import {
   EscolherEmpresaRequestSchema,
   EscolherEmpresaResponseSchema,
@@ -17,10 +20,14 @@ import {
  * BFF: Abre sessão na empresa selecionada (multi-empresa)
  * POST /api/auth/escolher-empresa
  */
-function getIdentityTokenParaEscolherEmpresa(request: NextRequest): string | null {
+/**
+ * Token para escolher-empresa: identity válido, senão Bearer (access), senão cookie.
+ * Se o cookie de identity já expirou, não pode bloquear o access do header.
+ */
+function getTokenParaEscolherEmpresa(request: NextRequest): string | null {
   const fromCookie =
-    request.cookies.get(AUTH_COOKIE_IDENTITY)?.value ??
-    request.cookies.get(AUTH_COOKIE_LEGACY)?.value ??
+    request.cookies.get(AUTH_COOKIE_IDENTITY)?.value?.trim() ||
+    request.cookies.get(AUTH_COOKIE_LEGACY)?.value?.trim() ||
     null
 
   const authHeader = request.headers.get('authorization')
@@ -32,18 +39,18 @@ function getIdentityTokenParaEscolherEmpresa(request: NextRequest): string | nul
     }
   }
 
-  /**
-   * Cookie httpOnly é a fonte estável após login; o cliente às vezes envia no header
-   * o JWT do tenant (Zustand `auth`) por engano, o que gera "token inválido" no hub.
-   * Preferimos o cookie de identidade quando existir.
-   */
-  if (fromCookie) return fromCookie
-  return fromBearer
+  if (fromCookie && !isTokenExpired(fromCookie)) {
+    return fromCookie
+  }
+  if (fromBearer && !isTokenExpired(fromBearer)) {
+    return fromBearer
+  }
+  return fromCookie || fromBearer
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const token = getIdentityTokenParaEscolherEmpresa(request)
+    const token = getTokenParaEscolherEmpresa(request)
     if (!token) {
       return NextResponse.json({ error: 'Token não encontrado' }, { status: 401 })
     }
@@ -72,7 +79,14 @@ export async function POST(request: NextRequest) {
 
     const res = NextResponse.json(parsed, { status: 200 })
     res.cookies.set(AUTH_COOKIE_TENANT, parsed.accessToken, cookieOptsMaxAge(accessMaxAge))
-    res.cookies.set(AUTH_COOKIE_REFRESH, parsed.refreshToken, cookieOptsMaxAge(refreshMaxAge))
+    // Mapa por empresa + cookie legado last-wins para ponte do hub.
+    applyRefreshTokenMap(
+      res,
+      readRefreshTokenMap(request),
+      validated.empresaId,
+      parsed.refreshToken,
+      refreshMaxAge
+    )
     return res
   } catch (error) {
     if (error instanceof ApiError) {

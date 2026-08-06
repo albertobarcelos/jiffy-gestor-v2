@@ -14,7 +14,7 @@ type TabKey = 'terminal'
 export interface TerminaisTabsModalState {
   open: boolean
   tab: TabKey
-  mode: 'edit'
+  mode: 'create' | 'edit'
   terminalId?: string
 }
 
@@ -93,6 +93,7 @@ export function TerminaisTabsModal({
   }, [])
 
   const terminalId = state.terminalId
+  const isCreate = state.mode === 'create'
 
   const footerActions = useMemo((): JiffySidePanelFooterActions => {
     const saving = embedFormState.isSubmitting
@@ -105,14 +106,16 @@ export function TerminaisTabsModal({
       onCancel: handleRequestClose,
       showSave: false,
       showSaveAndClose: true,
-      saveAndCloseLabel: 'Salvar',
+      saveAndCloseLabel: isCreate ? 'Cadastrar' : 'Salvar',
       onSaveAndClose: () => {
         void terminalRef.current?.saveTerminalAndClose?.()
       },
       saveAndCloseLoading: saving,
       saveAndCloseDisabled: disabled,
     }
-  }, [embedFormState, handleRequestClose])
+  }, [embedFormState, handleRequestClose, isCreate])
+
+  const modalTitle = isCreate ? 'Novo Terminal' : 'Editar Terminal'
 
   const tabsSlot = (
     <div className="-mx-2 -mt-2 bg-info px-4 md:-mx-4 md:px-6">
@@ -120,7 +123,7 @@ export function TerminaisTabsModal({
         <button
           type="button"
           onClick={() => onTabChange('terminal')}
-          className={`font-nunito rounded-t-lg px-4 py-2 text-xs font-semibold md:text-sm ${
+          className={`rounded-t-lg px-4 py-2 text-xs font-semibold md:text-sm ${
             state.tab === 'terminal'
               ? 'bg-primary text-white'
               : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
@@ -138,7 +141,7 @@ export function TerminaisTabsModal({
       <JiffySidePanelModal
         open={state.open}
         onClose={handleRequestClose}
-        title="Editar Terminal"
+        title={modalTitle}
         scrollableBody={false}
         footerVariant="bar"
         panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,45vw)]"
@@ -146,10 +149,15 @@ export function TerminaisTabsModal({
         footerActions={footerActions}
       >
         <div className="flex min-h-0 flex-1 flex-col">
-          {state.tab === 'terminal' && terminalId ? (
+          {state.tab === 'terminal' && (isCreate || terminalId) ? (
             <EditarTerminais
               ref={terminalRef}
-              key={`terminal-${terminalId}-sess-${formSession}`}
+              key={
+                isCreate
+                  ? `terminal-create-sess-${formSession}`
+                  : `terminal-${terminalId}-sess-${formSession}`
+              }
+              mode={state.mode}
               terminalId={terminalId}
               isEmbedded
               embeddedFormId={TERMINAIS_TABS_MODAL_FORM_ID}
@@ -208,7 +216,7 @@ export function TerminaisTabsModal({
                   onClick={handleSaveAndCloseFromConfirm}
                   className="w-full rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
                 >
-                  Salvar e fechar
+                  {isCreate ? 'Cadastrar e fechar' : 'Salvar e fechar'}
                 </button>
               </div>
             </div>,

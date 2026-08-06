@@ -10,7 +10,7 @@ export const DELIVERY_KANBAN_COLUMN_IDS: ColunaKanbanId[] = [
   'PRONTO_ENTREGA',
   'EM_ROTA',
   'FINALIZADAS',
-  'COM_NFE',
+  'COM_FISCAL',
 ]
 
 export interface PedidosDeliveryKanbanColumnFilterOptions {
@@ -82,7 +82,7 @@ export function buildPedidosDeliveryParamsForKanbanColumn(
   params: PedidosDeliveryInfiniteParams,
   options?: PedidosDeliveryKanbanColumnFilterOptions
 ): PedidosDeliveryInfiniteParams {
-  if (columnId === 'FINALIZADAS' || columnId === 'COM_NFE') {
+  if (columnId === 'FINALIZADAS' || columnId === 'COM_FISCAL') {
     return paramsFinalizadosKanbanColumn(params, options)
   }
 
@@ -100,7 +100,7 @@ export function buildPedidosDeliveryParamsForKanbanColumn(
 
 /** Colunas que compartilham a mesma query API (`FINALIZADO`) e exigem split client-side. */
 export function isColunaKanbanDeliveryFiscalSplit(columnId: ColunaKanbanId): boolean {
-  return columnId === 'FINALIZADAS' || columnId === 'COM_NFE'
+  return columnId === 'FINALIZADAS' || columnId === 'COM_FISCAL'
 }
 
 /** Filtra itens da listagem para a coluna visual (etapa Kanban + regras delivery). */
@@ -122,8 +122,8 @@ export function vendaPertenceColunaDeliveryKanban(
       return etapa === 'EM_ROTA'
     case 'FINALIZADAS':
       return etapa === 'FINALIZADAS' || etapa === 'PENDENTE_EMISSAO'
-    case 'COM_NFE':
-      return etapa === 'COM_NFE'
+    case 'COM_FISCAL':
+      return etapa === 'COM_FISCAL'
     default:
       return false
   }

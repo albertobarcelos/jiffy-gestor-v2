@@ -36,8 +36,8 @@ export function ExampleHelperFunction() {
 export function ExampleTailwindClasses() {
   return (
     <div className="bg-primary text-primary-text p-4 rounded-lg">
-      <h2 className="text-alternate font-exo text-xl">Título</h2>
-      <p className="text-secondary-text font-nunito">
+      <h2 className="text-alternate text-xl">Título</h2>
+      <p className="text-secondary-text ">
         Texto secundário usando Tailwind
       </p>
       <button className="bg-success text-white px-4 py-2 rounded hover:bg-success/90">
@@ -73,16 +73,16 @@ export function ExampleCards() {
   return (
     <div className="grid grid-cols-3 gap-4">
       <div className="bg-primary-bg border-2 border-alternate rounded-lg p-4">
-        <h3 className="text-primary font-exo font-semibold">Card 1</h3>
-        <p className="text-secondary-text font-nunito">Descrição</p>
+        <h3 className="text-primary font-semibold">Card 1</h3>
+        <p className="text-secondary-text ">Descrição</p>
       </div>
       <div className="bg-secondary-bg border-2 border-primary rounded-lg p-4">
-        <h3 className="text-primary-text font-exo font-semibold">Card 2</h3>
-        <p className="text-terciary-text font-nunito">Descrição</p>
+        <h3 className="text-primary-text font-semibold">Card 2</h3>
+        <p className="text-terciary-text ">Descrição</p>
       </div>
       <div className="bg-custom-2 border-2 border-accent3 rounded-lg p-4">
-        <h3 className="text-primary font-exo font-semibold">Card 3</h3>
-        <p className="text-secondary-text font-nunito">Descrição</p>
+        <h3 className="text-primary font-semibold">Card 3</h3>
+        <p className="text-secondary-text ">Descrição</p>
       </div>
     </div>
   )

@@ -18,7 +18,7 @@ export function DroppableColumnContent({
   const { setNodeRef, isOver } = useDroppable({ id: columnId })
   const showDropSlotPendente = columnId === 'PENDENTE_EMISSAO' && isOver
   const showDropSlotFinalizadas = columnId === 'FINALIZADAS' && isOver
-  const showDropSlotComNfe = columnId === 'COM_NFE' && isOver
+  const showDropSlotComFiscal = columnId === 'COM_FISCAL' && isOver
   const showDropSlotNovos = columnId === 'NOVOS_PEDIDOS' && isOver
   const showDropSlotPreparo = columnId === 'EM_PREPARO' && isOver
   const showDropSlotPronto = columnId === 'PRONTO_ENTREGA' && isOver
@@ -27,7 +27,7 @@ export function DroppableColumnContent({
     ? 'ring-2 ring-yellow-400 ring-inset bg-yellow-50/50'
     : showDropSlotFinalizadas
       ? 'ring-2 ring-blue-400 ring-inset bg-blue-50/50'
-      : showDropSlotComNfe
+      : showDropSlotComFiscal
         ? 'ring-2 ring-green-400 ring-inset bg-green-50/50'
         : showDropSlotNovos
           ? 'ring-2 ring-sky-400 ring-inset bg-sky-50/50'
@@ -51,7 +51,7 @@ export function DroppableColumnContent({
           Solte aqui para voltar à coluna Finalizadas
         </div>
       )}
-      {showDropSlotComNfe && (
+      {showDropSlotComFiscal && (
         <div className="mb-2 flex min-h-[72px] items-center justify-center rounded-lg border-2 border-dashed border-green-500 bg-green-50/90 px-2 text-center text-sm font-medium text-green-800 transition-all">
           Solte aqui para emitir ou reemitir nota
         </div>

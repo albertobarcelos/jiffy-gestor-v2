@@ -19,7 +19,7 @@ function formatarDataHora(expiraEm: string): string {
 }
 
 /**
- * Linha de convite no modo lista — alinhada à grade de `EmpresaListRow` (MeusAppsFeedList).
+ * Linha de convite no modo lista — alinhada à grade de `EmpresaListRow` (MinhasEmpresasFeedList).
  */
 export function ConviteListRow({
   convite,

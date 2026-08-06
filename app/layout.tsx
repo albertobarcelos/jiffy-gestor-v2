@@ -28,6 +28,13 @@ const generalSans = localFont({
 export const metadata: Metadata = {
   title: 'Jiffy Gestor - Sistema de Gestão',
   description: 'Sistema de gestão empresarial Jiffy',
+  icons: {
+    icon: [
+      { url: '/images/jiffy-favicon.png', type: 'image/png', sizes: '512x512' },
+    ],
+    shortcut: '/images/jiffy-favicon.png',
+    apple: [{ url: '/images/jiffy-favicon.png', type: 'image/png', sizes: '512x512' }],
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

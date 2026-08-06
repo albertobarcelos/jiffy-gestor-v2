@@ -124,7 +124,7 @@ describe('fetchGestorApi', () => {
         .mockResolvedValueOnce(makeOkResponse())
 
       vi.mocked(fetchTenantRefreshAccessToken).mockResolvedValue('novo-token')
-      vi.mocked(syncTenantAccessTokenClient).mockImplementation(() => {})
+      vi.mocked(syncTenantAccessTokenClient).mockReturnValue(true)
 
       mockGetState.mockReturnValue({ tenantAuth: null })
 

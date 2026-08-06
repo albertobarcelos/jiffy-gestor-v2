@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { Impressora } from '@/src/domain/entities/Impressora'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { MdSearch, MdPrint, MdDelete, MdContentCopy } from 'react-icons/md'
 import {
   ImpressorasTabsModal,
@@ -43,7 +44,7 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
-  const { auth, isAuthenticated } = useAuthStore()
+  const { isAuthenticated } = useAuthStore()
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -61,7 +62,7 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
    */
   const loadAllImpressoras = useCallback(
     async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         return
       }
@@ -85,7 +86,7 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
             params.append('q', searchTextRef.current)
           }
 
-          const response = await fetch(`/api/impressoras?${params.toString()}`, {
+          const response = await fetchGestorApi(`/api/impressoras?${params.toString()}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -128,12 +129,12 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
         setIsLoading(false)
       }
     },
-    [auth]
+    []
   )
 
   // Debounce da busca
   useEffect(() => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     if (debounceTimerRef.current) {
@@ -149,13 +150,13 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
         clearTimeout(debounceTimerRef.current)
       }
     }
-  }, [searchText, auth, loadAllImpressoras])
+  }, [searchText, loadAllImpressoras])
 
   // Carrega impressoras iniciais apenas quando o token estiver disponível
   useEffect(() => {
     if (!isAuthenticated || hasLoadedInitialRef.current) return
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     hasLoadedInitialRef.current = true
@@ -229,12 +230,12 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
     setIsDeleting(true)
 
     try {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         throw new Error('Token não encontrado')
       }
 
-      const response = await fetch(`/api/impressoras/${impressoraToDelete}`, {
+      const response = await fetchGestorApi(`/api/impressoras/${impressoraToDelete}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -260,7 +261,7 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
     } finally {
       setIsDeleting(false)
     }
-  }, [impressoraToDelete, auth, loadAllImpressoras, onReload])
+  }, [impressoraToDelete, loadAllImpressoras, onReload])
 
   /**
    * Gera código abreviado do ID (primeiros 6 caracteres em maiúsculas)
@@ -275,16 +276,16 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
       <div className="md:px-6 px-1 pt-1 pb-1 flex-shrink-0">
         <div className="flex items-start justify-between">
           <div className="">
-            <p className="text-primary md:text-xl text-sm font-semibold font-nunito">
+            <p className="text-primary md:text-xl text-sm font-semibold ">
               Impressoras Cadastradas
             </p>
-            <p className="text-tertiary md:text-[22px] text-sm font-medium font-nunito">
+            <p className="text-tertiary md:text-[22px] text-sm font-medium ">
               Total {impressoras.length} de {totalImpressoras}
             </p>
           </div>
           <button
             onClick={handleAdd}
-            className="h-8 md:px-[30px] px-2 bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+            className="h-8 md:px-[30px] px-2 bg-primary text-info rounded-lg font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
           >
             + Adicionar
           </button>
@@ -304,7 +305,7 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
                 placeholder="Pesquisar impressoras..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
-                className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+                className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm "
               />
             </div>
           </div>
@@ -313,17 +314,17 @@ export function ImpressorasList({ onReload }: ImpressorasListProps) {
       {/* Cabeçalho da tabela */}
       <div className="md:px-[30px] mt-0 flex-shrink-0">
         <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px]">
-          <div className="flex-[1] w-16 font-nunito font-semibold text-sm text-primary-text text-left hidden md:flex">
+          <div className="flex-[1] w-16 font-semibold text-sm text-primary-text text-left hidden md:flex">
             Ícone
           </div>
-          <div className="flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text">
+          <div className="flex-[2] font-semibold md:text-sm text-xs text-primary-text">
             Código
           </div>
-          <div className="flex-[2] font-nunito font-semibold md:text-sm text-xs text-primary-text">
+          <div className="flex-[2] font-semibold md:text-sm text-xs text-primary-text">
             Impressora
           </div>
           
-          <div className="flex-[1] text-right font-nunito font-semibold md:text-sm text-xs text-primary-text">
+          <div className="flex-[1] text-right font-semibold md:text-sm text-xs text-primary-text">
             Ações
           </div>
         </div>

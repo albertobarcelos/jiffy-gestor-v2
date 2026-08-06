@@ -276,7 +276,7 @@ export function ConfigurarNcmModal({
         }}
       >
         <div style={{ padding: '24px 24px 16px 24px', flexShrink: 0 }}>
-          <h1 className="text-alternate font-exo font-semibold text-lg sm:text-xl">
+          <h1 className="text-alternate font-semibold text-lg sm:text-xl">
             {configuracaoImposto ? 'Editar Configuração de Impostos por NCM' : 'Nova Configuração de Impostos por NCM'}
           </h1>
         </div>
@@ -307,6 +307,9 @@ export function ConfigurarNcmModal({
               size="small"
             />
             <p className="text-xs text-secondary-text/70">8 dígitos</p>
+            {configuracaoImposto?.ncm?.descricao?.trim() ? (
+              <p className="text-sm text-secondary-text">{configuracaoImposto.ncm.descricao.trim()}</p>
+            ) : null}
           </div>
 
           <div className="grid md:grid-cols-2 grid-cols-1 gap-4">

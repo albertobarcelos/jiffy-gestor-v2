@@ -1,4 +1,9 @@
-# Guia Oficial: Implementação Segura Multi-Tenant — Jiffy Gestor
+﻿# Guia Oficial: Implementação Segura Multi-Tenant — Jiffy Gestor
+
+> **Fonte da verdade** para sessão e HTTP no ERP. Complementos:  
+> - Hub / Meu Jiffy → [`arquitetura-jiffy/5.presentation/4.FLUXO_VOLTAR_AO_MEU_JIFFY.md`](./arquitetura-jiffy/5.presentation/4.FLUXO_VOLTAR_AO_MEU_JIFFY.md)  
+> - Invariantes multi-aba → [`arquitetura-jiffy/5.presentation/6.INVARIANTES_SESSAO_MULTI_ABA.md`](./arquitetura-jiffy/5.presentation/6.INVARIANTES_SESSAO_MULTI_ABA.md)  
+> - Login / identidade → [`FLUXO_LOGIN_ATUAL.md`](./FLUXO_LOGIN_ATUAL.md)
 
 ## 1. Visão geral
 
@@ -36,6 +41,10 @@ Cada aba do browser pode estar em uma empresa diferente. O `tenantAuth` fica em 
 
 - Aba A (Empresa X) não compartilha token com Aba B (Empresa Y)
 - O cookie global `tenant-token` **não** deve ser a fonte de verdade no cliente; o BFF deve preferir o `Authorization: Bearer` enviado pelo frontend
+- A **URL (slug + prefixo de `empresaId`)** é canônica: se divergir do token da aba, o bootstrap faz rebind via `escolher-empresa`
+- O BFF guarda `refresh-token-map` por `empresaId`; o cookie `refresh-token` legado fica como “última empresa” / ponte do hub
+
+Ver: `docs/arquitetura-jiffy/5.presentation/6.INVARIANTES_SESSAO_MULTI_ABA.md`
 
 ### 2.3 Reidratação
 
@@ -115,7 +124,7 @@ Comportamento do `ErpTenantAccessGuard`:
 
 - Loading → `JiffyLoading`
 - Sessão expirada → redirect `/login`
-- Sem sessão de empresa (identidade ok) → redirect `/meus-apps`
+- Sem sessão de empresa (identidade ok) → redirect `/minhas-empresas`
 
 Arquivos:
 
@@ -356,7 +365,7 @@ flowchart TD
   A[Login identity] --> B[Selecionar empresa no hub]
   B --> C[tenantAuth na aba sessionStorage]
   C --> D[ErpTenantAccessGuard]
-  D -->|Sem acesso| E[Redirect login ou meus-apps]
+  D -->|Sem acesso| E[Redirect login ou minhas-empresas]
   D -->|OK| F[useSecureTenantQuery / Mutation]
   F --> G[fetchGestorApi com Bearer tenantAuth]
   G --> H[BFF valida JWT e empresaId]

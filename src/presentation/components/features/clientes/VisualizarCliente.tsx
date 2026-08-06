@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
@@ -62,9 +63,7 @@ export function VisualizarCliente({
   onClose,
   onEdit,
 }: VisualizarClienteProps) {
-  const router = useRouter()
-  const { auth } = useAuthStore()
-  const [cliente, setCliente] = useState<Cliente | null>(null)
+  const router = useRouter()  const [cliente, setCliente] = useState<Cliente | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const INPUT_LABEL_PROPS = { shrink: true } as const
@@ -83,7 +82,7 @@ export function VisualizarCliente({
   // Carregar dados do cliente
   useEffect(() => {
     const loadCliente = async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         setError('Token não encontrado')
         setIsLoading(false)
@@ -94,7 +93,7 @@ export function VisualizarCliente({
       setError(null)
 
       try {
-        const response = await fetch(`/api/clientes/${clienteId}`, {
+        const response = await fetchGestorApi(`/api/clientes/${clienteId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -121,7 +120,7 @@ export function VisualizarCliente({
     if (clienteId) {
       loadCliente()
     }
-  }, [clienteId, auth])
+  }, [clienteId])
 
   if (isLoading) {
     return (
@@ -155,7 +154,7 @@ export function VisualizarCliente({
               </div>
               <div className="flex flex-col items-start">
                 <div className="flex items-center gap-2">
-                  <h1 className="text-primary text-lg font-semibold font-exo">
+                  <h1 className="text-primary text-lg font-semibold ">
                     {cliente.getNome()}
                   </h1>
                   <button
@@ -340,7 +339,7 @@ export function VisualizarCliente({
 
         {/* Fiscal — fora das duas colunas, largura total; campos lado a lado no desktop */}
         <div className="rounded-lg bg-white px-2 py-2 shadow-sm md:px-6 md:py-3">
-          <h2 className="text-primary text-lg font-semibold font-nunito mb-3 flex items-center gap-2 border-b-2 border-primary pb-2">
+          <h2 className="text-primary text-lg font-semibold mb-3 flex items-center gap-2 border-b-2 border-primary pb-2">
             <span className="text-xl text-primary">
               <MdReceiptLong />
             </span>

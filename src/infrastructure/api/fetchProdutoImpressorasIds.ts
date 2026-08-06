@@ -1,3 +1,4 @@
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { getOrFetchImpressorasIdsDoProduto } from '@/src/infrastructure/api/produtoImpressorasSessionCache'
 
 async function fetchImpressorasIdsDoProdutoFromApi(
@@ -7,7 +8,7 @@ async function fetchImpressorasIdsDoProdutoFromApi(
   const id = produtoId.trim()
   if (!id || !accessToken?.trim()) return []
 
-  const res = await fetch(`/api/produtos/${encodeURIComponent(id)}`, {
+  const res = await fetchGestorApi(`/api/produtos/${encodeURIComponent(id)}`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
       Accept: 'application/json',

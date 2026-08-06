@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter, usePathname } from 'next/navigation' // Importar useRouter e usePathname
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import {
   MdSearch,
   MdAttachMoney,
@@ -21,6 +22,8 @@ import { GraficoVendasPorUsuarioModal } from './GraficoVendasPorUsuarioModal'
 import { FormControl, InputAdornment, InputLabel, MenuItem, Select, TextField } from '@mui/material'
 import { sxEntradaCompactaProdutoSelect } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import { TipoVendaIcon } from './TipoVendaIcon'
+import { calculatePeriodo } from '@/src/shared/utils/dateFilters' // Importar calculatePeriodo
+import { calcularPeriodoNoFusoEmpresa } from '@/src/shared/utils/periodoNoFusoEmpresa'
 import { startOfDay } from 'date-fns'
 import type { DateRange } from 'react-day-picker'
 import {
@@ -37,17 +40,38 @@ import { FaturamentoRangeCalendar } from '@/src/presentation/components/ui/Fatur
 import { useDashboardFaturamentoPorDiaQuery } from '@/src/presentation/hooks/useDashboardFaturamentoPorDiaQuery'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { useExportarRelatorioVendas } from '@/src/presentation/hooks/useExportarRelatorioVendas'
-import {
-  buildVendasListQueryParams,
-  filtrarVendasPorStatusCliente,
-  mapearVendaApiRow,
-} from '@/src/presentation/utils/vendas/vendasListQuery'
-import { calcularTotalCanceladoLista } from '@/src/presentation/utils/vendas/vendasListCalculos'
 import type {
-  MetricasVendas,
-  VendaListItem as Venda,
-  VendasFiltrosQuerySnapshot,
+  MetricasVendas as MetricasVendasExport,
+  VendasFiltrosQuerySnapshot as VendasFiltrosQuerySnapshotExport,
 } from '@/src/presentation/utils/vendas/vendasListTypes'
+// Tipos
+interface Venda {
+  id: string
+  numeroVenda: number
+  codigoVenda: string
+  numeroMesa?: number
+  valorFinal: number
+  tipoVenda: 'balcao' | 'mesa' | 'gestor'
+  abertoPorId: string
+  canceladoPorId?: string
+  codigoTerminal: string
+  terminalId: string
+  dataCriacao: string
+  dataUltimoProdutoLancado?: string
+  dataUltimaMovimentacao?: string
+  dataCancelamento?: string
+  dataFinalizacao?: string
+  metodoPagamento?: string
+  status?: string
+  totalValorProdutosRemovidos?: number
+}
+
+interface MetricasVendas {
+  totalFaturado: number
+  countVendasEfetivadas: number
+  countVendasCanceladas: number
+  countProdutosVendidos: number
+}
 
 interface UsuarioPDV {
   id: string
@@ -112,9 +136,6 @@ const PERIODOS_SELECT_VALIDOS = [
   'Últimos 90 Dias',
 ] as const
 
-/** Período padrão ao abrir a tela ou ao limpar filtros (sem parâmetro na URL). */
-const PERIODO_PADRAO_LISTAGEM = 'Hoje'
-
 /** Mapeia slugs do dashboard V2 / URLs antigas → rótulos do select de relatórios. */
 function mapearPeriodoUrlParaSelect(v: string): string {
   const t = v.trim()
@@ -131,7 +152,7 @@ function mapearPeriodoUrlParaSelect(v: string): string {
 }
 
 function normalizarPeriodoSelect(v: string | undefined): string {
-  if (!v) return PERIODO_PADRAO_LISTAGEM
+  if (!v) return 'Hoje'
   const mapped = mapearPeriodoUrlParaSelect(v)
   if ((PERIODOS_SELECT_VALIDOS as readonly string[]).includes(mapped)) return mapped
   return 'Todos'
@@ -165,6 +186,251 @@ function formatarDataHoraFiltroCurta(date: Date): string {
 function formatarHoraParaInputCalendar(d: Date | null | undefined): string {
   if (!d) return '00:00'
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+function getTimeZoneOffsetMinutes(date: Date, timeZone: string): number {
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  })
+  const parts = dtf.formatToParts(date)
+  const map: Partial<Record<Intl.DateTimeFormatPartTypes, string>> = {}
+  for (const p of parts) {
+    if (p.type !== 'literal') map[p.type] = p.value
+  }
+  const year = Number(map.year)
+  const month = Number(map.month)
+  const day = Number(map.day)
+  let hour = Number(map.hour)
+  const minute = Number(map.minute)
+  const second = Number(map.second)
+  if (hour === 24) hour = 0
+  const asUTC = Date.UTC(year, month - 1, day, hour, minute, second)
+  return Math.round((asUTC - date.getTime()) / 60000)
+}
+
+function zonedLocalPartsToUtcDate(
+  dateParts: {
+    year: number
+    month: number
+    day: number
+    hour: number
+    minute: number
+    second: number
+    millisecond: number
+  },
+  timeZone: string
+): Date {
+  const { year, month, day, hour, minute, second, millisecond } = dateParts
+  const guess = Date.UTC(year, month - 1, day, hour, minute, second, millisecond)
+  const off1 = getTimeZoneOffsetMinutes(new Date(guess), timeZone)
+  const utc1 = guess - off1 * 60_000
+  const off2 = getTimeZoneOffsetMinutes(new Date(utc1), timeZone)
+  const utc2 = guess - off2 * 60_000
+  return new Date(utc2)
+}
+
+function toISOStringNoFusoEmpresa(date: Date, timeZoneEmpresa: string): string {
+  const tz = timeZoneEmpresa.trim()
+  if (!tz) return date.toISOString()
+  return zonedLocalPartsToUtcDate(
+    {
+      year: date.getFullYear(),
+      month: date.getMonth() + 1,
+      day: date.getDate(),
+      hour: date.getHours(),
+      minute: date.getMinutes(),
+      second: date.getSeconds(),
+      millisecond: date.getMilliseconds(),
+    },
+    tz
+  ).toISOString()
+}
+
+/** Snapshot dos filtros para montar a query da listagem (GET /api/vendas). */
+interface VendasFiltrosQuerySnapshot {
+  searchQuery: string
+  valorMinimo: string
+  valorMaximo: string
+  periodo: string
+  statusFilter: string | null
+  tipoVendaFilter: string | null
+  meioPagamentoFilter: string
+  usuarioAbertoPorFilter: string
+  terminalFilter: string
+  usuarioCancelouFilter: string
+  periodoInicial: Date | null
+  periodoFinal: Date | null
+}
+
+/** Normaliza string de moeda do filtro para número (mesma regra do input de valor). */
+function normalizarMoedaFiltroVLista(value: string): number | null {
+  if (!value || value.trim() === '') return null
+
+  let clean = value.replace(/[^\d,.]/g, '').trim()
+
+  if (!clean) return null
+
+  if (clean.includes(',')) {
+    clean = clean.replace(/\./g, '').replace(',', '.')
+  } else if (clean.includes('.')) {
+    if ((clean.match(/\./g) || []).length > 1) {
+      clean = clean.replace(/\./g, '')
+    }
+    const parts = clean.split('.')
+    if (parts.length === 2 && parts[1].length === 3) {
+      clean = clean.replace('.', '')
+    }
+  }
+
+  const num = parseFloat(clean)
+  return isNaN(num) ? null : num
+}
+
+/** Monta query string da listagem (sem limit/offset). */
+function buildVendasListQueryParams(
+  filters: VendasFiltrosQuerySnapshot,
+  args?: { timeZoneEmpresa?: string }
+): URLSearchParams {
+  const baseParams = new URLSearchParams()
+
+  if (filters.searchQuery) {
+    baseParams.append('q', filters.searchQuery)
+  }
+
+  if (filters.tipoVendaFilter) {
+    baseParams.append('tipoVenda', filters.tipoVendaFilter.toLowerCase())
+  }
+
+  const normalizedStatus = filters.statusFilter?.toUpperCase()
+  if (normalizedStatus && normalizedStatus !== 'ABERTA') {
+    baseParams.append('status', normalizedStatus)
+  } else {
+    baseParams.append('status', 'FINALIZADA')
+    baseParams.append('status', 'CANCELADA')
+  }
+
+  if (filters.usuarioAbertoPorFilter) {
+    baseParams.append('abertoPorId', filters.usuarioAbertoPorFilter)
+  }
+
+  if (filters.usuarioCancelouFilter) {
+    baseParams.append('canceladoPorId', filters.usuarioCancelouFilter)
+  }
+
+  const valorMin = normalizarMoedaFiltroVLista(filters.valorMinimo)
+  if (valorMin !== null && valorMin > 0) {
+    baseParams.append('valorFinalMinimo', valorMin.toString())
+  }
+
+  const valorMax = normalizarMoedaFiltroVLista(filters.valorMaximo)
+  if (valorMax !== null && valorMax > 0) {
+    baseParams.append('valorFinalMaximo', valorMax.toString())
+  }
+
+  if (filters.meioPagamentoFilter) {
+    baseParams.append('meioPagamentoId', filters.meioPagamentoFilter)
+  }
+
+  if (filters.terminalFilter) {
+    baseParams.append('terminalId', filters.terminalFilter)
+  }
+
+  let inicioFiltro: Date | null = null
+  let fimFiltro: Date | null = null
+  /** Presets (Hoje, Últimos N dias, Mês atual): mesma regra do dashboard/BFF — `calcularPeriodoNoFusoEmpresa`. */
+  let intervaloUtcJaNoFusoApi = false
+  if (filters.periodoInicial && filters.periodoFinal) {
+    inicioFiltro = filters.periodoInicial
+    fimFiltro = filters.periodoFinal
+  } else if (filters.periodo !== 'Todos') {
+    const tzParaPresets = args?.timeZoneEmpresa?.trim() || 'America/Sao_Paulo'
+    const noFuso = calcularPeriodoNoFusoEmpresa(filters.periodo, tzParaPresets)
+    if (noFuso.inicio != null && noFuso.fim != null) {
+      inicioFiltro = noFuso.inicio
+      fimFiltro = noFuso.fim
+      intervaloUtcJaNoFusoApi = true
+    } else {
+      const { inicio, fim } = calculatePeriodo(filters.periodo)
+      inicioFiltro = inicio
+      fimFiltro = fim
+    }
+  }
+  /**
+   * Backend: período por data de finalização (`dataFinalizacaoInicial`/`dataFinalizacaoFinal`).
+   * Com status apenas ABERTA não é permitido filtrar por finalização — usa-se data de criação.
+   */
+  const usarDatasCriacao = normalizedStatus === 'ABERTA'
+  const tzEmpresa = args?.timeZoneEmpresa?.trim() || ''
+  const isoInicioFiltroVendas = (): string => {
+    if (usarDatasCriacao) return inicioFiltro!.toISOString()
+    if (intervaloUtcJaNoFusoApi || !tzEmpresa) return inicioFiltro!.toISOString()
+    return toISOStringNoFusoEmpresa(inicioFiltro!, tzEmpresa)
+  }
+  const isoFimFiltroVendas = (): string => {
+    if (usarDatasCriacao) return fimFiltro!.toISOString()
+    if (intervaloUtcJaNoFusoApi || !tzEmpresa) return fimFiltro!.toISOString()
+    return toISOStringNoFusoEmpresa(fimFiltro!, tzEmpresa)
+  }
+  if (inicioFiltro) {
+    baseParams.append(
+      usarDatasCriacao ? 'dataCriacaoInicial' : 'dataFinalizacaoInicial',
+      isoInicioFiltroVendas()
+    )
+  }
+  if (fimFiltro) {
+    baseParams.append(
+      usarDatasCriacao ? 'dataCriacaoFinal' : 'dataFinalizacaoFinal',
+      isoFimFiltroVendas()
+    )
+  }
+
+  return baseParams
+}
+
+/** Mapeia linha da API para o tipo usado na lista. */
+function mapearVendaApiRow(item: any): Venda {
+  return {
+    ...item,
+    totalValorProdutosRemovidos:
+      item.totalValorProdutosRemovidos ||
+      item.totalValorProdutosRemovido ||
+      item.valorProdutosRemovidos ||
+      item.valorProdutosRemovido ||
+      0,
+  }
+}
+
+/**
+ * Refina por status usando datas (quando a API retorna mistura ou caso "Aberta").
+ */
+function filtrarVendasPorStatusCliente(itens: Venda[], statusFilter: string | null): Venda[] {
+  return itens.filter((v: Venda) => {
+    const normalizedStatus = statusFilter?.toUpperCase()
+
+    if (!normalizedStatus || normalizedStatus === 'ABERTA') {
+      if (normalizedStatus === 'ABERTA') {
+        return !v.dataCancelamento && !v.dataFinalizacao
+      }
+      return !!(v.dataCancelamento || v.dataFinalizacao)
+    }
+
+    if (normalizedStatus === 'CANCELADA') {
+      return !!v.dataCancelamento
+    }
+
+    if (normalizedStatus === 'FINALIZADA') {
+      return !!v.dataFinalizacao && !v.dataCancelamento
+    }
+
+    return !!(v.dataCancelamento || v.dataFinalizacao)
+  })
 }
 
 /** Borda do `Select` outlined sempre visível (o MUI deixa o repouso tão claro que parece sumir). */
@@ -201,7 +467,7 @@ const sxVendasFiltroSelectBase = {
     color: 'var(--color-secondary-text)',
     fontWeight: 300,
     fontSize: '0.975rem',
-    fontFamily: '"Nunito", sans-serif',
+    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
   },
   '& .MuiInputLabel-root.Mui-focused': {
     color: 'var(--color-secondary-text)',
@@ -243,7 +509,7 @@ const sxVendasFiltroTextFieldMoeda = {
   '& .MuiOutlinedInput-root': {
     ...sxVendasFiltroOutlinedInputRoot,
     backgroundColor: 'var(--color-info)',
-    fontFamily: '"Nunito", sans-serif',
+    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
     height: 30,
     minHeight: 30,
     paddingLeft: 2,
@@ -255,7 +521,7 @@ const sxVendasFiltroTextFieldMoeda = {
     color: 'var(--color-secondary-text)',
     fontWeight: 300,
     fontSize: '0.975rem',
-    fontFamily: '"Nunito", sans-serif',
+    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
   },
   '& .MuiInputLabel-root.Mui-focused': {
     color: 'var(--color-secondary-text)',
@@ -284,7 +550,6 @@ const sxVendasFiltroTextFieldMoeda = {
  * Implementa scroll infinito, filtros avançados e cards de métricas
  */
 export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
-  const { auth } = useAuthStore()
   const { timezoneAgregacao, empresa } = useEmpresaMe()
   const { exportar: exportarRelatorio, isExportando } = useExportarRelatorioVendas()
   const router = useRouter()
@@ -501,7 +766,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
    * Carrega todos os usuários PDV
    */
   const loadAllUsuariosPDV = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     try {
@@ -517,7 +782,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
           ativo: 'true',
         })
 
-        const response = await fetch(`/api/usuarios?${params.toString()}`, {
+        const response = await fetchGestorApi(`/api/usuarios?${params.toString()}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -541,13 +806,13 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     } catch (error) {
       console.error('Erro ao carregar usuários PDV:', error)
     }
-  }, [auth])
+  }, [])
 
   /**
    * Carrega todos os meios de pagamento
    */
   const loadAllMeiosPagamento = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     setIsLoadingMeiosPagamento(true)
@@ -565,7 +830,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
           ativo: 'true',
         })
 
-        const response = await fetch(`/api/meios-pagamentos?${params.toString()}`, {
+        const response = await fetchGestorApi(`/api/meios-pagamentos?${params.toString()}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -591,13 +856,13 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     } finally {
       setIsLoadingMeiosPagamento(false)
     }
-  }, [auth])
+  }, [])
 
   /**
    * Carrega todos os terminais
    */
   const loadAllTerminais = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     setIsLoadingTerminais(true)
@@ -614,7 +879,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
           offset: currentOffset.toString(),
         })
 
-        const response = await fetch(`/api/terminais?${params.toString()}`, {
+        const response = await fetchGestorApi(`/api/terminais?${params.toString()}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -640,7 +905,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     } finally {
       setIsLoadingTerminais(false)
     }
-  }, [auth])
+  }, [])
 
   /**
    * Indica se a API provavelmente tem próxima página (com base em count/totalPages ou página cheia).
@@ -680,7 +945,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
       params.append('limit', String(pageSize))
       params.append('offset', String(offset))
 
-      const response = await fetch(`/api/vendas?${params.toString()}`, {
+      const response = await fetchGestorApi(`/api/vendas?${params.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -713,7 +978,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
    * Primeira página: reseta lista, métricas e offset; filtros vão na query (backend).
    */
   const fetchVendas = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     const seq = ++vendasFetchSeqRef.current
@@ -749,13 +1014,13 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         setIsLoading(false)
       }
     }
-  }, [auth, buscarPaginaVendas, inferirHasMoreApi])
+  }, [ buscarPaginaVendas, inferirHasMoreApi])
 
   /**
    * Próximas páginas (scroll infinito / botão).
    */
   const loadMoreVendas = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
     if (!hasMoreVendasRef.current || isLoadingRef.current || isLoadingMoreRef.current) return
 
@@ -779,13 +1044,25 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
       // Sempre encerra: um reset de filtros pode invalidar `seq` e outra busca já zerou o estado
       setIsLoadingMore(false)
     }
-  }, [auth, buscarPaginaVendas, inferirHasMoreApi])
+  }, [ buscarPaginaVendas, inferirHasMoreApi])
 
   /** Soma “Total cancelado” apenas sobre as vendas já carregadas na lista (métricas globais vêm de `metricas`). */
-  const totalCanceladoSomenteLista = useMemo(
-    () => calcularTotalCanceladoLista(vendas),
-    [vendas]
-  )
+  const totalCanceladoSomenteLista = useMemo(() => {
+    return vendas.reduce((total, v) => {
+      const totalRemovidos = Number(v.totalValorProdutosRemovidos) || 0
+      const valorFinal = Number(v.valorFinal) || 0
+
+      if (v.dataCancelamento) {
+        return total + totalRemovidos + valorFinal
+      }
+
+      if (v.dataFinalizacao && !v.dataCancelamento && totalRemovidos > 0) {
+        return total + totalRemovidos
+      }
+
+      return total
+    }, 0)
+  }, [vendas])
 
   const avisoGraficoListaParcial =
     hasMoreVendas && totalListaCount != null && vendas.length < totalListaCount
@@ -870,13 +1147,13 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   }, [handleScrollListaVendas])
 
   /**
-   * Restaura filtros ao padrão da tela (vendas de hoje, demais filtros vazios).
+   * Limpa todos os filtros
    */
   const handleClearFilters = useCallback(() => {
     setSearchQuery('')
     setValorMinimo('')
     setValorMaximo('')
-    setPeriodo(PERIODO_PADRAO_LISTAGEM)
+    setPeriodo('Todos')
     setStatusFilter(null)
     setTipoVendaFilter(null)
     setMeioPagamentoFilter('')
@@ -885,21 +1162,6 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     setUsuarioCancelouFilter('')
     setPeriodoInicial(null)
     setPeriodoFinal(null)
-
-    filtersRef.current = {
-      searchQuery: '',
-      valorMinimo: '',
-      valorMaximo: '',
-      periodo: PERIODO_PADRAO_LISTAGEM,
-      statusFilter: null,
-      tipoVendaFilter: null,
-      meioPagamentoFilter: '',
-      usuarioAbertoPorFilter: '',
-      terminalFilter: '',
-      usuarioCancelouFilter: '',
-      periodoInicial: null,
-      periodoFinal: null,
-    }
 
     // Remove todos os parâmetros de filtro da URL
     // Verifica se estamos no cliente antes de usar window
@@ -931,7 +1193,8 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
   }, [router, pathname])
 
   const handleExportarRelatorio = useCallback(() => {
-    const token = auth?.getAccessToken()
+    const tenantAuth = useAuthStore.getState().tenantAuth
+    const token = tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Sessão expirada. Faça login novamente.')
       return
@@ -941,15 +1204,15 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     const meiosPagamentoPorId = new Map(meiosPagamento.map(m => [m.id, m.nome]))
     const terminaisPorId = new Map(terminais.map(t => [t.id, t.nome]))
 
-    const user = auth?.getUser()
+    const user = useAuthStore.getState().getUser()
     const usuarioGerador =
       user?.getName()?.trim() || user?.getEmail()?.trim() || 'Usuário não identificado'
 
     void exportarRelatorio({
-      filters: filtersRef.current,
+      filters: filtersRef.current as VendasFiltrosQuerySnapshotExport,
       token,
       timeZoneEmpresa: timezoneAgregacao,
-      metricas,
+      metricas: metricas as MetricasVendasExport | null,
       usuariosPorId,
       meiosPagamentoPorId,
       terminaisPorId,
@@ -960,7 +1223,6 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
       },
     })
   }, [
-    auth,
     empresa,
     exportarRelatorio,
     meiosPagamento,
@@ -1023,7 +1285,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
 
   const handleVerNfce = useCallback(
     async (vendaId: string) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -1032,7 +1294,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
       setIsAbrindoNfce(prev => ({ ...prev, [vendaId]: true }))
       try {
         const queryFiscal = new URLSearchParams({ incluirFiscal: 'true' }).toString()
-        const response = await fetch(`/api/vendas/${encodeURIComponent(vendaId)}?${queryFiscal}`, {
+        const response = await fetchGestorApi(`/api/vendas/${encodeURIComponent(vendaId)}?${queryFiscal}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -1071,7 +1333,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         })
       }
     },
-    [auth]
+    []
   )
 
   return (
@@ -1087,7 +1349,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
           <button
             type="button"
             onClick={() => setFiltrosVisiveisMobile(prev => !prev)}
-            className="font-nunito flex items-center gap-2 rounded-md bg-primary px-3 py-1 text-sm text-white shadow-sm"
+            className="flex items-center gap-2 rounded-md bg-primary px-3 py-1 text-sm text-white shadow-sm"
             aria-expanded={filtrosVisiveisMobile}
           >
             {filtrosVisiveisMobile ? <MdFilterAltOff size={18} /> : <MdFilterList size={18} />}
@@ -1100,7 +1362,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
           className={`flex flex-col items-center gap-3 py-2 sm:flex-row ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}
         >
           {/* Campo de Pesquisa */}
-          <div className="relative w-full min-w-0 flex-1 sm:max-w-sm md:max-w-md lg:max-w-lg">
+          <div className="relative w-full flex-[2]">
             <MdSearch
               className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text"
               size={20}
@@ -1115,7 +1377,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
                   fetchVendas()
                 }
               }}
-              className="font-nunito h-8 w-full rounded-lg border bg-info pl-10 pr-4 text-sm shadow-sm"
+              className="h-8 w-full rounded-lg border bg-info pl-10 pr-4 text-sm shadow-sm"
             />
           </div>
 
@@ -1156,7 +1418,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
           </div>
 
           {/* Label Período */}
-          <span className="font-exo text-sm text-primary">Período:</span>
+          <span className="text-sm text-primary">Período:</span>
           <div className="flex flex-row items-center gap-3">
             {/* Dropdown Período */}
             <FormControl size="small" sx={{ minWidth: 150 }}>
@@ -1190,7 +1452,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             <button
               type="button"
               onClick={() => setIsDatasModalOpen(true)}
-              className="font-nunito flex h-8 shrink-0 items-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
+              className="flex h-8 shrink-0 items-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
             >
               <MdCalendarToday size={18} />
               Por datas
@@ -1201,7 +1463,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               onClick={handleExportarRelatorio}
               disabled={isExportando || isLoading}
               title="Exportar relatório em Excel (.xlsx)"
-              className="font-nunito flex h-8 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg border-2 border-primary bg-info px-4 text-sm text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-8 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg border-2 border-primary bg-info px-4 text-sm text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <MdDownload size={18} />
               {isExportando ? 'Exportando...' : 'Exportar XLS'}
@@ -1233,7 +1495,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               value={statusFilter || ''}
               onChange={e => setStatusFilter(e.target.value || null)}
               displayEmpty
-              className="font-nunito"
+              className=""
             >
               <MenuItem value="">
                 <span className="text-secondary-text">Selecione...</span>
@@ -1253,7 +1515,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               value={tipoVendaFilter || ''}
               onChange={e => setTipoVendaFilter(e.target.value || null)}
               displayEmpty
-              className="font-nunito"
+              className=""
             >
               <MenuItem value="">
                 <span className="text-secondary-text">Selecione...</span>
@@ -1278,7 +1540,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               disabled={isLoadingMeiosPagamento}
               displayEmpty
               MenuProps={menuPropsVendasFiltroListaLonga}
-              className="font-nunito"
+              className=""
             >
               <MenuItem value="">
                 <span className="text-secondary-text">Selecione...</span>
@@ -1302,7 +1564,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               onChange={e => setUsuarioAbertoPorFilter(e.target.value)}
               displayEmpty
               MenuProps={menuPropsVendasFiltroListaLonga}
-              className="font-nunito"
+              className=""
             >
               <MenuItem value="">
                 <span className="text-secondary-text">Selecione...</span>
@@ -1327,7 +1589,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               disabled={isLoadingTerminais}
               displayEmpty
               MenuProps={menuPropsVendasFiltroListaLonga}
-              className="font-nunito"
+              className=""
             >
               <MenuItem value="">
                 <span className="text-secondary-text">Selecione...</span>
@@ -1351,7 +1613,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               onChange={e => setUsuarioCancelouFilter(e.target.value)}
               displayEmpty
               MenuProps={menuPropsVendasFiltroListaLonga}
-              className="font-nunito"
+              className=""
             >
               <MenuItem value="">
                 <span className="text-secondary-text">Selecione...</span>
@@ -1367,10 +1629,10 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
           {/* Botão Limpar Filtros */}
           <button
             onClick={handleClearFilters}
-            className="font-nunito flex h-8 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
+            className="flex h-8 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
           >
             <MdFilterAltOff size={18} />
-            Limpar
+            Limpar Filtros
           </button>
         </div>
 
@@ -1386,10 +1648,10 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               <span className="text-xl text-info">🛒</span>
             </div>
             <div className="flex flex-1 flex-col items-end">
-              <span className="font-nunito text-xs text-secondary-text">
+              <span className="text-xs text-secondary-text">
                 {statusFilter === 'Aberta' ? 'Vendas em Aberto' : 'Vendas Finalizadas'}
               </span>
-              <span className="font-exo text-[22px] text-primary">
+              <span className="text-[22px] text-primary">
                 {metricas?.countVendasEfetivadas || 0}
               </span>
             </div>
@@ -1405,8 +1667,8 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               <span className="text-xl text-info">✕</span>
             </div>
             <div className="flex flex-1 flex-col items-end">
-              <span className="font-nunito text-xs text-secondary-text">Vendas Canceladas</span>
-              <span className="font-exo text-[22px] text-primary">
+              <span className="text-xs text-secondary-text">Vendas Canceladas</span>
+              <span className="text-[22px] text-primary">
                 {metricas?.countVendasCanceladas || 0}
               </span>
             </div>
@@ -1420,8 +1682,8 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               </span>
             </div>
             <div className="flex flex-1 flex-col items-end">
-              <span className="font-nunito text-xs text-secondary-text">Produtos Vendidos</span>
-              <span className="font-exo text-[22px] text-primary">
+              <span className="text-xs text-secondary-text">Produtos Vendidos</span>
+              <span className="text-[22px] text-primary">
                 {metricas?.countProdutosVendidos || 0}
               </span>
             </div>
@@ -1435,12 +1697,12 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               </span>
             </div>
             <div className="flex flex-1 flex-col items-end">
-              <span className="font-nunito text-xs text-secondary-text">Total Cancelado</span>
-              <span className="font-exo text-[22px] text-primary">
+              <span className="text-xs text-secondary-text">Total Cancelado</span>
+              <span className="text-[22px] text-primary">
                 {formatCurrency(totalCanceladoSomenteLista)}
               </span>
               {hasMoreVendas ? (
-                <span className="font-nunito max-w-[10rem] text-right text-[10px] leading-tight text-secondary-text">
+                <span className="max-w-[10rem] text-right text-[10px] leading-tight text-secondary-text">
                   Parcial: Vendas carregadas na lista.
                 </span>
               ) : null}
@@ -1455,8 +1717,8 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
               </span>
             </div>
             <div className="flex flex-1 flex-col items-end">
-              <span className="font-nunito text-xs text-secondary-text">Total Faturado</span>
-              <span className="font-exo text-[22px] text-primary">
+              <span className="text-xs text-secondary-text">Total Faturado</span>
+              <span className="text-[22px] text-primary">
                 {metricas?.totalFaturado ? formatCurrency(metricas.totalFaturado) : 'R$ 0,00'}
               </span>
             </div>
@@ -1466,7 +1728,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         {/* Tabela de Vendas */}
         <div className="overflow-hidden rounded-lg bg-info">
           {/* Cabeçalho */}
-          <div className="font-nunito flex items-center gap-2 rounded-t-lg bg-custom-2 py-2 text-sm font-semibold text-primary-text md:px-3">
+          <div className="flex items-center gap-2 rounded-t-lg bg-custom-2 py-2 text-sm font-semibold text-primary-text md:px-3">
             <div className="hidden flex-1 md:flex">Código Venda</div>
             <div className="flex-1 text-center text-xs md:text-sm">Data Abertura</div>
             <div className="hidden flex-1 text-center text-xs md:flex md:text-sm">
@@ -1635,7 +1897,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             type="button"
             disabled={!rascunhoIntervaloRange?.from || !rascunhoIntervaloRange?.to}
             onClick={handleAplicarIntervaloDatasVendas}
-            className="rounded-b-l-lg font-nunito flex h-full w-full items-center justify-center bg-primary text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-b-l-lg flex h-full w-full items-center justify-center bg-primary text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Aplicar
           </button>

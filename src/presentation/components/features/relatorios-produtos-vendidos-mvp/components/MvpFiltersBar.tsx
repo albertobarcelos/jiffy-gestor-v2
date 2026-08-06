@@ -56,7 +56,7 @@ export function MvpFiltersBar({
         <button
           type="button"
           onClick={() => setFiltrosVisiveisMobile(prev => !prev)}
-          className="font-nunito flex items-center gap-2 rounded-md bg-primary px-3 py-1 text-sm text-white shadow-sm"
+          className="flex items-center gap-2 rounded-md bg-primary px-3 py-1 text-sm text-white shadow-sm"
           aria-expanded={filtrosVisiveisMobile}
         >
           {filtrosVisiveisMobile ? <MdFilterAltOff size={18} /> : <MdFilterList size={18} />}
@@ -80,7 +80,7 @@ export function MvpFiltersBar({
             onKeyDown={e => {
               if (e.key === 'Enter') onAplicar()
             }}
-            className="font-nunito h-8 w-full rounded-lg border bg-info pl-10 pr-4 text-sm shadow-sm"
+            className="h-8 w-full rounded-lg border bg-info pl-10 pr-4 text-sm shadow-sm"
           />
         </div>
         {acoesToolbar ? (
@@ -106,7 +106,7 @@ export function MvpFiltersBar({
             disabled={gruposLoading}
             displayEmpty
             MenuProps={menuPropsRelatorioFiltroListaLonga}
-            className="font-nunito"
+            className=""
           >
             <MenuItem value="">
               <span className="text-secondary-text">Todos os grupos</span>
@@ -186,7 +186,7 @@ export function MvpFiltersBar({
         <button
           type="button"
           onClick={onLimpar}
-          className="font-nunito flex h-8 items-center justify-center gap-1 rounded-lg bg-primary px-3 text-sm text-white transition-colors hover:bg-primary/90"
+          className="flex h-8 items-center justify-center gap-1 rounded-lg bg-primary px-3 text-sm text-white transition-colors hover:bg-primary/90"
         >
           <MdFilterAltOff size={18} aria-hidden />
           Limpar
@@ -195,14 +195,14 @@ export function MvpFiltersBar({
         <button
           type="button"
           onClick={onAplicar}
-          className="font-nunito flex h-8 items-center rounded-lg bg-primary px-3 text-sm text-white transition-colors hover:bg-primary/90"
+          className="flex h-8 items-center rounded-lg bg-primary px-3 text-sm text-white transition-colors hover:bg-primary/90"
         >
           Aplicar filtros
         </button>
         </div>
 
         <div className="flex flex-wrap items-end justify-end gap-x-2 gap-y-3">
-          <span className="font-exo shrink-0 self-center text-sm text-primary">Período:</span>
+          <span className="shrink-0 self-center text-sm text-primary">Período:</span>
           <FormControl size="small" sx={sxRelatorioFiltroSelectPeriodo}>
             <Select
               value={values.filtroPeriodo}
@@ -225,7 +225,7 @@ export function MvpFiltersBar({
           <button
             type="button"
             onClick={() => setIsDatasModalOpen(true)}
-            className="font-nunito flex h-8 shrink-0 items-center gap-1 rounded-lg bg-primary px-3 text-sm text-white transition-colors hover:bg-primary/90"
+            className="flex h-8 shrink-0 items-center gap-1 rounded-lg bg-primary px-3 text-sm text-white transition-colors hover:bg-primary/90"
           >
             <MdCalendarToday size={18} />
             Por datas

@@ -90,7 +90,6 @@ export function KanbanColuna(props: KanbanColunaProps) {
             >
               <MenuItem value="data">Data</MenuItem>
               <MenuItem value="numero">Nº da venda</MenuItem>
-              <MenuItem value="cliente">Cliente</MenuItem>
             </Select>
           </FormControl>
           <button

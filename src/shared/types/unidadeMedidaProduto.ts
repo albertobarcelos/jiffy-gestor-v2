@@ -2,6 +2,16 @@ export type UnidadeMedidaProduto = 'UN' | 'KG' | 'LT'
 
 const UNIDADES_VALIDAS = new Set<UnidadeMedidaProduto>(['UN', 'KG', 'LT'])
 
+/** Opções do select de unidade (código + rótulo amigável). */
+export const UNIDADES_MEDIDA_PRODUTO_OPCOES: ReadonlyArray<{
+  value: UnidadeMedidaProduto
+  label: string
+}> = [
+  { value: 'UN', label: 'UN — Unidade' },
+  { value: 'KG', label: 'KG — Quilograma' },
+  { value: 'LT', label: 'LT — Litro' },
+]
+
 export function normalizarUnidadeMedidaProduto(raw: unknown): UnidadeMedidaProduto {
   const codigo = String(raw ?? 'UN')
     .trim()
@@ -27,4 +37,10 @@ export function formatarUnidadeMedidaProdutoExibicao(unidade: UnidadeMedidaProdu
   if (unidade === 'KG') return 'KG'
   if (unidade === 'LT') return 'LT'
   return 'UN'
+}
+
+/** Label completa para selects / formulários. */
+export function formatarUnidadeMedidaProdutoLabel(unidade: UnidadeMedidaProduto): string {
+  const opcao = UNIDADES_MEDIDA_PRODUTO_OPCOES.find(o => o.value === unidade)
+  return opcao?.label ?? 'UN — Unidade'
 }

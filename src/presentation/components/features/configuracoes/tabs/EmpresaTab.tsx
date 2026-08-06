@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -136,9 +137,7 @@ const LOGO_COLUNA_LARGURA_CLASS = 'w-full shrink-0 lg:w-[280px]'
 /**
  * Tab de Empresa - Edição de dados da empresa
  */
-export function EmpresaTab() {
-  const { auth } = useAuthStore()
-  const [empresa, setEmpresa] = useState<Cliente | null>(null)
+export function EmpresaTab() {  const [empresa, setEmpresa] = useState<Cliente | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
 
@@ -217,7 +216,7 @@ export function EmpresaTab() {
       return null
     })
     try {
-      const res = await fetch('/api/empresas/me/logo-impressao', {
+      const res = await fetchGestorApi('/api/empresas/me/logo-impressao', {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) {
@@ -305,12 +304,12 @@ export function EmpresaTab() {
   }
 
   const loadEmpresa = async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     setIsLoading(true)
     try {
-      const response = await fetch('/api/empresas/me', {
+      const response = await fetchGestorApi('/api/empresas/me', {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -420,7 +419,7 @@ export function EmpresaTab() {
 
     try {
       // Buscar lista de municípios do estado
-      const response = await fetch(`/api/v1/ibge/municipios?uf=${uf}`)
+      const response = await fetchGestorApi(`/api/v1/ibge/municipios?uf=${uf}`)
       if (response.ok) {
         const data = await response.json()
         const municipios = data.municipios || []
@@ -444,7 +443,7 @@ export function EmpresaTab() {
           return true
         } else {
           // Se não encontrou na lista, tentar via API de validação
-          const validacaoResponse = await fetch(
+          const validacaoResponse = await fetchGestorApi(
             `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(nomeCidade.trim())}&uf=${uf}`
           )
           if (validacaoResponse.ok) {
@@ -486,7 +485,7 @@ export function EmpresaTab() {
     try {
       const body = new FormData()
       body.append('file', file)
-      const response = await fetch('/api/empresas/me/logo-impressao', {
+      const response = await fetchGestorApi('/api/empresas/me/logo-impressao', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -511,7 +510,7 @@ export function EmpresaTab() {
 
   const deleteLogoImpressaoFromApi = async (token: string): Promise<UploadLogoResult> => {
     try {
-      const response = await fetch('/api/empresas/me/logo-impressao', {
+      const response = await fetchGestorApi('/api/empresas/me/logo-impressao', {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -576,7 +575,7 @@ export function EmpresaTab() {
 
   const handleSaveLogo = async () => {
     if (!hasLogoPendingChanges || logoBusy) return
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     setIsSavingLogo(true)
@@ -631,14 +630,14 @@ export function EmpresaTab() {
   }
 
   const undoServerLogoRemoval = async () => {
-    const t = auth?.getAccessToken()
+    const t = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!t) return
     setPendingRemoveLogoOnSave(false)
     await refreshSavedLogoImpressao(t)
   }
 
   const handleSave = async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token || !empresa) {
       console.error('Token ou empresa não disponível')
       return
@@ -664,7 +663,7 @@ export function EmpresaTab() {
           const nomeCidadeParaValidar = ultimaCidadeBuscada.current || cidade.trim()
 
           try {
-            const response = await fetch(
+            const response = await fetchGestorApi(
               `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(nomeCidadeParaValidar)}&uf=${estado}`
             )
             if (response.ok) {
@@ -736,7 +735,7 @@ export function EmpresaTab() {
 
         console.log('Enviando dados:', body)
 
-        const response = await fetch(`/api/empresas/${empresa.getId()}`, {
+        const response = await fetchGestorApi(`/api/empresas/${empresa.getId()}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -787,7 +786,7 @@ export function EmpresaTab() {
           {!isEditing && (
             <button
               onClick={() => setIsEditing(true)}
-              className="h-8 rounded-lg bg-primary px-6 font-exo text-sm font-medium text-white transition-colors hover:bg-primary/90"
+              className="h-8 rounded-lg bg-primary px-6 text-sm font-medium text-white transition-colors hover:bg-primary/90"
             >
               Editar
             </button>
@@ -799,7 +798,7 @@ export function EmpresaTab() {
                 disabled={
                   isSaving || (cidadeValida === false && cidade.length > 0)
                 }
-                className="flex h-8 items-center gap-2 rounded-lg bg-primary px-6 font-exo text-sm font-medium text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-8 items-center gap-2 rounded-lg bg-primary px-6 text-sm font-medium text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <span>✓</span> {isSaving ? 'Salvando…' : 'Salvar'}
               </button>
@@ -811,7 +810,7 @@ export function EmpresaTab() {
                   loadEmpresa()
                 }}
                 disabled={isSaving}
-                className="h-8 rounded-lg border border-primary bg-primary/10 px-6 font-exo text-sm font-medium text-primary transition-colors hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-50"
+                className="h-8 rounded-lg border border-primary bg-primary/10 px-6 text-sm font-medium text-primary transition-colors hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Cancelar
               </button>
@@ -823,11 +822,11 @@ export function EmpresaTab() {
           {/* Dados Básicos + Logo (títulos na mesma linha em desktop) */}
           <div>
             <div className="mb-2 flex flex-col gap-1 lg:flex-row lg:items-baseline lg:gap-4">
-              <h4 className="font-nunito min-w-0 flex-1 text-lg font-semibold text-primary">
+              <h4 className="min-w-0 flex-1 text-lg font-semibold text-primary">
                 Dados Básicos
               </h4>
               <h4
-                className={`font-nunito text-lg font-semibold text-primary ${LOGO_COLUNA_LARGURA_CLASS}`}
+                className={`text-lg font-semibold text-primary ${LOGO_COLUNA_LARGURA_CLASS}`}
               >
                 Logo de impressão
               </h4>
@@ -948,7 +947,7 @@ export function EmpresaTab() {
                             e.stopPropagation()
                             handleReopenLogoCrop()
                           }}
-                          className="rounded border border-primary bg-primary/10 px-2 py-0.5 font-exo text-[11px] font-medium leading-tight text-primary hover:bg-primary/15"
+                          className="rounded border border-primary bg-primary/10 px-2 py-0.5 text-[11px] font-medium leading-tight text-primary hover:bg-primary/15"
                         >
                           Ajustar recorte
                         </button>
@@ -958,7 +957,7 @@ export function EmpresaTab() {
                             e.stopPropagation()
                             logoFileInputRef.current?.click()
                           }}
-                          className="rounded border border-primary bg-primary/10 px-2 py-0.5 font-exo text-[11px] font-medium leading-tight text-primary hover:bg-primary/15"
+                          className="rounded border border-primary bg-primary/10 px-2 py-0.5 text-[11px] font-medium leading-tight text-primary hover:bg-primary/15"
                         >
                           Trocar imagem
                         </button>
@@ -970,7 +969,7 @@ export function EmpresaTab() {
                               void handleSaveLogo()
                             }}
                             disabled={logoBusy}
-                            className="rounded bg-primary px-2.5 py-0.5 font-exo text-[11px] font-medium leading-tight text-white hover:bg-primary/90 disabled:opacity-50"
+                            className="rounded bg-primary px-2.5 py-0.5 text-[11px] font-medium leading-tight text-white hover:bg-primary/90 disabled:opacity-50"
                           >
                             {isSavingLogo ? 'Salvando…' : 'Salvar'}
                           </button>
@@ -990,7 +989,7 @@ export function EmpresaTab() {
                             e.stopPropagation()
                             void undoServerLogoRemoval()
                           }}
-                          className="rounded border border-primary bg-primary/10 px-2 py-0.5 font-exo text-[11px] font-medium leading-tight text-primary hover:bg-primary/15"
+                          className="rounded border border-primary bg-primary/10 px-2 py-0.5 text-[11px] font-medium leading-tight text-primary hover:bg-primary/15"
                         >
                           Desfazer
                         </button>
@@ -1000,7 +999,7 @@ export function EmpresaTab() {
                             e.stopPropagation()
                             logoFileInputRef.current?.click()
                           }}
-                          className="rounded border border-primary bg-primary/10 px-2 py-0.5 font-exo text-[11px] font-medium leading-tight text-primary hover:bg-primary/15"
+                          className="rounded border border-primary bg-primary/10 px-2 py-0.5 text-[11px] font-medium leading-tight text-primary hover:bg-primary/15"
                         >
                           Trocar imagem
                         </button>
@@ -1012,7 +1011,7 @@ export function EmpresaTab() {
                               void handleSaveLogo()
                             }}
                             disabled={logoBusy}
-                            className="rounded bg-primary px-2.5 py-0.5 font-exo text-[11px] font-medium leading-tight text-white hover:bg-primary/90 disabled:opacity-50"
+                            className="rounded bg-primary px-2.5 py-0.5 text-[11px] font-medium leading-tight text-white hover:bg-primary/90 disabled:opacity-50"
                           >
                             {isSavingLogo ? 'Salvando…' : 'Salvar'}
                           </button>
@@ -1046,7 +1045,7 @@ export function EmpresaTab() {
                             e.stopPropagation()
                             logoFileInputRef.current?.click()
                           }}
-                          className="rounded border border-primary bg-primary/10 px-2 py-0.5 font-exo text-[11px] font-medium leading-tight text-primary hover:bg-primary/15"
+                          className="rounded border border-primary bg-primary/10 px-2 py-0.5 text-[11px] font-medium leading-tight text-primary hover:bg-primary/15"
                         >
                           Trocar imagem
                         </button>
@@ -1071,7 +1070,7 @@ export function EmpresaTab() {
                         logoBusy ? 'pointer-events-none cursor-not-allowed' : ''
                       }`}
                     >
-                      <span className="font-nunito text-sm font-semibold text-primary">
+                      <span className="text-sm font-semibold text-primary">
                         Adicionar logo
                       </span>
                       <span className="text-[11px] leading-snug text-secondary-text">
@@ -1088,7 +1087,7 @@ export function EmpresaTab() {
 
           {/* Endereço */}
           <div>
-            <h4 className="font-nunito mb-2 text-lg font-semibold text-primary">Endereço</h4>
+            <h4 className="mb-2 text-lg font-semibold text-primary">Endereço</h4>
             <div className="space-y-6">
               {/* Linha 1: CEP + Rua */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">

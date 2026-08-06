@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { ClientesTabsModal, ClientesTabsModalState } from './ClientesTabsModal'
 import { MdSearch, MdVisibility } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
@@ -66,7 +67,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
   const hasLoadedInitialRef = useRef(false)
   const isLoadingRef = useRef(false)
   const lastLoadKeyRef = useRef<string | null>(null)
-  const { auth, isAuthenticated } = useAuthStore()
+  const { isAuthenticated } = useAuthStore()
 
   const searchTextRef = useRef('')
   const filterStatusRef = useRef<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
@@ -109,7 +110,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
    */
   const loadAllClientes = useCallback(
     async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         return
       }
@@ -156,7 +157,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
             params.append('ativo', ativoFilter.toString())
           }
 
-          const response = await fetch(`/api/clientes?${params.toString()}`, {
+          const response = await fetchGestorApi(`/api/clientes?${params.toString()}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -198,17 +199,17 @@ export function ClientesList({ onReload }: ClientesListProps) {
         isLoadingRef.current = false
       }
     },
-    [auth]
+    []
   )
 
   // Carrega clientes quando autenticar e quando busca/filtro mudam (fonte única de verdade)
   useEffect(() => {
     if (!isAuthenticated) return
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     loadAllClientes()
-  }, [isAuthenticated, debouncedSearch, filterStatus, auth, loadAllClientes])
+  }, [isAuthenticated, debouncedSearch, filterStatus, loadAllClientes])
 
   const handleStatusChange = () => {
     loadAllClientes()
@@ -257,7 +258,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
    */
   const handleToggleClienteStatus = useCallback(
     async (cliente: Cliente, novoStatus: boolean) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -282,7 +283,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
       )
 
       try {
-        const response = await fetch(`/api/clientes/${clienteId}`, {
+        const response = await fetchGestorApi(`/api/clientes/${clienteId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -313,7 +314,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
         })
       }
     },
-    [auth, clientes, loadAllClientes, onReload]
+    [ clientes, loadAllClientes, onReload]
   )
 
   return (
@@ -332,7 +333,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
           <div className="flex gap-2">
             <button
               onClick={handleAdd}
-              className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold font-exo text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+              className="h-8 px-[30px] bg-primary text-info rounded-lg font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
             >
               Novo
               <span className="text-lg">+</span>
@@ -355,7 +356,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
                 placeholder="Pesquisar cliente..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
-                className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm font-nunito"
+                className="w-full h-full pl-11 pr-4 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm "
               />
             </div>
           </div>
@@ -369,7 +370,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
               onChange={(e) =>
                 setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Desativado')
               }
-              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm font-nunito"
+              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm "
             >
               <option value="Todos">Todos</option>
               <option value="Ativo">Ativo</option>
@@ -381,25 +382,25 @@ export function ClientesList({ onReload }: ClientesListProps) {
       {/* Cabeçalho da tabela */}
       <div className="md:px-[0px] mt-0 flex-shrink-0">
         <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-2">
-          <div className="flex-[2.5] font-nunito font-semibold md:text-sm text-xs text-primary-text">
+          <div className="flex-[2.5] font-semibold md:text-sm text-xs text-primary-text">
             Nome
           </div>
-          <div className="flex-[1.5] font-nunito font-semibold text-sm text-primary-text hidden md:flex">
+          <div className="flex-[1.5] font-semibold text-sm text-primary-text hidden md:flex">
             CPF/CNPJ
           </div>
-          <div className="flex-[1.5] font-nunito font-semibold text-sm text-primary-text hidden md:flex min-w-0">
+          <div className="flex-[1.5] font-semibold text-sm text-primary-text hidden md:flex min-w-0">
             Indicador IE
           </div>
-          <div className="flex-[1.5] font-nunito font-semibold text-sm text-primary-text hidden md:flex min-w-0">
+          <div className="flex-[1.5] font-semibold text-sm text-primary-text hidden md:flex min-w-0">
             Inscrição est.
           </div>
-          <div className="md:flex-[2] flex-[1.5] font-nunito font-semibold md:text-sm text-xs text-center md:text-start text-primary-text">
+          <div className="md:flex-[2] flex-[1.5] font-semibold md:text-sm text-xs text-center md:text-start text-primary-text">
             Telefone
           </div>
-          <div className="flex-[2] font-nunito font-semibold text-sm text-primary-text hidden md:flex">
+          <div className="flex-[2] font-semibold text-sm text-primary-text hidden md:flex">
             Email
           </div>
-          <div className="flex-[1] md:text-center text-end font-nunito font-semibold md:text-sm text-xs text-primary-text">
+          <div className="flex-[1] md:text-center text-end font-semibold md:text-sm text-xs text-primary-text">
             Status
           </div>
         </div>
@@ -439,10 +440,10 @@ export function ClientesList({ onReload }: ClientesListProps) {
             onClick={handleRowClick}
             className={`${bgClass} rounded-lg md:px-4 py-2 mb-1 flex items-center hover:bg-secondary-bg/15 cursor-pointer`}
           >
-            <div className="flex-[2.5] font-nunito font-normal md:text-sm text-xs text-primary-text flex items-center">
+            <div className="flex-[2.5] font-normal md:text-sm text-xs text-primary-text flex items-center">
               <span>{cliente.getNome()}</span>
             </div>
-            <div className="flex-[1.5] font-nunito text-sm text-secondary-text hidden md:flex">
+            <div className="flex-[1.5] text-sm text-secondary-text hidden md:flex">
               {documentoClienteExibicao(cliente.getCpf(), cliente.getCnpj())}
             </div>
             <MuiTooltip
@@ -450,7 +451,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
               placement="bottom"
               slotProps={TOOLTIP_SLOT_PROPS}
             >
-              <div className="flex-[1.5] font-nunito text-sm text-secondary-text hidden md:flex min-w-0 items-center">
+              <div className="flex-[1.5] text-sm text-secondary-text hidden md:flex min-w-0 items-center">
                 <span className="truncate">
                   {textoIndicadorIeLista(cliente.getIndicadorInscricaoEstadual())}
                 </span>
@@ -461,14 +462,14 @@ export function ClientesList({ onReload }: ClientesListProps) {
               placement="bottom"
               slotProps={TOOLTIP_SLOT_PROPS}
             >
-              <div className="flex-[1.5] font-nunito text-sm text-secondary-text hidden md:flex min-w-0 items-center">
+              <div className="flex-[1.5] text-sm text-secondary-text hidden md:flex min-w-0 items-center">
                 <span className="truncate">{cliente.getInscricaoEstadual()?.trim() || '-'}</span>
               </div>
             </MuiTooltip>
-            <div className="md:flex-[2] flex-[1.5] font-nunito md:text-sm text-xs text-center md:text-start text-secondary-text">
+            <div className="md:flex-[2] flex-[1.5] md:text-sm text-xs text-center md:text-start text-secondary-text">
               {telefoneListaExibicao(cliente.getTelefone())}
             </div>
-            <div className="flex-[2] font-nunito text-sm text-secondary-text hidden md:flex">
+            <div className="flex-[2] text-sm text-secondary-text hidden md:flex">
               {cliente.getEmail() || '-'}
             </div>
             <MuiTooltip

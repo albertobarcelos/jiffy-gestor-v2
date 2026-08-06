@@ -11,6 +11,7 @@ import { useProdutoPatchMutation, isSavingOf } from '@/src/presentation/hooks/us
 import { useGrupoProdutoPatchMutation } from '@/src/presentation/hooks/useGrupoProdutoPatchMutation'
 import { useProdutosFilters } from '@/src/presentation/hooks/useProdutosFilters'
 import { useIsMobile } from '@/src/presentation/hooks/useIsMobile'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { ProdutosTabsModal, type ProdutosTabsModalState } from '../ProdutosTabsModal'
@@ -48,6 +49,7 @@ interface InfinitePagesData {
 
 export function ProdutosList() {
   const queryClient = useQueryClient()
+  const empresaId = useTenantEmpresaId()
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -74,6 +76,16 @@ export function ProdutosList() {
 
   const { data: gruposProdutos = [], isLoading: isLoadingGruposProdutos } = useGruposProdutos({ limit: 100, ativo: null })
   const { data: gruposComplementos = [], isLoading: isLoadingGruposComplementos } = useGruposComplementos({ limit: 100, ativo: null })
+
+  const gruposProdutosFiltrados = useMemo(() => {
+    if (filters.statusGrupoFilter === 'Ativo') {
+      return gruposProdutos.filter((g) => g.isAtivo())
+    }
+    if (filters.statusGrupoFilter === 'Desativado') {
+      return gruposProdutos.filter((g) => !g.isAtivo())
+    }
+    return gruposProdutos
+  }, [gruposProdutos, filters.statusGrupoFilter])
 
   const { data, fetchNextPage, hasNextPage, isFetching, isFetchingNextPage, isLoading, error } =
     useProdutosInfinite(queryParams)
@@ -124,7 +136,7 @@ export function ProdutosList() {
 
   /** Grupos ordenados por `ordem` (API), fallback por nome do grupo. */
   const produtosAgrupadosOrdenados = useMemo(() => {
-    return [...produtosAgrupados].sort((a, b) => {
+    const ordenados = [...produtosAgrupados].sort((a, b) => {
       const grupoIdA = a.items[0]?.getGrupoId()
       const grupoIdB = b.items[0]?.getGrupoId()
 
@@ -142,7 +154,20 @@ export function ProdutosList() {
       if (labelCmp !== 0) return labelCmp
       return a.groupKey.localeCompare(b.groupKey)
     })
-  }, [produtosAgrupados, grupoProdutoMap])
+
+    if (filters.statusGrupoFilter === 'Todos') return ordenados
+
+    return ordenados.filter(({ items }) => {
+      const grupoId = items[0]?.getGrupoId()
+      if (!grupoId) {
+        // "Sem grupo" só aparece quando o filtro de status do grupo é Ativo/Todos
+        return filters.statusGrupoFilter === 'Ativo'
+      }
+      const ativo = grupoProdutoMap.get(grupoId)?.ativo
+      if (typeof ativo !== 'boolean') return filters.statusGrupoFilter === 'Ativo'
+      return filters.statusGrupoFilter === 'Ativo' ? ativo : !ativo
+    })
+  }, [produtosAgrupados, grupoProdutoMap, filters.statusGrupoFilter])
 
   // Inicializar grupos expandidos quando novos grupos aparecem
   useEffect(() => {
@@ -178,24 +203,42 @@ export function ProdutosList() {
   // Modal helpers
   const openTabsModal = useCallback(
     (config: Partial<ProdutosTabsModalState>) => {
-      setTabsModalState({ open: true, tab: 'produto', mode: 'create', ...config })
+      const grupoId = config.grupoId
+      const initialGrupo =
+        config.initialGrupo ??
+        (grupoId ? gruposProdutos.find(g => g.getId() === grupoId) : undefined)
+      setTabsModalState({
+        open: true,
+        tab: 'produto',
+        mode: 'create',
+        ...config,
+        initialGrupo,
+      })
       const params = new URLSearchParams(Array.from(searchParams.entries()))
       params.set('modalOpen', 'true')
       router.replace(`${pathname}?${params.toString()}`, { scroll: false })
     },
-    [router, searchParams, pathname]
+    [router, searchParams, pathname, gruposProdutos]
   )
 
   const closeTabsModal = useCallback(() => {
-    setTabsModalState({ open: false, tab: 'produto', mode: 'create', prefillGrupoProdutoId: undefined, grupoId: undefined })
+    setTabsModalState({
+      open: false,
+      tab: 'produto',
+      mode: 'create',
+      prefillGrupoProdutoId: undefined,
+      grupoId: undefined,
+      initialGrupo: undefined,
+    })
     const params = new URLSearchParams(Array.from(searchParams.entries()))
     params.delete('modalOpen')
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }, [router, searchParams, pathname])
 
   const updateProdutoInCache = useCallback((produtoId: string, produtoData: unknown) => {
+    if (!empresaId) return
     queryClient.setQueriesData<InfinitePagesData>(
-      { queryKey: ['produtos', 'infinite'], exact: false },
+      { queryKey: ['tenant', empresaId, 'produtos', 'infinite'], exact: false },
       (oldData) => {
         if (!oldData?.pages) return oldData
         return {
@@ -214,16 +257,25 @@ export function ProdutosList() {
         }
       }
     )
-  }, [queryClient])
+  }, [queryClient, empresaId])
 
   const handleTabsModalReload = useCallback((produtoId?: string, produtoData?: unknown) => {
     if (produtoId && produtoData) {
       updateProdutoInCache(produtoId, produtoData)
-    } else {
-      void queryClient.invalidateQueries({ queryKey: ['produtos', 'infinite'], exact: false, refetchType: 'active' })
-      void queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false, refetchType: 'active' })
+      return
     }
-  }, [queryClient, updateProdutoInCache])
+    if (!empresaId) return
+    void queryClient.invalidateQueries({
+      queryKey: ['tenant', empresaId, 'produtos', 'infinite'],
+      exact: false,
+      refetchType: 'active',
+    })
+    void queryClient.invalidateQueries({
+      queryKey: ['tenant', empresaId, 'grupos-produtos'],
+      exact: false,
+      refetchType: 'active',
+    })
+  }, [queryClient, empresaId, updateProdutoInCache])
 
   // Handlers de produto — recebem produtoId como arg, sem closure por item
   const handleValorChange = useCallback((produtoId: string, novoValor: number) => {
@@ -249,14 +301,6 @@ export function ProdutosList() {
     if (!produto) return
     openTabsModal({ tab: 'produto', mode: 'copy', produto, grupoId: produto.getGrupoId() })
   }, [produtos, openTabsModal])
-
-  const handleOpenComplementosModal = useCallback((produto: Produto) => {
-    openTabsModal({ tab: 'complementos', mode: 'edit', produto, grupoId: produto.getGrupoId() })
-  }, [openTabsModal])
-
-  const handleOpenImpressorasModal = useCallback((produto: Produto) => {
-    openTabsModal({ tab: 'impressoras', mode: 'edit', produto, grupoId: produto.getGrupoId() })
-  }, [openTabsModal])
 
   // Handlers de grupo — todos estáveis, recebem IDs como argumento
   const handleToggleExpand = useCallback((groupKey: string) => {
@@ -306,13 +350,15 @@ export function ProdutosList() {
         onToggleFiltros={() => setFiltrosVisiveis((v) => !v)}
         filterStatus={filters.filterStatus}
         onFilterStatusChange={actions.setStatus}
+        statusGrupoFilter={filters.statusGrupoFilter}
+        onStatusGrupoChange={actions.setStatusGrupo}
         ativoLocalFilter={filters.ativoLocalFilter}
         onAtivoLocalChange={actions.setAtivoLocal}
         ativoDeliveryFilter={filters.ativoDeliveryFilter}
         onAtivoDeliveryChange={actions.setAtivoDelivery}
         grupoProdutoFilter={filters.grupoProdutoFilter}
         onGrupoProdutoChange={actions.setGrupoProduto}
-        gruposProdutos={gruposProdutos}
+        gruposProdutos={gruposProdutosFiltrados}
         isLoadingGruposProdutos={isLoadingGruposProdutos}
         grupoComplementoFilter={filters.grupoComplementoFilter}
         onGrupoComplementoChange={actions.setGrupoComplemento}
@@ -396,8 +442,6 @@ export function ProdutosList() {
                             onValorChange={handleValorChange}
                             onSwitchToggle={handleStatusToggle}
                             onToggleBoolean={handleToggleBooleanField}
-                            onOpenComplementosModal={handleOpenComplementosModal}
-                            onOpenImpressorasModal={handleOpenImpressorasModal}
                             onEditProduto={handleEditProduto}
                             onCopyProduto={handleCopyProduto}
                           />

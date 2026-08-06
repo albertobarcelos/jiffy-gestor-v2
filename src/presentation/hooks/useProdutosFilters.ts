@@ -7,6 +7,7 @@ interface FiltersState {
   searchText: string
   debouncedSearch: string
   filterStatus: StatusFilter
+  statusGrupoFilter: StatusFilter
   ativoLocalFilter: TriState
   ativoDeliveryFilter: TriState
   grupoProdutoFilter: string
@@ -18,6 +19,7 @@ type FiltersAction =
   | { type: 'SET_SEARCH'; value: string }
   | { type: 'SET_DEBOUNCED_SEARCH'; value: string }
   | { type: 'SET_STATUS'; value: StatusFilter }
+  | { type: 'SET_STATUS_GRUPO'; value: StatusFilter }
   | { type: 'SET_ATIVO_LOCAL'; value: TriState }
   | { type: 'SET_ATIVO_DELIVERY'; value: TriState }
   | { type: 'SET_GRUPO_PRODUTO'; value: string }
@@ -28,6 +30,7 @@ const initialState: FiltersState = {
   searchText: '',
   debouncedSearch: '',
   filterStatus: 'Ativo',
+  statusGrupoFilter: 'Ativo',
   ativoLocalFilter: 'Todos',
   ativoDeliveryFilter: 'Todos',
   grupoProdutoFilter: '',
@@ -43,6 +46,8 @@ function filtersReducer(state: FiltersState, action: FiltersAction): FiltersStat
       return { ...state, debouncedSearch: action.value }
     case 'SET_STATUS':
       return { ...state, filterStatus: action.value }
+    case 'SET_STATUS_GRUPO':
+      return { ...state, statusGrupoFilter: action.value, grupoProdutoFilter: '' }
     case 'SET_ATIVO_LOCAL':
       return { ...state, ativoLocalFilter: action.value }
     case 'SET_ATIVO_DELIVERY':
@@ -110,6 +115,10 @@ export function useProdutosFilters() {
   // `dispatch` é estável (garantia do useReducer), portanto essas funções também são estáveis.
   const setSearch = useCallback((value: string) => dispatch({ type: 'SET_SEARCH', value }), [])
   const setStatus = useCallback((value: StatusFilter) => dispatch({ type: 'SET_STATUS', value }), [])
+  const setStatusGrupo = useCallback(
+    (value: StatusFilter) => dispatch({ type: 'SET_STATUS_GRUPO', value }),
+    []
+  )
   const setAtivoLocal = useCallback((value: TriState) => dispatch({ type: 'SET_ATIVO_LOCAL', value }), [])
   const setAtivoDelivery = useCallback((value: TriState) => dispatch({ type: 'SET_ATIVO_DELIVERY', value }), [])
   const setGrupoProduto = useCallback((value: string) => dispatch({ type: 'SET_GRUPO_PRODUTO', value }), [])
@@ -117,8 +126,26 @@ export function useProdutosFilters() {
   const reset = useCallback(() => dispatch({ type: 'RESET' }), [])
 
   const actions = useMemo(
-    () => ({ setSearch, setStatus, setAtivoLocal, setAtivoDelivery, setGrupoProduto, setGrupoComplemento, reset }),
-    [setSearch, setStatus, setAtivoLocal, setAtivoDelivery, setGrupoProduto, setGrupoComplemento, reset]
+    () => ({
+      setSearch,
+      setStatus,
+      setStatusGrupo,
+      setAtivoLocal,
+      setAtivoDelivery,
+      setGrupoProduto,
+      setGrupoComplemento,
+      reset,
+    }),
+    [
+      setSearch,
+      setStatus,
+      setStatusGrupo,
+      setAtivoLocal,
+      setAtivoDelivery,
+      setGrupoProduto,
+      setGrupoComplemento,
+      reset,
+    ]
   )
 
   return {

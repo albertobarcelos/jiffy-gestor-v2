@@ -11,9 +11,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
  * Replica o design e funcionalidades do Flutter
  */
 export function MeuCaixaView() {
-  const router = useRouter()
-  const { auth } = useAuthStore()
-  const [caixaAtual, setCaixaAtual] = useState<Caixa | null>(null)
+  const router = useRouter()  const [caixaAtual, setCaixaAtual] = useState<Caixa | null>(null)
   const [operacoes, setOperacoes] = useState<OperacaoCaixa[]>([])
   const [saldoCaixa, setSaldoCaixa] = useState(0)
   const [somaSuprimentos, setSomaSuprimentos] = useState(0)
@@ -26,7 +24,7 @@ export function MeuCaixaView() {
   // Buscar dados do caixa
   useEffect(() => {
     const buscarCaixa = async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return
 
       setIsLoading(true)
@@ -60,7 +58,7 @@ export function MeuCaixaView() {
     }
 
     buscarCaixa()
-  }, [auth, operacoes, somaSuprimentos, somaSangrias])
+  }, [ operacoes, somaSuprimentos, somaSangrias])
 
   const formatarData = (data: Date) => {
     return data.toLocaleDateString('pt-BR', {
@@ -83,7 +81,7 @@ export function MeuCaixaView() {
         {/* Header com data de abertura */}
         <div className="mb-6">
           <div className="h-10 bg-white/20 rounded-tl-[16px] rounded-br-[6px] rounded-bl-[6px] rounded-tr-[6px] flex items-center justify-between px-5">
-            <p className="text-primary text-sm font-semibold font-exo">
+            <p className="text-primary text-sm font-semibold ">
               {caixaAtual
                 ? `Aberto em ${formatarData(caixaAtual.getDataAbertura())}`
                 : 'Carregando...'}
@@ -91,13 +89,13 @@ export function MeuCaixaView() {
            
             <button
               onClick={() => router.push('/historico-fechamento')}
-              className="h-9 px-6 bg-primary text-info rounded-[30px] font-medium font-exo text-sm hover:bg-primary/90 transition-colors"
+              className="h-9 px-6 bg-primary text-info rounded-[30px] font-medium text-sm hover:bg-primary/90 transition-colors"
             >
               Histórico de Fechamentos
             </button>
             <button
               onClick={() => setMostrarModalFechar(true)}
-              className="h-9 px-6 bg-primary text-info rounded-[30px] font-medium font-exo text-sm hover:bg-primary/90 transition-colors"
+              className="h-9 px-6 bg-primary text-info rounded-[30px] font-medium text-sm hover:bg-primary/90 transition-colors"
             >
               Fechar Caixa
             </button>
@@ -110,12 +108,12 @@ export function MeuCaixaView() {
           <div className="h-[120px] bg-info rounded-[10px] p-3 flex flex-col">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-2xl">💰</span>
-              <p className="text-primary-text text-sm font-semibold font-exo">
+              <p className="text-primary-text text-sm font-semibold ">
                 Saldo em Caixa
               </p>
             </div>
             <div className="flex-1 flex items-center justify-center">
-              <p className="text-tertiary text-xl font-semibold font-exo">
+              <p className="text-tertiary text-xl font-semibold ">
                 {formatarMoeda(saldoCaixa)}
               </p>
             </div>
@@ -128,12 +126,12 @@ export function MeuCaixaView() {
           >
             <div className="flex items-center gap-2 mb-3">
               <span className="text-2xl">⬇️</span>
-              <p className="text-primary-text text-sm font-semibold font-exo">
+              <p className="text-primary-text text-sm font-semibold ">
                 Suprimentos
               </p>
             </div>
             <div className="flex-1 flex items-center justify-center">
-              <p className="text-success text-xl font-semibold font-exo">
+              <p className="text-success text-xl font-semibold ">
                 {formatarMoeda(somaSuprimentos)}
               </p>
             </div>
@@ -146,12 +144,12 @@ export function MeuCaixaView() {
           >
             <div className="flex items-center gap-2 mb-3">
               <span className="text-2xl">⬆️</span>
-              <p className="text-primary-text text-sm font-semibold font-exo">
+              <p className="text-primary-text text-sm font-semibold ">
                 Sangrias
               </p>
             </div>
             <div className="flex-1 flex items-center justify-center">
-              <p className="text-error text-xl font-semibold font-exo">
+              <p className="text-error text-xl font-semibold ">
                 {formatarMoeda(somaSangrias)}
               </p>
             </div>
@@ -161,7 +159,7 @@ export function MeuCaixaView() {
         {/* Histórico de Operações */}
         <div className="mb-5">
           <div className="flex items-center gap-5 mb-5">
-            <h3 className="text-secondary text-sm font-semibold font-exo">
+            <h3 className="text-secondary text-sm font-semibold ">
               Histórico de Operações
             </h3>
             <div className="flex-1 h-[1px] bg-alternate"></div>

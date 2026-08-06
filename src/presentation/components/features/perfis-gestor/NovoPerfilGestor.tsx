@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import {
   useState,
@@ -11,6 +11,7 @@ import {
 } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { PerfilGestor } from '@/src/domain/entities/PerfilGestor'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
@@ -18,6 +19,7 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { showToast } from '@/src/shared/utils/toast'
 import { MdPerson } from 'react-icons/md'
+import { HUB_ROUTES } from '@/src/shared/constants/hubRoutes'
 
 interface NovoPerfilGestorProps {
   perfilId?: string
@@ -63,9 +65,7 @@ export const NovoPerfilGestor = forwardRef<NovoPerfilGestorHandle, NovoPerfilGes
     },
     ref
   ) {
-  const router = useRouter()
-  const { auth } = useAuthStore()
-  const isEditing = !!perfilId
+  const router = useRouter()  const isEditing = !!perfilId
 
   // Estados do formulário
   const [role, setRole] = useState('')
@@ -148,14 +148,14 @@ export const NovoPerfilGestor = forwardRef<NovoPerfilGestorHandle, NovoPerfilGes
     if (!isEditing || hasLoadedPerfilRef.current) return
 
     const loadPerfil = async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return
 
       setIsLoadingPerfil(true)
       hasLoadedPerfilRef.current = true
 
       try {
-        const response = await fetch(`/api/pessoas/perfis-gestor/${perfilId}`, {
+        const response = await fetchGestorApi(`/api/pessoas/perfis-gestor/${perfilId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -191,7 +191,7 @@ export const NovoPerfilGestor = forwardRef<NovoPerfilGestorHandle, NovoPerfilGes
     const forceClosePanel = closeAfterEmbeddedSaveRef.current
     closeAfterEmbeddedSaveRef.current = false
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado. Faça login novamente.')
       return
@@ -219,7 +219,7 @@ export const NovoPerfilGestor = forwardRef<NovoPerfilGestorHandle, NovoPerfilGes
         : '/api/pessoas/perfis-gestor'
       const method = isEditing ? 'PATCH' : 'POST'
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
@@ -268,7 +268,7 @@ export const NovoPerfilGestor = forwardRef<NovoPerfilGestorHandle, NovoPerfilGes
             ? 'Perfil gestor atualizado com sucesso!'
             : 'Perfil gestor criado com sucesso!'
         )
-        router.push('/meus-apps/perfis-gestor')
+        router.push(HUB_ROUTES.perfisGestor)
       }
     } catch (error) {
       showToast.error(
@@ -284,7 +284,7 @@ export const NovoPerfilGestor = forwardRef<NovoPerfilGestorHandle, NovoPerfilGes
     if (isEmbedded) {
       onCancel?.()
     } else {
-      router.push('/meus-apps/perfis-gestor')
+      router.push(HUB_ROUTES.perfisGestor)
     }
   }
 
@@ -326,7 +326,7 @@ export const NovoPerfilGestor = forwardRef<NovoPerfilGestorHandle, NovoPerfilGes
                   <MdPerson />
                 </span>
               </div>
-              <h1 className="font-exo text-sm font-semibold text-primary md:text-lg">
+              <h1 className="text-sm font-semibold text-primary md:text-lg">
                 {isEditing ? 'Editar Perfil Gestor' : 'Novo Perfil Gestor'}
               </h1>
             </div>

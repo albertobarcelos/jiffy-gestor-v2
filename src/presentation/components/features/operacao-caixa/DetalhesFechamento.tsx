@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
 import { MdClose } from 'react-icons/md'
 import { CircularProgress } from '@mui/material'
@@ -75,9 +76,7 @@ interface DetalhesFechamentoProps {
  * Modal de detalhes de fechamento de caixa
  * Exibe informações completas em formato de cupom fiscal
  */
-export function DetalhesFechamento({ idOperacaoCaixa, open, onClose }: DetalhesFechamentoProps) {
-  const { auth } = useAuthStore()
-  const [operacaoCaixa, setOperacaoCaixa] = useState<OperacaoCaixaDetalhada | null>(null)
+export function DetalhesFechamento({ idOperacaoCaixa, open, onClose }: DetalhesFechamentoProps) {  const [operacaoCaixa, setOperacaoCaixa] = useState<OperacaoCaixaDetalhada | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
   /**
@@ -151,13 +150,13 @@ export function DetalhesFechamento({ idOperacaoCaixa, open, onClose }: DetalhesF
   const fetchDetalhesOperacaoCaixa = async () => {
     if (!idOperacaoCaixa || !open) return
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     setIsLoading(true)
 
     try {
-      const response = await fetch(
+      const response = await fetchGestorApi(
         `/api/caixa/operacao-caixa-terminal/${idOperacaoCaixa}?tipoRetorno=detalhado`,
         {
           headers: {
@@ -221,7 +220,7 @@ export function DetalhesFechamento({ idOperacaoCaixa, open, onClose }: DetalhesF
           margin: { xs: 0, sm: '0 auto' },
           maxHeight: '90vh',
           backgroundColor: '#FFFFD9',
-          fontFamily: "'Roboto Mono', 'Courier New', monospace",
+          fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
           color: '#000000',
         },
       }}
@@ -240,7 +239,7 @@ export function DetalhesFechamento({ idOperacaoCaixa, open, onClose }: DetalhesF
         {/* Conteúdo */}
         <div
           className="flex-1 overflow-y-auto px-4 pb-4 bg-[#FFFFD9] text-xs md:text-sm"
-          style={{ fontFamily: "'Roboto Mono', 'Courier New', monospace" }}
+          style={{ fontFamily: 'var(--font-general-sans), system-ui, sans-serif' }}
         >
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-12">

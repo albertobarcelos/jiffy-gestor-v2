@@ -1,9 +1,11 @@
-'use client'
+﻿'use client'
 
-import { FormControl, InputLabel, MenuItem, Select } from '@mui/material'
+import { Autocomplete, FormControl, InputLabel, MenuItem, Select, TextField } from '@mui/material'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
 import { sxEntradaCompactaProduto, sxEntradaCompactaProdutoSelect } from './produtoFormMuiSx'
+import { UNIDADES_MEDIDA_PRODUTO_OPCOES } from '@/src/shared/types/unidadeMedidaProduto'
+import type { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 
 interface InformacoesProdutoStepProps {
   nomeProduto: string
@@ -19,7 +21,7 @@ interface InformacoesProdutoStepProps {
   /** EAN / código de barras (GTIN — até 14 dígitos numéricos). */
   codigoEanBarras: string
   onCodigoEanBarrasChange: (value: string) => void
-  grupos: any[]
+  grupos: GrupoProduto[]
   isLoadingGrupos: boolean
   onNext: () => void
   /** Salva com dados preenchidos até aqui e encerra o fluxo (sem passos seguintes) */
@@ -67,34 +69,16 @@ export function InformacoesProdutoStep({
     onPrecoVendaChange(formatted)
   }
 
-  const getGrupoId = (grupo: any) => {
-    if (!grupo) return ''
-    if (typeof grupo.getId === 'function') return grupo.getId()
-    return grupo.id ?? ''
-  }
-
-  const getGrupoNome = (grupo: any) => {
-    if (!grupo) return ''
-    if (typeof grupo.getNome === 'function') return grupo.getNome()
-    return grupo.nome ?? ''
-  }
-
-  const isGrupoAtivo = (grupo: any) => {
-    if (!grupo) return true
-    if (typeof grupo.isAtivo === 'function') return grupo.isAtivo()
-    if (typeof grupo.ativo === 'boolean') return grupo.ativo
-    return true
-  }
+  const grupoSelecionado = grupos.find(g => g.getId() === grupoProduto) ?? null
 
   return (
     <div className="rounded-[10px] bg-info p-2 md:p-4">
       <div className="mb-2 flex items-center gap-5">
-        <h2 className="font-exo text-xl font-semibold text-primary">Informações</h2>
+        <h2 className="text-xl font-semibold text-primary">Informações</h2>
         <div className="h-px flex-1 bg-primary/70" />
       </div>
-      <p className="font-nunito mb-4 text-sm text-secondary-text">
-        Preencha os dados principais do produto. Essas informações serão usadas para identificação e
-        exibição no PDV.
+      <p className="mb-4 text-sm text-secondary-text">
+        Essas informações serão usadas para identificação e exibição no Jiffy POS.
       </p>
 
       <div className="space-y-4">
@@ -107,7 +91,7 @@ export function InformacoesProdutoStep({
             type="text"
             value={nomeProduto}
             onChange={e => onNomeProdutoChange(e.target.value.toLocaleUpperCase('pt-BR'))}
-            placeholder="Nome que Aparecerá no PDV"
+            placeholder="Nome que Aparecerá no Jiffy POS"
             className="bg-white"
             sx={sxEntradaCompactaProduto}
             InputLabelProps={{ required: true }}
@@ -125,43 +109,52 @@ export function InformacoesProdutoStep({
           />
         </div>
 
-        {/* Linha 2: Unidade (mais estreita) + Grupo + Código EAN — três colunas em desktop */}
+        {/* Linha 2: Grupo (com pesquisa) + Unidade + Código EAN */}
         <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,9.5rem)_minmax(0,1fr)]">
-        <div className="min-w-0">
-            {isLoadingGrupos ? (
-              <div className="flex h-[40px] w-full items-center justify-center rounded-md border border-dashed border-[#CBD0E3] bg-white">
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              </div>
-            ) : (
-              <FormControl
-                fullWidth
-                size="small"
-                variant="outlined"
-                sx={sxEntradaCompactaProdutoSelect}
-              >
-                <InputLabel id="np-grupo-label">Grupo</InputLabel>
-                <Select
-                  labelId="np-grupo-label"
-                  label="Grupo"
-                  value={grupoProduto || ''}
-                  onChange={e => onGrupoProdutoChange(e.target.value || null)}
+          <div className="relative z-20 min-w-0">
+            <Autocomplete
+              id="np-grupo-produto-searchable"
+              size="small"
+              options={grupos}
+              loading={isLoadingGrupos}
+              loadingText="Carregando..."
+              noOptionsText="Nenhum grupo encontrado"
+              getOptionLabel={grupo =>
+                grupo.isAtivo() ? grupo.getNome() : `${grupo.getNome()} (Inativo)`
+              }
+              isOptionEqualToValue={(a, b) => a.getId() === b.getId()}
+              value={grupoSelecionado}
+              onChange={(_, grupo) => onGrupoProdutoChange(grupo?.getId() ?? null)}
+              renderOption={(props, grupo) => (
+                <li
+                  {...props}
+                  key={grupo.getId()}
+                  style={{
+                    ...props.style,
+                    color: grupo.isAtivo() ? undefined : '#9CA3AF',
+                  }}
                 >
-                  <MenuItem value="">
-                    <span className="text-secondary-text">Selecione o Grupo</span>
-                  </MenuItem>
-                  {grupos.map(grupo => {
-                    const id = getGrupoId(grupo)
-                    const nome = getGrupoNome(grupo)
-                    const ativo = isGrupoAtivo(grupo)
-                    return (
-                      <MenuItem key={id} value={id} sx={ativo ? undefined : { color: '#9CA3AF' }}>
-                        {ativo ? nome : `${nome} (Inativo)`}
-                      </MenuItem>
-                    )
-                  })}
-                </Select>
-              </FormControl>
-            )}
+                  {grupo.isAtivo() ? grupo.getNome() : `${grupo.getNome()} (Inativo)`}
+                </li>
+              )}
+              renderInput={params => (
+                <TextField
+                  {...params}
+                  label="Grupo"
+                  placeholder="Pesquise ou selecione"
+                  InputLabelProps={{
+                    ...params.InputLabelProps,
+                    shrink: true,
+                  }}
+                  sx={{
+                    ...sxEntradaCompactaProduto,
+                    '& .MuiOutlinedInput-root': {
+                      backgroundColor: '#fff',
+                    },
+                  }}
+                />
+              )}
+            />
           </div>
           <div className="min-w-0">
             <FormControl
@@ -178,16 +171,16 @@ export function InformacoesProdutoStep({
                 onChange={e => onUnidadeProdutoChange(e.target.value || null)}
               >
                 <MenuItem value="">
-                  <span className="text-secondary-text">Escolha a Unidade</span>
+                  <span className="text-secondary-text">Selecione a unidade</span>
                 </MenuItem>
-                <MenuItem value="UN">Unitário</MenuItem>
-                <MenuItem value="KG">Kg</MenuItem>
-                <MenuItem value="LT">Litro</MenuItem>
+                {UNIDADES_MEDIDA_PRODUTO_OPCOES.map(opcao => (
+                  <MenuItem key={opcao.value} value={opcao.value}>
+                    {opcao.label}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
           </div>
-
-          
 
           <div className="min-w-0">
             <Input
@@ -228,7 +221,7 @@ export function InformacoesProdutoStep({
             <Button
               type="button"
               onClick={onSaveAndClose}
-              className="h-8 rounded-lg border-2 px-6 font-exo text-sm font-semibold hover:bg-primary/10 sm:px-8"
+              className="h-8 rounded-lg border-2 px-6 text-sm font-semibold hover:bg-primary/10 sm:px-8"
               sx={{
                 backgroundColor: 'var(--color-info)',
                 color: 'var(--color-primary)',
@@ -241,7 +234,7 @@ export function InformacoesProdutoStep({
             <Button
               type="button"
               onClick={onNext}
-              className="h-8 rounded-lg px-10 font-exo text-sm font-semibold text-white hover:bg-primary/90"
+              className="h-8 rounded-lg px-10 text-sm font-semibold text-white hover:bg-primary/90"
               sx={{
                 backgroundColor: 'var(--color-primary)',
               }}

@@ -6,16 +6,19 @@ import type { Auth } from '@/src/domain/entities/Auth'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { buildAuthFromAccessToken } from '@/src/shared/utils/buildAuthFromAccessToken'
-import { getTabTenantToken, hasSessionNonce } from '@/src/shared/utils/tabSession'
+import { getTabTenantToken } from '@/src/shared/utils/tabSession'
 import { fetchTenantRefreshAccessToken } from '@/src/shared/utils/fetchTenantRefreshAccessToken'
 import { syncTenantAccessTokenClient } from '@/src/presentation/utils/syncTenantAccessTokenClient'
+import { restoreIdentityFromCookie } from '@/src/presentation/utils/restoreIdentityFromCookie'
+import { ensureHubBearerToken } from '@/src/presentation/utils/ensureHubBearerToken'
 import {
   SESSION_STORAGE_HUB_LOGOUT_SELF,
   SESSION_STORAGE_TENANT_LOGOUT_SELF,
   JIFFY_SESSION_EXPIRED_EVENT,
 } from '@/src/shared/constants/sessionCoordinator'
+import { HUB_PATH, isHubPathname } from '@/src/shared/constants/hubRoutes'
 
-/** Tempo máximo de espera para o refresh de token antes de forçar logout. */
+/** Tempo máximo de espera para o refresh de token antes de encerrar a sessão da empresa. */
 const REFRESH_TIMEOUT_MS = 5_000
 
 function isHubLogoutInitiatorTab(): boolean {
@@ -47,12 +50,13 @@ const SESSAO_TIMEOUT_MAX_MS = 1000 * 60 * 60 * 24 * 14
 
 /**
  * Proteção de rotas no cliente: exige sessão válida e não expirada.
- * Chama logout (limpa cookie httpOnly + estado) antes de redirecionar ao login.
- * Aguarda reidratação do Zustand para evitar falsos positivos após reload.
+ *
+ * - Sessão da **empresa** morta com identidade do hub ok → `logoutTenant` + {@link HUB_PATH}
+ * - Identidade do hub também morta → `logout` completo + `/login`
  *
  * Além da checagem na montagem/atualização do store, faz **poll** e **timeout** na data
  * de `expiresAt` — assim, se o JWT expira com o usuário parado na mesma página, ainda
- * redireciona ao login (o efeito do Zustand sozinho não reexecuta só pelo passar do tempo).
+ * redireciona (o efeito do Zustand sozinho não reexecuta só pelo passar do tempo).
  */
 const PUBLIC_PREFIXES = [
   '/login',
@@ -72,7 +76,7 @@ function isHubPath(p: string | null): boolean {
   if (!p) return false
   /** Perfil da conta: só identidade de hub (como Meus Apps), sem empresa nesta aba. */
   if (p === '/perfil' || p.startsWith('/perfil/')) return true
-  return p.startsWith('/meus-apps')
+  return isHubPathname(p)
 }
 
 /**
@@ -103,9 +107,9 @@ function isTenantSessionAlive(): boolean {
   return getActiveTenantAuthOrNull() !== null
 }
 
-/** ERP: sessão da empresa (tenant JWT) é independente da identidade do hub. */
-function isTenantSessionValid(t: ReturnType<typeof useAuthStore.getState>['tenantAuth']): boolean {
-  return t !== null && !t.isExpired()
+function identityHubStillValid(): boolean {
+  const identity = useAuthStore.getState().identityAuth
+  return identity !== null && !identity.isExpired()
 }
 
 export function AuthGuard({ children }: AuthGuardProps) {
@@ -115,39 +119,101 @@ export function AuthGuard({ children }: AuthGuardProps) {
   const identityAuth = useAuthStore(s => s.identityAuth)
   const tenantAuth = useAuthStore(s => s.tenantAuth)
   const isRehydrated = useAuthStore(s => s.isRehydrated)
+  const isTabVerified = useAuthStore(s => s.isTabVerified)
   const logout = useAuthStore(s => s.logout)
+  const logoutTenant = useAuthStore(s => s.logoutTenant)
   const [allowed, setAllowed] = useState(false)
   const redirectingRef = useRef(false)
 
-  const invalidateSessionToLogin = useCallback(async () => {
+  /**
+   * Sessão da empresa indisponível (expirada / refresh falhou).
+   * Mantém o hub e vai para Minhas Empresas quando a identidade ainda é válida.
+   */
+  const endTenantSessionOrFullLogout = useCallback(async () => {
     if (redirectingRef.current) {
       return
     }
+    /** Disconnect explícito para Minhas Empresas: não disparar logout completo em race. */
+    if (isTenantLogoutInProgress()) {
+      return
+    }
     redirectingRef.current = true
+
+    if (identityHubStillValid()) {
+      try {
+        sessionStorage.setItem(SESSION_STORAGE_TENANT_LOGOUT_SELF, '1')
+      } catch {
+        /* noop */
+      }
+      try {
+        await logoutTenant()
+      } catch (error) {
+        console.error('AuthGuard: erro ao encerrar sessão da empresa:', error)
+      }
+      window.location.href = HUB_PATH
+      return
+    }
+
+    /**
+     * Sem identity válida o hub não pode abrir (só tenant/access deixa
+     * `usuario@sessao.local` e lista vazia). Tenta restaurar cookie; senão login.
+     */
+    const restored = await restoreIdentityFromCookie()
+    if (restored || identityHubStillValid()) {
+      try {
+        sessionStorage.setItem(SESSION_STORAGE_TENANT_LOGOUT_SELF, '1')
+      } catch {
+        /* noop */
+      }
+      try {
+        await logoutTenant()
+      } catch (error) {
+        console.error('AuthGuard: erro ao encerrar sessão da empresa:', error)
+      }
+      window.location.href = HUB_PATH
+      return
+    }
+
     try {
       await logout()
     } catch (error) {
       console.error('AuthGuard: erro ao encerrar sessão antes do login:', error)
     }
     window.location.href = '/login'
-  }, [logout])
+  }, [logout, logoutTenant])
+
+  /**
+   * Hub exige identidade (JWT de login), não basta tenant/access da empresa.
+   */
+  const allowHubOrRedirectLogin = useCallback(async (): Promise<boolean> => {
+    if (identityHubStillValid()) {
+      return true
+    }
+    const restored = await restoreIdentityFromCookie()
+    if (restored || identityHubStillValid()) {
+      return true
+    }
+    const hubBearer = await ensureHubBearerToken()
+    return hubBearer?.source === 'identity'
+  }, [])
 
   const redirectHubSemIdentidade = useCallback(() => {
     if (redirectingRef.current) {
       return
     }
     redirectingRef.current = true
-    // Limpar cookie de identidade antes de redirecionar (sem await para não bloquear o redirect)
-    void fetch('/api/auth/logout-hub', { method: 'POST', credentials: 'include' }).catch(() => { /* noop */ })
+    void fetch('/api/auth/logout-hub', { method: 'POST', credentials: 'include' }).catch(() => {
+      /* noop */
+    })
     window.location.href = '/login'
   }, [])
 
-  const redirectToMeusApps = useCallback(() => {
+  const redirectToHub = useCallback(() => {
     if (redirectingRef.current) {
       return
     }
     redirectingRef.current = true
-    window.location.href = '/meus-apps'
+    window.location.href = HUB_PATH
   }, [])
 
   useEffect(() => {
@@ -163,19 +229,76 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
     const isHub = isHubPath(pathname)
 
+    // Enquanto o bootstrap da aba (URL ↔ token / rebind) não confirmou a sessão,
+    // não tentar refresh ou redirect — TabSessionBootstrap reestabelece se necessário.
+    if (!isHub && !isTabVerified) {
+      return
+    }
+
+    if (isTenantLogoutInProgress()) {
+      if (isHub) {
+        if (identityAuth !== null && !identityAuth.isExpired()) {
+          try {
+            sessionStorage.removeItem(SESSION_STORAGE_TENANT_LOGOUT_SELF)
+          } catch {
+            /* noop */
+          }
+          redirectingRef.current = false
+          setAllowed(true)
+          return
+        }
+        let cancelled = false
+        void (async () => {
+          const ok = await allowHubOrRedirectLogin()
+          if (cancelled) {
+            return
+          }
+          try {
+            sessionStorage.removeItem(SESSION_STORAGE_TENANT_LOGOUT_SELF)
+          } catch {
+            /* noop */
+          }
+          if (ok) {
+            redirectingRef.current = false
+            setAllowed(true)
+            return
+          }
+          redirectHubSemIdentidade()
+        })()
+        return () => {
+          cancelled = true
+        }
+      }
+      /** Ainda na rota ERP durante disconnect → aguardar `location.assign(HUB_PATH)`. */
+      return
+    }
+
     if (isHub) {
-      const tenantAlive = isTenantSessionAlive()
-      if ((identityAuth !== null && !identityAuth.isExpired()) || tenantAlive) {
+      if (isHubLogoutInitiatorTab()) {
+        redirectHubSemIdentidade()
+        return
+      }
+      if (identityAuth !== null && !identityAuth.isExpired()) {
         redirectingRef.current = false
         setAllowed(true)
         return
       }
-      if (isHubLogoutInitiatorTab()) {
-        setAllowed(true)
-        return
+      let cancelled = false
+      void (async () => {
+        const ok = await allowHubOrRedirectLogin()
+        if (cancelled) {
+          return
+        }
+        if (ok) {
+          redirectingRef.current = false
+          setAllowed(true)
+          return
+        }
+        redirectHubSemIdentidade()
+      })()
+      return () => {
+        cancelled = true
       }
-      redirectHubSemIdentidade()
-      return
     }
 
     /**
@@ -196,6 +319,14 @@ export function AuthGuard({ children }: AuthGuardProps) {
     }
 
     if (!isAuthenticated || auth === null || auth.isExpired()) {
+      if (isTenantLogoutInProgress()) {
+        return
+      }
+      /** Sem tenant: se a identidade do hub ainda vale, ir ao portal — não tentar refresh da empresa. */
+      if (identityHubStillValid()) {
+        redirectToHub()
+        return
+      }
       let cancelled = false
       void (async () => {
         // Race: refresh token vs. timeout de segurança (5 s)
@@ -211,31 +342,29 @@ export function AuthGuard({ children }: AuthGuardProps) {
         }
         if (refreshed) {
           try {
-            syncTenantAccessTokenClient(refreshed)
+            if (!syncTenantAccessTokenClient(refreshed)) {
+              void endTenantSessionOrFullLogout()
+              return
+            }
             redirectingRef.current = false
             setAllowed(true)
           } catch {
-            void invalidateSessionToLogin()
+            void endTenantSessionOrFullLogout()
           }
           return
         }
-        void invalidateSessionToLogin()
+        void endTenantSessionOrFullLogout()
       })()
       return () => {
         cancelled = true
       }
     }
 
-    if (!tenantAuth && !hasSessionNonce()) {
-      if (isTenantLogoutInProgress()) {
-        try {
-          sessionStorage.removeItem(SESSION_STORAGE_TENANT_LOGOUT_SELF)
-        } catch { /* noop */ }
-      }
-      if (identityAuth) {
-        redirectToMeusApps()
+    if (!tenantAuth) {
+      if (identityHubStillValid() || identityAuth) {
+        redirectToHub()
       } else {
-        void invalidateSessionToLogin()
+        void endTenantSessionOrFullLogout()
       }
       return
     }
@@ -249,9 +378,11 @@ export function AuthGuard({ children }: AuthGuardProps) {
     tenantAuth,
     pathname,
     isRehydrated,
-    invalidateSessionToLogin,
+    isTabVerified,
+    endTenantSessionOrFullLogout,
     redirectHubSemIdentidade,
-    redirectToMeusApps,
+    redirectToHub,
+    allowHubOrRedirectLogin,
   ])
 
   useEffect(() => {
@@ -266,18 +397,25 @@ export function AuthGuard({ children }: AuthGuardProps) {
     const isHub = isHubPath(pathname)
 
     const checkExpired = () => {
+      if (isTenantLogoutInProgress()) {
+        return
+      }
       const st = useAuthStore.getState()
       if (isHub) {
         if (isHubLogoutInitiatorTab()) {
-          return
-        }
-        if (isTenantSessionAlive()) {
+          redirectHubSemIdentidade()
           return
         }
         const id = st.identityAuth
-        if (id === null || id.isExpired()) {
-          redirectHubSemIdentidade()
+        if (id !== null && !id.isExpired()) {
+          return
         }
+        void (async () => {
+          const ok = await allowHubOrRedirectLogin()
+          if (!ok) {
+            redirectHubSemIdentidade()
+          }
+        })()
         return
       }
       if (isTenantSessionAlive()) {
@@ -298,13 +436,15 @@ export function AuthGuard({ children }: AuthGuardProps) {
           window.clearTimeout(timeoutHandle)
           if (refreshed) {
             try {
-              syncTenantAccessTokenClient(refreshed)
+              if (!syncTenantAccessTokenClient(refreshed)) {
+                void endTenantSessionOrFullLogout()
+              }
             } catch {
-              void invalidateSessionToLogin()
+              void endTenantSessionOrFullLogout()
             }
             return
           }
-          void invalidateSessionToLogin()
+          void endTenantSessionOrFullLogout()
         })()
       }
     }
@@ -336,18 +476,22 @@ export function AuthGuard({ children }: AuthGuardProps) {
     identityAuth,
     tenantAuth,
     pathname,
-    invalidateSessionToLogin,
+    endTenantSessionOrFullLogout,
     redirectHubSemIdentidade,
+    allowHubOrRedirectLogin,
   ])
 
-  /** Listener centralizado: fetchGestorApi dispara este evento quando o refresh falha. */
+  /** Listener: fetchGestorApi dispara quando o refresh do tenant falha após 401. */
   useEffect(() => {
     const handleSessionExpired = () => {
-      void invalidateSessionToLogin()
+      if (isTenantLogoutInProgress()) {
+        return
+      }
+      void endTenantSessionOrFullLogout()
     }
     window.addEventListener(JIFFY_SESSION_EXPIRED_EVENT, handleSessionExpired)
     return () => window.removeEventListener(JIFFY_SESSION_EXPIRED_EVENT, handleSessionExpired)
-  }, [invalidateSessionToLogin])
+  }, [endTenantSessionOrFullLogout])
 
   // Rotas públicas: renderizar imediatamente sem checar autenticação
   if (isPublicPath(pathname)) {
@@ -367,4 +511,3 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
   return <>{children}</>
 }
-

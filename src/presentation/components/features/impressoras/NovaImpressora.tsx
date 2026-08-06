@@ -11,6 +11,7 @@ import {
 } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { Impressora } from '@/src/domain/entities/Impressora'
 import { showToast } from '@/src/shared/utils/toast'
 import { cn } from '@/src/shared/utils/cn'
@@ -135,7 +136,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
     ref
   ) {
     const router = useRouter()
-    const { auth, isAuthenticated } = useAuthStore()
+    const { isAuthenticated } = useAuthStore()
     // Em modo cópia, não é edição (sempre cria nova)
     const isEditing = !!impressoraId && !isCopyMode
 
@@ -352,7 +353,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
      */
     const loadTerminais = useCallback(
       async (offset: number, reset: boolean = false) => {
-        const token = auth?.getAccessToken()
+        const token = useAuthStore.getState().tenantAuth?.getAccessToken()
         if (!token) return
 
         setIsLoadingMore(true)
@@ -367,7 +368,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
             params.set('q', qBusca)
           }
 
-          const response = await fetch(`/api/terminais?${params.toString()}`, {
+          const response = await fetchGestorApi(`/api/terminais?${params.toString()}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -420,7 +421,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
           // Não define isLoadingTerminais aqui, pois é gerenciado por loadAllTerminais
         }
       },
-      [auth, impressoraId]
+      [ impressoraId]
     )
 
     /**
@@ -435,7 +436,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
       setCurrentPage(0)
       setHasMoreTerminals(true)
 
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         setIsLoadingTerminais(false)
         hasLoadedTerminaisRef.current = true
@@ -463,7 +464,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
             params.set('q', qBusca)
           }
 
-          const response = await fetch(`/api/terminais?${params.toString()}`, {
+          const response = await fetchGestorApi(`/api/terminais?${params.toString()}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -532,7 +533,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
         setIsLoadingTerminais(false)
         hasLoadedTerminaisRef.current = true
       }
-    }, [isEditing, auth, pageSize])
+    }, [isEditing, pageSize])
 
     /**
      * Carrega dados da impressora (para edição ou cópia)
@@ -541,14 +542,14 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
       // Em modo cópia ou edição, carrega os dados
       if ((!isEditing && !isCopyMode) || !impressoraId || hasLoadedImpressoraRef.current) return
 
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return
 
       setIsLoadingImpressora(true)
       hasLoadedImpressoraRef.current = true
 
       try {
-        const response = await fetch(`/api/impressoras/${impressoraId}`, {
+        const response = await fetchGestorApi(`/api/impressoras/${impressoraId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -599,7 +600,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
           let offset = 0
           let hasMore = true
           while (hasMore) {
-            const terminalResponse = await fetch(`/api/terminais?limit=100&offset=${offset}`, {
+            const terminalResponse = await fetchGestorApi(`/api/terminais?limit=100&offset=${offset}`, {
               headers: {
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',
@@ -688,7 +689,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
       } finally {
         setIsLoadingImpressora(false)
       }
-    }, [isEditing, isCopyMode, impressoraId, auth])
+    }, [isEditing, isCopyMode, impressoraId])
 
     // Carrega dados iniciais
     useEffect(() => {
@@ -1088,7 +1089,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
       const shouldClosePanel = embeddedCloseAfterSaveRef.current
       embeddedCloseAfterSaveRef.current = false
 
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado')
         return
@@ -1119,7 +1120,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
             dataAtualizacao: formattedDate,
           }
 
-          const createResponse = await fetch('/api/impressoras', {
+          const createResponse = await fetchGestorApi('/api/impressoras', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -1162,7 +1163,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
           terminais,
         }
 
-        const updateResponse = await fetch(`/api/impressoras/${impressoraIdToUse}`, {
+        const updateResponse = await fetchGestorApi(`/api/impressoras/${impressoraIdToUse}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -1327,14 +1328,14 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
         {!(isEmbedded && hideEmbeddedChrome) && (
           <div className="sticky top-0 z-10 border-b-2 border-primary/70 px-1 py-2 md:px-[30px]">
             <div className="flex items-center justify-between">
-              <h1 className="font-exo text-sm font-semibold text-primary md:text-xl">
+              <h1 className="text-sm font-semibold text-primary md:text-xl">
                 {pageTitle}
               </h1>
               <div className="flex flex-col-reverse items-center gap-2 md:flex-row">
                 <button
                   type="button"
                   onClick={handleCancel}
-                  className="h-8 rounded-lg border border-primary/70 bg-primary/10 px-2 font-exo text-sm font-semibold text-primary transition-colors hover:bg-primary/20 md:px-6"
+                  className="h-8 rounded-lg border border-primary/70 bg-primary/10 px-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/20 md:px-6"
                 >
                   Cancelar
                 </button>
@@ -1342,7 +1343,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                   type="button"
                   onClick={handleSave}
                   disabled={isLoading || !nome.trim()}
-                  className="flex h-8 items-center gap-2 rounded-lg bg-primary px-2 font-exo text-sm font-semibold text-info transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 md:px-8"
+                  className="flex h-8 items-center gap-2 rounded-lg bg-primary px-2 text-sm font-semibold text-info transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 md:px-8"
                 >
                   {isLoading ? (
                     <>
@@ -1384,7 +1385,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
             <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:overflow-x-visible">
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-info md:w-full md:min-w-[min(100%,520px)]">
                 <div className="shrink-0 border-b border-primary px-4 py-1">
-                  <h2 className="font-exo text-lg font-semibold text-primary">
+                  <h2 className="text-lg font-semibold text-primary">
                     Config. por Terminal
                   </h2>
                 </div>
@@ -1392,7 +1393,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                 {/* Barra de ações em lote — sempre visível; aplica só com terminais selecionados */}
                 <div className="shrink-0 border-b border-primary px-2 py-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="min-w-0 flex-1 font-nunito text-sm font-medium text-primary-text">
+                    <span className="min-w-0 flex-1 text-sm font-medium text-primary-text">
                       {selectedTerminalIds.size === 0 ?
                         'Nenhum terminal selecionado'
                       : `${selectedTerminalIds.size} terminal(is) selecionado(s)`}
@@ -1409,7 +1410,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                           onChange={e => setBuscaTerminalDraft(e.target.value)}
                           placeholder="Buscar terminal por nome..."
                           autoComplete="off"
-                          className="font-nunito h-8 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+                          className="h-8 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
                           aria-label="Buscar terminal por nome"
                         />
                       </div>
@@ -1417,7 +1418,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                         <button
                           type="button"
                           onClick={clearSelection}
-                          className="shrink-0 rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 font-exo text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
+                          className="shrink-0 rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
                         >
                           Limpar seleção
                         </button>
@@ -1429,12 +1430,12 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                         {/* Aplicar Modelo */}
                         <div className="flex flex-col gap-1">
-                          <label className="font-nunito text-xs text-primary-text">Modelo</label>
+                          <label className="text-xs text-primary-text">Modelo</label>
                           <div className="flex gap-1">
                             <select
                               value={bulkModelo}
                               onChange={e => setBulkModelo(e.target.value)}
-                              className="font-nunito h-7 flex-1 rounded-lg border border-primary bg-info px-2 text-xs text-primary-text focus:border-primary focus:outline-none"
+                              className="h-7 flex-1 rounded-lg border border-primary bg-info px-2 text-xs text-primary-text focus:border-primary focus:outline-none"
                             >
                               <option value="">Selecione...</option>
                               {MODELOS_OPTIONS.map(modelo => (
@@ -1454,7 +1455,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                                 }
                               }}
                               disabled={!bulkModelo || selectedTerminalIds.size === 0}
-                              className="whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-2 py-1 font-exo text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-2 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <MdCheck className="h-4 w-4" />
                             </button>
@@ -1462,7 +1463,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                         </div>
                         {/* Aplicar IP */}
                         <div className="flex flex-col gap-1">
-                          <label className="font-nunito text-xs text-primary-text">IP</label>
+                          <label className="text-xs text-primary-text">IP</label>
                           <div className="flex gap-1">
                             <input
                               type="text"
@@ -1479,7 +1480,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                                 }
                               }}
                               placeholder="192.168.1.100"
-                              className="font-nunito h-7 flex-1 rounded-lg border border-primary bg-info px-2 text-xs text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+                              className="h-7 flex-1 rounded-lg border border-primary bg-info px-2 text-xs text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
                             />
                             <button
                               type="button"
@@ -1493,7 +1494,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                                 }
                               }}
                               disabled={!bulkIP || selectedTerminalIds.size === 0}
-                              className="whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-2 py-1 font-exo text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-2 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <MdCheck className="h-4 w-4" />
                             </button>
@@ -1501,7 +1502,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                         </div>
                         {/* Aplicar Porta */}
                         <div className="flex flex-col gap-1">
-                          <label className="font-nunito text-xs text-primary-text">Porta</label>
+                          <label className="text-xs text-primary-text">Porta</label>
                           <div className="flex gap-1">
                             <input
                               type="text"
@@ -1512,7 +1513,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                               }}
                               placeholder="9100"
                               maxLength={5}
-                              className="font-nunito h-7 flex-1 rounded-lg border border-primary bg-info px-2 text-xs text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+                              className="h-7 flex-1 rounded-lg border border-primary bg-info px-2 text-xs text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
                             />
                             <button
                               type="button"
@@ -1523,7 +1524,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                                 }
                               }}
                               disabled={!bulkPorta || selectedTerminalIds.size === 0}
-                              className="whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-2 py-1 font-exo text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-2 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <MdCheck className="h-4 w-4" />
                             </button>
@@ -1532,7 +1533,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                       </div>
                       {/* Segunda linha: Ações Rápidas */}
                       <div className="flex flex-col gap-1">
-                        <label className="font-nunito text-xs text-primary-text">
+                        <label className="text-xs text-primary-text">
                           Ações Rápidas
                         </label>
                         <div className="grid grid-cols-3 gap-2">
@@ -1540,7 +1541,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                             type="button"
                             onClick={() => applyBulkUpdate('modoFicha', true)}
                             disabled={selectedTerminalIds.size === 0}
-                            className="w-full whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 font-exo text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="w-full whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             Modo Ficha ON
                           </button>
@@ -1548,7 +1549,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                             type="button"
                             onClick={() => applyBulkUpdate('imprimirSenha', true)}
                             disabled={selectedTerminalIds.size === 0}
-                            className="w-full whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 font-exo text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="w-full whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             Imprimir Senha ON
                           </button>
@@ -1556,7 +1557,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                             type="button"
                             onClick={() => applyBulkUpdate('ativo', true)}
                             disabled={selectedTerminalIds.size === 0}
-                            className="w-full whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 font-exo text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="w-full whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             Ativar
                           </button>
@@ -1564,7 +1565,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                             type="button"
                             onClick={() => applyBulkUpdate('modoFicha', false)}
                             disabled={selectedTerminalIds.size === 0}
-                            className="w-full whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 font-exo text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="w-full whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             Modo Ficha OFF
                           </button>
@@ -1572,7 +1573,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                             type="button"
                             onClick={() => applyBulkUpdate('imprimirSenha', false)}
                             disabled={selectedTerminalIds.size === 0}
-                            className="w-full whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 font-exo text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="w-full whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             Imprimir Senha OFF
                           </button>
@@ -1580,7 +1581,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                             type="button"
                             onClick={() => applyBulkUpdate('ativo', false)}
                             disabled={selectedTerminalIds.size === 0}
-                            className="w-full whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 font-exo text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="w-full whitespace-nowrap rounded-lg border border-primary/70 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             Desativar
                           </button>
@@ -1601,26 +1602,26 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                         className="h-4 w-4 cursor-pointer rounded border-primary bg-info text-primary focus:ring-2 focus:ring-primary"
                       />
                     </div>
-                    <div className="min-w-0 font-nunito text-sm font-semibold text-primary-text">
+                    <div className="min-w-0 text-sm font-semibold text-primary-text">
                       Terminal
                     </div>
                     <div className="flex min-w-0 w-full justify-center">
-                      <span className="font-nunito text-center text-sm font-semibold text-primary-text">
+                      <span className="text-center text-sm font-semibold text-primary-text">
                         Modo Ficha
                       </span>
                     </div>
                     <div className="flex min-w-0 w-full justify-center">
-                      <span className="font-nunito text-center text-sm font-semibold text-primary-text">
+                      <span className="text-center text-sm font-semibold text-primary-text">
                         Imprimir Senha
                       </span>
                     </div>
                     <div className="flex min-w-0 w-full justify-center">
-                      <span className="font-nunito text-center text-sm font-semibold text-primary-text">
+                      <span className="text-center text-sm font-semibold text-primary-text">
                         Ativo
                       </span>
                     </div>
                     <div className="flex min-w-0 w-full justify-center">
-                      <span className="font-nunito text-center text-sm font-semibold text-primary-text">
+                      <span className="text-center text-sm font-semibold text-primary-text">
                         Rede
                       </span>
                     </div>
@@ -1737,7 +1738,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                                 onClick={e => e.stopPropagation()}
                               />
                             </div>
-                            <div className="font-nunito min-w-0 truncate text-sm text-primary-text">
+                            <div className="min-w-0 truncate text-sm text-primary-text">
                               {config.nome}
                             </div>
                             <div className="flex min-w-0 w-full justify-center">
@@ -1803,7 +1804,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                             <div className="border-t border-primary/20 bg-gray-50/90 px-4 py-3">
                               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                 <div className="space-y-1">
-                                  <label className="font-nunito text-xs text-primary-text">
+                                  <label className="text-xs text-primary-text">
                                     Modelo
                                   </label>
                                   <select
@@ -1811,7 +1812,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                                     onChange={e =>
                                       updateTerminalConfig(index, 'modeloDisplay', e.target.value)
                                     }
-                                    className="font-nunito h-8 w-full rounded-lg border border-primary bg-info px-3 text-sm text-primary-text focus:border-primary focus:outline-none"
+                                    className="h-8 w-full rounded-lg border border-primary bg-info px-3 text-sm text-primary-text focus:border-primary focus:outline-none"
                                   >
                                     {MODELOS_OPTIONS.map(modelo => (
                                       <option key={modelo} value={modelo}>
@@ -1821,7 +1822,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                                   </select>
                                 </div>
                                 <div className="space-y-1">
-                                  <label className="font-nunito text-xs text-primary-text">
+                                  <label className="text-xs text-primary-text">
                                     IP
                                   </label>
                                   <input
@@ -1837,11 +1838,11 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                                       }
                                     }}
                                     placeholder="192.168.1.100"
-                                    className="font-nunito h-8 w-full rounded-lg border border-primary bg-info px-3 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+                                    className="h-8 w-full rounded-lg border border-primary bg-info px-3 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
                                   />
                                 </div>
                                 <div className="space-y-1">
-                                  <label className="font-nunito text-xs text-primary-text">
+                                  <label className="text-xs text-primary-text">
                                     Porta
                                   </label>
                                   <input
@@ -1852,7 +1853,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                                     }
                                     placeholder="9100"
                                     maxLength={5}
-                                    className="font-nunito h-8 w-full rounded-lg border border-primary bg-info px-3 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+                                    className="h-8 w-full rounded-lg border border-primary bg-info px-3 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
                                   />
                                 </div>
                               </div>
@@ -1874,12 +1875,12 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                               onChange={() => toggleTerminalSelection(config.terminalId)}
                               className="h-4 w-4 shrink-0 cursor-pointer rounded border-primary bg-info text-primary focus:ring-2 focus:ring-primary"
                             />
-                            <span className="font-nunito min-w-0 flex-[1_1_8rem] truncate text-sm font-medium text-primary-text">
+                            <span className="min-w-0 flex-[1_1_8rem] truncate text-sm font-medium text-primary-text">
                               {config.nome}
                             </span>
                             <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 sm:gap-4">
                               <div className="flex flex-col items-center gap-0.5">
-                                <span className="font-nunito text-[10px] leading-none text-secondary-text">
+                                <span className="text-[10px] leading-none text-secondary-text">
                                   Modo Ficha
                                 </span>
                                 <JiffyIconSwitch
@@ -1895,7 +1896,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                                 />
                               </div>
                               <div className="flex flex-col items-center gap-0.5">
-                                <span className="font-nunito text-[10px] leading-none text-secondary-text">
+                                <span className="text-[10px] leading-none text-secondary-text">
                                   Imprimir Senha
                                 </span>
                                 <JiffyIconSwitch
@@ -1911,7 +1912,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                                 />
                               </div>
                               <div className="flex flex-col items-center gap-0.5">
-                                <span className="font-nunito text-[10px] leading-none text-secondary-text">
+                                <span className="text-[10px] leading-none text-secondary-text">
                                   Ativo
                                 </span>
                                 <JiffyIconSwitch
@@ -1948,7 +1949,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                           {isExpanded && (
                             <div className="space-y-3 border-t border-primary/15 px-3 pb-3 pt-2">
                               <div className="space-y-1">
-                                <label className="font-nunito text-xs text-primary-text">
+                                <label className="text-xs text-primary-text">
                                   Modelo
                                 </label>
                                 <select
@@ -1956,7 +1957,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                                   onChange={e =>
                                     updateTerminalConfig(index, 'modeloDisplay', e.target.value)
                                   }
-                                  className="font-nunito h-8 w-full rounded-lg border border-primary bg-info px-3 text-sm text-primary-text focus:border-primary focus:outline-none"
+                                  className="h-8 w-full rounded-lg border border-primary bg-info px-3 text-sm text-primary-text focus:border-primary focus:outline-none"
                                 >
                                   {MODELOS_OPTIONS.map(modelo => (
                                     <option key={modelo} value={modelo}>
@@ -1966,7 +1967,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                                 </select>
                               </div>
                               <div className="space-y-1">
-                                <label className="font-nunito text-xs text-primary-text">IP</label>
+                                <label className="text-xs text-primary-text">IP</label>
                                 <input
                                   type="text"
                                   value={config.ip}
@@ -1978,11 +1979,11 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                                     }
                                   }}
                                   placeholder="192.168.1.100"
-                                  className="font-nunito h-8 w-full rounded-lg border border-primary bg-info px-3 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+                                  className="h-8 w-full rounded-lg border border-primary bg-info px-3 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
                                 />
                               </div>
                               <div className="space-y-1">
-                                <label className="font-nunito text-xs text-primary-text">
+                                <label className="text-xs text-primary-text">
                                   Porta
                                 </label>
                                 <input
@@ -1993,7 +1994,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                                   }
                                   placeholder="9100"
                                   maxLength={5}
-                                  className="font-nunito h-8 w-full rounded-lg border border-primary bg-info px-3 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+                                  className="h-8 w-full rounded-lg border border-primary bg-info px-3 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
                                 />
                               </div>
                             </div>

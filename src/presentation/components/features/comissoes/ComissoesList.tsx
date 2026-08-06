@@ -10,8 +10,10 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { FaturamentoRangeCalendar } from '@/src/presentation/components/ui/FaturamentoRangeCalendar'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
-import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useTenantEmpresaId, useTenantQueryKey } from '@/src/presentation/hooks/useTenantQueryKey'
+import { buildTenantQueryKey } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { useComissoesPdv, fetchComissoesPdvAllItemsForTaxa } from '@/src/presentation/hooks/useComissoesPdv'
 import type { ComissoesPdvFetchParams } from '@/src/presentation/hooks/useComissoesPdv'
 import type {
@@ -170,9 +172,8 @@ function textoPeriodoResumo(ini: string, fim: string): string {
  * Layout no padrão das listas em Configurações (ex.: Taxas).
  */
 export function ComissoesList() {
-  const { auth } = useAuthStore()
   const { timezoneAgregacao } = useEmpresaMe()
-  const token = auth?.getAccessToken()
+  const token = useAuthStore.getState().tenantAuth?.getAccessToken()
   const empresaId = useTenantEmpresaId()
 
   const [taxaFiltro, setTaxaFiltro] = useState('')
@@ -214,8 +215,10 @@ export function ComissoesList() {
 
   const { data, isLoading, isFetching, error } = useComissoesPdv(fetchParams)
 
+  const taxasPercentualQueryKey = useTenantQueryKey(['taxas', 'dropdown-comissoes'])
+
   const taxasPercentualQuery = useQuery({
-    queryKey: ['taxas', 'dropdown-comissoes', empresaId],
+    queryKey: taxasPercentualQueryKey,
     queryFn: async (): Promise<Taxa[]> => {
       if (!token) return []
       const todas: Taxa[] = []
@@ -226,7 +229,7 @@ export function ComissoesList() {
           limit: String(TAXAS_PAGE_FETCH),
           offset: String(offsetLista),
         })
-        const response = await fetch(`/api/taxas?${sp.toString()}`, {
+        const response = await fetchGestorApi(`/api/taxas?${sp.toString()}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -267,7 +270,12 @@ export function ComissoesList() {
 
   const comissoesPorTaxaQueries = useQueries({
     queries: taxasOpts.map(taxa => ({
-      queryKey: ['comissoes-pdv', 'todas-taxas', taxa.getId(), empresaId, mergeApiFilters],
+      queryKey: buildTenantQueryKey(empresaId, [
+        'comissoes-pdv',
+        'todas-taxas',
+        taxa.getId(),
+        mergeApiFilters,
+      ]),
       queryFn: () =>
         fetchComissoesPdvAllItemsForTaxa(token!, {
           taxaId: taxa.getId(),
@@ -275,7 +283,7 @@ export function ComissoesList() {
           orderByDirection: 'asc',
           ...mergeApiFilters,
         }),
-      enabled: Boolean(token && taxaFiltro === '' && taxasOpts.length > 0),
+      enabled: Boolean(token && empresaId && taxaFiltro === '' && taxasOpts.length > 0),
       staleTime: 60_000,
     })),
   })
@@ -513,7 +521,7 @@ export function ComissoesList() {
                     : 'Escolher intervalo — data de criação da venda'
                 }
                 className={cn(
-                  'h-9 shrink-0 rounded-md border px-3 font-exo text-xs font-semibold transition-colors',
+                  'h-9 shrink-0 rounded-md border px-3 text-xs font-semibold transition-colors',
                   textoPeriodoResumo(draft.criacaoIni, draft.criacaoFim)
                     ? 'border-primary bg-primary/10 text-primary'
                     : 'border-gray-200 bg-white text-primary-text hover:border-primary/40 hover:bg-gray-50'
@@ -530,7 +538,7 @@ export function ComissoesList() {
                     : 'Escolher intervalo — data de finalização da venda'
                 }
                 className={cn(
-                  'h-9 shrink-0 rounded-md border px-3 font-exo text-xs font-semibold transition-colors',
+                  'h-9 shrink-0 rounded-md border px-3 text-xs font-semibold transition-colors',
                   textoPeriodoResumo(draft.finalIni, draft.finalFim)
                     ? 'border-primary bg-primary/10 text-primary'
                     : 'border-gray-200 bg-white text-primary-text hover:border-primary/40 hover:bg-gray-50'
@@ -624,7 +632,7 @@ export function ComissoesList() {
             <button
               type="button"
               onClick={limparTodosFiltros}
-              className="h-9 w-full shrink-0 rounded-md border border-primary/50 bg-primary/10 px-3 font-exo text-xs font-semibold text-primary transition-colors hover:bg-primary/15 sm:w-auto"
+              className="h-9 w-full shrink-0 rounded-md border border-primary/50 bg-primary/10 px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/15 sm:w-auto"
             >
               Limpar
             </button>
@@ -653,7 +661,7 @@ export function ComissoesList() {
             type="button"
             disabled={!rascunhoIntervaloRange?.from || !rascunhoIntervaloRange?.to}
             onClick={aplicarPainelIntervalo}
-            className="rounded-b-l-lg font-nunito flex h-full w-full items-center justify-center bg-primary text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-b-l-lg flex h-full w-full items-center justify-center bg-primary text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Aplicar período
           </button>

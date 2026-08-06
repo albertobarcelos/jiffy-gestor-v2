@@ -336,6 +336,15 @@ const DEFAULT_BAR_ACTION_ORDER: readonly JiffyFooterBarKey[] = [
   'saveAndClose',
 ]
 
+/** Fechar/nav = 1; Salvar = 2 → Salvar ~2× mais largo (padrão em todas as abas). */
+const FOOTER_BAR_COL_WEIGHT: Record<JiffyFooterBarKey, number> = {
+  prev: 1,
+  next: 1,
+  cancel: 1,
+  save: 2,
+  saveAndClose: 2,
+}
+
 /** Monta a sequência de colunas respeitando `barActionOrder` e os flags visíveis */
 function buildFooterBarKeys(fa: JiffySidePanelFooterActions): JiffyFooterBarKey[] {
   const visible = new Set<JiffyFooterBarKey>()
@@ -357,7 +366,8 @@ function buildFooterBarKeys(fa: JiffySidePanelFooterActions): JiffyFooterBarKey[
 }
 
 /**
- * Rodapé em faixa: N colunas iguais; ordem padrão Anterior → Próximo → Cancelar → Salvar (customizável).
+ * Rodapé em faixa: colunas ponderadas — ações primárias (`save` / `saveAndClose`)
+ * ocupam o dobro da largura de Fechar / Anterior / Próximo.
  * Em cadastros costuma omitir Cancelar (fechar pelo X) — um único Salvar ocupa 100% da largura.
  * Só a primeira coluna recebe canto inferior esquerdo arredondado (igual ao painel).
  */
@@ -475,11 +485,12 @@ function JiffyPanelFooterBar({
     }
   }
 
+  const gridTemplateColumns = keys
+    .map(key => `minmax(0, ${FOOTER_BAR_COL_WEIGHT[key]}fr)`)
+    .join(' ')
+
   return (
-    <div
-      className="grid w-full"
-      style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}
-    >
+    <div className="grid w-full" style={{ gridTemplateColumns }}>
       {keys.map((key, i) => (
         <div
           key={key}
@@ -516,7 +527,7 @@ export interface JiffySidePanelModalProps {
    */
   scrollableBody?: boolean
   /**
-   * `bar`: botões em linha única, largura igual (grid), colados na base do painel — Salvar por último (à direita). Só Salvar = largura total.
+   * `bar`: botões em linha única, colados na base do painel — Salvar (~2×) mais largo que Fechar/nav. Só Salvar = largura total.
    * `default`: agrupamento compacto com espaçamento (Anterior/Próximo à esquerda; Cancelar/Salvar à direita).
    */
   footerVariant?: 'default' | 'bar'
@@ -672,7 +683,7 @@ export function JiffySidePanelModal({
           ) : (
             <div
               className={cn(
-                'flex shrink-0 items-start justify-between gap-3 px-4 py-3 md:px-6',
+                'relative z-10 flex shrink-0 items-start justify-between gap-3 px-4 py-3 md:px-6',
                 isGlass ? 'border-b border-white/25 bg-transparent' : 'border-b border-gray-200'
               )}
             >
@@ -684,7 +695,7 @@ export function JiffySidePanelModal({
                   {title}
                 </h2>
                 {subtitle ? (
-                  <p className="mt-1 font-['Nunito',sans-serif] text-sm font-medium tracking-wide text-primary-text">
+                  <p className="mt-1 text-sm font-medium tracking-wide text-primary-text">
                     {subtitle}
                   </p>
                 ) : null}
@@ -693,7 +704,7 @@ export function JiffySidePanelModal({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="shrink-0 text-secondary-text hover:bg-gray-100 hover:text-primary-text"
+                className="relative z-10 shrink-0 text-secondary-text hover:bg-gray-100 hover:text-primary-text"
                 aria-label="Fechar"
                 onClick={requestClose}
               >

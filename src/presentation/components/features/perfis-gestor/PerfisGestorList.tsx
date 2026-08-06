@@ -10,6 +10,7 @@ import {
 } from 'react'
 import { PerfilGestor } from '@/src/domain/entities/PerfilGestor'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
@@ -58,7 +59,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
-  const { auth, isAuthenticated } = useAuthStore()
+  const { isAuthenticated } = useAuthStore()
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -75,7 +76,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
    */
   const loadContagemUsuariosPorPerfil = useCallback(
     async (perfilIds: string[]) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token || perfilIds.length === 0) return
 
       try {
@@ -84,7 +85,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
           perfilIds.map(async (perfilId) => {
             try {
               // Busca todos os usuários do perfil (com limit alto) para contar corretamente
-              const response = await fetch(`/api/pessoas/usuarios-gestor?perfilGestorId=${perfilId}&limit=100&offset=0`, {
+              const response = await fetchGestorApi(`/api/pessoas/usuarios-gestor?perfilGestorId=${perfilId}&limit=100&offset=0`, {
                 headers: {
                   Authorization: `Bearer ${token}`,
                   'Content-Type': 'application/json',
@@ -131,7 +132,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
         console.error('Erro ao carregar contagem de usuários gestor:', error)
       }
     },
-    [auth]
+    []
   )
 
   /**
@@ -140,7 +141,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
    */
   const loadAllPerfis = useCallback(
     async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         return
       }
@@ -163,7 +164,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
             params.append('q', searchTextRef.current)
           }
 
-          const response = await fetch(`/api/pessoas/perfis-gestor?${params.toString()}`, {
+          const response = await fetchGestorApi(`/api/pessoas/perfis-gestor?${params.toString()}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -205,7 +206,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
         setIsLoading(false)
       }
     },
-    [auth]
+    []
   )
 
   // Debounce da busca
@@ -233,7 +234,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
   useEffect(() => {
     if (!isAuthenticated || hasLoadedInitialRef.current) return
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     hasLoadedInitialRef.current = true
@@ -248,11 +249,11 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
 
   const loadUsuariosPorPerfil = useCallback(
     async (perfilId: string) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token || usuariosPorPerfil[perfilId]) return
 
       try {
-        const response = await fetch(`/api/pessoas/usuarios-gestor?perfilGestorId=${perfilId}&limit=100&offset=0`, {
+        const response = await fetchGestorApi(`/api/pessoas/usuarios-gestor?perfilGestorId=${perfilId}&limit=100&offset=0`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -282,7 +283,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
         console.error('Erro ao carregar usuários gestor do perfil:', error)
       }
     },
-    [auth, usuariosPorPerfil]
+    [ usuariosPorPerfil]
   )
 
   const toggleExpand = (perfilId: string) => {
@@ -301,7 +302,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
    */
   const handleTogglePermission = useCallback(
     async (perfilId: string, permission: 'acessoFinanceiro' | 'acessoEstoque' | 'acessoFiscal' | 'acessoDashboard', newValue: boolean) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -346,7 +347,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
           [permission]: newValue,
         }
         
-        const response = await fetch(`/api/pessoas/perfis-gestor/${perfilId}`, {
+        const response = await fetchGestorApi(`/api/pessoas/perfis-gestor/${perfilId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -390,7 +391,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
         })
       }
     },
-    [auth, perfis, loadAllPerfis]
+    [ perfis, loadAllPerfis]
   )
 
   const openTabsModal = useCallback((config: Partial<PerfisGestorTabsModalState> = {}) => {
@@ -440,7 +441,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
   return (
     <div className="mx-auto flex h-full w-full min-w-0 max-w-6xl flex-col">
       <div className="flex-shrink-0 px-1 pt-1 md:px-0">
-        <span className="font-nunito text-sm font-semibold text-secondary md:text-lg">
+        <span className="text-sm font-semibold text-secondary md:text-lg">
           Perfis Gestor Cadastrados
         </span>
       </div>
@@ -449,22 +450,22 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
         <div className="mt-2 hidden flex-shrink-0 md:block">
           <div className="flex h-11 w-full min-w-0 items-center gap-[10px] border-b border-gray-200 bg-gray-50 px-3 pr-2 md:px-4">
             <div className="w-8 shrink-0 md:h-8" aria-hidden />
-            <div className="min-w-0 truncate text-left font-nunito text-xs font-semibold text-secondary md:flex-[3] md:text-sm">
+            <div className="min-w-0 truncate text-left text-xs font-semibold text-secondary md:flex-[3] md:text-sm">
               Perfil
             </div>
-            <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary md:flex-[1] md:text-sm">
+            <div className="min-w-0 truncate text-center text-xs font-semibold text-secondary md:flex-[1] md:text-sm">
               Qtd. Usuario
             </div>
-            <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary md:flex-[1] md:text-sm">
+            <div className="min-w-0 truncate text-center text-xs font-semibold text-secondary md:flex-[1] md:text-sm">
               Financeiro
             </div>
-            <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary md:flex-[1] md:text-sm">
+            <div className="min-w-0 truncate text-center text-xs font-semibold text-secondary md:flex-[1] md:text-sm">
               Estoque
             </div>
-            <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary md:flex-[1] md:text-sm">
+            <div className="min-w-0 truncate text-center text-xs font-semibold text-secondary md:flex-[1] md:text-sm">
               Fiscal
             </div>
-            <div className="min-w-0 truncate text-center font-nunito text-xs font-semibold text-secondary md:flex-[1] md:text-sm">
+            <div className="min-w-0 truncate text-center text-xs font-semibold text-secondary md:flex-[1] md:text-sm">
               Dashboard
             </div>
           </div>
@@ -567,11 +568,11 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
                     <MdKeyboardArrowRight size={18} />
                   </span>
                 </button>
-                <div className="md:flex-[3] font-nunito text-left md:text-sm text-primary-text flex items-center gap-2">
+                <div className="md:flex-[3] text-left md:text-sm text-primary-text flex items-center gap-2">
                   <span className="font-normal">{perfil.getRole()}</span>
                 </div>
                 <div
-                  className="md:flex-[1] flex items-center justify-center font-nunito md:text-sm text-xs text-secondary-text tabular-nums"
+                  className="md:flex-[1] flex items-center justify-center md:text-sm text-xs text-secondary-text tabular-nums"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {contagemUsuarios} usuário(s)
@@ -630,7 +631,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
                     </span>
                   </button>
                   <span className="text-base font-semibold text-secondary-text">Perfil:</span>
-                  <span className="font-nunito font-normal text-base text-primary-text max-w-[55%] truncate">
+                  <span className="font-normal text-base text-primary-text max-w-[55%] truncate">
                     {perfil.getRole()}
                   </span>
                 </div>
@@ -671,7 +672,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
                   />
                 </div>
                 <div className="text-center mt-2">
-                  <span className="font-nunito text-xs text-secondary-text tabular-nums">
+                  <span className="text-xs text-secondary-text tabular-nums">
                     Qtd. User: {contagemUsuarios}
                   </span>
                 </div>
@@ -695,10 +696,10 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
                             <span className="text-primary"><MdPerson size={22} /></span>
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="font-nunito text-sm font-semibold text-primary-text">
+                            <p className="text-sm font-semibold text-primary-text">
                               {usuario.nome}
                             </p>
-                            <p className="mt-1 font-nunito text-xs text-secondary-text">
+                            <p className="mt-1 text-xs text-secondary-text">
                               {usuario.username || 'Sem e-mail'}
                             </p>
                           </div>
@@ -727,10 +728,10 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
                             <span className="text-primary"><MdPerson size={22} /></span>
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="font-nunito text-sm font-semibold text-primary-text">
+                            <p className="text-sm font-semibold text-primary-text">
                               {usuario.nome}
                             </p>
-                            <p className="mt-1 font-nunito text-xs text-secondary-text">
+                            <p className="mt-1 text-xs text-secondary-text">
                               {usuario.username || 'Sem e-mail'}
                             </p>
                           </div>

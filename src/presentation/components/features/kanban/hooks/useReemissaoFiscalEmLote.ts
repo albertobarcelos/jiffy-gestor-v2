@@ -26,7 +26,8 @@ export interface ReemissaoFiscalLoteProgresso {
 }
 
 interface UseReemissaoFiscalEmLoteParams {
-  vendasPendentesEmissao: Venda[]
+  /** Vendas da coluna/filtro Rejeitadas (fonte do lote). */
+  vendasRejeitadas: Venda[]
   acaoFiscalEmAndamentoPorVenda: Record<string, 'emitindo' | 'reemitindo'>
   fetchNextPage: () => void | Promise<unknown>
   hasNextPage: boolean
@@ -40,14 +41,12 @@ function rotuloVendaKanban(venda: Venda): string {
 }
 
 export function useReemissaoFiscalEmLote({
-  vendasPendentesEmissao,
+  vendasRejeitadas,
   acaoFiscalEmAndamentoPorVenda,
   fetchNextPage,
   hasNextPage,
   refetchListagem,
-}: UseReemissaoFiscalEmLoteParams) {
-  const { auth } = useAuthStore()
-  const queryClient = useQueryClient()
+}: UseReemissaoFiscalEmLoteParams) {  const queryClient = useQueryClient()
 
   const [progresso, setProgresso] = useState<ReemissaoFiscalLoteProgresso>({
     status: 'idle',
@@ -60,11 +59,11 @@ export function useReemissaoFiscalEmLote({
   const processadasRef = useRef(new Set<string>())
   const cancelarRef = useRef(false)
   const pausadoRef = useRef(false)
-  const vendasRef = useRef(vendasPendentesEmissao)
+  const vendasRef = useRef(vendasRejeitadas)
   const acaoFiscalRef = useRef(acaoFiscalEmAndamentoPorVenda)
   const hasNextPageRef = useRef(hasNextPage)
 
-  vendasRef.current = vendasPendentesEmissao
+  vendasRef.current = vendasRejeitadas
   acaoFiscalRef.current = acaoFiscalEmAndamentoPorVenda
   hasNextPageRef.current = hasNextPage
 
@@ -80,10 +79,10 @@ export function useReemissaoFiscalEmLote({
 
   const totalElegiveisVisiveis = useMemo(
     () =>
-      vendasPendentesEmissao.filter(v =>
+      vendasRejeitadas.filter(v =>
         vendaElegivelParaReemissaoAutomaticaLote(v, acaoFiscalEmAndamentoPorVenda)
       ).length,
-    [vendasPendentesEmissao, acaoFiscalEmAndamentoPorVenda]
+    [vendasRejeitadas, acaoFiscalEmAndamentoPorVenda]
   )
 
   const exibirBarraReemissaoEmLote = useMemo(
@@ -107,7 +106,7 @@ export function useReemissaoFiscalEmLote({
   }, [queryClient, refetchListagem])
 
   const executarLoop = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Sessão expirada. Faça login novamente.')
       setProgresso(prev => ({ ...prev, status: 'idle' }))
@@ -185,7 +184,7 @@ export function useReemissaoFiscalEmLote({
         `Lote concluído: ${enviadas} enviada(s)${erros > 0 ? `, ${erros} erro(s)` : ''}.`
       )
     }
-  }, [auth, fetchNextPage, invalidarListagemKanban, listarElegiveisPendentes])
+  }, [ fetchNextPage, invalidarListagemKanban, listarElegiveisPendentes])
 
   const iniciar = useCallback(() => {
     if (totalElegiveisVisiveis === 0) {

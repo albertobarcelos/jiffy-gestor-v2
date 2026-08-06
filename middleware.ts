@@ -3,8 +3,13 @@ import type { NextRequest } from 'next/server'
 import {
   AUTH_COOKIE_IDENTITY,
   AUTH_COOKIE_LEGACY,
+  AUTH_COOKIE_REFRESH,
   AUTH_COOKIE_TENANT,
 } from '@/src/shared/utils/authCookies'
+import {
+  HUB_PATH,
+  isHubPathname,
+} from '@/src/shared/constants/hubRoutes'
 import { queryRegistroConviteNovoUsuarioFromLoginSearch } from '@/src/presentation/components/features/auth/utils/inviteLoginPayload'
 import {
   buildGestaoPath,
@@ -51,9 +56,38 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Raiz → dashboard (rota canônica)
+  // Raiz → hub (rota canônica) se houver qualquer cookie de sessão; senão login
   if (pathname === '/') {
-    return NextResponse.redirect(new URL('/meus-apps', request.url))
+    const hasAnySessionCookie =
+      Boolean(request.cookies.get(AUTH_COOKIE_IDENTITY)?.value) ||
+      Boolean(request.cookies.get(AUTH_COOKIE_TENANT)?.value) ||
+      Boolean(request.cookies.get(AUTH_COOKIE_REFRESH)?.value) ||
+      Boolean(request.cookies.get(AUTH_COOKIE_LEGACY)?.value)
+    if (!hasAnySessionCookie) {
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
+    return NextResponse.redirect(new URL(HUB_PATH, request.url))
+  }
+
+  /**
+   * Hub (Minhas Empresas / perfil): o AuthGuard valida a identidade no cliente.
+   * Não exigir identity cookie sozinho — após logout da empresa o token pode
+   * estar só no Zustand. Mas sem nenhum cookie de sessão → login (nada a clicar).
+   */
+  const isHubRoute =
+    isHubPathname(pathname) ||
+    pathname === '/perfil' ||
+    pathname.startsWith('/perfil/')
+  if (isHubRoute) {
+    const hasAnySessionCookie =
+      Boolean(request.cookies.get(AUTH_COOKIE_IDENTITY)?.value) ||
+      Boolean(request.cookies.get(AUTH_COOKIE_TENANT)?.value) ||
+      Boolean(request.cookies.get(AUTH_COOKIE_REFRESH)?.value) ||
+      Boolean(request.cookies.get(AUTH_COOKIE_LEGACY)?.value)
+    if (!hasAnySessionCookie) {
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
+    return NextResponse.next()
   }
 
   // Antiga URL /dashboard/v2 → /dashboard

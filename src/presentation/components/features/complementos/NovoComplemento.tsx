@@ -10,6 +10,7 @@ import {
 } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { Complemento } from '@/src/domain/entities/Complemento'
 import { FormControl, InputLabel, MenuItem, Select } from '@mui/material'
 import { Input } from '@/src/presentation/components/ui/input'
@@ -77,7 +78,8 @@ interface NovoComplementoProps {
     isSubmitting: boolean
     canSubmit: boolean
   }) => void
-  onSaved?: () => void
+  /** Chamado após salvar; passa o id do complemento criado/editado. */
+  onSaved?: (id?: string) => void
   onCancel?: () => void
 }
 
@@ -106,8 +108,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
     ref
   ) {
   const router = useRouter()
-  const { auth } = useAuthStore()
-  const accessToken = auth?.getAccessToken()
+  const accessToken = useAuthStore.getState().tenantAuth?.getAccessToken()
   const isEditing = !!complementoId
 
   // Estados do formulário
@@ -204,7 +205,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
 
     const loadComplemento = async () => {
       try {
-        const response = await fetch(`/api/complementos/${complementoId}`, {
+        const response = await fetchGestorApi(`/api/complementos/${complementoId}`, {
           headers: {
             Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
@@ -249,7 +250,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
   }, [isEditing, complementoId, accessToken])
 
   const persistComplemento = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       alert('Token não encontrado')
       return
@@ -276,7 +277,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
         : '/api/complementos'
       const method = isEditing ? 'PATCH' : 'POST'
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
@@ -290,10 +291,12 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
         throw new Error(errorData.error || 'Erro ao salvar complemento')
       }
 
+      const savedData = (await response.json().catch(() => ({}))) as { id?: string }
+      const savedId = savedData?.id?.toString()
       showToast.success(isEditing ? 'Complemento atualizado com sucesso!' : 'Complemento criado com sucesso!')
       commitBaselineLatestRef.current()
       if (isEmbedded) {
-        onSaved?.()
+        onSaved?.(savedId)
       } else {
         router.push('/complementos')
       }
@@ -304,7 +307,6 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
       setIsLoading(false)
     }
   }, [
-    auth,
     isEditing,
     complementoId,
     nome,
@@ -369,7 +371,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
         <div className="sticky top-0 z-10 bg-primary-bg rounded-tl-[20px] shadow-md md:px-[30px] px-2 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <h1 className="text-primary md:text-lg text-sm font-semibold font-exo">
+              <h1 className="text-primary md:text-lg text-sm font-semibold ">
                 {isEditing
                   ? `Editar Complemento: ${nome || ''}`
                   : `Novo Complemento: ${nome || ''}`}
@@ -396,33 +398,36 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
           {/* Dados */}
           <div className="bg-info rounded-[10px] p-2">
             <div className="flex items-center gap-5 mb-2">
-              <h2 className="text-primary text-xl font-semibold font-exo">
+              <h2 className="text-primary text-xl font-semibold ">
                 Dados do Complemento
               </h2>
               <div className="flex-1 h-px bg-primary/70"></div>
             </div>
 
             <div className="space-y-6">
-              <JiffyIconSwitch
-                checked={ativo}
-                onChange={e => setAtivo(e.target.checked)}
-                label={ativo ? 'Ativo' : 'Inativo'}
-                bordered={false}
-                size="sm"
-                className="justify-end"
-              />
-
-              <Input
-                label="Nome do Complemento"
-                value={nome}
-                onChange={e => setNome(e.target.value.toUpperCase())}
-                required
-                size="small"
-                placeholder="Nome do Complemento"
-                className="bg-white"
-                sx={sxCampoTextoMaiusculo}
-                InputLabelProps={{ required: true }}
-              />
+              <div className="flex items-start gap-3">
+                <div className="min-w-0 flex-1">
+                  <Input
+                    label="Nome do Complemento"
+                    value={nome}
+                    onChange={e => setNome(e.target.value.toUpperCase())}
+                    required
+                    size="small"
+                    placeholder="Nome do Complemento"
+                    className="bg-white"
+                    sx={sxCampoTextoMaiusculo}
+                    InputLabelProps={{ required: true }}
+                  />
+                </div>
+                <JiffyIconSwitch
+                  checked={ativo}
+                  onChange={e => setAtivo(e.target.checked)}
+                  label={ativo ? 'Ativo' : 'Inativo'}
+                  bordered={false}
+                  size="sm"
+                  className="mt-1.5 shrink-0"
+                />
+              </div>
 
               <Input
                 label="Descrição"
@@ -463,7 +468,6 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
                       ...sxEntradaCompactaComplemento,
                       '& .MuiSelect-select': {
                         ...entradaCompactaSelect,
-                        textTransform: 'uppercase',
                       },
                     }}
                   >
@@ -483,15 +487,9 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
                         )
                       }}
                     >
-                      <MenuItem value="nenhum" sx={{ textTransform: 'uppercase' }}>
-                        Nenhum
-                      </MenuItem>
-                      <MenuItem value="aumenta" sx={{ textTransform: 'uppercase' }}>
-                        Aumenta
-                      </MenuItem>
-                      <MenuItem value="diminui" sx={{ textTransform: 'uppercase' }}>
-                        Diminui
-                      </MenuItem>
+                      <MenuItem value="nenhum">Nenhum</MenuItem>
+                      <MenuItem value="aumenta">Aumenta</MenuItem>
+                      <MenuItem value="diminui">Diminui</MenuItem>
                     </Select>
                   </FormControl>
                 </div>

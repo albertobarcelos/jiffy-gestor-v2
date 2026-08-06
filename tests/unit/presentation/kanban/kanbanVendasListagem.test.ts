@@ -62,7 +62,7 @@ describe('filtrarVendaDeliveryKanbanColunaPorDatasToolbar', () => {
       filtrarVendaDeliveryKanbanColunaPorDatasToolbar(dentro, 'FINALIZADAS', params)
     ).toBe(true)
     expect(
-      filtrarVendaDeliveryKanbanColunaPorDatasToolbar(fora, 'COM_NFE', params)
+      filtrarVendaDeliveryKanbanColunaPorDatasToolbar(fora, 'COM_FISCAL', params)
     ).toBe(false)
     expect(
       filtrarVendaDeliveryKanbanColunaPorDatasToolbar(dentro, 'PENDENTE_EMISSAO', params)

@@ -44,7 +44,7 @@ export function useTrocarEmpresaGestor() {
         const token = await fetchAccessTokenEscolherEmpresa(empresa.id)
         const nomeSlug = empresa.nomeFantasia?.trim() || 'empresa'
         const empParam = buildEmpresaUrlParam(nomeSlug, empresa.id)
-        bootstrapTabSessionManually(token, empParam)
+        bootstrapTabSessionManually(token, empParam, empresa.id)
 
         const prev = useAuthStore.getState().getUser()
         const auth = buildAuthFromAccessToken(
@@ -52,6 +52,7 @@ export function useTrocarEmpresaGestor() {
           prev ? { id: prev.getId(), email: prev.getEmail(), name: prev.getName() } : undefined
         )
         setTenantAuth(auth)
+        useAuthStore.getState().setTabVerified(true)
 
         await queryClient.invalidateQueries()
         const modulePath = stripGestaoEmpresaSlugFromPath(pathname) || '/dashboard'

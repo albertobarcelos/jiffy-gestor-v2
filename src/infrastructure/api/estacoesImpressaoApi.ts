@@ -1,3 +1,4 @@
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
 import {
   getEstacaoImpressaoId,
@@ -41,7 +42,7 @@ async function requestJson<T>(
   token: string,
   init?: RequestInit
 ): Promise<T> {
-  const res = await fetch(url, {
+  const res = await fetchGestorApi(url, {
     ...init,
     headers: {
       Authorization: `Bearer ${token}`,

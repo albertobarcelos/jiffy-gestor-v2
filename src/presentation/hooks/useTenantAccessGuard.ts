@@ -15,7 +15,7 @@ export interface TenantAccessGuard {
 }
 
 /**
- * Guard de acesso multi-tenant por página (estilo Omie).
+ * Guard de acesso multi-tenant por página.
  *
  * Valida se existe sessão de empresa ativa e não expirada nesta aba.
  * Deve ser usado em todas as páginas ERP antes de renderizar conteúdo sensível.
@@ -48,7 +48,7 @@ export function useTenantAccessGuard(): TenantAccessGuard {
     if (!isAuthenticated || !tenantAuth) {
       accessError = 'Sessão não encontrada. Faça login.'
     } else if (tenantAuth.isExpired()) {
-      accessError = 'Sessão expirada. Faça login novamente.'
+      accessError = 'Sessão da empresa expirada. Selecione novamente em Minhas Empresas.'
     } else if (!empresaId) {
       accessError = 'Empresa não identificada no token.'
     } else {

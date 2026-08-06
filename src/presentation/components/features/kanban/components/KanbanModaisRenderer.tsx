@@ -111,7 +111,7 @@ export function KanbanModaisRenderer({
             type="button"
             disabled={!rascunhoPeriodoRange?.from || !rascunhoPeriodoRange?.to}
             onClick={onAplicarPeriodoDatas}
-            className="rounded-b-l-lg font-nunito flex h-full w-full items-center justify-center bg-primary text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-b-l-lg flex h-full w-full items-center justify-center bg-primary text-sm font-semibold text-white shadow-sm transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Aplicar
           </button>

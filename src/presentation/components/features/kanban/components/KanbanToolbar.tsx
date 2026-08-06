@@ -11,7 +11,7 @@ import {
   MdSettings,
 } from 'react-icons/md'
 import { KanbanModoVendasToggle, type ModoKanbanVendas } from '../KanbanModoVendasToggle'
-import type { OrigemFiltro, TipoEntregaFiltro } from '../types'
+import type { ColunaKanbanFiltroExtra, OrigemFiltro, TipoEntregaFiltro } from '../types'
 import {
   KANBAN_FILTRO_DATA_PRESET_OPCOES,
   type KanbanFiltroDataPreset,
@@ -27,6 +27,9 @@ export interface KanbanToolbarProps {
   onOrigemFilterChange: (value: OrigemFiltro) => void
   tipoEntregaFilter: TipoEntregaFiltro
   onTipoEntregaFilterChange: (value: TipoEntregaFiltro) => void
+  /** Filtro extra balcão: Emitidas / Pendentes / Rejeitadas / Todas (`colunaKanban`). */
+  colunaKanbanFiltro?: ColunaKanbanFiltroExtra
+  onColunaKanbanFiltroChange?: (value: ColunaKanbanFiltroExtra) => void
   terminalFilter: string
   onTerminalFilterChange: (value: string) => void
   terminais: { id: string; nome: string }[]
@@ -52,7 +55,7 @@ const sxKanbanFiltroSelect = {
     minHeight: 32,
     borderRadius: '8px',
     backgroundColor: 'var(--color-info)',
-    fontFamily: '"Nunito", sans-serif',
+    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
     '& .MuiOutlinedInput-notchedOutline': {
       borderColor: 'rgba(0, 0, 0, 0.23)',
       borderWidth: 1,
@@ -67,7 +70,7 @@ const sxKanbanFiltroSelect = {
   },
   '& .MuiInputLabel-root': {
     color: 'var(--color-secondary-text)',
-    fontFamily: '"Nunito", sans-serif',
+    fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
     fontSize: '0.875rem',
     fontWeight: 300,
   },
@@ -144,7 +147,7 @@ function FiltroDataPresetSelect({
             label={label}
             value={preset}
             onChange={e => onPresetChange(e.target.value as KanbanFiltroDataPreset)}
-            className="font-nunito"
+            className=""
           >
             {KANBAN_FILTRO_DATA_PRESET_OPCOES.map(opcao => (
               <MenuItem key={opcao.value} value={opcao.value}>
@@ -172,6 +175,8 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
     onOrigemFilterChange,
     tipoEntregaFilter,
     onTipoEntregaFilterChange,
+    colunaKanbanFiltro: colunaKanbanFiltroProp,
+    onColunaKanbanFiltroChange,
     terminalFilter,
     onTerminalFilterChange,
     terminais,
@@ -190,6 +195,8 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
 
   const isModoDelivery = modoKanbanVendas === 'delivery'
   const [refreshSpinning, setRefreshSpinning] = useState(false)
+  const colunaKanbanFiltro = colunaKanbanFiltroProp ?? ''
+  const onColunaKanbanFiltro = onColunaKanbanFiltroChange ?? (() => undefined)
 
   return (
     <div className="bg-primary-background mt-2 flex-shrink-0 rounded-b-lg rounded-t-lg pb-0">
@@ -197,7 +204,7 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
         <button
           type="button"
           onClick={onToggleFiltrosMobile}
-          className="font-nunito flex items-center gap-2 rounded-md px-3 py-1 text-sm text-white shadow-sm"
+          className="flex items-center gap-2 rounded-md px-3 py-1 text-sm text-white shadow-sm"
           style={{ backgroundColor: KANBAN_BUTTON_COLOR }}
           aria-expanded={filtrosVisiveisMobile}
         >
@@ -221,7 +228,7 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
               value={searchInput}
               onChange={e => onSearchInputChange(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && onRefresh()}
-              className="font-nunito h-8 w-full rounded-lg border bg-info pl-6 pr-4 text-sm shadow-sm"
+              className="h-8 w-full rounded-lg border bg-info pl-6 pr-4 text-sm shadow-sm"
             />
           </div>
         </div>
@@ -239,10 +246,10 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
               onChange={e => onOrigemFilterChange(e.target.value as OrigemFiltro)}
               displayEmpty
               disabled={origemFilterDisabled}
-              className="font-nunito"
+              className=""
             >
               <MenuItem value="">Todos</MenuItem>
-              <MenuItem value="PDV">PDV</MenuItem>
+              <MenuItem value="PDV">POS</MenuItem>
               <MenuItem value="GESTOR">Gestor</MenuItem>
             </Select>
           </FormControl>
@@ -261,11 +268,36 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
               value={tipoEntregaFilter}
               onChange={e => onTipoEntregaFilterChange(e.target.value as TipoEntregaFiltro)}
               displayEmpty
-              className="font-nunito"
+              className=""
             >
               <MenuItem value="">Todos</MenuItem>
               <MenuItem value="entrega">Entrega</MenuItem>
               <MenuItem value="retirada">Retirada</MenuItem>
+            </Select>
+          </FormControl>
+        </div>
+        ) : null}
+
+        {modoKanbanVendas === 'balcao' ? (
+        <div className="flex flex-col gap-1">
+          <FormControl size="small" variant="outlined" sx={sxKanbanFiltroSelect}>
+            <InputLabel id="kanban-filtro-coluna-fiscal-label" shrink>
+              Filtro
+            </InputLabel>
+            <Select
+              labelId="kanban-filtro-coluna-fiscal-label"
+              label="Filtro"
+              value={colunaKanbanFiltro}
+              onChange={e =>
+                onColunaKanbanFiltro(e.target.value as ColunaKanbanFiltroExtra)
+              }
+              displayEmpty
+              className=""
+            >
+              <MenuItem value="">Emitidas</MenuItem>
+              <MenuItem value="PENDENTE_EMISSAO">Pendentes</MenuItem>
+              <MenuItem value="REJEITADAS">Rejeitadas</MenuItem>
+              <MenuItem value="TODAS">Todas</MenuItem>
             </Select>
           </FormControl>
         </div>
@@ -288,7 +320,7 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
               onChange={e => onTerminalFilterChange(e.target.value)}
               displayEmpty
               disabled={isLoadingTerminais}
-              className="font-nunito"
+              className=""
             >
               <MenuItem value="">Todos</MenuItem>
               {terminais.map(terminal => (
@@ -313,7 +345,7 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
 
         <button
           onClick={onClearFilters}
-          className="font-nunito flex h-8 items-center justify-center gap-1 rounded-lg border px-1 text-sm transition-colors"
+          className="flex h-8 items-center justify-center gap-1 rounded-lg border px-1 text-sm transition-colors"
           style={{ borderColor: KANBAN_BUTTON_COLOR, color: KANBAN_BUTTON_COLOR }}
         >
           <MdFilterAltOff size={16} />

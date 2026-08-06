@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -6,6 +6,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantAccessGuard } from '@/src/presentation/hooks/useTenantAccessGuard'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 
 interface PainelContadorAcessoGuardProps {
   children: React.ReactNode
@@ -16,14 +17,12 @@ interface PainelContadorAcessoGuardProps {
  * Enquanto o claim não estiver no token, permite acesso (compatibilidade).
  */
 export function PainelContadorAcessoGuard({ children }: PainelContadorAcessoGuardProps) {
-  const router = useRouter()
-  const { auth } = useAuthStore()
-  const { hasAccess, isLoading } = useTenantAccessGuard()
+  const router = useRouter()  const { hasAccess, isLoading } = useTenantAccessGuard()
 
   useEffect(() => {
-    if (isLoading || !hasAccess || !auth) return
+    if (isLoading || !hasAccess || !useAuthStore.getState().tenantAuth) return
 
-    const token = auth.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     try {
@@ -32,12 +31,12 @@ export function PainelContadorAcessoGuard({ children }: PainelContadorAcessoGuar
       }
       if (payload.acessoFiscal === false) {
         showToast.warning('Seu perfil não possui acesso ao Painel do Contador.')
-        router.replace('/meus-apps')
+        router.replace(HUB_PATH)
       }
     } catch {
       // Sem claim no JWT: mantém compatibilidade com sessões atuais
     }
-  }, [auth, hasAccess, isLoading, router])
+  }, [ hasAccess, isLoading, router])
 
   if (isLoading) {
     return (

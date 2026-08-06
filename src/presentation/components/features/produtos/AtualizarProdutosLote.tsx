@@ -1,10 +1,11 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Produto } from '@/src/domain/entities/Produto'
 import { Impressora } from '@/src/domain/entities/Impressora'
 import { transformarParaReal, brToEUA } from '@/src/shared/utils/formatters'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -12,11 +13,13 @@ import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Checkbox } from '@/src/presentation/components/ui/checkbox'
 import {
+  Autocomplete,
   FormControl,
   InputAdornment,
   InputLabel,
   MenuItem,
   Select,
+  TextField,
   type SelectChangeEvent,
 } from '@mui/material'
 import type { SxProps, Theme } from '@mui/material/styles'
@@ -33,9 +36,38 @@ import {
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
 import { ProdutoActionIconsDisplay } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoActionIconsDisplay'
+import {
+  ProdutoFiscalCelulasEditaveis,
+  fiscalLinhaDraftDirty,
+  fiscalLinhaDraftFromProduto,
+  type FiscalCampoLinha,
+  type FiscalLinhaDraft,
+} from '@/src/presentation/components/features/produtos/AtualizarProdutosLote/ProdutoFiscalCelulasEditaveis'
 import { MdSearch, MdExpandMore, MdExpandLess, MdCheckCircle, MdError } from 'react-icons/md'
+import {
+  ProdutosTabsModal,
+  type ProdutosTabsModalState,
+} from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
+import { FixedRowsScrollArea } from '@/src/presentation/components/ui/FixedRowsScrollArea'
+import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
+import {
+  uniaoIdsVinculosDosAlvos,
+  TEXTOS_VINCULO_IMPRESSORAS,
+  TEXTOS_VINCULO_GRUPOS_COMPLEMENTOS,
+} from '@/src/shared/helpers/filtroVinculoLote'
+import { useListaVinculoLote } from '@/src/presentation/hooks/useListaVinculoLote'
 
-/** Chaves de permissão PDV no PATCH (alinhado a NovoProduto / cardápio). */
+const getProdutoId = (produto: Produto) => produto.getId()
+const getProdutoImpressoraIds = (produto: Produto) =>
+  produto.getImpressoras().map((impressora) => impressora.id)
+const getProdutoGrupoComplementoIds = (produto: Produto) =>
+  produto.getGruposComplementos().map((grupo) => grupo.id)
+const getImpressoraId = (impressora: Impressora) => impressora.getId()
+const getImpressoraNome = (impressora: Impressora) => impressora.getNome()
+const getGrupoComplementoId = (grupo: GrupoComplemento) => grupo.getId()
+const getGrupoComplementoNome = (grupo: GrupoComplemento) => grupo.getNome()
+
+/** Chaves de permissão POS no PATCH (alinhado a NovoProduto / cardápio). */
 type PermissaoCampoChave =
   | 'favorito'
   | 'permiteDesconto'
@@ -54,22 +86,20 @@ type FiltroColunaVazia =
   | 'sem_impressoras'
   | 'sem_ncm'
   | 'sem_grupos_complementos'
-  /* Colunas CEST / origem / tipo / indicador: backend ainda não devolve na listagem — descomente quando o GET /api/produtos incluir:
   | 'sem_cest'
   | 'sem_origem'
   | 'sem_tipo'
   | 'sem_indicador'
-  */
 
 const LABEL_FILTRO_COLUNA: Record<FiltroColunaVazia, string> = {
   [FILTRO_COLUNA_TODOS]: 'Todos',
   sem_impressoras: 'Sem impressoras',
   sem_ncm: 'Sem NCM',
   sem_grupos_complementos: 'Sem grupos de complementos',
-  /* sem_cest: 'Sem CEST',
+  sem_cest: 'Sem CEST',
   sem_origem: 'Sem origem da mercadoria',
   sem_tipo: 'Sem tipo de produto',
-  sem_indicador: 'Sem indicador de produção', */
+  sem_indicador: 'Sem indicador de produção',
 }
 
 function produtoSemDadoNaColuna(p: Produto, filtro: FiltroColunaVazia): boolean {
@@ -81,7 +111,7 @@ function produtoSemDadoNaColuna(p: Produto, filtro: FiltroColunaVazia): boolean 
       return !p.getNcm().trim()
     case 'sem_grupos_complementos':
       return p.getGruposComplementos().length === 0
-    /* case 'sem_cest':
+    case 'sem_cest':
       return !p.getCest().trim()
     case 'sem_origem':
       return !p.getOrigemMercadoria().trim()
@@ -90,7 +120,7 @@ function produtoSemDadoNaColuna(p: Produto, filtro: FiltroColunaVazia): boolean 
     case 'sem_indicador': {
       const v = p.getIndicadorProducaoEscala()
       return v === null || String(v).trim() === ''
-    } */
+    }
     default:
       return true
   }
@@ -121,45 +151,11 @@ function parseProdutosLoteApiResponse(data: unknown): { list: Produto[]; count: 
   return { list, count }
 }
 
-/** Ancestor com overflow de rolagem (ex.: `main` do layout de produtos). */
-function findScrollableAncestor(start: HTMLElement | null): HTMLElement | null {
-  let el: HTMLElement | null = start
-  while (el) {
-    const { overflowY } = window.getComputedStyle(el)
-    if (/(auto|scroll|overlay)/.test(overflowY) && el.scrollHeight > el.clientHeight + 1) {
-      return el
-    }
-    el = el.parentElement
-  }
-  return null
-}
-
 /** Texto único para célula sem dado (alinha com o filtro “sem …”). */
 function textoOuNenhum(v: string | null | undefined): string {
   const t = v === null || v === undefined ? '' : String(v).trim()
   return t === '' ? 'Nenhum' : t
 }
-
-/* Usados nas colunas da grade quando CEST/origem/tipo/indicador vierem do backend na listagem:
-function labelListaFiscal(
-  value: string | null | undefined,
-  options: { value: string; label: string }[],
-): { curto: string; title: string } {
-  const v = value === null || value === undefined ? '' : String(value).trim()
-  if (v === '') return { curto: 'Nenhum', title: '' }
-  const opt = options.find((o) => o.value === v)
-  if (opt) return { curto: opt.value, title: opt.label }
-  return { curto: v, title: v }
-}
-
-function celulaFiscalIndicador(v: string | null | undefined): { curto: string; title: string } {
-  const s = v === null || v === undefined ? '' : String(v).trim()
-  if (s === '') return { curto: 'Nenhum', title: '' }
-  const opt = indicadoresProducao.find((o) => o.value === s)
-  if (opt) return { curto: s, title: opt.label }
-  return { curto: s, title: s }
-}
-*/
 
 const CAMPOS_PERMISSAO_PDV: { chave: PermissaoCampoChave; label: string }[] = [
   { chave: 'favorito', label: 'Favorito' },
@@ -248,29 +244,69 @@ function filtrosDisponiveisPorAba(tab: TabPainelLote): FiltroColunaVazia[] {
   const r: FiltroColunaVazia[] = [FILTRO_COLUNA_TODOS]
   if (tab === 'impressoras') r.push('sem_impressoras')
   if (tab === 'gruposComplementos') r.push('sem_grupos_complementos')
-  if (tab === 'fiscal') r.push('sem_ncm')
+  if (tab === 'fiscal') {
+    r.push('sem_ncm', 'sem_cest', 'sem_origem', 'sem_tipo', 'sem_indicador')
+  }
   return r
 }
 
-function montarBodyFiscalLote(d: FiscalLoteDraft): Record<string, unknown> | null {
-  const fiscal: Record<string, unknown> = {}
+/** Payload `alteracoes` do PATCH /produtos-fiscais/lote (só campos informados). */
+function montarAlteracoesFiscalLote(d: FiscalLoteDraft): Record<string, unknown> | null {
+  const alteracoes: Record<string, unknown> = {}
   const ncmT = d.ncm.replace(/\D/g, '').slice(0, 8)
   const cestT = d.cest.replace(/\D/g, '').slice(0, 7)
-  // Só envia NCM/CEST completos (evita PATCH com código parcial)
-  if (ncmT.length === 8) fiscal.ncm = ncmT
-  if (cestT.length === 7) fiscal.cest = cestT
+  if (ncmT.length === 8) alteracoes.ncm = ncmT
+  if (cestT.length === 7) alteracoes.cest = cestT
   if (d.origemMercadoria !== '') {
     const om = parseInt(d.origemMercadoria, 10)
-    if (!Number.isNaN(om)) fiscal.origemMercadoria = om
+    if (!Number.isNaN(om)) alteracoes.origemMercadoria = om
   }
   const tipoT = d.tipoProduto.trim()
-  if (tipoT) fiscal.tipoProduto = tipoT
+  if (tipoT) alteracoes.tipoProduto = tipoT
   const indT = d.indicadorProducaoEscala.trim()
-  if (indT) fiscal.indicadorProducaoEscala = indT
-  if (Object.keys(fiscal).length === 0) return null
-  const body: Record<string, unknown> = { fiscal }
-  if (ncmT.length === 8) body.ncm = ncmT
-  return body
+  if (indT) alteracoes.indicadorProducaoEscala = indT
+  return Object.keys(alteracoes).length > 0 ? alteracoes : null
+}
+
+
+type ProdutoFiscalDtoApi = {
+  produtoId?: string
+  ncm?: string | null
+  cest?: string | null
+  origemMercadoria?: number | string | null
+  tipoProduto?: string | null
+  indicadorProducaoEscala?: string | null
+}
+
+function partialFiscalFromDto(dto: ProdutoFiscalDtoApi) {
+  const origem =
+    dto.origemMercadoria === null || dto.origemMercadoria === undefined || dto.origemMercadoria === ''
+      ? ''
+      : String(dto.origemMercadoria)
+  return {
+    ncm: dto.ncm ? String(dto.ncm) : '',
+    cest: dto.cest ? String(dto.cest) : '',
+    origemMercadoria: origem,
+    tipoProduto: dto.tipoProduto ? String(dto.tipoProduto) : '',
+    indicadorProducaoEscala:
+      dto.indicadorProducaoEscala === null || dto.indicadorProducaoEscala === undefined
+        ? null
+        : String(dto.indicadorProducaoEscala),
+  }
+}
+
+const FISCAL_BATCH_CHUNK = 100
+
+function normalizarNcm8(ncmRaw: string): string {
+  return String(ncmRaw ?? '')
+    .replace(/\D/g, '')
+    .slice(0, 8)
+}
+
+function normalizarCest7(cestRaw: string): string {
+  return String(cestRaw ?? '')
+    .replace(/\D/g, '')
+    .slice(0, 7)
 }
 
 /**
@@ -292,6 +328,15 @@ export function AtualizarPrecoLote() {
   const [grupoProdutoFilter, setGrupoProdutoFilter] = useState('')
   /** Mostrar apenas produtos sem dado na coluna escolhida (filtro só no front). */
   const [filtroColunaVazia, setFiltroColunaVazia] = useState<FiltroColunaVazia>(FILTRO_COLUNA_TODOS)
+  /**
+   * IDs congelados do filtro “Listar sem dado em”.
+   * Congela na seleção do filtro e ao carregar mais itens; não remove a linha
+   * quando o usuário preenche o campo (ex.: NCM) e ainda precisa editar CEST/origem.
+   */
+  const [idsFiltroColunaCongelados, setIdsFiltroColunaCongelados] = useState<Set<string> | null>(
+    null
+  )
+  const filtroColunaAnteriorRef = useRef<FiltroColunaVazia>(FILTRO_COLUNA_TODOS)
   const [adjustMode, setAdjustMode] = useState<'valor' | 'percentual'>('valor')
   const [adjustAmount, setAdjustAmount] = useState('')
   const [adjustDirection, setAdjustDirection] = useState<'increase' | 'decrease'>('increase')
@@ -316,6 +361,15 @@ export function AtualizarPrecoLote() {
     atual: number
     total: number
   } | null>(null)
+  const [salvandoFiscalLinhaId, setSalvandoFiscalLinhaId] = useState<string | null>(null)
+  const [fiscalLinhaDrafts, setFiscalLinhaDrafts] = useState<Record<string, FiscalLinhaDraft>>({})
+  const [tabsModalState, setTabsModalState] = useState<ProdutosTabsModalState>({
+    open: false,
+    tab: 'produto',
+    mode: 'edit',
+  })
+  const fiscalEnrichAttemptedRef = useRef<Set<string>>(new Set())
+  const fiscalEnrichInflightRef = useRef<Set<string>>(new Set())
   const [ncmValidation, setNcmValidation] = useState<NcmValidationResult | null>(null)
   const [isValidatingNcm, setIsValidatingNcm] = useState(false)
   const ncmValidationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -339,17 +393,56 @@ export function AtualizarPrecoLote() {
   }))
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const produtosRef = useRef<Produto[]>([])
-  const listaAreaRef = useRef<HTMLDivElement>(null)
+  /** Área rolável do `FixedRowsScrollArea` (infinite scroll interno). */
+  const listaScrollRef = useRef<HTMLDivElement>(null)
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null)
   const hasMoreProdutosRef = useRef(false)
   const isLoadingRef = useRef(false)
   const isLoadingMoreRef = useRef(false)
   const loadMoreLockRef = useRef(false)
-  const carregarMaisProdutosRef = useRef<() => Promise<void>>(async () => {})
-  const { auth } = useAuthStore()
-
+  const carregarMaisProdutosRef = useRef<() => Promise<void>>(async () => {})
   useEffect(() => {
     produtosRef.current = produtos
+  }, [produtos])
+
+  useEffect(() => {
+    setFiscalLinhaDrafts(prev => {
+      let mudou = false
+      const next = { ...prev }
+      for (const p of produtos) {
+        const id = p.getId()
+        const fromProduto = fiscalLinhaDraftFromProduto(p)
+        if (!next[id]) {
+          next[id] = fromProduto
+          mudou = true
+          continue
+        }
+        // Preenche campos vazios do draft quando o produto ganha dados (ex.: enrich batch)
+        const atual = next[id]
+        const mesclado: FiscalLinhaDraft = {
+          ncm: atual.ncm.trim() ? atual.ncm : fromProduto.ncm,
+          cest: atual.cest.trim() ? atual.cest : fromProduto.cest,
+          origemMercadoria: atual.origemMercadoria.trim()
+            ? atual.origemMercadoria
+            : fromProduto.origemMercadoria,
+          tipoProduto: atual.tipoProduto.trim() ? atual.tipoProduto : fromProduto.tipoProduto,
+          indicadorProducaoEscala: atual.indicadorProducaoEscala.trim()
+            ? atual.indicadorProducaoEscala
+            : fromProduto.indicadorProducaoEscala,
+        }
+        if (
+          mesclado.ncm !== atual.ncm ||
+          mesclado.cest !== atual.cest ||
+          mesclado.origemMercadoria !== atual.origemMercadoria ||
+          mesclado.tipoProduto !== atual.tipoProduto ||
+          mesclado.indicadorProducaoEscala !== atual.indicadorProducaoEscala
+        ) {
+          next[id] = mesclado
+          mudou = true
+        }
+      }
+      return mudou ? next : prev
+    })
   }, [produtos])
 
   useEffect(() => {
@@ -373,6 +466,91 @@ export function AtualizarPrecoLote() {
   useEffect(() => {
     setProdutosExpandidos(new Set())
   }, [activeTab])
+
+  /** Aba fiscal: 1× POST batch (em vez de N× GET /produtos/:id). */
+  useEffect(() => {
+    if (activeTab !== 'fiscal' || isLoading) return
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+    if (!token) return
+
+    const pendentes = produtos.filter(p => {
+      const id = p.getId()
+      if (fiscalEnrichAttemptedRef.current.has(id)) return false
+      if (fiscalEnrichInflightRef.current.has(id)) return false
+      return (
+        !p.getNcm().trim() ||
+        !p.getOrigemMercadoria().trim() ||
+        !p.getTipoProduto().trim() ||
+        !(p.getIndicadorProducaoEscala() ?? '').trim()
+      )
+    })
+
+    if (pendentes.length === 0) return
+
+    const lote = pendentes.slice(0, FISCAL_BATCH_CHUNK)
+    const ids = lote.map(p => p.getId())
+    for (const id of ids) {
+      fiscalEnrichInflightRef.current.add(id)
+    }
+
+    let cancelled = false
+
+    void (async () => {
+      try {
+        const response = await fetchGestorApi('/api/v1/fiscal/produtos-fiscais/batch', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ produtoIds: ids }),
+        })
+
+        if (!response.ok) {
+          for (const id of ids) fiscalEnrichAttemptedRef.current.add(id)
+          return
+        }
+
+        const data = (await response.json()) as { produtos?: ProdutoFiscalDtoApi[] }
+        if (cancelled) return
+
+        const porId = new Map<string, ProdutoFiscalDtoApi>()
+        for (const item of data.produtos ?? []) {
+          if (item?.produtoId) porId.set(String(item.produtoId), item)
+        }
+
+        setProdutos(prev =>
+          prev.map(p => {
+            const dto = porId.get(p.getId())
+            if (!dto) return p
+            const partial = partialFiscalFromDto(dto)
+            return p.withDadosFiscais({
+              ncm: partial.ncm || p.getNcm(),
+              cest: partial.cest || p.getCest(),
+              origemMercadoria: partial.origemMercadoria || p.getOrigemMercadoria(),
+              tipoProduto: partial.tipoProduto || p.getTipoProduto(),
+              indicadorProducaoEscala:
+                partial.indicadorProducaoEscala ?? p.getIndicadorProducaoEscala(),
+            })
+          })
+        )
+
+        for (const id of ids) fiscalEnrichAttemptedRef.current.add(id)
+      } catch (error) {
+        console.error('Erro ao buscar produtos fiscais em batch', error)
+        if (!cancelled) {
+          for (const id of ids) fiscalEnrichAttemptedRef.current.add(id)
+        }
+      } finally {
+        for (const id of ids) fiscalEnrichInflightRef.current.delete(id)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeTab, isLoading, produtos])
+
 
   const marcarProdutosAlteradosNaSessao = useCallback((ids: string[], aba: TabPainelLote) => {
     if (ids.length === 0) return
@@ -422,20 +600,22 @@ export function AtualizarPrecoLote() {
     [searchText, filterStatus, ativoLocalFilter, ativoDeliveryFilter, grupoProdutoFilter],
   )
 
-  const buscarProdutos = useCallback(async () => {
-    const token = auth?.getAccessToken()
-    if (!token) return
+  const buscarProdutos = useCallback(async (): Promise<Produto[]> => {
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+    if (!token) return []
 
     loadMoreLockRef.current = false
     setIsLoading(true)
     setProdutos([])
     setHasMoreProdutos(false)
     setIsLoadingMore(false)
+    fiscalEnrichAttemptedRef.current = new Set()
+    fiscalEnrichInflightRef.current = new Set()
     // Mantém produtosSelecionados: a seleção persiste entre buscas até ação manual ou após salvar em lote
 
     try {
       const params = buildProdutosLoteParams(0)
-      const response = await fetch(`/api/produtos?${params.toString()}`, {
+      const response = await fetchGestorApi(`/api/produtos?${params.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -455,15 +635,17 @@ export function AtualizarPrecoLote() {
         produtosParsed.length === PRODUTOS_LOTE_PAGE_SIZE &&
         (count !== null ? produtosParsed.length < count : true)
       setHasMoreProdutos(produtosParsed.length > 0 && hasMore)
+      return produtosParsed
     } catch (error: unknown) {
       console.error('Erro ao buscar produtos', error)
+      return []
     } finally {
       setIsLoading(false)
     }
-  }, [auth, buildProdutosLoteParams])
+  }, [ buildProdutosLoteParams])
 
   const carregarMaisProdutos = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
     if (
       loadMoreLockRef.current ||
@@ -480,7 +662,7 @@ export function AtualizarPrecoLote() {
 
     try {
       const params = buildProdutosLoteParams(offset)
-      const response = await fetch(`/api/produtos?${params.toString()}`, {
+      const response = await fetchGestorApi(`/api/produtos?${params.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -524,20 +706,20 @@ export function AtualizarPrecoLote() {
       loadMoreLockRef.current = false
       setIsLoadingMore(false)
     }
-  }, [auth, buildProdutosLoteParams])
+  }, [ buildProdutosLoteParams])
 
   useEffect(() => {
     carregarMaisProdutosRef.current = carregarMaisProdutos
   }, [carregarMaisProdutos])
 
-  /** Rolagem no `main` (layout produtos): dispara “carregar mais” perto do fim. */
+  /** Rolagem no container fixo (~12 linhas): dispara “carregar mais” perto do fim. */
   useEffect(() => {
-    const scrollEl = findScrollableAncestor(listaAreaRef.current)
-    if (!scrollEl) return
+    const scrollEl = listaScrollRef.current
+    if (!scrollEl || !hasMoreProdutos || isLoading) return
 
     const onScroll = () => {
       const { scrollTop, clientHeight, scrollHeight } = scrollEl
-      if (scrollHeight - scrollTop - clientHeight < 280) {
+      if (scrollHeight - scrollTop - clientHeight < 120) {
         void carregarMaisProdutosRef.current()
       }
     }
@@ -548,11 +730,10 @@ export function AtualizarPrecoLote() {
 
   useEffect(() => {
     const sentinel = loadMoreSentinelRef.current
-    if (!sentinel || !hasMoreProdutos || isLoading) {
+    const root = listaScrollRef.current
+    if (!sentinel || !root || !hasMoreProdutos || isLoading) {
       return
     }
-
-    const root = findScrollableAncestor(sentinel)
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -561,11 +742,21 @@ export function AtualizarPrecoLote() {
           void carregarMaisProdutosRef.current()
         }
       },
-      { root: root ?? null, rootMargin: '200px', threshold: 0 },
+      { root, rootMargin: '80px', threshold: 0 },
     )
     observer.observe(sentinel)
     return () => observer.disconnect()
   }, [hasMoreProdutos, isLoading, produtos.length])
+
+  /** Se a lista ainda não preenche a área fixa e há mais páginas, carrega automaticamente. */
+  useEffect(() => {
+    if (!hasMoreProdutos || isLoading || isLoadingMore) return
+    const scrollEl = listaScrollRef.current
+    if (!scrollEl) return
+    if (scrollEl.scrollHeight <= scrollEl.clientHeight + 8) {
+      void carregarMaisProdutosRef.current()
+    }
+  }, [hasMoreProdutos, isLoading, isLoadingMore, produtos.length])
 
   // Debounce na busca e filtros
   useEffect(() => {
@@ -650,7 +841,7 @@ export function AtualizarPrecoLote() {
 
   // Carregar todas as impressoras
   const loadAllImpressoras = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     setIsLoadingImpressoras(true)
@@ -666,7 +857,7 @@ export function AtualizarPrecoLote() {
           offset: currentOffset.toString(),
         })
 
-        const response = await fetch(`/api/impressoras?${params.toString()}`, {
+        const response = await fetchGestorApi(`/api/impressoras?${params.toString()}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -702,7 +893,7 @@ export function AtualizarPrecoLote() {
     } finally {
       setIsLoadingImpressoras(false)
     }
-  }, [auth])
+  }, [])
 
   // Carregar impressoras quando tab de impressoras estiver ativa
   useEffect(() => {
@@ -746,7 +937,7 @@ export function AtualizarPrecoLote() {
 
     setIsValidatingNcm(true)
     ncmValidationTimerRef.current = setTimeout(async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         setIsValidatingNcm(false)
         return
@@ -756,7 +947,7 @@ export function AtualizarPrecoLote() {
       const timeoutId = setTimeout(() => controller.abort(), 5000)
 
       try {
-        const response = await fetch(`/api/v1/fiscal/configuracoes/ncms/validar/${ncmTrimmed}`, {
+        const response = await fetchGestorApi(`/api/v1/fiscal/configuracoes/ncms/validar/${ncmTrimmed}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -791,7 +982,7 @@ export function AtualizarPrecoLote() {
         clearTimeout(ncmValidationTimerRef.current)
       }
     }
-  }, [fiscalLoteDraft.ncm, auth, activeTab])
+  }, [fiscalLoteDraft.ncm, activeTab])
 
   // Lista de CESTs compatíveis com o NCM validado
   useEffect(() => {
@@ -816,7 +1007,7 @@ export function AtualizarPrecoLote() {
     }
 
     const fetchCests = async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return
 
       setIsLoadingCests(true)
@@ -824,7 +1015,7 @@ export function AtualizarPrecoLote() {
       const timeoutId = setTimeout(() => controller.abort(), 5000)
 
       try {
-        const response = await fetch(`/api/v1/fiscal/configuracoes/cests/por-ncm/${ncmTrimmed}`, {
+        const response = await fetchGestorApi(`/api/v1/fiscal/configuracoes/cests/por-ncm/${ncmTrimmed}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -855,7 +1046,7 @@ export function AtualizarPrecoLote() {
     }
 
     void fetchCests()
-  }, [ncmValidation, fiscalLoteDraft.ncm, auth, activeTab])
+  }, [ncmValidation, fiscalLoteDraft.ncm, activeTab])
 
   // Validação CEST (debounce 400ms) — igual NovoProduto
   useEffect(() => {
@@ -893,7 +1084,7 @@ export function AtualizarPrecoLote() {
     setIsValidatingCest(true)
 
     const timer = setTimeout(async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         setIsValidatingCest(false)
         return
@@ -907,7 +1098,7 @@ export function AtualizarPrecoLote() {
           ? `/api/v1/fiscal/configuracoes/cests/validar/${cestTrimmed}/ncm/${ncmTrimmed}`
           : `/api/v1/fiscal/configuracoes/cests/validar/${cestTrimmed}`
 
-        const response = await fetch(url, {
+        const response = await fetchGestorApi(url, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -957,7 +1148,7 @@ export function AtualizarPrecoLote() {
       clearTimeout(timer)
       abortController.abort()
     }
-  }, [fiscalLoteDraft.cest, fiscalLoteDraft.ncm, ncmValidation, cestsDisponiveis, auth, activeTab])
+  }, [fiscalLoteDraft.cest, fiscalLoteDraft.ncm, ncmValidation, cestsDisponiveis, activeTab])
 
   // Com CEST preenchido, sugere indicador de escala (igual NovoProduto — só reage ao CEST)
   useEffect(() => {
@@ -988,7 +1179,7 @@ export function AtualizarPrecoLote() {
       return
     }
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado')
       return
@@ -1041,7 +1232,7 @@ export function AtualizarPrecoLote() {
       })
 
       // Chama API de bulk-update
-      const response = await fetch('/api/produtos/bulk-update', {
+      const response = await fetchGestorApi('/api/produtos/bulk-update', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1077,6 +1268,42 @@ export function AtualizarPrecoLote() {
     }
   }
 
+
+  /** Atualiza só as linhas afetadas (mantém scroll e itens já carregados). */
+  const aplicarImpressorasNasLinhas = useCallback(
+    (produtoIds: string[], impressorasIds: string[], modo: 'adicionar' | 'remover') => {
+      const idsAlvo = new Set(produtoIds)
+      const resumoPorId = new Map(
+        impressorasDisponiveis.map((imp) => [
+          imp.getId(),
+          { id: imp.getId(), nome: imp.getNome(), ativo: imp.isAtivo() },
+        ])
+      )
+
+      setProdutos((prev) =>
+        prev.map((produto) => {
+          if (!idsAlvo.has(produto.getId())) return produto
+
+          if (modo === 'adicionar') {
+            const porId = new Map(produto.getImpressoras().map((i) => [i.id, i]))
+            for (const id of impressorasIds) {
+              if (porId.has(id)) continue
+              const resumo = resumoPorId.get(id)
+              if (resumo) porId.set(id, resumo)
+            }
+            return produto.withImpressoras(Array.from(porId.values()))
+          }
+
+          const remover = new Set(impressorasIds)
+          return produto.withImpressoras(
+            produto.getImpressoras().filter((i) => !remover.has(i.id))
+          )
+        })
+      )
+    },
+    [impressorasDisponiveis]
+  )
+
   // Funções de impressoras
   const adicionarImpressoras = async () => {
     if (produtosSelecionados.size === 0) {
@@ -1089,18 +1316,19 @@ export function AtualizarPrecoLote() {
       return
     }
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado')
       return
     }
 
     setIsUpdating(true)
-    showToast.loading('Vinculando impressoras...')
+    const toastId = showToast.loading('Vinculando impressoras...')
 
     try {
       const impressorasIdsArray = Array.from(impressorasSelecionadas)
-      const payload = Array.from(produtosSelecionados).map((produtoId) => {
+      const produtoIds = Array.from(produtosSelecionados)
+      const payload = produtoIds.map((produtoId) => {
         const produto = produtos.find((p) => p.getId() === produtoId)
         const impressorasExistentes = produto?.getImpressoras().map((i) => i.id) || []
         const impressorasCombinadas = [...new Set([...impressorasExistentes, ...impressorasIdsArray])]
@@ -1111,7 +1339,7 @@ export function AtualizarPrecoLote() {
         }
       })
 
-      const response = await fetch('/api/produtos/bulk-update', {
+      const response = await fetchGestorApi('/api/produtos/bulk-update', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1125,15 +1353,14 @@ export function AtualizarPrecoLote() {
         throw new Error(errorData.message || `Erro ${response.status}`)
       }
 
-      marcarProdutosAlteradosNaSessao(Array.from(produtosSelecionados), 'impressoras')
-
-      await buscarProdutos()
-      showToast.success(`Impressoras vinculadas com sucesso!`)
+      marcarProdutosAlteradosNaSessao(produtoIds, 'impressoras')
+      aplicarImpressorasNasLinhas(produtoIds, impressorasIdsArray, 'adicionar')
+      showToast.successLoading(toastId, 'Impressoras vinculadas com sucesso!')
       setImpressorasSelecionadas(new Set())
       setProdutosSelecionados(new Set())
     } catch (error: any) {
       console.error('Erro ao vincular impressoras', error)
-      showToast.error(error.message || 'Erro ao vincular impressoras')
+      showToast.errorLoading(toastId, error.message || 'Erro ao vincular impressoras')
     } finally {
       setIsUpdating(false)
     }
@@ -1150,14 +1377,14 @@ export function AtualizarPrecoLote() {
       return
     }
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado')
       return
     }
 
     setIsUpdating(true)
-    showToast.loading('Desvinculando impressoras...')
+    const toastId = showToast.loading('Desvinculando impressoras...')
 
     try {
       const impressorasIdsArray = Array.from(impressorasSelecionadas)
@@ -1166,7 +1393,7 @@ export function AtualizarPrecoLote() {
         impressorasIdsToRemove: impressorasIdsArray,
       }))
 
-      const response = await fetch('/api/produtos/bulk-update', {
+      const response = await fetchGestorApi('/api/produtos/bulk-update', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1181,14 +1408,17 @@ export function AtualizarPrecoLote() {
       }
 
       marcarProdutosAlteradosNaSessao(Array.from(produtosSelecionados), 'impressoras')
-
-      await buscarProdutos()
-      showToast.success(`Impressoras desvinculadas com sucesso!`)
+      aplicarImpressorasNasLinhas(
+        Array.from(produtosSelecionados),
+        Array.from(impressorasSelecionadas),
+        'remover'
+      )
+      showToast.successLoading(toastId, 'Impressoras desvinculadas com sucesso!')
       setImpressorasSelecionadas(new Set())
       setProdutosSelecionados(new Set())
     } catch (error: any) {
       console.error('Erro ao desvincular impressoras', error)
-      showToast.error(error.message || 'Erro ao desvincular impressoras')
+      showToast.errorLoading(toastId, error.message || 'Erro ao desvincular impressoras')
     } finally {
       setIsUpdating(false)
     }
@@ -1214,7 +1444,7 @@ export function AtualizarPrecoLote() {
       return
     }
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado')
       return
@@ -1236,7 +1466,7 @@ export function AtualizarPrecoLote() {
         }
       })
 
-      const response = await fetch('/api/produtos/bulk-update', {
+      const response = await fetchGestorApi('/api/produtos/bulk-update', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1275,7 +1505,7 @@ export function AtualizarPrecoLote() {
       return
     }
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado')
       return
@@ -1291,7 +1521,7 @@ export function AtualizarPrecoLote() {
         gruposComplementosIdsToRemove: gruposIdsArray,
       }))
 
-      const response = await fetch('/api/produtos/bulk-update', {
+      const response = await fetchGestorApi('/api/produtos/bulk-update', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1339,7 +1569,7 @@ export function AtualizarPrecoLote() {
       return
     }
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado')
       return
@@ -1362,7 +1592,7 @@ export function AtualizarPrecoLote() {
         const produtoId = ids[i]
         setSalvandoPermissoesProgresso({ atual: i + 1, total })
 
-        const response = await fetch(`/api/produtos/${produtoId}`, {
+        const response = await fetchGestorApi(`/api/produtos/${produtoId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -1407,15 +1637,249 @@ export function AtualizarPrecoLote() {
     }
   }
 
-  /** PATCH sequencial com objeto `fiscal` (sem bulk-update). */
+  const atualizarDraftFiscalLinha = useCallback(
+    (produtoId: string, campo: FiscalCampoLinha, valor: string) => {
+      setFiscalLinhaDrafts(prev => {
+        const produto = produtosRef.current.find(p => p.getId() === produtoId)
+        const base = prev[produtoId] ?? (produto ? fiscalLinhaDraftFromProduto(produto) : null)
+        if (!base) return prev
+
+        const nextDraft: FiscalLinhaDraft = { ...base, [campo]: valor }
+
+        if (campo === 'ncm') {
+          const ncmNovo = normalizarNcm8(valor)
+          if (ncmNovo !== normalizarNcm8(base.ncm)) {
+            nextDraft.cest = ''
+          }
+          // Igual NovoProduto: ao informar NCM válido, sugere origem/tipo padrão se vazios
+          if (ncmNovo.length === 8) {
+            if (!String(nextDraft.origemMercadoria ?? '').trim()) {
+              nextDraft.origemMercadoria = '0'
+            }
+            if (!String(nextDraft.tipoProduto ?? '').trim()) {
+              nextDraft.tipoProduto = '00'
+            }
+          }
+        }
+
+        if (campo === 'cest') {
+          const cestNovo = normalizarCest7(valor)
+          // Igual NovoProduto: CEST preenchido → indicador "1" se ainda vazio
+          if (cestNovo.length === 7 && !String(nextDraft.indicadorProducaoEscala ?? '').trim()) {
+            nextDraft.indicadorProducaoEscala = '1'
+          }
+        }
+
+        return { ...prev, [produtoId]: nextDraft }
+      })
+    },
+    []
+  )
+
+  /** PATCH fiscal da linha inteira (um request por produto ao clicar OK). */
+  const salvarFiscalLinha = useCallback(
+    async (produto: Produto): Promise<boolean> => {
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado')
+        return false
+      }
+
+      const produtoId = produto.getId()
+      const draft = fiscalLinhaDrafts[produtoId] ?? fiscalLinhaDraftFromProduto(produto)
+
+      if (!fiscalLinhaDraftDirty(produto, draft)) {
+        showToast.info('Nenhuma alteração fiscal nesta linha.')
+        return false
+      }
+
+      const draftParaSalvar: FiscalLinhaDraft = { ...draft }
+      const ncmT = normalizarNcm8(draftParaSalvar.ncm)
+      const cestT = normalizarCest7(draftParaSalvar.cest)
+      const temCest = cestT.length === 7
+      const temOutrosCampos =
+        draftParaSalvar.origemMercadoria !== '' ||
+        draftParaSalvar.tipoProduto !== '' ||
+        draftParaSalvar.indicadorProducaoEscala.trim() !== '' ||
+        temCest
+
+      if (ncmT.length > 0 && ncmT.length !== 8) {
+        showToast.error('O código NCM deve conter exatamente 8 dígitos numéricos.')
+        return false
+      }
+
+      if (temOutrosCampos && ncmT.length !== 8) {
+        showToast.error('Informe o NCM (8 dígitos) antes de salvar os demais campos fiscais.')
+        return false
+      }
+
+      if (ncmT.length === 8) {
+        try {
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 8000)
+          const response = await fetchGestorApi(
+            `/api/v1/fiscal/configuracoes/ncms/validar/${encodeURIComponent(ncmT)}`,
+            {
+              headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+              signal: controller.signal,
+            }
+          )
+          clearTimeout(timeoutId)
+          if (response.ok) {
+            const data = (await response.json()) as { valido?: boolean; mensagem?: string }
+            if (data.valido === false) {
+              showToast.error(data.mensagem || 'O código NCM informado não é válido.')
+              return false
+            }
+          }
+        } catch {
+          /* segue com PATCH se o validador estiver indisponível */
+        }
+        draftParaSalvar.ncm = ncmT
+      }
+
+      if (temCest) {
+        try {
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 8000)
+          const response = await fetchGestorApi(
+            `/api/v1/fiscal/configuracoes/cests/validar/${encodeURIComponent(cestT)}/ncm/${encodeURIComponent(ncmT)}`,
+            {
+              headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+              signal: controller.signal,
+            }
+          )
+          clearTimeout(timeoutId)
+          if (response.ok) {
+            const data = (await response.json()) as {
+              valido?: boolean
+              compativel?: boolean
+              mensagem?: string
+            }
+            const ok =
+              data.valido !== false &&
+              (data.compativel === undefined || data.compativel === true)
+            if (!ok) {
+              showToast.error(data.mensagem || 'O código CEST informado não é válido.')
+              return false
+            }
+          }
+        } catch {
+          /* segue com PATCH se o validador estiver indisponível */
+        }
+        draftParaSalvar.cest = cestT
+      } else {
+        draftParaSalvar.cest = ''
+      }
+
+      if (draftParaSalvar.indicadorProducaoEscala.trim() !== '' && !cestT) {
+        showToast.error(
+          'Preencha o CEST antes de informar a produção em escala relevante neste produto.'
+        )
+        return false
+      }
+
+      if (
+        temCest &&
+        !draftParaSalvar.indicadorProducaoEscala.trim() &&
+        !produto.getIndicadorProducaoEscala()
+      ) {
+        draftParaSalvar.indicadorProducaoEscala = '1'
+      }
+
+      const alteracoes = montarAlteracoesFiscalLote(draftParaSalvar)
+      if (!alteracoes) {
+        showToast.error('Preencha ao menos um campo fiscal.')
+        return false
+      }
+
+      setSalvandoFiscalLinhaId(produtoId)
+
+      try {
+        const response = await fetchGestorApi('/api/v1/fiscal/produtos-fiscais/lote', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            produtoIds: [produtoId],
+            alteracoes,
+          }),
+        })
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}))
+          const msg =
+            typeof error.message === 'string' && error.message.trim() !== ''
+              ? error.message
+              : `Erro ${response.status}`
+          showToast.error(msg)
+          return false
+        }
+
+        const result = (await response.json().catch(() => ({}))) as {
+          erros?: number
+          errosDetalhe?: { produtoId?: string; mensagem?: string }[]
+          produtos?: ProdutoFiscalDtoApi[]
+        }
+
+        if ((result.erros ?? 0) > 0) {
+          const detalhe = result.errosDetalhe?.[0]?.mensagem
+          showToast.error(detalhe || 'Erro ao salvar dados fiscais da linha.')
+          return false
+        }
+
+        const dto = result.produtos?.find(p => p.produtoId === produtoId)
+        const partial = dto
+          ? partialFiscalFromDto(dto)
+          : {
+              ncm: ncmT.length === 8 ? ncmT : draftParaSalvar.ncm,
+              cest: cestT,
+              origemMercadoria: draftParaSalvar.origemMercadoria,
+              tipoProduto: draftParaSalvar.tipoProduto,
+              indicadorProducaoEscala:
+                draftParaSalvar.indicadorProducaoEscala.trim() === ''
+                  ? null
+                  : draftParaSalvar.indicadorProducaoEscala,
+            }
+
+        setProdutos(prev =>
+          prev.map(p => (p.getId() === produtoId ? p.withDadosFiscais(partial) : p))
+        )
+        setFiscalLinhaDrafts(prev => ({
+          ...prev,
+          [produtoId]: {
+            ncm: partial.ncm ?? '',
+            cest: partial.cest ?? '',
+            origemMercadoria: partial.origemMercadoria ?? '',
+            tipoProduto: partial.tipoProduto ?? '',
+            indicadorProducaoEscala: partial.indicadorProducaoEscala ?? '',
+          },
+        }))
+        marcarProdutosAlteradosNaSessao([produtoId], 'fiscal')
+        showToast.success('Dados fiscais salvos.')
+        return true
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : 'Erro ao salvar dados fiscais'
+        showToast.error(msg)
+        return false
+      } finally {
+        setSalvandoFiscalLinhaId(null)
+      }
+    },
+    [ fiscalLinhaDrafts, marcarProdutosAlteradosNaSessao]
+  )
+
+  /** 1× PATCH /produtos-fiscais/lote (em vez de N× PATCH /produtos/:id). */
   const aplicarFiscalEmLote = async () => {
     if (produtosSelecionados.size === 0) {
       showToast.error('Selecione pelo menos um produto')
       return
     }
 
-    const body = montarBodyFiscalLote(fiscalLoteDraft)
-    if (!body) {
+    const alteracoes = montarAlteracoesFiscalLote(fiscalLoteDraft)
+    if (!alteracoes) {
       showToast.error('Preencha ao menos um campo fiscal')
       return
     }
@@ -1460,7 +1924,7 @@ export function AtualizarPrecoLote() {
       return
     }
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado')
       return
@@ -1472,46 +1936,123 @@ export function AtualizarPrecoLote() {
     setIsSalvandoFiscal(true)
     setSalvandoFiscalProgresso({ atual: 0, total: totalIds })
 
-    let sucesso = 0
-    let falhas = 0
-    const idsFiscalComSucesso: string[] = []
-
     try {
-      for (let i = 0; i < ids.length; i++) {
-        const produtoId = ids[i]
-        setSalvandoFiscalProgresso({ atual: i + 1, total: totalIds })
+      const response = await fetchGestorApi('/api/v1/fiscal/produtos-fiscais/lote', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          produtoIds: ids,
+          alteracoes,
+        }),
+      })
 
-        const response = await fetch(`/api/produtos/${produtoId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(body),
-        })
+      setSalvandoFiscalProgresso({ atual: totalIds, total: totalIds })
 
-        if (!response.ok) {
-          const error = await response.json().catch(() => ({}))
-          const msg =
-            typeof error.message === 'string' && error.message.trim() !== ''
-              ? error.message
-              : `Erro ${response.status}`
-          console.error(`Fiscal produto ${produtoId}:`, msg)
-          falhas += 1
-        } else {
-          sucesso += 1
-          idsFiscalComSucesso.push(produtoId)
-        }
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}))
+        const msg =
+          typeof error.message === 'string' && error.message.trim() !== ''
+            ? error.message
+            : `Erro ${response.status}`
+        throw new Error(msg)
       }
 
-      marcarProdutosAlteradosNaSessao(idsFiscalComSucesso, 'fiscal')
+      const result = (await response.json()) as {
+        total?: number
+        criados?: number
+        atualizados?: number
+        erros?: number
+        produtos?: ProdutoFiscalDtoApi[]
+        errosDetalhe?: { produtoId?: string; mensagem?: string }[]
+      }
 
-      await buscarProdutos()
+      const sucessoIds = new Set(
+        (result.produtos ?? [])
+          .map(p => p.produtoId)
+          .filter((id): id is string => typeof id === 'string' && id.length > 0)
+      )
+
+      // Fallback: se a API não devolver a lista, assume sucesso nos IDs sem erro
+      if (sucessoIds.size === 0 && (result.erros ?? 0) === 0) {
+        for (const id of ids) sucessoIds.add(id)
+      }
+
+      const partialAplicado = {
+        ncm: typeof alteracoes.ncm === 'string' ? alteracoes.ncm : undefined,
+        cest: typeof alteracoes.cest === 'string' ? alteracoes.cest : undefined,
+        origemMercadoria:
+          alteracoes.origemMercadoria !== undefined
+            ? String(alteracoes.origemMercadoria)
+            : undefined,
+        tipoProduto:
+          typeof alteracoes.tipoProduto === 'string' ? alteracoes.tipoProduto : undefined,
+        indicadorProducaoEscala:
+          typeof alteracoes.indicadorProducaoEscala === 'string'
+            ? alteracoes.indicadorProducaoEscala
+            : undefined,
+      }
+
+      setProdutos(prev =>
+        prev.map(p => {
+          if (!sucessoIds.has(p.getId())) return p
+          const dto = result.produtos?.find(x => x.produtoId === p.getId())
+          if (dto) return p.withDadosFiscais(partialFiscalFromDto(dto))
+          return p.withDadosFiscais({
+            ncm: partialAplicado.ncm ?? p.getNcm(),
+            cest: partialAplicado.cest ?? p.getCest(),
+            origemMercadoria: partialAplicado.origemMercadoria ?? p.getOrigemMercadoria(),
+            tipoProduto: partialAplicado.tipoProduto ?? p.getTipoProduto(),
+            indicadorProducaoEscala:
+              partialAplicado.indicadorProducaoEscala ?? p.getIndicadorProducaoEscala(),
+          })
+        })
+      )
+
+      setFiscalLinhaDrafts(prev => {
+        const next = { ...prev }
+        for (const id of sucessoIds) {
+          const produto = produtosRef.current.find(p => p.getId() === id)
+          const dto = result.produtos?.find(x => x.produtoId === id)
+          if (dto) {
+            const partial = partialFiscalFromDto(dto)
+            next[id] = {
+              ncm: partial.ncm,
+              cest: partial.cest,
+              origemMercadoria: partial.origemMercadoria,
+              tipoProduto: partial.tipoProduto,
+              indicadorProducaoEscala: partial.indicadorProducaoEscala ?? '',
+            }
+          } else if (produto) {
+            const base = next[id] ?? fiscalLinhaDraftFromProduto(produto)
+            next[id] = {
+              ncm: partialAplicado.ncm ?? base.ncm,
+              cest: partialAplicado.cest ?? base.cest,
+              origemMercadoria: partialAplicado.origemMercadoria ?? base.origemMercadoria,
+              tipoProduto: partialAplicado.tipoProduto ?? base.tipoProduto,
+              indicadorProducaoEscala:
+                partialAplicado.indicadorProducaoEscala ?? base.indicadorProducaoEscala,
+            }
+          }
+        }
+        return next
+      })
+
+      const idsSucesso = Array.from(sucessoIds)
+      marcarProdutosAlteradosNaSessao(idsSucesso, 'fiscal')
       setProdutosSelecionados(new Set())
+
+      const falhas = result.erros ?? Math.max(0, totalIds - idsSucesso.length)
+      const sucesso = idsSucesso.length
 
       if (falhas === 0) {
         showToast.success(`Dados fiscais atualizados! (${sucesso} produto(s))`)
       } else {
+        for (const err of result.errosDetalhe ?? []) {
+          console.error(`Fiscal produto ${err.produtoId}:`, err.mensagem)
+        }
         showToast.warning(
           `${sucesso} atualizado(s) com sucesso. ${falhas} falhou(ram). Verifique o console para detalhes.`
         )
@@ -1525,14 +2066,111 @@ export function AtualizarPrecoLote() {
     }
   }
 
+
   const isNcmInvalidFiscal = ncmValidation != null && !ncmValidation.valido
   const isCestInvalidFiscal = cestValidation != null && !cestValidation.valido
   const isNcmValidFiscal = ncmValidation != null && ncmValidation.valido
   const hasCestsDisponiveisFiscal = cestsDisponiveis.length > 0
+  const fiscalLoteBodyPronto = montarAlteracoesFiscalLote(fiscalLoteDraft) != null
 
   const produtosExibicao = useMemo(() => {
     if (filtroColunaVazia === FILTRO_COLUNA_TODOS) return produtos
-    return produtos.filter((p) => produtoSemDadoNaColuna(p, filtroColunaVazia))
+    if (!idsFiltroColunaCongelados) {
+      return produtos.filter(p => produtoSemDadoNaColuna(p, filtroColunaVazia))
+    }
+    return produtos.filter(p => idsFiltroColunaCongelados.has(p.getId()))
+  }, [produtos, filtroColunaVazia, idsFiltroColunaCongelados])
+
+  /**
+   * Listas de vínculo em lote (impressoras / grupos): ver
+   * docs/arquitetura-jiffy/5.presentation/3.FLUXO_VINCULO_LOTE.md
+   */
+  const idsImpressorasVinculadas = useMemo(
+    () =>
+      uniaoIdsVinculosDosAlvos(
+        produtos,
+        produtosSelecionados,
+        getProdutoId,
+        getProdutoImpressoraIds
+      ),
+    [produtos, produtosSelecionados]
+  )
+
+  const idsGruposComplementosVinculados = useMemo(
+    () =>
+      uniaoIdsVinculosDosAlvos(
+        produtos,
+        produtosSelecionados,
+        getProdutoId,
+        getProdutoGrupoComplementoIds
+      ),
+    [produtos, produtosSelecionados]
+  )
+
+  const listaImpressorasVinculo = useListaVinculoLote({
+    catalogo: impressorasDisponiveis,
+    getId: getImpressoraId,
+    getNome: getImpressoraNome,
+    idsJaVinculados: idsImpressorasVinculadas,
+    modo: modoImpressora,
+    temAlvosSelecionados: produtosSelecionados.size > 0,
+    selecionados: impressorasSelecionadas,
+    setSelecionados: setImpressorasSelecionadas,
+    textos: TEXTOS_VINCULO_IMPRESSORAS,
+  })
+
+  const listaGruposComplementosVinculo = useListaVinculoLote({
+    catalogo: gruposComplementos,
+    getId: getGrupoComplementoId,
+    getNome: getGrupoComplementoNome,
+    idsJaVinculados: idsGruposComplementosVinculados,
+    modo: modoGrupoComplemento,
+    temAlvosSelecionados: produtosSelecionados.size > 0,
+    selecionados: gruposComplementosSelecionados,
+    setSelecionados: setGruposComplementosSelecionados,
+    textos: TEXTOS_VINCULO_GRUPOS_COMPLEMENTOS,
+  })
+
+
+  /** Congela IDs ao selecionar o filtro; só inclui novos matches ao carregar mais — não remove ao editar. */
+  useEffect(() => {
+    if (filtroColunaVazia === FILTRO_COLUNA_TODOS) {
+      filtroColunaAnteriorRef.current = FILTRO_COLUNA_TODOS
+      setIdsFiltroColunaCongelados(null)
+      return
+    }
+
+    const filtroMudou = filtroColunaAnteriorRef.current !== filtroColunaVazia
+    filtroColunaAnteriorRef.current = filtroColunaVazia
+
+    setIdsFiltroColunaCongelados(prev => {
+      const idsNaLista = new Set(produtos.map(p => p.getId()))
+      const next = new Set<string>()
+
+      if (!filtroMudou && prev) {
+        for (const id of prev) {
+          if (idsNaLista.has(id)) next.add(id)
+        }
+      }
+
+      for (const p of produtos) {
+        if (produtoSemDadoNaColuna(p, filtroColunaVazia)) {
+          next.add(p.getId())
+        }
+      }
+
+      if (prev && prev.size === next.size) {
+        let iguais = true
+        for (const id of next) {
+          if (!prev.has(id)) {
+            iguais = false
+            break
+          }
+        }
+        if (iguais) return prev
+      }
+      return next
+    })
   }, [produtos, filtroColunaVazia])
 
   const todosSelecionados =
@@ -1540,13 +2178,58 @@ export function AtualizarPrecoLote() {
     produtosExibicao.every((p) => produtosSelecionados.has(p.getId()))
   const algunsSelecionadosLista =
     produtosExibicao.some((p) => produtosSelecionados.has(p.getId())) && !todosSelecionados
-  const todasImpressorasSelecionadas = impressorasDisponiveis.length > 0 && impressorasSelecionadas.size === impressorasDisponiveis.length
-  const algumasImpressorasSelecionadas = impressorasSelecionadas.size > 0 && impressorasSelecionadas.size < impressorasDisponiveis.length
-  const todosGruposComplementosSelecionados = gruposComplementos.length > 0 && gruposComplementosSelecionados.size === gruposComplementos.length
-  const algunsGruposComplementosSelecionados = gruposComplementosSelecionados.size > 0 && gruposComplementosSelecionados.size < gruposComplementos.length
   const todasPermissoesSelecionadas =
     CAMPOS_PERMISSAO_PDV.length > 0 &&
     permissoesCamposSelecionados.size === CAMPOS_PERMISSAO_PDV.length
+
+
+  const openEdicaoProduto = useCallback(
+    (produto: Produto) => {
+      setTabsModalState({
+        open: true,
+        tab: 'produto',
+        mode: 'edit',
+        produto,
+        grupoId: produto.getGrupoId(),
+        initialStepProduto: activeTab === 'fiscal' ? 2 : 0,
+      })
+    },
+    [activeTab]
+  )
+
+  const closeEdicaoProduto = useCallback(() => {
+    setTabsModalState({ open: false, tab: 'produto', mode: 'edit' })
+  }, [])
+
+  const handleEdicaoProdutoReload = useCallback(
+    (produtoId?: string, produtoData?: unknown) => {
+      if (!produtoId || !produtoData) return
+      try {
+        const atualizado = Produto.fromJSON(produtoData)
+        setProdutos(prev =>
+          prev.map(p =>
+            p.getId() === produtoId
+              ? p.withDadosFiscais({
+                  ncm: atualizado.getNcm(),
+                  cest: atualizado.getCest(),
+                  origemMercadoria: atualizado.getOrigemMercadoria(),
+                  tipoProduto: atualizado.getTipoProduto(),
+                  indicadorProducaoEscala: atualizado.getIndicadorProducaoEscala(),
+                })
+              : p
+          )
+        )
+        setFiscalLinhaDrafts(prev => ({
+          ...prev,
+          [produtoId]: fiscalLinhaDraftFromProduto(atualizado),
+        }))
+        marcarProdutosAlteradosNaSessao([produtoId], 'fiscal')
+      } catch (error) {
+        console.error('Erro ao aplicar produto editado na lista em lote', error)
+      }
+    },
+    [marcarProdutosAlteradosNaSessao]
+  )
 
   const handleClearFilters = useCallback(() => {
     setSearchText('')
@@ -1555,6 +2238,8 @@ export function AtualizarPrecoLote() {
     setAtivoDeliveryFilter('Todos')
     setGrupoProdutoFilter('')
     setFiltroColunaVazia(FILTRO_COLUNA_TODOS)
+    setIdsFiltroColunaCongelados(null)
+    filtroColunaAnteriorRef.current = FILTRO_COLUNA_TODOS
   }, [])
 
   return (
@@ -1686,7 +2371,7 @@ export function AtualizarPrecoLote() {
           </div>
           <Link
             href="/produtos"
-            className="h-8 px-8 rounded-lg bg-info text-primary justify-center font-semibold font-exo text-sm border border-primary shadow-sm hover:bg-primary/20 transition-colors flex items-center"
+            className="h-8 px-8 rounded-lg bg-info text-primary justify-center font-semibold text-sm border border-primary shadow-sm hover:bg-primary/20 transition-colors flex items-center"
           >
             Fechar
           </Link>
@@ -1704,7 +2389,7 @@ export function AtualizarPrecoLote() {
                 <select
                   value={adjustMode}
                   onChange={(e) => setAdjustMode(e.target.value as 'valor' | 'percentual')}
-                  className="w-full h-8 px-4 rounded-lg border border-primary/70 bg-white text-sm font-nunito focus:outline-none focus:border-primary"
+                  className="w-full h-8 px-4 rounded-lg border border-primary/70 bg-white text-sm focus:outline-none focus:border-primary"
                 >
                   <option value="valor">Valor (R$)</option>
                   <option value="percentual">Porcent. (%)</option>
@@ -1811,9 +2496,8 @@ export function AtualizarPrecoLote() {
           </>
         ) : activeTab === 'impressoras' ? (
           <>
-            <div className="flex flex-col gap-1">
-              {/* Modo de operação: Adicionar ou Remover */}
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <label className="block text-xs font-semibold text-secondary-text">
                   Modo de operação:
                 </label>
@@ -1823,6 +2507,7 @@ export function AtualizarPrecoLote() {
                     onClick={() => {
                       setModoImpressora('adicionar')
                       setImpressorasSelecionadas(new Set())
+                      listaImpressorasVinculo.limparBusca()
                     }}
                     className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
                       modoImpressora === 'adicionar'
@@ -1837,6 +2522,7 @@ export function AtualizarPrecoLote() {
                     onClick={() => {
                       setModoImpressora('remover')
                       setImpressorasSelecionadas(new Set())
+                      listaImpressorasVinculo.limparBusca()
                     }}
                     className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
                       modoImpressora === 'remover'
@@ -1847,27 +2533,65 @@ export function AtualizarPrecoLote() {
                     Desvincular
                   </button>
                 </div>
+                <span className="text-[11px] text-secondary-text">
+                  {listaImpressorasVinculo.hintModo}
+                </span>
               </div>
+
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-                <label className="block text-xs font-semibold text-secondary-text">
-                  {modoImpressora === 'adicionar' ? 'Selecionar Impressoras' : 'Selecionar Impressoras para Remover'} ({impressorasSelecionadas.size} selecionada{impressorasSelecionadas.size !== 1 ? 's' : ''})
-                </label>
+                <div className="flex flex-wrap items-center gap-2 min-w-0">
+                  <label className="block text-xs font-semibold text-secondary-text whitespace-nowrap">
+                    {modoImpressora === 'adicionar'
+                      ? 'Selecionar Impressoras'
+                      : 'Selecionar Impressoras para Remover'}
+                    {' '}
+                    ({impressorasSelecionadas.size} selecionada
+                    {impressorasSelecionadas.size !== 1 ? 's' : ''}
+                    {listaImpressorasVinculo.paraExibir.length > 0
+                      ? ` · ${listaImpressorasVinculo.filtradas.length}/${listaImpressorasVinculo.paraExibir.length}`
+                      : ''}
+                    )
+                  </label>
+                  {listaImpressorasVinculo.exibirBusca && (
+                    <div className="w-[min(200px,100%)]">
+                      <Input
+                        size="small"
+                        value={listaImpressorasVinculo.busca}
+                        onChange={(e) => listaImpressorasVinculo.setBusca(e.target.value)}
+                        placeholder="Pesquisar impressora..."
+                        aria-label="Pesquisar impressora"
+                        sx={{
+                          ...sxEntradaCompactaProduto,
+                          '& .MuiOutlinedInput-root': {
+                            backgroundColor: '#fff',
+                            minHeight: 32,
+                          },
+                          '& .MuiOutlinedInput-input': {
+                            padding: '6px 10px',
+                            fontSize: '0.75rem',
+                          },
+                        }}
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <MdSearch size={16} className="text-secondary-text" aria-hidden />
+                            </InputAdornment>
+                          ),
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
                 <div className="flex items-center gap-4">
-                  {impressorasDisponiveis.length > 0 && (
+                  {listaImpressorasVinculo.filtradas.length > 0 && (
                     <button
                       type="button"
-                      onClick={() => {
-                        if (todasImpressorasSelecionadas) {
-                          setImpressorasSelecionadas(new Set())
-                        } else {
-                          setImpressorasSelecionadas(
-                            new Set(impressorasDisponiveis.map((i) => i.getId()))
-                          )
-                        }
-                      }}
-                      className="text-xs text-primary hover:underline"
+                      onClick={listaImpressorasVinculo.toggleSelecaoTodasVisiveis}
+                      className="text-xs text-primary hover:underline whitespace-nowrap"
                     >
-                      {todasImpressorasSelecionadas ? 'Desmarcar todas' : 'Selecionar todas'}
+                      {listaImpressorasVinculo.todasSelecionadas
+                        ? 'Desmarcar todas'
+                        : 'Selecionar todas'}
                     </button>
                   )}
                   <div className="flex justify-end max-w-4xl">
@@ -1903,16 +2627,28 @@ export function AtualizarPrecoLote() {
                 <div className="flex items-center justify-center py-4">
                   <span className="text-sm text-secondary-text">Nenhuma impressora disponível</span>
                 </div>
+              ) : listaImpressorasVinculo.paraExibir.length === 0 ? (
+                <div className="flex items-center justify-center py-4">
+                  <span className="text-sm text-secondary-text">
+                    {listaImpressorasVinculo.emptyModo}
+                  </span>
+                </div>
+              ) : listaImpressorasVinculo.filtradas.length === 0 ? (
+                <div className="flex items-center justify-center py-4">
+                  <span className="text-sm text-secondary-text">
+                    Nenhuma impressora encontrada para “{listaImpressorasVinculo.busca.trim()}”
+                  </span>
+                </div>
               ) : (
                 <div className="w-full">
-                  <div className="max-h-36 overflow-y-auto border border-gray-200 rounded-lg bg-white p-1">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-1">
-                      {impressorasDisponiveis.map((impressora) => {
+                  <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg bg-white p-1.5">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5">
+                      {listaImpressorasVinculo.filtradas.map((impressora) => {
                         const isSelected = impressorasSelecionadas.has(impressora.getId())
                         return (
                           <label
                             key={impressora.getId()}
-                            className={`flex min-h-0 items-center gap-0.5 rounded-lg border p-1 cursor-pointer transition-colors ${
+                            className={`flex min-h-0 items-center gap-1 rounded-lg border px-1.5 py-1 cursor-pointer transition-colors ${
                               isSelected
                                 ? 'bg-primary/10 border-primary'
                                 : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
@@ -1927,7 +2663,10 @@ export function AtualizarPrecoLote() {
                               className="data-[state=checked]:bg-primary data-[state=checked]:border-primary flex-shrink-0"
                               sx={sxCheckboxListaLote}
                             />
-                            <span className="md:text-sm text-xs font-medium text-primary-text truncate">
+                            <span
+                              className="md:text-sm text-xs font-medium text-primary-text truncate"
+                              title={impressora.getNome()}
+                            >
                               {impressora.getNome()}
                             </span>
                           </label>
@@ -1937,15 +2676,12 @@ export function AtualizarPrecoLote() {
                   </div>
                 </div>
               )}
-              
             </div>
-            
           </>
         ) : activeTab === 'gruposComplementos' ? (
           <>
-            <div className="flex flex-col gap-1">
-              {/* Modo de operação: Adicionar ou Remover */}
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <label className="block text-xs font-semibold text-secondary-text">
                   Modo de operação:
                 </label>
@@ -1955,6 +2691,7 @@ export function AtualizarPrecoLote() {
                     onClick={() => {
                       setModoGrupoComplemento('adicionar')
                       setGruposComplementosSelecionados(new Set())
+                      listaGruposComplementosVinculo.limparBusca()
                     }}
                     className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
                       modoGrupoComplemento === 'adicionar'
@@ -1969,6 +2706,7 @@ export function AtualizarPrecoLote() {
                     onClick={() => {
                       setModoGrupoComplemento('remover')
                       setGruposComplementosSelecionados(new Set())
+                      listaGruposComplementosVinculo.limparBusca()
                     }}
                     className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
                       modoGrupoComplemento === 'remover'
@@ -1979,27 +2717,65 @@ export function AtualizarPrecoLote() {
                     Desvincular
                   </button>
                 </div>
+                <span className="text-[11px] text-secondary-text">
+                  {listaGruposComplementosVinculo.hintModo}
+                </span>
               </div>
+
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-                <label className="block text-xs font-semibold text-secondary-text">
-                  {modoGrupoComplemento === 'adicionar' ? 'Selecionar Grupos de Complementos' : 'Selecionar Grupos de Complementos para Remover'} ({gruposComplementosSelecionados.size} selecionado{gruposComplementosSelecionados.size !== 1 ? 's' : ''})
-                </label>
+                <div className="flex flex-wrap items-center gap-2 min-w-0">
+                  <label className="block text-xs font-semibold text-secondary-text whitespace-nowrap">
+                    {modoGrupoComplemento === 'adicionar'
+                      ? 'Selecionar Grupos de Complementos'
+                      : 'Selecionar Grupos de Complementos para Remover'}
+                    {' '}
+                    ({gruposComplementosSelecionados.size} selecionado
+                    {gruposComplementosSelecionados.size !== 1 ? 's' : ''}
+                    {listaGruposComplementosVinculo.paraExibir.length > 0
+                      ? ` · ${listaGruposComplementosVinculo.filtradas.length}/${listaGruposComplementosVinculo.paraExibir.length}`
+                      : ''}
+                    )
+                  </label>
+                  {listaGruposComplementosVinculo.exibirBusca && (
+                    <div className="w-[min(200px,100%)]">
+                      <Input
+                        size="small"
+                        value={listaGruposComplementosVinculo.busca}
+                        onChange={(e) => listaGruposComplementosVinculo.setBusca(e.target.value)}
+                        placeholder="Pesquisar grupo..."
+                        aria-label="Pesquisar grupo de complementos"
+                        sx={{
+                          ...sxEntradaCompactaProduto,
+                          '& .MuiOutlinedInput-root': {
+                            backgroundColor: '#fff',
+                            minHeight: 32,
+                          },
+                          '& .MuiOutlinedInput-input': {
+                            padding: '6px 10px',
+                            fontSize: '0.75rem',
+                          },
+                        }}
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <MdSearch size={16} className="text-secondary-text" aria-hidden />
+                            </InputAdornment>
+                          ),
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
                 <div className="flex items-center gap-4">
-                  {gruposComplementos.length > 0 && (
+                  {listaGruposComplementosVinculo.filtradas.length > 0 && (
                     <button
                       type="button"
-                      onClick={() => {
-                        if (todosGruposComplementosSelecionados) {
-                          setGruposComplementosSelecionados(new Set())
-                        } else {
-                          setGruposComplementosSelecionados(
-                            new Set(gruposComplementos.map((g) => g.getId()))
-                          )
-                        }
-                      }}
-                      className="text-xs text-primary hover:underline"
+                      onClick={listaGruposComplementosVinculo.toggleSelecaoTodasVisiveis}
+                      className="text-xs text-primary hover:underline whitespace-nowrap"
                     >
-                      {todosGruposComplementosSelecionados ? 'Desmarcar todos' : 'Selecionar todos'}
+                      {listaGruposComplementosVinculo.todasSelecionadas
+                        ? 'Desmarcar todos'
+                        : 'Selecionar todos'}
                     </button>
                   )}
                   <div className="flex justify-end max-w-4xl">
@@ -2029,22 +2805,38 @@ export function AtualizarPrecoLote() {
               </div>
               {isLoadingGruposComplementos ? (
                 <div className="flex items-center justify-center py-4">
-                  <span className="text-sm text-secondary-text">Carregando grupos de complementos...</span>
+                  <span className="text-sm text-secondary-text">
+                    Carregando grupos de complementos...
+                  </span>
                 </div>
               ) : gruposComplementos.length === 0 ? (
                 <div className="flex items-center justify-center py-4">
-                  <span className="text-sm text-secondary-text">Nenhum grupo de complementos disponível</span>
+                  <span className="text-sm text-secondary-text">
+                    Nenhum grupo de complementos disponível
+                  </span>
+                </div>
+              ) : listaGruposComplementosVinculo.paraExibir.length === 0 ? (
+                <div className="flex items-center justify-center py-4">
+                  <span className="text-sm text-secondary-text">
+                    {listaGruposComplementosVinculo.emptyModo}
+                  </span>
+                </div>
+              ) : listaGruposComplementosVinculo.filtradas.length === 0 ? (
+                <div className="flex items-center justify-center py-4">
+                  <span className="text-sm text-secondary-text">
+                    Nenhum grupo encontrado para “{listaGruposComplementosVinculo.busca.trim()}”
+                  </span>
                 </div>
               ) : (
                 <div className="w-full">
-                  <div className="max-h-36 overflow-y-auto border border-gray-200 rounded-lg bg-white p-1">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-1">
-                      {gruposComplementos.map((grupo) => {
+                  <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg bg-white p-1.5">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5">
+                      {listaGruposComplementosVinculo.filtradas.map((grupo) => {
                         const isSelected = gruposComplementosSelecionados.has(grupo.getId())
                         return (
                           <label
                             key={grupo.getId()}
-                            className={`flex min-h-0 items-center gap-0.5 rounded-lg border p-1 cursor-pointer transition-colors ${
+                            className={`flex min-h-0 items-center gap-1 rounded-lg border px-1.5 py-1 cursor-pointer transition-colors ${
                               isSelected
                                 ? 'bg-primary/10 border-primary'
                                 : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
@@ -2059,7 +2851,10 @@ export function AtualizarPrecoLote() {
                               className="data-[state=checked]:bg-primary data-[state=checked]:border-primary flex-shrink-0"
                               sx={sxCheckboxListaLote}
                             />
-                            <span className="md:text-sm text-xs font-medium text-primary-text truncate">
+                            <span
+                              className="md:text-sm text-xs font-medium text-primary-text truncate"
+                              title={grupo.getNome()}
+                            >
                               {grupo.getNome()}
                             </span>
                           </label>
@@ -2069,9 +2864,7 @@ export function AtualizarPrecoLote() {
                   </div>
                 </div>
               )}
-             
             </div>
-            
           </>
         ) : activeTab === 'permissoes' ? (
           <>
@@ -2203,14 +2996,14 @@ export function AtualizarPrecoLote() {
               <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                 <div className="min-w-0 flex-1">
                   <div className="mb-1 flex flex-wrap items-center gap-2">
-                    <h2 className="font-exo text-base font-semibold text-primary md:text-lg">
+                    <h2 className="text-base font-semibold text-primary md:text-lg">
                       Configuração Fiscal
                     </h2>
                     <div className="h-px min-w-[40px] flex-1 bg-primary/70" />
                   </div>
-                  <p className="font-nunito text-xs text-secondary-text md:text-sm">
-                    Preencha as informações fiscais. Serão aplicadas aos produtos selecionados na lista
-                    abaixo (um PATCH por produto).
+                  <p className="text-xs text-secondary-text md:text-sm">
+                    Edite os campos fiscais na linha de cada produto e confirme com OK (um PATCH
+                    por produto). Use o painel acima para aplicar o mesmo valor a vários selecionados.
                   </p>
                 </div>
                 <div className="shrink-0">
@@ -2222,6 +3015,7 @@ export function AtualizarPrecoLote() {
                       isSalvandoPermissoes ||
                       isSalvandoFiscal ||
                       produtosSelecionados.size === 0 ||
+                      !fiscalLoteBodyPronto ||
                       isNcmInvalidFiscal ||
                       isCestInvalidFiscal ||
                       isValidatingNcm ||
@@ -2249,7 +3043,17 @@ export function AtualizarPrecoLote() {
                     value={fiscalLoteDraft.ncm}
                     onChange={(e) => {
                       const v = e.target.value.replace(/\D/g, '').slice(0, 8)
-                      setFiscalLoteDraft((d) => ({ ...d, ncm: v }))
+                      setFiscalLoteDraft((d) => {
+                        const next = { ...d, ncm: v }
+                        if (normalizarNcm8(v) !== normalizarNcm8(d.ncm)) {
+                          next.cest = ''
+                        }
+                        if (normalizarNcm8(v).length === 8) {
+                          if (!next.origemMercadoria.trim()) next.origemMercadoria = '0'
+                          if (!next.tipoProduto.trim()) next.tipoProduto = '00'
+                        }
+                        return next
+                      })
                     }}
                     placeholder="8 dígitos"
                     className="bg-white"
@@ -2272,11 +3076,11 @@ export function AtualizarPrecoLote() {
                     }}
                   />
                   {isValidatingNcm && (
-                    <p className="mt-1 font-nunito text-xs text-secondary-text">Validando NCM...</p>
+                    <p className="mt-1 text-xs text-secondary-text">Validando NCM...</p>
                   )}
                   {!isValidatingNcm && ncmValidation && (
                     <p
-                      className={`mt-1 font-nunito text-xs ${ncmValidation.valido ? 'text-green-600' : 'text-red-600'}`}
+                      className={`mt-1 text-xs ${ncmValidation.valido ? 'text-green-600' : 'text-red-600'}`}
                     >
                       {ncmValidation.valido && ncmValidation.descricao
                         ? ncmValidation.descricao
@@ -2351,16 +3155,16 @@ export function AtualizarPrecoLote() {
                     />
                   )}
                   {isLoadingCests && (
-                    <p className="mt-1 font-nunito text-xs text-secondary-text">
+                    <p className="mt-1 text-xs text-secondary-text">
                       Carregando CESTs compatíveis...
                     </p>
                   )}
                   {isValidatingCest && (
-                    <p className="mt-1 font-nunito text-xs text-secondary-text">Validando CEST...</p>
+                    <p className="mt-1 text-xs text-secondary-text">Validando CEST...</p>
                   )}
                   {!isValidatingCest && !isLoadingCests && cestValidation && (
                     <p
-                      className={`mt-1 font-nunito text-xs ${cestValidation.valido ? 'text-green-600' : 'text-red-600'}`}
+                      className={`mt-1 text-xs ${cestValidation.valido ? 'text-green-600' : 'text-red-600'}`}
                     >
                       {cestValidation.valido && cestValidation.descricao
                         ? cestValidation.descricao
@@ -2437,7 +3241,7 @@ export function AtualizarPrecoLote() {
                     ))}
                   </Select>
                 </FormControl>
-                <p className="mt-1 font-nunito text-xs text-secondary-text">
+                <p className="mt-1 text-xs text-secondary-text">
                   Obrigatório para produtos no Anexo XXVII (52/2017)
                 </p>
               </div>
@@ -2530,34 +3334,37 @@ export function AtualizarPrecoLote() {
               </FormControl>
             </div>
 
-            <div className="w-[min(220px,38vw)] min-w-[160px] shrink-0 md:max-w-[260px] md:flex-1">
-              <FormControl
-                fullWidth
+            <div className="relative z-20 w-[min(220px,38vw)] min-w-[160px] shrink-0 md:max-w-[260px] md:flex-1">
+              <Autocomplete
+                id="lote-filter-grupo-searchable"
                 size="small"
-                variant="outlined"
-                sx={sxEntradaCompactaProdutoSelect}
+                options={gruposProdutos}
+                loading={isLoadingGruposProdutos}
                 disabled={isLoadingGruposProdutos}
-              >
-                <InputLabel id="lote-filter-grupo-label">Grupo de produtos</InputLabel>
-                <Select
-                  labelId="lote-filter-grupo-label"
-                  label="Grupo de produtos"
-                  value={grupoProdutoFilter}
-                  onChange={(e: SelectChangeEvent<string>) => setGrupoProdutoFilter(e.target.value)}
-                >
-                  <MenuItem value="">
-                    <span className="text-secondary-text">
-                      {isLoadingGruposProdutos ? 'Carregando...' : 'Todos'}
-                    </span>
-                  </MenuItem>
-                  {!isLoadingGruposProdutos &&
-                    gruposProdutos.map((grupo) => (
-                      <MenuItem key={grupo.getId()} value={grupo.getId()}>
-                        {grupo.getNome()}
-                      </MenuItem>
-                    ))}
-                </Select>
-              </FormControl>
+                loadingText="Carregando..."
+                noOptionsText="Nenhum grupo encontrado"
+                getOptionLabel={grupo => grupo.getNome()}
+                isOptionEqualToValue={(a, b) => a.getId() === b.getId()}
+                value={gruposProdutos.find(g => g.getId() === grupoProdutoFilter) ?? null}
+                onChange={(_, grupo) => setGrupoProdutoFilter(grupo?.getId() ?? '')}
+                renderInput={params => (
+                  <TextField
+                    {...params}
+                    label="Grupo de produtos"
+                    placeholder="Pesquise ou Selecione"
+                    InputLabelProps={{
+                      ...params.InputLabelProps,
+                      shrink: true,
+                    }}
+                    sx={{
+                      ...sxEntradaCompactaProduto,
+                      '& .MuiOutlinedInput-root': {
+                        backgroundColor: '#fff',
+                      },
+                    }}
+                  />
+                )}
+              />
             </div>
 
             {filtrosDisponiveisPorAba(activeTab).length > 1 ? (
@@ -2605,8 +3412,9 @@ export function AtualizarPrecoLote() {
         </div>
       </div>
 
-      {/* Conteúdo */}
-      <div ref={listaAreaRef} className="py-2">
+      {/* Conteúdo — lista com base fixa; padding inferior para o scroll da página
+          chegar ao fim nítido do quadro antes de usar só o scroll interno. */}
+      <div className="px-1 pt-2 pb-8 md:px-2 md:pb-10">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-12 gap-2">
             <JiffyLoading />
@@ -2619,13 +3427,22 @@ export function AtualizarPrecoLote() {
           <div className="text-center py-12 px-4">
             <p className="text-secondary-text">
               {filtroColunaVazia !== FILTRO_COLUNA_TODOS
-                ? `Nenhum produto entre os já carregados atende a “${LABEL_FILTRO_COLUNA[filtroColunaVazia]}”. Continue rolando para carregar mais itens ou altere os filtros da busca (filtro só na tela).`
+                ? `Nenhum produto entre os já carregados atende a “${LABEL_FILTRO_COLUNA[filtroColunaVazia]}”. Role a lista para carregar mais itens ou altere os filtros da busca (filtro só na tela).`
                 : 'Nenhum produto para exibir com o filtro atual.'}
             </p>
           </div>
         ) : (
-          <div className="bg-info rounded-lg overflow-hidden">
-            <div className="flex items-center h-11 gap-2 md:px-4 px-2 text-xs font-semibold text-primary-text uppercase tracking-wide bg-custom-2">
+          <FixedRowsScrollArea
+            ref={listaScrollRef}
+            visibleRows={12}
+            rowHeightPx={44}
+            className={activeTab === 'fiscal' ? 'overflow-x-auto' : undefined}
+            header={
+              <div
+                className={`flex items-center h-11 gap-3 md:px-4 px-2 text-xs font-semibold text-primary-text uppercase tracking-wide bg-custom-2 ${
+                  activeTab === 'fiscal' ? 'min-w-[1180px]' : ''
+                }`}
+              >
               <div className="flex-none md:w-10 w-6 flex justify-center">
                 <Checkbox
                   checked={todosSelecionados}
@@ -2640,29 +3457,49 @@ export function AtualizarPrecoLote() {
                   className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                 />
               </div>
-              <div className="flex-1 md:w-14 text-xs">Código</div>
-              <div className="flex-[1.5] text-xs">Nome</div>
+              <div className="w-14 shrink-0 text-xs md:w-16">Código</div>
+              <div className="min-w-0 flex-[1.4] text-xs">Nome</div>
+              {activeTab === 'permissoes' ? (
+                <div className="hidden w-[13.75rem] shrink-0 text-xs sm:block">Permissões</div>
+              ) : null}
+              <div className="hidden min-w-0 flex-1 text-xs md:block">Grupo</div>
               {activeTab === 'impressoras' ? (
-                <div className="flex-[1.2] text-center hidden md:flex">Impressoras</div>
+                <div className="hidden min-w-0 flex-[1.2] text-center text-xs md:block">Impressoras</div>
               ) : null}
               {activeTab === 'gruposComplementos' ? (
-                <div className="flex-[1.2] text-center hidden md:flex">Grupos Complementos</div>
+                <div className="hidden min-w-0 flex-[1.2] text-center text-xs md:block">
+                  Grupos Complementos
+                </div>
               ) : null}
               {activeTab === 'fiscal' ? (
-                <div className="hidden md:flex w-[80px] shrink-0 text-center text-xs leading-tight">NCM</div>
+                <>
+                  <div className="hidden md:flex w-[108px] shrink-0 text-center text-xs leading-tight">
+                    NCM
+                  </div>
+                  <div className="hidden lg:flex w-[168px] shrink-0 text-center text-xs leading-tight">
+                    CEST
+                  </div>
+                  <div className="hidden lg:flex w-[200px] shrink-0 text-center text-xs leading-tight">
+                    Origem
+                  </div>
+                  <div className="hidden lg:flex w-[200px] shrink-0 text-center text-xs leading-tight">
+                    Tipo
+                  </div>
+                  <div className="hidden lg:flex w-[220px] shrink-0 text-center text-xs leading-tight">
+                    Indic.
+                  </div>
+                  <div className="hidden md:flex w-[64px] shrink-0 text-center text-xs leading-tight">
+                    OK
+                  </div>
+                </>
               ) : null}
-              {/* Colunas CEST / Origem / Tipo / Indic. produção — ocultas até o backend retornar esses campos na listagem (descomente junto com filtros e células abaixo).
-              <div className="hidden lg:flex w-[64px] shrink-0 text-center text-xs leading-tight">CEST</div>
-              <div className="hidden lg:flex w-[52px] shrink-0 text-center text-xs leading-tight">Origem</div>
-              <div className="hidden lg:flex w-[40px] shrink-0 text-center text-xs leading-tight">Tipo</div>
-              <div className="hidden lg:flex min-w-0 w-[120px] shrink-0 text-center text-[10px] leading-tight px-0.5">
-                Indic. produção
+              {activeTab !== 'fiscal' ? (
+                <div className="w-24 shrink-0 text-right text-xs md:w-28">Valor atual</div>
+              ) : null}
               </div>
-              */}
-              <div className="md:flex-1 text-right text-xs">Valor atual</div>
-            </div>
-
-            <div className="flex flex-col gap-2 mt-2">
+            }
+          >
+            <div className={`flex flex-col gap-2 ${activeTab === 'fiscal' ? 'min-w-[1180px]' : ''}`}>
               {produtosExibicao
                 .slice()
                 .sort((a, b) => a.getNome().localeCompare(b.getNome(), 'pt-BR'))
@@ -2673,9 +3510,10 @@ export function AtualizarPrecoLote() {
                 const impressorasDoProduto = produto.getImpressoras()
                 // Usar diretamente os grupos de complementos que vêm do produto
                 const gruposComplementosDoProduto = produto.getGruposComplementos()
-                /* const fiscalOrigem = labelListaFiscal(produto.getOrigemMercadoria(), origensMercadoria)
-                const fiscalTipo = labelListaFiscal(produto.getTipoProduto(), tiposProduto)
-                const fiscalInd = celulaFiscalIndicador(produto.getIndicadorProducaoEscala()) */
+                const nomeGrupoProduto =
+                  produto.getNomeGrupo()?.trim() ||
+                  gruposProdutos.find(g => g.getId() === produto.getGrupoId())?.getNome() ||
+                  ''
                 // Cor: selecionado > alterado nesta aba (mesmo tom do hover da lista) > zebra
                 const bgColor = isSelected
                   ? foiAlteradoNaSessao
@@ -2688,11 +3526,15 @@ export function AtualizarPrecoLote() {
                       : 'bg-white'
                 const hoverRow = 'hover:bg-primary-bg'
                 const isExpanded = produtosExpandidos.has(produto.getId())
+                const salvandoEstaLinha = salvandoFiscalLinhaId === produto.getId()
+                const fiscalDraft =
+                  fiscalLinhaDrafts[produto.getId()] ?? fiscalLinhaDraftFromProduto(produto)
+                const fiscalDirty = fiscalLinhaDraftDirty(produto, fiscalDraft)
                 return (
                   <div key={produto.getId()} className="flex flex-col">
                     {/* Linha principal do produto */}
                     <div
-                      className={`flex rounded-lg items-center md:px-4 px-2 gap-2 ${bgColor} ${hoverRow} transition-colors cursor-default`}
+                      className={`flex rounded-lg items-center md:px-4 px-2 gap-3 ${bgColor} ${hoverRow} transition-colors cursor-default`}
                       style={{ minHeight: '36px' }}
                     >
                       <div className="flex-none md:w-10 w-6 flex justify-center">
@@ -2706,108 +3548,113 @@ export function AtualizarPrecoLote() {
                           className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                         />
                       </div>
-                      <div className="flex-1 md:w-24 font-mono text-xs text-secondary-text">
+                      <div className="w-14 shrink-0 text-xs text-secondary-text md:w-16">
                         {textoOuNenhum(String(produto.getCodigoProduto() ?? ''))}
                       </div>
-                      <div className="md:flex-[1.5] flex-[2] min-w-0 md:pr-4">
-                        <p className="break-words text-xs font-normal text-primary-text md:text-sm">
-                          {produto.getNome()}
+                      <div className="min-w-0 flex-[1.4]">
+                        {activeTab === 'fiscal' ? (
+                          <button
+                            type="button"
+                            onClick={e => {
+                              e.stopPropagation()
+                              openEdicaoProduto(produto)
+                            }}
+                            className="break-words text-left text-xs font-normal text-primary-text underline-offset-2 hover:text-primary hover:underline md:text-sm"
+                            title="Abrir edição do produto"
+                          >
+                            {produto.getNome()}
+                          </button>
+                        ) : (
+                          <p className="truncate text-xs font-normal text-primary-text md:text-sm">
+                            {produto.getNome()}
+                          </p>
+                        )}
+                        <p
+                          className="mt-0.5 truncate text-[11px] text-secondary-text md:hidden"
+                          title={nomeGrupoProduto || undefined}
+                        >
+                          {textoOuNenhum(nomeGrupoProduto)}
                         </p>
                         {activeTab === 'permissoes' ? (
-                          <ProdutoActionIconsDisplay produto={produto} />
+                          <div className="mt-1 sm:hidden">
+                            <ProdutoActionIconsDisplay produto={produto} />
+                          </div>
                         ) : null}
                       </div>
+                      {activeTab === 'permissoes' ? (
+                        <div className="hidden w-[13.75rem] shrink-0 items-center sm:flex">
+                          <ProdutoActionIconsDisplay produto={produto} />
+                        </div>
+                      ) : null}
+                      <div className="hidden min-w-0 flex-1 items-center md:flex">
+                        <span
+                          className="truncate text-xs text-primary-text"
+                          title={nomeGrupoProduto || undefined}
+                        >
+                          {textoOuNenhum(nomeGrupoProduto)}
+                        </span>
+                      </div>
                       {activeTab === 'impressoras' ? (
-                        <div className="flex-[1.2] justify-center hidden md:flex">
+                        <div className="flex-[1.2] hidden min-w-0 md:flex md:items-center">
                           {impressorasDoProduto.length === 0 ? (
                             <span className="text-xs text-secondary-text">Nenhum</span>
                           ) : (
-                            <select
-                              className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary cursor-pointer"
-                              defaultValue=""
-                              onChange={(event) => {
-                                event.currentTarget.value = ''
-                              }}
-                              onClick={(e) => e.stopPropagation()}
+                            <div
+                              className="flex w-full min-w-0 flex-wrap gap-1"
+                              title={impressorasDoProduto.map((i) => i.nome).join(', ')}
                             >
-                              <option value="" disabled>
-                                {impressorasDoProduto.length} impressora{impressorasDoProduto.length !== 1 ? 's' : ''}
-                              </option>
                               {impressorasDoProduto.map((impressora) => (
-                                <option key={impressora.id} value={impressora.id}>
+                                <span
+                                  key={impressora.id}
+                                  className="inline-flex max-w-full truncate rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium leading-tight text-primary-text"
+                                >
                                   {impressora.nome}
-                                </option>
+                                </span>
                               ))}
-                            </select>
+                            </div>
                           )}
                         </div>
                       ) : null}
                       {activeTab === 'gruposComplementos' ? (
-                        <div className="flex-[1.2] justify-center hidden md:flex">
+                        <div className="flex-[1.2] hidden min-w-0 md:flex md:items-center">
                           {gruposComplementosDoProduto.length === 0 ? (
                             <span className="text-xs text-secondary-text">Nenhum</span>
                           ) : (
-                            <select
-                              className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary cursor-pointer"
-                              defaultValue=""
-                              onChange={(event) => {
-                                event.currentTarget.value = ''
-                              }}
-                              onClick={(e) => e.stopPropagation()}
+                            <div
+                              className="flex w-full min-w-0 flex-wrap gap-1"
+                              title={gruposComplementosDoProduto.map((g) => g.nome).join(', ')}
                             >
-                              <option value="" disabled>
-                                {gruposComplementosDoProduto.length} grupo{gruposComplementosDoProduto.length !== 1 ? 's' : ''}
-                              </option>
                               {gruposComplementosDoProduto.map((grupo) => (
-                                <option key={grupo.id} value={grupo.id}>
+                                <span
+                                  key={grupo.id}
+                                  className="inline-flex max-w-full truncate rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium leading-tight text-primary-text"
+                                >
                                   {grupo.nome}
-                                </option>
+                                </span>
                               ))}
-                            </select>
+                            </div>
                           )}
                         </div>
                       ) : null}
                       {activeTab === 'fiscal' ? (
-                        <div className="hidden md:flex w-[80px] shrink-0 justify-center font-mono text-[11px] text-primary-text px-0.5">
-                          <span className="truncate" title={produto.getNcm() || undefined}>
-                            {textoOuNenhum(produto.getNcm())}
-                          </span>
+                        <ProdutoFiscalCelulasEditaveis
+                          produto={produto}
+                          variant="desktop"
+                          draft={fiscalDraft}
+                          onDraftChange={(campo, valor) =>
+                            atualizarDraftFiscalLinha(produto.getId(), campo, valor)
+                          }
+                          disabled={isSalvandoFiscal}
+                          salvando={salvandoEstaLinha}
+                          dirty={fiscalDirty}
+                          onConfirmar={() => void salvarFiscalLinha(produto)}
+                        />
+                      ) : null}
+                      {activeTab !== 'fiscal' ? (
+                        <div className="w-24 shrink-0 text-right text-xs font-normal text-primary-text md:w-28 md:text-sm">
+                          {transformarParaReal(produto.getValor())}
                         </div>
                       ) : null}
-                      {/* CEST / Origem / Tipo / Indic. — ver cabeçalho da grade
-                      <div className="hidden lg:flex w-[64px] shrink-0 justify-center font-mono text-[11px] text-primary-text px-0.5">
-                        <span className="truncate" title={produto.getCest() || undefined}>
-                          {textoOuNenhum(produto.getCest())}
-                        </span>
-                      </div>
-                      <div className="hidden lg:flex w-[52px] shrink-0 justify-center px-0.5">
-                        <span
-                          className="truncate text-center text-[11px] text-primary-text"
-                          title={fiscalOrigem.title || undefined}
-                        >
-                          {fiscalOrigem.curto}
-                        </span>
-                      </div>
-                      <div className="hidden lg:flex w-[40px] shrink-0 justify-center px-0.5">
-                        <span
-                          className="truncate text-center text-[11px] text-primary-text"
-                          title={fiscalTipo.title || undefined}
-                        >
-                          {fiscalTipo.curto}
-                        </span>
-                      </div>
-                      <div className="hidden lg:flex min-w-0 w-[120px] shrink-0 justify-center px-0.5">
-                        <span
-                          className="truncate text-center text-[11px] text-primary-text"
-                          title={fiscalInd.title || undefined}
-                        >
-                          {fiscalInd.curto}
-                        </span>
-                      </div>
-                      */}
-                      <div className="flex-1 text-right font-normal md:text-sm text-xs text-primary-text">
-                        {transformarParaReal(produto.getValor())}
-                      </div>
                       {(activeTab === 'impressoras' ||
                         activeTab === 'gruposComplementos' ||
                         activeTab === 'fiscal') && (
@@ -2817,7 +3664,9 @@ export function AtualizarPrecoLote() {
                             e.stopPropagation()
                             toggleExpansao(produto.getId())
                           }}
-                          className="md:hidden flex items-center justify-center w-8 h-8 rounded-lg hover:bg-primary/10 transition-colors"
+                          className={`flex items-center justify-center w-8 h-8 rounded-lg hover:bg-primary/10 transition-colors ${
+                            activeTab === 'fiscal' ? 'lg:hidden' : 'md:hidden'
+                          }`}
                           aria-label={isExpanded ? 'Ocultar detalhes' : 'Expandir detalhes'}
                         >
                           {isExpanded ? (
@@ -2836,27 +3685,22 @@ export function AtualizarPrecoLote() {
                           }`}
                         >
                           <div className="flex flex-col gap-1">
-                            <label className="text-xs font-semibold text-secondary-text">Impressoras</label>
+                            <label className="text-xs font-semibold text-secondary-text">
+                              Impressoras
+                            </label>
                             {impressorasDoProduto.length === 0 ? (
                               <span className="text-xs text-secondary-text">Nenhum</span>
                             ) : (
-                              <select
-                                className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary cursor-pointer"
-                                defaultValue=""
-                                onChange={(event) => {
-                                  event.currentTarget.value = ''
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <option value="" disabled>
-                                  {impressorasDoProduto.length} impressora{impressorasDoProduto.length !== 1 ? 's' : ''}
-                                </option>
+                              <div className="flex flex-wrap gap-1">
                                 {impressorasDoProduto.map((impressora) => (
-                                  <option key={impressora.id} value={impressora.id}>
+                                  <span
+                                    key={impressora.id}
+                                    className="inline-flex max-w-full truncate rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium leading-tight text-primary-text"
+                                  >
                                     {impressora.nome}
-                                  </option>
+                                  </span>
                                 ))}
-                              </select>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -2869,27 +3713,22 @@ export function AtualizarPrecoLote() {
                           }`}
                         >
                           <div className="flex flex-col gap-1">
-                            <label className="text-xs font-semibold text-secondary-text">Grupos de Complementos</label>
+                            <label className="text-xs font-semibold text-secondary-text">
+                              Grupos de Complementos
+                            </label>
                             {gruposComplementosDoProduto.length === 0 ? (
                               <span className="text-xs text-secondary-text">Nenhum</span>
                             ) : (
-                              <select
-                                className="w-full h-8 px-2 rounded-lg border border-gray-200 bg-white text-xs text-primary-text focus:outline-none focus:border-primary cursor-pointer"
-                                defaultValue=""
-                                onChange={(event) => {
-                                  event.currentTarget.value = ''
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <option value="" disabled>
-                                  {gruposComplementosDoProduto.length} grupo{gruposComplementosDoProduto.length !== 1 ? 's' : ''}
-                                </option>
+                              <div className="flex flex-wrap gap-1">
                                 {gruposComplementosDoProduto.map((grupo) => (
-                                  <option key={grupo.id} value={grupo.id}>
+                                  <span
+                                    key={grupo.id}
+                                    className="inline-flex max-w-full truncate rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium leading-tight text-primary-text"
+                                  >
                                     {grupo.nome}
-                                  </option>
+                                  </span>
                                 ))}
-                              </select>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -2897,18 +3736,47 @@ export function AtualizarPrecoLote() {
                     {isExpanded &&
                       activeTab === 'fiscal' && (
                         <div
-                          className={`md:hidden px-2 pb-2 pt-1 border-b border-gray-200 ${
+                          className={`px-2 pb-2 pt-1 border-b border-gray-200 md:hidden ${
                             foiAlteradoNaSessao ? 'bg-primary-bg' : 'bg-gray-50'
                           }`}
                         >
-                          <div className="flex flex-col gap-1">
-                            <label className="text-xs font-semibold text-secondary-text">NCM</label>
-                            <span className="font-mono text-xs text-primary-text">
-                              {textoOuNenhum(produto.getNcm())}
-                            </span>
-                          </div>
+                          <ProdutoFiscalCelulasEditaveis
+                            produto={produto}
+                            variant="mobile"
+                            draft={fiscalDraft}
+                            onDraftChange={(campo, valor) =>
+                              atualizarDraftFiscalLinha(produto.getId(), campo, valor)
+                            }
+                            disabled={isSalvandoFiscal}
+                            salvando={salvandoEstaLinha}
+                            dirty={fiscalDirty}
+                            onConfirmar={() => void salvarFiscalLinha(produto)}
+                          />
                         </div>
                       )}
+                    {isExpanded && activeTab === 'fiscal' ? (
+                      <div
+                        className={`hidden md:block lg:hidden px-4 pb-2 pt-1 border-b border-gray-200 ${
+                          foiAlteradoNaSessao ? 'bg-primary-bg' : 'bg-gray-50'
+                        }`}
+                      >
+                        <p className="mb-2 text-xs text-secondary-text">
+                          CEST, origem, tipo e indicador:
+                        </p>
+                        <ProdutoFiscalCelulasEditaveis
+                          produto={produto}
+                          variant="mobile"
+                          draft={fiscalDraft}
+                          onDraftChange={(campo, valor) =>
+                            atualizarDraftFiscalLinha(produto.getId(), campo, valor)
+                          }
+                          disabled={isSalvandoFiscal}
+                          salvando={salvandoEstaLinha}
+                          dirty={fiscalDirty}
+                          onConfirmar={() => void salvarFiscalLinha(produto)}
+                        />
+                      </div>
+                    ) : null}
                   </div>
                 )
               })}
@@ -2921,7 +3789,7 @@ export function AtualizarPrecoLote() {
                 </div>
               ) : null}
             </div>
-          </div>
+          </FixedRowsScrollArea>
         )}
       </div>
 
@@ -2933,7 +3801,7 @@ export function AtualizarPrecoLote() {
           aria-live="polite"
         >
           <JiffyLoading />
-          <p className="text-center font-nunito text-sm font-medium text-white">
+          <p className="text-center text-sm font-medium text-white">
             {isSalvandoFiscal
               ? salvandoFiscalProgresso
                 ? `Salvando dados fiscais (${salvandoFiscalProgresso.atual}/${salvandoFiscalProgresso.total})...`
@@ -2944,6 +3812,13 @@ export function AtualizarPrecoLote() {
           </p>
         </div>
       ) : null}
+
+      <ProdutosTabsModal
+        state={tabsModalState}
+        onClose={closeEdicaoProduto}
+        onReload={handleEdicaoProdutoReload}
+        onTabChange={tab => setTabsModalState(prev => ({ ...prev, tab }))}
+      />
     </div>
   )
 }

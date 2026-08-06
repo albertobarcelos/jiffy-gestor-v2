@@ -10,9 +10,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
  * Replica o design e funcionalidades do Flutter
  */
 export function FechamentosList() {
-  const router = useRouter()
-  const { auth } = useAuthStore()
-  const [fechamentos, setFechamentos] = useState<FechamentoCaixa[]>([])
+  const router = useRouter()  const [fechamentos, setFechamentos] = useState<FechamentoCaixa[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [hasNextPage, setHasNextPage] = useState(true)
   const [offset, setOffset] = useState(0)
@@ -39,7 +37,7 @@ export function FechamentosList() {
 
   const loadFechamentos = useCallback(
     async (reset: boolean = false) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return
 
       if (isLoadingRef.current || (!hasNextPageRef.current && !reset)) return
@@ -77,7 +75,7 @@ export function FechamentosList() {
         isLoadingRef.current = false
       }
     },
-    [auth, filtroPeriodo]
+    [ filtroPeriodo]
   )
 
   // Scroll infinito
@@ -103,7 +101,7 @@ export function FechamentosList() {
 
   // Carrega fechamentos quando o filtro muda
   useEffect(() => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
     loadFechamentos(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -132,13 +130,13 @@ export function FechamentosList() {
         {/* Header com filtro */}
         <div className="mb-6">
           <div className="h-[42px] bg-white/20 flex items-center justify-between px-4">
-            <p className="text-primary text-sm font-semibold font-exo">
+            <p className="text-primary text-sm font-semibold ">
               Fechamentos | {filtroPeriodo}
             </p>
             <select
               value={filtroPeriodo}
               onChange={(e) => setFiltroPeriodo(e.target.value as any)}
-              className="h-9 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text text-sm font-nunito focus:outline-none focus:border-primary"
+              className="h-9 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text text-sm focus:outline-none focus:border-primary"
             >
               <option value="Semana">Semana</option>
               <option value="15 Dias">15 Dias</option>

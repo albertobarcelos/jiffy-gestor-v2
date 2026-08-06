@@ -22,7 +22,7 @@ export function EscolhaTipoPedidoModal({ open, onClose, onSelect }: EscolhaTipoP
     <Dialog open={open} onOpenChange={isOpen => !isOpen && onClose()}>
       <DialogContent sx={{ maxWidth: 480, padding: '0px 24px 24px 24px' }}>
         <div className="flex items-center justify-between">
-          <h1 className="text-primary font-exo py-4 text-lg font-semibold sm:text-2xl">
+          <h1 className="text-primary py-4 text-lg font-semibold sm:text-2xl">
             Novo Pedido
           </h1>
           <button

@@ -18,14 +18,15 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { useInfiniteQuery } from '@tanstack/react-query'
+import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecureTenantInfiniteQuery'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { ProdutosTabsModal, ProdutosTabsModalState } from '../produtos/ProdutosTabsModal'
 import { Produto } from '@/src/domain/entities/Produto'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { MdEdit } from 'react-icons/md'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { MdKeyboardArrowDown, MdKeyboardArrowUp } from 'react-icons/md'
 
 interface ProdutoGrupo {
   id: string
@@ -49,7 +50,6 @@ interface ProdutosPorGrupoListProps {
 const PAGE_SIZE = 10
 
 export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListProps) {
-  const { auth } = useAuthStore()
   const [localProdutos, setLocalProdutos] = useState<ProdutoGrupo[]>([])
   const [tabsModalState, setTabsModalState] = useState<ProdutosTabsModalState>({
     open: false,
@@ -94,12 +94,10 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
     isLoading,
     error,
     refetch,
-  } = useInfiniteQuery<ProdutosResponse>({
-    queryKey: ['produtos-por-grupo', grupoProdutoId],
-    initialPageParam: 0,
-    enabled: !!grupoProdutoId,
-    queryFn: async ({ pageParam }) => {
-      const res = await fetch(
+  } = useSecureTenantInfiniteQuery<ProdutosResponse, number>(
+    ['produtos-por-grupo', grupoProdutoId],
+    async (_ctx, pageParam) => {
+      const res = await fetchGestorApi(
         `/api/grupos-produtos/${grupoProdutoId}/produtos?limit=${PAGE_SIZE}&offset=${pageParam}`
       )
 
@@ -110,11 +108,15 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
 
       return res.json()
     },
-    getNextPageParam: (lastPage) =>
-      lastPage.hasMore && typeof lastPage.nextOffset === 'number'
-        ? lastPage.nextOffset
-        : undefined,
-  })
+    {
+      initialPageParam: 0,
+      enabled: !!grupoProdutoId,
+      getNextPageParam: lastPage =>
+        lastPage.hasMore && typeof lastPage.nextOffset === 'number'
+          ? lastPage.nextOffset
+          : undefined,
+    }
+  )
 
   const serverProdutos = useMemo(() => {
     return data?.pages.flatMap((page) => page.items || []) ?? []
@@ -241,14 +243,14 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
 
   const handleEditProduto = useCallback(
     async (produtoId: string) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
       }
 
       try {
-        const response = await fetch(`/api/produtos/${produtoId}`, {
+        const response = await fetchGestorApi(`/api/produtos/${produtoId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -276,7 +278,38 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
         showToast.error(err instanceof Error ? err.message : 'Erro ao carregar produto')
       }
     },
-    [auth]
+    []
+  )
+
+  const persistNovaOrdem = useCallback(
+    async (updatedState: ProdutoGrupo[], movedId: string, newIndex: number, previousState: ProdutoGrupo[]) => {
+      setLocalProdutos(updatedState)
+      previousLocalProdutosRef.current = updatedState
+
+      try {
+        const response = await fetchGestorApi(`/api/produtos/${movedId}/reordena-produto`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ novaPosicao: newIndex + 1 }),
+        })
+
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}))
+          throw new Error(body.message || 'Erro ao reordenar produto')
+        }
+
+        showToast.success('Ordem do produto atualizada com sucesso!')
+        refetch()
+      } catch (err: unknown) {
+        console.error('Erro ao reordenar produto:', err)
+        setLocalProdutos(previousState)
+        previousLocalProdutosRef.current = previousState
+        showToast.error(err instanceof Error ? err.message : 'Erro ao reordenar produto')
+      }
+    },
+    [refetch]
   )
 
   const handleDragEnd = useCallback(
@@ -296,34 +329,24 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
 
       const previousState = [...localProdutos]
       const updatedState = arrayMove([...localProdutos], oldIndex, newIndex)
-      setLocalProdutos(updatedState)
-      previousLocalProdutosRef.current = updatedState
-
-      const novaPosicao = newIndex + 1
-      try {
-        const response = await fetch(`/api/produtos/${active.id}/reordena-produto`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ novaPosicao }),
-        })
-
-        if (!response.ok) {
-          const body = await response.json().catch(() => ({}))
-          throw new Error(body.message || 'Erro ao reordenar produto')
-        }
-
-        showToast.success('Ordem do produto atualizada com sucesso!')
-        refetch()
-      } catch (err: any) {
-        console.error('Erro ao reordenar produto:', err)
-        setLocalProdutos(previousState)
-        previousLocalProdutosRef.current = previousState
-        showToast.error(err?.message || 'Erro ao reordenar produto')
-      }
+      await persistNovaOrdem(updatedState, String(active.id), newIndex, previousState)
     },
-    [localProdutos, refetch]
+    [localProdutos, persistNovaOrdem]
+  )
+
+  const handleMoveProduto = useCallback(
+    async (produtoId: string, direction: 'up' | 'down') => {
+      const oldIndex = localProdutos.findIndex((produto) => produto.id === produtoId)
+      if (oldIndex === -1) return
+
+      const newIndex = direction === 'up' ? oldIndex - 1 : oldIndex + 1
+      if (newIndex < 0 || newIndex >= localProdutos.length) return
+
+      const previousState = [...localProdutos]
+      const updatedState = arrayMove([...localProdutos], oldIndex, newIndex)
+      await persistNovaOrdem(updatedState, produtoId, newIndex, previousState)
+    },
+    [localProdutos, persistNovaOrdem]
   )
 
   if (error) {
@@ -346,7 +369,7 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
   if (!isLoading && localProdutos.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-secondary-text text-sm font-nunito">
+        <p className="text-secondary-text text-sm ">
           Nenhum produto associado a este grupo.
         </p>
       </div>
@@ -356,42 +379,39 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
   return (
     <>
       <div className="flex min-h-0 flex-1 flex-col mx-1 bg-white overflow-hidden">
-        <div className="mb-1 flex flex-row items-center justify-between">
-          <div className="flex flex-col items-start">
-          <h2 className="shrink-0 text-primary md:text-xl text-sm font-semibold">
-            Produtos vinculados ao grupo
+        <div className="mb-2 flex flex-wrap items-center gap-3 md:gap-5">
+          <h2 className="shrink-0 text-primary text-sm font-semibold md:text-xl">
+            Produtos
+            <span className="ml-1.5 tabular-nums text-primary/70">
+              ({data?.pages[0]?.count ?? localProdutos.length})
+            </span>
           </h2>
-          <p className="md:text-sm text-xs text-secondary-text">
-            Arraste para reordenar a posição dos produtos
-          </p>
-          </div>
-              <button
-                type="button"
-                onClick={handleOpenNovoProdutoModal}
-                className="md:h-8 md:px-[10px] px-2 py-1 md:py-0 bg-primary text-info rounded-lg font-semibold font-exo md:text-sm text-xs flex items-center gap-2 hover:bg-primary/90 transition-colors"
-              >
-                Novo produto
-              </button>
+          <div className="h-px min-w-[2rem] flex-1 bg-primary/70" aria-hidden />
+          <button
+            type="button"
+            onClick={handleOpenNovoProdutoModal}
+            className="flex shrink-0 items-center gap-2 rounded-lg bg-primary px-2 py-1 text-xs font-semibold text-info transition-colors hover:bg-primary/90 md:h-8 md:px-[10px] md:text-sm"
+          >
+            Novo produto
+          </button>
         </div>
-        <div className="h-[1px] border-t border-primary/70"></div>
 
-        <div className="mt-1 px-2 py-3 bg-custom-2 rounded-lg grid grid-cols-12 text-sm font-semibold text-primary-text">
-          <div className="col-span-1">#</div>
-          <div className="col-span-6">Produto</div>
-          <div className="col-span-3">Valor</div>
-          <div className="col-span-2 text-right pr-5">Ordenar</div>
+        <div className="mt-1 grid grid-cols-[minmax(0,1fr)_5.5rem_5.5rem] items-center gap-3 rounded-lg bg-custom-2 px-2 py-2 text-xs font-semibold text-secondary-text md:grid-cols-[minmax(0,1fr)_5.5rem_6.5rem] md:text-sm">
+          <span>Produto</span>
+          <span className="text-right">Valor</span>
+          <span className="text-center">Ordem</span>
         </div>
 
         <div
           ref={listRef}
-          className="min-h-0 flex-1 overflow-y-auto md:px-6 px-1 py-2 space-y-2 [&::-webkit-scrollbar]:hidden"
+          className="min-h-0 flex-1 overflow-y-auto px-1 py-2 space-y-1 [&::-webkit-scrollbar]:hidden md:px-2"
           style={{
-            scrollbarWidth: 'none', // Firefox
-            msOverflowStyle: 'none', // Edge legado
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
           }}
         >
           {isLoading && localProdutos.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-8 gap-2">
+            <div className="flex flex-col items-center justify-center gap-2 py-8">
               <JiffyLoading />
             </div>
           )}
@@ -410,8 +430,10 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
                   key={produto.id}
                   produto={produto}
                   index={index}
+                  total={localProdutos.length}
                   formatCurrency={formatCurrency}
                   onEdit={handleEditProduto}
+                  onMove={handleMoveProduto}
                 />
               ))}
             </SortableContext>
@@ -421,7 +443,7 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
             <div ref={loadMoreRef} className="py-4">
               {isFetchingNextPage && (
                 <div className="flex justify-center">
-                  <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                 </div>
               )}
             </div>
@@ -433,15 +455,11 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
         state={tabsModalState}
         onClose={handleCloseTabsModal}
         onReload={(produtoId?: string, produtoData?: any) => {
-          // Se temos dados do produto, podemos atualizar o cache local
-          // Caso contrário, apenas refaz a requisição
           if (produtoId && produtoData) {
-            // Atualizar produto na lista local se estiver presente
             setLocalProdutos((prev) =>
               prev.map((p) => (p.id === produtoId ? { ...p, ...produtoData } : p))
             )
           }
-          // Sempre refaz a requisição para garantir sincronização
           refetch()
         }}
         onTabChange={handleTabsModalTabChange}
@@ -453,13 +471,17 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
 function ProdutoItem({
   produto,
   index,
+  total,
   formatCurrency,
   onEdit,
+  onMove,
 }: {
   produto: ProdutoGrupo
   index: number
+  total: number
   formatCurrency: (value: number) => string
   onEdit: (produtoId: string) => void
+  onMove: (produtoId: string, direction: 'up' | 'down') => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: produto.id,
@@ -470,47 +492,71 @@ function ProdutoItem({
     transition,
   }
 
+  const canMoveUp = index > 0
+  const canMoveDown = index < total - 1
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`grid grid-cols-12 gap-3 items-center rounded-lg py-2 transition ${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
-        } ${isDragging ? 'opacity-50 ring-2 ring-primary/40' : ''}`}
+      className={`grid grid-cols-[minmax(0,1fr)_5.5rem_5.5rem] items-center gap-3 rounded-lg px-2 py-2 transition md:grid-cols-[minmax(0,1fr)_5.5rem_6.5rem] ${
+        index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
+      } ${isDragging ? 'opacity-50 ring-2 ring-primary/40' : ''}`}
     >
-      <div className="col-span-1 md:text-sm text-xs font-semibold text-primary-text">{index + 1}</div>
-      <div className="col-span-6 md:text-sm text-xs text-primary-text whitespace-normal break-words">
-        <div className="flex items-center uppercase gap-2">
-          <span>{produto.nome}</span>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onEdit(produto.id)
-            }}
-            className="text-primary hover:text-primary/80 transition-colors"
-            aria-label={`Editar ${produto.nome}`}
-            title="Editar produto"
-          >
-            <MdEdit size={16} />
-          </button>
-        </div>
-      </div>
-      <div className="col-span-3 md:text-sm text-xs text-primary-text">{formatCurrency(produto.valor)}</div>
-      <div
-        className="col-span-2 flex justify-end pr-2 cursor-grab active:cursor-grabbing text-secondary-text hover:text-primary active:text-primary transition touch-manipulation min-h-[35px] items-center"
-        {...attributes}
-        {...listeners}
-        style={{ touchAction: 'none' }}
-        title="Arraste para reordenar"
+      <button
+        type="button"
+        onClick={() => onEdit(produto.id)}
+        className="min-w-0 truncate text-left text-xs font-medium uppercase text-primary-text hover:text-primary hover:underline md:text-sm"
+        title="Editar produto"
       >
-        <svg
-          className="md:w-5 md:h-5 w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
+        {produto.nome}
+      </button>
+      <div className="text-right text-xs tabular-nums text-primary-text md:text-sm">
+        {formatCurrency(produto.valor)}
+      </div>
+      <div className="flex items-center justify-end gap-0.5">
+        <span className="mr-0.5 w-4 text-center text-[11px] tabular-nums text-secondary-text">
+          {index + 1}
+        </span>
+        <button
+          type="button"
+          onClick={() => onMove(produto.id, 'up')}
+          disabled={!canMoveUp}
+          className="rounded p-0.5 text-secondary-text transition hover:bg-primary/10 hover:text-primary disabled:cursor-not-allowed disabled:opacity-30"
+          aria-label={`Subir ${produto.nome}`}
+          title="Subir"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 9h16M4 15h16" />
-        </svg>
+          <MdKeyboardArrowUp size={18} />
+        </button>
+        <button
+          type="button"
+          onClick={() => onMove(produto.id, 'down')}
+          disabled={!canMoveDown}
+          className="rounded p-0.5 text-secondary-text transition hover:bg-primary/10 hover:text-primary disabled:cursor-not-allowed disabled:opacity-30"
+          aria-label={`Descer ${produto.nome}`}
+          title="Descer"
+        >
+          <MdKeyboardArrowDown size={18} />
+        </button>
+        <button
+          type="button"
+          className="cursor-grab touch-manipulation rounded border border-gray-200 bg-white p-1 text-secondary-text transition hover:border-primary/40 hover:text-primary active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
+          style={{ touchAction: 'none' }}
+          title="Arrastar para reordenar"
+          aria-label={`Arrastar ${produto.nome}`}
+        >
+          <svg
+            className="h-3.5 w-3.5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 9h16M4 15h16" />
+          </svg>
+        </button>
       </div>
     </div>
   )

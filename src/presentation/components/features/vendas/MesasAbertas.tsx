@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { MdAttachMoney, MdRestaurant, MdPrint } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { DetalhesVendas } from './DetalhesVendas'
@@ -56,9 +57,7 @@ const DUR_MAX_MS = 2 * 60 * 60 * 1000 // 2 horas
  * Componente de listagem de mesas em aberto
  * Exibe apenas mesas (não balcão) com scroll infinito e cards de métricas
  */
-export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
-  const { auth } = useAuthStore()
-
+export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
   const [vendas, setVendas] = useState<Venda[]>([])
   const [metricas, setMetricas] = useState<MetricasVendas | null>(null)
   const [usuariosPDV, setUsuariosPDV] = useState<UsuarioPDV[]>([])
@@ -245,7 +244,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
    * Carrega todos os usuários PDV
    */
   const loadAllUsuariosPDV = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     try {
@@ -260,7 +259,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
           offset: currentOffset.toString(),
         })
 
-        const response = await fetch(`/api/usuarios?${params.toString()}`, {
+        const response = await fetchGestorApi(`/api/usuarios?${params.toString()}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -286,20 +285,20 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
     } finally {
       //setIsLoadingUsuariosPDV(false) // Não temos este estado, mas manter para referência
     }
-  }, [auth])
+  }, [])
 
   /**
    * Busca nome do cliente dado o clienteId (usa mesmo endpoint de VisualizarCliente).
    */
   const fetchNomesClientes = useCallback(
     async (clienteIds: string[]) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token || clienteIds.length === 0) return
 
       const results = await Promise.all(
         clienteIds.map(async clienteId => {
           try {
-            const response = await fetch(`/api/clientes/${clienteId}`, {
+            const response = await fetchGestorApi(`/api/clientes/${clienteId}`, {
               headers: {
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',
@@ -330,7 +329,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
         return next
       })
     },
-    [auth]
+    []
   )
 
   /**
@@ -339,13 +338,13 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
    */
   const fetchClienteIdPorVenda = useCallback(
     async (ids: string[]) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token || ids.length === 0) return
 
       const results = await Promise.all(
         ids.map(async id => {
           try {
-            const response = await fetch(`/api/vendas/${id}`, {
+            const response = await fetchGestorApi(`/api/vendas/${id}`, {
               headers: {
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',
@@ -370,7 +369,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
         return next
       })
     },
-    [auth]
+    []
   )
 
   /**
@@ -378,7 +377,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
    */
   const fetchVendas = useCallback(
     async (resetPage = false, filterWithoutMovement: boolean = apenasSemMovimentacao) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return
 
       if (resetPage) {
@@ -398,7 +397,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
           tipoVenda: 'mesa', // Filtro fixo: apenas mesas
         })
 
-        const response = await fetch(`/api/vendas?${params.toString()}`, {
+        const response = await fetchGestorApi(`/api/vendas?${params.toString()}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -507,7 +506,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
         setHasLoadedOnce(true)
       }
     },
-    [auth, apenasSemMovimentacao]
+    [ apenasSemMovimentacao]
   )
 
   // Scroll infinito
@@ -596,12 +595,12 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
 
   // Efeito para carregar dados auxiliares e iniciar a busca de vendas
   useEffect(() => {
-    if (!auth || !cachesHydrated) return
+    if (!useAuthStore.getState().tenantAuth || !cachesHydrated) return
 
     loadAllUsuariosPDV()
     fetchVendas(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auth, cachesHydrated, apenasSemMovimentacao])
+  }, [ cachesHydrated, apenasSemMovimentacao])
 
   return (
     <div className="flex h-full max-h-[calc(100vh-100px)] flex-col overflow-hidden">
@@ -612,7 +611,7 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
               Todas as Mesas Abertas
             </p>
             <div className="flex items-center justify-end gap-2">
-          <label className="font-nunito flex items-center gap-2 text-xs text-primary-text md:text-sm">
+          <label className="flex items-center gap-2 text-xs text-primary-text md:text-sm">
             <input
               type="checkbox"
               checked={apenasSemMovimentacao}
@@ -642,10 +641,10 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
               />
             </div>
             <div className="flex flex-1 flex-col items-center justify-between md:items-end">
-              <span className="font-nunito text-center text-[10px] text-secondary-text md:text-end md:text-xs">
+              <span className="text-center text-[10px] text-secondary-text md:text-end md:text-xs">
                 Mesas Abertas
               </span>
-              <span className="font-exo text-lg text-primary md:text-[22px]">
+              <span className="text-lg text-primary md:text-[22px]">
                 {metricas?.countVendasEfetivadas || 0}
               </span>
             </div>
@@ -659,10 +658,10 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
               </span>
             </div>
             <div className="flex flex-1 flex-col items-center justify-between md:items-end">
-              <span className="font-nunito text-center text-[10px] text-secondary-text md:text-xs">
+              <span className="text-center text-[10px] text-secondary-text md:text-xs">
                 Total de Produtos vendidos
               </span>
-              <span className="font-exo text-lg text-primary md:text-[22px]">
+              <span className="text-lg text-primary md:text-[22px]">
                 {metricas?.countProdutosVendidos || 0}
               </span>
             </div>
@@ -676,10 +675,10 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
               </span>
             </div>
             <div className="flex flex-1 flex-col items-center justify-between md:items-end">
-              <span className="font-nunito text-center text-[10px] text-secondary-text md:text-xs">
+              <span className="text-center text-[10px] text-secondary-text md:text-xs">
                 Total à faturar
               </span>
-              <span className="font-exo text-lg text-primary md:text-[22px]">
+              <span className="text-lg text-primary md:text-[22px]">
                 {metricas?.totalFaturado ? formatCurrency(metricas.totalFaturado) : 'R$ 0,00'}
               </span>
             </div>
@@ -818,22 +817,22 @@ export function MesasAbertas({ initialPeriodo }: MesasAbertasProps) {
                       title={movimentoTooltip}
                     />
                     {clienteNome ? (
-                      <span className="font-nunito text-xs font-semibold text-primary-text">
+                      <span className="text-xs font-semibold text-primary-text">
                         {clienteNome}
                       </span>
                     ) : (
-                      <span className="font-nunito text-xs text-info">-</span>
+                      <span className="text-xs text-info">-</span>
                     )}
                   </div>
 
                   <div className="mb-4 flex w-full flex-col items-start px-2">
                     <div className="flex flex-col items-start md:flex-row md:items-center">
-                      <span className="font-nunito text-xs font-semibold text-primary-text">
+                      <span className="text-xs font-semibold text-primary-text">
                         Usuário
                       </span>{' '}
                       <span className="text-xs font-normal">: {usuarioNome}</span>
                     </div>
-                    <div className="font-nunito mt-1 flex w-full justify-between text-xs text-primary-text">
+                    <div className="mt-1 flex w-full justify-between text-xs text-primary-text">
                       <div className="flex flex-col items-start">
                         <span className="font-semibold">Valor atual</span>
                         <span>{formatCurrency(venda.valorFinal)}</span>

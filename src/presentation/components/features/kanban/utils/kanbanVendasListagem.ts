@@ -43,7 +43,7 @@ export function filtrarPedidosDeliveryKanbanPorDatasToolbar(
 /**
  * Filtro de datas da toolbar por coluna delivery.
  * - Operacionais: filtram por data de CRIAÇÃO (mesmo critério da API dessas colunas).
- * - Fiscais (FINALIZADAS / COM_NFE): filtram só por data de FINALIZAÇÃO. Aplicar criação aqui
+ * - Fiscais (FINALIZADAS / COM_FISCAL): filtram só por data de FINALIZAÇÃO. Aplicar criação aqui
  *   esconderia um pedido finalizado no período mas criado antes dele (ex.: criado ontem,
  *   finalizado hoje), divergindo da contagem (que conta todos os finalizados do período).
  */
@@ -57,7 +57,7 @@ export function filtrarVendaDeliveryKanbanColunaPorDatasToolbar(
   const isColunaFiscal =
     columnId === 'FINALIZADAS' ||
     columnId === 'PENDENTE_EMISSAO' ||
-    columnId === 'COM_NFE'
+    columnId === 'COM_FISCAL'
 
   if (!temFiltroCriacao && !temFiltroFinalizacao) return true
 

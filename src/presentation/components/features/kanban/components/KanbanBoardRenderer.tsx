@@ -125,7 +125,7 @@ export function KanbanBoardRenderer({
                   onToggleDirecaoOrdenacao={onToggleDirecaoOrdenacao}
                   onColumnScroll={onColumnScroll}
                   columnRodape={
-                    colId === 'PENDENTE_EMISSAO' &&
+                    colId === 'REJEITADAS' &&
                     reemissaoEmLote?.exibirBarraReemissaoEmLote ? (
                       <KanbanReemissaoEmLoteBar
                         totalElegiveis={reemissaoEmLote.totalElegiveisVisiveis}

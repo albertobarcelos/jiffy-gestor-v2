@@ -188,9 +188,7 @@ export function usePedidosDeliveryKanbanColumns(
   options?: PedidosDeliveryInfiniteOptions & {
     getEtapaKanban?: (v: VendaUnificadaDTO) => string
   }
-) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
+) {  const token = useAuthStore.getState().tenantAuth?.getAccessToken()
   const empresaId = useTenantEmpresaId()
   const queryClient = useQueryClient()
 
@@ -216,7 +214,7 @@ export function usePedidosDeliveryKanbanColumns(
   const prontoQuery = usePedidosDeliveryKanbanColumnInfinite('PRONTO_ENTREGA', params, columnInfiniteOptions)
   const rotaQuery = usePedidosDeliveryKanbanColumnInfinite('EM_ROTA', params, columnInfiniteOptions)
   const finalizadasQuery = usePedidosDeliveryKanbanColumnInfinite('FINALIZADAS', params, columnInfiniteOptions)
-  const comNfeQuery = usePedidosDeliveryKanbanColumnInfinite('COM_NFE', params, columnInfiniteOptions)
+  const comFiscalQuery = usePedidosDeliveryKanbanColumnInfinite('COM_FISCAL', params, columnInfiniteOptions)
 
   const queryByColumn: Record<ColunaKanbanId, typeof novosQuery> = {
     NOVOS_PEDIDOS: novosQuery,
@@ -225,7 +223,8 @@ export function usePedidosDeliveryKanbanColumns(
     EM_ROTA: rotaQuery,
     FINALIZADAS: finalizadasQuery,
     PENDENTE_EMISSAO: finalizadasQuery,
-    COM_NFE: comNfeQuery,
+    COM_FISCAL: comFiscalQuery,
+    REJEITADAS: comFiscalQuery,
   }
 
   const queryByColumnRef = useRef(queryByColumn)
@@ -270,7 +269,7 @@ export function usePedidosDeliveryKanbanColumns(
     prontoQuery.data,
     rotaQuery.data,
     finalizadasQuery.data,
-    comNfeQuery.data,
+    comFiscalQuery.data,
   ])
 
   const refetchIntervalMs =
@@ -418,10 +417,10 @@ export function usePedidosDeliveryKanbanColumns(
     finalizadasQuery.isLoading,
     finalizadasQuery.isFetchingNextPage,
     finalizadasQuery.hasNextPage,
-    comNfeQuery.data,
-    comNfeQuery.isLoading,
-    comNfeQuery.isFetchingNextPage,
-    comNfeQuery.hasNextPage,
+    comFiscalQuery.data,
+    comFiscalQuery.isLoading,
+    comFiscalQuery.isFetchingNextPage,
+    comFiscalQuery.hasNextPage,
   ])
 
   const isLoading = DELIVERY_KANBAN_COLUMN_IDS.some(id => queryByColumn[id]?.isLoading)
@@ -439,7 +438,7 @@ export function usePedidosDeliveryKanbanColumns(
     prontoQuery.data,
     rotaQuery.data,
     finalizadasQuery.data,
-    comNfeQuery.data,
+    comFiscalQuery.data,
   ])
 
   const refetch = useCallback(async () => {

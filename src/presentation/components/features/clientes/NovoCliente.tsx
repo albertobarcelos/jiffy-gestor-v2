@@ -10,6 +10,7 @@ import {
 } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
@@ -108,9 +109,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
   },
   ref
 ) {
-  const router = useRouter()
-  const { auth } = useAuthStore()
-  const isEditing = !!clienteId
+  const router = useRouter()  const isEditing = !!clienteId
 
   // Estados do formulário
   const [nome, setNome] = useState('')
@@ -238,14 +237,14 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
     if (!isEditing || hasLoadedClienteRef.current) return
 
     const loadCliente = async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return
 
       setIsLoadingCliente(true)
       hasLoadedClienteRef.current = true
 
       try {
-        const response = await fetch(`/api/clientes/${clienteId}`, {
+        const response = await fetchGestorApi(`/api/clientes/${clienteId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -408,7 +407,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
 
     try {
       // Usa rota API do Next.js para fazer a requisição pelo servidor
-      const response = await fetch(`/api/consulta-cnpj?cnpj=${rawCNPJ}`, {
+      const response = await fetchGestorApi(`/api/consulta-cnpj?cnpj=${rawCNPJ}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -578,7 +577,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
     const shouldClosePanel = embeddedCloseAfterSaveRef.current
     embeddedCloseAfterSaveRef.current = false
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado')
       return
@@ -612,7 +611,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
       // Se ainda não foi validada, validar agora
       if (cidadeValida === null) {
         try {
-          const response = await fetch(
+          const response = await fetchGestorApi(
             `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(cidade)}&uf=${estado}`
           )
           if (response.ok) {
@@ -703,7 +702,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
         : '/api/clientes'
       const method = isEditing ? 'PATCH' : 'POST'
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
@@ -836,7 +835,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
                   <MdPerson />
                 </span>
               </div>
-              <h1 className="text-primary text-lg font-semibold font-exo">
+              <h1 className="text-primary text-lg font-semibold ">
                 {isEditing ? 'Editar Cliente' : 'Novo Cliente'}
               </h1>
             </div>
@@ -875,7 +874,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
           <div className="bg-info rounded-lg md:px-5 py-2 space-y-4">
             <div className="flex items-center gap-1">
               <MdPerson className="text-primary text-2xl" />
-              <h2 className="text-primary text-base font-semibold font-nunito">
+              <h2 className="text-primary text-base font-semibold ">
                 Dados Pessoais
               </h2>
               <div className="flex-1" aria-hidden />
@@ -1063,7 +1062,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
           {/* Fiscal (antes do endereço — mesmo nível do payload da API) */}
           <div className="mt-2 rounded-lg bg-info md:px-5 px-1 py-2 space-y-4">
             <div className="flex items-center gap-3">
-              <h2 className="text-primary text-base font-semibold font-nunito flex items-center gap-2">
+              <h2 className="text-primary text-base font-semibold flex items-center gap-2">
                 <span className="text-xl text-primary">
                   <MdReceiptLong />
                 </span>
@@ -1146,7 +1145,7 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
             <div className="bg-info md:px-5 py-1 space-y-4">
               <div className="flex items-center gap-1">
               <MdLocationOn className="text-primary text-2xl" />
-                <h2 className="text-primary text-base font-semibold font-nunito">
+                <h2 className="text-primary text-base font-semibold ">
                   Endereço
                 </h2>
                 <div className="flex-1 border-t border-primary/40" aria-hidden />

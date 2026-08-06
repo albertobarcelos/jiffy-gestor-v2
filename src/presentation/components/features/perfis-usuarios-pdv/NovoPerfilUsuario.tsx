@@ -11,6 +11,7 @@ import {
 } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { PerfilUsuario } from '@/src/domain/entities/PerfilUsuario'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
@@ -100,9 +101,7 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
     },
     ref
   ) {
-  const router = useRouter()
-  const { auth } = useAuthStore()
-  const isEditing = !!perfilId
+  const router = useRouter()  const isEditing = !!perfilId
 
   // Estados do formulário
   const [role, setRole] = useState('')
@@ -253,7 +252,7 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
     async (next: MeioPagamento[], previous: MeioPagamento[]) => {
       if (!perfilId) return
       const seqAtStart = ++meiosPersistSeqRef.current
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         if (seqAtStart === meiosPersistSeqRef.current) {
@@ -266,7 +265,7 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
       meiosPatchInFlightRef.current += 1
       setIsSavingMeiosPagamento(true)
       try {
-        const response = await fetch(`/api/perfis-usuarios-pdv/${perfilId}`, {
+        const response = await fetchGestorApi(`/api/perfis-usuarios-pdv/${perfilId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -309,7 +308,7 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
         }
       }
     },
-    [perfilId, auth]
+    [perfilId]
   )
 
   // Baseline inicial em modo criação
@@ -469,7 +468,7 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
     async (campo: PermissaoCampo, next: boolean, previous: boolean) => {
       if (!perfilId) return
       const seqAtStart = ++permissoesPersistSeqRef.current
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         if (seqAtStart === permissoesPersistSeqRef.current) {
@@ -486,7 +485,7 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
         return nextSet
       })
       try {
-        const response = await fetch(`/api/perfis-usuarios-pdv/${perfilId}`, {
+        const response = await fetchGestorApi(`/api/perfis-usuarios-pdv/${perfilId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -529,7 +528,7 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
         })
       }
     },
-    [perfilId, auth, aplicarValorPermissao]
+    [perfilId, aplicarValorPermissao]
   )
 
   /** Atualiza UI e, se já existir perfil, persiste o campo via PATCH */
@@ -602,14 +601,14 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
     if (!isEditing || hasLoadedPerfilRef.current) return
 
     const loadPerfil = async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return
 
       setIsLoadingPerfil(true)
       hasLoadedPerfilRef.current = true
 
       try {
-        const response = await fetch(`/api/perfis-usuarios-pdv/${perfilId}`, {
+        const response = await fetchGestorApi(`/api/perfis-usuarios-pdv/${perfilId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -730,7 +729,7 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
     const forceClosePanel = closeAfterEmbeddedSaveRef.current
     closeAfterEmbeddedSaveRef.current = false
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado. Faça login novamente.')
       return
@@ -792,7 +791,7 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
         : '/api/perfis-usuarios-pdv'
       const method = isEditing ? 'PATCH' : 'POST'
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
@@ -822,10 +821,10 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
       // Se estiver editando, recarrega os dados do perfil para garantir sincronização
       if (isEditing && perfilId) {
         hasLoadedPerfilRef.current = false
-        const token = auth?.getAccessToken()
+        const token = useAuthStore.getState().tenantAuth?.getAccessToken()
         if (token) {
           try {
-            const reloadResponse = await fetch(`/api/perfis-usuarios-pdv/${perfilId}`, {
+            const reloadResponse = await fetchGestorApi(`/api/perfis-usuarios-pdv/${perfilId}`, {
               headers: {
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',
@@ -1013,7 +1012,7 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
                   <MdPerson />
                 </span>
               </div>
-              <h1 className="text-primary md:text-lg text-sm font-semibold font-exo">
+              <h1 className="text-primary md:text-lg text-sm font-semibold ">
                 {isEditing ? 'Editar Perfil de Usuário' : 'Novo Perfil de Usuário'}
               </h1>
             </div>
@@ -1064,7 +1063,7 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
 
               <div className="mt-4 space-y-2">
                 <div className="mb-2 flex items-center gap-5">
-                  <h2 className="shrink-0 text-primary md:text-base text-sm font-semibold font-exo">
+                  <h2 className="shrink-0 text-primary md:text-base text-sm font-semibold ">
                     Meios de Pagamento *
                   </h2>
                   <div className="h-px min-w-0 flex-1 bg-primary/70" aria-hidden />
@@ -1081,7 +1080,7 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
                       placeholder="Buscar meio de pagamento..."
                       value={searchMeioPagamento}
                       onChange={(e) => setSearchMeioPagamento(e.target.value)}
-                      className="font-nunito h-8 w-full rounded-lg border border-gray-300 bg-info pl-10 pr-4 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+                      className="h-8 w-full rounded-lg border border-gray-300 bg-info pl-10 pr-4 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
                     />
                   </div>
                   <Button

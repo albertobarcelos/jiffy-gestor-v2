@@ -2,10 +2,10 @@
 
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useQueryClient } from '@tanstack/react-query'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { NovoGrupo, type NovoGrupoHandle } from './NovoGrupo'
 import { GRUPO_PRODUTOS_MODAL_FORM_ID } from './grupoProdutosModalConstants'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 
 interface NovoGrupoModalShellProps {
   grupoId?: string
@@ -16,7 +16,7 @@ interface NovoGrupoModalShellProps {
  */
 export function NovoGrupoModalShell({ grupoId }: NovoGrupoModalShellProps) {
   const router = useRouter()
-  const queryClient = useQueryClient()
+  const invalidate = useInvalidateTenantQueries()
   const mode = grupoId ? 'edit' : 'create'
   const [grupoNome, setGrupoNome] = useState('')
 
@@ -39,21 +39,20 @@ export function NovoGrupoModalShell({ grupoId }: NovoGrupoModalShellProps) {
   const [embedSubTab, setEmbedSubTab] = useState(0)
   const ngRef = useRef<NovoGrupoHandle>(null)
 
+  const invalidateListas = useCallback(async () => {
+    await invalidate(['grupos-produtos'])
+    await invalidate(['produtos', 'infinite'])
+  }, [invalidate])
+
   const handleClose = () => {
+    void invalidateListas()
     router.push('/grupos-produtos')
     router.refresh()
-    queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false })
-    queryClient.invalidateQueries({ queryKey: ['produtos', 'infinite'] })
   }
 
   const handleReloadCaches = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false })
-    void queryClient.invalidateQueries({
-      queryKey: ['produtos', 'infinite'],
-      exact: false,
-      refetchType: 'active',
-    })
-  }, [queryClient])
+    void invalidateListas()
+  }, [invalidateListas])
 
   const handleSalvarGrupoAbaProdutos = useCallback(() => {
     void ngRef.current?.saveGrupo?.()

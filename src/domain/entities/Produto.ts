@@ -42,7 +42,7 @@ function firstNonEmptyString(...candidates: unknown[]): string {
 
 /**
  * Lê campos fiscais do JSON do cardápio: objeto `fiscal`, opcional `dadosFiscais`,
- * aliases comuns (`codigoCest`, `codigoNcm`) e raiz do produto.
+ * aliases comuns (`codigoCest`, `codigoNcm`, snake_case) e raiz do produto.
  */
 function extractFiscalStrings(data: any): {
   ncm: string
@@ -60,35 +60,53 @@ function extractFiscalStrings(data: any): {
   const ncm = firstNonEmptyString(
     fiscal.ncm,
     fiscal.codigoNcm,
+    fiscal.codigo_ncm,
     d.ncm,
     d.codigoNcm,
+    d.codigo_ncm,
   )
   const cest = firstNonEmptyString(
     fiscal.cest,
     fiscal.codigoCest,
     fiscal.cestCodigo,
+    fiscal.codigo_cest,
     d.cest,
     d.codigoCest,
+    d.codigo_cest,
   )
   const origemMercadoria = firstNonEmptyString(
     fiscal.origemMercadoria,
+    fiscal.origem_mercadoria,
     fiscal.origem,
     d.origemMercadoria,
+    d.origem_mercadoria,
     d.origem,
   )
-  const tipoProduto = firstNonEmptyString(
+  const tipoProdutoRaw = firstNonEmptyString(
     fiscal.tipoProduto,
+    fiscal.tipo_produto,
     fiscal.tipoMercadoria,
+    fiscal.tipo_mercadoria,
     fiscal.tipoItem,
+    fiscal.tipo_item,
     d.tipoProduto,
+    d.tipo_produto,
     d.tipoMercadoria,
+    d.tipo_mercadoria,
   )
+  /** API às vezes manda `0`/`1` em vez de `00`/`01`. */
+  const tipoProduto =
+    /^\d{1}$/.test(tipoProdutoRaw) ? tipoProdutoRaw.padStart(2, '0') : tipoProdutoRaw
 
   const indStr = firstNonEmptyString(
     fiscal.indicadorProducaoEscala,
+    fiscal.indicador_producao_escala,
     fiscal.indicadorEscala,
+    fiscal.indicador_escala,
     d.indicadorProducaoEscala,
+    d.indicador_producao_escala,
     d.indicadorEscala,
+    d.indicador_escala,
   )
 
   return {
@@ -338,6 +356,52 @@ export class Produto {
 
   getUnidadeMedida(): UnidadeMedidaProduto {
     return this.unidadeMedida
+  }
+
+  /** Retorna cópia com campos fiscais atualizados (edição inline / lote). */
+  withDadosFiscais(partial: {
+    ncm?: string
+    cest?: string
+    origemMercadoria?: string
+    tipoProduto?: string
+    indicadorProducaoEscala?: string | null
+  }): Produto {
+    return Produto.fromJSON({
+      ...this.toJSON(),
+      ncm: partial.ncm !== undefined ? partial.ncm : this.ncm,
+      cest: partial.cest !== undefined ? partial.cest : this.cest,
+      origemMercadoria:
+        partial.origemMercadoria !== undefined
+          ? partial.origemMercadoria
+          : this.origemMercadoria,
+      tipoProduto: partial.tipoProduto !== undefined ? partial.tipoProduto : this.tipoProduto,
+      indicadorProducaoEscala:
+        partial.indicadorProducaoEscala !== undefined
+          ? partial.indicadorProducaoEscala
+          : this.indicadorProducaoEscala,
+      fiscal: {
+        ncm: partial.ncm !== undefined ? partial.ncm : this.ncm,
+        cest: partial.cest !== undefined ? partial.cest : this.cest,
+        origemMercadoria:
+          partial.origemMercadoria !== undefined
+            ? partial.origemMercadoria
+            : this.origemMercadoria,
+        tipoProduto:
+          partial.tipoProduto !== undefined ? partial.tipoProduto : this.tipoProduto,
+        indicadorProducaoEscala:
+          partial.indicadorProducaoEscala !== undefined
+            ? partial.indicadorProducaoEscala
+            : this.indicadorProducaoEscala,
+      },
+    })
+  }
+
+  /** Retorna cópia com impressoras atualizadas (vínculo/desvínculo em lote, sem refetch). */
+  withImpressoras(impressoras: ProdutoImpressoraResumo[]): Produto {
+    return Produto.fromJSON({
+      ...this.toJSON(),
+      impressoras,
+    })
   }
 
   toJSON() {

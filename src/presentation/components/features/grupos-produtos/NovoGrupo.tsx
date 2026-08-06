@@ -13,16 +13,17 @@ import {
 import { useRouter, useSearchParams } from 'next/navigation'
 import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { IconPickerModal } from './IconPickerModal'
 import { ColorPickerModal } from './ColorPickerModal'
 import { ProdutosPorGrupoList } from './ProdutosPorGrupoList'
-import { useQueryClient } from '@tanstack/react-query'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { Input } from '@/src/presentation/components/ui/input'
 import { cn } from '@/src/shared/utils/cn'
 import { showToast } from '@/src/shared/utils/toast'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 
 /** Labels outlined em preto — igual NovoGrupoComplemento */
 const sxOutlinedLabelTextoEscuro = {
@@ -52,6 +53,11 @@ const sxEntradaNomeGrupoProduto = {
 
 interface NovoGrupoProps {
   grupoId?: string
+  /**
+   * Dados já conhecidos (ex.: lista de produtos) para hidratar o form sem spinner.
+   * O fetch ainda confirma/atualiza delivery/local etc. em background.
+   */
+  initialGrupo?: GrupoProduto
   isEmbedded?: boolean
   /** `id` do `<form>` para o rodapé do `JiffySidePanelModal` usar `form="..."` no Salvar */
   embeddedFormId?: string
@@ -110,6 +116,7 @@ function GrupoDetalhesFormShell({
 export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function NovoGrupo(
   {
     grupoId,
+    initialGrupo,
     isEmbedded = false,
     embeddedFormId,
     hideEmbeddedFormActions,
@@ -124,16 +131,26 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
   ref
 ) {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const { auth } = useAuthStore()
-  const queryClient = useQueryClient() // Obter a instância do queryClient
+  const searchParams = useSearchParams()  const invalidate = useInvalidateTenantQueries()
 
-  const [nome, setNome] = useState('')
-  const [ativo, setAtivo] = useState(true)
-  const [corHex, setCorHex] = useState('#530CA3')
-  const [iconName, setIconName] = useState('')
-  const [ativoDelivery, setAtivoDelivery] = useState(false)
-  const [ativoLocal, setAtivoLocal] = useState(false)
+  const effectiveGrupoId = grupoId || searchParams.get('id') || null
+  const seedMatches =
+    !!initialGrupo && !!effectiveGrupoId && initialGrupo.getId() === effectiveGrupoId
+
+  const [nome, setNome] = useState(() => (seedMatches ? initialGrupo!.getNome() : ''))
+  const [ativo, setAtivo] = useState(() => (seedMatches ? initialGrupo!.isAtivo() : true))
+  const [corHex, setCorHex] = useState(() =>
+    seedMatches ? initialGrupo!.getCorHex() : '#530CA3'
+  )
+  const [iconName, setIconName] = useState(() =>
+    seedMatches ? initialGrupo!.getIconName() : ''
+  )
+  const [ativoDelivery, setAtivoDelivery] = useState(() =>
+    seedMatches ? initialGrupo!.isAtivoDelivery() : false
+  )
+  const [ativoLocal, setAtivoLocal] = useState(() =>
+    seedMatches ? initialGrupo!.isAtivoLocal() : false
+  )
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(false)
   const [activeTab, setActiveTab] = useState(initialTab)
@@ -147,8 +164,6 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
     onGrupoNomeChange?.(nome)
   }, [nome, onGrupoNomeChange])
 
-  // Determina se está editando ou criando
-  const effectiveGrupoId = grupoId || searchParams.get('id') || null
   const isEditMode = !!effectiveGrupoId
 
   /** Cabeçalho próprio só fora do painel padronizado (ou embed sem delegar ao modal) */
@@ -234,11 +249,11 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
     return () => window.clearTimeout(t)
   }, [isLoadingData, isEditMode, effectiveGrupoId])
 
-  // Carrega dados do grupo para edição
+  // Carrega dados do grupo para edição (em embed com seed: sem spinner — SPA)
   useEffect(() => {
     if (!isEditMode || !effectiveGrupoId) return
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     // Evita carregar múltiplas vezes o mesmo grupo
@@ -249,10 +264,15 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
       return
     }
 
+    const hasSeed =
+      !!initialGrupo && initialGrupo.getId() === effectiveGrupoId
+    /** Em painel embutido (ou com seed da lista) não bloqueia a UI com spinner full-screen. */
+    const blockUi = !isEmbedded && !hasSeed
+
     const loadGrupo = async () => {
-      setIsLoadingData(true)
+      if (blockUi) setIsLoadingData(true)
       try {
-        const response = await fetch(`/api/grupos-produtos/${effectiveGrupoId}`, {
+        const response = await fetchGestorApi(`/api/grupos-produtos/${effectiveGrupoId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -281,14 +301,29 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
         }, 100)
       } catch (error) {
         console.error('Erro ao carregar grupo:', error)
-        alert('Erro ao carregar dados do grupo')
+        if (!hasSeed) {
+          alert('Erro ao carregar dados do grupo')
+        }
       } finally {
-        setIsLoadingData(false)
+        if (blockUi) setIsLoadingData(false)
       }
     }
 
-    loadGrupo()
-  }, [isEditMode, effectiveGrupoId, auth, normalizeColor])
+    // Seed imediato (lista já tinha o grupo) + baseline provisório até o fetch confirmar
+    if (hasSeed && !hasLoadedGrupoRef.current) {
+      setNome(initialGrupo!.getNome())
+      setAtivo(initialGrupo!.isAtivo())
+      setCorHex(normalizeColor(initialGrupo!.getCorHex()))
+      setIconName(initialGrupo!.getIconName())
+      setAtivoDelivery(initialGrupo!.isAtivoDelivery())
+      setAtivoLocal(initialGrupo!.isAtivoLocal())
+      window.setTimeout(() => {
+        commitBaselineLatestRef.current()
+      }, 50)
+    }
+
+    void loadGrupo()
+  }, [isEditMode, effectiveGrupoId, normalizeColor, isEmbedded, initialGrupo])
 
   const handleSave = useCallback(
     async (opts?: { keepModalOpen?: boolean }) => {
@@ -297,7 +332,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
         return
       }
 
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         alert('Token não encontrado')
         return
@@ -329,7 +364,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
               ativoLocal,
             }
 
-        const response = await fetch(url, {
+        const response = await fetchGestorApi(url, {
           method,
           headers: {
             'Content-Type': 'application/json',
@@ -343,14 +378,14 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
           throw new Error(error.message || 'Erro ao salvar grupo')
         }
 
-        // Sucesso — mesmo cache que na página avulsa (lista de produtos depende dos dois)
+        // Sucesso — invalidação com escopo tenant (MULTI-TENANT-JIFFY-DOC-OFICIAL)
+        const invalidateListas = async () => {
+          await invalidate(['grupos-produtos'])
+          await invalidate(['produtos', 'infinite'])
+        }
+
         if (isEmbedded) {
-          void queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false })
-          void queryClient.invalidateQueries({
-            queryKey: ['produtos', 'infinite'],
-            exact: false,
-            refetchType: 'active',
-          })
+          await invalidateListas()
           commitBaselineLatestRef.current()
           if (opts?.keepModalOpen) {
             onReload?.()
@@ -360,10 +395,9 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
           onSaved?.()
           onClose?.()
         } else {
+          await invalidateListas()
           router.push('/grupos-produtos')
-          router.refresh() // Força a revalidação dos dados da rota para recarregar a lista
-          queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false }) // Invalida todas as queries de grupos de produtos
-          queryClient.invalidateQueries({ queryKey: ['produtos', 'infinite'] }) // Invalida o cache do React Query para produtos
+          router.refresh()
         }
       } catch (error: any) {
         console.error('Erro ao salvar grupo:', error)
@@ -381,9 +415,8 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
       iconName,
       ativoDelivery,
       ativoLocal,
-      auth,
       isEmbedded,
-      queryClient,
+      invalidate,
       router,
       onReload,
       onSaved,
@@ -454,7 +487,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
               type="button"
               onClick={() => setActiveTab(0)}
               className={cn(
-                'rounded-t-lg px-4 py-2 font-nunito text-xs font-semibold transition-colors md:text-sm',
+                'rounded-t-lg px-4 py-2 text-xs font-semibold transition-colors md:text-sm',
                 activeTab === 0
                   ? 'bg-primary text-white'
                   : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
@@ -466,7 +499,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
               type="button"
               onClick={() => setActiveTab(1)}
               className={cn(
-                'rounded-t-lg px-4 py-2 font-nunito text-xs font-semibold transition-colors md:text-sm',
+                'rounded-t-lg px-4 py-2 text-xs font-semibold transition-colors md:text-sm',
                 activeTab === 1
                   ? 'bg-primary text-white'
                   : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
@@ -509,12 +542,14 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                         )}
                       </div>
                       <div>
-                        <h2 className="text-primary-text md:text-lg text-sm font-nunito font-semibold">
+                        <h2 className="text-primary-text md:text-lg text-sm font-semibold">
                           {nome.trim() ? nome : 'Nome do Grupo'}
                         </h2>
-                        <p className="text-secondary-text md:text-sm text-xs font-nunito">
-                          {iconName ? `Ícone selecionado: ${iconName}` : 'Definição do Ícone do Grupo'}
-                        </p>
+                        {!iconName ? (
+                          <p className="text-secondary-text md:text-sm text-xs">
+                            Definição do Ícone do Grupo
+                          </p>
+                        ) : null}
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-2">
@@ -550,7 +585,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                     <div className="grid grid-cols-2 gap-2">
                       {/* Cor */}
                       <div>
-                        <label className="block text-primary-text md:text-sm text-xs font-nunito font-semibold mb-2">
+                        <label className="block text-primary-text md:text-sm text-xs font-semibold mb-2">
                           Cor do Grupo
                         </label>
                         <div className="flex flex-col gap-2">
@@ -566,7 +601,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                             <button
                               type="button"
                               onClick={() => setIsColorPickerOpen(true)}
-                              className="px-2 py-3 bg-primary text-info rounded-lg font-nunito md:text-sm text-xs font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
+                              className="px-2 py-3 bg-primary text-info rounded-lg md:text-sm text-xs font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
                             >
                               Escolher cor
                             </button>
@@ -577,7 +612,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
 
                       {/* Ícone */}
                       <div>
-                        <label className="block text-primary-text md:text-sm text-xs font-nunito font-semibold mb-2">
+                        <label className="block text-primary-text md:text-sm text-xs font-semibold mb-2">
                           Ícone do Grupo
                         </label>
                         <div className="flex items-center gap-2">
@@ -596,7 +631,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                           <button
                             type="button"
                             onClick={() => setIsIconPickerOpen(true)}
-                            className="px-2 py-3 bg-primary text-info rounded-lg font-nunito md:text-sm text-xs font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
+                            className="px-2 py-3 bg-primary text-info rounded-lg md:text-sm text-xs font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
                           >
                             Escolher Ícone
                           </button>
@@ -606,7 +641,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
 
                     {/* Preview do ícone */}
                     <div>
-                      <label className="block text-primary-text md:text-sm text-xs font-nunito font-semibold mb-2">
+                      <label className="block text-primary-text md:text-sm text-xs font-semibold mb-2">
                         Preview do Ícone
                       </label>
                       <div className="flex items-center gap-4">
@@ -663,7 +698,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                             className="w-5 h-5 rounded border-primary/60 text-primary focus:ring-primary"
                             style={{ accentColor: 'var(--color-primary)' }}
                           />
-                          <span className="text-primary-text md:text-sm text-xs font-nunito">
+                          <span className="text-primary-text md:text-sm text-xs ">
                             Ativo para Delivery
                           </span>
                         </label>
@@ -677,7 +712,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                             className="w-5 h-5 rounded border-primary/60 text-primary focus:ring-primary"
                             style={{ accentColor: 'var(--color-primary)' }}
                           />
-                          <span className="text-primary-text md:text-sm text-xs font-nunito">
+                          <span className="text-primary-text md:text-sm text-xs ">
                             Ativo para Local
                           </span>
                         </label>
@@ -696,7 +731,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                 <ProdutosPorGrupoList grupoProdutoId={effectiveGrupoId} />
               ) : (
                 <div className="text-center py-12">
-                  <p className="text-secondary-text font-nunito">
+                  <p className="text-secondary-text ">
                     A lista de produtos vinculados aparece no modo de edição.
                   </p>
                 </div>

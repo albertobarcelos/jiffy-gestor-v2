@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Produto } from '@/src/domain/entities/Produto'
 import { ProdutoMovimento } from '@/src/domain/entities/MovimentoEstoque'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast, handleApiError } from '@/src/shared/utils/toast'
 import { transformarParaReal, brToEUA } from '@/src/shared/utils/formatters'
 import { Button } from '@/src/presentation/components/ui/button'
@@ -44,9 +45,7 @@ interface MovimentoEstoqueFormProps {
  * Replica completamente o design e funcionalidades do Flutter
  */
 export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFormProps) {
-  const router = useRouter()
-  const { auth } = useAuthStore()
-  
+  const router = useRouter()  
   // Estados do formulário
   const [dataLancamento, setDataLancamento] = useState(
     new Date().toLocaleDateString('pt-BR', {
@@ -89,7 +88,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
 
   // Buscar produtos disponíveis com debounce
   const buscarProdutos = useCallback(async (searchText: string = '') => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     setIsLoadingProdutos(true)
@@ -105,7 +104,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
         params.append('name', searchText)
       }
 
-      const response = await fetch(`/api/produtos?${params.toString()}`, {
+      const response = await fetchGestorApi(`/api/produtos?${params.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -134,7 +133,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
     } finally {
       setIsLoadingProdutos(false)
     }
-  }, [auth])
+  }, [])
 
   // Carregar produtos iniciais
   useEffect(() => {
@@ -312,7 +311,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
     const toastId = showToast.loading('Salvando movimentação...')
 
     try {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.errorLoading(toastId, 'Token não encontrado')
         return
@@ -352,7 +351,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
       {/* Header */}
       <div className="px-[35px] pt-0 pb-0">
         <div className="h-[90px] flex items-center justify-between">
-          <h1 className="text-primary text-2xl font-semibold font-exo">Estoque</h1>
+          <h1 className="text-primary text-2xl font-semibold ">Estoque</h1>
           <div className="flex items-center gap-[10px]">
             <div className="w-[300px]">
               <div className="h-[48px] relative">
@@ -367,7 +366,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
                       buscarProdutos(e.target.value)
                     }, 500)
                   }}
-                  className="w-full h-full pl-12 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-secondary font-nunito text-sm"
+                  className="w-full h-full pl-12 rounded-[24px] border-[0.6px] border-secondary bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-secondary text-sm"
                 />
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
                   🔍
@@ -386,12 +385,12 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-3">
                 <span className="text-2xl">{icone}</span>
-                <h2 className="text-primary text-lg font-semibold font-exo">{titulo}</h2>
+                <h2 className="text-primary text-lg font-semibold ">{titulo}</h2>
               </div>
               <Button
                 onClick={() => router.push('/estoque')}
                 variant="outlined"
-                className="h-9 px-[26px] bg-primary/10 text-primary rounded-[30px] font-medium font-exo text-sm hover:bg-primary/20"
+                className="h-9 px-[26px] bg-primary/10 text-primary rounded-[30px] font-medium text-sm hover:bg-primary/20"
               >
                 Cancelar
               </Button>
@@ -404,7 +403,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
           {/* Seção Dados */}
           <div className="bg-info rounded-[10px] p-5 mb-6">
             <div className="flex items-center gap-5 mb-5">
-              <h3 className="text-secondary text-xl font-semibold font-exo">Dados</h3>
+              <h3 className="text-secondary text-xl font-semibold ">Dados</h3>
               <div className="flex-1 h-[1px] bg-alternate"></div>
             </div>
 
@@ -418,7 +417,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
                   value={dataLancamento}
                   onChange={(e) => setDataLancamento(e.target.value)}
                   placeholder="DD/MM/AAAA"
-                  className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary font-nunito"
+                  className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary "
                 />
               </div>
 
@@ -431,7 +430,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
                   value={numeroDocumento}
                   onChange={(e) => setNumeroDocumento(e.target.value)}
                   placeholder="Digite o número do documento"
-                  className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary font-nunito"
+                  className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary "
                 />
               </div>
 
@@ -462,7 +461,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
                   value={fornecedorClienteNome}
                   onChange={(e) => setFornecedorClienteNome(e.target.value)}
                   placeholder={`Digite o nome do ${tipo === 'ENTRADA' ? 'fornecedor' : tipo === 'SAIDA' ? 'cliente' : 'fornecedor/cliente'}`}
-                  className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary font-nunito"
+                  className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary "
                 />
               </div>
 
@@ -475,7 +474,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
                   value={observacoes}
                   onChange={(e) => setObservacoes(e.target.value)}
                   placeholder="Digite observações (opcional)"
-                  className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary font-nunito"
+                  className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary "
                 />
               </div>
             </div>
@@ -485,7 +484,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
           <div className="bg-info rounded-[10px] p-5 mb-6">
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-5">
-                <h3 className="text-secondary text-xl font-semibold font-exo">Produtos</h3>
+                <h3 className="text-secondary text-xl font-semibold ">Produtos</h3>
                 <div className="flex-1 h-[1px] bg-alternate"></div>
               </div>
             </div>
@@ -527,7 +526,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
                       setQuantidadeProduto(value)
                     }}
                     placeholder="0,00"
-                    className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary font-nunito"
+                    className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary "
                   />
                 </div>
 
@@ -543,7 +542,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
                       setValorTotalProduto(value)
                     }}
                     placeholder="0,00"
-                    className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary font-nunito"
+                    className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary "
                   />
                 </div>
 
@@ -608,7 +607,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
                       const produtoInfo = produtosDisponiveis.find((p) => p.getId() === produto.produtoId)
                       return (
                         <TableRow key={index}>
-                          <TableCell className="font-mono text-sm">
+                          <TableCell className="text-sm">
                             {produtoInfo?.getCodigoProduto() || '-'}
                           </TableCell>
                           <TableCell className="font-semibold">{produto.produtoNome}</TableCell>
@@ -658,7 +657,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
           {/* Seção Valores */}
           <div className="bg-info rounded-[10px] p-5 mb-6">
             <div className="flex items-center gap-5 mb-5">
-              <h3 className="text-secondary text-xl font-semibold font-exo">Valores</h3>
+              <h3 className="text-secondary text-xl font-semibold ">Valores</h3>
               <div className="flex-1 h-[1px] bg-alternate"></div>
             </div>
 
@@ -671,7 +670,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
                   type="text"
                   value={transformarParaReal(totalProdutos)}
                   disabled
-                  className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text font-nunito"
+                  className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text "
                 />
               </div>
 
@@ -687,7 +686,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
                     setDesconto(value)
                   }}
                   placeholder="0,00"
-                  className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary font-nunito"
+                  className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary "
                 />
               </div>
 
@@ -703,7 +702,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
                     setAcrescimo(value)
                   }}
                   placeholder="0,00"
-                  className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary font-nunito"
+                  className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text focus:outline-none focus:border-primary "
                 />
               </div>
 
@@ -715,7 +714,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
                   type="text"
                   value={transformarParaReal(valorFinalNum)}
                   disabled
-                  className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text font-semibold font-nunito"
+                  className="w-full h-12 px-4 rounded-lg border border-secondary bg-primary-bg text-primary-text font-semibold "
                 />
               </div>
             </div>
@@ -726,7 +725,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
             <Button
               onClick={handleConfirmar}
               disabled={isLoading || produtos.length === 0 || !numeroDocumento}
-              className="h-12 px-8 bg-primary text-info rounded-[30px] font-medium font-exo text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-12 px-8 bg-primary text-info rounded-[30px] font-medium text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? 'Confirmando...' : 'Confirmar Movimentação'}
             </Button>

@@ -176,7 +176,7 @@ export function ConfiguracaoFiscalStep({
     return (
       <div className="rounded-[10px] bg-info p-2 md:p-4">
         <div className="mb-2 flex items-center gap-5">
-          <h2 className="font-exo text-xl font-semibold text-primary">Configuração Fiscal</h2>
+          <h2 className="text-xl font-semibold text-primary">Configuração Fiscal</h2>
           <div className="h-px flex-1 bg-primary/70" />
         </div>
 
@@ -186,16 +186,16 @@ export function ConfiguracaoFiscalStep({
             <MdWarning className="w-8 h-8 text-amber-500" />
           </div>
 
-          <h4 className="text-lg font-semibold text-primary-text font-exo mb-2">
+          <h4 className="text-lg font-semibold text-primary-text mb-2">
             Serviço fiscal temporariamente indisponível
           </h4>
 
-          <p className="text-sm text-secondary-text font-nunito max-w-md mb-2">
+          <p className="text-sm text-secondary-text max-w-md mb-2">
             Estamos enfrentando uma instabilidade no serviço fiscal.
             Os dados fiscais não puderam ser carregados neste momento.
           </p>
 
-          <p className="text-sm text-secondary-text font-nunito max-w-md mb-6">
+          <p className="text-sm text-secondary-text max-w-md mb-6">
             <strong className="text-primary-text">Não se preocupe:</strong> se o produto já possuía dados fiscais,
             eles estão salvos e serão exibidos quando o serviço estiver disponível novamente.
           </p>
@@ -207,7 +207,7 @@ export function ConfiguracaoFiscalStep({
                 type="button"
                 onClick={handleRetryWithCooldown}
                 disabled={isLoadingFiscal || isCooldownActive}
-                className="flex items-center gap-2 h-10 px-6 rounded-lg bg-primary text-white font-semibold font-exo text-sm hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 h-10 px-6 rounded-lg bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {isLoadingFiscal ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -237,7 +237,7 @@ export function ConfiguracaoFiscalStep({
                       }}
                     />
                   </div>
-                  <p className="text-xs text-secondary-text font-nunito">
+                  <p className="text-xs text-secondary-text ">
                     {cooldownProgress < 100
                       ? 'Aguarde para tentar novamente...'
                       : 'Pronto! Você pode tentar novamente.'}
@@ -252,7 +252,7 @@ export function ConfiguracaoFiscalStep({
           <div className="mt-4 flex justify-start border-t border-dashed border-[#E4E7F4] pt-6">
             <Button
               onClick={onBack}
-              className="h-8 rounded-lg border-2 px-10 font-exo text-sm font-semibold hover:bg-primary/20"
+              className="h-8 rounded-lg border-2 px-10 text-sm font-semibold hover:bg-primary/20"
               sx={{
                 backgroundColor: 'var(--color-info)',
                 color: 'var(--color-primary)',
@@ -272,11 +272,11 @@ export function ConfiguracaoFiscalStep({
     <div className="rounded-[10px] bg-info p-2 md:p-4">
       <div className="mb-2 flex flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-exo text-xl font-semibold text-primary">Configuração Fiscal</h2>
+          <h2 className="text-xl font-semibold text-primary">Configuração Fiscal</h2>
           <div className="h-px flex-1 bg-primary/70" />
         </div>
-        <p className="font-nunito text-sm text-secondary-text">
-          Preencha as informações fiscais do produto. Essas informações serão usadas para emissão de notas fiscais.
+        <p className="text-sm text-secondary-text">
+          Essas informações serão usadas para emissão de notas fiscais.
         </p>
       </div>
 
@@ -315,10 +315,10 @@ export function ConfiguracaoFiscalStep({
               }}
             />
             {isValidatingNcm && (
-              <p className="mt-1 text-xs font-nunito text-secondary-text">Validando NCM...</p>
+              <p className="mt-1 text-xs text-secondary-text">Validando NCM...</p>
             )}
             {!isValidatingNcm && ncmValidation && (
-              <p className={`mt-1 text-xs font-nunito ${ncmValidation.valido ? 'text-green-600' : 'text-red-600'}`}>
+              <p className={`mt-1 text-xs ${ncmValidation.valido ? 'text-green-600' : 'text-red-600'}`}>
                 {ncmValidation.valido && ncmValidation.descricao ? ncmValidation.descricao : ncmValidation.mensagem}
               </p>
             )}
@@ -379,13 +379,13 @@ export function ConfiguracaoFiscalStep({
               />
             )}
             {isLoadingCests && (
-              <p className="mt-1 text-xs font-nunito text-secondary-text">Carregando CESTs compatíveis...</p>
+              <p className="mt-1 text-xs text-secondary-text">Carregando CESTs compatíveis...</p>
             )}
             {isValidatingCest && (
-              <p className="mt-1 text-xs font-nunito text-secondary-text">Validando CEST...</p>
+              <p className="mt-1 text-xs text-secondary-text">Validando CEST...</p>
             )}
             {!isValidatingCest && !isLoadingCests && cestValidation && (
-              <p className={`mt-1 text-xs font-nunito ${cestValidation.valido ? 'text-green-600' : 'text-red-600'}`}>
+              <p className={`mt-1 text-xs ${cestValidation.valido ? 'text-green-600' : 'text-red-600'}`}>
                 {cestValidation.valido && cestValidation.descricao ? cestValidation.descricao : cestValidation.mensagem}
               </p>
             )}
@@ -453,7 +453,7 @@ export function ConfiguracaoFiscalStep({
               </button>
             )}
           </div>
-          <p className="mt-1 text-xs font-nunito text-secondary-text">
+          <p className="mt-1 text-xs text-secondary-text">
             Obrigatório para produtos no Anexo XXVII (52/2017)
           </p>
         </div>
@@ -463,7 +463,7 @@ export function ConfiguracaoFiscalStep({
         <div className="mt-4 flex justify-between border-t border-dashed border-[#E4E7F4] pt-6">
           <Button
             onClick={onBack}
-            className="h-8 rounded-lg border-2 px-10 font-exo text-sm font-semibold hover:bg-primary/20"
+            className="h-8 rounded-lg border-2 px-10 text-sm font-semibold hover:bg-primary/20"
             sx={{
               backgroundColor: 'var(--color-info)',
               color: 'var(--color-primary)',
@@ -476,7 +476,7 @@ export function ConfiguracaoFiscalStep({
           <Button
             onClick={onNext}
             disabled={isNcmInvalid || isValidatingNcm || isCestInvalid || isValidatingCest}
-            className={`h-8 rounded-lg px-10 font-exo text-sm font-semibold text-white ${
+            className={`h-8 rounded-lg px-10 text-sm font-semibold text-white ${
               isNcmInvalid || isValidatingNcm || isCestInvalid || isValidatingCest
                 ? 'cursor-not-allowed opacity-50'
                 : 'hover:bg-primary/90'
