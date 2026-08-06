@@ -53,6 +53,31 @@ describe('montarDiffProdutosPedidoDelivery', () => {
     expect(diff.add[0]).toMatchObject({ produtoId: 'cat-1', quantidade: 3 })
   })
 
+  it('alterar valorUnitario vira remove + add com o novo preço', () => {
+    const original = item({
+      produtoId: 'cat-1',
+      produtoLancadoId: 'lan-1',
+      valorUnitario: 10,
+      valorCatalogo: 10,
+      permiteAlterarPreco: true,
+    })
+    const editado = item({
+      produtoId: 'cat-1',
+      produtoLancadoId: 'lan-1',
+      valorUnitario: 15.5,
+      valorCatalogo: 10,
+      permiteAlterarPreco: true,
+    })
+    const diff = montarDiffProdutosPedidoDelivery([original], [editado])
+
+    expect(diff.remove).toEqual(['lan-1'])
+    expect(diff.add).toHaveLength(1)
+    expect(diff.add[0]).toMatchObject({
+      produtoId: 'cat-1',
+      valorUnitario: 15.5,
+    })
+  })
+
   it('lista final vazia sinaliza resultariaSemProdutos', () => {
     const original = item({ produtoId: 'cat-1', produtoLancadoId: 'lan-1' })
     const diff = montarDiffProdutosPedidoDelivery([original], [])

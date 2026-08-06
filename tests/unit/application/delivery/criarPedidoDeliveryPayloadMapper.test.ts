@@ -14,6 +14,8 @@ function baseInput(
         produtoId: 'prod-1',
         quantidade: 1,
         valorUnitario: 24,
+        valorCatalogo: 24,
+        permiteAlterarPreco: false,
         valorDesconto: null,
         valorAcrescimo: null,
         tipoDesconto: null,
@@ -146,5 +148,55 @@ describe('CriarPedidoDeliveryPayloadMapper', () => {
         complemento: undefined,
       },
     ])
+  })
+
+  it('envia valorUnitario alterado nos produtos', () => {
+    const payload = buildCriarPedidoDeliveryPayload(
+      baseInput({
+        produtos: [
+          {
+            produtoId: 'prod-1',
+            quantidade: 2,
+            valorUnitario: 19.9,
+            valorCatalogo: 24,
+            permiteAlterarPreco: true,
+            valorDesconto: null,
+            valorAcrescimo: null,
+            tipoDesconto: null,
+            tipoAcrescimo: null,
+            complementos: [],
+          },
+        ],
+      })
+    )
+
+    expect(payload.produtos[0]).toMatchObject({
+      produtoId: 'prod-1',
+      quantidade: 2,
+      valorUnitario: 19.9,
+    })
+  })
+
+  it('não envia valorUnitario quando preço não foi alterado', () => {
+    const payload = buildCriarPedidoDeliveryPayload(
+      baseInput({
+        produtos: [
+          {
+            produtoId: 'prod-1',
+            quantidade: 1,
+            valorUnitario: 24,
+            valorCatalogo: 24,
+            permiteAlterarPreco: true,
+            valorDesconto: null,
+            valorAcrescimo: null,
+            tipoDesconto: null,
+            tipoAcrescimo: null,
+            complementos: [],
+          },
+        ],
+      })
+    )
+
+    expect(payload.produtos[0].valorUnitario).toBeUndefined()
   })
 })
