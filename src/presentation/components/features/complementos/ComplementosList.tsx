@@ -9,6 +9,14 @@ import { MdSearch } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import {
+  CadastroListHeader,
+  CadastroListHeaderLabel,
+  CadastroListRow,
+  CadastroListShell,
+  CadastroListThumbSpacer,
+  EntityListThumbnail,
+} from '@/src/presentation/components/ui/cadastro-list'
 import { useComplementosInfinite } from '@/src/presentation/hooks/useComplementos'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import {
@@ -21,7 +29,7 @@ interface ComplementosListProps {
 }
 
 /**
- * Linha da tabela (memo) — mesmo padrão de GruposComplementosList / GrupoItem
+ * Linha da tabela — shell compartilhado com GruposComplementosList
  */
 const ComplementoRow = memo(function ComplementoRow({
   complemento,
@@ -52,45 +60,45 @@ const ComplementoRow = memo(function ComplementoRow({
   savingTipo: boolean
   togglingStatus: boolean
 }) {
-  const isZebraEven = index % 2 === 0
-  const bgClass = isZebraEven ? 'bg-gray-50' : 'bg-white'
-
   return (
-    <div
+    <CadastroListRow
+      variant="complementos"
+      index={index}
       onClick={() => onRowClick(complemento)}
-      className={`${bgClass} rounded-lg md:px-4 px-1 py-3 flex items-center md:gap-[10px] gap-1 hover:bg-secondary-bg/15 cursor-pointer`}
     >
-      <div className="md:flex-[3] flex-[2] font-normal md:text-sm text-[10px] text-primary-text flex items-center gap-1">
-        <span># {complemento.getNome()}</span>
-      </div>
-      <div className="flex-[3] text-sm text-secondary-text hidden md:flex">
+      {/* src: preencher quando o backend expuser URL da foto do complemento */}
+      <EntityListThumbnail src={null} alt={complemento.getNome()} />
+
+      <span
+        className="min-w-0 truncate font-normal text-xs text-primary-text md:text-sm"
+        title={complemento.getNome()}
+      >
+        {complemento.getNome()}
+      </span>
+
+      <div className="hidden min-w-0 truncate text-sm text-secondary-text md:block">
         {complemento.getDescricao() || 'Nenhuma'}
       </div>
 
-      <div className="flex-[2]" onClick={e => e.stopPropagation()}>
-        <div className="flex flex-col items-start gap-1">
-          <div className="flex items-center justify-end gap-2 px-3 py-1 rounded-lg border border-gray-300 bg-white max-w-[140px]">
-            <input
-              type="text"
-              value={valorDisplay}
-              onChange={e => onValorChange(complemento.getId(), e.target.value)}
-              onFocus={onValorFocus}
-              onBlur={() => onValorSubmit(complemento.getId())}
-              onKeyDown={e => onValorKeyDown(complemento.getId(), e)}
-              onClick={e => e.stopPropagation()}
-              disabled={savingValor}
-              className={`w-full bg-transparent text-left md:text-sm text-[10px] font-normal text-primary-text focus:outline-none ${
-                savingValor ? 'opacity-70 cursor-not-allowed' : ''
-              }`}
-            />
-          </div>
+      <div className="min-w-0" onClick={e => e.stopPropagation()}>
+        <div className="flex max-w-[140px] items-center rounded-lg border border-gray-300 bg-white px-3 py-1">
+          <input
+            type="text"
+            value={valorDisplay}
+            onChange={e => onValorChange(complemento.getId(), e.target.value)}
+            onFocus={onValorFocus}
+            onBlur={() => onValorSubmit(complemento.getId())}
+            onKeyDown={e => onValorKeyDown(complemento.getId(), e)}
+            onClick={e => e.stopPropagation()}
+            disabled={savingValor}
+            className={`w-full bg-transparent text-left text-[10px] font-normal text-primary-text focus:outline-none md:text-sm ${
+              savingValor ? 'cursor-not-allowed opacity-70' : ''
+            }`}
+          />
         </div>
       </div>
 
-      <div
-        className="flex-1 md:text-sm text-[10px] text-secondary-text text-center"
-        onClick={e => e.stopPropagation()}
-      >
+      <div className="min-w-0" onClick={e => e.stopPropagation()}>
         <select
           value={(complemento.getTipoImpactoPreco() || 'nenhum').toLowerCase()}
           onChange={e =>
@@ -98,8 +106,8 @@ const ComplementoRow = memo(function ComplementoRow({
           }
           onClick={e => e.stopPropagation()}
           disabled={savingTipo}
-          className={`w-full px-0 py-1 rounded-lg border border-gray-300 bg-white md:text-sm text-[10px] font-normal text-primary-text focus:outline-none focus:border-primary text-center ${
-            savingTipo ? 'opacity-70 cursor-not-allowed' : ''
+          className={`w-full rounded-lg border border-gray-300 bg-white px-1 py-1 text-center text-[10px] font-normal text-primary-text focus:border-primary focus:outline-none md:text-sm ${
+            savingTipo ? 'cursor-not-allowed opacity-70' : ''
           }`}
         >
           <option value="nenhum">NENHUM</option>
@@ -107,8 +115,9 @@ const ComplementoRow = memo(function ComplementoRow({
           <option value="diminui">DIMINUI</option>
         </select>
       </div>
+
       <div
-        className="md:flex-[2] flex-[1] flex justify-end"
+        className="flex items-center justify-center"
         onClick={e => e.stopPropagation()}
         onMouseDown={e => e.stopPropagation()}
         onTouchStart={e => e.stopPropagation()}
@@ -130,7 +139,7 @@ const ComplementoRow = memo(function ComplementoRow({
           }}
         />
       </div>
-    </div>
+    </CadastroListRow>
   )
 })
 
@@ -154,7 +163,8 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const valorDebounceTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
-  const handleValorSubmitRef = useRef<((complementoId: string) => Promise<void>) | null>(null)  const router = useRouter()
+  const handleValorSubmitRef = useRef<((complementoId: string) => Promise<void>) | null>(null)
+  const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const invalidate = useInvalidateTenantQueries()
@@ -565,7 +575,8 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="md:px-[30px] flex-shrink-0 py-[4px]">
+      <CadastroListShell className="flex min-h-0 flex-1 flex-col overflow-hidden px-2 md:px-[30px]">
+      <div className="flex-shrink-0 py-[4px]">
         <div className="flex flex-row items-center justify-between">
           <div className="flex flex-col md:pl-5">
             <p className="text-primary text-lg font-semibold">Complementos Cadastrados</p>
@@ -591,7 +602,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
 
       <div className="h-[2px] border-t-2 border-primary/70 flex-shrink-0" />
 
-      <div className="flex flex-shrink-0 gap-3 md:px-[20px] px-2 py-2">
+      <div className="flex flex-shrink-0 gap-3 py-2">
         <div className="max-w-[360px] min-w-[180px] flex-1">
           <div className="relative h-8">
             <MdSearch
@@ -623,30 +634,20 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         </div>
       </div>
 
-      <div className="md:px-[30px] mt-0 flex-shrink-0 px-1">
-        <div className="bg-custom-2 flex h-10 items-center gap-[10px] rounded-lg px-1 md:px-4">
-          <div className="md:flex-[3] flex-[2] font-semibold text-xs text-primary-text md:text-sm">
-            Nome
-          </div>
-          <div className="hidden flex-[3] font-semibold text-xs text-primary-text md:flex md:text-sm">
-            Descrição
-          </div>
-          <div className="flex-[2] font-semibold text-xs text-primary-text md:text-sm">
-            Valor
-          </div>
-          <div className="flex-[1] text-center font-semibold text-xs text-primary-text md:text-sm">
-            Impacto
-          </div>
-          <div className="md:flex-[2] flex-[1] text-end font-semibold text-xs text-primary-text md:mt-0 md:text-end md:text-sm">
-            Status
-          </div>
-        </div>
+      <div className="flex-shrink-0">
+        <CadastroListHeader variant="complementos">
+          <CadastroListThumbSpacer />
+          <CadastroListHeaderLabel>Nome</CadastroListHeaderLabel>
+          <CadastroListHeaderLabel hideOnMobile>Descrição</CadastroListHeaderLabel>
+          <CadastroListHeaderLabel>Valor</CadastroListHeaderLabel>
+          <CadastroListHeaderLabel className="text-center">Impacto</CadastroListHeaderLabel>
+          <CadastroListHeaderLabel className="text-center">Status</CadastroListHeaderLabel>
+        </CadastroListHeader>
       </div>
 
-      {/* Só as linhas rolam: ocupa todo o espaço restante abaixo do cabeçalho das colunas (sem max-h). */}
       <div
         ref={scrollContainerRef}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-2 pb-2 pt-2 scrollbar-hide md:px-[30px]"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-2 pt-2 scrollbar-hide"
       >
         {(isLoading || (complementos.length === 0 && isFetching)) && (
           <div className="flex flex-col items-center justify-center gap-2 py-8">
@@ -694,6 +695,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         onReload={handleTabsModalReload}
         onTabChange={handleTabsModalTabChange}
       />
+      </CadastroListShell>
     </div>
   )
 }
