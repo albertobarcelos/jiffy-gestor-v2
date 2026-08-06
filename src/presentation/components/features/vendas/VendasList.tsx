@@ -13,6 +13,7 @@ import {
   MdPrint,
   MdFilterList,
   MdReceiptLong,
+  MdDownload,
 } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -38,6 +39,11 @@ import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side
 import { FaturamentoRangeCalendar } from '@/src/presentation/components/ui/FaturamentoRangeCalendar'
 import { useDashboardFaturamentoPorDiaQuery } from '@/src/presentation/hooks/useDashboardFaturamentoPorDiaQuery'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
+import { useExportarRelatorioVendas } from '@/src/presentation/hooks/useExportarRelatorioVendas'
+import type {
+  MetricasVendas as MetricasVendasExport,
+  VendasFiltrosQuerySnapshot as VendasFiltrosQuerySnapshotExport,
+} from '@/src/presentation/utils/vendas/vendasListTypes'
 // Tipos
 interface Venda {
   id: string
@@ -543,7 +549,9 @@ const sxVendasFiltroTextFieldMoeda = {
  * Componente de listagem de vendas
  * Implementa scroll infinito, filtros avançados e cards de métricas
  */
-export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {  const { timezoneAgregacao } = useEmpresaMe()
+export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
+  const { timezoneAgregacao, empresa } = useEmpresaMe()
+  const { exportar: exportarRelatorio, isExportando } = useExportarRelatorioVendas()
   const router = useRouter()
   const pathname = usePathname()
 
@@ -1184,6 +1192,46 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     router.refresh() // Força a revalidação da rota para recarregar com os filtros limpos
   }, [router, pathname])
 
+  const handleExportarRelatorio = useCallback(() => {
+    const tenantAuth = useAuthStore.getState().tenantAuth
+    const token = tenantAuth?.getAccessToken()
+    if (!token) {
+      showToast.error('Sessão expirada. Faça login novamente.')
+      return
+    }
+
+    const usuariosPorId = new Map(usuariosPDV.map(u => [u.id, u.nome]))
+    const meiosPagamentoPorId = new Map(meiosPagamento.map(m => [m.id, m.nome]))
+    const terminaisPorId = new Map(terminais.map(t => [t.id, t.nome]))
+
+    const user = useAuthStore.getState().getUser()
+    const usuarioGerador =
+      user?.getName()?.trim() || user?.getEmail()?.trim() || 'Usuário não identificado'
+
+    void exportarRelatorio({
+      filters: filtersRef.current as VendasFiltrosQuerySnapshotExport,
+      token,
+      timeZoneEmpresa: timezoneAgregacao,
+      metricas: metricas as MetricasVendasExport | null,
+      usuariosPorId,
+      meiosPagamentoPorId,
+      terminaisPorId,
+      contexto: {
+        nomeEmpresa: empresa?.nomeExibicao ?? 'Empresa',
+        cnpjEmpresa: empresa?.cnpj ?? '—',
+        usuarioGerador,
+      },
+    })
+  }, [
+    empresa,
+    exportarRelatorio,
+    meiosPagamento,
+    metricas,
+    terminais,
+    timezoneAgregacao,
+    usuariosPDV,
+  ])
+
   /**
    * Handle Enter nos campos de valor
    */
@@ -1404,10 +1452,21 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             <button
               type="button"
               onClick={() => setIsDatasModalOpen(true)}
-              className="flex h-8 items-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
+              className="flex h-8 shrink-0 items-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
             >
               <MdCalendarToday size={18} />
               Por datas
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportarRelatorio}
+              disabled={isExportando || isLoading}
+              title="Exportar relatório em Excel (.xlsx)"
+              className="flex h-8 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg border-2 border-primary bg-info px-4 text-sm text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <MdDownload size={18} />
+              {isExportando ? 'Exportando...' : 'Exportar XLS'}
             </button>
             {periodoInicial && periodoFinal ? (
               <div className="flex shrink-0 flex-col gap-0 text-[11px] leading-snug text-primary/85 sm:text-xs">

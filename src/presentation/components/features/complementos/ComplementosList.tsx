@@ -1,14 +1,22 @@
-﻿'use client'
+'use client'
 
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { Complemento } from '@/src/domain/entities/Complemento'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import { MdPhotoCamera, MdSearch } from 'react-icons/md'
+import { MdImageNotSupported, MdPhotoCamera, MdSearch } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import {
+  CadastroListHeader,
+  CadastroListHeaderLabel,
+  CadastroListRow,
+  CadastroListShell,
+  CadastroListThumbSpacer,
+  EntityListThumbnail,
+} from '@/src/presentation/components/ui/cadastro-list'
 import { useComplementosInfinite } from '@/src/presentation/hooks/useComplementos'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { DELIVERY_IMAGE_ACCEPT } from '@/src/shared/constants/deliveryImageUpload'
@@ -29,6 +37,9 @@ interface ComplementosListProps {
   onReload?: () => void
 }
 
+/**
+ * Miniatura com upload — empty state clicável; com URL usa EntityListThumbnail + badge de câmera.
+ */
 function ComplementoImagemThumb({
   nome,
   imagemUrl,
@@ -44,53 +55,73 @@ function ComplementoImagemThumb({
   const hasImage = Boolean(imagemUrl)
   const label = hasImage ? `Trocar imagem de ${nome}` : `Inserir imagem de ${nome}`
 
+  const openFilePicker = (e: React.SyntheticEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (isUploading) return
+    inputRef.current?.click()
+  }
+
+  const stopRow = (e: React.SyntheticEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
   return (
-    <button
-      type="button"
-      onClick={e => {
-        e.stopPropagation()
-        if (isUploading) return
-        inputRef.current?.click()
-      }}
-      disabled={isUploading}
-      aria-label={label}
-      title={label}
-      className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-gray-50 transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-60 md:h-12 md:w-12"
+    <div
+      className="relative h-11 w-11 shrink-0 md:h-12 md:w-12"
+      onClick={stopRow}
+      onMouseDown={stopRow}
     >
       <input
         ref={inputRef}
         type="file"
         accept={DELIVERY_IMAGE_ACCEPT}
         className="hidden"
+        onClick={e => e.stopPropagation()}
         onChange={e => {
           const file = e.target.files?.[0]
           e.target.value = ''
           if (file) onSelectFile(file)
         }}
       />
-      {imagemUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={imagemUrl}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover"
-        />
+      {hasImage ? (
+        <>
+          <EntityListThumbnail src={imagemUrl} alt={nome} />
+          <button
+            type="button"
+            title={label}
+            aria-label={label}
+            disabled={isUploading}
+            onClick={openFilePicker}
+            className="absolute -bottom-1 -right-1 z-10 flex h-5 w-5 items-center justify-center rounded-full border border-white bg-primary text-white shadow disabled:cursor-wait disabled:opacity-60"
+          >
+            <MdPhotoCamera className="h-3 w-3" />
+          </button>
+        </>
       ) : (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <MdPhotoCamera className="h-5 w-5 text-secondary-text/70" />
-        </div>
+        <button
+          type="button"
+          title={label}
+          aria-label={label}
+          disabled={isUploading}
+          onClick={openFilePicker}
+          className="relative flex h-full w-full items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-secondary-text transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
+        >
+          <MdImageNotSupported className="h-6 w-6 md:h-7 md:w-7" />
+        </button>
       )}
       {isUploading ? (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/35">
+        <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-black/35">
           <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
         </div>
       ) : null}
-    </button>
+    </div>
   )
 }
 
 /**
- * Linha da tabela (memo) — mesmo padrão de GruposComplementosList / GrupoItem
+ * Linha da tabela — shell compartilhado com GruposComplementosList
  */
 const ComplementoRow = memo(function ComplementoRow({
   complemento,
@@ -127,51 +158,49 @@ const ComplementoRow = memo(function ComplementoRow({
   isUploadingImagem?: boolean
   onUploadImagem?: (complementoId: string, file: File) => void
 }) {
-  const isZebraEven = index % 2 === 0
-  const bgClass = isZebraEven ? 'bg-gray-50' : 'bg-white'
-
   return (
-    <div
+    <CadastroListRow
+      variant="complementos"
+      index={index}
       onClick={() => onRowClick(complemento)}
-      className={`${bgClass} rounded-lg md:px-4 px-1 py-3 flex items-center md:gap-[10px] gap-1 hover:bg-secondary-bg/15 cursor-pointer`}
     >
-      <div className="md:flex-[3] flex-[2] font-normal md:text-sm text-[10px] text-primary-text flex min-w-0 items-center gap-2">
-        <ComplementoImagemThumb
-          nome={complemento.getNome()}
-          imagemUrl={imagemUrl}
-          isUploading={isUploadingImagem}
-          onSelectFile={file => onUploadImagem?.(complemento.getId(), file)}
-        />
-        <span className="truncate"># {complemento.getNome()}</span>
-      </div>
-      <div className="flex-[3] text-sm text-secondary-text hidden md:flex">
+      <ComplementoImagemThumb
+        nome={complemento.getNome()}
+        imagemUrl={imagemUrl}
+        isUploading={isUploadingImagem}
+        onSelectFile={file => onUploadImagem?.(complemento.getId(), file)}
+      />
+
+      <span
+        className="min-w-0 truncate font-normal text-xs text-primary-text md:text-sm"
+        title={complemento.getNome()}
+      >
+        {complemento.getNome()}
+      </span>
+
+      <div className="hidden min-w-0 truncate text-sm text-secondary-text md:block">
         {complemento.getDescricao() || 'Nenhuma'}
       </div>
 
-      <div className="flex-[2]" onClick={e => e.stopPropagation()}>
-        <div className="flex flex-col items-start gap-1">
-          <div className="flex items-center justify-end gap-2 px-3 py-1 rounded-lg border border-gray-300 bg-white max-w-[140px]">
-            <input
-              type="text"
-              value={valorDisplay}
-              onChange={e => onValorChange(complemento.getId(), e.target.value)}
-              onFocus={onValorFocus}
-              onBlur={() => onValorSubmit(complemento.getId())}
-              onKeyDown={e => onValorKeyDown(complemento.getId(), e)}
-              onClick={e => e.stopPropagation()}
-              disabled={savingValor}
-              className={`w-full bg-transparent text-left md:text-sm text-[10px] font-normal text-primary-text focus:outline-none ${
-                savingValor ? 'opacity-70 cursor-not-allowed' : ''
-              }`}
-            />
-          </div>
+      <div className="min-w-0" onClick={e => e.stopPropagation()}>
+        <div className="flex max-w-[140px] items-center rounded-lg border border-gray-300 bg-white px-3 py-1">
+          <input
+            type="text"
+            value={valorDisplay}
+            onChange={e => onValorChange(complemento.getId(), e.target.value)}
+            onFocus={onValorFocus}
+            onBlur={() => onValorSubmit(complemento.getId())}
+            onKeyDown={e => onValorKeyDown(complemento.getId(), e)}
+            onClick={e => e.stopPropagation()}
+            disabled={savingValor}
+            className={`w-full bg-transparent text-left text-[10px] font-normal text-primary-text focus:outline-none md:text-sm ${
+              savingValor ? 'cursor-not-allowed opacity-70' : ''
+            }`}
+          />
         </div>
       </div>
 
-      <div
-        className="flex-1 md:text-sm text-[10px] text-secondary-text text-center"
-        onClick={e => e.stopPropagation()}
-      >
+      <div className="min-w-0" onClick={e => e.stopPropagation()}>
         <select
           value={(complemento.getTipoImpactoPreco() || 'nenhum').toLowerCase()}
           onChange={e =>
@@ -179,8 +208,8 @@ const ComplementoRow = memo(function ComplementoRow({
           }
           onClick={e => e.stopPropagation()}
           disabled={savingTipo}
-          className={`w-full px-0 py-1 rounded-lg border border-gray-300 bg-white md:text-sm text-[10px] font-normal text-primary-text focus:outline-none focus:border-primary text-center ${
-            savingTipo ? 'opacity-70 cursor-not-allowed' : ''
+          className={`w-full rounded-lg border border-gray-300 bg-white px-1 py-1 text-center text-[10px] font-normal text-primary-text focus:border-primary focus:outline-none md:text-sm ${
+            savingTipo ? 'cursor-not-allowed opacity-70' : ''
           }`}
         >
           <option value="nenhum">NENHUM</option>
@@ -188,8 +217,9 @@ const ComplementoRow = memo(function ComplementoRow({
           <option value="diminui">DIMINUI</option>
         </select>
       </div>
+
       <div
-        className="md:flex-[2] flex-[1] flex justify-end"
+        className="flex items-center justify-center"
         onClick={e => e.stopPropagation()}
         onMouseDown={e => e.stopPropagation()}
         onTouchStart={e => e.stopPropagation()}
@@ -211,7 +241,7 @@ const ComplementoRow = memo(function ComplementoRow({
           }}
         />
       </div>
-    </div>
+    </CadastroListRow>
   )
 })
 
@@ -236,7 +266,6 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const valorDebounceTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
   const handleValorSubmitRef = useRef<((complementoId: string) => Promise<void>) | null>(null)
-
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -301,33 +330,30 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
     }
   }, [complementos, imagensPorComplementoId])
 
-  const handleUploadImagem = useCallback(
-    async (complementoId: string, file: File) => {
-      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-      if (!token) {
-        showToast.error('Token não encontrado')
-        return
-      }
+  const handleUploadImagem = useCallback(async (complementoId: string, file: File) => {
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+    if (!token) {
+      showToast.error('Token não encontrado')
+      return
+    }
 
-      setUploadingImagemComplementoId(complementoId)
-      const toastId = showToast.loading('Enviando imagem...')
+    setUploadingImagemComplementoId(complementoId)
+    const toastId = showToast.loading('Enviando imagem...')
 
-      try {
-        await uploadComplementoImagem(complementoId, file, token)
-        const persistedUrl = await fetchComplementoImagemUrl(complementoId, token)
-        setImagensPorComplementoId(prev => ({
-          ...prev,
-          [complementoId]: persistedUrl,
-        }))
-        showToast.successLoading(toastId, 'Imagem salva com sucesso!')
-      } catch (error) {
-        showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
-      } finally {
-        setUploadingImagemComplementoId(null)
-      }
-    },
-    []
-  )
+    try {
+      await uploadComplementoImagem(complementoId, file, token)
+      const persistedUrl = await fetchComplementoImagemUrl(complementoId, token)
+      setImagensPorComplementoId(prev => ({
+        ...prev,
+        [complementoId]: persistedUrl,
+      }))
+      showToast.successLoading(toastId, 'Imagem salva com sucesso!')
+    } catch (uploadError) {
+      showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(uploadError))
+    } finally {
+      setUploadingImagemComplementoId(null)
+    }
+  }, [])
 
   const { selectForEntity: selectComplementoImagem, cropModal: complementoCropModal } =
     useEntityImageCropUpload({
@@ -535,7 +561,6 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
       }
     },
     [
-      auth,
       valorInputs,
       parseValorToNumber,
       complementos,
@@ -602,7 +627,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         })
       }
     },
-    [auth, complementos, refetch, onReload]
+    [complementos, refetch, onReload]
   )
 
   const handleToggleComplementoStatus = useCallback(
@@ -647,7 +672,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         })
       }
     },
-    [auth, handleActionsReload]
+    [handleActionsReload]
   )
 
   const openTabsModal = useCallback(
@@ -712,7 +737,8 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="md:px-[30px] flex-shrink-0 py-[4px]">
+      <CadastroListShell className="flex min-h-0 flex-1 flex-col overflow-hidden px-2 md:px-[30px]">
+      <div className="flex-shrink-0 py-[4px]">
         <div className="flex flex-row items-center justify-between">
           <div className="flex flex-col md:pl-5">
             <p className="text-primary text-lg font-semibold">Complementos Cadastrados</p>
@@ -738,7 +764,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
 
       <div className="h-[2px] border-t-2 border-primary/70 flex-shrink-0" />
 
-      <div className="flex flex-shrink-0 gap-3 md:px-[20px] px-2 py-2">
+      <div className="flex flex-shrink-0 gap-3 py-2">
         <div className="max-w-[360px] min-w-[180px] flex-1">
           <div className="relative h-8">
             <MdSearch
@@ -770,30 +796,20 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         </div>
       </div>
 
-      <div className="md:px-[30px] mt-0 flex-shrink-0 px-1">
-        <div className="bg-custom-2 flex h-10 items-center gap-[10px] rounded-lg px-1 md:px-4">
-          <div className="md:flex-[3] flex-[2] font-semibold text-xs text-primary-text md:text-sm">
-            Nome
-          </div>
-          <div className="hidden flex-[3] font-semibold text-xs text-primary-text md:flex md:text-sm">
-            Descrição
-          </div>
-          <div className="flex-[2] font-semibold text-xs text-primary-text md:text-sm">
-            Valor
-          </div>
-          <div className="flex-[1] text-center font-semibold text-xs text-primary-text md:text-sm">
-            Impacto
-          </div>
-          <div className="md:flex-[2] flex-[1] text-end font-semibold text-xs text-primary-text md:mt-0 md:text-end md:text-sm">
-            Status
-          </div>
-        </div>
+      <div className="flex-shrink-0">
+        <CadastroListHeader variant="complementos">
+          <CadastroListThumbSpacer />
+          <CadastroListHeaderLabel>Nome</CadastroListHeaderLabel>
+          <CadastroListHeaderLabel hideOnMobile>Descrição</CadastroListHeaderLabel>
+          <CadastroListHeaderLabel>Valor</CadastroListHeaderLabel>
+          <CadastroListHeaderLabel className="text-center">Impacto</CadastroListHeaderLabel>
+          <CadastroListHeaderLabel className="text-center">Status</CadastroListHeaderLabel>
+        </CadastroListHeader>
       </div>
 
-      {/* Só as linhas rolam: ocupa todo o espaço restante abaixo do cabeçalho das colunas (sem max-h). */}
       <div
         ref={scrollContainerRef}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-2 pb-2 pt-2 scrollbar-hide md:px-[30px]"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-2 pt-2 scrollbar-hide"
       >
         {(isLoading || (complementos.length === 0 && isFetching)) && (
           <div className="flex flex-col items-center justify-center gap-2 py-8">
@@ -845,6 +861,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         onTabChange={handleTabsModalTabChange}
       />
       {complementoCropModal}
+      </CadastroListShell>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
@@ -156,9 +156,12 @@ export function AuthGuard({ children }: AuthGuardProps) {
       return
     }
 
-    /** Sem identity: se o refresh ainda vale, o hub consegue continuar com access. */
-    const hubBearer = await ensureHubBearerToken()
-    if (hubBearer) {
+    /**
+     * Sem identity válida o hub não pode abrir (só tenant/access deixa
+     * `usuario@sessao.local` e lista vazia). Tenta restaurar cookie; senão login.
+     */
+    const restored = await restoreIdentityFromCookie()
+    if (restored || identityHubStillValid()) {
       try {
         sessionStorage.setItem(SESSION_STORAGE_TENANT_LOGOUT_SELF, '1')
       } catch {
@@ -181,8 +184,11 @@ export function AuthGuard({ children }: AuthGuardProps) {
     window.location.href = '/login'
   }, [logout, logoutTenant])
 
+  /**
+   * Hub exige identidade (JWT de login), não basta tenant/access da empresa.
+   */
   const allowHubOrRedirectLogin = useCallback(async (): Promise<boolean> => {
-    if (identityHubStillValid() || isTenantSessionAlive()) {
+    if (identityHubStillValid()) {
       return true
     }
     const restored = await restoreIdentityFromCookie()
@@ -190,7 +196,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
       return true
     }
     const hubBearer = await ensureHubBearerToken()
-    return hubBearer !== null
+    return hubBearer?.source === 'identity'
   }, [])
 
   const redirectHubSemIdentidade = useCallback(() => {
@@ -233,7 +239,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
     if (isTenantLogoutInProgress()) {
       if (isHub) {
-        if ((identityAuth !== null && !identityAuth.isExpired()) || isTenantSessionAlive()) {
+        if (identityAuth !== null && !identityAuth.isExpired()) {
           try {
             sessionStorage.removeItem(SESSION_STORAGE_TENANT_LOGOUT_SELF)
           } catch {
@@ -270,13 +276,12 @@ export function AuthGuard({ children }: AuthGuardProps) {
     }
 
     if (isHub) {
-      const tenantAlive = isTenantSessionAlive()
-      if ((identityAuth !== null && !identityAuth.isExpired()) || tenantAlive) {
-        redirectingRef.current = false
-        setAllowed(true)
+      if (isHubLogoutInitiatorTab()) {
+        redirectHubSemIdentidade()
         return
       }
-      if (isHubLogoutInitiatorTab()) {
+      if (identityAuth !== null && !identityAuth.isExpired()) {
+        redirectingRef.current = false
         setAllowed(true)
         return
       }
@@ -400,9 +405,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
       const st = useAuthStore.getState()
       if (isHub) {
         if (isHubLogoutInitiatorTab()) {
-          return
-        }
-        if (isTenantSessionAlive()) {
+          redirectHubSemIdentidade()
           return
         }
         const id = st.identityAuth
