@@ -31,6 +31,7 @@ import { DesignModelosTab } from '../components/tabs/DesignModelosTab'
 import { DesignCoresTab } from '../components/tabs/DesignCoresTab'
 import { DesignTipografiasTab } from '../components/tabs/DesignTipografiasTab'
 import { DesignCategoriasTab } from '../components/tabs/DesignCategoriasTab'
+import { DesignRelacionadosTab } from '../components/tabs/DesignRelacionadosTab'
 
 export function DeliveryDesignCustomizerScreen() {
   const { empresa, isLoading: empresaLoading } = useEmpresaMe()
@@ -334,6 +335,13 @@ export function DeliveryDesignCustomizerScreen() {
               isError={categoriasGruposError}
               onChange={updateDraft}
               onGruposChange={setPreviewCategoriasGrupos}
+            />
+          )}
+          {activeTab === 'relacionados' && (
+            <DesignRelacionadosTab
+              grupos={previewCategoriasGrupos}
+              isLoading={categoriasGruposLoading}
+              isError={categoriasGruposError}
             />
           )}
         </div>

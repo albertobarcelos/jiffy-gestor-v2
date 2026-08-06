@@ -33,6 +33,7 @@ export type DesignTabId =
   | 'cores'
   | 'tipografias'
   | 'categorias'
+  | 'relacionados'
 
 export type DeliveryPublicoDesignConfig = {
   layoutId: DeliveryLayoutId

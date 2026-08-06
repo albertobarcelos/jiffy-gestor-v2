@@ -36,7 +36,7 @@ import {
 } from '../../shared/stores/deliveryCarrinhoStore'
 import { buildCatalogViewModel } from '../../shared/mappers/buildCatalogViewModel'
 import { applySugestoesDaCasaVisibility } from '../../shared/utils/applySugestoesDaCasaVisibility'
-import { findCatalogoProdutoById } from '../../shared/utils/findCatalogoProdutoById'
+import { findCatalogoProdutoById, findCatalogoGrupoIdByProdutoId } from '../../shared/utils/findCatalogoProdutoById'
 import { formatEmpresaPublicaEndereco } from '../../shared/utils/formatEmpresaPublicaEndereco'
 import { produtoTemComplementosAtivos } from '../../shared/utils/produtoComplementosUtils'
 import { resolveDeliveryLayoutHome } from '../layouts/DeliveryPublicoLayoutRegistry'
@@ -227,6 +227,7 @@ export function DeliveryPublicoHomeScreen({
 
       adicionarItem(slug, {
         produtoId: produto.id,
+        grupoId: findCatalogoGrupoIdByProdutoId(grupos, produto.id),
         produtoNome: produto.nome,
         produtoImagemUrl: produto.imagemUrl,
         quantidade: 1,
@@ -516,6 +517,7 @@ function DeliveryPublicoHomeContent({
         <DeliveryProdutoModal
           slug={slug}
           produto={produtoSelecionado}
+          grupoId={findCatalogoGrupoIdByProdutoId(grupos, produtoSelecionado.id)}
           onClose={onCloseProduto}
           onAdicionado={onProdutoAdicionado}
         />

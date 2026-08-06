@@ -35,6 +35,14 @@ export type CatalogoPublicoProdutoDTO = {
   grupoComplementosIds: string[]
 }
 
+export type PecaTambemProdutoDTO = CatalogoPublicoProdutoDTO & {
+  grupoIdOrigem: string
+}
+
+export type GetPecaTambemPublicoResponseDTO = {
+  produtos: PecaTambemProdutoDTO[]
+}
+
 export type CatalogoPublicoGrupoProdutoDTO = {
   id: string
   nome: string

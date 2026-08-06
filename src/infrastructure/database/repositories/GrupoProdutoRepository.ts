@@ -126,5 +126,43 @@ export class GrupoProdutoRepository implements IGrupoProdutoRepository {
       }
     )
   }
+
+  async listarProdutosRelacionados(grupoId: string) {
+    const { data } = await this.apiClient.request<{
+      relacionados: Array<{
+        produtoId: string
+        ordem: number
+        nome: string
+        valor: number
+        imagemUrl: string | null
+        ativo: boolean
+        ativoDelivery: boolean
+        codigoProduto: number
+      }>
+    }>(`/api/v1/cardapio/grupos-produtos/${grupoId}/relacionados`, {
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+      },
+    })
+
+    return data?.relacionados ?? []
+  }
+
+  async substituirProdutosRelacionados(
+    grupoId: string,
+    produtoIds: string[]
+  ): Promise<void> {
+    await this.apiClient.request(
+      `/api/v1/cardapio/grupos-produtos/${grupoId}/relacionados`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.token}`,
+        },
+        body: JSON.stringify({ produtoIds }),
+      }
+    )
+  }
 }
 

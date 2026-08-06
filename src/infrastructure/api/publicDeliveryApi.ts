@@ -5,6 +5,7 @@ import type {
   CriarClienteDeliveryPublicoInput,
   GetCatalogoPublicoResponseDTO,
   GetMeiosPagamentoPublicosResponseDTO,
+  GetPecaTambemPublicoResponseDTO,
 } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { DisponibilidadeDeliveryDTO } from '@/src/application/dto/delivery-publico/DisponibilidadeDeliveryDTO'
 import type { HorarioFuncionamentoPublicoDTO } from '@/src/application/dto/delivery-publico/HorarioFuncionamentoPublicoDTO'
@@ -57,6 +58,27 @@ export async function fetchCatalogoPublico(
   if (params?.limit != null) search.set('limit', String(params.limit))
   const qs = search.toString()
   const url = `/api/public/delivery/catalogo/${encodeURIComponent(slug)}${qs ? `?${qs}` : ''}`
+
+  const res = await fetch(url, { cache: 'no-store' })
+  if (!res.ok) {
+    throw new PublicDeliveryApiError(await parseErrorMessage(res), res.status)
+  }
+  return res.json()
+}
+
+export async function fetchPecaTambemPublico(
+  slug: string,
+  params: { grupoIds: string[]; excludeProdutoIds?: string[] }
+): Promise<GetPecaTambemPublicoResponseDTO> {
+  const search = new URLSearchParams()
+  if (params.grupoIds.length > 0) {
+    search.set('grupoIds', params.grupoIds.join(','))
+  }
+  if (params.excludeProdutoIds?.length) {
+    search.set('excludeProdutoIds', params.excludeProdutoIds.join(','))
+  }
+  const qs = search.toString()
+  const url = `/api/public/delivery/catalogo/${encodeURIComponent(slug)}/peca-tambem${qs ? `?${qs}` : ''}`
 
   const res = await fetch(url, { cache: 'no-store' })
   if (!res.ok) {

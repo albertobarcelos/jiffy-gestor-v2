@@ -13,3 +13,13 @@ export function findCatalogoProdutoById(
   }
   return null
 }
+
+export function findCatalogoGrupoIdByProdutoId(
+  grupos: CatalogoPublicoGrupoProdutoDTO[],
+  produtoId: string
+): string | null {
+  for (const grupo of grupos) {
+    if (grupo.produtos.some(p => p.id === produtoId)) return grupo.id
+  }
+  return null
+}
