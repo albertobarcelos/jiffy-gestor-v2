@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -69,7 +69,6 @@ export default function MinhasEmpresasPage() {
   const [feedGridExpandido, setFeedGridExpandido] = useState(false)
 
   const hubSessaoProativaDisparadaRef = useRef(false)
-  const redirectTimerRef = useRef<number | undefined>(undefined)
 
   const irParaLogin = useCallback(() => {
     void logout().finally(() => {
@@ -80,19 +79,17 @@ export default function MinhasEmpresasPage() {
   const reportHubSessionIssue = useCallback(
     (message: string) => {
       setHubTokenBanner(message)
-      toast.error(message, { id: HUB_SESSAO_TOAST_ID, duration: 8000 })
+      toast.error(message, { id: HUB_SESSAO_TOAST_ID, duration: 4000 })
 
       if (!hubSessaoProativaDisparadaRef.current) {
         hubSessaoProativaDisparadaRef.current = true
-        redirectTimerRef.current = window.setTimeout(() => {
-          irParaLogin()
-        }, 3000)
+        irParaLogin()
       }
     },
     [irParaLogin]
   )
 
-  /** Bootstrap: identity → access da aba → refresh cookie. */
+  /** Bootstrap: identity → access da aba → refresh cookie. Sem token → login imediato. */
   useEffect(() => {
     if (!isRehydrated) {
       return
@@ -103,7 +100,7 @@ export default function MinhasEmpresasPage() {
       if (cancelado) {
         return
       }
-      if (!bearer) {
+      if (!bearer || bearer.source !== 'identity') {
         setHubBearer(null)
         setHubBearerReady(true)
         reportHubSessionIssue(HUB_SESSAO_TOKEN_MENSAGEM)
@@ -116,9 +113,6 @@ export default function MinhasEmpresasPage() {
     })()
     return () => {
       cancelado = true
-      if (redirectTimerRef.current !== undefined) {
-        window.clearTimeout(redirectTimerRef.current)
-      }
     }
   }, [isRehydrated, identityAuth, reportHubSessionIssue])
 
@@ -499,6 +493,19 @@ export default function MinhasEmpresasPage() {
     viewMode === 'grid' &&
     feedItems.length > MINHAS_EMPRESAS_GRID_PREVIEW_LIMIT &&
     !buscaAtiva
+
+  if (!isRehydrated || !hubBearerReady || !hubBearer) {
+    return (
+      <div
+        className="flex min-h-[40vh] w-full items-center justify-center bg-gray-50"
+        role="status"
+        aria-live="polite"
+        aria-label="Validando sessão"
+      >
+        <JiffyLoading />
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-0 w-full bg-gray-50 pb-8">
