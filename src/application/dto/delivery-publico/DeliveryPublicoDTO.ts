@@ -125,6 +125,9 @@ export type ClienteDeliveryPublicoDTO = {
   enderecos: EnderecoClienteDeliveryPublicoDTO[]
 }
 
+export type { CreatePedidoPublicoResponseDTO } from './CreatePedidoPublicoResponseDTO'
+export { parseCreatePedidoPublicoResponse } from './CreatePedidoPublicoResponseDTO'
+
 export {
   AtualizarClienteDeliveryPublicoInputSchema,
   ClientePedidoPublicoInputSchema,

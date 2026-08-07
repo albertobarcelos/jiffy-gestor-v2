@@ -7,9 +7,13 @@ import {
   type JiffySidePanelFooterActions,
 } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { Produto } from '@/src/domain/entities/Produto'
+import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { NovoProduto, type NovoProdutoHandle } from './NovoProduto'
-import { ComplementosMultiSelectDialog } from './ComplementosMultiSelectDialog'
-import { ProdutoImpressorasDialog } from './ProdutoImpressorasDialog'
+import { ComplementosMultiSelectDialog, type ComplementosMultiSelectHandle } from './ComplementosMultiSelectDialog'
+import {
+  ProdutoImpressorasDialog,
+  type ProdutoImpressorasHandle,
+} from './ProdutoImpressorasDialog'
 import { ProdutoImagemPanel } from './ProdutoImagemPanel'
 import { NovoGrupo, type NovoGrupoHandle } from '../grupos-produtos/NovoGrupo'
 import { GRUPO_PRODUTOS_MODAL_FORM_ID } from '../grupos-produtos/grupoProdutosModalConstants'
@@ -31,6 +35,8 @@ export interface ProdutosTabsModalState {
   produto?: Produto
   prefillGrupoProdutoId?: string
   grupoId?: string
+  /** Grupo já carregado na lista — evita spinner ao abrir a aba Grupo. */
+  initialGrupo?: GrupoProduto
   initialStepProduto?: 0 | 1 | 2
   /** Aba inicial do `NovoGrupo` (0 = detalhes, 1 = produtos vinculados) */
   initialTabGrupo?: number
@@ -52,6 +58,8 @@ export function ProdutosTabsModal({
   const produtoId = state.produto?.getId()
   const npRef = useRef<NovoProdutoHandle>(null)
   const grupoNgRef = useRef<NovoGrupoHandle>(null)
+  const complementosRef = useRef<ComplementosMultiSelectHandle>(null)
+  const impressorasRef = useRef<ProdutoImpressorasHandle>(null)
   /** Evita fechar o painel quando o salvamento do produto é só etapa antes do salvamento do grupo */
   const suppressCloseOnNextProdutoSuccessRef = useRef(false)
 
@@ -64,6 +72,31 @@ export function ProdutosTabsModal({
     isSubmitting: false,
     canSubmit: false,
   })
+  const [embedComplementos, setEmbedComplementos] = useState({
+    isDirty: false,
+    isSaving: false,
+  })
+  const [embedImpressoras, setEmbedImpressoras] = useState({
+    isDirty: false,
+    isSaving: false,
+  })
+
+  const handleEmbedComplementosChange = useCallback(
+    (next: { isDirty: boolean; isSaving: boolean }) => {
+      setEmbedComplementos(prev =>
+        prev.isDirty === next.isDirty && prev.isSaving === next.isSaving ? prev : next
+      )
+    },
+    []
+  )
+  const handleEmbedImpressorasChange = useCallback(
+    (next: { isDirty: boolean; isSaving: boolean }) => {
+      setEmbedImpressoras(prev =>
+        prev.isDirty === next.isDirty && prev.isSaving === next.isSaving ? prev : next
+      )
+    },
+    []
+  )
 
   /** Confirmação ao fechar o painel com produto em edição e alterações não salvas */
   const [confirmExitOpen, setConfirmExitOpen] = useState(false)
@@ -96,7 +129,11 @@ export function ProdutosTabsModal({
     // Duplo rAF: o baseline do produto pode ser commitado após load (setTimeout no filho); avaliar dirty no próximo frame evita falso positivo ao fechar logo ao abrir.
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        if (npRef.current?.isDirty?.()) {
+        if (
+          npRef.current?.isDirty?.() ||
+          complementosRef.current?.isDirty?.() ||
+          impressorasRef.current?.isDirty?.()
+        ) {
           setConfirmExitOpen(true)
           return
         }
@@ -115,14 +152,34 @@ export function ProdutosTabsModal({
   }, [])
 
   /** Salva o produto e fecha o painel — alinhado ao rodapé do wizard (passos 0–1 vs fiscal). */
-  const handleSaveAndCloseFromConfirm = useCallback(() => {
+  const handleSaveAndCloseFromConfirm = useCallback(async () => {
     setConfirmExitOpen(false)
-    if (wizardStep < 2) {
-      void npRef.current?.savePartialAndClose()
-    } else {
-      void npRef.current?.saveFinal()
+    if (npRef.current?.isDirty?.()) {
+      if (wizardStep < 2) {
+        void npRef.current?.savePartialAndClose()
+      } else {
+        void npRef.current?.saveFinal()
+      }
+      return
     }
-  }, [wizardStep])
+    if (complementosRef.current?.isDirty?.()) {
+      const ok = await complementosRef.current.save()
+      if (ok) onClose()
+      return
+    }
+    if (impressorasRef.current?.isDirty?.()) {
+      const ok = await impressorasRef.current.save()
+      if (ok) onClose()
+    }
+  }, [wizardStep, onClose])
+
+  const handleSalvarComplementos = useCallback(async () => {
+    await complementosRef.current?.save()
+  }, [])
+
+  const handleSalvarImpressoras = useCallback(async () => {
+    await impressorasRef.current?.save()
+  }, [])
 
   /** Persiste alterações pendentes do produto sem fechar o painel (orquestração com salvamento do grupo). */
   const persistPendingProdutoChanges = useCallback(async (): Promise<boolean> => {
@@ -177,10 +234,13 @@ export function ProdutosTabsModal({
       return
     }
     if (state.tab === 'produto') setMountedProduto(true)
-    if (state.tab === 'complementos' && produtoId) setMountedComplementos(true)
-    if (state.tab === 'impressoras' && produtoId) setMountedImpressoras(true)
-    if (state.tab === 'imagem' && produtoId) setMountedImagem(true)
-    if (state.tab === 'grupo' && state.grupoId) setMountedGrupo(true)
+    // Pré-monta Complementos / Impressoras / Imagem / Grupo em background (SPA sem spinner ao trocar aba).
+    if (produtoId) {
+      setMountedComplementos(true)
+      setMountedImpressoras(true)
+      setMountedImagem(true)
+    }
+    if (state.grupoId) setMountedGrupo(true)
   }, [state.open, state.tab, produtoId, state.grupoId])
 
   const showProdutoPanel = state.open && (mountedProduto || state.tab === 'produto')
@@ -211,33 +271,55 @@ export function ProdutosTabsModal({
   }, [produtoId, state.mode])
 
   const title = useMemo(() => {
+    const nome = state.produto?.getNome()?.trim()
+
     if (state.tab === 'produto') {
-      switch (state.mode) {
-        case 'create':
-          return 'Novo Produto'
-        case 'copy':
-          return 'Copiar Produto'
-        case 'edit':
-        default:
-          return 'Editar Produto'
+      // Criação sem nome ainda: mantém o verbo da ação como título
+      if (state.mode === 'create' && !nome) {
+        return 'Novo Produto'
       }
+      const displayName = nome || 'Produto'
+      return (
+        <span className="block max-w-full truncate tracking-normal" title={displayName}>
+          {displayName}
+        </span>
+      )
     }
-    if (state.tab === 'complementos') {
-      return 'Complementos de'
-    }
-    if (state.tab === 'impressoras') {
-      return 'Impressoras de'
-    }
+
     if (state.tab === 'imagem') {
       return 'Imagem de'
     }
-    return state.grupoId ? 'Grupo Produtos de' : 'Grupo Produtos'
+
+    // Complementos / Grupo / Impressoras: só o produto (a tab já dá o contexto)
+    const displayName = nome || 'Produto'
+    return (
+      <span className="block max-w-full truncate tracking-normal" title={displayName}>
+        {displayName}
+      </span>
+    )
   }, [state])
 
-  /** Mesmo subtítulo do `JiffySidePanelModal` em todas as abas quando há produto no estado */
+  /** Contexto da ação/aba — tipografia menor; o nome do produto fica no título */
   const subtitle = useMemo(() => {
-    return state.produto?.getNome()
-  }, [state.produto])
+    if (state.tab === 'imagem') {
+      return state.produto?.getNome()
+    }
+
+    if (state.tab !== 'produto') return undefined
+
+    if (state.mode === 'create' && !state.produto?.getNome()?.trim()) {
+      return undefined
+    }
+
+    const label =
+      state.mode === 'create'
+        ? 'Novo produto'
+        : state.mode === 'copy'
+          ? 'Copiar produto'
+          : 'Editar produto'
+
+    return <span className="font-normal text-secondary-text">{label}</span>
+  }, [state])
 
   const footerProduto = useMemo((): JiffySidePanelFooterActions | undefined => {
     if (state.tab !== 'produto') return undefined
@@ -291,11 +373,43 @@ export function ProdutosTabsModal({
     }
   }, [state.tab, wizardStep, wizardSaving, fiscalOnlyBack])
 
-  const footerComplementosOuImpressoras = useMemo(
+  const footerComplementos = useMemo(
     (): JiffySidePanelFooterActions => ({
+      showCancel: true,
+      cancelLabel: 'Fechar',
+      cancelVariant: 'primaryTint10',
+      onCancel: handleRequestClose,
       showSave: true,
-      saveLabel: 'Fechar',
-      onSave: handleRequestClose,
+      saveLabel: 'Salvar',
+      onSave: () => void handleSalvarComplementos(),
+      saveLoading: embedComplementos.isSaving,
+      saveDisabled: !embedComplementos.isDirty || embedComplementos.isSaving,
+    }),
+    [handleRequestClose, handleSalvarComplementos, embedComplementos]
+  )
+
+  const footerImpressoras = useMemo(
+    (): JiffySidePanelFooterActions => ({
+      showCancel: true,
+      cancelLabel: 'Fechar',
+      cancelVariant: 'primaryTint10',
+      onCancel: handleRequestClose,
+      showSave: true,
+      saveLabel: 'Salvar',
+      onSave: () => void handleSalvarImpressoras(),
+      saveLoading: embedImpressoras.isSaving,
+      saveDisabled: !embedImpressoras.isDirty || embedImpressoras.isSaving,
+    }),
+    [handleRequestClose, handleSalvarImpressoras, embedImpressoras]
+  )
+
+  /** Aba Imagem: upload no painel — sem validação do form do produto; só Fechar. */
+  const footerImagem = useMemo(
+    (): JiffySidePanelFooterActions => ({
+      showCancel: true,
+      cancelLabel: 'Fechar',
+      cancelVariant: 'primaryTint10',
+      onCancel: handleRequestClose,
     }),
     [handleRequestClose]
   )
@@ -304,15 +418,6 @@ export function ProdutosTabsModal({
     const savingGrupoOuProduto = embedGrupoForm.isSubmitting || wizardSaving
     const saveDisabled = !embedGrupoForm.canSubmit || savingGrupoOuProduto
 
-    if (embedGrupoTab === 0) {
-      return {
-        showSave: true,
-        saveLabel: 'Salvar',
-        onSave: () => void handleSalvarGrupoCombinado(),
-        saveLoading: savingGrupoOuProduto,
-        saveDisabled,
-      }
-    }
     return {
       showCancel: true,
       cancelLabel: 'Fechar',
@@ -324,18 +429,33 @@ export function ProdutosTabsModal({
       saveLoading: savingGrupoOuProduto,
       saveDisabled,
     }
-  }, [embedGrupoTab, embedGrupoForm, handleRequestClose, handleSalvarGrupoCombinado, wizardSaving])
+  }, [embedGrupoForm, handleRequestClose, handleSalvarGrupoCombinado, wizardSaving])
 
   const footerActions = useMemo(() => {
     if (state.tab === 'produto') return footerProduto
-    if (state.tab === 'complementos' || state.tab === 'impressoras' || state.tab === 'imagem')
-      return footerComplementosOuImpressoras
+    if (state.tab === 'complementos') return footerComplementos
+    if (state.tab === 'impressoras') return footerImpressoras
+    if (state.tab === 'imagem') return footerImagem
     if (state.tab === 'grupo' && !state.grupoId) {
-      return footerComplementosOuImpressoras
+      return {
+        showCancel: true,
+        cancelLabel: 'Fechar',
+        cancelVariant: 'primaryTint10' as const,
+        onCancel: handleRequestClose,
+      }
     }
     if (state.tab === 'grupo') return footerGrupo
     return undefined
-  }, [state.tab, state.grupoId, footerProduto, footerComplementosOuImpressoras, footerGrupo])
+  }, [
+    state.tab,
+    state.grupoId,
+    footerProduto,
+    footerComplementos,
+    footerImpressoras,
+    footerImagem,
+    footerGrupo,
+    handleRequestClose,
+  ])
 
   return (
     <>
@@ -390,6 +510,11 @@ export function ProdutosTabsModal({
                 key={`${produtoId ?? 'new'}-${state.mode}-${produtoFormSession}`}
                 ref={npRef}
                 produtoId={state.mode === 'create' ? undefined : produtoId}
+                initialProduto={
+                  state.mode !== 'create' && state.produto?.getId() === produtoId
+                    ? state.produto
+                    : undefined
+                }
                 isCopyMode={state.mode === 'copy'}
                 defaultGrupoProdutoId={
                   state.mode === 'create' ? state.prefillGrupoProdutoId : undefined
@@ -423,11 +548,14 @@ export function ProdutosTabsModal({
               aria-hidden={state.tab !== 'complementos'}
             >
               <ComplementosMultiSelectDialog
+                ref={complementosRef}
                 open={state.open}
                 produtoId={produtoId}
                 produtoNome={state.produto?.getNome()}
+                initialGruposResumo={state.produto?.getGruposComplementos()}
                 onClose={handleRequestClose}
                 isEmbedded
+                onEmbedStateChange={handleEmbedComplementosChange}
               />
             </div>
           ) : state.open && state.tab === 'complementos' && !produtoId ? (
@@ -445,11 +573,14 @@ export function ProdutosTabsModal({
               aria-hidden={state.tab !== 'impressoras'}
             >
               <ProdutoImpressorasDialog
+                ref={impressorasRef}
                 open={state.open}
                 produtoId={produtoId}
                 produtoNome={state.produto?.getNome()}
+                initialImpressorasResumo={state.produto?.getImpressoras()}
                 onClose={handleRequestClose}
                 isEmbedded
+                onEmbedStateChange={handleEmbedImpressorasChange}
               />
             </div>
           ) : state.open && state.tab === 'impressoras' && !produtoId ? (
@@ -492,6 +623,7 @@ export function ProdutosTabsModal({
                 ref={grupoNgRef}
                 key={state.grupoId}
                 grupoId={state.grupoId!}
+                initialGrupo={state.initialGrupo}
                 isEmbedded
                 embeddedFormId={GRUPO_PRODUTOS_MODAL_FORM_ID}
                 hideEmbeddedFormActions

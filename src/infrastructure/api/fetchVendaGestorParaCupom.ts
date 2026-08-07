@@ -1,3 +1,4 @@
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import type { ItemCupomDelivery, VendaGestorCupomDTO } from '@/src/shared/types/deliveryImpressao'
 
 function mapProdutoLinha(p: Record<string, unknown>): ItemCupomDelivery {
@@ -83,7 +84,7 @@ export async function fetchVendaGestorParaCupom(
   accessToken: string | undefined
 ): Promise<VendaGestorCupomDTO | null> {
   if (!accessToken?.trim()) return null
-  const res = await fetch(`/api/vendas/gestor/${encodeURIComponent(vendaId)}?incluirFiscal=false`, {
+  const res = await fetchGestorApi(`/api/vendas/gestor/${encodeURIComponent(vendaId)}?incluirFiscal=false`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
       Accept: 'application/json',

@@ -9,11 +9,15 @@ function baseInput(
     tipoInicioPedido: 'entrega',
     origem: 'GESTOR',
     status: 'ABERTA',
+    telefoneCliente: '65999998888',
     produtos: [
       {
         produtoId: 'prod-1',
+        nome: 'Produto teste',
         quantidade: 1,
         valorUnitario: 24,
+        valorCatalogo: 24,
+        permiteAlterarPreco: false,
         valorDesconto: null,
         valorAcrescimo: null,
         tipoDesconto: null,
@@ -37,7 +41,7 @@ function baseInput(
     meiosPagamento: [],
     nomesMeiosPagamentoPedido: {},
     ...overrides,
-  }
+  } as CriarPedidoDeliveryInputDTO
 }
 
 describe('CriarPedidoDeliveryPayloadMapper', () => {
@@ -169,5 +173,57 @@ describe('CriarPedidoDeliveryPayloadMapper', () => {
     expect(payload.slotInicio).toBe('2026-06-15T22:00:00.000Z')
     expect(payload.slotFim).toBe('2026-06-15T22:15:00.000Z')
     expect(payload.tempoTotalEstimadoSegundos).toBeUndefined()
+  })
+
+  it('envia valorUnitario alterado nos produtos', () => {
+    const payload = buildCriarPedidoDeliveryPayload(
+      baseInput({
+        produtos: [
+          {
+            produtoId: 'prod-1',
+            nome: 'Produto teste',
+            quantidade: 2,
+            valorUnitario: 19.9,
+            valorCatalogo: 24,
+            permiteAlterarPreco: true,
+            valorDesconto: null,
+            valorAcrescimo: null,
+            tipoDesconto: null,
+            tipoAcrescimo: null,
+            complementos: [],
+          },
+        ],
+      })
+    )
+
+    expect(payload.produtos[0]).toMatchObject({
+      produtoId: 'prod-1',
+      quantidade: 2,
+      valorUnitario: 19.9,
+    })
+  })
+
+  it('não envia valorUnitario quando preço não foi alterado', () => {
+    const payload = buildCriarPedidoDeliveryPayload(
+      baseInput({
+        produtos: [
+          {
+            produtoId: 'prod-1',
+            nome: 'Produto teste',
+            quantidade: 1,
+            valorUnitario: 24,
+            valorCatalogo: 24,
+            permiteAlterarPreco: true,
+            valorDesconto: null,
+            valorAcrescimo: null,
+            tipoDesconto: null,
+            tipoAcrescimo: null,
+            complementos: [],
+          },
+        ],
+      })
+    )
+
+    expect(payload.produtos[0].valorUnitario).toBeUndefined()
   })
 })

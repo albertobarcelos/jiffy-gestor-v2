@@ -1,3 +1,4 @@
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import {
   obterPedidoDeliveryDetalheCache,
   salvarPedidoDeliveryDetalheCache,
@@ -41,7 +42,7 @@ export async function fetchPedidoDeliveryDetalhe(
 
   logImpressao('fetchPedidoDelivery.inicio', { vendaId })
 
-  const res = await fetch(`/api/delivery/pedidos/${encodeURIComponent(vendaId)}`, {
+  const res = await fetchGestorApi(`/api/delivery/pedidos/${encodeURIComponent(vendaId)}`, {
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: 'application/json',

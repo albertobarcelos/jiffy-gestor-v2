@@ -131,6 +131,10 @@ export function useNovoPedidoEdicaoLinha({
           produtoEntity?.getUnidadeMedida() ??
           unidadeMedidaEdicao,
         valorUnitario: novoValorUnitario,
+        valorCatalogo:
+          produtoAtual.valorCatalogo ?? produtoEntity?.getValor() ?? novoValorUnitario,
+        permiteAlterarPreco:
+          produtoAtual.permiteAlterarPreco ?? permiteAlterarPreco,
         tipoDesconto: podeAplicarDesconto ? (ehPorcentagem ? 'porcentagem' : 'fixo') : null,
         valorDesconto: podeAplicarDesconto ? valorNum : null,
         tipoAcrescimo: podeAplicarAcrescimo ? (ehPorcentagem ? 'porcentagem' : 'fixo') : null,

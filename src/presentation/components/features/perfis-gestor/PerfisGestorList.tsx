@@ -10,6 +10,7 @@ import {
 } from 'react'
 import { PerfilGestor } from '@/src/domain/entities/PerfilGestor'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
@@ -58,7 +59,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
-  const { auth, isAuthenticated } = useAuthStore()
+  const { isAuthenticated } = useAuthStore()
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -75,7 +76,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
    */
   const loadContagemUsuariosPorPerfil = useCallback(
     async (perfilIds: string[]) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token || perfilIds.length === 0) return
 
       try {
@@ -84,7 +85,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
           perfilIds.map(async (perfilId) => {
             try {
               // Busca todos os usuários do perfil (com limit alto) para contar corretamente
-              const response = await fetch(`/api/pessoas/usuarios-gestor?perfilGestorId=${perfilId}&limit=100&offset=0`, {
+              const response = await fetchGestorApi(`/api/pessoas/usuarios-gestor?perfilGestorId=${perfilId}&limit=100&offset=0`, {
                 headers: {
                   Authorization: `Bearer ${token}`,
                   'Content-Type': 'application/json',
@@ -131,7 +132,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
         console.error('Erro ao carregar contagem de usuários gestor:', error)
       }
     },
-    [auth]
+    []
   )
 
   /**
@@ -140,7 +141,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
    */
   const loadAllPerfis = useCallback(
     async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         return
       }
@@ -163,7 +164,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
             params.append('q', searchTextRef.current)
           }
 
-          const response = await fetch(`/api/pessoas/perfis-gestor?${params.toString()}`, {
+          const response = await fetchGestorApi(`/api/pessoas/perfis-gestor?${params.toString()}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -205,7 +206,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
         setIsLoading(false)
       }
     },
-    [auth]
+    []
   )
 
   // Debounce da busca
@@ -233,7 +234,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
   useEffect(() => {
     if (!isAuthenticated || hasLoadedInitialRef.current) return
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     hasLoadedInitialRef.current = true
@@ -248,11 +249,11 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
 
   const loadUsuariosPorPerfil = useCallback(
     async (perfilId: string) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token || usuariosPorPerfil[perfilId]) return
 
       try {
-        const response = await fetch(`/api/pessoas/usuarios-gestor?perfilGestorId=${perfilId}&limit=100&offset=0`, {
+        const response = await fetchGestorApi(`/api/pessoas/usuarios-gestor?perfilGestorId=${perfilId}&limit=100&offset=0`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -282,7 +283,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
         console.error('Erro ao carregar usuários gestor do perfil:', error)
       }
     },
-    [auth, usuariosPorPerfil]
+    [ usuariosPorPerfil]
   )
 
   const toggleExpand = (perfilId: string) => {
@@ -301,7 +302,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
    */
   const handleTogglePermission = useCallback(
     async (perfilId: string, permission: 'acessoFinanceiro' | 'acessoEstoque' | 'acessoFiscal' | 'acessoDashboard', newValue: boolean) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -346,7 +347,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
           [permission]: newValue,
         }
         
-        const response = await fetch(`/api/pessoas/perfis-gestor/${perfilId}`, {
+        const response = await fetchGestorApi(`/api/pessoas/perfis-gestor/${perfilId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -390,7 +391,7 @@ export const PerfisGestorList = forwardRef<PerfisGestorListHandle, PerfisGestorL
         })
       }
     },
-    [auth, perfis, loadAllPerfis]
+    [ perfis, loadAllPerfis]
   )
 
   const openTabsModal = useCallback((config: Partial<PerfisGestorTabsModalState> = {}) => {

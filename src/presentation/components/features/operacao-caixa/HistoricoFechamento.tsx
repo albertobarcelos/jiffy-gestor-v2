@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { MdSearch, MdCalendarToday, MdFilterAltOff, MdFilterList, MdClose } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -192,9 +193,7 @@ const sxHistoricoFiltroTextFieldDate = {
  * Componente de histórico de fechamento de caixa
  * Implementa scroll infinito, filtros avançados e exibição em tabela
  */
-export function HistoricoFechamento() {
-  const { auth } = useAuthStore()
-  const { timezoneAgregacao } = useEmpresaMe()
+export function HistoricoFechamento() {  const { timezoneAgregacao } = useEmpresaMe()
 
   // Estados de filtros
   const [searchQuery, setSearchQuery] = useState('')
@@ -362,7 +361,7 @@ export function HistoricoFechamento() {
    */
   const fetchOperacoesCaixa = useCallback(
     async (resetPage = false) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return
 
       if (resetPage) {
@@ -442,7 +441,7 @@ export function HistoricoFechamento() {
           params.append('status', filters.statusFilter.trim().toLowerCase())
         }
 
-        const response = await fetch(`/api/caixa/operacao-caixa-terminal?${params.toString()}`, {
+        const response = await fetchGestorApi(`/api/caixa/operacao-caixa-terminal?${params.toString()}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -493,14 +492,14 @@ export function HistoricoFechamento() {
         setIsLoadingMore(false)
       }
     },
-    [auth, currentPage, pageSize]
+    [ currentPage, pageSize]
   )
 
   /**
    * Busca todos os terminais
    */
   const loadAllTerminais = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     setIsLoadingTerminais(true)
@@ -517,7 +516,7 @@ export function HistoricoFechamento() {
           offset: currentOffset.toString(),
         })
 
-        const response = await fetch(`/api/terminais?${params.toString()}`, {
+        const response = await fetchGestorApi(`/api/terminais?${params.toString()}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -554,7 +553,7 @@ export function HistoricoFechamento() {
     } finally {
       setIsLoadingTerminais(false)
     }
-  }, [auth])
+  }, [])
 
   // Debounce para busca
   useEffect(() => {

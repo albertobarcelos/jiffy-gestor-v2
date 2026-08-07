@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter, usePathname } from 'next/navigation' // Importar useRouter e usePathname
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import {
   MdSearch,
   MdAttachMoney,
@@ -12,6 +13,7 @@ import {
   MdPrint,
   MdFilterList,
   MdReceiptLong,
+  MdDownload,
 } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -37,6 +39,11 @@ import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side
 import { FaturamentoRangeCalendar } from '@/src/presentation/components/ui/FaturamentoRangeCalendar'
 import { useDashboardFaturamentoPorDiaQuery } from '@/src/presentation/hooks/useDashboardFaturamentoPorDiaQuery'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
+import { useExportarRelatorioVendas } from '@/src/presentation/hooks/useExportarRelatorioVendas'
+import type {
+  MetricasVendas as MetricasVendasExport,
+  VendasFiltrosQuerySnapshot as VendasFiltrosQuerySnapshotExport,
+} from '@/src/presentation/utils/vendas/vendasListTypes'
 // Tipos
 interface Venda {
   id: string
@@ -543,8 +550,8 @@ const sxVendasFiltroTextFieldMoeda = {
  * Implementa scroll infinito, filtros avançados e cards de métricas
  */
 export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
-  const { auth } = useAuthStore()
-  const { timezoneAgregacao } = useEmpresaMe()
+  const { timezoneAgregacao, empresa } = useEmpresaMe()
+  const { exportar: exportarRelatorio, isExportando } = useExportarRelatorioVendas()
   const router = useRouter()
   const pathname = usePathname()
 
@@ -759,7 +766,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
    * Carrega todos os usuários PDV
    */
   const loadAllUsuariosPDV = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     try {
@@ -775,7 +782,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
           ativo: 'true',
         })
 
-        const response = await fetch(`/api/usuarios?${params.toString()}`, {
+        const response = await fetchGestorApi(`/api/usuarios?${params.toString()}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -799,13 +806,13 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     } catch (error) {
       console.error('Erro ao carregar usuários PDV:', error)
     }
-  }, [auth])
+  }, [])
 
   /**
    * Carrega todos os meios de pagamento
    */
   const loadAllMeiosPagamento = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     setIsLoadingMeiosPagamento(true)
@@ -823,7 +830,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
           ativo: 'true',
         })
 
-        const response = await fetch(`/api/meios-pagamentos?${params.toString()}`, {
+        const response = await fetchGestorApi(`/api/meios-pagamentos?${params.toString()}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -849,13 +856,13 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     } finally {
       setIsLoadingMeiosPagamento(false)
     }
-  }, [auth])
+  }, [])
 
   /**
    * Carrega todos os terminais
    */
   const loadAllTerminais = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     setIsLoadingTerminais(true)
@@ -872,7 +879,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
           offset: currentOffset.toString(),
         })
 
-        const response = await fetch(`/api/terminais?${params.toString()}`, {
+        const response = await fetchGestorApi(`/api/terminais?${params.toString()}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -898,7 +905,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     } finally {
       setIsLoadingTerminais(false)
     }
-  }, [auth])
+  }, [])
 
   /**
    * Indica se a API provavelmente tem próxima página (com base em count/totalPages ou página cheia).
@@ -938,7 +945,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
       params.append('limit', String(pageSize))
       params.append('offset', String(offset))
 
-      const response = await fetch(`/api/vendas?${params.toString()}`, {
+      const response = await fetchGestorApi(`/api/vendas?${params.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -971,7 +978,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
    * Primeira página: reseta lista, métricas e offset; filtros vão na query (backend).
    */
   const fetchVendas = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     const seq = ++vendasFetchSeqRef.current
@@ -1007,13 +1014,13 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         setIsLoading(false)
       }
     }
-  }, [auth, buscarPaginaVendas, inferirHasMoreApi])
+  }, [ buscarPaginaVendas, inferirHasMoreApi])
 
   /**
    * Próximas páginas (scroll infinito / botão).
    */
   const loadMoreVendas = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
     if (!hasMoreVendasRef.current || isLoadingRef.current || isLoadingMoreRef.current) return
 
@@ -1037,7 +1044,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
       // Sempre encerra: um reset de filtros pode invalidar `seq` e outra busca já zerou o estado
       setIsLoadingMore(false)
     }
-  }, [auth, buscarPaginaVendas, inferirHasMoreApi])
+  }, [ buscarPaginaVendas, inferirHasMoreApi])
 
   /** Soma “Total cancelado” apenas sobre as vendas já carregadas na lista (métricas globais vêm de `metricas`). */
   const totalCanceladoSomenteLista = useMemo(() => {
@@ -1185,6 +1192,46 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
     router.refresh() // Força a revalidação da rota para recarregar com os filtros limpos
   }, [router, pathname])
 
+  const handleExportarRelatorio = useCallback(() => {
+    const tenantAuth = useAuthStore.getState().tenantAuth
+    const token = tenantAuth?.getAccessToken()
+    if (!token) {
+      showToast.error('Sessão expirada. Faça login novamente.')
+      return
+    }
+
+    const usuariosPorId = new Map(usuariosPDV.map(u => [u.id, u.nome]))
+    const meiosPagamentoPorId = new Map(meiosPagamento.map(m => [m.id, m.nome]))
+    const terminaisPorId = new Map(terminais.map(t => [t.id, t.nome]))
+
+    const user = useAuthStore.getState().getUser()
+    const usuarioGerador =
+      user?.getName()?.trim() || user?.getEmail()?.trim() || 'Usuário não identificado'
+
+    void exportarRelatorio({
+      filters: filtersRef.current as VendasFiltrosQuerySnapshotExport,
+      token,
+      timeZoneEmpresa: timezoneAgregacao,
+      metricas: metricas as MetricasVendasExport | null,
+      usuariosPorId,
+      meiosPagamentoPorId,
+      terminaisPorId,
+      contexto: {
+        nomeEmpresa: empresa?.nomeExibicao ?? 'Empresa',
+        cnpjEmpresa: empresa?.cnpj ?? '—',
+        usuarioGerador,
+      },
+    })
+  }, [
+    empresa,
+    exportarRelatorio,
+    meiosPagamento,
+    metricas,
+    terminais,
+    timezoneAgregacao,
+    usuariosPDV,
+  ])
+
   /**
    * Handle Enter nos campos de valor
    */
@@ -1238,7 +1285,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
 
   const handleVerNfce = useCallback(
     async (vendaId: string) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -1247,7 +1294,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
       setIsAbrindoNfce(prev => ({ ...prev, [vendaId]: true }))
       try {
         const queryFiscal = new URLSearchParams({ incluirFiscal: 'true' }).toString()
-        const response = await fetch(`/api/vendas/${encodeURIComponent(vendaId)}?${queryFiscal}`, {
+        const response = await fetchGestorApi(`/api/vendas/${encodeURIComponent(vendaId)}?${queryFiscal}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -1286,7 +1333,7 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
         })
       }
     },
-    [auth]
+    []
   )
 
   return (
@@ -1405,10 +1452,21 @@ export function VendasList({ initialPeriodo, initialStatus }: VendasListProps) {
             <button
               type="button"
               onClick={() => setIsDatasModalOpen(true)}
-              className="flex h-8 items-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
+              className="flex h-8 shrink-0 items-center gap-2 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
             >
               <MdCalendarToday size={18} />
               Por datas
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportarRelatorio}
+              disabled={isExportando || isLoading}
+              title="Exportar relatório em Excel (.xlsx)"
+              className="flex h-8 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg border-2 border-primary bg-info px-4 text-sm text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <MdDownload size={18} />
+              {isExportando ? 'Exportando...' : 'Exportar XLS'}
             </button>
             {periodoInicial && periodoFinal ? (
               <div className="flex shrink-0 flex-col gap-0 text-[11px] leading-snug text-primary/85 sm:text-xs">

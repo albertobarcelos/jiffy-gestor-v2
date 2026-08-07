@@ -16,9 +16,7 @@ interface DetalhesCaixaViewProps {
  * Replica o design e funcionalidades do Flutter
  */
 export function DetalhesCaixaView({ caixaRef, conferenciaCaixaRef }: DetalhesCaixaViewProps) {
-  const router = useRouter()
-  const { auth } = useAuthStore()
-  const [caixa, setCaixa] = useState<Caixa | null>(null)
+  const router = useRouter()  const [caixa, setCaixa] = useState<Caixa | null>(null)
   const [operacoes, setOperacoes] = useState<OperacaoCaixa[]>([])
   const [somaSuprimentos, setSomaSuprimentos] = useState(0)
   const [somaSangrias, setSomaSangrias] = useState(0)
@@ -27,7 +25,7 @@ export function DetalhesCaixaView({ caixaRef, conferenciaCaixaRef }: DetalhesCai
 
   useEffect(() => {
     const buscarDetalhes = async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return
 
       setIsLoading(true)
@@ -61,7 +59,7 @@ export function DetalhesCaixaView({ caixaRef, conferenciaCaixaRef }: DetalhesCai
     }
 
     buscarDetalhes()
-  }, [caixaRef, auth, operacoes, somaSuprimentos, somaSangrias])
+  }, [caixaRef, operacoes, somaSuprimentos, somaSangrias])
 
   const formatarMoeda = (valor: number) => {
     return new Intl.NumberFormat('pt-BR', {

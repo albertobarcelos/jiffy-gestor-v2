@@ -18,11 +18,13 @@ Documento de referência para as próximas fases: **o que migrar para o backend*
 
 ## 2. Endpoints e integrações
 
-### 2.1 Next.js API (BFF) — `fetch` + Bearer
+### 2.1 Next.js API (BFF) — `fetchGestorApi` + `tenantAuth`
+
+> **Padrão obrigatório:** ver [`MULTI-TENANT-JIFFY-DOC-OFICIAL.md`](./MULTI-TENANT-JIFFY-DOC-OFICIAL.md). No ERP use só `tenantAuth` (nunca `auth` / `identityAuth`) e chame o BFF via `fetchGestorApi` / `useSecureTenantQuery`.
 
 | Uso na tela | Método / rota | Parâmetros relevantes |
 |-------------|---------------|------------------------|
-| Empresa + timezone | `GET /api/empresas/me` | `Authorization: Bearer` |
+| Empresa + timezone | `GET /api/empresas/me` | `Authorization: Bearer` (`tenantAuth`) |
 | Resumo (atual + anterior) | `GET /api/dashboard/resumo` | `dataFinalizacaoInicial`, `dataFinalizacaoFinal` (ISO) |
 | Evolução / comparativo | `GET /api/dashboard/evolucao` | datas ISO, `status` (ex.: FINALIZADA/CANCELADA), `intervaloHora` opcional (15/30/60) |
 | Top produtos | `GET /api/dashboard/top-produtos` | `periodo`, `limit`, datas opcionais |

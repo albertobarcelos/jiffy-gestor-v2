@@ -19,9 +19,27 @@ export async function GET(request: NextRequest) {
     })
 
     const payload = response.data
-    if (process.env.NODE_ENV === 'development' && payload && typeof payload === 'object') {
+    if (payload && typeof payload === 'object') {
       const p = payload as Record<string, unknown>
-      console.log('[api/empresas/me] parametroEmpresa (timezone API):', p.parametroEmpresa)
+      const responseEmpresaId = p.id != null ? String(p.id) : null
+      // Anti-mix: backend/cache não pode devolver outra empresa que a do Bearer.
+      if (
+        responseEmpresaId &&
+        tokenInfo.empresaId &&
+        responseEmpresaId !== tokenInfo.empresaId
+      ) {
+        console.error('[api/empresas/me] empresa da resposta ≠ token', {
+          tokenEmpresaId: tokenInfo.empresaId,
+          responseEmpresaId,
+        })
+        return NextResponse.json(
+          { error: 'Resposta de empresa incompatível com a sessão da aba' },
+          { status: 409 }
+        )
+      }
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[api/empresas/me] parametroEmpresa (timezone API):', p.parametroEmpresa)
+      }
     }
 
     return NextResponse.json(payload)

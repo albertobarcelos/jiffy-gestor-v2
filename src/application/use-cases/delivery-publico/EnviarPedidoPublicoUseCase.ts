@@ -2,6 +2,7 @@ import type {
   CheckoutFormData,
   PedidoPublicoCarrinhoItemInput,
 } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
+import type { CreatePedidoPublicoResponseDTO } from '@/src/application/dto/delivery-publico/CreatePedidoPublicoResponseDTO'
 import {
   CreatePedidoPublicoInputSchema,
   type ClienteDeliveryPublicoDTO,
@@ -27,7 +28,11 @@ export type EnviarPedidoPublicoInput = {
 }
 
 export type EnviarPedidoPublicoResult =
-  | { ok: true; clienteAtualizado: ClienteDeliveryPublicoDTO | null }
+  | {
+      ok: true
+      clienteAtualizado: ClienteDeliveryPublicoDTO | null
+      pedido: CreatePedidoPublicoResponseDTO
+    }
   | { ok: false; error: string }
 
 /**
@@ -103,8 +108,8 @@ export class EnviarPedidoPublicoUseCase {
       }
     }
 
-    await criarPedidoPublico(payload)
-    return { ok: true, clienteAtualizado }
+    const pedido = await criarPedidoPublico(payload)
+    return { ok: true, clienteAtualizado, pedido }
   }
 }
 

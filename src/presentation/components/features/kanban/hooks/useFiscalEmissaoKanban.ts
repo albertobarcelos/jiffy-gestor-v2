@@ -138,9 +138,7 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
     setSelectedVendaId,
     setEmitirNfeModalOpen,
   } = params
-  const queryClient = useQueryClient()
-  const { auth } = useAuthStore()
-  const [acaoFiscalEmAndamentoPorVenda, setAcaoFiscalEmAndamentoPorVenda] = useState<
+  const queryClient = useQueryClient()  const [acaoFiscalEmAndamentoPorVenda, setAcaoFiscalEmAndamentoPorVenda] = useState<
     Record<string, AcaoFiscalKanbanEmAndamento>
   >({})
   const emissaoFiscalLockRef = useRef<ReturnType<typeof createEmissaoFiscalKanbanLock> | null>(
@@ -208,7 +206,7 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
       tentativas: number,
       intervaloMs: number
     ): Promise<boolean> => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return false
 
       const statusAnterior = normalizarStatusFiscal(statusAnteriorRaw)
@@ -237,7 +235,7 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
 
       return false
     },
-    [auth, queryClient]
+    [ queryClient]
   )
 
   /** Continua buscando status após o loading do botão (várias notas / SEFAZ lenta). */

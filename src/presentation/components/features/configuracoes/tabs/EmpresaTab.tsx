@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -136,9 +137,7 @@ const LOGO_COLUNA_LARGURA_CLASS = 'w-full shrink-0 lg:w-[280px]'
 /**
  * Tab de Empresa - Edição de dados da empresa
  */
-export function EmpresaTab() {
-  const { auth } = useAuthStore()
-  const [empresa, setEmpresa] = useState<Cliente | null>(null)
+export function EmpresaTab() {  const [empresa, setEmpresa] = useState<Cliente | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
 
@@ -217,7 +216,7 @@ export function EmpresaTab() {
       return null
     })
     try {
-      const res = await fetch('/api/empresas/me/logo-impressao', {
+      const res = await fetchGestorApi('/api/empresas/me/logo-impressao', {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) {
@@ -305,12 +304,12 @@ export function EmpresaTab() {
   }
 
   const loadEmpresa = async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     setIsLoading(true)
     try {
-      const response = await fetch('/api/empresas/me', {
+      const response = await fetchGestorApi('/api/empresas/me', {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -420,7 +419,7 @@ export function EmpresaTab() {
 
     try {
       // Buscar lista de municípios do estado
-      const response = await fetch(`/api/v1/ibge/municipios?uf=${uf}`)
+      const response = await fetchGestorApi(`/api/v1/ibge/municipios?uf=${uf}`)
       if (response.ok) {
         const data = await response.json()
         const municipios = data.municipios || []
@@ -444,7 +443,7 @@ export function EmpresaTab() {
           return true
         } else {
           // Se não encontrou na lista, tentar via API de validação
-          const validacaoResponse = await fetch(
+          const validacaoResponse = await fetchGestorApi(
             `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(nomeCidade.trim())}&uf=${uf}`
           )
           if (validacaoResponse.ok) {
@@ -486,7 +485,7 @@ export function EmpresaTab() {
     try {
       const body = new FormData()
       body.append('file', file)
-      const response = await fetch('/api/empresas/me/logo-impressao', {
+      const response = await fetchGestorApi('/api/empresas/me/logo-impressao', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -511,7 +510,7 @@ export function EmpresaTab() {
 
   const deleteLogoImpressaoFromApi = async (token: string): Promise<UploadLogoResult> => {
     try {
-      const response = await fetch('/api/empresas/me/logo-impressao', {
+      const response = await fetchGestorApi('/api/empresas/me/logo-impressao', {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -576,7 +575,7 @@ export function EmpresaTab() {
 
   const handleSaveLogo = async () => {
     if (!hasLogoPendingChanges || logoBusy) return
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     setIsSavingLogo(true)
@@ -631,14 +630,14 @@ export function EmpresaTab() {
   }
 
   const undoServerLogoRemoval = async () => {
-    const t = auth?.getAccessToken()
+    const t = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!t) return
     setPendingRemoveLogoOnSave(false)
     await refreshSavedLogoImpressao(t)
   }
 
   const handleSave = async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token || !empresa) {
       console.error('Token ou empresa não disponível')
       return
@@ -664,7 +663,7 @@ export function EmpresaTab() {
           const nomeCidadeParaValidar = ultimaCidadeBuscada.current || cidade.trim()
 
           try {
-            const response = await fetch(
+            const response = await fetchGestorApi(
               `/api/v1/ibge/validar-cidade?cidade=${encodeURIComponent(nomeCidadeParaValidar)}&uf=${estado}`
             )
             if (response.ok) {
@@ -736,7 +735,7 @@ export function EmpresaTab() {
 
         console.log('Enviando dados:', body)
 
-        const response = await fetch(`/api/empresas/${empresa.getId()}`, {
+        const response = await fetchGestorApi(`/api/empresas/${empresa.getId()}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',

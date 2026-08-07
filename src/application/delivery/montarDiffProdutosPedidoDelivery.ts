@@ -25,12 +25,13 @@ export interface DiffProdutosPedidoDelivery {
  */
 function assinaturaProduto(p: ProdutoSelecionado): string {
   const complementos = (p.complementos ?? [])
-    .map(c => `${c.id}:${c.grupoId}:${c.quantidade}`)
+    .map(c => `${c.id}:${c.grupoId}:${c.quantidade}:${c.valor}`)
     .sort()
     .join('|')
   return [
     p.produtoId,
     p.quantidade,
+    p.valorUnitario,
     p.tipoDesconto ?? '',
     p.valorDesconto ?? '',
     p.tipoAcrescimo ?? '',

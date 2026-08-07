@@ -22,7 +22,7 @@ import {
   ClientesTabsModal,
   ClientesTabsModalState,
 } from '@/src/presentation/components/features/clientes/ClientesTabsModal'
-import { useQueryClient } from '@tanstack/react-query'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 interface SeletorClienteModalProps {
   open: boolean
@@ -38,7 +38,7 @@ export function SeletorClienteModal({
   onSelect,
   title = 'Selecionar Cliente',
 }: SeletorClienteModalProps) {
-  const queryClient = useQueryClient()
+  const invalidate = useInvalidateTenantQueries()
   const [searchText, setSearchText] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
@@ -178,8 +178,8 @@ export function SeletorClienteModal({
 
   const handleClienteTabsModalReload = useCallback(() => {
     // Invalidar queries de clientes para atualizar a lista
-    queryClient.invalidateQueries({ queryKey: ['clientes'] })
-  }, [queryClient])
+    void invalidate(['clientes'])
+  }, [invalidate])
 
   const handleClienteTabsModalTabChange = useCallback((tab: 'cliente' | 'visualizar') => {
     setClienteTabsModalState(prev => ({

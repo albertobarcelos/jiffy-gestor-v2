@@ -11,6 +11,7 @@ import {
   clearAuthCookie,
   cookieOptsMaxAge,
 } from '@/src/shared/utils/authCookies'
+import { AUTH_COOKIE_REFRESH_MAP } from '@/src/shared/utils/refreshTokenMap'
 
 /**
  * API Route para login
@@ -50,6 +51,7 @@ export async function POST(request: NextRequest) {
     response.cookies.set(AUTH_COOKIE_IDENTITY, auth.getAccessToken(), cookieOptsMaxAge(maxAge))
     clearAuthCookie(response, AUTH_COOKIE_TENANT)
     clearAuthCookie(response, AUTH_COOKIE_REFRESH)
+    clearAuthCookie(response, AUTH_COOKIE_REFRESH_MAP)
     clearAuthCookie(response, AUTH_COOKIE_LEGACY)
 
     return response

@@ -17,14 +17,12 @@ interface PainelContadorAcessoGuardProps {
  * Enquanto o claim não estiver no token, permite acesso (compatibilidade).
  */
 export function PainelContadorAcessoGuard({ children }: PainelContadorAcessoGuardProps) {
-  const router = useRouter()
-  const { auth } = useAuthStore()
-  const { hasAccess, isLoading } = useTenantAccessGuard()
+  const router = useRouter()  const { hasAccess, isLoading } = useTenantAccessGuard()
 
   useEffect(() => {
-    if (isLoading || !hasAccess || !auth) return
+    if (isLoading || !hasAccess || !useAuthStore.getState().tenantAuth) return
 
-    const token = auth.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     try {
@@ -38,7 +36,7 @@ export function PainelContadorAcessoGuard({ children }: PainelContadorAcessoGuar
     } catch {
       // Sem claim no JWT: mantém compatibilidade com sessões atuais
     }
-  }, [auth, hasAccess, isLoading, router])
+  }, [ hasAccess, isLoading, router])
 
   if (isLoading) {
     return (

@@ -1,3 +1,4 @@
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 /**
  * Resolve nome da impressora cadastrada no Gestor (nome usado no QZ Tray no Windows).
  * BFF: GET `/api/impressoras/:id` → backend `/api/v1/preferencias/impressoras/:id`.
@@ -9,7 +10,7 @@ export async function fetchNomeImpressoraPorId(
   const id = impressoraId.trim()
   if (!id || !accessToken?.trim()) return null
 
-  const res = await fetch(`/api/impressoras/${encodeURIComponent(id)}`, {
+  const res = await fetchGestorApi(`/api/impressoras/${encodeURIComponent(id)}`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
       Accept: 'application/json',
