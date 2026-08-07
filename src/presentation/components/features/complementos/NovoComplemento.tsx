@@ -280,7 +280,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
 
   const handleImagemUpload = useCallback(
     async (file: File) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado')
         return
@@ -314,7 +314,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
         setIsUploadingImagem(false)
       }
     },
-    [auth, complementoId, serverImagemUrl, applyImagemUrl]
+    [complementoId, serverImagemUrl, applyImagemUrl]
   )
 
   const handleClearImagemPreview = useCallback(() => {

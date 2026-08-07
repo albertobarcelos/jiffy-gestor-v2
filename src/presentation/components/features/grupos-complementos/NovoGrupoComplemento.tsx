@@ -408,7 +408,7 @@ export const NovoGrupoComplemento = forwardRef<
 
   const handleImagemUpload = useCallback(
     async (file: File) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado')
         return
@@ -443,7 +443,7 @@ export const NovoGrupoComplemento = forwardRef<
         setIsUploadingImagem(false)
       }
     },
-    [auth, grupoId, onReload, serverImagemUrl, applyImagemUrl]
+    [grupoId, onReload, serverImagemUrl, applyImagemUrl]
   )
 
   const handleClearImagemPreview = useCallback(() => {
@@ -535,6 +535,29 @@ export const NovoGrupoComplemento = forwardRef<
                 </div>
               </div>
 
+              {/* Complementos: a gestão de vínculos acontece exclusivamente na aba Complementos. */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Complementos
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onGoToComplementosTab?.()
+                  }}
+                  disabled={!onGoToComplementosTab}
+                  className="inline-flex h-8 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-medium text-info shadow transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 md:text-base"
+                >
+                  <MdAdd className="text-sm md:text-lg" />
+                  {isEditing ? 'Gerenciar complementos' : 'Ir para Complementos'}
+                  {(isEditing ? vinculadosCount : complementosIdsDraft.length) > 0 ? (
+                    <span className="rounded-md bg-white/20 px-1.5 py-0.5 text-xs font-semibold tabular-nums">
+                      {isEditing ? vinculadosCount : complementosIdsDraft.length}
+                    </span>
+                  ) : null}
+                </button>
+              </div>
+
               <DeliveryImageUploadField
                 label="Imagem do grupo (cardápio digital)"
                 disabled={!isEditing}
@@ -559,29 +582,6 @@ export const NovoGrupoComplemento = forwardRef<
                     : undefined
                 }
               />
-
-              {/* Complementos: a gestão de vínculos acontece exclusivamente na aba Complementos. */}
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Complementos
-                </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onGoToComplementosTab?.()
-                  }}
-                  disabled={!onGoToComplementosTab}
-                  className="inline-flex h-8 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-medium text-info shadow transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 md:text-base"
-                >
-                  <MdAdd className="text-sm md:text-lg" />
-                  {isEditing ? 'Gerenciar complementos' : 'Ir para Complementos'}
-                  {(isEditing ? vinculadosCount : complementosIdsDraft.length) > 0 ? (
-                    <span className="rounded-md bg-white/20 px-1.5 py-0.5 text-xs font-semibold tabular-nums">
-                      {isEditing ? vinculadosCount : complementosIdsDraft.length}
-                    </span>
-                  ) : null}
-                </button>
-              </div>
 
             </div>
           </div>
