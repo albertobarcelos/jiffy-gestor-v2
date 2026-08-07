@@ -156,6 +156,34 @@ describe('deliveryCheckoutProgress', () => {
     expect(progress?.total).toBe(3)
   })
 
+  it('marca 100% na revisão', () => {
+    const progress = calculateDeliveryCheckoutProgress({
+      checkoutStep: 'revisao',
+      tipoEntrega: 'retirada',
+      modoTempo: 'imediato',
+    })
+    expect(progress?.percentage).toBe(100)
+  })
+
+  it('omite progresso no step de sucesso', () => {
+    expect(
+      calculateDeliveryCheckoutProgress({
+        checkoutStep: 'sucesso',
+        tipoEntrega: 'entrega',
+        modoTempo: 'imediato',
+      })
+    ).toBeNull()
+  })
+
+  it('omite progresso no step de detalhes do pedido', () => {
+    expect(
+      calculateDeliveryCheckoutProgress({
+        checkoutStep: 'pedidoDetalhe',
+        tipoEntrega: 'retirada',
+        modoTempo: 'imediato',
+      })
+    ).toBeNull()
+  })
   it('valida nome e sobrenome', () => {
     expect(isNomeCompletoCheckoutValido('Andre')).toBe(false)
     expect(isNomeCompletoCheckoutValido('Andre Silva')).toBe(true)

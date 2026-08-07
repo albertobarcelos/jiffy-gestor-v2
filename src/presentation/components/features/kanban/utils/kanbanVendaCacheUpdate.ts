@@ -1,3 +1,4 @@
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import type { InfiniteData, QueryClient } from '@tanstack/react-query'
 import type { KanbanVendaCachePatch } from '@/src/application/dto/TransicaoKanbanDTO'
 import { extrairPatchKanbanDeRespostaTransicao } from '@/src/application/mappers/TransicaoPedidoDeliveryMapper'
@@ -436,7 +437,7 @@ export async function sincronizarPedidoDeliveryKanbanEmBackground(
   token: string
 ): Promise<void> {
   try {
-    const response = await fetch(`/api/delivery/pedidos/${encodeURIComponent(vendaId)}`, {
+    const response = await fetchGestorApi(`/api/delivery/pedidos/${encodeURIComponent(vendaId)}`, {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/json',
@@ -512,7 +513,7 @@ export async function sincronizarVendaGestorKanbanEmBackground(
   token: string
 ): Promise<void> {
   try {
-    const response = await fetch(`/api/vendas/gestor/${vendaId}?incluirFiscal=false`, {
+    const response = await fetchGestorApi(`/api/vendas/gestor/${vendaId}?incluirFiscal=false`, {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/json',
@@ -685,7 +686,7 @@ export async function sincronizarStatusFiscalVendaKanban(
         ? `/api/vendas/gestor/${encodeURIComponent(venda.id)}?incluirFiscal=true`
         : `/api/vendas/${encodeURIComponent(venda.id)}?incluirFiscal=true`
 
-    const response = await fetch(url, {
+    const response = await fetchGestorApi(url, {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/json',

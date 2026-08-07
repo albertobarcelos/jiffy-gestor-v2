@@ -8,6 +8,7 @@ import {
   normalizarClienteDeliveryApi,
 } from '@/src/application/mappers/ClienteDeliveryMoradaMapper'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { showToast } from '@/src/shared/utils/toast'
@@ -219,7 +220,7 @@ export function useMoradasPorTelefone(
       if (!telefone || !token || !empresaId) return []
 
       if (usarModuloDelivery) {
-        const response = await fetch(
+        const response = await fetchGestorApi(
           `/api/delivery/clientes/${encodeURIComponent(telefone)}`,
           {
             headers: {
@@ -243,7 +244,7 @@ export function useMoradasPorTelefone(
         return cliente ? clienteDeliveryParaMoradas(cliente) : []
       }
 
-      const response = await fetch(
+      const response = await fetchGestorApi(
         `/api/gestor/morada-telefone?telefone=${encodeURIComponent(telefone)}`,
         {
           headers: {
@@ -288,7 +289,7 @@ export function useCriarMoradaTelefone(options?: MoradaTelefoneHookOptions) {
         const enderecoPayload = moradaDtoParaEnderecoDeliveryPayload(dto)
         const telefone = dto.telefone.replace(/\D/g, '')
 
-        const getResponse = await fetch(
+        const getResponse = await fetchGestorApi(
           `/api/delivery/clientes/${encodeURIComponent(telefone)}`,
           {
             headers: {
@@ -299,7 +300,7 @@ export function useCriarMoradaTelefone(options?: MoradaTelefoneHookOptions) {
         )
 
         if (getResponse.ok) {
-          const patchResponse = await fetch(
+          const patchResponse = await fetchGestorApi(
             `/api/delivery/clientes/${encodeURIComponent(telefone)}`,
             {
               method: 'PATCH',
@@ -332,7 +333,7 @@ export function useCriarMoradaTelefone(options?: MoradaTelefoneHookOptions) {
           )
         }
 
-        const postResponse = await fetch('/api/delivery/clientes', {
+        const postResponse = await fetchGestorApi('/api/delivery/clientes', {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${token}`,
@@ -356,7 +357,7 @@ export function useCriarMoradaTelefone(options?: MoradaTelefoneHookOptions) {
         return extrairMoradaDeClienteDeliveryResponse(postData, dto)
       }
 
-      const response = await fetch('/api/gestor/morada-telefone', {
+      const response = await fetchGestorApi('/api/gestor/morada-telefone', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -408,7 +409,7 @@ export function useAtualizarMoradaTelefone(options?: MoradaTelefoneHookOptions) 
         const telefone = dto.telefone.replace(/\D/g, '')
         const enderecoPayload = moradaDtoParaEnderecoDeliveryPayload(dto)
 
-        const response = await fetch(
+        const response = await fetchGestorApi(
           `/api/delivery/clientes/${encodeURIComponent(telefone)}`,
           {
             method: 'PATCH',
@@ -436,7 +437,7 @@ export function useAtualizarMoradaTelefone(options?: MoradaTelefoneHookOptions) 
         return extrairMoradaDeClienteDeliveryResponse(data, dto, id)
       }
 
-      const response = await fetch(`/api/gestor/morada-telefone/${encodeURIComponent(id)}`, {
+      const response = await fetchGestorApi(`/api/gestor/morada-telefone/${encodeURIComponent(id)}`, {
         method: 'PATCH',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -490,7 +491,7 @@ export function useRegistrarUsoMoradaTelefone(options?: MoradaTelefoneHookOption
         return
       }
 
-      const response = await fetch(
+      const response = await fetchGestorApi(
         `/api/gestor/morada-telefone/${encodeURIComponent(id)}/registrar-uso`,
         {
           method: 'POST',

@@ -14,7 +14,7 @@ export function activateHubEmpresaSessionAndBuildUrl(
   subRoute: HubEmpresaSubRoute
 ): string {
   const empParam = buildEmpresaUrlParam(empresaNome, empresaId)
-  bootstrapTabSessionManually(accessToken, empParam)
+  bootstrapTabSessionManually(accessToken, empParam, empresaId)
 
   const prev = useAuthStore.getState().getUser()
   const auth = buildAuthFromAccessToken(
@@ -22,6 +22,7 @@ export function activateHubEmpresaSessionAndBuildUrl(
     prev ? { id: prev.getId(), email: prev.getEmail(), name: prev.getName() } : undefined
   )
   useAuthStore.getState().setTenantAuth(auth)
+  useAuthStore.getState().setTabVerified(true)
 
   const slug = empresaNomeParaSlugUrl(empresaNome)
   return `${subRoute}/${slug}?${empParam}`

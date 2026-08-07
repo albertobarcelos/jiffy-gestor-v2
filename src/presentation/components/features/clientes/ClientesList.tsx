@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { ClientesTabsModal, ClientesTabsModalState } from './ClientesTabsModal'
 import { MdSearch, MdVisibility } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
@@ -66,7 +67,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
   const hasLoadedInitialRef = useRef(false)
   const isLoadingRef = useRef(false)
   const lastLoadKeyRef = useRef<string | null>(null)
-  const { auth, isAuthenticated } = useAuthStore()
+  const { isAuthenticated } = useAuthStore()
 
   const searchTextRef = useRef('')
   const filterStatusRef = useRef<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
@@ -109,7 +110,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
    */
   const loadAllClientes = useCallback(
     async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         return
       }
@@ -156,7 +157,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
             params.append('ativo', ativoFilter.toString())
           }
 
-          const response = await fetch(`/api/clientes?${params.toString()}`, {
+          const response = await fetchGestorApi(`/api/clientes?${params.toString()}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -198,17 +199,17 @@ export function ClientesList({ onReload }: ClientesListProps) {
         isLoadingRef.current = false
       }
     },
-    [auth]
+    []
   )
 
   // Carrega clientes quando autenticar e quando busca/filtro mudam (fonte única de verdade)
   useEffect(() => {
     if (!isAuthenticated) return
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     loadAllClientes()
-  }, [isAuthenticated, debouncedSearch, filterStatus, auth, loadAllClientes])
+  }, [isAuthenticated, debouncedSearch, filterStatus, loadAllClientes])
 
   const handleStatusChange = () => {
     loadAllClientes()
@@ -257,7 +258,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
    */
   const handleToggleClienteStatus = useCallback(
     async (cliente: Cliente, novoStatus: boolean) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -282,7 +283,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
       )
 
       try {
-        const response = await fetch(`/api/clientes/${clienteId}`, {
+        const response = await fetchGestorApi(`/api/clientes/${clienteId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -313,7 +314,7 @@ export function ClientesList({ onReload }: ClientesListProps) {
         })
       }
     },
-    [auth, clientes, loadAllClientes, onReload]
+    [ clientes, loadAllClientes, onReload]
   )
 
   return (

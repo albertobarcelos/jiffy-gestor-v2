@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { Produto } from '@/src/domain/entities/Produto'
 import type { Produto as ProdutoEntity } from '@/src/domain/entities/Produto'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { fetchProdutosDoGrupo, fetchProdutosPorNomeBusca } from '../../novoPedidoProdutosApi'
 
 export type UseProdutosVendaQueryParams = {
@@ -25,36 +25,37 @@ export function useProdutosVendaQuery({
 }: UseProdutosVendaQueryParams) {
   const buscaProdutoFiltrada = buscaProdutoTexto.trim().toLowerCase()
 
-  const { data: produtosBuscadosData, isLoading: isLoadingBuscaProdutos } = useQuery({
-    queryKey: ['produtos-busca', buscaProdutoFiltrada],
-    queryFn: async () => {
-      if (!token) throw new Error('Token não encontrado')
-      const produtos = await fetchProdutosPorNomeBusca(buscaProdutoFiltrada, token)
+  const { data: produtosBuscadosData, isLoading: isLoadingBuscaProdutos } = useSecureTenantQuery(
+    ['produtos-busca', buscaProdutoFiltrada],
+    async ({ token: tenantToken }) => {
+      const produtos = await fetchProdutosPorNomeBusca(buscaProdutoFiltrada, tenantToken)
       return { produtos }
     },
-    enabled: !!token && enabled && buscaProdutoFiltrada.length >= 2,
-    staleTime: 1000 * 60 * 5,
-    refetchOnWindowFocus: false,
-  })
+    {
+      enabled: !!token && enabled && buscaProdutoFiltrada.length >= 2,
+      staleTime: 1000 * 60 * 5,
+    }
+  )
 
   const {
     data: produtosPorGrupoData,
     isLoading: isLoadingProdutos,
     error: produtosError,
-  } = useQuery({
-    queryKey: ['produtos-por-grupo', grupoSelecionadoId, empresaId],
-    queryFn: async () => {
-      if (!grupoSelecionadoId || !token) {
-        return { produtos: [], count: 0 }
+  } = useSecureTenantQuery(
+    ['produtos-por-grupo', grupoSelecionadoId],
+    async ({ token: tenantToken }) => {
+      if (!grupoSelecionadoId) {
+        return { produtos: [] as Produto[], count: 0 }
       }
-      return fetchProdutosDoGrupo(grupoSelecionadoId, token)
+      return fetchProdutosDoGrupo(grupoSelecionadoId, tenantToken)
     },
-    enabled: enabled && !!grupoSelecionadoId && !!token,
-    staleTime: 1000 * 60 * 5,
-    gcTime: 1000 * 60 * 15,
-    retry: 1,
-    refetchOnWindowFocus: false,
-  })
+    {
+      enabled: enabled && !!grupoSelecionadoId && !!token,
+      staleTime: 1000 * 60 * 5,
+      gcTime: 1000 * 60 * 15,
+      retry: 1,
+    }
+  )
 
   useEffect(() => {
     if (!produtosPorGrupoData?.produtos?.length) return

@@ -1,15 +1,22 @@
 /**
- * BFF: obtém JWT da empresa (tenant) usando o cookie httpOnly de identidade (`credentials`).
- * Não envia `Authorization` no header — o cliente costumava mandar o JWT tenant do Zustand
- * por engano e o BFF priorizava esse valor antes do cookie, gerando token inválido no hub.
+ * BFF: obtém JWT da empresa. Envia Bearer do hub (identity ou access) quando
+ * disponível — necessário se o cookie `identity-token` já expirou.
  */
-export async function fetchAccessTokenEscolherEmpresa(empresaId: string): Promise<string> {
+export async function fetchAccessTokenEscolherEmpresa(
+  empresaId: string,
+  hubBearerToken?: string | null
+): Promise<string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+  if (hubBearerToken) {
+    headers.Authorization = `Bearer ${hubBearerToken}`
+  }
+
   const res = await fetch('/api/auth/escolher-empresa', {
     method: 'POST',
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify({ empresaId }),
   })
 

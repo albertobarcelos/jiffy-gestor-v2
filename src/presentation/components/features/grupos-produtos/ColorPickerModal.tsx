@@ -1,5 +1,6 @@
 'use client'
 
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { useEffect, useState, useCallback } from 'react'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
@@ -41,7 +42,7 @@ export function ColorPickerModal({ open, onClose, onSelect }: ColorPickerModalPr
     setIsLoading(true)
     setError(null)
     try {
-      const response = await fetch('/api/preferencias/cores-disponiveis', {
+      const response = await fetchGestorApi('/api/preferencias/cores-disponiveis', {
         headers: {
           'Content-Type': 'application/json',
         },

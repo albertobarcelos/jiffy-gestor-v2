@@ -1,6 +1,15 @@
 'use client'
 
-import { useState, useMemo, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
+import {
+  useState,
+  useMemo,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  useRef,
+  forwardRef,
+  useImperativeHandle,
+} from 'react'
 import { createPortal } from 'react-dom'
 import {
   Dialog,
@@ -10,6 +19,7 @@ import {
   DialogTitle,
 } from '@/src/presentation/components/ui/dialog'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { MdAdd, MdClose, MdPrint, MdSearch, MdEdit } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
@@ -18,6 +28,7 @@ import {
   ImpressorasTabsModal,
   ImpressorasTabsModalState,
 } from '@/src/presentation/components/features/impressoras/ImpressorasTabsModal'
+import { cn } from '@/src/shared/utils/cn'
 
 interface ProdutoImpressora {
   id: string
@@ -50,6 +61,23 @@ function mapResumoToImpressoras(
     }))
 }
 
+function sameIdSet(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false
+  const sa = [...a].sort()
+  const sb = [...b].sort()
+  return sa.every((id, i) => id === sb[i])
+}
+
+export type ProdutoImpressorasHandle = {
+  isDirty: () => boolean
+  save: () => Promise<boolean>
+}
+
+export type ProdutoImpressorasEmbedState = {
+  isDirty: boolean
+  isSaving: boolean
+}
+
 interface ProdutoImpressorasDialogProps {
   open: boolean
   produtoId?: string
@@ -58,21 +86,30 @@ interface ProdutoImpressorasDialogProps {
   initialImpressorasResumo?: ReadonlyArray<ProdutoImpressoraResumoInicial>
   onClose: () => void
   isEmbedded?: boolean
+  onEmbedStateChange?: (state: ProdutoImpressorasEmbedState) => void
 }
 
 /**
- * Modal de leitura para exibir as impressoras vinculadas a um produto
+ * Modal / aba para vincular impressoras a um produto (persistência no Salvar).
  */
-export function ProdutoImpressorasDialog({
-  open,
-  produtoId,
-  produtoNome,
-  initialImpressorasResumo,
-  onClose,
-  isEmbedded = false,
-}: ProdutoImpressorasDialogProps) {
+export const ProdutoImpressorasDialog = forwardRef<
+  ProdutoImpressorasHandle,
+  ProdutoImpressorasDialogProps
+>(function ProdutoImpressorasDialog(
+  {
+    open,
+    produtoId,
+    produtoNome: _produtoNome,
+    initialImpressorasResumo,
+    onClose,
+    isEmbedded = false,
+    onEmbedStateChange,
+  },
+  ref
+) {
   const isRehydrated = useAuthStore(s => s.isRehydrated)
   const [searchQuery, setSearchQuery] = useState('')
+  const [filterTab, setFilterTab] = useState<'vinculados' | 'disponiveis' | 'todos'>('vinculados')
   const [impressoras, setImpressoras] = useState<ProdutoImpressora[]>(() =>
     mapResumoToImpressoras(initialImpressorasResumo)
   )
@@ -80,8 +117,11 @@ export function ProdutoImpressorasDialog({
   const [error, setError] = useState<string | null>(null)
   const [allImpressoras, setAllImpressoras] = useState<ProdutoImpressora[]>([])
   const [isLoadingAllImpressoras, setIsLoadingAllImpressoras] = useState(false)
-  /** Durante o PATCH só o switch desta impressora fica desabilitado (evita “congelar” toda a lista). */
-  const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const baselineImpressorasIdsRef = useRef<string[]>(
+    mapResumoToImpressoras(initialImpressorasResumo).map(i => i.id)
+  )
+  const isDirtyRef = useRef(false)
   const [impressorasModalState, setImpressorasModalState] = useState<ImpressorasTabsModalState>({
     open: false,
     tab: 'impressora',
@@ -96,7 +136,7 @@ export function ProdutoImpressorasDialog({
     async (signal?: AbortSignal) => {
       if (!produtoId) return
 
-      const token = useAuthStore.getState().auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         setError('Token não encontrado. Faça login novamente.')
         setImpressoras([])
@@ -104,10 +144,13 @@ export function ProdutoImpressorasDialog({
         return
       }
 
-      setIsLoading(true)
+      const hasSeed = baselineImpressorasIdsRef.current.length > 0
+      if (!(isEmbedded && hasSeed)) {
+        setIsLoading(true)
+      }
       setError(null)
       try {
-        const response = await fetch(`/api/produtos/${produtoId}`, {
+        const response = await fetchGestorApi(`/api/produtos/${produtoId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -136,7 +179,17 @@ export function ProdutoImpressorasDialog({
           }))
           .filter((item: ProdutoImpressora) => Boolean(item.id))
 
-        setImpressoras(impressorasData)
+        if (isDirtyRef.current) {
+          setImpressoras(prev =>
+            prev.map(local => {
+              const fromServer = impressorasData.find(i => i.id === local.id)
+              return fromServer ?? local
+            })
+          )
+        } else {
+          setImpressoras(impressorasData)
+          baselineImpressorasIdsRef.current = impressorasData.map(i => i.id)
+        }
       } catch (err) {
         if (signal?.aborted || (err instanceof DOMException && err.name === 'AbortError')) {
           return
@@ -150,11 +203,11 @@ export function ProdutoImpressorasDialog({
         }
       }
     },
-    [produtoId]
+    [produtoId, isEmbedded]
   )
 
   const loadAllImpressoras = useCallback(async () => {
-    const token = useAuthStore.getState().auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       setAllImpressoras([])
       return
@@ -168,7 +221,7 @@ export function ProdutoImpressorasDialog({
       const collected: ProdutoImpressora[] = []
 
       while (hasMore) {
-        const response = await fetch(`/api/impressoras?limit=${limit}&offset=${offset}`, {
+        const response = await fetchGestorApi(`/api/impressoras?limit=${limit}&offset=${offset}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -209,15 +262,20 @@ export function ProdutoImpressorasDialog({
     }
   }, [])
 
-  // Antes do paint: evita um frame com lista vazia e isLoading false (efeito roda depois do paint).
+  // Antes do paint: spinner só se não há seed (lista do produto) — em embed evita flash de loading.
   useLayoutEffect(() => {
     if (open && produtoId && isRehydrated) {
-      setIsLoading(true)
+      const hasSeed = baselineImpressorasIdsRef.current.length > 0 || impressoras.length > 0
+      if (!isEmbedded && !hasSeed) {
+        setIsLoading(true)
+      }
     }
     if (!open || !produtoId) {
       setIsLoading(false)
     }
-  }, [open, produtoId, isRehydrated])
+    // impressoras só no momento da abertura
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, produtoId, isRehydrated, isEmbedded])
 
   useEffect(() => {
     if (!open || !produtoId || !isRehydrated) {
@@ -240,12 +298,38 @@ export function ProdutoImpressorasDialog({
     if (!open) {
       sessionCatalogOrderRef.current = null
       setSessionOrderTick(0)
+      setFilterTab('vinculados')
+      setSearchQuery('')
+      baselineImpressorasIdsRef.current = []
+      isDirtyRef.current = false
+      setIsSaving(false)
+      onEmbedStateChange?.({ isDirty: false, isSaving: false })
     }
-  }, [open])
+  }, [open, onEmbedStateChange])
 
   const linkedIds = useMemo(() => {
     return new Set(impressoras.map(i => i.id))
   }, [impressoras])
+
+  /** Catálogo + vínculos seedados (mostra "Neste produto" sem esperar `/api/impressoras`). */
+  const catalogoComVinculos = useMemo(() => {
+    const byId = new Map<string, ProdutoImpressora>()
+    for (const i of allImpressoras) byId.set(i.id, i)
+    for (const i of impressoras) {
+      if (!byId.has(i.id)) byId.set(i.id, i)
+    }
+    return Array.from(byId.values())
+  }, [allImpressoras, impressoras])
+
+  const filterCounts = useMemo(() => {
+    const vinculados = linkedIds.size
+    const catalogSize = allImpressoras.length
+    return {
+      vinculados,
+      disponiveis: catalogSize > 0 ? Math.max(0, catalogSize - vinculados) : 0,
+      todos: catalogSize > 0 ? catalogSize : vinculados,
+    }
+  }, [linkedIds, allImpressoras])
 
   /** Captura ordem inicial (vinculadas primeiro) uma vez por abertura, após catálogo e vínculos carregados */
   useEffect(() => {
@@ -280,30 +364,40 @@ export function ProdutoImpressorasDialog({
   )
 
   const filteredAllImpressoras = useMemo(() => {
-    const base = allImpressoras ?? []
+    const base = catalogoComVinculos
     const normalized = searchQuery.trim().toLowerCase()
-    const filtered = !normalized
+    const bySearch = !normalized
       ? [...base]
       : base.filter(impressora => {
           const target = `${impressora.nome} ${impressora.modelo ?? ''} ${impressora.local ?? ''}`
           return target.toLowerCase().includes(normalized)
         })
 
-    const linkedFallback = new Set(impressoras.map(i => i.id))
+    const filtrados =
+      filterTab === 'vinculados'
+        ? bySearch.filter(i => linkedIds.has(i.id))
+        : filterTab === 'disponiveis'
+          ? bySearch.filter(i => !linkedIds.has(i.id))
+          : bySearch
+
     const collator = new Intl.Collator('pt-BR', { sensitivity: 'base' })
+
+    if (filterTab !== 'todos') {
+      return [...filtrados].sort((a, b) => collator.compare(a.nome, b.nome))
+    }
 
     const ordemSessao = sessionCatalogOrderRef.current
     if (!open || ordemSessao === null) {
-      return [...filtered].sort((a, b) => {
-        const aLinked = linkedFallback.has(a.id)
-        const bLinked = linkedFallback.has(b.id)
+      return [...filtrados].sort((a, b) => {
+        const aLinked = linkedIds.has(a.id)
+        const bLinked = linkedIds.has(b.id)
         if (aLinked !== bLinked) return aLinked ? -1 : 1
         return collator.compare(a.nome, b.nome)
       })
     }
 
     const ordemMap = new Map(ordemSessao.map((id, idx) => [id, idx]))
-    return [...filtered].sort((a, b) => {
+    return [...filtrados].sort((a, b) => {
       const ia = ordemMap.get(a.id)
       const ib = ordemMap.get(b.id)
       if (ia !== undefined && ib !== undefined) return ia - ib
@@ -311,7 +405,7 @@ export function ProdutoImpressorasDialog({
       if (ib !== undefined) return 1
       return collator.compare(a.nome, b.nome)
     })
-  }, [allImpressoras, searchQuery, impressoras, open, sessionOrderTick])
+  }, [catalogoComVinculos, searchQuery, filterTab, linkedIds, open, sessionOrderTick])
 
   const handleClose = () => {
     onClose()
@@ -362,14 +456,14 @@ export function ProdutoImpressorasDialog({
         return false
       }
 
-      const token = useAuthStore.getState().auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return false
       }
 
       try {
-        const response = await fetch(`/api/produtos/${produtoId}`, {
+        const response = await fetchGestorApi(`/api/produtos/${produtoId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -414,18 +508,13 @@ export function ProdutoImpressorasDialog({
   )
 
   const handleToggleVinculo = useCallback(
-    async (impressoraId: string, vincular: boolean) => {
-      if (togglingId !== null) return
+    (impressoraId: string, vincular: boolean) => {
+      if (isSaving) return
 
       const next = new Set(linkedIds)
       if (vincular) next.add(impressoraId)
       else next.delete(impressoraId)
       const newIds = Array.from(next)
-
-      const antesSnapshot = impressoras
-      const catalogOrderBefore = sessionCatalogOrderRef.current
-        ? [...sessionCatalogOrderRef.current]
-        : null
 
       const optimisticList: ProdutoImpressora[] = newIds.map(printerId => {
         const detalhes = findImpressoraById(printerId)
@@ -449,27 +538,72 @@ export function ProdutoImpressorasDialog({
         setSessionOrderTick(t => t + 1)
       }
 
-      setTogglingId(impressoraId)
-      try {
-        const ok = await persistImpressorasSelection(
-          newIds,
-          vincular ? 'Impressora vinculada ao produto!' : 'Impressora removida do produto.',
-          { optimisticPreApplied: true }
-        )
-        if (!ok) {
-          setImpressoras(antesSnapshot)
-          sessionCatalogOrderRef.current = catalogOrderBefore
-          setSessionOrderTick(t => t + 1)
-        }
-      } finally {
-        setTogglingId(null)
-      }
+      isDirtyRef.current = !sameIdSet(newIds, baselineImpressorasIdsRef.current)
+      onEmbedStateChange?.({ isDirty: isDirtyRef.current, isSaving: false })
     },
-    [togglingId, linkedIds, impressoras, findImpressoraById, persistImpressorasSelection]
+    [isSaving, linkedIds, findImpressoraById, onEmbedStateChange]
   )
 
-  /** Um único fluxo visual: só some o Jiffy quando produto + catálogo `/api/impressoras` terminarem. */
-  const carregandoListaImpressoras = isLoading || isLoadingAllImpressoras
+  const savePendingImpressoras = useCallback(async (): Promise<boolean> => {
+    if (!produtoId) {
+      showToast.error('Produto não encontrado.')
+      return false
+    }
+
+    const currentIds = impressoras.map(i => i.id)
+    const baselineIds = baselineImpressorasIdsRef.current
+    if (sameIdSet(currentIds, baselineIds)) {
+      isDirtyRef.current = false
+      onEmbedStateChange?.({ isDirty: false, isSaving: false })
+      return true
+    }
+
+    setIsSaving(true)
+    onEmbedStateChange?.({ isDirty: true, isSaving: true })
+    try {
+      const ok = await persistImpressorasSelection(currentIds, 'Impressoras atualizadas com sucesso!', {
+        optimisticPreApplied: true,
+      })
+      if (ok) {
+        baselineImpressorasIdsRef.current = [...currentIds]
+        isDirtyRef.current = false
+        onEmbedStateChange?.({ isDirty: false, isSaving: false })
+      } else {
+        onEmbedStateChange?.({ isDirty: true, isSaving: false })
+      }
+      return ok
+    } finally {
+      setIsSaving(false)
+    }
+  }, [produtoId, impressoras, persistImpressorasSelection, onEmbedStateChange])
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      isDirty: () =>
+        !sameIdSet(
+          impressoras.map(i => i.id),
+          baselineImpressorasIdsRef.current
+        ),
+      save: () => savePendingImpressoras(),
+    }),
+    [impressoras, savePendingImpressoras]
+  )
+
+  useEffect(() => {
+    const dirty = !sameIdSet(
+      impressoras.map(i => i.id),
+      baselineImpressorasIdsRef.current
+    )
+    isDirtyRef.current = dirty
+    onEmbedStateChange?.({ isDirty: dirty, isSaving })
+  }, [impressoras, isSaving, onEmbedStateChange])
+
+  /** Só bloqueia a UI se não há nada para mostrar (seed / vínculos locais). */
+  const carregandoListaImpressoras =
+    (isLoading || isLoadingAllImpressoras) &&
+    impressoras.length === 0 &&
+    allImpressoras.length === 0
 
   /** Mesmo shell visual de `renderCatalogoGruposCard` em ComplementosMultiSelectDialog */
   const renderCatalogoImpressorasCard = () => (
@@ -494,29 +628,67 @@ export function ProdutoImpressorasDialog({
         </div>
       ) : (
         <>
-          <div className="relative mb-2 shrink-0">
-            <MdSearch
-              className="pointer-events-none absolute left-2.5 top-1/2 z-[1] -translate-y-1/2 text-secondary-text"
-              size={16}
-            />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Buscar impressora..."
-              className="h-9 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-xs text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
-            />
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <div className="relative min-w-[140px] flex-1">
+              <MdSearch
+                className="pointer-events-none absolute left-2.5 top-1/2 z-[1] -translate-y-1/2 text-secondary-text"
+                size={16}
+              />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Buscar impressora..."
+                className="h-8 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-xs text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+              />
+            </div>
+            <div className="flex h-8 shrink-0 overflow-hidden rounded-lg border border-gray-200 text-xs font-medium">
+              {(['vinculados', 'disponiveis', 'todos'] as const).map(tab => {
+                const labels = {
+                  vinculados: 'Neste produto',
+                  disponiveis: 'Disponíveis',
+                  todos: 'Todos',
+                }
+                const count = filterCounts[tab]
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setFilterTab(tab)}
+                    className={cn(
+                      'flex h-full items-center gap-1.5 px-2.5 transition-colors',
+                      filterTab === tab
+                        ? 'bg-primary text-white'
+                        : 'bg-white text-secondary-text hover:bg-gray-50'
+                    )}
+                  >
+                    <span>{labels[tab]}</span>
+                    <span
+                      className={cn(
+                        'tabular-nums',
+                        filterTab === tab ? 'text-white/80' : 'text-secondary-text/80'
+                      )}
+                    >
+                      ({count})
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
           <div className="scrollbar-hide max-h-[280px] min-h-0 overflow-y-auto overscroll-y-contain rounded-lg border border-gray-100 bg-gray-50/50 md:max-h-[360px]">
             {filteredAllImpressoras.length ? (
               <ul className="divide-y divide-gray-100">
                 {filteredAllImpressoras.map(impressora => {
                   const isLinked = linkedIds.has(impressora.id)
-                  const isRowLoading = togglingId === impressora.id
+                  const isRowLoading = isSaving
                   return (
                     <li
                       key={impressora.id}
-                      className="flex items-center justify-between gap-2 px-2 py-1.5 hover:bg-white/80"
+                      className={cn(
+                        'flex items-center justify-between gap-2 px-2 py-1.5 hover:bg-white/80',
+                        !isLinked && filterTab === 'todos' && 'opacity-70'
+                      )}
                     >
                       <div className="min-w-0 flex-1 py-2">
                         <div className="flex items-center gap-2">
@@ -526,7 +698,7 @@ export function ProdutoImpressorasDialog({
                           <button
                             type="button"
                             onClick={() => handleEditImpressora(impressora)}
-                            disabled={togglingId !== null}
+                            disabled={isSaving}
                             className="shrink-0 text-primary transition-colors hover:text-primary/80 disabled:cursor-not-allowed disabled:opacity-60"
                             aria-label={`Editar ${impressora.nome}`}
                             title="Editar impressora"
@@ -561,8 +733,9 @@ export function ProdutoImpressorasDialog({
                           checked={isLinked}
                           onChange={e => {
                             e.stopPropagation()
-                            void handleToggleVinculo(impressora.id, e.target.checked)
+                            handleToggleVinculo(impressora.id, e.target.checked)
                           }}
+                          label="Vínculo"
                           labelPosition="start"
                           bordered={false}
                           size="xs"
@@ -586,7 +759,11 @@ export function ProdutoImpressorasDialog({
                 <p className="text-xs text-secondary-text">
                   {allImpressoras.length === 0
                     ? 'Nenhuma impressora cadastrada.'
-                    : `Nenhuma impressora encontrada${searchQuery.trim() ? ` para "${searchQuery.trim()}"` : ''}.`}
+                    : filterTab === 'vinculados'
+                      ? 'Nenhuma impressora vinculada a este produto.'
+                      : filterTab === 'disponiveis'
+                        ? 'Nenhuma impressora disponível para vincular.'
+                        : `Nenhuma impressora encontrada${searchQuery.trim() ? ` para "${searchQuery.trim()}"` : ''}.`}
                 </p>
               </div>
             )}
@@ -600,25 +777,21 @@ export function ProdutoImpressorasDialog({
 
   const embeddedSectionHeader = (
     <div className="px-6 py-3">
-      {/* Mesmo padrão de ComplementosMultiSelectDialog (aba embutida) */}
       <div className="flex min-w-0 flex-wrap items-center gap-3 md:gap-5">
         <h2 className="min-w-0 break-words text-lg font-semibold text-primary md:text-xl">
-          Impressoras Vinculadas
+          Impressoras ({filterCounts.vinculados})
         </h2>
         <div className="h-px min-w-8 flex-1 bg-primary/70" />
         <button
           type="button"
           onClick={handleOpenNovaImpressora}
-          disabled={togglingId !== null}
+          disabled={isSaving}
           className="flex shrink-0 items-center rounded-lg border border-primary bg-primary px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 md:h-8 md:gap-2 md:px-4 md:text-sm"
         >
           <MdAdd size={18} />
           Nova impressora
         </button>
       </div>
-      <p className="text-sm text-secondary-text">
-        {impressoras.length} impressora{impressoras.length === 1 ? '' : 's'} vinculadas
-      </p>
     </div>
   )
 
@@ -687,40 +860,52 @@ export function ProdutoImpressorasDialog({
           <div className="pr-8">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <DialogTitle className="flex-1 !pb-0 !pt-0">
-                {produtoNome ? `Impressoras de ${produtoNome}` : 'Selecionar impressoras'}
+                Impressoras ({filterCounts.vinculados})
               </DialogTitle>
               <button
                 type="button"
                 onClick={handleOpenNovaImpressora}
-                disabled={togglingId !== null}
+                disabled={isSaving}
                 className="flex shrink-0 items-center rounded-lg border border-primary bg-primary px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 md:h-8 md:gap-2 md:px-4 md:text-sm"
               >
                 <MdAdd size={18} />
                 Nova impressora
               </button>
             </div>
-            <p className="mt-1 text-xs text-secondary-text">
-              {impressoras.length} impressora{impressoras.length === 1 ? '' : 's'} vinculadas
-            </p>
           </div>
         </DialogHeader>
 
         <DialogContent sx={{ padding: '16px 24px 0 24px' }}>{renderDialogBody()}</DialogContent>
 
         <DialogFooter
-          className="flex items-center justify-start border-t border-gray-100"
-          sx={{ justifyContent: 'flex-start' }}
+          className="flex items-center justify-between gap-3 border-t border-gray-100"
+          sx={{ justifyContent: 'space-between' }}
         >
           <button
             type="button"
             onClick={handleClose}
-            className="h-10 rounded-[24px] border border-gray-300 px-6 text-sm font-semibold text-primary-text transition-colors hover:bg-gray-50"
+            disabled={isSaving}
+            className="h-10 rounded-[24px] border border-gray-300 px-6 text-sm font-semibold text-primary-text transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
             Fechar
+          </button>
+          <button
+            type="button"
+            onClick={() => void savePendingImpressoras()}
+            disabled={
+              isSaving ||
+              sameIdSet(
+                impressoras.map(i => i.id),
+                baselineImpressorasIdsRef.current
+              )
+            }
+            className="h-10 rounded-[24px] border border-primary bg-primary px-6 text-sm font-semibold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSaving ? 'Salvando...' : 'Salvar'}
           </button>
         </DialogFooter>
       </Dialog>
       {impressorasModalPortal}
     </>
   )
-}
+})

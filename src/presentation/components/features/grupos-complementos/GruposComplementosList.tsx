@@ -3,20 +3,28 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { useGruposComplementosInfinite } from '@/src/presentation/hooks/useGruposComplementos'
-import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import {
+  CadastroListHeader,
+  CadastroListHeaderLabel,
+  CadastroListRow,
+  CadastroListShell,
+  CadastroListThumbSpacer,
+  EntityListThumbnail,
+} from '@/src/presentation/components/ui/cadastro-list'
+import {
   MdSearch,
   MdExtension,
-  MdAddCircle,
   MdKeyboardArrowUp,
   MdKeyboardArrowDown,
+  MdImageNotSupported,
   MdPhotoCamera,
 } from 'react-icons/md'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { useQueryClient } from '@tanstack/react-query'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { showToast } from '@/src/shared/utils/toast'
 import { DELIVERY_IMAGE_ACCEPT } from '@/src/shared/constants/deliveryImageUpload'
 import {
@@ -36,6 +44,10 @@ interface GruposComplementosListProps {
   onReload?: () => void
 }
 
+function stopRowInteraction(e: React.SyntheticEvent) {
+  e.stopPropagation()
+}
+
 function GrupoImagemThumb({
   nome,
   imagemUrl,
@@ -48,27 +60,24 @@ function GrupoImagemThumb({
   onSelectFile: (file: File) => void
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
-  const hasImage = Boolean(imagemUrl)
-  const label = hasImage ? `Trocar imagem de ${nome}` : `Inserir imagem de ${nome}`
+
+  const openFilePicker = useCallback(() => {
+    if (isUploading) return
+    inputRef.current?.click()
+  }, [isUploading])
 
   return (
-    <button
-      type="button"
-      onClick={e => {
-        e.stopPropagation()
-        if (isUploading) return
-        inputRef.current?.click()
-      }}
-      disabled={isUploading}
-      aria-label={label}
-      title={label}
-      className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-gray-50 transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-60 md:h-12 md:w-12"
+    <div
+      className="relative h-11 w-11 shrink-0 md:h-12 md:w-12"
+      onClick={stopRowInteraction}
+      onMouseDown={stopRowInteraction}
     >
       <input
         ref={inputRef}
         type="file"
         accept={DELIVERY_IMAGE_ACCEPT}
         className="hidden"
+        onClick={e => e.stopPropagation()}
         onChange={e => {
           const file = e.target.files?.[0]
           e.target.value = ''
@@ -76,23 +85,43 @@ function GrupoImagemThumb({
         }}
       />
       {imagemUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={imagemUrl}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover"
-        />
+        <>
+          <EntityListThumbnail src={imagemUrl} alt={nome} />
+          <button
+            type="button"
+            title="Trocar imagem"
+            aria-label={`Trocar imagem de ${nome}`}
+            disabled={isUploading}
+            onClick={e => {
+              stopRowInteraction(e)
+              openFilePicker()
+            }}
+            className="absolute -bottom-1 -right-1 z-10 flex h-5 w-5 items-center justify-center rounded-full border border-white bg-primary text-white shadow disabled:cursor-wait disabled:opacity-60"
+          >
+            <MdPhotoCamera className="h-3 w-3" />
+          </button>
+        </>
       ) : (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <MdPhotoCamera className="h-5 w-5 text-secondary-text/70" />
-        </div>
+        <button
+          type="button"
+          title={`Inserir imagem de ${nome}`}
+          aria-label={`Inserir imagem de ${nome}`}
+          disabled={isUploading}
+          onClick={e => {
+            stopRowInteraction(e)
+            openFilePicker()
+          }}
+          className="relative flex h-full w-full items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-secondary-text transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
+        >
+          <MdImageNotSupported className="h-6 w-6 md:h-7 md:w-7" />
+        </button>
       )}
       {isUploading ? (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/35">
+        <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-black/35">
           <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
         </div>
       ) : null}
-    </button>
+    </div>
   )
 }
 
@@ -102,12 +131,10 @@ function GrupoImagemThumb({
 const GrupoItem = memo(function GrupoItem({
   grupo,
   onToggleStatus,
-  onActionsChanged,
   onOpenComplementosModal,
   onEditGrupo,
   onChangeQuantidade,
   isChangingQuantidade,
-  ordemPosicional,
   rowIndex,
   imagemUrl,
   isUploadingImagem,
@@ -115,178 +142,136 @@ const GrupoItem = memo(function GrupoItem({
 }: {
   grupo: GrupoComplemento
   onToggleStatus?: (grupoId: string, novoStatus: boolean) => void
-  onActionsChanged?: () => void
   onOpenComplementosModal?: (grupo: GrupoComplemento) => void
   onEditGrupo?: (grupo: GrupoComplemento) => void
   onChangeQuantidade?: (grupo: GrupoComplemento, tipo: 'min' | 'max', delta: number) => void
   isChangingQuantidade?: boolean
-  ordemPosicional: number
   rowIndex: number
   imagemUrl?: string | null
   isUploadingImagem?: boolean
   onUploadImagem?: (grupoId: string, file: File) => void
 }) {
   const complementos = useMemo(() => grupo.getComplementos() || [], [grupo])
-  const ordem = useMemo(() => {
-    const value = grupo.getOrdem?.()
-    if (typeof value === 'undefined') {
-      console.warn('[GruposComplementosList] Grupo sem ordem recebida do backend', {
-        id: grupo.getId(),
-        nome: grupo.getNome(),
-        grupo,
-      })
-    }
-    return value
-  }, [grupo])
   const complementosIds = useMemo(() => grupo.getComplementosIds() || [], [grupo])
   const isAtivo = useMemo(() => grupo.isAtivo(), [grupo])
-  const hasComplementos = useMemo(() => complementosIds.length > 0, [complementosIds])
+  const qtdComplementos = complementos.length || complementosIds.length
 
-  // Handler para abrir edição ao clicar na linha
   const handleRowClick = useCallback(() => {
     onEditGrupo?.(grupo)
   }, [grupo, onEditGrupo])
 
+  const actionBtnBase =
+    'inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-full border px-2.5 text-xs font-semibold leading-none transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-secondary/80'
+
   return (
-    <div className="bg-info rounded-lg mb-2">
-      
-      {/* Linha principal do grupo */}
-      <div 
-        onClick={handleRowClick}
-        className={`md:px-4 py-2 flex items-center rounded-lg gap-[10px] transition-shadow hover:bg-secondary-bg/15 cursor-pointer ${
-          rowIndex % 2 === 0 ? 'bg-gray-50' : 'bg-white'
-        }`}
+    <CadastroListRow
+      variant="grupos-complementos"
+      index={rowIndex}
+      onClick={handleRowClick}
+    >
+      <GrupoImagemThumb
+        nome={grupo.getNome()}
+        imagemUrl={imagemUrl}
+        isUploading={isUploadingImagem}
+        onSelectFile={file => onUploadImagem?.(grupo.getId(), file)}
+      />
+
+      <span
+        className="min-w-0 truncate font-normal text-xs text-primary-text md:text-sm"
+        title={grupo.getNome()}
       >
-        <div className="items-start text-xs text-secondary-text md:flex-1">
-          
-          <span className="text-sm text-left font-semibold text-primary-text/70">
-            {ordemPosicional}
-          </span>
-        </div>
-        <div className="md:flex-[3] flex-[2] min-w-0 flex items-center gap-2">
-          <GrupoImagemThumb
-            nome={grupo.getNome()}
-            imagemUrl={imagemUrl}
-            isUploading={isUploadingImagem}
-            onSelectFile={file => onUploadImagem?.(grupo.getId(), file)}
-          />
-          <div className="flex min-w-0 flex-col gap-1 md:flex-row">
-            <span className="flex items-center gap-2 truncate font-normal md:text-sm text-xs text-primary-text">
-              {grupo.getNome()}
-            </span>
-              <button
-                type="button"
-                title="Editar complementos do grupo"
-                aria-label={`Editar complementos do grupo ${grupo.getNome()}`}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpenComplementosModal?.(grupo)
-                }}
-                className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
-                  hasComplementos
-                    ? 'bg-primary text-white border border-primary hover:bg-primary/90'
-                    : 'bg-info text-primary border border-primary/30 hover:bg-gray-300'
-                }`}
-              >
-                <MdExtension className="text-sm" />
-              </button>
-          </div>
-        </div>
-        <div className="flex-[3] justify-center hidden md:flex" onClick={(e) => e.stopPropagation()}>
-          <div className="grid grid-cols-2 text-sm gap-4">
-            {[
-              {
-                label: 'Qtd mín.',
-                valor: grupo.getQtdMinima(),
-                tipo: 'min' as const,
-                invertButtons: true,
-              },
-              {
-                label: 'Qtd máx.',
-                valor: grupo.getQtdMaxima(),
-                tipo: 'max' as const,
-                invertButtons: false,
-              },
-            ].map((item) => (
-              <div
-                key={`${grupo.getId()}-${item.tipo}`}
-                className={`flex items-center gap-2 ${item.invertButtons ? 'flex-row-reverse justify-end' : ''}`}
-              >
-                <div className="flex flex-col items-center text-center text-xs text-secondary-text min-w-[70px]">
-                  <span className="tracking-wide">{item.label}</span>
-                  <span className="text-sm font-normal text-primary-text">{item.valor}</span>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <button
-                    type="button"
-                    aria-label={`Aumentar ${item.label}`}
-                    disabled={isChangingQuantidade}
-                    onClick={() => onChangeQuantidade?.(grupo, item.tipo, 1)}
-                    className="w-4 h-4 rounded-md border border-gray-300 flex items-center justify-center text-primary hover:bg-primary/10 disabled:opacity-50"
-                  >
-                    <MdKeyboardArrowUp />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Diminuir ${item.label}`}
-                    disabled={isChangingQuantidade}
-                    onClick={() => onChangeQuantidade?.(grupo, item.tipo, -1)}
-                    className="w-4 h-4 rounded-md border border-gray-300 flex items-center justify-center text-primary hover:bg-primary/10 disabled:opacity-50"
-                  >
-                    <MdKeyboardArrowDown />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        
-        <div className="flex-[2] flex items-center justify-start" onClick={(e) => e.stopPropagation()}>
-          {complementos.length === 0 ? (
-            <span className="text-sm font-normal text-secondary-text">Nenhum complemento</span>
-          ) : (
-            <select
-              className="w-full md:px-3 py-1.5 rounded-xl border border-gray-300 bg-white md:text-sm text-xs font-normal text-primary-text focus:outline-none focus:border-primary"
-              defaultValue=""
-              onChange={(event) => {
-                event.target.value = ''
-              }}
+        {grupo.getNome()}
+      </span>
+
+      <div className="hidden items-center justify-center md:flex" onClick={e => e.stopPropagation()}>
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          {[
+            {
+              label: 'Qtd mín.',
+              valor: grupo.getQtdMinima(),
+              tipo: 'min' as const,
+              invertButtons: true,
+            },
+            {
+              label: 'Qtd máx.',
+              valor: grupo.getQtdMaxima(),
+              tipo: 'max' as const,
+              invertButtons: false,
+            },
+          ].map(item => (
+            <div
+              key={`${grupo.getId()}-${item.tipo}`}
+              className={`flex items-center gap-1.5 ${item.invertButtons ? 'flex-row-reverse' : ''}`}
             >
-              <option value="" disabled>{complementos.length} complemento(s)</option>
-              {complementos.map((complemento: any, index: number) => (
-                <option key={complemento.id || index} value={complemento.nome || `complemento-${index}`}>
-                  {complemento.nome || 'Complemento sem nome'}{' '}
-                  {typeof complemento.valor !== 'undefined'
-                    ? `--- R$ ${Number(complemento.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                    : ''}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-        <div
-          className="md:flex-[1.5] flex items-center md:justify-end justify-end"
-          onClick={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
-        >
-          <JiffyIconSwitch
-            checked={isAtivo}
-            onChange={(e) => {
-              e.stopPropagation()
-              onToggleStatus?.(grupo.getId(), e.target.checked)
-            }}
-            bordered={false}
-            size="sm"
-            className="shrink-0"
-            inputProps={{
-              'aria-label': isAtivo ? 'Desativar grupo de complementos' : 'Ativar grupo de complementos',
-            }}
-          />
+              <div className="flex min-w-[3.5rem] flex-col items-center text-center text-xs text-secondary-text">
+                <span className="tracking-wide">{item.label}</span>
+                <span className="text-sm font-normal text-primary-text">{item.valor}</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <button
+                  type="button"
+                  aria-label={`Aumentar ${item.label}`}
+                  disabled={isChangingQuantidade}
+                  onClick={() => onChangeQuantidade?.(grupo, item.tipo, 1)}
+                  className="flex h-5 w-5 items-center justify-center rounded-md border border-gray-300 text-primary hover:bg-primary/10 disabled:opacity-50"
+                >
+                  <MdKeyboardArrowUp />
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Diminuir ${item.label}`}
+                  disabled={isChangingQuantidade}
+                  onClick={() => onChangeQuantidade?.(grupo, item.tipo, -1)}
+                  className="flex h-5 w-5 items-center justify-center rounded-md border border-gray-300 text-primary hover:bg-primary/10 disabled:opacity-50"
+                >
+                  <MdKeyboardArrowDown />
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
-    </div>
+      <div className="flex min-w-0 items-center justify-center" onClick={e => e.stopPropagation()}>
+        <button
+          type="button"
+          aria-label={`Editar complementos do grupo ${grupo.getNome()}`}
+          title="Editar complementos"
+          onClick={() => onOpenComplementosModal?.(grupo)}
+          className={`${actionBtnBase} max-w-full border-secondary/60 bg-white text-secondary hover:bg-secondary/10`}
+        >
+          <MdExtension className="shrink-0 text-base" />
+          <span className="truncate">
+            {qtdComplementos === 0
+              ? 'Editar Complementos'
+              : `Editar ${qtdComplementos} Complementos`}
+          </span>
+        </button>
+      </div>
+
+      <div
+        className="flex items-center justify-center"
+        onClick={e => e.stopPropagation()}
+        onMouseDown={e => e.stopPropagation()}
+        onTouchStart={e => e.stopPropagation()}
+      >
+        <JiffyIconSwitch
+          checked={isAtivo}
+          onChange={e => {
+            e.stopPropagation()
+            onToggleStatus?.(grupo.getId(), e.target.checked)
+          }}
+          bordered={false}
+          size="sm"
+          className="shrink-0"
+          inputProps={{
+            'aria-label': isAtivo
+              ? 'Desativar grupo de complementos'
+              : 'Ativar grupo de complementos',
+          }}
+        />
+      </div>
+    </CadastroListRow>
   )
 })
 
@@ -299,7 +284,6 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Debounce da busca (500ms)
   useEffect(() => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current)
@@ -316,12 +300,10 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
     }
   }, [searchText])
 
-  // Determina o filtro ativo (memoizado)
   const ativoFilter = useMemo<boolean | null>(() => {
     return filterStatus === 'Ativo' ? true : filterStatus === 'Inativo' ? false : null
   }, [filterStatus])
 
-  // Hook otimizado com React Query
   const {
     data,
     fetchNextPage,
@@ -343,7 +325,6 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
     }
   }, [isLoading, isFetching])
 
-  // Achatando todas as páginas em uma única lista (memoizado)
   const grupos = useMemo(() => {
     return data?.pages.flatMap((page) => page.grupos) || []
   }, [data])
@@ -352,14 +333,9 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
     return data?.pages[0]?.count || 0
   }, [data])
 
-  const filteredTotal = useMemo(() => {
-    return grupos.length
-  }, [grupos])
-
-  // Handler de scroll com throttle para melhor performance
   const handleScroll = useCallback(() => {
     if (scrollTimeoutRef.current) {
-      return // Ignora se já há um timeout pendente
+      return
     }
 
     scrollTimeoutRef.current = setTimeout(() => {
@@ -368,8 +344,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
 
       const { scrollTop, scrollHeight, clientHeight } = container
       const distanceFromBottom = scrollHeight - (scrollTop + clientHeight)
-      
-      // Carregar próxima página quando estiver a 400px do final (prefetch mais agressivo)
+
       if (distanceFromBottom < 400) {
         if (hasNextPage && !isFetchingNextPage) {
           fetchNextPage()
@@ -377,10 +352,9 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
       }
 
       scrollTimeoutRef.current = null
-    }, 100) // Throttle de 100ms
+    }, 100)
   }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
-  // Scroll infinito com prefetching inteligente e throttle
   useEffect(() => {
     const container = scrollContainerRef.current
     if (!container) return
@@ -394,7 +368,6 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
     }
   }, [handleScroll])
 
-  // Carrega automaticamente todas as páginas (10 itens por vez)
   useEffect(() => {
     if (!hasNextPage) {
       return
@@ -405,21 +378,19 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
     }
   }, [hasNextPage, isFetching, isFetchingNextPage, fetchNextPage])
 
-  // Notificar erro
   useEffect(() => {
     if (error) {
       console.error('Erro ao carregar grupos de complementos:', error)
     }
   }, [error])
 
-  const { auth } = useAuthStore()
   const [updatingQuantidadeId, setUpdatingQuantidadeId] = useState<string | null>(null)
   const [imagensPorGrupoId, setImagensPorGrupoId] = useState<Record<string, string | null>>({})
   const [uploadingImagemGrupoId, setUploadingImagemGrupoId] = useState<string | null>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
-  const queryClient = useQueryClient() // Declarar queryClient aqui
+  const invalidate = useInvalidateTenantQueries()
 
   useEffect(() => {
     const idsFaltantes = grupos
@@ -429,7 +400,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
     if (idsFaltantes.length === 0) return
 
     let cancelled = false
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     void fetchGruposComplementoImagemUrlsBatch(idsFaltantes, token).then(resolved => {
@@ -440,11 +411,11 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
     return () => {
       cancelled = true
     }
-  }, [auth, grupos, imagensPorGrupoId])
+  }, [grupos, imagensPorGrupoId])
 
   const handleUploadImagem = useCallback(
     async (grupoId: string, file: File) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado')
         return
@@ -467,7 +438,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
         setUploadingImagemGrupoId(null)
       }
     },
-    [auth]
+    []
   )
 
   const { selectForEntity: selectGrupoComplementoImagem, cropModal: grupoComplementoCropModal } =
@@ -490,14 +461,14 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
 
   const toggleGroupStatus = useCallback(
     async (grupoId: string, novoStatus: boolean) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
       }
 
       try {
-        const response = await fetch(`/api/grupos-complementos/${grupoId}`, {
+        const response = await fetchGestorApi(`/api/grupos-complementos/${grupoId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -522,7 +493,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
         showToast.error(error.message || 'Erro ao atualizar status do grupo')
       }
     },
-    [auth, handleActionsReload]
+    [handleActionsReload]
   )
 
   const openTabsModal = useCallback(
@@ -534,7 +505,6 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
         grupo: config.grupo,
       }))
 
-      // Adicionar um parâmetro na URL para forçar o recarregamento ao fechar o modal de complemento
       const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
       currentSearchParams.set('modalComplementoOpen', 'true')
       router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
@@ -547,15 +517,13 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
       ...prev,
       open: false,
     }))
-    
-    // Remover o parâmetro da URL para forçar o recarregamento da rota
+
     const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
     currentSearchParams.delete('modalComplementoOpen')
     router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
-    router.refresh() // Força a revalidação da rota principal
-    // Invalida o cache do React Query para grupos de complementos
-    await queryClient.invalidateQueries({ queryKey: ['grupos-complementos'], exact: false })
-  }, [router, searchParams, pathname, refetch])
+    router.refresh()
+    await invalidate(['grupos-complementos'])
+  }, [router, searchParams, pathname, invalidate])
 
   const handleTabsModalReload = useCallback(async () => {
     setImagensPorGrupoId({})
@@ -598,7 +566,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
 
   const handleChangeQuantidade = useCallback(
     async (grupo: GrupoComplemento, tipo: 'min' | 'max', delta: number) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -626,7 +594,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
       setUpdatingQuantidadeId(grupo.getId())
 
       try {
-        const response = await fetch(`/api/grupos-complementos/${grupo.getId()}`, {
+        const response = await fetchGestorApi(`/api/grupos-complementos/${grupo.getId()}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -649,20 +617,20 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
         setUpdatingQuantidadeId(null)
       }
     },
-    [auth, handleActionsReload]
+    [handleActionsReload]
   )
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header com título, filtros e botão */}
-      <div className="md:px-[30px] px-2 py-[4px] flex-shrink-0">
+    <div className="flex h-full flex-col">
+      <CadastroListShell className="flex min-h-0 flex-1 flex-col px-2 md:px-[30px]">
+      <div className="flex-shrink-0 py-[4px]">
         <div className="flex flex-row items-center justify-between">
           <div className="flex flex-col md:pl-5">
             <p className="text-primary text-lg font-semibold">
               Grupos de Complementos Cadastrados
             </p>
             <p className="text-tertiary md:text-[22px] text-sm font-normal">
-              Total {grupos.length} de {filteredTotal}
+              Total {grupos.length} de {totalGrupos}
             </p>
           </div>
           <button
@@ -681,69 +649,54 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
         </div>
       </div>
       <div className="h-[2px] border-t-2 border-primary/70 flex-shrink-0"></div>
-      <div className="flex gap-3 px-2 py-1 flex-shrink-0">
-      <div className="flex-1 min-w-[180px] max-w-[360px]">
-            <div className="relative h-8">
-              <input
-                id="grupos-complementos-search"
-                type="text"
-                placeholder="Pesquisar grupo..."
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                className="w-full h-full px-5 pl-12 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm"
-              />
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
-                <MdSearch size={18} />
-              </span>
-            </div>
+      <div className="flex gap-3 py-1 flex-shrink-0">
+        <div className="flex-1 min-w-[180px] max-w-[360px]">
+          <div className="relative h-8">
+            <input
+              id="grupos-complementos-search"
+              type="text"
+              placeholder="Pesquisar grupo..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="w-full h-full px-5 pl-12 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm"
+            />
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
+              <MdSearch size={18} />
+            </span>
           </div>
+        </div>
 
-          <div className="w-full flex gap-1 items-center sm:w-[160px]">
-            <label className="text-xs font-semibold text-secondary-text mb-1 block">
-              Status
-            </label>
-            <select
-              value={filterStatus}
-              onChange={(e) =>
-                setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Inativo')
-              }
-              className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm"
-            >
-              <option value="Todos">Todos</option>
-              <option value="Ativo">Ativo</option>
-              <option value="Inativo">Inativo</option>
-            </select>
-          </div>
-          </div>
-
-      {/* Cabeçalho da tabela */}
-      <div className="flex-shrink-0">
-        <div className="h-10 bg-custom-2 rounded-lg px-2 flex items-center gap-[10px]">
-          <div className="font-semibold text-sm text-primary-text md:flex-1">
-            Ordem
-          </div>
-          <div className="md:flex-[3] flex-[2] font-semibold md:text-sm text-xs text-primary-text">
-            Nome
-          </div>
-          <div className="flex-[3] font-semibold text-sm text-primary-text justify-center hidden md:flex">
-            Qtd de Complementos
-          </div>
-          <div className="flex-[2] font-semibold md:text-sm text-xs text-primary-text">
-            Complementos
-          </div>
-          <div className="md:flex-[1.5] text-end font-semibold md:text-sm text-xs text-primary-text">
-            Status
-          </div>
+        <div className="w-full flex gap-1 items-center sm:w-[160px]">
+          <label className="text-xs font-semibold text-secondary-text mb-1 block">Status</label>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value as 'Todos' | 'Ativo' | 'Inativo')}
+            className="w-full h-8 px-5 rounded-lg border border-gray-200 bg-info text-primary-text focus:outline-none focus:border-primary text-sm"
+          >
+            <option value="Todos">Todos</option>
+            <option value="Ativo">Ativo</option>
+            <option value="Inativo">Inativo</option>
+          </select>
         </div>
       </div>
 
-      {/* Lista de grupos com scroll */}
+      <div className="flex-shrink-0">
+        <CadastroListHeader variant="grupos-complementos">
+          <CadastroListThumbSpacer />
+          <CadastroListHeaderLabel>Nome</CadastroListHeaderLabel>
+          <CadastroListHeaderLabel hideOnMobile className="justify-center text-center">
+            Qtd mín. / máx.
+          </CadastroListHeaderLabel>
+          <CadastroListHeaderLabel className="text-center">Complementos</CadastroListHeaderLabel>
+          <CadastroListHeaderLabel className="text-center">Status</CadastroListHeaderLabel>
+        </CadastroListHeader>
+      </div>
+
       <div
         ref={scrollContainerRef}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-1 pb-2 pt-2 scrollbar-hide"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-2 pt-2 scrollbar-hide"
         style={{ maxHeight: 'calc(100vh - 250px)' }}
       >
-        {/* Skeleton loaders para carregamento inicial - sempre mostra durante loading */}
         {(isLoading || (grupos.length === 0 && isFetching)) && (
           <div className="flex flex-col items-center justify-center py-8 gap-2">
             <JiffyLoading />
@@ -761,12 +714,10 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
             key={grupo.getId()}
             grupo={grupo}
             onToggleStatus={toggleGroupStatus}
-            onActionsChanged={handleActionsReload}
             onOpenComplementosModal={handleOpenComplementosModal}
             onEditGrupo={handleEditGrupo}
             onChangeQuantidade={handleChangeQuantidade}
             isChangingQuantidade={updatingQuantidadeId === grupo.getId()}
-            ordemPosicional={index + 1}
             rowIndex={index}
             imagemUrl={imagensPorGrupoId[grupo.getId()] ?? null}
             isUploadingImagem={uploadingImagemGrupoId === grupo.getId()}
@@ -787,6 +738,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
         onTabChange={handleTabsModalTabChange}
       />
       {grupoComplementoCropModal}
+      </CadastroListShell>
     </div>
   )
 }

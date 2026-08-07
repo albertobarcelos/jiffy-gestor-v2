@@ -188,9 +188,7 @@ export function usePedidosDeliveryKanbanColumns(
   options?: PedidosDeliveryInfiniteOptions & {
     getEtapaKanban?: (v: VendaUnificadaDTO) => string
   }
-) {
-  const { auth } = useAuthStore()
-  const token = auth?.getAccessToken()
+) {  const token = useAuthStore.getState().tenantAuth?.getAccessToken()
   const empresaId = useTenantEmpresaId()
   const queryClient = useQueryClient()
 

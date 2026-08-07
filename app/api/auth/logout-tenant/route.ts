@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
-import { clearAuthCookie, AUTH_COOKIE_TENANT, AUTH_COOKIE_REFRESH } from '@/src/shared/utils/authCookies'
+import { clearAuthCookie, AUTH_COOKIE_TENANT } from '@/src/shared/utils/authCookies'
 
 /**
- * Encerra só a sessão na empresa (token após escolher-empresa).
- * Mantém `identity-token` (hub / Meus Apps continua logado).
+ * Encerra só a sessão da empresa **nesta navegação** (cookie `tenant-token`).
+ * Mantém `identity-token` e `refresh-token` — o refresh é a ponte global do hub
+ * quando o identity já expirou (ver 4.FLUXO_VOLTAR_AO_MEU_JIFFY.md).
  */
 export async function POST() {
   const response = NextResponse.json(
@@ -11,6 +12,5 @@ export async function POST() {
     { status: 200 }
   )
   clearAuthCookie(response, AUTH_COOKIE_TENANT)
-  clearAuthCookie(response, AUTH_COOKIE_REFRESH)
   return response
 }

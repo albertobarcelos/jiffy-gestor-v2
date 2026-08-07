@@ -10,6 +10,7 @@ import { Input } from '@/src/presentation/components/ui/input'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
 import { formatarTelefoneBr } from '@/src/shared/utils/telefoneBr'
 import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
@@ -84,9 +85,7 @@ export function EntregadorDeliveryModal({
   entregadorId,
   onClose,
   onSalvo,
-}: EntregadorDeliveryModalProps) {
-  const { auth } = useAuthStore()
-  const [form, setForm] = useState<EntregadorFormState>(EMPTY_FORM)
+}: EntregadorDeliveryModalProps) {  const [form, setForm] = useState<EntregadorFormState>(EMPTY_FORM)
   const [carregando, setCarregando] = useState(false)
   const [salvando, setSalvando] = useState(false)
 
@@ -104,7 +103,7 @@ export function EntregadorDeliveryModal({
       return
     }
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     let cancelado = false
@@ -112,7 +111,7 @@ export function EntregadorDeliveryModal({
 
     void (async () => {
       try {
-        const res = await fetch(`/api/delivery/entregadores/${encodeURIComponent(entregadorId)}`, {
+        const res = await fetchGestorApi(`/api/delivery/entregadores/${encodeURIComponent(entregadorId)}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             Accept: 'application/json',
@@ -156,10 +155,10 @@ export function EntregadorDeliveryModal({
     return () => {
       cancelado = true
     }
-  }, [open, entregadorId, auth, onClose])
+  }, [open, entregadorId, onClose])
 
   const salvar = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Sessão expirada.')
       return
@@ -190,7 +189,7 @@ export function EntregadorDeliveryModal({
       const url = isEdicao
         ? `/api/delivery/entregadores/${encodeURIComponent(entregadorId!)}`
         : '/api/delivery/entregadores'
-      const res = await fetch(url, {
+      const res = await fetchGestorApi(url, {
         method: isEdicao ? 'PATCH' : 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -209,7 +208,7 @@ export function EntregadorDeliveryModal({
     } finally {
       setSalvando(false)
     }
-  }, [auth, form, isEdicao, entregadorId, onSalvo])
+  }, [ form, isEdicao, entregadorId, onSalvo])
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()

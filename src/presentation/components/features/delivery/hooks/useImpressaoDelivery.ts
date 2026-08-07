@@ -3,7 +3,6 @@
 import { useCallback } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
-import { usePreferenciasImpressaoDelivery } from '@/src/presentation/hooks/usePreferenciasImpressaoDelivery'
 import { decidirImpressaoAposAcao } from '@/src/application/delivery/decidirImpressaoPosTransicao'
 import { fetchVendaGestorTickets } from '@/src/infrastructure/api/fetchVendaGestorTickets'
 import { filtrarTicketsPorTipoDecidido } from '@/src/application/delivery/filtrarTicketsPorTipoDecidido'
@@ -54,10 +53,7 @@ function resolverTipoCupomComFallbackProduto(
 /**
  * Impressão do fluxo delivery: monta tickets via instruções + detalhe do pedido.
  */
-export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
-  const { auth } = useAuthStore()
-  const { empresa, deliveryCupomTemplate } = useEmpresaMe()
-  const { preferenciasImpressaoDelivery } = usePreferenciasImpressaoDelivery()
+export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {  const { empresa, preferenciasImpressaoDelivery, deliveryCupomTemplate } = useEmpresaMe()
 
   const avisarImpressoraExpedicaoNecessaria = useCallback(() => {
     showToast.warning(TOAST_IMPRESSORA_EXPEDICAO_NECESSARIA)
@@ -76,7 +72,7 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
         ehDeliveryGestor: venda.isPedidoEntregaGestor(),
       })
       if (!venda.isPedidoEntregaGestor()) return
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         warnImpressao('hook.processarAposTransicoes.sem_token', { vendaId: venda.id })
         return
@@ -178,7 +174,7 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
         logImpressao('hook.imprimir_tickets_concluido', { vendaId: venda.id })
       }
     },
-    [auth, deliveryCupomTemplate, empresa, preferenciasImpressaoDelivery]
+    [ deliveryCupomTemplate, empresa, preferenciasImpressaoDelivery]
   )
 
   const processarAposTransicaoVendaGestorId = useCallback(
@@ -202,7 +198,7 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
         warnImpressao('hook.reimpressao.coluna_operacional_ignorada', { colunaId })
         return
       }
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Sessão expirada.')
         return
@@ -284,7 +280,6 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
       logImpressao('hook.reimpressao_concluida', { vendaId: venda.id })
     },
     [
-      auth,
       avisarImpressoraExpedicaoNecessaria,
       deliveryCupomTemplate,
       empresa,

@@ -15,6 +15,7 @@ import {
 } from '@tanstack/react-query'
 
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 
@@ -186,7 +187,7 @@ async function fetchRelatorioMvp(
 
 
 
-  const response = await fetch(`/api/relatorios/produtos-vendidos/mvp?${search.toString()}`, {
+  const response = await fetchGestorApi(`/api/relatorios/produtos-vendidos/mvp?${search.toString()}`, {
 
     headers: { Authorization: `Bearer ${params.token}` },
 
@@ -240,7 +241,7 @@ async function fetchRelatorioMvpComparativo(
 
 
 
-  const response = await fetch(`/api/relatorios/produtos-vendidos/mvp?${search.toString()}`, {
+  const response = await fetchGestorApi(`/api/relatorios/produtos-vendidos/mvp?${search.toString()}`, {
 
     headers: { Authorization: `Bearer ${params.token}` },
 

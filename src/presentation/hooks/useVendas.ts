@@ -1374,7 +1374,7 @@ export function useTransicaoVendaGestor() {
         payload.motivo = String(motivo).trim()
       }
 
-      const response = await fetch(`/api/vendas/gestor/${id}/transicoes`, {
+      const response = await fetchGestorApi(`/api/vendas/gestor/${id}/transicoes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -1452,7 +1452,7 @@ export function useTransicaoPedidoDelivery(options?: {
           body.motivoCancelamento = motivoCancelamento
         }
 
-        const response = await fetch(
+        const response = await fetchGestorApi(
           `/api/delivery/pedidos/${encodeURIComponent(id)}/transicao-status`,
           {
             method: 'PATCH',
@@ -1507,7 +1507,7 @@ export function useFinalzarVendaGestor() {
 
   return useSecureTenantMutation(
     async (_, { id }: { id: string }) => {
-      const response = await fetch(`/api/vendas/gestor/${id}/finalizar`, {
+      const response = await fetchGestorApi(`/api/vendas/gestor/${id}/finalizar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       })

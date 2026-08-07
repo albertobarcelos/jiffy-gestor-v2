@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Produto } from '@/src/domain/entities/Produto'
 import { ProdutoMovimento } from '@/src/domain/entities/MovimentoEstoque'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast, handleApiError } from '@/src/shared/utils/toast'
 import { transformarParaReal, brToEUA } from '@/src/shared/utils/formatters'
 import { Button } from '@/src/presentation/components/ui/button'
@@ -44,9 +45,7 @@ interface MovimentoEstoqueFormProps {
  * Replica completamente o design e funcionalidades do Flutter
  */
 export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFormProps) {
-  const router = useRouter()
-  const { auth } = useAuthStore()
-  
+  const router = useRouter()  
   // Estados do formulário
   const [dataLancamento, setDataLancamento] = useState(
     new Date().toLocaleDateString('pt-BR', {
@@ -89,7 +88,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
 
   // Buscar produtos disponíveis com debounce
   const buscarProdutos = useCallback(async (searchText: string = '') => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     setIsLoadingProdutos(true)
@@ -105,7 +104,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
         params.append('name', searchText)
       }
 
-      const response = await fetch(`/api/produtos?${params.toString()}`, {
+      const response = await fetchGestorApi(`/api/produtos?${params.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -134,7 +133,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
     } finally {
       setIsLoadingProdutos(false)
     }
-  }, [auth])
+  }, [])
 
   // Carregar produtos iniciais
   useEffect(() => {
@@ -312,7 +311,7 @@ export function MovimentoEstoqueForm({ tipo, titulo, icone }: MovimentoEstoqueFo
     const toastId = showToast.loading('Salvando movimentação...')
 
     try {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.errorLoading(toastId, 'Token não encontrado')
         return

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Usuario } from '@/src/domain/entities/Usuario'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
@@ -70,9 +71,7 @@ export function UsuariosList({
   })
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
-  const hasLoadedInitialRef = useRef(false)
-  const { auth } = useAuthStore()
-  const router = useRouter()
+  const hasLoadedInitialRef = useRef(false)  const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
   
@@ -95,7 +94,7 @@ export function UsuariosList({
   // Carregar todos os perfis PDV fazendo requisições sequenciais
   // Continua carregando páginas de 10 em 10 até não haver mais itens
   const loadPerfisPDV = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     setIsLoadingPerfis(true)
@@ -111,7 +110,7 @@ export function UsuariosList({
           offset: currentOffset.toString(),
         })
 
-        const response = await fetch(`/api/perfis-pdv?${params.toString()}`, {
+        const response = await fetchGestorApi(`/api/perfis-pdv?${params.toString()}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -149,7 +148,7 @@ export function UsuariosList({
     } finally {
       setIsLoadingPerfis(false)
     }
-  }, [auth])
+  }, [])
 
   // Carregar perfis PDV quando o componente montar
   useEffect(() => {
@@ -162,7 +161,7 @@ export function UsuariosList({
    */
   const loadAllUsuarios = useCallback(
     async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         return
       }
@@ -202,7 +201,7 @@ export function UsuariosList({
             params.append('tipoUsuarioPdv', tipoUsuarioPdv)
           }
 
-          const response = await fetch(`/api/usuarios?${params.toString()}`, {
+          const response = await fetchGestorApi(`/api/usuarios?${params.toString()}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -256,7 +255,7 @@ export function UsuariosList({
         setIsLoading(false)
       }
     },
-    [auth, tipoUsuarioPdv]
+    [ tipoUsuarioPdv]
   )
 
   // Debounce da busca (500ms)
@@ -278,11 +277,11 @@ export function UsuariosList({
 
   // Carrega usuários quando busca ou filtro mudam
   useEffect(() => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     loadAllUsuarios()
-  }, [debouncedSearch, filterStatus, auth, loadAllUsuarios])
+  }, [debouncedSearch, filterStatus, loadAllUsuarios])
 
   const handleStatusChange = () => {
     loadAllUsuarios()
@@ -338,7 +337,7 @@ export function UsuariosList({
    */
   const handlePerfilChange = useCallback(
     async (usuario: Usuario, novoPerfilId: string) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -379,7 +378,7 @@ export function UsuariosList({
       }
 
       try {
-        const response = await fetch(`/api/usuarios/${usuarioId}`, {
+        const response = await fetchGestorApi(`/api/usuarios/${usuarioId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -408,7 +407,7 @@ export function UsuariosList({
         })
       }
     },
-    [auth, usuarios, allPerfisPDV, loadAllUsuarios, onReload]
+    [ usuarios, allPerfisPDV, loadAllUsuarios, onReload]
   )
 
   /**
@@ -416,7 +415,7 @@ export function UsuariosList({
    */
   const handleToggleUsuarioStatus = useCallback(
     async (usuario: Usuario, novoStatus: boolean) => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         showToast.error('Token não encontrado. Faça login novamente.')
         return
@@ -441,7 +440,7 @@ export function UsuariosList({
       )
 
       try {
-        const response = await fetch(`/api/usuarios/${usuarioId}`, {
+        const response = await fetchGestorApi(`/api/usuarios/${usuarioId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -472,7 +471,7 @@ export function UsuariosList({
         })
       }
     },
-    [auth, usuarios, loadAllUsuarios, onReload]
+    [ usuarios, loadAllUsuarios, onReload]
   )
 
   /**
@@ -492,12 +491,12 @@ export function UsuariosList({
     setIsDeleting(true)
 
     try {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
         throw new Error('Token não encontrado')
       }
 
-      const response = await fetch(`/api/usuarios/${usuarioToDelete}`, {
+      const response = await fetchGestorApi(`/api/usuarios/${usuarioToDelete}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -524,7 +523,7 @@ export function UsuariosList({
     } finally {
       setIsDeleting(false)
     }
-  }, [usuarioToDelete, auth, loadAllUsuarios, onReload])
+  }, [usuarioToDelete, loadAllUsuarios, onReload])
 
   return (
     <div className="flex flex-col h-full">

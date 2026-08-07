@@ -21,6 +21,13 @@ export interface ProdutoSelecionado {
   nome: string
   quantidade: number
   valorUnitario: number
+  /**
+   * Preço do catálogo no momento do lançamento.
+   * Usado no create para enviar `valorUnitario` só quando houve override.
+   */
+  valorCatalogo?: number
+  /** Snapshot do flag do produto no lançamento (UI + decisão de override no payload). */
+  permiteAlterarPreco?: boolean
   /** UN = unitário (qtd inteira); KG/LT = qtd fracionária permitida. */
   unidadeMedida?: UnidadeMedidaProduto
   complementos: ComplementoSelecionado[]

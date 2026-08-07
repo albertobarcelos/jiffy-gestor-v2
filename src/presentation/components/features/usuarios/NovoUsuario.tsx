@@ -11,6 +11,7 @@ import {
 } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { Usuario } from '@/src/domain/entities/Usuario'
 import { MenuItem } from '@mui/material'
 import IconButton from '@mui/material/IconButton'
@@ -73,9 +74,7 @@ export const NovoUsuario = forwardRef<NovoUsuarioHandle, NovoUsuarioProps>(funct
   },
   ref
 ) {
-  const router = useRouter()
-  const { auth } = useAuthStore()
-  const isEditing = !!usuarioId
+  const router = useRouter()  const isEditing = !!usuarioId
   const formId = embeddedFormId ?? 'novo-usuario-form'
   const INPUT_LABEL_PROPS = { shrink: true } as const
   /** Padding interno menor e label alinhada ao topo (padrão cadastros) */
@@ -147,7 +146,7 @@ export const NovoUsuario = forwardRef<NovoUsuarioHandle, NovoUsuarioProps>(funct
 
   // Carrega todos os perfis PDV: usa `count` da API para saber quando parar
   const loadPerfisPDV = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     setIsLoadingPerfis(true)
@@ -162,7 +161,7 @@ export const NovoUsuario = forwardRef<NovoUsuarioHandle, NovoUsuarioProps>(funct
           offset: String(offset),
         })
 
-        const response = await fetch(`/api/perfis-pdv?${params.toString()}`, {
+        const response = await fetchGestorApi(`/api/perfis-pdv?${params.toString()}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -208,7 +207,7 @@ export const NovoUsuario = forwardRef<NovoUsuarioHandle, NovoUsuarioProps>(funct
     } finally {
       setIsLoadingPerfis(false)
     }
-  }, [auth])
+  }, [])
 
   // Carregar perfis PDV quando o componente montar
   useEffect(() => {
@@ -232,11 +231,11 @@ export const NovoUsuario = forwardRef<NovoUsuarioHandle, NovoUsuarioProps>(funct
       // Se o perfil ainda não foi carregado, tenta carregar novamente
       // Isso pode acontecer se os perfis carregarem antes do usuário
       const loadPerfilAgain = async () => {
-        const token = auth?.getAccessToken()
+        const token = useAuthStore.getState().tenantAuth?.getAccessToken()
         if (!token) return
 
         try {
-          const response = await fetch(`/api/usuarios/${usuarioId}`, {
+          const response = await fetchGestorApi(`/api/usuarios/${usuarioId}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -258,7 +257,7 @@ export const NovoUsuario = forwardRef<NovoUsuarioHandle, NovoUsuarioProps>(funct
 
       loadPerfilAgain()
     }
-  }, [isEditing, perfisPDV, perfilPdvId, usuarioId, auth])
+  }, [isEditing, perfisPDV, perfilPdvId, usuarioId])
 
   useEffect(() => {
     onEmbedFormStateChange?.({ isSubmitting: isLoading, canSubmit: canSubmitEmbed })
@@ -269,14 +268,14 @@ export const NovoUsuario = forwardRef<NovoUsuarioHandle, NovoUsuarioProps>(funct
     if (!isEditing || hasLoadedUsuarioRef.current) return
 
     const loadUsuario = async () => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return
 
       setIsLoadingUsuario(true)
       hasLoadedUsuarioRef.current = true
 
       try {
-        const response = await fetch(`/api/usuarios/${usuarioId}`, {
+        const response = await fetchGestorApi(`/api/usuarios/${usuarioId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -335,7 +334,7 @@ export const NovoUsuario = forwardRef<NovoUsuarioHandle, NovoUsuarioProps>(funct
     const shouldClosePanel = embeddedCloseAfterSaveRef.current
     embeddedCloseAfterSaveRef.current = false
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Token não encontrado')
       return
@@ -384,7 +383,7 @@ export const NovoUsuario = forwardRef<NovoUsuarioHandle, NovoUsuarioProps>(funct
         : '/api/usuarios'
       const method = isEditing ? 'PATCH' : 'POST'
 
-      const response = await fetch(url, {
+      const response = await fetchGestorApi(url, {
         method,
         headers: {
           'Content-Type': 'application/json',

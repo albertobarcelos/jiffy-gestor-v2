@@ -31,6 +31,7 @@ export interface EnderecoEmpresaMe {
 export interface EmpresaMeResumo {
   id: string
   nomeExibicao: string
+  cnpj?: string
   cidade?: string
   estado?: string
   endereco?: EnderecoEmpresaMe | null
@@ -64,9 +65,13 @@ function mapEnderecoEmpresaMe(enderecoRaw: Record<string, unknown>): EnderecoEmp
   return hasAny ? mapped : null
 }
 
-export async function fetchEmpresaMeQueryData(token: string): Promise<EmpresaMeQueryData> {
+export async function fetchEmpresaMeQueryData(
+  token: string,
+  expectedEmpresaId?: string | null
+): Promise<EmpresaMeQueryData> {
   const res = await fetchGestorApi('/api/empresas/me', {
     headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
@@ -78,12 +83,18 @@ export async function fetchEmpresaMeQueryData(token: string): Promise<EmpresaMeQ
   if (!id) {
     throw new Error('Resposta sem id da empresa')
   }
+  if (expectedEmpresaId && id !== expectedEmpresaId) {
+    throw new Error('Resposta de empresa incompatível com a sessão da aba')
+  }
 
   const candidatos = [data.nomeFantasia, data.razaoSocial, data.nome]
   const nomeBruto = candidatos.find(
     (v): v is string => typeof v === 'string' && v.trim().length > 0
   )
   const nomeExibicao = nomeBruto?.trim() ?? 'Empresa'
+  const cnpjBruto = data.cnpj
+  const cnpj =
+    typeof cnpjBruto === 'string' && cnpjBruto.trim().length > 0 ? cnpjBruto.trim() : undefined
   const endereco =
     data.endereco && typeof data.endereco === 'object' && !Array.isArray(data.endereco)
       ? (data.endereco as Record<string, unknown>)
@@ -116,6 +127,7 @@ export async function fetchEmpresaMeQueryData(token: string): Promise<EmpresaMeQ
     empresa: {
       id,
       nomeExibicao,
+      cnpj,
       cidade,
       estado,
       endereco: mapEnderecoEmpresaMe(endereco),
@@ -137,7 +149,7 @@ export function useEmpresaMe() {
 
   const query = useSecureTenantQuery(
     ['empresas', 'me'],
-    ({ token }) => fetchEmpresaMeQueryData(token),
+    ({ token, empresaId }) => fetchEmpresaMeQueryData(token, empresaId),
     {
       staleTime: 1000 * 60 * 5,
       refetchOnWindowFocus: false,

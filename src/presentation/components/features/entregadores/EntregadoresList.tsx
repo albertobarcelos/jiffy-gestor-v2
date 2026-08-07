@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { MdDelete, MdSearch } from 'react-icons/md'
 import { Tooltip as MuiTooltip } from '@mui/material'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { formatarTelefoneBr } from '@/src/shared/utils/telefoneBr'
@@ -77,7 +78,7 @@ function telefoneListaExibicao(valor?: string | null): string {
 }
 
 export function EntregadoresList() {
-  const { auth, isAuthenticated } = useAuthStore()
+  const { isAuthenticated } = useAuthStore()
   const [entregadores, setEntregadores] = useState<EntregadorDeliveryResumo[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [searchText, setSearchText] = useState('')
@@ -122,7 +123,7 @@ export function EntregadoresList() {
   }, [searchText])
 
   const loadEntregadores = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     setIsLoading(true)
@@ -134,7 +135,7 @@ export function EntregadoresList() {
       if (status === 'Ativo') params.set('ativo', 'true')
       if (status === 'Desativado') params.set('ativo', 'false')
 
-      const res = await fetch(`/api/delivery/entregadores?${params.toString()}`, {
+      const res = await fetchGestorApi(`/api/delivery/entregadores?${params.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: 'application/json',
@@ -166,15 +167,15 @@ export function EntregadoresList() {
       setIsLoading(false)
       hasLoadedInitialRef.current = true
     }
-  }, [auth])
+  }, [])
 
   useEffect(() => {
     if (!isAuthenticated) return
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     void loadEntregadores()
-  }, [isAuthenticated, debouncedSearch, filterStatus, auth, loadEntregadores])
+  }, [isAuthenticated, debouncedSearch, filterStatus, loadEntregadores])
 
   const abrirCriar = () => {
     setEditingId(null)
@@ -204,7 +205,7 @@ export function EntregadoresList() {
 
   const confirmarExclusao = async () => {
     if (!deletingId) return
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Sessão expirada.')
       return
@@ -212,7 +213,7 @@ export function EntregadoresList() {
 
     setIsDeleting(true)
     try {
-      const res = await fetch(`/api/delivery/entregadores/${encodeURIComponent(deletingId)}`, {
+      const res = await fetchGestorApi(`/api/delivery/entregadores/${encodeURIComponent(deletingId)}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       })

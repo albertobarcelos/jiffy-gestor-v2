@@ -3,24 +3,21 @@ import toast from 'react-hot-toast'
 import { SESSION_STORAGE_TENANT_LOGOUT_SELF } from '@/src/shared/constants/sessionCoordinator'
 import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { ensureHubBearerToken } from '@/src/presentation/utils/ensureHubBearerToken'
 import { restoreIdentityFromCookie } from '@/src/presentation/utils/restoreIdentityFromCookie'
 
 type DisconnectOpts = {
   queryClient: QueryClient
   logoutTenant: () => Promise<void>
-  /** Logout completo (hub + empresa). Usado se a identidade do portal não puder ser recuperada. */
+  /** Logout completo (hub + empresa). Só se não houver identity nem refresh. */
   logout?: () => Promise<void>
 }
 
 /**
- * Logout só da empresa: limpa cache + tenant state e volta ao portal (Meu Jiffy).
+ * Sai da empresa nesta aba e volta ao Meu Jiffy.
  *
- * Fluxo:
- *  1. Marca `TENANT_LOGOUT_SELF` (fica até o hub carregar) → AuthGuard não faz logout completo.
- *  2. Garante identidade do hub (Zustand ou cookie `identity-token`).
- *  3. Regrava cookie de identidade se o JWT do hub ainda for válido.
- *  4. Limpa React Query e chama logoutTenant (sessionStorage + Zustand).
- *  5. Navega para {@link HUB_PATH} — ou `/login` se o portal não tiver sessão recuperável.
+ * Não exige identity: se o refresh cookie ainda valer, o hub sobe com access.
+ * Não apaga o refresh (logout-tenant só limpa tenant-token).
  */
 export async function disconnectEmpresaTab({
   queryClient,
@@ -33,14 +30,16 @@ export async function disconnectEmpresaTab({
     /* noop */
   }
 
-  const identityOk = await restoreIdentityFromCookie()
-  if (!identityOk) {
+  await restoreIdentityFromCookie()
+  const hubBearer = await ensureHubBearerToken()
+
+  if (!hubBearer) {
     try {
       sessionStorage.removeItem(SESSION_STORAGE_TENANT_LOGOUT_SELF)
     } catch {
       /* noop */
     }
-    toast.error('Sessão do Meu Jiffy expirou. Faça login novamente.', {
+    toast.error('Sessão expirada. Faça login novamente.', {
       id: 'meu-jiffy-sessao-expirada',
       duration: 6000,
     })
@@ -58,14 +57,13 @@ export async function disconnectEmpresaTab({
     return
   }
 
-  const identity = useAuthStore.getState().identityAuth
-  if (identity && !identity.isExpired()) {
+  if (hubBearer.source === 'identity') {
     try {
       await fetch('/api/auth/sync-identity-cookie', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accessToken: identity.getAccessToken() }),
+        body: JSON.stringify({ accessToken: hubBearer.token }),
       })
     } catch (e) {
       console.error('disconnectEmpresaTab: sync identity cookie', e)

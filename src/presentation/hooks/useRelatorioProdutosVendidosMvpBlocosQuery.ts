@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import type {
   RelatorioProdutosVendidosMvpParticipacaoAbcDTO,
@@ -75,7 +76,7 @@ async function fetchBlocoParticipacao(
   appendFiltrosBloco(search, params, params.timezone)
   search.append('somenteParticipacao', '1')
 
-  const response = await fetch(`/api/relatorios/produtos-vendidos/mvp?${search.toString()}`, {
+  const response = await fetchGestorApi(`/api/relatorios/produtos-vendidos/mvp?${search.toString()}`, {
     headers: { Authorization: `Bearer ${params.token}` },
   })
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>
@@ -93,7 +94,7 @@ async function fetchBlocoParticipacaoAbc(
   appendFiltrosBloco(search, params, params.timezone)
   search.append('somenteParticipacaoAbc', '1')
 
-  const response = await fetch(`/api/relatorios/produtos-vendidos/mvp?${search.toString()}`, {
+  const response = await fetchGestorApi(`/api/relatorios/produtos-vendidos/mvp?${search.toString()}`, {
     headers: { Authorization: `Bearer ${params.token}` },
   })
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>
@@ -111,7 +112,7 @@ async function fetchBlocoSerie(
   appendFiltrosBloco(search, params, params.timezone)
   search.append('somenteSerie', '1')
 
-  const response = await fetch(`/api/relatorios/produtos-vendidos/mvp?${search.toString()}`, {
+  const response = await fetchGestorApi(`/api/relatorios/produtos-vendidos/mvp?${search.toString()}`, {
     headers: { Authorization: `Bearer ${params.token}` },
   })
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>

@@ -5,6 +5,7 @@ import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPaga
 import { useEntregadoresQuery } from '@/src/presentation/components/features/pedidos/hooks/data/useEntregadoresQuery'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import {
   type VendasUnificadasQueryParams,
 } from './useVendasUnificadas'
@@ -51,9 +52,7 @@ export function useKanbanDataQueries({
   setTipoEntregaFilter,
   colunaKanbanFiltro = '',
 }: UseKanbanDataQueriesParams) {
-  const isModoDeliveryKanban = modoKanbanVendas === 'delivery'
-  const { auth } = useAuthStore()
-  const hasKanbanToken = !!auth?.getAccessToken()
+  const isModoDeliveryKanban = modoKanbanVendas === 'delivery'  const hasKanbanToken = !!useAuthStore.getState().tenantAuth?.getAccessToken()
   const empresaId = useTenantEmpresaId()
 
   const [terminalFilter, setTerminalFilter] = useState('')
@@ -76,7 +75,7 @@ export function useKanbanDataQueries({
 
   useEntregadoresQuery({
     enabled: hasKanbanToken && isModoDeliveryKanban,
-    token: auth?.getAccessToken(),
+    token: useAuthStore.getState().tenantAuth?.getAccessToken(),
   })
 
   const nomesMeiosPagamentoKanban = useMemo(() => {
@@ -112,7 +111,7 @@ export function useKanbanDataQueries({
   )
 
   const loadAllTerminais = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) return
 
     setIsLoadingTerminais(true)
@@ -128,7 +127,7 @@ export function useKanbanDataQueries({
           offset: currentOffset.toString(),
         })
 
-        const response = await fetch(`/api/terminais?${params.toString()}`, {
+        const response = await fetchGestorApi(`/api/terminais?${params.toString()}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -154,7 +153,7 @@ export function useKanbanDataQueries({
     } finally {
       setIsLoadingTerminais(false)
     }
-  }, [auth])
+  }, [])
 
   useEffect(() => {
     if (isModoDeliveryKanban) return

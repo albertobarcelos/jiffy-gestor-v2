@@ -15,8 +15,10 @@ import { InformacoesProdutoStep } from './NovoProduto/InformacoesProdutoStep'
 import { ConfiguracoesGeraisStep } from './NovoProduto/ConfiguracoesGeraisStep'
 import { ConfiguracaoFiscalStep } from './NovoProduto/ConfiguracaoFiscalStep'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast, handleApiError } from '@/src/shared/utils/toast'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
+import { Produto } from '@/src/domain/entities/Produto'
 import { MdImage } from 'react-icons/md'
 import { cn } from '@/src/shared/utils/cn'
 
@@ -43,6 +45,45 @@ interface BaselineSnapshotProduto {
   origemMercadoria: string | null
   tipoProduto: string | null
   indicadorProducaoEscala: string | null
+}
+
+/** Formata valor para o input de preço (mesmo formato do load da API). */
+function formatCurrencyValue(value: number | string): string {
+  const numericValue =
+    typeof value === 'number'
+      ? value
+      : Number(
+          value
+            .toString()
+            .replace(/[^\d,.-]/g, '')
+            .replace(',', '.')
+        ) || 0
+
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(numericValue)
+}
+
+/** Hidrata o form com o produto da lista — evita inputs vazios enquanto o GET responde. */
+function seedFormFromProduto(produto: Produto, isCopy: boolean) {
+  const nome = produto.getNome() || ''
+  return {
+    nomeProduto: isCopy ? (nome ? `${nome} - Cópia` : 'Cópia ') : nome,
+    precoVenda: produto.getValor() ? formatCurrencyValue(produto.getValor()) : '',
+    unidadeProduto: (produto.getUnidadeMedida() as string | null) || null,
+    grupoProduto: produto.getGrupoId() || null,
+    favorito: produto.isFavorito(),
+    permiteDesconto: produto.permiteDescontoAtivo(),
+    permiteAcrescimo: produto.permiteAcrescimoAtivo(),
+    abreComplementos: produto.abreComplementosAtivo(),
+    permiteAlterarPreco: produto.permiteAlterarPrecoAtivo(),
+    incideTaxa: produto.incideTaxaAtivo(),
+    ativoDelivery: produto.isAtivoDelivery(),
+    ativo: produto.isAtivo(),
+    grupoComplementosIds: produto.getGruposComplementos().map(g => g.id),
+    impressorasIds: produto.getImpressoras().map(i => i.id),
+  }
 }
 
 function parsePrecoFormParaNumero(preco: string): number {
@@ -281,6 +322,11 @@ export interface NovoProdutoHandle {
 
 export interface NovoProdutoProps {
   produtoId?: string
+  /**
+   * Produto já conhecido (lista / modal) — hidrata o form na abertura sem esperar o GET.
+   * O fetch ainda confirma descrição, EAN, fiscal etc. em background.
+   */
+  initialProduto?: Produto
   isCopyMode?: boolean
   defaultGrupoProdutoId?: string
   initialStep?: 0 | 1 | 2
@@ -304,6 +350,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
   function NovoProdutoContent(
     {
       produtoId,
+      initialProduto,
       isCopyMode = false,
       defaultGrupoProdutoId,
       initialStep = 0,
@@ -320,30 +367,53 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
   ) {
     const router = useRouter()
     const searchParams = useSearchParams()
-    const { auth } = useAuthStore()
 
     // Estado do step atual (0 = Informações, 1 = Configurações, 2 = Configuração Fiscal)
     const [selectedPage, setSelectedPage] = useState<0 | 1 | 2>(initialStep)
 
-    // Estados do formulário
-    const [nomeProduto, setNomeProduto] = useState('')
+    const formSeed =
+      initialProduto && produtoId && initialProduto.getId() === produtoId
+        ? seedFormFromProduto(initialProduto, isCopyMode)
+        : null
+    const hasFormSeedRef = useRef(Boolean(formSeed))
+
+    // Estados do formulário (seed da lista evita inputs brancos com backend lento)
+    const [nomeProduto, setNomeProduto] = useState(() => formSeed?.nomeProduto ?? '')
     const [descricaoProduto, setDescricaoProduto] = useState('')
-    const [precoVenda, setPrecoVenda] = useState('')
-    const [unidadeProduto, setUnidadeProduto] = useState<string | null>(null)
-    const [grupoProduto, setGrupoProduto] = useState<string | null>(null)
+    const [precoVenda, setPrecoVenda] = useState(() => formSeed?.precoVenda ?? '')
+    const [unidadeProduto, setUnidadeProduto] = useState<string | null>(
+      () => formSeed?.unidadeProduto ?? null
+    )
+    const [grupoProduto, setGrupoProduto] = useState<string | null>(
+      () => formSeed?.grupoProduto ?? defaultGrupoProdutoId ?? null
+    )
     const [codigoEanBarras, setCodigoEanBarras] = useState('')
-    const [favorito, setFavorito] = useState(false)
-    const [permiteDesconto, setPermiteDesconto] = useState(false)
-    const [permiteAcrescimo, setPermiteAcrescimo] = useState(false)
-    const [abreComplementos, setAbreComplementos] = useState(false)
-    const [permiteAlterarPreco, setPermiteAlterarPreco] = useState(false)
-    const [incideTaxa, setIncideTaxa] = useState(false)
-    const [ativoDelivery, setAtivoDelivery] = useState(true)
-    const [ativo, setAtivo] = useState(true)
-    const [grupoComplementosIds, setGrupoComplementosIds] = useState<string[]>([])
-    const [impressorasIds, setImpressorasIds] = useState<string[]>([])
+    const [favorito, setFavorito] = useState(() => formSeed?.favorito ?? false)
+    const [permiteDesconto, setPermiteDesconto] = useState(
+      () => formSeed?.permiteDesconto ?? false
+    )
+    const [permiteAcrescimo, setPermiteAcrescimo] = useState(
+      () => formSeed?.permiteAcrescimo ?? false
+    )
+    const [abreComplementos, setAbreComplementos] = useState(
+      () => formSeed?.abreComplementos ?? false
+    )
+    const [permiteAlterarPreco, setPermiteAlterarPreco] = useState(
+      () => formSeed?.permiteAlterarPreco ?? false
+    )
+    const [incideTaxa, setIncideTaxa] = useState(() => formSeed?.incideTaxa ?? false)
+    const [ativoDelivery, setAtivoDelivery] = useState(() => formSeed?.ativoDelivery ?? true)
+    const [ativo, setAtivo] = useState(() => formSeed?.ativo ?? true)
+    const [grupoComplementosIds, setGrupoComplementosIds] = useState<string[]>(
+      () => formSeed?.grupoComplementosIds ?? []
+    )
+    const [impressorasIds, setImpressorasIds] = useState<string[]>(
+      () => formSeed?.impressorasIds ?? []
+    )
     // Guardar os grupos originais para comparar na remoção
-    const [originalGrupoComplementosIds, setOriginalGrupoComplementosIds] = useState<string[]>([])
+    const [originalGrupoComplementosIds, setOriginalGrupoComplementosIds] = useState<string[]>(
+      () => formSeed?.grupoComplementosIds ?? []
+    )
 
     // Estados fiscais
     const [ncm, setNcm] = useState('')
@@ -392,7 +462,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
     const baselineSerializedRef = useRef<string | null>(null)
     const createBaselineCommittedRef = useRef(false)
     /** grupoId do último GET bem-sucedido (ou após salvar) — diff de grupo não usa só o snapshot JSON. */
-    const grupoProdutoIdCarregadoRef = useRef<string | null>(null)
+    const grupoProdutoIdCarregadoRef = useRef<string | null>(formSeed?.grupoProduto ?? null)
 
     // Verificar se é modo cópia via query param
     // Extrair o valor uma vez e usar como string estável
@@ -513,20 +583,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
 
     // Carregar grupos de produtos usando React Query (com cache)
     const formatCurrency = useCallback((value: number | string) => {
-      const numericValue =
-        typeof value === 'number'
-          ? value
-          : Number(
-              value
-                .toString()
-                .replace(/[^\d,.-]/g, '')
-                .replace(',', '.')
-            ) || 0
-
-      return new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: 'BRL',
-      }).format(numericValue)
+      return formatCurrencyValue(value)
     }, [])
 
     /**
@@ -645,7 +702,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       loadedProdutoIdRef.current = cacheKey
 
       const loadProduto = async () => {
-        const token = auth?.getAccessToken()
+        const token = useAuthStore.getState().tenantAuth?.getAccessToken()
         if (!token) {
           // Se não tem token, reseta as flags
           hasLoadedProdutoRef.current = false
@@ -654,9 +711,9 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           return
         }
 
-        setIsLoadingProduto(true)
+        setIsLoadingProduto(!hasFormSeedRef.current)
         try {
-          const response = await fetch(`/api/produtos/${currentEffectiveProdutoId}`, {
+          const response = await fetchGestorApi(`/api/produtos/${currentEffectiveProdutoId}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -776,12 +833,12 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       } else if (effectiveProdutoId) {
         // Se não temos dados fiscais armazenados mas estamos editando, buscar do produto
         // Isso pode acontecer se o usuário navegou diretamente para o passo 3
-        const token = auth?.getAccessToken()
+        const token = useAuthStore.getState().tenantAuth?.getAccessToken()
         if (!token) return
 
         const loadFiscalData = async () => {
           try {
-            const response = await fetch(`/api/produtos/${effectiveProdutoId}`, {
+            const response = await fetchGestorApi(`/api/produtos/${effectiveProdutoId}`, {
               headers: {
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',
@@ -815,7 +872,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
 
         loadFiscalData()
       }
-    }, [selectedPage, effectiveProdutoId, auth])
+    }, [selectedPage, effectiveProdutoId])
 
     // Validação do NCM via API do backend (com debounce de 600ms)
     // IMPORTANTE: Só valida se estivermos no passo 3 (ConfiguracaoFiscalStep) para evitar chamadas desnecessárias
@@ -867,7 +924,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       // Debounce: aguardar 600ms após parar de digitar
       setIsValidatingNcm(true)
       ncmValidationTimerRef.current = setTimeout(async () => {
-        const token = auth?.getAccessToken()
+        const token = useAuthStore.getState().tenantAuth?.getAccessToken()
         if (!token) {
           setIsValidatingNcm(false)
           return
@@ -878,7 +935,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         const timeoutId = setTimeout(() => controller.abort(), 5000)
 
         try {
-          const response = await fetch(`/api/v1/fiscal/configuracoes/ncms/validar/${ncmTrimmed}`, {
+          const response = await fetchGestorApi(`/api/v1/fiscal/configuracoes/ncms/validar/${ncmTrimmed}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -917,7 +974,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           clearTimeout(ncmValidationTimerRef.current)
         }
       }
-    }, [ncm, auth, selectedPage])
+    }, [ncm, selectedPage])
 
     // Buscar CESTs compatíveis quando o NCM é validado com sucesso
     // Fluxo: Frontend → Backend → Microserviço Fiscal (frontend nunca se comunica diretamente com o fiscal)
@@ -950,7 +1007,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       }
 
       const fetchCests = async () => {
-        const token = auth?.getAccessToken()
+        const token = useAuthStore.getState().tenantAuth?.getAccessToken()
         if (!token) return
 
         setIsLoadingCests(true)
@@ -959,7 +1016,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         const timeoutId = setTimeout(() => controller.abort(), 5000)
 
         try {
-          const response = await fetch(`/api/v1/fiscal/configuracoes/cests/por-ncm/${ncmTrimmed}`, {
+          const response = await fetchGestorApi(`/api/v1/fiscal/configuracoes/cests/por-ncm/${ncmTrimmed}`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -993,7 +1050,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       }
 
       fetchCests()
-    }, [ncmValidation, ncm, auth, selectedPage])
+    }, [ncmValidation, ncm, selectedPage])
 
     // Validar CEST selecionado via API do backend (com debounce de 400ms)
     // Inclui validação de compatibilidade CEST x NCM quando o NCM está disponível.
@@ -1041,7 +1098,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       setIsValidatingCest(true)
 
       const timer = setTimeout(async () => {
-        const token = auth?.getAccessToken()
+        const token = useAuthStore.getState().tenantAuth?.getAccessToken()
         if (!token) {
           setIsValidatingCest(false)
           return
@@ -1057,7 +1114,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
             ? `/api/v1/fiscal/configuracoes/cests/validar/${cestTrimmed}/ncm/${ncmTrimmed}`
             : `/api/v1/fiscal/configuracoes/cests/validar/${cestTrimmed}`
 
-          const response = await fetch(url, {
+          const response = await fetchGestorApi(url, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -1113,7 +1170,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         clearTimeout(timer)
         abortController.abort()
       }
-    }, [cest, ncm, ncmValidation, cestsDisponiveis, auth, selectedPage])
+    }, [cest, ncm, ncmValidation, cestsDisponiveis, selectedPage])
 
     // Preencher automaticamente o Indicador de Produção em Escala Relevante quando CEST for preenchido
     useEffect(() => {
@@ -1137,11 +1194,11 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
 
       if (!currentEffectiveProdutoId) return
 
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return
 
       setIsLoadingProduto(true)
-      fetch(`/api/produtos/${currentEffectiveProdutoId}`, {
+      fetchGestorApi(`/api/produtos/${currentEffectiveProdutoId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -1175,7 +1232,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         .finally(() => {
           setIsLoadingProduto(false)
         })
-    }, [produtoId, isCopyMode, searchParams, auth])
+    }, [produtoId, isCopyMode, searchParams])
 
     const handleNext = () => {
       if (selectedPage < 2) {
@@ -1293,7 +1350,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       onWizardSavingChange?.(true)
 
       try {
-        const token = auth?.getAccessToken()
+        const token = useAuthStore.getState().tenantAuth?.getAccessToken()
         if (!token) {
           showToast.errorLoading(toastId, 'Token não encontrado')
           return false
@@ -1406,7 +1463,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           return true
         }
 
-        const response = await fetch(url, {
+        const response = await fetchGestorApi(url, {
           method,
           headers: {
             'Content-Type': 'application/json',
@@ -1427,7 +1484,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           try {
             // Remover cada grupo individualmente usando DELETE
             const deletePromises = originalGrupoComplementosIds.map(grupoId =>
-              fetch(`/api/produtos/${effectiveProdutoId}/grupos-complementos/${grupoId}`, {
+              fetchGestorApi(`/api/produtos/${effectiveProdutoId}/grupos-complementos/${grupoId}`, {
                 method: 'DELETE',
                 headers: {
                   Authorization: `Bearer ${token}`,
@@ -1457,7 +1514,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         let produtoAtualizado = null
         if (isEditMode && precisaSalvarProduto) {
           try {
-            const produtoResponse = await fetch(`/api/produtos/${effectiveProdutoId}`, {
+            const produtoResponse = await fetchGestorApi(`/api/produtos/${effectiveProdutoId}`, {
               headers: {
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',

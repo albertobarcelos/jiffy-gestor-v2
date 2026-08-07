@@ -38,15 +38,13 @@ export function PedidoEntregaQuickViewPopover({
   anchorEl,
   open,
   onClose,
-}: PedidoEntregaQuickViewPopoverProps) {
-  const { auth } = useAuthStore()
-  const { empresa } = useEmpresaMe()
+}: PedidoEntregaQuickViewPopoverProps) {  const { empresa } = useEmpresaMe()
   const [loading, setLoading] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [dados, setDados] = useState<PedidoKanbanQuickViewData | null>(null)
 
   const carregar = useCallback(async () => {
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       setErro('Sessão expirada. Faça login novamente.')
       return
@@ -81,7 +79,7 @@ export function PedidoEntregaQuickViewPopover({
     } finally {
       setLoading(false)
     }
-  }, [auth, observacaoPedidoHint, tabelaOrigem, tipoVenda, vendaId])
+  }, [ observacaoPedidoHint, tabelaOrigem, tipoVenda, vendaId])
 
   useEffect(() => {
     if (!open) {

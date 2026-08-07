@@ -11,6 +11,7 @@ import {
   type Ref,
 } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import Modal from '@mui/material/Modal'
 import Slide from '@mui/material/Slide'
 import type { TransitionProps } from '@mui/material/transitions'
@@ -440,7 +441,7 @@ async function buscarNomeTerminalParaResumoFiscal(
   terminalId: string
 ): Promise<string | null> {
   try {
-    const res = await fetch(`/api/terminais/${encodeURIComponent(terminalId)}/detalhes`, {
+    const res = await fetchGestorApi(`/api/terminais/${encodeURIComponent(terminalId)}/detalhes`, {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -460,7 +461,7 @@ async function buscarNomeEmpresaParaResumoFiscal(
   empresaId: string
 ): Promise<string | null> {
   try {
-    const res = await fetch(`/api/empresas/${encodeURIComponent(empresaId)}`, {
+    const res = await fetchGestorApi(`/api/empresas/${encodeURIComponent(empresaId)}`, {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -484,9 +485,7 @@ export function DetalhesVendas({
   onClose,
   onAfterClose,
   tabelaOrigem = 'venda',
-}: DetalhesVendasProps) {
-  const { auth } = useAuthStore()
-  const [venda, setVenda] = useState<VendaDetalhes | null>(null)
+}: DetalhesVendasProps) {  const [venda, setVenda] = useState<VendaDetalhes | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [nomesUsuarios, setNomesUsuarios] = useState<Record<string, string>>({})
   const [nomesMeiosPagamento, setNomesMeiosPagamento] = useState<
@@ -567,7 +566,7 @@ export function DetalhesVendas({
    */
   const fetchUsuarioNome = useCallback(
     async (usuarioId: string): Promise<string | null> => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return null
 
       try {
@@ -593,7 +592,7 @@ export function DetalhesVendas({
         return null
       }
     },
-    [auth, tabelaOrigem]
+    [ tabelaOrigem]
   )
 
   /**
@@ -601,11 +600,11 @@ export function DetalhesVendas({
    */
   const fetchMeioPagamento = useCallback(
     async (meioId: string): Promise<MeioPagamentoDetalhes | null> => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return null
 
       try {
-        const response = await fetch(`/api/meios-pagamentos/${meioId}`, {
+        const response = await fetchGestorApi(`/api/meios-pagamentos/${meioId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -626,7 +625,7 @@ export function DetalhesVendas({
         return null
       }
     },
-    [auth]
+    []
   )
 
   /**
@@ -634,11 +633,11 @@ export function DetalhesVendas({
    */
   const fetchClienteNome = useCallback(
     async (clienteId: string): Promise<string | null> => {
-      const token = auth?.getAccessToken()
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return null
 
       try {
-        const response = await fetch(`/api/clientes/${clienteId}`, {
+        const response = await fetchGestorApi(`/api/clientes/${clienteId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -654,7 +653,7 @@ export function DetalhesVendas({
         return null
       }
     },
-    [auth]
+    []
   )
 
   /**
@@ -717,7 +716,7 @@ export function DetalhesVendas({
   const fetchVendaDetalhes = useCallback(async () => {
     if (!vendaId || !open) return
 
-    const token = auth?.getAccessToken()
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Usuário não autenticado.')
       onClose() // Fecha o modal se não houver token
@@ -780,7 +779,7 @@ export function DetalhesVendas({
       // Se não encontrou o codigoTerminal e temos terminalId, busca os detalhes do terminal
       if (tabelaOrigem === 'venda' && !codigoTerminal && dataRaw.terminalId) {
         try {
-          const terminalResponse = await fetch(`/api/terminais/${dataRaw.terminalId}/detalhes`, {
+          const terminalResponse = await fetchGestorApi(`/api/terminais/${dataRaw.terminalId}/detalhes`, {
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -1009,7 +1008,6 @@ export function DetalhesVendas({
   }, [
     vendaId,
     open,
-    auth,
     fetchUsuarioNome,
     fetchMeioPagamento,
     fetchClienteNome,

@@ -4,7 +4,8 @@ Este arquivo acompanha a implementação por partes do fluxo descrito nos guias 
 
 **Referências no repo**
 
-- Fluxo atual de login e proxy Next → backend: `docs/FLUXO_LOGIN_ATUAL.md`
+- **ERP / multi-tenant (obrigatório):** [`docs/MULTI-TENANT-JIFFY-DOC-OFICIAL.md`](./MULTI-TENANT-JIFFY-DOC-OFICIAL.md)
+- Fluxo de login e proxy Next → backend: `docs/FLUXO_LOGIN_ATUAL.md`
 - Padrão de feature com views + utils + tipos: `src/presentation/components/features/meus-apps/`
 - Login existente: `src/presentation/components/features/auth/LoginForm.tsx`, rotas `app/api/auth/login/`, `app/api/auth/escolher-empresa/`
 

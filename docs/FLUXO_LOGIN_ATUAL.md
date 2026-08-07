@@ -1,8 +1,11 @@
-﻿# Fluxo de Login (ATUAL) — para ser substituído
+﻿# Fluxo de Login (ATUAL) — hub / identidade
 
 Este documento descreve **como o login funciona hoje** (UI → API interna → API externa → sessão/cookie → navegação), incluindo **endpoints utilizados** e **o fluxo após autenticação**.
 
-> Objetivo: servir como “baseline” para o refactor do novo fluxo de login.
+> Escopo: **hub** (`identityAuth`, login, escolher empresa).  
+> Para dados do **ERP** (produtos, vendas, etc.): padrão obrigatório em [`MULTI-TENANT-JIFFY-DOC-OFICIAL.md`](./MULTI-TENANT-JIFFY-DOC-OFICIAL.md) — `tenantAuth` + `fetchGestorApi` / `useSecureTenantQuery`. **Não** use o campo legado `auth` em hooks ERP.
+
+> Objetivo histórico: servir como “baseline” do login; complementa (não substitui) o guia multi-tenant.
 
 ## 1) Tela / Componente responsável
 
