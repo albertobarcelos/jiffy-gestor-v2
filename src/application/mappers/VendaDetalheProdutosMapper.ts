@@ -109,6 +109,9 @@ export function mapProdutoDetalheVenda(prod: Record<string, unknown>): ProdutoSe
     nome: nomeProduto,
     quantidade,
     valorUnitario: Number(prod.valorUnitario) || 0,
+    // Sem catálogo no GET: assume preço persistido como base (só envia override se a UI alterar).
+    valorCatalogo: Number(prod.valorUnitario) || 0,
+    permiteAlterarPreco: Boolean(prod.permiteAlterarPreco),
     ...(unidadeRaw != null && String(unidadeRaw).trim() !== ''
       ? { unidadeMedida: normalizarUnidadeMedidaProduto(unidadeRaw) }
       : {}),

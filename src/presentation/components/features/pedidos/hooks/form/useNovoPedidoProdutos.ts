@@ -183,6 +183,8 @@ export function useNovoPedidoProdutos({
             nome: produto.getNome(),
             quantidade: 1,
             valorUnitario: produto.getValor(),
+            valorCatalogo: produto.getValor(),
+            permiteAlterarPreco: false,
             unidadeMedida: produto.getUnidadeMedida(),
             complementos: [],
           },
@@ -228,11 +230,12 @@ export function useNovoPedidoProdutos({
       }
 
       const permiteAlterarPreco = produto.permiteAlterarPrecoAtivo()
+      const valorCatalogo = produto.getValor()
       const valorUnitarioFinal = permiteAlterarPreco
         ? valorUnitario
         : idxLinha !== null
-          ? (produtos[idxLinha]?.valorUnitario ?? produto.getValor())
-          : produto.getValor()
+          ? (produtos[idxLinha]?.valorUnitario ?? valorCatalogo)
+          : valorCatalogo
 
       const complementosLinha: ComplementoSelecionado[] = complementos.map(c => ({
         id: c.id,
@@ -256,6 +259,9 @@ export function useNovoPedidoProdutos({
           novos[idxLinha] = aplicarComplementos({
             ...atual,
             valorUnitario: valorUnitarioFinal,
+            valorCatalogo: atual.valorCatalogo ?? valorCatalogo,
+            permiteAlterarPreco:
+              atual.permiteAlterarPreco ?? permiteAlterarPreco,
           })
           return novos
         })
@@ -267,6 +273,8 @@ export function useNovoPedidoProdutos({
             nome: produto.getNome(),
             quantidade: 1,
             valorUnitario: valorUnitarioFinal,
+            valorCatalogo,
+            permiteAlterarPreco,
             unidadeMedida: produto.getUnidadeMedida(),
             complementos: complementosLinha,
             tipoDesconto: null,

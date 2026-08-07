@@ -1,6 +1,6 @@
 import type { CriarVendaGestorApiRequest } from '@/src/application/dto/api/vendaGestorApi'
 import type { CriarVendaGestorInputDTO } from '@/src/application/dto/CriarVendaGestorDTO'
-import { calcularTotalProduto } from '@/src/domain/services/pedido/CalculadoraPedido'
+import { deveEnviarValorUnitarioAlterado } from '@/src/domain/services/pedido/deveEnviarValorUnitarioAlterado'
 import type { PagamentoSelecionado, ProdutoSelecionado } from '@/src/domain/types/pedido'
 import { observacoesArrayFromTexto } from '@/src/shared/helpers/observacaoPedido'
 
@@ -18,15 +18,12 @@ export function mapProdutosLancadosPayload(produtos: ProdutoSelecionado[]) {
         p.tipoAcrescimo === 'porcentagem' ? p.valorAcrescimo / 100 : p.valorAcrescimo
     }
 
-    const valorFinalProduto = calcularTotalProduto(p)
-
     const observacoes = observacoesArrayFromTexto(p.observacao)
 
     return {
       produtoId: p.produtoId,
       quantidade: p.quantidade,
-      valorUnitario: p.valorUnitario,
-      valorFinal: valorFinalProduto,
+      ...(deveEnviarValorUnitarioAlterado(p) ? { valorUnitario: p.valorUnitario } : {}),
       tipoDesconto: p.tipoDesconto || null,
       valorDesconto: valorDescontoFinal,
       tipoAcrescimo: p.tipoAcrescimo || null,
@@ -35,7 +32,6 @@ export function mapProdutosLancadosPayload(produtos: ProdutoSelecionado[]) {
       complementos: (p.complementos || []).map(comp => ({
         complementoId: comp.id,
         grupoComplementoId: comp.grupoId,
-        valorUnitario: comp.valor,
         quantidade: comp.quantidade,
       })),
     }
@@ -95,9 +91,6 @@ export function buildCriarVendaGestorPayload(input: CriarVendaGestorInputDTO): C
     tipoVenda: input.tipoInicioPedido === 'entrega' ? 'entrega' : 'balcao',
     origem: input.origem,
     statusVenda: input.status,
-    valorFinal: input.totalProdutos,
-    totalDesconto: 0,
-    totalAcrescimo: 0,
     produtosLancados,
     produtos: produtosLancados,
   }

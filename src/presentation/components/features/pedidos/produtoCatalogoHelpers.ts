@@ -91,6 +91,8 @@ export function aplicarProdutoAtualizadoNasLinhasCarrinho(
       nome: produtoAtualizado.getNome(),
       unidadeMedida: produtoAtualizado.getUnidadeMedida(),
       ncm: ncmAtualizado || linha.ncm,
+      valorCatalogo: novoValorCatalogo,
+      permiteAlterarPreco,
       complementos,
       ...(atualizarValorUnitario ? { valorUnitario: novoValorCatalogo } : {}),
     }
