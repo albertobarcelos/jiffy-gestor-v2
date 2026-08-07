@@ -67,11 +67,14 @@ export interface ComplementoProdutoPedidoDeliveryApi {
   complementoId: string
   grupoComplementoId: string
   quantidade: number
+  valorUnitario?: number
 }
 
 export interface ProdutoPedidoDeliveryApi {
   produtoId: string
   quantidade: number
+  /** Preço unitário alterado (produto com `permiteAlterarPreco`). */
+  valorUnitario?: number
   tipoDesconto?: 'porcentagem' | 'fixo' | null
   valorDesconto?: number | null
   tipoAcrescimo?: 'porcentagem' | 'fixo' | null
