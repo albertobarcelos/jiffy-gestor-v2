@@ -517,7 +517,12 @@ function DeliveryPublicoHomeContent({
         <DeliveryProdutoModal
           slug={slug}
           produto={produtoSelecionado}
-          grupoId={findCatalogoGrupoIdByProdutoId(grupos, produtoSelecionado.id)}
+          grupoId={
+            viewModel.grupos
+              .flatMap(g => g.produtos)
+              .find(p => p.id === produtoSelecionado.id)?.grupoId ||
+            findCatalogoGrupoIdByProdutoId(grupos, produtoSelecionado.id)
+          }
           onClose={onCloseProduto}
           onAdicionado={onProdutoAdicionado}
         />

@@ -36,7 +36,10 @@ export type CatalogoPublicoProdutoDTO = {
 }
 
 export type PecaTambemProdutoDTO = CatalogoPublicoProdutoDTO & {
+  /** Grupo do carrinho que originou esta sugestão (prioridade de ordenação). */
   grupoIdOrigem: string
+  /** Grupo real do produto sugerido no cardápio (para gravar no carrinho). */
+  grupoId: string
 }
 
 export type GetPecaTambemPublicoResponseDTO = {

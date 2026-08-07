@@ -14,7 +14,7 @@ type DeliverySugestoesProdutoCardProps = {
 }
 
 /**
- * Card vertical do carrossel Sugestões: imagem → preço → nome → descrição.
+ * Card vertical do carrossel Sugestões / Peça Também: imagem → preço → nome.
  */
 export function DeliverySugestoesProdutoCard({
   produto,
@@ -118,14 +118,6 @@ export function DeliverySugestoesProdutoCard({
         >
           {produto.nome}
         </p>
-        {produto.descricao?.trim() ? (
-          <p
-            className="mt-0.5 line-clamp-1 text-xs leading-snug"
-            style={{ color: 'var(--delivery-text-muted)' }}
-          >
-            {produto.descricao}
-          </p>
-        ) : null}
       </button>
     </article>
   )

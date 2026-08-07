@@ -1,7 +1,23 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { MdSearch } from 'react-icons/md'
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useProdutos } from '@/src/presentation/hooks/useProdutos'
@@ -12,6 +28,7 @@ import {
 import { cn } from '@/src/shared/utils/cn'
 import type { DesignCategoriaGrupo } from '../../../shared/types/designCategoriaGrupo'
 import { omitGrupoSugestoesDaCasaCarrier } from '../../../shared/constants/deliveryPublicoSugestoes'
+import { DesignRelacionadoProdutoSortableItem } from '../DesignRelacionadoProdutoSortableItem'
 
 type DesignRelacionadosTabProps = {
   grupos: DesignCategoriaGrupo[]
@@ -50,11 +67,20 @@ export function DesignRelacionadosTab({
 
   const produtosQuery = useProdutos({
     ativoDelivery: true,
-    name: buscaProduto.trim() || undefined,
     limit: 100,
   })
 
   const produtos = produtosQuery.data?.produtos ?? []
+
+  const produtosFiltrados = useMemo(() => {
+    const q = buscaProduto.trim().toLowerCase()
+    if (!q) return produtos
+    return produtos.filter(produto => {
+      const nome = produto.getNome().toLowerCase()
+      const codigo = String(produto.getCodigoProduto() ?? '')
+      return nome.includes(q) || codigo.includes(q)
+    })
+  }, [buscaProduto, produtos])
 
   const selectedGrupo = gruposListaveis.find(g => g.id === selectedGrupoId)
 
@@ -85,6 +111,12 @@ export function DesignRelacionadosTab({
     return ordered
   }, [selectedProdutoIds, produtos, relacionadosQuery.data])
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  )
+
   const toggleProduto = (produtoId: string) => {
     setDirty(true)
     setSelectedProdutoIds(prev =>
@@ -93,6 +125,19 @@ export function DesignRelacionadosTab({
         : [...prev, produtoId]
     )
   }
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    setSelectedProdutoIds(prev => {
+      const oldIndex = prev.indexOf(String(active.id))
+      const newIndex = prev.indexOf(String(over.id))
+      if (oldIndex === -1 || newIndex === -1) return prev
+      return arrayMove(prev, oldIndex, newIndex)
+    })
+    setDirty(true)
+  }, [])
 
   const handleSelectGrupo = (grupoId: string) => {
     if (grupoId === selectedGrupoId) return
@@ -216,12 +261,12 @@ export function DesignRelacionadosTab({
                     <li className="flex justify-center py-8">
                       <JiffyLoading />
                     </li>
-                  ) : produtos.length === 0 ? (
+                  ) : produtosFiltrados.length === 0 ? (
                     <li className="px-2 py-4 text-sm text-secondary-text">
                       Nenhum produto encontrado.
                     </li>
                   ) : (
-                    produtos.map(produto => {
+                    produtosFiltrados.map(produto => {
                       const id = produto.getId()
                       const checked = selectedProdutoIds.includes(id)
                       return (
@@ -255,8 +300,13 @@ export function DesignRelacionadosTab({
               </div>
 
               <div className="flex min-h-0 flex-col">
-                <div className="border-b border-gray-100 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-secondary-text">
-                  Ordem no carrossel
+                <div className="border-b border-gray-100 px-3 py-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-secondary-text">
+                    Ordem no carrossel
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-secondary-text">
+                    Arraste pelo ☰ para reordenar
+                  </p>
                 </div>
                 <ul className="max-h-[22rem] flex-1 overflow-y-auto p-2">
                   {relacionadosOrdered.length === 0 ? (
@@ -264,33 +314,28 @@ export function DesignRelacionadosTab({
                       Nenhum produto vinculado. Ative produtos na lista ao lado.
                     </li>
                   ) : (
-                    relacionadosOrdered.map((item, index) => (
-                      <li
-                        key={item.id}
-                        className="mb-1 flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-2.5 py-2"
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <SortableContext
+                        items={relacionadosOrdered.map(item => item.id)}
+                        strategy={verticalListSortingStrategy}
                       >
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                          {index + 1}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm text-primary-text">
-                            {item.nome}
-                          </p>
-                          {item.codigo != null ? (
-                            <p className="text-[11px] text-secondary-text">
-                              COD. {item.codigo}
-                            </p>
-                          ) : null}
-                        </div>
-                        <button
-                          type="button"
-                          className="text-xs font-medium text-red-600 hover:underline"
-                          onClick={() => toggleProduto(item.id)}
-                        >
-                          Remover
-                        </button>
-                      </li>
-                    ))
+                        {relacionadosOrdered.map((item, index) => (
+                          <DesignRelacionadoProdutoSortableItem
+                            key={item.id}
+                            id={item.id}
+                            nome={item.nome}
+                            codigo={item.codigo}
+                            ordem={index + 1}
+                            disabled={salvarMutation.isPending}
+                            onRemove={toggleProduto}
+                          />
+                        ))}
+                      </SortableContext>
+                    </DndContext>
                   )}
                 </ul>
               </div>

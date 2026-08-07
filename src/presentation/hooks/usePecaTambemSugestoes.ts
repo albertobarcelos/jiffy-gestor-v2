@@ -10,19 +10,34 @@ export function usePecaTambemSugestoes(
   grupoIds: string[],
   excludeProdutoIds: string[]
 ) {
-  const grupoIdsKey = useMemo(() => [...grupoIds].sort().join(','), [grupoIds])
+  // Ordem preservada: prioridade do carrossel + invalida cache ao mudar sequência.
+  const grupoIdsKey = useMemo(() => grupoIds.filter(Boolean).join(','), [grupoIds])
   const excludeKey = useMemo(
-    () => [...excludeProdutoIds].sort().join(','),
+    () => [...new Set(excludeProdutoIds.filter(Boolean))].sort().join(','),
     [excludeProdutoIds]
   )
 
   return useQuery({
     queryKey: ['public-delivery-peca-tambem', slug, grupoIdsKey, excludeKey],
-    queryFn: async (): Promise<PecaTambemProdutoDTO[]> => {
-      if (!slug || grupoIds.length === 0) return []
-      const data = await fetchPecaTambemPublico(slug, {
-        grupoIds,
-        excludeProdutoIds,
+    queryFn: async ({ queryKey }): Promise<PecaTambemProdutoDTO[]> => {
+      const [, slugKey, gruposKey, excludesKey] = queryKey as [
+        string,
+        string,
+        string,
+        string,
+      ]
+      const ids = String(gruposKey || '')
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+      if (!slugKey || ids.length === 0) return []
+      const excludes = String(excludesKey || '')
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+      const data = await fetchPecaTambemPublico(slugKey, {
+        grupoIds: ids,
+        excludeProdutoIds: excludes,
       })
       return data.produtos ?? []
     },

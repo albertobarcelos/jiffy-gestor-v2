@@ -19,7 +19,7 @@ function toViewModel(produto: PecaTambemProdutoDTO): DeliveryPublicoProdutoViewM
     descricao: produto.descricao,
     preco: produto.valor,
     imagemUrl: produto.imagemUrl,
-    grupoId: produto.grupoIdOrigem,
+    grupoId: produto.grupoId || produto.grupoIdOrigem,
     temComplementos:
       produto.abreComplementos && produto.grupoComplementosIds.length > 0,
   }
@@ -40,6 +40,10 @@ export function DeliveryPecaTambemCarousel({
     handleMouseMove,
     handleMouseUp,
     handleMouseLeave,
+    handleClickCapture,
+    handleTouchStart,
+    handleTouchMove,
+    handleTouchEnd,
   } = useHorizontalDragScroll<HTMLDivElement>()
 
   if (produtos.length === 0) return null
@@ -47,7 +51,7 @@ export function DeliveryPecaTambemCarousel({
   return (
     <section className="mt-1" aria-label="Peça Também">
       <h2
-        className="mb-2 px-0.5 text-base font-semibold uppercase tracking-wide"
+        className="mb-2 px-0.5 text-sm font-medium tracking-wide"
         style={{ color: 'var(--delivery-text-primary)' }}
       >
         Peça Também
@@ -58,6 +62,10 @@ export function DeliveryPecaTambemCarousel({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
+        onClickCapture={handleClickCapture}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         onWheel={handleWheel}
         className={`flex items-start gap-3 overflow-x-auto pb-1 pt-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
           isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'

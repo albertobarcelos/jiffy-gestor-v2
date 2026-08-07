@@ -21,6 +21,7 @@ import {
 } from '../../shared/stores/deliveryCarrinhoStore'
 import {
   mapPedidoPublicoCriadoParaConfirmado,
+  type MapPedidoPublicoConfirmadoFallback,
   type PedidoPublicoConfirmadoSnapshot,
 } from '@/src/application/mappers/PedidoPublicoConfirmadoMapper'
 import { DELIVERY_PAIS_TELEFONE_PADRAO } from '../../shared/constants/deliveryPaisesTelefone'
@@ -31,7 +32,10 @@ import { formatDeliveryCurrency } from '../../shared/utils/formatDeliveryCurrenc
 import { DeliveryProdutoModal } from '../components/DeliveryProdutoModal'
 import { DeliveryPecaTambemCarousel } from '../../shared/components/DeliveryPecaTambemCarousel'
 import { usePecaTambemSugestoes } from '@/src/presentation/hooks/usePecaTambemSugestoes'
-import type { CatalogoPublicoProdutoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import type {
+  CatalogoPublicoProdutoDTO,
+  PecaTambemProdutoDTO,
+} from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { produtoTemComplementosAtivos } from '../../shared/utils/produtoComplementosUtils'
 import { DeliveryCheckoutFooterActions } from '../components/checkout/DeliveryCheckoutFooterActions'
 import { DeliveryCheckoutIdentifiqueSeModal } from '../components/checkout/DeliveryCheckoutIdentifiqueSeModal'
@@ -160,8 +164,11 @@ export function DeliveryPublicoCarrinhoScreen({
       b.adicionadoEm.localeCompare(a.adicionadoEm)
     )
     for (const item of ordenados) {
+      // Prefere o grupo do catálogo (evita grupoIdOrigem gravado por engano no carrinho).
       const grupoId =
-        item.grupoId ?? findCatalogoGrupoIdByProdutoId(grupos, item.produtoId)
+        findCatalogoGrupoIdByProdutoId(grupos, item.produtoId) ||
+        item.grupoId?.trim() ||
+        null
       if (!grupoId || seen.has(grupoId)) continue
       seen.add(grupoId)
       ids.push(grupoId)
@@ -196,6 +203,17 @@ export function DeliveryPublicoCarrinhoScreen({
     return map
   }, [pecaTambemQuery.data])
 
+  const resolverGrupoIdProduto = useCallback(
+    (produtoId: string, fromSugestao?: PecaTambemProdutoDTO | null) => {
+      return (
+        fromSugestao?.grupoId ||
+        findCatalogoGrupoIdByProdutoId(grupos, produtoId) ||
+        null
+      )
+    },
+    [grupos]
+  )
+
   const handlePecaTambemClick = useCallback(
     (produtoId: string) => {
       const fromSugestao = pecaTambemById.get(produtoId)
@@ -203,12 +221,9 @@ export function DeliveryPublicoCarrinhoScreen({
       const produto = fromCatalogo ?? fromSugestao ?? null
       if (!produto) return
       setProdutoPecaTambem(produto)
-      setProdutoPecaTambemGrupoId(
-        fromSugestao?.grupoIdOrigem ??
-          findCatalogoGrupoIdByProdutoId(grupos, produtoId)
-      )
+      setProdutoPecaTambemGrupoId(resolverGrupoIdProduto(produtoId, fromSugestao))
     },
-    [grupos, pecaTambemById]
+    [grupos, pecaTambemById, resolverGrupoIdProduto]
   )
 
   const handlePecaTambemAddRapido = useCallback(
@@ -225,9 +240,7 @@ export function DeliveryPublicoCarrinhoScreen({
 
       adicionarItem(slug, {
         produtoId: produto.id,
-        grupoId:
-          fromSugestao?.grupoIdOrigem ??
-          findCatalogoGrupoIdByProdutoId(grupos, produto.id),
+        grupoId: resolverGrupoIdProduto(produtoId, fromSugestao),
         produtoNome: produto.nome,
         produtoImagemUrl: produto.imagemUrl,
         quantidade: 1,
@@ -238,7 +251,14 @@ export function DeliveryPublicoCarrinhoScreen({
       })
       showToast.success(`${produto.nome} adicionado`)
     },
-    [adicionarItem, grupos, handlePecaTambemClick, pecaTambemById, slug]
+    [
+      adicionarItem,
+      grupos,
+      handlePecaTambemClick,
+      pecaTambemById,
+      resolverGrupoIdProduto,
+      slug,
+    ]
   )
 
   const enderecoClienteSelecionado = useMemo(() => {
@@ -402,9 +422,11 @@ export function DeliveryPublicoCarrinhoScreen({
 
   const handleEnviarPedido = async () => {
     // Fallback local capturado antes do limpar do carrinho no use case.
-    const fallback = {
+    const fallback: MapPedidoPublicoConfirmadoFallback = {
       tipoEntrega: form.tipoEntrega,
-      modoTempo: form.modoTempo,
+      modoTempo: form.modoTempo === 'agendado' ? 'agendado' : 'imediato',
+      slotInicio: form.slotInicio,
+      slotLabel: form.slotLabel,
       nome: nomeClienteExibicao,
       telefone: form.telefone,
       telefonePaisIso2: form.telefonePaisIso2 || DELIVERY_PAIS_TELEFONE_PADRAO,
@@ -609,7 +631,7 @@ export function DeliveryPublicoCarrinhoScreen({
               </button>
             </header>
 
-            <div className="relative mx-auto min-h-0 w-full max-w-2xl flex-1 space-y-4 overflow-y-auto overscroll-y-contain p-3 pb-36 max-sm:scrollbar-hide sm:space-y-5 sm:p-4">
+            <div className="mx-auto min-h-0 w-full max-w-2xl flex-1 space-y-4 overflow-y-auto overscroll-y-contain p-3 max-sm:scrollbar-hide sm:space-y-5 sm:p-4">
               {itens.length === 0 ? (
                 <div className="py-16 text-center">
                   <p className="delivery-text-muted">Carrinho vazio</p>
@@ -652,6 +674,14 @@ export function DeliveryPublicoCarrinhoScreen({
                     </AnimatePresence>
                   </div>
 
+                  <button
+                    type="button"
+                    onClick={voltar}
+                    className="flex min-h-[48px] w-full items-center justify-center rounded-xl bg-black text-sm font-semibold uppercase tracking-wide text-white"
+                  >
+                    Adicionar mais produtos
+                  </button>
+
                   {(pecaTambemQuery.data?.length ?? 0) > 0 ? (
                     <DeliveryPecaTambemCarousel
                       produtos={pecaTambemQuery.data ?? []}
@@ -660,21 +690,12 @@ export function DeliveryPublicoCarrinhoScreen({
                       onProdutoAddRapido={handlePecaTambemAddRapido}
                     />
                   ) : null}
-
-                  <button
-                    type="button"
-                    onClick={voltar}
-                    className="flex min-h-[48px] w-full items-center justify-center rounded-xl text-sm font-semibold uppercase tracking-wide delivery-text-primary"
-                    style={{ backgroundColor: 'var(--delivery-surface-muted)' }}
-                  >
-                    Adicionar mais produtos
-                  </button>
                 </>
               )}
             </div>
 
             {itens.length > 0 ? (
-              <div className="absolute bottom-0 left-0 right-0 z-20 border-t border-neutral-200 bg-white">
+              <div className="z-20 shrink-0 border-t border-neutral-200 bg-white">
                 <DeliveryCheckoutFooterActions
                   onVoltar={voltar}
                   onContinuar={handleContinuarCheckout}
@@ -893,6 +914,9 @@ export function DeliveryPublicoCarrinhoScreen({
           <DeliveryCheckoutRevisaoModal
             modo="somenteLeitura"
             tipoEntrega={pedidoConfirmado.tipoEntrega}
+            modoTempo={pedidoConfirmado.modoTempo}
+            slotInicio={pedidoConfirmado.slotInicio}
+            slotLabel={pedidoConfirmado.slotLabel}
             nome={pedidoConfirmado.nome}
             telefone={pedidoConfirmado.telefone}
             telefonePaisIso2={pedidoConfirmado.telefonePaisIso2}

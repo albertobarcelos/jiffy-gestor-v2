@@ -105,6 +105,7 @@ export function itemSemComplemento(
 
   return {
     produtoId: item.produtoId,
+    grupoId: item.grupoId ?? null,
     produtoNome: item.produtoNome,
     produtoImagemUrl: item.produtoImagemUrl,
     quantidade: item.quantidade,
