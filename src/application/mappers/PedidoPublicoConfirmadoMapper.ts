@@ -10,6 +10,8 @@ export type PedidoPublicoConfirmadoSnapshot = {
   codigoVenda: string | null
   tipoEntrega: DeliveryTipoEntrega
   modoTempo: 'imediato' | 'agendado'
+  slotInicio: string
+  slotLabel: string
   nome: string
   telefone: string
   telefonePaisIso2: string
@@ -30,6 +32,8 @@ export type MapPedidoPublicoConfirmadoFallback = {
   /** Contexto local do checkout — preenchido quando a API omite algo. */
   tipoEntrega: DeliveryTipoEntrega
   modoTempo: 'imediato' | 'agendado'
+  slotInicio: string
+  slotLabel: string
   nome: string
   telefone: string
   telefonePaisIso2: string
@@ -129,6 +133,8 @@ export function mapPedidoPublicoCriadoParaConfirmado(
     codigoVenda: pedido.codigoVenda,
     tipoEntrega,
     modoTempo,
+    slotInicio: fallback.slotInicio,
+    slotLabel: fallback.slotLabel,
     nome,
     telefone,
     telefonePaisIso2: fallback.telefonePaisIso2,

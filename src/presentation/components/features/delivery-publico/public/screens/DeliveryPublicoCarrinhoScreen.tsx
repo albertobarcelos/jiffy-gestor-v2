@@ -21,6 +21,7 @@ import {
 } from '../../shared/stores/deliveryCarrinhoStore'
 import {
   mapPedidoPublicoCriadoParaConfirmado,
+  type MapPedidoPublicoConfirmadoFallback,
   type PedidoPublicoConfirmadoSnapshot,
 } from '@/src/application/mappers/PedidoPublicoConfirmadoMapper'
 import { DELIVERY_PAIS_TELEFONE_PADRAO } from '../../shared/constants/deliveryPaisesTelefone'
@@ -303,9 +304,11 @@ export function DeliveryPublicoCarrinhoScreen({
 
   const handleEnviarPedido = async () => {
     // Fallback local capturado antes do limpar do carrinho no use case.
-    const fallback = {
+    const fallback: MapPedidoPublicoConfirmadoFallback = {
       tipoEntrega: form.tipoEntrega,
-      modoTempo: form.modoTempo,
+      modoTempo: form.modoTempo === 'agendado' ? 'agendado' : 'imediato',
+      slotInicio: form.slotInicio,
+      slotLabel: form.slotLabel,
       nome: nomeClienteExibicao,
       telefone: form.telefone,
       telefonePaisIso2: form.telefonePaisIso2 || DELIVERY_PAIS_TELEFONE_PADRAO,
@@ -768,6 +771,9 @@ export function DeliveryPublicoCarrinhoScreen({
           <DeliveryCheckoutRevisaoModal
             modo="somenteLeitura"
             tipoEntrega={pedidoConfirmado.tipoEntrega}
+            modoTempo={pedidoConfirmado.modoTempo}
+            slotInicio={pedidoConfirmado.slotInicio}
+            slotLabel={pedidoConfirmado.slotLabel}
             nome={pedidoConfirmado.nome}
             telefone={pedidoConfirmado.telefone}
             telefonePaisIso2={pedidoConfirmado.telefonePaisIso2}

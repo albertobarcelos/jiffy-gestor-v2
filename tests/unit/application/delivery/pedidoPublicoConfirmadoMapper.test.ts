@@ -116,6 +116,8 @@ describe('mapPedidoPublicoCriadoParaConfirmado', () => {
     const snapshot = mapPedidoPublicoCriadoParaConfirmado(pedido, {
       tipoEntrega: 'retirada',
       modoTempo: 'imediato',
+      slotInicio: '',
+      slotLabel: '',
       nome: 'Fallback',
       telefone: '11999999999',
       telefonePaisIso2: 'BR',
