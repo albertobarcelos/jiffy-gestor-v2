@@ -5,6 +5,7 @@ import type {
 } from '@/src/application/dto/api/pedidoDeliveryApi'
 import type { CriarPedidoDeliveryInputDTO } from '@/src/application/dto/CriarPedidoDeliveryDTO'
 import type { ProdutoSelecionado } from '@/src/domain/types/pedido'
+import { deveEnviarValorUnitarioAlterado } from '@/src/domain/services/pedido/deveEnviarValorUnitarioAlterado'
 import { observacoesArrayFromTexto } from '@/src/shared/helpers/observacaoPedido'
 
 function mapEtiquetaDelivery(raw?: string): 'casa' | 'trabalho' | 'outro' {
@@ -38,6 +39,7 @@ export function mapProdutosPedidoDeliveryPayload(produtos: ProdutoSelecionado[])
     return {
       produtoId: p.produtoId,
       quantidade: p.quantidade,
+      ...(deveEnviarValorUnitarioAlterado(p) ? { valorUnitario: p.valorUnitario } : {}),
       tipoDesconto: p.tipoDesconto || null,
       valorDesconto: valorDescontoFinal,
       tipoAcrescimo: p.tipoAcrescimo || null,

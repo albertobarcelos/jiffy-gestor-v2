@@ -68,9 +68,10 @@ export interface CriarVendaGestorApiRequest {
   tipoVenda: string
   origem: string
   statusVenda: string
-  valorFinal: number
-  totalDesconto: number
-  totalAcrescimo: number
+  /** Totais da venda: calculados pelo backend — não enviar no create. */
+  valorFinal?: number
+  totalDesconto?: number
+  totalAcrescimo?: number
   produtosLancados: unknown[]
   /** compat backend — remover quando API aceitar uma chave */
   produtos: unknown[]
