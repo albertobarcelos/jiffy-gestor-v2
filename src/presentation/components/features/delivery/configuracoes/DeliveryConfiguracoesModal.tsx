@@ -4,14 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MdPrint, MdRefresh, MdTune } from 'react-icons/md'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import {
   salvarMapeamentosEstacao,
   type ImpressoraLogica,
 } from '@/src/infrastructure/api/estacoesImpressaoApi'
 import { showToast } from '@/src/shared/utils/toast'
 import type { ModoImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
-import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
 import {
   DEFAULT_DELIVERY_CUPOM_TEMPLATE,
   type DeliveryCupomTemplateConfig,
@@ -35,6 +33,7 @@ import {
   isTcpPrinterRef,
 } from '@/src/infrastructure/printing/qzTrayClient'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
+import { useAtualizarEmpresaDelivery } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
 import {
   useDeliveryConfigEstacaoImpressao,
   useDeliveryConfigImpressorasLogicas,
@@ -53,19 +52,6 @@ function clampCopiasUnificado(n: number): number {
   return Math.min(99, Math.max(1, Math.floor(n)))
 }
 
-async function mensagemErroHttp(res: Response): Promise<string> {
-  const raw: unknown = await res.json().catch(() => ({}))
-  return (
-    textoErroCorpoApi(raw) ||
-    (raw &&
-    typeof raw === 'object' &&
-    'error' in raw &&
-    typeof (raw as { error: unknown }).error === 'string'
-      ? (raw as { error: string }).error
-      : '') ||
-    `Erro HTTP ${res.status}`
-  )
-}
 
 function DeliveryToggleRow(props: {
   id: string
@@ -225,6 +211,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
     deliveryCupomTemplate: cupomTemplateRemoto,
     isLoading: carregandoEmpresaMe,
   } = useEmpresaMe()
+  const atualizarEmpresaDelivery = useAtualizarEmpresaDelivery()
   const impressorasLogicasQuery = useDeliveryConfigImpressorasLogicas(open)
   const estacaoImpressaoQuery = useDeliveryConfigEstacaoImpressao(open)
   const invalidateDeliveryConfigQueries = useInvalidateDeliveryConfigImpressaoQueries()
@@ -378,18 +365,8 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
 
     setSalvando(true)
     try {
-      const patchRes = await fetchGestorApi(`/api/empresas/${encodeURIComponent(empresaId)}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ parametroDelivery }),
-      })
-
-      if (!patchRes.ok) {
-        throw new Error(await mensagemErroHttp(patchRes))
-      }
+      // Preferências de impressão ficam em empresa delivery (não no PATCH genérico de /api/empresas).
+      await atualizarEmpresaDelivery.mutateAsync({ parametroDelivery })
 
       if (estacaoImpressaoId && impressorasLogicas.length > 0) {
         await salvarMapeamentosEstacao(token, estacaoImpressaoId, payload)
@@ -408,6 +385,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
       setSalvando(false)
     }
   }, [
+    atualizarEmpresaDelivery,
     empresa?.id,
     estacaoImpressaoId,
     autoIniciarPreparoNovosPedidos,
