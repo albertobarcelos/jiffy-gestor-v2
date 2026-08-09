@@ -34,6 +34,7 @@ import {
 } from '@/src/infrastructure/printing/qzTrayClient'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { useAtualizarEmpresaDelivery } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
+import { usePreferenciasImpressaoDelivery } from '@/src/presentation/hooks/usePreferenciasImpressaoDelivery'
 import {
   useDeliveryConfigEstacaoImpressao,
   useDeliveryConfigImpressorasLogicas,
@@ -207,10 +208,13 @@ function ImpressoraMapeamentoInput({
 export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfiguracoesModalProps) {  const token = useAuthStore.getState().tenantAuth?.getAccessToken()
   const {
     empresa,
-    preferenciasImpressaoDelivery,
     deliveryCupomTemplate: cupomTemplateRemoto,
     isLoading: carregandoEmpresaMe,
   } = useEmpresaMe()
+  const {
+    preferenciasImpressaoDelivery,
+    isLoading: carregandoPreferenciasDelivery,
+  } = usePreferenciasImpressaoDelivery()
   const atualizarEmpresaDelivery = useAtualizarEmpresaDelivery()
   const impressorasLogicasQuery = useDeliveryConfigImpressorasLogicas(open)
   const estacaoImpressaoQuery = useDeliveryConfigEstacaoImpressao(open)
@@ -245,6 +249,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
   const carregando =
     open &&
     (carregandoEmpresaMe ||
+      carregandoPreferenciasDelivery ||
       impressorasLogicasQuery.isPending ||
       estacaoImpressaoQuery.isPending)
 
@@ -260,7 +265,13 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
       mapeamentosHidratadosRef.current = false
       return
     }
-    if (formularioHidratadoRef.current || carregandoEmpresaMe || !empresa?.id) return
+    if (
+      formularioHidratadoRef.current ||
+      carregandoEmpresaMe ||
+      carregandoPreferenciasDelivery ||
+      !empresa?.id
+    )
+      return
 
     const prefs = preferenciasImpressaoDelivery
     formularioHidratadoRef.current = true
@@ -274,6 +285,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
   }, [
     open,
     carregandoEmpresaMe,
+    carregandoPreferenciasDelivery,
     empresa?.id,
     preferenciasImpressaoDelivery,
     cupomTemplateRemoto,
