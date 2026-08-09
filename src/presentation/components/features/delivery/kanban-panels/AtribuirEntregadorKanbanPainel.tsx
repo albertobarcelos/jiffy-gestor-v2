@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MdAttachMoney, MdSportsMotorsports } from 'react-icons/md'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
@@ -35,9 +35,15 @@ import {
   SelectValue,
 } from '@/src/presentation/components/ui/select'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { showToast } from '@/src/shared/utils/toast'
+import {
+  getUltimoEntregadorSelecionado,
+  normalizarFiltroTipoEntregador,
+  setUltimoEntregadorSelecionado,
+} from '@/src/shared/constants/pedidoForm'
 import {
   formatarTaxaEntregaDetalheExibicao,
   resolverTaxaEntregaAtivaDetalheKanban,
@@ -149,6 +155,11 @@ export function AtribuirEntregadorKanbanPainel({
   onSalvo,
 }: AtribuirEntregadorKanbanPainelProps) {
   const queryClient = useQueryClient()
+  const empresaId = useTenantEmpresaId()
+  const filtroTipoEntregador = useMemo(
+    () => normalizarFiltroTipoEntregador(venda?.tipoVenda),
+    [venda?.tipoVenda]
+  )
   const [entregadorId, setEntregadorId] = useState('')
   const [entregadorInicialId, setEntregadorInicialId] = useState('')
   const [taxaEntregaDetalhe, setTaxaEntregaDetalhe] = useState<TaxaEntregaDetalhe | null>(null)
@@ -156,6 +167,10 @@ export function AtribuirEntregadorKanbanPainel({
   const [pedidoPago, setPedidoPago] = useState(false)
   const [carregandoTaxa, setCarregandoTaxa] = useState(false)
   const [salvando, setSalvando] = useState(false)
+  /** True após o GET/hidratação do pedido no open atual. */
+  const [dadosPedidoProntos, setDadosPedidoProntos] = useState(false)
+  /** Evita reaplicar o “último entregador” várias vezes no mesmo open. */
+  const sugeriuUltimoEntregadorRef = useRef(false)
 
   /** Sincroniza valor atual + baseline do entregador (usado ao carregar/refrescar o pedido). */
   const aplicarEntregadorId = useCallback((id: string) => {
@@ -223,8 +238,11 @@ export function AtribuirEntregadorKanbanPainel({
     const token = useAuthStore.getState().tenantAuth?.getAccessToken()
     if (!token) {
       showToast.error('Sessão expirada. Faça login novamente.')
+      setDadosPedidoProntos(true)
       return
     }
+
+    setDadosPedidoProntos(false)
 
     if (venda.tabelaOrigem === 'venda_gestor') {
       setCarregandoTaxa(true)
@@ -251,6 +269,7 @@ export function AtribuirEntregadorKanbanPainel({
         showToast.error('Erro ao carregar dados do pedido.')
       } finally {
         setCarregandoTaxa(false)
+        setDadosPedidoProntos(true)
       }
       return
     }
@@ -275,6 +294,7 @@ export function AtribuirEntregadorKanbanPainel({
         showToast.error('Erro ao carregar entregador do pedido.')
       }
     }
+    setDadosPedidoProntos(true)
   }, [aplicarEntregadorId, carregarTaxaEntrega, entregadorVinculadoId, open, venda])
 
   useEffect(() => {
@@ -286,10 +306,39 @@ export function AtribuirEntregadorKanbanPainel({
       setPedidoPago(false)
       setCarregandoTaxa(false)
       setSalvando(false)
+      setDadosPedidoProntos(false)
+      sugeriuUltimoEntregadorRef.current = false
       return
     }
     void carregarDadosVenda()
   }, [open, carregarDadosVenda])
+
+  // Pedido sem entregador: sugere o último escolhido neste terminal (por empresa + tipo entrega/retirada).
+  useEffect(() => {
+    if (!open || !venda || !dadosPedidoProntos) return
+    if (sugeriuUltimoEntregadorRef.current) return
+    if (entregadoresQuery.isLoading) return
+    if (entregadorInicialId.trim()) return
+    if (entregadorId.trim()) return
+
+    const ultimo = getUltimoEntregadorSelecionado(empresaId, filtroTipoEntregador)
+    if (!ultimo) return
+    if (!entregadores.some(e => e.id === ultimo)) return
+
+    sugeriuUltimoEntregadorRef.current = true
+    // Só preenche a seleção atual — baseline continua vazio para exigir Salvar.
+    setEntregadorId(ultimo)
+  }, [
+    open,
+    venda,
+    dadosPedidoProntos,
+    empresaId,
+    filtroTipoEntregador,
+    entregadores,
+    entregadoresQuery.isLoading,
+    entregadorId,
+    entregadorInicialId,
+  ])
 
   const handleSalvar = async () => {
     if (!venda) return
@@ -338,6 +387,13 @@ export function AtribuirEntregadorKanbanPainel({
           entregadorId: entregadorSelecionado,
           token,
         })
+        if (entregadorSelecionado) {
+          setUltimoEntregadorSelecionado(
+            entregadorSelecionado,
+            empresaId,
+            filtroTipoEntregador
+          )
+        }
       }
 
       invalidarPedidoKanbanQuickViewCache(venda.id)
