@@ -8,6 +8,7 @@ type DeliveryCatalogoCategoriaTabsProps = {
   activeGrupoId: string | null
   interactive?: boolean
   onGrupoClick?: (grupoId: string) => void
+  /** Se omitido, o botão de menu não é renderizado (ex.: Grade já tem menu na toolbar). */
   onMenuClick?: () => void
 }
 
@@ -29,16 +30,18 @@ export function DeliveryCatalogoCategoriaTabs({
       }}
     >
       <div className="flex items-center gap-1 px-2 @sm:px-3">
-        <button
-          type="button"
-          aria-label="Menu de categorias"
-          disabled={!interactive}
-          onClick={() => interactive && onMenuClick?.()}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg disabled:cursor-default"
-          style={{ color: 'var(--delivery-primary)' }}
-        >
-          <Menu className="h-5 w-5" aria-hidden />
-        </button>
+        {onMenuClick ? (
+          <button
+            type="button"
+            aria-label="Menu de categorias"
+            disabled={!interactive}
+            onClick={() => interactive && onMenuClick()}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg disabled:cursor-default"
+            style={{ color: 'var(--delivery-primary)' }}
+          >
+            <Menu className="h-5 w-5" aria-hidden />
+          </button>
+        ) : null}
 
         <div className="min-w-0 flex-1 overflow-x-auto scrollbar-hide">
           <div className="flex w-max">

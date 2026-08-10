@@ -13,13 +13,24 @@ describe('designPublishRules', () => {
     expect(getPublishDisabledReason(createDefaultDesignConfig())).toBeUndefined()
   })
 
-  it('bloqueia layout premium com motivo', () => {
+  it('permite layouts vitrine, grade e catalogo', () => {
+    for (const layoutId of ['vitrine', 'grade', 'catalogo'] as const) {
+      const config = {
+        ...createDefaultDesignConfig(),
+        layoutId,
+      }
+      expect(canPublishDesign(config)).toBe(true)
+      expect(getPublishDisabledReason(config)).toBeUndefined()
+    }
+  })
+
+  it('bloqueia tipografia premium com motivo', () => {
     const config = {
       ...createDefaultDesignConfig(),
-      layoutId: 'vitrine' as const,
+      tipografia: { presetId: 'moderna' as const },
     }
     expect(canPublishDesign(config)).toBe(false)
-    expect(getPublishDisabledReason(config)).toMatch(/Básico/i)
+    expect(getPublishDisabledReason(config)).toMatch(/Urbana/i)
   })
 
   it('permite paleta personalizada', () => {

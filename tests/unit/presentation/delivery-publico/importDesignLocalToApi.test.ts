@@ -78,8 +78,8 @@ describe('importDesignLocalToApi', () => {
   it('só salva draft quando published local não é publicável', async () => {
     const defaults = createDefaultDesignConfig('Loja')
     writeDesignStorage(EMPRESA_ID, {
-      draft: { ...defaults, layoutId: 'vitrine' },
-      published: { ...defaults, layoutId: 'vitrine' },
+      draft: { ...defaults, tipografia: { presetId: 'moderna' } },
+      published: { ...defaults, tipografia: { presetId: 'moderna' } },
     })
 
     const salvarDraft = vi.fn(async input => ({

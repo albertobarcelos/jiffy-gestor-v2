@@ -4,7 +4,7 @@ import {
 } from '@/src/application/dto/delivery-publico/DeliveryPublicoDesignDTO'
 
 /** Espelha o gate do backend (`ValidarPublicacaoDesignDelivery`). UX apenas — BE é fonte da verdade. */
-const LAYOUTS_PUBLICAVEIS = new Set(['basico'])
+const LAYOUTS_PUBLICAVEIS = new Set(['basico', 'vitrine', 'grade', 'catalogo'])
 
 const PALETAS_PUBLICAVEIS = new Set([
   'carvao',
@@ -16,7 +16,7 @@ const PALETAS_PUBLICAVEIS = new Set([
 const TIPOGRAFIAS_PUBLICAVEIS = new Set(['urbana'])
 
 const MENSAGEM_NAO_PUBLICAVEL =
-  'Somente o modelo Básico, as paletas Carvão, Lavanda, Mirtilo e Personalizada e a tipografia Urbana podem ser publicados no momento'
+  'Somente as paletas Carvão, Lavanda, Mirtilo e Personalizada e a tipografia Urbana podem ser publicados no momento'
 
 /**
  * Valida shape Zod + gate de publicação antes do POST /publish.

@@ -760,7 +760,7 @@ export function DeliveryPublicoCarrinhoScreen({
             enderecoCliente={pedidoConfirmado.enderecoCliente}
             enderecoEmpresaTexto={pedidoConfirmado.enderecoEmpresaTexto}
             telefoneEmpresa={empresa?.telefone ?? null}
-            nomeEmpresa={empresa?.nomeFantasia ?? null}
+            nomeEmpresa={empresa?.nomeExibicao ?? empresa?.nomeFantasia ?? null}
             codigoVenda={pedidoConfirmado.codigoVenda}
             onVerPedido={() => goToCheckoutStep('pedidoDetalhe')}
             onVoltarAoCardapio={concluirAposSucesso}

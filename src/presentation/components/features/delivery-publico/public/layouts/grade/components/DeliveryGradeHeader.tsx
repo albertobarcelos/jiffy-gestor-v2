@@ -1,6 +1,5 @@
 'use client'
 
-import { Info, User } from 'lucide-react'
 import type { DeliveryPublicoDesignConfig } from '../../../../shared/types/deliveryPublicoDesignConfig'
 
 type DeliveryGradeHeaderProps = {
@@ -23,24 +22,7 @@ export function DeliveryGradeHeader({ config, disponivel }: DeliveryGradeHeaderP
       >
         <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/20 to-black/50" />
 
-        <div className="relative flex items-start justify-between px-4 pb-6 pt-4">
-          <button
-            type="button"
-            aria-label="Informações"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/50 bg-black/20 text-white backdrop-blur-sm"
-          >
-            <Info className="h-4 w-4" aria-hidden />
-          </button>
-          <button
-            type="button"
-            aria-label="Perfil"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/50 bg-black/20 text-white backdrop-blur-sm"
-          >
-            <User className="h-4 w-4" aria-hidden />
-          </button>
-        </div>
-
-        <div className="relative flex flex-col items-center px-4 pb-8 pt-2 text-center">
+        <div className="relative flex flex-col items-center px-4 pb-8 pt-10 text-center">
           <div
             className="mb-3 flex h-14 w-14 items-center justify-center overflow-hidden border-2 border-white bg-white shadow-md"
             style={{ borderRadius: logoRadius }}

@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronRight, ShoppingCart, User } from 'lucide-react'
+import { ShoppingCart } from 'lucide-react'
 import type { DeliveryPublicoDesignConfig } from '../../../../shared/types/deliveryPublicoDesignConfig'
 
 type DeliveryCatalogoHeaderProps = {
@@ -33,8 +33,12 @@ export function DeliveryCatalogoHeader({
 
       <div className="flex items-center gap-3 px-4 py-3">
         <div
-          className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden border border-gray-100 bg-white shadow-sm"
-          style={{ borderRadius: logoRadius }}
+          className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden border shadow-sm"
+          style={{
+            borderRadius: logoRadius,
+            borderColor: 'var(--delivery-card-border)',
+            backgroundColor: 'var(--delivery-surface)',
+          }}
         >
           {config.cabecalho.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -46,11 +50,8 @@ export function DeliveryCatalogoHeader({
           )}
         </div>
 
-        <button
-          type="button"
-          className="flex min-w-0 flex-1 items-center gap-1 text-left"
-        >
-          <span
+        <div className="min-w-0 flex-1">
+          <h1
             className="truncate text-base font-bold @sm:text-lg"
             style={{
               color: 'var(--delivery-primary)',
@@ -58,9 +59,8 @@ export function DeliveryCatalogoHeader({
             }}
           >
             {nomeLoja}
-          </span>
-          <ChevronRight className="h-4 w-4 shrink-0 opacity-70" aria-hidden />
-        </button>
+          </h1>
+        </div>
 
         <span
           className={`hidden shrink-0 rounded-md px-2 py-1 text-xs font-semibold @sm:inline-flex ${
@@ -79,6 +79,7 @@ export function DeliveryCatalogoHeader({
           style={{
             borderColor: 'var(--delivery-card-border)',
             color: 'var(--delivery-primary)',
+            backgroundColor: 'var(--delivery-surface)',
           }}
         >
           <ShoppingCart className="h-5 w-5" aria-hidden />
@@ -87,18 +88,6 @@ export function DeliveryCatalogoHeader({
               {carrinhoQuantidade > 99 ? '99+' : carrinhoQuantidade}
             </span>
           ) : null}
-        </button>
-
-        <button
-          type="button"
-          aria-label="Perfil"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border"
-          style={{
-            borderColor: 'var(--delivery-card-border)',
-            color: 'var(--delivery-primary)',
-          }}
-        >
-          <User className="h-5 w-5" aria-hidden />
         </button>
       </div>
     </header>

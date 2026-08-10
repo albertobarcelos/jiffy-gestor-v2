@@ -357,7 +357,7 @@ export function DeliveryPublicoHomeScreen({
   return (
     <DeliveryThemeScope
       slug={slug}
-      nomeExibicaoFallback={empresa?.nomeFantasia ?? ''}
+      nomeExibicaoFallback={empresa?.nomeExibicao ?? empresa?.nomeFantasia ?? ''}
       empresa={empresa}
       designReady={designReady}
     >

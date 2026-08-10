@@ -111,14 +111,13 @@ describe('validarPublicacaoDesign', () => {
     expect(result.ok).toBe(true)
   })
 
-  it('rejeita layout não publicável', () => {
-    const result = validarPublicacaoDesign({
-      ...createDefaultDeliveryPublicoDesignConfig(),
-      layoutId: 'vitrine',
-    })
-    expect(result.ok).toBe(false)
-    if (!result.ok) {
-      expect(result.error).toMatch(/Básico/i)
+  it('aceita layouts vitrine, grade e catalogo', () => {
+    for (const layoutId of ['vitrine', 'grade', 'catalogo'] as const) {
+      const result = validarPublicacaoDesign({
+        ...createDefaultDeliveryPublicoDesignConfig(),
+        layoutId,
+      })
+      expect(result.ok).toBe(true)
     }
   })
 
@@ -144,6 +143,12 @@ describe('validarPublicacaoDesign', () => {
       podePublicarDesign({
         ...createDefaultDeliveryPublicoDesignConfig(),
         layoutId: 'grade',
+      })
+    ).toBe(true)
+    expect(
+      podePublicarDesign({
+        ...createDefaultDeliveryPublicoDesignConfig(),
+        tipografia: { presetId: 'moderna' },
       })
     ).toBe(false)
   })
