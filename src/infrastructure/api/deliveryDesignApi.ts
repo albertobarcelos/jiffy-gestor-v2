@@ -1,4 +1,5 @@
 import {
+  deliveryPublicoDesignConfigSchema,
   deliveryPublicoDesignMeResponseSchema,
   type DeliveryPublicoDesignConfigDTO,
   type DeliveryPublicoDesignMeResponseDTO,

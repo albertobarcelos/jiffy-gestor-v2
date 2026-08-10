@@ -31,6 +31,7 @@ import { DesignModelosTab } from '../components/tabs/DesignModelosTab'
 import { DesignCoresTab } from '../components/tabs/DesignCoresTab'
 import { DesignTipografiasTab } from '../components/tabs/DesignTipografiasTab'
 import { DesignCategoriasTab } from '../components/tabs/DesignCategoriasTab'
+import { useHydrateDesignCabecalhoMidia } from '../hooks/useHydrateDesignCabecalhoMidia'
 
 export function DeliveryDesignCustomizerScreen() {
   const { empresa, isLoading: empresaLoading } = useEmpresaMe()
@@ -38,6 +39,9 @@ export function DeliveryDesignCustomizerScreen() {
   const [activeTab, setActiveTab] = useState<DesignTabId>('cabecalho')
   const [migrationOpen, setMigrationOpen] = useState(false)
   const [migrationBusy, setMigrationBusy] = useState(false)
+
+  const nomeVitrineFallback =
+    (empresaDelivery?.nomeExibicao?.trim() || empresa?.nomeExibicao || '').trim()
 
   const {
     draft,
@@ -60,7 +64,7 @@ export function DeliveryDesignCustomizerScreen() {
   } = useDeliveryDesignDraft({
     empresaId: empresa?.id,
     slug: empresaDelivery?.slug,
-    nomeExibicaoFallback: empresa?.nomeExibicao ?? '',
+    nomeExibicaoFallback: nomeVitrineFallback,
     enabled: Boolean(empresa?.id),
   })
 
@@ -119,6 +123,15 @@ export function DeliveryDesignCustomizerScreen() {
     published,
     serverPublishedAt,
   ])
+
+  useHydrateDesignCabecalhoMidia({
+    slug: empresaDelivery?.slug,
+    hasEmpresaDelivery: Boolean(empresaDelivery),
+    enabled: hydrated,
+    publishedLogoUrl: published.cabecalho.logoUrl,
+    publishedCapaUrl: published.cabecalho.capaUrl,
+    onChange: updateDraft,
+  })
 
   const canPublish = canPublishDesign(draft)
   const busy = isSavingDraft || isPublishing || migrationBusy
@@ -314,6 +327,8 @@ export function DeliveryDesignCustomizerScreen() {
               config={draft}
               slug={empresaDelivery?.slug}
               hasEmpresaDelivery={Boolean(empresaDelivery)}
+              nomeFantasiaFallback={empresa?.nomeExibicao ?? ''}
+              nomeExibicaoDelivery={empresaDelivery?.nomeExibicao ?? null}
               onChange={updateDraft}
             />
           )}

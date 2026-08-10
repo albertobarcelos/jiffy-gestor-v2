@@ -1,9 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchEmpresaPublicaMidia } from '@/src/infrastructure/api/publicDeliveryApi'
 import {
+  clearEmpresaDeliveryBanner,
+  clearEmpresaDeliveryLogo,
   mensagemLegivelDeliveryMediaError,
   uploadEmpresaDeliveryBanner,
   uploadEmpresaDeliveryLogo,
@@ -22,10 +24,6 @@ type UseDesignCabecalhoMidiaOptions = {
   onChange: (updater: (current: DeliveryPublicoDesignConfig) => DeliveryPublicoDesignConfig) => void
 }
 
-function isPersistedImageUrl(url: string | null | undefined): url is string {
-  return typeof url === 'string' && url.trim().length > 0 && !url.startsWith('blob:')
-}
-
 function revokeBlobUrl(url: string | null | undefined) {
   if (url?.startsWith('blob:')) {
     URL.revokeObjectURL(url)
@@ -42,7 +40,8 @@ export function useDesignCabecalhoMidia({
   const { auth } = useAuthStore()
   const [isUploadingLogo, setIsUploadingLogo] = useState(false)
   const [isUploadingBanner, setIsUploadingBanner] = useState(false)
-  const hydratedSlugRef = useRef<string | null>(null)
+  const [isClearingLogo, setIsClearingLogo] = useState(false)
+  const [isClearingBanner, setIsClearingBanner] = useState(false)
 
   const updateCabecalhoField = useCallback(
     (field: CabecalhoMidiaField, url: string | null) => {
@@ -53,56 +52,6 @@ export function useDesignCabecalhoMidia({
     },
     [onChange]
   )
-
-  useEffect(() => {
-    const trimmedSlug = slug?.trim()
-    if (!trimmedSlug || !hasEmpresaDelivery) return
-    if (hydratedSlugRef.current === trimmedSlug) return
-
-    let cancelled = false
-
-    void fetchEmpresaPublicaMidia(trimmedSlug)
-      .then(({ logoUrl: apiLogo, bannerUrl: apiBanner }) => {
-        if (cancelled) return
-
-        onChange(current => {
-          const nextLogo = isPersistedImageUrl(current.cabecalho.logoUrl)
-            ? current.cabecalho.logoUrl
-            : apiLogo
-          const nextCapa = isPersistedImageUrl(current.cabecalho.capaUrl)
-            ? current.cabecalho.capaUrl
-            : apiBanner
-
-          if (
-            nextLogo === current.cabecalho.logoUrl &&
-            nextCapa === current.cabecalho.capaUrl
-          ) {
-            return current
-          }
-
-          revokeBlobUrl(current.cabecalho.logoUrl)
-          revokeBlobUrl(current.cabecalho.capaUrl)
-
-          return {
-            ...current,
-            cabecalho: {
-              ...current.cabecalho,
-              logoUrl: nextLogo,
-              capaUrl: nextCapa,
-            },
-          }
-        })
-
-        hydratedSlugRef.current = trimmedSlug
-      })
-      .catch(() => {
-        if (!cancelled) hydratedSlugRef.current = trimmedSlug
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [slug, hasEmpresaDelivery, onChange])
 
   const uploadMidia = useCallback(
     async (field: CabecalhoMidiaField, file: File) => {
@@ -178,19 +127,53 @@ export function useDesignCabecalhoMidia({
     [uploadMidia]
   )
 
-  const clearLogo = useCallback(() => {
-    revokeBlobUrl(logoUrl)
-    updateCabecalhoField('logoUrl', null)
-  }, [logoUrl, updateCabecalhoField])
+  const clearMidia = useCallback(
+    async (field: CabecalhoMidiaField) => {
+      const token = auth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado')
+        return
+      }
 
-  const clearBanner = useCallback(() => {
-    revokeBlobUrl(capaUrl)
-    updateCabecalhoField('capaUrl', null)
-  }, [capaUrl, updateCabecalhoField])
+      if (!hasEmpresaDelivery) {
+        showToast.error('Configure a Empresa Delivery antes de remover imagens.')
+        return
+      }
+
+      const previousUrl = field === 'logoUrl' ? logoUrl : capaUrl
+      const setClearing = field === 'logoUrl' ? setIsClearingLogo : setIsClearingBanner
+      setClearing(true)
+      const toastId = showToast.loading(
+        field === 'logoUrl' ? 'Removendo logo...' : 'Removendo capa...'
+      )
+
+      try {
+        if (field === 'logoUrl') {
+          await clearEmpresaDeliveryLogo(token)
+        } else {
+          await clearEmpresaDeliveryBanner(token)
+        }
+        revokeBlobUrl(previousUrl)
+        updateCabecalhoField(field, null)
+        showToast.successLoading(
+          toastId,
+          field === 'logoUrl' ? 'Logo removido.' : 'Capa removida.'
+        )
+      } catch (error) {
+        showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
+      } finally {
+        setClearing(false)
+      }
+    },
+    [auth, hasEmpresaDelivery, logoUrl, capaUrl, updateCabecalhoField]
+  )
+
+  const clearLogo = useCallback(() => clearMidia('logoUrl'), [clearMidia])
+  const clearBanner = useCallback(() => clearMidia('capaUrl'), [clearMidia])
 
   return {
-    isUploadingLogo,
-    isUploadingBanner,
+    isUploadingLogo: isUploadingLogo || isClearingLogo,
+    isUploadingBanner: isUploadingBanner || isClearingBanner,
     handleLogoUpload,
     handleBannerUpload,
     clearLogo,

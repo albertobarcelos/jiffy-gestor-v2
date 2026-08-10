@@ -89,13 +89,13 @@ Defaults: `createDefaultDesignConfig` — layout `basico`, paleta `carvao`, tipo
 
 ### 2.4 Regras de publicação (front, hoje)
 
-Só pode publicar (gate `designPublishRules`):
+Só pode publicar (gate `designPublishRules` / BE `ValidarPublicacaoDesignDelivery`):
 
-- Layout **Básico**
+- Layouts **Básico, Vitrine, Grade, Catálogo** (afetam a home; carrinho/pagamento são compartilhados)
 - Paletas publicáveis (ex.: carvão, lavanda, mirtilo, personalizada)
 - Tipografia **urbana**
 
-Modelos/paletas/tipografias “premium” existem na UI mas não entram no published.
+Paletas/tipografias ainda bloqueadas no gate existem na UI para preview, mas não entram no published.
 
 ### 2.5 O que já persiste no backend
 
@@ -127,7 +127,7 @@ Catálogo público (`GET .../catalogo/{slug}`) já devolve `empresa.logoUrl` / `
 | Escopo persistido | Todo o `DeliveryPublicoDesignConfig` **sem** depender de data-URLs de mídia | URLs de logo/capa continuam resolvidas pela API de Image |
 | Draft vs published | Manter os **dois** estados no backend (`draft` + `published` jsonb) | Espelha UX atual (editar sem ir ao ar) |
 | Publicação | `POST .../publish` copia draft → published + regras de gate | Igual botão Publicar atual |
-| Fonte de `nomeExibicao` | Cadastro empresa (readonly no Design); no payload pode ser omitido ou ignorado no servidor | Evita divergência |
+| Fonte de `nomeExibicao` | Coluna `empresa_delivery.nome_exibicao` (editável no Design via `PATCH /empresas/me`); fallback = `empresa.nome_fantasia`. JSON de design só espelha. | Nome de vitrine do cardápio sem alterar fantasia do ERP |
 | Logo/capa no JSON | Guardar só `logoFormato`; URLs **não** são fonte de verdade (merge na leitura) | Evita URL stale vs CDN |
 | Gate premium | Replicar no **backend** as mesmas regras de publish do front | Segurança: front não é confiável |
 | Visitante sem design | Defaults server-side = `createDefaultDesignConfig` | Comportamento previsível |

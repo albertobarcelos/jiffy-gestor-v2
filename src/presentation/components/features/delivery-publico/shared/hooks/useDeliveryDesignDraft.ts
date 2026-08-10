@@ -62,14 +62,24 @@ export function useDeliveryDesignDraft({
   useEffect(() => {
     if (!empresaId || !designQuery.data || hydrated) return
 
-    const uiDraft = apiDesignConfigToUi(
-      designQuery.data.draft,
-      nomeExibicaoFallback
-    )
     const uiPublished = apiDesignConfigToUi(
       designQuery.data.published,
       nomeExibicaoFallback
     )
+    const uiDraftRaw = apiDesignConfigToUi(
+      designQuery.data.draft,
+      nomeExibicaoFallback
+    )
+    // Se o draft perdeu logo/capa no JSON mas o published ainda tem,
+    // reaproveita o espelho para o editor não ficar sem preview.
+    const uiDraft: DeliveryPublicoDesignConfig = {
+      ...uiDraftRaw,
+      cabecalho: {
+        ...uiDraftRaw.cabecalho,
+        logoUrl: uiDraftRaw.cabecalho.logoUrl ?? uiPublished.cabecalho.logoUrl,
+        capaUrl: uiDraftRaw.cabecalho.capaUrl ?? uiPublished.cabecalho.capaUrl,
+      },
+    }
     setPublished(uiPublished)
     setDraft(uiDraft)
     setHydrated(true)

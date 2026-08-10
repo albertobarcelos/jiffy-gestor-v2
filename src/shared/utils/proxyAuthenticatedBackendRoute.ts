@@ -44,3 +44,32 @@ export async function proxyAuthenticatedBackendPost(
     return handleAuthenticatedBackendError(error, `Erro no proxy POST ${upstreamPath}:`)
   }
 }
+
+export async function proxyAuthenticatedBackendDelete(
+  upstreamPath: string,
+  token: string
+): Promise<NextResponse> {
+  try {
+    const apiClient = new ApiClient()
+    const response = await apiClient.request<unknown>(upstreamPath, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      },
+    })
+
+    if (response.status === 204) {
+      return new NextResponse(null, { status: 204 })
+    }
+
+    return NextResponse.json(response.data ?? {}, {
+      status: response.status || 200,
+    })
+  } catch (error) {
+    return handleAuthenticatedBackendError(
+      error,
+      `Erro no proxy DELETE ${upstreamPath}:`
+    )
+  }
+}

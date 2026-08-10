@@ -16,15 +16,19 @@ export interface EmpresaDeliveryDTO {
   id: string
   slug: string
   empresaId: string
+  /** Nome de vitrine do cardápio. Null/undefined = usar nome fantasia da empresa. */
+  nomeExibicao?: string | null
   parametroDelivery: ParametroDeliveryDTO
 }
 
 export interface CreateEmpresaDeliveryInput {
   slug: string
+  nomeExibicao?: string | null
   parametroDelivery?: Partial<ParametroDeliveryDTO> | null
 }
 
 export interface UpdateEmpresaDeliveryInput {
   slug?: string
+  nomeExibicao?: string | null
   parametroDelivery?: Partial<ParametroDeliveryDTO> | null
 }
