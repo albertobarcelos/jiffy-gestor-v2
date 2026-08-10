@@ -57,6 +57,22 @@
 }
 
 /**
+ * Título de grupo sticky abaixo da toolbar (tabs/busca) — Vitrine e demais modelos.
+ * `--delivery-sticky-toolbar-h` é medido no layout (altura da barra sticky).
+ */
+.delivery-publico-grupo-section {
+  scroll-margin-top: var(--delivery-sticky-toolbar-h, 0px);
+}
+
+.delivery-publico-grupo-title-sticky {
+  position: sticky;
+  top: var(--delivery-sticky-toolbar-h, 0px);
+  /* Acima dos overlays dos cards (+ / badge); abaixo da toolbar de tabs (z-40). */
+  z-index: 30;
+  isolation: isolate;
+}
+
+/**
  * Layout Básico — topnav rola com a página; busca + chips ficam sticky no topo.
  */
 .delivery-basico-catalog-root {

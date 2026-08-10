@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { DeliveryBuscaProdutos } from '../../../shared/components/DeliveryBuscaProdutos'
 import { DeliveryPedidoFooter } from '../../../shared/components/DeliveryPedidoFooter'
 import { filterViewModelByBusca } from '../../../shared/utils/filterViewModelByBusca'
@@ -27,6 +27,8 @@ export function VitrineLayoutHome({
   carrinhoThumbsTargetRef,
 }: DeliveryLayoutHomeProps) {
   const filtered = filterViewModelByBusca(viewModel)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const toolbarRef = useRef<HTMLDivElement>(null)
   const [buscaAberta, setBuscaAberta] = useState(false)
   const [activeGrupoId, setActiveGrupoId] = useState<string | null>(
     filtered.grupos[0]?.id ?? null
@@ -37,6 +39,29 @@ export function VitrineLayoutHome({
       setActiveGrupoId(filtered.grupos[0]?.id ?? null)
     }
   }, [filtered.grupos, activeGrupoId])
+
+  // Altura da barra sticky (tabs + busca) para os títulos de grupo pararem abaixo dela.
+  useEffect(() => {
+    const root = rootRef.current
+    const toolbar = toolbarRef.current
+    if (!root || !toolbar) return
+
+    const syncToolbarHeight = () => {
+      root.style.setProperty(
+        '--delivery-sticky-toolbar-h',
+        `${Math.round(toolbar.offsetHeight)}px`
+      )
+    }
+
+    syncToolbarHeight()
+    const observer = new ResizeObserver(syncToolbarHeight)
+    observer.observe(toolbar)
+
+    return () => {
+      observer.disconnect()
+      root.style.removeProperty('--delivery-sticky-toolbar-h')
+    }
+  }, [buscaAberta, filtered.grupos.length])
 
   const stickyFooterVisible = viewModel.carrinho.quantidadeItens > 0
 
@@ -49,28 +74,41 @@ export function VitrineLayoutHome({
   )
 
   return (
-    <div className="flex min-h-full flex-col pb-24">
+    <div ref={rootRef} className="flex min-h-full flex-col pb-24">
       <div className="delivery-publico-content-column flex min-h-0 w-full flex-1 flex-col">
         <DeliveryVitrineHeader
           config={config}
           disponivel={viewModel.disponivel}
         />
 
-        <DeliveryVitrineCategoriaTabs
-          grupos={filtered.grupos}
-          activeGrupoId={activeGrupoId}
-          interactive={interactive}
-          onGrupoClick={handleGrupoClick}
-          onSearchToggle={() => setBuscaAberta(current => !current)}
-        />
-
-        {buscaAberta ? (
-          <DeliveryBuscaProdutos
-            value={viewModel.termoBusca}
+        {/* Tabs + busca no mesmo sticky: senão a busca abre fora da viewport ao rolar. */}
+        <div
+          ref={toolbarRef}
+          className="sticky top-0 z-40 border-b pb-0"
+          style={{
+            borderColor: 'var(--delivery-card-border)',
+            backgroundColor: 'var(--delivery-bg, var(--delivery-surface))',
+          }}
+        >
+          <DeliveryVitrineCategoriaTabs
+            grupos={filtered.grupos}
+            activeGrupoId={activeGrupoId}
             interactive={interactive}
-            onChange={onBuscaChange}
+            onGrupoClick={handleGrupoClick}
+            onSearchToggle={() => setBuscaAberta(current => !current)}
           />
-        ) : null}
+
+          {buscaAberta ? (
+            <div className="pb-3">
+              <DeliveryBuscaProdutos
+                value={viewModel.termoBusca}
+                interactive={interactive}
+                embedded
+                onChange={onBuscaChange}
+              />
+            </div>
+          ) : null}
+        </div>
 
         <div className="flex-1 pb-4">
           {filtered.grupos.map((grupo, index) => (

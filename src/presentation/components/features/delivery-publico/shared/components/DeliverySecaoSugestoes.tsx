@@ -49,12 +49,12 @@ export function DeliverySecaoSugestoes({
 
   return (
     <section
-      className={`mt-5 mb-0${stickyTitle ? ' delivery-basico-grupo-section' : ''}`}
+      className={`mt-5 mb-0${stickyTitle ? ' delivery-publico-grupo-section' : ''}`}
       id={`grupo-${grupo.id || DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID}`}
     >
       <h2
         className={`delivery-grupo-title mx-4 mb-2 flex min-h-12 items-center rounded-lg px-4 py-2.5 text-base uppercase tracking-wide @sm:min-h-14 @sm:text-lg @lg:min-h-20 @lg:py-4 @lg:text-xl @xl:min-h-20 @xl:text-2xl${
-          stickyTitle ? ' delivery-basico-grupo-title-sticky' : ''
+          stickyTitle ? ' delivery-publico-grupo-title-sticky' : ''
         }`}
         style={tituloStyle}
         aria-label={grupo.nome}

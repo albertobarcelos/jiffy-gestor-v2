@@ -7,6 +7,8 @@ type DeliveryGrupoTituloBarProps = {
   config: DeliveryPublicoDesignConfig
   nome: string
   imagemUrl?: string | null
+  /** Fica fixo abaixo da toolbar até o próximo grupo (ex.: Vitrine). */
+  sticky?: boolean
   className?: string
 }
 
@@ -15,6 +17,7 @@ export function DeliveryGrupoTituloBar({
   config,
   nome,
   imagemUrl,
+  sticky = false,
   className = 'mb-3',
 }: DeliveryGrupoTituloBarProps) {
   const tituloStyle = resolveGrupoTituloBarStyle({
@@ -25,7 +28,9 @@ export function DeliveryGrupoTituloBar({
 
   return (
     <h2
-      className={`delivery-grupo-title flex min-h-12 items-center rounded-lg px-4 py-2.5 text-base uppercase tracking-wide @sm:min-h-14 @sm:text-lg ${className}`}
+      className={`delivery-grupo-title flex min-h-12 items-center rounded-lg px-4 py-2.5 text-base uppercase tracking-wide @sm:min-h-14 @sm:text-lg ${
+        sticky ? 'delivery-publico-grupo-title-sticky ' : ''
+      }${className}`}
       style={tituloStyle}
       aria-label={nome}
     >
