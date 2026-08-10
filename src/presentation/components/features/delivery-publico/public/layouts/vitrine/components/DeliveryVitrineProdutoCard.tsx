@@ -39,7 +39,11 @@ export function DeliveryVitrineProdutoCard({
     >
       {produto.imagemUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={produto.imagemUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        <img
+          src={produto.imagemUrl}
+          alt=""
+          className="absolute inset-0 h-full w-full object-contain object-center"
+        />
       ) : (
         <div className="absolute inset-0 flex items-center justify-center">
           <Camera className="h-12 w-12" style={{ color: 'var(--delivery-text-muted)' }} aria-hidden />

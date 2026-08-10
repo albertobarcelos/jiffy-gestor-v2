@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { DeliveryBuscaProdutos } from '../../../shared/components/DeliveryBuscaProdutos'
 import { DeliveryPedidoFooter } from '../../../shared/components/DeliveryPedidoFooter'
+import { DeliveryStatusHorario } from '../../../shared/components/DeliveryStatusHorario'
 import { filterViewModelByBusca } from '../../../shared/utils/filterViewModelByBusca'
 import type { DeliveryLayoutHomeProps } from '../DeliveryLayoutHomeProps'
 import { DeliveryVitrineHeader } from './components/DeliveryVitrineHeader'
@@ -76,9 +77,12 @@ export function VitrineLayoutHome({
   return (
     <div ref={rootRef} className="flex min-h-full flex-col pb-24">
       <div className="delivery-publico-content-column flex min-h-0 w-full flex-1 flex-col">
-        <DeliveryVitrineHeader
-          config={config}
+        <DeliveryVitrineHeader config={config} />
+
+        <DeliveryStatusHorario
           disponivel={viewModel.disponivel}
+          horarioTexto={viewModel.horarioTexto}
+          interactive={interactive}
         />
 
         {/* Tabs + busca no mesmo sticky: senão a busca abre fora da viewport ao rolar. */}
