@@ -1,6 +1,5 @@
 'use client'
 
-import { User } from 'lucide-react'
 import type { DeliveryPublicoDesignConfig } from '../../../../shared/types/deliveryPublicoDesignConfig'
 
 type DeliveryVitrineHeaderProps = {
@@ -45,14 +44,6 @@ export function DeliveryVitrineHeader({
           </div>
         </div>
 
-        <button
-          type="button"
-          aria-label="Perfil"
-          className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-white/20 text-white backdrop-blur-sm @sm:right-4 @sm:top-4"
-        >
-          <User className="h-5 w-5" aria-hidden />
-        </button>
-
         <div className="absolute inset-x-0 bottom-4 px-4 @sm:bottom-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -62,12 +53,6 @@ export function DeliveryVitrineHeader({
               >
                 {nomeLoja}
               </h1>
-              <button
-                type="button"
-                className="mt-0.5 text-xs font-medium text-white/90 underline-offset-2 hover:underline"
-              >
-                Ver mais
-              </button>
             </div>
             <span
               className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold ${

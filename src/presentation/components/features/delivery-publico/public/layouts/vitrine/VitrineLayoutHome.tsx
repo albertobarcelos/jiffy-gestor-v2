@@ -19,7 +19,9 @@ export function VitrineLayoutHome({
   onBuscaChange,
   onGrupoClick,
   onProdutoClick,
+  onProdutoAddRapido,
   onPedidoClick,
+  quantidadePorProduto,
   carrinhoThumbs,
   carrinhoThumbsBounceKey,
   carrinhoThumbsTargetRef,
@@ -48,62 +50,75 @@ export function VitrineLayoutHome({
 
   return (
     <div className="flex min-h-full flex-col pb-24">
-      <DeliveryVitrineHeader
-        config={config}
-        disponivel={viewModel.disponivel}
-      />
-
-      <DeliveryVitrineCategoriaTabs
-        grupos={filtered.grupos}
-        activeGrupoId={activeGrupoId}
-        interactive={interactive}
-        onGrupoClick={handleGrupoClick}
-        onSearchToggle={() => setBuscaAberta(current => !current)}
-      />
-
-      {buscaAberta ? (
-        <DeliveryBuscaProdutos
-          value={viewModel.termoBusca}
-          interactive={interactive}
-          onChange={onBuscaChange}
+      <div className="delivery-publico-content-column flex min-h-0 w-full flex-1 flex-col">
+        <DeliveryVitrineHeader
+          config={config}
+          disponivel={viewModel.disponivel}
         />
-      ) : null}
 
-      <div className="flex-1 pb-4">
-        {filtered.grupos.map((grupo, index) => (
-          <DeliveryVitrineSecaoGrupo
-            key={grupo.id}
-            config={config}
-            grupo={grupo}
+        <DeliveryVitrineCategoriaTabs
+          grupos={filtered.grupos}
+          activeGrupoId={activeGrupoId}
+          interactive={interactive}
+          onGrupoClick={handleGrupoClick}
+          onSearchToggle={() => setBuscaAberta(current => !current)}
+        />
+
+        {buscaAberta ? (
+          <DeliveryBuscaProdutos
+            value={viewModel.termoBusca}
             interactive={interactive}
-            denseTop={
-              index > 0 &&
-              filtered.grupos[index - 1]?.id === DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID
-            }
-            onProdutoClick={onProdutoClick}
+            onChange={onBuscaChange}
           />
-        ))}
+        ) : null}
+
+        <div className="flex-1 pb-4">
+          {filtered.grupos.map((grupo, index) => (
+            <DeliveryVitrineSecaoGrupo
+              key={grupo.id}
+              config={config}
+              grupo={grupo}
+              interactive={interactive}
+              denseTop={
+                index > 0 &&
+                filtered.grupos[index - 1]?.id === DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID
+              }
+              quantidadePorProduto={quantidadePorProduto}
+              onProdutoClick={onProdutoClick}
+              onProdutoAddRapido={onProdutoAddRapido}
+              onAbrirCarrinho={onPedidoClick}
+            />
+          ))}
+        </div>
+
+        <DeliveryPublicoLojaFooter
+          config={config}
+          enderecoTexto={enderecoTexto}
+          horarioTexto={viewModel.horarioSemanalTexto}
+        />
       </div>
 
       {stickyFooterVisible ? (
-        <div className="fixed inset-x-0 bottom-0 z-40 bg-white/95 pt-2 backdrop-blur-sm">
-          <DeliveryPedidoFooter
-            total={viewModel.carrinho.total}
-            quantidadeItens={viewModel.carrinho.quantidadeItens}
-            interactive={interactive}
-            onClick={onPedidoClick}
-            thumbs={carrinhoThumbs}
-            thumbsBounceKey={carrinhoThumbsBounceKey}
-            thumbsTargetRef={carrinhoThumbsTargetRef}
-          />
+        <div className="fixed inset-x-0 bottom-0 z-40">
+          <div
+            className="delivery-publico-content-column pt-2 backdrop-blur-sm"
+            style={{
+              backgroundColor:
+                'color-mix(in srgb, var(--delivery-bg, var(--delivery-surface)) 95%, transparent)',
+            }}
+          >
+            <DeliveryPedidoFooter
+              total={viewModel.carrinho.total}
+              quantidadeItens={viewModel.carrinho.quantidadeItens}
+              interactive={interactive}
+              onClick={onPedidoClick}
+              thumbs={carrinhoThumbs}
+              thumbsBounceKey={carrinhoThumbsBounceKey}
+              thumbsTargetRef={carrinhoThumbsTargetRef}
+            />
+          </div>
         </div>
       ) : null}
-
-      <DeliveryPublicoLojaFooter
-        config={config}
-        enderecoTexto={enderecoTexto}
-        horarioTexto={viewModel.horarioSemanalTexto}
-      />
     </div>
   )
 }

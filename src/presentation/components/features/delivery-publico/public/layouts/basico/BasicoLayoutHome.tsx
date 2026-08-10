@@ -39,7 +39,7 @@ export function BasicoLayoutHome({
         onPedidoClick={onPedidoClick}
       />
 
-      <div className="delivery-basico-content-column flex min-h-0 w-full flex-1 flex-col">
+      <div className="delivery-publico-content-column delivery-basico-content-column flex min-h-0 w-full flex-1 flex-col">
         <DeliveryLojaHeader config={config} />
         <DeliveryStatusHorario
           disponivel={viewModel.disponivel}
@@ -85,7 +85,7 @@ export function BasicoLayoutHome({
       {viewModel.carrinho.quantidadeItens > 0 ? (
         <div className="fixed inset-x-0 bottom-0 z-40">
           <div
-            className="delivery-basico-content-column pt-2 backdrop-blur-sm"
+            className="delivery-publico-content-column delivery-basico-content-column pt-2 backdrop-blur-sm"
             style={{
               backgroundColor:
                 'color-mix(in srgb, var(--delivery-bg, var(--delivery-surface)) 95%, transparent)',

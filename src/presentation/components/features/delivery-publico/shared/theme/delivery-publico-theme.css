@@ -46,17 +46,21 @@
   font-family: var(--delivery-font-title);
 }
 /**
- * Layout Básico — topnav rola com a página; busca + chips ficam sticky no topo.
- * Conteúdo abaixo do topnav limitado a 1024px (centralizado no desktop).
+ * Coluna de conteúdo padrão da home pública (todos os modelos).
+ * max-width 1200px, centralizada no desktop.
  */
-.delivery-basico-catalog-root {
-  --delivery-sticky-toolbar-h: 0px;
-}
-
+.delivery-publico-content-column,
 .delivery-basico-content-column {
   width: 100%;
   max-width: 1200px;
   margin-inline: auto;
+}
+
+/**
+ * Layout Básico — topnav rola com a página; busca + chips ficam sticky no topo.
+ */
+.delivery-basico-catalog-root {
+  --delivery-sticky-toolbar-h: 0px;
 }
 
 .delivery-basico-sticky-nav {
