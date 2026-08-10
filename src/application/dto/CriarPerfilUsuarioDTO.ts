@@ -27,6 +27,7 @@ export const CriarPerfilUsuarioSchema = z.object({
   lancarTaxa: z.boolean().optional().default(false),
   removerTaxa: z.boolean().optional().default(false),
   removerLicenca: z.boolean().optional().default(false),
+  exigirMotivoCancelamento: z.boolean().optional().default(true),
 })
 
 export type CriarPerfilUsuarioDTO = z.infer<typeof CriarPerfilUsuarioSchema>
