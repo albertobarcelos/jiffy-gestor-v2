@@ -57,19 +57,12 @@
 }
 
 /**
- * Título de grupo sticky abaixo da toolbar (tabs/busca) — Vitrine e demais modelos.
- * `--delivery-sticky-toolbar-h` é medido no layout (altura da barra sticky).
+ * Âncora de scroll das seções (Vitrine usa título fixo via JS, não sticky CSS).
  */
 .delivery-publico-grupo-section {
-  scroll-margin-top: var(--delivery-sticky-toolbar-h, 0px);
-}
-
-.delivery-publico-grupo-title-sticky {
-  position: sticky;
-  top: var(--delivery-sticky-toolbar-h, 0px);
-  /* Acima dos overlays dos cards (+ / badge); abaixo da toolbar de tabs (z-40). */
-  z-index: 30;
-  isolation: isolate;
+  scroll-margin-top: calc(
+    var(--delivery-sticky-toolbar-h, 0px) + var(--delivery-sticky-grupo-gap, 10px)
+  );
 }
 
 /**

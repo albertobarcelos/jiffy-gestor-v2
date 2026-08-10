@@ -36,7 +36,6 @@ export function DeliveryVitrineSecaoGrupo({
         config={config}
         grupo={grupo}
         interactive={interactive}
-        stickyTitle
         quantidadePorProduto={quantidadePorProduto}
         onProdutoClick={onProdutoClick}
         onProdutoAddRapido={onProdutoAddRapido}
@@ -54,7 +53,6 @@ export function DeliveryVitrineSecaoGrupo({
         config={config}
         nome={grupo.nome}
         imagemUrl={grupo.imagemUrl}
-        sticky
       />
       <div className="grid grid-cols-1 gap-4 @3xl:grid-cols-3 @5xl:grid-cols-4">
         {grupo.produtos.map(produto => (

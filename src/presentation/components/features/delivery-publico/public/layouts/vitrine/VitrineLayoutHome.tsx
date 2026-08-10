@@ -1,13 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { DeliveryBuscaProdutos } from '../../../shared/components/DeliveryBuscaProdutos'
+import { useRef } from 'react'
 import { DeliveryPedidoFooter } from '../../../shared/components/DeliveryPedidoFooter'
 import { DeliveryStatusHorario } from '../../../shared/components/DeliveryStatusHorario'
 import { filterViewModelByBusca } from '../../../shared/utils/filterViewModelByBusca'
 import type { DeliveryLayoutHomeProps } from '../DeliveryLayoutHomeProps'
 import { DeliveryVitrineHeader } from './components/DeliveryVitrineHeader'
-import { DeliveryVitrineCategoriaTabs } from './components/DeliveryVitrineCategoriaTabs'
+import { DeliveryVitrineStickyToolbar } from './components/DeliveryVitrineStickyToolbar'
 import { DeliveryVitrineSecaoGrupo } from './components/DeliveryVitrineSecaoGrupo'
 import { DeliveryPublicoLojaFooter } from '../../../shared/components/DeliveryPublicoLojaFooter'
 import { DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID } from '../../../shared/constants/deliveryPublicoSugestoes'
@@ -29,50 +28,7 @@ export function VitrineLayoutHome({
 }: DeliveryLayoutHomeProps) {
   const filtered = filterViewModelByBusca(viewModel)
   const rootRef = useRef<HTMLDivElement>(null)
-  const toolbarRef = useRef<HTMLDivElement>(null)
-  const [buscaAberta, setBuscaAberta] = useState(false)
-  const [activeGrupoId, setActiveGrupoId] = useState<string | null>(
-    filtered.grupos[0]?.id ?? null
-  )
-
-  useEffect(() => {
-    if (!filtered.grupos.some(grupo => grupo.id === activeGrupoId)) {
-      setActiveGrupoId(filtered.grupos[0]?.id ?? null)
-    }
-  }, [filtered.grupos, activeGrupoId])
-
-  // Altura da barra sticky (tabs + busca) para os títulos de grupo pararem abaixo dela.
-  useEffect(() => {
-    const root = rootRef.current
-    const toolbar = toolbarRef.current
-    if (!root || !toolbar) return
-
-    const syncToolbarHeight = () => {
-      root.style.setProperty(
-        '--delivery-sticky-toolbar-h',
-        `${Math.round(toolbar.offsetHeight)}px`
-      )
-    }
-
-    syncToolbarHeight()
-    const observer = new ResizeObserver(syncToolbarHeight)
-    observer.observe(toolbar)
-
-    return () => {
-      observer.disconnect()
-      root.style.removeProperty('--delivery-sticky-toolbar-h')
-    }
-  }, [buscaAberta, filtered.grupos.length])
-
   const stickyFooterVisible = viewModel.carrinho.quantidadeItens > 0
-
-  const handleGrupoClick = useCallback(
-    (grupoId: string) => {
-      setActiveGrupoId(grupoId)
-      onGrupoClick?.(grupoId)
-    },
-    [onGrupoClick]
-  )
 
   return (
     <div ref={rootRef} className="flex min-h-full flex-col pb-24">
@@ -85,34 +41,15 @@ export function VitrineLayoutHome({
           interactive={interactive}
         />
 
-        {/* Tabs + busca no mesmo sticky: senão a busca abre fora da viewport ao rolar. */}
-        <div
-          ref={toolbarRef}
-          className="sticky top-0 z-40 border-b pb-0"
-          style={{
-            borderColor: 'var(--delivery-card-border)',
-            backgroundColor: 'var(--delivery-bg, var(--delivery-surface))',
-          }}
-        >
-          <DeliveryVitrineCategoriaTabs
-            grupos={filtered.grupos}
-            activeGrupoId={activeGrupoId}
-            interactive={interactive}
-            onGrupoClick={handleGrupoClick}
-            onSearchToggle={() => setBuscaAberta(current => !current)}
-          />
-
-          {buscaAberta ? (
-            <div className="pb-3">
-              <DeliveryBuscaProdutos
-                value={viewModel.termoBusca}
-                interactive={interactive}
-                embedded
-                onChange={onBuscaChange}
-              />
-            </div>
-          ) : null}
-        </div>
+        <DeliveryVitrineStickyToolbar
+          catalogRootRef={rootRef}
+          config={config}
+          grupos={filtered.grupos}
+          termoBusca={viewModel.termoBusca}
+          interactive={interactive}
+          onBuscaChange={onBuscaChange}
+          onGrupoClick={onGrupoClick}
+        />
 
         <div className="flex-1 pb-4">
           {filtered.grupos.map((grupo, index) => (
