@@ -26,7 +26,8 @@ export class PerfilUsuario {
     private readonly encerrarCaixa: boolean,
     private readonly lancarTaxa: boolean,
     private readonly removerTaxa: boolean,
-    private readonly removerLicenca: boolean
+    private readonly removerLicenca: boolean,
+    private readonly exigirMotivoCancelamento: boolean
   ) {}
 
   static create(
@@ -53,7 +54,8 @@ export class PerfilUsuario {
     encerrarCaixa: boolean,
     lancarTaxa: boolean,
     removerTaxa: boolean,
-    removerLicenca: boolean
+    removerLicenca: boolean,
+    exigirMotivoCancelamento: boolean
   ): PerfilUsuario {
     if (!id || !role) {
       throw new Error('ID e role são obrigatórios')
@@ -83,7 +85,8 @@ export class PerfilUsuario {
       encerrarCaixa,
       lancarTaxa,
       removerTaxa,
-      removerLicenca
+      removerLicenca,
+      exigirMotivoCancelamento
     )
   }
 
@@ -114,7 +117,11 @@ export class PerfilUsuario {
       data.encerrarCaixa === true || data.encerrarCaixa === 'true',
       data.lancarTaxa === true || data.lancarTaxa === 'true',
       data.removerTaxa === true || data.removerTaxa === 'true',
-      data.removerLicenca === true || data.removerLicenca === 'true'
+      data.removerLicenca === true || data.removerLicenca === 'true',
+      // Default true alinhado ao Prisma (`@default(true)`)
+      data.exigirMotivoCancelamento === undefined || data.exigirMotivoCancelamento === null
+        ? true
+        : data.exigirMotivoCancelamento === true || data.exigirMotivoCancelamento === 'true'
     )
   }
 
@@ -214,6 +221,10 @@ export class PerfilUsuario {
     return this.removerLicenca
   }
 
+  mustExigirMotivoCancelamento(): boolean {
+    return this.exigirMotivoCancelamento
+  }
+
   toJSON() {
     return {
       id: this.id,
@@ -240,7 +251,7 @@ export class PerfilUsuario {
       lancarTaxa: this.lancarTaxa,
       removerTaxa: this.removerTaxa,
       removerLicenca: this.removerLicenca,
+      exigirMotivoCancelamento: this.exigirMotivoCancelamento,
     }
   }
 }
-

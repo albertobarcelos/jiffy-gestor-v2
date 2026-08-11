@@ -113,6 +113,8 @@ function asPersistedAuthJson(raw: unknown): PersistedAuthJSON | null {
 /**
  * Descarta empresas do hub se o dono não bater com a identidade.
  * Sem identity (hub via access/refresh), mantém a lista se `hubEmpresasUserId` existir.
+ * Se o id da identity mudou (claim JWT ≠ user do login) mas a lista existe, reatribui o
+ * owner — evita zerar cards após `restoreIdentityFromCookie`.
  */
 export function sanitizeHubEmpresasForIdentity(
   identityAuth: Auth | null,
@@ -131,8 +133,11 @@ export function sanitizeHubEmpresasForIdentity(
   }
 
   const identityUserId = identityAuth.getUser().getId()
-  if (!hubEmpresasUserId || hubEmpresasUserId !== identityUserId) {
-    return { hubEmpresas: null, hubEmpresasUserId: null }
+  if (!hubEmpresasUserId) {
+    return { hubEmpresas, hubEmpresasUserId: identityUserId }
+  }
+  if (hubEmpresasUserId !== identityUserId) {
+    return { hubEmpresas, hubEmpresasUserId: identityUserId }
   }
 
   return { hubEmpresas, hubEmpresasUserId }

@@ -4,14 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MdPrint, MdRefresh, MdTune } from 'react-icons/md'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import {
   salvarMapeamentosEstacao,
   type ImpressoraLogica,
 } from '@/src/infrastructure/api/estacoesImpressaoApi'
 import { showToast } from '@/src/shared/utils/toast'
 import type { ModoImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
-import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
 import {
   DEFAULT_DELIVERY_CUPOM_TEMPLATE,
   type DeliveryCupomTemplateConfig,
@@ -23,7 +21,10 @@ import {
 } from './DeliveryModoCupomToggle'
 import { DeliveryCupomTemplateEditor } from './DeliveryCupomTemplateEditor'
 import { JiffyConfirmDialog } from '@/src/presentation/components/ui/jiffy-confirm-dialog'
-import { DIALOG_SALVAR_SEM_IMPRESSORA_EXPEDICAO } from '@/src/shared/utils/deliveryImpressoraExpedicao'
+import {
+  DIALOG_SALVAR_SEM_IMPRESSORA_EXPEDICAO,
+  TOAST_IMPRESSORA_EXPEDICAO_NECESSARIA,
+} from '@/src/shared/utils/deliveryImpressoraExpedicao'
 import { salvarDeliveryCupomTemplateLocal } from '@/src/infrastructure/printing/deliveryCupomTemplateStorage'
 import {
   isQzChunkLoadError,
@@ -35,6 +36,8 @@ import {
   isTcpPrinterRef,
 } from '@/src/infrastructure/printing/qzTrayClient'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
+import { useAtualizarEmpresaDelivery } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
+import { usePreferenciasImpressaoDelivery } from '@/src/presentation/hooks/usePreferenciasImpressaoDelivery'
 import {
   useDeliveryConfigEstacaoImpressao,
   useDeliveryConfigImpressorasLogicas,
@@ -53,19 +56,6 @@ function clampCopiasUnificado(n: number): number {
   return Math.min(99, Math.max(1, Math.floor(n)))
 }
 
-async function mensagemErroHttp(res: Response): Promise<string> {
-  const raw: unknown = await res.json().catch(() => ({}))
-  return (
-    textoErroCorpoApi(raw) ||
-    (raw &&
-    typeof raw === 'object' &&
-    'error' in raw &&
-    typeof (raw as { error: unknown }).error === 'string'
-      ? (raw as { error: string }).error
-      : '') ||
-    `Erro HTTP ${res.status}`
-  )
-}
 
 function DeliveryToggleRow(props: {
   id: string
@@ -221,10 +211,17 @@ function ImpressoraMapeamentoInput({
 export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfiguracoesModalProps) {  const token = useAuthStore.getState().tenantAuth?.getAccessToken()
   const {
     empresa,
-    preferenciasImpressaoDelivery,
     deliveryCupomTemplate: cupomTemplateRemoto,
     isLoading: carregandoEmpresaMe,
   } = useEmpresaMe()
+  const {
+    preferenciasImpressaoDelivery,
+    empresaDeliveryConfigurada,
+    isLoading: carregandoPreferenciasDelivery,
+    isFetching: buscandoPreferenciasDelivery,
+    refetch: refetchPreferenciasDelivery,
+  } = usePreferenciasImpressaoDelivery()
+  const atualizarEmpresaDelivery = useAtualizarEmpresaDelivery()
   const impressorasLogicasQuery = useDeliveryConfigImpressorasLogicas(open)
   const estacaoImpressaoQuery = useDeliveryConfigEstacaoImpressao(open)
   const invalidateDeliveryConfigQueries = useInvalidateDeliveryConfigImpressaoQueries()
@@ -258,6 +255,8 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
   const carregando =
     open &&
     (carregandoEmpresaMe ||
+      carregandoPreferenciasDelivery ||
+      buscandoPreferenciasDelivery ||
       impressorasLogicasQuery.isPending ||
       estacaoImpressaoQuery.isPending)
 
@@ -273,7 +272,21 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
       mapeamentosHidratadosRef.current = false
       return
     }
-    if (formularioHidratadoRef.current || carregandoEmpresaMe || !empresa?.id) return
+    // Força rehidratar com dados frescos do delivery ao abrir o painel.
+    formularioHidratadoRef.current = false
+    void refetchPreferenciasDelivery()
+  }, [open, refetchPreferenciasDelivery])
+
+  useEffect(() => {
+    if (!open) return
+    if (
+      formularioHidratadoRef.current ||
+      carregandoEmpresaMe ||
+      carregandoPreferenciasDelivery ||
+      buscandoPreferenciasDelivery ||
+      !empresa?.id
+    )
+      return
 
     const prefs = preferenciasImpressaoDelivery
     formularioHidratadoRef.current = true
@@ -287,6 +300,8 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
   }, [
     open,
     carregandoEmpresaMe,
+    carregandoPreferenciasDelivery,
+    buscandoPreferenciasDelivery,
     empresa?.id,
     preferenciasImpressaoDelivery,
     cupomTemplateRemoto,
@@ -378,18 +393,8 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
 
     setSalvando(true)
     try {
-      const patchRes = await fetchGestorApi(`/api/empresas/${encodeURIComponent(empresaId)}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ parametroDelivery }),
-      })
-
-      if (!patchRes.ok) {
-        throw new Error(await mensagemErroHttp(patchRes))
-      }
+      // Preferências de impressão ficam em empresa delivery (não no PATCH genérico de /api/empresas).
+      await atualizarEmpresaDelivery.mutateAsync({ parametroDelivery })
 
       if (estacaoImpressaoId && impressorasLogicas.length > 0) {
         await salvarMapeamentosEstacao(token, estacaoImpressaoId, payload)
@@ -401,13 +406,19 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
       showToast.success('Configurações de delivery salvas.')
       setConfirmSalvarSemImpressoraOpen(false)
     } catch (error) {
-      const msg =
+      const raw =
         error instanceof Error ? error.message : 'Não foi possível salvar as configurações de delivery.'
+      const lower = raw.toLowerCase()
+      const msg =
+        lower.includes('não encontr') || lower.includes('nao encontr') || lower.includes('not found') || lower.includes('404')
+          ? 'Empresa delivery não encontrada. Ative o cardápio/delivery da empresa antes de salvar a impressão.'
+          : raw
       showToast.error(msg)
     } finally {
       setSalvando(false)
     }
   }, [
+    atualizarEmpresaDelivery,
     empresa?.id,
     estacaoImpressaoId,
     autoIniciarPreparoNovosPedidos,
@@ -432,12 +443,18 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
       showToast.error('Empresa não carregada. Aguarde ou abra o painel novamente.')
       return
     }
+    if (!empresaDeliveryConfigurada) {
+      showToast.error(
+        'Empresa delivery não encontrada. Ative o cardápio/delivery da empresa antes de salvar a impressão.'
+      )
+      return
+    }
     if (!impressoraExpedicaoId.trim()) {
-      setConfirmSalvarSemImpressoraOpen(true)
+      showToast.warning(TOAST_IMPRESSORA_EXPEDICAO_NECESSARIA)
       return
     }
     void executarSalvar()
-  }, [empresa?.id, executarSalvar, impressoraExpedicaoId, token])
+  }, [empresa?.id, empresaDeliveryConfigurada, executarSalvar, impressoraExpedicaoId, token])
 
   return (
     <>

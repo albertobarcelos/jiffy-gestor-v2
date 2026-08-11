@@ -31,6 +31,7 @@ export interface CriarPerfilUsuarioDTO {
   lancarTaxa?: boolean
   removerTaxa?: boolean
   removerLicenca?: boolean
+  exigirMotivoCancelamento?: boolean
 }
 
 export interface AtualizarPerfilUsuarioDTO {
@@ -57,6 +58,7 @@ export interface AtualizarPerfilUsuarioDTO {
   lancarTaxa?: boolean
   removerTaxa?: boolean
   removerLicenca?: boolean
+  exigirMotivoCancelamento?: boolean
 }
 
 /**

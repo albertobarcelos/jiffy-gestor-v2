@@ -23,8 +23,8 @@ import { MdCheck, MdExpandLess, MdExpandMore, MdPhone, MdSearch } from 'react-ic
 interface TerminalConfig {
   terminalId: string
   nome: string
-  modelo: string // valor DB: generico, sunmiIntegrada, stone
-  modeloDisplay: string // valor display: Genérico, Sunmi Integrada, Stone
+  modelo: string // valor DB: generico, sunmiIntegrada, stoneIntegrada, pagbankIntegrada, cieloIntegrada
+  modeloDisplay: string // valor display: Genérico, Sunmi Integrada, Stone Integrada, Pagbank Integrada, Cielo Integrada
   ip: string
   porta: string
   modoFicha: boolean
@@ -64,6 +64,7 @@ const MODELO_MAP: Record<string, string> = {
   sunmiIntegrada: 'Sunmi Integrada',
   stoneIntegrada: 'Stone Integrada',
   pagbankIntegrada: 'Pagbank Integrada',
+  cieloIntegrada: 'Cielo Integrada',
 }
 
 const MODELO_REVERSE_MAP: Record<string, string> = {
@@ -71,9 +72,16 @@ const MODELO_REVERSE_MAP: Record<string, string> = {
   'Sunmi Integrada': 'sunmiIntegrada',
   'Stone Integrada': 'stoneIntegrada',
   'Pagbank Integrada': 'pagbankIntegrada',
+  'Cielo Integrada': 'cieloIntegrada',
 }
 
-const MODELOS_OPTIONS = ['Genérico', 'Sunmi Integrada', 'Stone Integrada', 'Pagbank Integrada']
+const MODELOS_OPTIONS = [
+  'Genérico',
+  'Sunmi Integrada',
+  'Stone Integrada',
+  'Pagbank Integrada',
+  'Cielo Integrada',
+]
 
 /**
  * Mesmo critério que `TerminaisTab` (`terminaisFiltrados`): só terminais não bloqueados.
@@ -563,9 +571,9 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
         const data = await response.json()
         const impressora = Impressora.fromJSON(data)
 
-        // Em modo cópia, adiciona " (Cópia)" ao nome
+        // Em modo cópia, adiciona " (Cópia)" ao nome — sempre em maiúsculas (mesmo padrão do input)
         const nomeBase = impressora.getNome()
-        setNome(isCopyMode ? `${nomeBase} (Cópia)` : nomeBase)
+        setNome((isCopyMode ? `${nomeBase} (Cópia)` : nomeBase).toUpperCase())
 
         // Carrega configurações dos terminais
         // Seguindo o fluxo do Flutter: para cada terminalId em terminaisConfig, busca o terminal individualmente
@@ -1095,7 +1103,8 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
         return
       }
 
-      if (!nome.trim()) {
+      const nomeNormalizado = nome.trim().toUpperCase()
+      if (!nomeNormalizado) {
         showToast.error('Nome da impressora é obrigatório')
         return
       }
@@ -1110,7 +1119,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
         // Se criando (nova ou cópia), cria a impressora primeiro
         if (!isEditing || isCopyMode) {
           const createBody = {
-            nome,
+            nome: nomeNormalizado,
             modelo: 'generico', // Valor padrão
             tipoConexao: 'ethernet',
             ip: '192.168.1.100',
@@ -1158,7 +1167,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
 
         // Atualiza impressora com terminais
         const updateBody = {
-          nome,
+          nome: nomeNormalizado,
           dataAtualizacao: formattedDate,
           terminais,
         }
@@ -1184,7 +1193,8 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
         )
 
         // Atualiza estado inicial após salvar
-        setNomeInicial(nome)
+        setNome(nomeNormalizado)
+        setNomeInicial(nomeNormalizado)
         setTerminaisConfigInicial(JSON.parse(JSON.stringify(terminaisConfig)))
 
         if (isCopyMode) {
@@ -1371,8 +1381,8 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
             <div className="shrink-0">
               <Input
                 label="Nome da Impressora"
-                value={nome.toUpperCase()}
-                onChange={e => setNome(e.target.value)}
+                value={nome}
+                onChange={e => setNome(e.target.value.toUpperCase())}
                 required
                 size="small"
                 placeholder="Digite o nome da impressora"
