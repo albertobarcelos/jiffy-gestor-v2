@@ -28,6 +28,7 @@ export const AtualizarPerfilUsuarioSchema = z.object({
   lancarTaxa: z.boolean().optional(),
   removerTaxa: z.boolean().optional(),
   removerLicenca: z.boolean().optional(),
+  exigirMotivoCancelamento: z.boolean().optional(),
 })
 
 export type AtualizarPerfilUsuarioDTO = z.infer<typeof AtualizarPerfilUsuarioSchema>

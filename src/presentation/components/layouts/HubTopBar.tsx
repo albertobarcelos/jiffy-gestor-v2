@@ -13,11 +13,19 @@ type HubTopBarProps = {
 
 export function HubTopBar({ onMenuClick }: HubTopBarProps) {
   const search = useHubSearchSlot()
-  const { getUser, logoutHub } = useAuthStore()
-  const user = getUser()
+  const isRehydrated = useAuthStore(s => s.isRehydrated)
+  const identityAuth = useAuthStore(s => s.identityAuth)
+  const tenantAuth = useAuthStore(s => s.tenantAuth)
+  const logoutHub = useAuthStore(s => s.logoutHub)
 
-  const nomeUsuario = user?.getName()?.trim() ?? ''
-  const emailUsuario = user?.getEmail()?.trim() ?? ''
+  const user = identityAuth?.getUser() ?? tenantAuth?.getUser() ?? null
+  const nomeUsuario = isRehydrated ? (user?.getName()?.trim() ?? '') : ''
+  const emailUsuario = isRehydrated ? (user?.getEmail()?.trim() ?? '') : ''
+  const labelSecundario = !isRehydrated
+    ? '…'
+    : emailUsuario && !emailUsuario.endsWith('@sessao.local')
+      ? emailUsuario
+      : nomeUsuario || emailUsuario || 'Usuário'
 
   return (
     <header className="sticky top-0 z-30 shrink-0 border-b border-gray-200 bg-white">
@@ -50,7 +58,7 @@ export function HubTopBar({ onMenuClick }: HubTopBarProps) {
           )}
         >
           <div className="hidden min-w-0 flex-col items-end text-right leading-tight sm:flex">
-            {nomeUsuario ? (
+            {nomeUsuario && emailUsuario && !emailUsuario.endsWith('@sessao.local') ? (
               <span className="max-w-[220px] truncate text-sm font-semibold uppercase text-gray-900">
                 {nomeUsuario}
               </span>
@@ -58,10 +66,11 @@ export function HubTopBar({ onMenuClick }: HubTopBarProps) {
             <span
               className={cn(
                 'max-w-[220px] truncate text-sm text-gray-600',
-                !nomeUsuario && 'font-medium text-gray-800'
+                !(nomeUsuario && emailUsuario && !emailUsuario.endsWith('@sessao.local')) &&
+                  'font-medium text-gray-800'
               )}
             >
-              {emailUsuario || 'Usuário'}
+              {labelSecundario}
             </span>
           </div>
 

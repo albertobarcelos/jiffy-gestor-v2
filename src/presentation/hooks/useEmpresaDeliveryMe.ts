@@ -2,7 +2,12 @@
 
 import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
-import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import { useQueryClient } from '@tanstack/react-query'
+import {
+  buildTenantQueryKey,
+  useInvalidateTenantQueries,
+} from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
 import type {
@@ -81,6 +86,8 @@ export function useCriarEmpresaDelivery() {
 
 export function useAtualizarEmpresaDelivery() {
   const invalidate = useInvalidateTenantQueries()
+  const queryClient = useQueryClient()
+  const empresaId = useTenantEmpresaId()
 
   return useSecureTenantMutation<EmpresaDeliveryDTO, UpdateEmpresaDeliveryInput>(
     async ({ token }, input) => {
@@ -96,7 +103,11 @@ export function useAtualizarEmpresaDelivery() {
       return data as EmpresaDeliveryDTO
     },
     {
-      onSuccess: async () => {
+      onSuccess: async data => {
+        queryClient.setQueryData(
+          buildTenantQueryKey(empresaId, EMPRESA_DELIVERY_ME_QUERY_KEY),
+          data
+        )
         await invalidate(EMPRESA_DELIVERY_ME_QUERY_KEY)
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new Event('jiffy:empresa-delivery-updated'))

@@ -40,5 +40,8 @@ export function usePreferenciasImpressaoDelivery() {
     preferenciasImpressaoDelivery,
     empresaDeliveryConfigurada: empresaDeliveryQuery.data != null,
     isLoading,
+    isError: empresaDeliveryQuery.isError,
+    isFetching: empresaDeliveryQuery.isFetching,
+    refetch: empresaDeliveryQuery.refetch,
   }
 }

@@ -69,6 +69,8 @@ export default function MinhasEmpresasPage() {
   const [feedGridExpandido, setFeedGridExpandido] = useState(false)
 
   const hubSessaoProativaDisparadaRef = useRef(false)
+  const redirectTimerRef = useRef<number | undefined>(undefined)
+  const hubEmpresasRefetchDoneRef = useRef(false)
 
   const irParaLogin = useCallback(() => {
     void logout().finally(() => {
@@ -76,20 +78,47 @@ export default function MinhasEmpresasPage() {
     })
   }, [logout])
 
+  /**
+   * Sessão inválida: banner + toast; logout só após delay e nova checagem do Bearer
+   * (evita corrida com refresh/access e o flash “Usuário” / lista vazia).
+   */
   const reportHubSessionIssue = useCallback(
     (message: string) => {
       setHubTokenBanner(message)
-      toast.error(message, { id: HUB_SESSAO_TOAST_ID, duration: 4000 })
+      toast.error(message, { id: HUB_SESSAO_TOAST_ID, duration: 8000 })
 
-      if (!hubSessaoProativaDisparadaRef.current) {
-        hubSessaoProativaDisparadaRef.current = true
-        irParaLogin()
+      if (hubSessaoProativaDisparadaRef.current) {
+        return
       }
+      hubSessaoProativaDisparadaRef.current = true
+
+      if (redirectTimerRef.current !== undefined) {
+        window.clearTimeout(redirectTimerRef.current)
+      }
+
+      redirectTimerRef.current = window.setTimeout(() => {
+        void (async () => {
+          const retry = await ensureHubBearerToken()
+          if (retry) {
+            setHubBearer(retry.token)
+            setHubBearerReady(true)
+            setHubTokenBanner(null)
+            hubSessaoProativaDisparadaRef.current = false
+            toast.dismiss(HUB_SESSAO_TOAST_ID)
+            return
+          }
+          irParaLogin()
+        })()
+      }, 3000)
     },
     [irParaLogin]
   )
 
-  /** Bootstrap: identity → access da aba → refresh cookie. Sem token → login imediato. */
+  /**
+   * Bootstrap hub: identity → cookie → access da aba → refresh.
+   * Aceita identity **ou** access (docs FLUXO_VOLTAR_AO_MEU_JIFFY) — identity JWT é curto;
+   * rejeitar access causava logout em loop, header “Usuário” piscando e lista vazia.
+   */
   useEffect(() => {
     if (!isRehydrated) {
       return
@@ -100,7 +129,7 @@ export default function MinhasEmpresasPage() {
       if (cancelado) {
         return
       }
-      if (!bearer || bearer.source !== 'identity') {
+      if (!bearer) {
         setHubBearer(null)
         setHubBearerReady(true)
         reportHubSessionIssue(HUB_SESSAO_TOKEN_MENSAGEM)
@@ -113,8 +142,54 @@ export default function MinhasEmpresasPage() {
     })()
     return () => {
       cancelado = true
+      if (redirectTimerRef.current !== undefined) {
+        window.clearTimeout(redirectTimerRef.current)
+        redirectTimerRef.current = undefined
+      }
     }
   }, [isRehydrated, identityAuth, reportHubSessionIssue])
+
+  /** Se a lista do login sumiu, recupera empresas via refresh-map / Bearer atual. */
+  useEffect(() => {
+    if (!isRehydrated || !hubBearerReady || !hubBearer) {
+      return
+    }
+    if (hubEmpresas !== null) {
+      hubEmpresasRefetchDoneRef.current = false
+      return
+    }
+    if (hubEmpresasRefetchDoneRef.current) {
+      return
+    }
+    hubEmpresasRefetchDoneRef.current = true
+
+    let cancelado = false
+    void (async () => {
+      try {
+        const res = await fetch('/api/auth/hub-empresas', {
+          method: 'GET',
+          credentials: 'include',
+          headers: { Authorization: `Bearer ${hubBearer}` },
+        })
+        if (!res.ok || cancelado) {
+          return
+        }
+        const data = (await res.json().catch(() => null)) as {
+          empresas?: LoginEmpresaSnapshot[]
+        } | null
+        const lista = Array.isArray(data?.empresas) ? data.empresas : []
+        if (!cancelado && lista.length > 0) {
+          setHubEmpresas(lista)
+        }
+      } catch (e) {
+        console.error('[MinhasEmpresas] refetch hub-empresas:', e)
+      }
+    })()
+
+    return () => {
+      cancelado = true
+    }
+  }, [isRehydrated, hubBearerReady, hubBearer, hubEmpresas, setHubEmpresas])
 
   useEffect(() => {
     if (!isRehydrated || !hubBearerReady || !hubBearer) {
