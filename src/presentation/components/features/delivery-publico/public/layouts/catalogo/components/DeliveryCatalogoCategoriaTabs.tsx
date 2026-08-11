@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import { Menu } from 'lucide-react'
 import type { DeliveryPublicoGrupoViewModel } from '../../../../shared/types/deliveryPublicoViewModel'
 
@@ -10,6 +11,11 @@ type DeliveryCatalogoCategoriaTabsProps = {
   onGrupoClick?: (grupoId: string) => void
   /** Se omitido, o botão de menu não é renderizado (ex.: Grade já tem menu na toolbar). */
   onMenuClick?: () => void
+  /**
+   * Quando true, remove sticky/borda próprios — a barra fica dentro de um
+   * container fixed (ex.: Grade sticky toolbar).
+   */
+  embedded?: boolean
 }
 
 export function DeliveryCatalogoCategoriaTabs({
@@ -18,16 +24,45 @@ export function DeliveryCatalogoCategoriaTabs({
   interactive = false,
   onGrupoClick,
   onMenuClick,
+  embedded = false,
 }: DeliveryCatalogoCategoriaTabsProps) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const activeTabRef = useRef<HTMLButtonElement | HTMLSpanElement | null>(null)
+
+  useEffect(() => {
+    if (!activeGrupoId) return
+    const scroller = scrollRef.current
+    const tab = activeTabRef.current
+    if (!scroller || !tab) return
+
+    const scrollerRect = scroller.getBoundingClientRect()
+    const tabRect = tab.getBoundingClientRect()
+    const tabOffset = tabRect.left - scrollerRect.left + scroller.scrollLeft
+    const target = tabOffset - (scroller.clientWidth - tabRect.width) / 2
+    const maxScroll = Math.max(0, scroller.scrollWidth - scroller.clientWidth)
+    const nextLeft = Math.max(0, Math.min(target, maxScroll))
+
+    if (Math.abs(scroller.scrollLeft - nextLeft) < 1) return
+    scroller.scrollTo({ left: nextLeft, behavior: 'auto' })
+  }, [activeGrupoId])
+
   if (grupos.length === 0) return null
 
   return (
     <div
-      className="sticky top-0 z-20 mt-3 border-b"
-      style={{
-        borderColor: 'var(--delivery-card-border)',
-        backgroundColor: 'var(--delivery-bg, var(--delivery-surface))',
-      }}
+      className={
+        embedded
+          ? 'mt-1'
+          : 'sticky top-0 z-20 mt-3 border-b'
+      }
+      style={
+        embedded
+          ? undefined
+          : {
+              borderColor: 'var(--delivery-card-border)',
+              backgroundColor: 'var(--delivery-bg, var(--delivery-surface))',
+            }
+      }
     >
       <div className="flex items-center gap-1 px-2 @sm:px-3">
         {onMenuClick ? (
@@ -43,7 +78,10 @@ export function DeliveryCatalogoCategoriaTabs({
           </button>
         ) : null}
 
-        <div className="min-w-0 flex-1 overflow-x-auto scrollbar-hide">
+        <div
+          ref={scrollRef}
+          className="min-w-0 flex-1 overflow-x-auto scrollbar-hide"
+        >
           <div className="flex w-max">
             {grupos.map(grupo => {
               const active = grupo.id === activeGrupoId
@@ -61,6 +99,7 @@ export function DeliveryCatalogoCategoriaTabs({
                   <button
                     key={grupo.id}
                     type="button"
+                    ref={active ? activeTabRef : undefined}
                     onClick={() => onGrupoClick(grupo.id)}
                     className={className}
                     style={style}
@@ -71,7 +110,12 @@ export function DeliveryCatalogoCategoriaTabs({
               }
 
               return (
-                <span key={grupo.id} className={className} style={style}>
+                <span
+                  key={grupo.id}
+                  ref={active ? activeTabRef : undefined}
+                  className={className}
+                  style={style}
+                >
                   {grupo.nome}
                 </span>
               )

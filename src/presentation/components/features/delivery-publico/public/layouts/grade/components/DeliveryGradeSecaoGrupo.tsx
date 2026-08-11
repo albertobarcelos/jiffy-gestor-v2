@@ -45,13 +45,16 @@ export function DeliveryGradeSecaoGrupo({
   }
 
   return (
-    <section className={`${denseTop ? 'mt-2' : 'mt-5'} px-4`} id={`grupo-${grupo.id}`}>
+    <section
+      className={`${denseTop ? 'mt-2' : 'mt-5'} delivery-publico-grupo-section px-4`}
+      id={`grupo-${grupo.id}`}
+    >
       <DeliveryGrupoTituloBar
         config={config}
         nome={grupo.nome}
         imagemUrl={grupo.imagemUrl}
       />
-      <div className="grid grid-cols-2 gap-3 @lg:gap-4">
+      <div className="grid grid-cols-2 gap-3 @lg:gap-4 @5xl:grid-cols-4">
         {grupo.produtos.map(produto => (
           <DeliveryGradeProdutoCard
             key={produto.id}

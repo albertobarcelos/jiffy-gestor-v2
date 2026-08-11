@@ -1,13 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useRef } from 'react'
 import { DeliveryPedidoFooter } from '../../../shared/components/DeliveryPedidoFooter'
 import { DeliveryPublicoLojaFooter } from '../../../shared/components/DeliveryPublicoLojaFooter'
+import { DeliveryStatusHorario } from '../../../shared/components/DeliveryStatusHorario'
 import { filterViewModelByBusca } from '../../../shared/utils/filterViewModelByBusca'
 import type { DeliveryLayoutHomeProps } from '../DeliveryLayoutHomeProps'
-import { DeliveryCatalogoCategoriaTabs } from '../catalogo/components/DeliveryCatalogoCategoriaTabs'
 import { DeliveryGradeHeader } from './components/DeliveryGradeHeader'
-import { DeliveryGradeToolbar } from './components/DeliveryGradeToolbar'
+import { DeliveryGradeStickyToolbar } from './components/DeliveryGradeStickyToolbar'
 import { DeliveryGradeSecaoGrupo } from './components/DeliveryGradeSecaoGrupo'
 import { DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID } from '../../../shared/constants/deliveryPublicoSugestoes'
 
@@ -27,56 +27,43 @@ export function GradeLayoutHome({
   carrinhoThumbsTargetRef,
 }: DeliveryLayoutHomeProps) {
   const filtered = filterViewModelByBusca(viewModel)
+  const rootRef = useRef<HTMLDivElement>(null)
   const stickyFooterVisible = viewModel.carrinho.quantidadeItens > 0
-  const [activeGrupoId, setActiveGrupoId] = useState<string | null>(
-    filtered.grupos[0]?.id ?? null
-  )
-
-  useEffect(() => {
-    if (!filtered.grupos.some(grupo => grupo.id === activeGrupoId)) {
-      setActiveGrupoId(filtered.grupos[0]?.id ?? null)
-    }
-  }, [filtered.grupos, activeGrupoId])
-
-  const handleGrupoClick = useCallback(
-    (grupoId: string) => {
-      setActiveGrupoId(grupoId)
-      onGrupoClick?.(grupoId)
-    },
-    [onGrupoClick]
-  )
 
   const handleMenuClick = useCallback(() => {
     const firstGrupo = filtered.grupos[0]
-    if (firstGrupo) handleGrupoClick(firstGrupo.id)
-  }, [filtered.grupos, handleGrupoClick])
+    if (firstGrupo) onGrupoClick?.(firstGrupo.id)
+  }, [filtered.grupos, onGrupoClick])
 
   return (
-    <div className="flex min-h-full flex-col pb-24">
+    <div ref={rootRef} className="flex min-h-full flex-col pb-24">
       <div
         className="delivery-publico-content-column flex min-h-0 w-full flex-1 flex-col"
         style={{ backgroundColor: 'var(--delivery-primary-dark)' }}
       >
-        <DeliveryGradeHeader config={config} disponivel={viewModel.disponivel} />
+        <DeliveryGradeHeader config={config} />
 
         <div
-          className="-mt-1 flex flex-1 flex-col rounded-t-[1.75rem] pb-2 pt-4"
+          className="relative z-0 -mt-10 flex flex-1 flex-col rounded-t-[1.75rem] pb-2 pt-12 @sm:-mt-12 @sm:pt-14"
           style={{ backgroundColor: 'var(--delivery-bg, var(--delivery-surface))' }}
         >
-          <DeliveryGradeToolbar
+          <DeliveryStatusHorario
+            disponivel={viewModel.disponivel}
+            horarioTexto={viewModel.horarioTexto}
+            interactive={interactive}
+          />
+
+          <DeliveryGradeStickyToolbar
+            catalogRootRef={rootRef}
+            config={config}
+            grupos={filtered.grupos}
             termoBusca={viewModel.termoBusca}
             carrinhoQuantidade={viewModel.carrinho.quantidadeItens}
             interactive={interactive}
             onBuscaChange={onBuscaChange}
+            onGrupoClick={onGrupoClick}
             onPedidoClick={onPedidoClick}
             onMenuClick={handleMenuClick}
-          />
-
-          <DeliveryCatalogoCategoriaTabs
-            grupos={filtered.grupos}
-            activeGrupoId={activeGrupoId}
-            interactive={interactive}
-            onGrupoClick={handleGrupoClick}
           />
 
           <div className="flex-1 pb-4">

@@ -95,12 +95,28 @@ export function useDesignCabecalhoMidia({
           await uploadEmpresaDeliveryBanner(file, token)
         }
 
-        const { logoUrl: apiLogo, bannerUrl: apiBanner } =
-          await fetchEmpresaPublicaMidia(trimmedSlug)
-        const persistedUrl = field === 'logoUrl' ? apiLogo : apiBanner
+        // Retry: CDN/FK pode demorar um instante após o confirm do upload.
+        let persistedUrl: string | null = null
+        for (let attempt = 0; attempt < 4; attempt++) {
+          if (attempt > 0) {
+            await new Promise(resolve => window.setTimeout(resolve, 350 * attempt))
+          }
+          const { logoUrl: apiLogo, bannerUrl: apiBanner } =
+            await fetchEmpresaPublicaMidia(trimmedSlug)
+          persistedUrl = field === 'logoUrl' ? apiLogo : apiBanner
+          if (persistedUrl?.trim()) break
+        }
 
         revokeBlobUrl(preview)
-        updateCabecalhoField(field, persistedUrl ?? preview)
+        if (!persistedUrl?.trim()) {
+          updateCabecalhoField(field, previousUrl ?? null)
+          throw new Error(
+            field === 'logoUrl'
+              ? 'Logo enviado, mas a URL ainda não está disponível. Tente novamente.'
+              : 'Capa enviada, mas a URL ainda não está disponível. Tente novamente.'
+          )
+        }
+        updateCabecalhoField(field, persistedUrl)
 
         showToast.successLoading(
           toastId,

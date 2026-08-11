@@ -272,6 +272,26 @@ html.delivery-publico-ios-lock select {
 }
 
 /**
+ * Grade — banner um pouco mais alto que a Vitrine (3:1) para overlap na área branca.
+ */
+.delivery-loja-capa.delivery-grade-capa {
+  aspect-ratio: 2.5 / 1;
+}
+
+.delivery-preview-shell .delivery-loja-capa.delivery-grade-capa {
+  aspect-ratio: 2.5 / 1;
+  /* Grade mantém cantos inferiores arredondados (override do radius 0 do preview). */
+  border-radius: 0 0 2rem 2rem !important;
+}
+
+@media (min-width: 1024px) {
+  .delivery-loja-capa.delivery-grade-capa {
+    aspect-ratio: auto;
+    height: 320px;
+  }
+}
+
+/**
  * Formulário de checkout — card com tinta clara da paleta; campos brancos com texto na cor primária.
  */
 .delivery-checkout-form-card {

@@ -96,6 +96,12 @@ export function useDeliveryDesignDraft({
     }
     if (lockAutosaveRef.current) return
 
+    // Evita gravar null no lugar da logo/capa enquanto o preview ainda é blob:.
+    const hasPendingBlobMidia =
+      draft.cabecalho.logoUrl?.startsWith('blob:') ||
+      draft.cabecalho.capaUrl?.startsWith('blob:')
+    if (hasPendingBlobMidia) return
+
     const handle = window.setTimeout(() => {
       if (lockAutosaveRef.current) return
       const payload = uiDesignConfigToApi(draft)
