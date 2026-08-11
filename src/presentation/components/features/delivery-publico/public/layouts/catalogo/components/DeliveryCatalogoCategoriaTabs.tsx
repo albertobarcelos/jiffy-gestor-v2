@@ -27,7 +27,7 @@ export function DeliveryCatalogoCategoriaTabs({
   embedded = false,
 }: DeliveryCatalogoCategoriaTabsProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
-  const activeTabRef = useRef<HTMLButtonElement | HTMLSpanElement | null>(null)
+  const activeTabRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     if (!activeGrupoId) return
@@ -100,7 +100,7 @@ export function DeliveryCatalogoCategoriaTabs({
                   <button
                     key={grupo.id}
                     type="button"
-                    ref={active ? activeTabRef : undefined}
+                    ref={active ? el => { activeTabRef.current = el } : undefined}
                     onClick={() => onGrupoClick(grupo.id)}
                     className={className}
                     style={style}
@@ -113,7 +113,7 @@ export function DeliveryCatalogoCategoriaTabs({
               return (
                 <span
                   key={grupo.id}
-                  ref={active ? activeTabRef : undefined}
+                  ref={active ? el => { activeTabRef.current = el } : undefined}
                   className={className}
                   style={style}
                 >

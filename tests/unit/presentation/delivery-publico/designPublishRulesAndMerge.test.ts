@@ -24,13 +24,15 @@ describe('designPublishRules', () => {
     }
   })
 
-  it('bloqueia tipografia premium com motivo', () => {
-    const config = {
-      ...createDefaultDesignConfig(),
-      tipografia: { presetId: 'moderna' as const },
+  it('permite tipografias urbana, moderna, classica e elegante', () => {
+    for (const presetId of ['urbana', 'moderna', 'classica', 'elegante'] as const) {
+      const config = {
+        ...createDefaultDesignConfig(),
+        tipografia: { presetId },
+      }
+      expect(canPublishDesign(config)).toBe(true)
+      expect(getPublishDisabledReason(config)).toBeUndefined()
     }
-    expect(canPublishDesign(config)).toBe(false)
-    expect(getPublishDisabledReason(config)).toMatch(/Urbana/i)
   })
 
   it('permite paletas sugeridas antes bloqueadas', () => {

@@ -20,10 +20,15 @@ const PALETAS_PUBLICAVEIS = new Set([
   'personalizada',
 ])
 
-const TIPOGRAFIAS_PUBLICAVEIS = new Set(['urbana'])
+const TIPOGRAFIAS_PUBLICAVEIS = new Set([
+  'urbana',
+  'moderna',
+  'classica',
+  'elegante',
+])
 
 const MENSAGEM_NAO_PUBLICAVEL =
-  'Somente a tipografia Urbana pode ser publicada no momento'
+  'Esta combinação de layout, paleta ou tipografia não pode ser publicada no momento'
 
 /**
  * Valida shape Zod + gate de publicação antes do POST /publish.

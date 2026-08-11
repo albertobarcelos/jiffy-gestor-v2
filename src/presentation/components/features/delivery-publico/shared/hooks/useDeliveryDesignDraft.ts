@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { DeliveryPublicoDesignMeResponseDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDesignDTO'
 import type { DeliveryPublicoDesignConfig } from '../types/deliveryPublicoDesignConfig'
 import { createDefaultDesignConfig } from '../constants/defaultDesignConfig'
-import { canPublishDesign } from '../constants/designPublishRules'
+import { canPublishDesign, getPublishDisabledReason } from '../constants/designPublishRules'
 import {
   isDesignConfigEqual,
 } from '../utils/designConfigStorage'
@@ -122,7 +122,8 @@ export function useDeliveryDesignDraft({
   const publish = useCallback(async () => {
     if (!canPublishDesign(draft)) {
       throw new Error(
-        'Somente o modelo Básico, as paletas publicáveis e a tipografia Urbana podem ser publicados no momento'
+        getPublishDisabledReason(draft) ??
+          'Esta combinação de layout, paleta ou tipografia não pode ser publicada no momento'
       )
     }
 

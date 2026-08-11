@@ -142,12 +142,14 @@ describe('validarPublicacaoDesign', () => {
     }
   })
 
-  it('rejeita tipografia não publicável', () => {
-    const result = validarPublicacaoDesign({
-      ...createDefaultDeliveryPublicoDesignConfig(),
-      tipografia: { presetId: 'moderna' },
-    })
-    expect(result.ok).toBe(false)
+  it('permite tipografias publicáveis', () => {
+    for (const presetId of ['urbana', 'moderna', 'classica', 'elegante'] as const) {
+      const result = validarPublicacaoDesign({
+        ...createDefaultDeliveryPublicoDesignConfig(),
+        tipografia: { presetId },
+      })
+      expect(result.ok).toBe(true)
+    }
   })
 
   it('podePublicarDesign espelha o gate', () => {
@@ -163,6 +165,6 @@ describe('validarPublicacaoDesign', () => {
         ...createDefaultDeliveryPublicoDesignConfig(),
         tipografia: { presetId: 'moderna' },
       })
-    ).toBe(false)
+    ).toBe(true)
   })
 })

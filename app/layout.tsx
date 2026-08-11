@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import localFont from 'next/font/local'
+import { Outfit } from 'next/font/google'
 import { AppRouterCacheProvider } from '@mui/material-nextjs/v15-appRouter'
 import { AppToaster } from '@/src/presentation/components/ui/AppToaster'
 import { ThemeProvider } from '@/src/presentation/providers/ThemeProvider'
@@ -23,6 +24,13 @@ const generalSans = localFont({
   display: 'swap',
 })
 
+/** Tipografia Moderna do delivery público — geométrica, distinta da Urbana. */
+const outfit = Outfit({
+  subsets: ['latin'],
+  variable: '--font-delivery-moderna',
+  display: 'swap',
+})
+
 
 
 export const metadata: Metadata = {
@@ -39,7 +47,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" className={generalSans.variable}>
+    <html lang="pt-BR" className={`${generalSans.variable} ${outfit.variable}`}>
       {/* suppressHydrationWarning: extensões (ex. ColorZilla) injetam atributos no body e disparam falso positivo de hidratação */}
       <body className={`${generalSans.className} antialiased`} suppressHydrationWarning>
         <AppRouterCacheProvider>

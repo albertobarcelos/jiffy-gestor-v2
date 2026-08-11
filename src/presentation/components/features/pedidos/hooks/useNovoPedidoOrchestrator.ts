@@ -194,7 +194,7 @@ export function useNovoPedidoOrchestrator({
   const pedidoBalcao = tipoInicioPedido !== 'entrega'
   const canalVendaNovoPedido: CanalVendaNovoPedido =
     tipoInicioPedido === 'entrega' ? 'entrega' : 'balcao'
-  /** Balcão e delivery: passo de produtos é sempre o step 1 na criação. */
+  /** BalcÃ£o e delivery: passo de produtos Ã© sempre o step 1 na criaÃ§Ã£o. */
   const estaNoPassoProdutos = open && !modoVisualizacao && currentStep === 1
 
   const {
@@ -408,11 +408,11 @@ export function useNovoPedidoOrchestrator({
     pagamentoEntregaConfirmado,
   } = flags
 
-  /** Primeira carga ou fetch sem cache ainda — evita área vazia sem feedback */
+  /** Primeira carga ou fetch sem cache ainda â€” evita Ã¡rea vazia sem feedback */
   const mostrarLoadingFormasPagamento =
     isPendingMeiosPagamento || (isFetchingMeiosPagamento && meiosPagamentoData === undefined)
 
-  // Refs estáveis: evitam que `carregarVendaExistente` mude quando queries atualizam ao focar a aba
+  // Refs estÃ¡veis: evitam que `carregarVendaExistente` mude quando queries atualizam ao focar a aba
   const meiosPagamentoRef = useRef(meiosPagamento)
   meiosPagamentoRef.current = meiosPagamento
   const tenantAuth = useAuthStore(s => s.tenantAuth)

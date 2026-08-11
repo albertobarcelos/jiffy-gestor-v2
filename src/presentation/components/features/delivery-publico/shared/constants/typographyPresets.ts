@@ -4,7 +4,7 @@ export type TypographyPresetDefinition = {
   id: TypographyPresetId
   nome: string
   premium: boolean
-  /** Pode ser publicada no cardápio público (demais presets: preview no designer apenas). */
+  /** Pode ser publicada no cardápio público. */
   publicavel: boolean
   titleFontFamily: string
   bodyFontFamily: string
@@ -22,24 +22,25 @@ export const TYPOGRAPHY_PRESETS: TypographyPresetDefinition[] = [
   {
     id: 'moderna',
     nome: 'Moderna',
-    premium: true,
-    publicavel: false,
-    titleFontFamily: 'var(--font-general-sans), system-ui, sans-serif',
-    bodyFontFamily: 'var(--font-general-sans), system-ui, sans-serif',
+    premium: false,
+    publicavel: true,
+    // Outfit (carregada em app/layout) — geométrica, distinta da General Sans da Urbana.
+    titleFontFamily: 'var(--font-delivery-moderna), system-ui, sans-serif',
+    bodyFontFamily: 'var(--font-delivery-moderna), system-ui, sans-serif',
   },
   {
     id: 'classica',
     nome: 'Clássica',
-    premium: true,
-    publicavel: false,
+    premium: false,
+    publicavel: true,
     titleFontFamily: 'Georgia, "Times New Roman", serif',
     bodyFontFamily: 'var(--font-general-sans), system-ui, sans-serif',
   },
   {
     id: 'elegante',
     nome: 'Elegante',
-    premium: true,
-    publicavel: false,
+    premium: false,
+    publicavel: true,
     titleFontFamily: 'Georgia, "Times New Roman", serif',
     bodyFontFamily: 'Georgia, "Times New Roman", serif',
   },
