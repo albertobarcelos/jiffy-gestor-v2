@@ -14,5 +14,9 @@ export function canPublishDesign(config: DeliveryPublicoDesignConfig): boolean {
 export function getPublishDisabledReason(config: DeliveryPublicoDesignConfig): string | undefined {
   if (canPublishDesign(config)) return undefined
 
-  return `Somente o modelo Básico, as paletas ${getPublishablePaletteLabel()} e a tipografia ${getPublishableTypographyLabel()} podem ser publicados no momento`
+  if (!canPublishLayout(config.layoutId)) {
+    return 'Este modelo de layout ainda não pode ser publicado'
+  }
+
+  return `Somente as paletas ${getPublishablePaletteLabel()} e a tipografia ${getPublishableTypographyLabel()} podem ser publicados no momento`
 }

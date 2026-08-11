@@ -1,34 +1,39 @@
 'use client'
 
-import { User } from 'lucide-react'
 import type { DeliveryPublicoDesignConfig } from '../../../../shared/types/deliveryPublicoDesignConfig'
 
 type DeliveryVitrineHeaderProps = {
   config: DeliveryPublicoDesignConfig
-  disponivel: boolean
 }
 
-export function DeliveryVitrineHeader({
-  config,
-  disponivel,
-}: DeliveryVitrineHeaderProps) {
+export function DeliveryVitrineHeader({ config }: DeliveryVitrineHeaderProps) {
   const nomeLoja = config.cabecalho.nomeExibicao.trim() || 'Sua loja'
   const logoRadius = config.cabecalho.logoFormato === 'circular' ? '9999px' : '12px'
+  const capaUrl = config.cabecalho.capaUrl
 
   return (
     <header className="relative">
+      {/* Base do Básico + altura mobile um pouco maior (3:1). Desktop: 300px. */}
       <div
-        className="relative h-44 bg-cover bg-center @sm:h-48 @lg:h-52"
-        style={{
-          backgroundColor: 'var(--delivery-hero-bg)',
-          backgroundImage: config.cabecalho.capaUrl ? `url(${config.cabecalho.capaUrl})` : undefined,
-        }}
+        className="delivery-loja-capa delivery-vitrine-capa relative h-auto w-full overflow-hidden"
+        style={{ backgroundColor: 'var(--delivery-hero-bg)' }}
+        role="img"
+        aria-label="Capa da loja"
       >
+        {capaUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={capaUrl}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover object-center"
+          />
+        ) : null}
+
         <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/10 to-black/55" />
 
-        <div className="absolute left-3 top-3 z-10 @sm:left-4 @sm:top-4">
+        <div className="absolute left-3 top-3 z-10 @sm:left-4 @sm:top-3">
           <div
-            className="flex h-14 w-14 items-center justify-center overflow-hidden border-2 border-white bg-white shadow-md @sm:h-16 @sm:w-16"
+            className="flex h-11 w-11 items-center justify-center overflow-hidden border-2 border-white bg-white shadow-md @sm:h-14 @sm:w-14"
             style={{ borderRadius: logoRadius }}
           >
             {config.cabecalho.logoUrl ? (
@@ -36,7 +41,7 @@ export function DeliveryVitrineHeader({
               <img src={config.cabecalho.logoUrl} alt="" className="h-full w-full object-cover" />
             ) : (
               <span
-                className="text-xl font-bold @sm:text-2xl"
+                className="text-lg font-bold @sm:text-xl"
                 style={{ color: 'var(--delivery-primary)' }}
               >
                 {(nomeLoja[0] ?? '?').toUpperCase()}
@@ -45,38 +50,13 @@ export function DeliveryVitrineHeader({
           </div>
         </div>
 
-        <button
-          type="button"
-          aria-label="Perfil"
-          className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-white/20 text-white backdrop-blur-sm @sm:right-4 @sm:top-4"
-        >
-          <User className="h-5 w-5" aria-hidden />
-        </button>
-
-        <div className="absolute inset-x-0 bottom-4 px-4 @sm:bottom-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h1
-                className="truncate text-lg font-bold uppercase tracking-wide text-white @sm:text-xl"
-                style={{ fontFamily: 'var(--delivery-font-title)' }}
-              >
-                {nomeLoja}
-              </h1>
-              <button
-                type="button"
-                className="mt-0.5 text-xs font-medium text-white/90 underline-offset-2 hover:underline"
-              >
-                Ver mais
-              </button>
-            </div>
-            <span
-              className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold ${
-                disponivel ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-              }`}
-            >
-              {disponivel ? 'Disponível' : 'Indisponível'}
-            </span>
-          </div>
+        <div className="absolute inset-x-0 bottom-2.5 px-4 @sm:bottom-3">
+          <h1
+            className="truncate text-base font-bold uppercase tracking-wide text-white @sm:text-lg"
+            style={{ fontFamily: 'var(--delivery-font-title)' }}
+          >
+            {nomeLoja}
+          </h1>
         </div>
       </div>
     </header>

@@ -31,7 +31,10 @@ export function usePublishedDesignBySlug({
 }: UsePublishedDesignBySlugOptions) {
   const config = useMemo((): DeliveryPublicoDesignConfig => {
     const fallbackNome =
-      nomeExibicaoFallback || empresa?.nomeFantasia || ''
+      nomeExibicaoFallback ||
+        empresa?.nomeExibicao ||
+        empresa?.nomeFantasia ||
+        ''
 
     if (empresa?.design) {
       const parsed = deliveryPublicoDesignConfigSchema.safeParse(empresa.design)

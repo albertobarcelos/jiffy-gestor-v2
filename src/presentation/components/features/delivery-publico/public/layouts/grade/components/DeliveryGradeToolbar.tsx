@@ -20,7 +20,7 @@ export function DeliveryGradeToolbar({
   onMenuClick,
 }: DeliveryGradeToolbarProps) {
   return (
-    <div className="mt-3 flex items-center gap-2 px-4">
+    <div className="flex items-center gap-2 px-4 pt-3">
       <label className="relative min-w-0 flex-1">
         <Search
           className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
@@ -49,7 +49,7 @@ export function DeliveryGradeToolbar({
         disabled={!interactive}
         onClick={() => interactive && onPedidoClick?.()}
         className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white disabled:cursor-default"
-        style={{ backgroundColor: 'var(--delivery-primary)' }}
+        style={{ backgroundColor: 'var(--delivery-primary-dark, #171717)' }}
       >
         <ShoppingCart className="h-5 w-5" aria-hidden />
         {carrinhoQuantidade > 0 ? (

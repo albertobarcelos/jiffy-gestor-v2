@@ -1,11 +1,10 @@
 'use client'
 
-import { ChevronRight, ShoppingCart, User } from 'lucide-react'
+import { ShoppingCart } from 'lucide-react'
 import type { DeliveryPublicoDesignConfig } from '../../../../shared/types/deliveryPublicoDesignConfig'
 
 type DeliveryCatalogoHeaderProps = {
   config: DeliveryPublicoDesignConfig
-  disponivel: boolean
   carrinhoQuantidade: number
   interactive?: boolean
   onPedidoClick?: () => void
@@ -13,28 +12,42 @@ type DeliveryCatalogoHeaderProps = {
 
 export function DeliveryCatalogoHeader({
   config,
-  disponivel,
   carrinhoQuantidade,
   interactive = false,
   onPedidoClick,
 }: DeliveryCatalogoHeaderProps) {
   const nomeLoja = config.cabecalho.nomeExibicao.trim() || 'Sua loja'
   const logoRadius = config.cabecalho.logoFormato === 'circular' ? '9999px' : '10px'
+  const capaUrl = config.cabecalho.capaUrl
 
   return (
     <header>
       <div
-        className="h-36 bg-cover bg-center @sm:h-40"
-        style={{
-          backgroundColor: 'var(--delivery-hero-bg)',
-          backgroundImage: config.cabecalho.capaUrl ? `url(${config.cabecalho.capaUrl})` : undefined,
-        }}
-      />
+        className="delivery-loja-capa delivery-catalogo-capa relative w-full overflow-hidden"
+        style={{ backgroundColor: 'var(--delivery-primary-dark)' }}
+        role="img"
+        aria-label="Capa da loja"
+      >
+        {capaUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={capaUrl}
+            alt=""
+            className="relative z-0 block h-auto w-full object-contain object-center"
+          />
+        ) : (
+          <div className="delivery-catalogo-capa-placeholder w-full" aria-hidden />
+        )}
+      </div>
 
       <div className="flex items-center gap-3 px-4 py-3">
         <div
-          className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden border border-gray-100 bg-white shadow-sm"
-          style={{ borderRadius: logoRadius }}
+          className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden border shadow-sm"
+          style={{
+            borderRadius: logoRadius,
+            borderColor: 'var(--delivery-card-border)',
+            backgroundColor: 'var(--delivery-surface)',
+          }}
         >
           {config.cabecalho.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -46,11 +59,8 @@ export function DeliveryCatalogoHeader({
           )}
         </div>
 
-        <button
-          type="button"
-          className="flex min-w-0 flex-1 items-center gap-1 text-left"
-        >
-          <span
+        <div className="min-w-0 flex-1">
+          <h1
             className="truncate text-base font-bold @sm:text-lg"
             style={{
               color: 'var(--delivery-primary)',
@@ -58,17 +68,8 @@ export function DeliveryCatalogoHeader({
             }}
           >
             {nomeLoja}
-          </span>
-          <ChevronRight className="h-4 w-4 shrink-0 opacity-70" aria-hidden />
-        </button>
-
-        <span
-          className={`hidden shrink-0 rounded-md px-2 py-1 text-xs font-semibold @sm:inline-flex ${
-            disponivel ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-          }`}
-        >
-          {disponivel ? 'Disponível' : 'Indisponível'}
-        </span>
+          </h1>
+        </div>
 
         <button
           type="button"
@@ -79,6 +80,7 @@ export function DeliveryCatalogoHeader({
           style={{
             borderColor: 'var(--delivery-card-border)',
             color: 'var(--delivery-primary)',
+            backgroundColor: 'var(--delivery-surface)',
           }}
         >
           <ShoppingCart className="h-5 w-5" aria-hidden />
@@ -87,18 +89,6 @@ export function DeliveryCatalogoHeader({
               {carrinhoQuantidade > 99 ? '99+' : carrinhoQuantidade}
             </span>
           ) : null}
-        </button>
-
-        <button
-          type="button"
-          aria-label="Perfil"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border"
-          style={{
-            borderColor: 'var(--delivery-card-border)',
-            color: 'var(--delivery-primary)',
-          }}
-        >
-          <User className="h-5 w-5" aria-hidden />
         </button>
       </div>
     </header>

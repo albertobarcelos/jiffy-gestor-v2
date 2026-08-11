@@ -26,13 +26,15 @@ export function mergeDesignConfigWithEmpresa(
   if (!empresa) return design
 
   const nomeDesign = design.cabecalho.nomeExibicao.trim()
-  const nomeApi = empresa.nomeFantasia?.trim() ?? ''
+  const nomeVitrine =
+    empresa.nomeExibicao?.trim() || empresa.nomeFantasia?.trim() || ''
 
   return {
     ...design,
     cabecalho: {
       ...design.cabecalho,
-      nomeExibicao: (nomeDesign || nomeApi).slice(0, CABECALHO_NOME_MAX_LENGTH),
+      // Design enriquecido / nomeExibicao da API têm prioridade; fantasia é fallback.
+      nomeExibicao: (nomeDesign || nomeVitrine).slice(0, CABECALHO_NOME_MAX_LENGTH),
       logoUrl: resolveMidiaUrl(empresa.logoUrl, design.cabecalho.logoUrl),
       capaUrl: resolveMidiaUrl(empresa.bannerUrl, design.cabecalho.capaUrl),
     },

@@ -77,6 +77,11 @@ export type CatalogoPublicoPaginaDTO = {
 export type EmpresaPublicaDTO = {
   id: string
   nomeFantasia: string
+  /**
+   * Nome de vitrine do delivery (custom ?? fantasia).
+   * Ausente em respostas legadas — nesse caso use `nomeFantasia`.
+   */
+  nomeExibicao?: string
   slug: string
   telefone: string | null
   segmento: string | null

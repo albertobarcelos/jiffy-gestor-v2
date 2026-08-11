@@ -9,7 +9,7 @@ export type ColorPaletteDefinition = {
   id: Exclude<ColorPaletteId, 'personalizada'>
   nome: string
   premium: boolean
-  /** Pode ser publicada no cardápio público (demais paletas: preview no designer apenas). */
+  /** Pode ser publicada no cardápio público. */
   publicavel: boolean
   colors: DesignCustomColors
 }
@@ -24,7 +24,7 @@ export const CUSTOM_PALETTE_DEFAULTS: DesignCustomColors = {
 
 /**
  * Paletas sugeridas do customizador Design.
- * Carvão é o padrão temporário; Lavanda usa `alternate`/`secondary` do tema Jiffy.
+ * Carvão é o padrão; Lavanda usa `alternate`/`secondary` do tema Jiffy.
  */
 export const COLOR_PALETTES: ColorPaletteDefinition[] = [
   {
@@ -49,7 +49,7 @@ export const COLOR_PALETTES: ColorPaletteDefinition[] = [
   {
     id: 'mirtilo',
     nome: 'Mirtilo',
-    premium: true,
+    premium: false,
     publicavel: true,
     colors: {
       primary: colors.tertiary, // #006699 — azul médio (derivado da família do primary)
@@ -61,50 +61,56 @@ export const COLOR_PALETTES: ColorPaletteDefinition[] = [
   {
     id: 'pessego',
     nome: 'Pêssego',
-    premium: true,
-    publicavel: false,
+    premium: false,
+    publicavel: true,
     colors: { primary: '#FF6B00', primaryDark: '#C2410C', surface: '#FFFFFF', text: '#171A1C' },
   },
   {
     id: 'canela',
     nome: 'Canela',
-    premium: true,
-    publicavel: false,
+    premium: false,
+    publicavel: true,
     colors: { primary: '#D97706', primaryDark: '#92400E', surface: '#FFFFFF', text: '#171A1C' },
   },
   {
     id: 'cereja',
     nome: 'Cereja',
-    premium: true,
-    publicavel: false,
+    premium: false,
+    publicavel: true,
     colors: { primary: '#DC2626', primaryDark: '#991B1B', surface: '#FFF5F5', text: '#171A1C' },
   },
   {
     id: 'gergelim',
     nome: 'Gergelim',
-    premium: true,
-    publicavel: false,
-    colors: { primary: '#171717', primaryDark: '#000000', surface: '#F5F5F5', text: '#171A1C' },
+    premium: false,
+    publicavel: true,
+    // Areia / sésamo tostado — distinto do cinza do Carvão e do marrom do Chocolate.
+    colors: {
+      primary: '#C4A574',
+      primaryDark: '#6F5530',
+      surface: '#FFFBF5',
+      text: '#2C2416',
+    },
   },
   {
     id: 'hortela',
     nome: 'Hortelã',
-    premium: true,
-    publicavel: false,
+    premium: false,
+    publicavel: true,
     colors: { primary: '#059669', primaryDark: '#065F46', surface: '#ECFDF5', text: '#171A1C' },
   },
   {
     id: 'chocolate',
     nome: 'Chocolate',
-    premium: true,
-    publicavel: false,
+    premium: false,
+    publicavel: true,
     colors: { primary: '#78350F', primaryDark: '#451A03', surface: '#FFF7ED', text: '#171A1C' },
   },
   {
     id: 'mostarda',
     nome: 'Mostarda',
-    premium: true,
-    publicavel: false,
+    premium: false,
+    publicavel: true,
     colors: { primary: '#EAB308', primaryDark: '#854D0E', surface: '#FFFFFF', text: '#171A1C' },
   },
 ]

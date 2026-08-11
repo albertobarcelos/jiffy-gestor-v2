@@ -44,12 +44,23 @@ export function apiDesignConfigToUi(
 
 /**
  * UI → payload canônico da API (`schemaVersion: 1`).
+ * Não envia blob:/data: (preview local) para não gravar URL inválida no draft.
  */
 export function uiDesignConfigToApi(
   ui: DeliveryPublicoDesignConfig
 ): DeliveryPublicoDesignConfigDTO {
   const nome = ui.cabecalho.nomeExibicao.trim()
   const base = createDefaultDeliveryPublicoDesignConfig(nome)
+  const logoUrl = ui.cabecalho.logoUrl?.trim() || null
+  const capaUrl = ui.cabecalho.capaUrl?.trim() || null
+  const logoPersistivel =
+    logoUrl && !logoUrl.startsWith('blob:') && !logoUrl.startsWith('data:')
+      ? logoUrl
+      : null
+  const capaPersistivel =
+    capaUrl && !capaUrl.startsWith('blob:') && !capaUrl.startsWith('data:')
+      ? capaUrl
+      : null
 
   return {
     ...base,
@@ -57,8 +68,8 @@ export function uiDesignConfigToApi(
     cabecalho: {
       logoFormato: ui.cabecalho.logoFormato,
       ...(nome ? { nomeExibicao: nome.slice(0, 20) } : {}),
-      logoUrl: ui.cabecalho.logoUrl,
-      capaUrl: ui.cabecalho.capaUrl,
+      logoUrl: logoPersistivel,
+      capaUrl: capaPersistivel,
     },
     cores: {
       paletaId: ui.cores.paletaId,

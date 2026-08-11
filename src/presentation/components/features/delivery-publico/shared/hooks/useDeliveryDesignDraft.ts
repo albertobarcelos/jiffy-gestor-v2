@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { DeliveryPublicoDesignMeResponseDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDesignDTO'
 import type { DeliveryPublicoDesignConfig } from '../types/deliveryPublicoDesignConfig'
 import { createDefaultDesignConfig } from '../constants/defaultDesignConfig'
-import { canPublishDesign } from '../constants/designPublishRules'
+import { canPublishDesign, getPublishDisabledReason } from '../constants/designPublishRules'
 import {
   isDesignConfigEqual,
 } from '../utils/designConfigStorage'
@@ -62,14 +62,24 @@ export function useDeliveryDesignDraft({
   useEffect(() => {
     if (!empresaId || !designQuery.data || hydrated) return
 
-    const uiDraft = apiDesignConfigToUi(
-      designQuery.data.draft,
-      nomeExibicaoFallback
-    )
     const uiPublished = apiDesignConfigToUi(
       designQuery.data.published,
       nomeExibicaoFallback
     )
+    const uiDraftRaw = apiDesignConfigToUi(
+      designQuery.data.draft,
+      nomeExibicaoFallback
+    )
+    // Se o draft perdeu logo/capa no JSON mas o published ainda tem,
+    // reaproveita o espelho para o editor não ficar sem preview.
+    const uiDraft: DeliveryPublicoDesignConfig = {
+      ...uiDraftRaw,
+      cabecalho: {
+        ...uiDraftRaw.cabecalho,
+        logoUrl: uiDraftRaw.cabecalho.logoUrl ?? uiPublished.cabecalho.logoUrl,
+        capaUrl: uiDraftRaw.cabecalho.capaUrl ?? uiPublished.cabecalho.capaUrl,
+      },
+    }
     setPublished(uiPublished)
     setDraft(uiDraft)
     setHydrated(true)
@@ -85,6 +95,12 @@ export function useDeliveryDesignDraft({
       return
     }
     if (lockAutosaveRef.current) return
+
+    // Evita gravar null no lugar da logo/capa enquanto o preview ainda é blob:.
+    const hasPendingBlobMidia =
+      draft.cabecalho.logoUrl?.startsWith('blob:') ||
+      draft.cabecalho.capaUrl?.startsWith('blob:')
+    if (hasPendingBlobMidia) return
 
     const handle = window.setTimeout(() => {
       if (lockAutosaveRef.current) return
@@ -106,7 +122,8 @@ export function useDeliveryDesignDraft({
   const publish = useCallback(async () => {
     if (!canPublishDesign(draft)) {
       throw new Error(
-        'Somente o modelo Básico, as paletas publicáveis e a tipografia Urbana podem ser publicados no momento'
+        getPublishDisabledReason(draft) ??
+          'Esta combinação de layout, paleta ou tipografia não pode ser publicada no momento'
       )
     }
 

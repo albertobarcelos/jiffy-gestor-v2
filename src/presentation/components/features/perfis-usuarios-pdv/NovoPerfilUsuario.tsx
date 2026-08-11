@@ -80,6 +80,7 @@ type PermissaoCampo =
   | 'lancarTaxa'
   | 'removerTaxa'
   | 'removerLicenca'
+  | 'exigirMotivoCancelamento'
 
 /**
  * Componente para criar/editar perfil de usuário
@@ -101,7 +102,8 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
     },
     ref
   ) {
-  const router = useRouter()  const isEditing = !!perfilId
+  const router = useRouter()
+  const isEditing = !!perfilId
 
   // Estados do formulário
   const [role, setRole] = useState('')
@@ -127,6 +129,8 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
   const [lancarTaxa, setLancarTaxa] = useState(false)
   const [removerTaxa, setRemoverTaxa] = useState(false)
   const [removerLicenca, setRemoverLicenca] = useState(false)
+  /** Default true alinhado ao backend (`@default(true)`) */
+  const [exigirMotivoCancelamento, setExigirMotivoCancelamento] = useState(true)
 
   // Estados de loading e dados
   const [isLoading, setIsLoading] = useState(false)
@@ -182,6 +186,7 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
       lancarTaxa,
       removerTaxa,
       removerLicenca,
+      exigirMotivoCancelamento,
     })
   }, [
     role,
@@ -207,6 +212,7 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
     lancarTaxa,
     removerTaxa,
     removerLicenca,
+    exigirMotivoCancelamento,
   ])
 
   const baselineSerializedRef = useRef('')
@@ -346,6 +352,7 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
     lancarTaxa: false,
     removerTaxa: false,
     removerLicenca: false,
+    exigirMotivoCancelamento: true,
   })
 
   useEffect(() => {
@@ -371,6 +378,7 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
       lancarTaxa,
       removerTaxa,
       removerLicenca,
+      exigirMotivoCancelamento,
     }
   }, [
     cancelarVenda,
@@ -394,6 +402,7 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
     lancarTaxa,
     removerTaxa,
     removerLicenca,
+    exigirMotivoCancelamento,
   ])
 
   const aplicarValorPermissao = useCallback((campo: PermissaoCampo, value: boolean) => {
@@ -460,6 +469,9 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
         break
       case 'removerLicenca':
         setRemoverLicenca(value)
+        break
+      case 'exigirMotivoCancelamento':
+        setExigirMotivoCancelamento(value)
         break
     }
   }, [])
@@ -641,6 +653,7 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
           setLancarTaxa(perfil.canLancarTaxa())
           setRemoverTaxa(perfil.canRemoverTaxa())
           setRemoverLicenca(perfil.canRemoverLicenca())
+          setExigirMotivoCancelamento(perfil.mustExigirMotivoCancelamento())
 
           // Guarda os nomes dos meios de pagamento do perfil para usar depois
           const nomesMeios = perfil.getAcessoMeiosPagamento()
@@ -777,6 +790,7 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
         lancarTaxa,
         removerTaxa,
         removerLicenca,
+        exigirMotivoCancelamento,
       }
 
       // Debug: log do body antes de enviar
@@ -1183,6 +1197,20 @@ export const NovoPerfilUsuario = forwardRef<NovoPerfilUsuarioHandle, NovoPerfilU
                     size="sm"
                     className="shrink-0"
                     inputProps={{ 'aria-label': 'Permitir cancelar produto' }}
+                  />
+
+              </div>
+
+              <div className="flex items-center justify-between p-1 bg-white">
+                <span className="text-primary-text font-medium text-xs md:text-sm">Exigir Motivo de Cancelamento?</span>
+                <JiffyIconSwitch
+                    checked={exigirMotivoCancelamento}
+                    onChange={e => handlePermissaoChange('exigirMotivoCancelamento', e.target.checked)}
+                    disabled={isLoading || savingPermissoes.has('exigirMotivoCancelamento')}
+                    bordered={false}
+                    size="sm"
+                    className="shrink-0"
+                    inputProps={{ 'aria-label': 'Exigir motivo de cancelamento' }}
                   />
 
               </div>

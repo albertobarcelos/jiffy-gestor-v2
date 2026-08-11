@@ -27,17 +27,46 @@ export async function restoreIdentityFromCookie(): Promise<boolean> {
       return false
     }
 
-    const restored = buildAuthFromAccessToken(accessToken)
+    const prevUser = current?.getUser()
+    const restored = buildAuthFromAccessToken(
+      accessToken,
+      prevUser
+        ? {
+            id: prevUser.getId(),
+            email: prevUser.getEmail(),
+            name: prevUser.getName(),
+          }
+        : undefined
+    )
     if (restored.isExpired()) {
       return false
     }
 
-    useAuthStore.setState(state => ({
-      identityAuth: restored,
-      auth: state.tenantAuth ?? restored,
-      isAuthenticated: true,
-      error: null,
-    }))
+    useAuthStore.setState(state => {
+      const newUserId = restored.getUser().getId()
+      let { hubEmpresas, hubEmpresasUserId } = state
+      // Continuity: cookie restore pode mudar o claim de id vs o user do login;
+      // se a lista era do mesmo dono (ou identity anterior), reatribui o owner.
+      if (
+        hubEmpresas &&
+        hubEmpresas.length > 0 &&
+        hubEmpresasUserId &&
+        hubEmpresasUserId !== newUserId
+      ) {
+        const prevId = prevUser?.getId()
+        if (!prevId || prevId === hubEmpresasUserId || prevId === newUserId) {
+          hubEmpresasUserId = newUserId
+        }
+      }
+      return {
+        identityAuth: restored,
+        auth: state.tenantAuth ?? restored,
+        hubEmpresas,
+        hubEmpresasUserId,
+        isAuthenticated: true,
+        error: null,
+      }
+    })
     return true
   } catch (e) {
     console.error('restoreIdentityFromCookie:', e)

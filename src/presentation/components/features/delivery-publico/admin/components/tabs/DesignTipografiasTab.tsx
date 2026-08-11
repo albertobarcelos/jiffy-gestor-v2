@@ -1,10 +1,7 @@
 'use client'
 
 import type { DeliveryPublicoDesignConfig, TypographyPresetId } from '../../../shared/types/deliveryPublicoDesignConfig'
-import {
-  TYPOGRAPHY_PRESETS,
-  getPublishableTypographyLabel,
-} from '../../../shared/constants/typographyPresets'
+import { TYPOGRAPHY_PRESETS } from '../../../shared/constants/typographyPresets'
 import { DesignSelectableCard } from '../DesignSelectableCard'
 
 type DesignTipografiasTabProps = {
@@ -31,15 +28,13 @@ export function DesignTipografiasTab({ config, onChange }: DesignTipografiasTabP
     <div className="space-y-2">
       <h3 className="text-base font-semibold text-primary">Tipografias sugeridas</h3>
       <p className="text-sm text-secondary-text">
-        Teste qualquer tipografia no preview. Por enquanto, apenas a tipografia{' '}
-        {getPublishableTypographyLabel()} pode ser publicada.
+        Escolha uma tipografia. Todas as opções podem ser publicadas no cardápio.
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
         {TYPOGRAPHY_PRESETS.map(preset => (
           <DesignSelectableCard
             key={preset.id}
             selected={config.tipografia.presetId === preset.id}
-            premium={preset.premium}
             title={preset.nome}
             onClick={() =>
               onChange(current => ({

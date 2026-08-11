@@ -9,9 +9,18 @@ import {
   type RefObject,
 } from 'react'
 
+export type DeliveryCatalogPinMetrics = {
+  pinned: boolean
+  height: number
+  left: number
+  width: number
+  top: number
+}
+
 type DeliveryBasicoCatalogStickyNavProps = {
   children: ReactNode
-  catalogRootRef: RefObject<HTMLDivElement | null>
+  catalogRootRef: RefObject<HTMLElement | null>
+  onPinMetricsChange?: (metrics: DeliveryCatalogPinMetrics) => void
 }
 
 type PinMetrics = {
@@ -28,9 +37,11 @@ type PinMetrics = {
 export function DeliveryBasicoCatalogStickyNav({
   children,
   catalogRootRef,
+  onPinMetricsChange,
 }: DeliveryBasicoCatalogStickyNavProps) {
   const sentinelRef = useRef<HTMLDivElement>(null)
   const navRef = useRef<HTMLDivElement>(null)
+  const onPinMetricsChangeRef = useRef(onPinMetricsChange)
   const [pinned, setPinned] = useState(false)
   const [metrics, setMetrics] = useState<PinMetrics>({
     height: 0,
@@ -38,6 +49,10 @@ export function DeliveryBasicoCatalogStickyNav({
     width: 0,
     top: 0,
   })
+
+  useEffect(() => {
+    onPinMetricsChangeRef.current = onPinMetricsChange
+  }, [onPinMetricsChange])
 
   const resolveScrollRoot = useCallback((): HTMLElement | null => {
     const root = catalogRootRef.current
@@ -55,12 +70,16 @@ export function DeliveryBasicoCatalogStickyNav({
     if (!nav || !root) return
 
     const height = Math.round(nav.offsetHeight)
-    root.style.setProperty('--delivery-sticky-toolbar-h', `${height}px`)
+    const prevHeight = root.style.getPropertyValue('--delivery-sticky-toolbar-h')
+    const nextHeight = `${height}px`
+    if (prevHeight !== nextHeight) {
+      root.style.setProperty('--delivery-sticky-toolbar-h', nextHeight)
+    }
 
     const scrollRect = scrollRoot?.getBoundingClientRect()
     const navRect = nav.getBoundingClientRect()
     const column = root.querySelector(
-      '.delivery-basico-content-column'
+      '.delivery-publico-content-column, .delivery-basico-content-column'
     ) as HTMLElement | null
     const columnRect = column?.getBoundingClientRect()
     const candidate = root.closest(
@@ -81,7 +100,6 @@ export function DeliveryBasicoCatalogStickyNav({
 
     const next: PinMetrics = {
       height,
-      // Com transform no preview, `fixed` é relativo ao shell — converter coords.
       top: Math.round(containingRect ? portTop - containingRect.top : portTop),
       left: Math.round(containingRect ? portLeft - containingRect.left : portLeft),
       width: Math.round(portWidth),
@@ -138,14 +156,32 @@ export function DeliveryBasicoCatalogStickyNav({
   }, [catalogRootRef, measure, resolveScrollRoot, syncPinned])
 
   useEffect(() => {
-    // Recalcula métricas ao pin/unpin (spacer entra/sai do fluxo).
     measure()
   }, [pinned, measure])
+
+  useEffect(() => {
+    const root = catalogRootRef.current
+    if (!root) return
+    if (pinned) {
+      root.setAttribute('data-delivery-toolbar-pinned', 'true')
+    } else {
+      root.removeAttribute('data-delivery-toolbar-pinned')
+    }
+    return () => {
+      root.removeAttribute('data-delivery-toolbar-pinned')
+    }
+  }, [catalogRootRef, pinned])
+
+  useEffect(() => {
+    onPinMetricsChangeRef.current?.({
+      pinned,
+      ...metrics,
+    })
+  }, [pinned, metrics])
 
   return (
     <>
       <div ref={sentinelRef} className="h-0 w-full" aria-hidden />
-      {/* Reserva espaço só quando a barra está pinned (fixed). */}
       <div
         aria-hidden
         className="pointer-events-none"

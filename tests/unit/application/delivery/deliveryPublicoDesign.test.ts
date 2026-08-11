@@ -111,31 +111,45 @@ describe('validarPublicacaoDesign', () => {
     expect(result.ok).toBe(true)
   })
 
-  it('rejeita layout não publicável', () => {
-    const result = validarPublicacaoDesign({
-      ...createDefaultDeliveryPublicoDesignConfig(),
-      layoutId: 'vitrine',
-    })
-    expect(result.ok).toBe(false)
-    if (!result.ok) {
-      expect(result.error).toMatch(/Básico/i)
+  it('aceita layouts vitrine, grade e catalogo', () => {
+    for (const layoutId of ['vitrine', 'grade', 'catalogo'] as const) {
+      const result = validarPublicacaoDesign({
+        ...createDefaultDeliveryPublicoDesignConfig(),
+        layoutId,
+      })
+      expect(result.ok).toBe(true)
     }
   })
 
-  it('rejeita paleta não publicável', () => {
-    const result = validarPublicacaoDesign({
-      ...createDefaultDeliveryPublicoDesignConfig(),
-      cores: { paletaId: 'pessego' },
-    })
-    expect(result.ok).toBe(false)
+  it('aceita todas as paletas sugeridas', () => {
+    for (const paletaId of [
+      'carvao',
+      'lavanda',
+      'mirtilo',
+      'pessego',
+      'canela',
+      'cereja',
+      'gergelim',
+      'hortela',
+      'chocolate',
+      'mostarda',
+    ] as const) {
+      const result = validarPublicacaoDesign({
+        ...createDefaultDeliveryPublicoDesignConfig(),
+        cores: { paletaId },
+      })
+      expect(result.ok).toBe(true)
+    }
   })
 
-  it('rejeita tipografia não publicável', () => {
-    const result = validarPublicacaoDesign({
-      ...createDefaultDeliveryPublicoDesignConfig(),
-      tipografia: { presetId: 'moderna' },
-    })
-    expect(result.ok).toBe(false)
+  it('permite tipografias publicáveis', () => {
+    for (const presetId of ['urbana', 'moderna', 'classica', 'elegante'] as const) {
+      const result = validarPublicacaoDesign({
+        ...createDefaultDeliveryPublicoDesignConfig(),
+        tipografia: { presetId },
+      })
+      expect(result.ok).toBe(true)
+    }
   })
 
   it('podePublicarDesign espelha o gate', () => {
@@ -145,6 +159,12 @@ describe('validarPublicacaoDesign', () => {
         ...createDefaultDeliveryPublicoDesignConfig(),
         layoutId: 'grade',
       })
-    ).toBe(false)
+    ).toBe(true)
+    expect(
+      podePublicarDesign({
+        ...createDefaultDeliveryPublicoDesignConfig(),
+        tipografia: { presetId: 'moderna' },
+      })
+    ).toBe(true)
   })
 })

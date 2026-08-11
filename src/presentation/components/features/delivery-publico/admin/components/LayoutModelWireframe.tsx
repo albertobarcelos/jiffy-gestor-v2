@@ -78,17 +78,35 @@ function GradeWireframe() {
 function CatalogoWireframe() {
   return (
     <div className="space-y-1.5">
-      <Block className="h-4 w-full" />
-      <BlockSoft className="h-2 w-full rounded-full" />
-      <BlockSoft className="h-2 w-2/3 rounded-full" />
-      <BlockSoft className="h-1.5 w-1/3 bg-gray-300/80" />
-      <div className="flex gap-1.5 overflow-hidden">
-        <Block className="h-8 w-[55%] shrink-0 rounded-md" />
-        <Block className="h-8 w-[40%] shrink-0 rounded-md opacity-70" />
+      <Block className="h-5 w-full rounded-b-lg" />
+      <BlockSoft className="mx-auto h-2 w-3/4 rounded-full" />
+      <BlockSoft className="h-2.5 w-full rounded-full" />
+      <div className="flex gap-1 border-b border-gray-200 pb-1">
+        <BlockSoft className="h-2 w-1/4 bg-gray-300/80" />
+        <BlockSoft className="h-2 w-1/4" />
+        <BlockSoft className="h-2 w-1/4" />
       </div>
-      <div className="flex gap-1.5 overflow-hidden">
-        <Block className="h-7 w-[55%] shrink-0 rounded-md" />
-        <Block className="h-7 w-[40%] shrink-0 rounded-md opacity-70" />
+      <BlockSoft className="h-2 w-1/2 rounded-sm" />
+      <div className="flex gap-1 overflow-hidden">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div key={index} className="w-[31%] shrink-0 space-y-1">
+            <Block className="aspect-square w-full rounded-md" />
+            <BlockSoft className="h-1.5 w-full" />
+            <BlockSoft className="h-1 w-2/3" />
+          </div>
+        ))}
+      </div>
+      <BlockSoft className="h-2 w-2/5 rounded-sm" />
+      <div className="flex gap-1 overflow-hidden">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div key={index} className="w-[31%] shrink-0 space-y-1">
+            <Block
+              className={`aspect-square w-full rounded-md${index === 2 ? ' opacity-70' : ''}`}
+            />
+            <BlockSoft className="h-1.5 w-full" />
+            <BlockSoft className="h-1 w-2/3" />
+          </div>
+        ))}
       </div>
     </div>
   )

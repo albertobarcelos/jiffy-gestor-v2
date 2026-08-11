@@ -1,48 +1,40 @@
 'use client'
 
-import { Info, User } from 'lucide-react'
 import type { DeliveryPublicoDesignConfig } from '../../../../shared/types/deliveryPublicoDesignConfig'
 
 type DeliveryGradeHeaderProps = {
   config: DeliveryPublicoDesignConfig
-  disponivel: boolean
 }
 
-export function DeliveryGradeHeader({ config, disponivel }: DeliveryGradeHeaderProps) {
+export function DeliveryGradeHeader({ config }: DeliveryGradeHeaderProps) {
   const nomeLoja = config.cabecalho.nomeExibicao.trim() || 'Sua loja'
   const logoRadius = config.cabecalho.logoFormato === 'circular' ? '9999px' : '12px'
+  const capaUrl = config.cabecalho.capaUrl
 
   return (
-    <header className="relative px-4 pt-3">
+    <header className="relative z-20 px-2.5 pt-0">
       <div
-        className="relative overflow-hidden rounded-b-[2rem] bg-cover bg-center @sm:rounded-b-[2.25rem]"
-        style={{
-          backgroundColor: 'var(--delivery-hero-bg)',
-          backgroundImage: config.cabecalho.capaUrl ? `url(${config.cabecalho.capaUrl})` : undefined,
-        }}
+        className="delivery-loja-capa delivery-grade-capa relative w-full overflow-hidden rounded-b-xl"
+        style={{ backgroundColor: 'var(--delivery-primary-dark)' }}
+        role="img"
+        aria-label="Capa da loja"
       >
-        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/20 to-black/50" />
+        {capaUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={capaUrl}
+            alt=""
+            className="relative z-0 block h-auto w-full object-contain object-center"
+          />
+        ) : (
+          <div className="delivery-grade-capa-placeholder w-full" aria-hidden />
+        )}
 
-        <div className="relative flex items-start justify-between px-4 pb-6 pt-4">
-          <button
-            type="button"
-            aria-label="Informações"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/50 bg-black/20 text-white backdrop-blur-sm"
-          >
-            <Info className="h-4 w-4" aria-hidden />
-          </button>
-          <button
-            type="button"
-            aria-label="Perfil"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/50 bg-black/20 text-white backdrop-blur-sm"
-          >
-            <User className="h-4 w-4" aria-hidden />
-          </button>
-        </div>
+        <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-b from-black/30 via-black/20 to-black/50" />
 
-        <div className="relative flex flex-col items-center px-4 pb-8 pt-2 text-center">
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center px-4 text-center">
           <div
-            className="mb-3 flex h-14 w-14 items-center justify-center overflow-hidden border-2 border-white bg-white shadow-md"
+            className="mb-2 flex h-14 w-14 items-center justify-center overflow-hidden border-2 border-white bg-white shadow-md @sm:mb-3"
             style={{ borderRadius: logoRadius }}
           >
             {config.cabecalho.logoUrl ? (
@@ -55,18 +47,11 @@ export function DeliveryGradeHeader({ config, disponivel }: DeliveryGradeHeaderP
             )}
           </div>
           <h1
-            className="text-lg font-bold uppercase tracking-wide text-white @sm:text-xl"
+            className="truncate text-lg font-bold uppercase tracking-wide text-white @sm:text-xl"
             style={{ fontFamily: 'var(--delivery-font-title)' }}
           >
             {nomeLoja}
           </h1>
-          <span
-            className={`mt-2 rounded-md px-2.5 py-1 text-xs font-semibold ${
-              disponivel ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-            }`}
-          >
-            {disponivel ? 'Disponível' : 'Indisponível'}
-          </span>
         </div>
       </div>
     </header>

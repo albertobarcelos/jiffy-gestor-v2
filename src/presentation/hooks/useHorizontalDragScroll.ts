@@ -30,6 +30,9 @@ export function useHorizontalDragScroll<T extends HTMLElement>() {
   const handleMouseDown = useCallback(
     (event: React.MouseEvent<T>) => {
       if (!scrollRef.current) return
+      // Só botão principal; evita interferir em outros gestos.
+      if (event.button !== 0) return
+
       hasMovedRef.current = false
       suppressClickRef.current = false
       setIsDragging(true)

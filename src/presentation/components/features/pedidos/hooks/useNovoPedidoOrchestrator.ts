@@ -12,6 +12,7 @@ import {
 } from '@/src/presentation/hooks/useVendas'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
+import { usePreferenciasImpressaoDelivery } from '@/src/presentation/hooks/usePreferenciasImpressaoDelivery'
 import { useImpressaoDelivery } from '@/features/delivery/hooks/useImpressaoDelivery'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import type { NovoPedidoModalProps } from '../types'
@@ -72,7 +73,8 @@ export function useNovoPedidoOrchestrator({
   tipoInicioPedido = 'balcao',
   abaDetalhesInicial,
 }: NovoPedidoModalProps) {
-  const { empresa, preferenciasImpressaoDelivery } = useEmpresaMe()
+  const { empresa } = useEmpresaMe()
+  const { preferenciasImpressaoDelivery } = usePreferenciasImpressaoDelivery()
   const { processarAposTransicaoVendaGestorId } = useImpressaoDelivery()
   const empresaId = useTenantEmpresaId()
   const createVendaGestor = useCreateVendaGestor()
@@ -194,7 +196,7 @@ export function useNovoPedidoOrchestrator({
   const pedidoBalcao = tipoInicioPedido !== 'entrega'
   const canalVendaNovoPedido: CanalVendaNovoPedido =
     tipoInicioPedido === 'entrega' ? 'entrega' : 'balcao'
-  /** Balcão e delivery: passo de produtos é sempre o step 1 na criação. */
+  /** BalcÃ£o e delivery: passo de produtos Ã© sempre o step 1 na criaÃ§Ã£o. */
   const estaNoPassoProdutos = open && !modoVisualizacao && currentStep === 1
 
   const {
@@ -408,11 +410,11 @@ export function useNovoPedidoOrchestrator({
     pagamentoEntregaConfirmado,
   } = flags
 
-  /** Primeira carga ou fetch sem cache ainda — evita área vazia sem feedback */
+  /** Primeira carga ou fetch sem cache ainda â€” evita Ã¡rea vazia sem feedback */
   const mostrarLoadingFormasPagamento =
     isPendingMeiosPagamento || (isFetchingMeiosPagamento && meiosPagamentoData === undefined)
 
-  // Refs estáveis: evitam que `carregarVendaExistente` mude quando queries atualizam ao focar a aba
+  // Refs estÃ¡veis: evitam que `carregarVendaExistente` mude quando queries atualizam ao focar a aba
   const meiosPagamentoRef = useRef(meiosPagamento)
   meiosPagamentoRef.current = meiosPagamento
   const tenantAuth = useAuthStore(s => s.tenantAuth)

@@ -13,13 +13,37 @@ describe('designPublishRules', () => {
     expect(getPublishDisabledReason(createDefaultDesignConfig())).toBeUndefined()
   })
 
-  it('bloqueia layout premium com motivo', () => {
-    const config = {
-      ...createDefaultDesignConfig(),
-      layoutId: 'vitrine' as const,
+  it('permite layouts vitrine, grade e catalogo', () => {
+    for (const layoutId of ['vitrine', 'grade', 'catalogo'] as const) {
+      const config = {
+        ...createDefaultDesignConfig(),
+        layoutId,
+      }
+      expect(canPublishDesign(config)).toBe(true)
+      expect(getPublishDisabledReason(config)).toBeUndefined()
     }
-    expect(canPublishDesign(config)).toBe(false)
-    expect(getPublishDisabledReason(config)).toMatch(/Básico/i)
+  })
+
+  it('permite tipografias urbana, moderna, classica e elegante', () => {
+    for (const presetId of ['urbana', 'moderna', 'classica', 'elegante'] as const) {
+      const config = {
+        ...createDefaultDesignConfig(),
+        tipografia: { presetId },
+      }
+      expect(canPublishDesign(config)).toBe(true)
+      expect(getPublishDisabledReason(config)).toBeUndefined()
+    }
+  })
+
+  it('permite paletas sugeridas antes bloqueadas', () => {
+    for (const paletaId of ['pessego', 'hortela', 'mostarda'] as const) {
+      const config = {
+        ...createDefaultDesignConfig(),
+        cores: { paletaId },
+      }
+      expect(canPublishDesign(config)).toBe(true)
+      expect(getPublishDisabledReason(config)).toBeUndefined()
+    }
   })
 
   it('permite paleta personalizada', () => {

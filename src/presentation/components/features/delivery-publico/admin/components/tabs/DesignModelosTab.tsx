@@ -16,8 +16,8 @@ export function DesignModelosTab({ config, onChange }: DesignModelosTabProps) {
       <div>
         <h3 className="text-base font-semibold text-primary">Modelos</h3>
         <p className="mt-1 text-sm text-secondary-text">
-          Escolha a estrutura do catálogo. Cores, fontes e demais opções do design aplicam em
-          qualquer modelo.
+          Escolha a estrutura da home do cardápio. Carrinho e pagamento são os mesmos em todos os
+          modelos. Cores, fontes e demais opções do design aplicam em qualquer modelo.
         </p>
       </div>
 
@@ -26,7 +26,6 @@ export function DesignModelosTab({ config, onChange }: DesignModelosTabProps) {
           <DesignSelectableCard
             key={modelo.id}
             selected={config.layoutId === modelo.id}
-            premium={modelo.premium}
             title={modelo.nome}
             description={modelo.descricao}
             onClick={() => onChange(current => ({ ...current, layoutId: modelo.id }))}

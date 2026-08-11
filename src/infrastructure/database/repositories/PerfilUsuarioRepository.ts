@@ -118,6 +118,8 @@ export class PerfilUsuarioRepository implements IPerfilUsuarioRepository {
         lancarTaxa: data.lancarTaxa !== undefined ? data.lancarTaxa : false,
         removerTaxa: data.removerTaxa !== undefined ? data.removerTaxa : false,
         removerLicenca: data.removerLicenca !== undefined ? data.removerLicenca : false,
+        exigirMotivoCancelamento:
+          data.exigirMotivoCancelamento !== undefined ? data.exigirMotivoCancelamento : true,
       }
 
       const response = await this.apiClient.request<any>(
@@ -180,6 +182,9 @@ export class PerfilUsuarioRepository implements IPerfilUsuarioRepository {
       if (data.lancarTaxa !== undefined) requestBody.lancarTaxa = data.lancarTaxa
       if (data.removerTaxa !== undefined) requestBody.removerTaxa = data.removerTaxa
       if (data.removerLicenca !== undefined) requestBody.removerLicenca = data.removerLicenca
+      if (data.exigirMotivoCancelamento !== undefined) {
+        requestBody.exigirMotivoCancelamento = data.exigirMotivoCancelamento
+      }
 
       // Log para debug
       console.log('📤 [PerfilUsuarioRepository] Enviando para API externa:', {

@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import { Search } from 'lucide-react'
 import type { DeliveryPublicoGrupoViewModel } from '../../../../shared/types/deliveryPublicoViewModel'
 
@@ -18,60 +19,86 @@ export function DeliveryVitrineCategoriaTabs({
   onGrupoClick,
   onSearchToggle,
 }: DeliveryVitrineCategoriaTabsProps) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const activeTabRef = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    if (!activeGrupoId) return
+    const scroller = scrollRef.current
+    const tab = activeTabRef.current
+    if (!scroller || !tab) return
+
+    const scrollerRect = scroller.getBoundingClientRect()
+    const tabRect = tab.getBoundingClientRect()
+    const tabOffset = tabRect.left - scrollerRect.left + scroller.scrollLeft
+    const target = tabOffset - (scroller.clientWidth - tabRect.width) / 2
+    const maxScroll = Math.max(0, scroller.scrollWidth - scroller.clientWidth)
+    const nextLeft = Math.max(0, Math.min(target, maxScroll))
+
+    if (Math.abs(scroller.scrollLeft - nextLeft) < 1) return
+    scroller.scrollTo({ left: nextLeft, behavior: 'auto' })
+  }, [activeGrupoId])
+
   if (grupos.length === 0) return null
 
   return (
-    <div
-      className="sticky top-0 z-20 border-b bg-white"
-      style={{ borderColor: 'var(--delivery-card-border)' }}
-    >
-      <div className="flex items-center gap-2 px-2 @sm:px-3">
-        <div className="flex min-w-0 flex-1 overflow-x-auto scrollbar-hide">
-          <div className="flex w-max min-w-full">
-            {grupos.map(grupo => {
-              const active = grupo.id === activeGrupoId
-              const className = `shrink-0 border-b-2 px-3 py-3 text-sm font-semibold transition-colors @sm:px-4 ${
-                active ? 'border-[var(--delivery-primary)]' : 'border-transparent'
-              }`
+    <div className="flex max-w-full min-w-0 items-end gap-2 px-2 @sm:px-3">
+      <div
+        ref={scrollRef}
+        className="max-w-full min-w-0 flex-1 touch-pan-x overflow-x-auto overflow-y-hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
+        <div className="flex w-max min-w-full">
+          {grupos.map(grupo => {
+            const active = grupo.id === activeGrupoId
+            // pb menor: underline fica perto do nome (não “flutuando” no fundo da barra).
+            const className = `shrink-0 border-b-2 px-3 pt-2.5 pb-1 text-sm font-semibold transition-colors @sm:px-4 @sm:pt-3 @sm:pb-1.5 ${
+              active ? 'border-[var(--delivery-primary)]' : 'border-transparent'
+            }`
 
-              const style = {
-                color: active ? 'var(--delivery-primary)' : 'var(--delivery-text-secondary)',
-                fontFamily: 'var(--delivery-font-body)',
-              } as const
+            const style = {
+              color: active ? 'var(--delivery-primary)' : 'var(--delivery-text-secondary)',
+              fontFamily: 'var(--delivery-font-body)',
+            } as const
 
-              if (interactive && onGrupoClick) {
-                return (
-                  <button
-                    key={grupo.id}
-                    type="button"
-                    onClick={() => onGrupoClick(grupo.id)}
-                    className={className}
-                    style={style}
-                  >
-                    {grupo.nome}
-                  </button>
-                )
-              }
-
+            if (interactive && onGrupoClick) {
               return (
-                <span key={grupo.id} className={className} style={style}>
+                <button
+                  key={grupo.id}
+                  type="button"
+                  ref={active ? el => { activeTabRef.current = el } : undefined}
+                  onClick={() => onGrupoClick(grupo.id)}
+                  className={className}
+                  style={style}
+                >
                   {grupo.nome}
-                </span>
+                </button>
               )
-            })}
-          </div>
-        </div>
+            }
 
-        <button
-          type="button"
-          aria-label="Pesquisar produtos"
-          disabled={!interactive}
-          onClick={() => interactive && onSearchToggle?.()}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[var(--delivery-primary)] disabled:cursor-default"
-        >
-          <Search className="h-5 w-5" aria-hidden />
-        </button>
+            return (
+              <span
+                key={grupo.id}
+                ref={active ? el => { activeTabRef.current = el } : undefined}
+                className={className}
+                style={style}
+              >
+                {grupo.nome}
+              </span>
+            )
+          })}
+        </div>
       </div>
+
+      <button
+        type="button"
+        aria-label="Pesquisar produtos"
+        disabled={!interactive}
+        onClick={() => interactive && onSearchToggle?.()}
+        className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--delivery-primary)] disabled:cursor-default"
+      >
+        <Search className="h-5 w-5" aria-hidden />
+      </button>
     </div>
   )
 }

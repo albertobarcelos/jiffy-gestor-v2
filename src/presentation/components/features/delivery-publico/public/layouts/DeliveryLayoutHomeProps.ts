@@ -1,6 +1,7 @@
 import type { ComponentType, Ref } from 'react'
 import type { DeliveryCarrinhoThumb } from '../../shared/components/DeliveryPedidoFooter'
 import type { DeliveryPublicoDesignConfig } from '../../shared/types/deliveryPublicoDesignConfig'
+import type { DeliveryLojaInformacoesData } from '../../shared/types/deliveryLojaInformacoes'
 import type { DeliveryPublicoViewModel } from '../../shared/types/deliveryPublicoViewModel'
 
 export type DeliveryLayoutHomeProps = {
@@ -8,6 +9,8 @@ export type DeliveryLayoutHomeProps = {
   viewModel: DeliveryPublicoViewModel
   /** Endereço formatado da loja (footer do layout Vitrine). */
   enderecoTexto?: string | null
+  /** Dados do modal de informações (botão "i" do status). */
+  lojaInformacoes?: DeliveryLojaInformacoesData | null
   interactive?: boolean
   onBuscaChange?: (termo: string) => void
   onGrupoClick?: (grupoId: string) => void
