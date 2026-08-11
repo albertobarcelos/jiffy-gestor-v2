@@ -10,13 +10,20 @@ const PALETAS_PUBLICAVEIS = new Set([
   'carvao',
   'lavanda',
   'mirtilo',
+  'pessego',
+  'canela',
+  'cereja',
+  'gergelim',
+  'hortela',
+  'chocolate',
+  'mostarda',
   'personalizada',
 ])
 
 const TIPOGRAFIAS_PUBLICAVEIS = new Set(['urbana'])
 
 const MENSAGEM_NAO_PUBLICAVEL =
-  'Somente as paletas Carvão, Lavanda, Mirtilo e Personalizada e a tipografia Urbana podem ser publicados no momento'
+  'Somente a tipografia Urbana pode ser publicada no momento'
 
 /**
  * Valida shape Zod + gate de publicação antes do POST /publish.

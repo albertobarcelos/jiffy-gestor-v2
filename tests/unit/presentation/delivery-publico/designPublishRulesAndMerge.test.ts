@@ -33,6 +33,17 @@ describe('designPublishRules', () => {
     expect(getPublishDisabledReason(config)).toMatch(/Urbana/i)
   })
 
+  it('permite paletas sugeridas antes bloqueadas', () => {
+    for (const paletaId of ['pessego', 'hortela', 'mostarda'] as const) {
+      const config = {
+        ...createDefaultDesignConfig(),
+        cores: { paletaId },
+      }
+      expect(canPublishDesign(config)).toBe(true)
+      expect(getPublishDisabledReason(config)).toBeUndefined()
+    }
+  })
+
   it('permite paleta personalizada', () => {
     const config = {
       ...createDefaultDesignConfig(),

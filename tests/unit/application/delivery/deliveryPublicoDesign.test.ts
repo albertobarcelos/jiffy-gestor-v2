@@ -121,12 +121,25 @@ describe('validarPublicacaoDesign', () => {
     }
   })
 
-  it('rejeita paleta não publicável', () => {
-    const result = validarPublicacaoDesign({
-      ...createDefaultDeliveryPublicoDesignConfig(),
-      cores: { paletaId: 'pessego' },
-    })
-    expect(result.ok).toBe(false)
+  it('aceita todas as paletas sugeridas', () => {
+    for (const paletaId of [
+      'carvao',
+      'lavanda',
+      'mirtilo',
+      'pessego',
+      'canela',
+      'cereja',
+      'gergelim',
+      'hortela',
+      'chocolate',
+      'mostarda',
+    ] as const) {
+      const result = validarPublicacaoDesign({
+        ...createDefaultDeliveryPublicoDesignConfig(),
+        cores: { paletaId },
+      })
+      expect(result.ok).toBe(true)
+    }
   })
 
   it('rejeita tipografia não publicável', () => {
