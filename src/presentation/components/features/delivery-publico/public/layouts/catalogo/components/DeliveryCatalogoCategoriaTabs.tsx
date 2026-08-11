@@ -64,7 +64,7 @@ export function DeliveryCatalogoCategoriaTabs({
             }
       }
     >
-      <div className="flex items-center gap-1 px-2 @sm:px-3">
+      <div className="flex max-w-full min-w-0 items-center gap-1 px-2 @sm:px-3">
         {onMenuClick ? (
           <button
             type="button"
@@ -80,7 +80,8 @@ export function DeliveryCatalogoCategoriaTabs({
 
         <div
           ref={scrollRef}
-          className="min-w-0 flex-1 overflow-x-auto scrollbar-hide"
+          className="max-w-full min-w-0 flex-1 touch-pan-x overflow-x-auto overflow-y-hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          style={{ WebkitOverflowScrolling: 'touch' }}
         >
           <div className="flex w-max">
             {grupos.map(grupo => {

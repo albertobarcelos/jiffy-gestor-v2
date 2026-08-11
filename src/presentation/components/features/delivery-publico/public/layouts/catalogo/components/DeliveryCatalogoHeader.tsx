@@ -5,7 +5,6 @@ import type { DeliveryPublicoDesignConfig } from '../../../../shared/types/deliv
 
 type DeliveryCatalogoHeaderProps = {
   config: DeliveryPublicoDesignConfig
-  disponivel: boolean
   carrinhoQuantidade: number
   interactive?: boolean
   onPedidoClick?: () => void
@@ -13,23 +12,33 @@ type DeliveryCatalogoHeaderProps = {
 
 export function DeliveryCatalogoHeader({
   config,
-  disponivel,
   carrinhoQuantidade,
   interactive = false,
   onPedidoClick,
 }: DeliveryCatalogoHeaderProps) {
   const nomeLoja = config.cabecalho.nomeExibicao.trim() || 'Sua loja'
   const logoRadius = config.cabecalho.logoFormato === 'circular' ? '9999px' : '10px'
+  const capaUrl = config.cabecalho.capaUrl
 
   return (
     <header>
       <div
-        className="h-36 bg-cover bg-center @sm:h-40"
-        style={{
-          backgroundColor: 'var(--delivery-hero-bg)',
-          backgroundImage: config.cabecalho.capaUrl ? `url(${config.cabecalho.capaUrl})` : undefined,
-        }}
-      />
+        className="delivery-loja-capa delivery-catalogo-capa relative w-full overflow-hidden"
+        style={{ backgroundColor: 'var(--delivery-primary-dark)' }}
+        role="img"
+        aria-label="Capa da loja"
+      >
+        {capaUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={capaUrl}
+            alt=""
+            className="relative z-0 block h-auto w-full object-contain object-center"
+          />
+        ) : (
+          <div className="delivery-catalogo-capa-placeholder w-full" aria-hidden />
+        )}
+      </div>
 
       <div className="flex items-center gap-3 px-4 py-3">
         <div
@@ -61,14 +70,6 @@ export function DeliveryCatalogoHeader({
             {nomeLoja}
           </h1>
         </div>
-
-        <span
-          className={`hidden shrink-0 rounded-md px-2 py-1 text-xs font-semibold @sm:inline-flex ${
-            disponivel ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-          }`}
-        >
-          {disponivel ? 'Disponível' : 'Indisponível'}
-        </span>
 
         <button
           type="button"

@@ -293,34 +293,42 @@ html.delivery-publico-ios-lock select {
 }
 
 /**
- * Grade — altura ditada pela imagem (sem crop; object-contain).
- * Fundo = primary-dark (mesmo tom da coluna). Preview colado no topo.
+ * Grade / Catálogo — altura ditada pela imagem (sem crop; object-contain).
+ * Fundo = primary-dark. Preview colado no topo.
  */
-.delivery-loja-capa.delivery-grade-capa {
+.delivery-loja-capa.delivery-grade-capa,
+.delivery-loja-capa.delivery-catalogo-capa {
   aspect-ratio: auto;
   height: auto;
   background-color: var(--delivery-primary-dark) !important;
 }
 
-.delivery-grade-capa-placeholder {
+.delivery-grade-capa-placeholder,
+.delivery-catalogo-capa-placeholder {
   aspect-ratio: 2.5 / 1;
 }
 
-.delivery-preview-shell .delivery-loja-capa.delivery-grade-capa {
+.delivery-preview-shell .delivery-loja-capa.delivery-grade-capa,
+.delivery-preview-shell .delivery-loja-capa.delivery-catalogo-capa {
   height: auto !important;
   aspect-ratio: auto;
   margin-top: 0 !important;
   background-color: var(--delivery-primary-dark) !important;
+}
+
+.delivery-preview-shell .delivery-loja-capa.delivery-grade-capa {
   /* Grade mantém cantos inferiores levemente arredondados (override do radius 0 do preview). */
   border-radius: 0 0 0.75rem 0.75rem !important;
 }
 
-.delivery-preview-shell .delivery-grade-capa-placeholder {
+.delivery-preview-shell .delivery-grade-capa-placeholder,
+.delivery-preview-shell .delivery-catalogo-capa-placeholder {
   aspect-ratio: 2.5 / 1;
 }
 
 @media (min-width: 1024px) {
-  .delivery-loja-capa.delivery-grade-capa {
+  .delivery-loja-capa.delivery-grade-capa,
+  .delivery-loja-capa.delivery-catalogo-capa {
     aspect-ratio: auto;
     height: auto;
     max-height: none;

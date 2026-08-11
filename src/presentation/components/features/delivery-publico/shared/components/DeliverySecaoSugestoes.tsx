@@ -33,7 +33,6 @@ export function DeliverySecaoSugestoes({
     scrollRef,
     isDragging,
     handleMouseDown,
-    handleWheel,
     handleMouseMove,
     handleMouseUp,
     handleMouseLeave,
@@ -68,7 +67,6 @@ export function DeliverySecaoSugestoes({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
-        onWheel={handleWheel}
         className={`flex items-start gap-3 overflow-x-auto px-4 pb-0 pt-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
           isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'
         }`}

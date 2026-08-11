@@ -1,13 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useRef } from 'react'
 import { DeliveryPedidoFooter } from '../../../shared/components/DeliveryPedidoFooter'
 import { DeliveryPublicoLojaFooter } from '../../../shared/components/DeliveryPublicoLojaFooter'
+import { DeliveryStatusHorario } from '../../../shared/components/DeliveryStatusHorario'
 import { filterViewModelByBusca } from '../../../shared/utils/filterViewModelByBusca'
 import type { DeliveryLayoutHomeProps } from '../DeliveryLayoutHomeProps'
 import { DeliveryCatalogoHeader } from './components/DeliveryCatalogoHeader'
-import { DeliveryCatalogoSearch } from './components/DeliveryCatalogoSearch'
-import { DeliveryCatalogoCategoriaTabs } from './components/DeliveryCatalogoCategoriaTabs'
+import { DeliveryCatalogoStickyToolbar } from './components/DeliveryCatalogoStickyToolbar'
 import { DeliveryCatalogoSecaoGrupo } from './components/DeliveryCatalogoSecaoGrupo'
 import { DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID } from '../../../shared/constants/deliveryPublicoSugestoes'
 
@@ -15,6 +15,7 @@ export function CatalogoLayoutHome({
   config,
   viewModel,
   enderecoTexto,
+  lojaInformacoes = null,
   interactive = false,
   onBuscaChange,
   onGrupoClick,
@@ -27,55 +28,39 @@ export function CatalogoLayoutHome({
   carrinhoThumbsTargetRef,
 }: DeliveryLayoutHomeProps) {
   const filtered = filterViewModelByBusca(viewModel)
-  const [activeGrupoId, setActiveGrupoId] = useState<string | null>(
-    filtered.grupos[0]?.id ?? null
-  )
-
-  useEffect(() => {
-    if (!filtered.grupos.some(grupo => grupo.id === activeGrupoId)) {
-      setActiveGrupoId(filtered.grupos[0]?.id ?? null)
-    }
-  }, [filtered.grupos, activeGrupoId])
-
+  const rootRef = useRef<HTMLDivElement>(null)
   const stickyFooterVisible = viewModel.carrinho.quantidadeItens > 0
-
-  const handleGrupoClick = useCallback(
-    (grupoId: string) => {
-      setActiveGrupoId(grupoId)
-      onGrupoClick?.(grupoId)
-    },
-    [onGrupoClick]
-  )
 
   const handleMenuClick = useCallback(() => {
     const firstGrupo = filtered.grupos[0]
-    if (firstGrupo) handleGrupoClick(firstGrupo.id)
-  }, [filtered.grupos, handleGrupoClick])
+    if (firstGrupo) onGrupoClick?.(firstGrupo.id)
+  }, [filtered.grupos, onGrupoClick])
 
   return (
-    <div className="flex min-h-full flex-col pb-24">
+    <div ref={rootRef} className="flex min-h-full flex-col pb-24">
       <div className="delivery-publico-content-column flex min-h-0 w-full flex-1 flex-col">
         <DeliveryCatalogoHeader
           config={config}
-          disponivel={viewModel.disponivel}
           carrinhoQuantidade={viewModel.carrinho.quantidadeItens}
           interactive={interactive}
           onPedidoClick={onPedidoClick}
         />
 
-        <div className="mt-2 space-y-3">
-          <DeliveryCatalogoSearch
-            termoBusca={viewModel.termoBusca}
-            interactive={interactive}
-            onChange={onBuscaChange}
-          />
-        </div>
-
-        <DeliveryCatalogoCategoriaTabs
-          grupos={filtered.grupos}
-          activeGrupoId={activeGrupoId}
+        <DeliveryStatusHorario
+          disponivel={viewModel.disponivel}
+          horarioTexto={viewModel.horarioTexto}
           interactive={interactive}
-          onGrupoClick={handleGrupoClick}
+          lojaInformacoes={lojaInformacoes}
+        />
+
+        <DeliveryCatalogoStickyToolbar
+          catalogRootRef={rootRef}
+          config={config}
+          grupos={filtered.grupos}
+          termoBusca={viewModel.termoBusca}
+          interactive={interactive}
+          onBuscaChange={onBuscaChange}
+          onGrupoClick={onGrupoClick}
           onMenuClick={handleMenuClick}
         />
 

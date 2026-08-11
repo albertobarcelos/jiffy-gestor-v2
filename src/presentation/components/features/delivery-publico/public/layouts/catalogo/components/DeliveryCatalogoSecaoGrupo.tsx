@@ -1,5 +1,6 @@
 'use client'
 
+import { useHorizontalDragScroll } from '@/src/presentation/hooks/useHorizontalDragScroll'
 import { DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID } from '../../../../shared/constants/deliveryPublicoSugestoes'
 import { DeliveryGrupoTituloBar } from '../../../../shared/components/DeliveryGrupoTituloBar'
 import { DeliverySecaoSugestoes } from '../../../../shared/components/DeliverySecaoSugestoes'
@@ -18,6 +19,10 @@ type DeliveryCatalogoSecaoGrupoProps = {
   onAbrirCarrinho?: () => void
 }
 
+/**
+ * Prateleira horizontal por grupo — identidade do modelo Catálogo
+ * (diferente do grid vertical da Grade / Vitrine).
+ */
 export function DeliveryCatalogoSecaoGrupo({
   config,
   grupo,
@@ -28,6 +33,15 @@ export function DeliveryCatalogoSecaoGrupo({
   onProdutoAddRapido,
   onAbrirCarrinho,
 }: DeliveryCatalogoSecaoGrupoProps) {
+  const {
+    scrollRef,
+    isDragging,
+    handleMouseDown,
+    handleMouseMove,
+    handleMouseUp,
+    handleMouseLeave,
+  } = useHorizontalDragScroll<HTMLDivElement>()
+
   if (grupo.produtos.length === 0) return null
 
   if (grupo.id === DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID) {
@@ -45,7 +59,10 @@ export function DeliveryCatalogoSecaoGrupo({
   }
 
   return (
-    <section className={`${denseTop ? 'mt-2' : 'mt-5'}`} id={`grupo-${grupo.id}`}>
+    <section
+      className={`${denseTop ? 'mt-2' : 'mt-5'} delivery-publico-grupo-section`}
+      id={`grupo-${grupo.id}`}
+    >
       <div className="px-4">
         <DeliveryGrupoTituloBar
           config={config}
@@ -54,11 +71,21 @@ export function DeliveryCatalogoSecaoGrupo({
         />
       </div>
 
-      <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-pl-4 scroll-pr-4 px-4 pb-1 scrollbar-hide [scroll-padding-inline:1rem]">
+      <div
+        ref={scrollRef}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
+        className={`flex max-w-full snap-x snap-mandatory gap-3 overflow-x-auto overflow-y-hidden scroll-pl-4 scroll-pr-4 px-4 pb-1 pt-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+          isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'
+        }`}
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
         {grupo.produtos.map(produto => (
           <div
             key={produto.id}
-            className="w-[min(68%,14.5rem)] shrink-0 snap-start @sm:w-[min(62%,15.5rem)]"
+            className="w-[min(32%,10.5rem)] shrink-0 snap-start @sm:w-[min(30%,12rem)] @lg:w-[min(24%,14rem)] @5xl:w-[min(20%,15rem)]"
           >
             <DeliveryCatalogoProdutoCard
               produto={produto}

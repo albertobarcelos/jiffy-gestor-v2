@@ -2,6 +2,8 @@
 
 import { useCallback, useRef, useState } from 'react'
 
+const DRAG_THRESHOLD_PX = 6
+
 /** Drag horizontal + wheel para faixas com overflow-x (checkout, wizard, etc.). */
 export function useHorizontalDragScroll<T extends HTMLElement>() {
   const scrollRef = useRef<T>(null)
@@ -12,6 +14,9 @@ export function useHorizontalDragScroll<T extends HTMLElement>() {
 
   const handleMouseDown = useCallback((event: React.MouseEvent<T>) => {
     if (!scrollRef.current) return
+    // Só botão principal; evita interferir em outros gestos.
+    if (event.button !== 0) return
+
     hasMovedRef.current = false
     setIsDragging(true)
 
@@ -24,12 +29,11 @@ export function useHorizontalDragScroll<T extends HTMLElement>() {
       if (!scrollRef.current) return
 
       const x = moveEvent.pageX - scrollRef.current.offsetLeft
-      const walk = (x - startXRef.current) * 2
+      const walk = x - startXRef.current
 
-      if (Math.abs(walk) > 5) {
+      if (Math.abs(walk) > DRAG_THRESHOLD_PX) {
         hasMovedRef.current = true
         moveEvent.preventDefault()
-        moveEvent.stopPropagation()
       }
 
       if (hasMovedRef.current) {
@@ -46,9 +50,22 @@ export function useHorizontalDragScroll<T extends HTMLElement>() {
       document.removeEventListener('mousemove', handleGlobalMouseMove)
       document.removeEventListener('mouseup', handleGlobalMouseUp)
 
-      setTimeout(() => {
+      // Após arrastar, o browser ainda dispara `click` no elemento sob o cursor.
+      // Captura e cancela esse click fantasma para não abrir o produto.
+      if (hasMovedRef.current) {
+        const suppressClick = (clickEvent: MouseEvent) => {
+          clickEvent.preventDefault()
+          clickEvent.stopPropagation()
+          clickEvent.stopImmediatePropagation()
+        }
+        document.addEventListener('click', suppressClick, true)
+        window.setTimeout(() => {
+          document.removeEventListener('click', suppressClick, true)
+          hasMovedRef.current = false
+        }, 0)
+      } else {
         hasMovedRef.current = false
-      }, 100)
+      }
     }
 
     document.addEventListener('mousemove', handleGlobalMouseMove)

@@ -27,7 +27,7 @@ export function DeliveryCatalogoProdutoCard({
   return (
     <div className="w-full snap-start">
       <div
-        className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl border"
+        className="relative aspect-square w-full overflow-hidden rounded-2xl border"
         style={{
           backgroundColor: 'var(--delivery-surface)',
           borderColor: 'var(--delivery-card-border)',

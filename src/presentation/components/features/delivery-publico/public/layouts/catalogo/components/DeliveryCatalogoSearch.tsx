@@ -5,16 +5,19 @@ import { Search } from 'lucide-react'
 type DeliveryCatalogoSearchProps = {
   termoBusca: string
   interactive?: boolean
+  /** Quando true, remove margem extra (ex.: dentro da sticky toolbar). */
+  embedded?: boolean
   onChange?: (termo: string) => void
 }
 
 export function DeliveryCatalogoSearch({
   termoBusca,
   interactive = false,
+  embedded = false,
   onChange,
 }: DeliveryCatalogoSearchProps) {
   return (
-    <div className="px-4">
+    <div className={embedded ? 'px-4 pt-3' : 'px-4'}>
       <label className="relative block">
         <Search
           className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"

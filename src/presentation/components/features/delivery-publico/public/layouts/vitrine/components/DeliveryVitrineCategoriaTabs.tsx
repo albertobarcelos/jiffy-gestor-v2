@@ -42,10 +42,11 @@ export function DeliveryVitrineCategoriaTabs({
   if (grupos.length === 0) return null
 
   return (
-    <div className="flex items-end gap-2 px-2 @sm:px-3">
+    <div className="flex max-w-full min-w-0 items-end gap-2 px-2 @sm:px-3">
       <div
         ref={scrollRef}
-        className="flex min-w-0 flex-1 overflow-x-auto scrollbar-hide"
+        className="max-w-full min-w-0 flex-1 touch-pan-x overflow-x-auto overflow-y-hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={{ WebkitOverflowScrolling: 'touch' }}
       >
         <div className="flex w-max min-w-full">
           {grupos.map(grupo => {
