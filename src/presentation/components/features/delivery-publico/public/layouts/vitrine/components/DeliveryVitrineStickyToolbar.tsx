@@ -97,6 +97,14 @@ export const DeliveryVitrineStickyToolbar = memo(function DeliveryVitrineStickyT
       (root.closest('.delivery-publico-scroll') as HTMLElement | null)
 
     let rafId = 0
+    let hiddenTitle: HTMLElement | null = null
+
+    const clearHiddenTitle = () => {
+      if (!hiddenTitle) return
+      hiddenTitle.style.visibility = ''
+      hiddenTitle.removeAttribute('data-delivery-title-pinned-hidden')
+      hiddenTitle = null
+    }
 
     const sync = () => {
       const title = document
@@ -104,6 +112,7 @@ export const DeliveryVitrineStickyToolbar = memo(function DeliveryVitrineStickyT
         ?.querySelector('.delivery-grupo-title') as HTMLElement | null
 
       if (!title) {
+        clearHiddenTitle()
         setShowPinnedTitle(false)
         return
       }
@@ -112,6 +121,17 @@ export const DeliveryVitrineStickyToolbar = memo(function DeliveryVitrineStickyT
       const stickyLine =
         viewportTop + pinMetrics.height + PINNED_TITLE_GAP_PX
       const next = title.getBoundingClientRect().top < stickyLine - 0.5
+
+      // Esconde o título da lista enquanto o clone fixo está ativo (evita duplicata).
+      if (next) {
+        if (hiddenTitle && hiddenTitle !== title) clearHiddenTitle()
+        title.style.visibility = 'hidden'
+        title.setAttribute('data-delivery-title-pinned-hidden', 'true')
+        hiddenTitle = title
+      } else {
+        clearHiddenTitle()
+      }
+
       setShowPinnedTitle(prev => (prev === next ? prev : next))
     }
 
@@ -132,6 +152,7 @@ export const DeliveryVitrineStickyToolbar = memo(function DeliveryVitrineStickyT
       scrollTarget.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onScroll)
       if (rafId) window.cancelAnimationFrame(rafId)
+      clearHiddenTitle()
     }
   }, [catalogRootRef, pinMetrics.pinned, pinMetrics.height, activeGrupoId])
 

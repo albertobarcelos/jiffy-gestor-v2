@@ -16,6 +16,7 @@ export function BasicoLayoutHome({
   config,
   viewModel,
   enderecoTexto,
+  lojaInformacoes = null,
   interactive = false,
   onBuscaChange,
   onGrupoClick,
@@ -45,6 +46,7 @@ export function BasicoLayoutHome({
           disponivel={viewModel.disponivel}
           horarioTexto={viewModel.horarioTexto}
           interactive={interactive}
+          lojaInformacoes={lojaInformacoes}
         />
         <DeliveryBasicoCatalogToolbar
           config={config}

@@ -9,6 +9,7 @@ import {
   buildMockDeliveryViewModel,
   buildPreviewViewModelFromGrupos,
 } from '../../shared/mappers/buildMockViewModel'
+import { buildMockLojaInformacoesData } from '../../shared/utils/buildLojaInformacoesData'
 import { applySugestoesDaCasaVisibility } from '../../shared/utils/applySugestoesDaCasaVisibility'
 import { LAYOUT_MODELS } from '../../shared/constants/layoutModels'
 import { resolveDeliveryLayoutHome } from '../../public/layouts/DeliveryPublicoLayoutRegistry'
@@ -32,6 +33,10 @@ export function DeliveryMobilePreviewFrame({
     return applySugestoesDaCasaVisibility(base, config, { injectPreviewFallback: true })
   }, [categoriasGrupos, config])
   const LayoutHome = resolveDeliveryLayoutHome(config.layoutId)
+  const lojaInformacoes = useMemo(
+    () => buildMockLojaInformacoesData(config.cabecalho.nomeExibicao),
+    [config.cabecalho.nomeExibicao]
+  )
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col items-stretch">
@@ -49,6 +54,7 @@ export function DeliveryMobilePreviewFrame({
                 config={config}
                 viewModel={viewModel}
                 enderecoTexto={null}
+                lojaInformacoes={lojaInformacoes}
                 interactive={false}
               />
             </div>

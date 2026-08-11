@@ -272,22 +272,34 @@ html.delivery-publico-ios-lock select {
 }
 
 /**
- * Grade — banner um pouco mais alto que a Vitrine (3:1) para overlap na área branca.
+ * Grade — mobile mantém proporção; desktop deixa a imagem ditar a altura
+ * (sem crop; object-contain no <img>).
  */
 .delivery-loja-capa.delivery-grade-capa {
+  aspect-ratio: auto;
+  height: auto;
+}
+
+.delivery-grade-capa-placeholder {
   aspect-ratio: 2.5 / 1;
 }
 
 .delivery-preview-shell .delivery-loja-capa.delivery-grade-capa {
+  height: auto !important;
+  aspect-ratio: auto;
+  /* Grade mantém cantos inferiores levemente arredondados (override do radius 0 do preview). */
+  border-radius: 0 0 0.75rem 0.75rem !important;
+}
+
+.delivery-preview-shell .delivery-grade-capa-placeholder {
   aspect-ratio: 2.5 / 1;
-  /* Grade mantém cantos inferiores arredondados (override do radius 0 do preview). */
-  border-radius: 0 0 2rem 2rem !important;
 }
 
 @media (min-width: 1024px) {
   .delivery-loja-capa.delivery-grade-capa {
     aspect-ratio: auto;
-    height: 320px;
+    height: auto;
+    max-height: none;
   }
 }
 

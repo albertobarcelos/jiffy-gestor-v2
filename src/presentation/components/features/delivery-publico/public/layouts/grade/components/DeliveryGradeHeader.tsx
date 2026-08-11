@@ -12,10 +12,9 @@ export function DeliveryGradeHeader({ config }: DeliveryGradeHeaderProps) {
   const capaUrl = config.cabecalho.capaUrl
 
   return (
-    <header className="relative z-20 px-4 pt-3">
-      {/* Mesma proporção do Básico/Vitrine: evita crop agressivo do bg-cover por altura do conteúdo. */}
+    <header className="relative z-20 px-2.5 pt-0">
       <div
-        className="delivery-loja-capa delivery-grade-capa relative h-auto w-full overflow-hidden rounded-b-[2rem] @sm:rounded-b-[2.25rem]"
+        className="delivery-loja-capa delivery-grade-capa relative w-full overflow-hidden rounded-b-xl"
         style={{ backgroundColor: 'var(--delivery-hero-bg)' }}
         role="img"
         aria-label="Capa da loja"
@@ -25,13 +24,15 @@ export function DeliveryGradeHeader({ config }: DeliveryGradeHeaderProps) {
           <img
             src={capaUrl}
             alt=""
-            className="absolute inset-0 h-full w-full object-cover object-center"
+            className="relative z-0 block h-auto w-full object-contain object-center"
           />
-        ) : null}
+        ) : (
+          <div className="delivery-grade-capa-placeholder w-full" aria-hidden />
+        )}
 
-        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/20 to-black/50" />
+        <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-b from-black/30 via-black/20 to-black/50" />
 
-        <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center">
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center px-4 text-center">
           <div
             className="mb-2 flex h-14 w-14 items-center justify-center overflow-hidden border-2 border-white bg-white shadow-md @sm:mb-3"
             style={{ borderRadius: logoRadius }}

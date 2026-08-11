@@ -15,6 +15,7 @@ export function VitrineLayoutHome({
   config,
   viewModel,
   enderecoTexto,
+  lojaInformacoes = null,
   interactive = false,
   onBuscaChange,
   onGrupoClick,
@@ -39,6 +40,7 @@ export function VitrineLayoutHome({
           disponivel={viewModel.disponivel}
           horarioTexto={viewModel.horarioTexto}
           interactive={interactive}
+          lojaInformacoes={lojaInformacoes}
         />
 
         <DeliveryVitrineStickyToolbar

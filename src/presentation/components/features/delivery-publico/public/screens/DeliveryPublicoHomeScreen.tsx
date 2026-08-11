@@ -15,12 +15,15 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type {
   CatalogoPublicoProdutoDTO,
   EmpresaPublicaDTO,
+  MeioPagamentoPublicoDTO,
 } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import type { HorarioFuncionamentoPublicoDTO } from '@/src/application/dto/delivery-publico/HorarioFuncionamentoPublicoDTO'
 import {
   flattenCatalogoGrupos,
   useAutoFetchCatalogoGrupos,
   usePublicDeliveryCatalogInfinite,
   usePublicDeliveryHorarioFuncionamento,
+  usePublicDeliveryMeiosPagamento,
 } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import { resolverExibicaoHorarioHome } from '../../shared/utils/formatarHorarioFuncionamentoPublico'
 import { isPublicDeliverySlugNotFound } from '@/src/infrastructure/api/publicDeliveryApi'
@@ -38,6 +41,7 @@ import { buildCatalogViewModel } from '../../shared/mappers/buildCatalogViewMode
 import { applySugestoesDaCasaVisibility } from '../../shared/utils/applySugestoesDaCasaVisibility'
 import { findCatalogoProdutoById } from '../../shared/utils/findCatalogoProdutoById'
 import { formatEmpresaPublicaEndereco } from '../../shared/utils/formatEmpresaPublicaEndereco'
+import { buildLojaInformacoesData } from '../../shared/utils/buildLojaInformacoesData'
 import { produtoTemComplementosAtivos } from '../../shared/utils/produtoComplementosUtils'
 import { resolveDeliveryLayoutHome } from '../layouts/DeliveryPublicoLayoutRegistry'
 import type { DeliveryPublicoViewModel } from '../../shared/types/deliveryPublicoViewModel'
@@ -100,6 +104,7 @@ export function DeliveryPublicoHomeScreen({
   const catalogQuery = usePublicDeliveryCatalogInfinite(slug)
   useAutoFetchCatalogoGrupos(catalogQuery)
   const horarioQuery = usePublicDeliveryHorarioFuncionamento(slug)
+  const meiosQuery = usePublicDeliveryMeiosPagamento(slug)
 
   const { data, isLoading, isError, error, isFetchingNextPage } = catalogQuery
   const empresa: EmpresaPublicaDTO | null = data?.pages[0]?.empresa ?? null
@@ -369,6 +374,8 @@ export function DeliveryPublicoHomeScreen({
         disponivel={exibicaoHorario.disponivel}
         horarioTexto={exibicaoHorario.horarioTexto}
         horarioSemanalTexto={exibicaoHorario.horarioSemanalTexto}
+        horario={horarioQuery.data ?? null}
+        meiosPagamento={meiosQuery.data?.meiosPagamento ?? []}
         carrinhoTotal={carrinhoTotal}
         carrinhoQuantidade={carrinhoQuantidade}
         isCatalogLoading={isCatalogLoading}
@@ -406,6 +413,8 @@ type DeliveryPublicoHomeContentProps = {
   disponivel: boolean
   horarioTexto: string
   horarioSemanalTexto: string
+  horario: HorarioFuncionamentoPublicoDTO | null
+  meiosPagamento: MeioPagamentoPublicoDTO[]
   carrinhoTotal: number
   carrinhoQuantidade: number
   isCatalogLoading: boolean
@@ -437,6 +446,8 @@ function DeliveryPublicoHomeContent({
   disponivel,
   horarioTexto,
   horarioSemanalTexto,
+  horario,
+  meiosPagamento,
   carrinhoTotal,
   carrinhoQuantidade,
   isCatalogLoading,
@@ -481,6 +492,21 @@ function DeliveryPublicoHomeContent({
     config,
   ])
 
+  const lojaInformacoes = useMemo(
+    () =>
+      buildLojaInformacoesData({
+        nomeLoja:
+          config.cabecalho.nomeExibicao ||
+          empresa?.nomeExibicao ||
+          empresa?.nomeFantasia ||
+          'Sua loja',
+        empresa,
+        horario,
+        meiosPagamento,
+      }),
+    [config.cabecalho.nomeExibicao, empresa, horario, meiosPagamento]
+  )
+
   const LayoutHome = resolveDeliveryLayoutHome(config.layoutId)
   const enderecoTexto = formatEmpresaPublicaEndereco(empresa?.endereco ?? null)
 
@@ -501,6 +527,7 @@ function DeliveryPublicoHomeContent({
         config={config}
         viewModel={viewModel}
         enderecoTexto={enderecoTexto}
+        lojaInformacoes={lojaInformacoes}
         interactive={!bloquearUiFlyToCart}
         onBuscaChange={onBuscaChange}
         onGrupoClick={onGrupoClick}

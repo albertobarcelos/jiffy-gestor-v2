@@ -15,6 +15,7 @@ export function GradeLayoutHome({
   config,
   viewModel,
   enderecoTexto,
+  lojaInformacoes = null,
   interactive = false,
   onBuscaChange,
   onGrupoClick,
@@ -44,13 +45,14 @@ export function GradeLayoutHome({
         <DeliveryGradeHeader config={config} />
 
         <div
-          className="relative z-0 -mt-10 flex flex-1 flex-col rounded-t-[1.75rem] pb-2 pt-12 @sm:-mt-12 @sm:pt-14"
+          className="relative z-0 -mt-10 flex flex-1 flex-col rounded-t-xl pb-2 pt-12 @sm:-mt-12 @sm:pt-14"
           style={{ backgroundColor: 'var(--delivery-bg, var(--delivery-surface))' }}
         >
           <DeliveryStatusHorario
             disponivel={viewModel.disponivel}
             horarioTexto={viewModel.horarioTexto}
             interactive={interactive}
+            lojaInformacoes={lojaInformacoes}
           />
 
           <DeliveryGradeStickyToolbar

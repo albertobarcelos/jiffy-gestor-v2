@@ -49,7 +49,7 @@ export function DeliveryGradeToolbar({
         disabled={!interactive}
         onClick={() => interactive && onPedidoClick?.()}
         className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white disabled:cursor-default"
-        style={{ backgroundColor: 'var(--delivery-primary)' }}
+        style={{ backgroundColor: 'var(--delivery-primary-dark, #171717)' }}
       >
         <ShoppingCart className="h-5 w-5" aria-hidden />
         {carrinhoQuantidade > 0 ? (
