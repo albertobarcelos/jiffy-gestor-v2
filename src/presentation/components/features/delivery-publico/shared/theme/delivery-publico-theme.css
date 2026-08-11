@@ -70,6 +70,7 @@
  */
 .delivery-basico-catalog-root {
   --delivery-sticky-toolbar-h: 0px;
+  --delivery-sticky-grupo-gap: 10px;
 }
 
 .delivery-basico-sticky-nav {
@@ -84,7 +85,9 @@
 }
 
 .delivery-basico-grupo-section {
-  scroll-margin-top: var(--delivery-sticky-toolbar-h);
+  scroll-margin-top: calc(
+    var(--delivery-sticky-toolbar-h) + var(--delivery-sticky-grupo-gap, 10px)
+  );
 }
 
 .delivery-basico-grupo-title-sticky {
@@ -95,10 +98,28 @@
 @media (min-width: 768px) {
   .delivery-basico-grupo-title-sticky {
     position: sticky;
-    top: var(--delivery-sticky-toolbar-h);
+    top: calc(
+      var(--delivery-sticky-toolbar-h) + var(--delivery-sticky-grupo-gap, 10px)
+    );
     z-index: 20;
     background-color: var(--delivery-primary-dark, #171717);
     color: var(--delivery-btn-text, #ffffff);
+  }
+
+  /*
+   * Faixa opaca no vão entre toolbar e título sticky (mesma ideia do overlay
+   * Grade/Vitrine) — evita conteúdo “vazar” ao rolar. Estende nas laterais
+   * para cobrir o px-4 / mx-4 da seção.
+   */
+  .delivery-basico-grupo-title-sticky::before {
+    content: '';
+    position: absolute;
+    left: -1rem;
+    right: -1rem;
+    bottom: 100%;
+    height: var(--delivery-sticky-grupo-gap, 10px);
+    background-color: var(--delivery-bg, var(--delivery-surface, #ffffff));
+    pointer-events: none;
   }
 }
 
@@ -272,12 +293,13 @@ html.delivery-publico-ios-lock select {
 }
 
 /**
- * Grade — mobile mantém proporção; desktop deixa a imagem ditar a altura
- * (sem crop; object-contain no <img>).
+ * Grade — altura ditada pela imagem (sem crop; object-contain).
+ * Fundo = primary-dark (mesmo tom da coluna). Preview colado no topo.
  */
 .delivery-loja-capa.delivery-grade-capa {
   aspect-ratio: auto;
   height: auto;
+  background-color: var(--delivery-primary-dark) !important;
 }
 
 .delivery-grade-capa-placeholder {
@@ -287,6 +309,8 @@ html.delivery-publico-ios-lock select {
 .delivery-preview-shell .delivery-loja-capa.delivery-grade-capa {
   height: auto !important;
   aspect-ratio: auto;
+  margin-top: 0 !important;
+  background-color: var(--delivery-primary-dark) !important;
   /* Grade mantém cantos inferiores levemente arredondados (override do radius 0 do preview). */
   border-radius: 0 0 0.75rem 0.75rem !important;
 }

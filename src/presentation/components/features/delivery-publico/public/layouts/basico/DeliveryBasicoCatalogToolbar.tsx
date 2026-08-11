@@ -8,10 +8,10 @@ import type { DeliveryPublicoGrupoViewModel } from '../../../shared/types/delive
 import { DeliveryBasicoCatalogStickyNav } from './DeliveryBasicoCatalogStickyNav'
 import type { RefObject } from 'react'
 
-function readCssPx(el: HTMLElement, varName: string): number {
+function readCssPx(el: HTMLElement, varName: string, fallback = 0): number {
   const raw = getComputedStyle(el).getPropertyValue(varName).trim()
   const value = Number.parseFloat(raw)
-  return Number.isFinite(value) ? value : 0
+  return Number.isFinite(value) ? value : fallback
 }
 
 type DeliveryBasicoCatalogToolbarProps = {
@@ -71,7 +71,9 @@ export const DeliveryBasicoCatalogToolbar = memo(function DeliveryBasicoCatalogT
         ? scrollRoot.getBoundingClientRect().top
         : 0
       const stickyLine =
-        viewportTop + readCssPx(root, '--delivery-sticky-toolbar-h') + 12
+        viewportTop +
+        readCssPx(root, '--delivery-sticky-toolbar-h') +
+        readCssPx(root, '--delivery-sticky-grupo-gap', 10)
 
       let nextId = sections[0].id.replace(/^grupo-/, '')
       for (const section of sections) {

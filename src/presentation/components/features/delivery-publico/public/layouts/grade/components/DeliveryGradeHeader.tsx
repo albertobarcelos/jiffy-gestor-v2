@@ -15,7 +15,7 @@ export function DeliveryGradeHeader({ config }: DeliveryGradeHeaderProps) {
     <header className="relative z-20 px-2.5 pt-0">
       <div
         className="delivery-loja-capa delivery-grade-capa relative w-full overflow-hidden rounded-b-xl"
-        style={{ backgroundColor: 'var(--delivery-hero-bg)' }}
+        style={{ backgroundColor: 'var(--delivery-primary-dark)' }}
         role="img"
         aria-label="Capa da loja"
       >

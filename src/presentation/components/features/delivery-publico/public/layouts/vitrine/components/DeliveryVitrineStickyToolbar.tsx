@@ -9,7 +9,7 @@ import {
   type RefObject,
 } from 'react'
 import { DeliveryBuscaProdutos } from '../../../../shared/components/DeliveryBuscaProdutos'
-import { DeliveryGrupoTituloBar } from '../../../../shared/components/DeliveryGrupoTituloBar'
+import { DeliveryPinnedGrupoTituloOverlay } from '../../../../shared/components/DeliveryPinnedGrupoTituloOverlay'
 import { useDeliveryActiveGrupoFromScroll } from '../../../../shared/hooks/useDeliveryActiveGrupoFromScroll'
 import type { DeliveryPublicoDesignConfig } from '../../../../shared/types/deliveryPublicoDesignConfig'
 import type { DeliveryPublicoGrupoViewModel } from '../../../../shared/types/deliveryPublicoViewModel'
@@ -191,25 +191,14 @@ export const DeliveryVitrineStickyToolbar = memo(function DeliveryVitrineStickyT
       </DeliveryBasicoCatalogStickyNav>
 
       {pinMetrics.pinned && showPinnedTitle && activeGrupo ? (
-        <div
-          className="pointer-events-none px-4"
-          style={{
-            position: 'fixed',
-            top: pinMetrics.top + pinMetrics.height + PINNED_TITLE_GAP_PX,
-            left: pinMetrics.left,
-            width: pinMetrics.width,
-            zIndex: 35,
-            transform: 'translateZ(0)',
-            backfaceVisibility: 'hidden',
-          }}
-        >
-          <DeliveryGrupoTituloBar
-            config={config}
-            nome={activeGrupo.nome}
-            imagemUrl={activeGrupo.imagemUrl}
-            className="mb-0 shadow-sm"
-          />
-        </div>
+        <DeliveryPinnedGrupoTituloOverlay
+          config={config}
+          grupo={activeGrupo}
+          top={pinMetrics.top + pinMetrics.height}
+          left={pinMetrics.left}
+          width={pinMetrics.width}
+          gapPx={PINNED_TITLE_GAP_PX}
+        />
       ) : null}
     </>
   )
