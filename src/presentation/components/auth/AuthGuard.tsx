@@ -127,7 +127,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
   /**
    * Sessão da empresa indisponível (expirada / refresh falhou).
-   * Mantém o hub e vai para Minhas Empresas quando a identidade ainda é válida.
+   * Mantém o hub quando identity **ou** access/refresh ainda permitem Meu Jiffy.
    */
   const endTenantSessionOrFullLogout = useCallback(async () => {
     if (redirectingRef.current) {
@@ -139,7 +139,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     }
     redirectingRef.current = true
 
-    if (identityHubStillValid()) {
+    const goHubAfterTenantLogout = async () => {
       try {
         sessionStorage.setItem(SESSION_STORAGE_TENANT_LOGOUT_SELF, '1')
       } catch {
@@ -151,26 +151,23 @@ export function AuthGuard({ children }: AuthGuardProps) {
         console.error('AuthGuard: erro ao encerrar sessão da empresa:', error)
       }
       window.location.href = HUB_PATH
+    }
+
+    if (identityHubStillValid()) {
+      await goHubAfterTenantLogout()
       return
     }
 
-    /**
-     * Sem identity válida o hub não pode abrir (só tenant/access deixa
-     * `usuario@sessao.local` e lista vazia). Tenta restaurar cookie; senão login.
-     */
     const restored = await restoreIdentityFromCookie()
     if (restored || identityHubStillValid()) {
-      try {
-        sessionStorage.setItem(SESSION_STORAGE_TENANT_LOGOUT_SELF, '1')
-      } catch {
-        /* noop */
-      }
-      try {
-        await logoutTenant()
-      } catch (error) {
-        console.error('AuthGuard: erro ao encerrar sessão da empresa:', error)
-      }
-      window.location.href = HUB_PATH
+      await goHubAfterTenantLogout()
+      return
+    }
+
+    /** Identity expirada: access/refresh ainda pode abrir o hub (padrão multi-tenant). */
+    const hubBearer = await ensureHubBearerToken()
+    if (hubBearer) {
+      await goHubAfterTenantLogout()
       return
     }
 
@@ -183,7 +180,8 @@ export function AuthGuard({ children }: AuthGuardProps) {
   }, [logout, logoutTenant])
 
   /**
-   * Hub exige identidade (JWT de login), não basta tenant/access da empresa.
+   * Hub: identity válido, cookie de identity, ou access/refresh via `ensureHubBearerToken`.
+   * Não exigir só identity — o JWT de identidade expira rápido; access/refresh mantém o Meu Jiffy.
    */
   const allowHubOrRedirectLogin = useCallback(async (): Promise<boolean> => {
     if (identityHubStillValid()) {
@@ -194,7 +192,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
       return true
     }
     const hubBearer = await ensureHubBearerToken()
-    return hubBearer?.source === 'identity'
+    return hubBearer !== null
   }, [])
 
   const redirectHubSemIdentidade = useCallback(() => {
