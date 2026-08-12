@@ -14,11 +14,19 @@ import { parseCreatePedidoPublicoResponse } from '@/src/application/dto/delivery
 export class PublicDeliveryApiError extends Error {
   constructor(
     message: string,
-    readonly status: number
+    readonly status: number,
+    readonly code?: string
   ) {
     super(message)
     this.name = 'PublicDeliveryApiError'
   }
+}
+
+/** Slot atingiu o limite de pedidos agendados. */
+export function isPublicDeliverySlotLotado(error: unknown): boolean {
+  if (!(error instanceof PublicDeliveryApiError)) return false
+  if (error.code === 'SLOT_LOTADO') return true
+  return /limite de pedidos|SLOT_LOTADO/i.test(error.message)
 }
 
 /** Slug não cadastrado — loja delivery inexistente. */
@@ -30,13 +38,28 @@ export function isPublicDeliverySlugNotFound(error: unknown): boolean {
   )
 }
 
-async function parseErrorMessage(res: Response): Promise<string> {
+async function parseErrorMessage(
+  res: Response
+): Promise<{ message: string; code?: string }> {
   try {
-    const data = (await res.json()) as { message?: string; error?: string }
-    return data.message || data.error || `Erro ${res.status}`
+    const data = (await res.json()) as {
+      message?: string
+      error?: string
+      details?: { code?: string }
+      code?: string
+    }
+    return {
+      message: data.message || data.error || `Erro ${res.status}`,
+      code: data.details?.code || data.code,
+    }
   } catch {
-    return `Erro ${res.status}`
+    return { message: `Erro ${res.status}` }
   }
+}
+
+async function throwPublicDeliveryApiError(res: Response): Promise<never> {
+  const parsed = await parseErrorMessage(res)
+  throw new PublicDeliveryApiError(parsed.message, res.status, parsed.code)
 }
 
 export async function fetchEmpresaPublicaMidia(slug: string): Promise<{
@@ -62,7 +85,7 @@ export async function fetchCatalogoPublico(
 
   const res = await fetch(url, { cache: 'no-store' })
   if (!res.ok) {
-    throw new PublicDeliveryApiError(await parseErrorMessage(res), res.status)
+    throw await throwPublicDeliveryApiError(res)
   }
   return res.json()
 }
@@ -73,7 +96,7 @@ export async function fetchMeiosPagamentoPublicos(
   const url = `/api/public/delivery/meios-pagamento/${encodeURIComponent(slug)}`
   const res = await fetch(url, { cache: 'no-store' })
   if (!res.ok) {
-    throw new PublicDeliveryApiError(await parseErrorMessage(res), res.status)
+    throw await throwPublicDeliveryApiError(res)
   }
   return res.json()
 }
@@ -88,7 +111,7 @@ export async function fetchDisponibilidadePublica(
   const url = `/api/public/delivery/disponibilidade/${encodeURIComponent(slug)}?${search.toString()}`
   const res = await fetch(url, { cache: 'no-store' })
   if (!res.ok) {
-    throw new PublicDeliveryApiError(await parseErrorMessage(res), res.status)
+    throw await throwPublicDeliveryApiError(res)
   }
   return res.json()
 }
@@ -99,7 +122,7 @@ export async function fetchHorarioFuncionamentoPublico(
   const url = `/api/public/delivery/horario-funcionamento/${encodeURIComponent(slug)}`
   const res = await fetch(url, { cache: 'no-store' })
   if (!res.ok) {
-    throw new PublicDeliveryApiError(await parseErrorMessage(res), res.status)
+    throw await throwPublicDeliveryApiError(res)
   }
   return res.json()
 }
@@ -113,7 +136,7 @@ export async function criarPedidoPublico(
     body: JSON.stringify(input),
   })
   if (!res.ok) {
-    throw new PublicDeliveryApiError(await parseErrorMessage(res), res.status)
+    throw await throwPublicDeliveryApiError(res)
   }
   return parseCreatePedidoPublicoResponse(await res.json())
 }
@@ -132,7 +155,7 @@ export async function buscarClienteDeliveryPublico(
   )
   if (res.status === 404) return null
   if (!res.ok) {
-    throw new PublicDeliveryApiError(await parseErrorMessage(res), res.status)
+    throw await throwPublicDeliveryApiError(res)
   }
   return res.json()
 }
@@ -146,7 +169,7 @@ export async function criarClienteDeliveryPublico(
     body: JSON.stringify(input),
   })
   if (!res.ok) {
-    throw new PublicDeliveryApiError(await parseErrorMessage(res), res.status)
+    throw await throwPublicDeliveryApiError(res)
   }
   return res.json()
 }
@@ -165,7 +188,7 @@ export async function atualizarClienteDeliveryPublico(
     }
   )
   if (!res.ok) {
-    throw new PublicDeliveryApiError(await parseErrorMessage(res), res.status)
+    throw await throwPublicDeliveryApiError(res)
   }
   return res.json()
 }

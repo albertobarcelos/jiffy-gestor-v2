@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import type { CheckoutFormData } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
 import type { CreatePedidoPublicoResponseDTO } from '@/src/application/dto/delivery-publico/CreatePedidoPublicoResponseDTO'
 import type { ClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
@@ -10,6 +11,7 @@ import { garantirEnderecoEntregaPublicoUseCase } from '@/src/application/use-cas
 import {
   atualizarClienteDeliveryPublico,
   buscarClienteDeliveryPublico,
+  isPublicDeliverySlotLotado,
 } from '@/src/infrastructure/api/publicDeliveryApi'
 import { usePublicDeliveryMeiosPagamento } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import { showToast } from '@/src/shared/utils/toast'
@@ -103,6 +105,7 @@ function limparLookupEstadoIncompleto(
 }
 
 export function useDeliveryCheckout(slug: string) {
+  const queryClient = useQueryClient()
   const itens = useDeliveryCarrinhoItens(slug)
   const total = useDeliveryCarrinhoTotal(slug)
   const limpar = useDeliveryCarrinhoStore(s => s.limpar)
@@ -565,12 +568,27 @@ export function useDeliveryCheckout(slug: string) {
       return { ok: true, pedido: resultado.pedido }
     } catch (error) {
       console.error(error)
+      if (isPublicDeliverySlotLotado(error)) {
+        setForm(prev => ({
+          ...prev,
+          slotInicio: '',
+          slotFim: '',
+          slotLabel: '',
+        }))
+        void queryClient.invalidateQueries({
+          queryKey: ['public-delivery', 'disponibilidade', slug],
+        })
+        showToast.error(
+          'Este horário esgotou. Escolha outro horário disponível.'
+        )
+        return { ok: false }
+      }
       showToast.error(error instanceof Error ? error.message : 'Erro ao enviar pedido')
       return { ok: false }
     } finally {
       setEnviando(false)
     }
-  }, [slug, itens, total, form, clienteLookup.cliente, limpar, resolveTelefoneApi])
+  }, [slug, itens, total, form, clienteLookup.cliente, limpar, resolveTelefoneApi, queryClient])
 
   return {
     itens,

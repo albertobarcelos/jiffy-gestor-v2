@@ -26,6 +26,7 @@ const DEFAULT_FORM: AgendamentoDeliveryConfigDTO = {
   intervaloSlotMinutos: 15,
   leadTimeMinutos: 45,
   diasAntecedenciaMax: 3,
+  maxPedidosPorSlot: null,
   turnos: [],
 }
 
@@ -83,6 +84,7 @@ export function AgendamentoDeliveryConfigScreen() {
     if (!configQuery.data) return
     setForm({
       ...configQuery.data,
+      maxPedidosPorSlot: configQuery.data.maxPedidosPorSlot ?? null,
       turnos: configQuery.data.turnos.map(t => ({ ...t })),
     })
     hidratadoRef.current = true
@@ -139,6 +141,7 @@ export function AgendamentoDeliveryConfigScreen() {
       const salvo = await salvarMutation.mutateAsync(validacao.data)
       setForm({
         ...salvo,
+        maxPedidosPorSlot: salvo.maxPedidosPorSlot ?? null,
         turnos: salvo.turnos.map(t => ({ ...t })),
       })
       showToast.success('Configuração de agendamento salva.')
@@ -334,6 +337,31 @@ export function AgendamentoDeliveryConfigScreen() {
                 />
                 <span className="block text-xs text-secondary-text">
                   De 1 a 7 dias à frente.
+                </span>
+              </label>
+
+              <label className="block space-y-1">
+                <span className="text-sm font-semibold text-primary-text">
+                  Máx. pedidos por horário
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  placeholder="Sem limite"
+                  value={form.maxPedidosPorSlot ?? ''}
+                  onChange={e => {
+                    const raw = e.target.value.trim()
+                    setForm(prev => ({
+                      ...prev,
+                      maxPedidosPorSlot:
+                        raw === '' ? null : Math.max(1, Number(raw) || 1),
+                    }))
+                  }}
+                  className="h-9 w-full rounded-lg border border-gray-200 px-3 text-sm text-primary-text"
+                />
+                <span className="block text-xs text-secondary-text">
+                  Deixe vazio para sem limite. Conta entrega e retirada no mesmo
+                  horário.
                 </span>
               </label>
             </div>

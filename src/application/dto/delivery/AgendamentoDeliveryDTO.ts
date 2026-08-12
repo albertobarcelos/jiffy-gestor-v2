@@ -21,6 +21,8 @@ export const agendamentoDeliveryConfigSchema = z
     intervaloSlotMinutos: z.union([z.literal(15), z.literal(30)]),
     leadTimeMinutos: z.number().int().nonnegative(),
     diasAntecedenciaMax: z.number().int().min(1).max(7),
+    /** Null = sem limite. Inteiro ≥ 1. */
+    maxPedidosPorSlot: z.number().int().min(1).nullable(),
     turnos: z.array(turnoHorarioFuncionamentoSchema),
   })
   .strict()

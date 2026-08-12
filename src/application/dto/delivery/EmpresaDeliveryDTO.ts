@@ -9,6 +9,7 @@ export interface ParametroDeliveryDTO {
   intervaloSlotMinutos?: 15 | 30
   leadTimeMinutos?: number
   diasAntecedenciaMax?: number
+  maxPedidosPorSlot?: number | null
   impressoraExpedicaoId: string | null
 }
 
