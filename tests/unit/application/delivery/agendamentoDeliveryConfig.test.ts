@@ -64,6 +64,7 @@ describe('validarConfigAgendamentoDelivery', () => {
       intervaloSlotMinutos: 15,
       leadTimeMinutos: 45,
       diasAntecedenciaMax: 3,
+      maxPedidosPorSlot: null,
       turnos: [
         {
           diaSemana: 1,
@@ -76,6 +77,32 @@ describe('validarConfigAgendamentoDelivery', () => {
     expect(result.ok).toBe(true)
   })
 
+  it('aceita maxPedidosPorSlot >= 1', () => {
+    const result = validarConfigAgendamentoDelivery({
+      timezone: 'America/Sao_Paulo',
+      aceitaAgendamento: true,
+      intervaloSlotMinutos: 15,
+      leadTimeMinutos: 45,
+      diasAntecedenciaMax: 3,
+      maxPedidosPorSlot: 8,
+      turnos: [],
+    })
+    expect(result.ok).toBe(true)
+  })
+
+  it('rejeita maxPedidosPorSlot = 0', () => {
+    const result = validarConfigAgendamentoDelivery({
+      timezone: 'America/Sao_Paulo',
+      aceitaAgendamento: true,
+      intervaloSlotMinutos: 15,
+      leadTimeMinutos: 45,
+      diasAntecedenciaMax: 3,
+      maxPedidosPorSlot: 0,
+      turnos: [],
+    })
+    expect(result.ok).toBe(false)
+  })
+
   it('rejeita antecedência fora de 1..7', () => {
     const result = validarConfigAgendamentoDelivery({
       timezone: 'America/Sao_Paulo',
@@ -83,6 +110,7 @@ describe('validarConfigAgendamentoDelivery', () => {
       intervaloSlotMinutos: 15,
       leadTimeMinutos: 45,
       diasAntecedenciaMax: 9,
+      maxPedidosPorSlot: null,
       turnos: [],
     })
     expect(result.ok).toBe(false)

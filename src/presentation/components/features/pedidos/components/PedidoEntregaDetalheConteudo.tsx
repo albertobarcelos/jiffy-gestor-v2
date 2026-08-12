@@ -13,6 +13,8 @@ import {
   rotuloCobrancaEntrega,
   taxaEntregaTemValor,
 } from '@/src/application/mappers/PedidoDisplayMapper'
+import { formatarAgendaSlotDelivery } from '@/src/presentation/components/features/kanban/utils/kanbanDeliveryCardDisplay'
+import { useEmpresaDeliveryMe } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
 import type { DetalhesEntregaPedido, FluxoPagamentoEntrega, PagamentoSelecionado } from '../types'
 import { PedidoDetalhesObservacoesSection } from './PedidoDetalhesObservacoesSection'
 
@@ -52,6 +54,7 @@ export function PedidoEntregaDetalheConteudo({
   exibirTitulo = true,
   className = '',
 }: PedidoEntregaDetalheConteudoProps) {
+  const { data: empresaDelivery } = useEmpresaDeliveryMe()
   const nomeCliente = detalhesEntrega?.clienteNome || clienteNome || '—'
 
   const troco =
@@ -70,6 +73,31 @@ export function PedidoEntregaDetalheConteudo({
   )
 
   const entregadorExibicao = nomeEntregador?.trim() || '—'
+
+  const previsaoEntregaExibicao = useMemo(() => {
+    const agenda = formatarAgendaSlotDelivery(
+      {
+        pedidoAgendado: detalhesEntrega?.pedidoAgendado,
+        slotInicio: detalhesEntrega?.slotInicio,
+        slotFim: detalhesEntrega?.slotFim,
+        previsaoEntregaEm: detalhesEntrega?.previsaoEntrega,
+      },
+      empresaDelivery?.parametroDelivery?.timezone ?? 'America/Sao_Paulo'
+    )
+    if (agenda) {
+      return `${agenda.data} · ${agenda.horario}`
+    }
+    return formatarPrevisaoEntregaExibicao(
+      detalhesEntrega?.previsaoEntrega,
+      formatarDataDetalhePedido
+    )
+  }, [
+    detalhesEntrega?.pedidoAgendado,
+    detalhesEntrega?.previsaoEntrega,
+    detalhesEntrega?.slotFim,
+    detalhesEntrega?.slotInicio,
+    empresaDelivery?.parametroDelivery?.timezone,
+  ])
 
   return (
     <div className={`flex flex-col gap-3 text-sm ${className}`.trim()}>
@@ -112,13 +140,7 @@ export function PedidoEntregaDetalheConteudo({
           {formatarEnderecoEntregaCompleto(detalhesEntrega?.enderecoEntrega)}
         </span>
       </div>
-      <LinhaDetalhe
-        label="Previsão de Entrega:"
-        value={formatarPrevisaoEntregaExibicao(
-          detalhesEntrega?.previsaoEntrega,
-          formatarDataDetalhePedido
-        )}
-      />
+      <LinhaDetalhe label="Previsão de Entrega:" value={previsaoEntregaExibicao} />
       <LinhaDetalhe
         label="Data Início Preparo:"
         value={formatarDataDetalhePedido(detalhesEntrega?.dataInicioPreparo)}

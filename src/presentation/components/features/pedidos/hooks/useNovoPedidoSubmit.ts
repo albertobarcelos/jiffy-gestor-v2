@@ -225,7 +225,18 @@ export function useNovoPedidoSubmit({
         err?.response?.data?.error ||
         err?.message ||
         'Erro ao criar pedido'
-      showToast.error(errorMessage)
+      const detailsCode = (err?.response?.data as { details?: { code?: string } } | undefined)
+        ?.details?.code
+      if (
+        detailsCode === 'SLOT_LOTADO' ||
+        /limite de pedidos|SLOT_LOTADO/i.test(errorMessage)
+      ) {
+        showToast.error(
+          'Este horário esgotou. Escolha outro horário disponível.'
+        )
+      } else {
+        showToast.error(errorMessage)
+      }
     } finally {
       finalizarSubmit()
     }
