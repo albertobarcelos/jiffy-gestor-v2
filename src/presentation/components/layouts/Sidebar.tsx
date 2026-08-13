@@ -48,6 +48,7 @@ export function Sidebar() {
       '/complementos',
       '/produtos',
       '/grupos-produtos',
+      '/menus',
       '/estoque',
     ]
     
@@ -103,6 +104,7 @@ export function Sidebar() {
         path: '#',
         icon: '📋',
         children: [
+          { name: 'Menus', path: '/menus', icon: '📖' },
           { name: 'Grupo Produtos', path: '/grupos-produtos', icon: '📦' },
           { name: 'Produtos', path: '/produtos', icon: '🛍️' },
           { name: 'Grupo Complementos', path: '/grupos-complementos', icon: '📋' },

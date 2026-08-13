@@ -2,6 +2,7 @@
 
 import { useReducer, useMemo, useEffect, useRef, useCallback } from 'react'
 import type { StatusFilter, TriState } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutosFilters'
+import { produtosInfiniteQueryParams } from '@/src/presentation/hooks/useProdutos'
 
 interface FiltersState {
   searchText: string
@@ -99,16 +100,19 @@ export function useProdutosFilters() {
   }, [state.ativoDeliveryFilter])
 
   const queryParams = useMemo(
-    () => ({
-      name: state.debouncedSearch || undefined,
-      ativo: ativoFilter,
-      ativoLocal: ativoLocalBoolean,
-      ativoDelivery: ativoDeliveryBoolean,
-      grupoProdutoId: state.grupoProdutoFilter || undefined,
-      grupoComplementosId:
-        state.grupoComplementoFilter === '__none__' ? undefined : state.grupoComplementoFilter || undefined,
-      limit: state.limit,
-    }),
+    () =>
+      produtosInfiniteQueryParams({
+        name: state.debouncedSearch || undefined,
+        ativo: ativoFilter,
+        ativoLocal: ativoLocalBoolean,
+        ativoDelivery: ativoDeliveryBoolean,
+        grupoProdutoId: state.grupoProdutoFilter || undefined,
+        grupoComplementosId:
+          state.grupoComplementoFilter === '__none__'
+            ? undefined
+            : state.grupoComplementoFilter || undefined,
+        limit: state.limit,
+      }),
     [state.debouncedSearch, ativoFilter, ativoLocalBoolean, ativoDeliveryBoolean, state.grupoProdutoFilter, state.grupoComplementoFilter, state.limit]
   )
 
