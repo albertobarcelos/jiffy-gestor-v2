@@ -2,6 +2,7 @@ import {
   normalizarUnidadeMedidaProduto,
   type UnidadeMedidaProduto,
 } from '@/src/shared/types/unidadeMedidaProduto'
+import type { ProdutoMenuResumo } from '@/src/shared/types/menus'
 
 /**
  * Entidade de domínio representando um Produto
@@ -23,6 +24,19 @@ interface ProdutoImpressoraResumo {
   id: string
   nome: string
   ativo: boolean
+}
+
+function mapMenusFromJson(raw: unknown): ProdutoMenuResumo[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((item: unknown) => {
+      const rec = asPlainRecord(item)
+      const nested = asPlainRecord(rec.menu)
+      const id = firstNonEmptyString(nested.id, rec.id)
+      const nome = firstNonEmptyString(nested.nome, rec.nome) || 'Menu'
+      return id ? { id, nome } : null
+    })
+    .filter((m): m is ProdutoMenuResumo => m != null)
 }
 
 function asPlainRecord(v: unknown): Record<string, unknown> {
@@ -142,7 +156,8 @@ export class Produto {
     private readonly origemMercadoria?: string,
     private readonly tipoProduto?: string,
     private readonly indicadorProducaoEscala?: string | null,
-    private readonly unidadeMedida: UnidadeMedidaProduto = 'UN'
+    private readonly unidadeMedida: UnidadeMedidaProduto = 'UN',
+    private readonly menus?: ProdutoMenuResumo[]
   ) {}
 
   static create(
@@ -168,7 +183,8 @@ export class Produto {
     origemMercadoria?: string,
     tipoProduto?: string,
     indicadorProducaoEscala?: string | null,
-    unidadeMedida?: UnidadeMedidaProduto
+    unidadeMedida?: UnidadeMedidaProduto,
+    menus?: ProdutoMenuResumo[]
   ): Produto {
     if (!id || !nome) {
       throw new Error('ID e nome são obrigatórios')
@@ -197,7 +213,8 @@ export class Produto {
       origemMercadoria,
       tipoProduto,
       indicadorProducaoEscala,
-      normalizarUnidadeMedidaProduto(unidadeMedida)
+      normalizarUnidadeMedidaProduto(unidadeMedida),
+      menus
     )
   }
 
@@ -257,7 +274,8 @@ export class Produto {
       fisc.origemMercadoria,
       fisc.tipoProduto,
       fisc.indicadorProducaoEscala,
-      normalizarUnidadeMedidaProduto(data.unidadeMedida)
+      normalizarUnidadeMedidaProduto(data.unidadeMedida),
+      mapMenusFromJson(data.menus)
     )
   }
 
@@ -358,6 +376,10 @@ export class Produto {
     return this.unidadeMedida
   }
 
+  getMenus(): ProdutoMenuResumo[] {
+    return this.menus || []
+  }
+
   /** Retorna cópia com campos fiscais atualizados (edição inline / lote). */
   withDadosFiscais(partial: {
     ncm?: string
@@ -404,6 +426,13 @@ export class Produto {
     })
   }
 
+  withMenus(menus: ProdutoMenuResumo[]): Produto {
+    return Produto.fromJSON({
+      ...this.toJSON(),
+      menus,
+    })
+  }
+
   toJSON() {
     return {
       id: this.id,
@@ -429,6 +458,7 @@ export class Produto {
       tipoProduto: this.tipoProduto ?? '',
       indicadorProducaoEscala: this.indicadorProducaoEscala ?? null,
       unidadeMedida: this.unidadeMedida,
+      menus: this.menus ?? [],
     }
   }
 }

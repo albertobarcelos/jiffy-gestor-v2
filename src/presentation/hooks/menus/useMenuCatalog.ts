@@ -58,7 +58,7 @@ export function useMenuProdutos(params: UseMenuProdutosParams) {
         count: data.count ?? 0,
       }
     },
-    { enabled: Boolean(menuId) && enabled }
+    { enabled: Boolean(menuId) && enabled, staleTime: 1000 * 60 * 5 }
   )
 }
 
@@ -95,6 +95,6 @@ export function useMenuGruposProdutos(params: UseMenuGruposParams) {
         count: data.count ?? 0,
       }
     },
-    { enabled: Boolean(menuId) && enabled }
+    { enabled: Boolean(menuId) && enabled, staleTime: 1000 * 60 * 5 }
   )
 }

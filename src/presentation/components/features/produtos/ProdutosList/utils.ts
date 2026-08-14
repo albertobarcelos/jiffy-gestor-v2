@@ -73,7 +73,9 @@ export function produtoFromApiPreservandoOrdem(anterior: Produto, raw: unknown):
     parsed.getCest(),
     parsed.getOrigemMercadoria(),
     parsed.getTipoProduto(),
-    parsed.getIndicadorProducaoEscala()
+    parsed.getIndicadorProducaoEscala(),
+    parsed.getUnidadeMedida(),
+    parsed.getMenus()
   )
 }
 
@@ -100,7 +102,9 @@ export const cloneProdutoWithPatch = (produto: Produto, patch: ProdutoPatch): Pr
     produto.getCest(),
     produto.getOrigemMercadoria(),
     produto.getTipoProduto(),
-    produto.getIndicadorProducaoEscala()
+    produto.getIndicadorProducaoEscala(),
+    produto.getUnidadeMedida(),
+    produto.getMenus()
   )
 
 /**

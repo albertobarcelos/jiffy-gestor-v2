@@ -232,7 +232,7 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
   }, [refetch])
 
   const handleTabsModalTabChange = useCallback(
-    (tab: 'produto' | 'complementos' | 'impressoras' | 'grupo') => {
+    (tab: 'produto' | 'complementos' | 'impressoras' | 'menus' | 'grupo') => {
       setTabsModalState((prev) => ({
         ...prev,
         tab,

@@ -57,7 +57,7 @@ export function useMenus(params: UseMenusParams = {}) {
         count: data.count ?? 0,
       }
     },
-    { enabled }
+    { enabled, staleTime: 1000 * 60 * 5 }
   )
 }
 
@@ -75,6 +75,6 @@ export function useMenu(menuId: string | undefined, enabled = true) {
       const data = await response.json()
       return data.data as Menu
     },
-    { enabled: Boolean(menuId) && enabled }
+    { enabled: Boolean(menuId) && enabled, staleTime: 1000 * 60 * 5 }
   )
 }

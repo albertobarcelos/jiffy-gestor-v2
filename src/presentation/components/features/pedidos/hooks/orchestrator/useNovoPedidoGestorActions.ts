@@ -211,7 +211,7 @@ export function useNovoPedidoGestorActions({
   }, [setProdutoTabsModalState])
 
   const handleTabChangeProdutoModal = useCallback(
-    (tab: 'produto' | 'complementos' | 'impressoras' | 'grupo') => {
+    (tab: 'produto' | 'complementos' | 'impressoras' | 'menus' | 'grupo') => {
       setProdutoTabsModalState((prev: ProdutosTabsModalState) => ({ ...prev, tab }))
     },
     [setProdutoTabsModalState]

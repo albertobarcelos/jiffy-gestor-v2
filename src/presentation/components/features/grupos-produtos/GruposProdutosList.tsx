@@ -360,7 +360,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
   }, [router, searchParams, invalidateListas, pathname])
 
   const handleProdutoTabChange = useCallback(
-    (tab: 'produto' | 'complementos' | 'impressoras' | 'grupo') => {
+    (tab: 'produto' | 'complementos' | 'impressoras' | 'menus' | 'grupo') => {
       setProdutoTabsState((prev) => ({
         ...prev,
         tab,

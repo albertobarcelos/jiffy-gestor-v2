@@ -266,7 +266,7 @@ export interface NovoPedidoDetalheSlice {
   ) => void
   handleFecharProdutoTabsModal: () => void
   handleTabChangeProdutoModal: (
-    tab: 'produto' | 'complementos' | 'impressoras' | 'grupo'
+    tab: 'produto' | 'complementos' | 'impressoras' | 'menus' | 'grupo'
   ) => void
   handleConfirmarCancelamentoVenda: () => void
   cancelarVendaGestor: ReturnType<typeof useCancelarVendaGestor>

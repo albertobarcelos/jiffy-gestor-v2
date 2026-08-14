@@ -111,6 +111,18 @@ export interface UpdateMenuProdutosBatchInput {
   update?: Array<{ produtoId: string } & UpdateMenuProdutoInput>
 }
 
+/** Resumo do menu no GET do produto (`menus: [{ id, nome }]`). */
+export interface ProdutoMenuResumo {
+  id: string
+  nome: string
+}
+
+/** PATCH `/cardapio/produtos/{id}/menus` — remove é aplicado antes do add. */
+export interface UpdateProdutoMenusInput {
+  add?: string[]
+  remove?: string[]
+}
+
 export interface ReorderInput {
   novaPosicao: number
 }
