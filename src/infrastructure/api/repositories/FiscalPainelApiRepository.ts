@@ -429,12 +429,16 @@ export class FiscalPainelApiRepository implements IFiscalPainelRepository {
       cache: 'no-store',
       headers: authHeaders(this.token),
     })
-    const data = await parseJson<CbenefItemDTO[] & { error?: string; message?: string }>(response)
+    const data = await parseJson<CbenefItemDTO[] | { error?: string; message?: string }>(response)
+    const mensagemErro =
+      data && typeof data === 'object' && !Array.isArray(data)
+        ? data.error || data.message
+        : undefined
     if (!response.ok) {
-      throw new Error(data.error || data.message || `Erro ao listar cBenef (${response.status})`)
+      throw new Error(mensagemErro || `Erro ao listar cBenef (${response.status})`)
     }
     if (!Array.isArray(data)) {
-      throw new Error(data.error || data.message || 'Resposta inválida ao listar cBenef')
+      throw new Error(mensagemErro || 'Resposta inválida ao listar cBenef')
     }
     return data
   }
