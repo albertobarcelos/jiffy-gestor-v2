@@ -53,7 +53,7 @@ function JiffyToastBar({ toast: t }: { toast: Toast }) {
  */
 export function AppToaster() {
   return (
-    <Toaster position="top-right" toastOptions={toastOptions}>
+    <Toaster position="top-right" toastOptions={toastOptions} containerClassName="print:hidden">
       {(t) => <JiffyToastBar toast={t} />}
     </Toaster>
   )

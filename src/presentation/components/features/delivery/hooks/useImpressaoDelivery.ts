@@ -54,7 +54,8 @@ function resolverTipoCupomComFallbackProduto(
 /**
  * Impressão do fluxo delivery: monta tickets via instruções + detalhe do pedido.
  */
-export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {  const { empresa, deliveryCupomTemplate } = useEmpresaMe()
+export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
+  const { empresa, deliveryCupomTemplate } = useEmpresaMe()
   const { preferenciasImpressaoDelivery } = usePreferenciasImpressaoDelivery()
 
   const avisarImpressoraExpedicaoNecessaria = useCallback(() => {

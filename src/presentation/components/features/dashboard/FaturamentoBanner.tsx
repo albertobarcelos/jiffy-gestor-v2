@@ -36,13 +36,14 @@ export function FaturamentoBanner({
 
   return (
     <div className="relative z-0 mx-2 mb-2 overflow-visible pt-1.5 md:mx-4">
-      <div className="relative overflow-visible rounded-2xl bg-secondary bg-gradient-to-br px-3 py-2 pr-24 sm:pr-28 md:px-5 md:py-4 md:pr-32 lg:pr-[min(300px,32vw)]">
+      <div className="relative overflow-hidden rounded-2xl bg-secondary bg-gradient-to-br px-3 py-3 pr-3 sm:overflow-visible sm:pr-28 md:overflow-visible md:px-5 md:py-4 md:pr-32 lg:pr-[min(300px,32vw)]">
         {/* Duas colunas — definem a altura da faixa */}
-        <div className="relative z-10 grid grid-cols-1 items-center gap-6 lg:grid-cols-3 lg:gap-8">
-          <div>
+        <div className="relative z-10 grid grid-cols-1 items-center gap-3 lg:grid-cols-3 lg:gap-8">
+          <div className="flex items-end justify-between gap-2">
+            <div className="min-w-0 flex-1">
             <div className="mb-2 flex items-center gap-1 text-white/90">
-              <MdOutlineMonetizationOn className="h-8 w-8 text-[#F59E0B]" size={30} />
-              <span className="text-lg font-semibold">
+              <MdOutlineMonetizationOn className="h-7 w-7 shrink-0 text-[#F59E0B] md:h-8 md:w-8" size={30} />
+              <span className="text-base font-semibold md:text-lg">
                 {tituloFaturamentoBanner(periodoData)}
               </span>
             </div>
@@ -58,7 +59,7 @@ export function FaturamentoBanner({
                   : formatarMoeda(totalFaturadoPeriodo)}
             </p>
             <div
-              className={`font-regular mt-3 inline-flex flex-wrap items-center gap-1 py-1 text-base text-white/90 transition-opacity duration-300 ${
+              className={`font-regular mt-2 inline-flex flex-wrap items-center gap-1 py-1 text-sm text-white/90 transition-opacity duration-300 md:mt-3 md:text-base ${
                 atualizandoResumo && !carregandoResumo ? 'opacity-50' : ''
               }`}
             >
@@ -93,6 +94,17 @@ export function FaturamentoBanner({
                 </>
               )}
             </div>
+            </div>
+            <div className="relative h-[132px] w-[108px] shrink-0 sm:hidden" aria-hidden>
+              <Image
+                src="/images/jiffy-acenando.png"
+                alt=""
+                fill
+                className="object-contain object-bottom drop-shadow-xl"
+                sizes="108px"
+                priority
+              />
+            </div>
           </div>
           <div
             className={`col-span-2 flex flex-col items-start gap-4 text-white/90 transition-opacity duration-300 lg:items-center lg:text-center ${
@@ -100,31 +112,31 @@ export function FaturamentoBanner({
             }`}
           >
             {comparacaoPeriodoAnterior.status === 'carregando' ? (
-              <span className="text-lg font-semibold tracking-wide opacity-80">…</span>
+              <span className="text-base font-semibold tracking-wide opacity-80 md:text-lg">…</span>
             ) : comparacaoPeriodoAnterior.status === 'erro' ? (
-              <span className="text-lg font-semibold tracking-wide opacity-90">
+              <span className="text-base font-semibold tracking-wide opacity-90 md:text-lg">
                 Atualize a página ou tente novamente em instantes
               </span>
             ) : comparacaoPeriodoAnterior.status === 'sem_base' ? (
-              <span className="text-lg font-semibold tracking-wide">
+              <span className="text-base font-semibold tracking-wide md:text-lg">
                 {prefixoSemFaturamentoNaBase(periodoData)}
               </span>
             ) : comparacaoPeriodoAnterior.percentual > 0 ? (
-                <span className="text-lg font-semibold tracking-wide">
+                <span className="text-base font-semibold tracking-wide md:text-lg">
                   Suas vendas estão{' '}
-                  <span className="text-xl font-bold">{comparacaoPeriodoAnterior.percentual}%</span>{' '}
+                  <span className="text-lg font-bold md:text-xl">{comparacaoPeriodoAnterior.percentual}%</span>{' '}
                   acima {copyComparacao.acimaResto}
                 </span>
               ) : comparacaoPeriodoAnterior.percentual < 0 ? (
-                <span className="text-lg font-semibold tracking-wide">
+                <span className="text-base font-semibold tracking-wide md:text-lg">
                   Suas vendas estão{' '}
-                  <span className="text-xl font-bold">
+                  <span className="text-lg font-bold md:text-xl">
                     {Math.abs(comparacaoPeriodoAnterior.percentual)}%
                   </span>{' '}
                   abaixo {copyComparacao.abaixoResto}
                 </span>
               ) : (
-                <span className="text-lg font-semibold tracking-wide">
+                <span className="text-base font-semibold tracking-wide md:text-lg">
                   Faturamento alinhado com {copyComparacao.alinhadoCom} (
                   {formatarMoeda(comparacaoPeriodoAnterior.anterior)})
                 </span>
@@ -132,17 +144,17 @@ export function FaturamentoBanner({
             <button
               type="button"
               onClick={irParaRelatoriosVendas}
-              className="inline-flex items-center gap-2 rounded-full bg-accent1 px-8 py-2 text-lg font-semibold text-white shadow-md transition hover:brightness-95"
+              className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-accent1 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:brightness-95 sm:gap-2 sm:px-8 sm:text-lg"
             >
               Veja suas vendas em tempo real
-              <ChevronRight className="h-5 w-5" />
+              <ChevronRight className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
             </button>
           </div>
         </div>
 
         {/* Mascote fora do grid: absolute em relação à faixa; não influencia altura */}
         <div
-          className="pointer-events-none absolute bottom-0 right-0 z-20 h-[200px] w-[160px] translate-x-2 translate-y-2 sm:h-[230px] sm:w-[200px] sm:translate-x-4 sm:translate-y-3 md:h-[180px] md:w-[180px] md:translate-x-6 lg:h-[240px] lg:w-[200px] lg:translate-x-8 lg:translate-y-4 xl:h-[240px] xl:w-[220px] xl:translate-x-12"
+          className="pointer-events-none absolute bottom-0 right-0 z-20 hidden h-[230px] w-[200px] translate-x-4 translate-y-3 sm:block md:h-[180px] md:w-[180px] md:translate-x-6 lg:h-[240px] lg:w-[200px] lg:translate-x-8 lg:translate-y-4 xl:h-[240px] xl:w-[220px] xl:translate-x-12"
           aria-hidden
         >
           <div className="relative h-full w-full">

@@ -15,6 +15,7 @@ import {
   sxEntradaCompactaProduto,
   sxEntradaCompactaProdutoSelect,
 } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
+import { GrupoProdutosMultiFilter } from '@/src/presentation/components/features/produtos/GrupoProdutosMultiFilter'
 
 export type StatusFilter = 'Todos' | 'Ativo' | 'Desativado'
 export type TriState = 'Todos' | 'Sim' | 'Não'
@@ -41,8 +42,8 @@ interface ProdutosFiltersProps {
   ativoDeliveryFilter: TriState
   onAtivoDeliveryChange: (v: TriState) => void
 
-  grupoProdutoFilter: string
-  onGrupoProdutoChange: (v: string) => void
+  grupoProdutoFilter: string[]
+  onGrupoProdutoChange: (v: string[]) => void
   gruposProdutos: GrupoProduto[]
   isLoadingGruposProdutos: boolean
 
@@ -174,36 +175,13 @@ export function ProdutosFilters({
           </FormControl>
         </div>
 
-        <div className="relative z-20 w-full min-w-[180px] sm:w-[220px]">
-          <Autocomplete
+        <div className="relative z-20 w-full min-w-[180px] sm:w-[240px]">
+          <GrupoProdutosMultiFilter
             id="produtos-filter-grupo-searchable"
-            size="small"
-            options={gruposProdutos}
+            grupos={gruposProdutos}
             loading={isLoadingGruposProdutos}
-            disabled={isLoadingGruposProdutos}
-            loadingText="Carregando..."
-            noOptionsText="Nenhum grupo encontrado"
-            getOptionLabel={grupo => grupo.getNome()}
-            isOptionEqualToValue={(a, b) => a.getId() === b.getId()}
-            value={gruposProdutos.find(g => g.getId() === grupoProdutoFilter) ?? null}
-            onChange={(_, grupo) => onGrupoProdutoChange(grupo?.getId() ?? '')}
-            renderInput={params => (
-              <TextField
-                {...params}
-                label="Grupo de produtos"
-                placeholder="Pesquise ou Selecione"
-                InputLabelProps={{
-                  ...params.InputLabelProps,
-                  shrink: true,
-                }}
-                sx={{
-                  ...sxEntradaCompactaProduto,
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: '#fff',
-                  },
-                }}
-              />
-            )}
+            value={grupoProdutoFilter}
+            onChange={onGrupoProdutoChange}
           />
         </div>
 

@@ -155,9 +155,16 @@ export function ProdutosList() {
       return a.groupKey.localeCompare(b.groupKey)
     })
 
-    if (filters.statusGrupoFilter === 'Todos') return ordenados
+    if (filters.statusGrupoFilter === 'Todos') {
+      if (filters.grupoProdutoFilter.length === 0) return ordenados
+      const idsSelecionados = new Set(filters.grupoProdutoFilter)
+      return ordenados.filter(({ items }) => {
+        const grupoId = items[0]?.getGrupoId()
+        return Boolean(grupoId && idsSelecionados.has(grupoId))
+      })
+    }
 
-    return ordenados.filter(({ items }) => {
+    const porStatus = ordenados.filter(({ items }) => {
       const grupoId = items[0]?.getGrupoId()
       if (!grupoId) {
         // "Sem grupo" só aparece quando o filtro de status do grupo é Ativo/Todos
@@ -167,7 +174,15 @@ export function ProdutosList() {
       if (typeof ativo !== 'boolean') return filters.statusGrupoFilter === 'Ativo'
       return filters.statusGrupoFilter === 'Ativo' ? ativo : !ativo
     })
-  }, [produtosAgrupados, grupoProdutoMap, filters.statusGrupoFilter])
+
+    if (filters.grupoProdutoFilter.length === 0) return porStatus
+
+    const idsSelecionados = new Set(filters.grupoProdutoFilter)
+    return porStatus.filter(({ items }) => {
+      const grupoId = items[0]?.getGrupoId()
+      return Boolean(grupoId && idsSelecionados.has(grupoId))
+    })
+  }, [produtosAgrupados, grupoProdutoMap, filters.statusGrupoFilter, filters.grupoProdutoFilter])
 
   // Inicializar grupos expandidos quando novos grupos aparecem
   useEffect(() => {
@@ -369,7 +384,7 @@ export function ProdutosList() {
 
       <div
         ref={scrollContainerRef}
-        className="flex-1 min-h-0 overflow-y-auto px-1 mt-2 scrollbar-hide"
+        className="mt-2 min-h-0 flex-1 overflow-y-auto px-1 scrollbar-thin"
       >
         {/* Loading inicial */}
         {isLoadingAny && produtos.length === 0 && (

@@ -10,7 +10,7 @@ interface FiltersState {
   statusGrupoFilter: StatusFilter
   ativoLocalFilter: TriState
   ativoDeliveryFilter: TriState
-  grupoProdutoFilter: string
+  grupoProdutoFilter: string[]
   grupoComplementoFilter: string
   limit: number
 }
@@ -22,7 +22,7 @@ type FiltersAction =
   | { type: 'SET_STATUS_GRUPO'; value: StatusFilter }
   | { type: 'SET_ATIVO_LOCAL'; value: TriState }
   | { type: 'SET_ATIVO_DELIVERY'; value: TriState }
-  | { type: 'SET_GRUPO_PRODUTO'; value: string }
+  | { type: 'SET_GRUPO_PRODUTO'; value: string[] }
   | { type: 'SET_GRUPO_COMPLEMENTO'; value: string }
   | { type: 'RESET' }
 
@@ -33,7 +33,7 @@ const initialState: FiltersState = {
   statusGrupoFilter: 'Ativo',
   ativoLocalFilter: 'Todos',
   ativoDeliveryFilter: 'Todos',
-  grupoProdutoFilter: '',
+  grupoProdutoFilter: [],
   grupoComplementoFilter: '',
   limit: 100,
 }
@@ -47,7 +47,7 @@ function filtersReducer(state: FiltersState, action: FiltersAction): FiltersStat
     case 'SET_STATUS':
       return { ...state, filterStatus: action.value }
     case 'SET_STATUS_GRUPO':
-      return { ...state, statusGrupoFilter: action.value, grupoProdutoFilter: '' }
+      return { ...state, statusGrupoFilter: action.value, grupoProdutoFilter: [] }
     case 'SET_ATIVO_LOCAL':
       return { ...state, ativoLocalFilter: action.value }
     case 'SET_ATIVO_DELIVERY':
@@ -104,7 +104,8 @@ export function useProdutosFilters() {
       ativo: ativoFilter,
       ativoLocal: ativoLocalBoolean,
       ativoDelivery: ativoDeliveryBoolean,
-      grupoProdutoId: state.grupoProdutoFilter || undefined,
+      grupoProdutoId:
+        state.grupoProdutoFilter.length === 1 ? state.grupoProdutoFilter[0] : undefined,
       grupoComplementosId:
         state.grupoComplementoFilter === '__none__' ? undefined : state.grupoComplementoFilter || undefined,
       limit: state.limit,
@@ -121,7 +122,7 @@ export function useProdutosFilters() {
   )
   const setAtivoLocal = useCallback((value: TriState) => dispatch({ type: 'SET_ATIVO_LOCAL', value }), [])
   const setAtivoDelivery = useCallback((value: TriState) => dispatch({ type: 'SET_ATIVO_DELIVERY', value }), [])
-  const setGrupoProduto = useCallback((value: string) => dispatch({ type: 'SET_GRUPO_PRODUTO', value }), [])
+  const setGrupoProduto = useCallback((value: string[]) => dispatch({ type: 'SET_GRUPO_PRODUTO', value }), [])
   const setGrupoComplemento = useCallback((value: string) => dispatch({ type: 'SET_GRUPO_COMPLEMENTO', value }), [])
   const reset = useCallback(() => dispatch({ type: 'RESET' }), [])
 

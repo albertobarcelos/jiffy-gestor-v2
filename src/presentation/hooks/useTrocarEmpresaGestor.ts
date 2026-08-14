@@ -13,7 +13,7 @@ import {
   syncEmpresaUrlPathFromSession,
 } from '@/src/shared/utils/tabSession'
 import { buildGestaoPath, stripGestaoEmpresaSlugFromPath } from '@/src/shared/utils/gestaoRoutes'
-import { buildAuthFromAccessToken } from '@/src/shared/utils/buildAuthFromAccessToken'
+import { buildAuthFromAccessToken, isEmailSessaoPlaceholder } from '@/src/shared/utils/buildAuthFromAccessToken'
 import type { LoginEmpresaSnapshot } from '@/src/domain/types/LoginEmpresaSnapshot'
 
 export function useTrocarEmpresaGestor() {
@@ -47,10 +47,15 @@ export function useTrocarEmpresaGestor() {
         bootstrapTabSessionManually(token, empParam, empresa.id)
 
         const prev = useAuthStore.getState().getUser()
-        const auth = buildAuthFromAccessToken(
-          token,
-          prev ? { id: prev.getId(), email: prev.getEmail(), name: prev.getName() } : undefined
-        )
+        if (!prev || isEmailSessaoPlaceholder(prev.getEmail())) {
+          toast.error('Sessão sem usuário válido. Faça login novamente.')
+          return
+        }
+        const auth = buildAuthFromAccessToken(token, {
+          id: prev.getId(),
+          email: prev.getEmail(),
+          name: prev.getName(),
+        })
         setTenantAuth(auth)
         useAuthStore.getState().setTabVerified(true)
 

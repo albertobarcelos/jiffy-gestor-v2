@@ -346,6 +346,7 @@ export default function DashboardV2() {
         onClose={() => setModalIntervaloPersonalizadoAberto(false)}
         title="Escolha o período"
         zIndex={1500}
+        fullScreenOnMobile
         panelClassName="!bg-[#f9fafb] w-[45vw] min-w-[260px] max-w-[min(100vw-1rem,95vw)] sm:min-w-[280px]"
         scrollableBody={false}
         footerSlot={

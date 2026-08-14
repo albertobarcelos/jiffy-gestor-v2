@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { buildAuthFromAccessToken } from '@/src/shared/utils/buildAuthFromAccessToken'
+import { buildAuthFromAccessToken, isEmailSessaoPlaceholder } from '@/src/shared/utils/buildAuthFromAccessToken'
 import {
   consumeTabSession,
   getTabTenantToken,
@@ -37,10 +37,14 @@ function activateTenantToken(
   setTabVerified: ReturnType<typeof useAuthStore.getState>['setTabVerified']
 ): void {
   const prev = useAuthStore.getState().getUser()
-  const auth = buildAuthFromAccessToken(
-    token,
-    prev ? { id: prev.getId(), email: prev.getEmail(), name: prev.getName() } : undefined
-  )
+  if (!prev || isEmailSessaoPlaceholder(prev.getEmail())) {
+    throw new Error('Sessão sem usuário válido')
+  }
+  const auth = buildAuthFromAccessToken(token, {
+    id: prev.getId(),
+    email: prev.getEmail(),
+    name: prev.getName(),
+  })
   setTenantAuth(auth)
   setTabVerified(true)
 }

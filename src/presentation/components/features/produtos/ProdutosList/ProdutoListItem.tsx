@@ -96,91 +96,112 @@ function ProdutoListItemBase({
         )
       : null
 
+  const codigo = produto.getCodigoProduto() ?? '—'
+
+  const thumb = imagemPreview ? (
+    <button
+      type="button"
+      title="Ver imagem"
+      aria-label={`Ver imagem de ${nomeCompleto}`}
+      onClick={e => {
+        e.stopPropagation()
+        setImagemExpandida(true)
+      }}
+      className="group relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-white"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element -- preview local estático */}
+      <img
+        src={imagemPreview}
+        alt=""
+        className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+      />
+      <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
+        <MdVisibility className="text-white drop-shadow" size={22} />
+      </span>
+    </button>
+  ) : (
+    <div
+      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-secondary-text"
+      aria-hidden
+      title="Sem imagem"
+    >
+      <MdImageNotSupported className="h-7 w-7" />
+    </div>
+  )
+
   return (
     <>
+      {/* Mobile: dados na 1ª linha; opções rápidas na 2ª */}
       <div
         onClick={() => onEditProduto(produtoId)}
-        className="grid cursor-pointer items-center gap-x-1.5 gap-y-2 border border-gray-200 bg-white px-2 py-2 hover:bg-secondary-text/10 md:gap-x-2 md:px-4 [grid-template-columns:auto_minmax(0,1fr)_auto] md:[grid-template-columns:auto_minmax(0,30ch)_auto_auto_minmax(0,1fr)_auto]"
+        className="flex cursor-pointer flex-col gap-2 border border-gray-200 bg-white px-2 py-2 hover:bg-secondary-text/10 md:hidden"
       >
-        {imagemPreview ? (
-          <button
-            type="button"
-            title="Ver imagem"
-            aria-label={`Ver imagem de ${nomeCompleto}`}
-            onClick={e => {
-              e.stopPropagation()
-              setImagemExpandida(true)
-            }}
-            className="group relative h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-white md:h-12 md:w-12"
+        <div className="flex items-center gap-2">
+          {thumb}
+          <span className="inline-flex shrink-0 items-center rounded-full border border-primary px-2 py-0.5 text-[11px] font-semibold leading-none text-primary">
+            COD. {codigo}
+          </span>
+          <span
+            className="min-w-0 flex-1 truncate text-base font-medium tracking-wide text-primary-text"
+            title={nomeCompleto}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element -- preview local estático */}
-            <img
-              src={imagemPreview}
-              alt=""
-              className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
-            />
-            <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
-              <MdVisibility className="text-white drop-shadow" size={22} />
-            </span>
-          </button>
-        ) : (
-          <div
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-secondary-text md:h-12 md:w-12"
-            aria-hidden
-            title="Sem imagem"
-          >
-            <MdImageNotSupported className="h-6 w-6 md:h-7 md:w-7" />
-          </div>
-        )}
-
-        <span
-          className="min-w-0 truncate text-sm font-normal tracking-wide text-primary-text md:text-base"
-          title={nomeCompleto.length > 30 ? nomeCompleto : undefined}
-        >
-          {nomeExibicao}
-        </span>
-
-        <span className="inline-flex shrink-0 items-center justify-center rounded-full border border-primary px-2 py-0.5 text-[10px] font-semibold leading-tight text-primary md:text-[11px]">
-          COD. {produto.getCodigoProduto() ?? '—'}
-        </span>
-
-        <div
-          className="col-span-3 flex items-center gap-1 md:col-span-1 md:gap-1.5"
-          onClick={e => e.stopPropagation()}
-        >
-          <div className="md:hidden">
-            <ProdutoActionIcons
-              produto={produto}
-              toggleStates={toggleStates}
-              variant="mobile"
-              onToggleBoolean={onToggleBoolean}
-              onCopyProduto={onCopyProduto}
-            />
-          </div>
-          <div className="hidden md:block">
-            <ProdutoActionIcons
-              produto={produto}
-              toggleStates={toggleStates}
-              variant="desktop"
-              onToggleBoolean={onToggleBoolean}
-              onCopyProduto={onCopyProduto}
-            />
-          </div>
-        </div>
-
-        <div className="hidden min-w-0 md:block" aria-hidden />
-
-        <div
-          className="col-span-3 flex flex-wrap items-center justify-end gap-2 md:col-span-1 md:mr-4 md:gap-4"
-          onClick={e => e.stopPropagation()}
-        >
-          <div className="relative">
+            {nomeCompleto}
+          </span>
+          <div className="flex shrink-0 items-center gap-2" onClick={e => e.stopPropagation()}>
             <ProdutoValorInput
               valor={produto.getValor()}
               disabled={isSavingValor}
               onCommit={valor => onValorChange(produtoId, valor)}
             />
+            <ProdutoStatusSwitch
+              isAtivo={isAtivo}
+              disabled={isSavingStatus}
+              onChange={status => onSwitchToggle(produtoId, status)}
+            />
           </div>
+        </div>
+        <div onClick={e => e.stopPropagation()}>
+          <ProdutoActionIcons
+            produto={produto}
+            toggleStates={toggleStates}
+            variant="mobile"
+            onToggleBoolean={onToggleBoolean}
+            onCopyProduto={onCopyProduto}
+          />
+        </div>
+      </div>
+
+      {/* Desktop */}
+      <div
+        onClick={() => onEditProduto(produtoId)}
+        className="hidden cursor-pointer items-center gap-x-2 border border-gray-200 bg-white px-4 py-2 hover:bg-secondary-text/10 md:grid md:[grid-template-columns:auto_minmax(0,30ch)_auto_auto_minmax(0,1fr)_auto]"
+      >
+        {thumb}
+        <span
+          className="min-w-0 truncate text-base font-normal tracking-wide text-primary-text"
+          title={nomeCompleto.length > 30 ? nomeCompleto : undefined}
+        >
+          {nomeExibicao}
+        </span>
+        <span className="inline-flex shrink-0 items-center justify-center rounded-full border border-primary px-2 py-0.5 text-[11px] font-semibold leading-tight text-primary">
+          COD. {codigo}
+        </span>
+        <div onClick={e => e.stopPropagation()}>
+          <ProdutoActionIcons
+            produto={produto}
+            toggleStates={toggleStates}
+            variant="desktop"
+            onToggleBoolean={onToggleBoolean}
+            onCopyProduto={onCopyProduto}
+          />
+        </div>
+        <div aria-hidden />
+        <div className="mr-4 flex items-center gap-4" onClick={e => e.stopPropagation()}>
+          <ProdutoValorInput
+            valor={produto.getValor()}
+            disabled={isSavingValor}
+            onCommit={valor => onValorChange(produtoId, valor)}
+          />
           <ProdutoStatusSwitch
             isAtivo={isAtivo}
             disabled={isSavingStatus}

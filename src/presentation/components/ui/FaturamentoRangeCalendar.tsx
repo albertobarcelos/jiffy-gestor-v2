@@ -399,7 +399,8 @@ export function FaturamentoRangeCalendar({
           font-size: clamp(0.7rem, 2.6cqw, 1.05rem);
         }
         .faturamento-rdp-scope.faturamento-rdp-modal .rdp-weekday {
-          font-size: clamp(0.58rem, 2cqw, 0.75rem);
+          font-size: clamp(0.85rem, 3.4cqw, 1.05rem);
+          font-weight: 600;
         }
 
         @container fat-cal (max-width: 520px) {
@@ -422,9 +423,9 @@ export function FaturamentoRangeCalendar({
             /* Dias quadrados: altura acompanha largura (evita retângulos em modais estreitos). */
             --rdp-day-height: var(--rdp-day-width);
             --rdp-day_button-height: var(--rdp-day_button-width);
-            --rdp-nav-height: clamp(2rem, 10.5cqw, 3.35rem);
-            --rdp-nav_button-width: clamp(1.5rem, 8.5cqw, 3.25rem);
-            --rdp-nav_button-height: clamp(1.5rem, 8.5cqw, 3.25rem);
+            --rdp-nav-height: clamp(2.75rem, 12cqw, 3.75rem);
+            --rdp-nav_button-width: clamp(2.5rem, 12cqw, 3.5rem);
+            --rdp-nav_button-height: clamp(2.5rem, 12cqw, 3.5rem);
           }
         }
 
@@ -446,9 +447,9 @@ export function FaturamentoRangeCalendar({
             /* Dias quadrados: altura acompanha largura (evita retângulos em modais estreitos). */
             --rdp-day-height: var(--rdp-day-width);
             --rdp-day_button-height: var(--rdp-day_button-width);
-            --rdp-nav-height: clamp(2.05rem, 7cqw, 3.35rem);
-            --rdp-nav_button-width: clamp(1.45rem, 5.75cqw, 3.5rem);
-            --rdp-nav_button-height: clamp(1.45rem, 5.75cqw, 3.5rem);
+            --rdp-nav-height: clamp(2.5rem, 8cqw, 3.75rem);
+            --rdp-nav_button-width: clamp(2.25rem, 7cqw, 3.5rem);
+            --rdp-nav_button-height: clamp(2.25rem, 7cqw, 3.5rem);
           }
         }
 
@@ -484,6 +485,8 @@ export function FaturamentoRangeCalendar({
         }
         .faturamento-rdp-scope .rdp-chevron {
           fill: ${colors.primaryText} !important;
+          width: 1.85rem !important;
+          height: 1.85rem !important;
         }
         .faturamento-rdp-scope.faturamento-rdp-modal .rdp-day_button {
           border: 1px solid rgba(15, 23, 42, 0.12) !important;
@@ -509,7 +512,7 @@ export function FaturamentoRangeCalendar({
           --rdp-day_button-width: clamp(2.2rem, calc((100cqw - 2 * var(--fat-pad)) / 7 - 0.1rem), 4.5rem);
           --rdp-day-height: clamp(2.85rem, calc(var(--rdp-day-width) * 1.15), 5.25rem);
           --rdp-day_button-height: var(--rdp-day-height);
-          --rdp-nav-height: clamp(2.25rem, 9cqw, 3.35rem);
+          --rdp-nav-height: clamp(2.75rem, 11cqw, 3.75rem);
         }
         .faturamento-rdp-scope.faturamento-rdp-mes-unico .rdp-months {
           flex-direction: column;
@@ -618,6 +621,8 @@ export function FaturamentoRangeCalendar({
         }
         .faturamento-rdp-scope .rdp-chevron {
           fill: ${colors.accent1} !important;
+          width: 1.85rem !important;
+          height: 1.85rem !important;
         }
         .faturamento-rdp-scope:not(.faturamento-rdp-modal) .rdp-day_button {
           border: 1px solid rgba(255, 255, 255, 0.4) !important;
@@ -686,6 +691,115 @@ export function FaturamentoRangeCalendar({
         ${estiloEscopoClaro}
       `}</style>
 
+      <div
+        className={cn(
+          'mx-2 mb-1.5 mt-1 shrink-0 rounded-lg border px-3 py-2',
+          fundoModalClaro
+            ? 'border-primary/15 bg-white shadow-sm'
+            : 'border-white/20 bg-white/5'
+        )}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <p
+              className={cn(
+                'text-[11px] font-semibold uppercase tracking-wide',
+                fundoModalClaro ? 'text-primary-text/55' : 'text-white/70'
+              )}
+            >
+              Período selecionado
+            </p>
+            <p
+              className={cn(
+                'mt-0.5 break-words text-sm font-semibold leading-snug tabular-nums',
+                fundoModalClaro ? 'text-primary' : 'text-white',
+                (!textoPeriodoSelecionado || aguardandoFimDoIntervalo) &&
+                  'font-normal italic opacity-80'
+              )}
+            >
+              {aguardandoFimDoIntervalo
+                ? 'Selecione a data final no calendário.'
+                : (textoPeriodoSelecionado ??
+                  'Selecione o intervalo no calendário e as horas.')}
+            </p>
+            {horarioInvalido ? (
+              <p className="mt-1 text-xs font-medium text-red-600" role="alert">
+                A hora de término deve ser igual ou posterior à de início.
+              </p>
+            ) : null}
+          </div>
+
+          {fundoModalClaro ? (
+            <div
+              className="flex shrink-0 items-center gap-0.5 rounded-lg border border-gray-200 bg-gray-50 p-0.5"
+              role="group"
+              aria-label="Visualização do calendário"
+            >
+              <MuiTooltip
+                title="Um mês (com faturamento R$)"
+                placement="top"
+                slotProps={{
+                  tooltip: {
+                    sx: {
+                      bgcolor: '#ffffff',
+                      color: '#111827',
+                      border: '1px solid #e5e7eb',
+                      boxShadow: 2,
+                      fontSize: '0.75rem',
+                    },
+                  },
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => alternarVisualizacao('um_mes')}
+                  className={cn(
+                    'inline-flex h-7 w-7 items-center justify-center rounded-md transition',
+                    modoUmMes
+                      ? 'bg-primary text-white shadow-sm'
+                      : 'text-primary-text/60 hover:bg-white hover:text-primary'
+                  )}
+                  aria-label="Visualização em um mês com faturamento"
+                  aria-pressed={modoUmMes}
+                >
+                  <CalendarIcon className="h-3.5 w-3.5" aria-hidden />
+                </button>
+              </MuiTooltip>
+              <MuiTooltip
+                title="Dois meses (sem faturamento nas células)"
+                placement="top"
+                slotProps={{
+                  tooltip: {
+                    sx: {
+                      bgcolor: '#ffffff',
+                      color: '#111827',
+                      border: '1px solid #e5e7eb',
+                      boxShadow: 2,
+                      fontSize: '0.75rem',
+                    },
+                  },
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => alternarVisualizacao('dois_meses')}
+                  className={cn(
+                    'inline-flex h-7 w-7 items-center justify-center rounded-md transition',
+                    visualizacao === 'dois_meses'
+                      ? 'bg-primary text-white shadow-sm'
+                      : 'text-primary-text/60 hover:bg-white hover:text-primary'
+                  )}
+                  aria-label="Visualização em dois meses"
+                  aria-pressed={visualizacao === 'dois_meses'}
+                >
+                  <CalendarRange className="h-3.5 w-3.5" aria-hidden />
+                </button>
+              </MuiTooltip>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
       {/* showOutsideDays=false: não mostra células do mês anterior/seguinte (evita duplicar datas e confundir com o intervalo). */}
       {/* navLayout=around: seta « no 1º mês (esq.) e seta » no último mês (dir.). */}
       <div className={cn(fundoModalClaro ? 'flex shrink-0 flex-col' : '')}>
@@ -724,7 +838,7 @@ export function FaturamentoRangeCalendar({
           className={cn(
             'rounded-lg [&_.rdp-caption_label]:font-medium',
             fundoModalClaro
-              ? 'w-full max-w-none border border-gray-200 bg-white px-2 text-primary-text xl:p-3 2xl:p-4 [&_.rdp-caption_label]:text-secondary 2xl:[&_.rdp-caption_label]:text-base 2xl:[&_.rdp-day_button>span:first-child]:text-base 2xl:[&_.rdp-day_button>span:last-child]:text-xs [&_.rdp-dropdown]:text-[#330468] [&_.rdp-nav_button]:text-secondary [&_.rdp-selected]:!text-xs [&_.rdp-weekday]:py-1 [&_.rdp-weekday]:text-gray-500 2xl:[&_.rdp-weekday]:text-xs'
+              ? 'w-full max-w-none border border-gray-200 bg-white px-2 text-primary-text xl:p-3 2xl:p-4 [&_.rdp-caption_label]:text-secondary 2xl:[&_.rdp-caption_label]:text-base 2xl:[&_.rdp-day_button>span:first-child]:text-base 2xl:[&_.rdp-day_button>span:last-child]:text-xs [&_.rdp-dropdown]:text-[#330468] [&_.rdp-nav_button]:text-secondary [&_.rdp-selected]:!text-xs [&_.rdp-weekday]:py-1.5 [&_.rdp-weekday]:text-gray-500 2xl:[&_.rdp-weekday]:text-sm'
               : 'w-full min-w-0 max-w-full border border-white/15 bg-white/5 p-2 text-accent1 [--rdp-nav-height:2.75rem] [&_.rdp-caption_label]:text-accent1 [&_.rdp-dropdown]:text-[#330468] [&_.rdp-nav_button]:text-white [&_.rdp-selected]:!text-sm [&_.rdp-weekday]:text-white/80'
           )}
           components={{
@@ -810,115 +924,6 @@ export function FaturamentoRangeCalendar({
                 aria-hidden
               />
             </div>
-          </div>
-        </div>
-
-        <div
-          className={cn(
-            'mx-2 mt-1.5 rounded-lg border px-3 py-2',
-            fundoModalClaro
-              ? 'border-primary/15 bg-white shadow-sm'
-              : 'border-white/20 bg-white/5'
-          )}
-        >
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <p
-                className={cn(
-                  'text-[11px] font-semibold uppercase tracking-wide',
-                  fundoModalClaro ? 'text-primary-text/55' : 'text-white/70'
-                )}
-              >
-                Período selecionado
-              </p>
-              <p
-                className={cn(
-                  'mt-0.5 break-words text-sm font-semibold leading-snug tabular-nums',
-                  fundoModalClaro ? 'text-primary' : 'text-white',
-                  (!textoPeriodoSelecionado || aguardandoFimDoIntervalo) &&
-                    'font-normal italic opacity-80'
-                )}
-              >
-                {aguardandoFimDoIntervalo
-                  ? 'Selecione a data final no calendário.'
-                  : (textoPeriodoSelecionado ??
-                    'Selecione o intervalo no calendário e as horas.')}
-              </p>
-              {horarioInvalido ? (
-                <p className="mt-1 text-xs font-medium text-red-600" role="alert">
-                  A hora de término deve ser igual ou posterior à de início.
-                </p>
-              ) : null}
-            </div>
-
-            {fundoModalClaro ? (
-              <div
-                className="flex shrink-0 items-center gap-0.5 rounded-lg border border-gray-200 bg-gray-50 p-0.5"
-                role="group"
-                aria-label="Visualização do calendário"
-              >
-                <MuiTooltip
-                  title="Um mês (com faturamento R$)"
-                  placement="top"
-                  slotProps={{
-                    tooltip: {
-                      sx: {
-                        bgcolor: '#ffffff',
-                        color: '#111827',
-                        border: '1px solid #e5e7eb',
-                        boxShadow: 2,
-                        fontSize: '0.75rem',
-                      },
-                    },
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => alternarVisualizacao('um_mes')}
-                    className={cn(
-                      'inline-flex h-7 w-7 items-center justify-center rounded-md transition',
-                      modoUmMes
-                        ? 'bg-primary text-white shadow-sm'
-                        : 'text-primary-text/60 hover:bg-white hover:text-primary'
-                    )}
-                    aria-label="Visualização em um mês com faturamento"
-                    aria-pressed={modoUmMes}
-                  >
-                    <CalendarIcon className="h-3.5 w-3.5" aria-hidden />
-                  </button>
-                </MuiTooltip>
-                <MuiTooltip
-                  title="Dois meses (sem faturamento nas células)"
-                  placement="top"
-                  slotProps={{
-                    tooltip: {
-                      sx: {
-                        bgcolor: '#ffffff',
-                        color: '#111827',
-                        border: '1px solid #e5e7eb',
-                        boxShadow: 2,
-                        fontSize: '0.75rem',
-                      },
-                    },
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => alternarVisualizacao('dois_meses')}
-                    className={cn(
-                      'inline-flex h-7 w-7 items-center justify-center rounded-md transition',
-                      visualizacao === 'dois_meses'
-                        ? 'bg-primary text-white shadow-sm'
-                        : 'text-primary-text/60 hover:bg-white hover:text-primary'
-                    )}
-                    aria-label="Visualização em dois meses"
-                    aria-pressed={visualizacao === 'dois_meses'}
-                  >
-                    <CalendarRange className="h-3.5 w-3.5" aria-hidden />
-                  </button>
-                </MuiTooltip>
-              </div>
-            ) : null}
           </div>
         </div>
       </div>

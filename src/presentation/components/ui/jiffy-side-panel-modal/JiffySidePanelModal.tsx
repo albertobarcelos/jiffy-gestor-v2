@@ -548,6 +548,12 @@ export interface JiffySidePanelModalProps {
    * @default 'solid'
    */
   panelSurface?: 'solid' | 'glass'
+  /**
+   * No mobile, o painel ocupa a tela inteira (filtro de período, etc.).
+   * No `md+` permanece lateral.
+   * @default false
+   */
+  fullScreenOnMobile?: boolean
 }
 
 /**
@@ -578,6 +584,7 @@ export function JiffySidePanelModal({
   showCloseButton = true,
   transparentBackdrop = false,
   panelSurface = 'solid',
+  fullScreenOnMobile = false,
 }: JiffySidePanelModalProps) {
   const isGlass = panelSurface === 'glass'
   const [internalOpen, setInternalOpen] = useState(open)
@@ -647,7 +654,9 @@ export function JiffySidePanelModal({
             isGlass ?
               'backdrop-blur-md bg-white/30 shadow-[0_10px_30px_rgba(0,0,0,0.15)] border-l-2 border-white'
             : 'bg-white shadow-xl',
-            panelClassName
+            panelClassName,
+            fullScreenOnMobile &&
+              'max-md:!left-0 max-md:!right-0 max-md:!w-full max-md:!max-w-none max-md:!min-w-0 max-md:!rounded-none'
           )}
           role="dialog"
           aria-modal
