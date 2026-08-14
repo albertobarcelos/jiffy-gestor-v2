@@ -18,6 +18,9 @@ import type {
   PaginaExportacaoHistoricoDTO,
   AgendamentoExportacaoXmlDTO,
   AgendamentoExportacaoXmlResponseDTO,
+  ValidarCbenefDTO,
+  CbenefItemDTO,
+  ImportarCbenefResultadoDTO,
 } from '@/src/application/dto/painel-contador/PainelContadorDTO'
 
 export interface CertificadoApiResult {
@@ -100,4 +103,7 @@ export interface IFiscalPainelRepository {
     input: AgendamentoExportacaoXmlDTO
   ): Promise<AgendamentoExportacaoXmlResponseDTO>
   desativarAgendamentoExportacaoXml(): Promise<void>
+  validarCbenef(codigo: string): Promise<ValidarCbenefDTO>
+  listarCbenef(uf: string, cst?: string): Promise<CbenefItemDTO[]>
+  importarCbenef(arquivo: File): Promise<ImportarCbenefResultadoDTO>
 }

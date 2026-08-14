@@ -13,6 +13,10 @@ import {
   sincronizarStatusFiscalVendaKanban,
 } from '../utils/kanbanVendaCacheUpdate'
 import type { Venda } from '../types'
+import { useVerificarCbenefEmissao } from '@/src/presentation/hooks/painel-contador/useCbenef'
+import type { ItemVendaCbenef } from '@/src/domain/entities/painel-contador/cbenefRegras'
+import { useTabsStore } from '@/src/presentation/stores/tabsStore'
+import { PORTAL_CONTADOR_PATH } from '@/src/presentation/components/features/painel-contador/painelContadorEtapas'
 
 export type AcaoFiscalKanbanEmAndamento = 'emitindo' | 'reemitindo'
 
@@ -99,6 +103,11 @@ export function deveEncerrarPollComStatus(
   return false
 }
 
+export interface AlertaCbenefKanban {
+  itens: ItemVendaCbenef[]
+  ncmParaConfigurar: string | null
+}
+
 export interface VendaSelecionadaParaEmissao {
   id: string
   tabelaOrigem: 'venda' | 'venda_gestor'
@@ -138,7 +147,12 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
     setSelectedVendaId,
     setEmitirNfeModalOpen,
   } = params
-  const queryClient = useQueryClient()  const [acaoFiscalEmAndamentoPorVenda, setAcaoFiscalEmAndamentoPorVenda] = useState<
+  const queryClient = useQueryClient()
+  const verificarCbenef = useVerificarCbenefEmissao()
+  const addTab = useTabsStore(s => s.addTab)
+  const [alertaCbenef, setAlertaCbenef] = useState<AlertaCbenefKanban | null>(null)
+  const pendenciaCbenefRef = useRef<(() => Promise<void>) | null>(null)
+  const [acaoFiscalEmAndamentoPorVenda, setAcaoFiscalEmAndamentoPorVenda] = useState<
     Record<string, AcaoFiscalKanbanEmAndamento>
   >({})
   const emissaoFiscalLockRef = useRef<ReturnType<typeof createEmissaoFiscalKanbanLock> | null>(
@@ -339,36 +353,59 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
 
       if (podeReemitirInterativo) {
         const docId = venda.documentoFiscalId?.trim()
-        if (docId) {
-          const payload = {
-            id: venda.id,
-            documentId: docId,
-          }
-          await executarAcaoFiscalComLock(
-            venda,
-            'reemitindo',
-            venda.statusFiscal,
-            async () => {
-              if (venda.tabelaOrigem === 'venda_gestor') {
-                return reemitirNfeGestor(payload)
-              }
-              return reemitirNfePdv(payload)
+        const executarAtalho = async () => {
+          if (docId) {
+            const payload = {
+              id: venda.id,
+              documentId: docId,
             }
-          )
-          return
-        }
-
-        const modeloEmitir = resolveModeloParaEmitirNota(venda)
-        if (modeloEmitir !== null) {
-          if (modeloEmitir === 55 && !venda.cliente?.id?.trim()) {
-            showToast.error(
-              'Para emitir NF-e (modelo 55) é obrigatório que a venda tenha um cliente cadastrado. Vincule o cliente na origem do pedido e tente novamente.'
+            await executarAcaoFiscalComLock(
+              venda,
+              'reemitindo',
+              venda.statusFiscal,
+              async () => {
+                if (venda.tabelaOrigem === 'venda_gestor') {
+                  return reemitirNfeGestor(payload)
+                }
+                return reemitirNfePdv(payload)
+              }
             )
             return
           }
-          await executarAcaoFiscalComLock(venda, 'emitindo', venda.statusFiscal, () =>
-            emitirNotaParaVenda(venda, modeloEmitir)
-          )
+
+          const modeloEmitir = resolveModeloParaEmitirNota(venda)
+          if (modeloEmitir !== null) {
+            if (modeloEmitir === 55 && !venda.cliente?.id?.trim()) {
+              showToast.error(
+                'Para emitir NF-e (modelo 55) é obrigatório que a venda tenha um cliente cadastrado. Vincule o cliente na origem do pedido e tente novamente.'
+              )
+              return
+            }
+            await executarAcaoFiscalComLock(venda, 'emitindo', venda.statusFiscal, () =>
+              emitirNotaParaVenda(venda, modeloEmitir)
+            )
+          }
+        }
+
+        if (docId || resolveModeloParaEmitirNota(venda) !== null) {
+          try {
+            const itens = await verificarCbenef.mutateAsync({
+              vendaId: venda.id,
+              tabelaOrigem: venda.tabelaOrigem,
+              tipoVenda: venda.tipoVenda,
+            })
+            if (itens.length > 0) {
+              pendenciaCbenefRef.current = executarAtalho
+              setAlertaCbenef({
+                itens,
+                ncmParaConfigurar: itens[0]?.ncm ?? null,
+              })
+              return
+            }
+          } catch (error) {
+            console.error('Erro ao verificar cBenef antes da emissão:', error)
+          }
+          await executarAtalho()
           return
         }
       }
@@ -398,12 +435,39 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
       setPrimeiroPorColuna,
       setSelectedVendaId,
       setVendaSelecionadaParaEmissao,
+      verificarCbenef,
     ]
   )
+
+  const handleContinuarCbenefKanban = useCallback(async () => {
+    const executar = pendenciaCbenefRef.current
+    pendenciaCbenefRef.current = null
+    setAlertaCbenef(null)
+    if (executar) await executar()
+  }, [])
+
+  const handleConfigurarCbenefKanban = useCallback(() => {
+    pendenciaCbenefRef.current = null
+    addTab({
+      id: 'etapa-3-cenario-fiscal',
+      label: 'Cenário Fiscal (NCMs)',
+      path: PORTAL_CONTADOR_PATH,
+    })
+    setAlertaCbenef(null)
+  }, [addTab])
+
+  const handleCancelarCbenefKanban = useCallback(() => {
+    pendenciaCbenefRef.current = null
+    setAlertaCbenef(null)
+  }, [])
 
   return {
     acaoFiscalEmAndamentoPorVenda,
     getEtapaKanbanParaExibicao,
     handleEmitirNfe,
+    alertaCbenef,
+    handleContinuarCbenefKanban,
+    handleConfigurarCbenefKanban,
+    handleCancelarCbenefKanban,
   }
 }

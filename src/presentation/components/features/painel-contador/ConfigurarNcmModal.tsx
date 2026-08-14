@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
-  DialogTitle,
   DialogFooter,
 } from '@/src/presentation/components/ui/dialog'
 import { Button } from '@/src/presentation/components/ui/button'
@@ -20,28 +19,24 @@ import {
 import { showToast } from '@/src/shared/utils/toast'
 import { useResumoEmpresaPainel } from '@/src/presentation/hooks/painel-contador/useResumoEmpresaPainel'
 import { useConfiguracoesNcm } from '@/src/presentation/hooks/painel-contador/useConfiguracoesNcm'
-
-interface ConfiguracaoImpostoNcm {
-  ncm?: {
-    codigo: string
-    descricao?: string
-  }
-  cfop?: string
-  csosn?: string
-  icms?: {
-    origem?: number
-    cst?: string
-    aliquota?: number
-  }
-  pis?: {
-    cst?: string
-    aliquota?: number
-  }
-  cofins?: {
-    cst?: string
-    aliquota?: number
-  }
-}
+import { CampoCbenef } from './CampoCbenef'
+import type { ConfiguracaoImpostoNcm } from './configuracaoImpostoNcm'
+import {
+  CSOSN_OPTIONS,
+  CST_ICMS_OPTIONS,
+  CST_PIS_COFINS_OPTIONS,
+} from './ncmImpostosOpcoes'
+import {
+  NCM_IMPOSTOS_FORM_VAZIO,
+  ncmImpostosFormFromConfig,
+  ncmImpostosFormToPayload,
+} from './ncmImpostosForm'
+import {
+  isCstIcmsBeneficio,
+  isCstIcmsNaoSuportado,
+  MENSAGEM_CST_NAO_SUPORTADO,
+  normalizarCstIcms,
+} from '@/src/domain/entities/painel-contador/cbenefRegras'
 
 interface ConfigurarNcmModalProps {
   open: boolean
@@ -59,52 +54,23 @@ export function ConfigurarNcmModal({
   const { data: resumo, isLoading: isLoadingRegime } = useResumoEmpresaPainel()
   const { salvarMutation } = useConfiguracoesNcm()
   const regimeTributario = resumo?.codigoRegimeTributario ?? null
+  const ufEmpresa = resumo?.uf ?? ''
   const isLoading = salvarMutation.isPending
-  const [formData, setFormData] = useState({
-    ncm: '',
-    cfop: '',
-    csosn: '',
-    icmsCst: '',
-    icmsAliquota: '',
-    pisCst: '',
-    pisAliquota: '',
-    cofinsCst: '',
-    cofinsAliquota: '',
-  })
+  const [buscaCbenefAberta, setBuscaCbenefAberta] = useState(false)
+  const [formData, setFormData] = useState(NCM_IMPOSTOS_FORM_VAZIO)
 
-  // Determinar se é Simples Nacional (1 ou 2) ou Regime Normal (3)
-  // Se regimeTributario for null (ainda carregando), não renderiza os campos até carregar
-  // Se for 1 ou 2 = Simples Nacional (usa CSOSN)
-  // Se for 3 = Regime Normal (usa CST)
   const isSimplesNacional = regimeTributario === 1 || regimeTributario === 2
+  const cstIcms = normalizarCstIcms(formData.icmsCst)
+  const exibirCbenef = !isLoadingRegime && !isSimplesNacional && isCstIcmsBeneficio(cstIcms)
+  const exibirReducaoBase = !isSimplesNacional && cstIcms === '20'
 
   useEffect(() => {
-    if (configuracaoImposto) {
-      setFormData({
-        ncm: configuracaoImposto.ncm?.codigo || '',
-        cfop: configuracaoImposto.cfop || '',
-        csosn: configuracaoImposto.csosn || '',
-        icmsCst: configuracaoImposto.icms?.cst || '',
-        icmsAliquota: configuracaoImposto.icms?.aliquota?.toString() || '',
-        pisCst: configuracaoImposto.pis?.cst || '',
-        pisAliquota: configuracaoImposto.pis?.aliquota?.toString() || '',
-        cofinsCst: configuracaoImposto.cofins?.cst || '',
-        cofinsAliquota: configuracaoImposto.cofins?.aliquota?.toString() || '',
-      })
-    } else {
-      setFormData({
-        ncm: '',
-        cfop: '',
-        csosn: '',
-        icmsCst: '',
-        icmsAliquota: '',
-        pisCst: '',
-        pisAliquota: '',
-        cofinsCst: '',
-        cofinsAliquota: '',
-      })
-    }
-  }, [configuracaoImposto, open])
+    if (!open) return
+    setFormData(ncmImpostosFormFromConfig(configuracaoImposto))
+    setBuscaCbenefAberta(false)
+    // Só reidrata ao abrir o modal — senão a digitação no cBenef é revertida.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- snapshot de abertura
+  }, [open])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -114,25 +80,21 @@ export function ConfigurarNcmModal({
       return
     }
 
-    try {
-      const payload = {
-        cfop: formData.cfop || undefined,
-        csosn: formData.csosn || undefined,
-        icms: {
-          origem: 0,
-          cst: formData.icmsCst || undefined,
-          aliquota: formData.icmsAliquota ? parseFloat(formData.icmsAliquota) : undefined,
-        },
-        pis: {
-          cst: formData.pisCst || undefined,
-          aliquota: formData.pisAliquota ? parseFloat(formData.pisAliquota) : undefined,
-        },
-        cofins: {
-          cst: formData.cofinsCst || undefined,
-          aliquota: formData.cofinsAliquota ? parseFloat(formData.cofinsAliquota) : undefined,
-        },
-      }
+    if (!isSimplesNacional && isCstIcmsNaoSuportado(cstIcms)) {
+      showToast.error(MENSAGEM_CST_NAO_SUPORTADO)
+      return
+    }
 
+    if (exibirReducaoBase) {
+      const reducao = formData.icmsReducaoBase ? parseFloat(formData.icmsReducaoBase) : NaN
+      if (!Number.isFinite(reducao) || reducao < 0 || reducao > 100) {
+        showToast.error('Informe o % de redução da base de cálculo (0 a 100) para CST 20.')
+        return
+      }
+    }
+
+    try {
+      const payload = ncmImpostosFormToPayload(formData, isSimplesNacional)
       await salvarMutation.mutateAsync({ ncm: formData.ncm, input: payload })
       onSuccess()
     } catch (error: unknown) {
@@ -140,117 +102,25 @@ export function ConfigurarNcmModal({
     }
   }
 
-  // Opções CSOSN (Simples Nacional)
-  const csosnOptions = [
-    { value: '102', label: '102 - Tributada pelo Simples Nacional sem permissão de crédito' },
-    { value: '103', label: '103 - Isenção do ICMS no Simples Nacional para faixa de receita bruta' },
-    { value: '300', label: '300 - Imune' },
-    { value: '400', label: '400 - Não tributada pelo Simples Nacional' },
-    { value: '500', label: '500 - ICMS cobrado anteriormente por substituição tributária (substituído) ou por antecipação' },
-    { value: '900', label: '900 - Outros' },
-    { value: 'M61', label: 'M61 - ICMS cobrado anteriormente por substituição tributária (substituidor)' },
-  ]
-
-  // Opções CST (Presumido/Real)
-  const cstOptions = [
-    { value: '00', label: '00 - Tributada integralmente' },
-    { value: '10', label: '10 - Tributada e com cobrança do ICMS por substituição tributária' },
-    { value: '20', label: '20 - Com redução de base de cálculo' },
-    { value: '30', label: '30 - Isenta ou não tributada e com cobrança do ICMS por substituição tributária' },
-    { value: '40', label: '40 - Isenta' },
-    { value: '41', label: '41 - Não tributada' },
-    { value: '50', label: '50 - Suspensa' },
-    { value: '51', label: '51 - Diferimento' },
-    { value: '60', label: '60 - ICMS cobrado anteriormente por substituição tributária' },
-    { value: '70', label: '70 - Com redução de base de cálculo e cobrança do ICMS por substituição tributária' },
-    { value: '90', label: '90 - Outras' },
-  ]
-
-  // Opções CST PIS/COFINS
-  const pisCofinsCstOptions = [
-    { value: '01', label: '01 - Operação Tributável com Alíquota Básica' },
-    { value: '02', label: '02 - Operação Tributável com Alíquota Diferenciada' },
-    { value: '03', label: '03 - Operação Tributável com Alíquota por Unidade de Medida de Produto' },
-    { value: '04', label: '04 - Operação Tributável Monofásica - Revenda a Alíquota Zero' },
-    { value: '05', label: '05 - Operação Tributável por Substituição Tributária' },
-    { value: '06', label: '06 - Operação Tributável a Alíquota Zero' },
-    { value: '07', label: '07 - Operação Isenta da Contribuição' },
-    { value: '08', label: '08 - Operação sem Incidência da Contribuição' },
-    { value: '09', label: '09 - Operação com Suspensão da Incidência da Contribuição' },
-    { value: '49', label: '49 - Outras Operações de Saída' },
-    { value: '50', label: '50 - Operação com Direito a Crédito - Vinculada Exclusivamente a Receita Tributada no Mercado Interno' },
-    { value: '51', label: '51 - Operação com Direito a Crédito - Vinculada Exclusivamente a Receita Não Tributada no Mercado Interno' },
-    { value: '52', label: '52 - Operação com Direito a Crédito - Vinculada Exclusivamente a Receita de Exportação' },
-    { value: '53', label: '53 - Operação com Direito a Crédito - Vinculada a Receitas Tributadas e Não-Tributadas no Mercado Interno' },
-    { value: '54', label: '54 - Operação com Direito a Crédito - Vinculada a Receitas Tributadas no Mercado Interno e de Exportação' },
-    { value: '55', label: '55 - Operação com Direito a Crédito - Vinculada a Receitas Não-Tributadas no Mercado Interno e de Exportação' },
-    { value: '56', label: '56 - Operação com Direito a Crédito - Vinculada a Receitas Tributadas e Não-Tributadas no Mercado Interno e de Exportação' },
-    { value: '60', label: '60 - Crédito Presumido - Operação de Aquisição Vinculada Exclusivamente a Receita Tributada no Mercado Interno' },
-    { value: '61', label: '61 - Crédito Presumido - Operação de Aquisição Vinculada Exclusivamente a Receita Não-Tributada no Mercado Interno' },
-    { value: '62', label: '62 - Crédito Presumido - Operação de Aquisição Vinculada Exclusivamente a Receita de Exportação' },
-    { value: '63', label: '63 - Crédito Presumido - Operação de Aquisição Vinculada a Receitas Tributadas e Não-Tributadas no Mercado Interno' },
-    { value: '64', label: '64 - Crédito Presumido - Operação de Aquisição Vinculada a Receitas Tributadas no Mercado Interno e de Exportação' },
-    { value: '65', label: '65 - Crédito Presumido - Operação de Aquisição Vinculada a Receitas Não-Tributadas no Mercado Interno e de Exportação' },
-    { value: '66', label: '66 - Crédito Presumido - Operação de Aquisição Vinculada a Receitas Tributadas e Não-Tributadas no Mercado Interno e de Exportação' },
-    { value: '67', label: '67 - Crédito Presumido - Outras Operações' },
-    { value: '70', label: '70 - Operação de Aquisição sem Direito a Crédito' },
-    { value: '71', label: '71 - Operação de Aquisição com Isenção' },
-    { value: '72', label: '72 - Operação de Aquisição com Suspensão' },
-    { value: '73', label: '73 - Operação de Aquisição a Alíquota Zero' },
-    { value: '74', label: '74 - Operação de Aquisição sem Incidência da Contribuição' },
-    { value: '75', label: '75 - Operação de Aquisição por Substituição Tributária' },
-    { value: '98', label: '98 - Outras Operações de Entrada' },
-    { value: '99', label: '99 - Outras Operações' },
-  ]
-
-  const origemOptions = [
-    { value: '0', label: 'Nacional' },
-    { value: '1', label: 'Estrangeira - Importação direta' },
-    { value: '2', label: 'Estrangeira - Adquirida no mercado interno' },
-    { value: '3', label: 'Nacional - Mercadoria com >40% de conteúdo estrangeiro' },
-    { value: '4', label: 'Nacional - Produzida em conformidade com processos produtivos' },
-    { value: '5', label: 'Nacional - Mercadoria com <40% de conteúdo estrangeiro' },
-    { value: '6', label: 'Estrangeira - Importação direta sem similar nacional' },
-    { value: '7', label: 'Estrangeira - Adquirida no mercado interno sem similar nacional' },
-    { value: '8', label: 'Nacional - Mercadoria com >70% de conteúdo estrangeiro' },
-  ]
-
-  const tipoProdutoOptions = [
-    { value: '00', label: 'Mercadoria para Revenda' },
-    { value: '01', label: 'Matéria Prima' },
-    { value: '02', label: 'Embalagem' },
-    { value: '03', label: 'Produto em Processo' },
-    { value: '04', label: 'Produto Acabado' },
-    { value: '05', label: 'Subproduto' },
-    { value: '06', label: 'Produto Intermediário' },
-    { value: '07', label: 'Material de Uso e Consumo' },
-    { value: '08', label: 'Ativo Imobilizado' },
-    { value: '09', label: 'Serviços' },
-    { value: '10', label: 'Outros Insumos' },
-    { value: '99', label: 'Outros' },
-    { value: 'KT', label: 'Kit' },
-  ]
-
   return (
-    <Dialog 
-      open={open} 
+    <Dialog
+      open={open}
       onOpenChange={onClose}
       maxWidth="md"
       fullWidth
+      disableEnforceFocus={buscaCbenefAberta}
       sx={{
         '& .MuiDialog-container': {
           zIndex: 1300,
         },
-        // Garante que elementos portaled apareçam acima do Dialog
         '& .MuiBackdrop-root': {
           zIndex: 1300,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)', // Backdrop opaco
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
         },
         '& .MuiDialog-paper': {
           zIndex: 1300,
-          backgroundColor: '#ffffff', // Fundo branco sólido
-          opacity: 1, // Garante opacidade total
-          // Mobile: modal ocupa ~95% da viewport (largura e altura)
+          backgroundColor: '#ffffff',
+          opacity: 1,
           width: { xs: '95vw', sm: 'auto' },
           maxWidth: { xs: '95vw !important', sm: undefined },
           height: { xs: '95vh', sm: 'auto' },
@@ -261,15 +131,15 @@ export function ConfigurarNcmModal({
         },
       }}
     >
-      <DialogContent 
-        sx={{ 
+      <DialogContent
+        sx={{
           maxWidth: { xs: '100%', sm: '56rem' },
           width: { xs: '100%', sm: 'auto' },
           maxHeight: { xs: '100%', sm: '90vh' },
           minHeight: { xs: 0, sm: 'auto' },
           flex: { xs: 1, sm: 'none' },
-          overflow: 'hidden', // Remove overflow do container principal
-          backgroundColor: '#ffffff', // Fundo branco sólido
+          overflow: 'hidden',
+          backgroundColor: '#ffffff',
           padding: 0,
           display: 'flex',
           flexDirection: 'column',
@@ -277,217 +147,272 @@ export function ConfigurarNcmModal({
       >
         <div style={{ padding: '24px 24px 16px 24px', flexShrink: 0 }}>
           <h1 className="text-alternate font-semibold text-lg sm:text-xl">
-            {configuracaoImposto ? 'Editar Configuração de Impostos por NCM' : 'Nova Configuração de Impostos por NCM'}
+            {configuracaoImposto
+              ? 'Editar Configuração de Impostos por NCM'
+              : 'Nova Configuração de Impostos por NCM'}
           </h1>
         </div>
 
-        <div 
+        <div
           style={{
             flex: 1,
             overflowY: 'auto',
             overflowX: 'hidden',
-            minHeight: 0, // Permite que o flex funcione corretamente
+            minHeight: 0,
           }}
           className="scrollbar-thin md:px-24 px-2"
         >
-          <form id="configurar-ncm-form" onSubmit={handleSubmit} className="space-y-4" style={{ paddingTop: '8px', paddingBottom: '24px' }}>
-          <div className="space-y-2">
-            <Label htmlFor="ncm">NCM *</Label>
-            <Input
-              id="ncm"
-              value={formData.ncm}
-              onChange={(e) => {
-                const value = e.target.value.replace(/\D/g, '').slice(0, 8)
-                setFormData({ ...formData, ncm: value })
-              }}
-              placeholder="12345678"
-              inputProps={{ maxLength: 8 }}
-              required
-              disabled={!!configuracaoImposto}
-              size="small"
-            />
-            <p className="text-xs text-secondary-text/70">8 dígitos</p>
-            {configuracaoImposto?.ncm?.descricao?.trim() ? (
-              <p className="text-sm text-secondary-text">{configuracaoImposto.ncm.descricao.trim()}</p>
-            ) : null}
-          </div>
-
-          <div className="grid md:grid-cols-2 grid-cols-1 gap-4">
+          <form
+            id="configurar-ncm-form"
+            onSubmit={handleSubmit}
+            className="space-y-4"
+            style={{ paddingTop: '8px', paddingBottom: '24px' }}
+          >
             <div className="space-y-2">
-              <Label htmlFor="cfop">CFOP</Label>
+              <Label htmlFor="ncm">NCM *</Label>
               <Input
-                id="cfop"
-                value={formData.cfop}
+                id="ncm"
+                value={formData.ncm}
                 onChange={(e) => {
-                  const value = e.target.value.replace(/\D/g, '').slice(0, 4)
-                  setFormData({ ...formData, cfop: value })
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 8)
+                  setFormData({ ...formData, ncm: value })
                 }}
-                placeholder="5102"
-                inputProps={{ maxLength: 4 }}
+                placeholder="12345678"
+                inputProps={{ maxLength: 8 }}
+                required
+                disabled={!!configuracaoImposto}
                 size="small"
               />
-              <p className="text-xs text-secondary-text/70">4 dígitos</p>
+              <p className="text-xs text-secondary-text/70">8 dígitos</p>
+              {configuracaoImposto?.ncm?.descricao?.trim() ? (
+                <p className="text-sm text-secondary-text">{configuracaoImposto.ncm.descricao.trim()}</p>
+              ) : null}
             </div>
 
-            {/* Lógica Condicional: Mostrar CSOSN se Simples Nacional, ou CST se Regime Normal */}
-            {isLoadingRegime ? (
+            <div className="grid md:grid-cols-2 grid-cols-1 gap-4">
               <div className="space-y-2">
-                <Label>Carregando regime tributário...</Label>
-                <div className="h-10 flex items-center text-sm text-secondary-text/70">
-                  Aguarde...
+                <Label htmlFor="cfop">CFOP</Label>
+                <Input
+                  id="cfop"
+                  value={formData.cfop}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 4)
+                    setFormData({ ...formData, cfop: value })
+                  }}
+                  placeholder="5102"
+                  inputProps={{ maxLength: 4 }}
+                  size="small"
+                />
+                <p className="text-xs text-secondary-text/70">4 dígitos</p>
+              </div>
+
+              {isLoadingRegime ? (
+                <div className="space-y-2">
+                  <Label>Carregando regime tributário...</Label>
+                  <div className="h-10 flex items-center text-sm text-secondary-text/70">
+                    Aguarde...
+                  </div>
+                </div>
+              ) : isSimplesNacional ? (
+                <div className="space-y-2">
+                  <Label htmlFor="csosn">CSOSN (Simples Nacional) *</Label>
+                  <Select
+                    value={formData.csosn}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, csosn: value, icmsCst: '' })
+                    }
+                  >
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Selecione o CSOSN" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CSOSN_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-secondary-text/70">
+                    Regime: Simples Nacional - Use CSOSN
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="icmsCst">CST ICMS (Presumido/Real) *</Label>
+                  <Select
+                    value={formData.icmsCst}
+                    onValueChange={(value) => {
+                      const usaCbenef = isCstIcmsBeneficio(value)
+                      setFormData({
+                        ...formData,
+                        icmsCst: value,
+                        csosn: '',
+                        icmsReducaoBase: value === '20' ? formData.icmsReducaoBase : '',
+                        codigoBeneficioFiscal: usaCbenef ? formData.codigoBeneficioFiscal : '',
+                      })
+                    }}
+                  >
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Selecione o CST" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CST_ICMS_OPTIONS.map((option) => {
+                        const naoSuportado = isCstIcmsNaoSuportado(option.value)
+                        return (
+                          <SelectItem
+                            key={option.value}
+                            value={option.value}
+                            disabled={naoSuportado}
+                          >
+                            {naoSuportado ? `${option.label} (não suportado)` : option.label}
+                          </SelectItem>
+                        )
+                      })}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-secondary-text/70">
+                    Regime: Presumido/Real - Use CST
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="grid md:grid-cols-2 grid-cols-1 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="icmsAliquota">Alíquota ICMS (%)</Label>
+                <Input
+                  id="icmsAliquota"
+                  type="number"
+                  inputProps={{ step: 0.01, min: 0, max: 100 }}
+                  value={formData.icmsAliquota}
+                  onChange={(e) =>
+                    setFormData({ ...formData, icmsAliquota: e.target.value })
+                  }
+                  placeholder="18.00"
+                  size="small"
+                />
+              </div>
+              {exibirCbenef ? (
+                <CampoCbenef
+                  value={formData.codigoBeneficioFiscal}
+                  onChange={(codigo) =>
+                    setFormData((prev) => ({ ...prev, codigoBeneficioFiscal: codigo }))
+                  }
+                  uf={ufEmpresa}
+                  cst={formData.icmsCst}
+                  onBuscaAbertaChange={setBuscaCbenefAberta}
+                />
+              ) : (
+                <div className="space-y-2" />
+              )}
+            </div>
+
+            {exibirReducaoBase ? (
+              <div className="grid md:grid-cols-2 grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="icmsReducaoBase">% Redução da Base de Cálculo *</Label>
+                  <Input
+                    id="icmsReducaoBase"
+                    type="number"
+                    inputProps={{ step: 0.01, min: 0, max: 100 }}
+                    value={formData.icmsReducaoBase}
+                    onChange={(e) =>
+                      setFormData({ ...formData, icmsReducaoBase: e.target.value })
+                    }
+                    placeholder="33.33"
+                    size="small"
+                    required
+                  />
+                  <p className="text-xs text-secondary-text/70">
+                    Base efetiva = valor do produto × (1 − {formData.icmsReducaoBase || '0'}%)
+                  </p>
                 </div>
               </div>
-            ) : isSimplesNacional ? (
+            ) : null}
+
+            <div className="grid md:grid-cols-2 grid-cols-1 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="csosn">CSOSN (Simples Nacional) *</Label>
+                <Label htmlFor="pisCst">CST PIS</Label>
                 <Select
-                  value={formData.csosn}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, csosn: value, icmsCst: '' })
-                  }
+                  value={formData.pisCst}
+                  onValueChange={(value) => setFormData({ ...formData, pisCst: value })}
                 >
                   <SelectTrigger className="h-10">
-                    <SelectValue placeholder="Selecione o CSOSN" />
+                    <SelectValue placeholder="Selecione o CST PIS" />
                   </SelectTrigger>
                   <SelectContent>
-                    {csosnOptions.map((option) => (
+                    {CST_PIS_COFINS_OPTIONS.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-secondary-text/70">
-                  Regime: Simples Nacional - Use CSOSN
-                </p>
               </div>
-            ) : (
+
               <div className="space-y-2">
-                <Label htmlFor="icmsCst">CST ICMS (Presumido/Real) *</Label>
-                <Select
-                  value={formData.icmsCst}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, icmsCst: value, csosn: '' })
+                <Label htmlFor="pisAliquota">Alíquota PIS (%)</Label>
+                <Input
+                  id="pisAliquota"
+                  type="number"
+                  inputProps={{ step: 0.01, min: 0, max: 100 }}
+                  value={formData.pisAliquota}
+                  onChange={(e) =>
+                    setFormData({ ...formData, pisAliquota: e.target.value })
                   }
+                  placeholder="1.65"
+                  size="small"
+                />
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 grid-cols-1 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="cofinsCst">CST COFINS</Label>
+                <Select
+                  value={formData.cofinsCst}
+                  onValueChange={(value) => setFormData({ ...formData, cofinsCst: value })}
                 >
                   <SelectTrigger className="h-10">
-                    <SelectValue placeholder="Selecione o CST" />
+                    <SelectValue placeholder="Selecione o CST COFINS" />
                   </SelectTrigger>
                   <SelectContent>
-                    {cstOptions.map((option) => (
+                    {CST_PIS_COFINS_OPTIONS.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-secondary-text/70">
-                  Regime: Presumido/Real - Use CST
-                </p>
               </div>
-            )}
-          </div>
 
-          <div className="grid md:grid-cols-2 grid-cols-1 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="icmsAliquota">Alíquota ICMS (%)</Label>
-              <Input
-                id="icmsAliquota"
-                type="number"
-                inputProps={{ step: 0.01, min: 0, max: 100 }}
-                value={formData.icmsAliquota}
-                onChange={(e) =>
-                  setFormData({ ...formData, icmsAliquota: e.target.value })
-                }
-                placeholder="18.00"
-                size="small"
-              />
+              <div className="space-y-2">
+                <Label htmlFor="cofinsAliquota">Alíquota COFINS (%)</Label>
+                <Input
+                  id="cofinsAliquota"
+                  type="number"
+                  inputProps={{ step: 0.01, min: 0, max: 100 }}
+                  value={formData.cofinsAliquota}
+                  onChange={(e) =>
+                    setFormData({ ...formData, cofinsAliquota: e.target.value })
+                  }
+                  placeholder="7.60"
+                  size="small"
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              {/* Espaço reservado para manter layout */}
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-2 grid-cols-1 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="pisCst">CST PIS</Label>
-              <Select
-                value={formData.pisCst}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, pisCst: value })
-                }
-              >
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder="Selecione o CST PIS" />
-                </SelectTrigger>
-                <SelectContent>
-                  {pisCofinsCstOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="pisAliquota">Alíquota PIS (%)</Label>
-              <Input
-                id="pisAliquota"
-                type="number"
-                inputProps={{ step: 0.01, min: 0, max: 100 }}
-                value={formData.pisAliquota}
-                onChange={(e) =>
-                  setFormData({ ...formData, pisAliquota: e.target.value })
-                }
-                placeholder="1.65"
-                size="small"
-              />
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-2 grid-cols-1 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="cofinsCst">CST COFINS</Label>
-              <Select
-                value={formData.cofinsCst}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, cofinsCst: value })
-                }
-              >
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder="Selecione o CST COFINS" />
-                </SelectTrigger>
-                <SelectContent>
-                  {pisCofinsCstOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="cofinsAliquota">Alíquota COFINS (%)</Label>
-              <Input
-                id="cofinsAliquota"
-                type="number"
-                inputProps={{ step: 0.01, min: 0, max: 100 }}
-                value={formData.cofinsAliquota}
-                onChange={(e) =>
-                  setFormData({ ...formData, cofinsAliquota: e.target.value })
-                }
-                placeholder="7.60"
-                size="small"
-              />
-            </div>
-          </div>
-
           </form>
         </div>
 
-        <DialogFooter sx={{ padding: '16px 24px 24px 24px', flexShrink: 0, borderTop: '1px solid #e5e7eb', marginTop: 0 }}>
+        <DialogFooter
+          sx={{
+            padding: '16px 24px 24px 24px',
+            flexShrink: 0,
+            borderTop: '1px solid #e5e7eb',
+            marginTop: 0,
+          }}
+        >
           <Button
             type="button"
             variant="outlined"
@@ -497,14 +422,14 @@ export function ConfigurarNcmModal({
               backgroundColor: 'rgba(131, 56, 236, 0.1)',
               color: 'var(--color-alternate)',
               borderColor: 'var(--color-alternate)',
-              '&:hover': { 
-                backgroundColor: 'rgba(131, 56, 236, 0.2)' 
+              '&:hover': {
+                backgroundColor: 'rgba(131, 56, 236, 0.2)',
               },
             }}
           >
             Cancelar
           </Button>
-          <Button 
+          <Button
             type="button"
             onClick={(e) => {
               e.preventDefault()
@@ -517,8 +442,8 @@ export function ConfigurarNcmModal({
             sx={{
               backgroundColor: 'var(--color-alternate)',
               color: '#ffffff',
-              '&:hover': { 
-                backgroundColor: 'rgba(131, 56, 236, 0.8)' 
+              '&:hover': {
+                backgroundColor: 'rgba(131, 56, 236, 0.8)',
               },
             }}
           >

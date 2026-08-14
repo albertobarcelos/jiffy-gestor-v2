@@ -181,7 +181,15 @@ export function useKanbanOrchestrator() {
   const emitirNotaGestor = useEmitirNfeGestor()
   const emitirNotaDelivery = useEmitirNfeDelivery()
 
-  const { acaoFiscalEmAndamentoPorVenda, getEtapaKanbanParaExibicao: getEtapaKanbanFiscal, handleEmitirNfe } =
+  const {
+    acaoFiscalEmAndamentoPorVenda,
+    getEtapaKanbanParaExibicao: getEtapaKanbanFiscal,
+    handleEmitirNfe,
+    alertaCbenef,
+    handleContinuarCbenefKanban,
+    handleConfigurarCbenefKanban,
+    handleCancelarCbenefKanban,
+  } =
     useFiscalEmissaoKanban({
       reemitirNfePdv: payload => reemitirNfePdv.mutateAsync(payload),
       reemitirNfeGestor: payload => reemitirNfeGestor.mutateAsync(payload),
@@ -409,6 +417,10 @@ export function useKanbanOrchestrator() {
       modais.setVendaSelecionadaParaEmissao(null)
     },
     onClienteSalvoEmitirNfe: () => void data.refetch(),
+    alertaCbenef,
+    onContinuarCbenef: () => void handleContinuarCbenefKanban(),
+    onConfigurarCbenef: handleConfigurarCbenefKanban,
+    onCancelarCbenef: handleCancelarCbenefKanban,
     novoPedidoCriarContext: modais.novoPedidoCriarContext,
     novoPedidoModalOpen: modais.novoPedidoModalOpen,
     onCloseNovoPedidoCriar: () => modais.setNovoPedidoModalOpen(false),

@@ -25,6 +25,9 @@ import type {
   PaginaExportacaoHistoricoDTO,
   AgendamentoExportacaoXmlDTO,
   AgendamentoExportacaoXmlResponseDTO,
+  ValidarCbenefDTO,
+  CbenefItemDTO,
+  ImportarCbenefResultadoDTO,
 } from '@/src/application/dto/painel-contador/PainelContadorDTO'
 import { EmpresaPainelResumo } from '@/src/domain/entities/painel-contador/EmpresaPainelResumo'
 import { ConfiguracaoFiscalEmpresa } from '@/src/domain/entities/painel-contador/ConfiguracaoFiscalEmpresa'
@@ -400,6 +403,65 @@ export class FiscalPainelApiRepository implements IFiscalPainelRepository {
     if (!response.ok) {
       const data = await parseJson<{ error?: string; message?: string }>(response)
       throw new Error(data.error || data.message || 'Erro ao desativar agendamento')
+    }
+  }
+
+  async validarCbenef(codigo: string): Promise<ValidarCbenefDTO> {
+    const data = await this.get<ValidarCbenefDTO>(
+      `/api/v1/fiscal/configuracoes/cbenef/${encodeURIComponent(codigo)}`
+    )
+    return {
+      valido: data.valido === true,
+      codigo: data.codigo ?? codigo,
+      descricao: data.descricao ?? null,
+      uf: data.uf ?? null,
+      vigente: data.vigente === true || data.valido === true,
+      cstIcmsCompativel: data.cstIcmsCompativel ?? null,
+      mensagem: data.mensagem ?? null,
+    }
+  }
+
+  async listarCbenef(uf: string, cst?: string): Promise<CbenefItemDTO[]> {
+    const search = new URLSearchParams({ uf })
+    if (cst) search.set('cst', cst)
+    const path = `/api/v1/fiscal/configuracoes/cbenef?${search.toString()}`
+    const response = await fetchGestorApi(path, {
+      cache: 'no-store',
+      headers: authHeaders(this.token),
+    })
+    const data = await parseJson<CbenefItemDTO[] & { error?: string; message?: string }>(response)
+    if (!response.ok) {
+      throw new Error(data.error || data.message || `Erro ao listar cBenef (${response.status})`)
+    }
+    if (!Array.isArray(data)) {
+      throw new Error(data.error || data.message || 'Resposta inválida ao listar cBenef')
+    }
+    return data
+  }
+
+  async importarCbenef(arquivo: File): Promise<ImportarCbenefResultadoDTO> {
+    const form = new FormData()
+    form.append('arquivo', arquivo)
+    const response = await fetchGestorApi('/api/v1/fiscal/configuracoes/cbenef/importar', {
+      method: 'POST',
+      cache: 'no-store',
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+      },
+      body: form,
+    })
+    const data = await parseJson<ImportarCbenefResultadoDTO & { error?: string; message?: string }>(
+      response
+    )
+    if (!response.ok) {
+      throw new Error(data.error || data.message || 'Erro ao importar tabela cBenef')
+    }
+    return {
+      totalProcessados: data.totalProcessados ?? 0,
+      inseridos: data.inseridos ?? 0,
+      atualizados: data.atualizados ?? 0,
+      ignorados: data.ignorados ?? 0,
+      erros: typeof data.erros === 'number' ? data.erros : 0,
     }
   }
 }

@@ -4,6 +4,7 @@ import { CertificadoDigital } from '@/src/domain/entities/painel-contador/Certif
 import { ConfiguracaoEmissao } from '@/src/domain/entities/painel-contador/ConfiguracaoEmissao'
 import { ConfiguracaoNcmImpostos } from '@/src/domain/entities/painel-contador/ConfiguracaoNcmImpostos'
 import { formatarRegimeTributario } from '@/src/shared/helpers/formatarRegimeTributario'
+import { normalizarUf } from '@/src/domain/entities/painel-contador/cbenefRegras'
 import type { ResumoEmpresaPainelDTO, ProgressoEtapasDTO } from '@/src/application/dto/painel-contador/PainelContadorDTO'
 import type { ProgressoEtapasMap } from '@/src/domain/policies/painel-contador/EtapaHabilitadaPolicy'
 import type { CertificadoStatusResult } from '@/src/domain/policies/painel-contador/CertificadoValidoPolicy'
@@ -60,6 +61,7 @@ export class FiscalPainelMapper {
       cnpj: empresa?.cnpj ?? '--',
       regimeLabel: formatarRegimeTributario(configFiscal?.codigoRegimeTributario),
       codigoRegimeTributario: configFiscal?.codigoRegimeTributario ?? null,
+      uf: normalizarUf(configFiscal?.uf || empresa?.getUf()),
     }
   }
 

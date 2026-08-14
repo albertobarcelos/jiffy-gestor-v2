@@ -1,12 +1,13 @@
 'use client'
 
 import { EmitirNfeModal } from '../../fiscal/EmitirNfeModal'
+import { AlertaCbenefEmissaoDialog } from '../../fiscal/AlertaCbenefEmissaoDialog'
 import { NovoPedidoModal } from '../../pedidos/NovoPedidoModal'
 import { DeliveryConfiguracoesModal } from '../../delivery/configuracoes/DeliveryConfiguracoesModal'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { FaturamentoRangeCalendar } from '@/src/presentation/components/ui/FaturamentoRangeCalendar'
 import type { ModoKanbanVendas } from '../KanbanModoVendasToggle'
-import type { VendaSelecionadaParaEmissao } from '../hooks/useFiscalEmissaoKanban'
+import type { AlertaCbenefKanban, VendaSelecionadaParaEmissao } from '../hooks/useFiscalEmissaoKanban'
 import type { TipoPedido } from '../../pedidos/components/EscolhaTipoPedidoModal'
 import type { AbaDetalhesPedido } from '../../pedidos/types'
 import type { Venda } from '../types'
@@ -30,6 +31,10 @@ export interface KanbanModaisRendererProps {
   emitirNfeModalOpen: boolean
   onCloseEmitirNfe: () => void
   onClienteSalvoEmitirNfe: () => void
+  alertaCbenef: AlertaCbenefKanban | null
+  onContinuarCbenef: () => void
+  onConfigurarCbenef: () => void
+  onCancelarCbenef: () => void
   novoPedidoCriarContext: { instanciaKey: number; tipoInicioPedido: TipoPedido } | null
   novoPedidoModalOpen: boolean
   onCloseNovoPedidoCriar: () => void
@@ -77,6 +82,10 @@ export function KanbanModaisRenderer({
   emitirNfeModalOpen,
   onCloseEmitirNfe,
   onClienteSalvoEmitirNfe,
+  alertaCbenef,
+  onContinuarCbenef,
+  onConfigurarCbenef,
+  onCancelarCbenef,
   novoPedidoCriarContext,
   novoPedidoModalOpen,
   onCloseNovoPedidoCriar,
@@ -196,6 +205,13 @@ export function KanbanModaisRenderer({
           modoVisualizacao={true}
         />
       )}
+      <AlertaCbenefEmissaoDialog
+        open={Boolean(alertaCbenef)}
+        itens={alertaCbenef?.itens ?? []}
+        onContinuar={onContinuarCbenef}
+        onConfigurar={onConfigurarCbenef}
+        onCancelar={onCancelarCbenef}
+      />
     </>
   )
 }
