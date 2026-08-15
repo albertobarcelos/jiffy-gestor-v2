@@ -162,8 +162,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, data })
   } catch (error: any) {
     console.error('Erro na API de criação de produto:', error)
+    const data = error instanceof ApiError ? error.data : undefined
+    const produtoIdJaCriado =
+      data &&
+      typeof data === 'object' &&
+      typeof (data as { produtoId?: unknown }).produtoId === 'string'
+        ? (data as { produtoId: string }).produtoId
+        : undefined
     return NextResponse.json(
-      { message: error.message || 'Erro interno do servidor' },
+      {
+        message: error.message || 'Erro interno do servidor',
+        ...(produtoIdJaCriado ? { produtoId: produtoIdJaCriado } : {}),
+      },
       { status: error.status || 500 }
     )
   }

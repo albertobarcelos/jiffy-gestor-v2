@@ -21,6 +21,11 @@ import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { Produto } from '@/src/domain/entities/Produto'
 import { MdImage } from 'react-icons/md'
 import { cn } from '@/src/shared/utils/cn'
+import { usePropagarAlteracaoProduto } from '@/src/presentation/hooks/produtos/usePropagarAlteracaoProduto'
+import {
+  snapshotPropagavelDePatch,
+  type DestinoAlteracaoProduto,
+} from '@/src/shared/types/propagarAlteracaoProduto'
 
 /** Snapshot serializado por `getFormSnapshot` — deve permanecer alinhado a esse método. */
 interface BaselineSnapshotProduto {
@@ -121,6 +126,25 @@ function extrairGrupoProdutoIdDoJsonProduto(produto: Record<string, unknown>): s
     if (typeof id === 'number' && Number.isFinite(id)) return String(id)
   }
   return null
+}
+
+/** Defaults de origem/tipo não contam como dados fiscais — o microserviço exige NCM. */
+function fiscalDeveSerEnviado(fiscalData: Record<string, unknown>): boolean {
+  return typeof fiscalData.ncm === 'string' && fiscalData.ncm.trim() !== ''
+}
+
+function extrairIdProdutoDaRespostaApi(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== 'object') return undefined
+  const root = payload as Record<string, unknown>
+  const nested =
+    root.data && typeof root.data === 'object' && !Array.isArray(root.data)
+      ? (root.data as Record<string, unknown>)
+      : null
+  const candidates = [root.id, root.produtoId, nested?.id, nested?.produtoId]
+  for (const c of candidates) {
+    if (typeof c === 'string' && c.trim() !== '') return c.trim()
+  }
+  return undefined
 }
 
 /** Compara ids de grupo para o PATCH parcial (null, undefined e string vazia tratados como ausência). */
@@ -279,10 +303,6 @@ function montarPatchParcialEdicaoProduto(
     delta.impressorasIds = bodyCompleto.impressorasIds
   }
 
-  const ncmCompatAtual = bodyCompleto.ncm as string | undefined
-  const ncmCompatBase = base.ncm?.trim() ? base.ncm.trim() : undefined
-  if (ncmCompatAtual !== ncmCompatBase) delta.ncm = ncmCompatAtual
-
   if (
     incluirAtivo &&
     bodyCompleto.ativo !== undefined &&
@@ -291,14 +311,26 @@ function montarPatchParcialEdicaoProduto(
     delta.ativo = bodyCompleto.ativo
   }
 
-  const fiscalRefBaseline = montarFiscalReferenciaBaseline(
-    base,
-    salvarSomenteDadosGerais,
-    fiscalRef,
-    hasLoadedFiscal
-  )
-  const fiscalDelta = diffFiscalParcial(fiscalAtual, fiscalRefBaseline)
-  if (fiscalDelta) delta.fiscal = fiscalDelta
+  // Step 1–2: não mexe em NCM/fiscal. Diff parcial sem NCM vira `fiscal: {}` no JSON
+  // e o microserviço responde "Código NCM é obrigatório".
+  if (!salvarSomenteDadosGerais) {
+    const ncmCompatAtual = bodyCompleto.ncm as string | undefined
+    const ncmCompatBase = base.ncm?.trim() ? base.ncm.trim() : undefined
+    if (ncmCompatAtual !== ncmCompatBase && ncmCompatAtual) {
+      delta.ncm = ncmCompatAtual
+    }
+
+    const fiscalRefBaseline = montarFiscalReferenciaBaseline(
+      base,
+      salvarSomenteDadosGerais,
+      fiscalRef,
+      hasLoadedFiscal
+    )
+    const fiscalDelta = diffFiscalParcial(fiscalAtual, fiscalRefBaseline)
+    if (fiscalDelta && fiscalDeveSerEnviado(fiscalAtual)) {
+      delta.fiscal = fiscalAtual
+    }
+  }
 
   return delta
 }
@@ -332,6 +364,11 @@ export interface NovoProdutoProps {
   hideEmbeddedHeader?: boolean
   /** Omite botões inferiores dos passos (Anterior / Próximo / Salvar e fechar) */
   hideEmbeddedFormActions?: boolean
+  /**
+   * Na criação, envia `menuIds` no POST para já vincular o produto a esses cardápios
+   * (em vez de só o menu principal).
+   */
+  menuIds?: string[]
   onWizardStepChange?: (step: 0 | 1 | 2) => void
   onWizardSavingChange?: (saving: boolean) => void
   /** Passo 2 com fiscal indisponível: só “Voltar” no fluxo interno */
@@ -354,6 +391,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       isEmbedded = false,
       hideEmbeddedHeader = false,
       hideEmbeddedFormActions = false,
+      menuIds,
       onWizardStepChange,
       onWizardSavingChange,
       onFiscalUnavailableChange,
@@ -361,7 +399,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
     ref
   ) {
     const router = useRouter()
-    const searchParams = useSearchParams()
+    const searchParams = useSearchParams()
     // Estado do step atual (0 = Informações, 1 = Configurações, 2 = Configuração Fiscal)
     const [selectedPage, setSelectedPage] = useState<0 | 1 | 2>(initialStep)
 
@@ -463,6 +501,12 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
     const copyFromId = useMemo(() => copyFromIdValue, [copyFromIdValue])
     const effectiveProdutoId = useMemo(() => produtoId || copyFromId, [produtoId, copyFromId])
     const effectiveIsCopyMode = useMemo(() => isCopyMode || !!copyFromId, [isCopyMode, copyFromId])
+    /** Id persistido nesta sessão de criação (evita segundo POST se o fiscal falhar depois do create). */
+    const [idCriadoNestaSessao, setIdCriadoNestaSessao] = useState<string | undefined>()
+    const idPersistidoParaSave =
+      (produtoId && !effectiveIsCopyMode ? produtoId : undefined) || idCriadoNestaSessao
+    const { pedirConfirmacao, aplicarNosDestinos, dialog: dialogPropagacao } =
+      usePropagarAlteracaoProduto()
 
     /** Snapshot só dos dados do produto (sem passo do wizard) — trocar de etapa não é “alteração”. */
     const getFormSnapshot = useCallback(() => {
@@ -1330,10 +1374,24 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         return false
       }
 
+      let destinosPropagacao: DestinoAlteracaoProduto = {
+        aplicarNoCadastroBase: false,
+        menuIds: [],
+      }
+      const formularioSujo =
+        baselineSerializedRef.current !== null &&
+        getFormSnapshot() !== baselineSerializedRef.current
+      if (idPersistidoParaSave && formularioSujo) {
+        const resposta = await pedirConfirmacao({
+          origem: 'cadastroBase',
+          produtoId: idPersistidoParaSave,
+        })
+        if (resposta === null) return false
+        destinosPropagacao = resposta
+      }
+
       const toastId = showToast.loading(
-        effectiveProdutoId && !effectiveIsCopyMode
-          ? 'Salvando alterações...'
-          : 'Cadastrando produto...'
+        idPersistidoParaSave ? 'Salvando alterações...' : 'Cadastrando produto...'
       )
 
       onWizardSavingChange?.(true)
@@ -1345,42 +1403,23 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           return false
         }
 
-        // Montar objeto de dados fiscais (só inclui se houver pelo menos um campo preenchido)
-        const fiscalData: any = {}
+        const fiscalData: Record<string, unknown> = {}
         let ncmCompatBody: string | undefined
 
-        if (salvarSomenteDadosGerais && !hasLoadedFiscalDataRef.current) {
-          // Edição sem abrir o passo fiscal: preserva fiscal carregado na ref
-          const ref = fiscalDataFromProductRef.current
-          if (ref?.ncm) fiscalData.ncm = String(ref.ncm).trim()
-          if (ref?.cest) fiscalData.cest = String(ref.cest).trim()
-          if (
-            ref?.origemMercadoria !== undefined &&
-            ref?.origemMercadoria !== null &&
-            String(ref.origemMercadoria) !== ''
-          ) {
-            fiscalData.origemMercadoria =
-              typeof ref.origemMercadoria === 'number'
-                ? ref.origemMercadoria
-                : parseInt(String(ref.origemMercadoria), 10)
-          }
-          if (ref?.tipoProduto) fiscalData.tipoProduto = ref.tipoProduto
-          if (ref?.indicadorProducaoEscala) {
-            fiscalData.indicadorProducaoEscala = ref.indicadorProducaoEscala
-          }
-          ncmCompatBody = ref?.ncm ? String(ref.ncm).trim() : undefined
-        } else {
+        if (!salvarSomenteDadosGerais) {
           if (ncm && ncm.trim() !== '') fiscalData.ncm = ncm.trim()
           if (cest && cest.trim() !== '') fiscalData.cest = cest.trim()
-          if (origemMercadoria) fiscalData.origemMercadoria = parseInt(origemMercadoria)
+          if (origemMercadoria !== null && origemMercadoria !== '') {
+            fiscalData.origemMercadoria = parseInt(origemMercadoria, 10)
+          }
           if (tipoProduto) fiscalData.tipoProduto = tipoProduto
           if (indicadorProducaoEscala) fiscalData.indicadorProducaoEscala = indicadorProducaoEscala
-          ncmCompatBody = ncm || undefined
+          ncmCompatBody = ncm?.trim() ? ncm.trim() : undefined
         }
 
-        const isEditMode = Boolean(effectiveProdutoId && !effectiveIsCopyMode)
+        const isEditMode = Boolean(idPersistidoParaSave)
 
-        const body: any = {
+        const body: Record<string, unknown> = {
           nome: nomeProduto,
           descricao: descricaoProduto,
           valor: precoVendaNum,
@@ -1395,13 +1434,12 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           incideTaxa,
           gruposComplementosIds: grupoComplementosIds,
           impressorasIds,
-          // Manter ncm no body para compatibilidade (backend ainda aceita)
-          ncm: ncmCompatBody,
-          ...(effectiveProdutoId ? { ativo } : {}),
+          ...(ncmCompatBody ? { ncm: ncmCompatBody } : {}),
+          ...(idPersistidoParaSave ? { ativo } : {}),
+          ...(!isEditMode && menuIds && menuIds.length > 0 ? { menuIds } : {}),
         }
 
-        // Adicionar objeto fiscal apenas se houver dados fiscais
-        if (Object.keys(fiscalData).length > 0) {
+        if (fiscalDeveSerEnviado(fiscalData)) {
           body.fiscal = fiscalData
         }
 
@@ -1410,20 +1448,17 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
               baselineSerializedRef.current,
               grupoProdutoIdCarregadoRef.current,
               body,
-              fiscalData,
+              fiscalDeveSerEnviado(fiscalData) ? fiscalData : {},
               salvarSomenteDadosGerais,
               fiscalDataFromProductRef.current,
               hasLoadedFiscalDataRef.current,
-              Boolean(effectiveProdutoId)
+              Boolean(idPersistidoParaSave)
             )
           : body
 
-        const url =
-          effectiveProdutoId && !effectiveIsCopyMode
-            ? `/api/produtos/${effectiveProdutoId}`
-            : '/api/produtos'
+        const url = isEditMode ? `/api/produtos/${idPersistidoParaSave}` : '/api/produtos'
 
-        const method = effectiveProdutoId && !effectiveIsCopyMode ? 'PATCH' : 'POST'
+        const method = isEditMode ? 'PATCH' : 'POST'
 
         // Se for edição e gruposComplementosIds estiver vazio, precisamos remover
         // os grupos individualmente usando DELETE, pois a API externa não processa array vazio
@@ -1462,17 +1497,28 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
 
         if (!response.ok) {
           const error = await response.json().catch(() => ({}))
+          const idJaCriado = extrairIdProdutoDaRespostaApi(error)
+          if (!isEditMode && idJaCriado) {
+            setIdCriadoNestaSessao(idJaCriado)
+          }
           const errorMessage = error.message || 'Erro ao salvar produto'
           showToast.errorLoading(toastId, errorMessage)
           return false
         }
+
+        const payloadSucesso = await response.json().catch(() => ({}))
+        const idDaResposta = extrairIdProdutoDaRespostaApi(payloadSucesso)
+        if (!isEditMode && idDaResposta) {
+          setIdCriadoNestaSessao(idDaResposta)
+        }
+        const idSalvo = idPersistidoParaSave || idDaResposta
 
         // Se precisar remover grupos individualmente (quando array está vazio)
         if (shouldRemoveGruposIndividually) {
           try {
             // Remover cada grupo individualmente usando DELETE
             const deletePromises = originalGrupoComplementosIds.map(grupoId =>
-              fetchGestorApi(`/api/produtos/${effectiveProdutoId}/grupos-complementos/${grupoId}`, {
+              fetchGestorApi(`/api/produtos/${idSalvo}/grupos-complementos/${grupoId}`, {
                 method: 'DELETE',
                 headers: {
                   Authorization: `Bearer ${token}`,
@@ -1500,9 +1546,9 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
 
         // Buscar o produto atualizado para atualizar o cache (apenas quando houve PATCH)
         let produtoAtualizado = null
-        if (isEditMode && precisaSalvarProduto) {
+        if (isEditMode && precisaSalvarProduto && idSalvo) {
           try {
-            const produtoResponse = await fetchGestorApi(`/api/produtos/${effectiveProdutoId}`, {
+            const produtoResponse = await fetchGestorApi(`/api/produtos/${idSalvo}`, {
               headers: {
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',
@@ -1519,10 +1565,30 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
 
         showToast.successLoading(
           toastId,
-          effectiveProdutoId && !effectiveIsCopyMode
-            ? 'Produto atualizado com sucesso!'
-            : 'Produto cadastrado com sucesso!'
+          isEditMode ? 'Produto atualizado com sucesso!' : 'Produto cadastrado com sucesso!'
         )
+
+        const snapPropagar = snapshotPropagavelDePatch(
+          (bodyToSend ?? {}) as Record<string, unknown>
+        )
+        if (snapPropagar && idSalvo && destinosPropagacao.menuIds.length > 0) {
+          try {
+            await aplicarNosDestinos({
+              produtoId: idSalvo,
+              snapshot: snapPropagar,
+              destinos: {
+                aplicarNoCadastroBase: false,
+                menuIds: destinosPropagacao.menuIds,
+              },
+            })
+          } catch (propErr) {
+            showToast.error(
+              propErr instanceof Error
+                ? propErr.message
+                : 'Produto salvo, mas não foi possível atualizar os cardápios selecionados'
+            )
+          }
+        }
         grupoProdutoIdCarregadoRef.current = produtoAtualizado
           ? extrairGrupoProdutoIdDoJsonProduto(produtoAtualizado as Record<string, unknown>)
           : extrairGrupoProdutoIdDoJsonProduto({
@@ -1532,8 +1598,11 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         if (onSuccess) {
           // Passar dados do produto para atualização otimista do cache
           onSuccess(
-            isEditMode && produtoAtualizado && effectiveProdutoId
-              ? { produtoId: effectiveProdutoId, produtoData: produtoAtualizado }
+            idSalvo
+              ? {
+                  produtoId: idSalvo,
+                  produtoData: produtoAtualizado ?? payloadSucesso?.data ?? payloadSucesso,
+                }
               : undefined
           )
         } else {
@@ -1847,6 +1916,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
             </div>
           </div>
         ) : null}
+        {dialogPropagacao}
       </div>
     )
   }

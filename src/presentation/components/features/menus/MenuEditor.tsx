@@ -1,27 +1,33 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { MdArrowBack, MdDragIndicator } from 'react-icons/md'
+import { MdArrowBack } from 'react-icons/md'
 import { useMenu } from '@/src/presentation/hooks/menus/useMenus'
 import {
   useMenuGruposProdutos,
   useMenuProdutos,
 } from '@/src/presentation/hooks/menus/useMenuCatalog'
 import { useMenuMutations } from '@/src/presentation/hooks/menus/useMenuMutations'
-import { MenuProdutoPanel } from './MenuProdutoPanel'
+import { usePropagarAlteracaoProduto } from '@/src/presentation/hooks/produtos/usePropagarAlteracaoProduto'
 import { AddProdutosToMenuPanel } from './AddProdutosToMenuPanel'
+import {
+  MenuProdutoTabsModal,
+  type MenuProdutoTabsKey,
+  type MenuProdutoTabsModalState,
+} from './MenuProdutoTabsModal'
+import {
+  ProdutosTabsModal,
+  type ProdutosTabsModalState,
+} from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
+import { CatalogGroupedList } from '@/src/presentation/components/features/catalogo/CatalogGroupedList'
+import { CatalogProductRow } from '@/src/presentation/components/features/catalogo/CatalogProductRow'
+import type { CatalogGroup } from '@/src/presentation/components/features/catalogo/types'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
-import type { MenuProduto } from '@/src/shared/types/menus'
-
-function formatBrl(value: number) {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(value)
-}
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import type { MenuGrupoProduto, MenuProduto } from '@/src/shared/types/menus'
 
 interface MenuEditorProps {
   menuId: string
@@ -30,26 +36,87 @@ interface MenuEditorProps {
 export function MenuEditor({ menuId }: MenuEditorProps) {
   const { toGestao } = useGestaoPath()
   const { data: menu, isLoading: loadingMenu } = useMenu(menuId)
-  const { data: gruposData, isLoading: loadingGrupos } = useMenuGruposProdutos({
+  const {
+    data: gruposData,
+    isLoading: loadingGrupos,
+    fetchNextPage: fetchNextGrupos,
+    hasNextPage: hasNextGrupos,
+    isFetching: isFetchingGrupos,
+    isFetchingNextPage: isFetchingNextGrupos,
+  } = useMenuGruposProdutos({
     menuId,
   })
-  const { data: produtosData, isLoading: loadingProdutos } = useMenuProdutos({
+  const {
+    data: produtosData,
+    isLoading: loadingProdutos,
+    fetchNextPage: fetchNextProdutos,
+    hasNextPage: hasNextProdutos,
+    isFetching: isFetchingProdutos,
+    isFetchingNextPage: isFetchingNextProdutos,
+  } = useMenuProdutos({
     menuId,
+    ativo: null,
   })
-  const { syncProdutos } = useMenuMutations(menuId)
+  const { syncProdutos, updateProduto } = useMenuMutations(menuId)
+  const { pedirConfirmacao, aplicarNosDestinos, dialog: dialogPropagacao } =
+    usePropagarAlteracaoProduto()
+  const invalidate = useInvalidateTenantQueries()
 
-  const [selectedGrupoBaseId, setSelectedGrupoBaseId] = useState<string | null>(null)
-  const [produtoPanel, setProdutoPanel] = useState<MenuProduto | null>(null)
+  useEffect(() => {
+    if (hasNextProdutos && !isFetchingNextProdutos && !isFetchingProdutos && produtosData) {
+      void fetchNextProdutos()
+    }
+  }, [
+    hasNextProdutos,
+    isFetchingNextProdutos,
+    isFetchingProdutos,
+    fetchNextProdutos,
+    produtosData,
+  ])
+
+  useEffect(() => {
+    if (hasNextGrupos && !isFetchingNextGrupos && !isFetchingGrupos && gruposData) {
+      void fetchNextGrupos()
+    }
+  }, [hasNextGrupos, isFetchingNextGrupos, isFetchingGrupos, fetchNextGrupos, gruposData])
+
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
   const [addOpen, setAddOpen] = useState(false)
+  const [tabsState, setTabsState] = useState<MenuProdutoTabsModalState>({
+    open: false,
+    tab: 'produto',
+    produto: null,
+    grupo: null,
+  })
+  const [createProdutoState, setCreateProdutoState] = useState<ProdutosTabsModalState>({
+    open: false,
+    tab: 'produto',
+    mode: 'create',
+  })
 
   const grupos = useMemo(() => {
-    const items = [...(gruposData?.items ?? [])]
-    return items.sort((a, b) => a.ordem - b.ordem)
-  }, [gruposData?.items])
+    const map = new Map<string, MenuGrupoProduto>()
+    for (const page of gruposData?.pages ?? []) {
+      for (const grupo of page.items) {
+        if (!map.has(grupo.id)) map.set(grupo.id, grupo)
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.ordem - b.ordem)
+  }, [gruposData?.pages])
+
+  const produtosDoMenu = useMemo(() => {
+    const map = new Map<string, MenuProduto>()
+    for (const page of produtosData?.pages ?? []) {
+      for (const produto of page.items) {
+        if (!map.has(produto.produtoId)) map.set(produto.produtoId, produto)
+      }
+    }
+    return Array.from(map.values())
+  }, [produtosData?.pages])
 
   const produtosPorGrupo = useMemo(() => {
     const map = new Map<string, MenuProduto[]>()
-    for (const produto of produtosData?.items ?? []) {
+    for (const produto of produtosDoMenu) {
       const key = produto.grupoProduto?.id ?? 'sem-grupo'
       const list = map.get(key) ?? []
       list.push(produto)
@@ -59,23 +126,255 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
       list.sort((a, b) => a.ordem - b.ordem)
     }
     return map
-  }, [produtosData?.items])
+  }, [produtosDoMenu])
 
-  const activeGrupoId = selectedGrupoBaseId ?? grupos[0]?.grupoBase?.id ?? null
-  const produtosDoGrupo = activeGrupoId
-    ? produtosPorGrupo.get(activeGrupoId) ?? []
-    : []
+  const catalogGroups = useMemo<CatalogGroup<MenuProduto>[]>(() => {
+    const used = new Set<string>()
+    const groups: CatalogGroup<MenuProduto>[] = grupos.map(grupo => {
+      const baseId = grupo.grupoBase.id
+      used.add(baseId)
+      const cor = grupo.grupoBase.corHex
+      const icon = grupo.grupoBase.iconName
+      return {
+        groupKey: `gid:${baseId}`,
+        grupoLabel: grupo.nome || grupo.grupoBase.nome,
+        grupoId: baseId,
+        grupoVisual:
+          cor && icon ? { corHex: cor, iconName: icon } : undefined,
+        grupoAtivo: grupo.grupoBase.ativo ?? true,
+        items: produtosPorGrupo.get(baseId) ?? [],
+      }
+    })
 
-  const handleRemove = async (produto: MenuProduto) => {
-    if (!window.confirm(`Remover "${produto.nome}" deste cardápio?`)) return
-    try {
-      await syncProdutos.mutateAsync({ remove: [produto.produtoId] })
-      showToast.success('Produto removido deste cardápio')
-      if (produtoPanel?.produtoId === produto.produtoId) setProdutoPanel(null)
-    } catch (err) {
-      showToast.error(err instanceof Error ? err.message : 'Erro ao remover')
+    for (const [baseId, items] of produtosPorGrupo) {
+      if (used.has(baseId) || baseId === 'sem-grupo') continue
+      groups.push({
+        groupKey: `gid:${baseId}`,
+        grupoLabel: items[0]?.grupoProduto?.nome || 'Grupo',
+        grupoId: baseId,
+        grupoAtivo: true,
+        items,
+      })
     }
-  }
+
+    const semGrupo = produtosPorGrupo.get('sem-grupo')
+    if (semGrupo?.length) {
+      groups.push({
+        groupKey: 'sem_grupo',
+        grupoLabel: 'Sem grupo',
+        grupoAtivo: true,
+        items: semGrupo,
+      })
+    }
+
+    return groups
+  }, [grupos, produtosPorGrupo])
+
+  useEffect(() => {
+    setExpandedGroups(prev => {
+      let changed = false
+      const next: Record<string, boolean> = {}
+      catalogGroups.forEach(({ groupKey }) => {
+        if (typeof prev[groupKey] === 'undefined') {
+          changed = true
+          next[groupKey] = true
+        } else next[groupKey] = prev[groupKey]
+      })
+      return changed ? next : prev
+    })
+  }, [catalogGroups])
+
+  const findGrupo = useCallback(
+    (grupoBaseId: string | undefined) =>
+      grupos.find(g => g.grupoBase.id === grupoBaseId) ?? null,
+    [grupos]
+  )
+
+  const handleToggleExpand = useCallback((groupKey: string) => {
+    setExpandedGroups(prev => {
+      const currentlyExpanded = prev[groupKey] !== false
+      return { ...prev, [groupKey]: !currentlyExpanded }
+    })
+  }, [])
+
+  const openTabs = useCallback(
+    (config: Partial<MenuProdutoTabsModalState> & { tab: MenuProdutoTabsKey }) => {
+      setTabsState(prev => ({
+        open: true,
+        produto: config.produto ?? prev.produto,
+        grupo: config.grupo ?? prev.grupo,
+        ...config,
+      }))
+    },
+    []
+  )
+
+  const closeTabs = useCallback(() => {
+    setTabsState({
+      open: false,
+      tab: 'produto',
+      produto: null,
+      grupo: null,
+    })
+  }, [])
+
+  const handleEditProduto = useCallback(
+    (produtoId: string) => {
+      const produto = produtosDoMenu.find(p => p.produtoId === produtoId)
+      if (!produto) return
+      openTabs({
+        tab: 'produto',
+        produto,
+        grupo: findGrupo(produto.grupoProduto?.id),
+      })
+    },
+    [produtosDoMenu, findGrupo, openTabs]
+  )
+
+  const handleEditGrupo = useCallback(
+    (grupoId: string | undefined) => {
+      if (!grupoId) return
+      const grupo = findGrupo(grupoId)
+      if (!grupo) return
+      const primeiro = produtosPorGrupo.get(grupoId)?.[0] ?? null
+      openTabs({
+        tab: 'grupo',
+        grupo,
+        produto: primeiro,
+      })
+    },
+    [findGrupo, produtosPorGrupo, openTabs]
+  )
+
+  const handleAddProduto = useCallback(
+    (_grupoNome: string, grupoId: string | undefined) => {
+      setCreateProdutoState({
+        open: true,
+        tab: 'produto',
+        mode: 'create',
+        prefillGrupoProdutoId: grupoId,
+        createMenuIds: [menuId],
+      })
+    },
+    [menuId]
+  )
+
+  const closeCreateProduto = useCallback(() => {
+    setCreateProdutoState({
+      open: false,
+      tab: 'produto',
+      mode: 'create',
+      prefillGrupoProdutoId: undefined,
+      createMenuIds: undefined,
+    })
+  }, [])
+
+  const handleCreateProdutoReload = useCallback(() => {
+    void invalidate(['menu-produtos'])
+    void invalidate(['menu-grupos'])
+    void invalidate(['produtos'])
+  }, [invalidate])
+
+  const handleValorChange = useCallback(
+    async (produtoId: string, valor: number) => {
+      const destinos = await pedirConfirmacao({
+        origem: 'menu',
+        produtoId,
+        menuIdAtual: menuId,
+      })
+      if (destinos === null) return
+      try {
+        await updateProduto.mutateAsync({ produtoId, input: { valor } })
+        if (destinos.aplicarNoCadastroBase || destinos.menuIds.length > 0) {
+          await aplicarNosDestinos({
+            produtoId,
+            snapshot: { valor },
+            destinos,
+          })
+        }
+        showToast.success('Preço atualizado neste cardápio')
+      } catch (err) {
+        showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar preço')
+      }
+    },
+    [updateProduto, pedirConfirmacao, aplicarNosDestinos, menuId]
+  )
+
+  const handleStatusToggle = useCallback(
+    async (produtoId: string, ativo: boolean) => {
+      const destinos = await pedirConfirmacao({
+        origem: 'menu',
+        produtoId,
+        menuIdAtual: menuId,
+      })
+      if (destinos === null) return
+      try {
+        await updateProduto.mutateAsync({ produtoId, input: { ativo } })
+        if (destinos.aplicarNoCadastroBase || destinos.menuIds.length > 0) {
+          await aplicarNosDestinos({
+            produtoId,
+            snapshot: { ativo },
+            destinos,
+          })
+        }
+        showToast.success(
+          ativo ? 'Produto ativo neste cardápio' : 'Produto inativo neste cardápio'
+        )
+      } catch (err) {
+        showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar status')
+      }
+    },
+    [updateProduto, pedirConfirmacao, aplicarNosDestinos, menuId]
+  )
+
+  const handleRemove = useCallback(
+    (produtoId: string) => {
+      const produto = produtosDoMenu.find(p => p.produtoId === produtoId)
+      if (!produto) return
+      if (!window.confirm(`Remover "${produto.nome}" deste cardápio?`)) return
+      void syncProdutos
+        .mutateAsync({ remove: [produto.produtoId] })
+        .then(() => {
+          showToast.success('Produto removido deste cardápio')
+          if (tabsState.produto?.produtoId === produto.produtoId) closeTabs()
+        })
+        .catch(err =>
+          showToast.error(err instanceof Error ? err.message : 'Erro ao remover')
+        )
+    },
+    [produtosDoMenu, syncProdutos, tabsState.produto, closeTabs]
+  )
+
+  const renderItem = useCallback(
+    (produto: MenuProduto) => {
+      const savingThis =
+        updateProduto.isPending && updateProduto.variables?.produtoId === produto.produtoId
+      return (
+        <CatalogProductRow
+          variant="menu"
+          id={produto.produtoId}
+          nome={produto.nome}
+          valor={Number(produto.valor)}
+          ativo={produto.ativo}
+          imagemUrl={produto.image?.imageUrl}
+          isSavingValor={savingThis && updateProduto.variables?.input.valor !== undefined}
+          isSavingStatus={savingThis && updateProduto.variables?.input.ativo !== undefined}
+          onValorChange={handleValorChange}
+          onSwitchToggle={handleStatusToggle}
+          onEdit={handleEditProduto}
+          onRemove={handleRemove}
+        />
+      )
+    },
+    [
+      updateProduto.isPending,
+      updateProduto.variables,
+      handleValorChange,
+      handleStatusToggle,
+      handleEditProduto,
+      handleRemove,
+    ]
+  )
 
   if (loadingMenu) {
     return (
@@ -99,9 +398,11 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     )
   }
 
+  const isLoadingList = loadingGrupos || loadingProdutos
+
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="px-1 py-[4px] md:px-[30px]">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex-shrink-0 px-1 py-[4px] md:px-[30px]">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-start gap-3 md:pl-5">
             <Link
@@ -113,10 +414,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
             </Link>
             <div>
               <p className="text-sm font-semibold text-primary">Cardápio do menu</p>
-              <p className="text-sm font-normal text-tertiary md:text-[22px]">
-                {menu.nome}
-              </p>
-             
+              <p className="text-sm font-normal text-tertiary md:text-[22px]">{menu.nome}</p>
             </div>
           </div>
           <button
@@ -130,142 +428,46 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         </div>
       </div>
 
-      <div className="h-[2px] border-t-2 border-primary/70" />
+      <div className="h-[4px] flex-shrink-0 border-t-2 border-primary/50" />
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[280px_1fr]">
-        <aside className="border-b border-gray-100 bg-info lg:border-b-0 lg:border-r">
-          <div className="px-4 py-3 text-sm font-semibold text-primary">
-            Grupos deste cardápio
-          </div>
-          {loadingGrupos ? (
-            <div className="flex justify-center py-6">
-              <JiffyLoading />
-            </div>
-          ) : grupos.length === 0 ? (
-            <p className="px-4 pb-4 text-sm text-secondary-text">
-              Nenhum grupo neste cardápio. Adicione produtos para montar os grupos.
-            </p>
-          ) : (
-            <ul className="px-2 pb-2">
-              {grupos.map((grupo) => {
-                const baseId = grupo.grupoBase.id
-                const selected = activeGrupoId === baseId
-                const count = produtosPorGrupo.get(baseId)?.length ?? 0
-                return (
-                  <li key={grupo.id}>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedGrupoBaseId(baseId)}
-                      className={`mb-1 flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
-                        selected
-                          ? 'bg-white font-medium text-primary-text shadow-sm'
-                          : 'text-secondary-text hover:bg-white/70'
-                      }`}
-                    >
-                      <MdDragIndicator
-                        className="h-4 w-4 shrink-0 text-secondary-text/40"
-                        title="Em breve será possível arrastar para reordenar"
-                      />
-                      <span className="min-w-0 flex-1 truncate">{grupo.nome}</span>
-                      <span className="text-xs text-secondary-text">{count}</span>
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </aside>
-
-        <section className="flex min-h-0 flex-col bg-white">
-          <div className="px-1 pt-2 md:px-4">
-            <div className="flex h-10 items-center gap-[10px] rounded-lg bg-custom-2 px-4">
-              <div className="flex-[4] text-[10px] font-semibold text-primary-text md:text-sm">
-                Produto
-              </div>
-              <div className="flex-[2] text-[10px] font-semibold text-primary-text md:text-sm">
-                Preço
-              </div>
-              <div className="flex-[2] text-right text-[10px] font-semibold text-primary-text md:text-sm">
-                Ações
-              </div>
-            </div>
-          </div>
-
-          <div className="min-h-0 flex-1 overflow-y-auto px-1 pt-1 md:px-4">
-            {loadingProdutos ? (
-              <div className="flex justify-center py-8">
-                <JiffyLoading />
-              </div>
-            ) : !activeGrupoId ? (
-              <p className="py-8 text-center text-sm text-secondary-text">
-                Selecione um grupo à esquerda.
-              </p>
-            ) : produtosDoGrupo.length === 0 ? (
-              <p className="py-8 text-center text-sm text-secondary-text">
-                Nenhum produto neste grupo. Use “Adicionar produtos”.
-              </p>
-            ) : (
-              produtosDoGrupo.map((produto, index) => {
-                const bgColor = index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
-                return (
-                  <div
-                    key={produto.id}
-                    className={`mb-2 flex items-center gap-[10px] rounded-lg px-4 py-2 md:h-[50px] ${bgColor} transition-colors hover:bg-[var(--color-primary-background)] hover:shadow-md`}
-                  >
-                    <div className="flex min-w-0 flex-[4] items-center gap-2">
-                      <MdDragIndicator
-                        className="h-4 w-4 shrink-0 text-secondary-text/40"
-                        title="Em breve será possível arrastar para reordenar"
-                      />
-                      <div className="min-w-0">
-                        <p className="truncate text-xs text-primary-text md:text-sm">
-                          {produto.nome}
-                        </p>
-                        <p className="text-[10px] text-secondary-text md:hidden">
-                          {formatBrl(Number(produto.valor))}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="hidden flex-[2] text-sm text-primary-text md:block">
-                      {formatBrl(Number(produto.valor))}
-                    </div>
-                    <div className="flex flex-[2] justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setProdutoPanel(produto)}
-                        className="h-8 rounded-lg border border-primary/50 bg-white px-3 text-xs font-semibold text-primary-text transition-colors hover:bg-primary/10 md:text-sm"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRemove(produto)}
-                        className="h-8 rounded-lg border border-primary/50 bg-white px-3 text-xs font-semibold text-primary-text transition-colors hover:bg-primary/10 md:text-sm"
-                      >
-                        Remover
-                      </button>
-                    </div>
-                  </div>
-                )
-              })
-            )}
-          </div>
-        </section>
+      <div className="mt-2 min-h-0 flex-1 overflow-y-auto px-1 scrollbar-hide">
+        <CatalogGroupedList
+          groups={catalogGroups}
+          getItemKey={item => item.produtoId}
+          renderItem={renderItem}
+          expandedGroups={expandedGroups}
+          isLoading={isLoadingList && catalogGroups.length === 0}
+          emptyLabel="Nenhum produto neste cardápio. Use “Adicionar produtos”."
+          listAriaLabel="Produtos deste cardápio"
+          showGrupoStatusSwitch={false}
+          addProdutoLabel="Adicionar produto"
+          onToggleExpand={handleToggleExpand}
+          onEditGrupo={handleEditGrupo}
+          onAddProduto={handleAddProduto}
+        />
       </div>
 
-      <MenuProdutoPanel
-        open={Boolean(produtoPanel)}
+      <MenuProdutoTabsModal
         menuId={menuId}
-        produto={produtoPanel}
-        onClose={() => setProdutoPanel(null)}
+        state={tabsState}
+        onClose={closeTabs}
+        onTabChange={tab => setTabsState(prev => ({ ...prev, tab }))}
+      />
+
+      <ProdutosTabsModal
+        state={createProdutoState}
+        onClose={closeCreateProduto}
+        onReload={handleCreateProdutoReload}
+        onTabChange={tab => setCreateProdutoState(prev => ({ ...prev, tab }))}
       />
 
       <AddProdutosToMenuPanel
         open={addOpen}
         menuId={menuId}
-        produtosJaNoMenu={new Set((produtosData?.items ?? []).map((p) => p.produtoId))}
+        produtosJaNoMenu={new Set(produtosDoMenu.map(p => p.produtoId))}
         onClose={() => setAddOpen(false)}
       />
+      {dialogPropagacao}
     </div>
   )
 }

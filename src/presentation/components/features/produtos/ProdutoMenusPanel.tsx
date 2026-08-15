@@ -25,6 +25,7 @@ const MENUS_API_MAX_LIMIT = 100
 export type ProdutoMenusHandle = {
   isDirty: () => boolean
   save: () => Promise<boolean>
+  getSelectedIds: () => string[]
 }
 
 export type ProdutoMenusEmbedState = {
@@ -34,7 +35,11 @@ export type ProdutoMenusEmbedState = {
 
 interface ProdutoMenusPanelProps {
   produtoId?: string
+  /** Edição: PATCH imediato. Criação/cópia: só seleção local (vai no POST `menuIds`). */
+  persistChanges?: boolean
   initialMenusResumo?: ReadonlyArray<ProdutoMenuResumo>
+  initialMenuIds?: string[]
+  onSelectionChange?: (ids: string[]) => void
   onEmbedStateChange?: (state: ProdutoMenusEmbedState) => void
 }
 
@@ -49,31 +54,51 @@ function idsFromResumo(resumo?: ReadonlyArray<ProdutoMenuResumo>): string[] {
   return (resumo ?? []).map((m) => m.id).filter(Boolean)
 }
 
+function initialIdsFromProps(
+  initialMenuIds?: string[],
+  initialMenusResumo?: ReadonlyArray<ProdutoMenuResumo>
+): string[] {
+  if (initialMenuIds !== undefined) return [...initialMenuIds]
+  return idsFromResumo(initialMenusResumo)
+}
+
 /**
- * Aba de vínculos do produto com menus (checkboxes). Persistência no Salvar.
+ * Aba de vínculos do produto com menus (checkboxes).
+ * Na edição, o Salvar persiste via PATCH. Na criação/cópia, a seleção segue no POST.
  */
 export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPanelProps>(
   function ProdutoMenusPanel(
-    { produtoId, initialMenusResumo, onEmbedStateChange },
+    {
+      produtoId,
+      persistChanges = true,
+      initialMenusResumo,
+      initialMenuIds,
+      onSelectionChange,
+      onEmbedStateChange,
+    },
     ref
   ) {
+    const seedIds = initialIdsFromProps(initialMenuIds, initialMenusResumo)
     const [searchQuery, setSearchQuery] = useState('')
-    const [selectedIds, setSelectedIds] = useState<string[]>(() => idsFromResumo(initialMenusResumo))
-    const baselineIdsRef = useRef<string[]>(idsFromResumo(initialMenusResumo))
+    const [selectedIds, setSelectedIds] = useState<string[]>(() => seedIds)
+    const baselineIdsRef = useRef<string[]>(seedIds)
     const isDirtyRef = useRef(false)
 
     const { data: menusData, isLoading: loadingMenus, isError: menusError } = useMenus({
       ativo: null,
       limit: MENUS_API_MAX_LIMIT,
-      enabled: Boolean(produtoId),
+      enabled: true,
     })
-    const { data: produtoDetalhe, isLoading: loadingProduto } = useProduto(produtoId ?? '')
-    const mutation = useAtualizarProdutoMenus(produtoId)
-    const initialIdsRef = useRef(idsFromResumo(initialMenusResumo))
+    const { data: produtoDetalhe, isLoading: loadingProduto } = useProduto(
+      persistChanges && produtoId ? produtoId : ''
+    )
+    const mutation = useAtualizarProdutoMenus(persistChanges ? produtoId : undefined)
+    const initialIdsRef = useRef(seedIds)
 
     const menus = menusData?.items ?? []
 
     useEffect(() => {
+      if (!persistChanges) return
       if (!produtoId || loadingProduto) return
       if (isDirtyRef.current) return
       const nextIds = produtoDetalhe
@@ -81,16 +106,25 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
         : initialIdsRef.current
       baselineIdsRef.current = nextIds
       setSelectedIds(nextIds)
+      onSelectionChange?.(nextIds)
       onEmbedStateChange?.({ isDirty: false, isSaving: false })
-    }, [produtoId, produtoDetalhe, loadingProduto, onEmbedStateChange])
+    }, [
+      persistChanges,
+      produtoId,
+      produtoDetalhe,
+      loadingProduto,
+      onEmbedStateChange,
+      onSelectionChange,
+    ])
 
     const emitDirty = useCallback(
       (nextIds: string[], isSaving = false) => {
         const dirty = !sameIdSet(nextIds, baselineIdsRef.current)
         isDirtyRef.current = dirty
+        onSelectionChange?.(nextIds)
         onEmbedStateChange?.({ isDirty: dirty, isSaving })
       },
-      [onEmbedStateChange]
+      [onEmbedStateChange, onSelectionChange]
     )
 
     const filteredMenus = useMemo(() => {
@@ -126,7 +160,12 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
     )
 
     const save = useCallback(async (): Promise<boolean> => {
-      if (!produtoId) return false
+      if (!persistChanges || !produtoId) {
+        baselineIdsRef.current = selectedIds
+        isDirtyRef.current = false
+        onEmbedStateChange?.({ isDirty: false, isSaving: false })
+        return true
+      }
       const baseline = new Set(baselineIdsRef.current)
       const selected = new Set(selectedIds)
       const add = selectedIds.filter((id) => !baseline.has(id))
@@ -147,27 +186,20 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
         showToast.error(err instanceof Error ? err.message : 'Erro ao salvar menus')
         return false
       }
-    }, [produtoId, selectedIds, mutation, emitDirty, onEmbedStateChange])
+    }, [persistChanges, produtoId, selectedIds, mutation, emitDirty, onEmbedStateChange])
 
     useImperativeHandle(
       ref,
       () => ({
         isDirty: () => !sameIdSet(selectedIds, baselineIdsRef.current),
         save,
+        getSelectedIds: () => selectedIds,
       }),
       [selectedIds, save]
     )
 
-    const isLoading = loadingMenus || loadingProduto
+    const isLoading = loadingMenus || (persistChanges && loadingProduto)
     const isSaving = mutation.isPending
-
-    if (!produtoId) {
-      return (
-        <div className="flex h-full min-h-0 flex-1 items-center justify-center text-sm text-secondary-text">
-          Salve o produto para vincular aos cardápios.
-        </div>
-      )
-    }
 
     if (isLoading) {
       return (
@@ -188,8 +220,9 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <p className="shrink-0 px-4 pt-3 text-xs text-secondary-text">
-          Marque os cardápios em que este produto deve aparecer. Preço e nome no cardápio são
-          definidos em cada menu.
+          {persistChanges
+            ? 'Marque os cardápios em que este produto deve aparecer. Preço e nome no cardápio são definidos em cada menu.'
+            : 'Marque os cardápios em que este produto deve aparecer ao salvar. Se nenhum for marcado, o produto entra no menu principal.'}
         </p>
         <div className="shrink-0 px-4 py-3">
           <div className="relative">

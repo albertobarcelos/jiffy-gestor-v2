@@ -8,6 +8,7 @@ import { useProdutosInfinite } from '@/src/presentation/hooks/useProdutos'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
 import { useProdutoPatchMutation, isSavingOf } from '@/src/presentation/hooks/useProdutoPatchMutation'
+import { usePropagarAlteracaoProduto } from '@/src/presentation/hooks/produtos/usePropagarAlteracaoProduto'
 import { useGrupoProdutoPatchMutation } from '@/src/presentation/hooks/useGrupoProdutoPatchMutation'
 import { useProdutosFilters } from '@/src/presentation/hooks/useProdutosFilters'
 import { useIsMobile } from '@/src/presentation/hooks/useIsMobile'
@@ -17,8 +18,9 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { ProdutosTabsModal, type ProdutosTabsModalState } from '../ProdutosTabsModal'
 import { ProdutosHeader } from './ProdutosHeader'
 import { ProdutosFilters } from './ProdutosFilters'
-import { ProdutosGroupHeader } from './ProdutosGroupHeader'
 import { ProdutoListItem } from './ProdutoListItem'
+import { CatalogGroupedList } from '@/src/presentation/components/features/catalogo/CatalogGroupedList'
+import type { CatalogGroup } from '@/src/presentation/components/features/catalogo/types'
 
 import { Produto } from '@/src/domain/entities/Produto'
 import type { ToggleField } from '@/src/shared/types/produto'
@@ -72,6 +74,8 @@ export function ProdutosList() {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   const patchMutation = useProdutoPatchMutation()
+  const { pedirConfirmacao, aplicarNosDestinos, dialog: dialogPropagacao } =
+    usePropagarAlteracaoProduto()
   const grupoPatchMutation = useGrupoProdutoPatchMutation()
 
   const { data: gruposProdutos = [], isLoading: isLoadingGruposProdutos } = useGruposProdutos({ limit: 100, ativo: null })
@@ -278,17 +282,63 @@ export function ProdutosList() {
   }, [queryClient, empresaId, updateProdutoInCache])
 
   // Handlers de produto — recebem produtoId como arg, sem closure por item
-  const handleValorChange = useCallback((produtoId: string, novoValor: number) => {
-    patchMutation.mutate({ type: 'valor', produtoId, novoValor })
-  }, [patchMutation])
+  const handleValorChange = useCallback(async (produtoId: string, novoValor: number) => {
+    const destinos = await pedirConfirmacao({ origem: 'cadastroBase', produtoId })
+    if (destinos === null) return
+    patchMutation.mutate(
+      { type: 'valor', produtoId, novoValor },
+      {
+        onSuccess: () => {
+          if (destinos.menuIds.length === 0) return
+          void aplicarNosDestinos({
+            produtoId,
+            snapshot: { valor: novoValor },
+            destinos: { aplicarNoCadastroBase: false, menuIds: destinos.menuIds },
+          })
+        },
+      }
+    )
+  }, [patchMutation, pedirConfirmacao, aplicarNosDestinos])
 
-  const handleStatusToggle = useCallback((produtoId: string, novoStatus: boolean) => {
-    patchMutation.mutate({ type: 'status', produtoId, novoStatus, filterStatus })
-  }, [patchMutation, filterStatus])
+  const handleStatusToggle = useCallback(async (produtoId: string, novoStatus: boolean) => {
+    const destinos = await pedirConfirmacao({ origem: 'cadastroBase', produtoId })
+    if (destinos === null) return
+    patchMutation.mutate(
+      { type: 'status', produtoId, novoStatus, filterStatus },
+      {
+        onSuccess: () => {
+          if (destinos.menuIds.length === 0) return
+          void aplicarNosDestinos({
+            produtoId,
+            snapshot: { ativo: novoStatus },
+            destinos: { aplicarNoCadastroBase: false, menuIds: destinos.menuIds },
+          })
+        },
+      }
+    )
+  }, [patchMutation, filterStatus, pedirConfirmacao, aplicarNosDestinos])
 
-  const handleToggleBooleanField = useCallback((produtoId: string, field: ToggleField, novoValor: boolean) => {
-    patchMutation.mutate({ type: 'toggle', produtoId, field, novoValor })
-  }, [patchMutation])
+  const handleToggleBooleanField = useCallback(async (produtoId: string, field: ToggleField, novoValor: boolean) => {
+    if (field !== 'favorito') {
+      patchMutation.mutate({ type: 'toggle', produtoId, field, novoValor })
+      return
+    }
+    const destinos = await pedirConfirmacao({ origem: 'cadastroBase', produtoId })
+    if (destinos === null) return
+    patchMutation.mutate(
+      { type: 'toggle', produtoId, field, novoValor },
+      {
+        onSuccess: () => {
+          if (destinos.menuIds.length === 0) return
+          void aplicarNosDestinos({
+            produtoId,
+            snapshot: { favorito: novoValor },
+            destinos: { aplicarNoCadastroBase: false, menuIds: destinos.menuIds },
+          })
+        },
+      }
+    )
+  }, [patchMutation, pedirConfirmacao, aplicarNosDestinos])
 
   const handleEditProduto = useCallback((produtoId: string) => {
     const produto = produtos.find((p) => p.getId() === produtoId)
@@ -329,6 +379,46 @@ export function ProdutosList() {
     }
     openTabsModal({ tab: 'produto', mode: 'create', prefillGrupoProdutoId: grupoId })
   }, [openTabsModal])
+
+  const catalogGroups = useMemo<CatalogGroup<Produto>[]>(
+    () =>
+      produtosAgrupadosOrdenados.map(({ groupKey, grupoLabel, items }) => {
+        const grupoId = items[0]?.getGrupoId()
+        const info = grupoId ? grupoProdutoMap.get(grupoId) : undefined
+        return {
+          groupKey,
+          grupoLabel,
+          grupoId,
+          grupoVisual: info ? { corHex: info.corHex, iconName: info.iconName } : undefined,
+          grupoAtivo: info?.ativo ?? true,
+          items,
+        }
+      }),
+    [produtosAgrupadosOrdenados, grupoProdutoMap]
+  )
+
+  const renderCatalogItem = useCallback(
+    (produto: Produto) => (
+      <ProdutoListItem
+        produto={produto}
+        isSavingValor={isSavingOf(patchMutation, produto.getId(), 'valor')}
+        isSavingStatus={isSavingOf(patchMutation, produto.getId(), 'status')}
+        onValorChange={handleValorChange}
+        onSwitchToggle={handleStatusToggle}
+        onToggleBoolean={handleToggleBooleanField}
+        onEditProduto={handleEditProduto}
+        onCopyProduto={handleCopyProduto}
+      />
+    ),
+    [
+      patchMutation,
+      handleValorChange,
+      handleStatusToggle,
+      handleToggleBooleanField,
+      handleEditProduto,
+      handleCopyProduto,
+    ]
+  )
 
   const isLoadingAny = isLoading || isFetching || isFetchingNextPage
 
@@ -371,89 +461,20 @@ export function ProdutosList() {
         ref={scrollContainerRef}
         className="flex-1 min-h-0 overflow-y-auto px-1 mt-2 scrollbar-hide"
       >
-        {/* Loading inicial */}
-        {isLoadingAny && produtos.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-12 gap-2">
-            <JiffyLoading />
-          </div>
-        )}
-
-        {/* Sem resultados */}
-        {!isLoadingAny && produtos.length === 0 && data && (
-          <div className="flex items-center justify-center py-12">
-            <p className="text-secondary-text">Nenhum produto encontrado.</p>
-          </div>
-        )}
-
-        {/* Lista agrupada */}
-        {produtosAgrupadosOrdenados.length > 0 && (
-          <div role="list" aria-label="Lista de produtos" className="space-y-4 pb-4">
-            {produtosAgrupadosOrdenados.map(({ groupKey, grupoLabel, items }) => {
-              const grupoId = items[0]?.getGrupoId()
-              const info = grupoId ? grupoProdutoMap.get(grupoId) : undefined
-              const grupoVisual = info ? { corHex: info.corHex, iconName: info.iconName } : undefined
-              const grupoAtivo = info?.ativo ?? true
-              const isExpanded = expandedGroups[groupKey] !== false
-
-              return (
-                <div key={groupKey} role="listitem" className="space-y-1">
-                  {/* sticky top-0 z-20: CSS nativo, sem JS, sem complexidade */}
-                  <div className="sticky top-0 z-20 -mx-1 bg-gray-50">
-                    <ProdutosGroupHeader
-                      grupo={grupoLabel}
-                      grupoId={grupoId}
-                      groupKey={groupKey}
-                      grupoVisual={grupoVisual}
-                      grupoAtivo={grupoAtivo}
-                      itemCount={items.length}
-                      isExpanded={isExpanded}
-                      onToggleExpand={handleToggleExpand}
-                      onEditGrupo={handleEditGrupoProduto}
-                      onToggleGrupoStatus={handleToggleGroupStatus}
-                      onAddProduto={handleAddProdutoForGroup}
-                    />
-                  </div>
-
-                  {!isExpanded ? (
-                    <div className="rounded-xl border border-dashed border-secondary/40 px-4 py-1 text-sm text-secondary-text mx-1">
-                      Produtos ocultos. Clique{' '}
-                      <button
-                        type="button"
-                        onClick={() => handleToggleExpand(groupKey)}
-                        className="font-medium text-primary underline underline-offset-2 transition-colors hover:text-primary/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded-sm"
-                      >
-                        aqui!
-                      </button>{' '}
-                      para visualizar.
-                    </div>
-                  ) : (
-                    <div>
-                      {items.map((produto) => (
-                        // content-visibility: auto faz o browser pular layout/paint de itens
-                        // fora do viewport — virtualização CSS nativa, sem quebrar o sticky.
-                        <div
-                          key={produto.getId()}
-                          style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 90px' }}
-                        >
-                          <ProdutoListItem
-                            produto={produto}
-                            isSavingValor={isSavingOf(patchMutation, produto.getId(), 'valor')}
-                            isSavingStatus={isSavingOf(patchMutation, produto.getId(), 'status')}
-                            onValorChange={handleValorChange}
-                            onSwitchToggle={handleStatusToggle}
-                            onToggleBoolean={handleToggleBooleanField}
-                            onEditProduto={handleEditProduto}
-                            onCopyProduto={handleCopyProduto}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
+        <CatalogGroupedList
+          groups={catalogGroups}
+          getItemKey={produto => produto.getId()}
+          renderItem={renderCatalogItem}
+          expandedGroups={expandedGroups}
+          isLoading={isLoadingAny && produtos.length === 0}
+          emptyLabel="Nenhum produto encontrado."
+          listAriaLabel="Lista de produtos"
+          showGrupoStatusSwitch
+          onToggleExpand={handleToggleExpand}
+          onEditGrupo={handleEditGrupoProduto}
+          onToggleGrupoStatus={handleToggleGroupStatus}
+          onAddProduto={handleAddProdutoForGroup}
+        />
 
         {isFetchingNextPage && (
           <div className="flex justify-center py-4">
@@ -468,6 +489,7 @@ export function ProdutosList() {
         onReload={handleTabsModalReload}
         onTabChange={(tab) => setTabsModalState((prev) => ({ ...prev, tab }))}
       />
+      {dialogPropagacao}
     </div>
   )
 }

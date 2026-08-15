@@ -34,6 +34,8 @@ export interface ProdutosTabsModalState {
   initialStepProduto?: 0 | 1 | 2
   /** Aba inicial do `NovoGrupo` (0 = detalhes, 1 = produtos vinculados) */
   initialTabGrupo?: number
+  /** Na criação, vincula o produto a estes menus (POST `menuIds`). */
+  createMenuIds?: string[]
 }
 
 interface ProdutosTabsModalProps {
@@ -58,6 +60,9 @@ export function ProdutosTabsModal({
   /** Evita fechar o painel quando o salvamento do produto é só etapa antes do salvamento do grupo */
   const suppressCloseOnNextProdutoSuccessRef = useRef(false)
 
+  const isDraftProduto = state.mode === 'create' || state.mode === 'copy'
+
+  const [draftMenuIds, setDraftMenuIds] = useState<string[]>([])
   const [wizardStep, setWizardStep] = useState<0 | 1 | 2>(state.initialStepProduto ?? 0)
   const [wizardSaving, setWizardSaving] = useState(false)
   const [fiscalOnlyBack, setFiscalOnlyBack] = useState(false)
@@ -118,9 +123,16 @@ export function ProdutosTabsModal({
   useEffect(() => {
     if (state.open && !prevPainelAbertoRef.current) {
       setProdutoFormSession(s => s + 1)
+      if (state.mode === 'create') {
+        setDraftMenuIds(state.createMenuIds ?? [])
+      } else if (state.mode === 'copy') {
+        setDraftMenuIds((state.produto?.getMenus() ?? []).map(m => m.id).filter(Boolean))
+      } else {
+        setDraftMenuIds([])
+      }
     }
     prevPainelAbertoRef.current = state.open
-  }, [state.open])
+  }, [state.open, state.mode, state.createMenuIds, state.produto])
 
   // Limpa overlay de confirmação ao fechar; ao abrir, zera flags para não herdar sessão anterior
   useEffect(() => {
@@ -162,7 +174,7 @@ export function ProdutosTabsModal({
   /** Salva o produto e fecha o painel — alinhado ao rodapé do wizard (passos 0–1 vs fiscal). */
   const handleSaveAndCloseFromConfirm = useCallback(async () => {
     setConfirmExitOpen(false)
-    if (npRef.current?.isDirty?.()) {
+    if (npRef.current?.isDirty?.() || (isDraftProduto && menusRef.current?.isDirty?.())) {
       if (wizardStep < 2) {
         void npRef.current?.savePartialAndClose()
       } else {
@@ -184,7 +196,7 @@ export function ProdutosTabsModal({
       const ok = await menusRef.current.save()
       if (ok) onClose()
     }
-  }, [wizardStep, onClose])
+  }, [wizardStep, onClose, isDraftProduto])
 
   const handleSalvarComplementos = useCallback(async () => {
     await complementosRef.current?.save()
@@ -197,6 +209,15 @@ export function ProdutosTabsModal({
   const handleSalvarMenus = useCallback(async () => {
     await menusRef.current?.save()
   }, [])
+
+  /** Na criação/cópia, Salvar na aba Menus grava o produto (POST), como nas 3 etapas. */
+  const handleSalvarProdutoNaAbaMenus = useCallback(() => {
+    if (wizardStep < 2) {
+      void npRef.current?.savePartialAndClose()
+      return
+    }
+    void npRef.current?.saveFinal()
+  }, [wizardStep])
 
   /** Persiste alterações pendentes do produto sem fechar o painel (orquestração com salvamento do grupo). */
   const persistPendingProdutoChanges = useCallback(async (): Promise<boolean> => {
@@ -250,16 +271,16 @@ export function ProdutosTabsModal({
       setMountedGrupo(false)
       return
     }
-    if (state.tab === 'produto') setMountedProduto(true)
+    if (isDraftProduto || state.tab === 'produto') setMountedProduto(true)
     if (produtoId) {
       setMountedComplementos(true)
       setMountedImpressoras(true)
     }
-    if (produtoId && state.mode === 'edit') {
+    if (isDraftProduto || (produtoId && state.mode === 'edit')) {
       setMountedMenus(true)
     }
     if (state.grupoId) setMountedGrupo(true)
-  }, [state.open, state.tab, produtoId, state.grupoId, state.mode])
+  }, [state.open, state.tab, produtoId, state.grupoId, state.mode, isDraftProduto])
 
   const showProdutoPanel = state.open && (mountedProduto || state.tab === 'produto')
   const showComplementosPanel =
@@ -267,7 +288,8 @@ export function ProdutosTabsModal({
   const showImpressorasPanel =
     state.open && !!produtoId && (mountedImpressoras || state.tab === 'impressoras')
   const showMenusPanel =
-    state.open && !!produtoId && state.mode === 'edit' && (mountedMenus || state.tab === 'menus')
+    state.open && (isDraftProduto || (state.mode === 'edit' && !!produtoId)) &&
+    (mountedMenus || state.tab === 'menus')
   const showGrupoPanel = state.open && !!state.grupoId && (mountedGrupo || state.tab === 'grupo')
 
   useEffect(() => {
@@ -372,6 +394,7 @@ export function ProdutosTabsModal({
     return {
       barSecondaryTone: 'primaryMuted',
       barShowPrevNextIcons: true,
+      barActionOrder: ['prev', 'save', 'next'],
       showPrevious: true,
       onPrevious: () => npRef.current?.goBack(),
       previousDisabled: wizardSaving,
@@ -380,8 +403,12 @@ export function ProdutosTabsModal({
       onSave: () => void npRef.current?.saveFinal(),
       saveLoading: wizardSaving,
       saveDisabled: wizardSaving,
+      showNext: true,
+      nextLabel: 'Próximo',
+      onNext: () => onTabChange('menus'),
+      nextDisabled: wizardSaving,
     }
-  }, [state.tab, wizardStep, wizardSaving, fiscalOnlyBack])
+  }, [state.tab, wizardStep, wizardSaving, fiscalOnlyBack, onTabChange])
 
   const footerComplementos = useMemo(
     (): JiffySidePanelFooterActions => ({
@@ -414,18 +441,38 @@ export function ProdutosTabsModal({
   )
 
   const footerMenus = useMemo(
-    (): JiffySidePanelFooterActions => ({
-      showCancel: true,
-      cancelLabel: 'Fechar',
-      cancelVariant: 'primaryTint10',
-      onCancel: handleRequestClose,
-      showSave: true,
-      saveLabel: 'Salvar',
-      onSave: () => void handleSalvarMenus(),
-      saveLoading: embedMenus.isSaving,
-      saveDisabled: !embedMenus.isDirty || embedMenus.isSaving,
-    }),
-    [handleRequestClose, handleSalvarMenus, embedMenus]
+    (): JiffySidePanelFooterActions =>
+      isDraftProduto
+        ? {
+            showCancel: true,
+            cancelLabel: 'Fechar',
+            cancelVariant: 'primaryTint10',
+            onCancel: handleRequestClose,
+            showSave: true,
+            saveLabel: 'Salvar e fechar',
+            onSave: handleSalvarProdutoNaAbaMenus,
+            saveLoading: wizardSaving,
+            saveDisabled: wizardSaving,
+          }
+        : {
+            showCancel: true,
+            cancelLabel: 'Fechar',
+            cancelVariant: 'primaryTint10',
+            onCancel: handleRequestClose,
+            showSave: true,
+            saveLabel: 'Salvar',
+            onSave: () => void handleSalvarMenus(),
+            saveLoading: embedMenus.isSaving,
+            saveDisabled: !embedMenus.isDirty || embedMenus.isSaving,
+          },
+    [
+      handleRequestClose,
+      handleSalvarMenus,
+      handleSalvarProdutoNaAbaMenus,
+      embedMenus,
+      isDraftProduto,
+      wizardSaving,
+    ]
   )
 
   const footerGrupo = useMemo((): JiffySidePanelFooterActions => {
@@ -494,7 +541,7 @@ export function ProdutosTabsModal({
                 {
                   key: 'menus' as const,
                   label: 'Menus',
-                  disabled: !produtoId || state.mode !== 'edit',
+                  disabled: !(isDraftProduto || (state.mode === 'edit' && !!produtoId)),
                 },
               ] as const
             ).map(tab => (
@@ -537,6 +584,7 @@ export function ProdutosTabsModal({
                 defaultGrupoProdutoId={
                   state.mode === 'create' ? state.prefillGrupoProdutoId : undefined
                 }
+                menuIds={isDraftProduto ? draftMenuIds : undefined}
                 initialStep={state.initialStepProduto ?? 0}
                 isEmbedded
                 hideEmbeddedHeader
@@ -616,15 +664,19 @@ export function ProdutosTabsModal({
               aria-hidden={state.tab !== 'menus'}
             >
               <ProdutoMenusPanel
+                key={`menus-${produtoFormSession}`}
                 ref={menusRef}
-                produtoId={produtoId}
-                initialMenusResumo={state.produto?.getMenus()}
+                produtoId={state.mode === 'edit' ? produtoId : undefined}
+                persistChanges={state.mode === 'edit'}
+                initialMenusResumo={state.mode === 'edit' ? state.produto?.getMenus() : undefined}
+                initialMenuIds={isDraftProduto ? draftMenuIds : undefined}
+                onSelectionChange={isDraftProduto ? setDraftMenuIds : undefined}
                 onEmbedStateChange={handleEmbedMenusChange}
               />
             </div>
-          ) : state.open && state.tab === 'menus' && (!produtoId || state.mode !== 'edit') ? (
+          ) : state.open && state.tab === 'menus' && state.mode === 'edit' && !produtoId ? (
             <div className="flex h-full min-h-0 flex-1 items-center justify-center px-4 text-center text-sm text-secondary-text">
-              Salve o produto para vincular aos cardápios.
+              Selecione um produto para vincular aos cardápios.
             </div>
           ) : null}
 
