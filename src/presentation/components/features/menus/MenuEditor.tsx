@@ -2,15 +2,20 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { MdArrowBack } from 'react-icons/md'
+import { InputAdornment, TextField } from '@mui/material'
+import { MdArrowBack, MdSearch } from 'react-icons/md'
 import { useMenu } from '@/src/presentation/hooks/menus/useMenus'
 import {
   useMenuGruposProdutos,
   useMenuProdutos,
 } from '@/src/presentation/hooks/menus/useMenuCatalog'
+import { useMenuProdutosFilters } from '@/src/presentation/hooks/menus/useMenuProdutosFilters'
 import { useMenuMutations } from '@/src/presentation/hooks/menus/useMenuMutations'
 import { usePropagarAlteracaoProduto } from '@/src/presentation/hooks/produtos/usePropagarAlteracaoProduto'
+import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
+import { useIsMobile } from '@/src/presentation/hooks/useIsMobile'
 import { AddProdutosToMenuPanel } from './AddProdutosToMenuPanel'
+import { MenuProdutosFilters } from './MenuProdutosFilters'
 import {
   MenuProdutoTabsModal,
   type MenuProdutoTabsKey,
@@ -23,6 +28,7 @@ import {
 import { CatalogGroupedList } from '@/src/presentation/components/features/catalogo/CatalogGroupedList'
 import { CatalogProductRow } from '@/src/presentation/components/features/catalogo/CatalogProductRow'
 import type { CatalogGroup } from '@/src/presentation/components/features/catalogo/types'
+import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
@@ -35,6 +41,13 @@ interface MenuEditorProps {
 
 export function MenuEditor({ menuId }: MenuEditorProps) {
   const { toGestao } = useGestaoPath()
+  const isMobile = useIsMobile()
+  const { state: filters, query, temFiltroAtivo, actions } = useMenuProdutosFilters()
+  const [filtrosVisiveis, setFiltrosVisiveis] = useState(false)
+  useEffect(() => {
+    setFiltrosVisiveis(!isMobile)
+  }, [isMobile])
+
   const { data: menu, isLoading: loadingMenu } = useMenu(menuId)
   const {
     data: gruposData,
@@ -55,8 +68,28 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     isFetchingNextPage: isFetchingNextProdutos,
   } = useMenuProdutos({
     menuId,
-    ativo: null,
+    q: query.q,
+    ativo: query.ativo,
+    favorito: query.favorito,
+    grupoProdutoId: query.grupoProdutoId,
+    grupoComplementosId: query.grupoComplementosId,
+    tipo: query.tipo,
   })
+  const [addOpen, setAddOpen] = useState(false)
+  const {
+    data: produtosTodosData,
+    fetchNextPage: fetchNextTodos,
+    hasNextPage: hasNextTodos,
+    isFetching: isFetchingTodos,
+    isFetchingNextPage: isFetchingNextTodos,
+  } = useMenuProdutos({
+    menuId,
+    ativo: null,
+    tipo: 'all',
+    enabled: addOpen,
+  })
+  const { data: gruposComplementos = [], isLoading: isLoadingGruposComplementos } =
+    useGruposComplementos({ limit: 100, ativo: null })
   const { syncProdutos, updateProduto } = useMenuMutations(menuId)
   const { pedirConfirmacao, aplicarNosDestinos, dialog: dialogPropagacao } =
     usePropagarAlteracaoProduto()
@@ -80,8 +113,20 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     }
   }, [hasNextGrupos, isFetchingNextGrupos, isFetchingGrupos, fetchNextGrupos, gruposData])
 
+  useEffect(() => {
+    if (addOpen && hasNextTodos && !isFetchingNextTodos && !isFetchingTodos && produtosTodosData) {
+      void fetchNextTodos()
+    }
+  }, [
+    addOpen,
+    hasNextTodos,
+    isFetchingNextTodos,
+    isFetchingTodos,
+    fetchNextTodos,
+    produtosTodosData,
+  ])
+
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
-  const [addOpen, setAddOpen] = useState(false)
   const [tabsState, setTabsState] = useState<MenuProdutoTabsModalState>({
     open: false,
     tab: 'produto',
@@ -113,6 +158,26 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     }
     return Array.from(map.values())
   }, [produtosData?.pages])
+
+  const idsNoMenu = useMemo(() => {
+    const source = addOpen ? produtosTodosData?.pages : produtosData?.pages
+    const ids = new Set<string>()
+    for (const page of source ?? []) {
+      for (const produto of page.items) ids.add(produto.produtoId)
+    }
+    return ids
+  }, [addOpen, produtosTodosData?.pages, produtosData?.pages])
+
+  const gruposDoMenu = useMemo(() => {
+    const map = new Map<string, { id: string; nome: string }>()
+    for (const grupo of grupos) {
+      const id = grupo.grupoBase.id
+      if (!map.has(id)) {
+        map.set(id, { id, nome: grupo.nome || grupo.grupoBase.nome })
+      }
+    }
+    return Array.from(map.values())
+  }, [grupos])
 
   const produtosPorGrupo = useMemo(() => {
     const map = new Map<string, MenuProduto[]>()
@@ -170,11 +235,16 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     return groups
   }, [grupos, produtosPorGrupo])
 
+  const catalogGroupsVisiveis = useMemo(() => {
+    if (!temFiltroAtivo) return catalogGroups
+    return catalogGroups.filter(grupo => grupo.items.length > 0)
+  }, [catalogGroups, temFiltroAtivo])
+
   useEffect(() => {
     setExpandedGroups(prev => {
       let changed = false
       const next: Record<string, boolean> = {}
-      catalogGroups.forEach(({ groupKey }) => {
+      catalogGroupsVisiveis.forEach(({ groupKey }) => {
         if (typeof prev[groupKey] === 'undefined') {
           changed = true
           next[groupKey] = true
@@ -182,7 +252,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
       })
       return changed ? next : prev
     })
-  }, [catalogGroups])
+  }, [catalogGroupsVisiveis])
 
   const findGrupo = useCallback(
     (grupoBaseId: string | undefined) =>
@@ -403,7 +473,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex-shrink-0 px-1 py-[4px] md:px-[30px]">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="flex items-start gap-3 md:pl-5">
             <Link
               href={toGestao('/menus')}
@@ -417,6 +487,45 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
               <p className="text-sm font-normal text-tertiary md:text-[22px]">{menu.nome}</p>
             </div>
           </div>
+
+          <div className="mb-1 w-full max-w-[350px]">
+            <TextField
+              id="menu-produtos-search"
+              size="small"
+              fullWidth
+              value={filters.searchText}
+              onChange={e => actions.setSearch(e.target.value)}
+              label="Pesquisar"
+              placeholder="Nome ou descrição"
+              InputLabelProps={{ shrink: true }}
+              sx={{
+                ...sxEntradaCompactaProduto,
+                '& .MuiOutlinedInput-root': {
+                  backgroundColor: '#fff',
+                  height: 32,
+                  minHeight: 32,
+                },
+                '& .MuiOutlinedInput-input': {
+                  padding: '4px 8px',
+                  fontSize: '0.8125rem',
+                },
+                '& .MuiInputAdornment-root': {
+                  marginRight: '2px',
+                },
+                '& .MuiInputLabel-root': {
+                  fontSize: '0.8125rem',
+                },
+              }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <MdSearch className="text-secondary-text" size={16} />
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </div>
+
           <button
             type="button"
             onClick={() => setAddOpen(true)}
@@ -430,14 +539,38 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
 
       <div className="h-[4px] flex-shrink-0 border-t-2 border-primary/50" />
 
+      <MenuProdutosFilters
+        filtrosVisiveis={filtrosVisiveis}
+        isMobile={isMobile}
+        onToggleFiltros={() => setFiltrosVisiveis(v => !v)}
+        filterStatus={filters.filterStatus}
+        onFilterStatusChange={actions.setStatus}
+        favoritoFilter={filters.favoritoFilter}
+        onFavoritoChange={actions.setFavorito}
+        tipo={filters.tipo}
+        onTipoChange={actions.setTipo}
+        grupoProdutoId={filters.grupoProdutoId}
+        onGrupoProdutoChange={actions.setGrupo}
+        gruposDoMenu={gruposDoMenu}
+        grupoComplementosId={filters.grupoComplementosId}
+        onGrupoComplementoChange={actions.setGrupoComplemento}
+        gruposComplementos={gruposComplementos}
+        isLoadingGruposComplementos={isLoadingGruposComplementos}
+        onClearFilters={actions.reset}
+      />
+
       <div className="mt-2 min-h-0 flex-1 overflow-y-auto px-1 scrollbar-hide">
         <CatalogGroupedList
-          groups={catalogGroups}
+          groups={catalogGroupsVisiveis}
           getItemKey={item => item.produtoId}
           renderItem={renderItem}
           expandedGroups={expandedGroups}
-          isLoading={isLoadingList && catalogGroups.length === 0}
-          emptyLabel="Nenhum produto neste cardápio. Use “Adicionar produtos”."
+          isLoading={isLoadingList && catalogGroupsVisiveis.length === 0}
+          emptyLabel={
+            temFiltroAtivo
+              ? 'Nenhum produto encontrado com esses filtros.'
+              : 'Nenhum produto neste cardápio. Use “Adicionar produtos”.'
+          }
           listAriaLabel="Produtos deste cardápio"
           showGrupoStatusSwitch={false}
           addProdutoLabel="Adicionar produto"
@@ -464,7 +597,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
       <AddProdutosToMenuPanel
         open={addOpen}
         menuId={menuId}
-        produtosJaNoMenu={new Set(produtosDoMenu.map(p => p.produtoId))}
+        produtosJaNoMenu={idsNoMenu}
         onClose={() => setAddOpen(false)}
       />
       {dialogPropagacao}

@@ -114,6 +114,7 @@ export class MenuRepository implements IMenuRepository {
     if (params.grupoComplementosId) {
       query.append('grupoComplementosId', params.grupoComplementosId)
     }
+    if (params.tipo) query.append('tipo', params.tipo)
 
     const { data } = await this.apiClient.request<any>(
       `${BASE}/${menuId}/produtos?${query.toString()}`,

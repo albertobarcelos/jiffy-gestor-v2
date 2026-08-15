@@ -17,9 +17,9 @@ import {
   type MenuGrupoSnapshotHandle,
 } from './MenuGrupoSnapshotForm'
 import {
-  MenuProdutoComplementosForm,
-  type MenuProdutoComplementosHandle,
-} from './MenuProdutoComplementosForm'
+  ComplementosMultiSelectDialog,
+  type ComplementosMultiSelectHandle,
+} from '@/src/presentation/components/features/produtos/ComplementosMultiSelectDialog'
 
 export type MenuProdutoTabsKey = 'produto' | 'grupo' | 'complementos'
 
@@ -45,12 +45,24 @@ export function MenuProdutoTabsModal({
 }: MenuProdutoTabsModalProps) {
   const produtoRef = useRef<MenuProdutoSnapshotHandle>(null)
   const grupoRef = useRef<MenuGrupoSnapshotHandle>(null)
-  const complementosRef = useRef<MenuProdutoComplementosHandle>(null)
+  const complementosRef = useRef<ComplementosMultiSelectHandle>(null)
 
   const [produtoDirty, setProdutoDirty] = useState(false)
   const [grupoDirty, setGrupoDirty] = useState(false)
-  const [complementosDirty, setComplementosDirty] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [embedComplementos, setEmbedComplementos] = useState({
+    isDirty: false,
+    isSaving: false,
+  })
+
+  const handleEmbedComplementosChange = useCallback(
+    (next: { isDirty: boolean; isSaving: boolean }) => {
+      setEmbedComplementos(prev =>
+        prev.isDirty === next.isDirty && prev.isSaving === next.isSaving ? prev : next
+      )
+    },
+    []
+  )
 
   const title = useMemo(() => {
     const nome = state.produto?.nome || state.grupo?.nome || 'Cardápio'
@@ -74,7 +86,8 @@ export function MenuProdutoTabsModal({
       ? produtoDirty
       : state.tab === 'grupo'
         ? grupoDirty
-        : complementosDirty
+        : embedComplementos.isDirty
+  const currentSaving = state.tab === 'complementos' ? embedComplementos.isSaving : saving
 
   const footerActions: JiffySidePanelFooterActions = {
     showCancel: true,
@@ -84,8 +97,8 @@ export function MenuProdutoTabsModal({
     showSave: true,
     saveLabel: 'Salvar',
     onSave: () => void handleSave(),
-    saveLoading: saving,
-    saveDisabled: !currentDirty || saving,
+    saveLoading: currentSaving,
+    saveDisabled: !currentDirty || currentSaving,
   }
 
   const produtoEnabled = Boolean(state.produto)
@@ -177,12 +190,16 @@ export function MenuProdutoTabsModal({
             )}
             aria-hidden={state.tab !== 'complementos'}
           >
-            <MenuProdutoComplementosForm
+            <ComplementosMultiSelectDialog
               ref={complementosRef}
+              open={state.open}
+              produtoId={state.produto.produtoId}
+              produtoNome={state.produto.nome}
+              initialGruposResumo={state.produto.gruposComplementos}
               menuId={menuId}
-              produto={state.produto}
-              onDirtyChange={setComplementosDirty}
-              onSavingChange={setSaving}
+              onClose={onClose}
+              isEmbedded
+              onEmbedStateChange={handleEmbedComplementosChange}
             />
           </div>
         ) : null}

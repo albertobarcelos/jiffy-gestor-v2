@@ -28,6 +28,8 @@ export interface BuscarMenusResponse {
   hasPrevious?: boolean
 }
 
+export type MenuProdutoTipoFiltro = 'all' | 'padrao' | 'pizza'
+
 export interface BuscarMenuProdutosParams {
   q?: string
   limit?: number
@@ -36,6 +38,7 @@ export interface BuscarMenuProdutosParams {
   favorito?: boolean | null
   grupoProdutoId?: string
   grupoComplementosId?: string
+  tipo?: MenuProdutoTipoFiltro
 }
 
 export interface BuscarMenuGruposParams {

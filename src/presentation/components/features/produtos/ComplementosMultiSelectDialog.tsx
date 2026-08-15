@@ -29,6 +29,7 @@ import {
 } from '../grupos-complementos/GruposComplementosTabsModal'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { cn } from '@/src/shared/utils/cn'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 
 /** Grupo vinculado ao produto (estado local da aba). */
 interface GrupoComplementoItem {
@@ -179,6 +180,11 @@ interface ComplementosMultiSelectDialogProps {
       tipoImpactoPreco?: 'aumenta' | 'diminui' | 'nenhum'
     }>
   }>
+  /**
+   * Se informado, o vínculo de grupos grava só no snapshot do menu
+   * (`PATCH /menus/:menuId/produtos/:produtoId`), não no cadastro base.
+   */
+  menuId?: string
   onClose: () => void
   isEmbedded?: boolean
   /** Estado do formulário embutido (dirty/saving) para o rodapé do painel. */
@@ -194,12 +200,15 @@ export const ComplementosMultiSelectDialog = forwardRef<
     produtoId,
     produtoNome,
     initialGruposResumo,
+    menuId,
     onClose,
     isEmbedded = false,
     onEmbedStateChange,
   },
   ref
 ) {
+  const invalidate = useInvalidateTenantQueries()
+  const vinculoNoMenu = Boolean(menuId)
   const [groups, setGroups] = useState<GrupoComplementoItem[]>(() =>
     mapResumoToGrupos(initialGruposResumo)
   )
@@ -263,7 +272,10 @@ export const ComplementosMultiSelectDialog = forwardRef<
       }
       setError(null)
       try {
-        const response = await fetchGestorApi(`/api/produtos/${produtoId}`, {
+        const url = menuId
+          ? `/api/menus/${menuId}/produtos/${produtoId}`
+          : `/api/produtos/${produtoId}`
+        const response = await fetchGestorApi(url, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -277,7 +289,11 @@ export const ComplementosMultiSelectDialog = forwardRef<
           throw new Error(errorData.message || 'Erro ao carregar complementos do produto')
         }
 
-        const produto = await response.json()
+        const payload = await response.json()
+        const produto =
+          payload?.data && typeof payload.data === 'object' && !Array.isArray(payload.data)
+            ? payload.data
+            : payload
         const grupos: GrupoComplementoItem[] = (produto.gruposComplementos || []).map((grupo: any) =>
           mapApiGrupoToGrupoComplemento(grupo)
         )
@@ -307,7 +323,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
         }
       }
     },
-    [open, produtoId]
+    [open, produtoId, menuId]
   )
 
   const loadSelectableGroups = useCallback(async (signal?: AbortSignal) => {
@@ -473,7 +489,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
     }
   }, [gruposVinculadosIds, allSelectableGroups])
 
-  const showAtivoComplemento = filterTab === 'todos'
+  const showAtivoComplemento = filterTab === 'todos' && !vinculoNoMenu
 
   /** Um único GET por grupo — reutilizado ao expandir catálogo e após vínculo (substitui GET produto inteiro). */
   const fetchGrupoComplementoPorId = useCallback(
@@ -537,11 +553,11 @@ export const ComplementosMultiSelectDialog = forwardRef<
     })
   }, [])
 
-  /** Complementos de grupos não vinculados: carrega sob demanda (inclui após desvincular com painel aberto). */
+  /** Complementos do grupo: no snapshot do menu o GET não traz a lista aninhada. */
   useEffect(() => {
     for (const grupoId of expandedGrupoIds) {
-      const vinculado = groups.some(g => g.id === grupoId)
-      if (vinculado) continue
+      const vinculado = groups.find(g => g.id === grupoId)
+      if ((vinculado?.complementos?.length ?? 0) > 0) continue
       if (Object.hasOwn(detalhesComplementosCache, grupoId)) continue
       if (loadingDetalheGrupoId === grupoId) continue
       void carregarComplementosDoGrupo(grupoId)
@@ -624,7 +640,22 @@ export const ComplementosMultiSelectDialog = forwardRef<
       const addedIds = ids.filter(id => !antesIds.includes(id))
 
       try {
-        if (ids.length === 0) {
+        if (menuId) {
+          const response = await fetchGestorApi(`/api/menus/${menuId}/produtos/${produtoId}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ gruposComplementosIds: ids }),
+          })
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            throw new Error(errorData.message || 'Erro ao atualizar grupos de complementos')
+          }
+          await invalidate(['menu-produtos', menuId])
+          await invalidate(['menu', menuId])
+        } else if (ids.length === 0) {
           // A API ignora PATCH com `gruposComplementosIds: []`, então removemos cada
           // vínculo via DELETE para desvincular todos os grupos do produto.
           const resultados = await Promise.allSettled(
@@ -708,7 +739,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
         return false
       }
     },
-    [produtoId, groups, fetchGrupoComplementoPorId, loadGroups]
+    [produtoId, menuId, groups, fetchGrupoComplementoPorId, loadGroups, invalidate]
   )
 
   /** Liga/desliga vínculo só no estado local — PATCH ocorre no Salvar. */
@@ -790,10 +821,16 @@ export const ComplementosMultiSelectDialog = forwardRef<
     setIsSaving(true)
     onEmbedStateChange?.({ isDirty: true, isSaving: true })
     try {
-      const ok = await persistGruposSelection(currentIds, 'Grupos atualizados com sucesso!', {
-        optimisticPreApplied: true,
-        antesIdsSnapshot: baselineIds,
-      })
+      const ok = await persistGruposSelection(
+        currentIds,
+        vinculoNoMenu
+          ? 'Complementos atualizados neste cardápio'
+          : 'Grupos atualizados com sucesso!',
+        {
+          optimisticPreApplied: true,
+          antesIdsSnapshot: baselineIds,
+        }
+      )
       if (ok) {
         baselineGruposIdsRef.current = [...currentIds]
         isDirtyRef.current = false
@@ -805,7 +842,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
     } finally {
       setIsSaving(false)
     }
-  }, [produtoId, groups, persistGruposSelection, onEmbedStateChange])
+  }, [produtoId, groups, persistGruposSelection, onEmbedStateChange, vinculoNoMenu])
 
   useImperativeHandle(
     ref,
@@ -1050,7 +1087,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
             <div className="flex h-8 shrink-0 overflow-hidden rounded-lg border border-gray-200 text-xs font-medium">
               {(['vinculados', 'disponiveis', 'todos'] as const).map(tab => {
                 const labels = {
-                  vinculados: 'Neste produto',
+                  vinculados: vinculoNoMenu ? 'Neste cardápio' : 'Neste produto',
                   disponiveis: 'Disponíveis',
                   todos: 'Todos',
                 }
@@ -1095,17 +1132,21 @@ export const ComplementosMultiSelectDialog = forwardRef<
                   const expandido = expandedGrupoIds.has(grupo.id)
                   const grupoVinculado = groups.find(g => g.id === grupo.id)
                   const complementosLista =
-                    grupoVinculado?.complementos ?? detalhesComplementosCache[grupo.id] ?? []
+                    (grupoVinculado?.complementos?.length
+                      ? grupoVinculado.complementos
+                      : detalhesComplementosCache[grupo.id]) ?? []
                   const complementosOrdenados = ordenarComplementosParaExibicao(complementosLista)
                   const qtdComplementosConhecida =
-                    grupoVinculado != null || grupo.id in detalhesComplementosCache
-                      ? complementosOrdenados.length
-                      : null
+                    (grupoVinculado?.complementos?.length ?? 0) > 0
+                      ? grupoVinculado!.complementos.length
+                      : grupo.id in detalhesComplementosCache
+                        ? complementosOrdenados.length
+                        : null
                   const mostrarLoadingDetalhe =
                     expandido &&
-                    !grupoVinculado &&
                     loadingDetalheGrupoId === grupo.id &&
-                    !(grupo.id in detalhesComplementosCache)
+                    !(grupo.id in detalhesComplementosCache) &&
+                    !(grupoVinculado?.complementos?.length)
 
                   return (
                     <li key={grupo.id}>
@@ -1285,7 +1326,9 @@ export const ComplementosMultiSelectDialog = forwardRef<
                 {allSelectableGroups.length === 0
                   ? 'Nenhum grupo de complementos cadastrado.'
                   : filterTab === 'vinculados'
-                    ? 'Nenhum grupo vinculado a este produto.'
+                    ? vinculoNoMenu
+                      ? 'Nenhum grupo vinculado a este cardápio.'
+                      : 'Nenhum grupo vinculado a este produto.'
                     : filterTab === 'disponiveis'
                       ? 'Nenhum grupo disponível para vincular.'
                       : 'Nenhum grupo encontrado para a busca.'}
@@ -1319,6 +1362,12 @@ export const ComplementosMultiSelectDialog = forwardRef<
                 Criar novo grupo
               </button>
             </div>
+            {vinculoNoMenu ? (
+              <p className="mt-2 text-xs text-secondary-text">
+                Os grupos marcados valem só neste cardápio. Alterar aqui não muda o cadastro do
+                produto.
+              </p>
+            ) : null}
           </div>
           <div className="scrollbar-hide flex-1 overflow-y-auto px-2 py-4 md:px-6">
             {renderDialogBody()}

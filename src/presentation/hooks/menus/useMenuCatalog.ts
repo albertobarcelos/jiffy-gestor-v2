@@ -22,7 +22,10 @@ interface UseMenuProdutosParams {
   menuId: string | undefined
   q?: string
   grupoProdutoId?: string
+  grupoComplementosId?: string
   ativo?: boolean | null
+  favorito?: boolean | null
+  tipo?: 'all' | 'padrao' | 'pizza'
   limit?: number
   enabled?: boolean
 }
@@ -41,20 +44,26 @@ export function useMenuProdutos(params: UseMenuProdutosParams) {
     menuId,
     q = '',
     grupoProdutoId,
-    ativo = true,
+    grupoComplementosId,
+    ativo = null,
+    favorito = null,
+    tipo = 'all',
     limit = MENU_CATALOG_PAGE_SIZE,
     enabled = true,
   } = params
 
   return useSecureTenantInfiniteQuery<MenuProdutosPage, number>(
-    ['menu-produtos', menuId, q, grupoProdutoId, ativo, limit],
+    ['menu-produtos', menuId, q, grupoProdutoId, grupoComplementosId, ativo, favorito, tipo, limit],
     async ({ token }, pageParam) => {
       const searchParams = new URLSearchParams()
       searchParams.set('limit', String(limit))
       searchParams.set('offset', String(pageParam))
       if (q.trim()) searchParams.set('q', q.trim())
       if (grupoProdutoId) searchParams.set('grupoProdutoId', grupoProdutoId)
+      if (grupoComplementosId) searchParams.set('grupoComplementosId', grupoComplementosId)
       if (ativo !== null) searchParams.set('ativo', String(ativo))
+      if (favorito !== null) searchParams.set('favorito', String(favorito))
+      if (tipo) searchParams.set('tipo', tipo)
 
       const response = await fetchGestorApi(
         `/api/menus/${menuId}/produtos?${searchParams}`,

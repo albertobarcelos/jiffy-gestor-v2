@@ -22,6 +22,10 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     const { searchParams } = new URL(req.url)
 
     const repo = new MenuRepository(new ApiClient(), validation.tokenInfo.token)
+    const tipoRaw = searchParams.get('tipo')
+    const tipo =
+      tipoRaw === 'all' || tipoRaw === 'padrao' || tipoRaw === 'pizza' ? tipoRaw : undefined
+
     const result = await repo.listarProdutos(id, {
       q: searchParams.get('q') || undefined,
       limit: parseInt(searchParams.get('limit') || '50', 10),
@@ -30,6 +34,7 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
       favorito: parseOptionalBool(searchParams.get('favorito')),
       grupoProdutoId: searchParams.get('grupoProdutoId') || undefined,
       grupoComplementosId: searchParams.get('grupoComplementosId') || undefined,
+      tipo,
     })
 
     return NextResponse.json(
