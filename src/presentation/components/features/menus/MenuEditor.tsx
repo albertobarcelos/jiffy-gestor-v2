@@ -90,7 +90,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   })
   const { data: gruposComplementos = [], isLoading: isLoadingGruposComplementos } =
     useGruposComplementos({ limit: 100, ativo: null })
-  const { syncProdutos, updateProduto } = useMenuMutations(menuId)
+  const { syncProdutos, updateProduto, uploadImagemProduto } = useMenuMutations(menuId)
   const { pedirConfirmacao, aplicarNosDestinos, dialog: dialogPropagacao } =
     usePropagarAlteracaoProduto()
   const invalidate = useInvalidateTenantQueries()
@@ -415,10 +415,25 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     [produtosDoMenu, syncProdutos, tabsState.produto, closeTabs]
   )
 
+  const handleChangeImage = useCallback(
+    async (produtoId: string, file: File) => {
+      try {
+        await uploadImagemProduto.mutateAsync({ produtoId, file })
+        showToast.success('Imagem atualizada neste cardápio')
+      } catch (err) {
+        showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar imagem')
+      }
+    },
+    [uploadImagemProduto]
+  )
+
   const renderItem = useCallback(
     (produto: MenuProduto) => {
       const savingThis =
         updateProduto.isPending && updateProduto.variables?.produtoId === produto.produtoId
+      const savingImage =
+        uploadImagemProduto.isPending &&
+        uploadImagemProduto.variables?.produtoId === produto.produtoId
       return (
         <CatalogProductRow
           variant="menu"
@@ -429,20 +444,25 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
           imagemUrl={produto.image?.imageUrl}
           isSavingValor={savingThis && updateProduto.variables?.input.valor !== undefined}
           isSavingStatus={savingThis && updateProduto.variables?.input.ativo !== undefined}
+          isSavingImage={savingImage}
           onValorChange={handleValorChange}
           onSwitchToggle={handleStatusToggle}
           onEdit={handleEditProduto}
           onRemove={handleRemove}
+          onChangeImage={handleChangeImage}
         />
       )
     },
     [
       updateProduto.isPending,
       updateProduto.variables,
+      uploadImagemProduto.isPending,
+      uploadImagemProduto.variables,
       handleValorChange,
       handleStatusToggle,
       handleEditProduto,
       handleRemove,
+      handleChangeImage,
     ]
   )
 

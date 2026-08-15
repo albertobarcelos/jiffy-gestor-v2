@@ -1238,24 +1238,26 @@ export const ComplementosMultiSelectDialog = forwardRef<
                             </div>
                           ) : (
                             <>
-                              <button
-                                type="button"
-                                onClick={e => {
-                                  e.stopPropagation()
-                                  void handleOpenGrupoComplementosTab(grupo.id, grupo.nome)
-                                }}
-                                disabled={
-                                  isSaving || abrindoGrupoComplementosId === grupo.id
-                                }
-                                className="mb-1 inline-flex items-center gap-1.5 rounded bg-white px-1 py-1 text-[11px] text-primary disabled:cursor-not-allowed disabled:opacity-50"
-                              >
-                                + Gerenciar complementos
-                                {qtdComplementosConhecida != null ? (
-                                  <span className="tabular-nums text-primary/70">
-                                    ({qtdComplementosConhecida})
-                                  </span>
-                                ) : null}
-                              </button>
+                              {!vinculoNoMenu ? (
+                                <button
+                                  type="button"
+                                  onClick={e => {
+                                    e.stopPropagation()
+                                    void handleOpenGrupoComplementosTab(grupo.id, grupo.nome)
+                                  }}
+                                  disabled={
+                                    isSaving || abrindoGrupoComplementosId === grupo.id
+                                  }
+                                  className="mb-1 inline-flex items-center gap-1.5 rounded bg-white px-1 py-1 text-[11px] text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  + Gerenciar complementos
+                                  {qtdComplementosConhecida != null ? (
+                                    <span className="tabular-nums text-primary/70">
+                                      ({qtdComplementosConhecida})
+                                    </span>
+                                  ) : null}
+                                </button>
+                              ) : null}
                               {complementosOrdenados.length === 0 ? (
                                 <p className="py-2 text-center text-xs text-secondary-text">
                                   Nenhum complemento neste grupo.
@@ -1352,20 +1354,22 @@ export const ComplementosMultiSelectDialog = forwardRef<
                 Grupos de complementos
               </h2>
               <div className="h-px min-w-8 flex-1 bg-primary/70" />
-              <button
-                type="button"
-                onClick={handleOpenNovoGrupoModal}
-                disabled={isSaving}
-                className="flex shrink-0 items-center rounded-lg border border-primary bg-primary px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 md:h-8 md:gap-2 md:px-4 md:text-sm"
-              >
-                <MdAdd size={18} />
-                Criar novo grupo
-              </button>
+              {!vinculoNoMenu ? (
+                <button
+                  type="button"
+                  onClick={handleOpenNovoGrupoModal}
+                  disabled={isSaving}
+                  className="flex shrink-0 items-center rounded-lg border border-primary bg-primary px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 md:h-8 md:gap-2 md:px-4 md:text-sm"
+                >
+                  <MdAdd size={18} />
+                  Criar novo grupo
+                </button>
+              ) : null}
             </div>
             {vinculoNoMenu ? (
               <p className="mt-2 text-xs text-secondary-text">
-                Os grupos marcados valem só neste cardápio. Alterar aqui não muda o cadastro do
-                produto.
+                Os grupos marcados valem só neste cardápio. Nome e valor dos complementos se
+                alteram no cadastro do grupo, não aqui.
               </p>
             ) : null}
           </div>
@@ -1373,12 +1377,14 @@ export const ComplementosMultiSelectDialog = forwardRef<
             {renderDialogBody()}
           </div>
         </div>
-        <GruposComplementosTabsModal
-          state={gruposTabsModalState}
-          onClose={handleGruposTabsClose}
-          onTabChange={handleGruposTabsTabChange}
-          onReload={handleGruposTabsReload}
-        />
+        {!vinculoNoMenu ? (
+          <GruposComplementosTabsModal
+            state={gruposTabsModalState}
+            onClose={handleGruposTabsClose}
+            onTabChange={handleGruposTabsTabChange}
+            onReload={handleGruposTabsReload}
+          />
+        ) : null}
       </>
     )
   }

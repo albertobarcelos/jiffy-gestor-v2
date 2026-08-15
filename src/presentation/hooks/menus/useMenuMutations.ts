@@ -141,6 +141,25 @@ export function useMenuMutations(menuId?: string) {
     { onSuccess: () => invalidate(['menu-produtos', menuId]) }
   )
 
+  const uploadImagemProduto = useSecureTenantMutation(
+    async ({ token }, vars: { produtoId: string; file: File }) => {
+      if (!menuId) throw new Error('menuId é obrigatório')
+      const form = new FormData()
+      form.append('file', vars.file)
+      const response = await fetchGestorApi(
+        `/api/menus/${menuId}/produtos/${vars.produtoId}/imagem`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: form,
+        }
+      )
+      if (!response.ok) await parseError(response, 'Erro ao atualizar imagem do produto')
+      return (await response.json()).data
+    },
+    { onSuccess: () => invalidateMenuTree(invalidate, menuId) }
+  )
+
   const renameGrupo = useSecureTenantMutation(
     async (
       { token },
@@ -193,6 +212,7 @@ export function useMenuMutations(menuId?: string) {
     syncProdutos,
     updateProduto,
     reorderProduto,
+    uploadImagemProduto,
     renameGrupo,
     reorderGrupo,
   }

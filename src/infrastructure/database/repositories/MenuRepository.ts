@@ -193,6 +193,16 @@ export class MenuRepository implements IMenuRepository {
     return data
   }
 
+  async confirmarUploadIntent(uploadIntentId: string): Promise<void> {
+    await this.apiClient.request(
+      `/api/v1/media/image-upload-intents/${uploadIntentId}/confirm`,
+      {
+        method: 'POST',
+        headers: this.authHeaders(),
+      }
+    )
+  }
+
   async listarGrupos(menuId: string, params: BuscarMenuGruposParams) {
     const query = new URLSearchParams()
     appendPagination(query, params)
