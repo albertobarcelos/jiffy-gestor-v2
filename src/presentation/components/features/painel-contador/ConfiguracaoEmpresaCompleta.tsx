@@ -38,6 +38,7 @@ interface ConfiguracaoFiscal {
   codigoRegimeTributario?: number
   simplesNacional?: boolean
   contribuinteIcms?: boolean
+  rodapeNota?: string
 }
 
 /** Labels outlined — alinhado a EmpresaTab / NovoMeioPagamento */
@@ -197,6 +198,7 @@ export function ConfiguracaoEmpresaCompleta() {
     isento: false,
     inscricaoMunicipal: '',
     codigoRegimeTributario: '1' as '1' | '2' | '3',
+    rodapeNota: '',
   })
 
   // Validação de cidade
@@ -279,12 +281,14 @@ export function ConfiguracaoEmpresaCompleta() {
         codigoRegimeTributario: config.codigoRegimeTributario ?? undefined,
         simplesNacional: config.simplesNacional,
         contribuinteIcms: config.contribuinteIcms,
+        rodapeNota: config.rodapeNota,
       })
       setFormDataFiscal({
         inscricaoEstadual: config.inscricaoEstadual || '',
         isento: config.inscricaoEstadual === 'ISENTO' || !config.inscricaoEstadual,
         inscricaoMunicipal: config.inscricaoMunicipal || '',
         codigoRegimeTributario: String(config.codigoRegimeTributario || 1) as '1' | '2' | '3',
+        rodapeNota: config.rodapeNota || '',
       })
     }
   }, [isRehydrated, dadosQuery.data, dadosQuery.isLoading])
@@ -431,6 +435,7 @@ export function ConfiguracaoEmpresaCompleta() {
         codigoRegimeTributario: parseInt(formDataFiscal.codigoRegimeTributario, 10),
         simplesNacional: formDataFiscal.codigoRegimeTributario === '1',
         contribuinteIcms: true,
+        rodapeNota: formDataFiscal.rodapeNota.trim(),
       }
 
       await salvarMutation.mutateAsync({
@@ -935,6 +940,26 @@ export function ConfiguracaoEmpresaCompleta() {
                 <p className="mt-1 text-xs text-secondary-text/70">
                   {getRegimeLabel(formDataFiscal.codigoRegimeTributario)}
                 </p>
+              </div>
+
+              <div className="md:col-span-2">
+                <Input
+                  label="Rodapé da nota"
+                  value={formDataFiscal.rodapeNota}
+                  onChange={e =>
+                    setFormDataFiscal(prev => ({
+                      ...prev,
+                      rodapeNota: e.target.value,
+                    }))
+                  }
+                  placeholder="Ex.: Ouvidoria Procon MT 151"
+                  helperText="Informações complementares impressas no rodapé da NFC-e/NF-e."
+                  multiline
+                  minRows={3}
+                  inputProps={{ maxLength: 5000 }}
+                  size="small"
+                  sx={sxEntradaConfig}
+                />
               </div>
             </div>
           </div>

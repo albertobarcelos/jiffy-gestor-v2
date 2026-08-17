@@ -271,6 +271,8 @@ export interface SalvarFiscalDTO {
   simplesNacional?: boolean
   contribuinteIcms?: boolean
   ibptToken?: string | null
+  /** Informações complementares impressas no rodapé da nota. */
+  rodapeNota?: string
 }
 
 export interface ValidarCbenefDTO {
