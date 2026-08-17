@@ -28,7 +28,7 @@ export function montarParticipacaoGrupos(
   const map = new Map<string, { nome: string; valor: number; grupoId: string | null }>()
   for (const r of linhas) {
     const key = r.grupoId ?? '__sem_grupo__'
-    const nome = r.grupoNome ?? 'Sem grupo'
+    const nome = r.grupoNome ?? 'Sem categoria'
     const prev = map.get(key)
     if (!prev) {
       map.set(key, { nome, valor: r.valorTotal, grupoId: r.grupoId })

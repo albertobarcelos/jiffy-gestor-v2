@@ -535,7 +535,7 @@ export function ProdutosTabsModal({
             {(
               [
                 { key: 'produto' as const, label: 'Produto', disabled: false },
-                { key: 'grupo' as const, label: 'Grupo', disabled: !state.grupoId },
+                { key: 'grupo' as const, label: 'Categoria', disabled: !state.grupoId },
                 { key: 'complementos' as const, label: 'Complementos', disabled: !produtoId },
                 { key: 'impressoras' as const, label: 'Impressoras', disabled: !produtoId },
                 {
@@ -710,7 +710,7 @@ export function ProdutosTabsModal({
             </div>
           ) : state.open && state.tab === 'grupo' && !state.grupoId ? (
             <div className="flex h-full min-h-0 flex-1 items-center justify-center text-sm text-secondary-text">
-              Selecione um grupo válido para editar.
+              Selecione uma categoria válida para editar.
             </div>
           ) : null}
         </div>

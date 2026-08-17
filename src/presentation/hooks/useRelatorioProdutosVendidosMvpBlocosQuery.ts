@@ -81,7 +81,7 @@ async function fetchBlocoParticipacao(
   })
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>
   if (!response.ok) {
-    const msg = typeof data.error === 'string' ? data.error : 'Erro ao carregar participação por grupo.'
+    const msg = typeof data.error === 'string' ? data.error : 'Erro ao carregar participação por categoria.'
     throw new Error(msg)
   }
   return data as unknown as RelatorioProdutosVendidosMvpParticipacaoDTO

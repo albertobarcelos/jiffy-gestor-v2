@@ -177,7 +177,7 @@ export function useMenuMutations(menuId?: string) {
           body: JSON.stringify({ nome: vars.nome }),
         }
       )
-      if (!response.ok) await parseError(response, 'Erro ao renomear grupo do menu')
+      if (!response.ok) await parseError(response, 'Erro ao renomear categoria do menu')
       return (await response.json()).data
     },
     { onSuccess: () => invalidate(['menu-grupos', menuId]) }
@@ -200,7 +200,7 @@ export function useMenuMutations(menuId?: string) {
           body: JSON.stringify({ novaPosicao: vars.novaPosicao }),
         }
       )
-      if (!response.ok) await parseError(response, 'Erro ao reordenar grupo')
+      if (!response.ok) await parseError(response, 'Erro ao reordenar categoria')
     },
     { onSuccess: () => invalidate(['menu-grupos', menuId]) }
   )

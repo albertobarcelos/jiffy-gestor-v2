@@ -373,7 +373,7 @@ export function ProdutosList() {
   }, [produtos, openTabsModal])
 
   const handleAddProdutoForGroup = useCallback((grupoNome: string, grupoId: string | undefined) => {
-    if (!grupoId || grupoNome.toLowerCase() === 'sem grupo') {
+    if (!grupoId || grupoNome.toLowerCase() === 'sem categoria') {
       openTabsModal({ tab: 'produto', mode: 'create' })
       return
     }

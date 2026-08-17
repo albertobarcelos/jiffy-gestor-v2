@@ -28,7 +28,7 @@ export function useGrupoProdutoPatchMutation() {
         await queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'produtos', 'infinite'], exact: false })
       },
       onError: (err) => {
-        showToast.error(err.message || 'Erro ao atualizar status do grupo')
+        showToast.error(err.message || 'Erro ao atualizar status da categoria')
       },
     }
   )

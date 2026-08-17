@@ -400,7 +400,7 @@ export function AtualizarPrecoLote() {
   const isLoadingRef = useRef(false)
   const isLoadingMoreRef = useRef(false)
   const loadMoreLockRef = useRef(false)
-  const carregarMaisProdutosRef = useRef<() => Promise<void>>(async () => {})
+  const carregarMaisProdutosRef = useRef<() => Promise<void>>(async () => {})
   useEffect(() => {
     produtosRef.current = produtos
   }, [produtos])
@@ -3342,7 +3342,7 @@ export function AtualizarPrecoLote() {
                 loading={isLoadingGruposProdutos}
                 disabled={isLoadingGruposProdutos}
                 loadingText="Carregando..."
-                noOptionsText="Nenhum grupo encontrado"
+                noOptionsText="Nenhuma categoria encontrada"
                 getOptionLabel={grupo => grupo.getNome()}
                 isOptionEqualToValue={(a, b) => a.getId() === b.getId()}
                 value={gruposProdutos.find(g => g.getId() === grupoProdutoFilter) ?? null}
@@ -3350,7 +3350,7 @@ export function AtualizarPrecoLote() {
                 renderInput={params => (
                   <TextField
                     {...params}
-                    label="Grupo de produtos"
+                    label="Categoria"
                     placeholder="Pesquise ou Selecione"
                     InputLabelProps={{
                       ...params.InputLabelProps,
@@ -3462,7 +3462,7 @@ export function AtualizarPrecoLote() {
               {activeTab === 'permissoes' ? (
                 <div className="hidden w-[13.75rem] shrink-0 text-xs sm:block">Permissões</div>
               ) : null}
-              <div className="hidden min-w-0 flex-1 text-xs md:block">Grupo</div>
+              <div className="hidden min-w-0 flex-1 text-xs md:block">Categoria</div>
               {activeTab === 'impressoras' ? (
                 <div className="hidden min-w-0 flex-[1.2] text-center text-xs md:block">Impressoras</div>
               ) : null}

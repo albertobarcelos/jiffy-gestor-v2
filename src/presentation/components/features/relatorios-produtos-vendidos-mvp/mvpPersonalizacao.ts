@@ -54,7 +54,7 @@ export const MVP_COLUNA_CATALOGO: { id: MvpColunaId; label: string; hint?: strin
   { id: 'index', label: '#', hint: 'Posição na lista' },
   { id: 'abc', label: 'ABC' },
   { id: 'produto', label: 'Produto' },
-  { id: 'grupo', label: 'Grupo' },
+  { id: 'grupo', label: 'Categoria' },
   { id: 'quantidade', label: 'Quantidade' },
   {
     id: 'varQtd',

@@ -215,7 +215,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
       if (used.has(baseId) || baseId === 'sem-grupo') continue
       groups.push({
         groupKey: `gid:${baseId}`,
-        grupoLabel: items[0]?.grupoProduto?.nome || 'Grupo',
+        grupoLabel: items[0]?.grupoProduto?.nome || 'Categoria',
         grupoId: baseId,
         grupoAtivo: true,
         items,
@@ -226,7 +226,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     if (semGrupo?.length) {
       groups.push({
         groupKey: 'sem_grupo',
-        grupoLabel: 'Sem grupo',
+        grupoLabel: 'Sem categoria',
         grupoAtivo: true,
         items: semGrupo,
       })

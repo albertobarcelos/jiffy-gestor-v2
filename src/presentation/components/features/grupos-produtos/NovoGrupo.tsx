@@ -131,7 +131,8 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
   ref
 ) {
   const router = useRouter()
-  const searchParams = useSearchParams()  const invalidate = useInvalidateTenantQueries()
+  const searchParams = useSearchParams()
+  const invalidate = useInvalidateTenantQueries()
 
   const effectiveGrupoId = grupoId || searchParams.get('id') || null
   const seedMatches =
@@ -280,7 +281,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
         })
 
         if (!response.ok) {
-          throw new Error('Erro ao carregar grupo')
+          throw new Error('Erro ao carregar categoria')
         }
 
         const data = await response.json()
@@ -302,7 +303,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
       } catch (error) {
         console.error('Erro ao carregar grupo:', error)
         if (!hasSeed) {
-          alert('Erro ao carregar dados do grupo')
+          alert('Erro ao carregar dados da categoria')
         }
       } finally {
         if (blockUi) setIsLoadingData(false)
@@ -328,7 +329,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
   const handleSave = useCallback(
     async (opts?: { keepModalOpen?: boolean }) => {
       if (!nome.trim()) {
-        alert('Nome do grupo é obrigatório')
+        alert('Nome da categoria é obrigatório')
         return
       }
 
@@ -375,7 +376,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
 
         if (!response.ok) {
           const error = await response.json()
-          throw new Error(error.message || 'Erro ao salvar grupo')
+          throw new Error(error.message || 'Erro ao salvar categoria')
         }
 
         // Sucesso — invalidação com escopo tenant (MULTI-TENANT-JIFFY-DOC-OFICIAL)
@@ -389,7 +390,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
           commitBaselineLatestRef.current()
           if (opts?.keepModalOpen) {
             onReload?.()
-            showToast.success('Grupo salvo com sucesso.')
+            showToast.success('Categoria salva com sucesso.')
             return
           }
           onSaved?.()
@@ -401,7 +402,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
         }
       } catch (error: any) {
         console.error('Erro ao salvar grupo:', error)
-        alert(error.message || 'Erro ao salvar grupo')
+        alert(error.message || 'Erro ao salvar categoria')
       } finally {
         setIsLoading(false)
       }
@@ -493,7 +494,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                   : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
               )}
             >
-              Detalhes do Grupo
+              Detalhes da Categoria
             </button>
             <button
               type="button"
@@ -520,7 +521,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
               >
                 <div className="mb-2 flex items-center gap-5">
                 <h2 className="shrink-0 text-primary md:text-xl text-sm font-semibold">
-                  Dados do Grupo de Produtos
+                  Dados da Categoria
                 </h2>
                 <div className="h-px min-w-0 flex-1 bg-primary/70" aria-hidden />
               </div>
@@ -543,11 +544,11 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                       </div>
                       <div>
                         <h2 className="text-primary-text md:text-lg text-sm font-semibold">
-                          {nome.trim() ? nome : 'Nome do Grupo'}
+                          {nome.trim() ? nome : 'Nome da Categoria'}
                         </h2>
                         {!iconName ? (
                           <p className="text-secondary-text md:text-sm text-xs">
-                            Definição do Ícone do Grupo
+                            Definição do Ícone da Categoria
                           </p>
                         ) : null}
                       </div>
@@ -556,7 +557,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                       <JiffyIconSwitch
                         checked={ativo}
                         onChange={e => setAtivo(e.target.checked)}
-                        label={ativo ? 'Grupo ativo' : 'Grupo inativo'}
+                        label={ativo ? 'Categoria ativa' : 'Categoria inativa'}
                         labelPosition="end"
                         bordered={false}
                         size="sm"
@@ -571,12 +572,12 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                   <div className="md:space-y-6 space-y-4">
                     {/* Nome — label na borda superior (outlined), igual cadastro de grupo de complementos */}
                     <Input
-                      label="Nome do Grupo"
+                      label="Nome da Categoria"
                       value={nome}
                       onChange={e => setNome(e.target.value.toLocaleUpperCase('pt-BR'))}
                       required
                       size="small"
-                      placeholder="Digite o nome do grupo"
+                      placeholder="Digite o nome da categoria"
                       className="bg-info"
                       sx={sxEntradaNomeGrupoProduto}
                     />
@@ -586,7 +587,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                       {/* Cor */}
                       <div>
                         <label className="block text-primary-text md:text-sm text-xs font-semibold mb-2">
-                          Cor do Grupo
+                          Cor da Categoria
                         </label>
                         <div className="flex flex-col gap-2">
                           <div className="flex items-center gap-2">
@@ -595,7 +596,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                               onClick={() => setIsColorPickerOpen(true)}
                               className="md:w-12 md:h-12 w-10 h-10 rounded-lg border border-primary/20 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                               style={{ backgroundColor: corHex || '#530CA3' }}
-                              aria-label="Selecionar cor do grupo"
+                              aria-label="Selecionar cor da categoria"
                             />
                             
                             <button
@@ -613,7 +614,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                       {/* Ícone */}
                       <div>
                         <label className="block text-primary-text md:text-sm text-xs font-semibold mb-2">
-                          Ícone do Grupo
+                          Ícone da Categoria
                         </label>
                         <div className="flex items-center gap-2">
                           <button

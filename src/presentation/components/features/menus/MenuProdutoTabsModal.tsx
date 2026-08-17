@@ -120,7 +120,7 @@ export function MenuProdutoTabsModal({
           {(
             [
               { key: 'produto' as const, label: 'Produto', disabled: !produtoEnabled },
-              { key: 'grupo' as const, label: 'Grupo', disabled: !grupoEnabled },
+              { key: 'grupo' as const, label: 'Categoria', disabled: !grupoEnabled },
               {
                 key: 'complementos' as const,
                 label: 'Complementos',

@@ -415,7 +415,7 @@ export function RelatoriosProdutosVendidosMvpPage() {
       <MvpChartModal
         open={modalGruposAberto}
         onClose={handleFecharModalGrafico}
-        title="Participação por grupos"
+        title="Participação por categorias"
       >
         <MvpPainelAsync
           loading={participacaoFetching && !participacaoData}

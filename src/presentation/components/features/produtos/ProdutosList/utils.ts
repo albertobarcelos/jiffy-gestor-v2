@@ -4,7 +4,7 @@ import type { ProdutoPatch } from '@/src/shared/types/produto'
 const collator = new Intl.Collator('pt-BR', { sensitivity: 'accent', numeric: false })
 
 export const normalizeGroupName = (nome?: string) =>
-  nome && nome.trim().length > 0 ? nome : 'Sem grupo'
+  nome && nome.trim().length > 0 ? nome : 'Sem categoria'
 
 /**
  * Chave estável para agrupar produtos na lista: um bucket por `grupoId`.

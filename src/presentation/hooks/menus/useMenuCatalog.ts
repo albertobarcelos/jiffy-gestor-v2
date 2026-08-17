@@ -125,7 +125,7 @@ export function useMenuGruposProdutos(params: UseMenuGruposParams) {
         `/api/menus/${menuId}/grupos-produtos?${searchParams}`,
         { headers: { Authorization: `Bearer ${token}` } }
       )
-      if (!response.ok) await parseError(response, 'Erro ao carregar grupos do menu')
+      if (!response.ok) await parseError(response, 'Erro ao carregar categorias do menu')
 
       const data = await response.json()
       const items = (data.items ?? []) as MenuGrupoProduto[]

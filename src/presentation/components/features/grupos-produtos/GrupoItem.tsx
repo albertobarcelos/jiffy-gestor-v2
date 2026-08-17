@@ -159,7 +159,7 @@ export const GrupoItem = memo(function GrupoItem({
             size="sm"
             className="shrink-0"
             inputProps={{
-              'aria-label': isAtivo ? 'Desativar grupo de produtos' : 'Ativar grupo de produtos',
+              'aria-label': isAtivo ? 'Desativar categoria' : 'Ativar categoria',
             }}
           />
         </div>

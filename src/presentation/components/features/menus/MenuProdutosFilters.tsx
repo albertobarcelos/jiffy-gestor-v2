@@ -138,7 +138,7 @@ export function MenuProdutosFilters({
             id="menu-produtos-filter-grupo"
             size="small"
             options={gruposDoMenu}
-            noOptionsText="Nenhum grupo neste cardápio"
+            noOptionsText="Nenhuma categoria neste cardápio"
             getOptionLabel={grupo => grupo.nome}
             isOptionEqualToValue={(a, b) => a.id === b.id}
             value={gruposDoMenu.find(g => g.id === grupoProdutoId) ?? null}
@@ -146,7 +146,7 @@ export function MenuProdutosFilters({
             renderInput={params => (
               <TextField
                 {...params}
-                label="Grupo de produtos"
+                label="Categoria"
                 placeholder="Pesquise ou selecione"
                 InputLabelProps={{ ...params.InputLabelProps, shrink: true }}
                 sx={{

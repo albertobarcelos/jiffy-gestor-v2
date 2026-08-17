@@ -103,7 +103,7 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
-        throw new Error(body.message || 'Erro ao carregar produtos do grupo')
+        throw new Error(body.message || 'Erro ao carregar produtos da categoria')
       }
 
       return res.json()
@@ -353,7 +353,7 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
     return (
       <div className="flex flex-col items-center justify-center py-6 px-2 gap-4">
         <p className="text-secondary-text text-sm text-center">
-          Não foi possível carregar os produtos deste grupo.
+          Não foi possível carregar os produtos desta categoria.
         </p>
         <button
           type="button"
@@ -370,7 +370,7 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
     return (
       <div className="text-center py-12">
         <p className="text-secondary-text text-sm ">
-          Nenhum produto associado a este grupo.
+          Nenhum produto associado a esta categoria.
         </p>
       </div>
     )

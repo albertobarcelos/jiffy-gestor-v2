@@ -118,7 +118,7 @@ export function InformacoesProdutoStep({
               options={grupos}
               loading={isLoadingGrupos}
               loadingText="Carregando..."
-              noOptionsText="Nenhum grupo encontrado"
+              noOptionsText="Nenhuma categoria encontrada"
               getOptionLabel={grupo =>
                 grupo.isAtivo() ? grupo.getNome() : `${grupo.getNome()} (Inativo)`
               }
@@ -140,7 +140,7 @@ export function InformacoesProdutoStep({
               renderInput={params => (
                 <TextField
                   {...params}
-                  label="Grupo"
+                  label="Categoria"
                   placeholder="Pesquise ou selecione"
                   InputLabelProps={{
                     ...params.InputLabelProps,

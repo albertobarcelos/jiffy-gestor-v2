@@ -1312,7 +1312,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           return false
         }
         if (!grupoProduto) {
-          showToast.error('Selecione o grupo do produto.')
+          showToast.error('Selecione a categoria do produto.')
           return false
         }
         if (!unidadeProduto) {

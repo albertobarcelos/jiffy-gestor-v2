@@ -105,7 +105,7 @@ export function Sidebar() {
         icon: '📋',
         children: [
           { name: 'Menus', path: '/menus', icon: '📖' },
-          { name: 'Grupo Produtos', path: '/grupos-produtos', icon: '📦' },
+          { name: 'Categorias', path: '/grupos-produtos', icon: '📦' },
           { name: 'Produtos', path: '/produtos', icon: '🛍️' },
           { name: 'Grupo Complementos', path: '/grupos-complementos', icon: '📋' },
           { name: 'Complementos', path: '/complementos', icon: '➕' },

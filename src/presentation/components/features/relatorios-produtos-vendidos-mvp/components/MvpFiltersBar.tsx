@@ -96,11 +96,11 @@ export function MvpFiltersBar({
         <div className="flex flex-wrap items-end justify-center gap-x-1 gap-y-3 md:justify-start">
         <FormControl size="small" variant="outlined" sx={{ ...sxRelatorioFiltroSelectBase, minWidth: 200 }}>
           <InputLabel id="mvp-filtro-grupo-label" shrink>
-            Grupo de produtos
+            Categoria
           </InputLabel>
           <Select
             labelId="mvp-filtro-grupo-label"
-            label="Grupo de produtos"
+            label="Categoria"
             value={values.grupoId}
             onChange={e => set({ grupoId: e.target.value })}
             disabled={gruposLoading}
@@ -109,7 +109,7 @@ export function MvpFiltersBar({
             className=""
           >
             <MenuItem value="">
-              <span className="text-secondary-text">Todos os grupos</span>
+              <span className="text-secondary-text">Todas as categorias</span>
             </MenuItem>
             {grupos.map(g => (
               <MenuItem key={g.id} value={g.id}>

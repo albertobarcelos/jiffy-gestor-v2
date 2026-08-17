@@ -17,6 +17,6 @@ export async function updateGrupoProdutoStatus({ grupoId, novoStatus, token }: U
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}))
-    throw new Error(err.message || 'Erro ao atualizar status do grupo')
+    throw new Error(err.message || 'Erro ao atualizar status da categoria')
   }
 }

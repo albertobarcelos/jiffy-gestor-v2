@@ -191,7 +191,7 @@ export function TopNav() {
         icon: MdShoppingBag,
         children: [
           { name: 'Menus', path: '/menus', icon: MdMenuBook },
-          { name: 'Grupo de Produtos', path: '/grupos-produtos', icon: MdCategory },
+          { name: 'Categorias', path: '/grupos-produtos', icon: MdCategory },
           { name: 'Produtos', path: '/produtos', icon: MdShoppingBag },
           { name: 'Grupo de Complementos', path: '/grupos-complementos', icon: MdCategory },
           { name: 'Complementos', path: '/complementos', icon: MdAddCircle },

@@ -53,7 +53,7 @@ export const MenuGrupoSnapshotForm = forwardRef<
   const save = useCallback(async () => {
     const nomeTrim = nome.trim()
     if (!nomeTrim) {
-      showToast.error('Informe o nome do grupo neste cardápio')
+      showToast.error('Informe o nome da categoria neste cardápio')
       return false
     }
     onSavingChange?.(true)
@@ -62,10 +62,10 @@ export const MenuGrupoSnapshotForm = forwardRef<
         grupoProdutoId: grupo.grupoBase.id,
         nome: nomeTrim,
       })
-      showToast.success('Grupo atualizado neste cardápio')
+      showToast.success('Categoria atualizada neste cardápio')
       return true
     } catch (err) {
-      showToast.error(err instanceof Error ? err.message : 'Erro ao salvar grupo')
+      showToast.error(err instanceof Error ? err.message : 'Erro ao salvar categoria')
       return false
     } finally {
       onSavingChange?.(false)
@@ -85,11 +85,11 @@ export const MenuGrupoSnapshotForm = forwardRef<
     >
       <div className="rounded-[10px] bg-info p-2 md:p-4">
         <div className="mb-2 flex items-center gap-5">
-          <h2 className="text-xl font-semibold text-primary">Grupo neste cardápio</h2>
+          <h2 className="text-xl font-semibold text-primary">Categoria neste cardápio</h2>
           <div className="h-px flex-1 bg-primary/70" />
         </div>
         <p className="mb-4 text-sm text-secondary-text">
-          O nome abaixo vale só neste cardápio. O cadastro do grupo não é alterado.
+          O nome abaixo vale só neste cardápio. O cadastro da categoria não é alterado.
           {grupo.grupoBase.nome ? ` Cadastro: ${grupo.grupoBase.nome}.` : ''}
         </p>
         <Input

@@ -61,7 +61,7 @@ function CatalogGroupHeaderInner({
             </p>
             <button
               type="button"
-              title="Editar grupo"
+              title="Editar categoria"
               onClick={() => onEditGrupo(grupoId)}
               disabled={!grupoId}
               className={`flex h-5 w-5 items-center justify-center rounded-full border border-gray-200 text-primary-text transition-colors hover:bg-primary/10 ${
@@ -78,8 +78,8 @@ function CatalogGroupHeaderInner({
                 onClick={e => e.stopPropagation()}
                 data-tooltip={
                   grupoAtivo
-                    ? 'Grupo ativo — clique para desativar'
-                    : 'Grupo desativado — clique para ativar'
+                    ? 'Categoria ativa — clique para desativar'
+                    : 'Categoria desativada — clique para ativar'
                 }
               >
                 <JiffyIconSwitch
@@ -94,8 +94,8 @@ function CatalogGroupHeaderInner({
                   className="shrink-0 px-0 py-0"
                   inputProps={{
                     'aria-label': grupoAtivo
-                      ? 'Desativar grupo de produtos'
-                      : 'Ativar grupo de produtos',
+                      ? 'Desativar categoria'
+                      : 'Ativar categoria',
                     onClick: e => e.stopPropagation(),
                   }}
                 />
@@ -104,7 +104,7 @@ function CatalogGroupHeaderInner({
           </div>
           <p className="text-xs text-secondary-text">{itemCount} produtos</p>
           {grupoVisual && showGrupoStatusSwitch && !grupoAtivo ? (
-            <p className="text-[11px] font-semibold uppercase text-error">Grupo inativo</p>
+            <p className="text-[11px] font-semibold uppercase text-error">Categoria inativa</p>
           ) : null}
         </div>
       </div>
