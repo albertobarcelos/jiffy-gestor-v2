@@ -27,6 +27,10 @@ import {
   GruposComplementosTabsModal,
   GruposComplementosTabsModalState,
 } from '../grupos-complementos/GruposComplementosTabsModal'
+import {
+  ComplementosTabsModal,
+  type ComplementosTabsModalState,
+} from '../complementos/ComplementosTabsModal'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { cn } from '@/src/shared/utils/cn'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
@@ -124,6 +128,7 @@ function sameIdSet(a: readonly string[], b: readonly string[]): boolean {
 export type ComplementosMultiSelectHandle = {
   isDirty: () => boolean
   save: () => Promise<boolean>
+  getSelectedIds: () => string[]
 }
 
 export type ComplementosEmbedState = {
@@ -185,6 +190,16 @@ interface ComplementosMultiSelectDialogProps {
    * (`PATCH /menus/:menuId/produtos/:produtoId`), não no cadastro base.
    */
   menuId?: string
+  /**
+   * @deprecated O wizard do cardápio agora permite criar grupo/complemento no próprio fluxo.
+   * Mantido só por compatibilidade; não esconde mais os botões de criação.
+   */
+  somenteVinculo?: boolean
+  /**
+   * Sem `produtoId`: só seleção local (wizard do cardápio). Grupo/complemento novo
+   * ainda grava no cadastro; o vínculo com o produto fica para o POST final.
+   */
+  modoRascunho?: boolean
   onClose: () => void
   isEmbedded?: boolean
   /** Estado do formulário embutido (dirty/saving) para o rodapé do painel. */
@@ -201,6 +216,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
     produtoNome,
     initialGruposResumo,
     menuId,
+    modoRascunho = false,
     onClose,
     isEmbedded = false,
     onEmbedStateChange,
@@ -209,6 +225,8 @@ export const ComplementosMultiSelectDialog = forwardRef<
 ) {
   const invalidate = useInvalidateTenantQueries()
   const vinculoNoMenu = Boolean(menuId)
+  const ocultarGestaoGrupo = vinculoNoMenu
+  const rascunho = modoRascunho || !produtoId
   const [groups, setGroups] = useState<GrupoComplementoItem[]>(() =>
     mapResumoToGrupos(initialGruposResumo)
   )
@@ -244,6 +262,12 @@ export const ComplementosMultiSelectDialog = forwardRef<
       mode: 'create',
       grupo: undefined,
     })
+  const [complementosTabsState, setComplementosTabsState] = useState<ComplementosTabsModalState>({
+    open: false,
+    tab: 'complemento',
+    mode: 'create',
+  })
+  const grupoAlvoNovoComplementoRef = useRef<string | null>(null)
 
   /**
    * Ordem das linhas do catálogo enquanto o painel está aberto (evita reordenar a cada toggle).
@@ -400,24 +424,28 @@ export const ComplementosMultiSelectDialog = forwardRef<
   }, [])
 
   useEffect(() => {
-    if (!open || !produtoId) return
+    if (!open) return
 
     const ac = new AbortController()
     setCatalogSearch('')
-    // Em embed (ou com seed da lista): não bloqueia a UI com spinner full-card.
-    // groups.length / baseline só no momento da abertura — não reexecutar a cada toggle.
     const silentInitial =
       isEmbedded || baselineGruposIdsRef.current.length > 0 || groups.length > 0
-    void Promise.all([
-      loadGroups({ silent: silentInitial, signal: ac.signal }),
-      loadSelectableGroups(ac.signal),
-    ])
+
+    if (rascunho) {
+      setIsLoading(false)
+      void loadSelectableGroups(ac.signal)
+    } else {
+      void Promise.all([
+        loadGroups({ silent: silentInitial, signal: ac.signal }),
+        loadSelectableGroups(ac.signal),
+      ])
+    }
 
     return () => {
       ac.abort()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- groups só no momento da abertura
-  }, [open, produtoId, isEmbedded, loadGroups, loadSelectableGroups])
+  }, [open, produtoId, rascunho, isEmbedded, loadGroups, loadSelectableGroups])
 
   useEffect(() => {
     if (!open) {
@@ -433,9 +461,13 @@ export const ComplementosMultiSelectDialog = forwardRef<
       baselineGruposIdsRef.current = []
       isDirtyRef.current = false
       setIsSaving(false)
+      if (rascunho) {
+        setGroups([])
+        setAllSelectableGroups([])
+      }
       onEmbedStateChange?.({ isDirty: false, isSaving: false })
     }
-  }, [open, onEmbedStateChange])
+  }, [open, rascunho, onEmbedStateChange])
 
   const gruposVinculadosIds = useMemo(() => groups.map(g => g.id), [groups])
 
@@ -489,7 +521,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
     }
   }, [gruposVinculadosIds, allSelectableGroups])
 
-  const showAtivoComplemento = filterTab === 'todos' && !vinculoNoMenu
+  const showAtivoComplemento = filterTab === 'todos' && !ocultarGestaoGrupo
 
   /** Um único GET por grupo — reutilizado ao expandir catálogo e após vínculo (substitui GET produto inteiro). */
   const fetchGrupoComplementoPorId = useCallback(
@@ -624,6 +656,10 @@ export const ComplementosMultiSelectDialog = forwardRef<
         antesIdsSnapshot?: string[]
       }
     ) => {
+      if (rascunho) {
+        return true
+      }
+
       if (!produtoId) {
         showToast.error('Produto não encontrado.')
         return false
@@ -739,13 +775,13 @@ export const ComplementosMultiSelectDialog = forwardRef<
         return false
       }
     },
-    [produtoId, menuId, groups, fetchGrupoComplementoPorId, loadGroups, invalidate]
+    [rascunho, produtoId, menuId, groups, fetchGrupoComplementoPorId, loadGroups, invalidate]
   )
 
   /** Liga/desliga vínculo só no estado local — PATCH ocorre no Salvar. */
   const handleToggleCatalogGrupo = useCallback(
     (id: string) => {
-      if (isSaving || !produtoId) return
+      if (isSaving) return
 
       const antesIds = groups.map(g => g.id)
       const newIds = antesIds.includes(id) ? antesIds.filter(x => x !== id) : [...antesIds, id]
@@ -801,10 +837,16 @@ export const ComplementosMultiSelectDialog = forwardRef<
       isDirtyRef.current = !sameIdSet(newIds, baselineGruposIdsRef.current)
       onEmbedStateChange?.({ isDirty: isDirtyRef.current, isSaving: false })
     },
-    [isSaving, produtoId, groups, allSelectableGroups, onEmbedStateChange]
+    [isSaving, groups, allSelectableGroups, onEmbedStateChange]
   )
 
   const savePendingGrupos = useCallback(async (): Promise<boolean> => {
+    if (rascunho) {
+      isDirtyRef.current = false
+      onEmbedStateChange?.({ isDirty: false, isSaving: false })
+      return true
+    }
+
     if (!produtoId) {
       showToast.error('Produto não encontrado.')
       return false
@@ -842,7 +884,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
     } finally {
       setIsSaving(false)
     }
-  }, [produtoId, groups, persistGruposSelection, onEmbedStateChange, vinculoNoMenu])
+  }, [produtoId, groups, persistGruposSelection, onEmbedStateChange, vinculoNoMenu, rascunho])
 
   useImperativeHandle(
     ref,
@@ -852,6 +894,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
         baselineGruposIdsRef.current
       ),
       save: () => savePendingGrupos(),
+      getSelectedIds: () => groups.map(g => g.id),
     }),
     [groups, savePendingGrupos]
   )
@@ -964,6 +1007,80 @@ export const ComplementosMultiSelectDialog = forwardRef<
     [fetchGrupoComplementoPorId]
   )
 
+  const handleOpenNovoComplemento = useCallback((grupoId: string) => {
+    grupoAlvoNovoComplementoRef.current = grupoId
+    setComplementosTabsState({
+      open: true,
+      tab: 'complemento',
+      mode: 'create',
+      complementoId: undefined,
+    })
+  }, [])
+
+  const vincularComplementoAoGrupo = useCallback(
+    async (grupoId: string, complementoId: string) => {
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+      if (!token) {
+        throw new Error('Token não encontrado. Faça login novamente.')
+      }
+
+      const grupoAtual = await fetchGrupoComplementoPorId(grupoId)
+      const idsAtuais = (grupoAtual?.complementos ?? []).map(c => c.getId())
+      const nextIds = Array.from(new Set([...idsAtuais, complementoId]))
+
+      const response = await fetchGestorApi(`/api/grupos-complementos/${grupoId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ complementosIds: nextIds }),
+      })
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(
+          errorData.error || errorData.message || 'Erro ao vincular complemento ao grupo'
+        )
+      }
+
+      const grupoMapeado = await fetchGrupoComplementoPorId(grupoId)
+      if (!grupoMapeado) return
+
+      setDetalhesComplementosCache(prev => ({
+        ...prev,
+        [grupoId]: grupoMapeado.complementos,
+      }))
+      setGroups(prev => {
+        if (prev.some(g => g.id === grupoId)) {
+          return prev.map(g => (g.id === grupoId ? { ...g, ...grupoMapeado } : g))
+        }
+        return [...prev, grupoMapeado]
+      })
+    },
+    [fetchGrupoComplementoPorId]
+  )
+
+  const handleComplementoCreated = useCallback(
+    async (newId: string) => {
+      const grupoId = grupoAlvoNovoComplementoRef.current
+      if (!grupoId) return
+      try {
+        await vincularComplementoAoGrupo(grupoId, newId)
+        showToast.success('Complemento criado e vinculado ao grupo.')
+      } catch (err) {
+        showToast.error(
+          err instanceof Error ? err.message : 'Complemento criado, mas não foi vinculado ao grupo.'
+        )
+      }
+    },
+    [vincularComplementoAoGrupo]
+  )
+
+  const closeComplementosTabsModal = useCallback(() => {
+    setComplementosTabsState(prev => ({ ...prev, open: false }))
+    grupoAlvoNovoComplementoRef.current = null
+  }, [])
+
   const handleOpenGrupoComplementosTab = useCallback(
     async (grupoId: string, grupoNome?: string) => {
       if (isSaving || abrindoGrupoComplementosId !== null) return
@@ -1024,6 +1141,64 @@ export const ComplementosMultiSelectDialog = forwardRef<
     }))
   }, [])
 
+  const handleGrupoCreated = useCallback(
+    async (grupoId: string) => {
+      if (rascunho) {
+        const grupoMapeado = await fetchGrupoComplementoPorId(grupoId)
+        if (grupoMapeado) {
+          setGroups(prev => (prev.some(g => g.id === grupoId) ? prev : [...prev, grupoMapeado]))
+          setDetalhesComplementosCache(prev => ({
+            ...prev,
+            [grupoId]: grupoMapeado.complementos,
+          }))
+        } else {
+          setGroups(prev =>
+            prev.some(g => g.id === grupoId)
+              ? prev
+              : [
+                  ...prev,
+                  {
+                    id: grupoId,
+                    nome: 'Grupo',
+                    complementos: [],
+                    obrigatorio: false,
+                    qtdMinima: 0,
+                    qtdMaxima: 0,
+                  },
+                ]
+          )
+        }
+        isDirtyRef.current = true
+        onEmbedStateChange?.({ isDirty: true, isSaving: false })
+        setFilterTab('vinculados')
+        setExpandedGrupoIds(prev => new Set(prev).add(grupoId))
+        await loadSelectableGroups()
+        return
+      }
+
+      const nextIds = Array.from(new Set([...groups.map(g => g.id), grupoId]))
+      const ok = await persistGruposSelection(nextIds, undefined, { silentSuccess: true })
+      if (!ok) {
+        showToast.error('Grupo criado, mas não foi vinculado ao produto.')
+        return
+      }
+      baselineGruposIdsRef.current = nextIds
+      isDirtyRef.current = false
+      onEmbedStateChange?.({ isDirty: false, isSaving: false })
+      setFilterTab('vinculados')
+      setExpandedGrupoIds(prev => new Set(prev).add(grupoId))
+      await loadSelectableGroups()
+    },
+    [
+      rascunho,
+      groups,
+      persistGruposSelection,
+      onEmbedStateChange,
+      loadSelectableGroups,
+      fetchGrupoComplementoPorId,
+    ]
+  )
+
   const handleGruposTabsReload = useCallback(async () => {
     const grupoId = gruposTabsModalState.grupo?.getId()
     await Promise.all([loadGroups({ silent: true }), loadSelectableGroups()])
@@ -1044,12 +1219,12 @@ export const ComplementosMultiSelectDialog = forwardRef<
       open: false,
     }))
     void (async () => {
-      await loadGroups({ silent: true })
+      await Promise.all([loadGroups({ silent: true }), loadSelectableGroups()])
       if (grupoId) {
         await atualizarComplementosDoGrupoNaLista(grupoId)
       }
     })()
-  }, [loadGroups, gruposTabsModalState.grupo, atualizarComplementosDoGrupoNaLista])
+  }, [loadGroups, loadSelectableGroups, gruposTabsModalState.grupo, atualizarComplementosDoGrupoNaLista])
 
   const renderCatalogoGruposCard = () => (
     <div className="mb-4 flex min-h-0 flex-col rounded-lg border border-[#E6E9F4] bg-white p-2 shadow-[0_10px_30px_rgba(15,23,42,0.08)]">
@@ -1238,25 +1413,38 @@ export const ComplementosMultiSelectDialog = forwardRef<
                             </div>
                           ) : (
                             <>
-                              {!vinculoNoMenu ? (
-                                <button
-                                  type="button"
-                                  onClick={e => {
-                                    e.stopPropagation()
-                                    void handleOpenGrupoComplementosTab(grupo.id, grupo.nome)
-                                  }}
-                                  disabled={
-                                    isSaving || abrindoGrupoComplementosId === grupo.id
-                                  }
-                                  className="mb-1 inline-flex items-center gap-1.5 rounded bg-white px-1 py-1 text-[11px] text-primary disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                  + Gerenciar complementos
-                                  {qtdComplementosConhecida != null ? (
-                                    <span className="tabular-nums text-primary/70">
-                                      ({qtdComplementosConhecida})
-                                    </span>
-                                  ) : null}
-                                </button>
+                              {!ocultarGestaoGrupo ? (
+                                <div className="mb-2 flex flex-wrap items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={e => {
+                                      e.stopPropagation()
+                                      handleOpenNovoComplemento(grupo.id)
+                                    }}
+                                    disabled={isSaving}
+                                    className="inline-flex items-center gap-1 rounded bg-white px-2 py-1 text-[11px] font-semibold text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    + Criar complemento
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={e => {
+                                      e.stopPropagation()
+                                      void handleOpenGrupoComplementosTab(grupo.id, grupo.nome)
+                                    }}
+                                    disabled={
+                                      isSaving || abrindoGrupoComplementosId === grupo.id
+                                    }
+                                    className="inline-flex items-center gap-1.5 rounded bg-white px-1 py-1 text-[11px] text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    Gerenciar complementos
+                                    {qtdComplementosConhecida != null ? (
+                                      <span className="tabular-nums text-primary/70">
+                                        ({qtdComplementosConhecida})
+                                      </span>
+                                    ) : null}
+                                  </button>
+                                </div>
                               ) : null}
                               {complementosOrdenados.length === 0 ? (
                                 <p className="py-2 text-center text-xs text-secondary-text">
@@ -1354,7 +1542,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
                 Grupos de complementos
               </h2>
               <div className="h-px min-w-8 flex-1 bg-primary/70" />
-              {!vinculoNoMenu ? (
+              {!ocultarGestaoGrupo ? (
                 <button
                   type="button"
                   onClick={handleOpenNovoGrupoModal}
@@ -1371,19 +1559,38 @@ export const ComplementosMultiSelectDialog = forwardRef<
                 Os grupos marcados valem só neste cardápio. Nome e valor dos complementos se
                 alteram no cadastro do grupo, não aqui.
               </p>
-            ) : null}
+            ) : (
+              <p className="mt-2 text-xs text-secondary-text">
+                {rascunho
+                  ? 'Marque os grupos deste produto. Novos grupos e complementos salvam na hora; o produto só é criado ao concluir o passo a passo.'
+                  : 'Vincule grupos existentes ou crie um novo. Ao expandir um grupo, dá para criar um complemento sem sair deste fluxo.'}
+              </p>
+            )}
           </div>
           <div className="scrollbar-hide flex-1 overflow-y-auto px-2 py-4 md:px-6">
             {renderDialogBody()}
           </div>
         </div>
-        {!vinculoNoMenu ? (
-          <GruposComplementosTabsModal
-            state={gruposTabsModalState}
-            onClose={handleGruposTabsClose}
-            onTabChange={handleGruposTabsTabChange}
-            onReload={handleGruposTabsReload}
-          />
+        {!ocultarGestaoGrupo ? (
+          <>
+            <GruposComplementosTabsModal
+              state={gruposTabsModalState}
+              onClose={handleGruposTabsClose}
+              onTabChange={handleGruposTabsTabChange}
+              onReload={handleGruposTabsReload}
+              onCreated={handleGrupoCreated}
+              zIndex={1400}
+            />
+            <ComplementosTabsModal
+              state={complementosTabsState}
+              onClose={closeComplementosTabsModal}
+              onTabChange={tab => setComplementosTabsState(prev => ({ ...prev, tab }))}
+              onCreated={id => {
+                void handleComplementoCreated(id)
+              }}
+              zIndex={1500}
+            />
+          </>
         ) : null}
       </>
     )
@@ -1431,8 +1638,11 @@ export const ComplementosMultiSelectDialog = forwardRef<
               <button
                 type="button"
                 onClick={handleOpenNovoGrupoModal}
-                disabled={isSaving}
-                className="flex shrink-0 items-center rounded-lg border border-primary bg-primary px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 md:h-8 md:gap-2 md:px-4 md:text-sm"
+                disabled={isSaving || ocultarGestaoGrupo}
+                className={cn(
+                  'flex shrink-0 items-center rounded-lg border border-primary bg-primary px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 md:h-8 md:gap-2 md:px-4 md:text-sm',
+                  ocultarGestaoGrupo && 'hidden'
+                )}
               >
                 <MdAdd size={18} />
                 Criar novo grupo
@@ -1474,6 +1684,17 @@ export const ComplementosMultiSelectDialog = forwardRef<
         onClose={handleCloseGruposTabsModal}
         onTabChange={handleGruposTabsTabChange}
         onReload={handleGruposTabsReload}
+        onCreated={handleGrupoCreated}
+        zIndex={1400}
+      />
+      <ComplementosTabsModal
+        state={complementosTabsState}
+        onClose={closeComplementosTabsModal}
+        onTabChange={tab => setComplementosTabsState(prev => ({ ...prev, tab }))}
+        onCreated={id => {
+          void handleComplementoCreated(id)
+        }}
+        zIndex={1500}
       />
     </>
   )

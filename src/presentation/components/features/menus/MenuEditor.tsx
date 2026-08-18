@@ -15,6 +15,7 @@ import { usePropagarAlteracaoProduto } from '@/src/presentation/hooks/produtos/u
 import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
 import { useIsMobile } from '@/src/presentation/hooks/useIsMobile'
 import { AddProdutosToMenuPanel } from './AddProdutosToMenuPanel'
+import { MenuNovoProdutoWizard } from './MenuNovoProdutoWizard'
 import { MenuProdutosFilters } from './MenuProdutosFilters'
 import {
   MenuProdutoTabsModal,
@@ -76,6 +77,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     tipo: query.tipo,
   })
   const [addOpen, setAddOpen] = useState(false)
+  const [wizardOpen, setWizardOpen] = useState(false)
   const {
     data: produtosTodosData,
     fetchNextPage: fetchNextTodos,
@@ -546,14 +548,24 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
             />
           </div>
 
-          <button
-            type="button"
-            onClick={() => setAddOpen(true)}
-            className="flex h-8 items-center gap-2 rounded-lg bg-primary px-[30px] text-sm font-semibold text-info transition-colors hover:bg-primary/90"
-          >
-            Adicionar produtos
-            <span className="text-lg">+</span>
-          </button>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setWizardOpen(true)}
+              className="flex h-8 items-center gap-2 rounded-lg border border-primary bg-info px-[20px] text-sm font-semibold text-primary transition-colors hover:bg-primary/10"
+            >
+              Cadastrar produto neste cardápio
+              <span className="text-lg">+</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setAddOpen(true)}
+              className="flex h-8 items-center gap-2 rounded-lg bg-primary px-[30px] text-sm font-semibold text-info transition-colors hover:bg-primary/90"
+            >
+              Adicionar produtos
+              <span className="text-lg">+</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -589,7 +601,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
           emptyLabel={
             temFiltroAtivo
               ? 'Nenhum produto encontrado com esses filtros.'
-              : 'Nenhum produto neste cardápio. Use “Adicionar produtos”.'
+              : 'Nenhum produto neste cardápio. Use “Cadastrar produto neste cardápio” ou “Adicionar produtos”.'
           }
           listAriaLabel="Produtos deste cardápio"
           showGrupoStatusSwitch={false}
@@ -619,6 +631,13 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         menuId={menuId}
         produtosJaNoMenu={idsNoMenu}
         onClose={() => setAddOpen(false)}
+      />
+
+      <MenuNovoProdutoWizard
+        open={wizardOpen}
+        menuId={menuId}
+        menuNome={menu.nome}
+        onClose={() => setWizardOpen(false)}
       />
       {dialogPropagacao}
     </div>

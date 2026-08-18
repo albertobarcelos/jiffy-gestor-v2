@@ -33,6 +33,10 @@ interface GruposComplementosTabsModalProps {
   onClose: () => void
   onTabChange: (tab: TabKey) => void
   onReload?: () => void
+  /** Empilhar acima de outro painel (ex.: wizard do cardápio). */
+  zIndex?: number
+  /** Após criar um grupo novo — para auto-vincular ao produto no fluxo do wizard. */
+  onCreated?: (grupoId: string) => void | Promise<void>
 }
 
 export function GruposComplementosTabsModal({
@@ -40,6 +44,8 @@ export function GruposComplementosTabsModal({
   onClose,
   onTabChange,
   onReload,
+  zIndex = 1300,
+  onCreated,
 }: GruposComplementosTabsModalProps) {
   const grupoId = state.grupo?.getId()
   const ngcRef = useRef<NovoGrupoComplementoHandle>(null)
@@ -155,6 +161,7 @@ export function GruposComplementosTabsModal({
         title={title}
         scrollableBody={false}
         footerVariant="bar"
+        zIndex={zIndex}
         panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,45vw)]"
         footerActions={footerActions}
         tabsSlot={
@@ -209,7 +216,10 @@ export function GruposComplementosTabsModal({
               complementosIdsDraft={draftComplementosIds}
               onBasicDataChange={setBasicData}
               onGoToComplementosTab={goToComplementosTab}
-              onSaved={() => {
+              onSaved={async (id) => {
+                if (state.mode === 'create' && id) {
+                  await onCreated?.(id)
+                }
                 onReload?.()
                 onClose()
               }}
@@ -233,6 +243,7 @@ export function GruposComplementosTabsModal({
               onDraftLinkedIdsChange={setDraftComplementosIds}
               onClose={handleRequestClose}
               onUpdated={onReload}
+              nestedModalZIndex={zIndex + 150}
             />
           </div>
         </div>

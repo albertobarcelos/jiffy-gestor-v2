@@ -67,7 +67,7 @@ interface NovoGrupoComplementoProps {
     canSubmit: boolean
   }) => void
   onClose?: () => void
-  onSaved?: () => void
+  onSaved?: (id?: string) => void
   /** Após salvar mantendo o painel aberto (rodapé na aba Complementos) — invalida listas. */
   onReload?: () => void
   /** IDs mantidos pelo modal pai durante a criação; edição persiste vínculos na aba Complementos. */
@@ -309,6 +309,22 @@ export const NovoGrupoComplemento = forwardRef<
         throw new Error(errorData.error || 'Erro ao salvar grupo de complementos')
       }
 
+      const payload = await response.json().catch(() => ({}))
+      const idCriado = !isEditing
+        ? (() => {
+            const root = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : null
+            const nested =
+              root?.data && typeof root.data === 'object' && !Array.isArray(root.data)
+                ? (root.data as Record<string, unknown>)
+                : null
+            const candidates = [root?.id, nested?.id]
+            for (const c of candidates) {
+              if (typeof c === 'string' && c.trim() !== '') return c.trim()
+            }
+            return undefined
+          })()
+        : grupoId
+
       showToast.successLoading(
         toastId,
         isEditing ? 'Grupo de complementos atualizado com sucesso!' : 'Grupo de complementos criado com sucesso!'
@@ -321,7 +337,7 @@ export const NovoGrupoComplemento = forwardRef<
           onReload?.()
           return
         }
-        onSaved?.()
+        await Promise.resolve(onSaved?.(idCriado))
         onClose?.()
       } else {
         setTimeout(() => {
