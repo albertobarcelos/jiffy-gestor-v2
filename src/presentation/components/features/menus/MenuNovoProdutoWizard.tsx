@@ -1,61 +1,69 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Autocomplete, FormControl, InputLabel, MenuItem, Select, TextField } from '@mui/material'
+import { Autocomplete, InputAdornment, TextField } from '@mui/material'
 import {
   JiffySidePanelModal,
   type JiffySidePanelFooterActions,
 } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
-import { Input } from '@/src/presentation/components/ui/input'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
-import { sxEntradaCompactaProduto, sxEntradaCompactaProdutoSelect } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
-import { UNIDADES_MEDIDA_PRODUTO_OPCOES } from '@/src/shared/types/unidadeMedidaProduto'
+import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
 import { cn } from '@/src/shared/utils/cn'
 import type { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
+import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import {
   ComplementosMultiSelectDialog,
   type ComplementosMultiSelectHandle,
 } from '@/src/presentation/components/features/produtos/ComplementosMultiSelectDialog'
-import { MENU_SIDE_PANEL_CLASS } from './menuPanelConstants'
+import {
+  ProdutoImpressorasDialog,
+  type ProdutoImpressorasHandle,
+} from '@/src/presentation/components/features/produtos/ProdutoImpressorasDialog'
+import {
+  ProdutoMenusPanel,
+  type ProdutoMenusHandle,
+} from '@/src/presentation/components/features/produtos/ProdutoMenusPanel'
+import {
+  NovoProduto,
+  type NovoProdutoHandle,
+} from '@/src/presentation/components/features/produtos/NovoProduto'
+import {
+  NovoGrupo,
+  type NovoGrupoHandle,
+} from '@/src/presentation/components/features/grupos-produtos/NovoGrupo'
+import { MENU_WIDE_PANEL_CLASS } from './menuPanelConstants'
 
-type WizardStep = 0 | 1 | 2
+function CategoriaIconeNome({ grupo, size = 18 }: { grupo: GrupoProduto; size?: number }) {
+  const cor = grupo.getCorHex() || '#530CA3'
+  return (
+    <span className="flex min-w-0 items-center gap-2">
+      <span
+        className="flex shrink-0 items-center justify-center rounded-md border"
+        style={{
+          borderColor: cor,
+          width: size + 10,
+          height: size + 10,
+        }}
+      >
+        <DinamicIcon iconName={grupo.getIconName()} color={cor} size={size} />
+      </span>
+      <span className="truncate">{grupo.getNome()}</span>
+    </span>
+  )
+}
 
-const STEP_LABELS = ['Categoria', 'Produto', 'Complementos'] as const
+type WizardStep = 0 | 1 | 2 | 3 | 4
+
+const STEP_LABELS = ['Categoria', 'Produto', 'Complementos', 'Impressoras', 'Menus'] as const
 
 interface MenuNovoProdutoWizardProps {
   open: boolean
   menuId: string
   menuNome?: string
   onClose: () => void
-}
-
-function extrairIdDaResposta(payload: unknown): string | undefined {
-  if (!payload || typeof payload !== 'object') return undefined
-  const root = payload as Record<string, unknown>
-  const nested =
-    root.data && typeof root.data === 'object' && !Array.isArray(root.data)
-      ? (root.data as Record<string, unknown>)
-      : null
-  const candidates = [root.id, root.produtoId, nested?.id, nested?.produtoId]
-  for (const c of candidates) {
-    if (typeof c === 'string' && c.trim() !== '') return c.trim()
-  }
-  return undefined
-}
-
-function formatCurrency(value: string) {
-  const numbers = value.replace(/\D/g, '')
-  if (!numbers) return ''
-  const num = parseFloat(numbers) / 100
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(num)
 }
 
 export function MenuNovoProdutoWizard({
@@ -65,28 +73,31 @@ export function MenuNovoProdutoWizard({
   onClose,
 }: MenuNovoProdutoWizardProps) {
   const invalidate = useInvalidateTenantQueries()
+  const grupoRef = useRef<NovoGrupoHandle>(null)
+  const npRef = useRef<NovoProdutoHandle>(null)
   const compsRef = useRef<ComplementosMultiSelectHandle>(null)
+  const impressorasRef = useRef<ProdutoImpressorasHandle>(null)
+  const menusRef = useRef<ProdutoMenusHandle>(null)
 
   const [step, setStep] = useState<WizardStep>(0)
+  const [produtoInnerStep, setProdutoInnerStep] = useState<0 | 1 | 2>(0)
   const [saving, setSaving] = useState(false)
-  /** Mantém o passo 3 montado ao voltar, para não perder a seleção local. */
-  const [keepComplementos, setKeepComplementos] = useState(false)
+  const [produtoSaving, setProdutoSaving] = useState(false)
 
-  // Passo 1 — categoria
+  const [keepNovaCategoria, setKeepNovaCategoria] = useState(false)
+  const [keepProduto, setKeepProduto] = useState(false)
+  const [keepComplementos, setKeepComplementos] = useState(false)
+  const [keepImpressoras, setKeepImpressoras] = useState(false)
+  const [keepMenus, setKeepMenus] = useState(false)
+  const [skipComplementos, setSkipComplementos] = useState(false)
+  const [skipImpressoras, setSkipImpressoras] = useState(false)
+
   const [modoCategoria, setModoCategoria] = useState<'existente' | 'nova'>('existente')
   const [categoriaId, setCategoriaId] = useState<string | null>(null)
   const [categoriaNomeLabel, setCategoriaNomeLabel] = useState('')
   const [novaCategoriaNome, setNovaCategoriaNome] = useState('')
-  /** Id da categoria nova já gravada neste wizard (retry do Concluir). */
   const [categoriaNovaPersistidaId, setCategoriaNovaPersistidaId] = useState<string | null>(null)
-
-  // Passo 2 — produto
-  const [nomeProduto, setNomeProduto] = useState('')
-  const [descricaoProduto, setDescricaoProduto] = useState('')
-  const [precoVenda, setPrecoVenda] = useState('')
-  const [unidadeProduto, setUnidadeProduto] = useState<string | null>(null)
-  const [codigoEan, setCodigoEan] = useState('')
-  const [produtoId, setProdutoId] = useState<string | null>(null)
+  const [grupoCanSubmit, setGrupoCanSubmit] = useState(false)
 
   const { data: categorias = [], isLoading: loadingCategorias } = useGruposProdutos({
     limit: 500,
@@ -96,24 +107,33 @@ export function MenuNovoProdutoWizard({
 
   const resetState = useCallback(() => {
     setStep(0)
+    setProdutoInnerStep(0)
     setSaving(false)
+    setProdutoSaving(false)
+    setKeepNovaCategoria(false)
+    setKeepProduto(false)
+    setKeepComplementos(false)
+    setKeepImpressoras(false)
+    setKeepMenus(false)
+    setSkipComplementos(false)
+    setSkipImpressoras(false)
     setModoCategoria('existente')
     setCategoriaId(null)
     setCategoriaNomeLabel('')
     setNovaCategoriaNome('')
     setCategoriaNovaPersistidaId(null)
-    setNomeProduto('')
-    setDescricaoProduto('')
-    setPrecoVenda('')
-    setUnidadeProduto(null)
-    setCodigoEan('')
-    setProdutoId(null)
-    setKeepComplementos(false)
+    setGrupoCanSubmit(false)
   }, [])
 
   useEffect(() => {
     if (open) resetState()
-    else setKeepComplementos(false)
+    else {
+      setKeepNovaCategoria(false)
+      setKeepProduto(false)
+      setKeepComplementos(false)
+      setKeepImpressoras(false)
+      setKeepMenus(false)
+    }
   }, [open, resetState])
 
   const categoriasUnicas = useMemo(() => {
@@ -133,16 +153,18 @@ export function MenuNovoProdutoWizard({
     [categoriasUnicas, categoriaId]
   )
 
-  const canAdvanceCategoria =
-    modoCategoria === 'existente'
-      ? Boolean(categoriaId)
-      : novaCategoriaNome.trim().length > 0
+  const grupoProdutoIdParaProduto =
+    modoCategoria === 'existente' ? categoriaId : categoriaNovaPersistidaId
 
-  const canAdvanceProduto =
-    canAdvanceCategoria &&
-    nomeProduto.trim().length > 0 &&
-    Boolean(precoVenda) &&
-    parseFloat(precoVenda.replace(/[^\d,]/g, '').replace(',', '.')) > 0
+  const categoriaLabelProduto =
+    modoCategoria === 'existente'
+      ? categoriaNomeLabel || categoriaSelecionada?.getNome() || ''
+      : novaCategoriaNome
+
+  const canAdvanceCategoria =
+    modoCategoria === 'existente' ? Boolean(categoriaId) : grupoCanSubmit
+
+  const busy = saving || produtoSaving
 
   const invalidateMenu = useCallback(async () => {
     await invalidate(['menus'])
@@ -162,130 +184,16 @@ export function MenuNovoProdutoWizard({
       return categoriaId
     }
 
-    // Já criada nesta sessão (retry do Concluir)
-    if (categoriaNovaPersistidaId) return categoriaNovaPersistidaId
-
-    const nome = novaCategoriaNome.trim()
-    if (!nome) {
-      showToast.error('Informe o nome da categoria')
+    if (!grupoRef.current) {
+      showToast.error('Não foi possível criar a categoria')
       return null
     }
-
-    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-    if (!token) {
-      showToast.error('Token não encontrado')
-      return null
-    }
-
-    const response = await fetchGestorApi('/api/grupos-produtos', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        nome: nome.toLocaleUpperCase('pt-BR'),
-        ativo: true,
-        corHex: '#530CA3',
-        iconName: '',
-        ativoDelivery: false,
-        ativoLocal: false,
-      }),
-    })
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}))
-      throw new Error(
-        (err as { message?: string }).message || 'Erro ao criar categoria'
-      )
-    }
-
-    const payload = await response.json()
-    const id = extrairIdDaResposta(payload)
-    if (!id) throw new Error('Categoria criada, mas o id não foi retornado')
-
+    const id = await grupoRef.current.saveGrupo({ silent: true })
+    if (!id) return null
     setCategoriaNovaPersistidaId(id)
     setCategoriaId(id)
-    setCategoriaNomeLabel(nome.toLocaleUpperCase('pt-BR'))
-    await invalidate(['grupos-produtos'])
     return id
-  }, [modoCategoria, categoriaId, categoriaNovaPersistidaId, novaCategoriaNome, invalidate])
-
-  const createProduto = useCallback(
-    async (grupoId: string, gruposComplementosIds: string[]): Promise<string | null> => {
-      if (produtoId) return produtoId
-
-      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-      if (!token) {
-        showToast.error('Token não encontrado')
-        return null
-      }
-
-      const precoVendaNum = parseFloat(
-        precoVenda.replace(/[^\d,]/g, '').replace(',', '.')
-      )
-      if (!nomeProduto.trim()) {
-        showToast.error('Informe o nome do produto')
-        return null
-      }
-      if (!precoVenda || precoVendaNum <= 0) {
-        showToast.error('Informe um preço de venda válido')
-        return null
-      }
-
-      const response = await fetchGestorApi('/api/produtos', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          nome: nomeProduto.trim(),
-          descricao: descricaoProduto.trim(),
-          valor: precoVendaNum,
-          grupoId,
-          unidadeMedida: unidadeProduto,
-          codigoEan: codigoEan.trim(),
-          favorito: false,
-          abreComplementos: true,
-          permiteAcrescimo: true,
-          permiteDesconto: true,
-          permiteAlterarPreco: false,
-          incideTaxa: false,
-          gruposComplementosIds,
-          impressorasIds: [],
-          menuIds: [menuId],
-        }),
-      })
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}))
-        const idJaCriado = extrairIdDaResposta(err)
-        if (idJaCriado) {
-          setProdutoId(idJaCriado)
-          return idJaCriado
-        }
-        throw new Error(
-          (err as { message?: string }).message || 'Erro ao cadastrar produto'
-        )
-      }
-
-      const payload = await response.json()
-      const id = extrairIdDaResposta(payload)
-      if (!id) throw new Error('Produto criado, mas o id não foi retornado')
-      setProdutoId(id)
-      return id
-    },
-    [
-      produtoId,
-      precoVenda,
-      nomeProduto,
-      descricaoProduto,
-      unidadeProduto,
-      codigoEan,
-      menuId,
-    ]
-  )
+  }, [modoCategoria, categoriaId])
 
   const handleNextFromCategoria = useCallback(() => {
     if (!canAdvanceCategoria) {
@@ -296,67 +204,60 @@ export function MenuNovoProdutoWizard({
     }
     if (modoCategoria === 'existente') {
       setCategoriaNomeLabel(categoriaSelecionada?.getNome() ?? categoriaNomeLabel)
-    } else {
-      setCategoriaNomeLabel(novaCategoriaNome.trim())
     }
+    setKeepProduto(true)
     setStep(1)
   }, [
     canAdvanceCategoria,
     modoCategoria,
     categoriaSelecionada,
     categoriaNomeLabel,
-    novaCategoriaNome,
   ])
 
   const handleNextFromProduto = useCallback(() => {
-    if (!canAdvanceProduto) {
+    if (!(npRef.current?.canAdvanceCurrentPage() ?? true)) {
       showToast.error('Preencha os dados obrigatórios do produto')
+      return
+    }
+    if (produtoInnerStep < 2) {
+      npRef.current?.goNext()
       return
     }
     setKeepComplementos(true)
     setStep(2)
-  }, [canAdvanceProduto])
+  }, [produtoInnerStep])
 
-  const finishWizard = useCallback(
-    async (opts?: { skipComplementos?: boolean }) => {
-      setSaving(true)
-      const toastId = showToast.loading('Cadastrando produto no cardápio...')
-      try {
-        const grupoId = await ensureCategoria()
-        if (!grupoId) {
-          showToast.errorLoading(toastId, 'Não foi possível definir a categoria')
-          return
-        }
+  const finishWizard = useCallback(async () => {
+    setSaving(true)
+    try {
+      const grupoId = await ensureCategoria()
+      if (!grupoId) return
 
-        const ids = opts?.skipComplementos
-          ? []
-          : (compsRef.current?.getSelectedIds() ?? [])
+      const gruposComplementosIds = skipComplementos
+        ? []
+        : (compsRef.current?.getSelectedIds() ?? [])
+      const impressorasIds = skipImpressoras
+        ? []
+        : (impressorasRef.current?.getSelectedIds() ?? [])
+      const menusEscolhidos = menusRef.current?.getSelectedIds() ?? []
+      const menuIds = [...new Set([menuId, ...menusEscolhidos])]
 
-        const createdId = await createProduto(grupoId, ids)
-        if (!createdId) {
-          showToast.errorLoading(toastId, 'Não foi possível criar o produto')
-          return
-        }
+      const ok = await npRef.current?.saveFinal({
+        grupoId,
+        gruposComplementosIds,
+        impressorasIds,
+        menuIds,
+      })
+      if (!ok) return
 
-        await invalidateMenu()
-        showToast.successLoading(
-          toastId,
-          opts?.skipComplementos
-            ? 'Produto disponível no cardápio'
-            : 'Produto concluído no cardápio'
-        )
-        onClose()
-      } catch (err) {
-        showToast.errorLoading(
-          toastId,
-          err instanceof Error ? err.message : 'Erro ao finalizar cadastro'
-        )
-      } finally {
-        setSaving(false)
-      }
-    },
-    [ensureCategoria, createProduto, invalidateMenu, onClose]
-  )
+      await invalidateMenu()
+      onClose()
+    } catch (err) {
+      showToast.error(err instanceof Error ? err.message : 'Erro ao finalizar cadastro')
+    } finally {
+      setSaving(false)
+    }
+  }, [ensureCategoria, menuId, invalidateMenu, onClose, skipComplementos, skipImpressoras])
 
   const footerActions = useMemo((): JiffySidePanelFooterActions => {
     if (step === 0) {
@@ -367,15 +268,14 @@ export function MenuNovoProdutoWizard({
         onCancel: onClose,
         showNext: true,
         nextLabel: 'Continuar',
-        onNext: () => {
-          handleNextFromCategoria()
-        },
-        nextDisabled: !canAdvanceCategoria || saving,
+        onNext: handleNextFromCategoria,
+        nextDisabled: !canAdvanceCategoria || busy,
         showPrevious: false,
         barShowPrevNextIcons: true,
         barSecondaryTone: 'primaryMuted',
       }
     }
+
     if (step === 1) {
       return {
         showCancel: true,
@@ -384,40 +284,94 @@ export function MenuNovoProdutoWizard({
         onCancel: onClose,
         showPrevious: true,
         previousLabel: 'Anterior',
-        onPrevious: () => setStep(0),
-        previousDisabled: saving,
+        onPrevious: () => {
+          if (produtoInnerStep === 0) setStep(0)
+          else npRef.current?.goBack()
+        },
+        previousDisabled: busy,
         showNext: true,
         nextLabel: 'Continuar',
-        onNext: () => {
-          handleNextFromProduto()
-        },
-        nextDisabled: !canAdvanceProduto || saving,
+        onNext: handleNextFromProduto,
+        nextDisabled: busy,
         barShowPrevNextIcons: true,
         barSecondaryTone: 'primaryMuted',
       }
     }
+
+    if (step === 2) {
+      return {
+        showCancel: true,
+        cancelLabel: 'Pular',
+        cancelVariant: 'primaryTint10',
+        onCancel: () => {
+          setSkipComplementos(true)
+          setKeepImpressoras(true)
+          setStep(3)
+        },
+        cancelDisabled: busy,
+        showPrevious: true,
+        previousLabel: 'Anterior',
+        onPrevious: () => setStep(1),
+        previousDisabled: busy,
+        showNext: true,
+        nextLabel: 'Continuar',
+        onNext: () => {
+          setSkipComplementos(false)
+          setKeepImpressoras(true)
+          setStep(3)
+        },
+        nextDisabled: busy,
+        barShowPrevNextIcons: true,
+        barSecondaryTone: 'primaryMuted',
+        barActionOrder: ['prev', 'cancel', 'next'],
+      }
+    }
+
+    if (step === 3) {
+      return {
+        showCancel: true,
+        cancelLabel: 'Pular',
+        cancelVariant: 'primaryTint10',
+        onCancel: () => {
+          setSkipImpressoras(true)
+          setKeepMenus(true)
+          setStep(4)
+        },
+        cancelDisabled: busy,
+        showPrevious: true,
+        previousLabel: 'Anterior',
+        onPrevious: () => setStep(2),
+        previousDisabled: busy,
+        showNext: true,
+        nextLabel: 'Continuar',
+        onNext: () => {
+          setSkipImpressoras(false)
+          setKeepMenus(true)
+          setStep(4)
+        },
+        nextDisabled: busy,
+        barShowPrevNextIcons: true,
+        barSecondaryTone: 'primaryMuted',
+        barActionOrder: ['prev', 'cancel', 'next'],
+      }
+    }
+
     return {
-      showCancel: true,
-      cancelLabel: 'Pular',
-      cancelVariant: 'primaryTint10',
-      onCancel: () => {
-        void finishWizard({ skipComplementos: true })
-      },
-      cancelDisabled: saving,
+      showCancel: false,
       showPrevious: true,
       previousLabel: 'Anterior',
-      onPrevious: () => setStep(1),
-      previousDisabled: saving,
+      onPrevious: () => setStep(3),
+      previousDisabled: busy,
       showSave: true,
       saveLabel: 'Concluir',
       onSave: () => {
         void finishWizard()
       },
-      saveLoading: saving,
-      saveDisabled: saving,
+      saveLoading: busy,
+      saveDisabled: busy,
       barShowPrevNextIcons: true,
       barSecondaryTone: 'primaryMuted',
-      barActionOrder: ['prev', 'cancel', 'save'],
+      barActionOrder: ['prev', 'save'],
     }
   }, [
     step,
@@ -426,8 +380,8 @@ export function MenuNovoProdutoWizard({
     handleNextFromProduto,
     finishWizard,
     canAdvanceCategoria,
-    canAdvanceProduto,
-    saving,
+    busy,
+    produtoInnerStep,
   ])
 
   return (
@@ -442,11 +396,11 @@ export function MenuNovoProdutoWizard({
       }
       scrollableBody={false}
       footerVariant="bar"
-      panelClassName={MENU_SIDE_PANEL_CLASS}
+      panelClassName={MENU_WIDE_PANEL_CLASS}
       footerActions={footerActions}
     >
       <div className="relative flex min-h-0 flex-1 flex-col">
-        <div className="flex shrink-0 gap-1 border-b border-primary/20 bg-info px-2 pt-2 md:px-4">
+        <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-primary/20 bg-info px-2 pt-2 md:px-4">
           {STEP_LABELS.map((label, index) => {
             const active = step === index
             const done = step > index
@@ -454,7 +408,7 @@ export function MenuNovoProdutoWizard({
               <div
                 key={label}
                 className={cn(
-                  'flex-1 rounded-t-lg px-2 py-2 text-center text-xs font-semibold md:text-sm',
+                  'flex-1 whitespace-nowrap rounded-t-lg px-2 py-2 text-center text-[11px] font-semibold md:text-sm',
                   active && 'bg-white text-primary',
                   done && !active && 'text-primary/70',
                   !active && !done && 'text-secondary-text'
@@ -499,7 +453,8 @@ export function MenuNovoProdutoWizard({
                   type="button"
                   onClick={() => {
                     setModoCategoria('nova')
-                    setCategoriaNovaPersistidaId(null)
+                    setKeepNovaCategoria(true)
+                    setCategoriaId(null)
                   }}
                   className={cn(
                     'rounded-lg border px-3 py-1.5 text-sm font-semibold transition-colors',
@@ -529,10 +484,10 @@ export function MenuNovoProdutoWizard({
                     setCategoriaNomeLabel(grupo?.getNome() ?? '')
                   }}
                   renderOption={(props, grupo) => {
-                    const { key, ...rest } = props as typeof props & { key?: React.Key }
+                    const { key: _key, ...rest } = props
                     return (
                       <li {...rest} key={grupo.getId()}>
-                        {grupo.getNome()}
+                        <CategoriaIconeNome grupo={grupo} />
                       </li>
                     )
                   }}
@@ -545,6 +500,32 @@ export function MenuNovoProdutoWizard({
                         ...params.InputLabelProps,
                         shrink: true,
                       }}
+                      InputProps={{
+                        ...params.InputProps,
+                        startAdornment: (
+                          <>
+                            {categoriaSelecionada ? (
+                              <InputAdornment position="start" sx={{ ml: 0.5, mr: 0 }}>
+                                <span
+                                  className="flex items-center justify-center rounded-md border"
+                                  style={{
+                                    borderColor: categoriaSelecionada.getCorHex() || '#530CA3',
+                                    width: 26,
+                                    height: 26,
+                                  }}
+                                >
+                                  <DinamicIcon
+                                    iconName={categoriaSelecionada.getIconName()}
+                                    color={categoriaSelecionada.getCorHex() || '#530CA3'}
+                                    size={16}
+                                  />
+                                </span>
+                              </InputAdornment>
+                            ) : null}
+                            {params.InputProps.startAdornment}
+                          </>
+                        ),
+                      }}
                       sx={{
                         ...sxEntradaCompactaProduto,
                         '& .MuiOutlinedInput-root': { backgroundColor: '#fff' },
@@ -552,135 +533,85 @@ export function MenuNovoProdutoWizard({
                     />
                   )}
                 />
-              ) : (
-                <Input
-                  label="Nome da categoria"
-                  required
-                  size="small"
-                  value={novaCategoriaNome}
-                  onChange={e => {
-                    setNovaCategoriaNome(e.target.value.toLocaleUpperCase('pt-BR'))
-                    setCategoriaNovaPersistidaId(null)
-                  }}
-                  placeholder="Ex.: PASTÉIS"
-                  className="bg-white"
-                  sx={sxEntradaCompactaProduto}
-                  InputLabelProps={{ required: true }}
-                />
-              )}
+              ) : null}
             </div>
           ) : null}
 
-          {step === 1 ? (
-            <div className="rounded-[10px] bg-info p-2 md:p-4">
-              <div className="mb-2 flex items-center gap-5">
-                <h2 className="text-xl font-semibold text-primary">Produto</h2>
-                <div className="h-px flex-1 bg-primary/70" />
-              </div>
-              <p className="mb-4 text-sm text-secondary-text">
-                Preencha os dados do produto. Ele só será criado no cadastro e neste cardápio
-                ao concluir o passo a passo.
-                {categoriaNomeLabel || categoriaSelecionada || novaCategoriaNome
-                  ? ` Categoria: ${categoriaNomeLabel || categoriaSelecionada?.getNome() || novaCategoriaNome}.`
-                  : ''}
-              </p>
+          {modoCategoria === 'nova' || keepNovaCategoria ? (
+            <div
+              className={cn(
+                'min-h-[280px]',
+                (step !== 0 || modoCategoria !== 'nova') && 'hidden'
+              )}
+            >
+              <NovoGrupo
+                ref={grupoRef}
+                grupoId={categoriaNovaPersistidaId ?? undefined}
+                isEmbedded
+                hideEmbeddedFormActions
+                detalhesOnly
+                nestedPickerZIndex={1450}
+                onGrupoNomeChange={setNovaCategoriaNome}
+                onEmbedFormStateChange={state => setGrupoCanSubmit(state.canSubmit)}
+              />
+            </div>
+          ) : null}
 
-              <div className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-[1fr_180px]">
-                  <Input
-                    label="Nome do Produto"
-                    required
-                    size="small"
-                    value={nomeProduto}
-                    onChange={e =>
-                      setNomeProduto(e.target.value.toLocaleUpperCase('pt-BR'))
-                    }
-                    placeholder="Nome que Aparecerá no Jiffy POS"
-                    className="bg-white"
-                    sx={sxEntradaCompactaProduto}
-                    InputLabelProps={{ required: true }}
-                  />
-                  <Input
-                    label="Preço de Venda"
-                    size="small"
-                    value={precoVenda}
-                    onChange={e => setPrecoVenda(formatCurrency(e.target.value))}
-                    placeholder="R$ 0,00"
-                    className="bg-white"
-                    sx={sxEntradaCompactaProduto}
-                  />
-                </div>
-
-                <Input
-                  label="Descrição"
-                  size="small"
-                  value={descricaoProduto}
-                  onChange={e => setDescricaoProduto(e.target.value)}
-                  placeholder="Opcional"
-                  className="bg-white"
-                  sx={sxEntradaCompactaProduto}
-                />
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <FormControl
-                    fullWidth
-                    size="small"
-                    variant="outlined"
-                    sx={sxEntradaCompactaProdutoSelect}
-                  >
-                    <InputLabel id="menu-wizard-unidade-label">Unidade</InputLabel>
-                    <Select
-                      labelId="menu-wizard-unidade-label"
-                      label="Unidade"
-                      value={unidadeProduto || ''}
-                      onChange={e => setUnidadeProduto(e.target.value || null)}
-                    >
-                      <MenuItem value="">
-                        <span className="text-secondary-text">Selecione</span>
-                      </MenuItem>
-                      {UNIDADES_MEDIDA_PRODUTO_OPCOES.map(opcao => (
-                        <MenuItem key={opcao.value} value={opcao.value}>
-                          {opcao.label}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                  <Input
-                    label="Código EAN"
-                    size="small"
-                    value={codigoEan}
-                    onChange={e =>
-                      setCodigoEan(e.target.value.replace(/\D/g, '').slice(0, 14))
-                    }
-                    placeholder="Opcional"
-                    className="bg-white"
-                    sx={sxEntradaCompactaProduto}
-                  />
-                </div>
-              </div>
+          {step === 1 || keepProduto ? (
+            <div className={cn('flex h-full min-h-[320px] flex-col', step !== 1 && 'hidden')}>
+              <NovoProduto
+                ref={npRef}
+                isEmbedded
+                hideEmbeddedHeader
+                hideEmbeddedFormActions
+                defaultGrupoProdutoId={grupoProdutoIdParaProduto ?? undefined}
+                lockGrupoProduto
+                lockedGrupoLabel={categoriaLabelProduto}
+                onWizardStepChange={setProdutoInnerStep}
+                onWizardSavingChange={setProdutoSaving}
+                onSuccess={() => undefined}
+                onClose={() => undefined}
+              />
             </div>
           ) : null}
 
           {step === 2 || keepComplementos ? (
-            <div
-              className={cn(
-                'flex h-full min-h-[320px] flex-col',
-                step !== 2 && 'hidden'
-              )}
-            >
+            <div className={cn('flex h-full min-h-[320px] flex-col', step !== 2 && 'hidden')}>
               <ComplementosMultiSelectDialog
                 ref={compsRef}
                 open={open}
                 modoRascunho
-                produtoNome={nomeProduto}
                 isEmbedded
                 onClose={() => undefined}
               />
             </div>
           ) : null}
+
+          {step === 3 || keepImpressoras ? (
+            <div className={cn('flex h-full min-h-[320px] flex-col', step !== 3 && 'hidden')}>
+              <ProdutoImpressorasDialog
+                ref={impressorasRef}
+                open={open}
+                modoRascunho
+                isEmbedded
+                onClose={() => undefined}
+              />
+            </div>
+          ) : null}
+
+          {step === 4 || keepMenus ? (
+            <div className={cn('flex h-full min-h-[320px] flex-col', step !== 4 && 'hidden')}>
+              <ProdutoMenusPanel
+                ref={menusRef}
+                persistChanges={false}
+                initialMenuIds={[menuId]}
+                lockedMenuIds={[menuId]}
+              />
+            </div>
+          ) : null}
         </div>
 
-        {saving ? (
+        {busy ? (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white/40">
             <JiffyLoading />
           </div>

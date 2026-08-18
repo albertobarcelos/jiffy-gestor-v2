@@ -21,6 +21,7 @@ interface IconPickerModalProps {
   onClose: () => void
   onSelect: (iconName: string) => void
   selectedColor?: string
+  zIndex?: number
 }
 
 /**
@@ -32,6 +33,7 @@ export function IconPickerModal({
   onClose,
   onSelect,
   selectedColor = '#171A1C',
+  zIndex = 1300,
 }: IconPickerModalProps) {
   const [icons, setIcons] = useState<IconData[]>([])
   const [filteredIcons, setFilteredIcons] = useState<IconData[]>([])
@@ -39,7 +41,7 @@ export function IconPickerModal({
   const [activeTab, setActiveTab] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [groups, setGroups] = useState<string[]>([])
+  const [groups, setGroups] = useState<string[]>([])
   const loadIcons = useCallback(async () => {
     setIsLoading(true)
     setError(null)
@@ -139,6 +141,7 @@ export function IconPickerModal({
     <JiffySidePanelModal
       open={isOpen}
       onClose={onClose}
+      zIndex={zIndex}
       title="SELECIONE UM ÍCONE"
       panelClassName="w-[min(32rem,100vw)] max-w-[100vw] sm:w-[min(38rem,90rem)]"
       scrollableBody={false}

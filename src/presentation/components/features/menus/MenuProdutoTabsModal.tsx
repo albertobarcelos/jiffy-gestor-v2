@@ -7,7 +7,13 @@ import {
 } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { cn } from '@/src/shared/utils/cn'
 import type { MenuGrupoProduto, MenuProduto } from '@/src/shared/types/menus'
-import { MENU_SIDE_PANEL_CLASS } from './menuPanelConstants'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import {
+  snapshotMenuProdutoParaOutrosMenus,
+  vincularProdutoMenusComSnapshot,
+} from '@/src/application/use-cases/produtos/VincularProdutoMenusComSnapshotUseCase'
+import { MENU_WIDE_PANEL_CLASS } from './menuPanelConstants'
 import {
   MenuProdutoSnapshotForm,
   type MenuProdutoSnapshotHandle,
@@ -20,8 +26,12 @@ import {
   ComplementosMultiSelectDialog,
   type ComplementosMultiSelectHandle,
 } from '@/src/presentation/components/features/produtos/ComplementosMultiSelectDialog'
+import {
+  ProdutoMenusPanel,
+  type ProdutoMenusHandle,
+} from '@/src/presentation/components/features/produtos/ProdutoMenusPanel'
 
-export type MenuProdutoTabsKey = 'produto' | 'grupo' | 'complementos'
+export type MenuProdutoTabsKey = 'produto' | 'grupo' | 'complementos' | 'menus'
 
 export interface MenuProdutoTabsModalState {
   open: boolean
@@ -46,11 +56,17 @@ export function MenuProdutoTabsModal({
   const produtoRef = useRef<MenuProdutoSnapshotHandle>(null)
   const grupoRef = useRef<MenuGrupoSnapshotHandle>(null)
   const complementosRef = useRef<ComplementosMultiSelectHandle>(null)
+  const menusRef = useRef<ProdutoMenusHandle>(null)
+  const invalidate = useInvalidateTenantQueries()
 
   const [produtoDirty, setProdutoDirty] = useState(false)
   const [grupoDirty, setGrupoDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [embedComplementos, setEmbedComplementos] = useState({
+    isDirty: false,
+    isSaving: false,
+  })
+  const [embedMenus, setEmbedMenus] = useState({
     isDirty: false,
     isSaving: false,
   })
@@ -62,6 +78,40 @@ export function MenuProdutoTabsModal({
       )
     },
     []
+  )
+
+  const handleEmbedMenusChange = useCallback(
+    (next: { isDirty: boolean; isSaving: boolean }) => {
+      setEmbedMenus(prev =>
+        prev.isDirty === next.isDirty && prev.isSaving === next.isSaving ? prev : next
+      )
+    },
+    []
+  )
+
+  const persistMenusFromSnapshot = useCallback(
+    async (diff: { add: string[]; remove: string[] }) => {
+      const produto = state.produto
+      if (!produto) throw new Error('Produto não informado')
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+      if (!token) throw new Error('Token não encontrado')
+      const add = diff.add.filter(id => id !== menuId)
+      const remove = diff.remove.filter(id => id !== menuId)
+      await vincularProdutoMenusComSnapshot({
+        token,
+        produtoId: produto.produtoId,
+        add,
+        remove,
+        snapshot: snapshotMenuProdutoParaOutrosMenus(produto),
+      })
+      await invalidate(['produto', produto.produtoId])
+      await invalidate(['menus'])
+      await invalidate(['menu'])
+      await invalidate(['menu-produtos'])
+      await invalidate(['menu-grupos'])
+      await invalidate(['menu-produto'])
+    },
+    [state.produto, menuId, invalidate]
   )
 
   const title = useMemo(() => {
@@ -77,6 +127,7 @@ export function MenuProdutoTabsModal({
     let ok = false
     if (state.tab === 'produto') ok = (await produtoRef.current?.save()) ?? false
     else if (state.tab === 'grupo') ok = (await grupoRef.current?.save()) ?? false
+    else if (state.tab === 'menus') ok = (await menusRef.current?.save()) ?? false
     else ok = (await complementosRef.current?.save()) ?? false
     if (ok) onClose()
   }, [state.tab, onClose])
@@ -86,8 +137,15 @@ export function MenuProdutoTabsModal({
       ? produtoDirty
       : state.tab === 'grupo'
         ? grupoDirty
-        : embedComplementos.isDirty
-  const currentSaving = state.tab === 'complementos' ? embedComplementos.isSaving : saving
+        : state.tab === 'menus'
+          ? embedMenus.isDirty
+          : embedComplementos.isDirty
+  const currentSaving =
+    state.tab === 'complementos'
+      ? embedComplementos.isSaving
+      : state.tab === 'menus'
+        ? embedMenus.isSaving
+        : saving
 
   const footerActions: JiffySidePanelFooterActions = {
     showCancel: true,
@@ -113,7 +171,7 @@ export function MenuProdutoTabsModal({
       subtitle={<span className="font-normal text-secondary-text">Neste cardápio</span>}
       scrollableBody={false}
       footerVariant="bar"
-      panelClassName={MENU_SIDE_PANEL_CLASS}
+      panelClassName={MENU_WIDE_PANEL_CLASS}
       footerActions={footerActions}
       tabsSlot={
         <div className="flex flex-wrap gap-1 px-2 pb-0">
@@ -126,6 +184,7 @@ export function MenuProdutoTabsModal({
                 label: 'Complementos',
                 disabled: !complementosEnabled,
               },
+              { key: 'menus' as const, label: 'Menus', disabled: !produtoEnabled },
             ] as const
           ).map(tab => (
             <button
@@ -200,6 +259,26 @@ export function MenuProdutoTabsModal({
               onClose={onClose}
               isEmbedded
               onEmbedStateChange={handleEmbedComplementosChange}
+            />
+          </div>
+        ) : null}
+
+        {state.produto ? (
+          <div
+            className={cn(
+              'flex min-h-0 flex-1 flex-col overflow-hidden',
+              state.tab !== 'menus' && 'hidden'
+            )}
+            aria-hidden={state.tab !== 'menus'}
+          >
+            <ProdutoMenusPanel
+              ref={menusRef}
+              produtoId={state.produto.produtoId}
+              persistChanges
+              lockedMenuIds={[menuId]}
+              onPersist={persistMenusFromSnapshot}
+              onEmbedStateChange={handleEmbedMenusChange}
+              description="Marque outros cardápios para incluir este produto com os dados deste (nome, preço, categoria e complementos). Este cardápio permanece marcado. Expanda um vínculo já salvo para conferir os dados em cada menu."
             />
           </div>
         ) : null}

@@ -16,6 +16,8 @@ import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplem
 import { useIsMobile } from '@/src/presentation/hooks/useIsMobile'
 import { AddProdutosToMenuPanel } from './AddProdutosToMenuPanel'
 import { MenuNovoProdutoWizard } from './MenuNovoProdutoWizard'
+import { MenuCardapioAcoes } from './MenuCardapioAcoes'
+import { MenuCardapioEmptyState } from './MenuCardapioEmptyState'
 import { MenuProdutosFilters } from './MenuProdutosFilters'
 import {
   MenuProdutoTabsModal,
@@ -491,6 +493,8 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   }
 
   const isLoadingList = loadingGrupos || loadingProdutos
+  const cardapioVazio = !temFiltroAtivo && produtosDoMenu.length === 0
+  const mostrarAcoesCabecalho = !cardapioVazio
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -548,24 +552,12 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
             />
           </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setWizardOpen(true)}
-              className="flex h-8 items-center gap-2 rounded-lg border border-primary bg-info px-[20px] text-sm font-semibold text-primary transition-colors hover:bg-primary/10"
-            >
-              Cadastrar produto neste cardápio
-              <span className="text-lg">+</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setAddOpen(true)}
-              className="flex h-8 items-center gap-2 rounded-lg bg-primary px-[30px] text-sm font-semibold text-info transition-colors hover:bg-primary/90"
-            >
-              Adicionar produtos
-              <span className="text-lg">+</span>
-            </button>
-          </div>
+          {mostrarAcoesCabecalho ? (
+            <MenuCardapioAcoes
+              onCadastrar={() => setWizardOpen(true)}
+              onAdicionar={() => setAddOpen(true)}
+            />
+          ) : null}
         </div>
       </div>
 
@@ -598,10 +590,14 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
           renderItem={renderItem}
           expandedGroups={expandedGroups}
           isLoading={isLoadingList && catalogGroupsVisiveis.length === 0}
-          emptyLabel={
-            temFiltroAtivo
-              ? 'Nenhum produto encontrado com esses filtros.'
-              : 'Nenhum produto neste cardápio. Use “Cadastrar produto neste cardápio” ou “Adicionar produtos”.'
+          emptyLabel="Nenhum produto encontrado com esses filtros."
+          emptyContent={
+            cardapioVazio && !isLoadingList ? (
+              <MenuCardapioEmptyState
+                onCadastrar={() => setWizardOpen(true)}
+                onAdicionar={() => setAddOpen(true)}
+              />
+            ) : undefined
           }
           listAriaLabel="Produtos deste cardápio"
           showGrupoStatusSwitch={false}

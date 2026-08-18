@@ -50,20 +50,53 @@ interface GrupoCatalogoItem {
   id: string
   nome: string
   obrigatorio: boolean
+  complementos?: Complemento[]
 }
 
 /** Máximo permitido pela API (`GrupoComplementoRepository` / schema: limit ≤ 100). */
 const LISTAGEM_PAGE_SIZE = 100
 
+function unwrapGrupoPayload(payload: unknown): Record<string, unknown> | null {
+  if (!payload || typeof payload !== 'object') return null
+  const root = payload as Record<string, unknown>
+  const nested =
+    root.data && typeof root.data === 'object' && !Array.isArray(root.data)
+      ? (root.data as Record<string, unknown>)
+      : null
+  if (nested && (nested.id != null || nested.nome != null)) return nested
+  return root
+}
+
+function mapComplementosFromApi(raw: unknown): Complemento[] {
+  if (!Array.isArray(raw)) return []
+  const out: Complemento[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const rec = item as Record<string, unknown>
+    const id = rec.id != null ? String(rec.id) : ''
+    const nome = rec.nome != null ? String(rec.nome) : ''
+    if (!id || !nome) continue
+    try {
+      out.push(Complemento.fromJSON(item))
+    } catch {
+      continue
+    }
+  }
+  return out
+}
+
 /** Mesmo shape do GET produto e do GET grupo — evita duplicar lógica de parse */
 function mapApiGrupoToGrupoComplemento(grupo: any): GrupoComplementoItem {
+  const raw = unwrapGrupoPayload(grupo) ?? (grupo as Record<string, unknown>)
+  const id = raw?.id != null ? String(raw.id) : ''
+  const nome = raw?.nome != null ? String(raw.nome) : ''
   return {
-    id: grupo.id?.toString() || '',
-    nome: grupo.nome?.toString() || '',
-    complementos: (grupo.complementos || []).map((item: any) => Complemento.fromJSON(item)),
-    obrigatorio: Boolean(grupo.obrigatorio),
-    qtdMinima: typeof grupo.qtdMinima === 'number' ? grupo.qtdMinima : grupo.obrigatorio ? 1 : 0,
-    qtdMaxima: typeof grupo.qtdMaxima === 'number' && grupo.qtdMaxima > 0 ? grupo.qtdMaxima : 0,
+    id,
+    nome,
+    complementos: mapComplementosFromApi(raw?.complementos),
+    obrigatorio: Boolean(raw?.obrigatorio),
+    qtdMinima: typeof raw?.qtdMinima === 'number' ? raw.qtdMinima : raw?.obrigatorio ? 1 : 0,
+    qtdMaxima: typeof raw?.qtdMaxima === 'number' && raw.qtdMaxima > 0 ? raw.qtdMaxima : 0,
   }
 }
 
@@ -243,7 +276,9 @@ export const ComplementosMultiSelectDialog = forwardRef<
   const [isLoadingSelectableGroups, setIsLoadingSelectableGroups] = useState(false)
   const [catalogSearch, setCatalogSearch] = useState('')
   /** Filtro da lista: neste produto / disponíveis / todos. */
-  const [filterTab, setFilterTab] = useState<'vinculados' | 'disponiveis' | 'todos'>('vinculados')
+  const [filterTab, setFilterTab] = useState<'vinculados' | 'disponiveis' | 'todos'>(
+    rascunho ? 'todos' : 'vinculados'
+  )
   /** IDs de grupos com a lista de complementos expandida na UI */
   const [expandedGrupoIds, setExpandedGrupoIds] = useState<Set<string>>(() => new Set())
   /** Complementos carregados sob demanda (grupos ainda não vinculados ao produto) */
@@ -386,12 +421,20 @@ export const ComplementosMultiSelectDialog = forwardRef<
         const data = await response.json()
         const items = data.items || []
         const mapped = items
-          .map((item: any) => ({
-            id: item.id?.toString() || '',
-            nome: item.nome?.toString() || 'Grupo',
-            obrigatorio: Boolean(item.obrigatorio),
-          }))
-          .filter((item: GrupoCatalogoItem) => Boolean(item.id))
+          .map((item: any) => {
+            const id = item.id?.toString() || ''
+            if (!id) return null
+            const complementos = Array.isArray(item.complementos)
+              ? mapComplementosFromApi(item.complementos)
+              : undefined
+            return {
+              id,
+              nome: item.nome?.toString() || 'Grupo',
+              obrigatorio: Boolean(item.obrigatorio),
+              ...(complementos ? { complementos } : {}),
+            } satisfies GrupoCatalogoItem
+          })
+          .filter((item: GrupoCatalogoItem | null): item is GrupoCatalogoItem => Boolean(item))
 
         collected.push(...mapped)
 
@@ -408,6 +451,15 @@ export const ComplementosMultiSelectDialog = forwardRef<
       }
 
       setAllSelectableGroups(collected)
+      const cacheFromList: Record<string, Complemento[]> = {}
+      for (const grupo of collected) {
+        if (grupo.complementos) {
+          cacheFromList[grupo.id] = grupo.complementos
+        }
+      }
+      if (Object.keys(cacheFromList).length > 0) {
+        setDetalhesComplementosCache(prev => ({ ...cacheFromList, ...prev }))
+      }
     } catch (err) {
       if (signal?.aborted || (err instanceof DOMException && err.name === 'AbortError')) {
         return
@@ -456,7 +508,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
       setAbrindoGrupoComplementosId(null)
       sessionCatalogOrderRef.current = null
       setSessionOrderTick(0)
-      setFilterTab('vinculados')
+      setFilterTab(rascunho ? 'todos' : 'vinculados')
       setCatalogSearch('')
       baselineGruposIdsRef.current = []
       isDirtyRef.current = false
@@ -486,6 +538,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
           id: g.id,
           nome: g.nome,
           obrigatorio: g.obrigatorio,
+          complementos: g.complementos,
         })
       }
     }
@@ -528,20 +581,24 @@ export const ComplementosMultiSelectDialog = forwardRef<
     async (grupoId: string): Promise<GrupoComplementoItem | null> => {
       const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) return null
-      try {
-        const response = await fetchGestorApi(`/api/grupos-complementos/${grupoId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          cache: 'no-store',
-        })
-        if (!response.ok) return null
-        const data = await response.json()
-        return mapApiGrupoToGrupoComplemento(data)
-      } catch {
-        return null
+      const response = await fetchGestorApi(`/api/grupos-complementos/${grupoId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        cache: 'no-store',
+      })
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(
+          errorData.error ||
+            errorData.message ||
+            'Erro ao carregar complementos do grupo'
+        )
       }
+      const data = await response.json()
+      const mapped = mapApiGrupoToGrupoComplemento(data)
+      return mapped.id ? mapped : null
     },
     []
   )
@@ -557,11 +614,12 @@ export const ComplementosMultiSelectDialog = forwardRef<
       try {
         const grupo = await fetchGrupoComplementoPorId(grupoId)
         if (!grupo?.id) {
-          throw new Error('Erro ao carregar complementos do grupo')
+          showToast.error('Erro ao carregar complementos do grupo')
+          setDetalhesComplementosCache(prev => ({ ...prev, [grupoId]: [] }))
+          return
         }
         setDetalhesComplementosCache(prev => ({ ...prev, [grupoId]: grupo.complementos }))
       } catch (err) {
-        console.error(err)
         showToast.error(
           err instanceof Error ? err.message : 'Erro ao carregar complementos do grupo.'
         )
@@ -591,12 +649,15 @@ export const ComplementosMultiSelectDialog = forwardRef<
       const vinculado = groups.find(g => g.id === grupoId)
       if ((vinculado?.complementos?.length ?? 0) > 0) continue
       if (Object.hasOwn(detalhesComplementosCache, grupoId)) continue
+      const doCatalogo = allSelectableGroups.find(g => g.id === grupoId)?.complementos
+      if (doCatalogo) continue
       if (loadingDetalheGrupoId === grupoId) continue
       void carregarComplementosDoGrupo(grupoId)
     }
   }, [
     expandedGrupoIds,
     groups,
+    allSelectableGroups,
     detalhesComplementosCache,
     loadingDetalheGrupoId,
     carregarComplementosDoGrupo,
@@ -1144,14 +1205,32 @@ export const ComplementosMultiSelectDialog = forwardRef<
   const handleGrupoCreated = useCallback(
     async (grupoId: string) => {
       if (rascunho) {
-        const grupoMapeado = await fetchGrupoComplementoPorId(grupoId)
-        if (grupoMapeado) {
-          setGroups(prev => (prev.some(g => g.id === grupoId) ? prev : [...prev, grupoMapeado]))
-          setDetalhesComplementosCache(prev => ({
-            ...prev,
-            [grupoId]: grupoMapeado.complementos,
-          }))
-        } else {
+        try {
+          const grupoMapeado = await fetchGrupoComplementoPorId(grupoId)
+          if (grupoMapeado) {
+            setGroups(prev => (prev.some(g => g.id === grupoId) ? prev : [...prev, grupoMapeado]))
+            setDetalhesComplementosCache(prev => ({
+              ...prev,
+              [grupoId]: grupoMapeado.complementos,
+            }))
+          } else {
+            setGroups(prev =>
+              prev.some(g => g.id === grupoId)
+                ? prev
+                : [
+                    ...prev,
+                    {
+                      id: grupoId,
+                      nome: 'Grupo',
+                      complementos: [],
+                      obrigatorio: false,
+                      qtdMinima: 0,
+                      qtdMaxima: 0,
+                    },
+                  ]
+            )
+          }
+        } catch {
           setGroups(prev =>
             prev.some(g => g.id === grupoId)
               ? prev
@@ -1309,18 +1388,19 @@ export const ComplementosMultiSelectDialog = forwardRef<
                   const complementosLista =
                     (grupoVinculado?.complementos?.length
                       ? grupoVinculado.complementos
-                      : detalhesComplementosCache[grupo.id]) ?? []
+                      : detalhesComplementosCache[grupo.id] ?? grupo.complementos) ?? []
                   const complementosOrdenados = ordenarComplementosParaExibicao(complementosLista)
                   const qtdComplementosConhecida =
                     (grupoVinculado?.complementos?.length ?? 0) > 0
                       ? grupoVinculado!.complementos.length
-                      : grupo.id in detalhesComplementosCache
+                      : grupo.id in detalhesComplementosCache || grupo.complementos
                         ? complementosOrdenados.length
                         : null
                   const mostrarLoadingDetalhe =
                     expandido &&
                     loadingDetalheGrupoId === grupo.id &&
                     !(grupo.id in detalhesComplementosCache) &&
+                    !grupo.complementos &&
                     !(grupoVinculado?.complementos?.length)
 
                   return (

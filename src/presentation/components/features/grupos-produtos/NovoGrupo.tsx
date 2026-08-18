@@ -76,6 +76,10 @@ interface NovoGrupoProps {
   onSaved?: () => void
   /** Após salvar mantendo o painel aberto (ex.: aba Produtos vinculados) — invalida listas sem fechar. */
   onReload?: () => void
+  /** Só a ficha da categoria (esconde a aba Produtos vinculados). */
+  detalhesOnly?: boolean
+  /** Empilha os pickers de ícone/cor acima de outro painel. */
+  nestedPickerZIndex?: number
   initialTab?: number // 0 = Detalhes do Grupo, 1 = Produtos Vinculados
 }
 
@@ -84,7 +88,7 @@ export interface NovoGrupoHandle {
   /** Há alterações em relação ao último baseline (carregamento ou salvamento). */
   isDirty: () => boolean
   /** Persiste o grupo sem depender do `<form>` (rodapé na aba Produtos vinculados). */
-  saveGrupo: () => Promise<void>
+  saveGrupo: (opts?: { silent?: boolean }) => Promise<string | null>
   /** Salva e fecha o painel (mesmo fluxo do submit do formulário em modo embed). */
   saveGrupoAndClose: () => Promise<void>
 }
@@ -109,6 +113,20 @@ function GrupoDetalhesFormShell({
   return <>{children}</>
 }
 
+function extrairIdGrupoDaResposta(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== 'object') return undefined
+  const root = payload as Record<string, unknown>
+  const nested =
+    root.data && typeof root.data === 'object' && !Array.isArray(root.data)
+      ? (root.data as Record<string, unknown>)
+      : null
+  const candidates = [root.id, nested?.id]
+  for (const c of candidates) {
+    if (typeof c === 'string' && c.trim() !== '') return c.trim()
+  }
+  return undefined
+}
+
 /**
  * Componente para criar/editar grupo de produtos
  * Replica o design e lógica do Flutter NovoGrupoTabbedWidget
@@ -119,13 +137,14 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
     initialGrupo,
     isEmbedded = false,
     embeddedFormId,
-    hideEmbeddedFormActions,
     onGrupoNomeChange,
     onEmbedFormStateChange,
     onEmbeddedTabChange,
     onClose,
     onSaved,
     onReload,
+    detalhesOnly = false,
+    nestedPickerZIndex = 1300,
     initialTab = 0,
   },
   ref
@@ -134,7 +153,9 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
   const searchParams = useSearchParams()
   const invalidate = useInvalidateTenantQueries()
 
-  const effectiveGrupoId = grupoId || searchParams.get('id') || null
+  const effectiveGrupoId = isEmbedded
+    ? grupoId ?? null
+    : grupoId || searchParams.get('id') || null
   const seedMatches =
     !!initialGrupo && !!effectiveGrupoId && initialGrupo.getId() === effectiveGrupoId
 
@@ -154,7 +175,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
   )
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(false)
-  const [activeTab, setActiveTab] = useState(initialTab)
+  const [activeTab, setActiveTab] = useState(detalhesOnly ? 0 : initialTab)
   const [isIconPickerOpen, setIsIconPickerOpen] = useState(false)
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false)
 
@@ -166,9 +187,6 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
   }, [nome, onGrupoNomeChange])
 
   const isEditMode = !!effectiveGrupoId
-
-  /** Cabeçalho próprio só fora do painel padronizado (ou embed sem delegar ao modal) */
-  const showPageHeader = !(isEmbedded && hideEmbeddedFormActions)
 
   const emitEmbedFormState = useCallback(() => {
     onEmbedFormStateChange?.({
@@ -184,6 +202,10 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
   useEffect(() => {
     onEmbeddedTabChange?.(activeTab)
   }, [activeTab, onEmbeddedTabChange])
+
+  useEffect(() => {
+    if (detalhesOnly) setActiveTab(0)
+  }, [detalhesOnly])
 
   const normalizeColor = useCallback((value: string) => {
     if (!value) return '#CCCCCC'
@@ -327,16 +349,24 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
   }, [isEditMode, effectiveGrupoId, normalizeColor, isEmbedded, initialGrupo])
 
   const handleSave = useCallback(
-    async (opts?: { keepModalOpen?: boolean }) => {
+    async (opts?: { keepModalOpen?: boolean; silent?: boolean }): Promise<string | null> => {
       if (!nome.trim()) {
-        alert('Nome da categoria é obrigatório')
-        return
+        if (opts?.silent) {
+          showToast.error('Nome da categoria é obrigatório')
+        } else {
+          alert('Nome da categoria é obrigatório')
+        }
+        return null
       }
 
       const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
-        alert('Token não encontrado')
-        return
+        if (opts?.silent) {
+          showToast.error('Token não encontrado')
+        } else {
+          alert('Token não encontrado')
+        }
+        return null
       }
 
       setIsLoading(true)
@@ -347,23 +377,14 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
           : '/api/grupos-produtos'
         const method = isEditMode ? 'PATCH' : 'POST'
 
-        const body = isEditMode
-          ? {
-              nome,
-              ativo,
-              corHex,
-              iconName,
-              ativoDelivery,
-              ativoLocal,
-            }
-          : {
-              nome,
-              ativo,
-              corHex,
-              iconName,
-              ativoDelivery,
-              ativoLocal,
-            }
+        const body = {
+          nome,
+          ativo,
+          corHex,
+          iconName,
+          ativoDelivery,
+          ativoLocal,
+        }
 
         const response = await fetchGestorApi(url, {
           method,
@@ -379,7 +400,11 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
           throw new Error(error.message || 'Erro ao salvar categoria')
         }
 
-        // Sucesso — invalidação com escopo tenant (MULTI-TENANT-JIFFY-DOC-OFICIAL)
+        const payload = await response.json().catch(() => ({}))
+        const idSalvo = isEditMode
+          ? effectiveGrupoId
+          : extrairIdGrupoDaResposta(payload) ?? null
+
         const invalidateListas = async () => {
           await invalidate(['grupos-produtos'])
           await invalidate(['produtos', 'infinite'])
@@ -390,19 +415,29 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
           commitBaselineLatestRef.current()
           if (opts?.keepModalOpen) {
             onReload?.()
-            showToast.success('Categoria salva com sucesso.')
-            return
+            if (!opts.silent) {
+              showToast.success('Categoria salva com sucesso.')
+            }
+            return idSalvo
           }
           onSaved?.()
           onClose?.()
+          return idSalvo
         } else {
           await invalidateListas()
           router.push('/grupos-produtos')
           router.refresh()
+          return idSalvo
         }
       } catch (error: any) {
         console.error('Erro ao salvar grupo:', error)
-        alert(error.message || 'Erro ao salvar categoria')
+        const message = error.message || 'Erro ao salvar categoria'
+        if (opts?.silent) {
+          showToast.error(message)
+        } else {
+          alert(message)
+        }
+        return null
       } finally {
         setIsLoading(false)
       }
@@ -432,8 +467,11 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
         if (isLoadingData) return false
         return getFormSnapshot() !== baselineSerializedRef.current
       },
-      saveGrupo: () => handleSave({ keepModalOpen: true }),
-      saveGrupoAndClose: () => handleSave(),
+      saveGrupo: (opts?: { silent?: boolean }) =>
+        handleSave({ keepModalOpen: true, silent: opts?.silent }),
+      saveGrupoAndClose: async () => {
+        await handleSave()
+      },
     }),
     [getFormSnapshot, isLoadingData, handleSave]
   )
@@ -482,6 +520,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
         )}
       >
         {/* Abas — mesmo modelo do `GruposComplementosTabsModal` (faixa cinza + pílulas) */}
+        {!detalhesOnly ? (
         <div className="shrink-0 w-full border-b border-gray-200 bg-info px-6">
           <div className="flex flex-wrap gap-1">
             <button
@@ -510,6 +549,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
             </button>
           </div>
         </div>
+        ) : null}
 
         {/* Conteúdo das tabs */}
         <div className="flex min-h-0 flex-1 flex-col px-6 overflow-hidden">
@@ -726,7 +766,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
             </div>
           )}
 
-          {activeTab === 1 && (
+          {activeTab === 1 && !detalhesOnly && (
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden py-6">
               {isEditMode && effectiveGrupoId ? (
                 <ProdutosPorGrupoList grupoProdutoId={effectiveGrupoId} />
@@ -751,11 +791,13 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
           setIsIconPickerOpen(false)
         }}
         selectedColor={corHex}
+        zIndex={nestedPickerZIndex}
       />
       <ColorPickerModal
         open={isColorPickerOpen}
         onClose={() => setIsColorPickerOpen(false)}
         onSelect={handleColorSelect}
+        zIndex={nestedPickerZIndex}
       />
     </div>
   )

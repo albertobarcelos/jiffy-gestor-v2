@@ -47,6 +47,7 @@ export function useAtualizarProdutoMenus(produtoId: string | undefined) {
         await invalidate(['menu'])
         await invalidate(['menu-produtos'])
         await invalidate(['menu-grupos'])
+        await invalidate(['menu-produto'])
       },
     }
   )

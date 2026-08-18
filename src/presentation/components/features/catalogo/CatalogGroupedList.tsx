@@ -12,6 +12,8 @@ export interface CatalogGroupedListProps<T> {
   expandedGroups: Record<string, boolean>
   isLoading?: boolean
   emptyLabel?: string
+  /** Substitui `emptyLabel` quando a lista está vazia. */
+  emptyContent?: ReactNode
   listAriaLabel?: string
   showGrupoStatusSwitch?: boolean
   addProdutoLabel?: string
@@ -28,6 +30,7 @@ export function CatalogGroupedList<T>({
   expandedGroups,
   isLoading = false,
   emptyLabel = 'Nenhum produto encontrado.',
+  emptyContent,
   listAriaLabel = 'Lista de produtos',
   showGrupoStatusSwitch = true,
   addProdutoLabel,
@@ -45,6 +48,7 @@ export function CatalogGroupedList<T>({
   }
 
   if (!isLoading && groups.length === 0) {
+    if (emptyContent) return emptyContent
     return (
       <div className="flex items-center justify-center py-12">
         <p className="text-secondary-text">{emptyLabel}</p>

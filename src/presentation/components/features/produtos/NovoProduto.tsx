@@ -335,6 +335,13 @@ function montarPatchParcialEdicaoProduto(
   return delta
 }
 
+export type NovoProdutoSaveOverrides = {
+  grupoId?: string
+  gruposComplementosIds?: string[]
+  impressorasIds?: string[]
+  menuIds?: string[]
+}
+
 /** API imperativa para o rodapé do `JiffySidePanelModal` (wizard 3 passos). */
 export interface NovoProdutoHandle {
   goNext: () => void
@@ -342,9 +349,11 @@ export interface NovoProdutoHandle {
   /** Mesmo fluxo que “Salvar e fechar” nos passos 1–2 */
   savePartialAndClose: () => Promise<boolean>
   /** Salvar completo (passo fiscal ou cadastro inteiro) */
-  saveFinal: () => Promise<boolean>
+  saveFinal: (overrides?: NovoProdutoSaveOverrides) => Promise<boolean>
   /** Há alterações em relação ao último baseline (carregamento ou salvamento). */
   isDirty: () => boolean
+  /** Valida o passo interno atual sem persistir (wizard do cardápio). */
+  canAdvanceCurrentPage: () => boolean
 }
 
 export interface NovoProdutoProps {
@@ -369,6 +378,9 @@ export interface NovoProdutoProps {
    * (em vez de só o menu principal).
    */
   menuIds?: string[]
+  /** Trava a categoria (definida no passo anterior do wizard do cardápio). */
+  lockGrupoProduto?: boolean
+  lockedGrupoLabel?: string
   onWizardStepChange?: (step: 0 | 1 | 2) => void
   onWizardSavingChange?: (saving: boolean) => void
   /** Passo 2 com fiscal indisponível: só “Voltar” no fluxo interno */
@@ -392,6 +404,8 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       hideEmbeddedHeader = false,
       hideEmbeddedFormActions = false,
       menuIds,
+      lockGrupoProduto = false,
+      lockedGrupoLabel,
       onWizardStepChange,
       onWizardSavingChange,
       onFiscalUnavailableChange,
@@ -570,12 +584,6 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       if (defaultGrupoProdutoId && defaultGrupoProdutoId !== grupoProduto) {
         setGrupoProduto(defaultGrupoProdutoId)
       }
-      // Resetar campos fiscais para valores padrão na criação
-      setNcm('')
-      setCest('')
-      setOrigemMercadoria('0') // Padrão na criação
-      setTipoProduto('00') // Padrão na criação
-      setIndicadorProducaoEscala(null)
     }, [defaultGrupoProdutoId, effectiveProdutoId, effectiveIsCopyMode, grupoProduto])
 
     // Baseline inicial em modo criação (após grupo opcional do contexto)
@@ -1303,15 +1311,21 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       setShowDiscardDialog(true)
     }
 
-    const handleSave = async (opcoes?: { salvarSomenteDadosGerais?: boolean }) => {
+    const handleSave = async (
+      opcoes?: { salvarSomenteDadosGerais?: boolean } & NovoProdutoSaveOverrides
+    ) => {
       const salvarSomenteDadosGerais = opcoes?.salvarSomenteDadosGerais === true
+      const grupoIdFinal = opcoes?.grupoId ?? grupoProduto
+      const gruposComplementosIdsFinal = opcoes?.gruposComplementosIds ?? grupoComplementosIds
+      const impressorasIdsFinal = opcoes?.impressorasIds ?? impressorasIds
+      const menuIdsFinal = opcoes?.menuIds ?? menuIds
 
       if (salvarSomenteDadosGerais) {
         if (!nomeProduto?.trim()) {
           showToast.error('Informe o nome do produto.')
           return false
         }
-        if (!grupoProduto) {
+        if (!grupoIdFinal) {
           showToast.error('Selecione a categoria do produto.')
           return false
         }
@@ -1325,6 +1339,14 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       const precoVendaNum = parseFloat(precoVenda.replace(/[^\d,]/g, '').replace(',', '.'))
       if (!precoVenda || precoVendaNum === 0) {
         showToast.error('O campo "Preço de Venda" não pode ser vazio ou zero.')
+        return false
+      }
+      if (!nomeProduto?.trim()) {
+        showToast.error('Informe o nome do produto.')
+        return false
+      }
+      if (!grupoIdFinal) {
+        showToast.error('Selecione a categoria do produto.')
         return false
       }
 
@@ -1423,7 +1445,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           nome: nomeProduto,
           descricao: descricaoProduto,
           valor: precoVendaNum,
-          grupoId: grupoProduto,
+          grupoId: grupoIdFinal,
           unidadeMedida: unidadeProduto,
           codigoEan: codigoEanBarras.trim(),
           favorito,
@@ -1432,11 +1454,11 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           permiteDesconto,
           permiteAlterarPreco,
           incideTaxa,
-          gruposComplementosIds: grupoComplementosIds,
-          impressorasIds,
+          gruposComplementosIds: gruposComplementosIdsFinal,
+          impressorasIds: impressorasIdsFinal,
           ...(ncmCompatBody ? { ncm: ncmCompatBody } : {}),
           ...(idPersistidoParaSave ? { ativo } : {}),
-          ...(!isEditMode && menuIds && menuIds.length > 0 ? { menuIds } : {}),
+          ...(!isEditMode && menuIdsFinal && menuIdsFinal.length > 0 ? { menuIds: menuIdsFinal } : {}),
         }
 
         if (fiscalDeveSerEnviado(fiscalData)) {
@@ -1638,14 +1660,32 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           })
         },
         savePartialAndClose: () => handleSaveRef.current({ salvarSomenteDadosGerais: true }),
-        saveFinal: () => handleSaveRef.current(),
+        saveFinal: overrides => handleSaveRef.current(overrides),
         isDirty: () => {
           if (isLoadingProduto) return false
           if (baselineSerializedRef.current === null) return false
           return getFormSnapshot() !== baselineSerializedRef.current
         },
+        canAdvanceCurrentPage: () => {
+          const precoNum = parseFloat(
+            precoVenda.replace(/[^\d,]/g, '').replace(',', '.')
+          )
+          if (!nomeProduto?.trim()) return false
+          if (!precoVenda || precoNum <= 0) return false
+          if (!unidadeProduto) return false
+          if (!lockGrupoProduto && !grupoProduto) return false
+          return true
+        },
       }),
-      [getFormSnapshot, isLoadingProduto]
+      [
+        getFormSnapshot,
+        isLoadingProduto,
+        nomeProduto,
+        precoVenda,
+        unidadeProduto,
+        grupoProduto,
+        lockGrupoProduto,
+      ]
     )
 
     useEffect(() => {
@@ -1806,6 +1846,8 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
               onUnidadeProdutoChange={setUnidadeProduto}
               grupoProduto={grupoProduto}
               onGrupoProdutoChange={setGrupoProduto}
+              lockGrupoProduto={lockGrupoProduto}
+              lockedGrupoLabel={lockedGrupoLabel}
               codigoEanBarras={codigoEanBarras}
               onCodigoEanBarrasChange={setCodigoEanBarras}
               grupos={grupos}
