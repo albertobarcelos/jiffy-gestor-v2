@@ -356,7 +356,7 @@ export const ProdutoMenuVinculoForm = forwardRef<
   }
 
   return (
-    <div className="relative border-t border-gray-200/80 py-1">
+    <div className="relative border-t border-gray-200/80 py-1 overflow-x-hidden">
       {saving ? (
         <div className="absolute right-2 top-1 z-10 text-[10px] text-secondary-text">Salvando…</div>
       ) : null}

@@ -54,6 +54,8 @@ interface ProdutoMenusPanelProps {
   onSelectionChange?: (ids: string[]) => void
   onEmbedStateChange?: (state: ProdutoMenusEmbedState) => void
   description?: string
+  /** Painel embutido em modal lateral (altura fixa, scroll só quando necessário). */
+  isEmbedded?: boolean
 }
 
 function sameIdSet(a: readonly string[], b: readonly string[]): boolean {
@@ -92,6 +94,7 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
       onSelectionChange,
       onEmbedStateChange,
       description,
+      isEmbedded = false,
     },
     ref
   ) {
@@ -359,16 +362,22 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
     }
 
     return (
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <p className="shrink-0 px-4 pt-3 text-xs text-secondary-text">
-          {description
-            ? description
-            : persistChanges
-              ? 'Marque os cardápios em que este produto deve aparecer. Expanda um vínculo já salvo para editar nome, preço, categoria e complementos naquele cardápio. Ao salvar, você pode copiar as alterações para outros menus.'
-              : lockedSet.size > 0
-                ? 'Este cardápio já entra. Marque outros se quiser o produto em mais menus.'
-                : 'Marque os cardápios em que este produto deve aparecer ao salvar. Se nenhum for marcado, o produto entra no menu principal.'}
-        </p>
+      <>
+        <div
+          className={cn(
+            'flex min-h-0 flex-col overflow-hidden',
+            isEmbedded ? 'h-full flex-1' : 'flex-1'
+          )}
+        >
+          <p className="shrink-0 px-4 pt-3 text-xs text-secondary-text">
+            {description
+              ? description
+              : persistChanges
+                ? 'Marque os cardápios em que este produto deve aparecer. Expanda um vínculo já salvo para editar nome, preço, categoria e complementos naquele cardápio. Ao salvar, você pode copiar as alterações para outros menus.'
+                : lockedSet.size > 0
+                  ? 'Este cardápio já entra. Marque outros se quiser o produto em mais menus.'
+                  : 'Marque os cardápios em que este produto deve aparecer ao salvar. Se nenhum for marcado, o produto entra no menu principal.'}
+          </p>
         <div className="shrink-0 px-4 py-3">
           <div className="relative">
             <MdSearch
@@ -384,7 +393,14 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
             />
           </div>
         </div>
-        <ul className="min-h-0 flex-1 overflow-y-auto">
+        <ul
+          className={cn(
+            'min-h-0 overflow-x-hidden',
+            isEmbedded
+              ? 'flex-1 overflow-y-auto overscroll-y-contain scrollbar-hide'
+              : 'flex-1 overflow-y-auto'
+          )}
+        >
           {filteredMenus.length === 0 ? (
             <li className="px-4 py-6 text-center text-sm text-secondary-text">
               Nenhum menu encontrado.
@@ -486,8 +502,9 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
             })
           )}
         </ul>
+        </div>
         {dialogPropagacao}
-      </div>
+      </>
     )
   }
 )

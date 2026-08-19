@@ -17,6 +17,7 @@ import {
 import { ProdutoMenusPanel, type ProdutoMenusHandle } from './ProdutoMenusPanel'
 import { NovoGrupo, type NovoGrupoHandle } from '../grupos-produtos/NovoGrupo'
 import { GRUPO_PRODUTOS_MODAL_FORM_ID } from '../grupos-produtos/grupoProdutosModalConstants'
+import { MENU_WIDE_PANEL_CLASS } from '@/src/presentation/components/features/menus/menuPanelConstants'
 import { cn } from '@/src/shared/utils/cn'
 
 export type ProdutosTabsTabKey = 'produto' | 'complementos' | 'impressoras' | 'menus' | 'grupo'
@@ -528,7 +529,7 @@ export function ProdutosTabsModal({
         subtitle={subtitle}
         scrollableBody={false}
         footerVariant="bar"
-        panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,45vw)]"
+        panelClassName={MENU_WIDE_PANEL_CLASS}
         footerActions={footerActions}
         tabsSlot={
           <div className="flex flex-wrap gap-1 px-2 pb-0">
@@ -668,6 +669,7 @@ export function ProdutosTabsModal({
                 ref={menusRef}
                 produtoId={state.mode === 'edit' ? produtoId : undefined}
                 persistChanges={state.mode === 'edit'}
+                isEmbedded
                 initialMenusResumo={state.mode === 'edit' ? state.produto?.getMenus() : undefined}
                 initialMenuIds={isDraftProduto ? draftMenuIds : undefined}
                 onSelectionChange={isDraftProduto ? setDraftMenuIds : undefined}

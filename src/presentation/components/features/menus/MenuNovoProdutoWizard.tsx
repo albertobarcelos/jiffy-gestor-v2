@@ -604,6 +604,7 @@ export function MenuNovoProdutoWizard({
               <ProdutoMenusPanel
                 ref={menusRef}
                 persistChanges={false}
+                isEmbedded
                 initialMenuIds={[menuId]}
                 lockedMenuIds={[menuId]}
               />

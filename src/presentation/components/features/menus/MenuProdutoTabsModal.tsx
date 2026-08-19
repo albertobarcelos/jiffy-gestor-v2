@@ -204,11 +204,11 @@ export function MenuProdutoTabsModal({
         </div>
       }
     >
-      <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex h-full min-h-0 flex-1 flex-col">
         {state.produto ? (
           <div
             className={cn(
-              'flex min-h-0 flex-1 flex-col overflow-hidden',
+              'flex h-full min-h-0 flex-1 flex-col overflow-hidden',
               state.tab !== 'produto' && 'hidden'
             )}
             aria-hidden={state.tab !== 'produto'}
@@ -226,7 +226,7 @@ export function MenuProdutoTabsModal({
         {state.grupo ? (
           <div
             className={cn(
-              'flex min-h-0 flex-1 flex-col overflow-hidden',
+              'flex h-full min-h-0 flex-1 flex-col overflow-hidden',
               state.tab !== 'grupo' && 'hidden'
             )}
             aria-hidden={state.tab !== 'grupo'}
@@ -244,7 +244,7 @@ export function MenuProdutoTabsModal({
         {state.produto ? (
           <div
             className={cn(
-              'flex min-h-0 flex-1 flex-col overflow-hidden',
+              'flex h-full min-h-0 flex-1 flex-col overflow-hidden',
               state.tab !== 'complementos' && 'hidden'
             )}
             aria-hidden={state.tab !== 'complementos'}
@@ -266,7 +266,7 @@ export function MenuProdutoTabsModal({
         {state.produto ? (
           <div
             className={cn(
-              'flex min-h-0 flex-1 flex-col overflow-hidden',
+              'flex h-full min-h-0 flex-1 flex-col overflow-hidden',
               state.tab !== 'menus' && 'hidden'
             )}
             aria-hidden={state.tab !== 'menus'}
@@ -275,6 +275,7 @@ export function MenuProdutoTabsModal({
               ref={menusRef}
               produtoId={state.produto.produtoId}
               persistChanges
+              isEmbedded
               lockedMenuIds={[menuId]}
               onPersist={persistMenusFromSnapshot}
               onEmbedStateChange={handleEmbedMenusChange}
