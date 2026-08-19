@@ -5,6 +5,8 @@ export type SnapshotProdutoPropagavel = {
   valor?: number
   ativo?: boolean
   favorito?: boolean
+  grupoProdutoId?: string
+  gruposComplementosIds?: string[]
 }
 
 export type OrigemAlteracaoProduto = 'cadastroBase' | 'menu'
@@ -35,6 +37,17 @@ export function snapshotPropagavelDePatch(
   }
   if (typeof patch.ativo === 'boolean') out.ativo = patch.ativo
   if (typeof patch.favorito === 'boolean') out.favorito = patch.favorito
+  if (typeof patch.grupoId === 'string' && patch.grupoId.trim() !== '') {
+    out.grupoProdutoId = patch.grupoId.trim()
+  }
+  if (typeof patch.grupoProdutoId === 'string' && patch.grupoProdutoId.trim() !== '') {
+    out.grupoProdutoId = patch.grupoProdutoId.trim()
+  }
+  if (Array.isArray(patch.gruposComplementosIds)) {
+    out.gruposComplementosIds = patch.gruposComplementosIds.filter(
+      (id): id is string => typeof id === 'string' && Boolean(id)
+    )
+  }
   return Object.keys(out).length > 0 ? out : null
 }
 

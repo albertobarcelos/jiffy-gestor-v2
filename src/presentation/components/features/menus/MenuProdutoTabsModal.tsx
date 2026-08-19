@@ -278,7 +278,7 @@ export function MenuProdutoTabsModal({
               lockedMenuIds={[menuId]}
               onPersist={persistMenusFromSnapshot}
               onEmbedStateChange={handleEmbedMenusChange}
-              description="Marque outros cardápios para incluir este produto com os dados deste (nome, preço, categoria e complementos). Este cardápio permanece marcado. Expanda um vínculo já salvo para conferir os dados em cada menu."
+              description="Marque outros cardápios para incluir este produto com os dados deste. Expanda um vínculo para editar os dados daquele cardápio; ao salvar, você pode copiar as alterações para outros menus ou para o cadastro base."
             />
           </div>
         ) : null}

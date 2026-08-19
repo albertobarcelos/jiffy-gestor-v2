@@ -119,6 +119,7 @@ export function usePropagarAlteracaoProduto(): {
       })
       await invalidate(['menu-produtos'])
       await invalidate(['menu-grupos'])
+      await invalidate(['menu-produto'])
       await invalidate(['produtos'])
       await invalidate(['produto', params.produtoId])
     },

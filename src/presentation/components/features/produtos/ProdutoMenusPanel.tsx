@@ -15,10 +15,14 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useMenus } from '@/src/presentation/hooks/menus/useMenus'
 import { useProduto } from '@/src/presentation/hooks/useProdutos'
 import { useAtualizarProdutoMenus } from '@/src/presentation/hooks/produtos/useAtualizarProdutoMenus'
+import { usePropagarAlteracaoProduto } from '@/src/presentation/hooks/produtos/usePropagarAlteracaoProduto'
 import { showToast } from '@/src/shared/utils/toast'
 import { cn } from '@/src/shared/utils/cn'
 import type { Menu, ProdutoMenuResumo } from '@/src/shared/types/menus'
-import { ProdutoMenuVinculoDetalhe } from './ProdutoMenuVinculoDetalhe'
+import {
+  ProdutoMenuVinculoForm,
+  type ProdutoMenuVinculoFormHandle,
+} from './ProdutoMenuVinculoForm'
 
 /** Limite máximo da listagem de menus no backend. */
 const MENUS_API_MAX_LIMIT = 100
@@ -102,6 +106,10 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
       return [...new Set([...seedIds, ...locked])]
     })
     const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set())
+    const [snapshotDirtyIds, setSnapshotDirtyIds] = useState<Set<string>>(() => new Set())
+    const formRefs = useRef(new Map<string, ProdutoMenuVinculoFormHandle | null>())
+    const { pedirConfirmacao, aplicarNosDestinos, dialog: dialogPropagacao } =
+      usePropagarAlteracaoProduto()
     const [baselineIds, setBaselineIds] = useState<string[]>(() => [
       ...new Set([...seedIds, ...(lockedMenuIds ?? []).filter(Boolean)]),
     ])
@@ -165,15 +173,39 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
       })
     }, [selectedIds, lockedSet])
 
-    const emitDirty = useCallback(
-      (nextIds: string[], isSaving = false) => {
-        const dirty = !sameIdSet(nextIds, baselineIdsRef.current)
+    const emitEmbedState = useCallback(
+      (linkDirty: boolean, isSaving = false) => {
+        const dirty = linkDirty || snapshotDirtyIds.size > 0
         isDirtyRef.current = dirty
-        onSelectionChange?.(nextIds)
         onEmbedStateChange?.({ isDirty: dirty, isSaving })
       },
-      [onEmbedStateChange, onSelectionChange]
+      [onEmbedStateChange, snapshotDirtyIds]
     )
+
+    const emitDirty = useCallback(
+      (nextIds: string[], isSaving = false) => {
+        const linkDirty = !sameIdSet(nextIds, baselineIdsRef.current)
+        onSelectionChange?.(nextIds)
+        emitEmbedState(linkDirty, isSaving)
+      },
+      [onSelectionChange, emitEmbedState]
+    )
+
+    const handleSnapshotDirty = useCallback((menuId: string, dirty: boolean) => {
+      setSnapshotDirtyIds(prev => {
+        const has = prev.has(menuId)
+        if (dirty === has) return prev
+        const next = new Set(prev)
+        if (dirty) next.add(menuId)
+        else next.delete(menuId)
+        return next
+      })
+    }, [])
+
+    useEffect(() => {
+      const linkDirty = !sameIdSet(selectedIds, baselineIdsRef.current)
+      emitEmbedState(linkDirty, savingLocal || mutation.isPending)
+    }, [snapshotDirtyIds, selectedIds, savingLocal, mutation.isPending, emitEmbedState])
 
     const filteredMenus = useMemo(() => {
       const q = searchQuery.trim().toLowerCase()
@@ -231,6 +263,8 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
       const selected = new Set(selectedIds)
       const add = selectedIds.filter(id => !baseline.has(id))
       const remove = baselineIdsRef.current.filter(id => !selected.has(id) && !lockedSet.has(id))
+      const linkDirty = add.length > 0 || remove.length > 0
+      const dirtySnapshotMenuIds = [...snapshotDirtyIds]
 
       if (!onPersist && (!persistChanges || !produtoId)) {
         baselineIdsRef.current = selectedIds
@@ -240,21 +274,39 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
         return true
       }
 
-      if (add.length === 0 && remove.length === 0) return true
+      if (!linkDirty && dirtySnapshotMenuIds.length === 0) return true
 
       emitDirty(selectedIds, true)
       setSavingLocal(true)
       try {
-        if (onPersist) {
-          await onPersist({ add, remove })
-        } else {
-          await mutation.mutateAsync({ add, remove })
+        if (linkDirty) {
+          if (onPersist) {
+            await onPersist({ add, remove })
+          } else {
+            await mutation.mutateAsync({ add, remove })
+          }
+          baselineIdsRef.current = selectedIds
+          setBaselineIds(selectedIds)
         }
-        baselineIdsRef.current = selectedIds
-        setBaselineIds(selectedIds)
+
+        for (const menuId of dirtySnapshotMenuIds) {
+          const ok = (await formRefs.current.get(menuId)?.save()) ?? false
+          if (!ok) {
+            emitDirty(selectedIds, false)
+            return false
+          }
+        }
+
+        setSnapshotDirtyIds(new Set())
         isDirtyRef.current = false
         onEmbedStateChange?.({ isDirty: false, isSaving: false })
-        showToast.success('Menus do produto atualizados')
+        showToast.success(
+          linkDirty && dirtySnapshotMenuIds.length > 0
+            ? 'Menus e dados do produto atualizados'
+            : linkDirty
+              ? 'Menus do produto atualizados'
+              : 'Dados do produto atualizados nos cardápios'
+        )
         return true
       } catch (err) {
         emitDirty(selectedIds, false)
@@ -267,6 +319,7 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
       persistChanges,
       produtoId,
       selectedIds,
+      snapshotDirtyIds,
       mutation,
       emitDirty,
       onEmbedStateChange,
@@ -277,11 +330,12 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
     useImperativeHandle(
       ref,
       () => ({
-        isDirty: () => !sameIdSet(selectedIds, baselineIdsRef.current),
+        isDirty: () =>
+          !sameIdSet(selectedIds, baselineIdsRef.current) || snapshotDirtyIds.size > 0,
         save,
         getSelectedIds: () => [...new Set([...selectedIds, ...lockedSet])],
       }),
-      [selectedIds, save, lockedSet]
+      [selectedIds, snapshotDirtyIds, save, lockedSet]
     )
 
     const isLoading = loadingMenus || (persistChanges && loadingProduto)
@@ -310,7 +364,7 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
           {description
             ? description
             : persistChanges
-              ? 'Marque os cardápios em que este produto deve aparecer. Expanda um vínculo já salvo para ver nome, preço e complementos naquele cardápio.'
+              ? 'Marque os cardápios em que este produto deve aparecer. Expanda um vínculo já salvo para editar nome, preço, categoria e complementos naquele cardápio. Ao salvar, você pode copiar as alterações para outros menus.'
               : lockedSet.size > 0
                 ? 'Este cardápio já entra. Marque outros se quiser o produto em mais menus.'
                 : 'Marque os cardápios em que este produto deve aparecer ao salvar. Se nenhum for marcado, o produto entra no menu principal.'}
@@ -343,6 +397,11 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
               const snapshotDisponivel =
                 canShowSnapshot && vinculado && persistedVinculoIds.has(menu.id)
               const isExpanded = snapshotDisponivel && expandedIds.has(menu.id)
+              const showSnapshotForm =
+                canShowSnapshot &&
+                vinculado &&
+                persistedVinculoIds.has(menu.id) &&
+                (isExpanded || snapshotDirtyIds.has(menu.id))
               return (
                 <li
                   key={menu.id}
@@ -405,12 +464,20 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
                       }}
                     />
                   </div>
-                  {isExpanded && produtoId ? (
-                    <div className="px-4 pb-2 pl-10">
-                      <ProdutoMenuVinculoDetalhe
+                  {showSnapshotForm && produtoId ? (
+                    <div className={cn('pb-1 pl-8 pr-2', !isExpanded && 'hidden')}>
+                      <ProdutoMenuVinculoForm
+                        ref={handle => {
+                          if (handle) formRefs.current.set(menu.id, handle)
+                          else formRefs.current.delete(menu.id)
+                        }}
                         menuId={menu.id}
                         produtoId={produtoId}
-                        enabled={isExpanded}
+                        enabled={showSnapshotForm}
+                        onDirtyChange={handleSnapshotDirty}
+                        dirtyMenuId={menu.id}
+                        pedirConfirmacao={pedirConfirmacao}
+                        aplicarNosDestinos={aplicarNosDestinos}
                       />
                     </div>
                   ) : null}
@@ -419,6 +486,7 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
             })
           )}
         </ul>
+        {dialogPropagacao}
       </div>
     )
   }

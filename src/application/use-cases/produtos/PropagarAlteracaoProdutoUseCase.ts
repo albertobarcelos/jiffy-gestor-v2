@@ -52,6 +52,19 @@ function patchMenuProduto(snapshot: SnapshotProdutoPropagavel): UpdateMenuProdut
   if (compartilhado.valor !== undefined) out.valor = compartilhado.valor
   if (compartilhado.ativo !== undefined) out.ativo = compartilhado.ativo
   if (compartilhado.favorito !== undefined) out.favorito = compartilhado.favorito
+  if (snapshot.grupoProdutoId) out.grupoProdutoId = snapshot.grupoProdutoId
+  if (snapshot.gruposComplementosIds !== undefined) {
+    out.gruposComplementosIds = snapshot.gruposComplementosIds
+  }
+  return out
+}
+
+function patchCadastroBase(snapshot: SnapshotProdutoPropagavel): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...camposCompartilhados(snapshot) }
+  if (snapshot.grupoProdutoId) out.grupoId = snapshot.grupoProdutoId
+  if (snapshot.gruposComplementosIds !== undefined) {
+    out.gruposComplementosIds = snapshot.gruposComplementosIds
+  }
   return out
 }
 
@@ -78,15 +91,22 @@ export async function aplicarAlteracaoProdutoNosDestinos(params: {
   const { produtoId, token, aplicarNoCadastroBase, menuIds } = params
   const headers = authHeaders(token)
   const compartilhado = camposCompartilhados(params.snapshot)
-  const menuPatch = patchMenuProduto(compartilhado)
+  const menuPatch = patchMenuProduto(params.snapshot)
+  const basePatch = patchCadastroBase(params.snapshot)
 
-  if (Object.keys(compartilhado).length === 0) return
+  if (
+    Object.keys(compartilhado).length === 0 &&
+    !params.snapshot.grupoProdutoId &&
+    params.snapshot.gruposComplementosIds === undefined
+  ) {
+    return
+  }
 
-  if (aplicarNoCadastroBase) {
+  if (aplicarNoCadastroBase && Object.keys(basePatch).length > 0) {
     const response = await fetchGestorApi(`/api/produtos/${produtoId}`, {
       method: 'PATCH',
       headers,
-      body: JSON.stringify(compartilhado),
+      body: JSON.stringify(basePatch),
     })
     if (!response.ok) await parseError(response, 'Erro ao atualizar o cadastro base')
   }
