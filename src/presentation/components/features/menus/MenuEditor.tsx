@@ -12,6 +12,8 @@ import {
 import { useMenuProdutosFilters } from '@/src/presentation/hooks/menus/useMenuProdutosFilters'
 import { useMenuMutations } from '@/src/presentation/hooks/menus/useMenuMutations'
 import { usePropagarAlteracaoProduto } from '@/src/presentation/hooks/produtos/usePropagarAlteracaoProduto'
+import { useEntityImageCropUpload } from '@/src/presentation/hooks/useEntityImageCropUpload'
+import { MENU_PRODUTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
 import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
 import { useIsMobile } from '@/src/presentation/hooks/useIsMobile'
 import { AddProdutosToMenuPanel } from './AddProdutosToMenuPanel'
@@ -95,7 +97,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   const { data: gruposComplementos = [], isLoading: isLoadingGruposComplementos } =
     useGruposComplementos({ limit: 100, ativo: null })
   const { syncProdutos, updateProduto, uploadImagemProduto } = useMenuMutations(menuId)
-  const { pedirConfirmacao, aplicarNosDestinos, dialog: dialogPropagacao } =
+  const { pedirConfirmacao, aplicarNosDestinos, aplicarImagemNosDestinos, dialog: dialogPropagacao } =
     usePropagarAlteracaoProduto()
   const invalidate = useInvalidateTenantQueries()
 
@@ -419,16 +421,45 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     [produtosDoMenu, syncProdutos, tabsState.produto, closeTabs]
   )
 
-  const handleChangeImage = useCallback(
+  const handleUploadImagem = useCallback(
     async (produtoId: string, file: File) => {
       try {
         await uploadImagemProduto.mutateAsync({ produtoId, file })
-        showToast.success('Imagem atualizada neste cardápio')
+        const destinos = await pedirConfirmacao({
+          origem: 'menu',
+          produtoId,
+          menuIdAtual: menuId,
+          variante: 'imagem',
+        })
+        if (destinos && destinos.menuIds.length > 0) {
+          await aplicarImagemNosDestinos({
+            produtoId,
+            file,
+            destinos,
+            vincularSeAusente: true,
+          })
+          showToast.success('Imagem atualizada neste cardápio e nos selecionados')
+        } else {
+          showToast.success('Imagem atualizada neste cardápio')
+        }
       } catch (err) {
         showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar imagem')
       }
     },
-    [uploadImagemProduto]
+    [uploadImagemProduto, pedirConfirmacao, aplicarImagemNosDestinos, menuId]
+  )
+
+  const { selectForEntity: selectProdutoImagem, cropModal: produtoCropModal } =
+    useEntityImageCropUpload({
+      preset: MENU_PRODUTO_CROP_PRESET,
+      upload: handleUploadImagem,
+    })
+
+  const handleChangeImage = useCallback(
+    (produtoId: string, file: File) => {
+      selectProdutoImagem(produtoId, file)
+    },
+    [selectProdutoImagem]
   )
 
   const renderItem = useCallback(
@@ -636,6 +667,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         onClose={() => setWizardOpen(false)}
       />
       {dialogPropagacao}
+      {produtoCropModal}
     </div>
   )
 }

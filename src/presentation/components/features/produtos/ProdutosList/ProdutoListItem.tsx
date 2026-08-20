@@ -15,6 +15,7 @@ export interface ProdutoListItemProps {
   onToggleBoolean: (produtoId: string, field: ToggleField, value: boolean) => void
   onEditProduto: (produtoId: string) => void
   onCopyProduto: (produtoId: string) => void
+  imagemUrl?: string | null
 }
 
 function ProdutoListItemBase({
@@ -26,6 +27,7 @@ function ProdutoListItemBase({
   onToggleBoolean,
   onEditProduto,
   onCopyProduto,
+  imagemUrl,
 }: ProdutoListItemProps) {
   const produtoId = produto.getId()
   const toggleStates = useMemo<Record<ToggleField, boolean>>(
@@ -47,6 +49,7 @@ function ProdutoListItemBase({
       nome={produto.getNome()}
       valor={produto.getValor()}
       ativo={produto.isAtivo()}
+      imagemUrl={imagemUrl ?? produto.getImagemUrl()}
       codigo={produto.getCodigoProduto()}
       isSavingValor={isSavingValor}
       isSavingStatus={isSavingStatus}
@@ -88,7 +91,8 @@ function arePropsEqual(prev: ProdutoListItemProps, next: ProdutoListItemProps): 
     prev.onSwitchToggle === next.onSwitchToggle &&
     prev.onToggleBoolean === next.onToggleBoolean &&
     prev.onEditProduto === next.onEditProduto &&
-    prev.onCopyProduto === next.onCopyProduto
+    prev.onCopyProduto === next.onCopyProduto &&
+    prev.imagemUrl === next.imagemUrl
   )
 }
 

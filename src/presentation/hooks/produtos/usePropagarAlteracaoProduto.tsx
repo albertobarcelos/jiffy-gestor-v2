@@ -13,13 +13,21 @@ import type {
   MenuAlvoPropagacao,
   OrigemAlteracaoProduto,
   SnapshotProdutoPropagavel,
+  VariantePropagacaoProduto,
 } from '@/src/shared/types/propagarAlteracaoProduto'
+import {
+  aplicarImagemProdutoNosMenus,
+  buscarMenusDaEmpresa,
+} from '@/src/presentation/utils/uploadImagemProdutoMenus'
 
 type Pedido = {
   origem: OrigemAlteracaoProduto
+  variante: VariantePropagacaoProduto
   produtoId: string
   menuIdAtual?: string
   menusIniciais?: MenuAlvoPropagacao[]
+  excluirMenuIds?: string[]
+  fonteMenus?: 'produto' | 'empresa'
   resolve: (value: DestinoAlteracaoProduto | null) => void
 }
 
@@ -34,11 +42,20 @@ export function usePropagarAlteracaoProduto(): {
     produtoId: string
     menuIdAtual?: string
     menusIniciais?: MenuAlvoPropagacao[]
+    variante?: VariantePropagacaoProduto
+    excluirMenuIds?: string[]
+    fonteMenus?: 'produto' | 'empresa'
   }) => Promise<DestinoAlteracaoProduto | null>
   aplicarNosDestinos: (params: {
     produtoId: string
     snapshot: SnapshotProdutoPropagavel
     destinos: DestinoAlteracaoProduto
+  }) => Promise<void>
+  aplicarImagemNosDestinos: (params: {
+    produtoId: string
+    file: File
+    destinos: DestinoAlteracaoProduto
+    vincularSeAusente?: boolean
   }) => Promise<void>
   dialog: ReactNode
 } {
@@ -68,26 +85,42 @@ export function usePropagarAlteracaoProduto(): {
       produtoId: string
       menuIdAtual?: string
       menusIniciais?: MenuAlvoPropagacao[]
+      variante?: VariantePropagacaoProduto
+      excluirMenuIds?: string[]
+      fonteMenus?: 'produto' | 'empresa'
     }): Promise<DestinoAlteracaoProduto | null> => {
+      const variante = opts.variante ?? 'dados'
       const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+      const excluir = new Set(
+        [opts.menuIdAtual, ...(opts.excluirMenuIds ?? [])].map(id => id?.trim()).filter(Boolean) as string[]
+      )
+
       let lista = opts.menusIniciais ?? []
       if (lista.length === 0 && token) {
         try {
-          lista = await listarMenusDoProduto({ produtoId: opts.produtoId, token })
+          if (opts.fonteMenus === 'empresa') {
+            lista = (await buscarMenusDaEmpresa({ token })).map(m => ({ id: m.id, nome: m.nome }))
+          } else {
+            lista = await listarMenusDoProduto({ produtoId: opts.produtoId, token })
+            if (variante === 'imagem' && lista.filter(m => !excluir.has(m.id)).length === 0) {
+              lista = (await buscarMenusDaEmpresa({ token })).map(m => ({ id: m.id, nome: m.nome }))
+            }
+          }
         } catch {
           lista = []
         }
       }
-      if (opts.menuIdAtual) {
-        lista = lista.filter(m => m.id !== opts.menuIdAtual)
-      }
+      lista = lista.filter(m => !excluir.has(m.id))
 
       if (opts.origem === 'cadastroBase' && lista.length === 0) {
         return { aplicarNoCadastroBase: false, menuIds: [] }
       }
+      if (variante === 'imagem' && lista.length === 0) {
+        return { aplicarNoCadastroBase: false, menuIds: [] }
+      }
 
       return new Promise(resolve => {
-        const next: Pedido = { ...opts, resolve }
+        const next: Pedido = { ...opts, variante, resolve }
         pedidoRef.current = next
         setPedido(next)
         setMenus(lista)
@@ -126,19 +159,44 @@ export function usePropagarAlteracaoProduto(): {
     [invalidate]
   )
 
+  const aplicarImagemNosDestinos = useCallback(
+    async (params: {
+      produtoId: string
+      file: File
+      destinos: DestinoAlteracaoProduto
+      vincularSeAusente?: boolean
+    }) => {
+      if (params.destinos.menuIds.length === 0) return
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+      if (!token) throw new Error('Token não encontrado')
+      await aplicarImagemProdutoNosMenus({
+        token,
+        produtoId: params.produtoId,
+        menuIds: params.destinos.menuIds,
+        file: params.file,
+        vincularSeAusente: params.vincularSeAusente ?? true,
+      })
+      await invalidate(['menu-produtos'])
+      await invalidate(['produtos-imagens-cadastro'])
+      await invalidate(['produto', params.produtoId])
+    },
+    [invalidate]
+  )
+
   const onSim = useCallback(() => {
-    if (pedido?.origem === 'menu' && menus.length === 0) {
+    if (pedido?.variante !== 'imagem' && pedido?.origem === 'menu' && menus.length === 0) {
       setCadastroBaseMarcado(true)
     }
     setPasso('escolher')
-  }, [pedido?.origem, menus.length])
+  }, [pedido?.origem, pedido?.variante, menus.length])
 
   const dialog = (
     <PropagarAlteracaoProdutoDialog
       open={Boolean(pedido)}
       passo={passo}
       origem={pedido?.origem ?? 'cadastroBase'}
-      incluirCadastroBase={pedido?.origem === 'menu'}
+      variante={pedido?.variante ?? 'dados'}
+      incluirCadastroBase={pedido?.variante !== 'imagem' && pedido?.origem === 'menu'}
       menus={menus}
       selecionados={selecionados}
       cadastroBaseMarcado={cadastroBaseMarcado}
@@ -165,5 +223,5 @@ export function usePropagarAlteracaoProduto(): {
     />
   )
 
-  return { pedirConfirmacao, aplicarNosDestinos, dialog }
+  return { pedirConfirmacao, aplicarNosDestinos, aplicarImagemNosDestinos, dialog }
 }

@@ -157,7 +157,8 @@ export class Produto {
     private readonly tipoProduto?: string,
     private readonly indicadorProducaoEscala?: string | null,
     private readonly unidadeMedida: UnidadeMedidaProduto = 'UN',
-    private readonly menus?: ProdutoMenuResumo[]
+    private readonly menus?: ProdutoMenuResumo[],
+    private readonly imagemUrl?: string | null
   ) {}
 
   static create(
@@ -184,7 +185,8 @@ export class Produto {
     tipoProduto?: string,
     indicadorProducaoEscala?: string | null,
     unidadeMedida?: UnidadeMedidaProduto,
-    menus?: ProdutoMenuResumo[]
+    menus?: ProdutoMenuResumo[],
+    imagemUrl?: string | null
   ): Produto {
     if (!id || !nome) {
       throw new Error('ID e nome são obrigatórios')
@@ -214,7 +216,8 @@ export class Produto {
       tipoProduto,
       indicadorProducaoEscala,
       normalizarUnidadeMedidaProduto(unidadeMedida),
-      menus
+      menus,
+      imagemUrl ?? null
     )
   }
 
@@ -275,7 +278,16 @@ export class Produto {
       fisc.tipoProduto,
       fisc.indicadorProducaoEscala,
       normalizarUnidadeMedidaProduto(data.unidadeMedida),
-      mapMenusFromJson(data.menus)
+      mapMenusFromJson(data.menus),
+      (() => {
+        const raw =
+          data.imagemUrl ??
+          data.imageUrl ??
+          (data.image && typeof data.image === 'object' ? data.image.imageUrl : null)
+        if (typeof raw !== 'string') return null
+        const trimmed = raw.trim()
+        return trimmed || null
+      })()
     )
   }
 
@@ -380,6 +392,11 @@ export class Produto {
     return this.menus || []
   }
 
+  getImagemUrl(): string | null {
+    const url = this.imagemUrl?.trim()
+    return url ? url : null
+  }
+
   /** Retorna cópia com campos fiscais atualizados (edição inline / lote). */
   withDadosFiscais(partial: {
     ncm?: string
@@ -459,6 +476,7 @@ export class Produto {
       indicadorProducaoEscala: this.indicadorProducaoEscala ?? null,
       unidadeMedida: this.unidadeMedida,
       menus: this.menus ?? [],
+      imagemUrl: this.imagemUrl ?? null,
     }
   }
 }

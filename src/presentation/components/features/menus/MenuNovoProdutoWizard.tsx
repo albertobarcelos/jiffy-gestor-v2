@@ -9,6 +9,7 @@ import {
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
+import { useMenus } from '@/src/presentation/hooks/menus/useMenus'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { showToast } from '@/src/shared/utils/toast'
 import { cn } from '@/src/shared/utils/cn'
@@ -104,6 +105,15 @@ export function MenuNovoProdutoWizard({
     ativo: true,
     enabled: open,
   })
+  const { data: menusLista } = useMenus({ tipo: 'principal', limit: 10, enabled: open })
+  const principalMenuId = useMemo(
+    () => menusLista?.items.find(m => m.tipo === 'principal')?.id ?? null,
+    [menusLista]
+  )
+  const menusTravadosWizard = useMemo(
+    () => [...new Set([menuId, principalMenuId].filter((id): id is string => Boolean(id)))],
+    [menuId, principalMenuId]
+  )
 
   const resetState = useCallback(() => {
     setStep(0)
@@ -240,7 +250,7 @@ export function MenuNovoProdutoWizard({
         ? []
         : (impressorasRef.current?.getSelectedIds() ?? [])
       const menusEscolhidos = menusRef.current?.getSelectedIds() ?? []
-      const menuIds = [...new Set([menuId, ...menusEscolhidos])]
+      const menuIds = [...new Set([menuId, principalMenuId, ...menusEscolhidos].filter((id): id is string => Boolean(id)))]
 
       const ok = await npRef.current?.saveFinal({
         grupoId,
@@ -257,7 +267,7 @@ export function MenuNovoProdutoWizard({
     } finally {
       setSaving(false)
     }
-  }, [ensureCategoria, menuId, invalidateMenu, onClose, skipComplementos, skipImpressoras])
+  }, [ensureCategoria, menuId, principalMenuId, invalidateMenu, onClose, skipComplementos, skipImpressoras])
 
   const footerActions = useMemo((): JiffySidePanelFooterActions => {
     if (step === 0) {
@@ -564,6 +574,7 @@ export function MenuNovoProdutoWizard({
                 isEmbedded
                 hideEmbeddedHeader
                 hideEmbeddedFormActions
+                previewMenuId={menuId}
                 defaultGrupoProdutoId={grupoProdutoIdParaProduto ?? undefined}
                 lockGrupoProduto
                 lockedGrupoLabel={categoriaLabelProduto}
@@ -605,8 +616,8 @@ export function MenuNovoProdutoWizard({
                 ref={menusRef}
                 persistChanges={false}
                 isEmbedded
-                initialMenuIds={[menuId]}
-                lockedMenuIds={[menuId]}
+                initialMenuIds={menusTravadosWizard}
+                lockedMenuIds={menusTravadosWizard}
               />
             </div>
           ) : null}

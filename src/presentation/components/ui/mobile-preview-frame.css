@@ -1,0 +1,16 @@
+.mobile-preview-shell {
+  width: 100%;
+  max-width: 24rem;
+  margin-inline: auto;
+  min-height: 0;
+}
+
+.mobile-preview-viewport {
+  width: 100%;
+  min-height: 0;
+}
+
+.mobile-preview-scale-host {
+  width: 100%;
+  padding: 0.75rem;
+}

@@ -19,6 +19,7 @@ import { ProdutosTabsModal, type ProdutosTabsModalState } from '../ProdutosTabsM
 import { ProdutosHeader } from './ProdutosHeader'
 import { ProdutosFilters } from './ProdutosFilters'
 import { ProdutoListItem } from './ProdutoListItem'
+import { useImagensProdutosCadastroBase } from '@/src/presentation/hooks/produtos/useImagensProdutosCadastroBase'
 import { CatalogGroupedList } from '@/src/presentation/components/features/catalogo/CatalogGroupedList'
 import type { CatalogGroup } from '@/src/presentation/components/features/catalogo/types'
 
@@ -93,6 +94,7 @@ export function ProdutosList() {
 
   const { data, fetchNextPage, hasNextPage, isFetching, isFetchingNextPage, isLoading, error } =
     useProdutosInfinite(queryParams)
+  const { data: imagensPorProdutoId = {} } = useImagensProdutosCadastroBase()
 
   // Produtos achatados + sem duplicatas
   const produtos = useMemo(() => {
@@ -401,6 +403,7 @@ export function ProdutosList() {
     (produto: Produto) => (
       <ProdutoListItem
         produto={produto}
+        imagemUrl={imagensPorProdutoId[produto.getId()] ?? produto.getImagemUrl()}
         isSavingValor={isSavingOf(patchMutation, produto.getId(), 'valor')}
         isSavingStatus={isSavingOf(patchMutation, produto.getId(), 'status')}
         onValorChange={handleValorChange}
@@ -411,6 +414,7 @@ export function ProdutosList() {
       />
     ),
     [
+      imagensPorProdutoId,
       patchMutation,
       handleValorChange,
       handleStatusToggle,

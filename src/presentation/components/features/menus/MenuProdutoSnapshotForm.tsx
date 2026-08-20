@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useState,
 } from 'react'
 import { Input } from '@/src/presentation/components/ui/input'
@@ -15,6 +16,9 @@ import { usePropagarAlteracaoProduto } from '@/src/presentation/hooks/produtos/u
 import { showToast } from '@/src/shared/utils/toast'
 import type { MenuProduto } from '@/src/shared/types/menus'
 import { MENU_PRODUTO_FORM_ID } from './menuPanelConstants'
+import { ProdutoFormWithPreviewLayout } from '@/src/presentation/components/features/produtos/preview/ProdutoFormWithPreviewLayout'
+import { parsePrecoPreviewFromInput } from '@/src/presentation/components/features/produtos/preview/produtoPreviewModel'
+import type { ProdutoPreviewImageUpload } from '@/src/presentation/components/features/produtos/preview/ProdutoSimplePreviewCard'
 
 export type MenuProdutoSnapshotHandle = {
   isDirty: () => boolean
@@ -58,8 +62,9 @@ export const MenuProdutoSnapshotForm = forwardRef<
   },
   ref
 ) {
-  const { updateProduto } = useMenuMutations(menuId)
-  const { pedirConfirmacao, aplicarNosDestinos, dialog: dialogPropagacao } =
+  const { updateProduto, uploadImagemProduto } = useMenuMutations(menuId)
+  const [imagemPreviewOverride, setImagemPreviewOverride] = useState<string | null>(null)
+  const { pedirConfirmacao, aplicarNosDestinos, aplicarImagemNosDestinos, dialog: dialogPropagacao } =
     usePropagarAlteracaoProduto()
   const [nome, setNome] = useState(produto.nome)
   const [descricao, setDescricao] = useState(produto.descricao ?? '')
@@ -80,6 +85,62 @@ export const MenuProdutoSnapshotForm = forwardRef<
   useEffect(() => {
     syncFromProduto(produto)
   }, [produto, syncFromProduto])
+
+  useEffect(() => {
+    if (!produto.image?.imageUrl) return
+    setImagemPreviewOverride(prev => {
+      if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+      return null
+    })
+  }, [produto.image?.imageUrl])
+
+  useEffect(() => {
+    return () => {
+      if (imagemPreviewOverride?.startsWith('blob:')) {
+        URL.revokeObjectURL(imagemPreviewOverride)
+      }
+    }
+  }, [imagemPreviewOverride])
+
+  const handlePreviewImageUpload = useCallback(
+    async (file: File) => {
+      const blobUrl = URL.createObjectURL(file)
+      setImagemPreviewOverride(prev => {
+        if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+        return blobUrl
+      })
+      try {
+        await uploadImagemProduto.mutateAsync({
+          produtoId: produto.produtoId,
+          file,
+        })
+        const destinos = await pedirConfirmacao({
+          origem: 'menu',
+          produtoId: produto.produtoId,
+          menuIdAtual: menuId,
+          variante: 'imagem',
+        })
+        if (destinos && destinos.menuIds.length > 0) {
+          await aplicarImagemNosDestinos({
+            produtoId: produto.produtoId,
+            file,
+            destinos,
+            vincularSeAusente: true,
+          })
+          showToast.success('Imagem atualizada neste cardápio e nos selecionados')
+        } else {
+          showToast.success('Imagem atualizada neste cardápio')
+        }
+      } catch (err) {
+        setImagemPreviewOverride(prev => {
+          if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+          return null
+        })
+        showToast.error(err instanceof Error ? err.message : 'Erro ao enviar imagem')
+      }
+    },
+    [uploadImagemProduto, produto.produtoId, menuId, pedirConfirmacao, aplicarImagemNosDestinos]
+  )
 
   const isDirty = useCallback(() => {
     const valorNum = parseCurrency(valor)
@@ -160,15 +221,41 @@ export const MenuProdutoSnapshotForm = forwardRef<
 
   useImperativeHandle(ref, () => ({ isDirty, save }), [isDirty, save])
 
+  const previewProduto = useMemo(
+    () => ({
+      nome,
+      preco: parsePrecoPreviewFromInput(valor),
+      descricao,
+      imagemUrl: imagemPreviewOverride ?? produto.image?.imageUrl ?? null,
+    }),
+    [nome, valor, descricao, imagemPreviewOverride, produto.image?.imageUrl]
+  )
+
+  const previewImageUpload = useMemo(
+    (): ProdutoPreviewImageUpload => ({
+      enabled: true,
+      busy: uploadImagemProduto.isPending,
+      hint: 'Arraste ou clique para recortar e enviar',
+      onUpload: handlePreviewImageUpload,
+    }),
+    [handlePreviewImageUpload, uploadImagemProduto.isPending]
+  )
+
   return (
-    <form
-      id={formId}
-      className="min-h-0 flex-1 overflow-y-auto p-2 md:p-4"
-      onSubmit={e => {
-        e.preventDefault()
-        void save()
-      }}
+    <ProdutoFormWithPreviewLayout
+      showPreview
+      preview={previewProduto}
+      imageUpload={previewImageUpload}
+      className="min-h-0 flex-1"
     >
+      <form
+        id={formId}
+        className="p-2 md:p-4"
+        onSubmit={e => {
+          e.preventDefault()
+          void save()
+        }}
+      >
       <div className="rounded-[10px] bg-info p-2 md:p-4">
         <div className="mb-2 flex items-center gap-5">
           <h2 className="text-xl font-semibold text-primary">Informações</h2>
@@ -236,6 +323,7 @@ export const MenuProdutoSnapshotForm = forwardRef<
         </div>
       </div>
       {dialogPropagacao}
-    </form>
+      </form>
+    </ProdutoFormWithPreviewLayout>
   )
 })

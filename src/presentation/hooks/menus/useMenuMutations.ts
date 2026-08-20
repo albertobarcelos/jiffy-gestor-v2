@@ -25,6 +25,7 @@ async function invalidateMenuTree(
   menuId?: string
 ) {
   await invalidate(['menus'])
+  await invalidate(['produtos-imagens-cadastro'])
   if (menuId) {
     await invalidate(['menu', menuId])
     await invalidate(['menu-produtos', menuId])

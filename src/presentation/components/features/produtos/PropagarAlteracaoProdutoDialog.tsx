@@ -11,6 +11,7 @@ interface PropagarAlteracaoProdutoDialogProps {
   open: boolean
   passo: Passo
   origem: 'cadastroBase' | 'menu'
+  variante?: 'dados' | 'imagem'
   incluirCadastroBase: boolean
   menus: MenuAlvoPropagacao[]
   selecionados: Set<string>
@@ -29,6 +30,7 @@ export function PropagarAlteracaoProdutoDialog({
   open,
   passo,
   origem,
+  variante = 'dados',
   incluirCadastroBase,
   menus,
   selecionados,
@@ -42,17 +44,28 @@ export function PropagarAlteracaoProdutoDialog({
   onToggleCadastroBase,
   onDismiss,
 }: PropagarAlteracaoProdutoDialogProps) {
+  const isImagem = variante === 'imagem'
   const titulo =
     passo === 'perguntar'
-      ? 'Aplicar esta alteração em outros lugares?'
-      : 'Onde aplicar esta alteração?'
+      ? isImagem
+        ? 'Aplicar esta imagem em outros cardápios?'
+        : 'Aplicar esta alteração em outros Menus?'
+      : isImagem
+        ? 'Onde aplicar esta imagem?'
+        : 'Onde aplicar esta alteração?'
 
   const descricao =
     passo === 'perguntar'
-      ? origem === 'cadastroBase'
-        ? 'A alteração será salva no cadastro do produto. Deseja copiar também para algum cardápio?'
-        : 'A alteração será salva neste cardápio. Deseja copiar também para o cadastro base ou para outros menus?'
-      : 'Marque os destinos. O que não for marcado permanece como está.'
+      ? isImagem
+        ? origem === 'cadastroBase'
+          ? 'A imagem será salva no menu principal. Deseja aplicar também em outros cardápios?'
+          : 'A imagem será salva neste cardápio. Deseja trocar a foto em outros menus também?'
+        : origem === 'cadastroBase'
+          ? 'A alteração será salva no cadastro do produto. Deseja copiar também para algum cardápio?'
+          : 'A alteração será salva neste cardápio. Deseja copiar também para o cadastro base ou para outros menus?'
+      : isImagem
+        ? 'Marque os cardápios. Os que não forem marcados mantêm a imagem atual.'
+        : 'Marque os destinos. O que não for marcado permanece como está.'
 
   return (
     <JiffyConfirmDialog

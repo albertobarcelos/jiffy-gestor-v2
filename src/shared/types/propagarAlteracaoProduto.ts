@@ -11,6 +11,9 @@ export type SnapshotProdutoPropagavel = {
 
 export type OrigemAlteracaoProduto = 'cadastroBase' | 'menu'
 
+/** `dados` = nome/preço etc. `imagem` = copiar foto para outros cardápios. */
+export type VariantePropagacaoProduto = 'dados' | 'imagem'
+
 export type DestinoAlteracaoProduto = {
   aplicarNoCadastroBase: boolean
   menuIds: string[]
