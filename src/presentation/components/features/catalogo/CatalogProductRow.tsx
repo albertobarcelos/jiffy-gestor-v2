@@ -10,6 +10,7 @@ import {
   MdVisibility,
 } from 'react-icons/md'
 import { ProdutoValorInput } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoValorInput'
+import { ProdutoNomeInput } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoNomeInput'
 import { ProdutoStatusSwitch } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoStatusSwitch'
 import { cn } from '@/src/shared/utils/cn'
 import type { CatalogListVariant } from './types'
@@ -26,7 +27,9 @@ export interface CatalogProductRowProps {
   isSavingValor?: boolean
   isSavingStatus?: boolean
   isSavingImage?: boolean
-  onValorChange: (id: string, valor: number) => void
+  isSavingNome?: boolean
+  onNomeChange?: (id: string, nome: string) => void | boolean | Promise<void | boolean>
+  onValorChange: (id: string, valor: number) => void | boolean | Promise<void | boolean>
   onSwitchToggle: (id: string, status: boolean) => void
   onEdit: (id: string) => void
   onRemove?: (id: string) => void
@@ -46,6 +49,8 @@ function CatalogProductRowInner({
   isSavingValor,
   isSavingStatus,
   isSavingImage,
+  isSavingNome,
+  onNomeChange,
   onValorChange,
   onSwitchToggle,
   onEdit,
@@ -58,6 +63,7 @@ function CatalogProductRowInner({
   const imagemPreview = imagemUrl?.trim() || null
   const isMenu = variant === 'menu'
   const podeTrocarImagem = Boolean(onChangeImage)
+  const podeEditarNome = Boolean(onNomeChange)
 
   const abrirSeletorImagem = () => {
     if (isSavingImage) return
@@ -195,12 +201,22 @@ function CatalogProductRowInner({
           placeholderSemImagem
         )}
 
-        <span
-          className="min-w-0 truncate text-sm font-normal tracking-wide text-primary-text md:text-base"
-          title={nome.length > 30 ? nome : undefined}
-        >
-          {nomeExibicao}
-        </span>
+        {podeEditarNome && onNomeChange ? (
+          <div className="min-w-0" onClick={e => e.stopPropagation()}>
+            <ProdutoNomeInput
+              nome={nome}
+              disabled={isSavingNome}
+              onCommit={novoNome => onNomeChange(id, novoNome)}
+            />
+          </div>
+        ) : (
+          <span
+            className="min-w-0 truncate text-sm font-normal tracking-wide text-primary-text md:text-base"
+            title={nome.length > 30 ? nome : undefined}
+          >
+            {nomeExibicao}
+          </span>
+        )}
 
         {!isMenu ? (
           <span className="inline-flex shrink-0 items-center justify-center rounded-full border border-primary px-2 py-0.5 text-[10px] font-semibold leading-tight text-primary md:text-[11px]">
@@ -285,6 +301,8 @@ function arePropsEqual(prev: CatalogProductRowProps, next: CatalogProductRowProp
     prev.isSavingValor === next.isSavingValor &&
     prev.isSavingStatus === next.isSavingStatus &&
     prev.isSavingImage === next.isSavingImage &&
+    prev.isSavingNome === next.isSavingNome &&
+    prev.onNomeChange === next.onNomeChange &&
     prev.onValorChange === next.onValorChange &&
     prev.onSwitchToggle === next.onSwitchToggle &&
     prev.onEdit === next.onEdit &&

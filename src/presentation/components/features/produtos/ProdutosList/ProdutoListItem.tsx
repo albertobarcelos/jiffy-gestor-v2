@@ -11,7 +11,9 @@ export interface ProdutoListItemProps {
   isSavingValor?: boolean
   isSavingStatus?: boolean
   isSavingImage?: boolean
-  onValorChange: (produtoId: string, valor: number) => void
+  isSavingNome?: boolean
+  onNomeChange: (produtoId: string, nome: string) => void | boolean | Promise<void | boolean>
+  onValorChange: (produtoId: string, valor: number) => void | boolean | Promise<void | boolean>
   onSwitchToggle: (produtoId: string, status: boolean) => void
   onToggleBoolean: (produtoId: string, field: ToggleField, value: boolean) => void
   onEditProduto: (produtoId: string) => void
@@ -25,6 +27,8 @@ function ProdutoListItemBase({
   isSavingValor,
   isSavingStatus,
   isSavingImage,
+  isSavingNome,
+  onNomeChange,
   onValorChange,
   onSwitchToggle,
   onToggleBoolean,
@@ -58,6 +62,8 @@ function ProdutoListItemBase({
       isSavingValor={isSavingValor}
       isSavingStatus={isSavingStatus}
       isSavingImage={isSavingImage}
+      isSavingNome={isSavingNome}
+      onNomeChange={onNomeChange}
       onValorChange={onValorChange}
       onSwitchToggle={onSwitchToggle}
       onEdit={onEditProduto}
@@ -94,6 +100,8 @@ function arePropsEqual(prev: ProdutoListItemProps, next: ProdutoListItemProps): 
     prev.isSavingValor === next.isSavingValor &&
     prev.isSavingStatus === next.isSavingStatus &&
     prev.isSavingImage === next.isSavingImage &&
+    prev.isSavingNome === next.isSavingNome &&
+    prev.onNomeChange === next.onNomeChange &&
     prev.onValorChange === next.onValorChange &&
     prev.onSwitchToggle === next.onSwitchToggle &&
     prev.onToggleBoolean === next.onToggleBoolean &&

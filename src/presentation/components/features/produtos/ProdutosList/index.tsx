@@ -237,9 +237,28 @@ export function ProdutosList() {
   }, [queryClient, empresaId, updateProdutoInCache])
 
   // Handlers de produto — recebem produtoId como arg, sem closure por item
+  const handleNomeChange = useCallback(async (produtoId: string, novoNome: string) => {
+    const destinos = await pedirConfirmacao({ origem: 'cadastroBase', produtoId })
+    if (destinos === null) return false
+    patchMutation.mutate(
+      { type: 'nome', produtoId, novoNome },
+      {
+        onSuccess: () => {
+          if (destinos.menuIds.length === 0) return
+          void aplicarNosDestinos({
+            produtoId,
+            snapshot: { nome: novoNome },
+            destinos: { aplicarNoCadastroBase: false, menuIds: destinos.menuIds },
+          })
+        },
+      }
+    )
+    return true
+  }, [patchMutation, pedirConfirmacao, aplicarNosDestinos])
+
   const handleValorChange = useCallback(async (produtoId: string, novoValor: number) => {
     const destinos = await pedirConfirmacao({ origem: 'cadastroBase', produtoId })
-    if (destinos === null) return
+    if (destinos === null) return false
     patchMutation.mutate(
       { type: 'valor', produtoId, novoValor },
       {
@@ -253,6 +272,7 @@ export function ProdutosList() {
         },
       }
     )
+    return true
   }, [patchMutation, pedirConfirmacao, aplicarNosDestinos])
 
   const handleStatusToggle = useCallback(async (produtoId: string, novoStatus: boolean) => {
@@ -438,7 +458,9 @@ export function ProdutosList() {
                   imagemUrl={imagensPorProdutoId[produto.getId()] ?? produto.getImagemUrl()}
                   isSavingValor={isSavingOf(patchMutation, produto.getId(), 'valor')}
                   isSavingStatus={isSavingOf(patchMutation, produto.getId(), 'status')}
+                  isSavingNome={isSavingOf(patchMutation, produto.getId(), 'nome')}
                   isSavingImage={savingImageProdutoId === produto.getId()}
+                  onNomeChange={handleNomeChange}
                   onValorChange={handleValorChange}
                   onSwitchToggle={handleStatusToggle}
                   onToggleBoolean={handleToggleBooleanField}

@@ -114,6 +114,18 @@ export async function aplicarAlteracaoProdutoNosDestinos(params: {
   if (Object.keys(menuPatch).length === 0) return
 
   const ids = [...new Set(menuIds.filter(Boolean))]
+  if (ids.length === 0) return
+
+  // Garante vínculo (cria snapshot) antes de aplicar o PATCH nos menus selecionados.
+  const vinculoResponse = await fetchGestorApi(`/api/produtos/${produtoId}/menus`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ add: ids }),
+  })
+  if (!vinculoResponse.ok) {
+    await parseError(vinculoResponse, 'Erro ao vincular o produto aos cardápios')
+  }
+
   for (const menuId of ids) {
     const response = await fetchGestorApi(`/api/menus/${menuId}/produtos/${produtoId}`, {
       method: 'PATCH',

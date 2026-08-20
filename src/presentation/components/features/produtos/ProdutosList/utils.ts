@@ -53,7 +53,7 @@ export const cloneProdutoWithPatch = (produto: Produto, patch: ProdutoPatch): Pr
   Produto.create(
     produto.getId(),
     produto.getCodigoProduto(),
-    produto.getNome(),
+    patch.nome ?? produto.getNome(),
     patch.valor ?? produto.getValor(),
     patch.ativo ?? produto.isAtivo(),
     produto.getNomeGrupo(),

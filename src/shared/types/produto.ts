@@ -2,6 +2,7 @@
  * Campos mutáveis de um Produto que podem ser enviados via PATCH para a API.
  */
 export type ProdutoPatch = Partial<{
+  nome: string
   valor: number
   ativo: boolean
   favorito: boolean

@@ -341,6 +341,33 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     },
     [tipoCadastro.pedirTipo, openWizardCadastro]
   )
+  const handleNomeChange = useCallback(
+    async (produtoId: string, nome: string) => {
+      const destinos = await pedirConfirmacao({
+        origem: 'menu',
+        produtoId,
+        menuIdAtual: menuId,
+      })
+      if (destinos === null) return false
+      try {
+        await updateProduto.mutateAsync({ produtoId, input: { nome } })
+        if (destinos.aplicarNoCadastroBase || destinos.menuIds.length > 0) {
+          await aplicarNosDestinos({
+            produtoId,
+            snapshot: { nome },
+            destinos,
+          })
+        }
+        showToast.success('Nome atualizado neste cardápio')
+        return true
+      } catch (err) {
+        showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar nome')
+        return false
+      }
+    },
+    [updateProduto, pedirConfirmacao, aplicarNosDestinos, menuId]
+  )
+
   const handleValorChange = useCallback(
     async (produtoId: string, valor: number) => {
       const destinos = await pedirConfirmacao({
@@ -348,7 +375,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         produtoId,
         menuIdAtual: menuId,
       })
-      if (destinos === null) return
+      if (destinos === null) return false
       try {
         await updateProduto.mutateAsync({ produtoId, input: { valor } })
         if (destinos.aplicarNoCadastroBase || destinos.menuIds.length > 0) {
@@ -359,8 +386,10 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
           })
         }
         showToast.success('Preço atualizado neste cardápio')
+        return true
       } catch (err) {
         showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar preço')
+        return false
       }
     },
     [updateProduto, pedirConfirmacao, aplicarNosDestinos, menuId]
@@ -507,7 +536,9 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
           imagemUrl={produto.image?.imageUrl}
           isSavingValor={savingThis && updateProduto.variables?.input.valor !== undefined}
           isSavingStatus={savingThis && updateProduto.variables?.input.ativo !== undefined}
+          isSavingNome={savingThis && updateProduto.variables?.input.nome !== undefined}
           isSavingImage={savingImage}
+          onNomeChange={handleNomeChange}
           onValorChange={handleValorChange}
           onSwitchToggle={handleStatusToggle}
           onEdit={handleEditProduto}
@@ -528,6 +559,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
       updateProduto.variables,
       uploadImagemProduto.isPending,
       uploadImagemProduto.variables,
+      handleNomeChange,
       handleValorChange,
       handleStatusToggle,
       handleEditProduto,
