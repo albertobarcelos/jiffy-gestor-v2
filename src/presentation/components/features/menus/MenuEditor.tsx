@@ -623,6 +623,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
             <MenuCardapioAcoes
               onCadastrar={() => tipoCadastro.pedirTipo(() => openWizardCadastro())}
               onAdicionar={() => setAddOpen(true)}
+              loteHref={toGestao(`/menus/${menuId}/atualizar-lote`)}
             />
           ) : null}
         </div>

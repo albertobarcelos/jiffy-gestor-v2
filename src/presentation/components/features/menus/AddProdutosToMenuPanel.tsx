@@ -1,13 +1,14 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { MdSearch } from 'react-icons/md'
+import { MdImageNotSupported, MdSearch } from 'react-icons/md'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import {
   produtosInfiniteQueryParams,
   useProdutosInfinite,
 } from '@/src/presentation/hooks/useProdutos'
+import { useImagensProdutosCadastroBase } from '@/src/presentation/hooks/produtos/useImagensProdutosCadastroBase'
 import { useMenuMutations } from '@/src/presentation/hooks/menus/useMenuMutations'
 import { showToast } from '@/src/shared/utils/toast'
 import { MENU_SIDE_PANEL_CLASS } from './menuPanelConstants'
@@ -31,6 +32,7 @@ export function AddProdutosToMenuPanel({
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { syncProdutos } = useMenuMutations(menuId)
+  const { data: imagensPorProdutoId = {} } = useImagensProdutosCadastroBase()
 
   useEffect(() => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
@@ -69,8 +71,8 @@ export function AddProdutosToMenuPanel({
   const produtos = useMemo(() => {
     if (!data?.pages) return []
     const map = new Map<string, Produto>()
-    data.pages.forEach((page) => {
-      page.produtos.forEach((p) => {
+    data.pages.forEach(page => {
+      page.produtos.forEach(p => {
         if (!map.has(p.getId())) map.set(p.getId(), p)
       })
     })
@@ -80,7 +82,7 @@ export function AddProdutosToMenuPanel({
   const totalApi = data?.pages?.[0]?.count ?? 0
 
   const disponiveis = useMemo(
-    () => produtos.filter((p) => !produtosJaNoMenu.has(p.getId())),
+    () => produtos.filter(p => !produtosJaNoMenu.has(p.getId())),
     [produtos, produtosJaNoMenu]
   )
 
@@ -92,11 +94,11 @@ export function AddProdutosToMenuPanel({
   }
 
   const allSelected =
-    disponiveis.length > 0 && disponiveis.every((p) => selected.has(p.getId()))
-  const someSelected = disponiveis.some((p) => selected.has(p.getId()))
+    disponiveis.length > 0 && disponiveis.every(p => selected.has(p.getId()))
+  const someSelected = disponiveis.some(p => selected.has(p.getId()))
 
   const toggle = (id: string) => {
-    setSelected((prev) => {
+    setSelected(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
@@ -105,12 +107,12 @@ export function AddProdutosToMenuPanel({
   }
 
   const toggleAll = () => {
-    setSelected((prev) => {
+    setSelected(prev => {
       const next = new Set(prev)
       if (allSelected) {
-        disponiveis.forEach((p) => next.delete(p.getId()))
+        disponiveis.forEach(p => next.delete(p.getId()))
       } else {
-        disponiveis.forEach((p) => next.add(p.getId()))
+        disponiveis.forEach(p => next.add(p.getId()))
       }
       return next
     })
@@ -169,7 +171,7 @@ export function AddProdutosToMenuPanel({
               type="text"
               placeholder="Pesquisar produto..."
               value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
+              onChange={e => setSearchText(e.target.value)}
               className="h-full w-full rounded-lg border border-gray-200 bg-white px-5 pl-12 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
             />
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-text">
@@ -194,7 +196,7 @@ export function AddProdutosToMenuPanel({
               <input
                 type="checkbox"
                 checked={allSelected}
-                ref={(el) => {
+                ref={el => {
                   if (el) el.indeterminate = someSelected && !allSelected
                 }}
                 onChange={toggleAll}
@@ -207,6 +209,8 @@ export function AddProdutosToMenuPanel({
             const id = produto.getId()
             const checked = selected.has(id)
             const bgColor = index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
+            const imagemUrl =
+              imagensPorProdutoId[id]?.trim() || produto.getImagemUrl()?.trim() || null
             return (
               <label
                 key={id}
@@ -216,9 +220,32 @@ export function AddProdutosToMenuPanel({
                   type="checkbox"
                   checked={checked}
                   onChange={() => toggle(id)}
-                  className="h-4 w-4 accent-primary"
+                  className="h-4 w-4 shrink-0 accent-primary"
                 />
+                {imagemUrl ? (
+                  <span className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-white">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- preview do cadastro */}
+                    <img
+                      src={imagemUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  </span>
+                ) : (
+                  <span
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-secondary-text"
+                    aria-hidden
+                  >
+                    <MdImageNotSupported className="h-5 w-5" />
+                  </span>
+                )}
                 <span className="min-w-0 flex-1 truncate">{produto.getNome()}</span>
+                <span className="shrink-0 text-xs font-medium text-secondary-text md:text-sm">
+                  {new Intl.NumberFormat('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL',
+                  }).format(produto.getValor())}
+                </span>
               </label>
             )
           })}

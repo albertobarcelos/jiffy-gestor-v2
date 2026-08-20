@@ -3,6 +3,7 @@ import type {
   BuscarMenuGruposParams,
   BuscarMenuProdutosParams,
   BuscarMenusParams,
+  BuscarMenusPaginatedResponse,
   BuscarMenusResponse,
   IMenuRepository,
 } from '@/src/domain/repositories/IMenuRepository'
@@ -32,7 +33,7 @@ function appendPagination(
   }
 }
 
-function mapPaginated<T>(data: any): BuscarMenusResponse & { items: T[] } {
+function mapPaginated<T>(data: any): BuscarMenusPaginatedResponse<T> {
   return {
     items: (data?.items ?? []) as T[],
     count: data?.count ?? 0,

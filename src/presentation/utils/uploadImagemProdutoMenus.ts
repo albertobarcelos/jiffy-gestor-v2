@@ -129,14 +129,17 @@ export async function buscarMenusDaEmpresa(params: {
   })
   if (!response.ok) return []
   const data = await response.json().catch(() => ({}))
-  const items = Array.isArray(data.items) ? data.items : []
+  const items: unknown[] = Array.isArray(data.items) ? data.items : []
   return items
-    .map((item: { id?: unknown; nome?: unknown; tipo?: unknown }) => ({
-      id: String(item.id ?? '').trim(),
-      nome: String(item.nome ?? 'Menu').trim() || 'Menu',
-      tipo: typeof item.tipo === 'string' ? item.tipo : undefined,
-    }))
-    .filter(item => item.id)
+    .map(raw => {
+      const item = raw as { id?: unknown; nome?: unknown; tipo?: unknown }
+      return {
+        id: String(item.id ?? '').trim(),
+        nome: String(item.nome ?? 'Menu').trim() || 'Menu',
+        tipo: typeof item.tipo === 'string' ? item.tipo : undefined,
+      }
+    })
+    .filter(item => Boolean(item.id))
 }
 
 export async function buscarIdMenuPrincipal(token: string): Promise<string | null> {

@@ -28,6 +28,11 @@ export interface BuscarMenusResponse {
   hasPrevious?: boolean
 }
 
+/** Resposta paginada genérica (produtos/grupos reutilizam a mesma forma de `BuscarMenusResponse`). */
+export type BuscarMenusPaginatedResponse<T> = Omit<BuscarMenusResponse, 'items'> & {
+  items: T[]
+}
+
 export type MenuProdutoTipoFiltro = 'all' | 'padrao' | 'pizza'
 
 export interface BuscarMenuProdutosParams {
@@ -59,7 +64,7 @@ export interface IMenuRepository {
   listarProdutos(
     menuId: string,
     params: BuscarMenuProdutosParams
-  ): Promise<BuscarMenusResponse & { items: MenuProduto[] }>
+  ): Promise<BuscarMenusPaginatedResponse<MenuProduto>>
   buscarProduto(menuId: string, produtoId: string): Promise<MenuProduto>
   atualizarProdutos(
     menuId: string,
@@ -85,7 +90,7 @@ export interface IMenuRepository {
   listarGrupos(
     menuId: string,
     params: BuscarMenuGruposParams
-  ): Promise<BuscarMenusResponse & { items: MenuGrupoProduto[] }>
+  ): Promise<BuscarMenusPaginatedResponse<MenuGrupoProduto>>
   atualizarGrupo(
     menuId: string,
     grupoProdutoId: string,

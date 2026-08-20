@@ -1,6 +1,6 @@
 'use client'
 
-import { MdDeleteOutline, MdMenuBook } from 'react-icons/md'
+import { MdDeleteOutline, MdMenuBook, MdModeEdit } from 'react-icons/md'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import type { Menu } from '@/src/shared/types/menus'
 
@@ -28,12 +28,26 @@ export function MenuListItem({
   return (
     <div
       className={`mb-2 flex items-center gap-[10px] px-4 py-2 md:h-[50px] ${bgColor} cursor-pointer transition-colors hover:bg-secondary-text/10`}
-      onClick={() => onEdit(menu)}
+      onClick={() => onOpenCardapio(menu)}
     >
       <div className="flex min-w-0 flex-[4] flex-col items-start justify-center text-left">
-        <span className="w-full truncate text-left text-xs font-normal text-primary-text md:text-sm">
-          {menu.nome}
-        </span>
+        <div className="flex max-w-full items-center gap-1.5">
+          <span className="min-w-0 truncate text-left text-xs font-normal text-primary-text md:text-sm">
+            {menu.nome}
+          </span>
+          <button
+            type="button"
+            title="Editar menu"
+            aria-label={`Editar menu ${menu.nome}`}
+            onClick={e => {
+              e.stopPropagation()
+              onEdit(menu)
+            }}
+            className="flex shrink-0 items-center justify-center text-primary transition-colors hover:text-primary/80"
+          >
+            <MdModeEdit size={14} />
+          </button>
+        </div>
         {menu.descricao ? (
           <span className="hidden w-full truncate text-left text-xs text-secondary-text md:block">
             {menu.descricao}
@@ -51,9 +65,9 @@ export function MenuListItem({
 
       <div
         className="flex flex-[2] items-center justify-end gap-2"
-        onClick={(e) => e.stopPropagation()}
-        onMouseDown={(e) => e.stopPropagation()}
-        onTouchStart={(e) => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
+        onMouseDown={e => e.stopPropagation()}
+        onTouchStart={e => e.stopPropagation()}
       >
         <button
           type="button"
@@ -77,7 +91,7 @@ export function MenuListItem({
 
         <JiffyIconSwitch
           checked={menu.ativo}
-          onChange={(e) => onToggleStatus(menu, e.target.checked)}
+          onChange={e => onToggleStatus(menu, e.target.checked)}
           bordered={false}
           size="sm"
           className="shrink-0"
