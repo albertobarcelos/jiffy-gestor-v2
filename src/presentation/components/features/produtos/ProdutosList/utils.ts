@@ -3,39 +3,9 @@ import type { ProdutoPatch } from '@/src/shared/types/produto'
 
 const collator = new Intl.Collator('pt-BR', { sensitivity: 'accent', numeric: false })
 
-export const normalizeGroupName = (nome?: string) =>
-  nome && nome.trim().length > 0 ? nome : 'Sem categoria'
-
-/**
- * Chave estável para agrupar produtos na lista: um bucket por `grupoId`.
- * Não funde grupos distintos só porque o nome é igual — IDs diferentes ⇒ blocos separados.
- * Sem `grupoId`, agrupa por nome normalizado (comportamento legado para produtos órfãos).
- */
-export const buildProdutoGroupKey = (p: Produto): string => {
-  const gid = p.getGrupoId()?.trim()
-  if (gid) return `gid:${gid}`
-  return `sem_grupo:${normalizeGroupName(p.getNomeGrupo())}`
-}
-
+/** Lista sequencial: ordenação alfabética por nome do produto. */
 export const sortProdutosAlphabetically = (lista: Produto[]): Produto[] =>
-  [...lista].sort((a, b) => {
-    const grupoCompare = collator.compare(
-      normalizeGroupName(a.getNomeGrupo()),
-      normalizeGroupName(b.getNomeGrupo())
-    )
-    return grupoCompare !== 0 ? grupoCompare : collator.compare(a.getNome(), b.getNome())
-  })
-
-/** Ordenação dentro do mesmo grupo: campo `ordem` da API, depois nome. */
-export const sortProdutosWithinGroup = (lista: Produto[]): Produto[] =>
-  [...lista].sort((a, b) => {
-    const oa = a.getOrdem()
-    const ob = b.getOrdem()
-    const na = typeof oa === 'number' && Number.isFinite(oa) ? oa : Number.MAX_SAFE_INTEGER
-    const nb = typeof ob === 'number' && Number.isFinite(ob) ? ob : Number.MAX_SAFE_INTEGER
-    if (na !== nb) return na - nb
-    return collator.compare(a.getNome(), b.getNome())
-  })
+  [...lista].sort((a, b) => collator.compare(a.getNome(), b.getNome()))
 
 /**
  * Monta `Produto` a partir da resposta da API mantendo `ordem` do item já em cache

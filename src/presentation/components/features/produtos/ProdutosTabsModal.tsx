@@ -7,7 +7,6 @@ import {
   type JiffySidePanelFooterActions,
 } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { Produto } from '@/src/domain/entities/Produto'
-import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { NovoProduto, type NovoProdutoHandle } from './NovoProduto'
 import { ComplementosMultiSelectDialog, type ComplementosMultiSelectHandle } from './ComplementosMultiSelectDialog'
 import {
@@ -15,12 +14,10 @@ import {
   type ProdutoImpressorasHandle,
 } from './ProdutoImpressorasDialog'
 import { ProdutoMenusPanel, type ProdutoMenusHandle } from './ProdutoMenusPanel'
-import { NovoGrupo, type NovoGrupoHandle } from '../grupos-produtos/NovoGrupo'
-import { GRUPO_PRODUTOS_MODAL_FORM_ID } from '../grupos-produtos/grupoProdutosModalConstants'
 import { MENU_WIDE_PANEL_CLASS } from '@/src/presentation/components/features/menus/menuPanelConstants'
 import { cn } from '@/src/shared/utils/cn'
 
-export type ProdutosTabsTabKey = 'produto' | 'complementos' | 'impressoras' | 'menus' | 'grupo'
+export type ProdutosTabsTabKey = 'produto' | 'complementos' | 'impressoras' | 'menus'
 type TabKey = ProdutosTabsTabKey
 
 export interface ProdutosTabsModalState {
@@ -30,11 +27,7 @@ export interface ProdutosTabsModalState {
   produto?: Produto
   prefillGrupoProdutoId?: string
   grupoId?: string
-  /** Grupo já carregado na lista — evita spinner ao abrir a aba Grupo. */
-  initialGrupo?: GrupoProduto
   initialStepProduto?: 0 | 1 | 2
-  /** Aba inicial do `NovoGrupo` (0 = detalhes, 1 = produtos vinculados) */
-  initialTabGrupo?: number
   /** Na criação, vincula o produto a estes menus (POST `menuIds`). */
   createMenuIds?: string[]
 }
@@ -54,12 +47,9 @@ export function ProdutosTabsModal({
 }: ProdutosTabsModalProps) {
   const produtoId = state.produto?.getId()
   const npRef = useRef<NovoProdutoHandle>(null)
-  const grupoNgRef = useRef<NovoGrupoHandle>(null)
   const complementosRef = useRef<ComplementosMultiSelectHandle>(null)
   const impressorasRef = useRef<ProdutoImpressorasHandle>(null)
   const menusRef = useRef<ProdutoMenusHandle>(null)
-  /** Evita fechar o painel quando o salvamento do produto é só etapa antes do salvamento do grupo */
-  const suppressCloseOnNextProdutoSuccessRef = useRef(false)
 
   const isDraftProduto = state.mode === 'create' || state.mode === 'copy'
 
@@ -68,11 +58,6 @@ export function ProdutosTabsModal({
   const [wizardSaving, setWizardSaving] = useState(false)
   const [fiscalOnlyBack, setFiscalOnlyBack] = useState(false)
 
-  const [embedGrupoTab, setEmbedGrupoTab] = useState(state.initialTabGrupo ?? 0)
-  const [embedGrupoForm, setEmbedGrupoForm] = useState({
-    isSubmitting: false,
-    canSubmit: false,
-  })
   const [embedComplementos, setEmbedComplementos] = useState({
     isDirty: false,
     isSaving: false,
@@ -135,14 +120,13 @@ export function ProdutosTabsModal({
     prevPainelAbertoRef.current = state.open
   }, [state.open, state.mode, state.createMenuIds, state.produto])
 
-  // Limpa overlay de confirmação ao fechar; ao abrir, zera flags para não herdar sessão anterior
+  // Limpa overlay de confirmação ao fechar
   useEffect(() => {
     if (!state.open) {
       setConfirmExitOpen(false)
       return
     }
     setConfirmExitOpen(false)
-    suppressCloseOnNextProdutoSuccessRef.current = false
   }, [state.open])
 
   const handleRequestClose = useCallback(() => {
@@ -220,38 +204,6 @@ export function ProdutosTabsModal({
     void npRef.current?.saveFinal()
   }, [wizardStep])
 
-  /** Persiste alterações pendentes do produto sem fechar o painel (orquestração com salvamento do grupo). */
-  const persistPendingProdutoChanges = useCallback(async (): Promise<boolean> => {
-    if (!npRef.current?.isDirty?.()) return true
-    suppressCloseOnNextProdutoSuccessRef.current = true
-    try {
-      const ok =
-        wizardStep < 2 ? await npRef.current.savePartialAndClose() : await npRef.current.saveFinal()
-      if (!ok) {
-        suppressCloseOnNextProdutoSuccessRef.current = false
-      }
-      return ok
-    } catch {
-      suppressCloseOnNextProdutoSuccessRef.current = false
-      return false
-    }
-  }, [wizardStep])
-
-  /** Salva produto pendente (se houver) e em seguida o grupo — mesma ação do botão Salvar na aba Grupo. */
-  const handleSalvarGrupoCombinado = useCallback(async () => {
-    const produtoOk = await persistPendingProdutoChanges()
-    if (!produtoOk) return
-
-    if (embedGrupoTab === 0) {
-      const el = document.getElementById(GRUPO_PRODUTOS_MODAL_FORM_ID)
-      if (el instanceof HTMLFormElement) {
-        el.requestSubmit()
-      }
-    } else {
-      await grupoNgRef.current?.saveGrupo()
-    }
-  }, [embedGrupoTab, persistPendingProdutoChanges])
-
   /**
    * Mantém cada aba montada após a primeira visita enquanto o painel estiver aberto,
    * evitando remount e novas requisições ao alternar abas.
@@ -261,7 +213,6 @@ export function ProdutosTabsModal({
   const [mountedComplementos, setMountedComplementos] = useState(false)
   const [mountedImpressoras, setMountedImpressoras] = useState(false)
   const [mountedMenus, setMountedMenus] = useState(false)
-  const [mountedGrupo, setMountedGrupo] = useState(false)
 
   useEffect(() => {
     if (!state.open) {
@@ -269,7 +220,6 @@ export function ProdutosTabsModal({
       setMountedComplementos(false)
       setMountedImpressoras(false)
       setMountedMenus(false)
-      setMountedGrupo(false)
       return
     }
     if (isDraftProduto || state.tab === 'produto') setMountedProduto(true)
@@ -280,8 +230,7 @@ export function ProdutosTabsModal({
     if (isDraftProduto || (produtoId && state.mode === 'edit')) {
       setMountedMenus(true)
     }
-    if (state.grupoId) setMountedGrupo(true)
-  }, [state.open, state.tab, produtoId, state.grupoId, state.mode, isDraftProduto])
+  }, [state.open, state.tab, produtoId, state.mode, isDraftProduto])
 
   const showProdutoPanel = state.open && (mountedProduto || state.tab === 'produto')
   const showComplementosPanel =
@@ -291,17 +240,11 @@ export function ProdutosTabsModal({
   const showMenusPanel =
     state.open && (isDraftProduto || (state.mode === 'edit' && !!produtoId)) &&
     (mountedMenus || state.tab === 'menus')
-  const showGrupoPanel = state.open && !!state.grupoId && (mountedGrupo || state.tab === 'grupo')
 
   useEffect(() => {
     if (!state.open) return
     setWizardStep(state.initialStepProduto ?? 0)
   }, [state.open, state.initialStepProduto])
-
-  useEffect(() => {
-    if (!state.open) return
-    setEmbedGrupoTab(state.initialTabGrupo ?? 0)
-  }, [state.open, state.initialTabGrupo])
 
   /**
    * Identidade estável do painel: produto + modo. Não incluir `state.tab` — senão cada troca de aba
@@ -327,7 +270,7 @@ export function ProdutosTabsModal({
       )
     }
 
-    // Complementos / Grupo / Impressoras: só o produto (a tab já dá o contexto)
+    // Complementos / Impressoras / Menus: só o produto (a tab já dá o contexto)
     const displayName = nome || 'Produto'
     return (
       <span className="block max-w-full truncate tracking-normal" title={displayName}>
@@ -476,48 +419,13 @@ export function ProdutosTabsModal({
     ]
   )
 
-  const footerGrupo = useMemo((): JiffySidePanelFooterActions => {
-    const savingGrupoOuProduto = embedGrupoForm.isSubmitting || wizardSaving
-    const saveDisabled = !embedGrupoForm.canSubmit || savingGrupoOuProduto
-
-    return {
-      showCancel: true,
-      cancelLabel: 'Fechar',
-      cancelVariant: 'primaryTint10',
-      onCancel: handleRequestClose,
-      showSave: true,
-      saveLabel: 'Salvar',
-      onSave: () => void handleSalvarGrupoCombinado(),
-      saveLoading: savingGrupoOuProduto,
-      saveDisabled,
-    }
-  }, [embedGrupoForm, handleRequestClose, handleSalvarGrupoCombinado, wizardSaving])
-
   const footerActions = useMemo(() => {
     if (state.tab === 'produto') return footerProduto
     if (state.tab === 'complementos') return footerComplementos
     if (state.tab === 'impressoras') return footerImpressoras
     if (state.tab === 'menus') return footerMenus
-    if (state.tab === 'grupo' && !state.grupoId) {
-      return {
-        showCancel: true,
-        cancelLabel: 'Fechar',
-        cancelVariant: 'primaryTint10' as const,
-        onCancel: handleRequestClose,
-      }
-    }
-    if (state.tab === 'grupo') return footerGrupo
     return undefined
-  }, [
-    state.tab,
-    state.grupoId,
-    footerProduto,
-    footerComplementos,
-    footerImpressoras,
-    footerMenus,
-    footerGrupo,
-    handleRequestClose,
-  ])
+  }, [state.tab, footerProduto, footerComplementos, footerImpressoras, footerMenus])
 
   return (
     <>
@@ -536,7 +444,6 @@ export function ProdutosTabsModal({
             {(
               [
                 { key: 'produto' as const, label: 'Produto', disabled: false },
-                { key: 'grupo' as const, label: 'Categoria', disabled: !state.grupoId },
                 { key: 'complementos' as const, label: 'Complementos', disabled: !produtoId },
                 { key: 'impressoras' as const, label: 'Impressoras', disabled: !produtoId },
                 {
@@ -596,10 +503,6 @@ export function ProdutosTabsModal({
                 onClose={handleRequestClose}
                 onSuccess={produtoData => {
                   onReload?.(produtoData?.produtoId, produtoData?.produtoData)
-                  if (suppressCloseOnNextProdutoSuccessRef.current) {
-                    suppressCloseOnNextProdutoSuccessRef.current = false
-                    return
-                  }
                   onClose()
                 }}
               />
@@ -679,40 +582,6 @@ export function ProdutosTabsModal({
           ) : state.open && state.tab === 'menus' && state.mode === 'edit' && !produtoId ? (
             <div className="flex h-full min-h-0 flex-1 items-center justify-center px-4 text-center text-sm text-secondary-text">
               Selecione um produto para vincular aos cardápios.
-            </div>
-          ) : null}
-
-          {showGrupoPanel ? (
-            <div
-              className={cn(
-                'flex min-h-0 flex-1 flex-col overflow-hidden',
-                state.tab !== 'grupo' && 'hidden'
-              )}
-              aria-hidden={state.tab !== 'grupo'}
-            >
-              {/* key só pelo grupoId: incluir a aba interna remontava o form e voltava para initialTab 0 */}
-              <NovoGrupo
-                ref={grupoNgRef}
-                key={state.grupoId}
-                grupoId={state.grupoId!}
-                initialGrupo={state.initialGrupo}
-                isEmbedded
-                embeddedFormId={GRUPO_PRODUTOS_MODAL_FORM_ID}
-                hideEmbeddedFormActions
-                onEmbedFormStateChange={setEmbedGrupoForm}
-                onEmbeddedTabChange={setEmbedGrupoTab}
-                onClose={handleRequestClose}
-                onReload={onReload}
-                onSaved={() => {
-                  onReload?.()
-                  onClose()
-                }}
-                initialTab={state.initialTabGrupo ?? 0}
-              />
-            </div>
-          ) : state.open && state.tab === 'grupo' && !state.grupoId ? (
-            <div className="flex h-full min-h-0 flex-1 items-center justify-center text-sm text-secondary-text">
-              Selecione uma categoria válida para editar.
             </div>
           ) : null}
         </div>

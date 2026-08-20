@@ -1898,7 +1898,9 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           if (!nomeProduto?.trim()) return false
           if (!precoVenda || precoNum <= 0) return false
           if (!unidadeProduto) return false
-          if (!lockGrupoProduto && !grupoProduto) return false
+          const isEditMode = Boolean(effectiveProdutoId) && !effectiveIsCopyMode
+          // Criação/cópia: categoria obrigatória. Edição: campo oculto, grupo já vem do produto.
+          if (!isEditMode && !lockGrupoProduto && !grupoProduto) return false
           return true
         },
       }),
@@ -1910,6 +1912,8 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         unidadeProduto,
         grupoProduto,
         lockGrupoProduto,
+        effectiveProdutoId,
+        effectiveIsCopyMode,
       ]
     )
 
@@ -2139,6 +2143,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
               onGrupoProdutoChange={setGrupoProduto}
               lockGrupoProduto={lockGrupoProduto}
               lockedGrupoLabel={lockedGrupoLabel}
+              showCategoriaField={!(!!effectiveProdutoId && !effectiveIsCopyMode)}
               codigoEanBarras={codigoEanBarras}
               onCodigoEanBarrasChange={setCodigoEanBarras}
               grupos={grupos}

@@ -25,6 +25,8 @@ interface InformacoesProdutoStepProps {
   isLoadingGrupos: boolean
   lockGrupoProduto?: boolean
   lockedGrupoLabel?: string
+  /** Na edição do produto base o campo some; na criação permanece obrigatório. */
+  showCategoriaField?: boolean
   onNext: () => void
   /** Salva com dados preenchidos até aqui e encerra o fluxo (sem passos seguintes) */
   onSaveAndClose: () => void
@@ -53,6 +55,7 @@ export function InformacoesProdutoStep({
   isLoadingGrupos,
   lockGrupoProduto = false,
   lockedGrupoLabel,
+  showCategoriaField = true,
   onNext,
   onSaveAndClose,
   hideStepFooter = false,
@@ -113,71 +116,79 @@ export function InformacoesProdutoStep({
           />
         </div>
 
-        {/* Linha 2: Grupo (com pesquisa) + Unidade + Código EAN */}
-        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,9.5rem)_minmax(0,1fr)]">
-          <div className="relative z-20 min-w-0">
-            {lockGrupoProduto && !grupoSelecionado && lockedGrupoLabel ? (
-              <TextField
-                size="small"
-                fullWidth
-                label="Categoria"
-                value={lockedGrupoLabel}
-                disabled
-                InputLabelProps={{ shrink: true }}
-                sx={{
-                  ...sxEntradaCompactaProduto,
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: '#fff',
-                  },
-                }}
-              />
-            ) : (
-              <Autocomplete
-                id="np-grupo-produto-searchable"
-                size="small"
-                options={grupos}
-                loading={isLoadingGrupos}
-                loadingText="Carregando..."
-                noOptionsText="Nenhuma categoria encontrada"
-                disabled={lockGrupoProduto}
-                getOptionLabel={grupo =>
-                  grupo.isAtivo() ? grupo.getNome() : `${grupo.getNome()} (Inativo)`
-                }
-                isOptionEqualToValue={(a, b) => a.getId() === b.getId()}
-                value={grupoSelecionado}
-                onChange={(_, grupo) => onGrupoProdutoChange(grupo?.getId() ?? null)}
-                renderOption={(props, grupo) => (
-                  <li
-                    {...props}
-                    key={grupo.getId()}
-                    style={{
-                      ...props.style,
-                      color: grupo.isAtivo() ? undefined : '#9CA3AF',
-                    }}
-                  >
-                    {grupo.isAtivo() ? grupo.getNome() : `${grupo.getNome()} (Inativo)`}
-                  </li>
-                )}
-                renderInput={params => (
-                  <TextField
-                    {...params}
-                    label="Categoria"
-                    placeholder="Pesquise ou selecione"
-                    InputLabelProps={{
-                      ...params.InputLabelProps,
-                      shrink: true,
-                    }}
-                    sx={{
-                      ...sxEntradaCompactaProduto,
-                      '& .MuiOutlinedInput-root': {
-                        backgroundColor: '#fff',
-                      },
-                    }}
-                  />
-                )}
-              />
-            )}
-          </div>
+        {/* Linha 2: Categoria (só na criação) + Unidade + Código EAN */}
+        <div
+          className={
+            showCategoriaField
+              ? 'grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,9.5rem)_minmax(0,1fr)]'
+              : 'grid grid-cols-[minmax(0,9.5rem)_minmax(0,1fr)] gap-4'
+          }
+        >
+          {showCategoriaField ? (
+            <div className="relative z-20 min-w-0">
+              {lockGrupoProduto && !grupoSelecionado && lockedGrupoLabel ? (
+                <TextField
+                  size="small"
+                  fullWidth
+                  label="Categoria"
+                  value={lockedGrupoLabel}
+                  disabled
+                  InputLabelProps={{ shrink: true }}
+                  sx={{
+                    ...sxEntradaCompactaProduto,
+                    '& .MuiOutlinedInput-root': {
+                      backgroundColor: '#fff',
+                    },
+                  }}
+                />
+              ) : (
+                <Autocomplete
+                  id="np-grupo-produto-searchable"
+                  size="small"
+                  options={grupos}
+                  loading={isLoadingGrupos}
+                  loadingText="Carregando..."
+                  noOptionsText="Nenhuma categoria encontrada"
+                  disabled={lockGrupoProduto}
+                  getOptionLabel={grupo =>
+                    grupo.isAtivo() ? grupo.getNome() : `${grupo.getNome()} (Inativo)`
+                  }
+                  isOptionEqualToValue={(a, b) => a.getId() === b.getId()}
+                  value={grupoSelecionado}
+                  onChange={(_, grupo) => onGrupoProdutoChange(grupo?.getId() ?? null)}
+                  renderOption={(props, grupo) => (
+                    <li
+                      {...props}
+                      key={grupo.getId()}
+                      style={{
+                        ...props.style,
+                        color: grupo.isAtivo() ? undefined : '#9CA3AF',
+                      }}
+                    >
+                      {grupo.isAtivo() ? grupo.getNome() : `${grupo.getNome()} (Inativo)`}
+                    </li>
+                  )}
+                  renderInput={params => (
+                    <TextField
+                      {...params}
+                      label="Categoria"
+                      placeholder="Pesquise ou selecione"
+                      InputLabelProps={{
+                        ...params.InputLabelProps,
+                        shrink: true,
+                      }}
+                      sx={{
+                        ...sxEntradaCompactaProduto,
+                        '& .MuiOutlinedInput-root': {
+                          backgroundColor: '#fff',
+                        },
+                      }}
+                    />
+                  )}
+                />
+              )}
+            </div>
+          ) : null}
           <div className="min-w-0">
             <FormControl
               fullWidth
