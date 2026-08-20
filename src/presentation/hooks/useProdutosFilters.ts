@@ -1,7 +1,7 @@
 'use client'
 
 import { useReducer, useMemo, useEffect, useRef, useCallback } from 'react'
-import type { StatusFilter, TriState } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutosFilters'
+import type { StatusFilter } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutosFilters'
 import { produtosInfiniteQueryParams } from '@/src/presentation/hooks/useProdutos'
 
 interface FiltersState {
@@ -9,8 +9,6 @@ interface FiltersState {
   debouncedSearch: string
   filterStatus: StatusFilter
   statusGrupoFilter: StatusFilter
-  ativoLocalFilter: TriState
-  ativoDeliveryFilter: TriState
   grupoProdutoFilter: string
   grupoComplementoFilter: string
   limit: number
@@ -21,8 +19,6 @@ type FiltersAction =
   | { type: 'SET_DEBOUNCED_SEARCH'; value: string }
   | { type: 'SET_STATUS'; value: StatusFilter }
   | { type: 'SET_STATUS_GRUPO'; value: StatusFilter }
-  | { type: 'SET_ATIVO_LOCAL'; value: TriState }
-  | { type: 'SET_ATIVO_DELIVERY'; value: TriState }
   | { type: 'SET_GRUPO_PRODUTO'; value: string }
   | { type: 'SET_GRUPO_COMPLEMENTO'; value: string }
   | { type: 'RESET' }
@@ -32,8 +28,6 @@ const initialState: FiltersState = {
   debouncedSearch: '',
   filterStatus: 'Ativo',
   statusGrupoFilter: 'Ativo',
-  ativoLocalFilter: 'Todos',
-  ativoDeliveryFilter: 'Todos',
   grupoProdutoFilter: '',
   grupoComplementoFilter: '',
   limit: 100,
@@ -49,10 +43,6 @@ function filtersReducer(state: FiltersState, action: FiltersAction): FiltersStat
       return { ...state, filterStatus: action.value }
     case 'SET_STATUS_GRUPO':
       return { ...state, statusGrupoFilter: action.value, grupoProdutoFilter: '' }
-    case 'SET_ATIVO_LOCAL':
-      return { ...state, ativoLocalFilter: action.value }
-    case 'SET_ATIVO_DELIVERY':
-      return { ...state, ativoDeliveryFilter: action.value }
     case 'SET_GRUPO_PRODUTO':
       return { ...state, grupoProdutoFilter: action.value }
     case 'SET_GRUPO_COMPLEMENTO':
@@ -87,25 +77,11 @@ export function useProdutosFilters() {
     return null
   }, [state.filterStatus])
 
-  const ativoLocalBoolean = useMemo<boolean | null>(() => {
-    if (state.ativoLocalFilter === 'Sim') return true
-    if (state.ativoLocalFilter === 'Não') return false
-    return null
-  }, [state.ativoLocalFilter])
-
-  const ativoDeliveryBoolean = useMemo<boolean | null>(() => {
-    if (state.ativoDeliveryFilter === 'Sim') return true
-    if (state.ativoDeliveryFilter === 'Não') return false
-    return null
-  }, [state.ativoDeliveryFilter])
-
   const queryParams = useMemo(
     () =>
       produtosInfiniteQueryParams({
         name: state.debouncedSearch || undefined,
         ativo: ativoFilter,
-        ativoLocal: ativoLocalBoolean,
-        ativoDelivery: ativoDeliveryBoolean,
         grupoProdutoId: state.grupoProdutoFilter || undefined,
         grupoComplementosId:
           state.grupoComplementoFilter === '__none__'
@@ -113,7 +89,7 @@ export function useProdutosFilters() {
             : state.grupoComplementoFilter || undefined,
         limit: state.limit,
       }),
-    [state.debouncedSearch, ativoFilter, ativoLocalBoolean, ativoDeliveryBoolean, state.grupoProdutoFilter, state.grupoComplementoFilter, state.limit]
+    [state.debouncedSearch, ativoFilter, state.grupoProdutoFilter, state.grupoComplementoFilter, state.limit]
   )
 
   // `dispatch` é estável (garantia do useReducer), portanto essas funções também são estáveis.
@@ -123,8 +99,6 @@ export function useProdutosFilters() {
     (value: StatusFilter) => dispatch({ type: 'SET_STATUS_GRUPO', value }),
     []
   )
-  const setAtivoLocal = useCallback((value: TriState) => dispatch({ type: 'SET_ATIVO_LOCAL', value }), [])
-  const setAtivoDelivery = useCallback((value: TriState) => dispatch({ type: 'SET_ATIVO_DELIVERY', value }), [])
   const setGrupoProduto = useCallback((value: string) => dispatch({ type: 'SET_GRUPO_PRODUTO', value }), [])
   const setGrupoComplemento = useCallback((value: string) => dispatch({ type: 'SET_GRUPO_COMPLEMENTO', value }), [])
   const reset = useCallback(() => dispatch({ type: 'RESET' }), [])
@@ -134,22 +108,11 @@ export function useProdutosFilters() {
       setSearch,
       setStatus,
       setStatusGrupo,
-      setAtivoLocal,
-      setAtivoDelivery,
       setGrupoProduto,
       setGrupoComplemento,
       reset,
     }),
-    [
-      setSearch,
-      setStatus,
-      setStatusGrupo,
-      setAtivoLocal,
-      setAtivoDelivery,
-      setGrupoProduto,
-      setGrupoComplemento,
-      reset,
-    ]
+    [setSearch, setStatus, setStatusGrupo, setGrupoProduto, setGrupoComplemento, reset]
   )
 
   return {

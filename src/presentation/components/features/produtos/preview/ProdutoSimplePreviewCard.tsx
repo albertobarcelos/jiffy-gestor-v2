@@ -160,21 +160,28 @@ export function ProdutoSimplePreviewCard({
           ) : (
             <div className="flex h-full w-full flex-col items-center justify-center gap-1 px-3 text-center text-secondary-text">
               <MdImageNotSupported className="h-12 w-12 opacity-50" aria-hidden />
-              {showUploadUi && uploadEnabled ? (
+              {showUploadUi ? (
                 <p className="text-[10px] leading-tight text-neutral-500">
-                  {imageUpload?.hint ?? 'Arraste ou clique'}
+                  {imageUpload?.busy
+                    ? 'Enviando imagem…'
+                    : dragActive
+                      ? 'Solte para recortar'
+                      : uploadEnabled
+                        ? (imageUpload?.hint ?? 'Arraste ou clique para enviar')
+                        : (imageUpload?.disabledHint ?? 'Upload indisponível')}
                 </p>
               ) : null}
             </div>
           )}
 
-          {showUploadUi && uploadEnabled ? (
+          {/* Overlay de upload só quando já há imagem (hover/arraste); no vazio fica só o placeholder cinza */}
+          {showUploadUi && uploadEnabled && imagem ? (
             <div
               className={cn(
                 'pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/45 px-3 text-center text-white transition-opacity',
-                imagem ? 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100' : '',
-                dragActive && 'opacity-100',
-                imageUpload?.busy && 'opacity-100'
+                !dragActive && !imageUpload?.busy
+                  ? 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'
+                  : 'opacity-100'
               )}
             >
               <MdAddAPhoto className="h-8 w-8 drop-shadow" aria-hidden />
@@ -188,7 +195,7 @@ export function ProdutoSimplePreviewCard({
             </div>
           ) : null}
 
-          {showUploadUi && !uploadEnabled && imageUpload?.disabledHint ? (
+          {showUploadUi && !uploadEnabled && imageUpload?.disabledHint && imagem ? (
             <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/55 px-2 py-1.5 text-center text-[10px] leading-tight text-white">
               {imageUpload.disabledHint}
             </div>

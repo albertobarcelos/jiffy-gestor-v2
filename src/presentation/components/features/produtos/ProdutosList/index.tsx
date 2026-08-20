@@ -406,10 +406,6 @@ export function ProdutosList() {
         onFilterStatusChange={actions.setStatus}
         statusGrupoFilter={filters.statusGrupoFilter}
         onStatusGrupoChange={actions.setStatusGrupo}
-        ativoLocalFilter={filters.ativoLocalFilter}
-        onAtivoLocalChange={actions.setAtivoLocal}
-        ativoDeliveryFilter={filters.ativoDeliveryFilter}
-        onAtivoDeliveryChange={actions.setAtivoDelivery}
         grupoProdutoFilter={filters.grupoProdutoFilter}
         onGrupoProdutoChange={actions.setGrupoProduto}
         gruposProdutos={gruposProdutosFiltrados}
