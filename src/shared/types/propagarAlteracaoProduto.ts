@@ -11,8 +11,12 @@ export type SnapshotProdutoPropagavel = {
 
 export type OrigemAlteracaoProduto = 'cadastroBase' | 'menu'
 
-/** `dados` = nome/preço etc. `imagem` = copiar foto para outros cardápios. */
-export type VariantePropagacaoProduto = 'dados' | 'imagem'
+/**
+ * `dados` = nome/preço etc.
+ * `imagem` = copiar foto (só edição).
+ * `vinculoMenus` = vincular produto a outros cardápios após criação.
+ */
+export type VariantePropagacaoProduto = 'dados' | 'imagem' | 'vinculoMenus'
 
 export type DestinoAlteracaoProduto = {
   aplicarNoCadastroBase: boolean

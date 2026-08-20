@@ -32,7 +32,11 @@ import {
   GruposProdutosTabsModal,
   GruposProdutosTabsModalState,
 } from './GruposProdutosTabsModal'
-import { ProdutosTabsModal, ProdutosTabsModalState } from '../produtos/ProdutosTabsModal'
+import {
+  EscolherTipoProdutoModal,
+  useEscolherTipoProdutoCadastro,
+} from '../produtos/EscolherTipoProdutoModal'
+import { ProdutoNovoWizard } from '../produtos/ProdutoNovoWizard'
 
 interface GruposProdutosListProps {
   onReload?: () => void
@@ -43,6 +47,9 @@ interface GruposProdutosListProps {
  * Usa React Query para cache automático e deduplicação de requisições
  */
 export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
+  const tipoCadastro = useEscolherTipoProdutoCadastro()
+  const [wizardOpen, setWizardOpen] = useState(false)
+  const [wizardCategoriaId, setWizardCategoriaId] = useState<string | undefined>()
   const [searchText, setSearchText] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Inativo'>('Ativo')
@@ -62,14 +69,6 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     open: false,
     tab: 'grupo',
     mode: 'create',
-    grupoId: undefined,
-  })
-  const [produtoTabsState, setProdutoTabsState] = useState<ProdutosTabsModalState>({
-    open: false,
-    tab: 'produto',
-    mode: 'create',
-    produto: undefined,
-    prefillGrupoProdutoId: undefined,
     grupoId: undefined,
   })
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
@@ -326,49 +325,20 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
 
   const handleOpenProdutoModal = useCallback(
     (grupoId: string) => {
-      setProdutoTabsState({
-        open: true,
-        tab: 'produto',
-        mode: 'create',
-        produto: undefined,
-        prefillGrupoProdutoId: grupoId,
-        grupoId: undefined,
+      tipoCadastro.pedirTipo(() => {
+        setWizardCategoriaId(grupoId)
+        setWizardOpen(true)
       })
-
-      // Adicionar um parâmetro na URL para forçar o recarregamento ao fechar
-      const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
-      currentSearchParams.set('modalProdutoOpen', 'true')
-      router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
     },
-    [router, searchParams, pathname]
+    [tipoCadastro.pedirTipo]
   )
 
-  const handleCloseProdutoModal = useCallback(() => {
-    setProdutoTabsState((prev) => ({
-      ...prev,
-      open: false,
-      produto: undefined,
-      prefillGrupoProdutoId: undefined,
-      grupoId: undefined,
-    }))
-    
-    // Remover o parâmetro da URL para forçar o recarregamento da rota
-    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
-    currentSearchParams.delete('modalProdutoOpen')
-    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
-    router.refresh() // Força a revalidação da rota principal
+  const handleCloseWizard = useCallback(() => {
+    setWizardOpen(false)
+    setWizardCategoriaId(undefined)
     void invalidateListas()
-  }, [router, searchParams, invalidateListas, pathname])
-
-  const handleProdutoTabChange = useCallback(
-    (tab: 'produto' | 'complementos' | 'impressoras' | 'menus' | 'grupo') => {
-      setProdutoTabsState((prev) => ({
-        ...prev,
-        tab,
-      }))
-    },
-    []
-  )
+    onReload?.()
+  }, [invalidateListas, onReload])
 
   // Handler para quando o drag termina - versão simples: envia para API e recarrega a página
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
@@ -596,19 +566,20 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       onReload={handleTabsModalReload}
       onTabChange={handleTabsModalTabChange}
     />
-    <ProdutosTabsModal
-      state={produtoTabsState}
-      onClose={handleCloseProdutoModal}
-      onReload={(produtoId?: string, produtoData?: any) => {
-        // Se temos dados do produto, podemos atualizar o cache
-        // Caso contrário, apenas chama o onReload original
-        if (produtoId && produtoData) {
-          // Aqui poderia atualizar o cache se necessário
-          // Por enquanto, apenas chama o onReload original
-        }
+    <EscolherTipoProdutoModal
+      open={tipoCadastro.open}
+      onClose={tipoCadastro.fechar}
+      onContinuar={tipoCadastro.continuar}
+    />
+    <ProdutoNovoWizard
+      origem="cadastro"
+      open={wizardOpen}
+      initialCategoriaId={wizardCategoriaId}
+      onClose={handleCloseWizard}
+      onSuccess={() => {
+        void invalidateListas()
         onReload?.()
       }}
-      onTabChange={handleProdutoTabChange}
     />
     </>
   )

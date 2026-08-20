@@ -25,12 +25,30 @@ export function extrairMenuIdsDoProdutoJson(produto: unknown): string[] {
   ]
 }
 
-export function unirMenuIds(...grupos: Array<Iterable<string> | undefined>): string[] {
-  return [
-    ...new Set(
-      grupos.flatMap(grupo => (grupo ? [...grupo] : [])).map(id => id.trim()).filter(Boolean)
-    ),
-  ]
+export function unirMenuIds(
+  ...grupos: Array<Iterable<unknown> | string | null | undefined>
+): string[] {
+  const ids: string[] = []
+
+  const coletar = (valor: unknown) => {
+    if (valor == null) return
+    if (typeof valor === 'string') {
+      const t = valor.trim()
+      if (t) ids.push(t)
+      return
+    }
+    if (typeof valor === 'number' || typeof valor === 'boolean') {
+      const t = String(valor).trim()
+      if (t) ids.push(t)
+      return
+    }
+    if (typeof valor === 'object' && Symbol.iterator in (valor as object)) {
+      for (const item of valor as Iterable<unknown>) coletar(item)
+    }
+  }
+
+  for (const grupo of grupos) coletar(grupo)
+  return [...new Set(ids)]
 }
 
 export async function buscarMenuIdsDoProduto(params: {
@@ -83,7 +101,7 @@ export async function uploadImagemProdutoNosMenus(params: {
   menuIds: string[]
   file: File
 }): Promise<void> {
-  const ids = [...new Set(params.menuIds.map(id => id.trim()).filter(Boolean))]
+  const ids = unirMenuIds(params.menuIds)
   if (ids.length === 0) {
     throw new Error('Vincule o produto a um cardápio para enviar a imagem')
   }
@@ -174,7 +192,7 @@ export async function buscarPrimeiraImagemProdutoNosMenus(params: {
   produtoId: string
   menuIds: string[]
 }): Promise<string | null> {
-  const ids = [...new Set(params.menuIds.map(id => id.trim()).filter(Boolean))]
+  const ids = unirMenuIds(params.menuIds)
   for (const menuId of ids) {
     const response = await fetchGestorApi(`/api/menus/${menuId}/produtos/${params.produtoId}`, {
       headers: { Authorization: `Bearer ${params.token}` },

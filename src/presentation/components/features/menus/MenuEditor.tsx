@@ -27,18 +27,24 @@ import {
   type MenuProdutoTabsModalState,
 } from './MenuProdutoTabsModal'
 import {
-  ProdutosTabsModal,
-  type ProdutosTabsModalState,
-} from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
+  EscolherTipoProdutoModal,
+  useEscolherTipoProdutoCadastro,
+} from '@/src/presentation/components/features/produtos/EscolherTipoProdutoModal'
 import { CatalogGroupedList } from '@/src/presentation/components/features/catalogo/CatalogGroupedList'
 import { CatalogProductRow } from '@/src/presentation/components/features/catalogo/CatalogProductRow'
 import type { CatalogGroup } from '@/src/presentation/components/features/catalogo/types'
+import { MenuProdutoRowQuickActions } from './MenuProdutoRowQuickActions'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
-import type { MenuGrupoProduto, MenuProduto } from '@/src/shared/types/menus'
+import type {
+  MenuGrupoProduto,
+  MenuProduto,
+  UpdateMenuProdutoInput,
+} from '@/src/shared/types/menus'
+import type { SnapshotProdutoPropagavel } from '@/src/shared/types/propagarAlteracaoProduto'
 
 interface MenuEditorProps {
   menuId: string
@@ -82,6 +88,8 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   })
   const [addOpen, setAddOpen] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
+  const [wizardCategoriaId, setWizardCategoriaId] = useState<string | undefined>()
+  const tipoCadastro = useEscolherTipoProdutoCadastro()
   const {
     data: produtosTodosData,
     fetchNextPage: fetchNextTodos,
@@ -139,11 +147,16 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     produto: null,
     grupo: null,
   })
-  const [createProdutoState, setCreateProdutoState] = useState<ProdutosTabsModalState>({
-    open: false,
-    tab: 'produto',
-    mode: 'create',
-  })
+
+  const openWizardCadastro = useCallback((categoriaId?: string) => {
+    setWizardCategoriaId(categoriaId)
+    setWizardOpen(true)
+  }, [])
+
+  const closeWizardCadastro = useCallback(() => {
+    setWizardOpen(false)
+    setWizardCategoriaId(undefined)
+  }, [])
 
   const grupos = useMemo(() => {
     const map = new Map<string, MenuGrupoProduto>()
@@ -324,33 +337,10 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
 
   const handleAddProduto = useCallback(
     (_grupoNome: string, grupoId: string | undefined) => {
-      setCreateProdutoState({
-        open: true,
-        tab: 'produto',
-        mode: 'create',
-        prefillGrupoProdutoId: grupoId,
-        createMenuIds: [menuId],
-      })
+      tipoCadastro.pedirTipo(() => openWizardCadastro(grupoId))
     },
-    [menuId]
+    [tipoCadastro.pedirTipo, openWizardCadastro]
   )
-
-  const closeCreateProduto = useCallback(() => {
-    setCreateProdutoState({
-      open: false,
-      tab: 'produto',
-      mode: 'create',
-      prefillGrupoProdutoId: undefined,
-      createMenuIds: undefined,
-    })
-  }, [])
-
-  const handleCreateProdutoReload = useCallback(() => {
-    void invalidate(['menu-produtos'])
-    void invalidate(['menu-grupos'])
-    void invalidate(['produtos'])
-  }, [invalidate])
-
   const handleValorChange = useCallback(
     async (produtoId: string, valor: number) => {
       const destinos = await pedirConfirmacao({
@@ -398,6 +388,44 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         )
       } catch (err) {
         showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar status')
+      }
+    },
+    [updateProduto, pedirConfirmacao, aplicarNosDestinos, menuId]
+  )
+
+  const handleQuickPatch = useCallback(
+    async (produtoId: string, input: UpdateMenuProdutoInput): Promise<boolean> => {
+      const destinos = await pedirConfirmacao({
+        origem: 'menu',
+        produtoId,
+        menuIdAtual: menuId,
+      })
+      if (destinos === null) return false
+      try {
+        await updateProduto.mutateAsync({ produtoId, input })
+        const snapshot = input as SnapshotProdutoPropagavel
+        if (destinos.aplicarNoCadastroBase || destinos.menuIds.length > 0) {
+          await aplicarNosDestinos({
+            produtoId,
+            snapshot,
+            destinos,
+          })
+        }
+        if (input.favorito !== undefined) {
+          showToast.success(
+            input.favorito ? 'Marcado como favorito neste cardápio' : 'Removido dos favoritos'
+          )
+        } else if (input.descricao !== undefined) {
+          showToast.success('Descrição atualizada neste cardápio')
+        } else if (input.gruposComplementosIds !== undefined) {
+          showToast.success('Complementos atualizados neste cardápio')
+        } else {
+          showToast.success('Produto atualizado neste cardápio')
+        }
+        return true
+      } catch (err) {
+        showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar produto')
+        return false
       }
     },
     [updateProduto, pedirConfirmacao, aplicarNosDestinos, menuId]
@@ -485,6 +513,13 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
           onEdit={handleEditProduto}
           onRemove={handleRemove}
           onChangeImage={handleChangeImage}
+          actionsSlot={
+            <MenuProdutoRowQuickActions
+              produto={produto}
+              disabled={savingThis}
+              onPatch={handleQuickPatch}
+            />
+          }
         />
       )
     },
@@ -498,6 +533,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
       handleEditProduto,
       handleRemove,
       handleChangeImage,
+      handleQuickPatch,
     ]
   )
 
@@ -585,7 +621,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
 
           {mostrarAcoesCabecalho ? (
             <MenuCardapioAcoes
-              onCadastrar={() => setWizardOpen(true)}
+              onCadastrar={() => tipoCadastro.pedirTipo(() => openWizardCadastro())}
               onAdicionar={() => setAddOpen(true)}
             />
           ) : null}
@@ -625,7 +661,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
           emptyContent={
             cardapioVazio && !isLoadingList ? (
               <MenuCardapioEmptyState
-                onCadastrar={() => setWizardOpen(true)}
+                onCadastrar={() => tipoCadastro.pedirTipo(() => openWizardCadastro())}
                 onAdicionar={() => setAddOpen(true)}
               />
             ) : undefined
@@ -646,13 +682,6 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         onTabChange={tab => setTabsState(prev => ({ ...prev, tab }))}
       />
 
-      <ProdutosTabsModal
-        state={createProdutoState}
-        onClose={closeCreateProduto}
-        onReload={handleCreateProdutoReload}
-        onTabChange={tab => setCreateProdutoState(prev => ({ ...prev, tab }))}
-      />
-
       <AddProdutosToMenuPanel
         open={addOpen}
         menuId={menuId}
@@ -660,11 +689,17 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         onClose={() => setAddOpen(false)}
       />
 
+      <EscolherTipoProdutoModal
+        open={tipoCadastro.open}
+        onClose={tipoCadastro.fechar}
+        onContinuar={tipoCadastro.continuar}
+      />
       <MenuNovoProdutoWizard
         open={wizardOpen}
         menuId={menuId}
         menuNome={menu.nome}
-        onClose={() => setWizardOpen(false)}
+        initialCategoriaId={wizardCategoriaId}
+        onClose={closeWizardCadastro}
       />
       {dialogPropagacao}
       {produtoCropModal}

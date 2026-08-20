@@ -5,9 +5,11 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
+  type ChangeEvent,
   type MouseEvent,
   type ReactNode,
 } from 'react'
@@ -15,19 +17,23 @@ import { Autocomplete, Popover, TextField, Tooltip } from '@mui/material'
 import {
   MdImageNotSupported,
   MdList,
+  MdModeEdit,
   MdNotes,
   MdStar,
   MdStarBorder,
 } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
-import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import { ProdutoValorInput } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoValorInput'
 import { ProdutoStatusSwitch } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoStatusSwitch'
+import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { cn } from '@/src/shared/utils/cn'
 import { useMenuProduto } from '@/src/presentation/hooks/menus/useMenuProduto'
 import { useMenuMutations } from '@/src/presentation/hooks/menus/useMenuMutations'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
 import type { UpdateMenuProdutoInput } from '@/src/shared/types/menus'
 import type {
@@ -35,7 +41,6 @@ import type {
   SnapshotProdutoPropagavel,
 } from '@/src/shared/types/propagarAlteracaoProduto'
 import type { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
-import type { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import {
   formatMenuProdutoCurrency,
   parseMenuProdutoCurrency,
@@ -71,6 +76,11 @@ function sameIdList(a: readonly string[], b: readonly string[]): boolean {
   const sb = [...b].sort()
   return sa.every((id, i) => id === sb[i])
 }
+
+const CATEGORIA_INPUT_FOLGA_PX = 40
+const CATEGORIA_INPUT_MIN_PX = 56
+const CATEGORIA_INPUT_TEXT_CLASS =
+  'text-sm font-semibold tracking-wide text-primary-text md:text-base'
 
 const ROW_ICON_BTN =
   'flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-secondary/60 bg-white text-secondary transition-colors hover:bg-secondary/10'
@@ -126,13 +136,14 @@ export const ProdutoMenuVinculoForm = forwardRef<
   },
   ref
 ) {
+  const invalidate = useInvalidateTenantQueries()
   const { data, isLoading, isError, error, refetch } = useMenuProduto(
     menuId,
     produtoId,
     enabled
   )
-  const { updateProduto } = useMenuMutations(menuId)
-  const { data: gruposProdutos = [], isLoading: loadingGrupos } = useGruposProdutos({
+  const { updateProduto, renameGrupo } = useMenuMutations(menuId)
+  const { data: gruposProdutos = [] } = useGruposProdutos({
     limit: 100,
     ativo: null,
     enabled,
@@ -146,7 +157,6 @@ export const ProdutoMenuVinculoForm = forwardRef<
     valor: number
     ativo: boolean
     favorito: boolean
-    grupoProdutoId: string
     gruposComplementosIds: string[]
   } | null>(null)
 
@@ -155,13 +165,31 @@ export const ProdutoMenuVinculoForm = forwardRef<
   const [valor, setValor] = useState('')
   const [ativo, setAtivo] = useState(true)
   const [favorito, setFavorito] = useState(false)
-  const [grupoProdutoId, setGrupoProdutoId] = useState<string | null>(null)
   const [gruposComplementosIds, setGruposComplementosIds] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [complAnchor, setComplAnchor] = useState<HTMLElement | null>(null)
   const [descAnchor, setDescAnchor] = useState<HTMLElement | null>(null)
+  const [categoriaNome, setCategoriaNome] = useState('')
+  const [editandoCategoria, setEditandoCategoria] = useState(false)
+  const [savingCategoria, setSavingCategoria] = useState(false)
+  const [categoriaInputWidthPx, setCategoriaInputWidthPx] = useState(CATEGORIA_INPUT_MIN_PX)
+  const categoriaInputRef = useRef<HTMLInputElement>(null)
+  const categoriaSizerRef = useRef<HTMLSpanElement>(null)
+  const categoriaNomeSalvoRef = useRef('')
+  const categoriaCursorRef = useRef<{ start: number; end: number } | null>(null)
+  const bloqueiaBlurCategoriaRef = useRef(false)
 
   const valorNumerico = useMemo(() => parseMenuProdutoCurrency(valor) || 0, [valor])
+  const grupoProdutoId = data?.grupoProduto?.id ?? ''
+
+  const grupoVisual = useMemo(() => {
+    const grupo = gruposProdutos.find(g => g.getId() === grupoProdutoId)
+    if (!grupo) return null
+    const corHex = grupo.getCorHex()
+    const iconName = grupo.getIconName()
+    if (!corHex || !iconName) return null
+    return { corHex, iconName }
+  }, [gruposProdutos, grupoProdutoId])
 
   const syncFromData = useCallback((next: NonNullable<typeof data>) => {
     const baseline = {
@@ -170,7 +198,6 @@ export const ProdutoMenuVinculoForm = forwardRef<
       valor: Number(next.valor),
       ativo: next.ativo,
       favorito: next.favorito,
-      grupoProdutoId: next.grupoProduto?.id ?? '',
       gruposComplementosIds: (next.gruposComplementos ?? []).map(g => g.id).filter(Boolean),
     }
     baselineRef.current = baseline
@@ -179,14 +206,12 @@ export const ProdutoMenuVinculoForm = forwardRef<
     setValor(formatMenuProdutoCurrency(String(Math.round(baseline.valor * 100))))
     setAtivo(baseline.ativo)
     setFavorito(baseline.favorito)
-    setGrupoProdutoId(baseline.grupoProdutoId || null)
     setGruposComplementosIds(baseline.gruposComplementosIds)
+    const nomeCategoria = next.grupoProduto?.nome ?? 'Sem categoria'
+    setCategoriaNome(nomeCategoria)
+    categoriaNomeSalvoRef.current = nomeCategoria
+    setEditandoCategoria(false)
   }, [])
-
-  const grupoSelecionado = useMemo(
-    () => gruposProdutos.find(g => g.getId() === grupoProdutoId) ?? null,
-    [gruposProdutos, grupoProdutoId]
-  )
 
   const complementosSelecionados = useMemo(
     () => gruposComplementos.filter(g => gruposComplementosIds.includes(g.getId())),
@@ -213,10 +238,9 @@ export const ProdutoMenuVinculoForm = forwardRef<
       (Number.isFinite(valorNum) ? valorNum : -1) !== base.valor ||
       ativo !== base.ativo ||
       favorito !== base.favorito ||
-      (grupoProdutoId ?? '') !== base.grupoProdutoId ||
       !sameIdList(gruposComplementosIds, base.gruposComplementosIds)
     )
-  }, [nome, descricao, valor, ativo, favorito, grupoProdutoId, gruposComplementosIds])
+  }, [nome, descricao, valor, ativo, favorito, gruposComplementosIds])
 
   const dirtyRef = useRef(false)
   const lastReportedDirtyRef = useRef<boolean | null>(null)
@@ -255,10 +279,6 @@ export const ProdutoMenuVinculoForm = forwardRef<
       showToast.error('Informe um preço válido')
       return false
     }
-    if (!grupoProdutoId) {
-      showToast.error('Selecione a categoria')
-      return false
-    }
 
     const destinos = await pedirConfirmacao({
       origem: 'menu',
@@ -273,7 +293,6 @@ export const ProdutoMenuVinculoForm = forwardRef<
       valor: valorNum,
       ativo,
       favorito,
-      grupoProdutoId,
       gruposComplementosIds: [...gruposComplementosIds],
     }
 
@@ -283,7 +302,6 @@ export const ProdutoMenuVinculoForm = forwardRef<
       valor: snapshot.valor,
       ativo: snapshot.ativo,
       favorito: snapshot.favorito,
-      grupoProdutoId: snapshot.grupoProdutoId,
       gruposComplementosIds: snapshot.gruposComplementosIds,
     }
 
@@ -299,7 +317,6 @@ export const ProdutoMenuVinculoForm = forwardRef<
         valor: valorNum,
         ativo,
         favorito,
-        grupoProdutoId,
         gruposComplementosIds: [...gruposComplementosIds],
       }
       onDirtyChangeRef.current?.(dirtyTargetMenuId, false)
@@ -319,16 +336,169 @@ export const ProdutoMenuVinculoForm = forwardRef<
     descricao,
     ativo,
     favorito,
-    grupoProdutoId,
     gruposComplementosIds,
     produtoId,
     menuId,
     pedirConfirmacao,
     aplicarNosDestinos,
     updateProduto,
+    dirtyTargetMenuId,
   ])
 
   useImperativeHandle(ref, () => ({ isDirty, save }), [isDirty, save])
+
+  useEffect(() => {
+    if (!editandoCategoria) return
+    const el = categoriaInputRef.current
+    if (!el) return
+    el.focus()
+    el.select()
+  }, [editandoCategoria])
+
+  useLayoutEffect(() => {
+    if (!editandoCategoria) return
+
+    const sizer = categoriaSizerRef.current
+    if (sizer) {
+      const measured = Math.ceil(sizer.scrollWidth) + CATEGORIA_INPUT_FOLGA_PX
+      setCategoriaInputWidthPx(Math.max(measured, CATEGORIA_INPUT_MIN_PX))
+    }
+
+    if (!categoriaCursorRef.current) return
+    const el = categoriaInputRef.current
+    const cursor = categoriaCursorRef.current
+    categoriaCursorRef.current = null
+    if (!el) return
+    const max = el.value.length
+    el.setSelectionRange(Math.min(cursor.start, max), Math.min(cursor.end, max))
+  }, [categoriaNome, editandoCategoria])
+
+  const handleCategoriaNomeChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const el = e.target
+    categoriaCursorRef.current = {
+      start: el.selectionStart ?? el.value.length,
+      end: el.selectionEnd ?? el.value.length,
+    }
+    setCategoriaNome(el.value.toLocaleUpperCase('pt-BR'))
+  }
+
+  const iniciarEdicaoCategoria = () => {
+    if (!grupoProdutoId || savingCategoria) return
+    categoriaNomeSalvoRef.current = categoriaNome
+    setEditandoCategoria(true)
+  }
+
+  const cancelarEdicaoCategoria = () => {
+    setCategoriaNome(categoriaNomeSalvoRef.current)
+    setEditandoCategoria(false)
+  }
+
+  const renomearGrupoEmMenu = async (
+    token: string,
+    alvoMenuId: string,
+    nome: string
+  ) => {
+    const response = await fetchGestorApi(
+      `/api/menus/${alvoMenuId}/grupos-produtos/${grupoProdutoId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ nome }),
+      }
+    )
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(
+        (errorData as { message?: string }).message ||
+          'Erro ao renomear categoria em outro cardápio'
+      )
+    }
+  }
+
+  const renomearGrupoNoCadastroBase = async (token: string, nome: string) => {
+    const response = await fetchGestorApi(`/api/grupos-produtos/${grupoProdutoId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ nome }),
+    })
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(
+        (errorData as { message?: string }).message ||
+          'Erro ao renomear categoria no cadastro base'
+      )
+    }
+  }
+
+  const salvarNomeCategoria = async () => {
+    const nomeTrim = categoriaNome.trim()
+    if (!nomeTrim) {
+      showToast.error('Informe o nome da categoria neste cardápio')
+      return
+    }
+    if (!grupoProdutoId) {
+      showToast.error('Categoria não encontrada neste cardápio')
+      setEditandoCategoria(false)
+      return
+    }
+    if (nomeTrim === categoriaNomeSalvoRef.current.trim()) {
+      setEditandoCategoria(false)
+      return
+    }
+
+    bloqueiaBlurCategoriaRef.current = true
+    setSavingCategoria(true)
+    try {
+      const destinos = await pedirConfirmacao({
+        origem: 'menu',
+        produtoId,
+        menuIdAtual: menuId,
+      })
+      if (destinos === null) return
+
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+      if (!token) throw new Error('Token não encontrado')
+
+      await renameGrupo.mutateAsync({ grupoProdutoId, nome: nomeTrim })
+
+      for (const outroMenuId of destinos.menuIds) {
+        await renomearGrupoEmMenu(token, outroMenuId, nomeTrim)
+      }
+      if (destinos.aplicarNoCadastroBase) {
+        await renomearGrupoNoCadastroBase(token, nomeTrim)
+      }
+
+      setCategoriaNome(nomeTrim)
+      categoriaNomeSalvoRef.current = nomeTrim
+      setEditandoCategoria(false)
+      await invalidate(['menu-grupos'])
+      await invalidate(['menu-produto', menuId, produtoId])
+      await invalidate(['menu-produtos'])
+      await invalidate(['grupos-produtos'])
+
+      if (destinos.aplicarNoCadastroBase || destinos.menuIds.length > 0) {
+        showToast.success('Categoria atualizada neste cardápio e nos selecionados')
+      } else {
+        showToast.success('Categoria atualizada neste cardápio')
+      }
+    } catch (err) {
+      showToast.error(err instanceof Error ? err.message : 'Erro ao salvar categoria')
+    } finally {
+      setSavingCategoria(false)
+      bloqueiaBlurCategoriaRef.current = false
+    }
+  }
+
+  const handleBlurCategoria = () => {
+    if (bloqueiaBlurCategoriaRef.current || savingCategoria) return
+    cancelarEdicaoCategoria()
+  }
 
   if (!enabled) return null
 
@@ -356,99 +526,150 @@ export const ProdutoMenuVinculoForm = forwardRef<
   }
 
   return (
-    <div className="relative border-t border-gray-200/80 py-1 overflow-x-hidden">
+    <div className="relative overflow-x-hidden border-t border-gray-200/80 py-1">
       {saving ? (
         <div className="absolute right-2 top-1 z-10 text-[10px] text-secondary-text">Salvando…</div>
       ) : null}
+
       <div
-        className="flex w-full items-center gap-x-1.5 border border-gray-200 bg-white px-2 py-2 md:gap-x-2 md:px-3"
+        className="mb-1 flex items-center gap-2 bg-gray-50 px-2 py-1.5"
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex min-w-0 flex-1 items-center gap-x-1.5 overflow-hidden md:gap-x-2">
-          {data.image?.imageUrl ? (
-            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-gray-200 md:h-12 md:w-12">
-              {/* eslint-disable-next-line @next/next/no-img-element -- snapshot do menu */}
-              <img
-                src={data.image.imageUrl}
-                alt=""
-                className="h-full w-full object-cover"
-              />
-            </div>
-          ) : (
-            <div
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-secondary-text md:h-12 md:w-12"
+        {grupoVisual ? (
+          <span
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border-2 bg-white text-[var(--grupo-color)]"
+            style={{
+              borderColor: grupoVisual.corHex,
+              ['--grupo-color' as string]: grupoVisual.corHex,
+            }}
+          >
+            <DinamicIcon iconName={grupoVisual.iconName} color="currentColor" size={18} />
+          </span>
+        ) : (
+          <span className="h-9 w-9 shrink-0 rounded-full border border-gray-300 bg-gray-200" />
+        )}
+        {editandoCategoria ? (
+          <span className="relative inline-flex max-w-[min(100%,28rem)] shrink-0 items-center">
+            <span
+              ref={categoriaSizerRef}
               aria-hidden
+              className={cn(
+                'invisible absolute left-0 top-0 whitespace-pre',
+                CATEGORIA_INPUT_TEXT_CLASS
+              )}
             >
-              <MdImageNotSupported className="h-6 w-6" />
-            </div>
-          )}
-
-          <input
-            type="text"
-            aria-label="Nome no cardápio"
-            value={nome}
-            disabled={saving}
-            onChange={e => setNome(e.target.value.toLocaleUpperCase('pt-BR'))}
-            className="min-w-0 max-w-[30ch] shrink truncate border-0 bg-transparent text-sm font-normal tracking-wide text-primary-text outline-none ring-0 focus:ring-1 focus:ring-primary/40 md:text-base"
-          />
-
-          <div className="flex shrink-0 items-center gap-1">
-            <div className="hidden w-[9.5rem] shrink-0 md:block">
-              <Autocomplete<GrupoProduto, false, false, false>
-                size="small"
-                options={gruposProdutos}
-                loading={loadingGrupos}
-                value={grupoSelecionado}
-                onChange={(_, value) => setGrupoProdutoId(value?.getId() ?? null)}
-                getOptionLabel={option => option.getNome()}
-                getOptionKey={option => option.getId()}
-                isOptionEqualToValue={(a, b) => a.getId() === b.getId()}
-                disabled={saving}
-                renderInput={params => (
-                  <TextField
-                    {...params}
-                    placeholder="Categoria"
-                    size="small"
-                    sx={sxEntradaCompactaProduto}
-                  />
-                )}
-              />
-            </div>
-
-            <div className="flex shrink-0 items-center gap-1">
-              <RowIconButton
-                title={
-                  gruposComplementosIds.length > 0
-                    ? `Complementos (${gruposComplementosIds.length})`
-                    : 'Grupos de complementos'
+              {categoriaNome || ' '}
+            </span>
+            <input
+              ref={categoriaInputRef}
+              type="text"
+              aria-label="Nome da categoria neste cardápio"
+              value={categoriaNome}
+              disabled={savingCategoria}
+              onChange={handleCategoriaNomeChange}
+              onBlur={handleBlurCategoria}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  void salvarNomeCategoria()
                 }
-                active={gruposComplementosIds.length > 0}
-                disabled={saving}
-                onClick={e => setComplAnchor(e.currentTarget)}
-              >
-                <MdList className="text-lg" />
-              </RowIconButton>
-              <RowIconButton
-                title={descricao.trim() ? 'Editar descrição' : 'Adicionar descrição'}
-                active={Boolean(descricao.trim())}
-                disabled={saving}
-                onClick={e => setDescAnchor(e.currentTarget)}
-              >
-                <MdNotes className="text-lg" />
-              </RowIconButton>
-              <RowIconButton
-                title={favorito ? 'Remover dos favoritos' : 'Marcar como favorito'}
-                active={favorito}
-                disabled={saving}
-                onClick={() => setFavorito(v => !v)}
-              >
-                {favorito ? <MdStar className="text-lg" /> : <MdStarBorder className="text-lg" />}
-              </RowIconButton>
-            </div>
+                if (e.key === 'Escape') {
+                  e.preventDefault()
+                  cancelarEdicaoCategoria()
+                }
+              }}
+              style={{ width: categoriaInputWidthPx }}
+              className={cn(
+                'border-0 bg-transparent outline-none ring-1 ring-primary/40',
+                CATEGORIA_INPUT_TEXT_CLASS
+              )}
+            />
+          </span>
+        ) : (
+          <p className={cn('min-w-0 truncate', CATEGORIA_INPUT_TEXT_CLASS)}>
+            {categoriaNome}
+          </p>
+        )}
+        <button
+          type="button"
+          title="Editar nome da categoria neste cardápio"
+          disabled={!grupoProdutoId || savingCategoria || editandoCategoria}
+          onClick={iniciarEdicaoCategoria}
+          className={cn(
+            'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-gray-200 text-primary-text transition-colors hover:bg-primary/10',
+            (!grupoProdutoId || savingCategoria || editandoCategoria) &&
+              'cursor-not-allowed opacity-50'
+          )}
+        >
+          <MdModeEdit size={14} />
+        </button>
+      </div>
+
+      <div
+        className="grid w-full items-center gap-x-1.5 border border-gray-200 bg-white px-2 py-2 md:gap-x-2 md:px-3 [grid-template-columns:auto_minmax(0,30ch)_auto_minmax(0,1fr)_auto]"
+        onClick={e => e.stopPropagation()}
+      >
+        {data.image?.imageUrl ? (
+          <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-gray-200 md:h-12 md:w-12">
+            {/* eslint-disable-next-line @next/next/no-img-element -- snapshot do menu */}
+            <img
+              src={data.image.imageUrl}
+              alt=""
+              className="h-full w-full object-cover"
+            />
           </div>
+        ) : (
+          <div
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-secondary-text md:h-12 md:w-12"
+            aria-hidden
+          >
+            <MdImageNotSupported className="h-6 w-6" />
+          </div>
+        )}
+
+        <input
+          type="text"
+          aria-label="Nome no cardápio"
+          value={nome}
+          disabled={saving}
+          onChange={e => setNome(e.target.value.toLocaleUpperCase('pt-BR'))}
+          className="min-w-0 truncate border-0 bg-transparent text-sm font-normal tracking-wide text-primary-text outline-none ring-0 focus:ring-1 focus:ring-primary/40 md:text-base"
+        />
+
+        <div className="flex shrink-0 items-center gap-1">
+          <RowIconButton
+            title={
+              gruposComplementosIds.length > 0
+                ? `Complementos (${gruposComplementosIds.length})`
+                : 'Grupos de complementos'
+            }
+            active={gruposComplementosIds.length > 0}
+            disabled={saving}
+            onClick={e => setComplAnchor(e.currentTarget)}
+          >
+            <MdList className="text-lg" />
+          </RowIconButton>
+          <RowIconButton
+            title={descricao.trim() ? 'Editar descrição' : 'Adicionar descrição'}
+            active={Boolean(descricao.trim())}
+            disabled={saving}
+            onClick={e => setDescAnchor(e.currentTarget)}
+          >
+            <MdNotes className="text-lg" />
+          </RowIconButton>
+          <RowIconButton
+            title={favorito ? 'Remover dos favoritos' : 'Marcar como favorito'}
+            active={favorito}
+            disabled={saving}
+            onClick={() => setFavorito(v => !v)}
+          >
+            {favorito ? <MdStar className="text-lg" /> : <MdStarBorder className="text-lg" />}
+          </RowIconButton>
         </div>
 
-        <div className="ml-auto flex shrink-0 items-center gap-2 md:mr-1">
+        <div className="min-w-0" aria-hidden />
+
+        <div className="flex shrink-0 items-center justify-end gap-2">
           <ProdutoValorInput
             valor={valorNumerico}
             disabled={saving}
@@ -514,23 +735,6 @@ export const ProdutoMenuVinculoForm = forwardRef<
           />
         </div>
       </Popover>
-
-      <div className="mt-1 px-1 md:hidden">
-        <Autocomplete<GrupoProduto, false, false, false>
-          size="small"
-          options={gruposProdutos}
-          loading={loadingGrupos}
-          value={grupoSelecionado}
-          onChange={(_, value) => setGrupoProdutoId(value?.getId() ?? null)}
-          getOptionLabel={option => option.getNome()}
-          getOptionKey={option => option.getId()}
-          isOptionEqualToValue={(a, b) => a.getId() === b.getId()}
-          disabled={saving}
-          renderInput={params => (
-            <TextField {...params} placeholder="Categoria" size="small" sx={sxEntradaCompactaProduto} />
-          )}
-        />
-      </div>
     </div>
   )
 })

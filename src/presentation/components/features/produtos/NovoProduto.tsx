@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import {
   useState,
@@ -18,12 +18,14 @@ import { ProdutoFormWithPreviewLayout } from './preview/ProdutoFormWithPreviewLa
 import { parsePrecoPreviewFromInput } from './preview/produtoPreviewModel'
 import type { ProdutoPreviewImageUpload } from './preview/ProdutoSimplePreviewCard'
 import {
+  aplicarImagemProdutoNosMenus,
   buscarIdMenuPrincipal,
+  buscarMenusDaEmpresa,
   buscarPrimeiraImagemProdutoNosMenus,
   extrairImagemUrlDoProdutoJson,
   extrairMenuIdsDoProdutoJson,
   unirMenuIds,
-  uploadImagemProdutoNosMenus,
+  vincularProdutoAosMenus,
 } from '@/src/presentation/utils/uploadImagemProdutoMenus'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
@@ -558,22 +560,31 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
     const resolverDestinosPadraoImagem = useCallback(
       async (token: string, extras: Iterable<string> = []) => {
         const principalId = await buscarIdMenuPrincipal(token)
-        if (previewMenuId) {
-          return unirMenuIds([previewMenuId, principalId ?? '', extras])
-        }
-        return unirMenuIds([principalId ?? ''])
+        // Sempre inclui o principal + menus já escolhidos (wizard) / extras.
+        return unirMenuIds(previewMenuId, principalId, extras)
       },
       [previewMenuId]
     )
 
     const perguntarCopiaImagemCadastroBase = useCallback(
       async (produtoIdAlvo: string, file: File, jaAplicados: string[]) => {
+        // Pergunta de imagem só na edição a partir do cadastro base (não no wizard de menu).
         if (previewMenuId) return
+        const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+        const idsJa = unirMenuIds(jaAplicados)
+        let menusJaSalvos: Array<{ id: string; nome: string }> = []
+        if (token && idsJa.length > 0) {
+          const todos = await buscarMenusDaEmpresa({ token })
+          const setIds = new Set(idsJa)
+          menusJaSalvos = todos.filter(m => setIds.has(m.id)).map(m => ({ id: m.id, nome: m.nome }))
+        }
         const destinos = await pedirConfirmacao({
           origem: 'cadastroBase',
           produtoId: produtoIdAlvo,
           variante: 'imagem',
-          excluirMenuIds: jaAplicados,
+          excluirMenuIds: idsJa,
+          fonteMenus: 'empresa',
+          menusJaSalvos,
         })
         if (!destinos || destinos.menuIds.length === 0) return
         await aplicarImagemNosDestinos({
@@ -586,6 +597,47 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       [previewMenuId, pedirConfirmacao, aplicarImagemNosDestinos]
     )
 
+    const perguntarVinculoOutrosMenusAposCriacao = useCallback(
+      async (produtoIdAlvo: string, menuIdsJaSalvos: string[], fileImagem?: File | null) => {
+        const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+        if (!token) return
+
+        const todosMenus = await buscarMenusDaEmpresa({ token })
+        const idsJa = new Set(unirMenuIds(menuIdsJaSalvos))
+        const menusJaSalvos = todosMenus
+          .filter(m => idsJa.has(m.id))
+          .map(m => ({ id: m.id, nome: m.nome }))
+
+        const destinos = await pedirConfirmacao({
+          origem: 'cadastroBase',
+          produtoId: produtoIdAlvo,
+          variante: 'vinculoMenus',
+          excluirMenuIds: [...idsJa],
+          fonteMenus: 'empresa',
+          menusJaSalvos,
+        })
+        if (!destinos || destinos.menuIds.length === 0) return
+
+        if (fileImagem) {
+          await aplicarImagemNosDestinos({
+            produtoId: produtoIdAlvo,
+            file: fileImagem,
+            destinos,
+            vincularSeAusente: true,
+          })
+        } else {
+          await vincularProdutoAosMenus({
+            token,
+            produtoId: produtoIdAlvo,
+            menuIds: destinos.menuIds,
+          })
+          await invalidate(['menu-produtos'])
+          await invalidate(['produtos-imagens-cadastro'])
+        }
+      },
+      [pedirConfirmacao, aplicarImagemNosDestinos, invalidate]
+    )
+
     const persistPreviewImage = useCallback(
       async (produtoIdAlvo: string, file: File, destinos: string[]) => {
         const token = useAuthStore.getState().tenantAuth?.getAccessToken()
@@ -594,11 +646,13 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         if (ids.length === 0) {
           throw new Error('Não foi possível identificar o menu para salvar a imagem')
         }
-        await uploadImagemProdutoNosMenus({
+        // Garante vínculo antes do POST da imagem (senão o menu responde 404).
+        await aplicarImagemProdutoNosMenus({
           token,
           produtoId: produtoIdAlvo,
           menuIds: ids,
           file,
+          vincularSeAusente: true,
         })
         pendingPreviewImageRef.current = null
         await invalidate(['menus'])
@@ -879,7 +933,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
             const imagemLegado = extrairImagemUrlDoProdutoJson(produto)
             if (imagemLegado) setServerPreviewImage(imagemLegado)
             const principalId = await buscarIdMenuPrincipal(token)
-            const ordemImagem = unirMenuIds([previewMenuId ?? '', principalId ?? '', menuIdsLoaded])
+            const ordemImagem = unirMenuIds(previewMenuId, principalId, menuIdsLoaded)
             if (ordemImagem.length > 0) {
               const imagemMenu = await buscarPrimeiraImagemProdutoNosMenus({
                 token,
@@ -1518,6 +1572,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       )
 
       onWizardSavingChange?.(true)
+      const jaExistiaAntesDoSave = Boolean(idPersistidoParaSave)
 
       try {
         const token = useAuthStore.getState().tenantAuth?.getAccessToken()
@@ -1741,15 +1796,19 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         }
 
         const imagemPendente = pendingPreviewImageRef.current
+        let menusComImagem = unirMenuIds(menuIdsFinal)
         if (imagemPendente && idSalvo) {
           try {
             const destinosImagem = await resolverDestinosPadraoImagem(
               token,
-              previewMenuId ? menuIdsFinal ?? [] : []
+              menuIdsFinal ?? []
             )
             if (destinosImagem.length > 0) {
               await persistPreviewImage(idSalvo, imagemPendente, destinosImagem)
-              await perguntarCopiaImagemCadastroBase(idSalvo, imagemPendente, destinosImagem)
+              menusComImagem = destinosImagem
+              if (jaExistiaAntesDoSave) {
+                await perguntarCopiaImagemCadastroBase(idSalvo, imagemPendente, destinosImagem)
+              }
             } else {
               showToast.error('Produto salvo. Vincule-o a um cardápio para enviar a imagem.')
             }
@@ -1758,6 +1817,22 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
               imgErr instanceof Error
                 ? imgErr.message
                 : 'Produto salvo, mas não foi possível enviar a imagem'
+            )
+          }
+        }
+
+        if (!jaExistiaAntesDoSave && idSalvo) {
+          try {
+            await perguntarVinculoOutrosMenusAposCriacao(
+              idSalvo,
+              menusComImagem.length > 0 ? menusComImagem : menuIdsFinal ?? [],
+              imagemPendente
+            )
+          } catch (vinculoErr) {
+            showToast.error(
+              vinculoErr instanceof Error
+                ? vinculoErr.message
+                : 'Produto salvo, mas não foi possível vincular a outros cardápios'
             )
           }
         }

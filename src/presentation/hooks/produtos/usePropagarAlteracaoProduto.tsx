@@ -26,9 +26,21 @@ type Pedido = {
   produtoId: string
   menuIdAtual?: string
   menusIniciais?: MenuAlvoPropagacao[]
+  menusJaSalvos?: MenuAlvoPropagacao[]
   excluirMenuIds?: string[]
   fonteMenus?: 'produto' | 'empresa'
   resolve: (value: DestinoAlteracaoProduto | null) => void
+}
+
+type PedirConfirmacaoOpts = {
+  origem: OrigemAlteracaoProduto
+  produtoId: string
+  menuIdAtual?: string
+  menusIniciais?: MenuAlvoPropagacao[]
+  menusJaSalvos?: MenuAlvoPropagacao[]
+  variante?: VariantePropagacaoProduto
+  excluirMenuIds?: string[]
+  fonteMenus?: 'produto' | 'empresa'
 }
 
 /**
@@ -37,15 +49,7 @@ type Pedido = {
  * `null` = cancelou. Destinos vazios = salvar só no local.
  */
 export function usePropagarAlteracaoProduto(): {
-  pedirConfirmacao: (opts: {
-    origem: OrigemAlteracaoProduto
-    produtoId: string
-    menuIdAtual?: string
-    menusIniciais?: MenuAlvoPropagacao[]
-    variante?: VariantePropagacaoProduto
-    excluirMenuIds?: string[]
-    fonteMenus?: 'produto' | 'empresa'
-  }) => Promise<DestinoAlteracaoProduto | null>
+  pedirConfirmacao: (opts: PedirConfirmacaoOpts) => Promise<DestinoAlteracaoProduto | null>
   aplicarNosDestinos: (params: {
     produtoId: string
     snapshot: SnapshotProdutoPropagavel
@@ -80,25 +84,24 @@ export function usePropagarAlteracaoProduto(): {
   }, [])
 
   const pedirConfirmacao = useCallback(
-    async (opts: {
-      origem: OrigemAlteracaoProduto
-      produtoId: string
-      menuIdAtual?: string
-      menusIniciais?: MenuAlvoPropagacao[]
-      variante?: VariantePropagacaoProduto
-      excluirMenuIds?: string[]
-      fonteMenus?: 'produto' | 'empresa'
-    }): Promise<DestinoAlteracaoProduto | null> => {
+    async (opts: PedirConfirmacaoOpts): Promise<DestinoAlteracaoProduto | null> => {
       const variante = opts.variante ?? 'dados'
       const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       const excluir = new Set(
-        [opts.menuIdAtual, ...(opts.excluirMenuIds ?? [])].map(id => id?.trim()).filter(Boolean) as string[]
+        [opts.menuIdAtual, ...(opts.excluirMenuIds ?? [])]
+          .map(id => (typeof id === 'string' ? id.trim() : String(id ?? '').trim()))
+          .filter(Boolean)
       )
 
       let lista = opts.menusIniciais ?? []
       if (lista.length === 0 && token) {
         try {
-          if (opts.fonteMenus === 'empresa') {
+          const precisaEmpresa =
+            opts.fonteMenus === 'empresa' ||
+            variante === 'vinculoMenus' ||
+            (variante === 'imagem' && opts.origem === 'cadastroBase')
+
+          if (precisaEmpresa) {
             lista = (await buscarMenusDaEmpresa({ token })).map(m => ({ id: m.id, nome: m.nome }))
           } else {
             lista = await listarMenusDoProduto({ produtoId: opts.produtoId, token })
@@ -115,7 +118,7 @@ export function usePropagarAlteracaoProduto(): {
       if (opts.origem === 'cadastroBase' && lista.length === 0) {
         return { aplicarNoCadastroBase: false, menuIds: [] }
       }
-      if (variante === 'imagem' && lista.length === 0) {
+      if ((variante === 'imagem' || variante === 'vinculoMenus') && lista.length === 0) {
         return { aplicarNoCadastroBase: false, menuIds: [] }
       }
 
@@ -184,7 +187,12 @@ export function usePropagarAlteracaoProduto(): {
   )
 
   const onSim = useCallback(() => {
-    if (pedido?.variante !== 'imagem' && pedido?.origem === 'menu' && menus.length === 0) {
+    if (
+      pedido?.variante !== 'imagem' &&
+      pedido?.variante !== 'vinculoMenus' &&
+      pedido?.origem === 'menu' &&
+      menus.length === 0
+    ) {
       setCadastroBaseMarcado(true)
     }
     setPasso('escolher')
@@ -196,7 +204,12 @@ export function usePropagarAlteracaoProduto(): {
       passo={passo}
       origem={pedido?.origem ?? 'cadastroBase'}
       variante={pedido?.variante ?? 'dados'}
-      incluirCadastroBase={pedido?.variante !== 'imagem' && pedido?.origem === 'menu'}
+      menusJaSalvos={pedido?.menusJaSalvos}
+      incluirCadastroBase={
+        pedido?.variante !== 'imagem' &&
+        pedido?.variante !== 'vinculoMenus' &&
+        pedido?.origem === 'menu'
+      }
       menus={menus}
       selecionados={selecionados}
       cadastroBaseMarcado={cadastroBaseMarcado}

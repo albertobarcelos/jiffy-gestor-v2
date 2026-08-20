@@ -30,7 +30,7 @@ export interface CatalogProductRowProps {
   onSwitchToggle: (id: string, status: boolean) => void
   onEdit: (id: string) => void
   onRemove?: (id: string) => void
-  /** Só no cardápio: troca a imagem do snapshot daquele menu. */
+  /** Troca a imagem (cadastro base ou snapshot do cardápio) — abre o crop no pai. */
   onChangeImage?: (id: string, file: File) => void
 }
 
@@ -57,7 +57,7 @@ function CatalogProductRowInner({
   const nomeExibicao = nome.length > 30 ? `${nome.slice(0, 30)}…` : nome
   const imagemPreview = imagemUrl?.trim() || null
   const isMenu = variant === 'menu'
-  const podeTrocarImagem = isMenu && Boolean(onChangeImage)
+  const podeTrocarImagem = Boolean(onChangeImage)
 
   const abrirSeletorImagem = () => {
     if (isSavingImage) return
@@ -108,6 +108,21 @@ function CatalogProductRowInner({
         )
       : null
 
+  const placeholderSemImagem = (
+    <span
+      className={cn(
+        'flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-dashed md:h-12 md:w-12',
+        podeTrocarImagem
+          ? 'border-primary/40 bg-primary/5 text-primary hover:bg-primary/10'
+          : 'border-gray-300 bg-gray-50 text-secondary-text'
+      )}
+      aria-hidden={!podeTrocarImagem}
+      title={podeTrocarImagem ? undefined : 'Sem imagem'}
+    >
+      <MdImageNotSupported className="h-6 w-6 md:h-7 md:w-7" />
+    </span>
+  )
+
   return (
     <>
       <div
@@ -115,93 +130,69 @@ function CatalogProductRowInner({
         className={cn(
           'grid cursor-pointer items-center gap-x-1.5 gap-y-2 border border-gray-200 bg-white px-2 py-2 hover:bg-secondary-text/10 md:gap-x-2 md:px-4',
           isMenu
-            ? '[grid-template-columns:auto_minmax(0,1fr)_auto] md:[grid-template-columns:auto_minmax(0,1fr)_auto]'
+            ? '[grid-template-columns:auto_minmax(0,1fr)_auto] md:[grid-template-columns:auto_minmax(0,30ch)_auto_minmax(0,1fr)_auto]'
             : '[grid-template-columns:auto_minmax(0,1fr)_auto] md:[grid-template-columns:auto_minmax(0,30ch)_auto_auto_minmax(0,1fr)_auto]'
         )}
       >
         {imagemPreview ? (
           <div className="relative h-11 w-11 shrink-0 md:h-12 md:w-12">
-            {podeTrocarImagem ? (
-              <button
-                type="button"
-                title="Trocar imagem neste cardápio"
-                aria-label={`Trocar imagem de ${nome}`}
-                disabled={isSavingImage}
-                onClick={e => {
-                  e.stopPropagation()
-                  abrirSeletorImagem()
-                }}
-                className="group relative h-full w-full overflow-hidden rounded-lg border border-gray-200 bg-white disabled:opacity-60"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element -- preview do snapshot/cadastro */}
-                <img
-                  src={imagemPreview}
-                  alt=""
-                  className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
-                />
-                <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
+            <button
+              type="button"
+              title={podeTrocarImagem ? 'Trocar imagem' : 'Ver imagem'}
+              aria-label={
+                podeTrocarImagem ? `Trocar imagem de ${nome}` : `Ver imagem de ${nome}`
+              }
+              disabled={isSavingImage}
+              onClick={e => {
+                e.stopPropagation()
+                if (podeTrocarImagem) abrirSeletorImagem()
+                else setImagemExpandida(true)
+              }}
+              className="group relative h-full w-full overflow-hidden rounded-lg border border-gray-200 bg-white disabled:opacity-60"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element -- preview do snapshot/cadastro */}
+              <img
+                src={imagemPreview}
+                alt=""
+                className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+              />
+              <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
+                {podeTrocarImagem ? (
                   <MdAddAPhoto className="text-white drop-shadow" size={20} />
-                </span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                title="Ver imagem"
-                aria-label={`Ver imagem de ${nome}`}
-                onClick={e => {
-                  e.stopPropagation()
-                  setImagemExpandida(true)
-                }}
-                className="group relative h-full w-full overflow-hidden rounded-lg border border-gray-200 bg-white"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element -- preview do snapshot/cadastro */}
-                <img
-                  src={imagemPreview}
-                  alt=""
-                  className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
-                />
-                <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
+                ) : (
                   <MdVisibility className="text-white drop-shadow" size={22} />
-                </span>
-              </button>
-            )}
-            {podeTrocarImagem ? (
-              <button
-                type="button"
-                title="Ver imagem"
-                aria-label={`Ver imagem de ${nome}`}
-                onClick={e => {
-                  e.stopPropagation()
-                  setImagemExpandida(true)
-                }}
-                className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border border-white bg-primary text-white shadow"
-              >
-                <MdVisibility size={12} />
-              </button>
-            ) : null}
+                )}
+              </span>
+            </button>
+            <button
+              type="button"
+              title="Ver imagem"
+              aria-label={`Ver imagem de ${nome}`}
+              onClick={e => {
+                e.stopPropagation()
+                setImagemExpandida(true)
+              }}
+              className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border border-white bg-primary text-white shadow"
+            >
+              <MdVisibility size={12} />
+            </button>
           </div>
         ) : podeTrocarImagem ? (
           <button
             type="button"
-            title="Adicionar imagem neste cardápio"
+            title="Adicionar imagem"
             aria-label={`Adicionar imagem de ${nome}`}
             disabled={isSavingImage}
             onClick={e => {
               e.stopPropagation()
               abrirSeletorImagem()
             }}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-dashed border-primary/40 bg-primary/5 text-primary transition-colors hover:bg-primary/10 disabled:opacity-60 md:h-12 md:w-12"
+            className="shrink-0 disabled:opacity-60"
           >
-            <MdAddAPhoto className="h-5 w-5 md:h-6 md:w-6" />
+            {placeholderSemImagem}
           </button>
         ) : (
-          <div
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-secondary-text md:h-12 md:w-12"
-            aria-hidden
-            title="Sem imagem"
-          >
-            <MdImageNotSupported className="h-6 w-6 md:h-7 md:w-7" />
-          </div>
+          placeholderSemImagem
         )}
 
         <span
@@ -217,21 +208,26 @@ function CatalogProductRowInner({
           </span>
         ) : null}
 
-        {!isMenu && actionsSlot ? (
+        {actionsSlot ? (
           <div
-            className="col-span-3 flex items-center gap-1 md:col-span-1 md:gap-1.5"
+            className={cn(
+              'flex items-center gap-1 md:gap-1.5',
+              isMenu
+                ? 'col-span-2 md:col-span-1'
+                : 'col-span-3 md:col-span-1'
+            )}
             onClick={e => e.stopPropagation()}
           >
             {actionsSlot}
           </div>
         ) : null}
 
-        {!isMenu ? <div className="hidden min-w-0 md:block" aria-hidden /> : null}
+        <div className="hidden min-w-0 md:block" aria-hidden />
 
         <div
           className={cn(
             'flex flex-wrap items-center justify-end gap-2 md:gap-4',
-            isMenu ? '' : 'col-span-3 md:col-span-1 md:mr-4'
+            isMenu ? 'col-span-2 md:col-span-1 md:mr-4' : 'col-span-3 md:col-span-1 md:mr-4'
           )}
           onClick={e => e.stopPropagation()}
         >

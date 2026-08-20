@@ -3,7 +3,10 @@
 import { JiffyConfirmDialog } from '@/src/presentation/components/ui/jiffy-confirm-dialog'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { cn } from '@/src/shared/utils/cn'
-import type { MenuAlvoPropagacao } from '@/src/shared/types/propagarAlteracaoProduto'
+import type {
+  MenuAlvoPropagacao,
+  VariantePropagacaoProduto,
+} from '@/src/shared/types/propagarAlteracaoProduto'
 
 type Passo = 'perguntar' | 'escolher'
 
@@ -11,7 +14,9 @@ interface PropagarAlteracaoProdutoDialogProps {
   open: boolean
   passo: Passo
   origem: 'cadastroBase' | 'menu'
-  variante?: 'dados' | 'imagem'
+  variante?: VariantePropagacaoProduto
+  /** Menus em que o produto/imagem já foi salvo (exibição na pergunta de criação). */
+  menusJaSalvos?: MenuAlvoPropagacao[]
   incluirCadastroBase: boolean
   menus: MenuAlvoPropagacao[]
   selecionados: Set<string>
@@ -26,11 +31,23 @@ interface PropagarAlteracaoProdutoDialogProps {
   onDismiss: () => void
 }
 
+function formatarListaMenus(menus: MenuAlvoPropagacao[]): string {
+  if (menus.length === 0) return ''
+  if (menus.length === 1) return menus[0].nome
+  if (menus.length === 2) return `${menus[0].nome} e ${menus[1].nome}`
+  const inicio = menus
+    .slice(0, -1)
+    .map(m => m.nome)
+    .join(', ')
+  return `${inicio} e ${menus[menus.length - 1].nome}`
+}
+
 export function PropagarAlteracaoProdutoDialog({
   open,
   passo,
   origem,
   variante = 'dados',
+  menusJaSalvos = [],
   incluirCadastroBase,
   menus,
   selecionados,
@@ -45,27 +62,45 @@ export function PropagarAlteracaoProdutoDialog({
   onDismiss,
 }: PropagarAlteracaoProdutoDialogProps) {
   const isImagem = variante === 'imagem'
+  const isVinculo = variante === 'vinculoMenus'
+  const nomesJaSalvos = formatarListaMenus(menusJaSalvos)
+
   const titulo =
     passo === 'perguntar'
-      ? isImagem
-        ? 'Aplicar esta imagem em outros cardápios?'
-        : 'Aplicar esta alteração em outros Menus?'
-      : isImagem
-        ? 'Onde aplicar esta imagem?'
-        : 'Onde aplicar esta alteração?'
+      ? isVinculo
+        ? 'Vincular este produto a outros cardápios?'
+        : isImagem
+          ? 'Aplicar esta imagem em outros cardápios?'
+          : 'Aplicar esta alteração em outros Menus?'
+      : isVinculo
+        ? 'Onde vincular o produto?'
+        : isImagem
+          ? 'Onde aplicar esta imagem?'
+          : 'Onde aplicar esta alteração?'
 
   const descricao =
     passo === 'perguntar'
-      ? isImagem
-        ? origem === 'cadastroBase'
-          ? 'A imagem será salva no menu principal. Deseja aplicar também em outros cardápios?'
-          : 'A imagem será salva neste cardápio. Deseja trocar a foto em outros menus também?'
-        : origem === 'cadastroBase'
-          ? 'A alteração será salva no cadastro do produto. Deseja copiar também para algum cardápio?'
-          : 'A alteração será salva neste cardápio. Deseja copiar também para o cadastro base ou para outros menus?'
-      : isImagem
-        ? 'Marque os cardápios. Os que não forem marcados mantêm a imagem atual.'
-        : 'Marque os destinos. O que não for marcado permanece como está.'
+      ? isVinculo
+        ? nomesJaSalvos
+          ? `O produto já foi salvo em: ${nomesJaSalvos}. Deseja vinculá-lo também a outros cardápios?`
+          : 'O produto foi salvo. Deseja vinculá-lo também a outros cardápios?'
+        : isImagem
+          ? origem === 'cadastroBase'
+            ? menusJaSalvos.length > 0
+              ? `A imagem será salva em: ${nomesJaSalvos}. Deseja aplicar também em outros cardápios?`
+              : 'A imagem será salva no menu principal. Deseja aplicar também em outros cardápios?'
+            : 'A imagem será salva neste cardápio. Deseja trocar a foto em outros menus também?'
+          : origem === 'cadastroBase'
+            ? 'A alteração será salva no cadastro do produto. Deseja copiar também para algum cardápio?'
+            : 'A alteração será salva neste cardápio. Deseja copiar também para o cadastro base ou para outros menus?'
+      : isVinculo
+        ? 'Marque os cardápios adicionais. Os já salvos permanecem vinculados.'
+        : isImagem
+          ? 'Marque os cardápios. Os que não forem marcados mantêm a imagem atual.'
+          : 'Marque os destinos. O que não for marcado permanece como está.'
+
+  const labelNao = isVinculo ? 'Não, só nestes' : 'Não, só aqui'
+  const labelConfirmar = isVinculo ? 'Vincular nos selecionados' : 'Aplicar nos selecionados'
 
   return (
     <JiffyConfirmDialog
@@ -87,7 +122,7 @@ export function PropagarAlteracaoProdutoDialog({
               onClick={onNao}
               className="h-10 rounded-lg border border-gray-300 px-4 text-sm font-semibold text-primary-text transition-colors hover:bg-gray-50 disabled:opacity-50"
             >
-              Não, só aqui
+              {labelNao}
             </button>
             <button
               type="button"
@@ -114,7 +149,7 @@ export function PropagarAlteracaoProdutoDialog({
               onClick={onConfirmarEscolha}
               className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-white transition-colors hover:bg-primary/90 disabled:opacity-50"
             >
-              Aplicar nos selecionados
+              {labelConfirmar}
             </button>
           </div>
         )
@@ -142,7 +177,9 @@ export function PropagarAlteracaoProdutoDialog({
             ) : null}
             {menus.length === 0 && !incluirCadastroBase ? (
               <li className="px-3 py-6 text-center text-sm text-secondary-text">
-                Este produto não está em nenhum outro cardápio.
+                {isVinculo
+                  ? 'Não há outros cardápios disponíveis para vincular.'
+                  : 'Este produto não está em nenhum outro cardápio.'}
               </li>
             ) : (
               menus.map((menu, index) => {

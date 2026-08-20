@@ -10,11 +10,13 @@ export interface ProdutoListItemProps {
   produto: Produto
   isSavingValor?: boolean
   isSavingStatus?: boolean
+  isSavingImage?: boolean
   onValorChange: (produtoId: string, valor: number) => void
   onSwitchToggle: (produtoId: string, status: boolean) => void
   onToggleBoolean: (produtoId: string, field: ToggleField, value: boolean) => void
   onEditProduto: (produtoId: string) => void
   onCopyProduto: (produtoId: string) => void
+  onChangeImage?: (produtoId: string, file: File) => void
   imagemUrl?: string | null
 }
 
@@ -22,11 +24,13 @@ function ProdutoListItemBase({
   produto,
   isSavingValor,
   isSavingStatus,
+  isSavingImage,
   onValorChange,
   onSwitchToggle,
   onToggleBoolean,
   onEditProduto,
   onCopyProduto,
+  onChangeImage,
   imagemUrl,
 }: ProdutoListItemProps) {
   const produtoId = produto.getId()
@@ -53,9 +57,11 @@ function ProdutoListItemBase({
       codigo={produto.getCodigoProduto()}
       isSavingValor={isSavingValor}
       isSavingStatus={isSavingStatus}
+      isSavingImage={isSavingImage}
       onValorChange={onValorChange}
       onSwitchToggle={onSwitchToggle}
       onEdit={onEditProduto}
+      onChangeImage={onChangeImage}
       actionsSlot={
         <>
           <div className="md:hidden">
@@ -87,11 +93,13 @@ function arePropsEqual(prev: ProdutoListItemProps, next: ProdutoListItemProps): 
     prev.produto === next.produto &&
     prev.isSavingValor === next.isSavingValor &&
     prev.isSavingStatus === next.isSavingStatus &&
+    prev.isSavingImage === next.isSavingImage &&
     prev.onValorChange === next.onValorChange &&
     prev.onSwitchToggle === next.onSwitchToggle &&
     prev.onToggleBoolean === next.onToggleBoolean &&
     prev.onEditProduto === next.onEditProduto &&
     prev.onCopyProduto === next.onCopyProduto &&
+    prev.onChangeImage === next.onChangeImage &&
     prev.imagemUrl === next.imagemUrl
   )
 }
