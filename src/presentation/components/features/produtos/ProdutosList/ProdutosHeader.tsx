@@ -23,15 +23,15 @@ export function ProdutosHeader({
   return (
     <div className="flex-shrink-0 px-1 md:px-[30px]">
       <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div className="mb-1">
+        <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-end md:justify-between md:gap-4">
+          <div className="md:mb-1">
             <p className="text-sm font-semibold text-primary">Produtos Cadastrados</p>
             <p className="text-sm font-medium text-tertiary md:text-[22px]">
               Total {totalLocal} de {totalApi}
             </p>
           </div>
 
-          <div className="mb-1 ml-0 w-full max-w-[350px] md:ml-6">
+          <div className="w-full md:mb-1 md:ml-6 md:max-w-[350px]">
             <TextField
               id="produtos-search"
               size="small"
@@ -69,17 +69,17 @@ export function ProdutosHeader({
             />
           </div>
 
-          <div className="mb-1 flex flex-1 flex-col items-stretch justify-end gap-1 md:flex-row md:items-center md:gap-3">
+          <div className="flex gap-2 md:mb-1 md:flex-1 md:items-center md:justify-end md:gap-3">
             <Link
               href="/produtos/atualizar-produtos-lote"
-              className="flex h-8 items-center gap-1.5 rounded-lg border border-primary/50 bg-info px-3 text-xs font-semibold text-primary-text transition-colors hover:bg-primary/10 md:px-4 md:text-sm"
+              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-primary/50 bg-info px-3 text-xs font-semibold text-primary-text transition-colors hover:bg-primary/10 md:h-8 md:flex-none md:px-4 md:text-sm"
             >
               Produtos em Lote
             </Link>
             <button
               type="button"
               onClick={onNovoProduto}
-              className="flex h-8 items-center gap-1.5 rounded-lg bg-primary px-5 text-xs font-semibold text-info transition-colors hover:bg-primary/90 md:text-sm"
+              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-info transition-colors hover:bg-primary/90 md:h-8 md:flex-none md:px-5 md:text-sm"
             >
               Novo
               <span className="text-base leading-none">+</span>

@@ -15,6 +15,7 @@ import {
   sxEntradaCompactaProduto,
   sxEntradaCompactaProdutoSelect,
 } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
+import { GrupoProdutosMultiFilter } from '@/src/presentation/components/features/produtos/GrupoProdutosMultiFilter'
 
 export type StatusFilter = 'Todos' | 'Ativo' | 'Desativado'
 export type TriState = 'Todos' | 'Sim' | 'Não'
@@ -35,8 +36,14 @@ interface ProdutosFiltersProps {
   statusGrupoFilter: StatusFilter
   onStatusGrupoChange: (v: StatusFilter) => void
 
-  grupoProdutoFilter: string
-  onGrupoProdutoChange: (v: string) => void
+  ativoLocalFilter: TriState
+  onAtivoLocalChange: (v: TriState) => void
+
+  ativoDeliveryFilter: TriState
+  onAtivoDeliveryChange: (v: TriState) => void
+
+  grupoProdutoFilter: string[]
+  onGrupoProdutoChange: (v: string[]) => void
   gruposProdutos: GrupoProduto[]
   isLoadingGruposProdutos: boolean
 
@@ -56,6 +63,10 @@ export function ProdutosFilters({
   onFilterStatusChange,
   statusGrupoFilter,
   onStatusGrupoChange,
+  ativoLocalFilter,
+  onAtivoLocalChange,
+  ativoDeliveryFilter,
+  onAtivoDeliveryChange,
   grupoProdutoFilter,
   onGrupoProdutoChange,
   gruposProdutos,
@@ -128,36 +139,49 @@ export function ProdutosFilters({
           </FormControl>
         </div>
 
-        <div className="relative z-20 w-full min-w-[180px] sm:w-[220px]">
-          <Autocomplete
+        <div className="w-full min-w-[120px] sm:w-[140px]">
+          <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
+            <InputLabel id="produtos-filter-local-label">Ativo no local</InputLabel>
+            <Select
+              labelId="produtos-filter-local-label"
+              label="Ativo no local"
+              value={ativoLocalFilter}
+              onChange={(e: SelectChangeEvent<string>) =>
+                onAtivoLocalChange(e.target.value as TriState)
+              }
+            >
+              <MenuItem value="Todos">Todos</MenuItem>
+              <MenuItem value="Sim">Sim</MenuItem>
+              <MenuItem value="Não">Não</MenuItem>
+            </Select>
+          </FormControl>
+        </div>
+
+        <div className="w-full min-w-[136px] sm:w-[156px]">
+          <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
+            <InputLabel id="produtos-filter-delivery-label">Ativo no delivery</InputLabel>
+            <Select
+              labelId="produtos-filter-delivery-label"
+              label="Ativo no delivery"
+              value={ativoDeliveryFilter}
+              onChange={(e: SelectChangeEvent<string>) =>
+                onAtivoDeliveryChange(e.target.value as TriState)
+              }
+            >
+              <MenuItem value="Todos">Todos</MenuItem>
+              <MenuItem value="Sim">Sim</MenuItem>
+              <MenuItem value="Não">Não</MenuItem>
+            </Select>
+          </FormControl>
+        </div>
+
+        <div className="relative z-20 w-full min-w-[180px] sm:w-[240px]">
+          <GrupoProdutosMultiFilter
             id="produtos-filter-grupo-searchable"
-            size="small"
-            options={gruposProdutos}
+            grupos={gruposProdutos}
             loading={isLoadingGruposProdutos}
-            disabled={isLoadingGruposProdutos}
-            loadingText="Carregando..."
-            noOptionsText="Nenhuma categoria encontrada"
-            getOptionLabel={grupo => grupo.getNome()}
-            isOptionEqualToValue={(a, b) => a.getId() === b.getId()}
-            value={gruposProdutos.find(g => g.getId() === grupoProdutoFilter) ?? null}
-            onChange={(_, grupo) => onGrupoProdutoChange(grupo?.getId() ?? '')}
-            renderInput={params => (
-              <TextField
-                {...params}
-                label="Categoria"
-                placeholder="Pesquise ou Selecione"
-                InputLabelProps={{
-                  ...params.InputLabelProps,
-                  shrink: true,
-                }}
-                sx={{
-                  ...sxEntradaCompactaProduto,
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: '#fff',
-                  },
-                }}
-              />
-            )}
+            value={grupoProdutoFilter}
+            onChange={onGrupoProdutoChange}
           />
         </div>
 

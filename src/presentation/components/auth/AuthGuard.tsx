@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import type { Auth } from '@/src/domain/entities/Auth'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
-import { buildAuthFromAccessToken } from '@/src/shared/utils/buildAuthFromAccessToken'
+import { buildAuthFromAccessToken, isEmailSessaoPlaceholder } from '@/src/shared/utils/buildAuthFromAccessToken'
 import { getTabTenantToken } from '@/src/shared/utils/tabSession'
 import { fetchTenantRefreshAccessToken } from '@/src/shared/utils/fetchTenantRefreshAccessToken'
 import { syncTenantAccessTokenClient } from '@/src/presentation/utils/syncTenantAccessTokenClient'
@@ -65,6 +65,8 @@ const PUBLIC_PREFIXES = [
   '/esqueci-senha',
   '/redefinir-senha',
   '/notas-fiscais',
+  '/cardapio',
+  '/delivery',
 ]
 
 function isPublicPath(p: string | null): boolean {
@@ -93,10 +95,14 @@ function getActiveTenantAuthOrNull(): Auth | null {
   if (!raw) return null
   try {
     const u = st.identityAuth?.getUser()
-    const built = buildAuthFromAccessToken(
-      raw,
-      u ? { id: u.getId(), email: u.getEmail(), name: u.getName() } : undefined
-    )
+    if (!u || isEmailSessaoPlaceholder(u.getEmail())) {
+      return null
+    }
+    const built = buildAuthFromAccessToken(raw, {
+      id: u.getId(),
+      email: u.getEmail(),
+      name: u.getName(),
+    })
     return built.isExpired() ? null : built
   } catch {
     return null

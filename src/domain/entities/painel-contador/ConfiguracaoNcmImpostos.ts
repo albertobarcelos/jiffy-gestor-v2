@@ -1,9 +1,19 @@
 export interface ImpostosNcm {
   cfop?: string
   csosn?: string
-  icms?: { origem?: number; cst?: string; aliquota?: number }
+  codigoBeneficioFiscal?: string
+  icms?: { origem?: number; cst?: string; aliquota?: number; reducaoBase?: number }
   pis?: { cst?: string; aliquota?: number }
   cofins?: { cst?: string; aliquota?: number }
+}
+
+function asNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : undefined
+  }
+  return undefined
 }
 
 export class ConfiguracaoNcmImpostos {
@@ -22,7 +32,27 @@ export class ConfiguracaoNcmImpostos {
     const codigo = String(data.codigo ?? ncmNested?.codigo ?? '').trim()
     if (codigo.length !== 8) return null
 
-    const impostos = (data.impostos as ImpostosNcm | undefined) ?? {}
+    const impostosRaw = (data.impostos as ImpostosNcm | undefined) ?? {}
+    const icmsRaw =
+      impostosRaw.icms && typeof impostosRaw.icms === 'object'
+        ? (impostosRaw.icms as Record<string, unknown>)
+        : undefined
+
+    const impostos: ImpostosNcm = {
+      ...impostosRaw,
+      codigoBeneficioFiscal:
+        impostosRaw.codigoBeneficioFiscal ??
+        (typeof data.codigoBeneficioFiscal === 'string' ? data.codigoBeneficioFiscal : undefined),
+      icms: icmsRaw
+        ? {
+            origem: asNumber(icmsRaw.origem),
+            cst: typeof icmsRaw.cst === 'string' ? icmsRaw.cst : undefined,
+            aliquota: asNumber(icmsRaw.aliquota),
+            reducaoBase: asNumber(icmsRaw.reducaoBase),
+          }
+        : impostosRaw.icms,
+    }
+
     const descricao = String(data.descricao ?? ncmNested?.descricao ?? '').trim()
 
     return new ConfiguracaoNcmImpostos(codigo, descricao, impostos)

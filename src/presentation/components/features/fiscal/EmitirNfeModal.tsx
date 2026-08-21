@@ -11,6 +11,13 @@ import {
   ClientesTabsModal,
   type ClientesTabsModalState,
 } from '@/src/presentation/components/features/clientes/ClientesTabsModal'
+import { AlertaCbenefEmissaoDialog } from '@/src/presentation/components/features/fiscal/AlertaCbenefEmissaoDialog'
+import { ConfigurarNcmModal } from '@/src/presentation/components/features/painel-contador/ConfigurarNcmModal'
+import { useVerificarCbenefEmissao } from '@/src/presentation/hooks/painel-contador/useCbenef'
+import { useConfiguracoesNcm } from '@/src/presentation/hooks/painel-contador/useConfiguracoesNcm'
+import { useTabsStore } from '@/src/presentation/stores/tabsStore'
+import { PORTAL_CONTADOR_PATH } from '@/src/presentation/components/features/painel-contador/painelContadorEtapas'
+import type { ItemVendaCbenef } from '@/src/domain/entities/painel-contador/cbenefRegras'
 
 /** Aplica máscara de CPF (000.000.000-00) durante a digitação — apenas UI. */
 function formatarCpfMascara(valor: string): string {
@@ -63,8 +70,14 @@ export function EmitirNfeModal({
     usarModuloDelivery ? emitirNfeDelivery
     : tabelaOrigem === 'venda_gestor' ? emitirNfeGestor
     : emitirNfePdv
+  const verificarCbenef = useVerificarCbenefEmissao()
+  const { ncmsQuery } = useConfiguracoesNcm()
+  const addTab = useTabsStore(s => s.addTab)
   const [emissaoEmProcessamento, setEmissaoEmProcessamento] = useState(false)
   const [modeloEmitindo, setModeloEmitindo] = useState<55 | 65 | null>(null)
+  const [itensSemCbenef, setItensSemCbenef] = useState<ItemVendaCbenef[]>([])
+  const [modeloPendenteCbenef, setModeloPendenteCbenef] = useState<55 | 65 | null>(null)
+  const [ncmParaConfigurar, setNcmParaConfigurar] = useState<string | null>(null)
   /** CPF do consumidor para NFC-e (UI preparada; envio ao backend pendente). */
   const [cpfNfce, setCpfNfce] = useState('')
   const [clientesTabsState, setClientesTabsState] = useState<ClientesTabsModalState>({
@@ -77,6 +90,9 @@ export function EmitirNfeModal({
   useEffect(() => {
     if (!open) {
       setCpfNfce('')
+      setItensSemCbenef([])
+      setModeloPendenteCbenef(null)
+      setNcmParaConfigurar(null)
       setClientesTabsState({
         open: false,
         tab: 'cliente',
@@ -106,17 +122,8 @@ export function EmitirNfeModal({
     })
   }, [])
 
-  const emitirPorModelo = useCallback(
+  const executarEmissao = useCallback(
     async (modelo: 55 | 65) => {
-      if (emissaoEmProcessamento || emitirNfe.isPending) return
-
-      if (modelo === 55 && !temClienteCadastrado) {
-        showToast.error(
-          'Para emitir NF-e (modelo 55) é obrigatório que a venda tenha um cliente cadastrado. Vincule o cliente na origem do pedido e tente novamente.'
-        )
-        return
-      }
-
       setEmissaoEmProcessamento(true)
       setModeloEmitindo(modelo)
 
@@ -131,12 +138,71 @@ export function EmitirNfeModal({
       } finally {
         setEmissaoEmProcessamento(false)
         setModeloEmitindo(null)
+        setItensSemCbenef([])
+        setModeloPendenteCbenef(null)
       }
     },
-    [emissaoEmProcessamento, emitirNfe, onClose, temClienteCadastrado, vendaId]
+    [emitirNfe, onClose, vendaId]
   )
 
-  const bloqueado = emissaoEmProcessamento || emitirNfe.isPending
+  const emitirPorModelo = useCallback(
+    async (modelo: 55 | 65) => {
+      if (emissaoEmProcessamento || emitirNfe.isPending || verificarCbenef.isPending) return
+
+      if (modelo === 55 && !temClienteCadastrado) {
+        showToast.error(
+          'Para emitir NF-e (modelo 55) é obrigatório que a venda tenha um cliente cadastrado. Vincule o cliente na origem do pedido e tente novamente.'
+        )
+        return
+      }
+
+      try {
+        const itens = await verificarCbenef.mutateAsync({
+          vendaId,
+          tabelaOrigem,
+          tipoVenda,
+        })
+        if (itens.length > 0) {
+          setItensSemCbenef(itens)
+          setModeloPendenteCbenef(modelo)
+          return
+        }
+      } catch (error) {
+        console.error('Erro ao verificar cBenef antes da emissão:', error)
+      }
+
+      await executarEmissao(modelo)
+    },
+    [
+      emissaoEmProcessamento,
+      emitirNfe.isPending,
+      executarEmissao,
+      tabelaOrigem,
+      temClienteCadastrado,
+      tipoVenda,
+      vendaId,
+      verificarCbenef,
+    ]
+  )
+
+  const bloqueado = emissaoEmProcessamento || emitirNfe.isPending || verificarCbenef.isPending
+
+  const configuracaoNcmEdicao = useMemo(() => {
+    if (!ncmParaConfigurar) return null
+    const entity = ncmsQuery.data?.ncms.find((ncm) => ncm.codigo === ncmParaConfigurar)
+    if (!entity) {
+      return { ncm: { codigo: ncmParaConfigurar } }
+    }
+    return {
+      ncm: { codigo: entity.codigo, descricao: entity.descricao },
+      cfop: entity.impostos.cfop,
+      csosn: entity.impostos.csosn,
+      codigoBeneficioFiscal: entity.impostos.codigoBeneficioFiscal,
+      icms: entity.impostos.icms,
+      pis: entity.impostos.pis,
+      cofins: entity.impostos.cofins,
+    }
+  }, [ncmParaConfigurar, ncmsQuery.data?.ncms])
 
   return (
     <>
@@ -307,6 +373,51 @@ export function EmitirNfeModal({
         onClose={handleFecharEdicaoCliente}
         onReload={onClienteSalvo}
         onTabChange={tab => setClientesTabsState(prev => ({ ...prev, tab }))}
+      />
+
+      <AlertaCbenefEmissaoDialog
+        open={itensSemCbenef.length > 0 && modeloPendenteCbenef != null && !ncmParaConfigurar}
+        itens={itensSemCbenef}
+        busy={bloqueado}
+        onCancelar={() => {
+          setItensSemCbenef([])
+          setModeloPendenteCbenef(null)
+        }}
+        onConfigurar={() => {
+          const ncm = itensSemCbenef[0]?.ncm
+          if (ncm) {
+            setNcmParaConfigurar(ncm)
+            addTab({
+              id: 'etapa-3-cenario-fiscal',
+              label: 'Cenário Fiscal (NCMs)',
+              path: PORTAL_CONTADOR_PATH,
+            })
+            return
+          }
+          addTab({
+            id: 'etapa-3-cenario-fiscal',
+            label: 'Cenário Fiscal (NCMs)',
+            path: PORTAL_CONTADOR_PATH,
+          })
+        }}
+        onContinuar={() => {
+          if (modeloPendenteCbenef) {
+            void executarEmissao(modeloPendenteCbenef)
+          }
+        }}
+      />
+
+      <ConfigurarNcmModal
+        open={Boolean(ncmParaConfigurar)}
+        configuracaoImposto={configuracaoNcmEdicao}
+        onClose={() => setNcmParaConfigurar(null)}
+        onSuccess={() => {
+          setNcmParaConfigurar(null)
+          setItensSemCbenef([])
+          setModeloPendenteCbenef(null)
+          void ncmsQuery.refetch()
+          showToast.success('cBenef salvo. Tente emitir novamente.')
+        }}
       />
     </>
   )

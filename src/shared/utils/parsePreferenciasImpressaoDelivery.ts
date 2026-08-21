@@ -36,8 +36,9 @@ function modoNormalizado(v: unknown): ModoImpressaoDelivery {
 }
 
 /**
- * Extrai preferências de impressão delivery do JSON de empresa (`GET /api/empresas/me`).
- * Campos oficiais em `parametroDelivery` (backend). Mantém aliases em `parametroEmpresa` legado.
+ * Extrai preferências de impressão delivery.
+ * Fonte canônica: `parametroDelivery` em `GET /api/delivery/empresas/me`.
+ * Mantém fallback em `GET /api/empresas/me` (legado).
  */
 export function parsePreferenciasImpressaoDelivery(
   data: Record<string, unknown>

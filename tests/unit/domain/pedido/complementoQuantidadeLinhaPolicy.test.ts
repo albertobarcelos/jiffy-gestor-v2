@@ -133,4 +133,48 @@ describe('CalculadoraPedido alinhada ao backend', () => {
     const total = calcularTotalProduto(linha)
     expect(total).toBe(10 * 2.5 + 2 * 1)
   })
+
+  it('calcularTotalComplementos soma aumenta, subtrai diminui e ignora nenhum', async () => {
+    const { calcularTotalComplementos } = await import('@/src/domain/services/pedido/CalculadoraPedido')
+    const total = calcularTotalComplementos({
+      produtoId: 'p1',
+      nome: 'Item',
+      quantidade: 1,
+      valorUnitario: 24,
+      complementos: [
+        { id: 'c1', grupoId: 'g1', nome: 'Extra', valor: 10, quantidade: 1, tipoImpactoPreco: 'aumenta' },
+        { id: 'c2', grupoId: 'g1', nome: 'Sem', valor: 10, quantidade: 1, tipoImpactoPreco: 'diminui' },
+        { id: 'c3', grupoId: 'g1', nome: 'Opcional', valor: 5, quantidade: 2, tipoImpactoPreco: 'nenhum' },
+      ],
+    })
+    expect(total).toBe(0)
+  })
+
+  it('obterTotalComplemento retorna valor negativo para diminui', async () => {
+    const { obterTotalComplemento } = await import('@/src/domain/services/pedido/CalculadoraPedido')
+    expect(
+      obterTotalComplemento({
+        id: 'c1',
+        grupoId: 'g1',
+        nome: 'Sem',
+        valor: 10,
+        quantidade: 2,
+        tipoImpactoPreco: 'diminui',
+      })
+    ).toBe(-20)
+  })
+
+  it('obterTotalComplemento retorna zero para nenhum mesmo com valor', async () => {
+    const { obterTotalComplemento } = await import('@/src/domain/services/pedido/CalculadoraPedido')
+    expect(
+      obterTotalComplemento({
+        id: 'c1',
+        grupoId: 'g1',
+        nome: 'Opcional',
+        valor: 5,
+        quantidade: 3,
+        tipoImpactoPreco: 'nenhum',
+      })
+    ).toBe(0)
+  })
 })

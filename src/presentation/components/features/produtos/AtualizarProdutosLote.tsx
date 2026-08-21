@@ -13,13 +13,11 @@ import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Checkbox } from '@/src/presentation/components/ui/checkbox'
 import {
-  Autocomplete,
   FormControl,
   InputAdornment,
   InputLabel,
   MenuItem,
   Select,
-  TextField,
   type SelectChangeEvent,
 } from '@mui/material'
 import type { SxProps, Theme } from '@mui/material/styles'
@@ -34,7 +32,12 @@ import {
   tiposProduto,
 } from '@/src/presentation/components/features/produtos/NovoProduto/fiscalSelectOptions'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
+import { GrupoProdutosMultiFilter } from '@/src/presentation/components/features/produtos/GrupoProdutosMultiFilter'
 import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
+import {
+  mapaOrdemGrupoProduto,
+  sortProdutosPorOrdemMenu,
+} from '@/src/presentation/components/features/produtos/ProdutosList/utils'
 import { ProdutoActionIconsDisplay } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoActionIconsDisplay'
 import {
   ProdutoFiscalCelulasEditaveis,
@@ -325,7 +328,7 @@ export function AtualizarPrecoLote() {
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
   const [ativoLocalFilter, setAtivoLocalFilter] = useState<'Todos' | 'Sim' | 'Não'>('Todos')
   const [ativoDeliveryFilter, setAtivoDeliveryFilter] = useState<'Todos' | 'Sim' | 'Não'>('Todos')
-  const [grupoProdutoFilter, setGrupoProdutoFilter] = useState('')
+  const [grupoProdutoFilter, setGrupoProdutoFilter] = useState<string[]>([])
   /** Mostrar apenas produtos sem dado na coluna escolhida (filtro só no front). */
   const [filtroColunaVazia, setFiltroColunaVazia] = useState<FiltroColunaVazia>(FILTRO_COLUNA_TODOS)
   /**
@@ -592,8 +595,8 @@ export function AtualizarPrecoLote() {
       if (ativoDeliveryBoolean !== null) {
         params.append('ativoDelivery', ativoDeliveryBoolean.toString())
       }
-      if (grupoProdutoFilter) {
-        params.append('grupoProdutoId', grupoProdutoFilter)
+      if (grupoProdutoFilter.length === 1) {
+        params.append('grupoProdutoId', grupoProdutoFilter[0])
       }
       return params
     },
@@ -2074,12 +2077,23 @@ export function AtualizarPrecoLote() {
   const fiscalLoteBodyPronto = montarAlteracoesFiscalLote(fiscalLoteDraft) != null
 
   const produtosExibicao = useMemo(() => {
-    if (filtroColunaVazia === FILTRO_COLUNA_TODOS) return produtos
-    if (!idsFiltroColunaCongelados) {
-      return produtos.filter(p => produtoSemDadoNaColuna(p, filtroColunaVazia))
+    let lista = produtos
+    if (grupoProdutoFilter.length > 0) {
+      const idsGrupo = new Set(grupoProdutoFilter)
+      lista = lista.filter(p => {
+        const grupoId = p.getGrupoId()
+        return Boolean(grupoId && idsGrupo.has(grupoId))
+      })
     }
-    return produtos.filter(p => idsFiltroColunaCongelados.has(p.getId()))
-  }, [produtos, filtroColunaVazia, idsFiltroColunaCongelados])
+    if (filtroColunaVazia !== FILTRO_COLUNA_TODOS) {
+      if (!idsFiltroColunaCongelados) {
+        lista = lista.filter(p => produtoSemDadoNaColuna(p, filtroColunaVazia))
+      } else {
+        lista = lista.filter(p => idsFiltroColunaCongelados.has(p.getId()))
+      }
+    }
+    return sortProdutosPorOrdemMenu(lista, mapaOrdemGrupoProduto(gruposProdutos))
+  }, [produtos, filtroColunaVazia, idsFiltroColunaCongelados, grupoProdutoFilter, gruposProdutos])
 
   /**
    * Listas de vínculo em lote (impressoras / grupos): ver
@@ -2236,7 +2250,7 @@ export function AtualizarPrecoLote() {
     setFilterStatus('Ativo')
     setAtivoLocalFilter('Todos')
     setAtivoDeliveryFilter('Todos')
-    setGrupoProdutoFilter('')
+    setGrupoProdutoFilter([])
     setFiltroColunaVazia(FILTRO_COLUNA_TODOS)
     setIdsFiltroColunaCongelados(null)
     filtroColunaAnteriorRef.current = FILTRO_COLUNA_TODOS
@@ -3334,36 +3348,13 @@ export function AtualizarPrecoLote() {
               </FormControl>
             </div>
 
-            <div className="relative z-20 w-[min(220px,38vw)] min-w-[160px] shrink-0 md:max-w-[260px] md:flex-1">
-              <Autocomplete
+            <div className="relative z-20 w-[min(240px,38vw)] min-w-[160px] shrink-0 md:max-w-[280px] md:flex-1">
+              <GrupoProdutosMultiFilter
                 id="lote-filter-grupo-searchable"
-                size="small"
-                options={gruposProdutos}
+                grupos={gruposProdutos}
                 loading={isLoadingGruposProdutos}
-                disabled={isLoadingGruposProdutos}
-                loadingText="Carregando..."
-                noOptionsText="Nenhuma categoria encontrada"
-                getOptionLabel={grupo => grupo.getNome()}
-                isOptionEqualToValue={(a, b) => a.getId() === b.getId()}
-                value={gruposProdutos.find(g => g.getId() === grupoProdutoFilter) ?? null}
-                onChange={(_, grupo) => setGrupoProdutoFilter(grupo?.getId() ?? '')}
-                renderInput={params => (
-                  <TextField
-                    {...params}
-                    label="Categoria"
-                    placeholder="Pesquise ou Selecione"
-                    InputLabelProps={{
-                      ...params.InputLabelProps,
-                      shrink: true,
-                    }}
-                    sx={{
-                      ...sxEntradaCompactaProduto,
-                      '& .MuiOutlinedInput-root': {
-                        backgroundColor: '#fff',
-                      },
-                    }}
-                  />
-                )}
+                value={grupoProdutoFilter}
+                onChange={setGrupoProdutoFilter}
               />
             </div>
 
@@ -3501,8 +3492,6 @@ export function AtualizarPrecoLote() {
           >
             <div className={`flex flex-col gap-2 ${activeTab === 'fiscal' ? 'min-w-[1180px]' : ''}`}>
               {produtosExibicao
-                .slice()
-                .sort((a, b) => a.getNome().localeCompare(b.getNome(), 'pt-BR'))
                 .map((produto, index) => {
                 const isSelected = produtosSelecionados.has(produto.getId())
                 const foiAlteradoNaSessao = produtosAlteradosPorAba[activeTab].has(produto.getId())

@@ -38,7 +38,8 @@ import { useImagensProdutosCadastroBase } from '@/src/presentation/hooks/produto
 import { Produto } from '@/src/domain/entities/Produto'
 import type { ToggleField } from '@/src/shared/types/produto'
 import {
-  sortProdutosAlphabetically,
+  sortProdutosPorOrdemMenu,
+  mapaOrdemGrupoProduto,
   produtoFromApiPreservandoOrdem,
 } from './utils'
 
@@ -125,22 +126,42 @@ export function ProdutosList() {
     return map
   }, [gruposProdutos])
 
+  const ordemGrupoPorId = useMemo(
+    () => mapaOrdemGrupoProduto(gruposProdutos),
+    [gruposProdutos]
+  )
+
   const produtosVisiveis = useMemo(() => {
-    const sorted = sortProdutosAlphabetically(produtos)
+    let list = produtos
 
-    if (filters.statusGrupoFilter === 'Todos') return sorted
+    if (filters.grupoProdutoFilter.length > 1) {
+      const idsSelecionados = new Set(filters.grupoProdutoFilter)
+      list = list.filter(p => {
+        const grupoId = p.getGrupoId()
+        return Boolean(grupoId && idsSelecionados.has(grupoId))
+      })
+    }
 
-    return sorted.filter((p) => {
-      const grupoId = p.getGrupoId()
-      if (!grupoId) {
-        // "Sem grupo" só aparece quando o filtro de status do grupo é Ativo/Todos
-        return filters.statusGrupoFilter === 'Ativo'
-      }
-      const ativo = grupoProdutoMap.get(grupoId)?.ativo
-      if (typeof ativo !== 'boolean') return filters.statusGrupoFilter === 'Ativo'
-      return filters.statusGrupoFilter === 'Ativo' ? ativo : !ativo
-    })
-  }, [produtos, grupoProdutoMap, filters.statusGrupoFilter])
+    if (filters.statusGrupoFilter !== 'Todos') {
+      list = list.filter((p) => {
+        const grupoId = p.getGrupoId()
+        if (!grupoId) {
+          return filters.statusGrupoFilter === 'Ativo'
+        }
+        const ativo = grupoProdutoMap.get(grupoId)?.ativo
+        if (typeof ativo !== 'boolean') return filters.statusGrupoFilter === 'Ativo'
+        return filters.statusGrupoFilter === 'Ativo' ? ativo : !ativo
+      })
+    }
+
+    return sortProdutosPorOrdemMenu(list, ordemGrupoPorId)
+  }, [
+    produtos,
+    grupoProdutoMap,
+    ordemGrupoPorId,
+    filters.statusGrupoFilter,
+    filters.grupoProdutoFilter,
+  ])
 
   const loadMoreRef = useRef<HTMLDivElement>(null)
 
@@ -476,6 +497,10 @@ export function ProdutosList() {
         onFilterStatusChange={actions.setStatus}
         statusGrupoFilter={filters.statusGrupoFilter}
         onStatusGrupoChange={actions.setStatusGrupo}
+        ativoLocalFilter={filters.ativoLocalFilter}
+        onAtivoLocalChange={actions.setAtivoLocal}
+        ativoDeliveryFilter={filters.ativoDeliveryFilter}
+        onAtivoDeliveryChange={actions.setAtivoDelivery}
         grupoProdutoFilter={filters.grupoProdutoFilter}
         onGrupoProdutoChange={actions.setGrupoProduto}
         gruposProdutos={gruposProdutosFiltrados}

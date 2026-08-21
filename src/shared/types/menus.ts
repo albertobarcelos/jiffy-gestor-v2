@@ -24,6 +24,7 @@ export interface MenuGrupoBase {
   ordem?: number
   corHex?: string | null
   iconName?: string | null
+  imagemUrl?: string | null
 }
 
 export interface MenuGrupoProduto {
@@ -32,6 +33,7 @@ export interface MenuGrupoProduto {
   ordem: number
   menuId: string
   grupoBase: MenuGrupoBase
+  image?: MenuProdutoImage | null
   dataCriacao: string
   dataAtualizacao: string
 }

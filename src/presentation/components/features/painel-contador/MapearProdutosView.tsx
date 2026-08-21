@@ -7,28 +7,8 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { ConfigurarNcmModal } from './ConfigurarNcmModal'
 import { HistoricoConfiguracaoNcmModal } from './HistoricoConfiguracaoNcmModal'
 import { CopiarConfiguracaoNcmModal } from './CopiarConfiguracaoNcmModal'
-
-interface ConfiguracaoImpostoNcm {
-  ncm?: {
-    codigo: string
-    descricao?: string
-  }
-  cfop?: string
-  csosn?: string
-  icms?: {
-    origem?: number
-    cst?: string
-    aliquota?: number
-  }
-  pis?: {
-    cst?: string
-    aliquota?: number
-  }
-  cofins?: {
-    cst?: string
-    aliquota?: number
-  }
-}
+import { isCstIcmsBeneficio } from '@/src/domain/entities/painel-contador/cbenefRegras'
+import type { ConfiguracaoImpostoNcm } from './configuracaoImpostoNcm'
 
 function mapNcmToConfiguracaoImposto(item: unknown): ConfiguracaoImpostoNcm | null {
   if (!item || typeof item !== 'object') return null
@@ -39,6 +19,7 @@ function mapNcmToConfiguracaoImposto(item: unknown): ConfiguracaoImpostoNcm | nu
     impostos?: {
       cfop?: string
       csosn?: string
+      codigoBeneficioFiscal?: string
       icms?: ConfiguracaoImpostoNcm['icms']
       pis?: ConfiguracaoImpostoNcm['pis']
       cofins?: ConfiguracaoImpostoNcm['cofins']
@@ -58,6 +39,7 @@ function mapNcmToConfiguracaoImposto(item: unknown): ConfiguracaoImpostoNcm | nu
     },
     cfop: impostos.cfop,
     csosn: impostos.csosn,
+    codigoBeneficioFiscal: impostos.codigoBeneficioFiscal,
     icms: impostos.icms,
     pis: impostos.pis,
     cofins: impostos.cofins,
@@ -69,6 +51,7 @@ function entityToViewConfig(entity: ConfiguracaoNcmImpostos): ConfiguracaoImpost
     ncm: { codigo: entity.codigo, descricao: entity.descricao },
     cfop: entity.impostos.cfop,
     csosn: entity.impostos.csosn,
+    codigoBeneficioFiscal: entity.impostos.codigoBeneficioFiscal,
     icms: entity.impostos.icms,
     pis: entity.impostos.pis,
     cofins: entity.impostos.cofins,
@@ -261,6 +244,11 @@ export function MapearProdutosView() {
                       <th className="px-4 py-3 text-left text-sm font-semibold text-alternate uppercase">
                         Alíquota ICMS (%)
                       </th>
+                      {!isSimplesNacional ? (
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-alternate uppercase">
+                          cBenef
+                        </th>
+                      ) : null}
                       <th className="px-4 py-3 text-left text-sm font-semibold text-alternate uppercase">
                         Ações
                       </th>
@@ -300,6 +288,13 @@ export function MapearProdutosView() {
                         <td className="px-4 py-3 text-sm text-secondary-text">
                           {formatarAliquota(config.icms?.aliquota)}
                         </td>
+                        {!isSimplesNacional ? (
+                          <td className="px-4 py-3 text-sm text-secondary-text whitespace-nowrap">
+                            {isCstIcmsBeneficio(config.icms?.cst)
+                              ? config.codigoBeneficioFiscal || '--'
+                              : '--'}
+                          </td>
+                        ) : null}
                         <td className="px-4 py-3">
                           <div className="flex gap-2">
                             {config.ncm?.codigo && (
@@ -413,6 +408,16 @@ export function MapearProdutosView() {
                             {formatarAliquota(config.icms?.aliquota)}
                           </span>
                         </div>
+                        {!isSimplesNacional ? (
+                          <div className="break-words">
+                            <span className="font-semibold text-alternate">cBenef:</span>{' '}
+                            <span className="text-secondary-text/90">
+                              {isCstIcmsBeneficio(config.icms?.cst)
+                                ? config.codigoBeneficioFiscal || '--'
+                                : '--'}
+                            </span>
+                          </div>
+                        ) : null}
                         {config.ncm?.codigo && (
                           <div className="flex flex-wrap gap-2 pt-1">
                             <button

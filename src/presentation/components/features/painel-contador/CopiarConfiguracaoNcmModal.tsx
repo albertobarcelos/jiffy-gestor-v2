@@ -13,28 +13,7 @@ import { Input } from '@/src/presentation/components/ui/input'
 import { Label } from '@/src/presentation/components/ui/label'
 import { showToast } from '@/src/shared/utils/toast'
 import { useConfiguracoesNcm } from '@/src/presentation/hooks/painel-contador/useConfiguracoesNcm'
-
-interface ConfiguracaoImpostoNcm {
-  ncm?: {
-    codigo: string
-    descricao?: string
-  }
-  cfop?: string
-  csosn?: string
-  icms?: {
-    origem?: number
-    cst?: string
-    aliquota?: number
-  }
-  pis?: {
-    cst?: string
-    aliquota?: number
-  }
-  cofins?: {
-    cst?: string
-    aliquota?: number
-  }
-}
+import type { ConfiguracaoImpostoNcm } from './configuracaoImpostoNcm'
 
 interface CopiarConfiguracaoNcmModalProps {
   open: boolean

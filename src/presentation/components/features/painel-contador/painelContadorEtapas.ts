@@ -5,6 +5,7 @@ import {
   MdFileDownload,
   MdReceipt,
   MdReceiptLong,
+  MdTableChart,
 } from 'react-icons/md'
 import { Etapa1DadosFiscaisEmpresa } from './Etapa1DadosFiscaisEmpresa'
 import { Etapa2EmissorFiscal } from './Etapa2EmissorFiscal'
@@ -12,6 +13,7 @@ import { MapearProdutosView } from './MapearProdutosView'
 import { Etapa4InutilizarNotas } from './Etapa4InutilizarNotas'
 import { ReformaTributariaView } from './ReformaTributariaView'
 import { ExportarXmlView } from './ExportarXmlView'
+import { ImportarCbenefView } from './ImportarCbenefView'
 /** URL única do painel — etapas são abas SPA, sem troca de rota. */
 export const PORTAL_CONTADOR_PATH = '/portal-contador'
 
@@ -79,5 +81,14 @@ export const PAINEL_CONTADOR_ETAPAS: EtapaPainelConfig[] = [
     path: PORTAL_CONTADOR_PATH,
     component: ExportarXmlView,
     icon: MdFileDownload,
+  },
+  {
+    id: 'manutencao-cbenef',
+    step: 7,
+    title: 'Tabela cBenef',
+    label: 'Tabela cBenef',
+    path: PORTAL_CONTADOR_PATH,
+    component: ImportarCbenefView,
+    icon: MdTableChart,
   },
 ]

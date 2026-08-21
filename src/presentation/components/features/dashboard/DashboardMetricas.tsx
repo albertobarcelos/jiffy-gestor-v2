@@ -34,29 +34,29 @@ function MetricCard({
   atualizando?: boolean
 }) {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-2">
-      <div className="flex items-center gap-4">
+    <div className="rounded-2xl border border-gray-200 bg-white p-3">
+      <div className="flex items-center gap-3 md:gap-4">
         {/* Ícone à esquerda — círculo lavanda (modelo Figma) */}
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-violet-100/90 text-primary md:h-14 md:w-14">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-violet-100/90 text-primary md:h-14 md:w-14">
           {icon}
         </div>
         {/* Título, valor + badge e rodapé à direita */}
         <div className="min-w-0 flex-1">
-          <p className="text-lg font-semibold text-primary-text">
+          <p className="text-base font-semibold text-primary-text md:text-lg">
             {tituloBase}
             {tituloPeriodo ? (
-              <span className="text-sm font-normal text-primary-text/90"> ({tituloPeriodo})</span>
+              <span className="text-xs font-normal text-primary-text/90 md:text-sm"> ({tituloPeriodo})</span>
             ) : null}
           </p>
           <div
             className={`transition-opacity duration-300 ${atualizando ? 'animate-pulse opacity-40' : 'opacity-100'}`}
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-2xl font-semibold tracking-tight text-primary-text md:text-[32px]">
+              <span className="text-xl font-semibold tracking-tight text-primary-text md:text-[32px]">
                 {valor}
               </span>
               <span
-                className={`mr-4 rounded-md px-2 py-0.5 text-sm font-medium text-white ${
+                className={`rounded-md px-2 py-0.5 text-xs font-medium text-white md:mr-4 md:text-sm ${
                   badgePositivo ? 'bg-[#00B074]' : 'bg-[#D92D20]'
                 }`}
               >

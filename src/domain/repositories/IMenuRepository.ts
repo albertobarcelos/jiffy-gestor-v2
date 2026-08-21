@@ -85,6 +85,11 @@ export interface IMenuRepository {
     produtoId: string,
     input: ImageUploadIntentInput
   ): Promise<ImageUploadIntentResponse>
+  criarUploadIntentGrupo(
+    menuId: string,
+    grupoProdutoId: string,
+    input: ImageUploadIntentInput
+  ): Promise<ImageUploadIntentResponse>
   confirmarUploadIntent(uploadIntentId: string): Promise<void>
 
   listarGrupos(

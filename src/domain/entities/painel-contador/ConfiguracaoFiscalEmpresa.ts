@@ -1,5 +1,9 @@
 export type IbptTokenStatus = 'CADASTRADO' | 'NAO_CADASTRADO' | null
 
+function textoOpcional(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
 export class ConfiguracaoFiscalEmpresa {
   private constructor(
     readonly id: string | null,
@@ -11,7 +15,9 @@ export class ConfiguracaoFiscalEmpresa {
     readonly codigoRegimeTributario: number | null,
     readonly simplesNacional: boolean,
     readonly contribuinteIcms: boolean,
-    readonly ibptTokenStatus: IbptTokenStatus
+    readonly ibptTokenStatus: IbptTokenStatus,
+    /** Rodapé da NFC-e/NF-e — informações complementares (`POST /v1/empresas-fiscais`). */
+    readonly rodapeNota: string
   ) {}
 
   static fromApiResponse(data: Record<string, unknown> | null | undefined): ConfiguracaoFiscalEmpresa | null {
@@ -39,7 +45,8 @@ export class ConfiguracaoFiscalEmpresa {
       codigo != null && !Number.isNaN(codigo) ? codigo : null,
       data.simplesNacional === true,
       data.contribuinteIcms === true,
-      ibptTokenStatus
+      ibptTokenStatus,
+      textoOpcional(data.rodapeNota)
     )
   }
 

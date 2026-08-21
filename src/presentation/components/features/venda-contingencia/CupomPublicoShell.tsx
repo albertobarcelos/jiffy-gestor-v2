@@ -16,7 +16,7 @@ type CupomPublicoShellProps = {
 export function CupomPublicoShell({ children, className, style }: CupomPublicoShellProps) {
   return (
     <div
-      className={`w-full overflow-hidden border-x border-slate-200/90 shadow-lg shadow-slate-200/60 ${className ?? ''}`}
+      className={`w-full overflow-hidden border-x border-slate-200/90 shadow-lg shadow-slate-200/60 print:shadow-none ${className ?? ''}`}
       style={style}
     >
       <CupomBordaPicotadaSuperior />

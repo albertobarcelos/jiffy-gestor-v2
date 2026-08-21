@@ -4,6 +4,7 @@
   MdRemoveCircleOutline,
   MdLaunch,
   MdAttachMoney,
+  MdDeliveryDining,
 } from 'react-icons/md'
 import type { ComponentType } from 'react'
 import type { ToggleField, ProdutoPatch } from '@/src/shared/types/produto'
@@ -47,6 +48,11 @@ export const toggleFieldConfig: Record<ToggleField, ToggleFieldConfig> = {
     bodyKey: 'incideTaxa',
     successTrue: 'Incidência de taxa habilitada!',
     successFalse: 'Incidência de taxa desabilitada!',
+  },
+  ativoDelivery: {
+    bodyKey: 'ativoDelivery',
+    successTrue: 'Produto ativado no delivery!',
+    successFalse: 'Produto desativado no delivery!',
   },
 }
 
@@ -112,6 +118,14 @@ export const actionIconsConfig: ActionIconDef[] = [
       'Quando ativo, este produto entra no cálculo das taxas configuradas (serviço, couvert, etc.) no pedido.',
     Icon: TaxasIcon,
     field: 'incideTaxa',
+  },
+  {
+    key: 'delivery',
+    ariaLabel: 'Ativar delivery',
+    label:
+      'Quando ativo, este produto fica disponível para venda no cardápio de delivery público.',
+    Icon: MdDeliveryDining,
+    field: 'ativoDelivery',
   },
   {
     key: 'copiar',

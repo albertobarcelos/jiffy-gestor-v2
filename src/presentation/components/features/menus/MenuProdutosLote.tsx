@@ -10,6 +10,7 @@ import {
   useMenuProdutos,
 } from '@/src/presentation/hooks/menus/useMenuCatalog'
 import { useMenuMutations } from '@/src/presentation/hooks/menus/useMenuMutations'
+import { coletarGruposMenuPorSnapshot, ordemSnapshotCategoria } from './ordenarGruposMenuSnapshot'
 import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
 import { useListaVinculoLote } from '@/src/presentation/hooks/useListaVinculoLote'
 import { usePropagarAlteracaoProduto } from '@/src/presentation/hooks/produtos/usePropagarAlteracaoProduto'
@@ -121,14 +122,21 @@ export function MenuProdutosLote({ menuId }: MenuProdutosLoteProps) {
     tipo: 'all',
   })
 
-  const { data: gruposData } = useMenuGruposProdutos({ menuId })
-  const gruposDoMenu = useMemo(() => {
-    const map = new Map<string, MenuGrupoProduto>()
-    for (const page of gruposData?.pages ?? []) {
-      for (const g of page.items) map.set(g.grupoBase.id, g)
-    }
-    return Array.from(map.values())
-  }, [gruposData])
+  const {
+    data: gruposData,
+    fetchNextPage: fetchNextGrupos,
+    hasNextPage: hasNextGrupos,
+    isFetchingNextPage: isFetchingNextGrupos,
+  } = useMenuGruposProdutos({ menuId })
+
+  useEffect(() => {
+    if (hasNextGrupos && !isFetchingNextGrupos) void fetchNextGrupos()
+  }, [hasNextGrupos, isFetchingNextGrupos, fetchNextGrupos])
+
+  const gruposDoMenu = useMemo(
+    () => coletarGruposMenuPorSnapshot(gruposData?.pages),
+    [gruposData]
+  )
 
   const { data: gruposComplementos = [] } = useGruposComplementos({
     limit: 100,
@@ -142,10 +150,17 @@ export function MenuProdutosLote({ menuId }: MenuProdutosLoteProps) {
         if (!map.has(p.produtoId)) map.set(p.produtoId, p)
       }
     }
-    return Array.from(map.values()).sort((a, b) =>
-      a.nome.localeCompare(b.nome, 'pt-BR')
+    const ordemGrupo = new Map(
+      gruposDoMenu.map(g => [g.grupoBase.id, ordemSnapshotCategoria(g)])
     )
-  }, [produtosData])
+    return Array.from(map.values()).sort((a, b) => {
+      const grupoA = ordemGrupo.get(a.grupoProduto?.id ?? '') ?? Number.MAX_SAFE_INTEGER
+      const grupoB = ordemGrupo.get(b.grupoProduto?.id ?? '') ?? Number.MAX_SAFE_INTEGER
+      if (grupoA !== grupoB) return grupoA - grupoB
+      if (a.ordem !== b.ordem) return a.ordem - b.ordem
+      return a.nome.localeCompare(b.nome, 'pt-BR')
+    })
+  }, [produtosData, gruposDoMenu])
 
   const totalApi = produtosData?.pages?.[0]?.count ?? 0
 

@@ -1,6 +1,14 @@
 import { z } from 'zod'
 import type { CertificadoStatusResult } from '@/src/domain/policies/painel-contador/CertificadoValidoPolicy'
 import type { ProgressoEtapasMap } from '@/src/domain/policies/painel-contador/EtapaHabilitadaPolicy'
+import {
+  isCstIcmsNaoSuportado,
+  isLiteralSemCbenef,
+  LITERAL_SEM_CBENEF,
+  mascaraCodigoCbenef,
+  MENSAGEM_CST_NAO_SUPORTADO,
+  normalizarCstIcms,
+} from '@/src/domain/entities/painel-contador/cbenefRegras'
 
 export interface ResumoEmpresaPainelDTO {
   id: string
@@ -8,6 +16,8 @@ export interface ResumoEmpresaPainelDTO {
   cnpj: string
   regimeLabel: string
   codigoRegimeTributario: number | null
+  /** UF da empresa (config fiscal ou endereço). Sempre 2 letras ou vazio. */
+  uf: string
 }
 
 export interface ProgressoEtapasDTO {
@@ -41,19 +51,47 @@ export const SalvarEmissaoSchema = z.object({
 
 export type SalvarEmissaoDTO = z.infer<typeof SalvarEmissaoSchema>
 
-export const SalvarNcmImpostosSchema = z.object({
-  cfop: z.string().optional(),
-  csosn: z.string().optional(),
-  icms: z
-    .object({
-      origem: z.number().optional(),
-      cst: z.string().optional(),
-      aliquota: z.number().optional(),
-    })
-    .optional(),
-  pis: z.object({ cst: z.string().optional(), aliquota: z.number().optional() }).optional(),
-  cofins: z.object({ cst: z.string().optional(), aliquota: z.number().optional() }).optional(),
-})
+const emptyToUndefined = (value: unknown) =>
+  typeof value === 'string' && value.trim() === '' ? undefined : value
+
+export const SalvarNcmImpostosSchema = z
+  .object({
+    cfop: z.string().optional(),
+    csosn: z.string().optional(),
+    codigoBeneficioFiscal: z.preprocess((value) => {
+      const cleaned = emptyToUndefined(value)
+      if (cleaned == null || typeof cleaned !== 'string') return cleaned
+      if (isLiteralSemCbenef(cleaned)) return LITERAL_SEM_CBENEF
+      return mascaraCodigoCbenef(cleaned)
+    }, z.union([z.literal(LITERAL_SEM_CBENEF), z.string().regex(/^[A-Z0-9]{8}$|^[A-Z0-9]{10}$/), z.null()]).optional()),
+    icms: z
+      .object({
+        origem: z.number().optional(),
+        cst: z.string().optional(),
+        aliquota: z.number().optional(),
+        reducaoBase: z.number().min(0).max(100).optional(),
+      })
+      .optional(),
+    pis: z.object({ cst: z.string().optional(), aliquota: z.number().optional() }).optional(),
+    cofins: z.object({ cst: z.string().optional(), aliquota: z.number().optional() }).optional(),
+  })
+  .superRefine((data, ctx) => {
+    const cst = normalizarCstIcms(data.icms?.cst)
+    if (isCstIcmsNaoSuportado(cst)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['icms', 'cst'],
+        message: MENSAGEM_CST_NAO_SUPORTADO,
+      })
+    }
+    if (cst === '20' && data.icms?.reducaoBase == null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['icms', 'reducaoBase'],
+        message: 'Informe o percentual de redução da base de cálculo para CST 20.',
+      })
+    }
+  })
 
 export type SalvarNcmImpostosDTO = z.infer<typeof SalvarNcmImpostosSchema>
 
@@ -233,4 +271,34 @@ export interface SalvarFiscalDTO {
   simplesNacional?: boolean
   contribuinteIcms?: boolean
   ibptToken?: string | null
+  /** Informações complementares impressas no rodapé da nota. */
+  rodapeNota?: string
+}
+
+export interface ValidarCbenefDTO {
+  valido: boolean
+  codigo: string
+  descricao?: string | null
+  uf?: string | null
+  vigente?: boolean
+  cstIcmsCompativel?: string | null
+  mensagem?: string | null
+}
+
+export interface CbenefItemDTO {
+  codigo: string
+  descricao: string
+  uf?: string
+  cstIcmsCompativel?: string
+  cstIcms?: string
+  vigenciaInicio?: string | null
+  vigenciaFim?: string | null
+}
+
+export interface ImportarCbenefResultadoDTO {
+  totalProcessados: number
+  inseridos: number
+  atualizados: number
+  ignorados: number
+  erros: number
 }
