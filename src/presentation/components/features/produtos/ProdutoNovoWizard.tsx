@@ -37,10 +37,8 @@ import {
 } from '@/src/presentation/components/features/grupos-produtos/NovoGrupo'
 import { MENU_WIDE_PANEL_CLASS } from '@/src/presentation/components/features/menus/menuPanelConstants'
 import {
-  buscarIdMenuPrincipal,
   unirMenuIds,
 } from '@/src/presentation/utils/uploadImagemProdutoMenus'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
 
 function CategoriaIconeNome({ grupo, size = 18 }: { grupo: GrupoProduto; size?: number }) {
   const cor = grupo.getCorHex() || '#530CA3'
@@ -125,10 +123,16 @@ export function ProdutoNovoWizard({
     [menusLista]
   )
 
+  /** Pré-seleção: cadastro → principal; menu → cardápio atual (só ele travado). */
+  const menusIniciaisWizard = useMemo(() => {
+    if (origem === 'menu') return menuId ? [menuId] : []
+    return principalMenuId ? [principalMenuId] : []
+  }, [origem, menuId, principalMenuId])
+
   const menusTravadosWizard = useMemo(() => {
     if (origem !== 'menu') return [] as string[]
-    return [...new Set([menuId, principalMenuId].filter((id): id is string => Boolean(id)))]
-  }, [origem, menuId, principalMenuId])
+    return menuId ? [menuId] : []
+  }, [origem, menuId])
 
   const previewMenuId = origem === 'menu' ? menuId : undefined
 
@@ -275,7 +279,11 @@ export function ProdutoNovoWizard({
 
     setSaving(true)
     try {
-      const grupoId = await ensureCategoria()
+      // Preferir categoria existente escolhida no passo 2; senão criar a nova do passo 1.
+      const grupoEscolhidoNoForm = npRef.current?.getGrupoProdutoId() ?? null
+      const grupoId = grupoEscolhidoNoForm
+        ? grupoEscolhidoNoForm
+        : await ensureCategoria()
       if (!grupoId) return
 
       const gruposComplementosIds = skipComplementos
@@ -285,23 +293,16 @@ export function ProdutoNovoWizard({
         ? []
         : (impressorasRef.current?.getSelectedIds() ?? [])
       const menusEscolhidos = menusRef.current?.getSelectedIds() ?? []
-      let menuIds =
-        origem === 'menu'
-          ? unirMenuIds(menuId, principalMenuId, menusEscolhidos)
-          : // Cadastro base: sempre inclui o principal (+ menus marcados no passo Menus).
-            unirMenuIds(principalMenuId, menusEscolhidos)
+      let menuIds = unirMenuIds(menusEscolhidos)
 
-      if (origem === 'cadastro' && menuIds.length === 0) {
-        const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-        if (token) {
-          menuIds = unirMenuIds(await buscarIdMenuPrincipal(token))
+      if (origem === 'menu') {
+        menuIds = unirMenuIds(menuId, menusEscolhidos)
+        if (!menuId || !menuIds.includes(menuId)) {
+          showToast.error('Mantenha o cardápio atual vinculado ao produto')
+          return
         }
       }
-
-      if (menuIds.length === 0) {
-        showToast.error('Não foi possível identificar o menu principal para vincular o produto')
-        return
-      }
+      // Cadastro base: seleção vazia é válida (só produto base, sem vínculo a menus).
 
       const ok = await npRef.current?.saveFinal({
         grupoId,
@@ -323,7 +324,6 @@ export function ProdutoNovoWizard({
     origem,
     menuId,
     ensureCategoria,
-    principalMenuId,
     invalidateAposSalvar,
     onClose,
     onSuccess,
@@ -630,8 +630,9 @@ export function ProdutoNovoWizard({
                 hideEmbeddedFormActions
                 previewMenuId={previewMenuId}
                 defaultGrupoProdutoId={grupoProdutoIdParaProduto ?? undefined}
-                lockGrupoProduto
-                lockedGrupoLabel={categoriaLabelProduto}
+                pendingNovaCategoriaLabel={
+                  modoCategoria === 'nova' ? categoriaLabelProduto || undefined : undefined
+                }
                 onWizardStepChange={setProdutoInnerStep}
                 onWizardSavingChange={setProdutoSaving}
                 onSuccess={() => undefined}
@@ -667,11 +668,17 @@ export function ProdutoNovoWizard({
           {step === 4 || keepMenus ? (
             <div className={cn('flex h-full min-h-[320px] flex-col', step !== 4 && 'hidden')}>
               <ProdutoMenusPanel
+                key={`wizard-menus-${origem}-${menusIniciaisWizard.join('|')}-${menusTravadosWizard.join('|')}`}
                 ref={menusRef}
                 persistChanges={false}
                 isEmbedded
-                initialMenuIds={menusTravadosWizard}
+                initialMenuIds={menusIniciaisWizard}
                 lockedMenuIds={menusTravadosWizard}
+                description={
+                  origem === 'menu'
+                    ? 'Este cardápio já entra e não pode ser desmarcado. Marque outros se quiser o produto em mais menus (incluindo o principal).'
+                    : 'O menu principal já vem marcado. Você pode desmarcá-lo e salvar só o produto base, ou incluir outros cardápios.'
+                }
               />
             </div>
           ) : null}

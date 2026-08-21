@@ -165,6 +165,29 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
       lockedSet,
     ])
 
+    /** Criação/cópia: aplica `initialMenuIds` tardios (ex.: principal carregou depois) se ainda não houve edição. */
+    useEffect(() => {
+      if (persistChanges) return
+      if (isDirtyRef.current) return
+      const next = [
+        ...new Set([...initialIdsFromProps(initialMenuIds, initialMenusResumo), ...lockedSet]),
+      ]
+      if (sameIdSet(next, selectedIds)) return
+      if (!sameIdSet(selectedIds, baselineIdsRef.current)) return
+      initialIdsRef.current = next
+      baselineIdsRef.current = next
+      setBaselineIds(next)
+      setSelectedIds(next)
+      onSelectionChange?.(next)
+    }, [
+      persistChanges,
+      initialMenuIds,
+      initialMenusResumo,
+      lockedSet,
+      selectedIds,
+      onSelectionChange,
+    ])
+
     useEffect(() => {
       setExpandedIds(prev => {
         if (prev.size === 0) return prev
@@ -375,8 +398,8 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
               : persistChanges
                 ? 'Marque os cardápios em que este produto deve aparecer. Expanda um vínculo já salvo para editar nome, preço, categoria e complementos naquele cardápio. Ao salvar, você pode copiar as alterações para outros menus.'
                 : lockedSet.size > 0
-                  ? 'Este cardápio já entra. Marque outros se quiser o produto em mais menus.'
-                  : 'Marque os cardápios em que este produto deve aparecer ao salvar. Se nenhum for marcado, o produto entra no menu principal.'}
+                  ? 'Este cardápio já entra e não pode ser desmarcado. Marque outros se quiser o produto em mais menus.'
+                  : 'Marque os cardápios em que este produto deve aparecer ao salvar. Se nenhum for marcado, o produto fica só no cadastro base.'}
           </p>
         <div className="shrink-0 px-4 py-3">
           <div className="relative">

@@ -25,6 +25,8 @@ interface InformacoesProdutoStepProps {
   isLoadingGrupos: boolean
   lockGrupoProduto?: boolean
   lockedGrupoLabel?: string
+  /** Nome da categoria nova ainda não gravada (wizard passo 1). */
+  pendingNovaCategoriaLabel?: string
   /** Na edição do produto base o campo some; na criação permanece obrigatório. */
   showCategoriaField?: boolean
   onNext: () => void
@@ -55,6 +57,7 @@ export function InformacoesProdutoStep({
   isLoadingGrupos,
   lockGrupoProduto = false,
   lockedGrupoLabel,
+  pendingNovaCategoriaLabel,
   showCategoriaField = true,
   onNext,
   onSaveAndClose,
@@ -142,50 +145,63 @@ export function InformacoesProdutoStep({
                   }}
                 />
               ) : (
-                <Autocomplete
-                  id="np-grupo-produto-searchable"
-                  size="small"
-                  options={grupos}
-                  loading={isLoadingGrupos}
-                  loadingText="Carregando..."
-                  noOptionsText="Nenhuma categoria encontrada"
-                  disabled={lockGrupoProduto}
-                  getOptionLabel={grupo =>
-                    grupo.isAtivo() ? grupo.getNome() : `${grupo.getNome()} (Inativo)`
-                  }
-                  isOptionEqualToValue={(a, b) => a.getId() === b.getId()}
-                  value={grupoSelecionado}
-                  onChange={(_, grupo) => onGrupoProdutoChange(grupo?.getId() ?? null)}
-                  renderOption={(props, grupo) => (
-                    <li
-                      {...props}
-                      key={grupo.getId()}
-                      style={{
-                        ...props.style,
-                        color: grupo.isAtivo() ? undefined : '#9CA3AF',
-                      }}
-                    >
-                      {grupo.isAtivo() ? grupo.getNome() : `${grupo.getNome()} (Inativo)`}
-                    </li>
-                  )}
-                  renderInput={params => (
-                    <TextField
-                      {...params}
-                      label="Categoria"
-                      placeholder="Pesquise ou selecione"
-                      InputLabelProps={{
-                        ...params.InputLabelProps,
-                        shrink: true,
-                      }}
-                      sx={{
-                        ...sxEntradaCompactaProduto,
-                        '& .MuiOutlinedInput-root': {
-                          backgroundColor: '#fff',
-                        },
-                      }}
-                    />
-                  )}
-                />
+                <>
+                  <Autocomplete
+                    id="np-grupo-produto-searchable"
+                    size="small"
+                    options={grupos}
+                    loading={isLoadingGrupos}
+                    loadingText="Carregando..."
+                    noOptionsText="Nenhuma categoria encontrada"
+                    disabled={lockGrupoProduto}
+                    getOptionLabel={grupo =>
+                      grupo.isAtivo() ? grupo.getNome() : `${grupo.getNome()} (Inativo)`
+                    }
+                    isOptionEqualToValue={(a, b) => a.getId() === b.getId()}
+                    value={grupoSelecionado}
+                    onChange={(_, grupo) => onGrupoProdutoChange(grupo?.getId() ?? null)}
+                    renderOption={(props, grupo) => (
+                      <li
+                        {...props}
+                        key={grupo.getId()}
+                        style={{
+                          ...props.style,
+                          color: grupo.isAtivo() ? undefined : '#9CA3AF',
+                        }}
+                      >
+                        {grupo.isAtivo() ? grupo.getNome() : `${grupo.getNome()} (Inativo)`}
+                      </li>
+                    )}
+                    renderInput={params => (
+                      <TextField
+                        {...params}
+                        label="Categoria"
+                        placeholder={
+                          pendingNovaCategoriaLabel && !grupoSelecionado
+                            ? `Nova: ${pendingNovaCategoriaLabel}`
+                            : 'Pesquise ou selecione'
+                        }
+                        InputLabelProps={{
+                          ...params.InputLabelProps,
+                          shrink: true,
+                        }}
+                        sx={{
+                          ...sxEntradaCompactaProduto,
+                          '& .MuiOutlinedInput-root': {
+                            backgroundColor: '#fff',
+                          },
+                        }}
+                      />
+                    )}
+                  />
+                  {pendingNovaCategoriaLabel?.trim() && !grupoSelecionado ? (
+                    <p className="mt-1 text-[10px] leading-snug text-secondary-text">
+                      Ao concluir, será criada a categoria “{pendingNovaCategoriaLabel.trim()}”.
+                      Selecione uma existente para usar no lugar, ou volte ao passo anterior para
+                      alterar a nova.
+                    </p>
+                  ) : null}
+                </>
               )}
             </div>
           ) : null}

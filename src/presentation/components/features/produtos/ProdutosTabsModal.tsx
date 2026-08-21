@@ -15,6 +15,7 @@ import {
 } from './ProdutoImpressorasDialog'
 import { ProdutoMenusPanel, type ProdutoMenusHandle } from './ProdutoMenusPanel'
 import { MENU_WIDE_PANEL_CLASS } from '@/src/presentation/components/features/menus/menuPanelConstants'
+import { useMenus } from '@/src/presentation/hooks/menus/useMenus'
 import { cn } from '@/src/shared/utils/cn'
 
 export type ProdutosTabsTabKey = 'produto' | 'complementos' | 'impressoras' | 'menus'
@@ -52,6 +53,16 @@ export function ProdutosTabsModal({
   const menusRef = useRef<ProdutoMenusHandle>(null)
 
   const isDraftProduto = state.mode === 'create' || state.mode === 'copy'
+
+  const { data: menusPrincipais } = useMenus({
+    tipo: 'principal',
+    limit: 10,
+    enabled: state.open && state.mode === 'create',
+  })
+  const principalMenuId = useMemo(
+    () => menusPrincipais?.items.find(m => m.tipo === 'principal')?.id ?? null,
+    [menusPrincipais]
+  )
 
   const [draftMenuIds, setDraftMenuIds] = useState<string[]>([])
   const [wizardStep, setWizardStep] = useState<0 | 1 | 2>(state.initialStepProduto ?? 0)
@@ -105,20 +116,43 @@ export function ProdutosTabsModal({
    */
   const [produtoFormSession, setProdutoFormSession] = useState(0)
   const prevPainelAbertoRef = useRef(false)
+  const seededPrincipalCreateRef = useRef(false)
 
   useEffect(() => {
     if (state.open && !prevPainelAbertoRef.current) {
       setProdutoFormSession(s => s + 1)
+      seededPrincipalCreateRef.current = false
       if (state.mode === 'create') {
-        setDraftMenuIds(state.createMenuIds ?? [])
+        const fromCaller = state.createMenuIds ?? []
+        if (fromCaller.length > 0) {
+          setDraftMenuIds(fromCaller)
+          seededPrincipalCreateRef.current = true
+        } else if (principalMenuId) {
+          setDraftMenuIds([principalMenuId])
+          seededPrincipalCreateRef.current = true
+        } else {
+          setDraftMenuIds([])
+        }
       } else if (state.mode === 'copy') {
         setDraftMenuIds((state.produto?.getMenus() ?? []).map(m => m.id).filter(Boolean))
       } else {
         setDraftMenuIds([])
       }
     }
+    if (!state.open) {
+      seededPrincipalCreateRef.current = false
+    }
     prevPainelAbertoRef.current = state.open
-  }, [state.open, state.mode, state.createMenuIds, state.produto])
+  }, [state.open, state.mode, state.createMenuIds, state.produto, principalMenuId])
+
+  /** Cadastro sem createMenuIds: pré-marca o principal uma vez quando ele chega após abrir. */
+  useEffect(() => {
+    if (!state.open || state.mode !== 'create') return
+    if ((state.createMenuIds?.length ?? 0) > 0) return
+    if (seededPrincipalCreateRef.current || !principalMenuId) return
+    seededPrincipalCreateRef.current = true
+    setDraftMenuIds(prev => (prev.length === 0 ? [principalMenuId] : prev))
+  }, [state.open, state.mode, state.createMenuIds, principalMenuId])
 
   // Limpa overlay de confirmação ao fechar
   useEffect(() => {
@@ -577,6 +611,11 @@ export function ProdutosTabsModal({
                 initialMenuIds={isDraftProduto ? draftMenuIds : undefined}
                 onSelectionChange={isDraftProduto ? setDraftMenuIds : undefined}
                 onEmbedStateChange={handleEmbedMenusChange}
+                description={
+                  state.mode === 'create'
+                    ? 'O menu principal já vem marcado. Você pode desmarcá-lo e salvar só o produto base, ou incluir outros cardápios.'
+                    : undefined
+                }
               />
             </div>
           ) : state.open && state.tab === 'menus' && state.mode === 'edit' && !produtoId ? (

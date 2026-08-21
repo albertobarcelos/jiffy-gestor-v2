@@ -22,7 +22,11 @@ import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecure
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
-import { ProdutosTabsModal, ProdutosTabsModalState } from '../produtos/ProdutosTabsModal'
+import {
+  ProdutosTabsModal,
+  type ProdutosTabsModalState,
+  type ProdutosTabsTabKey,
+} from '../produtos/ProdutosTabsModal'
 import {
   EscolherTipoProdutoModal,
   useEscolherTipoProdutoCadastro,
@@ -235,15 +239,12 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
     refetch()
   }, [refetch])
 
-  const handleTabsModalTabChange = useCallback(
-    (tab: 'produto' | 'complementos' | 'impressoras' | 'menus' | 'grupo') => {
-      setTabsModalState((prev) => ({
-        ...prev,
-        tab,
-      }))
-    },
-    []
-  )
+  const handleTabsModalTabChange = useCallback((tab: ProdutosTabsTabKey) => {
+    setTabsModalState(prev => ({
+      ...prev,
+      tab,
+    }))
+  }, [])
 
   const handleEditProduto = useCallback(
     async (produtoId: string) => {

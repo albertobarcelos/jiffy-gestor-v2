@@ -368,6 +368,8 @@ export interface NovoProdutoHandle {
   isDirty: () => boolean
   /** Valida o passo interno atual sem persistir (wizard do cardápio). */
   canAdvanceCurrentPage: () => boolean
+  /** Categoria selecionada no formulário (existente). Null se ainda for só a nova do passo 1. */
+  getGrupoProdutoId: () => string | null
 }
 
 export interface NovoProdutoProps {
@@ -392,9 +394,14 @@ export interface NovoProdutoProps {
    * (em vez de só o menu principal).
    */
   menuIds?: string[]
-  /** Trava a categoria (definida no passo anterior do wizard do cardápio). */
+  /** Trava a categoria (legado; preferir dropdown editável + pendingNovaCategoriaLabel). */
   lockGrupoProduto?: boolean
   lockedGrupoLabel?: string
+  /**
+   * Wizard: nome da categoria nova do passo 1 ainda não persistida.
+   * Permite avançar sem `grupoId` e mostra aviso no campo Categoria.
+   */
+  pendingNovaCategoriaLabel?: string
   onWizardStepChange?: (step: 0 | 1 | 2) => void
   onWizardSavingChange?: (saving: boolean) => void
   /** Passo 2 com fiscal indisponível: só “Voltar” no fluxo interno */
@@ -426,6 +433,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       menuIds,
       lockGrupoProduto = false,
       lockedGrupoLabel,
+      pendingNovaCategoriaLabel,
       onWizardStepChange,
       onWizardSavingChange,
       onFiscalUnavailableChange,
@@ -558,12 +566,12 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       usePropagarAlteracaoProduto()
 
     const resolverDestinosPadraoImagem = useCallback(
-      async (token: string, extras: Iterable<string> = []) => {
-        const principalId = await buscarIdMenuPrincipal(token)
-        // Sempre inclui o principal + menus já escolhidos (wizard) / extras.
-        return unirMenuIds(previewMenuId, principalId, extras)
+      async (_token: string, extras: Iterable<string> = []) => {
+        // Só menus já vinculados/escolhidos (+ cardápio atual no fluxo de menu).
+        // Não força o principal — o produto pode existir só no cadastro base.
+        return unirMenuIds(previewMenuId, menusVinculadosIds, extras)
       },
-      [previewMenuId]
+      [previewMenuId, menusVinculadosIds]
     )
 
     const perguntarCopiaImagemCadastroBase = useCallback(
@@ -721,10 +729,10 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       if (effectiveProdutoId || effectiveIsCopyMode) {
         return
       }
-      if (defaultGrupoProdutoId && defaultGrupoProdutoId !== grupoProduto) {
-        setGrupoProduto(defaultGrupoProdutoId)
-      }
-    }, [defaultGrupoProdutoId, effectiveProdutoId, effectiveIsCopyMode, grupoProduto])
+      // Só preenche se ainda estiver vazio — não sobrescreve troca manual no wizard.
+      if (!defaultGrupoProdutoId) return
+      setGrupoProduto(prev => prev ?? defaultGrupoProdutoId)
+    }, [defaultGrupoProdutoId, effectiveProdutoId, effectiveIsCopyMode])
 
     // Baseline inicial em modo criação (após grupo opcional do contexto)
     useEffect(() => {
@@ -1886,6 +1894,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         },
         savePartialAndClose: () => handleSaveRef.current({ salvarSomenteDadosGerais: true }),
         saveFinal: overrides => handleSaveRef.current(overrides),
+        getGrupoProdutoId: () => grupoProduto,
         isDirty: () => {
           if (isLoadingProduto) return false
           if (baselineSerializedRef.current === null) return false
@@ -1899,8 +1908,15 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           if (!precoVenda || precoNum <= 0) return false
           if (!unidadeProduto) return false
           const isEditMode = Boolean(effectiveProdutoId) && !effectiveIsCopyMode
-          // Criação/cópia: categoria obrigatória. Edição: campo oculto, grupo já vem do produto.
-          if (!isEditMode && !lockGrupoProduto && !grupoProduto) return false
+          // Criação/cópia: categoria existente ou nova pendente do wizard (passo 1).
+          if (
+            !isEditMode &&
+            !lockGrupoProduto &&
+            !grupoProduto &&
+            !pendingNovaCategoriaLabel?.trim()
+          ) {
+            return false
+          }
           return true
         },
       }),
@@ -1912,6 +1928,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         unidadeProduto,
         grupoProduto,
         lockGrupoProduto,
+        pendingNovaCategoriaLabel,
         effectiveProdutoId,
         effectiveIsCopyMode,
       ]
@@ -1975,8 +1992,8 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           await perguntarCopiaImagemCadastroBase(produtoIdAlvo, file, destinos)
           showToast.success(
             destinos.length > 1
-              ? 'Imagem atualizada no cardápio atual e no menu principal'
-              : 'Imagem atualizada no menu principal'
+              ? 'Imagem atualizada nos cardápios vinculados'
+              : 'Imagem atualizada no cardápio vinculado'
           )
         } catch (err) {
           showToast.error(err instanceof Error ? err.message : 'Erro ao enviar imagem')
@@ -2143,6 +2160,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
               onGrupoProdutoChange={setGrupoProduto}
               lockGrupoProduto={lockGrupoProduto}
               lockedGrupoLabel={lockedGrupoLabel}
+              pendingNovaCategoriaLabel={pendingNovaCategoriaLabel}
               showCategoriaField={!(!!effectiveProdutoId && !effectiveIsCopyMode)}
               codigoEanBarras={codigoEanBarras}
               onCodigoEanBarrasChange={setCodigoEanBarras}
