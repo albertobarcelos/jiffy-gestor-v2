@@ -253,7 +253,7 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
     }, [menus, searchQuery, selectedIds])
 
     const toggleMenu = useCallback(
-      (menu: Menu, checked: boolean) => {
+      async (menu: Menu, checked: boolean) => {
         if (!checked && lockedSet.has(menu.id)) return
         const next = checked
           ? selectedIds.includes(menu.id)
@@ -261,8 +261,10 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
             : [...selectedIds, menu.id]
           : selectedIds.filter(id => id !== menu.id)
         const withLocked = [...new Set([...next, ...lockedSet])]
+        const previousIds = selectedIds
         setSelectedIds(withLocked)
         emitDirty(withLocked)
+
         if (!checked) {
           setExpandedIds(prev => {
             if (!prev.has(menu.id)) return prev
@@ -270,9 +272,52 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
             copy.delete(menu.id)
             return copy
           })
+          return
+        }
+
+        /** Novo vínculo: persiste na hora para o snapshot já aparecer na expansão. */
+        const alreadyPersisted =
+          baselineIdsRef.current.includes(menu.id) || lockedSet.has(menu.id)
+        const canPersistNow = Boolean(onPersist) || (persistChanges && Boolean(produtoId))
+        if (alreadyPersisted || !canPersistNow) return
+
+        emitDirty(withLocked, true)
+        setSavingLocal(true)
+        try {
+          if (onPersist) {
+            await onPersist({ add: [menu.id], remove: [] })
+          } else {
+            await mutation.mutateAsync({ add: [menu.id], remove: [] })
+          }
+          const nextBaseline = [...new Set([...baselineIdsRef.current, menu.id])]
+          baselineIdsRef.current = nextBaseline
+          setBaselineIds(nextBaseline)
+          setExpandedIds(prev => {
+            const copy = new Set(prev)
+            copy.add(menu.id)
+            return copy
+          })
+          emitDirty(withLocked, false)
+          showToast.success(`Produto incluído em ${menu.nome}`)
+        } catch (err) {
+          setSelectedIds(previousIds)
+          emitDirty(previousIds, false)
+          showToast.error(
+            err instanceof Error ? err.message : 'Erro ao vincular o produto ao menu'
+          )
+        } finally {
+          setSavingLocal(false)
         }
       },
-      [selectedIds, emitDirty, lockedSet]
+      [
+        selectedIds,
+        emitDirty,
+        lockedSet,
+        onPersist,
+        persistChanges,
+        produtoId,
+        mutation,
+      ]
     )
 
     const toggleExpand = useCallback((menuId: string) => {
@@ -396,7 +441,7 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
             {description
               ? description
               : persistChanges
-                ? 'Marque os cardápios em que este produto deve aparecer. Expanda um vínculo já salvo para editar nome, preço, categoria e complementos naquele cardápio. Ao salvar, você pode copiar as alterações para outros menus.'
+                ? 'Marque os cardápios em que este produto deve aparecer. Ao ativar um novo vínculo, ele é salvo na hora e você já pode expandir para editar os dados naquele cardápio. Ao salvar alterações nos dados, você pode copiar para outros menus.'
                 : lockedSet.size > 0
                   ? 'Este cardápio já entra e não pode ser desmarcado. Marque outros se quiser o produto em mais menus.'
                   : 'Marque os cardápios em que este produto deve aparecer ao salvar. Se nenhum for marcado, o produto fica só no cadastro base.'}
@@ -491,7 +536,9 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
                     </div>
                     <JiffyIconSwitch
                       checked={vinculado}
-                      onChange={e => toggleMenu(menu, e.target.checked)}
+                      onChange={e => {
+                        void toggleMenu(menu, e.target.checked)
+                      }}
                       label="Vínculo"
                       labelPosition="start"
                       size="xs"

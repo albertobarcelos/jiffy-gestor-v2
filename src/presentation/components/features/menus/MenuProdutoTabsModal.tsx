@@ -9,10 +9,7 @@ import { cn } from '@/src/shared/utils/cn'
 import type { MenuGrupoProduto, MenuProduto } from '@/src/shared/types/menus'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
-import {
-  snapshotMenuProdutoParaOutrosMenus,
-  vincularProdutoMenusComSnapshot,
-} from '@/src/application/use-cases/produtos/VincularProdutoMenusComSnapshotUseCase'
+import { vincularProdutoMenusComSnapshot } from '@/src/application/use-cases/produtos/VincularProdutoMenusComSnapshotUseCase'
 import { MENU_WIDE_PANEL_CLASS } from './menuPanelConstants'
 import {
   MenuProdutoSnapshotForm,
@@ -102,7 +99,7 @@ export function MenuProdutoTabsModal({
         produtoId: produto.produtoId,
         add,
         remove,
-        snapshot: snapshotMenuProdutoParaOutrosMenus(produto),
+        menuOrigemId: menuId,
       })
       await invalidate(['produto', produto.produtoId])
       await invalidate(['menus'])
@@ -153,7 +150,7 @@ export function MenuProdutoTabsModal({
     cancelVariant: 'primaryTint10',
     onCancel: onClose,
     showSave: true,
-    saveLabel: 'Salvar',
+    saveLabel: 'Salvar e fechar',
     onSave: () => void handleSave(),
     saveLoading: currentSaving,
     saveDisabled: !currentDirty || currentSaving,
@@ -279,7 +276,7 @@ export function MenuProdutoTabsModal({
               lockedMenuIds={[menuId]}
               onPersist={persistMenusFromSnapshot}
               onEmbedStateChange={handleEmbedMenusChange}
-              description="Marque outros cardápios para incluir este produto com os dados deste. Expanda um vínculo para editar os dados daquele cardápio; ao salvar, você pode copiar as alterações para outros menus ou para o cadastro base."
+              description="Marque outros cardápios para incluir este produto com os dados deste. Ao ativar um vínculo, ele é salvo na hora e a expansão já mostra os dados. Ao editar e salvar, você pode copiar as alterações para outros menus ou para o cadastro base."
             />
           </div>
         ) : null}
