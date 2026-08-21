@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import {
   DndContext,
   KeyboardSensor,
@@ -33,11 +34,12 @@ import {
 import { resolveDesignPaletteColors } from '../../../shared/constants/colorPalettes'
 import { DesignCategoriaGrupoSortableItem } from '../DesignCategoriaGrupoSortableItem'
 import { useDesignCategoriaGrupoActions } from '../../hooks/useDesignCategoriaGrupoActions'
-import { useDesignCategoriaGruposImagens } from '../../../shared/hooks/useDesignCategoriaGruposImagens'
 
 type DesignCategoriasTabProps = {
   config: DeliveryPublicoDesignConfig
   grupos: DesignCategoriaGrupo[]
+  menuId: string | null
+  hasMenu?: boolean
   isLoading?: boolean
   isError?: boolean
   onChange: (updater: (current: DeliveryPublicoDesignConfig) => DeliveryPublicoDesignConfig) => void
@@ -47,6 +49,8 @@ type DesignCategoriasTabProps = {
 export function DesignCategoriasTab({
   config,
   grupos,
+  menuId,
+  hasMenu = true,
   isLoading = false,
   isError = false,
   onChange,
@@ -62,7 +66,7 @@ export function DesignCategoriasTab({
     patchGrupoImagemUrl,
     uploadingGrupoId,
     reorderingGrupoId,
-  } = useDesignCategoriaGrupoActions()
+  } = useDesignCategoriaGrupoActions(menuId)
 
   const palette = resolveDesignPaletteColors(config)
   const mostrarSugestoes = config.categorias.mostrarSugestoesDaCasa !== false
@@ -115,19 +119,6 @@ export function DesignCategoriasTab({
     },
     [onGruposChange]
   )
-
-  const handleImagensResolved = useCallback(
-    (resolved: DesignCategoriaGrupo[]) => {
-      updateGrupos(resolved)
-    },
-    [updateGrupos]
-  )
-
-  const { isResolvingImagens } = useDesignCategoriaGruposImagens({
-    grupos: localGrupos,
-    enabled: usarBannerImagem && localGrupos.length > 0,
-    onResolved: handleImagensResolved,
-  })
 
   useEffect(() => {
     setLocalGrupos(grupos)
@@ -247,10 +238,28 @@ export function DesignCategoriasTab({
     )
   }
 
+  if (!hasMenu) {
+    return (
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <p className="font-semibold">Cardápio do delivery não configurado</p>
+        <p className="mt-1 text-xs">
+          Em Empresa Delivery, escolha o cardápio publicado. As categorias desta tela vêm desse
+          menu.
+        </p>
+        <Link
+          href="/configuracoes/empresa-delivery"
+          className="mt-3 inline-flex text-sm font-semibold text-primary underline-offset-2 hover:underline"
+        >
+          Ir para Empresa Delivery
+        </Link>
+      </div>
+    )
+  }
+
   if (isError) {
     return (
       <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-        Não foi possível carregar os grupos de produtos. Tente recarregar a página.
+        Não foi possível carregar os grupos do cardápio publicado. Tente recarregar a página.
       </div>
     )
   }
@@ -442,20 +451,16 @@ export function DesignCategoriasTab({
 
       {!hasListaGrupos ? (
         <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
-          <p className="text-sm font-semibold text-primary-text">Nenhum grupo no delivery</p>
+          <p className="text-sm font-semibold text-primary-text">Nenhum grupo neste cardápio</p>
           <p className="mt-1 text-xs text-secondary-text">
-            Cadastre grupos de produtos ativos no delivery em Grupos de produtos para personalizar
-            as categorias aqui.
+            Vincule categorias ao cardápio publicado no delivery para personalizar a ordem e os
+            banners aqui.
           </p>
         </div>
       ) : (
         <div className="flex flex-col gap-4 lg:flex-row">
           <div className="w-full shrink-0 lg:max-w-[240px]">
-            <p className="mb-1.5 text-xs text-secondary-text">
-              {usarBannerImagem && isResolvingImagens
-                ? 'Carregando banners dos grupos…'
-                : 'Arraste para definir a ordem'}
-            </p>
+            <p className="mb-1.5 text-xs text-secondary-text">Arraste para definir a ordem</p>
             <ul className="space-y-1.5">
               {mostrarSugestoes && grupoSugestoesReal ? (
                 <li>

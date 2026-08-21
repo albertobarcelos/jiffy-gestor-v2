@@ -15,6 +15,7 @@ import {
 } from '@/src/shared/types/deliveryCupomTemplate'
 import { parseDeliveryCupomTemplate } from '@/src/shared/utils/parseDeliveryCupomTemplate'
 import { getDeliveryCupomTemplateLocal } from '@/src/infrastructure/printing/deliveryCupomTemplateStorage'
+import { lerMenuIdDeParametroEmpresa } from '@/src/shared/utils/parametroEmpresaMenus'
 
 /** Endereço da empresa (GET `/api/empresas/me`) — usado em mensagens de retirada. */
 export interface EnderecoEmpresaMe {
@@ -44,6 +45,8 @@ export interface EmpresaMeQueryData {
   deliveryCupomTemplate: DeliveryCupomTemplateConfig
   /** Cópia de `parametroEmpresa` para PATCH parcial (ex.: modal delivery). */
   parametroEmpresa: Record<string, unknown>
+  /** Cardápio publicado no delivery (`parametroEmpresa.menuDeliveryId`). */
+  menuDeliveryId: string | null
 }
 
 function mapEnderecoEmpresaMe(enderecoRaw: Record<string, unknown>): EnderecoEmpresaMe | null {
@@ -136,6 +139,7 @@ export async function fetchEmpresaMeQueryData(
     preferenciasImpressaoDelivery: parsePreferenciasImpressaoDelivery(data),
     deliveryCupomTemplate: getDeliveryCupomTemplateLocal(id) ?? parseDeliveryCupomTemplate(data),
     parametroEmpresa,
+    menuDeliveryId: lerMenuIdDeParametroEmpresa(parametroEmpresa, 'menuDeliveryId'),
   }
 }
 
@@ -174,6 +178,7 @@ export function useEmpresaMe() {
       data?.preferenciasImpressaoDelivery ?? DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
     deliveryCupomTemplate: data?.deliveryCupomTemplate ?? DEFAULT_DELIVERY_CUPOM_TEMPLATE,
     parametroEmpresa: data?.parametroEmpresa ?? {},
+    menuDeliveryId: data?.menuDeliveryId ?? null,
     isLoading: query.isPending,
     error:
       query.error instanceof Error

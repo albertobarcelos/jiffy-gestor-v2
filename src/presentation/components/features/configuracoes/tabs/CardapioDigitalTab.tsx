@@ -11,28 +11,54 @@ import {
   useEmpresaDeliveryMe,
 } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
+import { useAtualizarParametroEmpresa } from '@/src/presentation/hooks/useAtualizarParametroEmpresa'
+import { useMenus } from '@/src/presentation/hooks/menus/useMenus'
+import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import {
   normalizeDeliverySlug,
   validateDeliverySlug,
 } from '@/src/shared/utils/slugDelivery'
+import { montarParametroEmpresaComMenuDelivery } from '@/src/shared/utils/parametroEmpresaMenus'
 import { compartilharLinkDelivery } from '@/src/presentation/components/features/delivery-publico/shared/utils/compartilharProdutoDelivery'
 import { deliveryPublicoHomePath } from '@/src/presentation/components/features/delivery-publico/shared/utils/deliveryPublicoRoutes'
+import type { Menu } from '@/src/shared/types/menus'
+
+function rotuloMenuDelivery(menu: Menu): string {
+  return menu.tipo === 'principal' ? `${menu.nome} (principal)` : menu.nome
+}
 
 export function CardapioDigitalTab() {
-  const { empresa } = useEmpresaMe()
+  const { toGestao } = useGestaoPath()
+  const { empresa, parametroEmpresa, menuDeliveryId: menuDeliveryIdSalvo } = useEmpresaMe()
   const empresaDeliveryQuery = useEmpresaDeliveryMe()
   const criarMutation = useCriarEmpresaDelivery()
   const atualizarMutation = useAtualizarEmpresaDelivery()
+  const atualizarParametroEmpresa = useAtualizarParametroEmpresa()
+  const menusQuery = useMenus({ limit: 100 })
 
   const [slug, setSlug] = useState('')
   const [slugErro, setSlugErro] = useState<string | null>(null)
+  const [menuDeliveryId, setMenuDeliveryId] = useState<string | null>(null)
 
   const formularioHidratadoRef = useRef(false)
 
   const empresaDelivery = empresaDeliveryQuery.data
   const configurado = empresaDelivery != null
   const carregando =
-    empresaDeliveryQuery.isPending || criarMutation.isPending || atualizarMutation.isPending
+    empresaDeliveryQuery.isPending ||
+    criarMutation.isPending ||
+    atualizarMutation.isPending ||
+    atualizarParametroEmpresa.isPending
+
+  const menusDisponiveis = useMemo(() => {
+    const items = menusQuery.data?.items ?? []
+    const ativos = items.filter(menu => menu.ativo)
+    if (menuDeliveryId && !ativos.some(menu => menu.id === menuDeliveryId)) {
+      const selecionado = items.find(menu => menu.id === menuDeliveryId)
+      if (selecionado) return [selecionado, ...ativos]
+    }
+    return ativos
+  }, [menuDeliveryId, menusQuery.data?.items])
 
   const linkPublico = useMemo(() => {
     if (!slug.trim()) return ''
@@ -66,6 +92,10 @@ export function CardapioDigitalTab() {
     empresaDeliveryQuery.isSuccess,
   ])
 
+  useEffect(() => {
+    setMenuDeliveryId(menuDeliveryIdSalvo)
+  }, [menuDeliveryIdSalvo])
+
   const handleSlugBlur = useCallback(() => {
     const normalizado = normalizeDeliverySlug(slug)
     setSlug(normalizado)
@@ -96,18 +126,37 @@ export function CardapioDigitalTab() {
     try {
       if (configurado) {
         await atualizarMutation.mutateAsync({ slug: slugNormalizado })
-        showToast.success('Empresa Delivery atualizada.')
       } else {
         await criarMutation.mutateAsync({ slug: slugNormalizado })
         formularioHidratadoRef.current = false
-        showToast.success('Empresa Delivery ativada! O catálogo foi espelhado do ERP.')
       }
+
+      if (empresa?.id) {
+        await atualizarParametroEmpresa.mutateAsync(
+          montarParametroEmpresaComMenuDelivery(parametroEmpresa, menuDeliveryId)
+        )
+      }
+
+      showToast.success(
+        configurado
+          ? 'Empresa Delivery atualizada.'
+          : 'Empresa Delivery ativada! O catálogo foi espelhado do ERP.'
+      )
     } catch (error) {
       const msg =
         error instanceof Error ? error.message : 'Não foi possível salvar as configurações.'
       showToast.error(msg)
     }
-  }, [atualizarMutation, configurado, criarMutation, slug])
+  }, [
+    atualizarMutation,
+    atualizarParametroEmpresa,
+    configurado,
+    criarMutation,
+    empresa?.id,
+    menuDeliveryId,
+    parametroEmpresa,
+    slug,
+  ])
 
   if (empresaDeliveryQuery.isPending) {
     return (
@@ -145,7 +194,7 @@ export function CardapioDigitalTab() {
           <div>
             <h1 className="text-xl font-bold text-primary-text">Empresa Delivery</h1>
             <p className="mt-1 text-sm text-secondary-text">
-              Configure o link público da loja online.
+              Configure o link público e o cardápio (menu) publicado na loja online.
             </p>
           </div>
         </div>
@@ -178,6 +227,50 @@ export function CardapioDigitalTab() {
                 </div>
               </div>
               {slugErro ? <p className="mt-1 text-xs text-red-600">{slugErro}</p> : null}
+            </div>
+
+            <div>
+              <label htmlFor="empresa-delivery-menu" className="text-sm font-semibold text-primary-text">
+                Cardápio publicado no delivery
+              </label>
+              <p className="mt-0.5 text-xs text-secondary-text">
+                Produtos, preços e fotos do app público saem deste menu.
+              </p>
+              <select
+                id="empresa-delivery-menu"
+                value={menuDeliveryId ?? ''}
+                disabled={carregando || menusQuery.isPending}
+                onChange={e => setMenuDeliveryId(e.target.value.trim() || null)}
+                className="mt-2 h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-primary-text outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <option value="">Selecione um cardápio</option>
+                {menusDisponiveis.map(menu => (
+                  <option key={menu.id} value={menu.id}>
+                    {rotuloMenuDelivery(menu)}
+                    {menu.ativo ? '' : ' (inativo)'}
+                  </option>
+                ))}
+              </select>
+              {menusQuery.isError ? (
+                <p className="mt-1 text-xs text-red-600">
+                  Não foi possível carregar os menus.{' '}
+                  <button
+                    type="button"
+                    className="underline"
+                    onClick={() => void menusQuery.refetch()}
+                  >
+                    Tentar de novo
+                  </button>
+                </p>
+              ) : null}
+              {!menusQuery.isPending && menusDisponiveis.length === 0 ? (
+                <p className="mt-1 text-xs text-secondary-text">
+                  Nenhum menu ativo.{' '}
+                  <Link href={toGestao('/menus')} className="font-semibold text-secondary underline">
+                    Cadastrar cardápio
+                  </Link>
+                </p>
+              ) : null}
             </div>
 
             {configurado && linkPublico ? (

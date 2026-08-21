@@ -194,6 +194,22 @@ export class MenuRepository implements IMenuRepository {
     return data
   }
 
+  async criarUploadIntentGrupo(
+    menuId: string,
+    grupoProdutoId: string,
+    input: ImageUploadIntentInput
+  ): Promise<ImageUploadIntentResponse> {
+    const { data } = await this.apiClient.request<ImageUploadIntentResponse>(
+      `${BASE}/${menuId}/grupos-produtos/${grupoProdutoId}/upload-intent`,
+      {
+        method: 'POST',
+        headers: this.authHeaders(true),
+        body: JSON.stringify(input),
+      }
+    )
+    return data
+  }
+
   async confirmarUploadIntent(uploadIntentId: string): Promise<void> {
     await this.apiClient.request(
       `/api/v1/media/image-upload-intents/${uploadIntentId}/confirm`,

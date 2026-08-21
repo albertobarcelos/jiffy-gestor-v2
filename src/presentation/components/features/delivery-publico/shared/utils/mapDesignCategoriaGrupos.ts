@@ -1,5 +1,30 @@
 import type { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
+import type { MenuGrupoProduto } from '@/src/shared/types/menus'
 import type { DesignCategoriaGrupo } from '../types/designCategoriaGrupo'
+
+export function imagemUrlDoMenuGrupo(grupo: MenuGrupoProduto): string | null {
+  const fromSnapshot = grupo.image?.imageUrl?.trim()
+  if (fromSnapshot) return fromSnapshot
+  const fromBase = grupo.grupoBase.imagemUrl?.trim()
+  return fromBase || null
+}
+
+export function mapMenuGruposToDesignCategorias(
+  grupos: MenuGrupoProduto[]
+): DesignCategoriaGrupo[] {
+  return [...grupos]
+    .sort((a, b) => {
+      if (a.ordem !== b.ordem) return a.ordem - b.ordem
+      return a.nome.localeCompare(b.nome, 'pt-BR')
+    })
+    .map(grupo => ({
+      id: grupo.grupoBase.id,
+      nome: grupo.nome?.trim() || grupo.grupoBase.nome,
+      iconName: grupo.grupoBase.iconName || 'restaurant',
+      cor: grupo.grupoBase.corHex || '#CCCCCC',
+      imagemUrl: imagemUrlDoMenuGrupo(grupo),
+    }))
+}
 
 export function mapGruposProdutoToDesignCategorias(
   grupos: GrupoProduto[]
@@ -20,3 +45,4 @@ export function mapGruposProdutoToDesignCategorias(
       imagemUrl: grupo.getImagemUrl()?.trim() || null,
     }))
 }
+

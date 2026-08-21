@@ -14,7 +14,6 @@ import {
 } from '../../shared/constants/designPublishRules'
 import { useDeliveryDesignDraft } from '../../shared/hooks/useDeliveryDesignDraft'
 import { useDesignCategoriaGrupos } from '../../shared/hooks/useDesignCategoriaGrupos'
-import { useDesignCategoriaGruposImagens } from '../../shared/hooks/useDesignCategoriaGruposImagens'
 import type { DesignCategoriaGrupo } from '../../shared/types/designCategoriaGrupo'
 import { mergeDesignCategoriaGrupos } from '../../shared/utils/mergeDesignCategoriaGrupos'
 import { DesignTabNav } from '../components/DesignTabNav'
@@ -26,7 +25,7 @@ import { DesignTipografiasTab } from '../components/tabs/DesignTipografiasTab'
 import { DesignCategoriasTab } from '../components/tabs/DesignCategoriasTab'
 
 export function DeliveryDesignCustomizerScreen() {
-  const { empresa, isLoading: empresaLoading } = useEmpresaMe()
+  const { empresa, menuDeliveryId, isLoading: empresaLoading } = useEmpresaMe()
   const { data: empresaDelivery, isLoading: deliveryLoading } = useEmpresaDeliveryMe()
   const [activeTab, setActiveTab] = useState<DesignTabId>('cabecalho')
 
@@ -38,9 +37,10 @@ export function DeliveryDesignCustomizerScreen() {
 
   const {
     grupos: categoriasGrupos,
+    hasMenu,
     isLoading: categoriasGruposLoading,
     isError: categoriasGruposError,
-  } = useDesignCategoriaGrupos(Boolean(empresa?.id))
+  } = useDesignCategoriaGrupos(menuDeliveryId, Boolean(empresa?.id))
 
   const [previewCategoriasGrupos, setPreviewCategoriasGrupos] = useState<DesignCategoriaGrupo[]>([])
 
@@ -49,19 +49,6 @@ export function DeliveryDesignCustomizerScreen() {
       mergeDesignCategoriaGrupos(categoriasGrupos, previous)
     )
   }, [categoriasGrupos])
-
-  const handlePreviewImagensResolved = useCallback((resolved: DesignCategoriaGrupo[]) => {
-    setPreviewCategoriasGrupos(previous => mergeDesignCategoriaGrupos(resolved, previous))
-  }, [])
-
-  useDesignCategoriaGruposImagens({
-    grupos: previewCategoriasGrupos,
-    enabled:
-      Boolean(draft.categorias.tituloGrupoFundo === 'imagem') &&
-      hydrated &&
-      previewCategoriasGrupos.length > 0,
-    onResolved: handlePreviewImagensResolved,
-  })
 
   const canPublish = canPublishDesign(draft)
 
@@ -144,6 +131,8 @@ export function DeliveryDesignCustomizerScreen() {
             <DesignCategoriasTab
               config={draft}
               grupos={previewCategoriasGrupos}
+              menuId={menuDeliveryId}
+              hasMenu={hasMenu}
               isLoading={categoriasGruposLoading}
               isError={categoriasGruposError}
               onChange={updateDraft}

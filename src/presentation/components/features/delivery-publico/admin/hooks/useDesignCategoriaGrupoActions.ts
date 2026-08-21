@@ -1,49 +1,49 @@
 'use client'
 
 import { useCallback, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import {
-  fetchGrupoProdutoImagemUrl,
-  mensagemLegivelDeliveryMediaError,
-  uploadGrupoProdutoImagem,
-} from '@/src/infrastructure/api/deliveryMediaApi'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
 import type { DesignCategoriaGrupo } from '../../shared/types/designCategoriaGrupo'
 
-export function useDesignCategoriaGrupoActions() {
-  const { auth } = useAuthStore()
-  const queryClient = useQueryClient()
+export function useDesignCategoriaGrupoActions(menuId: string | null) {
+  const invalidate = useInvalidateTenantQueries()
   const [uploadingGrupoId, setUploadingGrupoId] = useState<string | null>(null)
   const [reorderingGrupoId, setReorderingGrupoId] = useState<string | null>(null)
-  const [updatingIconGrupoId, setUpdatingIconGrupoId] = useState<string | null>(null)
 
   const invalidateGrupos = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: ['grupos-produtos'], exact: false })
-  }, [queryClient])
+    if (!menuId) return
+    await invalidate(['menu-grupos', menuId])
+  }, [invalidate, menuId])
+
+  const exigirMenu = useCallback(() => {
+    if (!menuId) {
+      const message = 'Configure o cardápio publicado no delivery antes de editar as categorias.'
+      showToast.error(message)
+      throw new Error(message)
+    }
+    return menuId
+  }, [menuId])
 
   const reordenarGrupo = useCallback(
     async (grupoId: string, novaPosicao: number) => {
-      const token = auth?.getAccessToken()
-      if (!token) {
-        showToast.error('Token não encontrado')
-        throw new Error('Token não encontrado')
-      }
-
+      const idMenu = exigirMenu()
       setReorderingGrupoId(grupoId)
       try {
-        const response = await fetch(`/api/grupos-produtos/${grupoId}/reordena-grupo`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ novaPosicao }),
-        })
+        const response = await fetchGestorApi(
+          `/api/menus/${idMenu}/grupos-produtos/${encodeURIComponent(grupoId)}/reordena-grupo`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ novaPosicao }),
+          }
+        )
 
         if (!response.ok) {
           const error = await response.json().catch(() => ({}))
-          throw new Error(error.message || 'Erro ao reordenar grupo')
+          throw new Error(
+            (error as { message?: string }).message || 'Erro ao reordenar grupo'
+          )
         }
 
         await invalidateGrupos()
@@ -51,34 +51,50 @@ export function useDesignCategoriaGrupoActions() {
         setReorderingGrupoId(null)
       }
     },
-    [auth, invalidateGrupos]
+    [exigirMenu, invalidateGrupos]
   )
 
   const uploadImagemGrupo = useCallback(
     async (grupoId: string, file: File): Promise<string | null> => {
-      const token = auth?.getAccessToken()
-      if (!token) {
-        showToast.error('Token não encontrado')
-        throw new Error('Token não encontrado')
-      }
-
+      const idMenu = exigirMenu()
       setUploadingGrupoId(grupoId)
       const toastId = showToast.loading('Enviando imagem...')
 
       try {
-        await uploadGrupoProdutoImagem(grupoId, file, token)
-        const imagemUrl = await fetchGrupoProdutoImagemUrl(grupoId, token)
+        const form = new FormData()
+        form.append('file', file)
+        const response = await fetchGestorApi(
+          `/api/menus/${idMenu}/grupos-produtos/${encodeURIComponent(grupoId)}/imagem`,
+          {
+            method: 'POST',
+            body: form,
+          }
+        )
+
+        const payload = (await response.json().catch(() => ({}))) as {
+          message?: string
+          imagemUrl?: string | null
+        }
+
+        if (!response.ok) {
+          throw new Error(payload.message || 'Erro ao enviar imagem do grupo')
+        }
+
+        const imagemUrl = payload.imagemUrl?.trim() || null
         showToast.successLoading(toastId, 'Imagem salva no grupo!')
         await invalidateGrupos()
         return imagemUrl
       } catch (error) {
-        showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
+        showToast.errorLoading(
+          toastId,
+          error instanceof Error ? error.message : 'Erro ao enviar imagem do grupo'
+        )
         throw error
       } finally {
         setUploadingGrupoId(null)
       }
     },
-    [auth, invalidateGrupos]
+    [exigirMenu, invalidateGrupos]
   )
 
   const patchGrupoImagemUrl = useCallback(
@@ -89,53 +105,12 @@ export function useDesignCategoriaGrupoActions() {
     []
   )
 
-  const patchGrupoIconName = useCallback(
-    (grupos: DesignCategoriaGrupo[], grupoId: string, iconName: string) =>
-      grupos.map(grupo => (grupo.id === grupoId ? { ...grupo, iconName } : grupo)),
-    []
-  )
-
-  const atualizarIconeGrupo = useCallback(
-    async (grupoId: string, iconName: string) => {
-      const token = auth?.getAccessToken()
-      if (!token) {
-        showToast.error('Token não encontrado')
-        throw new Error('Token não encontrado')
-      }
-
-      setUpdatingIconGrupoId(grupoId)
-      try {
-        const response = await fetch(`/api/grupos-produtos/${grupoId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ iconName }),
-        })
-
-        if (!response.ok) {
-          const error = await response.json().catch(() => ({}))
-          throw new Error(error.message || 'Erro ao salvar ícone do grupo')
-        }
-
-        await invalidateGrupos()
-      } finally {
-        setUpdatingIconGrupoId(null)
-      }
-    },
-    [auth, invalidateGrupos]
-  )
-
   return {
     reordenarGrupo,
     uploadImagemGrupo,
-    atualizarIconeGrupo,
     patchGrupoImagemUrl,
-    patchGrupoIconName,
     uploadingGrupoId,
     reorderingGrupoId,
-    updatingIconGrupoId,
     invalidateGrupos,
   }
 }
