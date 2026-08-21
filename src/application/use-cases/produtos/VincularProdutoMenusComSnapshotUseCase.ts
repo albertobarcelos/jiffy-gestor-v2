@@ -13,6 +13,38 @@ function authHeaders(token: string) {
   }
 }
 
+function unwrapMenuProdutoPayload(payload: unknown): MenuProduto {
+  if (payload && typeof payload === 'object') {
+    const rec = payload as Record<string, unknown>
+    if (rec.data && typeof rec.data === 'object' && !Array.isArray(rec.data)) {
+      return rec.data as MenuProduto
+    }
+  }
+  return payload as MenuProduto
+}
+
+/** Lê o snapshot atual do produto neste cardápio (inclui imageId atualizado). */
+export async function buscarMenuProdutoNoCardapio(params: {
+  token: string
+  menuId: string
+  produtoId: string
+}): Promise<MenuProduto> {
+  const response = await fetchGestorApi(
+    `/api/menus/${params.menuId}/produtos/${params.produtoId}`,
+    {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${params.token}`,
+      },
+      cache: 'no-store',
+    }
+  )
+  if (!response.ok) {
+    await parseError(response, 'Erro ao carregar produto deste cardápio')
+  }
+  return unwrapMenuProdutoPayload(await response.json())
+}
+
 /** Campos do snapshot deste cardápio para gravar em outros menus. */
 export function snapshotMenuProdutoParaOutrosMenus(
   produto: MenuProduto
@@ -36,20 +68,38 @@ export function snapshotMenuProdutoParaOutrosMenus(
 
 /**
  * Vincula/desvincula o produto em outros menus.
- * No add, cria o snapshot e em seguida aplica os dados do cardápio de origem
- * (não o cadastro base).
+ * No add, busca o snapshot fresco do cardápio de origem (quando `menuOrigemId`
+ * é informado) para não perder imagem/dados desatualizados no modal.
  */
 export async function vincularProdutoMenusComSnapshot(params: {
   token: string
   produtoId: string
   add: string[]
   remove: string[]
-  snapshot: UpdateMenuProdutoInput
+  /** Cardápio de origem — usado para recarregar o snapshot antes do vínculo. */
+  menuOrigemId?: string
+  /** Fallback se não houver `menuOrigemId` ou a busca falhar antes do add. */
+  snapshot?: UpdateMenuProdutoInput
 }): Promise<void> {
-  const { token, produtoId, snapshot } = params
+  const { token, produtoId } = params
   const headers = authHeaders(token)
   const add = [...new Set(params.add.filter(Boolean))]
   const remove = [...new Set(params.remove.filter(Boolean))]
+
+  let snapshot = params.snapshot
+  if (add.length > 0) {
+    if (params.menuOrigemId) {
+      const fresco = await buscarMenuProdutoNoCardapio({
+        token,
+        menuId: params.menuOrigemId,
+        produtoId,
+      })
+      snapshot = snapshotMenuProdutoParaOutrosMenus(fresco)
+    }
+    if (!snapshot) {
+      throw new Error('Snapshot do cardápio de origem é obrigatório ao vincular')
+    }
+  }
 
   for (const menuId of add) {
     const response = await fetchGestorApi(`/api/menus/${menuId}/produtos`, {

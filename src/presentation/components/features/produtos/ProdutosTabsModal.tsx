@@ -226,8 +226,9 @@ export function ProdutosTabsModal({
   }, [])
 
   const handleSalvarMenus = useCallback(async () => {
-    await menusRef.current?.save()
-  }, [])
+    const ok = (await menusRef.current?.save()) ?? false
+    if (ok) onClose()
+  }, [onClose])
 
   /** Na criação/cópia, Salvar na aba Menus grava o produto (POST), como nas 3 etapas. */
   const handleSalvarProdutoNaAbaMenus = useCallback(() => {
@@ -438,7 +439,7 @@ export function ProdutosTabsModal({
             cancelVariant: 'primaryTint10',
             onCancel: handleRequestClose,
             showSave: true,
-            saveLabel: 'Salvar',
+            saveLabel: 'Salvar e fechar',
             onSave: () => void handleSalvarMenus(),
             saveLoading: embedMenus.isSaving,
             saveDisabled: !embedMenus.isDirty || embedMenus.isSaving,
