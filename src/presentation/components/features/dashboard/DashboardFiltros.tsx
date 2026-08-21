@@ -33,10 +33,10 @@ function RotuloPeriodoComDatas({
   faixa: string | null
 }) {
   return (
-    <span className="inline-flex items-baseline gap-x-1 whitespace-nowrap">
+    <span className="inline-flex max-w-full items-baseline gap-x-1">
       <span className="text-sm font-semibold">{titulo}</span>
       {faixa ? (
-        <span className="text-[10px] font-normal opacity-90">· {faixa}</span>
+        <span className="truncate text-[10px] font-normal opacity-90 sm:text-xs">· {faixa}</span>
       ) : null}
     </span>
   )
@@ -61,11 +61,48 @@ export function DashboardFiltros({
   const faixaMes = labelFaixaDatasPeriodoPreset('mes', timeZoneEmpresa)
 
   return (
-    <div className="relative z-30 mb-2 flex flex-nowrap items-center gap-x-3 overflow-x-auto px-2 pt-2 md:px-4">
-      <h1 className="shrink-0 text-xl font-semibold text-primary-text">Visão Geral</h1>
+    <div className="relative z-30 mb-2 flex flex-col gap-2 px-2 pt-2 md:flex-row md:items-center md:gap-x-3 md:px-4">
+      <div className="flex items-center justify-between gap-2 md:contents">
+        <h1 className="shrink-0 text-xl font-semibold text-primary-text">Visão Geral</h1>
+        <div className="flex shrink-0 items-center gap-1 md:hidden">
+          <p className="whitespace-nowrap text-xs text-primary-text/60">
+            {atualizando ? 'Atualizando…' : subtituloAtualizacao}
+          </p>
+          <MuiTooltip
+            title="Atualizar dados"
+            placement="bottom"
+            slotProps={{
+              tooltip: {
+                sx: {
+                  bgcolor: '#ffffff',
+                  color: '#111827',
+                  border: '1px solid #e5e7eb',
+                  boxShadow: 2,
+                  fontSize: '0.75rem',
+                },
+              },
+            }}
+          >
+            <span>
+              <button
+                type="button"
+                onClick={handleAtualizarDashboard}
+                disabled={atualizando}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-primary transition hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label="Atualizar dados do dashboard"
+              >
+                <RefreshCw
+                  className={`h-3.5 w-3.5 ${atualizando ? 'animate-spin' : ''}`}
+                  aria-hidden
+                />
+              </button>
+            </span>
+          </MuiTooltip>
+        </div>
+      </div>
 
-      <div className="flex shrink-0 items-center gap-1.5">
-        <div className="relative w-fit max-w-[min(100%,28rem)]">
+      <div className="flex min-w-0 w-full items-center gap-1.5 md:w-auto md:shrink-0">
+        <div className="relative min-w-0 w-full md:w-fit md:max-w-[min(100%,28rem)]">
           <label htmlFor="dashboard-periodo-data" className="sr-only">
             Período
           </label>
@@ -76,7 +113,7 @@ export function DashboardFiltros({
           <Select value={periodoData} onValueChange={handlePeriodoDataChange}>
             <SelectTrigger
               id="dashboard-periodo-data"
-              className="!h-9 !w-fit max-w-full gap-2 rounded-lg bg-primary/5 py-0 pl-9 pr-2 text-left text-sm font-medium text-primary shadow-none ring-offset-0 focus:outline-none focus:ring-2 focus:ring-primary/35 focus:ring-offset-0 data-[state=open]:border-primary [&>span]:min-w-0 [&>span]:truncate [&>svg]:shrink-0 [&>svg]:text-primary"
+              className="!h-9 !w-full max-w-full gap-2 rounded-lg bg-primary/5 py-0 pl-9 pr-2 text-left text-sm font-medium text-primary shadow-none ring-offset-0 focus:outline-none focus:ring-2 focus:ring-primary/35 focus:ring-offset-0 data-[state=open]:border-primary md:!w-fit [&>span]:min-w-0 [&>span]:truncate [&>svg]:shrink-0 [&>svg]:text-primary"
             >
               <SelectValue placeholder="Período" />
             </SelectTrigger>
@@ -156,7 +193,7 @@ export function DashboardFiltros({
           </MuiTooltip>
         ) : null}
 
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="hidden shrink-0 items-center gap-1 md:flex">
           <p className="whitespace-nowrap text-sm text-primary-text/60">
             {atualizando ? 'Atualizando…' : subtituloAtualizacao}
           </p>

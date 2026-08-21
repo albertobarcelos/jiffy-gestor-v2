@@ -14,6 +14,7 @@ function toImpostoConfig(ncm: any) {
     },
     cfop: impostos.cfop,
     csosn: impostos.csosn,
+    codigoBeneficioFiscal: impostos.codigoBeneficioFiscal,
     icms: impostos.icms,
     pis: impostos.pis,
     cofins: impostos.cofins,

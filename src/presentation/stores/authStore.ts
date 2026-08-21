@@ -5,7 +5,10 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { Auth } from '@/src/domain/entities/Auth'
 import { User } from '@/src/domain/entities/User'
 import type { LoginEmpresaSnapshot } from '@/src/domain/types/LoginEmpresaSnapshot'
-import { buildAuthFromAccessToken } from '@/src/shared/utils/buildAuthFromAccessToken'
+import {
+  buildAuthFromAccessToken,
+  isEmailSessaoPlaceholder,
+} from '@/src/shared/utils/buildAuthFromAccessToken'
 import {
   SESSION_STORAGE_TENANT_TOKEN,
 } from '@/src/shared/constants/sessionCoordinator'
@@ -166,10 +169,18 @@ function restoreTenantFromSessionStorage(identityAuth: Auth | null): Auth | null
     }
 
     const prev = identityAuth?.getUser()
-    return buildAuthFromAccessToken(
-      token,
-      prev ? { id: prev.getId(), email: prev.getEmail(), name: prev.getName() } : undefined
-    )
+    if (!prev || isEmailSessaoPlaceholder(prev.getEmail())) {
+      return null
+    }
+    try {
+      return buildAuthFromAccessToken(token, {
+        id: prev.getId(),
+        email: prev.getEmail(),
+        name: prev.getName(),
+      })
+    } catch {
+      return null
+    }
   } catch {
     return null
   }

@@ -13,6 +13,9 @@ O **Portal do Contador** (`/portal-contador`) configura o onboarding fiscal da e
 4. Inutilização de numeração (opcional)
 5. Chave IBPT (opcional)
 6. Reforma tributária (opcional)
+7. Tabela cBenef (opcional, admin)
+
+Campo **cBenef** e **% redução de base (CST 20)** ficam no modal de impostos por NCM (etapa 3). Detalhes em `docs/MANUTENCAO_CBENEF.md`.
 
 ## Camadas (frontend)
 

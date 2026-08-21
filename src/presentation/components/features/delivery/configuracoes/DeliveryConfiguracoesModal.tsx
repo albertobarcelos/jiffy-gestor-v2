@@ -208,7 +208,8 @@ function ImpressoraMapeamentoInput({
   )
 }
 
-export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfiguracoesModalProps) {  const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfiguracoesModalProps) {
+  const token = useAuthStore.getState().tenantAuth?.getAccessToken()
   const {
     empresa,
     deliveryCupomTemplate: cupomTemplateRemoto,

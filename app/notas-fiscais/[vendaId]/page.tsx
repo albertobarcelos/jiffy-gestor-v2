@@ -7,7 +7,9 @@ import {
   resolveDocumentoFiscalIdPublico,
 } from '@/src/infrastructure/api/fetchVendaContingenciaPublica'
 import { CupomFiscalContingencia } from '@/src/presentation/components/features/venda-contingencia/CupomFiscalContingencia'
+import { CupomPublicoComAcoes } from '@/src/presentation/components/features/venda-contingencia/CupomPublicoComAcoes'
 import { CupomPublicoShell } from '@/src/presentation/components/features/venda-contingencia/CupomPublicoShell'
+import { buildNotaFiscalPublicaUrl } from '@/src/shared/utils/notaFiscalPublicaUrl'
 
 export const dynamic = 'force-dynamic'
 
@@ -62,22 +64,30 @@ export default async function NotaFiscalPublicPage({ params }: PageProps) {
       ? `/api/public/notas-fiscais-consumidor/${encodeURIComponent(documentoFiscalId)}/danfe-80`
       : null
 
+  let pageUrl = ''
+  try {
+    pageUrl = buildNotaFiscalPublicaUrl(vendaId)
+  } catch {
+    pageUrl = `/notas-fiscais/${encodeURIComponent(vendaId)}`
+  }
+
   return (
     <div
-      className="min-h-screen flex justify-center py-8 px-4 sm:px-5"
-      style={{ background: 'linear-gradient(to bottom right, #f8fafc, #e2e8f0)' }}
+      className="flex min-h-screen justify-center bg-gradient-to-br from-slate-50 to-slate-200 px-4 py-8 sm:px-5 print:min-h-0 print:bg-white print:bg-none print:p-0"
     >
-      <CupomPublicoShell
-        className="max-w-lg"
-        style={{
-          fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
-          color: '#0f172a',
-        }}
-      >
-        <div className="px-5 sm:px-6 py-5">
-          <CupomFiscalContingencia data={data} rodapeDanfeSrc={rodapeDanfeSrc} />
-        </div>
-      </CupomPublicoShell>
+      <CupomPublicoComAcoes pageUrl={pageUrl} rodapeDanfeSrc={rodapeDanfeSrc}>
+        <CupomPublicoShell
+          className="max-w-lg"
+          style={{
+            fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
+            color: '#0f172a',
+          }}
+        >
+          <div className="px-5 sm:px-6 py-5">
+            <CupomFiscalContingencia data={data} rodapeDanfeSrc={rodapeDanfeSrc} />
+          </div>
+        </CupomPublicoShell>
+      </CupomPublicoComAcoes>
     </div>
   )
 }

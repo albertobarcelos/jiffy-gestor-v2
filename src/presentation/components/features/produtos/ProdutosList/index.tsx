@@ -126,7 +126,15 @@ export function ProdutosList() {
   }, [gruposProdutos])
 
   const produtosVisiveis = useMemo(() => {
-    const sorted = sortProdutosAlphabetically(produtos)
+    let sorted = sortProdutosAlphabetically(produtos)
+
+    if (filters.grupoProdutoFilter.length > 1) {
+      const idsSelecionados = new Set(filters.grupoProdutoFilter)
+      sorted = sorted.filter(p => {
+        const grupoId = p.getGrupoId()
+        return Boolean(grupoId && idsSelecionados.has(grupoId))
+      })
+    }
 
     if (filters.statusGrupoFilter === 'Todos') return sorted
 
@@ -140,7 +148,7 @@ export function ProdutosList() {
       if (typeof ativo !== 'boolean') return filters.statusGrupoFilter === 'Ativo'
       return filters.statusGrupoFilter === 'Ativo' ? ativo : !ativo
     })
-  }, [produtos, grupoProdutoMap, filters.statusGrupoFilter])
+  }, [produtos, grupoProdutoMap, filters.statusGrupoFilter, filters.grupoProdutoFilter])
 
   const loadMoreRef = useRef<HTMLDivElement>(null)
 
@@ -476,6 +484,10 @@ export function ProdutosList() {
         onFilterStatusChange={actions.setStatus}
         statusGrupoFilter={filters.statusGrupoFilter}
         onStatusGrupoChange={actions.setStatusGrupo}
+        ativoLocalFilter={filters.ativoLocalFilter}
+        onAtivoLocalChange={actions.setAtivoLocal}
+        ativoDeliveryFilter={filters.ativoDeliveryFilter}
+        onAtivoDeliveryChange={actions.setAtivoDelivery}
         grupoProdutoFilter={filters.grupoProdutoFilter}
         onGrupoProdutoChange={actions.setGrupoProduto}
         gruposProdutos={gruposProdutosFiltrados}

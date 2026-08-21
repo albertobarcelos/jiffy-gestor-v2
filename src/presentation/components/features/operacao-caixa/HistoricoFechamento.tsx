@@ -193,7 +193,8 @@ const sxHistoricoFiltroTextFieldDate = {
  * Componente de histórico de fechamento de caixa
  * Implementa scroll infinito, filtros avançados e exibição em tabela
  */
-export function HistoricoFechamento() {  const { timezoneAgregacao } = useEmpresaMe()
+export function HistoricoFechamento() {
+  const { timezoneAgregacao } = useEmpresaMe()
 
   // Estados de filtros
   const [searchQuery, setSearchQuery] = useState('')
@@ -1080,6 +1081,7 @@ export function HistoricoFechamento() {  const { timezoneAgregacao } = useEmpre
         open={isDatasModalOpen}
         onClose={() => setIsDatasModalOpen(false)}
         title="Escolha o período"
+        fullScreenOnMobile
         panelClassName="!bg-[#f9fafb] w-[45vw] min-w-[260px] max-w-[min(100vw-1rem,95vw)] sm:min-w-[280px]"
         scrollableBody={false}
         footerSlot={

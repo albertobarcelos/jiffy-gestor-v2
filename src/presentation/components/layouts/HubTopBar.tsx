@@ -1,11 +1,13 @@
 ﻿'use client'
 
+import { useEffect } from 'react'
 import { Menu, LogOut } from 'lucide-react'
 import { cn } from '@/src/shared/utils/cn'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { disconnectHubTab } from '@/src/presentation/utils/disconnectHubTab'
 import { useHubSearchSlot } from '@/src/presentation/contexts/HubSearchContext'
 import { SearchBar } from '@/src/presentation/components/features/minhas-empresas/components/SearchBar'
+import { isEmailSessaoPlaceholder } from '@/src/shared/utils/buildAuthFromAccessToken'
 
 type HubTopBarProps = {
   onMenuClick: () => void
@@ -17,15 +19,26 @@ export function HubTopBar({ onMenuClick }: HubTopBarProps) {
   const identityAuth = useAuthStore(s => s.identityAuth)
   const tenantAuth = useAuthStore(s => s.tenantAuth)
   const logoutHub = useAuthStore(s => s.logoutHub)
+  const logout = useAuthStore(s => s.logout)
 
   const user = identityAuth?.getUser() ?? tenantAuth?.getUser() ?? null
   const nomeUsuario = isRehydrated ? (user?.getName()?.trim() ?? '') : ''
   const emailUsuario = isRehydrated ? (user?.getEmail()?.trim() ?? '') : ''
+
+  /** Placeholder legado = sessão inválida → logout completo. */
+  useEffect(() => {
+    if (!isRehydrated || !user) return
+    if (!isEmailSessaoPlaceholder(emailUsuario)) return
+    void logout().finally(() => {
+      window.location.href = '/login'
+    })
+  }, [isRehydrated, user, emailUsuario, logout])
+
   const labelSecundario = !isRehydrated
     ? '…'
-    : emailUsuario && !emailUsuario.endsWith('@sessao.local')
+    : !isEmailSessaoPlaceholder(emailUsuario)
       ? emailUsuario
-      : nomeUsuario || emailUsuario || 'Usuário'
+      : nomeUsuario || '…'
 
   return (
     <header className="sticky top-0 z-30 shrink-0 border-b border-gray-200 bg-white">
@@ -58,7 +71,7 @@ export function HubTopBar({ onMenuClick }: HubTopBarProps) {
           )}
         >
           <div className="hidden min-w-0 flex-col items-end text-right leading-tight sm:flex">
-            {nomeUsuario && emailUsuario && !emailUsuario.endsWith('@sessao.local') ? (
+            {nomeUsuario && !isEmailSessaoPlaceholder(emailUsuario) ? (
               <span className="max-w-[220px] truncate text-sm font-semibold uppercase text-gray-900">
                 {nomeUsuario}
               </span>
@@ -66,7 +79,7 @@ export function HubTopBar({ onMenuClick }: HubTopBarProps) {
             <span
               className={cn(
                 'max-w-[220px] truncate text-sm text-gray-600',
-                !(nomeUsuario && emailUsuario && !emailUsuario.endsWith('@sessao.local')) &&
+                !(nomeUsuario && !isEmailSessaoPlaceholder(emailUsuario)) &&
                   'font-medium text-gray-800'
               )}
             >
