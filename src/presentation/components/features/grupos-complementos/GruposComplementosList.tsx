@@ -18,12 +18,23 @@ import {
   MdExtension,
   MdKeyboardArrowUp,
   MdKeyboardArrowDown,
+  MdImageNotSupported,
+  MdPhotoCamera,
 } from 'react-icons/md'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { showToast } from '@/src/shared/utils/toast'
+import { DELIVERY_IMAGE_ACCEPT } from '@/src/shared/constants/deliveryImageUpload'
+import {
+  fetchGrupoComplementoImagemUrl,
+  fetchGruposComplementoImagemUrlsBatch,
+  mensagemLegivelDeliveryMediaError,
+  uploadGrupoComplementoImagem,
+} from '@/src/infrastructure/api/deliveryMediaApi'
+import { DELIVERY_GRUPO_COMPLEMENTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
+import { useEntityImageCropUpload } from '@/src/presentation/hooks/useEntityImageCropUpload'
 import {
   GruposComplementosTabsModal,
   GruposComplementosTabsModalState,
@@ -31,6 +42,87 @@ import {
 
 interface GruposComplementosListProps {
   onReload?: () => void
+}
+
+function stopRowInteraction(e: React.SyntheticEvent) {
+  e.stopPropagation()
+}
+
+function GrupoImagemThumb({
+  nome,
+  imagemUrl,
+  isUploading,
+  onSelectFile,
+}: {
+  nome: string
+  imagemUrl?: string | null
+  isUploading?: boolean
+  onSelectFile: (file: File) => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const openFilePicker = useCallback(() => {
+    if (isUploading) return
+    inputRef.current?.click()
+  }, [isUploading])
+
+  return (
+    <div
+      className="relative h-11 w-11 shrink-0 md:h-12 md:w-12"
+      onClick={stopRowInteraction}
+      onMouseDown={stopRowInteraction}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept={DELIVERY_IMAGE_ACCEPT}
+        className="hidden"
+        onClick={e => e.stopPropagation()}
+        onChange={e => {
+          const file = e.target.files?.[0]
+          e.target.value = ''
+          if (file) onSelectFile(file)
+        }}
+      />
+      {imagemUrl ? (
+        <>
+          <EntityListThumbnail src={imagemUrl} alt={nome} />
+          <button
+            type="button"
+            title="Trocar imagem"
+            aria-label={`Trocar imagem de ${nome}`}
+            disabled={isUploading}
+            onClick={e => {
+              stopRowInteraction(e)
+              openFilePicker()
+            }}
+            className="absolute -bottom-1 -right-1 z-10 flex h-5 w-5 items-center justify-center rounded-full border border-white bg-primary text-white shadow disabled:cursor-wait disabled:opacity-60"
+          >
+            <MdPhotoCamera className="h-3 w-3" />
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          title={`Inserir imagem de ${nome}`}
+          aria-label={`Inserir imagem de ${nome}`}
+          disabled={isUploading}
+          onClick={e => {
+            stopRowInteraction(e)
+            openFilePicker()
+          }}
+          className="relative flex h-full w-full items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-secondary-text transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
+        >
+          <MdImageNotSupported className="h-6 w-6 md:h-7 md:w-7" />
+        </button>
+      )}
+      {isUploading ? (
+        <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-black/35">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+        </div>
+      ) : null}
+    </div>
+  )
 }
 
 /**
@@ -44,6 +136,9 @@ const GrupoItem = memo(function GrupoItem({
   onChangeQuantidade,
   isChangingQuantidade,
   rowIndex,
+  imagemUrl,
+  isUploadingImagem,
+  onUploadImagem,
 }: {
   grupo: GrupoComplemento
   onToggleStatus?: (grupoId: string, novoStatus: boolean) => void
@@ -52,6 +147,9 @@ const GrupoItem = memo(function GrupoItem({
   onChangeQuantidade?: (grupo: GrupoComplemento, tipo: 'min' | 'max', delta: number) => void
   isChangingQuantidade?: boolean
   rowIndex: number
+  imagemUrl?: string | null
+  isUploadingImagem?: boolean
+  onUploadImagem?: (grupoId: string, file: File) => void
 }) {
   const complementos = useMemo(() => grupo.getComplementos() || [], [grupo])
   const complementosIds = useMemo(() => grupo.getComplementosIds() || [], [grupo])
@@ -71,8 +169,12 @@ const GrupoItem = memo(function GrupoItem({
       index={rowIndex}
       onClick={handleRowClick}
     >
-      {/* src: preencher quando o backend expuser URL da foto do grupo */}
-      <EntityListThumbnail src={null} alt={grupo.getNome()} />
+      <GrupoImagemThumb
+        nome={grupo.getNome()}
+        imagemUrl={imagemUrl}
+        isUploading={isUploadingImagem}
+        onSelectFile={file => onUploadImagem?.(grupo.getId(), file)}
+      />
 
       <span
         className="min-w-0 truncate font-normal text-xs text-primary-text md:text-sm"
@@ -283,10 +385,67 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
   }, [error])
 
   const [updatingQuantidadeId, setUpdatingQuantidadeId] = useState<string | null>(null)
+  const [imagensPorGrupoId, setImagensPorGrupoId] = useState<Record<string, string | null>>({})
+  const [uploadingImagemGrupoId, setUploadingImagemGrupoId] = useState<string | null>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const invalidate = useInvalidateTenantQueries()
+
+  useEffect(() => {
+    const idsFaltantes = grupos
+      .map(g => g.getId())
+      .filter(id => !(id in imagensPorGrupoId))
+
+    if (idsFaltantes.length === 0) return
+
+    let cancelled = false
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+    if (!token) return
+
+    void fetchGruposComplementoImagemUrlsBatch(idsFaltantes, token).then(resolved => {
+      if (cancelled) return
+      setImagensPorGrupoId(prev => ({ ...prev, ...resolved }))
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [grupos, imagensPorGrupoId])
+
+  const handleUploadImagem = useCallback(
+    async (grupoId: string, file: File) => {
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado')
+        return
+      }
+
+      setUploadingImagemGrupoId(grupoId)
+      const toastId = showToast.loading('Enviando imagem...')
+
+      try {
+        await uploadGrupoComplementoImagem(grupoId, file, token)
+        const persistedUrl = await fetchGrupoComplementoImagemUrl(grupoId, token)
+        setImagensPorGrupoId(prev => ({
+          ...prev,
+          [grupoId]: persistedUrl,
+        }))
+        showToast.successLoading(toastId, 'Imagem salva com sucesso!')
+      } catch (error) {
+        showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
+      } finally {
+        setUploadingImagemGrupoId(null)
+      }
+    },
+    []
+  )
+
+  const { selectForEntity: selectGrupoComplementoImagem, cropModal: grupoComplementoCropModal } =
+    useEntityImageCropUpload({
+      preset: DELIVERY_GRUPO_COMPLEMENTO_CROP_PRESET,
+      upload: handleUploadImagem,
+    })
 
   const [tabsModalState, setTabsModalState] = useState<GruposComplementosTabsModalState>({
     open: false,
@@ -367,6 +526,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
   }, [router, searchParams, pathname, invalidate])
 
   const handleTabsModalReload = useCallback(async () => {
+    setImagensPorGrupoId({})
     await handleActionsReload()
   }, [handleActionsReload])
 
@@ -559,6 +719,9 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
             onChangeQuantidade={handleChangeQuantidade}
             isChangingQuantidade={updatingQuantidadeId === grupo.getId()}
             rowIndex={index}
+            imagemUrl={imagensPorGrupoId[grupo.getId()] ?? null}
+            isUploadingImagem={uploadingImagemGrupoId === grupo.getId()}
+            onUploadImagem={selectGrupoComplementoImagem}
           />
         ))}
 
@@ -574,6 +737,7 @@ export function GruposComplementosList({ onReload }: GruposComplementosListProps
         onReload={handleTabsModalReload}
         onTabChange={handleTabsModalTabChange}
       />
+      {grupoComplementoCropModal}
       </CadastroListShell>
     </div>
   )

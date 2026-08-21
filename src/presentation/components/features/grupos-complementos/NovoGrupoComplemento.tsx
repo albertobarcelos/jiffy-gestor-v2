@@ -18,6 +18,13 @@ import { Button } from '@/src/presentation/components/ui/button'
 import { showToast, handleApiError } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
+import { DeliveryImageUploadField } from '@/src/presentation/components/ui/DeliveryImageUploadField'
+import { DELIVERY_GRUPO_COMPLEMENTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
+import {
+  mensagemLegivelDeliveryMediaError,
+  uploadGrupoComplementoImagem,
+  fetchGrupoComplementoImagemUrl,
+} from '@/src/infrastructure/api/deliveryMediaApi'
 
 /** Labels outlined em preto (MUI usa cinza por padrão) — igual NovoComplemento */
 const sxOutlinedLabelTextoEscuro = {
@@ -123,6 +130,9 @@ export const NovoGrupoComplemento = forwardRef<
   // Estados de loading e dados
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingGrupo, setIsLoadingGrupo] = useState(false)
+  const [isUploadingImagem, setIsUploadingImagem] = useState(false)
+  const [serverImagemUrl, setServerImagemUrl] = useState<string | null>(null)
+  const [imagemPreviewUrl, setImagemPreviewUrl] = useState<string | null>(null)
   const hasLoadedGrupoRef = useRef(false)
   const baselineSerializedRef = useRef<string>('')
 
@@ -183,8 +193,21 @@ export const NovoGrupoComplemento = forwardRef<
   const commitBaselineLatestRef = useRef(commitBaseline)
   commitBaselineLatestRef.current = commitBaseline
 
+  const applyImagemUrl = useCallback((url: string | null) => {
+    setServerImagemUrl(url)
+    setImagemPreviewUrl(prev => {
+      if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+      return url
+    })
+  }, [])
+
   useEffect(() => {
     hasLoadedGrupoRef.current = false
+    setServerImagemUrl(null)
+    setImagemPreviewUrl(prev => {
+      if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+      return null
+    })
   }, [grupoId])
 
   // Baseline em modo criação (estado inicial)
@@ -227,6 +250,13 @@ export const NovoGrupoComplemento = forwardRef<
             setAtivo(grupo.isAtivo())
             const ids = grupo.getComplementosIds() ?? []
             setVinculadosCount(ids.length || (grupo.getComplementos()?.length ?? 0))
+
+            if (grupoId) {
+              const deliveryImagemUrl = await fetchGrupoComplementoImagemUrl(grupoId, token)
+              applyImagemUrl(deliveryImagemUrl ?? grupo.getImagemUrl() ?? null)
+            } else {
+              applyImagemUrl(grupo.getImagemUrl() ?? null)
+            }
 
             window.setTimeout(() => {
               commitBaselineLatestRef.current()
@@ -392,6 +422,53 @@ export const NovoGrupoComplemento = forwardRef<
     }
   }
 
+  const handleImagemUpload = useCallback(
+    async (file: File) => {
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado')
+        return
+      }
+      if (!grupoId) {
+        showToast.error('Salve o grupo antes de enviar uma imagem.')
+        return
+      }
+
+      const preview = URL.createObjectURL(file)
+      setImagemPreviewUrl(prev => {
+        if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+        return preview
+      })
+
+      setIsUploadingImagem(true)
+      const toastId = showToast.loading('Enviando imagem...')
+
+      try {
+        await uploadGrupoComplementoImagem(grupoId, file, token)
+        const persistedUrl = await fetchGrupoComplementoImagemUrl(grupoId, token)
+        applyImagemUrl(persistedUrl ?? preview)
+        showToast.successLoading(toastId, 'Imagem enviada com sucesso!')
+        onReload?.()
+      } catch (error) {
+        setImagemPreviewUrl(prev => {
+          if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+          return serverImagemUrl
+        })
+        showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(error))
+      } finally {
+        setIsUploadingImagem(false)
+      }
+    },
+    [grupoId, onReload, serverImagemUrl, applyImagemUrl]
+  )
+
+  const handleClearImagemPreview = useCallback(() => {
+    setImagemPreviewUrl(prev => {
+      if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+      return serverImagemUrl
+    })
+  }, [serverImagemUrl])
+
   if (isLoadingGrupo) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-2">
@@ -496,6 +573,31 @@ export const NovoGrupoComplemento = forwardRef<
                   ) : null}
                 </button>
               </div>
+
+              <DeliveryImageUploadField
+                label="Imagem do grupo (cardápio digital)"
+                disabled={!isEditing}
+                busy={isUploadingImagem}
+                previewUrl={imagemPreviewUrl}
+                cropPreset={DELIVERY_GRUPO_COMPLEMENTO_CROP_PRESET}
+                helperText={
+                  isEditing
+                    ? 'Após escolher o arquivo, ajuste o recorte (máx. 280×280). A imagem aparece no cardápio digital após o upload.'
+                    : 'Salve o grupo para habilitar o envio de imagem.'
+                }
+                emptyHint={
+                  isEditing
+                    ? 'Arraste uma imagem ou clique para selecionar'
+                    : 'Disponível após salvar o grupo'
+                }
+                onFileSelected={handleImagemUpload}
+                onClearPreview={
+                  imagemPreviewUrl?.startsWith('blob:') &&
+                  imagemPreviewUrl !== serverImagemUrl
+                    ? handleClearImagemPreview
+                    : undefined
+                }
+              />
 
             </div>
           </div>
