@@ -4,14 +4,12 @@ import { cn } from '@/src/shared/utils/cn'
 import Link from 'next/link'
 
 interface MenuCardapioAcoesProps {
-  onCadastrar: () => void
   onAdicionar: () => void
   loteHref?: string
   className?: string
 }
 
 export function MenuCardapioAcoes({
-  onCadastrar,
   onAdicionar,
   loteHref,
   className,
@@ -26,14 +24,6 @@ export function MenuCardapioAcoes({
           Produtos em lote
         </Link>
       ) : null}
-      <button
-        type="button"
-        onClick={onCadastrar}
-        className="flex h-8 items-center gap-2 rounded-lg border border-primary bg-info px-[20px] text-sm font-semibold text-primary transition-colors hover:bg-primary/10"
-      >
-        Cadastrar produto neste cardápio
-        <span className="text-lg">+</span>
-      </button>
       <button
         type="button"
         onClick={onAdicionar}

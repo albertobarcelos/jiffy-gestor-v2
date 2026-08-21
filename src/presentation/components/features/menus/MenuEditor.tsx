@@ -653,7 +653,6 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
 
           {mostrarAcoesCabecalho ? (
             <MenuCardapioAcoes
-              onCadastrar={() => tipoCadastro.pedirTipo(() => openWizardCadastro())}
               onAdicionar={() => setAddOpen(true)}
               loteHref={toGestao(`/menus/${menuId}/atualizar-lote`)}
             />
@@ -693,10 +692,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
           emptyLabel="Nenhum produto encontrado com esses filtros."
           emptyContent={
             cardapioVazio && !isLoadingList ? (
-              <MenuCardapioEmptyState
-                onCadastrar={() => tipoCadastro.pedirTipo(() => openWizardCadastro())}
-                onAdicionar={() => setAddOpen(true)}
-              />
+              <MenuCardapioEmptyState onAdicionar={() => setAddOpen(true)} />
             ) : undefined
           }
           listAriaLabel="Produtos deste cardápio"
@@ -720,6 +716,9 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         menuId={menuId}
         produtosJaNoMenu={idsNoMenu}
         onClose={() => setAddOpen(false)}
+        onCadastrarNovoProduto={() =>
+          tipoCadastro.pedirTipo(() => openWizardCadastro())
+        }
       />
 
       <EscolherTipoProdutoModal

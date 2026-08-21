@@ -19,6 +19,8 @@ interface AddProdutosToMenuPanelProps {
   menuId: string
   produtosJaNoMenu: Set<string>
   onClose: () => void
+  /** Abre o fluxo de cadastro de produto neste cardápio (fecha este painel). */
+  onCadastrarNovoProduto?: () => void
 }
 
 export function AddProdutosToMenuPanel({
@@ -26,6 +28,7 @@ export function AddProdutosToMenuPanel({
   menuId,
   produtosJaNoMenu,
   onClose,
+  onCadastrarNovoProduto,
 }: AddProdutosToMenuPanelProps) {
   const [searchText, setSearchText] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -160,11 +163,26 @@ export function AddProdutosToMenuPanel({
     >
       <div className="flex min-h-0 flex-1 flex-col p-2 md:p-4">
         <div className="mb-3 rounded-[10px] bg-info p-2 md:p-4">
-          <div className="mb-3">
-            <p className="text-sm font-semibold text-primary">Produtos cadastrados</p>
-            <p className="text-sm font-medium text-tertiary">
-              Total {disponiveis.length} de {totalApi}
-            </p>
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-primary">Produtos cadastrados</p>
+              <p className="text-sm font-medium text-tertiary">
+                Total {disponiveis.length} de {totalApi}
+              </p>
+            </div>
+            {onCadastrarNovoProduto ? (
+              <button
+                type="button"
+                onClick={() => {
+                  closeAndReset()
+                  onCadastrarNovoProduto()
+                }}
+                className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-primary bg-white px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 sm:text-sm"
+              >
+                Cadastrar novo produto neste Menu
+                <span className="text-base leading-none">+</span>
+              </button>
+            ) : null}
           </div>
           <div className="relative h-8">
             <input

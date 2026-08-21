@@ -729,10 +729,21 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       if (effectiveProdutoId || effectiveIsCopyMode) {
         return
       }
-      // Só preenche se ainda estiver vazio — não sobrescreve troca manual no wizard.
-      if (!defaultGrupoProdutoId) return
-      setGrupoProduto(prev => prev ?? defaultGrupoProdutoId)
-    }, [defaultGrupoProdutoId, effectiveProdutoId, effectiveIsCopyMode])
+      // Wizard: se voltou e escolheu "nova categoria", limpa a existente que ficou no form.
+      if (pendingNovaCategoriaLabel?.trim() && !defaultGrupoProdutoId) {
+        setGrupoProduto(null)
+        return
+      }
+      // Wizard / pré-seleção: aplica a categoria do passo 1 quando ela muda.
+      if (defaultGrupoProdutoId) {
+        setGrupoProduto(defaultGrupoProdutoId)
+      }
+    }, [
+      defaultGrupoProdutoId,
+      pendingNovaCategoriaLabel,
+      effectiveProdutoId,
+      effectiveIsCopyMode,
+    ])
 
     // Baseline inicial em modo criação (após grupo opcional do contexto)
     useEffect(() => {
