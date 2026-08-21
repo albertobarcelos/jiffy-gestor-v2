@@ -34,6 +34,7 @@ import { CatalogGroupedList } from '@/src/presentation/components/features/catal
 import { CatalogProductRow } from '@/src/presentation/components/features/catalogo/CatalogProductRow'
 import type { CatalogGroup } from '@/src/presentation/components/features/catalogo/types'
 import { MenuProdutoRowQuickActions } from './MenuProdutoRowQuickActions'
+import { coletarGruposMenuPorSnapshot, ordemSnapshotCategoria } from './ordenarGruposMenuSnapshot'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
@@ -158,15 +159,10 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     setWizardCategoriaId(undefined)
   }, [])
 
-  const grupos = useMemo(() => {
-    const map = new Map<string, MenuGrupoProduto>()
-    for (const page of gruposData?.pages ?? []) {
-      for (const grupo of page.items) {
-        if (!map.has(grupo.id)) map.set(grupo.id, grupo)
-      }
-    }
-    return Array.from(map.values()).sort((a, b) => a.ordem - b.ordem)
-  }, [gruposData?.pages])
+  const grupos = useMemo(
+    () => coletarGruposMenuPorSnapshot(gruposData?.pages),
+    [gruposData?.pages]
+  )
 
   const produtosDoMenu = useMemo(() => {
     const map = new Map<string, MenuProduto>()
@@ -226,6 +222,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         grupoVisual:
           cor && icon ? { corHex: cor, iconName: icon } : undefined,
         grupoAtivo: grupo.grupoBase.ativo ?? true,
+        ordem: ordemSnapshotCategoria(grupo),
         items: produtosPorGrupo.get(baseId) ?? [],
       }
     })
@@ -237,6 +234,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         grupoLabel: items[0]?.grupoProduto?.nome || 'Categoria',
         grupoId: baseId,
         grupoAtivo: true,
+        ordem: Number.MAX_SAFE_INTEGER,
         items,
       })
     }
@@ -247,11 +245,12 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         groupKey: 'sem_grupo',
         grupoLabel: 'Sem categoria',
         grupoAtivo: true,
+        ordem: Number.MAX_SAFE_INTEGER,
         items: semGrupo,
       })
     }
 
-    return groups
+    return groups.sort((a, b) => (a.ordem ?? Number.MAX_SAFE_INTEGER) - (b.ordem ?? Number.MAX_SAFE_INTEGER))
   }, [grupos, produtosPorGrupo])
 
   const catalogGroupsVisiveis = useMemo(() => {

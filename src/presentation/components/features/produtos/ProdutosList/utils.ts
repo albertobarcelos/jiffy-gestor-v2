@@ -3,9 +3,40 @@ import type { ProdutoPatch } from '@/src/shared/types/produto'
 
 const collator = new Intl.Collator('pt-BR', { sensitivity: 'accent', numeric: false })
 
-/** Lista sequencial: ordenação alfabética por nome do produto. */
-export const sortProdutosAlphabetically = (lista: Produto[]): Produto[] =>
-  [...lista].sort((a, b) => collator.compare(a.getNome(), b.getNome()))
+function ordemNumerica(valor: number | undefined): number {
+  return typeof valor === 'number' && Number.isFinite(valor) ? valor : Number.MAX_SAFE_INTEGER
+}
+
+/**
+ * Ordem do cardápio: categoria (`GrupoProduto.ordem`) e depois o produto no grupo.
+ * Nome só desempatar quando a ordem for igual ou ausente.
+ */
+export function sortProdutosPorOrdemMenu(
+  lista: Produto[],
+  ordemGrupoPorId: ReadonlyMap<string, number>
+): Produto[] {
+  return [...lista].sort((a, b) => {
+    const ordemGrupoA = ordemGrupoPorId.get(a.getGrupoId() ?? '') ?? Number.MAX_SAFE_INTEGER
+    const ordemGrupoB = ordemGrupoPorId.get(b.getGrupoId() ?? '') ?? Number.MAX_SAFE_INTEGER
+    if (ordemGrupoA !== ordemGrupoB) return ordemGrupoA - ordemGrupoB
+
+    const ordemA = ordemNumerica(a.getOrdem())
+    const ordemB = ordemNumerica(b.getOrdem())
+    if (ordemA !== ordemB) return ordemA - ordemB
+
+    return collator.compare(a.getNome(), b.getNome())
+  })
+}
+
+export function mapaOrdemGrupoProduto(
+  grupos: Array<{ getId: () => string; getOrdem: () => number | undefined }>
+): Map<string, number> {
+  const map = new Map<string, number>()
+  for (const grupo of grupos) {
+    map.set(grupo.getId(), ordemNumerica(grupo.getOrdem()))
+  }
+  return map
+}
 
 /**
  * Monta `Produto` a partir da resposta da API mantendo `ordem` do item já em cache

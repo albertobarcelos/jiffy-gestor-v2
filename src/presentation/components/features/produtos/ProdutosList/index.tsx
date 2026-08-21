@@ -38,7 +38,8 @@ import { useImagensProdutosCadastroBase } from '@/src/presentation/hooks/produto
 import { Produto } from '@/src/domain/entities/Produto'
 import type { ToggleField } from '@/src/shared/types/produto'
 import {
-  sortProdutosAlphabetically,
+  sortProdutosPorOrdemMenu,
+  mapaOrdemGrupoProduto,
   produtoFromApiPreservandoOrdem,
 } from './utils'
 
@@ -125,30 +126,42 @@ export function ProdutosList() {
     return map
   }, [gruposProdutos])
 
+  const ordemGrupoPorId = useMemo(
+    () => mapaOrdemGrupoProduto(gruposProdutos),
+    [gruposProdutos]
+  )
+
   const produtosVisiveis = useMemo(() => {
-    let sorted = sortProdutosAlphabetically(produtos)
+    let list = produtos
 
     if (filters.grupoProdutoFilter.length > 1) {
       const idsSelecionados = new Set(filters.grupoProdutoFilter)
-      sorted = sorted.filter(p => {
+      list = list.filter(p => {
         const grupoId = p.getGrupoId()
         return Boolean(grupoId && idsSelecionados.has(grupoId))
       })
     }
 
-    if (filters.statusGrupoFilter === 'Todos') return sorted
+    if (filters.statusGrupoFilter !== 'Todos') {
+      list = list.filter((p) => {
+        const grupoId = p.getGrupoId()
+        if (!grupoId) {
+          return filters.statusGrupoFilter === 'Ativo'
+        }
+        const ativo = grupoProdutoMap.get(grupoId)?.ativo
+        if (typeof ativo !== 'boolean') return filters.statusGrupoFilter === 'Ativo'
+        return filters.statusGrupoFilter === 'Ativo' ? ativo : !ativo
+      })
+    }
 
-    return sorted.filter((p) => {
-      const grupoId = p.getGrupoId()
-      if (!grupoId) {
-        // "Sem grupo" só aparece quando o filtro de status do grupo é Ativo/Todos
-        return filters.statusGrupoFilter === 'Ativo'
-      }
-      const ativo = grupoProdutoMap.get(grupoId)?.ativo
-      if (typeof ativo !== 'boolean') return filters.statusGrupoFilter === 'Ativo'
-      return filters.statusGrupoFilter === 'Ativo' ? ativo : !ativo
-    })
-  }, [produtos, grupoProdutoMap, filters.statusGrupoFilter, filters.grupoProdutoFilter])
+    return sortProdutosPorOrdemMenu(list, ordemGrupoPorId)
+  }, [
+    produtos,
+    grupoProdutoMap,
+    ordemGrupoPorId,
+    filters.statusGrupoFilter,
+    filters.grupoProdutoFilter,
+  ])
 
   const loadMoreRef = useRef<HTMLDivElement>(null)
 

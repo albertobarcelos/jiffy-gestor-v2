@@ -11,5 +11,7 @@ export interface CatalogGroup<T> {
   grupoId?: string
   grupoVisual?: CatalogGrupoVisual
   grupoAtivo: boolean
+  /** Ordem da categoria no snapshot do menu. Ausente = vai para o fim. */
+  ordem?: number
   items: T[]
 }
