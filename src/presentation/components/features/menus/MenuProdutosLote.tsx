@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Autocomplete, TextField } from '@mui/material'
+import { Autocomplete, InputAdornment, TextField } from '@mui/material'
 import { MdImageNotSupported, MdSearch, MdStar } from 'react-icons/md'
 import { useMenu } from '@/src/presentation/hooks/menus/useMenus'
 import {
@@ -508,7 +508,27 @@ export function MenuProdutosLote({ menuId }: MenuProdutosLoteProps) {
                 value={adjustAmount}
                 onChange={e => setAdjustAmount(e.target.value.replace(/[^\d,.-]/g, ''))}
                 placeholder={adjustMode === 'valor' ? '0,00' : '0'}
-                className="h-8 bg-white"
+                size="small"
+                InputProps={{
+                  sx: {
+                    height: 32,
+                    backgroundColor: '#fff',
+                    borderRadius: '0.5rem',
+                    '& input': {
+                      padding: '6px 10px',
+                      fontSize: '0.875rem',
+                      height: 32,
+                      boxSizing: 'border-box',
+                    },
+                    '& fieldset': {
+                      borderColor: 'var(--color-primary)',
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: 'var(--color-primary)',
+                      borderWidth: '1px',
+                    },
+                  },
+                }}
               />
             </div>
             <Button
@@ -562,65 +582,151 @@ export function MenuProdutosLote({ menuId }: MenuProdutosLoteProps) {
         ) : null}
 
         {activeTab === 'complementos' ? (
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <label className="flex items-center gap-1 text-sm font-semibold">
-                <Checkbox
-                  checked={modoComplemento === 'adicionar'}
-                  onChange={() => setModoComplemento('adicionar')}
-                />
-                Vincular
-              </label>
-              <label className="flex items-center gap-1 text-sm font-semibold">
-                <Checkbox
-                  checked={modoComplemento === 'remover'}
-                  onChange={() => setModoComplemento('remover')}
-                />
-                Desvincular
-              </label>
-              <Button
-                type="button"
-                disabled={
-                  isUpdating || selecionados.size === 0 || gruposComplSelecionados.size === 0
-                }
-                onClick={() => void handleAplicarComplementos()}
-                className="h-8 bg-primary text-info"
-              >
-                {isUpdating
-                  ? 'Aplicando…'
-                  : `${modoComplemento === 'adicionar' ? 'Vincular' : 'Desvincular'} (${selecionados.size})`}
-              </Button>
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold text-secondary-text">Modo de operação:</span>
+              <div className="flex gap-1 rounded-lg bg-info p-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModoComplemento('adicionar')
+                    setGruposComplSelecionados(new Set())
+                    listaCompl.limparBusca()
+                  }}
+                  className={`rounded px-3 py-1 text-xs font-semibold transition-colors ${
+                    modoComplemento === 'adicionar'
+                      ? 'bg-primary text-info'
+                      : 'text-secondary-text hover:bg-primary/10'
+                  }`}
+                >
+                  Vincular
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModoComplemento('remover')
+                    setGruposComplSelecionados(new Set())
+                    listaCompl.limparBusca()
+                  }}
+                  className={`rounded px-3 py-1 text-xs font-semibold transition-colors ${
+                    modoComplemento === 'remover'
+                      ? 'bg-primary text-info'
+                      : 'text-secondary-text hover:bg-primary/10'
+                  }`}
+                >
+                  Desvincular
+                </button>
+              </div>
+              <span className="text-[11px] text-secondary-text">{listaCompl.hintModo}</span>
             </div>
-            <p className="text-xs text-secondary-text">{listaCompl.hintModo}</p>
-            {listaCompl.exibirBusca ? (
-              <Input
-                value={listaCompl.busca}
-                onChange={e => listaCompl.setBusca(e.target.value)}
-                placeholder="Buscar grupo de complementos…"
-                className="h-8 max-w-md bg-white"
-              />
-            ) : null}
-            <div className="max-h-40 overflow-y-auto rounded-lg border border-primary/20 bg-white p-2">
-              {listaCompl.filtradas.length === 0 ? (
-                <p className="px-2 py-3 text-sm text-secondary-text">{listaCompl.emptyModo}</p>
-              ) : (
-                <>
-                  <label className="mb-1 flex items-center gap-2 px-1 text-sm font-semibold">
-                    <Checkbox
-                      checked={listaCompl.todasSelecionadas}
-                      onChange={listaCompl.toggleSelecaoTodasVisiveis}
+
+            <div className="flex flex-col justify-between gap-2 md:flex-row md:items-center">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <label className="block whitespace-nowrap text-xs font-semibold text-secondary-text">
+                  {modoComplemento === 'adicionar'
+                    ? 'Selecionar Grupos de Complementos'
+                    : 'Selecionar Grupos de Complementos para Remover'}{' '}
+                  ({gruposComplSelecionados.size} selecionado
+                  {gruposComplSelecionados.size !== 1 ? 's' : ''}
+                  {listaCompl.paraExibir.length > 0
+                    ? ` · ${listaCompl.filtradas.length}/${listaCompl.paraExibir.length}`
+                    : ''}
+                  )
+                </label>
+                {listaCompl.exibirBusca ? (
+                  <div className="w-[min(200px,100%)]">
+                    <Input
+                      size="small"
+                      value={listaCompl.busca}
+                      onChange={e => listaCompl.setBusca(e.target.value)}
+                      placeholder="Pesquisar grupo..."
+                      aria-label="Pesquisar grupo de complementos"
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <MdSearch size={16} className="text-secondary-text" aria-hidden />
+                          </InputAdornment>
+                        ),
+                        sx: {
+                          height: 32,
+                          backgroundColor: '#fff',
+                          borderRadius: '0.5rem',
+                          '& input': {
+                            padding: '6px 10px',
+                            fontSize: '0.75rem',
+                            height: 32,
+                            boxSizing: 'border-box',
+                          },
+                          '& fieldset': {
+                            borderColor: 'rgba(0,0,0,0.23)',
+                          },
+                          '&.Mui-focused fieldset': {
+                            borderColor: 'var(--color-primary)',
+                            borderWidth: '1px',
+                          },
+                        },
+                      }}
                     />
-                    Selecionar todos visíveis
-                  </label>
+                  </div>
+                ) : null}
+              </div>
+              <div className="flex items-center gap-4">
+                {listaCompl.filtradas.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={listaCompl.toggleSelecaoTodasVisiveis}
+                    className="whitespace-nowrap text-xs text-primary hover:underline"
+                  >
+                    {listaCompl.todasSelecionadas ? 'Desmarcar todos' : 'Selecionar todos'}
+                  </button>
+                ) : null}
+                <Button
+                  type="button"
+                  disabled={
+                    isUpdating || selecionados.size === 0 || gruposComplSelecionados.size === 0
+                  }
+                  onClick={() => void handleAplicarComplementos()}
+                  className="h-8 bg-primary text-info md:min-w-[180px]"
+                >
+                  {isUpdating
+                    ? modoComplemento === 'adicionar'
+                      ? 'Vinculando…'
+                      : 'Desvinculando…'
+                    : modoComplemento === 'adicionar'
+                      ? `Vincular a ${selecionados.size} produto(s)`
+                      : `Desvincular de ${selecionados.size} produto(s)`}
+                </Button>
+              </div>
+            </div>
+
+            {listaCompl.paraExibir.length === 0 ? (
+              <div className="flex items-center justify-center py-4">
+                <span className="text-sm text-secondary-text">{listaCompl.emptyModo}</span>
+              </div>
+            ) : listaCompl.filtradas.length === 0 ? (
+              <div className="flex items-center justify-center py-4">
+                <span className="text-sm text-secondary-text">
+                  Nenhum grupo encontrado para “{listaCompl.busca.trim()}”
+                </span>
+              </div>
+            ) : (
+              <div className="max-h-48 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white p-1.5">
+                <div className="grid grid-cols-2 gap-1.5 md:grid-cols-4">
                   {listaCompl.filtradas.map(g => {
                     const id = g.getId()
+                    const isSelected = gruposComplSelecionados.has(id)
                     return (
                       <label
                         key={id}
-                        className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm hover:bg-primary/5"
+                        className={`flex min-h-0 cursor-pointer items-center gap-1 rounded-lg border px-1.5 py-1 transition-colors ${
+                          isSelected
+                            ? 'border-primary bg-primary/10'
+                            : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                        }`}
                       >
                         <Checkbox
-                          checked={gruposComplSelecionados.has(id)}
+                          size="small"
+                          checked={isSelected}
                           onChange={() => {
                             setGruposComplSelecionados(prev => {
                               const next = new Set(prev)
@@ -629,14 +735,20 @@ export function MenuProdutosLote({ menuId }: MenuProdutosLoteProps) {
                               return next
                             })
                           }}
+                          className="shrink-0"
                         />
-                        {g.getNome()}
+                        <span
+                          className="truncate text-xs font-medium text-primary-text md:text-sm"
+                          title={g.getNome()}
+                        >
+                          {g.getNome()}
+                        </span>
                       </label>
                     )
                   })}
-                </>
-              )}
-            </div>
+                </div>
+              </div>
+            )}
           </div>
         ) : null}
 

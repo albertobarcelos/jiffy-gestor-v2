@@ -18,7 +18,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import {
   aplicarImagemProdutoNosMenus,
-  buscarIdMenuPrincipal,
+  buscarMenuIdsDoProduto,
   buscarMenusDaEmpresa,
   unirMenuIds,
 } from '@/src/presentation/utils/uploadImagemProdutoMenus'
@@ -142,12 +142,33 @@ export function ProdutosList() {
     })
   }, [produtos, grupoProdutoMap, filters.statusGrupoFilter])
 
-  // Scroll infinito: carrega próxima página quando o usuário chega perto do fim
+  const loadMoreRef = useRef<HTMLDivElement>(null)
+
+  // Scroll infinito: só busca a próxima página quando o sentinela entra na viewport da lista
   useEffect(() => {
-    if (hasNextPage && !isFetchingNextPage && !isFetching && data) {
-      fetchNextPage()
+    const sentinel = loadMoreRef.current
+    const root = scrollContainerRef.current
+    if (!sentinel || !root || !hasNextPage || isFetchingNextPage || isFetching) {
+      return
     }
-  }, [hasNextPage, isFetchingNextPage, isFetching, fetchNextPage, data])
+
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries.some(e => e.isIntersecting) && hasNextPage && !isFetchingNextPage && !isFetching) {
+          void fetchNextPage()
+        }
+      },
+      { root, rootMargin: '120px', threshold: 0 }
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [
+    hasNextPage,
+    isFetchingNextPage,
+    isFetching,
+    fetchNextPage,
+    produtosVisiveis.length,
+  ])
 
   useEffect(() => {
     if (error) console.error('Erro ao carregar produtos:', error)
@@ -334,43 +355,72 @@ export function ProdutosList() {
         const token = useAuthStore.getState().tenantAuth?.getAccessToken()
         if (!token) throw new Error('Token não encontrado')
 
-        const principalId = await buscarIdMenuPrincipal(token)
-        const destinosIniciais = unirMenuIds(principalId)
-        if (destinosIniciais.length === 0) {
-          throw new Error('Não foi possível identificar o menu principal para salvar a imagem')
-        }
+        // Só envia para menus já vinculados — não amarra o principal automaticamente.
+        let menusVinculados = unirMenuIds(
+          await buscarMenuIdsDoProduto({ token, produtoId })
+        )
 
-        await aplicarImagemProdutoNosMenus({
-          token,
-          produtoId,
-          menuIds: destinosIniciais,
-          file,
-          vincularSeAusente: true,
-        })
-
-        const todosMenus = await buscarMenusDaEmpresa({ token })
-        const menusJaSalvos = todosMenus
-          .filter(m => destinosIniciais.includes(m.id))
-          .map(m => ({ id: m.id, nome: m.nome }))
-
-        const destinos = await pedirConfirmacao({
-          origem: 'cadastroBase',
-          produtoId,
-          variante: 'imagem',
-          excluirMenuIds: destinosIniciais,
-          fonteMenus: 'empresa',
-          menusJaSalvos,
-        })
-        if (destinos && destinos.menuIds.length > 0) {
+        if (menusVinculados.length === 0) {
+          const destinos = await pedirConfirmacao({
+            origem: 'cadastroBase',
+            produtoId,
+            variante: 'imagem',
+            fonteMenus: 'empresa',
+            passoInicial: 'escolher',
+            exigePeloMenosUmMenu: true,
+          })
+          if (!destinos || destinos.menuIds.length === 0) {
+            showToast.error('Vincule o produto a um cardápio para enviar a imagem')
+            return
+          }
           await aplicarImagemNosDestinos({
             produtoId,
             file,
             destinos,
             vincularSeAusente: true,
           })
-          showToast.success('Imagem atualizada no menu principal e nos selecionados')
+          showToast.success(
+            destinos.menuIds.length > 1
+              ? 'Imagem atualizada nos cardápios selecionados'
+              : 'Imagem atualizada no cardápio selecionado'
+          )
         } else {
-          showToast.success('Imagem atualizada no menu principal')
+          await aplicarImagemProdutoNosMenus({
+            token,
+            produtoId,
+            menuIds: menusVinculados,
+            file,
+            vincularSeAusente: false,
+          })
+
+          const todosMenus = await buscarMenusDaEmpresa({ token })
+          const menusJaSalvos = todosMenus
+            .filter(m => menusVinculados.includes(m.id))
+            .map(m => ({ id: m.id, nome: m.nome }))
+
+          const destinos = await pedirConfirmacao({
+            origem: 'cadastroBase',
+            produtoId,
+            variante: 'imagem',
+            excluirMenuIds: menusVinculados,
+            fonteMenus: 'empresa',
+            menusJaSalvos,
+          })
+          if (destinos && destinos.menuIds.length > 0) {
+            await aplicarImagemNosDestinos({
+              produtoId,
+              file,
+              destinos,
+              vincularSeAusente: true,
+            })
+            showToast.success('Imagem atualizada nos cardápios vinculados e nos selecionados')
+          } else {
+            showToast.success(
+              menusVinculados.length > 1
+                ? 'Imagem atualizada nos cardápios vinculados'
+                : 'Imagem atualizada no cardápio vinculado'
+            )
+          }
         }
 
         if (empresaId) {
@@ -470,6 +520,7 @@ export function ProdutosList() {
                 />
               </div>
             ))}
+            {hasNextPage ? <div ref={loadMoreRef} className="h-4 w-full" aria-hidden /> : null}
           </div>
         )}
 

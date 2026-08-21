@@ -108,7 +108,7 @@ export function PropagarAlteracaoProdutoDialog({
           ? origem === 'cadastroBase'
             ? menusJaSalvos.length > 0
               ? `A imagem será salva em: ${nomesJaSalvos}. Deseja aplicar também em outros cardápios?`
-              : 'A imagem será salva no menu principal. Deseja aplicar também em outros cardápios?'
+              : 'Escolha em quais cardápios salvar esta imagem. Produto sem vínculo não envia foto automaticamente.'
             : 'A imagem será salva neste cardápio. Deseja trocar a foto em outros menus também?'
           : origem === 'cadastroBase'
             ? 'A alteração será salva no cadastro do produto. Deseja copiar também para algum cardápio?'

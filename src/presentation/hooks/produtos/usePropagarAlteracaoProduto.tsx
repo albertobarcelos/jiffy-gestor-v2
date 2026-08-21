@@ -45,6 +45,10 @@ type PedirConfirmacaoOpts = {
   variante?: VariantePropagacaoProduto
   excluirMenuIds?: string[]
   fonteMenus?: 'produto' | 'empresa'
+  /** Abre direto na lista de menus (ex.: imagem sem vínculo prévio). */
+  passoInicial?: 'perguntar' | 'escolher'
+  /** Impede confirmar sem pelo menos um menu marcado. */
+  exigePeloMenosUmMenu?: boolean
 }
 
 /**
@@ -226,7 +230,8 @@ export function usePropagarAlteracaoProduto(): {
         opts,
         variante,
         lista,
-        passoInicial: 'perguntar',
+        passoInicial: opts.passoInicial ?? 'perguntar',
+        exigePeloMenosUmMenu: opts.exigePeloMenosUmMenu,
       })
     },
     [abrirDialogo]
