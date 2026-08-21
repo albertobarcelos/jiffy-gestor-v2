@@ -15,6 +15,7 @@ import type {
 } from '../../types'
 import { showToast } from '@/src/shared/utils/toast'
 import { useVendaDetalheCarregadaQuery } from './useVendaDetalheCarregadaQuery'
+import { obterRascunhoInformacoesAdicionais } from '@/src/shared/helpers/informacoesAdicionaisNota'
 
 export interface AplicarVendaDetalheHandlers {
   setDetalhesPedidoMeta: (meta: DetalhesPedidoMeta | null) => void
@@ -38,12 +39,14 @@ export interface AplicarVendaDetalheHandlers {
   setNomesUsuariosPedido: (map: Record<string, string>) => void
   setNomesMeiosPagamentoPedido: (map: Record<string, string>) => void
   setObservacaoPedido: (observacao: string) => void
+  setObservacaoNota: (observacao: string) => void
   setCurrentStep: (step: 1 | 2 | 3 | 4) => void
 }
 
 export function aplicarVendaDetalheCarregada(
   dto: VendaDetalheCarregadaDTO,
-  handlers: AplicarVendaDetalheHandlers
+  handlers: AplicarVendaDetalheHandlers,
+  vendaId?: string
 ): void {
   handlers.setDetalhesPedidoMeta(dto.detalhesPedidoMeta)
   handlers.setResumoFiscal(dto.resumoFiscal)
@@ -81,6 +84,11 @@ export function aplicarVendaDetalheCarregada(
   handlers.setNomesUsuariosPedido(dto.nomesUsuariosPedido)
   handlers.setNomesMeiosPagamentoPedido(dto.nomesMeiosPagamentoPedido)
   handlers.setObservacaoPedido(dto.observacaoPedido?.trim() || '')
+  handlers.setObservacaoNota(
+    dto.observacaoNota?.trim() ||
+      (vendaId ? obterRascunhoInformacoesAdicionais(vendaId) : undefined) ||
+      ''
+  )
 
   if (dto.irParaStep4) {
     handlers.setCurrentStep(4)
@@ -151,7 +159,7 @@ export function useCarregarVenda({
     if (ultimoDtoAplicadoRef.current === chaveAplicacao) return
     ultimoDtoAplicadoRef.current = chaveAplicacao
 
-    aplicarVendaDetalheCarregada(query.data, handlersRef.current)
+    aplicarVendaDetalheCarregada(query.data, handlersRef.current, vendaIdParaCarregar)
     setDadosVendaAplicados(true)
   }, [open, query.data, query.dataUpdatedAt, vendaIdParaCarregar])
 

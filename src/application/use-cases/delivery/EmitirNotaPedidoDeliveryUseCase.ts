@@ -4,8 +4,8 @@ import { novoPedidoReadRepository } from '@/src/infrastructure/api/repositories/
 export class EmitirNotaPedidoDeliveryUseCase {
   constructor(private readonly repo: INovoPedidoReadRepository = novoPedidoReadRepository) {}
 
-  execute(pedidoId: string, token: string, modelo: 55 | 65) {
-    return this.repo.emitirNotaPedidoDelivery(pedidoId, token, modelo)
+  execute(pedidoId: string, token: string, modelo: 55 | 65, informacoesAdicionais?: string) {
+    return this.repo.emitirNotaPedidoDelivery(pedidoId, token, modelo, informacoesAdicionais)
   }
 }
 

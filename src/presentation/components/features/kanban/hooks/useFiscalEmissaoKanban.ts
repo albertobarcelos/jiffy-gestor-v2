@@ -126,9 +126,9 @@ interface UseFiscalEmissaoKanbanParams {
     documentId: string
     numero?: number
   }) => Promise<unknown>
-  emitirNotaPdv: (payload: { id: string; modelo: 55 | 65 }) => Promise<unknown>
-  emitirNotaGestor: (payload: { id: string; modelo: 55 | 65 }) => Promise<unknown>
-  emitirNotaDelivery: (payload: { id: string; modelo: 55 | 65 }) => Promise<unknown>
+  emitirNotaPdv: (payload: { id: string; modelo: 55 | 65; informacoesAdicionais?: string }) => Promise<unknown>
+  emitirNotaGestor: (payload: { id: string; modelo: 55 | 65; informacoesAdicionais?: string }) => Promise<unknown>
+  emitirNotaDelivery: (payload: { id: string; modelo: 55 | 65; informacoesAdicionais?: string }) => Promise<unknown>
   setPrimeiroPorColuna: Dispatch<SetStateAction<Record<string, string>>>
   setVendaSelecionadaParaEmissao: Dispatch<SetStateAction<VendaSelecionadaParaEmissao | null>>
   setSelectedVendaId: Dispatch<SetStateAction<string | null>>

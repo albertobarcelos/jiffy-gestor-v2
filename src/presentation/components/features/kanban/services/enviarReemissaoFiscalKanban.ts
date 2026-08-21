@@ -5,6 +5,7 @@ import {
   resolveFiscalEmissionConfig,
 } from '@/src/presentation/hooks/useVendas'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { anexarInformacoesAdicionaisEmitirNota } from '@/src/shared/helpers/informacoesAdicionaisNota'
 import { resolveModeloParaEmitirNota } from '../hooks/useVendasUnificadas'
 import type { Venda } from '../types'
 
@@ -33,13 +34,18 @@ async function emitirNotaSilenciosa(
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      tipoDocumento: fiscalConfig.tipoDocumento,
-      modelo,
-      serie: fiscalConfig.serie,
-      ambiente: fiscalConfig.ambiente,
-      crt: fiscalConfig.crt,
-    }),
+    body: JSON.stringify(
+      anexarInformacoesAdicionaisEmitirNota(
+        {
+          tipoDocumento: fiscalConfig.tipoDocumento,
+          modelo,
+          serie: fiscalConfig.serie,
+          ambiente: fiscalConfig.ambiente,
+          crt: fiscalConfig.crt,
+        },
+        venda.id
+      )
+    ),
   })
   if (!response.ok) {
     throw new Error(await parseErroResponse(response))

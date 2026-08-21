@@ -18,6 +18,11 @@ import { useConfiguracoesNcm } from '@/src/presentation/hooks/painel-contador/us
 import { useTabsStore } from '@/src/presentation/stores/tabsStore'
 import { PORTAL_CONTADOR_PATH } from '@/src/presentation/components/features/painel-contador/painelContadorEtapas'
 import type { ItemVendaCbenef } from '@/src/domain/entities/painel-contador/cbenefRegras'
+import {
+  INFORMACOES_ADICIONAIS_NOTA_MAX,
+  obterRascunhoInformacoesAdicionais,
+  salvarRascunhoInformacoesAdicionais,
+} from '@/src/shared/helpers/informacoesAdicionaisNota'
 
 /** Aplica máscara de CPF (000.000.000-00) durante a digitação — apenas UI. */
 function formatarCpfMascara(valor: string): string {
@@ -78,8 +83,8 @@ export function EmitirNfeModal({
   const [itensSemCbenef, setItensSemCbenef] = useState<ItemVendaCbenef[]>([])
   const [modeloPendenteCbenef, setModeloPendenteCbenef] = useState<55 | 65 | null>(null)
   const [ncmParaConfigurar, setNcmParaConfigurar] = useState<string | null>(null)
-  /** CPF do consumidor para NFC-e (UI preparada; envio ao backend pendente). */
   const [cpfNfce, setCpfNfce] = useState('')
+  const [informacoesAdicionais, setInformacoesAdicionais] = useState('')
   const [clientesTabsState, setClientesTabsState] = useState<ClientesTabsModalState>({
     open: false,
     tab: 'cliente',
@@ -90,6 +95,7 @@ export function EmitirNfeModal({
   useEffect(() => {
     if (!open) {
       setCpfNfce('')
+      setInformacoesAdicionais('')
       setItensSemCbenef([])
       setModeloPendenteCbenef(null)
       setNcmParaConfigurar(null)
@@ -99,8 +105,10 @@ export function EmitirNfeModal({
         mode: 'edit',
         clienteId: undefined,
       })
+      return
     }
-  }, [open])
+    setInformacoesAdicionais(obterRascunhoInformacoesAdicionais(vendaId) ?? '')
+  }, [open, vendaId])
 
   const temClienteCadastrado = useMemo(
     () => Boolean(clienteId && String(clienteId).trim() !== ''),
@@ -131,6 +139,7 @@ export function EmitirNfeModal({
         await emitirNfe.mutateAsync({
           id: vendaId,
           modelo,
+          informacoesAdicionais,
         })
         onClose()
       } catch (error) {
@@ -142,7 +151,7 @@ export function EmitirNfeModal({
         setModeloPendenteCbenef(null)
       }
     },
-    [emitirNfe, onClose, vendaId]
+    [emitirNfe, informacoesAdicionais, onClose, vendaId]
   )
 
   const emitirPorModelo = useCallback(
@@ -358,6 +367,23 @@ export function EmitirNfeModal({
                 </button>
               </div>
             </div>
+
+            <Input
+              label="Observação da nota (opcional)"
+              value={informacoesAdicionais}
+              onChange={e => {
+                const texto = e.target.value
+                setInformacoesAdicionais(texto)
+                salvarRascunhoInformacoesAdicionais(vendaId, texto)
+              }}
+              placeholder="Ex: Informações complementares para a NFC-e/NF-e..."
+              helperText="Enviado na emissão como informações complementares (máx. 3500). O rodapé da empresa é concatenado depois."
+              multiline
+              minRows={2}
+              inputProps={{ maxLength: INFORMACOES_ADICIONAIS_NOTA_MAX }}
+              size="small"
+              disabled={bloqueado}
+            />
           </div>
 
           <DialogFooter sx={{ mt: 2, justifyContent: 'flex-end' }}>

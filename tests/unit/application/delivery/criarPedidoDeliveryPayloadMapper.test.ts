@@ -199,4 +199,17 @@ describe('CriarPedidoDeliveryPayloadMapper', () => {
 
     expect(payload.produtos[0].valorUnitario).toBeUndefined()
   })
+
+  it('não envia observacaoNota no create — a API só aceita informacoesAdicionais no emitir-nota', () => {
+    const payload = buildCriarPedidoDeliveryPayload(
+      baseInput({
+        observacaoPedido: 'Tocar campainha',
+        observacaoNota: 'CFOP 5102',
+        telefoneCliente: '65999999999',
+      })
+    )
+    expect(payload.observacoes).toEqual(['Tocar campainha'])
+    expect(payload).not.toHaveProperty('observacaoNota')
+    expect(payload).not.toHaveProperty('informacoesAdicionais')
+  })
 })

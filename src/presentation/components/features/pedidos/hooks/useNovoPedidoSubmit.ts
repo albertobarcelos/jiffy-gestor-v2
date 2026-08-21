@@ -16,6 +16,7 @@ import type { CriarPedidoDeliveryApiRequest } from '@/src/application/dto/api/pe
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { showToast } from '@/src/shared/utils/toast'
 import { validarObservacoesPedido } from '@/src/shared/helpers/observacaoPedido'
+import { salvarRascunhoInformacoesAdicionais } from '@/src/shared/helpers/informacoesAdicionaisNota'
 
 export { validarInformacoesPedido }
 
@@ -192,6 +193,7 @@ export function useNovoPedidoSubmit({
 
       if (idCriado) {
         setVendaIdCriada(idCriado)
+        salvarRascunhoInformacoesAdicionais(idCriado, input.observacaoNota ?? '')
 
         if (
           tipoInicioPedido === 'entrega' &&

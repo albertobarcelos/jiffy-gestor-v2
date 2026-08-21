@@ -41,7 +41,8 @@ export interface INovoPedidoReadRepository {
   emitirNotaPedidoDelivery(
     pedidoId: string,
     token: string,
-    modelo: 55 | 65
+    modelo: 55 | 65,
+    informacoesAdicionais?: string
   ): Promise<Record<string, unknown>>
 
   buscarAuthMe(token: string): Promise<Record<string, unknown> | null>

@@ -42,6 +42,7 @@ export function splitFormContextValue(
     longPressComplementoTimeoutRef: _lpctr,
     longPressComplementoIndexRef: _lpcir,
     modoVisualizacao: _mv,
+    vendaId: _vid,
     tabelaOrigemVenda: _tov,
     tipoInicioPedido: _tii,
     statusFiscalUnificado: _sfu,
@@ -119,6 +120,7 @@ export function splitDetalheContextValue(
 ): NovoPedidoDetalheSlice {
   return {
     modoVisualizacao: value.modoVisualizacao,
+    vendaId: value.vendaId,
     tabelaOrigemVenda: value.tabelaOrigemVenda,
     tipoInicioPedido: value.tipoInicioPedido,
     statusFiscalUnificado: value.statusFiscalUnificado,

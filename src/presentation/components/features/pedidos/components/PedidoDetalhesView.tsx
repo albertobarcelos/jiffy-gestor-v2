@@ -2,12 +2,11 @@
 
 import { Button } from '@/src/presentation/components/ui/button'
 import { Label } from '@/src/presentation/components/ui/label'
+import { Input } from '@/src/presentation/components/ui/input'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { abrirDocumentoFiscalPdf, tipoDocFiscalFromModelo } from '@/src/presentation/utils/abrirDocumentoFiscalPdf'
 import { showToast } from '@/src/shared/utils/toast'
-import { MdCreditCard, MdDelete } from 'react-icons/md'
-// Mantido para uso futuro (pagamento efetivado e depois cancelado):
-// import { pagamentoComDestaqueCanceladoDetalhes } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
+import { MdCreditCard, MdDelete, MdEdit, MdPersonOutline } from 'react-icons/md'
 import { statusFiscalEhEmitida } from '@/src/domain/services/pedido/RegrasFiscaisVenda'
 import { obterUnidadeMedidaProdutoLinha } from '../produtoCatalogoHelpers'
 import { formatarQuantidadeProdutoExibicao } from '@/src/shared/utils/quantidadeProdutoInput'
@@ -16,7 +15,6 @@ import {
   rotuloOrigemExibicao,
   taxaEntregaTemValor,
 } from '@/src/application/mappers/PedidoDisplayMapper'
-import { PedidoDetalhesInfo } from './PedidoDetalhesInfo'
 import { PedidoDetalhesNotaFiscal } from './PedidoDetalhesNotaFiscal'
 import { PedidoDetalhesPagamentos } from './PedidoDetalhesPagamentos'
 import { PedidoDetalhesProdutos } from './PedidoDetalhesProdutos'
@@ -25,6 +23,11 @@ import { PedidoDetalhesObservacoesSection } from './PedidoDetalhesObservacoesSec
 import { useNovoPedidoDetalheContext } from '../context/NovoPedidoDetalheContext'
 import { useNovoPedidoFormContext } from '../context/NovoPedidoFormContext'
 import { useNovoPedidoUIContext } from '../context/NovoPedidoUIContext'
+import {
+  INFORMACOES_ADICIONAIS_NOTA_MAX,
+  salvarRascunhoInformacoesAdicionais,
+} from '@/src/shared/helpers/informacoesAdicionaisNota'
+import { useState, useEffect } from 'react'
 
 export function PedidoDetalhesView() {
   const {
@@ -38,9 +41,9 @@ export function PedidoDetalhesView() {
     statusFiscalUnificado,
     detalhesPedidoMeta,
     detalhesEntregaPedido,
+    vendaId,
   } = useNovoPedidoDetalheContext()
-  const { currentStep } = useNovoPedidoUIContext()
-  const { origem } = useNovoPedidoFormContext()
+  const { currentStep, setSeletorClienteOpen } = useNovoPedidoUIContext()
   const {
     adicionarPagamentoPorCard,
     calcularTotalProduto,
@@ -62,6 +65,9 @@ export function PedidoDetalhesView() {
     produtosList,
     catalogoProdutosPorId,
     observacaoPedido,
+    observacaoNota,
+    setObservacaoNota,
+    origem,
     removerPagamento,
     rotuloModeloNfe,
     rotuloStatusResumoModal,
@@ -76,6 +82,20 @@ export function PedidoDetalhesView() {
     dataVenda,
     clienteNome,
   } = useNovoPedidoFormContext()
+  const [isEditingObservacaoNota, setIsEditingObservacaoNota] = useState(false)
+  const [localObservacaoNota, setLocalObservacaoNota] = useState(observacaoNota)
+
+  useEffect(() => {
+    setLocalObservacaoNota(observacaoNota)
+  }, [observacaoNota])
+
+  const handleSalvarObservacaoNota = () => {
+    if (!vendaId) return
+    salvarRascunhoInformacoesAdicionais(vendaId, localObservacaoNota)
+    setObservacaoNota(localObservacaoNota)
+    setIsEditingObservacaoNota(false)
+    showToast.success('Observação da nota salva. Será enviada na emissão.')
+  }
 
   return (
     <>            {/* STEP 4: Detalhes da Venda (visualização ou após criar pedido) */}
@@ -207,139 +227,242 @@ export function PedidoDetalhesView() {
                     )}
 
                     {abaDetalhesPedido === 'infoPedido' && (
-                      <PedidoDetalhesInfo
+                      <div
                         role="tabpanel"
                         aria-labelledby="tab-detalhes-info-pedido"
+                        className="space-y-6 py-2"
                       >
-                        <h3 className="text-lg font-semibold">Informações do Pedido</h3>
-                        <div className="flex flex-col gap-3 text-sm">
-                          <div className="flex justify-between rounded-lg bg-white px-1">
-                            <span className="text-gray-600">Data:</span>
-                            <span className="font-medium">
-                              {(dataVenda ? new Date(dataVenda) : new Date()).toLocaleString(
-                                'pt-BR',
-                                {
-                                  day: '2-digit',
-                                  month: '2-digit',
-                                  year: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                }
+                        {/* Seção do Cliente em Destaque */}
+                        <div className="space-y-2">
+                          <Label className="text-sm font-semibold text-gray-800">Cliente da Venda</Label>
+                          {clienteNome ? (
+                            <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-colors hover:bg-gray-50">
+                              <div className="flex items-center gap-3">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                  <MdPersonOutline size={20} />
+                                </div>
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-semibold text-gray-900">{clienteNome}</span>
+                                </div>
+                              </div>
+                              {!statusFiscalEhEmitida(statusFiscalUnificado) && (
+                                <button
+                                  type="button"
+                                  onClick={() => setSeletorClienteOpen(true)}
+                                  className="flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-white hover:text-primary hover:shadow-sm"
+                                  title="Alterar cliente"
+                                >
+                                  <MdEdit size={18} />
+                                </button>
                               )}
-                            </span>
-                          </div>
-                          <div className="flex justify-between px-1">
-                            <span className="text-gray-600">Origem:</span>
-                            <span className="font-medium">
-                              {rotuloOrigemExibicao(origem)}
-                            </span>
-                          </div>
-                          <div className="flex justify-between rounded-lg bg-white px-1">
-                            <span className="text-gray-600">Status:</span>
-                            <span className="font-medium">{rotuloStatusResumoModal}</span>
-                          </div>
-                          {clienteNome && (
-                            <div className="flex justify-between px-1">
-                              <span className="text-gray-600">Cliente:</span>
-                              <span className="font-medium">{clienteNome}</span>
+                            </div>
+                          ) : !statusFiscalEhEmitida(statusFiscalUnificado) ? (
+                            <button
+                              type="button"
+                              onClick={() => setSeletorClienteOpen(true)}
+                              className="group flex w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-200 bg-gray-50/50 p-4 transition-all hover:border-primary/40 hover:bg-primary/5"
+                            >
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary shadow-sm transition-colors group-hover:bg-primary group-hover:text-white">
+                                <MdPersonOutline size={24} />
+                              </div>
+                              <div className="text-center">
+                                <span className="block text-sm font-semibold text-gray-700 group-hover:text-primary">
+                                  Vincular cliente
+                                </span>
+                                <span className="block text-xs text-gray-500">
+                                  Clique para selecionar um cliente para esta venda
+                                </span>
+                              </div>
+                            </button>
+                          ) : (
+                            <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-200 text-gray-400">
+                                <MdPersonOutline size={20} />
+                              </div>
+                              <span className="text-sm font-medium text-gray-500">Não informado</span>
                             </div>
                           )}
-
-                          <div className="flex justify-between rounded-lg bg-white px-1">
-                            <span className="text-gray-600">Total de Itens:</span>
-                            <span className="font-medium">
-                              {totalItensPedido} {totalItensPedido === 1 ? 'produto' : 'produtos'}
-                            </span>
-                          </div>
-                          <div className="flex justify-between px-1">
-                            <span className="text-gray-600">Aberto por:</span>
-                            <span className="font-medium">
-                              {formatarUsuarioPorId(detalhesPedidoMeta?.abertoPorId)}
-                            </span>
-                          </div>
-                          {detalhesPedidoMeta?.ultimoResponsavelId && (
-                            <div className="flex justify-between rounded-lg bg-white px-1">
-                              <span className="text-gray-600">Última alteração por:</span>
-                              <span className="font-medium">
-                                {formatarUsuarioPorId(detalhesPedidoMeta.ultimoResponsavelId)}
-                              </span>
-                            </div>
-                          )}
-                          {detalhesPedidoMeta?.canceladoPorId && (
-                            <div className="flex justify-between px-1">
-                              <span className="text-gray-600">Cancelado por:</span>
-                              <span className="font-medium text-red-600">
-                                {formatarUsuarioPorId(detalhesPedidoMeta.canceladoPorId)}
-                              </span>
-                            </div>
-                          )}
-                          {detalhesPedidoMeta?.codigoTerminal && (
-                            <div className="flex justify-between rounded-lg bg-white px-1">
-                              <span className="text-gray-600">Código do terminal:</span>
-                              <span className="font-medium">
-                                {detalhesPedidoMeta.codigoTerminal}
-                              </span>
-                            </div>
-                          )}
-                          {detalhesPedidoMeta?.identificacao && (
-                            <div className="flex justify-between px-1">
-                              <span className="text-gray-600">Identificação:</span>
-                              <span className="font-medium">
-                                {detalhesPedidoMeta.identificacao}
-                              </span>
-                            </div>
-                          )}
-                          <div className="flex justify-between rounded-lg bg-white px-1">
-                            <span className="text-gray-600">Solicitar emissão fiscal:</span>
-                            <span className="font-medium">
-                              {detalhesPedidoMeta?.solicitarEmissaoFiscal ? 'Sim' : 'Não'}
-                            </span>
-                          </div>
-                          {detalhesPedidoMeta?.dataUltimaModificacao && (
-                            <div className="flex justify-between px-1">
-                              <span className="text-gray-600">Última modificação:</span>
-                              <span className="font-medium">
-                                {formatarDataDetalhePedido(
-                                  detalhesPedidoMeta.dataUltimaModificacao
-                                )}
-                              </span>
-                            </div>
-                          )}
-                          {detalhesPedidoMeta?.dataUltimoProdutoLancado && (
-                            <div className="flex justify-between rounded-lg bg-white px-1">
-                              <span className="text-gray-600">Último produto lançado:</span>
-                              <span className="font-medium">
-                                {formatarDataDetalhePedido(
-                                  detalhesPedidoMeta.dataUltimoProdutoLancado
-                                )}
-                              </span>
-                            </div>
-                          )}
-                          {detalhesPedidoMeta?.dataFinalizacao && (
-                            <div className="flex justify-between px-1">
-                              <span className="text-gray-600">Data finalização:</span>
-                              <span className="font-medium">
-                                {formatarDataDetalhePedido(detalhesPedidoMeta.dataFinalizacao)}
-                              </span>
-                            </div>
-                          )}
-                          {detalhesPedidoMeta?.dataCancelamento && (
-                            <div className="flex justify-between rounded-lg bg-white px-1">
-                              <span className="text-gray-600">Data cancelamento:</span>
-                              <span className="font-medium text-red-600">
-                                {formatarDataDetalhePedido(detalhesPedidoMeta.dataCancelamento)}
-                              </span>
-                            </div>
-                          )}
-                          <PedidoDetalhesObservacoesSection
-                            observacaoPedido={observacaoPedido}
-                            observacaoPedidoEntrega={detalhesEntregaPedido?.observacaoPedido}
-                            incluirObservacoesItens={false}
-                            exibirTituloSecao={false}
-                            className="border-t border-gray-200 pt-3"
-                          />
                         </div>
-                      </PedidoDetalhesInfo>
+
+                        {/* Grade de Informações Gerais */}
+                        <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                          <div className="bg-gray-50/80 px-4 py-3 border-b border-gray-200">
+                            <h3 className="text-sm font-semibold text-gray-800">Detalhes Gerais</h3>
+                          </div>
+                          <div className="divide-y divide-gray-100">
+                            <div className="flex items-center justify-between px-4 py-3">
+                              <span className="text-sm text-gray-500">Data</span>
+                              <span className="text-sm font-medium text-gray-900">
+                                {(dataVenda ? new Date(dataVenda) : new Date()).toLocaleString('pt-BR', {
+                                  day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                                })}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between px-4 py-3">
+                              <span className="text-sm text-gray-500">Origem</span>
+                              <span className="text-sm font-medium text-gray-900">{rotuloOrigemExibicao(origem)}</span>
+                            </div>
+                            <div className="flex items-center justify-between px-4 py-3">
+                              <span className="text-sm text-gray-500">Status</span>
+                              <span className="text-sm font-medium text-gray-900">{rotuloStatusResumoModal}</span>
+                            </div>
+                            <div className="flex items-center justify-between px-4 py-3">
+                              <span className="text-sm text-gray-500">Total de Itens</span>
+                              <span className="text-sm font-medium text-gray-900">
+                                {totalItensPedido} {totalItensPedido === 1 ? 'produto' : 'produtos'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Grade de Metadados (Auditoria) */}
+                        <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                          <div className="bg-gray-50/80 px-4 py-3 border-b border-gray-200">
+                            <h3 className="text-sm font-semibold text-gray-800">Auditoria e Sistema</h3>
+                          </div>
+                          <div className="divide-y divide-gray-100">
+                            <div className="flex items-center justify-between px-4 py-3">
+                              <span className="text-sm text-gray-500">Aberto por</span>
+                              <span className="text-sm font-medium text-gray-900">{formatarUsuarioPorId(detalhesPedidoMeta?.abertoPorId)}</span>
+                            </div>
+                            {detalhesPedidoMeta?.ultimoResponsavelId && (
+                              <div className="flex items-center justify-between px-4 py-3">
+                                <span className="text-sm text-gray-500">Última alteração por</span>
+                                <span className="text-sm font-medium text-gray-900">{formatarUsuarioPorId(detalhesPedidoMeta.ultimoResponsavelId)}</span>
+                              </div>
+                            )}
+                            {detalhesPedidoMeta?.canceladoPorId && (
+                              <div className="flex items-center justify-between px-4 py-3">
+                                <span className="text-sm text-gray-500">Cancelado por</span>
+                                <span className="text-sm font-medium text-red-600">{formatarUsuarioPorId(detalhesPedidoMeta.canceladoPorId)}</span>
+                              </div>
+                            )}
+                            {detalhesPedidoMeta?.codigoTerminal && (
+                              <div className="flex items-center justify-between px-4 py-3">
+                                <span className="text-sm text-gray-500">Código do terminal</span>
+                                <span className="text-sm font-medium text-gray-900">{detalhesPedidoMeta.codigoTerminal}</span>
+                              </div>
+                            )}
+                            {detalhesPedidoMeta?.identificacao && (
+                              <div className="flex items-center justify-between px-4 py-3">
+                                <span className="text-sm text-gray-500">Identificação</span>
+                                <span className="text-sm font-medium text-gray-900">{detalhesPedidoMeta.identificacao}</span>
+                              </div>
+                            )}
+                            <div className="flex items-center justify-between px-4 py-3">
+                              <span className="text-sm text-gray-500">Solicitar emissão fiscal</span>
+                              <span className="text-sm font-medium text-gray-900">{detalhesPedidoMeta?.solicitarEmissaoFiscal ? 'Sim' : 'Não'}</span>
+                            </div>
+                            {detalhesPedidoMeta?.dataUltimaModificacao && (
+                              <div className="flex items-center justify-between px-4 py-3">
+                                <span className="text-sm text-gray-500">Última modificação</span>
+                                <span className="text-sm font-medium text-gray-900">{formatarDataDetalhePedido(detalhesPedidoMeta.dataUltimaModificacao)}</span>
+                              </div>
+                            )}
+                            {detalhesPedidoMeta?.dataUltimoProdutoLancado && (
+                              <div className="flex items-center justify-between px-4 py-3">
+                                <span className="text-sm text-gray-500">Último produto lançado</span>
+                                <span className="text-sm font-medium text-gray-900">{formatarDataDetalhePedido(detalhesPedidoMeta.dataUltimoProdutoLancado)}</span>
+                              </div>
+                            )}
+                            {detalhesPedidoMeta?.dataFinalizacao && (
+                              <div className="flex items-center justify-between px-4 py-3">
+                                <span className="text-sm text-gray-500">Data finalização</span>
+                                <span className="text-sm font-medium text-gray-900">{formatarDataDetalhePedido(detalhesPedidoMeta.dataFinalizacao)}</span>
+                              </div>
+                            )}
+                            {detalhesPedidoMeta?.dataCancelamento && (
+                              <div className="flex items-center justify-between px-4 py-3">
+                                <span className="text-sm text-gray-500">Data cancelamento</span>
+                                <span className="text-sm font-medium text-red-600">{formatarDataDetalhePedido(detalhesPedidoMeta.dataCancelamento)}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                          
+                        {/* Grade de Observações */}
+                        <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                          <div className="bg-gray-50/80 px-4 py-3 border-b border-gray-200">
+                            <h3 className="text-sm font-semibold text-gray-800">Observações</h3>
+                          </div>
+                          
+                          <div className="p-4 space-y-4">
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-sm font-semibold text-gray-800">Observação da Nota Fiscal</Label>
+                                {!statusFiscalEhEmitida(statusFiscalUnificado) && !isEditingObservacaoNota && (
+                                  <Button
+                                    variant="text"
+                                    size="sm"
+                                    className="h-auto p-0 text-primary font-semibold hover:bg-transparent hover:underline"
+                                    onClick={() => setIsEditingObservacaoNota(true)}
+                                  >
+                                    <MdEdit className="h-4 w-4 mr-1" /> Editar
+                                  </Button>
+                                )}
+                              </div>
+                              
+                              {isEditingObservacaoNota ? (
+                                <div className="space-y-2">
+                                  <Input
+                                    value={localObservacaoNota}
+                                    onChange={e => setLocalObservacaoNota(e.target.value)}
+                                    placeholder="Ex: Informações complementares para a NFC-e/NF-e..."
+                                    helperText="Enviado na emissão como informações complementares (máx. 3500). O rodapé da empresa é concatenado depois."
+                                    multiline
+                                    minRows={2}
+                                    inputProps={{ maxLength: INFORMACOES_ADICIONAIS_NOTA_MAX }}
+                                    size="small"
+                                    sx={{
+                                      '& .MuiOutlinedInput-root': { 
+                                        backgroundColor: '#f9fafb', 
+                                        borderRadius: '8px',
+                                      },
+                                    }}
+                                  />
+                                  <div className="flex justify-end gap-2">
+                                    <Button
+                                      variant="outlined"
+                                      size="sm"
+                                      onClick={() => {
+                                        setLocalObservacaoNota(observacaoNota)
+                                        setIsEditingObservacaoNota(false)
+                                      }}
+                                    >
+                                      Cancelar
+                                    </Button>
+                                    <Button
+                                      variant="contained"
+                                      size="sm"
+                                      onClick={handleSalvarObservacaoNota}
+                                      sx={{
+                                        backgroundColor: 'var(--color-primary)',
+                                        color: '#fff',
+                                        '&:hover': { backgroundColor: 'var(--color-primary)', opacity: 0.92 },
+                                      }}
+                                    >
+                                      Salvar
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="rounded-lg border border-gray-200 bg-gray-50/50 p-3 text-sm text-gray-700 min-h-[60px] whitespace-pre-wrap">
+                                  {observacaoNota || <span className="text-gray-400 italic">Nenhuma observação informada para a nota fiscal.</span>}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="pt-4 border-t border-gray-100">
+                              <PedidoDetalhesObservacoesSection
+                                observacaoPedido={observacaoPedido}
+                                observacaoPedidoEntrega={detalhesEntregaPedido?.observacaoPedido}
+                                incluirObservacoesItens={false}
+                                exibirTituloSecao={false}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     )}
 
                     {/* Lista de Produtos (Visualização) */}

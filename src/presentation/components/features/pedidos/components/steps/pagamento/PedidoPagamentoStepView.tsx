@@ -1,14 +1,15 @@
 'use client'
 
-import { Button } from '@/src/presentation/components/ui/button'
+import { Input } from '@/src/presentation/components/ui/input'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { Label } from '@/src/presentation/components/ui/label'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
-import { MdCreditCard, MdDelete, MdPersonOutline } from 'react-icons/md'
+import { MdCreditCard, MdDelete, MdEdit, MdPersonOutline } from 'react-icons/md'
 import { PedidoPagamentoStep } from '../../PedidoPagamentoStep'
 import { useNovoPedidoFormContext } from '../../../context/NovoPedidoFormContext'
 import { useNovoPedidoUIContext } from '../../../context/NovoPedidoUIContext'
 import { useNovoPedidoDetalheContext } from '../../../context/NovoPedidoDetalheContext'
+import { INFORMACOES_ADICIONAIS_NOTA_MAX } from '@/src/shared/helpers/informacoesAdicionaisNota'
 
 /** Mesmas dimensões dos cards de forma de pagamento e dos lançamentos em Detalhes. */
 const MEIO_PAGAMENTO_CARD_SIZE_CLASS = 'h-[98px] w-[150px] shrink-0'
@@ -23,16 +24,18 @@ export function PedidoPagamentoStepView() {
     clienteNome,
     formatarValorRecebido,
     fluxoPagamentoEntrega,
+    handleRemoveCliente,
     meiosPagamento,
     mostrarLoadingFormasPagamento,
     obterIconeMeioPagamento,
+    observacaoNota,
+    setObservacaoNota,
     pagamentos,
     pedidoEntregaAceitaPagamentoPendente,
     pedidoGestorComPagamentoNoPasso3,
     removerPagamento,
     rotuloCobrancaPendente,
     rotuloStatusPagamentoExibicao,
-    rotuloStatusResumoModal,
     setFluxoPagamentoEntrega,
     setPagamentos,
     setValorRecebido,
@@ -47,11 +50,13 @@ export function PedidoPagamentoStepView() {
     valorAPagarLancamento,
     valorRecebido,
     valorTaxaEntrega,
+    produtos,
+    calcularTotalProduto,
   } = useNovoPedidoFormContext()
 
   const nomeClienteResumo =
     tipoInicioPedido === 'entrega' ? (clienteEntregaVinculado?.nome ?? '') : clienteNome
-  const rotuloAcaoClienteBalcao = nomeClienteResumo?.trim() ? 'Editar cliente' : 'Vincular Cliente'
+  const temCliente = Boolean(nomeClienteResumo.trim())
   const restanteALancarExibicao = pedidoEntregaAceitaPagamentoPendente
     ? valorAPagarLancamento
     : valorAPagar
@@ -62,74 +67,130 @@ export function PedidoPagamentoStepView() {
 
   return (
     <PedidoPagamentoStep>
-      <div className="rounded-lg border bg-gray-50 px-4">
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="text-lg font-semibold">Informações do Pedido</h3>
-          {tipoInicioPedido !== 'entrega' && (
-            <Button
+      <div className="space-y-5 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        {/* Lista de Produtos (Resumo) */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-sm font-semibold text-gray-800">Resumo do Pedido</Label>
+            <span className="text-xs font-medium text-gray-500">
+              {totalItensPedido} {totalItensPedido === 1 ? 'item' : 'itens'}
+            </span>
+          </div>
+          
+          <div className="max-h-[180px] overflow-y-auto rounded-lg border border-gray-100 bg-gray-50/50 scrollbar-thin">
+            <table className="w-full text-left text-xs">
+              <thead className="sticky top-0 z-10 bg-gray-100/90 backdrop-blur-sm">
+                <tr className="text-gray-500">
+                  <th className="px-3 py-2 font-medium">Produto</th>
+                  <th className="px-2 py-2 text-right font-medium">Qtd</th>
+                  <th className="px-2 py-2 text-right font-medium">Un.</th>
+                  <th className="px-3 py-2 text-right font-medium">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {produtos.map((produto, idx) => (
+                  <tr key={produto.produtoLancadoId || idx} className="text-gray-700">
+                    <td className="px-3 py-2.5 font-medium">
+                      <div className="line-clamp-2">{produto.nome}</div>
+                      {produto.complementos.length > 0 && (
+                        <div className="mt-0.5 text-[10px] text-gray-400">
+                          + {produto.complementos.length} comp.
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-2 py-2.5 text-right">{produto.quantidade}</td>
+                    <td className="px-2 py-2.5 text-right">{transformarParaReal(produto.valorUnitario)}</td>
+                    <td className="px-3 py-2.5 text-right font-semibold text-gray-900">
+                      {transformarParaReal(calcularTotalProduto(produto))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <hr className="border-gray-100" />
+
+        {/* Seção do Cliente */}
+        <div className="space-y-2">
+          <Label className="text-sm font-semibold text-gray-800">Cliente da Nota Fiscal</Label>
+          
+          {temCliente ? (
+            <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-3 transition-colors hover:bg-gray-100/50">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <MdPersonOutline size={20} />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold text-gray-900">{nomeClienteResumo}</span>
+                  <span className="text-xs text-gray-500">Vinculado ao pedido</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setSeletorClienteOpen(true)}
+                  className="flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-white hover:text-primary hover:shadow-sm"
+                  title="Alterar cliente"
+                >
+                  <MdEdit size={18} />
+                </button>
+                {tipoInicioPedido !== 'entrega' && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveCliente}
+                    className="flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-white hover:text-red-600 hover:shadow-sm"
+                    title="Remover cliente"
+                  >
+                    <MdDelete size={18} />
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <button
               type="button"
-              variant="contained"
-              size="sm"
               onClick={() => setSeletorClienteOpen(true)}
-              title={rotuloAcaoClienteBalcao}
-              aria-label={rotuloAcaoClienteBalcao}
-              className="flex h-8 min-h-8 w-8 min-w-8 shrink-0 items-center justify-center p-0"
-              sx={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 32,
-                height: 32,
-                minWidth: 32,
-                minHeight: 32,
-                padding: 0,
-                lineHeight: 0,
-                backgroundColor: 'var(--color-primary)',
-                borderColor: 'var(--color-primary)',
-                color: '#fff',
-                boxShadow: 'none',
-                '& svg': { width: 20, height: 20, color: '#fff', fill: 'currentColor' },
-                '&:hover': {
-                  backgroundColor: 'var(--color-primary)',
-                  borderColor: 'var(--color-primary)',
-                  boxShadow: 'none',
-                  opacity: 0.9,
-                },
-              }}
+              className="group flex w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-200 bg-gray-50/50 p-4 transition-all hover:border-primary/40 hover:bg-primary/5"
             >
-              <MdPersonOutline aria-hidden />
-            </Button>
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary shadow-sm transition-colors group-hover:bg-primary group-hover:text-white">
+                <MdPersonOutline size={24} />
+              </div>
+              <div className="text-center">
+                <span className="block text-sm font-semibold text-gray-700 group-hover:text-primary">
+                  Vincular cliente
+                </span>
+                <span className="block text-xs text-gray-500">
+                  Obrigatório para emissão de NF-e
+                </span>
+              </div>
+            </button>
           )}
         </div>
-        <div className="space-y-0 text-sm leading-snug">
-          <div className="flex justify-between px-1 py-0">
-            <span className="text-gray-600">Data:</span>
-            <span className="font-medium">
-              {new Date().toLocaleString('pt-BR', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </span>
-          </div>
-          <div className="flex justify-between px-1 py-0">
-            <span className="text-gray-600">Status:</span>
-            <span className="font-medium">{rotuloStatusResumoModal}</span>
-          </div>
-          {nomeClienteResumo && (
-            <div className="flex justify-between px-1 py-0">
-              <span className="text-gray-600">Cliente:</span>
-              <span className="font-medium">{nomeClienteResumo}</span>
-            </div>
-          )}
-          <div className="flex justify-between px-1 py-0">
-            <span className="text-gray-600">Total de Itens:</span>
-            <span className="font-medium">
-              {totalItensPedido} {totalItensPedido === 1 ? 'produto' : 'produtos'}
-            </span>
-          </div>
+
+        {/* Seção da Observação */}
+        <div className="pt-1">
+          <Input
+            label="Observação da nota (Opcional)"
+            value={observacaoNota}
+            onChange={e => setObservacaoNota(e.target.value)}
+            placeholder="Ex: Informações complementares para a NFC-e/NF-e..."
+            helperText="Enviado na emissão como informações complementares (máx. 3500). O rodapé da empresa é concatenado depois."
+            multiline
+            minRows={2}
+            inputProps={{ maxLength: INFORMACOES_ADICIONAIS_NOTA_MAX }}
+            size="small"
+            sx={{
+              '& .MuiOutlinedInput-root': { 
+                backgroundColor: '#f9fafb', 
+                borderRadius: '8px',
+                transition: 'all 0.2s ease-in-out',
+                '&:hover': { backgroundColor: '#f3f4f6' },
+                '&.Mui-focused': { backgroundColor: '#ffffff', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }
+              },
+            }}
+          />
         </div>
       </div>
 

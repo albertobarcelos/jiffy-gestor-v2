@@ -16,6 +16,7 @@ import {
 } from '@/src/application/mappers/TransicaoPedidoDeliveryMapper'
 import { emitirNotaPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/EmitirNotaPedidoDeliveryUseCase'
 import { deveUsarModuloDeliveryParaDetalhe } from '@/src/application/mappers/PedidoDeliveryDetalheAdapter'
+import { anexarInformacoesAdicionaisEmitirNota } from '@/src/shared/helpers/informacoesAdicionaisNota'
 
 /**
  * Extrai o motivo de rejeição (xMotivo) do XML de retorno da SEFAZ
@@ -823,6 +824,12 @@ export function useVincularClienteNaVenda() {
   )
 }
 
+type EmitirNotaMutationInput = {
+  id: string
+  modelo: 55 | 65
+  informacoesAdicionais?: string
+}
+
 /**
  * Hook para emitir NFe (NFC-e ou NF-e) para uma venda PDV.
  * Fluxo assíncrono real: retorna após enfileirar/processar no backend.
@@ -833,19 +840,25 @@ export function useEmitirNfe() {
   const empresaId = useTenantEmpresaId()
 
   return useSecureTenantMutation(
-    async ({ token }, { id, modelo }: { id: string; modelo: 55 | 65 }) => {
+    async ({ token }, { id, modelo, informacoesAdicionais }: EmitirNotaMutationInput) => {
       const fiscalConfig = await resolveFiscalEmissionConfig(token, modelo)
 
       const response = await fetchGestorApi(`/api/vendas/${id}/emitir-nota`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tipoDocumento: fiscalConfig.tipoDocumento,
-          modelo,
-          serie: fiscalConfig.serie,
-          ambiente: fiscalConfig.ambiente,
-          crt: fiscalConfig.crt,
-        }),
+        body: JSON.stringify(
+          anexarInformacoesAdicionaisEmitirNota(
+            {
+              tipoDocumento: fiscalConfig.tipoDocumento,
+              modelo,
+              serie: fiscalConfig.serie,
+              ambiente: fiscalConfig.ambiente,
+              crt: fiscalConfig.crt,
+            },
+            id,
+            informacoesAdicionais
+          )
+        ),
       })
 
       if (!response.ok) {
@@ -924,19 +937,25 @@ export function useEmitirNfeGestor() {
   const empresaId = useTenantEmpresaId()
 
   return useSecureTenantMutation(
-    async ({ token }, { id, modelo }: { id: string; modelo: 55 | 65 }) => {
+    async ({ token }, { id, modelo, informacoesAdicionais }: EmitirNotaMutationInput) => {
       const fiscalConfig = await resolveFiscalEmissionConfig(token, modelo)
 
       const response = await fetchGestorApi(`/api/vendas/gestor/${id}/emitir-nota`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tipoDocumento: fiscalConfig.tipoDocumento,
-          modelo,
-          serie: fiscalConfig.serie,
-          ambiente: fiscalConfig.ambiente,
-          crt: fiscalConfig.crt,
-        }),
+        body: JSON.stringify(
+          anexarInformacoesAdicionaisEmitirNota(
+            {
+              tipoDocumento: fiscalConfig.tipoDocumento,
+              modelo,
+              serie: fiscalConfig.serie,
+              ambiente: fiscalConfig.ambiente,
+              crt: fiscalConfig.crt,
+            },
+            id,
+            informacoesAdicionais
+          )
+        ),
       })
 
       if (!response.ok) {
@@ -997,8 +1016,8 @@ export function useEmitirNfeDelivery() {
   const empresaId = useTenantEmpresaId()
 
   return useSecureTenantMutation(
-    async ({ token }, { id, modelo }: { id: string; modelo: 55 | 65 }) => {
-      return emitirNotaPedidoDeliveryUseCase.execute(id, token, modelo)
+    async ({ token }, { id, modelo, informacoesAdicionais }: EmitirNotaMutationInput) => {
+      return emitirNotaPedidoDeliveryUseCase.execute(id, token, modelo, informacoesAdicionais)
     },
     {
       onSuccess: (data, variables) => {

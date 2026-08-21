@@ -29,6 +29,7 @@ function dtoBase(
     dataFinalizacaoCarregada: null,
     vendaGestorJaCancelada: false,
     observacaoPedido: null,
+    observacaoNota: null,
     irParaStep4: true,
     ...overrides,
   }

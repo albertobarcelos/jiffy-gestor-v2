@@ -9,6 +9,7 @@ import {
   useCancelarNotaFiscalVendaPdv,
   useCancelarNotaFiscalVendaGestor,
   useTransicaoPedidoDelivery,
+  useVincularClienteNaVenda,
 } from '@/src/presentation/hooks/useVendas'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
@@ -86,6 +87,7 @@ export function useNovoPedidoOrchestrator({
   const cancelarNotaFiscalVendaPdv = useCancelarNotaFiscalVendaPdv()
   const cancelarNotaFiscalVendaGestor = useCancelarNotaFiscalVendaGestor()
   const transicaoPedidoDelivery = useTransicaoPedidoDelivery()
+  const vincularCliente = useVincularClienteNaVenda()
 
   const form = useNovoPedidoFormState(tipoInicioPedido)
   const {
@@ -101,6 +103,8 @@ export function useNovoPedidoOrchestrator({
     setProdutos,
     observacaoPedido,
     setObservacaoPedido,
+    observacaoNota,
+    setObservacaoNota,
     catalogoProdutosPorId,
     setCatalogoProdutosPorId,
     pagamentos,
@@ -324,6 +328,20 @@ export function useNovoPedidoOrchestrator({
     getAccessToken: () => useAuthStore.getState().tenantAuth?.getAccessToken(),
   })
 
+  const handleSelectClienteIntercepted = useCallback(
+    (cliente: import('@/src/domain/entities/Cliente').Cliente) => {
+      handleSelectCliente(cliente)
+      if (modoVisualizacao && vendaId) {
+        vincularCliente.mutate({
+          vendaId,
+          clienteId: cliente.getId(),
+          tabelaOrigem: tabelaOrigemVenda,
+        })
+      }
+    },
+    [handleSelectCliente, modoVisualizacao, vendaId, tabelaOrigemVenda, vincularCliente]
+  )
+
   // Buscar meios de pagamento
   const {
     data: meiosPagamentoData,
@@ -448,6 +466,7 @@ export function useNovoPedidoOrchestrator({
       setNomesUsuariosPedido,
       setNomesMeiosPagamentoPedido,
       setObservacaoPedido,
+      setObservacaoNota,
       setCurrentStep,
     },
   })
@@ -545,6 +564,7 @@ export function useNovoPedidoOrchestrator({
       produtos,
       pagamentos,
       observacaoPedido,
+      observacaoNota,
       totalProdutos,
       totalPagamentos,
       totalPagamentosLancados,
@@ -753,7 +773,7 @@ export function useNovoPedidoOrchestrator({
     handleMouseUp,
     handleRemoveCliente,
     handleReloadClienteEntregaAposEdicao,
-    handleSelectCliente,
+    handleSelectCliente: handleSelectClienteIntercepted,
     handleTabChangeClienteTabsModalEntrega,
     handleTabChangeProdutoModal,
     handleTipoAtendimentoDeliveryChange,
@@ -778,6 +798,7 @@ export function useNovoPedidoOrchestrator({
     moradaEntregaSelecionada,
     mostrarLoadingFormasPagamento,
     modoVisualizacao,
+    vendaId,
     modalCancelarVendaOpen,
     modalConfirmacaoSaidaOpen,
     modalEdicaoProdutoOpen,
@@ -787,6 +808,8 @@ export function useNovoPedidoOrchestrator({
     obterTotalComplemento,
     observacaoPedido,
     setObservacaoPedido,
+    observacaoNota,
+    setObservacaoNota,
     origem,
     statusFiscalDetalhe,
     pagamentoModoCobranca,

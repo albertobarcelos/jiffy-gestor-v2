@@ -1,3 +1,5 @@
+import { informacoesAdicionaisFromTexto } from '@/src/shared/helpers/informacoesAdicionaisNota'
+
 export const OBSERVACAO_PEDIDO_MIN_CHARS = 3
 export const OBSERVACAO_PEDIDO_MAX_CHARS = 100
 
@@ -17,6 +19,17 @@ export function observacoesArrayFromTexto(texto: string | undefined | null): str
   const t = texto?.trim()
   if (!t) return undefined
   return [t]
+}
+
+/** Rascunho de UI; na emissão vira `informacoesAdicionais` (Swagger, máx. 3500). */
+export function observacaoNotaFromTexto(texto: string | undefined | null): string | undefined {
+  return informacoesAdicionaisFromTexto(texto)
+}
+
+export function textoObservacaoNotaApi(data: Record<string, unknown> | null | undefined): string {
+  if (!data) return ''
+  const raw = data.informacoesAdicionais ?? data.observacaoNota ?? data.observacaoNotaFiscal
+  return typeof raw === 'string' ? raw.trim() : ''
 }
 
 export function textoFromObservacoesApi(observacoes: unknown): string {

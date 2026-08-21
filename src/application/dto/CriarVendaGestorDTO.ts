@@ -35,6 +35,8 @@ export interface CriarVendaGestorInputDTO {
   meiosPagamento: Array<{ getId(): string; getNome(): string }>
   nomesMeiosPagamentoPedido: Record<string, string>
   observacaoPedido?: string
+  /** Rascunho de UI; enviado só no emitir-nota como `informacoesAdicionais`. */
+  observacaoNota?: string
 }
 
 export type { CriarVendaGestorApiRequest as CriarVendaGestorPayload } from '@/src/application/dto/api/vendaGestorApi'

@@ -65,6 +65,7 @@ export function createNovoPedidoResetForm({
     setClienteTabsModalEntregaState({ open: false, tab: 'cliente', mode: 'edit' })
     form.setProdutos([])
     form.setObservacaoPedido('')
+    form.setObservacaoNota('')
     form.setPagamentos([])
     form.setMeioPagamentoId('')
     form.setValorRecebido('')

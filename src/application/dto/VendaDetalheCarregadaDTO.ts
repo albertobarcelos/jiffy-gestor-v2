@@ -34,6 +34,7 @@ export interface VendaDetalheCarregadaDTO {
   dataFinalizacaoCarregada: string | null
   vendaGestorJaCancelada: boolean
   observacaoPedido: string | null
+  observacaoNota: string | null
   /** Quando true, o modal deve ir direto para o step 4 (modo visualização). */
   irParaStep4: boolean
 }

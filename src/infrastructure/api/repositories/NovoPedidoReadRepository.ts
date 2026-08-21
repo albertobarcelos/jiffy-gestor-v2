@@ -6,6 +6,7 @@ import type {
 } from '@/src/domain/repositories/INovoPedidoReadRepository'
 import { normalizarListaEntregadoresDelivery } from '@/src/application/mappers/EntregadorDeliveryNormalizer'
 import type { UsuarioPdvEntregadorOption } from '@/src/domain/types/vendaDetalhe'
+import { anexarInformacoesAdicionaisEmitirNota } from '@/src/shared/helpers/informacoesAdicionaisNota'
 
 const PRODUTOS_POR_PAGINA = 100
 
@@ -213,14 +214,17 @@ export class NovoPedidoReadRepository implements INovoPedidoReadRepository {
   async emitirNotaPedidoDelivery(
     pedidoId: string,
     token: string,
-    modelo: 55 | 65
+    modelo: 55 | 65,
+    informacoesAdicionais?: string
   ): Promise<Record<string, unknown>> {
     const raw = await fetchJson<unknown>(
       `/api/delivery/pedidos/${encodeURIComponent(pedidoId)}/emitir-nota`,
       token,
       {
         method: 'POST',
-        body: JSON.stringify({ modelo }),
+        body: JSON.stringify(
+          anexarInformacoesAdicionaisEmitirNota({ modelo }, pedidoId, informacoesAdicionais)
+        ),
       }
     )
     if (raw && typeof raw === 'object' && !Array.isArray(raw)) {

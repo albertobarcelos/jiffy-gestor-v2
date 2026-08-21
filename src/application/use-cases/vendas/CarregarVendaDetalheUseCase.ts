@@ -19,7 +19,7 @@ import {
 } from '@/src/application/mappers/VendaApiNormalizer'
 import type { VendaGestorApiResponse } from '@/src/application/dto/api/vendaGestorApi'
 import { deveUsarModuloDeliveryParaDetalhe } from '@/src/application/mappers/PedidoDeliveryDetalheAdapter'
-import { textoFromObservacoesApi } from '@/src/shared/helpers/observacaoPedido'
+import { textoFromObservacoesApi, textoObservacaoNotaApi } from '@/src/shared/helpers/observacaoPedido'
 import type { IVendaDetalheReadRepository } from '@/src/domain/repositories/IVendaDetalheReadRepository'
 import { vendaDetalheReadRepository } from '@/src/infrastructure/api/repositories/VendaDetalheReadRepository'
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
@@ -468,6 +468,7 @@ export class CarregarVendaDetalheUseCase {
       dataFinalizacaoCarregada,
       vendaGestorJaCancelada,
       observacaoPedido: observacaoPedidoCarregada,
+      observacaoNota: textoObservacaoNotaApi(vendaData) || null,
       irParaStep4: Boolean(modoVisualizacao),
     }
   }

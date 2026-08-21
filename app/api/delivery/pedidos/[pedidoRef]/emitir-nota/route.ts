@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError, mensagemLegivelApiError } from '@/src/infrastructure/api/apiClient'
+import { informacoesAdicionaisFromTexto } from '@/src/shared/helpers/informacoesAdicionaisNota'
 
 /**
  * POST /api/delivery/pedidos/[pedidoRef]/emitir-nota
@@ -19,13 +20,19 @@ export async function POST(
       return NextResponse.json({ error: 'ID do pedido é obrigatório' }, { status: 400 })
     }
 
-    const body = (await request.json()) as { modelo?: number }
+    const body = (await request.json()) as { modelo?: number; informacoesAdicionais?: string }
     const modelo = Number(body.modelo)
     if (![55, 65].includes(modelo)) {
       return NextResponse.json(
         { error: 'Modelo deve ser 55 (NF-e) ou 65 (NFC-e)' },
         { status: 400 }
       )
+    }
+
+    const payload: Record<string, unknown> = { modelo }
+    const informacoesAdicionais = informacoesAdicionaisFromTexto(body.informacoesAdicionais)
+    if (informacoesAdicionais) {
+      payload.informacoesAdicionais = informacoesAdicionais
     }
 
     const apiClient = new ApiClient()
@@ -38,7 +45,7 @@ export async function POST(
           'Content-Type': 'application/json',
           Accept: 'application/json',
         },
-        body: JSON.stringify({ modelo }),
+        body: JSON.stringify(payload),
       }
     )
 
@@ -54,3 +61,4 @@ export async function POST(
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
   }
 }
+

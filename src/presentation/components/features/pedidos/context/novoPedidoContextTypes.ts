@@ -75,6 +75,8 @@ export interface NovoPedidoFormSlice {
   dataVenda: string
   observacaoPedido: string
   setObservacaoPedido: Dispatch<SetStateAction<string>>
+  observacaoNota: string
+  setObservacaoNota: Dispatch<SetStateAction<string>>
 }
 
 /** Catálogo: grupos, produtos do grupo e busca. */
@@ -244,6 +246,7 @@ export interface NovoPedidoUISlice {
 /** Modo visualização/detalhe (passo 4) e cancelamento. */
 export interface NovoPedidoDetalheSlice {
   modoVisualizacao?: boolean
+  vendaId?: string
   tabelaOrigemVenda: 'venda' | 'venda_gestor'
   tipoInicioPedido: 'balcao' | 'entrega'
   statusFiscalUnificado: string | null

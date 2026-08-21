@@ -105,4 +105,21 @@ describe('CriarVendaPayloadMapper (contrato PR #115)', () => {
     expect(payload.totalAcrescimo).toBeUndefined()
     expect(payload.produtosLancados).toHaveLength(1)
   })
+
+  it('não envia observacaoNota no create — a API só aceita informacoesAdicionais no emitir-nota', () => {
+    const payload = buildCriarVendaGestorPayload(
+      baseInput({
+        observacaoPedido: 'Sem cebola',
+        observacaoNota: '  Ouvidoria Procon MT 151  ',
+      })
+    )
+    expect(payload.observacoes).toEqual(['Sem cebola'])
+    expect(payload).not.toHaveProperty('observacaoNota')
+    expect(payload).not.toHaveProperty('informacoesAdicionais')
+  })
+
+  it('omite observacaoNota quando vazia', () => {
+    const payload = buildCriarVendaGestorPayload(baseInput({ observacaoNota: '   ' }))
+    expect(payload).not.toHaveProperty('observacaoNota')
+  })
 })
