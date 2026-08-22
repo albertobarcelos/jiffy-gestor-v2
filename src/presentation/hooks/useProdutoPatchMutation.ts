@@ -48,7 +48,9 @@ function successMessage(payload: ProdutoPatchPayload): string {
     case 'valor':
       return 'Valor atualizado com sucesso!'
     case 'status':
-      return payload.novoStatus ? 'Produto ativado com sucesso!' : 'Produto desativado com sucesso!'
+      return payload.novoStatus
+        ? 'Produto disponível no cadastro e nos cardápios vinculados!'
+        : 'Produto indisponível no cadastro e nos cardápios vinculados!'
     case 'toggle': {
       const cfg = toggleFieldConfig[payload.field]
       return payload.novoValor ? cfg.successTrue : cfg.successFalse

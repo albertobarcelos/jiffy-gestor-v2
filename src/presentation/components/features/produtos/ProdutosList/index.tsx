@@ -318,7 +318,12 @@ export function ProdutosList() {
   }, [patchMutation, pedirConfirmacao, aplicarNosDestinos])
 
   const handleStatusToggle = useCallback(async (produtoId: string, novoStatus: boolean) => {
-    const destinos = await pedirConfirmacao({ origem: 'cadastroBase', produtoId })
+    const destinos = await pedirConfirmacao({
+      origem: 'cadastroBase',
+      produtoId,
+      variante: 'statusAtivo',
+      novoAtivo: novoStatus,
+    })
     if (destinos === null) return
     patchMutation.mutate(
       { type: 'status', produtoId, novoStatus, filterStatus },

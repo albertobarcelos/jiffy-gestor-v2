@@ -400,6 +400,8 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         origem: 'menu',
         produtoId,
         menuIdAtual: menuId,
+        variante: 'statusAtivo',
+        novoAtivo: ativo,
       })
       if (destinos === null) return
       try {
@@ -412,7 +414,9 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
           })
         }
         showToast.success(
-          ativo ? 'Produto ativo neste cardápio' : 'Produto inativo neste cardápio'
+          ativo
+            ? 'Produto disponível neste cardápio'
+            : 'Produto indisponível neste cardápio'
         )
       } catch (err) {
         showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar status')

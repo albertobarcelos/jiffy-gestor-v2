@@ -526,11 +526,6 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
                           {isPrincipal ? 'Principal' : 'Personalizado'}
                           {isLocked ? ' · Neste cardápio' : ''}
                           {!menu.ativo ? ' · Inativo' : ''}
-                          {vinculado &&
-                          canShowSnapshot &&
-                          !persistedVinculoIds.has(menu.id)
-                            ? ' · Salve para ver os dados'
-                            : ''}
                         </p>
                       </div>
                     </div>

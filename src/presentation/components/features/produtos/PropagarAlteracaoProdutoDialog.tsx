@@ -19,11 +19,15 @@ interface PropagarAlteracaoProdutoDialogProps {
   passo: Passo
   origem: 'cadastroBase' | 'menu'
   variante?: VariantePropagacaoProduto
+  /** true = ativar; false = desativar (só `statusAtivo`). */
+  novoAtivo?: boolean
   /** Menus em que o produto/imagem já foi salvo (exibição na pergunta de criação). */
   menusJaSalvos?: MenuAlvoPropagacao[]
   incluirCadastroBase: boolean
   /** Lista de menus na alteração a partir do cadastro base (sem passo perguntar). */
   fluxoListaCadastroBase?: boolean
+  /** Confirmação simples: ativo/inativo vale em todos os menus vinculados. */
+  confirmacaoStatusGlobal?: boolean
   /** Obriga marcar ao menos um menu para confirmar (produto já vinculado). */
   exigePeloMenosUmMenu?: boolean
   menusJaVinculadosIds?: Set<string>
@@ -59,9 +63,11 @@ export function PropagarAlteracaoProdutoDialog({
   passo,
   origem,
   variante = 'dados',
+  novoAtivo,
   menusJaSalvos = [],
   incluirCadastroBase,
   fluxoListaCadastroBase = false,
+  confirmacaoStatusGlobal = false,
   exigePeloMenosUmMenu = false,
   menusJaVinculadosIds,
   menus,
@@ -79,56 +85,106 @@ export function PropagarAlteracaoProdutoDialog({
 }: PropagarAlteracaoProdutoDialogProps) {
   const isImagem = variante === 'imagem'
   const isVinculo = variante === 'vinculoMenus'
+  const isStatus = variante === 'statusAtivo'
+  const ativando = isStatus && novoAtivo === true
+  const desativando = isStatus && novoAtivo === false
   const nomesJaSalvos = formatarListaMenus(menusJaSalvos)
 
-  const titulo = fluxoListaCadastroBase
-    ? 'Onde aplicar esta alteração?'
-    : passo === 'perguntar'
-      ? isVinculo
-        ? 'Vincular este produto a outros cardápios?'
-        : isImagem
-          ? 'Aplicar esta imagem em outros cardápios?'
-          : 'Aplicar esta alteração em outros Menus?'
-      : isVinculo
-        ? 'Onde vincular o produto?'
-        : isImagem
-          ? 'Onde aplicar esta imagem?'
-          : 'Onde aplicar esta alteração?'
+  const titulo = confirmacaoStatusGlobal
+    ? ativando
+      ? 'Ativar produto?'
+      : 'Desativar produto?'
+    : fluxoListaCadastroBase
+      ? 'Onde aplicar esta alteração?'
+      : passo === 'perguntar'
+        ? isVinculo
+          ? 'Vincular este produto a outros cardápios?'
+          : isImagem
+            ? 'Aplicar esta imagem em outros cardápios?'
+            : isStatus
+              ? ativando
+                ? 'Ativar produto neste cardápio?'
+                : 'Desativar produto neste cardápio?'
+              : 'Aplicar esta alteração em outros Menus?'
+        : isVinculo
+          ? 'Onde vincular o produto?'
+          : isImagem
+            ? 'Onde aplicar esta imagem?'
+            : isStatus
+              ? ativando
+                ? 'Onde mais ativar o produto?'
+                : 'Onde mais desativar o produto?'
+              : 'Onde aplicar esta alteração?'
 
-  const descricao = fluxoListaCadastroBase
-    ? exigePeloMenosUmMenu
-      ? 'A alteração será salva no cadastro base e nos menus marcados. Menus desmarcados permanecem vinculados, mas não recebem esta alteração. É obrigatório marcar pelo menos um menu.'
-      : 'A alteração será salva no cadastro base. Marque os menus para vincular o produto e aplicar a alteração neles, ou confirme sem seleção para salvar só no cadastro.'
-    : passo === 'perguntar'
-      ? isVinculo
-        ? nomesJaSalvos
-          ? `O produto já foi salvo em: ${nomesJaSalvos}. Deseja vinculá-lo também a outros cardápios?`
-          : 'O produto foi salvo. Deseja vinculá-lo também a outros cardápios?'
-        : isImagem
-          ? origem === 'cadastroBase'
-            ? menusJaSalvos.length > 0
-              ? `A imagem será salva em: ${nomesJaSalvos}. Deseja aplicar também em outros cardápios?`
-              : 'Escolha em quais cardápios salvar esta imagem. Produto sem vínculo não envia foto automaticamente.'
-            : 'A imagem será salva neste cardápio. Deseja trocar a foto em outros menus também?'
-          : origem === 'cadastroBase'
-            ? 'A alteração será salva no cadastro do produto. Deseja copiar também para algum cardápio?'
-            : 'A alteração será salva neste cardápio. Deseja copiar também para o cadastro base ou para outros menus?'
-      : isVinculo
-        ? 'Marque os cardápios adicionais. Os já salvos permanecem vinculados.'
-        : isImagem
-          ? 'Marque os cardápios. Os que não forem marcados mantêm a imagem atual.'
-          : 'Marque os destinos. O que não for marcado permanece como está.'
+  const descricao = confirmacaoStatusGlobal
+    ? desativando
+      ? 'O produto ficará indisponível no cadastro base e em todos os cardápios em que estiver vinculado. Deseja continuar?'
+      : 'O produto ficará disponível no cadastro base e em todos os cardápios em que estiver vinculado. Deseja continuar?'
+    : fluxoListaCadastroBase
+      ? exigePeloMenosUmMenu
+        ? 'A alteração será salva no cadastro base e nos menus marcados. Menus desmarcados permanecem vinculados, mas não recebem esta alteração. É obrigatório marcar pelo menos um menu.'
+        : 'A alteração será salva no cadastro base. Marque os menus para vincular o produto e aplicar a alteração neles, ou confirme sem seleção para salvar só no cadastro.'
+      : passo === 'perguntar'
+        ? isVinculo
+          ? nomesJaSalvos
+            ? `O produto já foi salvo em: ${nomesJaSalvos}. Deseja vinculá-lo também a outros cardápios?`
+            : 'O produto foi salvo. Deseja vinculá-lo também a outros cardápios?'
+          : isImagem
+            ? origem === 'cadastroBase'
+              ? menusJaSalvos.length > 0
+                ? `A imagem será salva em: ${nomesJaSalvos}. Deseja aplicar também em outros cardápios?`
+                : 'Escolha em quais cardápios salvar esta imagem. Produto sem vínculo não envia foto automaticamente.'
+              : 'A imagem será salva neste cardápio. Deseja trocar a foto em outros menus também?'
+            : isStatus
+              ? desativando
+                ? 'O produto ficará indisponível neste cardápio. Deseja aplicar a mesma desativação no cadastro base ou em outros menus?'
+                : 'O produto ficará disponível neste cardápio. Deseja aplicar a mesma ativação no cadastro base ou em outros menus?'
+              : origem === 'cadastroBase'
+                ? 'A alteração será salva no cadastro do produto. Deseja copiar também para algum cardápio?'
+                : 'A alteração será salva neste cardápio. Deseja copiar também para o cadastro base ou para outros menus?'
+        : isVinculo
+          ? 'Marque os cardápios adicionais. Os já salvos permanecem vinculados.'
+          : isImagem
+            ? 'Marque os cardápios. Os que não forem marcados mantêm a imagem atual.'
+            : isStatus
+              ? desativando
+                ? 'Marque onde mais o produto deve ficar indisponível. O que não for marcado permanece como está.'
+                : 'Marque onde mais o produto deve ficar disponível. O que não for marcado permanece como está.'
+              : 'Marque os destinos. O que não for marcado permanece como está.'
 
   const labelNao = isVinculo ? 'Não, só nestes' : 'Não, só aqui'
-  const labelConfirmar = fluxoListaCadastroBase
-    ? 'Salvar alteração'
-    : isVinculo
-      ? 'Vincular nos selecionados'
-      : 'Aplicar nos selecionados'
+  const labelConfirmar = confirmacaoStatusGlobal
+    ? ativando
+      ? 'Ativar'
+      : 'Desativar'
+    : fluxoListaCadastroBase
+      ? 'Salvar alteração'
+      : isVinculo
+        ? 'Vincular nos selecionados'
+        : isStatus
+          ? ativando
+            ? 'Ativar nos selecionados'
+            : 'Desativar nos selecionados'
+          : 'Aplicar nos selecionados'
 
-  const mostrarLista = fluxoListaCadastroBase || passo === 'escolher'
+  const mostrarLista =
+    !confirmacaoStatusGlobal && (fluxoListaCadastroBase || passo === 'escolher')
 
   const footerActions = useMemo((): JiffySidePanelFooterActions => {
+    if (confirmacaoStatusGlobal) {
+      return {
+        showCancel: true,
+        cancelLabel: 'Cancelar',
+        cancelVariant: 'primaryTint10',
+        onCancel: onDismiss,
+        cancelDisabled: busy,
+        showSave: true,
+        saveLabel: labelConfirmar,
+        onSave: onConfirmarEscolha,
+        saveLoading: busy,
+        saveDisabled: busy,
+      }
+    }
     if (fluxoListaCadastroBase) {
       return {
         showCancel: true,
@@ -170,6 +226,7 @@ export function PropagarAlteracaoProdutoDialog({
       saveDisabled: busy || confirmarEscolhaDisabled,
     }
   }, [
+    confirmacaoStatusGlobal,
     fluxoListaCadastroBase,
     passo,
     busy,
