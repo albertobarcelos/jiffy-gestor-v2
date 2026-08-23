@@ -11,3 +11,8 @@ export {
   DESCRICAO_MODO_CUPOM_DELIVERY,
   type DeliveryModoCupomToggleProps,
 } from './DeliveryModoCupomToggle'
+export {
+  DeliveryModoPapelInfoTooltip,
+  DeliveryModoPapelToggle,
+  DESCRICAO_MODO_PAPEL,
+} from './DeliveryModoPapelToggle'

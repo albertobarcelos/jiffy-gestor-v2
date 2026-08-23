@@ -1,6 +1,6 @@
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 /**
- * Resolve nome da impressora cadastrada no Gestor (nome usado no QZ Tray no Windows).
+ * Resolve o nome da impressora lógica cadastrada no Gestor.
  * BFF: GET `/api/impressoras/:id` → backend `/api/v1/preferencias/impressoras/:id`.
  */
 export async function fetchNomeImpressoraPorId(

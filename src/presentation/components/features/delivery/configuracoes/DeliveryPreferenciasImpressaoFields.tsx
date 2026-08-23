@@ -6,6 +6,7 @@ import {
   DeliveryModoCupomInfoTooltip,
   DeliveryModoCupomToggle,
 } from './DeliveryModoCupomToggle'
+import { CupomCampoInfo } from './DeliveryModoPapelToggle'
 
 function clampCopiasUnificado(n: number): number {
   if (!Number.isFinite(n)) return 1
@@ -18,17 +19,18 @@ function DeliveryToggleRow(props: {
   disabled?: boolean
   onChecked: (v: boolean) => void
   titulo: string
-  descricao: string
+  info: string
 }) {
-  const { id, checked, disabled, onChecked, titulo, descricao } = props
+  const { id, checked, disabled, onChecked, titulo, info } = props
   return (
-    <label
-      htmlFor={id}
-      className={`flex items-center justify-between gap-2 rounded-lg bg-white px-2 py-2 shadow-sm ring-1 ring-gray-100 ${disabled ? 'cursor-default opacity-75' : 'cursor-pointer'}`}
+    <div
+      className={`flex items-center justify-between gap-2 rounded-lg bg-white px-2 py-2 shadow-sm ring-1 ring-gray-100 ${disabled ? 'opacity-75' : ''}`}
     >
-      <div className="min-w-0">
-        <p className="text-sm font-semibold text-primary-text">{titulo}</p>
-        <p className="mt-0.5 text-xs text-secondary-text">{descricao}</p>
+      <div className="flex min-w-0 items-center gap-1.5">
+        <label htmlFor={id} className={`text-sm font-semibold text-primary-text ${disabled ? 'cursor-default' : 'cursor-pointer'}`}>
+          {titulo}
+        </label>
+        <CupomCampoInfo texto={info} ariaLabel={titulo} />
       </div>
       <input
         id={id}
@@ -36,9 +38,9 @@ function DeliveryToggleRow(props: {
         checked={checked}
         disabled={disabled}
         onChange={e => onChecked(e.target.checked)}
-        className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 accent-secondary focus:ring-secondary"
+        className="h-4 w-4 shrink-0 rounded border-gray-300 accent-secondary focus:ring-secondary"
       />
-    </label>
+    </div>
   )
 }
 
@@ -76,7 +78,7 @@ export function DeliveryPreferenciasImpressaoFields(props: {
         disabled={disabled}
         onChecked={v => onChange({ autoIniciarPreparoNovosPedidos: v })}
         titulo="Enviar novos pedidos direto para produção"
-        descricao="Quando ativo, pedidos novos entram automaticamente em preparo/produção."
+        info="Ligado: o pedido novo já entra na cozinha, sem você aceitar um a um. Desligado: você decide quando começar o preparo."
       />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -162,10 +164,10 @@ export function DeliveryPreferenciasImpressaoFields(props: {
               ? 'Imprimir ao iniciar preparo'
               : 'Imprimir produção ao iniciar preparo'
           }
-          descricao={
+          info={
             modoImpressao === 'unificado'
-              ? 'Cupom completo assim que o pedido entra em preparação.'
-              : 'Tickets da cozinha ao entrar em preparação.'
+              ? 'Ligado: o cupom completo sai assim que o pedido entra em preparo.'
+              : 'Ligado: a cozinha recebe o cupom assim que o pedido entra em preparo.'
           }
         />
 
@@ -177,7 +179,7 @@ export function DeliveryPreferenciasImpressaoFields(props: {
               disabled={disabled}
               onChecked={v => onChange({ imprimirAoFicarPronto: v })}
               titulo="Imprimir expedição ao marcar pronto"
-              descricao="Cupom ou ticket de conferência/expedição ao marcar o pedido pronto."
+              info="Ligado: o cupom da entrega sai quando você marca o pedido como pronto."
             />
 
             {!value.imprimirAoFicarPronto ? (
@@ -196,17 +198,22 @@ export function DeliveryPreferenciasImpressaoFields(props: {
       </div>
 
       <div className="space-y-1">
-        <label
-          htmlFor={`${idPrefix}-imp-expedicao`}
-          className="text-sm font-semibold text-primary-text"
-        >
-          Impressora de expedição (sistema / lógica)
-        </label>
-        <p className="text-xs text-secondary-text">
-          {modoImpressao === 'unificado'
-            ? 'Onde o cupom completo será impresso ao iniciar preparo.'
-            : 'Onde o cupom de expedição será impresso ao marcar pronto. Produção continua na impressora de cada produto.'}
-        </p>
+        <div className="flex items-center gap-2">
+          <label
+            htmlFor={`${idPrefix}-imp-expedicao`}
+            className="text-sm font-semibold text-primary-text"
+          >
+            Impressora de expedição
+          </label>
+          <CupomCampoInfo
+            texto={
+              modoImpressao === 'unificado'
+                ? 'É a impressora do cupom completo, quando o pedido entra em preparo.'
+                : 'É a impressora do cupom que vai na entrega. A da cozinha é a de cada produto.'
+            }
+            ariaLabel="Impressora de expedição"
+          />
+        </div>
         {impressorasLogicas.length === 0 ? (
           <p className="text-xs text-amber-800">
             Nenhuma impressora cadastrada no sistema. Cadastre em Configurações → Impressoras antes

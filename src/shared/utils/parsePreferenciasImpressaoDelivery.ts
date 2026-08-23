@@ -90,11 +90,6 @@ export function parsePreferenciasImpressaoDelivery(
 
   const impressoraExpedicaoId = idNullable(pick('impressoraExpedicaoId') ?? pick('impressora_expedicao_id'))
 
-  const envPadrao =
-    typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_QZ_PRINTER_DEFAULT?.trim()
-      ? process.env.NEXT_PUBLIC_QZ_PRINTER_DEFAULT.trim()
-      : null
-
   return {
     modo: modoImp,
     copiasCupomUnificado: copias,
@@ -105,7 +100,7 @@ export function parsePreferenciasImpressaoDelivery(
     imprimirAoReceber: imprimirReceber,
     imprimirAoFicarPronto: imprimirPronto,
     impressoraExpedicaoId,
-    impressoraPadraoNome: envPadrao,
+    impressoraPadraoNome: null,
   }
 }
 
