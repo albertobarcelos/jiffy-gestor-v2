@@ -7,7 +7,13 @@ import {
   SESSION_STORAGE_HUB_LOGOUT_SELF,
   SESSION_STORAGE_TENANT_LOGOUT_SELF,
 } from '@/src/shared/constants/sessionCoordinator'
-import { HUB_PATH, isHubPathname } from '@/src/shared/constants/hubRoutes'
+import { isHubPathname } from '@/src/shared/constants/hubRoutes'
+import { isSinalKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/isKioskGestorPedidos'
+import {
+  lerSinalGestorDoBrowser,
+  urlHubDaSessaoAtual,
+  urlLoginDaSessaoAtual,
+} from '@/src/presentation/gestor-pedidos/pathsGestorSessao'
 
 /**
  * Outra guia encerrou a sessão da empresa (tenant): avisa e fecha esta guia (com fallback).
@@ -65,24 +71,27 @@ export function EmpresaSessionLostGate() {
     const tenantGone = tenantAuth === null
 
     if (hadTenant && tenantGone && !skipSelfLogout) {
-      window.alert(
-        'O acesso a esta empresa foi encerrado em outra guia ou a sessão foi finalizada.'
-      )
-      try {
-        window.close()
-      } catch {
-        /* noop */
+      const kiosk = isSinalKioskGestorPedidos(lerSinalGestorDoBrowser())
+      if (!kiosk) {
+        window.alert(
+          'O acesso a esta empresa foi encerrado em outra guia ou a sessão foi finalizada.'
+        )
+        try {
+          window.close()
+        } catch {
+          /* noop */
+        }
       }
       window.setTimeout(() => {
         if (typeof document === 'undefined' || document.visibilityState !== 'visible') {
           return
         }
-        if (identityAuth) {
-          window.location.assign(HUB_PATH)
-        } else {
-          window.location.assign('/login')
+        if (kiosk || !identityAuth) {
+          window.location.assign(urlLoginDaSessaoAtual())
+          return
         }
-      }, 200)
+        window.location.assign(urlHubDaSessaoAtual())
+      }, kiosk ? 0 : 200)
     }
 
     prevTenant.current = tenantAuth

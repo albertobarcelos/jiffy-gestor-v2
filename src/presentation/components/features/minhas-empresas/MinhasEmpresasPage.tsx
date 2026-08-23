@@ -30,6 +30,16 @@ import { appEmpresaCorrespondeBusca, conviteCorrespondeBusca } from './utils/min
 import { activateHubEmpresaSessionAndBuildUrl } from './utils/activateHubEmpresaSession'
 import { HUB_ROUTES } from '@/src/shared/constants/hubRoutes'
 import { ensureHubBearerToken } from '@/src/presentation/utils/ensureHubBearerToken'
+import { resolverDestinoPosLoginUseCase } from '@/src/application/use-cases/superficie/ResolverDestinoPosLoginUseCase'
+import { montarContextoAcessoSuperficie } from '@/src/presentation/gestor-pedidos/montarContextoAcessoSuperficie'
+import { buildGestaoPath } from '@/src/shared/utils/gestaoRoutes'
+import { entrarEmpresaGestorNaAba } from '@/src/presentation/gestor-pedidos/entrarEmpresaGestorNaAba'
+import { isSinalKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/isKioskGestorPedidos'
+import {
+  lerSinalGestorDoBrowser,
+  urlLoginDaSessaoAtual,
+} from '@/src/presentation/gestor-pedidos/pathsGestorSessao'
+import { planearDestinoAposLogin } from '@/src/presentation/gestor-pedidos/planearDestinoAposLogin'
 
 const HUB_SESSAO_TOAST_ID = 'minhas-empresas-sessao-token'
 
@@ -71,10 +81,11 @@ export default function MinhasEmpresasPage() {
   const hubSessaoProativaDisparadaRef = useRef(false)
   const redirectTimerRef = useRef<number | undefined>(undefined)
   const hubEmpresasRefetchDoneRef = useRef(false)
+  const autoEnterGestorRef = useRef(false)
 
   const irParaLogin = useCallback(() => {
     void logout().finally(() => {
-      window.location.href = '/login'
+      window.location.href = urlLoginDaSessaoAtual()
     })
   }, [logout])
 
@@ -460,25 +471,54 @@ export default function MinhasEmpresasPage() {
     [reportHubSessionIssue, removerEmpresaDesvinculada]
   )
 
-  const handleAcessar = async (appId: string) => {
-    const app = appsBase.find(a => a.id === appId)
-    if (app?.status === 'inativo') {
+  const handleAcessar = useCallback(
+    async (appId: string) => {
+      const app = appsBase.find(a => a.id === appId)
+      if (app?.status === 'inativo') {
+        return
+      }
+
+      setAcessoErro(null)
+      setBusyAppId(appId)
+
+      try {
+        const token = await obterTokenEmpresa(appId)
+        if (isSinalKioskGestorPedidos(lerSinalGestorDoBrowser())) {
+          router.replace(
+            entrarEmpresaGestorNaAba({
+              accessToken: token,
+              empresaNome: app?.nome ?? '',
+              empresaId: appId,
+            })
+          )
+          return
+        }
+        const empParam = prepareTabSession(token, app?.nome ?? '', appId)
+        const destino = resolverDestinoPosLoginUseCase.execute(montarContextoAcessoSuperficie(token))
+        window.open(buildGestaoPath(empParam, destino.pathModulo), '_blank')
+      } catch (e) {
+        reportErroAcessoEmpresa(e, appId)
+      } finally {
+        setBusyAppId(null)
+      }
+    },
+    [appsBase, obterTokenEmpresa, reportErroAcessoEmpresa, router]
+  )
+
+  useEffect(() => {
+    if (!isRehydrated || !hubBearerReady || autoEnterGestorRef.current || busyAppId) {
       return
     }
-
-    setAcessoErro(null)
-    setBusyAppId(appId)
-
-    try {
-      const token = await obterTokenEmpresa(appId)
-      const empParam = prepareTabSession(token, app?.nome ?? '', appId)
-      window.open(`/gestao/${empParam}/dashboard`, '_blank')
-    } catch (e) {
-      reportErroAcessoEmpresa(e, appId)
-    } finally {
-      setBusyAppId(null)
+    const plano = planearDestinoAposLogin({
+      empresas: hubEmpresas,
+      sinalGestor: lerSinalGestorDoBrowser(),
+    })
+    if (plano.tipo !== 'pedidos-gestor') {
+      return
     }
-  }
+    autoEnterGestorRef.current = true
+    void handleAcessar(plano.empresa.id)
+  }, [busyAppId, handleAcessar, hubBearerReady, hubEmpresas, isRehydrated])
 
   const handleGerenciarConvites = async (appId: string) => {
     const app = appsBase.find(a => a.id === appId)

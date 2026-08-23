@@ -17,6 +17,10 @@ import {
   JIFFY_SESSION_EXPIRED_EVENT,
 } from '@/src/shared/constants/sessionCoordinator'
 import { HUB_PATH, isHubPathname } from '@/src/shared/constants/hubRoutes'
+import {
+  irParaLoginDaSessaoAtual,
+  urlHubDaSessaoAtual,
+} from '@/src/presentation/gestor-pedidos/pathsGestorSessao'
 
 /** Tempo máximo de espera para o refresh de token antes de encerrar a sessão da empresa. */
 const REFRESH_TIMEOUT_MS = 5_000
@@ -156,7 +160,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
       } catch (error) {
         console.error('AuthGuard: erro ao encerrar sessão da empresa:', error)
       }
-      window.location.href = HUB_PATH
+      window.location.href = urlHubDaSessaoAtual()
     }
 
     if (identityHubStillValid()) {
@@ -182,7 +186,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     } catch (error) {
       console.error('AuthGuard: erro ao encerrar sessão antes do login:', error)
     }
-    window.location.href = '/login'
+    irParaLoginDaSessaoAtual('assign')
   }, [logout, logoutTenant])
 
   /**
@@ -209,7 +213,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     void fetch('/api/auth/logout-hub', { method: 'POST', credentials: 'include' }).catch(() => {
       /* noop */
     })
-    window.location.href = '/login'
+    irParaLoginDaSessaoAtual('assign')
   }, [])
 
   const redirectToHub = useCallback(() => {
@@ -217,7 +221,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
       return
     }
     redirectingRef.current = true
-    window.location.href = HUB_PATH
+    window.location.href = urlHubDaSessaoAtual()
   }, [])
 
   useEffect(() => {
@@ -235,7 +239,11 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
     // Enquanto o bootstrap da aba (URL ↔ token / rebind) não confirmou a sessão,
     // não tentar refresh ou redirect — TabSessionBootstrap reestabelece se necessário.
+    // Sem identidade e sem tenant: não esperar para sempre (ex.: `/pedidos?gestor` no Tauri).
     if (!isHub && !isTabVerified) {
+      if (!isTenantSessionAlive() && !identityHubStillValid()) {
+        irParaLoginDaSessaoAtual()
+      }
       return
     }
 

@@ -4,12 +4,10 @@ import dynamic from 'next/dynamic'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 
 /**
- * Kanban carregado sob demanda (bundle separado).
- * O `loading` do dynamic cobre o download do chunk; não usar Suspense extra aqui —
- * o VendasKanban não suspende com `use()`, e Suspense+dynamic gerava dois spinners
- * seguidos antes do loading interno (dados) do próprio Kanban.
+ * O mesmo `VendasKanban` de antes. Este ficheiro é o adapter da rota —
+ * para retirar o casco `/pedidos`, apaga-se esta pasta e as pages.
  */
-const PedidosClientesKanban = dynamic(
+const Kanban = dynamic(
   () =>
     import('@/features/kanban').then(mod => ({
       default: mod.VendasKanban,
@@ -24,10 +22,10 @@ const PedidosClientesKanban = dynamic(
   }
 )
 
-export default function PedidosClientesPage() {
+export function GestorPedidosKanban() {
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <PedidosClientesKanban />
+      <Kanban />
     </div>
   )
 }

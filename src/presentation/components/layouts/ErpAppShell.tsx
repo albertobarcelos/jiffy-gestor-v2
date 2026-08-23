@@ -1,19 +1,27 @@
-﻿'use client'
+'use client'
 
 import type { ReactNode } from 'react'
 import { TopNav } from '@/src/presentation/components/layouts/TopNav'
 import { ErpTenantAccessGuard } from '@/src/presentation/components/layouts/ErpTenantAccessGuard'
+import { useKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/useKioskGestorPedidos'
 import { useDetectCacheLeaks } from '@/src/presentation/hooks/useDetectCacheLeaks'
 import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 
 function ErpAppShellInner({ children }: { children: ReactNode }) {
   useDetectCacheLeaks()
+  const kiosk = useKioskGestorPedidos()
 
   return (
     <div className="flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-gray-50">
-      <TopNav />
+      {!kiosk && <TopNav />}
 
-      <main className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain px-1 md:px-2">
+      <main
+        className={
+          kiosk
+            ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
+            : 'flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain px-1 md:px-2'
+        }
+      >
         {children}
       </main>
     </div>

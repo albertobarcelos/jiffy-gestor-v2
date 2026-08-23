@@ -1,7 +1,12 @@
 import type { QueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { SESSION_STORAGE_TENANT_LOGOUT_SELF } from '@/src/shared/constants/sessionCoordinator'
-import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
+import { isSinalKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/isKioskGestorPedidos'
+import {
+  lerSinalGestorDoBrowser,
+  urlHubDaSessaoAtual,
+  urlLoginDaSessaoAtual,
+} from '@/src/presentation/gestor-pedidos/pathsGestorSessao'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { ensureHubBearerToken } from '@/src/presentation/utils/ensureHubBearerToken'
 import { restoreIdentityFromCookie } from '@/src/presentation/utils/restoreIdentityFromCookie'
@@ -53,7 +58,7 @@ export async function disconnectEmpresaTab({
     } catch (e) {
       console.error('disconnectEmpresaTab: logout completo', e)
     }
-    window.location.assign('/login')
+    window.location.assign(urlLoginDaSessaoAtual())
     return
   }
 
@@ -77,5 +82,9 @@ export async function disconnectEmpresaTab({
     console.error('disconnectEmpresaTab:', e)
   }
 
-  window.location.assign(HUB_PATH)
+  window.location.assign(
+    isSinalKioskGestorPedidos(lerSinalGestorDoBrowser())
+      ? urlLoginDaSessaoAtual()
+      : urlHubDaSessaoAtual()
+  )
 }

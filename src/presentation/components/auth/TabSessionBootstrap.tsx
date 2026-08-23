@@ -15,11 +15,29 @@ import {
   SESSION_STORAGE_EMPRESA_ID,
   SESSION_STORAGE_TENANT_TOKEN,
 } from '@/src/shared/constants/sessionCoordinator'
-import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
+import {
+  irParaLoginDaSessaoAtual,
+  urlHubDaSessaoAtual,
+} from '@/src/presentation/gestor-pedidos/pathsGestorSessao'
 import { extractTokenInfo } from '@/src/shared/utils/validateToken'
 import { decideTabSessionBootstrap } from '@/src/presentation/utils/decideTabSessionBootstrap'
 
 type RebindPending = { empresaId: string; empParam: string }
+
+const ROTAS_PUBLICAS_PREFIXO = [
+  '/login',
+  '/registro',
+  '/confirmar-email',
+  '/esqueci-senha',
+  '/redefinir-senha',
+  '/notas-fiscais',
+  '/cardapio',
+  '/delivery',
+]
+
+function isRotaPublicaBootstrap(pathname: string): boolean {
+  return ROTAS_PUBLICAS_PREFIXO.some(r => pathname === r || pathname.startsWith(`${r}/`))
+}
 
 function getEmpParam(): string | null {
   try {
@@ -74,7 +92,7 @@ async function rebindViaEscolherEmpresa(
     activateTenantToken(data.accessToken, setTenantAuth, setTabVerified)
   } catch {
     clearTabSession()
-    window.location.href = HUB_PATH
+    irParaLoginDaSessaoAtual()
   }
 }
 
@@ -96,6 +114,11 @@ export function TabSessionBootstrap() {
   useLayoutEffect(() => {
     if (typeof window === 'undefined' || !isRehydrated || didRunRef.current) return
 
+    if (isRotaPublicaBootstrap(window.location.pathname)) {
+      didRunRef.current = true
+      return
+    }
+
     const emp = getEmpParam()
     const pendingToken = consumeTabSession(emp)
     const existingToken = pendingToken ? null : getTabTenantToken()
@@ -115,7 +138,14 @@ export function TabSessionBootstrap() {
       storedEmpresaId,
     })
 
-    if (decision.type === 'wait') return
+    if (decision.type === 'wait') {
+      const identity = useAuthStore.getState().identityAuth
+      if (!identity || identity.isExpired()) {
+        didRunRef.current = true
+        irParaLoginDaSessaoAtual()
+      }
+      return
+    }
 
     didRunRef.current = true
 
@@ -137,7 +167,12 @@ export function TabSessionBootstrap() {
       } catch {
         /* ignore */
       }
-      window.location.href = HUB_PATH
+      const identity = useAuthStore.getState().identityAuth
+      if (identity && !identity.isExpired()) {
+        window.location.replace(urlHubDaSessaoAtual())
+      } else {
+        irParaLoginDaSessaoAtual()
+      }
       return
     }
 

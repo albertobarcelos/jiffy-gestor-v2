@@ -7,6 +7,7 @@ import { QueryProvider } from '@/src/presentation/providers/QueryProvider'
 import { AuthStorageCrossTabSync } from '@/src/presentation/components/auth/AuthStorageCrossTabSync'
 import { EmpresaSessionLostGate } from '@/src/presentation/components/auth/EmpresaSessionLostGate'
 import { AuthGuard } from '@/src/presentation/components/auth/AuthGuard'
+import { SuperficieRedirectGate } from '@/src/presentation/gestor-pedidos/SuperficieRedirectGate'
 import { TabSessionBootstrap } from '@/src/presentation/components/auth/TabSessionBootstrap'
 import { TenantCacheIsolation } from '@/src/presentation/components/auth/TenantCacheIsolation'
 import { DocumentoFiscalPdfRetryModal } from '@/src/presentation/components/features/fiscal'
@@ -50,6 +51,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <TenantCacheIsolation />
               <TabSessionBootstrap />
               <AuthGuard>
+                <SuperficieRedirectGate />
                 {children}
               </AuthGuard>
               <DocumentoFiscalPdfRetryModal />

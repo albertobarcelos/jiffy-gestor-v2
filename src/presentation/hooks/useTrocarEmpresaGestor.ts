@@ -13,6 +13,8 @@ import {
   syncEmpresaUrlPathFromSession,
 } from '@/src/shared/utils/tabSession'
 import { buildGestaoPath, stripGestaoEmpresaSlugFromPath } from '@/src/shared/utils/gestaoRoutes'
+import { autorizarRotaNaSuperficieUseCase } from '@/src/application/use-cases/superficie/AutorizarRotaNaSuperficieUseCase'
+import { montarContextoAcessoSuperficie } from '@/src/presentation/gestor-pedidos/montarContextoAcessoSuperficie'
 import { buildAuthFromAccessToken, isEmailSessaoPlaceholder } from '@/src/shared/utils/buildAuthFromAccessToken'
 import type { LoginEmpresaSnapshot } from '@/src/domain/types/LoginEmpresaSnapshot'
 
@@ -61,7 +63,11 @@ export function useTrocarEmpresaGestor() {
 
         await queryClient.invalidateQueries()
         const modulePath = stripGestaoEmpresaSlugFromPath(pathname) || '/dashboard'
-        router.replace(buildGestaoPath(empParam, modulePath))
+        const authz = autorizarRotaNaSuperficieUseCase.execute({
+          pathModulo: modulePath,
+          contexto: montarContextoAcessoSuperficie(token),
+        })
+        router.replace(buildGestaoPath(empParam, authz.permitido ? modulePath : authz.destinoSeNegado))
         syncEmpresaUrlPathFromSession()
         router.refresh()
       } catch (e) {

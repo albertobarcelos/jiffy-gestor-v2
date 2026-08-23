@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { disconnectEmpresaTab } from '@/src/presentation/utils/disconnectEmpresaTab'
+import { urlLoginDaSessaoAtual } from '@/src/presentation/gestor-pedidos/pathsGestorSessao'
 import { useEmpresaUrlSync } from '@/src/presentation/hooks/useEmpresaUrlSync'
 import { EmpresaSwitcherTopNav } from './EmpresaSwitcherTopNav'
 import { useQueryClient } from '@tanstack/react-query'
@@ -26,6 +27,7 @@ import {
   MdPercent,
   MdAnalytics,
   MdMenuBook,
+  MdDesktopWindows,
 } from 'react-icons/md'
 import type { IconType } from 'react-icons'
 import { useAcessoFiscal } from '@/src/presentation/hooks/useAcessoFiscal'
@@ -95,7 +97,7 @@ export function TopNav() {
       '/grupos-produtos',
       '/menus',
       '/estoque',
-      '/pedidos-clientes',
+      '/pedidos',
     ]
     
     // Prefetch com delay para não bloquear a renderização inicial
@@ -213,7 +215,8 @@ export function TopNav() {
         path: '#',
         icon: MdPointOfSale,
         children: [
-          { name: 'Pedidos e Clientes', path: '/pedidos-clientes', icon: MdReceipt },
+          { name: 'Pedidos e Clientes', path: '/pedidos', icon: MdReceipt },
+          { name: 'Abrir no Windows', path: '/pedidos/abrir-windows', icon: MdDesktopWindows },
           { name: 'Mesas Abertas', path: '/vendas/abertas', icon: MdTableBar },
           { name: 'Relatório de Vendas', path: '/relatorios-vendas', icon: MdAssessment },
           { name: 'Relatório de Produtos', path: '/relatorios-produtos-vendidos', icon: MdAnalytics },
@@ -279,7 +282,7 @@ export function TopNav() {
     } catch (e) {
       console.error('TopNav: erro ao sair da conta', e)
     }
-    window.location.assign('/login')
+    window.location.assign(urlLoginDaSessaoAtual())
   }, [queryClient, logout])
 
   useEffect(() => {

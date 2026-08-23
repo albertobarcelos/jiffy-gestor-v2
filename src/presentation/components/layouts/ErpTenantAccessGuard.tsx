@@ -7,7 +7,12 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantAccessGuard } from '@/src/presentation/hooks/useTenantAccessGuard'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { SESSION_STORAGE_TENANT_LOGOUT_SELF } from '@/src/shared/constants/sessionCoordinator'
-import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
+import {
+  estaNaMesmaRotaLocal,
+  irParaLoginDaSessaoAtual,
+  urlHubDaSessaoAtual,
+  urlLoginDaSessaoAtual,
+} from '@/src/presentation/gestor-pedidos/pathsGestorSessao'
 
 interface ErpTenantAccessGuardProps {
   children: ReactNode
@@ -33,6 +38,10 @@ export function ErpTenantAccessGuard({ children }: ErpTenantAccessGuardProps) {
 
     try {
       if (sessionStorage.getItem(SESSION_STORAGE_TENANT_LOGOUT_SELF) === '1') {
+        const identity = useAuthStore.getState().identityAuth
+        if (!identity || identity.isExpired()) {
+          irParaLoginDaSessaoAtual()
+        }
         return
       }
     } catch {
@@ -53,20 +62,26 @@ export function ErpTenantAccessGuard({ children }: ErpTenantAccessGuardProps) {
           } catch {
             /* noop */
           }
-          window.location.assign(HUB_PATH)
+          window.location.assign(urlHubDaSessaoAtual())
         })()
         return
       }
-      router.replace('/login')
+      const login = urlLoginDaSessaoAtual()
+      if (!estaNaMesmaRotaLocal(login)) {
+        router.replace(login)
+      }
       return
     }
 
     const identity = useAuthStore.getState().identityAuth
     if (identity && !identity.isExpired()) {
-      router.replace(HUB_PATH)
+      router.replace(urlHubDaSessaoAtual())
       return
     }
-    router.replace('/login')
+    const login = urlLoginDaSessaoAtual()
+    if (!estaNaMesmaRotaLocal(login)) {
+      router.replace(login)
+    }
   }, [hasAccess, isLoading, router, tenantAuth])
 
   if (isLoading || !hasAccess) {

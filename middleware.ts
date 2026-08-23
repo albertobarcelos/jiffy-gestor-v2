@@ -18,6 +18,15 @@ import {
   parseEmpresaSlugFromSearch,
   stripEmpresaSlugFromSearch,
 } from '@/src/shared/utils/gestaoRoutes'
+import { QUERY_GESTOR } from '@/src/presentation/gestor-pedidos/constantes'
+
+function urlLoginPreservandoGestor(request: NextRequest): URL {
+  const dest = new URL('/login', request.url)
+  if (request.nextUrl.searchParams.has(QUERY_GESTOR)) {
+    dest.searchParams.set(QUERY_GESTOR, request.nextUrl.searchParams.get(QUERY_GESTOR) ?? '')
+  }
+  return dest
+}
 
 /**
  * Middleware para proteção de rotas - OTIMIZADO
@@ -69,7 +78,7 @@ export function middleware(request: NextRequest) {
       Boolean(request.cookies.get(AUTH_COOKIE_REFRESH)?.value) ||
       Boolean(request.cookies.get(AUTH_COOKIE_LEGACY)?.value)
     if (!hasAnySessionCookie) {
-      return NextResponse.redirect(new URL('/login', request.url))
+      return NextResponse.redirect(urlLoginPreservandoGestor(request))
     }
     return NextResponse.redirect(new URL(HUB_PATH, request.url))
   }
@@ -90,7 +99,7 @@ export function middleware(request: NextRequest) {
       Boolean(request.cookies.get(AUTH_COOKIE_REFRESH)?.value) ||
       Boolean(request.cookies.get(AUTH_COOKIE_LEGACY)?.value)
     if (!hasAnySessionCookie) {
-      return NextResponse.redirect(new URL('/login', request.url))
+      return NextResponse.redirect(urlLoginPreservandoGestor(request))
     }
     return NextResponse.next()
   }
@@ -155,7 +164,7 @@ export function middleware(request: NextRequest) {
     if (isApiRoute) {
       return NextResponse.json({ error: 'Token não encontrado' }, { status: 401 })
     }
-    return NextResponse.redirect(new URL('/login', request.url))
+    return NextResponse.redirect(urlLoginPreservandoGestor(request))
   }
 
   // Para rotas de página e API, apenas verifica se token existe

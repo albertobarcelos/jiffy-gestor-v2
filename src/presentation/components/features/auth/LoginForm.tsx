@@ -11,6 +11,10 @@ import { AuthEnvelopeIcon, AuthLockIcon } from '@/src/presentation/components/fe
 import { authFluid } from '@/src/presentation/components/features/auth/components/auth-input-fluid'
 import { cn } from '@/src/shared/utils/cn'
 import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
+import { fetchAccessTokenEscolherEmpresa } from '@/src/presentation/utils/escolherEmpresaApi'
+import { entrarEmpresaGestorNaAba } from '@/src/presentation/gestor-pedidos/entrarEmpresaGestorNaAba'
+import { lerSinalGestorDoBrowser } from '@/src/presentation/gestor-pedidos/pathsGestorSessao'
+import { planearDestinoAposLogin } from '@/src/presentation/gestor-pedidos/planearDestinoAposLogin'
 
 /**
  * Componente de formulário de login
@@ -87,7 +91,26 @@ export function LoginForm() {
 
       loginWithHubEmpresas(resultado.auth, resultado.empresas)
 
-      router.replace(HUB_PATH)
+      const destino = planearDestinoAposLogin({
+        empresas: resultado.empresas,
+        sinalGestor: lerSinalGestorDoBrowser(),
+      })
+      if (destino.tipo === 'pedidos-gestor') {
+        const token = await fetchAccessTokenEscolherEmpresa(
+          destino.empresa.id,
+          resultado.auth.getAccessToken()
+        )
+        router.replace(
+          entrarEmpresaGestorNaAba({
+            accessToken: token,
+            empresaNome: destino.empresa.nomeFantasia,
+            empresaId: destino.empresa.id,
+          })
+        )
+        return
+      }
+
+      router.replace(destino.path || HUB_PATH)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao fazer login'
       setError(message)

@@ -5,6 +5,7 @@ import { Menu, LogOut } from 'lucide-react'
 import { cn } from '@/src/shared/utils/cn'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { disconnectHubTab } from '@/src/presentation/utils/disconnectHubTab'
+import { urlLoginDaSessaoAtual } from '@/src/presentation/gestor-pedidos/pathsGestorSessao'
 import { useHubSearchSlot } from '@/src/presentation/contexts/HubSearchContext'
 import { SearchBar } from '@/src/presentation/components/features/minhas-empresas/components/SearchBar'
 import { isEmailSessaoPlaceholder } from '@/src/shared/utils/buildAuthFromAccessToken'
@@ -30,7 +31,7 @@ export function HubTopBar({ onMenuClick }: HubTopBarProps) {
     if (!isRehydrated || !user) return
     if (!isEmailSessaoPlaceholder(emailUsuario)) return
     void logout().finally(() => {
-      window.location.href = '/login'
+      window.location.href = urlLoginDaSessaoAtual()
     })
   }, [isRehydrated, user, emailUsuario, logout])
 
