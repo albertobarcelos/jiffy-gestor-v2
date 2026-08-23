@@ -222,7 +222,7 @@ export function KanbanVendaCardHeader(props: KanbanVendaCardHeaderProps) {
       <div className="flex gap-2 border-b border-gray-100 pb-1.5">
         <div className="min-w-0 flex-1">
           <div className="mb-0.5 flex items-center gap-1">
-            <p className="min-w-0 truncate text-xs leading-tight text-gray-500">
+            <p className="min-w-0 truncate text-sm font-bold leading-tight text-gray-900">
               {linhaIdentificacaoVenda}
             </p>
             {editarProdutosBtn}
@@ -265,7 +265,7 @@ export function KanbanVendaCardHeader(props: KanbanVendaCardHeaderProps) {
     <div className="flex gap-2">
       <div className="min-w-0 flex-1 border-b border-gray-100 pb-1.5">
         <div className="mb-0.5 flex items-center gap-1">
-          <p className="min-w-0 truncate text-xs text-gray-500">
+          <p className="min-w-0 truncate text-sm font-bold text-gray-900">
             {prefixoLinhaOrigemCard} | {linhaIdentificacaoVenda}
           </p>
           {editarProdutosBtn}

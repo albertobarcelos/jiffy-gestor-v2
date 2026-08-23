@@ -24,10 +24,10 @@ export function KanbanCardAcaoButton(props: {
       className="flex-1 min-w-0 !bg-[#003366] !text-white hover:!bg-[#003366] hover:!text-white"
       sx={{
         backgroundColor: `${KANBAN_CARD_ACAO_COLOR} !important`,
-        py: 0.375,
-        px: 1,
+        py: 0.75,
+        px: 1.25,
         display: 'inline-flex',
-        minHeight: 'auto',
+        minHeight: 36,
         fontFamily: 'var(--font-general-sans), system-ui, sans-serif',
         fontSize: '13px',
         fontWeight: 500,

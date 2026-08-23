@@ -11,7 +11,16 @@ import {
   MdSettings,
 } from 'react-icons/md'
 import { KanbanModoVendasToggle, type ModoKanbanVendas } from '../KanbanModoVendasToggle'
-import type { ColunaKanbanFiltroExtra, OrigemFiltro, TipoEntregaFiltro } from '../types'
+import type {
+  ColunaKanbanFiltroExtra,
+  ColunaKanbanId,
+  KanbanColumn,
+  OrigemFiltro,
+  TipoEntregaFiltro,
+} from '../types'
+import type { ModoVisualizacaoKanban } from '../utils/kanbanModoVisualizacao'
+import { KanbanColunasMenu } from './KanbanColunasMenu'
+import { KanbanModoVisualizacaoSelect } from './KanbanModoVisualizacaoSelect'
 import {
   KANBAN_FILTRO_DATA_PRESET_OPCOES,
   type KanbanFiltroDataPreset,
@@ -42,8 +51,14 @@ export interface KanbanToolbarProps {
   onClearFilters: () => void
   modoKanbanVendas: ModoKanbanVendas
   onModoKanbanVendasChange: (value: ModoKanbanVendas) => void
+  modoVisualizacao: ModoVisualizacaoKanban
+  onModoVisualizacaoChange: (value: ModoVisualizacaoKanban) => void
   onAbrirConfiguracoesDelivery: () => void
   onAbrirNovoPedido: () => void
+  colunasDoModo: KanbanColumn[]
+  colunasOcultas: readonly ColunaKanbanId[]
+  onSetColunaVisivel: (id: ColunaKanbanId, visivel: boolean) => void
+  contagemPorColuna: (id: ColunaKanbanId) => number
 }
 
 const KANBAN_BUTTON_COLOR = '#530CA3'
@@ -189,8 +204,14 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
     onClearFilters,
     modoKanbanVendas,
     onModoKanbanVendasChange,
+    modoVisualizacao,
+    onModoVisualizacaoChange,
     onAbrirConfiguracoesDelivery,
     onAbrirNovoPedido,
+    colunasDoModo,
+    colunasOcultas,
+    onSetColunaVisivel,
+    contagemPorColuna,
   } = props
 
   const isModoDelivery = modoKanbanVendas === 'delivery'
@@ -365,6 +386,16 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
           >
             <MdRefresh className={`h-5 w-5 ${refreshSpinning ? 'animate-spin' : ''}`} />
           </button>
+          <KanbanColunasMenu
+            colunasDoModo={colunasDoModo}
+            ocultas={colunasOcultas}
+            onSetColunaVisivel={onSetColunaVisivel}
+            contagemPorColuna={contagemPorColuna}
+          />
+          <KanbanModoVisualizacaoSelect
+            value={modoVisualizacao}
+            onChange={onModoVisualizacaoChange}
+          />
           <KanbanModoVendasToggle value={modoKanbanVendas} onChange={onModoKanbanVendasChange} />
           <button
             type="button"

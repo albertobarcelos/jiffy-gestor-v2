@@ -140,6 +140,41 @@ export function acoesTransicaoEntregaAvanco(
   return acoes
 }
 
+export type RotuloAvancarEtapaKanban = {
+  label: string
+  loading: string
+}
+
+function vendaEhRetiradaKanban(tipoVenda?: string | null): boolean {
+  return String(tipoVenda ?? '').trim().toLowerCase() === 'retirada'
+}
+
+/** Texto do botão de avanço: diz a próxima etapa (entrega ≠ retirada nos dois últimos). */
+export function rotuloBotaoAvancarEtapaKanban(
+  colunaAtual: ColunaKanbanId,
+  tipoVenda?: string | null
+): RotuloAvancarEtapaKanban {
+  const retirada = vendaEhRetiradaKanban(tipoVenda)
+
+  if (colunaAtual === 'NOVOS_PEDIDOS') {
+    return { label: 'Iniciar preparo', loading: 'Iniciando…' }
+  }
+  if (colunaAtual === 'EM_PREPARO') {
+    return { label: 'Marcar como pronto', loading: 'Marcando…' }
+  }
+  if (colunaAtual === 'PRONTO_ENTREGA') {
+    return retirada
+      ? { label: 'Liberar retirada', loading: 'Liberando…' }
+      : { label: 'Saiu para entrega', loading: 'Enviando…' }
+  }
+  if (colunaAtual === 'EM_ROTA') {
+    return retirada
+      ? { label: 'Confirmar retirada', loading: 'Finalizando…' }
+      : { label: 'Confirmar entrega', loading: 'Finalizando…' }
+  }
+  return { label: 'Avançar etapa', loading: 'Avançando…' }
+}
+
 function dadosFiscalVendaKanban(v: VendaUnificadaDTO) {
   return {
     statusFiscal: v.statusFiscal,
