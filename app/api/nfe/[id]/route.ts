@@ -14,7 +14,7 @@ export async function GET(
 ) {
   let id: string | undefined
   try {
-    const validation = validateRequest(request)
+    const validation = validateRequest(request, { requireAuthorizationHeader: true })
     if (!validation.valid || !validation.tokenInfo) {
       return validation.error!
     }
