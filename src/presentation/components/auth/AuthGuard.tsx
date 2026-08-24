@@ -244,7 +244,17 @@ export function AuthGuard({ children }: AuthGuardProps) {
       if (!isTenantSessionAlive() && !identityHubStillValid()) {
         irParaLoginDaSessaoAtual()
       }
-      return
+      const timeoutId = window.setTimeout(() => {
+        if (useAuthStore.getState().isTabVerified || isTenantSessionAlive()) {
+          return
+        }
+        if (identityHubStillValid()) {
+          window.location.replace(urlHubDaSessaoAtual())
+          return
+        }
+        irParaLoginDaSessaoAtual()
+      }, 4_000)
+      return () => window.clearTimeout(timeoutId)
     }
 
     if (isTenantLogoutInProgress()) {
@@ -516,7 +526,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     }
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
-        <JiffyLoading />
+        <JiffyLoading text="Abrindo sessão…" />
       </div>
     )
   }

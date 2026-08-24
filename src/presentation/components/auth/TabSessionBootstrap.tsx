@@ -8,6 +8,7 @@ import {
   getTabTenantToken,
   bootstrapTabSessionManually,
   clearTabSession,
+  getEmpresaSlugParam,
 } from '@/src/shared/utils/tabSession'
 import { parseEmpresaSlugFromPath, parseEmpresaSlugFromSearch } from '@/src/shared/utils/gestaoRoutes'
 import {
@@ -17,8 +18,11 @@ import {
 } from '@/src/shared/constants/sessionCoordinator'
 import {
   irParaLoginDaSessaoAtual,
+  lerSinalGestorDoBrowser,
+  pathPedidosGestor,
   urlHubDaSessaoAtual,
 } from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
+import { isSinalKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
 import { extractTokenInfo } from '@/src/shared/utils/validateToken'
 import { decideTabSessionBootstrap } from '@/src/presentation/utils/decideTabSessionBootstrap'
 
@@ -120,6 +124,17 @@ export function TabSessionBootstrap() {
     }
 
     const emp = getEmpParam()
+
+    /** Jiffy Flow abre `/pedidos?gestor` — a URL canônica é `/gestao/{slug}/pedidos?gestor`. */
+    if (!emp && isSinalKioskGestorPedidos(lerSinalGestorDoBrowser())) {
+      const storedSlug = getEmpresaSlugParam()
+      if (storedSlug) {
+        didRunRef.current = true
+        window.location.replace(pathPedidosGestor(storedSlug))
+        return
+      }
+    }
+
     const pendingToken = consumeTabSession(emp)
     const existingToken = pendingToken ? null : getTabTenantToken()
 
@@ -157,7 +172,11 @@ export function TabSessionBootstrap() {
       } catch {
         /* ignore */
       }
-      activateTenantToken(decision.token, setTenantAuth, setTabVerified)
+      try {
+        activateTenantToken(decision.token, setTenantAuth, setTabVerified)
+      } catch {
+        irParaLoginDaSessaoAtual()
+      }
       return
     }
 

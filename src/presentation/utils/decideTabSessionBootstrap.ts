@@ -62,6 +62,14 @@ export function decideTabSessionBootstrap(input: {
     return { type: 'activate', token: pendingToken }
   }
 
+  /**
+   * Tauri / `?gestor` abre `/pedidos` sem slug. Sem token da aba não há o que
+   * esperar — o hub escolhe a empresa (ou o bootstrap restaura o slug gravado).
+   */
+  if (!empParam && !existingToken) {
+    return { type: 'redirect-hub' }
+  }
+
   if (existingToken) {
     if (tokenMatchesUrlEmpresa(existingToken, empParam)) {
       return { type: 'activate', token: existingToken }

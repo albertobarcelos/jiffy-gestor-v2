@@ -16,7 +16,7 @@ const Kanban = dynamic(
     ssr: false,
     loading: () => (
       <div className="flex h-full items-center justify-center bg-gray-50">
-        <JiffyLoading />
+        <JiffyLoading text="Carregando o quadro de pedidos…" />
       </div>
     ),
   }

@@ -112,6 +112,17 @@ describe('decideTabSessionBootstrap', () => {
     ).toEqual({ type: 'rebind', empresaId: EMPRESA_B, empParam: SLUG_B })
   })
 
+  it('sem slug e sem token da aba → redirect-hub (Tauri /pedidos?gestor)', () => {
+    expect(
+      decideTabSessionBootstrap({
+        empParam: null,
+        pendingToken: null,
+        existingToken: null,
+        hubEmpresas: hub,
+      })
+    ).toEqual({ type: 'redirect-hub' })
+  })
+
   it('sem token e hub ainda vazio → wait', () => {
     expect(
       decideTabSessionBootstrap({
