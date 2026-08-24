@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import { TopNav } from '@/src/presentation/components/layouts/TopNav'
 import { ErpTenantAccessGuard } from '@/src/presentation/components/layouts/ErpTenantAccessGuard'
-import { useKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/useKioskGestorPedidos'
+import { useKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/kiosk/useKioskGestorPedidos'
 import { useDetectCacheLeaks } from '@/src/presentation/hooks/useDetectCacheLeaks'
 import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 

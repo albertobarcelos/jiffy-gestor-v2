@@ -1,15 +1,15 @@
 import { Superficie } from '@/src/domain/superficie/Superficie'
 import {
   type ContextoAcessoSuperficie,
-  isOperadorSomentePortal,
-  MODULO_PORTAL_PEDIDOS,
+  isOperadorSomentePedidos,
+  MODULO_CLAIM_PEDIDOS,
   temModulo,
 } from '@/src/domain/superficie/ContextoAcessoSuperficie'
 
 /**
  * Quem pode estar em cada superfície.
- * Utilizador sem sinais de portal continua no ERP (compatibilidade).
- * Portal vazio é visível a qualquer sessão ativa (preview); só o operador
+ * Utilizador sem sinais de pedidos continua no ERP (compatibilidade).
+ * O quadro vazio é visível a qualquer sessão ativa (preview); só o operador
  * exclusivo é barrado no ERP.
  */
 export class PodeAcessarSuperficie {
@@ -17,11 +17,11 @@ export class PodeAcessarSuperficie {
     if (!contexto.usuarioAtivo) return false
 
     if (superficie.isErp()) {
-      return !isOperadorSomentePortal(contexto)
+      return !isOperadorSomentePedidos(contexto)
     }
 
-    if (superficie.isPortalPedidos()) {
-      if (contexto.claimPortalPedidos === false && !temModulo(contexto, MODULO_PORTAL_PEDIDOS)) {
+    if (superficie.isGestorPedidos()) {
+      if (contexto.claimPedidos === false && !temModulo(contexto, MODULO_CLAIM_PEDIDOS)) {
         return false
       }
       return true

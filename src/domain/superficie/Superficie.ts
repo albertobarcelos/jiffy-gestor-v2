@@ -2,11 +2,15 @@ export const CODIGOS_SUPERFICIE = ['ERP', 'PORTAL_PEDIDOS'] as const
 
 export type CodigoSuperficie = (typeof CODIGOS_SUPERFICIE)[number]
 
+/**
+ * Superfície de UI. O código `PORTAL_PEDIDOS` é o contrato do JWT/backend;
+ * no produto a superfície é o quadro em `/pedidos`.
+ */
 export class Superficie {
   private constructor(private readonly codigo: CodigoSuperficie) {}
 
   static readonly ERP = Superficie.create('ERP')
-  static readonly PORTAL_PEDIDOS = Superficie.create('PORTAL_PEDIDOS')
+  static readonly GESTOR_PEDIDOS = Superficie.create('PORTAL_PEDIDOS')
 
   static create(raw: string): Superficie {
     const codigo = String(raw ?? '')
@@ -35,7 +39,7 @@ export class Superficie {
     return this.codigo === 'ERP'
   }
 
-  isPortalPedidos(): boolean {
+  isGestorPedidos(): boolean {
     return this.codigo === 'PORTAL_PEDIDOS'
   }
 

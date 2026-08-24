@@ -1,17 +1,17 @@
 export { Superficie, CODIGOS_SUPERFICIE, type CodigoSuperficie } from './Superficie'
 export {
   criarContextoAcessoSuperficie,
-  isOperadorSomentePortal,
+  isOperadorSomentePedidos,
   temModulo,
   MODULO_ERP,
-  MODULO_PORTAL_PEDIDOS,
+  MODULO_CLAIM_PEDIDOS,
   type ContextoAcessoSuperficie,
 } from './ContextoAcessoSuperficie'
 export { PodeAcessarSuperficie } from './policies/PodeAcessarSuperficie'
 export {
   RotasDaSuperficie,
   normalizarPathModulo,
-  isRotaPortalPedidos,
+  isRotaQuadroPedidos,
   isRotaPublicaAuth,
   isRotaSessaoHub,
   PATH_DASHBOARD_ERP,

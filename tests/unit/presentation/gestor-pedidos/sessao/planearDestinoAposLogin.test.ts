@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { LoginEmpresaSnapshot } from '@/src/domain/types/LoginEmpresaSnapshot'
-import { escolherEmpresaUnicaAtiva } from '@/src/presentation/gestor-pedidos/escolherEmpresaUnicaAtiva'
-import { planearDestinoAposLogin } from '@/src/presentation/gestor-pedidos/planearDestinoAposLogin'
+import { escolherEmpresaUnicaAtiva } from '@/src/presentation/gestor-pedidos/sessao/escolherEmpresaUnicaAtiva'
+import { planearDestinoAposLogin } from '@/src/presentation/gestor-pedidos/sessao/planearDestinoAposLogin'
 
 const ativa = (id: string): LoginEmpresaSnapshot => ({
   id,

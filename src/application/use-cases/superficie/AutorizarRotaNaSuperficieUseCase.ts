@@ -2,7 +2,7 @@ import type { ContextoAcessoSuperficie } from '@/src/domain/superficie/ContextoA
 import { Superficie } from '@/src/domain/superficie/Superficie'
 import { PodeAcessarSuperficie } from '@/src/domain/superficie/policies/PodeAcessarSuperficie'
 import {
-  isRotaPortalPedidos,
+  isRotaQuadroPedidos,
   isRotaPublicaAuth,
   isRotaSessaoHub,
   normalizarPathModulo,
@@ -32,8 +32,8 @@ export class AutorizarRotaNaSuperficieUseCase {
       }
     }
 
-    if (isRotaPortalPedidos(pathModulo)) {
-      const permitido = PodeAcessarSuperficie.check(Superficie.PORTAL_PEDIDOS, input.contexto)
+    if (isRotaQuadroPedidos(pathModulo)) {
+      const permitido = PodeAcessarSuperficie.check(Superficie.GESTOR_PEDIDOS, input.contexto)
       return {
         permitido,
         pathModulo,

@@ -10,7 +10,7 @@ import { usePrefetch } from '@/src/presentation/hooks/usePrefetch'
 import { useAcessoFiscal } from '@/src/presentation/hooks/useAcessoFiscal'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import { matchesModulePath } from '@/src/shared/utils/gestaoRoutes'
-import { urlLoginDaSessaoAtual } from '@/src/presentation/gestor-pedidos/pathsGestorSessao'
+import { urlLoginDaSessaoAtual } from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
 
 /**
  * Sidebar do dashboard

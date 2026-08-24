@@ -1,5 +1,5 @@
 import type { ContextoAcessoSuperficie } from '@/src/domain/superficie/ContextoAcessoSuperficie'
-import { isOperadorSomentePortal } from '@/src/domain/superficie/ContextoAcessoSuperficie'
+import { isOperadorSomentePedidos } from '@/src/domain/superficie/ContextoAcessoSuperficie'
 import { Superficie } from '@/src/domain/superficie/Superficie'
 import {
   PATH_DASHBOARD_ERP,
@@ -9,9 +9,9 @@ import type { DestinoPosLoginDTO } from '@/src/application/dto/superficie/Destin
 
 export class ResolverDestinoPosLoginUseCase {
   execute(contexto: ContextoAcessoSuperficie): DestinoPosLoginDTO {
-    if (isOperadorSomentePortal(contexto)) {
+    if (isOperadorSomentePedidos(contexto)) {
       return {
-        superficie: Superficie.PORTAL_PEDIDOS.getCodigo(),
+        superficie: Superficie.GESTOR_PEDIDOS.getCodigo(),
         pathModulo: PATH_GESTOR_PEDIDOS,
       }
     }

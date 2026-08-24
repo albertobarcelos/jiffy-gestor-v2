@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo } from 'react'
-import { PEDIDOS_WINDOWS_PROTOCOLO, urlInstaladorPedidosWindows } from './constantes'
+import { PEDIDOS_WINDOWS_PROTOCOLO, urlInstaladorPedidosWindows } from '../constantes'
 import { planearAbrirPedidosWindows } from './planearAbrirPedidosWindows'
 
 export function AbrirPedidosWindowsPainel() {

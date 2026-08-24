@@ -18,7 +18,7 @@ import {
 import {
   irParaLoginDaSessaoAtual,
   urlHubDaSessaoAtual,
-} from '@/src/presentation/gestor-pedidos/pathsGestorSessao'
+} from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
 import { extractTokenInfo } from '@/src/shared/utils/validateToken'
 import { decideTabSessionBootstrap } from '@/src/presentation/utils/decideTabSessionBootstrap'
 

@@ -1,4 +1,4 @@
-import { PEDIDOS_PATH, QUERY_GESTOR } from './constantes'
+import { PEDIDOS_PATH, QUERY_GESTOR } from '../constantes'
 
 function pathSemQuery(pathModulo: string): string {
   return pathModulo.split('?')[0] || ''

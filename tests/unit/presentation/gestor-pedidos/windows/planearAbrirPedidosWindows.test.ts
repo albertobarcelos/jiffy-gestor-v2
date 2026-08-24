@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   isWindowsUserAgent,
   planearAbrirPedidosWindows,
-} from '@/src/presentation/gestor-pedidos/planearAbrirPedidosWindows'
+} from '@/src/presentation/gestor-pedidos/windows/planearAbrirPedidosWindows'
 
 describe('planearAbrirPedidosWindows', () => {
   it('reconhece Windows de secretária e ignora Windows Phone', () => {

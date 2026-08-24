@@ -14,7 +14,7 @@ import {
 } from '@/src/shared/utils/tabSession'
 import { buildGestaoPath, stripGestaoEmpresaSlugFromPath } from '@/src/shared/utils/gestaoRoutes'
 import { autorizarRotaNaSuperficieUseCase } from '@/src/application/use-cases/superficie/AutorizarRotaNaSuperficieUseCase'
-import { montarContextoAcessoSuperficie } from '@/src/presentation/gestor-pedidos/montarContextoAcessoSuperficie'
+import { montarContextoAcessoSuperficie } from '@/src/presentation/gestor-pedidos/superficie/montarContextoAcessoSuperficie'
 import { buildAuthFromAccessToken, isEmailSessaoPlaceholder } from '@/src/shared/utils/buildAuthFromAccessToken'
 import type { LoginEmpresaSnapshot } from '@/src/domain/types/LoginEmpresaSnapshot'
 

@@ -1,19 +1,19 @@
-/** Módulo em `UsuarioGestor.modulosAcesso` e/ou claim JWT. */
-export const MODULO_PORTAL_PEDIDOS = 'portal-pedidos'
+/** Claim JWT / `UsuarioGestor.modulosAcesso`. Contrato do backend — não alterar o valor. */
+export const MODULO_CLAIM_PEDIDOS = 'portal-pedidos'
 
-/** Se presente junto com o portal, o utilizador também acede ao ERP. */
+/** Se presente junto com o módulo de pedidos, o utilizador também acede ao ERP. */
 export const MODULO_ERP = 'erp'
 
 export type ContextoAcessoSuperficie = {
   usuarioAtivo: boolean
   modulosAcesso: readonly string[]
-  /** Só o portal: bloqueia dashboard, produtos, Kanban ERP, etc. */
-  somentePortalPedidos: boolean
+  /** Só o quadro de pedidos: bloqueia dashboard, produtos, resto do ERP. */
+  somentePedidos: boolean
   /**
-   * Claim explícito de acesso ao portal.
+   * Claim explícito de acesso ao quadro de pedidos.
    * `null` = ausente (compatibilidade).
    */
-  claimPortalPedidos: boolean | null
+  claimPedidos: boolean | null
 }
 
 export function criarContextoAcessoSuperficie(
@@ -26,9 +26,8 @@ export function criarContextoAcessoSuperficie(
   return {
     usuarioAtivo: input.usuarioAtivo !== false,
     modulosAcesso: modulos,
-    somentePortalPedidos: input.somentePortalPedidos === true,
-    claimPortalPedidos:
-      input.claimPortalPedidos === undefined ? null : input.claimPortalPedidos,
+    somentePedidos: input.somentePedidos === true,
+    claimPedidos: input.claimPedidos === undefined ? null : input.claimPedidos,
   }
 }
 
@@ -37,9 +36,9 @@ export function temModulo(contexto: ContextoAcessoSuperficie, modulo: string): b
   return contexto.modulosAcesso.includes(alvo)
 }
 
-export function isOperadorSomentePortal(contexto: ContextoAcessoSuperficie): boolean {
-  if (contexto.somentePortalPedidos) return true
-  const temPortal = temModulo(contexto, MODULO_PORTAL_PEDIDOS)
+export function isOperadorSomentePedidos(contexto: ContextoAcessoSuperficie): boolean {
+  if (contexto.somentePedidos) return true
+  const temPedidos = temModulo(contexto, MODULO_CLAIM_PEDIDOS)
   const temErp = temModulo(contexto, MODULO_ERP)
-  return temPortal && !temErp
+  return temPedidos && !temErp
 }

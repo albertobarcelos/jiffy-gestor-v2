@@ -4,43 +4,43 @@ import { PodeAcessarSuperficie } from '@/src/domain/superficie/policies/PodeAces
 import { Superficie } from '@/src/domain/superficie/Superficie'
 
 describe('PodeAcessarSuperficie', () => {
-  it('utilizador sem sinais continua no ERP e pode pré-visualizar o portal', () => {
+  it('utilizador sem sinais continua no ERP e pode pré-visualizar o quadro', () => {
     const ctx = criarContextoAcessoSuperficie()
     expect(PodeAcessarSuperficie.check(Superficie.ERP, ctx)).toBe(true)
-    expect(PodeAcessarSuperficie.check(Superficie.PORTAL_PEDIDOS, ctx)).toBe(true)
+    expect(PodeAcessarSuperficie.check(Superficie.GESTOR_PEDIDOS, ctx)).toBe(true)
   })
 
   it('operador exclusivo não entra no ERP', () => {
     const ctx = criarContextoAcessoSuperficie({
-      somentePortalPedidos: true,
+      somentePedidos: true,
       modulosAcesso: ['portal-pedidos'],
     })
     expect(PodeAcessarSuperficie.check(Superficie.ERP, ctx)).toBe(false)
-    expect(PodeAcessarSuperficie.check(Superficie.PORTAL_PEDIDOS, ctx)).toBe(true)
+    expect(PodeAcessarSuperficie.check(Superficie.GESTOR_PEDIDOS, ctx)).toBe(true)
   })
 
-  it('módulo portal-pedidos sem erp implica só portal', () => {
+  it('módulo portal-pedidos sem erp implica só o quadro de pedidos', () => {
     const ctx = criarContextoAcessoSuperficie({ modulosAcesso: ['portal-pedidos'] })
     expect(PodeAcessarSuperficie.check(Superficie.ERP, ctx)).toBe(false)
   })
 
-  it('portal + erp permite as duas superfícies', () => {
+  it('pedidos + erp permite as duas superfícies', () => {
     const ctx = criarContextoAcessoSuperficie({
       modulosAcesso: ['portal-pedidos', 'erp'],
     })
     expect(PodeAcessarSuperficie.check(Superficie.ERP, ctx)).toBe(true)
-    expect(PodeAcessarSuperficie.check(Superficie.PORTAL_PEDIDOS, ctx)).toBe(true)
+    expect(PodeAcessarSuperficie.check(Superficie.GESTOR_PEDIDOS, ctx)).toBe(true)
   })
 
-  it('claim portalPedidos=false sem módulo bloqueia o portal', () => {
-    const ctx = criarContextoAcessoSuperficie({ claimPortalPedidos: false })
-    expect(PodeAcessarSuperficie.check(Superficie.PORTAL_PEDIDOS, ctx)).toBe(false)
+  it('claim portalPedidos=false sem módulo bloqueia o quadro', () => {
+    const ctx = criarContextoAcessoSuperficie({ claimPedidos: false })
+    expect(PodeAcessarSuperficie.check(Superficie.GESTOR_PEDIDOS, ctx)).toBe(false)
     expect(PodeAcessarSuperficie.check(Superficie.ERP, ctx)).toBe(true)
   })
 
   it('utilizador inativo não acede a nenhuma superfície', () => {
     const ctx = criarContextoAcessoSuperficie({ usuarioAtivo: false })
     expect(PodeAcessarSuperficie.check(Superficie.ERP, ctx)).toBe(false)
-    expect(PodeAcessarSuperficie.check(Superficie.PORTAL_PEDIDOS, ctx)).toBe(false)
+    expect(PodeAcessarSuperficie.check(Superficie.GESTOR_PEDIDOS, ctx)).toBe(false)
   })
 })

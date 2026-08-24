@@ -12,9 +12,9 @@ import { authFluid } from '@/src/presentation/components/features/auth/component
 import { cn } from '@/src/shared/utils/cn'
 import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 import { fetchAccessTokenEscolherEmpresa } from '@/src/presentation/utils/escolherEmpresaApi'
-import { entrarEmpresaGestorNaAba } from '@/src/presentation/gestor-pedidos/entrarEmpresaGestorNaAba'
-import { lerSinalGestorDoBrowser } from '@/src/presentation/gestor-pedidos/pathsGestorSessao'
-import { planearDestinoAposLogin } from '@/src/presentation/gestor-pedidos/planearDestinoAposLogin'
+import { entrarEmpresaGestorNaAba } from '@/src/presentation/gestor-pedidos/sessao/entrarEmpresaGestorNaAba'
+import { lerSinalGestorDoBrowser } from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
+import { planearDestinoAposLogin } from '@/src/presentation/gestor-pedidos/sessao/planearDestinoAposLogin'
 
 /**
  * Componente de formulário de login

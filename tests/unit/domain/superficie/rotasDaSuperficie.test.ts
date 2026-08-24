@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  isRotaPortalPedidos,
+  isRotaQuadroPedidos,
   isRotaPublicaAuth,
   isRotaSessaoHub,
   normalizarPathModulo,
@@ -16,16 +16,16 @@ describe('RotasDaSuperficie', () => {
   it('classifica login, hub e pedidos', () => {
     expect(isRotaPublicaAuth('/login')).toBe(true)
     expect(isRotaSessaoHub('/minhas-empresas')).toBe(true)
-    expect(isRotaPortalPedidos('/pedidos')).toBe(true)
-    expect(isRotaPortalPedidos('/pedidos/abrir-windows')).toBe(true)
-    expect(isRotaPortalPedidos('/portal-pedidos')).toBe(false)
-    expect(isRotaPortalPedidos('/gestor-pedidos')).toBe(false)
+    expect(isRotaQuadroPedidos('/pedidos')).toBe(true)
+    expect(isRotaQuadroPedidos('/pedidos/abrir-windows')).toBe(true)
+    expect(isRotaQuadroPedidos('/portal-pedidos')).toBe(false)
+    expect(isRotaQuadroPedidos('/gestor-pedidos')).toBe(false)
   })
 
   it('operador de pedidos não entra em /produtos', () => {
-    expect(RotasDaSuperficie.pathPermitido(Superficie.PORTAL_PEDIDOS, '/produtos')).toBe(false)
-    expect(RotasDaSuperficie.pathPermitido(Superficie.PORTAL_PEDIDOS, '/pedidos')).toBe(true)
-    expect(RotasDaSuperficie.pathPermitido(Superficie.PORTAL_PEDIDOS, '/login')).toBe(true)
+    expect(RotasDaSuperficie.pathPermitido(Superficie.GESTOR_PEDIDOS, '/produtos')).toBe(false)
+    expect(RotasDaSuperficie.pathPermitido(Superficie.GESTOR_PEDIDOS, '/pedidos')).toBe(true)
+    expect(RotasDaSuperficie.pathPermitido(Superficie.GESTOR_PEDIDOS, '/login')).toBe(true)
   })
 
   it('ERP pode abrir pedidos e o dashboard', () => {

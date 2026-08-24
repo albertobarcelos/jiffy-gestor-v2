@@ -8,12 +8,12 @@ import {
   SESSION_STORAGE_TENANT_LOGOUT_SELF,
 } from '@/src/shared/constants/sessionCoordinator'
 import { isHubPathname } from '@/src/shared/constants/hubRoutes'
-import { isSinalKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/isKioskGestorPedidos'
+import { isSinalKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
 import {
   lerSinalGestorDoBrowser,
   urlHubDaSessaoAtual,
   urlLoginDaSessaoAtual,
-} from '@/src/presentation/gestor-pedidos/pathsGestorSessao'
+} from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
 
 /**
  * Outra guia encerrou a sessão da empresa (tenant): avisa e fecha esta guia (com fallback).

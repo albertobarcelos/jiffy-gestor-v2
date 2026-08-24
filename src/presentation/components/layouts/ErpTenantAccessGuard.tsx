@@ -12,7 +12,7 @@ import {
   irParaLoginDaSessaoAtual,
   urlHubDaSessaoAtual,
   urlLoginDaSessaoAtual,
-} from '@/src/presentation/gestor-pedidos/pathsGestorSessao'
+} from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
 
 interface ErpTenantAccessGuardProps {
   children: ReactNode

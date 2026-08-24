@@ -20,7 +20,7 @@ import { HUB_PATH, isHubPathname } from '@/src/shared/constants/hubRoutes'
 import {
   irParaLoginDaSessaoAtual,
   urlHubDaSessaoAtual,
-} from '@/src/presentation/gestor-pedidos/pathsGestorSessao'
+} from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
 
 /** Tempo máximo de espera para o refresh de token antes de encerrar a sessão da empresa. */
 const REFRESH_TIMEOUT_MS = 5_000

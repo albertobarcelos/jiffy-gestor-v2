@@ -3,7 +3,7 @@ import {
   deveEsconderTopNavNoGestorPedidos,
   isRotaPedidos,
   isSinalKioskGestorPedidos,
-} from '@/src/presentation/gestor-pedidos/isKioskGestorPedidos'
+} from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
 
 describe('rota /pedidos', () => {
   it('reconhece o quadro e ignora rotas mortas', () => {

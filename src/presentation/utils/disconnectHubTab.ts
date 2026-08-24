@@ -1,9 +1,9 @@
 import { SESSION_STORAGE_HUB_LOGOUT_SELF } from '@/src/shared/constants/sessionCoordinator'
-import { isSinalKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/isKioskGestorPedidos'
+import { isSinalKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
 import {
   lerSinalGestorDoBrowser,
   urlLoginDaSessaoAtual,
-} from '@/src/presentation/gestor-pedidos/pathsGestorSessao'
+} from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
 
 type DisconnectHubOpts = {
   logoutHub: () => Promise<void>

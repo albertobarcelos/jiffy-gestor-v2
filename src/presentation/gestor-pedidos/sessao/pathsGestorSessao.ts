@@ -1,7 +1,7 @@
 import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 import { buildGestaoPath } from '@/src/shared/utils/gestaoRoutes'
-import { PEDIDOS_PATH, QUERY_GESTOR } from './constantes'
-import { isSinalKioskGestorPedidos } from './isKioskGestorPedidos'
+import { PEDIDOS_PATH, QUERY_GESTOR } from '../constantes'
+import { isSinalKioskGestorPedidos } from '../kiosk/isKioskGestorPedidos'
 
 export function lerSinalGestorDoBrowser(): { hasTauri: boolean; search: string } {
   if (typeof window === 'undefined') {

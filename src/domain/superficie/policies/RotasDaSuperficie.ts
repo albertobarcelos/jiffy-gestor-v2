@@ -13,7 +13,7 @@ const PREFIXOS_PUBLICOS = [
   '/notas-fiscais',
 ] as const
 
-/** Hub e identidade: o operador precisa escolher empresa antes do portal. */
+/** Hub e identidade: o operador precisa escolher empresa antes do quadro. */
 const PREFIXOS_SESSAO = ['/minhas-empresas', '/perfil', '/hub', '/convites-gestor'] as const
 
 export function normalizarPathModulo(path: string): string {
@@ -37,7 +37,7 @@ export function isRotaSessaoHub(path: string): boolean {
   return PREFIXOS_SESSAO.some(prefixo => coincidePrefixo(normalizado, prefixo))
 }
 
-export function isRotaPortalPedidos(path: string): boolean {
+export function isRotaQuadroPedidos(path: string): boolean {
   return coincidePrefixo(normalizarPathModulo(path), PATH_GESTOR_PEDIDOS)
 }
 
@@ -47,16 +47,16 @@ export class RotasDaSuperficie {
     if (isRotaPublicaAuth(normalizado) || isRotaSessaoHub(normalizado)) {
       return true
     }
-    if (isRotaPortalPedidos(normalizado)) {
+    if (isRotaQuadroPedidos(normalizado)) {
       return true
     }
-    if (superficie.isPortalPedidos()) {
+    if (superficie.isGestorPedidos()) {
       return false
     }
     return superficie.isErp()
   }
 
   static destinoSeNegado(superficie: Superficie): string {
-    return superficie.isPortalPedidos() ? PATH_GESTOR_PEDIDOS : PATH_DASHBOARD_ERP
+    return superficie.isGestorPedidos() ? PATH_GESTOR_PEDIDOS : PATH_DASHBOARD_ERP
   }
 }

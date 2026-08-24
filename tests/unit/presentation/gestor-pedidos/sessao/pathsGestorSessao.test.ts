@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mesmaRotaLocal } from '@/src/presentation/gestor-pedidos/pathsGestorSessao'
+import { mesmaRotaLocal } from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
 
 describe('mesmaRotaLocal', () => {
   it('reconhece /login?gestor igual a si mesmo', () => {

@@ -1,7 +1,7 @@
 import type { LoginEmpresaSnapshot } from '@/src/domain/types/LoginEmpresaSnapshot'
 import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 import { escolherEmpresaUnicaAtiva } from './escolherEmpresaUnicaAtiva'
-import { isSinalKioskGestorPedidos } from './isKioskGestorPedidos'
+import { isSinalKioskGestorPedidos } from '../kiosk/isKioskGestorPedidos'
 import { pathHubComSinalGestor } from './pathsGestorSessao'
 
 export type DestinoAposLogin =

@@ -10,10 +10,10 @@ describe('ResolverDestinoPosLoginUseCase', () => {
     expect(destino).toEqual({ superficie: 'ERP', pathModulo: '/dashboard' })
   })
 
-  it('operador exclusivo vai ao portal', () => {
+  it('operador exclusivo vai ao quadro de pedidos', () => {
     const destino = useCase.execute(
       criarContextoAcessoSuperficie({
-        somentePortalPedidos: true,
+        somentePedidos: true,
         modulosAcesso: ['portal-pedidos'],
       })
     )

@@ -31,15 +31,15 @@ import { activateHubEmpresaSessionAndBuildUrl } from './utils/activateHubEmpresa
 import { HUB_ROUTES } from '@/src/shared/constants/hubRoutes'
 import { ensureHubBearerToken } from '@/src/presentation/utils/ensureHubBearerToken'
 import { resolverDestinoPosLoginUseCase } from '@/src/application/use-cases/superficie/ResolverDestinoPosLoginUseCase'
-import { montarContextoAcessoSuperficie } from '@/src/presentation/gestor-pedidos/montarContextoAcessoSuperficie'
+import { montarContextoAcessoSuperficie } from '@/src/presentation/gestor-pedidos/superficie/montarContextoAcessoSuperficie'
 import { buildGestaoPath } from '@/src/shared/utils/gestaoRoutes'
-import { entrarEmpresaGestorNaAba } from '@/src/presentation/gestor-pedidos/entrarEmpresaGestorNaAba'
-import { isSinalKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/isKioskGestorPedidos'
+import { entrarEmpresaGestorNaAba } from '@/src/presentation/gestor-pedidos/sessao/entrarEmpresaGestorNaAba'
+import { isSinalKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
 import {
   lerSinalGestorDoBrowser,
   urlLoginDaSessaoAtual,
-} from '@/src/presentation/gestor-pedidos/pathsGestorSessao'
-import { planearDestinoAposLogin } from '@/src/presentation/gestor-pedidos/planearDestinoAposLogin'
+} from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
+import { planearDestinoAposLogin } from '@/src/presentation/gestor-pedidos/sessao/planearDestinoAposLogin'
 
 const HUB_SESSAO_TOAST_ID = 'minhas-empresas-sessao-token'
 

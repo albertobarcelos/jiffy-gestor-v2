@@ -1,12 +1,12 @@
 import type { QueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { SESSION_STORAGE_TENANT_LOGOUT_SELF } from '@/src/shared/constants/sessionCoordinator'
-import { isSinalKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/isKioskGestorPedidos'
+import { isSinalKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
 import {
   lerSinalGestorDoBrowser,
   urlHubDaSessaoAtual,
   urlLoginDaSessaoAtual,
-} from '@/src/presentation/gestor-pedidos/pathsGestorSessao'
+} from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { ensureHubBearerToken } from '@/src/presentation/utils/ensureHubBearerToken'
 import { restoreIdentityFromCookie } from '@/src/presentation/utils/restoreIdentityFromCookie'
