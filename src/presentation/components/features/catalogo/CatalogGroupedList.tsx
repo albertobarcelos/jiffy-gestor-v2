@@ -93,11 +93,11 @@ export function CatalogGroupedList<T>({
                 para visualizar.
               </div>
             ) : (
-              <div className="rounded-lg bg-white">
+              <div className="overflow-visible rounded-lg bg-white">
                 {group.items.map(item => (
                   <div
                     key={getItemKey(item)}
-                    style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 90px' }}
+                    className="relative z-0 overflow-visible has-[.tooltip-hover-above:hover]:z-[200] has-[.tooltip-hover-below:hover]:z-[200]"
                   >
                     {renderItem(item)}
                   </div>

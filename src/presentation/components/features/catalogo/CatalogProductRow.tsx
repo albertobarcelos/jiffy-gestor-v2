@@ -2,6 +2,7 @@
 
 import { memo, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { Tooltip } from '@mui/material'
 import {
   MdAddAPhoto,
   MdClose,
@@ -272,15 +273,19 @@ function CatalogProductRowInner({
             />
           )}
           {isMenu && onRemove ? (
-            <button
-              type="button"
-              title="Remover deste cardápio"
-              aria-label={`Remover ${nome} deste cardápio`}
-              onClick={() => onRemove(id)}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-primary/50 text-primary transition-colors hover:bg-primary/10"
-            >
-              <MdDeleteOutline size={18} />
-            </button>
+            <Tooltip title="Remover deste cardápio" arrow placement="top">
+              <button
+                type="button"
+                aria-label={`Remover ${nome} deste cardápio`}
+                onClick={e => {
+                  e.stopPropagation()
+                  onRemove(id)
+                }}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-primary/50 text-primary transition-colors hover:bg-primary/10"
+              >
+                <MdDeleteOutline size={18} />
+              </button>
+            </Tooltip>
           ) : null}
         </div>
       </div>
