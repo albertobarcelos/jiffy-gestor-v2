@@ -5,6 +5,7 @@ import {
   JiffySidePanelModal,
   type JiffySidePanelFooterActions,
 } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
+import { JiffyFriendlyAlertDialog } from '@/src/presentation/components/ui/JiffyFriendlyAlertDialog'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { cn } from '@/src/shared/utils/cn'
 import type {
@@ -90,11 +91,7 @@ export function PropagarAlteracaoProdutoDialog({
   const desativando = isStatus && novoAtivo === false
   const nomesJaSalvos = formatarListaMenus(menusJaSalvos)
 
-  const titulo = confirmacaoStatusGlobal
-    ? ativando
-      ? 'Ativar produto?'
-      : 'Desativar produto?'
-    : fluxoListaCadastroBase
+  const titulo = fluxoListaCadastroBase
       ? 'Onde aplicar esta alteração?'
       : passo === 'perguntar'
         ? isVinculo
@@ -116,11 +113,7 @@ export function PropagarAlteracaoProdutoDialog({
                 : 'Onde mais desativar o produto?'
               : 'Onde aplicar esta alteração?'
 
-  const descricao = confirmacaoStatusGlobal
-    ? desativando
-      ? 'O produto ficará indisponível no cadastro base e em todos os cardápios em que estiver vinculado. Deseja continuar?'
-      : 'O produto ficará disponível no cadastro base e em todos os cardápios em que estiver vinculado. Deseja continuar?'
-    : fluxoListaCadastroBase
+  const descricao = fluxoListaCadastroBase
       ? exigePeloMenosUmMenu
         ? 'A alteração será salva no cadastro base e nos menus marcados. Menus desmarcados permanecem vinculados, mas não recebem esta alteração. É obrigatório marcar pelo menos um menu.'
         : 'A alteração será salva no cadastro base. Marque os menus para vincular o produto e aplicar a alteração neles, ou confirme sem seleção para salvar só no cadastro.'
@@ -153,11 +146,7 @@ export function PropagarAlteracaoProdutoDialog({
               : 'Marque os destinos. O que não for marcado permanece como está.'
 
   const labelNao = isVinculo ? 'Não, só nestes' : 'Não, só aqui'
-  const labelConfirmar = confirmacaoStatusGlobal
-    ? ativando
-      ? 'Ativar'
-      : 'Desativar'
-    : fluxoListaCadastroBase
+  const labelConfirmar = fluxoListaCadastroBase
       ? 'Salvar alteração'
       : isVinculo
         ? 'Vincular nos selecionados'
@@ -171,20 +160,6 @@ export function PropagarAlteracaoProdutoDialog({
     !confirmacaoStatusGlobal && (fluxoListaCadastroBase || passo === 'escolher')
 
   const footerActions = useMemo((): JiffySidePanelFooterActions => {
-    if (confirmacaoStatusGlobal) {
-      return {
-        showCancel: true,
-        cancelLabel: 'Cancelar',
-        cancelVariant: 'primaryTint10',
-        onCancel: onDismiss,
-        cancelDisabled: busy,
-        showSave: true,
-        saveLabel: labelConfirmar,
-        onSave: onConfirmarEscolha,
-        saveLoading: busy,
-        saveDisabled: busy,
-      }
-    }
     if (fluxoListaCadastroBase) {
       return {
         showCancel: true,
@@ -226,7 +201,6 @@ export function PropagarAlteracaoProdutoDialog({
       saveDisabled: busy || confirmarEscolhaDisabled,
     }
   }, [
-    confirmacaoStatusGlobal,
     fluxoListaCadastroBase,
     passo,
     busy,
@@ -239,6 +213,29 @@ export function PropagarAlteracaoProdutoDialog({
     onSim,
     onVoltar,
   ])
+
+  if (confirmacaoStatusGlobal) {
+    const tituloAmigavel = desativando
+      ? 'Ops! Este produto ficará indisponível'
+      : 'Ativar este produto?'
+    const descricaoAmigavel = desativando
+      ? 'Ao desativar, o produto será pausado e deixará de aparecer em todos os Menus em que estiver vinculado. Confirme se é isso mesmo que você deseja.'
+      : 'Ele voltará a ficar disponível no cadastro base e em todos os cardápios vinculados.'
+
+    return (
+      <JiffyFriendlyAlertDialog
+        open={open}
+        onClose={onDismiss}
+        onConfirm={onConfirmarEscolha}
+        title={tituloAmigavel}
+        description={descricaoAmigavel}
+        confirmLabel="Ok, entendi!"
+        iconVariant={desativando ? 'warning' : 'success'}
+        busy={busy}
+        zIndex={1400}
+      />
+    )
+  }
 
   return (
     <JiffySidePanelModal

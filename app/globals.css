@@ -60,7 +60,7 @@
     opacity: 0;
     pointer-events: none;
     transition: opacity 120ms ease-out, transform 120ms ease-out;
-    z-index: 20;
+    z-index: 9999;
   }
   .tooltip-hover:hover::after {
     opacity: 1;
@@ -90,7 +90,7 @@
     opacity: 0;
     pointer-events: none;
     transition: opacity 120ms ease-out, transform 120ms ease-out;
-    z-index: 20;
+    z-index: 9999;
   }
   .tooltip-hover-below:hover::after {
     opacity: 1;
@@ -151,7 +151,7 @@
     opacity: 0;
     pointer-events: none;
     transition: opacity 120ms ease-out;
-    z-index: 20;
+    z-index: 9999;
   }
   .tooltip-hover-above:hover::after {
     opacity: 1;

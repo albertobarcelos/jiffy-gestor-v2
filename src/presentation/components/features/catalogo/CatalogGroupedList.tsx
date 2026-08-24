@@ -93,7 +93,7 @@ export function CatalogGroupedList<T>({
                 para visualizar.
               </div>
             ) : (
-              <div>
+              <div className="rounded-lg bg-white">
                 {group.items.map(item => (
                   <div
                     key={getItemKey(item)}

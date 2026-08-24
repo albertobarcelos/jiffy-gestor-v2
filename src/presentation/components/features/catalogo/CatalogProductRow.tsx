@@ -12,6 +12,7 @@ import {
 import { ProdutoValorInput } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoValorInput'
 import { ProdutoNomeInput } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoNomeInput'
 import { ProdutoStatusSwitch } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoStatusSwitch'
+import { MenuProdutoPauseControl } from '@/src/presentation/components/features/menus/MenuProdutoPauseControl'
 import { cn } from '@/src/shared/utils/cn'
 import type { CatalogListVariant } from './types'
 
@@ -62,6 +63,7 @@ function CatalogProductRowInner({
   const nomeExibicao = nome.length > 30 ? `${nome.slice(0, 30)}…` : nome
   const imagemPreview = imagemUrl?.trim() || null
   const isMenu = variant === 'menu'
+  const pausadoNoMenu = isMenu && !ativo
   const podeTrocarImagem = Boolean(onChangeImage)
   const podeEditarNome = Boolean(onNomeChange)
 
@@ -134,7 +136,11 @@ function CatalogProductRowInner({
       <div
         onClick={() => onEdit(id)}
         className={cn(
-          'grid cursor-pointer items-center gap-x-1.5 gap-y-2 border border-gray-200 bg-white px-2 py-2 hover:bg-secondary-text/10 md:gap-x-2 md:px-4',
+          'grid cursor-pointer items-center gap-x-1.5 gap-y-2 border border-gray-200 px-2 py-2 md:gap-x-2 md:px-4',
+          'relative z-0 has-[.tooltip-hover-above:hover]:z-[100] has-[.tooltip-hover-below:hover]:z-[100]',
+          pausadoNoMenu
+            ? 'bg-gray-200 hover:bg-gray-200'
+            : 'bg-white hover:bg-secondary-text/10',
           isMenu
             ? '[grid-template-columns:auto_minmax(0,1fr)_auto] md:[grid-template-columns:auto_minmax(0,30ch)_auto_minmax(0,1fr)_auto]'
             : '[grid-template-columns:auto_minmax(0,1fr)_auto] md:[grid-template-columns:auto_minmax(0,30ch)_auto_auto_minmax(0,1fr)_auto]'
@@ -252,11 +258,19 @@ function CatalogProductRowInner({
             disabled={isSavingValor}
             onCommit={novoValor => onValorChange(id, novoValor)}
           />
-          <ProdutoStatusSwitch
-            isAtivo={ativo}
-            disabled={isSavingStatus}
-            onChange={status => onSwitchToggle(id, status)}
-          />
+          {isMenu ? (
+            <MenuProdutoPauseControl
+              isAtivo={ativo}
+              disabled={isSavingStatus}
+              onToggle={status => onSwitchToggle(id, status)}
+            />
+          ) : (
+            <ProdutoStatusSwitch
+              isAtivo={ativo}
+              disabled={isSavingStatus}
+              onChange={status => onSwitchToggle(id, status)}
+            />
+          )}
           {isMenu && onRemove ? (
             <button
               type="button"

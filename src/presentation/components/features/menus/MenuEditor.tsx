@@ -37,6 +37,7 @@ import { MenuProdutoRowQuickActions } from './MenuProdutoRowQuickActions'
 import { coletarGruposMenuPorSnapshot, ordemSnapshotCategoria } from './ordenarGruposMenuSnapshot'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { JiffyFriendlyAlertDialog } from '@/src/presentation/components/ui/JiffyFriendlyAlertDialog'
 import { showToast } from '@/src/shared/utils/toast'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
@@ -90,6 +91,11 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   const [addOpen, setAddOpen] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [wizardCategoriaId, setWizardCategoriaId] = useState<string | undefined>()
+  const [statusConfirm, setStatusConfirm] = useState<{
+    produtoId: string
+    ativo: boolean
+  } | null>(null)
+  const [statusConfirmSaving, setStatusConfirmSaving] = useState(false)
   const tipoCadastro = useEscolherTipoProdutoCadastro()
   const {
     data: produtosTodosData,
@@ -394,36 +400,26 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     [updateProduto, pedirConfirmacao, aplicarNosDestinos, menuId]
   )
 
-  const handleStatusToggle = useCallback(
-    async (produtoId: string, ativo: boolean) => {
-      const destinos = await pedirConfirmacao({
-        origem: 'menu',
-        produtoId,
-        menuIdAtual: menuId,
-        variante: 'statusAtivo',
-        novoAtivo: ativo,
-      })
-      if (destinos === null) return
-      try {
-        await updateProduto.mutateAsync({ produtoId, input: { ativo } })
-        if (destinos.aplicarNoCadastroBase || destinos.menuIds.length > 0) {
-          await aplicarNosDestinos({
-            produtoId,
-            snapshot: { ativo },
-            destinos,
-          })
-        }
-        showToast.success(
-          ativo
-            ? 'Produto disponível neste cardápio'
-            : 'Produto indisponível neste cardápio'
-        )
-      } catch (err) {
-        showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar status')
-      }
-    },
-    [updateProduto, pedirConfirmacao, aplicarNosDestinos, menuId]
-  )
+  const handleStatusToggle = useCallback((produtoId: string, ativo: boolean) => {
+    setStatusConfirm({ produtoId, ativo })
+  }, [])
+
+  const confirmStatusToggle = useCallback(async () => {
+    if (!statusConfirm) return
+    const { produtoId, ativo } = statusConfirm
+    setStatusConfirmSaving(true)
+    try {
+      await updateProduto.mutateAsync({ produtoId, input: { ativo } })
+      showToast.success(
+        ativo ? 'Produto disponível neste cardápio' : 'Produto pausado neste cardápio'
+      )
+      setStatusConfirm(null)
+    } catch (err) {
+      showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar status')
+    } finally {
+      setStatusConfirmSaving(false)
+    }
+  }, [statusConfirm, updateProduto])
 
   const handleQuickPatch = useCallback(
     async (produtoId: string, input: UpdateMenuProdutoInput): Promise<boolean> => {
@@ -737,6 +733,26 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         onClose={closeWizardCadastro}
       />
       {dialogPropagacao}
+      <JiffyFriendlyAlertDialog
+        open={Boolean(statusConfirm)}
+        onClose={() => {
+          if (!statusConfirmSaving) setStatusConfirm(null)
+        }}
+        onConfirm={() => void confirmStatusToggle()}
+        title={
+          statusConfirm?.ativo
+            ? 'Retomar este produto neste cardápio?'
+            : 'Ops! Pausar este produto neste cardápio?'
+        }
+        description={
+          statusConfirm?.ativo
+            ? 'O produto voltará a ficar disponível apenas neste cardápio. O cadastro base e os demais menus não serão alterados.'
+            : 'Ao pausar, o produto deixará de aparecer neste cardápio. O cadastro base e os demais menus não serão alterados. Confirme se é isso mesmo que você deseja.'
+        }
+        confirmLabel="Ok, entendi!"
+        iconVariant={statusConfirm?.ativo ? 'success' : 'warning'}
+        busy={statusConfirmSaving}
+      />
       {produtoCropModal}
     </div>
   )
