@@ -30,17 +30,17 @@ export async function GET(req: NextRequest) {
     const grupoProdutoId = searchParams.get('grupoProdutoId') || undefined
     const grupoComplementosId = searchParams.get('grupoComplementosId') || undefined
 
+    const parseOptionalBoolean = (value: string | null): boolean | null => {
+      if (value === 'true') return true
+      if (value === 'false') return false
+      return null
+    }
+
     let ativo: boolean | null = null
     if (ativoParam === 'true') {
       ativo = true
     } else if (ativoParam === 'false') {
       ativo = false
-    }
-
-    const parseOptionalBoolean = (value: string | null): boolean | null => {
-      if (value === 'true') return true
-      if (value === 'false') return false
-      return null
     }
 
     const ativoLocal = parseOptionalBoolean(ativoLocalParam)

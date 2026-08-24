@@ -11,10 +11,12 @@ import { Input } from '@/src/presentation/components/ui/input'
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
 import { MenuItem } from '@mui/material'
 import { LogoImpressaoCropModal } from '../LogoImpressaoCropModal'
+import { MenuParametroEmpresaSelect } from '../MenuParametroEmpresaSelect'
 import {
   LOGO_IMPRESSAO_HEIGHT,
   LOGO_IMPRESSAO_WIDTH,
 } from '@/src/presentation/utils/logoImpressaoCrop'
+import { lerMenuIdDeParametroEmpresa } from '@/src/shared/utils/parametroEmpresaMenus'
 
 /** Labels outlined — alinhado a NovoMeioPagamento / EditarTerminais */
 const sxOutlinedLabelTextoEscuro = {
@@ -137,7 +139,8 @@ const LOGO_COLUNA_LARGURA_CLASS = 'w-full shrink-0 lg:w-[280px]'
 /**
  * Tab de Empresa - Edição de dados da empresa
  */
-export function EmpresaTab() {  const [empresa, setEmpresa] = useState<Cliente | null>(null)
+export function EmpresaTab() {
+  const [empresa, setEmpresa] = useState<Cliente | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
 
@@ -158,6 +161,8 @@ export function EmpresaTab() {  const [empresa, setEmpresa] = useState<Cliente 
   const [codigoCidadeIbge, setCodigoCidadeIbge] = useState<string | null>(null)
   /** Valor exibido no select (IANA); vem de `parametroEmpresa.timezone` no GET /empresas/me. */
   const [timezone, setTimezone] = useState('')
+  /** Menu usado nas vendas do gestor (`parametroEmpresa.menuVendaGestorId`). */
+  const [menuVendaGestorId, setMenuVendaGestorId] = useState<string | null>(null)
   /** Snapshot de `parametroEmpresa` para PATCH preservar tipos impressão/cobrança etc. */
   const [parametroEmpresaDraft, setParametroEmpresaDraft] = useState<Record<string, unknown>>({})
 
@@ -333,9 +338,11 @@ export function EmpresaTab() {  const [empresa, setEmpresa] = useState<Cliente 
             (typeof pe.timeZone === 'string' && pe.timeZone) ||
             ''
           setTimezone(String(tz).trim())
+          setMenuVendaGestorId(lerMenuIdDeParametroEmpresa(pe, 'menuVendaGestorId'))
         } else {
           setParametroEmpresaDraft({})
           setTimezone('')
+          setMenuVendaGestorId(null)
         }
 
         try {
@@ -729,6 +736,7 @@ export function EmpresaTab() {  const [empresa, setEmpresa] = useState<Cliente 
         } else {
           delete parametroEmpresa.timezone
         }
+        parametroEmpresa.menuVendaGestorId = menuVendaGestorId
         if (Object.keys(parametroEmpresa).length > 0) {
           body.parametroEmpresa = parametroEmpresa
         }
@@ -755,6 +763,9 @@ export function EmpresaTab() {  const [empresa, setEmpresa] = useState<Cliente 
 
         setIsEditing(false)
         await loadEmpresa()
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('jiffy:empresa-me-updated'))
+        }
         showToast.success('Empresa atualizada com sucesso!')
       } catch (error) {
         console.error('Erro ao salvar empresa:', error)
@@ -1235,6 +1246,15 @@ export function EmpresaTab() {  const [empresa, setEmpresa] = useState<Cliente 
                     </MenuItem>
                   ))}
                 </Input>
+                <MenuParametroEmpresaSelect
+                  id="empresa-menu-venda-gestor"
+                  variant="mui"
+                  sx={sxEntradaEmpresa}
+                  label="Menu usado nas vendas (gestor)"
+                  value={menuVendaGestorId}
+                  onChange={setMenuVendaGestorId}
+                  disabled={!isEditing}
+                />
               </div>
             </div>
           </div>

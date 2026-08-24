@@ -103,13 +103,10 @@ function CatalogGroupHeaderInner({
             ) : null}
           </div>
           <p className="text-xs text-secondary-text">{itemCount} produtos</p>
-          {grupoVisual && showGrupoStatusSwitch && !grupoAtivo ? (
-            <p className="text-[11px] font-semibold uppercase text-error">Categoria inativa</p>
-          ) : null}
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col-reverse items-center justify-end gap-2 md:flex-row md:gap-4">
+      <div className="flex shrink-0 flex-col-reverse items-center justify-end gap-2 md:flex-row md:gap-4">
         <button
           type="button"
           onClick={() => onAddProduto(grupo, grupoId)}

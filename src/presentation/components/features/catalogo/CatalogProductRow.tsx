@@ -26,6 +26,7 @@ export interface CatalogProductRowProps {
   imagemUrl?: string | null
   codigo?: string
   actionsSlot?: ReactNode
+  categoriaSlot?: ReactNode
   isSavingValor?: boolean
   isSavingStatus?: boolean
   isSavingImage?: boolean
@@ -48,6 +49,7 @@ function CatalogProductRowInner({
   imagemUrl,
   codigo,
   actionsSlot,
+  categoriaSlot,
   isSavingValor,
   isSavingStatus,
   isSavingImage,
@@ -144,7 +146,9 @@ function CatalogProductRowInner({
             : 'bg-white hover:bg-secondary-text/10',
           isMenu
             ? '[grid-template-columns:auto_minmax(0,1fr)_auto] md:[grid-template-columns:auto_minmax(0,30ch)_auto_minmax(0,1fr)_auto]'
-            : '[grid-template-columns:minmax(0,1fr)_auto] md:[grid-template-columns:minmax(0,30ch)_auto_auto_minmax(0,1fr)_auto]'
+            : categoriaSlot
+              ? '[grid-template-columns:minmax(0,1fr)_auto] md:[grid-template-columns:minmax(0,30ch)_auto_auto_minmax(9rem,14rem)_minmax(0,1fr)_auto]'
+              : '[grid-template-columns:minmax(0,1fr)_auto] md:[grid-template-columns:minmax(0,30ch)_auto_auto_minmax(0,1fr)_auto]'
         )}
       >
         {isMenu && imagemPreview ? (
@@ -237,7 +241,7 @@ function CatalogProductRowInner({
               'flex items-center gap-1 md:gap-1.5',
               isMenu
                 ? 'col-span-2 md:col-span-1'
-                : 'col-span-3 md:col-span-1'
+                : 'col-span-2 max-md:overflow-x-auto max-md:pb-0.5 md:col-span-1'
             )}
             onClick={e => e.stopPropagation()}
           >
@@ -245,12 +249,26 @@ function CatalogProductRowInner({
           </div>
         ) : null}
 
-        <div className="hidden min-w-0 md:block" aria-hidden />
+        {categoriaSlot ? (
+          <div
+            className={cn(
+              'min-w-0 w-full',
+              isMenu ? 'hidden md:block' : 'col-span-2 md:col-span-1 md:w-auto'
+            )}
+            onClick={e => e.stopPropagation()}
+          >
+            {categoriaSlot}
+          </div>
+        ) : (
+          <div className="hidden min-w-0 md:block" aria-hidden />
+        )}
 
         <div
           className={cn(
             'flex flex-wrap items-center justify-end gap-2 md:gap-4',
-            isMenu ? 'col-span-2 md:col-span-1 md:mr-4' : 'col-span-3 md:col-span-1 md:mr-4'
+            isMenu
+              ? 'col-span-2 md:col-span-1 md:mr-4'
+              : 'col-span-2 md:col-span-1 md:mr-4'
           )}
           onClick={e => e.stopPropagation()}
         >
@@ -317,6 +335,7 @@ function arePropsEqual(prev: CatalogProductRowProps, next: CatalogProductRowProp
     prev.imagemUrl === next.imagemUrl &&
     prev.codigo === next.codigo &&
     prev.actionsSlot === next.actionsSlot &&
+    prev.categoriaSlot === next.categoriaSlot &&
     prev.isSavingValor === next.isSavingValor &&
     prev.isSavingStatus === next.isSavingStatus &&
     prev.isSavingImage === next.isSavingImage &&

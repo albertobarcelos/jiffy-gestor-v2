@@ -73,7 +73,7 @@ export function useNovoPedidoOrchestrator({
   tipoInicioPedido = 'balcao',
   abaDetalhesInicial,
 }: NovoPedidoModalProps) {
-  const { empresa } = useEmpresaMe()
+  const { empresa, menuVendaGestorId, menuDeliveryId } = useEmpresaMe()
   const { preferenciasImpressaoDelivery } = usePreferenciasImpressaoDelivery()
   const { processarAposTransicaoVendaGestorId } = useImpressaoDelivery()
   const empresaId = useTenantEmpresaId()
@@ -188,6 +188,8 @@ export function useNovoPedidoOrchestrator({
   const pedidoBalcao = tipoInicioPedido !== 'entrega'
   const canalVendaNovoPedido: CanalVendaNovoPedido =
     tipoInicioPedido === 'entrega' ? 'entrega' : 'balcao'
+  const menuCatalogoId =
+    canalVendaNovoPedido === 'entrega' ? menuDeliveryId : menuVendaGestorId
   /** Balcão e delivery: passo de produtos é sempre o step 1 na criação. */
   const estaNoPassoProdutos = open && !modoVisualizacao && currentStep === 1
 
@@ -219,10 +221,11 @@ export function useNovoPedidoOrchestrator({
     isLoadingProdutos,
     produtosError,
     carregarProdutoNoCatalogoSeNecessario,
+    menuCatalogoIndisponivel,
   } = useNovoPedidoCatalogoData({
     estaNoPassoProdutos,
     token,
-    empresaId: empresaId ?? undefined,
+    menuId: menuCatalogoId,
     canal: canalVendaNovoPedido,
     grupoSelecionadoId,
     setGrupoSelecionadoId,
@@ -766,6 +769,7 @@ export function useNovoPedidoOrchestrator({
     isLoadingProdutosVenda,
     isLoadingBuscaProdutos,
     isLoadingProdutos,
+    menuCatalogoIndisponivel,
     indiceLinhaPainelProduto,
     justificativaCancelamento,
     longPressComplementoIndexRef,

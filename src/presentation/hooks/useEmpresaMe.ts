@@ -47,6 +47,8 @@ export interface EmpresaMeQueryData {
   parametroEmpresa: Record<string, unknown>
   /** Cardápio publicado no delivery (`parametroEmpresa.menuDeliveryId`). */
   menuDeliveryId: string | null
+  /** Cardápio usado nas vendas do gestor (`parametroEmpresa.menuVendaGestorId`). */
+  menuVendaGestorId: string | null
 }
 
 function mapEnderecoEmpresaMe(enderecoRaw: Record<string, unknown>): EnderecoEmpresaMe | null {
@@ -140,6 +142,7 @@ export async function fetchEmpresaMeQueryData(
     deliveryCupomTemplate: getDeliveryCupomTemplateLocal(id) ?? parseDeliveryCupomTemplate(data),
     parametroEmpresa,
     menuDeliveryId: lerMenuIdDeParametroEmpresa(parametroEmpresa, 'menuDeliveryId'),
+    menuVendaGestorId: lerMenuIdDeParametroEmpresa(parametroEmpresa, 'menuVendaGestorId'),
   }
 }
 
@@ -179,6 +182,7 @@ export function useEmpresaMe() {
     deliveryCupomTemplate: data?.deliveryCupomTemplate ?? DEFAULT_DELIVERY_CUPOM_TEMPLATE,
     parametroEmpresa: data?.parametroEmpresa ?? {},
     menuDeliveryId: data?.menuDeliveryId ?? null,
+    menuVendaGestorId: data?.menuVendaGestorId ?? null,
     isLoading: query.isPending,
     error:
       query.error instanceof Error

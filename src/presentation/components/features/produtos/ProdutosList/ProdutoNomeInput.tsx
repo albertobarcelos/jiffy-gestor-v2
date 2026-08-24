@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, type ChangeEvent } from 'react'
 
 export type ProdutoNomeCommitResult = void | boolean | Promise<void | boolean>
 
@@ -28,6 +28,7 @@ export function ProdutoNomeInput({ nome, disabled = false, onCommit }: ProdutoNo
   const committingRef = useRef(false)
   const onCommitRef = useRef(onCommit)
   const inputRef = useRef<HTMLInputElement>(null)
+  const nomeCursorRef = useRef<{ start: number; end: number } | null>(null)
   onCommitRef.current = onCommit
 
   useEffect(() => {
@@ -42,6 +43,25 @@ export function ProdutoNomeInput({ nome, disabled = false, onCommit }: ProdutoNo
     el.focus()
     el.select()
   }, [editing])
+
+  useLayoutEffect(() => {
+    if (!editing || !nomeCursorRef.current) return
+    const el = inputRef.current
+    const cursor = nomeCursorRef.current
+    nomeCursorRef.current = null
+    if (!el) return
+    const max = el.value.length
+    el.setSelectionRange(Math.min(cursor.start, max), Math.min(cursor.end, max))
+  }, [inputValue, editing])
+
+  const handleInputChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    const el = e.target
+    nomeCursorRef.current = {
+      start: el.selectionStart ?? el.value.length,
+      end: el.selectionEnd ?? el.value.length,
+    }
+    setInputValue(el.value.toLocaleUpperCase('pt-BR'))
+  }, [])
 
   const startEdit = useCallback(
     (e: React.MouseEvent | React.KeyboardEvent) => {
@@ -121,7 +141,7 @@ export function ProdutoNomeInput({ nome, disabled = false, onCommit }: ProdutoNo
       value={inputValue}
       disabled={disabled}
       onClick={e => e.stopPropagation()}
-      onChange={e => setInputValue(e.target.value.toLocaleUpperCase('pt-BR'))}
+      onChange={handleInputChange}
       onBlur={() => {
         void handleCommit()
       }}

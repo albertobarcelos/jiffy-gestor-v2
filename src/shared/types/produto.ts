@@ -12,6 +12,10 @@ export type ProdutoPatch = Partial<{
   permiteAlterarPreco: boolean
   incideTaxa: boolean
   ativoDelivery: boolean
+  /** PATCH do cadastro base — backend espera `grupoId`. */
+  grupoId: string
+  /** Apenas atualização otimista no cache; não enviar à API. */
+  nomeGrupo: string
 }>
 
 /**

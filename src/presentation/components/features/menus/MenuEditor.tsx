@@ -39,6 +39,8 @@ import { sxEntradaCompactaProduto } from '@/src/presentation/components/features
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyFriendlyAlertDialog } from '@/src/presentation/components/ui/JiffyFriendlyAlertDialog'
 import { showToast } from '@/src/shared/utils/toast'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import type {
@@ -346,6 +348,47 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     },
     [tipoCadastro.pedirTipo, openWizardCadastro]
   )
+
+  const handleToggleGrupoStatus = useCallback(
+    async (grupoId: string) => {
+      const grupo = findGrupo(grupoId)
+      if (!grupo) return
+
+      const novoStatus = !(grupo.grupoBase.ativo ?? true)
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+      if (!token) return
+
+      try {
+        const response = await fetchGestorApi(`/api/grupos-produtos/${grupoId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ ativo: novoStatus }),
+        })
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}))
+          throw new Error(
+            (error as { message?: string }).message || 'Erro ao atualizar categoria'
+          )
+        }
+
+        showToast.success(
+          novoStatus ? 'Categoria ativada com sucesso!' : 'Categoria desativada com sucesso!'
+        )
+        await invalidate(['menu-grupos', menuId])
+        await invalidate(['grupos-produtos'])
+      } catch (err) {
+        showToast.error(
+          err instanceof Error ? err.message : 'Não foi possível atualizar o status da categoria.'
+        )
+      }
+    },
+    [findGrupo, invalidate, menuId]
+  )
+
   const handleNomeChange = useCallback(
     async (produtoId: string, nome: string) => {
       const destinos = await pedirConfirmacao({
@@ -695,10 +738,10 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
             ) : undefined
           }
           listAriaLabel="Produtos deste cardápio"
-          showGrupoStatusSwitch={false}
           addProdutoLabel="Adicionar produto"
           onToggleExpand={handleToggleExpand}
           onEditGrupo={handleEditGrupo}
+          onToggleGrupoStatus={handleToggleGrupoStatus}
           onAddProduto={handleAddProduto}
         />
       </div>

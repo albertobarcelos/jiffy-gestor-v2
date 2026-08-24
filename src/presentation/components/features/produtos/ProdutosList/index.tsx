@@ -79,16 +79,6 @@ export function ProdutosList() {
   const { data: gruposProdutos = [], isLoading: isLoadingGruposProdutos } = useGruposProdutos({ limit: 100, ativo: null })
   const { data: gruposComplementos = [], isLoading: isLoadingGruposComplementos } = useGruposComplementos({ limit: 100, ativo: null })
 
-  const gruposProdutosFiltrados = useMemo(() => {
-    if (filters.statusGrupoFilter === 'Ativo') {
-      return gruposProdutos.filter((g) => g.isAtivo())
-    }
-    if (filters.statusGrupoFilter === 'Desativado') {
-      return gruposProdutos.filter((g) => !g.isAtivo())
-    }
-    return gruposProdutos
-  }, [gruposProdutos, filters.statusGrupoFilter])
-
   const { data, fetchNextPage, hasNextPage, isFetching, isFetchingNextPage, isLoading, error } =
     useProdutosInfinite(queryParams)
 
@@ -106,10 +96,9 @@ export function ProdutosList() {
 
   const totalProdutos = useMemo(() => data?.pages?.[0]?.count ?? 0, [data])
 
-  // Map consolidado: ativo por grupoId (filtro Status categoria + opções do Autocomplete).
   const grupoProdutoMap = useMemo(() => {
     const map = new Map<string, { ativo: boolean }>()
-    gruposProdutos.forEach((g) => map.set(g.getId(), { ativo: g.isAtivo() }))
+    gruposProdutos.forEach(g => map.set(g.getId(), { ativo: g.isAtivo() }))
     return map
   }, [gruposProdutos])
 
@@ -117,6 +106,8 @@ export function ProdutosList() {
     () => mapaOrdemGrupoProduto(gruposProdutos),
     [gruposProdutos]
   )
+
+  const filtraStatusCategoria = filters.statusGrupoFilter !== 'Todos'
 
   const produtosVisiveis = useMemo(() => {
     let list = produtos
@@ -129,8 +120,8 @@ export function ProdutosList() {
       })
     }
 
-    if (filters.statusGrupoFilter !== 'Todos') {
-      list = list.filter((p) => {
+    if (filtraStatusCategoria) {
+      list = list.filter(p => {
         const grupoId = p.getGrupoId()
         if (!grupoId) {
           return filters.statusGrupoFilter === 'Ativo'
@@ -146,9 +137,27 @@ export function ProdutosList() {
     produtos,
     grupoProdutoMap,
     ordemGrupoPorId,
+    filtraStatusCategoria,
     filters.statusGrupoFilter,
     filters.grupoProdutoFilter,
   ])
+
+  /** Status categoria filtra no cliente — carrega todas as páginas da API antes de contar/exibir. */
+  useEffect(() => {
+    if (!filtraStatusCategoria) return
+    if (hasNextPage && !isFetchingNextPage && !isFetching) {
+      void fetchNextPage()
+    }
+  }, [
+    filtraStatusCategoria,
+    hasNextPage,
+    isFetchingNextPage,
+    isFetching,
+    fetchNextPage,
+    produtos.length,
+  ])
+
+  const totalContagem = filtraStatusCategoria ? produtosVisiveis.length : totalProdutos
 
   const loadMoreRef = useRef<HTMLDivElement>(null)
 
@@ -304,6 +313,32 @@ export function ProdutosList() {
     return true
   }, [patchMutation, pedirConfirmacao, aplicarNosDestinos])
 
+  const handleGrupoChange = useCallback(
+    async (produtoId: string, novoGrupoId: string, novoGrupoNome: string) => {
+      const produto = produtos.find(p => p.getId() === produtoId)
+      if (!produto || produto.getGrupoId() === novoGrupoId) return false
+
+      const destinos = await pedirConfirmacao({ origem: 'cadastroBase', produtoId })
+      if (destinos === null) return false
+
+      patchMutation.mutate(
+        { type: 'grupo', produtoId, novoGrupoId, novoGrupoNome },
+        {
+          onSuccess: () => {
+            if (destinos.menuIds.length === 0) return
+            void aplicarNosDestinos({
+              produtoId,
+              snapshot: { grupoProdutoId: novoGrupoId },
+              destinos: { aplicarNoCadastroBase: false, menuIds: destinos.menuIds },
+            })
+          },
+        }
+      )
+      return true
+    },
+    [produtos, patchMutation, pedirConfirmacao, aplicarNosDestinos]
+  )
+
   const handleStatusToggle = useCallback(async (produtoId: string, novoStatus: boolean) => {
     const destinos = await pedirConfirmacao({
       origem: 'cadastroBase',
@@ -369,7 +404,7 @@ export function ProdutosList() {
     <div className="flex min-h-0 flex-1 flex-col">
       <ProdutosHeader
         totalLocal={produtosVisiveis.length}
-        totalApi={totalProdutos}
+        totalApi={totalContagem}
         searchText={filters.searchText}
         onSearchChange={actions.setSearch}
         onNovoProduto={() => tipoCadastro.pedirTipo(() => openWizardCadastro())}
@@ -385,13 +420,9 @@ export function ProdutosList() {
         onFilterStatusChange={actions.setStatus}
         statusGrupoFilter={filters.statusGrupoFilter}
         onStatusGrupoChange={actions.setStatusGrupo}
-        ativoLocalFilter={filters.ativoLocalFilter}
-        onAtivoLocalChange={actions.setAtivoLocal}
-        ativoDeliveryFilter={filters.ativoDeliveryFilter}
-        onAtivoDeliveryChange={actions.setAtivoDelivery}
         grupoProdutoFilter={filters.grupoProdutoFilter}
         onGrupoProdutoChange={actions.setGrupoProduto}
-        gruposProdutos={gruposProdutosFiltrados}
+        gruposProdutos={gruposProdutos}
         isLoadingGruposProdutos={isLoadingGruposProdutos}
         grupoComplementoFilter={filters.grupoComplementoFilter}
         onGrupoComplementoChange={actions.setGrupoComplemento}
@@ -418,11 +449,15 @@ export function ProdutosList() {
               <div key={produto.getId()} role="listitem">
                 <ProdutoListItem
                   produto={produto}
+                  gruposProdutos={gruposProdutos}
+                  isLoadingGruposProdutos={isLoadingGruposProdutos}
                   isSavingValor={isSavingOf(patchMutation, produto.getId(), 'valor')}
                   isSavingStatus={isSavingOf(patchMutation, produto.getId(), 'status')}
                   isSavingNome={isSavingOf(patchMutation, produto.getId(), 'nome')}
+                  isSavingGrupo={isSavingOf(patchMutation, produto.getId(), 'grupo')}
                   onNomeChange={handleNomeChange}
                   onValorChange={handleValorChange}
+                  onGrupoChange={handleGrupoChange}
                   onSwitchToggle={handleStatusToggle}
                   onToggleBoolean={handleToggleBooleanField}
                   onEditProduto={handleEditProduto}
