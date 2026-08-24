@@ -1,14 +1,13 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { MdImageNotSupported, MdSearch } from 'react-icons/md'
+import { MdSearch } from 'react-icons/md'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import {
   produtosInfiniteQueryParams,
   useProdutosInfinite,
 } from '@/src/presentation/hooks/useProdutos'
-import { useImagensProdutosCadastroBase } from '@/src/presentation/hooks/produtos/useImagensProdutosCadastroBase'
 import { useMenuMutations } from '@/src/presentation/hooks/menus/useMenuMutations'
 import { showToast } from '@/src/shared/utils/toast'
 import { MENU_SIDE_PANEL_CLASS } from './menuPanelConstants'
@@ -35,7 +34,6 @@ export function AddProdutosToMenuPanel({
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { syncProdutos } = useMenuMutations(menuId)
-  const { data: imagensPorProdutoId = {} } = useImagensProdutosCadastroBase()
 
   useEffect(() => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
@@ -227,8 +225,6 @@ export function AddProdutosToMenuPanel({
             const id = produto.getId()
             const checked = selected.has(id)
             const bgColor = index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
-            const imagemUrl =
-              imagensPorProdutoId[id]?.trim() || produto.getImagemUrl()?.trim() || null
             return (
               <label
                 key={id}
@@ -240,23 +236,6 @@ export function AddProdutosToMenuPanel({
                   onChange={() => toggle(id)}
                   className="h-4 w-4 shrink-0 accent-primary"
                 />
-                {imagemUrl ? (
-                  <span className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-white">
-                    {/* eslint-disable-next-line @next/next/no-img-element -- preview do cadastro */}
-                    <img
-                      src={imagemUrl}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  </span>
-                ) : (
-                  <span
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-secondary-text"
-                    aria-hidden
-                  >
-                    <MdImageNotSupported className="h-5 w-5" />
-                  </span>
-                )}
                 <span className="min-w-0 flex-1 truncate">{produto.getNome()}</span>
                 <span className="shrink-0 text-xs font-medium text-secondary-text md:text-sm">
                   {new Intl.NumberFormat('pt-BR', {

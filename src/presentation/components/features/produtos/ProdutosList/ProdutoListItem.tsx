@@ -10,7 +10,6 @@ export interface ProdutoListItemProps {
   produto: Produto
   isSavingValor?: boolean
   isSavingStatus?: boolean
-  isSavingImage?: boolean
   isSavingNome?: boolean
   onNomeChange: (produtoId: string, nome: string) => void | boolean | Promise<void | boolean>
   onValorChange: (produtoId: string, valor: number) => void | boolean | Promise<void | boolean>
@@ -18,15 +17,12 @@ export interface ProdutoListItemProps {
   onToggleBoolean: (produtoId: string, field: ToggleField, value: boolean) => void
   onEditProduto: (produtoId: string) => void
   onCopyProduto: (produtoId: string) => void
-  onChangeImage?: (produtoId: string, file: File) => void
-  imagemUrl?: string | null
 }
 
 function ProdutoListItemBase({
   produto,
   isSavingValor,
   isSavingStatus,
-  isSavingImage,
   isSavingNome,
   onNomeChange,
   onValorChange,
@@ -34,8 +30,6 @@ function ProdutoListItemBase({
   onToggleBoolean,
   onEditProduto,
   onCopyProduto,
-  onChangeImage,
-  imagemUrl,
 }: ProdutoListItemProps) {
   const produtoId = produto.getId()
   const toggleStates = useMemo<Record<ToggleField, boolean>>(
@@ -58,17 +52,14 @@ function ProdutoListItemBase({
       nome={produto.getNome()}
       valor={produto.getValor()}
       ativo={produto.isAtivo()}
-      imagemUrl={imagemUrl ?? produto.getImagemUrl()}
       codigo={produto.getCodigoProduto()}
       isSavingValor={isSavingValor}
       isSavingStatus={isSavingStatus}
-      isSavingImage={isSavingImage}
       isSavingNome={isSavingNome}
       onNomeChange={onNomeChange}
       onValorChange={onValorChange}
       onSwitchToggle={onSwitchToggle}
       onEdit={onEditProduto}
-      onChangeImage={onChangeImage}
       actionsSlot={
         <>
           <div className="md:hidden">
@@ -100,16 +91,13 @@ function arePropsEqual(prev: ProdutoListItemProps, next: ProdutoListItemProps): 
     prev.produto === next.produto &&
     prev.isSavingValor === next.isSavingValor &&
     prev.isSavingStatus === next.isSavingStatus &&
-    prev.isSavingImage === next.isSavingImage &&
     prev.isSavingNome === next.isSavingNome &&
     prev.onNomeChange === next.onNomeChange &&
     prev.onValorChange === next.onValorChange &&
     prev.onSwitchToggle === next.onSwitchToggle &&
     prev.onToggleBoolean === next.onToggleBoolean &&
     prev.onEditProduto === next.onEditProduto &&
-    prev.onCopyProduto === next.onCopyProduto &&
-    prev.onChangeImage === next.onChangeImage &&
-    prev.imagemUrl === next.imagemUrl
+    prev.onCopyProduto === next.onCopyProduto
   )
 }
 

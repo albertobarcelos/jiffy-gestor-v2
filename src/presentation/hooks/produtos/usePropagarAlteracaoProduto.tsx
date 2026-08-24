@@ -312,7 +312,6 @@ export function usePropagarAlteracaoProduto(): {
         vincularSeAusente: params.vincularSeAusente ?? true,
       })
       await invalidate(['menu-produtos'])
-      await invalidate(['produtos-imagens-cadastro'])
       await invalidate(['produto', params.produtoId])
     },
     [invalidate]

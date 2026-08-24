@@ -144,10 +144,10 @@ function CatalogProductRowInner({
             : 'bg-white hover:bg-secondary-text/10',
           isMenu
             ? '[grid-template-columns:auto_minmax(0,1fr)_auto] md:[grid-template-columns:auto_minmax(0,30ch)_auto_minmax(0,1fr)_auto]'
-            : '[grid-template-columns:auto_minmax(0,1fr)_auto] md:[grid-template-columns:auto_minmax(0,30ch)_auto_auto_minmax(0,1fr)_auto]'
+            : '[grid-template-columns:minmax(0,1fr)_auto] md:[grid-template-columns:minmax(0,30ch)_auto_auto_minmax(0,1fr)_auto]'
         )}
       >
-        {imagemPreview ? (
+        {isMenu && imagemPreview ? (
           <div className="relative h-11 w-11 shrink-0 md:h-12 md:w-12">
             <button
               type="button"
@@ -190,7 +190,7 @@ function CatalogProductRowInner({
               <MdVisibility size={12} />
             </button>
           </div>
-        ) : podeTrocarImagem ? (
+        ) : isMenu && podeTrocarImagem ? (
           <button
             type="button"
             title="Adicionar imagem"
@@ -204,9 +204,9 @@ function CatalogProductRowInner({
           >
             {placeholderSemImagem}
           </button>
-        ) : (
+        ) : isMenu ? (
           placeholderSemImagem
-        )}
+        ) : null}
 
         {podeEditarNome && onNomeChange ? (
           <div className="min-w-0" onClick={e => e.stopPropagation()}>
@@ -289,7 +289,7 @@ function CatalogProductRowInner({
           ) : null}
         </div>
       </div>
-      {podeTrocarImagem ? (
+      {isMenu && podeTrocarImagem ? (
         <input
           ref={fileInputRef}
           type="file"

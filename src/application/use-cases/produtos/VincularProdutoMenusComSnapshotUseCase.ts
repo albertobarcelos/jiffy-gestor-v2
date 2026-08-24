@@ -62,8 +62,87 @@ export function snapshotMenuProdutoParaOutrosMenus(
   out.gruposComplementosIds = (produto.gruposComplementos ?? [])
     .map(g => g.id)
     .filter(Boolean)
-  out.imageId = produto.image?.imageId ?? null
+  const imageId = produto.image?.imageId
+  if (imageId) {
+    out.imageId = imageId
+  }
   return out
+}
+
+/**
+ * Escolhe um cardápio já vinculado que tenha imagem no snapshot.
+ * Retorna undefined se nenhum candidato tiver imagem — nesse caso o vínculo simples
+ * (add/remove) restaura o soft-delete preservando a imagem anterior do próprio menu.
+ */
+export async function resolverMenuOrigemComSnapshotImagem(params: {
+  token: string
+  produtoId: string
+  candidatos: string[]
+}): Promise<string | undefined> {
+  const ids = [...new Set(params.candidatos.filter(Boolean))]
+  if (ids.length === 0) return undefined
+
+  for (const menuId of ids) {
+    try {
+      const snap = await buscarMenuProdutoNoCardapio({
+        token: params.token,
+        menuId,
+        produtoId: params.produtoId,
+      })
+      if (snap.image?.imageId) return menuId
+    } catch {
+      // tenta o próximo candidato
+    }
+  }
+
+  return undefined
+}
+
+/**
+ * Vincula/desvincula menus copiando snapshot (incl. imagem) de um cardápio de origem quando possível.
+ */
+export async function persistirVinculosProdutoComSnapshotOpcional(params: {
+  token: string
+  produtoId: string
+  add: string[]
+  remove: string[]
+  /** Menus já vinculados antes desta operação — candidatos à origem do snapshot. */
+  menusOrigemCandidatos: string[]
+  vincularSimples: (input: { add: string[]; remove: string[] }) => Promise<void>
+}): Promise<void> {
+  const add = [...new Set(params.add.filter(Boolean))]
+  const remove = [...new Set(params.remove.filter(Boolean))]
+
+  if (add.length === 0) {
+    if (remove.length === 0) return
+    await vincularProdutoMenusComSnapshot({
+      token: params.token,
+      produtoId: params.produtoId,
+      add: [],
+      remove,
+    })
+    return
+  }
+
+  const candidatos = params.menusOrigemCandidatos.filter(id => !add.includes(id))
+  const menuOrigemId = await resolverMenuOrigemComSnapshotImagem({
+    token: params.token,
+    produtoId: params.produtoId,
+    candidatos,
+  })
+
+  if (menuOrigemId) {
+    await vincularProdutoMenusComSnapshot({
+      token: params.token,
+      produtoId: params.produtoId,
+      add,
+      remove,
+      menuOrigemId,
+    })
+    return
+  }
+
+  await params.vincularSimples({ add, remove })
 }
 
 /**

@@ -609,22 +609,26 @@ export const ProdutoMenuVinculoForm = forwardRef<
         className="grid w-full items-center gap-x-1.5 border border-gray-200 bg-white px-2 py-2 md:gap-x-2 md:px-3 [grid-template-columns:auto_minmax(0,30ch)_auto_minmax(0,1fr)_auto]"
         onClick={e => e.stopPropagation()}
       >
-        {data.image?.imageUrl ? (
-          <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-gray-200 md:h-12 md:w-12">
-            {/* eslint-disable-next-line @next/next/no-img-element -- snapshot do menu */}
-            <img
-              src={data.image.imageUrl}
-              alt=""
-              className="h-full w-full object-cover"
-            />
-          </div>
+        {data.image?.imageUrl?.trim() ? (
+          <Tooltip title="Imagem neste cardápio" arrow placement="top">
+            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-gray-200 md:h-12 md:w-12">
+              {/* eslint-disable-next-line @next/next/no-img-element -- snapshot do menu (somente leitura) */}
+              <img
+                src={data.image.imageUrl.trim()}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            </div>
+          </Tooltip>
         ) : (
-          <div
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-secondary-text md:h-12 md:w-12"
-            aria-hidden
-          >
-            <MdImageNotSupported className="h-6 w-6" />
-          </div>
+          <Tooltip title="Sem imagem neste cardápio" arrow placement="top">
+            <div
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-secondary-text md:h-12 md:w-12"
+              aria-hidden
+            >
+              <MdImageNotSupported className="h-6 w-6" />
+            </div>
+          </Tooltip>
         )}
 
         <input
