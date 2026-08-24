@@ -1,6 +1,10 @@
 import { erroImpressao, logImpressao } from '@/src/shared/utils/logImpressaoDelivery'
 import type { CreatePrintJobRequest } from '@/src/infrastructure/printing/agent/printJobTypes'
-import { buildAgentPrintJob, printAgentBaseUrl } from '@/src/infrastructure/printing/agent/localAgentClient'
+import {
+  buildAgentPrintJob,
+  mensagemJiffyPrintIndisponivel,
+  printAgentBaseUrl,
+} from '@/src/infrastructure/printing/agent/localAgentClient'
 
 export type PrintDeliveryCupomInput = CreatePrintJobRequest
 
@@ -23,8 +27,8 @@ function extrairMensagemErro(payload: unknown, fallback: string): string {
   return fallback
 }
 
-function mensagemFalhaRede(agentUrl: string): string {
-  return `Não foi possível falar com o agente de impressão em ${agentUrl}. Abra o agent.exe neste PC (ícone na bandeja) e tente de novo.`
+function mensagemFalhaRede(): string {
+  return mensagemJiffyPrintIndisponivel()
 }
 
 /**
@@ -74,7 +78,7 @@ export async function printDeliveryCupom(
       | null
 
     if (!response.ok) {
-      const mensagem = extrairMensagemErro(payload, mensagemFalhaRede(agentUrl))
+      const mensagem = extrairMensagemErro(payload, mensagemFalhaRede())
       erroImpressao('printDeliveryCupom.agent_local_http', {
         status: response.status,
         mensagem,
@@ -97,7 +101,7 @@ export async function printDeliveryCupom(
       duplicate: Boolean(payload?.duplicate),
     }
   } catch (error) {
-    const mensagem = mensagemFalhaRede(agentUrl)
+    const mensagem = mensagemFalhaRede()
     erroImpressao(
       'printDeliveryCupom.agent_local_excecao',
       { mensagem, jobId, printerName, agentUrl },

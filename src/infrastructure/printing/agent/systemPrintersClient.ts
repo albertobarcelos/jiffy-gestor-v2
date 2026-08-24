@@ -1,4 +1,4 @@
-import { printAgentBaseUrl } from './localAgentClient'
+import { mensagemJiffyPrintIndisponivel, printAgentBaseUrl } from './localAgentClient'
 import { isImpressoraVirtualPdf } from '@/src/infrastructure/printing/resolvePrinterDestinationForTicket'
 
 export type AgentSystemPrinter = {
@@ -10,13 +10,18 @@ export type AgentSystemPrinter = {
 
 export async function fetchAgentSystemPrinters(): Promise<AgentSystemPrinter[]> {
   const agentUrl = printAgentBaseUrl()
-  const response = await fetch(`${agentUrl}/v1/system-printers`, {
-    method: 'GET',
-    headers: { Accept: 'application/json' },
-  })
+  let response: Response
+  try {
+    response = await fetch(`${agentUrl}/v1/system-printers`, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+    })
+  } catch {
+    throw new Error(mensagemJiffyPrintIndisponivel())
+  }
   if (!response.ok) {
     throw new Error(
-      `Não foi possível listar as impressoras deste PC (${response.status}). Confira se o agent.exe está aberto.`
+      'Não foi possível listar as impressoras. Confira se o Jiffy Print está aberto neste computador.'
     )
   }
   const payload = (await response.json()) as { items?: Array<{ name?: string; isDefault?: boolean; isLocal?: boolean; isNetwork?: boolean }> }

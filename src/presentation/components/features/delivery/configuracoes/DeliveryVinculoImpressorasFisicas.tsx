@@ -2,6 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ImpressoraLogica } from '@/src/infrastructure/api/estacoesImpressaoApi'
+import {
+  jaPediuDownloadJiffyPrint,
+  marcarDownloadJiffyPrintIniciado,
+  mensagemJiffyPrintIndisponivel,
+  nomeFicheiroInstaladorJiffyPrint,
+  urlInstaladorJiffyPrint,
+} from '@/src/infrastructure/printing/agent/localAgentClient'
 import { fetchAgentSystemPrinters } from '@/src/infrastructure/printing/agent/systemPrintersClient'
 import {
   formatTcpPrinterRef,
@@ -24,6 +31,11 @@ export function DeliveryVinculoImpressorasFisicas(props: DeliveryVinculoImpresso
   const [fisicas, setFisicas] = useState<string[]>([])
   const [carregandoFisicas, setCarregandoFisicas] = useState(false)
   const [erroFisicas, setErroFisicas] = useState<string | null>(null)
+  const [downloadPedido, setDownloadPedido] = useState(false)
+
+  useEffect(() => {
+    setDownloadPedido(jaPediuDownloadJiffyPrint())
+  }, [])
 
   const carregarFisicas = useCallback(async () => {
     if (!enabled) return
@@ -35,9 +47,9 @@ export function DeliveryVinculoImpressorasFisicas(props: DeliveryVinculoImpresso
     } catch (error) {
       setFisicas([])
       setErroFisicas(
-        error instanceof Error
+        error instanceof Error && !/failed to fetch/i.test(error.message)
           ? error.message
-          : 'Não foi possível listar as impressoras deste PC. Abra o agent.exe.'
+          : mensagemJiffyPrintIndisponivel()
       )
     } finally {
       setCarregandoFisicas(false)
@@ -80,15 +92,42 @@ export function DeliveryVinculoImpressorasFisicas(props: DeliveryVinculoImpresso
     <div className="space-y-3">
       {erroFisicas ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          {erroFisicas}{' '}
-          <button
-            type="button"
-            className="font-semibold underline"
-            onClick={() => void carregarFisicas()}
-            disabled={carregandoFisicas || disabled}
-          >
-            Tentar de novo
-          </button>
+          <p>{erroFisicas}</p>
+          <p className="mt-1 text-xs">
+            Cozinha, Caixa e as outras linhas são só os nomes do Gestor. A impressora de verdade
+            aparece no menu depois que o Jiffy Print estiver aberto.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <a
+              href={urlInstaladorJiffyPrint()}
+              download={nomeFicheiroInstaladorJiffyPrint()}
+              className="inline-flex rounded-lg bg-secondary px-3 py-2 text-sm font-semibold text-white hover:opacity-90"
+              onClick={() => {
+                marcarDownloadJiffyPrintIniciado()
+                setDownloadPedido(true)
+              }}
+            >
+              {downloadPedido ? 'Baixar de novo' : 'Baixar o Jiffy Print'}
+            </a>
+            <button
+              type="button"
+              className="inline-flex rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100"
+              onClick={() => void carregarFisicas()}
+              disabled={carregandoFisicas || disabled}
+            >
+              Já instalei — tentar de novo
+            </button>
+          </div>
+          {downloadPedido ? (
+            <p
+              role="status"
+              className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900"
+            >
+              Download iniciado. Procure <strong>{nomeFicheiroInstaladorJiffyPrint()}</strong> na
+              pasta Downloads, instale, abra o Jiffy Print e depois clique em «Já instalei —
+              tentar de novo».
+            </p>
+          ) : null}
         </div>
       ) : null}
 
@@ -114,7 +153,7 @@ export function DeliveryVinculoImpressorasFisicas(props: DeliveryVinculoImpresso
                 <select
                   id={`vinculo-fisica-${logica.id}`}
                   value={selectValue}
-                  disabled={disabled || carregandoFisicas}
+                  disabled={disabled || carregandoFisicas || Boolean(erroFisicas)}
                   onChange={e => {
                     const value = e.target.value
                     if (value === OPCAO_TCP) {
@@ -140,7 +179,7 @@ export function DeliveryVinculoImpressorasFisicas(props: DeliveryVinculoImpresso
                   <input
                     aria-label={`IP da impressora ${logica.nome}`}
                     value={tcp?.host ?? ''}
-                    disabled={disabled}
+                    disabled={disabled || Boolean(erroFisicas)}
                     onChange={e =>
                       setVinculo(logica.id, formatTcpPrinterRef(e.target.value.trim(), tcp?.port || 9100))
                     }
@@ -153,7 +192,7 @@ export function DeliveryVinculoImpressorasFisicas(props: DeliveryVinculoImpresso
                     min={1}
                     max={65535}
                     value={tcp?.port ?? 9100}
-                    disabled={disabled}
+                    disabled={disabled || Boolean(erroFisicas)}
                     onChange={e =>
                       setVinculo(
                         logica.id,

@@ -476,7 +476,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
           <DeliveryConfigCollapsibleSection
             icon={<MdPrint className="h-5 w-5" aria-hidden />}
             title="Vínculo com impressoras deste PC"
-            info="Ligue cada impressora do sistema à impressora de verdade deste computador. Sem esse vínculo, o cupom não sai."
+            info="Escolha, para cada nome do Gestor, qual impressora deste computador deve receber o cupom. O Jiffy Print precisa estar aberto."
             resetExpandedWhen={open}
           >
             <DeliveryVinculoImpressorasFisicas
