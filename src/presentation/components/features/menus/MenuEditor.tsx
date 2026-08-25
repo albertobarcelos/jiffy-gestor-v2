@@ -650,7 +650,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
               <MdArrowBack className="h-5 w-5" />
             </Link>
             <div>
-              <p className="text-sm font-semibold text-primary">Cardápio do menu</p>
+              <p className="text-sm font-semibold text-primary">Produtos do menu</p>
               <p className="text-sm font-normal text-tertiary md:text-[22px]">{menu.nome}</p>
             </div>
           </div>

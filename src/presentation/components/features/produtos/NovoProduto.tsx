@@ -2150,7 +2150,6 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
               lockGrupoProduto={lockGrupoProduto}
               lockedGrupoLabel={lockedGrupoLabel}
               pendingNovaCategoriaLabel={pendingNovaCategoriaLabel}
-              showCategoriaField={!(!!effectiveProdutoId && !effectiveIsCopyMode)}
               codigoEanBarras={codigoEanBarras}
               onCodigoEanBarrasChange={setCodigoEanBarras}
               grupos={grupos}

@@ -147,7 +147,7 @@ function CatalogProductRowInner({
           isMenu
             ? '[grid-template-columns:auto_minmax(0,1fr)_auto] md:[grid-template-columns:auto_minmax(0,30ch)_auto_minmax(0,1fr)_auto]'
             : categoriaSlot
-              ? '[grid-template-columns:minmax(0,1fr)_auto] md:[grid-template-columns:minmax(0,30ch)_auto_auto_minmax(9rem,14rem)_minmax(0,1fr)_auto]'
+              ? '[grid-template-columns:minmax(0,1fr)_auto] md:[grid-template-columns:minmax(0,30ch)_auto_auto_auto_auto]'
               : '[grid-template-columns:minmax(0,1fr)_auto] md:[grid-template-columns:minmax(0,30ch)_auto_auto_minmax(0,1fr)_auto]'
         )}
       >
@@ -213,7 +213,7 @@ function CatalogProductRowInner({
         ) : null}
 
         {podeEditarNome && onNomeChange ? (
-          <div className="min-w-0" onClick={e => e.stopPropagation()}>
+          <div className="min-w-0 justify-self-start">
             <ProdutoNomeInput
               nome={nome}
               disabled={isSavingNome}
@@ -238,12 +238,11 @@ function CatalogProductRowInner({
         {actionsSlot ? (
           <div
             className={cn(
-              'flex items-center gap-1 md:gap-1.5',
+              'flex items-center gap-1 justify-self-start md:gap-1.5',
               isMenu
                 ? 'col-span-2 md:col-span-1'
                 : 'col-span-2 max-md:overflow-x-auto max-md:pb-0.5 md:col-span-1'
             )}
-            onClick={e => e.stopPropagation()}
           >
             {actionsSlot}
           </div>
@@ -252,10 +251,9 @@ function CatalogProductRowInner({
         {categoriaSlot ? (
           <div
             className={cn(
-              'min-w-0 w-full',
-              isMenu ? 'hidden md:block' : 'col-span-2 md:col-span-1 md:w-auto'
+              'min-w-0 justify-self-start',
+              isMenu ? 'hidden md:block' : 'col-span-2 md:col-span-1'
             )}
-            onClick={e => e.stopPropagation()}
           >
             {categoriaSlot}
           </div>
@@ -265,12 +263,11 @@ function CatalogProductRowInner({
 
         <div
           className={cn(
-            'flex flex-wrap items-center justify-end gap-2 md:gap-4',
+            'flex w-auto flex-wrap items-center justify-end gap-2 self-center justify-self-end md:gap-4',
             isMenu
               ? 'col-span-2 md:col-span-1 md:mr-4'
               : 'col-span-2 md:col-span-1 md:mr-4'
           )}
-          onClick={e => e.stopPropagation()}
         >
           <ProdutoValorInput
             valor={valor}

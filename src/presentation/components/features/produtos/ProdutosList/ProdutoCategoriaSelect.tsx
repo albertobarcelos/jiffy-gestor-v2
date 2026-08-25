@@ -80,7 +80,6 @@ export function ProdutoCategoriaSelect({
       isOptionEqualToValue={(a, b) => a.getId() === b.getId()}
       value={value ?? undefined}
       onChange={handleChange}
-      onClick={e => e.stopPropagation()}
       slotProps={{
         popper: {
           placement: 'bottom-start',
@@ -92,6 +91,8 @@ export function ProdutoCategoriaSelect({
           {...params}
           placeholder="Categoria"
           InputLabelProps={{ shrink: true }}
+          onClick={e => e.stopPropagation()}
+          onMouseDown={e => e.stopPropagation()}
           sx={{
             ...sxEntradaCompactaProduto,
             width: '100%',

@@ -28,7 +28,7 @@ interface InformacoesProdutoStepProps {
   lockedGrupoLabel?: string
   /** Nome da categoria nova ainda não gravada (wizard passo 1). */
   pendingNovaCategoriaLabel?: string
-  /** Na edição do produto base o campo some; na criação permanece obrigatório. */
+  /** Oculta o campo Categoria (ex.: fluxos que fixam a categoria). */
   showCategoriaField?: boolean
   onNext: () => void
   /** Salva com dados preenchidos até aqui e encerra o fluxo (sem passos seguintes) */
@@ -165,7 +165,7 @@ export function InformacoesProdutoStep({
           />
         </div>
 
-        {/* Linha 2: Categoria (só na criação) + Unidade + Código EAN */}
+        {/* Linha 2: Categoria + Unidade + Código EAN */}
         <div
           className={
             showCategoriaField
