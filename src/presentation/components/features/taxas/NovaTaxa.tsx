@@ -15,6 +15,7 @@ import { FormControl, InputLabel, MenuItem, Select } from '@mui/material'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { Input } from '@/src/presentation/components/ui/input'
+import { UppercaseLocaleInput } from '@/src/presentation/components/ui/UppercaseLocaleInput'
 import { Button } from '@/src/presentation/components/ui/button'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -772,10 +773,10 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
 
             <div className="space-y-3">
               <div className=" w-full grid grid-cols-4 items-center">
-              <Input
+              <UppercaseLocaleInput
                 label="Nome"
                 value={nome}
-                onChange={e => setNome(maiusculasPt(e.target.value))}
+                onValueChange={setNome}
                 required
                 size="small"
                 placeholder="Nome da taxa"

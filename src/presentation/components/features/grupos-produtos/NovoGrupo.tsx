@@ -21,6 +21,7 @@ import { ProdutosPorGrupoList } from './ProdutosPorGrupoList'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { Input } from '@/src/presentation/components/ui/input'
+import { UppercaseLocaleInput } from '@/src/presentation/components/ui/UppercaseLocaleInput'
 import { cn } from '@/src/shared/utils/cn'
 import { showToast } from '@/src/shared/utils/toast'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
@@ -611,10 +612,10 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                 <div className="md:py-5 py-2">
                   <div className="md:space-y-6 space-y-4">
                     {/* Nome — label na borda superior (outlined), igual cadastro de grupo de complementos */}
-                    <Input
+                    <UppercaseLocaleInput
                       label="Nome da Categoria"
                       value={nome}
-                      onChange={e => setNome(e.target.value.toLocaleUpperCase('pt-BR'))}
+                      onValueChange={setNome}
                       required
                       size="small"
                       placeholder="Digite o nome da categoria"

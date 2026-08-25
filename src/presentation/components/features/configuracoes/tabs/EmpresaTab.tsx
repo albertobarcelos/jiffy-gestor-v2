@@ -8,6 +8,7 @@ import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { CidadeAutocomplete } from '@/src/presentation/components/ui/cidade-autocomplete'
 import { Input } from '@/src/presentation/components/ui/input'
+import { UppercaseLocaleInput } from '@/src/presentation/components/ui/UppercaseLocaleInput'
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
 import { MenuItem } from '@mui/material'
 import { LogoImpressaoCropModal } from '../LogoImpressaoCropModal'
@@ -844,35 +845,35 @@ export function EmpresaTab() {
             </div>
             <div className="flex flex-col gap-7 lg:flex-row lg:items-start">
               <div className="min-w-0 flex-1 space-y-7">
-                <Input
+                <UppercaseLocaleInput
                   label="CNPJ"
                   value={cnpj}
-                  onChange={e => setCnpj(maiusculasPt(e.target.value))}
+                  onValueChange={setCnpj}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}
                 />
                 <div className="grid grid-cols-1 gap-7 md:grid-cols-2">
-                  <Input
+                  <UppercaseLocaleInput
                     label="Razão Social"
                     value={razaoSocial}
-                    onChange={e => setRazaoSocial(maiusculasPt(e.target.value))}
+                    onValueChange={setRazaoSocial}
                     disabled={!isEditing}
                     size="small"
                     sx={sxEntradaEmpresa}
                   />
-                  <Input
+                  <UppercaseLocaleInput
                     label="Nome Fantasia"
                     value={nomeFantasia}
-                    onChange={e => setNomeFantasia(maiusculasPt(e.target.value))}
+                    onValueChange={setNomeFantasia}
                     disabled={!isEditing}
                     size="small"
                     sx={sxEntradaEmpresa}
                   />
-                  <Input
+                  <UppercaseLocaleInput
                     label="Telefone"
                     value={telefone}
-                    onChange={e => setTelefone(maiusculasPt(e.target.value))}
+                    onValueChange={setTelefone}
                     disabled={!isEditing}
                     size="small"
                     sx={sxEntradaEmpresa}
@@ -1102,19 +1103,19 @@ export function EmpresaTab() {
             <div className="space-y-6">
               {/* Linha 1: CEP + Rua */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <Input
+                <UppercaseLocaleInput
                   label="CEP"
                   value={cep}
-                  onChange={e => setCep(maiusculasPt(e.target.value))}
+                  onValueChange={setCep}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}
                 />
                 <div className="md:col-span-2">
-                  <Input
+                  <UppercaseLocaleInput
                     label="Rua"
                     value={rua}
-                    onChange={e => setRua(maiusculasPt(e.target.value))}
+                    onValueChange={setRua}
                     disabled={!isEditing}
                     size="small"
                     sx={sxEntradaEmpresa}
@@ -1124,26 +1125,26 @@ export function EmpresaTab() {
 
               {/* Linha 2: Número, Complemento e Bairro */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <Input
+                <UppercaseLocaleInput
                   label="Número"
                   value={numero}
-                  onChange={e => setNumero(maiusculasPt(e.target.value))}
+                  onValueChange={setNumero}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}
                 />
-                <Input
+                <UppercaseLocaleInput
                   label="Complemento"
                   value={complemento}
-                  onChange={e => setComplemento(maiusculasPt(e.target.value))}
+                  onValueChange={setComplemento}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}
                 />
-                <Input
+                <UppercaseLocaleInput
                   label="Bairro"
                   value={bairro}
-                  onChange={e => setBairro(maiusculasPt(e.target.value))}
+                  onValueChange={setBairro}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}

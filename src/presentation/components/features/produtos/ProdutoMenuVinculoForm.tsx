@@ -9,7 +9,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type ChangeEvent,
   type MouseEvent,
   type ReactNode,
 } from 'react'
@@ -28,6 +27,7 @@ import { ProdutoStatusSwitch } from '@/src/presentation/components/features/prod
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { cn } from '@/src/shared/utils/cn'
 import { useMenuProduto } from '@/src/presentation/hooks/menus/useMenuProduto'
+import { useLocaleUppercaseInputHandler } from '@/src/presentation/hooks/useLocaleUppercaseInputHandler'
 import { useMenuMutations } from '@/src/presentation/hooks/menus/useMenuMutations'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
@@ -173,11 +173,13 @@ export const ProdutoMenuVinculoForm = forwardRef<
   const [editandoCategoria, setEditandoCategoria] = useState(false)
   const [savingCategoria, setSavingCategoria] = useState(false)
   const [categoriaInputWidthPx, setCategoriaInputWidthPx] = useState(CATEGORIA_INPUT_MIN_PX)
-  const categoriaInputRef = useRef<HTMLInputElement>(null)
   const categoriaSizerRef = useRef<HTMLSpanElement>(null)
   const categoriaNomeSalvoRef = useRef('')
-  const categoriaCursorRef = useRef<{ start: number; end: number } | null>(null)
   const bloqueiaBlurCategoriaRef = useRef(false)
+  const { inputRef: categoriaInputRef, handleChange: handleCategoriaNomeChange } =
+    useLocaleUppercaseInputHandler(categoriaNome, setCategoriaNome)
+  const { inputRef: nomeCardapioInputRef, handleChange: handleNomeChange } =
+    useLocaleUppercaseInputHandler(nome, setNome)
 
   const valorNumerico = useMemo(() => parseMenuProdutoCurrency(valor) || 0, [valor])
   const grupoProdutoId = data?.grupoProduto?.id ?? ''
@@ -363,24 +365,7 @@ export const ProdutoMenuVinculoForm = forwardRef<
       const measured = Math.ceil(sizer.scrollWidth) + CATEGORIA_INPUT_FOLGA_PX
       setCategoriaInputWidthPx(Math.max(measured, CATEGORIA_INPUT_MIN_PX))
     }
-
-    if (!categoriaCursorRef.current) return
-    const el = categoriaInputRef.current
-    const cursor = categoriaCursorRef.current
-    categoriaCursorRef.current = null
-    if (!el) return
-    const max = el.value.length
-    el.setSelectionRange(Math.min(cursor.start, max), Math.min(cursor.end, max))
   }, [categoriaNome, editandoCategoria])
-
-  const handleCategoriaNomeChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const el = e.target
-    categoriaCursorRef.current = {
-      start: el.selectionStart ?? el.value.length,
-      end: el.selectionEnd ?? el.value.length,
-    }
-    setCategoriaNome(el.value.toLocaleUpperCase('pt-BR'))
-  }
 
   const iniciarEdicaoCategoria = () => {
     if (!grupoProdutoId || savingCategoria) return
@@ -634,9 +619,10 @@ export const ProdutoMenuVinculoForm = forwardRef<
         <input
           type="text"
           aria-label="Nome no cardápio"
+          ref={nomeCardapioInputRef}
           value={nome}
           disabled={saving}
-          onChange={e => setNome(e.target.value.toLocaleUpperCase('pt-BR'))}
+          onChange={handleNomeChange}
           className="min-w-0 truncate border-0 bg-transparent text-sm font-normal tracking-wide text-primary-text outline-none ring-0 focus:ring-1 focus:ring-primary/40 md:text-base"
         />
 

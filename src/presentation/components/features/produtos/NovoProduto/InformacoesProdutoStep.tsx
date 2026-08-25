@@ -1,9 +1,9 @@
 ﻿'use client'
 
-import { useLayoutEffect, useRef, type ChangeEvent, type RefObject } from 'react'
 import { Autocomplete, FormControl, InputLabel, MenuItem, Select, TextField } from '@mui/material'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
+import { useLocaleUppercaseInputHandler } from '@/src/presentation/hooks/useLocaleUppercaseInputHandler'
 import { sxEntradaCompactaProduto, sxEntradaCompactaProdutoSelect } from './produtoFormMuiSx'
 import { UNIDADES_MEDIDA_PRODUTO_OPCOES } from '@/src/shared/types/unidadeMedidaProduto'
 import type { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
@@ -64,10 +64,10 @@ export function InformacoesProdutoStep({
   onSaveAndClose,
   hideStepFooter = false,
 }: InformacoesProdutoStepProps) {
-  const nomeInputRef = useRef<HTMLInputElement>(null)
-  const nomeCursorRef = useRef<{ start: number; end: number } | null>(null)
-  const descricaoInputRef = useRef<HTMLTextAreaElement>(null)
-  const descricaoCursorRef = useRef<{ start: number; end: number } | null>(null)
+  const { inputRef: nomeInputRef, handleChange: handleNomeChange } =
+    useLocaleUppercaseInputHandler(nomeProduto, onNomeProdutoChange)
+  const { inputRef: descricaoInputRef, handleChange: handleDescricaoChange } =
+    useLocaleUppercaseInputHandler(descricaoProduto, onDescricaoProdutoChange)
 
   const formatCurrency = (value: string) => {
     const numbers = value.replace(/\D/g, '')
@@ -83,45 +83,6 @@ export function InformacoesProdutoStep({
   const handlePrecoChange = (value: string) => {
     const formatted = formatCurrency(value)
     onPrecoVendaChange(formatted)
-  }
-
-  const restoreInputSelection = (
-    inputRef: RefObject<HTMLInputElement | HTMLTextAreaElement | null>,
-    cursorRef: RefObject<{ start: number; end: number } | null>
-  ) => {
-    if (!cursorRef.current) return
-    const el = inputRef.current
-    const cursor = cursorRef.current
-    cursorRef.current = null
-    if (!el) return
-    const max = el.value.length
-    el.setSelectionRange(Math.min(cursor.start, max), Math.min(cursor.end, max))
-  }
-
-  useLayoutEffect(() => {
-    restoreInputSelection(nomeInputRef, nomeCursorRef)
-  }, [nomeProduto])
-
-  useLayoutEffect(() => {
-    restoreInputSelection(descricaoInputRef, descricaoCursorRef)
-  }, [descricaoProduto])
-
-  const handleNomeChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const el = e.target
-    nomeCursorRef.current = {
-      start: el.selectionStart ?? el.value.length,
-      end: el.selectionEnd ?? el.value.length,
-    }
-    onNomeProdutoChange(el.value.toLocaleUpperCase('pt-BR'))
-  }
-
-  const handleDescricaoChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const el = e.target
-    descricaoCursorRef.current = {
-      start: el.selectionStart ?? el.value.length,
-      end: el.selectionEnd ?? el.value.length,
-    }
-    onDescricaoProdutoChange(el.value.toLocaleUpperCase('pt-BR'))
   }
 
   const grupoSelecionado = grupos.find(g => g.getId() === grupoProduto) ?? null

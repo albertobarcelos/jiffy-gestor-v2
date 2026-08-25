@@ -9,6 +9,7 @@ import {
   useState,
 } from 'react'
 import { Input } from '@/src/presentation/components/ui/input'
+import { UppercaseLocaleInput } from '@/src/presentation/components/ui/UppercaseLocaleInput'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import { useMenuMutations } from '@/src/presentation/hooks/menus/useMenuMutations'
@@ -268,12 +269,12 @@ export const MenuProdutoSnapshotForm = forwardRef<
 
         <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-[1fr_180px]">
-            <Input
+            <UppercaseLocaleInput
               label="Nome no cardápio"
               required
               size="small"
               value={nome}
-              onChange={e => setNome(e.target.value.toLocaleUpperCase('pt-BR'))}
+              onValueChange={setNome}
               className="bg-white"
               sx={sxEntradaCompactaProduto}
               InputLabelProps={{ required: true }}

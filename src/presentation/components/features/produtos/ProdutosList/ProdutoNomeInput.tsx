@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useLayoutEffect, useCallback, useRef, type ChangeEvent } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useLocaleUppercaseInputHandler } from '@/src/presentation/hooks/useLocaleUppercaseInputHandler'
 
 export type ProdutoNomeCommitResult = void | boolean | Promise<void | boolean>
 
@@ -27,9 +28,12 @@ export function ProdutoNomeInput({ nome, disabled = false, onCommit }: ProdutoNo
   const [inputValue, setInputValue] = useState(nome)
   const committingRef = useRef(false)
   const onCommitRef = useRef(onCommit)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const nomeCursorRef = useRef<{ start: number; end: number } | null>(null)
   onCommitRef.current = onCommit
+
+  const { inputRef, handleChange: handleInputChange } = useLocaleUppercaseInputHandler(
+    inputValue,
+    setInputValue
+  )
 
   useEffect(() => {
     if (committingRef.current || editing) return
@@ -43,25 +47,6 @@ export function ProdutoNomeInput({ nome, disabled = false, onCommit }: ProdutoNo
     el.focus()
     el.select()
   }, [editing])
-
-  useLayoutEffect(() => {
-    if (!editing || !nomeCursorRef.current) return
-    const el = inputRef.current
-    const cursor = nomeCursorRef.current
-    nomeCursorRef.current = null
-    if (!el) return
-    const max = el.value.length
-    el.setSelectionRange(Math.min(cursor.start, max), Math.min(cursor.end, max))
-  }, [inputValue, editing])
-
-  const handleInputChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-    const el = e.target
-    nomeCursorRef.current = {
-      start: el.selectionStart ?? el.value.length,
-      end: el.selectionEnd ?? el.value.length,
-    }
-    setInputValue(el.value.toLocaleUpperCase('pt-BR'))
-  }, [])
 
   const startEdit = useCallback(
     (e: React.MouseEvent | React.KeyboardEvent) => {

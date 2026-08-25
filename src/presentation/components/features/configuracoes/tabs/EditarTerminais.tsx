@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, forwardRef, useImperativeHand
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { Input } from '@/src/presentation/components/ui/input'
+import { UppercaseLocaleInput } from '@/src/presentation/components/ui/UppercaseLocaleInput'
 import { Button } from '@/src/presentation/components/ui/button'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -664,15 +665,14 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
               </div>
 
               <div className="space-y-5">
-                <Input
+                <UppercaseLocaleInput
                   label="Nome do Terminal"
                   value={nomeTerminal}
-                  onChange={e =>
-                    setNomeTerminal(maiusculasPt(e.target.value).slice(0, NOME_TERMINAL_MAX))
-                  }
+                  onValueChange={setNomeTerminal}
                   placeholder="Digite o nome do Terminal"
                   size="small"
                   required
+                  maxLength={NOME_TERMINAL_MAX}
                   inputProps={{ maxLength: NOME_TERMINAL_MAX }}
                   className="bg-info"
                   sx={sxEntradaTerminal}
