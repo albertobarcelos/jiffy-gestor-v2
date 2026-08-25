@@ -8,6 +8,7 @@ import { MdDelete, MdPhone, MdSearch } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
+import { useMenus } from '@/src/presentation/hooks/menus/useMenus'
 import { TerminaisTabsModal, TerminaisTabsModalState } from './TerminaisTabsModal'
 
 /** Tamanho de página alinhado ao backend (Swagger): menos round-trips na listagem */
@@ -84,8 +85,14 @@ export function TerminaisTab() {
   const [updatingFiscal, setUpdatingFiscal] = useState<Record<string, boolean>>({})
   const [updatingLeitor, setUpdatingLeitor] = useState<Record<string, boolean>>({})
   const [updatingPrinter, setUpdatingPrinter] = useState<Record<string, boolean>>({})
+  const [updatingMenu, setUpdatingMenu] = useState<Record<string, boolean>>({})
   const [impressoras, setImpressoras] = useState<Array<{ id: string; nome: string }>>([])
   const [loadingImpressoras, setLoadingImpressoras] = useState(false)
+  const menusQuery = useMenus({ limit: 100 })
+  const menusAtivos = useMemo(
+    () => (menusQuery.data?.items ?? []).filter(menu => menu.ativo),
+    [menusQuery.data?.items]
+  )
   const [tabsModalState, setTabsModalState] = useState<TerminaisTabsModalState>({
     open: false,
     tab: 'terminal',
@@ -745,7 +752,81 @@ export function TerminaisTab() {
         })
       }
     },
-    [ impressoras]
+    [impressoras]
+  )
+
+  const handleChangeMenu = useCallback(
+    async (terminalId: string, menuPrincipalId: string) => {
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+      if (!token) {
+        showToast.error('Token não encontrado. Faça login novamente.')
+        return
+      }
+
+      if (!menuPrincipalId) {
+        showToast.error('Selecione um menu para o terminal')
+        return
+      }
+
+      const previousMenuId = terminais.find(item => item.terminal.getId() === terminalId)?.rawData
+        ?.menuPrincipalId as string | undefined
+
+      setUpdatingMenu(prev => ({ ...prev, [terminalId]: true }))
+      setTerminais(prev =>
+        prev.map(item => {
+          if (item.terminal.getId() !== terminalId) return item
+          return {
+            ...item,
+            rawData: {
+              ...item.rawData,
+              menuPrincipalId,
+            },
+          }
+        })
+      )
+
+      try {
+        const response = await fetchGestorApi(`/api/terminais/${terminalId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ menuPrincipalId }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Erro ao atualizar menu do terminal')
+        }
+
+        showToast.success('Menu do terminal atualizado!')
+      } catch (error: unknown) {
+        console.error('Erro ao atualizar menu do terminal:', error)
+        showToast.error(
+          error instanceof Error ? error.message : 'Erro ao atualizar menu do terminal'
+        )
+
+        setTerminais(prev =>
+          prev.map(item => {
+            if (item.terminal.getId() !== terminalId) return item
+            return {
+              ...item,
+              rawData: {
+                ...item.rawData,
+                menuPrincipalId: previousMenuId,
+              },
+            }
+          })
+        )
+      } finally {
+        setUpdatingMenu(prev => {
+          const { [terminalId]: _, ...rest } = prev
+          return rest
+        })
+      }
+    },
+    [terminais]
   )
 
   // Carrega dados iniciais
@@ -819,7 +900,7 @@ export function TerminaisTab() {
       <div className="flex-1 overflow-y-auto overflow-x-hidden md:px-[20px] px-1 scrollbar-hide">
         {/* Barra de títulos das colunas - sticky dentro do scroll */}
         {terminaisFiltrados.length > 0 && (
-          <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px] sticky top-0 z-10 mb-2">
+          <div className="min-h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px] sticky top-0 z-10 mb-2 py-1">
             <div className="flex-[2] font-semibold text-xs text-primary-text uppercase hidden md:block">
               Código do Terminal
             </div>
@@ -829,11 +910,15 @@ export function TerminaisTab() {
             <div className="flex-[2] font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Modelo Dispositivo
             </div>
-            <div className="flex-[1.5] font-semibold md:text-xs text-[10px] text-primary-text uppercase">
-              Versão APK
+            <div className="w-14 shrink-0 text-center font-semibold md:text-xs text-[10px] leading-tight text-primary-text uppercase">
+              <span className="block">Versão</span>
+              <span className="block">APK</span>
             </div>
             <div className="flex-[2] font-semibold md:text-xs text-[10px] text-primary-text uppercase hidden md:flex">
               Imp. Finalização
+            </div>
+            <div className="flex-[2] font-semibold md:text-xs text-[10px] text-primary-text uppercase hidden md:flex">
+              Menu
             </div>
             <div className="flex-[1.5] text-center font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Comp. Mesas
@@ -841,12 +926,11 @@ export function TerminaisTab() {
             <div className="flex-[1.5] text-center font-semibold md:text-xs text-[10px] text-primary-text uppercase">
               Fiscal ativo
             </div>
-            <div className="flex-[1.5] text-center font-semibold md:text-xs text-[10px] text-primary-text uppercase">
-              Leitor C. Barras
+            <div className="flex-[1.5] text-center font-semibold md:text-xs text-[10px] leading-tight text-primary-text uppercase">
+              <span className="block">Leitor C.</span>
+              <span className="block">Barras</span>
             </div>
-            <div className="md:flex-[1.5] flex-[1] text-center font-semibold md:text-xs text-[10px] text-primary-text uppercase">
-              Remover
-            </div>
+            <div className="w-10 shrink-0" aria-hidden />
           </div>
         )}
 
@@ -900,6 +984,20 @@ export function TerminaisTab() {
           const compartilhamentoAtivo = prefs.compartilharMesas
           const fiscalAtivo = prefs.fiscalAtivo
           const leitorHabilitado = prefs.leitorHabilitado
+          const menuPrincipalId =
+            typeof rawData?.menuPrincipalId === 'string' ? rawData.menuPrincipalId : ''
+          const menusParaSelect = (() => {
+            if (
+              menuPrincipalId &&
+              !menusAtivos.some(menu => menu.id === menuPrincipalId)
+            ) {
+              const selecionado = (menusQuery.data?.items ?? []).find(
+                menu => menu.id === menuPrincipalId
+              )
+              if (selecionado) return [selecionado, ...menusAtivos]
+            }
+            return menusAtivos
+          })()
 
           return (
               <div
@@ -928,7 +1026,7 @@ export function TerminaisTab() {
               <div className="flex-[2] md:text-sm text-[10px] text-secondary-text ">
                 {modelo}
               </div>
-              <div className="flex-[1.5] md:text-sm text-[10px] text-secondary-text ">
+              <div className="w-14 shrink-0 text-center md:text-sm text-[10px] text-secondary-text">
                 {versao}
               </div>
               <div className="flex-[2] md:text-sm text-[10px] text-secondary-text hidden md:flex">
@@ -953,6 +1051,33 @@ export function TerminaisTab() {
                 ) : (
                   <div className="md:text-xs text-[10px] text-secondary-text">Carregando...</div>
                 )}
+              </div>
+              <div
+                className="flex-[2] md:text-sm text-[10px] text-secondary-text hidden md:flex"
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <select
+                  value={menuPrincipalId}
+                  onChange={(event) => {
+                    event.stopPropagation()
+                    void handleChangeMenu(terminal.getId(), event.target.value)
+                  }}
+                  onClick={(event) => event.stopPropagation()}
+                  disabled={
+                    !!updatingMenu[terminal.getId()] || menusQuery.isPending
+                  }
+                  className="w-full max-w-[220px] h-8 rounded-lg border border-gray-200 bg-white md:text-sm text-xs text-primary-text px-2 focus:outline-none focus:border-primary"
+                  aria-label={`Menu do terminal — ${nome}`}
+                >
+                  <option value="">Selecione</option>
+                  {menusParaSelect.map(menu => (
+                    <option key={menu.id} value={menu.id}>
+                      {menu.tipo === 'principal' ? `${menu.nome} (principal)` : menu.nome}
+                      {menu.ativo ? '' : ' (inativo)'}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div
                 className="flex-[1.5] flex justify-center"
@@ -1017,7 +1142,7 @@ export function TerminaisTab() {
                 />
               </div>
               <div
-                className="md:flex-[1.5] flex-[1] flex justify-center"
+                className="w-10 shrink-0 flex justify-center"
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
               >

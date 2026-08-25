@@ -46,11 +46,7 @@ export function DeliveryComplementosObrigatoriosAlertDialog({
         </button>
 
         <div
-          className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border-2"
-          style={{
-            borderColor: 'var(--delivery-primary-dark)',
-            color: 'var(--delivery-primary-dark)',
-          }}
+          className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border-2 border-red-600 text-red-600"
           aria-hidden
         >
           <span className="text-[2.25rem] font-bold leading-none">!</span>
