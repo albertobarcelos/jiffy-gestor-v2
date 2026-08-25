@@ -8,7 +8,7 @@ import type { CatalogGroup } from './types'
 export interface CatalogGroupedListProps<T> {
   groups: CatalogGroup<T>[]
   getItemKey: (item: T) => string
-  renderItem: (item: T) => ReactNode
+  renderItem: (item: T, index: number) => ReactNode
   expandedGroups: Record<string, boolean>
   isLoading?: boolean
   emptyLabel?: string
@@ -16,11 +16,19 @@ export interface CatalogGroupedListProps<T> {
   emptyContent?: ReactNode
   listAriaLabel?: string
   showGrupoStatusSwitch?: boolean
+  showHeaderActions?: boolean
+  itemCountSuffix?: string
+  /** Ex.: "Produtos" ou "Terminais" — usado na mensagem de grupo recolhido. */
+  collapsedHintItemLabel?: string
+  /** Exibe caixa tracejada quando o grupo está recolhido. Default: true. */
+  showCollapsedHint?: boolean
   addProdutoLabel?: string
+  renderBeforeGroupItems?: (group: CatalogGroup<T>) => ReactNode
+  renderGroupHeaderAddon?: (group: CatalogGroup<T>) => ReactNode
   onToggleExpand: (groupKey: string) => void
-  onEditGrupo: (grupoId: string | undefined) => void
+  onEditGrupo?: (grupoId: string | undefined) => void
   onToggleGrupoStatus?: (grupoId: string) => void
-  onAddProduto: (grupoNome: string, grupoId: string | undefined) => void
+  onAddProduto?: (grupoNome: string, grupoId: string | undefined) => void
 }
 
 export function CatalogGroupedList<T>({
@@ -33,7 +41,13 @@ export function CatalogGroupedList<T>({
   emptyContent,
   listAriaLabel = 'Lista de produtos',
   showGrupoStatusSwitch = true,
+  showHeaderActions = true,
+  itemCountSuffix = 'produtos',
+  collapsedHintItemLabel = 'Produtos',
+  showCollapsedHint = true,
   addProdutoLabel,
+  renderBeforeGroupItems,
+  renderGroupHeaderAddon,
   onToggleExpand,
   onEditGrupo,
   onToggleGrupoStatus,
@@ -72,7 +86,10 @@ export function CatalogGroupedList<T>({
                 itemCount={group.items.length}
                 isExpanded={isExpanded}
                 showGrupoStatusSwitch={showGrupoStatusSwitch}
+                showHeaderActions={showHeaderActions}
+                itemCountSuffix={itemCountSuffix}
                 addProdutoLabel={addProdutoLabel}
+                headerAddon={renderGroupHeaderAddon?.(group)}
                 onToggleExpand={onToggleExpand}
                 onEditGrupo={onEditGrupo}
                 onToggleGrupoStatus={onToggleGrupoStatus}
@@ -80,9 +97,9 @@ export function CatalogGroupedList<T>({
               />
             </div>
 
-            {!isExpanded ? (
+            {!isExpanded && showCollapsedHint ? (
               <div className="mx-1 rounded-xl border border-dashed border-secondary/40 px-4 py-1 text-sm text-secondary-text">
-                Produtos ocultos. Clique{' '}
+                {collapsedHintItemLabel} ocultos. Clique{' '}
                 <button
                   type="button"
                   onClick={() => onToggleExpand(group.groupKey)}
@@ -92,18 +109,19 @@ export function CatalogGroupedList<T>({
                 </button>{' '}
                 para visualizar.
               </div>
-            ) : (
+            ) : isExpanded ? (
               <div className="overflow-visible rounded-lg bg-white">
-                {group.items.map(item => (
+                {renderBeforeGroupItems?.(group)}
+                {group.items.map((item, index) => (
                   <div
                     key={getItemKey(item)}
                     className="relative z-0 overflow-visible has-[.tooltip-hover-above:hover]:z-[200] has-[.tooltip-hover-below:hover]:z-[200]"
                   >
-                    {renderItem(item)}
+                    {renderItem(item, index)}
                   </div>
                 ))}
               </div>
-            )}
+            ) : null}
           </div>
         )
       })}
