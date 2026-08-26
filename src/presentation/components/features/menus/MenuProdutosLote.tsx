@@ -34,8 +34,11 @@ import type {
   MenuProduto,
   UpdateMenuProdutoInput,
 } from '@/src/shared/types/menus'
+import {
+  atualizarMenuProdutoViaBffUseCase,
+  atualizarMenuProdutosBatchViaBffUseCase,
+} from '@/src/application/use-cases/menus/menuBffUseCases'
 import type { SnapshotProdutoPropagavel } from '@/src/shared/types/propagarAlteracaoProduto'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
 const BATCH_CHUNK = 100
 const MONEY = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -247,26 +250,22 @@ export function MenuProdutosLote({ menuId }: MenuProdutosLoteProps) {
       if (!token) throw new Error('Token não encontrado')
 
       for (const alvoMenuId of destinos.menuIds) {
-        const batchRes = await fetchGestorApi(`/api/menus/${alvoMenuId}/produtos`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ update }),
-        })
-        if (batchRes.ok) continue
-
-        for (const item of update) {
-          const { produtoId, ...input } = item
-          await fetchGestorApi(`/api/menus/${alvoMenuId}/produtos/${produtoId}`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(input),
+        try {
+          await atualizarMenuProdutosBatchViaBffUseCase.execute({
+            token,
+            menuId: alvoMenuId,
+            data: { update },
           })
+        } catch {
+          for (const item of update) {
+            const { produtoId, ...input } = item
+            await atualizarMenuProdutoViaBffUseCase.execute({
+              token,
+              menuId: alvoMenuId,
+              produtoId,
+              data: input,
+            })
+          }
         }
       }
 

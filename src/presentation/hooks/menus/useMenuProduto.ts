@@ -1,20 +1,10 @@
 'use client'
 
 import { type QueryClient } from '@tanstack/react-query'
+import { buscarMenuProdutoViaBffUseCase } from '@/src/application/use-cases/menus/menuBffUseCases'
 import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { buildTenantQueryKey } from '@/src/presentation/hooks/useInvalidateTenantQueries'
-import { ApiError } from '@/src/infrastructure/api/apiClient'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import type { MenuProduto } from '@/src/shared/types/menus'
-
-async function parseError(response: Response, fallback: string): Promise<never> {
-  const errorData = await response.json().catch(() => ({}))
-  throw new ApiError(
-    (errorData as { message?: string }).message || fallback,
-    response.status,
-    errorData
-  )
-}
 
 export function menuProdutoQueryBaseKey(menuId: string, produtoId: string) {
   return ['menu-produto', menuId, produtoId] as const
@@ -25,17 +15,7 @@ export async function fetchMenuProdutoSnapshot(
   menuId: string,
   produtoId: string
 ): Promise<MenuProduto> {
-  const response = await fetchGestorApi(`/api/menus/${menuId}/produtos/${produtoId}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
-  })
-  if (!response.ok) await parseError(response, 'Erro ao carregar produto deste cardápio')
-  const payload = await response.json()
-  const data =
-    payload?.data && typeof payload.data === 'object' && !Array.isArray(payload.data)
-      ? payload.data
-      : payload
-  return data as MenuProduto
+  return buscarMenuProdutoViaBffUseCase.execute({ token, menuId, produtoId })
 }
 
 /**

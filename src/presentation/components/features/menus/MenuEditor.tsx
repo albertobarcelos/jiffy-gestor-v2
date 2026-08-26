@@ -39,7 +39,7 @@ import { sxEntradaCompactaProduto } from '@/src/presentation/components/features
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyFriendlyAlertDialog } from '@/src/presentation/components/ui/JiffyFriendlyAlertDialog'
 import { showToast } from '@/src/shared/utils/toast'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { atualizarGrupoProdutoViaBffUseCase } from '@/src/application/use-cases/grupos-produtos/AtualizarGrupoProdutoViaBffUseCase'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
@@ -359,21 +359,11 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
       if (!token) return
 
       try {
-        const response = await fetchGestorApi(`/api/grupos-produtos/${grupoId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ ativo: novoStatus }),
+        await atualizarGrupoProdutoViaBffUseCase.execute({
+          token,
+          grupoId,
+          patch: { ativo: novoStatus },
         })
-
-        if (!response.ok) {
-          const error = await response.json().catch(() => ({}))
-          throw new Error(
-            (error as { message?: string }).message || 'Erro ao atualizar categoria'
-          )
-        }
 
         showToast.success(
           novoStatus ? 'Categoria ativada com sucesso!' : 'Categoria desativada com sucesso!'
