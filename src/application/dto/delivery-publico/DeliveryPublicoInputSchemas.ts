@@ -44,9 +44,17 @@ export const CobrancaPedidoPublicoInputSchema = z.object({
   momentoCobranca: z.literal('na_entrega'),
 })
 
+export const CotacaoPedidoPublicoInputSchema = z.object({
+  slug: z.string().min(1),
+  tipoEntrega: z.enum(['entrega', 'retirada']),
+  cliente: ClientePedidoPublicoInputSchema,
+  produtos: z.array(ProdutoPedidoPublicoInputSchema).min(1),
+})
+
 export const CreatePedidoPublicoInputSchema = z.object({
   slug: z.string().min(1),
   origem: z.literal('JIFFY_DELIVERY'),
+  tokenCotacao: z.string().min(1),
   tipoEntrega: z.enum(['entrega', 'retirada']),
   cliente: ClientePedidoPublicoInputSchema,
   documentoCpfCnpj: z
@@ -85,6 +93,7 @@ export type ComplementoPedidoPublicoInput = z.infer<typeof ComplementoPedidoPubl
 export type ProdutoPedidoPublicoInput = z.infer<typeof ProdutoPedidoPublicoInputSchema>
 export type ClientePedidoPublicoInput = z.infer<typeof ClientePedidoPublicoInputSchema>
 export type CobrancaPedidoPublicoInput = z.infer<typeof CobrancaPedidoPublicoInputSchema>
+export type CotacaoPedidoPublicoInput = z.infer<typeof CotacaoPedidoPublicoInputSchema>
 export type CreatePedidoPublicoInput = z.infer<typeof CreatePedidoPublicoInputSchema>
 export type CriarClienteDeliveryPublicoInput = z.infer<
   typeof CriarClienteDeliveryPublicoInputSchema

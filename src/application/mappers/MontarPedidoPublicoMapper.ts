@@ -2,7 +2,10 @@ import type {
   CheckoutFormData,
   PedidoPublicoCarrinhoItemInput,
 } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
-import type { CreatePedidoPublicoInput } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import type {
+  CotacaoPedidoPublicoInput,
+  CreatePedidoPublicoInput,
+} from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { DELIVERY_PAIS_TELEFONE_PADRAO } from '@/src/shared/constants/deliveryPaisesTelefone'
 import {
   comporTelefoneApi,
@@ -27,6 +30,17 @@ export type MontarPedidoPublicoResult =
   | { ok: true; payload: CreatePedidoPublicoInput }
   | { ok: false; error: string }
 
+export type MontarCotacaoPublicoResult =
+  | { ok: true; payload: CotacaoPedidoPublicoInput }
+  | { ok: false; error: string }
+
+type ComposicaoPedidoPublico = {
+  tipoEntrega: CreatePedidoPublicoInput['tipoEntrega']
+  cliente: CreatePedidoPublicoInput['cliente']
+  produtos: CreatePedidoPublicoInput['produtos']
+  cpfDocumento: string | null
+}
+
 function extrairCpfPedido(
   cpfMascarado: string
 ): { ok: true; cpf: string | null } | { ok: false; error: string } {
@@ -38,15 +52,14 @@ function extrairCpfPedido(
   return { ok: true, cpf: digits }
 }
 
-/** Monta o payload de create do pedido público a partir do checkout. */
-export function montarPedidoPublico({
-  slug,
+function montarComposicaoPedidoPublico({
   itens,
-  total: _total,
   form,
   enderecoIdEntrega,
   telefoneApi,
-}: MontarPedidoPublicoParams): MontarPedidoPublicoResult {
+}: Omit<MontarPedidoPublicoParams, 'slug' | 'total'>):
+  | { ok: true; composicao: ComposicaoPedidoPublico }
+  | { ok: false; error: string } {
   const paisIso2 = form.telefonePaisIso2 || DELIVERY_PAIS_TELEFONE_PADRAO
   const telResolvido = (telefoneApi ?? '').replace(/\D/g, '')
   const tel =
@@ -104,27 +117,64 @@ export function montarPedidoPublico({
     cliente.enderecoIdEntrega = idEntrega
   }
 
+  return {
+    ok: true,
+    composicao: {
+      tipoEntrega: form.tipoEntrega,
+      cliente,
+      produtos,
+      cpfDocumento: cpfResult.cpf,
+    },
+  }
+}
+
+/** Monta payload de cotação (mesma composição validada no create público). */
+export function montarCotacaoPublico(
+  params: MontarPedidoPublicoParams
+): MontarCotacaoPublicoResult {
+  const composicao = montarComposicaoPedidoPublico(params)
+  if (!composicao.ok) return composicao
+
+  return {
+    ok: true,
+    payload: {
+      slug: params.slug,
+      tipoEntrega: composicao.composicao.tipoEntrega,
+      cliente: composicao.composicao.cliente,
+      produtos: composicao.composicao.produtos,
+    },
+  }
+}
+
+/** Monta o payload de create do pedido público a partir do checkout. */
+export function montarPedidoPublico(
+  params: MontarPedidoPublicoParams & { tokenCotacao: string }
+): MontarPedidoPublicoResult {
+  const composicao = montarComposicaoPedidoPublico(params)
+  if (!composicao.ok) return composicao
+
   const payload: CreatePedidoPublicoInput = {
-    slug,
+    slug: params.slug,
     origem: 'JIFFY_DELIVERY',
-    tipoEntrega: form.tipoEntrega,
-    cliente,
-    produtos,
+    tokenCotacao: params.tokenCotacao,
+    tipoEntrega: composicao.composicao.tipoEntrega,
+    cliente: composicao.composicao.cliente,
+    produtos: composicao.composicao.produtos,
   }
 
-  if (cpfResult.cpf) {
-    payload.documentoCpfCnpj = cpfResult.cpf
+  if (composicao.composicao.cpfDocumento) {
+    payload.documentoCpfCnpj = composicao.composicao.cpfDocumento
   }
 
-  if (form.pagamentos.length > 0) {
-    payload.cobrancas = form.pagamentos.map(p => ({
+  if (params.form.pagamentos.length > 0) {
+    payload.cobrancas = params.form.pagamentos.map(p => ({
       meioPagamentoId: p.meioPagamentoId,
       valor: p.valor,
       momentoCobranca: 'na_entrega',
     }))
   }
 
-  const obsPedido = form.observacaoPedido.trim()
+  const obsPedido = params.form.observacaoPedido.trim()
   if (obsPedido) {
     payload.observacoes = [obsPedido]
   }

@@ -23,11 +23,13 @@ import {
   mapPedidoPublicoCriadoParaConfirmado,
   type PedidoPublicoConfirmadoSnapshot,
 } from '@/src/application/mappers/PedidoPublicoConfirmadoMapper'
+import type { CotacaoPedidoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { DELIVERY_PAIS_TELEFONE_PADRAO } from '../../shared/constants/deliveryPaisesTelefone'
 import { findCatalogoProdutoById } from '../../shared/utils/findCatalogoProdutoById'
 import { itemSemComplemento } from '../../shared/utils/deliveryCarrinhoItemUtils'
 import { formatEmpresaPublicaEndereco } from '../../shared/utils/formatEmpresaPublicaEndereco'
 import { formatDeliveryCurrency } from '../../shared/utils/formatDeliveryCurrency'
+import { isTokenCotacaoExpirado } from '../../shared/utils/deliveryCheckoutCotacaoUtils'
 import { DeliveryProdutoModal } from '../components/DeliveryProdutoModal'
 import { DeliveryCheckoutFooterActions } from '../components/checkout/DeliveryCheckoutFooterActions'
 import { DeliveryCheckoutIdentifiqueSeModal } from '../components/checkout/DeliveryCheckoutIdentifiqueSeModal'
@@ -36,6 +38,7 @@ import { DeliveryCheckoutEnderecoFormModal } from '../components/checkout/Delive
 import type { ModoEntregaOpcao } from '../components/checkout/DeliveryCheckoutTipoEntregaOpcoes'
 import { DeliveryCheckoutPagamentoModal } from '../components/checkout/DeliveryCheckoutPagamentoModal'
 import { DeliveryCheckoutRevisaoModal } from '../components/checkout/DeliveryCheckoutRevisaoModal'
+import { DeliveryCotacaoDesatualizadaDialog } from '../components/checkout/DeliveryCotacaoDesatualizadaDialog'
 import { DeliveryCheckoutSucessoModal } from '../components/checkout/DeliveryCheckoutSucessoModal'
 import { DeliveryCheckoutProgressProvider } from '../components/checkout/DeliveryCheckoutProgressContext'
 import {
@@ -74,6 +77,10 @@ export function DeliveryPublicoCarrinhoScreen({
   const [removingIds, setRemovingIds] = useState<Set<string>>(() => new Set())
   const [pedidoConfirmado, setPedidoConfirmado] =
     useState<PedidoPublicoConfirmadoSnapshot | null>(null)
+  const [cotacaoDesatualizada, setCotacaoDesatualizada] = useState<{
+    message: string
+    cotacao: CotacaoPedidoPublicoDTO
+  } | null>(null)
 
   const requestClose = () => setAberto(false)
 
@@ -112,6 +119,16 @@ export function DeliveryPublicoCarrinhoScreen({
     salvarNomeCliente,
     limparIdentificacaoCliente,
     consultarTelefoneAtual,
+    totalOficial,
+    subtotalOficial,
+    taxaEntregaOficial,
+    cotacao,
+    cotacaoLoading,
+    cotacaoPronta,
+    recotarPedido,
+    aplicarCotacaoAtualizada,
+    limparCotacao,
+    limparCarrinhoAposPedido,
   } = useDeliveryCheckout(slug)
 
   const quantidadeItens = useMemo(
@@ -161,6 +178,8 @@ export function DeliveryPublicoCarrinhoScreen({
 
   const nomeClienteExibicao =
     form.nome.trim() || clienteLookup.cliente?.nome?.trim() || ''
+
+  const totalCheckout = totalOficial ?? total
 
   const identificacaoCompleta = useMemo(
     () =>
@@ -219,6 +238,49 @@ export function DeliveryPublicoCarrinhoScreen({
     setCheckoutStep(next)
   }, [])
 
+  const prevCheckoutStepForCotacaoRef = useRef<DeliveryCheckoutStep>(null)
+
+  const cotacaoValidaParaPagamento = useMemo(() => {
+    if (!cotacaoPronta || !cotacao?.tokenCotacao) return false
+    return !isTokenCotacaoExpirado(cotacao.expiresAt)
+  }, [cotacao, cotacaoPronta])
+
+  const irParaPagamentoComCotacao = useCallback(async () => {
+    if (cotacaoValidaParaPagamento) {
+      goToCheckoutStep('pagamento')
+      return
+    }
+    const ok = await recotarPedido()
+    if (ok) goToCheckoutStep('pagamento')
+  }, [cotacaoValidaParaPagamento, recotarPedido, goToCheckoutStep])
+
+  useEffect(() => {
+    const stepComCotacao =
+      checkoutStep === 'telefone' || checkoutStep === 'pagamento' || checkoutStep === 'revisao'
+
+    if (!stepComCotacao) {
+      prevCheckoutStepForCotacaoRef.current = checkoutStep
+      return
+    }
+
+    if (checkoutStep === 'telefone') {
+      if (form.tipoEntrega !== 'entrega' || !enderecoClienteSelecionado) return
+    }
+
+    if (itens.length === 0 || cotacaoLoading || cotacaoValidaParaPagamento) return
+
+    prevCheckoutStepForCotacaoRef.current = checkoutStep
+    void recotarPedido()
+  }, [
+    checkoutStep,
+    form.tipoEntrega,
+    enderecoClienteSelecionado,
+    cotacaoLoading,
+    cotacaoValidaParaPagamento,
+    recotarPedido,
+    itens.length,
+  ])
+
   const fecharCheckout = () => {
     setHighestCheckoutPercentage(0)
     setVoltarParaRevisao(false)
@@ -276,7 +338,6 @@ export function DeliveryPublicoCarrinhoScreen({
   }
 
   const handleEnviarPedido = async () => {
-    // Fallback local capturado antes do limpar do carrinho no use case.
     const fallback = {
       tipoEntrega: form.tipoEntrega,
       modoTempo: form.modoTempo,
@@ -289,7 +350,7 @@ export function DeliveryPublicoCarrinhoScreen({
         ...item,
         complementos: [...item.complementos],
       })),
-      total,
+      total: totalCheckout,
       pagamentos: pagamentosRevisao.map(p => ({ ...p })),
       observacaoPedido: form.observacaoPedido,
       cpfNotaFiscal: form.cpfNotaFiscal,
@@ -297,12 +358,28 @@ export function DeliveryPublicoCarrinhoScreen({
     }
 
     const resultado = await enviarPedido()
-    if (!resultado.ok) return
+    if (!resultado.ok) {
+      if ('reason' in resultado && resultado.reason === 'cotacao_desatualizada') {
+        setCotacaoDesatualizada({
+          message: resultado.message,
+          cotacao: resultado.cotacao,
+        })
+      }
+      return
+    }
 
     setPedidoConfirmado(mapPedidoPublicoCriadoParaConfirmado(resultado.pedido, fallback))
     setVoltarParaRevisao(false)
     setVoltarParaIdentificacao(false)
     goToCheckoutStep('sucesso')
+    limparCarrinhoAposPedido()
+  }
+
+  const handleConfirmarCotacaoDesatualizada = async () => {
+    if (!cotacaoDesatualizada) return
+    aplicarCotacaoAtualizada(cotacaoDesatualizada.cotacao)
+    setCotacaoDesatualizada(null)
+    await handleEnviarPedido()
   }
 
   const voltar = () => requestClose()
@@ -320,7 +397,7 @@ export function DeliveryPublicoCarrinhoScreen({
       goToCheckoutStep('telefone')
       return
     }
-    goToCheckoutStep('pagamento')
+    void irParaPagamentoComCotacao()
   }
 
   const handleUsarNovoEndereco = () => {
@@ -333,6 +410,7 @@ export function DeliveryPublicoCarrinhoScreen({
     setVoltarParaRevisao(false)
     setVoltarParaIdentificacao(false)
     prevCheckoutStepRef.current = null
+    limparCotacao()
     goToCheckoutStep('telefone')
   }
 
@@ -357,7 +435,7 @@ export function DeliveryPublicoCarrinhoScreen({
       goToCheckoutStep('revisao')
       return
     }
-    goToCheckoutStep('pagamento')
+    void irParaPagamentoComCotacao()
   }
 
   const handlePagamentoContinuar = () => {
@@ -407,7 +485,7 @@ export function DeliveryPublicoCarrinhoScreen({
       goToCheckoutStep('telefone')
       return
     }
-    goToCheckoutStep('pagamento')
+    void irParaPagamentoComCotacao()
   }
 
   const handleCancelarEnderecoForm = () => {
@@ -607,6 +685,9 @@ export function DeliveryPublicoCarrinhoScreen({
             enderecoCliente={enderecoClienteSelecionado}
             temEnderecosCadastrados={(clienteLookup.cliente?.enderecos?.length ?? 0) > 0}
             enderecoEmpresaTexto={enderecoEmpresaTexto}
+            taxaEntregaOficial={taxaEntregaOficial}
+            cotacaoLoading={cotacaoLoading}
+            cotacaoPronta={cotacaoPronta}
             onChangeTelefone={value => updateForm('telefone', value)}
             onChangeTelefonePais={iso2 => updateForm('telefonePaisIso2', iso2)}
             onConsultarTelefone={consultarTelefoneAtual}
@@ -643,7 +724,13 @@ export function DeliveryPublicoCarrinhoScreen({
 
         {checkoutStep === 'pagamento' ? (
           <DeliveryCheckoutPagamentoModal
-            total={total}
+            tipoEntrega={form.tipoEntrega}
+            subtotal={total}
+            subtotalOficial={subtotalOficial}
+            taxaEntregaOficial={taxaEntregaOficial}
+            total={totalCheckout}
+            cotacaoLoading={cotacaoLoading}
+            cotacaoPronta={cotacaoPronta}
             meiosPagamento={meiosPagamento}
             loadingMeios={loadingMeios}
             pagamentos={form.pagamentos}
@@ -664,6 +751,11 @@ export function DeliveryPublicoCarrinhoScreen({
             enderecoEmpresaTexto={enderecoEmpresaTexto}
             itens={itens}
             total={total}
+            subtotalOficial={subtotalOficial}
+            taxaEntregaOficial={taxaEntregaOficial}
+            totalOficial={totalOficial}
+            cotacaoLoading={cotacaoLoading}
+            cotacaoPronta={cotacaoPronta}
             pagamentos={pagamentosRevisao}
             observacaoPedido={form.observacaoPedido}
             cpfNotaFiscal={form.cpfNotaFiscal}
@@ -722,6 +814,14 @@ export function DeliveryPublicoCarrinhoScreen({
           />
         ) : null}
       </DeliveryCheckoutShell>
+
+      {cotacaoDesatualizada ? (
+        <DeliveryCotacaoDesatualizadaDialog
+          message={cotacaoDesatualizada.message}
+          cotacao={cotacaoDesatualizada.cotacao}
+          onConfirmar={() => void handleConfirmarCotacaoDesatualizada()}
+        />
+      ) : null}
     </DeliveryCheckoutProgressProvider>
   )
 }

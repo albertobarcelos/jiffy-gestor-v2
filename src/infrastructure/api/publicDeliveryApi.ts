@@ -1,6 +1,7 @@
 import type {
   AtualizarClienteDeliveryPublicoInput,
   ClienteDeliveryPublicoDTO,
+  CotacaoPedidoPublicoInput,
   CreatePedidoPublicoInput,
   CreatePedidoPublicoResponseDTO,
   CriarClienteDeliveryPublicoInput,
@@ -8,15 +9,37 @@ import type {
   GetMeiosPagamentoPublicosResponseDTO,
 } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { parseCreatePedidoPublicoResponse } from '@/src/application/dto/delivery-publico/CreatePedidoPublicoResponseDTO'
+import {
+  parseCotacaoPedidoPublicoFromErrorBody,
+  parseCotacaoPedidoPublicoResponse,
+  type CotacaoPedidoPublicoDTO,
+} from '@/src/application/dto/delivery-publico/CotacaoPedidoPublicoDTO'
 
 export class PublicDeliveryApiError extends Error {
   constructor(
     message: string,
-    readonly status: number
+    readonly status: number,
+    readonly details?: unknown
   ) {
     super(message)
     this.name = 'PublicDeliveryApiError'
   }
+}
+
+export class CotacaoDesatualizadaPublicDeliveryError extends PublicDeliveryApiError {
+  readonly cotacao: CotacaoPedidoPublicoDTO
+
+  constructor(message: string, cotacao: CotacaoPedidoPublicoDTO, details?: unknown) {
+    super(message, 409, details)
+    this.name = 'CotacaoDesatualizadaPublicDeliveryError'
+    this.cotacao = cotacao
+  }
+}
+
+export function isCotacaoDesatualizadaError(
+  error: unknown
+): error is CotacaoDesatualizadaPublicDeliveryError {
+  return error instanceof CotacaoDesatualizadaPublicDeliveryError
 }
 
 /** Slug não cadastrado — loja delivery inexistente. */
@@ -28,13 +51,41 @@ export function isPublicDeliverySlugNotFound(error: unknown): boolean {
   )
 }
 
-async function parseErrorMessage(res: Response): Promise<string> {
-  try {
-    const data = (await res.json()) as { message?: string; error?: string }
-    return data.message || data.error || `Erro ${res.status}`
-  } catch {
-    return `Erro ${res.status}`
+function parseErrorMessageFromBody(body: unknown, status: number): string {
+  if (body && typeof body === 'object' && !Array.isArray(body)) {
+    const o = body as Record<string, unknown>
+    if (typeof o.message === 'string' && o.message.trim()) return o.message.trim()
+    if (typeof o.error === 'string' && o.error.trim()) return o.error.trim()
+    if (o.details && typeof o.details === 'object') {
+      const d = o.details as Record<string, unknown>
+      if (typeof d.message === 'string' && d.message.trim()) return d.message.trim()
+    }
   }
+  return `Erro ${status}`
+}
+
+async function parseErrorMessage(res: Response): Promise<string> {
+  const body = await parseErrorBody(res)
+  return parseErrorMessageFromBody(body, res.status)
+}
+
+async function parseErrorBody(res: Response): Promise<unknown> {
+  try {
+    return await res.json()
+  } catch {
+    return null
+  }
+}
+
+function extrairCotacaoDoErro(body: unknown): CotacaoPedidoPublicoDTO | null {
+  if (!body || typeof body !== 'object') return null
+  const o = body as Record<string, unknown>
+  const fromDetails =
+    o.details && typeof o.details === 'object'
+      ? parseCotacaoPedidoPublicoFromErrorBody(o.details)
+      : null
+  if (fromDetails) return fromDetails
+  return parseCotacaoPedidoPublicoFromErrorBody(body)
 }
 
 export async function fetchEmpresaPublicaMidia(slug: string): Promise<{
@@ -76,6 +127,25 @@ export async function fetchMeiosPagamentoPublicos(
   return res.json()
 }
 
+export async function cotarPedidoPublico(
+  input: CotacaoPedidoPublicoInput
+): Promise<CotacaoPedidoPublicoDTO> {
+  const res = await fetch('/api/public/delivery/cotacao', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new PublicDeliveryApiError(
+      parseErrorMessageFromBody(body, res.status),
+      res.status,
+      body
+    )
+  }
+  return parseCotacaoPedidoPublicoResponse(await res.json())
+}
+
 export async function criarPedidoPublico(
   input: CreatePedidoPublicoInput
 ): Promise<CreatePedidoPublicoResponseDTO> {
@@ -85,7 +155,15 @@ export async function criarPedidoPublico(
     body: JSON.stringify(input),
   })
   if (!res.ok) {
-    throw new PublicDeliveryApiError(await parseErrorMessage(res), res.status)
+    const body = await parseErrorBody(res)
+    const message = parseErrorMessageFromBody(body, res.status)
+    if (res.status === 409) {
+      const cotacao = extrairCotacaoDoErro(body)
+      if (cotacao) {
+        throw new CotacaoDesatualizadaPublicDeliveryError(message, cotacao, body)
+      }
+    }
+    throw new PublicDeliveryApiError(message, res.status, body)
   }
   return parseCreatePedidoPublicoResponse(await res.json())
 }
