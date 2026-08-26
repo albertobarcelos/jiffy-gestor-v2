@@ -169,6 +169,10 @@ export function useDeliveryCheckout(slug: string) {
   const limparCotacao = useCallback(() => {
     cotacaoSeqRef.current += 1
     setCotacao(null)
+    setForm(prev => {
+      if (prev.pagamentos.length === 0) return prev
+      return { ...prev, pagamentos: [] }
+    })
   }, [])
 
   useEffect(() => {
@@ -415,14 +419,21 @@ export function useDeliveryCheckout(slug: string) {
     [slug, setTipoEntregaPreferencia, agendarConsultaTelefone, limparCotacao]
   )
 
-  const selecionarEnderecoExistente = useCallback((enderecoId: string) => {
-    preferirNovoEnderecoRef.current = false
-    setForm(prev => ({
-      ...prev,
-      modoEndereco: 'existente',
-      enderecoIdSelecionado: enderecoId,
-    }))
-  }, [])
+  const selecionarEnderecoExistente = useCallback(
+    (enderecoId: string) => {
+      preferirNovoEnderecoRef.current = false
+      const f = formRef.current
+      if (f.enderecoIdSelecionado !== enderecoId || f.modoEndereco !== 'existente') {
+        limparCotacao()
+      }
+      setForm(prev => ({
+        ...prev,
+        modoEndereco: 'existente',
+        enderecoIdSelecionado: enderecoId,
+      }))
+    },
+    [limparCotacao]
+  )
 
   const usarNovoEndereco = useCallback(() => {
     preferirNovoEnderecoRef.current = true

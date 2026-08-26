@@ -29,6 +29,7 @@ import { findCatalogoProdutoById } from '../../shared/utils/findCatalogoProdutoB
 import { itemSemComplemento } from '../../shared/utils/deliveryCarrinhoItemUtils'
 import { formatEmpresaPublicaEndereco } from '../../shared/utils/formatEmpresaPublicaEndereco'
 import { formatDeliveryCurrency } from '../../shared/utils/formatDeliveryCurrency'
+import { isTokenCotacaoExpirado } from '../../shared/utils/deliveryCheckoutCotacaoUtils'
 import { DeliveryProdutoModal } from '../components/DeliveryProdutoModal'
 import { DeliveryCheckoutFooterActions } from '../components/checkout/DeliveryCheckoutFooterActions'
 import { DeliveryCheckoutIdentifiqueSeModal } from '../components/checkout/DeliveryCheckoutIdentifiqueSeModal'
@@ -121,6 +122,7 @@ export function DeliveryPublicoCarrinhoScreen({
     totalOficial,
     subtotalOficial,
     taxaEntregaOficial,
+    cotacao,
     cotacaoLoading,
     cotacaoPronta,
     recotarPedido,
@@ -179,19 +181,6 @@ export function DeliveryPublicoCarrinhoScreen({
 
   const totalCheckout = totalOficial ?? total
 
-  const prevCheckoutStepForCotacaoRef = useRef<DeliveryCheckoutStep>(null)
-  useEffect(() => {
-    if (checkoutStep !== 'revisao') {
-      prevCheckoutStepForCotacaoRef.current = checkoutStep
-      return
-    }
-    const entrouNaRevisao = prevCheckoutStepForCotacaoRef.current !== 'revisao'
-    prevCheckoutStepForCotacaoRef.current = checkoutStep
-    if ((entrouNaRevisao || !cotacaoPronta) && itens.length > 0) {
-      void recotarPedido()
-    }
-  }, [checkoutStep, cotacaoPronta, recotarPedido, itens.length])
-
   const identificacaoCompleta = useMemo(
     () =>
       isIdentificacaoCheckoutCompleta({
@@ -248,6 +237,49 @@ export function DeliveryPublicoCarrinhoScreen({
     prevCheckoutStepRef.current = next
     setCheckoutStep(next)
   }, [])
+
+  const prevCheckoutStepForCotacaoRef = useRef<DeliveryCheckoutStep>(null)
+
+  const cotacaoValidaParaPagamento = useMemo(() => {
+    if (!cotacaoPronta || !cotacao?.tokenCotacao) return false
+    return !isTokenCotacaoExpirado(cotacao.expiresAt)
+  }, [cotacao, cotacaoPronta])
+
+  const irParaPagamentoComCotacao = useCallback(async () => {
+    if (cotacaoValidaParaPagamento) {
+      goToCheckoutStep('pagamento')
+      return
+    }
+    const ok = await recotarPedido()
+    if (ok) goToCheckoutStep('pagamento')
+  }, [cotacaoValidaParaPagamento, recotarPedido, goToCheckoutStep])
+
+  useEffect(() => {
+    const stepComCotacao =
+      checkoutStep === 'telefone' || checkoutStep === 'pagamento' || checkoutStep === 'revisao'
+
+    if (!stepComCotacao) {
+      prevCheckoutStepForCotacaoRef.current = checkoutStep
+      return
+    }
+
+    if (checkoutStep === 'telefone') {
+      if (form.tipoEntrega !== 'entrega' || !enderecoClienteSelecionado) return
+    }
+
+    if (itens.length === 0 || cotacaoLoading || cotacaoValidaParaPagamento) return
+
+    prevCheckoutStepForCotacaoRef.current = checkoutStep
+    void recotarPedido()
+  }, [
+    checkoutStep,
+    form.tipoEntrega,
+    enderecoClienteSelecionado,
+    cotacaoLoading,
+    cotacaoValidaParaPagamento,
+    recotarPedido,
+    itens.length,
+  ])
 
   const fecharCheckout = () => {
     setHighestCheckoutPercentage(0)
@@ -365,7 +397,7 @@ export function DeliveryPublicoCarrinhoScreen({
       goToCheckoutStep('telefone')
       return
     }
-    goToCheckoutStep('pagamento')
+    void irParaPagamentoComCotacao()
   }
 
   const handleUsarNovoEndereco = () => {
@@ -403,7 +435,7 @@ export function DeliveryPublicoCarrinhoScreen({
       goToCheckoutStep('revisao')
       return
     }
-    goToCheckoutStep('pagamento')
+    void irParaPagamentoComCotacao()
   }
 
   const handlePagamentoContinuar = () => {
@@ -453,7 +485,7 @@ export function DeliveryPublicoCarrinhoScreen({
       goToCheckoutStep('telefone')
       return
     }
-    goToCheckoutStep('pagamento')
+    void irParaPagamentoComCotacao()
   }
 
   const handleCancelarEnderecoForm = () => {
@@ -653,6 +685,9 @@ export function DeliveryPublicoCarrinhoScreen({
             enderecoCliente={enderecoClienteSelecionado}
             temEnderecosCadastrados={(clienteLookup.cliente?.enderecos?.length ?? 0) > 0}
             enderecoEmpresaTexto={enderecoEmpresaTexto}
+            taxaEntregaOficial={taxaEntregaOficial}
+            cotacaoLoading={cotacaoLoading}
+            cotacaoPronta={cotacaoPronta}
             onChangeTelefone={value => updateForm('telefone', value)}
             onChangeTelefonePais={iso2 => updateForm('telefonePaisIso2', iso2)}
             onConsultarTelefone={consultarTelefoneAtual}
@@ -689,7 +724,13 @@ export function DeliveryPublicoCarrinhoScreen({
 
         {checkoutStep === 'pagamento' ? (
           <DeliveryCheckoutPagamentoModal
-            total={total}
+            tipoEntrega={form.tipoEntrega}
+            subtotal={total}
+            subtotalOficial={subtotalOficial}
+            taxaEntregaOficial={taxaEntregaOficial}
+            total={totalCheckout}
+            cotacaoLoading={cotacaoLoading}
+            cotacaoPronta={cotacaoPronta}
             meiosPagamento={meiosPagamento}
             loadingMeios={loadingMeios}
             pagamentos={form.pagamentos}

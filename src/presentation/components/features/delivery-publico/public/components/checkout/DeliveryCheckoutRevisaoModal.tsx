@@ -177,10 +177,14 @@ export function DeliveryCheckoutRevisaoModal({
     ? formatarTelefoneExibicao(telefone, telefonePaisIso2)
     : 'Não informado'
   const nomeExibicao = nome.trim() || 'Não informado'
+  const isEntrega = tipoEntrega === 'entrega'
   const totalExibicao = totalOficial ?? total
   const subtotalExibicao = subtotalOficial ?? total
   const taxaExibicao = taxaEntregaOficial ?? 0
-  const exibirTaxaEntrega = tipoEntrega === 'entrega' && taxaExibicao > 0
+  const exibirTaxaEntrega = isEntrega
+  const taxaEntregaTexto = cotacaoLoading
+    ? 'Calculando...'
+    : transformarParaReal(taxaExibicao)
   const trocoReceber = calcularTrocoCheckout(
     totalExibicao,
     pagamentos.map(p => ({ meioPagamentoId: p.meioPagamentoId, valor: p.valor })),
@@ -191,7 +195,6 @@ export function DeliveryCheckoutRevisaoModal({
   )
   const primeiroMeioNome = pagamentos[0]?.meio?.nome ?? ''
   const IconePagamento = obterIconeMeioPagamento(primeiroMeioNome)
-  const isEntrega = tipoEntrega === 'entrega'
   const observacaoTrim = observacaoPedido.trim()
   const cpfTrim = cpfNotaFiscal.replace(/\D/g, '')
 
@@ -584,9 +587,7 @@ export function DeliveryCheckoutRevisaoModal({
           {exibirTaxaEntrega ? (
             <div className="flex items-center justify-between text-sm">
               <span className="delivery-text-secondary">Taxa de entrega</span>
-              <span className="font-medium delivery-text-primary">
-                {transformarParaReal(taxaExibicao)}
-              </span>
+              <span className="font-medium delivery-text-primary">{taxaEntregaTexto}</span>
             </div>
           ) : null}
           <div className="flex items-center justify-between text-sm font-semibold">

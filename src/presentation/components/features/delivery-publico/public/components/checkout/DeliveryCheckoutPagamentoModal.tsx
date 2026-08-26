@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { MdDelete } from 'react-icons/md'
 import type { MeioPagamentoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import type { DeliveryTipoEntrega } from '../../../shared/stores/deliveryPreferenciaEntregaStore'
 import {
   formatBRLFromMaskedInput,
   parseBRLToNumber,
@@ -30,7 +31,13 @@ import {
 const MEIO_CARD_CLASS = 'h-[88px] w-[132px] shrink-0'
 
 type DeliveryCheckoutPagamentoModalProps = {
+  tipoEntrega: DeliveryTipoEntrega
+  subtotal: number
+  subtotalOficial?: number | null
+  taxaEntregaOficial?: number | null
   total: number
+  cotacaoLoading?: boolean
+  cotacaoPronta?: boolean
   meiosPagamento: MeioPagamentoPublicoDTO[]
   loadingMeios: boolean
   pagamentos: CheckoutPagamentoItem[]
@@ -48,7 +55,13 @@ function maskFromNumber(value: number): string {
 type PrecisaTrocoOpcao = null | boolean
 
 export function DeliveryCheckoutPagamentoModal({
+  tipoEntrega,
+  subtotal,
+  subtotalOficial = null,
+  taxaEntregaOficial = null,
   total,
+  cotacaoLoading = false,
+  cotacaoPronta = true,
   meiosPagamento,
   loadingMeios,
   pagamentos,
@@ -77,10 +90,17 @@ export function DeliveryCheckoutPagamentoModal({
     return map
   }, [meiosPagamento])
 
+  const isEntrega = tipoEntrega === 'entrega'
+  const subtotalExibicao = subtotalOficial ?? subtotal
+  const taxaExibicao = taxaEntregaOficial ?? 0
+  const exibirTaxaEntrega = isEntrega
+  const taxaEntregaTexto = cotacaoLoading
+    ? 'Calculando...'
+    : transformarParaReal(taxaExibicao)
   const totalLancado = somaPagamentosCheckout(pagamentos)
   const restante = restantePagamentoCheckout(total, pagamentos)
   const pagamentoCompleto = restante <= 0.01 && pagamentos.length > 0
-  const cardsDesabilitados = pagamentoCompleto
+  const cardsDesabilitados = pagamentoCompleto || cotacaoLoading || !cotacaoPronta
 
   const meioSelecionado = meioSelecionadoId
     ? (meiosById.get(meioSelecionadoId) ?? null)
@@ -217,6 +237,11 @@ export function DeliveryCheckoutPagamentoModal({
   }
 
   const handleContinuar = () => {
+    if (cotacaoLoading || !cotacaoPronta) {
+      showToast.error('Aguarde o cálculo do total do pedido')
+      return
+    }
+
     const result = tentarAdicionarPagamentoPendente({
       assumirSemTrocoQuandoIndefinido: true,
     })
@@ -240,7 +265,11 @@ export function DeliveryCheckoutPagamentoModal({
 
   const podeAdicionar =
     Boolean(meioSelecionado) &&
-    (!ehDinheiro || precisaTroco !== null)
+    (!ehDinheiro || precisaTroco !== null) &&
+    !cotacaoLoading &&
+    cotacaoPronta
+
+  const continuarDisabled = cotacaoLoading || !cotacaoPronta
 
   const fieldClass =
     'w-full rounded-xl border bg-transparent px-3 py-3 text-base outline-none delivery-text-primary'
@@ -250,7 +279,11 @@ export function DeliveryCheckoutPagamentoModal({
     <>
       <DeliveryCheckoutShellHeader title="Pagamento" showBack onBack={onVoltar} />
       <DeliveryCheckoutShellFooter>
-        <DeliveryCheckoutFooterActions onVoltar={onVoltar} onContinuar={handleContinuar} />
+        <DeliveryCheckoutFooterActions
+          onVoltar={onVoltar}
+          onContinuar={handleContinuar}
+          continuarDisabled={continuarDisabled}
+        />
       </DeliveryCheckoutShellFooter>
 
       <div className="space-y-4">
@@ -261,15 +294,23 @@ export function DeliveryCheckoutPagamentoModal({
           <div className="flex items-center justify-between text-sm">
             <span className="delivery-text-secondary">Subtotal</span>
             <span className="font-medium delivery-text-primary">
-              {transformarParaReal(total)}
+              {cotacaoLoading ? 'Calculando...' : transformarParaReal(subtotalExibicao)}
             </span>
           </div>
+          {exibirTaxaEntrega ? (
+            <div className="flex items-center justify-between text-sm">
+              <span className="delivery-text-secondary">Taxa de entrega</span>
+              <span className="font-medium delivery-text-primary">{taxaEntregaTexto}</span>
+            </div>
+          ) : null}
           <div
             className="flex items-center justify-between border-t pt-2 text-sm font-semibold"
             style={{ borderColor: 'var(--delivery-border)' }}
           >
             <span className="delivery-text-primary">Total</span>
-            <span className="delivery-text-primary">{transformarParaReal(total)}</span>
+            <span className="delivery-text-primary">
+              {cotacaoLoading ? 'Calculando...' : transformarParaReal(total)}
+            </span>
           </div>
           {restante > 0.01 ? (
             <div className="flex items-center justify-between text-sm font-semibold">
@@ -294,6 +335,8 @@ export function DeliveryCheckoutPagamentoModal({
             <p className="text-sm delivery-text-secondary">
               Nenhuma forma de pagamento disponível no momento.
             </p>
+          ) : cotacaoLoading || !cotacaoPronta ? (
+            <p className="text-sm delivery-text-secondary">Calculando total do pedido...</p>
           ) : (
             <div
               ref={scrollRef}

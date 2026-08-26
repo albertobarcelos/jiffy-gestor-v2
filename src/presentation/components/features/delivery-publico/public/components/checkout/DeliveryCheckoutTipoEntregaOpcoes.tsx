@@ -5,10 +5,6 @@ import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/de
 import type { DeliveryTipoEntrega } from '../../../shared/stores/deliveryPreferenciaEntregaStore'
 import { formatDeliveryCurrency } from '../../../shared/utils/formatDeliveryCurrency'
 import { formatarResumoEnderecoPublico } from '../../../shared/utils/garantirEnderecoClientePublico'
-import { DELIVERY_PUBLICO_TAXA_ENTREGA_PLACEHOLDER } from '../../../shared/constants/deliveryPublicoPlaceholders'
-
-/** @deprecated Preferir `DELIVERY_PUBLICO_TAXA_ENTREGA_PLACEHOLDER`. */
-export const TAXA_ENTREGA_FICTICIA = DELIVERY_PUBLICO_TAXA_ENTREGA_PLACEHOLDER
 
 export type ModoEntregaOpcao = {
   tipoEntrega: DeliveryTipoEntrega
@@ -22,6 +18,9 @@ type DeliveryCheckoutTipoEntregaOpcoesProps = {
   /** Cliente já tem ao menos um endereço no cadastro (mesmo que nenhum esteja selecionado). */
   temEnderecosCadastrados: boolean
   enderecoEmpresaTexto: string | null
+  taxaEntregaOficial?: number | null
+  cotacaoLoading?: boolean
+  cotacaoPronta?: boolean
   onChangeOpcao: (opcao: ModoEntregaOpcao) => void
   onEditarEndereco: () => void
   onCadastrarEndereco: () => void
@@ -52,6 +51,48 @@ const OPCOES: Array<{
   },
 ]
 
+function TaxaEntregaCardFooter({
+  isEntrega,
+  enderecoCliente,
+  cotacaoLoading = false,
+  cotacaoPronta = false,
+  taxaEntregaOficial = null,
+}: {
+  isEntrega: boolean
+  enderecoCliente: EnderecoClienteDeliveryPublicoDTO | null
+  cotacaoLoading?: boolean
+  cotacaoPronta?: boolean
+  taxaEntregaOficial?: number | null
+}) {
+  if (!isEntrega) {
+    return (
+      <p className="mt-2 text-xs font-medium" style={{ color: 'var(--delivery-primary)' }}>
+        Sem taxa de entrega
+      </p>
+    )
+  }
+
+  if (!enderecoCliente) return null
+
+  if (cotacaoLoading) {
+    return (
+      <p className="mt-2 text-xs font-medium delivery-text-secondary">
+        Calculando taxa de entrega...
+      </p>
+    )
+  }
+
+  if (cotacaoPronta && taxaEntregaOficial != null) {
+    return (
+      <p className="mt-2 text-xs font-medium" style={{ color: 'var(--delivery-primary)' }}>
+        Taxa de entrega {formatDeliveryCurrency(taxaEntregaOficial)}
+      </p>
+    )
+  }
+
+  return null
+}
+
 /** Grid de opções + card de endereço/retirada (usado no modal unificado de identificação). */
 export function DeliveryCheckoutTipoEntregaOpcoes({
   tipoEntrega,
@@ -59,14 +100,14 @@ export function DeliveryCheckoutTipoEntregaOpcoes({
   enderecoCliente,
   temEnderecosCadastrados,
   enderecoEmpresaTexto,
+  taxaEntregaOficial = null,
+  cotacaoLoading = false,
+  cotacaoPronta = false,
   onChangeOpcao,
   onEditarEndereco,
   onCadastrarEndereco,
 }: DeliveryCheckoutTipoEntregaOpcoesProps) {
   const isEntrega = tipoEntrega === 'entrega'
-  const taxaLabel = isEntrega
-    ? `Taxa de entrega ${formatDeliveryCurrency(TAXA_ENTREGA_FICTICIA)}`
-    : 'Sem taxa de entrega'
   const precisaCadastrarEndereco = isEntrega && !enderecoCliente && !temEnderecosCadastrados
 
   return (
@@ -121,9 +162,7 @@ export function DeliveryCheckoutTipoEntregaOpcoes({
               <p className="text-sm font-semibold delivery-text-primary">
                 {enderecoEmpresaTexto || 'Endereço da loja indisponível'}
               </p>
-              <p className="mt-2 text-xs font-medium" style={{ color: 'var(--delivery-primary)' }}>
-                {taxaLabel}
-              </p>
+              <TaxaEntregaCardFooter isEntrega={false} enderecoCliente={null} />
             </div>
           </div>
         ) : precisaCadastrarEndereco ? (
@@ -187,9 +226,13 @@ export function DeliveryCheckoutTipoEntregaOpcoes({
                       .join(' - ')}
                   </p>
                   <p className="sr-only">{formatarResumoEnderecoPublico(enderecoCliente)}</p>
-                  <p className="mt-2 text-xs font-medium" style={{ color: 'var(--delivery-primary)' }}>
-                    {taxaLabel}
-                  </p>
+                  <TaxaEntregaCardFooter
+                    isEntrega={isEntrega}
+                    enderecoCliente={enderecoCliente}
+                    cotacaoLoading={cotacaoLoading}
+                    cotacaoPronta={cotacaoPronta}
+                    taxaEntregaOficial={taxaEntregaOficial}
+                  />
                 </>
               ) : (
                 <>

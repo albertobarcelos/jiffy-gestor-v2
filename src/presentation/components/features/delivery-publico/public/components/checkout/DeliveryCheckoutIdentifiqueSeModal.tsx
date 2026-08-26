@@ -42,6 +42,9 @@ type DeliveryCheckoutIdentifiqueSeModalProps = {
   enderecoCliente: EnderecoClienteDeliveryPublicoDTO | null
   temEnderecosCadastrados: boolean
   enderecoEmpresaTexto: string | null
+  taxaEntregaOficial?: number | null
+  cotacaoLoading?: boolean
+  cotacaoPronta?: boolean
   onChangeTelefone: (value: string) => void
   onChangeTelefonePais?: (iso2: string) => void
   /** Busca manual (10 dígitos): blur do input ou Enter/OK do teclado. */
@@ -69,6 +72,9 @@ export function DeliveryCheckoutIdentifiqueSeModal({
   enderecoCliente,
   temEnderecosCadastrados,
   enderecoEmpresaTexto,
+  taxaEntregaOficial = null,
+  cotacaoLoading = false,
+  cotacaoPronta = false,
   onChangeTelefone,
   onConsultarTelefone,
   onChangeNome,
@@ -425,6 +431,9 @@ export function DeliveryCheckoutIdentifiqueSeModal({
             enderecoCliente={enderecoCliente}
             temEnderecosCadastrados={temEnderecosCadastrados}
             enderecoEmpresaTexto={enderecoEmpresaTexto}
+            taxaEntregaOficial={taxaEntregaOficial}
+            cotacaoLoading={cotacaoLoading}
+            cotacaoPronta={cotacaoPronta}
             onChangeOpcao={onChangeOpcaoEntrega}
             onEditarEndereco={onEditarEndereco}
             onCadastrarEndereco={onCadastrarEndereco}
