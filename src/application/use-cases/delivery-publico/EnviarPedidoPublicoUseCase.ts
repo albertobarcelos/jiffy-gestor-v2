@@ -3,6 +3,7 @@ import type {
   PedidoPublicoCarrinhoItemInput,
 } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
 import type { CreatePedidoPublicoResponseDTO } from '@/src/application/dto/delivery-publico/CreatePedidoPublicoResponseDTO'
+import type { CotacaoPedidoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import {
   CreatePedidoPublicoInputSchema,
   type ClienteDeliveryPublicoDTO,
@@ -15,6 +16,7 @@ import {
   atualizarClienteDeliveryPublico,
   buscarClienteDeliveryPublico,
   criarPedidoPublico,
+  isCotacaoDesatualizadaError,
 } from '@/src/infrastructure/api/publicDeliveryApi'
 
 export type EnviarPedidoPublicoInput = {
@@ -25,6 +27,7 @@ export type EnviarPedidoPublicoInput = {
   total: number
   form: CheckoutFormData
   clienteLookup: ClienteDeliveryPublicoDTO | null
+  tokenCotacao: string
 }
 
 export type EnviarPedidoPublicoResult =
@@ -32,6 +35,12 @@ export type EnviarPedidoPublicoResult =
       ok: true
       clienteAtualizado: ClienteDeliveryPublicoDTO | null
       pedido: CreatePedidoPublicoResponseDTO
+    }
+  | {
+      ok: false
+      reason: 'cotacao_desatualizada'
+      message: string
+      cotacao: CotacaoPedidoPublicoDTO
     }
   | { ok: false; error: string }
 
@@ -48,6 +57,9 @@ export class EnviarPedidoPublicoUseCase {
     if (input.itens.length === 0) {
       return { ok: false, error: 'Carrinho vazio' }
     }
+    if (!input.tokenCotacao.trim()) {
+      return { ok: false, error: 'Cotação do pedido não encontrada. Aguarde a atualização dos valores.' }
+    }
 
     let enderecoIdEntrega: string | null = null
     const formComNome: CheckoutFormData = {
@@ -56,24 +68,31 @@ export class EnviarPedidoPublicoUseCase {
     }
 
     if (formComNome.tipoEntrega === 'entrega') {
-      enderecoIdEntrega = await garantirEnderecoEntregaPublicoUseCase.execute({
-        telefone: tel,
-        nome: input.nomeEfetivo,
-        modoEndereco: formComNome.modoEndereco,
-        enderecoIdSelecionado: formComNome.enderecoIdSelecionado || null,
-        clienteLookup: input.clienteLookup,
-        enderecoNovo: {
-          rua: formComNome.rua,
-          numero: formComNome.numero,
-          bairro: formComNome.bairro,
-          cidade: formComNome.cidade,
-          estado: formComNome.estado,
-          cep: formComNome.cep,
-          complemento: formComNome.complemento,
-          pontoReferencia: formComNome.pontoReferencia,
-          etiqueta: formComNome.etiquetaEndereco,
-        },
-      })
+      try {
+        enderecoIdEntrega = await garantirEnderecoEntregaPublicoUseCase.execute({
+          telefone: tel,
+          nome: input.nomeEfetivo,
+          modoEndereco: formComNome.modoEndereco,
+          enderecoIdSelecionado: formComNome.enderecoIdSelecionado || null,
+          clienteLookup: input.clienteLookup,
+          enderecoNovo: {
+            rua: formComNome.rua,
+            numero: formComNome.numero,
+            bairro: formComNome.bairro,
+            cidade: formComNome.cidade,
+            estado: formComNome.estado,
+            cep: formComNome.cep,
+            complemento: formComNome.complemento,
+            pontoReferencia: formComNome.pontoReferencia,
+            etiqueta: formComNome.etiquetaEndereco,
+          },
+        })
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : 'Erro ao resolver endereço',
+        }
+      }
     }
 
     const resultado = montarPedidoPublico({
@@ -83,6 +102,7 @@ export class EnviarPedidoPublicoUseCase {
       form: formComNome,
       enderecoIdEntrega,
       telefoneApi: tel,
+      tokenCotacao: input.tokenCotacao,
     })
     if (!resultado.ok) {
       return resultado
@@ -97,7 +117,6 @@ export class EnviarPedidoPublicoUseCase {
     let clienteAtualizado: ClienteDeliveryPublicoDTO | null = null
     const cpfPedido = payload.cliente.cpf?.replace(/\D/g, '') ?? ''
     if (cpfPedido.length === 11) {
-      // Create reutiliza cliente existente sem atualizar CPF — garante no cadastro via PATCH.
       const rawAtual = await buscarClienteDeliveryPublico(tel)
       const cpfAtual = rawAtual?.cpf?.replace(/\D/g, '') ?? ''
       if (rawAtual && !cpfAtual) {
@@ -108,8 +127,23 @@ export class EnviarPedidoPublicoUseCase {
       }
     }
 
-    const pedido = await criarPedidoPublico(payload)
-    return { ok: true, clienteAtualizado, pedido }
+    try {
+      const pedido = await criarPedidoPublico(payload)
+      return { ok: true, clienteAtualizado, pedido }
+    } catch (error) {
+      if (isCotacaoDesatualizadaError(error)) {
+        return {
+          ok: false,
+          reason: 'cotacao_desatualizada',
+          message: error.message,
+          cotacao: error.cotacao,
+        }
+      }
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : 'Erro ao enviar pedido',
+      }
+    }
   }
 }
 

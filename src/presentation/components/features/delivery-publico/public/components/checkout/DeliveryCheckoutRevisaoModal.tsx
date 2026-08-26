@@ -37,6 +37,11 @@ type DeliveryCheckoutRevisaoModalProps = {
   enderecoEmpresaTexto: string | null
   itens: DeliveryCarrinhoItem[]
   total: number
+  subtotalOficial?: number | null
+  taxaEntregaOficial?: number | null
+  totalOficial?: number | null
+  cotacaoLoading?: boolean
+  cotacaoPronta?: boolean
   pagamentos: Array<{
     meioPagamentoId: string
     valor: number
@@ -140,6 +145,11 @@ export function DeliveryCheckoutRevisaoModal({
   enderecoEmpresaTexto,
   itens,
   total,
+  subtotalOficial = null,
+  taxaEntregaOficial = null,
+  totalOficial = null,
+  cotacaoLoading = false,
+  cotacaoPronta = true,
   pagamentos,
   observacaoPedido,
   cpfNotaFiscal,
@@ -167,8 +177,16 @@ export function DeliveryCheckoutRevisaoModal({
     ? formatarTelefoneExibicao(telefone, telefonePaisIso2)
     : 'Não informado'
   const nomeExibicao = nome.trim() || 'Não informado'
+  const isEntrega = tipoEntrega === 'entrega'
+  const totalExibicao = totalOficial ?? total
+  const subtotalExibicao = subtotalOficial ?? total
+  const taxaExibicao = taxaEntregaOficial ?? 0
+  const exibirTaxaEntrega = isEntrega
+  const taxaEntregaTexto = cotacaoLoading
+    ? 'Calculando...'
+    : transformarParaReal(taxaExibicao)
   const trocoReceber = calcularTrocoCheckout(
-    total,
+    totalExibicao,
     pagamentos.map(p => ({ meioPagamentoId: p.meioPagamentoId, valor: p.valor })),
     meioPagamentoId =>
       isMeioPagamentoDinheiro(
@@ -177,7 +195,6 @@ export function DeliveryCheckoutRevisaoModal({
   )
   const primeiroMeioNome = pagamentos[0]?.meio?.nome ?? ''
   const IconePagamento = obterIconeMeioPagamento(primeiroMeioNome)
-  const isEntrega = tipoEntrega === 'entrega'
   const observacaoTrim = observacaoPedido.trim()
   const cpfTrim = cpfNotaFiscal.replace(/\D/g, '')
 
@@ -229,8 +246,14 @@ export function DeliveryCheckoutRevisaoModal({
           <DeliveryCheckoutFooterActions
             onVoltar={onVoltar}
             onContinuar={() => onEnviar?.()}
-            continuarDisabled={enviando}
-            continuarLabel={enviando ? 'Enviando...' : 'Enviar pedido'}
+            continuarDisabled={enviando || cotacaoLoading || !cotacaoPronta}
+            continuarLabel={
+              cotacaoLoading
+                ? 'Atualizando valores...'
+                : enviando
+                  ? 'Enviando...'
+                  : 'Enviar pedido'
+            }
           />
         )}
       </DeliveryCheckoutShellFooter>
@@ -552,15 +575,24 @@ export function DeliveryCheckoutRevisaoModal({
         )}
 
         <div className="space-y-2 pt-3">
+          {cotacaoLoading ? (
+            <p className="text-xs delivery-text-secondary">Calculando valores oficiais...</p>
+          ) : null}
           <div className="flex items-center justify-between text-sm">
             <span className="delivery-text-secondary">Subtotal</span>
             <span className="font-medium delivery-text-primary">
-              {transformarParaReal(total)}
+              {transformarParaReal(subtotalExibicao)}
             </span>
           </div>
+          {exibirTaxaEntrega ? (
+            <div className="flex items-center justify-between text-sm">
+              <span className="delivery-text-secondary">Taxa de entrega</span>
+              <span className="font-medium delivery-text-primary">{taxaEntregaTexto}</span>
+            </div>
+          ) : null}
           <div className="flex items-center justify-between text-sm font-semibold">
             <span className="delivery-text-primary">Total</span>
-            <span className="delivery-text-primary">{transformarParaReal(total)}</span>
+            <span className="delivery-text-primary">{transformarParaReal(totalExibicao)}</span>
           </div>
         </div>
       </div>

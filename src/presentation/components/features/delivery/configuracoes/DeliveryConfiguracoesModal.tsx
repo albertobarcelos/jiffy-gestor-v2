@@ -229,7 +229,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
 
   const [modoImpressao, setModoImpressao] = useState<ModoImpressaoDelivery>('unificado')
   const [copiasUnificado, setCopiasUnificado] = useState(1)
-  const [autoIniciarPreparoNovosPedidos, setAutoIniciarPreparoNovosPedidos] = useState(true)
+  const [autoIniciarPreparoNovosPedidos, setAutoIniciarPreparoNovosPedidos] = useState(false)
   const [imprimirAoReceber, setImprimirAoReceber] = useState(true)
   const [imprimirAoFicarPronto, setImprimirAoFicarPronto] = useState(true)
   const [impressoraExpedicaoId, setImpressoraExpedicaoId] = useState<string>('')
