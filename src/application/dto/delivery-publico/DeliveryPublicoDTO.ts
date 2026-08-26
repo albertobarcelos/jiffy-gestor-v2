@@ -121,11 +121,18 @@ export type ClienteDeliveryPublicoDTO = {
 export type { CreatePedidoPublicoResponseDTO } from './CreatePedidoPublicoResponseDTO'
 export { parseCreatePedidoPublicoResponse } from './CreatePedidoPublicoResponseDTO'
 
+export type { CotacaoPedidoPublicoDTO } from './CotacaoPedidoPublicoDTO'
+export {
+  parseCotacaoPedidoPublicoFromErrorBody,
+  parseCotacaoPedidoPublicoResponse,
+} from './CotacaoPedidoPublicoDTO'
+
 export {
   AtualizarClienteDeliveryPublicoInputSchema,
   ClientePedidoPublicoInputSchema,
   CobrancaPedidoPublicoInputSchema,
   ComplementoPedidoPublicoInputSchema,
+  CotacaoPedidoPublicoInputSchema,
   CreatePedidoPublicoInputSchema,
   CriarClienteDeliveryPublicoInputSchema,
   EnderecoDeliveryPublicoInputSchema,
@@ -137,6 +144,7 @@ export type {
   ClientePedidoPublicoInput,
   CobrancaPedidoPublicoInput,
   ComplementoPedidoPublicoInput,
+  CotacaoPedidoPublicoInput,
   CreatePedidoPublicoInput,
   CriarClienteDeliveryPublicoInput,
   EnderecoDeliveryPublicoInput,

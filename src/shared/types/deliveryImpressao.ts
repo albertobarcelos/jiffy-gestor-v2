@@ -49,7 +49,7 @@ export interface PreferenciasImpressaoDelivery {
 export const DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY: PreferenciasImpressaoDelivery = {
   modo: 'unificado',
   copiasCupomUnificado: 1,
-  autoIniciarPreparoNovosPedidos: true,
+  autoIniciarPreparoNovosPedidos: false,
   imprimirAoReceber: true,
   imprimirAoFicarPronto: true,
   impressoraExpedicaoId: null,

@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CheckoutFormData } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
 import type { CreatePedidoPublicoResponseDTO } from '@/src/application/dto/delivery-publico/CreatePedidoPublicoResponseDTO'
+import type { CotacaoPedidoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { ClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { normalizarClienteDeliveryPublico } from '@/src/application/mappers/ClienteDeliveryPublicoMapper'
+import { cotarPedidoPublicoUseCase } from '@/src/application/use-cases/delivery-publico/CotarPedidoPublicoUseCase'
 import { enviarPedidoPublicoUseCase } from '@/src/application/use-cases/delivery-publico/EnviarPedidoPublicoUseCase'
 import { garantirEnderecoEntregaPublicoUseCase } from '@/src/application/use-cases/delivery-publico/GarantirEnderecoEntregaPublicoUseCase'
 import {
@@ -26,6 +28,40 @@ import {
   useDeliveryPreferenciaEntregaStore,
   type DeliveryTipoEntrega,
 } from '../stores/deliveryPreferenciaEntregaStore'
+import {
+  type DeliveryCheckoutCotacaoState,
+  isTokenCotacaoExpirado,
+  mapCotacaoDtoToCheckoutState,
+} from '../utils/deliveryCheckoutCotacaoUtils'
+
+export type EnviarPedidoCheckoutResult =
+  | { ok: true; pedido: CreatePedidoPublicoResponseDTO }
+  | {
+      ok: false
+      reason: 'cotacao_desatualizada'
+      message: string
+      cotacao: CotacaoPedidoPublicoDTO
+    }
+  | { ok: false }
+
+const COTACAO_INVALIDATING_FORM_KEYS = new Set<keyof CheckoutFormData>([
+  'tipoEntrega',
+  'telefone',
+  'telefonePaisIso2',
+  'nome',
+  'modoEndereco',
+  'enderecoIdSelecionado',
+  'rua',
+  'numero',
+  'bairro',
+  'cidade',
+  'estado',
+  'cep',
+  'complemento',
+  'pontoReferencia',
+  'etiquetaEndereco',
+  'cpfNotaFiscal',
+])
 
 export type ClienteLookupStatus =
   | 'idle'
@@ -114,8 +150,11 @@ export function useDeliveryCheckout(slug: string) {
   )
   const [clienteLookup, setClienteLookup] = useState<ClienteLookupState>(createInitialLookup)
   const [enviando, setEnviando] = useState(false)
+  const [cotacao, setCotacao] = useState<DeliveryCheckoutCotacaoState | null>(null)
+  const [cotacaoLoading, setCotacaoLoading] = useState(false)
 
   const lookupSeqRef = useRef(0)
+  const cotacaoSeqRef = useRef(0)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const telefoneDigitsRef = useRef('')
   /** Escolha explícita do usuário; não pode ser sobrescrita pelo lookup. */
@@ -124,6 +163,17 @@ export function useDeliveryCheckout(slug: string) {
   formRef.current = form
   const clienteLookupRef = useRef(clienteLookup)
   clienteLookupRef.current = clienteLookup
+  const cotacaoRef = useRef(cotacao)
+  cotacaoRef.current = cotacao
+
+  const limparCotacao = useCallback(() => {
+    cotacaoSeqRef.current += 1
+    setCotacao(null)
+  }, [])
+
+  useEffect(() => {
+    limparCotacao()
+  }, [itens, limparCotacao])
 
   useEffect(() => {
     const syncTipoEntregaFromStore = () => {
@@ -358,8 +408,11 @@ export function useDeliveryCheckout(slug: string) {
       if (key === 'telefone' || key === 'telefonePaisIso2') {
         agendarConsultaTelefone(next.telefone)
       }
+      if (COTACAO_INVALIDATING_FORM_KEYS.has(key)) {
+        limparCotacao()
+      }
     },
-    [slug, setTipoEntregaPreferencia, agendarConsultaTelefone]
+    [slug, setTipoEntregaPreferencia, agendarConsultaTelefone, limparCotacao]
   )
 
   const selecionarEnderecoExistente = useCallback((enderecoId: string) => {
@@ -491,9 +544,61 @@ export function useDeliveryCheckout(slug: string) {
     return enderecoId
   }, [resolveTelefoneApi])
 
-  const enviarPedido = useCallback(async (): Promise<
-    { ok: true; pedido: CreatePedidoPublicoResponseDTO } | { ok: false }
-  > => {
+  const aplicarCotacaoAtualizada = useCallback((dto: CotacaoPedidoPublicoDTO) => {
+    setCotacao(mapCotacaoDtoToCheckoutState(dto))
+  }, [])
+
+  const recotarPedido = useCallback(async (): Promise<boolean> => {
+    const f = formRef.current
+    const tel = resolveTelefoneApi(f)
+    telefoneDigitsRef.current = tel
+    if (tel.length < 8) {
+      showToast.error('Informe um telefone válido')
+      return false
+    }
+    if (itens.length === 0) {
+      return false
+    }
+
+    const nomeEfetivo =
+      f.nome.trim() || clienteLookupRef.current.cliente?.nome?.trim() || null
+
+    const seq = ++cotacaoSeqRef.current
+    setCotacaoLoading(true)
+    try {
+      const resultado = await cotarPedidoPublicoUseCase.execute({
+        slug,
+        telefoneApi: tel,
+        nomeEfetivo,
+        itens,
+        form: f,
+        clienteLookup: clienteLookupRef.current.cliente,
+      })
+
+      if (seq !== cotacaoSeqRef.current) return false
+
+      if (!resultado.ok) {
+        setCotacao(null)
+        showToast.error(resultado.error)
+        return false
+      }
+
+      setCotacao(mapCotacaoDtoToCheckoutState(resultado.cotacao))
+      return true
+    } catch (error) {
+      if (seq !== cotacaoSeqRef.current) return false
+      setCotacao(null)
+      console.error(error)
+      showToast.error(error instanceof Error ? error.message : 'Erro ao cotar pedido')
+      return false
+    } finally {
+      if (seq === cotacaoSeqRef.current) {
+        setCotacaoLoading(false)
+      }
+    }
+  }, [slug, itens, resolveTelefoneApi])
+
+  const enviarPedido = useCallback(async (): Promise<EnviarPedidoCheckoutResult> => {
     const tel = resolveTelefoneApi(form)
     telefoneDigitsRef.current = tel
     if (tel.length < 8) {
@@ -509,6 +614,21 @@ export function useDeliveryCheckout(slug: string) {
     const nomeEfetivo =
       form.nome.trim() || clienteLookup.cliente?.nome?.trim() || null
 
+    let tokenCotacao = cotacaoRef.current?.tokenCotacao ?? ''
+    if (
+      !tokenCotacao ||
+      (cotacaoRef.current && isTokenCotacaoExpirado(cotacaoRef.current.expiresAt))
+    ) {
+      const cotou = await recotarPedido()
+      if (!cotou) return { ok: false }
+      tokenCotacao = cotacaoRef.current?.tokenCotacao ?? ''
+    }
+
+    if (!tokenCotacao) {
+      showToast.error('Não foi possível validar os valores do pedido')
+      return { ok: false }
+    }
+
     setEnviando(true)
     try {
       const resultado = await enviarPedidoPublicoUseCase.execute({
@@ -516,13 +636,24 @@ export function useDeliveryCheckout(slug: string) {
         telefoneApi: tel,
         nomeEfetivo,
         itens,
-        total,
+        total: cotacaoRef.current?.valorFinal ?? total,
         form,
         clienteLookup: clienteLookup.cliente,
+        tokenCotacao,
       })
 
       if (!resultado.ok) {
-        showToast.error(resultado.error)
+        if ('reason' in resultado && resultado.reason === 'cotacao_desatualizada') {
+          return {
+            ok: false,
+            reason: 'cotacao_desatualizada',
+            message: resultado.message,
+            cotacao: resultado.cotacao,
+          }
+        }
+        if ('error' in resultado) {
+          showToast.error(resultado.error)
+        }
         return { ok: false }
       }
 
@@ -536,7 +667,6 @@ export function useDeliveryCheckout(slug: string) {
         }))
       }
 
-      limpar(slug)
       return { ok: true, pedido: resultado.pedido }
     } catch (error) {
       console.error(error)
@@ -545,11 +675,31 @@ export function useDeliveryCheckout(slug: string) {
     } finally {
       setEnviando(false)
     }
-  }, [slug, itens, total, form, clienteLookup.cliente, limpar, resolveTelefoneApi])
+  }, [slug, itens, total, form, clienteLookup.cliente, resolveTelefoneApi, recotarPedido])
+
+  const totalOficial = cotacao?.valorFinal ?? null
+  const subtotalOficial = cotacao?.subtotalProdutos ?? null
+  const taxaEntregaOficial = cotacao?.taxaEntrega ?? null
+  const cotacaoPronta = Boolean(cotacao?.tokenCotacao) && !cotacaoLoading
+
+  const limparCarrinhoAposPedido = useCallback(() => {
+    limparCotacao()
+    limpar(slug)
+  }, [limpar, slug, limparCotacao])
 
   return {
     itens,
     total,
+    totalOficial,
+    subtotalOficial,
+    taxaEntregaOficial,
+    cotacao,
+    cotacaoLoading,
+    cotacaoPronta,
+    recotarPedido,
+    aplicarCotacaoAtualizada,
+    limparCotacao,
+    limparCarrinhoAposPedido,
     form,
     updateForm,
     clienteLookup,

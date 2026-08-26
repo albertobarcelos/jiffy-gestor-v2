@@ -48,6 +48,7 @@ describe('montarPedidoPublico + CreatePedidoPublicoInputSchema', () => {
       itens: [item],
       total: 30.5,
       form: formBase(),
+      tokenCotacao: 'token-teste',
     })
     expect(result.ok).toBe(true)
     if (!result.ok) return
@@ -61,6 +62,7 @@ describe('montarPedidoPublico + CreatePedidoPublicoInputSchema', () => {
       itens: [item],
       total: 30.5,
       form: formBase({ cpfNotaFiscal: '123.456.789-09' }),
+      tokenCotacao: 'token-teste',
     })
     expect(result.ok).toBe(true)
     if (!result.ok) return
@@ -75,6 +77,7 @@ describe('montarPedidoPublico + CreatePedidoPublicoInputSchema', () => {
       itens: [item],
       total: 30.5,
       form: formBase({ cpfNotaFiscal: '123' }),
+      tokenCotacao: 'token-teste',
     })
     expect(result.ok).toBe(false)
   })

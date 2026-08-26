@@ -204,6 +204,8 @@ describe('resolverAdicaoPagamentoCheckout', () => {
 })
 
 describe('montarPedidoPublico cobrancas', () => {
+  const tokenCotacao = 'token-teste'
+
   it('envia N cobranças com os valores lançados', () => {
     const result = montarPedidoPublico({
       slug: 'loja',
@@ -215,6 +217,7 @@ describe('montarPedidoPublico cobrancas', () => {
           { meioPagamentoId: 'meio-dinheiro', valor: 10.5 },
         ],
       }),
+      tokenCotacao,
     })
 
     expect(result.ok).toBe(true)
@@ -234,6 +237,7 @@ describe('montarPedidoPublico cobrancas', () => {
         pagamentos: [{ meioPagamentoId: 'meio-dinheiro', valor: 50 }],
         observacaoPedido: 'Sem cebola',
       }),
+      tokenCotacao,
     })
 
     expect(result.ok).toBe(true)
@@ -258,6 +262,7 @@ describe('montarPedidoPublico cobrancas', () => {
         pagamentos: [{ meioPagamentoId: 'meio-pix', valor: 30.5 }],
         cpfNotaFiscal: '123.456.789-09',
       }),
+      tokenCotacao,
     })
 
     expect(result.ok).toBe(true)
@@ -275,6 +280,7 @@ describe('montarPedidoPublico cobrancas', () => {
         pagamentos: [{ meioPagamentoId: 'meio-pix', valor: 30.5 }],
         cpfNotaFiscal: '123.456',
       }),
+      tokenCotacao,
     })
 
     expect(result.ok).toBe(false)
@@ -290,6 +296,7 @@ describe('montarPedidoPublico cobrancas', () => {
         pagamentos: [{ meioPagamentoId: 'meio-pix', valor: 30.5 }],
       }),
       telefoneApi: '11999999999',
+      tokenCotacao,
     })
 
     expect(result.ok).toBe(true)
