@@ -1,29 +1,10 @@
 import { Produto } from '@/src/domain/entities/Produto'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { fetchBffJson, fetchBffVoid } from '@/src/infrastructure/api/bffClient'
 import type { UpdateMenuProdutoInput } from '@/src/shared/types/menus'
 import type {
   MenuAlvoPropagacao,
   SnapshotProdutoPropagavel,
 } from '@/src/shared/types/propagarAlteracaoProduto'
-
-/**
- * Orquestra só rotas que o BFF/backend já expõem:
- * - GET  /api/produtos/:id
- * - PATCH /api/produtos/:id
- * - PATCH /api/menus/:menuId/produtos/:produtoId
- */
-
-async function parseError(response: Response, fallback: string): Promise<never> {
-  const errorData = await response.json().catch(() => ({}))
-  throw new Error((errorData as { message?: string }).message || fallback)
-}
-
-function authHeaders(token: string) {
-  return {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${token}`,
-  }
-}
 
 /** Campos aceitos tanto no PATCH do produto-base quanto no PATCH do MenuProduto. */
 function camposCompartilhados(
@@ -68,17 +49,76 @@ function patchCadastroBase(snapshot: SnapshotProdutoPropagavel): Record<string, 
   return out
 }
 
+export class PropagarAlteracaoProdutoUseCase {
+  async listarMenusDoProduto(params: {
+    produtoId: string
+    token: string
+  }): Promise<MenuAlvoPropagacao[]> {
+    const data = await fetchBffJson<{ data?: unknown }>(
+      `/api/produtos/${encodeURIComponent(params.produtoId)}`,
+      params.token
+    )
+    const payload = data?.data && typeof data.data === 'object' ? data.data : data
+    return Produto.fromJSON(payload).getMenus()
+  }
+
+  async aplicarAlteracaoProdutoNosDestinos(params: {
+    produtoId: string
+    token: string
+    snapshot: SnapshotProdutoPropagavel
+    aplicarNoCadastroBase: boolean
+    menuIds: string[]
+  }): Promise<void> {
+    const { produtoId, token, aplicarNoCadastroBase, menuIds } = params
+    const compartilhado = camposCompartilhados(params.snapshot)
+    const menuPatch = patchMenuProduto(params.snapshot)
+    const basePatch = patchCadastroBase(params.snapshot)
+
+    if (
+      Object.keys(compartilhado).length === 0 &&
+      !params.snapshot.grupoProdutoId &&
+      params.snapshot.gruposComplementosIds === undefined
+    ) {
+      return
+    }
+
+    if (aplicarNoCadastroBase && Object.keys(basePatch).length > 0) {
+      await fetchBffVoid(`/api/produtos/${encodeURIComponent(produtoId)}`, token, {
+        method: 'PATCH',
+        body: JSON.stringify(basePatch),
+      })
+    }
+
+    if (Object.keys(menuPatch).length === 0) return
+
+    const ids = [...new Set(menuIds.filter(Boolean))]
+    if (ids.length === 0) return
+
+    await fetchBffVoid(`/api/produtos/${encodeURIComponent(produtoId)}/menus`, token, {
+      method: 'PATCH',
+      body: JSON.stringify({ add: ids }),
+    })
+
+    for (const menuId of ids) {
+      await fetchBffVoid(
+        `/api/menus/${encodeURIComponent(menuId)}/produtos/${encodeURIComponent(produtoId)}`,
+        token,
+        {
+          method: 'PATCH',
+          body: JSON.stringify(menuPatch),
+        }
+      )
+    }
+  }
+}
+
+export const propagarAlteracaoProdutoUseCase = new PropagarAlteracaoProdutoUseCase()
+
 export async function listarMenusDoProduto(params: {
   produtoId: string
   token: string
 }): Promise<MenuAlvoPropagacao[]> {
-  const response = await fetchGestorApi(`/api/produtos/${params.produtoId}`, {
-    headers: authHeaders(params.token),
-  })
-  if (!response.ok) await parseError(response, 'Erro ao carregar menus do produto')
-  const data = await response.json()
-  const payload = data?.data && typeof data.data === 'object' ? data.data : data
-  return Produto.fromJSON(payload).getMenus()
+  return propagarAlteracaoProdutoUseCase.listarMenusDoProduto(params)
 }
 
 export async function aplicarAlteracaoProdutoNosDestinos(params: {
@@ -88,52 +128,5 @@ export async function aplicarAlteracaoProdutoNosDestinos(params: {
   aplicarNoCadastroBase: boolean
   menuIds: string[]
 }): Promise<void> {
-  const { produtoId, token, aplicarNoCadastroBase, menuIds } = params
-  const headers = authHeaders(token)
-  const compartilhado = camposCompartilhados(params.snapshot)
-  const menuPatch = patchMenuProduto(params.snapshot)
-  const basePatch = patchCadastroBase(params.snapshot)
-
-  if (
-    Object.keys(compartilhado).length === 0 &&
-    !params.snapshot.grupoProdutoId &&
-    params.snapshot.gruposComplementosIds === undefined
-  ) {
-    return
-  }
-
-  if (aplicarNoCadastroBase && Object.keys(basePatch).length > 0) {
-    const response = await fetchGestorApi(`/api/produtos/${produtoId}`, {
-      method: 'PATCH',
-      headers,
-      body: JSON.stringify(basePatch),
-    })
-    if (!response.ok) await parseError(response, 'Erro ao atualizar o cadastro base')
-  }
-
-  if (Object.keys(menuPatch).length === 0) return
-
-  const ids = [...new Set(menuIds.filter(Boolean))]
-  if (ids.length === 0) return
-
-  // Garante vínculo (cria snapshot) antes de aplicar o PATCH nos menus selecionados.
-  const vinculoResponse = await fetchGestorApi(`/api/produtos/${produtoId}/menus`, {
-    method: 'PATCH',
-    headers,
-    body: JSON.stringify({ add: ids }),
-  })
-  if (!vinculoResponse.ok) {
-    await parseError(vinculoResponse, 'Erro ao vincular o produto aos cardápios')
-  }
-
-  for (const menuId of ids) {
-    const response = await fetchGestorApi(`/api/menus/${menuId}/produtos/${produtoId}`, {
-      method: 'PATCH',
-      headers,
-      body: JSON.stringify(menuPatch),
-    })
-    if (!response.ok) {
-      await parseError(response, 'Erro ao atualizar o produto em um dos cardápios')
-    }
-  }
+  return propagarAlteracaoProdutoUseCase.aplicarAlteracaoProdutoNosDestinos(params)
 }

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
-import { MenuRepository } from '@/src/infrastructure/database/repositories/MenuRepository'
+import {
+  CriarMenuUseCase,
+  ListarMenusUseCase,
+} from '@/src/application/use-cases/menus/menuCadastroUseCases'
+import { createMenuRepository } from '@/src/infrastructure/database/repositories/createMenuRepository'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { menuApiErrorResponse } from '@/src/shared/utils/menuApiRoute'
 
@@ -19,8 +22,8 @@ export async function GET(req: NextRequest) {
     const ativo =
       ativoParam === 'true' ? true : ativoParam === 'false' ? false : null
 
-    const repo = new MenuRepository(new ApiClient(), validation.tokenInfo.token)
-    const result = await repo.listarMenus({ q, limit, offset, ativo, tipo })
+    const useCase = new ListarMenusUseCase(createMenuRepository(validation.tokenInfo.token))
+    const result = await useCase.execute({ q, limit, offset, ativo, tipo })
 
     return NextResponse.json(
       { success: true, ...result },
@@ -38,12 +41,8 @@ export async function POST(req: NextRequest) {
     if (!validation.valid || !validation.tokenInfo) return validation.error!
 
     const body = await req.json()
-    if (!body?.nome || typeof body.nome !== 'string') {
-      return NextResponse.json({ message: 'Nome é obrigatório' }, { status: 400 })
-    }
-
-    const repo = new MenuRepository(new ApiClient(), validation.tokenInfo.token)
-    const menu = await repo.criarMenu({
+    const useCase = new CriarMenuUseCase(createMenuRepository(validation.tokenInfo.token))
+    const menu = await useCase.execute({
       nome: body.nome,
       descricao: body.descricao ?? null,
       codigo: body.codigo,

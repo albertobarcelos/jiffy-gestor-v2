@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
-import { MenuRepository } from '@/src/infrastructure/database/repositories/MenuRepository'
+import { AtualizarMenuGrupoUseCase } from '@/src/application/use-cases/menus/menuGrupoUseCases'
+import { createMenuRepository } from '@/src/infrastructure/database/repositories/createMenuRepository'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { menuApiErrorResponse } from '@/src/shared/utils/menuApiRoute'
 
@@ -14,13 +14,8 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
 
     const { id, grupoProdutoId } = await params
     const body = await req.json()
-
-    if (!body?.nome || typeof body.nome !== 'string' || !body.nome.trim()) {
-      return NextResponse.json({ message: 'Nome é obrigatório' }, { status: 400 })
-    }
-
-    const repo = new MenuRepository(new ApiClient(), validation.tokenInfo.token)
-    const grupo = await repo.atualizarGrupo(id, grupoProdutoId, body.nome.trim())
+    const useCase = new AtualizarMenuGrupoUseCase(createMenuRepository(validation.tokenInfo.token))
+    const grupo = await useCase.execute(id, grupoProdutoId, body.nome ?? '')
 
     return NextResponse.json({ success: true, data: grupo })
   } catch (error) {

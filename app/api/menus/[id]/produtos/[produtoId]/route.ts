@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
-import { MenuRepository } from '@/src/infrastructure/database/repositories/MenuRepository'
+import {
+  AtualizarMenuProdutoUseCase,
+  BuscarMenuProdutoUseCase,
+} from '@/src/application/use-cases/menus/menuProdutoUseCases'
+import { createMenuRepository } from '@/src/infrastructure/database/repositories/createMenuRepository'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { menuApiErrorResponse } from '@/src/shared/utils/menuApiRoute'
 
@@ -13,8 +16,8 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     if (!validation.valid || !validation.tokenInfo) return validation.error!
 
     const { id, produtoId } = await params
-    const repo = new MenuRepository(new ApiClient(), validation.tokenInfo.token)
-    const produto = await repo.buscarProduto(id, produtoId)
+    const useCase = new BuscarMenuProdutoUseCase(createMenuRepository(validation.tokenInfo.token))
+    const produto = await useCase.execute(id, produtoId)
 
     return NextResponse.json({ success: true, data: produto })
   } catch (error) {
@@ -30,8 +33,10 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
 
     const { id, produtoId } = await params
     const body = await req.json()
-    const repo = new MenuRepository(new ApiClient(), validation.tokenInfo.token)
-    const produto = await repo.atualizarProduto(id, produtoId, body)
+    const useCase = new AtualizarMenuProdutoUseCase(
+      createMenuRepository(validation.tokenInfo.token)
+    )
+    const produto = await useCase.execute(id, produtoId, body)
 
     return NextResponse.json({ success: true, data: produto })
   } catch (error) {

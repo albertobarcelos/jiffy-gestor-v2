@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
-import { MenuRepository } from '@/src/infrastructure/database/repositories/MenuRepository'
+import { CriarUploadIntentMenuProdutoUseCase } from '@/src/application/use-cases/menus/menuProdutoUseCases'
+import { createMenuRepository } from '@/src/infrastructure/database/repositories/createMenuRepository'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { menuApiErrorResponse } from '@/src/shared/utils/menuApiRoute'
 
@@ -17,16 +17,10 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
 
     const { id, produtoId } = await params
     const body = await req.json()
-
-    if (!body?.fileName || !body?.mimeType || !body?.sizeInBytes) {
-      return NextResponse.json(
-        { message: 'fileName, mimeType e sizeInBytes são obrigatórios' },
-        { status: 400 }
-      )
-    }
-
-    const repo = new MenuRepository(new ApiClient(), validation.tokenInfo.token)
-    const intent = await repo.criarUploadIntentProduto(id, produtoId, {
+    const useCase = new CriarUploadIntentMenuProdutoUseCase(
+      createMenuRepository(validation.tokenInfo.token)
+    )
+    const intent = await useCase.execute(id, produtoId, {
       fileName: body.fileName,
       mimeType: body.mimeType,
       sizeInBytes: body.sizeInBytes,

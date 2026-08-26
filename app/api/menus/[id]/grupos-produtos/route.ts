@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
-import { MenuRepository } from '@/src/infrastructure/database/repositories/MenuRepository'
+import { ListarMenuGruposUseCase } from '@/src/application/use-cases/menus/menuGrupoUseCases'
+import { createMenuRepository } from '@/src/infrastructure/database/repositories/createMenuRepository'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { menuApiErrorResponse } from '@/src/shared/utils/menuApiRoute'
 
@@ -21,8 +21,8 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     const { id } = await params
     const { searchParams } = new URL(req.url)
 
-    const repo = new MenuRepository(new ApiClient(), validation.tokenInfo.token)
-    const result = await repo.listarGrupos(id, {
+    const useCase = new ListarMenuGruposUseCase(createMenuRepository(validation.tokenInfo.token))
+    const result = await useCase.execute(id, {
       q: searchParams.get('q') || undefined,
       limit: parseInt(searchParams.get('limit') || '100', 10),
       offset: parseInt(searchParams.get('offset') || '0', 10),

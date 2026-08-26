@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
-import { MenuRepository } from '@/src/infrastructure/database/repositories/MenuRepository'
+import {
+  AtualizarMenuProdutosBatchUseCase,
+  ListarMenuProdutosUseCase,
+} from '@/src/application/use-cases/menus/menuProdutoUseCases'
+import { createMenuRepository } from '@/src/infrastructure/database/repositories/createMenuRepository'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { menuApiErrorResponse } from '@/src/shared/utils/menuApiRoute'
 
@@ -20,13 +23,14 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
 
     const { id } = await params
     const { searchParams } = new URL(req.url)
-
-    const repo = new MenuRepository(new ApiClient(), validation.tokenInfo.token)
     const tipoRaw = searchParams.get('tipo')
     const tipo =
       tipoRaw === 'all' || tipoRaw === 'padrao' || tipoRaw === 'pizza' ? tipoRaw : undefined
 
-    const result = await repo.listarProdutos(id, {
+    const useCase = new ListarMenuProdutosUseCase(
+      createMenuRepository(validation.tokenInfo.token)
+    )
+    const result = await useCase.execute(id, {
       q: searchParams.get('q') || undefined,
       limit: parseInt(searchParams.get('limit') || '50', 10),
       offset: parseInt(searchParams.get('offset') || '0', 10),
@@ -54,8 +58,10 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
 
     const { id } = await params
     const body = await req.json()
-    const repo = new MenuRepository(new ApiClient(), validation.tokenInfo.token)
-    const menu = await repo.atualizarProdutos(id, {
+    const useCase = new AtualizarMenuProdutosBatchUseCase(
+      createMenuRepository(validation.tokenInfo.token)
+    )
+    const menu = await useCase.execute(id, {
       add: body.add,
       remove: body.remove,
       update: body.update,

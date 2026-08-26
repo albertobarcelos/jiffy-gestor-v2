@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
-import { MenuRepository } from '@/src/infrastructure/database/repositories/MenuRepository'
+import { ReordenarMenuGrupoUseCase } from '@/src/application/use-cases/menus/menuGrupoUseCases'
+import { createMenuRepository } from '@/src/infrastructure/database/repositories/createMenuRepository'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { menuApiErrorResponse } from '@/src/shared/utils/menuApiRoute'
 
@@ -14,14 +14,8 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
 
     const { id, grupoProdutoId } = await params
     const body = await req.json()
-    const novaPosicao = Number(body.novaPosicao)
-
-    if (!novaPosicao || novaPosicao < 1) {
-      return NextResponse.json({ message: 'Nova posição inválida' }, { status: 400 })
-    }
-
-    const repo = new MenuRepository(new ApiClient(), validation.tokenInfo.token)
-    await repo.reordenarGrupo(id, grupoProdutoId, novaPosicao)
+    const useCase = new ReordenarMenuGrupoUseCase(createMenuRepository(validation.tokenInfo.token))
+    await useCase.execute(id, grupoProdutoId, Number(body.novaPosicao))
 
     return NextResponse.json({
       success: true,

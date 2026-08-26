@@ -1,26 +1,7 @@
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { fetchBffJson } from '@/src/infrastructure/api/bffClient'
 import type { MenuGrupoProduto, MenuProduto } from '@/src/shared/types/menus'
 
 const PAGE_LIMIT = 100
-
-async function fetchJson<T>(url: string, token: string): Promise<T> {
-  const response = await fetchGestorApi(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    cache: 'no-store',
-  })
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
-    throw new Error(
-      (errorData as { message?: string; error?: string }).message ||
-        (errorData as { error?: string }).error ||
-        'Erro na requisição'
-    )
-  }
-  return (await response.json()) as T
-}
 
 export type MenuProdutoCatalogTipoFiltro = 'all' | 'padrao' | 'pizza'
 
@@ -47,7 +28,7 @@ export async function fetchAllMenuProdutos(
     if (filters?.ativo !== undefined) params.set('ativo', String(filters.ativo))
     if (filters?.tipo) params.set('tipo', filters.tipo)
 
-    const data = await fetchJson<{ items?: MenuProduto[] }>(
+    const data = await fetchBffJson<{ items?: MenuProduto[] }>(
       `/api/menus/${encodeURIComponent(menuId)}/produtos?${params}`,
       token
     )
@@ -72,7 +53,7 @@ export async function fetchAllMenuGruposProdutos(
       limit: String(PAGE_LIMIT),
       offset: String(offset),
     })
-    const data = await fetchJson<{ items?: MenuGrupoProduto[] }>(
+    const data = await fetchBffJson<{ items?: MenuGrupoProduto[] }>(
       `/api/menus/${encodeURIComponent(menuId)}/grupos-produtos?${params}`,
       token
     )
@@ -91,7 +72,7 @@ export async function fetchMenuProdutoSnapshot(
   token: string
 ): Promise<MenuProduto | null> {
   try {
-    const raw = await fetchJson<unknown>(
+    const raw = await fetchBffJson<unknown>(
       `/api/menus/${encodeURIComponent(menuId)}/produtos/${encodeURIComponent(produtoId)}`,
       token
     )
@@ -103,4 +84,16 @@ export async function fetchMenuProdutoSnapshot(
   } catch {
     return null
   }
+}
+
+export async function fetchMenuProdutoOrThrow(
+  menuId: string,
+  produtoId: string,
+  token: string
+): Promise<MenuProduto> {
+  const snapshot = await fetchMenuProdutoSnapshot(menuId, produtoId, token)
+  if (!snapshot) {
+    throw new Error('Erro ao carregar produto deste cardápio')
+  }
+  return snapshot
 }
