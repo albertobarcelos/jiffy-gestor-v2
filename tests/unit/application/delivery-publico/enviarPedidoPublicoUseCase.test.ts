@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CheckoutFormData } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
 import type { ClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { EnviarPedidoPublicoUseCase } from '@/src/application/use-cases/delivery-publico/EnviarPedidoPublicoUseCase'
@@ -45,12 +45,18 @@ const item = {
   complementos: [],
 }
 
+const tokenCotacao = 'token-teste'
+
 describe('EnviarPedidoPublicoUseCase', () => {
   beforeEach(() => {
     vi.mocked(publicDeliveryApi.criarPedidoPublico).mockReset()
     vi.mocked(publicDeliveryApi.buscarClienteDeliveryPublico).mockReset()
     vi.mocked(publicDeliveryApi.atualizarClienteDeliveryPublico).mockReset()
     vi.mocked(publicDeliveryApi.criarPedidoPublico).mockResolvedValue({ id: 'pedido-1' })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
   it('cria pedido de retirada sem PATCH de CPF', async () => {
@@ -63,6 +69,7 @@ describe('EnviarPedidoPublicoUseCase', () => {
       total: 20,
       form: formBase(),
       clienteLookup: null,
+      tokenCotacao,
     })
 
     expect(result.ok).toBe(true)
@@ -95,6 +102,7 @@ describe('EnviarPedidoPublicoUseCase', () => {
       total: 20,
       form: formBase({ cpfNotaFiscal: '12345678909' }),
       clienteLookup: null,
+      tokenCotacao,
     })
 
     expect(result.ok).toBe(true)
@@ -125,6 +133,7 @@ describe('EnviarPedidoPublicoUseCase', () => {
       total: 20,
       form: formBase({ cpfNotaFiscal: '12345678909' }),
       clienteLookup: null,
+      tokenCotacao,
     })
 
     expect(publicDeliveryApi.atualizarClienteDeliveryPublico).not.toHaveBeenCalled()
@@ -149,14 +158,14 @@ describe('EnviarPedidoPublicoUseCase', () => {
         enderecoIdSelecionado: 'end-1',
       }),
       clienteLookup: null,
+      tokenCotacao,
     })
 
     expect(result.ok).toBe(true)
     expect(garantirSpy).toHaveBeenCalledOnce()
     const payload = vi.mocked(publicDeliveryApi.criarPedidoPublico).mock.calls[0]?.[0]
     expect(payload?.cliente.enderecoIdEntrega).toBe('end-1')
-
-    garantirSpy.mockRestore()
+    expect(payload?.tokenCotacao).toBe(tokenCotacao)
   })
 
   it('retorna erro se telefone inválido', async () => {
@@ -169,6 +178,7 @@ describe('EnviarPedidoPublicoUseCase', () => {
       total: 20,
       form: formBase(),
       clienteLookup: null,
+      tokenCotacao,
     })
     expect(result).toEqual({ ok: false, error: 'Informe um telefone válido' })
     expect(publicDeliveryApi.criarPedidoPublico).not.toHaveBeenCalled()
