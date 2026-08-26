@@ -232,6 +232,7 @@ export function MenuProdutoTabsModal({
               ref={grupoRef}
               menuId={menuId}
               grupo={state.grupo}
+              produtoId={state.produto?.produtoId}
               onDirtyChange={setGrupoDirty}
               onSavingChange={setSaving}
             />

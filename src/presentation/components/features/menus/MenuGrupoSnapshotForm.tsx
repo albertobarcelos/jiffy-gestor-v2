@@ -9,7 +9,12 @@ import {
 } from 'react'
 import { Input } from '@/src/presentation/components/ui/input'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
+import { renomearMenuGrupoViaBffUseCase } from '@/src/application/use-cases/menus/menuBffUseCases'
+import { atualizarGrupoProdutoViaBffUseCase } from '@/src/application/use-cases/grupos-produtos/AtualizarGrupoProdutoViaBffUseCase'
 import { useMenuMutations } from '@/src/presentation/hooks/menus/useMenuMutations'
+import { usePropagarAlteracaoProduto } from '@/src/presentation/hooks/produtos/usePropagarAlteracaoProduto'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import type { MenuGrupoProduto } from '@/src/shared/types/menus'
 
@@ -23,6 +28,8 @@ export type MenuGrupoSnapshotHandle = {
 interface MenuGrupoSnapshotFormProps {
   menuId: string
   grupo: MenuGrupoProduto
+  /** Usado para listar outros menus na propagação; se ausente, lista todos os cardápios. */
+  produtoId?: string
   onDirtyChange?: (dirty: boolean) => void
   onSavingChange?: (saving: boolean) => void
 }
@@ -31,10 +38,12 @@ export const MenuGrupoSnapshotForm = forwardRef<
   MenuGrupoSnapshotHandle,
   MenuGrupoSnapshotFormProps
 >(function MenuGrupoSnapshotForm(
-  { menuId, grupo, onDirtyChange, onSavingChange },
+  { menuId, grupo, produtoId, onDirtyChange, onSavingChange },
   ref
 ) {
   const { renameGrupo } = useMenuMutations(menuId)
+  const { pedirConfirmacao, dialog: dialogPropagacao } = usePropagarAlteracaoProduto()
+  const invalidate = useInvalidateTenantQueries()
   const [nome, setNome] = useState(grupo.nome)
 
   useEffect(() => {
@@ -58,11 +67,47 @@ export const MenuGrupoSnapshotForm = forwardRef<
     }
     onSavingChange?.(true)
     try {
+      const destinos = await pedirConfirmacao({
+        origem: 'menu',
+        produtoId: produtoId ?? grupo.grupoBase.id,
+        menuIdAtual: menuId,
+        ...(produtoId ? {} : { fonteMenus: 'empresa' as const }),
+      })
+      if (destinos === null) return false
+
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+      if (!token) throw new Error('Token não encontrado')
+
       await renameGrupo.mutateAsync({
         grupoProdutoId: grupo.grupoBase.id,
         nome: nomeTrim,
       })
-      showToast.success('Categoria atualizada neste cardápio')
+
+      for (const outroMenuId of destinos.menuIds) {
+        await renomearMenuGrupoViaBffUseCase.execute({
+          token,
+          menuId: outroMenuId,
+          grupoProdutoId: grupo.grupoBase.id,
+          nome: nomeTrim,
+        })
+      }
+      if (destinos.aplicarNoCadastroBase) {
+        await atualizarGrupoProdutoViaBffUseCase.execute({
+          token,
+          grupoId: grupo.grupoBase.id,
+          patch: { nome: nomeTrim },
+        })
+      }
+
+      await invalidate(['menu-grupos'])
+      await invalidate(['menu-produtos'])
+      await invalidate(['grupos-produtos'])
+
+      if (destinos.aplicarNoCadastroBase || destinos.menuIds.length > 0) {
+        showToast.success('Categoria atualizada neste cardápio e nos selecionados')
+      } else {
+        showToast.success('Categoria atualizada neste cardápio')
+      }
       return true
     } catch (err) {
       showToast.error(err instanceof Error ? err.message : 'Erro ao salvar categoria')
@@ -70,7 +115,16 @@ export const MenuGrupoSnapshotForm = forwardRef<
     } finally {
       onSavingChange?.(false)
     }
-  }, [nome, grupo.grupoBase.id, renameGrupo, onSavingChange])
+  }, [
+    nome,
+    grupo.grupoBase.id,
+    menuId,
+    produtoId,
+    pedirConfirmacao,
+    renameGrupo,
+    invalidate,
+    onSavingChange,
+  ])
 
   useImperativeHandle(ref, () => ({ isDirty, save }), [isDirty, save])
 
@@ -89,7 +143,8 @@ export const MenuGrupoSnapshotForm = forwardRef<
           <div className="h-px flex-1 bg-primary/70" />
         </div>
         <p className="mb-4 text-sm text-secondary-text">
-          O nome abaixo vale só neste cardápio. O cadastro da categoria não é alterado.
+          Essas alterações valem neste cardápio. Ao salvar, você pode copiar para o cadastro base
+          ou para outros menus.
           {grupo.grupoBase.nome ? ` Cadastro: ${grupo.grupoBase.nome}.` : ''}
         </p>
         <Input
@@ -103,6 +158,7 @@ export const MenuGrupoSnapshotForm = forwardRef<
           InputLabelProps={{ required: true }}
         />
       </div>
+      {dialogPropagacao}
     </form>
   )
 })
