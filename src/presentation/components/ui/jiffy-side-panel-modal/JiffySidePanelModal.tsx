@@ -69,9 +69,10 @@ export interface JiffySidePanelFooterActions {
   saveAndCloseColor?: 'primary' | 'secondary'
   /**
    * Rodapé `footerVariant="bar"`: estilo de Anterior / Próximo.
+   * `primary` = fundo primário sólido e texto branco (igual ao Salvar).
    * `primaryMuted` = fundo primary ~15% (alinhado a `bg-primary/15`) e texto na cor primária.
    */
-  barSecondaryTone?: 'gray' | 'primaryMuted'
+  barSecondaryTone?: 'gray' | 'primaryMuted' | 'primary'
   /**
    * Rodapé `footerVariant="bar"`: estilo do botão de cancelar (ex.: "Salvar e fechar").
    * `primary` = mesmo visual do Salvar (fundo primário, texto branco).
@@ -341,8 +342,9 @@ export function footerBarSecondaryTint10BarSx(isFirstColumn: boolean) {
 
 function footerBarPrevNextSx(
   isFirstColumn: boolean,
-  tone: 'gray' | 'primaryMuted' | undefined
+  tone: 'gray' | 'primaryMuted' | 'primary' | undefined
 ) {
+  if (tone === 'primary') return footerSavePrimaryBarSx(isFirstColumn)
   return tone === 'primaryMuted' ?
       footerBarPrimaryMutedSx(isFirstColumn)
     : footerBarSecondarySx(isFirstColumn)
