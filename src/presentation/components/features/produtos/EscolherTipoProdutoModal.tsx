@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   JiffySidePanelModal,
   type JiffySidePanelFooterActions,
@@ -29,7 +30,7 @@ const OPCOES: Array<{
     id: 'pizza',
     titulo: 'Pizza',
     descricao: 'Defina tamanho, tipos de massa, borda e sabores.',
-    disponivel: false,
+    disponivel: true,
     iconName: 'pizza',
   },
 ]
@@ -140,6 +141,7 @@ export function EscolherTipoProdutoModal({
 }
 
 export function useEscolherTipoProdutoCadastro() {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const pendingRef = useRef<(() => void) | null>(null)
 
@@ -153,13 +155,22 @@ export function useEscolherTipoProdutoCadastro() {
     setOpen(false)
   }, [])
 
-  const continuar = useCallback((tipo: TipoCadastroProduto) => {
-    if (tipo !== 'preparado') return
-    const seguir = pendingRef.current
-    pendingRef.current = null
-    setOpen(false)
-    seguir?.()
-  }, [])
+  const continuar = useCallback(
+    (tipo: TipoCadastroProduto) => {
+      if (tipo === 'pizza') {
+        pendingRef.current = null
+        setOpen(false)
+        router.push('/produtos/pizzas')
+        return
+      }
+      if (tipo !== 'preparado') return
+      const seguir = pendingRef.current
+      pendingRef.current = null
+      setOpen(false)
+      seguir?.()
+    },
+    [router]
+  )
 
   return { open, pedirTipo, fechar, continuar }
 }
