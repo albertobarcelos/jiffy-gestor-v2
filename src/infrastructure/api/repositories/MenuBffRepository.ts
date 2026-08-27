@@ -42,9 +42,9 @@ type ListarMenuGruposParams = {
   grupoProdutoId?: string
 }
 
-function unwrapData<T>(payload: { data?: T } & T): T {
-  if (payload && typeof payload === 'object' && 'data' in payload && payload.data != null) {
-    return payload.data as T
+function unwrapData<T>(payload: { data: T } | T): T {
+  if (payload && typeof payload === 'object' && 'data' in payload) {
+    return payload.data
   }
   return payload as T
 }

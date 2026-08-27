@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { ZodError, type ZodSchema } from 'zod'
+import { ZodError, type ZodType, type ZodTypeDef } from 'zod'
 
 export function searchParamsToRecord(searchParams: URLSearchParams): Record<string, string> {
   const record: Record<string, string> = {}
@@ -17,6 +17,10 @@ export function menuZodErrorResponse(error: unknown): NextResponse | null {
   )
 }
 
-export function parseMenuRouteInput<T>(schema: ZodSchema<T>, input: unknown): T {
+/** Aceita schemas com `.default()` / `.transform()` (input ≠ output). */
+export function parseMenuRouteInput<TOutput>(
+  schema: ZodType<TOutput, ZodTypeDef, unknown>,
+  input: unknown
+): TOutput {
   return schema.parse(input)
 }

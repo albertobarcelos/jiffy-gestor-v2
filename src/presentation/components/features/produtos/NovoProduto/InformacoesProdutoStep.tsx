@@ -67,7 +67,10 @@ export function InformacoesProdutoStep({
   const { inputRef: nomeInputRef, handleChange: handleNomeChange } =
     useLocaleUppercaseInputHandler(nomeProduto, onNomeProdutoChange)
   const { inputRef: descricaoInputRef, handleChange: handleDescricaoChange } =
-    useLocaleUppercaseInputHandler(descricaoProduto, onDescricaoProdutoChange)
+    useLocaleUppercaseInputHandler<HTMLTextAreaElement>(
+      descricaoProduto,
+      onDescricaoProdutoChange
+    )
 
   const formatCurrency = (value: string) => {
     const numbers = value.replace(/\D/g, '')

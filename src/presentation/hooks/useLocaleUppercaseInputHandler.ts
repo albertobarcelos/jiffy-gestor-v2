@@ -17,13 +17,15 @@ export function toLocaleUppercasePt(valor: string, locale = LOCALE_PT): string {
  * Preserva a posição do cursor ao aplicar toLocaleUpperCase no onChange
  * (evita o cursor pular para o fim ao editar no meio do texto).
  */
-export function useLocaleUppercaseInputHandler(
+export function useLocaleUppercaseInputHandler<
+  TElement extends HTMLInputElement | HTMLTextAreaElement = HTMLInputElement,
+>(
   value: string,
   onValueChange: (value: string) => void,
   options: UseLocaleUppercaseInputHandlerOptions = {}
 ) {
   const { maxLength, locale = LOCALE_PT } = options
-  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null)
+  const inputRef = useRef<TElement>(null)
   const cursorRef = useRef<{ start: number; end: number } | null>(null)
 
   useLayoutEffect(() => {
