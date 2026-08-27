@@ -160,11 +160,13 @@ export function PropagarAlteracaoProdutoDialog({
     !confirmacaoStatusGlobal && (fluxoListaCadastroBase || passo === 'escolher')
 
   const footerActions = useMemo((): JiffySidePanelFooterActions => {
+    const cancelVariant = origem === 'menu' ? 'dangerOutline' : 'primaryTint10'
+
     if (fluxoListaCadastroBase) {
       return {
         showCancel: true,
         cancelLabel: 'Cancelar',
-        cancelVariant: 'primaryTint10',
+        cancelVariant,
         onCancel: onDismiss,
         cancelDisabled: busy,
         showSave: true,
@@ -178,7 +180,7 @@ export function PropagarAlteracaoProdutoDialog({
       return {
         showCancel: true,
         cancelLabel: labelNao,
-        cancelVariant: 'primaryTint10',
+        cancelVariant,
         onCancel: onNao,
         cancelDisabled: busy,
         showSave: true,
@@ -191,7 +193,7 @@ export function PropagarAlteracaoProdutoDialog({
     return {
       showCancel: true,
       cancelLabel: 'Voltar',
-      cancelVariant: 'primaryTint10',
+      cancelVariant,
       onCancel: onVoltar,
       cancelDisabled: busy,
       showSave: true,
@@ -201,6 +203,7 @@ export function PropagarAlteracaoProdutoDialog({
       saveDisabled: busy || confirmarEscolhaDisabled,
     }
   }, [
+    origem,
     fluxoListaCadastroBase,
     passo,
     busy,

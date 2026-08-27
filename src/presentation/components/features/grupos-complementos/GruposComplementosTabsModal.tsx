@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
+import type { JiffySidePanelFooterActions } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import {
   NovoGrupoComplemento,
@@ -37,6 +38,7 @@ interface GruposComplementosTabsModalProps {
   zIndex?: number
   /** Após criar um grupo novo — para auto-vincular ao produto no fluxo do wizard. */
   onCreated?: (grupoId: string) => void | Promise<void>
+  cancelVariant?: JiffySidePanelFooterActions['cancelVariant']
 }
 
 export function GruposComplementosTabsModal({
@@ -46,6 +48,7 @@ export function GruposComplementosTabsModal({
   onReload,
   zIndex = 1300,
   onCreated,
+  cancelVariant = 'primaryTint10',
 }: GruposComplementosTabsModalProps) {
   const grupoId = state.grupo?.getId()
   const ngcRef = useRef<NovoGrupoComplementoHandle>(null)
@@ -129,7 +132,7 @@ export function GruposComplementosTabsModal({
       ? {
           showCancel: true,
           cancelLabel: 'Fechar',
-          cancelVariant: 'primaryTint10' as const,
+          cancelVariant,
           onCancel: handleRequestClose,
           showSave: true,
           saveLabel: 'Salvar',
@@ -142,7 +145,7 @@ export function GruposComplementosTabsModal({
         ? {
             showCancel: true,
             cancelLabel: 'Fechar',
-            cancelVariant: 'primaryTint10' as const,
+            cancelVariant,
             onCancel: handleRequestClose,
             showSave: true,
             saveLabel: 'Salvar',

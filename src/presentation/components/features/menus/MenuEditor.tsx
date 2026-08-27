@@ -18,6 +18,7 @@ import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplem
 import { useIsMobile } from '@/src/presentation/hooks/useIsMobile'
 import { AddProdutosToMenuPanel } from './AddProdutosToMenuPanel'
 import { MenuNovoProdutoWizard } from './MenuNovoProdutoWizard'
+import { MenuReorderCardapioModal } from './reorder/MenuReorderCardapioModal'
 import { MenuCardapioAcoes } from './MenuCardapioAcoes'
 import { MenuCardapioEmptyState } from './MenuCardapioEmptyState'
 import { MenuProdutosFilters } from './MenuProdutosFilters'
@@ -34,6 +35,7 @@ import { CatalogGroupedList } from '@/src/presentation/components/features/catal
 import { CatalogProductRow } from '@/src/presentation/components/features/catalogo/CatalogProductRow'
 import type { CatalogGroup } from '@/src/presentation/components/features/catalogo/types'
 import { MenuProdutoRowQuickActions } from './MenuProdutoRowQuickActions'
+import { MENU_MODAL_CANCEL_VARIANT } from './menuPanelConstants'
 import { coletarGruposMenuPorSnapshot, ordemSnapshotCategoria } from './ordenarGruposMenuSnapshot'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -93,6 +95,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   const [addOpen, setAddOpen] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [wizardCategoriaId, setWizardCategoriaId] = useState<string | undefined>()
+  const [reorderOpen, setReorderOpen] = useState(false)
   const [statusConfirm, setStatusConfirm] = useState<{
     produtoId: string
     ativo: boolean
@@ -630,65 +633,73 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex-shrink-0 px-1 py-[4px] md:px-[30px]">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div className="flex items-start gap-3 md:pl-5">
+        <div className="flex flex-nowrap items-center gap-2 md:gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3 md:pl-5">
             <Link
               href={toGestao('/menus')}
-              className="mt-1 flex h-8 w-8 items-center justify-center rounded-lg border border-primary/50 text-primary transition-colors hover:bg-primary/10"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-primary/50 text-primary transition-colors hover:bg-primary/10"
               aria-label="Voltar"
             >
               <MdArrowBack className="h-5 w-5" />
             </Link>
-            <div>
-              <p className="text-sm font-semibold text-primary">Produtos do menu</p>
-              <p className="text-sm font-normal text-tertiary md:text-[22px]">{menu.nome}</p>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-primary">Produtos do menu</p>
+              <p
+                className="truncate text-sm font-normal text-tertiary md:text-xl"
+                title={menu.nome}
+              >
+                {menu.nome}
+              </p>
             </div>
           </div>
 
-          <div className="mb-1 w-full max-w-[350px]">
-            <TextField
-              id="menu-produtos-search"
-              size="small"
-              fullWidth
-              value={filters.searchText}
-              onChange={e => actions.setSearch(e.target.value)}
-              label="Pesquisar"
-              placeholder="Nome ou descrição"
-              InputLabelProps={{ shrink: true }}
-              sx={{
-                ...sxEntradaCompactaProduto,
-                '& .MuiOutlinedInput-root': {
-                  backgroundColor: '#fff',
-                  height: 32,
-                  minHeight: 32,
-                },
-                '& .MuiOutlinedInput-input': {
-                  padding: '4px 8px',
-                  fontSize: '0.8125rem',
-                },
-                '& .MuiInputAdornment-root': {
-                  marginRight: '2px',
-                },
-                '& .MuiInputLabel-root': {
-                  fontSize: '0.8125rem',
-                },
-              }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <MdSearch className="text-secondary-text" size={16} />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <div className="w-[min(220px,22vw)] shrink-0">
+              <TextField
+                id="menu-produtos-search"
+                size="small"
+                fullWidth
+                value={filters.searchText}
+                onChange={e => actions.setSearch(e.target.value)}
+                label="Pesquisar"
+                placeholder="Nome ou descrição"
+                InputLabelProps={{ shrink: true }}
+                sx={{
+                  ...sxEntradaCompactaProduto,
+                  '& .MuiOutlinedInput-root': {
+                    backgroundColor: '#fff',
+                    height: 32,
+                    minHeight: 32,
+                  },
+                  '& .MuiOutlinedInput-input': {
+                    padding: '4px 6px',
+                    fontSize: '0.8125rem',
+                  },
+                  '& .MuiInputAdornment-root': {
+                    marginRight: '2px',
+                  },
+                  '& .MuiInputLabel-root': {
+                    fontSize: '0.8125rem',
+                  },
+                }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <MdSearch className="text-secondary-text" size={16} />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </div>
 
-          {mostrarAcoesCabecalho ? (
-            <MenuCardapioAcoes
-              onAdicionar={() => setAddOpen(true)}
-              loteHref={toGestao(`/menus/${menuId}/atualizar-lote`)}
-            />
-          ) : null}
+            {mostrarAcoesCabecalho ? (
+              <MenuCardapioAcoes
+                onAdicionar={() => setAddOpen(true)}
+                onReordenar={() => setReorderOpen(true)}
+                loteHref={toGestao(`/menus/${menuId}/atualizar-lote`)}
+              />
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -757,6 +768,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         open={tipoCadastro.open}
         onClose={tipoCadastro.fechar}
         onContinuar={tipoCadastro.continuar}
+        cancelVariant={MENU_MODAL_CANCEL_VARIANT}
       />
       <MenuNovoProdutoWizard
         open={wizardOpen}
@@ -764,6 +776,11 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         menuNome={menu.nome}
         initialCategoriaId={wizardCategoriaId}
         onClose={closeWizardCadastro}
+      />
+      <MenuReorderCardapioModal
+        open={reorderOpen}
+        menuId={menuId}
+        onClose={() => setReorderOpen(false)}
       />
       {dialogPropagacao}
       <JiffyFriendlyAlertDialog

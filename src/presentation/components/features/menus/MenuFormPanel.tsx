@@ -9,7 +9,11 @@ import { sxEntradaCompactaProduto } from '@/src/presentation/components/features
 import { useMenuMutations } from '@/src/presentation/hooks/menus/useMenuMutations'
 import { showToast } from '@/src/shared/utils/toast'
 import type { Menu } from '@/src/shared/types/menus'
-import { MENU_FORM_ID, MENU_SIDE_PANEL_CLASS } from './menuPanelConstants'
+import {
+  MENU_FORM_ID,
+  MENU_MODAL_CANCEL_VARIANT,
+  MENU_SIDE_PANEL_CLASS,
+} from './menuPanelConstants'
 
 interface MenuFormPanelProps {
   open: boolean
@@ -75,7 +79,7 @@ export function MenuFormPanel({ open, menu, onClose }: MenuFormPanelProps) {
       footerActions={{
         showCancel: true,
         cancelLabel: 'Fechar',
-        cancelVariant: 'primaryTint10',
+        cancelVariant: MENU_MODAL_CANCEL_VARIANT,
         onCancel: onClose,
         showSave: true,
         saveLabel: 'Salvar',

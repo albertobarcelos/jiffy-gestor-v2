@@ -10,7 +10,7 @@ import type { MenuGrupoProduto, MenuProduto } from '@/src/shared/types/menus'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { vincularProdutoMenusComSnapshot } from '@/src/application/use-cases/produtos/VincularProdutoMenusComSnapshotUseCase'
-import { MENU_WIDE_PANEL_CLASS } from './menuPanelConstants'
+import { MENU_MODAL_CANCEL_VARIANT, MENU_WIDE_PANEL_CLASS } from './menuPanelConstants'
 import {
   MenuProdutoSnapshotForm,
   type MenuProdutoSnapshotHandle,
@@ -147,7 +147,7 @@ export function MenuProdutoTabsModal({
   const footerActions: JiffySidePanelFooterActions = {
     showCancel: true,
     cancelLabel: 'Fechar',
-    cancelVariant: 'primaryTint10',
+    cancelVariant: MENU_MODAL_CANCEL_VARIANT,
     onCancel: onClose,
     showSave: true,
     saveLabel: 'Salvar e fechar',

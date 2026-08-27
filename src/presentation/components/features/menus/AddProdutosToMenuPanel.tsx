@@ -10,7 +10,7 @@ import {
 } from '@/src/presentation/hooks/useProdutos'
 import { useMenuMutations } from '@/src/presentation/hooks/menus/useMenuMutations'
 import { showToast } from '@/src/shared/utils/toast'
-import { MENU_SIDE_PANEL_CLASS } from './menuPanelConstants'
+import { MENU_MODAL_CANCEL_VARIANT, MENU_SIDE_PANEL_CLASS } from './menuPanelConstants'
 import type { Produto } from '@/src/domain/entities/Produto'
 
 interface AddProdutosToMenuPanelProps {
@@ -150,7 +150,7 @@ export function AddProdutosToMenuPanel({
       footerActions={{
         showCancel: true,
         cancelLabel: 'Fechar',
-        cancelVariant: 'primaryTint10',
+        cancelVariant: MENU_MODAL_CANCEL_VARIANT,
         onCancel: closeAndReset,
         showSave: true,
         saveLabel: selected.size > 0 ? `Adicionar (${selected.size})` : 'Adicionar',

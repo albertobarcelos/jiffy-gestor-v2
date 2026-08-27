@@ -7,3 +7,6 @@ export const MENU_WIDE_PANEL_CLASS = 'w-[85vw] max-w-[100vw]'
 
 export const MENU_FORM_ID = 'menu-cadastro-form'
 export const MENU_PRODUTO_FORM_ID = 'menu-produto-form'
+
+/** Botão cancelar/fechar dos modais do fluxo de menus (vermelho/10). */
+export const MENU_MODAL_CANCEL_VARIANT = 'dangerOutline' as const

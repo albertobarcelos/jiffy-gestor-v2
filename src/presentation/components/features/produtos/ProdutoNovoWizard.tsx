@@ -35,7 +35,7 @@ import {
   NovoGrupo,
   type NovoGrupoHandle,
 } from '@/src/presentation/components/features/grupos-produtos/NovoGrupo'
-import { MENU_WIDE_PANEL_CLASS } from '@/src/presentation/components/features/menus/menuPanelConstants'
+import { MENU_MODAL_CANCEL_VARIANT, MENU_WIDE_PANEL_CLASS } from '@/src/presentation/components/features/menus/menuPanelConstants'
 import {
   unirMenuIds,
 } from '@/src/presentation/utils/uploadImagemProdutoMenus'
@@ -332,11 +332,14 @@ export function ProdutoNovoWizard({
   ])
 
   const footerActions = useMemo((): JiffySidePanelFooterActions => {
+    const cancelVariant =
+      origem === 'menu' ? MENU_MODAL_CANCEL_VARIANT : 'primaryTint10'
+
     if (step === 0) {
       return {
         showCancel: true,
         cancelLabel: 'Fechar',
-        cancelVariant: 'primaryTint10',
+        cancelVariant,
         onCancel: onClose,
         showNext: true,
         nextLabel: 'Continuar',
@@ -353,7 +356,7 @@ export function ProdutoNovoWizard({
       return {
         showCancel: true,
         cancelLabel: 'Fechar',
-        cancelVariant: 'primaryTint10',
+        cancelVariant,
         onCancel: onClose,
         showPrevious: true,
         previousLabel: 'Anterior',
@@ -375,7 +378,7 @@ export function ProdutoNovoWizard({
       return {
         showCancel: true,
         cancelLabel: 'Fechar',
-        cancelVariant: 'primaryTint10',
+        cancelVariant,
         onCancel: onClose,
         showPrevious: true,
         previousLabel: 'Anterior',
@@ -398,7 +401,7 @@ export function ProdutoNovoWizard({
       return {
         showCancel: true,
         cancelLabel: 'Fechar',
-        cancelVariant: 'primaryTint10',
+        cancelVariant,
         onCancel: onClose,
         showPrevious: true,
         previousLabel: 'Anterior',
@@ -436,6 +439,7 @@ export function ProdutoNovoWizard({
     }
   }, [
     step,
+    origem,
     onClose,
     handleNextFromCategoria,
     handleNextFromProduto,
@@ -650,6 +654,9 @@ export function ProdutoNovoWizard({
                 open={open}
                 modoRascunho
                 isEmbedded
+                nestedCancelVariant={
+                  origem === 'menu' ? MENU_MODAL_CANCEL_VARIANT : undefined
+                }
                 onClose={() => undefined}
               />
             </div>
