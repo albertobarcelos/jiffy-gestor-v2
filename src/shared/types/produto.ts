@@ -28,4 +28,3 @@ export type ToggleField =
   | 'abreComplementos'
   | 'permiteAlterarPreco'
   | 'incideTaxa'
-  | 'ativoDelivery'

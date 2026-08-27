@@ -21,8 +21,6 @@ function permissaoAtivaNoProduto(produto: Produto, field: ToggleField): boolean 
       return produto.permiteAlterarPrecoAtivo()
     case 'incideTaxa':
       return produto.incideTaxaAtivo()
-    case 'ativoDelivery':
-      return produto.isAtivoDelivery()
   }
 }
 

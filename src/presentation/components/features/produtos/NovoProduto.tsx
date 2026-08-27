@@ -55,7 +55,6 @@ interface BaselineSnapshotProduto {
   abreComplementos: boolean
   permiteAlterarPreco: boolean
   incideTaxa: boolean
-  ativoDelivery: boolean
   ativo: boolean
   grupoComplementosIds: string[]
   impressorasIds: string[]
@@ -98,7 +97,6 @@ function seedFormFromProduto(produto: Produto, isCopy: boolean) {
     abreComplementos: produto.abreComplementosAtivo(),
     permiteAlterarPreco: produto.permiteAlterarPrecoAtivo(),
     incideTaxa: produto.incideTaxaAtivo(),
-    ativoDelivery: produto.isAtivoDelivery(),
     ativo: produto.isAtivo(),
     grupoComplementosIds: produto.getGruposComplementos().map(g => g.id),
     impressorasIds: produto.getImpressoras().map(i => i.id),
@@ -311,9 +309,6 @@ function montarPatchParcialEdicaoProduto(
   if (!booleanIguaisParaPatch(bodyCompleto.incideTaxa, base.incideTaxa)) {
     delta.incideTaxa = bodyCompleto.incideTaxa
   }
-  if (!booleanIguaisParaPatch(bodyCompleto.ativoDelivery, base.ativoDelivery)) {
-    delta.ativoDelivery = bodyCompleto.ativoDelivery
-  }
 
   if (!arraysIdsIguais(bodyCompleto.gruposComplementosIds as unknown[], base.grupoComplementosIds)) {
     delta.gruposComplementosIds = bodyCompleto.gruposComplementosIds
@@ -497,7 +492,6 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       () => formSeed?.permiteAlterarPreco ?? false
     )
     const [incideTaxa, setIncideTaxa] = useState(() => formSeed?.incideTaxa ?? false)
-    const [ativoDelivery, setAtivoDelivery] = useState(() => formSeed?.ativoDelivery ?? true)
     const [ativo, setAtivo] = useState(() => formSeed?.ativo ?? true)
     const [grupoComplementosIds, setGrupoComplementosIds] = useState<string[]>(
       () => formSeed?.grupoComplementosIds ?? []
@@ -658,7 +652,6 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         abreComplementos,
         permiteAlterarPreco,
         incideTaxa,
-        ativoDelivery,
         ativo,
         grupoComplementosIds: [...grupoComplementosIds].sort(),
         impressorasIds: [...impressorasIds].sort(),
@@ -681,7 +674,6 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       abreComplementos,
       permiteAlterarPreco,
       incideTaxa,
-      ativoDelivery,
       ativo,
       grupoComplementosIds,
       impressorasIds,
@@ -808,7 +800,6 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           abreComplementos: !!(produto.abreComplementos || false),
           permiteAlterarPreco: !!(produto.permiteAlterarPreco ?? false),
           incideTaxa: !!(produto.incideTaxa ?? false),
-          ativoDelivery: produto.ativoDelivery === false ? false : true,
           // Mesma semântica que `setAtivo(produto.ativo ?? true)` — unknown precisa virar boolean explícito
           ativo: produto.ativo === false ? false : true,
           grupoComplementosIds: [...gruposIds].map(id => String(id)).sort(),
@@ -917,7 +908,6 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
             setAbreComplementos(produto.abreComplementos || false)
             setPermiteAlterarPreco(produto.permiteAlterarPreco ?? false)
             setIncideTaxa(produto.incideTaxa ?? false)
-            setAtivoDelivery(produto.ativoDelivery === false ? false : true)
             setAtivo(produto.ativo ?? true)
             const gruposIds = produto.gruposComplementos?.map((g: any) => g.id) || []
             setGrupoComplementosIds(gruposIds)
@@ -1608,7 +1598,6 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           permiteDesconto,
           permiteAlterarPreco,
           incideTaxa,
-          ativoDelivery,
           gruposComplementosIds: gruposComplementosIdsFinal,
           impressorasIds: impressorasIdsFinal,
           ...(ncmCompatBody ? { ncm: ncmCompatBody } : {}),
@@ -2172,8 +2161,6 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
               onPermiteAlterarPrecoChange={setPermiteAlterarPreco}
               incideTaxa={incideTaxa}
               onIncideTaxaChange={setIncideTaxa}
-              ativoDelivery={ativoDelivery}
-              onAtivoDeliveryChange={setAtivoDelivery}
               grupoComplementosIds={grupoComplementosIds}
               onGrupoComplementosIdsChange={setGrupoComplementosIds}
               impressorasIds={impressorasIds}
