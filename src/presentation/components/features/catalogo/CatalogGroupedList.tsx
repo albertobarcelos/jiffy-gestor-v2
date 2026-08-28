@@ -72,7 +72,7 @@ export function CatalogGroupedList<T>({
                 itemCount={group.items.length}
                 isExpanded={isExpanded}
                 showGrupoStatusSwitch={showGrupoStatusSwitch}
-                addProdutoLabel={addProdutoLabel}
+                addProdutoLabel={group.addProdutoLabel ?? addProdutoLabel}
                 onToggleExpand={onToggleExpand}
                 onEditGrupo={onEditGrupo}
                 onToggleGrupoStatus={onToggleGrupoStatus}

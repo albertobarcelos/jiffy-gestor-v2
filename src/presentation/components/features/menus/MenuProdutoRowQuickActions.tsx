@@ -54,6 +54,8 @@ function sameIdList(a: readonly string[], b: readonly string[]): boolean {
 export interface MenuProdutoRowQuickActionsProps {
   produto: MenuProduto
   disabled?: boolean
+  /** Sabores pizza não usam complementos padrão do cardápio. */
+  ocultarComplementos?: boolean
   /** Retorna `false` se o usuário cancelar ou se o patch falhar. */
   onPatch: (
     produtoId: string,
@@ -65,6 +67,7 @@ export interface MenuProdutoRowQuickActionsProps {
 export function MenuProdutoRowQuickActions({
   produto,
   disabled,
+  ocultarComplementos = false,
   onPatch,
 }: MenuProdutoRowQuickActionsProps) {
   const { data: gruposComplementos = [], isLoading: loadingComplementos } =
@@ -118,18 +121,20 @@ export function MenuProdutoRowQuickActions({
   return (
     <>
       <div className="flex shrink-0 items-center gap-1">
-        <RowIconButton
-          title={
-            gruposComplementosIds.length > 0
-              ? `Complementos (${gruposComplementosIds.length})`
-              : 'Grupos de complementos'
-          }
-          active={gruposComplementosIds.length > 0}
-          disabled={disabled}
-          onClick={e => setComplAnchor(e.currentTarget)}
-        >
-          <MdList className="text-lg" />
-        </RowIconButton>
+        {!ocultarComplementos ? (
+          <RowIconButton
+            title={
+              gruposComplementosIds.length > 0
+                ? `Complementos (${gruposComplementosIds.length})`
+                : 'Grupos de complementos'
+            }
+            active={gruposComplementosIds.length > 0}
+            disabled={disabled}
+            onClick={e => setComplAnchor(e.currentTarget)}
+          >
+            <MdList className="text-lg" />
+          </RowIconButton>
+        ) : null}
         <RowIconButton
           title={descricao.trim() ? 'Editar descrição' : 'Adicionar descrição'}
           active={Boolean(descricao.trim())}

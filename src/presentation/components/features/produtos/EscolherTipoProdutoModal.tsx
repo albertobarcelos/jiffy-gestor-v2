@@ -140,7 +140,7 @@ export function EscolherTipoProdutoModal({
   )
 }
 
-export function useEscolherTipoProdutoCadastro() {
+export function useEscolherTipoProdutoCadastro(options?: { onPizza?: () => void }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const pendingRef = useRef<(() => void) | null>(null)
@@ -160,6 +160,10 @@ export function useEscolherTipoProdutoCadastro() {
       if (tipo === 'pizza') {
         pendingRef.current = null
         setOpen(false)
+        if (options?.onPizza) {
+          options.onPizza()
+          return
+        }
         router.push('/produtos/pizzas')
         return
       }
@@ -169,7 +173,7 @@ export function useEscolherTipoProdutoCadastro() {
       setOpen(false)
       seguir?.()
     },
-    [router]
+    [options?.onPizza, router]
   )
 
   return { open, pedirTipo, fechar, continuar }

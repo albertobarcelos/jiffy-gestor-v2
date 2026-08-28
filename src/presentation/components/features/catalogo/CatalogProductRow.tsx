@@ -24,6 +24,10 @@ export interface CatalogProductRowProps {
   imagemUrl?: string | null
   codigo?: string
   actionsSlot?: ReactNode
+  /** Texto formatado no lugar do input de valor (ex.: pizza — "À partir de R$ X"). */
+  valorExibicao?: string
+  /** Oculta edição inline de preço (sabores pizza). */
+  valorSomenteLeitura?: boolean
   isSavingValor?: boolean
   isSavingStatus?: boolean
   isSavingImage?: boolean
@@ -46,6 +50,8 @@ function CatalogProductRowInner({
   imagemUrl,
   codigo,
   actionsSlot,
+  valorExibicao,
+  valorSomenteLeitura = false,
   isSavingValor,
   isSavingStatus,
   isSavingImage,
@@ -247,11 +253,20 @@ function CatalogProductRowInner({
           )}
           onClick={e => e.stopPropagation()}
         >
+          {valorSomenteLeitura ? (
+          <span
+            className="shrink-0 text-xs font-medium text-secondary-text md:text-sm"
+            title={valorExibicao}
+          >
+            {valorExibicao ?? '—'}
+          </span>
+        ) : (
           <ProdutoValorInput
             valor={valor}
             disabled={isSavingValor}
             onCommit={novoValor => onValorChange(id, novoValor)}
           />
+        )}
           <ProdutoStatusSwitch
             isAtivo={ativo}
             disabled={isSavingStatus}
@@ -298,6 +313,8 @@ function arePropsEqual(prev: CatalogProductRowProps, next: CatalogProductRowProp
     prev.imagemUrl === next.imagemUrl &&
     prev.codigo === next.codigo &&
     prev.actionsSlot === next.actionsSlot &&
+    prev.valorExibicao === next.valorExibicao &&
+    prev.valorSomenteLeitura === next.valorSomenteLeitura &&
     prev.isSavingValor === next.isSavingValor &&
     prev.isSavingStatus === next.isSavingStatus &&
     prev.isSavingImage === next.isSavingImage &&

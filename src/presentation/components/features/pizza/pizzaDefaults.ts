@@ -61,7 +61,10 @@ export const DEFAULT_BORDAS: Omit<PizzaLinhaComplementoDraft, 'localId'>[] = [
   { nome: 'TRADICIONAL', valor: 0, ativo: true },
 ]
 
-export function buildCreateCompletoPayload(draft: PizzaCategoriaDraft): CreateCategoriaPizzaCompletoInput {
+export function buildCreateCompletoPayload(
+  draft: PizzaCategoriaDraft,
+  options?: { menuId?: string }
+): CreateCategoriaPizzaCompletoInput {
   const tamanhos = draft.tamanhos
     .filter(t => t.nome.trim() && t.ativo)
     .map(t => ({
@@ -87,6 +90,7 @@ export function buildCreateCompletoPayload(draft: PizzaCategoriaDraft): CreateCa
     iconName: draft.iconName,
     ativo: draft.ativo,
     config: {
+      menuId: options?.menuId ?? null,
       regraPrecoMultiplosSabores: draft.regraPrecoMultiplosSabores,
       imprimir: true,
       permiteDesconto: true,

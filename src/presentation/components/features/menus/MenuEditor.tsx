@@ -18,6 +18,7 @@ import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplem
 import { useIsMobile } from '@/src/presentation/hooks/useIsMobile'
 import { AddProdutosToMenuPanel } from './AddProdutosToMenuPanel'
 import { MenuNovoProdutoWizard } from './MenuNovoProdutoWizard'
+import { MenuPizzaFlowPanel } from './MenuPizzaFlowPanel'
 import { MenuCardapioAcoes } from './MenuCardapioAcoes'
 import { MenuCardapioEmptyState } from './MenuCardapioEmptyState'
 import { MenuProdutosFilters } from './MenuProdutosFilters'
@@ -40,6 +41,15 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import { usePizzaCategorias } from '@/src/presentation/hooks/pizza/usePizza'
+import { usePizzaSaboresPrecosResumo } from '@/src/presentation/hooks/pizza/usePizzaSaboresPrecosResumo'
+import { PizzaSaborModal } from '@/src/presentation/components/features/pizza/PizzaSaborModal'
+import { PizzaCategoriaTabsModal } from '@/src/presentation/components/features/pizza/PizzaCategoriaTabsModal'
+import {
+  formatarPrecoAPartirDe,
+  isPizzaGrupoProdutoId,
+} from '@/src/presentation/utils/pizza/pizzaMenuHelpers'
+import type { CategoriaPizza } from '@/src/shared/types/pizza'
 import type {
   MenuGrupoProduto,
   MenuProduto,
@@ -90,7 +100,29 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   const [addOpen, setAddOpen] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [wizardCategoriaId, setWizardCategoriaId] = useState<string | undefined>()
-  const tipoCadastro = useEscolherTipoProdutoCadastro()
+  const [menuPizzaFlowOpen, setMenuPizzaFlowOpen] = useState(false)
+  const [pizzaFlowCategoriaId, setPizzaFlowCategoriaId] = useState<string | undefined>()
+  const [pizzaFlowAction, setPizzaFlowAction] = useState<'sabor' | undefined>()
+  const [pizzaSaborModalOpen, setPizzaSaborModalOpen] = useState(false)
+  const [pizzaSaborEditId, setPizzaSaborEditId] = useState<string | null>(null)
+  const [pizzaSaborCategoria, setPizzaSaborCategoria] = useState<CategoriaPizza | null>(null)
+  const [pizzaCategoriaEditOpen, setPizzaCategoriaEditOpen] = useState(false)
+  const [pizzaCategoriaEditId, setPizzaCategoriaEditId] = useState<string | null>(null)
+  const abrirPizzaNoMenu = useCallback(() => {
+    setPizzaFlowCategoriaId(undefined)
+    setPizzaFlowAction(undefined)
+    setMenuPizzaFlowOpen(true)
+  }, [])
+  const tipoCadastro = useEscolherTipoProdutoCadastro({ onPizza: abrirPizzaNoMenu })
+  const { data: pizzaCategoriasData } = usePizzaCategorias({ limit: 100 })
+  const pizzaCategoriaIds = useMemo(
+    () => new Set((pizzaCategoriasData?.items ?? []).map(categoria => categoria.id)),
+    [pizzaCategoriasData?.items]
+  )
+  const pizzaCategoriaPorId = useMemo(
+    () => new Map((pizzaCategoriasData?.items ?? []).map(categoria => [categoria.id, categoria])),
+    [pizzaCategoriasData?.items]
+  )
   const {
     data: produtosTodosData,
     fetchNextPage: fetchNextTodos,
@@ -159,6 +191,12 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     setWizardCategoriaId(undefined)
   }, [])
 
+  const handlePizzaMenuSuccess = useCallback(async () => {
+    await invalidate(['menu', menuId])
+    await invalidate(['menu-produtos', menuId])
+    await invalidate(['menu-grupos', menuId])
+  }, [invalidate, menuId])
+
   const grupos = useMemo(
     () => coletarGruposMenuPorSnapshot(gruposData?.pages),
     [gruposData?.pages]
@@ -173,6 +211,17 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     }
     return Array.from(map.values())
   }, [produtosData?.pages])
+
+  const pizzaSaborIds = useMemo(
+    () =>
+      produtosDoMenu
+        .filter(produto =>
+          isPizzaGrupoProdutoId(produto.grupoProduto?.id, pizzaCategoriaIds)
+        )
+        .map(produto => produto.produtoId),
+    [produtosDoMenu, pizzaCategoriaIds]
+  )
+  const { precosPorSaborId } = usePizzaSaboresPrecosResumo(pizzaSaborIds)
 
   const idsNoMenu = useMemo(() => {
     const source = addOpen ? produtosTodosData?.pages : produtosData?.pages
@@ -223,6 +272,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
           cor && icon ? { corHex: cor, iconName: icon } : undefined,
         grupoAtivo: grupo.grupoBase.ativo ?? true,
         ordem: ordemSnapshotCategoria(grupo),
+        addProdutoLabel: pizzaCategoriaIds.has(baseId) ? 'Adicionar sabor' : undefined,
         items: produtosPorGrupo.get(baseId) ?? [],
       }
     })
@@ -235,6 +285,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         grupoId: baseId,
         grupoAtivo: true,
         ordem: Number.MAX_SAFE_INTEGER,
+        addProdutoLabel: pizzaCategoriaIds.has(baseId) ? 'Adicionar sabor' : undefined,
         items,
       })
     }
@@ -251,7 +302,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     }
 
     return groups.sort((a, b) => (a.ordem ?? Number.MAX_SAFE_INTEGER) - (b.ordem ?? Number.MAX_SAFE_INTEGER))
-  }, [grupos, produtosPorGrupo])
+  }, [grupos, produtosPorGrupo, pizzaCategoriaIds])
 
   const catalogGroupsVisiveis = useMemo(() => {
     if (!temFiltroAtivo) return catalogGroups
@@ -310,18 +361,35 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     (produtoId: string) => {
       const produto = produtosDoMenu.find(p => p.produtoId === produtoId)
       if (!produto) return
+      const grupoId = produto.grupoProduto?.id
+      if (isPizzaGrupoProdutoId(grupoId, pizzaCategoriaIds)) {
+        const categoria = grupoId ? (pizzaCategoriaPorId.get(grupoId) ?? null) : null
+        if (!categoria) {
+          showToast.error('Categoria pizza não encontrada')
+          return
+        }
+        setPizzaSaborCategoria(categoria)
+        setPizzaSaborEditId(produtoId)
+        setPizzaSaborModalOpen(true)
+        return
+      }
       openTabs({
         tab: 'produto',
         produto,
         grupo: findGrupo(produto.grupoProduto?.id),
       })
     },
-    [produtosDoMenu, findGrupo, openTabs]
+    [produtosDoMenu, findGrupo, openTabs, pizzaCategoriaIds, pizzaCategoriaPorId]
   )
 
   const handleEditGrupo = useCallback(
     (grupoId: string | undefined) => {
       if (!grupoId) return
+      if (isPizzaGrupoProdutoId(grupoId, pizzaCategoriaIds)) {
+        setPizzaCategoriaEditId(grupoId)
+        setPizzaCategoriaEditOpen(true)
+        return
+      }
       const grupo = findGrupo(grupoId)
       if (!grupo) return
       const primeiro = produtosPorGrupo.get(grupoId)?.[0] ?? null
@@ -331,14 +399,36 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         produto: primeiro,
       })
     },
-    [findGrupo, produtosPorGrupo, openTabs]
+    [findGrupo, produtosPorGrupo, openTabs, pizzaCategoriaIds]
   )
+
+  const closePizzaSaborModal = useCallback(() => {
+    setPizzaSaborModalOpen(false)
+    setPizzaSaborEditId(null)
+    setPizzaSaborCategoria(null)
+  }, [])
+
+  const closePizzaCategoriaModal = useCallback(() => {
+    setPizzaCategoriaEditOpen(false)
+    setPizzaCategoriaEditId(null)
+  }, [])
+
+  const handlePizzaItemEditSuccess = useCallback(async () => {
+    await handlePizzaMenuSuccess()
+    await invalidate(['pizza', 'sabor', 'preco-resumo'])
+  }, [handlePizzaMenuSuccess, invalidate])
 
   const handleAddProduto = useCallback(
     (_grupoNome: string, grupoId: string | undefined) => {
+      if (grupoId && pizzaCategoriaIds.has(grupoId)) {
+        setPizzaFlowCategoriaId(grupoId)
+        setPizzaFlowAction('sabor')
+        setMenuPizzaFlowOpen(true)
+        return
+      }
       tipoCadastro.pedirTipo(() => openWizardCadastro(grupoId))
     },
-    [tipoCadastro.pedirTipo, openWizardCadastro]
+    [openWizardCadastro, pizzaCategoriaIds, tipoCadastro]
   )
   const handleNomeChange = useCallback(
     async (produtoId: string, nome: string) => {
@@ -469,12 +559,13 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         .then(() => {
           showToast.success('Produto removido deste cardápio')
           if (tabsState.produto?.produtoId === produto.produtoId) closeTabs()
+          if (pizzaSaborEditId === produto.produtoId) closePizzaSaborModal()
         })
         .catch(err =>
           showToast.error(err instanceof Error ? err.message : 'Erro ao remover')
         )
     },
-    [produtosDoMenu, syncProdutos, tabsState.produto, closeTabs]
+    [produtosDoMenu, syncProdutos, tabsState.produto, closeTabs, pizzaSaborEditId, closePizzaSaborModal]
   )
 
   const handleUploadImagem = useCallback(
@@ -520,6 +611,11 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
 
   const renderItem = useCallback(
     (produto: MenuProduto) => {
+      const isPizzaSabor = isPizzaGrupoProdutoId(produto.grupoProduto?.id, pizzaCategoriaIds)
+      const resumoPreco = precosPorSaborId.get(produto.produtoId)
+      const valorExibicao = isPizzaSabor
+        ? formatarPrecoAPartirDe(resumoPreco?.precoMinimo)
+        : undefined
       const savingThis =
         updateProduto.isPending && updateProduto.variables?.produtoId === produto.produtoId
       const savingImage =
@@ -530,14 +626,16 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
           variant="menu"
           id={produto.produtoId}
           nome={produto.nome}
-          valor={Number(produto.valor)}
+          valor={isPizzaSabor ? 0 : Number(produto.valor)}
+          valorSomenteLeitura={isPizzaSabor}
+          valorExibicao={valorExibicao}
           ativo={produto.ativo}
           imagemUrl={produto.image?.imageUrl}
           isSavingValor={savingThis && updateProduto.variables?.input.valor !== undefined}
           isSavingStatus={savingThis && updateProduto.variables?.input.ativo !== undefined}
           isSavingNome={savingThis && updateProduto.variables?.input.nome !== undefined}
           isSavingImage={savingImage}
-          onNomeChange={handleNomeChange}
+          onNomeChange={isPizzaSabor ? undefined : handleNomeChange}
           onValorChange={handleValorChange}
           onSwitchToggle={handleStatusToggle}
           onEdit={handleEditProduto}
@@ -547,6 +645,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
             <MenuProdutoRowQuickActions
               produto={produto}
               disabled={savingThis}
+              ocultarComplementos={isPizzaSabor}
               onPatch={handleQuickPatch}
             />
           }
@@ -554,6 +653,8 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
       )
     },
     [
+      pizzaCategoriaIds,
+      precosPorSaborId,
       updateProduto.isPending,
       updateProduto.variables,
       uploadImagemProduto.isPending,
@@ -731,6 +832,33 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         menuNome={menu.nome}
         initialCategoriaId={wizardCategoriaId}
         onClose={closeWizardCadastro}
+      />
+      <MenuPizzaFlowPanel
+        open={menuPizzaFlowOpen}
+        menuId={menuId}
+        menuNome={menu.nome}
+        initialCategoriaId={pizzaFlowCategoriaId}
+        initialAction={pizzaFlowAction}
+        onClose={() => {
+          setMenuPizzaFlowOpen(false)
+          setPizzaFlowCategoriaId(undefined)
+          setPizzaFlowAction(undefined)
+        }}
+        onSuccess={() => void handlePizzaMenuSuccess()}
+      />
+      <PizzaSaborModal
+        open={pizzaSaborModalOpen}
+        categoria={pizzaSaborCategoria}
+        saborId={pizzaSaborEditId}
+        menuId={menuId}
+        onClose={closePizzaSaborModal}
+        onSuccess={() => void handlePizzaItemEditSuccess()}
+      />
+      <PizzaCategoriaTabsModal
+        open={pizzaCategoriaEditOpen}
+        categoriaId={pizzaCategoriaEditId}
+        onClose={closePizzaCategoriaModal}
+        onSuccess={() => void handlePizzaItemEditSuccess()}
       />
       {dialogPropagacao}
       {produtoCropModal}

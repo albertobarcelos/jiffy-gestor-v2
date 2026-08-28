@@ -20,10 +20,11 @@ import {
   type PizzaLinhaComplementoEditDraft,
   type PizzaTamanhoEditDraft,
 } from '@/src/presentation/utils/pizza/pizzaEditMappers'
-import { PizzaSetupTabs, type PizzaSetupTabId } from './PizzaSetupTabs'
+import { PizzaCategoriaEditTabs, type PizzaCategoriaEditTabId } from './PizzaCategoriaEditTabs'
 import { PizzaCategoriaDetalhesTab } from './PizzaCategoriaDetalhesTab'
 import { PizzaTamanhoCards } from './PizzaTamanhoCards'
 import { PizzaMassaBordaTable } from './PizzaMassaBordaTable'
+import { PizzaCategoriaMenusPanel } from './PizzaCategoriaMenusPanel'
 
 interface PizzaCategoriaTabsModalProps {
   open: boolean
@@ -39,7 +40,7 @@ export function PizzaCategoriaTabsModal({
   onSuccess,
 }: PizzaCategoriaTabsModalProps) {
   const invalidate = useInvalidateTenantQueries()
-  const [tab, setTab] = useState<PizzaSetupTabId>('detalhes')
+  const [tab, setTab] = useState<PizzaCategoriaEditTabId>('detalhes')
   const [draft, setDraft] = useState<PizzaCategoriaEditDraft | null>(null)
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -166,19 +167,31 @@ export function PizzaCategoriaTabsModal({
     })
   }, [])
 
-  const footerActions = useMemo((): JiffySidePanelFooterActions => ({
-    showCancel: true,
-    cancelLabel: 'Cancelar',
-    cancelVariant: 'dangerOutline',
-    onCancel: handleRequestClose,
-    showSave: true,
-    saveLabel: 'Salvar',
-    saveLoading: salvarMutation.isPending,
-    saveDisabled: salvarMutation.isPending || loading || !draft,
-    onSave: () => void handleSalvar(),
-    barSecondaryTone: 'primary',
-    barActionOrder: ['cancel', 'save'],
-  }), [draft, handleRequestClose, handleSalvar, loading, salvarMutation.isPending])
+  const footerActions = useMemo((): JiffySidePanelFooterActions => {
+    if (tab === 'cardapios') {
+      return {
+        showCancel: true,
+        cancelLabel: 'Fechar',
+        cancelVariant: 'dangerOutline',
+        onCancel: handleRequestClose,
+        barSecondaryTone: 'primary',
+      }
+    }
+
+    return {
+      showCancel: true,
+      cancelLabel: 'Cancelar',
+      cancelVariant: 'dangerOutline',
+      onCancel: handleRequestClose,
+      showSave: true,
+      saveLabel: 'Salvar',
+      saveLoading: salvarMutation.isPending,
+      saveDisabled: salvarMutation.isPending || loading || !draft,
+      onSave: () => void handleSalvar(),
+      barSecondaryTone: 'primary',
+      barActionOrder: ['cancel', 'save'],
+    }
+  }, [draft, handleRequestClose, handleSalvar, loading, salvarMutation.isPending, tab])
 
   return (
     <>
@@ -200,7 +213,7 @@ export function PizzaCategoriaTabsModal({
             <div className="p-6 text-center text-sm text-error">{loadError}</div>
           ) : draft ? (
             <>
-              <PizzaSetupTabs active={tab} onChange={setTab} />
+              <PizzaCategoriaEditTabs active={tab} onChange={setTab} />
               {tab === 'detalhes' ? (
                 <>
                   <PizzaCategoriaDetalhesTab
@@ -236,6 +249,12 @@ export function PizzaCategoriaTabsModal({
                   linhas={draft.bordas}
                   onChange={bordas => setDraft({ ...draft, bordas })}
                   onRemover={handleRemoverBorda}
+                />
+              ) : null}
+              {tab === 'cardapios' && categoriaId ? (
+                <PizzaCategoriaMenusPanel
+                  categoriaId={categoriaId}
+                  categoriaNome={draft.nome}
                 />
               ) : null}
             </>

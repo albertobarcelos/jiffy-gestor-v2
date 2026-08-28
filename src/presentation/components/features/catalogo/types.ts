@@ -13,5 +13,7 @@ export interface CatalogGroup<T> {
   grupoAtivo: boolean
   /** Ordem da categoria no snapshot do menu. Ausente = vai para o fim. */
   ordem?: number
+  /** Rótulo do botão de adicionar item no grupo (ex.: pizza → "Adicionar sabor"). */
+  addProdutoLabel?: string
   items: T[]
 }

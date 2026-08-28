@@ -30,6 +30,8 @@ interface PizzaCategoriaSetupPanelProps {
   onClose: () => void
   onSuccess?: (categoriaId: string) => void
   initialNome?: string
+  /** Quando informado, associa a config da categoria a este cardápio. */
+  menuId?: string
 }
 
 export function PizzaCategoriaSetupPanel({
@@ -37,6 +39,7 @@ export function PizzaCategoriaSetupPanel({
   onClose,
   onSuccess,
   initialNome = '',
+  menuId,
 }: PizzaCategoriaSetupPanelProps) {
   const [tab, setTab] = useState<PizzaSetupTabId>('detalhes')
   const [draft, setDraft] = useState<PizzaCategoriaDraft>(() =>
@@ -90,16 +93,20 @@ export function PizzaCategoriaSetupPanel({
     }
 
     try {
-      const payload = buildCreateCompletoPayload(draft)
+      const payload = buildCreateCompletoPayload(draft, { menuId })
       const result = await criarMutation.mutateAsync(payload)
       baselineRef.current = serializePizzaDraft(draft)
-      showToast.success('Categoria pizza criada')
+      showToast.success(
+        menuId
+          ? 'Categoria criada. Cadastre sabores para exibir no cardápio.'
+          : 'Categoria pizza criada'
+      )
       onSuccess?.(result.categoria.id)
       onClose()
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : 'Erro ao salvar categoria')
     }
-  }, [criarMutation, draft, onClose, onSuccess])
+  }, [criarMutation, draft, menuId, onClose, onSuccess])
 
   const footerActions = useMemo((): JiffySidePanelFooterActions => {
     if (isUltimaAba) {
