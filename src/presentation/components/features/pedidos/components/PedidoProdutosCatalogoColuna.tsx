@@ -15,9 +15,11 @@ export function PedidoProdutosCatalogoColuna() {
     grupos,
     isLoadingBuscaProdutos,
     isLoadingProdutos,
+    menuCatalogoIndisponivel,
     produtosError,
     produtosList,
     setBuscaProdutoTexto,
+    tipoInicioPedido,
   } = useNovoPedidoFormContext()
 
   const emBusca = buscaProdutoTexto.length >= 2
@@ -30,6 +32,10 @@ export function PedidoProdutosCatalogoColuna() {
     ? `Resultados para "${buscaProdutoTexto}"`
     : `Produtos do grupo: `
   const isLoadingAtual = emBusca ? isLoadingBuscaProdutos : isLoadingProdutos
+  const mensagemMenuIndisponivel =
+    tipoInicioPedido === 'entrega'
+      ? 'Configure o menu em Configurações → Empresa Delivery.'
+      : 'Configure o menu em Configurações → Empresa.'
 
   return (
     <div className="flex min-h-0 min-w-0 flex-[3.8] basis-0 flex-col gap-2">
@@ -57,7 +63,11 @@ export function PedidoProdutosCatalogoColuna() {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-gray-50">
-        {!podeExibirProdutos ? (
+        {menuCatalogoIndisponivel ? (
+          <div className="flex flex-1 items-center justify-center p-4">
+            <p className="max-w-sm text-center text-sm text-gray-600">{mensagemMenuIndisponivel}</p>
+          </div>
+        ) : !podeExibirProdutos ? (
           <div className="flex flex-1 items-center justify-center p-4">
             <p className="text-center text-sm text-gray-500">
               Selecione uma categoria à esquerda ou pesquise pelo nome do produto

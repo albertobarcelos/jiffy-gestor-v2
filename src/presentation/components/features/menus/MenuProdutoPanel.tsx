@@ -3,7 +3,11 @@
 import { MenuProdutoSnapshotForm } from './MenuProdutoSnapshotForm'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import type { MenuProduto } from '@/src/shared/types/menus'
-import { MENU_PRODUTO_FORM_ID, MENU_SIDE_PANEL_CLASS } from './menuPanelConstants'
+import {
+  MENU_MODAL_CANCEL_VARIANT,
+  MENU_PRODUTO_FORM_ID,
+  MENU_SIDE_PANEL_CLASS,
+} from './menuPanelConstants'
 
 interface MenuProdutoPanelProps {
   open: boolean
@@ -37,7 +41,7 @@ export function MenuProdutoPanel({
       footerActions={{
         showCancel: true,
         cancelLabel: 'Fechar',
-        cancelVariant: 'primaryTint10',
+        cancelVariant: MENU_MODAL_CANCEL_VARIANT,
         onCancel: onClose,
         showSave: true,
         saveLabel: 'Salvar',

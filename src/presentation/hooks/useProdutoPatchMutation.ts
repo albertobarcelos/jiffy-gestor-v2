@@ -12,6 +12,7 @@ import type { ProdutoPatch, ToggleField } from '@/src/shared/types/produto'
 export type ProdutoPatchPayload =
   | { type: 'nome'; produtoId: string; novoNome: string }
   | { type: 'valor'; produtoId: string; novoValor: number }
+  | { type: 'grupo'; produtoId: string; novoGrupoId: string; novoGrupoNome: string }
   | { type: 'status'; produtoId: string; novoStatus: boolean; filterStatus?: string }
   | { type: 'toggle'; produtoId: string; field: ToggleField; novoValor: boolean }
 
@@ -34,6 +35,8 @@ function payloadToPatch(payload: ProdutoPatchPayload): ProdutoPatch {
       return { nome: payload.novoNome }
     case 'valor':
       return { valor: payload.novoValor }
+    case 'grupo':
+      return { grupoId: payload.novoGrupoId, nomeGrupo: payload.novoGrupoNome }
     case 'status':
       return { ativo: payload.novoStatus }
     case 'toggle':
@@ -47,8 +50,12 @@ function successMessage(payload: ProdutoPatchPayload): string {
       return 'Nome atualizado com sucesso!'
     case 'valor':
       return 'Valor atualizado com sucesso!'
+    case 'grupo':
+      return 'Categoria atualizada com sucesso!'
     case 'status':
-      return payload.novoStatus ? 'Produto ativado com sucesso!' : 'Produto desativado com sucesso!'
+      return payload.novoStatus
+        ? 'Produto disponível no cadastro e nos cardápios vinculados!'
+        : 'Produto indisponível no cadastro e nos cardápios vinculados!'
     case 'toggle': {
       const cfg = toggleFieldConfig[payload.field]
       return payload.novoValor ? cfg.successTrue : cfg.successFalse

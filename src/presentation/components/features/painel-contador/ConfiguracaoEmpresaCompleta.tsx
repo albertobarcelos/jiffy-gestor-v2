@@ -7,6 +7,7 @@ import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast } from '@/src/shared/utils/toast'
 import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
+import { UppercaseLocaleInput } from '@/src/presentation/components/ui/UppercaseLocaleInput'
 import { Label } from '@/src/presentation/components/ui/label'
 import { MenuItem } from '@mui/material'
 import { MdCheckCircle, MdError, MdSave } from 'react-icons/md'
@@ -568,13 +569,13 @@ export function ConfiguracaoEmpresaCompleta() {
                 InputLabelProps={{ required: true }}
               />
 
-              <Input
+              <UppercaseLocaleInput
                 label="Razão Social"
                 value={formDataEmpresa.razaoSocial}
-                onChange={e =>
+                onValueChange={razaoSocial =>
                   setFormDataEmpresa(prev => ({
                     ...prev,
-                    razaoSocial: maiusculasPt(e.target.value),
+                    razaoSocial,
                   }))
                 }
                 placeholder="Nome da empresa"
@@ -584,13 +585,13 @@ export function ConfiguracaoEmpresaCompleta() {
                 InputLabelProps={{ required: true }}
               />
 
-              <Input
+              <UppercaseLocaleInput
                 label="Nome Fantasia"
                 value={formDataEmpresa.nomeFantasia}
-                onChange={e =>
+                onValueChange={nomeFantasia =>
                   setFormDataEmpresa(prev => ({
                     ...prev,
-                    nomeFantasia: maiusculasPt(e.target.value),
+                    nomeFantasia,
                   }))
                 }
                 placeholder="Nome fantasia"
@@ -662,13 +663,13 @@ export function ConfiguracaoEmpresaCompleta() {
               />
 
               <div className="md:col-span-2">
-                <Input
+                <UppercaseLocaleInput
                   label="Rua"
                   value={formDataEmpresa.rua}
-                  onChange={e =>
+                  onValueChange={rua =>
                     setFormDataEmpresa(prev => ({
                       ...prev,
-                      rua: maiusculasPt(e.target.value),
+                      rua,
                     }))
                   }
                   placeholder="Nome da rua"
@@ -677,13 +678,13 @@ export function ConfiguracaoEmpresaCompleta() {
                 />
               </div>
 
-              <Input
+              <UppercaseLocaleInput
                 label="Número"
                 value={formDataEmpresa.numero}
-                onChange={e =>
+                onValueChange={numero =>
                   setFormDataEmpresa(prev => ({
                     ...prev,
-                    numero: maiusculasPt(e.target.value),
+                    numero,
                   }))
                 }
                 placeholder="123"
@@ -691,13 +692,13 @@ export function ConfiguracaoEmpresaCompleta() {
                 sx={sxEntradaConfig}
               />
 
-              <Input
+              <UppercaseLocaleInput
                 label="Complemento"
                 value={formDataEmpresa.complemento}
-                onChange={e =>
+                onValueChange={complemento =>
                   setFormDataEmpresa(prev => ({
                     ...prev,
-                    complemento: maiusculasPt(e.target.value),
+                    complemento,
                   }))
                 }
                 placeholder="Apto, Sala, etc."
@@ -705,13 +706,13 @@ export function ConfiguracaoEmpresaCompleta() {
                 sx={sxEntradaConfig}
               />
 
-              <Input
+              <UppercaseLocaleInput
                 label="Bairro"
                 value={formDataEmpresa.bairro}
-                onChange={e =>
+                onValueChange={bairro =>
                   setFormDataEmpresa(prev => ({
                     ...prev,
-                    bairro: maiusculasPt(e.target.value),
+                    bairro,
                   }))
                 }
                 placeholder="Nome do bairro"

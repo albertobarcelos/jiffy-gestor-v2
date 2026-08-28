@@ -15,11 +15,16 @@ export interface CatalogGroupHeaderProps {
   itemCount: number
   isExpanded: boolean
   showGrupoStatusSwitch?: boolean
+  /** Exibe editar categoria, switch de status e botão de adicionar. Default: true. */
+  showHeaderActions?: boolean
+  itemCountSuffix?: string
   addProdutoLabel?: string
+  /** Conteúdo extra ao lado do título (ex.: seletor de menu em lote). */
+  headerAddon?: React.ReactNode
   onToggleExpand: (groupKey: string) => void
-  onEditGrupo: (grupoId: string | undefined) => void
+  onEditGrupo?: (grupoId: string | undefined) => void
   onToggleGrupoStatus?: (grupoId: string) => void
-  onAddProduto: (grupoNome: string, grupoId: string | undefined) => void
+  onAddProduto?: (grupoNome: string, grupoId: string | undefined) => void
 }
 
 function CatalogGroupHeaderInner({
@@ -31,7 +36,10 @@ function CatalogGroupHeaderInner({
   itemCount,
   isExpanded,
   showGrupoStatusSwitch = true,
+  showHeaderActions = true,
+  itemCountSuffix = 'produtos',
   addProdutoLabel = 'Adicionar produto',
+  headerAddon,
   onToggleExpand,
   onEditGrupo,
   onToggleGrupoStatus,
@@ -50,27 +58,30 @@ function CatalogGroupHeaderInner({
           >
             <DinamicIcon iconName={grupoVisual.iconName} color="currentColor" size={22} />
           </span>
-        ) : (
+        ) : showHeaderActions ? (
           <span className="h-9 w-9 rounded-full border border-gray-300 bg-gray-200" />
-        )}
+        ) : null}
 
         <div>
           <div className="flex items-center gap-2">
             <p className="text-sm font-semibold tracking-wide text-primary-text md:text-base">
               {grupo}
             </p>
-            <button
-              type="button"
-              title="Editar categoria"
-              onClick={() => onEditGrupo(grupoId)}
-              disabled={!grupoId}
-              className={`flex h-5 w-5 items-center justify-center rounded-full border border-gray-200 text-primary-text transition-colors hover:bg-primary/10 ${
-                !grupoId ? 'cursor-not-allowed opacity-50' : ''
-              }`}
-            >
-              <MdModeEdit size={14} />
-            </button>
-            {showGrupoStatusSwitch ? (
+            {headerAddon}
+            {showHeaderActions ? (
+              <button
+                type="button"
+                title="Editar categoria"
+                onClick={() => onEditGrupo?.(grupoId)}
+                disabled={!grupoId}
+                className={`flex h-5 w-5 items-center justify-center rounded-full border border-gray-200 text-primary-text transition-colors hover:bg-primary/10 ${
+                  !grupoId ? 'cursor-not-allowed opacity-50' : ''
+                }`}
+              >
+                <MdModeEdit size={14} />
+              </button>
+            ) : null}
+            {showHeaderActions && showGrupoStatusSwitch ? (
               <div
                 className="tooltip-hover-below flex items-center justify-center"
                 onMouseDown={e => e.stopPropagation()}
@@ -102,22 +113,23 @@ function CatalogGroupHeaderInner({
               </div>
             ) : null}
           </div>
-          <p className="text-xs text-secondary-text">{itemCount} produtos</p>
-          {grupoVisual && showGrupoStatusSwitch && !grupoAtivo ? (
-            <p className="text-[11px] font-semibold uppercase text-error">Categoria inativa</p>
-          ) : null}
+          <p className="text-xs text-secondary-text">
+            {itemCount} {itemCountSuffix}
+          </p>
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col-reverse items-center justify-end gap-2 md:flex-row md:gap-4">
-        <button
-          type="button"
-          onClick={() => onAddProduto(grupo, grupoId)}
-          className="flex h-8 items-center px-2 text-xs font-semibold text-primary transition-colors rounded-lg border border-primary/50 bg-info hover:bg-primary/10 md:gap-2 md:px-[20px] md:text-sm"
-        >
-          {addProdutoLabel}
-          <span className="text-sm">+</span>
-        </button>
+      <div className="flex shrink-0 flex-col-reverse items-center justify-end gap-2 md:flex-row md:gap-4">
+        {showHeaderActions ? (
+          <button
+            type="button"
+            onClick={() => onAddProduto?.(grupo, grupoId)}
+            className="flex h-8 items-center px-2 text-xs font-semibold text-primary transition-colors rounded-lg border border-primary/50 bg-info hover:bg-primary/10 md:gap-2 md:px-[20px] md:text-sm"
+          >
+            {addProdutoLabel}
+            <span className="text-sm">+</span>
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={() => onToggleExpand(groupKey)}

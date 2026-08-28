@@ -12,16 +12,6 @@ import { usePropagarAlteracaoProduto } from '@/src/presentation/hooks/produtos/u
 import { useProdutosFilters } from '@/src/presentation/hooks/useProdutosFilters'
 import { useIsMobile } from '@/src/presentation/hooks/useIsMobile'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
-import { useEntityImageCropUpload } from '@/src/presentation/hooks/useEntityImageCropUpload'
-import { MENU_PRODUTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
-import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { showToast } from '@/src/shared/utils/toast'
-import {
-  aplicarImagemProdutoNosMenus,
-  buscarMenuIdsDoProduto,
-  buscarMenusDaEmpresa,
-  unirMenuIds,
-} from '@/src/presentation/utils/uploadImagemProdutoMenus'
 
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { ProdutosTabsModal, type ProdutosTabsModalState } from '../ProdutosTabsModal'
@@ -33,7 +23,6 @@ import { ProdutoNovoWizard } from '../ProdutoNovoWizard'
 import { ProdutosHeader } from './ProdutosHeader'
 import { ProdutosFilters } from './ProdutosFilters'
 import { ProdutoListItem } from './ProdutoListItem'
-import { useImagensProdutosCadastroBase } from '@/src/presentation/hooks/produtos/useImagensProdutosCadastroBase'
 
 import { Produto } from '@/src/domain/entities/Produto'
 import type { ToggleField } from '@/src/shared/types/produto'
@@ -84,26 +73,14 @@ export function ProdutosList() {
   const patchMutation = useProdutoPatchMutation()
   const tipoCadastro = useEscolherTipoProdutoCadastro()
   const [wizardOpen, setWizardOpen] = useState(false)
-  const { pedirConfirmacao, aplicarNosDestinos, aplicarImagemNosDestinos, dialog: dialogPropagacao } =
+  const { pedirConfirmacao, aplicarNosDestinos, dialog: dialogPropagacao } =
     usePropagarAlteracaoProduto()
-  const [savingImageProdutoId, setSavingImageProdutoId] = useState<string | null>(null)
 
   const { data: gruposProdutos = [], isLoading: isLoadingGruposProdutos } = useGruposProdutos({ limit: 100, ativo: null })
   const { data: gruposComplementos = [], isLoading: isLoadingGruposComplementos } = useGruposComplementos({ limit: 100, ativo: null })
 
-  const gruposProdutosFiltrados = useMemo(() => {
-    if (filters.statusGrupoFilter === 'Ativo') {
-      return gruposProdutos.filter((g) => g.isAtivo())
-    }
-    if (filters.statusGrupoFilter === 'Desativado') {
-      return gruposProdutos.filter((g) => !g.isAtivo())
-    }
-    return gruposProdutos
-  }, [gruposProdutos, filters.statusGrupoFilter])
-
   const { data, fetchNextPage, hasNextPage, isFetching, isFetchingNextPage, isLoading, error } =
     useProdutosInfinite(queryParams)
-  const { data: imagensPorProdutoId = {} } = useImagensProdutosCadastroBase()
 
   // Produtos achatados + sem duplicatas
   const produtos = useMemo(() => {
@@ -119,10 +96,9 @@ export function ProdutosList() {
 
   const totalProdutos = useMemo(() => data?.pages?.[0]?.count ?? 0, [data])
 
-  // Map consolidado: ativo por grupoId (filtro Status categoria + opções do Autocomplete).
   const grupoProdutoMap = useMemo(() => {
     const map = new Map<string, { ativo: boolean }>()
-    gruposProdutos.forEach((g) => map.set(g.getId(), { ativo: g.isAtivo() }))
+    gruposProdutos.forEach(g => map.set(g.getId(), { ativo: g.isAtivo() }))
     return map
   }, [gruposProdutos])
 
@@ -130,6 +106,8 @@ export function ProdutosList() {
     () => mapaOrdemGrupoProduto(gruposProdutos),
     [gruposProdutos]
   )
+
+  const filtraStatusCategoria = filters.statusGrupoFilter !== 'Todos'
 
   const produtosVisiveis = useMemo(() => {
     let list = produtos
@@ -142,8 +120,8 @@ export function ProdutosList() {
       })
     }
 
-    if (filters.statusGrupoFilter !== 'Todos') {
-      list = list.filter((p) => {
+    if (filtraStatusCategoria) {
+      list = list.filter(p => {
         const grupoId = p.getGrupoId()
         if (!grupoId) {
           return filters.statusGrupoFilter === 'Ativo'
@@ -159,9 +137,27 @@ export function ProdutosList() {
     produtos,
     grupoProdutoMap,
     ordemGrupoPorId,
+    filtraStatusCategoria,
     filters.statusGrupoFilter,
     filters.grupoProdutoFilter,
   ])
+
+  /** Status categoria filtra no cliente — carrega todas as páginas da API antes de contar/exibir. */
+  useEffect(() => {
+    if (!filtraStatusCategoria) return
+    if (hasNextPage && !isFetchingNextPage && !isFetching) {
+      void fetchNextPage()
+    }
+  }, [
+    filtraStatusCategoria,
+    hasNextPage,
+    isFetchingNextPage,
+    isFetching,
+    fetchNextPage,
+    produtos.length,
+  ])
+
+  const totalContagem = filtraStatusCategoria ? produtosVisiveis.length : totalProdutos
 
   const loadMoreRef = useRef<HTMLDivElement>(null)
 
@@ -317,8 +313,39 @@ export function ProdutosList() {
     return true
   }, [patchMutation, pedirConfirmacao, aplicarNosDestinos])
 
+  const handleGrupoChange = useCallback(
+    async (produtoId: string, novoGrupoId: string, novoGrupoNome: string) => {
+      const produto = produtos.find(p => p.getId() === produtoId)
+      if (!produto || produto.getGrupoId() === novoGrupoId) return false
+
+      const destinos = await pedirConfirmacao({ origem: 'cadastroBase', produtoId })
+      if (destinos === null) return false
+
+      patchMutation.mutate(
+        { type: 'grupo', produtoId, novoGrupoId, novoGrupoNome },
+        {
+          onSuccess: () => {
+            if (destinos.menuIds.length === 0) return
+            void aplicarNosDestinos({
+              produtoId,
+              snapshot: { grupoProdutoId: novoGrupoId },
+              destinos: { aplicarNoCadastroBase: false, menuIds: destinos.menuIds },
+            })
+          },
+        }
+      )
+      return true
+    },
+    [produtos, patchMutation, pedirConfirmacao, aplicarNosDestinos]
+  )
+
   const handleStatusToggle = useCallback(async (produtoId: string, novoStatus: boolean) => {
-    const destinos = await pedirConfirmacao({ origem: 'cadastroBase', produtoId })
+    const destinos = await pedirConfirmacao({
+      origem: 'cadastroBase',
+      produtoId,
+      variante: 'statusAtivo',
+      novoAtivo: novoStatus,
+    })
     if (destinos === null) return
     patchMutation.mutate(
       { type: 'status', produtoId, novoStatus, filterStatus },
@@ -369,110 +396,6 @@ export function ProdutosList() {
     openTabsModal({ tab: 'produto', mode: 'copy', produto, grupoId: produto.getGrupoId() })
   }, [produtos, openTabsModal])
 
-  const handleUploadImagemLista = useCallback(
-    async (produtoId: string, file: File) => {
-      setSavingImageProdutoId(produtoId)
-      try {
-        const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-        if (!token) throw new Error('Token não encontrado')
-
-        // Só envia para menus já vinculados — não amarra o principal automaticamente.
-        let menusVinculados = unirMenuIds(
-          await buscarMenuIdsDoProduto({ token, produtoId })
-        )
-
-        if (menusVinculados.length === 0) {
-          const destinos = await pedirConfirmacao({
-            origem: 'cadastroBase',
-            produtoId,
-            variante: 'imagem',
-            fonteMenus: 'empresa',
-            passoInicial: 'escolher',
-            exigePeloMenosUmMenu: true,
-          })
-          if (!destinos || destinos.menuIds.length === 0) {
-            showToast.error('Vincule o produto a um cardápio para enviar a imagem')
-            return
-          }
-          await aplicarImagemNosDestinos({
-            produtoId,
-            file,
-            destinos,
-            vincularSeAusente: true,
-          })
-          showToast.success(
-            destinos.menuIds.length > 1
-              ? 'Imagem atualizada nos cardápios selecionados'
-              : 'Imagem atualizada no cardápio selecionado'
-          )
-        } else {
-          await aplicarImagemProdutoNosMenus({
-            token,
-            produtoId,
-            menuIds: menusVinculados,
-            file,
-            vincularSeAusente: false,
-          })
-
-          const todosMenus = await buscarMenusDaEmpresa({ token })
-          const menusJaSalvos = todosMenus
-            .filter(m => menusVinculados.includes(m.id))
-            .map(m => ({ id: m.id, nome: m.nome }))
-
-          const destinos = await pedirConfirmacao({
-            origem: 'cadastroBase',
-            produtoId,
-            variante: 'imagem',
-            excluirMenuIds: menusVinculados,
-            fonteMenus: 'empresa',
-            menusJaSalvos,
-          })
-          if (destinos && destinos.menuIds.length > 0) {
-            await aplicarImagemNosDestinos({
-              produtoId,
-              file,
-              destinos,
-              vincularSeAusente: true,
-            })
-            showToast.success('Imagem atualizada nos cardápios vinculados e nos selecionados')
-          } else {
-            showToast.success(
-              menusVinculados.length > 1
-                ? 'Imagem atualizada nos cardápios vinculados'
-                : 'Imagem atualizada no cardápio vinculado'
-            )
-          }
-        }
-
-        if (empresaId) {
-          void queryClient.invalidateQueries({
-            queryKey: ['tenant', empresaId, 'produtos-imagens-cadastro'],
-            exact: false,
-            refetchType: 'active',
-          })
-        }
-      } catch (err) {
-        showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar imagem')
-      } finally {
-        setSavingImageProdutoId(null)
-      }
-    },
-    [pedirConfirmacao, aplicarImagemNosDestinos, empresaId, queryClient]
-  )
-
-  const { selectForEntity: selectProdutoImagem, cropModal: produtoCropModal } =
-    useEntityImageCropUpload({
-      preset: MENU_PRODUTO_CROP_PRESET,
-      upload: handleUploadImagemLista,
-    })
-
-  const handleChangeImage = useCallback(
-    (produtoId: string, file: File) => {
-      selectProdutoImagem(produtoId, file)
-    },
-    [selectProdutoImagem]
-  )
-
   const isLoadingAny = isLoading || isFetching || isFetchingNextPage
   const showInitialLoading = isLoadingAny && produtosVisiveis.length === 0
   const showEmpty = !isLoadingAny && produtosVisiveis.length === 0
@@ -481,7 +404,7 @@ export function ProdutosList() {
     <div className="flex min-h-0 flex-1 flex-col">
       <ProdutosHeader
         totalLocal={produtosVisiveis.length}
-        totalApi={totalProdutos}
+        totalApi={totalContagem}
         searchText={filters.searchText}
         onSearchChange={actions.setSearch}
         onNovoProduto={() => tipoCadastro.pedirTipo(() => openWizardCadastro())}
@@ -497,13 +420,9 @@ export function ProdutosList() {
         onFilterStatusChange={actions.setStatus}
         statusGrupoFilter={filters.statusGrupoFilter}
         onStatusGrupoChange={actions.setStatusGrupo}
-        ativoLocalFilter={filters.ativoLocalFilter}
-        onAtivoLocalChange={actions.setAtivoLocal}
-        ativoDeliveryFilter={filters.ativoDeliveryFilter}
-        onAtivoDeliveryChange={actions.setAtivoDelivery}
         grupoProdutoFilter={filters.grupoProdutoFilter}
         onGrupoProdutoChange={actions.setGrupoProduto}
-        gruposProdutos={gruposProdutosFiltrados}
+        gruposProdutos={gruposProdutos}
         isLoadingGruposProdutos={isLoadingGruposProdutos}
         grupoComplementoFilter={filters.grupoComplementoFilter}
         onGrupoComplementoChange={actions.setGrupoComplemento}
@@ -530,18 +449,19 @@ export function ProdutosList() {
               <div key={produto.getId()} role="listitem">
                 <ProdutoListItem
                   produto={produto}
-                  imagemUrl={imagensPorProdutoId[produto.getId()] ?? produto.getImagemUrl()}
+                  gruposProdutos={gruposProdutos}
+                  isLoadingGruposProdutos={isLoadingGruposProdutos}
                   isSavingValor={isSavingOf(patchMutation, produto.getId(), 'valor')}
                   isSavingStatus={isSavingOf(patchMutation, produto.getId(), 'status')}
                   isSavingNome={isSavingOf(patchMutation, produto.getId(), 'nome')}
-                  isSavingImage={savingImageProdutoId === produto.getId()}
+                  isSavingGrupo={isSavingOf(patchMutation, produto.getId(), 'grupo')}
                   onNomeChange={handleNomeChange}
                   onValorChange={handleValorChange}
+                  onGrupoChange={handleGrupoChange}
                   onSwitchToggle={handleStatusToggle}
                   onToggleBoolean={handleToggleBooleanField}
                   onEditProduto={handleEditProduto}
                   onCopyProduto={handleCopyProduto}
-                  onChangeImage={handleChangeImage}
                 />
               </div>
             ))}
@@ -574,7 +494,6 @@ export function ProdutosList() {
         onTabChange={(tab) => setTabsModalState((prev) => ({ ...prev, tab }))}
       />
       {dialogPropagacao}
-      {produtoCropModal}
     </div>
   )
 }

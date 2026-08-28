@@ -10,17 +10,19 @@ export interface INovoPedidoReadRepository {
 
   listarProdutosDoGrupo(
     grupoId: string,
-    token: string
+    token: string,
+    menuId: string | null
   ): Promise<{ produtos: Produto[]; count: number }>
 
-  listarGrupoIdsComProdutosAtivos(
+  listarGrupoIdsComProdutosAtivos(token: string, menuId: string | null): Promise<Set<string>>
+
+  buscarProdutoPorId(
+    produtoId: string,
     token: string,
-    canal: CanalVendaCatalogo
-  ): Promise<Set<string>>
+    menuId?: string | null
+  ): Promise<Produto | null>
 
-  buscarProdutoPorId(produtoId: string, token: string): Promise<Produto | null>
-
-  buscarProdutosPorNome(nome: string, token: string): Promise<Produto[]>
+  buscarProdutosPorNome(nome: string, token: string, menuId: string | null): Promise<Produto[]>
 
   buscarClienteJson(clienteId: string, token: string): Promise<Record<string, unknown> | null>
 

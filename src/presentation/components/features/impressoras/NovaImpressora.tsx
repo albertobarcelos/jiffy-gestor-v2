@@ -92,9 +92,9 @@ function terminaisAtivosParaNovaImpressora<T extends { bloqueado?: boolean | str
   return items.filter(t => !(t.bloqueado === true || t.bloqueado === 'true'))
 }
 
-/** Grid desktop (cabeçalho + linhas): mesma largura de colunas e padding para alinhar títulos aos controles */
+/** Grid desktop (cabeçalho + linhas): switches compactos + modelo/IP/porta sempre visíveis */
 const DESKTOP_TERMINAL_ROW_GRID =
-  'grid grid-cols-[auto_minmax(0,1fr)_7rem_7rem_7rem_3.5rem] items-center gap-3 px-2'
+  'grid grid-cols-[auto_minmax(0,1fr)_4.25rem_4.25rem_4.25rem_minmax(5.5rem,1fr)_minmax(5rem,0.85fr)_3.75rem] items-center gap-2 px-2 min-w-[44rem]'
 
 /** Debounce do termo enviado ao GET `/api/terminais?q=` (nova impressora — lista via API). */
 const BUSCA_TERMINAL_DEBOUNCE_MS = 480
@@ -1393,7 +1393,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
 
             {/* Tabela Config. por Terminal — ocupa altura fluida até o rodapé do painel */}
             <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:overflow-x-visible">
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-info md:w-full md:min-w-[min(100%,520px)]">
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-info md:w-full md:min-w-0">
                 <div className="shrink-0 border-b border-primary px-4 py-1">
                   <h2 className="text-lg font-semibold text-primary">
                     Config. por Terminal
@@ -1600,9 +1600,8 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                     </div>
                   </div>
 
-                {/* Cabeçalho (desktop): terminal + toggles; detalhes em área expansível */}
-                <div className="mt-2 hidden shrink-0 rounded-lg bg-custom-2 py-2 md:block">
-                  {/* Mesmo grid que as linhas: títulos centralizados como os switches/botão (flex w-full justify-center) */}
+                {/* Cabeçalho (desktop): todas as colunas visíveis */}
+                <div className="mt-2 hidden shrink-0 overflow-x-auto rounded-lg bg-custom-2 py-2 md:block">
                   <div className={DESKTOP_TERMINAL_ROW_GRID}>
                     <div className="flex items-center justify-center">
                       <input
@@ -1616,24 +1615,28 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                       Terminal
                     </div>
                     <div className="flex min-w-0 w-full justify-center">
-                      <span className="text-center text-sm font-semibold text-primary-text">
+                      <span className="text-center text-[10px] font-semibold leading-tight text-primary-text">
                         Modo Ficha
                       </span>
                     </div>
                     <div className="flex min-w-0 w-full justify-center">
-                      <span className="text-center text-sm font-semibold text-primary-text">
-                        Imprimir Senha
+                      <span className="text-center text-[10px] font-semibold leading-tight text-primary-text">
+                        Impr. Senha
                       </span>
                     </div>
                     <div className="flex min-w-0 w-full justify-center">
-                      <span className="text-center text-sm font-semibold text-primary-text">
+                      <span className="text-center text-[10px] font-semibold leading-tight text-primary-text">
                         Ativo
                       </span>
                     </div>
-                    <div className="flex min-w-0 w-full justify-center">
-                      <span className="text-center text-sm font-semibold text-primary-text">
-                        Rede
-                      </span>
+                    <div className="min-w-0 text-xs font-semibold text-primary-text">
+                      Modelo
+                    </div>
+                    <div className="min-w-0 text-xs font-semibold text-primary-text">
+                      IP
+                    </div>
+                    <div className="min-w-0 text-xs font-semibold text-primary-text">
+                      Porta
                     </div>
                   </div>
                 </div>
@@ -1726,10 +1729,10 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                           })
                         }}
                       >
-                        {/* Desktop: linha resumo + área expansível (modelo / IP / porta) */}
+                        {/* Desktop: linha única com todas as colunas */}
                         <div
                           className={cn(
-                            'hidden rounded-lg border border-transparent md:block',
+                            'hidden overflow-x-auto rounded-lg border border-transparent md:block',
                             bgClass
                           )}
                         >
@@ -1777,7 +1780,7 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                                 }}
                               />
                             </div>
-                            <div className="flex min-w-0 w-full justify-end pr-3">
+                            <div className="flex min-w-0 w-full justify-center">
                               <JiffyIconSwitch
                                 checked={config.ativo}
                                 onChange={e =>
@@ -1790,85 +1793,52 @@ export const NovaImpressora = forwardRef<NovaImpressoraHandle, NovaImpressoraPro
                                 }}
                               />
                             </div>
-                            <div className="flex min-w-0 w-full justify-end">
-                              <button
-                                type="button"
-                                onClick={() => toggleTerminalExpanded(config.terminalId)}
-                                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-primary hover:bg-primary/15"
-                                aria-expanded={isExpanded}
-                                aria-label={
-                                  isExpanded
-                                    ? 'Ocultar modelo, IP e porta'
-                                    : 'Mostrar modelo, IP e porta'
+                            <div className="min-w-0">
+                              <select
+                                value={config.modeloDisplay}
+                                onChange={e =>
+                                  updateTerminalConfig(index, 'modeloDisplay', e.target.value)
                                 }
+                                className="h-7 w-full min-w-0 rounded-lg border border-primary bg-info px-2 text-xs text-primary-text focus:border-primary focus:outline-none"
+                                aria-label={`Modelo — ${config.nome}`}
                               >
-                                {isExpanded ? (
-                                  <MdExpandLess className="h-6 w-6" />
-                                ) : (
-                                  <MdExpandMore className="h-6 w-6" />
-                                )}
-                              </button>
+                                {MODELOS_OPTIONS.map(modelo => (
+                                  <option key={modelo} value={modelo}>
+                                    {modelo}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="min-w-0">
+                              <input
+                                type="text"
+                                value={config.ip}
+                                onChange={e => updateTerminalConfig(index, 'ip', e.target.value)}
+                                onBlur={e => {
+                                  const ip = e.target.value
+                                  if (ip && !validateIPOnBlur(ip)) {
+                                    // validação exibida pelo toast em validateIPOnBlur
+                                  }
+                                }}
+                                placeholder="192.168.1.100"
+                                className="h-7 w-full min-w-0 rounded-lg border border-primary bg-info px-2 text-xs text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+                                aria-label={`IP — ${config.nome}`}
+                              />
+                            </div>
+                            <div className="min-w-0">
+                              <input
+                                type="text"
+                                value={config.porta}
+                                onChange={e =>
+                                  updateTerminalConfig(index, 'porta', e.target.value)
+                                }
+                                placeholder="9100"
+                                maxLength={5}
+                                className="h-7 w-full min-w-0 rounded-lg border border-primary bg-info px-2 text-xs text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
+                                aria-label={`Porta — ${config.nome}`}
+                              />
                             </div>
                           </div>
-                          {isExpanded && (
-                            <div className="border-t border-primary/20 bg-gray-50/90 px-4 py-3">
-                              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                <div className="space-y-1">
-                                  <label className="text-xs text-primary-text">
-                                    Modelo
-                                  </label>
-                                  <select
-                                    value={config.modeloDisplay}
-                                    onChange={e =>
-                                      updateTerminalConfig(index, 'modeloDisplay', e.target.value)
-                                    }
-                                    className="h-8 w-full rounded-lg border border-primary bg-info px-3 text-sm text-primary-text focus:border-primary focus:outline-none"
-                                  >
-                                    {MODELOS_OPTIONS.map(modelo => (
-                                      <option key={modelo} value={modelo}>
-                                        {modelo}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-                                <div className="space-y-1">
-                                  <label className="text-xs text-primary-text">
-                                    IP
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={config.ip}
-                                    onChange={e =>
-                                      updateTerminalConfig(index, 'ip', e.target.value)
-                                    }
-                                    onBlur={e => {
-                                      const ip = e.target.value
-                                      if (ip && !validateIPOnBlur(ip)) {
-                                        // validação exibida pelo toast em validateIPOnBlur
-                                      }
-                                    }}
-                                    placeholder="192.168.1.100"
-                                    className="h-8 w-full rounded-lg border border-primary bg-info px-3 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <label className="text-xs text-primary-text">
-                                    Porta
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={config.porta}
-                                    onChange={e =>
-                                      updateTerminalConfig(index, 'porta', e.target.value)
-                                    }
-                                    placeholder="9100"
-                                    maxLength={5}
-                                    className="h-8 w-full rounded-lg border border-primary bg-info px-3 text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          )}
                         </div>
 
                         {/* Mobile: mesma lógica — resumo + expansível com modelo/IP/porta */}

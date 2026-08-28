@@ -21,6 +21,7 @@ import { ProdutosPorGrupoList } from './ProdutosPorGrupoList'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { Input } from '@/src/presentation/components/ui/input'
+import { UppercaseLocaleInput } from '@/src/presentation/components/ui/UppercaseLocaleInput'
 import { cn } from '@/src/shared/utils/cn'
 import { showToast } from '@/src/shared/utils/toast'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
@@ -167,12 +168,6 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
   const [iconName, setIconName] = useState(() =>
     seedMatches ? initialGrupo!.getIconName() : ''
   )
-  const [ativoDelivery, setAtivoDelivery] = useState(() =>
-    seedMatches ? initialGrupo!.isAtivoDelivery() : false
-  )
-  const [ativoLocal, setAtivoLocal] = useState(() =>
-    seedMatches ? initialGrupo!.isAtivoLocal() : false
-  )
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(false)
   const [activeTab, setActiveTab] = useState(detalhesOnly ? 0 : initialTab)
@@ -243,10 +238,8 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
       ativo,
       corHex: normalizeColor(corHex),
       iconName,
-      ativoDelivery,
-      ativoLocal,
     })
-  }, [nome, ativo, corHex, iconName, ativoDelivery, ativoLocal, normalizeColor])
+  }, [nome, ativo, corHex, iconName, normalizeColor])
 
   const baselineSerializedRef = useRef<string>('')
 
@@ -313,8 +306,6 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
         setAtivo(grupo.isAtivo())
         setCorHex(normalizeColor(grupo.getCorHex()))
         setIconName(grupo.getIconName())
-        setAtivoDelivery(grupo.isAtivoDelivery())
-        setAtivoLocal(grupo.isAtivoLocal())
 
         hasLoadedGrupoRef.current = true
         loadedGrupoIdRef.current = effectiveGrupoId
@@ -338,8 +329,6 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
       setAtivo(initialGrupo!.isAtivo())
       setCorHex(normalizeColor(initialGrupo!.getCorHex()))
       setIconName(initialGrupo!.getIconName())
-      setAtivoDelivery(initialGrupo!.isAtivoDelivery())
-      setAtivoLocal(initialGrupo!.isAtivoLocal())
       window.setTimeout(() => {
         commitBaselineLatestRef.current()
       }, 50)
@@ -382,8 +371,6 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
           ativo,
           corHex,
           iconName,
-          ativoDelivery,
-          ativoLocal,
         }
 
         const response = await fetchGestorApi(url, {
@@ -449,8 +436,6 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
       ativo,
       corHex,
       iconName,
-      ativoDelivery,
-      ativoLocal,
       isEmbedded,
       invalidate,
       router,
@@ -611,10 +596,10 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                 <div className="md:py-5 py-2">
                   <div className="md:space-y-6 space-y-4">
                     {/* Nome — label na borda superior (outlined), igual cadastro de grupo de complementos */}
-                    <Input
+                    <UppercaseLocaleInput
                       label="Nome da Categoria"
                       value={nome}
-                      onChange={e => setNome(e.target.value.toLocaleUpperCase('pt-BR'))}
+                      onValueChange={setNome}
                       required
                       size="small"
                       placeholder="Digite o nome da categoria"
@@ -725,38 +710,6 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                             )}
                           </div>
                         </button>
-                      </div>
-                    </div>
-
-                    {/* Ativo Delivery e Local */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={ativoDelivery}
-                            onChange={(e) => setAtivoDelivery(e.target.checked)}
-                            className="w-5 h-5 rounded border-primary/60 text-primary focus:ring-primary"
-                            style={{ accentColor: 'var(--color-primary)' }}
-                          />
-                          <span className="text-primary-text md:text-sm text-xs ">
-                            Ativo para Delivery
-                          </span>
-                        </label>
-                      </div>
-                      <div>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={ativoLocal}
-                            onChange={(e) => setAtivoLocal(e.target.checked)}
-                            className="w-5 h-5 rounded border-primary/60 text-primary focus:ring-primary"
-                            style={{ accentColor: 'var(--color-primary)' }}
-                          />
-                          <span className="text-primary-text md:text-sm text-xs ">
-                            Ativo para Local
-                          </span>
-                        </label>
                       </div>
                     </div>
                   </div>

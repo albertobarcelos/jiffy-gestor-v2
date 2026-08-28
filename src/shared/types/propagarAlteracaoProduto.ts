@@ -15,8 +15,9 @@ export type OrigemAlteracaoProduto = 'cadastroBase' | 'menu'
  * `dados` = nome/preço etc.
  * `imagem` = copiar foto (só edição).
  * `vinculoMenus` = vincular produto a outros cardápios após criação.
+ * `statusAtivo` = ativar/desativar (mensagens e regras específicas).
  */
-export type VariantePropagacaoProduto = 'dados' | 'imagem' | 'vinculoMenus'
+export type VariantePropagacaoProduto = 'dados' | 'imagem' | 'vinculoMenus' | 'statusAtivo'
 
 export type DestinoAlteracaoProduto = {
   aplicarNoCadastroBase: boolean

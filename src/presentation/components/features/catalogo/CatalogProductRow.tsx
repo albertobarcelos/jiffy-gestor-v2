@@ -2,6 +2,7 @@
 
 import { memo, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { Tooltip } from '@mui/material'
 import {
   MdAddAPhoto,
   MdClose,
@@ -12,6 +13,7 @@ import {
 import { ProdutoValorInput } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoValorInput'
 import { ProdutoNomeInput } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoNomeInput'
 import { ProdutoStatusSwitch } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoStatusSwitch'
+import { MenuProdutoPauseControl } from '@/src/presentation/components/features/menus/MenuProdutoPauseControl'
 import { cn } from '@/src/shared/utils/cn'
 import type { CatalogListVariant } from './types'
 
@@ -24,6 +26,7 @@ export interface CatalogProductRowProps {
   imagemUrl?: string | null
   codigo?: string
   actionsSlot?: ReactNode
+  categoriaSlot?: ReactNode
   isSavingValor?: boolean
   isSavingStatus?: boolean
   isSavingImage?: boolean
@@ -46,6 +49,7 @@ function CatalogProductRowInner({
   imagemUrl,
   codigo,
   actionsSlot,
+  categoriaSlot,
   isSavingValor,
   isSavingStatus,
   isSavingImage,
@@ -62,6 +66,7 @@ function CatalogProductRowInner({
   const nomeExibicao = nome.length > 30 ? `${nome.slice(0, 30)}…` : nome
   const imagemPreview = imagemUrl?.trim() || null
   const isMenu = variant === 'menu'
+  const pausadoNoMenu = isMenu && !ativo
   const podeTrocarImagem = Boolean(onChangeImage)
   const podeEditarNome = Boolean(onNomeChange)
 
@@ -134,13 +139,19 @@ function CatalogProductRowInner({
       <div
         onClick={() => onEdit(id)}
         className={cn(
-          'grid cursor-pointer items-center gap-x-1.5 gap-y-2 border border-gray-200 bg-white px-2 py-2 hover:bg-secondary-text/10 md:gap-x-2 md:px-4',
+          'grid cursor-pointer items-center gap-x-1.5 gap-y-2 border border-gray-200 px-2 py-2 md:gap-x-2 md:px-4',
+          'relative z-0 has-[.tooltip-hover-above:hover]:z-[100] has-[.tooltip-hover-below:hover]:z-[100]',
+          pausadoNoMenu
+            ? 'bg-gray-200 hover:bg-gray-200'
+            : 'bg-white hover:bg-secondary-text/10',
           isMenu
             ? '[grid-template-columns:auto_minmax(0,1fr)_auto] md:[grid-template-columns:auto_minmax(0,30ch)_auto_minmax(0,1fr)_auto]'
-            : '[grid-template-columns:auto_minmax(0,1fr)_auto] md:[grid-template-columns:auto_minmax(0,30ch)_auto_auto_minmax(0,1fr)_auto]'
+            : categoriaSlot
+              ? '[grid-template-columns:minmax(0,1fr)_auto] md:[grid-template-columns:minmax(0,30ch)_auto_auto_auto_auto]'
+              : '[grid-template-columns:minmax(0,1fr)_auto] md:[grid-template-columns:minmax(0,30ch)_auto_auto_minmax(0,1fr)_auto]'
         )}
       >
-        {imagemPreview ? (
+        {isMenu && imagemPreview ? (
           <div className="relative h-11 w-11 shrink-0 md:h-12 md:w-12">
             <button
               type="button"
@@ -183,7 +194,7 @@ function CatalogProductRowInner({
               <MdVisibility size={12} />
             </button>
           </div>
-        ) : podeTrocarImagem ? (
+        ) : isMenu && podeTrocarImagem ? (
           <button
             type="button"
             title="Adicionar imagem"
@@ -197,12 +208,12 @@ function CatalogProductRowInner({
           >
             {placeholderSemImagem}
           </button>
-        ) : (
+        ) : isMenu ? (
           placeholderSemImagem
-        )}
+        ) : null}
 
         {podeEditarNome && onNomeChange ? (
-          <div className="min-w-0" onClick={e => e.stopPropagation()}>
+          <div className="min-w-0 justify-self-start">
             <ProdutoNomeInput
               nome={nome}
               disabled={isSavingNome}
@@ -227,50 +238,73 @@ function CatalogProductRowInner({
         {actionsSlot ? (
           <div
             className={cn(
-              'flex items-center gap-1 md:gap-1.5',
+              'flex items-center gap-1 justify-self-start md:gap-1.5',
               isMenu
                 ? 'col-span-2 md:col-span-1'
-                : 'col-span-3 md:col-span-1'
+                : 'col-span-2 max-md:overflow-x-auto max-md:pb-0.5 md:col-span-1'
             )}
-            onClick={e => e.stopPropagation()}
           >
             {actionsSlot}
           </div>
         ) : null}
 
-        <div className="hidden min-w-0 md:block" aria-hidden />
+        {categoriaSlot ? (
+          <div
+            className={cn(
+              'min-w-0 justify-self-start',
+              isMenu ? 'hidden md:block' : 'col-span-2 md:col-span-1'
+            )}
+          >
+            {categoriaSlot}
+          </div>
+        ) : (
+          <div className="hidden min-w-0 md:block" aria-hidden />
+        )}
 
         <div
           className={cn(
-            'flex flex-wrap items-center justify-end gap-2 md:gap-4',
-            isMenu ? 'col-span-2 md:col-span-1 md:mr-4' : 'col-span-3 md:col-span-1 md:mr-4'
+            'flex w-auto flex-wrap items-center justify-end gap-2 self-center justify-self-end md:gap-4',
+            isMenu
+              ? 'col-span-2 md:col-span-1 md:mr-4'
+              : 'col-span-2 md:col-span-1 md:mr-4'
           )}
-          onClick={e => e.stopPropagation()}
         >
           <ProdutoValorInput
             valor={valor}
             disabled={isSavingValor}
             onCommit={novoValor => onValorChange(id, novoValor)}
           />
-          <ProdutoStatusSwitch
-            isAtivo={ativo}
-            disabled={isSavingStatus}
-            onChange={status => onSwitchToggle(id, status)}
-          />
+          {isMenu ? (
+            <MenuProdutoPauseControl
+              isAtivo={ativo}
+              disabled={isSavingStatus}
+              onToggle={status => onSwitchToggle(id, status)}
+            />
+          ) : (
+            <ProdutoStatusSwitch
+              isAtivo={ativo}
+              disabled={isSavingStatus}
+              onChange={status => onSwitchToggle(id, status)}
+            />
+          )}
           {isMenu && onRemove ? (
-            <button
-              type="button"
-              title="Remover deste cardápio"
-              aria-label={`Remover ${nome} deste cardápio`}
-              onClick={() => onRemove(id)}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-primary/50 text-primary transition-colors hover:bg-primary/10"
-            >
-              <MdDeleteOutline size={18} />
-            </button>
+            <Tooltip title="Remover deste cardápio" arrow placement="top">
+              <button
+                type="button"
+                aria-label={`Remover ${nome} deste cardápio`}
+                onClick={e => {
+                  e.stopPropagation()
+                  onRemove(id)
+                }}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-primary/50 text-primary transition-colors hover:bg-primary/10"
+              >
+                <MdDeleteOutline size={18} />
+              </button>
+            </Tooltip>
           ) : null}
         </div>
       </div>
-      {podeTrocarImagem ? (
+      {isMenu && podeTrocarImagem ? (
         <input
           ref={fileInputRef}
           type="file"
@@ -298,6 +332,7 @@ function arePropsEqual(prev: CatalogProductRowProps, next: CatalogProductRowProp
     prev.imagemUrl === next.imagemUrl &&
     prev.codigo === next.codigo &&
     prev.actionsSlot === next.actionsSlot &&
+    prev.categoriaSlot === next.categoriaSlot &&
     prev.isSavingValor === next.isSavingValor &&
     prev.isSavingStatus === next.isSavingStatus &&
     prev.isSavingImage === next.isSavingImage &&

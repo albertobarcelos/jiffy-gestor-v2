@@ -36,12 +36,6 @@ interface ProdutosFiltersProps {
   statusGrupoFilter: StatusFilter
   onStatusGrupoChange: (v: StatusFilter) => void
 
-  ativoLocalFilter: TriState
-  onAtivoLocalChange: (v: TriState) => void
-
-  ativoDeliveryFilter: TriState
-  onAtivoDeliveryChange: (v: TriState) => void
-
   grupoProdutoFilter: string[]
   onGrupoProdutoChange: (v: string[]) => void
   gruposProdutos: GrupoProduto[]
@@ -63,10 +57,6 @@ export function ProdutosFilters({
   onFilterStatusChange,
   statusGrupoFilter,
   onStatusGrupoChange,
-  ativoLocalFilter,
-  onAtivoLocalChange,
-  ativoDeliveryFilter,
-  onAtivoDeliveryChange,
   grupoProdutoFilter,
   onGrupoProdutoChange,
   gruposProdutos,
@@ -135,42 +125,6 @@ export function ProdutosFilters({
               <MenuItem value="Todos">Todos</MenuItem>
               <MenuItem value="Ativo">Ativo</MenuItem>
               <MenuItem value="Desativado">Desativado</MenuItem>
-            </Select>
-          </FormControl>
-        </div>
-
-        <div className="w-full min-w-[120px] sm:w-[140px]">
-          <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
-            <InputLabel id="produtos-filter-local-label">Ativo no local</InputLabel>
-            <Select
-              labelId="produtos-filter-local-label"
-              label="Ativo no local"
-              value={ativoLocalFilter}
-              onChange={(e: SelectChangeEvent<string>) =>
-                onAtivoLocalChange(e.target.value as TriState)
-              }
-            >
-              <MenuItem value="Todos">Todos</MenuItem>
-              <MenuItem value="Sim">Sim</MenuItem>
-              <MenuItem value="Não">Não</MenuItem>
-            </Select>
-          </FormControl>
-        </div>
-
-        <div className="w-full min-w-[136px] sm:w-[156px]">
-          <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
-            <InputLabel id="produtos-filter-delivery-label">Ativo no delivery</InputLabel>
-            <Select
-              labelId="produtos-filter-delivery-label"
-              label="Ativo no delivery"
-              value={ativoDeliveryFilter}
-              onChange={(e: SelectChangeEvent<string>) =>
-                onAtivoDeliveryChange(e.target.value as TriState)
-              }
-            >
-              <MenuItem value="Todos">Todos</MenuItem>
-              <MenuItem value="Sim">Sim</MenuItem>
-              <MenuItem value="Não">Não</MenuItem>
             </Select>
           </FormControl>
         </div>

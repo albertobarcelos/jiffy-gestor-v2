@@ -10,10 +10,16 @@ export function PedidoProdutosCategoriasColuna() {
     grupoSelecionadoId,
     grupos,
     isLoadingGruposVenda,
+    menuCatalogoIndisponivel,
     setGrupoSelecionadoId,
+    tipoInicioPedido,
   } = useNovoPedidoFormContext()
 
   const emBusca = buscaProdutoTexto.length >= 2
+  const mensagemMenuIndisponivel =
+    tipoInicioPedido === 'entrega'
+      ? 'Configure o menu em Configurações → Empresa Delivery.'
+      : 'Configure o menu em Configurações → Empresa.'
 
   return (
     <nav
@@ -26,7 +32,9 @@ export function PedidoProdutosCategoriasColuna() {
         </span>
       </div>
       <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-1">
-        {isLoadingGruposVenda ? (
+        {menuCatalogoIndisponivel ? (
+          <p className="px-1 py-4 text-center text-[10px] text-gray-500">{mensagemMenuIndisponivel}</p>
+        ) : isLoadingGruposVenda ? (
           <div className="flex justify-center py-4">
             <JiffyLoading />
           </div>

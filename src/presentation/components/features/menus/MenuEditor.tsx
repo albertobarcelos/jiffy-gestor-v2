@@ -18,6 +18,7 @@ import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplem
 import { useIsMobile } from '@/src/presentation/hooks/useIsMobile'
 import { AddProdutosToMenuPanel } from './AddProdutosToMenuPanel'
 import { MenuNovoProdutoWizard } from './MenuNovoProdutoWizard'
+import { MenuReorderCardapioModal } from './reorder/MenuReorderCardapioModal'
 import { MenuCardapioAcoes } from './MenuCardapioAcoes'
 import { MenuCardapioEmptyState } from './MenuCardapioEmptyState'
 import { MenuProdutosFilters } from './MenuProdutosFilters'
@@ -34,10 +35,14 @@ import { CatalogGroupedList } from '@/src/presentation/components/features/catal
 import { CatalogProductRow } from '@/src/presentation/components/features/catalogo/CatalogProductRow'
 import type { CatalogGroup } from '@/src/presentation/components/features/catalogo/types'
 import { MenuProdutoRowQuickActions } from './MenuProdutoRowQuickActions'
+import { MENU_MODAL_CANCEL_VARIANT } from './menuPanelConstants'
 import { coletarGruposMenuPorSnapshot, ordemSnapshotCategoria } from './ordenarGruposMenuSnapshot'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { JiffyFriendlyAlertDialog } from '@/src/presentation/components/ui/JiffyFriendlyAlertDialog'
 import { showToast } from '@/src/shared/utils/toast'
+import { atualizarGrupoProdutoViaBffUseCase } from '@/src/application/use-cases/grupos-produtos/AtualizarGrupoProdutoViaBffUseCase'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import type {
@@ -90,6 +95,12 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   const [addOpen, setAddOpen] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [wizardCategoriaId, setWizardCategoriaId] = useState<string | undefined>()
+  const [reorderOpen, setReorderOpen] = useState(false)
+  const [statusConfirm, setStatusConfirm] = useState<{
+    produtoId: string
+    ativo: boolean
+  } | null>(null)
+  const [statusConfirmSaving, setStatusConfirmSaving] = useState(false)
   const tipoCadastro = useEscolherTipoProdutoCadastro()
   const {
     data: produtosTodosData,
@@ -340,6 +351,37 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     },
     [tipoCadastro.pedirTipo, openWizardCadastro]
   )
+
+  const handleToggleGrupoStatus = useCallback(
+    async (grupoId: string) => {
+      const grupo = findGrupo(grupoId)
+      if (!grupo) return
+
+      const novoStatus = !(grupo.grupoBase.ativo ?? true)
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+      if (!token) return
+
+      try {
+        await atualizarGrupoProdutoViaBffUseCase.execute({
+          token,
+          grupoId,
+          patch: { ativo: novoStatus },
+        })
+
+        showToast.success(
+          novoStatus ? 'Categoria ativada com sucesso!' : 'Categoria desativada com sucesso!'
+        )
+        await invalidate(['menu-grupos', menuId])
+        await invalidate(['grupos-produtos'])
+      } catch (err) {
+        showToast.error(
+          err instanceof Error ? err.message : 'Não foi possível atualizar o status da categoria.'
+        )
+      }
+    },
+    [findGrupo, invalidate, menuId]
+  )
+
   const handleNomeChange = useCallback(
     async (produtoId: string, nome: string) => {
       const destinos = await pedirConfirmacao({
@@ -394,32 +436,26 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     [updateProduto, pedirConfirmacao, aplicarNosDestinos, menuId]
   )
 
-  const handleStatusToggle = useCallback(
-    async (produtoId: string, ativo: boolean) => {
-      const destinos = await pedirConfirmacao({
-        origem: 'menu',
-        produtoId,
-        menuIdAtual: menuId,
-      })
-      if (destinos === null) return
-      try {
-        await updateProduto.mutateAsync({ produtoId, input: { ativo } })
-        if (destinos.aplicarNoCadastroBase || destinos.menuIds.length > 0) {
-          await aplicarNosDestinos({
-            produtoId,
-            snapshot: { ativo },
-            destinos,
-          })
-        }
-        showToast.success(
-          ativo ? 'Produto ativo neste cardápio' : 'Produto inativo neste cardápio'
-        )
-      } catch (err) {
-        showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar status')
-      }
-    },
-    [updateProduto, pedirConfirmacao, aplicarNosDestinos, menuId]
-  )
+  const handleStatusToggle = useCallback((produtoId: string, ativo: boolean) => {
+    setStatusConfirm({ produtoId, ativo })
+  }, [])
+
+  const confirmStatusToggle = useCallback(async () => {
+    if (!statusConfirm) return
+    const { produtoId, ativo } = statusConfirm
+    setStatusConfirmSaving(true)
+    try {
+      await updateProduto.mutateAsync({ produtoId, input: { ativo } })
+      showToast.success(
+        ativo ? 'Produto disponível neste cardápio' : 'Produto pausado neste cardápio'
+      )
+      setStatusConfirm(null)
+    } catch (err) {
+      showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar status')
+    } finally {
+      setStatusConfirmSaving(false)
+    }
+  }, [statusConfirm, updateProduto])
 
   const handleQuickPatch = useCallback(
     async (produtoId: string, input: UpdateMenuProdutoInput): Promise<boolean> => {
@@ -597,65 +633,73 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex-shrink-0 px-1 py-[4px] md:px-[30px]">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div className="flex items-start gap-3 md:pl-5">
+        <div className="flex flex-nowrap items-center gap-2 md:gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3 md:pl-5">
             <Link
               href={toGestao('/menus')}
-              className="mt-1 flex h-8 w-8 items-center justify-center rounded-lg border border-primary/50 text-primary transition-colors hover:bg-primary/10"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-primary/50 text-primary transition-colors hover:bg-primary/10"
               aria-label="Voltar"
             >
               <MdArrowBack className="h-5 w-5" />
             </Link>
-            <div>
-              <p className="text-sm font-semibold text-primary">Cardápio do menu</p>
-              <p className="text-sm font-normal text-tertiary md:text-[22px]">{menu.nome}</p>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-primary">Produtos do menu</p>
+              <p
+                className="truncate text-sm font-normal text-tertiary md:text-xl"
+                title={menu.nome}
+              >
+                {menu.nome}
+              </p>
             </div>
           </div>
 
-          <div className="mb-1 w-full max-w-[350px]">
-            <TextField
-              id="menu-produtos-search"
-              size="small"
-              fullWidth
-              value={filters.searchText}
-              onChange={e => actions.setSearch(e.target.value)}
-              label="Pesquisar"
-              placeholder="Nome ou descrição"
-              InputLabelProps={{ shrink: true }}
-              sx={{
-                ...sxEntradaCompactaProduto,
-                '& .MuiOutlinedInput-root': {
-                  backgroundColor: '#fff',
-                  height: 32,
-                  minHeight: 32,
-                },
-                '& .MuiOutlinedInput-input': {
-                  padding: '4px 8px',
-                  fontSize: '0.8125rem',
-                },
-                '& .MuiInputAdornment-root': {
-                  marginRight: '2px',
-                },
-                '& .MuiInputLabel-root': {
-                  fontSize: '0.8125rem',
-                },
-              }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <MdSearch className="text-secondary-text" size={16} />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <div className="w-[min(220px,22vw)] shrink-0">
+              <TextField
+                id="menu-produtos-search"
+                size="small"
+                fullWidth
+                value={filters.searchText}
+                onChange={e => actions.setSearch(e.target.value)}
+                label="Pesquisar"
+                placeholder="Nome ou descrição"
+                InputLabelProps={{ shrink: true }}
+                sx={{
+                  ...sxEntradaCompactaProduto,
+                  '& .MuiOutlinedInput-root': {
+                    backgroundColor: '#fff',
+                    height: 32,
+                    minHeight: 32,
+                  },
+                  '& .MuiOutlinedInput-input': {
+                    padding: '4px 6px',
+                    fontSize: '0.8125rem',
+                  },
+                  '& .MuiInputAdornment-root': {
+                    marginRight: '2px',
+                  },
+                  '& .MuiInputLabel-root': {
+                    fontSize: '0.8125rem',
+                  },
+                }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <MdSearch className="text-secondary-text" size={16} />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </div>
 
-          {mostrarAcoesCabecalho ? (
-            <MenuCardapioAcoes
-              onAdicionar={() => setAddOpen(true)}
-              loteHref={toGestao(`/menus/${menuId}/atualizar-lote`)}
-            />
-          ) : null}
+            {mostrarAcoesCabecalho ? (
+              <MenuCardapioAcoes
+                onAdicionar={() => setAddOpen(true)}
+                onReordenar={() => setReorderOpen(true)}
+                loteHref={toGestao(`/menus/${menuId}/atualizar-lote`)}
+              />
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -695,10 +739,10 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
             ) : undefined
           }
           listAriaLabel="Produtos deste cardápio"
-          showGrupoStatusSwitch={false}
           addProdutoLabel="Adicionar produto"
           onToggleExpand={handleToggleExpand}
           onEditGrupo={handleEditGrupo}
+          onToggleGrupoStatus={handleToggleGrupoStatus}
           onAddProduto={handleAddProduto}
         />
       </div>
@@ -724,6 +768,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         open={tipoCadastro.open}
         onClose={tipoCadastro.fechar}
         onContinuar={tipoCadastro.continuar}
+        cancelVariant={MENU_MODAL_CANCEL_VARIANT}
       />
       <MenuNovoProdutoWizard
         open={wizardOpen}
@@ -732,7 +777,32 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         initialCategoriaId={wizardCategoriaId}
         onClose={closeWizardCadastro}
       />
+      <MenuReorderCardapioModal
+        open={reorderOpen}
+        menuId={menuId}
+        onClose={() => setReorderOpen(false)}
+      />
       {dialogPropagacao}
+      <JiffyFriendlyAlertDialog
+        open={Boolean(statusConfirm)}
+        onClose={() => {
+          if (!statusConfirmSaving) setStatusConfirm(null)
+        }}
+        onConfirm={() => void confirmStatusToggle()}
+        title={
+          statusConfirm?.ativo
+            ? 'Retomar este produto neste cardápio?'
+            : 'Ops! Pausar este produto neste cardápio?'
+        }
+        description={
+          statusConfirm?.ativo
+            ? 'O produto voltará a ficar disponível apenas neste cardápio. O cadastro base e os demais menus não serão alterados.'
+            : 'Ao pausar, o produto deixará de aparecer neste cardápio. O cadastro base e os demais menus não serão alterados. Confirme se é isso mesmo que você deseja.'
+        }
+        confirmLabel="Ok, entendi!"
+        iconVariant={statusConfirm?.ativo ? 'success' : 'warning'}
+        busy={statusConfirmSaving}
+      />
       {produtoCropModal}
     </div>
   )

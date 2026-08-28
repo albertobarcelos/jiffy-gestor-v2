@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
-import { MenuRepository } from '@/src/infrastructure/database/repositories/MenuRepository'
+import {
+  CreateMenuBodySchema,
+  ListarMenusQuerySchema,
+} from '@/src/application/dto/menus/MenuInputSchemas'
+import {
+  CriarMenuUseCase,
+  ListarMenusUseCase,
+} from '@/src/application/use-cases/menus/menuCadastroUseCases'
+import { createMenuRepository } from '@/src/infrastructure/database/repositories/createMenuRepository'
+import {
+  menuZodErrorResponse,
+  parseMenuRouteInput,
+  searchParamsToRecord,
+} from '@/src/shared/utils/menuRouteValidation'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { menuApiErrorResponse } from '@/src/shared/utils/menuApiRoute'
 
@@ -11,22 +23,25 @@ export async function GET(req: NextRequest) {
     if (!validation.valid || !validation.tokenInfo) return validation.error!
 
     const { searchParams } = new URL(req.url)
-    const q = searchParams.get('q') || searchParams.get('name') || undefined
-    const limit = parseInt(searchParams.get('limit') || '20', 10)
-    const offset = parseInt(searchParams.get('offset') || '0', 10)
-    const tipo = searchParams.get('tipo') || undefined
-    const ativoParam = searchParams.get('ativo')
-    const ativo =
-      ativoParam === 'true' ? true : ativoParam === 'false' ? false : null
+    const query = parseMenuRouteInput(ListarMenusQuerySchema, searchParamsToRecord(searchParams))
+    const q = query.q || query.name || undefined
 
-    const repo = new MenuRepository(new ApiClient(), validation.tokenInfo.token)
-    const result = await repo.listarMenus({ q, limit, offset, ativo, tipo })
+    const useCase = new ListarMenusUseCase(createMenuRepository(validation.tokenInfo.token))
+    const result = await useCase.execute({
+      q,
+      limit: query.limit,
+      offset: query.offset,
+      ativo: query.ativo,
+      tipo: query.tipo,
+    })
 
     return NextResponse.json(
       { success: true, ...result },
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
+    const zodResponse = menuZodErrorResponse(error)
+    if (zodResponse) return zodResponse
     return menuApiErrorResponse(error, 'Erro ao listar menus')
   }
 }
@@ -37,13 +52,9 @@ export async function POST(req: NextRequest) {
     const validation = validateRequest(req)
     if (!validation.valid || !validation.tokenInfo) return validation.error!
 
-    const body = await req.json()
-    if (!body?.nome || typeof body.nome !== 'string') {
-      return NextResponse.json({ message: 'Nome é obrigatório' }, { status: 400 })
-    }
-
-    const repo = new MenuRepository(new ApiClient(), validation.tokenInfo.token)
-    const menu = await repo.criarMenu({
+    const body = parseMenuRouteInput(CreateMenuBodySchema, await req.json())
+    const useCase = new CriarMenuUseCase(createMenuRepository(validation.tokenInfo.token))
+    const menu = await useCase.execute({
       nome: body.nome,
       descricao: body.descricao ?? null,
       codigo: body.codigo,
@@ -52,6 +63,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, data: menu }, { status: 201 })
   } catch (error) {
+    const zodResponse = menuZodErrorResponse(error)
+    if (zodResponse) return zodResponse
     return menuApiErrorResponse(error, 'Erro ao criar menu')
   }
 }

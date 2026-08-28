@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
-import { MenuRepository } from '@/src/infrastructure/database/repositories/MenuRepository'
+import {
+  MenuRouteIdSchema,
+  UpdateMenuBodySchema,
+} from '@/src/application/dto/menus/MenuInputSchemas'
+import {
+  AtualizarMenuUseCase,
+  BuscarMenuPorIdUseCase,
+  ExcluirMenuUseCase,
+} from '@/src/application/use-cases/menus/menuCadastroUseCases'
+import { createMenuRepository } from '@/src/infrastructure/database/repositories/createMenuRepository'
+import { menuZodErrorResponse, parseMenuRouteInput } from '@/src/shared/utils/menuRouteValidation'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { menuApiErrorResponse } from '@/src/shared/utils/menuApiRoute'
 
@@ -13,11 +22,14 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     if (!validation.valid || !validation.tokenInfo) return validation.error!
 
     const { id } = await params
-    const repo = new MenuRepository(new ApiClient(), validation.tokenInfo.token)
-    const menu = await repo.buscarMenuPorId(id)
+    const menuId = parseMenuRouteInput(MenuRouteIdSchema, id)
+    const useCase = new BuscarMenuPorIdUseCase(createMenuRepository(validation.tokenInfo.token))
+    const menu = await useCase.execute(menuId)
 
     return NextResponse.json({ success: true, data: menu })
   } catch (error) {
+    const zodResponse = menuZodErrorResponse(error)
+    if (zodResponse) return zodResponse
     return menuApiErrorResponse(error, 'Erro ao buscar menu')
   }
 }
@@ -29,16 +41,15 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     if (!validation.valid || !validation.tokenInfo) return validation.error!
 
     const { id } = await params
-    const body = await req.json()
-    const repo = new MenuRepository(new ApiClient(), validation.tokenInfo.token)
-    const menu = await repo.atualizarMenu(id, {
-      nome: body.nome,
-      descricao: body.descricao,
-      ativo: body.ativo,
-    })
+    const menuId = parseMenuRouteInput(MenuRouteIdSchema, id)
+    const body = parseMenuRouteInput(UpdateMenuBodySchema, await req.json())
+    const useCase = new AtualizarMenuUseCase(createMenuRepository(validation.tokenInfo.token))
+    const menu = await useCase.execute(menuId, body)
 
     return NextResponse.json({ success: true, data: menu })
   } catch (error) {
+    const zodResponse = menuZodErrorResponse(error)
+    if (zodResponse) return zodResponse
     return menuApiErrorResponse(error, 'Erro ao atualizar menu')
   }
 }
@@ -50,11 +61,14 @@ export async function DELETE(req: NextRequest, { params }: RouteContext) {
     if (!validation.valid || !validation.tokenInfo) return validation.error!
 
     const { id } = await params
-    const repo = new MenuRepository(new ApiClient(), validation.tokenInfo.token)
-    await repo.excluirMenu(id)
+    const menuId = parseMenuRouteInput(MenuRouteIdSchema, id)
+    const useCase = new ExcluirMenuUseCase(createMenuRepository(validation.tokenInfo.token))
+    await useCase.execute(menuId)
 
     return new NextResponse(null, { status: 204 })
   } catch (error) {
+    const zodResponse = menuZodErrorResponse(error)
+    if (zodResponse) return zodResponse
     return menuApiErrorResponse(error, 'Erro ao excluir menu')
   }
 }

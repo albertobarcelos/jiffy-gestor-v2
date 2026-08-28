@@ -3,12 +3,17 @@
 import { useEffect, useState } from 'react'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { Input } from '@/src/presentation/components/ui/input'
+import { UppercaseLocaleInput } from '@/src/presentation/components/ui/UppercaseLocaleInput'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import { useMenuMutations } from '@/src/presentation/hooks/menus/useMenuMutations'
 import { showToast } from '@/src/shared/utils/toast'
 import type { Menu } from '@/src/shared/types/menus'
-import { MENU_FORM_ID, MENU_SIDE_PANEL_CLASS } from './menuPanelConstants'
+import {
+  MENU_FORM_ID,
+  MENU_MODAL_CANCEL_VARIANT,
+  MENU_SIDE_PANEL_CLASS,
+} from './menuPanelConstants'
 
 interface MenuFormPanelProps {
   open: boolean
@@ -74,7 +79,7 @@ export function MenuFormPanel({ open, menu, onClose }: MenuFormPanelProps) {
       footerActions={{
         showCancel: true,
         cancelLabel: 'Fechar',
-        cancelVariant: 'primaryTint10',
+        cancelVariant: MENU_MODAL_CANCEL_VARIANT,
         onCancel: onClose,
         showSave: true,
         saveLabel: 'Salvar',
@@ -103,12 +108,12 @@ export function MenuFormPanel({ open, menu, onClose }: MenuFormPanelProps) {
             </p>
 
             <div className="space-y-4">
-              <Input
+              <UppercaseLocaleInput
                 label="Nome do menu"
                 required
                 size="small"
                 value={nome}
-                onChange={(e) => setNome(e.target.value.toLocaleUpperCase('pt-BR'))}
+                onValueChange={setNome}
                 placeholder="Ex.: Delivery, Salão, Eventos"
                 className="bg-white"
                 sx={sxEntradaCompactaProduto}
