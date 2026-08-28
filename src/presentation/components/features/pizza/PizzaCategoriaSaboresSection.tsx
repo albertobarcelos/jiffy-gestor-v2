@@ -1,9 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { MdArrowDownward, MdArrowUpward, MdEdit } from 'react-icons/md'
+import { MdArrowDownward, MdArrowUpward, MdEdit, MdImageNotSupported } from 'react-icons/md'
 import { ProdutoStatusSwitch } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoStatusSwitch'
-import { Button } from '@/src/presentation/components/ui/button'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import {
   useAtualizarPizzaSaborMutation,
@@ -12,19 +11,40 @@ import {
 } from '@/src/presentation/hooks/pizza/usePizza'
 import { showToast } from '@/src/shared/utils/toast'
 import type { CategoriaPizza, SaborPizzaSummary } from '@/src/shared/types/pizza'
-import { cn } from '@/src/shared/utils/cn'
 
 interface PizzaCategoriaSaboresSectionProps {
   categoria: CategoriaPizza
   tamanhosCount: number
-  onAdicionarSabor: () => void
   onEditarSabor: (saborId: string) => void
+}
+
+function SaborListaThumbnail({ imagemUrl, nome }: { imagemUrl: string | null; nome: string }) {
+  const preview = imagemUrl?.trim() || null
+
+  if (preview) {
+    return (
+      <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-white md:h-12 md:w-12">
+        {/* eslint-disable-next-line @next/next/no-img-element -- thumbnail do sabor */}
+        <img src={preview} alt="" className="h-full w-full object-cover" />
+      </span>
+    )
+  }
+
+  return (
+    <span
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-secondary-text md:h-12 md:w-12"
+      title="Sem imagem"
+      aria-hidden
+    >
+      <MdImageNotSupported className="h-6 w-6 md:h-7 md:w-7" />
+      <span className="sr-only">Sem imagem de {nome}</span>
+    </span>
+  )
 }
 
 export function PizzaCategoriaSaboresSection({
   categoria,
   tamanhosCount,
-  onAdicionarSabor,
   onEditarSabor,
 }: PizzaCategoriaSaboresSectionProps) {
   const { data, isLoading, refetch } = usePizzaSabores(categoria.id)
@@ -78,32 +98,18 @@ export function PizzaCategoriaSaboresSection({
       ) : vazia ? (
         <p className="text-sm text-secondary-text">Nenhum sabor cadastrado nesta categoria.</p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-100">
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-50 text-left text-secondary-text">
-              <tr>
-                <th className="px-3 py-2 font-medium">Sabores</th>
-                <th className="px-3 py-2 font-medium">Tamanho</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="w-28 px-3 py-2 font-medium">Ordem</th>
-                <th className="w-12 px-3 py-2" />
-              </tr>
-            </thead>
+        <div className="w-full rounded-xl border border-gray-100">
+          <table className="w-full text-sm">
             <tbody>
               {sabores.map((sabor, index) => (
-                <tr key={sabor.id} className="border-t border-gray-100">
+                <tr key={sabor.id} className="border-t border-gray-100 first:border-t-0">
                   <td className="px-3 py-3">
                     <button
                       type="button"
                       className="flex w-full items-start gap-3 text-left hover:opacity-80"
                       onClick={() => onEditarSabor(sabor.id)}
                     >
-                      <span
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-lg"
-                        aria-hidden
-                      >
-                        🍕
-                      </span>
+                      <SaborListaThumbnail imagemUrl={sabor.imagemUrl} nome={sabor.nome} />
                       <div className="min-w-0">
                         <p className="font-medium text-primary-text">{sabor.nome}</p>
                         {sabor.descricao ? (
@@ -163,15 +169,6 @@ export function PizzaCategoriaSaboresSection({
         </div>
       )}
 
-      <Button
-        type="button"
-        variant="outlined"
-        className={cn('mt-4 border-primary text-primary', tamanhosCount === 0 && 'opacity-60')}
-        disabled={tamanhosCount === 0}
-        onClick={onAdicionarSabor}
-      >
-        + Adicionar item
-      </Button>
     </div>
   )
 }

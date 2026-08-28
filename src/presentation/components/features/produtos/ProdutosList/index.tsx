@@ -34,6 +34,9 @@ import { ProdutosHeader } from './ProdutosHeader'
 import { ProdutosFilters } from './ProdutosFilters'
 import { ProdutoListItem } from './ProdutoListItem'
 import { useImagensProdutosCadastroBase } from '@/src/presentation/hooks/produtos/useImagensProdutosCadastroBase'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
+import { PizzaNovoWizard } from '@/src/presentation/components/features/pizza/PizzaNovoWizard'
 
 import { Produto } from '@/src/domain/entities/Produto'
 import type { ToggleField } from '@/src/shared/types/produto'
@@ -64,6 +67,7 @@ export function ProdutosList() {
   const queryClient = useQueryClient()
   const empresaId = useTenantEmpresaId()
   const router = useRouter()
+  const { toGestao } = useGestaoPath()
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const isMobile = useIsMobile()
@@ -82,7 +86,15 @@ export function ProdutosList() {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   const patchMutation = useProdutoPatchMutation()
-  const tipoCadastro = useEscolherTipoProdutoCadastro()
+  const invalidate = useInvalidateTenantQueries()
+  const [pizzaWizardOpen, setPizzaWizardOpen] = useState(false)
+  const abrirWizardPizza = useCallback(() => setPizzaWizardOpen(true), [])
+  const handlePizzaCadastroConcluido = useCallback(async () => {
+    setPizzaWizardOpen(false)
+    await invalidate(['pizza'])
+    router.push(toGestao('/produtos/pizzas'))
+  }, [invalidate, router, toGestao])
+  const tipoCadastro = useEscolherTipoProdutoCadastro({ onPizza: abrirWizardPizza })
   const [wizardOpen, setWizardOpen] = useState(false)
   const { pedirConfirmacao, aplicarNosDestinos, aplicarImagemNosDestinos, dialog: dialogPropagacao } =
     usePropagarAlteracaoProduto()
@@ -566,6 +578,11 @@ export function ProdutosList() {
         open={wizardOpen}
         onClose={closeWizardCadastro}
         onSuccess={() => handleTabsModalReload()}
+      />
+      <PizzaNovoWizard
+        open={pizzaWizardOpen}
+        onClose={() => setPizzaWizardOpen(false)}
+        onSuccess={() => void handlePizzaCadastroConcluido()}
       />
       <ProdutosTabsModal
         state={tabsModalState}

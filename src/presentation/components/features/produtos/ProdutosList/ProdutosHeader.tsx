@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { InputAdornment, TextField } from '@mui/material'
 import { MdSearch } from 'react-icons/md'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
+import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 
 interface ProdutosHeaderProps {
   totalLocal: number
@@ -20,6 +21,8 @@ export function ProdutosHeader({
   onSearchChange,
   onNovoProduto,
 }: ProdutosHeaderProps) {
+  const { toGestao } = useGestaoPath()
+
   return (
     <div className="flex-shrink-0 px-1 md:px-[30px]">
       <div className="flex flex-col gap-2">
@@ -71,7 +74,13 @@ export function ProdutosHeader({
 
           <div className="flex gap-2 md:mb-1 md:flex-1 md:items-center md:justify-end md:gap-3">
             <Link
-              href="/produtos/atualizar-produtos-lote"
+              href={toGestao('/produtos/pizzas')}
+              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-primary/50 bg-info px-3 text-xs font-semibold text-primary-text transition-colors hover:bg-primary/10 md:h-8 md:flex-none md:px-4 md:text-sm"
+            >
+              Pizzas
+            </Link>
+            <Link
+              href={toGestao('/produtos/atualizar-produtos-lote')}
               className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-primary/50 bg-info px-3 text-xs font-semibold text-primary-text transition-colors hover:bg-primary/10 md:h-8 md:flex-none md:px-4 md:text-sm"
             >
               Produtos em Lote
