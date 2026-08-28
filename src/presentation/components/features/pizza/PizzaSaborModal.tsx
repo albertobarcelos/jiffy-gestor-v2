@@ -62,6 +62,7 @@ interface PizzaSaborModalProps {
   categoria: CategoriaPizza | null
   saborId?: string | null
   menuId?: string
+  initialTab?: SaborTab
   onClose: () => void
   onSuccess?: () => void
 }
@@ -71,11 +72,12 @@ export function PizzaSaborModal({
   categoria,
   saborId = null,
   menuId,
+  initialTab = 'detalhes',
   onClose,
   onSuccess,
 }: PizzaSaborModalProps) {
   const isEdit = Boolean(saborId)
-  const [tab, setTab] = useState<SaborTab>('detalhes')
+  const [tab, setTab] = useState<SaborTab>(initialTab)
   const [nome, setNome] = useState('')
   const [descricao, setDescricao] = useState('')
   const [ativo, setAtivo] = useState(true)
@@ -137,7 +139,7 @@ export function PizzaSaborModal({
 
   useEffect(() => {
     if (!open) return
-    setTab('detalhes')
+    setTab(initialTab)
     setSession(s => s + 1)
     saborHydratedRef.current = null
 
@@ -147,7 +149,7 @@ export function PizzaSaborModal({
       setAtivo(true)
       setPrecos({})
     }
-  }, [open, isEdit, saborId])
+  }, [open, isEdit, saborId, initialTab])
 
   useEffect(() => {
     if (!open || !isEdit || !saborDetalhe) return

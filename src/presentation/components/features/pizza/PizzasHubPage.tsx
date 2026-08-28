@@ -1,13 +1,12 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { MdArrowBack, MdArrowDownward, MdArrowUpward, MdEdit } from 'react-icons/md'
+import { MdArrowBack, MdArrowDownward, MdArrowUpward } from 'react-icons/md'
+import { CatalogGroupHeader } from '@/src/presentation/components/features/catalogo/CatalogGroupHeader'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { Button } from '@/src/presentation/components/ui/button'
 import { showToast } from '@/src/shared/utils/toast'
-import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
-import { ProdutoStatusSwitch } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoStatusSwitch'
 import {
   useAtualizarPizzaCategoriaMutation,
   usePizzaCategorias,
@@ -22,10 +21,12 @@ import { PizzaCategoriaSaboresSection } from './PizzaCategoriaSaboresSection'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import type { CategoriaPizza } from '@/src/shared/types/pizza'
 
-function PizzaCategoriaCard({
+function PizzaCategoriaBlock({
   categoria,
   index,
   total,
+  isExpanded,
+  onToggleExpand,
   onEditar,
   onAdicionarSabor,
   onEditarSabor,
@@ -36,6 +37,8 @@ function PizzaCategoriaCard({
   categoria: CategoriaPizza
   index: number
   total: number
+  isExpanded: boolean
+  onToggleExpand: (categoriaId: string) => void
   onEditar: (categoria: CategoriaPizza) => void
   onAdicionarSabor: (categoria: CategoriaPizza) => void
   onEditarSabor: (categoria: CategoriaPizza, saborId: string) => void
@@ -44,93 +47,85 @@ function PizzaCategoriaCard({
   savingStatus: boolean
 }) {
   const { data: tamanhosData } = usePizzaTamanhos(categoria.id)
-  const tamanhosCount = tamanhosData?.count ?? tamanhosData?.items?.length ?? 0
+  const tamanhosTotal = tamanhosData?.count ?? tamanhosData?.items?.length ?? 0
   const { data: saboresData } = usePizzaSabores(categoria.id)
-  const vazia = (saboresData?.count ?? 0) === 0
+  const saboresCount = saboresData?.count ?? saboresData?.items?.length ?? 0
+
+  const reorderActions = (
+    <div className="flex items-center gap-0.5">
+      <button
+        type="button"
+        className="rounded p-1 text-secondary-text hover:bg-gray-100 disabled:opacity-30"
+        disabled={index === 0 || savingStatus}
+        aria-label="Subir categoria"
+        onClick={e => {
+          e.stopPropagation()
+          onReordenar(categoria, 'up')
+        }}
+      >
+        <MdArrowUpward size={16} />
+      </button>
+      <button
+        type="button"
+        className="rounded p-1 text-secondary-text hover:bg-gray-100 disabled:opacity-30"
+        disabled={index === total - 1 || savingStatus}
+        aria-label="Descer categoria"
+        onClick={e => {
+          e.stopPropagation()
+          onReordenar(categoria, 'down')
+        }}
+      >
+        <MdArrowDownward size={16} />
+      </button>
+    </div>
+  )
 
   return (
     <div className="space-y-1">
       <div className="sticky top-0 z-20 -mx-1 bg-gray-50 py-1">
-        <header className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm md:px-6">
-          <span
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border"
-            style={{ borderColor: categoria.corHex }}
-          >
-            <DinamicIcon iconName={categoria.iconName} color={categoria.corHex} size={20} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-base font-semibold text-primary-text">{categoria.nome}</h2>
-              {vazia ? (
-                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-secondary-text">
-                  Categoria vazia
-                </span>
-              ) : null}
-            </div>
-            <p className="text-xs text-secondary-text">
-              {saboresData?.count ?? saboresData?.items?.length ?? 0} sabor
-              {(saboresData?.count ?? saboresData?.items?.length ?? 0) === 1 ? '' : 'es'}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 md:gap-3">
-            <button
-              type="button"
-              disabled={tamanhosCount === 0}
-              onClick={() => onAdicionarSabor(categoria)}
-              className="flex h-8 items-center gap-1 rounded-lg border border-primary/50 bg-info px-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60 md:px-5 md:text-sm"
-              title={
-                tamanhosCount === 0
-                  ? 'Configure tamanhos na categoria antes de adicionar sabores'
-                  : undefined
-              }
-            >
-              Adicionar item
-              <span className="text-sm leading-none">+</span>
-            </button>
-            <div className="flex items-center gap-1">
-            <button
-              type="button"
-              className="rounded p-1 text-secondary-text hover:bg-gray-100 disabled:opacity-30"
-              disabled={index === 0 || savingStatus}
-              aria-label="Subir categoria"
-              onClick={() => onReordenar(categoria, 'up')}
-            >
-              <MdArrowUpward size={18} />
-            </button>
-            <button
-              type="button"
-              className="rounded p-1 text-secondary-text hover:bg-gray-100 disabled:opacity-30"
-              disabled={index === total - 1 || savingStatus}
-              aria-label="Descer categoria"
-              onClick={() => onReordenar(categoria, 'down')}
-            >
-              <MdArrowDownward size={18} />
-            </button>
-            <button
-              type="button"
-              className="rounded p-1 text-primary hover:bg-primary/5"
-              aria-label="Editar categoria"
-              onClick={() => onEditar(categoria)}
-            >
-              <MdEdit size={18} />
-            </button>
-            </div>
-          </div>
-          <ProdutoStatusSwitch
-            isAtivo={categoria.ativo}
-            disabled={savingStatus}
-            onChange={ativo => onToggleAtivo(categoria, ativo)}
-          />
-        </header>
+        <CatalogGroupHeader
+          grupo={categoria.nome}
+          grupoId={categoria.id}
+          groupKey={categoria.id}
+          grupoVisual={{ corHex: categoria.corHex, iconName: categoria.iconName }}
+          grupoAtivo={categoria.ativo}
+          itemCount={saboresCount}
+          itemCountSubtitle={`${saboresCount} sabor${saboresCount === 1 ? '' : 'es'}`}
+          isExpanded={isExpanded}
+          addProdutoLabel="Adicionar item"
+          extraActions={reorderActions}
+          onToggleExpand={onToggleExpand}
+          onEditGrupo={() => onEditar(categoria)}
+          onToggleGrupoStatus={() => onToggleAtivo(categoria, !categoria.ativo)}
+          onAddProduto={() => {
+            if (tamanhosTotal === 0) {
+              showToast.error('Configure tamanhos na categoria antes de adicionar sabores')
+              return
+            }
+            onAdicionarSabor(categoria)
+          }}
+        />
       </div>
 
-      <section className="rounded-2xl border border-gray-200 bg-white shadow-sm">
+      {!isExpanded ? (
+        <div className="mx-1 rounded-xl border border-dashed border-secondary/40 px-4 py-1 text-sm text-secondary-text">
+          Sabores ocultos. Clique{' '}
+          <button
+            type="button"
+            onClick={() => onToggleExpand(categoria.id)}
+            className="rounded-sm font-medium text-primary underline underline-offset-2 transition-colors hover:text-primary/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+          >
+            aqui!
+          </button>{' '}
+          para visualizar.
+        </div>
+      ) : (
         <PizzaCategoriaSaboresSection
           categoria={categoria}
-          tamanhosCount={tamanhosCount}
+          tamanhosTotal={tamanhosTotal}
           onEditarSabor={saborId => onEditarSabor(categoria, saborId)}
         />
-      </section>
+      )}
     </div>
   )
 }
@@ -149,6 +144,7 @@ export function PizzasHubPage() {
   const [categoriaSabor, setCategoriaSabor] = useState<CategoriaPizza | null>(null)
   const [saborEditId, setSaborEditId] = useState<string | null>(null)
   const [savingCategoriaId, setSavingCategoriaId] = useState<string | null>(null)
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
 
   const categorias = data?.items ?? []
 
@@ -159,6 +155,13 @@ export function PizzasHubPage() {
     return () => {
       main.classList.remove('scrollbar-hide')
     }
+  }, [])
+
+  const handleToggleExpand = useCallback((categoriaId: string) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [categoriaId]: prev[categoriaId] === false,
+    }))
   }, [])
 
   const handleToggleAtivo = async (categoria: CategoriaPizza, ativo: boolean) => {
@@ -258,23 +261,30 @@ export function PizzasHubPage() {
             </Button>
           </div>
         ) : (
-          <div className="flex w-full flex-col space-y-4 pb-4">
+          <div
+            role="list"
+            aria-label="Categorias pizza"
+            className="flex w-full flex-col space-y-4 pb-4"
+          >
             {categorias.map((categoria, index) => (
-              <PizzaCategoriaCard
-                key={categoria.id}
-                categoria={categoria}
-                index={index}
-                total={categorias.length}
-                savingStatus={savingCategoriaId === categoria.id}
-                onToggleAtivo={handleToggleAtivo}
-                onReordenar={handleReordenarCategoria}
-                onEditar={cat => {
-                  setEditCategoriaId(cat.id)
-                  setEditOpen(true)
-                }}
-                onAdicionarSabor={abrirNovoSabor}
-                onEditarSabor={abrirEditarSabor}
-              />
+              <div key={categoria.id} role="listitem">
+                <PizzaCategoriaBlock
+                  categoria={categoria}
+                  index={index}
+                  total={categorias.length}
+                  isExpanded={expandedGroups[categoria.id] !== false}
+                  onToggleExpand={handleToggleExpand}
+                  savingStatus={savingCategoriaId === categoria.id}
+                  onToggleAtivo={handleToggleAtivo}
+                  onReordenar={handleReordenarCategoria}
+                  onEditar={cat => {
+                    setEditCategoriaId(cat.id)
+                    setEditOpen(true)
+                  }}
+                  onAdicionarSabor={abrirNovoSabor}
+                  onEditarSabor={abrirEditarSabor}
+                />
+              </div>
             ))}
           </div>
         )}

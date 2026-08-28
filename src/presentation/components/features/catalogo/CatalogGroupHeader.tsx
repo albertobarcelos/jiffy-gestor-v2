@@ -1,6 +1,6 @@
 'use client'
 
-import { memo } from 'react'
+import { memo, type ReactNode } from 'react'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { MdKeyboardArrowDown, MdModeEdit } from 'react-icons/md'
@@ -13,9 +13,13 @@ export interface CatalogGroupHeaderProps {
   grupoVisual?: CatalogGrupoVisual
   grupoAtivo: boolean
   itemCount: number
+  /** Substitui o texto padrão "{n} produtos". */
+  itemCountSubtitle?: string
   isExpanded: boolean
   showGrupoStatusSwitch?: boolean
   addProdutoLabel?: string
+  /** Ações extras ao lado do lápis de edição (ex.: reordenar categoria). */
+  extraActions?: ReactNode
   onToggleExpand: (groupKey: string) => void
   onEditGrupo: (grupoId: string | undefined) => void
   onToggleGrupoStatus?: (grupoId: string) => void
@@ -29,9 +33,11 @@ function CatalogGroupHeaderInner({
   grupoVisual,
   grupoAtivo,
   itemCount,
+  itemCountSubtitle,
   isExpanded,
   showGrupoStatusSwitch = true,
   addProdutoLabel = 'Adicionar produto',
+  extraActions,
   onToggleExpand,
   onEditGrupo,
   onToggleGrupoStatus,
@@ -70,6 +76,7 @@ function CatalogGroupHeaderInner({
             >
               <MdModeEdit size={14} />
             </button>
+            {extraActions}
             {showGrupoStatusSwitch ? (
               <div
                 className="tooltip-hover-below flex items-center justify-center"
@@ -102,7 +109,9 @@ function CatalogGroupHeaderInner({
               </div>
             ) : null}
           </div>
-          <p className="text-xs text-secondary-text">{itemCount} produtos</p>
+          <p className="text-xs text-secondary-text">
+            {itemCountSubtitle ?? `${itemCount} produtos`}
+          </p>
           {grupoVisual && showGrupoStatusSwitch && !grupoAtivo ? (
             <p className="text-[11px] font-semibold uppercase text-error">Categoria inativa</p>
           ) : null}

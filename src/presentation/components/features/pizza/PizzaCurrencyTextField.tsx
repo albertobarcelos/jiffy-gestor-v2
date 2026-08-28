@@ -7,6 +7,8 @@ import { formatBRLFromMaskedInput, parseBRLToNumber } from '@/src/shared/utils/f
 type PizzaCurrencyTextFieldProps = Omit<TextFieldProps, 'value' | 'onChange' | 'type'> & {
   value: number
   onChange: (value: number) => void
+  /** Disparado após confirmar o valor (Enter), sem fechar o contexto pai. */
+  onEnter?: () => void
 }
 
 function normalizeCurrencyValue(value: number) {
@@ -16,14 +18,27 @@ function normalizeCurrencyValue(value: number) {
 export function PizzaCurrencyTextField({
   value,
   onChange,
+  onEnter,
   disabled,
   onFocus,
   onBlur,
+  onKeyDown,
   inputProps,
   ...rest
 }: PizzaCurrencyTextFieldProps) {
   const [inputValue, setInputValue] = useState(() => formatBRLFromMaskedInput(value))
   const isEditingRef = useRef(false)
+
+  const commitInputValue = () => {
+    isEditingRef.current = false
+    const parsed = normalizeCurrencyValue(parseBRLToNumber(inputValue) ?? 0)
+    const formatted = formatBRLFromMaskedInput(parsed)
+    setInputValue(formatted)
+    if (parsed !== normalizeCurrencyValue(value)) {
+      onChange(parsed)
+    }
+    return parsed
+  }
 
   useEffect(() => {
     if (isEditingRef.current) return
@@ -54,14 +69,16 @@ export function PizzaCurrencyTextField({
         onFocus?.(e)
       }}
       onBlur={e => {
-        isEditingRef.current = false
-        const parsed = normalizeCurrencyValue(parseBRLToNumber(inputValue) ?? 0)
-        const formatted = formatBRLFromMaskedInput(parsed)
-        setInputValue(formatted)
-        if (parsed !== normalizeCurrencyValue(value)) {
-          onChange(parsed)
-        }
+        commitInputValue()
         onBlur?.(e)
+      }}
+      onKeyDown={e => {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          commitInputValue()
+          onEnter?.()
+        }
+        onKeyDown?.(e)
       }}
       inputProps={{
         inputMode: 'decimal',
