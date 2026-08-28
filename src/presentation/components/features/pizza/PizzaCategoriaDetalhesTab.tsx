@@ -20,12 +20,9 @@ export function PizzaCategoriaDetalhesTab({ draft, onChange }: PizzaCategoriaDet
 
   return (
     <div className="flex flex-col gap-5 p-4 md:p-6">
-      <div>
-        <h2 className="text-sm font-semibold text-primary-text">Detalhes da categoria</h2>
-        <p className="mt-1 text-xs text-secondary-text">
-          Nome, aparência e regra de preço para pizzas meio a meio.
-        </p>
-      </div>
+      <p className="text-xs text-secondary-text">
+        Nome, aparência e regra de preço para pizzas meio a meio.
+      </p>
 
       <TextField
         label="Nome da categoria"

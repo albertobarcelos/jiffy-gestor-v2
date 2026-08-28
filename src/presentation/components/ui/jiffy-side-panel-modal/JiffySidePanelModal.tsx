@@ -68,17 +68,24 @@ export interface JiffySidePanelFooterActions {
   /** Rodapé `footerVariant="bar"`: cor de destaque do botão "Salvar e fechar" (padrão `primary`). */
   saveAndCloseColor?: 'primary' | 'secondary'
   /**
-   * Rodapé `footerVariant="bar"`: estilo de Anterior / Próximo.
+   * Rodapé `footerVariant="bar"`: estilo de Anterior / Próximo / Continuar.
+   * `primary` = fundo primário sólido e texto branco (igual ao Salvar).
    * `primaryMuted` = fundo primary ~15% (alinhado a `bg-primary/15`) e texto na cor primária.
    */
-  barSecondaryTone?: 'gray' | 'primaryMuted'
+  barSecondaryTone?: 'gray' | 'primaryMuted' | 'primary'
   /**
    * Rodapé `footerVariant="bar"`: estilo do botão de cancelar (ex.: "Salvar e fechar").
    * `primary` = mesmo visual do Salvar (fundo primário, texto branco).
    * `primaryTint10` = fundo primary ~10% (equivalente visual a `bg-primary/10`), texto na cor primária.
    * `secondaryTint10` = fundo secondary ~10% (equivalente visual a `bg-secondary/10`), texto na cor secundária.
+   * `dangerOutline` = fundo error ~10% (equivalente visual a `bg-error/10`), texto vermelho.
    */
-  cancelVariant?: 'secondary' | 'primary' | 'primaryTint10' | 'secondaryTint10'
+  cancelVariant?: 'secondary' | 'primary' | 'primaryTint10' | 'secondaryTint10' | 'dangerOutline'
+  /**
+   * Rodapé `footerVariant="bar"`: Anterior/Próximo com a mesma largura que Salvar (2× Cancelar).
+   * Padrão false → Salvar 2× e Anterior/Próximo 1×.
+   */
+  barEqualNavAndSave?: boolean
   /**
    * Rodapé `footerVariant="bar"`: ordem dos botões visíveis.
    * Padrão: Anterior → Próximo → Cancelar → Salvar (apenas os habilitados entram na grade).
@@ -265,6 +272,28 @@ export function footerBarPrimaryMutedSx(isFirstColumn: boolean) {
   }
 }
 
+/** Cancelar / Fechar com tom error/10 (equivalente visual a `bg-error/10`) */
+export function footerBarErrorTint10BarSx(isFirstColumn: boolean) {
+  const bl =
+    isFirstColumn ?
+      ({ borderBottomLeftRadius: PANEL_RADIUS_LEFT } as const)
+    : {}
+  return {
+    borderRadius: 0,
+    ...bl,
+    boxShadow: 'none',
+    borderWidth: 0,
+    backgroundColor: 'color-mix(in srgb, var(--color-error, #d32f2f) 10%, transparent)',
+    color: 'var(--color-error, #d32f2f)',
+    fontWeight: 600,
+    '&:hover': {
+      backgroundColor: 'color-mix(in srgb, var(--color-error, #d32f2f) 18%, transparent)',
+      boxShadow: 'none',
+      ...bl,
+    },
+  }
+}
+
 /** Cancelar / Fechar com tom primary/10 (equivalente visual a `bg-primary/10`) */
 export function footerBarPrimaryTint10BarSx(isFirstColumn: boolean) {
   const bl =
@@ -311,8 +340,9 @@ export function footerBarSecondaryTint10BarSx(isFirstColumn: boolean) {
 
 function footerBarPrevNextSx(
   isFirstColumn: boolean,
-  tone: 'gray' | 'primaryMuted' | undefined
+  tone: 'gray' | 'primaryMuted' | 'primary' | undefined
 ) {
+  if (tone === 'primary') return footerSavePrimaryBarSx(isFirstColumn)
   return tone === 'primaryMuted' ?
       footerBarPrimaryMutedSx(isFirstColumn)
     : footerBarSecondarySx(isFirstColumn)
@@ -320,11 +350,12 @@ function footerBarPrevNextSx(
 
 function footerBarCancelSx(
   isFirstColumn: boolean,
-  variant: 'secondary' | 'primary' | 'primaryTint10' | 'secondaryTint10' | undefined
+  variant: 'secondary' | 'primary' | 'primaryTint10' | 'secondaryTint10' | 'dangerOutline' | undefined
 ) {
   if (variant === 'primary') return footerSavePrimaryBarSx(isFirstColumn)
   if (variant === 'primaryTint10') return footerBarPrimaryTint10BarSx(isFirstColumn)
   if (variant === 'secondaryTint10') return footerBarSecondaryTint10BarSx(isFirstColumn)
+  if (variant === 'dangerOutline') return footerBarErrorTint10BarSx(isFirstColumn)
   return footerBarSecondarySx(isFirstColumn)
 }
 
@@ -343,6 +374,19 @@ const FOOTER_BAR_COL_WEIGHT: Record<JiffyFooterBarKey, number> = {
   cancel: 1,
   save: 2,
   saveAndClose: 2,
+}
+
+function getFooterBarColWeight(
+  key: JiffyFooterBarKey,
+  fa: JiffySidePanelFooterActions
+): number {
+  if (fa.barEqualNavAndSave) {
+    if (key === 'cancel') return 1
+    if (key === 'prev' || key === 'next' || key === 'save' || key === 'saveAndClose') {
+      return 2
+    }
+  }
+  return FOOTER_BAR_COL_WEIGHT[key]
 }
 
 /** Monta a sequência de colunas respeitando `barActionOrder` e os flags visíveis */
@@ -384,6 +428,7 @@ function JiffyPanelFooterBar({
   if (n === 0) return null
 
   function cell(key: JiffyFooterBarKey, isFirstColumn: boolean): ReactNode {
+    const prevNextPrimary = fa.barSecondaryTone === 'primary'
     const prevNextSx = footerBarPrevNextSx(isFirstColumn, fa.barSecondaryTone)
     const icons = fa.barShowPrevNextIcons
     switch (key) {
@@ -391,8 +436,8 @@ function JiffyPanelFooterBar({
         return (
           <Button
             type="button"
-            variant="outlined"
-            color="inherit"
+            variant={prevNextPrimary ? 'contained' : 'outlined'}
+            color={prevNextPrimary ? 'primary' : 'inherit'}
             disabled={fa.previousDisabled}
             onClick={fa.onPrevious}
             className="h-12 min-h-12 w-full font-semibold shadow-none"
@@ -410,8 +455,8 @@ function JiffyPanelFooterBar({
         return (
           <Button
             type="button"
-            variant="outlined"
-            color="inherit"
+            variant={prevNextPrimary ? 'contained' : 'outlined'}
+            color={prevNextPrimary ? 'primary' : 'inherit'}
             disabled={fa.nextDisabled}
             onClick={fa.onNext}
             className="h-12 min-h-12 w-full font-semibold shadow-none"
@@ -486,7 +531,7 @@ function JiffyPanelFooterBar({
   }
 
   const gridTemplateColumns = keys
-    .map(key => `minmax(0, ${FOOTER_BAR_COL_WEIGHT[key]}fr)`)
+    .map(key => `minmax(0, ${getFooterBarColWeight(key, fa)}fr)`)
     .join(' ')
 
   return (

@@ -192,3 +192,57 @@ export interface UpdateSaborPizzaInput {
   ativo?: boolean
   precosTamanho?: PrecoSaborTamanhoInput[]
 }
+
+export interface MassaPizza {
+  id: string
+  nome: string
+  descricao: string | null
+  tipoImpactoPreco: TipoImpactoPreco
+  valor: number
+  ativo: boolean
+}
+
+export interface BordaPizza {
+  id: string
+  nome: string
+  descricao: string | null
+  tipoImpactoPreco: TipoImpactoPreco
+  valor: number
+  ativo: boolean
+}
+
+export interface GrupoMassasPizzaSummary {
+  id: string
+  nome: string
+  categoriaPizzaId: string
+  obrigatorio: boolean
+  qtdMinima: number
+  qtdMaxima: number
+  ordem: number
+  ativo: boolean
+}
+
+export interface GrupoBordasPizzaSummary {
+  id: string
+  nome: string
+  categoriaPizzaId: string
+  obrigatorio: boolean
+  qtdMinima: number
+  qtdMaxima: number
+  ordem: number
+  ativo: boolean
+}
+
+export interface GrupoMassasPizza extends GrupoMassasPizzaSummary {
+  massas: MassaPizza[]
+}
+
+export interface GrupoBordasPizza extends GrupoBordasPizzaSummary {
+  bordas: BordaPizza[]
+}
+
+export interface GrupoComplementoDelta<TAdd, TUpdate> {
+  add: TAdd[]
+  update: TUpdate[]
+  delete: string[]
+}

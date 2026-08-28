@@ -106,14 +106,14 @@ export function PizzaCategoriaSetupPanel({
       return {
         showCancel: true,
         cancelLabel: 'Cancelar',
-        cancelVariant: 'primaryTint10',
+        cancelVariant: 'dangerOutline',
         onCancel: handleRequestClose,
         showSave: true,
         saveLabel: 'Salvar',
         saveLoading: criarMutation.isPending,
         saveDisabled: criarMutation.isPending,
         onSave: () => void handleSalvar(),
-        barSecondaryTone: 'primaryMuted',
+        barSecondaryTone: 'primary',
         barActionOrder: ['cancel', 'save'],
       }
     }
@@ -136,9 +136,9 @@ export function PizzaCategoriaSetupPanel({
       },
       showCancel: true,
       cancelLabel: 'Cancelar',
-      cancelVariant: 'primaryTint10',
+      cancelVariant: 'dangerOutline',
       onCancel: handleRequestClose,
-      barSecondaryTone: 'primaryMuted',
+      barSecondaryTone: 'primary',
       barActionOrder: ['cancel', 'prev', 'next'],
     }
   }, [
@@ -157,6 +157,9 @@ export function PizzaCategoriaSetupPanel({
         open={open}
         onClose={handleRequestClose}
         title={draft.nome.trim() || 'Nova categoria pizza'}
+        subtitle={
+          <span className="font-normal text-secondary-text">Detalhes da categoria</span>
+        }
         panelClassName={MENU_WIDE_PANEL_CLASS}
         footerVariant="bar"
         footerActions={footerActions}
@@ -170,6 +173,12 @@ export function PizzaCategoriaSetupPanel({
             <PizzaTamanhoCards
               tamanhos={draft.tamanhos}
               onChange={tamanhos => setDraft({ ...draft, tamanhos })}
+              onRemover={tamanho =>
+                setDraft(prev => ({
+                  ...prev,
+                  tamanhos: prev.tamanhos.filter(t => t.localId !== tamanho.localId),
+                }))
+              }
             />
           ) : null}
           {tab === 'massas' ? (

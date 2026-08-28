@@ -1,7 +1,7 @@
 'use client'
 
 import { TextField } from '@mui/material'
-import { MdAdd } from 'react-icons/md'
+import { MdAdd, MdDeleteOutline } from 'react-icons/md'
 import { ProdutoStatusSwitch } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoStatusSwitch'
 import { Button } from '@/src/presentation/components/ui/button'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
@@ -12,9 +12,11 @@ import { createLocalId, textoPedacos, textoSaboresTamanho } from './pizzaDefault
 interface PizzaTamanhoCardsProps {
   tamanhos: PizzaTamanhoDraft[]
   onChange: (tamanhos: PizzaTamanhoDraft[]) => void
+  /** Quando informado, remove card e repassa item (para rastrear id no servidor). */
+  onRemover?: (tamanho: PizzaTamanhoDraft & { id?: string }) => void
 }
 
-export function PizzaTamanhoCards({ tamanhos, onChange }: PizzaTamanhoCardsProps) {
+export function PizzaTamanhoCards({ tamanhos, onChange, onRemover }: PizzaTamanhoCardsProps) {
   const atualizar = (localId: string, patch: Partial<PizzaTamanhoDraft>) => {
     onChange(tamanhos.map(t => (t.localId === localId ? { ...t, ...patch } : t)))
   }
@@ -32,15 +34,26 @@ export function PizzaTamanhoCards({ tamanhos, onChange }: PizzaTamanhoCardsProps
     ])
   }
 
+  const remover = (tamanho: PizzaTamanhoDraft & { id?: string }) => {
+    if (tamanhos.length <= 1) return
+    if (onRemover) {
+      onRemover(tamanho)
+      return
+    }
+    onChange(tamanhos.filter(t => t.localId !== tamanho.localId))
+  }
+
+  const podeRemover = tamanhos.length > 1
+
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
-      <button
-        type="button"
-        onClick={adicionar}
-        className="self-start text-sm font-medium text-primary hover:underline"
-      >
-        + Novo tamanho
-      </button>
+      <div>
+        <h2 className="text-sm font-semibold text-primary-text">Tamanhos</h2>
+        <p className="mt-1 text-xs text-secondary-text">
+          Indique aqui quais os tamanhos que suas pizzas são produzidas, em quantos pedaços são
+          cortadas e até quantos sabores seu restaurante monta cada tamanho:
+        </p>
+      </div>
 
       <div className="flex gap-3 overflow-x-auto pb-2">
         {tamanhos.map(tamanho => (
@@ -55,10 +68,22 @@ export function PizzaTamanhoCards({ tamanhos, onChange }: PizzaTamanhoCardsProps
               <span className="text-2xl" aria-hidden>
                 🍕
               </span>
-              <ProdutoStatusSwitch
-                isAtivo={tamanho.ativo}
-                onChange={ativo => atualizar(tamanho.localId, { ativo })}
-              />
+              <div className="flex items-center gap-1">
+                {podeRemover ? (
+                  <button
+                    type="button"
+                    className="rounded p-1 text-error hover:bg-error/10"
+                    aria-label="Remover tamanho"
+                    onClick={() => remover(tamanho as PizzaTamanhoDraft & { id?: string })}
+                  >
+                    <MdDeleteOutline size={18} />
+                  </button>
+                ) : null}
+                <ProdutoStatusSwitch
+                  isAtivo={tamanho.ativo}
+                  onChange={ativo => atualizar(tamanho.localId, { ativo })}
+                />
+              </div>
             </div>
 
             <TextField
@@ -111,7 +136,7 @@ export function PizzaTamanhoCards({ tamanhos, onChange }: PizzaTamanhoCardsProps
       <Button
         type="button"
         variant="outlined"
-        className="self-start border-primary text-primary md:hidden"
+        className="self-start border-primary text-primary"
         onClick={adicionar}
       >
         <MdAdd className="mr-1" /> Novo tamanho

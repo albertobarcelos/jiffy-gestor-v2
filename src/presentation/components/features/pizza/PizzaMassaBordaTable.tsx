@@ -6,12 +6,14 @@ import { Button } from '@/src/presentation/components/ui/button'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import type { PizzaLinhaComplementoDraft } from './pizzaDefaults'
 import { createLocalId } from './pizzaDefaults'
+import { PizzaCurrencyTextField } from './PizzaCurrencyTextField'
 
 interface PizzaMassaBordaTableProps {
   labelNome: string
   labelAdicionar: string
   linhas: PizzaLinhaComplementoDraft[]
   onChange: (linhas: PizzaLinhaComplementoDraft[]) => void
+  onRemover?: (linha: PizzaLinhaComplementoDraft & { id?: string }) => void
 }
 
 export function PizzaMassaBordaTable({
@@ -19,6 +21,7 @@ export function PizzaMassaBordaTable({
   labelAdicionar,
   linhas,
   onChange,
+  onRemover,
 }: PizzaMassaBordaTableProps) {
   const atualizar = (localId: string, patch: Partial<PizzaLinhaComplementoDraft>) => {
     onChange(linhas.map(l => (l.localId === localId ? { ...l, ...patch } : l)))
@@ -31,9 +34,13 @@ export function PizzaMassaBordaTable({
     ])
   }
 
-  const remover = (localId: string) => {
+  const remover = (linha: PizzaLinhaComplementoDraft & { id?: string }) => {
     if (linhas.length <= 1) return
-    onChange(linhas.filter(l => l.localId !== localId))
+    if (onRemover) {
+      onRemover(linha)
+      return
+    }
+    onChange(linhas.filter(l => l.localId !== linha.localId))
   }
 
   return (
@@ -62,14 +69,10 @@ export function PizzaMassaBordaTable({
                   />
                 </td>
                 <td className="px-3 py-2">
-                  <TextField
+                  <PizzaCurrencyTextField
                     size="small"
-                    type="number"
-                    inputProps={{ min: 0, step: 0.01 }}
                     value={Number.isFinite(linha.valor) ? linha.valor : 0}
-                    onChange={e =>
-                      atualizar(linha.localId, { valor: Number.parseFloat(e.target.value) || 0 })
-                    }
+                    onChange={valor => atualizar(linha.localId, { valor })}
                     sx={sxEntradaCompactaProduto}
                   />
                 </td>
@@ -84,7 +87,7 @@ export function PizzaMassaBordaTable({
                     type="button"
                     className="text-xs text-error hover:underline disabled:opacity-40"
                     disabled={linhas.length <= 1}
-                    onClick={() => remover(linha.localId)}
+                    onClick={() => remover(linha as PizzaLinhaComplementoDraft & { id?: string })}
                   >
                     Remover
                   </button>
