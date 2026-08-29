@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { MdExpandMore, MdSearch } from 'react-icons/md'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -16,6 +17,11 @@ import { useMenus } from '@/src/presentation/hooks/menus/useMenus'
 import { useProduto } from '@/src/presentation/hooks/useProdutos'
 import { useAtualizarProdutoMenus } from '@/src/presentation/hooks/produtos/useAtualizarProdutoMenus'
 import { usePropagarAlteracaoProduto } from '@/src/presentation/hooks/produtos/usePropagarAlteracaoProduto'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { refreshMenuProdutoSnapshotsCache } from '@/src/presentation/hooks/menus/useMenuProduto'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { persistirVinculosProdutoComSnapshotOpcional } from '@/src/application/use-cases/produtos/VincularProdutoMenusComSnapshotUseCase'
 import { showToast } from '@/src/shared/utils/toast'
 import { cn } from '@/src/shared/utils/cn'
 import type { Menu, ProdutoMenuResumo } from '@/src/shared/types/menus'
@@ -130,6 +136,60 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
     const mutation = useAtualizarProdutoMenus(
       persistChanges && !onPersist ? produtoId : undefined
     )
+    const queryClient = useQueryClient()
+    const empresaId = useTenantEmpresaId()
+    const invalidate = useInvalidateTenantQueries()
+
+    const invalidateVinculosCache = useCallback(async () => {
+      if (produtoId) {
+        await invalidate(['produto', produtoId])
+      }
+      await invalidate(['menus'])
+      await invalidate(['menu'])
+      await invalidate(['menu-produtos'])
+      await invalidate(['menu-grupos'])
+      await invalidate(['menu-produto'])
+    }, [produtoId, invalidate])
+
+    const persistLinkDiff = useCallback(
+      async (
+        diff: { add: string[]; remove: string[] },
+        menusOrigemCandidatos: string[]
+      ) => {
+        if (!produtoId) return
+
+        const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+        if (!token) throw new Error('Token não encontrado')
+
+        if (onPersist) {
+          await onPersist(diff)
+        } else {
+          await persistirVinculosProdutoComSnapshotOpcional({
+            token,
+            produtoId,
+            add: diff.add,
+            remove: diff.remove,
+            menusOrigemCandidatos,
+            vincularSimples: async input => {
+              await mutation.mutateAsync(input)
+            },
+          })
+        }
+
+        if (diff.add.length > 0) {
+          await refreshMenuProdutoSnapshotsCache(
+            queryClient,
+            empresaId,
+            token,
+            produtoId,
+            diff.add
+          )
+        }
+        await invalidateVinculosCache()
+      },
+      [onPersist, produtoId, mutation, invalidateVinculosCache, queryClient, empresaId]
+    )
+
     const [savingLocal, setSavingLocal] = useState(false)
     const initialIdsRef = useRef(seedIds)
 
@@ -287,7 +347,10 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
           if (onPersist) {
             await onPersist({ add: [menu.id], remove: [] })
           } else {
-            await mutation.mutateAsync({ add: [menu.id], remove: [] })
+            await persistLinkDiff(
+              { add: [menu.id], remove: [] },
+              baselineIdsRef.current.filter(id => id !== menu.id)
+            )
           }
           const nextBaseline = [...new Set([...baselineIdsRef.current, menu.id])]
           baselineIdsRef.current = nextBaseline
@@ -316,7 +379,7 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
         onPersist,
         persistChanges,
         produtoId,
-        mutation,
+        persistLinkDiff,
       ]
     )
 
@@ -354,7 +417,10 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
           if (onPersist) {
             await onPersist({ add, remove })
           } else {
-            await mutation.mutateAsync({ add, remove })
+            await persistLinkDiff(
+              { add, remove },
+              baselineIdsRef.current.filter(id => !add.includes(id))
+            )
           }
           baselineIdsRef.current = selectedIds
           setBaselineIds(selectedIds)
@@ -391,7 +457,7 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
       produtoId,
       selectedIds,
       snapshotDirtyIds,
-      mutation,
+      persistLinkDiff,
       emitDirty,
       onEmbedStateChange,
       onPersist,
@@ -526,11 +592,6 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
                           {isPrincipal ? 'Principal' : 'Personalizado'}
                           {isLocked ? ' · Neste cardápio' : ''}
                           {!menu.ativo ? ' · Inativo' : ''}
-                          {vinculado &&
-                          canShowSnapshot &&
-                          !persistedVinculoIds.has(menu.id)
-                            ? ' · Salve para ver os dados'
-                            : ''}
                         </p>
                       </div>
                     </div>

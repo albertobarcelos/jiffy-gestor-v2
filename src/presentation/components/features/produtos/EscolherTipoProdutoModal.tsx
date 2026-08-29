@@ -39,12 +39,14 @@ interface EscolherTipoProdutoModalProps {
   open: boolean
   onClose: () => void
   onContinuar: (tipo: TipoCadastroProduto) => void
+  cancelVariant?: JiffySidePanelFooterActions['cancelVariant']
 }
 
 export function EscolherTipoProdutoModal({
   open,
   onClose,
   onContinuar,
+  cancelVariant = 'primaryTint10',
 }: EscolherTipoProdutoModalProps) {
   const [tipo, setTipo] = useState<TipoCadastroProduto>('preparado')
 
@@ -63,7 +65,7 @@ export function EscolherTipoProdutoModal({
     (): JiffySidePanelFooterActions => ({
       showCancel: true,
       cancelLabel: 'Cancelar',
-      cancelVariant: 'primaryTint10',
+      cancelVariant,
       onCancel: onClose,
       showSave: true,
       saveLabel: 'Continuar',
@@ -71,7 +73,7 @@ export function EscolherTipoProdutoModal({
       onSave: handleContinuar,
       barActionOrder: ['cancel', 'save'],
     }),
-    [onClose, podeContinuar, handleContinuar]
+    [onClose, podeContinuar, handleContinuar, cancelVariant]
   )
 
   return (

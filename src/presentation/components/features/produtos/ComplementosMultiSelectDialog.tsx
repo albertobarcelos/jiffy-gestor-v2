@@ -33,6 +33,7 @@ import {
 } from '../complementos/ComplementosTabsModal'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { cn } from '@/src/shared/utils/cn'
+import type { JiffySidePanelFooterActions } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 
 /** Grupo vinculado ao produto (estado local da aba). */
@@ -237,6 +238,8 @@ interface ComplementosMultiSelectDialogProps {
   isEmbedded?: boolean
   /** Estado do formulário embutido (dirty/saving) para o rodapé do painel. */
   onEmbedStateChange?: (state: ComplementosEmbedState) => void
+  /** Estilo do Fechar em modais aninhados (ex.: fluxo de menus). */
+  nestedCancelVariant?: JiffySidePanelFooterActions['cancelVariant']
 }
 
 export const ComplementosMultiSelectDialog = forwardRef<
@@ -253,6 +256,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
     onClose,
     isEmbedded = false,
     onEmbedStateChange,
+    nestedCancelVariant,
   },
   ref
 ) {
@@ -1660,6 +1664,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
               onReload={handleGruposTabsReload}
               onCreated={handleGrupoCreated}
               zIndex={1400}
+              cancelVariant={nestedCancelVariant}
             />
             <ComplementosTabsModal
               state={complementosTabsState}
@@ -1766,6 +1771,7 @@ export const ComplementosMultiSelectDialog = forwardRef<
         onReload={handleGruposTabsReload}
         onCreated={handleGrupoCreated}
         zIndex={1400}
+        cancelVariant={nestedCancelVariant}
       />
       <ComplementosTabsModal
         state={complementosTabsState}

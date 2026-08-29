@@ -13,7 +13,6 @@ interface GrupoItemProps {
   index: number
   onStatusChanged?: () => void
   onToggleStatus?: (grupoId: string, novoStatus: boolean) => void
-  onToggleAtivoDelivery?: (grupoId: string, ativoDelivery: boolean) => void
   onEdit?: (grupo: GrupoProduto) => void
   onEditProdutos?: (grupo: GrupoProduto) => void
   onCreateProduto?: (grupoId: string) => void
@@ -26,7 +25,6 @@ export const GrupoItem = memo(function GrupoItem({
   grupo,
   index,
   onToggleStatus,
-  onToggleAtivoDelivery,
   onEdit,
   onEditProdutos,
   onCreateProduto,
@@ -51,7 +49,6 @@ export const GrupoItem = memo(function GrupoItem({
 
   const nome = grupo.getNome()
   const isAtivo = grupo.isAtivo()
-  const isAtivoDelivery = grupo.isAtivoDelivery()
   const corHex = grupo.getCorHex() || '#6B7280'
   const iconName = grupo.getIconName() || 'restaurant'
   // Zebra bem clara (como antes do ajuste de Design Categorias).
@@ -122,31 +119,6 @@ export const GrupoItem = memo(function GrupoItem({
           >
             <MdAddCircle />
           </button>
-        </div>
-      </div>
-
-      <div onClick={handleRowClick} className="flex-[2] flex cursor-pointer items-end justify-end">
-        <div
-          className="flex items-end justify-center"
-          onClick={e => e.stopPropagation()}
-          onMouseDown={e => e.stopPropagation()}
-          onTouchStart={e => e.stopPropagation()}
-        >
-          <JiffyIconSwitch
-            checked={isAtivoDelivery}
-            onChange={e => {
-              e.stopPropagation()
-              onToggleAtivoDelivery?.(grupo.getId(), e.target.checked)
-            }}
-            bordered={false}
-            size="sm"
-            className="shrink-0"
-            inputProps={{
-              'aria-label': isAtivoDelivery
-                ? 'Desativar grupo no delivery'
-                : 'Ativar grupo no delivery',
-            }}
-          />
         </div>
       </div>
 

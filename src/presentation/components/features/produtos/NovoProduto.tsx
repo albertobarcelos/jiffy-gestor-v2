@@ -55,7 +55,6 @@ interface BaselineSnapshotProduto {
   abreComplementos: boolean
   permiteAlterarPreco: boolean
   incideTaxa: boolean
-  ativoDelivery: boolean
   ativo: boolean
   grupoComplementosIds: string[]
   impressorasIds: string[]
@@ -98,7 +97,6 @@ function seedFormFromProduto(produto: Produto, isCopy: boolean) {
     abreComplementos: produto.abreComplementosAtivo(),
     permiteAlterarPreco: produto.permiteAlterarPrecoAtivo(),
     incideTaxa: produto.incideTaxaAtivo(),
-    ativoDelivery: produto.isAtivoDelivery(),
     ativo: produto.isAtivo(),
     grupoComplementosIds: produto.getGruposComplementos().map(g => g.id),
     impressorasIds: produto.getImpressoras().map(i => i.id),
@@ -311,9 +309,6 @@ function montarPatchParcialEdicaoProduto(
   if (!booleanIguaisParaPatch(bodyCompleto.incideTaxa, base.incideTaxa)) {
     delta.incideTaxa = bodyCompleto.incideTaxa
   }
-  if (!booleanIguaisParaPatch(bodyCompleto.ativoDelivery, base.ativoDelivery)) {
-    delta.ativoDelivery = bodyCompleto.ativoDelivery
-  }
 
   if (!arraysIdsIguais(bodyCompleto.gruposComplementosIds as unknown[], base.grupoComplementosIds)) {
     delta.gruposComplementosIds = bodyCompleto.gruposComplementosIds
@@ -448,6 +443,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
     },
     ref
   ) {
+    const imagemNoCardapio = Boolean(previewMenuId)
     const router = useRouter()
     const searchParams = useSearchParams()
     const invalidate = useInvalidateTenantQueries()
@@ -496,7 +492,6 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       () => formSeed?.permiteAlterarPreco ?? false
     )
     const [incideTaxa, setIncideTaxa] = useState(() => formSeed?.incideTaxa ?? false)
-    const [ativoDelivery, setAtivoDelivery] = useState(() => formSeed?.ativoDelivery ?? true)
     const [ativo, setAtivo] = useState(() => formSeed?.ativo ?? true)
     const [grupoComplementosIds, setGrupoComplementosIds] = useState<string[]>(
       () => formSeed?.grupoComplementosIds ?? []
@@ -573,42 +568,10 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
 
     const resolverDestinosPadraoImagem = useCallback(
       async (_token: string, extras: Iterable<string> = []) => {
-        // Só menus já vinculados/escolhidos (+ cardápio atual no fluxo de menu).
-        // Não força o principal — o produto pode existir só no cadastro base.
+        if (!imagemNoCardapio) return []
         return unirMenuIds(previewMenuId, menusVinculadosIds, extras)
       },
-      [previewMenuId, menusVinculadosIds]
-    )
-
-    const perguntarCopiaImagemCadastroBase = useCallback(
-      async (produtoIdAlvo: string, file: File, jaAplicados: string[]) => {
-        // Pergunta de imagem só na edição a partir do cadastro base (não no wizard de menu).
-        if (previewMenuId) return
-        const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-        const idsJa = unirMenuIds(jaAplicados)
-        let menusJaSalvos: Array<{ id: string; nome: string }> = []
-        if (token && idsJa.length > 0) {
-          const todos = await buscarMenusDaEmpresa({ token })
-          const setIds = new Set(idsJa)
-          menusJaSalvos = todos.filter(m => setIds.has(m.id)).map(m => ({ id: m.id, nome: m.nome }))
-        }
-        const destinos = await pedirConfirmacao({
-          origem: 'cadastroBase',
-          produtoId: produtoIdAlvo,
-          variante: 'imagem',
-          excluirMenuIds: idsJa,
-          fonteMenus: 'empresa',
-          menusJaSalvos,
-        })
-        if (!destinos || destinos.menuIds.length === 0) return
-        await aplicarImagemNosDestinos({
-          produtoId: produtoIdAlvo,
-          file,
-          destinos,
-          vincularSeAusente: true,
-        })
-      },
-      [previewMenuId, pedirConfirmacao, aplicarImagemNosDestinos]
+      [imagemNoCardapio, previewMenuId, menusVinculadosIds]
     )
 
     const perguntarVinculoOutrosMenusAposCriacao = useCallback(
@@ -632,7 +595,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         })
         if (!destinos || destinos.menuIds.length === 0) return
 
-        if (fileImagem) {
+        if (fileImagem && imagemNoCardapio) {
           await aplicarImagemNosDestinos({
             produtoId: produtoIdAlvo,
             file: fileImagem,
@@ -646,10 +609,9 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
             menuIds: destinos.menuIds,
           })
           await invalidate(['menu-produtos'])
-          await invalidate(['produtos-imagens-cadastro'])
         }
       },
-      [pedirConfirmacao, aplicarImagemNosDestinos, invalidate]
+      [pedirConfirmacao, aplicarImagemNosDestinos, invalidate, imagemNoCardapio]
     )
 
     const persistPreviewImage = useCallback(
@@ -670,7 +632,6 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         })
         pendingPreviewImageRef.current = null
         await invalidate(['menus'])
-        await invalidate(['produtos-imagens-cadastro'])
         await Promise.all(ids.map(id => invalidate(['menu-produtos', id])))
       },
       [invalidate]
@@ -691,7 +652,6 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         abreComplementos,
         permiteAlterarPreco,
         incideTaxa,
-        ativoDelivery,
         ativo,
         grupoComplementosIds: [...grupoComplementosIds].sort(),
         impressorasIds: [...impressorasIds].sort(),
@@ -714,7 +674,6 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       abreComplementos,
       permiteAlterarPreco,
       incideTaxa,
-      ativoDelivery,
       ativo,
       grupoComplementosIds,
       impressorasIds,
@@ -841,7 +800,6 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           abreComplementos: !!(produto.abreComplementos || false),
           permiteAlterarPreco: !!(produto.permiteAlterarPreco ?? false),
           incideTaxa: !!(produto.incideTaxa ?? false),
-          ativoDelivery: produto.ativoDelivery === false ? false : true,
           // Mesma semântica que `setAtivo(produto.ativo ?? true)` — unknown precisa virar boolean explícito
           ativo: produto.ativo === false ? false : true,
           grupoComplementosIds: [...gruposIds].map(id => String(id)).sort(),
@@ -950,7 +908,6 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
             setAbreComplementos(produto.abreComplementos || false)
             setPermiteAlterarPreco(produto.permiteAlterarPreco ?? false)
             setIncideTaxa(produto.incideTaxa ?? false)
-            setAtivoDelivery(produto.ativoDelivery === false ? false : true)
             setAtivo(produto.ativo ?? true)
             const gruposIds = produto.gruposComplementos?.map((g: any) => g.id) || []
             setGrupoComplementosIds(gruposIds)
@@ -959,17 +916,19 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
 
             const menuIdsLoaded = extrairMenuIdsDoProdutoJson(produto)
             setMenusVinculadosIds(menuIdsLoaded)
-            const imagemLegado = extrairImagemUrlDoProdutoJson(produto)
-            if (imagemLegado) setServerPreviewImage(imagemLegado)
-            const principalId = await buscarIdMenuPrincipal(token)
-            const ordemImagem = unirMenuIds(previewMenuId, principalId, menuIdsLoaded)
-            if (ordemImagem.length > 0) {
-              const imagemMenu = await buscarPrimeiraImagemProdutoNosMenus({
-                token,
-                produtoId: currentEffectiveProdutoId,
-                menuIds: ordemImagem,
-              })
-              if (imagemMenu) setServerPreviewImage(imagemMenu)
+            if (imagemNoCardapio) {
+              const imagemLegado = extrairImagemUrlDoProdutoJson(produto)
+              if (imagemLegado) setServerPreviewImage(imagemLegado)
+              const principalId = await buscarIdMenuPrincipal(token)
+              const ordemImagem = unirMenuIds(previewMenuId, principalId, menuIdsLoaded)
+              if (ordemImagem.length > 0) {
+                const imagemMenu = await buscarPrimeiraImagemProdutoNosMenus({
+                  token,
+                  produtoId: currentEffectiveProdutoId,
+                  menuIds: ordemImagem,
+                })
+                if (imagemMenu) setServerPreviewImage(imagemMenu)
+              }
             }
 
             // IMPORTANTE: Não preencher campos fiscais imediatamente para evitar chamadas ao microserviço fiscal
@@ -1639,7 +1598,6 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           permiteDesconto,
           permiteAlterarPreco,
           incideTaxa,
-          ativoDelivery,
           gruposComplementosIds: gruposComplementosIdsFinal,
           impressorasIds: impressorasIdsFinal,
           ...(ncmCompatBody ? { ncm: ncmCompatBody } : {}),
@@ -1686,7 +1644,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           : patchParcialEdicao
 
         if (isEditMode && !precisaSalvarProduto) {
-          const imagemPendente = pendingPreviewImageRef.current
+          const imagemPendente = imagemNoCardapio ? pendingPreviewImageRef.current : null
           if (imagemPendente && idPersistidoParaSave) {
             try {
               const destinos = await resolverDestinosPadraoImagem(token)
@@ -1698,11 +1656,6 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
                 return false
               }
               await persistPreviewImage(idPersistidoParaSave, imagemPendente, destinos)
-              await perguntarCopiaImagemCadastroBase(
-                idPersistidoParaSave,
-                imagemPendente,
-                destinos
-              )
               showToast.successLoading(toastId, 'Imagem atualizada')
             } catch (imgErr) {
               showToast.errorLoading(
@@ -1825,7 +1778,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           }
         }
 
-        const imagemPendente = pendingPreviewImageRef.current
+        const imagemPendente = imagemNoCardapio ? pendingPreviewImageRef.current : null
         let menusComImagem = unirMenuIds(menuIdsFinal)
         if (imagemPendente && idSalvo) {
           try {
@@ -1836,9 +1789,6 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
             if (destinosImagem.length > 0) {
               await persistPreviewImage(idSalvo, imagemPendente, destinosImagem)
               menusComImagem = destinosImagem
-              if (jaExistiaAntesDoSave) {
-                await perguntarCopiaImagemCadastroBase(idSalvo, imagemPendente, destinosImagem)
-              }
             } else {
               showToast.error('Produto salvo. Vincule-o a um cardápio para enviar a imagem.')
             }
@@ -1982,7 +1932,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
 
     const hideLocalStepFooter = Boolean(isEmbedded && hideEmbeddedFormActions)
     const showInnerProdutoHeader = !(isEmbedded && hideEmbeddedHeader)
-    const exibirPreviewMobile = showMobilePreview ?? true
+    const exibirPreviewMobile = imagemNoCardapio && (showMobilePreview ?? true)
 
     useEffect(() => {
       return () => {
@@ -1994,6 +1944,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
 
     const handlePreviewImageUpload = useCallback(
       async (file: File) => {
+        if (!imagemNoCardapio) return
         pendingPreviewImageRef.current = file
         const blobUrl = URL.createObjectURL(file)
         setLocalPreviewImage(prev => {
@@ -2011,7 +1962,6 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           const destinos = await resolverDestinosPadraoImagem(token, menuIds ?? [])
           if (destinos.length === 0) return
           await persistPreviewImage(produtoIdAlvo, file, destinos)
-          await perguntarCopiaImagemCadastroBase(produtoIdAlvo, file, destinos)
           showToast.success(
             destinos.length > 1
               ? 'Imagem atualizada nos cardápios vinculados'
@@ -2023,11 +1973,17 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           setUploadingPreviewImage(false)
         }
       },
-      [idPersistidoParaSave, menuIds, persistPreviewImage, resolverDestinosPadraoImagem, perguntarCopiaImagemCadastroBase]
+      [
+        imagemNoCardapio,
+        idPersistidoParaSave,
+        menuIds,
+        persistPreviewImage,
+        resolverDestinosPadraoImagem,
+      ]
     )
 
     const previewImageUpload = useMemo((): ProdutoPreviewImageUpload | undefined => {
-      if (!exibirPreviewMobile) return undefined
+      if (!exibirPreviewMobile || !imagemNoCardapio) return undefined
       return {
         enabled: !uploadingPreviewImage,
         busy: uploadingPreviewImage,
@@ -2183,7 +2139,6 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
               lockGrupoProduto={lockGrupoProduto}
               lockedGrupoLabel={lockedGrupoLabel}
               pendingNovaCategoriaLabel={pendingNovaCategoriaLabel}
-              showCategoriaField={!(!!effectiveProdutoId && !effectiveIsCopyMode)}
               codigoEanBarras={codigoEanBarras}
               onCodigoEanBarrasChange={setCodigoEanBarras}
               grupos={grupos}
@@ -2206,8 +2161,6 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
               onPermiteAlterarPrecoChange={setPermiteAlterarPreco}
               incideTaxa={incideTaxa}
               onIncideTaxaChange={setIncideTaxa}
-              ativoDelivery={ativoDelivery}
-              onAtivoDeliveryChange={setAtivoDelivery}
               grupoComplementosIds={grupoComplementosIds}
               onGrupoComplementosIdsChange={setGrupoComplementosIds}
               impressorasIds={impressorasIds}

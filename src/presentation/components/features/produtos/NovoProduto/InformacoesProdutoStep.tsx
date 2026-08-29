@@ -3,6 +3,7 @@
 import { Autocomplete, FormControl, InputLabel, MenuItem, Select, TextField } from '@mui/material'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
+import { useLocaleUppercaseInputHandler } from '@/src/presentation/hooks/useLocaleUppercaseInputHandler'
 import { sxEntradaCompactaProduto, sxEntradaCompactaProdutoSelect } from './produtoFormMuiSx'
 import { UNIDADES_MEDIDA_PRODUTO_OPCOES } from '@/src/shared/types/unidadeMedidaProduto'
 import type { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
@@ -27,7 +28,7 @@ interface InformacoesProdutoStepProps {
   lockedGrupoLabel?: string
   /** Nome da categoria nova ainda não gravada (wizard passo 1). */
   pendingNovaCategoriaLabel?: string
-  /** Na edição do produto base o campo some; na criação permanece obrigatório. */
+  /** Oculta o campo Categoria (ex.: fluxos que fixam a categoria). */
   showCategoriaField?: boolean
   onNext: () => void
   /** Salva com dados preenchidos até aqui e encerra o fluxo (sem passos seguintes) */
@@ -63,6 +64,14 @@ export function InformacoesProdutoStep({
   onSaveAndClose,
   hideStepFooter = false,
 }: InformacoesProdutoStepProps) {
+  const { inputRef: nomeInputRef, handleChange: handleNomeChange } =
+    useLocaleUppercaseInputHandler(nomeProduto, onNomeProdutoChange)
+  const { inputRef: descricaoInputRef, handleChange: handleDescricaoChange } =
+    useLocaleUppercaseInputHandler<HTMLTextAreaElement>(
+      descricaoProduto,
+      onDescricaoProdutoChange
+    )
+
   const formatCurrency = (value: string) => {
     const numbers = value.replace(/\D/g, '')
     if (!numbers) return ''
@@ -100,7 +109,8 @@ export function InformacoesProdutoStep({
             size="small"
             type="text"
             value={nomeProduto}
-            onChange={e => onNomeProdutoChange(e.target.value.toLocaleUpperCase('pt-BR'))}
+            inputRef={nomeInputRef}
+            onChange={handleNomeChange}
             placeholder="Nome que Aparecerá no Jiffy POS"
             className="bg-white"
             sx={sxEntradaCompactaProduto}
@@ -119,7 +129,7 @@ export function InformacoesProdutoStep({
           />
         </div>
 
-        {/* Linha 2: Categoria (só na criação) + Unidade + Código EAN */}
+        {/* Linha 2: Categoria + Unidade + Código EAN */}
         <div
           className={
             showCategoriaField
@@ -255,7 +265,8 @@ export function InformacoesProdutoStep({
           label="Descrição"
           size="small"
           value={descricaoProduto}
-          onChange={e => onDescricaoProdutoChange(e.target.value.toLocaleUpperCase('pt-BR'))}
+          inputRef={descricaoInputRef}
+          onChange={handleDescricaoChange}
           placeholder="Descrição do Produto"
           className="bg-white"
           multiline

@@ -68,7 +68,7 @@ export interface JiffySidePanelFooterActions {
   /** Rodapé `footerVariant="bar"`: cor de destaque do botão "Salvar e fechar" (padrão `primary`). */
   saveAndCloseColor?: 'primary' | 'secondary'
   /**
-   * Rodapé `footerVariant="bar"`: estilo de Anterior / Próximo / Continuar.
+   * Rodapé `footerVariant="bar"`: estilo de Anterior / Próximo.
    * `primary` = fundo primário sólido e texto branco (igual ao Salvar).
    * `primaryMuted` = fundo primary ~15% (alinhado a `bg-primary/15`) e texto na cor primária.
    */
@@ -78,7 +78,7 @@ export interface JiffySidePanelFooterActions {
    * `primary` = mesmo visual do Salvar (fundo primário, texto branco).
    * `primaryTint10` = fundo primary ~10% (equivalente visual a `bg-primary/10`), texto na cor primária.
    * `secondaryTint10` = fundo secondary ~10% (equivalente visual a `bg-secondary/10`), texto na cor secundária.
-   * `dangerOutline` = fundo error ~10% (equivalente visual a `bg-error/10`), texto vermelho.
+   * `dangerOutline` = fundo vermelho ~10% (`#dc2626`), texto na mesma cor (switch ativar/desativar).
    */
   cancelVariant?: 'secondary' | 'primary' | 'primaryTint10' | 'secondaryTint10' | 'dangerOutline'
   /**
@@ -316,6 +316,35 @@ export function footerBarPrimaryTint10BarSx(isFirstColumn: boolean) {
   }
 }
 
+/** Vermelho do trilho desligado do `JiffyIconSwitch` (red-600) */
+const FOOTER_DANGER_OUTLINE_COLOR = '#dc2626'
+
+/** Cancelar com fundo vermelho/10 e texto vermelho (mesmo tom do switch ativar/desativar) */
+export function footerBarDangerOutlineBarSx(isFirstColumn: boolean) {
+  const bl =
+    isFirstColumn ?
+      ({ borderBottomLeftRadius: PANEL_RADIUS_LEFT } as const)
+    : {}
+  return {
+    borderRadius: 0,
+    ...bl,
+    boxShadow: 'none',
+    borderWidth: 0,
+    backgroundColor: 'color-mix(in srgb, #dc2626 10%, transparent)',
+    color: FOOTER_DANGER_OUTLINE_COLOR,
+    fontWeight: 600,
+    '&:hover': {
+      backgroundColor: 'color-mix(in srgb, #dc2626 18%, transparent)',
+      boxShadow: 'none',
+      ...bl,
+    },
+    '&.Mui-disabled': {
+      backgroundColor: 'color-mix(in srgb, #dc2626 6%, transparent)',
+      color: 'rgba(220, 38, 38, 0.45)',
+    },
+  }
+}
+
 /** Cancelar / Fechar com tom secondary/10 (equivalente visual a `bg-secondary/10`) */
 export function footerBarSecondaryTint10BarSx(isFirstColumn: boolean) {
   const bl =
@@ -355,7 +384,7 @@ function footerBarCancelSx(
   if (variant === 'primary') return footerSavePrimaryBarSx(isFirstColumn)
   if (variant === 'primaryTint10') return footerBarPrimaryTint10BarSx(isFirstColumn)
   if (variant === 'secondaryTint10') return footerBarSecondaryTint10BarSx(isFirstColumn)
-  if (variant === 'dangerOutline') return footerBarErrorTint10BarSx(isFirstColumn)
+  if (variant === 'dangerOutline') return footerBarDangerOutlineBarSx(isFirstColumn)
   return footerBarSecondarySx(isFirstColumn)
 }
 

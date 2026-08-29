@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useLocaleUppercaseInputHandler } from '@/src/presentation/hooks/useLocaleUppercaseInputHandler'
 
 export type ProdutoNomeCommitResult = void | boolean | Promise<void | boolean>
 
@@ -27,8 +28,12 @@ export function ProdutoNomeInput({ nome, disabled = false, onCommit }: ProdutoNo
   const [inputValue, setInputValue] = useState(nome)
   const committingRef = useRef(false)
   const onCommitRef = useRef(onCommit)
-  const inputRef = useRef<HTMLInputElement>(null)
   onCommitRef.current = onCommit
+
+  const { inputRef, handleChange: handleInputChange } = useLocaleUppercaseInputHandler(
+    inputValue,
+    setInputValue
+  )
 
   useEffect(() => {
     if (committingRef.current || editing) return
@@ -121,7 +126,7 @@ export function ProdutoNomeInput({ nome, disabled = false, onCommit }: ProdutoNo
       value={inputValue}
       disabled={disabled}
       onClick={e => e.stopPropagation()}
-      onChange={e => setInputValue(e.target.value.toLocaleUpperCase('pt-BR'))}
+      onChange={handleInputChange}
       onBlur={() => {
         void handleCommit()
       }}

@@ -1,16 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
-import { MenuRepository } from '@/src/infrastructure/database/repositories/MenuRepository'
+import {
+  ListarMenuProdutosQuerySchema,
+  MenuRouteIdSchema,
+  UpdateMenuProdutosBatchBodySchema,
+} from '@/src/application/dto/menus/MenuInputSchemas'
+import {
+  AtualizarMenuProdutosBatchUseCase,
+  ListarMenuProdutosUseCase,
+} from '@/src/application/use-cases/menus/menuProdutoUseCases'
+import { createMenuRepository } from '@/src/infrastructure/database/repositories/createMenuRepository'
+import {
+  menuZodErrorResponse,
+  parseMenuRouteInput,
+  searchParamsToRecord,
+} from '@/src/shared/utils/menuRouteValidation'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { menuApiErrorResponse } from '@/src/shared/utils/menuApiRoute'
 
 type RouteContext = { params: Promise<{ id: string }> }
-
-function parseOptionalBool(value: string | null): boolean | null {
-  if (value === 'true') return true
-  if (value === 'false') return false
-  return null
-}
 
 /** GET /api/menus/:id/produtos — snapshots MenuProduto */
 export async function GET(req: NextRequest, { params }: RouteContext) {
@@ -19,29 +26,25 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     if (!validation.valid || !validation.tokenInfo) return validation.error!
 
     const { id } = await params
+    const menuId = parseMenuRouteInput(MenuRouteIdSchema, id)
     const { searchParams } = new URL(req.url)
+    const query = parseMenuRouteInput(
+      ListarMenuProdutosQuerySchema,
+      searchParamsToRecord(searchParams)
+    )
 
-    const repo = new MenuRepository(new ApiClient(), validation.tokenInfo.token)
-    const tipoRaw = searchParams.get('tipo')
-    const tipo =
-      tipoRaw === 'all' || tipoRaw === 'padrao' || tipoRaw === 'pizza' ? tipoRaw : undefined
-
-    const result = await repo.listarProdutos(id, {
-      q: searchParams.get('q') || undefined,
-      limit: parseInt(searchParams.get('limit') || '50', 10),
-      offset: parseInt(searchParams.get('offset') || '0', 10),
-      ativo: parseOptionalBool(searchParams.get('ativo')),
-      favorito: parseOptionalBool(searchParams.get('favorito')),
-      grupoProdutoId: searchParams.get('grupoProdutoId') || undefined,
-      grupoComplementosId: searchParams.get('grupoComplementosId') || undefined,
-      tipo,
-    })
+    const useCase = new ListarMenuProdutosUseCase(
+      createMenuRepository(validation.tokenInfo.token)
+    )
+    const result = await useCase.execute(menuId, query)
 
     return NextResponse.json(
       { success: true, ...result },
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
+    const zodResponse = menuZodErrorResponse(error)
+    if (zodResponse) return zodResponse
     return menuApiErrorResponse(error, 'Erro ao listar produtos do menu')
   }
 }
@@ -53,16 +56,17 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     if (!validation.valid || !validation.tokenInfo) return validation.error!
 
     const { id } = await params
-    const body = await req.json()
-    const repo = new MenuRepository(new ApiClient(), validation.tokenInfo.token)
-    const menu = await repo.atualizarProdutos(id, {
-      add: body.add,
-      remove: body.remove,
-      update: body.update,
-    })
+    const menuId = parseMenuRouteInput(MenuRouteIdSchema, id)
+    const body = parseMenuRouteInput(UpdateMenuProdutosBatchBodySchema, await req.json())
+    const useCase = new AtualizarMenuProdutosBatchUseCase(
+      createMenuRepository(validation.tokenInfo.token)
+    )
+    const menu = await useCase.execute(menuId, body)
 
     return NextResponse.json({ success: true, data: menu })
   } catch (error) {
+    const zodResponse = menuZodErrorResponse(error)
+    if (zodResponse) return zodResponse
     return menuApiErrorResponse(error, 'Erro ao atualizar produtos do menu')
   }
 }

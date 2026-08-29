@@ -4,12 +4,14 @@ import { useState, useEffect, useCallback, useRef, forwardRef, useImperativeHand
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { Input } from '@/src/presentation/components/ui/input'
+import { UppercaseLocaleInput } from '@/src/presentation/components/ui/UppercaseLocaleInput'
 import { Button } from '@/src/presentation/components/ui/button'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { MdClose, MdPhone, MdPrint } from 'react-icons/md'
 import { MenuItem, CircularProgress, Box } from '@mui/material'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
+import { MenuParametroEmpresaSelect } from '../MenuParametroEmpresaSelect'
 
 /** Labels outlined — alinhado a NovoMeioPagamento / NovoComplemento */
 const sxOutlinedLabelTextoEscuro = {
@@ -102,6 +104,7 @@ interface TerminalData {
   modeloDispositivo: string
   versaoApk: string
   bloqueado: boolean
+  menuPrincipalId?: string | null
 }
 
 interface TerminalPreferences {
@@ -183,6 +186,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
     isCreate ? CREATE_DEFAULT_PREFS.senhaProximoNumero : ''
   )
   const [impressoraSelecionadaId, setImpressoraSelecionadaId] = useState<string>('')
+  const [menuPrincipalId, setMenuPrincipalId] = useState<string | null>(null)
 
   // Estados de UI
   const [loadingImpressoras, setLoadingImpressoras] = useState(true)
@@ -195,6 +199,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
       nomeTerminal: (nomeTerminal || '').trim(),
       modeloDispositivo: (modeloDispositivo || '').trim(),
       versaoApk: (versaoApk || '').trim(),
+      menuPrincipalId: menuPrincipalId || '',
       compartilhaValue,
       fiscalAtivoValue,
       leitorCodigoBarrasValue,
@@ -207,6 +212,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
     nomeTerminal,
     modeloDispositivo,
     versaoApk,
+    menuPrincipalId,
     compartilhaValue,
     fiscalAtivoValue,
     leitorCodigoBarrasValue,
@@ -316,6 +322,11 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
       setNomeTerminal(maiusculasPt(data.nome || ''))
       setModeloDispositivo(data.modeloDispositivo || '')
       setVersaoApk(data.versaoApk || '')
+      setMenuPrincipalId(
+        typeof data.menuPrincipalId === 'string' && data.menuPrincipalId.trim()
+          ? data.menuPrincipalId.trim()
+          : null
+      )
     } catch (error) {
       console.error('Erro ao carregar terminal:', error)
       showToast.error('Erro ao carregar dados do terminal')
@@ -406,6 +417,10 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
       showToast.error(`Nome deve ter no máximo ${NOME_TERMINAL_MAX} caracteres`)
       return false
     }
+    if (!isCreate && !menuPrincipalId) {
+      showToast.error('Selecione o menu do terminal')
+      return false
+    }
     return true
   }
 
@@ -463,6 +478,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
             nome: nomeTerminal.trim(),
             modeloDispositivo: 'GESTOR',
             versaoApk: '0.0.0',
+            ...(menuPrincipalId ? { menuPrincipalId } : {}),
           }),
         })
 
@@ -530,6 +546,7 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
             modeloDispositivo,
             versaoApk,
             bloqueado: false,
+            ...(menuPrincipalId ? { menuPrincipalId } : {}),
           }),
         })
 
@@ -648,19 +665,27 @@ export const EditarTerminais = forwardRef<EditarTerminaisHandle, EditarTerminais
               </div>
 
               <div className="space-y-5">
-                <Input
+                <UppercaseLocaleInput
                   label="Nome do Terminal"
                   value={nomeTerminal}
-                  onChange={e =>
-                    setNomeTerminal(maiusculasPt(e.target.value).slice(0, NOME_TERMINAL_MAX))
-                  }
+                  onValueChange={setNomeTerminal}
                   placeholder="Digite o nome do Terminal"
                   size="small"
                   required
+                  maxLength={NOME_TERMINAL_MAX}
                   inputProps={{ maxLength: NOME_TERMINAL_MAX }}
                   className="bg-info"
                   sx={sxEntradaTerminal}
                   InputLabelProps={{ required: true }}
+                />
+
+                <MenuParametroEmpresaSelect
+                  id="terminal-menu-principal"
+                  variant="mui"
+                  sx={sxEntradaTerminal}
+                  label="Menu do terminal"
+                  value={menuPrincipalId}
+                  onChange={setMenuPrincipalId}
                 />
 
                 <div className="flex flex-col gap-6 md:flex-row">

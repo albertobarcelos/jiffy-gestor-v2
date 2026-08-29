@@ -9,7 +9,7 @@ import { useProdutosVendaQuery } from './useProdutosVendaQuery'
 export type UseNovoPedidoCatalogoDataParams = {
   estaNoPassoProdutos: boolean
   token: string | undefined
-  empresaId: string | undefined
+  menuId: string | null
   canal: CanalVendaNovoPedido
   grupoSelecionadoId: string | null
   setGrupoSelecionadoId: (id: string | null) => void
@@ -21,7 +21,7 @@ export type UseNovoPedidoCatalogoDataParams = {
 export function useNovoPedidoCatalogoData({
   estaNoPassoProdutos,
   token,
-  empresaId,
+  menuId,
   canal,
   grupoSelecionadoId,
   setGrupoSelecionadoId,
@@ -49,8 +49,7 @@ export function useNovoPedidoCatalogoData({
   const gruposQuery = useGruposVendaQuery({
     enabled: estaNoPassoProdutos,
     token,
-    empresaId,
-    canal,
+    menuId,
     grupoSelecionadoId,
     onGrupoSelecionadoInvalido,
   })
@@ -58,7 +57,7 @@ export function useNovoPedidoCatalogoData({
   const produtosQuery = useProdutosVendaQuery({
     enabled: estaNoPassoProdutos,
     token,
-    empresaId,
+    menuId,
     grupoSelecionadoId,
     buscaProdutoTexto,
     onProdutosGrupoCarregados,
@@ -91,7 +90,7 @@ export function useNovoPedidoCatalogoData({
       const fetchProduto = (async (): Promise<Produto | null> => {
         try {
           const { fetchProdutoCatalogoPorId } = await import('../../novoPedidoProdutosApi')
-          const entity = await fetchProdutoCatalogoPorId(produtoId, token)
+          const entity = await fetchProdutoCatalogoPorId(produtoId, token, menuId)
           if (!entity) return null
           setCatalogoProdutosPorId(prev => ({ ...prev, [entity.getId()]: entity }))
           return entity
@@ -110,8 +109,12 @@ export function useNovoPedidoCatalogoData({
         inflightProdutoPorIdRef.current.delete(produtoId)
       }
     },
-    [catalogoProdutosPorId, produtosQuery.produtosList, token, setCatalogoProdutosPorId]
+    [catalogoProdutosPorId, menuId, produtosQuery.produtosList, token, setCatalogoProdutosPorId]
   )
+
+  const menuCatalogoIndisponivel =
+    estaNoPassoProdutos &&
+    (gruposQuery.menuCatalogoIndisponivel || produtosQuery.menuCatalogoIndisponivel)
 
   return {
     grupos: gruposQuery.grupos,
@@ -124,5 +127,6 @@ export function useNovoPedidoCatalogoData({
     produtosError: produtosQuery.produtosError,
     carregarProdutoNoCatalogoSeNecessario,
     canal,
+    menuCatalogoIndisponivel,
   }
 }

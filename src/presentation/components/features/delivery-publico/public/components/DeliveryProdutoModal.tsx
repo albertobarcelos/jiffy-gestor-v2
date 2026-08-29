@@ -23,6 +23,8 @@ import {
 } from '../../shared/utils/compartilharProdutoDelivery'
 import { observacaoItemCarrinho } from '../../shared/utils/deliveryCarrinhoItemUtils'
 import { formatDeliveryCurrency } from '../../shared/utils/formatDeliveryCurrency'
+import type { GrupoComplementoPendente } from '../../shared/utils/produtoComplementosUtils'
+import { DeliveryComplementosObrigatoriosAlertDialog } from './DeliveryComplementosObrigatoriosAlertDialog'
 
 type DeliveryProdutoModalProps = {
   slug: string
@@ -82,6 +84,9 @@ export function DeliveryProdutoModal({
     itemEdicao ? observacaoItemCarrinho(itemEdicao) : ''
   )
   const [salvando, setSalvando] = useState(false)
+  const [gruposPendentesAlerta, setGruposPendentesAlerta] = useState<GrupoComplementoPendente[]>(
+    []
+  )
   const [aberto, setAberto] = useState(true)
   /** Evita fechar no click sintético / remount (Strict Mode) logo após abrir. */
   const fechamentoIntencionalRef = useRef(false)
@@ -115,7 +120,7 @@ export function DeliveryProdutoModal({
     valorComplementosUnitario,
     ajustarQuantidadeComplemento,
     getQuantidadeComplemento,
-    validar,
+    obterGruposPendentes,
   } = useProdutoComplementos(slug, produto, itemEdicao?.complementos)
 
   const valorUnitario = produto.valor + valorComplementosUnitario
@@ -151,12 +156,23 @@ export function DeliveryProdutoModal({
     })
   }
 
+  const handleConfirmarAlertaComplementos = () => {
+    setGruposPendentesAlerta([])
+    handleIrParaComplementos()
+  }
+
   const handleSalvar = () => {
     if (precisaComplementos && !cacheComplementos) {
       showToast.error('Aguarde o carregamento das opções do produto')
       return
     }
-    if (grupos.length > 0 && !validar()) return
+    if (grupos.length > 0) {
+      const pendentes = obterGruposPendentes()
+      if (pendentes.length > 0) {
+        setGruposPendentesAlerta(pendentes)
+        return
+      }
+    }
 
     setSalvando(true)
     try {
@@ -477,6 +493,13 @@ export function DeliveryProdutoModal({
           </DeliveryButton>
         </div>
           </motion.div>
+
+          {gruposPendentesAlerta.length > 0 ? (
+            <DeliveryComplementosObrigatoriosAlertDialog
+              gruposPendentes={gruposPendentesAlerta}
+              onConfirmar={handleConfirmarAlertaComplementos}
+            />
+          ) : null}
         </motion.div>
       ) : null}
     </AnimatePresence>

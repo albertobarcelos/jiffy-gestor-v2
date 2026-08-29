@@ -95,6 +95,8 @@ export interface NovoPedidoCatalogoSlice {
   isLoadingProdutosVenda: boolean
   isLoadingProdutos: boolean
   isLoadingBuscaProdutos: boolean
+  menuCatalogoIndisponivel: boolean
+  tipoInicioPedido: 'balcao' | 'entrega'
 }
 
 /** Edição/lançamento de linha de produto (painel e modal de edição). */

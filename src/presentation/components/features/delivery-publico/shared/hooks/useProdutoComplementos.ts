@@ -12,10 +12,11 @@ import type { DeliveryCarrinhoComplemento } from '../stores/deliveryCarrinhoStor
 import { showToast } from '@/src/shared/utils/toast'
 import {
   chaveComplemento,
+  listarGruposComplementosPendentes,
   produtoTemComplementosAtivos,
   resolveGruposComplementos,
   somarQuantidadeNoGrupo,
-  validarGruposComplementos,
+  type GrupoComplementoPendente,
   type GrupoComplementoResolvido,
 } from '../utils/produtoComplementosUtils'
 
@@ -116,13 +117,8 @@ export function useProdutoComplementos(
     []
   )
 
-  const validar = useCallback((): boolean => {
-    const resultado = validarGruposComplementos(grupos, quantidadesComplementos)
-    if (!resultado.valido && resultado.mensagem) {
-      showToast.error(resultado.mensagem)
-      return false
-    }
-    return true
+  const obterGruposPendentes = useCallback((): GrupoComplementoPendente[] => {
+    return listarGruposComplementosPendentes(grupos, quantidadesComplementos)
   }, [grupos, quantidadesComplementos])
 
   const getQuantidadeComplemento = useCallback(
@@ -142,6 +138,6 @@ export function useProdutoComplementos(
     valorComplementosUnitario,
     ajustarQuantidadeComplemento,
     getQuantidadeComplemento,
-    validar,
+    obterGruposPendentes,
   }
 }

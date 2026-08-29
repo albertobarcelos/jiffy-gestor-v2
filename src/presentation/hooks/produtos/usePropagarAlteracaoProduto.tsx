@@ -29,8 +29,11 @@ type Pedido = {
   menusJaSalvos?: MenuAlvoPropagacao[]
   excluirMenuIds?: string[]
   fonteMenus?: 'produto' | 'empresa'
+  novoAtivo?: boolean
   /** Fluxo da lista de produtos base (dados): lista de menus sem passo "perguntar". */
   fluxoListaCadastroBase?: boolean
+  /** Confirmação global de ativo/inativo na lista base. */
+  confirmacaoStatusGlobal?: boolean
   /** Se true, não permite confirmar com zero menus. */
   exigePeloMenosUmMenu?: boolean
   resolve: (value: DestinoAlteracaoProduto | null) => void
@@ -43,6 +46,8 @@ type PedirConfirmacaoOpts = {
   menusIniciais?: MenuAlvoPropagacao[]
   menusJaSalvos?: MenuAlvoPropagacao[]
   variante?: VariantePropagacaoProduto
+  /** Obrigatório em `statusAtivo`: true = ativar, false = desativar. */
+  novoAtivo?: boolean
   excluirMenuIds?: string[]
   fonteMenus?: 'produto' | 'empresa'
   /** Abre direto na lista de menus (ex.: imagem sem vínculo prévio). */
@@ -101,6 +106,7 @@ export function usePropagarAlteracaoProduto(): {
       preSelecionados?: Set<string>
       menusJaVinculados?: Set<string>
       fluxoListaCadastroBase?: boolean
+      confirmacaoStatusGlobal?: boolean
       exigePeloMenosUmMenu?: boolean
       passoInicial?: 'perguntar' | 'escolher'
     }): Promise<DestinoAlteracaoProduto | null> => {
@@ -109,6 +115,7 @@ export function usePropagarAlteracaoProduto(): {
           ...params.opts,
           variante: params.variante,
           fluxoListaCadastroBase: params.fluxoListaCadastroBase,
+          confirmacaoStatusGlobal: params.confirmacaoStatusGlobal,
           exigePeloMenosUmMenu: params.exigePeloMenosUmMenu,
           resolve,
         }
@@ -133,6 +140,29 @@ export function usePropagarAlteracaoProduto(): {
           .map(id => (typeof id === 'string' ? id.trim() : String(id ?? '').trim()))
           .filter(Boolean)
       )
+
+      // --- Lista base: ativo/inativo → confirmação global (todos os menus vinculados) ---
+      if (opts.origem === 'cadastroBase' && variante === 'statusAtivo' && token) {
+        let menusDoProduto: MenuAlvoPropagacao[] = []
+        try {
+          menusDoProduto = await listarMenusDoProduto({
+            produtoId: opts.produtoId,
+            token,
+          })
+        } catch {
+          menusDoProduto = []
+        }
+        const vinculadosIds = new Set(menusDoProduto.map(m => m.id).filter(Boolean))
+        return abrirDialogo({
+          opts,
+          variante,
+          lista: menusDoProduto,
+          preSelecionados: vinculadosIds,
+          menusJaVinculados: vinculadosIds,
+          confirmacaoStatusGlobal: true,
+          passoInicial: 'perguntar',
+        })
+      }
 
       // --- Fluxo lista de produtos base (alteração de dados): regras de vínculo/menus ---
       if (opts.origem === 'cadastroBase' && variante === 'dados' && token) {
@@ -282,7 +312,6 @@ export function usePropagarAlteracaoProduto(): {
         vincularSeAusente: params.vincularSeAusente ?? true,
       })
       await invalidate(['menu-produtos'])
-      await invalidate(['produtos-imagens-cadastro'])
       await invalidate(['produto', params.produtoId])
     },
     [invalidate]
@@ -301,6 +330,7 @@ export function usePropagarAlteracaoProduto(): {
   }, [pedido?.origem, pedido?.variante, menus.length])
 
   const fluxoLista = Boolean(pedido?.fluxoListaCadastroBase)
+  const confirmacaoStatusGlobal = Boolean(pedido?.confirmacaoStatusGlobal)
   const exigeMenu = Boolean(pedido?.exigePeloMenosUmMenu)
   const podeConfirmarLista = !exigeMenu || selecionados.size > 0
 
@@ -310,14 +340,17 @@ export function usePropagarAlteracaoProduto(): {
       passo={passo}
       origem={pedido?.origem ?? 'cadastroBase'}
       variante={pedido?.variante ?? 'dados'}
+      novoAtivo={pedido?.novoAtivo}
       menusJaSalvos={pedido?.menusJaSalvos}
       incluirCadastroBase={
         !fluxoLista &&
+        !confirmacaoStatusGlobal &&
         pedido?.variante !== 'imagem' &&
         pedido?.variante !== 'vinculoMenus' &&
         pedido?.origem === 'menu'
       }
       fluxoListaCadastroBase={fluxoLista}
+      confirmacaoStatusGlobal={confirmacaoStatusGlobal}
       exigePeloMenosUmMenu={exigeMenu}
       menusJaVinculadosIds={menusJaVinculadosIds}
       menus={menus}
@@ -329,6 +362,13 @@ export function usePropagarAlteracaoProduto(): {
       onSim={onSim}
       onVoltar={() => setPasso('perguntar')}
       onConfirmarEscolha={() => {
+        if (confirmacaoStatusGlobal) {
+          fechar({
+            aplicarNoCadastroBase: false,
+            menuIds: Array.from(selecionados),
+          })
+          return
+        }
         if (fluxoLista && !podeConfirmarLista) return
         fechar({
           aplicarNoCadastroBase: cadastroBaseMarcado,

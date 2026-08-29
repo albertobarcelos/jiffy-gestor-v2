@@ -1,9 +1,18 @@
 'use client'
 
+import {
+  atualizarMenuProdutoViaBffUseCase,
+  atualizarMenuProdutosBatchViaBffUseCase,
+  atualizarMenuViaBffUseCase,
+  criarMenuViaBffUseCase,
+  excluirMenuViaBffUseCase,
+  renomearMenuGrupoViaBffUseCase,
+  reordenarMenuGrupoViaBffUseCase,
+  reordenarMenuProdutoViaBffUseCase,
+  uploadImagemMenuProdutoViaBffUseCase,
+} from '@/src/application/use-cases/menus/menuBffUseCases'
 import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
-import { ApiError } from '@/src/infrastructure/api/apiClient'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import type {
   CreateMenuInput,
   UpdateMenuInput,
@@ -11,21 +20,11 @@ import type {
   UpdateMenuProdutosBatchInput,
 } from '@/src/shared/types/menus'
 
-async function parseError(response: Response, fallback: string) {
-  const errorData = await response.json().catch(() => ({}))
-  throw new ApiError(
-    (errorData as { message?: string }).message || fallback,
-    response.status,
-    errorData
-  )
-}
-
 async function invalidateMenuTree(
   invalidate: ReturnType<typeof useInvalidateTenantQueries>,
   menuId?: string
 ) {
   await invalidate(['menus'])
-  await invalidate(['produtos-imagens-cadastro'])
   if (menuId) {
     await invalidate(['menu', menuId])
     await invalidate(['menu-produtos', menuId])
@@ -38,61 +37,34 @@ export function useMenuMutations(menuId?: string) {
   const invalidate = useInvalidateTenantQueries()
 
   const createMenu = useSecureTenantMutation(
-    async ({ token }, input: CreateMenuInput) => {
-      const response = await fetchGestorApi('/api/menus', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(input),
-      })
-      if (!response.ok) await parseError(response, 'Erro ao criar menu')
-      return (await response.json()).data
-    },
+    async ({ token }, input: CreateMenuInput) =>
+      criarMenuViaBffUseCase.execute({ token, data: input }),
     { onSuccess: () => invalidate(['menus']) }
   )
 
   const updateMenu = useSecureTenantMutation(
-    async ({ token }, vars: { id: string; input: UpdateMenuInput }) => {
-      const response = await fetchGestorApi(`/api/menus/${vars.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(vars.input),
-      })
-      if (!response.ok) await parseError(response, 'Erro ao atualizar menu')
-      return (await response.json()).data
-    },
+    async ({ token }, vars: { id: string; input: UpdateMenuInput }) =>
+      atualizarMenuViaBffUseCase.execute({
+        token,
+        menuId: vars.id,
+        data: vars.input,
+      }),
     { onSuccess: (_data, vars) => invalidateMenuTree(invalidate, vars.id) }
   )
 
   const deleteMenu = useSecureTenantMutation(
-    async ({ token }, id: string) => {
-      const response = await fetchGestorApi(`/api/menus/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!response.ok) await parseError(response, 'Erro ao excluir menu')
-    },
+    async ({ token }, id: string) => excluirMenuViaBffUseCase.execute({ token, menuId: id }),
     { onSuccess: () => invalidate(['menus']) }
   )
 
   const syncProdutos = useSecureTenantMutation(
     async ({ token }, input: UpdateMenuProdutosBatchInput) => {
       if (!menuId) throw new Error('menuId é obrigatório')
-      const response = await fetchGestorApi(`/api/menus/${menuId}/produtos`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(input),
+      return atualizarMenuProdutosBatchViaBffUseCase.execute({
+        token,
+        menuId,
+        data: input,
       })
-      if (!response.ok) await parseError(response, 'Erro ao sincronizar produtos')
-      return (await response.json()).data
     },
     { onSuccess: () => invalidateMenuTree(invalidate, menuId) }
   )
@@ -103,19 +75,12 @@ export function useMenuMutations(menuId?: string) {
       vars: { produtoId: string; input: UpdateMenuProdutoInput }
     ) => {
       if (!menuId) throw new Error('menuId é obrigatório')
-      const response = await fetchGestorApi(
-        `/api/menus/${menuId}/produtos/${vars.produtoId}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(vars.input),
-        }
-      )
-      if (!response.ok) await parseError(response, 'Erro ao atualizar produto do menu')
-      return (await response.json()).data
+      return atualizarMenuProdutoViaBffUseCase.execute({
+        token,
+        menuId,
+        produtoId: vars.produtoId,
+        data: vars.input,
+      })
     },
     { onSuccess: () => invalidateMenuTree(invalidate, menuId) }
   )
@@ -126,18 +91,12 @@ export function useMenuMutations(menuId?: string) {
       vars: { produtoId: string; novaPosicao: number }
     ) => {
       if (!menuId) throw new Error('menuId é obrigatório')
-      const response = await fetchGestorApi(
-        `/api/menus/${menuId}/produtos/${vars.produtoId}/reordena-produto`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ novaPosicao: vars.novaPosicao }),
-        }
-      )
-      if (!response.ok) await parseError(response, 'Erro ao reordenar produto')
+      await reordenarMenuProdutoViaBffUseCase.execute({
+        token,
+        menuId,
+        produtoId: vars.produtoId,
+        novaPosicao: vars.novaPosicao,
+      })
     },
     { onSuccess: () => invalidate(['menu-produtos', menuId]) }
   )
@@ -145,18 +104,12 @@ export function useMenuMutations(menuId?: string) {
   const uploadImagemProduto = useSecureTenantMutation(
     async ({ token }, vars: { produtoId: string; file: File }) => {
       if (!menuId) throw new Error('menuId é obrigatório')
-      const form = new FormData()
-      form.append('file', vars.file)
-      const response = await fetchGestorApi(
-        `/api/menus/${menuId}/produtos/${vars.produtoId}/imagem`,
-        {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: form,
-        }
-      )
-      if (!response.ok) await parseError(response, 'Erro ao atualizar imagem do produto')
-      return (await response.json()).data
+      return uploadImagemMenuProdutoViaBffUseCase.execute({
+        token,
+        menuId,
+        produtoId: vars.produtoId,
+        file: vars.file,
+      })
     },
     { onSuccess: () => invalidateMenuTree(invalidate, menuId) }
   )
@@ -167,19 +120,12 @@ export function useMenuMutations(menuId?: string) {
       vars: { grupoProdutoId: string; nome: string }
     ) => {
       if (!menuId) throw new Error('menuId é obrigatório')
-      const response = await fetchGestorApi(
-        `/api/menus/${menuId}/grupos-produtos/${vars.grupoProdutoId}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ nome: vars.nome }),
-        }
-      )
-      if (!response.ok) await parseError(response, 'Erro ao renomear categoria do menu')
-      return (await response.json()).data
+      return renomearMenuGrupoViaBffUseCase.execute({
+        token,
+        menuId,
+        grupoProdutoId: vars.grupoProdutoId,
+        nome: vars.nome,
+      })
     },
     { onSuccess: () => invalidate(['menu-grupos', menuId]) }
   )
@@ -190,18 +136,12 @@ export function useMenuMutations(menuId?: string) {
       vars: { grupoProdutoId: string; novaPosicao: number }
     ) => {
       if (!menuId) throw new Error('menuId é obrigatório')
-      const response = await fetchGestorApi(
-        `/api/menus/${menuId}/grupos-produtos/${vars.grupoProdutoId}/reordena-grupo`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ novaPosicao: vars.novaPosicao }),
-        }
-      )
-      if (!response.ok) await parseError(response, 'Erro ao reordenar categoria')
+      await reordenarMenuGrupoViaBffUseCase.execute({
+        token,
+        menuId,
+        grupoProdutoId: vars.grupoProdutoId,
+        novaPosicao: vars.novaPosicao,
+      })
     },
     { onSuccess: () => invalidate(['menu-grupos', menuId]) }
   )

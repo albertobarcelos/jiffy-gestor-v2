@@ -14,6 +14,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import { Input } from '@/src/presentation/components/ui/input'
+import { UppercaseLocaleInput } from '@/src/presentation/components/ui/UppercaseLocaleInput'
 import { Button } from '@/src/presentation/components/ui/button'
 import { showToast, handleApiError } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -507,10 +508,10 @@ export const NovoGrupoComplemento = forwardRef<
                 />
               </div>
             <div className="space-y-4">
-              <Input
+              <UppercaseLocaleInput
                 label="Nome do Grupo"
                 value={nome}
-                onChange={(e) => setNome(e.target.value.toLocaleUpperCase('pt-BR'))}
+                onValueChange={setNome}
                 required
                 size="small"
                 placeholder="Digite o nome do grupo de complementos"

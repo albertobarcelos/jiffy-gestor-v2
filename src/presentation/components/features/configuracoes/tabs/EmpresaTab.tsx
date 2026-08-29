@@ -8,13 +8,16 @@ import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { CidadeAutocomplete } from '@/src/presentation/components/ui/cidade-autocomplete'
 import { Input } from '@/src/presentation/components/ui/input'
+import { UppercaseLocaleInput } from '@/src/presentation/components/ui/UppercaseLocaleInput'
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
 import { MenuItem } from '@mui/material'
 import { LogoImpressaoCropModal } from '../LogoImpressaoCropModal'
+import { MenuParametroEmpresaSelect } from '../MenuParametroEmpresaSelect'
 import {
   LOGO_IMPRESSAO_HEIGHT,
   LOGO_IMPRESSAO_WIDTH,
 } from '@/src/presentation/utils/logoImpressaoCrop'
+import { lerMenuIdDeParametroEmpresa } from '@/src/shared/utils/parametroEmpresaMenus'
 
 /** Labels outlined — alinhado a NovoMeioPagamento / EditarTerminais */
 const sxOutlinedLabelTextoEscuro = {
@@ -137,7 +140,8 @@ const LOGO_COLUNA_LARGURA_CLASS = 'w-full shrink-0 lg:w-[280px]'
 /**
  * Tab de Empresa - Edição de dados da empresa
  */
-export function EmpresaTab() {  const [empresa, setEmpresa] = useState<Cliente | null>(null)
+export function EmpresaTab() {
+  const [empresa, setEmpresa] = useState<Cliente | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
 
@@ -158,6 +162,8 @@ export function EmpresaTab() {  const [empresa, setEmpresa] = useState<Cliente 
   const [codigoCidadeIbge, setCodigoCidadeIbge] = useState<string | null>(null)
   /** Valor exibido no select (IANA); vem de `parametroEmpresa.timezone` no GET /empresas/me. */
   const [timezone, setTimezone] = useState('')
+  /** Menu usado nas vendas do gestor (`parametroEmpresa.menuVendaGestorId`). */
+  const [menuVendaGestorId, setMenuVendaGestorId] = useState<string | null>(null)
   /** Snapshot de `parametroEmpresa` para PATCH preservar tipos impressão/cobrança etc. */
   const [parametroEmpresaDraft, setParametroEmpresaDraft] = useState<Record<string, unknown>>({})
 
@@ -333,9 +339,11 @@ export function EmpresaTab() {  const [empresa, setEmpresa] = useState<Cliente 
             (typeof pe.timeZone === 'string' && pe.timeZone) ||
             ''
           setTimezone(String(tz).trim())
+          setMenuVendaGestorId(lerMenuIdDeParametroEmpresa(pe, 'menuVendaGestorId'))
         } else {
           setParametroEmpresaDraft({})
           setTimezone('')
+          setMenuVendaGestorId(null)
         }
 
         try {
@@ -729,6 +737,7 @@ export function EmpresaTab() {  const [empresa, setEmpresa] = useState<Cliente 
         } else {
           delete parametroEmpresa.timezone
         }
+        parametroEmpresa.menuVendaGestorId = menuVendaGestorId
         if (Object.keys(parametroEmpresa).length > 0) {
           body.parametroEmpresa = parametroEmpresa
         }
@@ -755,6 +764,9 @@ export function EmpresaTab() {  const [empresa, setEmpresa] = useState<Cliente 
 
         setIsEditing(false)
         await loadEmpresa()
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('jiffy:empresa-me-updated'))
+        }
         showToast.success('Empresa atualizada com sucesso!')
       } catch (error) {
         console.error('Erro ao salvar empresa:', error)
@@ -833,35 +845,35 @@ export function EmpresaTab() {  const [empresa, setEmpresa] = useState<Cliente 
             </div>
             <div className="flex flex-col gap-7 lg:flex-row lg:items-start">
               <div className="min-w-0 flex-1 space-y-7">
-                <Input
+                <UppercaseLocaleInput
                   label="CNPJ"
                   value={cnpj}
-                  onChange={e => setCnpj(maiusculasPt(e.target.value))}
+                  onValueChange={setCnpj}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}
                 />
                 <div className="grid grid-cols-1 gap-7 md:grid-cols-2">
-                  <Input
+                  <UppercaseLocaleInput
                     label="Razão Social"
                     value={razaoSocial}
-                    onChange={e => setRazaoSocial(maiusculasPt(e.target.value))}
+                    onValueChange={setRazaoSocial}
                     disabled={!isEditing}
                     size="small"
                     sx={sxEntradaEmpresa}
                   />
-                  <Input
+                  <UppercaseLocaleInput
                     label="Nome Fantasia"
                     value={nomeFantasia}
-                    onChange={e => setNomeFantasia(maiusculasPt(e.target.value))}
+                    onValueChange={setNomeFantasia}
                     disabled={!isEditing}
                     size="small"
                     sx={sxEntradaEmpresa}
                   />
-                  <Input
+                  <UppercaseLocaleInput
                     label="Telefone"
                     value={telefone}
-                    onChange={e => setTelefone(maiusculasPt(e.target.value))}
+                    onValueChange={setTelefone}
                     disabled={!isEditing}
                     size="small"
                     sx={sxEntradaEmpresa}
@@ -1091,19 +1103,19 @@ export function EmpresaTab() {  const [empresa, setEmpresa] = useState<Cliente 
             <div className="space-y-6">
               {/* Linha 1: CEP + Rua */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <Input
+                <UppercaseLocaleInput
                   label="CEP"
                   value={cep}
-                  onChange={e => setCep(maiusculasPt(e.target.value))}
+                  onValueChange={setCep}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}
                 />
                 <div className="md:col-span-2">
-                  <Input
+                  <UppercaseLocaleInput
                     label="Rua"
                     value={rua}
-                    onChange={e => setRua(maiusculasPt(e.target.value))}
+                    onValueChange={setRua}
                     disabled={!isEditing}
                     size="small"
                     sx={sxEntradaEmpresa}
@@ -1113,26 +1125,26 @@ export function EmpresaTab() {  const [empresa, setEmpresa] = useState<Cliente 
 
               {/* Linha 2: Número, Complemento e Bairro */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <Input
+                <UppercaseLocaleInput
                   label="Número"
                   value={numero}
-                  onChange={e => setNumero(maiusculasPt(e.target.value))}
+                  onValueChange={setNumero}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}
                 />
-                <Input
+                <UppercaseLocaleInput
                   label="Complemento"
                   value={complemento}
-                  onChange={e => setComplemento(maiusculasPt(e.target.value))}
+                  onValueChange={setComplemento}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}
                 />
-                <Input
+                <UppercaseLocaleInput
                   label="Bairro"
                   value={bairro}
-                  onChange={e => setBairro(maiusculasPt(e.target.value))}
+                  onValueChange={setBairro}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}
@@ -1235,6 +1247,15 @@ export function EmpresaTab() {  const [empresa, setEmpresa] = useState<Cliente 
                     </MenuItem>
                   ))}
                 </Input>
+                <MenuParametroEmpresaSelect
+                  id="empresa-menu-venda-gestor"
+                  variant="mui"
+                  sx={sxEntradaEmpresa}
+                  label="Menu usado nas vendas (gestor)"
+                  value={menuVendaGestorId}
+                  onChange={setMenuVendaGestorId}
+                  disabled={!isEditing}
+                />
               </div>
             </div>
           </div>

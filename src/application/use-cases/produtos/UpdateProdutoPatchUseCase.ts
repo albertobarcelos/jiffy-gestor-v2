@@ -15,13 +15,15 @@ export async function updateProdutoPatch({ produtoId, patch, token }: UpdateProd
     throw new Error('Informe um valor válido para o produto.')
   }
 
+  const { nomeGrupo: _nomeGrupo, ...apiPatch } = patch
+
   const response = await fetchGestorApi(`/api/produtos/${produtoId}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify(patch),
+    body: JSON.stringify(apiPatch),
   })
 
   if (!response.ok) {

@@ -35,7 +35,8 @@ import {
   NovoGrupo,
   type NovoGrupoHandle,
 } from '@/src/presentation/components/features/grupos-produtos/NovoGrupo'
-import { MENU_WIDE_PANEL_CLASS } from '@/src/presentation/components/features/menus/menuPanelConstants'
+import { MENU_MODAL_CANCEL_VARIANT, MENU_WIDE_PANEL_CLASS } from '@/src/presentation/components/features/menus/menuPanelConstants'
+import { JiffyUnsavedChangesDialog } from '@/src/presentation/components/ui/JiffyUnsavedChangesDialog'
 import {
   unirMenuIds,
 } from '@/src/presentation/utils/uploadImagemProdutoMenus'
@@ -91,7 +92,10 @@ export function ProdutoNovoWizard({
   const impressorasRef = useRef<ProdutoImpressorasHandle>(null)
   const menusRef = useRef<ProdutoMenusHandle>(null)
   const autoNovaSemCategoriasRef = useRef(false)
+  const initialCategoriaBaselineRef = useRef<string | null>(null)
 
+  const [wizardSession, setWizardSession] = useState(0)
+  const [confirmExitOpen, setConfirmExitOpen] = useState(false)
   const [step, setStep] = useState<WizardStep>(0)
   const [produtoInnerStep, setProdutoInnerStep] = useState<0 | 1 | 2>(0)
   const [saving, setSaving] = useState(false)
@@ -158,15 +162,19 @@ export function ProdutoNovoWizard({
   }, [initialCategoriaId])
 
   useEffect(() => {
-    if (open) resetState()
-    else {
+    if (open) {
+      initialCategoriaBaselineRef.current = initialCategoriaId ?? null
+      resetState()
+      setConfirmExitOpen(false)
+    } else {
       setKeepNovaCategoria(false)
       setKeepProduto(false)
       setKeepComplementos(false)
       setKeepImpressoras(false)
       setKeepMenus(false)
+      setConfirmExitOpen(false)
     }
-  }, [open, resetState])
+  }, [open, resetState, initialCategoriaId])
 
   const categoriasUnicas = useMemo(() => {
     const seen = new Set<string>()
@@ -212,6 +220,50 @@ export function ProdutoNovoWizard({
     modoCategoria === 'existente' ? Boolean(categoriaId) : grupoCanSubmit
 
   const busy = saving || produtoSaving
+
+  const evaluateWizardDirty = useCallback((): boolean => {
+    if (busy) return false
+
+    if (modoCategoria === 'existente') {
+      if (categoriaId !== initialCategoriaBaselineRef.current) return true
+    } else if (
+      grupoRef.current?.isDirty?.() ||
+      novaCategoriaNome.trim().length > 0 ||
+      grupoCanSubmit
+    ) {
+      return true
+    }
+
+    if (npRef.current?.isDirty?.()) return true
+    if (compsRef.current?.isDirty?.()) return true
+    if (impressorasRef.current?.isDirty?.()) return true
+    if (menusRef.current?.isDirty?.()) return true
+
+    return false
+  }, [busy, modoCategoria, categoriaId, novaCategoriaNome, grupoCanSubmit])
+
+  const handleRequestClose = useCallback(() => {
+    if (busy) return
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (evaluateWizardDirty()) {
+          setConfirmExitOpen(true)
+          return
+        }
+        onClose()
+      })
+    })
+  }, [busy, evaluateWizardDirty, onClose])
+
+  const handleContinueEditing = useCallback(() => {
+    setConfirmExitOpen(false)
+  }, [])
+
+  const handleConfirmExit = useCallback(() => {
+    setConfirmExitOpen(false)
+    setWizardSession(session => session + 1)
+    onClose()
+  }, [onClose])
 
   const invalidateAposSalvar = useCallback(async () => {
     await invalidate(['grupos-produtos'])
@@ -332,19 +384,22 @@ export function ProdutoNovoWizard({
   ])
 
   const footerActions = useMemo((): JiffySidePanelFooterActions => {
+    const cancelVariant =
+      origem === 'menu' ? MENU_MODAL_CANCEL_VARIANT : 'primaryTint10'
+
     if (step === 0) {
       return {
         showCancel: true,
         cancelLabel: 'Fechar',
-        cancelVariant: 'primaryTint10',
-        onCancel: onClose,
+        cancelVariant,
+        onCancel: handleRequestClose,
         showNext: true,
         nextLabel: 'Continuar',
         onNext: handleNextFromCategoria,
         nextDisabled: !canAdvanceCategoria || busy,
         showPrevious: false,
         barShowPrevNextIcons: true,
-        barSecondaryTone: 'primaryMuted',
+        barSecondaryTone: 'primary',
         barActionOrder: ['cancel', 'next'],
       }
     }
@@ -353,8 +408,8 @@ export function ProdutoNovoWizard({
       return {
         showCancel: true,
         cancelLabel: 'Fechar',
-        cancelVariant: 'primaryTint10',
-        onCancel: onClose,
+        cancelVariant,
+        onCancel: handleRequestClose,
         showPrevious: true,
         previousLabel: 'Anterior',
         onPrevious: () => {
@@ -367,7 +422,7 @@ export function ProdutoNovoWizard({
         onNext: handleNextFromProduto,
         nextDisabled: busy,
         barShowPrevNextIcons: true,
-        barSecondaryTone: 'primaryMuted',
+        barSecondaryTone: 'primary',
       }
     }
 
@@ -375,8 +430,8 @@ export function ProdutoNovoWizard({
       return {
         showCancel: true,
         cancelLabel: 'Fechar',
-        cancelVariant: 'primaryTint10',
-        onCancel: onClose,
+        cancelVariant,
+        onCancel: handleRequestClose,
         showPrevious: true,
         previousLabel: 'Anterior',
         onPrevious: () => setStep(1),
@@ -390,7 +445,7 @@ export function ProdutoNovoWizard({
         },
         nextDisabled: busy,
         barShowPrevNextIcons: true,
-        barSecondaryTone: 'primaryMuted',
+        barSecondaryTone: 'primary',
       }
     }
 
@@ -398,8 +453,8 @@ export function ProdutoNovoWizard({
       return {
         showCancel: true,
         cancelLabel: 'Fechar',
-        cancelVariant: 'primaryTint10',
-        onCancel: onClose,
+        cancelVariant,
+        onCancel: handleRequestClose,
         showPrevious: true,
         previousLabel: 'Anterior',
         onPrevious: () => setStep(2),
@@ -413,7 +468,7 @@ export function ProdutoNovoWizard({
         },
         nextDisabled: busy,
         barShowPrevNextIcons: true,
-        barSecondaryTone: 'primaryMuted',
+        barSecondaryTone: 'primary',
       }
     }
 
@@ -431,12 +486,13 @@ export function ProdutoNovoWizard({
       saveLoading: busy,
       saveDisabled: busy,
       barShowPrevNextIcons: true,
-      barSecondaryTone: 'primaryMuted',
+      barSecondaryTone: 'primary',
       barActionOrder: ['prev', 'save'],
     }
   }, [
     step,
-    onClose,
+    origem,
+    handleRequestClose,
     handleNextFromCategoria,
     handleNextFromProduto,
     finishWizard,
@@ -449,9 +505,10 @@ export function ProdutoNovoWizard({
     origem === 'menu' ? 'Cadastrar produto neste cardápio' : 'Cadastrar novo produto'
 
   return (
+    <>
     <JiffySidePanelModal
       open={open}
-      onClose={onClose}
+      onClose={handleRequestClose}
       title={titulo}
       subtitle={
         origem === 'menu' && menuNome ? (
@@ -611,6 +668,7 @@ export function ProdutoNovoWizard({
               )}
             >
               <NovoGrupo
+                key={`wizard-grupo-${wizardSession}`}
                 ref={grupoRef}
                 grupoId={categoriaNovaPersistidaId ?? undefined}
                 isEmbedded
@@ -626,6 +684,7 @@ export function ProdutoNovoWizard({
           {step === 1 || keepProduto ? (
             <div className={cn('flex h-full min-h-[320px] flex-col', step !== 1 && 'hidden')}>
               <NovoProduto
+                key={`wizard-produto-${wizardSession}`}
                 ref={npRef}
                 isEmbedded
                 hideEmbeddedHeader
@@ -646,10 +705,14 @@ export function ProdutoNovoWizard({
           {step === 2 || keepComplementos ? (
             <div className={cn('flex h-full min-h-[320px] flex-col', step !== 2 && 'hidden')}>
               <ComplementosMultiSelectDialog
+                key={`wizard-complementos-${wizardSession}`}
                 ref={compsRef}
                 open={open}
                 modoRascunho
                 isEmbedded
+                nestedCancelVariant={
+                  origem === 'menu' ? MENU_MODAL_CANCEL_VARIANT : undefined
+                }
                 onClose={() => undefined}
               />
             </div>
@@ -658,6 +721,7 @@ export function ProdutoNovoWizard({
           {step === 3 || keepImpressoras ? (
             <div className={cn('flex h-full min-h-[320px] flex-col', step !== 3 && 'hidden')}>
               <ProdutoImpressorasDialog
+                key={`wizard-impressoras-${wizardSession}`}
                 ref={impressorasRef}
                 open={open}
                 modoRascunho
@@ -670,7 +734,7 @@ export function ProdutoNovoWizard({
           {step === 4 || keepMenus ? (
             <div className={cn('flex h-full min-h-[320px] flex-col', step !== 4 && 'hidden')}>
               <ProdutoMenusPanel
-                key={`wizard-menus-${origem}-${menusIniciaisWizard.join('|')}-${menusTravadosWizard.join('|')}`}
+                key={`wizard-menus-${wizardSession}-${origem}-${menusIniciaisWizard.join('|')}-${menusTravadosWizard.join('|')}`}
                 ref={menusRef}
                 persistChanges={false}
                 isEmbedded
@@ -693,5 +757,16 @@ export function ProdutoNovoWizard({
         ) : null}
       </div>
     </JiffySidePanelModal>
+
+    <JiffyUnsavedChangesDialog
+      open={confirmExitOpen}
+      continueLabel="Continuar editando"
+      exitLabel="Sair"
+      description="Se você sair agora, perderá todas as informações digitadas e as alterações feitas neste cadastro. Nada será salvo até você concluir."
+      onContinue={handleContinueEditing}
+      onExit={handleConfirmExit}
+      zIndex={2100}
+    />
+    </>
   )
 }

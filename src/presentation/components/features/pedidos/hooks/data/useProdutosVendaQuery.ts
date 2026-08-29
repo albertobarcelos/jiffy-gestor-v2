@@ -9,7 +9,7 @@ import { fetchProdutosDoGrupo, fetchProdutosPorNomeBusca } from '../../novoPedid
 export type UseProdutosVendaQueryParams = {
   enabled: boolean
   token: string | undefined
-  empresaId: string | undefined
+  menuId: string | null
   grupoSelecionadoId: string | null
   buscaProdutoTexto: string
   onProdutosGrupoCarregados: (produtos: ProdutoEntity[]) => void
@@ -18,21 +18,26 @@ export type UseProdutosVendaQueryParams = {
 export function useProdutosVendaQuery({
   enabled,
   token,
-  empresaId,
+  menuId,
   grupoSelecionadoId,
   buscaProdutoTexto,
   onProdutosGrupoCarregados,
 }: UseProdutosVendaQueryParams) {
   const buscaProdutoFiltrada = buscaProdutoTexto.trim().toLowerCase()
+  const catalogoHabilitado = enabled && !!menuId
 
   const { data: produtosBuscadosData, isLoading: isLoadingBuscaProdutos } = useSecureTenantQuery(
-    ['produtos-busca', buscaProdutoFiltrada],
+    ['produtos-busca', menuId, buscaProdutoFiltrada],
     async ({ token: tenantToken }) => {
-      const produtos = await fetchProdutosPorNomeBusca(buscaProdutoFiltrada, tenantToken)
+      const produtos = await fetchProdutosPorNomeBusca(
+        buscaProdutoFiltrada,
+        tenantToken,
+        menuId
+      )
       return { produtos }
     },
     {
-      enabled: !!token && enabled && buscaProdutoFiltrada.length >= 2,
+      enabled: !!token && catalogoHabilitado && buscaProdutoFiltrada.length >= 2,
       staleTime: 1000 * 60 * 5,
     }
   )
@@ -42,15 +47,15 @@ export function useProdutosVendaQuery({
     isLoading: isLoadingProdutos,
     error: produtosError,
   } = useSecureTenantQuery(
-    ['produtos-por-grupo', grupoSelecionadoId],
+    ['produtos-por-grupo', menuId, grupoSelecionadoId],
     async ({ token: tenantToken }) => {
-      if (!grupoSelecionadoId) {
+      if (!grupoSelecionadoId || !menuId) {
         return { produtos: [] as Produto[], count: 0 }
       }
-      return fetchProdutosDoGrupo(grupoSelecionadoId, tenantToken)
+      return fetchProdutosDoGrupo(grupoSelecionadoId, tenantToken, menuId)
     },
     {
-      enabled: enabled && !!grupoSelecionadoId && !!token,
+      enabled: catalogoHabilitado && !!grupoSelecionadoId && !!token,
       staleTime: 1000 * 60 * 5,
       gcTime: 1000 * 60 * 15,
       retry: 1,
@@ -63,21 +68,23 @@ export function useProdutosVendaQuery({
   }, [produtosPorGrupoData, onProdutosGrupoCarregados])
 
   const produtosList = useMemo(() => {
+    if (!menuId) return []
+
     if (buscaProdutoFiltrada.length >= 2) {
       if (!produtosBuscadosData?.produtos) return []
       return [...produtosBuscadosData.produtos]
         .filter(p => p.isAtivo())
-        .sort((a, b) => a.getNome().localeCompare(b.getNome()))
+        .sort((a, b) => a.getNome().localeCompare(b.getNome(), 'pt-BR'))
     }
 
     if (!produtosPorGrupoData?.produtos) return []
     return [...produtosPorGrupoData.produtos]
       .filter(p => p.isAtivo())
-      .sort((a, b) => a.getNome().localeCompare(b.getNome()))
-  }, [buscaProdutoFiltrada, produtosBuscadosData, produtosPorGrupoData])
+      .sort((a, b) => a.getNome().localeCompare(b.getNome(), 'pt-BR'))
+  }, [menuId, buscaProdutoFiltrada, produtosBuscadosData, produtosPorGrupoData])
 
   const isLoadingProdutosVenda =
-    buscaProdutoFiltrada.length >= 2 ? isLoadingBuscaProdutos : isLoadingProdutos
+    !menuId ? false : buscaProdutoFiltrada.length >= 2 ? isLoadingBuscaProdutos : isLoadingProdutos
 
   return {
     produtosList,
@@ -88,5 +95,6 @@ export function useProdutosVendaQuery({
     produtosError,
     produtosPorGrupoData,
     produtosBuscadosData,
+    menuCatalogoIndisponivel: enabled && !menuId,
   }
 }

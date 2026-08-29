@@ -140,7 +140,7 @@ export function ImpressorasTabsModal({ state, onClose, onReload }: ImpressorasTa
         title={title}
         scrollableBody={false}
         footerVariant="bar"
-        panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(960px,45vw)]"
+        panelClassName="w-[85vw] max-w-[85vw]"
         tabsSlot={tabsSlot}
         footerActions={footerActions}
       >

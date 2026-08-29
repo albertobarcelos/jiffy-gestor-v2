@@ -532,6 +532,7 @@ export function ProdutosTabsModal({
                 isEmbedded
                 hideEmbeddedHeader
                 hideEmbeddedFormActions
+                showMobilePreview={false}
                 onWizardStepChange={setWizardStep}
                 onWizardSavingChange={setWizardSaving}
                 onFiscalUnavailableChange={setFiscalOnlyBack}

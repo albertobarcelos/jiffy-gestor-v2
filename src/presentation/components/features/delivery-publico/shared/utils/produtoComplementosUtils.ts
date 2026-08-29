@@ -59,19 +59,47 @@ export function somarQuantidadeNoGrupo(
   return total
 }
 
+export type GrupoComplementoPendente = {
+  id: string
+  nome: string
+  obrigatorio: boolean
+  quantidadeMinima: number
+  quantidadeSelecionada: number
+}
+
+function quantidadeMinimaGrupo(grupo: GrupoComplementoResolvido): number {
+  return grupo.obrigatorio ? Math.max(grupo.qtdMinima, 1) : grupo.qtdMinima
+}
+
+export function listarGruposComplementosPendentes(
+  grupos: GrupoComplementoResolvido[],
+  quantidades: Record<string, number>
+): GrupoComplementoPendente[] {
+  return grupos.flatMap(grupo => {
+    const quantidadeSelecionada = somarQuantidadeNoGrupo(quantidades, grupo.id)
+    const quantidadeMinima = quantidadeMinimaGrupo(grupo)
+    if (quantidadeMinima <= 0 || quantidadeSelecionada >= quantidadeMinima) return []
+
+    return [{
+      id: grupo.id,
+      nome: grupo.nome,
+      obrigatorio: grupo.obrigatorio,
+      quantidadeMinima,
+      quantidadeSelecionada,
+    }]
+  })
+}
+
 export function validarGruposComplementos(
   grupos: GrupoComplementoResolvido[],
   quantidades: Record<string, number>
 ): { valido: boolean; mensagem?: string } {
-  for (const grupo of grupos) {
-    const qtd = somarQuantidadeNoGrupo(quantidades, grupo.id)
-    const minimo = grupo.obrigatorio ? Math.max(grupo.qtdMinima, 1) : grupo.qtdMinima
-    if (minimo > 0 && qtd < minimo) {
-      return {
-        valido: false,
-        mensagem: `Selecione pelo menos ${minimo} em "${grupo.nome}"`,
-      }
-    }
+  const pendentes = listarGruposComplementosPendentes(grupos, quantidades)
+  if (pendentes.length === 0) return { valido: true }
+
+  const primeiro = pendentes[0]
+  return {
+    valido: false,
+    mensagem: `Selecione pelo menos ${primeiro.quantidadeMinima} em "${primeiro.nome}"`,
   }
-  return { valido: true }
 }
