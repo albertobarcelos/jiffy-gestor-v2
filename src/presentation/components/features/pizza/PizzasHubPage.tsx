@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { MdArrowBack, MdArrowDownward, MdArrowUpward } from 'react-icons/md'
+import { MdArrowBack } from 'react-icons/md'
 import { CatalogGroupHeader } from '@/src/presentation/components/features/catalogo/CatalogGroupHeader'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { Button } from '@/src/presentation/components/ui/button'
@@ -12,73 +12,36 @@ import {
   usePizzaCategorias,
   usePizzaSabores,
   usePizzaTamanhos,
-  useReordenarPizzaCategoriaMutation,
 } from '@/src/presentation/hooks/pizza/usePizza'
 import { PizzaCategoriaSetupPanel } from './PizzaCategoriaSetupPanel'
 import { PizzaCategoriaTabsModal } from './PizzaCategoriaTabsModal'
 import { PizzaSaborModal } from './PizzaSaborModal'
 import { PizzaCategoriaSaboresSection } from './PizzaCategoriaSaboresSection'
+import { PizzaReorderModal } from './reorder/PizzaReorderModal'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import type { CategoriaPizza } from '@/src/shared/types/pizza'
 
 function PizzaCategoriaBlock({
   categoria,
-  index,
-  total,
   isExpanded,
   onToggleExpand,
   onEditar,
   onAdicionarSabor,
   onEditarSabor,
   onToggleAtivo,
-  onReordenar,
-  savingStatus,
 }: {
   categoria: CategoriaPizza
-  index: number
-  total: number
   isExpanded: boolean
   onToggleExpand: (categoriaId: string) => void
   onEditar: (categoria: CategoriaPizza) => void
   onAdicionarSabor: (categoria: CategoriaPizza) => void
   onEditarSabor: (categoria: CategoriaPizza, saborId: string) => void
   onToggleAtivo: (categoria: CategoriaPizza, ativo: boolean) => void
-  onReordenar: (categoria: CategoriaPizza, direction: 'up' | 'down') => void
-  savingStatus: boolean
 }) {
   const { data: tamanhosData } = usePizzaTamanhos(categoria.id)
   const tamanhosTotal = tamanhosData?.count ?? tamanhosData?.items?.length ?? 0
   const { data: saboresData } = usePizzaSabores(categoria.id)
   const saboresCount = saboresData?.count ?? saboresData?.items?.length ?? 0
-
-  const reorderActions = (
-    <div className="flex items-center gap-0.5">
-      <button
-        type="button"
-        className="rounded p-1 text-secondary-text hover:bg-gray-100 disabled:opacity-30"
-        disabled={index === 0 || savingStatus}
-        aria-label="Subir categoria"
-        onClick={e => {
-          e.stopPropagation()
-          onReordenar(categoria, 'up')
-        }}
-      >
-        <MdArrowUpward size={16} />
-      </button>
-      <button
-        type="button"
-        className="rounded p-1 text-secondary-text hover:bg-gray-100 disabled:opacity-30"
-        disabled={index === total - 1 || savingStatus}
-        aria-label="Descer categoria"
-        onClick={e => {
-          e.stopPropagation()
-          onReordenar(categoria, 'down')
-        }}
-      >
-        <MdArrowDownward size={16} />
-      </button>
-    </div>
-  )
 
   return (
     <div className="space-y-1">
@@ -93,7 +56,6 @@ function PizzaCategoriaBlock({
           itemCountSubtitle={`${saboresCount} sabor${saboresCount === 1 ? '' : 'es'}`}
           isExpanded={isExpanded}
           addProdutoLabel="Adicionar item"
-          extraActions={reorderActions}
           onToggleExpand={onToggleExpand}
           onEditGrupo={() => onEditar(categoria)}
           onToggleGrupoStatus={() => onToggleAtivo(categoria, !categoria.ativo)}
@@ -135,15 +97,14 @@ export function PizzasHubPage() {
   const { toGestao } = useGestaoPath()
   const { data, isLoading, isError, refetch } = usePizzaCategorias({ limit: 50 })
   const atualizarCategoria = useAtualizarPizzaCategoriaMutation()
-  const reordenarCategoria = useReordenarPizzaCategoriaMutation()
 
   const [setupOpen, setSetupOpen] = useState(false)
+  const [reorderOpen, setReorderOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [editCategoriaId, setEditCategoriaId] = useState<string | null>(null)
   const [saborModalOpen, setSaborModalOpen] = useState(false)
   const [categoriaSabor, setCategoriaSabor] = useState<CategoriaPizza | null>(null)
   const [saborEditId, setSaborEditId] = useState<string | null>(null)
-  const [savingCategoriaId, setSavingCategoriaId] = useState<string | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
 
   const categorias = data?.items ?? []
@@ -165,36 +126,10 @@ export function PizzasHubPage() {
   }, [])
 
   const handleToggleAtivo = async (categoria: CategoriaPizza, ativo: boolean) => {
-    setSavingCategoriaId(categoria.id)
     try {
       await atualizarCategoria.mutateAsync({ id: categoria.id, patch: { ativo } })
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : 'Erro ao atualizar categoria')
-    } finally {
-      setSavingCategoriaId(null)
-    }
-  }
-
-  const handleReordenarCategoria = async (
-    categoria: CategoriaPizza,
-    direction: 'up' | 'down'
-  ) => {
-    const index = categorias.findIndex(c => c.id === categoria.id)
-    if (index < 0) return
-    const targetIndex = direction === 'up' ? index - 1 : index + 1
-    if (targetIndex < 0 || targetIndex >= categorias.length) return
-
-    setSavingCategoriaId(categoria.id)
-    try {
-      await reordenarCategoria.mutateAsync({
-        id: categoria.id,
-        novaPosicao: targetIndex + 1,
-      })
-      await refetch()
-    } catch (error) {
-      showToast.error(error instanceof Error ? error.message : 'Erro ao reordenar categoria')
-    } finally {
-      setSavingCategoriaId(null)
     }
   }
 
@@ -229,12 +164,23 @@ export function PizzasHubPage() {
             </p>
           </div>
         </div>
-        <Button variant="contained" onClick={() => setSetupOpen(true)}>
-          + Nova categoria pizza
-        </Button>
+        <div className="flex shrink-0 flex-nowrap items-center gap-1.5">
+          {categorias.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setReorderOpen(true)}
+              className="flex h-8 shrink-0 items-center whitespace-nowrap rounded-lg border border-primary/50 bg-white px-2.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 md:px-3 md:text-sm"
+            >
+              Reordenar pizzas
+            </button>
+          ) : null}
+          <Button variant="contained" onClick={() => setSetupOpen(true)}>
+            + Nova categoria pizza
+          </Button>
+        </div>
       </div>
     ),
-    [router, toGestao]
+    [router, toGestao, categorias.length]
   )
 
   return (
@@ -266,17 +212,13 @@ export function PizzasHubPage() {
             aria-label="Categorias pizza"
             className="flex w-full flex-col space-y-4 pb-4"
           >
-            {categorias.map((categoria, index) => (
+            {categorias.map(categoria => (
               <div key={categoria.id} role="listitem">
                 <PizzaCategoriaBlock
                   categoria={categoria}
-                  index={index}
-                  total={categorias.length}
                   isExpanded={expandedGroups[categoria.id] !== false}
                   onToggleExpand={handleToggleExpand}
-                  savingStatus={savingCategoriaId === categoria.id}
                   onToggleAtivo={handleToggleAtivo}
-                  onReordenar={handleReordenarCategoria}
                   onEditar={cat => {
                     setEditCategoriaId(cat.id)
                     setEditOpen(true)
@@ -295,6 +237,8 @@ export function PizzasHubPage() {
         onClose={() => setSetupOpen(false)}
         onSuccess={() => void refetch()}
       />
+
+      <PizzaReorderModal open={reorderOpen} onClose={() => setReorderOpen(false)} />
 
       <PizzaCategoriaTabsModal
         open={editOpen}
