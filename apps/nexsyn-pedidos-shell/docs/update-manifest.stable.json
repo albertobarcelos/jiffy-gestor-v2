@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "channel": "stable",
+  "latest": {
+    "version": "0.1.0",
+    "minAgentVersion": "0.1.0",
+    "url": "https://pub-f30dc155e8504591ac42219788281ee9.r2.dev/jiffy-flow/0.1.0/nexsyn-pedidos-shell.exe",
+    "sha256": "SUBSTITUIR_PELO_SHA256_DO_EXE",
+    "notes": "Jiffy Flow 0.1.0 — primeiro manifesto estável"
+  }
+}

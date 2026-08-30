@@ -2,6 +2,9 @@ use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_deep_link::DeepLinkExt;
 
 mod quadro_url;
+mod update;
+
+pub use update::try_run_apply_pending;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -33,6 +36,13 @@ pub fn run() {
                 .resizable(true)
                 .decorations(true)
                 .build()?;
+
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                if update::maybe_prompt_and_apply() {
+                    handle.exit(0);
+                }
+            });
             Ok(())
         })
         .run(tauri::generate_context!())
