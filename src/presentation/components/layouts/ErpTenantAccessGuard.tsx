@@ -1,8 +1,8 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useLayoutEffect, useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantAccessGuard } from '@/src/presentation/hooks/useTenantAccessGuard'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -13,7 +13,7 @@ import {
   urlHubDaSessaoAtual,
   urlLoginDaSessaoAtual,
 } from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
-import { isQuadroKioskAtual } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
+import { isRotaKioskPedidos } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
 
 interface ErpTenantAccessGuardProps {
   children: ReactNode
@@ -31,15 +31,23 @@ interface ErpTenantAccessGuardProps {
  */
 export function ErpTenantAccessGuard({ children }: ErpTenantAccessGuardProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const { hasAccess, isLoading } = useTenantAccessGuard()
   const tenantAuth = useAuthStore(s => s.tenantAuth)
-  const identityAuth = useAuthStore(s => s.identityAuth)
+  const [clientePronto, setClientePronto] = useState(false)
 
-  const kioskQuadroSemTenant =
-    isQuadroKioskAtual() &&
-    identityAuth !== null &&
-    !identityAuth.isExpired() &&
-    !hasAccess
+  useLayoutEffect(() => {
+    setClientePronto(true)
+  }, [])
+
+  const kioskFlow =
+    clientePronto &&
+    isRotaKioskPedidos(
+      pathname ?? '',
+      typeof window !== 'undefined' ? window.location.search : ''
+    )
+  /** Flow: lista / quadro sem tenant. Identity curto não pode bloquear esta rota. */
+  const kioskQuadroSemTenant = kioskFlow && !hasAccess
 
   useEffect(() => {
     if (isLoading || hasAccess) return
@@ -92,6 +100,10 @@ export function ErpTenantAccessGuard({ children }: ErpTenantAccessGuardProps) {
       router.replace(login)
     }
   }, [hasAccess, isLoading, kioskQuadroSemTenant, router, tenantAuth])
+
+  if (kioskFlow) {
+    return <>{children}</>
+  }
 
   if (isLoading) {
     return (

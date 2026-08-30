@@ -2,16 +2,17 @@ import type { LoginEmpresaSnapshot } from '@/src/domain/types/LoginEmpresaSnapsh
 import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 import { escolherEmpresaUnicaAtiva } from './escolherEmpresaUnicaAtiva'
 import { isSinalKioskGestorPedidos } from '../kiosk/isKioskGestorPedidos'
-import { pathQuadroKiosk } from './pathsGestorSessao'
+import { pathEscolherEmpresaKiosk } from './pathsGestorSessao'
 
 export type DestinoAposLogin =
   | { tipo: 'hub'; path: string }
   | { tipo: 'pedidos-gestor'; empresa: LoginEmpresaSnapshot }
-  | { tipo: 'quadro-kiosk'; path: string }
+  | { tipo: 'escolher-empresa-kiosk'; path: string }
 
 export function planearDestinoAposLogin(input: {
   empresas: readonly LoginEmpresaSnapshot[] | null | undefined
   sinalGestor: { hasTauri: boolean; search?: string }
+  ultimaEmpresaId?: string | null
 }): DestinoAposLogin {
   if (!isSinalKioskGestorPedidos(input.sinalGestor)) {
     return { tipo: 'hub', path: HUB_PATH }
@@ -22,5 +23,6 @@ export function planearDestinoAposLogin(input: {
     return { tipo: 'pedidos-gestor', empresa: unica }
   }
 
-  return { tipo: 'quadro-kiosk', path: pathQuadroKiosk() }
+  /** Várias empresas: sempre a lista. A última só destaca o item; não salta o ecrã. */
+  return { tipo: 'escolher-empresa-kiosk', path: pathEscolherEmpresaKiosk() }
 }

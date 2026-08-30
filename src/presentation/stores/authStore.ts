@@ -423,6 +423,20 @@ export const useAuthStore = create<AuthState>()(
         s.hubEmpresasUserId = sanitized.hubEmpresasUserId
         s.isAuthenticated = !!(identityAuth || tenantAuth)
         s.isRehydrated = true
+        /**
+         * Zustand persist já fez `set()` antes deste callback. Mutar `s` no sítio
+         * não notifica o React — após login + `location.assign` a lista ficava
+         * no robot até um F5. `set` força o `isRehydrated` a chegar aos guards.
+         */
+        _storeSet?.({
+          identityAuth,
+          tenantAuth,
+          auth: tenantAuth ?? identityAuth ?? null,
+          hubEmpresas: sanitized.hubEmpresas,
+          hubEmpresasUserId: sanitized.hubEmpresasUserId,
+          isAuthenticated: !!(identityAuth || tenantAuth),
+          isRehydrated: true,
+        })
       },
     }
   )

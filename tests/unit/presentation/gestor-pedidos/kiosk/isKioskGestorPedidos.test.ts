@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   deveEsconderTopNavNoGestorPedidos,
+  isRotaKioskPedidos,
   isRotaPedidos,
   isSinalKioskGestorPedidos,
 } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
@@ -8,6 +9,7 @@ import {
 describe('rota /pedidos', () => {
   it('reconhece o quadro e ignora rotas mortas', () => {
     expect(isRotaPedidos('/pedidos')).toBe(true)
+    expect(isRotaPedidos('/pedidos/empresas')).toBe(true)
     expect(isRotaPedidos('/pedidos/abrir-windows')).toBe(true)
     expect(isRotaPedidos('/pedidos-clientes')).toBe(false)
     expect(isRotaPedidos('/gestor-pedidos')).toBe(false)
@@ -21,6 +23,13 @@ describe('rota /pedidos', () => {
     expect(isSinalKioskGestorPedidos({ hasTauri: false, search: 'gestor=1' })).toBe(true)
     expect(isSinalKioskGestorPedidos({ hasTauri: false, search: 'kiosk=1' })).toBe(false)
     expect(isSinalKioskGestorPedidos({ hasTauri: false, search: '' })).toBe(false)
+  })
+
+  it('lista e quadro do Flow são kiosk com ?gestor', () => {
+    expect(isRotaKioskPedidos('/pedidos/empresas', '')).toBe(false)
+    expect(isRotaKioskPedidos('/minhas-empresas', '?gestor')).toBe(false)
+    expect(isRotaKioskPedidos('/pedidos/empresas', '?gestor')).toBe(true)
+    expect(isRotaKioskPedidos('/pedidos', '?gestor')).toBe(true)
   })
 
   it('esconde TopNav em /pedidos só com sinal', () => {

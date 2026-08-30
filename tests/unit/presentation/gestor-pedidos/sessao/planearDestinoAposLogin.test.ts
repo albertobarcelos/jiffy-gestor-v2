@@ -39,12 +39,32 @@ describe('planearDestinoAposLogin', () => {
     ).toEqual({ tipo: 'pedidos-gestor', empresa })
   })
 
-  it('no gestor com várias empresas vai ao quadro, não ao hub', () => {
+  it('no Flow com várias empresas e sem última vai à lista, não ao hub', () => {
     expect(
       planearDestinoAposLogin({
         empresas: [ativa('a'), ativa('b')],
         sinalGestor: { hasTauri: false, search: 'gestor' },
       })
-    ).toEqual({ tipo: 'quadro-kiosk', path: '/pedidos?gestor' })
+    ).toEqual({ tipo: 'escolher-empresa-kiosk', path: '/pedidos/empresas?gestor' })
+  })
+
+  it('no Flow com várias empresas vai à lista mesmo com última gravada', () => {
+    expect(
+      planearDestinoAposLogin({
+        empresas: [ativa('a'), ativa('b')],
+        sinalGestor: { hasTauri: true, search: '' },
+        ultimaEmpresaId: 'b',
+      })
+    ).toEqual({ tipo: 'escolher-empresa-kiosk', path: '/pedidos/empresas?gestor' })
+  })
+
+  it('no Flow ignora última empresa que já não está na lista', () => {
+    expect(
+      planearDestinoAposLogin({
+        empresas: [ativa('a'), ativa('b')],
+        sinalGestor: { hasTauri: true, search: '' },
+        ultimaEmpresaId: 'sumiu',
+      })
+    ).toEqual({ tipo: 'escolher-empresa-kiosk', path: '/pedidos/empresas?gestor' })
   })
 })

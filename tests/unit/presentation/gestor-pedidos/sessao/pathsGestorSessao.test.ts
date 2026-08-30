@@ -29,8 +29,10 @@ describe('pathHubComSinalGestor', () => {
     expect(pathHubComSinalGestor({ hasTauri: false, search: '' })).toBe('/minhas-empresas')
   })
 
-  it('no casco Windows vai ao quadro, não ao hub', () => {
-    expect(pathHubComSinalGestor({ hasTauri: true, search: '' })).toBe('/pedidos?gestor')
-    expect(pathHubComSinalGestor({ hasTauri: false, search: '?gestor' })).toBe('/pedidos?gestor')
+  it('no casco Windows vai à lista do Flow, não ao hub', () => {
+    expect(pathHubComSinalGestor({ hasTauri: true, search: '' })).toBe('/pedidos/empresas?gestor')
+    expect(pathHubComSinalGestor({ hasTauri: false, search: '?gestor' })).toBe(
+      '/pedidos/empresas?gestor'
+    )
   })
 })

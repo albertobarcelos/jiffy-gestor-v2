@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import type { Auth } from '@/src/domain/entities/Auth'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
@@ -18,10 +18,11 @@ import {
 } from '@/src/shared/constants/sessionCoordinator'
 import { isHubPathname } from '@/src/shared/constants/hubRoutes'
 import {
+  estaNaMesmaRotaLocal,
   irParaLoginDaSessaoAtual,
   urlHubDaSessaoAtual,
 } from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
-import { isQuadroKioskAtual } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
+import { isRotaKioskPedidos } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
 
 /** Tempo máximo de espera para o refresh de token antes de encerrar a sessão da empresa. */
 const REFRESH_TIMEOUT_MS = 5_000
@@ -218,12 +219,34 @@ export function AuthGuard({ children }: AuthGuardProps) {
   }, [])
 
   const redirectToHub = useCallback(() => {
+    const dest = urlHubDaSessaoAtual()
+    if (estaNaMesmaRotaLocal(dest)) {
+      redirectingRef.current = false
+      setAllowed(true)
+      return
+    }
     if (redirectingRef.current) {
       return
     }
     redirectingRef.current = true
-    window.location.href = urlHubDaSessaoAtual()
+    window.location.replace(dest)
   }, [])
+
+  useLayoutEffect(() => {
+    if (isPublicPath(pathname)) return
+    if (
+      isRotaKioskPedidos(
+        pathname ?? '',
+        typeof window !== 'undefined' ? window.location.search : ''
+      )
+    ) {
+      if (!useAuthStore.getState().isTabVerified) {
+        useAuthStore.getState().setTabVerified(true)
+      }
+      redirectingRef.current = false
+      setAllowed(true)
+    }
+  }, [pathname])
 
   useEffect(() => {
     // Rotas públicas: liberar imediatamente, sem esperar reidratação
@@ -232,19 +255,25 @@ export function AuthGuard({ children }: AuthGuardProps) {
       return
     }
 
-    if (!isRehydrated) {
-      return
-    }
-
     const isHub = isHubPath(pathname)
 
-    /** Casco Windows: o quadro renderiza sem tenant para o drop escolher a empresa. */
-    if (!isHub && isQuadroKioskAtual() && identityHubStillValid()) {
+    /** Flow: quadro e lista sem tenant. Não esperar persist — senão o login fica no robot até F5. */
+    if (
+      !isHub &&
+      isRotaKioskPedidos(
+        pathname ?? '',
+        typeof window !== 'undefined' ? window.location.search : ''
+      )
+    ) {
       if (!isTabVerified) {
         useAuthStore.getState().setTabVerified(true)
       }
       redirectingRef.current = false
       setAllowed(true)
+      return
+    }
+
+    if (!isRehydrated) {
       return
     }
 
@@ -520,7 +549,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     return <>{children}</>
   }
 
-  if (!isRehydrated || !allowed) {
+  if (!allowed) {
     if (isHubPath(pathname)) {
       return <div className="min-h-screen bg-[#fafafa]" />
     }

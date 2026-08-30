@@ -1,16 +1,25 @@
 import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 import { buildGestaoPath } from '@/src/shared/utils/gestaoRoutes'
 import { PEDIDOS_PATH, QUERY_GESTOR } from '../constantes'
-import { isSinalKioskGestorPedidos } from '../kiosk/isKioskGestorPedidos'
+import {
+  detectarRuntimeTauri,
+  isSinalKioskGestorPedidos,
+  lerSinalKioskFlowPersistido,
+  persistirSinalKioskFlow,
+} from '../kiosk/isKioskGestorPedidos'
 
 export function lerSinalGestorDoBrowser(): { hasTauri: boolean; search: string } {
   if (typeof window === 'undefined') {
     return { hasTauri: false, search: '' }
   }
-  return {
-    hasTauri: '__TAURI__' in window,
-    search: window.location.search,
+  const search = window.location.search
+  const runtimeTauri = detectarRuntimeTauri()
+  const persistido = lerSinalKioskFlowPersistido()
+  const hasTauri = runtimeTauri || persistido
+  if (isSinalKioskGestorPedidos({ hasTauri: runtimeTauri || persistido, search })) {
+    persistirSinalKioskFlow()
   }
+  return { hasTauri, search }
 }
 
 export function pathLoginComSinalGestor(sinal: {
@@ -24,13 +33,18 @@ export function pathHubComSinalGestor(sinal: {
   hasTauri: boolean
   search?: string
 }): string {
-  /** Windows / `?gestor`: o quadro escolhe a empresa — Minhas Empresas não entra neste fluxo. */
-  return isSinalKioskGestorPedidos(sinal) ? pathQuadroKiosk() : HUB_PATH
+  /** Windows / `?gestor`: nunca Minhas Empresas. */
+  return isSinalKioskGestorPedidos(sinal) ? pathEscolherEmpresaKiosk() : HUB_PATH
 }
 
 /** Quadro sem slug: o drop da toolbar escolhe a empresa. */
 export function pathQuadroKiosk(): string {
   return `${PEDIDOS_PATH}?${QUERY_GESTOR}`
+}
+
+/** Lista de empresas só do Jiffy Flow. O hub web não usa esta rota. */
+export function pathEscolherEmpresaKiosk(): string {
+  return `${PEDIDOS_PATH}/empresas?${QUERY_GESTOR}`
 }
 
 export function pathPedidosGestor(empParam: string): string {

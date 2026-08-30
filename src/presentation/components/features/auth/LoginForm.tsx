@@ -15,6 +15,10 @@ import { fetchAccessTokenEscolherEmpresa } from '@/src/presentation/utils/escolh
 import { entrarEmpresaGestorNaAba } from '@/src/presentation/gestor-pedidos/sessao/entrarEmpresaGestorNaAba'
 import { lerSinalGestorDoBrowser } from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
 import { planearDestinoAposLogin } from '@/src/presentation/gestor-pedidos/sessao/planearDestinoAposLogin'
+import { lerUltimaEmpresaKiosk } from '@/src/presentation/gestor-pedidos/kiosk/ultimaEmpresaKiosk'
+import { persistirSinalKioskFlow } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
+import { gravarEmpresasLoginFlow } from '@/src/presentation/gestor-pedidos/kiosk/empresasLoginFlow'
+import { clearTabSession } from '@/src/shared/utils/tabSession'
 
 /**
  * Componente de formulário de login
@@ -90,23 +94,36 @@ export function LoginForm() {
       }
 
       loginWithHubEmpresas(resultado.auth, resultado.empresas)
+      gravarEmpresasLoginFlow(resultado.empresas)
 
       const destino = planearDestinoAposLogin({
         empresas: resultado.empresas,
         sinalGestor: lerSinalGestorDoBrowser(),
+        ultimaEmpresaId: lerUltimaEmpresaKiosk()?.empresaId,
       })
       if (destino.tipo === 'pedidos-gestor') {
+        persistirSinalKioskFlow()
         const token = await fetchAccessTokenEscolherEmpresa(
           destino.empresa.id,
           resultado.auth.getAccessToken()
         )
-        router.replace(
+        window.location.assign(
           entrarEmpresaGestorNaAba({
             accessToken: token,
             empresaNome: destino.empresa.nomeFantasia,
             empresaId: destino.empresa.id,
           })
         )
+        return
+      }
+
+      if (destino.tipo === 'escolher-empresa-kiosk') {
+        persistirSinalKioskFlow()
+        clearTabSession()
+        await new Promise<void>(resolve => {
+          window.setTimeout(resolve, 0)
+        })
+        window.location.assign(destino.path)
         return
       }
 

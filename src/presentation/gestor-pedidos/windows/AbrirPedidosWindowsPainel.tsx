@@ -25,8 +25,8 @@ export function AbrirPedidosWindowsPainel() {
         <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Pedidos</p>
         <h1 className="mt-1 text-2xl font-semibold text-gray-900">Abrir no Windows</h1>
         <p className="mt-2 text-sm text-gray-600">
-          Se o app já estiver instalado neste PC, ele deve abrir sozinho. Caso contrário, baixe o
-          instalador (quadro + agente de impressão).
+          Se o Jiffy Flow já estiver neste PC, ele deve abrir sozinho. Caso contrário, baixe o
+          instalador. O Jiffy Print (cupons) instala-se à parte.
         </p>
       </div>
 
@@ -43,24 +43,18 @@ export function AbrirPedidosWindowsPainel() {
 
       {plano.mostrarDownload && (
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-gray-900">Instalador</h2>
+          <h2 className="text-base font-semibold text-gray-900">Jiffy Flow</h2>
           <p className="mt-1 text-sm text-gray-600">
-            Pacote da loja: janela de pedidos (`/pedidos`) e agente de impressão. Cada um atualiza
-            à parte depois de instalado.
+            Quadro de pedidos em janela Windows. Depois de instalado, actualiza sozinho pelo
+            manifesto. Não inclui o Jiffy Print.
           </p>
-          {instaladorUrl ? (
-            <a
-              href={instaladorUrl}
-              className="mt-4 inline-flex rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-gray-800"
-            >
-              Baixar instalador
-            </a>
-          ) : (
-            <p className="mt-4 rounded-xl bg-gray-50 px-3 py-2 text-sm text-gray-600">
-              O ficheiro ainda não está publicado. Quando houver release, defina{' '}
-              <code className="text-xs">NEXT_PUBLIC_PEDIDOS_WINDOWS_SETUP_URL</code>.
-            </p>
-          )}
+          <a
+            href={instaladorUrl ?? undefined}
+            download="JiffyFlow-setup.exe"
+            className="mt-4 inline-flex rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-gray-800"
+          >
+            Baixar o Jiffy Flow
+          </a>
         </div>
       )}
     </div>

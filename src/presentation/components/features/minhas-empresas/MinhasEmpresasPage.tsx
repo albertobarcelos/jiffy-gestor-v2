@@ -37,7 +37,7 @@ import { entrarEmpresaGestorNaAba } from '@/src/presentation/gestor-pedidos/sess
 import { isSinalKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
 import {
   lerSinalGestorDoBrowser,
-  pathQuadroKiosk,
+  pathEscolherEmpresaKiosk,
   urlLoginDaSessaoAtual,
 } from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
 
@@ -508,7 +508,7 @@ export default function MinhasEmpresasPage() {
   useEffect(() => {
     if (!isRehydrated) return
     if (isSinalKioskGestorPedidos(lerSinalGestorDoBrowser())) {
-      router.replace(pathQuadroKiosk())
+      router.replace(pathEscolherEmpresaKiosk())
     }
   }, [isRehydrated, router])
 

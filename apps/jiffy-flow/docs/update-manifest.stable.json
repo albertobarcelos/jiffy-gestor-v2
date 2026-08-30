@@ -1,0 +1,11 @@
+{
+    "schemaVersion":  1,
+    "channel":  "stable",
+    "latest":  {
+                   "version":  "0.1.0",
+                   "minAgentVersion":  "0.1.0",
+                   "url":  "https://pub-143026e1401641a5ad59a389410eed2a.r2.dev/releases/0.1.0/jiffy-flow.exe",
+                   "sha256":  "cc974cfe3063024e020120bcc736c643a931e146e050d9087ec2723cadccdbdf",
+                   "notes":  "Jiffy Flow 0.1.0 - quadro de pedidos (app.jiffy.run)"
+               }
+}
