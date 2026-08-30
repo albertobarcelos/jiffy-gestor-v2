@@ -25,10 +25,20 @@ function criarIntervaloHoje() {
   }
 }
 
-export function useKanbanFilters(timeZoneEmpresa?: string) {
+export function useKanbanFilters(
+  timeZoneEmpresa?: string,
+  opcoes?: { diaOperacionalFlow?: boolean }
+) {
+  const diaOperacionalFlow = Boolean(opcoes?.diaOperacionalFlow)
+  const tzEmpresa = timeZoneEmpresa ?? ''
+
   const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
-  const intervaloPeriodoPadrao = useMemo(() => criarIntervaloHoje(), [])
+  const intervaloCivilHoje = useMemo(() => criarIntervaloHoje(), [])
+  const intervaloPeriodoPadrao = diaOperacionalFlow
+    ? intervaloPresetKanbanFiltroData('hoje', tzEmpresa, { diaOperacionalFlow: true }) ??
+      intervaloCivilHoje
+    : intervaloCivilHoje
   const [periodoInicio, setPeriodoInicio] = useState<Date | null>(null)
   const [periodoFim, setPeriodoFim] = useState<Date | null>(null)
   const [periodoDataModo, setPeriodoDataModo] = useState<FiltroDataKanbanModo>('periodo')
@@ -66,10 +76,16 @@ export function useKanbanFilters(timeZoneEmpresa?: string) {
 
   const deveUsarPeriodoPadrao =
     periodoDataModo === 'periodo' && !periodoInicio && !periodoFim
-  const periodoInicioConsulta =
-    periodoInicio ?? (deveUsarPeriodoPadrao ? intervaloPeriodoPadrao.inicio : null)
-  const periodoFimConsulta =
-    periodoFim ?? (deveUsarPeriodoPadrao ? intervaloPeriodoPadrao.fim : null)
+  const intervaloLiveFlow =
+    diaOperacionalFlow && (periodoPreset === 'hoje' || periodoPreset === 'ontem')
+      ? intervaloPresetKanbanFiltroData(periodoPreset, tzEmpresa, { diaOperacionalFlow: true })
+      : null
+  const periodoInicioConsulta = intervaloLiveFlow
+    ? intervaloLiveFlow.inicio
+    : periodoInicio ?? (deveUsarPeriodoPadrao ? intervaloPeriodoPadrao.inicio : null)
+  const periodoFimConsulta = intervaloLiveFlow
+    ? intervaloLiveFlow.fim
+    : periodoFim ?? (deveUsarPeriodoPadrao ? intervaloPeriodoPadrao.fim : null)
   const periodoAtivoNaConsulta =
     periodoDataModo === 'periodo' && periodoInicioConsulta != null && periodoFimConsulta != null
   const periodoInicioISO = periodoAtivoNaConsulta
@@ -183,14 +199,21 @@ export function useKanbanFilters(timeZoneEmpresa?: string) {
         abrirModalPeriodoDatas()
         return
       }
-      const intervalo = intervaloPresetKanbanFiltroData(preset, timeZoneEmpresa ?? '')
+      const intervalo = intervaloPresetKanbanFiltroData(preset, tzEmpresa, {
+        diaOperacionalFlow,
+      })
       if (!intervalo) return
       setPeriodoDataModo('periodo')
       setPeriodoPreset(preset)
+      if (diaOperacionalFlow && (preset === 'hoje' || preset === 'ontem')) {
+        setPeriodoInicio(null)
+        setPeriodoFim(null)
+        return
+      }
       setPeriodoInicio(intervalo.inicio)
       setPeriodoFim(intervalo.fim)
     },
-    [aplicarPeriodoTodos, abrirModalPeriodoDatas, timeZoneEmpresa]
+    [aplicarPeriodoTodos, abrirModalPeriodoDatas, diaOperacionalFlow, tzEmpresa]
   )
 
   return {

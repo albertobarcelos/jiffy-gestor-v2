@@ -40,6 +40,26 @@ export function formatarMinutosCurto(minutos: number): string {
   return resto > 0 ? `${horas}h${resto}min` : `${horas}h`
 }
 
+/** Hora do pedido no cartão da Operação. Inclui dia se não for o mesmo dia civil. */
+export function formatarQuandoPedidoKanban(
+  iso: string | null | undefined,
+  agoraMs: number
+): string | null {
+  const inicio = parseIsoMs(iso)
+  if (inicio == null) return null
+  const pedido = new Date(inicio)
+  const agora = new Date(agoraMs)
+  const mesmaDataCivil =
+    pedido.getFullYear() === agora.getFullYear() &&
+    pedido.getMonth() === agora.getMonth() &&
+    pedido.getDate() === agora.getDate()
+  const hora = pedido.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  if (mesmaDataCivil) return hora
+  const dia = String(pedido.getDate()).padStart(2, '0')
+  const mes = String(pedido.getMonth() + 1).padStart(2, '0')
+  return `${dia}/${mes} ${hora}`
+}
+
 export function tomTempoPedidoKanban(
   minutosDecorridos: number | null,
   minutosAtraso: number | null

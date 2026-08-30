@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Menu, MenuItem } from '@mui/material'
-import { MdDashboard, MdExpandMore, MdLocalShipping, MdViewList } from 'react-icons/md'
+import { MdDashboard, MdExpandMore, MdViewList, MdViewQuilt } from 'react-icons/md'
 import {
   MODOS_VISUALIZACAO_KANBAN,
   ROTULO_MODO_VISUALIZACAO_KANBAN,
@@ -11,7 +11,7 @@ import {
 
 const ICONE_MODO: Record<ModoVisualizacaoKanban, typeof MdDashboard> = {
   quadro: MdDashboard,
-  expedicao: MdLocalShipping,
+  expedicao: MdViewQuilt,
   lista: MdViewList,
 }
 

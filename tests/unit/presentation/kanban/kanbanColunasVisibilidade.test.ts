@@ -4,6 +4,7 @@ import {
   alternarColunaOculta,
   colunasOcultasPadraoDoModo,
   podeOcultarColuna,
+  resolverColunasOcultasKanban,
   sanitizarColunasOcultas,
 } from '@/src/presentation/components/features/kanban/utils/kanbanColunasVisibilidade'
 import type { KanbanColumn } from '@/src/presentation/components/features/kanban/types'
@@ -43,6 +44,20 @@ describe('colunasOcultasPadraoDoModo', () => {
 
   it('balcão não esconde nada por defeito', () => {
     expect(colunasOcultasPadraoDoModo('balcao')).toEqual([])
+  })
+})
+
+describe('resolverColunasOcultasKanban', () => {
+  it('no Gestor web ignora a preferência e usa o padrão do modo', () => {
+    expect(resolverColunasOcultasKanban(false, 'delivery', [])).toEqual([
+      'NOVOS_PEDIDOS',
+      'COM_FISCAL',
+    ])
+    expect(resolverColunasOcultasKanban(false, 'balcao', ['COM_FISCAL'])).toEqual([])
+  })
+
+  it('no Flow usa a preferência do operador', () => {
+    expect(resolverColunasOcultasKanban(true, 'delivery', ['EM_ROTA'])).toEqual(['EM_ROTA'])
   })
 })
 

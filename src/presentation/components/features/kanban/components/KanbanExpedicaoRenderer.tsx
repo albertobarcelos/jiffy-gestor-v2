@@ -24,7 +24,7 @@ function RodapeCarregando({
           ?.isFetchingNextPage
       )
   if (!carregando) return null
-  return <p className="py-2 text-center text-xs text-gray-500">Carregando mais vendas…</p>
+  return <p className="py-1 text-center text-[11px] text-gray-500">Carregando mais vendas…</p>
 }
 
 function CabecalhoBloco({
@@ -37,15 +37,15 @@ function CabecalhoBloco({
   pendencias: number
 }) {
   return (
-    <div className="flex items-center gap-2 px-1 pb-2">
-      <h3 className="text-sm font-bold text-gray-900">{column.title}</h3>
-      <span className="rounded-full bg-gray-200 px-1.5 py-0.5 text-[11px] font-semibold text-gray-700">
+    <div className="flex items-center gap-1.5 px-0.5 pb-1.5">
+      <h3 className="text-[13px] font-bold text-gray-900">{column.title}</h3>
+      <span className="rounded-full bg-gray-200 px-1.5 py-px text-[10px] font-semibold text-gray-700">
         {count}
       </span>
       {pendencias > 0 ? (
-        <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-1.5 py-0.5 text-[11px] font-semibold text-red-700">
-          <MdWarningAmber className="h-3.5 w-3.5" />
-          {pendencias} {pendencias === 1 ? 'pendência' : 'pendências'}
+        <span className="inline-flex items-center gap-0.5 rounded-full bg-red-50 px-1.5 py-px text-[10px] font-semibold text-red-700">
+          <MdWarningAmber className="h-3 w-3" />
+          {pendencias} atenção
         </span>
       ) : null}
     </div>
@@ -64,7 +64,7 @@ export function KanbanExpedicaoRenderer(props: KanbanBoardRendererProps) {
     onAvancarEtapa,
   } = props
   const agoraMs = useAgoraKanban()
-  const { primaria, secundarias } = montarLayoutExpedicao(columns)
+  const { primaria, laterais, arquivo } = montarLayoutExpedicao(columns)
 
   if (mostrarLoadingLista) {
     return (
@@ -82,11 +82,11 @@ export function KanbanExpedicaoRenderer(props: KanbanBoardRendererProps) {
     )
   }
 
-  const renderCards = (column: KanbanColumn, densidade: 'principal' | 'secundaria') => {
+  const renderCards = (column: KanbanColumn) => {
     const colId = column.id as ColunaKanbanId
     const vendas = vendasPorColuna[colId] ?? []
     if (vendas.length === 0) {
-      return <p className="px-1 py-6 text-center text-xs text-gray-400">{column.placeholder}</p>
+      return <p className="px-1 py-4 text-center text-[11px] text-gray-400">{column.placeholder}</p>
     }
     return vendas.map((venda: Venda) => (
       <KanbanExpedicaoCard
@@ -94,7 +94,6 @@ export function KanbanExpedicaoRenderer(props: KanbanBoardRendererProps) {
         venda={venda}
         colunaId={colId}
         agoraMs={agoraMs}
-        densidade={densidade}
         avancando={Boolean(avancandoEtapaIds[venda.id])}
         onViewDetails={onViewDetails}
         onAvancarEtapa={onAvancarEtapa}
@@ -102,54 +101,46 @@ export function KanbanExpedicaoRenderer(props: KanbanBoardRendererProps) {
     ))
   }
 
-  return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-2 py-2 lg:flex-row">
-      <section className="flex min-h-0 min-w-0 flex-1 flex-col rounded-2xl bg-white/70 p-3 shadow-sm ring-1 ring-gray-100">
+  const blocoColuna = (column: KanbanColumn, grelha: string, flexGrow: boolean) => {
+    const colId = column.id as ColunaKanbanId
+    return (
+      <section
+        key={column.id}
+        className={`flex min-h-0 min-w-0 flex-col rounded-xl bg-white/80 p-2 shadow-sm ring-1 ring-gray-100 ${
+          flexGrow ? 'flex-1' : 'max-h-[30%] min-h-[6.5rem] shrink-0'
+        }`}
+      >
         <CabecalhoBloco
-          column={primaria}
-          count={getColumnTotalCount(primaria.id as ColunaKanbanId)}
-          pendencias={contarPendenciasExpedicao(
-            vendasPorColuna[primaria.id as ColunaKanbanId] ?? [],
-            agoraMs
-          )}
+          column={column}
+          count={getColumnTotalCount(colId)}
+          pendencias={
+            column.id === 'FINALIZADAS'
+              ? 0
+              : contarPendenciasExpedicao(vendasPorColuna[colId] ?? [], agoraMs)
+          }
         />
         <div
-          className="scrollbar-thin min-h-0 flex-1 overflow-y-auto pr-1"
-          onScroll={event => onColumnScroll(primaria.id as ColunaKanbanId, event)}
+          className="scrollbar-thin min-h-0 flex-1 overflow-y-auto"
+          onScroll={event => onColumnScroll(colId, event)}
         >
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(9.75rem,1fr))] gap-2">
-            {renderCards(primaria, 'principal')}
-          </div>
-          <RodapeCarregando columnId={primaria.id as ColunaKanbanId} {...props} />
+          <div className={grelha}>{renderCards(column)}</div>
+          <RodapeCarregando columnId={colId} {...props} />
         </div>
       </section>
+    )
+  }
 
-      {secundarias.length > 0 ? (
-        <div className="flex min-h-0 w-full flex-col gap-3 lg:w-[34%] lg:min-w-[18rem]">
-          {secundarias.map(column => {
-            const colId = column.id as ColunaKanbanId
-            return (
-              <section
-                key={column.id}
-                className="flex min-h-0 min-w-0 flex-1 flex-col rounded-2xl bg-white/70 p-3 shadow-sm ring-1 ring-gray-100"
-              >
-                <CabecalhoBloco
-                  column={column}
-                  count={getColumnTotalCount(colId)}
-                  pendencias={contarPendenciasExpedicao(vendasPorColuna[colId] ?? [], agoraMs)}
-                />
-                <div
-                  className="scrollbar-thin min-h-0 flex-1 overflow-y-auto pr-1"
-                  onScroll={event => onColumnScroll(colId, event)}
-                >
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2">
-                    {renderCards(column, 'secundaria')}
-                  </div>
-                  <RodapeCarregando columnId={colId} {...props} />
-                </div>
-              </section>
-            )
-          })}
+  const grelhaProducao = 'grid grid-cols-[repeat(auto-fill,minmax(9.25rem,1fr))] gap-2'
+  const grelhaLateral = 'grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2'
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden px-2 py-2 lg:flex-row">
+      {blocoColuna(primaria, grelhaProducao, true)}
+
+      {laterais.length > 0 || arquivo ? (
+        <div className="flex min-h-0 w-full flex-col gap-2 lg:w-[34%] lg:min-w-[17.5rem] lg:max-w-[26rem]">
+          {laterais.map(column => blocoColuna(column, grelhaLateral, true))}
+          {arquivo ? blocoColuna(arquivo, grelhaLateral, false) : null}
         </div>
       ) : null}
     </div>

@@ -38,6 +38,16 @@ export function colunasOcultasPadraoDoModo(modo: ModoKanbanVendas): ColunaKanban
   return modo === 'delivery' ? [...COLUNAS_OCULTAS_PADRAO_DELIVERY] : []
 }
 
+/** Gestor web: só o padrão do modo. Flow: preferência do operador. */
+export function resolverColunasOcultasKanban(
+  kiosk: boolean,
+  modo: ModoKanbanVendas,
+  ocultasPersistidas: readonly ColunaKanbanId[]
+): ColunaKanbanId[] {
+  if (!kiosk) return colunasOcultasPadraoDoModo(modo)
+  return [...ocultasPersistidas]
+}
+
 /**
  * Tira colunas marcadas como ocultas. Nunca esvazia o quadro (fica a primeira).
  */

@@ -24,7 +24,10 @@ import {
   lerModoKanbanVendasDoStorage,
   lerModoVisualizacaoKanbanDoStorage,
 } from '../rules/vendasKanban.storage'
-import type { ModoVisualizacaoKanban } from '../utils/kanbanModoVisualizacao'
+import {
+  resolverModoVisualizacaoKanban,
+  type ModoVisualizacaoKanban,
+} from '../utils/kanbanModoVisualizacao'
 import type { KanbanBoardRendererProps } from '../components/KanbanBoardRenderer'
 import type { KanbanModaisRendererProps } from '../components/KanbanModaisRenderer'
 import { useKanbanFilters } from './useKanbanFilters'
@@ -39,8 +42,9 @@ import { useKanbanDragDrop } from './useKanbanDragDrop'
 import { useKanbanModais } from './useKanbanModais'
 import { invalidateKanbanVendasListagens } from './kanbanListagemQueryCache'
 import { getVisibleKanbanColumns } from '../utils/kanbanColumnsConfig'
-import { aplicarColunasOcultas } from '../utils/kanbanColunasVisibilidade'
+import { aplicarColunasOcultas, resolverColunasOcultasKanban } from '../utils/kanbanColunasVisibilidade'
 import { useKanbanColunasVisibilidade } from './useKanbanColunasVisibilidade'
+import { useKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/kiosk/useKioskGestorPedidos'
 
 export interface KanbanToolbarProps {
   searchInput: string
@@ -81,8 +85,9 @@ export function useKanbanOrchestrator() {
   const { preferenciasImpressaoDelivery } = usePreferenciasImpressaoDelivery()
   const queryClient = useQueryClient()
   const empresaId = useTenantEmpresaId()
+  const kiosk = useKioskGestorPedidos()
 
-  const filters = useKanbanFilters(timezoneAgregacao)
+  const filters = useKanbanFilters(timezoneAgregacao, { diaOperacionalFlow: kiosk })
   const {
     searchInput,
     setSearchInput,
@@ -113,30 +118,44 @@ export function useKanbanOrchestrator() {
     periodoFimConsulta,
   } = filters
 
-  const [modoKanbanVendas, setModoKanbanVendas] = useState<ModoKanbanVendas>(() =>
+  const [modoKanbanVendasLivre, setModoKanbanVendas] = useState<ModoKanbanVendas>(() =>
     lerModoKanbanVendasDoStorage()
   )
-  const [modoVisualizacao, setModoVisualizacao] = useState<ModoVisualizacaoKanban>(() =>
+  /** Casco Windows: só delivery. O Gestor web continua a escolher balcão/delivery. */
+  const modoKanbanVendas: ModoKanbanVendas = kiosk ? 'delivery' : modoKanbanVendasLivre
+  const [modoVisualizacaoLivre, setModoVisualizacao] = useState<ModoVisualizacaoKanban>(() =>
     lerModoVisualizacaoKanbanDoStorage()
+  )
+  /** Gestor web: sempre Quadro. Flow: Quadro / Operação / Lista. */
+  const modoVisualizacao: ModoVisualizacaoKanban = resolverModoVisualizacaoKanban(
+    kiosk,
+    modoVisualizacaoLivre
   )
 
   useEffect(() => {
+    if (kiosk) return
     try {
-      localStorage.setItem(KANBAN_MODO_VENDAS_STORAGE_KEY, modoKanbanVendas)
+      localStorage.setItem(KANBAN_MODO_VENDAS_STORAGE_KEY, modoKanbanVendasLivre)
     } catch {
       /* quota / modo privado */
     }
-  }, [modoKanbanVendas])
+  }, [kiosk, modoKanbanVendasLivre])
 
   useEffect(() => {
+    if (!kiosk) return
     try {
-      localStorage.setItem(KANBAN_MODO_VISUALIZACAO_STORAGE_KEY, modoVisualizacao)
+      localStorage.setItem(KANBAN_MODO_VISUALIZACAO_STORAGE_KEY, modoVisualizacaoLivre)
     } catch {
       /* quota / modo privado */
     }
-  }, [modoVisualizacao])
+  }, [kiosk, modoVisualizacaoLivre])
 
   const visibilidadeColunas = useKanbanColunasVisibilidade(modoKanbanVendas)
+  const colunasOcultas = resolverColunasOcultasKanban(
+    kiosk,
+    modoKanbanVendas,
+    visibilidadeColunas.ocultas
+  )
 
   const { primeiroPorColuna, setPrimeiroPorColuna } = useKanbanPinning()
   const getEtapaKanbanParaExibicaoRef = useRef<(v: Venda) => string>(v => v.getEtapaKanban())
@@ -320,8 +339,8 @@ export function useKanbanOrchestrator() {
   )
 
   const columns = useMemo(
-    () => aplicarColunasOcultas(colunasDoModo, visibilidadeColunas.ocultas),
-    [colunasDoModo, visibilidadeColunas.ocultas]
+    () => aplicarColunasOcultas(colunasDoModo, colunasOcultas),
+    [colunasDoModo, colunasOcultas]
   )
 
   const mostrarLoadingLista = data.isLoading && colunas.todasVendas.length === 0
@@ -377,7 +396,7 @@ export function useKanbanOrchestrator() {
     onAbrirConfiguracoesDelivery: modais.abrirConfigImpressoraExpedicao,
     onAbrirNovoPedido: modais.handleAbrirNovoPedido,
     colunasDoModo,
-    colunasOcultas: visibilidadeColunas.ocultas,
+    colunasOcultas,
     onSetColunaVisivel: (id, visivel) =>
       visibilidadeColunas.setColunaVisivel(id, visivel, colunasDoModo),
     contagemPorColuna: colunas.getColumnTotalCount,
@@ -399,8 +418,9 @@ export function useKanbanOrchestrator() {
     direcaoOrdenacaoPorColuna: colunas.direcaoOrdenacaoPorColuna,
     onCriterioOrdenacaoChange: handleCriterioOrdenacaoChange,
     onToggleDirecaoOrdenacao: handleToggleDirecaoOrdenacao,
-    onOcultarColuna: (id: ColunaKanbanId) =>
-      visibilidadeColunas.setColunaVisivel(id, false, colunasDoModo),
+    onOcultarColuna: kiosk
+      ? (id: ColunaKanbanId) => visibilidadeColunas.setColunaVisivel(id, false, colunasDoModo)
+      : undefined,
     onColumnScroll: data.handleColumnScroll,
     deliveryKanban: data.deliveryKanban,
     balcaoKanban: data.balcaoKanban,

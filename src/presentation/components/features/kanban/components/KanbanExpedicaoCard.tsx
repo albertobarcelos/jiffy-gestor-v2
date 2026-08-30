@@ -11,16 +11,15 @@ import type { ColunaKanbanId, Venda } from '../types'
 import { KanbanAvancarEtapaCompacto } from './KanbanAvancarEtapaCompacto'
 
 const TOM_PILL: Record<TomTempoPedidoKanban, string> = {
-  ok: 'bg-slate-200 text-slate-700',
-  alerta: 'bg-amber-400 text-amber-950',
-  atraso: 'bg-red-700 text-white',
+  ok: 'bg-slate-100 text-slate-600',
+  alerta: 'bg-orange-400 text-orange-950',
+  atraso: 'bg-red-600 text-white',
 }
 
 export interface KanbanExpedicaoCardProps {
   venda: Venda
   colunaId: ColunaKanbanId
   agoraMs: number
-  densidade: 'principal' | 'secundaria'
   avancando: boolean
   onViewDetails: (venda: Venda) => void
   onAvancarEtapa: (venda: Venda, colunaAtual: ColunaKanbanId) => void
@@ -36,7 +35,6 @@ export function KanbanExpedicaoCard({
   venda,
   colunaId,
   agoraMs,
-  densidade,
   avancando,
   onViewDetails,
   onAvancarEtapa,
@@ -45,64 +43,73 @@ export function KanbanExpedicaoCard({
   const relogio = relogioPedidoKanban(venda, agoraMs)
   const cancelada = venda.isCancelada()
   const finalizada = colunaId === 'FINALIZADAS'
-  const compacta = densidade === 'secundaria'
+  const cobrar = venda.precisaConfirmarPagamentoParaFinalizar()
+  const atrasado = Boolean(relogio.rotuloAtraso)
+  const tempo = atrasado
+    ? relogio.rotuloAtraso?.replace(/^Atraso\s+/i, '')
+    : relogio.rotuloDecorrido
 
   return (
-    <button
-      type="button"
-      onClick={() => onViewDetails(venda)}
-      className={`flex w-full flex-col rounded-xl border bg-white text-left shadow-sm transition-shadow hover:shadow-md ${
+    <article
+      className={`flex min-w-0 flex-col rounded-xl border bg-white p-2.5 text-left shadow-sm ${
         cancelada ? 'border-gray-200 opacity-70' : 'border-gray-200'
-      } ${compacta ? 'gap-1 p-2' : 'gap-1.5 p-2.5'}`}
+      }`}
     >
-      <div className="flex items-start justify-between gap-1">
-        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-gray-600">
+      <button
+        type="button"
+        onClick={() => onViewDetails(venda)}
+        className="flex min-w-0 flex-1 flex-col text-left"
+      >
+        <p className="truncate text-[12px] font-semibold leading-tight text-gray-800">
+          {nomeClienteCurtoKanban(venda.cliente?.nome)}
+        </p>
+
+        <span className="mt-1 inline-flex items-center gap-1 text-[11px] text-gray-500">
           <IconeTipo tipo={tipo} />
           {rotuloTipoAtendimentoKanban(tipo)}
         </span>
-        {relogio.rotuloAtraso ? (
-          <span className="rounded-md bg-red-800 px-1.5 py-0.5 text-[10px] font-bold text-white">
-            {relogio.rotuloAtraso}
-          </span>
-        ) : null}
-      </div>
 
-      <div className="min-w-0">
-        <p className={`font-black leading-none text-gray-950 ${compacta ? 'text-xl' : 'text-2xl'}`}>
+        <p className="mt-2 text-[1.75rem] font-black leading-none tracking-tight text-gray-950">
           {venda.numeroVenda}
         </p>
-        <p className="mt-0.5 truncate text-xs font-medium text-gray-700">
-          {nomeClienteCurtoKanban(venda.cliente?.nome)}
-        </p>
-      </div>
 
-      {finalizada ? (
-        <p
-          className={`text-[11px] font-semibold ${
-            cancelada ? 'text-red-600' : 'text-emerald-600'
-          }`}
-        >
-          {cancelada ? 'Cancelado' : 'Concluído'}
-        </p>
-      ) : (
-        <div className="mt-auto flex items-end justify-between gap-1">
-          {relogio.rotuloDecorrido || relogio.rotuloHa ? (
-            <span
-              className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${TOM_PILL[relogio.tom]}`}
-            >
-              {compacta ? relogio.rotuloHa : relogio.rotuloDecorrido}
-            </span>
-          ) : (
-            <span />
-          )}
+        {finalizada ? (
+          <span
+            className={`mt-2 text-[11px] font-semibold ${
+              cancelada ? 'text-red-600' : 'text-emerald-600'
+            }`}
+          >
+            {cancelada ? 'Cancelado' : 'Concluído'}
+          </span>
+        ) : (
+          <div className="mt-2 flex flex-col items-start gap-1">
+            {tempo ? (
+              <span
+                className={`rounded-md px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${TOM_PILL[relogio.tom]}`}
+              >
+                {atrasado ? `Atraso ${tempo}` : tempo}
+              </span>
+            ) : null}
+            {cobrar ? (
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                Cobrar na entrega
+              </span>
+            ) : null}
+          </div>
+        )}
+      </button>
+
+      {finalizada ? null : (
+        <div className="mt-3">
           <KanbanAvancarEtapaCompacto
             venda={venda}
             colunaAtual={colunaId}
             avancando={avancando}
             onAvancar={onAvancarEtapa}
+            destaque
           />
         </div>
       )}
-    </button>
+    </article>
   )
 }
