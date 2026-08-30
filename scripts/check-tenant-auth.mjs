@@ -34,6 +34,7 @@ function isAllowlisted(rel) {
     n.endsWith('ensureHubBearerToken.ts') ||
     n.endsWith('fetchGestorApi.ts') ||
     n.endsWith('consultaCep.ts') ||
+    n.includes('/presentation/utils/vendas/') ||
     n.endsWith('cidade-autocomplete.tsx') ||
     n.endsWith('authStore.ts') ||
     n.includes('/shared/utils/fetchTenantRefresh')
@@ -43,6 +44,7 @@ function isAllowlisted(rel) {
 const roots = [
   'src/presentation/components/features',
   'src/presentation/hooks',
+  'src/presentation/utils',
   'src/infrastructure/api',
   'src/infrastructure/printing',
   'src/application',
@@ -65,6 +67,13 @@ for (const root of roots) {
       }
       if (/\bfetch\(\s*[`'"]\/api\//.test(line) && !/fetchGestorApi/.test(line)) {
         violations.push(`${rel}:${i + 1}: raw fetch('/api/...') (use fetchGestorApi)`)
+      }
+      if (
+        text.includes('/api/nfe') &&
+        /\bawait fetch\(/.test(line) &&
+        !/fetchGestorApi/.test(line)
+      ) {
+        violations.push(`${rel}:${i + 1}: raw fetch em fluxo /api/nfe (use fetchGestorApi)`)
       }
     })
   }
