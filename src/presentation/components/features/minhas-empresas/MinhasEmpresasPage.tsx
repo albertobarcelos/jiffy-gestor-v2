@@ -37,9 +37,9 @@ import { entrarEmpresaGestorNaAba } from '@/src/presentation/gestor-pedidos/sess
 import { isSinalKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
 import {
   lerSinalGestorDoBrowser,
+  pathQuadroKiosk,
   urlLoginDaSessaoAtual,
 } from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
-import { planearDestinoAposLogin } from '@/src/presentation/gestor-pedidos/sessao/planearDestinoAposLogin'
 
 const HUB_SESSAO_TOAST_ID = 'minhas-empresas-sessao-token'
 
@@ -81,7 +81,6 @@ export default function MinhasEmpresasPage() {
   const hubSessaoProativaDisparadaRef = useRef(false)
   const redirectTimerRef = useRef<number | undefined>(undefined)
   const hubEmpresasRefetchDoneRef = useRef(false)
-  const autoEnterGestorRef = useRef(false)
 
   const irParaLogin = useCallback(() => {
     void logout().finally(() => {
@@ -505,20 +504,13 @@ export default function MinhasEmpresasPage() {
     [appsBase, obterTokenEmpresa, reportErroAcessoEmpresa, router]
   )
 
+  /** Windows / `?gestor`: Minhas Empresas não faz parte deste fluxo. */
   useEffect(() => {
-    if (!isRehydrated || !hubBearerReady || autoEnterGestorRef.current || busyAppId) {
-      return
+    if (!isRehydrated) return
+    if (isSinalKioskGestorPedidos(lerSinalGestorDoBrowser())) {
+      router.replace(pathQuadroKiosk())
     }
-    const plano = planearDestinoAposLogin({
-      empresas: hubEmpresas,
-      sinalGestor: lerSinalGestorDoBrowser(),
-    })
-    if (plano.tipo !== 'pedidos-gestor') {
-      return
-    }
-    autoEnterGestorRef.current = true
-    void handleAcessar(plano.empresa.id)
-  }, [busyAppId, handleAcessar, hubBearerReady, hubEmpresas, isRehydrated])
+  }, [isRehydrated, router])
 
   const handleGerenciarConvites = async (appId: string) => {
     const app = appsBase.find(a => a.id === appId)

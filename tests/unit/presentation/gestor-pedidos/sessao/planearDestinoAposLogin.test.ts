@@ -39,12 +39,12 @@ describe('planearDestinoAposLogin', () => {
     ).toEqual({ tipo: 'pedidos-gestor', empresa })
   })
 
-  it('no gestor com várias empresas fica no hub', () => {
+  it('no gestor com várias empresas vai ao quadro, não ao hub', () => {
     expect(
       planearDestinoAposLogin({
         empresas: [ativa('a'), ativa('b')],
         sinalGestor: { hasTauri: false, search: 'gestor' },
       })
-    ).toEqual({ tipo: 'hub', path: '/minhas-empresas?gestor' })
+    ).toEqual({ tipo: 'quadro-kiosk', path: '/pedidos?gestor' })
   })
 })

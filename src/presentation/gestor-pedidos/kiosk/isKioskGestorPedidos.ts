@@ -1,3 +1,4 @@
+import { stripGestaoEmpresaSlugFromPath } from '@/src/shared/utils/gestaoRoutes'
 import { PEDIDOS_PATH, QUERY_GESTOR } from '../constantes'
 
 function pathSemQuery(pathModulo: string): string {
@@ -30,4 +31,15 @@ export function deveEsconderTopNavNoGestorPedidos(
 ): boolean {
   if (!isRotaPedidos(pathModulo)) return false
   return isSinalKioskGestorPedidos(sinal)
+}
+
+/** Quadro de pedidos no casco Windows / `?gestor` (não o ERP web). */
+export function isQuadroKioskAtual(): boolean {
+  if (typeof window === 'undefined') return false
+  const sinal = {
+    hasTauri: '__TAURI__' in window,
+    search: window.location.search,
+  }
+  if (!isSinalKioskGestorPedidos(sinal)) return false
+  return isRotaPedidos(stripGestaoEmpresaSlugFromPath(window.location.pathname))
 }

@@ -24,7 +24,13 @@ export function pathHubComSinalGestor(sinal: {
   hasTauri: boolean
   search?: string
 }): string {
-  return isSinalKioskGestorPedidos(sinal) ? `${HUB_PATH}?${QUERY_GESTOR}` : HUB_PATH
+  /** Windows / `?gestor`: o quadro escolhe a empresa — Minhas Empresas não entra neste fluxo. */
+  return isSinalKioskGestorPedidos(sinal) ? pathQuadroKiosk() : HUB_PATH
+}
+
+/** Quadro sem slug: o drop da toolbar escolhe a empresa. */
+export function pathQuadroKiosk(): string {
+  return `${PEDIDOS_PATH}?${QUERY_GESTOR}`
 }
 
 export function pathPedidosGestor(empParam: string): string {

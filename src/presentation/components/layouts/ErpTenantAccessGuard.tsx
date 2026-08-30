@@ -13,6 +13,7 @@ import {
   urlHubDaSessaoAtual,
   urlLoginDaSessaoAtual,
 } from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
+import { isQuadroKioskAtual } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
 
 interface ErpTenantAccessGuardProps {
   children: ReactNode
@@ -32,9 +33,17 @@ export function ErpTenantAccessGuard({ children }: ErpTenantAccessGuardProps) {
   const router = useRouter()
   const { hasAccess, isLoading } = useTenantAccessGuard()
   const tenantAuth = useAuthStore(s => s.tenantAuth)
+  const identityAuth = useAuthStore(s => s.identityAuth)
+
+  const kioskQuadroSemTenant =
+    isQuadroKioskAtual() &&
+    identityAuth !== null &&
+    !identityAuth.isExpired() &&
+    !hasAccess
 
   useEffect(() => {
     if (isLoading || hasAccess) return
+    if (kioskQuadroSemTenant) return
 
     try {
       if (sessionStorage.getItem(SESSION_STORAGE_TENANT_LOGOUT_SELF) === '1') {
@@ -82,9 +91,17 @@ export function ErpTenantAccessGuard({ children }: ErpTenantAccessGuardProps) {
     if (!estaNaMesmaRotaLocal(login)) {
       router.replace(login)
     }
-  }, [hasAccess, isLoading, router, tenantAuth])
+  }, [hasAccess, isLoading, kioskQuadroSemTenant, router, tenantAuth])
 
-  if (isLoading || !hasAccess) {
+  if (isLoading) {
+    return (
+      <div className="flex h-[100dvh] items-center justify-center bg-gray-50">
+        <JiffyLoading />
+      </div>
+    )
+  }
+
+  if (!hasAccess && !kioskQuadroSemTenant) {
     return (
       <div className="flex h-[100dvh] items-center justify-center bg-gray-50">
         <JiffyLoading />

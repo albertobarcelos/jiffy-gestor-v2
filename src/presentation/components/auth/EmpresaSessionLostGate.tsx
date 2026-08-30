@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { usePathname } from 'next/navigation'
 import { useEffect, useRef } from 'react'
@@ -84,6 +84,10 @@ export function EmpresaSessionLostGate() {
       }
       window.setTimeout(() => {
         if (typeof document === 'undefined' || document.visibilityState !== 'visible') {
+          return
+        }
+        if (kiosk && identityAuth && !identityAuth.isExpired()) {
+          window.location.assign(urlHubDaSessaoAtual())
           return
         }
         if (kiosk || !identityAuth) {

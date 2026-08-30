@@ -9,18 +9,20 @@ function temTauri(): boolean {
   return typeof window !== 'undefined' && '__TAURI__' in window
 }
 
+function kioskNesteBrowser(pathname: string | null): boolean {
+  if (typeof window === 'undefined') return false
+  return deveEsconderTopNavNoGestorPedidos(stripGestaoEmpresaSlugFromPath(pathname ?? ''), {
+    hasTauri: temTauri(),
+    search: window.location.search,
+  })
+}
+
 export function useKioskGestorPedidos(): boolean {
   const pathname = usePathname()
-  const [kiosk, setKiosk] = useState(false)
+  const [kiosk, setKiosk] = useState(() => kioskNesteBrowser(pathname))
 
   useEffect(() => {
-    const pathModulo = stripGestaoEmpresaSlugFromPath(pathname ?? '')
-    setKiosk(
-      deveEsconderTopNavNoGestorPedidos(pathModulo, {
-        hasTauri: temTauri(),
-        search: window.location.search,
-      })
-    )
+    setKiosk(kioskNesteBrowser(pathname))
   }, [pathname])
 
   return kiosk

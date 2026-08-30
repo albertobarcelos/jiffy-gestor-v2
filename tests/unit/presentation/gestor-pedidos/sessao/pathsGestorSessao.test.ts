@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mesmaRotaLocal } from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
+import { mesmaRotaLocal, pathHubComSinalGestor } from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
 
 describe('mesmaRotaLocal', () => {
   it('reconhece /login?gestor igual a si mesmo', () => {
@@ -21,5 +21,16 @@ describe('mesmaRotaLocal', () => {
     expect(
       mesmaRotaLocal({ pathname: '/pedidos', search: '?gestor' }, '/login?gestor')
     ).toBe(false)
+  })
+})
+
+describe('pathHubComSinalGestor', () => {
+  it('no ERP web continua Minhas Empresas', () => {
+    expect(pathHubComSinalGestor({ hasTauri: false, search: '' })).toBe('/minhas-empresas')
+  })
+
+  it('no casco Windows vai ao quadro, não ao hub', () => {
+    expect(pathHubComSinalGestor({ hasTauri: true, search: '' })).toBe('/pedidos?gestor')
+    expect(pathHubComSinalGestor({ hasTauri: false, search: '?gestor' })).toBe('/pedidos?gestor')
   })
 })

@@ -4,7 +4,9 @@ import {
   isEmailSessaoPlaceholder,
 } from '@/src/shared/utils/buildAuthFromAccessToken'
 import { bootstrapTabSessionManually, buildEmpresaUrlParam } from '@/src/shared/utils/tabSession'
-import { pathPedidosGestor } from './pathsGestorSessao'
+import { lerSinalGestorDoBrowser, pathPedidosGestor } from './pathsGestorSessao'
+import { isSinalKioskGestorPedidos } from '../kiosk/isKioskGestorPedidos'
+import { gravarUltimaEmpresaKiosk } from '../kiosk/ultimaEmpresaKiosk'
 
 /** Ativa a empresa nesta aba e devolve `/gestao/{slug}/pedidos?gestor`. */
 export function entrarEmpresaGestorNaAba(input: {
@@ -27,6 +29,18 @@ export function entrarEmpresaGestorNaAba(input: {
   })
   useAuthStore.getState().setTenantAuth(auth)
   useAuthStore.getState().setTabVerified(true)
+
+  if (isSinalKioskGestorPedidos(lerSinalGestorDoBrowser())) {
+    const userId =
+      useAuthStore.getState().identityAuth?.getUser().getId() ??
+      useAuthStore.getState().hubEmpresasUserId ??
+      prev.getId()
+    gravarUltimaEmpresaKiosk({
+      userId,
+      empresaId: input.empresaId,
+      empParam,
+    })
+  }
 
   return pathPedidosGestor(empParam)
 }

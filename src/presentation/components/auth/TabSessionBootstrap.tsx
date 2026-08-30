@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
@@ -23,6 +23,7 @@ import {
   urlHubDaSessaoAtual,
 } from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
 import { isSinalKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
+import { lerUltimaEmpresaKiosk } from '@/src/presentation/gestor-pedidos/kiosk/ultimaEmpresaKiosk'
 import { extractTokenInfo } from '@/src/shared/utils/validateToken'
 import { decideTabSessionBootstrap } from '@/src/presentation/utils/decideTabSessionBootstrap'
 
@@ -125,12 +126,27 @@ export function TabSessionBootstrap() {
 
     const emp = getEmpParam()
 
-    /** Jiffy Flow abre `/pedidos?gestor` — a URL canônica é `/gestao/{slug}/pedidos?gestor`. */
+    /** Jiffy Flow: `/pedidos?gestor` sem slug — restaura a última empresa ou o drop escolhe. */
     if (!emp && isSinalKioskGestorPedidos(lerSinalGestorDoBrowser())) {
       const storedSlug = getEmpresaSlugParam()
       if (storedSlug) {
         didRunRef.current = true
         window.location.replace(pathPedidosGestor(storedSlug))
+        return
+      }
+      const userId =
+        useAuthStore.getState().identityAuth?.getUser().getId() ??
+        useAuthStore.getState().hubEmpresasUserId
+      const last = lerUltimaEmpresaKiosk()
+      if (last?.empParam && (!userId || !last.userId || last.userId === userId)) {
+        didRunRef.current = true
+        window.location.replace(pathPedidosGestor(last.empParam))
+        return
+      }
+      const existingKioskToken = getTabTenantToken()
+      if (!existingKioskToken) {
+        didRunRef.current = true
+        setTabVerified(true)
         return
       }
     }

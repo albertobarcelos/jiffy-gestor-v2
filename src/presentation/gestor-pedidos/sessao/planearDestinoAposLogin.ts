@@ -2,11 +2,12 @@ import type { LoginEmpresaSnapshot } from '@/src/domain/types/LoginEmpresaSnapsh
 import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 import { escolherEmpresaUnicaAtiva } from './escolherEmpresaUnicaAtiva'
 import { isSinalKioskGestorPedidos } from '../kiosk/isKioskGestorPedidos'
-import { pathHubComSinalGestor } from './pathsGestorSessao'
+import { pathQuadroKiosk } from './pathsGestorSessao'
 
 export type DestinoAposLogin =
   | { tipo: 'hub'; path: string }
   | { tipo: 'pedidos-gestor'; empresa: LoginEmpresaSnapshot }
+  | { tipo: 'quadro-kiosk'; path: string }
 
 export function planearDestinoAposLogin(input: {
   empresas: readonly LoginEmpresaSnapshot[] | null | undefined
@@ -21,5 +22,5 @@ export function planearDestinoAposLogin(input: {
     return { tipo: 'pedidos-gestor', empresa: unica }
   }
 
-  return { tipo: 'hub', path: pathHubComSinalGestor(input.sinalGestor) }
+  return { tipo: 'quadro-kiosk', path: pathQuadroKiosk() }
 }

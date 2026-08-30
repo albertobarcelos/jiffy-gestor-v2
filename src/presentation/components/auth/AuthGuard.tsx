@@ -16,11 +16,12 @@ import {
   SESSION_STORAGE_TENANT_LOGOUT_SELF,
   JIFFY_SESSION_EXPIRED_EVENT,
 } from '@/src/shared/constants/sessionCoordinator'
-import { HUB_PATH, isHubPathname } from '@/src/shared/constants/hubRoutes'
+import { isHubPathname } from '@/src/shared/constants/hubRoutes'
 import {
   irParaLoginDaSessaoAtual,
   urlHubDaSessaoAtual,
 } from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
+import { isQuadroKioskAtual } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
 
 /** Tempo máximo de espera para o refresh de token antes de encerrar a sessão da empresa. */
 const REFRESH_TIMEOUT_MS = 5_000
@@ -237,24 +238,23 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
     const isHub = isHubPath(pathname)
 
+    /** Casco Windows: o quadro renderiza sem tenant para o drop escolher a empresa. */
+    if (!isHub && isQuadroKioskAtual() && identityHubStillValid()) {
+      if (!isTabVerified) {
+        useAuthStore.getState().setTabVerified(true)
+      }
+      redirectingRef.current = false
+      setAllowed(true)
+      return
+    }
+
     // Enquanto o bootstrap da aba (URL ↔ token / rebind) não confirmou a sessão,
     // não tentar refresh ou redirect — TabSessionBootstrap reestabelece se necessário.
-    // Sem identidade e sem tenant: não esperar para sempre (ex.: `/pedidos?gestor` no Tauri).
     if (!isHub && !isTabVerified) {
       if (!isTenantSessionAlive() && !identityHubStillValid()) {
         irParaLoginDaSessaoAtual()
       }
-      const timeoutId = window.setTimeout(() => {
-        if (useAuthStore.getState().isTabVerified || isTenantSessionAlive()) {
-          return
-        }
-        if (identityHubStillValid()) {
-          window.location.replace(urlHubDaSessaoAtual())
-          return
-        }
-        irParaLoginDaSessaoAtual()
-      }, 4_000)
-      return () => window.clearTimeout(timeoutId)
+      return
     }
 
     if (isTenantLogoutInProgress()) {
