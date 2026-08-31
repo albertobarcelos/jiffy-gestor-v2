@@ -155,6 +155,30 @@ fn garantir_webview(app: &AppHandle, bounds: &WhatsAppBounds) -> Result<(), Stri
     Ok(())
 }
 
+/// Esconde o host nativo sem alterar o pedido do Gestor (continua “visível”
+/// para repor quando a janela principal voltar). Evita que o WebView2 cubra a bolha.
+pub fn recolher_host(app: &AppHandle) {
+    if let Some(wv) = app.get_webview(WHATSAPP_LABEL) {
+        let _ = wv.hide();
+    }
+}
+
+pub fn repor_host_se_visivel(app: &AppHandle) {
+    if crate::bolha::principal_minimizada(app) {
+        return;
+    }
+    let quer = app
+        .try_state::<WhatsAppState>()
+        .and_then(|s| s.visible.lock().ok().map(|g| *g))
+        .unwrap_or(false);
+    if !quer {
+        return;
+    }
+    if let Some(wv) = app.get_webview(WHATSAPP_LABEL) {
+        let _ = wv.show();
+    }
+}
+
 #[tauri::command]
 pub async fn whatsapp_show(app: AppHandle, bounds: WhatsAppBounds) -> Result<(), String> {
     eprintln!(
@@ -162,6 +186,12 @@ pub async fn whatsapp_show(app: AppHandle, bounds: WhatsAppBounds) -> Result<(),
         bounds.x, bounds.y, bounds.width, bounds.height
     );
     garantir_webview(&app, &bounds)?;
+    marcar_visivel(&app, true);
+    if crate::bolha::principal_minimizada(&app) {
+        eprintln!("Jiffy Flow WhatsApp show ignorado (principal minimizada)");
+        recolher_host(&app);
+        return Ok(());
+    }
     let wv = app
         .get_webview(WHATSAPP_LABEL)
         .ok_or_else(|| "webview WhatsApp ausente".to_string())?;
@@ -169,10 +199,13 @@ pub async fn whatsapp_show(app: AppHandle, bounds: WhatsAppBounds) -> Result<(),
     let h = bounds.height.max(80.0);
     wv.set_position(LogicalPosition::new(bounds.x.max(0.0), bounds.y.max(0.0)))
         .map_err(|e| e.to_string())?;
-    wv.set_size(LogicalSize::new(w, h)).map_err(|e| e.to_string())?;
+    wv.set_size(LogicalSize::new(w, h))
+        .map_err(|e| e.to_string())?;
     wv.show().map_err(|e| e.to_string())?;
-    eprintln!("Jiffy Flow WhatsApp visível em ({}, {}) {w}x{h}", bounds.x, bounds.y);
-    marcar_visivel(&app, true);
+    eprintln!(
+        "Jiffy Flow WhatsApp visível em ({}, {}) {w}x{h}",
+        bounds.x, bounds.y
+    );
     Ok(())
 }
 

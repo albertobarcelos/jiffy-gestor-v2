@@ -2,6 +2,8 @@
 
 Casco Tauri 2. Abre a lista de empresas do Gestor em `/pedidos/empresas?gestor`. Sem regra de negócio. Identifica-se com User-Agent `JiffyFlow/` — o Gestor web no Chrome não muda.
 
+Bolha flutuante (janela sem barra, sempre no topo, fora da taskbar, ícone do Flow): só aparece ao minimizar o Gestor. Clique restaura a janela do Flow. Arrasta para outro sítio. Não é overlay do Windows — some no Win+D. Com a aba WhatsApp aberta, o WebView nativo fica escondido enquanto a principal está minimizada, para não cobrir a bolha.
+
 ## Dev
 
 1. Instalar [Rust](https://www.rust-lang.org/learn/get-started) e os [pré-requisitos Tauri](https://v2.tauri.app/start/prerequisites/).

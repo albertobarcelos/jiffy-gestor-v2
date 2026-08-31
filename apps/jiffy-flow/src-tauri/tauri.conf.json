@@ -20,6 +20,21 @@
         "resizable": true,
         "decorations": true,
         "fullscreen": false
+      },
+      {
+        "label": "bolha",
+        "create": false,
+        "title": "Jiffy Flow",
+        "width": 56,
+        "height": 56,
+        "decorations": false,
+        "transparent": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "resizable": false,
+        "shadow": false,
+        "dragDropEnabled": false
       }
     ],
     "security": {

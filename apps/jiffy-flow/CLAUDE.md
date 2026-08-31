@@ -27,6 +27,7 @@ Não usar cookie, `localStorage` nem `sessionStorage` como identidade do produto
 - Regista o protocolo `gestor-pedidos://`
 - Uma instância só (segundo clique foca a janela)
 - WebView persistente de `web.whatsapp.com` (sem ler conversas)
+- Bolha flutuante (janela à parte, sempre no topo, ícone do Flow): só aparece com a janela principal minimizada. Clique restaura o Flow (não troca de aba). Arrasta. Some no Win+D / ecrã exclusivo. Com o WhatsApp aberto, o WebView nativo é escondido enquanto a bolha está visível. A deteção de minimizar e a 2.ª instância usam `get_window("main")` — `get_webview_window("main")` fica `None` depois do filho WhatsApp.
 
 ## O que NÃO faz
 

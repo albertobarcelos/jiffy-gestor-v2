@@ -1,4 +1,4 @@
-import { detectarRuntimeTauri } from '../kiosk/isKioskGestorPedidos'
+import { estaNoAppJiffyFlow } from '../kiosk/isKioskGestorPedidos'
 
 export type WhatsAppBounds = {
   x: number
@@ -37,7 +37,7 @@ function resolverInvoke(): InvokeFn | null {
 }
 
 export function podeControlarWhatsAppWebView(): boolean {
-  return detectarRuntimeTauri() && resolverInvoke() !== null
+  return estaNoAppJiffyFlow() && resolverInvoke() !== null
 }
 
 function comTimeout<T>(p: Promise<T>, ms: number, cmd: string): Promise<T> {
@@ -116,4 +116,11 @@ export function boundsDoSlotWhatsApp(slotId: string): WhatsAppBounds | null {
   const r = el.getBoundingClientRect()
   if (r.width < 80 || r.height < 80) return null
   return { x: r.left, y: r.top, width: r.width, height: r.height }
+}
+
+/** Minimizar dispara resize no WebView; um `show` nativo aí restaura/cobre a bolha. */
+export function deveReposicionarWhatsAppNativo(
+  visibilityState: DocumentVisibilityState | string | undefined
+): boolean {
+  return visibilityState === 'visible'
 }

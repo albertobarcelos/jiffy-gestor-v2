@@ -2,8 +2,8 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Janela do quadro. Sem API de pedido.",
-  "windows": ["main"],
-  "webviews": ["main", "whatsapp"],
+  "windows": ["main", "bolha"],
+  "webviews": ["main", "whatsapp", "bolha"],
   "remote": {
     "urls": [
       "http://localhost:*/*",
@@ -11,7 +11,8 @@
       "https://*.jiffy.run/*",
       "https://web.whatsapp.com/*",
       "https://*.whatsapp.com/*",
-      "https://*.whatsapp.net/*"
+      "https://*.whatsapp.net/*",
+      "file:///**"
     ]
   },
   "permissions": [
@@ -24,7 +25,14 @@
     "core:webview:allow-set-webview-position",
     "core:webview:allow-set-webview-size",
     "core:webview:allow-clear-all-browsing-data",
+    "core:window:allow-start-dragging",
+    "core:window:allow-set-position",
+    "core:window:allow-unminimize",
+    "core:window:allow-set-focus",
+    "core:window:allow-show",
+    "core:window:allow-hide",
     "core:event:default",
-    "allow-whatsapp"
+    "allow-whatsapp",
+    "allow-bolha"
   ]
 }

@@ -3,10 +3,10 @@
 import { useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 import { stripGestaoEmpresaSlugFromPath } from '@/src/shared/utils/gestaoRoutes'
-import { isRotaWhatsAppFlow } from '../kiosk/isKioskGestorPedidos'
-import { detectarRuntimeTauri } from '../kiosk/isKioskGestorPedidos'
+import { estaNoAppJiffyFlow, isRotaWhatsAppFlow } from '../kiosk/isKioskGestorPedidos'
 import {
   boundsDoSlotWhatsApp,
+  deveReposicionarWhatsAppNativo,
   podeControlarWhatsAppWebView,
   whatsappHide,
   whatsappShow,
@@ -28,7 +28,7 @@ export function WhatsAppWebViewHost() {
   const aMostrarRef = useRef(false)
 
   useEffect(() => {
-    if (!detectarRuntimeTauri()) return
+    if (!estaNoAppJiffyFlow()) return
 
     const naRota = isRotaWhatsAppFlow(stripGestaoEmpresaSlugFromPath(pathname ?? ''))
     let cancelado = false
@@ -37,6 +37,9 @@ export function WhatsAppWebViewHost() {
 
     const aplicar = () => {
       if (cancelado) return
+      if (!deveReposicionarWhatsAppNativo(document.visibilityState)) {
+        return
+      }
       if (!naRota || whatsappWebViewEstaSuspenso()) {
         if (visivelRef.current) {
           visivelRef.current = false
@@ -87,6 +90,7 @@ export function WhatsAppWebViewHost() {
 
     aplicar()
     window.addEventListener('resize', aplicar)
+    document.addEventListener('visibilitychange', aplicar)
     const ro =
       typeof ResizeObserver !== 'undefined'
         ? new ResizeObserver(() => aplicar())
@@ -98,6 +102,7 @@ export function WhatsAppWebViewHost() {
       cancelado = true
       window.clearTimeout(timer)
       window.removeEventListener('resize', aplicar)
+      document.removeEventListener('visibilitychange', aplicar)
       ro?.disconnect()
       off()
     }

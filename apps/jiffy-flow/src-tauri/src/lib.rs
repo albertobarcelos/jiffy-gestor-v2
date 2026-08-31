@@ -1,6 +1,7 @@
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_deep_link::DeepLinkExt;
 
+mod bolha;
 mod quadro_url;
 mod update;
 mod whatsapp;
@@ -14,7 +15,10 @@ pub fn run() {
     #[cfg(desktop)]
     {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            if let Some(window) = app.get_webview_window("main") {
+            let janela = app
+                .get_window("main")
+                .or_else(|| app.get_webview("main").map(|wv| wv.window()));
+            if let Some(window) = janela {
                 let _ = window.unminimize();
                 let _ = window.set_focus();
             }
@@ -32,7 +36,10 @@ pub fn run() {
             whatsapp::whatsapp_status,
             whatsapp::whatsapp_chat_hint,
             whatsapp::whatsapp_inserir_texto,
+            bolha::bolha_clique,
+            bolha::bolha_arrastar,
         ])
+        .on_window_event(|window, event| bolha::no_evento(window, event))
         .setup(|app| {
             #[cfg(any(windows, target_os = "linux"))]
             {
@@ -55,6 +62,12 @@ pub fn run() {
                     "Object.defineProperty(window,'__JIFFY_FLOW_KIOSK__',{value:true,enumerable:true});",
                 )
                 .build()?;
+
+            if let Err(err) = bolha::abrir(app.handle()) {
+                eprintln!("Jiffy Flow: bolha não criou ({err})");
+            } else {
+                eprintln!("Jiffy Flow: bolha criada (oculta até minimizar)");
+            }
 
             let handle = app.handle().clone();
             std::thread::spawn(move || {
