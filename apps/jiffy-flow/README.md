@@ -1,6 +1,6 @@
 # Jiffy Flow — shell Windows
 
-Casco Tauri 2. Abre o quadro do Gestor em `/pedidos?gestor`. Sem regra de negócio.
+Casco Tauri 2. Abre a lista de empresas do Gestor em `/pedidos/empresas?gestor`. Sem regra de negócio. Identifica-se com User-Agent `JiffyFlow/` — o Gestor web no Chrome não muda.
 
 ## Dev
 

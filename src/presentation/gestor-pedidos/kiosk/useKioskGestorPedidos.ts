@@ -3,28 +3,19 @@
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { stripGestaoEmpresaSlugFromPath } from '@/src/shared/utils/gestaoRoutes'
-import {
-  deveEsconderTopNavNoGestorPedidos,
-  detectarRuntimeTauri,
-  lerSinalKioskFlowPersistido,
-  persistirSinalKioskFlow,
-} from './isKioskGestorPedidos'
+import { deveEsconderTopNavNoGestorPedidos, detectarRuntimeTauri } from './isKioskGestorPedidos'
 
 function kioskNesteBrowser(pathname: string | null): boolean {
   if (typeof window === 'undefined') return false
-  const hasTauri = detectarRuntimeTauri() || lerSinalKioskFlowPersistido()
-  const search = window.location.search
-  const kiosk = deveEsconderTopNavNoGestorPedidos(
+  return deveEsconderTopNavNoGestorPedidos(
     stripGestaoEmpresaSlugFromPath(pathname ?? ''),
-    { hasTauri, search }
+    { hasTauri: detectarRuntimeTauri(), search: window.location.search }
   )
-  if (kiosk) persistirSinalKioskFlow()
-  return kiosk
 }
 
 export function useKioskGestorPedidos(): boolean {
   const pathname = usePathname()
-  const [kiosk, setKiosk] = useState(() => kioskNesteBrowser(pathname))
+  const [kiosk, setKiosk] = useState(false)
 
   useEffect(() => {
     setKiosk(kioskNesteBrowser(pathname))

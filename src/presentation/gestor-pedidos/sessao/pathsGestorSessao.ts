@@ -1,25 +1,18 @@
 import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 import { buildGestaoPath } from '@/src/shared/utils/gestaoRoutes'
-import { PEDIDOS_PATH, QUERY_GESTOR } from '../constantes'
-import {
-  detectarRuntimeTauri,
-  isSinalKioskGestorPedidos,
-  lerSinalKioskFlowPersistido,
-  persistirSinalKioskFlow,
-} from '../kiosk/isKioskGestorPedidos'
+import { getEmpresaSlugParam } from '@/src/shared/utils/tabSession'
+import { parseEmpresaSlugFromPath } from '@/src/shared/utils/gestaoRoutes'
+import { PEDIDOS_PATH, PEDIDOS_WHATSAPP_PATH, QUERY_GESTOR } from '../constantes'
+import { detectarRuntimeTauri, isSinalKioskGestorPedidos } from '../kiosk/isKioskGestorPedidos'
 
 export function lerSinalGestorDoBrowser(): { hasTauri: boolean; search: string } {
   if (typeof window === 'undefined') {
     return { hasTauri: false, search: '' }
   }
-  const search = window.location.search
-  const runtimeTauri = detectarRuntimeTauri()
-  const persistido = lerSinalKioskFlowPersistido()
-  const hasTauri = runtimeTauri || persistido
-  if (isSinalKioskGestorPedidos({ hasTauri: runtimeTauri || persistido, search })) {
-    persistirSinalKioskFlow()
+  return {
+    hasTauri: detectarRuntimeTauri(),
+    search: window.location.search,
   }
-  return { hasTauri, search }
 }
 
 export function pathLoginComSinalGestor(sinal: {
@@ -49,6 +42,19 @@ export function pathEscolherEmpresaKiosk(): string {
 
 export function pathPedidosGestor(empParam: string): string {
   return buildGestaoPath(empParam, `${PEDIDOS_PATH}?${QUERY_GESTOR}`)
+}
+
+export function pathWhatsAppKiosk(): string {
+  const modulo = `${PEDIDOS_WHATSAPP_PATH}?${QUERY_GESTOR}`
+  if (typeof window === 'undefined') return modulo
+  const slug = parseEmpresaSlugFromPath(window.location.pathname) ?? getEmpresaSlugParam()
+  return slug ? buildGestaoPath(slug, modulo) : modulo
+}
+
+export function pathQuadroDaSessaoAtual(): string {
+  if (typeof window === 'undefined') return pathQuadroKiosk()
+  const slug = parseEmpresaSlugFromPath(window.location.pathname) ?? getEmpresaSlugParam()
+  return slug ? pathPedidosGestor(slug) : pathQuadroKiosk()
 }
 
 export function urlLoginDaSessaoAtual(): string {

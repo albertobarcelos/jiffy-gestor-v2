@@ -1,6 +1,11 @@
-export const PATH_PEDIDOS = '/pedidos'
+export const PATH_LISTA_EMPRESAS = '/pedidos/empresas'
 export const QUERY_GESTOR = 'gestor'
-export const URL_DEV_PADRAO = 'http://localhost:5000'
+export const URL_DEV_PADRAO = 'http://127.0.0.1:5000'
+
+function pathSemBarraFinal(pathname) {
+  const p = String(pathname || '').replace(/\/$/, '')
+  return p || '/'
+}
 
 export function montarUrlQuadro(origem) {
   const raw = String(origem ?? '').trim() || URL_DEV_PADRAO
@@ -8,11 +13,12 @@ export function montarUrlQuadro(origem) {
   try {
     parsed = new URL(raw.includes('://') ? raw : `http://${raw}`)
   } catch {
-    return `${URL_DEV_PADRAO}${PATH_PEDIDOS}?${QUERY_GESTOR}`
+    return `${URL_DEV_PADRAO}${PATH_LISTA_EMPRESAS}?${QUERY_GESTOR}`
   }
 
-  if (parsed.pathname === '/' || parsed.pathname === '') {
-    parsed.pathname = PATH_PEDIDOS
+  const path = pathSemBarraFinal(parsed.pathname)
+  if (path === '/' || path === '/pedidos') {
+    parsed.pathname = PATH_LISTA_EMPRESAS
   }
 
   if (!parsed.searchParams.has(QUERY_GESTOR)) {

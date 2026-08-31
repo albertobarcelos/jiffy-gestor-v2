@@ -1,7 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { useEffect, useLayoutEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantAccessGuard } from '@/src/presentation/hooks/useTenantAccessGuard'
@@ -13,7 +13,11 @@ import {
   urlHubDaSessaoAtual,
   urlLoginDaSessaoAtual,
 } from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
-import { isRotaKioskPedidos } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
+import {
+  isRotaKioskPedidos,
+  isRotaPedidos,
+} from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
+import { stripGestaoEmpresaSlugFromPath } from '@/src/shared/utils/gestaoRoutes'
 
 interface ErpTenantAccessGuardProps {
   children: ReactNode
@@ -34,18 +38,11 @@ export function ErpTenantAccessGuard({ children }: ErpTenantAccessGuardProps) {
   const pathname = usePathname()
   const { hasAccess, isLoading } = useTenantAccessGuard()
   const tenantAuth = useAuthStore(s => s.tenantAuth)
-  const [clientePronto, setClientePronto] = useState(false)
 
-  useLayoutEffect(() => {
-    setClientePronto(true)
-  }, [])
-
-  const kioskFlow =
-    clientePronto &&
-    isRotaKioskPedidos(
-      pathname ?? '',
-      typeof window !== 'undefined' ? window.location.search : ''
-    )
+  const kioskFlow = isRotaKioskPedidos(
+    pathname || (typeof window !== 'undefined' ? window.location.pathname : ''),
+    typeof window !== 'undefined' ? window.location.search : ''
+  )
   /** Flow: lista / quadro sem tenant. Identity curto não pode bloquear esta rota. */
   const kioskQuadroSemTenant = kioskFlow && !hasAccess
 
@@ -101,7 +98,7 @@ export function ErpTenantAccessGuard({ children }: ErpTenantAccessGuardProps) {
     }
   }, [hasAccess, isLoading, kioskQuadroSemTenant, router, tenantAuth])
 
-  if (kioskFlow) {
+  if (kioskFlow || isRotaPedidos(stripGestaoEmpresaSlugFromPath(pathname ?? ''))) {
     return <>{children}</>
   }
 

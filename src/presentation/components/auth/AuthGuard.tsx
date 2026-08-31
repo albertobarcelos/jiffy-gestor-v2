@@ -22,7 +22,12 @@ import {
   irParaLoginDaSessaoAtual,
   urlHubDaSessaoAtual,
 } from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
-import { isRotaKioskPedidos } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
+import {
+  estaNoAppJiffyFlow,
+  isRotaKioskPedidos,
+  isRotaPedidos,
+} from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
+import { stripGestaoEmpresaSlugFromPath } from '@/src/shared/utils/gestaoRoutes'
 
 /** Tempo máximo de espera para o refresh de token antes de encerrar a sessão da empresa. */
 const REFRESH_TIMEOUT_MS = 5_000
@@ -546,6 +551,17 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
   // Rotas públicas: renderizar imediatamente sem checar autenticação
   if (isPublicPath(pathname)) {
+    return <>{children}</>
+  }
+
+  /**
+   * .exe e `/pedidos`: nunca o robot do Gestor web.
+   * Sem isto, dashboard/hub sem tenant deixa o WebView no mascote para sempre.
+   */
+  if (
+    estaNoAppJiffyFlow() ||
+    isRotaPedidos(stripGestaoEmpresaSlugFromPath(pathname ?? ''))
+  ) {
     return <>{children}</>
   }
 

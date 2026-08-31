@@ -441,3 +441,11 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 )
+
+if (typeof window !== 'undefined') {
+  window.setTimeout(() => {
+    if (!useAuthStore.getState().isRehydrated) {
+      useAuthStore.setState({ isRehydrated: true })
+    }
+  }, 1500)
+}

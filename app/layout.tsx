@@ -9,6 +9,7 @@ import { EmpresaSessionLostGate } from '@/src/presentation/components/auth/Empre
 import { AuthGuard } from '@/src/presentation/components/auth/AuthGuard'
 import { SuperficieRedirectGate } from '@/src/presentation/gestor-pedidos/superficie/SuperficieRedirectGate'
 import { TabSessionBootstrap } from '@/src/presentation/components/auth/TabSessionBootstrap'
+import { JiffyFlowDestinoGate } from '@/src/presentation/gestor-pedidos/kiosk/JiffyFlowDestinoGate'
 import { TenantCacheIsolation } from '@/src/presentation/components/auth/TenantCacheIsolation'
 import { DocumentoFiscalPdfRetryModal } from '@/src/presentation/components/features/fiscal'
 import './globals.css'
@@ -50,6 +51,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <EmpresaSessionLostGate />
               <TenantCacheIsolation />
               <TabSessionBootstrap />
+              <JiffyFlowDestinoGate />
               <AuthGuard>
                 <SuperficieRedirectGate />
                 {children}

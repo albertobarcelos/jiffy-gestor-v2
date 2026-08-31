@@ -13,10 +13,13 @@ import { cn } from '@/src/shared/utils/cn'
 import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 import { fetchAccessTokenEscolherEmpresa } from '@/src/presentation/utils/escolherEmpresaApi'
 import { entrarEmpresaGestorNaAba } from '@/src/presentation/gestor-pedidos/sessao/entrarEmpresaGestorNaAba'
-import { lerSinalGestorDoBrowser } from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
+import { lerSinalGestorDoBrowser, pathEscolherEmpresaKiosk } from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
 import { planearDestinoAposLogin } from '@/src/presentation/gestor-pedidos/sessao/planearDestinoAposLogin'
 import { lerUltimaEmpresaKiosk } from '@/src/presentation/gestor-pedidos/kiosk/ultimaEmpresaKiosk'
-import { persistirSinalKioskFlow } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
+import {
+  estaNoAppJiffyFlow,
+  persistirSinalKioskFlow,
+} from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
 import { gravarEmpresasLoginFlow } from '@/src/presentation/gestor-pedidos/kiosk/empresasLoginFlow'
 import { clearTabSession } from '@/src/shared/utils/tabSession'
 
@@ -35,6 +38,10 @@ export function LoginForm() {
   const [resendMessage, setResendMessage] = useState<string | null>(null)
 
   const { loginWithHubEmpresas, setLoading, setError, isLoading } = useAuthStore()
+
+  useEffect(() => {
+    lerSinalGestorDoBrowser()
+  }, [])
 
   /** Convite por e-mail: `p` (base64url), ou legado `email` / `conviteId`. */
   useEffect(() => {
@@ -124,6 +131,14 @@ export function LoginForm() {
           window.setTimeout(resolve, 0)
         })
         window.location.assign(destino.path)
+        return
+      }
+
+      /** O .exe nunca abre Minhas Empresas — mesmo se o planner falhar. */
+      if (estaNoAppJiffyFlow()) {
+        persistirSinalKioskFlow()
+        clearTabSession()
+        window.location.assign(pathEscolherEmpresaKiosk())
         return
       }
 

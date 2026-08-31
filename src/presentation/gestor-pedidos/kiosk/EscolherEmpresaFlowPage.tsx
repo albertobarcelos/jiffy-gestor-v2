@@ -10,9 +10,7 @@ import { formatarCnpjExibicao } from '@/src/presentation/components/features/min
 import { fetchAccessTokenEscolherEmpresa } from '@/src/presentation/utils/escolherEmpresaApi'
 import { ensureHubBearerToken } from '@/src/presentation/utils/ensureHubBearerToken'
 import { disconnectHubTab } from '@/src/presentation/utils/disconnectHubTab'
-import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 import { entrarEmpresaGestorNaAba } from '../sessao/entrarEmpresaGestorNaAba'
-import { lerSinalGestorDoBrowser } from '../sessao/pathsGestorSessao'
 import {
   deveCarregarMaisEmpresasFlow,
   filtrarEmpresasFlow,
@@ -22,7 +20,7 @@ import {
   deveIrAoLoginPorSessao,
   fetchEmpresasAcessoPagina,
 } from './empresasAcessoApi'
-import { isSinalKioskGestorPedidos } from './isKioskGestorPedidos'
+import { persistirSinalKioskFlow } from './isKioskGestorPedidos'
 import { lerEmpresasLoginFlow } from './empresasLoginFlow'
 import { lerUltimaEmpresaKiosk } from './ultimaEmpresaKiosk'
 
@@ -39,16 +37,11 @@ function siglaEmpresa(nome: string): string {
  */
 export function EscolherEmpresaFlowPage() {
   const router = useRouter()
-  const isRehydrated = useAuthStore(s => s.isRehydrated)
   const hubEmpresas = useAuthStore(s => s.hubEmpresas)
   const identityAuth = useAuthStore(s => s.identityAuth)
   const logoutHub = useAuthStore(s => s.logoutHub)
   const identityOk = Boolean(identityAuth && !identityAuth.isExpired())
-  const [kioskOk, setKioskOk] = useState(() =>
-    typeof window !== 'undefined'
-      ? isSinalKioskGestorPedidos(lerSinalGestorDoBrowser())
-      : false
-  )
+  const [kioskOk, setKioskOk] = useState(true)
   const [buscaInput, setBuscaInput] = useState('')
   const [busca, setBusca] = useState('')
   const [items, setItems] = useState<LoginEmpresaSnapshot[]>([])
@@ -79,12 +72,19 @@ export function EscolherEmpresaFlowPage() {
   )
 
   useEffect(() => {
-    if (!isSinalKioskGestorPedidos(lerSinalGestorDoBrowser())) {
-      router.replace(HUB_PATH)
-      return
-    }
+    persistirSinalKioskFlow()
     setKioskOk(true)
-  }, [router])
+  }, [])
+
+  useEffect(() => {
+    if (listaPronta) return
+    const t = window.setTimeout(() => {
+      if (listaPronta) return
+      setErro('Não foi possível carregar as empresas. Entre novamente.')
+      setListaPronta(true)
+    }, 4000)
+    return () => window.clearTimeout(t)
+  }, [listaPronta])
 
   useEffect(() => {
     const t = window.setTimeout(() => setBusca(buscaInput.trim()), 300)
@@ -161,7 +161,6 @@ export function EscolherEmpresaFlowPage() {
       aplicarListaLocal(busca, PAGE_SIZE_EMPRESAS_FLOW)
       return
     }
-    if (!isRehydrated) return
     if (identityOk) {
       fonteRef.current = 'local'
       aplicarListaLocal(busca, PAGE_SIZE_EMPRESAS_FLOW)
@@ -171,7 +170,7 @@ export function EscolherEmpresaFlowPage() {
     setItems([])
     setListaPronta(false)
     void carregarDaApi(0, busca, false)
-  }, [aplicarListaLocal, busca, carregarDaApi, identityOk, isRehydrated, kioskOk, locais.length])
+  }, [aplicarListaLocal, busca, carregarDaApi, identityOk, kioskOk, locais.length])
 
   useEffect(() => {
     if (fonteRef.current !== 'local') return
@@ -235,14 +234,6 @@ export function EscolherEmpresaFlowPage() {
     },
     [busyId, falhouSessao, irAoLogin, router]
   )
-
-  if (!kioskOk) {
-    return (
-      <div className="flex h-full flex-1 items-center justify-center bg-primary-bg">
-        <JiffyLoading />
-      </div>
-    )
-  }
 
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col bg-primary-bg">

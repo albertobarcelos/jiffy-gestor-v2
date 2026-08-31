@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { mesmaRotaLocal, pathHubComSinalGestor } from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
+import {
+  mesmaRotaLocal,
+  pathHubComSinalGestor,
+  pathWhatsAppKiosk,
+} from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
 
 describe('mesmaRotaLocal', () => {
   it('reconhece /login?gestor igual a si mesmo', () => {
@@ -34,5 +38,11 @@ describe('pathHubComSinalGestor', () => {
     expect(pathHubComSinalGestor({ hasTauri: false, search: '?gestor' })).toBe(
       '/pedidos/empresas?gestor'
     )
+  })
+})
+
+describe('pathWhatsAppKiosk', () => {
+  it('sem janela fica no path do Flow', () => {
+    expect(pathWhatsAppKiosk()).toBe('/pedidos/whatsapp?gestor')
   })
 })

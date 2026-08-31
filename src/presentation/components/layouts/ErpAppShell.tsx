@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { TopNav } from '@/src/presentation/components/layouts/TopNav'
 import { ErpTenantAccessGuard } from '@/src/presentation/components/layouts/ErpTenantAccessGuard'
 import { useKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/kiosk/useKioskGestorPedidos'
+import { WhatsAppWebViewHost } from '@/src/presentation/gestor-pedidos/whatsapp/WhatsAppWebViewHost'
 import { useDetectCacheLeaks } from '@/src/presentation/hooks/useDetectCacheLeaks'
 import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 
@@ -13,6 +14,7 @@ function ErpAppShellInner({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-gray-50">
+      {kiosk ? <WhatsAppWebViewHost /> : null}
       {!kiosk && <TopNav />}
 
       <main

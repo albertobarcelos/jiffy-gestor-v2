@@ -4,11 +4,11 @@
   "version": "0.1.0",
   "identifier": "br.com.nexsyn.jiffy-flow",
   "build": {
-    "frontendDist": "http://localhost:5000/pedidos?gestor",
-    "devUrl": "http://localhost:5000/pedidos?gestor"
+    "frontendDist": "http://127.0.0.1:5000/pedidos/empresas?gestor",
+    "devUrl": "http://127.0.0.1:5000/pedidos/empresas?gestor"
   },
   "app": {
-    "withGlobalTauri": false,
+    "withGlobalTauri": true,
     "windows": [
       {
         "label": "main",

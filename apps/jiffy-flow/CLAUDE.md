@@ -4,22 +4,34 @@ Casco Windows. **Não imprime. Não tem regra de pedido.**
 
 ```text
 Browser / menu Vendas → gestor-pedidos://open
-    → este .exe (WebView2)
-    → Next em /pedidos?gestor
+    → este .exe (WebView2, User-Agent JiffyFlow/)
+    → Next em /pedidos/empresas?gestor
     → agente Go imprime (já instalado à parte)
 ```
+
+## Separação instalado vs web (obrigatória)
+
+| Superfície | Como se reconhece | Depois do login |
+|---|---|---|
+| **Jiffy Flow `.exe`** | User-Agent contém `JiffyFlow/` | Lista «Suas empresas» — nunca Minhas Empresas |
+| **Preview kiosk no Chrome** | só `?gestor` na URL | A mesma lista (dev) |
+| **Gestor no Chrome** | nenhum dos dois | Hub de cards, inalterado |
+
+Não usar cookie, `localStorage` nem `sessionStorage` como identidade do produto. O Chrome nunca envia `JiffyFlow/`. A janela do WhatsApp Web no Flow usa UA de Chrome normal (sem `JiffyFlow/`).
 
 ## O que este projeto faz
 
 - Janela nativa sem barra de endereço
-- Abre o Gestor em `/pedidos?gestor`
+- Abre o Gestor na janela nativa
+- Identifica-se com User-Agent `JiffyFlow/` (o Gestor web nunca abre Minhas Empresas neste casco)
 - Regista o protocolo `gestor-pedidos://`
 - Uma instância só (segundo clique foca a janela)
+- WebView persistente de `web.whatsapp.com` (sem ler conversas)
 
 ## O que NÃO faz
 
 - ESC/POS, spooler, fila
-- WhatsApp
+- API oficial / Baileys / chatbot / gravar mensagens
 - Embutir o Next no .exe
 - Alterar o agente Go
 

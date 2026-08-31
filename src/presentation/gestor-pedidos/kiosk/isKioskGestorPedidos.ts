@@ -1,28 +1,46 @@
 import { stripGestaoEmpresaSlugFromPath } from '@/src/shared/utils/gestaoRoutes'
-import { PEDIDOS_PATH, QUERY_GESTOR } from '../constantes'
+import {
+  PEDIDOS_PATH,
+  PEDIDOS_WHATSAPP_PATH,
+  QUERY_GESTOR,
+  TOKEN_USER_AGENT_JIFFY_FLOW,
+} from '../constantes'
 
-/** Tauri 2 com `withGlobalTauri: false` não põe `__TAURI__` no window. */
-export function detectarRuntimeTauri(): boolean {
+/**
+ * O .exe Jiffy Flow — não o Chrome, não o Gestor web.
+ * Fonte: User-Agent da janela (sobrevive login, F5 e perda de `?gestor`).
+ */
+export function pedidoVeioDoAppJiffyFlow(userAgent: string | null | undefined): boolean {
+  return String(userAgent ?? '').includes(TOKEN_USER_AGENT_JIFFY_FLOW)
+}
+
+/** Runtime na janela: UA do WebView, script da janela, ou IPC Tauri. */
+export function estaNoAppJiffyFlow(): boolean {
   if (typeof window === 'undefined') return false
-  return '__TAURI__' in window || '__TAURI_INTERNALS__' in window
+  if (pedidoVeioDoAppJiffyFlow(navigator.userAgent)) return true
+  const w = window as Window & { __JIFFY_FLOW_KIOSK__?: unknown }
+  return (
+    w.__JIFFY_FLOW_KIOSK__ === true ||
+    '__TAURI__' in window ||
+    '__TAURI_INTERNALS__' in window
+  )
 }
 
-const STORAGE_SINAL_KIOSK_FLOW = 'jiffy.flow.kiosk'
+export function detectarRuntimeTauri(): boolean {
+  return estaNoAppJiffyFlow()
+}
 
+/**
+ * @deprecated Não é identidade. O .exe é `JiffyFlow/` no User-Agent.
+ * Preview no Chrome é só `?gestor`. Não gravar cookie nem storage.
+ */
 export function persistirSinalKioskFlow(): void {
-  try {
-    sessionStorage.setItem(STORAGE_SINAL_KIOSK_FLOW, '1')
-  } catch {
-    /* noop */
-  }
+  /* identidade não vive em storage */
 }
 
+/** @deprecated Sempre false — não usar storage como se fosse o .exe. */
 export function lerSinalKioskFlowPersistido(): boolean {
-  try {
-    return sessionStorage.getItem(STORAGE_SINAL_KIOSK_FLOW) === '1'
-  } catch {
-    return false
-  }
+  return false
 }
 
 function pathSemQuery(pathModulo: string): string {
@@ -32,6 +50,25 @@ function pathSemQuery(pathModulo: string): string {
 export function isRotaPedidos(pathModulo: string): boolean {
   const path = pathSemQuery(pathModulo)
   return path === PEDIDOS_PATH || path.startsWith(`${PEDIDOS_PATH}/`)
+}
+
+export function isRotaWhatsAppFlow(pathModulo: string): boolean {
+  return pathSemQuery(pathModulo) === PEDIDOS_WHATSAPP_PATH
+}
+
+const PREFIXOS_CONTA_NO_FLOW = [
+  '/login',
+  '/registro',
+  '/confirmar-email',
+  '/esqueci-senha',
+  '/redefinir-senha',
+] as const
+
+/** Rotas que o .exe pode mostrar. Qualquer outra (hub, dashboard, ERP) é o Gestor web. */
+export function isRotaPermitidaNoJiffyFlow(pathname: string): boolean {
+  const path = stripGestaoEmpresaSlugFromPath(pathSemQuery(pathname))
+  if (isRotaPedidos(path)) return true
+  return PREFIXOS_CONTA_NO_FLOW.some(r => path === r || path.startsWith(`${r}/`))
 }
 
 export function isSinalKioskGestorPedidos(input: {
@@ -57,16 +94,16 @@ export function deveEsconderTopNavNoGestorPedidos(
   return isSinalKioskGestorPedidos(sinal)
 }
 
-/** Quadro / lista no Flow: path `/pedidos` + Tauri, `?gestor` ou sinal já persistido. */
+/** Quadro / lista no Flow: path `/pedidos` + app (`JiffyFlow/`) ou `?gestor`. */
 export function isRotaKioskPedidos(pathname: string, search = ''): boolean {
-  if (!isRotaPedidos(stripGestaoEmpresaSlugFromPath(pathname))) return false
-  const hasTauri =
-    typeof window !== 'undefined' &&
-    (detectarRuntimeTauri() || lerSinalKioskFlowPersistido())
-  const sinal = { hasTauri, search }
-  if (!isSinalKioskGestorPedidos(sinal)) return false
-  persistirSinalKioskFlow()
-  return true
+  const path = stripGestaoEmpresaSlugFromPath(pathname)
+  /** Rotas só do casco: nunca o hub web de Minhas Empresas. */
+  if (path === `${PEDIDOS_PATH}/empresas` || path === PEDIDOS_WHATSAPP_PATH) {
+    return true
+  }
+  if (!isRotaPedidos(path)) return false
+  const hasTauri = typeof window !== 'undefined' && detectarRuntimeTauri()
+  return isSinalKioskGestorPedidos({ hasTauri, search })
 }
 
 /** Quadro / lista de empresas no casco Windows / `?gestor` (não o ERP web). */

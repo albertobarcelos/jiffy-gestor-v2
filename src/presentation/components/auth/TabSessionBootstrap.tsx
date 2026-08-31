@@ -30,7 +30,10 @@ import {
 } from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
 import { PEDIDOS_PATH } from '@/src/presentation/gestor-pedidos/constantes'
 import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
-import { isSinalKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
+import {
+  isSinalKioskGestorPedidos,
+  persistirSinalKioskFlow,
+} from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
 import { lerUltimaEmpresaKiosk } from '@/src/presentation/gestor-pedidos/kiosk/ultimaEmpresaKiosk'
 import { extractTokenInfo } from '@/src/shared/utils/validateToken'
 import { decideTabSessionBootstrap } from '@/src/presentation/utils/decideTabSessionBootstrap'
@@ -126,21 +129,46 @@ export function TabSessionBootstrap() {
   const rebindRef = useRef<RebindPending | null>(null)
 
   useLayoutEffect(() => {
-    if (typeof window === 'undefined' || !isRehydrated) return
+    if (typeof window === 'undefined') return
 
-    if (isRotaPublicaBootstrap(pathname ?? window.location.pathname)) {
+    const pathNow = pathname ?? window.location.pathname
+    if (isRotaPublicaBootstrap(pathNow)) {
+      if (isSinalKioskGestorPedidos(lerSinalGestorDoBrowser())) {
+        persistirSinalKioskFlow()
+      }
       return
     }
+
+    /**
+     * Flow sem empresa na URL: não esperar Zustand.
+     * Quem logou no hub e reabre `/pedidos` ficava no quadro a girar para sempre.
+     */
+    const kioskAgora = isSinalKioskGestorPedidos(lerSinalGestorDoBrowser())
+    const pathModuloAgora = stripGestaoEmpresaSlugFromPath(pathNow)
+    if (
+      kioskAgora &&
+      !getEmpParam() &&
+      (pathModuloAgora === PEDIDOS_PATH || pathModuloAgora === HUB_PATH) &&
+      !getTabTenantToken()
+    ) {
+      if (didRunRef.current) return
+      didRunRef.current = true
+      persistirSinalKioskFlow()
+      window.location.replace(pathEscolherEmpresaKiosk())
+      return
+    }
+
+    if (!isRehydrated) return
 
     if (didRunRef.current) return
 
     const emp = getEmpParam()
 
     /** Jiffy Flow sem slug: aba já aberta, ou lista de empresas — nunca Minhas Empresas. */
-    if (!emp && isSinalKioskGestorPedidos(lerSinalGestorDoBrowser())) {
+    if (!emp && kioskAgora) {
       const pathModulo = stripGestaoEmpresaSlugFromPath(window.location.pathname)
       /** Lista do Flow: o utilizador acabou de entrar — não saltar para a última empresa. */
-      if (pathModulo === `${PEDIDOS_PATH}/empresas`) {
+      if (pathModulo === `${PEDIDOS_PATH}/empresas` || pathModulo === `${PEDIDOS_PATH}/whatsapp`) {
         didRunRef.current = true
         setTabVerified(true)
         return

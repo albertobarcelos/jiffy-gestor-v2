@@ -3,12 +3,28 @@
   "identifier": "default",
   "description": "Janela do quadro. Sem API de pedido.",
   "windows": ["main"],
+  "webviews": ["main", "whatsapp"],
   "remote": {
     "urls": [
       "http://localhost:*/*",
       "http://127.0.0.1:*/*",
-      "https://*.jiffy.run/*"
+      "https://*.jiffy.run/*",
+      "https://web.whatsapp.com/*",
+      "https://*.whatsapp.com/*",
+      "https://*.whatsapp.net/*"
     ]
   },
-  "permissions": ["core:default", "deep-link:default"]
+  "permissions": [
+    "core:default",
+    "deep-link:default",
+    "core:webview:default",
+    "core:webview:allow-create-webview",
+    "core:webview:allow-webview-show",
+    "core:webview:allow-webview-hide",
+    "core:webview:allow-set-webview-position",
+    "core:webview:allow-set-webview-size",
+    "core:webview:allow-clear-all-browsing-data",
+    "core:event:default",
+    "allow-whatsapp"
+  ]
 }

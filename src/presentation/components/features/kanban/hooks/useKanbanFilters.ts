@@ -13,6 +13,7 @@ import {
   gravarFiltroColunaKanbanNoStorage,
   lerFiltroColunaKanbanDoStorage,
 } from '../rules/vendasKanban.storage'
+import { lerPendenciaQuadroFlow } from '@/src/presentation/gestor-pedidos/quadro/filtroPendenteQuadroFlow'
 
 /** `periodo`: filtro por intervalo (default hoje quando sem datas explícitas). `todos`: sem filtro de data. */
 export type FiltroDataKanbanModo = 'periodo' | 'todos'
@@ -32,7 +33,8 @@ export function useKanbanFilters(
   const diaOperacionalFlow = Boolean(opcoes?.diaOperacionalFlow)
   const tzEmpresa = timeZoneEmpresa ?? ''
 
-  const [searchInput, setSearchInput] = useState('')
+  const [pendenciaQuadro] = useState(lerPendenciaQuadroFlow)
+  const [searchInput, setSearchInput] = useState(pendenciaQuadro.busca)
   const [searchQuery, setSearchQuery] = useState('')
   const intervaloCivilHoje = useMemo(() => criarIntervaloHoje(), [])
   const intervaloPeriodoPadrao = diaOperacionalFlow
@@ -41,8 +43,12 @@ export function useKanbanFilters(
     : intervaloCivilHoje
   const [periodoInicio, setPeriodoInicio] = useState<Date | null>(null)
   const [periodoFim, setPeriodoFim] = useState<Date | null>(null)
-  const [periodoDataModo, setPeriodoDataModo] = useState<FiltroDataKanbanModo>('periodo')
-  const [periodoPreset, setPeriodoPreset] = useState<KanbanFiltroDataPreset>('hoje')
+  const [periodoDataModo, setPeriodoDataModo] = useState<FiltroDataKanbanModo>(
+    pendenciaQuadro.periodoTodos ? 'todos' : 'periodo'
+  )
+  const [periodoPreset, setPeriodoPreset] = useState<KanbanFiltroDataPreset>(
+    pendenciaQuadro.periodoTodos ? 'todos' : 'hoje'
+  )
   const [origemFilter, setOrigemFilter] = useState<OrigemFiltro>('')
   const [tipoEntregaFilter, setTipoEntregaFilter] = useState<TipoEntregaFiltro>('')
   const [colunaKanbanFiltro, setColunaKanbanFiltroState] =

@@ -3,6 +3,7 @@ use tauri_plugin_deep_link::DeepLinkExt;
 
 mod quadro_url;
 mod update;
+mod whatsapp;
 
 pub use update::try_run_apply_pending;
 
@@ -22,6 +23,16 @@ pub fn run() {
 
     builder
         .plugin(tauri_plugin_deep_link::init())
+        .manage(whatsapp::WhatsAppState::default())
+        .invoke_handler(tauri::generate_handler![
+            whatsapp::whatsapp_show,
+            whatsapp::whatsapp_hide,
+            whatsapp::whatsapp_reload,
+            whatsapp::whatsapp_clear_session,
+            whatsapp::whatsapp_status,
+            whatsapp::whatsapp_chat_hint,
+            whatsapp::whatsapp_inserir_texto,
+        ])
         .setup(|app| {
             #[cfg(any(windows, target_os = "linux"))]
             {
@@ -29,12 +40,20 @@ pub fn run() {
             }
 
             let url = quadro_url::url_do_quadro();
+            eprintln!("Jiffy Flow a abrir {url}");
             let parsed: url::Url = url.parse().expect("GESTOR_PEDIDOS_URL inválida");
             WebviewWindowBuilder::new(app, "main", WebviewUrl::External(parsed))
                 .title("Pedidos")
                 .maximized(true)
                 .resizable(true)
                 .decorations(true)
+                .user_agent(concat!(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ",
+                    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 JiffyFlow/0.1.0"
+                ))
+                .initialization_script(
+                    "Object.defineProperty(window,'__JIFFY_FLOW_KIOSK__',{value:true,enumerable:true});",
+                )
                 .build()?;
 
             let handle = app.handle().clone();

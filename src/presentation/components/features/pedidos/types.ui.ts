@@ -1,5 +1,6 @@
 /** Props exclusivas da camada de apresentação (modal Novo Pedido). */
 
+import type { Cliente } from '@/src/domain/entities/Cliente'
 import type { AbaDetalhesPedido } from '@/src/domain/types/vendaDetalhe'
 
 export interface NovoPedidoModalProps {
@@ -29,4 +30,8 @@ export interface NovoPedidoModalProps {
    * balcao: step inicial = Informações; entrega: step inicial = Produtos.
    */
   tipoInicioPedido?: 'balcao' | 'entrega'
+  /** Cliente já escolhido no Flow — preenche telefone e vínculo na etapa Informações. */
+  clienteInicial?: Cliente | null
+  /** Telefone da conversa quando ainda não há cadastro. */
+  telefoneInicial?: string
 }
