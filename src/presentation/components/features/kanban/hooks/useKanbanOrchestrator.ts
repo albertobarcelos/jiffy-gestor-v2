@@ -123,7 +123,7 @@ export function useKanbanOrchestrator() {
   )
   /** Casco Windows: só delivery. O Gestor web continua a escolher balcão/delivery. */
   const modoKanbanVendas: ModoKanbanVendas = kiosk ? 'delivery' : modoKanbanVendasLivre
-  const [modoVisualizacaoLivre, setModoVisualizacao] = useState<ModoVisualizacaoKanban>(() =>
+  const [modoVisualizacaoLivre, setModoVisualizacaoLivre] = useState<ModoVisualizacaoKanban>(() =>
     lerModoVisualizacaoKanbanDoStorage()
   )
   /** Gestor web: sempre Quadro. Flow: Quadro / Operação / Lista. */
@@ -392,7 +392,7 @@ export function useKanbanOrchestrator() {
     modoKanbanVendas,
     onModoKanbanVendasChange: setModoKanbanVendas,
     modoVisualizacao,
-    onModoVisualizacaoChange: setModoVisualizacao,
+    onModoVisualizacaoChange: setModoVisualizacaoLivre,
     onAbrirConfiguracoesDelivery: modais.abrirConfigImpressoraExpedicao,
     onAbrirNovoPedido: modais.handleAbrirNovoPedido,
     colunasDoModo,

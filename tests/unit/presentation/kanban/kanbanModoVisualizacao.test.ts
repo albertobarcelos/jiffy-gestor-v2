@@ -14,7 +14,9 @@ import {
   tomTempoPedidoKanban,
 } from '@/src/presentation/components/features/kanban/utils/kanbanPedidoTempo'
 import {
+  classeDestaquePagamentoKanban,
   nomeClienteCurtoKanban,
+  rotuloStatusFinanceiroKanban,
   rotuloTipoAtendimentoKanban,
   tipoAtendimentoKanban,
 } from '@/src/presentation/components/features/kanban/utils/kanbanPedidoIdentidade'
@@ -102,6 +104,9 @@ describe('kanbanPedidoIdentidade', () => {
     expect(nomeClienteCurtoKanban('')).toBe('—')
     expect(tipoAtendimentoKanban('retirada')).toBe('retirada')
     expect(rotuloTipoAtendimentoKanban('entrega')).toBe('Entrega')
+    expect(rotuloStatusFinanceiroKanban('pendente')).toBe('Pendente')
+    expect(classeDestaquePagamentoKanban('pendente')).toContain('amber')
+    expect(classeDestaquePagamentoKanban('pago')).toContain('emerald')
   })
 })
 

@@ -1,9 +1,15 @@
 import type { ModoKanbanVendas } from '../KanbanModoVendasToggle'
-import type { ColunaKanbanFiltroExtra, ColunaKanbanId } from '../types'
+import type {
+  ColunaKanbanFiltroExtra,
+  ColunaKanbanId,
+  OrigemFiltro,
+  TipoEntregaFiltro,
+} from '../types'
 import {
   colunasOcultasPadraoDoModo,
   sanitizarColunasOcultas,
 } from '../utils/kanbanColunasVisibilidade'
+import type { KanbanFiltroDataPreset } from '../utils/kanbanFiltroDataPresets'
 import {
   parseModoVisualizacaoKanban,
   type ModoVisualizacaoKanban,
@@ -14,6 +20,123 @@ export const KANBAN_MODO_VENDAS_STORAGE_KEY = 'jiffy-gestor-v2:kanban-modo-venda
 export const KANBAN_MODO_VISUALIZACAO_STORAGE_KEY = 'jiffy-gestor-v2:kanban-modo-visualizacao'
 export const KANBAN_FILTRO_COLUNA_STORAGE_KEY = 'jiffy-gestor-v2:kanban-filtro-coluna'
 export const KANBAN_COLUNAS_OCULTAS_STORAGE_KEY = 'jiffy-gestor-v2:kanban-colunas-ocultas'
+/** Filtros da barra (busca, período, tipo). Independentes do modo Quadro/Operação/Lista. */
+export const KANBAN_FILTROS_TOOLBAR_STORAGE_KEY = 'jiffy-gestor-v2:kanban-filtros-toolbar'
+
+export type FiltroDataKanbanModoStorage = 'periodo' | 'todos'
+
+export type SnapshotFiltrosToolbarKanban = {
+  searchInput: string
+  origemFilter: OrigemFiltro
+  tipoEntregaFilter: TipoEntregaFiltro
+  periodoPreset: KanbanFiltroDataPreset
+  periodoDataModo: FiltroDataKanbanModoStorage
+  periodoInicioISO: string | null
+  periodoFimISO: string | null
+}
+
+const ORIGENS_FILTRO: readonly OrigemFiltro[] = ['', 'PDV', 'GESTOR', 'DELIVERY']
+const TIPOS_ENTREGA_FILTRO: readonly TipoEntregaFiltro[] = ['', 'entrega', 'retirada']
+const PRESETS_PERIODO: readonly KanbanFiltroDataPreset[] = [
+  'hoje',
+  'ontem',
+  'ultimos_7',
+  'todos',
+  'por_data',
+]
+
+export function snapshotFiltrosToolbarKanbanPadrao(): SnapshotFiltrosToolbarKanban {
+  return {
+    searchInput: '',
+    origemFilter: '',
+    tipoEntregaFilter: '',
+    periodoPreset: 'hoje',
+    periodoDataModo: 'periodo',
+    periodoInicioISO: null,
+    periodoFimISO: null,
+  }
+}
+
+function isOrigemFiltro(value: unknown): value is OrigemFiltro {
+  return typeof value === 'string' && (ORIGENS_FILTRO as readonly string[]).includes(value)
+}
+
+function isTipoEntregaFiltro(value: unknown): value is TipoEntregaFiltro {
+  return typeof value === 'string' && (TIPOS_ENTREGA_FILTRO as readonly string[]).includes(value)
+}
+
+function isPresetPeriodo(value: unknown): value is KanbanFiltroDataPreset {
+  return typeof value === 'string' && (PRESETS_PERIODO as readonly string[]).includes(value)
+}
+
+function isoOuNulo(value: unknown): string | null {
+  if (value == null || value === '') return null
+  if (typeof value !== 'string') return null
+  const t = Date.parse(value)
+  return Number.isFinite(t) ? value : null
+}
+
+export function sanitizarSnapshotFiltrosToolbarKanban(
+  raw: unknown
+): SnapshotFiltrosToolbarKanban {
+  const padrao = snapshotFiltrosToolbarKanbanPadrao()
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return padrao
+  const o = raw as Record<string, unknown>
+  const periodoPreset = isPresetPeriodo(o.periodoPreset) ? o.periodoPreset : padrao.periodoPreset
+  const periodoDataModo: FiltroDataKanbanModoStorage =
+    o.periodoDataModo === 'todos' || periodoPreset === 'todos' ? 'todos' : 'periodo'
+  const presetComDatas = periodoPreset === 'por_data' || periodoPreset === 'ultimos_7'
+  return {
+    searchInput: typeof o.searchInput === 'string' ? o.searchInput : '',
+    origemFilter: isOrigemFiltro(o.origemFilter) ? o.origemFilter : '',
+    tipoEntregaFilter: isTipoEntregaFiltro(o.tipoEntregaFilter) ? o.tipoEntregaFilter : '',
+    periodoPreset,
+    periodoDataModo,
+    periodoInicioISO: presetComDatas ? isoOuNulo(o.periodoInicioISO) : null,
+    periodoFimISO: presetComDatas ? isoOuNulo(o.periodoFimISO) : null,
+  }
+}
+
+/** «Pedidos do cliente» no WhatsApp sobrepõe busca/período; o resto da barra mantém-se. */
+export function mesclarPendenciaFiltrosToolbarKanban(
+  base: SnapshotFiltrosToolbarKanban,
+  pendencia: { busca: string; periodoTodos: boolean }
+): SnapshotFiltrosToolbarKanban {
+  return {
+    ...base,
+    searchInput: pendencia.busca || base.searchInput,
+    ...(pendencia.periodoTodos
+      ? {
+          periodoPreset: 'todos' as const,
+          periodoDataModo: 'todos' as const,
+          periodoInicioISO: null,
+          periodoFimISO: null,
+        }
+      : {}),
+  }
+}
+
+export function lerFiltrosToolbarKanbanDoStorage(): SnapshotFiltrosToolbarKanban {
+  if (typeof window === 'undefined') return snapshotFiltrosToolbarKanbanPadrao()
+  try {
+    const raw = sessionStorage.getItem(KANBAN_FILTROS_TOOLBAR_STORAGE_KEY)
+    if (!raw) return snapshotFiltrosToolbarKanbanPadrao()
+    return sanitizarSnapshotFiltrosToolbarKanban(JSON.parse(raw) as unknown)
+  } catch {
+    return snapshotFiltrosToolbarKanbanPadrao()
+  }
+}
+
+export function gravarFiltrosToolbarKanbanNoStorage(snapshot: SnapshotFiltrosToolbarKanban) {
+  try {
+    sessionStorage.setItem(
+      KANBAN_FILTROS_TOOLBAR_STORAGE_KEY,
+      JSON.stringify(sanitizarSnapshotFiltrosToolbarKanban(snapshot))
+    )
+  } catch {
+    /* quota / modo privado */
+  }
+}
 
 const FILTROS_COLUNA_VALIDOS: readonly ColunaKanbanFiltroExtra[] = [
   '',

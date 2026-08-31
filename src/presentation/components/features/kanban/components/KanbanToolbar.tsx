@@ -22,7 +22,6 @@ import type { ModoVisualizacaoKanban } from '../utils/kanbanModoVisualizacao'
 import { KanbanColunasMenu } from './KanbanColunasMenu'
 import { KanbanModoVisualizacaoSelect } from './KanbanModoVisualizacaoSelect'
 import { useKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/kiosk/useKioskGestorPedidos'
-import { GestorEmpresaSelectKiosk } from '@/src/presentation/gestor-pedidos/kiosk/GestorEmpresaSelectKiosk'
 import {
   KANBAN_FILTRO_DATA_PRESET_OPCOES,
   type KanbanFiltroDataPreset,
@@ -240,17 +239,15 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
       <div
         className={`flex flex-wrap items-end justify-center gap-x-1 gap-y-4 rounded-t-lg bg-custom-2 px-1 pb-2 pt-1.5 md:justify-start ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}
       >
-        {kiosk ? <GestorEmpresaSelectKiosk /> : null}
-
-        <div className="flex flex-col gap-1">
-          <div className="relative w-[250px] px-1 lg:w-[220px]">
+        <div className="flex min-w-[18rem] flex-[1_1_18rem] flex-col gap-1 sm:max-w-xl">
+          <div className="relative w-full px-1">
             <MdSearch
               className="absolute left-2 top-1/2 -translate-y-1/2 text-secondary-text"
               size={20}
             />
             <input
               type="text"
-              placeholder="Digite o código ou cliente"
+              placeholder="Código, cliente ou telefone"
               value={searchInput}
               onChange={e => onSearchInputChange(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && onRefresh()}

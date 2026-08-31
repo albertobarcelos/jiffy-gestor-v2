@@ -11,9 +11,13 @@ import {
 } from '../utils/kanbanFiltroDataPresets'
 import {
   gravarFiltroColunaKanbanNoStorage,
+  gravarFiltrosToolbarKanbanNoStorage,
   lerFiltroColunaKanbanDoStorage,
+  lerFiltrosToolbarKanbanDoStorage,
+  mesclarPendenciaFiltrosToolbarKanban,
 } from '../rules/vendasKanban.storage'
 import { lerPendenciaQuadroFlow } from '@/src/presentation/gestor-pedidos/quadro/filtroPendenteQuadroFlow'
+import { termoBuscaKanbanParaApi } from '../rules/vendasKanban.rules'
 
 /** `periodo`: filtro por intervalo (default hoje quando sem datas explícitas). `todos`: sem filtro de data. */
 export type FiltroDataKanbanModo = 'periodo' | 'todos'
@@ -33,24 +37,39 @@ export function useKanbanFilters(
   const diaOperacionalFlow = Boolean(opcoes?.diaOperacionalFlow)
   const tzEmpresa = timeZoneEmpresa ?? ''
 
-  const [pendenciaQuadro] = useState(lerPendenciaQuadroFlow)
-  const [searchInput, setSearchInput] = useState(pendenciaQuadro.busca)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [filtrosIniciais] = useState(() =>
+    mesclarPendenciaFiltrosToolbarKanban(
+      lerFiltrosToolbarKanbanDoStorage(),
+      lerPendenciaQuadroFlow()
+    )
+  )
+  const [searchInput, setSearchInput] = useState(filtrosIniciais.searchInput)
+  const [searchQuery, setSearchQuery] = useState(filtrosIniciais.searchInput.trim())
   const intervaloCivilHoje = useMemo(() => criarIntervaloHoje(), [])
   const intervaloPeriodoPadrao = diaOperacionalFlow
     ? intervaloPresetKanbanFiltroData('hoje', tzEmpresa, { diaOperacionalFlow: true }) ??
       intervaloCivilHoje
     : intervaloCivilHoje
-  const [periodoInicio, setPeriodoInicio] = useState<Date | null>(null)
-  const [periodoFim, setPeriodoFim] = useState<Date | null>(null)
+  const [periodoInicio, setPeriodoInicio] = useState<Date | null>(() => {
+    if (!filtrosIniciais.periodoInicioISO) return null
+    const d = new Date(filtrosIniciais.periodoInicioISO)
+    return Number.isFinite(d.getTime()) ? d : null
+  })
+  const [periodoFim, setPeriodoFim] = useState<Date | null>(() => {
+    if (!filtrosIniciais.periodoFimISO) return null
+    const d = new Date(filtrosIniciais.periodoFimISO)
+    return Number.isFinite(d.getTime()) ? d : null
+  })
   const [periodoDataModo, setPeriodoDataModo] = useState<FiltroDataKanbanModo>(
-    pendenciaQuadro.periodoTodos ? 'todos' : 'periodo'
+    filtrosIniciais.periodoDataModo
   )
   const [periodoPreset, setPeriodoPreset] = useState<KanbanFiltroDataPreset>(
-    pendenciaQuadro.periodoTodos ? 'todos' : 'hoje'
+    filtrosIniciais.periodoPreset
   )
-  const [origemFilter, setOrigemFilter] = useState<OrigemFiltro>('')
-  const [tipoEntregaFilter, setTipoEntregaFilter] = useState<TipoEntregaFiltro>('')
+  const [origemFilter, setOrigemFilter] = useState<OrigemFiltro>(filtrosIniciais.origemFilter)
+  const [tipoEntregaFilter, setTipoEntregaFilter] = useState<TipoEntregaFiltro>(
+    filtrosIniciais.tipoEntregaFilter
+  )
   const [colunaKanbanFiltro, setColunaKanbanFiltroState] =
     useState<ColunaKanbanFiltroExtra>(lerFiltroColunaKanbanDoStorage)
 
@@ -80,6 +99,26 @@ export function useKanbanFilters(
     }
   }, [searchInput])
 
+  useEffect(() => {
+    gravarFiltrosToolbarKanbanNoStorage({
+      searchInput,
+      origemFilter,
+      tipoEntregaFilter,
+      periodoPreset,
+      periodoDataModo,
+      periodoInicioISO: periodoInicio?.toISOString() ?? null,
+      periodoFimISO: periodoFim?.toISOString() ?? null,
+    })
+  }, [
+    searchInput,
+    origemFilter,
+    tipoEntregaFilter,
+    periodoPreset,
+    periodoDataModo,
+    periodoInicio,
+    periodoFim,
+  ])
+
   const deveUsarPeriodoPadrao =
     periodoDataModo === 'periodo' && !periodoInicio && !periodoFim
   const intervaloLiveFlow =
@@ -101,7 +140,7 @@ export function useKanbanFilters(
 
   /** Mesmo intervalo para criação (colunas operacionais) e finalização (colunas fiscais). */
   const vendasUnificadasQueryParams = useMemo(() => {
-    const qNormalizado = searchQuery.replace(/^#+/, '').trim()
+    const qNormalizado = termoBuscaKanbanParaApi(searchQuery)
     return {
       q: qNormalizado || undefined,
       origem: origemFilter || undefined,

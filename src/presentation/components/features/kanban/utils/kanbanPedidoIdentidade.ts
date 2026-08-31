@@ -40,3 +40,14 @@ export function rotuloStatusFinanceiroKanban(status: string | null | undefined):
   if (s === 'pendente') return 'Pendente'
   return '—'
 }
+
+export function classeDestaquePagamentoKanban(status: string | null | undefined): string {
+  const s = String(status ?? '')
+    .trim()
+    .toLowerCase()
+  if (s === 'pago') return 'bg-emerald-50 text-emerald-800'
+  if (s === 'parcial') return 'bg-sky-50 text-sky-800'
+  if (s === 'cancelado') return 'bg-red-50 text-red-700'
+  if (s === 'pendente') return 'bg-amber-50 text-amber-800'
+  return 'bg-gray-100 text-gray-600'
+}

@@ -5,6 +5,7 @@ import { MdExpandLess, MdExpandMore } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import {
+  classeDestaquePagamentoKanban,
   nomeClienteCurtoKanban,
   rotuloStatusFinanceiroKanban,
   rotuloTipoAtendimentoKanban,
@@ -12,6 +13,7 @@ import {
 } from '../utils/kanbanPedidoIdentidade'
 import { relogioPedidoKanban } from '../utils/kanbanPedidoTempo'
 import { useAgoraKanban } from '../hooks/useAgoraKanban'
+import { classeBordaEsquerdaColunaKanban } from '../rules/vendasKanban.rules'
 import type { ColunaKanbanId, KanbanColumn, Venda } from '../types'
 import type { KanbanBoardRendererProps } from './KanbanBoardRenderer'
 import { KanbanAvancarEtapaCompacto } from './KanbanAvancarEtapaCompacto'
@@ -91,7 +93,7 @@ export function KanbanListaRenderer(props: KanbanBoardRendererProps) {
         return (
           <section
             key={column.id}
-            className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200"
+            className={`overflow-hidden rounded-2xl border border-gray-200 border-l-4 bg-white shadow-sm ${classeBordaEsquerdaColunaKanban(colId)}`}
           >
             <button
               type="button"
@@ -125,9 +127,9 @@ export function KanbanListaRenderer(props: KanbanBoardRendererProps) {
                         <th className="px-3 py-2">Cliente</th>
                         <th className="px-3 py-2">Tipo</th>
                         <th className="px-3 py-2">Tempo</th>
-                        <th className="px-3 py-2">Pagamento</th>
+                        <th className="px-3 py-2 text-gray-800">Pagamento</th>
                         <th className="px-3 py-2">Total</th>
-                        <th className="px-4 py-2 text-right">Ação</th>
+                        <th className="px-4 py-2 text-center">Ação</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -144,10 +146,12 @@ export function KanbanListaRenderer(props: KanbanBoardRendererProps) {
                             }`}
                           >
                             <td className="px-4 py-3">
-                              <p className="text-sm font-bold text-gray-900">
-                                {venda.numeroVenda}
+                              <p className="flex items-baseline gap-1.5 leading-none">
+                                <span className="text-xl font-bold tabular-nums text-gray-900">
+                                  {venda.numeroVenda}
+                                </span>
                                 {venda.codigoVenda ? (
-                                  <span className="ml-1 font-medium text-gray-500">
+                                  <span className="text-xs font-medium text-gray-500">
                                     #{venda.codigoVenda}
                                   </span>
                                 ) : null}
@@ -164,13 +168,17 @@ export function KanbanListaRenderer(props: KanbanBoardRendererProps) {
                             <td className={`px-3 py-3 text-sm ${classeTomTempo(relogio.tom)}`}>
                               {relogio.rotuloAtraso ?? relogio.rotuloHa ?? '—'}
                             </td>
-                            <td className="px-3 py-3 text-sm text-gray-700">
-                              {rotuloStatusFinanceiroKanban(venda.statusFinanceiro)}
+                            <td className="px-3 py-3">
+                              <span
+                                className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold ${classeDestaquePagamentoKanban(venda.statusFinanceiro)}`}
+                              >
+                                {rotuloStatusFinanceiroKanban(venda.statusFinanceiro)}
+                              </span>
                             </td>
                             <td className="px-3 py-3 text-sm font-semibold text-gray-900">
                               {transformarParaReal(venda.valorFinal)}
                             </td>
-                            <td className="px-4 py-3 text-right">
+                            <td className="px-4 py-3 text-center">
                               {cancelada || colId === 'FINALIZADAS' ? (
                                 <span
                                   className={`text-xs font-semibold ${

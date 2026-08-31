@@ -55,7 +55,11 @@ export function GestorPedidosKanban() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {kiosk ? <JiffyWhatsAppToolbar aba="pedidos" /> : null}
+      {kiosk ? (
+        <JiffyWhatsAppToolbar aba="pedidos" />
+      ) : (
+        <div className="hidden" hidden aria-hidden />
+      )}
       <Kanban />
     </div>
   )

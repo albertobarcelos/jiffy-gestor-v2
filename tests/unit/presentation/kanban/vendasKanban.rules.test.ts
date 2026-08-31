@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  classeBordaEsquerdaColunaKanban,
   vendaElegivelParaReemissaoAutomaticaLote,
   fiscalKanbanPodeReemitirAposCooldown,
   rotuloBotaoAvancarEtapaKanban,
@@ -162,5 +163,14 @@ describe('rotuloBotaoAvancarEtapaKanban', () => {
     expect(rotuloBotaoAvancarEtapaKanban('EM_ROTA', 'retirada').label).toBe(
       'Confirmar retirada'
     )
+  })
+})
+
+describe('classeBordaEsquerdaColunaKanban', () => {
+  it('usa as mesmas cores da faixa dos cards do quadro', () => {
+    expect(classeBordaEsquerdaColunaKanban('EM_PREPARO')).toBe('border-l-amber-500')
+    expect(classeBordaEsquerdaColunaKanban('PRONTO_ENTREGA')).toBe('border-l-teal-500')
+    expect(classeBordaEsquerdaColunaKanban('EM_ROTA')).toBe('border-l-indigo-500')
+    expect(classeBordaEsquerdaColunaKanban('FINALIZADAS')).toBe('border-l-primary')
   })
 })
