@@ -30,10 +30,7 @@ import {
 } from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
 import { PEDIDOS_PATH } from '@/src/presentation/gestor-pedidos/constantes'
 import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
-import {
-  isSinalKioskGestorPedidos,
-  persistirSinalKioskFlow,
-} from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
+import { isSinalKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
 import { lerUltimaEmpresaKiosk } from '@/src/presentation/gestor-pedidos/kiosk/ultimaEmpresaKiosk'
 import { extractTokenInfo } from '@/src/shared/utils/validateToken'
 import { decideTabSessionBootstrap } from '@/src/presentation/utils/decideTabSessionBootstrap'
@@ -133,9 +130,6 @@ export function TabSessionBootstrap() {
 
     const pathNow = pathname ?? window.location.pathname
     if (isRotaPublicaBootstrap(pathNow)) {
-      if (isSinalKioskGestorPedidos(lerSinalGestorDoBrowser())) {
-        persistirSinalKioskFlow()
-      }
       return
     }
 
@@ -153,7 +147,6 @@ export function TabSessionBootstrap() {
     ) {
       if (didRunRef.current) return
       didRunRef.current = true
-      persistirSinalKioskFlow()
       window.location.replace(pathEscolherEmpresaKiosk())
       return
     }

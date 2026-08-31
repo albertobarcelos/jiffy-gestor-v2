@@ -16,10 +16,7 @@ import { entrarEmpresaGestorNaAba } from '@/src/presentation/gestor-pedidos/sess
 import { lerSinalGestorDoBrowser, pathEscolherEmpresaKiosk } from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
 import { planearDestinoAposLogin } from '@/src/presentation/gestor-pedidos/sessao/planearDestinoAposLogin'
 import { lerUltimaEmpresaKiosk } from '@/src/presentation/gestor-pedidos/kiosk/ultimaEmpresaKiosk'
-import {
-  estaNoAppJiffyFlow,
-  persistirSinalKioskFlow,
-} from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
+import { estaNoAppJiffyFlow } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
 import { gravarEmpresasLoginFlow } from '@/src/presentation/gestor-pedidos/kiosk/empresasLoginFlow'
 import { clearTabSession } from '@/src/shared/utils/tabSession'
 
@@ -109,7 +106,6 @@ export function LoginForm() {
         ultimaEmpresaId: lerUltimaEmpresaKiosk()?.empresaId,
       })
       if (destino.tipo === 'pedidos-gestor') {
-        persistirSinalKioskFlow()
         const token = await fetchAccessTokenEscolherEmpresa(
           destino.empresa.id,
           resultado.auth.getAccessToken()
@@ -125,7 +121,6 @@ export function LoginForm() {
       }
 
       if (destino.tipo === 'escolher-empresa-kiosk') {
-        persistirSinalKioskFlow()
         clearTabSession()
         await new Promise<void>(resolve => {
           window.setTimeout(resolve, 0)
@@ -136,7 +131,6 @@ export function LoginForm() {
 
       /** O .exe nunca abre Minhas Empresas — mesmo se o planner falhar. */
       if (estaNoAppJiffyFlow()) {
-        persistirSinalKioskFlow()
         clearTabSession()
         window.location.assign(pathEscolherEmpresaKiosk())
         return

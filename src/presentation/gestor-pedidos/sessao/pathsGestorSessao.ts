@@ -1,16 +1,15 @@
 import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
-import { buildGestaoPath } from '@/src/shared/utils/gestaoRoutes'
+import { buildGestaoPath, parseEmpresaSlugFromPath } from '@/src/shared/utils/gestaoRoutes'
 import { getEmpresaSlugParam } from '@/src/shared/utils/tabSession'
-import { parseEmpresaSlugFromPath } from '@/src/shared/utils/gestaoRoutes'
 import { PEDIDOS_PATH, PEDIDOS_WHATSAPP_PATH, QUERY_GESTOR } from '../constantes'
-import { detectarRuntimeTauri, isSinalKioskGestorPedidos } from '../kiosk/isKioskGestorPedidos'
+import { estaNoAppJiffyFlow, isSinalKioskGestorPedidos } from '../kiosk/isKioskGestorPedidos'
 
 export function lerSinalGestorDoBrowser(): { hasTauri: boolean; search: string } {
   if (typeof window === 'undefined') {
     return { hasTauri: false, search: '' }
   }
   return {
-    hasTauri: detectarRuntimeTauri(),
+    hasTauri: estaNoAppJiffyFlow(),
     search: window.location.search,
   }
 }

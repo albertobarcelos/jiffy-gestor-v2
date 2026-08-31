@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { stripGestaoEmpresaSlugFromPath } from '@/src/shared/utils/gestaoRoutes'
 import {
+  chromeErpCasco,
   deveEsconderTopNavNoGestorPedidos,
+  isRotaCascoFlowExclusivo,
   isRotaKioskPedidos,
   isRotaPermitidaNoJiffyFlow,
   isRotaPedidos,
   isRotaWhatsAppFlow,
   isSinalKioskGestorPedidos,
-  lerSinalKioskFlowPersistido,
+  kioskNesteBrowser,
   pedidoVeioDoAppJiffyFlow,
 } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
 
@@ -28,16 +30,12 @@ describe('rota /pedidos', () => {
     expect(isRotaPedidos('/dashboard')).toBe(false)
   })
 
-  it('sinal extra de kiosk: Tauri ou query (dev no browser)', () => {
+  it('sinal extra de kiosk: app ou query (dev no browser)', () => {
     expect(isSinalKioskGestorPedidos({ hasTauri: true })).toBe(true)
     expect(isSinalKioskGestorPedidos({ hasTauri: false, search: 'gestor' })).toBe(true)
     expect(isSinalKioskGestorPedidos({ hasTauri: false, search: 'gestor=1' })).toBe(true)
     expect(isSinalKioskGestorPedidos({ hasTauri: false, search: 'kiosk=1' })).toBe(false)
     expect(isSinalKioskGestorPedidos({ hasTauri: false, search: '' })).toBe(false)
-  })
-
-  it('não trata storage como se fosse o aplicativo instalado', () => {
-    expect(lerSinalKioskFlowPersistido()).toBe(false)
   })
 
   it('distingue o .exe do Chrome pelo User-Agent', () => {
@@ -77,5 +75,34 @@ describe('rota /pedidos', () => {
     expect(deveEsconderTopNavNoGestorPedidos('/dashboard', { hasTauri: true, search: '' })).toBe(
       false
     )
+  })
+
+  it('esconde TopNav na lista e no WhatsApp sem esperar window', () => {
+    expect(isRotaCascoFlowExclusivo('/pedidos/empresas')).toBe(true)
+    expect(isRotaCascoFlowExclusivo('/pedidos/whatsapp')).toBe(true)
+    expect(isRotaCascoFlowExclusivo('/pedidos')).toBe(false)
+    expect(
+      deveEsconderTopNavNoGestorPedidos('/pedidos/empresas', { hasTauri: false, search: '' })
+    ).toBe(true)
+    expect(
+      deveEsconderTopNavNoGestorPedidos('/pedidos/whatsapp', { hasTauri: false, search: '' })
+    ).toBe(true)
+    expect(kioskNesteBrowser('/pedidos/empresas')).toBe(true)
+    expect(kioskNesteBrowser('/dashboard')).toBe(false)
+  })
+
+  it('não pinta TopNav no SSR de /pedidos até o cliente confirmar', () => {
+    expect(
+      chromeErpCasco({ kiosk: false, rotaPedidos: true, clientePronto: false })
+    ).toEqual({ layoutKiosk: true, mostrarTopNav: false })
+    expect(
+      chromeErpCasco({ kiosk: true, rotaPedidos: true, clientePronto: true })
+    ).toEqual({ layoutKiosk: true, mostrarTopNav: false })
+    expect(
+      chromeErpCasco({ kiosk: false, rotaPedidos: false, clientePronto: false })
+    ).toEqual({ layoutKiosk: false, mostrarTopNav: true })
+    expect(
+      chromeErpCasco({ kiosk: false, rotaPedidos: true, clientePronto: true })
+    ).toEqual({ layoutKiosk: false, mostrarTopNav: true })
   })
 })

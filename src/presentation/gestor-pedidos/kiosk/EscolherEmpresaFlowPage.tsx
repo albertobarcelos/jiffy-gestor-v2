@@ -20,7 +20,6 @@ import {
   deveIrAoLoginPorSessao,
   fetchEmpresasAcessoPagina,
 } from './empresasAcessoApi'
-import { persistirSinalKioskFlow } from './isKioskGestorPedidos'
 import { lerEmpresasLoginFlow } from './empresasLoginFlow'
 import { lerUltimaEmpresaKiosk } from './ultimaEmpresaKiosk'
 
@@ -41,7 +40,6 @@ export function EscolherEmpresaFlowPage() {
   const identityAuth = useAuthStore(s => s.identityAuth)
   const logoutHub = useAuthStore(s => s.logoutHub)
   const identityOk = Boolean(identityAuth && !identityAuth.isExpired())
-  const [kioskOk, setKioskOk] = useState(true)
   const [buscaInput, setBuscaInput] = useState('')
   const [busca, setBusca] = useState('')
   const [items, setItems] = useState<LoginEmpresaSnapshot[]>([])
@@ -70,11 +68,6 @@ export function EscolherEmpresaFlowPage() {
     },
     [irAoLogin]
   )
-
-  useEffect(() => {
-    persistirSinalKioskFlow()
-    setKioskOk(true)
-  }, [])
 
   useEffect(() => {
     if (listaPronta) return
@@ -153,7 +146,6 @@ export function EscolherEmpresaFlowPage() {
   )
 
   useEffect(() => {
-    if (!kioskOk) return
     setErro(null)
     setVisiveis(PAGE_SIZE_EMPRESAS_FLOW)
     if (locais.length > 0) {
@@ -170,7 +162,7 @@ export function EscolherEmpresaFlowPage() {
     setItems([])
     setListaPronta(false)
     void carregarDaApi(0, busca, false)
-  }, [aplicarListaLocal, busca, carregarDaApi, identityOk, kioskOk, locais.length])
+  }, [aplicarListaLocal, busca, carregarDaApi, identityOk, locais.length])
 
   useEffect(() => {
     if (fonteRef.current !== 'local') return
