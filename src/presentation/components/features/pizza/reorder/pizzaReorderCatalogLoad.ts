@@ -56,14 +56,14 @@ export async function fetchAllPizzaCategorias(token: string): Promise<CategoriaP
   return sortByOrdemThenNome(items)
 }
 
-export async function fetchAllPizzaSaboresByCategoria(
+export async function fetchAllPizzaSabores(
   token: string,
-  categoriaPizzaId: string
+  categoriaPizzaId?: string
 ): Promise<SaborPizzaSummary[]> {
   const items = await fetchAllPages<SaborPizzaSummary>({
     fetchPage: async offset => {
       const searchParams = new URLSearchParams()
-      searchParams.set('categoriaPizzaId', categoriaPizzaId)
+      if (categoriaPizzaId) searchParams.set('categoriaPizzaId', categoriaPizzaId)
       searchParams.set('limit', String(PAGE_SIZE))
       searchParams.set('offset', String(offset))
 
@@ -83,6 +83,54 @@ export async function fetchAllPizzaSaboresByCategoria(
   })
 
   return sortByOrdemThenNome(items)
+}
+
+export async function fetchAllPizzaSaboresByCategoria(
+  token: string,
+  categoriaPizzaId: string
+): Promise<SaborPizzaSummary[]> {
+  return fetchAllPizzaSabores(token, categoriaPizzaId)
+}
+
+export function groupSaboresByCategoriaId(
+  sabores: SaborPizzaSummary[]
+): Record<string, SaborPizzaSummary[]> {
+  const map: Record<string, SaborPizzaSummary[]> = {}
+  for (const sabor of sabores) {
+    const list = map[sabor.categoriaPizzaId] ?? []
+    list.push(sabor)
+    map[sabor.categoriaPizzaId] = list
+  }
+  for (const categoriaId of Object.keys(map)) {
+    map[categoriaId] = sortByOrdemThenNome(map[categoriaId]!)
+  }
+  return map
+}
+
+export async function fetchTamanhosCountByCategorias(
+  token: string,
+  categoriaIds: readonly string[]
+): Promise<Record<string, number>> {
+  const entries = await Promise.all(
+    categoriaIds.map(async categoriaId => {
+      const searchParams = new URLSearchParams()
+      searchParams.set('categoriaPizzaId', categoriaId)
+      searchParams.set('limit', '1')
+      searchParams.set('offset', '0')
+
+      const response = await fetchGestorApi(
+        `/api/cardapio/pizza/tamanhos?${searchParams}`,
+        { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' }
+      )
+      if (!response.ok) {
+        throw new Error('Erro ao carregar tamanhos da categoria')
+      }
+      const data = await response.json()
+      return [categoriaId, data.count ?? 0] as const
+    })
+  )
+
+  return Object.fromEntries(entries)
 }
 
 export function categoriaPizzaLabel(categoria: CategoriaPizza): string {

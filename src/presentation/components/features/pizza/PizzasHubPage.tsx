@@ -10,20 +10,22 @@ import { showToast } from '@/src/shared/utils/toast'
 import {
   useAtualizarPizzaCategoriaMutation,
   usePizzaCategorias,
-  usePizzaSabores,
-  usePizzaTamanhos,
 } from '@/src/presentation/hooks/pizza/usePizza'
+import { usePizzaHubCatalog } from '@/src/presentation/hooks/pizza/usePizzaHubCatalog'
 import { PizzaCategoriaSetupPanel } from './PizzaCategoriaSetupPanel'
 import { PizzaCategoriaTabsModal } from './PizzaCategoriaTabsModal'
 import { PizzaSaborModal } from './PizzaSaborModal'
 import { PizzaCategoriaSaboresSection } from './PizzaCategoriaSaboresSection'
 import { PizzaReorderModal } from './reorder/PizzaReorderModal'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
-import type { CategoriaPizza } from '@/src/shared/types/pizza'
+import type { CategoriaPizza, SaborPizzaSummary } from '@/src/shared/types/pizza'
 
 function PizzaCategoriaBlock({
   categoria,
   isExpanded,
+  sabores,
+  tamanhosTotal,
+  catalogLoading,
   onToggleExpand,
   onEditar,
   onAdicionarSabor,
@@ -32,16 +34,16 @@ function PizzaCategoriaBlock({
 }: {
   categoria: CategoriaPizza
   isExpanded: boolean
+  sabores: SaborPizzaSummary[]
+  tamanhosTotal: number
+  catalogLoading: boolean
   onToggleExpand: (categoriaId: string) => void
   onEditar: (categoria: CategoriaPizza) => void
   onAdicionarSabor: (categoria: CategoriaPizza) => void
   onEditarSabor: (categoria: CategoriaPizza, saborId: string) => void
   onToggleAtivo: (categoria: CategoriaPizza, ativo: boolean) => void
 }) {
-  const { data: tamanhosData } = usePizzaTamanhos(categoria.id)
-  const tamanhosTotal = tamanhosData?.count ?? tamanhosData?.items?.length ?? 0
-  const { data: saboresData } = usePizzaSabores(categoria.id)
-  const saboresCount = saboresData?.count ?? saboresData?.items?.length ?? 0
+  const saboresCount = sabores.length
 
   return (
     <div className="space-y-1">
@@ -53,13 +55,18 @@ function PizzaCategoriaBlock({
           grupoVisual={{ corHex: categoria.corHex, iconName: categoria.iconName }}
           grupoAtivo={categoria.ativo}
           itemCount={saboresCount}
-          itemCountSubtitle={`${saboresCount} sabor${saboresCount === 1 ? '' : 'es'}`}
+          itemCountSubtitle={
+            catalogLoading
+              ? 'Carregando sabores…'
+              : `${saboresCount} sabor${saboresCount === 1 ? '' : 'es'}`
+          }
           isExpanded={isExpanded}
           addProdutoLabel="Adicionar item"
           onToggleExpand={onToggleExpand}
           onEditGrupo={() => onEditar(categoria)}
           onToggleGrupoStatus={() => onToggleAtivo(categoria, !categoria.ativo)}
           onAddProduto={() => {
+            if (catalogLoading) return
             if (tamanhosTotal === 0) {
               showToast.error('Configure tamanhos na categoria antes de adicionar sabores')
               return
@@ -81,9 +88,12 @@ function PizzaCategoriaBlock({
           </button>{' '}
           para visualizar.
         </div>
+      ) : catalogLoading ? (
+        <p className="px-2 py-3 text-sm text-secondary-text md:px-4">Carregando sabores…</p>
       ) : (
         <PizzaCategoriaSaboresSection
           categoria={categoria}
+          sabores={sabores}
           tamanhosTotal={tamanhosTotal}
           onEditarSabor={saborId => onEditarSabor(categoria, saborId)}
         />
@@ -108,6 +118,16 @@ export function PizzasHubPage() {
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
 
   const categorias = data?.items ?? []
+  const categoriaIds = useMemo(() => categorias.map(c => c.id), [categorias])
+
+  const {
+    saboresByCategoriaId,
+    tamanhosCountByCategoriaId,
+    isLoading: isLoadingCatalog,
+    isFetching: isFetchingCatalog,
+  } = usePizzaHubCatalog(categoriaIds, categorias.length > 0)
+
+  const catalogLoading = isLoadingCatalog || isFetchingCatalog
 
   useEffect(() => {
     const main = document.querySelector('main')
@@ -217,6 +237,9 @@ export function PizzasHubPage() {
                 <PizzaCategoriaBlock
                   categoria={categoria}
                   isExpanded={expandedGroups[categoria.id] !== false}
+                  sabores={saboresByCategoriaId[categoria.id] ?? []}
+                  tamanhosTotal={tamanhosCountByCategoriaId[categoria.id] ?? 0}
+                  catalogLoading={catalogLoading}
                   onToggleExpand={handleToggleExpand}
                   onToggleAtivo={handleToggleAtivo}
                   onEditar={cat => {

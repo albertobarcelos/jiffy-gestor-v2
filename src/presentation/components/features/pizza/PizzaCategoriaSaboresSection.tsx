@@ -2,33 +2,29 @@
 
 import { useCallback, useMemo, useState } from 'react'
 import { CatalogProductRow } from '@/src/presentation/components/features/catalogo/CatalogProductRow'
-import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
-import {
-  useAtualizarPizzaSaborMutation,
-  usePizzaSabores,
-} from '@/src/presentation/hooks/pizza/usePizza'
+import { useAtualizarPizzaSaborMutation } from '@/src/presentation/hooks/pizza/usePizza'
 import { usePizzaSaboresPrecosResumo } from '@/src/presentation/hooks/pizza/usePizzaSaboresPrecosResumo'
 import { formatarPrecoAPartirDe } from '@/src/presentation/utils/pizza/pizzaMenuHelpers'
 import { showToast } from '@/src/shared/utils/toast'
-import type { CategoriaPizza, PrecoSaborTamanhoInput } from '@/src/shared/types/pizza'
+import type { CategoriaPizza, PrecoSaborTamanhoInput, SaborPizzaSummary } from '@/src/shared/types/pizza'
 import { PizzaSaborRowQuickActions } from './PizzaSaborRowQuickActions'
 
 interface PizzaCategoriaSaboresSectionProps {
   categoria: CategoriaPizza
+  sabores: SaborPizzaSummary[]
   tamanhosTotal: number
   onEditarSabor: (saborId: string) => void
 }
 
 export function PizzaCategoriaSaboresSection({
   categoria,
+  sabores,
   tamanhosTotal,
   onEditarSabor,
 }: PizzaCategoriaSaboresSectionProps) {
-  const { data, isLoading } = usePizzaSabores(categoria.id)
   const atualizarSabor = useAtualizarPizzaSaborMutation()
   const [savingSaborId, setSavingSaborId] = useState<string | null>(null)
 
-  const sabores = data?.items ?? []
   const saborIds = useMemo(() => sabores.map(s => s.id), [sabores])
   const { precosPorSaborId } = usePizzaSaboresPrecosResumo(saborIds)
 
@@ -89,14 +85,6 @@ export function PizzaCategoriaSaboresSection({
     },
     [atualizarSabor, categoria.id]
   )
-
-  if (isLoading) {
-    return (
-      <div className="px-1 py-2">
-        <JiffyLoading text="Carregando sabores..." className="py-4" />
-      </div>
-    )
-  }
 
   if (sabores.length === 0) {
     return (
