@@ -11,22 +11,23 @@ import {
   useEmpresaDeliveryMe,
 } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
-import { useAtualizarParametroEmpresa } from '@/src/presentation/hooks/useAtualizarParametroEmpresa'
+import { useMenuDeliveryId } from '@/src/presentation/hooks/useMenuDeliveryId'
 import {
   normalizeDeliverySlug,
   validateDeliverySlug,
 } from '@/src/shared/utils/slugDelivery'
-import { patchMenuIdEmParametroEmpresa } from '@/src/shared/utils/parametroEmpresaMenus'
 import { compartilharLinkDelivery } from '@/src/presentation/components/features/delivery-publico/shared/utils/compartilharProdutoDelivery'
 import { deliveryPublicoHomePath } from '@/src/presentation/components/features/delivery-publico/shared/utils/deliveryPublicoRoutes'
 import { MenuParametroEmpresaSelect } from '../MenuParametroEmpresaSelect'
+import { DeliveryPendenciasAlert } from '@/src/presentation/components/features/delivery/configuracoes/DeliveryPendenciasAlert'
+import { lojaDeliveryProntaParaPublico } from '@/src/shared/constants/empresaDeliveryPendencias'
 
 export function CardapioDigitalTab() {
-  const { empresa, parametroEmpresa, menuDeliveryId: menuDeliveryIdSalvo } = useEmpresaMe()
+  const { empresa } = useEmpresaMe()
+  const { menuDeliveryId: menuDeliveryIdSalvo } = useMenuDeliveryId()
   const empresaDeliveryQuery = useEmpresaDeliveryMe()
   const criarMutation = useCriarEmpresaDelivery()
   const atualizarMutation = useAtualizarEmpresaDelivery()
-  const atualizarParametroEmpresa = useAtualizarParametroEmpresa()
 
   const [slug, setSlug] = useState('')
   const [slugErro, setSlugErro] = useState<string | null>(null)
@@ -35,12 +36,11 @@ export function CardapioDigitalTab() {
   const formularioHidratadoRef = useRef(false)
 
   const empresaDelivery = empresaDeliveryQuery.data
+  const pendencias = empresaDelivery?.pendencias ?? []
+  const lojaPublicaPronta = lojaDeliveryProntaParaPublico(pendencias)
   const configurado = empresaDelivery != null
   const carregando =
-    empresaDeliveryQuery.isPending ||
-    criarMutation.isPending ||
-    atualizarMutation.isPending ||
-    atualizarParametroEmpresa.isPending
+    empresaDeliveryQuery.isPending || criarMutation.isPending || atualizarMutation.isPending
 
   const linkPublico = useMemo(() => {
     if (!slug.trim()) return ''
@@ -105,18 +105,17 @@ export function CardapioDigitalTab() {
       return
     }
 
+    const payload = {
+      slug: slugNormalizado,
+      parametroDelivery: { menuDeliveryId },
+    }
+
     try {
       if (configurado) {
-        await atualizarMutation.mutateAsync({ slug: slugNormalizado })
+        await atualizarMutation.mutateAsync(payload)
       } else {
-        await criarMutation.mutateAsync({ slug: slugNormalizado })
+        await criarMutation.mutateAsync(payload)
         formularioHidratadoRef.current = false
-      }
-
-      if (empresa?.id) {
-        await atualizarParametroEmpresa.mutateAsync(
-          patchMenuIdEmParametroEmpresa(parametroEmpresa, 'menuDeliveryId', menuDeliveryId)
-        )
       }
 
       showToast.success(
@@ -129,16 +128,7 @@ export function CardapioDigitalTab() {
         error instanceof Error ? error.message : 'Não foi possível salvar as configurações.'
       showToast.error(msg)
     }
-  }, [
-    atualizarMutation,
-    atualizarParametroEmpresa,
-    configurado,
-    criarMutation,
-    empresa?.id,
-    menuDeliveryId,
-    parametroEmpresa,
-    slug,
-  ])
+  }, [atualizarMutation, configurado, criarMutation, menuDeliveryId, slug])
 
   if (empresaDeliveryQuery.isPending) {
     return (
@@ -180,6 +170,10 @@ export function CardapioDigitalTab() {
             </p>
           </div>
         </div>
+
+        {configurado && pendencias.length > 0 ? (
+          <DeliveryPendenciasAlert pendencias={pendencias} />
+        ) : null}
 
         <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm md:p-6">
           <div className="mt-4 space-y-4">
@@ -242,7 +236,23 @@ export function CardapioDigitalTab() {
                     href={linkPublico}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex h-9 items-center gap-2 rounded-lg bg-secondary px-3 text-sm font-semibold text-white transition-colors hover:bg-secondary/90"
+                    aria-disabled={!lojaPublicaPronta}
+                    title={
+                      lojaPublicaPronta
+                        ? undefined
+                        : 'Resolva as pendências acima antes de abrir a loja pública'
+                    }
+                    className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-semibold transition-colors ${
+                      lojaPublicaPronta
+                        ? 'bg-secondary text-white hover:bg-secondary/90'
+                        : 'cursor-not-allowed bg-gray-300 text-gray-600'
+                    }`}
+                    onClick={event => {
+                      if (!lojaPublicaPronta) {
+                        event.preventDefault()
+                        showToast.error('Resolva as pendências de configuração antes de abrir a loja online.')
+                      }
+                    }}
                   >
                     <MdOpenInNew className="h-4 w-4" aria-hidden />
                     Abrir loja online

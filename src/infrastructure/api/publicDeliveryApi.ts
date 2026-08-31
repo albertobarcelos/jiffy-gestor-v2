@@ -42,7 +42,47 @@ export function isCotacaoDesatualizadaError(
   return error instanceof CotacaoDesatualizadaPublicDeliveryError
 }
 
-/** Slug não cadastrado — loja delivery inexistente. */
+/** Loja delivery indisponível (pendências de configuração). */
+export function isEmpresaDeliveryIndisponivel(error: unknown): boolean {
+  return error instanceof PublicDeliveryApiError && error.status === 403
+}
+
+function extrairPendenciasDoCorpoErro(body: unknown): string[] {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return []
+  const raiz = body as Record<string, unknown>
+
+  const candidatos: unknown[] = []
+  if (raiz.details && typeof raiz.details === 'object') {
+    candidatos.push((raiz.details as Record<string, unknown>).details)
+    candidatos.push(raiz.details)
+  }
+  candidatos.push(raiz)
+
+  for (const bloco of candidatos) {
+    if (!bloco || typeof bloco !== 'object' || Array.isArray(bloco)) continue
+    const pendencias = (bloco as Record<string, unknown>).pendencias
+    if (!Array.isArray(pendencias)) continue
+    const mensagens = pendencias
+      .map(item => {
+        if (!item || typeof item !== 'object') return null
+        const msg = (item as Record<string, unknown>).message
+        return typeof msg === 'string' && msg.trim() ? msg.trim() : null
+      })
+      .filter((msg): msg is string => Boolean(msg))
+    if (mensagens.length) return mensagens
+  }
+
+  return []
+}
+
+/** Mensagens de pendência quando o catálogo público retorna 403. */
+export function extrairMensagensPendenciasCatalogo(error: unknown): string[] {
+  if (!(error instanceof PublicDeliveryApiError)) return []
+  const fromDetails = extrairPendenciasDoCorpoErro(error.details)
+  if (fromDetails.length) return fromDetails
+  return error.message ? [error.message] : []
+}
+
 export function isPublicDeliverySlugNotFound(error: unknown): boolean {
   return (
     error instanceof PublicDeliveryApiError &&
@@ -110,10 +150,15 @@ export async function fetchCatalogoPublico(
   const url = `/api/public/delivery/catalogo/${encodeURIComponent(slug)}${qs ? `?${qs}` : ''}`
 
   const res = await fetch(url, { cache: 'no-store' })
+  const body = await parseErrorBody(res)
   if (!res.ok) {
-    throw new PublicDeliveryApiError(await parseErrorMessage(res), res.status)
+    throw new PublicDeliveryApiError(
+      parseErrorMessageFromBody(body, res.status),
+      res.status,
+      body
+    )
   }
-  return res.json()
+  return body as GetCatalogoPublicoResponseDTO
 }
 
 export async function fetchMeiosPagamentoPublicos(

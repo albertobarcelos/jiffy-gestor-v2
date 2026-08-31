@@ -6,7 +6,7 @@ import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenan
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 
 /**
- * PATCH `/api/empresas/:id` só com `parametroEmpresa` (ex.: `menuDeliveryId`).
+ * PATCH `/api/empresas/:id` só com `parametroEmpresa` (ex.: `menuVendaGestorId`).
  * Preservar o objeto atual no caller para não apagar timezone e demais campos.
  */
 export function useAtualizarParametroEmpresa() {

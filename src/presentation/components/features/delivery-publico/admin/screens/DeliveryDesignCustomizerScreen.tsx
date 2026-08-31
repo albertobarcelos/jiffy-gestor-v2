@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { MdArrowBack, MdRefresh } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
+import { useMenuDeliveryId } from '@/src/presentation/hooks/useMenuDeliveryId'
 import { useEmpresaDeliveryMe } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
 import { showToast } from '@/src/shared/utils/toast'
 import type { DesignTabId } from '../../shared/types/deliveryPublicoDesignConfig'
@@ -25,7 +26,8 @@ import { DesignTipografiasTab } from '../components/tabs/DesignTipografiasTab'
 import { DesignCategoriasTab } from '../components/tabs/DesignCategoriasTab'
 
 export function DeliveryDesignCustomizerScreen() {
-  const { empresa, menuDeliveryId, isLoading: empresaLoading } = useEmpresaMe()
+  const { empresa, isLoading: empresaLoading } = useEmpresaMe()
+  const { menuDeliveryId, isLoading: menuDeliveryLoading } = useMenuDeliveryId()
   const { data: empresaDelivery, isLoading: deliveryLoading } = useEmpresaDeliveryMe()
   const [activeTab, setActiveTab] = useState<DesignTabId>('cabecalho')
 
@@ -63,7 +65,7 @@ export function DeliveryDesignCustomizerScreen() {
     showToast.success('Design restaurado.')
   }, [restore])
 
-  if (empresaLoading || deliveryLoading || !hydrated) {
+  if (empresaLoading || deliveryLoading || menuDeliveryLoading || !hydrated) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center bg-white">
         <JiffyLoading />

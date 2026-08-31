@@ -21,7 +21,8 @@ import {
   useAutoFetchCatalogoGrupos,
   usePublicDeliveryCatalogInfinite,
 } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
-import { isPublicDeliverySlugNotFound } from '@/src/infrastructure/api/publicDeliveryApi'
+import { isPublicDeliverySlugNotFound, isEmpresaDeliveryIndisponivel, extrairMensagensPendenciasCatalogo } from '@/src/infrastructure/api/publicDeliveryApi'
+import { DeliveryLojaIndisponivelScreen } from './DeliveryLojaIndisponivelScreen'
 import {
   DeliveryThemeScope,
   useDeliveryThemeContext,
@@ -334,6 +335,12 @@ export function DeliveryPublicoHomeScreen({
   }, [abrirCarrinho])
 
   const isCatalogLoading = isLoading && !data
+
+  if (isError && isEmpresaDeliveryIndisponivel(error)) {
+    return (
+      <DeliveryLojaIndisponivelScreen mensagens={extrairMensagensPendenciasCatalogo(error)} />
+    )
+  }
 
   if (isError && !isPublicDeliverySlugNotFound(error)) {
     return (

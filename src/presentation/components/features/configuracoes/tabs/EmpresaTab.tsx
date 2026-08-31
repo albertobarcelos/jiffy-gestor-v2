@@ -1,8 +1,12 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { buildTenantQueryKey } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { EMPRESA_DELIVERY_ME_QUERY_KEY } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -18,6 +22,13 @@ import {
   LOGO_IMPRESSAO_WIDTH,
 } from '@/src/presentation/utils/logoImpressaoCrop'
 import { lerMenuIdDeParametroEmpresa } from '@/src/shared/utils/parametroEmpresaMenus'
+import { EmpresaGeolocalizacaoSection } from '../EmpresaGeolocalizacaoSection'
+import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
+import {
+  lerEnderecoLocalizacaoDoPayloadEmpresa,
+  montarPatchEnderecoGeolocalizacao,
+  type EnderecoEmpresaGeocodeInput,
+} from '@/src/shared/utils/geolocalizacaoEmpresa'
 
 /** Labels outlined — alinhado a NovoMeioPagamento / EditarTerminais */
 const sxOutlinedLabelTextoEscuro = {
@@ -137,10 +148,18 @@ function LogoImpressaoPreviewImage({ src, alt }: { src: string; alt: string }) {
 
 const LOGO_COLUNA_LARGURA_CLASS = 'w-full shrink-0 lg:w-[280px]'
 
+function snapshotEnderecoGeocode(input: EnderecoEmpresaGeocodeInput): string {
+  return [input.rua, input.numero, input.bairro, input.cidade, input.estado, input.cep]
+    .map(valor => valor?.trim().toLocaleUpperCase('pt-BR') ?? '')
+    .join('|')
+}
+
 /**
  * Tab de Empresa - Edição de dados da empresa
  */
 export function EmpresaTab() {
+  const queryClient = useQueryClient()
+  const tenantEmpresaId = useTenantEmpresaId()
   const [empresa, setEmpresa] = useState<Cliente | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
@@ -160,6 +179,9 @@ export function EmpresaTab() {
   const [estado, setEstado] = useState('')
   const [cidadeValida, setCidadeValida] = useState<boolean | null>(null)
   const [codigoCidadeIbge, setCodigoCidadeIbge] = useState<string | null>(null)
+  const [enderecoLocalizacao, setEnderecoLocalizacao] = useState<GeoJsonPoint | null>(null)
+  const [providerEnderecoId, setProviderEnderecoId] = useState<string | null>(null)
+  const enderecoGeoSnapshotRef = useRef('')
   /** Valor exibido no select (IANA); vem de `parametroEmpresa.timezone` no GET /empresas/me. */
   const [timezone, setTimezone] = useState('')
   /** Menu usado nas vendas do gestor (`parametroEmpresa.menuVendaGestorId`). */
@@ -186,6 +208,34 @@ export function EmpresaTab() {
 
   // Ref para rastrear o último valor de cidade usado para buscar código IBGE
   const ultimaCidadeBuscada = useRef<string>('')
+
+  const enderecoGeocodeInput = useMemo<EnderecoEmpresaGeocodeInput>(
+    () => ({
+      rua,
+      numero,
+      bairro,
+      cidade: ultimaCidadeBuscada.current || cidade,
+      estado,
+      cep,
+      complemento,
+    }),
+    [rua, numero, bairro, cidade, estado, cep, complemento]
+  )
+
+  const enderecoAlteradoParaGeo = useMemo(() => {
+    if (!enderecoGeoSnapshotRef.current) return false
+    return snapshotEnderecoGeocode(enderecoGeocodeInput) !== enderecoGeoSnapshotRef.current
+  }, [enderecoGeocodeInput])
+
+  const handleLocalizacaoChange = useCallback(
+    (point: GeoJsonPoint | null, meta?: { providerEnderecoId?: string | null }) => {
+      setEnderecoLocalizacao(point)
+      if (meta?.providerEnderecoId !== undefined) {
+        setProviderEnderecoId(meta.providerEnderecoId)
+      }
+    },
+    []
+  )
 
   useEffect(() => {
     loadEmpresa()
@@ -358,25 +408,53 @@ export function EmpresaTab() {
           setTelefone(maiusculasPt(empresaData.getTelefone() || ''))
 
           const endereco = empresaData.getEndereco()
-          if (endereco) {
-            setCep(maiusculasPt(endereco.cep || ''))
-            setRua(maiusculasPt(endereco.rua || ''))
-            setNumero(maiusculasPt(endereco.numero || ''))
-            setComplemento(maiusculasPt(endereco.complemento || ''))
-            setBairro(maiusculasPt(endereco.bairro || ''))
-            setCidade(maiusculasPt(endereco.cidade || ''))
-            setEstado(endereco.estado || '')
+          const enderecoRaw =
+            raw.endereco && typeof raw.endereco === 'object' && !Array.isArray(raw.endereco)
+              ? (raw.endereco as Record<string, unknown>)
+              : null
+          const ruaCarregada = String(
+            endereco?.rua ?? enderecoRaw?.rua ?? enderecoRaw?.logradouro ?? ''
+          )
+          const cepCarregado = String(endereco?.cep ?? enderecoRaw?.cep ?? '')
 
-            // Carregar código IBGE se cidade e estado estiverem preenchidos
-            if (endereco.cidade && endereco.estado) {
-              const cidade = endereco.cidade
-              ultimaCidadeBuscada.current = cidade
-              buscarCodigoIbge(cidade, endereco.estado)
+          if (endereco || enderecoRaw) {
+            setCep(maiusculasPt(cepCarregado || ''))
+            setRua(maiusculasPt(ruaCarregada || ''))
+            setNumero(maiusculasPt(String(endereco?.numero ?? enderecoRaw?.numero ?? '')))
+            setComplemento(
+              maiusculasPt(String(endereco?.complemento ?? enderecoRaw?.complemento ?? ''))
+            )
+            setBairro(maiusculasPt(String(endereco?.bairro ?? enderecoRaw?.bairro ?? '')))
+            setCidade(maiusculasPt(String(endereco?.cidade ?? enderecoRaw?.cidade ?? '')))
+            setEstado(String(endereco?.estado ?? enderecoRaw?.estado ?? ''))
+
+            enderecoGeoSnapshotRef.current = snapshotEnderecoGeocode({
+              rua: ruaCarregada || '',
+              numero: String(endereco?.numero ?? enderecoRaw?.numero ?? ''),
+              bairro: String(endereco?.bairro ?? enderecoRaw?.bairro ?? ''),
+              cidade: String(endereco?.cidade ?? enderecoRaw?.cidade ?? ''),
+              estado: String(endereco?.estado ?? enderecoRaw?.estado ?? ''),
+              cep: cepCarregado || '',
+            })
+
+            const cidadeCarregada = String(endereco?.cidade ?? enderecoRaw?.cidade ?? '')
+            const estadoCarregado = String(endereco?.estado ?? enderecoRaw?.estado ?? '')
+
+            if (cidadeCarregada && estadoCarregado) {
+              ultimaCidadeBuscada.current = cidadeCarregada
+              buscarCodigoIbge(cidadeCarregada, estadoCarregado)
             } else {
               setCodigoCidadeIbge(null)
               ultimaCidadeBuscada.current = ''
             }
+          } else {
+            enderecoGeoSnapshotRef.current = ''
           }
+
+          const { enderecoLocalizacao: geoSalva, providerEnderecoId: providerSalvo } =
+            lerEnderecoLocalizacaoDoPayloadEmpresa(raw.endereco)
+          setEnderecoLocalizacao(geoSalva)
+          setProviderEnderecoId(providerSalvo)
         } catch (error) {
           console.error('Erro ao criar Cliente a partir dos dados da API:', error, 'Dados:', data)
           // Criar um Cliente vazio para evitar quebra da UI
@@ -725,6 +803,14 @@ export function EmpresaTab() {
         if (estado) endereco.estado = estado
         if (codigoCidadeIbge) endereco.codigoCidadeIbge = codigoCidadeIbge
 
+        const geoPatch = montarPatchEnderecoGeolocalizacao(
+          enderecoLocalizacao,
+          providerEnderecoId
+        )
+        if (geoPatch) {
+          Object.assign(endereco, geoPatch)
+        }
+
         // Adiciona endereco ao body apenas se houver pelo menos um campo
         if (Object.keys(endereco).length > 0) {
           body.endereco = endereco
@@ -763,7 +849,13 @@ export function EmpresaTab() {
         }
 
         setIsEditing(false)
+        enderecoGeoSnapshotRef.current = snapshotEnderecoGeocode(enderecoGeocodeInput)
         await loadEmpresa()
+        if (tenantEmpresaId) {
+          void queryClient.invalidateQueries({
+            queryKey: buildTenantQueryKey(tenantEmpresaId, EMPRESA_DELIVERY_ME_QUERY_KEY),
+          })
+        }
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new Event('jiffy:empresa-me-updated'))
         }
@@ -1259,6 +1351,14 @@ export function EmpresaTab() {
               </div>
             </div>
           </div>
+
+          <EmpresaGeolocalizacaoSection
+            endereco={enderecoGeocodeInput}
+            localizacao={enderecoLocalizacao}
+            onLocalizacaoChange={handleLocalizacaoChange}
+            disabled={!isEditing}
+            enderecoAlterado={enderecoAlteradoParaGeo}
+          />
         </div>
       </div>
 

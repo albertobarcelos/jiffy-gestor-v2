@@ -5,6 +5,12 @@ export interface ParametroDeliveryDTO {
   imprimirAoFicarPronto: boolean
   autoIniciarPreparoNovosPedidos: boolean
   impressoraExpedicaoId: string | null
+  menuDeliveryId?: string | null
+}
+
+export interface EmpresaDeliveryPendenciaDTO {
+  type: string
+  message: string
 }
 
 export interface EmpresaDeliveryDTO {
@@ -12,6 +18,7 @@ export interface EmpresaDeliveryDTO {
   slug: string
   empresaId: string
   parametroDelivery: ParametroDeliveryDTO
+  pendencias?: EmpresaDeliveryPendenciaDTO[]
 }
 
 export interface CreateEmpresaDeliveryInput {
