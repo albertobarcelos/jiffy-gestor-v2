@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { MdContentCopy, MdMoreVert } from 'react-icons/md'
+import { MdMoreVert } from 'react-icons/md'
 import type { Cliente } from '@/src/domain/entities/Cliente'
 import { Button } from '@/src/presentation/components/ui/button'
 import { SeletorClienteModal } from '@/src/presentation/components/features/pedidos/components/SeletorClienteModal'
@@ -10,20 +10,17 @@ import { NovoPedidoModal } from '@/src/presentation/components/features/pedidos/
 import { useClientes } from '@/src/presentation/hooks/useClientes'
 import { gravarPendenciaQuadroFlow } from '../quadro/filtroPendenteQuadroFlow'
 import { pathQuadroDaSessaoAtual } from '../sessao/pathsGestorSessao'
-import {
-  termoBuscaClientePorTelefone,
-  telefonesCorrespondem,
-} from '@/src/shared/utils/telefoneClienteMatch'
+import { WHATSAPP_PAINEL_LARGURA_PX } from '../constantes'
+import { termoBuscaClientePorTelefone } from '@/src/shared/utils/telefoneClienteMatch'
 import {
   conversaEhAMesma,
   idConversaWhatsApp,
-  nomesCorrespondem,
   tituloConversaGenerico,
 } from '@/src/shared/utils/nomeClienteMatch'
 import { podeControlarWhatsAppWebView, whatsappReload, whatsappStatus } from './tauriWhatsAppBridge'
 import { setWhatsAppWebViewSuspenso } from './whatsappUiState'
-import { ConsultaCardapioWhatsAppDialog } from './ConsultaCardapioWhatsAppDialog'
-import { MensagensRapidasWhatsAppDialog } from './MensagensRapidasWhatsAppDialog'
+import { AtalhosWhatsAppSection } from './AtalhosWhatsAppSection'
+import { escolherClienteDaConversa } from './escolherClienteDaConversa'
 import { useWhatsAppConversaAtual } from './useWhatsAppConversaAtual'
 
 type Props = {
@@ -38,8 +35,7 @@ export function JiffyCustomerPanel({ onPedirLimparSessao }: Props) {
   const [desvinculadoNestaConversa, setDesvinculadoNestaConversa] = useState(false)
   const [buscaAberta, setBuscaAberta] = useState(false)
   const [novoPedidoAberto, setNovoPedidoAberto] = useState(false)
-  const [cardapioAberto, setCardapioAberto] = useState(false)
-  const [mensagensAbertas, setMensagensAbertas] = useState(false)
+  const [configMensagensAberta, setConfigMensagensAberta] = useState(false)
   const [menuAberto, setMenuAberto] = useState(false)
   const [carregado, setCarregado] = useState(false)
   const [aviso, setAviso] = useState<string | null>(null)
@@ -76,22 +72,7 @@ export function JiffyCustomerPanel({ onPedirLimparSessao }: Props) {
   useEffect(() => {
     if (manualNestaConversa || desvinculadoNestaConversa) return
     if (isFetching) return
-    const lista = achados?.clientes ?? []
-    const porTel = telefoneConversa
-      ? lista.filter(c => telefonesCorrespondem(c.getTelefone(), telefoneConversa))
-      : []
-    if (porTel.length === 1) {
-      setCliente(porTel[0])
-      return
-    }
-    if (!tituloConversaGenerico(tituloConversa)) {
-      const porNome = lista.filter(c => nomesCorrespondem(c.getNome(), tituloConversa))
-      if (porNome.length === 1) {
-        setCliente(porNome[0])
-        return
-      }
-    }
-    setCliente(null)
+    setCliente(escolherClienteDaConversa(achados?.clientes ?? [], telefoneConversa, tituloConversa))
   }, [
     achados,
     isFetching,
@@ -122,9 +103,9 @@ export function JiffyCustomerPanel({ onPedirLimparSessao }: Props) {
   }, [])
 
   useEffect(() => {
-    setWhatsAppWebViewSuspenso(buscaAberta || novoPedidoAberto || cardapioAberto || mensagensAbertas)
+    setWhatsAppWebViewSuspenso(buscaAberta || novoPedidoAberto || configMensagensAberta)
     return () => setWhatsAppWebViewSuspenso(false)
-  }, [buscaAberta, novoPedidoAberto, cardapioAberto, mensagensAbertas])
+  }, [buscaAberta, novoPedidoAberto, configMensagensAberta])
 
   const telefoneExibido = cliente?.getTelefone()?.trim() || telefoneConversa || ''
 
@@ -158,16 +139,16 @@ export function JiffyCustomerPanel({ onPedirLimparSessao }: Props) {
     const onKey = (ev: KeyboardEvent) => {
       if (ev.key === 'F2') {
         ev.preventDefault()
-        if (!buscaAberta && !mensagensAbertas) abrirNovoPedido()
+        if (!buscaAberta && !configMensagensAberta) abrirNovoPedido()
       }
       if (ev.key === 'F3') {
         ev.preventDefault()
-        if (!novoPedidoAberto && !buscaAberta) setMensagensAbertas(true)
+        if (!novoPedidoAberto && !buscaAberta) setConfigMensagensAberta(true)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [abrirNovoPedido, buscaAberta, mensagensAbertas, novoPedidoAberto])
+  }, [abrirNovoPedido, buscaAberta, configMensagensAberta, novoPedidoAberto])
 
   const estadoCliente = useMemo(() => {
     if (desvinculadoNestaConversa) return 'desvinculado' as const
@@ -178,7 +159,10 @@ export function JiffyCustomerPanel({ onPedirLimparSessao }: Props) {
   }, [cliente, desvinculadoNestaConversa, isFetching, telefoneConversa, termoApi, tituloConversa])
 
   return (
-    <aside className="flex h-full min-h-0 w-[320px] shrink-0 flex-col border-l border-primary/10 bg-white">
+    <aside
+      className="flex h-full min-h-0 shrink-0 flex-col border-l border-primary/10 bg-white"
+      style={{ width: WHATSAPP_PAINEL_LARGURA_PX }}
+    >
       <div className="flex items-start justify-between gap-2 border-b border-primary-bg px-3 py-3">
         <div>
           <p className="text-sm font-semibold text-secondary">
@@ -290,19 +274,12 @@ export function JiffyCustomerPanel({ onPedirLimparSessao }: Props) {
           </Button>
         </div>
 
-        <p className="mt-5 text-[11px] font-semibold uppercase tracking-wide text-secondary-text">Atalhos</p>
-        <div className="mt-2 flex flex-col gap-2">
-          <Button type="button" variant="outlined" className="w-full" onClick={() => setMensagensAbertas(true)}>
-            Mensagens rápidas (F3)
-          </Button>
-          <Button type="button" variant="outlined" className="w-full" onClick={() => setCardapioAberto(true)}>
-            Cardápio
-          </Button>
-          <Button type="button" variant="outlined" className="w-full" onClick={() => void copiarTelefone()}>
-            <MdContentCopy className="mr-1" size={16} aria-hidden />
-            Copiar telefone
-          </Button>
-        </div>
+        <AtalhosWhatsAppSection
+          onAviso={setAviso}
+          onCopiarTelefone={() => void copiarTelefone()}
+          configAberta={configMensagensAberta}
+          onConfigAbertaChange={setConfigMensagensAberta}
+        />
       </div>
 
       <SeletorClienteModal
@@ -327,13 +304,6 @@ export function JiffyCustomerPanel({ onPedirLimparSessao }: Props) {
         onClose={() => setNovoPedidoAberto(false)}
         onAfterClose={() => setNovoPedidoAberto(false)}
         onSuccess={() => setNovoPedidoAberto(false)}
-      />
-
-      <ConsultaCardapioWhatsAppDialog open={cardapioAberto} onClose={() => setCardapioAberto(false)} />
-      <MensagensRapidasWhatsAppDialog
-        open={mensagensAbertas}
-        onClose={() => setMensagensAbertas(false)}
-        onAviso={setAviso}
       />
     </aside>
   )

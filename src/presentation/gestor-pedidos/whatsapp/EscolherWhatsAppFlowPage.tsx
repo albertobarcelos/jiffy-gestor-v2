@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   boundsDoSlotWhatsApp,
+  deveReposicionarWhatsAppNativo,
   podeControlarWhatsAppWebView,
   whatsappClearSession,
   whatsappShow,
 } from './tauriWhatsAppBridge'
 import { JiffyCustomerPanel } from './JiffyCustomerPanel'
 import { JiffyWhatsAppToolbar } from './JiffyWhatsAppToolbar'
-import { JiffyOrderActions } from './JiffyOrderActions'
 import { WHATSAPP_SLOT_ID } from './WhatsAppWebViewHost'
 
 /**
@@ -49,6 +49,7 @@ export function EscolherWhatsAppFlowPage() {
     let tentativas = 0
     const tentar = () => {
       if (cancelado) return
+      if (!deveReposicionarWhatsAppNativo(document.visibilityState)) return
       const bounds = boundsDoSlotWhatsApp(WHATSAPP_SLOT_ID)
       if (!bounds) {
         if (tentativas < 40) {
@@ -98,7 +99,6 @@ export function EscolherWhatsAppFlowPage() {
         </div>
         <JiffyCustomerPanel onPedirLimparSessao={() => setConfirmarLimpar(true)} />
       </div>
-      <JiffyOrderActions />
 
       {confirmarLimpar ? (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 px-4">
