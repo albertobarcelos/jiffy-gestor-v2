@@ -1,8 +1,4 @@
 export { DeliveryConfiguracoesModal } from './DeliveryConfiguracoesModal'
-export {
-  DeliveryPreferenciasImpressaoFields,
-  type DeliveryPreferenciasImpressaoFormState,
-} from './DeliveryPreferenciasImpressaoFields'
 export { DeliveryConfigCollapsibleSection } from './DeliveryConfigCollapsibleSection'
 export { DeliveryCupomTemplateEditor } from './DeliveryCupomTemplateEditor'
 export {

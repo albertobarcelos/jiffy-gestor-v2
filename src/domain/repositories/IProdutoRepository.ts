@@ -35,13 +35,5 @@ export interface IProdutoRepository {
    * @returns Promise com o produto atualizado
    */
   atualizarStatus(id: string, ativo: boolean): Promise<Produto>
-
-  /**
-   * Adiciona e/ou remove vínculos do produto com menus (snapshot por menu).
-   */
-  atualizarMenus(
-    id: string,
-    input: { add?: string[]; remove?: string[] }
-  ): Promise<Produto>
 }
 

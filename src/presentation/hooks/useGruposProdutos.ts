@@ -39,7 +39,7 @@ export function useGruposProdutos(params: GruposProdutosQueryParams = {}) {
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}))
           throw new ApiError(
-            errorData.message || 'Erro ao carregar categorias',
+            errorData.message || 'Erro ao carregar grupos de produtos',
             response.status,
             errorData
           )
