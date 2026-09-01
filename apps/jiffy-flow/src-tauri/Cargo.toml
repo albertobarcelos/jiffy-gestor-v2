@@ -1,6 +1,6 @@
 [package]
 name = "jiffy-flow"
-version = "0.1.0"
+version = "0.1.1"
 description = "Casco Windows do quadro de pedidos. Zero regra de pedido."
 authors = ["NexSyn"]
 edition = "2021"

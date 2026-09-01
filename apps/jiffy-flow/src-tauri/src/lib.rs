@@ -56,7 +56,7 @@ pub fn run() {
                 .decorations(true)
                 .user_agent(concat!(
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ",
-                    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 JiffyFlow/0.1.0"
+                    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 JiffyFlow/0.1.1"
                 ))
                 .initialization_script(
                     "Object.defineProperty(window,'__JIFFY_FLOW_KIOSK__',{value:true,enumerable:true});",

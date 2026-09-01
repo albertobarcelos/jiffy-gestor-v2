@@ -21,7 +21,7 @@ stable/
   JiffyFlow-setup.exe              # nome fixo — botão no Gestor
   update-manifest.stable.json      # contrato schemaVersion 1
 releases/
-  0.1.0/
+  0.1.1/
     jiffy-flow.exe                 # binário do update (SHA-256 no manifesto)
 ```
 
@@ -44,7 +44,7 @@ Exemplos:
 ```text
 {base}/stable/JiffyFlow-setup.exe
 {base}/stable/update-manifest.stable.json
-{base}/releases/0.1.0/jiffy-flow.exe
+{base}/releases/0.1.1/jiffy-flow.exe
 {base}/brand/logo.png
 ```
 

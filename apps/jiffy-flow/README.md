@@ -54,7 +54,7 @@ brand/logo.png
 brand/icon.png
 stable/JiffyFlow-setup.exe
 stable/update-manifest.stable.json
-releases/0.1.0/jiffy-flow.exe
+releases/0.1.1/jiffy-flow.exe
 ```
 
 Base pública: `https://pub-143026e1401641a5ad59a389410eed2a.r2.dev`. Ver `docs/arquitetura-jiffy/4.infrastructure/JIFFY_FLOW_R2.md`.
