@@ -66,8 +66,8 @@ describe('montarPedidoPublico + CreatePedidoPublicoInputSchema', () => {
     })
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.payload.cliente.cpf).toBe('12345678909')
     expect(result.payload.documentoCpfCnpj).toBe('12345678909')
+    expect(result.payload.cliente).toEqual({ telefone: '11999999999' })
     expect(CreatePedidoPublicoInputSchema.safeParse(result.payload).success).toBe(true)
   })
 

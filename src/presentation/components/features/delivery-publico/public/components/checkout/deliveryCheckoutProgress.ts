@@ -2,6 +2,7 @@ export type DeliveryCheckoutStep =
   | 'telefone'
   | 'enderecos'
   | 'enderecoForm'
+  | 'enderecoGeo'
   | 'pagamento'
   | 'revisao'
   | 'sucesso'
@@ -52,6 +53,7 @@ const STEP_TO_LOGICAL_STEP: Record<Exclude<DeliveryCheckoutStep, null>, LogicalC
   telefone: 'identificacao',
   enderecos: 'endereco',
   enderecoForm: 'endereco',
+  enderecoGeo: 'endereco',
   pagamento: 'pagamento',
   revisao: 'revisao',
   /** Terminal — progresso é omitido em `calculateDeliveryCheckoutProgress`. */

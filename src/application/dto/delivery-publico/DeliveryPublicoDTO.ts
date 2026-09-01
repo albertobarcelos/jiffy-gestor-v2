@@ -1,3 +1,5 @@
+import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
+
 /** DTOs espelhando o catálogo público delivery do backend (sem auth). */
 
 export type CatalogoPublicoComplementoDTO = {
@@ -108,6 +110,10 @@ export type EnderecoClienteDeliveryPublicoDTO = {
   cep: string | null
   complemento: string | null
   ultimaUtilizacaoEm?: string | null
+  enderecoLocalizacao?: GeoJsonPoint | null
+  preferenciaEntrega?: GeoJsonPoint | null
+  geocodingProvider?: string | null
+  providerEnderecoId?: string | null
 }
 
 export type ClienteDeliveryPublicoDTO = {

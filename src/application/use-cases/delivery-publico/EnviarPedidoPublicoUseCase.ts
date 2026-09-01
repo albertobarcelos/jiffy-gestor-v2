@@ -115,7 +115,7 @@ export class EnviarPedidoPublicoUseCase {
     const payload: CreatePedidoPublicoInput = parsed.data
 
     let clienteAtualizado: ClienteDeliveryPublicoDTO | null = null
-    const cpfPedido = payload.cliente.cpf?.replace(/\D/g, '') ?? ''
+    const cpfPedido = payload.documentoCpfCnpj?.replace(/\D/g, '') ?? ''
     if (cpfPedido.length === 11) {
       const rawAtual = await buscarClienteDeliveryPublico(tel)
       const cpfAtual = rawAtual?.cpf?.replace(/\D/g, '') ?? ''

@@ -92,16 +92,87 @@ export function isPublicDeliverySlugNotFound(error: unknown): boolean {
 }
 
 function parseErrorMessageFromBody(body: unknown, status: number): string {
+  if (status === 429) {
+    return formatarMensagemErroCotacaoPublica(429)
+  }
+
   if (body && typeof body === 'object' && !Array.isArray(body)) {
     const o = body as Record<string, unknown>
-    if (typeof o.message === 'string' && o.message.trim()) return o.message.trim()
-    if (typeof o.error === 'string' && o.error.trim()) return o.error.trim()
+    if (typeof o.message === 'string' && o.message.trim()) {
+      return formatarMensagemErroCotacaoPublica(status, o.message.trim())
+    }
+    if (typeof o.error === 'string' && o.error.trim()) {
+      return formatarMensagemErroCotacaoPublica(status, o.error.trim())
+    }
     if (o.details && typeof o.details === 'object') {
       const d = o.details as Record<string, unknown>
-      if (typeof d.message === 'string' && d.message.trim()) return d.message.trim()
+      if (typeof d.message === 'string' && d.message.trim()) {
+        return formatarMensagemErroCotacaoPublica(status, d.message.trim())
+      }
     }
   }
-  return `Erro ${status}`
+  return formatarMensagemErroCotacaoPublica(status)
+}
+
+/** Mensagem ao cliente externo quando o endereço está fora da cobertura de entrega. */
+export const MSG_FORA_COBERTURA_ENTREGA_PUBLICA =
+  'Seu endereço está fora da nossa área de cobertura para entrega. Você ainda pode retirar o pedido na loja.'
+
+export function isErroCoberturaEntregaPublica(message: string): boolean {
+  const lower = message.toLowerCase()
+  return (
+    message === MSG_FORA_COBERTURA_ENTREGA_PUBLICA ||
+    lower.includes('cobertura') ||
+    lower.includes('fora da área') ||
+    lower.includes('fora da area') ||
+    lower.includes('fora do raio') ||
+    lower.includes('raio de entrega') ||
+    lower.includes('área de entrega') ||
+    lower.includes('area de entrega') ||
+    lower.includes('coberto por nenhuma') ||
+    lower.includes('não atend') ||
+    lower.includes('nao atend')
+  )
+}
+
+/** Mensagens amigáveis para falhas na cotação pública (inclui rate limit 429). */
+export function formatarMensagemErroCotacaoPublica(
+  status: number,
+  rawMessage?: string | null
+): string {
+  const msg = rawMessage?.trim() ?? ''
+
+  if (status === 429) {
+    return 'Muitas tentativas de calcular o frete. Aguarde cerca de 1 minuto e tente novamente.'
+  }
+
+  if (msg) {
+    const lower = msg.toLowerCase()
+    if (lower.includes('geolocalização') || lower.includes('geolocalizacao')) {
+      return 'Este endereço ainda não tem localização para entrega. Escolha outro endereço ou cadastre um novo.'
+    }
+    if (lower.includes('cardápio delivery') || lower.includes('cardapio delivery')) {
+      return 'O cardápio de delivery está indisponível no momento. Tente novamente mais tarde.'
+    }
+    if (isErroCoberturaEntregaPublica(msg)) {
+      return MSG_FORA_COBERTURA_ENTREGA_PUBLICA
+    }
+    return msg
+  }
+
+  if (status === 400) {
+    return 'Não foi possível calcular o frete com os dados informados. Verifique o endereço ou tente retirada no local.'
+  }
+
+  if (status === 403) {
+    return 'A loja não está disponível para pedidos no momento.'
+  }
+
+  if (status >= 500) {
+    return 'Não foi possível calcular o frete agora. Tente novamente em instantes.'
+  }
+
+  return status > 0 ? `Não foi possível calcular o frete (erro ${status}).` : 'Não foi possível calcular o frete.'
 }
 
 async function parseErrorMessage(res: Response): Promise<string> {
