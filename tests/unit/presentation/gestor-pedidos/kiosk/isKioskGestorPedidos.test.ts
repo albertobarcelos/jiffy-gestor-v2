@@ -41,6 +41,11 @@ describe('rota /pedidos', () => {
   it('distingue o .exe do Chrome pelo User-Agent', () => {
     expect(
       pedidoVeioDoAppJiffyFlow(
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/131.0.0.0 Safari/537.36 Fredy/0.1.1'
+      )
+    ).toBe(true)
+    expect(
+      pedidoVeioDoAppJiffyFlow(
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/131.0.0.0 Safari/537.36 JiffyFlow/0.1.0'
       )
     ).toBe(true)

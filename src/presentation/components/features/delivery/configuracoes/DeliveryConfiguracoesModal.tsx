@@ -33,6 +33,7 @@ import {
 import { salvarMapeamentosEstacao } from '@/src/infrastructure/api/estacoesImpressaoApi'
 import { DeliveryVinculoImpressorasFisicas } from './DeliveryVinculoImpressorasFisicas'
 import { CupomCampoInfo } from './DeliveryModoPapelToggle'
+import { BaixarFredyCard } from '@/src/presentation/gestor-pedidos/windows/BaixarFredyCard'
 
 interface DeliveryConfiguracoesModalProps {
   open: boolean
@@ -281,6 +282,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
         onClose={onClose}
         title="Configurações de Impressão Delivery"
         subtitle="Neste PC: vincule cada impressora lógica à impressora física. O agente só imprime o destino escolhido."
+        headerExtra={<BaixarFredyCard />}
         panelClassName="w-[min(72rem,96vw)] max-w-[100vw] sm:w-[min(1200px,90vw)]"
         footerVariant="bar"
         footerActions={{

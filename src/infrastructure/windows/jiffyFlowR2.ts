@@ -1,5 +1,5 @@
 /**
- * Distribuição do Jiffy Flow no R2 (bucket `jiffy-flow`).
+ * Distribuição do Fredy no R2 (bucket `jiffy-flow`).
  * Contratos e paths. Sem regra de pedido.
  */
 
@@ -12,13 +12,13 @@ export const DEFAULT_JIFFY_FLOW_R2_PUBLIC_BASE =
 export const JIFFY_FLOW_R2_PATHS = {
   brandLogo: 'brand/logo.png',
   brandIcon: 'brand/icon.png',
-  setup: 'stable/JiffyFlow-setup.exe',
+  setup: 'stable/FredySetup.exe',
   manifest: 'stable/update-manifest.stable.json',
 } as const
 
 export function jiffyFlowReleaseExePath(version: string): string {
   const semver = version.trim()
-  return `releases/${semver}/jiffy-flow.exe`
+  return `releases/${semver}/Fredy.exe`
 }
 
 export function jiffyFlowR2PublicBase(): string {

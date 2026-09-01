@@ -239,7 +239,13 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
       <div
         className={`flex flex-wrap items-end justify-center gap-x-1 gap-y-4 rounded-t-lg bg-custom-2 px-1 pb-2 pt-1.5 md:justify-start ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}
       >
-        <div className="flex min-w-[18rem] flex-[1_1_18rem] flex-col gap-1 sm:max-w-xl">
+        <div
+          className={
+            kiosk
+              ? 'flex min-w-[18rem] flex-[1_1_18rem] flex-col gap-1 sm:max-w-xl'
+              : 'flex w-[13.5rem] shrink-0 flex-col gap-1'
+          }
+        >
           <div className="relative w-full px-1">
             <MdSearch
               className="absolute left-2 top-1/2 -translate-y-1/2 text-secondary-text"
@@ -247,11 +253,12 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
             />
             <input
               type="text"
-              placeholder="Código, cliente ou telefone"
+              placeholder={kiosk ? 'Código, cliente ou telefone' : 'Buscar pedido'}
               value={searchInput}
               onChange={e => onSearchInputChange(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && onRefresh()}
-              className="h-8 w-full rounded-lg border bg-info pl-6 pr-4 text-sm shadow-sm"
+              className="h-8 w-full rounded-lg border bg-info pl-6 pr-3 text-sm shadow-sm"
+              aria-label={kiosk ? 'Código, cliente ou telefone' : 'Buscar pedido'}
             />
           </div>
         </div>

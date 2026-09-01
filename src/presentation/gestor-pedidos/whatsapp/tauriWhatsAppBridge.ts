@@ -72,7 +72,7 @@ function naFila<T>(fn: () => Promise<T>): Promise<T> {
 async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   const api = resolverInvoke()
   if (!api) {
-    throw new Error('WhatsApp Web só no Jiffy Flow')
+    throw new Error('WhatsApp Web só no Fredy')
   }
   return comTimeout(api(cmd, args) as Promise<T>, INVOKE_TIMEOUT_MS, cmd)
 }
