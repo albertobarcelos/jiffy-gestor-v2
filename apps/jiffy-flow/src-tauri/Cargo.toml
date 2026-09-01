@@ -1,7 +1,7 @@
 [package]
 name = "jiffy-flow"
 version = "0.1.1"
-description = "Casco Windows do quadro de pedidos. Zero regra de pedido."
+description = "Fredy — gestor de pedidos no Windows. Por Jiffy."
 authors = ["NexSyn"]
 edition = "2021"
 rust-version = "1.77.2"

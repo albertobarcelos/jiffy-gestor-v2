@@ -147,11 +147,11 @@ fn garantir_webview(app: &AppHandle, bounds: &WhatsAppBounds) -> Result<(), Stri
     let w = bounds.width.max(80.0);
     let h = bounds.height.max(80.0);
 
-    eprintln!("Jiffy Flow a criar WebView WhatsApp em ({x}, {y}) {w}x{h}");
+    eprintln!("Fredy a criar WebView WhatsApp em ({x}, {y}) {w}x{h}");
     window
         .add_child(builder, LogicalPosition::new(x, y), LogicalSize::new(w, h))
         .map_err(|e| format!("não foi possível criar o WhatsApp Web: {e}"))?;
-    eprintln!("Jiffy Flow WebView WhatsApp criado");
+    eprintln!("Fredy WebView WhatsApp criado");
     Ok(())
 }
 
@@ -182,13 +182,13 @@ pub fn repor_host_se_visivel(app: &AppHandle) {
 #[tauri::command]
 pub async fn whatsapp_show(app: AppHandle, bounds: WhatsAppBounds) -> Result<(), String> {
     eprintln!(
-        "Jiffy Flow WhatsApp a mostrar ({}, {}) {}x{}",
+        "Fredy WhatsApp a mostrar ({}, {}) {}x{}",
         bounds.x, bounds.y, bounds.width, bounds.height
     );
     garantir_webview(&app, &bounds)?;
     marcar_visivel(&app, true);
     if crate::bolha::principal_minimizada(&app) {
-        eprintln!("Jiffy Flow WhatsApp show ignorado (principal minimizada)");
+        eprintln!("Fredy WhatsApp show ignorado (principal minimizada)");
         recolher_host(&app);
         return Ok(());
     }
@@ -203,7 +203,7 @@ pub async fn whatsapp_show(app: AppHandle, bounds: WhatsAppBounds) -> Result<(),
         .map_err(|e| e.to_string())?;
     wv.show().map_err(|e| e.to_string())?;
     eprintln!(
-        "Jiffy Flow WhatsApp visível em ({}, {}) {w}x{h}",
+        "Fredy WhatsApp visível em ({}, {}) {w}x{h}",
         bounds.x, bounds.y
     );
     Ok(())

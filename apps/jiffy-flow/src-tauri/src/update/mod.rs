@@ -1,4 +1,4 @@
-//! Update do Jiffy Flow — mesmo contrato do Jiffy Print (`schemaVersion: 1`).
+//! Update do Fredy — mesmo contrato do Jiffy Print (`schemaVersion: 1`).
 //!
 //! Manifesto HTTP + SHA-256. Não substitui o `.exe` em execução: baixa, lança
 //! `apply-pending` destacado, sai e o helper troca o ficheiro e relança.
@@ -41,7 +41,7 @@ pub fn maybe_prompt_and_apply() -> bool {
     match apply_from_ui(&res) {
         Ok(()) => true,
         Err(err) => {
-            alert_erro(&format!("Não foi possível atualizar o Jiffy Flow.\n{err}"));
+            alert_erro(&format!("Não foi possível atualizar o Fredy.\n{err}"));
             false
         }
     }
@@ -54,14 +54,14 @@ fn prompt_atualizar(res: &CheckResult) -> bool {
         format!("\n\n{}", res.notes.trim())
     };
     let texto = format!(
-        "Há uma nova versão do Jiffy Flow ({}). A atual é {}.{} \n\nAtualizar agora.",
+        "Há uma nova versão do Fredy ({}). A atual é {}.{} \n\nAtualizar agora.",
         res.latest, res.current, notas
     );
-    native_ok("Atualizar Jiffy Flow", &texto)
+    native_ok("Atualizar Fredy", &texto)
 }
 
 pub(crate) fn alert_erro(texto: &str) {
-    let _ = native_ok("Jiffy Flow", texto);
+    let _ = native_ok("Fredy", texto);
 }
 
 #[cfg(windows)]

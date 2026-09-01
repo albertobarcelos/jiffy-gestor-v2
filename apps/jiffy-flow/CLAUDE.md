@@ -1,10 +1,10 @@
-# CLAUDE.md — Jiffy Flow (Tauri)
+# CLAUDE.md — Fredy (Tauri)
 
-Casco Windows. **Não imprime. Não tem regra de pedido.**
+Casco Windows do **Fredy**. **Não imprime. Não tem regra de pedido.** Marca: Jiffy.
 
 ```text
-Browser / menu Vendas → gestor-pedidos://open
-    → este .exe (WebView2, User-Agent JiffyFlow/)
+Browser → gestor-pedidos://open
+    → este .exe (WebView2, User-Agent Fredy/)
     → Next em /pedidos/empresas?gestor
     → agente Go imprime (já instalado à parte)
 ```
@@ -13,21 +13,21 @@ Browser / menu Vendas → gestor-pedidos://open
 
 | Superfície | Como se reconhece | Depois do login |
 |---|---|---|
-| **Jiffy Flow `.exe`** | User-Agent contém `JiffyFlow/` | Lista «Suas empresas» — nunca Minhas Empresas |
+| **Fredy `.exe`** | User-Agent contém `Fredy/` (legado: `JiffyFlow/`) | Lista «Suas empresas» — nunca Minhas Empresas |
 | **Preview kiosk no Chrome** | só `?gestor` na URL | A mesma lista (dev) |
 | **Gestor no Chrome** | nenhum dos dois | Hub de cards, inalterado |
 
-Não usar cookie, `localStorage` nem `sessionStorage` como identidade do produto. O Chrome nunca envia `JiffyFlow/`. A janela do WhatsApp Web no Flow usa UA de Chrome normal (sem `JiffyFlow/`).
+Não usar cookie, `localStorage` nem `sessionStorage` como identidade do produto. O Chrome nunca envia `Fredy/`. A janela do WhatsApp Web no Fredy usa UA de Chrome normal (sem `Fredy/`).
 
 ## O que este projeto faz
 
 - Janela nativa sem barra de endereço
 - Abre o Gestor na janela nativa
-- Identifica-se com User-Agent `JiffyFlow/` (o Gestor web nunca abre Minhas Empresas neste casco)
+- Identifica-se com User-Agent `Fredy/` (o Gestor web nunca abre Minhas Empresas neste casco)
 - Regista o protocolo `gestor-pedidos://`
 - Uma instância só (segundo clique foca a janela)
 - WebView persistente de `web.whatsapp.com` (sem ler conversas)
-- Bolha flutuante (janela à parte, sempre no topo, ícone do Flow): só aparece com a janela principal minimizada. Clique restaura o Flow (não troca de aba). Arrasta. Some no Win+D / ecrã exclusivo. Com o WhatsApp aberto, o WebView nativo é escondido enquanto a bolha está visível. A deteção de minimizar e a 2.ª instância usam `get_window("main")` — `get_webview_window("main")` fica `None` depois do filho WhatsApp.
+- Bolha flutuante (janela à parte, sempre no topo, ícone do Fredy): só aparece com a janela principal minimizada. Clique restaura o Fredy (não troca de aba). Arrasta. Some no Win+D / ecrã exclusivo. Com o WhatsApp aberto, o WebView nativo é escondido enquanto a bolha está visível. A deteção de minimizar e a 2.ª instância usam `get_window("main")` — `get_webview_window("main")` fica `None` depois do filho WhatsApp.
 
 ## O que NÃO faz
 

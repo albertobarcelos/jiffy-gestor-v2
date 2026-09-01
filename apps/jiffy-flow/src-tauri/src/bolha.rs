@@ -1,5 +1,5 @@
 //! Bolha flutuante: só aparece com a janela principal minimizada.
-//! Clique restaura o Jiffy Flow. Não é filha da principal: sobrevive a minimizar.
+//! Clique restaura o Fredy. Não é filha da principal: sobrevive a minimizar.
 
 use std::fs;
 use std::path::PathBuf;
@@ -90,6 +90,8 @@ fn posicao_padrao(app: &AppHandle) -> PhysicalPosition<i32> {
 }
 
 fn url_da_bolha(app: &AppHandle) -> Result<url::Url, String> {
+    // Mesma origem do Gestor: o invoke do Tauri (clique/arrasto) só funciona aí.
+    // O mascote novo entra por `script_mascote_bolha`, não por file://.
     let quadro = crate::quadro_url::url_do_quadro();
     if let Ok(mut u) = url::Url::parse(&quadro) {
         u.set_path("/jiffy-flow-bolha.html");
@@ -103,6 +105,45 @@ fn url_da_bolha(app: &AppHandle) -> Result<url::Url, String> {
     let path = dir.join("bolha.html");
     fs::write(&path, HTML).map_err(|e| e.to_string())?;
     url::Url::from_file_path(&path).map_err(|_| format!("URL da bolha: {}", path.display()))
+}
+
+fn encode_base64(data: &[u8]) -> String {
+    const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
+    let mut i = 0;
+    while i + 3 <= data.len() {
+        let n = u32::from(data[i]) << 16 | u32::from(data[i + 1]) << 8 | u32::from(data[i + 2]);
+        out.push(T[((n >> 18) & 63) as usize] as char);
+        out.push(T[((n >> 12) & 63) as usize] as char);
+        out.push(T[((n >> 6) & 63) as usize] as char);
+        out.push(T[(n & 63) as usize] as char);
+        i += 3;
+    }
+    match data.len() - i {
+        1 => {
+            let n = u32::from(data[i]) << 16;
+            out.push(T[((n >> 18) & 63) as usize] as char);
+            out.push(T[((n >> 12) & 63) as usize] as char);
+            out.push('=');
+            out.push('=');
+        }
+        2 => {
+            let n = u32::from(data[i]) << 16 | u32::from(data[i + 1]) << 8;
+            out.push(T[((n >> 18) & 63) as usize] as char);
+            out.push(T[((n >> 12) & 63) as usize] as char);
+            out.push(T[((n >> 6) & 63) as usize] as char);
+            out.push('=');
+        }
+        _ => {}
+    }
+    out
+}
+
+fn script_mascote_bolha() -> String {
+    let b64 = encode_base64(LOGO_PNG);
+    format!(
+        "(function(){{function a(){{var i=document.querySelector('#bolha img');if(i)i.src='data:image/png;base64,{b64}';}}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',a);else a();}})();"
+    )
 }
 
 /// Ícone do Flow: quadrado com cantos arredondados (não círculo).
@@ -202,12 +243,12 @@ fn aplicar_visibilidade(app: &AppHandle) {
         let _ = bolha.set_always_on_top(true);
         aplicar_mascara(&bolha);
         trazer_ao_topo(&bolha);
-        eprintln!("Jiffy Flow bolha visível (principal minimizada)");
+        eprintln!("Fredy bolha visível (principal minimizada)");
     } else {
         let _ = bolha.hide();
         let handle = app.clone();
         let _ = std::thread::spawn(move || crate::whatsapp::repor_host_se_visivel(&handle));
-        eprintln!("Jiffy Flow bolha oculta (principal visível)");
+        eprintln!("Fredy bolha oculta (principal visível)");
     }
 }
 
@@ -236,9 +277,10 @@ pub fn abrir(app: &AppHandle) -> Result<(), String> {
         .filter(|p| dentro_de_algum_monitor(app, *p))
         .unwrap_or_else(|| posicao_padrao(app));
 
-    eprintln!("Jiffy Flow bolha URL {url}");
+    eprintln!("Fredy bolha URL {url}");
     let janela = WebviewWindowBuilder::new(app, BOLHA_LABEL, WebviewUrl::External(url))
-        .title("Jiffy Flow")
+        .initialization_script(script_mascote_bolha())
+        .title("Fredy")
         .inner_size(LADO_PX, LADO_PX)
         .resizable(false)
         .maximizable(false)
@@ -259,7 +301,7 @@ pub fn abrir(app: &AppHandle) -> Result<(), String> {
     aplicar_mascara(&janela);
     ligar_vigia(app);
     aplicar_visibilidade(app);
-    eprintln!("Jiffy Flow bolha pronta em ({}, {})", pos.x, pos.y);
+    eprintln!("Fredy bolha pronta em ({}, {})", pos.x, pos.y);
     Ok(())
 }
 
@@ -292,7 +334,7 @@ pub fn no_evento(window: &tauri::Window, event: &WindowEvent) {
 
 #[tauri::command]
 pub async fn bolha_clique(app: AppHandle) -> Result<(), String> {
-    eprintln!("Jiffy Flow bolha clique — restaurar");
+    eprintln!("Fredy bolha clique — restaurar");
     let Some(main) = janela_main(&app) else {
         return Err("janela principal ausente".to_string());
     };
