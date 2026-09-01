@@ -8,7 +8,7 @@ import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
-export interface ProdutosQueryParams {
+interface ProdutosQueryParams {
   name?: string
   ativo?: boolean | null
   ativoLocal?: boolean | null
@@ -17,26 +17,6 @@ export interface ProdutosQueryParams {
   grupoComplementosId?: string
   limit?: number
   offset?: number
-}
-
-/**
- * Params da listagem infinita de produtos (tela /produtos).
- * A query key do React Query inclui este objeto — o modal de menus
- * precisa usar o mesmo formato para reaproveitar o cache (5 min stale / 30 min gc).
- */
-export function produtosInfiniteQueryParams(
-  overrides: Partial<Omit<ProdutosQueryParams, 'offset'>> = {}
-): Omit<ProdutosQueryParams, 'offset'> {
-  return {
-    name: undefined,
-    ativo: true,
-    ativoLocal: null,
-    ativoDelivery: null,
-    grupoProdutoId: undefined,
-    grupoComplementosId: undefined,
-    limit: 100,
-    ...overrides,
-  }
 }
 
 interface ProdutosResponse {

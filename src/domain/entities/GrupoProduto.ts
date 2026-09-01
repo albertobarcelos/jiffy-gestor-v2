@@ -11,8 +11,7 @@ export class GrupoProduto {
     private readonly ativo: boolean,
     private readonly ativoDelivery: boolean,
     private readonly ativoLocal: boolean,
-    private readonly ordem?: number,
-    private readonly imagemUrl?: string | null
+    private readonly ordem?: number
   ) {}
 
   static create(params: {
@@ -24,7 +23,6 @@ export class GrupoProduto {
     ativoDelivery: boolean
     ativoLocal: boolean
     ordem?: number
-    imagemUrl?: string | null
   }): GrupoProduto {
     return new GrupoProduto(
       params.id,
@@ -34,8 +32,7 @@ export class GrupoProduto {
       params.ativo,
       params.ativoDelivery,
       params.ativoLocal,
-      params.ordem,
-      params.imagemUrl
+      params.ordem
     )
   }
 
@@ -48,12 +45,7 @@ export class GrupoProduto {
       json.ativo ?? true,
       json.ativoDelivery ?? false,
       json.ativoLocal ?? false,
-      json.ordem,
-      typeof json.imagemUrl === 'string'
-        ? json.imagemUrl
-        : typeof json.imageURL === 'string'
-          ? json.imageURL
-          : json.imagemUrl ?? null
+      json.ordem
     )
   }
 
@@ -89,10 +81,6 @@ export class GrupoProduto {
     return this.ordem
   }
 
-  getImagemUrl(): string | null | undefined {
-    return this.imagemUrl
-  }
-
   toJSON(): any {
     return {
       id: this.id,
@@ -103,7 +91,6 @@ export class GrupoProduto {
       ativoDelivery: this.ativoDelivery,
       ativoLocal: this.ativoLocal,
       ordem: this.ordem,
-      imagemUrl: this.imagemUrl ?? null,
     }
   }
 }

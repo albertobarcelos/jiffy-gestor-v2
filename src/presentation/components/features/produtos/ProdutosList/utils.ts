@@ -3,40 +3,39 @@ import type { ProdutoPatch } from '@/src/shared/types/produto'
 
 const collator = new Intl.Collator('pt-BR', { sensitivity: 'accent', numeric: false })
 
-function ordemNumerica(valor: number | undefined): number {
-  return typeof valor === 'number' && Number.isFinite(valor) ? valor : Number.MAX_SAFE_INTEGER
-}
+export const normalizeGroupName = (nome?: string) =>
+  nome && nome.trim().length > 0 ? nome : 'Sem grupo'
 
 /**
- * Ordem do cardápio: categoria (`GrupoProduto.ordem`) e depois o produto no grupo.
- * Nome só desempatar quando a ordem for igual ou ausente.
+ * Chave estável para agrupar produtos na lista: um bucket por `grupoId`.
+ * Não funde grupos distintos só porque o nome é igual — IDs diferentes ⇒ blocos separados.
+ * Sem `grupoId`, agrupa por nome normalizado (comportamento legado para produtos órfãos).
  */
-export function sortProdutosPorOrdemMenu(
-  lista: Produto[],
-  ordemGrupoPorId: ReadonlyMap<string, number>
-): Produto[] {
-  return [...lista].sort((a, b) => {
-    const ordemGrupoA = ordemGrupoPorId.get(a.getGrupoId() ?? '') ?? Number.MAX_SAFE_INTEGER
-    const ordemGrupoB = ordemGrupoPorId.get(b.getGrupoId() ?? '') ?? Number.MAX_SAFE_INTEGER
-    if (ordemGrupoA !== ordemGrupoB) return ordemGrupoA - ordemGrupoB
+export const buildProdutoGroupKey = (p: Produto): string => {
+  const gid = p.getGrupoId()?.trim()
+  if (gid) return `gid:${gid}`
+  return `sem_grupo:${normalizeGroupName(p.getNomeGrupo())}`
+}
 
-    const ordemA = ordemNumerica(a.getOrdem())
-    const ordemB = ordemNumerica(b.getOrdem())
-    if (ordemA !== ordemB) return ordemA - ordemB
+export const sortProdutosAlphabetically = (lista: Produto[]): Produto[] =>
+  [...lista].sort((a, b) => {
+    const grupoCompare = collator.compare(
+      normalizeGroupName(a.getNomeGrupo()),
+      normalizeGroupName(b.getNomeGrupo())
+    )
+    return grupoCompare !== 0 ? grupoCompare : collator.compare(a.getNome(), b.getNome())
+  })
 
+/** Ordenação dentro do mesmo grupo: campo `ordem` da API, depois nome. */
+export const sortProdutosWithinGroup = (lista: Produto[]): Produto[] =>
+  [...lista].sort((a, b) => {
+    const oa = a.getOrdem()
+    const ob = b.getOrdem()
+    const na = typeof oa === 'number' && Number.isFinite(oa) ? oa : Number.MAX_SAFE_INTEGER
+    const nb = typeof ob === 'number' && Number.isFinite(ob) ? ob : Number.MAX_SAFE_INTEGER
+    if (na !== nb) return na - nb
     return collator.compare(a.getNome(), b.getNome())
   })
-}
-
-export function mapaOrdemGrupoProduto(
-  grupos: Array<{ getId: () => string; getOrdem: () => number | undefined }>
-): Map<string, number> {
-  const map = new Map<string, number>()
-  for (const grupo of grupos) {
-    map.set(grupo.getId(), ordemNumerica(grupo.getOrdem()))
-  }
-  return map
-}
 
 /**
  * Monta `Produto` a partir da resposta da API mantendo `ordem` do item já em cache
@@ -58,7 +57,6 @@ export function produtoFromApiPreservandoOrdem(anterior: Produto, raw: unknown):
     parsed.getNome(),
     parsed.getValor(),
     parsed.isAtivo(),
-    parsed.getDescricao(),
     parsed.getNomeGrupo(),
     parsed.getGrupoId(),
     parsed.getEstoque(),
@@ -68,8 +66,6 @@ export function produtoFromApiPreservandoOrdem(anterior: Produto, raw: unknown):
     parsed.permiteDescontoAtivo(),
     parsed.permiteAlterarPrecoAtivo(),
     parsed.incideTaxaAtivo(),
-    parsed.isAtivoDelivery(),
-    parsed.isAtivoLocal(),
     ordemAnt,
     parsed.getGruposComplementos(),
     parsed.getImpressoras(),
@@ -77,9 +73,7 @@ export function produtoFromApiPreservandoOrdem(anterior: Produto, raw: unknown):
     parsed.getCest(),
     parsed.getOrigemMercadoria(),
     parsed.getTipoProduto(),
-    parsed.getIndicadorProducaoEscala(),
-    parsed.getUnidadeMedida(),
-    parsed.getMenus()
+    parsed.getIndicadorProducaoEscala()
   )
 }
 
@@ -87,10 +81,9 @@ export const cloneProdutoWithPatch = (produto: Produto, patch: ProdutoPatch): Pr
   Produto.create(
     produto.getId(),
     produto.getCodigoProduto(),
-    patch.nome ?? produto.getNome(),
+    produto.getNome(),
     patch.valor ?? produto.getValor(),
     patch.ativo ?? produto.isAtivo(),
-    produto.getDescricao(),
     produto.getNomeGrupo(),
     produto.getGrupoId(),
     produto.getEstoque(),
@@ -100,8 +93,6 @@ export const cloneProdutoWithPatch = (produto: Produto, patch: ProdutoPatch): Pr
     patch.permiteDesconto ?? produto.permiteDescontoAtivo(),
     patch.permiteAlterarPreco ?? produto.permiteAlterarPrecoAtivo(),
     patch.incideTaxa ?? produto.incideTaxaAtivo(),
-    patch.ativoDelivery ?? produto.isAtivoDelivery(),
-    produto.isAtivoLocal(),
     produto.getOrdem(),
     produto.getGruposComplementos(),
     produto.getImpressoras(),
@@ -109,9 +100,7 @@ export const cloneProdutoWithPatch = (produto: Produto, patch: ProdutoPatch): Pr
     produto.getCest(),
     produto.getOrigemMercadoria(),
     produto.getTipoProduto(),
-    produto.getIndicadorProducaoEscala(),
-    produto.getUnidadeMedida(),
-    produto.getMenus()
+    produto.getIndicadorProducaoEscala()
   )
 
 /**

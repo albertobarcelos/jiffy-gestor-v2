@@ -17,10 +17,7 @@ import type {
   useCancelarNotaFiscalVendaGestor,
   useTransicaoPedidoDelivery,
 } from '@/src/presentation/hooks/useVendas'
-import type {
-  ProdutosTabsModalState,
-  ProdutosTabsTabKey,
-} from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
+import type { ProdutosTabsModalState } from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
 import type { ClientesTabsModalState } from '@/src/presentation/components/features/clientes/ClientesTabsModal'
 import type { ComplementosTabsModalState } from '@/src/presentation/components/features/complementos/ComplementosTabsModal'
 import type { ModalLancamentoProdutoPainelConfirmPayload, ModalLancamentoProdutoPainelModo } from '../components/ModalLancamentoProdutoPainel'
@@ -268,7 +265,9 @@ export interface NovoPedidoDetalheSlice {
     options?: { initialStepProduto?: 0 | 1 | 2 }
   ) => void
   handleFecharProdutoTabsModal: () => void
-  handleTabChangeProdutoModal: (tab: ProdutosTabsTabKey) => void
+  handleTabChangeProdutoModal: (
+    tab: 'produto' | 'complementos' | 'impressoras' | 'grupo'
+  ) => void
   handleConfirmarCancelamentoVenda: () => void
   cancelarVendaGestor: ReturnType<typeof useCancelarVendaGestor>
   cancelarNotaFiscalVendaPdv: ReturnType<typeof useCancelarNotaFiscalVendaPdv>

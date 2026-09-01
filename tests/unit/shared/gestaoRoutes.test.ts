@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+﻿import { describe, it, expect } from 'vitest'
 import {
   buildGestaoPath,
   parseEmpresaSlugFromPath,
@@ -36,7 +36,5 @@ describe('gestaoRoutes', () => {
     expect(isGestaoScopedPath('/portal-contador')).toBe(true)
     expect(isGestaoScopedPath('/pedidos')).toBe(true)
     expect(isGestaoScopedPath(HUB_PATH)).toBe(false)
-    expect(isGestaoScopedPath('/cardapio/nexsyn-ltda')).toBe(false)
-    expect(isGestaoScopedPath('/delivery/nexsyn-ltda')).toBe(false)
   })
 })

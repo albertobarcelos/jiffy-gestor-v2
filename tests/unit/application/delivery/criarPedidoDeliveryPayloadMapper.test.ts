@@ -9,11 +9,9 @@ function baseInput(
     tipoInicioPedido: 'entrega',
     origem: 'GESTOR',
     status: 'ABERTA',
-    telefoneCliente: '65999998888',
     produtos: [
       {
         produtoId: 'prod-1',
-        nome: 'Produto teste',
         quantidade: 1,
         valorUnitario: 24,
         valorCatalogo: 24,
@@ -41,7 +39,7 @@ function baseInput(
     meiosPagamento: [],
     nomesMeiosPagamentoPedido: {},
     ...overrides,
-  } as CriarPedidoDeliveryInputDTO
+  }
 }
 
 describe('CriarPedidoDeliveryPayloadMapper', () => {
@@ -158,7 +156,6 @@ describe('CriarPedidoDeliveryPayloadMapper', () => {
         produtos: [
           {
             produtoId: 'prod-1',
-            nome: 'Produto teste',
             quantidade: 2,
             valorUnitario: 19.9,
             valorCatalogo: 24,
@@ -186,7 +183,6 @@ describe('CriarPedidoDeliveryPayloadMapper', () => {
         produtos: [
           {
             produtoId: 'prod-1',
-            nome: 'Produto teste',
             quantidade: 1,
             valorUnitario: 24,
             valorCatalogo: 24,

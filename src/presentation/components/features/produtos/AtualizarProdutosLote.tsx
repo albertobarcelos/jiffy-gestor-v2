@@ -34,10 +34,6 @@ import {
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { GrupoProdutosMultiFilter } from '@/src/presentation/components/features/produtos/GrupoProdutosMultiFilter'
 import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
-import {
-  mapaOrdemGrupoProduto,
-  sortProdutosPorOrdemMenu,
-} from '@/src/presentation/components/features/produtos/ProdutosList/utils'
 import { ProdutoActionIconsDisplay } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoActionIconsDisplay'
 import {
   ProdutoFiscalCelulasEditaveis,
@@ -2085,15 +2081,12 @@ export function AtualizarPrecoLote() {
         return Boolean(grupoId && idsGrupo.has(grupoId))
       })
     }
-    if (filtroColunaVazia !== FILTRO_COLUNA_TODOS) {
-      if (!idsFiltroColunaCongelados) {
-        lista = lista.filter(p => produtoSemDadoNaColuna(p, filtroColunaVazia))
-      } else {
-        lista = lista.filter(p => idsFiltroColunaCongelados.has(p.getId()))
-      }
+    if (filtroColunaVazia === FILTRO_COLUNA_TODOS) return lista
+    if (!idsFiltroColunaCongelados) {
+      return lista.filter(p => produtoSemDadoNaColuna(p, filtroColunaVazia))
     }
-    return sortProdutosPorOrdemMenu(lista, mapaOrdemGrupoProduto(gruposProdutos))
-  }, [produtos, filtroColunaVazia, idsFiltroColunaCongelados, grupoProdutoFilter, gruposProdutos])
+    return lista.filter(p => idsFiltroColunaCongelados.has(p.getId()))
+  }, [produtos, filtroColunaVazia, idsFiltroColunaCongelados, grupoProdutoFilter])
 
   /**
    * Listas de vínculo em lote (impressoras / grupos): ver
@@ -3453,7 +3446,7 @@ export function AtualizarPrecoLote() {
               {activeTab === 'permissoes' ? (
                 <div className="hidden w-[13.75rem] shrink-0 text-xs sm:block">Permissões</div>
               ) : null}
-              <div className="hidden min-w-0 flex-1 text-xs md:block">Categoria</div>
+              <div className="hidden min-w-0 flex-1 text-xs md:block">Grupo</div>
               {activeTab === 'impressoras' ? (
                 <div className="hidden min-w-0 flex-[1.2] text-center text-xs md:block">Impressoras</div>
               ) : null}
@@ -3492,6 +3485,8 @@ export function AtualizarPrecoLote() {
           >
             <div className={`flex flex-col gap-2 ${activeTab === 'fiscal' ? 'min-w-[1180px]' : ''}`}>
               {produtosExibicao
+                .slice()
+                .sort((a, b) => a.getNome().localeCompare(b.getNome(), 'pt-BR'))
                 .map((produto, index) => {
                 const isSelected = produtosSelecionados.has(produto.getId())
                 const foiAlteradoNaSessao = produtosAlteradosPorAba[activeTab].has(produto.getId())

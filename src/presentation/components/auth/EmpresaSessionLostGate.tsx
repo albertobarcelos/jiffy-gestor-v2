@@ -32,16 +32,7 @@ export function EmpresaSessionLostGate() {
       return
     }
 
-    const publicPrefixes = [
-      '/login',
-      '/registro',
-      '/esqueci-senha',
-      '/redefinir-senha',
-      '/confirmar-email',
-      '/notas-fiscais',
-      '/cardapio',
-      '/delivery',
-    ]
+    const publicPrefixes = ['/login', '/registro', '/esqueci-senha', '/redefinir-senha', '/confirmar-email', '/notas-fiscais']
     if (publicPrefixes.some(p => pathname === p || pathname.startsWith(`${p}/`))) {
       try {
         sessionStorage.removeItem(SESSION_STORAGE_TENANT_LOGOUT_SELF)

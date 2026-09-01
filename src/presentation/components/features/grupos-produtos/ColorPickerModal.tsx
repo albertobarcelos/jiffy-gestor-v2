@@ -9,7 +9,6 @@ interface ColorPickerModalProps {
   open: boolean
   onClose: () => void
   onSelect: (color: string) => void
-  zIndex?: number
 }
 
 const normalizeHexColor = (value: string): string => {
@@ -34,12 +33,7 @@ const normalizeHexColor = (value: string): string => {
   return `#${hex.toUpperCase()}`
 }
 
-export function ColorPickerModal({
-  open,
-  onClose,
-  onSelect,
-  zIndex = 1300,
-}: ColorPickerModalProps) {
+export function ColorPickerModal({ open, onClose, onSelect }: ColorPickerModalProps) {
   const [colors, setColors] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -90,7 +84,6 @@ export function ColorPickerModal({
     <JiffySidePanelModal
       open={open}
       onClose={onClose}
-      zIndex={zIndex}
       title="Selecione uma cor"
       panelClassName="w-[min(32rem,100vw)] max-w-[100vw] sm:w-[min(38rem,90vw)]"
       scrollableBody

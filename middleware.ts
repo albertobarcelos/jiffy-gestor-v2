@@ -84,12 +84,7 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/api/consulta-cnpj') ||
     pathname.startsWith('/api/consulta-cep') ||
     pathname.startsWith('/notas-fiscais') ||
-    pathname.startsWith('/api/public/notas-fiscais-consumidor') ||
-    pathname === '/cardapio' ||
-    pathname.startsWith('/cardapio/') ||
-    pathname === '/delivery' ||
-    pathname.startsWith('/delivery/') ||
-    pathname.startsWith('/api/public/delivery/')
+    pathname.startsWith('/api/public/notas-fiscais-consumidor')
   ) {
     return NextResponse.next()
   }

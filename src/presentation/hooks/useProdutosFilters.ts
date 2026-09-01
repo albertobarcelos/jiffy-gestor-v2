@@ -1,11 +1,7 @@
 'use client'
 
 import { useReducer, useMemo, useEffect, useRef, useCallback } from 'react'
-import type {
-  StatusFilter,
-  TriState,
-} from '@/src/presentation/components/features/produtos/ProdutosList/ProdutosFilters'
-import { produtosInfiniteQueryParams } from '@/src/presentation/hooks/useProdutos'
+import type { StatusFilter, TriState } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutosFilters'
 
 interface FiltersState {
   searchText: string
@@ -103,53 +99,31 @@ export function useProdutosFilters() {
   }, [state.ativoDeliveryFilter])
 
   const queryParams = useMemo(
-    () =>
-      produtosInfiniteQueryParams({
-        name: state.debouncedSearch || undefined,
-        ativo: ativoFilter,
-        ativoLocal: ativoLocalBoolean,
-        ativoDelivery: ativoDeliveryBoolean,
-        grupoProdutoId:
-          state.grupoProdutoFilter.length === 1 ? state.grupoProdutoFilter[0] : undefined,
-        grupoComplementosId:
-          state.grupoComplementoFilter === '__none__'
-            ? undefined
-            : state.grupoComplementoFilter || undefined,
-        limit: state.limit,
-      }),
-    [
-      state.debouncedSearch,
-      ativoFilter,
-      ativoLocalBoolean,
-      ativoDeliveryBoolean,
-      state.grupoProdutoFilter,
-      state.grupoComplementoFilter,
-      state.limit,
-    ]
+    () => ({
+      name: state.debouncedSearch || undefined,
+      ativo: ativoFilter,
+      ativoLocal: ativoLocalBoolean,
+      ativoDelivery: ativoDeliveryBoolean,
+      grupoProdutoId:
+        state.grupoProdutoFilter.length === 1 ? state.grupoProdutoFilter[0] : undefined,
+      grupoComplementosId:
+        state.grupoComplementoFilter === '__none__' ? undefined : state.grupoComplementoFilter || undefined,
+      limit: state.limit,
+    }),
+    [state.debouncedSearch, ativoFilter, ativoLocalBoolean, ativoDeliveryBoolean, state.grupoProdutoFilter, state.grupoComplementoFilter, state.limit]
   )
 
+  // `dispatch` é estável (garantia do useReducer), portanto essas funções também são estáveis.
   const setSearch = useCallback((value: string) => dispatch({ type: 'SET_SEARCH', value }), [])
   const setStatus = useCallback((value: StatusFilter) => dispatch({ type: 'SET_STATUS', value }), [])
   const setStatusGrupo = useCallback(
     (value: StatusFilter) => dispatch({ type: 'SET_STATUS_GRUPO', value }),
     []
   )
-  const setAtivoLocal = useCallback(
-    (value: TriState) => dispatch({ type: 'SET_ATIVO_LOCAL', value }),
-    []
-  )
-  const setAtivoDelivery = useCallback(
-    (value: TriState) => dispatch({ type: 'SET_ATIVO_DELIVERY', value }),
-    []
-  )
-  const setGrupoProduto = useCallback(
-    (value: string[]) => dispatch({ type: 'SET_GRUPO_PRODUTO', value }),
-    []
-  )
-  const setGrupoComplemento = useCallback(
-    (value: string) => dispatch({ type: 'SET_GRUPO_COMPLEMENTO', value }),
-    []
-  )
+  const setAtivoLocal = useCallback((value: TriState) => dispatch({ type: 'SET_ATIVO_LOCAL', value }), [])
+  const setAtivoDelivery = useCallback((value: TriState) => dispatch({ type: 'SET_ATIVO_DELIVERY', value }), [])
+  const setGrupoProduto = useCallback((value: string[]) => dispatch({ type: 'SET_GRUPO_PRODUTO', value }), [])
+  const setGrupoComplemento = useCallback((value: string) => dispatch({ type: 'SET_GRUPO_COMPLEMENTO', value }), [])
   const reset = useCallback(() => dispatch({ type: 'RESET' }), [])
 
   const actions = useMemo(
