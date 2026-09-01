@@ -309,6 +309,15 @@ export function DeliveryCheckoutEnderecoGeoModal({
             endereco={enderecoGeocode}
             localizacao={enderecoLocalizacao}
             mapValue={pinMapa}
+            pinModo={usarPontoPreferencia ? 'preferencia' : 'endereco'}
+            localizacaoReferencia={usarPontoPreferencia ? enderecoLocalizacao : null}
+            beforeMap={
+              <PreferenciaEntregaToggle
+                checked={usarPontoPreferencia}
+                onChange={handleTogglePreferencia}
+                disabled={!enderecoLocalizacao || salvando}
+              />
+            }
             onLocalizacaoChange={(point, meta) => {
               setEnderecoLocalizacao(point)
               setProviderEnderecoId(meta?.providerEnderecoId ?? null)
@@ -329,12 +338,6 @@ export function DeliveryCheckoutEnderecoGeoModal({
             successToast="Localização atualizada. Ajuste o pin se necessário."
           />
         ) : null}
-
-        <PreferenciaEntregaToggle
-          checked={usarPontoPreferencia}
-          onChange={handleTogglePreferencia}
-          disabled={!enderecoLocalizacao || salvando}
-        />
       </div>
 
       <DeliveryCheckoutPinAjustadoDialog

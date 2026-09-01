@@ -35,7 +35,7 @@ export function PreferenciaEntregaToggle({
       </label>
       {checked ? (
         <p className="mt-2 pl-7 text-xs delivery-text-secondary">
-          Arraste o pin no mapa para marcar onde você vai receber o pedido.
+          Arraste o pin azul no mapa para marcar onde você vai receber o pedido.
         </p>
       ) : null}
     </div>

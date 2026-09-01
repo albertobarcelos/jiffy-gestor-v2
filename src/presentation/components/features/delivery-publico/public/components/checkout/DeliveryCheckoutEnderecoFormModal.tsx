@@ -592,37 +592,6 @@ export function DeliveryCheckoutEnderecoFormModal({
               />
             </label>
 
-            <EnderecoGeolocalizacaoSection
-              variant="delivery"
-              autoGeocode={mostrarDetalhes && !geoSincronizadaComEndereco}
-              endereco={enderecoGeocode}
-              localizacao={enderecoLocalizacao}
-              mapValue={pinMapa}
-              onLocalizacaoChange={(point, meta) => {
-                setEnderecoLocalizacao(point)
-                setProviderEnderecoId(meta?.providerEnderecoId ?? null)
-                fecharDialogPin()
-                marcarGeoSincronizada()
-              }}
-              onMapChange={handleMapChange}
-              onGeocodeBuscandoChange={setBuscandoGeocodeMapa}
-              title="Localização para entrega"
-              subtitle={
-                usarPontoPreferencia
-                  ? 'Ajuste o pin do ponto de entrega. O endereço no mapa permanece fixo.'
-                  : 'O mapa atualiza ao alterar o endereço. Arraste o pin se precisar corrigir.'
-              }
-              obrigatorio
-              buscarLabel="Atualizar endereço no mapa"
-              successToast="Localização atualizada. Ajuste o pin se necessário."
-            />
-
-            <PreferenciaEntregaToggle
-              checked={usarPontoPreferencia}
-              onChange={handleTogglePreferencia}
-              disabled={!enderecoLocalizacao || salvando}
-            />
-
             <div>
               <p className="mb-1 text-sm font-semibold delivery-text-primary">
                 Salvar endereço como:
@@ -648,6 +617,40 @@ export function DeliveryCheckoutEnderecoFormModal({
                 </select>
               </div>
             </div>
+
+            <EnderecoGeolocalizacaoSection
+              variant="delivery"
+              autoGeocode={mostrarDetalhes && !geoSincronizadaComEndereco}
+              endereco={enderecoGeocode}
+              localizacao={enderecoLocalizacao}
+              mapValue={pinMapa}
+              pinModo={usarPontoPreferencia ? 'preferencia' : 'endereco'}
+              localizacaoReferencia={usarPontoPreferencia ? enderecoLocalizacao : null}
+              beforeMap={
+                <PreferenciaEntregaToggle
+                  checked={usarPontoPreferencia}
+                  onChange={handleTogglePreferencia}
+                  disabled={!enderecoLocalizacao || salvando}
+                />
+              }
+              onLocalizacaoChange={(point, meta) => {
+                setEnderecoLocalizacao(point)
+                setProviderEnderecoId(meta?.providerEnderecoId ?? null)
+                fecharDialogPin()
+                marcarGeoSincronizada()
+              }}
+              onMapChange={handleMapChange}
+              onGeocodeBuscandoChange={setBuscandoGeocodeMapa}
+              title="Localização para entrega"
+              subtitle={
+                usarPontoPreferencia
+                  ? 'Ajuste o pin do ponto de entrega. O endereço no mapa permanece fixo.'
+                  : 'O mapa atualiza ao alterar o endereço. Arraste o pin se precisar corrigir.'
+              }
+              obrigatorio
+              buscarLabel="Atualizar endereço no mapa"
+              successToast="Localização atualizada. Ajuste o pin se necessário."
+            />
           </>
         ) : null}
       </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { MdLocationOn, MdMyLocation } from 'react-icons/md'
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import {
@@ -111,6 +111,12 @@ export type EnderecoGeolocalizacaoSectionProps = {
   autoGeocode?: boolean
   autoGeocodeDebounceMs?: number
   onGeocodeBuscandoChange?: (buscando: boolean) => void
+  /** Conteúdo renderizado logo acima do mapa (ex.: toggle de preferência). */
+  beforeMap?: ReactNode
+  /** Pin arrastável: endereço ou ponto de entrega. */
+  pinModo?: 'endereco' | 'preferencia'
+  /** Pin fixo do endereço quando `pinModo` é preferencia. */
+  localizacaoReferencia?: GeoJsonPoint | null
 }
 
 export function EnderecoGeolocalizacaoSection({
@@ -133,6 +139,9 @@ export function EnderecoGeolocalizacaoSection({
   autoGeocode = false,
   autoGeocodeDebounceMs = 700,
   onGeocodeBuscandoChange,
+  beforeMap,
+  pinModo = 'endereco',
+  localizacaoReferencia = null,
 }: EnderecoGeolocalizacaoSectionProps) {
   const [buscandoGeocode, setBuscandoGeocode] = useState(false)
   const [buscandoGeocodeAuto, setBuscandoGeocodeAuto] = useState(false)
@@ -349,10 +358,14 @@ export function EnderecoGeolocalizacaoSection({
         ) : null}
 
         <p className={styles.hintClass}>
-          {autoGeocode
-            ? 'O mapa atualiza ao alterar o endereço. Arraste o pin se precisar ajustar o ponto exato.'
-            : 'Depois da busca, clique no mapa ou arraste o pin para marcar o ponto exato da entrega.'}
+          {pinModo === 'preferencia'
+            ? 'Pin vermelho = endereço. Pin azul = onde você recebe. Arraste o azul se precisar.'
+            : autoGeocode
+              ? 'O mapa atualiza ao alterar o endereço. Arraste o pin se precisar ajustar.'
+              : 'Depois da busca, clique no mapa ou arraste o pin para marcar o ponto exato da entrega.'}
         </p>
+
+        {beforeMap ? <div className="space-y-2">{beforeMap}</div> : null}
 
         <div
           ref={mapAnchorRef}
@@ -364,6 +377,8 @@ export function EnderecoGeolocalizacaoSection({
             disabled={disabled}
             estado={endereco.estado}
             hintBusca={buscarLabel}
+            pinModo={pinModo}
+            localizacaoReferencia={localizacaoReferencia}
             {...styles.mapProps}
           />
         </div>

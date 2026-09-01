@@ -8,6 +8,7 @@ import {
   type GeoJsonPoint,
 } from '@/src/shared/types/geoJsonPoint'
 import { getGoogleMapsApiKeyClient } from '@/src/shared/utils/googleMapsClient'
+import { criarOpcoesIconePinPreferencia, labelPinPreferenciaMapa } from './geolocalizacaoMapPinIcons'
 
 const MAP_CONTAINER_STYLE = { width: '100%', height: '320px' }
 
@@ -45,6 +46,10 @@ export type EnderecoGeolocalizacaoMapProps = {
   loadErrorClassName?: string
   /** Classes do hint sobreposto ao mapa. */
   overlayHintClassName?: string
+  /** Pin arrastável: endereço (vermelho padrão) ou ponto de entrega (azul). */
+  pinModo?: 'endereco' | 'preferencia'
+  /** Endereço fixo no mapa (vermelho padrão) quando `pinModo` é preferencia. */
+  localizacaoReferencia?: GeoJsonPoint | null
 }
 
 export function EnderecoGeolocalizacaoMap({
@@ -57,6 +62,8 @@ export function EnderecoGeolocalizacaoMap({
   missingKeyClassName = 'rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900',
   loadErrorClassName = 'rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700',
   overlayHintClassName = 'rounded-lg bg-white/95 px-3 py-2 text-center text-xs text-secondary-text shadow-sm',
+  pinModo = 'endereco',
+  localizacaoReferencia = null,
 }: EnderecoGeolocalizacaoMapProps) {
   const apiKey = getGoogleMapsApiKeyClient()
   const { isLoaded, loadError } = useJsApiLoader({
@@ -66,9 +73,21 @@ export function EnderecoGeolocalizacaoMap({
   })
 
   const posicaoMarcador = useMemo(() => latLngFromGeoJsonPoint(value), [value])
+  const posicaoReferencia = useMemo(
+    () => latLngFromGeoJsonPoint(localizacaoReferencia),
+    [localizacaoReferencia]
+  )
 
-  const centroInicial = posicaoMarcador ?? FALLBACK_CENTER
-  const zoomInicial = posicaoMarcador ? LOCALIZADO_ZOOM : FALLBACK_ZOOM
+  const modoPreferencia = pinModo === 'preferencia'
+  const exibirReferenciaFixa = modoPreferencia && Boolean(posicaoReferencia)
+
+  const iconePinPreferencia = useMemo(
+    () => (modoPreferencia ? criarOpcoesIconePinPreferencia() : undefined),
+    [modoPreferencia, isLoaded]
+  )
+
+  const centroInicial = posicaoMarcador ?? posicaoReferencia ?? FALLBACK_CENTER
+  const zoomInicial = posicaoMarcador || posicaoReferencia ? LOCALIZADO_ZOOM : FALLBACK_ZOOM
 
   const handlePositionChange = useCallback(
     (lat: number, lng: number) => {
@@ -101,12 +120,25 @@ export function EnderecoGeolocalizacaoMap({
 
   return (
     <div className={containerClassName}>
-      {!posicaoMarcador ? (
+      {!posicaoMarcador && !posicaoReferencia ? (
         <div className="pointer-events-none absolute inset-x-0 top-2 z-10 flex justify-center px-3">
           <p className={overlayHintClassName}>
             O mapa ainda não foi posicionado. Clique em{' '}
-            <span className="font-semibold">{hintBusca}</span> ou toque no mapa para posicionar o pin.
+            <span className="font-semibold">{hintBusca}</span> ou toque no mapa para posicionar o
+            pin.
             {estado ? ` (${estado})` : ''}
+          </p>
+        </div>
+      ) : null}
+
+      {modoPreferencia && (posicaoMarcador || posicaoReferencia) ? (
+        <div className="pointer-events-none absolute inset-x-0 bottom-2 z-10 flex justify-center px-3">
+          <p className={overlayHintClassName}>
+            <span className="font-semibold text-red-600">Vermelho</span> = endereço ·{' '}
+            <span className="font-semibold" style={{ color: '#2563eb' }}>
+              Azul
+            </span>{' '}
+            = ponto de entrega
           </p>
         </div>
       ) : null}
@@ -125,18 +157,32 @@ export function EnderecoGeolocalizacaoMap({
           fullscreenControl: false,
         }}
       >
+        {posicaoMarcador || posicaoReferencia ? (
+          <MapRecenter
+            position={posicaoMarcador ?? posicaoReferencia!}
+            zoom={LOCALIZADO_ZOOM}
+          />
+        ) : null}
+        {exibirReferenciaFixa && posicaoReferencia ? (
+          <Marker
+            position={posicaoReferencia}
+            draggable={false}
+            title="Endereço"
+            zIndex={1}
+          />
+        ) : null}
         {posicaoMarcador ? (
-          <>
-            <MapRecenter position={posicaoMarcador} zoom={LOCALIZADO_ZOOM} />
-            <Marker
-              position={posicaoMarcador}
-              draggable={!disabled}
-              onDragEnd={event => {
-                if (!event.latLng) return
-                handlePositionChange(event.latLng.lat(), event.latLng.lng())
-              }}
-            />
-          </>
+          <Marker
+            position={posicaoMarcador}
+            draggable={!disabled}
+            icon={modoPreferencia ? iconePinPreferencia : undefined}
+            title={modoPreferencia ? labelPinPreferenciaMapa() : 'Localização do endereço'}
+            zIndex={2}
+            onDragEnd={event => {
+              if (!event.latLng) return
+              handlePositionChange(event.latLng.lat(), event.latLng.lng())
+            }}
+          />
         ) : null}
       </GoogleMap>
     </div>
