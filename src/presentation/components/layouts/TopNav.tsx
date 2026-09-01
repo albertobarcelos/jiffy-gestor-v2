@@ -27,7 +27,6 @@ import {
   MdPercent,
   MdAnalytics,
   MdMenuBook,
-  MdDesktopWindows,
 } from 'react-icons/md'
 import type { IconType } from 'react-icons'
 import { useAcessoFiscal } from '@/src/presentation/hooks/useAcessoFiscal'
@@ -216,7 +215,6 @@ export function TopNav() {
         icon: MdPointOfSale,
         children: [
           { name: 'Pedidos e Clientes', path: '/pedidos', icon: MdReceipt },
-          { name: 'Abrir no Windows', path: '/pedidos/abrir-windows', icon: MdDesktopWindows },
           { name: 'Mesas Abertas', path: '/vendas/abertas', icon: MdTableBar },
           { name: 'Relatório de Vendas', path: '/relatorios-vendas', icon: MdAssessment },
           { name: 'Relatório de Produtos', path: '/relatorios-produtos-vendidos', icon: MdAnalytics },

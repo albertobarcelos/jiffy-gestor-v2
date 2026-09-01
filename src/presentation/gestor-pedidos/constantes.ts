@@ -23,19 +23,22 @@ export const STORAGE_KANBAN_BUSCA_FLOW = 'jiffy.flow.kanban.busca'
 /** Período do quadro ao voltar de «Pedidos do cliente» (`todos`). */
 export const STORAGE_KANBAN_PERIODO_FLOW = 'jiffy.flow.kanban.periodo'
 
-/** Página do menu: tenta o protocolo e oferece o instalador. */
+/** Rota do protocolo Windows (`gestor-pedidos://`). O download do Fredy está no modal de impressão. */
 export const PEDIDOS_ABRIR_WINDOWS_PATH = '/pedidos/abrir-windows'
 
-/** Protocolo que o Jiffy Flow regista. Não muda com o nome do produto. */
+/** Protocolo que o Fredy regista. Não muda com o nome do produto. */
 export const PEDIDOS_WINDOWS_PROTOCOLO = 'gestor-pedidos://open'
 
 /** `/pedidos?gestor` esconde o TopNav (dev no browser). No .exe a marca é o User-Agent. */
 export const QUERY_GESTOR = 'gestor'
 
 /**
- * Marca do Jiffy Flow no User-Agent do WebView. O Chrome da loja nunca tem isto.
- * Espelhado em `apps/jiffy-flow` (`JiffyFlow/` na janela principal).
+ * Marca do Fredy no User-Agent do WebView. O Chrome da loja nunca tem isto.
+ * Espelhado em `apps/jiffy-flow` (`Fredy/` na janela principal).
  */
+export const TOKEN_USER_AGENT_FREDY = 'Fredy/'
+
+/** User-Agent do casco antigo. O Gestor ainda reconhece para não partir instalações velhas. */
 export const TOKEN_USER_AGENT_JIFFY_FLOW = 'JiffyFlow/'
 
 /** Override local (DevTools). Não é persistência de negócio. */

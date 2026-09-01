@@ -47,16 +47,16 @@ pub fn run() {
             }
 
             let url = quadro_url::url_do_quadro();
-            eprintln!("Jiffy Flow a abrir {url}");
+            eprintln!("Fredy a abrir {url}");
             let parsed: url::Url = url.parse().expect("GESTOR_PEDIDOS_URL inválida");
             WebviewWindowBuilder::new(app, "main", WebviewUrl::External(parsed))
-                .title("Pedidos")
+                .title("Fredy")
                 .maximized(true)
                 .resizable(true)
                 .decorations(true)
                 .user_agent(concat!(
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ",
-                    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 JiffyFlow/0.1.1"
+                    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Fredy/0.1.1 JiffyFlow/0.1.1"
                 ))
                 .initialization_script(
                     "Object.defineProperty(window,'__JIFFY_FLOW_KIOSK__',{value:true,enumerable:true});",
@@ -64,9 +64,9 @@ pub fn run() {
                 .build()?;
 
             if let Err(err) = bolha::abrir(app.handle()) {
-                eprintln!("Jiffy Flow: bolha não criou ({err})");
+                eprintln!("Fredy: bolha não criou ({err})");
             } else {
-                eprintln!("Jiffy Flow: bolha criada (oculta até minimizar)");
+                eprintln!("Fredy: bolha criada (oculta até minimizar)");
             }
 
             let handle = app.handle().clone();
@@ -78,5 +78,5 @@ pub fn run() {
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("erro ao iniciar o Jiffy Flow");
+        .expect("erro ao iniciar o Fredy");
 }

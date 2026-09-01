@@ -18,11 +18,12 @@ import {
   parseEmpresaSlugFromSearch,
   stripEmpresaSlugFromSearch,
 } from '@/src/shared/utils/gestaoRoutes'
-import { PEDIDOS_PATH, QUERY_GESTOR, TOKEN_USER_AGENT_JIFFY_FLOW } from '@/src/presentation/gestor-pedidos/constantes'
+import { PEDIDOS_PATH, QUERY_GESTOR, TOKEN_USER_AGENT_FREDY, TOKEN_USER_AGENT_JIFFY_FLOW } from '@/src/presentation/gestor-pedidos/constantes'
 import { isRotaPermitidaNoJiffyFlow } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
 
 function pedidoVeioDoAppJiffyFlow(request: NextRequest): boolean {
-  return (request.headers.get('user-agent') ?? '').includes(TOKEN_USER_AGENT_JIFFY_FLOW)
+  const ua = request.headers.get('user-agent') ?? ''
+  return ua.includes(TOKEN_USER_AGENT_FREDY) || ua.includes(TOKEN_USER_AGENT_JIFFY_FLOW)
 }
 
 function urlListaEmpresasFlow(request: NextRequest): URL {

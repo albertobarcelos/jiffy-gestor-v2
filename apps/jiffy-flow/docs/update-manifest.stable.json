@@ -4,8 +4,8 @@
     "latest":  {
                    "version":  "0.1.1",
                    "minAgentVersion":  "0.1.0",
-                   "url":  "https://pub-143026e1401641a5ad59a389410eed2a.r2.dev/releases/0.1.1/jiffy-flow.exe",
-                   "sha256":  "e56a0a53b56fd24b64c34042d78d80081e9bcd120559f3afbafb56859c2a5df5",
-                   "notes":  "Jiffy Flow 0.1.1 - quadro de pedidos (app.jiffy.run)"
+                   "url":  "https://pub-143026e1401641a5ad59a389410eed2a.r2.dev/releases/0.1.1/Fredy.exe",
+                   "sha256":  "a61d041b79044d83c13d613de63a688783388167849b49dd8cd97aba75a6c39f",
+                   "notes":  "Fredy 0.1.1 - gestor de pedidos (app.jiffy.run)"
                }
 }

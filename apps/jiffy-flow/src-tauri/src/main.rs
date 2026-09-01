@@ -1,4 +1,4 @@
-// Sem consola/CMD no Windows (debug e release). O quadro corre na janela Pedidos.
+// Sem consola/CMD no Windows (debug e release). O quadro corre na janela Fredy.
 #![windows_subsystem = "windows"]
 
 fn main() {

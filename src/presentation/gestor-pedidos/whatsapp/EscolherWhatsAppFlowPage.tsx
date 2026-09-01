@@ -89,7 +89,7 @@ export function EscolherWhatsAppFlowPage() {
         >
           {noFlow === false ? (
             <div className="flex h-full items-center justify-center px-6 text-center text-sm text-white/80">
-              O WhatsApp Web abre no Jiffy Flow (aplicativo Windows), não no browser.
+              O WhatsApp Web abre no Fredy (aplicativo Windows), não no browser.
             </div>
           ) : noFlow === true && (erroNative || !nativoOk) ? (
             <p className="pointer-events-none absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-white/70">

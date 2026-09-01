@@ -1,4 +1,4 @@
-# Gera o Setup NSIS e a arvore do bucket R2 `jiffy-flow`.
+# Gera o Setup NSIS do Fredy e a arvore local do bucket R2 `jiffy-flow`.
 #
 #   .\scripts\package-flow.ps1 -GestorUrl "https://app.jiffy.run"
 #   .\scripts\package-flow.ps1 -GestorUrl "https://app.jiffy.run" -R2PublicBase "https://pub-xxxx.r2.dev"
@@ -42,7 +42,7 @@ if ($r2Base) {
     $env:JIFFY_FLOW_R2_PUBLIC_BASE = $r2Base
 }
 
-Write-Host "=== Jiffy Flow $Version ==="
+Write-Host "=== Fredy $Version ==="
 Write-Host "Gestor gravado: $origem"
 if ($r2Base) {
     Write-Host "R2 publico:     $r2Base"
@@ -63,18 +63,21 @@ if (-not $setupSrc) {
 
 $dist = Join-Path $Root "dist"
 New-Item -ItemType Directory -Force -Path $dist | Out-Null
-$setupDest = Join-Path $dist "JiffyFlow-$Version-setup.exe"
-$setupStable = Join-Path $dist "JiffyFlow-setup.exe"
+$setupDest = Join-Path $dist "Fredy-$Version-setup.exe"
+$setupStable = Join-Path $dist "FredySetup.exe"
 Copy-Item -LiteralPath $setupSrc.FullName -Destination $setupDest -Force
 Copy-Item -LiteralPath $setupSrc.FullName -Destination $setupStable -Force
 
-$exeSrc = Join-Path $Root "src-tauri\target\release\jiffy-flow.exe"
+$exeSrc = Join-Path $Root "src-tauri\target\release\Fredy.exe"
+if (-not (Test-Path $exeSrc)) {
+    $exeSrc = Join-Path $Root "src-tauri\target\release\jiffy-flow.exe"
+}
 if (-not (Test-Path $exeSrc)) {
     $exeSrc = Get-ChildItem (Join-Path $Root "src-tauri\target\release") -Filter "*.exe" |
         Where-Object { $_.Name -notmatch "setup" } |
         Select-Object -First 1 -ExpandProperty FullName
 }
-$exeDest = Join-Path $dist "jiffy-flow.exe"
+$exeDest = Join-Path $dist "Fredy.exe"
 if ($exeSrc -and (Test-Path $exeSrc)) {
     Copy-Item -LiteralPath $exeSrc -Destination $exeDest -Force
 }
@@ -120,9 +123,9 @@ if (-not (Test-Path $exeDest)) {
 
 $hash = (Get-FileHash -LiteralPath $exeDest -Algorithm SHA256).Hash.ToLowerInvariant()
 $exeUrl = if ($r2Base) {
-    "$r2Base/releases/$Version/jiffy-flow.exe"
+    "$r2Base/releases/$Version/Fredy.exe"
 } else {
-    "DEFINIR_JIFFY_FLOW_R2_PUBLIC_BASE/releases/$Version/jiffy-flow.exe"
+    "DEFINIR_JIFFY_FLOW_R2_PUBLIC_BASE/releases/$Version/Fredy.exe"
 }
 
 $manifest = [ordered]@{
@@ -133,7 +136,7 @@ $manifest = [ordered]@{
         minAgentVersion = "0.1.0"
         url             = $exeUrl
         sha256          = $hash
-        notes           = "Jiffy Flow $Version - quadro de pedidos (app.jiffy.run)"
+        notes           = "Fredy $Version - gestor de pedidos (app.jiffy.run)"
     }
 }
 $manifestJson = $manifest | ConvertTo-Json -Depth 5
@@ -148,15 +151,15 @@ New-Item -ItemType Directory -Force -Path $brandDir, $stableDir, $releaseDir | O
 
 Copy-Item -LiteralPath (Join-Path $Root "brand\logo.png") -Destination (Join-Path $brandDir "logo.png") -Force
 Copy-Item -LiteralPath (Join-Path $Root "brand\icon.png") -Destination (Join-Path $brandDir "icon.png") -Force
-Copy-Item -LiteralPath $setupStable -Destination (Join-Path $stableDir "JiffyFlow-setup.exe") -Force
+Copy-Item -LiteralPath $setupStable -Destination (Join-Path $stableDir "FredySetup.exe") -Force
 Copy-Item -LiteralPath $manifestPath -Destination (Join-Path $stableDir "update-manifest.stable.json") -Force
-Copy-Item -LiteralPath $exeDest -Destination (Join-Path $releaseDir "jiffy-flow.exe") -Force
+Copy-Item -LiteralPath $exeDest -Destination (Join-Path $releaseDir "Fredy.exe") -Force
 
 Write-Host "sha256 exe: $hash"
 Write-Host "ok"
 Write-Host "r2 tree: $r2"
 Write-Host "  brand/logo.png"
 Write-Host "  brand/icon.png"
-Write-Host "  stable/JiffyFlow-setup.exe"
+Write-Host "  stable/FredySetup.exe"
 Write-Host "  stable/update-manifest.stable.json"
-Write-Host "  releases/$Version/jiffy-flow.exe"
+Write-Host "  releases/$Version/Fredy.exe"

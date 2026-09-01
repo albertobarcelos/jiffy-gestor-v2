@@ -3,11 +3,13 @@ import {
   PEDIDOS_PATH,
   PEDIDOS_WHATSAPP_PATH,
   QUERY_GESTOR,
+  TOKEN_USER_AGENT_FREDY,
   TOKEN_USER_AGENT_JIFFY_FLOW,
 } from '../constantes'
 
 export function pedidoVeioDoAppJiffyFlow(userAgent: string | null | undefined): boolean {
-  return String(userAgent ?? '').includes(TOKEN_USER_AGENT_JIFFY_FLOW)
+  const ua = String(userAgent ?? '')
+  return ua.includes(TOKEN_USER_AGENT_FREDY) || ua.includes(TOKEN_USER_AGENT_JIFFY_FLOW)
 }
 
 export function estaNoAppJiffyFlow(): boolean {
