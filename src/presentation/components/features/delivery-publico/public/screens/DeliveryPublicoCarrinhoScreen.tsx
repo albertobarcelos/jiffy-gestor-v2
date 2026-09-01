@@ -38,6 +38,7 @@ import { DeliveryCheckoutEnderecoFormModal } from '../components/checkout/Delive
 import { DeliveryCheckoutEnderecoGeoModal } from '../components/checkout/DeliveryCheckoutEnderecoGeoModal'
 import type { EnderecoGeoCheckoutInput } from '@/src/application/dto/delivery-publico/EnderecoGeoCheckoutDTO'
 import { enderecoTemGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoDelivery'
+import { normalizarEnderecoGeocodeInput } from '@/src/shared/utils/normalizarTextoEnderecoPublico'
 import type { ModoEntregaOpcao } from '../components/checkout/DeliveryCheckoutTipoEntregaOpcoes'
 import { DeliveryCheckoutPagamentoModal } from '../components/checkout/DeliveryCheckoutPagamentoModal'
 import { DeliveryCheckoutRevisaoModal } from '../components/checkout/DeliveryCheckoutRevisaoModal'
@@ -86,9 +87,9 @@ export function DeliveryPublicoCarrinhoScreen({
     cotacao: CotacaoPedidoPublicoDTO
   } | null>(null)
   /** De onde o formulário de endereço foi aberto (volta correta ao cancelar). */
-  const [origemFormEndereco, setOrigemFormEndereco] = useState<'geo' | 'lista' | 'novo' | null>(
-    null
-  )
+  const [origemFormEndereco, setOrigemFormEndereco] = useState<
+    'geo' | 'lista' | 'novo' | 'identificacao' | null
+  >(null)
 
   const requestClose = () => setAberto(false)
 
@@ -476,6 +477,58 @@ export function DeliveryPublicoCarrinhoScreen({
     goToCheckoutStep('enderecoForm')
   }
 
+  const handleEditarEnderecoSelecionado = (
+    origem: 'identificacao' | 'revisao' = 'identificacao'
+  ) => {
+    if (!enderecoClienteSelecionado) {
+      handleTrocarEndereco(origem)
+      return
+    }
+    if (origem === 'revisao') {
+      setVoltarParaRevisao(true)
+      setVoltarParaIdentificacao(false)
+    } else {
+      setVoltarParaIdentificacao(true)
+      setVoltarParaRevisao(false)
+    }
+    setOrigemFormEndereco('identificacao')
+    preencherFormParaEditarEndereco(enderecoClienteSelecionado)
+    goToCheckoutStep('enderecoForm')
+  }
+
+  const handleTrocarEndereco = (origem: 'identificacao' | 'revisao' = 'identificacao') => {
+    if (origem === 'revisao') {
+      setVoltarParaRevisao(true)
+      setVoltarParaIdentificacao(false)
+    } else {
+      setVoltarParaIdentificacao(true)
+      setVoltarParaRevisao(false)
+    }
+    const enderecos = clienteLookup.cliente?.enderecos ?? []
+    if (enderecos.length > 0) {
+      goToCheckoutStep('enderecos')
+      return
+    }
+    setOrigemFormEndereco(origem === 'identificacao' ? 'identificacao' : 'novo')
+    usarNovoEndereco()
+    goToCheckoutStep('enderecoForm')
+  }
+
+  const handleNovoEnderecoDesdeIdentificacao = (
+    origem: 'identificacao' | 'revisao' = 'identificacao'
+  ) => {
+    if (origem === 'revisao') {
+      setVoltarParaRevisao(true)
+      setVoltarParaIdentificacao(false)
+    } else {
+      setVoltarParaIdentificacao(true)
+      setVoltarParaRevisao(false)
+    }
+    setOrigemFormEndereco(origem === 'identificacao' ? 'identificacao' : 'novo')
+    usarNovoEndereco()
+    goToCheckoutStep('enderecoForm')
+  }
+
   const handleEditarEnderecoDesdeGeo = () => {
     if (!enderecoClienteSelecionado) return
     setOrigemFormEndereco('geo')
@@ -547,15 +600,29 @@ export function DeliveryPublicoCarrinhoScreen({
     goToCheckoutStep('revisao')
   }
 
-  const handleAlterarEndereco = (origem: 'identificacao' | 'revisao' = 'identificacao') => {
-    if (origem === 'revisao') {
-      setVoltarParaRevisao(true)
-      setVoltarParaIdentificacao(false)
-    } else {
-      setVoltarParaIdentificacao(true)
-      setVoltarParaRevisao(false)
+  const handleCancelarEnderecoForm = () => {
+    if (origemFormEndereco === 'geo' && form.enderecoIdSelecionado.trim()) {
+      setOrigemFormEndereco(null)
+      goToCheckoutStep('enderecoGeo')
+      return
     }
-    abrirFluxoEndereco()
+    const origem = origemFormEndereco
+    setOrigemFormEndereco(null)
+    if (origem === 'identificacao' || voltarParaIdentificacao) {
+      setVoltarParaIdentificacao(false)
+      goToCheckoutStep('telefone')
+      return
+    }
+    if (voltarParaRevisao) {
+      goToCheckoutStep('revisao')
+      return
+    }
+    const enderecos = clienteLookup.cliente?.enderecos ?? []
+    if (enderecos.length > 0) {
+      goToCheckoutStep('enderecos')
+      return
+    }
+    goToCheckoutStep('telefone')
   }
 
   const handleChangeOpcaoEntrega = (opcao: ModoEntregaOpcao) => {
@@ -585,7 +652,7 @@ export function DeliveryPublicoCarrinhoScreen({
       await confirmarGeoEnderecoExistente({
         ...geo,
         modoAjustePin: 'atualizar_endereco',
-        enderecoRevertido: {
+        enderecoRevertido: normalizarEnderecoGeocodeInput({
           rua: form.rua,
           numero: form.numero,
           bairro: form.bairro,
@@ -593,7 +660,7 @@ export function DeliveryPublicoCarrinhoScreen({
           estado: form.estado,
           cep: form.cep,
           complemento: form.complemento,
-        },
+        }),
       })
     } else {
       await confirmarNovoEndereco(geo)
@@ -626,22 +693,6 @@ export function DeliveryPublicoCarrinhoScreen({
       return
     }
     fecharOuRevisao()
-  }
-
-  const handleCancelarEnderecoForm = () => {
-    if (origemFormEndereco === 'geo' && form.enderecoIdSelecionado.trim()) {
-      setOrigemFormEndereco(null)
-      goToCheckoutStep('enderecoGeo')
-      return
-    }
-    setOrigemFormEndereco(null)
-    const enderecos = clienteLookup.cliente?.enderecos ?? []
-    if (enderecos.length > 0) {
-      goToCheckoutStep('enderecos')
-      return
-    }
-    setVoltarParaIdentificacao(false)
-    goToCheckoutStep('telefone')
   }
 
   return (
@@ -830,6 +881,7 @@ export function DeliveryPublicoCarrinhoScreen({
             modoTempo={form.modoTempo}
             enderecoCliente={enderecoClienteSelecionado}
             temEnderecosCadastrados={(clienteLookup.cliente?.enderecos?.length ?? 0) > 0}
+            quantidadeEnderecos={clienteLookup.cliente?.enderecos?.length ?? 0}
             enderecoEmpresaTexto={enderecoEmpresaTexto}
             taxaEntregaOficial={taxaEntregaOficial}
             cotacaoLoading={cotacaoLoading}
@@ -839,8 +891,9 @@ export function DeliveryPublicoCarrinhoScreen({
             onConsultarTelefone={consultarTelefoneAtual}
             onChangeNome={value => updateForm('nome', value)}
             onChangeOpcaoEntrega={handleChangeOpcaoEntrega}
-            onEditarEndereco={() => handleAlterarEndereco('identificacao')}
-            onCadastrarEndereco={() => handleAlterarEndereco('identificacao')}
+            onEditarEndereco={() => handleEditarEnderecoSelecionado('identificacao')}
+            onTrocarEndereco={() => handleTrocarEndereco('identificacao')}
+            onCadastrarEndereco={() => handleNovoEnderecoDesdeIdentificacao('identificacao')}
             onSalvarNome={salvarNomeCliente}
             onLimparIdentificacao={limparIdentificacaoCliente}
             onClose={fecharOuRevisao}
@@ -928,7 +981,7 @@ export function DeliveryPublicoCarrinhoScreen({
             }}
             onEditarTipoEntrega={() => abrirStepDaRevisao('telefone')}
             onEditarCliente={() => abrirStepDaRevisao('telefone')}
-            onEditarEndereco={() => handleAlterarEndereco('revisao')}
+            onEditarEndereco={() => handleEditarEnderecoSelecionado('revisao')}
             onEditarPedido={() => {
               setVoltarParaRevisao(false)
               setVoltarParaIdentificacao(false)

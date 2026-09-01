@@ -21,6 +21,10 @@ import {
 import { usePublicDeliveryMeiosPagamento } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import { showToast } from '@/src/shared/utils/toast'
 import {
+  normalizarEnderecoFormPublico,
+  normalizarEnderecoGeocodeInput,
+} from '@/src/shared/utils/normalizarTextoEnderecoPublico'
+import {
   comporTelefoneApi,
   formatarTelefonePorPais,
 } from '@/src/shared/utils/deliveryTelefonePais'
@@ -452,12 +456,23 @@ export function useDeliveryCheckout(slug: string) {
 
   const usarNovoEndereco = useCallback(() => {
     preferirNovoEnderecoRef.current = true
+    limparCotacao()
     setForm(prev => ({
       ...prev,
       modoEndereco: 'novo',
       enderecoIdSelecionado: '',
+      rua: '',
+      numero: '',
+      bairro: '',
+      cidade: '',
+      estado: '',
+      cep: '',
+      complemento: '',
+      pontoReferencia: '',
+      etiquetaEndereco: 'casa',
+      apelidoEndereco: 'Casa',
     }))
-  }, [])
+  }, [limparCotacao])
 
   /** Prefill do formulário para editar um endereço já cadastrado (ex.: a partir do modal de geo). */
   const preencherFormParaEditarEndereco = useCallback(
@@ -478,10 +493,7 @@ export function useDeliveryCheckout(slug: string) {
         endereco.etiqueta === 'trabalho' || endereco.etiqueta === 'outro'
           ? endereco.etiqueta
           : 'casa'
-      setForm(prev => ({
-        ...prev,
-        modoEndereco: 'existente',
-        enderecoIdSelecionado: endereco.id,
+      const normalizado = normalizarEnderecoGeocodeInput({
         rua: endereco.rua ?? '',
         numero: endereco.numero ?? '',
         bairro: endereco.bairro ?? '',
@@ -489,6 +501,18 @@ export function useDeliveryCheckout(slug: string) {
         estado: endereco.estado ?? '',
         cep: endereco.cep ?? '',
         complemento: endereco.complemento ?? '',
+      })
+      setForm(prev => ({
+        ...prev,
+        modoEndereco: 'existente',
+        enderecoIdSelecionado: endereco.id,
+        rua: normalizado.rua,
+        numero: normalizado.numero,
+        bairro: normalizado.bairro ?? '',
+        cidade: normalizado.cidade ?? '',
+        estado: normalizado.estado ?? '',
+        cep: normalizado.cep ?? '',
+        complemento: normalizado.complemento ?? '',
         etiquetaEndereco: etiqueta,
         apelidoEndereco:
           etiqueta === 'trabalho' ? 'Trabalho' : etiqueta === 'outro' ? 'Outro' : 'Casa',
@@ -597,17 +621,21 @@ export function useDeliveryCheckout(slug: string) {
     setForm(prev => ({ ...prev, nome: cliente.nome?.trim() || nome }))
   }, [])
 
-  const montarEnderecoNovoForm = useCallback((f: CheckoutFormData) => ({
-    rua: f.rua,
-    numero: f.numero,
-    bairro: f.bairro,
-    cidade: f.cidade,
-    estado: f.estado,
-    cep: f.cep,
-    complemento: f.complemento,
-    pontoReferencia: f.pontoReferencia,
-    etiqueta: f.etiquetaEndereco,
-  }), [])
+  const montarEnderecoNovoForm = useCallback(
+    (f: CheckoutFormData) =>
+      normalizarEnderecoFormPublico({
+        rua: f.rua,
+        numero: f.numero,
+        bairro: f.bairro,
+        cidade: f.cidade,
+        estado: f.estado,
+        cep: f.cep,
+        complemento: f.complemento,
+        pontoReferencia: f.pontoReferencia,
+        etiqueta: f.etiquetaEndereco,
+      }),
+    []
+  )
 
   const confirmarNovoEndereco = useCallback(
     async (geo: EnderecoGeoCheckoutInput): Promise<string> => {

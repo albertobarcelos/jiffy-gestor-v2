@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { MapPin, Search, X } from 'lucide-react'
+import { useLocaleUppercaseInputHandler } from '@/src/presentation/hooks/useLocaleUppercaseInputHandler'
 import {
   buscarPlaceDetails,
   buscarPlacesAutocomplete,
@@ -11,6 +12,7 @@ import {
   type PlacesBias,
 } from '@/src/shared/utils/geolocalizacaoPlaces'
 import { cn } from '@/src/shared/utils/cn'
+import { maiusculasEnderecoInput } from '@/src/shared/utils/normalizarTextoEnderecoPublico'
 
 export type EnderecoPlacesAutocompleteVariant = 'delivery' | 'gestor'
 
@@ -134,14 +136,24 @@ export function EnderecoPlacesAutocomplete({
     [bias]
   )
 
-  const handleInputChange = (next: string) => {
-    onChange(next)
-    if (skipNextSearchRef.current) {
-      skipNextSearchRef.current = false
-      return
-    }
-    dispararBusca(next)
-  }
+  const delivery = variant === 'delivery'
+  const busy = loading || loadingDetails
+  const podeLimpar = value.trim().length > 0 && !disabled && !loadingDetails
+
+  const propagarValorInput = useCallback(
+    (next: string) => {
+      onChange(next)
+      if (skipNextSearchRef.current) {
+        skipNextSearchRef.current = false
+        return
+      }
+      dispararBusca(next)
+    },
+    [onChange, dispararBusca]
+  )
+
+  const { inputRef: uppercaseInputRef, handleChange: handleUppercaseChange } =
+    useLocaleUppercaseInputHandler(value, propagarValorInput)
 
   const limparBusca = () => {
     if (disabled || loadingDetails) return
@@ -167,10 +179,11 @@ export function EnderecoPlacesAutocomplete({
       })
       sessionTokenRef.current = criarSessionTokenPlaces()
       skipNextSearchRef.current = true
-      const texto =
+      const textoBruto =
         [details.rua, details.numero].filter(Boolean).join(', ') ||
         details.enderecoFormatado ||
         prediction.descricao
+      const texto = delivery ? maiusculasEnderecoInput(textoBruto) : textoBruto
       onChange(texto)
       onSelect(details)
       setPredictions([])
@@ -209,10 +222,6 @@ export function EnderecoPlacesAutocomplete({
     }
   }
 
-  const delivery = variant === 'delivery'
-  const busy = loading || loadingDetails
-  const podeLimpar = value.trim().length > 0 && !disabled && !loadingDetails
-
   return (
     <div ref={rootRef} className={cn('relative', className)}>
       <label className={cn('relative block', floatingLabel ? '' : 'space-y-1')}>
@@ -239,6 +248,7 @@ export function EnderecoPlacesAutocomplete({
           <input
             type="text"
             role="combobox"
+            ref={delivery ? uppercaseInputRef : undefined}
             aria-expanded={aberto}
             aria-controls={listId}
             aria-autocomplete="list"
@@ -250,7 +260,9 @@ export function EnderecoPlacesAutocomplete({
             disabled={disabled || loadingDetails}
             placeholder={placeholder}
             value={value}
-            onChange={e => handleInputChange(e.target.value)}
+            onChange={
+              delivery ? handleUppercaseChange : event => propagarValorInput(event.target.value)
+            }
             onFocus={() => {
               if (predictions.length > 0) setAberto(true)
             }}

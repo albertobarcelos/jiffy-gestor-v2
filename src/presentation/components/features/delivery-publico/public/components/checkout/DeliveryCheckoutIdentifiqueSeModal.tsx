@@ -41,6 +41,7 @@ type DeliveryCheckoutIdentifiqueSeModalProps = {
   modoTempo: 'imediato' | 'agendado'
   enderecoCliente: EnderecoClienteDeliveryPublicoDTO | null
   temEnderecosCadastrados: boolean
+  quantidadeEnderecos?: number
   enderecoEmpresaTexto: string | null
   taxaEntregaOficial?: number | null
   cotacaoLoading?: boolean
@@ -52,6 +53,7 @@ type DeliveryCheckoutIdentifiqueSeModalProps = {
   onChangeNome: (value: string) => void
   onChangeOpcaoEntrega: (opcao: ModoEntregaOpcao) => void
   onEditarEndereco: () => void
+  onTrocarEndereco: () => void
   onCadastrarEndereco: () => void
   onSalvarNome: (nome: string) => Promise<void>
   /** Remove cliente/lookup e reabre o input para buscar outro número. */
@@ -71,6 +73,7 @@ export function DeliveryCheckoutIdentifiqueSeModal({
   modoTempo,
   enderecoCliente,
   temEnderecosCadastrados,
+  quantidadeEnderecos = 0,
   enderecoEmpresaTexto,
   taxaEntregaOficial = null,
   cotacaoLoading = false,
@@ -80,6 +83,7 @@ export function DeliveryCheckoutIdentifiqueSeModal({
   onChangeNome,
   onChangeOpcaoEntrega,
   onEditarEndereco,
+  onTrocarEndereco,
   onCadastrarEndereco,
   onSalvarNome,
   onLimparIdentificacao,
@@ -430,12 +434,14 @@ export function DeliveryCheckoutIdentifiqueSeModal({
             modoTempo={modoTempo}
             enderecoCliente={enderecoCliente}
             temEnderecosCadastrados={temEnderecosCadastrados}
+            quantidadeEnderecos={quantidadeEnderecos}
             enderecoEmpresaTexto={enderecoEmpresaTexto}
             taxaEntregaOficial={taxaEntregaOficial}
             cotacaoLoading={cotacaoLoading}
             cotacaoPronta={cotacaoPronta}
             onChangeOpcao={onChangeOpcaoEntrega}
             onEditarEndereco={onEditarEndereco}
+            onTrocarEndereco={onTrocarEndereco}
             onCadastrarEndereco={onCadastrarEndereco}
           />
         ) : null}

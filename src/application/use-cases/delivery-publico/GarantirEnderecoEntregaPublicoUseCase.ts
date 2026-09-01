@@ -17,6 +17,8 @@ import {
   enderecoTemGeolocalizacao,
   montarPayloadGeoEnderecoDelivery,
 } from '@/src/shared/utils/geolocalizacaoEnderecoDelivery'
+import { normalizarEnderecoFormPublico, normalizarEnderecoGeocodeInput } from '@/src/shared/utils/normalizarTextoEnderecoPublico'
+import { toLocaleUppercasePt } from '@/src/shared/utils/localeUppercase'
 import {
   mesclarEnderecoComReverseGeocode,
   normalizarCepEndereco,
@@ -74,16 +76,28 @@ function montarTextoEnderecoPayload(
   const complementoParts = [base.complemento?.trim(), pontoReferencia?.trim()]
     .filter(Boolean)
     .join(' | ')
+  const complementoSalvo =
+    complementoParts.length > 0 ? toLocaleUppercasePt(complementoParts) : ''
 
-  return {
-    etiqueta,
+  const textoNormalizado = normalizarEnderecoGeocodeInput({
     rua: base.rua.trim(),
     numero: base.numero.trim(),
     bairro: (base.bairro ?? '').trim(),
-    cidade: (base.cidade ?? '').trim() || null,
-    estado: estado || null,
+    cidade: (base.cidade ?? '').trim(),
+    estado,
+    cep: base.cep ?? '',
+    complemento: base.complemento?.trim() ?? '',
+  })
+
+  return {
+    etiqueta,
+    rua: textoNormalizado.rua,
+    numero: textoNormalizado.numero,
+    bairro: textoNormalizado.bairro ?? '',
+    cidade: textoNormalizado.cidade || null,
+    estado: textoNormalizado.estado || null,
     ...(cep.length === 8 ? { cep } : {}),
-    ...(complementoParts.length > 0 ? { complemento: complementoParts } : {}),
+    ...(complementoSalvo ? { complemento: complementoSalvo } : {}),
   }
 }
 
@@ -95,28 +109,35 @@ async function resolverGeoParaPersistencia(
   }
 
   if (geo.enderecoRevertido?.rua?.trim()) {
-    return geo
+    return {
+      ...geo,
+      enderecoRevertido: normalizarEnderecoGeocodeInput(geo.enderecoRevertido),
+    }
   }
 
   const [lng, lat] = geo.pinPosition.coordinates
   const enderecoRevertido = await resolverEnderecoPorCoordenadas(lat, lng)
-  return { ...geo, enderecoRevertido }
+  return { ...geo, enderecoRevertido: normalizarEnderecoGeocodeInput(enderecoRevertido) }
 }
 
 function montarEnderecoPayload(
   form: EnderecoFormPublico,
   geo?: EnderecoGeoCheckoutInput | null
 ): EnderecoDeliveryPublicoInput {
-  let textoBase = enderecoFormParaGeocodeInput(form)
+  const formNormalizado = normalizarEnderecoFormPublico(form)
+  let textoBase = enderecoFormParaGeocodeInput(formNormalizado)
 
   if (geo?.modoAjustePin === 'atualizar_endereco' && geo.enderecoRevertido) {
-    textoBase = mesclarEnderecoComReverseGeocode(textoBase, geo.enderecoRevertido)
+    textoBase = mesclarEnderecoComReverseGeocode(
+      textoBase,
+      normalizarEnderecoGeocodeInput(geo.enderecoRevertido)
+    )
   }
 
   const base = montarTextoEnderecoPayload(
     textoBase,
-    form.etiqueta ?? 'casa',
-    form.pontoReferencia
+    formNormalizado.etiqueta ?? 'casa',
+    formNormalizado.pontoReferencia
   )
 
   if (!geo?.enderecoLocalizacao || !geo.pinPosition) {
