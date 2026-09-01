@@ -9,7 +9,7 @@ import {
 } from '@/src/shared/types/geoJsonPoint'
 import { getGoogleMapsApiKeyClient } from '@/src/shared/utils/googleMapsClient'
 
-const MAP_CONTAINER_STYLE = { width: '100%', height: '320px' }
+const MAP_CONTAINER_STYLE = { width: '100%', height: '400px' }
 
 /** Visão inicial do MT — evita sugerir Cuiabá antes da busca. */
 const FALLBACK_CENTER = { lat: -12.6819, lng: -56.9211 }
@@ -81,7 +81,7 @@ export function EmpresaGeolocalizacaoMap({
   }
 
   if (!isLoaded) {
-    return <div className="h-[320px] animate-pulse rounded-lg bg-gray-100" aria-hidden />
+    return <div className="h-[400px] animate-pulse rounded-lg bg-gray-100" aria-hidden />
   }
 
   return (
@@ -90,7 +90,7 @@ export function EmpresaGeolocalizacaoMap({
         <div className="pointer-events-none absolute inset-x-0 top-2 z-10 flex justify-center px-3">
           <p className="rounded-lg bg-white/95 px-3 py-2 text-center text-xs text-secondary-text shadow-sm">
             O mapa ainda não foi posicionado. Clique em{' '}
-            <span className="font-semibold text-primary-text">Buscar pelo endereço (Google)</span>.
+            <span className="font-semibold text-primary-text">Buscar endereço no mapa</span>.
             {estado ? ` (${estado})` : ''}
           </p>
         </div>

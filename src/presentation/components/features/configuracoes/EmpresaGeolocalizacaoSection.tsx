@@ -1,13 +1,12 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { MdLocationOn, MdMyLocation } from 'react-icons/md'
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import {
   enderecoEmpresaGeocodeMinimo,
   geocodificarEnderecoEmpresaViaGoogle,
-  montarEnderecoParaGeocode,
   type EnderecoEmpresaGeocodeInput,
 } from '@/src/shared/utils/geolocalizacaoEmpresa'
 import { showToast } from '@/src/shared/utils/toast'
@@ -19,7 +18,7 @@ const EmpresaGeolocalizacaoMap = dynamic(
     })),
   {
     ssr: false,
-    loading: () => <div className="h-[320px] animate-pulse rounded-lg bg-gray-100" aria-hidden />,
+    loading: () => <div className="h-[400px] animate-pulse rounded-lg bg-gray-100" aria-hidden />,
   }
 )
 
@@ -44,7 +43,6 @@ export function EmpresaGeolocalizacaoSection({
   const [buscandoGeocode, setBuscandoGeocode] = useState(false)
   const [ultimoEnderecoFormatado, setUltimoEnderecoFormatado] = useState<string | null>(null)
   const configurada = Boolean(localizacao)
-  const enderecoConsulta = useMemo(() => montarEnderecoParaGeocode(endereco), [endereco])
   const camposMinimosOk = enderecoEmpresaGeocodeMinimo(endereco)
   const podeBuscar = camposMinimosOk && !disabled
 
@@ -77,7 +75,7 @@ export function EmpresaGeolocalizacaoSection({
 
   return (
     <section id="geolocalizacao-empresa" className="scroll-mt-24">
-      <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-1 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h4 className="text-lg font-semibold text-primary">Localização no mapa</h4>
           <p className="text-xs text-secondary-text md:text-sm">
@@ -96,24 +94,12 @@ export function EmpresaGeolocalizacaoSection({
         </span>
       </div>
 
-      <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        {disabled ? (
-          <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-secondary-text">
-            Clique em <span className="font-semibold text-primary-text">Editar</span> para buscar a
-            localização pelo endereço cadastrado e salvar as coordenadas.
-          </p>
-        ) : null}
-
+      <div className="space-y-2 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
         {enderecoAlterado ? (
           <p className="rounded-lg border border-alternate/30 bg-alternate/10 px-3 py-2 text-sm text-alternate">
             O endereço textual foi alterado. Busque novamente no Google ou ajuste o pin antes de salvar.
           </p>
         ) : null}
-
-        <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-secondary-text">
-          <p className="font-semibold text-primary-text">Endereço que será enviado ao Google:</p>
-          <p className="mt-1 break-words">{enderecoConsulta || 'Preencha rua, número, cidade e estado.'}</p>
-        </div>
 
         <div className="flex flex-wrap gap-2">
           <button
@@ -123,7 +109,7 @@ export function EmpresaGeolocalizacaoSection({
             className="inline-flex h-9 items-center gap-2 rounded-lg border border-secondary px-3 text-sm font-semibold text-secondary transition-colors hover:bg-secondary/10 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <MdMyLocation className="h-4 w-4" aria-hidden />
-            {buscandoGeocode ? 'Buscando…' : 'Buscar pelo endereço (Google)'}
+            {buscandoGeocode ? 'Buscando…' : 'Buscar endereço no mapa'}
           </button>
         </div>
 

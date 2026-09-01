@@ -17,10 +17,6 @@ import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
 import { MenuItem } from '@mui/material'
 import { LogoImpressaoCropModal } from '../LogoImpressaoCropModal'
 import { MenuParametroEmpresaSelect } from '../MenuParametroEmpresaSelect'
-import {
-  LOGO_IMPRESSAO_HEIGHT,
-  LOGO_IMPRESSAO_WIDTH,
-} from '@/src/presentation/utils/logoImpressaoCrop'
 import { lerMenuIdDeParametroEmpresa } from '@/src/shared/utils/parametroEmpresaMenus'
 import { EmpresaGeolocalizacaoSection } from '../EmpresaGeolocalizacaoSection'
 import { EnderecoPlacesAutocomplete } from '@/src/presentation/components/shared/geolocalizacao/EnderecoPlacesAutocomplete'
@@ -65,6 +61,12 @@ const entradaCompactaSelect = {
 
 const sxEntradaEmpresa = {
   ...sxOutlinedLabelTextoEscuro,
+  marginTop: 0,
+  marginBottom: 0,
+  '& .MuiFormControl-root': {
+    marginTop: 0,
+    marginBottom: 0,
+  },
   '& .MuiOutlinedInput-root': {
     backgroundColor: 'transparent',
     borderRadius: '8px',
@@ -135,17 +137,24 @@ const FUSOS_IANA_BRASIL = [
 const MAX_LOGO_IMPRESSAO_BYTES = 1024 * 1024
 const LOGO_IMPRESSAO_ACCEPT = 'image/png,image/jpeg,image/webp'
 
-/** Moldura 280×150 — `object-contain` evita distorção; largura fixa no desktop. */
-function LogoImpressaoPreviewImage({ src, alt }: { src: string; alt: string }) {
+/** Pré-visualização — altura alinhada ao bloco de dados básicos (grid stretch no desktop). */
+function LogoImpressaoPreviewImage({
+  src,
+  alt,
+  className,
+}: {
+  src: string
+  alt: string
+  className?: string
+}) {
   return (
     <div
-      className="w-full overflow-hidden rounded-sm bg-white"
-      style={{ aspectRatio: `${LOGO_IMPRESSAO_WIDTH} / ${LOGO_IMPRESSAO_HEIGHT}` }}
+      className={`relative min-h-0 w-full flex-1 overflow-hidden rounded-sm bg-white max-h-[140px] lg:max-h-none ${className ?? ''}`}
     >
       <img
         src={src}
         alt={alt}
-        className="block h-full w-full object-contain object-center"
+        className="absolute inset-0 h-full w-full object-contain object-center"
         draggable={false}
       />
     </div>
@@ -951,7 +960,7 @@ export function EmpresaTab() {
         <div className="space-y-2 bg-info px-1 md:px-[18px]">
           {/* Dados Básicos + Logo (títulos na mesma linha em desktop) */}
           <div>
-            <div className="mb-2 flex flex-col gap-1 lg:flex-row lg:items-baseline lg:gap-4">
+            <div className="mb-1 flex flex-col gap-1 lg:flex-row lg:items-baseline lg:gap-4">
               <h4 className="min-w-0 flex-1 text-lg font-semibold text-primary">
                 Dados Básicos
               </h4>
@@ -961,8 +970,8 @@ export function EmpresaTab() {
                 Logo de impressão
               </h4>
             </div>
-            <div className="flex flex-col gap-7 lg:flex-row lg:items-start">
-              <div className="min-w-0 flex-1 space-y-7">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-stretch">
+              <div className="min-w-0 space-y-4">
                 <UppercaseLocaleInput
                   label="CNPJ"
                   value={cnpj}
@@ -971,7 +980,7 @@ export function EmpresaTab() {
                   size="small"
                   sx={sxEntradaEmpresa}
                 />
-                <div className="grid grid-cols-1 gap-7 md:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                   <UppercaseLocaleInput
                     label="Razão Social"
                     value={razaoSocial}
@@ -1008,7 +1017,7 @@ export function EmpresaTab() {
                 </div>
               </div>
 
-              <div className={LOGO_COLUNA_LARGURA_CLASS}>
+              <div className={`${LOGO_COLUNA_LARGURA_CLASS} flex min-h-0 flex-col`}>
                 <input
                   ref={logoFileInputRef}
                   type="file"
@@ -1040,10 +1049,10 @@ export function EmpresaTab() {
                     setLogoDragActive(false)
                     handleLogoFileInput(e.dataTransfer.files)
                   }}
-                  className={`relative flex w-full flex-col overflow-hidden rounded-lg border-2 border-dashed transition-colors ${
+                  className={`relative flex h-full min-h-[132px] flex-col overflow-hidden rounded-lg border-2 border-dashed transition-colors ${
                     pendingLogoPreviewUrl || serverLogoObjectUrl
                       ? 'p-1.5'
-                      : 'min-h-[150px]'
+                      : ''
                   } ${
                     logoDragActive
                       ? 'border-primary bg-primary/10'
@@ -1051,8 +1060,8 @@ export function EmpresaTab() {
                   } ${logoBusy ? 'pointer-events-none opacity-60' : ''}`}
                 >
                   {pendingLogoPreviewUrl ? (
-                    <div className="relative flex w-full flex-col gap-1">
-                      <div className="relative w-full">
+                    <div className="relative flex min-h-0 flex-1 flex-col gap-1">
+                      <div className="relative flex min-h-0 flex-1 flex-col">
                         <button
                           type="button"
                           title="Descartar alteração"
@@ -1070,7 +1079,7 @@ export function EmpresaTab() {
                           alt="Pré-visualização da logo de impressão"
                         />
                       </div>
-                      <div className="flex flex-wrap items-center justify-center gap-1 mt-2">
+                      <div className="flex shrink-0 flex-wrap items-center justify-center gap-1">
                         <button
                           type="button"
                           onClick={e => {
@@ -1149,8 +1158,8 @@ export function EmpresaTab() {
                       </div>
                     </div>
                   ) : serverLogoObjectUrl ? (
-                    <div className="relative flex w-full flex-col gap-1">
-                      <div className="relative w-full">
+                    <div className="relative flex min-h-0 flex-1 flex-col gap-1">
+                      <div className="relative flex min-h-0 flex-1 flex-col">
                         <button
                           type="button"
                           title="Remover logo de impressão"
@@ -1168,7 +1177,7 @@ export function EmpresaTab() {
                           alt="Logo de impressão atual"
                         />
                       </div>
-                      <div className="flex flex-wrap items-center justify-center gap-1">
+                      <div className="flex shrink-0 flex-wrap items-center justify-center gap-1">
                         <button
                           type="button"
                           onClick={e => {
@@ -1196,7 +1205,7 @@ export function EmpresaTab() {
                         if (logoBusy) return
                         logoFileInputRef.current?.click()
                       }}
-                      className={`flex min-h-[150px] cursor-pointer flex-col items-center justify-center gap-1 px-2 py-3 text-center hover:border-primary/50 ${
+                      className={`flex min-h-0 flex-1 cursor-pointer flex-col items-center justify-center gap-1 px-2 py-2 text-center hover:border-primary/50 ${
                         logoBusy ? 'pointer-events-none cursor-not-allowed' : ''
                       }`}
                     >
@@ -1217,8 +1226,8 @@ export function EmpresaTab() {
 
           {/* Endereço */}
           <div>
-            <h4 className="mb-2 text-lg font-semibold text-primary">Endereço</h4>
-            <div className="space-y-6">
+            <h4 className="mb-1 text-lg font-semibold text-primary">Endereço</h4>
+            <div className="space-y-3">
               {isEditing ? (
                 <EnderecoPlacesAutocomplete
                   variant="gestor"
@@ -1232,7 +1241,7 @@ export function EmpresaTab() {
               ) : null}
 
               {/* Linha 1: CEP + Rua */}
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <UppercaseLocaleInput
                   label="CEP"
                   value={cep}
@@ -1254,7 +1263,7 @@ export function EmpresaTab() {
               </div>
 
               {/* Linha 2: Número, Complemento e Bairro */}
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <UppercaseLocaleInput
                   label="Número"
                   value={numero}
@@ -1282,7 +1291,7 @@ export function EmpresaTab() {
               </div>
 
               {/* Linha 3: Estado + Cidade + Fuso horário (IANA) */}
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <Input
                   select
                   label="Estado"
