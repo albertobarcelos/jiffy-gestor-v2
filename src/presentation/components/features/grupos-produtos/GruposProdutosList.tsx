@@ -32,7 +32,11 @@ import {
   GruposProdutosTabsModal,
   GruposProdutosTabsModalState,
 } from './GruposProdutosTabsModal'
-import { ProdutosTabsModal, ProdutosTabsModalState } from '../produtos/ProdutosTabsModal'
+import {
+  EscolherTipoProdutoModal,
+  useEscolherTipoProdutoCadastro,
+} from '../produtos/EscolherTipoProdutoModal'
+import { ProdutoNovoWizard } from '../produtos/ProdutoNovoWizard'
 
 interface GruposProdutosListProps {
   onReload?: () => void
@@ -43,12 +47,16 @@ interface GruposProdutosListProps {
  * Usa React Query para cache automático e deduplicação de requisições
  */
 export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
+  const tipoCadastro = useEscolherTipoProdutoCadastro()
+  const [wizardOpen, setWizardOpen] = useState(false)
+  const [wizardCategoriaId, setWizardCategoriaId] = useState<string | undefined>()
   const [searchText, setSearchText] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Inativo'>('Ativo')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const loadMoreRef = useRef<HTMLDivElement>(null)  const invalidate = useInvalidateTenantQueries()
+  const loadMoreRef = useRef<HTMLDivElement>(null)
+  const invalidate = useInvalidateTenantQueries()
   const router = useRouter() // Obter a instância do router
   const searchParams = useSearchParams() // Obter os search params da URL
   const pathname = usePathname() // Obter o pathname da URL
@@ -61,14 +69,6 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
     open: false,
     tab: 'grupo',
     mode: 'create',
-    grupoId: undefined,
-  })
-  const [produtoTabsState, setProdutoTabsState] = useState<ProdutosTabsModalState>({
-    open: false,
-    tab: 'produto',
-    mode: 'create',
-    produto: undefined,
-    prefillGrupoProdutoId: undefined,
     grupoId: undefined,
   })
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
@@ -266,11 +266,11 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
 
         if (!response.ok) {
           const error = await response.json().catch(() => ({}))
-          throw new Error(error.message || 'Erro ao atualizar grupo')
+          throw new Error(error.message || 'Erro ao atualizar categoria')
         }
 
         showToast.success(
-          novoStatus ? 'Grupo ativado com sucesso!' : 'Grupo desativado com sucesso!'
+          novoStatus ? 'Categoria ativada com sucesso!' : 'Categoria desativada com sucesso!'
         )
         // Não invalidar cache imediatamente - a atualização otimista já atualizou a UI
         // O cache será invalidado apenas quando necessário (ex: ao fechar modal, mudar filtros, etc)
@@ -278,7 +278,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
         console.error('Erro ao atualizar status do grupo:', error)
         // Reverter atualização otimista em caso de erro
         setLocalGrupos(previousState)
-        showToast.error('Não foi possível atualizar o status do grupo.')
+        showToast.error('Não foi possível atualizar o status da categoria.')
       }
     },
     [ localGrupos]
@@ -325,49 +325,20 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
 
   const handleOpenProdutoModal = useCallback(
     (grupoId: string) => {
-      setProdutoTabsState({
-        open: true,
-        tab: 'produto',
-        mode: 'create',
-        produto: undefined,
-        prefillGrupoProdutoId: grupoId,
-        grupoId: undefined,
+      tipoCadastro.pedirTipo(() => {
+        setWizardCategoriaId(grupoId)
+        setWizardOpen(true)
       })
-
-      // Adicionar um parâmetro na URL para forçar o recarregamento ao fechar
-      const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
-      currentSearchParams.set('modalProdutoOpen', 'true')
-      router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
     },
-    [router, searchParams, pathname]
+    [tipoCadastro.pedirTipo]
   )
 
-  const handleCloseProdutoModal = useCallback(() => {
-    setProdutoTabsState((prev) => ({
-      ...prev,
-      open: false,
-      produto: undefined,
-      prefillGrupoProdutoId: undefined,
-      grupoId: undefined,
-    }))
-    
-    // Remover o parâmetro da URL para forçar o recarregamento da rota
-    const currentSearchParams = new URLSearchParams(Array.from(searchParams.entries()))
-    currentSearchParams.delete('modalProdutoOpen')
-    router.replace(`${pathname}?${currentSearchParams.toString()}`, { scroll: false })
-    router.refresh() // Força a revalidação da rota principal
+  const handleCloseWizard = useCallback(() => {
+    setWizardOpen(false)
+    setWizardCategoriaId(undefined)
     void invalidateListas()
-  }, [router, searchParams, invalidateListas, pathname])
-
-  const handleProdutoTabChange = useCallback(
-    (tab: 'produto' | 'complementos' | 'impressoras' | 'grupo') => {
-      setProdutoTabsState((prev) => ({
-        ...prev,
-        tab,
-      }))
-    },
-    []
-  )
+    onReload?.()
+  }, [invalidateListas, onReload])
 
   // Handler para quando o drag termina - versão simples: envia para API e recarrega a página
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
@@ -415,7 +386,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
 
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.message || 'Erro ao reordenar grupo')
+        throw new Error(error.message || 'Erro ao reordenar categoria')
       }
 
       showToast.success('Ordem atualizada com sucesso!')
@@ -425,7 +396,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       console.error('Erro ao reordenar grupo:', error)
       // Reverte feedback otimista
       setLocalGrupos(previousState)
-      showToast.error(error.message || 'Erro ao atualizar ordem do grupo')
+      showToast.error(error.message || 'Erro ao atualizar ordem da categoria')
     }
   }, [localGrupos, invalidate])
 
@@ -438,7 +409,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="md:pl-5">
               <p className="text-primary text-sm font-semibold">
-                Grupos Cadastrados
+                Categorias Cadastradas
               </p>
               <p className="text-tertiary md:text-[22px] text-sm font-normal">
                 Total {localGrupos.length} de {totalGrupos}
@@ -471,7 +442,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
               <input
                 id="grupos-complementos-search"
                 type="text"
-                placeholder="Pesquisar grupo..."
+                placeholder="Pesquisar categoria..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
                 className="w-full h-full px-5 pl-12 rounded-lg border border-gray-200 bg-info text-primary-text placeholder:text-secondary-text focus:outline-none focus:border-primary text-sm "
@@ -507,7 +478,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
             Ordem
           </div>
           <div className="flex-[2] font-semibold md:text-sm text-[10px] text-primary-text">
-            Ícones do Grupo
+            Ícones da Categoria
           </div>
           <div className="flex-[4] font-semibold md:text-sm text-[10px] text-primary-text">
             Nome
@@ -535,7 +506,7 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
 
         {localGrupos.length === 0 && !isLoading && !isFetching && hasLoadedOnce && (
           <div className="flex items-center justify-center py-12">
-            <p className="text-secondary-text">Nenhum grupo encontrado.</p>
+            <p className="text-secondary-text">Nenhuma categoria encontrada.</p>
           </div>
         )}
 
@@ -595,19 +566,20 @@ export function GruposProdutosList({ onReload }: GruposProdutosListProps) {
       onReload={handleTabsModalReload}
       onTabChange={handleTabsModalTabChange}
     />
-    <ProdutosTabsModal
-      state={produtoTabsState}
-      onClose={handleCloseProdutoModal}
-      onReload={(produtoId?: string, produtoData?: any) => {
-        // Se temos dados do produto, podemos atualizar o cache
-        // Caso contrário, apenas chama o onReload original
-        if (produtoId && produtoData) {
-          // Aqui poderia atualizar o cache se necessário
-          // Por enquanto, apenas chama o onReload original
-        }
+    <EscolherTipoProdutoModal
+      open={tipoCadastro.open}
+      onClose={tipoCadastro.fechar}
+      onContinuar={tipoCadastro.continuar}
+    />
+    <ProdutoNovoWizard
+      origem="cadastro"
+      open={wizardOpen}
+      initialCategoriaId={wizardCategoriaId}
+      onClose={handleCloseWizard}
+      onSuccess={() => {
+        void invalidateListas()
         onReload?.()
       }}
-      onTabChange={handleProdutoTabChange}
     />
     </>
   )

@@ -30,6 +30,16 @@ import { appEmpresaCorrespondeBusca, conviteCorrespondeBusca } from './utils/min
 import { activateHubEmpresaSessionAndBuildUrl } from './utils/activateHubEmpresaSession'
 import { HUB_ROUTES } from '@/src/shared/constants/hubRoutes'
 import { ensureHubBearerToken } from '@/src/presentation/utils/ensureHubBearerToken'
+import { resolverDestinoPosLoginUseCase } from '@/src/application/use-cases/superficie/ResolverDestinoPosLoginUseCase'
+import { montarContextoAcessoSuperficie } from '@/src/presentation/gestor-pedidos/superficie/montarContextoAcessoSuperficie'
+import { buildGestaoPath } from '@/src/shared/utils/gestaoRoutes'
+import { entrarEmpresaGestorNaAba } from '@/src/presentation/gestor-pedidos/sessao/entrarEmpresaGestorNaAba'
+import { isSinalKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
+import {
+  lerSinalGestorDoBrowser,
+  pathEscolherEmpresaKiosk,
+  urlLoginDaSessaoAtual,
+} from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
 
 const HUB_SESSAO_TOAST_ID = 'minhas-empresas-sessao-token'
 
@@ -74,7 +84,7 @@ export default function MinhasEmpresasPage() {
 
   const irParaLogin = useCallback(() => {
     void logout().finally(() => {
-      window.location.href = '/login'
+      window.location.href = urlLoginDaSessaoAtual()
     })
   }, [logout])
 
@@ -460,25 +470,47 @@ export default function MinhasEmpresasPage() {
     [reportHubSessionIssue, removerEmpresaDesvinculada]
   )
 
-  const handleAcessar = async (appId: string) => {
-    const app = appsBase.find(a => a.id === appId)
-    if (app?.status === 'inativo') {
-      return
-    }
+  const handleAcessar = useCallback(
+    async (appId: string) => {
+      const app = appsBase.find(a => a.id === appId)
+      if (app?.status === 'inativo') {
+        return
+      }
 
-    setAcessoErro(null)
-    setBusyAppId(appId)
+      setAcessoErro(null)
+      setBusyAppId(appId)
 
-    try {
-      const token = await obterTokenEmpresa(appId)
-      const empParam = prepareTabSession(token, app?.nome ?? '', appId)
-      window.open(`/gestao/${empParam}/dashboard`, '_blank')
-    } catch (e) {
-      reportErroAcessoEmpresa(e, appId)
-    } finally {
-      setBusyAppId(null)
+      try {
+        const token = await obterTokenEmpresa(appId)
+        if (isSinalKioskGestorPedidos(lerSinalGestorDoBrowser())) {
+          router.replace(
+            entrarEmpresaGestorNaAba({
+              accessToken: token,
+              empresaNome: app?.nome ?? '',
+              empresaId: appId,
+            })
+          )
+          return
+        }
+        const empParam = prepareTabSession(token, app?.nome ?? '', appId)
+        const destino = resolverDestinoPosLoginUseCase.execute(montarContextoAcessoSuperficie(token))
+        window.open(buildGestaoPath(empParam, destino.pathModulo), '_blank')
+      } catch (e) {
+        reportErroAcessoEmpresa(e, appId)
+      } finally {
+        setBusyAppId(null)
+      }
+    },
+    [appsBase, obterTokenEmpresa, reportErroAcessoEmpresa, router]
+  )
+
+  /** Windows / `?gestor`: Minhas Empresas não faz parte deste fluxo. */
+  useEffect(() => {
+    if (!isRehydrated) return
+    if (isSinalKioskGestorPedidos(lerSinalGestorDoBrowser())) {
+      router.replace(pathEscolherEmpresaKiosk())
     }
-  }
+  }, [isRehydrated, router])
 
   const handleGerenciarConvites = async (appId: string) => {
     const app = appsBase.find(a => a.id === appId)

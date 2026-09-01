@@ -2,6 +2,7 @@ import {
   normalizarUnidadeMedidaProduto,
   type UnidadeMedidaProduto,
 } from '@/src/shared/types/unidadeMedidaProduto'
+import type { ProdutoMenuResumo } from '@/src/shared/types/menus'
 
 /**
  * Entidade de domínio representando um Produto
@@ -23,6 +24,19 @@ interface ProdutoImpressoraResumo {
   id: string
   nome: string
   ativo: boolean
+}
+
+function mapMenusFromJson(raw: unknown): ProdutoMenuResumo[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((item: unknown) => {
+      const rec = asPlainRecord(item)
+      const nested = asPlainRecord(rec.menu)
+      const id = firstNonEmptyString(nested.id, rec.id)
+      const nome = firstNonEmptyString(nested.nome, rec.nome) || 'Menu'
+      return id ? { id, nome } : null
+    })
+    .filter((m): m is ProdutoMenuResumo => m != null)
 }
 
 function asPlainRecord(v: unknown): Record<string, unknown> {
@@ -125,6 +139,7 @@ export class Produto {
     private readonly nome: string,
     private readonly valor: number,
     private readonly ativo: boolean,
+    private readonly descricao?: string,
     private readonly nomeGrupo?: string,
     private readonly grupoId?: string,
     private readonly estoque?: number | string,
@@ -134,6 +149,8 @@ export class Produto {
     private readonly permiteDesconto?: boolean,
     private readonly permiteAlterarPreco?: boolean,
     private readonly incideTaxa?: boolean,
+    private readonly ativoDelivery?: boolean,
+    private readonly ativoLocal?: boolean,
     private readonly ordem?: number,
     private readonly gruposComplementos?: ProdutoGrupoComplementoResumo[],
     private readonly impressoras?: ProdutoImpressoraResumo[],
@@ -142,7 +159,9 @@ export class Produto {
     private readonly origemMercadoria?: string,
     private readonly tipoProduto?: string,
     private readonly indicadorProducaoEscala?: string | null,
-    private readonly unidadeMedida: UnidadeMedidaProduto = 'UN'
+    private readonly unidadeMedida: UnidadeMedidaProduto = 'UN',
+    private readonly menus?: ProdutoMenuResumo[],
+    private readonly imagemUrl?: string | null
   ) {}
 
   static create(
@@ -151,6 +170,7 @@ export class Produto {
     nome: string,
     valor: number,
     ativo: boolean,
+    descricao?: string,
     nomeGrupo?: string,
     grupoId?: string,
     estoque?: number | string,
@@ -160,6 +180,8 @@ export class Produto {
     permiteDesconto?: boolean,
     permiteAlterarPreco?: boolean,
     incideTaxa?: boolean,
+    ativoDelivery?: boolean,
+    ativoLocal?: boolean,
     ordem?: number,
     gruposComplementos?: ProdutoGrupoComplementoResumo[],
     impressoras?: ProdutoImpressoraResumo[],
@@ -168,7 +190,9 @@ export class Produto {
     origemMercadoria?: string,
     tipoProduto?: string,
     indicadorProducaoEscala?: string | null,
-    unidadeMedida?: UnidadeMedidaProduto
+    unidadeMedida?: UnidadeMedidaProduto,
+    menus?: ProdutoMenuResumo[],
+    imagemUrl?: string | null
   ): Produto {
     if (!id || !nome) {
       throw new Error('ID e nome são obrigatórios')
@@ -180,6 +204,7 @@ export class Produto {
       nome,
       valor,
       ativo,
+      descricao?.trim() || undefined,
       nomeGrupo,
       grupoId,
       estoque,
@@ -189,6 +214,8 @@ export class Produto {
       permiteDesconto,
       permiteAlterarPreco,
       incideTaxa,
+      ativoDelivery,
+      ativoLocal,
       ordem,
       gruposComplementos,
       impressoras,
@@ -197,7 +224,9 @@ export class Produto {
       origemMercadoria,
       tipoProduto,
       indicadorProducaoEscala,
-      normalizarUnidadeMedidaProduto(unidadeMedida)
+      normalizarUnidadeMedidaProduto(unidadeMedida),
+      menus,
+      imagemUrl ?? null
     )
   }
 
@@ -220,6 +249,7 @@ export class Produto {
       data.nome?.toString() || '',
       typeof data.valor === 'number' ? data.valor : parseFloat(data.valor) || 0,
       data.ativo === true || data.ativo === 'true',
+      data.descricao?.toString(),
       data.nomeGrupo?.toString(),
       data.grupoId?.toString(),
       data.estoque,
@@ -229,6 +259,8 @@ export class Produto {
       data.permiteDesconto === true || data.permiteDesconto === 'true',
       data.permiteAlterarPreco === true || data.permiteAlterarPreco === 'true',
       data.incideTaxa === true || data.incideTaxa === 'true',
+      data.ativoDelivery === false ? false : true,
+      data.ativoLocal === true || data.ativoLocal === 'true',
       (() => {
         if (typeof data.ordem === 'number' && Number.isFinite(data.ordem)) return data.ordem
         if (typeof data.ordem === 'string' && data.ordem.trim() !== '') {
@@ -257,7 +289,17 @@ export class Produto {
       fisc.origemMercadoria,
       fisc.tipoProduto,
       fisc.indicadorProducaoEscala,
-      normalizarUnidadeMedidaProduto(data.unidadeMedida)
+      normalizarUnidadeMedidaProduto(data.unidadeMedida),
+      mapMenusFromJson(data.menus),
+      (() => {
+        const raw =
+          data.imagemUrl ??
+          data.imageUrl ??
+          (data.image && typeof data.image === 'object' ? data.image.imageUrl : null)
+        if (typeof raw !== 'string') return null
+        const trimmed = raw.trim()
+        return trimmed || null
+      })()
     )
   }
 
@@ -279,6 +321,10 @@ export class Produto {
 
   isAtivo(): boolean {
     return this.ativo
+  }
+
+  getDescricao(): string | undefined {
+    return this.descricao
   }
 
   getNomeGrupo(): string | undefined {
@@ -315,6 +361,14 @@ export class Produto {
 
   incideTaxaAtivo(): boolean {
     return this.incideTaxa === true
+  }
+
+  isAtivoDelivery(): boolean {
+    return this.ativoDelivery !== false
+  }
+
+  isAtivoLocal(): boolean {
+    return this.ativoLocal === true
   }
 
   getOrdem(): number | undefined {
@@ -356,6 +410,15 @@ export class Produto {
 
   getUnidadeMedida(): UnidadeMedidaProduto {
     return this.unidadeMedida
+  }
+
+  getMenus(): ProdutoMenuResumo[] {
+    return this.menus || []
+  }
+
+  getImagemUrl(): string | null {
+    const url = this.imagemUrl?.trim()
+    return url ? url : null
   }
 
   /** Retorna cópia com campos fiscais atualizados (edição inline / lote). */
@@ -404,6 +467,13 @@ export class Produto {
     })
   }
 
+  withMenus(menus: ProdutoMenuResumo[]): Produto {
+    return Produto.fromJSON({
+      ...this.toJSON(),
+      menus,
+    })
+  }
+
   toJSON() {
     return {
       id: this.id,
@@ -411,6 +481,7 @@ export class Produto {
       nome: this.nome,
       valor: this.valor,
       ativo: this.ativo,
+      descricao: this.descricao,
       nomeGrupo: this.nomeGrupo,
       grupoId: this.grupoId,
       estoque: this.estoque,
@@ -420,6 +491,8 @@ export class Produto {
       permiteDesconto: this.permiteDesconto,
       permiteAlterarPreco: this.permiteAlterarPreco,
       incideTaxa: this.incideTaxa,
+      ativoDelivery: this.isAtivoDelivery(),
+      ativoLocal: this.isAtivoLocal(),
       ordem: this.ordem,
       gruposComplementos: this.gruposComplementos,
       impressoras: this.impressoras,
@@ -429,6 +502,8 @@ export class Produto {
       tipoProduto: this.tipoProduto ?? '',
       indicadorProducaoEscala: this.indicadorProducaoEscala ?? null,
       unidadeMedida: this.unidadeMedida,
+      menus: this.menus ?? [],
+      imagemUrl: this.imagemUrl ?? null,
     }
   }
 }

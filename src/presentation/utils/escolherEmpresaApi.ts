@@ -23,7 +23,11 @@ export async function fetchAccessTokenEscolherEmpresa(
   const body = (await res.json().catch(() => ({}))) as { error?: string; accessToken?: string }
 
   if (!res.ok) {
-    throw new Error(typeof body.error === 'string' ? body.error : `Erro ${res.status}`)
+    const err = new Error(
+      typeof body.error === 'string' ? body.error : `Erro ${res.status}`
+    ) as Error & { status?: number }
+    err.status = res.status
+    throw err
   }
   if (!body.accessToken) {
     throw new Error('Resposta sem accessToken')

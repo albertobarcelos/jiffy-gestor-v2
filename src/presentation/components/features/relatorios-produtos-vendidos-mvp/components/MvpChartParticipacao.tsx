@@ -73,11 +73,11 @@ function montarChartDataGrupos(dados: RelatorioParticipacaoGrupoDTO[] | undefine
     .slice(0, TOP_GRUPOS_PARTICIPACAO)
   const contagemPorNome = new Map<string, number>()
   for (const g of sorted) {
-    const nome = g.nomeGrupo || 'Sem grupo'
+    const nome = g.nomeGrupo || 'Sem categoria'
     contagemPorNome.set(nome, (contagemPorNome.get(nome) ?? 0) + 1)
   }
   return sorted.map((g, i) => {
-    const nomeBase = g.nomeGrupo || 'Sem grupo'
+    const nomeBase = g.nomeGrupo || 'Sem categoria'
     const nomeDuplicado = (contagemPorNome.get(nomeBase) ?? 0) > 1
     const name =
       nomeDuplicado && g.grupoId
@@ -99,10 +99,10 @@ function LegendaGruposFixa({ chartData }: { chartData: GrupoChartRow[] }) {
   return (
     <aside
       className="shrink-0 border-t border-primary/10 pt-4 lg:w-56 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0 xl:w-60"
-      aria-label="Legenda dos grupos"
+      aria-label="Legenda das categorias"
     >
       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-secondary-text">
-        Grupos
+        Categorias
       </p>
       <ul className="scrollbar-thin flex max-h-[min(22rem,55vh)] flex-col gap-2 overflow-y-auto pr-1">
         {chartData.map(entry => (
@@ -299,7 +299,7 @@ export function MvpChartParticipacao(props: {
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-semibold text-primary">Participação no faturamento filtrado</h3>
           <p className="mt-1 text-xs text-secondary-text">
-            Top {TOP_GRUPOS_PARTICIPACAO} grupos por faturamento no período filtrado.
+            Top {TOP_GRUPOS_PARTICIPACAO} categorias por faturamento no período filtrado.
           </p>
         </div>
         <MvpChartTipoSelect

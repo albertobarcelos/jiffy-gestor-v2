@@ -358,6 +358,7 @@ export class VendaUnificadaDTO {
       id: string
       nome: string
       cpfCnpj?: string
+      telefone?: string | null
     } | null,
     public readonly solicitarEmissaoFiscal: boolean,
     public readonly statusFiscal:

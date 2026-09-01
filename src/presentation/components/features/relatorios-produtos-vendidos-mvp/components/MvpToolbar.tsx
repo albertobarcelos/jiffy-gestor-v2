@@ -80,7 +80,7 @@ export function MvpRelatorioToolbarActions(props: {
         active={modalGruposAberto}
         onClick={onToggleModalGrupos}
         icon={<MdDonutLarge size={18} />}
-        label="Grupos"
+        label="Categorias"
       />
       <TogglePainelBtn
         active={modalAbcAberto}

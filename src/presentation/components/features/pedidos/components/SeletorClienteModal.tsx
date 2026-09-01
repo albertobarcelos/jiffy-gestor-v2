@@ -24,12 +24,15 @@ import {
 } from '@/src/presentation/components/features/clientes/ClientesTabsModal'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { clienteTelefoneContem } from '@/src/shared/utils/telefoneClienteMatch'
 interface SeletorClienteModalProps {
   open: boolean
   onClose: () => void
   onSelect: (cliente: Cliente) => void
   /** Título do modal (ex.: fluxo de venda no Kanban) */
   title?: string
+  /** Prefenche a busca (número da conversa no Flow). */
+  buscaInicial?: string
 }
 
 export function SeletorClienteModal({
@@ -37,6 +40,7 @@ export function SeletorClienteModal({
   onClose,
   onSelect,
   title = 'Selecionar Cliente',
+  buscaInicial = '',
 }: SeletorClienteModalProps) {
   const invalidate = useInvalidateTenantQueries()
   const [searchText, setSearchText] = useState('')
@@ -56,9 +60,13 @@ export function SeletorClienteModal({
   // Foca o campo de busca ao abrir o modal (timeout cobre a animação de entrada).
   useEffect(() => {
     if (!open) return
+    if (buscaInicial.trim()) {
+      setSearchText(buscaInicial.trim())
+      setDebouncedSearch(buscaInicial.trim())
+    }
     const id = setTimeout(() => searchInputRef.current?.focus(), 100)
     return () => clearTimeout(id)
-  }, [open])
+  }, [open, buscaInicial])
 
   // Debounce da busca (500ms)
   useEffect(() => {
@@ -108,7 +116,11 @@ export function SeletorClienteModal({
     let lista = Array.from(porId.values())
     const termo = debouncedSearch.trim().toLowerCase()
     if (termo) {
-      lista = lista.filter(c => c.getNome().toLowerCase().includes(termo))
+      lista = lista.filter(
+        c =>
+          c.getNome().toLowerCase().includes(termo) ||
+          clienteTelefoneContem(c.getTelefone(), debouncedSearch)
+      )
     }
     return lista
   }, [data, debouncedSearch])

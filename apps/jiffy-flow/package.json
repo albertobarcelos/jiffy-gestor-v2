@@ -1,0 +1,16 @@
+{
+  "name": "jiffy-flow",
+  "private": true,
+  "version": "0.1.1",
+  "type": "module",
+  "scripts": {
+    "test": "node --test lib/montarUrlQuadro.test.mjs",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "package:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/package-flow.ps1"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

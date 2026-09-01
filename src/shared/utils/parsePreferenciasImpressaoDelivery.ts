@@ -36,8 +36,9 @@ function modoNormalizado(v: unknown): ModoImpressaoDelivery {
 }
 
 /**
- * Extrai preferências de impressão delivery do JSON de empresa (`GET /api/empresas/me`).
- * Campos oficiais em `parametroDelivery` (backend). Mantém aliases em `parametroEmpresa` legado.
+ * Extrai preferências de impressão delivery.
+ * Fonte canônica: `parametroDelivery` em `GET /api/delivery/empresas/me`.
+ * Mantém fallback em `GET /api/empresas/me` (legado).
  */
 export function parsePreferenciasImpressaoDelivery(
   data: Record<string, unknown>
@@ -89,11 +90,6 @@ export function parsePreferenciasImpressaoDelivery(
 
   const impressoraExpedicaoId = idNullable(pick('impressoraExpedicaoId') ?? pick('impressora_expedicao_id'))
 
-  const envPadrao =
-    typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_QZ_PRINTER_DEFAULT?.trim()
-      ? process.env.NEXT_PUBLIC_QZ_PRINTER_DEFAULT.trim()
-      : null
-
   return {
     modo: modoImp,
     copiasCupomUnificado: copias,
@@ -104,7 +100,7 @@ export function parsePreferenciasImpressaoDelivery(
     imprimirAoReceber: imprimirReceber,
     imprimirAoFicarPronto: imprimirPronto,
     impressoraExpedicaoId,
-    impressoraPadraoNome: envPadrao,
+    impressoraPadraoNome: null,
   }
 }
 

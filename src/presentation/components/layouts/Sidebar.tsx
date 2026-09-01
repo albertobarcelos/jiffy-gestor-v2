@@ -10,6 +10,7 @@ import { usePrefetch } from '@/src/presentation/hooks/usePrefetch'
 import { useAcessoFiscal } from '@/src/presentation/hooks/useAcessoFiscal'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import { matchesModulePath } from '@/src/shared/utils/gestaoRoutes'
+import { urlLoginDaSessaoAtual } from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
 
 /**
  * Sidebar do dashboard
@@ -48,6 +49,7 @@ export function Sidebar() {
       '/complementos',
       '/produtos',
       '/grupos-produtos',
+      '/menus',
       '/estoque',
     ]
     
@@ -103,7 +105,8 @@ export function Sidebar() {
         path: '#',
         icon: '📋',
         children: [
-          { name: 'Grupo Produtos', path: '/grupos-produtos', icon: '📦' },
+          { name: 'Menus', path: '/menus', icon: '📖' },
+          { name: 'Categorias', path: '/grupos-produtos', icon: '📦' },
           { name: 'Produtos', path: '/produtos', icon: '🛍️' },
           { name: 'Grupo Complementos', path: '/grupos-complementos', icon: '📋' },
           { name: 'Complementos', path: '/complementos', icon: '➕' },
@@ -121,7 +124,8 @@ export function Sidebar() {
       },
       { name: 'Estoque', path: '/estoque', icon: '📦' },
       { name: 'Meu Caixa', path: '/meu-caixa', icon: '💼' },
-      { name: 'Pedidos e Clientes', path: '/pedidos-clientes', icon: '📄' },
+      { name: 'Pedidos e Clientes', path: '/pedidos', icon: '📄' },
+      { name: 'Abrir no Windows', path: '/pedidos/abrir-windows', icon: '🖥️' },
       { name: 'Portal do Contador', path: '/portal-contador', icon: '📊' },
       {
         name: 'Relatórios',
@@ -280,7 +284,7 @@ export function Sidebar() {
               } catch (e) {
                 console.error('Sidebar: erro ao sair da conta', e)
               }
-              window.location.assign('/login')
+              window.location.assign(urlLoginDaSessaoAtual())
             }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-info/80 hover:bg-info/10 transition-colors ${
               isCompact ? 'justify-center' : ''

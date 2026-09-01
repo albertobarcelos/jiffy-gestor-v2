@@ -13,8 +13,9 @@ interface GrupoItemProps {
   index: number
   onStatusChanged?: () => void
   onToggleStatus?: (grupoId: string, novoStatus: boolean) => void
+  onToggleAtivoDelivery?: (grupoId: string, ativoDelivery: boolean) => void
   onEdit?: (grupo: GrupoProduto) => void
-  onEditProdutos?: (grupo: GrupoProduto) => void // Abre edição na aba de produtos vinculados
+  onEditProdutos?: (grupo: GrupoProduto) => void
   onCreateProduto?: (grupoId: string) => void
 }
 
@@ -24,8 +25,8 @@ interface GrupoItemProps {
 export const GrupoItem = memo(function GrupoItem({
   grupo,
   index,
-  onStatusChanged,
   onToggleStatus,
+  onToggleAtivoDelivery,
   onEdit,
   onEditProdutos,
   onCreateProduto,
@@ -39,47 +40,38 @@ export const GrupoItem = memo(function GrupoItem({
     isDragging,
   } = useSortable({ id: grupo.getId() })
 
-  const style = useMemo(() => ({
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  }), [transform, transition, isDragging])
+  const style = useMemo(
+    () => ({
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+    }),
+    [transform, transition, isDragging]
+  )
 
-  const corHex = useMemo(() => grupo.getCorHex(), [grupo])
-  const iconName = useMemo(() => grupo.getIconName(), [grupo])
-  const nome = useMemo(() => grupo.getNome(), [grupo])
-  const isAtivo = useMemo(() => grupo.isAtivo(), [grupo])
-  
-  // Handler para abrir edição ao clicar na área clicável
-  const handleRowClick = useMemo(() => {
-    return () => {
-      onEdit?.(grupo)
-    }
-  }, [grupo, onEdit])
-  
-  // Função para renderizar o ícone do grupo
-  const renderIcon = useMemo(() => {
-    return (
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation()
-          onEdit?.(grupo)
-        }}
-        className="md:w-[45px] md:h-[45px] w-7 h-7 bg-info rounded-lg border-2 flex items-center justify-center"
-        style={{
-          borderColor: corHex,
-        }}
-        title="Editar icone"
-      >
-        <DinamicIcon iconName={iconName} color={corHex} size={24} />
-      </button>
-    )
-  }, [corHex, iconName, grupo, onEdit])
+  const nome = grupo.getNome()
+  const isAtivo = grupo.isAtivo()
+  const isAtivoDelivery = grupo.isAtivoDelivery()
+  const corHex = grupo.getCorHex() || '#6B7280'
+  const iconName = grupo.getIconName() || 'restaurant'
+  // Zebra bem clara (como antes do ajuste de Design Categorias).
+  const bgColor = index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
 
-  const bgColor = useMemo(() => {
-    return index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
-  }, [index])
+  const handleRowClick = () => {
+    onEdit?.(grupo)
+  }
+
+  // Ícone colorido em fundo claro (não fundo preenchido com ícone branco).
+  const renderIcon = (
+    <div
+      className="flex h-7 w-7 items-center justify-center rounded-lg border-2 bg-info md:h-[45px] md:w-[45px]"
+      style={{
+        borderColor: corHex,
+      }}
+    >
+      <DinamicIcon iconName={iconName} color={corHex} size={24} />
+    </div>
+  )
 
   return (
     <div
@@ -87,7 +79,6 @@ export const GrupoItem = memo(function GrupoItem({
       style={style}
       className={`md:h-[50px] py-2 ${bgColor} rounded-lg md:px-4 px-1 mb-2 flex items-center gap-[10px] hover:bg-[var(--color-primary-background)] transition-colors cursor-default hover:shadow-md`}
     >
-      {/* Handle de arrastar - apenas esta área é arrastável */}
       <div
         {...attributes}
         {...listeners}
@@ -99,59 +90,76 @@ export const GrupoItem = memo(function GrupoItem({
         <span>{index + 1}</span>
       </div>
 
-      {/* Ícone - área clicável */}
-      <div 
-        onClick={handleRowClick}
-        className="flex-[2] flex items-center cursor-pointer"
-      >
+      <div onClick={handleRowClick} className="flex-[2] flex items-center cursor-pointer">
         {renderIcon}
       </div>
 
-      {/* Nome - área clicável */}
-      <div 
+      <div
         onClick={handleRowClick}
         className="flex-[4] font-normal text-xs md:text-sm text-primary-text cursor-pointer flex flex-col md:flex-row items-start md:items-center justify-start gap-2"
       >
         <span>{nome}</span>
         <div className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation()
-            onEditProdutos?.(grupo)
-          }}
-          className="w-7 h-7 rounded-full border border-primary/50 flex items-center justify-center text-primary hover:bg-primary/10 transition-colors"
-          title="Ver produtos vinculados"
-        >
-          <MdLink />
-        </button>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation()
-            onCreateProduto?.(grupo.getId())
-          }}
-          className="w-7 h-7 rounded-full border border-primary/50 flex items-center justify-center text-primary hover:bg-primary/10 transition-colors"
-          title="criar um novo produto"
-        >
-          <MdAddCircle />
-        </button>
+          <button
+            type="button"
+            onClick={e => {
+              e.stopPropagation()
+              onEditProdutos?.(grupo)
+            }}
+            className="w-7 h-7 rounded-full border border-primary/50 flex items-center justify-center text-primary hover:bg-primary/10 transition-colors"
+            title="Ver produtos vinculados"
+          >
+            <MdLink />
+          </button>
+          <button
+            type="button"
+            onClick={e => {
+              e.stopPropagation()
+              onCreateProduto?.(grupo.getId())
+            }}
+            className="w-7 h-7 rounded-full border border-primary/50 flex items-center justify-center text-primary hover:bg-primary/10 transition-colors"
+            title="criar um novo produto"
+          >
+            <MdAddCircle />
+          </button>
         </div>
       </div>
 
-      {/* Status: switch padrão; cliques no switch não abrem a edição da linha */}
-      <div
-        onClick={handleRowClick}
-        className="flex-[2] flex cursor-pointer items-end justify-end"
-      >
-        <div className="flex items-end justify-center"
-          onClick={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
+      <div onClick={handleRowClick} className="flex-[2] flex cursor-pointer items-end justify-end">
+        <div
+          className="flex items-end justify-center"
+          onClick={e => e.stopPropagation()}
+          onMouseDown={e => e.stopPropagation()}
+          onTouchStart={e => e.stopPropagation()}
+        >
+          <JiffyIconSwitch
+            checked={isAtivoDelivery}
+            onChange={e => {
+              e.stopPropagation()
+              onToggleAtivoDelivery?.(grupo.getId(), e.target.checked)
+            }}
+            bordered={false}
+            size="sm"
+            className="shrink-0"
+            inputProps={{
+              'aria-label': isAtivoDelivery
+                ? 'Desativar grupo no delivery'
+                : 'Ativar grupo no delivery',
+            }}
+          />
+        </div>
+      </div>
+
+      <div onClick={handleRowClick} className="flex-[2] flex cursor-pointer items-end justify-end">
+        <div
+          className="flex items-end justify-center"
+          onClick={e => e.stopPropagation()}
+          onMouseDown={e => e.stopPropagation()}
+          onTouchStart={e => e.stopPropagation()}
         >
           <JiffyIconSwitch
             checked={isAtivo}
-            onChange={(e) => {
+            onChange={e => {
               e.stopPropagation()
               onToggleStatus?.(grupo.getId(), e.target.checked)
             }}
@@ -159,7 +167,7 @@ export const GrupoItem = memo(function GrupoItem({
             size="sm"
             className="shrink-0"
             inputProps={{
-              'aria-label': isAtivo ? 'Desativar grupo de produtos' : 'Ativar grupo de produtos',
+              'aria-label': isAtivo ? 'Desativar categoria' : 'Ativar categoria',
             }}
           />
         </div>
@@ -167,4 +175,3 @@ export const GrupoItem = memo(function GrupoItem({
     </div>
   )
 })
-

@@ -23,6 +23,12 @@ interface InformacoesProdutoStepProps {
   onCodigoEanBarrasChange: (value: string) => void
   grupos: GrupoProduto[]
   isLoadingGrupos: boolean
+  lockGrupoProduto?: boolean
+  lockedGrupoLabel?: string
+  /** Nome da categoria nova ainda não gravada (wizard passo 1). */
+  pendingNovaCategoriaLabel?: string
+  /** Na edição do produto base o campo some; na criação permanece obrigatório. */
+  showCategoriaField?: boolean
   onNext: () => void
   /** Salva com dados preenchidos até aqui e encerra o fluxo (sem passos seguintes) */
   onSaveAndClose: () => void
@@ -49,6 +55,10 @@ export function InformacoesProdutoStep({
   onCodigoEanBarrasChange,
   grupos,
   isLoadingGrupos,
+  lockGrupoProduto = false,
+  lockedGrupoLabel,
+  pendingNovaCategoriaLabel,
+  showCategoriaField = true,
   onNext,
   onSaveAndClose,
   hideStepFooter = false,
@@ -109,43 +119,24 @@ export function InformacoesProdutoStep({
           />
         </div>
 
-        {/* Linha 2: Grupo (com pesquisa) + Unidade + Código EAN */}
-        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,9.5rem)_minmax(0,1fr)]">
-          <div className="relative z-20 min-w-0">
-            <Autocomplete
-              id="np-grupo-produto-searchable"
-              size="small"
-              options={grupos}
-              loading={isLoadingGrupos}
-              loadingText="Carregando..."
-              noOptionsText="Nenhum grupo encontrado"
-              getOptionLabel={grupo =>
-                grupo.isAtivo() ? grupo.getNome() : `${grupo.getNome()} (Inativo)`
-              }
-              isOptionEqualToValue={(a, b) => a.getId() === b.getId()}
-              value={grupoSelecionado}
-              onChange={(_, grupo) => onGrupoProdutoChange(grupo?.getId() ?? null)}
-              renderOption={(props, grupo) => (
-                <li
-                  {...props}
-                  key={grupo.getId()}
-                  style={{
-                    ...props.style,
-                    color: grupo.isAtivo() ? undefined : '#9CA3AF',
-                  }}
-                >
-                  {grupo.isAtivo() ? grupo.getNome() : `${grupo.getNome()} (Inativo)`}
-                </li>
-              )}
-              renderInput={params => (
+        {/* Linha 2: Categoria (só na criação) + Unidade + Código EAN */}
+        <div
+          className={
+            showCategoriaField
+              ? 'grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,9.5rem)_minmax(0,1fr)]'
+              : 'grid grid-cols-[minmax(0,9.5rem)_minmax(0,1fr)] gap-4'
+          }
+        >
+          {showCategoriaField ? (
+            <div className="relative z-20 min-w-0">
+              {lockGrupoProduto && !grupoSelecionado && lockedGrupoLabel ? (
                 <TextField
-                  {...params}
-                  label="Grupo"
-                  placeholder="Pesquise ou selecione"
-                  InputLabelProps={{
-                    ...params.InputLabelProps,
-                    shrink: true,
-                  }}
+                  size="small"
+                  fullWidth
+                  label="Categoria"
+                  value={lockedGrupoLabel}
+                  disabled
+                  InputLabelProps={{ shrink: true }}
                   sx={{
                     ...sxEntradaCompactaProduto,
                     '& .MuiOutlinedInput-root': {
@@ -153,9 +144,67 @@ export function InformacoesProdutoStep({
                     },
                   }}
                 />
+              ) : (
+                <>
+                  <Autocomplete
+                    id="np-grupo-produto-searchable"
+                    size="small"
+                    options={grupos}
+                    loading={isLoadingGrupos}
+                    loadingText="Carregando..."
+                    noOptionsText="Nenhuma categoria encontrada"
+                    disabled={lockGrupoProduto}
+                    getOptionLabel={grupo =>
+                      grupo.isAtivo() ? grupo.getNome() : `${grupo.getNome()} (Inativo)`
+                    }
+                    isOptionEqualToValue={(a, b) => a.getId() === b.getId()}
+                    value={grupoSelecionado}
+                    onChange={(_, grupo) => onGrupoProdutoChange(grupo?.getId() ?? null)}
+                    renderOption={(props, grupo) => (
+                      <li
+                        {...props}
+                        key={grupo.getId()}
+                        style={{
+                          ...props.style,
+                          color: grupo.isAtivo() ? undefined : '#9CA3AF',
+                        }}
+                      >
+                        {grupo.isAtivo() ? grupo.getNome() : `${grupo.getNome()} (Inativo)`}
+                      </li>
+                    )}
+                    renderInput={params => (
+                      <TextField
+                        {...params}
+                        label="Categoria"
+                        placeholder={
+                          pendingNovaCategoriaLabel && !grupoSelecionado
+                            ? `Nova: ${pendingNovaCategoriaLabel}`
+                            : 'Pesquise ou selecione'
+                        }
+                        InputLabelProps={{
+                          ...params.InputLabelProps,
+                          shrink: true,
+                        }}
+                        sx={{
+                          ...sxEntradaCompactaProduto,
+                          '& .MuiOutlinedInput-root': {
+                            backgroundColor: '#fff',
+                          },
+                        }}
+                      />
+                    )}
+                  />
+                  {pendingNovaCategoriaLabel?.trim() && !grupoSelecionado ? (
+                    <p className="mt-1 text-[10px] leading-snug text-secondary-text">
+                      Ao concluir, será criada a categoria “{pendingNovaCategoriaLabel.trim()}”.
+                      Selecione uma existente para usar no lugar, ou volte ao passo anterior para
+                      alterar a nova.
+                    </p>
+                  ) : null}
+                </>
               )}
-            />
-          </div>
+            </div>
+          ) : null}
           <div className="min-w-0">
             <FormControl
               fullWidth

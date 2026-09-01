@@ -3,7 +3,7 @@
 > **Documento vivo** — descreve o comportamento atual do código. Ao alterar `VendasKanban`, `NovoPedidoModal` ou módulos em `./kanban/`, atualize as seções afetadas e a data no rodapé.
 
 **Última revisão:** 2026-06-30 (doc sincronizada com orchestrator + edição de produtos)
-**Rota:** `/pedidos-clientes` → `app/(erp)/pedidos-clientes/page.tsx`  
+**Rota:** `/pedidos` → `app/(erp)/pedidos/` (Windows/kiosk: mesmo path, sem TopNav)  
 **Componente raiz:** `src/presentation/components/features/kanban/VendasKanban.tsx`
 
 > **Pastas:** código em `features/kanban/`, `pedidos/`, `delivery/`, `fiscal/`. Inventário em [`docs/arquitetura-jiffy/PEDIDOS_FEATURES_REORGANIZACAO.md`](arquitetura-jiffy/PEDIDOS_FEATURES_REORGANIZACAO.md).
@@ -58,7 +58,7 @@ Funcionalidades centrais:
 ### Estrutura atual
 
 ```
-app/(erp)/pedidos-clientes/page.tsx    # dynamic import → VendasKanban (ssr: false)
+app/(erp)/pedidos/page.tsx           # quadro
 src/presentation/components/features/
 ├── kanban/
 │   ├── VendasKanban.tsx               # Composição pura (~20 linhas)

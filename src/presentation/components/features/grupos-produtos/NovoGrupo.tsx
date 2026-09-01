@@ -76,6 +76,10 @@ interface NovoGrupoProps {
   onSaved?: () => void
   /** Após salvar mantendo o painel aberto (ex.: aba Produtos vinculados) — invalida listas sem fechar. */
   onReload?: () => void
+  /** Só a ficha da categoria (esconde a aba Produtos vinculados). */
+  detalhesOnly?: boolean
+  /** Empilha os pickers de ícone/cor acima de outro painel. */
+  nestedPickerZIndex?: number
   initialTab?: number // 0 = Detalhes do Grupo, 1 = Produtos Vinculados
 }
 
@@ -84,7 +88,7 @@ export interface NovoGrupoHandle {
   /** Há alterações em relação ao último baseline (carregamento ou salvamento). */
   isDirty: () => boolean
   /** Persiste o grupo sem depender do `<form>` (rodapé na aba Produtos vinculados). */
-  saveGrupo: () => Promise<void>
+  saveGrupo: (opts?: { silent?: boolean }) => Promise<string | null>
   /** Salva e fecha o painel (mesmo fluxo do submit do formulário em modo embed). */
   saveGrupoAndClose: () => Promise<void>
 }
@@ -109,6 +113,20 @@ function GrupoDetalhesFormShell({
   return <>{children}</>
 }
 
+function extrairIdGrupoDaResposta(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== 'object') return undefined
+  const root = payload as Record<string, unknown>
+  const nested =
+    root.data && typeof root.data === 'object' && !Array.isArray(root.data)
+      ? (root.data as Record<string, unknown>)
+      : null
+  const candidates = [root.id, nested?.id]
+  for (const c of candidates) {
+    if (typeof c === 'string' && c.trim() !== '') return c.trim()
+  }
+  return undefined
+}
+
 /**
  * Componente para criar/editar grupo de produtos
  * Replica o design e lógica do Flutter NovoGrupoTabbedWidget
@@ -119,21 +137,25 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
     initialGrupo,
     isEmbedded = false,
     embeddedFormId,
-    hideEmbeddedFormActions,
     onGrupoNomeChange,
     onEmbedFormStateChange,
     onEmbeddedTabChange,
     onClose,
     onSaved,
     onReload,
+    detalhesOnly = false,
+    nestedPickerZIndex = 1300,
     initialTab = 0,
   },
   ref
 ) {
   const router = useRouter()
-  const searchParams = useSearchParams()  const invalidate = useInvalidateTenantQueries()
+  const searchParams = useSearchParams()
+  const invalidate = useInvalidateTenantQueries()
 
-  const effectiveGrupoId = grupoId || searchParams.get('id') || null
+  const effectiveGrupoId = isEmbedded
+    ? grupoId ?? null
+    : grupoId || searchParams.get('id') || null
   const seedMatches =
     !!initialGrupo && !!effectiveGrupoId && initialGrupo.getId() === effectiveGrupoId
 
@@ -153,7 +175,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
   )
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(false)
-  const [activeTab, setActiveTab] = useState(initialTab)
+  const [activeTab, setActiveTab] = useState(detalhesOnly ? 0 : initialTab)
   const [isIconPickerOpen, setIsIconPickerOpen] = useState(false)
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false)
 
@@ -165,9 +187,6 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
   }, [nome, onGrupoNomeChange])
 
   const isEditMode = !!effectiveGrupoId
-
-  /** Cabeçalho próprio só fora do painel padronizado (ou embed sem delegar ao modal) */
-  const showPageHeader = !(isEmbedded && hideEmbeddedFormActions)
 
   const emitEmbedFormState = useCallback(() => {
     onEmbedFormStateChange?.({
@@ -183,6 +202,10 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
   useEffect(() => {
     onEmbeddedTabChange?.(activeTab)
   }, [activeTab, onEmbeddedTabChange])
+
+  useEffect(() => {
+    if (detalhesOnly) setActiveTab(0)
+  }, [detalhesOnly])
 
   const normalizeColor = useCallback((value: string) => {
     if (!value) return '#CCCCCC'
@@ -280,7 +303,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
         })
 
         if (!response.ok) {
-          throw new Error('Erro ao carregar grupo')
+          throw new Error('Erro ao carregar categoria')
         }
 
         const data = await response.json()
@@ -302,7 +325,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
       } catch (error) {
         console.error('Erro ao carregar grupo:', error)
         if (!hasSeed) {
-          alert('Erro ao carregar dados do grupo')
+          alert('Erro ao carregar dados da categoria')
         }
       } finally {
         if (blockUi) setIsLoadingData(false)
@@ -326,16 +349,24 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
   }, [isEditMode, effectiveGrupoId, normalizeColor, isEmbedded, initialGrupo])
 
   const handleSave = useCallback(
-    async (opts?: { keepModalOpen?: boolean }) => {
+    async (opts?: { keepModalOpen?: boolean; silent?: boolean }): Promise<string | null> => {
       if (!nome.trim()) {
-        alert('Nome do grupo é obrigatório')
-        return
+        if (opts?.silent) {
+          showToast.error('Nome da categoria é obrigatório')
+        } else {
+          alert('Nome da categoria é obrigatório')
+        }
+        return null
       }
 
       const token = useAuthStore.getState().tenantAuth?.getAccessToken()
       if (!token) {
-        alert('Token não encontrado')
-        return
+        if (opts?.silent) {
+          showToast.error('Token não encontrado')
+        } else {
+          alert('Token não encontrado')
+        }
+        return null
       }
 
       setIsLoading(true)
@@ -346,23 +377,14 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
           : '/api/grupos-produtos'
         const method = isEditMode ? 'PATCH' : 'POST'
 
-        const body = isEditMode
-          ? {
-              nome,
-              ativo,
-              corHex,
-              iconName,
-              ativoDelivery,
-              ativoLocal,
-            }
-          : {
-              nome,
-              ativo,
-              corHex,
-              iconName,
-              ativoDelivery,
-              ativoLocal,
-            }
+        const body = {
+          nome,
+          ativo,
+          corHex,
+          iconName,
+          ativoDelivery,
+          ativoLocal,
+        }
 
         const response = await fetchGestorApi(url, {
           method,
@@ -375,10 +397,14 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
 
         if (!response.ok) {
           const error = await response.json()
-          throw new Error(error.message || 'Erro ao salvar grupo')
+          throw new Error(error.message || 'Erro ao salvar categoria')
         }
 
-        // Sucesso — invalidação com escopo tenant (MULTI-TENANT-JIFFY-DOC-OFICIAL)
+        const payload = await response.json().catch(() => ({}))
+        const idSalvo = isEditMode
+          ? effectiveGrupoId
+          : extrairIdGrupoDaResposta(payload) ?? null
+
         const invalidateListas = async () => {
           await invalidate(['grupos-produtos'])
           await invalidate(['produtos', 'infinite'])
@@ -389,19 +415,29 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
           commitBaselineLatestRef.current()
           if (opts?.keepModalOpen) {
             onReload?.()
-            showToast.success('Grupo salvo com sucesso.')
-            return
+            if (!opts.silent) {
+              showToast.success('Categoria salva com sucesso.')
+            }
+            return idSalvo
           }
           onSaved?.()
           onClose?.()
+          return idSalvo
         } else {
           await invalidateListas()
           router.push('/grupos-produtos')
           router.refresh()
+          return idSalvo
         }
       } catch (error: any) {
         console.error('Erro ao salvar grupo:', error)
-        alert(error.message || 'Erro ao salvar grupo')
+        const message = error.message || 'Erro ao salvar categoria'
+        if (opts?.silent) {
+          showToast.error(message)
+        } else {
+          alert(message)
+        }
+        return null
       } finally {
         setIsLoading(false)
       }
@@ -431,8 +467,11 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
         if (isLoadingData) return false
         return getFormSnapshot() !== baselineSerializedRef.current
       },
-      saveGrupo: () => handleSave({ keepModalOpen: true }),
-      saveGrupoAndClose: () => handleSave(),
+      saveGrupo: (opts?: { silent?: boolean }) =>
+        handleSave({ keepModalOpen: true, silent: opts?.silent }),
+      saveGrupoAndClose: async () => {
+        await handleSave()
+      },
     }),
     [getFormSnapshot, isLoadingData, handleSave]
   )
@@ -481,6 +520,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
         )}
       >
         {/* Abas — mesmo modelo do `GruposComplementosTabsModal` (faixa cinza + pílulas) */}
+        {!detalhesOnly ? (
         <div className="shrink-0 w-full border-b border-gray-200 bg-info px-6">
           <div className="flex flex-wrap gap-1">
             <button
@@ -493,7 +533,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                   : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
               )}
             >
-              Detalhes do Grupo
+              Detalhes da Categoria
             </button>
             <button
               type="button"
@@ -509,6 +549,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
             </button>
           </div>
         </div>
+        ) : null}
 
         {/* Conteúdo das tabs */}
         <div className="flex min-h-0 flex-1 flex-col px-6 overflow-hidden">
@@ -520,7 +561,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
               >
                 <div className="mb-2 flex items-center gap-5">
                 <h2 className="shrink-0 text-primary md:text-xl text-sm font-semibold">
-                  Dados do Grupo de Produtos
+                  Dados da Categoria
                 </h2>
                 <div className="h-px min-w-0 flex-1 bg-primary/70" aria-hidden />
               </div>
@@ -543,11 +584,11 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                       </div>
                       <div>
                         <h2 className="text-primary-text md:text-lg text-sm font-semibold">
-                          {nome.trim() ? nome : 'Nome do Grupo'}
+                          {nome.trim() ? nome : 'Nome da Categoria'}
                         </h2>
                         {!iconName ? (
                           <p className="text-secondary-text md:text-sm text-xs">
-                            Definição do Ícone do Grupo
+                            Definição do Ícone da Categoria
                           </p>
                         ) : null}
                       </div>
@@ -556,7 +597,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                       <JiffyIconSwitch
                         checked={ativo}
                         onChange={e => setAtivo(e.target.checked)}
-                        label={ativo ? 'Grupo ativo' : 'Grupo inativo'}
+                        label={ativo ? 'Categoria ativa' : 'Categoria inativa'}
                         labelPosition="end"
                         bordered={false}
                         size="sm"
@@ -571,12 +612,12 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                   <div className="md:space-y-6 space-y-4">
                     {/* Nome — label na borda superior (outlined), igual cadastro de grupo de complementos */}
                     <Input
-                      label="Nome do Grupo"
+                      label="Nome da Categoria"
                       value={nome}
                       onChange={e => setNome(e.target.value.toLocaleUpperCase('pt-BR'))}
                       required
                       size="small"
-                      placeholder="Digite o nome do grupo"
+                      placeholder="Digite o nome da categoria"
                       className="bg-info"
                       sx={sxEntradaNomeGrupoProduto}
                     />
@@ -586,7 +627,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                       {/* Cor */}
                       <div>
                         <label className="block text-primary-text md:text-sm text-xs font-semibold mb-2">
-                          Cor do Grupo
+                          Cor da Categoria
                         </label>
                         <div className="flex flex-col gap-2">
                           <div className="flex items-center gap-2">
@@ -595,7 +636,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                               onClick={() => setIsColorPickerOpen(true)}
                               className="md:w-12 md:h-12 w-10 h-10 rounded-lg border border-primary/20 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                               style={{ backgroundColor: corHex || '#530CA3' }}
-                              aria-label="Selecionar cor do grupo"
+                              aria-label="Selecionar cor da categoria"
                             />
                             
                             <button
@@ -613,7 +654,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
                       {/* Ícone */}
                       <div>
                         <label className="block text-primary-text md:text-sm text-xs font-semibold mb-2">
-                          Ícone do Grupo
+                          Ícone da Categoria
                         </label>
                         <div className="flex items-center gap-2">
                           <button
@@ -725,7 +766,7 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
             </div>
           )}
 
-          {activeTab === 1 && (
+          {activeTab === 1 && !detalhesOnly && (
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden py-6">
               {isEditMode && effectiveGrupoId ? (
                 <ProdutosPorGrupoList grupoProdutoId={effectiveGrupoId} />
@@ -750,11 +791,13 @@ export const NovoGrupo = forwardRef<NovoGrupoHandle, NovoGrupoProps>(function No
           setIsIconPickerOpen(false)
         }}
         selectedColor={corHex}
+        zIndex={nestedPickerZIndex}
       />
       <ColorPickerModal
         open={isColorPickerOpen}
         onClose={() => setIsColorPickerOpen(false)}
         onSelect={handleColorSelect}
+        zIndex={nestedPickerZIndex}
       />
     </div>
   )

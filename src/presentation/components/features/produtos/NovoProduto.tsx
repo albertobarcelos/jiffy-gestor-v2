@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import {
   useState,
@@ -14,13 +14,32 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { InformacoesProdutoStep } from './NovoProduto/InformacoesProdutoStep'
 import { ConfiguracoesGeraisStep } from './NovoProduto/ConfiguracoesGeraisStep'
 import { ConfiguracaoFiscalStep } from './NovoProduto/ConfiguracaoFiscalStep'
+import { ProdutoFormWithPreviewLayout } from './preview/ProdutoFormWithPreviewLayout'
+import { parsePrecoPreviewFromInput } from './preview/produtoPreviewModel'
+import type { ProdutoPreviewImageUpload } from './preview/ProdutoSimplePreviewCard'
+import {
+  aplicarImagemProdutoNosMenus,
+  buscarIdMenuPrincipal,
+  buscarMenusDaEmpresa,
+  buscarPrimeiraImagemProdutoNosMenus,
+  extrairImagemUrlDoProdutoJson,
+  extrairMenuIdsDoProdutoJson,
+  unirMenuIds,
+  vincularProdutoAosMenus,
+} from '@/src/presentation/utils/uploadImagemProdutoMenus'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast, handleApiError } from '@/src/shared/utils/toast'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { Produto } from '@/src/domain/entities/Produto'
 import { MdImage } from 'react-icons/md'
 import { cn } from '@/src/shared/utils/cn'
+import { usePropagarAlteracaoProduto } from '@/src/presentation/hooks/produtos/usePropagarAlteracaoProduto'
+import {
+  snapshotPropagavelDePatch,
+  type DestinoAlteracaoProduto,
+} from '@/src/shared/types/propagarAlteracaoProduto'
 
 /** Snapshot serializado por `getFormSnapshot` — deve permanecer alinhado a esse método. */
 interface BaselineSnapshotProduto {
@@ -36,6 +55,7 @@ interface BaselineSnapshotProduto {
   abreComplementos: boolean
   permiteAlterarPreco: boolean
   incideTaxa: boolean
+  ativoDelivery: boolean
   ativo: boolean
   grupoComplementosIds: string[]
   impressorasIds: string[]
@@ -78,6 +98,7 @@ function seedFormFromProduto(produto: Produto, isCopy: boolean) {
     abreComplementos: produto.abreComplementosAtivo(),
     permiteAlterarPreco: produto.permiteAlterarPrecoAtivo(),
     incideTaxa: produto.incideTaxaAtivo(),
+    ativoDelivery: produto.isAtivoDelivery(),
     ativo: produto.isAtivo(),
     grupoComplementosIds: produto.getGruposComplementos().map(g => g.id),
     impressorasIds: produto.getImpressoras().map(i => i.id),
@@ -121,6 +142,25 @@ function extrairGrupoProdutoIdDoJsonProduto(produto: Record<string, unknown>): s
     if (typeof id === 'number' && Number.isFinite(id)) return String(id)
   }
   return null
+}
+
+/** Defaults de origem/tipo não contam como dados fiscais — o microserviço exige NCM. */
+function fiscalDeveSerEnviado(fiscalData: Record<string, unknown>): boolean {
+  return typeof fiscalData.ncm === 'string' && fiscalData.ncm.trim() !== ''
+}
+
+function extrairIdProdutoDaRespostaApi(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== 'object') return undefined
+  const root = payload as Record<string, unknown>
+  const nested =
+    root.data && typeof root.data === 'object' && !Array.isArray(root.data)
+      ? (root.data as Record<string, unknown>)
+      : null
+  const candidates = [root.id, root.produtoId, nested?.id, nested?.produtoId]
+  for (const c of candidates) {
+    if (typeof c === 'string' && c.trim() !== '') return c.trim()
+  }
+  return undefined
 }
 
 /** Compara ids de grupo para o PATCH parcial (null, undefined e string vazia tratados como ausência). */
@@ -271,6 +311,9 @@ function montarPatchParcialEdicaoProduto(
   if (!booleanIguaisParaPatch(bodyCompleto.incideTaxa, base.incideTaxa)) {
     delta.incideTaxa = bodyCompleto.incideTaxa
   }
+  if (!booleanIguaisParaPatch(bodyCompleto.ativoDelivery, base.ativoDelivery)) {
+    delta.ativoDelivery = bodyCompleto.ativoDelivery
+  }
 
   if (!arraysIdsIguais(bodyCompleto.gruposComplementosIds as unknown[], base.grupoComplementosIds)) {
     delta.gruposComplementosIds = bodyCompleto.gruposComplementosIds
@@ -278,10 +321,6 @@ function montarPatchParcialEdicaoProduto(
   if (!arraysIdsIguais(bodyCompleto.impressorasIds as unknown[], base.impressorasIds)) {
     delta.impressorasIds = bodyCompleto.impressorasIds
   }
-
-  const ncmCompatAtual = bodyCompleto.ncm as string | undefined
-  const ncmCompatBase = base.ncm?.trim() ? base.ncm.trim() : undefined
-  if (ncmCompatAtual !== ncmCompatBase) delta.ncm = ncmCompatAtual
 
   if (
     incluirAtivo &&
@@ -291,16 +330,35 @@ function montarPatchParcialEdicaoProduto(
     delta.ativo = bodyCompleto.ativo
   }
 
-  const fiscalRefBaseline = montarFiscalReferenciaBaseline(
-    base,
-    salvarSomenteDadosGerais,
-    fiscalRef,
-    hasLoadedFiscal
-  )
-  const fiscalDelta = diffFiscalParcial(fiscalAtual, fiscalRefBaseline)
-  if (fiscalDelta) delta.fiscal = fiscalDelta
+  // Step 1–2: não mexe em NCM/fiscal. Diff parcial sem NCM vira `fiscal: {}` no JSON
+  // e o microserviço responde "Código NCM é obrigatório".
+  if (!salvarSomenteDadosGerais) {
+    const ncmCompatAtual = bodyCompleto.ncm as string | undefined
+    const ncmCompatBase = base.ncm?.trim() ? base.ncm.trim() : undefined
+    if (ncmCompatAtual !== ncmCompatBase && ncmCompatAtual) {
+      delta.ncm = ncmCompatAtual
+    }
+
+    const fiscalRefBaseline = montarFiscalReferenciaBaseline(
+      base,
+      salvarSomenteDadosGerais,
+      fiscalRef,
+      hasLoadedFiscal
+    )
+    const fiscalDelta = diffFiscalParcial(fiscalAtual, fiscalRefBaseline)
+    if (fiscalDelta && fiscalDeveSerEnviado(fiscalAtual)) {
+      delta.fiscal = fiscalAtual
+    }
+  }
 
   return delta
+}
+
+export type NovoProdutoSaveOverrides = {
+  grupoId?: string
+  gruposComplementosIds?: string[]
+  impressorasIds?: string[]
+  menuIds?: string[]
 }
 
 /** API imperativa para o rodapé do `JiffySidePanelModal` (wizard 3 passos). */
@@ -310,9 +368,13 @@ export interface NovoProdutoHandle {
   /** Mesmo fluxo que “Salvar e fechar” nos passos 1–2 */
   savePartialAndClose: () => Promise<boolean>
   /** Salvar completo (passo fiscal ou cadastro inteiro) */
-  saveFinal: () => Promise<boolean>
+  saveFinal: (overrides?: NovoProdutoSaveOverrides) => Promise<boolean>
   /** Há alterações em relação ao último baseline (carregamento ou salvamento). */
   isDirty: () => boolean
+  /** Valida o passo interno atual sem persistir (wizard do cardápio). */
+  canAdvanceCurrentPage: () => boolean
+  /** Categoria selecionada no formulário (existente). Null se ainda for só a nova do passo 1. */
+  getGrupoProdutoId: () => string | null
 }
 
 export interface NovoProdutoProps {
@@ -332,10 +394,29 @@ export interface NovoProdutoProps {
   hideEmbeddedHeader?: boolean
   /** Omite botões inferiores dos passos (Anterior / Próximo / Salvar e fechar) */
   hideEmbeddedFormActions?: boolean
+  /**
+   * Na criação, envia `menuIds` no POST para já vincular o produto a esses cardápios
+   * (em vez de só o menu principal).
+   */
+  menuIds?: string[]
+  /** Trava a categoria (legado; preferir dropdown editável + pendingNovaCategoriaLabel). */
+  lockGrupoProduto?: boolean
+  lockedGrupoLabel?: string
+  /**
+   * Wizard: nome da categoria nova do passo 1 ainda não persistida.
+   * Permite avançar sem `grupoId` e mostra aviso no campo Categoria.
+   */
+  pendingNovaCategoriaLabel?: string
   onWizardStepChange?: (step: 0 | 1 | 2) => void
   onWizardSavingChange?: (saving: boolean) => void
   /** Passo 2 com fiscal indisponível: só “Voltar” no fluxo interno */
   onFiscalUnavailableChange?: (onlyBack: boolean) => void
+  /** Preview de celular à direita (padrão: true no painel embutido). */
+  showMobilePreview?: boolean
+  /** Imagem exibida no preview (ex.: snapshot do cardápio). */
+  previewImagemUrl?: string | null
+  /** Cardápio extra para persistir a imagem (além dos menus já vinculados). */
+  previewMenuId?: string
 }
 
 /**
@@ -354,14 +435,33 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       isEmbedded = false,
       hideEmbeddedHeader = false,
       hideEmbeddedFormActions = false,
+      menuIds,
+      lockGrupoProduto = false,
+      lockedGrupoLabel,
+      pendingNovaCategoriaLabel,
       onWizardStepChange,
       onWizardSavingChange,
       onFiscalUnavailableChange,
+      showMobilePreview,
+      previewImagemUrl = null,
+      previewMenuId,
     },
     ref
   ) {
     const router = useRouter()
-    const searchParams = useSearchParams()
+    const searchParams = useSearchParams()
+    const invalidate = useInvalidateTenantQueries()
+    const [localPreviewImage, setLocalPreviewImage] = useState<string | null>(null)
+    const [serverPreviewImage, setServerPreviewImage] = useState<string | null>(
+      () => previewImagemUrl
+    )
+    const [menusVinculadosIds, setMenusVinculadosIds] = useState<string[]>(() =>
+      initialProduto && produtoId && !isCopyMode
+        ? initialProduto.getMenus().map(menu => menu.id)
+        : []
+    )
+    const [uploadingPreviewImage, setUploadingPreviewImage] = useState(false)
+    const pendingPreviewImageRef = useRef<File | null>(null)
     // Estado do step atual (0 = Informações, 1 = Configurações, 2 = Configuração Fiscal)
     const [selectedPage, setSelectedPage] = useState<0 | 1 | 2>(initialStep)
 
@@ -396,6 +496,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       () => formSeed?.permiteAlterarPreco ?? false
     )
     const [incideTaxa, setIncideTaxa] = useState(() => formSeed?.incideTaxa ?? false)
+    const [ativoDelivery, setAtivoDelivery] = useState(() => formSeed?.ativoDelivery ?? true)
     const [ativo, setAtivo] = useState(() => formSeed?.ativo ?? true)
     const [grupoComplementosIds, setGrupoComplementosIds] = useState<string[]>(
       () => formSeed?.grupoComplementosIds ?? []
@@ -463,6 +564,117 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
     const copyFromId = useMemo(() => copyFromIdValue, [copyFromIdValue])
     const effectiveProdutoId = useMemo(() => produtoId || copyFromId, [produtoId, copyFromId])
     const effectiveIsCopyMode = useMemo(() => isCopyMode || !!copyFromId, [isCopyMode, copyFromId])
+    /** Id persistido nesta sessão de criação (evita segundo POST se o fiscal falhar depois do create). */
+    const [idCriadoNestaSessao, setIdCriadoNestaSessao] = useState<string | undefined>()
+    const idPersistidoParaSave =
+      (produtoId && !effectiveIsCopyMode ? produtoId : undefined) || idCriadoNestaSessao
+    const { pedirConfirmacao, aplicarNosDestinos, aplicarImagemNosDestinos, dialog: dialogPropagacao } =
+      usePropagarAlteracaoProduto()
+
+    const resolverDestinosPadraoImagem = useCallback(
+      async (_token: string, extras: Iterable<string> = []) => {
+        // Só menus já vinculados/escolhidos (+ cardápio atual no fluxo de menu).
+        // Não força o principal — o produto pode existir só no cadastro base.
+        return unirMenuIds(previewMenuId, menusVinculadosIds, extras)
+      },
+      [previewMenuId, menusVinculadosIds]
+    )
+
+    const perguntarCopiaImagemCadastroBase = useCallback(
+      async (produtoIdAlvo: string, file: File, jaAplicados: string[]) => {
+        // Pergunta de imagem só na edição a partir do cadastro base (não no wizard de menu).
+        if (previewMenuId) return
+        const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+        const idsJa = unirMenuIds(jaAplicados)
+        let menusJaSalvos: Array<{ id: string; nome: string }> = []
+        if (token && idsJa.length > 0) {
+          const todos = await buscarMenusDaEmpresa({ token })
+          const setIds = new Set(idsJa)
+          menusJaSalvos = todos.filter(m => setIds.has(m.id)).map(m => ({ id: m.id, nome: m.nome }))
+        }
+        const destinos = await pedirConfirmacao({
+          origem: 'cadastroBase',
+          produtoId: produtoIdAlvo,
+          variante: 'imagem',
+          excluirMenuIds: idsJa,
+          fonteMenus: 'empresa',
+          menusJaSalvos,
+        })
+        if (!destinos || destinos.menuIds.length === 0) return
+        await aplicarImagemNosDestinos({
+          produtoId: produtoIdAlvo,
+          file,
+          destinos,
+          vincularSeAusente: true,
+        })
+      },
+      [previewMenuId, pedirConfirmacao, aplicarImagemNosDestinos]
+    )
+
+    const perguntarVinculoOutrosMenusAposCriacao = useCallback(
+      async (produtoIdAlvo: string, menuIdsJaSalvos: string[], fileImagem?: File | null) => {
+        const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+        if (!token) return
+
+        const todosMenus = await buscarMenusDaEmpresa({ token })
+        const idsJa = new Set(unirMenuIds(menuIdsJaSalvos))
+        const menusJaSalvos = todosMenus
+          .filter(m => idsJa.has(m.id))
+          .map(m => ({ id: m.id, nome: m.nome }))
+
+        const destinos = await pedirConfirmacao({
+          origem: 'cadastroBase',
+          produtoId: produtoIdAlvo,
+          variante: 'vinculoMenus',
+          excluirMenuIds: [...idsJa],
+          fonteMenus: 'empresa',
+          menusJaSalvos,
+        })
+        if (!destinos || destinos.menuIds.length === 0) return
+
+        if (fileImagem) {
+          await aplicarImagemNosDestinos({
+            produtoId: produtoIdAlvo,
+            file: fileImagem,
+            destinos,
+            vincularSeAusente: true,
+          })
+        } else {
+          await vincularProdutoAosMenus({
+            token,
+            produtoId: produtoIdAlvo,
+            menuIds: destinos.menuIds,
+          })
+          await invalidate(['menu-produtos'])
+          await invalidate(['produtos-imagens-cadastro'])
+        }
+      },
+      [pedirConfirmacao, aplicarImagemNosDestinos, invalidate]
+    )
+
+    const persistPreviewImage = useCallback(
+      async (produtoIdAlvo: string, file: File, destinos: string[]) => {
+        const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+        if (!token) throw new Error('Token não encontrado')
+        const ids = unirMenuIds(destinos)
+        if (ids.length === 0) {
+          throw new Error('Não foi possível identificar o menu para salvar a imagem')
+        }
+        // Garante vínculo antes do POST da imagem (senão o menu responde 404).
+        await aplicarImagemProdutoNosMenus({
+          token,
+          produtoId: produtoIdAlvo,
+          menuIds: ids,
+          file,
+          vincularSeAusente: true,
+        })
+        pendingPreviewImageRef.current = null
+        await invalidate(['menus'])
+        await invalidate(['produtos-imagens-cadastro'])
+        await Promise.all(ids.map(id => invalidate(['menu-produtos', id])))
+      },
+      [invalidate]
+    )
 
     /** Snapshot só dos dados do produto (sem passo do wizard) — trocar de etapa não é “alteração”. */
     const getFormSnapshot = useCallback(() => {
@@ -479,6 +691,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         abreComplementos,
         permiteAlterarPreco,
         incideTaxa,
+        ativoDelivery,
         ativo,
         grupoComplementosIds: [...grupoComplementosIds].sort(),
         impressorasIds: [...impressorasIds].sort(),
@@ -501,6 +714,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       abreComplementos,
       permiteAlterarPreco,
       incideTaxa,
+      ativoDelivery,
       ativo,
       grupoComplementosIds,
       impressorasIds,
@@ -523,16 +737,21 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       if (effectiveProdutoId || effectiveIsCopyMode) {
         return
       }
-      if (defaultGrupoProdutoId && defaultGrupoProdutoId !== grupoProduto) {
+      // Wizard: se voltou e escolheu "nova categoria", limpa a existente que ficou no form.
+      if (pendingNovaCategoriaLabel?.trim() && !defaultGrupoProdutoId) {
+        setGrupoProduto(null)
+        return
+      }
+      // Wizard / pré-seleção: aplica a categoria do passo 1 quando ela muda.
+      if (defaultGrupoProdutoId) {
         setGrupoProduto(defaultGrupoProdutoId)
       }
-      // Resetar campos fiscais para valores padrão na criação
-      setNcm('')
-      setCest('')
-      setOrigemMercadoria('0') // Padrão na criação
-      setTipoProduto('00') // Padrão na criação
-      setIndicadorProducaoEscala(null)
-    }, [defaultGrupoProdutoId, effectiveProdutoId, effectiveIsCopyMode, grupoProduto])
+    }, [
+      defaultGrupoProdutoId,
+      pendingNovaCategoriaLabel,
+      effectiveProdutoId,
+      effectiveIsCopyMode,
+    ])
 
     // Baseline inicial em modo criação (após grupo opcional do contexto)
     useEffect(() => {
@@ -622,6 +841,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           abreComplementos: !!(produto.abreComplementos || false),
           permiteAlterarPreco: !!(produto.permiteAlterarPreco ?? false),
           incideTaxa: !!(produto.incideTaxa ?? false),
+          ativoDelivery: produto.ativoDelivery === false ? false : true,
           // Mesma semântica que `setAtivo(produto.ativo ?? true)` — unknown precisa virar boolean explícito
           ativo: produto.ativo === false ? false : true,
           grupoComplementosIds: [...gruposIds].map(id => String(id)).sort(),
@@ -730,11 +950,27 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
             setAbreComplementos(produto.abreComplementos || false)
             setPermiteAlterarPreco(produto.permiteAlterarPreco ?? false)
             setIncideTaxa(produto.incideTaxa ?? false)
+            setAtivoDelivery(produto.ativoDelivery === false ? false : true)
             setAtivo(produto.ativo ?? true)
             const gruposIds = produto.gruposComplementos?.map((g: any) => g.id) || []
             setGrupoComplementosIds(gruposIds)
             setOriginalGrupoComplementosIds(gruposIds) // Guardar os grupos originais
             setImpressorasIds(produto.impressoras?.map((i: any) => i.id) || [])
+
+            const menuIdsLoaded = extrairMenuIdsDoProdutoJson(produto)
+            setMenusVinculadosIds(menuIdsLoaded)
+            const imagemLegado = extrairImagemUrlDoProdutoJson(produto)
+            if (imagemLegado) setServerPreviewImage(imagemLegado)
+            const principalId = await buscarIdMenuPrincipal(token)
+            const ordemImagem = unirMenuIds(previewMenuId, principalId, menuIdsLoaded)
+            if (ordemImagem.length > 0) {
+              const imagemMenu = await buscarPrimeiraImagemProdutoNosMenus({
+                token,
+                produtoId: currentEffectiveProdutoId,
+                menuIds: ordemImagem,
+              })
+              if (imagemMenu) setServerPreviewImage(imagemMenu)
+            }
 
             // IMPORTANTE: Não preencher campos fiscais imediatamente para evitar chamadas ao microserviço fiscal
             // Os dados fiscais serão carregados apenas quando o usuário chegar no passo 3 (ConfiguracaoFiscalStep)
@@ -1259,16 +1495,22 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       setShowDiscardDialog(true)
     }
 
-    const handleSave = async (opcoes?: { salvarSomenteDadosGerais?: boolean }) => {
+    const handleSave = async (
+      opcoes?: { salvarSomenteDadosGerais?: boolean } & NovoProdutoSaveOverrides
+    ) => {
       const salvarSomenteDadosGerais = opcoes?.salvarSomenteDadosGerais === true
+      const grupoIdFinal = opcoes?.grupoId ?? grupoProduto
+      const gruposComplementosIdsFinal = opcoes?.gruposComplementosIds ?? grupoComplementosIds
+      const impressorasIdsFinal = opcoes?.impressorasIds ?? impressorasIds
+      const menuIdsFinal = opcoes?.menuIds ?? menuIds
 
       if (salvarSomenteDadosGerais) {
         if (!nomeProduto?.trim()) {
           showToast.error('Informe o nome do produto.')
           return false
         }
-        if (!grupoProduto) {
-          showToast.error('Selecione o grupo do produto.')
+        if (!grupoIdFinal) {
+          showToast.error('Selecione a categoria do produto.')
           return false
         }
         if (!unidadeProduto) {
@@ -1281,6 +1523,14 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       const precoVendaNum = parseFloat(precoVenda.replace(/[^\d,]/g, '').replace(',', '.'))
       if (!precoVenda || precoVendaNum === 0) {
         showToast.error('O campo "Preço de Venda" não pode ser vazio ou zero.')
+        return false
+      }
+      if (!nomeProduto?.trim()) {
+        showToast.error('Informe o nome do produto.')
+        return false
+      }
+      if (!grupoIdFinal) {
+        showToast.error('Selecione a categoria do produto.')
         return false
       }
 
@@ -1330,13 +1580,28 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         return false
       }
 
+      let destinosPropagacao: DestinoAlteracaoProduto = {
+        aplicarNoCadastroBase: false,
+        menuIds: [],
+      }
+      const formularioSujo =
+        baselineSerializedRef.current !== null &&
+        getFormSnapshot() !== baselineSerializedRef.current
+      if (idPersistidoParaSave && formularioSujo) {
+        const resposta = await pedirConfirmacao({
+          origem: 'cadastroBase',
+          produtoId: idPersistidoParaSave,
+        })
+        if (resposta === null) return false
+        destinosPropagacao = resposta
+      }
+
       const toastId = showToast.loading(
-        effectiveProdutoId && !effectiveIsCopyMode
-          ? 'Salvando alterações...'
-          : 'Cadastrando produto...'
+        idPersistidoParaSave ? 'Salvando alterações...' : 'Cadastrando produto...'
       )
 
       onWizardSavingChange?.(true)
+      const jaExistiaAntesDoSave = Boolean(idPersistidoParaSave)
 
       try {
         const token = useAuthStore.getState().tenantAuth?.getAccessToken()
@@ -1345,46 +1610,27 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           return false
         }
 
-        // Montar objeto de dados fiscais (só inclui se houver pelo menos um campo preenchido)
-        const fiscalData: any = {}
+        const fiscalData: Record<string, unknown> = {}
         let ncmCompatBody: string | undefined
 
-        if (salvarSomenteDadosGerais && !hasLoadedFiscalDataRef.current) {
-          // Edição sem abrir o passo fiscal: preserva fiscal carregado na ref
-          const ref = fiscalDataFromProductRef.current
-          if (ref?.ncm) fiscalData.ncm = String(ref.ncm).trim()
-          if (ref?.cest) fiscalData.cest = String(ref.cest).trim()
-          if (
-            ref?.origemMercadoria !== undefined &&
-            ref?.origemMercadoria !== null &&
-            String(ref.origemMercadoria) !== ''
-          ) {
-            fiscalData.origemMercadoria =
-              typeof ref.origemMercadoria === 'number'
-                ? ref.origemMercadoria
-                : parseInt(String(ref.origemMercadoria), 10)
-          }
-          if (ref?.tipoProduto) fiscalData.tipoProduto = ref.tipoProduto
-          if (ref?.indicadorProducaoEscala) {
-            fiscalData.indicadorProducaoEscala = ref.indicadorProducaoEscala
-          }
-          ncmCompatBody = ref?.ncm ? String(ref.ncm).trim() : undefined
-        } else {
+        if (!salvarSomenteDadosGerais) {
           if (ncm && ncm.trim() !== '') fiscalData.ncm = ncm.trim()
           if (cest && cest.trim() !== '') fiscalData.cest = cest.trim()
-          if (origemMercadoria) fiscalData.origemMercadoria = parseInt(origemMercadoria)
+          if (origemMercadoria !== null && origemMercadoria !== '') {
+            fiscalData.origemMercadoria = parseInt(origemMercadoria, 10)
+          }
           if (tipoProduto) fiscalData.tipoProduto = tipoProduto
           if (indicadorProducaoEscala) fiscalData.indicadorProducaoEscala = indicadorProducaoEscala
-          ncmCompatBody = ncm || undefined
+          ncmCompatBody = ncm?.trim() ? ncm.trim() : undefined
         }
 
-        const isEditMode = Boolean(effectiveProdutoId && !effectiveIsCopyMode)
+        const isEditMode = Boolean(idPersistidoParaSave)
 
-        const body: any = {
+        const body: Record<string, unknown> = {
           nome: nomeProduto,
           descricao: descricaoProduto,
           valor: precoVendaNum,
-          grupoId: grupoProduto,
+          grupoId: grupoIdFinal,
           unidadeMedida: unidadeProduto,
           codigoEan: codigoEanBarras.trim(),
           favorito,
@@ -1393,15 +1639,15 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           permiteDesconto,
           permiteAlterarPreco,
           incideTaxa,
-          gruposComplementosIds: grupoComplementosIds,
-          impressorasIds,
-          // Manter ncm no body para compatibilidade (backend ainda aceita)
-          ncm: ncmCompatBody,
-          ...(effectiveProdutoId ? { ativo } : {}),
+          ativoDelivery,
+          gruposComplementosIds: gruposComplementosIdsFinal,
+          impressorasIds: impressorasIdsFinal,
+          ...(ncmCompatBody ? { ncm: ncmCompatBody } : {}),
+          ...(idPersistidoParaSave ? { ativo } : {}),
+          ...(!isEditMode && menuIdsFinal && menuIdsFinal.length > 0 ? { menuIds: menuIdsFinal } : {}),
         }
 
-        // Adicionar objeto fiscal apenas se houver dados fiscais
-        if (Object.keys(fiscalData).length > 0) {
+        if (fiscalDeveSerEnviado(fiscalData)) {
           body.fiscal = fiscalData
         }
 
@@ -1410,20 +1656,17 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
               baselineSerializedRef.current,
               grupoProdutoIdCarregadoRef.current,
               body,
-              fiscalData,
+              fiscalDeveSerEnviado(fiscalData) ? fiscalData : {},
               salvarSomenteDadosGerais,
               fiscalDataFromProductRef.current,
               hasLoadedFiscalDataRef.current,
-              Boolean(effectiveProdutoId)
+              Boolean(idPersistidoParaSave)
             )
           : body
 
-        const url =
-          effectiveProdutoId && !effectiveIsCopyMode
-            ? `/api/produtos/${effectiveProdutoId}`
-            : '/api/produtos'
+        const url = isEditMode ? `/api/produtos/${idPersistidoParaSave}` : '/api/produtos'
 
-        const method = effectiveProdutoId && !effectiveIsCopyMode ? 'PATCH' : 'POST'
+        const method = isEditMode ? 'PATCH' : 'POST'
 
         // Se for edição e gruposComplementosIds estiver vazio, precisamos remover
         // os grupos individualmente usando DELETE, pois a API externa não processa array vazio
@@ -1443,7 +1686,34 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           : patchParcialEdicao
 
         if (isEditMode && !precisaSalvarProduto) {
-          showToast.successLoading(toastId, 'Nenhuma alteração para salvar.')
+          const imagemPendente = pendingPreviewImageRef.current
+          if (imagemPendente && idPersistidoParaSave) {
+            try {
+              const destinos = await resolverDestinosPadraoImagem(token)
+              if (destinos.length === 0) {
+                showToast.errorLoading(
+                  toastId,
+                  'Produto salvo. Vincule-o a um cardápio para enviar a imagem.'
+                )
+                return false
+              }
+              await persistPreviewImage(idPersistidoParaSave, imagemPendente, destinos)
+              await perguntarCopiaImagemCadastroBase(
+                idPersistidoParaSave,
+                imagemPendente,
+                destinos
+              )
+              showToast.successLoading(toastId, 'Imagem atualizada')
+            } catch (imgErr) {
+              showToast.errorLoading(
+                toastId,
+                imgErr instanceof Error ? imgErr.message : 'Erro ao enviar imagem'
+              )
+              return false
+            }
+          } else {
+            showToast.successLoading(toastId, 'Nenhuma alteração para salvar.')
+          }
           commitBaselineLatestRef.current()
           if (onSuccess) {
             onSuccess(undefined)
@@ -1462,17 +1732,28 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
 
         if (!response.ok) {
           const error = await response.json().catch(() => ({}))
+          const idJaCriado = extrairIdProdutoDaRespostaApi(error)
+          if (!isEditMode && idJaCriado) {
+            setIdCriadoNestaSessao(idJaCriado)
+          }
           const errorMessage = error.message || 'Erro ao salvar produto'
           showToast.errorLoading(toastId, errorMessage)
           return false
         }
+
+        const payloadSucesso = await response.json().catch(() => ({}))
+        const idDaResposta = extrairIdProdutoDaRespostaApi(payloadSucesso)
+        if (!isEditMode && idDaResposta) {
+          setIdCriadoNestaSessao(idDaResposta)
+        }
+        const idSalvo = idPersistidoParaSave || idDaResposta
 
         // Se precisar remover grupos individualmente (quando array está vazio)
         if (shouldRemoveGruposIndividually) {
           try {
             // Remover cada grupo individualmente usando DELETE
             const deletePromises = originalGrupoComplementosIds.map(grupoId =>
-              fetchGestorApi(`/api/produtos/${effectiveProdutoId}/grupos-complementos/${grupoId}`, {
+              fetchGestorApi(`/api/produtos/${idSalvo}/grupos-complementos/${grupoId}`, {
                 method: 'DELETE',
                 headers: {
                   Authorization: `Bearer ${token}`,
@@ -1500,9 +1781,9 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
 
         // Buscar o produto atualizado para atualizar o cache (apenas quando houve PATCH)
         let produtoAtualizado = null
-        if (isEditMode && precisaSalvarProduto) {
+        if (isEditMode && precisaSalvarProduto && idSalvo) {
           try {
-            const produtoResponse = await fetchGestorApi(`/api/produtos/${effectiveProdutoId}`, {
+            const produtoResponse = await fetchGestorApi(`/api/produtos/${idSalvo}`, {
               headers: {
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',
@@ -1519,10 +1800,72 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
 
         showToast.successLoading(
           toastId,
-          effectiveProdutoId && !effectiveIsCopyMode
-            ? 'Produto atualizado com sucesso!'
-            : 'Produto cadastrado com sucesso!'
+          isEditMode ? 'Produto atualizado com sucesso!' : 'Produto cadastrado com sucesso!'
         )
+
+        const snapPropagar = snapshotPropagavelDePatch(
+          (bodyToSend ?? {}) as Record<string, unknown>
+        )
+        if (snapPropagar && idSalvo && destinosPropagacao.menuIds.length > 0) {
+          try {
+            await aplicarNosDestinos({
+              produtoId: idSalvo,
+              snapshot: snapPropagar,
+              destinos: {
+                aplicarNoCadastroBase: false,
+                menuIds: destinosPropagacao.menuIds,
+              },
+            })
+          } catch (propErr) {
+            showToast.error(
+              propErr instanceof Error
+                ? propErr.message
+                : 'Produto salvo, mas não foi possível atualizar os cardápios selecionados'
+            )
+          }
+        }
+
+        const imagemPendente = pendingPreviewImageRef.current
+        let menusComImagem = unirMenuIds(menuIdsFinal)
+        if (imagemPendente && idSalvo) {
+          try {
+            const destinosImagem = await resolverDestinosPadraoImagem(
+              token,
+              menuIdsFinal ?? []
+            )
+            if (destinosImagem.length > 0) {
+              await persistPreviewImage(idSalvo, imagemPendente, destinosImagem)
+              menusComImagem = destinosImagem
+              if (jaExistiaAntesDoSave) {
+                await perguntarCopiaImagemCadastroBase(idSalvo, imagemPendente, destinosImagem)
+              }
+            } else {
+              showToast.error('Produto salvo. Vincule-o a um cardápio para enviar a imagem.')
+            }
+          } catch (imgErr) {
+            showToast.error(
+              imgErr instanceof Error
+                ? imgErr.message
+                : 'Produto salvo, mas não foi possível enviar a imagem'
+            )
+          }
+        }
+
+        if (!jaExistiaAntesDoSave && idSalvo) {
+          try {
+            await perguntarVinculoOutrosMenusAposCriacao(
+              idSalvo,
+              menusComImagem.length > 0 ? menusComImagem : menuIdsFinal ?? [],
+              imagemPendente
+            )
+          } catch (vinculoErr) {
+            showToast.error(
+              vinculoErr instanceof Error
+                ? vinculoErr.message
+                : 'Produto salvo, mas não foi possível vincular a outros cardápios'
+            )
+          }
+        }
         grupoProdutoIdCarregadoRef.current = produtoAtualizado
           ? extrairGrupoProdutoIdDoJsonProduto(produtoAtualizado as Record<string, unknown>)
           : extrairGrupoProdutoIdDoJsonProduto({
@@ -1532,8 +1875,11 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         if (onSuccess) {
           // Passar dados do produto para atualização otimista do cache
           onSuccess(
-            isEditMode && produtoAtualizado && effectiveProdutoId
-              ? { produtoId: effectiveProdutoId, produtoData: produtoAtualizado }
+            idSalvo
+              ? {
+                  produtoId: idSalvo,
+                  produtoData: produtoAtualizado ?? payloadSucesso?.data ?? payloadSucesso,
+                }
               : undefined
           )
         } else {
@@ -1569,14 +1915,45 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           })
         },
         savePartialAndClose: () => handleSaveRef.current({ salvarSomenteDadosGerais: true }),
-        saveFinal: () => handleSaveRef.current(),
+        saveFinal: overrides => handleSaveRef.current(overrides),
+        getGrupoProdutoId: () => grupoProduto,
         isDirty: () => {
           if (isLoadingProduto) return false
           if (baselineSerializedRef.current === null) return false
           return getFormSnapshot() !== baselineSerializedRef.current
         },
+        canAdvanceCurrentPage: () => {
+          const precoNum = parseFloat(
+            precoVenda.replace(/[^\d,]/g, '').replace(',', '.')
+          )
+          if (!nomeProduto?.trim()) return false
+          if (!precoVenda || precoNum <= 0) return false
+          if (!unidadeProduto) return false
+          const isEditMode = Boolean(effectiveProdutoId) && !effectiveIsCopyMode
+          // Criação/cópia: categoria existente ou nova pendente do wizard (passo 1).
+          if (
+            !isEditMode &&
+            !lockGrupoProduto &&
+            !grupoProduto &&
+            !pendingNovaCategoriaLabel?.trim()
+          ) {
+            return false
+          }
+          return true
+        },
       }),
-      [getFormSnapshot, isLoadingProduto]
+      [
+        getFormSnapshot,
+        isLoadingProduto,
+        nomeProduto,
+        precoVenda,
+        unidadeProduto,
+        grupoProduto,
+        lockGrupoProduto,
+        pendingNovaCategoriaLabel,
+        effectiveProdutoId,
+        effectiveIsCopyMode,
+      ]
     )
 
     useEffect(() => {
@@ -1605,6 +1982,70 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
 
     const hideLocalStepFooter = Boolean(isEmbedded && hideEmbeddedFormActions)
     const showInnerProdutoHeader = !(isEmbedded && hideEmbeddedHeader)
+    const exibirPreviewMobile = showMobilePreview ?? true
+
+    useEffect(() => {
+      return () => {
+        if (localPreviewImage?.startsWith('blob:')) {
+          URL.revokeObjectURL(localPreviewImage)
+        }
+      }
+    }, [localPreviewImage])
+
+    const handlePreviewImageUpload = useCallback(
+      async (file: File) => {
+        pendingPreviewImageRef.current = file
+        const blobUrl = URL.createObjectURL(file)
+        setLocalPreviewImage(prev => {
+          if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+          return blobUrl
+        })
+
+        const produtoIdAlvo = idPersistidoParaSave
+        if (!produtoIdAlvo) return
+
+        setUploadingPreviewImage(true)
+        try {
+          const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+          if (!token) throw new Error('Token não encontrado')
+          const destinos = await resolverDestinosPadraoImagem(token, menuIds ?? [])
+          if (destinos.length === 0) return
+          await persistPreviewImage(produtoIdAlvo, file, destinos)
+          await perguntarCopiaImagemCadastroBase(produtoIdAlvo, file, destinos)
+          showToast.success(
+            destinos.length > 1
+              ? 'Imagem atualizada nos cardápios vinculados'
+              : 'Imagem atualizada no cardápio vinculado'
+          )
+        } catch (err) {
+          showToast.error(err instanceof Error ? err.message : 'Erro ao enviar imagem')
+        } finally {
+          setUploadingPreviewImage(false)
+        }
+      },
+      [idPersistidoParaSave, menuIds, persistPreviewImage, resolverDestinosPadraoImagem, perguntarCopiaImagemCadastroBase]
+    )
+
+    const previewImageUpload = useMemo((): ProdutoPreviewImageUpload | undefined => {
+      if (!exibirPreviewMobile) return undefined
+      return {
+        enabled: !uploadingPreviewImage,
+        busy: uploadingPreviewImage,
+        hint: 'Arraste ou clique para recortar e enviar',
+        disabledHint: 'Enviando imagem…',
+        onUpload: handlePreviewImageUpload,
+      }
+    }, [exibirPreviewMobile, uploadingPreviewImage, handlePreviewImageUpload])
+
+    const previewProduto = useMemo(
+      () => ({
+        nome: nomeProduto,
+        preco: parsePrecoPreviewFromInput(precoVenda),
+        descricao: descricaoProduto,
+        imagemUrl: localPreviewImage ?? serverPreviewImage ?? previewImagemUrl,
+      }),
+      [nomeProduto, precoVenda, descricaoProduto, localPreviewImage, serverPreviewImage, previewImagemUrl]
+    )
 
     return (
       <div
@@ -1719,12 +2160,14 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
           </div>
         </div>
 
-        {/* Conteúdo das etapas */}
-        <div
-          className={`flex min-h-0 flex-1 flex-col overflow-y-auto pb-4 ${
-            isEmbedded ? 'px-2 md:px-4' : 'px-1 pb-5 md:px-5'
-          }`}
+        {/* Conteúdo das etapas + preview fixo à direita */}
+        <ProdutoFormWithPreviewLayout
+          showPreview={exibirPreviewMobile}
+          preview={previewProduto}
+          imageUpload={previewImageUpload}
+          className={isEmbedded ? 'min-h-0 flex-1 px-2 md:px-4' : 'min-h-0 flex-1 px-1 md:px-5'}
         >
+          <div className="pb-4">
           {selectedPage === 0 ? (
             <InformacoesProdutoStep
               nomeProduto={nomeProduto}
@@ -1737,6 +2180,10 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
               onUnidadeProdutoChange={setUnidadeProduto}
               grupoProduto={grupoProduto}
               onGrupoProdutoChange={setGrupoProduto}
+              lockGrupoProduto={lockGrupoProduto}
+              lockedGrupoLabel={lockedGrupoLabel}
+              pendingNovaCategoriaLabel={pendingNovaCategoriaLabel}
+              showCategoriaField={!(!!effectiveProdutoId && !effectiveIsCopyMode)}
               codigoEanBarras={codigoEanBarras}
               onCodigoEanBarrasChange={setCodigoEanBarras}
               grupos={grupos}
@@ -1759,6 +2206,8 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
               onPermiteAlterarPrecoChange={setPermiteAlterarPreco}
               incideTaxa={incideTaxa}
               onIncideTaxaChange={setIncideTaxa}
+              ativoDelivery={ativoDelivery}
+              onAtivoDeliveryChange={setAtivoDelivery}
               grupoComplementosIds={grupoComplementosIds}
               onGrupoComplementosIdsChange={setGrupoComplementosIds}
               impressorasIds={impressorasIds}
@@ -1799,7 +2248,8 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
               hideStepFooter={hideLocalStepFooter}
             />
           )}
-        </div>
+          </div>
+        </ProdutoFormWithPreviewLayout>
 
         {/* Confirmação ao sair sem salvar (páginas /produtos/novo e /editar — sem onClose do painel) */}
         {showDiscardDialog ? (
@@ -1847,6 +2297,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
             </div>
           </div>
         ) : null}
+        {dialogPropagacao}
       </div>
     )
   }

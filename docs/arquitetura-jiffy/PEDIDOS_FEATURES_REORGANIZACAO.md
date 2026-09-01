@@ -27,7 +27,7 @@ Estes arquivos importam de `features/nfe` hoje e precisam ser atualizados nas fa
 
 | Arquivo | Import atual | Feature alvo (fase) |
 |---------|--------------|---------------------|
-| `app/(erp)/pedidos-clientes/page.tsx` | `VendasKanban` | `kanban` (Fase 4) |
+| `app/(erp)/pedidos/page.tsx` | `VendasKanban` | quadro |
 | `app/layout.tsx` | `DocumentoFiscalPdfRetryModal` | `fiscal` (Fase 2) |
 | `src/presentation/components/features/vendas/DetalhesVendas.tsx` | `StatusFiscalBadge` | `fiscal` (Fase 2) |
 | `src/presentation/hooks/usePedidosDeliveryInfinite.ts` | `kanban/kanbanVendaCacheUpdate` | `kanban` (Fase 4) |

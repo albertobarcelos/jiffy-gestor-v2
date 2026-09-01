@@ -15,7 +15,7 @@ interface GrupoProdutosMultiFilterProps {
 function rotuloGruposSelecionados(selecionados: GrupoProduto[]): string | null {
   if (selecionados.length === 0) return null
   if (selecionados.length === 1) return selecionados[0].getNome()
-  return `${selecionados.length} grupos selecionados`
+  return `${selecionados.length} categorias selecionadas`
 }
 
 export function GrupoProdutosMultiFilter({
@@ -59,7 +59,7 @@ export function GrupoProdutosMultiFilter({
       renderInput={params => (
         <TextField
           {...params}
-          label="Grupo de produtos"
+          label="Categoria"
           placeholder={value.length === 0 ? 'Pesquise ou Selecione' : ''}
           InputLabelProps={{
             ...params.InputLabelProps,
