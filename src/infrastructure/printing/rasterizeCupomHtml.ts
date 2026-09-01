@@ -132,7 +132,6 @@ export async function rasterizeCupomHtmlToPngBase64(
       useCORS: true,
       allowTaint: false,
       logging: false,
-      letterRendering: true,
       width,
       height,
       windowWidth: width,
