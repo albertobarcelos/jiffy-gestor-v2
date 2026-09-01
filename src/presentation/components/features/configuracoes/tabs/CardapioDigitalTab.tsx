@@ -20,7 +20,11 @@ import { compartilharLinkDelivery } from '@/src/presentation/components/features
 import { deliveryPublicoHomePath } from '@/src/presentation/components/features/delivery-publico/shared/utils/deliveryPublicoRoutes'
 import { MenuParametroEmpresaSelect } from '../MenuParametroEmpresaSelect'
 import { DeliveryPendenciasAlert } from '@/src/presentation/components/features/delivery/configuracoes/DeliveryPendenciasAlert'
-import { lojaDeliveryProntaParaPublico } from '@/src/shared/constants/empresaDeliveryPendencias'
+import {
+  filtrarPendenciasObrigatorias,
+  filtrarPendenciasOrientacao,
+  lojaDeliveryDisponivel,
+} from '@/src/shared/constants/empresaDeliveryPendencias'
 
 export function CardapioDigitalTab() {
   const { empresa } = useEmpresaMe()
@@ -37,7 +41,9 @@ export function CardapioDigitalTab() {
 
   const empresaDelivery = empresaDeliveryQuery.data
   const pendencias = empresaDelivery?.pendencias ?? []
-  const lojaPublicaPronta = lojaDeliveryProntaParaPublico(pendencias)
+  const pendenciasObrigatorias = filtrarPendenciasObrigatorias(pendencias)
+  const pendenciasOrientacao = filtrarPendenciasOrientacao(pendencias)
+  const lojaPublicaPronta = lojaDeliveryDisponivel(empresaDelivery ?? undefined)
   const configurado = empresaDelivery != null
   const carregando =
     empresaDeliveryQuery.isPending || criarMutation.isPending || atualizarMutation.isPending
@@ -171,8 +177,15 @@ export function CardapioDigitalTab() {
           </div>
         </div>
 
-        {configurado && pendencias.length > 0 ? (
-          <DeliveryPendenciasAlert pendencias={pendencias} />
+        {configurado && !lojaPublicaPronta && pendenciasObrigatorias.length > 0 ? (
+          <DeliveryPendenciasAlert
+            variant="bloqueante"
+            pendencias={pendenciasObrigatorias}
+          />
+        ) : null}
+
+        {configurado && pendenciasOrientacao.length > 0 ? (
+          <DeliveryPendenciasAlert variant="orientacao" pendencias={pendenciasOrientacao} />
         ) : null}
 
         <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm md:p-6">
@@ -240,7 +253,7 @@ export function CardapioDigitalTab() {
                     title={
                       lojaPublicaPronta
                         ? undefined
-                        : 'Resolva as pendências acima antes de abrir a loja pública'
+                        : 'Resolva as pendências obrigatórias antes de abrir a loja pública'
                     }
                     className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-semibold transition-colors ${
                       lojaPublicaPronta
@@ -250,7 +263,9 @@ export function CardapioDigitalTab() {
                     onClick={event => {
                       if (!lojaPublicaPronta) {
                         event.preventDefault()
-                        showToast.error('Resolva as pendências de configuração antes de abrir a loja online.')
+                        showToast.error(
+                          'Resolva as pendências obrigatórias antes de abrir a loja online.'
+                        )
                       }
                     }}
                   >

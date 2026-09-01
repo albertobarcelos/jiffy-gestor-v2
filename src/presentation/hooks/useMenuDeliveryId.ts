@@ -38,6 +38,7 @@ export function useMenuDeliveryId() {
   return {
     menuDeliveryId,
     empresaDeliveryConfigurada: empresaDeliveryQuery.data != null,
+    available: empresaDeliveryQuery.data?.available,
     pendencias: empresaDeliveryQuery.data?.pendencias ?? [],
     isLoading,
     isError: empresaDeliveryQuery.isError,

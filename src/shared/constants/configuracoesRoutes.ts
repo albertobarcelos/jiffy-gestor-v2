@@ -2,6 +2,7 @@
 export const CONFIGURACOES_TAB_SLUGS = [
   'empresa',
   'empresa-delivery',
+  'cobertura-delivery',
   'terminais',
   'impressoras',
   'meios-pagamentos',

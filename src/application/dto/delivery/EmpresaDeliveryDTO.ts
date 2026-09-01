@@ -11,6 +11,8 @@ export interface ParametroDeliveryDTO {
 export interface EmpresaDeliveryPendenciaDTO {
   type: string
   message: string
+  /** `false` = orientação ao técnico; não bloqueia a loja pública. */
+  obrigatoria?: boolean
 }
 
 export interface EmpresaDeliveryDTO {
@@ -18,6 +20,8 @@ export interface EmpresaDeliveryDTO {
   slug: string
   empresaId: string
   parametroDelivery: ParametroDeliveryDTO
+  /** `false` quando há pendência obrigatória; orientações não afetam este campo. */
+  available?: boolean
   pendencias?: EmpresaDeliveryPendenciaDTO[]
 }
 

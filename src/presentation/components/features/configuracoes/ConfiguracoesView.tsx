@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { EmpresaTab } from './tabs/EmpresaTab'
 import { CardapioDigitalTab } from './tabs/CardapioDigitalTab'
+import { CoberturaDeliveryTab } from './tabs/CoberturaDeliveryTab'
 import { TerminaisTab } from './tabs/TerminaisTab'
 import { ImpressorasList } from '@/src/presentation/components/features/impressoras/ImpressorasList'
 import { MeiosPagamentosList } from '@/src/presentation/components/features/meios-pagamentos/MeiosPagamentosList'
@@ -63,6 +64,7 @@ export function ConfiguracoesView({ activeTab }: ConfiguracoesViewProps) {
         <div className="flex flex-wrap gap-1 pt-2">
           {tabBtn('empresa', 'Empresa')}
           {tabBtn('empresa-delivery', 'Empresa Delivery')}
+          {tabBtn('cobertura-delivery', 'Cobertura Delivery')}
           {tabBtn('terminais', 'Terminais')}
           {tabBtn('impressoras', 'Impressoras')}
           {tabBtn('meios-pagamentos', 'Meios de pagamento')}
@@ -75,6 +77,7 @@ export function ConfiguracoesView({ activeTab }: ConfiguracoesViewProps) {
         <div className="flex flex-1 flex-col overflow-hidden rounded-b-[10px] bg-info">
           {activeTab === 'empresa' && <EmpresaTab />}
           {activeTab === 'empresa-delivery' && <CardapioDigitalTab />}
+          {activeTab === 'cobertura-delivery' && <CoberturaDeliveryTab />}
           {activeTab === 'terminais' && <TerminaisTab />}
           {activeTab === 'impressoras' && <ImpressorasList />}
           {activeTab === 'meios-pagamentos' && (
