@@ -88,7 +88,7 @@ export function EmpresaGeolocalizacaoSection({
           className={`inline-flex w-fit items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${
             configurada
               ? 'bg-emerald-100 text-emerald-800'
-              : 'bg-amber-100 text-amber-900'
+              : 'bg-alternate/15 text-alternate'
           }`}
         >
           <MdLocationOn className="h-4 w-4" aria-hidden />
@@ -105,7 +105,7 @@ export function EmpresaGeolocalizacaoSection({
         ) : null}
 
         {enderecoAlterado ? (
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <p className="rounded-lg border border-alternate/30 bg-alternate/10 px-3 py-2 text-sm text-alternate">
             O endereço textual foi alterado. Busque novamente no Google ou ajuste o pin antes de salvar.
           </p>
         ) : null}

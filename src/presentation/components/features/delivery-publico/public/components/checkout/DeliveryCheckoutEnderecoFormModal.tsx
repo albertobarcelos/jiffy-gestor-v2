@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, Home, LocateFixed, MapPin, Pencil } from 'lucide-react'
+import { ChevronDown, Home, LocateFixed, MapPin, Pencil, PenLine } from 'lucide-react'
 import type { EnderecoGeoCheckoutInput } from '@/src/application/dto/delivery-publico/EnderecoGeoCheckoutDTO'
 import {
   geoCheckoutProntaParaConfirmar,
@@ -237,6 +237,20 @@ export function DeliveryCheckoutEnderecoFormModal({
     setEtapaUi('busca')
   }
 
+  const iniciarPreenchimentoManual = () => {
+    const textoBusca = buscaPlaces.trim()
+    if (textoBusca) {
+      const digitosCep = normalizarDigitosCep(textoBusca)
+      if (digitosCep.length === 8 && !form.cep.trim()) {
+        onChange('cep', formatarCepMascara(digitosCep))
+      } else if (!form.rua.trim()) {
+        onChange('rua', maiusculasEnderecoInput(textoBusca))
+      }
+    }
+    setEtapaUi('edicao')
+    focoPendenteRef.current = form.rua.trim() ? 'numero' : 'rua'
+  }
+
   const handleTogglePreferencia = (checked: boolean) => {
     setUsarPontoPreferencia(checked)
     if (checked) {
@@ -423,6 +437,19 @@ export function DeliveryCheckoutEnderecoFormModal({
           disabled={salvando}
         />
 
+        {etapaUi === 'busca' ? (
+          <button
+            type="button"
+            disabled={salvando}
+            onClick={iniciarPreenchimentoManual}
+            className="flex min-h-[40px] w-full items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold delivery-text-primary disabled:opacity-60"
+            style={{ borderColor: 'var(--delivery-border)' }}
+          >
+            <PenLine className="h-4 w-4" aria-hidden />
+            Preencher endereço
+          </button>
+        ) : null}
+
         {etapaUi === 'resumo' && form.rua.trim() ? (
           <div
             className="rounded-xl border px-3 py-2"
@@ -471,77 +498,75 @@ export function DeliveryCheckoutEnderecoFormModal({
 
         {modoEdicaoCompleta ? (
           <>
-            <label className="relative block">
-              <span className="absolute -top-2 left-3 z-10 bg-[var(--delivery-surface,#fff)] px-1 text-xs delivery-text-secondary">
-                CEP
-              </span>
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={9}
-                placeholder="00000-000"
-                value={form.cep}
-                disabled={buscandoCep}
-                onChange={e => onChange('cep', formatarCepMascara(e.target.value))}
-                onBlur={() => {
-                  if (normalizarDigitosCep(form.cep).length === 8) void buscarCep()
-                }}
-                className={fieldClass}
-                style={fieldStyle}
-              />
-            </label>
-
-            <label className="relative block">
-              <span className="absolute -top-2 left-3 z-10 bg-[var(--delivery-surface,#fff)] px-1 text-xs delivery-text-secondary">
-                Cidade
-              </span>
-              <div className="relative">
-                <DeliveryCheckoutUppercaseInput
-                  ref={cidadeInputRef}
-                  value={
-                    form.cidade && form.estado
-                      ? `${form.cidade} - ${form.estado}`
-                      : form.cidade
-                  }
-                  onValueChange={raw => {
-                    const parts = raw.split('-').map(p => p.trim())
-                    if (parts.length >= 2 && parts[parts.length - 1].length <= 2) {
-                      onChange('estado', normalizarEstadoEndereco(parts.pop()!))
-                      onChange('cidade', maiusculasEnderecoInput(parts.join(' - ')))
-                    } else {
-                      onChange('cidade', maiusculasEnderecoInput(raw))
-                    }
-                  }}
-                  className={`${fieldClass} pr-9`}
-                  style={fieldStyle}
-                  placeholder="Cidade - UF"
-                />
-                <ChevronDown
-                  className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 opacity-40"
-                  aria-hidden
-                />
-              </div>
-            </label>
-
-            <label className="relative block">
-              <span className="absolute -top-2 left-3 z-10 bg-[var(--delivery-surface,#fff)] px-1 text-xs delivery-text-secondary">
-                Rua/Av.
-              </span>
-              <DeliveryCheckoutUppercaseInput
-                ref={ruaInputRef}
-                value={form.rua}
-                onValueChange={valor => onChange('rua', valor)}
-                className={fieldClass}
-                style={fieldStyle}
-              />
-            </label>
-          </>
-        ) : null}
-
-        {mostrarDetalhes ? (
-          <>
             <div className="flex gap-2">
               <label className="relative w-[38%] shrink-0">
+                <span className="absolute -top-2 left-3 z-10 bg-[var(--delivery-surface,#fff)] px-1 text-xs delivery-text-secondary">
+                  CEP
+                </span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={9}
+                  placeholder="00000-000"
+                  value={form.cep}
+                  disabled={buscandoCep}
+                  onChange={e => onChange('cep', formatarCepMascara(e.target.value))}
+                  onBlur={() => {
+                    if (normalizarDigitosCep(form.cep).length === 8) void buscarCep()
+                  }}
+                  className={fieldClass}
+                  style={fieldStyle}
+                />
+              </label>
+
+              <label className="relative min-w-0 flex-1">
+                <span className="absolute -top-2 left-3 z-10 bg-[var(--delivery-surface,#fff)] px-1 text-xs delivery-text-secondary">
+                  Cidade
+                </span>
+                <div className="relative">
+                  <DeliveryCheckoutUppercaseInput
+                    ref={cidadeInputRef}
+                    value={
+                      form.cidade && form.estado
+                        ? `${form.cidade} - ${form.estado}`
+                        : form.cidade
+                    }
+                    onValueChange={raw => {
+                      const parts = raw.split('-').map(p => p.trim())
+                      if (parts.length >= 2 && parts[parts.length - 1].length <= 2) {
+                        onChange('estado', normalizarEstadoEndereco(parts.pop()!))
+                        onChange('cidade', maiusculasEnderecoInput(parts.join(' - ')))
+                      } else {
+                        onChange('cidade', maiusculasEnderecoInput(raw))
+                      }
+                    }}
+                    className={`${fieldClass} pr-9`}
+                    style={fieldStyle}
+                    placeholder="Cidade - UF"
+                  />
+                  <ChevronDown
+                    className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 opacity-40"
+                    aria-hidden
+                  />
+                </div>
+              </label>
+            </div>
+
+            <div className="flex gap-2">
+              <label className="relative min-w-0 flex-1">
+                <span className="absolute -top-2 left-3 z-10 bg-[var(--delivery-surface,#fff)] px-1 text-xs delivery-text-secondary">
+                  Rua/Av.
+                </span>
+                <DeliveryCheckoutUppercaseInput
+                  ref={ruaInputRef}
+                  value={form.rua}
+                  onValueChange={valor => onChange('rua', valor)}
+                  className={fieldClass}
+                  style={fieldStyle}
+                />
+              </label>
+
+              <label className="relative w-[30%] shrink-0">
                 <span className="absolute -top-2 left-3 z-10 bg-[var(--delivery-surface,#fff)] px-1 text-xs delivery-text-secondary">
                   Número
                 </span>
@@ -553,7 +578,10 @@ export function DeliveryCheckoutEnderecoFormModal({
                   style={fieldStyle}
                 />
               </label>
-              <label className="relative min-w-0 flex-1">
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <label className="relative min-w-0">
                 <span className="absolute -top-2 left-3 z-10 bg-[var(--delivery-surface,#fff)] px-1 text-xs delivery-text-secondary">
                   Bairro
                 </span>
@@ -566,31 +594,94 @@ export function DeliveryCheckoutEnderecoFormModal({
                   style={fieldStyle}
                 />
               </label>
+
+              <label className="relative min-w-0">
+                <span className="absolute -top-2 left-3 z-10 bg-[var(--delivery-surface,#fff)] px-1 text-xs delivery-text-secondary">
+                  Complemento
+                </span>
+                <DeliveryCheckoutUppercaseInput
+                  value={form.complemento}
+                  onValueChange={valor => onChange('complemento', valor)}
+                  className={fieldClass}
+                  style={fieldStyle}
+                />
+              </label>
+
+              <label className="relative col-span-2 min-w-0 sm:col-span-1">
+                <span className="absolute -top-2 left-3 z-10 bg-[var(--delivery-surface,#fff)] px-1 text-xs delivery-text-secondary">
+                  Ponto de referência
+                </span>
+                <DeliveryCheckoutUppercaseInput
+                  value={form.pontoReferencia}
+                  onValueChange={valor => onChange('pontoReferencia', valor)}
+                  className={fieldClass}
+                  style={fieldStyle}
+                />
+              </label>
             </div>
+          </>
+        ) : null}
 
-            <label className="relative block">
-              <span className="absolute -top-2 left-3 z-10 bg-[var(--delivery-surface,#fff)] px-1 text-xs delivery-text-secondary">
-                Complemento
-              </span>
-              <DeliveryCheckoutUppercaseInput
-                value={form.complemento}
-                onValueChange={valor => onChange('complemento', valor)}
-                className={fieldClass}
-                style={fieldStyle}
-              />
-            </label>
+        {mostrarDetalhes ? (
+          <>
+            {!modoEdicaoCompleta ? (
+              <>
+                <div className="flex gap-2">
+                  <label className="relative w-[30%] shrink-0">
+                    <span className="absolute -top-2 left-3 z-10 bg-[var(--delivery-surface,#fff)] px-1 text-xs delivery-text-secondary">
+                      Número
+                    </span>
+                    <DeliveryCheckoutUppercaseInput
+                      ref={numeroInputRef}
+                      value={form.numero}
+                      onValueChange={valor => onChange('numero', valor)}
+                      className={fieldClass}
+                      style={fieldStyle}
+                    />
+                  </label>
 
-            <label className="relative block">
-              <span className="absolute -top-2 left-3 z-10 bg-[var(--delivery-surface,#fff)] px-1 text-xs delivery-text-secondary">
-                Ponto de referência
-              </span>
-              <DeliveryCheckoutUppercaseInput
-                value={form.pontoReferencia}
-                onValueChange={valor => onChange('pontoReferencia', valor)}
-                className={fieldClass}
-                style={fieldStyle}
-              />
-            </label>
+                  <label className="relative min-w-0 flex-1">
+                    <span className="absolute -top-2 left-3 z-10 bg-[var(--delivery-surface,#fff)] px-1 text-xs delivery-text-secondary">
+                      Bairro
+                    </span>
+                    <DeliveryCheckoutUppercaseInput
+                      ref={bairroInputRef}
+                      value={form.bairro}
+                      onValueChange={valor => onChange('bairro', valor)}
+                      placeholder="Informe o bairro"
+                      className={fieldClass}
+                      style={fieldStyle}
+                    />
+                  </label>
+                </div>
+
+                <div className="flex gap-2">
+                  <label className="relative min-w-0 flex-1">
+                    <span className="absolute -top-2 left-3 z-10 bg-[var(--delivery-surface,#fff)] px-1 text-xs delivery-text-secondary">
+                      Complemento
+                    </span>
+                    <DeliveryCheckoutUppercaseInput
+                      value={form.complemento}
+                      onValueChange={valor => onChange('complemento', valor)}
+                      className={fieldClass}
+                      style={fieldStyle}
+                    />
+                  </label>
+
+                  <label className="relative min-w-0 flex-1">
+                    <span className="absolute -top-2 left-3 z-10 bg-[var(--delivery-surface,#fff)] px-1 text-xs delivery-text-secondary">
+                      Ponto de referência
+                    </span>
+                    <DeliveryCheckoutUppercaseInput
+                      value={form.pontoReferencia}
+                      onValueChange={valor => onChange('pontoReferencia', valor)}
+                      className={fieldClass}
+                      style={fieldStyle}
+                    />
+                  </label>
+                </div>
+              </>
+            ) : null}
 
             <div>
               <p className="mb-1 text-sm font-semibold delivery-text-primary">
@@ -620,6 +711,7 @@ export function DeliveryCheckoutEnderecoFormModal({
 
             <EnderecoGeolocalizacaoSection
               variant="delivery"
+              hideHeader
               autoGeocode={mostrarDetalhes && !geoSincronizadaComEndereco}
               endereco={enderecoGeocode}
               localizacao={enderecoLocalizacao}
@@ -641,13 +733,6 @@ export function DeliveryCheckoutEnderecoFormModal({
               }}
               onMapChange={handleMapChange}
               onGeocodeBuscandoChange={setBuscandoGeocodeMapa}
-              title="Localização para entrega"
-              subtitle={
-                usarPontoPreferencia
-                  ? 'Ajuste o pin do ponto de entrega. O endereço no mapa permanece fixo.'
-                  : 'O mapa atualiza ao alterar o endereço. Arraste o pin se precisar corrigir.'
-              }
-              obrigatorio
               buscarLabel="Atualizar endereço no mapa"
               successToast="Localização atualizada. Ajuste o pin se necessário."
             />

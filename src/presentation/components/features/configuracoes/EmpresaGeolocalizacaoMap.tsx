@@ -65,7 +65,7 @@ export function EmpresaGeolocalizacaoMap({
 
   if (!apiKey) {
     return (
-      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+      <div className="rounded-lg border border-alternate/30 bg-alternate/10 px-3 py-2 text-sm text-alternate">
         Defina <code className="text-xs">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> no{' '}
         <code className="text-xs">.env.local</code> (mesma chave do Geocoding) para exibir o mapa.
       </div>

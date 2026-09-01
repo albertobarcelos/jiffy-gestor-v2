@@ -187,7 +187,7 @@ export function CoberturaDeliveryTab() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-      <div className="mx-auto w-full max-w-4xl space-y-6 p-4 md:p-6">
+      <div className="mx-auto w-full max-w-[1200px] space-y-6 p-4 md:p-6">
         <div className="flex items-start gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-secondary/10 text-secondary">
             <MdRadar className="h-6 w-6" aria-hidden />
@@ -207,10 +207,10 @@ export function CoberturaDeliveryTab() {
               <section
                 key={alerta.titulo}
                 role="alert"
-                className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950"
+                className="rounded-xl border border-alternate/40 bg-alternate/10 p-4 text-alternate"
               >
                 <p className="text-sm font-semibold">{alerta.titulo}</p>
-                <p className="mt-1 text-xs text-amber-900/80">{alerta.descricao}</p>
+                <p className="mt-1 text-xs text-alternate/80">{alerta.descricao}</p>
                 {alerta.href && alerta.label ? (
                   <Link
                     href={alerta.href}
@@ -245,7 +245,7 @@ export function CoberturaDeliveryTab() {
           </div>
 
           {geoQuery.isPending ? (
-            <div className="h-[360px] animate-pulse rounded-lg bg-gray-100" />
+            <div className="h-[480px] animate-pulse rounded-lg bg-gray-100" />
           ) : (
             <CoberturaDeliveryMap origem={origemGeo} raios={raios} />
           )}

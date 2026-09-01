@@ -304,6 +304,7 @@ export function DeliveryCheckoutEnderecoGeoModal({
         {!preparandoEndereco ? (
           <EnderecoGeolocalizacaoSection
             variant="delivery"
+            hideHeader
             geocodeMinimo="flexivel"
             autoGeocode={!geoSincronizadaComEndereco}
             endereco={enderecoGeocode}
@@ -327,13 +328,6 @@ export function DeliveryCheckoutEnderecoGeoModal({
             }}
             onMapChange={handleMapChangeComErro}
             onGeocodeBuscandoChange={setBuscandoGeocodeMapa}
-            title="Localização para entrega"
-            subtitle={
-              usarPontoPreferencia
-                ? 'Ajuste o pin do ponto de entrega.'
-                : 'O mapa reflete o endereço acima. Arraste o pin se precisar corrigir.'
-            }
-            obrigatorio
             buscarLabel="Atualizar endereço no mapa"
             successToast="Localização atualizada. Ajuste o pin se necessário."
           />

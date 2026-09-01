@@ -50,10 +50,10 @@ const VARIANT_STYLES: Record<
     titleClass: 'text-lg font-semibold text-primary',
     subtitleClass: 'text-xs text-secondary-text md:text-sm',
     badgeOk: 'bg-emerald-100 text-emerald-800',
-    badgePending: 'bg-amber-100 text-amber-900',
+    badgePending: 'bg-alternate/15 text-alternate',
     panelClass: 'space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm',
     infoClass: 'rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-secondary-text',
-    warningClass: 'rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900',
+    warningClass: 'rounded-lg border border-alternate/30 bg-alternate/10 px-3 py-2 text-sm text-alternate',
     addressPreviewClass: 'rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-secondary-text',
     buttonClass:
       'inline-flex h-9 items-center gap-2 rounded-lg border border-secondary px-3 text-sm font-semibold text-secondary transition-colors hover:bg-secondary/10 disabled:cursor-not-allowed disabled:opacity-50',
@@ -64,12 +64,12 @@ const VARIANT_STYLES: Record<
     titleClass: 'text-sm font-semibold delivery-text-primary',
     subtitleClass: 'text-xs delivery-text-secondary',
     badgeOk: 'bg-emerald-100 text-emerald-800',
-    badgePending: 'bg-amber-100 text-amber-900',
+    badgePending: 'bg-alternate/15 text-alternate',
     panelClass: 'space-y-2 rounded-xl border p-2.5',
     infoClass:
       'rounded-lg border px-3 py-1.5 text-sm delivery-text-secondary',
     warningClass:
-      'rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm text-amber-900',
+      'rounded-lg border border-alternate/30 bg-alternate/10 px-3 py-1.5 text-sm text-alternate',
     addressPreviewClass:
       'rounded-lg border px-3 py-1.5 text-xs delivery-text-secondary',
     buttonClass:
@@ -117,6 +117,8 @@ export type EnderecoGeolocalizacaoSectionProps = {
   pinModo?: 'endereco' | 'preferencia'
   /** Pin fixo do endereço quando `pinModo` é preferencia. */
   localizacaoReferencia?: GeoJsonPoint | null
+  /** Oculta título, subtítulo e badge de status (ex.: checkout delivery). */
+  hideHeader?: boolean
 }
 
 export function EnderecoGeolocalizacaoSection({
@@ -142,6 +144,7 @@ export function EnderecoGeolocalizacaoSection({
   beforeMap,
   pinModo = 'endereco',
   localizacaoReferencia = null,
+  hideHeader = false,
 }: EnderecoGeolocalizacaoSectionProps) {
   const [buscandoGeocode, setBuscandoGeocode] = useState(false)
   const [buscandoGeocodeAuto, setBuscandoGeocodeAuto] = useState(false)
@@ -273,27 +276,29 @@ export function EnderecoGeolocalizacaoSection({
 
   return (
     <section id={sectionId} className={sectionId ? 'scroll-mt-24' : undefined}>
-      <div
-        className={`mb-1.5 flex flex-col sm:flex-row sm:items-center sm:justify-between ${
-          variant === 'delivery' ? 'gap-1' : 'gap-2'
-        }`}
-      >
-        <div>
-          <h4 className={styles.titleClass}>
-            {title}
-            {obrigatorio ? <span className="text-red-500"> *</span> : null}
-          </h4>
-          {subtitle ? <p className={styles.subtitleClass}>{subtitle}</p> : null}
-        </div>
-        <span
-          className={`inline-flex w-fit items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${
-            configurada ? styles.badgeOk : styles.badgePending
+      {!hideHeader ? (
+        <div
+          className={`mb-1.5 flex flex-col sm:flex-row sm:items-center sm:justify-between ${
+            variant === 'delivery' ? 'gap-1' : 'gap-2'
           }`}
         >
-          <MdLocationOn className="h-4 w-4" aria-hidden />
-          {configurada ? 'Localização definida' : 'Localização pendente'}
-        </span>
-      </div>
+          <div>
+            <h4 className={styles.titleClass}>
+              {title}
+              {obrigatorio ? <span className="text-red-500"> *</span> : null}
+            </h4>
+            {subtitle ? <p className={styles.subtitleClass}>{subtitle}</p> : null}
+          </div>
+          <span
+            className={`inline-flex w-fit items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${
+              configurada ? styles.badgeOk : styles.badgePending
+            }`}
+          >
+            <MdLocationOn className="h-4 w-4" aria-hidden />
+            {configurada ? 'Localização definida' : 'Localização pendente'}
+          </span>
+        </div>
+      ) : null}
 
       <div className={styles.panelClass} style={panelStyle}>
         {disabled && disabledMessage ? (
@@ -320,7 +325,7 @@ export function EnderecoGeolocalizacaoSection({
           </p>
         ) : null}
 
-        {!camposMinimosOk && camposFaltantesMsg ? (
+        {!hideHeader && !camposMinimosOk && camposFaltantesMsg ? (
           <p className={styles.warningClass}>{camposFaltantesMsg}</p>
         ) : null}
 
@@ -357,13 +362,15 @@ export function EnderecoGeolocalizacaoSection({
           </p>
         ) : null}
 
-        <p className={styles.hintClass}>
-          {pinModo === 'preferencia'
-            ? 'Pin vermelho = endereço. Pin azul = onde você recebe. Arraste o azul se precisar.'
-            : autoGeocode
-              ? 'O mapa atualiza ao alterar o endereço. Arraste o pin se precisar ajustar.'
-              : 'Depois da busca, clique no mapa ou arraste o pin para marcar o ponto exato da entrega.'}
-        </p>
+        {!hideHeader ? (
+          <p className={styles.hintClass}>
+            {pinModo === 'preferencia'
+              ? 'Pin vermelho = endereço. Pin azul = onde você recebe. Arraste o azul se precisar.'
+              : autoGeocode
+                ? 'O mapa atualiza ao alterar o endereço. Arraste o pin se precisar ajustar.'
+                : 'Depois da busca, clique no mapa ou arraste o pin para marcar o ponto exato da entrega.'}
+          </p>
+        ) : null}
 
         {beforeMap ? <div className="space-y-2">{beforeMap}</div> : null}
 

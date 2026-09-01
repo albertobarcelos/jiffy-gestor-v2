@@ -59,7 +59,7 @@ export function EnderecoGeolocalizacaoMap({
   estado,
   hintBusca = 'Buscar pelo endereço (Google)',
   containerClassName = 'relative overflow-hidden rounded-lg border border-gray-200',
-  missingKeyClassName = 'rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900',
+  missingKeyClassName = 'rounded-lg border border-alternate/30 bg-alternate/10 px-3 py-2 text-sm text-alternate',
   loadErrorClassName = 'rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700',
   overlayHintClassName = 'rounded-lg bg-white/95 px-3 py-2 text-center text-xs text-secondary-text shadow-sm',
   pinModo = 'endereco',

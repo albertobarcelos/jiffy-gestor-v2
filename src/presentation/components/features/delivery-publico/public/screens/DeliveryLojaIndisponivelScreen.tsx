@@ -9,7 +9,7 @@ type DeliveryLojaIndisponivelScreenProps = {
 export function DeliveryLojaIndisponivelScreen({ mensagens }: DeliveryLojaIndisponivelScreenProps) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-white px-6 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-alternate/15 text-alternate">
         <MdStorefront className="h-7 w-7" aria-hidden />
       </div>
       <p className="mt-4 text-lg font-semibold text-gray-800">Loja em configuração</p>
