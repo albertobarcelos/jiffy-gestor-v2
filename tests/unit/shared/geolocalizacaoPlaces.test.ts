@@ -75,9 +75,7 @@ describe('place_id no payload geo', () => {
   it('mantém place_id ao atualizar endereço quando providerEnderecoId existe', () => {
     const payload = montarPayloadGeoEnderecoDelivery({
       enderecoLocalizacao: ponto,
-      pinPosition: ponto,
       providerEnderecoId: 'ChIJ_place',
-      modoAjustePin: 'atualizar_endereco',
     })
     expect(payload.enderecoLocalizacao.geocoding?.enderecoId).toBe('ChIJ_place')
     expect(payload.preferenciaEntrega).toBeUndefined()

@@ -8,6 +8,7 @@ import {
   limparLogradouroEnderecoGeocode,
   mesclarEnderecoComReverseGeocode,
   montarPayloadGeoEnderecoDelivery,
+  montarPayloadGeoEnderecoDeliveryLegado,
   reverseGeocodeTemLogradouro,
 } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
 
@@ -68,8 +69,28 @@ describe('geolocalizacaoEnderecoShared', () => {
     ).toContain('rua')
   })
 
-  it('salva pin como preferencia quando modo preferencia_entrega', () => {
+  it('salva preferenciaEntrega quando informada explicitamente', () => {
     const payload = montarPayloadGeoEnderecoDelivery({
+      enderecoLocalizacao: pontoA,
+      preferenciaEntrega: pontoB,
+    })
+    expect(payload.preferenciaEntrega).toEqual(pontoB)
+    expect(payload.enderecoLocalizacao.coordinates).toEqual(pontoA.coordinates)
+  })
+
+  it('mantém place_id na localização do endereço', () => {
+    const payload = montarPayloadGeoEnderecoDelivery({
+      enderecoLocalizacao: pontoB,
+      providerEnderecoId: 'place-123',
+    })
+    expect(payload.enderecoLocalizacao.coordinates).toEqual(pontoB.coordinates)
+    expect(payload.enderecoLocalizacao.geocoding?.enderecoId).toBe('place-123')
+    expect(payload.preferenciaEntrega).toBeUndefined()
+  })
+
+  /** @deprecated legado — modoAjustePin */
+  it('legado: salva pin como preferencia quando modo preferencia_entrega', () => {
+    const payload = montarPayloadGeoEnderecoDeliveryLegado({
       enderecoLocalizacao: pontoA,
       pinPosition: pontoB,
       modoAjustePin: 'preferencia_entrega',
@@ -77,8 +98,9 @@ describe('geolocalizacaoEnderecoShared', () => {
     expect(payload.preferenciaEntrega).toEqual(pontoB)
   })
 
-  it('usa pin como enderecoLocalizacao quando modo atualizar_endereco', () => {
-    const payload = montarPayloadGeoEnderecoDelivery({
+  /** @deprecated legado — modoAjustePin */
+  it('legado: usa pin como enderecoLocalizacao quando modo atualizar_endereco', () => {
+    const payload = montarPayloadGeoEnderecoDeliveryLegado({
       enderecoLocalizacao: pontoA,
       pinPosition: pontoB,
       providerEnderecoId: 'place-123',

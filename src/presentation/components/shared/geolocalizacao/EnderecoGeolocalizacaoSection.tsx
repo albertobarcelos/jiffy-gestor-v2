@@ -1,7 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { MdLocationOn, MdMyLocation } from 'react-icons/md'
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import {
@@ -10,6 +10,7 @@ import {
   descreverCamposGeocodeFaltantes,
   geocodificarEnderecoViaGoogle,
   montarEnderecoParaGeocode,
+  serializarEnderecoParaGeocode,
   type EnderecoGeocodeInput,
   type GeocodeMinimoModo,
 } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
@@ -64,15 +65,15 @@ const VARIANT_STYLES: Record<
     subtitleClass: 'text-xs delivery-text-secondary',
     badgeOk: 'bg-emerald-100 text-emerald-800',
     badgePending: 'bg-amber-100 text-amber-900',
-    panelClass: 'space-y-3 rounded-xl border p-3',
+    panelClass: 'space-y-2 rounded-xl border p-2.5',
     infoClass:
-      'rounded-lg border px-3 py-2 text-sm delivery-text-secondary',
+      'rounded-lg border px-3 py-1.5 text-sm delivery-text-secondary',
     warningClass:
-      'rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900',
+      'rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm text-amber-900',
     addressPreviewClass:
-      'rounded-lg border px-3 py-2 text-xs delivery-text-secondary',
+      'rounded-lg border px-3 py-1.5 text-xs delivery-text-secondary',
     buttonClass:
-      'flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold delivery-text-primary disabled:opacity-50',
+      'flex min-h-[40px] w-full items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold delivery-text-primary disabled:opacity-50',
     hintClass: 'text-xs delivery-text-secondary',
     mapProps: {
       containerClassName:
@@ -106,6 +107,10 @@ export type EnderecoGeolocalizacaoSectionProps = {
   disabledMessage?: string
   /** `flexivel` libera busca para endereços legados sem UF (ex.: checkout delivery). */
   geocodeMinimo?: GeocodeMinimoModo
+  /** Atualiza o pin automaticamente quando os campos do endereço mudam. */
+  autoGeocode?: boolean
+  autoGeocodeDebounceMs?: number
+  onGeocodeBuscandoChange?: (buscando: boolean) => void
 }
 
 export function EnderecoGeolocalizacaoSection({
@@ -125,9 +130,17 @@ export function EnderecoGeolocalizacaoSection({
   successToast = 'Localização encontrada. Confira o pin no mapa.',
   disabledMessage,
   geocodeMinimo,
+  autoGeocode = false,
+  autoGeocodeDebounceMs = 700,
+  onGeocodeBuscandoChange,
 }: EnderecoGeolocalizacaoSectionProps) {
   const [buscandoGeocode, setBuscandoGeocode] = useState(false)
+  const [buscandoGeocodeAuto, setBuscandoGeocodeAuto] = useState(false)
+  const [erroGeocodeAuto, setErroGeocodeAuto] = useState<string | null>(null)
   const [ultimoEnderecoFormatado, setUltimoEnderecoFormatado] = useState<string | null>(null)
+  const mapAnchorRef = useRef<HTMLDivElement>(null)
+  const geocodeAutoSeqRef = useRef(0)
+  const enderecoGeoKey = useMemo(() => serializarEnderecoParaGeocode(endereco), [endereco])
   const minimoGeocode: GeocodeMinimoModo =
     geocodeMinimo ?? (variant === 'delivery' ? 'flexivel' : 'strict')
   const configurada = Boolean(mapValue ?? localizacao)
@@ -150,6 +163,53 @@ export function EnderecoGeolocalizacaoSection({
   const buttonStyle =
     variant === 'delivery' ? ({ borderColor: 'var(--delivery-border)' } as const) : undefined
 
+  const rolarMapaParaVisivel = () => {
+    const el = mapAnchorRef.current
+    if (!el) return
+    // Duplo rAF: espera o pin/layout atualizar após a busca.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        el.scrollIntoView({ behavior: 'smooth', block: 'end', inline: 'nearest' })
+      })
+    })
+  }
+
+  const buscarGeocode = async (
+    opts: { silencioso: boolean; rolarMapa: boolean },
+    seqEsperada?: number
+  ) => {
+    if (disabled || !camposMinimosOk) return false
+
+    if (opts.rolarMapa) rolarMapaParaVisivel()
+    try {
+      const resultado = await geocodificarEnderecoViaGoogle(endereco, { minimo: minimoGeocode })
+      if (seqEsperada !== undefined && seqEsperada !== geocodeAutoSeqRef.current) {
+        return false
+      }
+      onLocalizacaoChange(resultado.enderecoLocalizacao, {
+        providerEnderecoId: resultado.providerEnderecoId,
+        enderecoFormatado: resultado.enderecoFormatado,
+      })
+      setUltimoEnderecoFormatado(resultado.enderecoFormatado)
+      setErroGeocodeAuto(null)
+      if (!opts.silencioso) {
+        showToast.success(successToast)
+        rolarMapaParaVisivel()
+      }
+      return true
+    } catch (error) {
+      if (seqEsperada !== undefined && seqEsperada !== geocodeAutoSeqRef.current) {
+        return false
+      }
+      const msg = error instanceof Error ? error.message : 'Erro ao buscar localização'
+      setErroGeocodeAuto(msg)
+      if (!opts.silencioso) {
+        showToast.error(msg)
+      }
+      return false
+    }
+  }
+
   const buscarLocalizacaoPeloEndereco = async () => {
     if (disabled) {
       showToast.error(
@@ -167,24 +227,48 @@ export function EnderecoGeolocalizacaoSection({
     }
 
     setBuscandoGeocode(true)
-    try {
-      const resultado = await geocodificarEnderecoViaGoogle(endereco, { minimo: minimoGeocode })
-      onLocalizacaoChange(resultado.enderecoLocalizacao, {
-        providerEnderecoId: resultado.providerEnderecoId,
-        enderecoFormatado: resultado.enderecoFormatado,
-      })
-      setUltimoEnderecoFormatado(resultado.enderecoFormatado)
-      showToast.success(successToast)
-    } catch (error) {
-      showToast.error(error instanceof Error ? error.message : 'Erro ao buscar localização')
-    } finally {
-      setBuscandoGeocode(false)
-    }
+    await buscarGeocode({ silencioso: false, rolarMapa: true })
+    setBuscandoGeocode(false)
   }
+
+  useEffect(() => {
+    onGeocodeBuscandoChange?.(buscandoGeocode || buscandoGeocodeAuto)
+  }, [buscandoGeocode, buscandoGeocodeAuto, onGeocodeBuscandoChange])
+
+  useEffect(() => {
+    if (!autoGeocode || disabled) return
+    if (!camposMinimosOk) {
+      setErroGeocodeAuto(null)
+      return
+    }
+
+    const seq = ++geocodeAutoSeqRef.current
+    setErroGeocodeAuto(null)
+
+    const timer = setTimeout(() => {
+      void (async () => {
+        setBuscandoGeocodeAuto(true)
+        await buscarGeocode({ silencioso: true, rolarMapa: false }, seq)
+        if (seq === geocodeAutoSeqRef.current) {
+          setBuscandoGeocodeAuto(false)
+        }
+      })()
+    }, autoGeocodeDebounceMs)
+
+    return () => {
+      clearTimeout(timer)
+    }
+    // enderecoGeoKey agrega os campos relevantes; endereco é lido no closure do timeout via ref implícito
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoGeocode, disabled, camposMinimosOk, enderecoGeoKey, minimoGeocode])
 
   return (
     <section id={sectionId} className={sectionId ? 'scroll-mt-24' : undefined}>
-      <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div
+        className={`mb-1.5 flex flex-col sm:flex-row sm:items-center sm:justify-between ${
+          variant === 'delivery' ? 'gap-1' : 'gap-2'
+        }`}
+      >
         <div>
           <h4 className={styles.titleClass}>
             {title}
@@ -209,9 +293,21 @@ export function EnderecoGeolocalizacaoSection({
           </p>
         ) : null}
 
-        {enderecoAlterado ? (
+        {enderecoAlterado && !autoGeocode ? (
           <p className={styles.warningClass}>
             O endereço textual foi alterado. Busque novamente no Google ou ajuste o pin.
+          </p>
+        ) : null}
+
+        {autoGeocode && (buscandoGeocodeAuto || buscandoGeocode) ? (
+          <p className={styles.infoClass} style={infoStyle}>
+            Atualizando localização no mapa…
+          </p>
+        ) : null}
+
+        {autoGeocode && erroGeocodeAuto && camposMinimosOk ? (
+          <p className={styles.warningClass}>
+            {erroGeocodeAuto} Você pode ajustar o pin manualmente ou tentar novamente.
           </p>
         ) : null}
 
@@ -219,14 +315,16 @@ export function EnderecoGeolocalizacaoSection({
           <p className={styles.warningClass}>{camposFaltantesMsg}</p>
         ) : null}
 
-        <div className={styles.addressPreviewClass} style={infoStyle}>
-          <p className={variant === 'delivery' ? 'font-semibold delivery-text-primary' : 'font-semibold text-primary-text'}>
-            Endereço enviado ao Google:
-          </p>
-          <p className="mt-1 break-words">
-            {enderecoConsulta || 'Preencha rua, número, cidade e estado.'}
-          </p>
-        </div>
+        {variant !== 'delivery' ? (
+          <div className={styles.addressPreviewClass} style={infoStyle}>
+            <p className="font-semibold text-primary-text">
+              Endereço enviado ao Google:
+            </p>
+            <p className="mt-1 break-words">
+              {enderecoConsulta || 'Preencha rua, número, cidade e estado.'}
+            </p>
+          </div>
+        ) : null}
 
         <div className={variant === 'delivery' ? undefined : 'flex flex-wrap gap-2'}>
           <button
@@ -241,27 +339,34 @@ export function EnderecoGeolocalizacaoSection({
           </button>
         </div>
 
-        {ultimoEnderecoFormatado ? (
+        {variant !== 'delivery' && ultimoEnderecoFormatado ? (
           <p className={styles.hintClass}>
             Google retornou:{' '}
-            <span className={variant === 'delivery' ? 'font-medium delivery-text-primary' : 'font-medium text-primary-text'}>
+            <span className="font-medium text-primary-text">
               {ultimoEnderecoFormatado}
             </span>
           </p>
         ) : null}
 
         <p className={styles.hintClass}>
-          Depois da busca, clique no mapa ou arraste o pin para marcar o ponto exato da entrega.
+          {autoGeocode
+            ? 'O mapa atualiza ao alterar o endereço. Arraste o pin se precisar ajustar o ponto exato.'
+            : 'Depois da busca, clique no mapa ou arraste o pin para marcar o ponto exato da entrega.'}
         </p>
 
-        <EnderecoGeolocalizacaoMap
-          value={mapValue ?? localizacao}
-          onChange={point => (onMapChange ? onMapChange(point) : onLocalizacaoChange(point))}
-          disabled={disabled}
-          estado={endereco.estado}
-          hintBusca={buscarLabel}
-          {...styles.mapProps}
-        />
+        <div
+          ref={mapAnchorRef}
+          className={variant === 'delivery' ? 'scroll-mb-28' : undefined}
+        >
+          <EnderecoGeolocalizacaoMap
+            value={mapValue ?? localizacao}
+            onChange={point => (onMapChange ? onMapChange(point) : onLocalizacaoChange(point))}
+            disabled={disabled}
+            estado={endereco.estado}
+            hintBusca={buscarLabel}
+            {...styles.mapProps}
+          />
+        </div>
       </div>
     </section>
   )

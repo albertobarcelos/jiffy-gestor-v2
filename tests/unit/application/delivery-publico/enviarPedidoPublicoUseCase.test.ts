@@ -244,10 +244,6 @@ describe('GarantirEnderecoEntregaPublicoUseCase', () => {
         type: 'Point' as const,
         coordinates: [-46.6333, -23.5505] as [number, number],
       },
-      pinPosition: {
-        type: 'Point' as const,
-        coordinates: [-46.6333, -23.5505] as [number, number],
-      },
     }
 
     const id = await garantirEnderecoEntregaPublicoUseCase.execute({

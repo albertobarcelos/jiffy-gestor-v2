@@ -17,14 +17,12 @@ import {
   enderecoTemGeolocalizacao,
   montarPayloadGeoEnderecoDelivery,
 } from '@/src/shared/utils/geolocalizacaoEnderecoDelivery'
-import { normalizarEnderecoFormPublico, normalizarEnderecoGeocodeInput } from '@/src/shared/utils/normalizarTextoEnderecoPublico'
-import { toLocaleUppercasePt } from '@/src/shared/utils/localeUppercase'
 import {
-  mesclarEnderecoComReverseGeocode,
-  normalizarCepEndereco,
-  resolverEnderecoPorCoordenadas,
-  type EnderecoGeocodeInput,
-} from '@/src/shared/utils/geolocalizacaoEnderecoShared'
+  normalizarEnderecoFormPublico,
+  normalizarEnderecoGeocodeInput,
+} from '@/src/shared/utils/normalizarTextoEnderecoPublico'
+import { toLocaleUppercasePt } from '@/src/shared/utils/localeUppercase'
+import { normalizarCepEndereco, type EnderecoGeocodeInput } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
 
 const MAX_ENDERECOS = 5
 
@@ -101,38 +99,12 @@ function montarTextoEnderecoPayload(
   }
 }
 
-async function resolverGeoParaPersistencia(
-  geo: EnderecoGeoCheckoutInput
-): Promise<EnderecoGeoCheckoutInput> {
-  if (geo.modoAjustePin !== 'atualizar_endereco') {
-    return geo
-  }
-
-  if (geo.enderecoRevertido?.rua?.trim()) {
-    return {
-      ...geo,
-      enderecoRevertido: normalizarEnderecoGeocodeInput(geo.enderecoRevertido),
-    }
-  }
-
-  const [lng, lat] = geo.pinPosition.coordinates
-  const enderecoRevertido = await resolverEnderecoPorCoordenadas(lat, lng)
-  return { ...geo, enderecoRevertido: normalizarEnderecoGeocodeInput(enderecoRevertido) }
-}
-
 function montarEnderecoPayload(
   form: EnderecoFormPublico,
   geo?: EnderecoGeoCheckoutInput | null
 ): EnderecoDeliveryPublicoInput {
   const formNormalizado = normalizarEnderecoFormPublico(form)
-  let textoBase = enderecoFormParaGeocodeInput(formNormalizado)
-
-  if (geo?.modoAjustePin === 'atualizar_endereco' && geo.enderecoRevertido) {
-    textoBase = mesclarEnderecoComReverseGeocode(
-      textoBase,
-      normalizarEnderecoGeocodeInput(geo.enderecoRevertido)
-    )
-  }
+  const textoBase = enderecoFormParaGeocodeInput(formNormalizado)
 
   const base = montarTextoEnderecoPayload(
     textoBase,
@@ -140,15 +112,14 @@ function montarEnderecoPayload(
     formNormalizado.pontoReferencia
   )
 
-  if (!geo?.enderecoLocalizacao || !geo.pinPosition) {
+  if (!geo?.enderecoLocalizacao) {
     return base
   }
 
   const geoPayload = montarPayloadGeoEnderecoDelivery({
     enderecoLocalizacao: geo.enderecoLocalizacao,
-    pinPosition: geo.pinPosition,
     providerEnderecoId: geo.providerEnderecoId,
-    modoAjustePin: geo.modoAjustePin,
+    preferenciaEntrega: geo.preferenciaEntrega,
   })
 
   return {
@@ -159,26 +130,27 @@ function montarEnderecoPayload(
 
 function montarUpdatePayloadExistente(
   endereco: EnderecoClienteDeliveryPublicoDTO,
-  geo: EnderecoGeoCheckoutInput
+  geo: EnderecoGeoCheckoutInput,
+  enderecoForm?: EnderecoFormPublico | null
 ): EnderecoDeliveryPublicoInput & { id: string } {
-  let textoBase = enderecoCadastroParaGeocodeInput(endereco)
-
-  if (geo.modoAjustePin === 'atualizar_endereco' && geo.enderecoRevertido) {
-    textoBase = mesclarEnderecoComReverseGeocode(textoBase, geo.enderecoRevertido)
-  }
+  const textoBase = enderecoForm
+    ? enderecoFormParaGeocodeInput(normalizarEnderecoFormPublico(enderecoForm))
+    : enderecoCadastroParaGeocodeInput(endereco)
 
   const geoPayload = montarPayloadGeoEnderecoDelivery({
     enderecoLocalizacao: geo.enderecoLocalizacao,
-    pinPosition: geo.pinPosition,
     providerEnderecoId: geo.providerEnderecoId,
-    modoAjustePin: geo.modoAjustePin,
+    preferenciaEntrega: geo.preferenciaEntrega,
   })
 
-  const etiqueta = (endereco.etiqueta as 'casa' | 'trabalho' | 'outro') || 'casa'
+  const etiqueta =
+    (enderecoForm?.etiqueta as 'casa' | 'trabalho' | 'outro' | undefined) ||
+    (endereco.etiqueta as 'casa' | 'trabalho' | 'outro') ||
+    'casa'
 
   return {
     id: endereco.id,
-    ...montarTextoEnderecoPayload(textoBase, etiqueta),
+    ...montarTextoEnderecoPayload(textoBase, etiqueta, enderecoForm?.pontoReferencia),
     ...geoPayload,
   }
 }
@@ -241,22 +213,14 @@ export class GarantirEnderecoEntregaPublicoUseCase {
       }
 
       const enderecoAtual = localizarEnderecoPorId(params.clienteLookup, id)
-      const geoInformada = Boolean(
-        params.geo?.enderecoLocalizacao && params.geo.pinPosition
-      )
-      const precisaPersistirGeo =
-        geoInformada &&
-        Boolean(
-          !enderecoAtual ||
-            !enderecoTemGeolocalizacao(enderecoAtual) ||
-            params.geo?.modoAjustePin === 'atualizar_endereco' ||
-            params.geo?.modoAjustePin === 'preferencia_entrega' ||
-            params.geo?.enderecoRevertido
-        )
+      const geoInformada = Boolean(params.geo?.enderecoLocalizacao)
 
-      if (enderecoAtual && precisaPersistirGeo && params.geo) {
-        const geoResolvida = await resolverGeoParaPersistencia(params.geo)
-        const updatePayload = montarUpdatePayloadExistente(enderecoAtual, geoResolvida)
+      if (enderecoAtual && geoInformada && params.geo) {
+        const updatePayload = montarUpdatePayloadExistente(
+          enderecoAtual,
+          params.geo,
+          params.enderecoNovo
+        )
         const atualizadoRaw = await atualizarClienteDeliveryPublico(telefone, {
           enderecos: { update: [updatePayload] },
         })
@@ -282,12 +246,11 @@ export class GarantirEnderecoEntregaPublicoUseCase {
       throw new Error('Preencha o endereço de entrega')
     }
 
-    if (!params.geo?.enderecoLocalizacao || !params.geo.pinPosition) {
+    if (!params.geo?.enderecoLocalizacao) {
       throw new Error('Confirme a localização no mapa antes de salvar o endereço.')
     }
 
-    const geoResolvida = params.geo ? await resolverGeoParaPersistencia(params.geo) : null
-    const enderecoPayload = montarEnderecoPayload(params.enderecoNovo, geoResolvida)
+    const enderecoPayload = montarEnderecoPayload(params.enderecoNovo, params.geo)
     const nome = params.nome?.trim() || null
 
     let clienteAtual =

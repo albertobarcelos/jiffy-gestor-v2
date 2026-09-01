@@ -1,10 +1,9 @@
 'use client'
 
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, Home, LocateFixed, MapPin, Pencil } from 'lucide-react'
 import type { EnderecoGeoCheckoutInput } from '@/src/application/dto/delivery-publico/EnderecoGeoCheckoutDTO'
 import {
-  aplicarPinNoMapaCheckout,
   geoCheckoutProntaParaConfirmar,
   montarGeoCheckoutInputFromState,
 } from '@/src/application/dto/delivery-publico/EnderecoGeoCheckoutDTO'
@@ -17,12 +16,7 @@ import {
   normalizarDigitosCep,
 } from '@/src/shared/utils/consultaCep'
 import { obterEnderecoPorGps } from '@/src/shared/utils/geolocalizacaoEndereco'
-import {
-  aplicarReverseGeocodeNoPreview,
-  limparLogradouroEnderecoGeocode,
-  resolverEnderecoPorCoordenadas,
-  type EnderecoGeocodeInput,
-} from '@/src/shared/utils/geolocalizacaoEnderecoShared'
+import { serializarEnderecoParaGeocode } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
 import {
   placeDetailsParaEnderecoGeocode,
   type PlaceDetailsResult,
@@ -30,15 +24,16 @@ import {
 } from '@/src/shared/utils/geolocalizacaoPlaces'
 import { showToast } from '@/src/shared/utils/toast'
 import { EnderecoPlacesAutocomplete } from '@/src/presentation/components/shared/geolocalizacao/EnderecoPlacesAutocomplete'
-import { useDeliveryCheckoutPinAjuste } from '../../../shared/hooks/useDeliveryCheckoutPinAjuste'
 import type { CheckoutFormData } from '../../../shared/utils/montarPedidoPublico'
+import { useDeliveryCheckoutPinAjustado } from '../../../shared/hooks/useDeliveryCheckoutPinAjustado'
 import {
   maiusculasEnderecoInput,
   normalizarEnderecoGeocodeInput,
   normalizarEstadoEndereco,
 } from '@/src/shared/utils/normalizarTextoEnderecoPublico'
 import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
-import { DeliveryCheckoutPinAjusteDialog } from './DeliveryCheckoutPinAjusteDialog'
+import { DeliveryCheckoutPinAjustadoDialog } from './DeliveryCheckoutPinAjustadoDialog'
+import { PreferenciaEntregaToggle } from './PreferenciaEntregaToggle'
 import { DeliveryCheckoutUppercaseInput } from './DeliveryCheckoutUppercaseInput'
 import {
   DeliveryCheckoutShellFooter,
@@ -59,7 +54,7 @@ type DeliveryCheckoutEnderecoFormModalProps = {
 }
 
 const fieldClass =
-  'w-full rounded-xl border bg-transparent px-3 py-3 text-base outline-none delivery-text-primary'
+  'w-full rounded-xl border bg-transparent px-3 py-2 text-base outline-none delivery-text-primary'
 const fieldStyle = { borderColor: 'var(--delivery-border)' } as const
 
 export function DeliveryCheckoutEnderecoFormModal({
@@ -77,33 +72,29 @@ export function DeliveryCheckoutEnderecoFormModal({
   const [buscandoGps, setBuscandoGps] = useState(false)
   const [salvando, setSalvando] = useState(false)
   const [enderecoLocalizacao, setEnderecoLocalizacao] = useState<GeoJsonPoint | null>(null)
-  const [pinPosition, setPinPosition] = useState<GeoJsonPoint | null>(null)
   const [providerEnderecoId, setProviderEnderecoId] = useState<string | null>(null)
-  const [enderecoAlteradoParaGeo, setEnderecoAlteradoParaGeo] = useState(false)
+  const [usarPontoPreferencia, setUsarPontoPreferencia] = useState(false)
+  const [preferenciaEntrega, setPreferenciaEntrega] = useState<GeoJsonPoint | null>(null)
+  const [buscandoGeocodeMapa, setBuscandoGeocodeMapa] = useState(false)
+  const [ultimoGeoKeySincronizado, setUltimoGeoKeySincronizado] = useState<string | null>(null)
   const [buscaPlaces, setBuscaPlaces] = useState(() =>
     [form.rua, form.numero].filter(Boolean).join(', ')
   )
-  const [buscandoReversePin, setBuscandoReversePin] = useState(false)
-  const [textoConfirmadoComPin, setTextoConfirmadoComPin] = useState(false)
-  const reverseSeqRef = useRef(0)
-  const formAntesDoAjustePinRef = useRef<EnderecoGeocodeInput | null>(null)
   const ruaInputRef = useRef<HTMLInputElement>(null)
   const numeroInputRef = useRef<HTMLInputElement>(null)
   const bairroInputRef = useRef<HTMLInputElement>(null)
   const cidadeInputRef = useRef<HTMLInputElement>(null)
   const focoPendenteRef = useRef<CampoEnderecoFoco | null>(null)
-  const {
-    modoAjustePin,
-    dialogEtapa,
-    referenciaGeocodeRef,
-    registrarReferenciaGeocode,
-    notificarPinMovido,
-    abrirDialogEtapa,
-    escolherModoPin,
-    fecharDialogPin,
-    exigeEscolhaModoPin,
-    pinDivergeDaReferencia,
-  } = useDeliveryCheckoutPinAjuste()
+
+  const pinMapa = usarPontoPreferencia
+    ? (preferenciaEntrega ?? enderecoLocalizacao)
+    : enderecoLocalizacao
+
+  const geoPronta = geoCheckoutProntaParaConfirmar({
+    enderecoLocalizacao,
+    usarPontoPreferencia,
+    preferenciaEntrega,
+  })
 
   const enderecoGeocode = useMemo(
     () => ({
@@ -117,11 +108,40 @@ export function DeliveryCheckoutEnderecoFormModal({
     }),
     [form.rua, form.numero, form.bairro, form.cidade, form.estado, form.cep, form.complemento]
   )
-  const enderecoGeocodeRef = useRef(enderecoGeocode)
-  enderecoGeocodeRef.current = enderecoGeocode
-
+  const enderecoGeoKey = useMemo(() => serializarEnderecoParaGeocode(enderecoGeocode), [enderecoGeocode])
+  const geoSincronizadaComEndereco =
+    Boolean(ultimoGeoKeySincronizado) && ultimoGeoKeySincronizado === enderecoGeoKey
   const mostrarDetalhes = etapaUi === 'resumo' || etapaUi === 'edicao'
   const modoEdicaoCompleta = etapaUi === 'edicao'
+
+  const marcarGeoSincronizada = useCallback(
+    (endereco?: typeof enderecoGeocode) => {
+      setUltimoGeoKeySincronizado(serializarEnderecoParaGeocode(endereco ?? enderecoGeocode))
+    },
+    [enderecoGeocode]
+  )
+
+  const {
+    dialogPinAberto,
+    variantePin,
+    handleMapChange,
+    confirmarAjustePin,
+    cancelarAjustePin,
+    fecharDialogPin,
+  } = useDeliveryCheckoutPinAjustado({
+    usarPontoPreferencia,
+    enderecoLocalizacao,
+    preferenciaEntrega,
+    providerEnderecoId,
+    setEnderecoLocalizacao,
+    setPreferenciaEntrega,
+    setProviderEnderecoId,
+    marcarGeoSincronizada,
+  })
+
+  useEffect(() => {
+    fecharDialogPin()
+  }, [enderecoGeoKey, fecharDialogPin])
 
   const focarCampo = useCallback((campo: CampoEnderecoFoco) => {
     const refMap: Record<CampoEnderecoFoco, React.RefObject<HTMLInputElement | null>> = {
@@ -157,45 +177,14 @@ export function DeliveryCheckoutEnderecoFormModal({
     focarCampo(campo)
   }, [etapaUi, focarCampo])
 
-  const aplicarPreviewNoForm = (preview: EnderecoGeocodeInput) => {
-    const normalizado = normalizarEnderecoGeocodeInput(preview)
-    onChange('rua', normalizado.rua)
-    onChange('numero', normalizado.numero)
-    onChange('bairro', normalizado.bairro ?? '')
-    onChange('cidade', normalizado.cidade ?? '')
-    onChange('estado', normalizado.estado ?? '')
-    onChange('cep', normalizado.cep ? formatarCepMascara(normalizado.cep) : '')
-  }
-
-  const resolverEnderecoDoPin = (point: GeoJsonPoint, abrirDialogSeDivergiu: boolean) => {
-    const [lng, lat] = point.coordinates
-    const seq = ++reverseSeqRef.current
-    const textoNoInicio = { ...enderecoGeocodeRef.current }
-    formAntesDoAjustePinRef.current = textoNoInicio
-    setBuscandoReversePin(true)
-    setTextoConfirmadoComPin(false)
-    setProviderEnderecoId(null)
-
-    void resolverEnderecoPorCoordenadas(lat, lng)
-      .then(revertido => {
-        if (seq !== reverseSeqRef.current) return
-        const aplicado = aplicarReverseGeocodeNoPreview(textoNoInicio, revertido)
-        if (aplicado.reconheceuLogradouro) {
-          aplicarPreviewNoForm(aplicado.endereco)
-          if (abrirDialogSeDivergiu) abrirDialogEtapa('ajuste_classico')
-          return
-        }
-        aplicarPreviewNoForm(textoNoInicio)
-        if (abrirDialogSeDivergiu) abrirDialogEtapa('confirma_endereco')
-      })
-      .catch(() => {
-        if (seq !== reverseSeqRef.current) return
-        aplicarPreviewNoForm(textoNoInicio)
-        if (abrirDialogSeDivergiu) abrirDialogEtapa('confirma_endereco')
-      })
-      .finally(() => {
-        if (seq === reverseSeqRef.current) setBuscandoReversePin(false)
-      })
+  const aplicarGeoEncontrada = (point: GeoJsonPoint, providerId?: string | null) => {
+    setEnderecoLocalizacao(point)
+    setProviderEnderecoId(providerId ?? null)
+    fecharDialogPin()
+    marcarGeoSincronizada()
+    if (usarPontoPreferencia) {
+      setPreferenciaEntrega(prev => prev ?? point)
+    }
   }
 
   const aplicarPlaceDetails = (place: PlaceDetailsResult) => {
@@ -208,12 +197,20 @@ export function DeliveryCheckoutEnderecoFormModal({
     if (fields.cep) onChange('cep', fields.cep)
 
     setEnderecoLocalizacao(place.enderecoLocalizacao)
-    setPinPosition(place.enderecoLocalizacao)
     setProviderEnderecoId(place.providerEnderecoId)
-    registrarReferenciaGeocode(place.enderecoLocalizacao)
-    formAntesDoAjustePinRef.current = null
-    setTextoConfirmadoComPin(false)
-    setEnderecoAlteradoParaGeo(false)
+    fecharDialogPin()
+    setPreferenciaEntrega(prev =>
+      usarPontoPreferencia ? (prev ?? place.enderecoLocalizacao) : null
+    )
+    marcarGeoSincronizada({
+      rua: fields.rua ?? form.rua,
+      numero: fields.numero ?? form.numero,
+      bairro: fields.bairro ?? form.bairro,
+      cidade: fields.cidade ?? form.cidade,
+      estado: fields.estado ?? form.estado,
+      cep: fields.cep ?? form.cep,
+      complemento: form.complemento,
+    })
     setBuscaPlaces(
       maiusculasEnderecoInput(
         [fields.rua, fields.numero].filter(Boolean).join(', ') || place.enderecoFormatado || ''
@@ -232,18 +229,21 @@ export function DeliveryCheckoutEnderecoFormModal({
     onChange('estado', '')
     onChange('complemento', '')
     onChange('pontoReferencia', '')
-    formAntesDoAjustePinRef.current = null
-    setTextoConfirmadoComPin(false)
-    marcarEnderecoAlterado()
+    setPreferenciaEntrega(null)
+    setUsarPontoPreferencia(false)
+    setEnderecoLocalizacao(null)
+    setProviderEnderecoId(null)
+    setUltimoGeoKeySincronizado(null)
     setEtapaUi('busca')
   }
 
-  const marcarEnderecoAlterado = () => {
-    setEnderecoAlteradoParaGeo(true)
-    setEnderecoLocalizacao(null)
-    setPinPosition(null)
-    setProviderEnderecoId(null)
-    registrarReferenciaGeocode(null)
+  const handleTogglePreferencia = (checked: boolean) => {
+    setUsarPontoPreferencia(checked)
+    if (checked) {
+      setPreferenciaEntrega(prev => prev ?? enderecoLocalizacao)
+    } else {
+      setPreferenciaEntrega(null)
+    }
   }
 
   const buscarCep = async () => {
@@ -263,7 +263,6 @@ export function DeliveryCheckoutEnderecoFormModal({
       if (dados.complemento && !form.complemento.trim()) {
         onChange('complemento', maiusculasEnderecoInput(dados.complemento))
       }
-      marcarEnderecoAlterado()
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : 'Erro ao consultar CEP')
     } finally {
@@ -292,13 +291,7 @@ export function DeliveryCheckoutEnderecoFormModal({
       if (enderecoGps.estado) onChange('estado', enderecoGps.estado)
 
       const point = geoJsonPointFromLatLng(dados.latitude, dados.longitude)
-      setEnderecoLocalizacao(point)
-      setPinPosition(point)
-      setProviderEnderecoId(dados.providerEnderecoId ?? null)
-      registrarReferenciaGeocode(point)
-      formAntesDoAjustePinRef.current = null
-      setTextoConfirmadoComPin(false)
-      setEnderecoAlteradoParaGeo(false)
+      aplicarGeoEncontrada(point, dados.providerEnderecoId ?? null)
       setBuscaPlaces(
         maiusculasEnderecoInput(
           [enderecoGps.rua, enderecoGps.numero].filter(Boolean).join(', ') || enderecoGps.rua || ''
@@ -314,63 +307,11 @@ export function DeliveryCheckoutEnderecoFormModal({
     }
   }
 
-  const handleMapChange = (point: GeoJsonPoint) => {
-    aplicarPinNoMapaCheckout(point, setPinPosition, setEnderecoLocalizacao)
-    if (!referenciaGeocodeRef.current) {
-      registrarReferenciaGeocode(point)
-      resolverEnderecoDoPin(point, false)
+  const handleConfirmar = async () => {
+    if (dialogPinAberto) {
+      showToast.error('Confirme ou cancele o ajuste do pin no mapa.')
       return
     }
-    const divergiu = pinDivergeDaReferencia(point)
-    notificarPinMovido(point)
-    resolverEnderecoDoPin(point, divergiu)
-  }
-
-  const restaurarTextoDoAjuste = () => {
-    if (formAntesDoAjustePinRef.current) {
-      aplicarPreviewNoForm(formAntesDoAjustePinRef.current)
-    }
-  }
-
-  const handleEscolherPreferencia = () => {
-    restaurarTextoDoAjuste()
-    setTextoConfirmadoComPin(false)
-    escolherModoPin('preferencia_entrega')
-  }
-
-  const handleEscolherAtualizarEndereco = () => {
-    formAntesDoAjustePinRef.current = { ...enderecoGeocodeRef.current }
-    setTextoConfirmadoComPin(false)
-    escolherModoPin('atualizar_endereco')
-  }
-
-  const handleConfirmaEnderecoSim = () => {
-    restaurarTextoDoAjuste()
-    setTextoConfirmadoComPin(true)
-    abrirDialogEtapa('ponto_diferente')
-  }
-
-  const handleConfirmaEnderecoNao = () => {
-    const base = formAntesDoAjustePinRef.current ?? enderecoGeocodeRef.current
-    aplicarPreviewNoForm(limparLogradouroEnderecoGeocode(base, true))
-    setTextoConfirmadoComPin(false)
-    escolherModoPin('atualizar_endereco')
-    setEtapaUi('edicao')
-  }
-
-  const handlePontoDiferenteNao = () => {
-    restaurarTextoDoAjuste()
-    setTextoConfirmadoComPin(true)
-    escolherModoPin('atualizar_endereco')
-  }
-
-  const handlePontoDiferenteSim = () => {
-    restaurarTextoDoAjuste()
-    setTextoConfirmadoComPin(true)
-    escolherModoPin('preferencia_entrega')
-  }
-
-  const handleConfirmar = async () => {
     if (!form.rua.trim()) {
       showToast.error('Informe a rua')
       solicitarFocoCampo('rua')
@@ -391,40 +332,24 @@ export function DeliveryCheckoutEnderecoFormModal({
       solicitarFocoCampo('cidade')
       return
     }
-    if (!geoCheckoutProntaParaConfirmar(pinPosition)) {
-      showToast.error('Busque o endereço no mapa e confirme a localização antes de continuar.')
+    if (!geoPronta || !geoSincronizadaComEndereco || buscandoGeocodeMapa) {
+      if (buscandoGeocodeMapa) {
+        showToast.error('Aguarde a atualização do mapa.')
+      } else if (!geoSincronizadaComEndereco) {
+        showToast.error('Aguarde o mapa atualizar com o endereço informado.')
+      } else if (usarPontoPreferencia && enderecoLocalizacao && !preferenciaEntrega) {
+        showToast.error('Marque o ponto de entrega no mapa.')
+      } else {
+        showToast.error('Busque o endereço no mapa e confirme a localização antes de continuar.')
+      }
       return
     }
-
-    if (exigeEscolhaModoPin(pinPosition)) {
-      showToast.error('Responda às perguntas sobre o ponto no mapa antes de continuar.')
-      return
-    }
-
-    const enderecoAtual = normalizarEnderecoGeocodeInput({
-      rua: form.rua,
-      numero: form.numero,
-      bairro: form.bairro,
-      cidade: form.cidade,
-      estado: form.estado,
-      cep: form.cep,
-      complemento: form.complemento,
-    })
 
     const geo = montarGeoCheckoutInputFromState({
       enderecoLocalizacao,
-      pinPosition,
       providerEnderecoId,
-      modoAjustePin,
-      ...(modoAjustePin === 'atualizar_endereco'
-        ? {
-            enderecoRevertido: textoConfirmadoComPin
-              ? normalizarEnderecoGeocodeInput(
-                  formAntesDoAjustePinRef.current ?? enderecoAtual
-                )
-              : enderecoAtual,
-          }
-        : {}),
+      usarPontoPreferencia,
+      preferenciaEntrega,
     })
     if (!geo) {
       showToast.error('Busque o endereço no mapa e confirme a localização antes de continuar.')
@@ -441,7 +366,13 @@ export function DeliveryCheckoutEnderecoFormModal({
     }
   }
 
-  const linhaCardSecundaria = [form.bairro, form.cidade, form.estado].filter(Boolean).join(' - ')
+  const linhaCidadeEstado = [form.cidade, form.estado].filter(Boolean).join(' - ')
+  const linhaBairroCep = [
+    form.bairro.trim() || null,
+    form.cep.trim() ? `CEP ${form.cep}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
   return (
     <>
@@ -456,22 +387,24 @@ export function DeliveryCheckoutEnderecoFormModal({
           onContinuar={() => void handleConfirmar()}
           voltarLabel="Cancelar"
           continuarLabel={salvando ? 'Salvando...' : 'Confirmar'}
-          voltarDisabled={salvando || buscandoReversePin}
+          voltarDisabled={salvando}
           continuarDisabled={
             salvando ||
-            buscandoReversePin ||
             etapaUi === 'busca' ||
-            !geoCheckoutProntaParaConfirmar(pinPosition)
+            !geoPronta ||
+            !geoSincronizadaComEndereco ||
+            buscandoGeocodeMapa ||
+            dialogPinAberto
           }
         />
       </DeliveryCheckoutShellFooter>
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         <button
           type="button"
           disabled={buscandoGps}
           onClick={() => void usarLocalizacaoAtual()}
-          className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold delivery-text-primary disabled:opacity-60"
+          className="flex min-h-[40px] w-full items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold delivery-text-primary disabled:opacity-60"
           style={{ borderColor: 'var(--delivery-border)' }}
         >
           <LocateFixed className="h-4 w-4" aria-hidden />
@@ -492,40 +425,35 @@ export function DeliveryCheckoutEnderecoFormModal({
 
         {etapaUi === 'resumo' && form.rua.trim() ? (
           <div
-            className="rounded-xl border p-3"
+            className="rounded-xl border px-3 py-2"
             style={{ borderColor: 'var(--delivery-border)' }}
           >
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-2.5">
               <div
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
                 style={{ backgroundColor: 'var(--delivery-surface-muted)' }}
               >
                 <MapPin
-                  className="h-5 w-5"
+                  className="h-4 w-4"
                   style={{ color: 'var(--delivery-text-muted)' }}
                   aria-hidden
                 />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-xs delivery-text-secondary">Endereço encontrado</p>
-                <p className="text-sm font-semibold delivery-text-primary">
+                <p className="text-sm font-semibold leading-snug delivery-text-primary">
                   {form.rua}
                   {form.numero.trim() ? `, ${form.numero}` : ''}
                 </p>
-                {linhaCardSecundaria ? (
-                  <p className="mt-0.5 text-xs delivery-text-secondary">{linhaCardSecundaria}</p>
-                ) : form.cidade.trim() ? (
-                  <p className="mt-0.5 text-xs delivery-text-secondary">
-                    {[form.cidade, form.estado].filter(Boolean).join(' - ')}
+                {linhaCidadeEstado ? (
+                  <p className="mt-0.5 text-xs leading-snug delivery-text-secondary">
+                    {linhaCidadeEstado}
                   </p>
                 ) : null}
-                {!form.bairro.trim() ? (
-                  <p className="mt-1 text-xs font-medium" style={{ color: 'var(--delivery-primary)' }}>
-                    Informe o bairro abaixo (o Google não retornou)
+                {linhaBairroCep ? (
+                  <p className="mt-0.5 text-xs leading-snug delivery-text-secondary">
+                    {linhaBairroCep}
                   </p>
-                ) : null}
-                {form.cep.trim() ? (
-                  <p className="mt-0.5 text-xs delivery-text-secondary">CEP {form.cep}</p>
                 ) : null}
               </div>
               <button
@@ -554,10 +482,7 @@ export function DeliveryCheckoutEnderecoFormModal({
                 placeholder="00000-000"
                 value={form.cep}
                 disabled={buscandoCep}
-                onChange={e => {
-                  onChange('cep', formatarCepMascara(e.target.value))
-                  marcarEnderecoAlterado()
-                }}
+                onChange={e => onChange('cep', formatarCepMascara(e.target.value))}
                 onBlur={() => {
                   if (normalizarDigitosCep(form.cep).length === 8) void buscarCep()
                 }}
@@ -580,7 +505,6 @@ export function DeliveryCheckoutEnderecoFormModal({
                   }
                   onValueChange={raw => {
                     const parts = raw.split('-').map(p => p.trim())
-                    marcarEnderecoAlterado()
                     if (parts.length >= 2 && parts[parts.length - 1].length <= 2) {
                       onChange('estado', normalizarEstadoEndereco(parts.pop()!))
                       onChange('cidade', maiusculasEnderecoInput(parts.join(' - ')))
@@ -606,10 +530,7 @@ export function DeliveryCheckoutEnderecoFormModal({
               <DeliveryCheckoutUppercaseInput
                 ref={ruaInputRef}
                 value={form.rua}
-                onValueChange={valor => {
-                  onChange('rua', valor)
-                  marcarEnderecoAlterado()
-                }}
+                onValueChange={valor => onChange('rua', valor)}
                 className={fieldClass}
                 style={fieldStyle}
               />
@@ -627,10 +548,7 @@ export function DeliveryCheckoutEnderecoFormModal({
                 <DeliveryCheckoutUppercaseInput
                   ref={numeroInputRef}
                   value={form.numero}
-                  onValueChange={valor => {
-                    onChange('numero', valor)
-                    marcarEnderecoAlterado()
-                  }}
+                  onValueChange={valor => onChange('numero', valor)}
                   className={fieldClass}
                   style={fieldStyle}
                 />
@@ -642,10 +560,7 @@ export function DeliveryCheckoutEnderecoFormModal({
                 <DeliveryCheckoutUppercaseInput
                   ref={bairroInputRef}
                   value={form.bairro}
-                  onValueChange={valor => {
-                    onChange('bairro', valor)
-                    marcarEnderecoAlterado()
-                  }}
+                  onValueChange={valor => onChange('bairro', valor)}
                   placeholder="Informe o bairro"
                   className={fieldClass}
                   style={fieldStyle}
@@ -677,12 +592,43 @@ export function DeliveryCheckoutEnderecoFormModal({
               />
             </label>
 
+            <EnderecoGeolocalizacaoSection
+              variant="delivery"
+              autoGeocode={mostrarDetalhes && !geoSincronizadaComEndereco}
+              endereco={enderecoGeocode}
+              localizacao={enderecoLocalizacao}
+              mapValue={pinMapa}
+              onLocalizacaoChange={(point, meta) => {
+                setEnderecoLocalizacao(point)
+                setProviderEnderecoId(meta?.providerEnderecoId ?? null)
+                fecharDialogPin()
+                marcarGeoSincronizada()
+              }}
+              onMapChange={handleMapChange}
+              onGeocodeBuscandoChange={setBuscandoGeocodeMapa}
+              title="Localização para entrega"
+              subtitle={
+                usarPontoPreferencia
+                  ? 'Ajuste o pin do ponto de entrega. O endereço no mapa permanece fixo.'
+                  : 'O mapa atualiza ao alterar o endereço. Arraste o pin se precisar corrigir.'
+              }
+              obrigatorio
+              buscarLabel="Atualizar endereço no mapa"
+              successToast="Localização atualizada. Ajuste o pin se necessário."
+            />
+
+            <PreferenciaEntregaToggle
+              checked={usarPontoPreferencia}
+              onChange={handleTogglePreferencia}
+              disabled={!enderecoLocalizacao || salvando}
+            />
+
             <div>
-              <p className="mb-2 text-sm font-semibold delivery-text-primary">
+              <p className="mb-1 text-sm font-semibold delivery-text-primary">
                 Salvar endereço como:
               </p>
               <div
-                className="flex items-center gap-2 rounded-xl border px-3 py-2.5"
+                className="flex items-center gap-2 rounded-xl border px-3 py-2"
                 style={{ borderColor: 'var(--delivery-border)' }}
               >
                 <Home className="h-4 w-4 shrink-0" style={{ color: 'var(--delivery-text-muted)' }} />
@@ -702,57 +648,15 @@ export function DeliveryCheckoutEnderecoFormModal({
                 </select>
               </div>
             </div>
-
-            <EnderecoGeolocalizacaoSection
-              variant="delivery"
-              endereco={enderecoGeocode}
-              localizacao={enderecoLocalizacao}
-              mapValue={pinPosition}
-              onLocalizacaoChange={(point, meta) => {
-                setEnderecoLocalizacao(point)
-                setPinPosition(point)
-                setProviderEnderecoId(meta?.providerEnderecoId ?? null)
-                registrarReferenciaGeocode(point)
-                formAntesDoAjustePinRef.current = null
-                setTextoConfirmadoComPin(false)
-                setEnderecoAlteradoParaGeo(false)
-              }}
-              onMapChange={handleMapChange}
-              enderecoAlterado={enderecoAlteradoParaGeo}
-              title="Localização para entrega"
-              subtitle="Obrigatória para calcular a taxa de entrega."
-              obrigatorio
-              buscarLabel="Buscar no mapa"
-              successToast="Localização encontrada. Ajuste o pin se necessário."
-            />
           </>
         ) : null}
       </div>
 
-      <DeliveryCheckoutPinAjusteDialog
-        etapa={dialogEtapa}
-        resumoEndereco={[
-          formAntesDoAjustePinRef.current?.rua ?? form.rua,
-          (formAntesDoAjustePinRef.current?.numero ?? form.numero)
-            ? `nº ${formAntesDoAjustePinRef.current?.numero ?? form.numero}`
-            : '',
-          formAntesDoAjustePinRef.current?.bairro ?? form.bairro,
-          [
-            formAntesDoAjustePinRef.current?.cidade ?? form.cidade,
-            formAntesDoAjustePinRef.current?.estado ?? form.estado,
-          ]
-            .filter(Boolean)
-            .join('/'),
-        ]
-          .filter(Boolean)
-          .join(', ')}
-        onEscolherPreferencia={handleEscolherPreferencia}
-        onEscolherAtualizarEndereco={handleEscolherAtualizarEndereco}
-        onConfirmaEnderecoSim={handleConfirmaEnderecoSim}
-        onConfirmaEnderecoNao={handleConfirmaEnderecoNao}
-        onPontoDiferenteSim={handlePontoDiferenteSim}
-        onPontoDiferenteNao={handlePontoDiferenteNao}
-        onFechar={fecharDialogPin}
+      <DeliveryCheckoutPinAjustadoDialog
+        open={dialogPinAberto}
+        variante={variantePin}
+        onConfirmar={confirmarAjustePin}
+        onCancelar={cancelarAjustePin}
       />
     </>
   )

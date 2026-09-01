@@ -11,6 +11,18 @@ export type EnderecoGeocodeInput = {
   complemento?: string
 }
 
+/** Chave estável dos campos que entram no geocode (ignora complemento). */
+export function serializarEnderecoParaGeocode(endereco: EnderecoGeocodeInput): string {
+  return JSON.stringify({
+    rua: endereco.rua?.trim() ?? '',
+    numero: endereco.numero?.trim() ?? '',
+    bairro: endereco.bairro?.trim() ?? '',
+    cidade: endereco.cidade?.trim() ?? '',
+    estado: endereco.estado?.trim() ?? '',
+    cep: normalizarCepEndereco(endereco.cep),
+  })
+}
+
 export type GeocodeEnderecoResult = {
   enderecoLocalizacao: GeoJsonPoint
   providerEnderecoId: string | null
@@ -277,7 +289,8 @@ export function enderecoTemGeolocalizacao(endereco: {
 
 export type ModoPersistenciaGeoEnderecoDelivery = 'preferencia_entrega' | 'atualizar_endereco'
 
-export function montarPayloadGeoEnderecoDelivery(input: {
+/** @deprecated Use `preferenciaEntrega` explícito no payload. */
+export function montarPayloadGeoEnderecoDeliveryLegado(input: {
   enderecoLocalizacao: GeoJsonPoint
   pinPosition: GeoJsonPoint
   providerEnderecoId?: string | null
@@ -306,6 +319,23 @@ export function montarPayloadGeoEnderecoDelivery(input: {
   return {
     enderecoLocalizacao,
     ...(preferenciaEntrega ? { preferenciaEntrega } : {}),
+  }
+}
+
+export function montarPayloadGeoEnderecoDelivery(input: {
+  enderecoLocalizacao: GeoJsonPoint
+  providerEnderecoId?: string | null
+  preferenciaEntrega?: GeoJsonPoint | null
+}): {
+  enderecoLocalizacao: EnderecoLocalizacaoInput
+  preferenciaEntrega?: GeoJsonPoint
+} {
+  return {
+    enderecoLocalizacao: montarEnderecoLocalizacaoInput(
+      input.enderecoLocalizacao,
+      input.providerEnderecoId
+    ),
+    ...(input.preferenciaEntrega ? { preferenciaEntrega: input.preferenciaEntrega } : {}),
   }
 }
 

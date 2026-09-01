@@ -119,7 +119,7 @@ export function EnderecoPlacesAutocomplete({
             setAberto(true)
             setHighlight(lista.length > 0 ? 0 : -1)
             if (lista.length === 0) {
-              setErro('Não encontramos sugestões. Continue digitando ou use Buscar no mapa.')
+              setErro('Não encontramos sugestões. Continue digitando ou use Buscar endereço no mapa.')
             }
           })
           .catch(error => {

@@ -38,7 +38,6 @@ import { DeliveryCheckoutEnderecoFormModal } from '../components/checkout/Delive
 import { DeliveryCheckoutEnderecoGeoModal } from '../components/checkout/DeliveryCheckoutEnderecoGeoModal'
 import type { EnderecoGeoCheckoutInput } from '@/src/application/dto/delivery-publico/EnderecoGeoCheckoutDTO'
 import { enderecoTemGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoDelivery'
-import { normalizarEnderecoGeocodeInput } from '@/src/shared/utils/normalizarTextoEnderecoPublico'
 import type { ModoEntregaOpcao } from '../components/checkout/DeliveryCheckoutTipoEntregaOpcoes'
 import { DeliveryCheckoutPagamentoModal } from '../components/checkout/DeliveryCheckoutPagamentoModal'
 import { DeliveryCheckoutRevisaoModal } from '../components/checkout/DeliveryCheckoutRevisaoModal'
@@ -649,19 +648,7 @@ export function DeliveryPublicoCarrinhoScreen({
       form.modoEndereco === 'existente' && Boolean(form.enderecoIdSelecionado.trim())
 
     if (editandoExistente) {
-      await confirmarGeoEnderecoExistente({
-        ...geo,
-        modoAjustePin: 'atualizar_endereco',
-        enderecoRevertido: normalizarEnderecoGeocodeInput({
-          rua: form.rua,
-          numero: form.numero,
-          bairro: form.bairro,
-          cidade: form.cidade,
-          estado: form.estado,
-          cep: form.cep,
-          complemento: form.complemento,
-        }),
-      })
+      await confirmarGeoEnderecoExistente(geo)
     } else {
       await confirmarNovoEndereco(geo)
     }
