@@ -23,12 +23,18 @@ import {
 } from '@/src/presentation/utils/logoImpressaoCrop'
 import { lerMenuIdDeParametroEmpresa } from '@/src/shared/utils/parametroEmpresaMenus'
 import { EmpresaGeolocalizacaoSection } from '../EmpresaGeolocalizacaoSection'
+import { EnderecoPlacesAutocomplete } from '@/src/presentation/components/shared/geolocalizacao/EnderecoPlacesAutocomplete'
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import {
   lerEnderecoLocalizacaoDoPayloadEmpresa,
   montarPatchEnderecoGeolocalizacao,
   type EnderecoEmpresaGeocodeInput,
 } from '@/src/shared/utils/geolocalizacaoEmpresa'
+import {
+  placeDetailsParaEnderecoGeocode,
+  type PlaceDetailsResult,
+} from '@/src/shared/utils/geolocalizacaoPlaces'
+import { formatarCepMascara } from '@/src/shared/utils/consultaCep'
 
 /** Labels outlined — alinhado a NovoMeioPagamento / EditarTerminais */
 const sxOutlinedLabelTextoEscuro = {
@@ -181,6 +187,7 @@ export function EmpresaTab() {
   const [codigoCidadeIbge, setCodigoCidadeIbge] = useState<string | null>(null)
   const [enderecoLocalizacao, setEnderecoLocalizacao] = useState<GeoJsonPoint | null>(null)
   const [providerEnderecoId, setProviderEnderecoId] = useState<string | null>(null)
+  const [buscaPlacesEmpresa, setBuscaPlacesEmpresa] = useState('')
   const enderecoGeoSnapshotRef = useRef('')
   /** Valor exibido no select (IANA); vem de `parametroEmpresa.timezone` no GET /empresas/me. */
   const [timezone, setTimezone] = useState('')
@@ -236,6 +243,25 @@ export function EmpresaTab() {
     },
     []
   )
+
+  const aplicarPlaceDetailsEmpresa = useCallback((place: PlaceDetailsResult) => {
+    const fields = placeDetailsParaEnderecoGeocode(place)
+    if (fields.rua) setRua(maiusculasPt(fields.rua))
+    if (fields.numero) setNumero(maiusculasPt(fields.numero))
+    if (fields.bairro) setBairro(maiusculasPt(fields.bairro))
+    if (fields.cidade) {
+      setCidade(maiusculasPt(fields.cidade))
+      ultimaCidadeBuscada.current = fields.cidade
+    }
+    if (fields.estado) setEstado(fields.estado.toUpperCase().slice(0, 2))
+    if (fields.cep) setCep(maiusculasPt(formatarCepMascara(fields.cep)))
+    setEnderecoLocalizacao(place.enderecoLocalizacao)
+    setProviderEnderecoId(place.providerEnderecoId)
+    setBuscaPlacesEmpresa(
+      [fields.rua, fields.numero].filter(Boolean).join(', ') || place.enderecoFormatado || ''
+    )
+    showToast.success('Endereço aplicado. Confira o pin no mapa e salve a empresa.')
+  }, [])
 
   useEffect(() => {
     loadEmpresa()
@@ -1193,6 +1219,18 @@ export function EmpresaTab() {
           <div>
             <h4 className="mb-2 text-lg font-semibold text-primary">Endereço</h4>
             <div className="space-y-6">
+              {isEditing ? (
+                <EnderecoPlacesAutocomplete
+                  variant="gestor"
+                  floatingLabel={false}
+                  label="Buscar endereço no Google"
+                  placeholder="Digite rua, bairro ou cidade…"
+                  value={buscaPlacesEmpresa}
+                  onChange={setBuscaPlacesEmpresa}
+                  onSelect={aplicarPlaceDetailsEmpresa}
+                />
+              ) : null}
+
               {/* Linha 1: CEP + Rua */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <UppercaseLocaleInput

@@ -3,6 +3,7 @@ import type {
   EnderecoClienteDeliveryPublicoDTO,
 } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { normalizarClienteDeliveryApi } from '@/src/application/mappers/ClienteDeliveryMoradaMapper'
+import { parseGeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 
 /** Códigos IBGE de UF → sigla (quando a API não manda `estado` preenchido). */
 const UF_POR_CODIGO_IBGE: Record<string, string> = {
@@ -89,6 +90,11 @@ function normalizeEnderecoRecord(
     complemento: asStr(pickField(e, ['complemento'])) || null,
     ultimaUtilizacaoEm:
       e.ultimaUtilizacaoEm != null ? asStr(e.ultimaUtilizacaoEm) || null : null,
+    enderecoLocalizacao: parseGeoJsonPoint(e.enderecoLocalizacao),
+    preferenciaEntrega: parseGeoJsonPoint(e.preferenciaEntrega),
+    geocodingProvider: asStr(pickField(e, ['geocodingProvider', 'geocoding_provider'])) || null,
+    providerEnderecoId:
+      asStr(pickField(e, ['providerEnderecoId', 'provider_endereco_id'])) || null,
   }
 }
 

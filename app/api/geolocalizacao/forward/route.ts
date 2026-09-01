@@ -42,16 +42,32 @@ function lerEnderecoDaQuery(request: NextRequest): EnderecoEmpresaGeocodeInput |
   const numero = searchParams.get('numero')?.trim() ?? ''
   const cidade = searchParams.get('cidade')?.trim() ?? ''
   const estado = searchParams.get('estado')?.trim().toUpperCase() ?? ''
+  const bairro = searchParams.get('bairro')?.trim() || undefined
+  const cep = searchParams.get('cep')?.trim() || undefined
+  const complemento = searchParams.get('complemento')?.trim() || undefined
 
   if (rua && numero && cidade && estado) {
     return {
       rua,
       numero,
-      bairro: searchParams.get('bairro')?.trim() || undefined,
+      bairro,
       cidade,
       estado,
-      cep: searchParams.get('cep')?.trim() || undefined,
-      complemento: searchParams.get('complemento')?.trim() || undefined,
+      cep,
+      complemento,
+    }
+  }
+
+  /** Checkout delivery: rua + número + contexto local (cidade ou bairro), UF opcional. */
+  if (rua && numero && (cidade || bairro)) {
+    return {
+      rua,
+      numero,
+      bairro,
+      cidade: cidade || undefined,
+      estado: estado || undefined,
+      cep,
+      complemento,
     }
   }
 
@@ -68,19 +84,95 @@ function lerEnderecoDaQuery(request: NextRequest): EnderecoEmpresaGeocodeInput |
   return null
 }
 
-function montarComponentesGoogle(input: EnderecoEmpresaGeocodeInput): string {
+function montarComponentesGoogle(input: EnderecoEmpresaGeocodeInput): string | null {
   const partes = ['country:BR']
-  if (input.estado && input.estado.length === 2) {
-    partes.push(`administrative_area:${input.estado}`)
-  }
-  if (input.cidade?.trim()) {
-    partes.push(`locality:${input.cidade.trim()}`)
-  }
-  const cep = normalizarCepEndereco(input.cep)
-  if (cep.length === 8) {
-    partes.push(`postal_code:${cep}`)
+  const estado = input.estado?.trim().toUpperCase()
+  if (estado && estado.length === 2 && estado !== 'BR') {
+    partes.push(`administrative_area:${estado}`)
   }
   return partes.join('|')
+}
+
+/** Endereços alternativos quando a busca completa falha (comum em cidades menores). */
+function montarEnderecosAlternativosGeocode(input: EnderecoEmpresaGeocodeInput): string[] {
+  const candidatos = new Set<string>()
+  const principal = montarEnderecoParaGeocode(input)
+  candidatos.add(principal)
+
+  const semComplemento = montarEnderecoParaGeocode({ ...input, complemento: undefined })
+  candidatos.add(semComplemento)
+
+  const cep = normalizarCepEndereco(input.cep)
+  const cepFormatado =
+    cep.length === 8 ? `${cep.slice(0, 5)}-${cep.slice(5)}` : input.cep?.trim()
+  const cidadeEstado = [input.cidade?.trim(), input.estado?.trim()?.toUpperCase()]
+    .filter(Boolean)
+    .join(' - ')
+
+  if (input.rua?.trim() && input.numero?.trim() && input.bairro?.trim() && cidadeEstado) {
+    candidatos.add(
+      [input.rua.trim(), input.numero.trim(), input.bairro.trim(), cidadeEstado, 'Brasil']
+        .filter(Boolean)
+        .join(', ')
+    )
+  }
+
+  if (cepFormatado && cidadeEstado) {
+    candidatos.add([cepFormatado, cidadeEstado, 'Brasil'].join(', '))
+  }
+
+  if (input.rua?.trim() && cidadeEstado) {
+    candidatos.add([input.rua.trim(), cidadeEstado, 'Brasil'].join(', '))
+  }
+
+  return [...candidatos].filter(endereco => endereco.trim().length >= 5)
+}
+
+async function consultarGoogleGeocode(
+  apiKey: string,
+  address: string,
+  components: string | null
+): Promise<GoogleGeocodeResponse> {
+  const url = new URL('https://maps.googleapis.com/maps/api/geocode/json')
+  url.searchParams.set('address', address)
+  if (components) url.searchParams.set('components', components)
+  url.searchParams.set('language', 'pt-BR')
+  url.searchParams.set('region', 'br')
+  url.searchParams.set('key', apiKey)
+
+  const response = await fetch(url.toString(), {
+    headers: { Accept: 'application/json' },
+    next: { revalidate: 0 },
+  })
+
+  if (!response.ok) {
+    return { status: 'HTTP_ERROR' }
+  }
+
+  return (await response.json()) as GoogleGeocodeResponse
+}
+
+async function resolverGeocodeGoogle(
+  apiKey: string,
+  input: EnderecoEmpresaGeocodeInput
+): Promise<GoogleGeocodeResponse | null> {
+  const enderecos = montarEnderecosAlternativosGeocode(input)
+  const componentesRestritos = montarComponentesGoogle(input)
+  const tentativas: Array<string | null> = [componentesRestritos, 'country:BR', null]
+
+  for (const endereco of enderecos) {
+    for (const components of tentativas) {
+      const data = await consultarGoogleGeocode(apiKey, endereco, components)
+      if (data.status === 'OK' && (data.results?.length ?? 0) > 0) {
+        return data
+      }
+      if (data.status && !NOT_FOUND.has(data.status) && data.status !== 'OK') {
+        return data
+      }
+    }
+  }
+
+  return null
 }
 
 function normalizarTextoComparacao(value: string): string {
@@ -103,15 +195,43 @@ function resultadoCompativelComCidade(
   })
 }
 
+function resultadoCompativelComEstado(
+  result: NonNullable<GoogleGeocodeResponse['results']>[number],
+  estadoEsperado: string
+): boolean {
+  const alvo = normalizarTextoComparacao(estadoEsperado)
+  if (alvo.length !== 2) return true
+
+  return (result.address_components ?? []).some(componente => {
+    if (!componente.types?.includes('administrative_area_level_1')) return false
+    const sigla = normalizarTextoComparacao(componente.short_name ?? '')
+    const nome = normalizarTextoComparacao(componente.long_name ?? '')
+    return sigla === alvo || nome.includes(alvo)
+  })
+}
+
 function escolherMelhorResultado(
   results: NonNullable<GoogleGeocodeResponse['results']>,
   input: EnderecoEmpresaGeocodeInput
 ) {
-  if (!input.cidade?.trim()) return results[0]
+  let candidatos = results
 
-  const cidadeEsperada = input.cidade.trim()
-  const compativel = results.find(result => resultadoCompativelComCidade(result, cidadeEsperada))
-  return compativel ?? results[0]
+  if (input.estado?.trim()) {
+    const noEstado = candidatos.filter(result =>
+      resultadoCompativelComEstado(result, input.estado!.trim())
+    )
+    if (noEstado.length > 0) candidatos = noEstado
+  }
+
+  const cidadeEsperada = input.cidade?.trim()
+  if (cidadeEsperada) {
+    const naCidade = candidatos.filter(result =>
+      resultadoCompativelComCidade(result, cidadeEsperada)
+    )
+    if (naCidade.length > 0) return naCidade[0]
+  }
+
+  return candidatos[0]
 }
 
 /**
@@ -141,26 +261,15 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const url = new URL('https://maps.googleapis.com/maps/api/geocode/json')
-    url.searchParams.set('address', address)
-    url.searchParams.set('components', montarComponentesGoogle(input))
-    url.searchParams.set('language', 'pt-BR')
-    url.searchParams.set('region', 'br')
-    url.searchParams.set('key', apiKey)
+    const data = await resolverGeocodeGoogle(apiKey, input)
 
-    const response = await fetch(url.toString(), {
-      headers: { Accept: 'application/json' },
-      next: { revalidate: 0 },
-    })
-
-    if (!response.ok) {
+    if (!data) {
       return NextResponse.json(
-        { error: 'Falha ao consultar Google Geocoding API' },
-        { status: 502 }
+        { error: 'Endereço não encontrado. Confira rua, número, CEP e cidade ou ajuste o pin no mapa.' },
+        { status: 404 }
       )
     }
 
-    const data = (await response.json()) as GoogleGeocodeResponse
     const status = data.status ?? ''
 
     if (NOT_FOUND.has(status)) {
