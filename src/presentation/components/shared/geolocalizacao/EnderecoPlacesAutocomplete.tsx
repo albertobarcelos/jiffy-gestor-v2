@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
-import { MapPin, Search } from 'lucide-react'
+import { MapPin, Search, X } from 'lucide-react'
 import {
   buscarPlaceDetails,
   buscarPlacesAutocomplete,
@@ -18,6 +18,8 @@ type EnderecoPlacesAutocompleteProps = {
   value: string
   onChange: (value: string) => void
   onSelect: (place: PlaceDetailsResult) => void
+  /** Chamado ao limpar a busca com o X (para resetar campos do formulário). */
+  onClear?: () => void
   bias?: PlacesBias | null
   variant?: EnderecoPlacesAutocompleteVariant
   disabled?: boolean
@@ -37,6 +39,7 @@ export function EnderecoPlacesAutocomplete({
   value,
   onChange,
   onSelect,
+  onClear,
   bias = null,
   variant = 'delivery',
   disabled = false,
@@ -140,6 +143,20 @@ export function EnderecoPlacesAutocomplete({
     dispararBusca(next)
   }
 
+  const limparBusca = () => {
+    if (disabled || loadingDetails) return
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    abortRef.current?.abort()
+    skipNextSearchRef.current = true
+    sessionTokenRef.current = criarSessionTokenPlaces()
+    onChange('')
+    setPredictions([])
+    setErro(null)
+    setLoading(false)
+    fecharLista()
+    onClear?.()
+  }
+
   const selecionarPrediction = async (prediction: PlacesAutocompletePrediction) => {
     setLoadingDetails(true)
     setErro(null)
@@ -194,6 +211,7 @@ export function EnderecoPlacesAutocomplete({
 
   const delivery = variant === 'delivery'
   const busy = loading || loadingDetails
+  const podeLimpar = value.trim().length > 0 && !disabled && !loadingDetails
 
   return (
     <div ref={rootRef} className={cn('relative', className)}>
@@ -239,8 +257,9 @@ export function EnderecoPlacesAutocomplete({
             onKeyDown={onKeyDown}
             className={cn(
               delivery
-                ? 'w-full rounded-xl border bg-transparent py-3 pl-10 pr-3 text-base outline-none delivery-text-primary'
-                : 'w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-10 pr-3 text-sm outline-none focus:border-secondary focus:ring-1 focus:ring-secondary',
+                ? 'w-full rounded-xl border bg-transparent py-3 pl-10 text-base outline-none delivery-text-primary'
+                : 'w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-10 text-sm outline-none focus:border-secondary focus:ring-1 focus:ring-secondary',
+              busy || podeLimpar ? 'pr-10' : 'pr-3',
               inputClassName
             )}
             style={
@@ -259,6 +278,20 @@ export function EnderecoPlacesAutocomplete({
             >
               {loadingDetails ? 'Aplicando…' : 'Buscando…'}
             </span>
+          ) : podeLimpar ? (
+            <button
+              type="button"
+              onClick={limparBusca}
+              className={cn(
+                'absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full transition-colors',
+                delivery
+                  ? 'delivery-text-secondary hover:bg-[var(--delivery-surface-muted,#f3f4f6)]'
+                  : 'text-secondary-text hover:bg-gray-100'
+              )}
+              aria-label="Limpar busca de endereço"
+            >
+              <X className="h-4 w-4" aria-hidden />
+            </button>
           ) : null}
         </div>
       </label>

@@ -1,30 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
 import {
-  geoJsonPointFromGoogleLocation,
+  geoJsonPointFromPlacesLocation,
   lerGoogleMapsApiKeyServer,
   parseGoogleAddressComponents,
   type GoogleAddressComponent,
 } from '@/src/shared/utils/googleAddressComponents'
+import { RATE_LIMIT_GEO, verificarRateLimit } from '@/src/shared/utils/rateLimitMemory'
 
-type GooglePlaceDetailsResponse = {
-  status?: string
-  error_message?: string
-  result?: {
-    place_id?: string
-    formatted_address?: string
-    geometry?: {
-      location?: { lat?: number; lng?: number }
-    }
-    address_components?: GoogleAddressComponent[]
+type PlacesNewDetailsResponse = {
+  id?: string
+  formattedAddress?: string
+  location?: { latitude?: number; longitude?: number }
+  addressComponents?: GoogleAddressComponent[]
+  error?: {
+    message?: string
+    status?: string
+    code?: number
   }
 }
 
-const NOT_FOUND = new Set(['ZERO_RESULTS', 'NOT_FOUND'])
-
 /**
  * GET /api/geolocalizacao/places/details?placeId=...&sessionToken=...
+ * Proxy para Places API (New) Place Details.
  */
 export async function GET(request: NextRequest) {
+  const rateLimited = verificarRateLimit(request, RATE_LIMIT_GEO.placesDetails)
+  if (rateLimited) return rateLimited
+
   const apiKey = lerGoogleMapsApiKeyServer()
   if (!apiKey) {
     return NextResponse.json(
@@ -34,55 +36,46 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = request.nextUrl
-  const placeId = searchParams.get('placeId')?.trim() ?? ''
+  const placeIdRaw = searchParams.get('placeId')?.trim() ?? ''
   const sessionToken = searchParams.get('sessionToken')?.trim() ?? ''
 
-  if (!placeId) {
+  if (!placeIdRaw) {
     return NextResponse.json({ error: 'Informe placeId' }, { status: 400 })
   }
 
-  const url = new URL('https://maps.googleapis.com/maps/api/place/details/json')
-  url.searchParams.set('place_id', placeId)
-  url.searchParams.set('key', apiKey)
-  url.searchParams.set('language', 'pt-BR')
-  url.searchParams.set(
-    'fields',
-    'place_id,formatted_address,geometry,address_component'
-  )
+  const placeId = placeIdRaw.replace(/^places\//, '')
+  const url = new URL(`https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`)
+  url.searchParams.set('languageCode', 'pt-BR')
+  url.searchParams.set('regionCode', 'BR')
   if (sessionToken) {
-    url.searchParams.set('sessiontoken', sessionToken)
+    url.searchParams.set('sessionToken', sessionToken)
   }
 
   try {
     const response = await fetch(url.toString(), {
-      headers: { Accept: 'application/json' },
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        'X-Goog-Api-Key': apiKey,
+        'X-Goog-FieldMask': 'id,formattedAddress,location,addressComponents',
+      },
       next: { revalidate: 0 },
     })
 
-    if (!response.ok) {
-      return NextResponse.json({ error: 'Falha ao consultar Place Details' }, { status: 502 })
-    }
+    const data = (await response.json().catch(() => ({}))) as PlacesNewDetailsResponse
 
-    const data = (await response.json()) as GooglePlaceDetailsResponse
-    const status = data.status ?? ''
-
-    if (NOT_FOUND.has(status)) {
+    if (response.status === 404 || data.error?.status === 'NOT_FOUND') {
       return NextResponse.json({ error: 'Endereço não encontrado' }, { status: 404 })
     }
 
-    if (status !== 'OK' || !data.result) {
-      return NextResponse.json(
-        {
-          error:
-            data.error_message?.trim() ||
-            `Google Place Details retornou status ${status || 'desconhecido'}`,
-        },
-        { status: 502 }
-      )
+    if (!response.ok) {
+      const msg =
+        data.error?.message?.trim() ||
+        `Falha ao consultar Place Details (New) [${response.status}]`
+      return NextResponse.json({ error: msg }, { status: 502 })
     }
 
-    const result = data.result
-    const enderecoLocalizacao = geoJsonPointFromGoogleLocation(result.geometry?.location)
+    const enderecoLocalizacao = geoJsonPointFromPlacesLocation(data.location)
     if (!enderecoLocalizacao) {
       return NextResponse.json(
         { error: 'Place Details não retornou coordenadas válidas' },
@@ -90,13 +83,13 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const parsed = parseGoogleAddressComponents(result.address_components)
-    const providerEnderecoId = result.place_id?.trim() || placeId
+    const parsed = parseGoogleAddressComponents(data.addressComponents)
+    const providerEnderecoId = data.id?.trim() || placeId
 
     return NextResponse.json({
       providerEnderecoId,
       enderecoLocalizacao,
-      enderecoFormatado: result.formatted_address?.trim() || null,
+      enderecoFormatado: data.formattedAddress?.trim() || null,
       rua: parsed.rua,
       numero: parsed.numero,
       bairro: parsed.bairro,

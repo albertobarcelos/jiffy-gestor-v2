@@ -50,6 +50,8 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/api/auth/usuario/') ||
     pathname.startsWith('/api/consulta-cnpj') ||
     pathname.startsWith('/api/consulta-cep') ||
+    /** Geo/Places do checkout delivery público (rate limit nas próprias routes). */
+    pathname.startsWith('/api/geolocalizacao/') ||
     pathname.startsWith('/notas-fiscais') ||
     pathname.startsWith('/api/public/notas-fiscais-consumidor') ||
     pathname === '/cardapio' ||

@@ -8,6 +8,7 @@ import {
   normalizarCepEndereco,
   type EnderecoEmpresaGeocodeInput,
 } from '@/src/shared/utils/geolocalizacaoEmpresa'
+import { RATE_LIMIT_GEO, verificarRateLimit } from '@/src/shared/utils/rateLimitMemory'
 
 type GoogleGeocodeResponse = {
   status?: string
@@ -239,6 +240,9 @@ function escolherMelhorResultado(
  * GET /api/geolocalizacao/forward?rua=...&numero=...&cidade=...&estado=...
  */
 export async function GET(request: NextRequest) {
+  const rateLimited = verificarRateLimit(request, RATE_LIMIT_GEO.forward)
+  if (rateLimited) return rateLimited
+
   const apiKey = lerGoogleMapsApiKey()
   if (!apiKey) {
     return NextResponse.json(

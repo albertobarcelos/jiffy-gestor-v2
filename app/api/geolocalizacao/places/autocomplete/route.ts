@@ -1,27 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { lerGoogleMapsApiKeyServer } from '@/src/shared/utils/googleAddressComponents'
+import { RATE_LIMIT_GEO, verificarRateLimit } from '@/src/shared/utils/rateLimitMemory'
 
-type GoogleAutocompletePrediction = {
-  place_id?: string
-  description?: string
-  structured_formatting?: {
-    main_text?: string
-    secondary_text?: string
+type PlacesNewText = {
+  text?: string
+}
+
+type PlacesNewPlacePrediction = {
+  place?: string
+  placeId?: string
+  text?: PlacesNewText
+  structuredFormat?: {
+    mainText?: PlacesNewText
+    secondaryText?: PlacesNewText
   }
 }
 
-type GoogleAutocompleteResponse = {
-  status?: string
-  error_message?: string
-  predictions?: GoogleAutocompletePrediction[]
+type PlacesNewAutocompleteResponse = {
+  suggestions?: Array<{
+    placePrediction?: PlacesNewPlacePrediction
+  }>
+  error?: {
+    message?: string
+    status?: string
+  }
 }
-
-const OK_OR_EMPTY = new Set(['OK', 'ZERO_RESULTS'])
 
 /**
  * GET /api/geolocalizacao/places/autocomplete?input=...&sessionToken=...&lat=&lng=&radius=
+ * Proxy para Places API (New) Autocomplete.
  */
 export async function GET(request: NextRequest) {
+  const rateLimited = verificarRateLimit(request, RATE_LIMIT_GEO.placesAutocomplete)
+  if (rateLimited) return rateLimited
+
   const apiKey = lerGoogleMapsApiKeyServer()
   if (!apiKey) {
     return NextResponse.json(
@@ -38,14 +50,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ predictions: [] })
   }
 
-  const url = new URL('https://maps.googleapis.com/maps/api/place/autocomplete/json')
-  url.searchParams.set('input', input)
-  url.searchParams.set('key', apiKey)
-  url.searchParams.set('language', 'pt-BR')
-  url.searchParams.set('components', 'country:br')
-  url.searchParams.set('types', 'address')
+  const body: Record<string, unknown> = {
+    input,
+    languageCode: 'pt-BR',
+    includedRegionCodes: ['br'],
+  }
+
   if (sessionToken) {
-    url.searchParams.set('sessiontoken', sessionToken)
+    body.sessionToken = sessionToken
   }
 
   const lat = searchParams.get('lat')
@@ -53,46 +65,51 @@ export async function GET(request: NextRequest) {
   const latNum = lat != null ? Number(lat) : NaN
   const lngNum = lng != null ? Number(lng) : NaN
   if (Number.isFinite(latNum) && Number.isFinite(lngNum)) {
-    url.searchParams.set('location', `${latNum},${lngNum}`)
     const radius = Number(searchParams.get('radius') ?? '50000')
-    url.searchParams.set('radius', String(Number.isFinite(radius) && radius > 0 ? radius : 50000))
+    const radiusMeters = Number.isFinite(radius) && radius > 0 ? radius : 50000
+    body.locationBias = {
+      circle: {
+        center: { latitude: latNum, longitude: lngNum },
+        radius: radiusMeters,
+      },
+    }
   }
 
   try {
-    const response = await fetch(url.toString(), {
-      headers: { Accept: 'application/json' },
+    const response = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'X-Goog-Api-Key': apiKey,
+        'X-Goog-FieldMask':
+          'suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat',
+      },
+      body: JSON.stringify(body),
       next: { revalidate: 0 },
     })
 
+    const data = (await response.json().catch(() => ({}))) as PlacesNewAutocompleteResponse
+
     if (!response.ok) {
-      return NextResponse.json(
-        { error: 'Falha ao consultar Places Autocomplete' },
-        { status: 502 }
-      )
+      const msg =
+        data.error?.message?.trim() ||
+        `Falha ao consultar Places Autocomplete (New) [${response.status}]`
+      return NextResponse.json({ error: msg }, { status: 502 })
     }
 
-    const data = (await response.json()) as GoogleAutocompleteResponse
-    const status = data.status ?? ''
-
-    if (!OK_OR_EMPTY.has(status)) {
-      return NextResponse.json(
-        {
-          error:
-            data.error_message?.trim() ||
-            `Google Places Autocomplete retornou status ${status || 'desconhecido'}`,
-        },
-        { status: 502 }
-      )
-    }
-
-    const predictions = (data.predictions ?? [])
-      .map(p => ({
-        placeId: p.place_id?.trim() ?? '',
-        descricao: p.description?.trim() ?? '',
-        descricaoPrincipal: p.structured_formatting?.main_text?.trim() ?? '',
-        descricaoSecundaria: p.structured_formatting?.secondary_text?.trim() ?? '',
-      }))
-      .filter(p => p.placeId && p.descricao)
+    const predictions = (data.suggestions ?? [])
+      .map(s => {
+        const p = s.placePrediction
+        if (!p) return null
+        const placeId = (p.placeId ?? p.place?.replace(/^places\//, '') ?? '').trim()
+        const descricao = p.text?.text?.trim() ?? ''
+        const descricaoPrincipal = p.structuredFormat?.mainText?.text?.trim() ?? ''
+        const descricaoSecundaria = p.structuredFormat?.secondaryText?.text?.trim() ?? ''
+        if (!placeId || !descricao) return null
+        return { placeId, descricao, descricaoPrincipal, descricaoSecundaria }
+      })
+      .filter((p): p is NonNullable<typeof p> => p != null)
 
     return NextResponse.json({ predictions })
   } catch {

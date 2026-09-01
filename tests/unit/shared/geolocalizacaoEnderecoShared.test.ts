@@ -166,15 +166,67 @@ describe('geolocalizacaoEnderecoShared', () => {
     expect(aplicado.endereco.cidade).toBe('Piquete')
   })
 
-  it('aplica rua do reverse quando reconhecida', () => {
+  it('preserva endereço digitado quando reverse aponta outra rua', () => {
     const aplicado = aplicarReverseGeocodeNoPreview(
       {
-        rua: 'Rua Antiga',
+        rua: 'Rua São Judas Tadeu',
+        numero: '50',
+        bairro: 'Centro',
+        cidade: 'Piquete',
+        estado: 'SP',
+        cep: '12620000',
+        complemento: 'Fundos',
+      },
+      {
+        rua: 'Rua Completamente Diferente',
+        numero: '999',
+        bairro: '',
+        cidade: 'Piquete',
+        estado: 'SP',
+        cep: '12620000',
+      }
+    )
+    expect(aplicado.reconheceuLogradouro).toBe(false)
+    expect(aplicado.endereco.rua).toBe('Rua São Judas Tadeu')
+    expect(aplicado.endereco.numero).toBe('50')
+    expect(aplicado.endereco.bairro).toBe('Centro')
+    expect(aplicado.endereco.complemento).toBe('Fundos')
+  })
+
+  it('quando a rua coincide, preenche vazios do reverse sem apagar bairro/número do cliente', () => {
+    const aplicado = aplicarReverseGeocodeNoPreview(
+      {
+        rua: 'Rua Nova',
         numero: '1',
-        bairro: 'X',
+        bairro: 'Centro',
         cidade: 'Piquete',
         estado: 'SP',
         complemento: 'Ap 2',
+      },
+      {
+        rua: 'R. Nova',
+        numero: '20',
+        bairro: '',
+        cidade: 'Piquete',
+        estado: 'SP',
+        cep: '12620000',
+      }
+    )
+    expect(aplicado.reconheceuLogradouro).toBe(true)
+    expect(aplicado.endereco.rua).toBe('Rua Nova')
+    expect(aplicado.endereco.numero).toBe('1')
+    expect(aplicado.endereco.bairro).toBe('Centro')
+    expect(aplicado.endereco.complemento).toBe('Ap 2')
+    expect(aplicado.endereco.cep).toBe('12620000')
+  })
+
+  it('usa dados do reverse quando o cliente ainda não informou rua', () => {
+    const aplicado = aplicarReverseGeocodeNoPreview(
+      {
+        rua: '',
+        numero: '',
+        cidade: 'Piquete',
+        estado: 'SP',
       },
       {
         rua: 'Rua Nova',
@@ -188,6 +240,6 @@ describe('geolocalizacaoEnderecoShared', () => {
     expect(aplicado.reconheceuLogradouro).toBe(true)
     expect(aplicado.endereco.rua).toBe('Rua Nova')
     expect(aplicado.endereco.numero).toBe('20')
-    expect(aplicado.endereco.complemento).toBe('Ap 2')
+    expect(aplicado.endereco.bairro).toBe('Centro')
   })
 })

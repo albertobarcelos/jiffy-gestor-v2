@@ -159,6 +159,20 @@ export function DeliveryCheckoutEnderecoFormModal({
     showToast.success('Endereço aplicado. Confira o número e o pin no mapa.')
   }
 
+  const limparCamposAposBuscaPlaces = () => {
+    onChange('cep', '')
+    onChange('rua', '')
+    onChange('numero', '')
+    onChange('bairro', '')
+    onChange('cidade', '')
+    onChange('estado', '')
+    onChange('complemento', '')
+    onChange('pontoReferencia', '')
+    formAntesDoAjustePinRef.current = null
+    setTextoConfirmadoComPin(false)
+    marcarEnderecoAlterado()
+  }
+
   const marcarEnderecoAlterado = () => {
     setEnderecoAlteradoParaGeo(true)
     setEnderecoLocalizacao(null)
@@ -382,6 +396,7 @@ export function DeliveryCheckoutEnderecoFormModal({
           value={buscaPlaces}
           onChange={setBuscaPlaces}
           onSelect={aplicarPlaceDetails}
+          onClear={limparCamposAposBuscaPlaces}
           bias={placesBias}
           disabled={salvando}
         />

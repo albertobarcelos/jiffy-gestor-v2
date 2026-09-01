@@ -8,7 +8,7 @@ import { montarPayloadGeoEnderecoDelivery } from '@/src/shared/utils/geolocaliza
 import { moradaDtoParaEnderecoDeliveryPayload } from '@/src/application/mappers/ClienteDeliveryMoradaMapper'
 
 describe('parseGoogleAddressComponents', () => {
-  it('extrai campos BR de address_components', () => {
+  it('extrai campos BR de address_components (legado)', () => {
     const parsed = parseGoogleAddressComponents([
       { long_name: '16', short_name: '16', types: ['street_number'] },
       { long_name: 'Rua Particular', short_name: 'Rua Particular', types: ['route'] },
@@ -25,6 +25,22 @@ describe('parseGoogleAddressComponents', () => {
     expect(parsed.cidade).toBe('Piquete')
     expect(parsed.estado).toBe('SP')
     expect(parsed.cep).toBe('12620000')
+  })
+
+  it('extrai campos BR de addressComponents (Places New)', () => {
+    const parsed = parseGoogleAddressComponents([
+      { longText: '16', shortText: '16', types: ['street_number'] },
+      { longText: 'Rua Particular', shortText: 'Rua Particular', types: ['route'] },
+      { longText: 'Vila Cristiana', shortText: 'Vila Cristiana', types: ['sublocality_level_1'] },
+      { longText: 'Piquete', shortText: 'Piquete', types: ['administrative_area_level_2'] },
+      { longText: 'São Paulo', shortText: 'SP', types: ['administrative_area_level_1'] },
+      { longText: '12620-000', shortText: '12620-000', types: ['postal_code'] },
+    ])
+
+    expect(parsed.rua).toBe('Rua Particular')
+    expect(parsed.numero).toBe('16')
+    expect(parsed.cidade).toBe('Piquete')
+    expect(parsed.estado).toBe('SP')
   })
 })
 

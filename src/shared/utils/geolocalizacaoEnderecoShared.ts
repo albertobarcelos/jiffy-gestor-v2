@@ -376,6 +376,22 @@ export function reverseGeocodeTemLogradouro(endereco: EnderecoGeocodeInput): boo
   return Boolean(endereco.rua?.trim() && endereco.rua.trim().length >= 2)
 }
 
+/** Compara ruas de forma tolerante (acentos, prefixo Rua/Av., pontuação). */
+export function ruasEquivalentesParaGeocode(a: string, b: string): boolean {
+  const norm = (s: string) =>
+    s
+      .normalize('NFD')
+      .replace(/\p{M}/gu, '')
+      .toLowerCase()
+      .replace(/\b(rua|r|avenida|av|travessa|tv|alameda|al|estrada|rodovia|rod)\b\.?/g, ' ')
+      .replace(/[^a-z0-9]+/g, '')
+      .trim()
+  const na = norm(a)
+  const nb = norm(b)
+  if (!na || !nb) return false
+  return na === nb || na.includes(nb) || nb.includes(na)
+}
+
 /**
  * Remove logradouro/CEP do preview (evita texto stale ao mover o pin).
  * Mantém cidade/UF e complemento quando `manterLocalidade` for true.
@@ -397,7 +413,10 @@ export function limparLogradouroEnderecoGeocode(
 
 /**
  * Aplica resultado do reverse no preview do pin.
- * Se não houver rua, limpa logradouro (não reaproveita endereço anterior).
+ *
+ * Se o cliente já digitou uma rua e o reverse devolve outra (mapa impreciso),
+ * o texto digitado é preservado e `reconheceuLogradouro` fica false (fluxo de confirmação).
+ * Campos já preenchidos pelo cliente (número, bairro, etc.) nunca são apagados pelo reverse.
  */
 export function aplicarReverseGeocodeNoPreview(
   anterior: EnderecoGeocodeInput,
@@ -414,16 +433,29 @@ export function aplicarReverseGeocodeNoPreview(
     }
   }
 
+  const ruaCliente = anterior.rua?.trim() || ''
+  const ruaRevertida = revertido.rua.trim()
+
+  // Cliente já informou a rua e o Google apontou outro logradouro → não sobrescrever.
+  if (ruaCliente && !ruasEquivalentesParaGeocode(ruaCliente, ruaRevertida)) {
+    return {
+      reconheceuLogradouro: false,
+      endereco: { ...anterior },
+    }
+  }
+
+  const cepCliente = normalizarCepEndereco(anterior.cep)
   const cepRevertido = normalizarCepEndereco(revertido.cep)
+
   return {
     reconheceuLogradouro: true,
     endereco: {
-      rua: revertido.rua.trim(),
-      numero: revertido.numero?.trim() || '',
-      bairro: revertido.bairro?.trim() || '',
-      cidade: revertido.cidade?.trim() || anterior.cidade || '',
-      estado: revertido.estado?.trim() || anterior.estado || '',
-      cep: cepRevertido.length === 8 ? cepRevertido : '',
+      rua: ruaCliente || ruaRevertida,
+      numero: anterior.numero?.trim() || revertido.numero?.trim() || '',
+      bairro: anterior.bairro?.trim() || revertido.bairro?.trim() || '',
+      cidade: anterior.cidade?.trim() || revertido.cidade?.trim() || '',
+      estado: anterior.estado?.trim() || revertido.estado?.trim() || '',
+      cep: cepCliente.length === 8 ? cepCliente : cepRevertido.length === 8 ? cepRevertido : '',
       complemento: anterior.complemento,
     },
   }

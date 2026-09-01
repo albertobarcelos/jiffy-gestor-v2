@@ -3,6 +3,7 @@ import {
   lerGoogleMapsApiKeyServer,
   parseGoogleAddressComponents,
 } from '@/src/shared/utils/googleAddressComponents'
+import { RATE_LIMIT_GEO, verificarRateLimit } from '@/src/shared/utils/rateLimitMemory'
 
 type GoogleGeocodeResponse = {
   status?: string
@@ -173,6 +174,9 @@ async function reverseNominatim(
  * Preferência: Google Geocoding; fallback: Nominatim (OpenStreetMap).
  */
 export async function GET(request: NextRequest) {
+  const rateLimited = verificarRateLimit(request, RATE_LIMIT_GEO.reverso)
+  if (rateLimited) return rateLimited
+
   const lat = request.nextUrl.searchParams.get('lat')
   const lon = request.nextUrl.searchParams.get('lon')
 
