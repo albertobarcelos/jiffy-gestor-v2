@@ -126,6 +126,7 @@ export function useNovoPedidoSubmit({
       produtos: input.produtos,
       pedidoDeliveryGestor: validacao.pedidoDeliveryGestor,
       clienteEntregaVinculadoId: input.clienteEntregaVinculado?.id,
+      telefoneClienteDelivery: input.telefoneCliente,
       pedidoComEntrega: validacao.pedidoComEntrega,
       temEnderecoEntrega: validacao.temEnderecoEntrega,
       pedidoGestorComPagamentoNoPasso3: validacao.pedidoGestorComPagamentoNoPasso3,

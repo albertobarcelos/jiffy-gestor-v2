@@ -143,7 +143,7 @@ export function clienteDeliveryParaMoradas(cliente: ClienteDeliveryApi): MoradaT
 
 export function moradaDtoParaEnderecoDeliveryPayload(dto: CriarMoradaTelefoneDTO) {
   const e = dto.endereco
-  return {
+  const base = {
     etiqueta: mapTipoEtiquetaUiParaEtiquetaDelivery(dto.tipoEtiqueta),
     rua: e.rua.trim(),
     numero: e.numero.trim(),
@@ -152,6 +152,26 @@ export function moradaDtoParaEnderecoDeliveryPayload(dto: CriarMoradaTelefoneDTO
     estado: e.estado.trim().slice(0, 2).toUpperCase() || null,
     cep: onlyDigits(e.cep),
     complemento: e.complemento?.trim() || null,
+  }
+
+  if (!e.enderecoLocalizacao?.coordinates) {
+    return base
+  }
+
+  return {
+    ...base,
+    enderecoLocalizacao: {
+      type: 'Point' as const,
+      coordinates: e.enderecoLocalizacao.coordinates,
+      ...(e.providerEnderecoId
+        ? {
+            geocoding: {
+              provider: 'GOOGLE' as const,
+              enderecoId: e.providerEnderecoId,
+            },
+          }
+        : {}),
+    },
   }
 }
 

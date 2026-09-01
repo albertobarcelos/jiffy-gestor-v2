@@ -26,6 +26,7 @@ export interface ValidarCriarVendaParams {
   produtos?: ProdutoSelecionado[]
   pedidoDeliveryGestor: boolean
   clienteEntregaVinculadoId?: string
+  telefoneClienteDelivery?: string | null
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
   pedidoGestorComPagamentoNoPasso3: boolean
@@ -43,6 +44,7 @@ export interface ValidarCriarVendaParams {
 export function validarInformacoesPedido(params: {
   pedidoDeliveryGestor: boolean
   clienteEntregaVinculadoId?: string
+  telefoneClienteDelivery?: string | null
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
   exibirToast?: boolean
@@ -51,6 +53,7 @@ export function validarInformacoesPedido(params: {
   const erro = validarInformacoesPedidoEntrega({
     pedidoDeliveryGestor: params.pedidoDeliveryGestor,
     clienteEntregaVinculadoId: params.clienteEntregaVinculadoId,
+    telefoneClienteDelivery: params.telefoneClienteDelivery,
     pedidoComEntrega: params.pedidoComEntrega,
     temEnderecoEntrega: params.temEnderecoEntrega,
   })

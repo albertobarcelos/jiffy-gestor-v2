@@ -522,6 +522,7 @@ export function useNovoPedidoOrchestrator({
     setCurrentStep,
     pedidoDeliveryGestor,
     clienteEntregaVinculadoId: clienteEntregaVinculado?.id,
+    telefoneClienteDelivery: telefoneBuscadoEntrega,
     pedidoComEntrega,
     temEnderecoEntrega: Boolean(moradaEntregaSelecionada?.endereco),
     modoEdicaoProdutos,
@@ -685,6 +686,7 @@ export function useNovoPedidoOrchestrator({
     canSubmitNovoPedido({
       pedidoDeliveryGestor,
       clienteEntregaVinculadoId: clienteEntregaVinculado?.id,
+      telefoneClienteDelivery: telefoneBuscadoEntrega,
       pedidoComEntrega,
       temEnderecoEntrega,
       pedidoEntregaAceitaPagamentoPendente,

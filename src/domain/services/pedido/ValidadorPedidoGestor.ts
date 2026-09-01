@@ -13,6 +13,7 @@ export type ValidarPedidoGestorInput = {
   produtos?: ProdutoSelecionado[]
   pedidoDeliveryGestor: boolean
   clienteEntregaVinculadoId?: string
+  telefoneClienteDelivery?: string | null
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
   pedidoGestorComPagamentoNoPasso3: boolean
@@ -36,12 +37,17 @@ export type ValidarPedidoGestorResult = {
 export function validarInformacoesPedidoEntrega(params: {
   pedidoDeliveryGestor: boolean
   clienteEntregaVinculadoId?: string
+  telefoneClienteDelivery?: string | null
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
 }): ValidacaoErroPedido | null {
   if (!params.pedidoDeliveryGestor) return null
 
-  if (!params.clienteEntregaVinculadoId?.trim()) {
+  const telefoneDelivery = (params.telefoneClienteDelivery ?? '').replace(/\D/g, '')
+  const temCliente =
+    Boolean(params.clienteEntregaVinculadoId?.trim()) || telefoneDelivery.length >= 11
+
+  if (!temCliente) {
     return { message: 'Informe o cliente do pedido antes de continuar.', goToStep: 2 }
   }
 
@@ -173,6 +179,7 @@ export function validarPedidoGestor(
   const erroEntrega = validarInformacoesPedidoEntrega({
     pedidoDeliveryGestor: input.pedidoDeliveryGestor,
     clienteEntregaVinculadoId: input.clienteEntregaVinculadoId,
+    telefoneClienteDelivery: input.telefoneClienteDelivery,
     pedidoComEntrega: input.pedidoComEntrega,
     temEnderecoEntrega: input.temEnderecoEntrega,
   })
