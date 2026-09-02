@@ -1,8 +1,8 @@
 /**
- * Campos de cardápio em `parametroEmpresa` (`GET/PATCH /empresas`).
- * Backend: `menuDeliveryId` e `menuVendaGestorId`.
+ * Campo de cardápio em `parametroEmpresa` (`GET/PATCH /empresas`).
+ * Backend: `menuVendaGestorId`. O menu de delivery fica em `parametroDelivery` (`/delivery/empresas/me`).
  */
-export type CampoMenuParametroEmpresa = 'menuDeliveryId' | 'menuVendaGestorId'
+export type CampoMenuParametroEmpresa = 'menuVendaGestorId'
 
 const ALIAS_MENU_VENDA_GESTOR = 'menuVendasGestorId'
 
@@ -42,12 +42,4 @@ export function patchMenuIdEmParametroEmpresa(
     delete next[ALIAS_MENU_VENDA_GESTOR]
   }
   return next
-}
-
-/** @deprecated Preferir `patchMenuIdEmParametroEmpresa(..., 'menuDeliveryId', ...)`. */
-export function montarParametroEmpresaComMenuDelivery(
-  parametroAtual: Record<string, unknown>,
-  menuDeliveryId: string | null
-): Record<string, unknown> {
-  return patchMenuIdEmParametroEmpresa(parametroAtual, 'menuDeliveryId', menuDeliveryId)
 }

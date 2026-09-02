@@ -33,8 +33,8 @@ export function DeliveryCotacaoDesatualizadaDialog({
         aria-modal="true"
         aria-labelledby="delivery-cotacao-desatualizada-titulo"
       >
-        <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-amber-100">
-          <AlertTriangle className="h-6 w-6 text-amber-600" strokeWidth={2.25} aria-hidden />
+        <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-alternate/15">
+          <AlertTriangle className="h-6 w-6 text-alternate" strokeWidth={2.25} aria-hidden />
         </div>
 
         <h2

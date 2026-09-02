@@ -239,6 +239,13 @@ describe('GarantirEnderecoEntregaPublicoUseCase', () => {
       ],
     } satisfies ClienteDeliveryPublicoDTO)
 
+    const geoMock = {
+      enderecoLocalizacao: {
+        type: 'Point' as const,
+        coordinates: [-46.6333, -23.5505] as [number, number],
+      },
+    }
+
     const id = await garantirEnderecoEntregaPublicoUseCase.execute({
       telefone: '11999999999',
       nome: 'Cliente',
@@ -253,6 +260,7 @@ describe('GarantirEnderecoEntregaPublicoUseCase', () => {
         estado: 'SP',
         etiqueta: 'casa',
       },
+      geo: geoMock,
     })
 
     expect(id).toBe('end-novo')

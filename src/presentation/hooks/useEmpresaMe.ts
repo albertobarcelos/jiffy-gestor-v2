@@ -43,10 +43,8 @@ export interface EmpresaMeQueryData {
   timezoneAgregacao: string
   preferenciasImpressaoDelivery: PreferenciasImpressaoDelivery
   deliveryCupomTemplate: DeliveryCupomTemplateConfig
-  /** Cópia de `parametroEmpresa` para PATCH parcial (ex.: modal delivery). */
+  /** Cópia de `parametroEmpresa` para PATCH parcial (ex.: aba Empresa). */
   parametroEmpresa: Record<string, unknown>
-  /** Cardápio publicado no delivery (`parametroEmpresa.menuDeliveryId`). */
-  menuDeliveryId: string | null
   /** Cardápio usado nas vendas do gestor (`parametroEmpresa.menuVendaGestorId`). */
   menuVendaGestorId: string | null
 }
@@ -141,7 +139,6 @@ export async function fetchEmpresaMeQueryData(
     preferenciasImpressaoDelivery: parsePreferenciasImpressaoDelivery(data),
     deliveryCupomTemplate: getDeliveryCupomTemplateLocal(id) ?? parseDeliveryCupomTemplate(data),
     parametroEmpresa,
-    menuDeliveryId: lerMenuIdDeParametroEmpresa(parametroEmpresa, 'menuDeliveryId'),
     menuVendaGestorId: lerMenuIdDeParametroEmpresa(parametroEmpresa, 'menuVendaGestorId'),
   }
 }
@@ -181,7 +178,6 @@ export function useEmpresaMe() {
       data?.preferenciasImpressaoDelivery ?? DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
     deliveryCupomTemplate: data?.deliveryCupomTemplate ?? DEFAULT_DELIVERY_CUPOM_TEMPLATE,
     parametroEmpresa: data?.parametroEmpresa ?? {},
-    menuDeliveryId: data?.menuDeliveryId ?? null,
     menuVendaGestorId: data?.menuVendaGestorId ?? null,
     isLoading: query.isPending,
     error:

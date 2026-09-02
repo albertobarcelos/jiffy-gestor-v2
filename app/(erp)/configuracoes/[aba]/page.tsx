@@ -6,6 +6,7 @@ import { Suspense, use, useEffect } from 'react'
 import { PageLoading } from '@/src/presentation/components/ui/PageLoading'
 import {
   configuracoesTabPath,
+  deliveryHubEtapaPath,
   isConfiguracoesTabSlug,
   resolveConfiguracoesTabFromPath,
 } from '@/src/shared/constants/configuracoesRoutes'
@@ -33,13 +34,17 @@ export default function ConfiguracoesTabPage({
   const isValidTab = isConfiguracoesTabSlug(aba)
 
   useEffect(() => {
+    if (aba === 'cobertura-delivery') {
+      router.replace(deliveryHubEtapaPath('delivery-cobertura'))
+      return
+    }
     if (!isValidTab && legacyTab) {
       router.replace(configuracoesTabPath(legacyTab))
     }
-  }, [isValidTab, legacyTab, router])
+  }, [aba, isValidTab, legacyTab, router])
 
   if (!isValidTab) {
-    if (legacyTab) {
+    if (legacyTab || aba === 'cobertura-delivery') {
       return (
         <div className="h-full">
           <PageLoading />

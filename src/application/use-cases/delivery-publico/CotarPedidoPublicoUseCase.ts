@@ -9,7 +9,11 @@ import {
 } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { montarCotacaoPublico } from '@/src/application/mappers/MontarPedidoPublicoMapper'
 import { garantirEnderecoEntregaPublicoUseCase } from '@/src/application/use-cases/delivery-publico/GarantirEnderecoEntregaPublicoUseCase'
-import { cotarPedidoPublico } from '@/src/infrastructure/api/publicDeliveryApi'
+import {
+  cotarPedidoPublico,
+  formatarMensagemErroCotacaoPublica,
+  PublicDeliveryApiError,
+} from '@/src/infrastructure/api/publicDeliveryApi'
 
 export type CotarPedidoPublicoInput = {
   slug: string
@@ -22,7 +26,7 @@ export type CotarPedidoPublicoInput = {
 
 export type CotarPedidoPublicoResult =
   | { ok: true; cotacao: CotacaoPedidoPublicoDTO }
-  | { ok: false; error: string }
+  | { ok: false; error: string; httpStatus?: number }
 
 /**
  * Garante endereço (se entrega) → monta payload de cotação → POST /delivery/cotacao.
@@ -92,6 +96,13 @@ export class CotarPedidoPublicoUseCase {
       const cotacao = await cotarPedidoPublico(parsed.data)
       return { ok: true, cotacao }
     } catch (error) {
+      if (error instanceof PublicDeliveryApiError) {
+        return {
+          ok: false,
+          error: formatarMensagemErroCotacaoPublica(error.status, error.message),
+          httpStatus: error.status,
+        }
+      }
       return {
         ok: false,
         error: error instanceof Error ? error.message : 'Erro ao cotar pedido',

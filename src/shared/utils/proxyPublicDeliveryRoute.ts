@@ -13,7 +13,10 @@ export async function proxyPublicDeliveryGet(
       method: 'GET',
       headers: { Accept: 'application/json' },
     })
-    return NextResponse.json(response.data ?? {}, { status: response.status || 200 })
+    return NextResponse.json(response.data ?? {}, {
+      status: response.status || 200,
+      headers: { 'Cache-Control': 'no-store' },
+    })
   } catch (error) {
     if (error instanceof ApiError) {
       return NextResponse.json(

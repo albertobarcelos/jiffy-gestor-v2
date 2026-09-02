@@ -7,11 +7,17 @@ import {
   moradaDtoParaEnderecoDeliveryPayload,
   normalizarClienteDeliveryApi,
 } from '@/src/application/mappers/ClienteDeliveryMoradaMapper'
+import type { ClienteDeliveryApi } from '@/src/application/mappers/ClienteDeliveryMoradaMapper'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { showToast } from '@/src/shared/utils/toast'
+import {
+  extrairDigitosTelefone,
+  telefoneCelularBrCompleto,
+} from '@/src/shared/utils/telefoneBr'
+import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 
 export interface MoradaTelefoneHookOptions {
   /** Usa `GET/POST/PATCH /api/delivery/clientes` em vez de morada-telefone do gestor. */
@@ -28,6 +34,18 @@ function moradasTelefoneQueryKey(
   empresaId: string | null
 ) {
   return ['moradas-telefone', empresaId, telefone, usarModuloDelivery ? 'delivery' : 'gestor'] as const
+}
+
+/** Backend delivery normaliza telefone com `Telefone.create` (11 dígitos BR). */
+export function telefoneProntoParaConsultaDelivery(
+  telefone: string | null | undefined,
+  usarModuloDelivery: boolean
+): boolean {
+  if (!telefone?.trim()) return false
+  if (!usarModuloDelivery) {
+    return extrairDigitosTelefone(telefone).length >= 8
+  }
+  return telefoneCelularBrCompleto(telefone)
 }
 
 /** Corpo JSON comum em erros do BFF / Nest (`error`, `message`, `title`). */
@@ -51,6 +69,9 @@ export interface EnderecoMorada {
   estado: string
   complemento?: string
   referencia?: string
+  /** Geo opcional (Places Autocomplete). */
+  enderecoLocalizacao?: GeoJsonPoint | null
+  providerEnderecoId?: string | null
 }
 
 export interface MoradaTelefone {
@@ -202,6 +223,87 @@ async function moradaFromResponse(
 }
 
 /**
+ * Busca cliente delivery por telefone (gestor autenticado).
+ * Retorna `null` em 404.
+ */
+export function useBuscarClienteDeliveryPorTelefone() {
+  return useSecureTenantMutation(
+    async ({ token }, telefone: string): Promise<ClienteDeliveryApi | null> => {
+      const digitos = extrairDigitosTelefone(telefone)
+      if (!telefoneCelularBrCompleto(digitos)) {
+        throw new Error('Informe o celular completo com DDD (11 dígitos).')
+      }
+
+      const response = await fetchGestorApi(
+        `/api/delivery/clientes/${encodeURIComponent(digitos)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+          },
+        }
+      )
+
+      if (response.status === 404) return null
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(
+          mensagemErroResposta(errorData, response.status, 'Erro ao buscar cliente delivery')
+        )
+      }
+
+      const data = await response.json()
+      return normalizarClienteDeliveryApi(data)
+    }
+  )
+}
+
+/**
+ * Cadastro rápido de cliente delivery (telefone + nome).
+ */
+export function useCriarClienteDeliveryRapido() {
+  return useSecureTenantMutation(
+    async (
+      { token },
+      input: { telefone: string; nome: string }
+    ): Promise<ClienteDeliveryApi> => {
+      const telefone = extrairDigitosTelefone(input.telefone)
+      if (!telefoneCelularBrCompleto(telefone)) {
+        throw new Error('Informe o celular completo com DDD (11 dígitos).')
+      }
+
+      const response = await fetchGestorApi('/api/delivery/clientes', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          telefone,
+          nome: input.nome.trim(),
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(
+          mensagemErroResposta(errorData, response.status, 'Erro ao cadastrar cliente delivery')
+        )
+      }
+
+      const data = await response.json()
+      const cliente = normalizarClienteDeliveryApi(data)
+      if (!cliente) {
+        throw new Error('Resposta inválida ao cadastrar cliente delivery')
+      }
+      return cliente
+    }
+  )
+}
+
+/**
  * Busca moradas ativas da empresa para o telefone informado.
  * Retorna lista vazia quando não há moradas cadastradas para o número.
  */
@@ -268,7 +370,13 @@ export function useMoradasPorTelefone(
         .filter((m: MoradaTelefone | null): m is MoradaTelefone => m != null)
       return lista
     },
-    enabled: !!telefone && isRehydrated && isAuthenticated && !!token && !!empresaId && !(tenantAuth?.isExpired()),
+    enabled:
+      telefoneProntoParaConsultaDelivery(telefone, usarModuloDelivery) &&
+      isRehydrated &&
+      isAuthenticated &&
+      !!token &&
+      !!empresaId &&
+      !(tenantAuth?.isExpired()),
     staleTime: 1000 * 60 * 2,
     refetchOnWindowFocus: false,
   })

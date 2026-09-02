@@ -27,10 +27,13 @@ function StatusSeparator() {
 
 export function DeliveryStatusHorario({
   disponivel,
+  horarioTexto,
   interactive = false,
   onInformacoesClick,
 }: DeliveryStatusHorarioProps) {
-  const horarioLinha = disponivel ? HORARIO_ABERTO_PLACEHOLDER : HORARIO_FECHADO_PLACEHOLDER
+  const horarioLinha =
+    horarioTexto?.trim() ||
+    (disponivel ? HORARIO_ABERTO_PLACEHOLDER : HORARIO_FECHADO_PLACEHOLDER)
 
   return (
     <div className="mt-2 px-4">

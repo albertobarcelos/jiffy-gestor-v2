@@ -4,7 +4,9 @@ import { useEffect } from 'react'
 import {
   useInfiniteQuery,
   useQuery,
+  useQueryClient,
   type InfiniteData,
+  type QueryClient,
   type UseInfiniteQueryResult,
 } from '@tanstack/react-query'
 import {
@@ -64,6 +66,42 @@ function gravarComplementosStorage(slug: string, data: ComplementosCache) {
   } catch {
     /* quota / modo privado */
   }
+}
+
+function limparComplementosStorage(slug: string) {
+  if (typeof window === 'undefined') return
+  try {
+    sessionStorage.removeItem(complementosStorageKey(slug))
+  } catch {
+    /* quota / modo privado */
+  }
+}
+
+/** Invalida cache React Query e complementos locais do catálogo público após mudar menu/slug. */
+export function invalidatePublicDeliveryCatalogForSlug(
+  queryClient: QueryClient,
+  slug: string | null | undefined
+) {
+  const slugNormalizado = slug?.trim()
+  if (!slugNormalizado) return
+
+  limparComplementosStorage(slugNormalizado)
+  usePublicDeliveryComplementosStore.setState(state => {
+    if (!state.porSlug[slugNormalizado]) return state
+    const next = { ...state.porSlug }
+    delete next[slugNormalizado]
+    return { porSlug: next }
+  })
+
+  void queryClient.invalidateQueries({
+    queryKey: ['public-delivery', slugNormalizado],
+  })
+}
+
+export const EMPRESA_DELIVERY_UPDATED_EVENT = 'jiffy:empresa-delivery-updated'
+
+export type EmpresaDeliveryUpdatedDetail = {
+  slug?: string | null
 }
 
 /** Persiste complementos da 1ª página (offset=0) em memória e sessionStorage. */
@@ -141,12 +179,26 @@ export function usePublicDeliveryCatalogPage(
 }
 
 export function usePublicDeliveryCatalogInfinite(slug: string, enabled = true) {
+  const queryClient = useQueryClient()
   const salvarComplementos = usePublicDeliveryComplementosStore(s => s.salvar)
   const hidratarDoStorage = usePublicDeliveryComplementosStore(s => s.hidratarDoStorage)
 
   useEffect(() => {
     if (slug) hidratarDoStorage(slug)
   }, [slug, hidratarDoStorage])
+
+  useEffect(() => {
+    const onDeliveryUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<EmpresaDeliveryUpdatedDetail>).detail
+      const slugAtualizado = detail?.slug?.trim()
+      if (!slugAtualizado || slugAtualizado !== slug.trim()) return
+      invalidatePublicDeliveryCatalogForSlug(queryClient, slugAtualizado)
+    }
+
+    window.addEventListener(EMPRESA_DELIVERY_UPDATED_EVENT, onDeliveryUpdated)
+    return () =>
+      window.removeEventListener(EMPRESA_DELIVERY_UPDATED_EVENT, onDeliveryUpdated)
+  }, [queryClient, slug])
 
   return useInfiniteQuery<GetCatalogoPublicoResponseDTO, Error>({
     queryKey: publicDeliveryCatalogInfiniteQueryKey(slug),

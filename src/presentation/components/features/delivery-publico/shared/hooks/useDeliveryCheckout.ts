@@ -2,11 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CheckoutFormData } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
+import type { EnderecoGeoCheckoutInput } from '@/src/application/dto/delivery-publico/EnderecoGeoCheckoutDTO'
 import type { CreatePedidoPublicoResponseDTO } from '@/src/application/dto/delivery-publico/CreatePedidoPublicoResponseDTO'
 import type { CotacaoPedidoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { ClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { normalizarClienteDeliveryPublico } from '@/src/application/mappers/ClienteDeliveryPublicoMapper'
 import { cotarPedidoPublicoUseCase } from '@/src/application/use-cases/delivery-publico/CotarPedidoPublicoUseCase'
+import {
+  formatarMensagemErroCotacaoPublica,
+  isErroCoberturaEntregaPublica,
+} from '@/src/infrastructure/api/publicDeliveryApi'
 import { enviarPedidoPublicoUseCase } from '@/src/application/use-cases/delivery-publico/EnviarPedidoPublicoUseCase'
 import { garantirEnderecoEntregaPublicoUseCase } from '@/src/application/use-cases/delivery-publico/GarantirEnderecoEntregaPublicoUseCase'
 import {
@@ -15,6 +20,10 @@ import {
 } from '@/src/infrastructure/api/publicDeliveryApi'
 import { usePublicDeliveryMeiosPagamento } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import { showToast } from '@/src/shared/utils/toast'
+import {
+  normalizarEnderecoFormPublico,
+  normalizarEnderecoGeocodeInput,
+} from '@/src/shared/utils/normalizarTextoEnderecoPublico'
 import {
   comporTelefoneApi,
   formatarTelefonePorPais,
@@ -42,7 +51,12 @@ export type EnviarPedidoCheckoutResult =
       message: string
       cotacao: CotacaoPedidoPublicoDTO
     }
+  | { ok: false; reason: 'loja_fechada' }
   | { ok: false }
+
+export type RecotarPedidoResult =
+  | { ok: true }
+  | { ok: false; reason?: 'fora_cobertura' | 'rate_limit' | 'bloqueado' | 'erro' }
 
 const COTACAO_INVALIDATING_FORM_KEYS = new Set<keyof CheckoutFormData>([
   'tipoEntrega',
@@ -152,6 +166,7 @@ export function useDeliveryCheckout(slug: string) {
   const [enviando, setEnviando] = useState(false)
   const [cotacao, setCotacao] = useState<DeliveryCheckoutCotacaoState | null>(null)
   const [cotacaoLoading, setCotacaoLoading] = useState(false)
+  const [foraCoberturaDialogAberto, setForaCoberturaDialogAberto] = useState(false)
 
   const lookupSeqRef = useRef(0)
   const cotacaoSeqRef = useRef(0)
@@ -165,9 +180,14 @@ export function useDeliveryCheckout(slug: string) {
   clienteLookupRef.current = clienteLookup
   const cotacaoRef = useRef(cotacao)
   cotacaoRef.current = cotacao
+  const cotacaoAutoBloqueioRef = useRef<{ chaveFalha: string | null; rateLimitAte: number }>({
+    chaveFalha: null,
+    rateLimitAte: 0,
+  })
 
   const limparCotacao = useCallback(() => {
     cotacaoSeqRef.current += 1
+    cotacaoAutoBloqueioRef.current = { chaveFalha: null, rateLimitAte: 0 }
     setCotacao(null)
     setForm(prev => {
       if (prev.pagamentos.length === 0) return prev
@@ -437,12 +457,107 @@ export function useDeliveryCheckout(slug: string) {
 
   const usarNovoEndereco = useCallback(() => {
     preferirNovoEnderecoRef.current = true
+    limparCotacao()
     setForm(prev => ({
       ...prev,
       modoEndereco: 'novo',
       enderecoIdSelecionado: '',
+      rua: '',
+      numero: '',
+      bairro: '',
+      cidade: '',
+      estado: '',
+      cep: '',
+      complemento: '',
+      pontoReferencia: '',
+      etiquetaEndereco: 'casa',
+      apelidoEndereco: 'Casa',
     }))
-  }, [])
+  }, [limparCotacao])
+
+  /** Prefill do formulário para editar um endereço já cadastrado (ex.: a partir do modal de geo). */
+  const preencherFormParaEditarEndereco = useCallback(
+    (endereco: {
+      id: string
+      rua: string
+      numero: string
+      bairro: string
+      cidade?: string | null
+      estado?: string | null
+      cep?: string | null
+      complemento?: string | null
+      etiqueta?: string | null
+    }) => {
+      preferirNovoEnderecoRef.current = false
+      limparCotacao()
+      const etiqueta =
+        endereco.etiqueta === 'trabalho' || endereco.etiqueta === 'outro'
+          ? endereco.etiqueta
+          : 'casa'
+      const normalizado = normalizarEnderecoGeocodeInput({
+        rua: endereco.rua ?? '',
+        numero: endereco.numero ?? '',
+        bairro: endereco.bairro ?? '',
+        cidade: endereco.cidade ?? '',
+        estado: endereco.estado ?? '',
+        cep: endereco.cep ?? '',
+        complemento: endereco.complemento ?? '',
+      })
+      setForm(prev => ({
+        ...prev,
+        modoEndereco: 'existente',
+        enderecoIdSelecionado: endereco.id,
+        rua: normalizado.rua,
+        numero: normalizado.numero,
+        bairro: normalizado.bairro ?? '',
+        cidade: normalizado.cidade ?? '',
+        estado: normalizado.estado ?? '',
+        cep: normalizado.cep ?? '',
+        complemento: normalizado.complemento ?? '',
+        etiquetaEndereco: etiqueta,
+        apelidoEndereco:
+          etiqueta === 'trabalho' ? 'Trabalho' : etiqueta === 'outro' ? 'Outro' : 'Casa',
+      }))
+    },
+    [limparCotacao]
+  )
+
+  const removerEnderecoCliente = useCallback(
+    async (enderecoId: string): Promise<void> => {
+      const id = enderecoId.trim()
+      if (!id) throw new Error('Endereço inválido')
+
+      const tel =
+        telefoneDigitsRef.current ||
+        clienteLookupRef.current.telefoneConsultado ||
+        resolveTelefoneApi(formRef.current)
+      if (tel.length < 8) {
+        throw new Error('Informe um telefone válido')
+      }
+
+      const atualizadoRaw = await atualizarClienteDeliveryPublico(tel, {
+        enderecos: { delete: [id] },
+      })
+      const cliente = normalizarClienteDeliveryPublico(atualizadoRaw)
+      if (!cliente) {
+        throw new Error('Não foi possível remover o endereço')
+      }
+
+      limparCotacao()
+      setClienteLookup({
+        status: 'encontrado',
+        telefoneConsultado: tel,
+        cliente,
+        mensagemErro: null,
+      })
+      setForm(prev =>
+        prev.enderecoIdSelecionado === id
+          ? { ...prev, enderecoIdSelecionado: '', modoEndereco: 'novo' }
+          : prev
+      )
+    },
+    [limparCotacao, resolveTelefoneApi]
+  )
 
   const consultarTelefoneAtual = useCallback(() => {
     const tel = onlyDigits(
@@ -507,7 +622,24 @@ export function useDeliveryCheckout(slug: string) {
     setForm(prev => ({ ...prev, nome: cliente.nome?.trim() || nome }))
   }, [])
 
-  const confirmarNovoEndereco = useCallback(async (): Promise<string> => {
+  const montarEnderecoNovoForm = useCallback(
+    (f: CheckoutFormData) =>
+      normalizarEnderecoFormPublico({
+        rua: f.rua,
+        numero: f.numero,
+        bairro: f.bairro,
+        cidade: f.cidade,
+        estado: f.estado,
+        cep: f.cep,
+        complemento: f.complemento,
+        pontoReferencia: f.pontoReferencia,
+        etiqueta: f.etiquetaEndereco,
+      }),
+    []
+  )
+
+  const confirmarNovoEndereco = useCallback(
+    async (geo: EnderecoGeoCheckoutInput): Promise<string> => {
     const f = formRef.current
     const tel = resolveTelefoneApi(f)
     telefoneDigitsRef.current = tel
@@ -522,17 +654,8 @@ export function useDeliveryCheckout(slug: string) {
       modoEndereco: 'novo',
       enderecoIdSelecionado: null,
       clienteLookup: clienteLookupRef.current.cliente,
-      enderecoNovo: {
-        rua: f.rua,
-        numero: f.numero,
-        bairro: f.bairro,
-        cidade: f.cidade,
-        estado: f.estado,
-        cep: f.cep,
-        complemento: f.complemento,
-        pontoReferencia: f.pontoReferencia,
-        etiqueta: f.etiquetaEndereco,
-      },
+      enderecoNovo: montarEnderecoNovoForm(f),
+      geo,
     })
 
     const raw = await buscarClienteDeliveryPublico(tel)
@@ -553,61 +676,152 @@ export function useDeliveryCheckout(slug: string) {
     }))
 
     return enderecoId
-  }, [resolveTelefoneApi])
+  },
+    [montarEnderecoNovoForm, resolveTelefoneApi]
+  )
+
+  const confirmarGeoEnderecoExistente = useCallback(
+    async (geo: EnderecoGeoCheckoutInput): Promise<void> => {
+      const f = formRef.current
+      const tel = resolveTelefoneApi(f)
+      const enderecoId = f.enderecoIdSelecionado.trim()
+      if (!enderecoId) {
+        throw new Error('Selecione um endereço de entrega')
+      }
+
+      const nomeEfetivo =
+        f.nome.trim() || clienteLookupRef.current.cliente?.nome?.trim() || null
+
+      await garantirEnderecoEntregaPublicoUseCase.execute({
+        telefone: tel,
+        nome: nomeEfetivo,
+        modoEndereco: 'existente',
+        enderecoIdSelecionado: enderecoId,
+        clienteLookup: clienteLookupRef.current.cliente,
+        enderecoNovo: montarEnderecoNovoForm(f),
+        geo,
+      })
+
+      const raw = await buscarClienteDeliveryPublico(tel)
+      const cliente = raw ? normalizarClienteDeliveryPublico(raw) : null
+      setClienteLookup({
+        status: cliente ? 'encontrado' : 'nao_encontrado',
+        telefoneConsultado: tel,
+        cliente,
+        mensagemErro: null,
+      })
+    },
+    [montarEnderecoNovoForm, resolveTelefoneApi]
+  )
 
   const aplicarCotacaoAtualizada = useCallback((dto: CotacaoPedidoPublicoDTO) => {
     setCotacao(mapCotacaoDtoToCheckoutState(dto))
   }, [])
 
-  const recotarPedido = useCallback(async (): Promise<boolean> => {
-    const f = formRef.current
-    const tel = resolveTelefoneApi(f)
-    telefoneDigitsRef.current = tel
-    if (tel.length < 8) {
-      showToast.error('Informe um telefone válido')
-      return false
-    }
-    if (itens.length === 0) {
-      return false
-    }
+  const recotarPedido = useCallback(
+    async (options?: { silencioso?: boolean; chaveAuto?: string }): Promise<RecotarPedidoResult> => {
+      const bloqueio = cotacaoAutoBloqueioRef.current
+      if (Date.now() < bloqueio.rateLimitAte) {
+        if (!options?.silencioso) {
+          showToast.error(formatarMensagemErroCotacaoPublica(429))
+        }
+        return { ok: false, reason: 'rate_limit' }
+      }
 
-    const nomeEfetivo =
-      f.nome.trim() || clienteLookupRef.current.cliente?.nome?.trim() || null
+      if (options?.chaveAuto && bloqueio.chaveFalha === options.chaveAuto) {
+        return { ok: false, reason: 'bloqueado' }
+      }
 
-    const seq = ++cotacaoSeqRef.current
-    setCotacaoLoading(true)
-    try {
-      const resultado = await cotarPedidoPublicoUseCase.execute({
-        slug,
-        telefoneApi: tel,
-        nomeEfetivo,
-        itens,
-        form: f,
-        clienteLookup: clienteLookupRef.current.cliente,
-      })
+      const f = formRef.current
+      const tel = resolveTelefoneApi(f)
+      telefoneDigitsRef.current = tel
+      if (tel.length < 8) {
+        if (!options?.silencioso) {
+          showToast.error('Informe um telefone válido')
+        }
+        return { ok: false, reason: 'erro' }
+      }
+      if (itens.length === 0) {
+        return { ok: false, reason: 'erro' }
+      }
 
-      if (seq !== cotacaoSeqRef.current) return false
+      const nomeEfetivo =
+        f.nome.trim() || clienteLookupRef.current.cliente?.nome?.trim() || null
 
-      if (!resultado.ok) {
+      const seq = ++cotacaoSeqRef.current
+      setCotacaoLoading(true)
+      try {
+        const resultado = await cotarPedidoPublicoUseCase.execute({
+          slug,
+          telefoneApi: tel,
+          nomeEfetivo,
+          itens,
+          form: f,
+          clienteLookup: clienteLookupRef.current.cliente,
+        })
+
+        if (seq !== cotacaoSeqRef.current) return { ok: false, reason: 'bloqueado' }
+
+        if (!resultado.ok) {
+          setCotacao(null)
+          if (options?.chaveAuto) {
+            const ate =
+              resultado.httpStatus === 429
+                ? Date.now() + 60_000
+                : cotacaoAutoBloqueioRef.current.rateLimitAte
+            cotacaoAutoBloqueioRef.current = {
+              chaveFalha: options.chaveAuto,
+              rateLimitAte: ate,
+            }
+          }
+
+          if (isErroCoberturaEntregaPublica(resultado.error)) {
+            setForaCoberturaDialogAberto(true)
+            return { ok: false, reason: 'fora_cobertura' }
+          }
+
+          const exibirToast = !options?.silencioso || resultado.httpStatus === 429
+          if (exibirToast) {
+            showToast.error(resultado.error)
+          }
+          return {
+            ok: false,
+            reason: resultado.httpStatus === 429 ? 'rate_limit' : 'erro',
+          }
+        }
+
+        if (options?.chaveAuto) {
+          cotacaoAutoBloqueioRef.current = { chaveFalha: null, rateLimitAte: 0 }
+        }
+        setCotacao(mapCotacaoDtoToCheckoutState(resultado.cotacao))
+        return { ok: true }
+      } catch (error) {
+        if (seq !== cotacaoSeqRef.current) return { ok: false, reason: 'bloqueado' }
         setCotacao(null)
-        showToast.error(resultado.error)
-        return false
+        if (options?.chaveAuto) {
+          cotacaoAutoBloqueioRef.current = {
+            chaveFalha: options.chaveAuto,
+            rateLimitAte: cotacaoAutoBloqueioRef.current.rateLimitAte,
+          }
+        }
+        console.error(error)
+        const msg = error instanceof Error ? error.message : 'Erro ao cotar pedido'
+        if (isErroCoberturaEntregaPublica(msg)) {
+          setForaCoberturaDialogAberto(true)
+          return { ok: false, reason: 'fora_cobertura' }
+        }
+        if (!options?.silencioso) {
+          showToast.error(msg)
+        }
+        return { ok: false, reason: 'erro' }
+      } finally {
+        if (seq === cotacaoSeqRef.current) {
+          setCotacaoLoading(false)
+        }
       }
-
-      setCotacao(mapCotacaoDtoToCheckoutState(resultado.cotacao))
-      return true
-    } catch (error) {
-      if (seq !== cotacaoSeqRef.current) return false
-      setCotacao(null)
-      console.error(error)
-      showToast.error(error instanceof Error ? error.message : 'Erro ao cotar pedido')
-      return false
-    } finally {
-      if (seq === cotacaoSeqRef.current) {
-        setCotacaoLoading(false)
-      }
-    }
-  }, [slug, itens, resolveTelefoneApi])
+    },
+    [slug, itens, resolveTelefoneApi]
+  )
 
   const enviarPedido = useCallback(async (): Promise<EnviarPedidoCheckoutResult> => {
     const tel = resolveTelefoneApi(form)
@@ -631,7 +845,7 @@ export function useDeliveryCheckout(slug: string) {
       (cotacaoRef.current && isTokenCotacaoExpirado(cotacaoRef.current.expiresAt))
     ) {
       const cotou = await recotarPedido()
-      if (!cotou) return { ok: false }
+      if (!cotou.ok) return { ok: false }
       tokenCotacao = cotacaoRef.current?.tokenCotacao ?? ''
     }
 
@@ -662,8 +876,16 @@ export function useDeliveryCheckout(slug: string) {
             cotacao: resultado.cotacao,
           }
         }
+        if ('reason' in resultado && resultado.reason === 'loja_fechada') {
+          showToast.error('A loja está fechada no momento. Não é possível finalizar pedidos.')
+          return { ok: false, reason: 'loja_fechada' }
+        }
         if ('error' in resultado) {
-          showToast.error(resultado.error)
+          if (isErroCoberturaEntregaPublica(resultado.error)) {
+            setForaCoberturaDialogAberto(true)
+          } else {
+            showToast.error(resultado.error)
+          }
         }
         return { ok: false }
       }
@@ -711,15 +933,20 @@ export function useDeliveryCheckout(slug: string) {
     aplicarCotacaoAtualizada,
     limparCotacao,
     limparCarrinhoAposPedido,
+    foraCoberturaDialogAberto,
+    fecharForaCoberturaDialog: () => setForaCoberturaDialogAberto(false),
     form,
     updateForm,
     clienteLookup,
     selecionarEnderecoExistente,
     usarNovoEndereco,
+    preencherFormParaEditarEndereco,
+    removerEnderecoCliente,
     consultarClientePorTelefone,
     consultarTelefoneAtual,
     limparIdentificacaoCliente,
     confirmarNovoEndereco,
+    confirmarGeoEnderecoExistente,
     salvarNomeCliente,
     meiosPagamento: meiosData?.meiosPagamento ?? [],
     loadingMeios,

@@ -1,9 +1,11 @@
 import type {
   EnderecoFormPublico,
 } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
+import type { EnderecoGeoCheckoutInput } from '@/src/application/dto/delivery-publico/EnderecoGeoCheckoutDTO'
 import type {
   ClienteDeliveryPublicoDTO,
   EnderecoDeliveryPublicoInput,
+  EnderecoClienteDeliveryPublicoDTO,
 } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { normalizarClienteDeliveryPublico } from '@/src/application/mappers/ClienteDeliveryPublicoMapper'
 import {
@@ -11,6 +13,16 @@ import {
   buscarClienteDeliveryPublico,
   criarClienteDeliveryPublico,
 } from '@/src/infrastructure/api/publicDeliveryApi'
+import {
+  enderecoTemGeolocalizacao,
+  montarPayloadGeoEnderecoDelivery,
+} from '@/src/shared/utils/geolocalizacaoEnderecoDelivery'
+import {
+  normalizarEnderecoFormPublico,
+  normalizarEnderecoGeocodeInput,
+} from '@/src/shared/utils/normalizarTextoEnderecoPublico'
+import { toLocaleUppercasePt } from '@/src/shared/utils/localeUppercase'
+import { normalizarCepEndereco, type EnderecoGeocodeInput } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
 
 const MAX_ENDERECOS = 5
 
@@ -22,23 +34,124 @@ export type GarantirEnderecoEntregaPublicoParams = {
   /** Snapshot do lookup anterior (pode estar desatualizado). */
   clienteLookup: ClienteDeliveryPublicoDTO | null
   enderecoNovo: EnderecoFormPublico
+  /** Geolocalização obrigatória para entrega (novo endereço ou backfill). */
+  geo?: EnderecoGeoCheckoutInput | null
 }
 
-function montarEnderecoPayload(form: EnderecoFormPublico): EnderecoDeliveryPublicoInput {
-  const estado = form.estado.trim().toUpperCase().slice(0, 2)
-  const cep = (form.cep ?? '').replace(/\D/g, '').slice(0, 8)
-  const complementoParts = [form.complemento?.trim(), form.pontoReferencia?.trim()]
+function enderecoCadastroParaGeocodeInput(
+  endereco: EnderecoClienteDeliveryPublicoDTO
+): EnderecoGeocodeInput {
+  return {
+    rua: endereco.rua,
+    numero: endereco.numero,
+    bairro: endereco.bairro,
+    cidade: endereco.cidade ?? '',
+    estado: endereco.estado ?? '',
+    cep: endereco.cep ?? '',
+    complemento: endereco.complemento ?? '',
+  }
+}
+
+function enderecoFormParaGeocodeInput(form: EnderecoFormPublico): EnderecoGeocodeInput {
+  return {
+    rua: form.rua,
+    numero: form.numero,
+    bairro: form.bairro,
+    cidade: form.cidade,
+    estado: form.estado,
+    cep: form.cep ?? '',
+    complemento: form.complemento ?? '',
+  }
+}
+
+function montarTextoEnderecoPayload(
+  base: EnderecoGeocodeInput,
+  etiqueta: 'casa' | 'trabalho' | 'outro',
+  pontoReferencia?: string | null
+): Omit<EnderecoDeliveryPublicoInput, 'enderecoLocalizacao' | 'preferenciaEntrega'> {
+  const estado = (base.estado ?? '').trim().toUpperCase().slice(0, 2)
+  const cep = normalizarCepEndereco(base.cep).slice(0, 8)
+  const complementoParts = [base.complemento?.trim(), pontoReferencia?.trim()]
     .filter(Boolean)
     .join(' | ')
+  const complementoSalvo =
+    complementoParts.length > 0 ? toLocaleUppercasePt(complementoParts) : ''
+
+  const textoNormalizado = normalizarEnderecoGeocodeInput({
+    rua: base.rua.trim(),
+    numero: base.numero.trim(),
+    bairro: (base.bairro ?? '').trim(),
+    cidade: (base.cidade ?? '').trim(),
+    estado,
+    cep: base.cep ?? '',
+    complemento: base.complemento?.trim() ?? '',
+  })
+
   return {
-    etiqueta: form.etiqueta ?? 'casa',
-    rua: form.rua.trim(),
-    numero: form.numero.trim(),
-    bairro: form.bairro.trim(),
-    cidade: form.cidade.trim() || null,
-    estado: estado || null,
+    etiqueta,
+    rua: textoNormalizado.rua,
+    numero: textoNormalizado.numero,
+    bairro: textoNormalizado.bairro ?? '',
+    cidade: textoNormalizado.cidade || null,
+    estado: textoNormalizado.estado || null,
     ...(cep.length === 8 ? { cep } : {}),
-    ...(complementoParts.length > 0 ? { complemento: complementoParts } : {}),
+    ...(complementoSalvo ? { complemento: complementoSalvo } : {}),
+  }
+}
+
+function montarEnderecoPayload(
+  form: EnderecoFormPublico,
+  geo?: EnderecoGeoCheckoutInput | null
+): EnderecoDeliveryPublicoInput {
+  const formNormalizado = normalizarEnderecoFormPublico(form)
+  const textoBase = enderecoFormParaGeocodeInput(formNormalizado)
+
+  const base = montarTextoEnderecoPayload(
+    textoBase,
+    formNormalizado.etiqueta ?? 'casa',
+    formNormalizado.pontoReferencia
+  )
+
+  if (!geo?.enderecoLocalizacao) {
+    return base
+  }
+
+  const geoPayload = montarPayloadGeoEnderecoDelivery({
+    enderecoLocalizacao: geo.enderecoLocalizacao,
+    providerEnderecoId: geo.providerEnderecoId,
+    preferenciaEntrega: geo.preferenciaEntrega,
+  })
+
+  return {
+    ...base,
+    ...geoPayload,
+  }
+}
+
+function montarUpdatePayloadExistente(
+  endereco: EnderecoClienteDeliveryPublicoDTO,
+  geo: EnderecoGeoCheckoutInput,
+  enderecoForm?: EnderecoFormPublico | null
+): EnderecoDeliveryPublicoInput & { id: string } {
+  const textoBase = enderecoForm
+    ? enderecoFormParaGeocodeInput(normalizarEnderecoFormPublico(enderecoForm))
+    : enderecoCadastroParaGeocodeInput(endereco)
+
+  const geoPayload = montarPayloadGeoEnderecoDelivery({
+    enderecoLocalizacao: geo.enderecoLocalizacao,
+    providerEnderecoId: geo.providerEnderecoId,
+    preferenciaEntrega: geo.preferenciaEntrega,
+  })
+
+  const etiqueta =
+    (enderecoForm?.etiqueta as 'casa' | 'trabalho' | 'outro' | undefined) ||
+    (endereco.etiqueta as 'casa' | 'trabalho' | 'outro') ||
+    'casa'
+
+  return {
+    id: endereco.id,
+    ...montarTextoEnderecoPayload(textoBase, etiqueta, enderecoForm?.pontoReferencia),
+    ...geoPayload,
   }
 }
 
@@ -67,6 +180,13 @@ function localizarEnderecoCriado(
   )
 }
 
+function localizarEnderecoPorId(
+  clienteLookup: ClienteDeliveryPublicoDTO | null,
+  enderecoId: string
+): EnderecoClienteDeliveryPublicoDTO | null {
+  return clienteLookup?.enderecos.find(e => e.id === enderecoId) ?? null
+}
+
 /**
  * Garante que o endereço de entrega exista no cadastro do cliente delivery
  * e retorna o `enderecoIdEntrega` a ser usado no pedido.
@@ -83,14 +203,38 @@ export class GarantirEnderecoEntregaPublicoUseCase {
       if (!id) {
         throw new Error('Selecione um endereço de entrega')
       }
+
       const nome = params.nome?.trim()
-      // Persiste o nome no cliente_delivery quando o usuário informou e o cadastro não tinha.
       if (nome) {
         const nomeAtual = params.clienteLookup?.nome?.trim() || ''
         if (nomeAtual !== nome) {
           await atualizarClienteDeliveryPublico(telefone, { nome })
         }
       }
+
+      const enderecoAtual = localizarEnderecoPorId(params.clienteLookup, id)
+      const geoInformada = Boolean(params.geo?.enderecoLocalizacao)
+
+      if (enderecoAtual && geoInformada && params.geo) {
+        const updatePayload = montarUpdatePayloadExistente(
+          enderecoAtual,
+          params.geo,
+          params.enderecoNovo
+        )
+        const atualizadoRaw = await atualizarClienteDeliveryPublico(telefone, {
+          enderecos: { update: [updatePayload] },
+        })
+        const atualizado = normalizarClienteDeliveryPublico(atualizadoRaw)
+        const enderecoPersistido = atualizado?.enderecos.find(e => e.id === id)
+        if (!enderecoPersistido || !enderecoTemGeolocalizacao(enderecoPersistido)) {
+          throw new Error('Não foi possível salvar a localização do endereço.')
+        }
+      } else if (enderecoAtual && !enderecoTemGeolocalizacao(enderecoAtual)) {
+        throw new Error(
+          'Este endereço precisa de confirmação no mapa antes de continuar.'
+        )
+      }
+
       return id
     }
 
@@ -102,7 +246,11 @@ export class GarantirEnderecoEntregaPublicoUseCase {
       throw new Error('Preencha o endereço de entrega')
     }
 
-    const enderecoPayload = montarEnderecoPayload(params.enderecoNovo)
+    if (!params.geo?.enderecoLocalizacao) {
+      throw new Error('Confirme a localização no mapa antes de salvar o endereço.')
+    }
+
+    const enderecoPayload = montarEnderecoPayload(params.enderecoNovo, params.geo)
     const nome = params.nome?.trim() || null
 
     let clienteAtual =

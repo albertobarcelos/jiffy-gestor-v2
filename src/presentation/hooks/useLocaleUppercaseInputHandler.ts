@@ -1,16 +1,13 @@
 'use client'
 
 import { useCallback, useLayoutEffect, useRef, type ChangeEvent } from 'react'
+import { toLocaleUppercasePt } from '@/src/shared/utils/localeUppercase'
 
-const LOCALE_PT = 'pt-BR'
+export { toLocaleUppercasePt }
 
 export interface UseLocaleUppercaseInputHandlerOptions {
   maxLength?: number
   locale?: string
-}
-
-export function toLocaleUppercasePt(valor: string, locale = LOCALE_PT): string {
-  return valor.toLocaleUpperCase(locale)
 }
 
 /**
@@ -24,7 +21,7 @@ export function useLocaleUppercaseInputHandler<
   onValueChange: (value: string) => void,
   options: UseLocaleUppercaseInputHandlerOptions = {}
 ) {
-  const { maxLength, locale = LOCALE_PT } = options
+  const { maxLength, locale = 'pt-BR' } = options
   const inputRef = useRef<TElement>(null)
   const cursorRef = useRef<{ start: number; end: number } | null>(null)
 

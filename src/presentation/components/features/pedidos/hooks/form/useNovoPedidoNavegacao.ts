@@ -20,6 +20,7 @@ export interface UseNovoPedidoNavegacaoParams {
   setCurrentStep: React.Dispatch<React.SetStateAction<1 | 2 | 3 | 4>>
   pedidoDeliveryGestor: boolean
   clienteEntregaVinculadoId?: string
+  telefoneClienteDelivery?: string | null
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
   /** Edição de produtos de pedido existente: trava a navegação entre etapas. */
@@ -39,6 +40,7 @@ export function useNovoPedidoNavegacao({
   setCurrentStep,
   pedidoDeliveryGestor,
   clienteEntregaVinculadoId,
+  telefoneClienteDelivery,
   pedidoComEntrega,
   temEnderecoEntrega,
   modoEdicaoProdutos,
@@ -79,12 +81,13 @@ export function useNovoPedidoNavegacao({
       validarInformacoesPedidoEntrega({
         pedidoDeliveryGestor,
         clienteEntregaVinculadoId,
+        telefoneClienteDelivery,
         pedidoComEntrega,
         temEnderecoEntrega,
         exibirToast,
         onError: showToast.error,
       }),
-    [pedidoDeliveryGestor, clienteEntregaVinculadoId, pedidoComEntrega, temEnderecoEntrega]
+    [pedidoDeliveryGestor, clienteEntregaVinculadoId, telefoneClienteDelivery, pedidoComEntrega, temEnderecoEntrega]
   )
 
   const canGoToStep2 = useCallback(() => {

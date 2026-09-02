@@ -1,5 +1,11 @@
 import { z } from 'zod'
 
+/** Alinhado ao `cotacaoEntregaDTOValidator` do backend (homolog). */
+const geoJsonPointSchema = z.object({
+  type: z.literal('Point'),
+  coordinates: z.tuple([z.number(), z.number()]),
+})
+
 const cotacaoComplementoSchema = z.object({
   complementoId: z.string(),
   grupoComplementoId: z.string(),
@@ -21,18 +27,10 @@ const cotacaoProdutoSchema = z.object({
 })
 
 const cotacaoEntregaSchema = z.object({
-  enderecoEntrega: z.object({
-    id: z.string().optional(),
-    etiqueta: z.string(),
-    rua: z.string(),
-    numero: z.string(),
-    bairro: z.string(),
-    cidade: z.string().nullable().optional(),
-    estado: z.string().nullable().optional(),
-    cep: z.string().nullable().optional(),
-    complemento: z.string().nullable().optional(),
-  }),
+  enderecoId: z.string().nullable(),
   taxaEntrega: z.number(),
+  enderecoLocalizacao: geoJsonPointSchema,
+  preferenciaEntrega: geoJsonPointSchema.nullable().optional(),
 })
 
 export const CotacaoPedidoPublicoResponseSchema = z.object({
@@ -47,8 +45,20 @@ export const CotacaoPedidoPublicoResponseSchema = z.object({
 
 export type CotacaoPedidoPublicoDTO = z.infer<typeof CotacaoPedidoPublicoResponseSchema>
 
+function mensagemErroParseCotacao(error: z.ZodError): string {
+  const paths = error.issues.map(i => i.path.join('.')).filter(Boolean)
+  if (paths.some(p => p.startsWith('entrega'))) {
+    return 'Resposta de cotação inválida (dados de entrega). Tente novamente.'
+  }
+  return 'Resposta de cotação inválida. Tente novamente.'
+}
+
 export function parseCotacaoPedidoPublicoResponse(raw: unknown): CotacaoPedidoPublicoDTO {
-  return CotacaoPedidoPublicoResponseSchema.parse(raw)
+  const parsed = CotacaoPedidoPublicoResponseSchema.safeParse(raw)
+  if (!parsed.success) {
+    throw new Error(mensagemErroParseCotacao(parsed.error))
+  }
+  return parsed.data
 }
 
 export function parseCotacaoPedidoPublicoFromErrorBody(raw: unknown): CotacaoPedidoPublicoDTO | null {

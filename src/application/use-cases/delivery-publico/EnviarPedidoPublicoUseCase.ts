@@ -17,6 +17,7 @@ import {
   buscarClienteDeliveryPublico,
   criarPedidoPublico,
   isCotacaoDesatualizadaError,
+  isEmpresaDeliveryFechadaError,
 } from '@/src/infrastructure/api/publicDeliveryApi'
 
 export type EnviarPedidoPublicoInput = {
@@ -42,6 +43,7 @@ export type EnviarPedidoPublicoResult =
       message: string
       cotacao: CotacaoPedidoPublicoDTO
     }
+  | { ok: false; reason: 'loja_fechada'; error: string }
   | { ok: false; error: string }
 
 /**
@@ -115,7 +117,7 @@ export class EnviarPedidoPublicoUseCase {
     const payload: CreatePedidoPublicoInput = parsed.data
 
     let clienteAtualizado: ClienteDeliveryPublicoDTO | null = null
-    const cpfPedido = payload.cliente.cpf?.replace(/\D/g, '') ?? ''
+    const cpfPedido = payload.documentoCpfCnpj?.replace(/\D/g, '') ?? ''
     if (cpfPedido.length === 11) {
       const rawAtual = await buscarClienteDeliveryPublico(tel)
       const cpfAtual = rawAtual?.cpf?.replace(/\D/g, '') ?? ''
@@ -137,6 +139,16 @@ export class EnviarPedidoPublicoUseCase {
           reason: 'cotacao_desatualizada',
           message: error.message,
           cotacao: error.cotacao,
+        }
+      }
+      if (isEmpresaDeliveryFechadaError(error)) {
+        return {
+          ok: false,
+          reason: 'loja_fechada',
+          error:
+            error instanceof Error
+              ? error.message
+              : 'A loja está fechada no momento.',
         }
       }
       return {

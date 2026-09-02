@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { MdArrowBack, MdRefresh } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
+import { useMenuDeliveryId } from '@/src/presentation/hooks/useMenuDeliveryId'
 import { useEmpresaDeliveryMe } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
 import { showToast } from '@/src/shared/utils/toast'
 import type { DesignTabId } from '../../shared/types/deliveryPublicoDesignConfig'
@@ -23,10 +24,17 @@ import { DesignModelosTab } from '../components/tabs/DesignModelosTab'
 import { DesignCoresTab } from '../components/tabs/DesignCoresTab'
 import { DesignTipografiasTab } from '../components/tabs/DesignTipografiasTab'
 import { DesignCategoriasTab } from '../components/tabs/DesignCategoriasTab'
+import { useTabsStore } from '@/src/presentation/stores/tabsStore'
+import {
+  DELIVERY_HUB_PATH,
+  DELIVERY_HUB_TAB_ID,
+} from '@/src/presentation/components/features/delivery/hub/deliveryHubEtapas'
 
 export function DeliveryDesignCustomizerScreen() {
-  const { empresa, menuDeliveryId, isLoading: empresaLoading } = useEmpresaMe()
+  const { empresa, isLoading: empresaLoading } = useEmpresaMe()
+  const { menuDeliveryId, isLoading: menuDeliveryLoading } = useMenuDeliveryId()
   const { data: empresaDelivery, isLoading: deliveryLoading } = useEmpresaDeliveryMe()
+  const setDeliveryHubTab = useTabsStore(s => s.setActiveTab)
   const [activeTab, setActiveTab] = useState<DesignTabId>('cabecalho')
 
   const { draft, hydrated, isDirty, updateDraft, publish, restore } = useDeliveryDesignDraft({
@@ -63,7 +71,7 @@ export function DeliveryDesignCustomizerScreen() {
     showToast.success('Design restaurado.')
   }, [restore])
 
-  if (empresaLoading || deliveryLoading || !hydrated) {
+  if (empresaLoading || deliveryLoading || menuDeliveryLoading || !hydrated) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center bg-white">
         <JiffyLoading />
@@ -78,7 +86,8 @@ export function DeliveryDesignCustomizerScreen() {
         <header className="shrink-0 border-b border-gray-200 px-4 pt-2 md:px-6">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Link
-              href="/configuracoes/empresa-delivery"
+              href={DELIVERY_HUB_PATH}
+              onClick={() => setDeliveryHubTab(DELIVERY_HUB_TAB_ID)}
               className="inline-flex items-center gap-1 text-sm font-semibold text-primary-text transition-colors hover:text-primary"
             >
               <MdArrowBack className="h-4 w-4" aria-hidden />

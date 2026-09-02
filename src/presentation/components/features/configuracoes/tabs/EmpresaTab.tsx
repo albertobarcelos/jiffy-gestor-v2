@@ -1,8 +1,12 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { buildTenantQueryKey } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { EMPRESA_DELIVERY_ME_QUERY_KEY } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -13,11 +17,20 @@ import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
 import { MenuItem } from '@mui/material'
 import { LogoImpressaoCropModal } from '../LogoImpressaoCropModal'
 import { MenuParametroEmpresaSelect } from '../MenuParametroEmpresaSelect'
-import {
-  LOGO_IMPRESSAO_HEIGHT,
-  LOGO_IMPRESSAO_WIDTH,
-} from '@/src/presentation/utils/logoImpressaoCrop'
 import { lerMenuIdDeParametroEmpresa } from '@/src/shared/utils/parametroEmpresaMenus'
+import { EmpresaGeolocalizacaoSection } from '../EmpresaGeolocalizacaoSection'
+import { EnderecoPlacesAutocomplete } from '@/src/presentation/components/shared/geolocalizacao/EnderecoPlacesAutocomplete'
+import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
+import {
+  lerEnderecoLocalizacaoDoPayloadEmpresa,
+  montarPatchEnderecoGeolocalizacao,
+  type EnderecoEmpresaGeocodeInput,
+} from '@/src/shared/utils/geolocalizacaoEmpresa'
+import {
+  placeDetailsParaEnderecoGeocode,
+  type PlaceDetailsResult,
+} from '@/src/shared/utils/geolocalizacaoPlaces'
+import { formatarCepMascara } from '@/src/shared/utils/consultaCep'
 
 /** Labels outlined — alinhado a NovoMeioPagamento / EditarTerminais */
 const sxOutlinedLabelTextoEscuro = {
@@ -48,6 +61,12 @@ const entradaCompactaSelect = {
 
 const sxEntradaEmpresa = {
   ...sxOutlinedLabelTextoEscuro,
+  marginTop: 0,
+  marginBottom: 0,
+  '& .MuiFormControl-root': {
+    marginTop: 0,
+    marginBottom: 0,
+  },
   '& .MuiOutlinedInput-root': {
     backgroundColor: 'transparent',
     borderRadius: '8px',
@@ -118,17 +137,24 @@ const FUSOS_IANA_BRASIL = [
 const MAX_LOGO_IMPRESSAO_BYTES = 1024 * 1024
 const LOGO_IMPRESSAO_ACCEPT = 'image/png,image/jpeg,image/webp'
 
-/** Moldura 280×150 — `object-contain` evita distorção; largura fixa no desktop. */
-function LogoImpressaoPreviewImage({ src, alt }: { src: string; alt: string }) {
+/** Pré-visualização — altura alinhada ao bloco de dados básicos (grid stretch no desktop). */
+function LogoImpressaoPreviewImage({
+  src,
+  alt,
+  className,
+}: {
+  src: string
+  alt: string
+  className?: string
+}) {
   return (
     <div
-      className="w-full overflow-hidden rounded-sm bg-white"
-      style={{ aspectRatio: `${LOGO_IMPRESSAO_WIDTH} / ${LOGO_IMPRESSAO_HEIGHT}` }}
+      className={`relative min-h-0 w-full flex-1 overflow-hidden rounded-sm bg-white max-h-[140px] lg:max-h-none ${className ?? ''}`}
     >
       <img
         src={src}
         alt={alt}
-        className="block h-full w-full object-contain object-center"
+        className="absolute inset-0 h-full w-full object-contain object-center"
         draggable={false}
       />
     </div>
@@ -137,10 +163,18 @@ function LogoImpressaoPreviewImage({ src, alt }: { src: string; alt: string }) {
 
 const LOGO_COLUNA_LARGURA_CLASS = 'w-full shrink-0 lg:w-[280px]'
 
+function snapshotEnderecoGeocode(input: EnderecoEmpresaGeocodeInput): string {
+  return [input.rua, input.numero, input.bairro, input.cidade, input.estado, input.cep]
+    .map(valor => valor?.trim().toLocaleUpperCase('pt-BR') ?? '')
+    .join('|')
+}
+
 /**
  * Tab de Empresa - Edição de dados da empresa
  */
 export function EmpresaTab() {
+  const queryClient = useQueryClient()
+  const tenantEmpresaId = useTenantEmpresaId()
   const [empresa, setEmpresa] = useState<Cliente | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
@@ -160,6 +194,10 @@ export function EmpresaTab() {
   const [estado, setEstado] = useState('')
   const [cidadeValida, setCidadeValida] = useState<boolean | null>(null)
   const [codigoCidadeIbge, setCodigoCidadeIbge] = useState<string | null>(null)
+  const [enderecoLocalizacao, setEnderecoLocalizacao] = useState<GeoJsonPoint | null>(null)
+  const [providerEnderecoId, setProviderEnderecoId] = useState<string | null>(null)
+  const [buscaPlacesEmpresa, setBuscaPlacesEmpresa] = useState('')
+  const enderecoGeoSnapshotRef = useRef('')
   /** Valor exibido no select (IANA); vem de `parametroEmpresa.timezone` no GET /empresas/me. */
   const [timezone, setTimezone] = useState('')
   /** Menu usado nas vendas do gestor (`parametroEmpresa.menuVendaGestorId`). */
@@ -186,6 +224,53 @@ export function EmpresaTab() {
 
   // Ref para rastrear o último valor de cidade usado para buscar código IBGE
   const ultimaCidadeBuscada = useRef<string>('')
+
+  const enderecoGeocodeInput = useMemo<EnderecoEmpresaGeocodeInput>(
+    () => ({
+      rua,
+      numero,
+      bairro,
+      cidade: ultimaCidadeBuscada.current || cidade,
+      estado,
+      cep,
+      complemento,
+    }),
+    [rua, numero, bairro, cidade, estado, cep, complemento]
+  )
+
+  const enderecoAlteradoParaGeo = useMemo(() => {
+    if (!enderecoGeoSnapshotRef.current) return false
+    return snapshotEnderecoGeocode(enderecoGeocodeInput) !== enderecoGeoSnapshotRef.current
+  }, [enderecoGeocodeInput])
+
+  const handleLocalizacaoChange = useCallback(
+    (point: GeoJsonPoint | null, meta?: { providerEnderecoId?: string | null }) => {
+      setEnderecoLocalizacao(point)
+      if (meta?.providerEnderecoId !== undefined) {
+        setProviderEnderecoId(meta.providerEnderecoId)
+      }
+    },
+    []
+  )
+
+  const aplicarPlaceDetailsEmpresa = useCallback((place: PlaceDetailsResult) => {
+    const fields = placeDetailsParaEnderecoGeocode(place)
+    if (fields.rua) setRua(maiusculasPt(fields.rua))
+    if (fields.numero) setNumero(maiusculasPt(fields.numero))
+    if (fields.bairro) setBairro(maiusculasPt(fields.bairro))
+    if (fields.cidade) {
+      setCidade(maiusculasPt(fields.cidade))
+      ultimaCidadeBuscada.current = fields.cidade
+    }
+    if (fields.estado) setEstado(fields.estado.toUpperCase().slice(0, 2))
+    if (fields.cep) setCep(maiusculasPt(formatarCepMascara(fields.cep)))
+    setEnderecoLocalizacao(place.enderecoLocalizacao)
+    setProviderEnderecoId(place.providerEnderecoId)
+    setBuscaPlacesEmpresa(
+      [fields.rua, fields.numero].filter(Boolean).join(', ') || place.enderecoFormatado || ''
+    )
+    showToast.success('Endereço aplicado. Confira o pin no mapa e salve a empresa.')
+  }, [])
 
   useEffect(() => {
     loadEmpresa()
@@ -358,25 +443,53 @@ export function EmpresaTab() {
           setTelefone(maiusculasPt(empresaData.getTelefone() || ''))
 
           const endereco = empresaData.getEndereco()
-          if (endereco) {
-            setCep(maiusculasPt(endereco.cep || ''))
-            setRua(maiusculasPt(endereco.rua || ''))
-            setNumero(maiusculasPt(endereco.numero || ''))
-            setComplemento(maiusculasPt(endereco.complemento || ''))
-            setBairro(maiusculasPt(endereco.bairro || ''))
-            setCidade(maiusculasPt(endereco.cidade || ''))
-            setEstado(endereco.estado || '')
+          const enderecoRaw =
+            raw.endereco && typeof raw.endereco === 'object' && !Array.isArray(raw.endereco)
+              ? (raw.endereco as Record<string, unknown>)
+              : null
+          const ruaCarregada = String(
+            endereco?.rua ?? enderecoRaw?.rua ?? enderecoRaw?.logradouro ?? ''
+          )
+          const cepCarregado = String(endereco?.cep ?? enderecoRaw?.cep ?? '')
 
-            // Carregar código IBGE se cidade e estado estiverem preenchidos
-            if (endereco.cidade && endereco.estado) {
-              const cidade = endereco.cidade
-              ultimaCidadeBuscada.current = cidade
-              buscarCodigoIbge(cidade, endereco.estado)
+          if (endereco || enderecoRaw) {
+            setCep(maiusculasPt(cepCarregado || ''))
+            setRua(maiusculasPt(ruaCarregada || ''))
+            setNumero(maiusculasPt(String(endereco?.numero ?? enderecoRaw?.numero ?? '')))
+            setComplemento(
+              maiusculasPt(String(endereco?.complemento ?? enderecoRaw?.complemento ?? ''))
+            )
+            setBairro(maiusculasPt(String(endereco?.bairro ?? enderecoRaw?.bairro ?? '')))
+            setCidade(maiusculasPt(String(endereco?.cidade ?? enderecoRaw?.cidade ?? '')))
+            setEstado(String(endereco?.estado ?? enderecoRaw?.estado ?? ''))
+
+            enderecoGeoSnapshotRef.current = snapshotEnderecoGeocode({
+              rua: ruaCarregada || '',
+              numero: String(endereco?.numero ?? enderecoRaw?.numero ?? ''),
+              bairro: String(endereco?.bairro ?? enderecoRaw?.bairro ?? ''),
+              cidade: String(endereco?.cidade ?? enderecoRaw?.cidade ?? ''),
+              estado: String(endereco?.estado ?? enderecoRaw?.estado ?? ''),
+              cep: cepCarregado || '',
+            })
+
+            const cidadeCarregada = String(endereco?.cidade ?? enderecoRaw?.cidade ?? '')
+            const estadoCarregado = String(endereco?.estado ?? enderecoRaw?.estado ?? '')
+
+            if (cidadeCarregada && estadoCarregado) {
+              ultimaCidadeBuscada.current = cidadeCarregada
+              buscarCodigoIbge(cidadeCarregada, estadoCarregado)
             } else {
               setCodigoCidadeIbge(null)
               ultimaCidadeBuscada.current = ''
             }
+          } else {
+            enderecoGeoSnapshotRef.current = ''
           }
+
+          const { enderecoLocalizacao: geoSalva, providerEnderecoId: providerSalvo } =
+            lerEnderecoLocalizacaoDoPayloadEmpresa(raw.endereco)
+          setEnderecoLocalizacao(geoSalva)
+          setProviderEnderecoId(providerSalvo)
         } catch (error) {
           console.error('Erro ao criar Cliente a partir dos dados da API:', error, 'Dados:', data)
           // Criar um Cliente vazio para evitar quebra da UI
@@ -725,6 +838,14 @@ export function EmpresaTab() {
         if (estado) endereco.estado = estado
         if (codigoCidadeIbge) endereco.codigoCidadeIbge = codigoCidadeIbge
 
+        const geoPatch = montarPatchEnderecoGeolocalizacao(
+          enderecoLocalizacao,
+          providerEnderecoId
+        )
+        if (geoPatch) {
+          Object.assign(endereco, geoPatch)
+        }
+
         // Adiciona endereco ao body apenas se houver pelo menos um campo
         if (Object.keys(endereco).length > 0) {
           body.endereco = endereco
@@ -763,7 +884,13 @@ export function EmpresaTab() {
         }
 
         setIsEditing(false)
+        enderecoGeoSnapshotRef.current = snapshotEnderecoGeocode(enderecoGeocodeInput)
         await loadEmpresa()
+        if (tenantEmpresaId) {
+          void queryClient.invalidateQueries({
+            queryKey: buildTenantQueryKey(tenantEmpresaId, EMPRESA_DELIVERY_ME_QUERY_KEY),
+          })
+        }
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new Event('jiffy:empresa-me-updated'))
         }
@@ -833,7 +960,7 @@ export function EmpresaTab() {
         <div className="space-y-2 bg-info px-1 md:px-[18px]">
           {/* Dados Básicos + Logo (títulos na mesma linha em desktop) */}
           <div>
-            <div className="mb-2 flex flex-col gap-1 lg:flex-row lg:items-baseline lg:gap-4">
+            <div className="mb-1 flex flex-col gap-1 lg:flex-row lg:items-baseline lg:gap-4">
               <h4 className="min-w-0 flex-1 text-lg font-semibold text-primary">
                 Dados Básicos
               </h4>
@@ -843,8 +970,8 @@ export function EmpresaTab() {
                 Logo de impressão
               </h4>
             </div>
-            <div className="flex flex-col gap-7 lg:flex-row lg:items-start">
-              <div className="min-w-0 flex-1 space-y-7">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-stretch">
+              <div className="min-w-0 space-y-4">
                 <UppercaseLocaleInput
                   label="CNPJ"
                   value={cnpj}
@@ -853,7 +980,7 @@ export function EmpresaTab() {
                   size="small"
                   sx={sxEntradaEmpresa}
                 />
-                <div className="grid grid-cols-1 gap-7 md:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                   <UppercaseLocaleInput
                     label="Razão Social"
                     value={razaoSocial}
@@ -890,7 +1017,7 @@ export function EmpresaTab() {
                 </div>
               </div>
 
-              <div className={LOGO_COLUNA_LARGURA_CLASS}>
+              <div className={`${LOGO_COLUNA_LARGURA_CLASS} flex min-h-0 flex-col`}>
                 <input
                   ref={logoFileInputRef}
                   type="file"
@@ -922,10 +1049,10 @@ export function EmpresaTab() {
                     setLogoDragActive(false)
                     handleLogoFileInput(e.dataTransfer.files)
                   }}
-                  className={`relative flex w-full flex-col overflow-hidden rounded-lg border-2 border-dashed transition-colors ${
+                  className={`relative flex h-full min-h-[132px] flex-col overflow-hidden rounded-lg border-2 border-dashed transition-colors ${
                     pendingLogoPreviewUrl || serverLogoObjectUrl
                       ? 'p-1.5'
-                      : 'min-h-[150px]'
+                      : ''
                   } ${
                     logoDragActive
                       ? 'border-primary bg-primary/10'
@@ -933,8 +1060,8 @@ export function EmpresaTab() {
                   } ${logoBusy ? 'pointer-events-none opacity-60' : ''}`}
                 >
                   {pendingLogoPreviewUrl ? (
-                    <div className="relative flex w-full flex-col gap-1">
-                      <div className="relative w-full">
+                    <div className="relative flex min-h-0 flex-1 flex-col gap-1">
+                      <div className="relative flex min-h-0 flex-1 flex-col">
                         <button
                           type="button"
                           title="Descartar alteração"
@@ -952,7 +1079,7 @@ export function EmpresaTab() {
                           alt="Pré-visualização da logo de impressão"
                         />
                       </div>
-                      <div className="flex flex-wrap items-center justify-center gap-1 mt-2">
+                      <div className="flex shrink-0 flex-wrap items-center justify-center gap-1">
                         <button
                           type="button"
                           onClick={e => {
@@ -1031,8 +1158,8 @@ export function EmpresaTab() {
                       </div>
                     </div>
                   ) : serverLogoObjectUrl ? (
-                    <div className="relative flex w-full flex-col gap-1">
-                      <div className="relative w-full">
+                    <div className="relative flex min-h-0 flex-1 flex-col gap-1">
+                      <div className="relative flex min-h-0 flex-1 flex-col">
                         <button
                           type="button"
                           title="Remover logo de impressão"
@@ -1050,7 +1177,7 @@ export function EmpresaTab() {
                           alt="Logo de impressão atual"
                         />
                       </div>
-                      <div className="flex flex-wrap items-center justify-center gap-1">
+                      <div className="flex shrink-0 flex-wrap items-center justify-center gap-1">
                         <button
                           type="button"
                           onClick={e => {
@@ -1078,7 +1205,7 @@ export function EmpresaTab() {
                         if (logoBusy) return
                         logoFileInputRef.current?.click()
                       }}
-                      className={`flex min-h-[150px] cursor-pointer flex-col items-center justify-center gap-1 px-2 py-3 text-center hover:border-primary/50 ${
+                      className={`flex min-h-0 flex-1 cursor-pointer flex-col items-center justify-center gap-1 px-2 py-2 text-center hover:border-primary/50 ${
                         logoBusy ? 'pointer-events-none cursor-not-allowed' : ''
                       }`}
                     >
@@ -1099,10 +1226,22 @@ export function EmpresaTab() {
 
           {/* Endereço */}
           <div>
-            <h4 className="mb-2 text-lg font-semibold text-primary">Endereço</h4>
-            <div className="space-y-6">
+            <h4 className="mb-1 text-lg font-semibold text-primary">Endereço</h4>
+            <div className="space-y-3">
+              {isEditing ? (
+                <EnderecoPlacesAutocomplete
+                  variant="gestor"
+                  floatingLabel={false}
+                  label="Buscar endereço no Google"
+                  placeholder="Digite rua, bairro ou cidade…"
+                  value={buscaPlacesEmpresa}
+                  onChange={setBuscaPlacesEmpresa}
+                  onSelect={aplicarPlaceDetailsEmpresa}
+                />
+              ) : null}
+
               {/* Linha 1: CEP + Rua */}
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <UppercaseLocaleInput
                   label="CEP"
                   value={cep}
@@ -1124,7 +1263,7 @@ export function EmpresaTab() {
               </div>
 
               {/* Linha 2: Número, Complemento e Bairro */}
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <UppercaseLocaleInput
                   label="Número"
                   value={numero}
@@ -1152,7 +1291,7 @@ export function EmpresaTab() {
               </div>
 
               {/* Linha 3: Estado + Cidade + Fuso horário (IANA) */}
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <Input
                   select
                   label="Estado"
@@ -1259,6 +1398,14 @@ export function EmpresaTab() {
               </div>
             </div>
           </div>
+
+          <EmpresaGeolocalizacaoSection
+            endereco={enderecoGeocodeInput}
+            localizacao={enderecoLocalizacao}
+            onLocalizacaoChange={handleLocalizacaoChange}
+            disabled={!isEditing}
+            enderecoAlterado={enderecoAlteradoParaGeo}
+          />
         </div>
       </div>
 

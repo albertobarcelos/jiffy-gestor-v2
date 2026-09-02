@@ -18,6 +18,8 @@ import {
   useCriarMoradaTelefone,
   useAtualizarMoradaTelefone,
   useRegistrarUsoMoradaTelefone,
+  useBuscarClienteDeliveryPorTelefone,
+  useCriarClienteDeliveryRapido,
   type MoradaTelefone,
   type EnderecoMorada,
 } from '@/src/presentation/hooks/useMoradaTelefone'
@@ -25,6 +27,16 @@ import {
   useBuscarClientePorTelefone,
   useCriarClienteRapido,
 } from '@/src/presentation/hooks/useClientes'
+import {
+  extrairDigitosTelefone,
+  telefoneCelularBrCompleto,
+} from '@/src/shared/utils/telefoneBr'
+import { EnderecoPlacesAutocomplete } from '@/src/presentation/components/shared/geolocalizacao/EnderecoPlacesAutocomplete'
+import {
+  placeDetailsParaEnderecoGeocode,
+  type PlaceDetailsResult,
+} from '@/src/shared/utils/geolocalizacaoPlaces'
+import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 
 /** Snapshot mínimo do cliente encontrado / criado. */
 interface ClienteEntrega {
@@ -122,9 +134,8 @@ function formatarTelefoneExibicao(valor: string): string {
   return `(${numeros.slice(0, 2)}) ${numeros.slice(2, 7)}-${numeros.slice(7, 11)}`
 }
 
-/** Retorna apenas os dígitos do telefone */
-function extrairDigitosTelefone(valor: string): string {
-  return valor.replace(/\D/g, '')
+function telefoneMinimoParaBusca(usarModuloDeliveryClientes: boolean): number {
+  return usarModuloDeliveryClientes ? 11 : 8
 }
 
 function moradaParaForm(m: MoradaTelefone): FormNovasMorada {
@@ -234,6 +245,8 @@ export function EntregaClienteSelector({
   const [nomeDigitado, setNomeDigitado] = useState('')
   /** `true` após busca sem resultado — exibe opção "Cadastrar cliente". */
   const [clienteNaoEncontrado, setClienteNaoEncontrado] = useState(false)
+  /** Cliente delivery localizado via `GET /delivery/clientes/{telefone}`. */
+  const [clienteDeliveryEncontrado, setClienteDeliveryEncontrado] = useState(false)
   /** Painel lateral de cadastro rápido de cliente. */
   const [painelClienteAberto, setPainelClienteAberto] = useState(false)
   /** Nome no formulário de cadastro rápido (separado do campo de busca). */
@@ -243,6 +256,11 @@ export function EntregaClienteSelector({
   const [painelMoradaAberto, setPainelMoradaAberto] = useState(false)
   const [formNova, setFormNova] = useState<FormNovasMorada>(FORM_INICIAL)
   const [isLoadingCep, setIsLoadingCep] = useState(false)
+  const [buscaPlacesMorada, setBuscaPlacesMorada] = useState('')
+  const [moradaGeo, setMoradaGeo] = useState<{
+    enderecoLocalizacao: GeoJsonPoint
+    providerEnderecoId: string
+  } | null>(null)
 
   const telefoneInputRef = useRef<HTMLInputElement>(null)
 
@@ -254,12 +272,22 @@ export function EntregaClienteSelector({
 
   const moradaHookOptions = { usarModuloDelivery: usarModuloDeliveryClientes }
 
-  const { data: moradas, isLoading: buscando } = useMoradasPorTelefone(telefoneBuscado, moradaHookOptions)
+  const { data: moradas, isLoading: buscando, isError: erroMoradas, error: erroMoradasMsg } =
+    useMoradasPorTelefone(telefoneBuscado, moradaHookOptions)
   const criarMorada = useCriarMoradaTelefone(moradaHookOptions)
   const atualizarMorada = useAtualizarMoradaTelefone(moradaHookOptions)
   const registrarUsoMorada = useRegistrarUsoMoradaTelefone(moradaHookOptions)
   const buscarCliente = useBuscarClientePorTelefone()
+  const buscarClienteDelivery = useBuscarClienteDeliveryPorTelefone()
   const criarCliente = useCriarClienteRapido()
+  const criarClienteDelivery = useCriarClienteDeliveryRapido()
+
+  useEffect(() => {
+    if (!erroMoradas || !erroMoradasMsg) return
+    showToast.error(
+      erroMoradasMsg instanceof Error ? erroMoradasMsg.message : 'Erro ao buscar endereços'
+    )
+  }, [erroMoradas, erroMoradasMsg])
 
   /**
    * Atualiza a morada no estado do pai e regista uso na API para ordenar como mais recente.
@@ -277,46 +305,95 @@ export function EntregaClienteSelector({
     [onMoradaSelecionada, telefoneBuscado, registrarUsoMorada]
   )
 
+  const podeGerenciarEnderecos =
+    Boolean(clienteVinculado?.id?.trim()) ||
+    (usarModuloDeliveryClientes && clienteDeliveryEncontrado)
+
   const abrirPainelNovo = useCallback(() => {
-    if (!clienteVinculado?.id?.trim()) {
+    if (!podeGerenciarEnderecos) {
       showToast.warning('Cadastre o cliente antes de adicionar um endereço.')
       return
     }
     setMoradaEditando(null)
     setFormNova(formInicialComEnderecoPadrao(enderecoPadrao))
+    setBuscaPlacesMorada('')
+    setMoradaGeo(null)
     setPainelMoradaAberto(true)
-  }, [clienteVinculado?.id, enderecoPadrao])
+  }, [podeGerenciarEnderecos, enderecoPadrao])
 
   const abrirPainelEditar = useCallback(
     (m: MoradaTelefone) => {
-      if (!clienteVinculado?.id?.trim()) {
+      if (!podeGerenciarEnderecos) {
         showToast.warning('Cadastre o cliente antes de editar o endereço.')
         return
       }
       setMoradaEditando(m)
       setFormNova(moradaParaForm(m))
+      setBuscaPlacesMorada('')
+      setMoradaGeo(null)
       setPainelMoradaAberto(true)
     },
-    [clienteVinculado?.id]
+    [podeGerenciarEnderecos]
   )
 
   const fecharPainelMorada = useCallback(() => {
     setPainelMoradaAberto(false)
     setMoradaEditando(null)
     setFormNova(formInicialComEnderecoPadrao(enderecoPadrao))
+    setBuscaPlacesMorada('')
+    setMoradaGeo(null)
   }, [enderecoPadrao])
 
   const handleBuscar = useCallback(async (telefoneOverride?: string) => {
     const digitos = extrairDigitosTelefone(telefoneOverride ?? telefoneInput)
-    if (digitos.length < 8) {
-      onAbrirSeletorCliente?.()
+    const minDigitos = telefoneMinimoParaBusca(usarModuloDeliveryClientes)
+
+    if (digitos.length < minDigitos) {
+      if (usarModuloDeliveryClientes) {
+        showToast.warning('Informe o celular completo com DDD (11 dígitos).')
+      } else {
+        onAbrirSeletorCliente?.()
+      }
       return
     }
 
     setClienteNaoEncontrado(false)
+    setClienteDeliveryEncontrado(false)
     onClienteVinculado(null)
-    setTelefoneBuscado(digitos)
     onMoradaSelecionada(null)
+
+    if (usarModuloDeliveryClientes) {
+      setTelefoneBuscado(digitos)
+      try {
+        const delivery = await buscarClienteDelivery.mutateAsync(digitos)
+        if (delivery) {
+          setClienteDeliveryEncontrado(true)
+          const nomeDelivery = delivery.nome?.trim() || nomeDigitado.trim() || 'Cliente'
+          if (delivery.clienteIdVinculado?.trim()) {
+            onClienteVinculado({
+              id: delivery.clienteIdVinculado.trim(),
+              nome: nomeDelivery,
+            })
+          } else {
+            onClienteVinculado({ id: '', nome: nomeDelivery })
+          }
+          return
+        }
+
+        const clienteErp = await buscarCliente.mutateAsync(digitos)
+        if (clienteErp) {
+          onClienteVinculado({ id: clienteErp.getId(), nome: clienteErp.getNome() })
+          return
+        }
+
+        setClienteNaoEncontrado(true)
+      } catch {
+        setClienteNaoEncontrado(true)
+      }
+      return
+    }
+
+    setTelefoneBuscado(digitos)
 
     try {
       const cliente = await buscarCliente.mutateAsync(digitos)
@@ -330,7 +407,10 @@ export function EntregaClienteSelector({
     }
   }, [
     telefoneInput,
+    usarModuloDeliveryClientes,
+    nomeDigitado,
     buscarCliente,
+    buscarClienteDelivery,
     onClienteVinculado,
     onMoradaSelecionada,
     setTelefoneBuscado,
@@ -350,10 +430,11 @@ export function EntregaClienteSelector({
   /** Ao sair do campo de telefone, busca o cliente automaticamente (telefone completo e ainda não buscado). */
   const handleTelefoneBlur = useCallback(() => {
     const digitos = extrairDigitosTelefone(telefoneInput)
-    if (digitos.length >= 8 && digitos !== telefoneBuscado) {
+    const minDigitos = telefoneMinimoParaBusca(usarModuloDeliveryClientes)
+    if (digitos.length >= minDigitos && digitos !== telefoneBuscado) {
       void handleBuscar()
     }
-  }, [telefoneInput, telefoneBuscado, handleBuscar])
+  }, [telefoneInput, telefoneBuscado, handleBuscar, usarModuloDeliveryClientes])
 
   const handleFormChange = useCallback(
     (campo: keyof FormNovasMorada, valor: string) => {
@@ -413,7 +494,7 @@ export function EntregaClienteSelector({
   }, [formNova.cep, aplicarEnderecoDoCep])
 
   const handleSalvarMorada = useCallback(async () => {
-    if (!clienteVinculado?.id?.trim()) {
+    if (!podeGerenciarEnderecos) {
       showToast.warning('Cadastre o cliente antes de salvar o endereço.')
       return
     }
@@ -448,6 +529,12 @@ export function EntregaClienteSelector({
       estado: uf,
       complemento: formNova.complemento.trim() || undefined,
       referencia: formNova.referencia.trim() || undefined,
+      ...(moradaGeo
+        ? {
+            enderecoLocalizacao: moradaGeo.enderecoLocalizacao,
+            providerEnderecoId: moradaGeo.providerEnderecoId,
+          }
+        : {}),
     }
 
     const dto = {
@@ -475,7 +562,7 @@ export function EntregaClienteSelector({
     setTelefoneBuscado(digitos)
     definirMoradaSelecionada(nova, digitos)
   }, [
-    clienteVinculado?.id,
+    podeGerenciarEnderecos,
     telefoneInput,
     formNova,
     moradaEditando,
@@ -485,6 +572,7 @@ export function EntregaClienteSelector({
     fecharPainelMorada,
     definirMoradaSelecionada,
     setTelefoneBuscado,
+    moradaGeo,
   ])
 
   const handleSalvarClienteRapido = useCallback(async () => {
@@ -494,8 +582,17 @@ export function EntregaClienteSelector({
       return
     }
     const digitos = extrairDigitosTelefone(telefoneInput)
+    if (usarModuloDeliveryClientes && !telefoneCelularBrCompleto(digitos)) {
+      showToast.warning('Informe o celular completo com DDD (11 dígitos).')
+      return
+    }
     try {
       const novo = await criarCliente.mutateAsync({ nome, telefone: digitos })
+      if (usarModuloDeliveryClientes) {
+        await criarClienteDelivery.mutateAsync({ telefone: digitos, nome })
+        setClienteDeliveryEncontrado(true)
+        setTelefoneBuscado(digitos)
+      }
       onClienteVinculado({ id: novo.getId(), nome: novo.getNome() })
       setClienteNaoEncontrado(false)
       setPainelClienteAberto(false)
@@ -504,7 +601,15 @@ export function EntregaClienteSelector({
     } catch {
       /* erro exibido pelo hook */
     }
-  }, [nomeNovoCliente, telefoneInput, criarCliente, onClienteVinculado])
+  }, [
+    nomeNovoCliente,
+    telefoneInput,
+    usarModuloDeliveryClientes,
+    criarCliente,
+    criarClienteDelivery,
+    onClienteVinculado,
+    setTelefoneBuscado,
+  ])
 
   const handleAbrirPainelCliente = useCallback(() => {
     setNomeNovoCliente(nomeDigitado.trim())
@@ -512,18 +617,19 @@ export function EntregaClienteSelector({
   }, [nomeDigitado])
 
   const moradasEncontradas = moradas ?? []
-  const buscaRealizada = telefoneBuscado !== null || clienteVinculado !== null
-  const buscandoCliente = buscarCliente.isPending
-  const clienteCadastrado = Boolean(clienteVinculado?.id?.trim())
+  const buscaRealizada =
+    telefoneBuscado !== null || clienteVinculado !== null || clienteDeliveryEncontrado
+  const buscandoCliente = buscarCliente.isPending || buscarClienteDelivery.isPending
+  const clienteCadastrado = podeGerenciarEnderecos
 
   useEffect(() => {
-    if (!mostrarEnderecos || !clienteVinculado || moradaSelecionada || moradasEncontradas.length === 0) {
+    if (!mostrarEnderecos || !clienteCadastrado || moradaSelecionada || moradasEncontradas.length === 0) {
       return
     }
     definirMoradaSelecionada(moradasEncontradas[0])
   }, [
     mostrarEnderecos,
-    clienteVinculado,
+    clienteCadastrado,
     moradaSelecionada,
     moradasEncontradas,
     definirMoradaSelecionada,
@@ -603,7 +709,7 @@ export function EntregaClienteSelector({
                 }}
               />
             </div>
-            {clienteVinculado && (
+            {clienteCadastrado && (
               <p className="mt-1 flex items-center gap-1 text-xs text-green-700">
                 <MdCheckCircle className="h-3.5 w-3.5" />
                 Cliente encontrado
@@ -885,6 +991,39 @@ export function EntregaClienteSelector({
             />
           </div>
 
+          <div>
+            <EnderecoPlacesAutocomplete
+              variant="gestor"
+              floatingLabel={false}
+              label="Buscar endereço no Google"
+              placeholder="Digite rua, bairro ou cidade…"
+              value={buscaPlacesMorada}
+              onChange={setBuscaPlacesMorada}
+              onSelect={(place: PlaceDetailsResult) => {
+                const fields = placeDetailsParaEnderecoGeocode(place)
+                setFormNova(prev => ({
+                  ...prev,
+                  ...(fields.rua ? { rua: fields.rua.toLocaleUpperCase('pt-BR') } : {}),
+                  ...(fields.numero ? { numero: fields.numero } : {}),
+                  ...(fields.bairro ? { bairro: fields.bairro.toLocaleUpperCase('pt-BR') } : {}),
+                  ...(fields.cidade ? { cidade: fields.cidade.toLocaleUpperCase('pt-BR') } : {}),
+                  ...(fields.estado ? { estado: fields.estado.toUpperCase().slice(0, 2) } : {}),
+                  ...(fields.cep ? { cep: formatarCepMascara(fields.cep) } : {}),
+                }))
+                setMoradaGeo({
+                  enderecoLocalizacao: place.enderecoLocalizacao,
+                  providerEnderecoId: place.providerEnderecoId,
+                })
+                setBuscaPlacesMorada(
+                  [fields.rua, fields.numero].filter(Boolean).join(', ') ||
+                    place.enderecoFormatado ||
+                    ''
+                )
+                showToast.success('Endereço aplicado a partir da sugestão do Google.')
+              }}
+            />
+          </div>
+
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2">
               <Label className="mb-1 block text-xs font-medium text-gray-600">
@@ -892,7 +1031,10 @@ export function EntregaClienteSelector({
               </Label>
               <input
                 value={formNova.rua}
-                onChange={e => handleFormChange('rua', e.target.value)}
+                onChange={e => {
+                  handleFormChange('rua', e.target.value)
+                  setMoradaGeo(null)
+                }}
                 placeholder="Rua das Flores"
                 className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
               />

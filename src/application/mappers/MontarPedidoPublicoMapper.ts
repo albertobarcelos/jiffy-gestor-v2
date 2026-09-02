@@ -36,7 +36,7 @@ export type MontarCotacaoPublicoResult =
 
 type ComposicaoPedidoPublico = {
   tipoEntrega: CreatePedidoPublicoInput['tipoEntrega']
-  cliente: CreatePedidoPublicoInput['cliente']
+  cliente: { telefone: string; enderecoIdEntrega?: string }
   produtos: CreatePedidoPublicoInput['produtos']
   cpfDocumento: string | null
 }
@@ -100,13 +100,8 @@ function montarComposicaoPedidoPublico({
     })),
   }))
 
-  const cliente: CreatePedidoPublicoInput['cliente'] = {
+  const cliente: ComposicaoPedidoPublico['cliente'] = {
     telefone: tel,
-    nome: form.nome.trim() || null,
-  }
-
-  if (cpfResult.cpf) {
-    cliente.cpf = cpfResult.cpf
   }
 
   if (form.tipoEntrega === 'entrega') {

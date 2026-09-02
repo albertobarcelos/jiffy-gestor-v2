@@ -15,8 +15,22 @@ import type {
   EmpresaDeliveryDTO,
   UpdateEmpresaDeliveryInput,
 } from '@/src/application/dto/delivery/EmpresaDeliveryDTO'
+import {
+  EMPRESA_DELIVERY_UPDATED_EVENT,
+  invalidatePublicDeliveryCatalogForSlug,
+  type EmpresaDeliveryUpdatedDetail,
+} from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 
 export const EMPRESA_DELIVERY_ME_QUERY_KEY = ['delivery', 'empresa-me'] as const
+
+function dispatchEmpresaDeliveryUpdated(slug: string | null | undefined) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(
+    new CustomEvent<EmpresaDeliveryUpdatedDetail>(EMPRESA_DELIVERY_UPDATED_EVENT, {
+      detail: { slug: slug ?? null },
+    })
+  )
+}
 
 async function parseJsonOrThrow(res: Response): Promise<unknown> {
   const raw: unknown = await res.json().catch(() => ({}))
@@ -59,6 +73,7 @@ export function useEmpresaDeliveryMe() {
 
 export function useCriarEmpresaDelivery() {
   const invalidate = useInvalidateTenantQueries()
+  const queryClient = useQueryClient()
 
   return useSecureTenantMutation<EmpresaDeliveryDTO, CreateEmpresaDeliveryInput>(
     async ({ token }, input) => {
@@ -74,11 +89,10 @@ export function useCriarEmpresaDelivery() {
       return data as EmpresaDeliveryDTO
     },
     {
-      onSuccess: async () => {
+      onSuccess: async data => {
         await invalidate(EMPRESA_DELIVERY_ME_QUERY_KEY)
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new Event('jiffy:empresa-delivery-updated'))
-        }
+        invalidatePublicDeliveryCatalogForSlug(queryClient, data.slug)
+        dispatchEmpresaDeliveryUpdated(data.slug)
       },
     }
   )
@@ -109,9 +123,8 @@ export function useAtualizarEmpresaDelivery() {
           data
         )
         await invalidate(EMPRESA_DELIVERY_ME_QUERY_KEY)
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new Event('jiffy:empresa-delivery-updated'))
-        }
+        invalidatePublicDeliveryCatalogForSlug(queryClient, data.slug)
+        dispatchEmpresaDeliveryUpdated(data.slug)
       },
     }
   )

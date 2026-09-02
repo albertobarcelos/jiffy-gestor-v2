@@ -64,7 +64,7 @@ export function DesignCabecalhoTab({
 
       {!canUpload ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Configure a Empresa Delivery (slug) em Configurações antes de enviar logo e capa.
+          Configure o Delivery (slug) em Configurações antes de enviar logo e capa.
         </p>
       ) : null}
 

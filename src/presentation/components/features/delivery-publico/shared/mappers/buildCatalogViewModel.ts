@@ -1,6 +1,7 @@
 import type { CatalogoPublicoGrupoProdutoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import type { FuncionamentoPublicoDTO } from '@/src/application/dto/delivery/FuncionamentoDeliveryDTO'
 import { listarProdutosFavoritos } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
-import { DELIVERY_PUBLICO_HORARIO_PLACEHOLDER } from '../constants/deliveryPublicoPlaceholders'
+import { formatarHorarioFuncionamentoPublico } from '@/src/shared/utils/funcionamentoDelivery'
 import {
   DELIVERY_PUBLICO_GRUPO_SUGESTOES_ICON,
   DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID,
@@ -67,7 +68,8 @@ function buildGrupoSugestoes(
  */
 export function buildCatalogViewModel(
   grupos: CatalogoPublicoGrupoProdutoDTO[],
-  overrides: Partial<DeliveryPublicoViewModel> = {}
+  overrides: Partial<DeliveryPublicoViewModel> = {},
+  funcionamento?: FuncionamentoPublicoDTO | null
 ): DeliveryPublicoViewModel {
   const carrier = findGrupoSugestoesDaCasaCarrier(grupos)
   const gruposVisiveis = omitGrupoSugestoesDaCasaCarrier(grupos)
@@ -78,8 +80,10 @@ export function buildCatalogViewModel(
 
   return {
     grupos: sugestoes ? [sugestoes, ...gruposMapeados] : gruposMapeados,
-    disponivel: true,
-    horarioTexto: DELIVERY_PUBLICO_HORARIO_PLACEHOLDER,
+    disponivel: funcionamento?.aberta ?? true,
+    horarioTexto: funcionamento
+      ? formatarHorarioFuncionamentoPublico(funcionamento)
+      : 'Consulte os horários',
     termoBusca: '',
     carrinho: { total: 0, quantidadeItens: 0 },
     ...overrides,

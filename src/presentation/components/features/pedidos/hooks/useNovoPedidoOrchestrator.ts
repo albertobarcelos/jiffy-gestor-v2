@@ -12,6 +12,7 @@ import {
 } from '@/src/presentation/hooks/useVendas'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
+import { useMenuDeliveryId } from '@/src/presentation/hooks/useMenuDeliveryId'
 import { usePreferenciasImpressaoDelivery } from '@/src/presentation/hooks/usePreferenciasImpressaoDelivery'
 import { useImpressaoDelivery } from '@/features/delivery/hooks/useImpressaoDelivery'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
@@ -73,7 +74,8 @@ export function useNovoPedidoOrchestrator({
   tipoInicioPedido = 'balcao',
   abaDetalhesInicial,
 }: NovoPedidoModalProps) {
-  const { empresa, menuVendaGestorId, menuDeliveryId } = useEmpresaMe()
+  const { empresa, menuVendaGestorId } = useEmpresaMe()
+  const { menuDeliveryId } = useMenuDeliveryId()
   const { preferenciasImpressaoDelivery } = usePreferenciasImpressaoDelivery()
   const { processarAposTransicaoVendaGestorId } = useImpressaoDelivery()
   const empresaId = useTenantEmpresaId()
@@ -520,6 +522,7 @@ export function useNovoPedidoOrchestrator({
     setCurrentStep,
     pedidoDeliveryGestor,
     clienteEntregaVinculadoId: clienteEntregaVinculado?.id,
+    telefoneClienteDelivery: telefoneBuscadoEntrega,
     pedidoComEntrega,
     temEnderecoEntrega: Boolean(moradaEntregaSelecionada?.endereco),
     modoEdicaoProdutos,
@@ -683,6 +686,7 @@ export function useNovoPedidoOrchestrator({
     canSubmitNovoPedido({
       pedidoDeliveryGestor,
       clienteEntregaVinculadoId: clienteEntregaVinculado?.id,
+      telefoneClienteDelivery: telefoneBuscadoEntrega,
       pedidoComEntrega,
       temEnderecoEntrega,
       pedidoEntregaAceitaPagamentoPendente,

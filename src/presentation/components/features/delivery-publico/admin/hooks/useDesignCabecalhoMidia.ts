@@ -113,7 +113,7 @@ export function useDesignCabecalhoMidia({
       }
 
       if (!hasEmpresaDelivery) {
-        showToast.error('Configure a Empresa Delivery antes de enviar imagens.')
+        showToast.error('Configure o Delivery antes de enviar imagens.')
         return
       }
 

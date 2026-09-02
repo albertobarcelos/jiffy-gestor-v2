@@ -1,5 +1,19 @@
 import { z } from 'zod'
 
+const geoJsonPointSchema = z.object({
+  type: z.literal('Point'),
+  coordinates: z.tuple([z.number(), z.number()]),
+})
+
+const enderecoLocalizacaoInputSchema = geoJsonPointSchema.extend({
+  geocoding: z
+    .object({
+      provider: z.enum(['GOOGLE']).optional(),
+      enderecoId: z.string().min(1).optional(),
+    })
+    .optional(),
+})
+
 const cpfDigitsSchema = z
   .string()
   .regex(/^\d{11}$/, 'CPF deve ter 11 dígitos')
@@ -15,6 +29,8 @@ export const EnderecoDeliveryPublicoInputSchema = z.object({
   estado: z.string().nullable().optional(),
   cep: z.string().optional(),
   complemento: z.string().nullable().optional(),
+  enderecoLocalizacao: enderecoLocalizacaoInputSchema.optional(),
+  preferenciaEntrega: geoJsonPointSchema.optional(),
 })
 
 export const ComplementoPedidoPublicoInputSchema = z.object({
@@ -30,13 +46,28 @@ export const ProdutoPedidoPublicoInputSchema = z.object({
   complementos: z.array(ComplementoPedidoPublicoInputSchema).optional(),
 })
 
-export const ClientePedidoPublicoInputSchema = z.object({
+/**
+ * Referência ao cliente delivery já cadastrado (cotação e create pedido público).
+ * Spec backend: apenas `telefone`; em entrega, também `enderecoIdEntrega`.
+ * Nome/CPF/endereços devem ser persistidos via POST/PATCH /delivery/clientes antes.
+ */
+export const ClienteReferenciaPedidoPublicoInputSchema = z
+  .object({
+    telefone: z.string().min(8),
+    enderecoIdEntrega: z.string().min(1).optional(),
+  })
+  .strict()
+
+/** Cadastro/atualização do cliente delivery (rotas POST/PATCH /delivery/clientes). */
+export const ClienteCadastroDeliveryPublicoInputSchema = z.object({
   telefone: z.string().min(8),
   nome: z.string().nullable().optional(),
   cpf: cpfDigitsSchema,
-  enderecoIdEntrega: z.string().nullable().optional(),
   enderecos: z.array(EnderecoDeliveryPublicoInputSchema).optional(),
 })
+
+/** @deprecated Use ClienteReferenciaPedidoPublicoInputSchema ou ClienteCadastroDeliveryPublicoInputSchema */
+export const ClientePedidoPublicoInputSchema = ClienteReferenciaPedidoPublicoInputSchema
 
 export const CobrancaPedidoPublicoInputSchema = z.object({
   meioPagamentoId: z.string().min(1),
@@ -47,7 +78,7 @@ export const CobrancaPedidoPublicoInputSchema = z.object({
 export const CotacaoPedidoPublicoInputSchema = z.object({
   slug: z.string().min(1),
   tipoEntrega: z.enum(['entrega', 'retirada']),
-  cliente: ClientePedidoPublicoInputSchema,
+  cliente: ClienteReferenciaPedidoPublicoInputSchema,
   produtos: z.array(ProdutoPedidoPublicoInputSchema).min(1),
 })
 
@@ -56,7 +87,7 @@ export const CreatePedidoPublicoInputSchema = z.object({
   origem: z.literal('JIFFY_DELIVERY'),
   tokenCotacao: z.string().min(1),
   tipoEntrega: z.enum(['entrega', 'retirada']),
-  cliente: ClientePedidoPublicoInputSchema,
+  cliente: ClienteReferenciaPedidoPublicoInputSchema,
   documentoCpfCnpj: z
     .string()
     .regex(/^\d{11}$|^\d{14}$/)
@@ -91,7 +122,13 @@ export const AtualizarClienteDeliveryPublicoInputSchema = z.object({
 export type EnderecoDeliveryPublicoInput = z.infer<typeof EnderecoDeliveryPublicoInputSchema>
 export type ComplementoPedidoPublicoInput = z.infer<typeof ComplementoPedidoPublicoInputSchema>
 export type ProdutoPedidoPublicoInput = z.infer<typeof ProdutoPedidoPublicoInputSchema>
-export type ClientePedidoPublicoInput = z.infer<typeof ClientePedidoPublicoInputSchema>
+export type ClienteReferenciaPedidoPublicoInput = z.infer<
+  typeof ClienteReferenciaPedidoPublicoInputSchema
+>
+export type ClienteCadastroDeliveryPublicoInput = z.infer<
+  typeof ClienteCadastroDeliveryPublicoInputSchema
+>
+export type ClientePedidoPublicoInput = ClienteReferenciaPedidoPublicoInput
 export type CobrancaPedidoPublicoInput = z.infer<typeof CobrancaPedidoPublicoInputSchema>
 export type CotacaoPedidoPublicoInput = z.infer<typeof CotacaoPedidoPublicoInputSchema>
 export type CreatePedidoPublicoInput = z.infer<typeof CreatePedidoPublicoInputSchema>

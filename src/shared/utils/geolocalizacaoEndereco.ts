@@ -7,6 +7,9 @@ export type EnderecoPorLocalizacao = {
   cidade: string
   estado: string
   cep: string
+  latitude: number
+  longitude: number
+  providerEnderecoId?: string | null
 }
 
 function obterPosicaoAtual(): Promise<GeolocationPosition> {
@@ -35,7 +38,8 @@ function mensagemErroGeo(error: unknown): string {
 }
 
 /**
- * Obtém coordenadas do GPS e resolve endereço via BFF `/api/geolocalizacao/reverso`.
+ * Obtém coordenadas do GPS e resolve endereço via BFF `/api/geolocalizacao/reverso`
+ * (Google Geocoding, com fallback Nominatim).
  */
 export async function obterEnderecoPorGps(): Promise<EnderecoPorLocalizacao> {
   let position: GeolocationPosition
@@ -69,5 +73,9 @@ export async function obterEnderecoPorGps(): Promise<EnderecoPorLocalizacao> {
     cidade: String(payload.cidade ?? ''),
     estado: String(payload.estado ?? '').toUpperCase().slice(0, 2),
     cep: cepDigits.length === 8 ? formatarCepMascara(cepDigits) : '',
+    latitude,
+    longitude,
+    providerEnderecoId:
+      typeof payload.providerEnderecoId === 'string' ? payload.providerEnderecoId : null,
   }
 }
