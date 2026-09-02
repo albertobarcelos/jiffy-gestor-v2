@@ -2,7 +2,6 @@
 export const CONFIGURACOES_TAB_SLUGS = [
   'empresa',
   'empresa-delivery',
-  'cobertura-delivery',
   'terminais',
   'impressoras',
   'meios-pagamentos',
@@ -15,11 +14,14 @@ export type ConfiguracoesTabSlug = (typeof CONFIGURACOES_TAB_SLUGS)[number]
 const LEGACY_QUERY_TAB: Record<string, ConfiguracoesTabSlug> = {
   planilha: 'importar-dados',
   'cardapio-digital': 'empresa-delivery',
+  /** Cobertura saiu da barra; redireciona para o hub Delivery. */
+  'cobertura-delivery': 'empresa-delivery',
 }
 
 /** Slugs de rota antigos → slug canônico (`/configuracoes/:aba`). */
 const LEGACY_PATH_TAB: Record<string, ConfiguracoesTabSlug> = {
   'cardapio-digital': 'empresa-delivery',
+  'cobertura-delivery': 'empresa-delivery',
 }
 
 export function isConfiguracoesTabSlug(value: string): value is ConfiguracoesTabSlug {
@@ -47,4 +49,15 @@ export function resolveConfiguracoesTabFromLegacyQuery(
 
 export function configuracoesTabPath(tab: ConfiguracoesTabSlug): string {
   return `/configuracoes/${tab}`
+}
+
+/** Hub Delivery + etapa SPA via query `?abrir=`. */
+export function deliveryHubEtapaPath(
+  etapaId:
+    | 'delivery-nome-cardapio'
+    | 'delivery-design'
+    | 'delivery-agenda'
+    | 'delivery-cobertura'
+): string {
+  return `${configuracoesTabPath('empresa-delivery')}?abrir=${encodeURIComponent(etapaId)}`
 }

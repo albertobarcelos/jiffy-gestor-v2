@@ -243,14 +243,14 @@ export function DesignCategoriasTab({
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
         <p className="font-semibold">Cardápio do delivery não configurado</p>
         <p className="mt-1 text-xs">
-          Em Empresa Delivery, escolha o cardápio publicado. As categorias desta tela vêm desse
+          Em Delivery, escolha o cardápio publicado. As categorias desta tela vêm desse
           menu.
         </p>
         <Link
           href="/configuracoes/empresa-delivery"
           className="mt-3 inline-flex text-sm font-semibold text-primary underline-offset-2 hover:underline"
         >
-          Ir para Empresa Delivery
+          Ir para Delivery
         </Link>
       </div>
     )

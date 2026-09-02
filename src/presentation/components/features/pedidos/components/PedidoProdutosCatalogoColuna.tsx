@@ -34,7 +34,7 @@ export function PedidoProdutosCatalogoColuna() {
   const isLoadingAtual = emBusca ? isLoadingBuscaProdutos : isLoadingProdutos
   const mensagemMenuIndisponivel =
     tipoInicioPedido === 'entrega'
-      ? 'Configure o menu em Configurações → Empresa Delivery.'
+      ? 'Configure o menu em Configurações → Delivery.'
       : 'Configure o menu em Configurações → Empresa.'
 
   return (

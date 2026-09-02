@@ -102,7 +102,7 @@ export function FuncionamentoDeliverySection({
       <section id="empresa-delivery-agenda" className={AGENDA_CARD_CLASS}>
         <AgendaHeader />
         <p className="mt-4 flex-1 text-sm text-secondary-text">
-          Ative a Empresa Delivery para configurar dias e horários de funcionamento.
+          Ative o Delivery para configurar dias e horários de funcionamento.
         </p>
       </section>
     )

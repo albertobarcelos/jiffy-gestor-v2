@@ -1,4 +1,7 @@
-import { configuracoesTabPath } from '@/src/shared/constants/configuracoesRoutes'
+import {
+  configuracoesTabPath,
+  deliveryHubEtapaPath,
+} from '@/src/shared/constants/configuracoesRoutes'
 
 export const EMPRESA_DELIVERY_PENDENCIA_TYPES = {
   EMPRESA_DELIVERY_NAO_CONFIGURADA: 'EMPRESA_DELIVERY_NAO_CONFIGURADA',
@@ -30,21 +33,25 @@ export type PendenciaAcao = {
 }
 
 const ACAO_POR_TIPO: Partial<Record<EmpresaDeliveryPendenciaType, PendenciaAcao>> = {
+  [EMPRESA_DELIVERY_PENDENCIA_TYPES.EMPRESA_DELIVERY_NAO_CONFIGURADA]: {
+    label: 'Configurar nome e cardápio',
+    href: deliveryHubEtapaPath('delivery-nome-cardapio'),
+  },
   [EMPRESA_DELIVERY_PENDENCIA_TYPES.GEOLOCALIZACAO_NAO_CONFIGURADA]: {
     label: 'Configurar na aba Empresa',
     href: `${configuracoesTabPath('empresa')}#geolocalizacao-empresa`,
   },
   [EMPRESA_DELIVERY_PENDENCIA_TYPES.CARDAPIO_DELIVERY_NAO_CONFIGURADO]: {
-    label: 'Selecionar cardápio abaixo',
-    href: '#empresa-delivery-menu',
+    label: 'Selecionar cardápio',
+    href: deliveryHubEtapaPath('delivery-nome-cardapio'),
   },
   [EMPRESA_DELIVERY_PENDENCIA_TYPES.COBERTURA_NAO_CONFIGURADA]: {
     label: 'Configurar cobertura de entrega',
-    href: configuracoesTabPath('cobertura-delivery'),
+    href: deliveryHubEtapaPath('delivery-cobertura'),
   },
   [EMPRESA_DELIVERY_PENDENCIA_TYPES.FUNCIONAMENTO_AGENDA_NAO_CONFIGURADA]: {
-    label: 'Configurar agenda abaixo',
-    href: '#empresa-delivery-agenda',
+    label: 'Configurar agenda',
+    href: deliveryHubEtapaPath('delivery-agenda'),
   },
   [EMPRESA_DELIVERY_PENDENCIA_TYPES.TIMEZONE_NAO_CONFIGURADO]: {
     label: 'Configurar fuso na aba Empresa',

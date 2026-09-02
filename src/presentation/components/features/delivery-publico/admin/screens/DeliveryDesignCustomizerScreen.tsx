@@ -24,11 +24,17 @@ import { DesignModelosTab } from '../components/tabs/DesignModelosTab'
 import { DesignCoresTab } from '../components/tabs/DesignCoresTab'
 import { DesignTipografiasTab } from '../components/tabs/DesignTipografiasTab'
 import { DesignCategoriasTab } from '../components/tabs/DesignCategoriasTab'
+import { useTabsStore } from '@/src/presentation/stores/tabsStore'
+import {
+  DELIVERY_HUB_PATH,
+  DELIVERY_HUB_TAB_ID,
+} from '@/src/presentation/components/features/delivery/hub/deliveryHubEtapas'
 
 export function DeliveryDesignCustomizerScreen() {
   const { empresa, isLoading: empresaLoading } = useEmpresaMe()
   const { menuDeliveryId, isLoading: menuDeliveryLoading } = useMenuDeliveryId()
   const { data: empresaDelivery, isLoading: deliveryLoading } = useEmpresaDeliveryMe()
+  const setDeliveryHubTab = useTabsStore(s => s.setActiveTab)
   const [activeTab, setActiveTab] = useState<DesignTabId>('cabecalho')
 
   const { draft, hydrated, isDirty, updateDraft, publish, restore } = useDeliveryDesignDraft({
@@ -80,7 +86,8 @@ export function DeliveryDesignCustomizerScreen() {
         <header className="shrink-0 border-b border-gray-200 px-4 pt-2 md:px-6">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Link
-              href="/configuracoes/empresa-delivery"
+              href={DELIVERY_HUB_PATH}
+              onClick={() => setDeliveryHubTab(DELIVERY_HUB_TAB_ID)}
               className="inline-flex items-center gap-1 text-sm font-semibold text-primary-text transition-colors hover:text-primary"
             >
               <MdArrowBack className="h-4 w-4" aria-hidden />

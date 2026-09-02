@@ -156,10 +156,10 @@ export function CoberturaDeliveryTab() {
     const items: { titulo: string; descricao: string; href?: string; label?: string }[] = []
     if (!empresaDelivery) {
       items.push({
-        titulo: 'Empresa Delivery não configurada',
-        descricao: 'Ative a loja online na aba Empresa Delivery antes de definir a cobertura.',
+        titulo: 'Delivery não configurado',
+        descricao: 'Ative a loja online na aba Delivery antes de definir a cobertura.',
         href: configuracoesTabPath('empresa-delivery'),
-        label: 'Ir para Empresa Delivery',
+        label: 'Ir para Delivery',
       })
     }
     if (empresaDelivery && !geoConfigurada && !geoQuery.isPending) {
@@ -419,7 +419,7 @@ export function CoberturaDeliveryTab() {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
         <p className="text-sm font-semibold text-primary-text">
-          Não foi possível carregar os dados da Empresa Delivery.
+          Não foi possível carregar os dados do Delivery.
         </p>
         <p className="text-sm text-secondary-text">{empresaDeliveryQuery.error.message}</p>
       </div>
