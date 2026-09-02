@@ -149,13 +149,14 @@ export const updateRaioEntregaInputValidator = z
 
 export type UpdateRaioEntregaInput = z.infer<typeof updateRaioEntregaInputValidator>
 
-/** Formulário UI — distância em km, convertida para metros no submit. */
+/** Formulário UI — distância em metros (enviada direto à API). */
 export const raioEntregaFormValidator = z.object({
   nome: z.string().max(255).optional(),
-  distanciaKm: z
-    .number({ invalid_type_error: 'Informe a distância em km' })
+  distanciaMetros: z
+    .number({ invalid_type_error: 'Informe a distância em metros' })
+    .int('Distância deve ser um número inteiro')
     .positive('Distância deve ser maior que zero')
-    .max(500, 'Distância máxima de 500 km'),
+    .max(500_000, 'Distância máxima de 500 km (500.000 m)'),
   valorTaxa: z
     .number({ invalid_type_error: 'Informe o valor da taxa' })
     .nonnegative('Valor da taxa não pode ser negativo'),
@@ -172,7 +173,7 @@ export function raioEntregaFormToCreateInput(values: RaioEntregaFormValues): Cre
   const nome = values.nome?.trim()
   return {
     nome: nome ? nome : null,
-    distanciaMaximaEmMetros: Math.round(values.distanciaKm * 1000),
+    distanciaMaximaEmMetros: values.distanciaMetros,
     valorTaxa: values.valorTaxa,
     tempoEntregaInMinutes: values.tempoEntregaInMinutes,
     ativo: values.ativo,
@@ -186,7 +187,7 @@ export function raioEntregaFormToUpdateInput(values: RaioEntregaFormValues): Upd
 export function raioEntregaToFormValues(raio: RaioEntregaDTO): RaioEntregaFormValues {
   return {
     nome: raio.nome ?? '',
-    distanciaKm: raio.distanciaMaximaEmMetros / 1000,
+    distanciaMetros: raio.distanciaMaximaEmMetros,
     valorTaxa: raio.valorTaxa,
     tempoEntregaInMinutes: raio.tempoEntregaInMinutes,
     ativo: raio.ativo,
@@ -194,11 +195,7 @@ export function raioEntregaToFormValues(raio: RaioEntregaDTO): RaioEntregaFormVa
 }
 
 export function formatDistanciaRaio(metros: number): string {
-  if (metros >= 1000) {
-    const km = metros / 1000
-    return `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(km)} km`
-  }
-  return `${metros} m`
+  return `${new Intl.NumberFormat('pt-BR').format(metros)} m`
 }
 
 export function formatValorTaxaRaio(valor: number): string {

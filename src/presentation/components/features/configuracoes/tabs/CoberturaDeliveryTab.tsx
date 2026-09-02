@@ -228,11 +228,12 @@ export function CoberturaDeliveryTab() {
         }
         setModalRaioAberto(false)
         setRaioEditando(null)
+        await raiosQuery.refetch()
       } catch (error) {
         showToast.error(error instanceof Error ? error.message : 'Não foi possível salvar o raio.')
       }
     },
-    [atualizarRaioMutation, criarRaioMutation, raioEditando]
+    [atualizarRaioMutation, criarRaioMutation, raioEditando, raiosQuery]
   )
 
   const handleSubmitModalArea = useCallback(

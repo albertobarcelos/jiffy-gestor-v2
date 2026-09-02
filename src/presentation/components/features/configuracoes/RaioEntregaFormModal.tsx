@@ -17,6 +17,7 @@ import {
   raioEntregaToFormValues,
   type RaioEntregaFormValues,
 } from '@/src/application/dto/delivery/CoberturaEntregaDTO'
+import { formatBRLFromMaskedInput, parseBRLToNumber } from '@/src/shared/utils/formatters'
 
 type RaioEntregaFormModalProps = {
   open: boolean
@@ -28,10 +29,17 @@ type RaioEntregaFormModalProps = {
 
 const VALORES_PADRAO: RaioEntregaFormValues = {
   nome: '',
-  distanciaKm: 15,
+  distanciaMetros: 1000,
   valorTaxa: 8,
   tempoEntregaInMinutes: 45,
   ativo: true,
+}
+
+function parseInteiroPositivoInput(value: string): number | undefined {
+  const digitos = value.replace(/\D/g, '')
+  if (!digitos) return undefined
+  const n = Number(digitos)
+  return Number.isFinite(n) ? n : undefined
 }
 
 function parseNumeroInput(value: string): number | undefined {
@@ -50,13 +58,28 @@ export function RaioEntregaFormModal({
 }: RaioEntregaFormModalProps) {
   const editando = Boolean(raio)
   const [values, setValues] = useState<RaioEntregaFormValues>(VALORES_PADRAO)
+  const [valorTaxaTexto, setValorTaxaTexto] = useState(() =>
+    formatBRLFromMaskedInput(VALORES_PADRAO.valorTaxa)
+  )
   const [erro, setErro] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open) return
     setErro(null)
-    setValues(raio ? raioEntregaToFormValues(raio) : VALORES_PADRAO)
+    const next = raio ? raioEntregaToFormValues(raio) : VALORES_PADRAO
+    setValues(next)
+    setValorTaxaTexto(formatBRLFromMaskedInput(next.valorTaxa))
   }, [open, raio])
+
+  const handleTaxaChange = useCallback((raw: string) => {
+    const formatado = formatBRLFromMaskedInput(raw)
+    setValorTaxaTexto(formatado)
+    const parsed = parseBRLToNumber(formatado)
+    setValues(v => ({
+      ...v,
+      valorTaxa: parsed != null && parsed >= 0 ? parsed : 0,
+    }))
+  }, [])
 
   const handleSubmit = useCallback(async () => {
     const parsed = raioEntregaFormValidator.safeParse(values)
@@ -103,22 +126,25 @@ export function RaioEntregaFormModal({
                 htmlFor="raio-distancia"
                 className="mb-1 block text-xs font-semibold text-secondary-text"
               >
-                Distância máxima (km)
+                Distância máxima (m)
               </label>
               <input
                 id="raio-distancia"
-                type="number"
-                min={0.1}
-                step={0.5}
-                value={values.distanciaKm}
-                onChange={e =>
+                type="text"
+                inputMode="numeric"
+                value={String(values.distanciaMetros)}
+                onChange={e => {
+                  const parsed = parseInteiroPositivoInput(e.target.value)
                   setValues(v => ({
                     ...v,
-                    distanciaKm: parseNumeroInput(e.target.value) ?? v.distanciaKm,
+                    distanciaMetros: parsed ?? 0,
                   }))
-                }
+                }}
+                onFocus={e => e.target.select()}
+                placeholder="1000"
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-primary"
                 disabled={salvando}
+                aria-label="Distância máxima em metros"
               />
             </div>
 
@@ -133,7 +159,7 @@ export function RaioEntregaFormModal({
                 id="raio-tempo"
                 type="number"
                 min={0}
-                step={1}
+                step={5}
                 value={values.tempoEntregaInMinutes}
                 onChange={e =>
                   setValues(v => ({
@@ -142,6 +168,7 @@ export function RaioEntregaFormModal({
                       parseNumeroInput(e.target.value) ?? v.tempoEntregaInMinutes,
                   }))
                 }
+                onFocus={e => e.target.select()}
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-primary"
                 disabled={salvando}
               />
@@ -153,22 +180,21 @@ export function RaioEntregaFormModal({
               htmlFor="raio-taxa"
               className="mb-1 block text-xs font-semibold text-secondary-text"
             >
-              Taxa de entrega (R$)
+              Taxa de entrega
             </label>
             <input
               id="raio-taxa"
-              type="number"
-              min={0}
-              step={0.01}
-              value={values.valorTaxa}
-              onChange={e =>
-                setValues(v => ({
-                  ...v,
-                  valorTaxa: parseNumeroInput(e.target.value) ?? v.valorTaxa,
-                }))
-              }
+              type="text"
+              inputMode="numeric"
+              value={valorTaxaTexto}
+              onChange={e => handleTaxaChange(e.target.value)}
+              onFocus={e => e.target.select()}
+              onClick={e => e.currentTarget.select()}
+              onMouseUp={e => e.preventDefault()}
+              placeholder="R$ 0,00"
               className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-primary"
               disabled={salvando}
+              aria-label="Taxa de entrega em reais"
             />
           </div>
 

@@ -15,6 +15,7 @@ import {
   areaEntregaToFormValues,
   type AreaEntregaFormValues,
 } from '@/src/application/dto/delivery/CoberturaEntregaDTO'
+import { formatBRLFromMaskedInput, parseBRLToNumber } from '@/src/shared/utils/formatters'
 
 type AreaEntregaFormModalProps = {
   open: boolean
@@ -47,13 +48,28 @@ export function AreaEntregaFormModal({
 }: AreaEntregaFormModalProps) {
   const editando = Boolean(area)
   const [values, setValues] = useState<AreaEntregaFormValues>(VALORES_PADRAO)
+  const [valorTaxaTexto, setValorTaxaTexto] = useState(() =>
+    formatBRLFromMaskedInput(VALORES_PADRAO.valorTaxa)
+  )
   const [erro, setErro] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open) return
     setErro(null)
-    setValues(area ? areaEntregaToFormValues(area) : VALORES_PADRAO)
+    const next = area ? areaEntregaToFormValues(area) : VALORES_PADRAO
+    setValues(next)
+    setValorTaxaTexto(formatBRLFromMaskedInput(next.valorTaxa))
   }, [open, area])
+
+  const handleTaxaChange = useCallback((raw: string) => {
+    const formatado = formatBRLFromMaskedInput(raw)
+    setValorTaxaTexto(formatado)
+    const parsed = parseBRLToNumber(formatado)
+    setValues(v => ({
+      ...v,
+      valorTaxa: parsed != null && parsed >= 0 ? parsed : 0,
+    }))
+  }, [])
 
   const handleSubmit = useCallback(async () => {
     const parsed = areaEntregaFormValidator.safeParse(values)
@@ -101,22 +117,21 @@ export function AreaEntregaFormModal({
                 htmlFor="area-taxa"
                 className="mb-1 block text-xs font-semibold text-secondary-text"
               >
-                Taxa de entrega (R$)
+                Taxa de entrega
               </label>
               <input
                 id="area-taxa"
-                type="number"
-                min={0}
-                step={0.01}
-                value={values.valorTaxa}
-                onChange={e =>
-                  setValues(v => ({
-                    ...v,
-                    valorTaxa: parseNumeroInput(e.target.value) ?? v.valorTaxa,
-                  }))
-                }
+                type="text"
+                inputMode="numeric"
+                value={valorTaxaTexto}
+                onChange={e => handleTaxaChange(e.target.value)}
+                onFocus={e => e.target.select()}
+                onClick={e => e.currentTarget.select()}
+                onMouseUp={e => e.preventDefault()}
+                placeholder="R$ 0,00"
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-primary"
                 disabled={salvando}
+                aria-label="Taxa de entrega em reais"
               />
             </div>
 
@@ -131,7 +146,7 @@ export function AreaEntregaFormModal({
                 id="area-tempo"
                 type="number"
                 min={0}
-                step={1}
+                step={5}
                 value={values.tempoEntregaInMinutes}
                 onChange={e =>
                   setValues(v => ({
@@ -140,6 +155,7 @@ export function AreaEntregaFormModal({
                       parseNumeroInput(e.target.value) ?? v.tempoEntregaInMinutes,
                   }))
                 }
+                onFocus={e => e.target.select()}
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-primary"
                 disabled={salvando}
               />

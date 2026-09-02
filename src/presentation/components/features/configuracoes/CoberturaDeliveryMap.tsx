@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Circle,
   GoogleMap,
   Marker,
   Polygon,
@@ -88,6 +87,51 @@ function MapFitCobertura({
 
     map.fitBounds(bounds, 48)
   }, [map, centro.lat, centro.lng, raios, areas, rascunhoPaths, congelarVisao])
+
+  return null
+}
+
+/** Círculos imperativos — evita “fantasma” do Circle do @react-google-maps/api ao mudar o raio. */
+function MapRaiosCirculos({
+  centro,
+  raios,
+}: {
+  centro: LatLng
+  raios: RaioEntregaDTO[]
+}) {
+  const map = useGoogleMap()
+  const raiosSignature = useMemo(
+    () => raios.map(r => `${r.id}:${r.distanciaMaximaEmMetros}:${r.ativo ? 1 : 0}`).join('|'),
+    [raios]
+  )
+
+  useEffect(() => {
+    if (!map || typeof google === 'undefined') return
+
+    const circles: google.maps.Circle[] = raios.map((raio, index) => {
+      const cores = CORES_COBERTURA[index % CORES_COBERTURA.length]
+      return new google.maps.Circle({
+        map,
+        center: centro,
+        radius: raio.distanciaMaximaEmMetros,
+        strokeColor: cores.stroke,
+        strokeOpacity: raio.ativo ? 0.7 : 0.3,
+        strokeWeight: 2,
+        fillColor: cores.fill,
+        fillOpacity: raio.ativo ? 0.18 : 0.06,
+        clickable: false,
+        zIndex: 1,
+      })
+    })
+
+    return () => {
+      for (const circle of circles) {
+        circle.setMap(null)
+      }
+    }
+    // raiosSignature garante redesenho quando a distância muda
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, centro.lat, centro.lng, raiosSignature])
 
   return null
 }
@@ -402,28 +446,7 @@ export function CoberturaDeliveryMap({
           congelarVisao={modoDesenho}
         />
         <Marker position={centro} title="Origem da loja" />
-
-        {raios.map((raio, index) => {
-          const cores = CORES_COBERTURA[index % CORES_COBERTURA.length]
-          const opacidade = raio.ativo ? 0.18 : 0.06
-          const strokeOpacidade = raio.ativo ? 0.7 : 0.3
-          return (
-            <Circle
-              key={raio.id}
-              center={centro}
-              radius={raio.distanciaMaximaEmMetros}
-              options={{
-                strokeColor: cores.stroke,
-                strokeOpacity: strokeOpacidade,
-                strokeWeight: 2,
-                fillColor: cores.fill,
-                fillOpacity: opacidade,
-                clickable: false,
-                zIndex: 1,
-              }}
-            />
-          )
-        })}
+        <MapRaiosCirculos centro={centro} raios={raios} />
 
         {areas.map((area, index) => {
           const cores = CORES_COBERTURA[(index + raios.length) % CORES_COBERTURA.length]
