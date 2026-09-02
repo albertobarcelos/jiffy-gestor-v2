@@ -43,6 +43,9 @@ import {
 
 type EtapaUiEndereco = 'busca' | 'resumo' | 'edicao'
 
+/** Como a geo foi obtida — manual exige confirmação explícita do pin no mapa. */
+type OrigemGeoEndereco = 'places' | 'gps' | 'manual' | 'salvo'
+
 type CampoEnderecoFoco = 'rua' | 'numero' | 'bairro' | 'cidade'
 
 type DeliveryCheckoutEnderecoFormModalProps = {
@@ -118,6 +121,13 @@ export function DeliveryCheckoutEnderecoFormModal({
   const [buscaPlaces, setBuscaPlaces] = useState(() =>
     [form.rua, form.numero].filter(Boolean).join(', ')
   )
+  const [origemGeo, setOrigemGeo] = useState<OrigemGeoEndereco | null>(() =>
+    geoInicialDoEnderecoSalvo(enderecoSalvo).enderecoLocalizacao ? 'salvo' : null
+  )
+  const [pinMapaConfirmado, setPinMapaConfirmado] = useState(
+    () => Boolean(geoInicialDoEnderecoSalvo(enderecoSalvo).enderecoLocalizacao)
+  )
+  const [mapaAjusteAberto, setMapaAjusteAberto] = useState(false)
   const ruaInputRef = useRef<HTMLInputElement>(null)
   const numeroInputRef = useRef<HTMLInputElement>(null)
   const bairroInputRef = useRef<HTMLInputElement>(null)
@@ -151,6 +161,9 @@ export function DeliveryCheckoutEnderecoFormModal({
     Boolean(ultimoGeoKeySincronizado) && ultimoGeoKeySincronizado === enderecoGeoKey
   const mostrarDetalhes = etapaUi === 'resumo' || etapaUi === 'edicao'
   const modoEdicaoCompleta = etapaUi === 'edicao'
+  const exigeConfirmacaoMapa = origemGeo === 'manual'
+  // Mapa só no fluxo manual ou se o cliente pedir — não abrir só porque o número mudou (Places).
+  const mostrarMapa = mostrarDetalhes && (exigeConfirmacaoMapa || mapaAjusteAberto)
 
   const marcarGeoSincronizada = useCallback(
     (endereco?: typeof enderecoGeocode) => {
@@ -177,9 +190,29 @@ export function DeliveryCheckoutEnderecoFormModal({
     marcarGeoSincronizada,
   })
 
+  const handleConfirmarAjustePin = useCallback(() => {
+    confirmarAjustePin()
+    setPinMapaConfirmado(true)
+  }, [confirmarAjustePin])
+
+  const confirmarPinNoMapa = useCallback(() => {
+    if (!enderecoLocalizacao) {
+      showToast.error('Aguarde o mapa marcar o endereço antes de confirmar o pin.')
+      return
+    }
+    setPinMapaConfirmado(true)
+    showToast.success('Localização confirmada no mapa.')
+  }, [enderecoLocalizacao])
+
   useEffect(() => {
     fecharDialogPin()
   }, [enderecoGeoKey, fecharDialogPin])
+
+  useEffect(() => {
+    if (origemGeo === 'manual') {
+      setPinMapaConfirmado(false)
+    }
+  }, [enderecoGeoKey, origemGeo])
 
   const focarCampo = useCallback((campo: CampoEnderecoFoco) => {
     const refMap: Record<CampoEnderecoFoco, React.RefObject<HTMLInputElement | null>> = {
@@ -254,8 +287,11 @@ export function DeliveryCheckoutEnderecoFormModal({
         [fields.rua, fields.numero].filter(Boolean).join(', ') || place.enderecoFormatado || ''
       )
     )
+    setOrigemGeo('places')
+    setPinMapaConfirmado(true)
+    setMapaAjusteAberto(false)
     setEtapaUi('resumo')
-    showToast.success('Endereço encontrado. Confira o número e o pin no mapa.')
+    showToast.success('Endereço encontrado. Confira o número e continue.')
   }
 
   const limparCamposAposBuscaPlaces = () => {
@@ -272,6 +308,9 @@ export function DeliveryCheckoutEnderecoFormModal({
     setEnderecoLocalizacao(null)
     setProviderEnderecoId(null)
     setUltimoGeoKeySincronizado(null)
+    setOrigemGeo(null)
+    setPinMapaConfirmado(false)
+    setMapaAjusteAberto(false)
     setEtapaUi('busca')
   }
 
@@ -285,6 +324,9 @@ export function DeliveryCheckoutEnderecoFormModal({
         onChange('rua', maiusculasEnderecoInput(textoBusca))
       }
     }
+    setOrigemGeo('manual')
+    setPinMapaConfirmado(false)
+    setMapaAjusteAberto(true)
     setEtapaUi('edicao')
     focoPendenteRef.current = form.rua.trim() ? 'numero' : 'rua'
   }
@@ -349,9 +391,12 @@ export function DeliveryCheckoutEnderecoFormModal({
           [enderecoGps.rua, enderecoGps.numero].filter(Boolean).join(', ') || enderecoGps.rua || ''
         )
       )
+      setOrigemGeo('gps')
+      setPinMapaConfirmado(true)
+      setMapaAjusteAberto(false)
       setEtapaUi('resumo')
 
-      showToast.success('Localização aplicada. Confira o número, o complemento e o pin no mapa.')
+      showToast.success('Localização aplicada. Confira o número e o complemento.')
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : 'Erro ao obter localização')
     } finally {
@@ -388,12 +433,21 @@ export function DeliveryCheckoutEnderecoFormModal({
       if (buscandoGeocodeMapa) {
         showToast.error('Aguarde a atualização do mapa.')
       } else if (!geoSincronizadaComEndereco) {
-        showToast.error('Aguarde o mapa atualizar com o endereço informado.')
+        showToast.error(
+          exigeConfirmacaoMapa
+            ? 'Preencha o endereço completo para o mapa localizar o pin.'
+            : 'Aguarde o mapa atualizar com o endereço informado.'
+        )
       } else if (usarPontoPreferencia && enderecoLocalizacao && !preferenciaEntrega) {
         showToast.error('Marque o ponto de entrega no mapa.')
       } else {
         showToast.error('Busque o endereço no mapa e confirme a localização antes de continuar.')
       }
+      return
+    }
+    if (exigeConfirmacaoMapa && !pinMapaConfirmado) {
+      showToast.error('Confirme no mapa se o pin está no local correto antes de continuar.')
+      setMapaAjusteAberto(true)
       return
     }
 
@@ -446,7 +500,8 @@ export function DeliveryCheckoutEnderecoFormModal({
             !geoPronta ||
             !geoSincronizadaComEndereco ||
             buscandoGeocodeMapa ||
-            dialogPinAberto
+            dialogPinAberto ||
+            (exigeConfirmacaoMapa && !pinMapaConfirmado)
           }
         />
       </DeliveryCheckoutShellFooter>
@@ -747,33 +802,119 @@ export function DeliveryCheckoutEnderecoFormModal({
               </div>
             </div>
 
-            <EnderecoGeolocalizacaoSection
-              variant="delivery"
-              hideHeader
-              autoGeocode={mostrarDetalhes && !geoSincronizadaComEndereco}
-              endereco={enderecoGeocode}
-              localizacao={enderecoLocalizacao}
-              mapValue={pinMapa}
-              pinModo={usarPontoPreferencia ? 'preferencia' : 'endereco'}
-              localizacaoReferencia={usarPontoPreferencia ? enderecoLocalizacao : null}
-              beforeMap={
+            {mostrarDetalhes && !mostrarMapa ? (
+              <div className="space-y-2">
                 <PreferenciaEntregaToggle
                   checked={usarPontoPreferencia}
-                  onChange={handleTogglePreferencia}
+                  onChange={checked => {
+                    handleTogglePreferencia(checked)
+                    if (checked) {
+                      setMapaAjusteAberto(true)
+                    }
+                  }}
                   disabled={!enderecoLocalizacao || salvando}
                 />
-              }
-              onLocalizacaoChange={(point, meta) => {
-                setEnderecoLocalizacao(point)
-                setProviderEnderecoId(meta?.providerEnderecoId ?? null)
-                fecharDialogPin()
-                marcarGeoSincronizada()
-              }}
-              onMapChange={handleMapChange}
-              onGeocodeBuscandoChange={setBuscandoGeocodeMapa}
-              buscarLabel="Atualizar endereço no mapa"
-              successToast="Localização atualizada. Ajuste o pin se necessário."
-            />
+                <button
+                  type="button"
+                  disabled={salvando || !enderecoLocalizacao}
+                  onClick={() => setMapaAjusteAberto(true)}
+                  className="flex min-h-[40px] w-full items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold delivery-text-primary disabled:opacity-60"
+                  style={{ borderColor: 'var(--delivery-border)' }}
+                >
+                  <MapPin className="h-4 w-4" aria-hidden />
+                  Ajustar no mapa (opcional)
+                </button>
+              </div>
+            ) : null}
+
+            {mostrarDetalhes ? (
+              <div className="space-y-2">
+                {exigeConfirmacaoMapa && mostrarMapa ? (
+                  <div
+                    className="rounded-xl border px-3 py-2 text-sm"
+                    style={{ borderColor: 'var(--delivery-border)' }}
+                  >
+                    <p className="font-semibold delivery-text-primary">Confirme a localização</p>
+                    <p className="mt-0.5 text-xs delivery-text-secondary">
+                      Como o endereço foi digitado manualmente, confira se o pin está no local
+                      correto. Arraste se precisar e confirme abaixo.
+                    </p>
+                  </div>
+                ) : null}
+
+                <EnderecoGeolocalizacaoSection
+                  variant="delivery"
+                  hideHeader
+                  hideMap={!mostrarMapa}
+                  autoGeocode={mostrarDetalhes && !geoSincronizadaComEndereco}
+                  endereco={enderecoGeocode}
+                  localizacao={enderecoLocalizacao}
+                  mapValue={pinMapa}
+                  pinModo={usarPontoPreferencia ? 'preferencia' : 'endereco'}
+                  localizacaoReferencia={usarPontoPreferencia ? enderecoLocalizacao : null}
+                  beforeMap={
+                    mostrarMapa ? (
+                      <PreferenciaEntregaToggle
+                        checked={usarPontoPreferencia}
+                        onChange={handleTogglePreferencia}
+                        disabled={!enderecoLocalizacao || salvando}
+                      />
+                    ) : null
+                  }
+                  onLocalizacaoChange={(point, meta) => {
+                    setEnderecoLocalizacao(point)
+                    setProviderEnderecoId(meta?.providerEnderecoId ?? null)
+                    fecharDialogPin()
+                    marcarGeoSincronizada()
+                    if (origemGeo === 'manual') {
+                      setPinMapaConfirmado(false)
+                    }
+                  }}
+                  onMapChange={handleMapChange}
+                  onGeocodeBuscandoChange={setBuscandoGeocodeMapa}
+                  buscarLabel="Atualizar endereço no mapa"
+                  successToast={
+                    exigeConfirmacaoMapa
+                      ? 'Pin atualizado. Confirme se está no local correto.'
+                      : 'Localização atualizada. Ajuste o pin se necessário.'
+                  }
+                />
+
+                {exigeConfirmacaoMapa && mostrarMapa ? (
+                  <button
+                    type="button"
+                    disabled={
+                      salvando ||
+                      !geoPronta ||
+                      !geoSincronizadaComEndereco ||
+                      buscandoGeocodeMapa ||
+                      dialogPinAberto ||
+                      pinMapaConfirmado
+                    }
+                    onClick={confirmarPinNoMapa}
+                    className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold text-white disabled:opacity-60"
+                    style={{ backgroundColor: 'var(--delivery-primary)' }}
+                  >
+                    <MapPin className="h-4 w-4" aria-hidden />
+                    {pinMapaConfirmado
+                      ? 'Pin confirmado no mapa'
+                      : 'Confirmar que o pin está correto'}
+                  </button>
+                ) : null}
+
+                {mapaAjusteAberto && !exigeConfirmacaoMapa ? (
+                  <button
+                    type="button"
+                    disabled={salvando}
+                    onClick={() => setMapaAjusteAberto(false)}
+                    className="flex min-h-[40px] w-full items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold delivery-text-primary disabled:opacity-60"
+                    style={{ borderColor: 'var(--delivery-border)' }}
+                  >
+                    Ocultar mapa
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
           </>
         ) : null}
       </div>
@@ -781,7 +922,7 @@ export function DeliveryCheckoutEnderecoFormModal({
       <DeliveryCheckoutPinAjustadoDialog
         open={dialogPinAberto}
         variante={variantePin}
-        onConfirmar={confirmarAjustePin}
+        onConfirmar={handleConfirmarAjustePin}
         onCancelar={cancelarAjustePin}
       />
     </>

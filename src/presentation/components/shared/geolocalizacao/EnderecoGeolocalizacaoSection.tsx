@@ -119,6 +119,11 @@ export type EnderecoGeolocalizacaoSectionProps = {
   localizacaoReferencia?: GeoJsonPoint | null
   /** Oculta título, subtítulo e badge de status (ex.: checkout delivery). */
   hideHeader?: boolean
+  /**
+   * Mantém auto-geocode e callbacks, mas não renderiza o mapa.
+   * Útil no checkout Places ao editar número sem abrir o mapa.
+   */
+  hideMap?: boolean
 }
 
 export function EnderecoGeolocalizacaoSection({
@@ -145,6 +150,7 @@ export function EnderecoGeolocalizacaoSection({
   pinModo = 'endereco',
   localizacaoReferencia = null,
   hideHeader = false,
+  hideMap = false,
 }: EnderecoGeolocalizacaoSectionProps) {
   const [buscandoGeocode, setBuscandoGeocode] = useState(false)
   const [buscandoGeocodeAuto, setBuscandoGeocodeAuto] = useState(false)
@@ -315,6 +321,31 @@ export function EnderecoGeolocalizacaoSection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoGeocode, disabled, camposMinimosOk, enderecoGeoKey, minimoGeocode])
 
+  const statusGeocodeAuto =
+    autoGeocode && (buscandoGeocodeAuto || buscandoGeocode) ? (
+      <p className={styles.infoClass} style={infoStyle}>
+        Atualizando localização…
+      </p>
+    ) : null
+
+  const statusErroGeocodeAuto =
+    autoGeocode && erroGeocodeAuto && camposMinimosOk ? (
+      <p className={styles.warningClass}>
+        {erroGeocodeAuto} Você pode ajustar o pin manualmente ou tentar novamente.
+      </p>
+    ) : null
+
+  // Geocode em background sem montar o mapa (ex.: Places + edição do número).
+  if (hideMap) {
+    if (!statusGeocodeAuto && !statusErroGeocodeAuto) return null
+    return (
+      <div className="space-y-2">
+        {statusGeocodeAuto}
+        {statusErroGeocodeAuto}
+      </div>
+    )
+  }
+
   return (
     <section id={sectionId} className={sectionId ? 'scroll-mt-24' : undefined}>
       {!hideHeader ? (
@@ -354,17 +385,8 @@ export function EnderecoGeolocalizacaoSection({
           </p>
         ) : null}
 
-        {autoGeocode && (buscandoGeocodeAuto || buscandoGeocode) ? (
-          <p className={styles.infoClass} style={infoStyle}>
-            Atualizando localização no mapa…
-          </p>
-        ) : null}
-
-        {autoGeocode && erroGeocodeAuto && camposMinimosOk ? (
-          <p className={styles.warningClass}>
-            {erroGeocodeAuto} Você pode ajustar o pin manualmente ou tentar novamente.
-          </p>
-        ) : null}
+        {statusGeocodeAuto}
+        {statusErroGeocodeAuto}
 
         {!hideHeader && !camposMinimosOk && camposFaltantesMsg ? (
           <p className={styles.warningClass}>{camposFaltantesMsg}</p>
