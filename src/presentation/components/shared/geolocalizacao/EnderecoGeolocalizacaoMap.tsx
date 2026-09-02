@@ -8,6 +8,7 @@ import {
   type GeoJsonPoint,
 } from '@/src/shared/types/geoJsonPoint'
 import { getGoogleMapsApiKeyClient } from '@/src/shared/utils/googleMapsClient'
+import { googleMapsLoaderConfig } from '@/src/shared/utils/googleMapsLoader'
 import { criarOpcoesIconePinPreferencia, labelPinPreferenciaMapa } from './geolocalizacaoMapPinIcons'
 
 const MAP_CONTAINER_STYLE = { width: '100%', height: '320px' }
@@ -66,11 +67,7 @@ export function EnderecoGeolocalizacaoMap({
   localizacaoReferencia = null,
 }: EnderecoGeolocalizacaoMapProps) {
   const apiKey = getGoogleMapsApiKeyClient()
-  const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: apiKey,
-    language: 'pt-BR',
-    region: 'BR',
-  })
+  const { isLoaded, loadError } = useJsApiLoader(googleMapsLoaderConfig(apiKey))
 
   const posicaoMarcador = useMemo(() => latLngFromGeoJsonPoint(value), [value])
   const posicaoReferencia = useMemo(

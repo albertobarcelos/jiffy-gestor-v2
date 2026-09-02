@@ -931,6 +931,9 @@ export function DeliveryPublicoCarrinhoScreen({
         {checkoutStep === 'enderecoForm' ? (
           <DeliveryCheckoutEnderecoFormModal
             form={form}
+            enderecoSalvo={
+              form.modoEndereco === 'existente' ? enderecoClienteSelecionado : null
+            }
             onChange={updateForm}
             onClose={fecharOuRevisao}
             onCancelar={handleCancelarEnderecoForm}

@@ -7,9 +7,10 @@ import {
   geoCheckoutProntaParaConfirmar,
   montarGeoCheckoutInputFromState,
 } from '@/src/application/dto/delivery-publico/EnderecoGeoCheckoutDTO'
+import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { EnderecoGeolocalizacaoSection } from '@/src/presentation/components/shared/geolocalizacao/EnderecoGeolocalizacaoSection'
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
-import { geoJsonPointFromLatLng } from '@/src/shared/types/geoJsonPoint'
+import { geoJsonPointFromLatLng, parseGeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import {
   consultarCepViaApi,
   formatarCepMascara,
@@ -51,6 +52,31 @@ type DeliveryCheckoutEnderecoFormModalProps = {
   onCancelar: () => void
   onConfirmar: (geo: EnderecoGeoCheckoutInput) => Promise<void>
   placesBias?: PlacesBias | null
+  /** Ao editar endereço existente, hidrata o pin com as coordenadas já salvas. */
+  enderecoSalvo?: EnderecoClienteDeliveryPublicoDTO | null
+}
+
+function geoInicialDoEnderecoSalvo(endereco: EnderecoClienteDeliveryPublicoDTO | null | undefined) {
+  const enderecoLocalizacao = parseGeoJsonPoint(endereco?.enderecoLocalizacao)
+  const preferenciaEntrega = parseGeoJsonPoint(endereco?.preferenciaEntrega)
+  return {
+    enderecoLocalizacao,
+    preferenciaEntrega,
+    providerEnderecoId: endereco?.providerEnderecoId?.trim() || null,
+    usarPontoPreferencia: Boolean(preferenciaEntrega),
+  }
+}
+
+function geoKeyDoForm(form: CheckoutFormData): string {
+  return serializarEnderecoParaGeocode({
+    rua: form.rua,
+    numero: form.numero,
+    bairro: form.bairro,
+    cidade: form.cidade,
+    estado: form.estado,
+    cep: form.cep,
+    complemento: form.complemento,
+  })
 }
 
 const fieldClass =
@@ -64,6 +90,7 @@ export function DeliveryCheckoutEnderecoFormModal({
   onCancelar,
   onConfirmar,
   placesBias = null,
+  enderecoSalvo = null,
 }: DeliveryCheckoutEnderecoFormModalProps) {
   const [etapaUi, setEtapaUi] = useState<EtapaUiEndereco>(() =>
     form.rua.trim() ? 'edicao' : 'busca'
@@ -71,12 +98,23 @@ export function DeliveryCheckoutEnderecoFormModal({
   const [buscandoCep, setBuscandoCep] = useState(false)
   const [buscandoGps, setBuscandoGps] = useState(false)
   const [salvando, setSalvando] = useState(false)
-  const [enderecoLocalizacao, setEnderecoLocalizacao] = useState<GeoJsonPoint | null>(null)
-  const [providerEnderecoId, setProviderEnderecoId] = useState<string | null>(null)
-  const [usarPontoPreferencia, setUsarPontoPreferencia] = useState(false)
-  const [preferenciaEntrega, setPreferenciaEntrega] = useState<GeoJsonPoint | null>(null)
+  const [enderecoLocalizacao, setEnderecoLocalizacao] = useState<GeoJsonPoint | null>(() =>
+    geoInicialDoEnderecoSalvo(enderecoSalvo).enderecoLocalizacao
+  )
+  const [providerEnderecoId, setProviderEnderecoId] = useState<string | null>(
+    () => geoInicialDoEnderecoSalvo(enderecoSalvo).providerEnderecoId
+  )
+  const [usarPontoPreferencia, setUsarPontoPreferencia] = useState(
+    () => geoInicialDoEnderecoSalvo(enderecoSalvo).usarPontoPreferencia
+  )
+  const [preferenciaEntrega, setPreferenciaEntrega] = useState<GeoJsonPoint | null>(() =>
+    geoInicialDoEnderecoSalvo(enderecoSalvo).preferenciaEntrega
+  )
   const [buscandoGeocodeMapa, setBuscandoGeocodeMapa] = useState(false)
-  const [ultimoGeoKeySincronizado, setUltimoGeoKeySincronizado] = useState<string | null>(null)
+  const [ultimoGeoKeySincronizado, setUltimoGeoKeySincronizado] = useState<string | null>(() => {
+    const geo = geoInicialDoEnderecoSalvo(enderecoSalvo)
+    return geo.enderecoLocalizacao ? geoKeyDoForm(form) : null
+  })
   const [buscaPlaces, setBuscaPlaces] = useState(() =>
     [form.rua, form.numero].filter(Boolean).join(', ')
   )

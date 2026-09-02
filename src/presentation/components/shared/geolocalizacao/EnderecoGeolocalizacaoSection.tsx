@@ -152,6 +152,8 @@ export function EnderecoGeolocalizacaoSection({
   const [ultimoEnderecoFormatado, setUltimoEnderecoFormatado] = useState<string | null>(null)
   const mapAnchorRef = useRef<HTMLDivElement>(null)
   const geocodeAutoSeqRef = useRef(0)
+  /** Evita que geocode em voo sobrescreva pin ajustado manualmente. */
+  const pinAjustadoManualmenteRef = useRef(false)
   const enderecoGeoKey = useMemo(() => serializarEnderecoParaGeocode(endereco), [endereco])
   const minimoGeocode: GeocodeMinimoModo =
     geocodeMinimo ?? (variant === 'delivery' ? 'flexivel' : 'strict')
@@ -164,6 +166,11 @@ export function EnderecoGeolocalizacaoSection({
   )
   const podeBuscar = camposMinimosOk && !disabled
   const styles = VARIANT_STYLES[variant]
+
+  const invalidarGeocodePendente = () => {
+    geocodeAutoSeqRef.current += 1
+    setBuscandoGeocodeAuto(false)
+  }
   const panelStyle =
     variant === 'delivery'
       ? ({ borderColor: 'var(--delivery-border)', backgroundColor: 'var(--delivery-surface)' } as const)
@@ -187,7 +194,7 @@ export function EnderecoGeolocalizacaoSection({
   }
 
   const buscarGeocode = async (
-    opts: { silencioso: boolean; rolarMapa: boolean },
+    opts: { silencioso: boolean; rolarMapa: boolean; forcar?: boolean },
     seqEsperada?: number
   ) => {
     if (disabled || !camposMinimosOk) return false
@@ -198,6 +205,11 @@ export function EnderecoGeolocalizacaoSection({
       if (seqEsperada !== undefined && seqEsperada !== geocodeAutoSeqRef.current) {
         return false
       }
+      // Pin movido pelo usuário: não reaplicar resultado atrasado do Google.
+      if (opts.silencioso && pinAjustadoManualmenteRef.current && !opts.forcar) {
+        return false
+      }
+      pinAjustadoManualmenteRef.current = false
       onLocalizacaoChange(resultado.enderecoLocalizacao, {
         providerEnderecoId: resultado.providerEnderecoId,
         enderecoFormatado: resultado.enderecoFormatado,
@@ -222,6 +234,17 @@ export function EnderecoGeolocalizacaoSection({
     }
   }
 
+  const handleMapChange = (point: GeoJsonPoint) => {
+    pinAjustadoManualmenteRef.current = true
+    invalidarGeocodePendente()
+    setErroGeocodeAuto(null)
+    if (onMapChange) {
+      onMapChange(point)
+      return
+    }
+    onLocalizacaoChange(point)
+  }
+
   const buscarLocalizacaoPeloEndereco = async () => {
     if (disabled) {
       showToast.error(
@@ -238,8 +261,10 @@ export function EnderecoGeolocalizacaoSection({
       return
     }
 
+    pinAjustadoManualmenteRef.current = false
+    invalidarGeocodePendente()
     setBuscandoGeocode(true)
-    await buscarGeocode({ silencioso: false, rolarMapa: true })
+    await buscarGeocode({ silencioso: false, rolarMapa: true, forcar: true })
     setBuscandoGeocode(false)
   }
 
@@ -247,12 +272,24 @@ export function EnderecoGeolocalizacaoSection({
     onGeocodeBuscandoChange?.(buscandoGeocode || buscandoGeocodeAuto)
   }, [buscandoGeocode, buscandoGeocodeAuto, onGeocodeBuscandoChange])
 
+  // Endereço textual mudou: permite novo auto-geocode sobrescrever pin antigo.
+  useEffect(() => {
+    pinAjustadoManualmenteRef.current = false
+  }, [enderecoGeoKey])
+
+  // Ao desligar autoGeocode (ex.: pin já sincronizado), cancela request em voo.
+  useEffect(() => {
+    if (autoGeocode && !disabled) return
+    invalidarGeocodePendente()
+  }, [autoGeocode, disabled])
+
   useEffect(() => {
     if (!autoGeocode || disabled) return
     if (!camposMinimosOk) {
       setErroGeocodeAuto(null)
       return
     }
+    if (pinAjustadoManualmenteRef.current) return
 
     const seq = ++geocodeAutoSeqRef.current
     setErroGeocodeAuto(null)
@@ -269,6 +306,10 @@ export function EnderecoGeolocalizacaoSection({
 
     return () => {
       clearTimeout(timer)
+      // Invalida a sequência desta execução para descartar fetch já iniciado.
+      if (geocodeAutoSeqRef.current === seq) {
+        geocodeAutoSeqRef.current += 1
+      }
     }
     // enderecoGeoKey agrega os campos relevantes; endereco é lido no closure do timeout via ref implícito
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -380,7 +421,7 @@ export function EnderecoGeolocalizacaoSection({
         >
           <EnderecoGeolocalizacaoMap
             value={mapValue ?? localizacao}
-            onChange={point => (onMapChange ? onMapChange(point) : onLocalizacaoChange(point))}
+            onChange={handleMapChange}
             disabled={disabled}
             estado={endereco.estado}
             hintBusca={buscarLabel}

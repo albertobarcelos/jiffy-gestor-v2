@@ -39,7 +39,7 @@ const ACAO_POR_TIPO: Partial<Record<EmpresaDeliveryPendenciaType, PendenciaAcao>
     href: '#empresa-delivery-menu',
   },
   [EMPRESA_DELIVERY_PENDENCIA_TYPES.COBERTURA_NAO_CONFIGURADA]: {
-    label: 'Configurar raios de entrega',
+    label: 'Configurar cobertura de entrega',
     href: configuracoesTabPath('cobertura-delivery'),
   },
   [EMPRESA_DELIVERY_PENDENCIA_TYPES.FUNCIONAMENTO_AGENDA_NAO_CONFIGURADA]: {

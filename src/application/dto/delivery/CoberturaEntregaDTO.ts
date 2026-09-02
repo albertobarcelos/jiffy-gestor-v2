@@ -1,4 +1,104 @@
 import { z } from 'zod'
+import {
+  geoJsonPolygonLikeValidator,
+  type GeoJsonPolygon,
+  type GeoJsonPolygonLike,
+} from '@/src/shared/types/geoJsonPolygon'
+
+export { type GeoJsonPolygon, type GeoJsonPolygonLike }
+
+export const areaEntregaDTOValidator = z.object({
+  id: z.string(),
+  nome: z.string().nullable(),
+  area: geoJsonPolygonLikeValidator,
+  valorTaxa: z.number().nonnegative(),
+  tempoEntregaInMinutes: z.number().int().nonnegative(),
+  ativo: z.boolean(),
+  dataCriacao: z.string(),
+  dataAtualizacao: z.string(),
+})
+
+export type AreaEntregaDTO = z.infer<typeof areaEntregaDTOValidator>
+
+export const createAreaEntregaInputValidator = z.object({
+  nome: z.string().max(255).nullable().optional(),
+  area: geoJsonPolygonLikeValidator,
+  valorTaxa: z.number().nonnegative('Valor da taxa não pode ser negativo'),
+  tempoEntregaInMinutes: z
+    .number()
+    .int('Tempo de entrega deve ser um número inteiro')
+    .nonnegative('Tempo de entrega não pode ser negativo'),
+  ativo: z.boolean().optional(),
+})
+
+export type CreateAreaEntregaInput = z.infer<typeof createAreaEntregaInputValidator>
+
+export const updateAreaEntregaInputValidator = z
+  .object({
+    nome: z.string().max(255).nullable().optional(),
+    area: geoJsonPolygonLikeValidator.optional(),
+    valorTaxa: z.number().nonnegative().optional(),
+    tempoEntregaInMinutes: z.number().int().nonnegative().optional(),
+    ativo: z.boolean().optional(),
+  })
+  .refine(
+    data =>
+      data.nome !== undefined ||
+      data.area !== undefined ||
+      data.valorTaxa !== undefined ||
+      data.tempoEntregaInMinutes !== undefined ||
+      data.ativo !== undefined,
+    { message: 'Informe ao menos um campo para atualizar' }
+  )
+
+export type UpdateAreaEntregaInput = z.infer<typeof updateAreaEntregaInputValidator>
+
+export const areaEntregaFormValidator = z.object({
+  nome: z.string().max(255).optional(),
+  valorTaxa: z
+    .number({ invalid_type_error: 'Informe o valor da taxa' })
+    .nonnegative('Valor da taxa não pode ser negativo'),
+  tempoEntregaInMinutes: z
+    .number({ invalid_type_error: 'Informe o tempo de entrega' })
+    .int('Tempo deve ser inteiro')
+    .nonnegative('Tempo não pode ser negativo'),
+  ativo: z.boolean(),
+})
+
+export type AreaEntregaFormValues = z.infer<typeof areaEntregaFormValidator>
+
+export function areaEntregaFormToCreateInput(
+  values: AreaEntregaFormValues,
+  area: GeoJsonPolygonLike
+): CreateAreaEntregaInput {
+  const nome = values.nome?.trim()
+  return {
+    nome: nome ? nome : null,
+    area,
+    valorTaxa: values.valorTaxa,
+    tempoEntregaInMinutes: values.tempoEntregaInMinutes,
+    ativo: values.ativo,
+  }
+}
+
+export function areaEntregaFormToUpdateInput(values: AreaEntregaFormValues): UpdateAreaEntregaInput {
+  const nome = values.nome?.trim()
+  return {
+    nome: nome ? nome : null,
+    valorTaxa: values.valorTaxa,
+    tempoEntregaInMinutes: values.tempoEntregaInMinutes,
+    ativo: values.ativo,
+  }
+}
+
+export function areaEntregaToFormValues(area: AreaEntregaDTO): AreaEntregaFormValues {
+  return {
+    nome: area.nome ?? '',
+    valorTaxa: area.valorTaxa,
+    tempoEntregaInMinutes: area.tempoEntregaInMinutes,
+    ativo: area.ativo,
+  }
+}
 
 export const raioEntregaDTOValidator = z.object({
   id: z.string(),
