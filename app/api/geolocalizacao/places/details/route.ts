@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
   const apiKey = lerGoogleMapsApiKeyServer()
   if (!apiKey) {
     return NextResponse.json(
-      { error: 'GOOGLE_MAPS_API_KEY não configurada no servidor' },
+      { error: 'NEXT_PUBLIC_GOOGLE_MAPS_API_KEY não configurada' },
       { status: 503 }
     )
   }

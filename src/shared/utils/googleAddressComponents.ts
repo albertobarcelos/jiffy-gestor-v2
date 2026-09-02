@@ -118,6 +118,6 @@ export function geoJsonPointFromPlacesLocation(location: {
 }
 
 export function lerGoogleMapsApiKeyServer(): string | null {
-  const key = process.env.GOOGLE_MAPS_API_KEY?.trim()
+  const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim()
   return key || null
 }

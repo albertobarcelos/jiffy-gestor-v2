@@ -33,7 +33,7 @@ type GoogleGeocodeResponse = {
 const NOT_FOUND = new Set(['ZERO_RESULTS', 'NOT_FOUND'])
 
 function lerGoogleMapsApiKey(): string | null {
-  const key = process.env.GOOGLE_MAPS_API_KEY?.trim()
+  const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim()
   return key || null
 }
 
@@ -246,7 +246,7 @@ export async function GET(request: NextRequest) {
   const apiKey = lerGoogleMapsApiKey()
   if (!apiKey) {
     return NextResponse.json(
-      { error: 'GOOGLE_MAPS_API_KEY não configurada no servidor' },
+      { error: 'NEXT_PUBLIC_GOOGLE_MAPS_API_KEY não configurada' },
       { status: 503 }
     )
   }
