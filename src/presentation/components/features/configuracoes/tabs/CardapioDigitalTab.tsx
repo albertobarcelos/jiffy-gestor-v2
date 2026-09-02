@@ -20,6 +20,9 @@ import { compartilharLinkDelivery } from '@/src/presentation/components/features
 import { deliveryPublicoHomePath } from '@/src/presentation/components/features/delivery-publico/shared/utils/deliveryPublicoRoutes'
 import { MenuParametroEmpresaSelect } from '../MenuParametroEmpresaSelect'
 import { DeliveryPendenciasAlert } from '@/src/presentation/components/features/delivery/configuracoes/DeliveryPendenciasAlert'
+import { DeliveryPendenciasOrientacaoNotifier } from '@/src/presentation/components/features/delivery/configuracoes/DeliveryPendenciasOrientacaoNotifier'
+import { FuncionamentoDeliverySection } from '@/src/presentation/components/features/delivery/configuracoes/FuncionamentoDeliverySection'
+import { EMPRESA_DELIVERY_PENDENCIA_TYPES } from '@/src/shared/constants/empresaDeliveryPendencias'
 import {
   filtrarPendenciasObrigatorias,
   filtrarPendenciasOrientacao,
@@ -43,6 +46,9 @@ export function CardapioDigitalTab() {
   const pendencias = empresaDelivery?.pendencias ?? []
   const pendenciasObrigatorias = filtrarPendenciasObrigatorias(pendencias)
   const pendenciasOrientacao = filtrarPendenciasOrientacao(pendencias)
+  const timezonePendente = pendencias.some(
+    p => p.type === EMPRESA_DELIVERY_PENDENCIA_TYPES.TIMEZONE_NAO_CONFIGURADO
+  )
   const lojaPublicaPronta = lojaDeliveryDisponivel(empresaDelivery ?? undefined)
   const configurado = empresaDelivery != null
   const carregando =
@@ -164,17 +170,22 @@ export function CardapioDigitalTab() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-      <div className="mx-auto w-full max-w-3xl space-y-6 p-4 md:p-6">
-        <div className="flex items-start gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-secondary/10 text-secondary">
-            <MdStorefront className="h-6 w-6" aria-hidden />
+      <div className="mx-auto w-full max-w-[1200px] space-y-6 p-4 md:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-secondary/10 text-secondary">
+              <MdStorefront className="h-6 w-6" aria-hidden />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold text-primary-text">Empresa Delivery</h1>
+              <p className="mt-1 text-sm text-secondary-text">
+                Configure o link público e o cardápio (menu) publicado na loja online.
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-primary-text">Empresa Delivery</h1>
-            <p className="mt-1 text-sm text-secondary-text">
-              Configure o link público e o cardápio (menu) publicado na loja online.
-            </p>
-          </div>
+          {configurado ? (
+            <DeliveryPendenciasOrientacaoNotifier pendencias={pendenciasOrientacao} />
+          ) : null}
         </div>
 
         {configurado && !lojaPublicaPronta && pendenciasObrigatorias.length > 0 ? (
@@ -184,12 +195,9 @@ export function CardapioDigitalTab() {
           />
         ) : null}
 
-        {configurado && pendenciasOrientacao.length > 0 ? (
-          <DeliveryPendenciasAlert variant="orientacao" pendencias={pendenciasOrientacao} />
-        ) : null}
-
-        <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm md:p-6">
-          <div className="mt-4 space-y-4">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-stretch">
+          <section className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-4 shadow-sm md:p-6">
+            <div className="flex min-h-0 flex-1 flex-col gap-4">
             <div>
               <label htmlFor="empresa-delivery-slug" className="text-sm font-semibold text-primary-text">
                 Link público da loja
@@ -277,7 +285,7 @@ export function CardapioDigitalTab() {
             ) : null}
 
             {configurado ? (
-              <div className="rounded-lg border border-gray-200 bg-white p-4">
+              <div className="mt-auto rounded-lg border border-gray-200 bg-white p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-semibold text-primary">Personalizar loja online</p>
@@ -302,8 +310,14 @@ export function CardapioDigitalTab() {
                 loja online.
               </p>
             ) : null}
-          </div>
-        </section>
+            </div>
+          </section>
+
+          <FuncionamentoDeliverySection
+            empresaDeliveryConfigurada={configurado}
+            timezonePendente={timezonePendente}
+          />
+        </div>
 
         <div className="flex justify-end pb-4">
           <button

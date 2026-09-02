@@ -51,6 +51,7 @@ export type EnviarPedidoCheckoutResult =
       message: string
       cotacao: CotacaoPedidoPublicoDTO
     }
+  | { ok: false; reason: 'loja_fechada' }
   | { ok: false }
 
 export type RecotarPedidoResult =
@@ -874,6 +875,10 @@ export function useDeliveryCheckout(slug: string) {
             message: resultado.message,
             cotacao: resultado.cotacao,
           }
+        }
+        if ('reason' in resultado && resultado.reason === 'loja_fechada') {
+          showToast.error('A loja está fechada no momento. Não é possível finalizar pedidos.')
+          return { ok: false, reason: 'loja_fechada' }
         }
         if ('error' in resultado) {
           if (isErroCoberturaEntregaPublica(resultado.error)) {

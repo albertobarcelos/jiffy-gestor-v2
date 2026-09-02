@@ -16,6 +16,7 @@ import type {
   CatalogoPublicoProdutoDTO,
   EmpresaPublicaDTO,
 } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import type { FuncionamentoPublicoDTO } from '@/src/application/dto/delivery/FuncionamentoDeliveryDTO'
 import {
   flattenCatalogoGrupos,
   useAutoFetchCatalogoGrupos,
@@ -101,6 +102,8 @@ export function DeliveryPublicoHomeScreen({
 
   const { data, isLoading, isError, error, isFetchingNextPage } = catalogQuery
   const empresa: EmpresaPublicaDTO | null = data?.pages[0]?.empresa ?? null
+  const funcionamento: FuncionamentoPublicoDTO | null = data?.pages[0]?.funcionamento ?? null
+  const lojaAberta = funcionamento?.aberta ?? true
 
   const carrinhoItens = useDeliveryCarrinhoItens(slug)
   const carrinhoTotal = useDeliveryCarrinhoTotal(slug)
@@ -363,6 +366,7 @@ export function DeliveryPublicoHomeScreen({
         slug={slug}
         grupos={grupos}
         empresa={empresa}
+        funcionamento={funcionamento}
         termoBusca={termoBusca}
         carrinhoTotal={carrinhoTotal}
         carrinhoQuantidade={carrinhoQuantidade}
@@ -387,7 +391,11 @@ export function DeliveryPublicoHomeScreen({
         bloquearUiFlyToCart={bloquearUiFlyToCart}
       />
       {carrinhoAberto ? (
-        <DeliveryPublicoCarrinhoScreen slug={slug} onClose={fecharCarrinho} />
+        <DeliveryPublicoCarrinhoScreen
+          slug={slug}
+          lojaAberta={lojaAberta}
+          onClose={fecharCarrinho}
+        />
       ) : null}
     </DeliveryThemeScope>
   )
@@ -397,6 +405,7 @@ type DeliveryPublicoHomeContentProps = {
   slug: string
   grupos: ReturnType<typeof flattenCatalogoGrupos>
   empresa: EmpresaPublicaDTO | null
+  funcionamento: FuncionamentoPublicoDTO | null
   termoBusca: string
   carrinhoTotal: number
   carrinhoQuantidade: number
@@ -425,6 +434,7 @@ function DeliveryPublicoHomeContent({
   slug,
   grupos,
   empresa,
+  funcionamento,
   termoBusca,
   carrinhoTotal,
   carrinhoQuantidade,
@@ -451,12 +461,16 @@ function DeliveryPublicoHomeContent({
   const { config } = useDeliveryThemeContext()
 
   const viewModel: DeliveryPublicoViewModel = useMemo(() => {
-    const base = buildCatalogViewModel(grupos, {
-      termoBusca,
-      carrinho: { total: carrinhoTotal, quantidadeItens: carrinhoQuantidade },
-    })
+    const base = buildCatalogViewModel(
+      grupos,
+      {
+        termoBusca,
+        carrinho: { total: carrinhoTotal, quantidadeItens: carrinhoQuantidade },
+      },
+      funcionamento
+    )
     return applySugestoesDaCasaVisibility(base, config)
-  }, [grupos, termoBusca, carrinhoTotal, carrinhoQuantidade, config])
+  }, [grupos, termoBusca, carrinhoTotal, carrinhoQuantidade, config, funcionamento])
 
   const LayoutHome = resolveDeliveryLayoutHome(config.layoutId)
   const enderecoTexto = formatEmpresaPublicaEndereco(empresa?.endereco ?? null)

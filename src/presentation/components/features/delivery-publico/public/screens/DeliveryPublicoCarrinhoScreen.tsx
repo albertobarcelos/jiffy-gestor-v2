@@ -57,12 +57,14 @@ import {
 
 type DeliveryPublicoCarrinhoScreenProps = {
   slug: string
+  lojaAberta?: boolean
   /** Chamado após a animação de fechamento (overlay sobre a home). */
   onClose: () => void
 }
 
 export function DeliveryPublicoCarrinhoScreen({
   slug,
+  lojaAberta = true,
   onClose,
 }: DeliveryPublicoCarrinhoScreenProps) {
   const atualizarQuantidade = useDeliveryCarrinhoStore(s => s.atualizarQuantidade)
@@ -381,6 +383,11 @@ export function DeliveryPublicoCarrinhoScreen({
   }
 
   const handleEnviarPedido = async () => {
+    if (!lojaAberta) {
+      showToast.error('A loja está fechada no momento. Não é possível finalizar pedidos.')
+      return
+    }
+
     const fallback = {
       tipoEntrega: form.tipoEntrega,
       modoTempo: form.modoTempo,
@@ -553,6 +560,10 @@ export function DeliveryPublicoCarrinhoScreen({
   }
 
   const handleContinuarCheckout = () => {
+    if (!lojaAberta) {
+      showToast.error('A loja está fechada no momento. Não é possível finalizar pedidos.')
+      return
+    }
     setHighestCheckoutPercentage(0)
     setVoltarParaRevisao(false)
     setVoltarParaIdentificacao(false)
@@ -736,6 +747,21 @@ export function DeliveryPublicoCarrinhoScreen({
             </header>
 
             <div className="relative mx-auto min-h-0 w-full max-w-2xl flex-1 space-y-4 overflow-y-auto overscroll-y-contain p-3 pb-36 max-sm:scrollbar-hide sm:space-y-5 sm:p-4">
+              {!lojaAberta ? (
+                <div
+                  role="status"
+                  className="rounded-xl border px-3 py-2 text-sm font-medium"
+                  style={{
+                    borderColor: 'var(--delivery-border)',
+                    backgroundColor: 'var(--delivery-surface-muted)',
+                    color: 'var(--delivery-text-primary)',
+                  }}
+                >
+                  Loja fechada no momento. Você pode navegar pelo cardápio, mas pedidos estão
+                  indisponíveis.
+                </div>
+              ) : null}
+
               {itens.length === 0 ? (
                 <div className="py-16 text-center">
                   <p className="delivery-text-muted">Carrinho vazio</p>
@@ -795,6 +821,8 @@ export function DeliveryPublicoCarrinhoScreen({
                 <DeliveryCheckoutFooterActions
                   onVoltar={voltar}
                   onContinuar={handleContinuarCheckout}
+                  continuarDisabled={!lojaAberta}
+                  continuarLabel={lojaAberta ? 'Continuar' : 'Loja fechada'}
                   top={
                     <p className="text-base leading-tight text-neutral-900 @sm:text-lg">
                       <span className="font-semibold">Total da compra:</span>{' '}

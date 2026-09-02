@@ -6,6 +6,8 @@ export const EMPRESA_DELIVERY_PENDENCIA_TYPES = {
   GEOLOCALIZACAO_NAO_CONFIGURADA: 'GEOLOCALIZACAO_NAO_CONFIGURADA',
   COBERTURA_NAO_CONFIGURADA: 'COBERTURA_NAO_CONFIGURADA',
   CANAL_WHATSAPP_NAO_CONECTADO: 'CANAL_WHATSAPP_NAO_CONECTADO',
+  FUNCIONAMENTO_AGENDA_NAO_CONFIGURADA: 'FUNCIONAMENTO_AGENDA_NAO_CONFIGURADA',
+  TIMEZONE_NAO_CONFIGURADO: 'TIMEZONE_NAO_CONFIGURADO',
 } as const
 
 export type EmpresaDeliveryPendenciaType =
@@ -39,6 +41,14 @@ const ACAO_POR_TIPO: Partial<Record<EmpresaDeliveryPendenciaType, PendenciaAcao>
   [EMPRESA_DELIVERY_PENDENCIA_TYPES.COBERTURA_NAO_CONFIGURADA]: {
     label: 'Configurar raios de entrega',
     href: configuracoesTabPath('cobertura-delivery'),
+  },
+  [EMPRESA_DELIVERY_PENDENCIA_TYPES.FUNCIONAMENTO_AGENDA_NAO_CONFIGURADA]: {
+    label: 'Configurar agenda abaixo',
+    href: '#empresa-delivery-agenda',
+  },
+  [EMPRESA_DELIVERY_PENDENCIA_TYPES.TIMEZONE_NAO_CONFIGURADO]: {
+    label: 'Configurar fuso na aba Empresa',
+    href: configuracoesTabPath('empresa'),
   },
 }
 

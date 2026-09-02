@@ -47,6 +47,24 @@ export function isEmpresaDeliveryIndisponivel(error: unknown): boolean {
   return error instanceof PublicDeliveryApiError && error.status === 403
 }
 
+export const EMPRESA_DELIVERY_FECHADA_CODE = 'EMPRESA_DELIVERY_FECHADA'
+
+export function isEmpresaDeliveryFechadaError(error: unknown): boolean {
+  if (!(error instanceof PublicDeliveryApiError) || error.status !== 409) return false
+  const body = error.details
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return error.message.toLowerCase().includes('não está aberta')
+  }
+  const raiz = body as Record<string, unknown>
+  const candidatos = [raiz.details, raiz]
+  for (const bloco of candidatos) {
+    if (!bloco || typeof bloco !== 'object' || Array.isArray(bloco)) continue
+    const code = (bloco as Record<string, unknown>).code
+    if (code === EMPRESA_DELIVERY_FECHADA_CODE) return true
+  }
+  return error.message.toLowerCase().includes('não está aberta')
+}
+
 function extrairPendenciasDoCorpoErro(body: unknown): string[] {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return []
   const raiz = body as Record<string, unknown>

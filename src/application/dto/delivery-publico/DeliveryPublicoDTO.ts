@@ -1,4 +1,5 @@
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
+import type { FuncionamentoPublicoDTO } from '@/src/application/dto/delivery/FuncionamentoDeliveryDTO'
 
 /** DTOs espelhando o catálogo público delivery do backend (sem auth). */
 
@@ -83,6 +84,7 @@ export type EmpresaPublicaDTO = {
 
 export type GetCatalogoPublicoResponseDTO = {
   empresa: EmpresaPublicaDTO
+  funcionamento: FuncionamentoPublicoDTO
   catalogo: CatalogoPublicoPaginaDTO
 }
 
