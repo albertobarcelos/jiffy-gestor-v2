@@ -20,7 +20,7 @@ import {
 import { getGoogleMapsApiKeyClient } from '@/src/shared/utils/googleMapsClient'
 import { googleMapsLoaderConfig } from '@/src/shared/utils/googleMapsLoader'
 
-const MAP_CONTAINER_STYLE = { width: '100%', height: '480px' }
+const MAP_CONTAINER_STYLE = { width: '100%', height: '100%' }
 const FALLBACK_CENTER = { lat: -12.6819, lng: -56.9211 }
 const FALLBACK_ZOOM = 6
 const LOCALIZADO_ZOOM = 15
@@ -132,6 +132,106 @@ function MapRaiosCirculos({
     // raiosSignature garante redesenho quando a distância muda
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, centro.lat, centro.lng, raiosSignature])
+
+  return null
+}
+
+function lerPathsDoPoligono(polygon: google.maps.Polygon): LatLngLiteral[] {
+  const path = polygon.getPath()
+  const coords: LatLngLiteral[] = []
+  for (let i = 0; i < path.getLength(); i++) {
+    const p = path.getAt(i)
+    coords.push({ lat: p.lat(), lng: p.lng() })
+  }
+  return coords
+}
+
+/** Polígonos imperativos — clique seleciona; área em edição fica com vértices arrastáveis. */
+function MapAreasPoligonos({
+  areas,
+  raiosCount,
+  areaDestacadaId,
+  areaFormaEditandoId,
+  selecaoHabilitada,
+  onSelecionarArea,
+  onFormaAlterada,
+}: {
+  areas: AreaEntregaDTO[]
+  raiosCount: number
+  areaDestacadaId: string | null
+  areaFormaEditandoId: string | null
+  selecaoHabilitada: boolean
+  onSelecionarArea?: (areaId: string) => void
+  onFormaAlterada?: (areaId: string, paths: LatLngLiteral[]) => void
+}) {
+  const map = useGoogleMap()
+  const onSelecionarRef = useRef(onSelecionarArea)
+  const onFormaAlteradaRef = useRef(onFormaAlterada)
+  onSelecionarRef.current = onSelecionarArea
+  onFormaAlteradaRef.current = onFormaAlterada
+
+  const areasSignature = useMemo(
+    () =>
+      areas
+        .map(a => `${a.id}:${a.ativo ? 1 : 0}:${JSON.stringify(a.area.coordinates)}`)
+        .join('|'),
+    [areas]
+  )
+
+  useEffect(() => {
+    if (!map || typeof google === 'undefined') return
+
+    const polygons: google.maps.Polygon[] = []
+    const listeners: google.maps.MapsEventListener[] = []
+
+    for (let index = 0; index < areas.length; index++) {
+      const area = areas[index]
+      const cores = CORES_COBERTURA[(index + raiosCount) % CORES_COBERTURA.length]
+      const editando = areaFormaEditandoId === area.id
+      const destacada = editando || areaDestacadaId === area.id
+      const rings = geoJsonToLatLngRings(area.area)
+
+      for (const paths of rings) {
+        const polygon = new google.maps.Polygon({
+          map,
+          paths,
+          strokeColor: cores.stroke,
+          strokeOpacity: area.ativo ? (destacada ? 1 : 0.85) : 0.35,
+          strokeWeight: destacada ? 3 : 2,
+          fillColor: cores.fill,
+          fillOpacity: area.ativo ? (destacada ? 0.38 : 0.28) : 0.08,
+          clickable: selecaoHabilitada && !editando && Boolean(onSelecionarRef.current),
+          editable: editando,
+          draggable: false,
+          zIndex: editando ? 5 : destacada ? 3 : 2,
+        })
+        polygons.push(polygon)
+
+        if (selecaoHabilitada && !editando) {
+          listeners.push(
+            polygon.addListener('click', () => {
+              onSelecionarRef.current?.(area.id)
+            })
+          )
+        }
+
+        if (editando) {
+          const path = polygon.getPath()
+          const emitir = () => onFormaAlteradaRef.current?.(area.id, lerPathsDoPoligono(polygon))
+          listeners.push(path.addListener('set_at', emitir))
+          listeners.push(path.addListener('insert_at', emitir))
+          listeners.push(path.addListener('remove_at', emitir))
+        }
+      }
+    }
+
+    return () => {
+      for (const listener of listeners) listener.remove()
+      for (const polygon of polygons) polygon.setMap(null)
+    }
+    // areas: recria só quando a assinatura de geometria/ativo muda (não a cada re-render)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, areasSignature, raiosCount, areaDestacadaId, areaFormaEditandoId, selecaoHabilitada])
 
   return null
 }
@@ -290,8 +390,11 @@ type CoberturaDeliveryMapProps = {
   modoDesenho?: boolean
   rascunhoPaths?: LatLngLiteral[] | null
   areaDestacadaId?: string | null
+  areaFormaEditandoId?: string | null
   onPoligonoDesenhado?: (paths: LatLngLiteral[]) => void
   onDesenhoCancelado?: () => void
+  onSelecionarAreaParaEditar?: (areaId: string) => void
+  onFormaAreaAlterada?: (areaId: string, paths: LatLngLiteral[]) => void
 }
 
 export function CoberturaDeliveryMap({
@@ -301,8 +404,11 @@ export function CoberturaDeliveryMap({
   modoDesenho = false,
   rascunhoPaths = null,
   areaDestacadaId = null,
+  areaFormaEditandoId = null,
   onPoligonoDesenhado,
   onDesenhoCancelado,
+  onSelecionarAreaParaEditar,
+  onFormaAreaAlterada,
 }: CoberturaDeliveryMapProps) {
   const apiKey = getGoogleMapsApiKeyClient()
   const { isLoaded, loadError } = useJsApiLoader(googleMapsLoaderConfig(apiKey))
@@ -346,7 +452,7 @@ export function CoberturaDeliveryMap({
 
   if (!apiKey) {
     return (
-      <div className="rounded-lg border border-alternate/30 bg-alternate/10 px-3 py-2 text-sm text-alternate">
+      <div className="flex h-full items-center justify-center rounded-lg border border-alternate/30 bg-alternate/10 px-3 py-2 text-center text-sm text-alternate">
         Defina <code className="text-xs">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> no{' '}
         <code className="text-xs">.env.local</code> para visualizar a cobertura no mapa.
       </div>
@@ -355,24 +461,26 @@ export function CoberturaDeliveryMap({
 
   if (loadError) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+      <div className="flex h-full items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-center text-sm text-red-700">
         Não foi possível carregar o Google Maps.
       </div>
     )
   }
 
   if (!isLoaded) {
-    return <div className="h-[480px] animate-pulse rounded-lg bg-gray-100" aria-hidden />
+    return <div className="h-full min-h-[280px] animate-pulse rounded-lg bg-gray-100" aria-hidden />
   }
 
   if (!centro) {
     return (
-      <div className="rounded-lg border border-alternate/30 bg-alternate/10 px-4 py-6 text-center text-sm text-alternate">
-        <p className="font-semibold">Geolocalização da loja não configurada</p>
-        <p className="mt-1 text-xs text-alternate/80">
-          A cobertura usa o endereço da empresa como referência. Configure a localização na aba
-          Empresa antes de cadastrar raios ou áreas.
-        </p>
+      <div className="flex h-full min-h-[280px] items-center justify-center rounded-lg border border-alternate/30 bg-alternate/10 px-4 py-6 text-center text-sm text-alternate">
+        <div>
+          <p className="font-semibold">Geolocalização da loja não configurada</p>
+          <p className="mt-1 text-xs text-alternate/80">
+            A cobertura usa o endereço da empresa como referência. Configure a localização na aba
+            Empresa antes de cadastrar raios ou áreas.
+          </p>
+        </div>
       </div>
     )
   }
@@ -380,7 +488,7 @@ export function CoberturaDeliveryMap({
   const podeConcluir = verticesDesenho.length >= MIN_VERTICES_AREA
 
   return (
-    <div className="relative overflow-hidden rounded-lg border border-gray-200">
+    <div className="relative h-full min-h-0 overflow-hidden">
       {modoDesenho ? (
         <div className="absolute left-0 right-0 top-0 z-10 space-y-2 bg-primary/95 px-3 py-2 text-xs text-white">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -428,6 +536,23 @@ export function CoberturaDeliveryMap({
         </div>
       ) : null}
 
+      {!modoDesenho && areaFormaEditandoId ? (
+        <div className="absolute left-0 right-0 top-0 z-10 bg-secondary/95 px-3 py-2 text-xs text-white">
+          <p className="font-semibold">Editando forma da área</p>
+          <p className="mt-0.5 text-[11px] text-white/85">
+            Arraste os vértices (ou os pontos intermediários) para ajustar. Use Salvar forma ou
+            Cancelar abaixo do mapa.
+          </p>
+        </div>
+      ) : null}
+
+      {!modoDesenho && !areaFormaEditandoId && onSelecionarAreaParaEditar ? (
+        <div className="pointer-events-none absolute bottom-3 left-3 right-3 z-10 rounded-md bg-black/55 px-3 py-1.5 text-[11px] text-white">
+          Clique em uma área no mapa para editar os pontos, ou use &quot;Editar no mapa&quot; na
+          lista.
+        </div>
+      ) : null}
+
       <GoogleMap
         mapContainerStyle={MAP_CONTAINER_STYLE}
         center={centroMapa}
@@ -443,34 +568,20 @@ export function CoberturaDeliveryMap({
           raios={raios}
           areas={areas}
           rascunhoPaths={rascunhoPaths}
-          congelarVisao={modoDesenho}
+          congelarVisao={modoDesenho || Boolean(areaFormaEditandoId)}
         />
         <Marker position={centro} title="Origem da loja" />
         <MapRaiosCirculos centro={centro} raios={raios} />
 
-        {areas.map((area, index) => {
-          const cores = CORES_COBERTURA[(index + raios.length) % CORES_COBERTURA.length]
-          const destacada = areaDestacadaId === area.id
-          const opacidade = area.ativo ? (destacada ? 0.38 : 0.28) : 0.08
-          const strokeOpacidade = area.ativo ? (destacada ? 1 : 0.85) : 0.35
-          const rings = geoJsonToLatLngRings(area.area)
-
-          return rings.map((paths, ringIndex) => (
-            <Polygon
-              key={`${area.id}-${ringIndex}`}
-              paths={paths}
-              options={{
-                strokeColor: cores.stroke,
-                strokeOpacity: strokeOpacidade,
-                strokeWeight: destacada ? 3 : 2,
-                fillColor: cores.fill,
-                fillOpacity: opacidade,
-                clickable: false,
-                zIndex: destacada ? 3 : 2,
-              }}
-            />
-          ))
-        })}
+        <MapAreasPoligonos
+          areas={areas}
+          raiosCount={raios.length}
+          areaDestacadaId={areaDestacadaId}
+          areaFormaEditandoId={areaFormaEditandoId}
+          selecaoHabilitada={!modoDesenho && !areaFormaEditandoId}
+          onSelecionarArea={onSelecionarAreaParaEditar}
+          onFormaAlterada={onFormaAreaAlterada}
+        />
 
         {rascunhoPaths && rascunhoPaths.length >= MIN_VERTICES_AREA ? (
           <Polygon

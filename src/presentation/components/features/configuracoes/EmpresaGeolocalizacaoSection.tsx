@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import { useState } from 'react'
-import { MdLocationOn, MdMyLocation } from 'react-icons/md'
+import { MdLocationOn, MdMap, MdMyLocation, MdVisibilityOff } from 'react-icons/md'
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import {
   enderecoEmpresaGeocodeMinimo,
@@ -33,6 +33,11 @@ type EmpresaGeolocalizacaoSectionProps = {
   enderecoAlterado?: boolean
 }
 
+function formatarCoordenadasResumo(point: GeoJsonPoint): string {
+  const [lng, lat] = point.coordinates
+  return `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+}
+
 export function EmpresaGeolocalizacaoSection({
   endereco,
   localizacao,
@@ -42,6 +47,7 @@ export function EmpresaGeolocalizacaoSection({
 }: EmpresaGeolocalizacaoSectionProps) {
   const [buscandoGeocode, setBuscandoGeocode] = useState(false)
   const [ultimoEnderecoFormatado, setUltimoEnderecoFormatado] = useState<string | null>(null)
+  const [mapaVisivel, setMapaVisivel] = useState(false)
   const configurada = Boolean(localizacao)
   const camposMinimosOk = enderecoEmpresaGeocodeMinimo(endereco)
   const podeBuscar = camposMinimosOk && !disabled
@@ -65,6 +71,7 @@ export function EmpresaGeolocalizacaoSection({
         enderecoFormatado: resultado.enderecoFormatado,
       })
       setUltimoEnderecoFormatado(resultado.enderecoFormatado)
+      setMapaVisivel(true)
       showToast.success('Localização encontrada. Confira o pin no mapa e clique em Salvar na empresa.')
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : 'Erro ao buscar localização')
@@ -101,6 +108,15 @@ export function EmpresaGeolocalizacaoSection({
           </p>
         ) : null}
 
+        {configurada && localizacao && !mapaVisivel ? (
+          <p className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-secondary-text">
+            Coordenadas salvas:{' '}
+            <span className="font-medium text-primary-text">
+              {formatarCoordenadasResumo(localizacao)}
+            </span>
+          </p>
+        ) : null}
+
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -111,6 +127,26 @@ export function EmpresaGeolocalizacaoSection({
             <MdMyLocation className="h-4 w-4" aria-hidden />
             {buscandoGeocode ? 'Buscando…' : 'Buscar endereço no mapa'}
           </button>
+
+          {mapaVisivel ? (
+            <button
+              type="button"
+              onClick={() => setMapaVisivel(false)}
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-gray-200 px-3 text-sm font-semibold text-secondary-text transition-colors hover:bg-gray-50"
+            >
+              <MdVisibilityOff className="h-4 w-4" aria-hidden />
+              Ocultar mapa
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setMapaVisivel(true)}
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-primary px-3 text-sm font-semibold text-primary transition-colors hover:bg-primary/5"
+            >
+              <MdMap className="h-4 w-4" aria-hidden />
+              Exibir localização no mapa
+            </button>
+          )}
         </div>
 
         {ultimoEnderecoFormatado ? (
@@ -120,16 +156,24 @@ export function EmpresaGeolocalizacaoSection({
           </p>
         ) : null}
 
-        <p className="text-xs text-secondary-text">
-          Depois da busca, clique no mapa ou arraste o pin para ajustar a posição exata da loja.
-        </p>
-
-        <EmpresaGeolocalizacaoMap
-          value={localizacao}
-          onChange={point => onLocalizacaoChange(point)}
-          disabled={disabled}
-          estado={endereco.estado}
-        />
+        {mapaVisivel ? (
+          <>
+            <p className="text-xs text-secondary-text">
+              Clique no mapa ou arraste o pin para ajustar a posição exata da loja.
+            </p>
+            <EmpresaGeolocalizacaoMap
+              value={localizacao}
+              onChange={point => onLocalizacaoChange(point)}
+              disabled={disabled}
+              estado={endereco.estado}
+            />
+          </>
+        ) : (
+          <p className="text-xs text-secondary-text">
+            O mapa só carrega quando você clicar em &quot;Exibir localização no mapa&quot;, para
+            reduzir o uso da API do Google.
+          </p>
+        )}
       </div>
     </section>
   )
