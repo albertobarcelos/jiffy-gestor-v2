@@ -16,6 +16,7 @@ export type ValidarPedidoGestorInput = {
   telefoneClienteDelivery?: string | null
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
+  enderecoEntregaTemGeo?: boolean
   pedidoGestorComPagamentoNoPasso3: boolean
   pedidoEntregaAceitaPagamentoPendente: boolean
   pagamentosCount: number
@@ -40,6 +41,8 @@ export function validarInformacoesPedidoEntrega(params: {
   telefoneClienteDelivery?: string | null
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
+  /** Morada com coordenadas persistidas (obrigatório no create delivery com entrega). */
+  enderecoEntregaTemGeo?: boolean
 }): ValidacaoErroPedido | null {
   if (!params.pedidoDeliveryGestor) return null
 
@@ -53,6 +56,19 @@ export function validarInformacoesPedidoEntrega(params: {
 
   if (params.pedidoComEntrega && !params.temEnderecoEntrega) {
     return { message: 'Selecione ou cadastre o endereço de entrega.', goToStep: 2 }
+  }
+
+  if (
+    params.pedidoComEntrega &&
+    params.temEnderecoEntrega &&
+    params.enderecoEntregaTemGeo === false
+  ) {
+    return {
+      message:
+        'O endereço de entrega precisa ter geolocalização. Confirme o pin no mapa antes de continuar.',
+      goToStep: 2,
+      code: 'entrega',
+    }
   }
 
   return null
@@ -182,6 +198,7 @@ export function validarPedidoGestor(
     telefoneClienteDelivery: input.telefoneClienteDelivery,
     pedidoComEntrega: input.pedidoComEntrega,
     temEnderecoEntrega: input.temEnderecoEntrega,
+    enderecoEntregaTemGeo: input.enderecoEntregaTemGeo,
   })
   if (erroEntrega) erros.push(erroEntrega)
 

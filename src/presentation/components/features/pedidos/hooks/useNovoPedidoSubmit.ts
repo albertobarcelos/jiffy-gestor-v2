@@ -62,6 +62,7 @@ export interface UseNovoPedidoSubmitParams {
     pedidoComRetirada: boolean
     pedidoComEntrega: boolean
     temEnderecoEntrega: boolean
+    enderecoEntregaTemGeo?: boolean
     troco: number
   }
   createVendaGestor: {
@@ -129,6 +130,7 @@ export function useNovoPedidoSubmit({
       telefoneClienteDelivery: input.telefoneCliente,
       pedidoComEntrega: validacao.pedidoComEntrega,
       temEnderecoEntrega: validacao.temEnderecoEntrega,
+      enderecoEntregaTemGeo: validacao.enderecoEntregaTemGeo,
       pedidoGestorComPagamentoNoPasso3: validacao.pedidoGestorComPagamentoNoPasso3,
       pedidoEntregaAceitaPagamentoPendente: validacao.pedidoEntregaAceitaPagamentoPendente,
       pagamentosCount: input.pagamentos.length,
@@ -210,7 +212,15 @@ export function useNovoPedidoSubmit({
       console.error('❌ Erro ao criar pedido:', error)
       const err = error as {
         message?: string
-        response?: { data?: { message?: string; error?: string } }
+        response?: {
+          data?: {
+            message?: string
+            error?: string
+            title?: string
+            code?: string
+            type?: string
+          }
+        }
         stack?: string
       }
       console.error('❌ Detalhes do erro:', {
@@ -219,12 +229,31 @@ export function useNovoPedidoSubmit({
         responseData: err?.response?.data,
         stack: err?.stack,
       })
-      const errorMessage =
-        err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        err?.message ||
-        'Erro ao criar pedido'
-      showToast.error(errorMessage)
+      const data = err?.response?.data
+      const code = String(data?.code ?? data?.type ?? data?.title ?? data?.error ?? '')
+      const rawMessage =
+        data?.message || data?.error || data?.title || err?.message || 'Erro ao criar pedido'
+
+      if (code.includes('GEOLOCALIZACAO_NAO_CONFIGURADA') || /geolocaliza/i.test(rawMessage)) {
+        showToast.error(
+          'Geolocalização ausente no endereço ou na empresa. Confirme o pin do endereço ou configure a geo da empresa no hub Delivery.'
+        )
+        setCurrentStep(2)
+        return
+      }
+
+      if (
+        code.includes('ENDERECO_FORA_COBERTURA_ENTREGA') ||
+        /fora da cobertura|não está coberto/i.test(rawMessage)
+      ) {
+        showToast.error(
+          'O endereço está fora da cobertura de entrega. Ajuste o pin ou escolha outro endereço.'
+        )
+        setCurrentStep(2)
+        return
+      }
+
+      showToast.error(rawMessage)
     } finally {
       finalizarSubmit()
     }

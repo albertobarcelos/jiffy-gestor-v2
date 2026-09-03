@@ -37,6 +37,12 @@ import {
   type PlaceDetailsResult,
 } from '@/src/shared/utils/geolocalizacaoPlaces'
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
+import type { EnderecoGeoCheckoutInput } from '@/src/application/dto/delivery-publico/EnderecoGeoCheckoutDTO'
+import { enderecoTemGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
+import {
+  MoradaEntregaGeoPanel,
+  type MoradaEntregaGeoFormPatch,
+} from '@/src/presentation/components/features/delivery/components/MoradaEntregaGeoPanel'
 
 /** Snapshot mínimo do cliente encontrado / criado. */
 interface ClienteEntrega {
@@ -160,14 +166,17 @@ function MoradaCard({
   selecionada,
   onSelecionar,
   onVerDetalhes,
+  exigirGeo,
 }: {
   morada: MoradaTelefone
   selecionada: boolean
   onSelecionar: () => void
   onVerDetalhes: () => void
+  exigirGeo?: boolean
 }) {
   const etiqueta = morada.tipoEtiqueta || morada.nomeMorada || 'Endereço'
   const e = morada.endereco
+  const temGeo = e ? enderecoTemGeolocalizacao(e) : false
   const linhaResumo =
     e ?
       `${e.rua || '—'}, ${e.numero || '—'} — ${e.cidade || '—'}`
@@ -193,6 +202,15 @@ function MoradaCard({
             {etiqueta}
           </p>
           <p className="truncate text-xs text-gray-500">{linhaResumo}</p>
+          {exigirGeo ? (
+            <p
+              className={`mt-1 text-[11px] font-medium ${
+                temGeo ? 'text-emerald-700' : 'text-amber-700'
+              }`}
+            >
+              {temGeo ? 'Com geolocalização' : 'Sem pin — confirme no mapa'}
+            </p>
+          ) : null}
         </div>
       </button>
 
@@ -257,10 +275,18 @@ export function EntregaClienteSelector({
   const [formNova, setFormNova] = useState<FormNovasMorada>(FORM_INICIAL)
   const [isLoadingCep, setIsLoadingCep] = useState(false)
   const [buscaPlacesMorada, setBuscaPlacesMorada] = useState('')
+  /** Legado (não delivery): geo só via Places simples. */
   const [moradaGeo, setMoradaGeo] = useState<{
     enderecoLocalizacao: GeoJsonPoint
     providerEnderecoId: string
   } | null>(null)
+  /** Delivery: sessão do painel de geo + estado reportado pelo MoradaEntregaGeoPanel. */
+  const [geoPanelSession, setGeoPanelSession] = useState(0)
+  const [forcarBackfillGeo, setForcarBackfillGeo] = useState(false)
+  const [geoPanelState, setGeoPanelState] = useState<{
+    podeSalvar: boolean
+    geo: EnderecoGeoCheckoutInput | null
+  }>({ podeSalvar: false, geo: null })
 
   const telefoneInputRef = useRef<HTMLInputElement>(null)
 
@@ -309,6 +335,14 @@ export function EntregaClienteSelector({
     Boolean(clienteVinculado?.id?.trim()) ||
     (usarModuloDeliveryClientes && clienteDeliveryEncontrado)
 
+  const resetGeoPainelState = useCallback(() => {
+    setBuscaPlacesMorada('')
+    setMoradaGeo(null)
+    setForcarBackfillGeo(false)
+    setGeoPanelState({ podeSalvar: false, geo: null })
+    setGeoPanelSession(s => s + 1)
+  }, [])
+
   const abrirPainelNovo = useCallback(() => {
     if (!podeGerenciarEnderecos) {
       showToast.warning('Cadastre o cliente antes de adicionar um endereço.')
@@ -316,13 +350,12 @@ export function EntregaClienteSelector({
     }
     setMoradaEditando(null)
     setFormNova(formInicialComEnderecoPadrao(enderecoPadrao))
-    setBuscaPlacesMorada('')
-    setMoradaGeo(null)
+    resetGeoPainelState()
     setPainelMoradaAberto(true)
-  }, [podeGerenciarEnderecos, enderecoPadrao])
+  }, [podeGerenciarEnderecos, enderecoPadrao, resetGeoPainelState])
 
   const abrirPainelEditar = useCallback(
-    (m: MoradaTelefone) => {
+    (m: MoradaTelefone, opts?: { forcarBackfill?: boolean }) => {
       if (!podeGerenciarEnderecos) {
         showToast.warning('Cadastre o cliente antes de editar o endereço.')
         return
@@ -331,9 +364,15 @@ export function EntregaClienteSelector({
       setFormNova(moradaParaForm(m))
       setBuscaPlacesMorada('')
       setMoradaGeo(null)
+      const precisaBackfill =
+        Boolean(opts?.forcarBackfill) ||
+        (usarModuloDeliveryClientes && !(m.endereco && enderecoTemGeolocalizacao(m.endereco)))
+      setForcarBackfillGeo(precisaBackfill)
+      setGeoPanelState({ podeSalvar: false, geo: null })
+      setGeoPanelSession(s => s + 1)
       setPainelMoradaAberto(true)
     },
-    [podeGerenciarEnderecos]
+    [podeGerenciarEnderecos, usarModuloDeliveryClientes]
   )
 
   const fecharPainelMorada = useCallback(() => {
@@ -342,8 +381,24 @@ export function EntregaClienteSelector({
     setFormNova(formInicialComEnderecoPadrao(enderecoPadrao))
     setBuscaPlacesMorada('')
     setMoradaGeo(null)
+    setForcarBackfillGeo(false)
+    setGeoPanelState({ podeSalvar: false, geo: null })
   }, [enderecoPadrao])
 
+  const tentarSelecionarMorada = useCallback(
+    (morada: MoradaTelefone, telefoneDigitosOverride?: string | null) => {
+      if (
+        usarModuloDeliveryClientes &&
+        !(morada.endereco && enderecoTemGeolocalizacao(morada.endereco))
+      ) {
+        showToast.warning('Confirme a localização no mapa antes de usar este endereço.')
+        abrirPainelEditar(morada, { forcarBackfill: true })
+        return
+      }
+      definirMoradaSelecionada(morada, telefoneDigitosOverride)
+    },
+    [usarModuloDeliveryClientes, abrirPainelEditar, definirMoradaSelecionada]
+  )
   const handleBuscar = useCallback(async (telefoneOverride?: string) => {
     const digitos = extrairDigitosTelefone(telefoneOverride ?? telefoneInput)
     const minDigitos = telefoneMinimoParaBusca(usarModuloDeliveryClientes)
@@ -520,6 +575,16 @@ export function EntregaClienteSelector({
       return
     }
 
+    const geoDelivery = usarModuloDeliveryClientes ? geoPanelState.geo : null
+    if (usarModuloDeliveryClientes) {
+      if (!geoPanelState.podeSalvar || !geoDelivery) {
+        showToast.warning(
+          'Defina a localização do endereço (Google, GPS ou confirme o pin no mapa) antes de salvar.'
+        )
+        return
+      }
+    }
+
     const endereco: EnderecoMorada = {
       cep: cepDigits,
       rua: formNova.rua.trim(),
@@ -529,12 +594,20 @@ export function EntregaClienteSelector({
       estado: uf,
       complemento: formNova.complemento.trim() || undefined,
       referencia: formNova.referencia.trim() || undefined,
-      ...(moradaGeo
+      ...(geoDelivery
         ? {
-            enderecoLocalizacao: moradaGeo.enderecoLocalizacao,
-            providerEnderecoId: moradaGeo.providerEnderecoId,
+            enderecoLocalizacao: geoDelivery.enderecoLocalizacao,
+            providerEnderecoId: geoDelivery.providerEnderecoId ?? null,
+            ...(geoDelivery.preferenciaEntrega
+              ? { preferenciaEntrega: geoDelivery.preferenciaEntrega }
+              : {}),
           }
-        : {}),
+        : moradaGeo
+          ? {
+              enderecoLocalizacao: moradaGeo.enderecoLocalizacao,
+              providerEnderecoId: moradaGeo.providerEnderecoId,
+            }
+          : {}),
     }
 
     const dto = {
@@ -551,9 +624,7 @@ export function EntregaClienteSelector({
       })
       fecharPainelMorada()
       setTelefoneBuscado(digitos)
-      if (moradaSelecionada?.id === moradaEditando.id) {
-        definirMoradaSelecionada(atualizada, digitos)
-      }
+      definirMoradaSelecionada(atualizada, digitos)
       return
     }
 
@@ -566,13 +637,14 @@ export function EntregaClienteSelector({
     telefoneInput,
     formNova,
     moradaEditando,
-    moradaSelecionada?.id,
     criarMorada,
     atualizarMorada,
     fecharPainelMorada,
     definirMoradaSelecionada,
     setTelefoneBuscado,
     moradaGeo,
+    usarModuloDeliveryClientes,
+    geoPanelState,
   ])
 
   const handleSalvarClienteRapido = useCallback(async () => {
@@ -626,12 +698,21 @@ export function EntregaClienteSelector({
     if (!mostrarEnderecos || !clienteCadastrado || moradaSelecionada || moradasEncontradas.length === 0) {
       return
     }
-    definirMoradaSelecionada(moradasEncontradas[0])
+    const primeira = moradasEncontradas[0]
+    if (
+      usarModuloDeliveryClientes &&
+      !(primeira.endereco && enderecoTemGeolocalizacao(primeira.endereco))
+    ) {
+      // Não auto-seleciona nem abre o painel em loop — o usuário escolhe e confirma o pin.
+      return
+    }
+    definirMoradaSelecionada(primeira)
   }, [
     mostrarEnderecos,
     clienteCadastrado,
     moradaSelecionada,
     moradasEncontradas,
+    usarModuloDeliveryClientes,
     definirMoradaSelecionada,
   ])
 
@@ -802,8 +883,9 @@ export function EntregaClienteSelector({
                   key={morada.id}
                   morada={morada}
                   selecionada={moradaSelecionada?.id === morada.id}
-                  onSelecionar={() => definirMoradaSelecionada(morada)}
+                  onSelecionar={() => tentarSelecionarMorada(morada)}
                   onVerDetalhes={() => abrirPainelEditar(morada)}
+                  exigirGeo={usarModuloDeliveryClientes}
                 />
               ))}
             </>
@@ -911,7 +993,11 @@ export function EntregaClienteSelector({
         footerVariant="bar"
         footerActions={{
           showSave: true,
-          saveLabel: moradaEditando ? 'Salvar alterações' : 'Salvar endereço',
+          saveLabel: moradaEditando
+            ? forcarBackfillGeo
+              ? 'Confirmar localização'
+              : 'Salvar alterações'
+            : 'Salvar endereço',
           saveLoading: criarMorada.isPending || atualizarMorada.isPending,
           saveDisabled:
             criarMorada.isPending ||
@@ -920,7 +1006,8 @@ export function EntregaClienteSelector({
             !formNova.rua ||
             !formNova.numero ||
             !formNova.cidade ||
-            !formNova.estado,
+            !formNova.estado ||
+            (usarModuloDeliveryClientes && !geoPanelState.podeSalvar),
           onSave: handleSalvarMorada,
           showCancel: true,
           cancelLabel: 'Cancelar',
@@ -992,36 +1079,69 @@ export function EntregaClienteSelector({
           </div>
 
           <div>
-            <EnderecoPlacesAutocomplete
-              variant="gestor"
-              floatingLabel={false}
-              label="Buscar endereço no Google"
-              placeholder="Digite rua, bairro ou cidade…"
-              value={buscaPlacesMorada}
-              onChange={setBuscaPlacesMorada}
-              onSelect={(place: PlaceDetailsResult) => {
-                const fields = placeDetailsParaEnderecoGeocode(place)
-                setFormNova(prev => ({
-                  ...prev,
-                  ...(fields.rua ? { rua: fields.rua.toLocaleUpperCase('pt-BR') } : {}),
-                  ...(fields.numero ? { numero: fields.numero } : {}),
-                  ...(fields.bairro ? { bairro: fields.bairro.toLocaleUpperCase('pt-BR') } : {}),
-                  ...(fields.cidade ? { cidade: fields.cidade.toLocaleUpperCase('pt-BR') } : {}),
-                  ...(fields.estado ? { estado: fields.estado.toUpperCase().slice(0, 2) } : {}),
-                  ...(fields.cep ? { cep: formatarCepMascara(fields.cep) } : {}),
-                }))
-                setMoradaGeo({
-                  enderecoLocalizacao: place.enderecoLocalizacao,
-                  providerEnderecoId: place.providerEnderecoId,
-                })
-                setBuscaPlacesMorada(
-                  [fields.rua, fields.numero].filter(Boolean).join(', ') ||
-                    place.enderecoFormatado ||
-                    ''
-                )
-                showToast.success('Endereço aplicado a partir da sugestão do Google.')
-              }}
-            />
+            {usarModuloDeliveryClientes ? (
+              <MoradaEntregaGeoPanel
+                sessionKey={`${geoPanelSession}-${moradaEditando?.id ?? 'new'}`}
+                form={{
+                  rua: formNova.rua,
+                  numero: formNova.numero,
+                  bairro: formNova.bairro,
+                  cidade: formNova.cidade,
+                  estado: formNova.estado,
+                  cep: formNova.cep,
+                  complemento: formNova.complemento,
+                }}
+                onFormPatch={(patch: MoradaEntregaGeoFormPatch) => {
+                  setFormNova(prev => ({
+                    ...prev,
+                    ...patch,
+                  }))
+                }}
+                initialGeo={
+                  moradaEditando?.endereco
+                    ? {
+                        enderecoLocalizacao: moradaEditando.endereco.enderecoLocalizacao,
+                        preferenciaEntrega: moradaEditando.endereco.preferenciaEntrega,
+                        providerEnderecoId: moradaEditando.endereco.providerEnderecoId,
+                      }
+                    : null
+                }
+                forcarModoManual={forcarBackfillGeo}
+                disabled={criarMorada.isPending || atualizarMorada.isPending}
+                onGeoStateChange={setGeoPanelState}
+              />
+            ) : (
+              <EnderecoPlacesAutocomplete
+                variant="gestor"
+                floatingLabel={false}
+                label="Buscar endereço no Google"
+                placeholder="Digite rua, bairro ou cidade…"
+                value={buscaPlacesMorada}
+                onChange={setBuscaPlacesMorada}
+                onSelect={(place: PlaceDetailsResult) => {
+                  const fields = placeDetailsParaEnderecoGeocode(place)
+                  setFormNova(prev => ({
+                    ...prev,
+                    ...(fields.rua ? { rua: fields.rua.toLocaleUpperCase('pt-BR') } : {}),
+                    ...(fields.numero ? { numero: fields.numero } : {}),
+                    ...(fields.bairro ? { bairro: fields.bairro.toLocaleUpperCase('pt-BR') } : {}),
+                    ...(fields.cidade ? { cidade: fields.cidade.toLocaleUpperCase('pt-BR') } : {}),
+                    ...(fields.estado ? { estado: fields.estado.toUpperCase().slice(0, 2) } : {}),
+                    ...(fields.cep ? { cep: formatarCepMascara(fields.cep) } : {}),
+                  }))
+                  setMoradaGeo({
+                    enderecoLocalizacao: place.enderecoLocalizacao,
+                    providerEnderecoId: place.providerEnderecoId,
+                  })
+                  setBuscaPlacesMorada(
+                    [fields.rua, fields.numero].filter(Boolean).join(', ') ||
+                      place.enderecoFormatado ||
+                      ''
+                  )
+                  showToast.success('Endereço aplicado a partir da sugestão do Google.')
+                }}
+              />
+            )}
           </div>
 
           <div className="grid grid-cols-3 gap-3">
@@ -1033,7 +1153,9 @@ export function EntregaClienteSelector({
                 value={formNova.rua}
                 onChange={e => {
                   handleFormChange('rua', e.target.value)
-                  setMoradaGeo(null)
+                  if (!usarModuloDeliveryClientes) {
+                    setMoradaGeo(null)
+                  }
                 }}
                 placeholder="Rua das Flores"
                 className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"

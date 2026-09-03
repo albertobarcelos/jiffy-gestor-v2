@@ -50,6 +50,7 @@ import { createNovoPedidoResetForm } from './orchestrator/createNovoPedidoResetF
 import { assembleNovoPedidoContextSlices } from './orchestrator/assembleNovoPedidoContextSlices'
 import { canSubmitNovoPedido } from './orchestrator/canSubmitNovoPedido'
 import { useNovoPedidoOrchestratorFlags } from './orchestrator/useNovoPedidoOrchestratorFlags'
+import { enderecoTemGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
 import {
   formatarDataDetalhePedido as formatarDataDetalhePedidoOrchestrator,
   formatarDataHoraResumoFiscal,
@@ -550,6 +551,10 @@ export function useNovoPedidoOrchestrator({
     telefoneClienteDelivery: telefoneBuscadoEntrega,
     pedidoComEntrega,
     temEnderecoEntrega: Boolean(moradaEntregaSelecionada?.endereco),
+    enderecoEntregaTemGeo: Boolean(
+      moradaEntregaSelecionada?.endereco &&
+        enderecoTemGeolocalizacao(moradaEntregaSelecionada.endereco)
+    ),
     modoEdicaoProdutos,
   })
 
@@ -604,6 +609,10 @@ export function useNovoPedidoOrchestrator({
       pedidoComRetirada,
       pedidoComEntrega,
       temEnderecoEntrega: Boolean(moradaEntregaSelecionada?.endereco),
+      enderecoEntregaTemGeo: Boolean(
+        moradaEntregaSelecionada?.endereco &&
+          enderecoTemGeolocalizacao(moradaEntregaSelecionada.endereco)
+      ),
       troco,
     },
     createVendaGestor,
@@ -706,6 +715,10 @@ export function useNovoPedidoOrchestrator({
   const handlePedidoPainelExited = useNovoPedidoResetOnExit(resetForm, onAfterClose)
 
   const temEnderecoEntrega = Boolean(moradaEntregaSelecionada?.endereco)
+  const enderecoEntregaTemGeo = Boolean(
+    moradaEntregaSelecionada?.endereco &&
+      enderecoTemGeolocalizacao(moradaEntregaSelecionada.endereco)
+  )
 
   const canSubmit = () =>
     canSubmitNovoPedido({
@@ -714,6 +727,7 @@ export function useNovoPedidoOrchestrator({
       telefoneClienteDelivery: telefoneBuscadoEntrega,
       pedidoComEntrega,
       temEnderecoEntrega,
+      enderecoEntregaTemGeo,
       pedidoEntregaAceitaPagamentoPendente,
       entregaComCobrancaPeloEntregador,
       produtosCount: produtos.length,

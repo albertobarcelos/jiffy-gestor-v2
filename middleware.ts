@@ -97,7 +97,13 @@ export function middleware(request: NextRequest) {
     /** Geo/Places do checkout delivery público (rate limit nas próprias routes). */
     pathname.startsWith('/api/geolocalizacao/') ||
     pathname.startsWith('/notas-fiscais') ||
-    pathname.startsWith('/api/public/notas-fiscais-consumidor')
+    pathname.startsWith('/api/public/notas-fiscais-consumidor') ||
+    /** Delivery/cardápio público (cliente final). */
+    pathname === '/cardapio' ||
+    pathname.startsWith('/cardapio/') ||
+    pathname === '/delivery' ||
+    pathname.startsWith('/delivery/') ||
+    pathname.startsWith('/api/public/delivery/')
   ) {
     return NextResponse.next()
   }

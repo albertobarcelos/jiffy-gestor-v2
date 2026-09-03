@@ -76,6 +76,9 @@ const PUBLIC_PREFIXES = [
   '/esqueci-senha',
   '/redefinir-senha',
   '/notas-fiscais',
+  /** Cardápio/delivery público (cliente final — sem login do ERP). */
+  '/cardapio',
+  '/delivery',
 ]
 
 function isPublicPath(p: string | null): boolean {

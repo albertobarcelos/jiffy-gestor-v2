@@ -8,6 +8,7 @@ export type CanSubmitNovoPedidoParams = {
   telefoneClienteDelivery?: string | null
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
+  enderecoEntregaTemGeo?: boolean
   pedidoEntregaAceitaPagamentoPendente: boolean
   entregaComCobrancaPeloEntregador: boolean
   produtosCount: number
@@ -32,6 +33,7 @@ export function validarNovoPedidoSubmit(
     telefoneClienteDelivery: params.telefoneClienteDelivery,
     pedidoComEntrega: params.pedidoComEntrega,
     temEnderecoEntrega: params.temEnderecoEntrega,
+    enderecoEntregaTemGeo: params.enderecoEntregaTemGeo,
     pedidoGestorComPagamentoNoPasso3: params.pedidoGestorComPagamentoNoPasso3,
     pedidoEntregaAceitaPagamentoPendente: params.pedidoEntregaAceitaPagamentoPendente,
     pagamentosCount: params.pagamentos.length,

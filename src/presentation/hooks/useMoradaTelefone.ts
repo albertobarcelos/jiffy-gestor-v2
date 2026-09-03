@@ -69,9 +69,11 @@ export interface EnderecoMorada {
   estado: string
   complemento?: string
   referencia?: string
-  /** Geo opcional (Places Autocomplete). */
+  /** Geo do logradouro (Places / GPS / pin no mapa). */
   enderecoLocalizacao?: GeoJsonPoint | null
   providerEnderecoId?: string | null
+  /** Ponto de entrega distinto do logradouro (portaria, bloco etc.). */
+  preferenciaEntrega?: GeoJsonPoint | null
 }
 
 export interface MoradaTelefone {
@@ -115,6 +117,34 @@ function enderecoTemConteudoMinimo(e: EnderecoMorada): boolean {
 /** Monta `EnderecoMorada` a partir de um objeto (raiz ou `endereco` aninhado). */
 function extrairEnderecoDeRecord(rec: Record<string, unknown>): EnderecoMorada {
   const estadoRaw = asStr(pick(rec, ['estado', 'uf', 'state']))
+  const enderecoLocalizacao = (() => {
+    const raw = rec.enderecoLocalizacao ?? rec.endereco_localizacao
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+    const o = raw as Record<string, unknown>
+    if (o.type !== 'Point' || !Array.isArray(o.coordinates) || o.coordinates.length < 2) {
+      return null
+    }
+    const lng = Number(o.coordinates[0])
+    const lat = Number(o.coordinates[1])
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null
+    return { type: 'Point' as const, coordinates: [lng, lat] as [number, number] }
+  })()
+  const preferenciaEntrega = (() => {
+    const raw = rec.preferenciaEntrega ?? rec.preferencia_entrega
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+    const o = raw as Record<string, unknown>
+    if (o.type !== 'Point' || !Array.isArray(o.coordinates) || o.coordinates.length < 2) {
+      return null
+    }
+    const lng = Number(o.coordinates[0])
+    const lat = Number(o.coordinates[1])
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null
+    return { type: 'Point' as const, coordinates: [lng, lat] as [number, number] }
+  })()
+  const providerEnderecoId = optStr(
+    pick(rec, ['providerEnderecoId', 'provider_endereco_id'])
+  )
+
   return {
     cep: asStr(pick(rec, ['cep', 'CEP', 'codigoPostal', 'codigo_postal'])),
     rua: asStr(pick(rec, ['rua', 'logradouro', 'street'])),
@@ -124,6 +154,13 @@ function extrairEnderecoDeRecord(rec: Record<string, unknown>): EnderecoMorada {
     estado: estadoRaw.toUpperCase().slice(0, 2),
     complemento: optStr(pick(rec, ['complemento', 'complement'])),
     referencia: optStr(pick(rec, ['referencia', 'referência', 'reference'])),
+    ...(enderecoLocalizacao
+      ? {
+          enderecoLocalizacao,
+          providerEnderecoId: providerEnderecoId ?? null,
+          ...(preferenciaEntrega ? { preferenciaEntrega } : {}),
+        }
+      : {}),
   }
 }
 
