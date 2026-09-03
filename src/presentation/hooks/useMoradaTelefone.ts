@@ -615,6 +615,94 @@ export function useAtualizarMoradaTelefone(options?: MoradaTelefoneHookOptions) 
 }
 
 /**
+ * Remove morada do catálogo do cliente.
+ * Delivery: `PATCH …/clientes/{telefone}` com `enderecos.delete`.
+ * Legado: `DELETE …/gestor/morada-telefone/{id}`.
+ */
+export function useExcluirMoradaTelefone(options?: MoradaTelefoneHookOptions) {
+  const queryClient = useQueryClient()
+  const empresaId = useTenantEmpresaId()
+  const usarModuloDelivery = options?.usarModuloDelivery ?? false
+
+  return useSecureTenantMutation(
+    async (
+      { token },
+      {
+        id,
+        telefoneDigitos,
+      }: {
+        id: string
+        telefoneDigitos: string
+      }
+    ) => {
+      const telefone = telefoneDigitos.replace(/\D/g, '')
+      if (!id.trim() || !telefone) {
+        throw new Error('Endereço ou telefone inválido')
+      }
+
+      if (usarModuloDelivery) {
+        const response = await fetchGestorApi(
+          `/api/delivery/clientes/${encodeURIComponent(telefone)}`,
+          {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+            body: JSON.stringify({
+              enderecos: { delete: [id] },
+            }),
+          }
+        )
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(
+            mensagemErroResposta(errorData, response.status, 'Erro ao remover endereço')
+          )
+        }
+
+        return
+      }
+
+      const response = await fetchGestorApi(
+        `/api/gestor/morada-telefone/${encodeURIComponent(id)}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+          },
+        }
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(
+          mensagemErroResposta(errorData, response.status, 'Erro ao remover endereço')
+        )
+      }
+    },
+    {
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries({
+          queryKey: moradasTelefoneQueryKey(
+            variables.telefoneDigitos,
+            usarModuloDelivery,
+            empresaId
+          ),
+        })
+        showToast.success('Endereço removido com sucesso!')
+      },
+      onError: (error: Error) => {
+        showToast.error(error.message || 'Erro ao remover endereço')
+      },
+    }
+  )
+}
+
+/**
  * Regista utilização da morada (POST …/registrar-uso) para ordenar como mais recente no catálogo.
  * Deve ser chamado ao selecionar um endereço; não está acoplado ao POST da venda.
  */

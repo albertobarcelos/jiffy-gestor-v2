@@ -24,6 +24,7 @@ export interface UseNovoPedidoNavegacaoParams {
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
   enderecoEntregaTemGeo?: boolean
+  enderecoEntregaCoberturaStatus?: 'ok' | 'fora' | 'pendente' | 'indisponivel' | null
   /** Edição de produtos de pedido existente: trava a navegação entre etapas. */
   modoEdicaoProdutos?: boolean
 }
@@ -45,6 +46,7 @@ export function useNovoPedidoNavegacao({
   pedidoComEntrega,
   temEnderecoEntrega,
   enderecoEntregaTemGeo,
+  enderecoEntregaCoberturaStatus,
   modoEdicaoProdutos,
 }: UseNovoPedidoNavegacaoParams) {
   const [modalConfirmacaoSaidaOpen, setModalConfirmacaoSaidaOpen] = useState(false)
@@ -87,6 +89,7 @@ export function useNovoPedidoNavegacao({
         pedidoComEntrega,
         temEnderecoEntrega,
         enderecoEntregaTemGeo,
+        enderecoEntregaCoberturaStatus,
         exibirToast,
         onError: showToast.error,
       }),
@@ -97,6 +100,7 @@ export function useNovoPedidoNavegacao({
       pedidoComEntrega,
       temEnderecoEntrega,
       enderecoEntregaTemGeo,
+      enderecoEntregaCoberturaStatus,
     ]
   )
 

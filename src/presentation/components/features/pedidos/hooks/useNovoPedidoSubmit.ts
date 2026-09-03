@@ -63,6 +63,7 @@ export interface UseNovoPedidoSubmitParams {
     pedidoComEntrega: boolean
     temEnderecoEntrega: boolean
     enderecoEntregaTemGeo?: boolean
+    enderecoEntregaCoberturaStatus?: 'ok' | 'fora' | 'pendente' | 'indisponivel' | null
     troco: number
   }
   createVendaGestor: {
@@ -131,6 +132,7 @@ export function useNovoPedidoSubmit({
       pedidoComEntrega: validacao.pedidoComEntrega,
       temEnderecoEntrega: validacao.temEnderecoEntrega,
       enderecoEntregaTemGeo: validacao.enderecoEntregaTemGeo,
+      enderecoEntregaCoberturaStatus: validacao.enderecoEntregaCoberturaStatus,
       pedidoGestorComPagamentoNoPasso3: validacao.pedidoGestorComPagamentoNoPasso3,
       pedidoEntregaAceitaPagamentoPendente: validacao.pedidoEntregaAceitaPagamentoPendente,
       pagamentosCount: input.pagamentos.length,

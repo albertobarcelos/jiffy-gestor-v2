@@ -12,7 +12,7 @@ import {
   type PlacesBias,
 } from '@/src/shared/utils/geolocalizacaoPlaces'
 import { cn } from '@/src/shared/utils/cn'
-import { maiusculasEnderecoInput } from '@/src/shared/utils/normalizarTextoEnderecoPublico'
+import { maiusculasEnderecoInput, tituloCasePalavrasEndereco } from '@/src/shared/utils/normalizarTextoEnderecoPublico'
 
 export type EnderecoPlacesAutocompleteVariant = 'delivery' | 'gestor'
 
@@ -140,6 +140,11 @@ export function EnderecoPlacesAutocomplete({
   const busy = loading || loadingDetails
   const podeLimpar = value.trim().length > 0 && !disabled && !loadingDetails
 
+  const formatarTextoBusca = useCallback(
+    (texto: string) => (delivery ? maiusculasEnderecoInput(texto) : tituloCasePalavrasEndereco(texto)),
+    [delivery]
+  )
+
   const propagarValorInput = useCallback(
     (next: string) => {
       onChange(next)
@@ -152,8 +157,10 @@ export function EnderecoPlacesAutocomplete({
     [onChange, dispararBusca]
   )
 
-  const { inputRef: uppercaseInputRef, handleChange: handleUppercaseChange } =
-    useLocaleUppercaseInputHandler(value, propagarValorInput)
+  const { inputRef: textoInputRef, handleChange: handleTextoChange } =
+    useLocaleUppercaseInputHandler(value, propagarValorInput, {
+      transform: formatarTextoBusca,
+    })
 
   const limparBusca = () => {
     if (disabled || loadingDetails) return
@@ -183,8 +190,7 @@ export function EnderecoPlacesAutocomplete({
         [details.rua, details.numero].filter(Boolean).join(', ') ||
         details.enderecoFormatado ||
         prediction.descricao
-      const texto = delivery ? maiusculasEnderecoInput(textoBruto) : textoBruto
-      onChange(texto)
+      onChange(formatarTextoBusca(textoBruto))
       onSelect(details)
       setPredictions([])
       fecharLista()
@@ -248,7 +254,7 @@ export function EnderecoPlacesAutocomplete({
           <input
             type="text"
             role="combobox"
-            ref={delivery ? uppercaseInputRef : undefined}
+            ref={textoInputRef}
             aria-expanded={aberto}
             aria-controls={listId}
             aria-autocomplete="list"
@@ -260,9 +266,7 @@ export function EnderecoPlacesAutocomplete({
             disabled={disabled || loadingDetails}
             placeholder={placeholder}
             value={value}
-            onChange={
-              delivery ? handleUppercaseChange : event => propagarValorInput(event.target.value)
-            }
+            onChange={handleTextoChange}
             onFocus={() => {
               if (predictions.length > 0) setAberto(true)
             }}

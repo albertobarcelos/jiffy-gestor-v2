@@ -132,6 +132,10 @@ export function useNovoPedidoOrchestrator({
     setCurrentStep,
     moradaEntregaSelecionada,
     setMoradaEntregaSelecionada,
+    enderecoEntregaCoberturaStatus,
+    setEnderecoEntregaCoberturaStatus,
+    enderecoEntregaCoberturaValorTaxa,
+    setEnderecoEntregaCoberturaValorTaxa,
     telefoneBuscaEntrega,
     setTelefoneBuscaEntrega,
     telefoneBuscadoEntrega,
@@ -406,6 +410,7 @@ export function useNovoPedidoOrchestrator({
     pagamentos,
     taxaEntregaId,
     taxasEntrega,
+    enderecoEntregaCoberturaValorTaxa,
     resumoFinanceiroDetalhes,
     detalhesEntregaPedido,
   })
@@ -555,6 +560,7 @@ export function useNovoPedidoOrchestrator({
       moradaEntregaSelecionada?.endereco &&
         enderecoTemGeolocalizacao(moradaEntregaSelecionada.endereco)
     ),
+    enderecoEntregaCoberturaStatus,
     modoEdicaoProdutos,
   })
 
@@ -590,6 +596,7 @@ export function useNovoPedidoOrchestrator({
       tempoPrevistoMinutos,
       pedidoComEntrega,
       taxaEntregaSelecionada,
+      taxaEntregaCoberturaValor: enderecoEntregaCoberturaValorTaxa,
       valorTaxaEntrega,
       moradaEntregaSelecionada,
       entregaComCobrancaPeloEntregador,
@@ -613,6 +620,7 @@ export function useNovoPedidoOrchestrator({
         moradaEntregaSelecionada?.endereco &&
           enderecoTemGeolocalizacao(moradaEntregaSelecionada.endereco)
       ),
+      enderecoEntregaCoberturaStatus,
       troco,
     },
     createVendaGestor,
@@ -728,6 +736,7 @@ export function useNovoPedidoOrchestrator({
       pedidoComEntrega,
       temEnderecoEntrega,
       enderecoEntregaTemGeo,
+      enderecoEntregaCoberturaStatus,
       pedidoEntregaAceitaPagamentoPendente,
       entregaComCobrancaPeloEntregador,
       produtosCount: produtos.length,
@@ -823,6 +832,11 @@ export function useNovoPedidoOrchestrator({
     meiosPagamento,
     meiosPagamentoScrollRef,
     moradaEntregaSelecionada,
+    setMoradaEntregaSelecionada,
+    enderecoEntregaCoberturaStatus,
+    setEnderecoEntregaCoberturaStatus,
+    enderecoEntregaCoberturaValorTaxa,
+    setEnderecoEntregaCoberturaValorTaxa,
     mostrarLoadingFormasPagamento,
     modoVisualizacao,
     modalCancelarVendaOpen,

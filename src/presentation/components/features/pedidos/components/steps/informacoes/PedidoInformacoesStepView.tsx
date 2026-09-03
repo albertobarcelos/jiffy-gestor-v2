@@ -1,15 +1,16 @@
 'use client'
 
+import { useCallback, useRef } from 'react'
 import { Label } from '@/src/presentation/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/presentation/components/ui/select'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { MdAccessTime, MdAttachMoney, MdPersonOutline, MdStore } from 'react-icons/md'
-import { EntregaClienteSelector } from '@/src/presentation/components/features/delivery/components/EntregaClienteSelector'
-import { PedidoInformacoesStep } from '../../PedidoInformacoesStep'
 import {
-  SEM_TAXA_ENTREGA_VALUE,
-  TEMPOS_PREVISTOS_ENTREGA,
-} from '@/src/shared/constants/pedidoForm'
+  EntregaClienteSelector,
+  type CoberturaMoradaSelecionadaStatus,
+} from '@/src/presentation/components/features/delivery/components/EntregaClienteSelector'
+import { PedidoInformacoesStep } from '../../PedidoInformacoesStep'
+import { TEMPOS_PREVISTOS_ENTREGA } from '@/src/shared/constants/pedidoForm'
 import { useNovoPedidoFormContext } from '../../../context/NovoPedidoFormContext'
 import { useNovoPedidoUIContext } from '../../../context/NovoPedidoUIContext'
 
@@ -30,13 +31,63 @@ export function PedidoInformacoesStepView() {
     setTelefoneBuscadoEntrega,
     tempoPrevistoMinutos,
     setTempoPrevistoMinutos,
-    taxaEntregaId,
-    setTaxaEntregaId,
-    taxasEntrega,
-    taxasEntregaQuery,
+    enderecoEntregaCoberturaValorTaxa,
+    setEnderecoEntregaCoberturaStatus,
+    setEnderecoEntregaCoberturaValorTaxa,
   } = useNovoPedidoFormContext()
 
   const { empresa, setSeletorClienteOpen } = useNovoPedidoUIContext()
+  const ultimaMoradaAutoTempoRef = useRef<string | null>(null)
+
+  const handleCoberturaMoradaChange = useCallback(
+    (cobertura: CoberturaMoradaSelecionadaStatus) => {
+      switch (cobertura.status) {
+        case 'coberta': {
+          setEnderecoEntregaCoberturaStatus('ok')
+          setEnderecoEntregaCoberturaValorTaxa(cobertura.valorTaxa)
+          if (
+            cobertura.moradaId !== ultimaMoradaAutoTempoRef.current &&
+            cobertura.tempoEntregaInMinutes > 0 &&
+            TEMPOS_PREVISTOS_ENTREGA.includes(cobertura.tempoEntregaInMinutes)
+          ) {
+            ultimaMoradaAutoTempoRef.current = cobertura.moradaId
+            setTempoPrevistoMinutos(cobertura.tempoEntregaInMinutes)
+          }
+          break
+        }
+        case 'fora':
+          setEnderecoEntregaCoberturaStatus('fora')
+          setEnderecoEntregaCoberturaValorTaxa(null)
+          break
+        case 'loading':
+          setEnderecoEntregaCoberturaStatus('pendente')
+          break
+        case 'erro':
+          setEnderecoEntregaCoberturaStatus('indisponivel')
+          setEnderecoEntregaCoberturaValorTaxa(null)
+          break
+        case 'sem_geo':
+        case 'null':
+        default:
+          setEnderecoEntregaCoberturaStatus(null)
+          setEnderecoEntregaCoberturaValorTaxa(null)
+          ultimaMoradaAutoTempoRef.current = null
+          break
+      }
+    },
+    [
+      setEnderecoEntregaCoberturaStatus,
+      setEnderecoEntregaCoberturaValorTaxa,
+      setTempoPrevistoMinutos,
+    ]
+  )
+
+  const taxaCoberturaLabel =
+    enderecoEntregaCoberturaValorTaxa == null
+      ? moradaEntregaSelecionada
+        ? 'Calculando…'
+        : 'Selecione um endereço'
+      : transformarParaReal(enderecoEntregaCoberturaValorTaxa)
 
   return (
     <PedidoInformacoesStep>
@@ -101,6 +152,10 @@ export function PedidoInformacoesStepView() {
           }}
           mostrarEnderecos={pedidoComEntrega}
           usarModuloDeliveryClientes={pedidoDeliveryGestor}
+          tempoPrevistoMinutos={pedidoComEntrega ? tempoPrevistoMinutos : null}
+          onCoberturaMoradaSelecionadaChange={
+            pedidoDeliveryGestor && pedidoComEntrega ? handleCoberturaMoradaChange : undefined
+          }
         />
         {pedidoComRetirada ? (
           <div className="mt-3 rounded-lg border border-primary/15 bg-white p-3 text-sm text-secondary-text">
@@ -130,6 +185,9 @@ export function PedidoInformacoesStepView() {
                   ))}
                 </SelectContent>
               </Select>
+              <p className="mt-1.5 text-[11px] text-secondary-text">
+                Pode ajustar o tempo; o valor escolhido vale no pedido e no card do endereço.
+              </p>
             </div>
 
             <div className="rounded-lg border border-primary/15 bg-white p-3">
@@ -137,29 +195,15 @@ export function PedidoInformacoesStepView() {
                 <MdAttachMoney className="h-5 w-5 text-primary" />
                 <Label className="text-sm font-semibold text-primary-text">Taxa de entrega</Label>
               </div>
-              <Select
-                value={taxaEntregaId || SEM_TAXA_ENTREGA_VALUE}
-                onValueChange={value =>
-                  setTaxaEntregaId(value === SEM_TAXA_ENTREGA_VALUE ? '' : value)
-                }
-                disabled={taxasEntregaQuery.isLoading}
+              <div
+                className="flex h-10 items-center rounded-md border border-primary/20 bg-gray-50 px-3 text-sm font-semibold text-primary-text"
+                aria-live="polite"
               >
-                <SelectTrigger className="border-primary/30 bg-white">
-                  <SelectValue
-                    placeholder={
-                      taxasEntregaQuery.isLoading ? 'Carregando taxas...' : 'Selecionar taxa'
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={SEM_TAXA_ENTREGA_VALUE}>Sem taxa de entrega</SelectItem>
-                  {taxasEntrega.map(taxa => (
-                    <SelectItem key={taxa.getId()} value={taxa.getId()}>
-                      {taxa.getNome()} - {transformarParaReal(taxa.getValor())}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                {taxaCoberturaLabel}
+              </div>
+              <p className="mt-1.5 text-[11px] text-secondary-text">
+                Calculada automaticamente pela área/raio do endereço (somente leitura).
+              </p>
             </div>
           </div>
         )}

@@ -7,6 +7,18 @@ export function maiusculasEnderecoInput(valor: string): string {
   return toLocaleUppercasePt(valor)
 }
 
+/**
+ * Título visual (primeira letra de cada palavra em maiúscula).
+ * Só para exibição no campo de busca do Google — formulário continua em maiúsculas.
+ */
+export function tituloCasePalavrasEndereco(valor: string): string {
+  return valor.replace(/\S+/gu, palavra => {
+    const primeira = palavra.charAt(0).toLocaleUpperCase('pt-BR')
+    const resto = palavra.slice(1).toLocaleLowerCase('pt-BR')
+    return `${primeira}${resto}`
+  })
+}
+
 export function normalizarEstadoEndereco(estado: string): string {
   return toLocaleUppercasePt(estado).slice(0, 2)
 }

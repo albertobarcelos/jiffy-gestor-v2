@@ -86,7 +86,10 @@ function buildClientePedidoDeliveryPayload(input: CriarPedidoDeliveryInputDTO) {
 }
 
 function buildTaxasPedidoDeliveryPayload(input: CriarPedidoDeliveryInputDTO) {
+  // Com cobertura geolocalizada o backend calcula a taxa no create.
+  // Só envia taxa de catálogo se não houver valor de cobertura (legado / sem geo).
   if (!input.pedidoComEntrega) return undefined
+  if (input.taxaEntregaCoberturaValor != null) return undefined
   const taxaId = input.taxaEntregaSelecionada?.getId()?.trim()
   if (!taxaId) return undefined
   return [{ taxaId, quantidade: 1 }]

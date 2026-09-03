@@ -17,6 +17,7 @@ export type ValidarPedidoGestorInput = {
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
   enderecoEntregaTemGeo?: boolean
+  enderecoEntregaCoberturaStatus?: 'ok' | 'fora' | 'pendente' | 'indisponivel' | null
   pedidoGestorComPagamentoNoPasso3: boolean
   pedidoEntregaAceitaPagamentoPendente: boolean
   pagamentosCount: number
@@ -43,6 +44,11 @@ export function validarInformacoesPedidoEntrega(params: {
   temEnderecoEntrega: boolean
   /** Morada com coordenadas persistidas (obrigatório no create delivery com entrega). */
   enderecoEntregaTemGeo?: boolean
+  /**
+   * Cobertura da morada selecionada (delivery).
+   * `ok` = dentro da área; `fora` = fora; `pendente` = calculando; `indisponivel` = falha ao verificar.
+   */
+  enderecoEntregaCoberturaStatus?: 'ok' | 'fora' | 'pendente' | 'indisponivel' | null
 }): ValidacaoErroPedido | null {
   if (!params.pedidoDeliveryGestor) return null
 
@@ -65,9 +71,40 @@ export function validarInformacoesPedidoEntrega(params: {
   ) {
     return {
       message:
-        'O endereço de entrega precisa ter geolocalização. Confirme o pin no mapa antes de continuar.',
+        'O endereço de entrega precisa ter geolocalização. Use “Localizar endereço” antes de continuar.',
       goToStep: 2,
       code: 'entrega',
+    }
+  }
+
+  if (
+    params.pedidoComEntrega &&
+    params.temEnderecoEntrega &&
+    params.enderecoEntregaTemGeo !== false
+  ) {
+    const cobertura = params.enderecoEntregaCoberturaStatus
+    if (cobertura === 'fora') {
+      return {
+        message:
+          'O endereço selecionado está fora da área de entrega. Escolha outro endereço para continuar.',
+        goToStep: 2,
+        code: 'entrega',
+      }
+    }
+    if (cobertura === 'indisponivel') {
+      return {
+        message:
+          'Não foi possível verificar a cobertura de entrega. Tente novamente em instantes.',
+        goToStep: 2,
+        code: 'entrega',
+      }
+    }
+    if (cobertura === 'pendente' || cobertura == null) {
+      return {
+        message: 'Aguarde o cálculo da taxa de entrega deste endereço.',
+        goToStep: 2,
+        code: 'entrega',
+      }
     }
   }
 
@@ -199,6 +236,7 @@ export function validarPedidoGestor(
     pedidoComEntrega: input.pedidoComEntrega,
     temEnderecoEntrega: input.temEnderecoEntrega,
     enderecoEntregaTemGeo: input.enderecoEntregaTemGeo,
+    enderecoEntregaCoberturaStatus: input.enderecoEntregaCoberturaStatus,
   })
   if (erroEntrega) erros.push(erroEntrega)
 
