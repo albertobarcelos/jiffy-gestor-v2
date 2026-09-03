@@ -80,6 +80,8 @@ interface AtribuirEntregadorKanbanPainelProps {
   open: boolean
   venda: Venda | null
   entregadorVinculadoId?: string | null
+  /** Aberto ao clicar “Saiu para entrega” sem motoboy: confirma e segue o despacho. */
+  modoDespacho?: boolean
   onClose: () => void
   onSalvo: (vendaId: string, entregadorId: string | null) => void
 }
@@ -151,6 +153,7 @@ export function AtribuirEntregadorKanbanPainel({
   open,
   venda,
   entregadorVinculadoId,
+  modoDespacho = false,
   onClose,
   onSalvo,
 }: AtribuirEntregadorKanbanPainelProps) {
@@ -340,10 +343,18 @@ export function AtribuirEntregadorKanbanPainel({
     entregadorInicialId,
   ])
 
+  const podeConfirmar = modoDespacho
+    ? Boolean(entregadorId.trim()) && !entregadoresQuery.isLoading && !carregandoTaxa
+    : temAlteracao
+
   const handleSalvar = async () => {
     if (!venda) return
     if (venda.tabelaOrigem !== 'venda_gestor') {
       showToast.error('Vincular entregador só está disponível para pedidos do gestor.')
+      return
+    }
+    if (modoDespacho && !entregadorId.trim()) {
+      showToast.error('Escolha um entregador para sair para entrega.')
       return
     }
 
@@ -357,6 +368,11 @@ export function AtribuirEntregadorKanbanPainel({
     const deveSalvarEntregador = entregadorMudou
 
     if (!deveSalvarTaxa && !deveSalvarEntregador) {
+      if (modoDespacho && entregadorId.trim()) {
+        onSalvo(venda.id, entregadorId.trim())
+        onClose()
+        return
+      }
       showToast.info('Nenhuma alteração para salvar.')
       return
     }
@@ -491,11 +507,16 @@ export function AtribuirEntregadorKanbanPainel({
       >
         <div className="shrink-0 border-b border-gray-200 bg-gray-50 px-6 py-4">
           <DialogTitle className="!p-0 text-lg font-semibold text-primary-text">
-            Vincular entregador
+            {modoDespacho ? 'Sair para entrega' : 'Vincular entregador'}
           </DialogTitle>
           {rotuloPedido && (
             <p className="mt-1 text-sm text-secondary-text">{rotuloPedido}</p>
           )}
+          {modoDespacho ? (
+            <p className="mt-1 text-xs text-secondary-text">
+              O último entregador usado neste terminal já vem selecionado.
+            </p>
+          ) : null}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
@@ -523,7 +544,7 @@ export function AtribuirEntregadorKanbanPainel({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={SEM_ENTREGADOR} className={SELECT_ITEM_ROXO}>
-                    Nenhum
+                    {modoDespacho ? 'Selecionar entregador' : 'Nenhum'}
                   </SelectItem>
                   {entregadores.map(entregador => (
                     <SelectItem
@@ -607,12 +628,12 @@ export function AtribuirEntregadorKanbanPainel({
               variant="contained"
               color="primary"
               onClick={() => void handleSalvar()}
-              disabled={salvando || carregandoTaxa || entregadoresQuery.isLoading || !temAlteracao}
+              disabled={salvando || carregandoTaxa || entregadoresQuery.isLoading || !podeConfirmar}
               isLoading={salvando}
               className="h-12 min-h-12 w-full font-semibold shadow-none"
               sx={footerSavePrimaryBarSx(false)}
             >
-              Salvar Alterações
+              {modoDespacho ? 'Sair para entrega' : 'Salvar Alterações'}
             </Button>
           </div>
         </div>

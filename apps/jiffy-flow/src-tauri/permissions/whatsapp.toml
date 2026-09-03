@@ -1,0 +1,12 @@
+[[permission]]
+identifier = "allow-whatsapp"
+description = "Mostra e esconde o WebView do WhatsApp Web"
+commands.allow = [
+  "whatsapp_show",
+  "whatsapp_hide",
+  "whatsapp_reload",
+  "whatsapp_clear_session",
+  "whatsapp_status",
+  "whatsapp_chat_hint",
+  "whatsapp_inserir_texto",
+]

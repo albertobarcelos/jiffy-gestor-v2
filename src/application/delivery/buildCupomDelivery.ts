@@ -34,7 +34,7 @@ export interface BuildCupomDeliveryOptions {
 }
 
 /**
- * Monta HTML para impressão térmica (QZ pixel/html). Largura ~80mm em px (~302px a 96dpi); pode reduzir para 58mm.
+ * Monta HTML do cupom delivery (preview / template). A impressão física usa o Document do agente.
  */
 export function buildCupomDelivery(
   venda: VendaGestorCupomDTO,

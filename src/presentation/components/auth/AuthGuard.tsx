@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import type { Auth } from '@/src/domain/entities/Auth'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
@@ -16,7 +16,18 @@ import {
   SESSION_STORAGE_TENANT_LOGOUT_SELF,
   JIFFY_SESSION_EXPIRED_EVENT,
 } from '@/src/shared/constants/sessionCoordinator'
-import { HUB_PATH, isHubPathname } from '@/src/shared/constants/hubRoutes'
+import { isHubPathname } from '@/src/shared/constants/hubRoutes'
+import {
+  estaNaMesmaRotaLocal,
+  irParaLoginDaSessaoAtual,
+  urlHubDaSessaoAtual,
+} from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
+import {
+  estaNoAppJiffyFlow,
+  isRotaKioskPedidos,
+  isRotaPedidos,
+} from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
+import { stripGestaoEmpresaSlugFromPath } from '@/src/shared/utils/gestaoRoutes'
 
 /** Tempo máximo de espera para o refresh de token antes de encerrar a sessão da empresa. */
 const REFRESH_TIMEOUT_MS = 5_000
@@ -65,8 +76,6 @@ const PUBLIC_PREFIXES = [
   '/esqueci-senha',
   '/redefinir-senha',
   '/notas-fiscais',
-  '/cardapio',
-  '/delivery',
 ]
 
 function isPublicPath(p: string | null): boolean {
@@ -156,7 +165,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
       } catch (error) {
         console.error('AuthGuard: erro ao encerrar sessão da empresa:', error)
       }
-      window.location.href = HUB_PATH
+      window.location.href = urlHubDaSessaoAtual()
     }
 
     if (identityHubStillValid()) {
@@ -182,7 +191,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     } catch (error) {
       console.error('AuthGuard: erro ao encerrar sessão antes do login:', error)
     }
-    window.location.href = '/login'
+    irParaLoginDaSessaoAtual('assign')
   }, [logout, logoutTenant])
 
   /**
@@ -209,16 +218,38 @@ export function AuthGuard({ children }: AuthGuardProps) {
     void fetch('/api/auth/logout-hub', { method: 'POST', credentials: 'include' }).catch(() => {
       /* noop */
     })
-    window.location.href = '/login'
+    irParaLoginDaSessaoAtual('assign')
   }, [])
 
   const redirectToHub = useCallback(() => {
+    const dest = urlHubDaSessaoAtual()
+    if (estaNaMesmaRotaLocal(dest)) {
+      redirectingRef.current = false
+      setAllowed(true)
+      return
+    }
     if (redirectingRef.current) {
       return
     }
     redirectingRef.current = true
-    window.location.href = HUB_PATH
+    window.location.replace(dest)
   }, [])
+
+  useLayoutEffect(() => {
+    if (isPublicPath(pathname)) return
+    if (
+      isRotaKioskPedidos(
+        pathname ?? '',
+        typeof window !== 'undefined' ? window.location.search : ''
+      )
+    ) {
+      if (!useAuthStore.getState().isTabVerified) {
+        useAuthStore.getState().setTabVerified(true)
+      }
+      redirectingRef.current = false
+      setAllowed(true)
+    }
+  }, [pathname])
 
   useEffect(() => {
     // Rotas públicas: liberar imediatamente, sem esperar reidratação
@@ -227,15 +258,34 @@ export function AuthGuard({ children }: AuthGuardProps) {
       return
     }
 
+    const isHub = isHubPath(pathname)
+
+    /** Flow: quadro e lista sem tenant. Não esperar persist — senão o login fica no robot até F5. */
+    if (
+      !isHub &&
+      isRotaKioskPedidos(
+        pathname ?? '',
+        typeof window !== 'undefined' ? window.location.search : ''
+      )
+    ) {
+      if (!isTabVerified) {
+        useAuthStore.getState().setTabVerified(true)
+      }
+      redirectingRef.current = false
+      setAllowed(true)
+      return
+    }
+
     if (!isRehydrated) {
       return
     }
 
-    const isHub = isHubPath(pathname)
-
     // Enquanto o bootstrap da aba (URL ↔ token / rebind) não confirmou a sessão,
     // não tentar refresh ou redirect — TabSessionBootstrap reestabelece se necessário.
     if (!isHub && !isTabVerified) {
+      if (!isTenantSessionAlive() && !identityHubStillValid()) {
+        irParaLoginDaSessaoAtual()
+      }
       return
     }
 
@@ -502,13 +552,24 @@ export function AuthGuard({ children }: AuthGuardProps) {
     return <>{children}</>
   }
 
-  if (!isRehydrated || !allowed) {
+  /**
+   * .exe e `/pedidos`: nunca o robot do Gestor web.
+   * Sem isto, dashboard/hub sem tenant deixa o WebView no mascote para sempre.
+   */
+  if (
+    estaNoAppJiffyFlow() ||
+    isRotaPedidos(stripGestaoEmpresaSlugFromPath(pathname ?? ''))
+  ) {
+    return <>{children}</>
+  }
+
+  if (!allowed) {
     if (isHubPath(pathname)) {
       return <div className="min-h-screen bg-[#fafafa]" />
     }
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
-        <JiffyLoading />
+        <JiffyLoading text="Abrindo sessão…" />
       </div>
     )
   }

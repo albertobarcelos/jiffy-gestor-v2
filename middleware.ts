@@ -18,6 +18,34 @@ import {
   parseEmpresaSlugFromSearch,
   stripEmpresaSlugFromSearch,
 } from '@/src/shared/utils/gestaoRoutes'
+import {
+  PATH_BOLHA_HTML,
+  PEDIDOS_PATH,
+  QUERY_GESTOR,
+  TOKEN_USER_AGENT_FREDY,
+  TOKEN_USER_AGENT_JIFFY_FLOW,
+} from '@/src/presentation/gestor-pedidos/constantes'
+import { isRotaPermitidaNoJiffyFlow } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
+
+function pedidoVeioDoAppJiffyFlow(request: NextRequest): boolean {
+  const ua = request.headers.get('user-agent') ?? ''
+  return ua.includes(TOKEN_USER_AGENT_FREDY) || ua.includes(TOKEN_USER_AGENT_JIFFY_FLOW)
+}
+
+function urlListaEmpresasFlow(request: NextRequest): URL {
+  return new URL(`${PEDIDOS_PATH}/empresas?${QUERY_GESTOR}`, request.url)
+}
+
+function urlLoginPreservandoGestor(request: NextRequest): URL {
+  const dest = new URL('/login', request.url)
+  if (
+    request.nextUrl.searchParams.has(QUERY_GESTOR) ||
+    pedidoVeioDoAppJiffyFlow(request)
+  ) {
+    dest.searchParams.set(QUERY_GESTOR, request.nextUrl.searchParams.get(QUERY_GESTOR) ?? '')
+  }
+  return dest
+}
 
 /**
  * Middleware para proteção de rotas - OTIMIZADO
@@ -26,6 +54,22 @@ import {
  */
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+  const noAppFlow = pedidoVeioDoAppJiffyFlow(request)
+
+  /** Bolha do Fredy: HTML estático. Sem isto o UA Fredy/ manda a janela 56px para /pedidos. */
+  if (pathname === PATH_BOLHA_HTML) {
+    return NextResponse.next()
+  }
+
+  /** O .exe não abre hub, dashboard nem o resto do Gestor web. */
+  if (noAppFlow && !pathname.startsWith('/api/') && !isRotaPermitidaNoJiffyFlow(pathname)) {
+    return NextResponse.redirect(urlListaEmpresasFlow(request))
+  }
+
+  /** Quadro sem empresa no .exe: lista, nunca o kanban a girar. */
+  if (noAppFlow && pathname === PEDIDOS_PATH) {
+    return NextResponse.redirect(urlListaEmpresasFlow(request))
+  }
 
   /** Convite novo usuário: não renderiza /login — vai direto para /registro (evita “flash” do login). */
   if (pathname === '/login') {
@@ -53,12 +97,7 @@ export function middleware(request: NextRequest) {
     /** Geo/Places do checkout delivery público (rate limit nas próprias routes). */
     pathname.startsWith('/api/geolocalizacao/') ||
     pathname.startsWith('/notas-fiscais') ||
-    pathname.startsWith('/api/public/notas-fiscais-consumidor') ||
-    pathname === '/cardapio' ||
-    pathname.startsWith('/cardapio/') ||
-    pathname === '/delivery' ||
-    pathname.startsWith('/delivery/') ||
-    pathname.startsWith('/api/public/delivery/')
+    pathname.startsWith('/api/public/notas-fiscais-consumidor')
   ) {
     return NextResponse.next()
   }
@@ -71,7 +110,10 @@ export function middleware(request: NextRequest) {
       Boolean(request.cookies.get(AUTH_COOKIE_REFRESH)?.value) ||
       Boolean(request.cookies.get(AUTH_COOKIE_LEGACY)?.value)
     if (!hasAnySessionCookie) {
-      return NextResponse.redirect(new URL('/login', request.url))
+      return NextResponse.redirect(urlLoginPreservandoGestor(request))
+    }
+    if (noAppFlow) {
+      return NextResponse.redirect(urlListaEmpresasFlow(request))
     }
     return NextResponse.redirect(new URL(HUB_PATH, request.url))
   }
@@ -92,7 +134,7 @@ export function middleware(request: NextRequest) {
       Boolean(request.cookies.get(AUTH_COOKIE_REFRESH)?.value) ||
       Boolean(request.cookies.get(AUTH_COOKIE_LEGACY)?.value)
     if (!hasAnySessionCookie) {
-      return NextResponse.redirect(new URL('/login', request.url))
+      return NextResponse.redirect(urlLoginPreservandoGestor(request))
     }
     return NextResponse.next()
   }
@@ -139,6 +181,23 @@ export function middleware(request: NextRequest) {
     return NextResponse.rewrite(rewriteUrl)
   }
 
+  /**
+   * Flow (`?gestor`): a página decide login vs lista. Não bloquear no Edge
+   * com token velho — isso deixava o WebView no robot até o compile acabar.
+   */
+  if (
+    pathname === PEDIDOS_PATH ||
+    pathname.startsWith(`${PEDIDOS_PATH}/`)
+  ) {
+    if (noAppFlow || request.nextUrl.searchParams.has(QUERY_GESTOR)) {
+      const res = NextResponse.next()
+      if (noAppFlow) {
+        res.headers.set('Cache-Control', 'no-store')
+      }
+      return res
+    }
+  }
+
   const tenantTok = request.cookies.get(AUTH_COOKIE_TENANT)?.value
   const identityTok = request.cookies.get(AUTH_COOKIE_IDENTITY)?.value
   const legacyTok = request.cookies.get(AUTH_COOKIE_LEGACY)?.value
@@ -157,7 +216,7 @@ export function middleware(request: NextRequest) {
     if (isApiRoute) {
       return NextResponse.json({ error: 'Token não encontrado' }, { status: 401 })
     }
-    return NextResponse.redirect(new URL('/login', request.url))
+    return NextResponse.redirect(urlLoginPreservandoGestor(request))
   }
 
   // Para rotas de página e API, apenas verifica se token existe
@@ -177,7 +236,7 @@ export const config = {
      * - images (image files)
      * - public files
      */
-    '/((?!_next/static|_next/image|favicon.ico|videos|images|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|videos|images|jiffy-flow-bolha\\.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
 

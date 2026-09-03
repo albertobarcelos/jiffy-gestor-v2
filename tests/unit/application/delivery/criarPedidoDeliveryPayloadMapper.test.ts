@@ -9,11 +9,9 @@ function baseInput(
     tipoInicioPedido: 'entrega',
     origem: 'GESTOR',
     status: 'ABERTA',
-    telefoneCliente: '65999998888',
     produtos: [
       {
         produtoId: 'prod-1',
-        nome: 'Produto teste',
         quantidade: 1,
         valorUnitario: 24,
         valorCatalogo: 24,
@@ -41,7 +39,7 @@ function baseInput(
     meiosPagamento: [],
     nomesMeiosPagamentoPedido: {},
     ...overrides,
-  } as CriarPedidoDeliveryInputDTO
+  }
 }
 
 describe('CriarPedidoDeliveryPayloadMapper', () => {
@@ -89,6 +87,18 @@ describe('CriarPedidoDeliveryPayloadMapper', () => {
 
     expect(payload.taxas).toEqual([{ taxaId: 'taxa-entrega-1', quantidade: 1 }])
     expect(payload.cobrancas?.[0]?.valor).toBe(29)
+  })
+
+  it('não envia cliente.nome — a API rejeita a chave com Zod strict', () => {
+    const payload = buildCriarPedidoDeliveryPayload(
+      baseInput({
+        telefoneCliente: '65999998888',
+        clienteEntregaVinculado: { id: 'cli-1', nome: 'Maria Silva' },
+      })
+    )
+
+    expect(payload.cliente).toEqual({ telefone: '65999998888' })
+    expect(payload.cliente).not.toHaveProperty('nome')
   })
 
   it('envia enderecoIdEntrega quando morada selecionada possui id', () => {
@@ -158,7 +168,6 @@ describe('CriarPedidoDeliveryPayloadMapper', () => {
         produtos: [
           {
             produtoId: 'prod-1',
-            nome: 'Produto teste',
             quantidade: 2,
             valorUnitario: 19.9,
             valorCatalogo: 24,
@@ -186,7 +195,6 @@ describe('CriarPedidoDeliveryPayloadMapper', () => {
         produtos: [
           {
             produtoId: 'prod-1',
-            nome: 'Produto teste',
             quantidade: 1,
             valorUnitario: 24,
             valorCatalogo: 24,

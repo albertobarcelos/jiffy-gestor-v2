@@ -12,6 +12,7 @@ import type { TipoPedido } from '../../pedidos/components/EscolhaTipoPedidoModal
 import type { AbaDetalhesPedido } from '../../pedidos/types'
 import type { Venda } from '../types'
 import type { DateRange } from 'react-day-picker'
+import { AtribuirEntregadorKanbanPainel } from '../../delivery/kanban-panels/AtribuirEntregadorKanbanPainel'
 
 export interface KanbanModaisRendererProps {
   timezoneAgregacao: string
@@ -62,6 +63,11 @@ export interface KanbanModaisRendererProps {
   onAfterCloseVisualizacao: () => void
   onSuccessVisualizacao: () => void
   modoKanbanVendas: ModoKanbanVendas
+  pedidoAtribuirEntregador: Venda | null
+  entregadorVinculadoDespacho?: string | null
+  modoDespachoEntregador: boolean
+  onCloseAtribuirEntregadorDespacho: () => void
+  onSalvoAtribuirEntregadorDespacho: (vendaId: string, entregadorId: string | null) => void
 }
 
 export function KanbanModaisRenderer({
@@ -102,6 +108,11 @@ export function KanbanModaisRenderer({
   onAfterCloseVisualizacao,
   onSuccessVisualizacao,
   modoKanbanVendas,
+  pedidoAtribuirEntregador,
+  entregadorVinculadoDespacho,
+  modoDespachoEntregador,
+  onCloseAtribuirEntregadorDespacho,
+  onSalvoAtribuirEntregadorDespacho,
 }: KanbanModaisRendererProps) {
   return (
     <>
@@ -206,6 +217,19 @@ export function KanbanModaisRenderer({
           modoVisualizacao={true}
         />
       )}
+      <AtribuirEntregadorKanbanPainel
+        key={
+          pedidoAtribuirEntregador
+            ? `despacho-entregador-${pedidoAtribuirEntregador.id}`
+            : 'despacho-entregador-fechado'
+        }
+        open={Boolean(pedidoAtribuirEntregador)}
+        venda={pedidoAtribuirEntregador}
+        entregadorVinculadoId={entregadorVinculadoDespacho}
+        modoDespacho={modoDespachoEntregador}
+        onClose={onCloseAtribuirEntregadorDespacho}
+        onSalvo={onSalvoAtribuirEntregadorDespacho}
+      />
       <AlertaCbenefEmissaoDialog
         open={Boolean(alertaCbenef)}
         itens={alertaCbenef?.itens ?? []}

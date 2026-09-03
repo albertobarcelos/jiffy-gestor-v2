@@ -219,7 +219,7 @@ export function GruposComplementosTabsModal({
               complementosIdsDraft={draftComplementosIds}
               onBasicDataChange={setBasicData}
               onGoToComplementosTab={goToComplementosTab}
-              onSaved={async (id) => {
+              onSaved={async (id?: string) => {
                 if (state.mode === 'create' && id) {
                   await onCreated?.(id)
                 }

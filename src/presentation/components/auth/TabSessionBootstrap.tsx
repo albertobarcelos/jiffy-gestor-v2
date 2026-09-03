@@ -1,6 +1,7 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useLayoutEffect, useRef } from 'react'
+import { usePathname } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { buildAuthFromAccessToken, isEmailSessaoPlaceholder } from '@/src/shared/utils/buildAuthFromAccessToken'
 import {
@@ -8,18 +9,48 @@ import {
   getTabTenantToken,
   bootstrapTabSessionManually,
   clearTabSession,
+  getEmpresaSlugParam,
 } from '@/src/shared/utils/tabSession'
-import { parseEmpresaSlugFromPath, parseEmpresaSlugFromSearch } from '@/src/shared/utils/gestaoRoutes'
+import {
+  parseEmpresaSlugFromPath,
+  parseEmpresaSlugFromSearch,
+  stripGestaoEmpresaSlugFromPath,
+} from '@/src/shared/utils/gestaoRoutes'
 import {
   SESSION_STORAGE_EMPRESA_SLUG,
   SESSION_STORAGE_EMPRESA_ID,
   SESSION_STORAGE_TENANT_TOKEN,
 } from '@/src/shared/constants/sessionCoordinator'
+import {
+  irParaLoginDaSessaoAtual,
+  lerSinalGestorDoBrowser,
+  pathEscolherEmpresaKiosk,
+  pathPedidosGestor,
+  urlHubDaSessaoAtual,
+} from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
+import { PEDIDOS_PATH } from '@/src/presentation/gestor-pedidos/constantes'
 import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
+import { isSinalKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
+import { lerUltimaEmpresaKiosk } from '@/src/presentation/gestor-pedidos/kiosk/ultimaEmpresaKiosk'
 import { extractTokenInfo } from '@/src/shared/utils/validateToken'
 import { decideTabSessionBootstrap } from '@/src/presentation/utils/decideTabSessionBootstrap'
 
 type RebindPending = { empresaId: string; empParam: string }
+
+const ROTAS_PUBLICAS_PREFIXO = [
+  '/login',
+  '/registro',
+  '/confirmar-email',
+  '/esqueci-senha',
+  '/redefinir-senha',
+  '/notas-fiscais',
+  '/cardapio',
+  '/delivery',
+]
+
+function isRotaPublicaBootstrap(pathname: string): boolean {
+  return ROTAS_PUBLICAS_PREFIXO.some(r => pathname === r || pathname.startsWith(`${r}/`))
+}
 
 function getEmpParam(): string | null {
   try {
@@ -74,7 +105,7 @@ async function rebindViaEscolherEmpresa(
     activateTenantToken(data.accessToken, setTenantAuth, setTabVerified)
   } catch {
     clearTabSession()
-    window.location.href = HUB_PATH
+    irParaLoginDaSessaoAtual()
   }
 }
 
@@ -90,13 +121,78 @@ export function TabSessionBootstrap() {
   const hubEmpresas = useAuthStore(s => s.hubEmpresas)
   const isRehydrated = useAuthStore(s => s.isRehydrated)
 
+  const pathname = usePathname()
   const didRunRef = useRef(false)
   const rebindRef = useRef<RebindPending | null>(null)
 
   useLayoutEffect(() => {
-    if (typeof window === 'undefined' || !isRehydrated || didRunRef.current) return
+    if (typeof window === 'undefined') return
+
+    const pathNow = pathname ?? window.location.pathname
+    if (isRotaPublicaBootstrap(pathNow)) {
+      return
+    }
+
+    /**
+     * Flow sem empresa na URL: não esperar Zustand.
+     * Quem logou no hub e reabre `/pedidos` ficava no quadro a girar para sempre.
+     */
+    const kioskAgora = isSinalKioskGestorPedidos(lerSinalGestorDoBrowser())
+    const pathModuloAgora = stripGestaoEmpresaSlugFromPath(pathNow)
+    if (
+      kioskAgora &&
+      !getEmpParam() &&
+      (pathModuloAgora === PEDIDOS_PATH || pathModuloAgora === HUB_PATH) &&
+      !getTabTenantToken()
+    ) {
+      if (didRunRef.current) return
+      didRunRef.current = true
+      window.location.replace(pathEscolherEmpresaKiosk())
+      return
+    }
+
+    if (!isRehydrated) return
+
+    if (didRunRef.current) return
 
     const emp = getEmpParam()
+
+    /** Jiffy Flow sem slug: aba já aberta, ou lista de empresas — nunca Minhas Empresas. */
+    if (!emp && kioskAgora) {
+      const pathModulo = stripGestaoEmpresaSlugFromPath(window.location.pathname)
+      /** Lista do Flow: o utilizador acabou de entrar — não saltar para a última empresa. */
+      if (pathModulo === `${PEDIDOS_PATH}/empresas` || pathModulo === `${PEDIDOS_PATH}/whatsapp`) {
+        didRunRef.current = true
+        setTabVerified(true)
+        return
+      }
+
+      const storedSlug = getEmpresaSlugParam()
+      if (storedSlug) {
+        didRunRef.current = true
+        window.location.replace(pathPedidosGestor(storedSlug))
+        return
+      }
+      const userId =
+        useAuthStore.getState().identityAuth?.getUser().getId() ??
+        useAuthStore.getState().hubEmpresasUserId
+      const last = lerUltimaEmpresaKiosk()
+      const lastDoUser = last?.empParam && (!userId || !last.userId || last.userId === userId)
+      if (lastDoUser && getTabTenantToken()) {
+        didRunRef.current = true
+        window.location.replace(pathPedidosGestor(last.empParam))
+        return
+      }
+      if (pathModulo === PEDIDOS_PATH || pathModulo === HUB_PATH) {
+        didRunRef.current = true
+        window.location.replace(pathEscolherEmpresaKiosk())
+        return
+      }
+      didRunRef.current = true
+      setTabVerified(true)
+      return
+    }
+
     const pendingToken = consumeTabSession(emp)
     const existingToken = pendingToken ? null : getTabTenantToken()
 
@@ -115,7 +211,14 @@ export function TabSessionBootstrap() {
       storedEmpresaId,
     })
 
-    if (decision.type === 'wait') return
+    if (decision.type === 'wait') {
+      const identity = useAuthStore.getState().identityAuth
+      if (!identity || identity.isExpired()) {
+        didRunRef.current = true
+        irParaLoginDaSessaoAtual()
+      }
+      return
+    }
 
     didRunRef.current = true
 
@@ -127,7 +230,11 @@ export function TabSessionBootstrap() {
       } catch {
         /* ignore */
       }
-      activateTenantToken(decision.token, setTenantAuth, setTabVerified)
+      try {
+        activateTenantToken(decision.token, setTenantAuth, setTabVerified)
+      } catch {
+        irParaLoginDaSessaoAtual()
+      }
       return
     }
 
@@ -137,7 +244,12 @@ export function TabSessionBootstrap() {
       } catch {
         /* ignore */
       }
-      window.location.href = HUB_PATH
+      const identity = useAuthStore.getState().identityAuth
+      if (identity && !identity.isExpired()) {
+        window.location.replace(urlHubDaSessaoAtual())
+      } else {
+        irParaLoginDaSessaoAtual()
+      }
       return
     }
 
@@ -150,7 +262,7 @@ export function TabSessionBootstrap() {
       /* ignore */
     }
     rebindRef.current = { empresaId: decision.empresaId, empParam: decision.empParam }
-  }, [isRehydrated, hubEmpresas, setTenantAuth, setTabVerified])
+  }, [hubEmpresas, isRehydrated, pathname, setTabVerified, setTenantAuth])
 
   useEffect(() => {
     const pending = rebindRef.current
