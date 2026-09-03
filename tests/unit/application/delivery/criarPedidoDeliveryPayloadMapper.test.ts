@@ -89,6 +89,18 @@ describe('CriarPedidoDeliveryPayloadMapper', () => {
     expect(payload.cobrancas?.[0]?.valor).toBe(29)
   })
 
+  it('não envia cliente.nome — a API rejeita a chave com Zod strict', () => {
+    const payload = buildCriarPedidoDeliveryPayload(
+      baseInput({
+        telefoneCliente: '65999998888',
+        clienteEntregaVinculado: { id: 'cli-1', nome: 'Maria Silva' },
+      })
+    )
+
+    expect(payload.cliente).toEqual({ telefone: '65999998888' })
+    expect(payload.cliente).not.toHaveProperty('nome')
+  })
+
   it('envia enderecoIdEntrega quando morada selecionada possui id', () => {
     const payload = buildCriarPedidoDeliveryPayload(
       baseInput({
