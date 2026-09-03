@@ -1,6 +1,6 @@
 [package]
 name = "jiffy-flow"
-version = "0.1.1"
+version = "0.1.4"
 description = "Fredy — gestor de pedidos no Windows. Por Jiffy."
 authors = ["NexSyn"]
 edition = "2021"
@@ -18,7 +18,7 @@ hex = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
-tauri = { version = "2", features = ["unstable"] }
+tauri = { version = "2", features = ["unstable", "tray-icon"] }
 tauri-plugin-deep-link = "2"
 ureq = { version = "2", default-features = false, features = ["tls"] }
 url = "2"

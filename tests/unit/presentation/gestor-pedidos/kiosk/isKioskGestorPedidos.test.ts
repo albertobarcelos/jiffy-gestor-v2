@@ -67,6 +67,7 @@ describe('rota /pedidos', () => {
   it('no .exe só conta, lista e quadro — nunca hub nem dashboard', () => {
     expect(isRotaPermitidaNoJiffyFlow('/pedidos/empresas')).toBe(true)
     expect(isRotaPermitidaNoJiffyFlow('/login')).toBe(true)
+    expect(isRotaPermitidaNoJiffyFlow('/jiffy-flow-bolha.html')).toBe(true)
     expect(isRotaPermitidaNoJiffyFlow('/minhas-empresas')).toBe(false)
     expect(isRotaPermitidaNoJiffyFlow('/dashboard')).toBe(false)
     expect(isRotaPermitidaNoJiffyFlow('/')).toBe(false)

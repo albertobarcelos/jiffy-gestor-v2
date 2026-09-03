@@ -95,15 +95,32 @@ function Find-SignTool {
     return $null
 }
 
+function Find-NexSynCodeSignThumbprint {
+    foreach ($store in @("Cert:\CurrentUser\My", "Cert:\LocalMachine\My")) {
+        $cert = Get-ChildItem -LiteralPath $store -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.HasPrivateKey -and
+                $_.Subject -eq "CN=NexSyn" -and
+                $_.EnhancedKeyUsageList.ObjectId -contains "1.3.6.1.5.5.7.3.3"
+            } |
+            Sort-Object NotAfter -Descending |
+            Select-Object -First 1
+        if ($cert) { return $cert.Thumbprint }
+    }
+    return $null
+}
+
 $signTool = Find-SignTool
 $thumb = $env:FLOW_SIGN_THUMBPRINT
 if (-not $thumb) { $thumb = $env:AGENT_SIGN_THUMBPRINT }
+if (-not $thumb) { $thumb = Find-NexSynCodeSignThumbprint }
 $pfx = $env:FLOW_SIGN_PFX
 if (-not $pfx) { $pfx = $env:AGENT_SIGN_PFX }
 
 if ($signTool -and ($thumb -or $pfx)) {
     Write-Host "=== Authenticode ==="
     $targets = @($setupDest)
+    if ((Test-Path $setupStable) -and ($setupStable -ne $setupDest)) { $targets += $setupStable }
     if (Test-Path $exeDest) { $targets += $exeDest }
     foreach ($file in $targets) {
         if ($thumb) {

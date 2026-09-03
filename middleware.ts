@@ -18,7 +18,13 @@ import {
   parseEmpresaSlugFromSearch,
   stripEmpresaSlugFromSearch,
 } from '@/src/shared/utils/gestaoRoutes'
-import { PEDIDOS_PATH, QUERY_GESTOR, TOKEN_USER_AGENT_FREDY, TOKEN_USER_AGENT_JIFFY_FLOW } from '@/src/presentation/gestor-pedidos/constantes'
+import {
+  PATH_BOLHA_HTML,
+  PEDIDOS_PATH,
+  QUERY_GESTOR,
+  TOKEN_USER_AGENT_FREDY,
+  TOKEN_USER_AGENT_JIFFY_FLOW,
+} from '@/src/presentation/gestor-pedidos/constantes'
 import { isRotaPermitidaNoJiffyFlow } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
 
 function pedidoVeioDoAppJiffyFlow(request: NextRequest): boolean {
@@ -49,6 +55,11 @@ function urlLoginPreservandoGestor(request: NextRequest): URL {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   const noAppFlow = pedidoVeioDoAppJiffyFlow(request)
+
+  /** Bolha do Fredy: HTML estático. Sem isto o UA Fredy/ manda a janela 56px para /pedidos. */
+  if (pathname === PATH_BOLHA_HTML) {
+    return NextResponse.next()
+  }
 
   /** O .exe não abre hub, dashboard nem o resto do Gestor web. */
   if (noAppFlow && !pathname.startsWith('/api/') && !isRotaPermitidaNoJiffyFlow(pathname)) {
@@ -223,7 +234,7 @@ export const config = {
      * - images (image files)
      * - public files
      */
-    '/((?!_next/static|_next/image|favicon.ico|videos|images|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|videos|images|jiffy-flow-bolha\\.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
 
