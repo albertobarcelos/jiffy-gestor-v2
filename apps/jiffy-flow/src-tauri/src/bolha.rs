@@ -1,5 +1,5 @@
-//! Bolha flutuante: só aparece com a janela principal minimizada.
-//! Clique restaura o Fredy. Não é filha da principal: sobrevive a minimizar.
+//! Bolha flutuante + modos de segundo plano.
+//! Minimizar → bolha + bandeja. Fechar (X) → só bandeja. Sair = menu da bandeja.
 
 use std::fs;
 use std::path::PathBuf;
@@ -11,6 +11,15 @@ use tauri::{
 
 static BOLHA_A_MOSTRA: AtomicBool = AtomicBool::new(false);
 static VIGIA_LIGADA: AtomicBool = AtomicBool::new(false);
+
+const MODO_VISIVEL: u8 = 0;
+const MODO_BOLHA: u8 = 1;
+const MODO_BANDEJA: u8 = 2;
+static MODO: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(MODO_VISIVEL);
+
+fn modo() -> u8 {
+    MODO.load(Ordering::Relaxed)
+}
 
 pub const BOLHA_LABEL: &str = "bolha";
 const LADO_PX: f64 = 56.0;
@@ -142,7 +151,7 @@ fn encode_base64(data: &[u8]) -> String {
 fn script_mascote_bolha() -> String {
     let b64 = encode_base64(LOGO_PNG);
     format!(
-        "(function(){{function a(){{var i=document.querySelector('#bolha img');if(i)i.src='data:image/png;base64,{b64}';}}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',a);else a();}})();"
+        "(function(){{function a(){{var i=document.querySelector('#bolha img');if(!i)return false;i.src='data:image/png;base64,{b64}';return true;}}if(a())return;document.addEventListener('DOMContentLoaded',a);window.addEventListener('load',a);var n=0,t=setInterval(function(){{if(a()||++n>40)clearInterval(t);}},50);}})();"
     )
 }
 
@@ -174,6 +183,11 @@ fn aplicar_mascara(janela: &tauri::WebviewWindow) {
 
 #[cfg(not(windows))]
 fn aplicar_mascara(_janela: &tauri::WebviewWindow) {}
+
+/// Janela fora de cena (minimizada, só bandeja, ou ainda a minimizar).
+pub(crate) fn principal_fora_de_cena(app: &AppHandle) -> bool {
+    modo() != MODO_VISIVEL || principal_minimizada(app)
+}
 
 pub(crate) fn principal_minimizada(app: &AppHandle) -> bool {
     let Some(main) = janela_main(app) else {
@@ -227,28 +241,93 @@ fn trazer_ao_topo(janela: &tauri::WebviewWindow) {
 #[cfg(not(windows))]
 fn trazer_ao_topo(_janela: &tauri::WebviewWindow) {}
 
+fn esconder_principal(app: &AppHandle) {
+    if let Some(main) = janela_main(app) {
+        let _ = main.set_skip_taskbar(true);
+        let _ = main.hide();
+    }
+}
+
+fn sincronizar_whatsapp(app: &AppHandle) {
+    let handle = app.clone();
+    if modo() == MODO_VISIVEL {
+        let _ = std::thread::spawn(move || crate::whatsapp::repor_host_se_visivel(&handle));
+    } else {
+        let _ = std::thread::spawn(move || crate::whatsapp::recolher_host(&handle));
+    }
+}
+
+/// Janela de volta: some a bolha. Usado pelo clique, pela bandeja e pela 2.ª instância.
+pub fn restaurar(app: &AppHandle) {
+    MODO.store(MODO_VISIVEL, Ordering::Relaxed);
+    if let Some(main) = janela_main(app) {
+        let _ = main.set_skip_taskbar(false);
+        let _ = main.unminimize();
+        let _ = main.show();
+        let _ = main.set_focus();
+    }
+    aplicar_visibilidade(app);
+    sincronizar_whatsapp(app);
+}
+
+/// Minimizar: bolha + bandeja, sem botão na barra de tarefas.
+pub fn minimizar_para_bolha(app: &AppHandle) {
+    if modo() == MODO_BOLHA {
+        return;
+    }
+    MODO.store(MODO_BOLHA, Ordering::Relaxed);
+    esconder_principal(app);
+    aplicar_visibilidade(app);
+    sincronizar_whatsapp(app);
+    eprintln!("Fredy minimizado — bolha e bandeja");
+}
+
+/// Fechar no X: só bandeja, sem bolha. Sair de verdade é o menu da bandeja.
+pub fn fechar_para_bandeja(app: &AppHandle) {
+    MODO.store(MODO_BANDEJA, Ordering::Relaxed);
+    esconder_principal(app);
+    aplicar_visibilidade(app);
+    sincronizar_whatsapp(app);
+    eprintln!("Fredy na bandeja — sem bolha");
+}
+
+fn pagina_e_a_bolha(atual: &url::Url) -> bool {
+    let path = atual.path();
+    path.ends_with("/jiffy-flow-bolha.html") || path.ends_with("/bolha.html")
+}
+
+fn garantir_pagina_bolha(app: &AppHandle, bolha: &tauri::WebviewWindow) {
+    let Ok(esperada) = url_da_bolha(app) else {
+        return;
+    };
+    if let Ok(atual) = bolha.url() {
+        if pagina_e_a_bolha(&atual) {
+            return;
+        }
+    }
+    eprintln!("Fredy bolha a recarregar HTML ({esperada})");
+    let _ = bolha.navigate(esperada);
+}
+
 fn aplicar_visibilidade(app: &AppHandle) {
     let Some(bolha) = app.get_webview_window(BOLHA_LABEL) else {
         return;
     };
-    let deve_mostrar = principal_minimizada(app);
+    let deve_mostrar = modo() == MODO_BOLHA;
     if deve_mostrar == BOLHA_A_MOSTRA.load(Ordering::Relaxed) {
         return;
     }
     BOLHA_A_MOSTRA.store(deve_mostrar, Ordering::Relaxed);
     if deve_mostrar {
-        let handle = app.clone();
-        let _ = std::thread::spawn(move || crate::whatsapp::recolher_host(&handle));
+        garantir_pagina_bolha(app, &bolha);
         let _ = bolha.show();
         let _ = bolha.set_always_on_top(true);
         aplicar_mascara(&bolha);
         trazer_ao_topo(&bolha);
-        eprintln!("Fredy bolha visível (principal minimizada)");
+        eprintln!("Fredy bolha visível");
     } else {
         let _ = bolha.hide();
-        let handle = app.clone();
-        let _ = std::thread::spawn(move || crate::whatsapp::repor_host_se_visivel(&handle));
-        eprintln!("Fredy bolha oculta (principal visível)");
+        eprintln!("Fredy bolha oculta");
     }
 }
 
@@ -280,6 +359,11 @@ pub fn abrir(app: &AppHandle) -> Result<(), String> {
     eprintln!("Fredy bolha URL {url}");
     let janela = WebviewWindowBuilder::new(app, BOLHA_LABEL, WebviewUrl::External(url))
         .initialization_script(script_mascote_bolha())
+        .on_page_load(|wv, payload| {
+            if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+                let _ = wv.eval(script_mascote_bolha());
+            }
+        })
         .title("Fredy")
         .inner_size(LADO_PX, LADO_PX)
         .resizable(false)
@@ -308,12 +392,15 @@ pub fn abrir(app: &AppHandle) -> Result<(), String> {
 pub fn no_evento(window: &tauri::Window, event: &WindowEvent) {
     match window.label() {
         "main" => match event {
-            WindowEvent::Resized(_) | WindowEvent::Moved(_) | WindowEvent::Focused(_) => {
-                aplicar_visibilidade(window.app_handle());
+            WindowEvent::CloseRequested { api, .. } => {
+                api.prevent_close();
+                fechar_para_bandeja(window.app_handle());
             }
-            WindowEvent::Destroyed => {
-                if let Some(bolha) = window.app_handle().get_webview_window(BOLHA_LABEL) {
-                    let _ = bolha.hide();
+            WindowEvent::Resized(_) | WindowEvent::Moved(_) | WindowEvent::Focused(_) => {
+                if modo() == MODO_VISIVEL && principal_minimizada(window.app_handle()) {
+                    minimizar_para_bolha(window.app_handle());
+                } else {
+                    aplicar_visibilidade(window.app_handle());
                 }
             }
             _ => {}
@@ -335,16 +422,7 @@ pub fn no_evento(window: &tauri::Window, event: &WindowEvent) {
 #[tauri::command]
 pub async fn bolha_clique(app: AppHandle) -> Result<(), String> {
     eprintln!("Fredy bolha clique — restaurar");
-    let Some(main) = janela_main(&app) else {
-        return Err("janela principal ausente".to_string());
-    };
-    let _ = main.unminimize();
-    let _ = main.show();
-    let _ = main.set_focus();
-    BOLHA_A_MOSTRA.store(false, Ordering::Relaxed);
-    if let Some(bolha) = app.get_webview_window(BOLHA_LABEL) {
-        let _ = bolha.hide();
-    }
+    restaurar(&app);
     Ok(())
 }
 

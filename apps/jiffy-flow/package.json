@@ -1,7 +1,7 @@
 {
   "name": "jiffy-flow",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.1.4",
   "type": "module",
   "scripts": {
     "test": "node --test lib/montarUrlQuadro.test.mjs",

@@ -41,6 +41,9 @@ export const TOKEN_USER_AGENT_FREDY = 'Fredy/'
 /** User-Agent do casco antigo. O Gestor ainda reconhece para não partir instalações velhas. */
 export const TOKEN_USER_AGENT_JIFFY_FLOW = 'JiffyFlow/'
 
+/** HTML estático da bolha (public/). O middleware não pode redirecionar isto para /pedidos. */
+export const PATH_BOLHA_HTML = '/jiffy-flow-bolha.html'
+
 /** Override local (DevTools). Não é persistência de negócio. */
 export const STORAGE_SOMENTE_PEDIDOS = 'jiffy.superficie.somente'
 

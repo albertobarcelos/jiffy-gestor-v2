@@ -39,6 +39,7 @@ export function EscolherEmpresaFlowPage() {
   const hubEmpresas = useAuthStore(s => s.hubEmpresas)
   const identityAuth = useAuthStore(s => s.identityAuth)
   const logoutHub = useAuthStore(s => s.logoutHub)
+  const isRehydrated = useAuthStore(s => s.isRehydrated)
   const identityOk = Boolean(identityAuth && !identityAuth.isExpired())
   const [buscaInput, setBuscaInput] = useState('')
   const [busca, setBusca] = useState('')
@@ -70,14 +71,14 @@ export function EscolherEmpresaFlowPage() {
   )
 
   useEffect(() => {
-    if (listaPronta) return
+    if (!isRehydrated || listaPronta) return
     const t = window.setTimeout(() => {
       if (listaPronta) return
       setErro('Não foi possível carregar as empresas. Entre novamente.')
       setListaPronta(true)
     }, 4000)
     return () => window.clearTimeout(t)
-  }, [listaPronta])
+  }, [isRehydrated, listaPronta])
 
   useEffect(() => {
     const t = window.setTimeout(() => setBusca(buscaInput.trim()), 300)
@@ -146,6 +147,7 @@ export function EscolherEmpresaFlowPage() {
   )
 
   useEffect(() => {
+    if (!isRehydrated) return
     setErro(null)
     setVisiveis(PAGE_SIZE_EMPRESAS_FLOW)
     if (locais.length > 0) {
@@ -162,7 +164,7 @@ export function EscolherEmpresaFlowPage() {
     setItems([])
     setListaPronta(false)
     void carregarDaApi(0, busca, false)
-  }, [aplicarListaLocal, busca, carregarDaApi, identityOk, locais.length])
+  }, [aplicarListaLocal, busca, carregarDaApi, identityOk, isRehydrated, locais.length])
 
   useEffect(() => {
     if (fonteRef.current !== 'local') return

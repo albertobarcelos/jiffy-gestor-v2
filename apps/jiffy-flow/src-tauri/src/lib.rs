@@ -1,6 +1,7 @@
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_deep_link::DeepLinkExt;
 
+mod bandeja;
 mod bolha;
 mod quadro_url;
 mod update;
@@ -18,9 +19,8 @@ pub fn run() {
             let janela = app
                 .get_window("main")
                 .or_else(|| app.get_webview("main").map(|wv| wv.window()));
-            if let Some(window) = janela {
-                let _ = window.unminimize();
-                let _ = window.set_focus();
+            if janela.is_some() {
+                bolha::restaurar(app);
             }
         }));
     }
@@ -56,7 +56,7 @@ pub fn run() {
                 .decorations(true)
                 .user_agent(concat!(
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ",
-                    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Fredy/0.1.1 JiffyFlow/0.1.1"
+                    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Fredy/0.1.4 JiffyFlow/0.1.4"
                 ))
                 .initialization_script(
                     "Object.defineProperty(window,'__JIFFY_FLOW_KIOSK__',{value:true,enumerable:true});",
@@ -67,6 +67,9 @@ pub fn run() {
                 eprintln!("Fredy: bolha não criou ({err})");
             } else {
                 eprintln!("Fredy: bolha criada (oculta até minimizar)");
+            }
+            if let Err(err) = bandeja::instalar(app) {
+                eprintln!("Fredy: bandeja não criou ({err})");
             }
 
             let handle = app.handle().clone();

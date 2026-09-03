@@ -1,5 +1,6 @@
 import { stripGestaoEmpresaSlugFromPath } from '@/src/shared/utils/gestaoRoutes'
 import {
+  PATH_BOLHA_HTML,
   PEDIDOS_PATH,
   PEDIDOS_WHATSAPP_PATH,
   QUERY_GESTOR,
@@ -46,6 +47,7 @@ const PREFIXOS_CONTA_NO_FLOW = [
 
 export function isRotaPermitidaNoJiffyFlow(pathname: string): boolean {
   const path = stripGestaoEmpresaSlugFromPath(pathSemQuery(pathname))
+  if (path === PATH_BOLHA_HTML) return true
   if (isRotaPedidos(path)) return true
   return PREFIXOS_CONTA_NO_FLOW.some(r => path === r || path.startsWith(`${r}/`))
 }

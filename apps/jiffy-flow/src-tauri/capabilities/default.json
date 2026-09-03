@@ -32,6 +32,7 @@
     "core:window:allow-show",
     "core:window:allow-hide",
     "core:event:default",
+    "core:tray:default",
     "allow-whatsapp",
     "allow-bolha"
   ]

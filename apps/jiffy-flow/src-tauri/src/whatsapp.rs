@@ -164,7 +164,7 @@ pub fn recolher_host(app: &AppHandle) {
 }
 
 pub fn repor_host_se_visivel(app: &AppHandle) {
-    if crate::bolha::principal_minimizada(app) {
+    if crate::bolha::principal_fora_de_cena(app) {
         return;
     }
     let quer = app
@@ -187,7 +187,7 @@ pub async fn whatsapp_show(app: AppHandle, bounds: WhatsAppBounds) -> Result<(),
     );
     garantir_webview(&app, &bounds)?;
     marcar_visivel(&app, true);
-    if crate::bolha::principal_minimizada(&app) {
+    if crate::bolha::principal_fora_de_cena(&app) {
         eprintln!("Fredy WhatsApp show ignorado (principal minimizada)");
         recolher_host(&app);
         return Ok(());
