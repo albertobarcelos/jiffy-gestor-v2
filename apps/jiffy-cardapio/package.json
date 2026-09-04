@@ -9,7 +9,8 @@
     "start": "next start -p 5001",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "smoke": "node scripts/smoke-public.mjs"
   },
   "dependencies": {
     "@react-google-maps/api": "^2.20.8",

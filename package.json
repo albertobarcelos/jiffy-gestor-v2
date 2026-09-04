@@ -15,7 +15,8 @@
     "check:tenant-auth": "node scripts/check-tenant-auth.mjs",
     "cardapio:dev": "npm run dev --prefix apps/jiffy-cardapio",
     "cardapio:test": "npm test --prefix apps/jiffy-cardapio",
-    "cardapio:type-check": "npm run type-check --prefix apps/jiffy-cardapio"
+    "cardapio:type-check": "npm run type-check --prefix apps/jiffy-cardapio",
+    "cardapio:smoke": "npm run smoke --prefix apps/jiffy-cardapio"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

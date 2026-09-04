@@ -33,7 +33,7 @@ Ver [`.env.example`](../.env.example):
 - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` — Places / mapa no checkout
 - `PORT=5001` (container)
 
-CORS: a API pública deve aceitar o origin do Cardápio (sem cookie de gestor).
+CORS: a API Wilcker deve aceitar o origin do Cardápio. O BFF `/api/public/delivery/*` do Cardápio expõe `Access-Control-Allow-Origin: *` para o Design do Gestor (outro host) ler logo/capa via catálogo.
 
 ## 4. Docker
 
@@ -49,15 +49,28 @@ docker run --rm -p 5001:5001 \
 
 `next.config.js` usa `output: 'standalone'`.
 
-## 5. Checklist antes do cutover
+## 5. Smoke (sem browser)
+
+Com Cardápio no ar:
+
+```bash
+# na raiz do monorepo
+CARDAPIO_PUBLIC_URL=http://localhost:5001 SLUG=minha-loja npm run cardapio:smoke
+
+# opcional: valida 308 do Gestor
+GESTOR_URL=http://localhost:5000 CARDAPIO_PUBLIC_URL=http://localhost:5001 SLUG=minha-loja npm run cardapio:smoke
+```
+
+## 6. Checklist antes do cutover
 
 - [ ] `npm run build` e `npm test` em `apps/jiffy-cardapio`
+- [ ] `npm run cardapio:smoke` com slug real
 - [ ] Pedido teste entrega + retirada no host novo
-- [ ] `CARDAPIO_PUBLIC_URL` no Gestor apontando para o host
+- [ ] `NEXT_PUBLIC_CARDAPIO_PUBLIC_URL` no Gestor apontando para o host
 - [ ] Link antigo `/delivery/{slug}` redireciona
-- [ ] Design/admin continua no Gestor
+- [ ] Design no Gestor hidrata logo/capa (via BFF do Cardápio)
 
-## 6. Fora deste doc
+## 7. Fora deste doc
 
 - Criar o DNS no provedor (ação humana)
-- Certificado OV / domínio custom da loja (`{slug}.jiffy.run`) — evolução futura
+- Domínio custom da loja (`{slug}.jiffy.run`) — evolução futura
