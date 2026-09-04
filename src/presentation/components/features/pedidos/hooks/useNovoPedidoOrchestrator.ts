@@ -900,7 +900,6 @@ export function useNovoPedidoOrchestrator({
     setModalConfirmacaoSaidaOpen,
     setModalEdicaoProdutoOpen,
     setModalLancamentoProdutoPainelOpen,
-    setMoradaEntregaSelecionada,
     setPagamentos,
     setProdutoIndexEdicao,
     setProdutoParaLancamentoPainel,

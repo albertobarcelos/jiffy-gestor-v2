@@ -8,6 +8,7 @@ import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 /** Prefixos de pathname que usam ErpAppShell (TopNav + main). */
 export const ERP_ROUTE_PREFIXES = [
   '/dashboard',
+  '/menus',
   '/produtos',
   '/grupos-produtos',
   '/grupos-complementos',
