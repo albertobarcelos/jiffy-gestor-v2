@@ -8,6 +8,7 @@ import { TerminaisTab } from './tabs/TerminaisTab'
 import { ImpressorasList } from '@/src/presentation/components/features/impressoras/ImpressorasList'
 import { MeiosPagamentosList } from '@/src/presentation/components/features/meios-pagamentos/MeiosPagamentosList'
 import { TaxasList } from '@/src/presentation/components/features/taxas/TaxasList'
+import { DeliveryHubView } from '@/src/presentation/components/features/delivery/hub/DeliveryHubView'
 import { PageLoading } from '@/src/presentation/components/ui/PageLoading'
 import { cn } from '@/src/shared/utils/cn'
 import {
@@ -61,6 +62,7 @@ export function ConfiguracoesView({ activeTab }: ConfiguracoesViewProps) {
       <div className="w-full shrink-0 border-b border-gray-200 bg-gray-50 px-4 md:px-4">
         <div className="flex flex-wrap gap-1 pt-2">
           {tabBtn('empresa', 'Empresa')}
+          {tabBtn('empresa-delivery', 'Delivery')}
           {tabBtn('terminais', 'Terminais')}
           {tabBtn('impressoras', 'Impressoras')}
           {tabBtn('meios-pagamentos', 'Meios de pagamento')}
@@ -72,6 +74,7 @@ export function ConfiguracoesView({ activeTab }: ConfiguracoesViewProps) {
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="flex flex-1 flex-col overflow-hidden rounded-b-[10px] bg-info">
           {activeTab === 'empresa' && <EmpresaTab />}
+          {activeTab === 'empresa-delivery' && <DeliveryHubView />}
           {activeTab === 'terminais' && <TerminaisTab />}
           {activeTab === 'impressoras' && <ImpressorasList />}
           {activeTab === 'meios-pagamentos' && (

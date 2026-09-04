@@ -1,6 +1,18 @@
-import type { EnderecoFormPublico } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
 import { toLocaleUppercasePt } from '@/src/shared/utils/localeUppercase'
 import type { EnderecoGeocodeInput } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
+
+/** Campos de endereço normalizáveis (gestor / formulários compartilhados). */
+export type EnderecoFormTexto = {
+  rua: string
+  numero: string
+  bairro: string
+  cidade: string
+  estado: string
+  cep?: string
+  complemento?: string
+  pontoReferencia?: string
+  etiqueta?: 'casa' | 'trabalho' | 'outro'
+}
 
 /** Maiúsculas pt-BR durante digitação (sem trim). */
 export function maiusculasEnderecoInput(valor: string): string {
@@ -23,7 +35,7 @@ export function normalizarEstadoEndereco(estado: string): string {
   return toLocaleUppercasePt(estado).slice(0, 2)
 }
 
-export function normalizarEnderecoFormPublico(form: EnderecoFormPublico): EnderecoFormPublico {
+export function normalizarEnderecoFormTexto(form: EnderecoFormTexto): EnderecoFormTexto {
   return {
     ...form,
     rua: toLocaleUppercasePt(form.rua.trim()),
@@ -39,6 +51,9 @@ export function normalizarEnderecoFormPublico(form: EnderecoFormPublico): Endere
       : form.pontoReferencia,
   }
 }
+
+/** @deprecated Use normalizarEnderecoFormTexto */
+export const normalizarEnderecoFormPublico = normalizarEnderecoFormTexto
 
 export function normalizarEnderecoGeocodeInput(input: EnderecoGeocodeInput): EnderecoGeocodeInput {
   return {
