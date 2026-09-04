@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f5f9;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 10px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+  }
+}
+
+:root {
+  --color-primary: #003366;
+  --color-secondary: #530ca3;
+  --color-tertiary: #006699;
+  --color-alternate: #8338ec;
+  --color-primary-text: #171a1c;
+  --color-secondary-text: #57636c;
+  --color-terciary-text: #97a1a9;
+  --color-primary-background: #eeeef5;
+  --color-secondary-background: #91b4c6;
+  --color-accent1: #b4dd2b;
+  --color-accent2: #c34848;
+  --color-accent3: #61bbe8;
+  --color-accent4: #057cb8;
+  --color-accent5: #00b074;
+  --color-success: #14ae5c;
+  --color-warning: #dba02f;
+  --color-error: #c34848;
+  --color-info: #ffffff;
+  --background: #eeeef5;
+  --foreground: #171a1c;
+}

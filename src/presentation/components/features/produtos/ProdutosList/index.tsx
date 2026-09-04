@@ -444,7 +444,11 @@ export function ProdutosList() {
             <p className="text-secondary-text">Nenhum produto encontrado.</p>
           </div>
         ) : (
-          <div role="list" aria-label="Lista de produtos" className="space-y-1 pb-4">
+          <div
+            role="list"
+            aria-label="Lista de produtos"
+            className="divide-y divide-gray-200 overflow-hidden border border-gray-200 pb-4"
+          >
             {produtosVisiveis.map((produto) => (
               <div key={produto.getId()} role="listitem">
                 <ProdutoListItem

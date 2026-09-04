@@ -69,7 +69,7 @@ export function DeliverySecaoGrupo({
       >
         {mostrarNome ? <span className="min-w-0 leading-tight">{grupo.nome}</span> : null}
       </h2>
-      <div className="grid grid-cols-1 gap-3 @lg:grid-cols-1 @3xl:grid-cols-2 @lg:gap-4">
+      <div className="grid grid-cols-1 gap-3 @lg:grid-cols-2 @lg:gap-4">
         {grupo.produtos.map(produto => (
           <div key={produto.id} className="min-w-0">
             <DeliveryProdutoListItem
