@@ -10,7 +10,7 @@ interface PedidoDetalhesTabsProps {
 }
 
 const ABAS_DETALHES: Array<{ id: AbaDetalhesPedido; label: string; tabId: string }> = [
-  { id: 'infoPedido', label: 'Info Pedidos', tabId: 'tab-detalhes-info-pedido' },
+  { id: 'infoPedido', label: 'Resumo', tabId: 'tab-detalhes-info-pedido' },
   { id: 'dadosEntrega', label: 'Dados da Entrega', tabId: 'tab-detalhes-dados-entrega' },
   { id: 'listaProdutos', label: 'Lista Produtos', tabId: 'tab-detalhes-lista-produtos' },
   { id: 'pagamentos', label: 'Pagamentos', tabId: 'tab-detalhes-pagamentos' },

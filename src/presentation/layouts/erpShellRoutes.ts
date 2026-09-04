@@ -21,7 +21,7 @@ export const ERP_ROUTE_PREFIXES = [
   '/meios-pagamentos',
   '/estoque',
   '/meu-caixa',
-  '/pedidos-clientes',
+  '/pedidos',
   '/vendas',
   '/relatorios',
   '/relatorios-vendas',

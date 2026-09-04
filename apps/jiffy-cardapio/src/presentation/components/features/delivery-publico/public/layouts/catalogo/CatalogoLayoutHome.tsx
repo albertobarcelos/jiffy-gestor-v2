@@ -1,0 +1,122 @@
+'use client'
+
+import { useCallback, useEffect, useState } from 'react'
+import { DeliveryPedidoFooter } from '../../../shared/components/DeliveryPedidoFooter'
+import { DeliveryPublicoLojaFooter } from '../../../shared/components/DeliveryPublicoLojaFooter'
+import { filterViewModelByBusca } from '../../../shared/utils/filterViewModelByBusca'
+import type { DeliveryLayoutHomeProps } from '../DeliveryLayoutHomeProps'
+import { DeliveryCatalogoHeader } from './components/DeliveryCatalogoHeader'
+import { DeliveryCatalogoSearch } from './components/DeliveryCatalogoSearch'
+import { DeliveryCatalogoCategoriaTabs } from './components/DeliveryCatalogoCategoriaTabs'
+import { DeliveryCatalogoSecaoGrupo } from './components/DeliveryCatalogoSecaoGrupo'
+import { DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID } from '../../../shared/constants/deliveryPublicoSugestoes'
+
+export function CatalogoLayoutHome({
+  config,
+  viewModel,
+  enderecoTexto,
+  interactive = false,
+  onBuscaChange,
+  onGrupoClick,
+  onProdutoClick,
+  onPedidoClick,
+  carrinhoThumbs,
+  carrinhoThumbsBounceKey,
+  carrinhoThumbsTargetRef,
+}: DeliveryLayoutHomeProps) {
+  const filtered = filterViewModelByBusca(viewModel)
+  const [activeGrupoId, setActiveGrupoId] = useState<string | null>(
+    filtered.grupos[0]?.id ?? null
+  )
+
+  useEffect(() => {
+    if (!filtered.grupos.some(grupo => grupo.id === activeGrupoId)) {
+      setActiveGrupoId(filtered.grupos[0]?.id ?? null)
+    }
+  }, [filtered.grupos, activeGrupoId])
+
+  const stickyFooterVisible = viewModel.carrinho.quantidadeItens > 0
+
+  const handleGrupoClick = useCallback(
+    (grupoId: string) => {
+      setActiveGrupoId(grupoId)
+      onGrupoClick?.(grupoId)
+    },
+    [onGrupoClick]
+  )
+
+  const handleMenuClick = useCallback(() => {
+    const firstGrupo = filtered.grupos[0]
+    if (firstGrupo) handleGrupoClick(firstGrupo.id)
+  }, [filtered.grupos, handleGrupoClick])
+
+  return (
+    <div className="flex min-h-full flex-col pb-24">
+      <DeliveryCatalogoHeader
+        config={config}
+        disponivel={viewModel.disponivel}
+        carrinhoQuantidade={viewModel.carrinho.quantidadeItens}
+        interactive={interactive}
+        onPedidoClick={onPedidoClick}
+      />
+
+      <div className="mt-2 space-y-3">
+        <DeliveryCatalogoSearch
+          termoBusca={viewModel.termoBusca}
+          interactive={interactive}
+          onChange={onBuscaChange}
+        />
+      </div>
+
+      <DeliveryCatalogoCategoriaTabs
+        grupos={filtered.grupos}
+        activeGrupoId={activeGrupoId}
+        interactive={interactive}
+        onGrupoClick={handleGrupoClick}
+        onMenuClick={handleMenuClick}
+      />
+
+      <div className="flex-1 pb-4">
+        {filtered.grupos.map((grupo, index) => (
+          <DeliveryCatalogoSecaoGrupo
+            key={grupo.id}
+            config={config}
+            grupo={grupo}
+            interactive={interactive}
+            denseTop={
+              index > 0 &&
+              filtered.grupos[index - 1]?.id === DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID
+            }
+            onProdutoClick={onProdutoClick}
+          />
+        ))}
+      </div>
+
+      {stickyFooterVisible ? (
+        <div
+          className="fixed inset-x-0 bottom-0 z-40 pt-2 backdrop-blur-sm"
+          style={{
+            backgroundColor:
+              'color-mix(in srgb, var(--delivery-bg, var(--delivery-surface)) 95%, transparent)',
+          }}
+        >
+          <DeliveryPedidoFooter
+            total={viewModel.carrinho.total}
+            quantidadeItens={viewModel.carrinho.quantidadeItens}
+            interactive={interactive}
+            onClick={onPedidoClick}
+            thumbs={carrinhoThumbs}
+            thumbsBounceKey={carrinhoThumbsBounceKey}
+            thumbsTargetRef={carrinhoThumbsTargetRef}
+          />
+        </div>
+      ) : null}
+
+      <DeliveryPublicoLojaFooter
+        config={config}
+        enderecoTexto={enderecoTexto}
+        horarioTexto={viewModel.horarioTexto}
+      />
+    </div>
+  )
+}

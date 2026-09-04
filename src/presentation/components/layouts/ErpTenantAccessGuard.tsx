@@ -2,12 +2,22 @@
 
 import type { ReactNode } from 'react'
 import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantAccessGuard } from '@/src/presentation/hooks/useTenantAccessGuard'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { SESSION_STORAGE_TENANT_LOGOUT_SELF } from '@/src/shared/constants/sessionCoordinator'
-import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
+import {
+  estaNaMesmaRotaLocal,
+  irParaLoginDaSessaoAtual,
+  urlHubDaSessaoAtual,
+  urlLoginDaSessaoAtual,
+} from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
+import {
+  isRotaKioskPedidos,
+  isRotaPedidos,
+} from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
+import { stripGestaoEmpresaSlugFromPath } from '@/src/shared/utils/gestaoRoutes'
 
 interface ErpTenantAccessGuardProps {
   children: ReactNode
@@ -25,14 +35,27 @@ interface ErpTenantAccessGuardProps {
  */
 export function ErpTenantAccessGuard({ children }: ErpTenantAccessGuardProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const { hasAccess, isLoading } = useTenantAccessGuard()
   const tenantAuth = useAuthStore(s => s.tenantAuth)
 
+  const kioskFlow = isRotaKioskPedidos(
+    pathname || (typeof window !== 'undefined' ? window.location.pathname : ''),
+    typeof window !== 'undefined' ? window.location.search : ''
+  )
+  /** Flow: lista / quadro sem tenant. Identity curto não pode bloquear esta rota. */
+  const kioskQuadroSemTenant = kioskFlow && !hasAccess
+
   useEffect(() => {
     if (isLoading || hasAccess) return
+    if (kioskQuadroSemTenant) return
 
     try {
       if (sessionStorage.getItem(SESSION_STORAGE_TENANT_LOGOUT_SELF) === '1') {
+        const identity = useAuthStore.getState().identityAuth
+        if (!identity || identity.isExpired()) {
+          irParaLoginDaSessaoAtual()
+        }
         return
       }
     } catch {
@@ -53,23 +76,41 @@ export function ErpTenantAccessGuard({ children }: ErpTenantAccessGuardProps) {
           } catch {
             /* noop */
           }
-          window.location.assign(HUB_PATH)
+          window.location.assign(urlHubDaSessaoAtual())
         })()
         return
       }
-      router.replace('/login')
+      const login = urlLoginDaSessaoAtual()
+      if (!estaNaMesmaRotaLocal(login)) {
+        router.replace(login)
+      }
       return
     }
 
     const identity = useAuthStore.getState().identityAuth
     if (identity && !identity.isExpired()) {
-      router.replace(HUB_PATH)
+      router.replace(urlHubDaSessaoAtual())
       return
     }
-    router.replace('/login')
-  }, [hasAccess, isLoading, router, tenantAuth])
+    const login = urlLoginDaSessaoAtual()
+    if (!estaNaMesmaRotaLocal(login)) {
+      router.replace(login)
+    }
+  }, [hasAccess, isLoading, kioskQuadroSemTenant, router, tenantAuth])
 
-  if (isLoading || !hasAccess) {
+  if (kioskFlow || isRotaPedidos(stripGestaoEmpresaSlugFromPath(pathname ?? ''))) {
+    return <>{children}</>
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex h-[100dvh] items-center justify-center bg-gray-50">
+        <JiffyLoading />
+      </div>
+    )
+  }
+
+  if (!hasAccess && !kioskQuadroSemTenant) {
     return (
       <div className="flex h-[100dvh] items-center justify-center bg-gray-50">
         <JiffyLoading />

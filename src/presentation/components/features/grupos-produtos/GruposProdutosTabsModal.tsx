@@ -74,8 +74,8 @@ export function GruposProdutosTabsModal({
 
   const title = useMemo(() => {
     return state.mode === 'create'
-      ? 'Nova Categoria'
-      : 'Editar Categoria'
+      ? 'Novo Grupo de Produtos'
+      : 'Editar Grupo de Produtos'
   }, [state.mode])
 
   const subtitle = useMemo(() => {

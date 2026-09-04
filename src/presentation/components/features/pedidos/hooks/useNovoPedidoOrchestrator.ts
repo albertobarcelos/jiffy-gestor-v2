@@ -1,6 +1,6 @@
-'use client'
+﻿'use client'
 
-import { useMemo, useRef, useCallback } from 'react'
+import { useMemo, useRef, useCallback, useEffect } from 'react'
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
 import {
   useCreatePedidoDelivery,
@@ -73,6 +73,8 @@ export function useNovoPedidoOrchestrator({
   tipoVendaGestor = null,
   tipoInicioPedido = 'balcao',
   abaDetalhesInicial,
+  clienteInicial = null,
+  telefoneInicial,
 }: NovoPedidoModalProps) {
   const { empresa, menuVendaGestorId } = useEmpresaMe()
   const { menuDeliveryId } = useMenuDeliveryId()
@@ -328,6 +330,29 @@ export function useNovoPedidoOrchestrator({
     setTipoAtendimentoDelivery,
     getAccessToken: () => useAuthStore.getState().tenantAuth?.getAccessToken(),
   })
+
+  useEffect(() => {
+    if (!open || vendaId || modoVisualizacao) return
+    if (clienteInicial) {
+      handleSelectCliente(clienteInicial)
+      return
+    }
+    const tel = telefoneInicial?.trim()
+    if (!tel || tipoInicioPedido !== 'entrega') return
+    const digitos = tel.replace(/\D/g, '')
+    setTelefoneBuscaEntrega(tel)
+    setTelefoneBuscadoEntrega(digitos.length >= 8 ? digitos : null)
+  }, [
+    open,
+    vendaId,
+    modoVisualizacao,
+    clienteInicial,
+    telefoneInicial,
+    tipoInicioPedido,
+    handleSelectCliente,
+    setTelefoneBuscaEntrega,
+    setTelefoneBuscadoEntrega,
+  ])
 
   // Buscar meios de pagamento
   const {

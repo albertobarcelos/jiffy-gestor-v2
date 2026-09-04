@@ -21,10 +21,7 @@ import type {
 } from '@/src/presentation/hooks/useVendas'
 import type { FluxoPagamentoEntrega, PagamentoSelecionado } from '../../types'
 import type { NovoPedidoFormState } from './useNovoPedidoFormState'
-import type {
-  ProdutosTabsModalState,
-  ProdutosTabsTabKey,
-} from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
+import type { ProdutosTabsModalState } from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
 
 type CancelarVendaGestor = ReturnType<typeof useCancelarVendaGestor>
 type CancelarNotaPdv = ReturnType<typeof useCancelarNotaFiscalVendaPdv>
@@ -214,7 +211,7 @@ export function useNovoPedidoGestorActions({
   }, [setProdutoTabsModalState])
 
   const handleTabChangeProdutoModal = useCallback(
-    (tab: ProdutosTabsTabKey) => {
+    (tab: 'produto' | 'complementos' | 'impressoras' | 'grupo') => {
       setProdutoTabsModalState((prev: ProdutosTabsModalState) => ({ ...prev, tab }))
     },
     [setProdutoTabsModalState]

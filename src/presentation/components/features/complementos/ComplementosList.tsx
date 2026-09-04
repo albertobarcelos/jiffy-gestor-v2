@@ -5,7 +5,7 @@ import { Complemento } from '@/src/domain/entities/Complemento'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import { MdImageNotSupported, MdPhotoCamera, MdSearch } from 'react-icons/md'
+import { MdSearch } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -19,15 +19,6 @@ import {
 } from '@/src/presentation/components/ui/cadastro-list'
 import { useComplementosInfinite } from '@/src/presentation/hooks/useComplementos'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
-import { DELIVERY_IMAGE_ACCEPT } from '@/src/shared/constants/deliveryImageUpload'
-import {
-  fetchComplementoImagemUrl,
-  fetchComplementosImagemUrlsBatch,
-  mensagemLegivelDeliveryMediaError,
-  uploadComplementoImagem,
-} from '@/src/infrastructure/api/deliveryMediaApi'
-import { DELIVERY_COMPLEMENTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
-import { useEntityImageCropUpload } from '@/src/presentation/hooks/useEntityImageCropUpload'
 import {
   ComplementosTabsModal,
   ComplementosTabsModalState,
@@ -35,89 +26,6 @@ import {
 
 interface ComplementosListProps {
   onReload?: () => void
-}
-
-/**
- * Miniatura com upload — empty state clicável; com URL usa EntityListThumbnail + badge de câmera.
- */
-function ComplementoImagemThumb({
-  nome,
-  imagemUrl,
-  isUploading,
-  onSelectFile,
-}: {
-  nome: string
-  imagemUrl?: string | null
-  isUploading?: boolean
-  onSelectFile: (file: File) => void
-}) {
-  const inputRef = useRef<HTMLInputElement>(null)
-  const hasImage = Boolean(imagemUrl)
-  const label = hasImage ? `Trocar imagem de ${nome}` : `Inserir imagem de ${nome}`
-
-  const openFilePicker = (e: React.SyntheticEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (isUploading) return
-    inputRef.current?.click()
-  }
-
-  const stopRow = (e: React.SyntheticEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-  }
-
-  return (
-    <div
-      className="relative h-11 w-11 shrink-0 md:h-12 md:w-12"
-      onClick={stopRow}
-      onMouseDown={stopRow}
-    >
-      <input
-        ref={inputRef}
-        type="file"
-        accept={DELIVERY_IMAGE_ACCEPT}
-        className="hidden"
-        onClick={e => e.stopPropagation()}
-        onChange={e => {
-          const file = e.target.files?.[0]
-          e.target.value = ''
-          if (file) onSelectFile(file)
-        }}
-      />
-      {hasImage ? (
-        <>
-          <EntityListThumbnail src={imagemUrl} alt={nome} />
-          <button
-            type="button"
-            title={label}
-            aria-label={label}
-            disabled={isUploading}
-            onClick={openFilePicker}
-            className="absolute -bottom-1 -right-1 z-10 flex h-5 w-5 items-center justify-center rounded-full border border-white bg-primary text-white shadow disabled:cursor-wait disabled:opacity-60"
-          >
-            <MdPhotoCamera className="h-3 w-3" />
-          </button>
-        </>
-      ) : (
-        <button
-          type="button"
-          title={label}
-          aria-label={label}
-          disabled={isUploading}
-          onClick={openFilePicker}
-          className="relative flex h-full w-full items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-secondary-text transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
-        >
-          <MdImageNotSupported className="h-6 w-6 md:h-7 md:w-7" />
-        </button>
-      )}
-      {isUploading ? (
-        <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-black/35">
-          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-        </div>
-      ) : null}
-    </div>
-  )
 }
 
 /**
@@ -137,9 +45,6 @@ const ComplementoRow = memo(function ComplementoRow({
   savingValor,
   savingTipo,
   togglingStatus,
-  imagemUrl,
-  isUploadingImagem,
-  onUploadImagem,
 }: {
   complemento: Complemento
   index: number
@@ -154,9 +59,6 @@ const ComplementoRow = memo(function ComplementoRow({
   savingValor: boolean
   savingTipo: boolean
   togglingStatus: boolean
-  imagemUrl?: string | null
-  isUploadingImagem?: boolean
-  onUploadImagem?: (complementoId: string, file: File) => void
 }) {
   return (
     <CadastroListRow
@@ -164,12 +66,8 @@ const ComplementoRow = memo(function ComplementoRow({
       index={index}
       onClick={() => onRowClick(complemento)}
     >
-      <ComplementoImagemThumb
-        nome={complemento.getNome()}
-        imagemUrl={imagemUrl}
-        isUploading={isUploadingImagem}
-        onSelectFile={file => onUploadImagem?.(complemento.getId(), file)}
-      />
+      {/* src: preencher quando o backend expuser URL da foto do complemento */}
+      <EntityListThumbnail src={null} alt={complemento.getNome()} />
 
       <span
         className="min-w-0 truncate font-normal text-xs text-primary-text md:text-sm"
@@ -301,65 +199,6 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
   }, [data])
 
   const totalComplementos = useMemo(() => data?.pages[0]?.count ?? 0, [data])
-
-  const [imagensPorComplementoId, setImagensPorComplementoId] = useState<
-    Record<string, string | null>
-  >({})
-  const [uploadingImagemComplementoId, setUploadingImagemComplementoId] = useState<string | null>(
-    null
-  )
-
-  useEffect(() => {
-    const idsFaltantes = complementos
-      .map(c => c.getId())
-      .filter(id => !(id in imagensPorComplementoId))
-
-    if (idsFaltantes.length === 0) return
-
-    let cancelled = false
-    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-    if (!token) return
-
-    void fetchComplementosImagemUrlsBatch(idsFaltantes, token).then(resolved => {
-      if (cancelled) return
-      setImagensPorComplementoId(prev => ({ ...prev, ...resolved }))
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [complementos, imagensPorComplementoId])
-
-  const handleUploadImagem = useCallback(async (complementoId: string, file: File) => {
-    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-    if (!token) {
-      showToast.error('Token não encontrado')
-      return
-    }
-
-    setUploadingImagemComplementoId(complementoId)
-    const toastId = showToast.loading('Enviando imagem...')
-
-    try {
-      await uploadComplementoImagem(complementoId, file, token)
-      const persistedUrl = await fetchComplementoImagemUrl(complementoId, token)
-      setImagensPorComplementoId(prev => ({
-        ...prev,
-        [complementoId]: persistedUrl,
-      }))
-      showToast.successLoading(toastId, 'Imagem salva com sucesso!')
-    } catch (uploadError) {
-      showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(uploadError))
-    } finally {
-      setUploadingImagemComplementoId(null)
-    }
-  }, [])
-
-  const { selectForEntity: selectComplementoImagem, cropModal: complementoCropModal } =
-    useEntityImageCropUpload({
-      preset: DELIVERY_COMPLEMENTO_CROP_PRESET,
-      upload: handleUploadImagem,
-    })
 
   // Debounce da busca (500ms) — igual GruposComplementosList
   useEffect(() => {
@@ -627,7 +466,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         })
       }
     },
-    [complementos, refetch, onReload]
+    [ complementos, refetch, onReload]
   )
 
   const handleToggleComplementoStatus = useCallback(
@@ -672,7 +511,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         })
       }
     },
-    [handleActionsReload]
+    [ handleActionsReload]
   )
 
   const openTabsModal = useCallback(
@@ -704,7 +543,6 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
   }, [router, searchParams, pathname, invalidate])
 
   const handleTabsModalReload = useCallback(async () => {
-    setImagensPorComplementoId({})
     await handleActionsReload()
   }, [handleActionsReload])
 
@@ -841,9 +679,6 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
             savingValor={!!savingValorMap[complemento.getId()]}
             savingTipo={!!savingTipoMap[complemento.getId()]}
             togglingStatus={!!togglingStatus[complemento.getId()]}
-            imagemUrl={imagensPorComplementoId[complemento.getId()] ?? null}
-            isUploadingImagem={uploadingImagemComplementoId === complemento.getId()}
-            onUploadImagem={selectComplementoImagem}
           />
         ))}
 
@@ -860,7 +695,6 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
         onReload={handleTabsModalReload}
         onTabChange={handleTabsModalTabChange}
       />
-      {complementoCropModal}
       </CadastroListShell>
     </div>
   )

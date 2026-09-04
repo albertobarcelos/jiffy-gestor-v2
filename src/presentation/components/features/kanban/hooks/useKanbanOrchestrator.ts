@@ -15,12 +15,19 @@ import { usePreferenciasImpressaoDelivery } from '@/src/presentation/hooks/usePr
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { invalidateVendaDetalheCarregadaCache } from '../../pedidos/hooks/data/useVendaDetalheCarregadaQuery'
 import { useEntregaTransicoesKanban } from '../../delivery/kanban-panels/useEntregaTransicoesKanban'
+import { definirEntregadorKanbanCache } from '../../delivery/kanban-panels/entregadorKanbanStore'
 import type { ModoKanbanVendas } from '../KanbanModoVendasToggle'
-import type { ColunaKanbanId, CriterioOrdenacaoKanban, Venda } from '../types'
+import type { ColunaKanbanId, CriterioOrdenacaoKanban, KanbanColumn, Venda } from '../types'
 import {
   KANBAN_MODO_VENDAS_STORAGE_KEY,
+  KANBAN_MODO_VISUALIZACAO_STORAGE_KEY,
   lerModoKanbanVendasDoStorage,
+  lerModoVisualizacaoKanbanDoStorage,
 } from '../rules/vendasKanban.storage'
+import {
+  resolverModoVisualizacaoKanban,
+  type ModoVisualizacaoKanban,
+} from '../utils/kanbanModoVisualizacao'
 import type { KanbanBoardRendererProps } from '../components/KanbanBoardRenderer'
 import type { KanbanModaisRendererProps } from '../components/KanbanModaisRenderer'
 import { useKanbanFilters } from './useKanbanFilters'
@@ -35,6 +42,9 @@ import { useKanbanDragDrop } from './useKanbanDragDrop'
 import { useKanbanModais } from './useKanbanModais'
 import { invalidateKanbanVendasListagens } from './kanbanListagemQueryCache'
 import { getVisibleKanbanColumns } from '../utils/kanbanColumnsConfig'
+import { aplicarColunasOcultas, resolverColunasOcultasKanban } from '../utils/kanbanColunasVisibilidade'
+import { useKanbanColunasVisibilidade } from './useKanbanColunasVisibilidade'
+import { useKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/kiosk/useKioskGestorPedidos'
 
 export interface KanbanToolbarProps {
   searchInput: string
@@ -60,8 +70,14 @@ export interface KanbanToolbarProps {
   onClearFilters: () => void
   modoKanbanVendas: ModoKanbanVendas
   onModoKanbanVendasChange: (value: ModoKanbanVendas) => void
+  modoVisualizacao: ModoVisualizacaoKanban
+  onModoVisualizacaoChange: (value: ModoVisualizacaoKanban) => void
   onAbrirConfiguracoesDelivery: () => void
   onAbrirNovoPedido: () => void
+  colunasDoModo: KanbanColumn[]
+  colunasOcultas: readonly ColunaKanbanId[]
+  onSetColunaVisivel: (id: ColunaKanbanId, visivel: boolean) => void
+  contagemPorColuna: (id: ColunaKanbanId) => number
 }
 
 export function useKanbanOrchestrator() {
@@ -69,8 +85,9 @@ export function useKanbanOrchestrator() {
   const { preferenciasImpressaoDelivery } = usePreferenciasImpressaoDelivery()
   const queryClient = useQueryClient()
   const empresaId = useTenantEmpresaId()
+  const kiosk = useKioskGestorPedidos()
 
-  const filters = useKanbanFilters(timezoneAgregacao)
+  const filters = useKanbanFilters(timezoneAgregacao, { diaOperacionalFlow: kiosk })
   const {
     searchInput,
     setSearchInput,
@@ -101,17 +118,44 @@ export function useKanbanOrchestrator() {
     periodoFimConsulta,
   } = filters
 
-  const [modoKanbanVendas, setModoKanbanVendas] = useState<ModoKanbanVendas>(() =>
+  const [modoKanbanVendasLivre, setModoKanbanVendas] = useState<ModoKanbanVendas>(() =>
     lerModoKanbanVendasDoStorage()
+  )
+  /** Casco Windows: só delivery. O Gestor web continua a escolher balcão/delivery. */
+  const modoKanbanVendas: ModoKanbanVendas = kiosk ? 'delivery' : modoKanbanVendasLivre
+  const [modoVisualizacaoLivre, setModoVisualizacaoLivre] = useState<ModoVisualizacaoKanban>(() =>
+    lerModoVisualizacaoKanbanDoStorage()
+  )
+  /** Gestor web: sempre Quadro. Flow: Quadro / Operação / Lista. */
+  const modoVisualizacao: ModoVisualizacaoKanban = resolverModoVisualizacaoKanban(
+    kiosk,
+    modoVisualizacaoLivre
   )
 
   useEffect(() => {
+    if (kiosk) return
     try {
-      localStorage.setItem(KANBAN_MODO_VENDAS_STORAGE_KEY, modoKanbanVendas)
+      localStorage.setItem(KANBAN_MODO_VENDAS_STORAGE_KEY, modoKanbanVendasLivre)
     } catch {
       /* quota / modo privado */
     }
-  }, [modoKanbanVendas])
+  }, [kiosk, modoKanbanVendasLivre])
+
+  useEffect(() => {
+    if (!kiosk) return
+    try {
+      localStorage.setItem(KANBAN_MODO_VISUALIZACAO_STORAGE_KEY, modoVisualizacaoLivre)
+    } catch {
+      /* quota / modo privado */
+    }
+  }, [kiosk, modoVisualizacaoLivre])
+
+  const visibilidadeColunas = useKanbanColunasVisibilidade(modoKanbanVendas)
+  const colunasOcultas = resolverColunasOcultasKanban(
+    kiosk,
+    modoKanbanVendas,
+    visibilidadeColunas.ocultas
+  )
 
   const { primeiroPorColuna, setPrimeiroPorColuna } = useKanbanPinning()
   const getEtapaKanbanParaExibicaoRef = useRef<(v: Venda) => string>(v => v.getEtapaKanban())
@@ -150,8 +194,6 @@ export function useKanbanOrchestrator() {
     onPedidoTransicionado: preTransicao.sincronizarVendaAposTransicao,
   })
 
-  const [vendaIdAbrirEntregador, setVendaIdAbrirEntregador] = useState<string | null>(null)
-
   const {
     avancandoEtapaIds,
     etapaLocalPorVendaId,
@@ -170,7 +212,8 @@ export function useKanbanOrchestrator() {
     },
     verificarImpressaoAntesTransicoes: preTransicao.verificarImpressaoAntesTransicoes,
     verificarEntregadorAntesDespachar: preTransicao.verificarEntregadorAntesDespachar,
-    onEntregadorAusenteAoDespachar: venda => setVendaIdAbrirEntregador(venda.id),
+    onEntregadorAusenteAoDespachar: (venda, colunaOrigem) =>
+      modais.abrirEntregadorParaDespacho(venda, colunaOrigem),
     confirmarPagamentoAntesFinalizar: preTransicao.confirmarPagamentoAntesFinalizar,
     revalidarPagamentoAntesFinalizar: preTransicao.revalidarPagamentoAntesFinalizar,
   })
@@ -290,9 +333,14 @@ export function useKanbanOrchestrator() {
     await data.refetch()
   }, [limparEstadoUiTransicao, data.refetch, setPrimeiroPorColuna])
 
-  const columns = useMemo(
+  const colunasDoModo = useMemo(
     () => getVisibleKanbanColumns(modoKanbanVendas, colunaKanbanFiltro),
     [modoKanbanVendas, colunaKanbanFiltro]
+  )
+
+  const columns = useMemo(
+    () => aplicarColunasOcultas(colunasDoModo, colunasOcultas),
+    [colunasDoModo, colunasOcultas]
   )
 
   const mostrarLoadingLista = data.isLoading && colunas.todasVendas.length === 0
@@ -343,8 +391,15 @@ export function useKanbanOrchestrator() {
     onClearFilters: handleClearFiltersComTerminal,
     modoKanbanVendas,
     onModoKanbanVendasChange: setModoKanbanVendas,
+    modoVisualizacao,
+    onModoVisualizacaoChange: setModoVisualizacaoLivre,
     onAbrirConfiguracoesDelivery: modais.abrirConfigImpressoraExpedicao,
     onAbrirNovoPedido: modais.handleAbrirNovoPedido,
+    colunasDoModo,
+    colunasOcultas,
+    onSetColunaVisivel: (id, visivel) =>
+      visibilidadeColunas.setColunaVisivel(id, visivel, colunasDoModo),
+    contagemPorColuna: colunas.getColumnTotalCount,
   }
 
   const boardProps: KanbanBoardRendererProps = {
@@ -363,6 +418,9 @@ export function useKanbanOrchestrator() {
     direcaoOrdenacaoPorColuna: colunas.direcaoOrdenacaoPorColuna,
     onCriterioOrdenacaoChange: handleCriterioOrdenacaoChange,
     onToggleDirecaoOrdenacao: handleToggleDirecaoOrdenacao,
+    onOcultarColuna: kiosk
+      ? (id: ColunaKanbanId) => visibilidadeColunas.setColunaVisivel(id, false, colunasDoModo)
+      : undefined,
     onColumnScroll: data.handleColumnScroll,
     deliveryKanban: data.deliveryKanban,
     balcaoKanban: data.balcaoKanban,
@@ -381,8 +439,6 @@ export function useKanbanOrchestrator() {
             void preTransicao.reimprimirCupomEntrega(vendaAtual, colunaAtual)
         : undefined,
     entregadorPorVendaId: entregador.entregadorPorVendaId,
-    vendaIdAbrirEntregador,
-    onAbrirEntregadorConsumido: () => setVendaIdAbrirEntregador(null),
     onEntregadorAtualizado: entregador.handleEntregadorAtualizado,
     onConfirmarCobranca:
       modoKanbanVendas === 'delivery'
@@ -454,7 +510,31 @@ export function useKanbanOrchestrator() {
       invalidateKanbanVendasListagens(queryClient)
     },
     modoKanbanVendas,
+    pedidoAtribuirEntregador: modais.despachoPendenteEntregador?.venda ?? null,
+    entregadorVinculadoDespacho:
+      (modais.despachoPendenteEntregador
+        ? entregador.entregadorPorVendaId[modais.despachoPendenteEntregador.venda.id]
+        : null) ??
+      modais.despachoPendenteEntregador?.venda.entregador?.id ??
+      null,
+    modoDespachoEntregador: Boolean(modais.despachoPendenteEntregador),
+    onCloseAtribuirEntregadorDespacho: () => modais.setDespachoPendenteEntregador(null),
+    onSalvoAtribuirEntregadorDespacho: (vendaId, entregadorId) => {
+      definirEntregadorKanbanCache(vendaId, entregadorId)
+      if (entregadorId) {
+        entregadorPorVendaIdRef.current = {
+          ...entregadorPorVendaIdRef.current,
+          [vendaId]: entregadorId,
+        }
+      }
+      entregador.handleEntregadorAtualizado(vendaId, entregadorId)
+      const pendente = modais.despachoPendenteEntregador
+      modais.setDespachoPendenteEntregador(null)
+      if (pendente && entregadorId) {
+        void handleAvancarEtapa(pendente.venda, pendente.colunaAtual)
+      }
+    },
   }
 
-  return { toolbarProps, boardProps, modaisProps }
+  return { toolbarProps, boardProps, modaisProps, modoVisualizacao }
 }

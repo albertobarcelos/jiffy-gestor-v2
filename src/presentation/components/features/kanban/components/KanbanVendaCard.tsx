@@ -53,10 +53,6 @@ export interface KanbanVendaCardProps {
   onReimprimirCupomDelivery?: (venda: Venda, colunaAtual: ColunaKanbanId) => void
   entregadorVinculadoId?: string | null
   onEntregadorAtualizado?: (vendaId: string, entregadorId: string | null) => void
-  /** Sinal externo (ex.: arraste para Em rota sem entregador) para abrir o modal de entregador. */
-  abrirEntregadorSolicitado?: boolean
-  /** Chamado após consumir o sinal de abertura (reseta o estado no pai). */
-  onAbrirEntregadorConsumido?: () => void
   /** Abre o modal de detalhes na guia de pagamento para confirmar a cobrança (coluna Em Rota). */
   onConfirmarCobranca?: (venda: Venda) => void
   nomesMeiosPagamento?: Record<string, string>
@@ -77,8 +73,6 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
     onReimprimirCupomDelivery,
     entregadorVinculadoId = null,
     onEntregadorAtualizado,
-    abrirEntregadorSolicitado = false,
-    onAbrirEntregadorConsumido,
     onConfirmarCobranca,
     nomesMeiosPagamento = {},
   } = props
@@ -104,11 +98,7 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
   )
   const entregadorJaVinculado = Boolean(entregadorVinculadoId?.trim())
 
-  const cardState = useKanbanVendaCardState({
-    abrirEntregadorSolicitado,
-    exibirAtribuirEntregador,
-    onAbrirEntregadorConsumido,
-  })
+  const cardState = useKanbanVendaCardState()
 
   const valorFormatado = transformarParaReal(venda.valorFinal)
   const clienteNome = venda.cliente?.nome?.trim() ? venda.cliente.nome : LABEL_SEM_CLIENTE

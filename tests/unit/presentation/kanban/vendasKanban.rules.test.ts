@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  classeBordaEsquerdaColunaKanban,
   vendaElegivelParaReemissaoAutomaticaLote,
   fiscalKanbanPodeReemitirAposCooldown,
+  rotuloBotaoAvancarEtapaKanban,
 } from '@/src/presentation/components/features/kanban/rules/vendasKanban.rules'
 import type { VendaUnificadaDTO } from '@/src/presentation/components/features/kanban/hooks/useVendasUnificadas'
 
@@ -135,5 +137,40 @@ describe('fiscalKanbanPodeReemitirAposCooldown', () => {
       dataUltimaModificacao: MAIS_DE_10_MIN_ATRAS,
     })
     expect(fiscalKanbanPodeReemitirAposCooldown(venda)).toBe(true)
+  })
+})
+
+describe('rotuloBotaoAvancarEtapaKanban', () => {
+  it('humaniza as duas primeiras etapas iguais para entrega e retirada', () => {
+    expect(rotuloBotaoAvancarEtapaKanban('NOVOS_PEDIDOS', 'entrega').label).toBe(
+      'Iniciar preparo'
+    )
+    expect(rotuloBotaoAvancarEtapaKanban('EM_PREPARO', 'retirada').label).toBe(
+      'Marcar como pronto'
+    )
+  })
+
+  it('diferencia entrega e retirada nas etapas finais', () => {
+    expect(rotuloBotaoAvancarEtapaKanban('PRONTO_ENTREGA', 'entrega').label).toBe(
+      'Saiu para entrega'
+    )
+    expect(rotuloBotaoAvancarEtapaKanban('PRONTO_ENTREGA', 'retirada').label).toBe(
+      'Liberar retirada'
+    )
+    expect(rotuloBotaoAvancarEtapaKanban('EM_ROTA', 'entrega').label).toBe(
+      'Confirmar entrega'
+    )
+    expect(rotuloBotaoAvancarEtapaKanban('EM_ROTA', 'retirada').label).toBe(
+      'Confirmar retirada'
+    )
+  })
+})
+
+describe('classeBordaEsquerdaColunaKanban', () => {
+  it('usa as mesmas cores da faixa dos cards do quadro', () => {
+    expect(classeBordaEsquerdaColunaKanban('EM_PREPARO')).toBe('border-l-amber-500')
+    expect(classeBordaEsquerdaColunaKanban('PRONTO_ENTREGA')).toBe('border-l-teal-500')
+    expect(classeBordaEsquerdaColunaKanban('EM_ROTA')).toBe('border-l-indigo-500')
+    expect(classeBordaEsquerdaColunaKanban('FINALIZADAS')).toBe('border-l-primary')
   })
 })

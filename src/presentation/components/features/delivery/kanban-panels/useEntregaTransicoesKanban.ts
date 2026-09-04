@@ -49,8 +49,8 @@ interface UseEntregaTransicoesKanbanParams {
     acoes: AcaoTransicaoGestor[]
   ) => Promise<VerificarImpressaoKanbanResult>
   verificarEntregadorAntesDespachar?: (venda: Venda) => Promise<boolean>
-  /** Sem entregador ao despachar: abrir o modal de vínculo de entregador do card. */
-  onEntregadorAusenteAoDespachar?: (venda: Venda) => void
+  /** Sem entregador ao despachar: abrir o popup de seleção (sem toast de erro). */
+  onEntregadorAusenteAoDespachar?: (venda: Venda, colunaOrigem: ColunaKanbanId) => void
   /** Quando finalizar exige pagamento quitado e ele ainda está pendente: confirma a cobrança automaticamente (retorna true se confirmado). */
   confirmarPagamentoAntesFinalizar?: (venda: Venda) => Promise<boolean>
   /** Reconsulta pagamento no delivery antes de bloquear finalização (lista unificada pode estar defasada). */
@@ -241,9 +241,8 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
         if (acoes.includes('despachar') && verificarEntregadorAntesDespachar) {
           const podeDespachar = await verificarEntregadorAntesDespachar(venda)
           if (!podeDespachar) {
-            showToast.error('Vincule um entregador antes de despachar para entrega.')
-            onEntregadorAusenteAoDespachar?.(venda)
             reverterTransicaoUi(venda.id)
+            onEntregadorAusenteAoDespachar?.(venda, colunaOrigem)
             return
           }
         }

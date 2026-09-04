@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: #0b1d4a;
+      overflow: hidden;
+    }
+    #bolha {
+      display: block;
+      width: 100%;
+      height: 100%;
+      padding: 0;
+      border: 0;
+      border-radius: 22%;
+      overflow: hidden;
+      background: #0b1d4a;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    #bolha img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <button id="bolha" type="button" aria-label="Abrir o Fredy">
+    <img src="/fredy-icon.png" alt="" />
+  </button>
+  <script>
+    function invoke(cmd) {
+      var core = window.__TAURI__ && window.__TAURI__.core;
+      if (core && core.invoke) return core.invoke(cmd);
+      var internals = window.__TAURI_INTERNALS__;
+      if (internals && internals.invoke) return internals.invoke(cmd);
+      return Promise.reject(new Error('sem Tauri'));
+    }
+    function abrirFlow() {
+      var agora = Date.now();
+      if (agora - (window.__jfBolhaCliqueEm || 0) < 400) return;
+      window.__jfBolhaCliqueEm = agora;
+      invoke('bolha_clique').catch(function (err) {
+        console.error('Fredy bolha clique', err);
+      });
+    }
+    function startDrag() {
+      return invoke('bolha_arrastar');
+    }
+    function dist(a, b) {
+      return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+    }
+    var down = null;
+    var dragged = false;
+    var el = document.getElementById('bolha');
+    el.addEventListener('pointerdown', function (e) {
+      if (e.button !== 0) return;
+      down = { x: e.screenX, y: e.screenY };
+      dragged = false;
+    });
+    window.addEventListener('pointermove', function (e) {
+      if (!down || dragged) return;
+      if (dist(down, { x: e.screenX, y: e.screenY }) > 20) {
+        dragged = true;
+        startDrag();
+      }
+    });
+    window.addEventListener('pointerup', function () {
+      if (!down) return;
+      var clique = !dragged;
+      down = null;
+      if (clique) abrirFlow();
+    });
+    el.addEventListener('click', function (e) {
+      e.preventDefault();
+      if (!dragged) abrirFlow();
+    });
+  </script>
+</body>
+</html>

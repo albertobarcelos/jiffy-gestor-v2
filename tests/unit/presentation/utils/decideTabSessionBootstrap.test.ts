@@ -112,6 +112,17 @@ describe('decideTabSessionBootstrap', () => {
     ).toEqual({ type: 'rebind', empresaId: EMPRESA_B, empParam: SLUG_B })
   })
 
+  it('sem slug e sem token da aba → wait (o kiosk trata no bootstrap, não no hub)', () => {
+    expect(
+      decideTabSessionBootstrap({
+        empParam: null,
+        pendingToken: null,
+        existingToken: null,
+        hubEmpresas: hub,
+      })
+    ).toEqual({ type: 'wait' })
+  })
+
   it('sem token e hub ainda vazio → wait', () => {
     expect(
       decideTabSessionBootstrap({

@@ -1,4 +1,5 @@
-import { buildCupomFromVendaGestorTicket } from '@/src/application/delivery/buildCupomFromVendaGestorTicket'
+import { mapTicketToPrintDocument } from '@/src/application/delivery/mapTicketToPrintDocument'
+import { mapTicketToGraphicPrintDocument } from '@/src/application/delivery/mapTicketToGraphicPrintDocument'
 import {
   avisosProdutoSemImpressora,
   CODES_PRODUTO_SEM_IMPRESSORA,
@@ -7,11 +8,7 @@ import {
 import { warningRedundanteMapeamentoImpressoraWindows } from '@/src/application/delivery/deliveryTicketWarningUtils'
 import type { VendaGestorTicket, VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
 import { printDeliveryCupom } from '@/src/infrastructure/printing/printDeliveryCupom'
-import {
-  mensagemDestinoImpressoraAusente,
-  resolvePrinterDestinationForTicket,
-} from '@/src/infrastructure/printing/resolvePrinterDestinationForTicket'
-import { isTcpPrinterRef } from '@/src/infrastructure/printing/qzTrayClient'
+import { buildPrintJobId, ticketPrintKey } from '@/src/infrastructure/printing/agent/printJobId'
 import { erroImpressao, logImpressao, warnImpressao } from '@/src/shared/utils/logImpressaoDelivery'
 import type { DeliveryCupomTemplateConfig } from '@/src/shared/types/deliveryCupomTemplate'
 
@@ -30,7 +27,6 @@ const AVISO_TEXTO: Record<string, string> = {
 }
 
 function ticketProducaoEhFallbackSemImpressoraProduto(ticket: VendaGestorTicket): boolean {
-  // Regra restrita ao cupom de produção: unificado e expedição continuam seguindo o ticket da API.
   if (ticket.tipoCupom !== 'producao') return false
   const origem = String(ticket.impressora?.origem ?? '')
     .trim()
@@ -45,9 +41,7 @@ export function notificarWarningsTickets(
   options?: {
     ignorarCodes?: string[]
     tickets?: VendaGestorTicket[]
-    /** Lote inclui cupom de produção — exibe aviso por produto sem impressora. */
     imprimeProducao?: boolean
-    /** Payload completo da API; garante aviso igual ao da transição do Kanban. */
     warningsProdutoSemImpressora?: VendaGestorTicketsResponse['warnings']
   }
 ): void {
@@ -74,7 +68,7 @@ export function notificarWarningsTickets(
 }
 
 /**
- * Envia cada ticket ao QZ Tray (Windows ou IP/tcp). Sem fallback de PDF no navegador.
+ * Envia cada ticket ao Print Orchestrator (agente Windows).
  */
 export async function imprimirTicketsApiGestor(params: {
   response: VendaGestorTicketsResponse
@@ -92,22 +86,22 @@ export async function imprimirTicketsApiGestor(params: {
     nomeEmpresa,
     jobNamePrefix,
     cupomTemplate,
-    accessToken,
-    onMensagem,
     onErro,
   } = params
+  const reimpressao = jobNamePrefix.toLowerCase().includes('reimpress')
 
   logImpressao('imprimirLote.inicio', {
     jobNamePrefix,
     numeroVenda: response.numeroVenda,
     vendaIdResumo: response.vendaId?.slice?.(0, 8),
     ticketsNoLote: ticketsAImprimir.length,
+    transporte: 'agent',
+    reimpressao,
   })
 
-  let impressosQz = 0
+  let impressos = 0
   let falhas = 0
   let ignoradosSemItens = 0
-  let ignoradosSemImpressora = 0
   let ignoradosFallbackProdutoSemImpressora = 0
 
   for (const ticket of ticketsAImprimir) {
@@ -132,59 +126,90 @@ export async function imprimirTicketsApiGestor(params: {
       continue
     }
 
-    const html = buildCupomFromVendaGestorTicket(response, ticket, {
-      nomeEmpresa,
-      template: cupomTemplate,
+    const printerName =
+      ticket.impressora?.nomeImpressoraWindows?.trim() || ticket.nomeImpressoraWindows?.trim() || ''
+    if (!printerName) {
+      falhas += 1
+      const nomeLogica = ticket.impressoraNome?.trim() || ticket.impressora?.nome?.trim() || 'lógica'
+      const mensagem = `Vincule a impressora "${nomeLogica}" a uma impressora deste PC em Configurações de impressão.`
+      erroImpressao('ticket.sem_impressora_fisica', {
+        tipoCupom: ticket.tipoCupom,
+        impressoraId: ticket.impressoraId,
+      })
+      onErro?.(mensagem)
+      continue
+    }
+
+    let document
+    try {
+      document =
+        cupomTemplate?.modoPapel === 'grafico'
+          ? await mapTicketToGraphicPrintDocument(response, ticket, {
+              nomeEmpresa,
+              template: cupomTemplate,
+            })
+          : mapTicketToPrintDocument(response, ticket, {
+              nomeEmpresa,
+              template: cupomTemplate,
+            })
+    } catch (error) {
+      falhas += 1
+      const mensagem =
+        error instanceof Error && error.message.trim()
+          ? error.message
+          : 'Falha ao montar o cupom gráfico.'
+      warnImpressao('ticket.grafico_falhou', {
+        mensagem,
+        causa: error instanceof Error ? error.message : String(error),
+      })
+      onErro?.(mensagem)
+      continue
+    }
+    const jobId = buildPrintJobId({
+      vendaId: response.vendaId,
+      tipoCupom: ticket.tipoCupom,
+      ticketKey: ticketPrintKey(ticket),
+      reimpressao,
     })
-    const printerName = await resolvePrinterDestinationForTicket(ticket, accessToken)
+    const copies = Math.min(20, Math.max(1, Number(ticket.copias) || 1))
+
     logImpressao('ticket.envio', {
       tipoCupom: ticket.tipoCupom,
       impressoraId: ticket.impressoraId ?? null,
-      impressoraNomeLogico: ticket.impressoraNome?.slice(0, 40) ?? null,
-      nomeImpressoraWindowsResolvido:
-        printerName ?? '(ausente — configure em Configurações → Impressoras)',
-      modoTcp: printerName ? isTcpPrinterRef(printerName) : false,
-      copiasTicket: ticket.copias ?? 1,
-      htmlChars: html.length,
+      printerName,
+      jobId,
+      copiasTicket: copies,
+      blocos: document.content.length,
     })
-    if (!printerName) {
-      ignoradosSemImpressora += 1
-      const msg = mensagemDestinoImpressoraAusente(ticket)
-      warnImpressao('ticket.sem_destino', { tipoCupom: ticket.tipoCupom })
-      onErro?.(msg)
-      continue
-    }
-    const copies = Math.min(20, Math.max(1, Number(ticket.copias) || 1))
 
     const r = await printDeliveryCupom({
-      html,
+      jobId,
       printerName,
       copies,
-      jobName: `${jobNamePrefix} #${response.numeroVenda}`,
+      document,
     })
-    if (r.ok && r.metodo === 'qz') impressosQz += 1
+    if (r.ok) impressos += 1
     if (!r.ok) falhas += 1
 
     logImpressao('ticket.resultado_print', {
       ok: r.ok,
-      metodo: r.metodo,
+      duplicate: r.duplicate ?? false,
       mensagemInterna: r.mensagem?.slice?.(0, 200) ?? null,
       copies,
-      printerResumido: printerName.slice(0, 50),
+      printerName,
     })
 
     if (!r.ok) {
-      erroImpressao('ticket.print_falhou', { metodo: r.metodo, mensagem: r.mensagem ?? null })
+      erroImpressao('ticket.print_falhou', { mensagem: r.mensagem ?? null })
       onErro?.(r.mensagem ?? 'Falha ao imprimir o cupom.')
     }
   }
 
   logImpressao('imprimirLote.fim', {
     numeroVenda: response.numeroVenda,
-    impressosQz,
+    impressos,
     falhas,
     ignoradosSemItens,
-    ignoradosSemImpressora,
     ignoradosFallbackProdutoSemImpressora,
   })
 }

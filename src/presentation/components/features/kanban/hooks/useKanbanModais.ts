@@ -5,7 +5,7 @@ import type { TipoPedido } from '../../pedidos/components/EscolhaTipoPedidoModal
 import type { AbaDetalhesPedido } from '../../pedidos/types'
 import type { VendaSelecionadaParaEmissao } from './useFiscalEmissaoKanban'
 import type { ModoKanbanVendas } from '../KanbanModoVendasToggle'
-import type { Venda } from '../types'
+import type { ColunaKanbanId, Venda } from '../types'
 
 export function useKanbanModais(modoKanbanVendas: ModoKanbanVendas) {
   const [selectedVendaId, setSelectedVendaId] = useState<string | null>(null)
@@ -80,6 +80,15 @@ export function useKanbanModais(modoKanbanVendas: ModoKanbanVendas) {
     setDeliveryConfiguracoesOpen(true)
   }, [])
 
+  const [despachoPendenteEntregador, setDespachoPendenteEntregador] = useState<{
+    venda: Venda
+    colunaAtual: ColunaKanbanId
+  } | null>(null)
+
+  const abrirEntregadorParaDespacho = useCallback((venda: Venda, colunaAtual: ColunaKanbanId) => {
+    setDespachoPendenteEntregador({ venda, colunaAtual })
+  }, [])
+
   return {
     selectedVendaId,
     setSelectedVendaId,
@@ -106,5 +115,8 @@ export function useKanbanModais(modoKanbanVendas: ModoKanbanVendas) {
     handleEditarProdutos,
     abrirDetalhesPagamentoPedido,
     abrirConfigImpressoraExpedicao,
+    despachoPendenteEntregador,
+    setDespachoPendenteEntregador,
+    abrirEntregadorParaDespacho,
   }
 }
