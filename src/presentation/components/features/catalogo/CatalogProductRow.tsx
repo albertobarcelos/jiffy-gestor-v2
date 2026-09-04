@@ -148,7 +148,7 @@ function CatalogProductRowInner({
           isMenu
             ? '[grid-template-columns:auto_minmax(0,1fr)_auto] md:[grid-template-columns:auto_minmax(0,30ch)_auto_minmax(0,1fr)_auto]'
             : categoriaSlot
-              ? '[grid-template-columns:minmax(0,1fr)_auto] md:[grid-template-columns:minmax(0,30ch)_auto_auto_auto_auto]'
+              ? '[grid-template-columns:minmax(0,1fr)_auto] md:[grid-template-columns:minmax(0,30ch)_auto_auto_12rem_auto]'
               : '[grid-template-columns:minmax(0,1fr)_auto] md:[grid-template-columns:minmax(0,30ch)_auto_auto_minmax(0,1fr)_auto]'
         )}
       >
@@ -255,6 +255,7 @@ function CatalogProductRowInner({
               'min-w-0 justify-self-start',
               isMenu ? 'hidden md:block' : 'col-span-2 md:col-span-1'
             )}
+            onClick={e => e.stopPropagation()}
           >
             {categoriaSlot}
           </div>
