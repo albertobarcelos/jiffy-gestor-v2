@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react'
 import type { Viewport } from 'next'
+import './globals.css'
 import '@/src/presentation/components/features/delivery-publico/shared/theme/delivery-publico-theme.css'
 import { DeliveryPublicoShell } from '@/src/presentation/components/features/delivery-publico/public/components/DeliveryPublicoShell'
+import { QueryProvider } from '@/src/presentation/providers/QueryProvider'
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -18,8 +20,11 @@ export const metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="pt-BR">
-      <body>
-        <DeliveryPublicoShell>{children}</DeliveryPublicoShell>
+      {/* ColorZilla e similares injetam cz-shortcut-listen no body antes do React hidratar. */}
+      <body suppressHydrationWarning>
+        <QueryProvider>
+          <DeliveryPublicoShell>{children}</DeliveryPublicoShell>
+        </QueryProvider>
       </body>
     </html>
   )

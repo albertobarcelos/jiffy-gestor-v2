@@ -35,7 +35,8 @@ npm run dev         # → http://localhost:5001
 
 Crie `.env.local` a partir de `.env.example` e preencha:
 - `NEXT_PUBLIC_EXTERNAL_API_BASE_URL` — URL do backend principal
-- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` — chave da Google Maps API
+- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` — chave pública (mapa/pin no checkout)
+- `GOOGLE_MAPS_API_KEY` — chave de servidor (BFF de geocode e Places)
 
 ## Scripts disponíveis
 

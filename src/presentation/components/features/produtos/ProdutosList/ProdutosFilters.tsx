@@ -113,10 +113,10 @@ export function ProdutosFilters({
 
         <div className="w-full min-w-[120px] sm:w-[132px]">
           <FormControl fullWidth size="small" variant="outlined" sx={sxEntradaCompactaProdutoSelect}>
-            <InputLabel id="produtos-filter-status-grupo-label">Status grupo</InputLabel>
+            <InputLabel id="produtos-filter-status-grupo-label">Status categoria</InputLabel>
             <Select
               labelId="produtos-filter-status-grupo-label"
-              label="Status grupo"
+              label="Status categoria"
               value={statusGrupoFilter}
               onChange={(e: SelectChangeEvent<string>) =>
                 onStatusGrupoChange(e.target.value as StatusFilter)

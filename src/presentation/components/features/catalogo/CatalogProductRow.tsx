@@ -139,15 +139,16 @@ function CatalogProductRowInner({
       <div
         onClick={() => onEdit(id)}
         className={cn(
-          'grid cursor-pointer items-center gap-x-1.5 gap-y-2 border border-gray-200 px-2 py-2 md:gap-x-2 md:px-4',
+          'grid cursor-pointer items-center gap-x-1.5 gap-y-2 px-2 py-2 md:gap-x-2 md:px-4',
           'relative z-0 has-[.tooltip-hover-above:hover]:z-[100] has-[.tooltip-hover-below:hover]:z-[100]',
+          isMenu ? 'border border-gray-200' : null,
           pausadoNoMenu
             ? 'bg-gray-200 hover:bg-gray-200'
             : 'bg-white hover:bg-secondary-text/10',
           isMenu
             ? '[grid-template-columns:auto_minmax(0,1fr)_auto] md:[grid-template-columns:auto_minmax(0,30ch)_auto_minmax(0,1fr)_auto]'
             : categoriaSlot
-              ? '[grid-template-columns:minmax(0,1fr)_auto] md:[grid-template-columns:minmax(0,30ch)_auto_auto_auto_auto]'
+              ? '[grid-template-columns:minmax(0,1fr)_auto] md:[grid-template-columns:minmax(0,30ch)_auto_auto_12rem_auto]'
               : '[grid-template-columns:minmax(0,1fr)_auto] md:[grid-template-columns:minmax(0,30ch)_auto_auto_minmax(0,1fr)_auto]'
         )}
       >
@@ -254,6 +255,7 @@ function CatalogProductRowInner({
               'min-w-0 justify-self-start',
               isMenu ? 'hidden md:block' : 'col-span-2 md:col-span-1'
             )}
+            onClick={e => e.stopPropagation()}
           >
             {categoriaSlot}
           </div>

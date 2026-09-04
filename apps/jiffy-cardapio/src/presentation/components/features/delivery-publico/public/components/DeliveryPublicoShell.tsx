@@ -1,6 +1,7 @@
 'use client'
 
 import { type ReactNode, useEffect } from 'react'
+import { Toaster } from 'react-hot-toast'
 import { useDeliveryVisualViewport } from '../../shared/hooks/useDeliveryVisualViewport'
 
 const IOS_LOCK_CLASS = 'delivery-publico-ios-lock'
@@ -27,6 +28,7 @@ export function DeliveryPublicoShell({ children }: { children: ReactNode }) {
   return (
     <div className="delivery-publico-shell">
       <main className="delivery-publico-scroll w-full">{children}</main>
+      <Toaster position="top-center" />
     </div>
   )
 }

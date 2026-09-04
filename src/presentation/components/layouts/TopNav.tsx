@@ -26,6 +26,7 @@ import {
   MdHistory,
   MdPercent,
   MdAnalytics,
+  MdMenuBook,
 } from 'react-icons/md'
 import type { IconType } from 'react-icons'
 import { useAcessoFiscal } from '@/src/presentation/hooks/useAcessoFiscal'
@@ -93,6 +94,7 @@ export function TopNav() {
       '/taxas',
       '/produtos',
       '/grupos-produtos',
+      '/menus',
       '/estoque',
       '/pedidos',
     ]
@@ -189,7 +191,8 @@ export function TopNav() {
         path: '#',
         icon: MdShoppingBag,
         children: [
-          { name: 'Grupo de Produtos', path: '/grupos-produtos', icon: MdCategory },
+          { name: 'Menus', path: '/menus', icon: MdMenuBook },
+          { name: 'Categorias', path: '/grupos-produtos', icon: MdCategory },
           { name: 'Produtos', path: '/produtos', icon: MdShoppingBag },
           { name: 'Grupo de Complementos', path: '/grupos-complementos', icon: MdCategory },
           { name: 'Complementos', path: '/complementos', icon: MdAddCircle },

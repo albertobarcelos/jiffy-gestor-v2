@@ -1,16 +1,17 @@
 import type { Config } from 'tailwindcss'
+import containerQueries from '@tailwindcss/container-queries'
 import formsPlugin from '@tailwindcss/forms'
+import { tailwindColors } from './src/shared/theme/colors'
 
 const config: Config = {
   content: [
-    './pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './components/**/*.{js,ts,jsx,tsx,mdx}',
     './app/**/*.{js,ts,jsx,tsx,mdx}',
     './src/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
     extend: {
       colors: {
+        ...tailwindColors,
         background: 'var(--background)',
         foreground: 'var(--foreground)',
       },
@@ -20,6 +21,7 @@ const config: Config = {
     },
   },
   plugins: [
+    containerQueries,
     formsPlugin({
       strategy: 'class',
     }),
