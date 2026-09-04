@@ -341,6 +341,50 @@ export function useCriarClienteDeliveryRapido() {
 }
 
 /**
+ * Atualiza só o nome do cliente delivery (`PATCH /api/delivery/clientes/{telefone}`).
+ */
+export function useAtualizarNomeClienteDelivery() {
+  return useSecureTenantMutation(
+    async (
+      { token },
+      input: { telefone: string; nome: string }
+    ): Promise<ClienteDeliveryApi | null> => {
+      const telefone = extrairDigitosTelefone(input.telefone)
+      if (!telefoneCelularBrCompleto(telefone)) {
+        throw new Error('Informe o celular completo com DDD (11 dígitos).')
+      }
+      const nome = input.nome.trim()
+      if (!nome) {
+        throw new Error('Informe o nome do cliente.')
+      }
+
+      const response = await fetchGestorApi(
+        `/api/delivery/clientes/${encodeURIComponent(telefone)}`,
+        {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify({ nome }),
+        }
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(
+          mensagemErroResposta(errorData, response.status, 'Erro ao atualizar nome do cliente')
+        )
+      }
+
+      const data = await response.json().catch(() => ({}))
+      return normalizarClienteDeliveryApi(data)
+    }
+  )
+}
+
+/**
  * Busca moradas ativas da empresa para o telefone informado.
  * Retorna lista vazia quando não há moradas cadastradas para o número.
  */

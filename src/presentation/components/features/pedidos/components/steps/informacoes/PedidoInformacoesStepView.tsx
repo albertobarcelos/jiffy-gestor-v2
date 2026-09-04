@@ -140,7 +140,7 @@ export function PedidoInformacoesStepView() {
           onMoradaSelecionada={setMoradaEntregaSelecionada}
           clienteVinculado={clienteEntregaVinculado}
           onClienteVinculado={setClienteEntregaVinculado}
-          onEditarClientePorDuploClique={handleAbrirEdicaoClienteEntrega}
+          onAbrirCadastroCliente={handleAbrirEdicaoClienteEntrega}
           onAbrirSeletorCliente={() => setSeletorClienteOpen(true)}
           telefoneExibicaoExterno={telefoneBuscaEntrega}
           onTelefoneExibicaoExternoChange={setTelefoneBuscaEntrega}

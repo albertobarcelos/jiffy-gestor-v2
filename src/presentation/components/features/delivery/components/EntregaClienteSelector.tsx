@@ -19,6 +19,7 @@ import {
   useRegistrarUsoMoradaTelefone,
   useBuscarClienteDeliveryPorTelefone,
   useCriarClienteDeliveryRapido,
+  useAtualizarNomeClienteDelivery,
   type MoradaTelefone,
   type EnderecoMorada,
 } from '@/src/presentation/hooks/useMoradaTelefone'
@@ -27,6 +28,7 @@ import type { ResultadoTaxaCoberturaPonto } from '@/src/shared/utils/calcularTax
 import {
   useBuscarClientePorTelefone,
   useCriarClienteRapido,
+  useAtualizarNomeCliente,
 } from '@/src/presentation/hooks/useClientes'
 import {
   extrairDigitosTelefone,
@@ -62,7 +64,9 @@ interface EntregaClienteSelectorProps {
   /** Cliente vinculado (controlado pelo pai para persistir entre etapas). */
   clienteVinculado: ClienteEntrega | null
   onClienteVinculado: (cliente: ClienteEntrega | null) => void
-  /** Duplo clique no campo nome com cliente já encontrado — abre o mesmo modal de edição da página de clientes. */
+  /** Clique no lápis — abre o modal de cadastro completo do cliente. */
+  onAbrirCadastroCliente?: () => void
+  /** @deprecated Use onAbrirCadastroCliente */
   onEditarClientePorDuploClique?: () => void
   /** Abre o seletor completo de clientes quando a busca por telefone não for possível. */
   onAbrirSeletorCliente?: () => void
@@ -360,6 +364,7 @@ export function EntregaClienteSelector({
   onMoradaSelecionada,
   clienteVinculado,
   onClienteVinculado,
+  onAbrirCadastroCliente,
   onEditarClientePorDuploClique,
   onAbrirSeletorCliente,
   telefoneExibicaoExterno,
@@ -415,8 +420,18 @@ export function EntregaClienteSelector({
   const [geoPanelPlaces, setGeoPanelPlaces] = useState<EnderecoGeoCheckoutInput | null>(null)
   const [localizandoMoradaId, setLocalizandoMoradaId] = useState<string | null>(null)
   const [moradaParaExcluir, setMoradaParaExcluir] = useState<MoradaTelefone | null>(null)
+  /** Edição inline do nome (cliente já encontrado). */
+  const [editandoNome, setEditandoNome] = useState(false)
+  const [nomeEmEdicao, setNomeEmEdicao] = useState('')
+  const [salvandoNome, setSalvandoNome] = useState(false)
 
   const telefoneInputRef = useRef<HTMLInputElement>(null)
+  const nomeInputRef = useRef<HTMLInputElement>(null)
+  const abrirCadastroCliente = onAbrirCadastroCliente ?? onEditarClientePorDuploClique
+  /** Evita blur+salvar quando o clique foi no lápis (que tira o foco do input). */
+  const ignorarBlurSalvarNomeRef = useRef(false)
+  /** Evita Enter + blur dispararem dois PATCH. */
+  const salvandoNomeRef = useRef(false)
 
   // Foca o campo de telefone ao montar (ex.: ao entrar na step de informações do pedido).
   useEffect(() => {
@@ -466,6 +481,104 @@ export function EntregaClienteSelector({
   const buscarClienteDelivery = useBuscarClienteDeliveryPorTelefone()
   const criarCliente = useCriarClienteRapido()
   const criarClienteDelivery = useCriarClienteDeliveryRapido()
+  const atualizarNomeDelivery = useAtualizarNomeClienteDelivery()
+  const atualizarNomeCliente = useAtualizarNomeCliente()
+
+  useEffect(() => {
+    setEditandoNome(false)
+    setNomeEmEdicao('')
+    setSalvandoNome(false)
+    salvandoNomeRef.current = false
+  }, [clienteVinculado?.id, telefoneBuscado])
+
+  useEffect(() => {
+    if (!editandoNome) return
+    const id = setTimeout(() => {
+      nomeInputRef.current?.focus()
+      nomeInputRef.current?.select()
+    }, 0)
+    return () => clearTimeout(id)
+  }, [editandoNome])
+
+  const iniciarEdicaoNome = useCallback(() => {
+    if (!clienteVinculado || salvandoNomeRef.current) return
+    setNomeEmEdicao(clienteVinculado.nome)
+    setEditandoNome(true)
+  }, [clienteVinculado])
+
+  const cancelarEdicaoNome = useCallback(() => {
+    setEditandoNome(false)
+    setNomeEmEdicao(clienteVinculado?.nome ?? '')
+  }, [clienteVinculado?.nome])
+
+  const salvarNomeCliente = useCallback(async () => {
+    if (!clienteVinculado || salvandoNomeRef.current) return
+
+    const nomeTrim = nomeEmEdicao.trim()
+    if (!nomeTrim) {
+      showToast.error('Informe o nome do cliente.')
+      nomeInputRef.current?.focus()
+      return
+    }
+
+    if (nomeTrim === clienteVinculado.nome.trim()) {
+      setEditandoNome(false)
+      return
+    }
+
+    salvandoNomeRef.current = true
+    setSalvandoNome(true)
+    setEditandoNome(false)
+    try {
+      if (usarModuloDeliveryClientes) {
+        const telefone =
+          telefoneBuscado || extrairDigitosTelefone(telefoneInput)
+        if (!telefoneCelularBrCompleto(telefone)) {
+          throw new Error('Informe o celular completo com DDD (11 dígitos).')
+        }
+        const atualizado = await atualizarNomeDelivery.mutateAsync({
+          telefone,
+          nome: nomeTrim,
+        })
+        const idErp =
+          atualizado?.clienteIdVinculado?.trim() ||
+          clienteVinculado.id.trim() ||
+          ''
+        onClienteVinculado({
+          id: idErp,
+          nome: atualizado?.nome?.trim() || nomeTrim,
+        })
+      } else {
+        const clienteId = clienteVinculado.id.trim()
+        if (!clienteId) {
+          throw new Error('Cliente inválido para atualizar o nome.')
+        }
+        await atualizarNomeCliente.mutateAsync({
+          clienteId,
+          nome: nomeTrim,
+        })
+        onClienteVinculado({ id: clienteId, nome: nomeTrim })
+      }
+      setNomeDigitado(nomeTrim)
+      showToast.success('Nome atualizado.')
+    } catch (err) {
+      showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar nome')
+      setNomeEmEdicao(nomeTrim)
+      setEditandoNome(true)
+    } finally {
+      salvandoNomeRef.current = false
+      setSalvandoNome(false)
+    }
+  }, [
+    clienteVinculado,
+    nomeEmEdicao,
+    usarModuloDeliveryClientes,
+    telefoneBuscado,
+    telefoneInput,
+    atualizarNomeDelivery,
+    atualizarNomeCliente,
+    onClienteVinculado,
+  ])
 
   useEffect(() => {
     if (!onCoberturaMoradaSelecionadaChange) return
@@ -1129,55 +1242,101 @@ export function EntregaClienteSelector({
                 aria-hidden
               />
               <input
+                ref={nomeInputRef}
                 type="text"
                 value={
-                  clienteVinculado
-                    ? clienteVinculado.nome
-                    : nomeDigitado
+                  editandoNome
+                    ? nomeEmEdicao
+                    : clienteVinculado
+                      ? clienteVinculado.nome
+                      : nomeDigitado
                 }
                 onChange={e => {
+                  if (editandoNome) {
+                    setNomeEmEdicao(e.target.value)
+                    return
+                  }
                   if (clienteVinculado) {
                     onClienteVinculado(null)
                     setClienteNaoEncontrado(false)
                   }
                   setNomeDigitado(e.target.value)
                 }}
-                readOnly={!!clienteVinculado}
+                readOnly={!!clienteVinculado && !editandoNome}
+                disabled={salvandoNome}
                 placeholder="Ex.: João Silva"
-                autoFocus
+                autoFocus={!clienteVinculado}
                 title={
-                  clienteVinculado?.id
-                    ? 'Clique para editar o cadastro do cliente.'
+                  clienteVinculado && !editandoNome
+                    ? 'Clique para editar o nome'
                     : undefined
                 }
-                className={`w-full rounded-md border py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-0 ${
-                  clienteVinculado
+                className={`w-full rounded-md border py-2 pl-9 text-sm focus:outline-none focus:ring-0 ${
+                  clienteVinculado?.id?.trim() ? 'pr-10' : 'pr-3'
+                } ${
+                  clienteVinculado && !editandoNome
                     ? 'cursor-pointer select-none border-green-400 bg-green-50 text-green-800'
-                    : 'border-primary/30 bg-white'
+                    : editandoNome
+                      ? 'border-primary/40 bg-white'
+                      : 'border-primary/30 bg-white'
                 }`}
                 onMouseDown={e => {
-                  /** Evita seleção de palavra ao abrir edição de cliente pelo campo readOnly. */
-                  if (clienteVinculado?.id && e.detail >= 2) {
+                  if (clienteVinculado && !editandoNome && e.detail >= 2) {
                     e.preventDefault()
                   }
                 }}
-                onClick={e => {
-                  if (clienteVinculado?.id) {
-                    e.preventDefault()
-                    onEditarClientePorDuploClique?.()
+                onClick={() => {
+                  if (clienteVinculado && !editandoNome) {
+                    iniciarEdicaoNome()
                   }
                 }}
-                onDoubleClick={e => {
-                  if (clienteVinculado?.id) {
+                onKeyDown={e => {
+                  if (!editandoNome) return
+                  if (e.key === 'Enter') {
                     e.preventDefault()
-                    onEditarClientePorDuploClique?.()
-                  } else {
-                    showToast.info(
-                      'Valide o telefone e localize um cliente cadastrado para editar o cadastro.'
-                    )
+                    void salvarNomeCliente()
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault()
+                    cancelarEdicaoNome()
                   }
+                }}
+                onBlur={() => {
+                  if (!editandoNome || salvandoNomeRef.current) return
+                  if (ignorarBlurSalvarNomeRef.current) {
+                    ignorarBlurSalvarNomeRef.current = false
+                    return
+                  }
+                  void salvarNomeCliente()
                 }}
               />
+              {clienteVinculado?.id?.trim() ? (
+                <button
+                  type="button"
+                  className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-primary hover:bg-primary/10 disabled:opacity-50"
+                  title="Editar cadastro do cliente"
+                  aria-label="Editar cadastro do cliente"
+                  disabled={salvandoNome}
+                  onMouseDown={() => {
+                    ignorarBlurSalvarNomeRef.current = true
+                  }}
+                  onClick={e => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    if (editandoNome) {
+                      cancelarEdicaoNome()
+                    }
+                    if (abrirCadastroCliente) {
+                      abrirCadastroCliente()
+                    } else {
+                      showToast.info(
+                        'Não foi possível abrir o cadastro completo neste fluxo.'
+                      )
+                    }
+                  }}
+                >
+                  <MdEdit className="h-4 w-4" />
+                </button>
+              ) : null}
             </div>
             {clienteCadastrado && (
               <p className="mt-1 flex items-center gap-1 text-xs text-green-700">
