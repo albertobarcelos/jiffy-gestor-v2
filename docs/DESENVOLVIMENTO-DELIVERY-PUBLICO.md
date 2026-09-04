@@ -2,8 +2,12 @@
 
 Documento vivo de planejamento e acompanhamento do novo fluxo público de delivery.
 
-> **Status:** em planejamento  
-> **Última atualização:** 2026-03-08 (abas Design documentadas)
+> **Status:** loja pública extraída para `apps/jiffy-cardapio` (mesmo Git)  
+> **App do cliente:** [`apps/jiffy-cardapio`](../apps/jiffy-cardapio/README.md) — porta 5001  
+> **Contrato de canal:** [`docs/CARDAPIO_CANAL_CONTRATO.md`](./CARDAPIO_CANAL_CONTRATO.md)  
+> **Última atualização:** 2026-09-03
+
+O Gestor mantém admin/design e, com `CARDAPIO_PUBLIC_URL`, redireciona `/delivery/*` e `/cardapio/*` para o Cardápio.
 
 ---
 
@@ -11,8 +15,8 @@ Documento vivo de planejamento e acompanhamento do novo fluxo público de delive
 
 Construir do zero o fluxo público de pedidos online (delivery), acessível via link com slug da empresa, sem login do cliente.
 
-**URL pública atual:** `/delivery/{slug}`  
-**Redirect legado:** `/cardapio/{slug}` → `/delivery/{slug}`
+**URL no Cardápio:** `/{slug}` (app `jiffy-cardapio`)  
+**Legado no Gestor:** `/delivery/{slug}` → redirect quando `CARDAPIO_PUBLIC_URL` estiver setada
 
 O lojista configura **qual layout visual** o app público usa; o cliente final vê o catálogo nesse layout.
 

@@ -26,6 +26,10 @@ import {
   TOKEN_USER_AGENT_JIFFY_FLOW,
 } from '@/src/presentation/gestor-pedidos/constantes'
 import { isRotaPermitidaNoJiffyFlow } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
+import {
+  isCardapioPublicRedirectEnabled,
+  mapGestorPublicPathToCardapioUrl,
+} from '@/src/shared/utils/cardapioPublicUrl'
 
 function pedidoVeioDoAppJiffyFlow(request: NextRequest): boolean {
   const ua = request.headers.get('user-agent') ?? ''
@@ -81,7 +85,28 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  /**
+   * Loja pública migrada para apps/jiffy-cardapio.
+   * Com CARDAPIO_PUBLIC_URL, /delivery e /cardapio redirecionam para o host do Cardápio.
+   */
+  if (isCardapioPublicRedirectEnabled()) {
+    const cardapioDest = mapGestorPublicPathToCardapioUrl(
+      pathname,
+      request.nextUrl.search
+    )
+    if (cardapioDest) {
+      return NextResponse.redirect(cardapioDest, 308)
+    }
+  }
+
   // Rotas públicas - bypass rápido
+  const lojaPublicaNoGestor =
+    !isCardapioPublicRedirectEnabled() &&
+    (pathname === '/cardapio' ||
+      pathname.startsWith('/cardapio/') ||
+      pathname === '/delivery' ||
+      pathname.startsWith('/delivery/'))
+
   if (
     pathname === '/login' ||
     pathname === '/registro' ||
@@ -94,15 +119,12 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/api/auth/usuario/') ||
     pathname.startsWith('/api/consulta-cnpj') ||
     pathname.startsWith('/api/consulta-cep') ||
-    /** Geo/Places do checkout delivery público (rate limit nas próprias routes). */
+    /** Geo/Places — ainda no Gestor se loja local; Cardápio tem as próprias. */
     pathname.startsWith('/api/geolocalizacao/') ||
     pathname.startsWith('/notas-fiscais') ||
     pathname.startsWith('/api/public/notas-fiscais-consumidor') ||
-    pathname === '/cardapio' ||
-    pathname.startsWith('/cardapio/') ||
-    pathname === '/delivery' ||
-    pathname.startsWith('/delivery/') ||
-    pathname.startsWith('/api/public/delivery/')
+    pathname.startsWith('/api/public/delivery/') ||
+    lojaPublicaNoGestor
   ) {
     return NextResponse.next()
   }

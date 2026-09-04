@@ -12,6 +12,7 @@ apps/**/src-tauri/target
 
 # next.js
 /.next/
+apps/**/.next/
 /out/
 
 # production

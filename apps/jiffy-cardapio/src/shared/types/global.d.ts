@@ -1,0 +1,51 @@
+export {}
+
+declare global {
+  // Cache em memória por instância do servidor (BFF). TTL controlado por cada rota.
+  // eslint-disable-next-line no-var
+  var __jiffyTopProdutosCache:
+    | Map<
+        string,
+        {
+          expiresAt: number
+          items: Array<{ produto: string; quantidade: number; valorTotal: number }>
+          totaisPeriodo: { quantidadeTotal: number; valorTotal: number }
+        }
+      >
+    | undefined
+
+  // eslint-disable-next-line no-var
+  var __jiffyProdutoNomeCache: Map<string, string> | undefined
+
+  /** Cache BFF: snapshot mínimo do cardápio por produtoId (nome, grupo, preço). */
+  // eslint-disable-next-line no-var
+  var __jiffyProdutoCardapioMiniCache:
+    | Map<
+        string,
+        {
+          nome: string
+          grupoId?: string
+          nomeGrupo?: string
+          valorCardapio?: number
+        }
+      >
+    | undefined
+
+  // eslint-disable-next-line no-var
+  var __jiffyTopGarconsCache:
+    | Map<
+        string,
+        {
+          expiresAt: number
+          totalUsuariosComVendas: number
+          items: Array<{
+            usuarioId: string
+            nome: string
+            qtdProdutos: number
+            qtdVendas: number
+            valorTotal: number
+          }>
+        }
+      >
+    | undefined
+}
