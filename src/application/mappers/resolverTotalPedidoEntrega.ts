@@ -18,6 +18,8 @@ export function resolverValorTaxaEntregaPedido(args: {
   pedidoComEntrega: boolean
   taxaEntregaValor?: number | null
   resumoFinanceiroDetalhes?: ResumoFinanceiroDetalhes | null
+  /** Taxa calculada pela cobertura (área/raio) da morada selecionada. */
+  taxaEntregaCoberturaValor?: number | null
   taxaEntregaCatalogoValor?: number | null
 }): number {
   if (!args.pedidoComEntrega) return 0
@@ -27,6 +29,11 @@ export function resolverValorTaxaEntregaPedido(args: {
 
   const fromResumo = args.resumoFinanceiroDetalhes?.totalTaxasEntrega
   if (fromResumo != null && fromResumo > 0) return fromResumo
+
+  const fromCobertura = args.taxaEntregaCoberturaValor
+  if (fromCobertura != null && Number.isFinite(fromCobertura)) {
+    return Math.max(0, Number(fromCobertura))
+  }
 
   const fromCatalogo = args.taxaEntregaCatalogoValor
   if (fromCatalogo != null && fromCatalogo > 0) return fromCatalogo

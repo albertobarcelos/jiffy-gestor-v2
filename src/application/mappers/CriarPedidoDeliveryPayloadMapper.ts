@@ -8,14 +8,6 @@ import type { ProdutoSelecionado } from '@/src/domain/types/pedido'
 import { deveEnviarValorUnitarioAlterado } from '@/src/domain/services/pedido/deveEnviarValorUnitarioAlterado'
 import { observacoesArrayFromTexto } from '@/src/shared/helpers/observacaoPedido'
 
-function mapEtiquetaDelivery(raw?: string): 'casa' | 'trabalho' | 'outro' {
-  const t = String(raw ?? '')
-    .trim()
-    .toLowerCase()
-  if (t === 'casa' || t === 'trabalho') return t
-  return 'outro'
-}
-
 function onlyDigits(value: string): string {
   return value.replace(/\D/g, '')
 }
@@ -84,25 +76,9 @@ function buildClientePedidoDeliveryPayload(input: CriarPedidoDeliveryInputDTO) {
   const cliente: CriarPedidoDeliveryApiRequest['cliente'] = { telefone }
 
   if (input.pedidoComEntrega && input.moradaEntregaSelecionada) {
-    const morada = input.moradaEntregaSelecionada
-    const moradaId = morada.id?.trim()
-
+    const moradaId = input.moradaEntregaSelecionada.id?.trim()
     if (moradaId) {
       cliente.enderecoIdEntrega = moradaId
-    } else if (morada.endereco) {
-      const e = morada.endereco
-      cliente.enderecos = [
-        {
-          etiqueta: mapEtiquetaDelivery(morada.tipoEtiqueta),
-          rua: String(e.rua ?? '').trim(),
-          numero: String(e.numero ?? '').trim(),
-          bairro: String(e.bairro ?? '').trim(),
-          cidade: e.cidade?.trim() || undefined,
-          estado: e.estado?.trim().slice(0, 2).toUpperCase() || undefined,
-          cep: onlyDigits(String(e.cep ?? '')).slice(0, 8) || undefined,
-          complemento: e.complemento?.trim() || undefined,
-        },
-      ]
     }
   }
 
@@ -110,7 +86,10 @@ function buildClientePedidoDeliveryPayload(input: CriarPedidoDeliveryInputDTO) {
 }
 
 function buildTaxasPedidoDeliveryPayload(input: CriarPedidoDeliveryInputDTO) {
+  // Com cobertura geolocalizada o backend calcula a taxa no create.
+  // Só envia taxa de catálogo se não houver valor de cobertura (legado / sem geo).
   if (!input.pedidoComEntrega) return undefined
+  if (input.taxaEntregaCoberturaValor != null) return undefined
   const taxaId = input.taxaEntregaSelecionada?.getId()?.trim()
   if (!taxaId) return undefined
   return [{ taxaId, quantidade: 1 }]

@@ -57,6 +57,8 @@ export function createNovoPedidoResetForm({
     form.setClienteId('')
     form.setClienteNome('')
     form.setMoradaEntregaSelecionada(null)
+    form.setEnderecoEntregaCoberturaStatus(null)
+    form.setEnderecoEntregaCoberturaValorTaxa(null)
     form.setTelefoneBuscaEntrega('')
     form.setTelefoneBuscadoEntrega(null)
     form.setTempoPrevistoMinutos(45)
