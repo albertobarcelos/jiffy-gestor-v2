@@ -132,17 +132,3 @@ export function resolveDesignPaletteColors(
   }
   return getColorPaletteById(config.cores.paletaId).colors
 }
-
-export function canPublishPalette(paletteId: ColorPaletteId): boolean {
-  if (paletteId === 'personalizada') return true
-  return COLOR_PALETTES.find(p => p.id === paletteId)?.publicavel ?? false
-}
-
-export function getPublishablePaletteLabel(): string {
-  const names = [
-    ...COLOR_PALETTES.filter(p => p.publicavel).map(p => p.nome),
-    'Personalizada',
-  ]
-  if (names.length <= 1) return names[0] ?? 'Carvão'
-  return `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`
-}

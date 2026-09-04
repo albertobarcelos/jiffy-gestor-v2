@@ -9,7 +9,7 @@ import type { MeioPagamentoPublicoDTO } from '@/src/application/dto/delivery-pub
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { formatarCpfCnpjInput } from '@/src/shared/utils/cpfCnpj'
 import { formatarValorComplemento } from '@/src/domain/services/pedido/CalculadoraPedido'
-import { normalizeTipoImpactoPreco } from '@/src/application/mappers/VendaApiNormalizer'
+import { normalizeTipoImpactoPreco } from '@/src/shared/utils/normalizeTipoImpactoPreco'
 import type { DeliveryCarrinhoItem } from '../../../shared/stores/deliveryCarrinhoStore'
 import type { DeliveryTipoEntrega } from '../../../shared/stores/deliveryPreferenciaEntregaStore'
 import { DELIVERY_PAIS_TELEFONE_PADRAO } from '../../../shared/constants/deliveryPaisesTelefone'

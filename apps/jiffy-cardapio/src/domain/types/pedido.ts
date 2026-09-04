@@ -1,6 +1,6 @@
 import type { UnidadeMedidaProduto } from '@/src/shared/types/unidadeMedidaProduto'
 
-/** Tipos de linha do pedido (compartilhados entre domain e apresentação). */
+/** Tipos mínimos de linha do pedido no Cardápio público. */
 
 export interface ComplementoSelecionado {
   id: string
@@ -13,22 +13,12 @@ export interface ComplementoSelecionado {
 
 export interface ProdutoSelecionado {
   produtoId: string
-  /**
-   * ID do item já lançado na venda (distinto do `produtoId` do catálogo).
-   * Necessário para remover o item via PATCH delivery (`produtos.remove`). Ausente em itens novos.
-   */
   produtoLancadoId?: string
   nome: string
   quantidade: number
   valorUnitario: number
-  /**
-   * Preço do catálogo no momento do lançamento.
-   * Usado no create para enviar `valorUnitario` só quando houve override.
-   */
   valorCatalogo?: number
-  /** Snapshot do flag do produto no lançamento (UI + decisão de override no payload). */
   permiteAlterarPreco?: boolean
-  /** UN = unitário (qtd inteira); KG/LT = qtd fracionária permitida. */
   unidadeMedida?: UnidadeMedidaProduto
   complementos: ComplementoSelecionado[]
   tipoDesconto?: 'fixo' | 'porcentagem' | null
@@ -36,13 +26,6 @@ export interface ProdutoSelecionado {
   tipoAcrescimo?: 'fixo' | 'porcentagem' | null
   valorAcrescimo?: number | null
   valorFinal?: number | null
-  lancadoPorId?: string
-  removido?: boolean
-  removidoPorId?: string
-  dataLancamento?: string
-  dataRemocao?: string
-  ncm?: string
-  /** Texto único na UI; enviado como `observacoes: [texto]` na API. */
   observacao?: string
 }
 
@@ -52,36 +35,8 @@ export interface PagamentoSelecionado {
   valor: number
   cobrarNaEntrega?: boolean
   naoEfetivo?: boolean
-  realizadoPorId?: string
   cancelado?: boolean
-  canceladoPorId?: string
-  dataCriacao?: string
-  dataCancelamento?: string
+  dataCancelamento?: string | null
   isTefUsed?: boolean
   isTefConfirmed?: boolean
-  tefIdentifier?: string
-  tefAdquirente?: string
-  cnpjAdquirente?: string
-  codigoAutorizacao?: string
-  tipoIntegracao?: string
-  bandeiraCartao?: string
 }
-
-export type StatusVenda = 'ABERTA' | 'FINALIZADA' | 'PENDENTE_EMISSAO'
-
-export type {
-  OrigemVenda,
-  FluxoPagamentoEntrega,
-  TipoAtendimentoDelivery,
-  AbaDetalhesPedido,
-  EnderecoEntregaDetalhe,
-  TaxaEntregaDetalhe,
-  DetalhesEntregaPedido,
-  UsuarioPdvEntregadorOption,
-  DetalhesPedidoMeta,
-  ResumoFinanceiroDetalhes,
-  ResumoFiscalVenda,
-  TabelaOrigemVenda,
-  CanalAberturaPedido,
-  MoradaEntregaSelecionada,
-} from './vendaDetalhe'

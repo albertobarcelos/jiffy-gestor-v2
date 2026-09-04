@@ -1,7 +1,7 @@
 'use client'
 
 import { MdClose } from 'react-icons/md'
-import { normalizeTipoImpactoPreco } from '@/src/application/mappers/VendaApiNormalizer'
+import { normalizeTipoImpactoPreco } from '@/src/shared/utils/normalizeTipoImpactoPreco'
 import { formatarValorComplemento } from '@/src/domain/services/pedido/CalculadoraPedido'
 import type { DeliveryCarrinhoComplemento } from '../stores/deliveryCarrinhoStore'
 

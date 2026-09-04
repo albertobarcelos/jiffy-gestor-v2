@@ -1,4 +1,4 @@
-import { normalizeTipoImpactoPreco } from '@/src/application/mappers/VendaApiNormalizer'
+import { normalizeTipoImpactoPreco } from '@/src/shared/utils/normalizeTipoImpactoPreco'
 import { calcularTotalComplementos } from '@/src/domain/services/pedido/CalculadoraPedido'
 import type {
   DeliveryCarrinhoComplemento,

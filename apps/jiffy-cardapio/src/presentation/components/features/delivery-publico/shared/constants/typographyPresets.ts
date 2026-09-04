@@ -48,13 +48,3 @@ export const TYPOGRAPHY_PRESETS: TypographyPresetDefinition[] = [
 export function getTypographyPresetById(id: TypographyPresetId): TypographyPresetDefinition {
   return TYPOGRAPHY_PRESETS.find(p => p.id === id) ?? TYPOGRAPHY_PRESETS[0]
 }
-
-export function canPublishTypography(presetId: TypographyPresetId): boolean {
-  return TYPOGRAPHY_PRESETS.find(p => p.id === presetId)?.publicavel ?? false
-}
-
-export function getPublishableTypographyLabel(): string {
-  const names = TYPOGRAPHY_PRESETS.filter(p => p.publicavel).map(p => p.nome)
-  if (names.length <= 1) return names[0] ?? 'Urbana'
-  return `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`
-}

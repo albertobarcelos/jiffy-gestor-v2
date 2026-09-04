@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react'
 import type { CatalogoPublicoProdutoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
-import { normalizeTipoImpactoPreco } from '@/src/application/mappers/VendaApiNormalizer'
+import { normalizeTipoImpactoPreco } from '@/src/shared/utils/normalizeTipoImpactoPreco'
 import { calcularTotalComplementos } from '@/src/domain/services/pedido/CalculadoraPedido'
 import {
   useEnsureComplementosCatalogo,
