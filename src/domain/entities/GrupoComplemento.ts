@@ -10,7 +10,8 @@ export class GrupoComplemento {
     private readonly ativo: boolean,
     private readonly ordem?: number,
     private readonly complementosIds?: string[],
-    private readonly complementos?: any[]
+    private readonly complementos?: any[],
+    private readonly imagemUrl?: string | null
   ) {}
 
   static create(
@@ -21,7 +22,8 @@ export class GrupoComplemento {
     ativo: boolean,
     ordem?: number,
     complementosIds?: string[],
-    complementos?: any[]
+    complementos?: any[],
+    imagemUrl?: string | null
   ): GrupoComplemento {
     if (!id || !nome) {
       throw new Error('ID e nome são obrigatórios')
@@ -43,7 +45,8 @@ export class GrupoComplemento {
       ativo,
       ordem,
       complementosIds,
-      complementos
+      complementos,
+      imagemUrl
     )
   }
 
@@ -79,7 +82,8 @@ export class GrupoComplemento {
             ? data.complementosIds.map((id: any) => id.toString())
             : [])
         : undefined,
-      data.complementos
+      data.complementos,
+      typeof data.imagemUrl === 'string' ? data.imagemUrl : data.imagemUrl ?? null
     )
   }
 
@@ -115,6 +119,10 @@ export class GrupoComplemento {
     return this.complementos
   }
 
+  getImagemUrl(): string | null | undefined {
+    return this.imagemUrl
+  }
+
   toJSON() {
     return {
       id: this.id,
@@ -125,6 +133,7 @@ export class GrupoComplemento {
       ordem: this.ordem,
       complementosIds: this.complementosIds,
       complementos: this.complementos,
+      imagemUrl: this.imagemUrl ?? null,
     }
   }
 }
