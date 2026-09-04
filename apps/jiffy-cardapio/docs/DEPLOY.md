@@ -19,10 +19,11 @@ Cliente acessa `https://cardapio.jiffy.run/{slug}` (logo da loja; não “Jiffy�
 3. No Gestor (produção/homolog), setar:
 
 ```env
-CARDAPIO_PUBLIC_URL=https://cardapio.jiffy.run
+NEXT_PUBLIC_CARDAPIO_PUBLIC_URL=https://cardapio.jiffy.run
+# opcional (alias server): CARDAPIO_PUBLIC_URL=https://cardapio.jiffy.run
 ```
 
-Com isso, `/delivery/{slug}` e `/cardapio/{slug}` no Gestor fazem **308** para o Cardápio.
+Com isso, `/delivery/{slug}` e `/cardapio/{slug}` no Gestor fazem **308** para o Cardápio, e o hub copia `https://cardapio.jiffy.run/{slug}`.
 
 ## 3. Variáveis do Cardápio
 

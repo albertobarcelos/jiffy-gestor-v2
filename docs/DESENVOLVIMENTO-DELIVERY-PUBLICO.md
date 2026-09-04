@@ -7,7 +7,7 @@ Documento vivo de planejamento e acompanhamento do novo fluxo público de delive
 > **Contrato de canal:** [`docs/CARDAPIO_CANAL_CONTRATO.md`](./CARDAPIO_CANAL_CONTRATO.md)  
 > **Última atualização:** 2026-09-03
 
-O Gestor mantém admin/design e, com `CARDAPIO_PUBLIC_URL`, redireciona `/delivery/*` e `/cardapio/*` para o Cardápio.
+O Gestor mantém admin/design e, com `NEXT_PUBLIC_CARDAPIO_PUBLIC_URL` (ou `CARDAPIO_PUBLIC_URL`), redireciona `/delivery/*` e `/cardapio/*` para o Cardápio. O hub copia o link canônico `{host}/{slug}`.
 
 ---
 

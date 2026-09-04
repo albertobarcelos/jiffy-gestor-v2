@@ -63,9 +63,10 @@ O admin (design, agenda, cobertura, kanban) **permanece no Gestor** em
 Com o Cardápio no ar, no Gestor:
 
 ```env
-CARDAPIO_PUBLIC_URL=http://localhost:5001
+NEXT_PUBLIC_CARDAPIO_PUBLIC_URL=http://localhost:5001
 # produção: https://cardapio.jiffy.run
+# alias server opcional: CARDAPIO_PUBLIC_URL=...
 ```
 
-`/delivery/{slug}` e `/cardapio/{slug}` passam a redirecionar para este app.
+`/delivery/{slug}` e `/cardapio/{slug}` passam a redirecionar para este app; o hub copia `{host}/{slug}`.
 Detalhes: [`docs/DEPLOY.md`](docs/DEPLOY.md).
