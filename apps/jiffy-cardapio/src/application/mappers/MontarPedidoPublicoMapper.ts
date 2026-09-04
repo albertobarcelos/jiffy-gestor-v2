@@ -11,7 +11,6 @@ import {
   comporTelefoneApi,
   telefoneNacionalValido,
 } from '@/src/shared/utils/deliveryTelefonePais'
-import { canalFromTipoEntrega } from '@/src/shared/types/canalPedidoCardapio'
 
 export type MontarPedidoPublicoParams = {
   slug: string
@@ -154,7 +153,6 @@ export function montarPedidoPublico(
     origem: 'JIFFY_DELIVERY',
     tokenCotacao: params.tokenCotacao,
     tipoEntrega: composicao.composicao.tipoEntrega,
-    canal: canalFromTipoEntrega(composicao.composicao.tipoEntrega),
     cliente: composicao.composicao.cliente,
     produtos: composicao.composicao.produtos,
   }

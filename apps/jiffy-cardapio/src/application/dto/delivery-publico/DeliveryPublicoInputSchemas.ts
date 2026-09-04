@@ -87,13 +87,6 @@ export const CreatePedidoPublicoInputSchema = z.object({
   origem: z.literal('JIFFY_DELIVERY'),
   tokenCotacao: z.string().min(1),
   tipoEntrega: z.enum(['entrega', 'retirada']),
-  /**
-   * Canal do Cardápio. Hoje espelha `tipoEntrega`; mesa/comanda reservados.
-   * @see docs/CARDAPIO_CANAL_CONTRATO.md
-   */
-  canal: z.enum(['entrega', 'retirada', 'mesa', 'comanda']).optional(),
-  mesaId: z.string().min(1).optional(),
-  comandaCodigo: z.string().min(1).optional(),
   cliente: ClienteReferenciaPedidoPublicoInputSchema,
   documentoCpfCnpj: z
     .string()

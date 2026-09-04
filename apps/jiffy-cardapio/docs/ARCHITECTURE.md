@@ -24,22 +24,13 @@ JIFFY-GESTOR-OFICIAL/          ← raiz do Git
 | **Backend Node.js** | Orquestrador: API REST/MQTT, persistência, regras de negócio |
 | **Go Agent** | Impressão local (Edge Print Gateway) |
 
-## Canais de pedido
+## Tipos de entrega
 
-```
-CanalPedidoCardapio = 'entrega' | 'retirada' | 'mesa' | 'comanda'
-```
+O checkout usa apenas `tipoEntrega`: `'entrega' | 'retirada'`.
 
-Definido em `src/shared/types/canalPedidoCardapio.ts`.
-
-| Canal | Path | Status |
-|-------|------|--------|
-| entrega / retirada | `/{slug}` | Ativo (checkout) |
-| mesa | `/{slug}/mesa/{mesaId}` | Rota + sessão reservadas; create no backend TBD |
-| tablet | `/{slug}/mesa/{mesaId}?tablet=1` | Mesmo canal `mesa`, flag kiosk |
-| comanda | `/{slug}/comanda/{codigo}` | Rota + sessão reservadas |
-
-Store: `canalCardapioStore` (Zustand persist).
+| Tipo | Path | Status |
+|------|------|--------|
+| entrega / retirada | `/{slug}` (+ carrinho) | Ativo |
 
 ## Fluxo de dados (storefront)
 

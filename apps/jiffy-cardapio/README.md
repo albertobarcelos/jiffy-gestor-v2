@@ -18,19 +18,12 @@ O Cardápio e o Gestor **compartilham o mesmo repositório Git** mas são aplica
 | `/{slug}` | Cardápio da loja (home) |
 | `/{slug}/carrinho` | Cardápio com carrinho aberto |
 | `/{slug}/catalogo` | Redireciona para `/{slug}` (compatibilidade) |
-| `/{slug}/mesa/{mesaId}` | QR na mesa (canal `mesa`; pedido mesa em evolução) |
-| `/{slug}/mesa/{mesaId}?tablet=1` | Tablet / kiosk na mesa |
-| `/{slug}/comanda/{codigo}` | Comanda (canal reservado) |
 | `/instrucoes` | Instruções de acesso (sem slug) |
 
-> O Gestor mantém as mesmas rotas com prefixo `/delivery/...` para backwards-compat durante a migração (Fase 2).
+## Tipos de entrega
 
-## Canais suportados
-
-- `entrega` — endereço de entrega com cálculo de frete
+- `entrega` — endereço com cálculo de frete
 - `retirada` — retirada no balcão
-- `mesa` — pedido na mesa (QR code de mesa)
-- `comanda` — comanda (QR code de comanda)
 
 ## Como rodar
 

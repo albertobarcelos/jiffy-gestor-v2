@@ -4,7 +4,6 @@ Documento vivo de planejamento e acompanhamento do novo fluxo público de delive
 
 > **Status:** loja pública **somente** em `apps/jiffy-cardapio` (mesmo Git)  
 > **App do cliente:** [`apps/jiffy-cardapio`](../apps/jiffy-cardapio/README.md) — porta 5001  
-> **Contrato de canal:** [`docs/CARDAPIO_CANAL_CONTRATO.md`](./CARDAPIO_CANAL_CONTRATO.md)  
 > **Última atualização:** 2026-09-03
 
 O Gestor mantém admin/design/kanban. A loja e o BFF público **não** residem mais no Gestor. Com `NEXT_PUBLIC_CARDAPIO_PUBLIC_URL` (ou `CARDAPIO_PUBLIC_URL`), `/delivery/*` e `/cardapio/*` no Gestor redirecionam (308) para o Cardápio. O hub copia o link canônico `{host}/{slug}`.
