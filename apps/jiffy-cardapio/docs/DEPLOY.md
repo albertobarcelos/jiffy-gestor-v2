@@ -30,7 +30,8 @@ Com isso, `/delivery/{slug}` e `/cardapio/{slug}` no Gestor fazem **308** para o
 Ver [`.env.example`](../.env.example):
 
 - `NEXT_PUBLIC_EXTERNAL_API_BASE_URL` — API Wilcker (pedidos públicos)
-- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` — Places / mapa no checkout
+- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` — mapa/pin no checkout
+- `GOOGLE_MAPS_API_KEY` — BFF (`/api/geolocalizacao/*`); precisa de Places API (New)
 - `PORT=5001` (container)
 
 CORS: a API Wilcker deve aceitar o origin do Cardápio. O BFF `/api/public/delivery/*` do Cardápio expõe `Access-Control-Allow-Origin: *` para o Design do Gestor (outro host) ler logo/capa via catálogo.
@@ -44,6 +45,7 @@ docker build -t jiffy-cardapio .
 docker run --rm -p 5001:5001 \
   -e NEXT_PUBLIC_EXTERNAL_API_BASE_URL=https://api.exemplo \
   -e NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=... \
+  -e GOOGLE_MAPS_API_KEY=... \
   jiffy-cardapio
 ```
 
