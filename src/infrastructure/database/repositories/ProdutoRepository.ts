@@ -139,38 +139,5 @@ export class ProdutoRepository implements IProdutoRepository {
       throw error
     }
   }
-
-  async atualizarMenus(
-    id: string,
-    input: { add?: string[]; remove?: string[] }
-  ): Promise<Produto> {
-    try {
-      const { data } = await this.apiClient.request<any>(
-        `/api/v1/cardapio/produtos/${id}/menus`,
-        {
-          method: 'PATCH',
-          headers: this.token
-            ? {
-                Authorization: `Bearer ${this.token}`,
-                'Content-Type': 'application/json',
-              }
-            : {
-                'Content-Type': 'application/json',
-              },
-          body: JSON.stringify({
-            add: input.add ?? [],
-            remove: input.remove ?? [],
-          }),
-        }
-      )
-
-      return Produto.fromJSON(data)
-    } catch (error) {
-      if (error instanceof ApiError) {
-        throw new Error(error.message || 'Erro ao atualizar menus do produto')
-      }
-      throw error
-    }
-  }
 }
 

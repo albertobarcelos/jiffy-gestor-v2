@@ -39,6 +39,7 @@ export interface KanbanBoardRendererProps {
   direcaoOrdenacaoPorColuna: Record<ColunaKanbanId, DirecaoOrdenacaoKanban>
   onCriterioOrdenacaoChange: (columnId: ColunaKanbanId, criterio: CriterioOrdenacaoKanban) => void
   onToggleDirecaoOrdenacao: (columnId: ColunaKanbanId) => void
+  onOcultarColuna?: (columnId: ColunaKanbanId) => void
   onColumnScroll: (columnId: ColunaKanbanId, event: React.UIEvent<HTMLDivElement>) => void
   deliveryKanban: DeliveryKanbanReturn
   balcaoKanban: BalcaoKanbanReturn
@@ -51,8 +52,6 @@ export interface KanbanBoardRendererProps {
   onEmitirNfe: (venda: Venda) => void
   onReimprimirCupomDelivery?: (venda: Venda, colunaAtual: ColunaKanbanId) => void
   entregadorPorVendaId: Record<string, string>
-  vendaIdAbrirEntregador: string | null
-  onAbrirEntregadorConsumido: () => void
   onEntregadorAtualizado: (vendaId: string, entregadorId: string | null) => void
   onConfirmarCobranca?: (venda: Venda) => void
   nomesMeiosPagamento: Record<string, string>
@@ -75,6 +74,7 @@ export function KanbanBoardRenderer({
   direcaoOrdenacaoPorColuna,
   onCriterioOrdenacaoChange,
   onToggleDirecaoOrdenacao,
+  onOcultarColuna,
   onColumnScroll,
   deliveryKanban,
   balcaoKanban,
@@ -87,8 +87,6 @@ export function KanbanBoardRenderer({
   onEmitirNfe,
   onReimprimirCupomDelivery,
   entregadorPorVendaId,
-  vendaIdAbrirEntregador,
-  onAbrirEntregadorConsumido,
   onEntregadorAtualizado,
   onConfirmarCobranca,
   nomesMeiosPagamento,
@@ -108,7 +106,7 @@ export function KanbanBoardRenderer({
             onDragEnd={onDragEnd}
             onDragCancel={onDragCancel}
           >
-            <div className="flex h-full min-h-0 min-w-max flex-1 gap-3">
+            <div className="flex h-full min-h-0 w-full min-w-0 flex-1 gap-3">
             {columns.map(column => {
               const colId = column.id as ColunaKanbanId
               const columnTotalCount = getColumnTotalCount(colId)
@@ -123,6 +121,7 @@ export function KanbanBoardRenderer({
                   direcaoOrdenacao={direcaoOrdenacaoPorColuna[colId] ?? 'desc'}
                   onCriterioOrdenacaoChange={onCriterioOrdenacaoChange}
                   onToggleDirecaoOrdenacao={onToggleDirecaoOrdenacao}
+                  onOcultarColuna={onOcultarColuna}
                   onColumnScroll={onColumnScroll}
                   columnRodape={
                     colId === 'REJEITADAS' &&
@@ -174,8 +173,6 @@ export function KanbanBoardRenderer({
                       entregadorVinculadoId={
                         entregadorPorVendaId[venda.id] ?? venda.entregador?.id ?? null
                       }
-                      abrirEntregadorSolicitado={vendaIdAbrirEntregador === venda.id}
-                      onAbrirEntregadorConsumido={onAbrirEntregadorConsumido}
                       onEntregadorAtualizado={(vendaId, entregadorId) => {
                         definirEntregadorKanbanCache(vendaId, entregadorId)
                         onEntregadorAtualizado(vendaId, entregadorId)

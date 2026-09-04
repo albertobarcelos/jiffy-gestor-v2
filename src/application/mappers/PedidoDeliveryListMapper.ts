@@ -62,7 +62,16 @@ export function pedidoDeliverySummaryParaUnifiedRecord(
     dataCriacao: summary.dataCriacao,
     dataFinalizacao: summary.dataFinalizacao,
     dataCancelamento: summary.dataCancelamento,
-    cliente: summary.cliente,
+    cliente: summary.cliente
+      ? {
+          ...summary.cliente,
+          telefone:
+            summary.cliente.telefone ||
+            summary.contextoEntrega?.destinatarioTelefone ||
+            summary.contextoEntrega?.clienteDeliveryTelefoneRef ||
+            null,
+        }
+      : null,
     solicitarEmissaoFiscal: summary.solicitarEmissaoFiscal,
     statusFiscal: resumoFiscal?.status ?? null,
     resumoFiscal,
@@ -120,6 +129,29 @@ function parseBoolean(raw: unknown, fallback: boolean): boolean {
   return fallback
 }
 
+function primeiroTexto(valor: unknown): string {
+  const s = String(valor ?? '').trim()
+  return s
+}
+
+function primeiroTelefoneClienteDelivery(
+  clienteRaw: Record<string, unknown> | null,
+  contexto: PedidoDeliverySummaryApi['contextoEntrega'] | null
+): string | undefined {
+  const candidatos = [
+    clienteRaw?.telefone,
+    clienteRaw?.celular,
+    clienteRaw?.phone,
+    contexto?.destinatarioTelefone,
+    contexto?.clienteDeliveryTelefoneRef,
+  ]
+  for (const c of candidatos) {
+    const s = primeiroTexto(c)
+    if (s) return s
+  }
+  return undefined
+}
+
 /** Normaliza item bruto da API (tolerante a campos opcionais). */
 export function normalizarPedidoDeliverySummaryJson(raw: unknown): PedidoDeliverySummaryApi | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
@@ -138,15 +170,22 @@ export function normalizarPedidoDeliverySummaryJson(raw: unknown): PedidoDeliver
     ? (statusRaw as PedidoDeliverySummaryApi['statusDelivery'])
     : 'PENDENTE'
 
+  const contextoEntregaRaw =
+    o.contextoEntrega && typeof o.contextoEntrega === 'object' && !Array.isArray(o.contextoEntrega)
+      ? (o.contextoEntrega as PedidoDeliverySummaryApi['contextoEntrega'])
+      : null
+
   const clienteRaw =
     o.cliente && typeof o.cliente === 'object' && !Array.isArray(o.cliente)
       ? (o.cliente as Record<string, unknown>)
       : null
+  const telefoneCliente = primeiroTelefoneClienteDelivery(clienteRaw, contextoEntregaRaw)
   const cliente =
     clienteRaw && String(clienteRaw.id ?? '').trim()
       ? {
           id: String(clienteRaw.id),
           nome: String(clienteRaw.nome ?? ''),
+          ...(telefoneCliente ? { telefone: telefoneCliente } : {}),
         }
       : null
 
@@ -174,11 +213,6 @@ export function normalizarPedidoDeliverySummaryJson(raw: unknown): PedidoDeliver
           nome: entregadorRaw.nome != null ? String(entregadorRaw.nome) : null,
           telefone: entregadorRaw.telefone != null ? String(entregadorRaw.telefone) : null,
         }
-      : null
-
-  const contextoEntregaRaw =
-    o.contextoEntrega && typeof o.contextoEntrega === 'object' && !Array.isArray(o.contextoEntrega)
-      ? (o.contextoEntrega as PedidoDeliverySummaryApi['contextoEntrega'])
       : null
 
   return {

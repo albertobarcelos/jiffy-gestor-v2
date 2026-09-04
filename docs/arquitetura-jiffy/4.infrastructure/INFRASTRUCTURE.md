@@ -78,6 +78,8 @@ A implementação por `ports`/contratos é essencial para:
 
 Infraestrutura deve focar em **como executar tecnicamente**, não em **o que o negócio decide**.
 
+Storage do casco Windows (Fredy): [`JIFFY_FLOW_R2.md`](./JIFFY_FLOW_R2.md) (bucket `jiffy-flow`, separado do Print).
+
 ## 7. Checklist rápido para infraestrutura
 
 1. esta implementação depende de contrato interno (port/interface)?

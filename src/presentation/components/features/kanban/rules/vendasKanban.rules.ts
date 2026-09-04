@@ -1,5 +1,11 @@
 import { fiscalPendentePodeReemitirAposCooldown } from '@/src/domain/services/pedido/RegrasFiscaisVenda'
 import {
+  clienteTelefoneContem,
+  digitosTelefone,
+  telefonesCorrespondem,
+  termoBuscaClientePorTelefone,
+} from '@/src/shared/utils/telefoneClienteMatch'
+import {
   isPedidoEntregaComEntregador,
   isPedidoEntregaKanban,
 } from '@/src/shared/helpers/pedidoEntregaKanban'
@@ -140,6 +146,41 @@ export function acoesTransicaoEntregaAvanco(
   return acoes
 }
 
+export type RotuloAvancarEtapaKanban = {
+  label: string
+  loading: string
+}
+
+function vendaEhRetiradaKanban(tipoVenda?: string | null): boolean {
+  return String(tipoVenda ?? '').trim().toLowerCase() === 'retirada'
+}
+
+/** Texto do botão de avanço: diz a próxima etapa (entrega ≠ retirada nos dois últimos). */
+export function rotuloBotaoAvancarEtapaKanban(
+  colunaAtual: ColunaKanbanId,
+  tipoVenda?: string | null
+): RotuloAvancarEtapaKanban {
+  const retirada = vendaEhRetiradaKanban(tipoVenda)
+
+  if (colunaAtual === 'NOVOS_PEDIDOS') {
+    return { label: 'Iniciar preparo', loading: 'Iniciando…' }
+  }
+  if (colunaAtual === 'EM_PREPARO') {
+    return { label: 'Marcar como pronto', loading: 'Marcando…' }
+  }
+  if (colunaAtual === 'PRONTO_ENTREGA') {
+    return retirada
+      ? { label: 'Liberar retirada', loading: 'Liberando…' }
+      : { label: 'Saiu para entrega', loading: 'Enviando…' }
+  }
+  if (colunaAtual === 'EM_ROTA') {
+    return retirada
+      ? { label: 'Confirmar retirada', loading: 'Finalizando…' }
+      : { label: 'Confirmar entrega', loading: 'Finalizando…' }
+  }
+  return { label: 'Avançar etapa', loading: 'Avançando…' }
+}
+
 function dadosFiscalVendaKanban(v: VendaUnificadaDTO) {
   return {
     statusFiscal: v.statusFiscal,
@@ -165,6 +206,19 @@ export function statusFiscalAguardandoSefaz(v: VendaUnificadaDTO): boolean {
   return STATUS_FISCAL_AGUARDANDO_SEFAZ.has(sf)
 }
 
+/** Faixa esquerda da etapa — a mesma dos cards do quadro. */
+export function classeBordaEsquerdaColunaKanban(columnId: ColunaKanbanId): string {
+  if (columnId === 'FINALIZADAS') return 'border-l-primary'
+  if (columnId === 'NOVOS_PEDIDOS') return 'border-l-sky-500'
+  if (columnId === 'EM_PREPARO') return 'border-l-amber-500'
+  if (columnId === 'PRONTO_ENTREGA') return 'border-l-teal-500'
+  if (columnId === 'EM_ROTA') return 'border-l-indigo-500'
+  if (columnId === 'PENDENTE_EMISSAO') return 'border-l-yellow-400'
+  if (columnId === 'COM_FISCAL') return 'border-l-green-400'
+  if (columnId === 'REJEITADAS') return 'border-l-red-500'
+  return 'border-l-gray-300'
+}
+
 /**
  * Borda esquerda e fundo do card conforme coluna e statusFiscal.
  * Finalizadas: primary. Pendente/Com nota: fiscal (emitida/cancelada/rejeitada), sem status na pendente → amarelo,
@@ -175,21 +229,14 @@ export function getCardBorderEFundoKanban(
   v: VendaUnificadaDTO,
   acaoFiscalEmAndamentoPorVenda: Record<string, 'emitindo' | 'reemitindo'>
 ): { borderClass: string; cardBgClass: string } {
-  if (columnId === 'FINALIZADAS') {
-    return { borderClass: 'border-l-primary', cardBgClass: 'bg-white' }
-  }
-
-  if (columnId === 'NOVOS_PEDIDOS') {
-    return { borderClass: 'border-l-sky-500', cardBgClass: 'bg-white' }
-  }
-  if (columnId === 'EM_PREPARO') {
-    return { borderClass: 'border-l-amber-500', cardBgClass: 'bg-white' }
-  }
-  if (columnId === 'PRONTO_ENTREGA') {
-    return { borderClass: 'border-l-teal-500', cardBgClass: 'bg-white' }
-  }
-  if (columnId === 'EM_ROTA') {
-    return { borderClass: 'border-l-indigo-500', cardBgClass: 'bg-white' }
+  if (
+    columnId === 'FINALIZADAS' ||
+    columnId === 'NOVOS_PEDIDOS' ||
+    columnId === 'EM_PREPARO' ||
+    columnId === 'PRONTO_ENTREGA' ||
+    columnId === 'EM_ROTA'
+  ) {
+    return { borderClass: classeBordaEsquerdaColunaKanban(columnId), cardBgClass: 'bg-white' }
   }
 
   const acao = acaoFiscalEmAndamentoPorVenda[v.id]
@@ -395,6 +442,9 @@ export function parseValorBuscaKanban(termo: string): number | null {
     return Number.isFinite(n) ? n : null
   }
 
+  // Inteiro longo é telefone, não valor (ex.: 5565992934536).
+  if (/^\d{8,}$/.test(t)) return null
+
   // 4.00 ou 4
   if (/^\d+(\.\d{1,2})?$/.test(t)) {
     const n = Number(t)
@@ -409,7 +459,7 @@ export function isTermoBuscaValorKanban(termo: string): boolean {
 }
 
 export function vendaAtendeBuscaKanban(
-  venda: Pick<Venda, 'id' | 'numeroVenda' | 'codigoVenda' | 'cliente' | 'valorFinal'>,
+  venda: Pick<Venda, 'id' | 'numeroVenda' | 'codigoVenda' | 'cliente' | 'valorFinal' | 'contextoEntrega'>,
   termoNormalizado: string,
   termoOriginal?: string
 ): boolean {
@@ -439,12 +489,57 @@ export function vendaAtendeBuscaKanban(
     .toLowerCase()
   if (nome && nome.includes(t)) return true
 
+  if (vendaAtendeTelefoneBuscaKanban(venda, termoOriginal ?? termoNormalizado)) return true
+
   const id = String(venda.id ?? '')
     .trim()
     .toLowerCase()
   if (id && id.includes(t)) return true
 
   return false
+}
+
+/** 8+ dígitos: telefone, não número de pedido nem valor. */
+export function ehTermoBuscaTelefoneKanban(termo: string): boolean {
+  return digitosTelefone(termo).length >= 8
+}
+
+/** `q` da API: telefone WhatsApp (55…) vira DDD+número. */
+export function termoBuscaKanbanParaApi(termo: string): string {
+  const trimmed = String(termo ?? '')
+    .trim()
+    .replace(/^#+/, '')
+    .trim()
+  if (!trimmed) return ''
+  if (ehTermoBuscaTelefoneKanban(trimmed)) {
+    return termoBuscaClientePorTelefone(trimmed)
+  }
+  return trimmed
+}
+
+export function telefonesDoPedidoKanban(
+  venda: Pick<Venda, 'cliente' | 'contextoEntrega'>
+): string[] {
+  return [
+    venda.cliente?.telefone,
+    venda.contextoEntrega?.destinatarioTelefone,
+    venda.contextoEntrega?.clienteDeliveryTelefoneRef,
+  ]
+    .map(v => String(v ?? '').trim())
+    .filter(Boolean)
+}
+
+export function vendaAtendeTelefoneBuscaKanban(
+  venda: Pick<Venda, 'cliente' | 'contextoEntrega'>,
+  termo: string
+): boolean {
+  if (!ehTermoBuscaTelefoneKanban(termo)) return false
+  const tels = telefonesDoPedidoKanban(venda)
+  if (tels.length === 0) return false
+  const digits = digitosTelefone(termo)
+  return tels.some(
+    tel => telefonesCorrespondem(tel, termo) || clienteTelefoneContem(tel, digits)
+  )
 }
 
 export function formatarDataCard(dataISO: string | null | undefined): string {

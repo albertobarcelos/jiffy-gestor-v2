@@ -8,9 +8,6 @@ export interface UpdateProdutoPatchInput {
 }
 
 export async function updateProdutoPatch({ produtoId, patch, token }: UpdateProdutoPatchInput): Promise<void> {
-  if (patch.nome !== undefined && patch.nome.trim() === '') {
-    throw new Error('Informe um nome válido para o produto.')
-  }
   if (patch.valor !== undefined && (Number.isNaN(patch.valor) || patch.valor < 0)) {
     throw new Error('Informe um valor válido para o produto.')
   }

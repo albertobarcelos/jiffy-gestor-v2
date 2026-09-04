@@ -2,11 +2,13 @@
 
 import { useEffect, useId, useState, type ReactNode } from 'react'
 import { MdExpandMore } from 'react-icons/md'
+import { CupomCampoInfo } from './DeliveryModoPapelToggle'
 
 interface DeliveryConfigCollapsibleSectionProps {
   icon: ReactNode
   title: string
   description?: ReactNode
+  info?: string
   headerActions?: ReactNode
   defaultExpanded?: boolean
   /** Quando muda (ex.: modal aberto), restaura o estado inicial de expansão. */
@@ -20,6 +22,7 @@ export function DeliveryConfigCollapsibleSection({
   icon,
   title,
   description,
+  info,
   headerActions,
   defaultExpanded = true,
   resetExpandedWhen,
@@ -36,21 +39,26 @@ export function DeliveryConfigCollapsibleSection({
   return (
     <section className="rounded-lg border border-gray-200 bg-white p-2 shadow-sm">
       <div className="flex items-start gap-2">
-        <span className="shrink-0 rounded-lg bg-secondary/10 p-2 text-secondary">{icon}</span>
+        <span className="shrink-0 rounded-lg bg-secondary p-2 text-white">{icon}</span>
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-3">
-            <button
-              type="button"
-              onClick={() => setExpanded(prev => !prev)}
-              aria-expanded={expanded}
-              aria-controls={contentId}
-              className="min-w-0 flex-1 rounded-lg text-left transition-colors hover:bg-gray-50/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary"
-            >
-              <h3 className="text-base font-semibold text-primary-text">{title}</h3>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setExpanded(prev => !prev)}
+                  aria-expanded={expanded}
+                  aria-controls={contentId}
+                  className="min-w-0 rounded-lg text-left transition-colors hover:bg-gray-50/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary"
+                >
+                  <h3 className="text-base font-semibold text-primary-text">{title}</h3>
+                </button>
+                {info ? <CupomCampoInfo texto={info} ariaLabel={title} /> : null}
+              </div>
               {description ? (
                 <div className="mt-1 text-sm text-secondary-text">{description}</div>
               ) : null}
-            </button>
+            </div>
 
             {headerActions ? <div className="shrink-0">{headerActions}</div> : null}
 

@@ -10,7 +10,6 @@ import { toggleFieldConfig } from '@/src/presentation/components/features/produt
 import type { ProdutoPatch, ToggleField } from '@/src/shared/types/produto'
 
 export type ProdutoPatchPayload =
-  | { type: 'nome'; produtoId: string; novoNome: string }
   | { type: 'valor'; produtoId: string; novoValor: number }
   | { type: 'grupo'; produtoId: string; novoGrupoId: string; novoGrupoNome: string }
   | { type: 'status'; produtoId: string; novoStatus: boolean; filterStatus?: string }
@@ -31,8 +30,6 @@ export function isSavingOf(
 
 function payloadToPatch(payload: ProdutoPatchPayload): ProdutoPatch {
   switch (payload.type) {
-    case 'nome':
-      return { nome: payload.novoNome }
     case 'valor':
       return { valor: payload.novoValor }
     case 'grupo':
@@ -46,8 +43,6 @@ function payloadToPatch(payload: ProdutoPatchPayload): ProdutoPatch {
 
 function successMessage(payload: ProdutoPatchPayload): string {
   switch (payload.type) {
-    case 'nome':
-      return 'Nome atualizado com sucesso!'
     case 'valor':
       return 'Valor atualizado com sucesso!'
     case 'grupo':

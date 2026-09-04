@@ -71,7 +71,6 @@ function sameIdSet(a: readonly string[], b: readonly string[]): boolean {
 export type ProdutoImpressorasHandle = {
   isDirty: () => boolean
   save: () => Promise<boolean>
-  getSelectedIds: () => string[]
 }
 
 export type ProdutoImpressorasEmbedState = {
@@ -88,11 +87,6 @@ interface ProdutoImpressorasDialogProps {
   onClose: () => void
   isEmbedded?: boolean
   onEmbedStateChange?: (state: ProdutoImpressorasEmbedState) => void
-  /**
-   * Sem `produtoId`: só seleção local. Nova impressora ainda grava no cadastro;
-   * o vínculo com o produto fica para o POST final.
-   */
-  modoRascunho?: boolean
 }
 
 /**
@@ -110,11 +104,9 @@ export const ProdutoImpressorasDialog = forwardRef<
     onClose,
     isEmbedded = false,
     onEmbedStateChange,
-    modoRascunho = false,
   },
   ref
 ) {
-  const rascunho = modoRascunho || !produtoId
   const isRehydrated = useAuthStore(s => s.isRehydrated)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterTab, setFilterTab] = useState<'vinculados' | 'disponiveis' | 'todos'>('vinculados')
@@ -272,38 +264,35 @@ export const ProdutoImpressorasDialog = forwardRef<
 
   // Antes do paint: spinner só se não há seed (lista do produto) — em embed evita flash de loading.
   useLayoutEffect(() => {
-    if (open && isRehydrated && (!rascunho ? produtoId : true)) {
+    if (open && produtoId && isRehydrated) {
       const hasSeed = baselineImpressorasIdsRef.current.length > 0 || impressoras.length > 0
-      if (!isEmbedded && !hasSeed && !rascunho) {
+      if (!isEmbedded && !hasSeed) {
         setIsLoading(true)
       }
     }
-    if (!open || (rascunho ? false : !produtoId)) {
+    if (!open || !produtoId) {
       setIsLoading(false)
     }
     // impressoras só no momento da abertura
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, produtoId, rascunho, isRehydrated, isEmbedded])
+  }, [open, produtoId, isRehydrated, isEmbedded])
 
   useEffect(() => {
-    if (!open || !isRehydrated) {
+    if (!open || !produtoId || !isRehydrated) {
       return
     }
 
     const ac = new AbortController()
     setSearchQuery('')
-    if (rascunho) {
-      setIsLoading(false)
-      void loadAllImpressoras()
-    } else if (produtoId) {
-      void loadImpressoras(ac.signal)
-      void loadAllImpressoras()
-    }
+    void loadImpressoras(ac.signal)
+    void loadAllImpressoras()
 
     return () => {
+      // Não chamar setIsLoading(false) aqui: no Strict Mode o cleanup roda entre duas execuções
+      // do efeito e gera um frame “vazio” sem spinner enquanto o segundo fetch ainda não terminou.
       ac.abort()
     }
-  }, [open, produtoId, rascunho, isRehydrated, loadImpressoras, loadAllImpressoras])
+  }, [open, produtoId, isRehydrated, loadImpressoras, loadAllImpressoras])
 
   useEffect(() => {
     if (!open) {
@@ -314,13 +303,9 @@ export const ProdutoImpressorasDialog = forwardRef<
       baselineImpressorasIdsRef.current = []
       isDirtyRef.current = false
       setIsSaving(false)
-      if (rascunho) {
-        setImpressoras([])
-        setAllImpressoras([])
-      }
       onEmbedStateChange?.({ isDirty: false, isSaving: false })
     }
-  }, [open, rascunho, onEmbedStateChange])
+  }, [open, onEmbedStateChange])
 
   const linkedIds = useMemo(() => {
     return new Set(impressoras.map(i => i.id))
@@ -436,17 +421,15 @@ export const ProdutoImpressorasDialog = forwardRef<
 
   const handleCloseImpressorasModal = () => {
     setImpressorasModalState(prev => ({ ...prev, open: false }))
-    if (!rascunho) {
-      loadImpressoras()
-    }
-    void loadAllImpressoras()
+    // Recarregar impressoras após fechar o modal de edição
+    loadImpressoras()
   }
 
   const handleImpressorasModalReload = () => {
-    void loadAllImpressoras()
-    if (!rascunho) {
-      loadImpressoras()
-    }
+    // Recarregar lista de impressoras disponíveis quando uma nova for criada
+    loadAllImpressoras()
+    // Recarregar também as impressoras vinculadas ao produto
+    loadImpressoras()
   }
 
   const handleEditImpressora = useCallback((impressora: ProdutoImpressora) => {
@@ -468,10 +451,6 @@ export const ProdutoImpressorasDialog = forwardRef<
       successMessage?: string,
       options?: { optimisticPreApplied?: boolean }
     ) => {
-      if (rascunho) {
-        return true
-      }
-
       if (!produtoId) {
         showToast.error('Produto não encontrado.')
         return false
@@ -525,7 +504,7 @@ export const ProdutoImpressorasDialog = forwardRef<
         return false
       }
     },
-    [rascunho, produtoId, findImpressoraById]
+    [produtoId, findImpressoraById]
   )
 
   const handleToggleVinculo = useCallback(
@@ -566,12 +545,6 @@ export const ProdutoImpressorasDialog = forwardRef<
   )
 
   const savePendingImpressoras = useCallback(async (): Promise<boolean> => {
-    if (rascunho) {
-      isDirtyRef.current = false
-      onEmbedStateChange?.({ isDirty: false, isSaving: false })
-      return true
-    }
-
     if (!produtoId) {
       showToast.error('Produto não encontrado.')
       return false
@@ -602,7 +575,7 @@ export const ProdutoImpressorasDialog = forwardRef<
     } finally {
       setIsSaving(false)
     }
-  }, [rascunho, produtoId, impressoras, persistImpressorasSelection, onEmbedStateChange])
+  }, [produtoId, impressoras, persistImpressorasSelection, onEmbedStateChange])
 
   useImperativeHandle(
     ref,
@@ -613,7 +586,6 @@ export const ProdutoImpressorasDialog = forwardRef<
           baselineImpressorasIdsRef.current
         ),
       save: () => savePendingImpressoras(),
-      getSelectedIds: () => impressoras.map(i => i.id),
     }),
     [impressoras, savePendingImpressoras]
   )

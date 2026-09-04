@@ -60,40 +60,9 @@ export function pagamentosCobremTotalPedido(
   return emCentavos(totalPagamentos) > emCentavos(totalProdutos) && troco > 0
 }
 
-export function meioNomeEhDinheiro(nome: string): boolean {
+function meioEhDinheiro(nome: string): boolean {
   const lower = nome.toLowerCase()
   return lower.includes('dinheiro') || lower.includes('cash')
-}
-
-export type LancamentoTroco = {
-  valor: number
-  isDinheiro: boolean
-}
-
-/**
- * Núcleo compartilhado de troco: último lançamento em dinheiro que ultrapassa o restante.
- */
-export function calcularTrocoSobreLancamentos(args: {
-  total: number
-  lancamentos: LancamentoTroco[]
-}): number {
-  const { total, lancamentos } = args
-  if (lancamentos.length === 0) return 0
-
-  for (let i = lancamentos.length - 1; i >= 0; i--) {
-    const p = lancamentos[i]
-    if (!p?.isDinheiro) continue
-
-    const totalAntes = lancamentos.slice(0, i).reduce((acc, x) => acc + x.valor, 0)
-    const valorFaltavaPagar = total - totalAntes
-
-    if (p.valor > valorFaltavaPagar) {
-      return p.valor - Math.max(0, valorFaltavaPagar)
-    }
-    return 0
-  }
-
-  return 0
 }
 
 export function calcularTrocoPedido(args: {
@@ -103,24 +72,30 @@ export function calcularTrocoPedido(args: {
   considerarApenasNaoCancelados?: boolean
 }): number {
   const { pagamentos, totalProdutos, meiosPagamento, considerarApenasNaoCancelados } = args
+  if (pagamentos.length === 0) return 0
 
-  const lancamentos: LancamentoTroco[] = []
-  for (const p of pagamentos) {
-    if (considerarApenasNaoCancelados) {
-      if (pagamentoEstaCancelado(p)) continue
-    } else if (!pagamentoContaComoEfetivo(p)) {
-      continue
-    }
+  for (let i = pagamentos.length - 1; i >= 0; i--) {
+    const p = pagamentos[i]
+    if (!p) continue
+    if (considerarApenasNaoCancelados && pagamentoEstaCancelado(p)) continue
+    if (!considerarApenasNaoCancelados && !pagamentoContaComoEfetivo(p)) continue
 
     const meio = meiosPagamento.find(m => m.getId() === p.meioPagamentoId)
-    lancamentos.push({
-      valor: p.valor,
-      isDinheiro: Boolean(meio && meioNomeEhDinheiro(meio.getNome())),
-    })
+    if (!meio || !meioEhDinheiro(meio.getNome())) continue
+
+    const totalAntes = pagamentos.slice(0, i).reduce((acc, x) => {
+      if (considerarApenasNaoCancelados) {
+        return acc + (!pagamentoEstaCancelado(x) ? x.valor : 0)
+      }
+      return acc + (pagamentoContaComoEfetivo(x) ? x.valor : 0)
+    }, 0)
+    const valorFaltavaPagar = totalProdutos - totalAntes
+
+    if (p.valor > valorFaltavaPagar) {
+      return p.valor - valorFaltavaPagar
+    }
+    return 0
   }
 
-  return calcularTrocoSobreLancamentos({
-    total: totalProdutos,
-    lancamentos,
-  })
+  return 0
 }

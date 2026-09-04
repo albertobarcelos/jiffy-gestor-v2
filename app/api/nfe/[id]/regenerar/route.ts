@@ -15,7 +15,7 @@ export async function POST(
   const { id } = await params
   
   try {
-    const validation = validateRequest(request)
+    const validation = validateRequest(request, { requireAuthorizationHeader: true })
     if (!validation.valid || !validation.tokenInfo) {
       return validation.error!
     }

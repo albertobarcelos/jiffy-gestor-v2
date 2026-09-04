@@ -1,5 +1,6 @@
 ﻿import {
   MdContentCopy,
+  MdStarBorder,
   MdAddCircleOutline,
   MdRemoveCircleOutline,
   MdLaunch,
@@ -73,6 +74,14 @@ export type ActionIconDef =
     }
 
 export const actionIconsConfig: ActionIconDef[] = [
+  {
+    key: 'favorito',
+    ariaLabel: 'Destacar no cardápio digital',
+    label:
+      'Destacar este produto no cardápio digital aumenta sua visibilidade e facilita o acesso dos consumidores.',
+    Icon: MdStarBorder,
+    field: 'favorito',
+  },
   {
     key: 'acrescentar',
     ariaLabel: 'Permitir acréscimo',

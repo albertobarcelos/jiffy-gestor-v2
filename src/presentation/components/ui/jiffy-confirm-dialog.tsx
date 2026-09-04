@@ -118,7 +118,6 @@ export function JiffyConfirmDialog({
       sx={
         [
           {
-            zIndex: 2100,
             '& .MuiDialog-paper': {
               borderRadius: 3,
               p: 0,
