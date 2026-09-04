@@ -57,10 +57,10 @@ npm run test:watch   # Executa testes em modo watch
 
 ## Relação com o Gestor (admin)
 
-O admin (design, agenda, cobertura, kanban) **permanece no Gestor** em
-`src/presentation/components/features/delivery-publico/admin/`.
+O admin (design, agenda, cobertura, kanban) **permanece no Gestor**.
+A loja e o BFF público **só** existem neste app (`apps/jiffy-cardapio`).
 
-Com o Cardápio no ar, no Gestor:
+No Gestor:
 
 ```env
 NEXT_PUBLIC_CARDAPIO_PUBLIC_URL=http://localhost:5001
@@ -68,5 +68,5 @@ NEXT_PUBLIC_CARDAPIO_PUBLIC_URL=http://localhost:5001
 # alias server opcional: CARDAPIO_PUBLIC_URL=...
 ```
 
-`/delivery/{slug}` e `/cardapio/{slug}` passam a redirecionar para este app; o hub copia `{host}/{slug}`.
+`/delivery/{slug}` e `/cardapio/{slug}` no Gestor passam a redirecionar (308) para este app; o hub copia `{host}/{slug}`.
 Detalhes: [`docs/DEPLOY.md`](docs/DEPLOY.md).

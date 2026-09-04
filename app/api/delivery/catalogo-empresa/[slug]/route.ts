@@ -2,8 +2,9 @@ import { NextRequest } from 'next/server'
 import { proxyPublicDeliveryGet } from '@/src/shared/utils/proxyPublicDeliveryRoute'
 
 /**
- * GET /api/public/delivery/catalogo/[slug]
- * Proxy público → GET /api/v1/delivery/catalogo/:slug
+ * GET /api/delivery/catalogo-empresa/[slug]
+ * Hydrate de logo/banner no Design (admin). Proxy autenticado → catálogo público upstream.
+ * A loja do cliente vive em apps/jiffy-cardapio; esta rota não substitui o BFF público.
  */
 export async function GET(
   request: NextRequest,

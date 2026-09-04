@@ -86,8 +86,9 @@ export function middleware(request: NextRequest) {
   }
 
   /**
-   * Loja pública migrada para apps/jiffy-cardapio.
-   * Com CARDAPIO_PUBLIC_URL, /delivery e /cardapio redirecionam para o host do Cardápio.
+   * Loja pública vive em apps/jiffy-cardapio.
+   * Com NEXT_PUBLIC_CARDAPIO_PUBLIC_URL / CARDAPIO_PUBLIC_URL,
+   * /delivery e /cardapio redirecionam (308) para o host do Cardápio.
    */
   if (isCardapioPublicRedirectEnabled()) {
     const cardapioDest = mapGestorPublicPathToCardapioUrl(
@@ -100,13 +101,6 @@ export function middleware(request: NextRequest) {
   }
 
   // Rotas públicas - bypass rápido
-  const lojaPublicaNoGestor =
-    !isCardapioPublicRedirectEnabled() &&
-    (pathname === '/cardapio' ||
-      pathname.startsWith('/cardapio/') ||
-      pathname === '/delivery' ||
-      pathname.startsWith('/delivery/'))
-
   if (
     pathname === '/login' ||
     pathname === '/registro' ||
@@ -119,12 +113,9 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/api/auth/usuario/') ||
     pathname.startsWith('/api/consulta-cnpj') ||
     pathname.startsWith('/api/consulta-cep') ||
-    /** Geo/Places — ainda no Gestor se loja local; Cardápio tem as próprias. */
     pathname.startsWith('/api/geolocalizacao/') ||
     pathname.startsWith('/notas-fiscais') ||
-    pathname.startsWith('/api/public/notas-fiscais-consumidor') ||
-    pathname.startsWith('/api/public/delivery/') ||
-    lojaPublicaNoGestor
+    pathname.startsWith('/api/public/notas-fiscais-consumidor')
   ) {
     return NextResponse.next()
   }

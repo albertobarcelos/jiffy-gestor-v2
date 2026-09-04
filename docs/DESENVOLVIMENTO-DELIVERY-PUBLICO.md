@@ -2,12 +2,12 @@
 
 Documento vivo de planejamento e acompanhamento do novo fluxo público de delivery.
 
-> **Status:** loja pública extraída para `apps/jiffy-cardapio` (mesmo Git)  
+> **Status:** loja pública **somente** em `apps/jiffy-cardapio` (mesmo Git)  
 > **App do cliente:** [`apps/jiffy-cardapio`](../apps/jiffy-cardapio/README.md) — porta 5001  
 > **Contrato de canal:** [`docs/CARDAPIO_CANAL_CONTRATO.md`](./CARDAPIO_CANAL_CONTRATO.md)  
 > **Última atualização:** 2026-09-03
 
-O Gestor mantém admin/design e, com `NEXT_PUBLIC_CARDAPIO_PUBLIC_URL` (ou `CARDAPIO_PUBLIC_URL`), redireciona `/delivery/*` e `/cardapio/*` para o Cardápio. O hub copia o link canônico `{host}/{slug}`.
+O Gestor mantém admin/design/kanban. A loja e o BFF público **não** residem mais no Gestor. Com `NEXT_PUBLIC_CARDAPIO_PUBLIC_URL` (ou `CARDAPIO_PUBLIC_URL`), `/delivery/*` e `/cardapio/*` no Gestor redirecionam (308) para o Cardápio. O hub copia o link canônico `{host}/{slug}`.
 
 ---
 
@@ -16,7 +16,7 @@ O Gestor mantém admin/design e, com `NEXT_PUBLIC_CARDAPIO_PUBLIC_URL` (ou `CARD
 Construir do zero o fluxo público de pedidos online (delivery), acessível via link com slug da empresa, sem login do cliente.
 
 **URL no Cardápio:** `/{slug}` (app `jiffy-cardapio`)  
-**Legado no Gestor:** `/delivery/{slug}` → redirect quando `CARDAPIO_PUBLIC_URL` estiver setada
+**Legado no Gestor:** `/delivery/{slug}` → **308** para o Cardápio quando a env estiver setada (páginas/BFF públicos removidos do Gestor)
 
 O lojista configura **qual layout visual** o app público usa; o cliente final vê o catálogo nesse layout.
 
@@ -38,10 +38,9 @@ O lojista configura **qual layout visual** o app público usa; o cliente final v
 
 ### Premissas técnicas
 
-- Código da feature em: `src/presentation/components/features/delivery-publico/`
-- Rotas públicas em: `app/delivery/` (legado `app/cardapio/` redireciona)
-- APIs públicas existentes (BFF): `app/api/public/delivery/*`
-- DTOs: `src/application/dto/delivery-publico/`
+- Admin/design no Gestor: `src/presentation/components/features/delivery-publico/admin/` (+ preview `public/layouts`)
+- Loja do cliente: `apps/jiffy-cardapio`
+- BFF público: `apps/jiffy-cardapio/app/api/public/delivery/*`
 - **Mesmos dados, layouts diferentes:** empresa, grupos, produtos, carrinho, tipo de entrega e horário alimentam todos os modelos
 
 ---

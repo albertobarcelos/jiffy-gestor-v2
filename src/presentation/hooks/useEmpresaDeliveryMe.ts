@@ -17,9 +17,8 @@ import type {
 } from '@/src/application/dto/delivery/EmpresaDeliveryDTO'
 import {
   EMPRESA_DELIVERY_UPDATED_EVENT,
-  invalidatePublicDeliveryCatalogForSlug,
   type EmpresaDeliveryUpdatedDetail,
-} from '@/src/presentation/hooks/usePublicDeliveryCatalog'
+} from '@/src/shared/constants/empresaDeliveryEvents'
 
 export const EMPRESA_DELIVERY_ME_QUERY_KEY = ['delivery', 'empresa-me'] as const
 
@@ -73,7 +72,6 @@ export function useEmpresaDeliveryMe() {
 
 export function useCriarEmpresaDelivery() {
   const invalidate = useInvalidateTenantQueries()
-  const queryClient = useQueryClient()
 
   return useSecureTenantMutation<EmpresaDeliveryDTO, CreateEmpresaDeliveryInput>(
     async ({ token }, input) => {
@@ -91,7 +89,6 @@ export function useCriarEmpresaDelivery() {
     {
       onSuccess: async data => {
         await invalidate(EMPRESA_DELIVERY_ME_QUERY_KEY)
-        invalidatePublicDeliveryCatalogForSlug(queryClient, data.slug)
         dispatchEmpresaDeliveryUpdated(data.slug)
       },
     }
@@ -123,7 +120,6 @@ export function useAtualizarEmpresaDelivery() {
           data
         )
         await invalidate(EMPRESA_DELIVERY_ME_QUERY_KEY)
-        invalidatePublicDeliveryCatalogForSlug(queryClient, data.slug)
         dispatchEmpresaDeliveryUpdated(data.slug)
       },
     }
