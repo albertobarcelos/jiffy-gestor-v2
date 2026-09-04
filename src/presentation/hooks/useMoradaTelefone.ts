@@ -7,11 +7,17 @@ import {
   moradaDtoParaEnderecoDeliveryPayload,
   normalizarClienteDeliveryApi,
 } from '@/src/application/mappers/ClienteDeliveryMoradaMapper'
+import type { ClienteDeliveryApi } from '@/src/application/mappers/ClienteDeliveryMoradaMapper'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { showToast } from '@/src/shared/utils/toast'
+import {
+  extrairDigitosTelefone,
+  telefoneCelularBrCompleto,
+} from '@/src/shared/utils/telefoneBr'
+import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 
 export interface MoradaTelefoneHookOptions {
   /** Usa `GET/POST/PATCH /api/delivery/clientes` em vez de morada-telefone do gestor. */
@@ -28,6 +34,18 @@ function moradasTelefoneQueryKey(
   empresaId: string | null
 ) {
   return ['moradas-telefone', empresaId, telefone, usarModuloDelivery ? 'delivery' : 'gestor'] as const
+}
+
+/** Backend delivery normaliza telefone com `Telefone.create` (11 dígitos BR). */
+export function telefoneProntoParaConsultaDelivery(
+  telefone: string | null | undefined,
+  usarModuloDelivery: boolean
+): boolean {
+  if (!telefone?.trim()) return false
+  if (!usarModuloDelivery) {
+    return extrairDigitosTelefone(telefone).length >= 8
+  }
+  return telefoneCelularBrCompleto(telefone)
 }
 
 /** Corpo JSON comum em erros do BFF / Nest (`error`, `message`, `title`). */
@@ -51,6 +69,11 @@ export interface EnderecoMorada {
   estado: string
   complemento?: string
   referencia?: string
+  /** Geo do logradouro (Places / GPS / pin no mapa). */
+  enderecoLocalizacao?: GeoJsonPoint | null
+  providerEnderecoId?: string | null
+  /** Ponto de entrega distinto do logradouro (portaria, bloco etc.). */
+  preferenciaEntrega?: GeoJsonPoint | null
 }
 
 export interface MoradaTelefone {
@@ -94,6 +117,34 @@ function enderecoTemConteudoMinimo(e: EnderecoMorada): boolean {
 /** Monta `EnderecoMorada` a partir de um objeto (raiz ou `endereco` aninhado). */
 function extrairEnderecoDeRecord(rec: Record<string, unknown>): EnderecoMorada {
   const estadoRaw = asStr(pick(rec, ['estado', 'uf', 'state']))
+  const enderecoLocalizacao = (() => {
+    const raw = rec.enderecoLocalizacao ?? rec.endereco_localizacao
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+    const o = raw as Record<string, unknown>
+    if (o.type !== 'Point' || !Array.isArray(o.coordinates) || o.coordinates.length < 2) {
+      return null
+    }
+    const lng = Number(o.coordinates[0])
+    const lat = Number(o.coordinates[1])
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null
+    return { type: 'Point' as const, coordinates: [lng, lat] as [number, number] }
+  })()
+  const preferenciaEntrega = (() => {
+    const raw = rec.preferenciaEntrega ?? rec.preferencia_entrega
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+    const o = raw as Record<string, unknown>
+    if (o.type !== 'Point' || !Array.isArray(o.coordinates) || o.coordinates.length < 2) {
+      return null
+    }
+    const lng = Number(o.coordinates[0])
+    const lat = Number(o.coordinates[1])
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null
+    return { type: 'Point' as const, coordinates: [lng, lat] as [number, number] }
+  })()
+  const providerEnderecoId = optStr(
+    pick(rec, ['providerEnderecoId', 'provider_endereco_id'])
+  )
+
   return {
     cep: asStr(pick(rec, ['cep', 'CEP', 'codigoPostal', 'codigo_postal'])),
     rua: asStr(pick(rec, ['rua', 'logradouro', 'street'])),
@@ -103,6 +154,13 @@ function extrairEnderecoDeRecord(rec: Record<string, unknown>): EnderecoMorada {
     estado: estadoRaw.toUpperCase().slice(0, 2),
     complemento: optStr(pick(rec, ['complemento', 'complement'])),
     referencia: optStr(pick(rec, ['referencia', 'referência', 'reference'])),
+    ...(enderecoLocalizacao
+      ? {
+          enderecoLocalizacao,
+          providerEnderecoId: providerEnderecoId ?? null,
+          ...(preferenciaEntrega ? { preferenciaEntrega } : {}),
+        }
+      : {}),
   }
 }
 
@@ -202,6 +260,87 @@ async function moradaFromResponse(
 }
 
 /**
+ * Busca cliente delivery por telefone (gestor autenticado).
+ * Retorna `null` em 404.
+ */
+export function useBuscarClienteDeliveryPorTelefone() {
+  return useSecureTenantMutation(
+    async ({ token }, telefone: string): Promise<ClienteDeliveryApi | null> => {
+      const digitos = extrairDigitosTelefone(telefone)
+      if (!telefoneCelularBrCompleto(digitos)) {
+        throw new Error('Informe o celular completo com DDD (11 dígitos).')
+      }
+
+      const response = await fetchGestorApi(
+        `/api/delivery/clientes/${encodeURIComponent(digitos)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+          },
+        }
+      )
+
+      if (response.status === 404) return null
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(
+          mensagemErroResposta(errorData, response.status, 'Erro ao buscar cliente delivery')
+        )
+      }
+
+      const data = await response.json()
+      return normalizarClienteDeliveryApi(data)
+    }
+  )
+}
+
+/**
+ * Cadastro rápido de cliente delivery (telefone + nome).
+ */
+export function useCriarClienteDeliveryRapido() {
+  return useSecureTenantMutation(
+    async (
+      { token },
+      input: { telefone: string; nome: string }
+    ): Promise<ClienteDeliveryApi> => {
+      const telefone = extrairDigitosTelefone(input.telefone)
+      if (!telefoneCelularBrCompleto(telefone)) {
+        throw new Error('Informe o celular completo com DDD (11 dígitos).')
+      }
+
+      const response = await fetchGestorApi('/api/delivery/clientes', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          telefone,
+          nome: input.nome.trim(),
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(
+          mensagemErroResposta(errorData, response.status, 'Erro ao cadastrar cliente delivery')
+        )
+      }
+
+      const data = await response.json()
+      const cliente = normalizarClienteDeliveryApi(data)
+      if (!cliente) {
+        throw new Error('Resposta inválida ao cadastrar cliente delivery')
+      }
+      return cliente
+    }
+  )
+}
+
+/**
  * Busca moradas ativas da empresa para o telefone informado.
  * Retorna lista vazia quando não há moradas cadastradas para o número.
  */
@@ -268,7 +407,13 @@ export function useMoradasPorTelefone(
         .filter((m: MoradaTelefone | null): m is MoradaTelefone => m != null)
       return lista
     },
-    enabled: !!telefone && isRehydrated && isAuthenticated && !!token && !!empresaId && !(tenantAuth?.isExpired()),
+    enabled:
+      telefoneProntoParaConsultaDelivery(telefone, usarModuloDelivery) &&
+      isRehydrated &&
+      isAuthenticated &&
+      !!token &&
+      !!empresaId &&
+      !(tenantAuth?.isExpired()),
     staleTime: 1000 * 60 * 2,
     refetchOnWindowFocus: false,
   })
@@ -464,6 +609,94 @@ export function useAtualizarMoradaTelefone(options?: MoradaTelefoneHookOptions) 
       },
       onError: (error: Error) => {
         showToast.error(error.message || 'Erro ao atualizar endereço')
+      },
+    }
+  )
+}
+
+/**
+ * Remove morada do catálogo do cliente.
+ * Delivery: `PATCH …/clientes/{telefone}` com `enderecos.delete`.
+ * Legado: `DELETE …/gestor/morada-telefone/{id}`.
+ */
+export function useExcluirMoradaTelefone(options?: MoradaTelefoneHookOptions) {
+  const queryClient = useQueryClient()
+  const empresaId = useTenantEmpresaId()
+  const usarModuloDelivery = options?.usarModuloDelivery ?? false
+
+  return useSecureTenantMutation(
+    async (
+      { token },
+      {
+        id,
+        telefoneDigitos,
+      }: {
+        id: string
+        telefoneDigitos: string
+      }
+    ) => {
+      const telefone = telefoneDigitos.replace(/\D/g, '')
+      if (!id.trim() || !telefone) {
+        throw new Error('Endereço ou telefone inválido')
+      }
+
+      if (usarModuloDelivery) {
+        const response = await fetchGestorApi(
+          `/api/delivery/clientes/${encodeURIComponent(telefone)}`,
+          {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+            body: JSON.stringify({
+              enderecos: { delete: [id] },
+            }),
+          }
+        )
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(
+            mensagemErroResposta(errorData, response.status, 'Erro ao remover endereço')
+          )
+        }
+
+        return
+      }
+
+      const response = await fetchGestorApi(
+        `/api/gestor/morada-telefone/${encodeURIComponent(id)}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+          },
+        }
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(
+          mensagemErroResposta(errorData, response.status, 'Erro ao remover endereço')
+        )
+      }
+    },
+    {
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries({
+          queryKey: moradasTelefoneQueryKey(
+            variables.telefoneDigitos,
+            usarModuloDelivery,
+            empresaId
+          ),
+        })
+        showToast.success('Endereço removido com sucesso!')
+      },
+      onError: (error: Error) => {
+        showToast.error(error.message || 'Erro ao remover endereço')
       },
     }
   )

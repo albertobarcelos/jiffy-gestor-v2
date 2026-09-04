@@ -5,6 +5,8 @@ import type {
   EnderecoMorada,
   MoradaTelefone,
 } from '@/src/presentation/hooks/useMoradaTelefone'
+import { parseGeoJsonPoint, type GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
+import { montarPayloadGeoEnderecoDelivery } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
 
 export interface ClienteDeliveryEnderecoApi {
   id?: string | null
@@ -17,6 +19,10 @@ export interface ClienteDeliveryEnderecoApi {
   cep?: string | null
   complemento?: string | null
   ultimaUtilizacaoEm?: string | null
+  enderecoLocalizacao?: GeoJsonPoint | null
+  preferenciaEntrega?: GeoJsonPoint | null
+  providerEnderecoId?: string | null
+  geocodingProvider?: string | null
 }
 
 export interface ClienteDeliveryApi {
@@ -34,6 +40,68 @@ function onlyDigits(value: string): string {
 function asStr(v: unknown): string {
   if (v == null) return ''
   return String(v).trim()
+}
+
+function pickField(obj: Record<string, unknown>, keys: string[]): unknown {
+  for (const k of keys) {
+    if (k in obj && obj[k] != null && String(obj[k]).trim() !== '') {
+      return obj[k]
+    }
+  }
+  return undefined
+}
+
+/** Extrai place id do Google de campos flat ou `geocoding.enderecoId` aninhado. */
+function extrairProviderEnderecoId(raw: Record<string, unknown>): string | null {
+  const flat = asStr(pickField(raw, ['providerEnderecoId', 'provider_endereco_id']))
+  if (flat) return flat
+
+  const loc = raw.enderecoLocalizacao
+  if (loc && typeof loc === 'object' && !Array.isArray(loc)) {
+    const geocoding = (loc as Record<string, unknown>).geocoding
+    if (geocoding && typeof geocoding === 'object' && !Array.isArray(geocoding)) {
+      const id = asStr(
+        pickField(geocoding as Record<string, unknown>, ['enderecoId', 'endereco_id', 'placeId'])
+      )
+      if (id) return id
+    }
+  }
+
+  const geocodingRoot = raw.geocoding
+  if (geocodingRoot && typeof geocodingRoot === 'object' && !Array.isArray(geocodingRoot)) {
+    const id = asStr(
+      pickField(geocodingRoot as Record<string, unknown>, ['enderecoId', 'endereco_id', 'placeId'])
+    )
+    if (id) return id
+  }
+
+  return null
+}
+
+function normalizarEnderecoDeliveryApi(raw: unknown): ClienteDeliveryEnderecoApi | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const e = raw as Record<string, unknown>
+  const id = asStr(pickField(e, ['id', 'enderecoId', 'enderecoDeliveryId']))
+  if (!id) return null
+
+  return {
+    id,
+    etiqueta: asStr(pickField(e, ['etiqueta', 'tipoEtiqueta'])) || 'casa',
+    rua: asStr(pickField(e, ['rua', 'logradouro'])),
+    numero: asStr(pickField(e, ['numero'])),
+    bairro: asStr(pickField(e, ['bairro'])),
+    cidade: asStr(pickField(e, ['cidade', 'localidade', 'municipio'])) || null,
+    estado: asStr(pickField(e, ['estado', 'uf', 'state'])) || null,
+    cep: asStr(pickField(e, ['cep', 'CEP'])) || null,
+    complemento: asStr(pickField(e, ['complemento'])) || null,
+    ultimaUtilizacaoEm:
+      e.ultimaUtilizacaoEm != null ? asStr(e.ultimaUtilizacaoEm) || null : null,
+    enderecoLocalizacao: parseGeoJsonPoint(e.enderecoLocalizacao),
+    preferenciaEntrega: parseGeoJsonPoint(e.preferenciaEntrega),
+    providerEnderecoId: extrairProviderEnderecoId(e),
+    geocodingProvider:
+      asStr(pickField(e, ['geocodingProvider', 'geocoding_provider'])) || null,
+  }
 }
 
 export function mapTipoEtiquetaUiParaEtiquetaDelivery(
@@ -74,7 +142,9 @@ export function normalizarClienteDeliveryApi(raw: unknown): ClienteDeliveryApi |
 
   const enderecosRaw = inner.enderecos
   const enderecos = Array.isArray(enderecosRaw)
-    ? (enderecosRaw as ClienteDeliveryEnderecoApi[])
+    ? enderecosRaw
+        .map(normalizarEnderecoDeliveryApi)
+        .filter((e): e is ClienteDeliveryEnderecoApi => e != null)
     : []
 
   return {
@@ -96,6 +166,8 @@ export function enderecoDeliveryParaMoradaTelefone(
 
   const etiqueta = asStr(endereco.etiqueta) || 'casa'
   const estadoRaw = asStr(endereco.estado)
+  const enderecoLocalizacao = parseGeoJsonPoint(endereco.enderecoLocalizacao)
+  const preferenciaEntrega = parseGeoJsonPoint(endereco.preferenciaEntrega)
 
   const enderecoMorada: EnderecoMorada = {
     cep: asStr(endereco.cep),
@@ -105,6 +177,13 @@ export function enderecoDeliveryParaMoradaTelefone(
     cidade: asStr(endereco.cidade),
     estado: estadoRaw.toUpperCase().slice(0, 2),
     complemento: asStr(endereco.complemento) || undefined,
+    ...(enderecoLocalizacao
+      ? {
+          enderecoLocalizacao,
+          providerEnderecoId: endereco.providerEnderecoId ?? null,
+          ...(preferenciaEntrega ? { preferenciaEntrega } : {}),
+        }
+      : {}),
   }
 
   return {
@@ -143,7 +222,7 @@ export function clienteDeliveryParaMoradas(cliente: ClienteDeliveryApi): MoradaT
 
 export function moradaDtoParaEnderecoDeliveryPayload(dto: CriarMoradaTelefoneDTO) {
   const e = dto.endereco
-  return {
+  const base = {
     etiqueta: mapTipoEtiquetaUiParaEtiquetaDelivery(dto.tipoEtiqueta),
     rua: e.rua.trim(),
     numero: e.numero.trim(),
@@ -152,6 +231,22 @@ export function moradaDtoParaEnderecoDeliveryPayload(dto: CriarMoradaTelefoneDTO
     estado: e.estado.trim().slice(0, 2).toUpperCase() || null,
     cep: onlyDigits(e.cep),
     complemento: e.complemento?.trim() || null,
+  }
+
+  const enderecoLocalizacao = parseGeoJsonPoint(e.enderecoLocalizacao)
+  if (!enderecoLocalizacao) {
+    return base
+  }
+
+  const geoPayload = montarPayloadGeoEnderecoDelivery({
+    enderecoLocalizacao,
+    providerEnderecoId: e.providerEnderecoId,
+    preferenciaEntrega: parseGeoJsonPoint(e.preferenciaEntrega),
+  })
+
+  return {
+    ...base,
+    ...geoPayload,
   }
 }
 

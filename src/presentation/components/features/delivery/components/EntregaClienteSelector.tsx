@@ -1,30 +1,53 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { MdSearch, MdAddLocation, MdEdit, MdLocationOn, MdPhone, MdPerson, MdCheckCircle } from 'react-icons/md'
+import { MdSearch, MdAddLocation, MdEdit, MdDelete, MdLocationOn, MdPhone, MdPerson, MdCheckCircle } from 'react-icons/md'
 import { Button } from '@/src/presentation/components/ui/button'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { Label } from '@/src/presentation/components/ui/label'
 import { showToast } from '@/src/shared/utils/toast'
-import {
-  consultarCepViaApi,
-  formatarCepMascara,
-  normalizarDigitosCep,
-  type ViaCepEnderecoNormalizado,
-} from '@/src/shared/utils/consultaCep'
+import { formatarCepMascara, normalizarDigitosCep } from '@/src/shared/utils/consultaCep'
+import { transformarParaReal } from '@/src/shared/utils/formatters'
+import { tituloCasePalavrasEndereco } from '@/src/shared/utils/normalizarTextoEnderecoPublico'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
+import { JiffyConfirmDialog } from '@/src/presentation/components/ui/jiffy-confirm-dialog'
 import {
   useMoradasPorTelefone,
   useCriarMoradaTelefone,
   useAtualizarMoradaTelefone,
+  useExcluirMoradaTelefone,
   useRegistrarUsoMoradaTelefone,
+  useBuscarClienteDeliveryPorTelefone,
+  useCriarClienteDeliveryRapido,
   type MoradaTelefone,
   type EnderecoMorada,
 } from '@/src/presentation/hooks/useMoradaTelefone'
+import { useCoberturaTaxaPorMoradas } from '@/src/presentation/hooks/useCoberturaTaxaPorMoradas'
+import type { ResultadoTaxaCoberturaPonto } from '@/src/shared/utils/calcularTaxaCoberturaPonto'
 import {
   useBuscarClientePorTelefone,
   useCriarClienteRapido,
 } from '@/src/presentation/hooks/useClientes'
+import {
+  extrairDigitosTelefone,
+  telefoneCelularBrCompleto,
+} from '@/src/shared/utils/telefoneBr'
+import { EnderecoPlacesAutocomplete } from '@/src/presentation/components/shared/geolocalizacao/EnderecoPlacesAutocomplete'
+import {
+  placeDetailsParaEnderecoGeocode,
+  type PlaceDetailsResult,
+} from '@/src/shared/utils/geolocalizacaoPlaces'
+import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
+import type { EnderecoGeoCheckoutInput } from '@/src/application/dto/delivery/EnderecoGeoCheckoutDTO'
+import { enderecoTemGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
+import { lerEnderecoLocalizacaoDoPayloadEmpresa } from '@/src/shared/utils/geolocalizacaoEmpresa'
+import { resolverGeoMoradaDeliveryGestor } from '@/src/shared/utils/resolverGeoMoradaDeliveryGestor'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
+import {
+  MoradaEntregaGeoPanel,
+  type MoradaEntregaGeoFormPatch,
+} from '@/src/presentation/components/features/delivery/components/MoradaEntregaGeoPanel'
 
 /** Snapshot mínimo do cliente encontrado / criado. */
 interface ClienteEntrega {
@@ -58,7 +81,27 @@ interface EntregaClienteSelectorProps {
   mostrarEnderecos?: boolean
   /** Catálogo de moradas via módulo delivery (`/api/delivery/clientes`). */
   usarModuloDeliveryClientes?: boolean
+  /**
+   * Tempo previsto escolhido no formulário (minutos).
+   * No card selecionado, sobrescreve o tempo sugerido pela área/raio.
+   */
+  tempoPrevistoMinutos?: number | null
+  /**
+   * Status de cobertura da morada selecionada (delivery).
+   * `null` = sem seleção / não aplicável.
+   */
+  onCoberturaMoradaSelecionadaChange?: (
+    status: CoberturaMoradaSelecionadaStatus
+  ) => void
 }
+
+export type CoberturaMoradaSelecionadaStatus =
+  | { status: 'null' }
+  | { status: 'sem_geo' }
+  | { status: 'loading' }
+  | { status: 'fora' }
+  | { status: 'coberta'; moradaId: string; valorTaxa: number; tempoEntregaInMinutes: number }
+  | { status: 'erro' }
 
 interface FormNovasMorada {
   nomeMorada: string
@@ -122,9 +165,22 @@ function formatarTelefoneExibicao(valor: string): string {
   return `(${numeros.slice(0, 2)}) ${numeros.slice(2, 7)}-${numeros.slice(7, 11)}`
 }
 
-/** Retorna apenas os dígitos do telefone */
-function extrairDigitosTelefone(valor: string): string {
-  return valor.replace(/\D/g, '')
+function telefoneMinimoParaBusca(usarModuloDeliveryClientes: boolean): number {
+  return usarModuloDeliveryClientes ? 11 : 8
+}
+
+const CAMPOS_ENDERECO_MAIUSCULA: ReadonlySet<keyof FormNovasMorada> = new Set([
+  'rua',
+  'numero',
+  'bairro',
+  'cidade',
+  'estado',
+  'complemento',
+  'referencia',
+])
+
+function paraMaiusculaEndereco(valor: string): string {
+  return valor.toLocaleUpperCase('pt-BR')
 }
 
 function moradaParaForm(m: MoradaTelefone): FormNovasMorada {
@@ -134,13 +190,13 @@ function moradaParaForm(m: MoradaTelefone): FormNovasMorada {
     nomeMorada: m.nomeMorada ?? nomePadraoMorada(tipoEtiqueta),
     tipoEtiqueta,
     cep: e?.cep ? formatarCepMascara(e.cep) : '',
-    rua: e?.rua ?? '',
-    numero: e?.numero ?? '',
-    bairro: e?.bairro ?? '',
-    cidade: e?.cidade ?? '',
-    estado: e?.estado ?? '',
-    complemento: e?.complemento ?? '',
-    referencia: e?.referencia ?? '',
+    rua: e?.rua ? paraMaiusculaEndereco(e.rua) : '',
+    numero: e?.numero ? paraMaiusculaEndereco(e.numero) : '',
+    bairro: e?.bairro ? paraMaiusculaEndereco(e.bairro) : '',
+    cidade: e?.cidade ? paraMaiusculaEndereco(e.cidade) : '',
+    estado: e?.estado ? e.estado.toUpperCase().slice(0, 2) : '',
+    complemento: e?.complemento ? paraMaiusculaEndereco(e.complemento) : '',
+    referencia: e?.referencia ? paraMaiusculaEndereco(e.referencia) : '',
   }
 }
 
@@ -149,14 +205,37 @@ function MoradaCard({
   selecionada,
   onSelecionar,
   onVerDetalhes,
+  onRemover,
+  onLocalizar,
+  localizando,
+  exigirGeo,
+  cobertura,
+  coberturaLoading,
+  tempoPrevistoOverrideMinutos,
 }: {
   morada: MoradaTelefone
   selecionada: boolean
   onSelecionar: () => void
   onVerDetalhes: () => void
+  onRemover: () => void
+  onLocalizar?: () => void
+  localizando?: boolean
+  exigirGeo?: boolean
+  cobertura?: ResultadoTaxaCoberturaPonto | null
+  coberturaLoading?: boolean
+  /** Tempo do formulário — só aplica no card selecionado. */
+  tempoPrevistoOverrideMinutos?: number | null
 }) {
   const etiqueta = morada.tipoEtiqueta || morada.nomeMorada || 'Endereço'
   const e = morada.endereco
+  const temGeo = e ? enderecoTemGeolocalizacao(e) : false
+  const foraDaArea = Boolean(temGeo && cobertura && !cobertura.coberta)
+  const tempoExibidoMinutos =
+    selecionada && tempoPrevistoOverrideMinutos != null && tempoPrevistoOverrideMinutos > 0
+      ? tempoPrevistoOverrideMinutos
+      : cobertura?.coberta && cobertura.tempoEntregaInMinutes > 0
+        ? cobertura.tempoEntregaInMinutes
+        : null
   const linhaResumo =
     e ?
       `${e.rua || '—'}, ${e.numero || '—'} — ${e.cidade || '—'}`
@@ -165,8 +244,12 @@ function MoradaCard({
     <div
       className={`flex items-start justify-between gap-2 rounded-lg border-2 p-3 transition-colors ${
         selecionada
-          ? 'border-primary bg-primary/5'
-          : 'border-gray-200 bg-white hover:border-primary/40'
+          ? foraDaArea
+            ? 'border-red-500 bg-red-50'
+            : 'border-primary bg-primary/5'
+          : foraDaArea
+            ? 'border-red-200 bg-red-50/60 hover:border-red-300'
+            : 'border-gray-200 bg-white hover:border-primary/40'
       }`}
     >
       <button
@@ -175,24 +258,99 @@ function MoradaCard({
         onClick={onSelecionar}
       >
         <MdLocationOn
-          className={`mt-0.5 h-5 w-5 flex-shrink-0 ${selecionada ? 'text-primary' : 'text-gray-400'}`}
+          className={`mt-0.5 h-5 w-5 flex-shrink-0 ${
+            selecionada
+              ? foraDaArea
+                ? 'text-red-600'
+                : 'text-primary'
+              : foraDaArea
+                ? 'text-red-400'
+                : 'text-gray-400'
+          }`}
         />
         <div className="min-w-0">
-          <p className={`text-sm font-semibold capitalize ${selecionada ? 'text-primary' : 'text-gray-800'}`}>
+          <p
+            className={`text-sm font-semibold capitalize ${
+              selecionada
+                ? foraDaArea
+                  ? 'text-red-700'
+                  : 'text-primary'
+                : 'text-gray-800'
+            }`}
+          >
             {etiqueta}
           </p>
           <p className="truncate text-xs text-gray-500">{linhaResumo}</p>
+          {exigirGeo ? (
+            <div className="mt-1 space-y-0.5">
+              <p
+                className={`text-[11px] font-medium ${
+                  temGeo ? 'text-emerald-700' : 'text-amber-700'
+                }`}
+              >
+                {temGeo ? 'Com geolocalização' : 'Sem localização — clique em Localizar endereço'}
+              </p>
+              {temGeo && coberturaLoading ? (
+                <p className="text-[11px] font-medium text-gray-500">Calculando taxa de entrega…</p>
+              ) : null}
+              {temGeo && cobertura?.coberta ? (
+                <p className="text-[11px] font-semibold text-emerald-700">
+                  Taxa de entrega: {transformarParaReal(cobertura.valorTaxa)}
+                  {tempoExibidoMinutos != null ? ` · ~${tempoExibidoMinutos} min` : ''}
+                </p>
+              ) : null}
+              {temGeo && cobertura && !cobertura.coberta ? (
+                <p className="text-[11px] font-semibold text-red-600">
+                  Fora da área de entrega — não é possível usar este endereço
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </button>
 
-      <button
-        type="button"
-        onClick={onVerDetalhes}
-        title="Editar endereço"
-        className="flex-shrink-0 rounded-full p-1.5 text-gray-400 transition-colors hover:bg-primary/10 hover:text-primary"
-      >
-        <MdEdit className="h-4 w-4" />
-      </button>
+      <div className="flex flex-shrink-0 flex-col items-end gap-1">
+        {exigirGeo && !temGeo && onLocalizar ? (
+          <Button
+            type="button"
+            variant="outlined"
+            disabled={localizando}
+            onClick={e => {
+              e.stopPropagation()
+              onLocalizar()
+            }}
+            className="h-8 border-amber-300 px-2 text-[11px] text-amber-800 hover:bg-amber-50"
+            title="Buscar coordenada no Google sem alterar o texto do endereço"
+          >
+            {localizando ? 'Localizando…' : 'Localizar endereço'}
+          </Button>
+        ) : null}
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={e => {
+              e.stopPropagation()
+              onVerDetalhes()
+            }}
+            title="Editar endereço"
+            className="rounded-full p-1.5 text-gray-400 transition-colors hover:bg-primary/10 hover:text-primary"
+          >
+            <MdEdit className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={e => {
+              e.stopPropagation()
+              onRemover()
+            }}
+            title="Remover endereço"
+            aria-label="Remover endereço"
+            className="rounded-full p-1.5 text-red-500 transition-colors hover:bg-red-50 hover:text-red-600"
+          >
+            <MdDelete className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -211,6 +369,8 @@ export function EntregaClienteSelector({
   enderecoPadrao,
   mostrarEnderecos = true,
   usarModuloDeliveryClientes = false,
+  tempoPrevistoMinutos = null,
+  onCoberturaMoradaSelecionadaChange,
 }: EntregaClienteSelectorProps) {
   const telefoneControlado =
     telefoneExibicaoExterno !== undefined &&
@@ -234,6 +394,8 @@ export function EntregaClienteSelector({
   const [nomeDigitado, setNomeDigitado] = useState('')
   /** `true` após busca sem resultado — exibe opção "Cadastrar cliente". */
   const [clienteNaoEncontrado, setClienteNaoEncontrado] = useState(false)
+  /** Cliente delivery localizado via `GET /delivery/clientes/{telefone}`. */
+  const [clienteDeliveryEncontrado, setClienteDeliveryEncontrado] = useState(false)
   /** Painel lateral de cadastro rápido de cliente. */
   const [painelClienteAberto, setPainelClienteAberto] = useState(false)
   /** Nome no formulário de cadastro rápido (separado do campo de busca). */
@@ -242,7 +404,17 @@ export function EntregaClienteSelector({
   const [moradaEditando, setMoradaEditando] = useState<MoradaTelefone | null>(null)
   const [painelMoradaAberto, setPainelMoradaAberto] = useState(false)
   const [formNova, setFormNova] = useState<FormNovasMorada>(FORM_INICIAL)
-  const [isLoadingCep, setIsLoadingCep] = useState(false)
+  const [buscaPlacesMorada, setBuscaPlacesMorada] = useState('')
+  /** Legado (não delivery): geo só via Places simples. */
+  const [moradaGeo, setMoradaGeo] = useState<{
+    enderecoLocalizacao: GeoJsonPoint
+    providerEnderecoId: string
+  } | null>(null)
+  /** Delivery: Places no painel (sem mapa). Geocode no salvar se Places não for usado. */
+  const [geoPanelSession, setGeoPanelSession] = useState(0)
+  const [geoPanelPlaces, setGeoPanelPlaces] = useState<EnderecoGeoCheckoutInput | null>(null)
+  const [localizandoMoradaId, setLocalizandoMoradaId] = useState<string | null>(null)
+  const [moradaParaExcluir, setMoradaParaExcluir] = useState<MoradaTelefone | null>(null)
 
   const telefoneInputRef = useRef<HTMLInputElement>(null)
 
@@ -254,12 +426,103 @@ export function EntregaClienteSelector({
 
   const moradaHookOptions = { usarModuloDelivery: usarModuloDeliveryClientes }
 
-  const { data: moradas, isLoading: buscando } = useMoradasPorTelefone(telefoneBuscado, moradaHookOptions)
+  const empresaGeoQuery = useSecureTenantQuery<{ enderecoLocalizacao: GeoJsonPoint | null }>(
+    ['empresa', 'endereco-geo', 'pedido-delivery'],
+    async ({ token }) => {
+      const res = await fetchGestorApi('/api/empresas/me', {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(typeof body.error === 'string' ? body.error : `Erro ${res.status}`)
+      }
+      const data = await res.json()
+      const endereco =
+        data.endereco && typeof data.endereco === 'object' && !Array.isArray(data.endereco)
+          ? data.endereco
+          : null
+      return lerEnderecoLocalizacaoDoPayloadEmpresa(endereco)
+    },
+    {
+      enabled: usarModuloDeliveryClientes,
+      staleTime: 1000 * 60 * 2,
+      refetchOnWindowFocus: false,
+    }
+  )
+  const fallbackEmpresaGeo = empresaGeoQuery.data?.enderecoLocalizacao ?? null
+
+  const { data: moradas, isLoading: buscando, isError: erroMoradas, error: erroMoradasMsg } =
+    useMoradasPorTelefone(telefoneBuscado, moradaHookOptions)
   const criarMorada = useCriarMoradaTelefone(moradaHookOptions)
   const atualizarMorada = useAtualizarMoradaTelefone(moradaHookOptions)
+  const excluirMorada = useExcluirMoradaTelefone(moradaHookOptions)
   const registrarUsoMorada = useRegistrarUsoMoradaTelefone(moradaHookOptions)
+  const coberturaTaxa = useCoberturaTaxaPorMoradas({
+    enabled: usarModuloDeliveryClientes && mostrarEnderecos,
+    moradas: moradas ?? [],
+  })
   const buscarCliente = useBuscarClientePorTelefone()
+  const buscarClienteDelivery = useBuscarClienteDeliveryPorTelefone()
   const criarCliente = useCriarClienteRapido()
+  const criarClienteDelivery = useCriarClienteDeliveryRapido()
+
+  useEffect(() => {
+    if (!onCoberturaMoradaSelecionadaChange) return
+
+    if (!usarModuloDeliveryClientes || !mostrarEnderecos || !moradaSelecionada) {
+      onCoberturaMoradaSelecionadaChange({ status: 'null' })
+      return
+    }
+
+    if (!(moradaSelecionada.endereco && enderecoTemGeolocalizacao(moradaSelecionada.endereco))) {
+      onCoberturaMoradaSelecionadaChange({ status: 'sem_geo' })
+      return
+    }
+
+    if (coberturaTaxa.isLoading) {
+      onCoberturaMoradaSelecionadaChange({ status: 'loading' })
+      return
+    }
+
+    if (coberturaTaxa.isError) {
+      onCoberturaMoradaSelecionadaChange({ status: 'erro' })
+      return
+    }
+
+    const cobertura = coberturaTaxa.porMoradaId[moradaSelecionada.id]
+    if (!cobertura) {
+      onCoberturaMoradaSelecionadaChange({ status: 'loading' })
+      return
+    }
+
+    if (!cobertura.coberta) {
+      onCoberturaMoradaSelecionadaChange({ status: 'fora' })
+      return
+    }
+
+    onCoberturaMoradaSelecionadaChange({
+      status: 'coberta',
+      moradaId: moradaSelecionada.id,
+      valorTaxa: cobertura.valorTaxa,
+      tempoEntregaInMinutes: cobertura.tempoEntregaInMinutes,
+    })
+  }, [
+    onCoberturaMoradaSelecionadaChange,
+    usarModuloDeliveryClientes,
+    mostrarEnderecos,
+    moradaSelecionada,
+    coberturaTaxa.isLoading,
+    coberturaTaxa.isError,
+    coberturaTaxa.porMoradaId,
+  ])
+
+  useEffect(() => {
+    if (!erroMoradas || !erroMoradasMsg) return
+    showToast.error(
+      erroMoradasMsg instanceof Error ? erroMoradasMsg.message : 'Erro ao buscar endereços'
+    )
+  }, [erroMoradas, erroMoradasMsg])
 
   /**
    * Atualiza a morada no estado do pai e regista uso na API para ordenar como mais recente.
@@ -277,46 +540,274 @@ export function EntregaClienteSelector({
     [onMoradaSelecionada, telefoneBuscado, registrarUsoMorada]
   )
 
+  const podeGerenciarEnderecos =
+    Boolean(clienteVinculado?.id?.trim()) ||
+    (usarModuloDeliveryClientes && clienteDeliveryEncontrado)
+
+  const resetGeoPainelState = useCallback(() => {
+    setBuscaPlacesMorada('')
+    setMoradaGeo(null)
+    setGeoPanelPlaces(null)
+    setGeoPanelSession(s => s + 1)
+  }, [])
+
   const abrirPainelNovo = useCallback(() => {
-    if (!clienteVinculado?.id?.trim()) {
+    if (!podeGerenciarEnderecos) {
       showToast.warning('Cadastre o cliente antes de adicionar um endereço.')
       return
     }
     setMoradaEditando(null)
     setFormNova(formInicialComEnderecoPadrao(enderecoPadrao))
+    resetGeoPainelState()
     setPainelMoradaAberto(true)
-  }, [clienteVinculado?.id, enderecoPadrao])
+  }, [podeGerenciarEnderecos, enderecoPadrao, resetGeoPainelState])
 
   const abrirPainelEditar = useCallback(
     (m: MoradaTelefone) => {
-      if (!clienteVinculado?.id?.trim()) {
+      if (!podeGerenciarEnderecos) {
         showToast.warning('Cadastre o cliente antes de editar o endereço.')
         return
       }
       setMoradaEditando(m)
       setFormNova(moradaParaForm(m))
+      setBuscaPlacesMorada('')
+      setMoradaGeo(null)
+      setGeoPanelPlaces(
+        m.endereco && enderecoTemGeolocalizacao(m.endereco)
+          ? {
+              enderecoLocalizacao: m.endereco.enderecoLocalizacao!,
+              providerEnderecoId: m.endereco.providerEnderecoId ?? null,
+            }
+          : null
+      )
+      setGeoPanelSession(s => s + 1)
       setPainelMoradaAberto(true)
     },
-    [clienteVinculado?.id]
+    [podeGerenciarEnderecos]
   )
 
   const fecharPainelMorada = useCallback(() => {
     setPainelMoradaAberto(false)
     setMoradaEditando(null)
     setFormNova(formInicialComEnderecoPadrao(enderecoPadrao))
+    setBuscaPlacesMorada('')
+    setMoradaGeo(null)
+    setGeoPanelPlaces(null)
   }, [enderecoPadrao])
 
+  const abrirConfirmacaoExclusao = useCallback(
+    (m: MoradaTelefone) => {
+      if (!podeGerenciarEnderecos) {
+        showToast.warning('Cadastre o cliente antes de remover o endereço.')
+        return
+      }
+      setMoradaParaExcluir(m)
+    },
+    [podeGerenciarEnderecos]
+  )
+
+  const fecharConfirmacaoExclusao = useCallback(() => {
+    if (excluirMorada.isPending) return
+    setMoradaParaExcluir(null)
+  }, [excluirMorada.isPending])
+
+  const confirmarExclusaoMorada = useCallback(async () => {
+    const morada = moradaParaExcluir
+    if (!morada) return
+
+    const digitos =
+      telefoneBuscado ||
+      extrairDigitosTelefone(telefoneInput) ||
+      extrairDigitosTelefone(morada.telefone)
+    if (!digitos) {
+      showToast.warning('Telefone inválido para remover o endereço.')
+      return
+    }
+
+    try {
+      await excluirMorada.mutateAsync({
+        id: morada.id,
+        telefoneDigitos: digitos,
+      })
+      if (moradaSelecionada?.id === morada.id) {
+        onMoradaSelecionada(null)
+      }
+      if (moradaEditando?.id === morada.id) {
+        fecharPainelMorada()
+      }
+      setMoradaParaExcluir(null)
+    } catch {
+      // toast já tratado no hook
+    }
+  }, [
+    moradaParaExcluir,
+    telefoneBuscado,
+    telefoneInput,
+    excluirMorada,
+    moradaSelecionada?.id,
+    onMoradaSelecionada,
+    moradaEditando?.id,
+    fecharPainelMorada,
+  ])
+
+  const tentarSelecionarMorada = useCallback(
+    (morada: MoradaTelefone, telefoneDigitosOverride?: string | null) => {
+      if (
+        usarModuloDeliveryClientes &&
+        !(morada.endereco && enderecoTemGeolocalizacao(morada.endereco))
+      ) {
+        showToast.warning(
+          'Este endereço ainda não tem localização. Use “Localizar endereço” antes de selecionar.'
+        )
+        return
+      }
+
+      if (usarModuloDeliveryClientes) {
+        if (coberturaTaxa.isLoading) {
+          showToast.warning('Aguarde o cálculo da taxa de entrega deste endereço.')
+          return
+        }
+        const cobertura = coberturaTaxa.porMoradaId[morada.id]
+        if (cobertura && !cobertura.coberta) {
+          showToast.error(
+            'Este endereço está fora da área de entrega. Escolha outro ou ajuste a cobertura.'
+          )
+          return
+        }
+      }
+
+      definirMoradaSelecionada(morada, telefoneDigitosOverride)
+    },
+    [usarModuloDeliveryClientes, definirMoradaSelecionada, coberturaTaxa.isLoading, coberturaTaxa.porMoradaId]
+  )
+
+  const handleLocalizarMorada = useCallback(
+    async (morada: MoradaTelefone) => {
+      if (!morada.endereco) {
+        showToast.warning('Endereço incompleto para localizar.')
+        return
+      }
+      setLocalizandoMoradaId(morada.id)
+      try {
+        const resolvida = await resolverGeoMoradaDeliveryGestor({
+          endereco: morada.endereco,
+          fallbackEmpresaGeo,
+        })
+        const digitos =
+          extrairDigitosTelefone(morada.telefone) ||
+          extrairDigitosTelefone(telefoneInput) ||
+          telefoneBuscado ||
+          ''
+        if (!digitos) {
+          showToast.error('Telefone do cliente não encontrado para salvar a localização.')
+          return
+        }
+        const atualizada = await atualizarMorada.mutateAsync({
+          id: morada.id,
+          dto: {
+            telefone: digitos,
+            tipoEtiqueta: morada.tipoEtiqueta,
+            nomeMorada: morada.nomeMorada,
+            endereco: {
+              ...morada.endereco,
+              enderecoLocalizacao: resolvida.enderecoLocalizacao,
+              providerEnderecoId: resolvida.providerEnderecoId ?? null,
+              preferenciaEntrega: null,
+            },
+          },
+        })
+        if (resolvida.origem === 'empresa') {
+          showToast.warning(
+            'Google não localizou o endereço. Usamos a localização da empresa como aproximação.'
+          )
+        } else {
+          showToast.success('Localização salva sem alterar o texto do endereço.')
+        }
+        if (moradaSelecionada?.id === morada.id || !moradaSelecionada) {
+          definirMoradaSelecionada(atualizada, digitos)
+        }
+      } catch (error) {
+        showToast.error(
+          error instanceof Error ? error.message : 'Não foi possível localizar o endereço'
+        )
+      } finally {
+        setLocalizandoMoradaId(null)
+      }
+    },
+    [
+      fallbackEmpresaGeo,
+      telefoneInput,
+      telefoneBuscado,
+      atualizarMorada,
+      moradaSelecionada?.id,
+      definirMoradaSelecionada,
+    ]
+  )
   const handleBuscar = useCallback(async (telefoneOverride?: string) => {
     const digitos = extrairDigitosTelefone(telefoneOverride ?? telefoneInput)
-    if (digitos.length < 8) {
-      onAbrirSeletorCliente?.()
+    const minDigitos = telefoneMinimoParaBusca(usarModuloDeliveryClientes)
+
+    /**
+     * Lupa sem telefone → seletor ERP (lista + novo cliente), como na main.
+     * Com dígitos incompletos no módulo delivery → exige celular 11 dígitos.
+     */
+    if (digitos.length === 0) {
+      if (onAbrirSeletorCliente) {
+        onAbrirSeletorCliente()
+        return
+      }
+      if (usarModuloDeliveryClientes) {
+        showToast.warning('Informe o celular completo com DDD (11 dígitos).')
+      }
+      return
+    }
+
+    if (digitos.length < minDigitos) {
+      if (usarModuloDeliveryClientes) {
+        showToast.warning('Informe o celular completo com DDD (11 dígitos).')
+      } else {
+        onAbrirSeletorCliente?.()
+      }
       return
     }
 
     setClienteNaoEncontrado(false)
+    setClienteDeliveryEncontrado(false)
     onClienteVinculado(null)
-    setTelefoneBuscado(digitos)
     onMoradaSelecionada(null)
+
+    if (usarModuloDeliveryClientes) {
+      setTelefoneBuscado(digitos)
+      try {
+        const delivery = await buscarClienteDelivery.mutateAsync(digitos)
+        if (delivery) {
+          setClienteDeliveryEncontrado(true)
+          const nomeDelivery = delivery.nome?.trim() || nomeDigitado.trim() || 'Cliente'
+          if (delivery.clienteIdVinculado?.trim()) {
+            onClienteVinculado({
+              id: delivery.clienteIdVinculado.trim(),
+              nome: nomeDelivery,
+            })
+          } else {
+            onClienteVinculado({ id: '', nome: nomeDelivery })
+          }
+          return
+        }
+
+        const clienteErp = await buscarCliente.mutateAsync(digitos)
+        if (clienteErp) {
+          onClienteVinculado({ id: clienteErp.getId(), nome: clienteErp.getNome() })
+          return
+        }
+
+        setClienteNaoEncontrado(true)
+      } catch {
+        setClienteNaoEncontrado(true)
+      }
+      return
+    }
+
+    setTelefoneBuscado(digitos)
 
     try {
       const cliente = await buscarCliente.mutateAsync(digitos)
@@ -330,7 +821,10 @@ export function EntregaClienteSelector({
     }
   }, [
     telefoneInput,
+    usarModuloDeliveryClientes,
+    nomeDigitado,
     buscarCliente,
+    buscarClienteDelivery,
     onClienteVinculado,
     onMoradaSelecionada,
     setTelefoneBuscado,
@@ -350,14 +844,20 @@ export function EntregaClienteSelector({
   /** Ao sair do campo de telefone, busca o cliente automaticamente (telefone completo e ainda não buscado). */
   const handleTelefoneBlur = useCallback(() => {
     const digitos = extrairDigitosTelefone(telefoneInput)
-    if (digitos.length >= 8 && digitos !== telefoneBuscado) {
+    const minDigitos = telefoneMinimoParaBusca(usarModuloDeliveryClientes)
+    if (digitos.length >= minDigitos && digitos !== telefoneBuscado) {
       void handleBuscar()
     }
-  }, [telefoneInput, telefoneBuscado, handleBuscar])
+  }, [telefoneInput, telefoneBuscado, handleBuscar, usarModuloDeliveryClientes])
 
   const handleFormChange = useCallback(
     (campo: keyof FormNovasMorada, valor: string) => {
-      setFormNova(prev => ({ ...prev, [campo]: valor }))
+      const normalizado = CAMPOS_ENDERECO_MAIUSCULA.has(campo)
+        ? campo === 'estado'
+          ? valor.toUpperCase().slice(0, 2)
+          : paraMaiusculaEndereco(valor)
+        : valor
+      setFormNova(prev => ({ ...prev, [campo]: normalizado }))
     },
     []
   )
@@ -367,53 +867,12 @@ export function EntregaClienteSelector({
     setFormNova(prev => ({
       ...prev,
       tipoEtiqueta,
-      nomeMorada:
-        prev.nomeMorada.trim() === '' ||
-        ETIQUETAS_MORADA.some(etiqueta => prev.nomeMorada === nomePadraoMorada(etiqueta))
-          ? nomePadraoMorada(tipoEtiqueta)
-          : prev.nomeMorada,
+      nomeMorada: nomePadraoMorada(tipoEtiqueta),
     }))
   }, [])
-
-  const handleCepInputChange = useCallback((valor: string) => {
-    setFormNova(prev => ({ ...prev, cep: formatarCepMascara(valor) }))
-  }, [])
-
-  const aplicarEnderecoDoCep = useCallback((dados: ViaCepEnderecoNormalizado) => {
-    setFormNova(prev => ({
-      ...prev,
-      cep: formatarCepMascara(dados.cep),
-      rua: dados.logradouro ? dados.logradouro.toLocaleUpperCase('pt-BR') : prev.rua,
-      bairro: dados.bairro ? dados.bairro.toLocaleUpperCase('pt-BR') : prev.bairro,
-      cidade: dados.localidade ? dados.localidade.toLocaleUpperCase('pt-BR') : prev.cidade,
-      estado: dados.uf ? dados.uf.toUpperCase().slice(0, 2) : prev.estado,
-      complemento:
-        dados.complemento ? dados.complemento.toLocaleUpperCase('pt-BR') : prev.complemento,
-    }))
-  }, [])
-
-  const handleBuscarCep = useCallback(async () => {
-    const digitos = normalizarDigitosCep(formNova.cep)
-    if (digitos.length !== 8) {
-      showToast.warning('CEP inválido. Informe 8 dígitos.')
-      return
-    }
-
-    setIsLoadingCep(true)
-    try {
-      const dados = await consultarCepViaApi(digitos)
-      aplicarEnderecoDoCep(dados)
-      showToast.success('Endereço encontrado pelo CEP.')
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Erro ao consultar CEP'
-      showToast.error(msg)
-    } finally {
-      setIsLoadingCep(false)
-    }
-  }, [formNova.cep, aplicarEnderecoDoCep])
 
   const handleSalvarMorada = useCallback(async () => {
-    if (!clienteVinculado?.id?.trim()) {
+    if (!podeGerenciarEnderecos) {
       showToast.warning('Cadastre o cliente antes de salvar o endereço.')
       return
     }
@@ -439,15 +898,77 @@ export function EntregaClienteSelector({
       return
     }
 
-    const endereco: EnderecoMorada = {
+    const enderecoBase: EnderecoMorada = {
       cep: cepDigits,
-      rua: formNova.rua.trim(),
-      numero: formNova.numero.trim(),
-      bairro: formNova.bairro.trim(),
-      cidade: formNova.cidade.trim(),
+      rua: paraMaiusculaEndereco(formNova.rua.trim()),
+      numero: paraMaiusculaEndereco(formNova.numero.trim()),
+      bairro: paraMaiusculaEndereco(formNova.bairro.trim()),
+      cidade: paraMaiusculaEndereco(formNova.cidade.trim()),
       estado: uf,
-      complemento: formNova.complemento.trim() || undefined,
-      referencia: formNova.referencia.trim() || undefined,
+      complemento: formNova.complemento.trim()
+        ? paraMaiusculaEndereco(formNova.complemento.trim())
+        : undefined,
+      referencia: formNova.referencia.trim()
+        ? paraMaiusculaEndereco(formNova.referencia.trim())
+        : undefined,
+    }
+
+    let geoParaSalvar: {
+      enderecoLocalizacao: GeoJsonPoint
+      providerEnderecoId?: string | null
+    } | null = null
+
+    if (usarModuloDeliveryClientes) {
+      if (geoPanelPlaces?.enderecoLocalizacao) {
+        geoParaSalvar = {
+          enderecoLocalizacao: geoPanelPlaces.enderecoLocalizacao,
+          providerEnderecoId: geoPanelPlaces.providerEnderecoId ?? null,
+        }
+      } else if (
+        moradaEditando?.endereco &&
+        enderecoTemGeolocalizacao(moradaEditando.endereco)
+      ) {
+        geoParaSalvar = {
+          enderecoLocalizacao: moradaEditando.endereco.enderecoLocalizacao!,
+          providerEnderecoId: moradaEditando.endereco.providerEnderecoId ?? null,
+        }
+      } else {
+        try {
+          const resolvida = await resolverGeoMoradaDeliveryGestor({
+            endereco: enderecoBase,
+            fallbackEmpresaGeo,
+          })
+          geoParaSalvar = {
+            enderecoLocalizacao: resolvida.enderecoLocalizacao,
+            providerEnderecoId: resolvida.providerEnderecoId ?? null,
+          }
+          if (resolvida.origem === 'empresa') {
+            showToast.warning(
+              'Google não localizou o endereço. Usamos a localização da empresa como aproximação.'
+            )
+          }
+        } catch (error) {
+          showToast.error(
+            error instanceof Error
+              ? error.message
+              : 'Não foi possível obter a localização do endereço'
+          )
+          return
+        }
+      }
+    } else if (moradaGeo) {
+      geoParaSalvar = moradaGeo
+    }
+
+    const endereco: EnderecoMorada = {
+      ...enderecoBase,
+      ...(geoParaSalvar
+        ? {
+            enderecoLocalizacao: geoParaSalvar.enderecoLocalizacao,
+            providerEnderecoId: geoParaSalvar.providerEnderecoId ?? null,
+            preferenciaEntrega: null,
+          }
+        : {}),
     }
 
     const dto = {
@@ -464,9 +985,7 @@ export function EntregaClienteSelector({
       })
       fecharPainelMorada()
       setTelefoneBuscado(digitos)
-      if (moradaSelecionada?.id === moradaEditando.id) {
-        definirMoradaSelecionada(atualizada, digitos)
-      }
+      definirMoradaSelecionada(atualizada, digitos)
       return
     }
 
@@ -475,16 +994,19 @@ export function EntregaClienteSelector({
     setTelefoneBuscado(digitos)
     definirMoradaSelecionada(nova, digitos)
   }, [
-    clienteVinculado?.id,
+    podeGerenciarEnderecos,
     telefoneInput,
     formNova,
     moradaEditando,
-    moradaSelecionada?.id,
     criarMorada,
     atualizarMorada,
     fecharPainelMorada,
     definirMoradaSelecionada,
     setTelefoneBuscado,
+    moradaGeo,
+    usarModuloDeliveryClientes,
+    geoPanelPlaces,
+    fallbackEmpresaGeo,
   ])
 
   const handleSalvarClienteRapido = useCallback(async () => {
@@ -494,8 +1016,17 @@ export function EntregaClienteSelector({
       return
     }
     const digitos = extrairDigitosTelefone(telefoneInput)
+    if (usarModuloDeliveryClientes && !telefoneCelularBrCompleto(digitos)) {
+      showToast.warning('Informe o celular completo com DDD (11 dígitos).')
+      return
+    }
     try {
       const novo = await criarCliente.mutateAsync({ nome, telefone: digitos })
+      if (usarModuloDeliveryClientes) {
+        await criarClienteDelivery.mutateAsync({ telefone: digitos, nome })
+        setClienteDeliveryEncontrado(true)
+        setTelefoneBuscado(digitos)
+      }
       onClienteVinculado({ id: novo.getId(), nome: novo.getNome() })
       setClienteNaoEncontrado(false)
       setPainelClienteAberto(false)
@@ -504,7 +1035,15 @@ export function EntregaClienteSelector({
     } catch {
       /* erro exibido pelo hook */
     }
-  }, [nomeNovoCliente, telefoneInput, criarCliente, onClienteVinculado])
+  }, [
+    nomeNovoCliente,
+    telefoneInput,
+    usarModuloDeliveryClientes,
+    criarCliente,
+    criarClienteDelivery,
+    onClienteVinculado,
+    setTelefoneBuscado,
+  ])
 
   const handleAbrirPainelCliente = useCallback(() => {
     setNomeNovoCliente(nomeDigitado.trim())
@@ -512,21 +1051,58 @@ export function EntregaClienteSelector({
   }, [nomeDigitado])
 
   const moradasEncontradas = moradas ?? []
-  const buscaRealizada = telefoneBuscado !== null || clienteVinculado !== null
-  const buscandoCliente = buscarCliente.isPending
-  const clienteCadastrado = Boolean(clienteVinculado?.id?.trim())
+  const buscaRealizada =
+    telefoneBuscado !== null || clienteVinculado !== null || clienteDeliveryEncontrado
+  const buscandoCliente = buscarCliente.isPending || buscarClienteDelivery.isPending
+  const clienteCadastrado = podeGerenciarEnderecos
 
   useEffect(() => {
-    if (!mostrarEnderecos || !clienteVinculado || moradaSelecionada || moradasEncontradas.length === 0) {
+    if (!mostrarEnderecos || !clienteCadastrado || moradaSelecionada || moradasEncontradas.length === 0) {
       return
     }
-    definirMoradaSelecionada(moradasEncontradas[0])
+
+    const candidata = moradasEncontradas.find(morada => {
+      if (!usarModuloDeliveryClientes) return true
+      if (!(morada.endereco && enderecoTemGeolocalizacao(morada.endereco))) return false
+      if (coberturaTaxa.isLoading) return false
+      const cobertura = coberturaTaxa.porMoradaId[morada.id]
+      return Boolean(cobertura?.coberta)
+    })
+
+    if (!candidata) {
+      return
+    }
+
+    definirMoradaSelecionada(candidata)
   }, [
     mostrarEnderecos,
-    clienteVinculado,
+    clienteCadastrado,
     moradaSelecionada,
     moradasEncontradas,
+    usarModuloDeliveryClientes,
     definirMoradaSelecionada,
+    coberturaTaxa.isLoading,
+    coberturaTaxa.porMoradaId,
+  ])
+
+  // Se a morada selecionada ficar fora da cobertura após recálculo, limpa a seleção.
+  useEffect(() => {
+    if (!usarModuloDeliveryClientes || !moradaSelecionada) return
+    if (coberturaTaxa.isLoading || coberturaTaxa.isError) return
+    const cobertura = coberturaTaxa.porMoradaId[moradaSelecionada.id]
+    if (cobertura && !cobertura.coberta) {
+      onMoradaSelecionada(null)
+      showToast.warning(
+        'O endereço selecionado está fora da área de entrega. Escolha outro endereço.'
+      )
+    }
+  }, [
+    usarModuloDeliveryClientes,
+    moradaSelecionada,
+    coberturaTaxa.isLoading,
+    coberturaTaxa.isError,
+    coberturaTaxa.porMoradaId,
+    onMoradaSelecionada,
   ])
 
   return (
@@ -603,7 +1179,7 @@ export function EntregaClienteSelector({
                 }}
               />
             </div>
-            {clienteVinculado && (
+            {clienteCadastrado && (
               <p className="mt-1 flex items-center gap-1 text-xs text-green-700">
                 <MdCheckCircle className="h-3.5 w-3.5" />
                 Cliente encontrado
@@ -696,8 +1272,17 @@ export function EntregaClienteSelector({
                   key={morada.id}
                   morada={morada}
                   selecionada={moradaSelecionada?.id === morada.id}
-                  onSelecionar={() => definirMoradaSelecionada(morada)}
+                  onSelecionar={() => tentarSelecionarMorada(morada)}
                   onVerDetalhes={() => abrirPainelEditar(morada)}
+                  onRemover={() => abrirConfirmacaoExclusao(morada)}
+                  onLocalizar={() => void handleLocalizarMorada(morada)}
+                  localizando={localizandoMoradaId === morada.id}
+                  exigirGeo={usarModuloDeliveryClientes}
+                  cobertura={coberturaTaxa.porMoradaId[morada.id] ?? null}
+                  coberturaLoading={coberturaTaxa.isLoading}
+                  tempoPrevistoOverrideMinutos={
+                    moradaSelecionada?.id === morada.id ? tempoPrevistoMinutos : null
+                  }
                 />
               ))}
             </>
@@ -822,67 +1407,87 @@ export function EntregaClienteSelector({
         }}
       >
         <div className="space-y-4 px-4 py-4 text-sm">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="mb-1 block text-xs font-medium text-gray-600">Etiqueta</Label>
-              <select
-                value={formNova.tipoEtiqueta}
-                onChange={e => handleTipoEtiquetaChange(e.target.value)}
-                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-              >
-                {ETIQUETAS_MORADA.map(etiqueta => (
-                  <option key={etiqueta} value={etiqueta}>
-                    {etiqueta}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <Label className="mb-1 block text-xs font-medium text-gray-600">CEP</Label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="postal-code"
-                  value={formNova.cep}
-                  onChange={e => handleCepInputChange(e.target.value)}
-                  placeholder="00000-000"
-                  maxLength={9}
-                  className="min-w-0 flex-1 rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                />
-                <Button
-                  type="button"
-                  variant="outlined"
-                  onClick={() => void handleBuscarCep()}
-                  disabled={isLoadingCep || normalizarDigitosCep(formNova.cep).length !== 8}
-                  className="flex-shrink-0 border-primary/30 hover:bg-primary/10"
-                  title="Buscar endereço pelo CEP"
-                  aria-label="Buscar endereço pelo CEP"
-                >
-                  {isLoadingCep ? (
-                    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                  ) : (
-                    <MdSearch className="h-4 w-4 text-primary" />
-                  )}
-                </Button>
-              </div>
-              <p className="mt-1 text-[11px] text-gray-400">
-                Opcional. Use a lupa apenas se quiser preencher o endereço pelo CEP.
-              </p>
-            </div>
-          </div>
-
           <div>
             <Label className="mb-1 block text-xs font-medium text-gray-600">
               Nome da morada <span className="text-red-500">*</span>
             </Label>
-            <input
-              value={formNova.nomeMorada}
-              onChange={e => handleFormChange('nomeMorada', e.target.value)}
-              placeholder="Ex.: Casa principal, Apartamento 301..."
+            <select
+              value={formNova.tipoEtiqueta}
+              onChange={e => handleTipoEtiquetaChange(e.target.value)}
               className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-              autoComplete="off"
-            />
+            >
+              {ETIQUETAS_MORADA.map(etiqueta => (
+                <option key={etiqueta} value={etiqueta}>
+                  {etiqueta}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-[11px] text-gray-400">
+              Classificação do endereço (Casa, Trabalho ou Outro).
+            </p>
+          </div>
+
+          <div>
+            {usarModuloDeliveryClientes ? (
+              <MoradaEntregaGeoPanel
+                sessionKey={`${geoPanelSession}-${moradaEditando?.id ?? 'new'}`}
+                onFormPatch={(patch: MoradaEntregaGeoFormPatch) => {
+                  setFormNova(prev => {
+                    const next = { ...prev, ...patch }
+                    if (patch.rua != null) next.rua = paraMaiusculaEndereco(patch.rua)
+                    if (patch.numero != null) next.numero = paraMaiusculaEndereco(patch.numero)
+                    if (patch.bairro != null) next.bairro = paraMaiusculaEndereco(patch.bairro)
+                    if (patch.cidade != null) next.cidade = paraMaiusculaEndereco(patch.cidade)
+                    if (patch.estado != null) next.estado = patch.estado.toUpperCase().slice(0, 2)
+                    return next
+                  })
+                }}
+                initialGeo={
+                  moradaEditando?.endereco &&
+                  enderecoTemGeolocalizacao(moradaEditando.endereco)
+                    ? {
+                        enderecoLocalizacao: moradaEditando.endereco.enderecoLocalizacao,
+                        providerEnderecoId: moradaEditando.endereco.providerEnderecoId,
+                      }
+                    : null
+                }
+                disabled={criarMorada.isPending || atualizarMorada.isPending}
+                onGeoStateChange={({ geo }) => setGeoPanelPlaces(geo)}
+              />
+            ) : (
+              <EnderecoPlacesAutocomplete
+                variant="gestor"
+                floatingLabel={false}
+                label="Buscar endereço no Google"
+                placeholder="Digite rua, bairro ou cidade…"
+                value={buscaPlacesMorada}
+                onChange={setBuscaPlacesMorada}
+                onSelect={(place: PlaceDetailsResult) => {
+                  const fields = placeDetailsParaEnderecoGeocode(place)
+                  setFormNova(prev => ({
+                    ...prev,
+                    ...(fields.rua ? { rua: paraMaiusculaEndereco(fields.rua) } : {}),
+                    ...(fields.numero ? { numero: paraMaiusculaEndereco(fields.numero) } : {}),
+                    ...(fields.bairro ? { bairro: paraMaiusculaEndereco(fields.bairro) } : {}),
+                    ...(fields.cidade ? { cidade: paraMaiusculaEndereco(fields.cidade) } : {}),
+                    ...(fields.estado ? { estado: fields.estado.toUpperCase().slice(0, 2) } : {}),
+                    ...(fields.cep ? { cep: formatarCepMascara(fields.cep) } : {}),
+                  }))
+                  setMoradaGeo({
+                    enderecoLocalizacao: place.enderecoLocalizacao,
+                    providerEnderecoId: place.providerEnderecoId,
+                  })
+                  setBuscaPlacesMorada(
+                    tituloCasePalavrasEndereco(
+                      [fields.rua, fields.numero].filter(Boolean).join(', ') ||
+                        place.enderecoFormatado ||
+                        ''
+                    )
+                  )
+                  showToast.success('Endereço aplicado a partir da sugestão do Google.')
+                }}
+              />
+            )}
           </div>
 
           <div className="grid grid-cols-3 gap-3">
@@ -892,9 +1497,14 @@ export function EntregaClienteSelector({
               </Label>
               <input
                 value={formNova.rua}
-                onChange={e => handleFormChange('rua', e.target.value)}
-                placeholder="Rua das Flores"
-                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                onChange={e => {
+                  handleFormChange('rua', e.target.value)
+                  if (!usarModuloDeliveryClientes) {
+                    setMoradaGeo(null)
+                  }
+                }}
+                placeholder="RUA DAS FLORES"
+                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-primary/40"
               />
             </div>
             <div>
@@ -905,7 +1515,7 @@ export function EntregaClienteSelector({
                 value={formNova.numero}
                 onChange={e => handleFormChange('numero', e.target.value)}
                 placeholder="100"
-                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-primary/40"
               />
             </div>
           </div>
@@ -915,8 +1525,8 @@ export function EntregaClienteSelector({
             <input
               value={formNova.bairro}
               onChange={e => handleFormChange('bairro', e.target.value)}
-              placeholder="Centro"
-              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+              placeholder="CENTRO"
+              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
           </div>
 
@@ -928,8 +1538,8 @@ export function EntregaClienteSelector({
               <input
                 value={formNova.cidade}
                 onChange={e => handleFormChange('cidade', e.target.value)}
-                placeholder="São Paulo"
-                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                placeholder="SÃO PAULO"
+                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-primary/40"
               />
             </div>
             <div>
@@ -938,7 +1548,7 @@ export function EntregaClienteSelector({
               </Label>
               <input
                 value={formNova.estado}
-                onChange={e => handleFormChange('estado', e.target.value.toUpperCase())}
+                onChange={e => handleFormChange('estado', e.target.value)}
                 placeholder="SP"
                 maxLength={2}
                 className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-primary/40"
@@ -951,8 +1561,8 @@ export function EntregaClienteSelector({
             <input
               value={formNova.complemento}
               onChange={e => handleFormChange('complemento', e.target.value)}
-              placeholder="Apto 2, Bloco B..."
-              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+              placeholder="APTO 2, BLOCO B..."
+              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
           </div>
 
@@ -961,12 +1571,42 @@ export function EntregaClienteSelector({
             <input
               value={formNova.referencia}
               onChange={e => handleFormChange('referencia', e.target.value)}
-              placeholder="Próximo ao mercado..."
-              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+              placeholder="PRÓXIMO AO MERCADO..."
+              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
           </div>
         </div>
       </JiffySidePanelModal>
+
+      <JiffyConfirmDialog
+        open={moradaParaExcluir != null}
+        onOpenChange={open => {
+          if (!open) fecharConfirmacaoExclusao()
+        }}
+        title="Remover endereço?"
+        description={
+          moradaParaExcluir ? (
+            <>
+              O endereço{' '}
+              <strong>
+                {moradaParaExcluir.tipoEtiqueta || moradaParaExcluir.nomeMorada || 'selecionado'}
+              </strong>
+              {moradaParaExcluir.endereco
+                ? ` (${moradaParaExcluir.endereco.rua}, ${moradaParaExcluir.endereco.numero})`
+                : ''}{' '}
+              será removido permanentemente. Deseja continuar?
+            </>
+          ) : (
+            'Este endereço será removido permanentemente. Deseja continuar?'
+          )
+        }
+        cancelLabel="Cancelar"
+        confirmLabel={excluirMorada.isPending ? 'Removendo…' : 'Remover'}
+        onConfirm={() => void confirmarExclusaoMorada()}
+        busy={excluirMorada.isPending}
+        confirmButtonClassName="bg-red-600 hover:bg-red-700"
+        titleSx={{ color: 'var(--color-alternate)' }}
+      />
     </div>
   )
 }
