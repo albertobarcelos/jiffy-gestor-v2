@@ -92,20 +92,21 @@ export function AreaEntregaFormModal({
         <div className="space-y-4 py-2">
           {!editando ? (
             <p className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
-              A forma desenhada no mapa será salva junto com a taxa e o tempo abaixo.
+              Esta área tem nome e taxa próprios. Desenhar uma área não altera o alcance do raio.
             </p>
           ) : null}
 
           <div>
             <label htmlFor="area-nome" className="mb-1 block text-xs font-semibold text-secondary-text">
-              Nome (opcional)
+              Nome da área
             </label>
             <input
               id="area-nome"
               type="text"
               value={values.nome ?? ''}
               onChange={e => setValues(v => ({ ...v, nome: e.target.value }))}
-              placeholder="Ex.: Bairro Centro"
+              placeholder="Ex.: Centro, Setor Industrial"
+              required
               className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-primary"
               disabled={salvando}
             />

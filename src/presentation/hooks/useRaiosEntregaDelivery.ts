@@ -55,23 +55,23 @@ export function useRaiosEntregaDelivery(options?: { enabled?: boolean }) {
   )
 }
 
-export function useCriarRaioEntregaDelivery() {
+export function useCriarRaiosEntregaEmLote() {
   const invalidate = useInvalidateTenantQueries()
 
-  return useSecureTenantMutation<RaioEntregaDTO, CreateRaioEntregaInput>(
-    async ({ token }, input) => {
-      const res = await fetchGestorApi('/api/delivery/empresas/me/raios-entrega', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(input),
-      })
-      const data = await parseJsonOrThrow(res)
-      const raio = normalizarRaioEntregaResposta(data)
-      if (!raio) throw new Error('Resposta inválida ao criar raio de entrega')
-      return raio
+  return useSecureTenantMutation<number, CreateRaioEntregaInput[]>(
+    async ({ token }, inputs) => {
+      for (const input of inputs) {
+        const res = await fetchGestorApi('/api/delivery/empresas/me/raios-entrega', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(input),
+        })
+        await parseJsonOrThrow(res)
+      }
+      return inputs.length
     },
     {
       onSuccess: async () => {
@@ -113,21 +113,25 @@ export function useAtualizarRaioEntregaDelivery() {
   )
 }
 
-export function useExcluirRaioEntregaDelivery() {
+/** Apaga vários raios e invalida a lista uma vez. Usado ao reduzir o alcance (faixas acima). */
+export function useExcluirRaiosEntregaEmLote() {
   const invalidate = useInvalidateTenantQueries()
 
-  return useSecureTenantMutation<void, string>(
-    async ({ token }, id) => {
-      const res = await fetchGestorApi(
-        `/api/delivery/empresas/me/raios-entrega/${encodeURIComponent(id)}`,
-        {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
+  return useSecureTenantMutation<number, string[]>(
+    async ({ token }, ids) => {
+      for (const id of ids) {
+        const res = await fetchGestorApi(
+          `/api/delivery/empresas/me/raios-entrega/${encodeURIComponent(id)}`,
+          {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        )
+        if (!res.ok && res.status !== 204) {
+          await parseJsonOrThrow(res)
         }
-      )
-      if (!res.ok && res.status !== 204) {
-        await parseJsonOrThrow(res)
       }
+      return ids.length
     },
     {
       onSuccess: async () => {

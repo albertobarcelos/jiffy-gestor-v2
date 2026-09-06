@@ -1,5 +1,4 @@
-import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
-import { geoJsonPointFromLatLng, parseGeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
+import { parseGeoJsonPoint, type GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 
 export type EnderecoEmpresaGeocodeInput = {
   rua: string
@@ -71,6 +70,27 @@ export function lerEnderecoLocalizacaoDoPayloadEmpresa(
   return { enderecoLocalizacao, providerEnderecoId }
 }
 
+function textoCampoEndereco(valor: unknown): string {
+  return typeof valor === 'string' ? valor : ''
+}
+
+/** Campos textuais do endereço da empresa para geocode (mesmo contrato da aba Empresa). */
+export function lerCamposEnderecoEmpresa(enderecoRaw: unknown): EnderecoEmpresaGeocodeInput {
+  if (!enderecoRaw || typeof enderecoRaw !== 'object' || Array.isArray(enderecoRaw)) {
+    return { rua: '', numero: '' }
+  }
+  const endereco = enderecoRaw as Record<string, unknown>
+  return {
+    rua: textoCampoEndereco(endereco.rua),
+    numero: textoCampoEndereco(endereco.numero),
+    bairro: textoCampoEndereco(endereco.bairro) || undefined,
+    cidade: textoCampoEndereco(endereco.cidade) || undefined,
+    estado: textoCampoEndereco(endereco.estado) || undefined,
+    cep: textoCampoEndereco(endereco.cep) || undefined,
+    complemento: textoCampoEndereco(endereco.complemento) || undefined,
+  }
+}
+
 export async function geocodificarEnderecoEmpresaViaGoogle(
   input: EnderecoEmpresaGeocodeInput
 ): Promise<GeocodeEmpresaResult> {
@@ -117,9 +137,4 @@ export function montarPatchEnderecoGeolocalizacao(
     geocodingProvider: 'GOOGLE',
     ...(providerEnderecoId ? { providerEnderecoId } : {}),
   }
-}
-
-/** Converte lat/lng do mapa para GeoJSON Point. */
-export function geoPointFromMapLatLng(lat: number, lng: number): GeoJsonPoint {
-  return geoJsonPointFromLatLng(lat, lng)
 }

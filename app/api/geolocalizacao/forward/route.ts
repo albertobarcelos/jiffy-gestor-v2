@@ -126,6 +126,14 @@ function montarEnderecosAlternativosGeocode(input: EnderecoEmpresaGeocodeInput):
     candidatos.add([input.rua.trim(), cidadeEstado, 'Brasil'].join(', '))
   }
 
+  if (input.bairro?.trim() && cidadeEstado) {
+    candidatos.add([input.bairro.trim(), cidadeEstado, 'Brasil'].join(', '))
+  }
+
+  if (cidadeEstado) {
+    candidatos.add([cidadeEstado, 'Brasil'].join(', '))
+  }
+
   return [...candidatos].filter(endereco => endereco.trim().length >= 5)
 }
 
@@ -269,7 +277,7 @@ export async function GET(request: NextRequest) {
 
     if (!data) {
       return NextResponse.json(
-        { error: 'Endereço não encontrado. Confira rua, número, CEP e cidade ou ajuste o pin no mapa.' },
+        { error: 'Endereço não encontrado. Confira rua, número, CEP e cidade.' },
         { status: 404 }
       )
     }
@@ -278,7 +286,7 @@ export async function GET(request: NextRequest) {
 
     if (NOT_FOUND.has(status)) {
       return NextResponse.json(
-        { error: 'Endereço não encontrado. Confira rua, número, CEP e cidade ou ajuste o pin no mapa.' },
+        { error: 'Endereço não encontrado. Confira rua, número, CEP e cidade.' },
         { status: 404 }
       )
     }
@@ -297,7 +305,7 @@ export async function GET(request: NextRequest) {
     const results = data.results ?? []
     if (!results.length) {
       return NextResponse.json(
-        { error: 'Endereço não encontrado. Confira os campos ou ajuste o pin no mapa.' },
+        { error: 'Endereço não encontrado. Confira rua, número, CEP e cidade.' },
         { status: 404 }
       )
     }
