@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildFinalizarCreateOverrideTaxaPatch,
   buildSalvarTaxaPedidoDeliveryPatch,
   extrairCobrancasPendentesNaEntregaPedidoDelivery,
   extrairTaxaEntregaAtivaPedidoDelivery,
@@ -188,6 +189,48 @@ describe('TaxaPedidoDeliveryPayloadMapper', () => {
       })
       expect(result.mudou).toBe(true)
       expect(result.patch.cobrancas).toBeUndefined()
+    })
+  })
+
+  describe('buildFinalizarCreateOverrideTaxaPatch', () => {
+    it('remove a taxa automática e lança cobrança na entrega no mesmo PATCH', () => {
+      const result = buildFinalizarCreateOverrideTaxaPatch({
+        taxaAtualId: 'tx-auto',
+        taxaSelecionadaId: null,
+        pagamentos: [{ meioPagamentoId: 'mp-1', valor: 40 }],
+        fluxoPagamentoEntrega: 'cobrar_entregador',
+      })
+
+      expect(result.mudou).toBe(true)
+      expect(result.patch.taxas).toEqual({ remove: ['tx-auto'] })
+      expect(result.patch.cobrancas).toEqual({
+        add: [
+          {
+            meioPagamentoId: 'mp-1',
+            valor: 40,
+            momentoCobranca: 'na_entrega',
+          },
+        ],
+      })
+    })
+
+    it('troca a taxa e efetiva cobrança antecipada no mesmo PATCH', () => {
+      const result = buildFinalizarCreateOverrideTaxaPatch({
+        taxaAtualId: 'tx-auto',
+        taxaSelecionadaId: 'tx-catalogo',
+        pagamentos: [{ meioPagamentoId: 'mp-1', valor: 52 }],
+        fluxoPagamentoEntrega: 'ja_pago',
+      })
+
+      expect(result.patch.taxas).toEqual({
+        remove: ['tx-auto'],
+        add: [{ taxaId: 'tx-catalogo', quantidade: 1 }],
+      })
+      expect(result.patch.cobrancas?.add?.[0]).toMatchObject({
+        momentoCobranca: 'antecipado',
+        pagamentoEfetivado: { confirmar: true },
+        valor: 52,
+      })
     })
   })
 })

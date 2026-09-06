@@ -25,7 +25,12 @@ export interface CriarVendaGestorInputDTO {
   tempoPrevistoMinutos: number
   pedidoComEntrega: boolean
   taxaEntregaSelecionada?: { getId(): string } | null
-  /** Taxa da cobertura geolocalizada; quando presente, o create delivery não envia taxa de catálogo. */
+  /**
+   * Seleção do wizard: vazio = automática (cobertura), `__sem_taxa__` = remover,
+   * senão `taxaId` do catálogo. O create não envia `taxas`; override é PATCH após o POST.
+   */
+  taxaEntregaId?: string | null
+  /** Taxa da cobertura geolocalizada (preview no wizard). */
   taxaEntregaCoberturaValor?: number | null
   valorTaxaEntrega: number
   moradaEntregaSelecionada?: MoradaEntregaSelecionada | null

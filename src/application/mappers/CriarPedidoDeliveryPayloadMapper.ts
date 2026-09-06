@@ -85,14 +85,10 @@ function buildClientePedidoDeliveryPayload(input: CriarPedidoDeliveryInputDTO) {
   return cliente
 }
 
-function buildTaxasPedidoDeliveryPayload(input: CriarPedidoDeliveryInputDTO) {
-  // Com cobertura geolocalizada o backend calcula a taxa no create.
-  // Só envia taxa de catálogo se não houver valor de cobertura (legado / sem geo).
-  if (!input.pedidoComEntrega) return undefined
-  if (input.taxaEntregaCoberturaValor != null) return undefined
-  const taxaId = input.taxaEntregaSelecionada?.getId()?.trim()
-  if (!taxaId) return undefined
-  return [{ taxaId, quantidade: 1 }]
+function buildTaxasPedidoDeliveryPayload() {
+  // POST /delivery/pedidos (Gestor) não aceita `taxas` — additionalProperties: false.
+  // A cobertura é calculada no backend. Override do atendente é PATCH após o create.
+  return undefined
 }
 
 export function buildCriarPedidoDeliveryPayload(
@@ -100,7 +96,7 @@ export function buildCriarPedidoDeliveryPayload(
 ): CriarPedidoDeliveryApiRequest {
   const observacoesPedido = observacoesArrayFromTexto(input.observacaoPedido)
   const cobrancas = buildCobrancasPedidoDeliveryPayload(input)
-  const taxas = buildTaxasPedidoDeliveryPayload(input)
+  const taxas = buildTaxasPedidoDeliveryPayload()
 
   const payload: CriarPedidoDeliveryApiRequest = {
     origem: 'GESTOR',

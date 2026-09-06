@@ -38,6 +38,12 @@ export interface INovoPedidoReadRepository {
     body: Record<string, unknown>
   ): Promise<void>
 
+  transicionarStatusPedidoDelivery(
+    pedidoId: string,
+    token: string,
+    body: { toStatus: string; motivoCancelamento?: string }
+  ): Promise<void>
+
   emitirNotaPedidoDelivery(
     pedidoId: string,
     token: string,

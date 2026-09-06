@@ -11,6 +11,13 @@ import {
 } from '@/src/presentation/components/features/delivery/components/EntregaClienteSelector'
 import { PedidoInformacoesStep } from '../../PedidoInformacoesStep'
 import { TEMPOS_PREVISTOS_ENTREGA } from '@/src/shared/constants/pedidoForm'
+import {
+  TAXA_ENTREGA_SELECT_AUTOMATICA,
+  TAXA_ENTREGA_SEM_TAXA_ID,
+  taxaEntregaIdParaSelect,
+  selectValueParaTaxaEntregaId,
+  resolverModoTaxaEntregaOverride,
+} from '@/src/shared/constants/taxaEntregaPedido'
 import { useNovoPedidoFormContext } from '../../../context/NovoPedidoFormContext'
 import { useNovoPedidoUIContext } from '../../../context/NovoPedidoUIContext'
 
@@ -34,15 +41,32 @@ export function PedidoInformacoesStepView() {
     enderecoEntregaCoberturaValorTaxa,
     setEnderecoEntregaCoberturaStatus,
     setEnderecoEntregaCoberturaValorTaxa,
+    taxaEntregaId,
+    setTaxaEntregaId,
+    taxasEntrega,
+    valorTaxaEntrega,
   } = useNovoPedidoFormContext()
 
   const { empresa, setSeletorClienteOpen } = useNovoPedidoUIContext()
   const ultimaMoradaAutoTempoRef = useRef<string | null>(null)
+  const ultimaMoradaIdRef = useRef<string | null>(null)
+
+  const resetOverrideSeMudouMorada = useCallback(
+    (moradaId: string | undefined) => {
+      if (!moradaId) return
+      if (ultimaMoradaIdRef.current && ultimaMoradaIdRef.current !== moradaId) {
+        setTaxaEntregaId('')
+      }
+      ultimaMoradaIdRef.current = moradaId
+    },
+    [setTaxaEntregaId]
+  )
 
   const handleCoberturaMoradaChange = useCallback(
     (cobertura: CoberturaMoradaSelecionadaStatus) => {
       switch (cobertura.status) {
         case 'coberta': {
+          resetOverrideSeMudouMorada(cobertura.moradaId)
           setEnderecoEntregaCoberturaStatus('ok')
           setEnderecoEntregaCoberturaValorTaxa(cobertura.valorTaxa)
           if (
@@ -69,25 +93,37 @@ export function PedidoInformacoesStepView() {
         case 'sem_geo':
         case 'null':
         default:
+          ultimaMoradaIdRef.current = null
+          ultimaMoradaAutoTempoRef.current = null
+          setTaxaEntregaId('')
           setEnderecoEntregaCoberturaStatus(null)
           setEnderecoEntregaCoberturaValorTaxa(null)
-          ultimaMoradaAutoTempoRef.current = null
           break
       }
     },
     [
+      resetOverrideSeMudouMorada,
       setEnderecoEntregaCoberturaStatus,
       setEnderecoEntregaCoberturaValorTaxa,
       setTempoPrevistoMinutos,
+      setTaxaEntregaId,
     ]
   )
 
-  const taxaCoberturaLabel =
+  const modoTaxa = resolverModoTaxaEntregaOverride(taxaEntregaId)
+  const labelAutomatica =
     enderecoEntregaCoberturaValorTaxa == null
       ? moradaEntregaSelecionada
-        ? 'Calculando…'
-        : 'Selecione um endereço'
-      : transformarParaReal(enderecoEntregaCoberturaValorTaxa)
+        ? 'Automática (calculando…)'
+        : 'Automática (selecione o endereço)'
+      : `Automática (${transformarParaReal(enderecoEntregaCoberturaValorTaxa)})`
+
+  const hintTaxa =
+    modoTaxa === 'automatica'
+      ? 'Padrão da área/raio. Pode remover ou trocar por uma taxa do catálogo.'
+      : modoTaxa === 'sem_taxa'
+        ? 'Sem taxa neste pedido. O total do pagamento já ignora a entrega.'
+        : `Taxa do catálogo: ${transformarParaReal(valorTaxaEntrega)}.`
 
   return (
     <PedidoInformacoesStep>
@@ -195,15 +231,24 @@ export function PedidoInformacoesStepView() {
                 <MdAttachMoney className="h-5 w-5 text-primary" />
                 <Label className="text-sm font-semibold text-primary-text">Taxa de entrega</Label>
               </div>
-              <div
-                className="flex h-10 items-center rounded-md border border-primary/20 bg-gray-50 px-3 text-sm font-semibold text-primary-text"
-                aria-live="polite"
+              <Select
+                value={taxaEntregaIdParaSelect(taxaEntregaId)}
+                onValueChange={value => setTaxaEntregaId(selectValueParaTaxaEntregaId(value))}
               >
-                {taxaCoberturaLabel}
-              </div>
-              <p className="mt-1.5 text-[11px] text-secondary-text">
-                Calculada automaticamente pela área/raio do endereço (somente leitura).
-              </p>
+                <SelectTrigger className="border-primary/30 bg-white">
+                  <SelectValue placeholder="Taxa de entrega" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={TAXA_ENTREGA_SELECT_AUTOMATICA}>{labelAutomatica}</SelectItem>
+                  <SelectItem value={TAXA_ENTREGA_SEM_TAXA_ID}>Sem taxa</SelectItem>
+                  {taxasEntrega.map(taxa => (
+                    <SelectItem key={taxa.getId()} value={taxa.getId()}>
+                      {`${taxa.getNome()} — ${transformarParaReal(taxa.getValor())}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="mt-1.5 text-[11px] text-secondary-text">{hintTaxa}</p>
             </div>
           </div>
         )}

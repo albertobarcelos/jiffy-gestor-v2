@@ -238,7 +238,7 @@ export function useNovoPedidoSubmit({
 
       if (code.includes('GEOLOCALIZACAO_NAO_CONFIGURADA') || /geolocaliza/i.test(rawMessage)) {
         showToast.error(
-          'Geolocalização ausente no endereço ou na empresa. Confirme o pin do endereço ou configure a geo da empresa no hub Delivery.'
+          'Não foi possível obter a localização. Confira o endereço e a geo da empresa no hub Delivery.'
         )
         setCurrentStep(2)
         return
@@ -249,7 +249,7 @@ export function useNovoPedidoSubmit({
         /fora da cobertura|não está coberto/i.test(rawMessage)
       ) {
         showToast.error(
-          'O endereço está fora da cobertura de entrega. Ajuste o pin ou escolha outro endereço.'
+          'O endereço ficou fora da cobertura cadastrada. Ajuste a área no hub Delivery se precisar aceitar este pedido.'
         )
         setCurrentStep(2)
         return

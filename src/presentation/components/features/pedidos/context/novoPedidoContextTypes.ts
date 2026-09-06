@@ -184,7 +184,7 @@ export interface NovoPedidoEntregaSlice {
   setEnderecoEntregaCoberturaStatus: Dispatch<
     SetStateAction<'ok' | 'fora' | 'pendente' | 'indisponivel' | null>
   >
-  /** Taxa calculada pela cobertura da morada selecionada (somente leitura na UI). */
+  /** Taxa calculada pela cobertura da morada selecionada. */
   enderecoEntregaCoberturaValorTaxa: number | null
   setEnderecoEntregaCoberturaValorTaxa: Dispatch<SetStateAction<number | null>>
   telefoneBuscaEntrega: string

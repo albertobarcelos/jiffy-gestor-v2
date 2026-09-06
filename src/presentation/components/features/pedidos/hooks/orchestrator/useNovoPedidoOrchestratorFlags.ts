@@ -7,6 +7,7 @@ import {
   resolverTotalPedidoComTaxaEntrega,
   resolverValorTaxaEntregaPedido,
 } from '@/src/application/mappers/resolverTotalPedidoEntrega'
+import { resolverModoTaxaEntregaOverride } from '@/src/shared/constants/taxaEntregaPedido'
 import {
   podeExibirAbaDadosEntregaDetalhe,
   podeExibirAbaNotaFiscalDetalhe,
@@ -161,6 +162,7 @@ export function useNovoPedidoOrchestratorFlags({
         resumoFinanceiroDetalhes,
         taxaEntregaCoberturaValor: enderecoEntregaCoberturaValorTaxa,
         taxaEntregaCatalogoValor: taxaEntregaSelecionada?.getValor(),
+        taxaEntregaOverride: resolverModoTaxaEntregaOverride(taxaEntregaId),
       }),
     [
       pedidoComEntrega,
@@ -168,6 +170,7 @@ export function useNovoPedidoOrchestratorFlags({
       resumoFinanceiroDetalhes,
       enderecoEntregaCoberturaValorTaxa,
       taxaEntregaSelecionada,
+      taxaEntregaId,
     ]
   )
 

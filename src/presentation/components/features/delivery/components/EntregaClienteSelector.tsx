@@ -40,16 +40,11 @@ import {
   type PlaceDetailsResult,
 } from '@/src/shared/utils/geolocalizacaoPlaces'
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
-import type { EnderecoGeoCheckoutInput } from '@/src/application/dto/delivery/EnderecoGeoCheckoutDTO'
 import { enderecoTemGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
 import { lerEnderecoLocalizacaoDoPayloadEmpresa } from '@/src/shared/utils/geolocalizacaoEmpresa'
 import { resolverGeoMoradaDeliveryGestor } from '@/src/shared/utils/resolverGeoMoradaDeliveryGestor'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
-import {
-  MoradaEntregaGeoPanel,
-  type MoradaEntregaGeoFormPatch,
-} from '@/src/presentation/components/features/delivery/components/MoradaEntregaGeoPanel'
 
 /** Snapshot mínimo do cliente encontrado / criado. */
 interface ClienteEntrega {
@@ -210,7 +205,6 @@ function MoradaCard({
   onSelecionar,
   onVerDetalhes,
   onRemover,
-  onLocalizar,
   localizando,
   exigirGeo,
   cobertura,
@@ -222,7 +216,6 @@ function MoradaCard({
   onSelecionar: () => void
   onVerDetalhes: () => void
   onRemover: () => void
-  onLocalizar?: () => void
   localizando?: boolean
   exigirGeo?: boolean
   cobertura?: ResultadoTaxaCoberturaPonto | null
@@ -249,10 +242,10 @@ function MoradaCard({
       className={`flex items-start justify-between gap-2 rounded-lg border-2 p-3 transition-colors ${
         selecionada
           ? foraDaArea
-            ? 'border-red-500 bg-red-50'
+            ? 'border-amber-400 bg-amber-50'
             : 'border-primary bg-primary/5'
           : foraDaArea
-            ? 'border-red-200 bg-red-50/60 hover:border-red-300'
+            ? 'border-amber-200 bg-amber-50/60 hover:border-amber-300'
             : 'border-gray-200 bg-white hover:border-primary/40'
       }`}
     >
@@ -265,10 +258,10 @@ function MoradaCard({
           className={`mt-0.5 h-5 w-5 flex-shrink-0 ${
             selecionada
               ? foraDaArea
-                ? 'text-red-600'
+                ? 'text-amber-700'
                 : 'text-primary'
               : foraDaArea
-                ? 'text-red-400'
+                ? 'text-amber-500'
                 : 'text-gray-400'
           }`}
         />
@@ -277,7 +270,7 @@ function MoradaCard({
             className={`text-sm font-semibold capitalize ${
               selecionada
                 ? foraDaArea
-                  ? 'text-red-700'
+                  ? 'text-amber-800'
                   : 'text-primary'
                 : 'text-gray-800'
             }`}
@@ -287,13 +280,9 @@ function MoradaCard({
           <p className="truncate text-xs text-gray-500">{linhaResumo}</p>
           {exigirGeo ? (
             <div className="mt-1 space-y-0.5">
-              <p
-                className={`text-[11px] font-medium ${
-                  temGeo ? 'text-emerald-700' : 'text-amber-700'
-                }`}
-              >
-                {temGeo ? 'Com geolocalização' : 'Sem localização — clique em Localizar endereço'}
-              </p>
+              {localizando ? (
+                <p className="text-[11px] font-medium text-gray-500">Buscando localização…</p>
+              ) : null}
               {temGeo && coberturaLoading ? (
                 <p className="text-[11px] font-medium text-gray-500">Calculando taxa de entrega…</p>
               ) : null}
@@ -304,8 +293,8 @@ function MoradaCard({
                 </p>
               ) : null}
               {temGeo && cobertura && !cobertura.coberta ? (
-                <p className="text-[11px] font-semibold text-red-600">
-                  Fora da área de entrega — não é possível usar este endereço
+                <p className="text-[11px] font-semibold text-amber-700">
+                  Fora da área cadastrada — taxa pode ser aproximada
                 </p>
               ) : null}
             </div>
@@ -314,21 +303,6 @@ function MoradaCard({
       </button>
 
       <div className="flex flex-shrink-0 flex-col items-end gap-1">
-        {exigirGeo && !temGeo && onLocalizar ? (
-          <Button
-            type="button"
-            variant="outlined"
-            disabled={localizando}
-            onClick={e => {
-              e.stopPropagation()
-              onLocalizar()
-            }}
-            className="h-8 border-amber-300 px-2 text-[11px] text-amber-800 hover:bg-amber-50"
-            title="Buscar coordenada no Google sem alterar o texto do endereço"
-          >
-            {localizando ? 'Localizando…' : 'Localizar endereço'}
-          </Button>
-        ) : null}
         <div className="flex items-center gap-0.5">
           <button
             type="button"
@@ -415,9 +389,6 @@ export function EntregaClienteSelector({
     enderecoLocalizacao: GeoJsonPoint
     providerEnderecoId: string
   } | null>(null)
-  /** Delivery: Places no painel (sem mapa). Geocode no salvar se Places não for usado. */
-  const [geoPanelSession, setGeoPanelSession] = useState(0)
-  const [geoPanelPlaces, setGeoPanelPlaces] = useState<EnderecoGeoCheckoutInput | null>(null)
   const [localizandoMoradaId, setLocalizandoMoradaId] = useState<string | null>(null)
   const [moradaParaExcluir, setMoradaParaExcluir] = useState<MoradaTelefone | null>(null)
   /** Edição inline do nome (cliente já encontrado). */
@@ -660,8 +631,6 @@ export function EntregaClienteSelector({
   const resetGeoPainelState = useCallback(() => {
     setBuscaPlacesMorada('')
     setMoradaGeo(null)
-    setGeoPanelPlaces(null)
-    setGeoPanelSession(s => s + 1)
   }, [])
 
   const abrirPainelNovo = useCallback(() => {
@@ -683,30 +652,18 @@ export function EntregaClienteSelector({
       }
       setMoradaEditando(m)
       setFormNova(moradaParaForm(m))
-      setBuscaPlacesMorada('')
-      setMoradaGeo(null)
-      setGeoPanelPlaces(
-        m.endereco && enderecoTemGeolocalizacao(m.endereco)
-          ? {
-              enderecoLocalizacao: m.endereco.enderecoLocalizacao!,
-              providerEnderecoId: m.endereco.providerEnderecoId ?? null,
-            }
-          : null
-      )
-      setGeoPanelSession(s => s + 1)
+      resetGeoPainelState()
       setPainelMoradaAberto(true)
     },
-    [podeGerenciarEnderecos]
+    [podeGerenciarEnderecos, resetGeoPainelState]
   )
 
   const fecharPainelMorada = useCallback(() => {
     setPainelMoradaAberto(false)
     setMoradaEditando(null)
     setFormNova(formInicialComEnderecoPadrao(enderecoPadrao))
-    setBuscaPlacesMorada('')
-    setMoradaGeo(null)
-    setGeoPanelPlaces(null)
-  }, [enderecoPadrao])
+    resetGeoPainelState()
+  }, [enderecoPadrao, resetGeoPainelState])
 
   const abrirConfirmacaoExclusao = useCallback(
     (m: MoradaTelefone) => {
@@ -763,37 +720,6 @@ export function EntregaClienteSelector({
     fecharPainelMorada,
   ])
 
-  const tentarSelecionarMorada = useCallback(
-    (morada: MoradaTelefone, telefoneDigitosOverride?: string | null) => {
-      if (
-        usarModuloDeliveryClientes &&
-        !(morada.endereco && enderecoTemGeolocalizacao(morada.endereco))
-      ) {
-        showToast.warning(
-          'Este endereço ainda não tem localização. Use “Localizar endereço” antes de selecionar.'
-        )
-        return
-      }
-
-      if (usarModuloDeliveryClientes) {
-        if (coberturaTaxa.isLoading) {
-          showToast.warning('Aguarde o cálculo da taxa de entrega deste endereço.')
-          return
-        }
-        const cobertura = coberturaTaxa.porMoradaId[morada.id]
-        if (cobertura && !cobertura.coberta) {
-          showToast.error(
-            'Este endereço está fora da área de entrega. Escolha outro ou ajuste a cobertura.'
-          )
-          return
-        }
-      }
-
-      definirMoradaSelecionada(morada, telefoneDigitosOverride)
-    },
-    [usarModuloDeliveryClientes, definirMoradaSelecionada, coberturaTaxa.isLoading, coberturaTaxa.porMoradaId]
-  )
-
   const handleLocalizarMorada = useCallback(
     async (morada: MoradaTelefone) => {
       if (!morada.endereco) {
@@ -833,8 +759,6 @@ export function EntregaClienteSelector({
           showToast.warning(
             'Google não localizou o endereço. Usamos a localização da empresa como aproximação.'
           )
-        } else {
-          showToast.success('Localização salva sem alterar o texto do endereço.')
         }
         if (moradaSelecionada?.id === morada.id || !moradaSelecionada) {
           definirMoradaSelecionada(atualizada, digitos)
@@ -855,6 +779,20 @@ export function EntregaClienteSelector({
       moradaSelecionada?.id,
       definirMoradaSelecionada,
     ]
+  )
+
+  const tentarSelecionarMorada = useCallback(
+    (morada: MoradaTelefone, telefoneDigitosOverride?: string | null) => {
+      definirMoradaSelecionada(morada, telefoneDigitosOverride)
+      if (
+        usarModuloDeliveryClientes &&
+        morada.endereco &&
+        !enderecoTemGeolocalizacao(morada.endereco)
+      ) {
+        void handleLocalizarMorada(morada)
+      }
+    },
+    [usarModuloDeliveryClientes, definirMoradaSelecionada, handleLocalizarMorada]
   )
   const handleBuscar = useCallback(async (telefoneOverride?: string) => {
     const digitos = extrairDigitosTelefone(telefoneOverride ?? telefoneInput)
@@ -1032,35 +970,30 @@ export function EntregaClienteSelector({
     } | null = null
 
     if (usarModuloDeliveryClientes) {
-      if (geoPanelPlaces?.enderecoLocalizacao) {
+      try {
+        const resolvida = await resolverGeoMoradaDeliveryGestor({
+          endereco: enderecoBase,
+          fallbackEmpresaGeo,
+        })
         geoParaSalvar = {
-          enderecoLocalizacao: geoPanelPlaces.enderecoLocalizacao,
-          providerEnderecoId: geoPanelPlaces.providerEnderecoId ?? null,
+          enderecoLocalizacao: resolvida.enderecoLocalizacao,
+          providerEnderecoId: resolvida.providerEnderecoId ?? null,
         }
-      } else if (
-        moradaEditando?.endereco &&
-        enderecoTemGeolocalizacao(moradaEditando.endereco)
-      ) {
-        geoParaSalvar = {
-          enderecoLocalizacao: moradaEditando.endereco.enderecoLocalizacao!,
-          providerEnderecoId: moradaEditando.endereco.providerEnderecoId ?? null,
+        if (resolvida.origem === 'empresa') {
+          showToast.warning(
+            'Google não localizou o endereço. Usamos a localização da empresa como aproximação.'
+          )
         }
-      } else {
-        try {
-          const resolvida = await resolverGeoMoradaDeliveryGestor({
-            endereco: enderecoBase,
-            fallbackEmpresaGeo,
-          })
+      } catch (error) {
+        if (
+          moradaEditando?.endereco &&
+          enderecoTemGeolocalizacao(moradaEditando.endereco)
+        ) {
           geoParaSalvar = {
-            enderecoLocalizacao: resolvida.enderecoLocalizacao,
-            providerEnderecoId: resolvida.providerEnderecoId ?? null,
+            enderecoLocalizacao: moradaEditando.endereco.enderecoLocalizacao!,
+            providerEnderecoId: moradaEditando.endereco.providerEnderecoId ?? null,
           }
-          if (resolvida.origem === 'empresa') {
-            showToast.warning(
-              'Google não localizou o endereço. Usamos a localização da empresa como aproximação.'
-            )
-          }
-        } catch (error) {
+        } else {
           showToast.error(
             error instanceof Error
               ? error.message
@@ -1118,7 +1051,6 @@ export function EntregaClienteSelector({
     setTelefoneBuscado,
     moradaGeo,
     usarModuloDeliveryClientes,
-    geoPanelPlaces,
     fallbackEmpresaGeo,
   ])
 
@@ -1174,48 +1106,13 @@ export function EntregaClienteSelector({
       return
     }
 
-    const candidata = moradasEncontradas.find(morada => {
-      if (!usarModuloDeliveryClientes) return true
-      if (!(morada.endereco && enderecoTemGeolocalizacao(morada.endereco))) return false
-      if (coberturaTaxa.isLoading) return false
-      const cobertura = coberturaTaxa.porMoradaId[morada.id]
-      return Boolean(cobertura?.coberta)
-    })
-
-    if (!candidata) {
-      return
-    }
-
-    definirMoradaSelecionada(candidata)
+    tentarSelecionarMorada(moradasEncontradas[0])
   }, [
     mostrarEnderecos,
     clienteCadastrado,
     moradaSelecionada,
     moradasEncontradas,
-    usarModuloDeliveryClientes,
-    definirMoradaSelecionada,
-    coberturaTaxa.isLoading,
-    coberturaTaxa.porMoradaId,
-  ])
-
-  // Se a morada selecionada ficar fora da cobertura após recálculo, limpa a seleção.
-  useEffect(() => {
-    if (!usarModuloDeliveryClientes || !moradaSelecionada) return
-    if (coberturaTaxa.isLoading || coberturaTaxa.isError) return
-    const cobertura = coberturaTaxa.porMoradaId[moradaSelecionada.id]
-    if (cobertura && !cobertura.coberta) {
-      onMoradaSelecionada(null)
-      showToast.warning(
-        'O endereço selecionado está fora da área de entrega. Escolha outro endereço.'
-      )
-    }
-  }, [
-    usarModuloDeliveryClientes,
-    moradaSelecionada,
-    coberturaTaxa.isLoading,
-    coberturaTaxa.isError,
-    coberturaTaxa.porMoradaId,
-    onMoradaSelecionada,
+    tentarSelecionarMorada,
   ])
 
   return (
@@ -1434,7 +1331,6 @@ export function EntregaClienteSelector({
                   onSelecionar={() => tentarSelecionarMorada(morada)}
                   onVerDetalhes={() => abrirPainelEditar(morada)}
                   onRemover={() => abrirConfirmacaoExclusao(morada)}
-                  onLocalizar={() => void handleLocalizarMorada(morada)}
                   localizando={localizandoMoradaId === morada.id}
                   exigirGeo={usarModuloDeliveryClientes}
                   cobertura={coberturaTaxa.porMoradaId[morada.id] ?? null}
@@ -1588,31 +1484,9 @@ export function EntregaClienteSelector({
 
           <div>
             {usarModuloDeliveryClientes ? (
-              <MoradaEntregaGeoPanel
-                sessionKey={`${geoPanelSession}-${moradaEditando?.id ?? 'new'}`}
-                onFormPatch={(patch: MoradaEntregaGeoFormPatch) => {
-                  setFormNova(prev => {
-                    const next = { ...prev, ...patch }
-                    if (patch.rua != null) next.rua = paraMaiusculaEndereco(patch.rua)
-                    if (patch.numero != null) next.numero = paraMaiusculaEndereco(patch.numero)
-                    if (patch.bairro != null) next.bairro = paraMaiusculaEndereco(patch.bairro)
-                    if (patch.cidade != null) next.cidade = paraMaiusculaEndereco(patch.cidade)
-                    if (patch.estado != null) next.estado = patch.estado.toUpperCase().slice(0, 2)
-                    return next
-                  })
-                }}
-                initialGeo={
-                  moradaEditando?.endereco &&
-                  enderecoTemGeolocalizacao(moradaEditando.endereco)
-                    ? {
-                        enderecoLocalizacao: moradaEditando.endereco.enderecoLocalizacao,
-                        providerEnderecoId: moradaEditando.endereco.providerEnderecoId,
-                      }
-                    : null
-                }
-                disabled={criarMorada.isPending || atualizarMorada.isPending}
-                onGeoStateChange={({ geo }) => setGeoPanelPlaces(geo)}
-              />
+              <p className="rounded-md border border-gray-100 bg-gray-50 px-3 py-2 text-[11px] text-gray-500">
+                Preencha o endereço. A localização é buscada automaticamente ao salvar, sem alterar o texto digitado.
+              </p>
             ) : (
               <EnderecoPlacesAutocomplete
                 variant="gestor"
@@ -1686,6 +1560,17 @@ export function EntregaClienteSelector({
               onChange={e => handleFormChange('bairro', e.target.value)}
               placeholder="CENTRO"
               className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
+          </div>
+
+          <div>
+            <Label className="mb-1 block text-xs font-medium text-gray-600">CEP</Label>
+            <input
+              value={formNova.cep}
+              onChange={e => handleFormChange('cep', formatarCepMascara(e.target.value))}
+              placeholder="00000-000"
+              inputMode="numeric"
+              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
           </div>
 

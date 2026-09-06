@@ -42,11 +42,11 @@ export function validarInformacoesPedidoEntrega(params: {
   telefoneClienteDelivery?: string | null
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
-  /** Morada com coordenadas persistidas (obrigatório no create delivery com entrega). */
+  /** Informativo — o Gestor não bloqueia o wizard por falta de pin. */
   enderecoEntregaTemGeo?: boolean
   /**
-   * Cobertura da morada selecionada (delivery).
-   * `ok` = dentro da área; `fora` = fora; `pendente` = calculando; `indisponivel` = falha ao verificar.
+   * Informativo — o Gestor não bloqueia por fora/pendente/indisponível.
+   * Taxa imprecisa é o trade-off de não achar a casa.
    */
   enderecoEntregaCoberturaStatus?: 'ok' | 'fora' | 'pendente' | 'indisponivel' | null
 }): ValidacaoErroPedido | null {
@@ -62,50 +62,6 @@ export function validarInformacoesPedidoEntrega(params: {
 
   if (params.pedidoComEntrega && !params.temEnderecoEntrega) {
     return { message: 'Selecione ou cadastre o endereço de entrega.', goToStep: 2 }
-  }
-
-  if (
-    params.pedidoComEntrega &&
-    params.temEnderecoEntrega &&
-    params.enderecoEntregaTemGeo === false
-  ) {
-    return {
-      message:
-        'O endereço de entrega precisa ter geolocalização. Use “Localizar endereço” antes de continuar.',
-      goToStep: 2,
-      code: 'entrega',
-    }
-  }
-
-  if (
-    params.pedidoComEntrega &&
-    params.temEnderecoEntrega &&
-    params.enderecoEntregaTemGeo !== false
-  ) {
-    const cobertura = params.enderecoEntregaCoberturaStatus
-    if (cobertura === 'fora') {
-      return {
-        message:
-          'O endereço selecionado está fora da área de entrega. Escolha outro endereço para continuar.',
-        goToStep: 2,
-        code: 'entrega',
-      }
-    }
-    if (cobertura === 'indisponivel') {
-      return {
-        message:
-          'Não foi possível verificar a cobertura de entrega. Tente novamente em instantes.',
-        goToStep: 2,
-        code: 'entrega',
-      }
-    }
-    if (cobertura === 'pendente' || cobertura == null) {
-      return {
-        message: 'Aguarde o cálculo da taxa de entrega deste endereço.',
-        goToStep: 2,
-        code: 'entrega',
-      }
-    }
   }
 
   return null

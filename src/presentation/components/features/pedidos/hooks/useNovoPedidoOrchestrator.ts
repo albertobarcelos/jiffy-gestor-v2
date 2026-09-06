@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useMemo, useRef, useCallback, useEffect } from 'react'
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
@@ -591,6 +591,7 @@ export function useNovoPedidoOrchestrator({
       tempoPrevistoMinutos,
       pedidoComEntrega,
       taxaEntregaSelecionada,
+      taxaEntregaId,
       taxaEntregaCoberturaValor: enderecoEntregaCoberturaValorTaxa,
       valorTaxaEntrega,
       moradaEntregaSelecionada,
