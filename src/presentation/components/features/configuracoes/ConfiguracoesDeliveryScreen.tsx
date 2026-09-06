@@ -24,7 +24,7 @@ export function ConfiguracoesDeliveryScreen({
   return (
     <div className="h-full">
       <Suspense fallback={<PageLoading />}>
-        <ConfiguracoesView activeTab="empresa-delivery" deliveryEtapaId={etapaId} />
+        <ConfiguracoesView activeTab="delivery" deliveryEtapaId={etapaId} />
       </Suspense>
     </div>
   )

@@ -2,7 +2,7 @@
 
 Documento de implementação da aba **Configurações → Delivery → Cobertura** do Gestor.
 
-URL canônica: `/gestao/{loja}/config/delivery/cobertura` (hub: `/config/delivery`). Rotas antigas `/configuracoes/empresa-delivery` e `/configuracoes/cobertura-delivery` redirecionam.
+URL canônica: `/gestao/{loja}/config/delivery/cobertura` (hub: `/config/delivery`).
 
 Objetivo: o operador deve configurar cobertura **como no Delivery Legal** — mapa em tela cheia, painel flutuante, km, hover que acende a faixa/área, e ferramentas de desenho/edição (polígono, círculo, arraste, recorte, apagar).
 

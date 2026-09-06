@@ -12,8 +12,10 @@ import { DeliveryHubView } from '@/src/presentation/components/features/delivery
 import { PageLoading } from '@/src/presentation/components/ui/PageLoading'
 import { cn } from '@/src/shared/utils/cn'
 import {
+  CONFIGURACOES_DELIVERY_TAB,
   configuracoesTabPath,
-  type ConfiguracoesTabSlug,
+  DELIVERY_HUB_PATH,
+  type ConfiguracoesViewTab,
   type DeliveryEtapaId,
 } from '@/src/shared/constants/configuracoesRoutes'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
@@ -27,7 +29,7 @@ const CadastroPorPlanilha = dynamic(
 )
 
 type ConfiguracoesViewProps = {
-  activeTab: ConfiguracoesTabSlug
+  activeTab: ConfiguracoesViewTab
   deliveryEtapaId?: DeliveryEtapaId | null
 }
 
@@ -40,13 +42,14 @@ export function ConfiguracoesView({ activeTab, deliveryEtapaId = null }: Configu
   const { toGestao } = useGestaoPath()
 
   const goToTab = useCallback(
-    (tab: ConfiguracoesTabSlug) => {
-      router.replace(toGestao(configuracoesTabPath(tab)), { scroll: false })
+    (tab: ConfiguracoesViewTab) => {
+      const path = tab === CONFIGURACOES_DELIVERY_TAB ? DELIVERY_HUB_PATH : configuracoesTabPath(tab)
+      router.replace(toGestao(path), { scroll: false })
     },
     [router, toGestao]
   )
 
-  const tabBtn = (tab: ConfiguracoesTabSlug, label: string) => (
+  const tabBtn = (tab: ConfiguracoesViewTab, label: string) => (
     <button
       key={tab}
       type="button"
@@ -67,7 +70,7 @@ export function ConfiguracoesView({ activeTab, deliveryEtapaId = null }: Configu
       <div className="w-full shrink-0 border-b border-gray-200 bg-gray-50 px-4 md:px-4">
         <div className="flex flex-wrap gap-1 pt-2">
           {tabBtn('empresa', 'Empresa')}
-          {tabBtn('empresa-delivery', 'Delivery')}
+          {tabBtn(CONFIGURACOES_DELIVERY_TAB, 'Delivery')}
           {tabBtn('terminais', 'Terminais')}
           {tabBtn('impressoras', 'Impressoras')}
           {tabBtn('meios-pagamentos', 'Meios de pagamento')}
@@ -79,7 +82,7 @@ export function ConfiguracoesView({ activeTab, deliveryEtapaId = null }: Configu
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="flex flex-1 flex-col overflow-hidden rounded-b-[10px] bg-info">
           {activeTab === 'empresa' && <EmpresaTab />}
-          {activeTab === 'empresa-delivery' && (
+          {activeTab === CONFIGURACOES_DELIVERY_TAB && (
             <DeliveryHubView etapaId={deliveryEtapaId} />
           )}
           {activeTab === 'terminais' && <TerminaisTab />}

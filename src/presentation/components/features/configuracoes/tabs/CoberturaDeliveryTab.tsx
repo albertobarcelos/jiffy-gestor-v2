@@ -33,7 +33,7 @@ import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { showToast } from '@/src/shared/utils/toast'
-import { configuracoesTabPath } from '@/src/shared/constants/configuracoesRoutes'
+import { DELIVERY_HUB_PATH, configuracoesTabPath } from '@/src/shared/constants/configuracoesRoutes'
 import {
   enderecoEmpresaGeocodeMinimo,
   geocodificarEnderecoEmpresaViaGoogle,
@@ -380,7 +380,7 @@ export function CoberturaDeliveryTab() {
         titulo: 'Delivery não configurado',
         descricao:
           'É necessário ter a empresa delivery cadastrada no backend para gerenciar áreas e raios.',
-        href: configuracoesTabPath('empresa-delivery'),
+        href: DELIVERY_HUB_PATH,
         label: 'Ir para Delivery',
       })
     }
@@ -919,7 +919,7 @@ export function CoberturaDeliveryTab() {
               ) : (
                 <div className="absolute inset-0">
                   <CoberturaDeliveryMap
-                    key="cobertura-delivery-map"
+                    key="cobertura-mapa"
                     origem={origemGeo}
                     raios={raios}
                     areas={areas}
