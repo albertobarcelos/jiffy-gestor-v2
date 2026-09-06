@@ -3,6 +3,10 @@
 import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import {
+  dispararEmpresaDeliveryAtualizada,
+  EMPRESA_DELIVERY_ME_QUERY_KEY,
+} from '@/src/presentation/hooks/useEmpresaDeliveryMe'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
 import type {
@@ -76,6 +80,8 @@ export function useCriarRaiosEntregaEmLote() {
     {
       onSuccess: async () => {
         await invalidate(RAIOS_ENTREGA_DELIVERY_QUERY_KEY)
+        await invalidate(EMPRESA_DELIVERY_ME_QUERY_KEY)
+        dispararEmpresaDeliveryAtualizada()
       },
     }
   )
@@ -136,6 +142,8 @@ export function useExcluirRaiosEntregaEmLote() {
     {
       onSuccess: async () => {
         await invalidate(RAIOS_ENTREGA_DELIVERY_QUERY_KEY)
+        await invalidate(EMPRESA_DELIVERY_ME_QUERY_KEY)
+        dispararEmpresaDeliveryAtualizada()
       },
     }
   )

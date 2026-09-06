@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { faixasKmFaltantes, sincronizarFaixasAlcanceKm } from '@/src/shared/utils/alcanceCoberturaKm'
+import {
+  faixasKmFaltantes,
+  parseAlcanceKmInteiro,
+  sincronizarFaixasAlcanceKm,
+} from '@/src/shared/utils/alcanceCoberturaKm'
 import { geoJsonPolygonDeCirculo, pathsDeCirculo, pathsDeAnelFaixa } from '@/src/shared/utils/geoJsonCircle'
 
 describe('alcanceCoberturaKm', () => {
@@ -36,6 +40,14 @@ describe('alcanceCoberturaKm', () => {
       criarKm: [1, 2, 3, 4],
       excluirIds: [],
     })
+  })
+
+  it('aceita km inteiro e rejeita vazio, fração e acima do máximo', () => {
+    expect(parseAlcanceKmInteiro('4', 500)).toEqual({ ok: true, km: 4 })
+    expect(parseAlcanceKmInteiro('4,0', 500)).toEqual({ ok: true, km: 4 })
+    expect(parseAlcanceKmInteiro('', 500)).toMatchObject({ ok: false })
+    expect(parseAlcanceKmInteiro('1,5', 500)).toMatchObject({ ok: false })
+    expect(parseAlcanceKmInteiro('600', 500)).toMatchObject({ ok: false })
   })
 })
 
