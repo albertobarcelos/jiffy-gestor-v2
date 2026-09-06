@@ -1,8 +1,9 @@
-﻿'use client'
+'use client'
 
 import { Button } from '@/src/presentation/components/ui/button'
 import { Label } from '@/src/presentation/components/ui/label'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
+import { estiloCardMeioPagamento } from '@/src/shared/utils/corFormaPagamentoFiscal'
 import { abrirDocumentoFiscalPdf, tipoDocFiscalFromModelo } from '@/src/presentation/utils/abrirDocumentoFiscalPdf'
 import { showToast } from '@/src/shared/utils/toast'
 import { MdCreditCard, MdDelete } from 'react-icons/md'
@@ -601,18 +602,20 @@ export function PedidoDetalhesView() {
                                 const Icone = obterIconeMeioPagamento(meio.getNome())
                                 const semSaldoParaAdicionar =
                                   valorAPagarLancamento <= 0 && !valorRecebido.trim()
+                                const estilo = estiloCardMeioPagamento(meio.getFormaPagamentoFiscal())
                                 return (
                                   <button
                                     key={meio.getId()}
                                     type="button"
                                     onClick={() => adicionarPagamentoPorCard(meio.getId())}
                                     disabled={semSaldoParaAdicionar}
-                                    className={`flex w-[150px] shrink-0 flex-col items-center justify-center gap-1 rounded-lg border-2 border-secondary bg-secondary p-2 text-white transition-all hover:brightness-110 ${
+                                    style={estilo}
+                                    className={`flex w-[150px] shrink-0 flex-col items-center justify-center gap-1 rounded-lg border-2 p-2 transition-all hover:brightness-110 ${
                                       semSaldoParaAdicionar ? 'cursor-not-allowed opacity-50' : ''
                                     }`}
                                   >
-                                    <Icone className="h-8 w-8 shrink-0 text-white" />
-                                    <span className="line-clamp-2 w-full text-center text-xs font-medium leading-tight text-white">
+                                    <Icone className="h-8 w-8 shrink-0" />
+                                    <span className="line-clamp-2 w-full text-center text-xs font-medium leading-tight">
                                       {meio.getNome()}
                                     </span>
                                   </button>

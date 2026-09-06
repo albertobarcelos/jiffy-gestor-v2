@@ -13,8 +13,11 @@ export type ValidarPedidoGestorInput = {
   produtos?: ProdutoSelecionado[]
   pedidoDeliveryGestor: boolean
   clienteEntregaVinculadoId?: string
+  telefoneClienteDelivery?: string | null
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
+  enderecoEntregaTemGeo?: boolean
+  enderecoEntregaCoberturaStatus?: 'ok' | 'fora' | 'pendente' | 'indisponivel' | null
   pedidoGestorComPagamentoNoPasso3: boolean
   pedidoEntregaAceitaPagamentoPendente: boolean
   pagamentosCount: number
@@ -36,12 +39,24 @@ export type ValidarPedidoGestorResult = {
 export function validarInformacoesPedidoEntrega(params: {
   pedidoDeliveryGestor: boolean
   clienteEntregaVinculadoId?: string
+  telefoneClienteDelivery?: string | null
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
+  /** Informativo — o Gestor não bloqueia o wizard por falta de pin. */
+  enderecoEntregaTemGeo?: boolean
+  /**
+   * Informativo — o Gestor não bloqueia por fora/pendente/indisponível.
+   * Taxa imprecisa é o trade-off de não achar a casa.
+   */
+  enderecoEntregaCoberturaStatus?: 'ok' | 'fora' | 'pendente' | 'indisponivel' | null
 }): ValidacaoErroPedido | null {
   if (!params.pedidoDeliveryGestor) return null
 
-  if (!params.clienteEntregaVinculadoId?.trim()) {
+  const telefoneDelivery = (params.telefoneClienteDelivery ?? '').replace(/\D/g, '')
+  const temCliente =
+    Boolean(params.clienteEntregaVinculadoId?.trim()) || telefoneDelivery.length >= 11
+
+  if (!temCliente) {
     return { message: 'Informe o cliente do pedido antes de continuar.', goToStep: 2 }
   }
 
@@ -173,8 +188,11 @@ export function validarPedidoGestor(
   const erroEntrega = validarInformacoesPedidoEntrega({
     pedidoDeliveryGestor: input.pedidoDeliveryGestor,
     clienteEntregaVinculadoId: input.clienteEntregaVinculadoId,
+    telefoneClienteDelivery: input.telefoneClienteDelivery,
     pedidoComEntrega: input.pedidoComEntrega,
     temEnderecoEntrega: input.temEnderecoEntrega,
+    enderecoEntregaTemGeo: input.enderecoEntregaTemGeo,
+    enderecoEntregaCoberturaStatus: input.enderecoEntregaCoberturaStatus,
   })
   if (erroEntrega) erros.push(erroEntrega)
 

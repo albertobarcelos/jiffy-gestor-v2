@@ -31,6 +31,7 @@ import type { IconType } from 'react-icons'
 import { useAcessoFiscal } from '@/src/presentation/hooks/useAcessoFiscal'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import { matchesModulePath } from '@/src/shared/utils/gestaoRoutes'
+import { isConfiguracoesModulePath } from '@/src/shared/constants/configuracoesRoutes'
 
 const MENU_ICON_PARENT =
   'inline-flex h-5 w-5 shrink-0 items-center justify-center [&>svg]:h-5 [&>svg]:w-5'
@@ -230,6 +231,9 @@ export function TopNav() {
   }, [temAcessoFiscal])
 
   const isMenuActive = (item: typeof menuItems[0]) => {
+    if (item.path === '/configuracoes/empresa') {
+      return isConfiguracoesModulePath(pathname ?? '')
+    }
     if (item.path !== '#') {
       return matchesModulePath(pathname ?? '', item.path)
     }
@@ -586,7 +590,7 @@ export function TopNav() {
             onMouseEnter={() => handleLinkHover('/configuracoes/empresa')}
             prefetch={true}
             className={`rounded-lg p-2 transition-colors hover:bg-gray-100 ${
-              matchesModulePath(pathname ?? '', '/configuracoes/empresa')
+              isConfiguracoesModulePath(pathname ?? '')
                 ? 'bg-gray-100 text-gray-900'
                 : 'text-gray-600'
             }`}

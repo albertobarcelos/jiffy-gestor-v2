@@ -29,6 +29,7 @@ export const ERP_ROUTE_PREFIXES = [
   '/painel-contador',
   '/historico-fechamento',
   '/configuracoes',
+  '/config',
   '/cadastro-por-planilha',
 ] as const
 

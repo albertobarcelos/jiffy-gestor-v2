@@ -11,6 +11,18 @@ import { Input } from '@/src/presentation/components/ui/input'
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
 import { MenuItem } from '@mui/material'
 import { LogoImpressaoCropModal } from '../LogoImpressaoCropModal'
+import { EnderecoPlacesAutocomplete } from '@/src/presentation/components/shared/geolocalizacao/EnderecoPlacesAutocomplete'
+import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
+import {
+  lerEnderecoLocalizacaoDoPayloadEmpresa,
+  montarPatchEnderecoGeolocalizacao,
+  type EnderecoEmpresaGeocodeInput,
+} from '@/src/shared/utils/geolocalizacaoEmpresa'
+import {
+  placeDetailsParaEnderecoGeocode,
+  type PlaceDetailsResult,
+} from '@/src/shared/utils/geolocalizacaoPlaces'
+import { formatarCepMascara } from '@/src/shared/utils/consultaCep'
 import {
   LOGO_IMPRESSAO_HEIGHT,
   LOGO_IMPRESSAO_WIDTH,
@@ -137,7 +149,8 @@ const LOGO_COLUNA_LARGURA_CLASS = 'w-full shrink-0 lg:w-[280px]'
 /**
  * Tab de Empresa - Edição de dados da empresa
  */
-export function EmpresaTab() {  const [empresa, setEmpresa] = useState<Cliente | null>(null)
+export function EmpresaTab() {
+  const [empresa, setEmpresa] = useState<Cliente | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
 
@@ -156,6 +169,9 @@ export function EmpresaTab() {  const [empresa, setEmpresa] = useState<Cliente 
   const [estado, setEstado] = useState('')
   const [cidadeValida, setCidadeValida] = useState<boolean | null>(null)
   const [codigoCidadeIbge, setCodigoCidadeIbge] = useState<string | null>(null)
+  const [enderecoLocalizacao, setEnderecoLocalizacao] = useState<GeoJsonPoint | null>(null)
+  const [providerEnderecoId, setProviderEnderecoId] = useState<string | null>(null)
+  const [buscaPlacesEmpresa, setBuscaPlacesEmpresa] = useState('')
   /** Valor exibido no select (IANA); vem de `parametroEmpresa.timezone` no GET /empresas/me. */
   const [timezone, setTimezone] = useState('')
   /** Snapshot de `parametroEmpresa` para PATCH preservar tipos impressão/cobrança etc. */
@@ -180,6 +196,38 @@ export function EmpresaTab() {  const [empresa, setEmpresa] = useState<Cliente 
 
   // Ref para rastrear o último valor de cidade usado para buscar código IBGE
   const ultimaCidadeBuscada = useRef<string>('')
+
+  const enderecoGeocodeInput = useMemo<EnderecoEmpresaGeocodeInput>(
+    () => ({
+      rua,
+      numero,
+      bairro,
+      cidade: ultimaCidadeBuscada.current || cidade,
+      estado,
+      cep,
+      complemento,
+    }),
+    [rua, numero, bairro, cidade, estado, cep, complemento]
+  )
+
+  const aplicarPlaceDetailsEmpresa = useCallback((place: PlaceDetailsResult) => {
+    const fields = placeDetailsParaEnderecoGeocode(place)
+    if (fields.rua) setRua(maiusculasPt(fields.rua))
+    if (fields.numero) setNumero(maiusculasPt(fields.numero))
+    if (fields.bairro) setBairro(maiusculasPt(fields.bairro))
+    if (fields.cidade) {
+      setCidade(maiusculasPt(fields.cidade))
+      ultimaCidadeBuscada.current = fields.cidade
+    }
+    if (fields.estado) setEstado(fields.estado.toUpperCase().slice(0, 2))
+    if (fields.cep) setCep(maiusculasPt(formatarCepMascara(fields.cep)))
+    setEnderecoLocalizacao(place.enderecoLocalizacao)
+    setProviderEnderecoId(place.providerEnderecoId)
+    setBuscaPlacesEmpresa(
+      [fields.rua, fields.numero].filter(Boolean).join(', ') || place.enderecoFormatado || ''
+    )
+    showToast.success('Endereço aplicado. Salve a empresa. O pin da loja é definido na cobertura.')
+  }, [])
 
   useEffect(() => {
     loadEmpresa()
@@ -369,6 +417,11 @@ export function EmpresaTab() {  const [empresa, setEmpresa] = useState<Cliente 
               ultimaCidadeBuscada.current = ''
             }
           }
+
+          const { enderecoLocalizacao: geoSalva, providerEnderecoId: providerSalvo } =
+            lerEnderecoLocalizacaoDoPayloadEmpresa(raw.endereco)
+          setEnderecoLocalizacao(geoSalva)
+          setProviderEnderecoId(providerSalvo)
         } catch (error) {
           console.error('Erro ao criar Cliente a partir dos dados da API:', error, 'Dados:', data)
           // Criar um Cliente vazio para evitar quebra da UI
@@ -716,6 +769,14 @@ export function EmpresaTab() {  const [empresa, setEmpresa] = useState<Cliente 
         if (nomeCidadeParaSalvar) endereco.cidade = nomeCidadeParaSalvar
         if (estado) endereco.estado = estado
         if (codigoCidadeIbge) endereco.codigoCidadeIbge = codigoCidadeIbge
+
+        const geoPatch = montarPatchEnderecoGeolocalizacao(
+          enderecoLocalizacao,
+          providerEnderecoId
+        )
+        if (geoPatch) {
+          Object.assign(endereco, geoPatch)
+        }
 
         // Adiciona endereco ao body apenas se houver pelo menos um campo
         if (Object.keys(endereco).length > 0) {
@@ -1089,6 +1150,18 @@ export function EmpresaTab() {  const [empresa, setEmpresa] = useState<Cliente 
           <div>
             <h4 className="mb-2 text-lg font-semibold text-primary">Endereço</h4>
             <div className="space-y-6">
+              {isEditing ? (
+                <EnderecoPlacesAutocomplete
+                  variant="gestor"
+                  floatingLabel={false}
+                  label="Buscar endereço no Google"
+                  placeholder="Digite rua, bairro ou cidade…"
+                  value={buscaPlacesEmpresa}
+                  onChange={setBuscaPlacesEmpresa}
+                  onSelect={aplicarPlaceDetailsEmpresa}
+                />
+              ) : null}
+
               {/* Linha 1: CEP + Rua */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <Input

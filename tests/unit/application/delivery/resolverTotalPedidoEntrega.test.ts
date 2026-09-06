@@ -40,4 +40,23 @@ describe('resolverTotalPedidoEntrega', () => {
     })
     expect(taxa).toBe(5)
   })
+
+  it('override sem taxa zera o preview mesmo com cobertura', () => {
+    const taxa = resolverValorTaxaEntregaPedido({
+      pedidoComEntrega: true,
+      taxaEntregaCoberturaValor: 8,
+      taxaEntregaOverride: 'sem_taxa',
+    })
+    expect(taxa).toBe(0)
+  })
+
+  it('override de catálogo vence a cobertura no wizard', () => {
+    const taxa = resolverValorTaxaEntregaPedido({
+      pedidoComEntrega: true,
+      taxaEntregaCoberturaValor: 8,
+      taxaEntregaCatalogoValor: 12,
+      taxaEntregaOverride: 'catalogo',
+    })
+    expect(taxa).toBe(12)
+  })
 })

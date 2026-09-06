@@ -1,15 +1,23 @@
 'use client'
 
+import { useCallback, useRef } from 'react'
 import { Label } from '@/src/presentation/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/presentation/components/ui/select'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { MdAccessTime, MdAttachMoney, MdPersonOutline, MdStore } from 'react-icons/md'
-import { EntregaClienteSelector } from '@/src/presentation/components/features/delivery/components/EntregaClienteSelector'
-import { PedidoInformacoesStep } from '../../PedidoInformacoesStep'
 import {
-  SEM_TAXA_ENTREGA_VALUE,
-  TEMPOS_PREVISTOS_ENTREGA,
-} from '@/src/shared/constants/pedidoForm'
+  EntregaClienteSelector,
+  type CoberturaMoradaSelecionadaStatus,
+} from '@/src/presentation/components/features/delivery/components/EntregaClienteSelector'
+import { PedidoInformacoesStep } from '../../PedidoInformacoesStep'
+import { TEMPOS_PREVISTOS_ENTREGA } from '@/src/shared/constants/pedidoForm'
+import {
+  TAXA_ENTREGA_SELECT_AUTOMATICA,
+  TAXA_ENTREGA_SEM_TAXA_ID,
+  taxaEntregaIdParaSelect,
+  selectValueParaTaxaEntregaId,
+  resolverModoTaxaEntregaOverride,
+} from '@/src/shared/constants/taxaEntregaPedido'
 import { useNovoPedidoFormContext } from '../../../context/NovoPedidoFormContext'
 import { useNovoPedidoUIContext } from '../../../context/NovoPedidoUIContext'
 
@@ -30,13 +38,92 @@ export function PedidoInformacoesStepView() {
     setTelefoneBuscadoEntrega,
     tempoPrevistoMinutos,
     setTempoPrevistoMinutos,
+    enderecoEntregaCoberturaValorTaxa,
+    setEnderecoEntregaCoberturaStatus,
+    setEnderecoEntregaCoberturaValorTaxa,
     taxaEntregaId,
     setTaxaEntregaId,
     taxasEntrega,
-    taxasEntregaQuery,
+    valorTaxaEntrega,
   } = useNovoPedidoFormContext()
 
   const { empresa, setSeletorClienteOpen } = useNovoPedidoUIContext()
+  const ultimaMoradaAutoTempoRef = useRef<string | null>(null)
+  const ultimaMoradaIdRef = useRef<string | null>(null)
+
+  const resetOverrideSeMudouMorada = useCallback(
+    (moradaId: string | undefined) => {
+      if (!moradaId) return
+      if (ultimaMoradaIdRef.current && ultimaMoradaIdRef.current !== moradaId) {
+        setTaxaEntregaId('')
+      }
+      ultimaMoradaIdRef.current = moradaId
+    },
+    [setTaxaEntregaId]
+  )
+
+  const handleCoberturaMoradaChange = useCallback(
+    (cobertura: CoberturaMoradaSelecionadaStatus) => {
+      switch (cobertura.status) {
+        case 'coberta': {
+          resetOverrideSeMudouMorada(cobertura.moradaId)
+          setEnderecoEntregaCoberturaStatus('ok')
+          setEnderecoEntregaCoberturaValorTaxa(cobertura.valorTaxa)
+          if (
+            cobertura.moradaId !== ultimaMoradaAutoTempoRef.current &&
+            cobertura.tempoEntregaInMinutes > 0 &&
+            TEMPOS_PREVISTOS_ENTREGA.includes(cobertura.tempoEntregaInMinutes)
+          ) {
+            ultimaMoradaAutoTempoRef.current = cobertura.moradaId
+            setTempoPrevistoMinutos(cobertura.tempoEntregaInMinutes)
+          }
+          break
+        }
+        case 'fora':
+          setEnderecoEntregaCoberturaStatus('fora')
+          setEnderecoEntregaCoberturaValorTaxa(null)
+          break
+        case 'loading':
+          setEnderecoEntregaCoberturaStatus('pendente')
+          break
+        case 'erro':
+          setEnderecoEntregaCoberturaStatus('indisponivel')
+          setEnderecoEntregaCoberturaValorTaxa(null)
+          break
+        case 'sem_geo':
+        case 'null':
+        default:
+          ultimaMoradaIdRef.current = null
+          ultimaMoradaAutoTempoRef.current = null
+          setTaxaEntregaId('')
+          setEnderecoEntregaCoberturaStatus(null)
+          setEnderecoEntregaCoberturaValorTaxa(null)
+          break
+      }
+    },
+    [
+      resetOverrideSeMudouMorada,
+      setEnderecoEntregaCoberturaStatus,
+      setEnderecoEntregaCoberturaValorTaxa,
+      setTempoPrevistoMinutos,
+      setTaxaEntregaId,
+    ]
+  )
+
+  const modoTaxa = resolverModoTaxaEntregaOverride(taxaEntregaId)
+  const labelAutomatica =
+    enderecoEntregaCoberturaValorTaxa == null
+      ? moradaEntregaSelecionada
+        ? 'Automática (calculando…)'
+        : 'Automática (selecione o endereço)'
+      : `Automática (${transformarParaReal(enderecoEntregaCoberturaValorTaxa)})`
+
+  const hintTaxa =
+    modoTaxa === 'automatica'
+      ? 'Padrão da área/raio. Pode remover ou trocar por uma taxa do catálogo.'
+      : modoTaxa === 'sem_taxa'
+        ? 'Sem taxa neste pedido. O total do pagamento já ignora a entrega.'
+        : `Taxa do catálogo: ${transformarParaReal(valorTaxaEntrega)}.`
 
   return (
     <PedidoInformacoesStep>
@@ -89,7 +176,7 @@ export function PedidoInformacoesStepView() {
           onMoradaSelecionada={setMoradaEntregaSelecionada}
           clienteVinculado={clienteEntregaVinculado}
           onClienteVinculado={setClienteEntregaVinculado}
-          onEditarClientePorDuploClique={handleAbrirEdicaoClienteEntrega}
+          onAbrirCadastroCliente={handleAbrirEdicaoClienteEntrega}
           onAbrirSeletorCliente={() => setSeletorClienteOpen(true)}
           telefoneExibicaoExterno={telefoneBuscaEntrega}
           onTelefoneExibicaoExternoChange={setTelefoneBuscaEntrega}
@@ -101,6 +188,10 @@ export function PedidoInformacoesStepView() {
           }}
           mostrarEnderecos={pedidoComEntrega}
           usarModuloDeliveryClientes={pedidoDeliveryGestor}
+          tempoPrevistoMinutos={pedidoComEntrega ? tempoPrevistoMinutos : null}
+          onCoberturaMoradaSelecionadaChange={
+            pedidoDeliveryGestor && pedidoComEntrega ? handleCoberturaMoradaChange : undefined
+          }
         />
         {pedidoComRetirada ? (
           <div className="mt-3 rounded-lg border border-primary/15 bg-white p-3 text-sm text-secondary-text">
@@ -130,6 +221,9 @@ export function PedidoInformacoesStepView() {
                   ))}
                 </SelectContent>
               </Select>
+              <p className="mt-1.5 text-[11px] text-secondary-text">
+                Pode ajustar o tempo; o valor escolhido vale no pedido e no card do endereço.
+              </p>
             </div>
 
             <div className="rounded-lg border border-primary/15 bg-white p-3">
@@ -138,28 +232,23 @@ export function PedidoInformacoesStepView() {
                 <Label className="text-sm font-semibold text-primary-text">Taxa de entrega</Label>
               </div>
               <Select
-                value={taxaEntregaId || SEM_TAXA_ENTREGA_VALUE}
-                onValueChange={value =>
-                  setTaxaEntregaId(value === SEM_TAXA_ENTREGA_VALUE ? '' : value)
-                }
-                disabled={taxasEntregaQuery.isLoading}
+                value={taxaEntregaIdParaSelect(taxaEntregaId)}
+                onValueChange={value => setTaxaEntregaId(selectValueParaTaxaEntregaId(value))}
               >
                 <SelectTrigger className="border-primary/30 bg-white">
-                  <SelectValue
-                    placeholder={
-                      taxasEntregaQuery.isLoading ? 'Carregando taxas...' : 'Selecionar taxa'
-                    }
-                  />
+                  <SelectValue placeholder="Taxa de entrega" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={SEM_TAXA_ENTREGA_VALUE}>Sem taxa de entrega</SelectItem>
+                  <SelectItem value={TAXA_ENTREGA_SELECT_AUTOMATICA}>{labelAutomatica}</SelectItem>
+                  <SelectItem value={TAXA_ENTREGA_SEM_TAXA_ID}>Sem taxa</SelectItem>
                   {taxasEntrega.map(taxa => (
                     <SelectItem key={taxa.getId()} value={taxa.getId()}>
-                      {taxa.getNome()} - {transformarParaReal(taxa.getValor())}
+                      {`${taxa.getNome()} — ${transformarParaReal(taxa.getValor())}`}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              <p className="mt-1.5 text-[11px] text-secondary-text">{hintTaxa}</p>
             </div>
           </div>
         )}

@@ -188,13 +188,14 @@ export function useKanbanPreTransicao({
         showToast.info(info)
       }
 
+      if (resultado.toastWarning) {
+        showToast.warning(resultado.toastWarning, { duration: 10000 })
+      }
+
       if (resultado.podeAvancar) {
         return { ok: true, ticketsPayload: resultado.ticketsPayload }
       }
 
-      if (resultado.toastWarning) {
-        showToast.warning(resultado.toastWarning)
-      }
       if (resultado.abrirModalConfig) {
         onAbrirConfigImpressoraExpedicao()
       }

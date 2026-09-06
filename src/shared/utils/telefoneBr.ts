@@ -1,8 +1,15 @@
 const MAX_DIGITOS_TELEFONE_BR = 11
 
+/** Celular BR completo (DDD + 9 dígitos) — exigido pelo backend delivery. */
+export const TELEFONE_CELULAR_BR_DIGITOS = MAX_DIGITOS_TELEFONE_BR
+
 /** Apenas dígitos (máx. 11) — use para API e persistência. */
 export function extrairDigitosTelefone(valor: string): string {
   return valor.replace(/\D/g, '').slice(0, MAX_DIGITOS_TELEFONE_BR)
+}
+
+export function telefoneCelularBrCompleto(valor: string): boolean {
+  return extrairDigitosTelefone(valor).length === TELEFONE_CELULAR_BR_DIGITOS
 }
 
 /** Máscara visual brasileira; não enviar o retorno para o backend. */

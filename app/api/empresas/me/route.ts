@@ -54,3 +54,42 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
   }
 }
+
+/**
+ * PATCH /api/empresas/me
+ * Atualiza a empresa da sessão (mesmo contrato de PATCH /api/empresas/[id]).
+ */
+export async function PATCH(request: NextRequest) {
+  try {
+    const validation = validateRequest(request)
+    if (!validation.valid || !validation.tokenInfo) {
+      return validation.error!
+    }
+    const { tokenInfo } = validation
+    if (!tokenInfo.empresaId) {
+      return NextResponse.json({ error: 'Empresa da sessão não encontrada' }, { status: 400 })
+    }
+
+    const body = await request.json()
+    const apiClient = new ApiClient()
+    const response = await apiClient.request<any>(`/api/v1/empresas/${tokenInfo.empresaId}`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${tokenInfo.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    })
+
+    return NextResponse.json(response.data)
+  } catch (error) {
+    console.error('Erro ao atualizar empresa:', error)
+    if (error instanceof ApiError) {
+      return NextResponse.json(
+        { error: error.message || 'Erro ao atualizar empresa' },
+        { status: error.status }
+      )
+    }
+    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
+  }
+}

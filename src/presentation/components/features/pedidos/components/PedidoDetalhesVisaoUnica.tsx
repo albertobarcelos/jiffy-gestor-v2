@@ -179,10 +179,6 @@ export function PedidoDetalhesVisaoUnica() {
         ) : null}
 
         <div className="mt-3 space-y-1 border-t border-gray-100 pt-2 text-sm">
-          <div className="flex justify-between text-gray-700">
-            <span>Itens</span>
-            <span className="tabular-nums">{transformarParaReal(totalProdutos)}</span>
-          </div>
           {taxa != null && taxa > 0 ? (
             <div className="flex justify-between text-gray-700">
               <span>Taxa de entrega</span>

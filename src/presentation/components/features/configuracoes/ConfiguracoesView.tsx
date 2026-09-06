@@ -8,12 +8,17 @@ import { TerminaisTab } from './tabs/TerminaisTab'
 import { ImpressorasList } from '@/src/presentation/components/features/impressoras/ImpressorasList'
 import { MeiosPagamentosList } from '@/src/presentation/components/features/meios-pagamentos/MeiosPagamentosList'
 import { TaxasList } from '@/src/presentation/components/features/taxas/TaxasList'
+import { DeliveryHubView } from '@/src/presentation/components/features/delivery/hub/DeliveryHubView'
 import { PageLoading } from '@/src/presentation/components/ui/PageLoading'
 import { cn } from '@/src/shared/utils/cn'
 import {
+  CONFIGURACOES_DELIVERY_TAB,
   configuracoesTabPath,
-  type ConfiguracoesTabSlug,
+  DELIVERY_HUB_PATH,
+  type ConfiguracoesViewTab,
+  type DeliveryEtapaId,
 } from '@/src/shared/constants/configuracoesRoutes'
+import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 
 const CadastroPorPlanilha = dynamic(
   () =>
@@ -24,23 +29,27 @@ const CadastroPorPlanilha = dynamic(
 )
 
 type ConfiguracoesViewProps = {
-  activeTab: ConfiguracoesTabSlug
+  activeTab: ConfiguracoesViewTab
+  deliveryEtapaId?: DeliveryEtapaId | null
 }
 
 /**
- * Configurações — abas em `/configuracoes/:aba` (ex.: `/configuracoes/taxas`).
+ * Configurações — abas em `/configuracoes/:aba`.
+ * Delivery usa `/config/delivery` e `/config/delivery/:etapa`.
  */
-export function ConfiguracoesView({ activeTab }: ConfiguracoesViewProps) {
+export function ConfiguracoesView({ activeTab, deliveryEtapaId = null }: ConfiguracoesViewProps) {
   const router = useRouter()
+  const { toGestao } = useGestaoPath()
 
   const goToTab = useCallback(
-    (tab: ConfiguracoesTabSlug) => {
-      router.replace(configuracoesTabPath(tab), { scroll: false })
+    (tab: ConfiguracoesViewTab) => {
+      const path = tab === CONFIGURACOES_DELIVERY_TAB ? DELIVERY_HUB_PATH : configuracoesTabPath(tab)
+      router.replace(toGestao(path), { scroll: false })
     },
-    [router]
+    [router, toGestao]
   )
 
-  const tabBtn = (tab: ConfiguracoesTabSlug, label: string) => (
+  const tabBtn = (tab: ConfiguracoesViewTab, label: string) => (
     <button
       key={tab}
       type="button"
@@ -61,6 +70,7 @@ export function ConfiguracoesView({ activeTab }: ConfiguracoesViewProps) {
       <div className="w-full shrink-0 border-b border-gray-200 bg-gray-50 px-4 md:px-4">
         <div className="flex flex-wrap gap-1 pt-2">
           {tabBtn('empresa', 'Empresa')}
+          {tabBtn(CONFIGURACOES_DELIVERY_TAB, 'Delivery')}
           {tabBtn('terminais', 'Terminais')}
           {tabBtn('impressoras', 'Impressoras')}
           {tabBtn('meios-pagamentos', 'Meios de pagamento')}
@@ -72,6 +82,9 @@ export function ConfiguracoesView({ activeTab }: ConfiguracoesViewProps) {
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="flex flex-1 flex-col overflow-hidden rounded-b-[10px] bg-info">
           {activeTab === 'empresa' && <EmpresaTab />}
+          {activeTab === CONFIGURACOES_DELIVERY_TAB && (
+            <DeliveryHubView etapaId={deliveryEtapaId} />
+          )}
           {activeTab === 'terminais' && <TerminaisTab />}
           {activeTab === 'impressoras' && <ImpressorasList />}
           {activeTab === 'meios-pagamentos' && (

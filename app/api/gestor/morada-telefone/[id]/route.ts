@@ -49,3 +49,51 @@ export async function PATCH(
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
   }
 }
+
+/**
+ * DELETE /api/gestor/morada-telefone/[id]
+ * Proxy para DELETE /api/v1/gestor/morada-telefone/{id}.
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const validation = validateRequest(request)
+    if (!validation.valid || !validation.tokenInfo) {
+      return validation.error!
+    }
+    const { tokenInfo } = validation
+
+    const { id } = await params
+    if (!id?.trim()) {
+      return NextResponse.json({ error: 'ID da morada é obrigatório' }, { status: 400 })
+    }
+
+    const apiClient = new ApiClient()
+    const response = await apiClient.request<unknown>(
+      `/api/v1/gestor/morada-telefone/${encodeURIComponent(id)}`,
+      {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${tokenInfo.token}`,
+          Accept: 'application/json',
+        },
+      }
+    )
+
+    return NextResponse.json(response.data ?? { ok: true })
+  } catch (error) {
+    console.error('Erro ao excluir morada por telefone:', error)
+    if (error instanceof ApiError) {
+      return NextResponse.json(
+        {
+          error: mensagemLegivelApiError(error),
+          details: error.data,
+        },
+        { status: error.status }
+      )
+    }
+    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
+  }
+}

@@ -97,14 +97,16 @@ export const useTabsStore = create<TabsState>()(
         }
 
         const { tabs } = get()
-        // Verifica se a aba já existe
         const existingTab = tabs.find((t) => t.id === tab.id)
         if (existingTab) {
-          // Se existe, apenas ativa
-          set({ activeTabId: tab.id })
+          set({
+            activeTabId: tab.id,
+            tabs: tabs.map((t) =>
+              t.id === tab.id ? { ...t, path: tab.path, label: tab.label, isFixed: tab.isFixed ?? t.isFixed } : t
+            ),
+          })
           return
         }
-        // Adiciona nova aba e ativa
         set({
           tabs: [...tabs, tab],
           activeTabId: tab.id,

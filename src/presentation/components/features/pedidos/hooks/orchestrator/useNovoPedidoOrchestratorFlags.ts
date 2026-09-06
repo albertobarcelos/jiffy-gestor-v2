@@ -7,6 +7,7 @@ import {
   resolverTotalPedidoComTaxaEntrega,
   resolverValorTaxaEntregaPedido,
 } from '@/src/application/mappers/resolverTotalPedidoEntrega'
+import { resolverModoTaxaEntregaOverride } from '@/src/shared/constants/taxaEntregaPedido'
 import {
   podeExibirAbaDadosEntregaDetalhe,
   podeExibirAbaNotaFiscalDetalhe,
@@ -50,6 +51,8 @@ export type UseNovoPedidoOrchestratorFlagsParams = {
   pagamentos: PagamentoSelecionado[]
   taxaEntregaId: string
   taxasEntrega: Taxa[]
+  /** Taxa da cobertura geolocalizada (novo pedido delivery). */
+  enderecoEntregaCoberturaValorTaxa?: number | null
   resumoFinanceiroDetalhes: ResumoFinanceiroDetalhes | null
   detalhesEntregaPedido: DetalhesEntregaPedido | null
 }
@@ -76,6 +79,7 @@ export function useNovoPedidoOrchestratorFlags({
   pagamentos,
   taxaEntregaId,
   taxasEntrega,
+  enderecoEntregaCoberturaValorTaxa = null,
   resumoFinanceiroDetalhes,
   detalhesEntregaPedido,
 }: UseNovoPedidoOrchestratorFlagsParams) {
@@ -156,13 +160,17 @@ export function useNovoPedidoOrchestratorFlags({
         pedidoComEntrega,
         taxaEntregaValor: detalhesEntregaPedido?.taxaEntrega?.valor,
         resumoFinanceiroDetalhes,
+        taxaEntregaCoberturaValor: enderecoEntregaCoberturaValorTaxa,
         taxaEntregaCatalogoValor: taxaEntregaSelecionada?.getValor(),
+        taxaEntregaOverride: resolverModoTaxaEntregaOverride(taxaEntregaId),
       }),
     [
       pedidoComEntrega,
       detalhesEntregaPedido?.taxaEntrega?.valor,
       resumoFinanceiroDetalhes,
+      enderecoEntregaCoberturaValorTaxa,
       taxaEntregaSelecionada,
+      taxaEntregaId,
     ]
   )
 

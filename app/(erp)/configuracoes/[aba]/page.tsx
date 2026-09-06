@@ -24,7 +24,6 @@ export default function ConfiguracoesTabPage({
   params: Promise<{ aba: string }>
 }) {
   const { aba } = use(params)
-
   if (!isConfiguracoesTabSlug(aba)) {
     notFound()
   }

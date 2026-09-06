@@ -43,7 +43,6 @@ export function splitFormContextValue(
     longPressComplementoIndexRef: _lpcir,
     modoVisualizacao: _mv,
     tabelaOrigemVenda: _tov,
-    tipoInicioPedido: _tii,
     statusFiscalUnificado: _sfu,
     isLoadingVenda: _ilv,
     abaDetalhesPedido: _adp,

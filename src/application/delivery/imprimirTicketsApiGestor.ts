@@ -6,6 +6,7 @@ import {
   mensagemProdutoSemImpressora,
 } from '@/src/application/delivery/deliveryProdutoSemImpressoraAvisos'
 import { warningRedundanteMapeamentoImpressoraWindows } from '@/src/application/delivery/deliveryTicketWarningUtils'
+import { TOAST_CUPOM_NAO_IMPRIMIU_SEM_VINCULO_PC } from '@/src/shared/utils/deliveryImpressoraExpedicao'
 import type { VendaGestorTicket, VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
 import { printDeliveryCupom } from '@/src/infrastructure/printing/printDeliveryCupom'
 import { buildPrintJobId, ticketPrintKey } from '@/src/infrastructure/printing/agent/printJobId'
@@ -79,6 +80,9 @@ export async function imprimirTicketsApiGestor(params: {
   accessToken?: string
   onMensagem?: (mensagem: string) => void
   onErro?: (mensagem: string) => void
+  onAviso?: (mensagem: string) => void
+  /** Quando o quadro já avisou que o fluxo segue sem papel. */
+  omitirAvisoSemVinculoPc?: boolean
 }): Promise<void> {
   const {
     response,
@@ -87,6 +91,8 @@ export async function imprimirTicketsApiGestor(params: {
     jobNamePrefix,
     cupomTemplate,
     onErro,
+    onAviso,
+    omitirAvisoSemVinculoPc,
   } = params
   const reimpressao = jobNamePrefix.toLowerCase().includes('reimpress')
 
@@ -131,12 +137,18 @@ export async function imprimirTicketsApiGestor(params: {
     if (!printerName) {
       falhas += 1
       const nomeLogica = ticket.impressoraNome?.trim() || ticket.impressora?.nome?.trim() || 'lógica'
-      const mensagem = `Vincule a impressora "${nomeLogica}" a uma impressora deste PC em Configurações de impressão.`
+      const mensagem = TOAST_CUPOM_NAO_IMPRIMIU_SEM_VINCULO_PC(nomeLogica)
       erroImpressao('ticket.sem_impressora_fisica', {
         tipoCupom: ticket.tipoCupom,
         impressoraId: ticket.impressoraId,
       })
-      onErro?.(mensagem)
+      if (!omitirAvisoSemVinculoPc) {
+        if (onAviso) {
+          onAviso(mensagem)
+        } else {
+          onErro?.(mensagem)
+        }
+      }
       continue
     }
 
