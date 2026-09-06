@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useCallback, useEffect } from 'react'
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
+import { ordenarMeiosPagamentoPadrao } from '@/src/shared/utils/corFormaPagamentoFiscal'
 import {
   useCreatePedidoDelivery,
   useCreateVendaGestor,
@@ -369,7 +370,8 @@ export function useNovoPedidoOrchestrator({
 
   const meiosPagamento = useMemo(() => {
     if (!meiosPagamentoData?.pages) return []
-    return meiosPagamentoData.pages.flatMap(page => page.meiosPagamento || [])
+    const lista = meiosPagamentoData.pages.flatMap(page => page.meiosPagamento || [])
+    return ordenarMeiosPagamentoPadrao(lista)
   }, [meiosPagamentoData])
 
   const { entregadores, entregadoresQuery } = useEntregadoresQuery({

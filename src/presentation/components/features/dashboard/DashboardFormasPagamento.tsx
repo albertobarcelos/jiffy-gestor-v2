@@ -2,54 +2,12 @@ import { useMemo } from 'react'
 import { Pie, PieChart, Cell, ResponsiveContainer } from 'recharts'
 import { Tooltip as MuiTooltip } from '@mui/material'
 import { formatarMoeda } from './dashboardTextHelpers'
+import { corFormaPagamentoFiscal } from '@/src/shared/utils/corFormaPagamentoFiscal'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useDashboardMetodosPagamentoDetalhadoQuery } from '@/src/presentation/hooks/useDashboardMetodosPagamentoDetalhadoQuery'
 
-/** Arco “restante” dos mini-donuts de formas de pagamento; cor principal vem da paleta por índice. */
+/** Arco “restante” dos mini-donuts de formas de pagamento; cor principal vem da paleta fiscal. */
 const COR_ARCO_RESTO_FORMAS_PAGAMENTO = '#EDE9FE'
-
-/**
- * Cor fixa por forma de pagamento fiscal (cadastro — campo estável; nome do meio pode ser “dindin” etc.).
- * Chaves como em `NovoMeioPagamento` / API (minúsculas, snake_case).
- */
-const COR_POR_FORMA_PAGAMENTO_FISCAL: Record<string, string> = {
-  dinheiro: '#00B074',
-  pix: '#B4DD2B',
-  cartao_credito: '#003366',
-  cartao_debito: '#006699',
-  vale_alimentacao: '#530CA3',
-  vale_refeicao: '#FF9800',
-  vale_presente: '#9C27B0',
-  vale_combustivel: '#00BCD4',
-}
-
-/** Quando a API enviar variação de chave (legado / normalização). */
-const ALIAS_FORMA_PAGAMENTO_FISCAL: Record<string, keyof typeof COR_POR_FORMA_PAGAMENTO_FISCAL> = {
-  cartao_de_credito: 'cartao_credito',
-  cartao_de_debito: 'cartao_debito',
-}
-
-const COR_FORMA_FISCAL_FALLBACK = '#14B8A6'
-
-/** Normaliza forma fiscal para lookup (minúsculas, sem acento, espaços → _). */
-function normalizarChaveFormaPagamentoFiscal(raw: string): string {
-  return raw
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, '_')
-}
-
-function corPrincipalDonutPorFormaFiscal(formaRaw: string): string {
-  const chave = normalizarChaveFormaPagamentoFiscal(formaRaw)
-  if (!chave) return COR_FORMA_FISCAL_FALLBACK
-  const direto = COR_POR_FORMA_PAGAMENTO_FISCAL[chave]
-  if (direto) return direto
-  const viaAlias = ALIAS_FORMA_PAGAMENTO_FISCAL[chave]
-  if (viaAlias) return COR_POR_FORMA_PAGAMENTO_FISCAL[viaAlias]
-  return COR_FORMA_FISCAL_FALLBACK
-}
 
 /** Exibe % no centro do mini-donut (inteiro se próximo, senão 1 casa decimal). */
 function formatarPercentualMiniDonut(p: number): string {
@@ -172,7 +130,7 @@ export function DashboardFormasPagamento({
               <DonutFormaPagamento
                 key={`${item.getMetodo()}-${index}`}
                 label={item.getMetodo()}
-                principal={corPrincipalDonutPorFormaFiscal(item.getFormaPagamentoFiscal())}
+                principal={corFormaPagamentoFiscal(item.getFormaPagamentoFiscal())}
                 secundaria={COR_ARCO_RESTO_FORMAS_PAGAMENTO}
                 pct={item.getPercentual()}
                 valor={item.getValor()}
