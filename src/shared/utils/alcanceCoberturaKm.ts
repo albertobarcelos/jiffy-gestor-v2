@@ -43,3 +43,21 @@ export function sincronizarFaixasAlcanceKm<T extends { id: string; distanciaMaxi
     excluirIds: raiosAcimaDoAlcance(raios, alcanceKm).map(raio => raio.id),
   }
 }
+
+export function parseAlcanceKmInteiro(
+  texto: string,
+  maxKm: number
+): { ok: true; km: number } | { ok: false; erro: string } {
+  const bruto = Number(String(texto).replace(',', '.').trim())
+  const km = Math.round(bruto)
+  if (!Number.isFinite(bruto) || km < 1) {
+    return { ok: false, erro: 'Informe o alcance do raio em km inteiros.' }
+  }
+  if (Math.abs(bruto - km) > 0.001) {
+    return { ok: false, erro: 'O alcance usa km inteiros (1, 2, 3…).' }
+  }
+  if (km > maxKm) {
+    return { ok: false, erro: `Alcance máximo de ${maxKm} km.` }
+  }
+  return { ok: true, km }
+}

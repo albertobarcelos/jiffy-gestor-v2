@@ -18,6 +18,11 @@ import type {
 
 export const EMPRESA_DELIVERY_ME_QUERY_KEY = ['delivery', 'empresa-me'] as const
 
+export function dispararEmpresaDeliveryAtualizada(): void {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new Event('jiffy:empresa-delivery-updated'))
+}
+
 async function parseJsonOrThrow(res: Response): Promise<unknown> {
   const raw: unknown = await res.json().catch(() => ({}))
   if (!res.ok) {
@@ -76,9 +81,7 @@ export function useCriarEmpresaDelivery() {
     {
       onSuccess: async () => {
         await invalidate(EMPRESA_DELIVERY_ME_QUERY_KEY)
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new Event('jiffy:empresa-delivery-updated'))
-        }
+        dispararEmpresaDeliveryAtualizada()
       },
     }
   )
@@ -109,9 +112,7 @@ export function useAtualizarEmpresaDelivery() {
           data
         )
         await invalidate(EMPRESA_DELIVERY_ME_QUERY_KEY)
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new Event('jiffy:empresa-delivery-updated'))
-        }
+        dispararEmpresaDeliveryAtualizada()
       },
     }
   )

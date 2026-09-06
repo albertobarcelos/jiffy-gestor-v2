@@ -20,7 +20,11 @@ import {
   DialogTitle,
 } from '@/src/presentation/components/ui/dialog'
 import { AreaEntregaFormModal } from '@/src/presentation/components/features/configuracoes/AreaEntregaFormModal'
-import { useEmpresaDeliveryMe } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
+import {
+  dispararEmpresaDeliveryAtualizada,
+  EMPRESA_DELIVERY_ME_QUERY_KEY,
+  useEmpresaDeliveryMe,
+} from '@/src/presentation/hooks/useEmpresaDeliveryMe'
 import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { useAtualizarRaioEntregaDelivery, useCriarRaiosEntregaEmLote, useExcluirRaiosEntregaEmLote, useRaiosEntregaDelivery } from '@/src/presentation/hooks/useRaiosEntregaDelivery'
 import {
@@ -62,7 +66,10 @@ import {
   type LatLngLiteral,
 } from '@/src/shared/types/geoJsonPolygon'
 import { geoJsonPolygonDeCirculo } from '@/src/shared/utils/geoJsonCircle'
-import { sincronizarFaixasAlcanceKm } from '@/src/shared/utils/alcanceCoberturaKm'
+import {
+  parseAlcanceKmInteiro,
+  sincronizarFaixasAlcanceKm,
+} from '@/src/shared/utils/alcanceCoberturaKm'
 import {
   limitarPontoAoRaio,
   pinDentroDoRaioPermitido,
@@ -106,6 +113,7 @@ const CoberturaDeliveryMap = dynamic(
 )
 
 const TEMPO_PADRAO_FAIXA_KM = 45
+const ALCANCE_INICIAL_KM = 4
 const CAMPOS_ENDERECO_PIN = [
   'cep',
   'rua',
@@ -187,11 +195,10 @@ export function CoberturaDeliveryTab() {
   const [prazosDraft, setPrazosDraft] = useState<Record<string, string>>({})
   const [alcanceKmTexto, setAlcanceKmTexto] = useState('')
   const [definindoAlcance, setDefinindoAlcance] = useState(false)
-  const [autoPinando, setAutoPinando] = useState(false)
+  const [confirmandoSetup, setConfirmandoSetup] = useState(false)
   const [pinRascunho, setPinRascunho] = useState<GeoJsonPoint | null>(null)
   const [pinSnapEpoch, setPinSnapEpoch] = useState(0)
   const [centroEnderecoGeo, setCentroEnderecoGeo] = useState<GeoJsonPoint | null>(null)
-  const autoPinTentadoRef = useRef(false)
   const geocodeResultadoRef = useRef<GeocodeEmpresaResult | null>(null)
   const geocodeAssinaturaRef = useRef('')
   const [mapaIndisponivel, setMapaIndisponivel] = useState(mapaGoogleAuthFalhou)
@@ -242,6 +249,8 @@ export function CoberturaDeliveryTab() {
     {
       onSuccess: async () => {
         await invalidateQueries(['empresa', 'endereco-geo'])
+        await invalidateQueries(EMPRESA_DELIVERY_ME_QUERY_KEY)
+        dispararEmpresaDeliveryAtualizada()
       },
     }
   )
@@ -253,7 +262,8 @@ export function CoberturaDeliveryTab() {
   const enderecoEmpresa = geoQuery.data?.endereco
   const geoConfigurada = origemGeo != null
   const pinPendente = Boolean(pinRascunho && !pontosGeoIguais(pinRascunho, origemGeo))
-  const salvandoPin = atualizarOrigemMutation.isPending && !autoPinando
+  const salvandoPin = atualizarOrigemMutation.isPending && !confirmandoSetup
+  const pinParaConfirmar = pinRascunho ?? centroEnderecoGeo ?? origemGeo
   const centroAjustePin = centroEnderecoGeo ?? origemGeo
   const pinSalvoForaDoRaio = Boolean(
     centroEnderecoGeo &&
@@ -283,6 +293,13 @@ export function CoberturaDeliveryTab() {
   )
   const modoDesenho = ferramenta === 'poligono'
   const temCoberturaAtiva = temCoberturaEntregaAtiva(raios, areas)
+  const setupInicial = Boolean(
+    empresaDelivery &&
+      !mapaIndisponivel &&
+      enderecoPreenchido &&
+      pinParaConfirmar &&
+      (!geoConfigurada || !temCoberturaAtiva)
+  )
   const areaFormaEditando = useMemo(
     () => areas.find(a => a.id === areaFormaEditandoId) ?? null,
     [areas, areaFormaEditandoId]
@@ -312,7 +329,7 @@ export function CoberturaDeliveryTab() {
     excluirAreaMutation.isPending ||
     excluirRaiosLoteMutation.isPending ||
     atualizarOrigemMutation.isPending ||
-    autoPinando
+    confirmandoSetup
 
   const raiosTaxaSignature = raiosOrdenados
     .map(raio => `${raio.id}:${raio.valorTaxa}:${raio.tempoEntregaInMinutes}`)
@@ -334,7 +351,7 @@ export function CoberturaDeliveryTab() {
 
   useEffect(() => {
     if (!raioAlcance) {
-      setAlcanceKmTexto('')
+      setAlcanceKmTexto(String(ALCANCE_INICIAL_KM))
       return
     }
     const km = metrosParaKmRaio(raioAlcance.distanciaMaximaEmMetros)
@@ -348,6 +365,7 @@ export function CoberturaDeliveryTab() {
       setCentroEnderecoGeo(null)
       geocodeResultadoRef.current = null
       geocodeAssinaturaRef.current = ''
+      if (!origemGeo) setPinRascunho(null)
       return
     }
     if (mapaIndisponivel) return
@@ -361,6 +379,9 @@ export function CoberturaDeliveryTab() {
         geocodeAssinaturaRef.current = enderecoAssinatura
         geocodeResultadoRef.current = resultado
         setCentroEnderecoGeo(resultado.enderecoLocalizacao)
+        if (!origemGeo) {
+          setPinRascunho(prev => prev ?? resultado.enderecoLocalizacao)
+        }
       } catch (error) {
         if (cancelado) return
         geocodeAssinaturaRef.current = enderecoAssinatura
@@ -371,52 +392,13 @@ export function CoberturaDeliveryTab() {
         }
         geocodeResultadoRef.current = null
         setCentroEnderecoGeo(null)
+        if (!origemGeo) setPinRascunho(null)
       }
     })()
     return () => {
       cancelado = true
     }
-  }, [enderecoAssinatura, enderecoEmpresa, mapaIndisponivel])
-
-  useEffect(() => {
-    if (mapaIndisponivel || autoPinTentadoRef.current) return
-    if (!empresaDelivery || geoQuery.isPending || geoQuery.isError || origemGeo) return
-    const resultado = geocodeResultadoRef.current
-    if (!resultado) return
-
-    autoPinTentadoRef.current = true
-    setAutoPinando(true)
-    void (async () => {
-      try {
-        await atualizarOrigemMutation.mutateAsync({
-          point: resultado.enderecoLocalizacao,
-          providerEnderecoId: resultado.providerEnderecoId,
-        })
-        await geoQuery.refetch()
-      } catch (error) {
-        if (isFalhaServicoMapaGoogle(error)) {
-          setMapaIndisponivel(true)
-          avisarMapaIndisponivelCliente('cobertura auto-pin', error)
-          return
-        }
-        autoPinTentadoRef.current = false
-        showToast.error(
-          error instanceof Error ? error.message : 'Não foi possível salvar a localização da loja.'
-        )
-      } finally {
-        setAutoPinando(false)
-      }
-    })()
-  }, [
-    atualizarOrigemMutation,
-    centroEnderecoGeo,
-    empresaDelivery,
-    geoQuery.isError,
-    geoQuery.isPending,
-    geoQuery.refetch,
-    mapaIndisponivel,
-    origemGeo,
-  ])
+  }, [enderecoAssinatura, enderecoEmpresa, mapaIndisponivel, origemGeo])
 
   const alertas = useMemo(() => {
     const items: { titulo: string; descricao: string; href?: string; label?: string }[] = []
@@ -440,15 +422,13 @@ export function CoberturaDeliveryTab() {
       !mapaIndisponivel &&
       !geoConfigurada &&
       !geoQuery.isPending &&
-      !autoPinando &&
       enderecoPreenchido &&
-      !pinPendente
+      !pinParaConfirmar
     ) {
       items.push({
         titulo: 'Marque a loja no mapa',
-        descricao: enderecoEmpresaGeocodeMinimo(enderecoEmpresa ?? { rua: '', numero: '' })
-          ? 'Clique no mapa para pinar a loja. Depois use Salvar localização no card para gravar o ponto e recentrar os raios.'
-          : 'Clique no mapa para marcar a loja. Se o endereço da empresa estiver completo, o pin entra sozinho.',
+        descricao:
+          'Clique no mapa para marcar a loja, até 1 km do endereço. Depois confirme a loja e o alcance no card.',
       })
     }
     if (
@@ -464,6 +444,7 @@ export function CoberturaDeliveryTab() {
     }
     if (
       empresaDelivery &&
+      !setupInicial &&
       geoConfigurada &&
       !temCoberturaAtiva &&
       !raiosQuery.isPending &&
@@ -477,16 +458,17 @@ export function CoberturaDeliveryTab() {
     }
     return items
   }, [
-    autoPinando,
     empresaDelivery,
     enderecoPreenchido,
     geoConfigurada,
     geoQuery.isPending,
     mapaIndisponivel,
+    pinParaConfirmar,
     pinPendente,
     pinSalvoForaDoRaio,
     raiosQuery.isPending,
     areasQuery.isPending,
+    setupInicial,
     temCoberturaAtiva,
   ])
 
@@ -800,20 +782,12 @@ export function CoberturaDeliveryTab() {
   }, [atualizarRaioMutation, prazosDraft, raiosOrdenados, raiosQuery, taxasDraft])
 
   const handleDefinirAlcanceRaio = useCallback(async () => {
-    const bruto = Number(alcanceKmTexto.replace(',', '.').trim())
-    const km = Math.round(bruto)
-    if (!Number.isFinite(bruto) || km < 1) {
-      showToast.error('Informe o alcance do raio em km inteiros.')
+    const parsed = parseAlcanceKmInteiro(alcanceKmTexto, DISTANCIA_MAXIMA_KM_RAIO)
+    if (!parsed.ok) {
+      showToast.error(parsed.erro)
       return
     }
-    if (Math.abs(bruto - km) > 0.001) {
-      showToast.error('O alcance usa km inteiros (1, 2, 3…).')
-      return
-    }
-    if (km > DISTANCIA_MAXIMA_KM_RAIO) {
-      showToast.error(`Alcance máximo de ${DISTANCIA_MAXIMA_KM_RAIO} km.`)
-      return
-    }
+    const km = parsed.km
     const { criarKm, excluirIds } = sincronizarFaixasAlcanceKm(raios, km)
     if (criarKm.length === 0 && excluirIds.length === 0) {
       showToast.info(`Alcance já está em ${km} km. Ajuste as taxas em Taxas e Entrega.`)
@@ -866,6 +840,81 @@ export function CoberturaDeliveryTab() {
     areasQuery,
     criarRaiosLoteMutation,
     excluirRaiosLoteMutation,
+    raios,
+    raiosQuery,
+  ])
+
+  const handleConfirmarLojaEAlcance = useCallback(async () => {
+    const parsed = parseAlcanceKmInteiro(alcanceKmTexto, DISTANCIA_MAXIMA_KM_RAIO)
+    if (!parsed.ok) {
+      showToast.error(parsed.erro)
+      return
+    }
+    const ponto = pinRascunho ?? centroEnderecoGeo ?? origemGeo
+    if (!ponto) {
+      showToast.error('Marque a loja no mapa, até 1 km do endereço, e confirme.')
+      return
+    }
+    const centro = centroEnderecoGeo ?? origemGeo
+    if (centro && !pinDentroDoRaioPermitido(centro, ponto)) {
+      showToast.error('O pin só pode ser salvo até 1 km do endereço da empresa.')
+      return
+    }
+    const km = parsed.km
+    setConfirmandoSetup(true)
+    try {
+      const precisaSalvarPin = !origemGeo || !pontosGeoIguais(ponto, origemGeo)
+      if (precisaSalvarPin) {
+        await atualizarOrigemMutation.mutateAsync({
+          point: ponto,
+          providerEnderecoId: geocodeResultadoRef.current?.providerEnderecoId,
+        })
+        await geoQuery.refetch()
+        setPinRascunho(null)
+      }
+      const { criarKm, excluirIds } = sincronizarFaixasAlcanceKm(raios, km)
+      if (criarKm.length > 0 || excluirIds.length > 0) {
+        const tempo =
+          raios.find(raio => raio.tempoEntregaInMinutes > 0)?.tempoEntregaInMinutes ??
+          TEMPO_PADRAO_FAIXA_KM
+        if (excluirIds.length > 0) {
+          await excluirRaiosLoteMutation.mutateAsync(excluirIds)
+        }
+        if (criarKm.length > 0) {
+          await criarRaiosLoteMutation.mutateAsync(
+            criarKm.map(faixaKm => ({
+              nome: formatAlcanceAteKm(kmParaMetrosRaio(faixaKm)),
+              distanciaMaximaEmMetros: kmParaMetrosRaio(faixaKm),
+              valorTaxa: 0,
+              tempoEntregaInMinutes: tempo,
+              ativo: true,
+            }))
+          )
+        }
+        await raiosQuery.refetch()
+        await areasQuery.refetch()
+      }
+      showToast.success(
+        `Loja confirmada. Alcance Até ${km} km gravado. Ajuste as taxas em Taxas e Entrega.`
+      )
+      setPainelAba('taxas')
+    } catch (error) {
+      showToast.error(
+        error instanceof Error ? error.message : 'Não foi possível confirmar a loja e o alcance.'
+      )
+    } finally {
+      setConfirmandoSetup(false)
+    }
+  }, [
+    alcanceKmTexto,
+    areasQuery,
+    atualizarOrigemMutation,
+    centroEnderecoGeo,
+    criarRaiosLoteMutation,
+    excluirRaiosLoteMutation,
+    geoQuery,
+    origemGeo,
+    pinRascunho,
     raios,
     raiosQuery,
   ])
@@ -973,7 +1022,7 @@ export function CoberturaDeliveryTab() {
                 <div className="absolute inset-0">
                   <CoberturaDeliveryMap
                     key="cobertura-mapa"
-                    origem={origemGeo}
+                    origem={origemGeo ?? (setupInicial ? pinRascunho : null)}
                     raios={raios}
                     areas={areas}
                     ferramenta={ferramenta}
@@ -1036,7 +1085,35 @@ export function CoberturaDeliveryTab() {
               </nav>
             </div>
 
-            {pinPendente ? (
+            {setupInicial ? (
+              <div className="mx-3 mt-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2.5">
+                <p className="text-sm font-semibold text-primary-text">Confirme a loja e o alcance</p>
+                <p className="mt-0.5 text-xs text-secondary-text">
+                  O pin está no endereço da empresa. Arraste até 1 km se precisar. Informe o alcance e
+                  confirme para gravar a loja e as faixas de 1 em 1 km.
+                </p>
+                <div className="mt-2.5 flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    aria-label="Alcance inicial do raio em km"
+                    value={alcanceKmTexto}
+                    onChange={event => setAlcanceKmTexto(event.target.value)}
+                    disabled={salvando || confirmandoSetup}
+                    className="w-16 rounded-lg border border-gray-200 bg-white px-2 py-2 text-center text-sm text-primary-text outline-none focus:border-primary"
+                  />
+                  <span className="shrink-0 text-xs font-semibold text-secondary-text">km</span>
+                  <button
+                    type="button"
+                    onClick={() => void handleConfirmarLojaEAlcance()}
+                    disabled={salvando || confirmandoSetup || !empresaDelivery}
+                    className="flex-1 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {confirmandoSetup ? 'Confirmando…' : 'Confirmar loja e alcance'}
+                  </button>
+                </div>
+              </div>
+            ) : pinPendente ? (
               <div className="mx-3 mt-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2.5">
                 <p className="text-sm font-semibold text-primary-text">Pin movido</p>
                 <p className="mt-0.5 text-xs text-secondary-text">
@@ -1209,7 +1286,13 @@ export function CoberturaDeliveryTab() {
                         placeholder="4"
                         value={alcanceKmTexto}
                         onChange={event => setAlcanceKmTexto(event.target.value)}
-                        disabled={salvando || definindoAlcance || !empresaDelivery || !geoConfigurada}
+                        disabled={
+                          salvando ||
+                          definindoAlcance ||
+                          confirmandoSetup ||
+                          !empresaDelivery ||
+                          (!geoConfigurada && !setupInicial)
+                        }
                         className="w-full rounded-md border border-gray-200 bg-white px-1.5 py-1 text-center text-xs text-primary-text outline-none focus:border-primary"
                       />
                       <span className="shrink-0 text-[11px] font-semibold text-secondary-text">
@@ -1218,7 +1301,14 @@ export function CoberturaDeliveryTab() {
                       <button
                         type="button"
                         onClick={() => void handleDefinirAlcanceRaio()}
-                        disabled={salvando || definindoAlcance || !empresaDelivery || !geoConfigurada}
+                        disabled={
+                          salvando ||
+                          definindoAlcance ||
+                          confirmandoSetup ||
+                          !empresaDelivery ||
+                          !geoConfigurada ||
+                          setupInicial
+                        }
                         className="inline-flex min-w-[4.5rem] shrink-0 items-center justify-center gap-1 rounded-md bg-primary px-2 py-1 text-[10px] font-semibold text-white hover:bg-primary/90 disabled:opacity-50"
                       >
                         {definindoAlcance ? (
@@ -1452,14 +1542,15 @@ export function CoberturaDeliveryTab() {
               </div>
             )}
 
-            {!mapaIndisponivel && (definindoAlcance || autoPinando || salvandoPin) ? (
+            {!mapaIndisponivel &&
+            (definindoAlcance || confirmandoSetup || salvandoPin) ? (
               <div
                 className="absolute inset-0 z-10 flex items-center justify-center bg-white/85"
                 role="status"
                 aria-live="polite"
                 aria-label={
-                  autoPinando
-                    ? 'Localizando a loja'
+                  confirmandoSetup
+                    ? 'Confirmando loja e alcance'
                     : salvandoPin
                       ? 'Salvando localização'
                       : 'Atualizando cobertura'
@@ -1469,8 +1560,8 @@ export function CoberturaDeliveryTab() {
                   size={48}
                   className="py-0"
                   text={
-                    autoPinando
-                      ? 'Localizando a loja…'
+                    confirmandoSetup
+                      ? 'Confirmando loja e alcance…'
                       : salvandoPin
                         ? 'Salvando localização…'
                         : 'Atualizando cobertura…'
