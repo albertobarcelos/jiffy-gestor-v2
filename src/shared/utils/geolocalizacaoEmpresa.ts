@@ -1,4 +1,8 @@
 import { parseGeoJsonPoint, type GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
+import {
+  erroGeocodeForwardParaCliente,
+  fetchGeocodeForward,
+} from '@/src/shared/utils/googleMapsFalha'
 
 export type EnderecoEmpresaGeocodeInput = {
   rua: string
@@ -99,21 +103,13 @@ export async function geocodificarEnderecoEmpresaViaGoogle(
   }
 
   const params = montarParametrosGeocodeEmpresa(input)
-  const response = await fetch(`/api/geolocalizacao/forward?${params.toString()}`, {
-    method: 'GET',
-    headers: { Accept: 'application/json' },
-  })
-
-  const payload = await response.json().catch(() => ({}))
-  if (!response.ok) {
-    const msg =
-      typeof payload.error === 'string'
-        ? payload.error
-        : 'Não foi possível localizar o endereço no Google Maps'
-    throw new Error(msg)
+  const { ok, status, payload } = await fetchGeocodeForward(params)
+  if (!ok) {
+    throw erroGeocodeForwardParaCliente(payload, status)
   }
 
-  const point = parseGeoJsonPoint(payload.enderecoLocalizacao)
+  const corpo = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {}
+  const point = parseGeoJsonPoint(corpo.enderecoLocalizacao)
   if (!point) {
     throw new Error('Resposta de geocodificação inválida')
   }
@@ -121,9 +117,9 @@ export async function geocodificarEnderecoEmpresaViaGoogle(
   return {
     enderecoLocalizacao: point,
     providerEnderecoId:
-      typeof payload.providerEnderecoId === 'string' ? payload.providerEnderecoId : null,
+      typeof corpo.providerEnderecoId === 'string' ? corpo.providerEnderecoId : null,
     enderecoFormatado:
-      typeof payload.enderecoFormatado === 'string' ? payload.enderecoFormatado : null,
+      typeof corpo.enderecoFormatado === 'string' ? corpo.enderecoFormatado : null,
   }
 }
 

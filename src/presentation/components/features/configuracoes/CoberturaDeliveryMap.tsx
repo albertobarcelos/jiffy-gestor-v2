@@ -32,6 +32,13 @@ import {
 import { distanciaMetrosEntrePontos } from '@/src/shared/utils/calcularTaxaCoberturaPonto'
 import { getGoogleMapsApiKeyClient } from '@/src/shared/utils/googleMapsClient'
 import { googleMapsLoaderConfig } from '@/src/shared/utils/googleMapsLoader'
+import {
+  MENSAGEM_MAPA_INDISPONIVEL_SUPORTE,
+} from '@/src/shared/utils/googleMapsFalha'
+import {
+  mapaGoogleAuthFalhou,
+  onMapaGoogleAuthFailure,
+} from '@/src/shared/utils/googleMapsFalhaCliente'
 import { pathsDeAnelFaixa } from '@/src/shared/utils/geoJsonCircle'
 import { RAIO_AJUSTE_PIN_METROS } from '@/src/shared/utils/ajustePinEmpresa'
 import {
@@ -759,7 +766,9 @@ export function CoberturaDeliveryMap({
   onHoverFim,
 }: CoberturaDeliveryMapProps) {
   const apiKey = getGoogleMapsApiKeyClient()
-  const { isLoaded, loadError } = useJsApiLoader(googleMapsLoaderConfig(apiKey))
+  const loaderConfig = useMemo(() => googleMapsLoaderConfig(apiKey), [apiKey])
+  const { isLoaded, loadError } = useJsApiLoader(loaderConfig)
+  const [authFalhou, setAuthFalhou] = useState(mapaGoogleAuthFalhou)
   const [verticesDesenho, setVerticesDesenho] = useState<LatLngLiteral[]>([])
   const [satelite, setSatelite] = useState(false)
   const [balaoPinAberto, setBalaoPinAberto] = useState(true)
@@ -792,6 +801,8 @@ export function CoberturaDeliveryMap({
   useEffect(() => {
     if (!modoDesenho) setVerticesDesenho([])
   }, [modoDesenho])
+
+  useEffect(() => onMapaGoogleAuthFailure(() => setAuthFalhou(true)), [])
 
   const handleAddVertice = useCallback((vertice: LatLngLiteral) => {
     setVerticesDesenho(prev => [...prev, vertice])
@@ -878,19 +889,18 @@ export function CoberturaDeliveryMap({
     [centroPin, ferramenta, onPinMovido]
   )
 
-  if (!apiKey) {
+  if (!apiKey || loadError || authFalhou) {
+    if (loadError) {
+      console.error('[jiffy:mapa] cobertura useJsApiLoader', loadError)
+    }
+    if (!apiKey) {
+      console.error('[jiffy:mapa] NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ausente no cliente')
+    }
     return (
-      <div className="flex h-full items-center justify-center rounded-lg border border-alternate/30 bg-alternate/10 px-3 py-2 text-center text-sm text-alternate">
-        Defina <code className="text-xs">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> no{' '}
-        <code className="text-xs">.env.local</code> para visualizar a cobertura no mapa.
-      </div>
-    )
-  }
-
-  if (loadError) {
-    return (
-      <div className="flex h-full items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-center text-sm text-red-700">
-        Não foi possível carregar o Google Maps.
+      <div className="flex h-full min-h-[280px] flex-col items-center justify-center gap-2 rounded-lg bg-white px-6 text-center">
+        <p className="max-w-sm text-sm font-medium text-primary-text">
+          {MENSAGEM_MAPA_INDISPONIVEL_SUPORTE}
+        </p>
       </div>
     )
   }

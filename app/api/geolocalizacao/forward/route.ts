@@ -9,6 +9,10 @@ import {
   type EnderecoEmpresaGeocodeInput,
 } from '@/src/shared/utils/geolocalizacaoEmpresa'
 import { RATE_LIMIT_GEO, verificarRateLimit } from '@/src/shared/utils/rateLimitMemory'
+import {
+  GOOGLE_MAPS_UNAVAILABLE_CODE,
+  MENSAGEM_MAPA_INDISPONIVEL_SUPORTE,
+} from '@/src/shared/utils/googleMapsFalha'
 
 type GoogleGeocodeResponse = {
   status?: string
@@ -253,8 +257,13 @@ export async function GET(request: NextRequest) {
 
   const apiKey = lerGoogleMapsApiKey()
   if (!apiKey) {
+    console.error('[geolocalizacao/forward] GOOGLE_MAPS_API_KEY ausente no servidor')
     return NextResponse.json(
-      { error: 'GOOGLE_MAPS_API_KEY não configurada no servidor' },
+      {
+        error: MENSAGEM_MAPA_INDISPONIVEL_SUPORTE,
+        errorCode: GOOGLE_MAPS_UNAVAILABLE_CODE,
+        googleStatus: 'MISSING_SERVER_KEY',
+      },
       { status: 503 }
     )
   }
@@ -292,11 +301,15 @@ export async function GET(request: NextRequest) {
     }
 
     if (status !== 'OK') {
+      console.error('[geolocalizacao/forward] Google recusou o geocode', {
+        status: status || 'desconhecido',
+        error_message: data.error_message ?? null,
+      })
       return NextResponse.json(
         {
-          error:
-            data.error_message?.trim() ||
-            `Google Geocoding retornou status ${status || 'desconhecido'}`,
+          error: MENSAGEM_MAPA_INDISPONIVEL_SUPORTE,
+          errorCode: GOOGLE_MAPS_UNAVAILABLE_CODE,
+          googleStatus: status || 'desconhecido',
         },
         { status: 502 }
       )
@@ -335,7 +348,15 @@ export async function GET(request: NextRequest) {
       enderecoFormatado: escolhido.formatted_address?.trim() || null,
       enderecoConsultado: address,
     })
-  } catch {
-    return NextResponse.json({ error: 'Erro ao consultar geolocalização' }, { status: 500 })
+  } catch (erro) {
+    console.error('[geolocalizacao/forward] falha ao consultar Google', erro)
+    return NextResponse.json(
+      {
+        error: MENSAGEM_MAPA_INDISPONIVEL_SUPORTE,
+        errorCode: GOOGLE_MAPS_UNAVAILABLE_CODE,
+        googleStatus: 'UPSTREAM_ERROR',
+      },
+      { status: 502 }
+    )
   }
 }

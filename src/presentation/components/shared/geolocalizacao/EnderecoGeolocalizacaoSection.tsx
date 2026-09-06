@@ -15,6 +15,11 @@ import {
   type GeocodeMinimoModo,
 } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
 import type { EnderecoGeolocalizacaoMapProps } from './EnderecoGeolocalizacaoMap'
+import {
+  isFalhaServicoMapaGoogle,
+  MENSAGEM_MAPA_INDISPONIVEL_SUPORTE,
+} from '@/src/shared/utils/googleMapsFalha'
+import { avisarMapaIndisponivelCliente } from '@/src/shared/utils/googleMapsFalhaCliente'
 import { showToast } from '@/src/shared/utils/toast'
 
 const EnderecoGeolocalizacaoMap = dynamic(
@@ -229,6 +234,11 @@ export function EnderecoGeolocalizacaoSection({
       return true
     } catch (error) {
       if (seqEsperada !== undefined && seqEsperada !== geocodeAutoSeqRef.current) {
+        return false
+      }
+      if (isFalhaServicoMapaGoogle(error)) {
+        setErroGeocodeAuto(MENSAGEM_MAPA_INDISPONIVEL_SUPORTE)
+        avisarMapaIndisponivelCliente('endereco geocode', error)
         return false
       }
       const msg = error instanceof Error ? error.message : 'Erro ao buscar localização'

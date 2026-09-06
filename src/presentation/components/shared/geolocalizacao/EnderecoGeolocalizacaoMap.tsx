@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { GoogleMap, Marker, useGoogleMap, useJsApiLoader } from '@react-google-maps/api'
 import {
   geoJsonPointFromLatLng,
@@ -9,6 +9,11 @@ import {
 } from '@/src/shared/types/geoJsonPoint'
 import { getGoogleMapsApiKeyClient } from '@/src/shared/utils/googleMapsClient'
 import { googleMapsLoaderConfig } from '@/src/shared/utils/googleMapsLoader'
+import { MENSAGEM_MAPA_INDISPONIVEL_SUPORTE } from '@/src/shared/utils/googleMapsFalha'
+import {
+  mapaGoogleAuthFalhou,
+  onMapaGoogleAuthFailure,
+} from '@/src/shared/utils/googleMapsFalhaCliente'
 import { criarOpcoesIconePinPreferencia, labelPinPreferenciaMapa } from './geolocalizacaoMapPinIcons'
 
 const MAP_CONTAINER_STYLE = { width: '100%', height: '320px' }
@@ -67,7 +72,11 @@ export function EnderecoGeolocalizacaoMap({
   localizacaoReferencia = null,
 }: EnderecoGeolocalizacaoMapProps) {
   const apiKey = getGoogleMapsApiKeyClient()
-  const { isLoaded, loadError } = useJsApiLoader(googleMapsLoaderConfig(apiKey))
+  const loaderConfig = useMemo(() => googleMapsLoaderConfig(apiKey), [apiKey])
+  const { isLoaded, loadError } = useJsApiLoader(loaderConfig)
+  const [authFalhou, setAuthFalhou] = useState(mapaGoogleAuthFalhou)
+
+  useEffect(() => onMapaGoogleAuthFailure(() => setAuthFalhou(true)), [])
 
   const posicaoMarcador = useMemo(() => latLngFromGeoJsonPoint(value), [value])
   const posicaoReferencia = useMemo(
@@ -94,19 +103,16 @@ export function EnderecoGeolocalizacaoMap({
     [disabled, onChange]
   )
 
-  if (!apiKey) {
+  if (!apiKey || loadError || authFalhou) {
+    if (loadError) {
+      console.error('[jiffy:mapa] endereço useJsApiLoader', loadError)
+    }
+    if (!apiKey) {
+      console.error('[jiffy:mapa] NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ausente no cliente')
+    }
     return (
-      <div className={missingKeyClassName}>
-        Defina <code className="text-xs">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> no{' '}
-        <code className="text-xs">.env.local</code> (mesma chave do Geocoding) para exibir o mapa.
-      </div>
-    )
-  }
-
-  if (loadError) {
-    return (
-      <div className={loadErrorClassName}>
-        Não foi possível carregar o Google Maps. Verifique a chave e as APIs habilitadas no Google Cloud.
+      <div className={!apiKey ? missingKeyClassName : loadErrorClassName}>
+        {MENSAGEM_MAPA_INDISPONIVEL_SUPORTE}
       </div>
     )
   }
