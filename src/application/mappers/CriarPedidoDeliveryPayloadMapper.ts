@@ -85,19 +85,14 @@ function buildClientePedidoDeliveryPayload(input: CriarPedidoDeliveryInputDTO) {
   return cliente
 }
 
-function buildTaxasPedidoDeliveryPayload() {
-  // POST /delivery/pedidos (Gestor) não aceita `taxas` — additionalProperties: false.
-  // A cobertura é calculada no backend. Override do atendente é PATCH após o create.
-  return undefined
-}
-
 export function buildCriarPedidoDeliveryPayload(
   input: CriarPedidoDeliveryInputDTO
 ): CriarPedidoDeliveryApiRequest {
   const observacoesPedido = observacoesArrayFromTexto(input.observacaoPedido)
   const cobrancas = buildCobrancasPedidoDeliveryPayload(input)
-  const taxas = buildTaxasPedidoDeliveryPayload()
 
+  // POST /delivery/pedidos (Gestor) não aceita `taxas` — additionalProperties: false.
+  // A cobertura é calculada no backend. Override do atendente é PATCH após o create.
   const payload: CriarPedidoDeliveryApiRequest = {
     origem: 'GESTOR',
     tipoEntrega: input.tipoAtendimentoDelivery,
@@ -112,10 +107,6 @@ export function buildCriarPedidoDeliveryPayload(
 
   if (cobrancas && cobrancas.length > 0) {
     payload.cobrancas = cobrancas
-  }
-
-  if (taxas && taxas.length > 0) {
-    payload.taxas = taxas
   }
 
   return payload
