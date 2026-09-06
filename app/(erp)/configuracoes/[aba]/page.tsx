@@ -7,11 +7,9 @@ import { PageLoading } from '@/src/presentation/components/ui/PageLoading'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import {
   configuracoesTabPath,
-  DELIVERY_HUB_PATH,
-  deliveryHubEtapaPath,
   isConfiguracoesTabSlug,
-  isDeliveryEtapaId,
   resolveConfiguracoesTabFromPath,
+  resolverRedirectHubDeliveryLegado,
 } from '@/src/shared/constants/configuracoesRoutes'
 import type { ConfiguracoesTabSlug } from '@/src/shared/constants/configuracoesRoutes'
 
@@ -40,12 +38,9 @@ export default function ConfiguracoesTabPage({
   const abrir = searchParams.get('abrir')
 
   useEffect(() => {
-    if (aba === 'cobertura-delivery' || (abrir && isDeliveryEtapaId(abrir))) {
-      router.replace(toGestao(deliveryHubEtapaPath('delivery-cobertura')))
-      return
-    }
-    if (aba === 'empresa-delivery') {
-      router.replace(toGestao(DELIVERY_HUB_PATH))
+    const redirectHub = resolverRedirectHubDeliveryLegado(aba, abrir)
+    if (redirectHub) {
+      router.replace(toGestao(redirectHub))
       return
     }
     if (!isValidTab && legacyTab) {

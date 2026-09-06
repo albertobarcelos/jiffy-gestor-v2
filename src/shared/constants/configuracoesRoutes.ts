@@ -16,15 +16,24 @@ export type ConfiguracoesTabSlug = (typeof CONFIGURACOES_TAB_SLUGS)[number]
 /** Hub Delivery — path canônico. */
 export const DELIVERY_HUB_PATH = '/config/delivery'
 
-export type DeliveryEtapaId = 'delivery-cobertura'
+export type DeliveryEtapaId =
+  | 'delivery-geolocalizacao'
+  | 'delivery-cobertura'
+  | 'delivery-entregadores'
+  | 'delivery-meios'
+  | 'delivery-impressoras'
 
 const DELIVERY_ETAPA_SLUG: Record<DeliveryEtapaId, string> = {
+  'delivery-geolocalizacao': 'empresa',
   'delivery-cobertura': 'cobertura',
+  'delivery-entregadores': 'entregadores',
+  'delivery-meios': 'meios',
+  'delivery-impressoras': 'impressoras',
 }
 
-const DELIVERY_SLUG_TO_ETAPA: Record<string, DeliveryEtapaId> = {
-  cobertura: 'delivery-cobertura',
-}
+const DELIVERY_SLUG_TO_ETAPA = Object.fromEntries(
+  Object.entries(DELIVERY_ETAPA_SLUG).map(([id, slug]) => [slug, id])
+) as Record<string, DeliveryEtapaId>
 
 const LEGACY_QUERY_TAB: Record<string, ConfiguracoesTabSlug> = {
   planilha: 'importar-dados',
@@ -81,6 +90,23 @@ export function isDeliveryEtapaId(value: string): value is DeliveryEtapaId {
 /** Path canônico da etapa (ex.: `/config/delivery/cobertura`). */
 export function deliveryHubEtapaPath(etapaId: DeliveryEtapaId): string {
   return `${DELIVERY_HUB_PATH}/${deliveryEtapaSlug(etapaId)}`
+}
+
+/** Rotas antigas `/configuracoes/:aba` → hub ou etapa interna. */
+export function resolverRedirectHubDeliveryLegado(
+  aba: string,
+  abrir: string | null | undefined
+): string | null {
+  if (aba === 'cobertura-delivery') {
+    return deliveryHubEtapaPath('delivery-cobertura')
+  }
+  if (aba === 'empresa-delivery') {
+    if (abrir && isDeliveryEtapaId(abrir)) {
+      return deliveryHubEtapaPath(abrir)
+    }
+    return DELIVERY_HUB_PATH
+  }
+  return null
 }
 
 export function isConfiguracoesModulePath(pathname: string): boolean {

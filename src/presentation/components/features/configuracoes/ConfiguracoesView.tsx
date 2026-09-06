@@ -33,7 +33,7 @@ type ConfiguracoesViewProps = {
 
 /**
  * Configurações — abas em `/configuracoes/:aba`.
- * Delivery usa `/config/delivery` e `/config/delivery/cobertura`.
+ * Delivery usa `/config/delivery` e `/config/delivery/:etapa`.
  */
 export function ConfiguracoesView({ activeTab, deliveryEtapaId = null }: ConfiguracoesViewProps) {
   const router = useRouter()

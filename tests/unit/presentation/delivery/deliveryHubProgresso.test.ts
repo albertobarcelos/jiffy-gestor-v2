@@ -26,5 +26,26 @@ describe('calcularDeliveryHubProgresso', () => {
     const cobertura = progresso.passos.find(passo => passo.id === 'delivery-cobertura')
     expect(geo?.concluido).toBe(true)
     expect(cobertura?.concluido).toBe(false)
+    expect(progresso.concluidosObrigatorios).toBe(1)
+    expect(progresso.totalObrigatorios).toBe(2)
+    expect(progresso.porcentagemObrigatorias).toBe(50)
+  })
+
+  it('marca geo incompleta quando a pendência é de pin', () => {
+    const progresso = calcularDeliveryHubProgresso(
+      [
+        {
+          type: EMPRESA_DELIVERY_PENDENCIA_TYPES.GEOLOCALIZACAO_NAO_CONFIGURADA,
+          message: 'Pin ausente',
+        },
+      ],
+      true
+    )
+    const geo = progresso.passos.find(passo => passo.id === 'delivery-geolocalizacao')
+    const cobertura = progresso.passos.find(passo => passo.id === 'delivery-cobertura')
+    expect(geo?.concluido).toBe(false)
+    expect(cobertura?.concluido).toBe(true)
+    expect(geo?.href).toBe('/config/delivery/empresa')
+    expect(cobertura?.href).toBe('/config/delivery/cobertura')
   })
 })

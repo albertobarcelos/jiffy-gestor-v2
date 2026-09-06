@@ -4,11 +4,11 @@ import {
   type EmpresaDeliveryPendenciaItem,
 } from '@/src/shared/constants/empresaDeliveryPendencias'
 import {
+  deliveryHubEtapaPath,
   type DeliveryEtapaId,
-} from '@/src/presentation/components/features/delivery/hub/deliveryHubEtapas'
-import { configuracoesTabPath, deliveryHubEtapaPath } from '@/src/shared/constants/configuracoesRoutes'
+} from '@/src/shared/constants/configuracoesRoutes'
 
-export type DeliveryPassoChecklistId = DeliveryEtapaId | 'delivery-geolocalizacao'
+export type DeliveryPassoChecklistId = 'delivery-geolocalizacao' | 'delivery-cobertura'
 
 export type DeliveryPassoChecklist = {
   id: DeliveryPassoChecklistId
@@ -24,13 +24,15 @@ const PASSOS_BASE: Omit<DeliveryPassoChecklist, 'concluido'>[] = [
     id: 'delivery-geolocalizacao',
     label: 'Endereço da empresa',
     obrigatoria: true,
-    href: configuracoesTabPath('empresa'),
+    etapaId: 'delivery-geolocalizacao',
+    href: deliveryHubEtapaPath('delivery-geolocalizacao'),
   },
   {
     id: 'delivery-cobertura',
     label: 'Cobertura de entrega',
     obrigatoria: true,
     etapaId: 'delivery-cobertura',
+    href: deliveryHubEtapaPath('delivery-cobertura'),
   },
 ]
 
@@ -93,8 +95,4 @@ export function calcularDeliveryHubProgresso(
     concluidosObrigatorios,
     porcentagemObrigatorias,
   }
-}
-
-export function deliveryHubAbrirEtapaHref(etapaId: DeliveryEtapaId): string {
-  return deliveryHubEtapaPath(etapaId)
 }

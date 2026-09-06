@@ -1,7 +1,4 @@
-import {
-  configuracoesTabPath,
-  deliveryHubEtapaPath,
-} from '@/src/shared/constants/configuracoesRoutes'
+import { deliveryHubEtapaPath } from '@/src/shared/constants/configuracoesRoutes'
 
 export const EMPRESA_DELIVERY_PENDENCIA_TYPES = {
   EMPRESA_DELIVERY_NAO_CONFIGURADA: 'EMPRESA_DELIVERY_NAO_CONFIGURADA',
@@ -43,7 +40,7 @@ const ACAO_POR_TIPO: Partial<Record<EmpresaDeliveryPendenciaType, PendenciaAcao>
   },
   [EMPRESA_DELIVERY_PENDENCIA_TYPES.TIMEZONE_NAO_CONFIGURADO]: {
     label: 'Configurar fuso na aba Empresa',
-    href: configuracoesTabPath('empresa'),
+    href: deliveryHubEtapaPath('delivery-geolocalizacao'),
   },
 }
 
