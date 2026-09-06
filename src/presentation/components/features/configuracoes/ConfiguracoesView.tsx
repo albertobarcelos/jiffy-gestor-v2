@@ -14,7 +14,9 @@ import { cn } from '@/src/shared/utils/cn'
 import {
   configuracoesTabPath,
   type ConfiguracoesTabSlug,
+  type DeliveryEtapaId,
 } from '@/src/shared/constants/configuracoesRoutes'
+import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 
 const CadastroPorPlanilha = dynamic(
   () =>
@@ -26,19 +28,22 @@ const CadastroPorPlanilha = dynamic(
 
 type ConfiguracoesViewProps = {
   activeTab: ConfiguracoesTabSlug
+  deliveryEtapaId?: DeliveryEtapaId | null
 }
 
 /**
- * Configurações — abas em `/configuracoes/:aba` (ex.: `/configuracoes/taxas`).
+ * Configurações — abas em `/configuracoes/:aba`.
+ * Delivery usa `/config/delivery` e `/config/delivery/cobertura`.
  */
-export function ConfiguracoesView({ activeTab }: ConfiguracoesViewProps) {
+export function ConfiguracoesView({ activeTab, deliveryEtapaId = null }: ConfiguracoesViewProps) {
   const router = useRouter()
+  const { toGestao } = useGestaoPath()
 
   const goToTab = useCallback(
     (tab: ConfiguracoesTabSlug) => {
-      router.replace(configuracoesTabPath(tab), { scroll: false })
+      router.replace(toGestao(configuracoesTabPath(tab)), { scroll: false })
     },
-    [router]
+    [router, toGestao]
   )
 
   const tabBtn = (tab: ConfiguracoesTabSlug, label: string) => (
@@ -74,7 +79,9 @@ export function ConfiguracoesView({ activeTab }: ConfiguracoesViewProps) {
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="flex flex-1 flex-col overflow-hidden rounded-b-[10px] bg-info">
           {activeTab === 'empresa' && <EmpresaTab />}
-          {activeTab === 'empresa-delivery' && <DeliveryHubView />}
+          {activeTab === 'empresa-delivery' && (
+            <DeliveryHubView etapaId={deliveryEtapaId} />
+          )}
           {activeTab === 'terminais' && <TerminaisTab />}
           {activeTab === 'impressoras' && <ImpressorasList />}
           {activeTab === 'meios-pagamentos' && (

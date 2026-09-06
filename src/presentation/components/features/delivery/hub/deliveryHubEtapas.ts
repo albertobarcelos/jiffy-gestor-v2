@@ -1,14 +1,15 @@
 import type { IconType } from 'react-icons'
 import { MdRadar } from 'react-icons/md'
-import { configuracoesTabPath } from '@/src/shared/constants/configuracoesRoutes'
+import {
+  DELIVERY_HUB_PATH,
+  deliveryHubEtapaPath,
+  type DeliveryEtapaId,
+} from '@/src/shared/constants/configuracoesRoutes'
 import { CoberturaDeliveryTab } from '@/src/presentation/components/features/configuracoes/tabs/CoberturaDeliveryTab'
 
-/** Path único do hub — etapas são abas SPA (tabsStore), sem troca de rota. */
-export const DELIVERY_HUB_PATH = configuracoesTabPath('empresa-delivery')
+export { DELIVERY_HUB_PATH, type DeliveryEtapaId }
 
 export const DELIVERY_HUB_TAB_ID = 'delivery-hub'
-
-export type DeliveryEtapaId = 'delivery-cobertura'
 
 export interface DeliveryEtapaConfig {
   id: DeliveryEtapaId
@@ -29,7 +30,7 @@ export const DELIVERY_HUB_ETAPAS: DeliveryEtapaConfig[] = [
     step: 1,
     title: 'Cobertura delivery',
     label: 'Cobertura delivery',
-    path: DELIVERY_HUB_PATH,
+    path: deliveryHubEtapaPath('delivery-cobertura'),
     component: CoberturaDeliveryTab,
     icon: MdRadar,
     botaoLabel: 'Abrir',

@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { MdCheckCircle, MdStorefront } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useEmpresaDeliveryMe } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
@@ -37,11 +37,10 @@ function SectionBox({ title, children }: { title: string; children: React.ReactN
  * Hub Delivery (visual do portal) — nesta branch só a etapa Cobertura.
  * Sem loja pública / design / agenda.
  */
-export function DeliveryHubView() {
+export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId | null }) {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { toGestao } = useGestaoPath()
-  const { addTab, activeTabId } = useTabsStore()
+  const { addTab, setActiveTab, activeTabId } = useTabsStore()
   const empresaDeliveryQuery = useEmpresaDeliveryMe()
   const previousTabIdRef = useRef<string | null>(null)
 
@@ -60,19 +59,15 @@ export function DeliveryHubView() {
       path: DELIVERY_HUB_PATH,
       isFixed: true,
     })
-  }, [addTab])
-
-  // Deep-link ?abrir=delivery-cobertura
-  useEffect(() => {
-    const abrir = searchParams.get('abrir')
-    if (!abrir || !isDeliveryEtapaId(abrir)) return
-
-    const etapa = getDeliveryEtapaById(abrir)
-    if (!etapa) return
-
-    addTab({ id: etapa.id, label: etapa.label, path: etapa.path })
-    router.replace(DELIVERY_HUB_PATH, { scroll: false })
-  }, [addTab, router, searchParams])
+    if (etapaId) {
+      const etapa = getDeliveryEtapaById(etapaId)
+      if (etapa) {
+        addTab({ id: etapa.id, label: etapa.label, path: etapa.path })
+      }
+    } else {
+      setActiveTab(DELIVERY_HUB_TAB_ID)
+    }
+  }, [addTab, etapaId, setActiveTab])
 
   useEffect(() => {
     const voltouParaHub = activeTabId === DELIVERY_HUB_TAB_ID
@@ -90,16 +85,14 @@ export function DeliveryHubView() {
     previousTabIdRef.current = activeTabId
   }, [activeTabId, empresaDeliveryQuery])
 
-  const abrirEtapa = useCallback((etapaId: DeliveryEtapaId) => {
-    const etapa = getDeliveryEtapaById(etapaId)
+  const abrirEtapa = useCallback((proximaEtapaId: DeliveryEtapaId) => {
+    const etapa = getDeliveryEtapaById(proximaEtapaId)
     if (!etapa) return
     addTab({ id: etapa.id, label: etapa.label, path: etapa.path })
-  }, [addTab])
+    router.push(toGestao(etapa.path))
+  }, [addTab, router, toGestao])
 
-  const etapaAtiva =
-    activeTabId && isDeliveryEtapaId(activeTabId)
-      ? getDeliveryEtapaById(activeTabId)
-      : undefined
+  const etapaAtiva = etapaId ? getDeliveryEtapaById(etapaId) : undefined
 
   if (etapaAtiva) {
     const EtapaComponent = etapaAtiva.component

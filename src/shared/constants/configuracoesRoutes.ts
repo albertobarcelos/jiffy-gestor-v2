@@ -1,4 +1,6 @@
-/** Segmentos de URL em `/configuracoes/:aba` */
+import { stripGestaoEmpresaSlugFromPath } from '@/src/shared/utils/gestaoRoutes'
+
+/** Segmentos de URL em `/configuracoes/:aba` (exceto Delivery, que vive em `/config/delivery`). */
 export const CONFIGURACOES_TAB_SLUGS = [
   'empresa',
   'empresa-delivery',
@@ -11,13 +13,26 @@ export const CONFIGURACOES_TAB_SLUGS = [
 
 export type ConfiguracoesTabSlug = (typeof CONFIGURACOES_TAB_SLUGS)[number]
 
+/** Hub Delivery — path canônico. */
+export const DELIVERY_HUB_PATH = '/config/delivery'
+
+export type DeliveryEtapaId = 'delivery-cobertura'
+
+const DELIVERY_ETAPA_SLUG: Record<DeliveryEtapaId, string> = {
+  'delivery-cobertura': 'cobertura',
+}
+
+const DELIVERY_SLUG_TO_ETAPA: Record<string, DeliveryEtapaId> = {
+  cobertura: 'delivery-cobertura',
+}
+
 const LEGACY_QUERY_TAB: Record<string, ConfiguracoesTabSlug> = {
   planilha: 'importar-dados',
   'cardapio-digital': 'empresa-delivery',
   'cobertura-delivery': 'empresa-delivery',
 }
 
-/** Slugs de rota antigos → slug canônico (`/configuracoes/:aba`). */
+/** Slugs de rota antigos → aba de Configurações. */
 const LEGACY_PATH_TAB: Record<string, ConfiguracoesTabSlug> = {
   'cardapio-digital': 'empresa-delivery',
   'cobertura-delivery': 'empresa-delivery',
@@ -47,10 +62,33 @@ export function resolveConfiguracoesTabFromLegacyQuery(
 }
 
 export function configuracoesTabPath(tab: ConfiguracoesTabSlug): string {
+  if (tab === 'empresa-delivery') return DELIVERY_HUB_PATH
   return `/configuracoes/${tab}`
 }
 
-/** Hub Delivery + etapa SPA via query `?abrir=`. */
-export function deliveryHubEtapaPath(etapaId: 'delivery-cobertura'): string {
-  return `${configuracoesTabPath('empresa-delivery')}?abrir=${encodeURIComponent(etapaId)}`
+export function deliveryEtapaSlug(etapaId: DeliveryEtapaId): string {
+  return DELIVERY_ETAPA_SLUG[etapaId]
+}
+
+export function deliveryEtapaIdFromSlug(slug: string): DeliveryEtapaId | null {
+  return DELIVERY_SLUG_TO_ETAPA[slug] ?? null
+}
+
+export function isDeliveryEtapaId(value: string): value is DeliveryEtapaId {
+  return value in DELIVERY_ETAPA_SLUG
+}
+
+/** Path canônico da etapa (ex.: `/config/delivery/cobertura`). */
+export function deliveryHubEtapaPath(etapaId: DeliveryEtapaId): string {
+  return `${DELIVERY_HUB_PATH}/${deliveryEtapaSlug(etapaId)}`
+}
+
+export function isConfiguracoesModulePath(pathname: string): boolean {
+  const current = stripGestaoEmpresaSlugFromPath(pathname)
+  return (
+    current === '/configuracoes' ||
+    current.startsWith('/configuracoes/') ||
+    current === '/config' ||
+    current.startsWith('/config/')
+  )
 }

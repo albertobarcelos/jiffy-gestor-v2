@@ -34,8 +34,8 @@ export type PendenciaAcao = {
 
 const ACAO_POR_TIPO: Partial<Record<EmpresaDeliveryPendenciaType, PendenciaAcao>> = {
   [EMPRESA_DELIVERY_PENDENCIA_TYPES.GEOLOCALIZACAO_NAO_CONFIGURADA]: {
-    label: 'Configurar na aba Empresa',
-    href: `${configuracoesTabPath('empresa')}#geolocalizacao-empresa`,
+    label: 'Definir pin na cobertura de entrega',
+    href: deliveryHubEtapaPath('delivery-cobertura'),
   },
   [EMPRESA_DELIVERY_PENDENCIA_TYPES.COBERTURA_NAO_CONFIGURADA]: {
     label: 'Configurar cobertura de entrega',

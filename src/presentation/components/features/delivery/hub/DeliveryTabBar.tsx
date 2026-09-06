@@ -1,7 +1,10 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { MdClose, MdDesignServices } from 'react-icons/md'
 import { useTabsStore } from '@/src/presentation/stores/tabsStore'
+import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
+import { DELIVERY_HUB_PATH } from '@/src/shared/constants/configuracoesRoutes'
 import {
   DELIVERY_HUB_ETAPAS,
   DELIVERY_HUB_TAB_ID,
@@ -13,10 +16,17 @@ import {
  * TabBar filtrada só com abas do hub Delivery (evita misturar com Portal do Contador).
  */
 export function DeliveryTabBar() {
+  const router = useRouter()
+  const { toGestao } = useGestaoPath()
   const { tabs, activeTabId, setActiveTab, removeTab } = useTabsStore()
   const deliveryTabs = tabs.filter(t => isDeliveryTabId(t.id))
 
   if (deliveryTabs.length === 0) return null
+
+  const irParaHub = () => {
+    setActiveTab(DELIVERY_HUB_TAB_ID)
+    router.push(toGestao(DELIVERY_HUB_PATH))
+  }
 
   return (
     <div className="shrink-0 border-b border-gray-200 bg-white/90 backdrop-blur-sm">
@@ -37,7 +47,16 @@ export function DeliveryTabBar() {
                   ? 'border-secondary'
                   : 'border-alternate/30 hover:bg-alternate/20'
               }`}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                if (tab.id === DELIVERY_HUB_TAB_ID) {
+                  irParaHub()
+                  return
+                }
+                if (etapa) {
+                  setActiveTab(etapa.id)
+                  router.push(toGestao(etapa.path))
+                }
+              }}
               title={tab.label}
               role="tab"
               aria-selected={isActive}
@@ -61,12 +80,7 @@ export function DeliveryTabBar() {
                   onClick={e => {
                     e.stopPropagation()
                     removeTab(tab.id)
-                    // Se a aba ativa caiu fora do Delivery, volta ao hub
-                    const { activeTabId: nextId, tabs: nextTabs } = useTabsStore.getState()
-                    if (!isDeliveryTabId(nextId)) {
-                      const hub = nextTabs.find(t => t.id === DELIVERY_HUB_TAB_ID)
-                      if (hub) setActiveTab(DELIVERY_HUB_TAB_ID)
-                    }
+                    irParaHub()
                   }}
                   className={`rounded-full p-0.5 hover:bg-alternate/20 ${
                     isActive ? 'text-secondary' : 'text-alternate'
@@ -80,7 +94,6 @@ export function DeliveryTabBar() {
           )
         })}
       </div>
-      {/* reforça ordem visual das etapas conhecidas */}
       <span className="sr-only">{DELIVERY_HUB_ETAPAS.map(e => e.label).join(', ')}</span>
     </div>
   )

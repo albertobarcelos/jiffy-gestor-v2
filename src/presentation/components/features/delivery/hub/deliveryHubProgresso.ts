@@ -4,10 +4,9 @@ import {
   type EmpresaDeliveryPendenciaItem,
 } from '@/src/shared/constants/empresaDeliveryPendencias'
 import {
-  DELIVERY_HUB_PATH,
   type DeliveryEtapaId,
 } from '@/src/presentation/components/features/delivery/hub/deliveryHubEtapas'
-import { configuracoesTabPath } from '@/src/shared/constants/configuracoesRoutes'
+import { configuracoesTabPath, deliveryHubEtapaPath } from '@/src/shared/constants/configuracoesRoutes'
 
 export type DeliveryPassoChecklistId = DeliveryEtapaId | 'delivery-geolocalizacao'
 
@@ -23,9 +22,9 @@ export type DeliveryPassoChecklist = {
 const PASSOS_BASE: Omit<DeliveryPassoChecklist, 'concluido'>[] = [
   {
     id: 'delivery-geolocalizacao',
-    label: 'Geolocalização da empresa',
+    label: 'Endereço da empresa',
     obrigatoria: true,
-    href: `${configuracoesTabPath('empresa')}#geolocalizacao-empresa`,
+    href: configuracoesTabPath('empresa'),
   },
   {
     id: 'delivery-cobertura',
@@ -61,7 +60,7 @@ export type DeliveryHubProgresso = {
  */
 export function calcularDeliveryHubProgresso(
   pendencias: EmpresaDeliveryPendenciaItem[] | undefined,
-  _empresaConfigurada: boolean
+  empresaConfigurada: boolean
 ): DeliveryHubProgresso {
   const lista = pendencias ?? []
 
@@ -73,9 +72,8 @@ export function calcularDeliveryHubProgresso(
     if (pendenciaRelacionada) {
       obrigatoria = pendenciaEhObrigatoria(pendenciaRelacionada)
     }
-    // Se a API não envia pendências, não marcar geo/cobertura como concluídos à força
-    if (lista.length === 0 && passo.id === 'delivery-cobertura') {
-      concluido = false
+    if (lista.length === 0) {
+      concluido = empresaConfigurada
     }
     return { ...passo, obrigatoria, concluido }
   })
@@ -98,5 +96,5 @@ export function calcularDeliveryHubProgresso(
 }
 
 export function deliveryHubAbrirEtapaHref(etapaId: DeliveryEtapaId): string {
-  return `${DELIVERY_HUB_PATH}?abrir=${encodeURIComponent(etapaId)}`
+  return deliveryHubEtapaPath(etapaId)
 }

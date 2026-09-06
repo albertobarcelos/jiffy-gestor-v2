@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import {
   configuracoesTabPath,
+  deliveryHubEtapaPath,
   resolveConfiguracoesTabFromLegacyQuery,
 } from '@/src/shared/constants/configuracoesRoutes'
 
@@ -13,6 +14,9 @@ export default async function ConfiguracoesIndexPage({
   searchParams: SearchParams
 }) {
   const { tab } = await searchParams
+  if (tab === 'cobertura-delivery') {
+    redirect(deliveryHubEtapaPath('delivery-cobertura'))
+  }
   const slug = resolveConfiguracoesTabFromLegacyQuery(tab)
   redirect(configuracoesTabPath(slug))
 }
