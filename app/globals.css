@@ -300,3 +300,9 @@ h6 {
 /* Remover warnings do normalize.css - não são erros críticos */
 /* Os warnings sobre -webkit-text-size-adjust, :host, -moz-focus-inner são do normalize.css */
 /* e não afetam a funcionalidade da aplicação */
+
+/* Google injeta overlays em inglês quando a chave/API falha; o Gestor mostra a mensagem humana. */
+body.jiffy-mapa-google-indisponivel .dismissButton,
+body.jiffy-mapa-google-indisponivel .gm-err-container {
+  display: none !important;
+}

@@ -35,13 +35,25 @@ import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalida
 import { showToast } from '@/src/shared/utils/toast'
 import { DELIVERY_HUB_PATH, configuracoesTabPath } from '@/src/shared/constants/configuracoesRoutes'
 import {
+  isFalhaServicoMapaGoogle,
+  MENSAGEM_MAPA_INDISPONIVEL_SUPORTE,
+} from '@/src/shared/utils/googleMapsFalha'
+import {
+  avisarMapaIndisponivelCliente,
+  mapaGoogleAuthFalhou,
+  onMapaGoogleAuthFailure,
+} from '@/src/shared/utils/googleMapsFalhaCliente'
+import {
   enderecoEmpresaGeocodeMinimo,
   geocodificarEnderecoEmpresaViaGoogle,
   lerCamposEnderecoEmpresa,
   lerEnderecoLocalizacaoDoPayloadEmpresa,
   montarPatchEnderecoGeolocalizacao,
 } from '@/src/shared/utils/geolocalizacaoEmpresa'
-import type { EnderecoEmpresaGeocodeInput } from '@/src/shared/utils/geolocalizacaoEmpresa'
+import type {
+  EnderecoEmpresaGeocodeInput,
+  GeocodeEmpresaResult,
+} from '@/src/shared/utils/geolocalizacaoEmpresa'
 import { pontosGeoIguais, type GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import {
   geoJsonToLatLngPath,
@@ -180,6 +192,9 @@ export function CoberturaDeliveryTab() {
   const [pinSnapEpoch, setPinSnapEpoch] = useState(0)
   const [centroEnderecoGeo, setCentroEnderecoGeo] = useState<GeoJsonPoint | null>(null)
   const autoPinTentadoRef = useRef(false)
+  const geocodeResultadoRef = useRef<GeocodeEmpresaResult | null>(null)
+  const geocodeAssinaturaRef = useRef('')
+  const [mapaIndisponivel, setMapaIndisponivel] = useState(mapaGoogleAuthFalhou)
   const acoesDesenhoRef = useRef<AcoesDesenhoCobertura | null>(null)
   const invalidateQueries = useInvalidateTenantQueries()
 
@@ -326,52 +341,82 @@ export function CoberturaDeliveryTab() {
     setAlcanceKmTexto(String(km).replace('.', ','))
   }, [raioAlcance])
 
+  useEffect(() => onMapaGoogleAuthFailure(() => setMapaIndisponivel(true)), [])
+
   useEffect(() => {
-    if (autoPinTentadoRef.current) return
-    if (!empresaDelivery || geoQuery.isPending || geoQuery.isError) return
-    if (origemGeo) return
-    if (!enderecoEmpresa || !enderecoEmpresaGeocodeMinimo(enderecoEmpresa)) return
+    if (!enderecoEmpresa || !enderecoEmpresaGeocodeMinimo(enderecoEmpresa)) {
+      setCentroEnderecoGeo(null)
+      geocodeResultadoRef.current = null
+      geocodeAssinaturaRef.current = ''
+      return
+    }
+    if (mapaIndisponivel) return
+    if (geocodeAssinaturaRef.current === enderecoAssinatura) return
+
+    let cancelado = false
+    void (async () => {
+      try {
+        const resultado = await geocodificarEnderecoEmpresaViaGoogle(enderecoEmpresa)
+        if (cancelado) return
+        geocodeAssinaturaRef.current = enderecoAssinatura
+        geocodeResultadoRef.current = resultado
+        setCentroEnderecoGeo(resultado.enderecoLocalizacao)
+      } catch (error) {
+        if (cancelado) return
+        geocodeAssinaturaRef.current = enderecoAssinatura
+        if (isFalhaServicoMapaGoogle(error)) {
+          setMapaIndisponivel(true)
+          avisarMapaIndisponivelCliente('cobertura geocode', error)
+          return
+        }
+        geocodeResultadoRef.current = null
+        setCentroEnderecoGeo(null)
+      }
+    })()
+    return () => {
+      cancelado = true
+    }
+  }, [enderecoAssinatura, enderecoEmpresa, mapaIndisponivel])
+
+  useEffect(() => {
+    if (mapaIndisponivel || autoPinTentadoRef.current) return
+    if (!empresaDelivery || geoQuery.isPending || geoQuery.isError || origemGeo) return
+    const resultado = geocodeResultadoRef.current
+    if (!resultado) return
+
     autoPinTentadoRef.current = true
     setAutoPinando(true)
     void (async () => {
       try {
-        const resultado = await geocodificarEnderecoEmpresaViaGoogle(enderecoEmpresa)
-        setCentroEnderecoGeo(resultado.enderecoLocalizacao)
         await atualizarOrigemMutation.mutateAsync({
           point: resultado.enderecoLocalizacao,
           providerEnderecoId: resultado.providerEnderecoId,
         })
         await geoQuery.refetch()
       } catch (error) {
+        if (isFalhaServicoMapaGoogle(error)) {
+          setMapaIndisponivel(true)
+          avisarMapaIndisponivelCliente('cobertura auto-pin', error)
+          return
+        }
         autoPinTentadoRef.current = false
         showToast.error(
-          error instanceof Error
-            ? error.message
-            : 'Não foi possível localizar a loja pelo endereço. Clique no mapa para marcar.'
+          error instanceof Error ? error.message : 'Não foi possível salvar a localização da loja.'
         )
       } finally {
         setAutoPinando(false)
       }
     })()
-  }, [atualizarOrigemMutation, empresaDelivery, enderecoEmpresa, geoQuery, origemGeo])
-
-  useEffect(() => {
-    if (!enderecoEmpresa || !enderecoEmpresaGeocodeMinimo(enderecoEmpresa)) {
-      setCentroEnderecoGeo(null)
-      return
-    }
-    let cancelado = false
-    void geocodificarEnderecoEmpresaViaGoogle(enderecoEmpresa)
-      .then(resultado => {
-        if (!cancelado) setCentroEnderecoGeo(resultado.enderecoLocalizacao)
-      })
-      .catch(() => {
-        /* Sem geocode do endereço, o limite de 1 km usa o pin gravado (centroAjustePin). */
-      })
-    return () => {
-      cancelado = true
-    }
-  }, [enderecoAssinatura, enderecoEmpresa])
+  }, [
+    atualizarOrigemMutation,
+    centroEnderecoGeo,
+    empresaDelivery,
+    geoQuery.isError,
+    geoQuery.isPending,
+    geoQuery.refetch,
+    mapaIndisponivel,
+    origemGeo,
+  ])
 
   const alertas = useMemo(() => {
     const items: { titulo: string; descricao: string; href?: string; label?: string }[] = []
@@ -384,8 +429,15 @@ export function CoberturaDeliveryTab() {
         label: 'Ir para Delivery',
       })
     }
+    if (mapaIndisponivel) {
+      items.push({
+        titulo: 'Mapa indisponível',
+        descricao: MENSAGEM_MAPA_INDISPONIVEL_SUPORTE,
+      })
+    }
     if (
       empresaDelivery &&
+      !mapaIndisponivel &&
       !geoConfigurada &&
       !geoQuery.isPending &&
       !autoPinando &&
@@ -430,6 +482,7 @@ export function CoberturaDeliveryTab() {
     enderecoPreenchido,
     geoConfigurada,
     geoQuery.isPending,
+    mapaIndisponivel,
     pinPendente,
     pinSalvoForaDoRaio,
     raiosQuery.isPending,
@@ -1399,7 +1452,7 @@ export function CoberturaDeliveryTab() {
               </div>
             )}
 
-            {definindoAlcance || autoPinando || salvandoPin ? (
+            {!mapaIndisponivel && (definindoAlcance || autoPinando || salvandoPin) ? (
               <div
                 className="absolute inset-0 z-10 flex items-center justify-center bg-white/85"
                 role="status"
