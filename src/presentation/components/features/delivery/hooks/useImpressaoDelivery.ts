@@ -67,7 +67,8 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
     async (
       venda: Venda,
       acoes: AcaoTransicaoGestor[],
-      ticketsPreload?: VendaGestorTicketsResponse
+      ticketsPreload?: VendaGestorTicketsResponse,
+      opcoes?: { omitirAvisoSemVinculoPc?: boolean }
     ) => {
       logImpressao('hook.processarAposTransicoes.entrada', {
         vendaId: venda.id,
@@ -173,6 +174,8 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
           accessToken: token,
           onMensagem: m => showToast.info(m),
           onErro: m => showToast.error(m),
+          onAviso: m => showToast.warning(m),
+          omitirAvisoSemVinculoPc: opcoes?.omitirAvisoSemVinculoPc,
         })
         logImpressao('hook.imprimir_tickets_concluido', { vendaId: venda.id })
       }
@@ -279,6 +282,7 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
         accessToken: token,
         onMensagem: m => showToast.info(m),
         onErro: m => showToast.error(m),
+        onAviso: m => showToast.warning(m),
       })
       logImpressao('hook.reimpressao_concluida', { vendaId: venda.id })
     },

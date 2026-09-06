@@ -197,19 +197,22 @@ export function useNovoPedidoSubmit({
 
       if (idCriado) {
         setVendaIdCriada(idCriado)
-
-        if (
-          tipoInicioPedido === 'entrega' &&
-          status === 'ABERTA' &&
-          preferenciasAutoIniciarPreparo
-        ) {
-          await processarAposTransicaoVendaGestorId?.(idCriado, 'iniciar_preparo')
-        }
       }
 
       setInternalDialogOpen(false)
       onSuccess()
       onClose()
+
+      if (
+        idCriado &&
+        tipoInicioPedido === 'entrega' &&
+        status === 'ABERTA' &&
+        preferenciasAutoIniciarPreparo
+      ) {
+        void processarAposTransicaoVendaGestorId?.(idCriado, 'iniciar_preparo').catch(error => {
+          console.error('Impressão após criar pedido falhou; o pedido já foi criado.', error)
+        })
+      }
     } catch (error: unknown) {
       console.error('❌ Erro ao criar pedido:', error)
       const err = error as {
