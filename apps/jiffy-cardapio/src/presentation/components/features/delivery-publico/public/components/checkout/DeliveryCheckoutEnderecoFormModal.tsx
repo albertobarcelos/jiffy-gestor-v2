@@ -12,7 +12,6 @@ import { EnderecoGeolocalizacaoSection } from '@/src/presentation/components/sha
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import { geoJsonPointFromLatLng, parseGeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import {
-  consultarCepViaApi,
   formatarCepMascara,
   normalizarDigitosCep,
 } from '@/src/shared/utils/consultaCep'
@@ -98,7 +97,6 @@ export function DeliveryCheckoutEnderecoFormModal({
   const [etapaUi, setEtapaUi] = useState<EtapaUiEndereco>(() =>
     form.rua.trim() ? 'edicao' : 'busca'
   )
-  const [buscandoCep, setBuscandoCep] = useState(false)
   const [buscandoGps, setBuscandoGps] = useState(false)
   const [salvando, setSalvando] = useState(false)
   const [enderecoLocalizacao, setEnderecoLocalizacao] = useState<GeoJsonPoint | null>(() =>
@@ -340,30 +338,6 @@ export function DeliveryCheckoutEnderecoFormModal({
     }
   }
 
-  const buscarCep = async () => {
-    const digitos = normalizarDigitosCep(form.cep)
-    if (digitos.length !== 8) {
-      showToast.error('Informe um CEP com 8 dígitos')
-      return
-    }
-    setBuscandoCep(true)
-    try {
-      const dados = await consultarCepViaApi(digitos)
-      onChange('cep', formatarCepMascara(dados.cep))
-      if (dados.logradouro) onChange('rua', maiusculasEnderecoInput(dados.logradouro))
-      if (dados.bairro) onChange('bairro', maiusculasEnderecoInput(dados.bairro))
-      if (dados.localidade) onChange('cidade', maiusculasEnderecoInput(dados.localidade))
-      if (dados.uf) onChange('estado', normalizarEstadoEndereco(dados.uf))
-      if (dados.complemento && !form.complemento.trim()) {
-        onChange('complemento', maiusculasEnderecoInput(dados.complemento))
-      }
-    } catch (error) {
-      showToast.error(error instanceof Error ? error.message : 'Erro ao consultar CEP')
-    } finally {
-      setBuscandoCep(false)
-    }
-  }
-
   const usarLocalizacaoAtual = async () => {
     setBuscandoGps(true)
     try {
@@ -602,11 +576,7 @@ export function DeliveryCheckoutEnderecoFormModal({
                   maxLength={9}
                   placeholder="00000-000"
                   value={form.cep}
-                  disabled={buscandoCep}
                   onChange={e => onChange('cep', formatarCepMascara(e.target.value))}
-                  onBlur={() => {
-                    if (normalizarDigitosCep(form.cep).length === 8) void buscarCep()
-                  }}
                   className={fieldClass}
                   style={fieldStyle}
                 />

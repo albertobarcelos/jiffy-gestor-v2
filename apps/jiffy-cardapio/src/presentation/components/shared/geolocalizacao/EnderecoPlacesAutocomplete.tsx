@@ -11,6 +11,7 @@ import {
   type PlacesAutocompletePrediction,
   type PlacesBias,
 } from '@/src/shared/utils/geolocalizacaoPlaces'
+import { mensagemAmigavelErroGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
 import { cn } from '@/src/shared/utils/cn'
 import { maiusculasEnderecoInput } from '@/src/shared/utils/normalizarTextoEnderecoPublico'
 
@@ -119,14 +120,16 @@ export function EnderecoPlacesAutocomplete({
             setAberto(true)
             setHighlight(lista.length > 0 ? 0 : -1)
             if (lista.length === 0) {
-              setErro('Não encontramos sugestões. Continue digitando ou use Buscar endereço no mapa.')
+              setErro(
+                'Não encontramos sugestões no Google. Continue digitando ou preencha o endereço manualmente.'
+              )
             }
           })
           .catch(error => {
             if (controller.signal.aborted) return
             if (error instanceof DOMException && error.name === 'AbortError') return
             setPredictions([])
-            setErro(error instanceof Error ? error.message : 'Erro ao buscar sugestões')
+            setErro(mensagemAmigavelErroGeolocalizacao(error, 'places'))
           })
           .finally(() => {
             if (!controller.signal.aborted) setLoading(false)
@@ -189,7 +192,7 @@ export function EnderecoPlacesAutocomplete({
       setPredictions([])
       fecharLista()
     } catch (error) {
-      setErro(error instanceof Error ? error.message : 'Erro ao obter detalhes do endereço')
+      setErro(mensagemAmigavelErroGeolocalizacao(error, 'details'))
     } finally {
       setLoadingDetails(false)
     }

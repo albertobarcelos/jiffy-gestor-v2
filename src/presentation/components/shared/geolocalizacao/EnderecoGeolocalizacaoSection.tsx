@@ -9,6 +9,7 @@ import {
   enriquecerEnderecoParaGeocode,
   descreverCamposGeocodeFaltantes,
   geocodificarEnderecoViaGoogle,
+  mensagemAmigavelErroGeolocalizacao,
   montarEnderecoParaGeocode,
   serializarEnderecoParaGeocode,
   type EnderecoGeocodeInput,
@@ -231,7 +232,7 @@ export function EnderecoGeolocalizacaoSection({
       if (seqEsperada !== undefined && seqEsperada !== geocodeAutoSeqRef.current) {
         return false
       }
-      const msg = error instanceof Error ? error.message : 'Erro ao buscar localização'
+      const msg = mensagemAmigavelErroGeolocalizacao(error, 'geocode')
       setErroGeocodeAuto(msg)
       if (!opts.silencioso) {
         showToast.error(msg)

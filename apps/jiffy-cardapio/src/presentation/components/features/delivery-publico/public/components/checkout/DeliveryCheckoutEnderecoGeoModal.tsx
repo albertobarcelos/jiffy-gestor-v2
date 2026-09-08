@@ -11,6 +11,7 @@ import { EnderecoGeolocalizacaoSection } from '@/src/presentation/components/sha
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import { parseGeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import {
+  mensagemAmigavelErroGeolocalizacao,
   prepararEnderecoGeocodeCheckout,
   serializarEnderecoParaGeocode,
   type EnderecoGeocodeFallback,
@@ -73,7 +74,6 @@ export function DeliveryCheckoutEnderecoGeoModal({
   const [enderecoGeocode, setEnderecoGeocode] = useState<EnderecoGeocodeInput>(() =>
     montarInputGeocode(endereco)
   )
-  const [resolveuViaCep, setResolveuViaCep] = useState(false)
   const [usouUfLoja, setUsouUfLoja] = useState(false)
   const [ultimoGeoKeySincronizado, setUltimoGeoKeySincronizado] = useState<string | null>(null)
 
@@ -136,21 +136,11 @@ export function DeliveryCheckoutEnderecoGeoModal({
   }, [enderecoGeoKey, fecharDialogPin])
 
   useEffect(() => {
-    let cancelled = false
     setPreparandoEndereco(true)
-
-    void (async () => {
-      const preparado = await prepararEnderecoGeocodeCheckout(enderecoBruto, enderecoFallback)
-      if (cancelled) return
-      setEnderecoGeocode(preparado.endereco)
-      setResolveuViaCep(preparado.resolveuViaCep)
-      setUsouUfLoja(preparado.usouUfLoja)
-      setPreparandoEndereco(false)
-    })()
-
-    return () => {
-      cancelled = true
-    }
+    const preparado = prepararEnderecoGeocodeCheckout(enderecoBruto, enderecoFallback)
+    setEnderecoGeocode(preparado.endereco)
+    setUsouUfLoja(preparado.usouUfLoja)
+    setPreparandoEndereco(false)
   }, [enderecoBruto, enderecoFallback])
 
   const handleMapChangeComErro = (point: GeoJsonPoint) => {
@@ -207,7 +197,7 @@ export function DeliveryCheckoutEnderecoGeoModal({
         )
       }
     } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Erro ao salvar localização'
+      const msg = mensagemAmigavelErroGeolocalizacao(error, 'geocode')
       setErroPosConfirmacao(msg)
       showToast.error(msg)
     } finally {
@@ -269,18 +259,6 @@ export function DeliveryCheckoutEnderecoGeoModal({
             ? 'Atualizando localização no mapa…'
             : 'Arraste o pin se o local no mapa não estiver correto.'}
         </p>
-
-        {resolveuViaCep ? (
-          <p
-            className="rounded-lg border px-3 py-1.5 text-xs"
-            style={{
-              borderColor: 'var(--delivery-border)',
-              backgroundColor: 'var(--delivery-surface-muted)',
-            }}
-          >
-            Cidade e UF completadas a partir do CEP cadastrado.
-          </p>
-        ) : null}
 
         {usouUfLoja ? (
           <p
