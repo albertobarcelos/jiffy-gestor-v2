@@ -22,13 +22,14 @@ import {
 } from '../../../shared/utils/checkoutPagamentosUtils'
 import { isMeioPagamentoDinheiro } from '../../../shared/utils/isMeioPagamentoDinheiro'
 import { obterIconeMeioPagamento } from '../../../shared/utils/obterIconeMeioPagamento'
+import { obterEstiloMeioPagamentoPublico } from '../../../shared/utils/obterEstiloMeioPagamentoPublico'
 import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
 import {
   DeliveryCheckoutShellFooter,
   DeliveryCheckoutShellHeader,
 } from './DeliveryCheckoutShell'
 
-const MEIO_CARD_CLASS = 'h-[88px] w-[132px] shrink-0'
+const MEIO_CARD_CLASS = 'h-[88px] w-full min-w-0'
 
 type DeliveryCheckoutPagamentoModalProps = {
   tipoEntrega: DeliveryTipoEntrega
@@ -340,7 +341,7 @@ export function DeliveryCheckoutPagamentoModal({
           ) : (
             <div
               ref={scrollRef}
-              className={`scrollbar-thin flex gap-2.5 overflow-x-auto px-0.5 py-2 ${
+              className={`scrollbar-thin overflow-x-auto px-0.5 py-2 ${
                 cardsDesabilitados
                   ? 'cursor-default'
                   : 'cursor-grab select-none active:cursor-grabbing'
@@ -349,31 +350,37 @@ export function DeliveryCheckoutPagamentoModal({
               onMouseDown={cardsDesabilitados ? undefined : handleMouseDown}
               onWheel={handleWheel}
             >
-              {meiosPagamento.map(meio => {
-                const Icone = obterIconeMeioPagamento(meio.nome)
-                const selecionado = meioSelecionadoId === meio.id
-                return (
-                  <button
-                    key={meio.id}
-                    type="button"
-                    disabled={cardsDesabilitados}
-                    onClick={() => handleSelecionarMeio(meio.id)}
-                    className={`flex ${MEIO_CARD_CLASS} flex-col items-center justify-center gap-1 rounded-xl border p-2 transition-opacity ${
-                      cardsDesabilitados ? 'cursor-not-allowed opacity-45' : ''
-                    } ${selecionado ? 'outline outline-2 outline-offset-2 outline-[var(--delivery-primary,#171717)]' : ''}`}
-                    style={{
-                      borderColor: '#000000',
-                      backgroundColor: '#000000',
-                      color: 'var(--delivery-btn-text, #ffffff)',
-                    }}
-                  >
-                    <Icone className="h-7 w-7 shrink-0" />
-                    <span className="line-clamp-2 w-full text-center text-[11px] font-medium leading-tight">
-                      {meio.nome}
-                    </span>
-                  </button>
-                )
-              })}
+              <div className="grid w-max grid-flow-col grid-rows-2 gap-2.5 auto-cols-[132px]">
+                {meiosPagamento.map(meio => {
+                  const Icone = obterIconeMeioPagamento(meio.nome)
+                  const estilo = obterEstiloMeioPagamentoPublico(meio)
+                  const selecionado = meioSelecionadoId === meio.id
+                  return (
+                    <button
+                      key={meio.id}
+                      type="button"
+                      disabled={cardsDesabilitados}
+                      onClick={() => handleSelecionarMeio(meio.id)}
+                      className={`flex ${MEIO_CARD_CLASS} flex-col items-center justify-center gap-1 rounded-xl border p-2 transition-opacity ${
+                        cardsDesabilitados ? 'cursor-not-allowed opacity-45' : ''
+                      } ${selecionado ? 'outline outline-2 outline-offset-2 outline-[var(--delivery-primary,#171717)]' : ''}`}
+                      style={{
+                        borderColor: estilo.backgroundColor,
+                        backgroundColor: estilo.backgroundColor,
+                        color: estilo.color,
+                      }}
+                    >
+                      <Icone
+                        className="h-9 w-9 shrink-0"
+                        style={{ color: estilo.iconColor ?? estilo.color }}
+                      />
+                      <span className="line-clamp-2 w-full text-center text-[11px] font-medium leading-tight">
+                        {meio.nome}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           )}
           {pagamentos.length > 0 && restante > 0.01 && !meioSelecionadoId ? (
