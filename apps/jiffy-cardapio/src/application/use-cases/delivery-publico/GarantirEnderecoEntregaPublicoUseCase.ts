@@ -23,8 +23,7 @@ import {
 } from '@/src/shared/utils/normalizarTextoEnderecoPublico'
 import { toLocaleUppercasePt } from '@/src/shared/utils/localeUppercase'
 import { normalizarCepEndereco, type EnderecoGeocodeInput } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
-
-const MAX_ENDERECOS = 5
+import { MAX_ENDERECOS_CLIENTE_DELIVERY } from '@/src/shared/constants/deliveryClienteEnderecos'
 
 export type GarantirEnderecoEntregaPublicoParams = {
   telefone: string
@@ -277,7 +276,7 @@ export class GarantirEnderecoEntregaPublicoUseCase {
       return localizarEnderecoCriado(criado, params.enderecoNovo, new Set())
     }
 
-    if (clienteAtual.enderecos.length >= MAX_ENDERECOS) {
+    if (clienteAtual.enderecos.length >= MAX_ENDERECOS_CLIENTE_DELIVERY) {
       throw new Error(
         'Este telefone já possui o máximo de endereços cadastrados. Escolha um endereço existente.'
       )

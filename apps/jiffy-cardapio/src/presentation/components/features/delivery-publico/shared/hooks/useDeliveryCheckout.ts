@@ -184,11 +184,64 @@ export function useDeliveryCheckout(slug: string) {
     chaveFalha: null,
     rateLimitAte: 0,
   })
+  /**
+   * Snapshot da seleção/cotação antes de “novo endereço” (ou fluxo que limpa a seleção),
+   * para restaurar sem nova requisição se o usuário cancelar.
+   */
+  const enderecoSelecaoBackupRef = useRef<{
+    enderecoIdSelecionado: string
+    cotacao: DeliveryCheckoutCotacaoState | null
+  } | null>(null)
+
+  const capturarBackupEnderecoSelecionado = useCallback(() => {
+    const f = formRef.current
+    const id = f.enderecoIdSelecionado.trim()
+    if (f.modoEndereco !== 'existente' || !id) return
+
+    const cotacaoAtual = cotacaoRef.current
+    enderecoSelecaoBackupRef.current = {
+      enderecoIdSelecionado: id,
+      cotacao:
+        cotacaoAtual && !isTokenCotacaoExpirado(cotacaoAtual.expiresAt) ? cotacaoAtual : null,
+    }
+  }, [])
+
+  const limparBackupEnderecoSelecionado = useCallback(() => {
+    enderecoSelecaoBackupRef.current = null
+  }, [])
+
+  /** Restaura endereço (e cotação, se ainda válida) após cancelar cadastro/troca. */
+  const restaurarEnderecoSelecaoCancelada = useCallback((): boolean => {
+    preferirNovoEnderecoRef.current = false
+    const backup = enderecoSelecaoBackupRef.current
+    if (!backup?.enderecoIdSelecionado) return false
+
+    const enderecos = clienteLookupRef.current.cliente?.enderecos ?? []
+    if (!enderecos.some(e => e.id === backup.enderecoIdSelecionado)) {
+      enderecoSelecaoBackupRef.current = null
+      return false
+    }
+
+    setForm(prev => ({
+      ...prev,
+      modoEndereco: 'existente',
+      enderecoIdSelecionado: backup.enderecoIdSelecionado,
+    }))
+
+    if (backup.cotacao && !isTokenCotacaoExpirado(backup.cotacao.expiresAt)) {
+      cotacaoSeqRef.current += 1
+      setCotacao(backup.cotacao)
+      setCotacaoLoading(false)
+    }
+
+    return true
+  }, [])
 
   const limparCotacao = useCallback(() => {
     cotacaoSeqRef.current += 1
     cotacaoAutoBloqueioRef.current = { chaveFalha: null, rateLimitAte: 0 }
     setCotacao(null)
+    setCotacaoLoading(false)
     setForm(prev => {
       if (prev.pagamentos.length === 0) return prev
       return { ...prev, pagamentos: [] }
@@ -442,6 +495,7 @@ export function useDeliveryCheckout(slug: string) {
   const selecionarEnderecoExistente = useCallback(
     (enderecoId: string) => {
       preferirNovoEnderecoRef.current = false
+      limparBackupEnderecoSelecionado()
       const f = formRef.current
       if (f.enderecoIdSelecionado !== enderecoId || f.modoEndereco !== 'existente') {
         limparCotacao()
@@ -452,10 +506,11 @@ export function useDeliveryCheckout(slug: string) {
         enderecoIdSelecionado: enderecoId,
       }))
     },
-    [limparCotacao]
+    [limparCotacao, limparBackupEnderecoSelecionado]
   )
 
   const usarNovoEndereco = useCallback(() => {
+    capturarBackupEnderecoSelecionado()
     preferirNovoEnderecoRef.current = true
     limparCotacao()
     setForm(prev => ({
@@ -473,7 +528,7 @@ export function useDeliveryCheckout(slug: string) {
       etiquetaEndereco: 'casa',
       apelidoEndereco: 'Casa',
     }))
-  }, [limparCotacao])
+  }, [limparCotacao, capturarBackupEnderecoSelecionado])
 
   /** Prefill do formulário para editar um endereço já cadastrado (ex.: a partir do modal de geo). */
   const preencherFormParaEditarEndereco = useCallback(
@@ -574,6 +629,7 @@ export function useDeliveryCheckout(slug: string) {
     if (debounceRef.current) clearTimeout(debounceRef.current)
     lookupSeqRef.current += 1
     preferirNovoEnderecoRef.current = false
+    enderecoSelecaoBackupRef.current = null
 
     const tel =
       onlyDigits(
@@ -668,6 +724,7 @@ export function useDeliveryCheckout(slug: string) {
     })
 
     preferirNovoEnderecoRef.current = false
+    limparBackupEnderecoSelecionado()
     setForm(prev => ({
       ...prev,
       modoEndereco: 'existente',
@@ -677,7 +734,7 @@ export function useDeliveryCheckout(slug: string) {
 
     return enderecoId
   },
-    [montarEnderecoNovoForm, resolveTelefoneApi]
+    [montarEnderecoNovoForm, resolveTelefoneApi, limparBackupEnderecoSelecionado]
   )
 
   const confirmarGeoEnderecoExistente = useCallback(
@@ -940,6 +997,8 @@ export function useDeliveryCheckout(slug: string) {
     clienteLookup,
     selecionarEnderecoExistente,
     usarNovoEndereco,
+    restaurarEnderecoSelecaoCancelada,
+    limparBackupEnderecoSelecionado,
     preencherFormParaEditarEndereco,
     removerEnderecoCliente,
     consultarClientePorTelefone,

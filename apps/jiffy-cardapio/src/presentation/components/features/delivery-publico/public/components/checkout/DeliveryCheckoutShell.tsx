@@ -240,6 +240,8 @@ export function DeliveryCheckoutShell({
                 {header.showBack ? (
                   <button
                     type="button"
+                    data-checkout-leave-without-numero=""
+                    onMouseDown={e => e.preventDefault()}
                     onClick={header.onBack ?? onClose}
                     aria-label="Voltar"
                     className={`flex items-center justify-center rounded-full ${
@@ -264,6 +266,8 @@ export function DeliveryCheckoutShell({
                   <DeliveryCheckoutProgressIndicator dark={isDarkHeader} />
                   <button
                     type="button"
+                    data-checkout-leave-without-numero=""
+                    onMouseDown={e => e.preventDefault()}
                     onClick={onClose}
                     aria-label="Fechar"
                     className={`flex shrink-0 items-center justify-center rounded-full ${

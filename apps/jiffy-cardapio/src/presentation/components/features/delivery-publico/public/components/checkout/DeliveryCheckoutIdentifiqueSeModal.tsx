@@ -55,6 +55,8 @@ type DeliveryCheckoutIdentifiqueSeModalProps = {
   onEditarEndereco: () => void
   onTrocarEndereco: () => void
   onCadastrarEndereco: () => void
+  /** Cliente no limite de endereços — botão “Novo endereço” visualmente bloqueado. */
+  novoEnderecoBloqueado?: boolean
   onSalvarNome: (nome: string) => Promise<void>
   /** Remove cliente/lookup e reabre o input para buscar outro número. */
   onLimparIdentificacao: () => void
@@ -85,6 +87,7 @@ export function DeliveryCheckoutIdentifiqueSeModal({
   onEditarEndereco,
   onTrocarEndereco,
   onCadastrarEndereco,
+  novoEnderecoBloqueado = false,
   onSalvarNome,
   onLimparIdentificacao,
   onClose,
@@ -443,6 +446,7 @@ export function DeliveryCheckoutIdentifiqueSeModal({
             onEditarEndereco={onEditarEndereco}
             onTrocarEndereco={onTrocarEndereco}
             onCadastrarEndereco={onCadastrarEndereco}
+            novoEnderecoBloqueado={novoEnderecoBloqueado}
           />
         ) : null}
       </div>

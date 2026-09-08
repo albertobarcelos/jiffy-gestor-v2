@@ -16,6 +16,8 @@ type DeliveryCheckoutEnderecosModalProps = {
   onUsarNovoEndereco: () => void
   onEditar: (endereco: EnderecoClienteDeliveryPublicoDTO) => void
   onRemover: (enderecoId: string) => Promise<void> | void
+  /** Cliente no limite — botão visualmente bloqueado, mas ainda clicável para o aviso. */
+  novoEnderecoBloqueado?: boolean
 }
 
 export function DeliveryCheckoutEnderecosModal({
@@ -26,6 +28,7 @@ export function DeliveryCheckoutEnderecosModal({
   onUsarNovoEndereco,
   onEditar,
   onRemover,
+  novoEnderecoBloqueado = false,
 }: DeliveryCheckoutEnderecosModalProps) {
   const [enderecoParaRemover, setEnderecoParaRemover] =
     useState<EnderecoClienteDeliveryPublicoDTO | null>(null)
@@ -70,34 +73,71 @@ export function DeliveryCheckoutEnderecosModal({
           return (
             <div
               key={endereco.id}
-              className="w-full rounded-xl border p-3 text-left transition-colors"
+              role="button"
+              tabIndex={bloqueado ? -1 : 0}
+              onClick={() => {
+                if (!bloqueado) onSelecionar(endereco.id)
+              }}
+              onKeyDown={e => {
+                if (bloqueado) return
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onSelecionar(endereco.id)
+                }
+              }}
+              className="w-full cursor-pointer rounded-xl border p-3 text-left transition-colors disabled:opacity-60"
               style={{
                 borderColor: selected
                   ? 'var(--delivery-primary)'
                   : 'var(--delivery-border)',
                 backgroundColor: 'var(--delivery-surface)',
+                opacity: bloqueado ? 0.6 : undefined,
               }}
             >
-              <button
-                type="button"
-                onClick={() => onSelecionar(endereco.id)}
-                disabled={bloqueado}
-                className="flex w-full gap-3 text-left disabled:opacity-60"
-              >
+              <div className="flex gap-3">
                 <MapPin
-                  className="mt-0.5 h-5 w-5 shrink-0"
+                  className="mt-1 h-5 w-5 shrink-0"
                   style={{ color: 'var(--delivery-text-primary)' }}
                   aria-hidden
                 />
                 <div className="min-w-0 flex-1">
-                  <span
-                    className="mb-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"
-                    style={{ backgroundColor: 'var(--delivery-surface-muted)' }}
-                  >
-                    <Home className="h-3 w-3" aria-hidden />
-                    {etiquetaEnderecoPublicoLabel(endereco.etiqueta)}
-                  </span>
-                  <p className="text-sm font-semibold delivery-text-primary">
+                  <div className="flex items-center gap-1">
+                    <span
+                      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"
+                      style={{ backgroundColor: 'var(--delivery-surface-muted)' }}
+                    >
+                      <Home className="h-3 w-3" aria-hidden />
+                      {etiquetaEnderecoPublicoLabel(endereco.etiqueta)}
+                    </span>
+                    <div className="-mr-1 ml-auto flex shrink-0 items-center gap-0.5">
+                      <button
+                        type="button"
+                        aria-label={`Editar endereço ${endereco.rua}`}
+                        disabled={removendo}
+                        onClick={e => {
+                          e.stopPropagation()
+                          onEditar(endereco)
+                        }}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg delivery-text-primary disabled:opacity-50"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Remover endereço ${endereco.rua}`}
+                        disabled={removendo}
+                        onClick={e => {
+                          e.stopPropagation()
+                          setEnderecoParaRemover(endereco)
+                        }}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-600 disabled:opacity-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <p className="mt-1 text-sm font-semibold delivery-text-primary">
                     {endereco.rua}, {endereco.numero}
                   </p>
                   {linha2 ? (
@@ -105,33 +145,6 @@ export function DeliveryCheckoutEnderecosModal({
                   ) : null}
                   <p className="sr-only">{formatarResumoEnderecoPublico(endereco)}</p>
                 </div>
-              </button>
-
-              <div className="mt-2 flex justify-end gap-1 pl-8">
-                <button
-                  type="button"
-                  aria-label={`Editar endereço ${endereco.rua}`}
-                  disabled={removendo}
-                  onClick={e => {
-                    e.stopPropagation()
-                    onEditar(endereco)
-                  }}
-                  className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg delivery-text-primary disabled:opacity-50"
-                >
-                  <Pencil className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  aria-label={`Remover endereço ${endereco.rua}`}
-                  disabled={removendo}
-                  onClick={e => {
-                    e.stopPropagation()
-                    setEnderecoParaRemover(endereco)
-                  }}
-                  className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg text-red-600 disabled:opacity-50"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
               </div>
             </div>
           )
@@ -141,7 +154,10 @@ export function DeliveryCheckoutEnderecosModal({
       <button
         type="button"
         onClick={onUsarNovoEndereco}
-        className="mt-4 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold uppercase tracking-wide delivery-text-primary"
+        aria-disabled={novoEnderecoBloqueado || undefined}
+        className={`mt-4 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold uppercase tracking-wide delivery-text-primary ${
+          novoEnderecoBloqueado ? 'opacity-50' : ''
+        }`}
         style={{ borderColor: 'var(--delivery-border)' }}
       >
         <Plus className="h-4 w-4" aria-hidden />

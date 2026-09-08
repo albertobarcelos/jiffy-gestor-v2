@@ -40,6 +40,11 @@ export function DeliveryCheckoutFooterActions({
         <button
           type="button"
           disabled={voltarDisabled}
+          data-checkout-leave-without-numero=""
+          onMouseDown={e => {
+            // Evita blur do campo número antes do click (focus trap).
+            if (!voltarDisabled) e.preventDefault()
+          }}
           onClick={onVoltar}
           className="inline-flex shrink-0 items-center justify-center gap-1.5 border border-neutral-300 bg-white px-5 text-base font-semibold text-black disabled:opacity-60"
         >

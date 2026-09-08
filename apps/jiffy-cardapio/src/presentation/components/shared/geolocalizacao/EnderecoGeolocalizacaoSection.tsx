@@ -120,6 +120,8 @@ export type EnderecoGeolocalizacaoSectionProps = {
   localizacaoReferencia?: GeoJsonPoint | null
   /** Oculta título, subtítulo e badge de status (ex.: checkout delivery). */
   hideHeader?: boolean
+  /** Oculta o botão de geocode pelo endereço (ex.: só marcar preferência de entrega). */
+  hideBuscar?: boolean
 }
 
 export function EnderecoGeolocalizacaoSection({
@@ -146,7 +148,9 @@ export function EnderecoGeolocalizacaoSection({
   pinModo = 'endereco',
   localizacaoReferencia = null,
   hideHeader = false,
+  hideBuscar = false,
 }: EnderecoGeolocalizacaoSectionProps) {
+  const ocultarBuscar = hideBuscar || pinModo === 'preferencia'
   const [buscandoGeocode, setBuscandoGeocode] = useState(false)
   const [buscandoGeocodeAuto, setBuscandoGeocodeAuto] = useState(false)
   const [erroGeocodeAuto, setErroGeocodeAuto] = useState<string | null>(null)
@@ -382,18 +386,20 @@ export function EnderecoGeolocalizacaoSection({
           </div>
         ) : null}
 
-        <div className={variant === 'delivery' ? undefined : 'flex flex-wrap gap-2'}>
-          <button
-            type="button"
-            onClick={() => void buscarLocalizacaoPeloEndereco()}
-            disabled={!podeBuscar || buscandoGeocode}
-            className={styles.buttonClass}
-            style={buttonStyle}
-          >
-            <MdMyLocation className="h-4 w-4" aria-hidden />
-            {buscandoGeocode ? 'Buscando…' : buscarLabel}
-          </button>
-        </div>
+        {!ocultarBuscar ? (
+          <div className={variant === 'delivery' ? undefined : 'flex flex-wrap gap-2'}>
+            <button
+              type="button"
+              onClick={() => void buscarLocalizacaoPeloEndereco()}
+              disabled={!podeBuscar || buscandoGeocode}
+              className={styles.buttonClass}
+              style={buttonStyle}
+            >
+              <MdMyLocation className="h-4 w-4" aria-hidden />
+              {buscandoGeocode ? 'Buscando…' : buscarLabel}
+            </button>
+          </div>
+        ) : null}
 
         {variant !== 'delivery' && ultimoEnderecoFormatado ? (
           <p className={styles.hintClass}>
