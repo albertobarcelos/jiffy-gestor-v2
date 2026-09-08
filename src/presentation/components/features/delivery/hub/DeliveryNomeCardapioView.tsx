@@ -22,8 +22,10 @@ import {
   filtrarPendenciasObrigatorias,
   lojaDeliveryDisponivel,
 } from '@/src/shared/constants/empresaDeliveryPendencias'
+import { getCardapioSlugInputPrefix } from '@/src/shared/utils/cardapioPublicUrl'
 
 export function DeliveryNomeCardapioView() {
+  const slugInputPrefix = getCardapioSlugInputPrefix()
   const { empresa } = useEmpresaMe()
   const { menuDeliveryId: menuDeliveryIdSalvo } = useMenuDeliveryId()
   const empresaDeliveryQuery = useEmpresaDeliveryMe()
@@ -174,7 +176,9 @@ export function DeliveryNomeCardapioView() {
               Apenas letras minúsculas, números e hífens (mínimo 3 caracteres).
             </p>
             <div className="mt-2 flex min-w-0 flex-1 items-center rounded-lg border border-gray-200 bg-gray-50">
-              <span className="shrink-0 pl-3 text-sm text-secondary-text">/delivery/</span>
+              <span className="shrink-0 pl-3 text-sm text-secondary-text">
+                {slugInputPrefix}
+              </span>
               <input
                 id="delivery-hub-slug"
                 type="text"

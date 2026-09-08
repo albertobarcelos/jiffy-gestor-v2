@@ -2,7 +2,6 @@ import type { AcaoTransicaoGestor } from '@/src/presentation/hooks/useVendas'
 import type {
   DecidirImpressaoResultado,
   PreferenciasImpressaoDelivery,
-  TipoCupomDelivery,
 } from '@/src/shared/types/deliveryImpressao'
 
 /**
@@ -40,26 +39,4 @@ export function decidirImpressaoAposAcao(
   }
 
   return { imprimir: false, tipoCupom: null, copies: 1 }
-}
-
-/**
- * Nome da impressora no Windows (QZ). Expedição: nome resolvido de `impressoraExpedicaoId` ou fallback.
- * Produção (separado): fallback até mapeamento produto → impressora na venda/cardápio.
- */
-export function resolverNomeImpressoraParaCupom(
-  prefs: PreferenciasImpressaoDelivery,
-  tipo: TipoCupomDelivery,
-  /** De GET `/api/impressoras/:id` quando `impressoraExpedicaoId` está definido. */
-  nomeImpressoraExpedicaoQz: string | null
-): string | null {
-  const padrao =
-    prefs.impressoraPadraoNome ||
-    (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_QZ_PRINTER_DEFAULT?.trim()
-      ? process.env.NEXT_PUBLIC_QZ_PRINTER_DEFAULT.trim()
-      : null)
-
-  if (tipo === 'expedicao') {
-    return nomeImpressoraExpedicaoQz || padrao
-  }
-  return padrao
 }

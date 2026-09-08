@@ -83,9 +83,6 @@ function buildClientePedidoDeliveryPayload(input: CriarPedidoDeliveryInputDTO) {
 
   const cliente: CriarPedidoDeliveryApiRequest['cliente'] = { telefone }
 
-  const nome = input.clienteEntregaVinculado?.nome?.trim()
-  if (nome) cliente.nome = nome
-
   if (input.pedidoComEntrega && input.moradaEntregaSelecionada) {
     const morada = input.moradaEntregaSelecionada
     const moradaId = morada.id?.trim()

@@ -7,15 +7,33 @@ import type {
 } from '@/src/shared/types/vendaGestorTickets'
 import {
   DEFAULT_DELIVERY_CUPOM_TEMPLATE,
+  DEFAULT_FONTES_MODELO,
   type DeliveryCupomModeloFonteConfig,
   type DeliveryCupomTemplateConfig,
 } from '@/src/shared/types/deliveryCupomTemplate'
+import { renderDashSeparatorHtml, renderQrSvg } from '@/src/infrastructure/printing/receiptBitmaps'
 
 export interface RenderDeliveryCupomHtmlInput {
   root: VendaGestorTicketsResponse
   ticket: VendaGestorTicket
   nomeEmpresa?: string
   template?: DeliveryCupomTemplateConfig
+}
+
+let cupomInnerWidthPx = 280
+
+function htmlSeparator(double = false): string {
+  return renderDashSeparatorHtml(cupomInnerWidthPx, double)
+}
+
+function renderObsPedido(root: VendaGestorTicketsResponse, template: DeliveryCupomTemplateConfig): string {
+  const texto = template.mostrarObservacaoPedido ? root.observacaoPedido?.trim() : ''
+  if (!texto) return ''
+  return `${htmlSeparator()}
+  <div class="obs-box">
+    <div class="obs-title">OBSERVAÇÃO DO PEDIDO</div>
+    <div class="obs-text">${escapeHtml(texto)}</div>
+  </div>`
 }
 
 function escapeHtml(s: string): string {
@@ -177,15 +195,27 @@ function larguraPx(mm: number): number {
 }
 
 function paddingPorDensidade(densidade: DeliveryCupomTemplateConfig['densidade']): number {
-  if (densidade === 'compacto') return 2
+  if (densidade === 'compacto') return 0
   if (densidade === 'espacoso') return 12
-  return 8
+  return 2
 }
 
 function lineHeightPorDensidade(densidade: DeliveryCupomTemplateConfig['densidade']): number {
-  if (densidade === 'compacto') return 1.1
+  if (densidade === 'compacto') return 1
   if (densidade === 'espacoso') return 1.5
-  return 1.35
+  return 1.1
+}
+
+function separatorPyPorDensidade(densidade: DeliveryCupomTemplateConfig['densidade']): number {
+  if (densidade === 'compacto') return 3
+  if (densidade === 'espacoso') return 16
+  return 5
+}
+
+function itemRowPyPorDensidade(densidade: DeliveryCupomTemplateConfig['densidade']): number {
+  if (densidade === 'compacto') return 0
+  if (densidade === 'espacoso') return 4
+  return 2
 }
 
 function fonteBloco(v: number | null | undefined, fallback: number): number {
@@ -197,7 +227,10 @@ function fontesDoModelo(
   tipoCupom: VendaGestorTicket['tipoCupom']
 ): DeliveryCupomModeloFonteConfig {
   const modelo = tipoCupom === 'producao' ? 'producao' : 'expedicao'
-  return template.fontesPorModelo?.[modelo] ?? DEFAULT_DELIVERY_CUPOM_TEMPLATE.fontesPorModelo[modelo]
+  return {
+    ...DEFAULT_FONTES_MODELO,
+    ...template.fontesPorModelo?.[modelo],
+  }
 }
 
 function valorItem(item: VendaGestorTicketItem): number | null {
@@ -231,7 +264,6 @@ function renderItens(
   template: DeliveryCupomTemplateConfig,
   options: { mostrarValores: boolean }
 ): string {
-  const produtoWeight = template.destacarProdutos ? 800 : 600
   return (ticket.itens ?? [])
     .map(p => {
       const q = quantidadeItem(p)
@@ -259,7 +291,7 @@ function renderItens(
       const tituloHtml = renderLinhaValor(`${q} X ${nome}`, preco)
 
       return `<div class="item-row">
-        <div class="item-title" style="font-weight:${produtoWeight};">${tituloHtml}</div>
+        <div class="item-title">${tituloHtml}</div>
         ${compHtml}
         ${obs}
       </div>`
@@ -303,7 +335,7 @@ function renderCabecalho(
     <div class="method">${pedido ? `${pedido} ` : ''}${escapeHtml(tipoVenda)}${codigo ? ` <strong>${escapeHtml(codigo)}</strong>` : ''}</div>
     ${cabecalhoExtra}
   </div>
-  <div class="separator"></div>`
+  ${htmlSeparator()}`
 }
 
 function renderMetaPedido(root: VendaGestorTicketsResponse, incluirEntregador: boolean): string {
@@ -314,7 +346,7 @@ function renderMetaPedido(root: VendaGestorTicketsResponse, incluirEntregador: b
   return `<div class="section meta-section">
     ${dataPedido ? `<div><strong>Data:</strong> ${escapeHtml(dataPedido)}</div>` : ''}
     ${dataPrevista ? `<div><strong>Data Prevista:</strong> ${escapeHtml(dataPrevista)}</div>` : ''}
-    ${entregador ? `<div class="separator"></div><div><strong>Entregador:</strong> ${escapeHtml(entregador)}</div>` : ''}
+    ${entregador ? `${htmlSeparator()}<div><strong>Entregador:</strong> ${escapeHtml(entregador)}</div>` : ''}
   </div>`
 }
 
@@ -336,20 +368,16 @@ function renderProducao(
   const ticket = input.ticket
   const empresa = nomeEmpresa(root, input.nomeEmpresa?.trim() || 'Jiffy Gestor')
   const cliente = root.cliente?.nome?.trim() || '—'
-  const obsPedido =
-    template.mostrarObservacaoPedido && root.observacaoPedido?.trim()
-      ? `<div class="obs"><strong>Obs. pedido:</strong> ${escapeHtml(root.observacaoPedido.trim())}</div>`
-      : ''
 
   return `${renderCabecalho(root, template, empresa, cabecalhoExtra)}
   ${renderMetaPedido(root, true)}
-  <div class="separator"></div>
+  ${htmlSeparator()}
   <div class="section customer-section" style="white-space: normal; word-wrap: break-word; overflow-wrap: break-word; word-break: normal;"><strong>Cliente:</strong> ${escapeHtml(cliente)}</div>
-  <div class="separator"></div>
+  ${htmlSeparator()}
   <div class="items-title">ITENS DO PEDIDO (${totalItensPedido(ticket)})</div>
   ${renderItens(ticket, template, { mostrarValores: false })}
-  ${obsPedido}
-  <div class="separator"></div>
+  ${renderObsPedido(root, template)}
+  ${htmlSeparator()}
   ${renderRodape(template, rodapeExtra)}`
 }
 
@@ -377,10 +405,9 @@ function renderWhatsappQr(telefone: string): string {
   const whatsappTelefone = telefoneWhatsapp(telefone)
   if (!whatsappTelefone) return ''
   const url = `https://wa.me/${whatsappTelefone}`
-  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=74x74&margin=0&data=${encodeURIComponent(url)}`
 
   return `<div class="whatsapp-qr">
-    <img src="${escapeHtml(qrSrc)}" alt="QR Code WhatsApp" width="74" height="74" />
+    ${renderQrSvg(url, 96)}
     <div>Scaneie e fale com o cliente via WhatsApp</div>
   </div>`
 }
@@ -417,7 +444,7 @@ function renderResumoExpedicao(root: VendaGestorTicketsResponse, ticket: VendaGe
     }`
   }
 
-  return `<div class="separator"></div>
+  return `${htmlSeparator()}
   <div class="summary-section">
     <div class="items-title">RESUMO PEDIDO</div>
     ${renderLinhaValor('Valor total dos itens:', escapeHtml(fmtBrl(resumo.valorItens)))}
@@ -445,7 +472,7 @@ function renderPagamento(root: VendaGestorTicketsResponse): string {
   const deveCobrar = p?.cobrarCliente === true || status === 'pendente' || (!status && receber > 0)
 
   if (deveCobrar) {
-    return `<div class="double-separator"></div>
+    return `${htmlSeparator(true)}
     <div class="payment-section">
       <div class="charge">COBRAR DO CLIENTE</div>
       <div style="display: block; word-wrap: break-word; text-align: center; margin-top: 4px;">
@@ -467,14 +494,14 @@ function renderPagamento(root: VendaGestorTicketsResponse): string {
         .join('')
     : `<div><span>${escapeHtml((meio || 'PAGO').toUpperCase())}:</span> ${fmtBrl(recebido ?? total - faltante)}</div>`
 
-  return `<div class="double-separator"></div>
+  return `${htmlSeparator(true)}
   <div class="payment-section">
     <div class="paid">PEDIDO PAGO</div>
     ${meios}
     ${faltante > 0 ? `<div><strong>FALTA:</strong> ${fmtBrl(Math.max(0, faltante))}</div>` : ''}
     ${trocoHtml}
   </div>
-  <div class="separator"></div>`
+  ${htmlSeparator()}`
 }
 
 function renderExpedicao(
@@ -493,24 +520,19 @@ function renderExpedicao(
     (typeof cr?.celular === 'string' && cr.celular.trim()) ||
     ''
   const telefoneFormatado = tel ? formatTelefone(tel) : ''
-  const obsPedido =
-    template.mostrarObservacaoPedido && root.observacaoPedido?.trim()
-      ? `<div class="obs"><strong>Obs. pedido:</strong> ${escapeHtml(root.observacaoPedido.trim())}</div>`
-      : ''
-
   return `${renderCabecalho(root, template, empresa, cabecalhoExtra)}
   ${renderMetaPedido(root, false)}
-  <div class="separator"></div>
+  ${htmlSeparator()}
   <div class="section customer-section" style="white-space: normal; word-wrap: break-word; overflow-wrap: break-word; word-break: normal;">
     <div style="margin-bottom: 1px;"><strong>CLIENTE:</strong> ${escapeHtml(cliente)}</div>
     ${template.mostrarTelefoneCliente && telefoneFormatado ? `<div style="margin-bottom: 1px;"><strong>TELEFONE:</strong> ${escapeHtml(telefoneFormatado)}</div>` : ''}
   </div>
   ${renderEnderecoExpedicao(root, template)}
   ${renderWhatsappQr(tel)}
-  <div class="separator"></div>
+  ${htmlSeparator()}
   <div class="items-title">ITENS DO PEDIDO (${totalItensPedido(ticket)})</div>
   ${renderItens(ticket, template, { mostrarValores: template.mostrarValores })}
-  ${obsPedido}
+  ${renderObsPedido(root, template)}
   ${template.mostrarValores ? renderResumoExpedicao(root, ticket) : ''}
   ${template.mostrarValores ? renderPagamento(root) : ''}
   ${renderRodape(template, rodapeExtra)}`
@@ -528,9 +550,18 @@ export function renderDeliveryCupomHtml(input: RenderDeliveryCupomHtmlInput): st
     0,
     Math.round((template.margemLateralMm ?? 0) * (w / template.larguraMm))
   )
-  const paddingLateral = padding + margemLateralPx
+  const paddingLateral = Math.max(padding, 2) + margemLateralPx
+  cupomInnerWidthPx = Math.max(80, w - paddingLateral * 2)
   const valueColPx = w <= 220 ? 58 : 68
-  const separatorPy = padding <= 2 ? 5 : padding >= 12 ? 16 : 12
+  const separatorPy = separatorPyPorDensidade(template.densidade)
+  const itemRowPy = itemRowPyPorDensidade(template.densidade)
+  const headerGap = template.densidade === 'compacto' ? 0 : Math.max(2, Math.floor(padding / 2))
+  const footerMt = template.densidade === 'compacto' ? 4 : template.densidade === 'espacoso' ? 12 : 8
+  const extraMt = template.densidade === 'compacto' ? 2 : template.densidade === 'espacoso' ? 6 : 4
+  const methodMt = template.densidade === 'compacto' ? 1 : 4
+  const qrGapTop = template.densidade === 'espacoso' ? 10 : 8
+  const qrGapBottom = template.densidade === 'compacto' ? 1 : template.densidade === 'espacoso' ? 3 : 2
+  const separatorAfterQr = Math.max(1, Math.ceil(separatorPy / 2))
   const lineHeight = lineHeightPorDensidade(template.densidade)
   const fonteBase = template.tamanhoFonteBase
   const fonteCabecalho = fonteBloco(
@@ -561,6 +592,16 @@ export function renderDeliveryCupomHtml(input: RenderDeliveryCupomHtmlInput): st
     fontesModelo.tamanhoFonteRodape ?? template.tamanhoFonteRodape,
     Math.max(8, fonteBase - 2)
   )
+  const dFontes = DEFAULT_DELIVERY_CUPOM_TEMPLATE
+  const peso = (on: boolean) => (on ? '800' : '400')
+  const negritoCabecalho = fontesModelo.negritoCabecalho ?? dFontes.negritoCabecalho
+  const negritoPedido = fontesModelo.negritoPedido ?? dFontes.negritoPedido
+  const negritoCliente = fontesModelo.negritoClienteEndereco ?? dFontes.negritoClienteEndereco
+  const negritoItens = fontesModelo.negritoItens ?? dFontes.negritoItens
+  const negritoResumo = fontesModelo.negritoResumo ?? dFontes.negritoResumo
+  const negritoPagamento = fontesModelo.negritoPagamento ?? dFontes.negritoPagamento
+  const negritoRodape = fontesModelo.negritoRodape ?? dFontes.negritoRodape
+  const pesoItem = !negritoItens ? '400' : template.destacarProdutos ? '800' : '600'
 
   const cabecalhoExtra = template.cabecalhoExtra.trim()
     ? `<div class="extra-header">${escapeMultiline(template.cabecalhoExtra.trim())}</div>`
@@ -573,39 +614,44 @@ export function renderDeliveryCupomHtml(input: RenderDeliveryCupomHtmlInput): st
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <style>
   html, body { margin:0; overflow-x:hidden; }
-  body { width:${w}px; max-width:100%; margin-left:auto; margin-right:auto; font-family: system-ui, -apple-system, Segoe UI, sans-serif; color:#111; }
-  .receipt { box-sizing:border-box; width:100%; max-width:100%; margin:0; padding:2px ${paddingLateral}px ${padding}px ${paddingLateral}px; font-size:${template.tamanhoFonteBase}px; line-height:${lineHeight}; overflow-x:hidden; }
-  .header { text-align:center; padding-bottom:${Math.max(2, Math.floor(padding / 2))}px; margin-bottom:${Math.max(2, Math.floor(padding / 2))}px; font-size:${fonteCabecalho}px; }
-  .brand { font-weight:800; font-size:${fonteCabecalho + 1}px; letter-spacing:.02em; }
-  .method { display:inline-block; margin-top:4px; padding:2px 8px; font-weight:900; font-size:${fonteCabecalho + 5}px; border:2px solid #000; border-radius:4px; }
+  body { width:${w}px; max-width:100%; margin-left:auto; margin-right:auto; font-family: "Segoe UI", Tahoma, Arial, sans-serif; color:#000; -webkit-font-smoothing:antialiased; }
+  .receipt { box-sizing:border-box; width:100%; max-width:100%; margin:0; padding:${template.densidade === 'compacto' ? 0 : 2}px ${paddingLateral}px ${padding}px ${paddingLateral}px; font-size:${template.tamanhoFonteBase}px; line-height:${lineHeight}; overflow-x:hidden; }
+  .header { text-align:center; padding-bottom:${headerGap}px; margin-bottom:${headerGap}px; font-size:${fonteCabecalho}px; font-weight:${peso(negritoCabecalho)}; }
+  .header strong { font-weight:inherit; }
+  .brand { font-weight:inherit; font-size:${fonteCabecalho + 1}px; letter-spacing:.02em; }
+  .method { display:inline-block; margin-top:${methodMt}px; padding:2px 8px; font-weight:${negritoCabecalho ? 900 : 400}; font-size:${fonteCabecalho + 5}px; border:2px solid #000; border-radius:4px; }
   .section { margin:${padding}px 0; }
-  .meta-section { font-size:${fontePedido}px; }
-  .customer-section, .address-section { font-size:${fonteClienteEndereco}px; }
-  .whatsapp-qr { margin:${Math.max(3, Math.floor(padding / 2))}px 0; display:flex; align-items:center; justify-content:flex-start; gap:6px; font-size:10px; font-weight:700; line-height:1.15; }
-  .whatsapp-qr img { display:block; width:74px; height:74px; flex:0 0 auto; image-rendering:pixelated; }
+  .meta-section, .meta-section strong { font-size:${fontePedido}px; font-weight:${peso(negritoPedido)}; }
+  .customer-section, .address-section, .customer-section strong, .address-section strong { font-size:${fonteClienteEndereco}px; font-weight:${peso(negritoCliente)}; }
+  .address-section { padding-bottom:8px; overflow:visible; }
+  .whatsapp-qr { margin:${qrGapTop}px 0 ${qrGapBottom}px 0; display:flex; align-items:center; justify-content:flex-start; gap:6px; font-size:10px; font-weight:${peso(negritoCliente)}; line-height:1.15; }
+  .whatsapp-qr + .separator { margin-top:${separatorAfterQr}px; }
+  .whatsapp-qr img, .whatsapp-qr svg { display:block; width:96px; height:96px; flex:0 0 auto; image-rendering:pixelated; image-rendering:crisp-edges; }
   .whatsapp-qr div { max-width:130px; text-align:left; }
-  .separator { width:100%; margin:${separatorPy}px 0; padding:0; border:0; box-sizing:border-box; overflow:hidden; white-space:nowrap; line-height:1; color:#000; font-weight:900; font-size:${fonteCabecalho + 2}px; }
-  .separator::before { content:"------------------------------------------------------------------------------------------"; letter-spacing:-.5px; }
-  .double-separator { width:100%; margin:${separatorPy}px 0; padding:0; border:0; box-sizing:border-box; overflow:hidden; line-height:1.2; color:#000; font-weight:900; font-size:${fonteCabecalho + 2}px; }
-  .double-separator::before { content:"------------------------------------------------------------------------------------------\A------------------------------------------------------------------------------------------"; white-space:pre; letter-spacing:-.5px; }
-  .items-title { margin:${padding}px 0 3px; font-weight:800; font-size:${fonteItens}px; }
-  .item-row { padding:3px 0; font-size:${fonteItens}px; }
+  .separator { width:100%; margin:${separatorPy}px 0; padding:0; border:0; line-height:0; }
+  .separator img { display:block; width:100%; height:auto; image-rendering:pixelated; image-rendering:crisp-edges; }
+  .items-title { margin:${padding}px 0 ${template.densidade === 'compacto' ? 1 : 3}px; font-weight:${peso(negritoItens)}; font-size:${fonteItens}px; }
+  .item-row { padding:${itemRowPy}px 0; font-size:${fonteItens}px; }
+  .item-title { font-weight:${pesoItem}; }
   .row-line { display:flex; justify-content:space-between; align-items:flex-start; gap:4px; width:100%; max-width:100%; box-sizing:border-box; }
   .row-line .label { flex:1 1 0; min-width:0; text-align:left; overflow-wrap:anywhere; word-break:break-word; }
   .row-line .value { flex:0 0 ${valueColPx}px; width:${valueColPx}px; min-width:${valueColPx}px; text-align:right; white-space:nowrap; }
-  .item-comps { padding-left:16px; font-size:${Math.max(8, fonteItens - 1)}px; color:#222; }
-  .item-note { padding-left:28px; font-size:${Math.max(8, fonteItens - 1)}px; color:#333; }
-  .obs { margin:${padding}px 0; font-size:${Math.max(8, fonteItens - 2)}px; }
-  .summary-section { font-size:${fonteResumo}px; }
-  .summary-section .items-title { font-size:${fonteResumo}px; }
-  .payment-section { font-size:${fontePagamento}px; }
-  .charge, .paid { text-align:center; font-weight:900; }
-  .extra-header, .extra-footer { margin-top:6px; font-size:${Math.max(8, fonteRodape)}px; white-space:normal; }
-  .footer { margin-top:12px; font-size:${fonteRodape}px; text-align:center; }
-  .printed-at { color:#555; }
+  .item-comps { padding-left:16px; font-size:${Math.max(8, fonteItens - 1)}px; color:#000; }
+  .item-note { padding-left:28px; font-size:${Math.max(8, fonteItens - 1)}px; color:#000; }
+  .obs-box { margin:${Math.max(6, padding + 2)}px 0; padding:3px 8px 7px; border:2px solid #000; border-radius:4px; text-align:center; line-height:1.15; }
+  .obs-title { font-weight:800; font-size:${fontePedido}px; letter-spacing:.02em; line-height:1.1; }
+  .obs-text { margin-top:1px; font-weight:800; font-size:${fonteItens + 1}px; line-height:1.15; overflow-wrap:anywhere; word-break:break-word; }
+  .summary-section, .summary-section strong { font-size:${fonteResumo}px; font-weight:${peso(negritoResumo)}; }
+  .summary-section .items-title { font-size:${fonteResumo}px; font-weight:${peso(negritoResumo)}; }
+  .payment-section, .payment-section strong { font-size:${fontePagamento}px; font-weight:${peso(negritoPagamento)}; }
+  .charge, .paid { text-align:center; font-weight:${negritoPagamento ? 900 : 400}; }
+  .extra-header { margin-top:${extraMt}px; font-size:${Math.max(8, fonteRodape)}px; white-space:normal; font-weight:${peso(negritoCabecalho)}; }
+  .extra-footer { margin-top:${extraMt}px; font-size:${Math.max(8, fonteRodape)}px; white-space:normal; font-weight:${peso(negritoRodape)}; }
+  .footer { margin-top:${footerMt}px; font-size:${fonteRodape}px; text-align:center; font-weight:${peso(negritoRodape)}; }
+  .printed-at { color:#000; }
 </style>
 </head><body>
-<div class="receipt">
+<div class="receipt" data-densidade="${template.densidade}">
   ${
     ticket.tipoCupom === 'producao'
       ? renderProducao(input, template, cabecalhoExtra, rodapeExtra)

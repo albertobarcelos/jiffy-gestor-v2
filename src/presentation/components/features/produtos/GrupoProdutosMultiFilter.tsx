@@ -37,8 +37,9 @@ export function GrupoProdutosMultiFilter({
       loading={loading}
       disabled={loading}
       loadingText="Carregando..."
-      noOptionsText="Nenhum grupo encontrado"
+      noOptionsText="Nenhuma categoria encontrada"
       getOptionLabel={grupo => grupo.getNome()}
+      getOptionKey={grupo => grupo.getId()}
       isOptionEqualToValue={(a, b) => a.getId() === b.getId()}
       value={selecionados}
       onChange={(_, gruposEscolhidos) => onChange(gruposEscolhidos.map(g => g.getId()))}

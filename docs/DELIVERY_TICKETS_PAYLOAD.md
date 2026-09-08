@@ -118,7 +118,7 @@ Regras importantes:
   payload de tickets.
 - Para resolver `nomeImpressoraWindows`, o frontend passa `estacaoImpressaoId`
   no `/tickets`. Sem esse parâmetro, o backend ainda retorna tickets, mas pode
-  retornar sem o nome Windows/QZ.
+  retornar sem o nome Windows (legado). A impressão física usa o agente Windows.
 
 Exemplo de complemento com dado extra apenas para impressao:
 

@@ -1,15 +1,25 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { MdReceiptLong, MdRestartAlt } from 'react-icons/md'
+import { MdPrint, MdReceiptLong, MdRestartAlt } from 'react-icons/md'
+import { mapTicketToGraphicPrintDocument } from '@/src/application/delivery/mapTicketToGraphicPrintDocument'
+import { mapTicketToPrintDocument } from '@/src/application/delivery/mapTicketToPrintDocument'
+import { printDeliveryCupom } from '@/src/infrastructure/printing/printDeliveryCupom'
+import { showToast } from '@/src/shared/utils/toast'
 import { DeliveryConfigCollapsibleSection } from './DeliveryConfigCollapsibleSection'
 import { larguraCupomDeliveryPx, renderDeliveryCupomHtml } from '@/src/application/delivery/renderDeliveryCupomHtml'
 import {
   DEFAULT_DELIVERY_CUPOM_TEMPLATE,
   DELIVERY_CUPOM_MARGEM_LATERAL_MAX_MM,
   type DeliveryCupomModelo,
+  type DeliveryCupomModeloFonteConfig,
   type DeliveryCupomTemplateConfig,
 } from '@/src/shared/types/deliveryCupomTemplate'
+import {
+  CupomCampoInfo,
+  DeliveryModoPapelInfoTooltip,
+  DeliveryModoPapelToggle,
+} from './DeliveryModoPapelToggle'
 import type {
   VendaGestorTicket,
   VendaGestorTicketsResponse,
@@ -20,6 +30,7 @@ interface DeliveryCupomTemplateEditorProps {
   onChange: (value: DeliveryCupomTemplateConfig) => void
   disabled?: boolean
   resetSectionsWhen?: unknown
+  resolveImpressoraTeste?: (modelo: DeliveryCupomModelo) => string
 }
 
 function update<K extends keyof DeliveryCupomTemplateConfig>(
@@ -39,27 +50,69 @@ type FonteBlocoKey =
   | 'tamanhoFontePagamento'
   | 'tamanhoFonteRodape'
 
+type NegritoBlocoKey =
+  | 'negritoCabecalho'
+  | 'negritoPedido'
+  | 'negritoClienteEndereco'
+  | 'negritoItens'
+  | 'negritoResumo'
+  | 'negritoPagamento'
+  | 'negritoRodape'
+
 const MODELOS_CUPOM: Array<{ value: DeliveryCupomModelo; label: string; hint: string }> = [
   {
     value: 'producao',
     label: 'Produção',
-    hint: 'Use fontes maiores para cozinha e preparo.',
+    hint: 'Cupom da cozinha, para preparar o pedido.',
   },
   {
     value: 'expedicao',
     label: 'Expedição',
-    hint: 'Use fontes menores para caber mais informações no papel.',
+    hint: 'Cupom da entrega, com endereço e valores.',
   },
 ]
 
-const FONTES_BLOCO: Array<[string, FonteBlocoKey]> = [
-  ['Cabeçalho', 'tamanhoFonteCabecalho'],
-  ['Pedido, data e previsão', 'tamanhoFontePedido'],
-  ['Cliente e endereço', 'tamanhoFonteClienteEndereco'],
-  ['Itens do pedido', 'tamanhoFonteItens'],
-  ['Resumo do pedido', 'tamanhoFonteResumo'],
-  ['Pagamento/cobrança', 'tamanhoFontePagamento'],
-  ['Empresa e rodapé', 'tamanhoFonteRodape'],
+const FONTES_BLOCO: Array<{
+  label: string
+  key: FonteBlocoKey
+  negritoKey: NegritoBlocoKey
+  modelos: DeliveryCupomModelo[]
+  labelPorModelo?: Partial<Record<DeliveryCupomModelo, string>>
+}> = [
+  { label: 'Cabeçalho', key: 'tamanhoFonteCabecalho', negritoKey: 'negritoCabecalho', modelos: ['producao', 'expedicao'] },
+  { label: 'Pedido, data e previsão', key: 'tamanhoFontePedido', negritoKey: 'negritoPedido', modelos: ['producao', 'expedicao'] },
+  {
+    label: 'Cliente e endereço',
+    key: 'tamanhoFonteClienteEndereco',
+    negritoKey: 'negritoClienteEndereco',
+    modelos: ['producao', 'expedicao'],
+    labelPorModelo: { producao: 'Cliente' },
+  },
+  { label: 'Itens do pedido', key: 'tamanhoFonteItens', negritoKey: 'negritoItens', modelos: ['producao', 'expedicao'] },
+  { label: 'Resumo do pedido', key: 'tamanhoFonteResumo', negritoKey: 'negritoResumo', modelos: ['expedicao'] },
+  { label: 'Pagamento/cobrança', key: 'tamanhoFontePagamento', negritoKey: 'negritoPagamento', modelos: ['expedicao'] },
+  { label: 'Empresa e rodapé', key: 'tamanhoFonteRodape', negritoKey: 'negritoRodape', modelos: ['producao', 'expedicao'] },
+]
+
+const TOGGLES_CUPOM: Array<{
+  label: string
+  key:
+    | 'mostrarLogoTexto'
+    | 'destacarProdutos'
+    | 'mostrarTelefoneCliente'
+    | 'mostrarEnderecoEntrega'
+    | 'mostrarValores'
+    | 'mostrarObservacaoPedido'
+    | 'mostrarDataHora'
+  modelos: DeliveryCupomModelo[]
+}> = [
+  { label: 'Mostrar nome/logo texto', key: 'mostrarLogoTexto', modelos: ['producao', 'expedicao'] },
+  { label: 'Produtos em destaque', key: 'destacarProdutos', modelos: ['producao', 'expedicao'] },
+  { label: 'Telefone do cliente', key: 'mostrarTelefoneCliente', modelos: ['expedicao'] },
+  { label: 'Endereço de entrega', key: 'mostrarEnderecoEntrega', modelos: ['expedicao'] },
+  { label: 'Valores', key: 'mostrarValores', modelos: ['expedicao'] },
+  { label: 'Observação do pedido', key: 'mostrarObservacaoPedido', modelos: ['producao', 'expedicao'] },
+  { label: 'Data/hora no rodapé', key: 'mostrarDataHora', modelos: ['producao', 'expedicao'] },
 ]
 
 function parseFonteOpcional(value: string): number | null {
@@ -80,8 +133,11 @@ const FONT_BLOCO_MAX = 18
 function FonteBlocoInput(props: {
   label: string
   value: number | null
+  padrao: number | null
+  negrito: boolean
   disabled?: boolean
   onChange: (v: number | null) => void
+  onNegritoChange: (v: boolean) => void
 }) {
   const [draft, setDraft] = useState(props.value == null ? '' : String(props.value))
 
@@ -108,12 +164,12 @@ function FonteBlocoInput(props: {
     else aplicarValor(Math.min(FONT_BLOCO_MAX, props.value + 1))
   }
 
-  const padraoAtivo = props.value != null
+  const padraoAtivo = props.value !== props.padrao
 
   return (
     <div className="space-y-0.5">
       <label className="text-xs font-medium text-primary-text">{props.label}</label>
-      <div className="flex items-center gap-1">
+      <div className="flex flex-wrap items-center gap-1 overflow-visible">
         <div
           className={`inline-flex h-7 overflow-hidden rounded-md border border-gray-200 bg-white ${props.disabled ? 'opacity-60' : ''}`}
         >
@@ -163,11 +219,25 @@ function FonteBlocoInput(props: {
         </div>
         <button
           type="button"
+          aria-pressed={props.negrito}
+          aria-label={`Negrito em ${props.label}`}
+          disabled={props.disabled}
+          onClick={() => props.onNegritoChange(!props.negrito)}
+          className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border text-xs font-black transition-colors ${
+            props.negrito
+              ? 'border-secondary bg-secondary text-white hover:bg-secondary/90'
+              : 'border-gray-200 bg-white text-primary-text hover:border-secondary/50'
+          } ${props.disabled ? 'opacity-60' : ''}`}
+        >
+          N
+        </button>
+        <button
+          type="button"
           disabled={props.disabled || !padraoAtivo}
-          onClick={() => aplicarValor(null)}
-          className={`h-7 shrink-0 rounded-md border px-2 text-xs font-normal transition-colors ${
+          onClick={() => aplicarValor(props.padrao)}
+          className={`h-7 shrink-0 rounded-md border px-2 text-xs font-semibold transition-colors ${
             padraoAtivo
-              ? 'border-secondary bg-secondary/10 text-secondary hover:bg-secondary/15 disabled:cursor-not-allowed disabled:opacity-50'
+              ? 'border-secondary bg-secondary text-white hover:bg-secondary/90 disabled:cursor-not-allowed disabled:opacity-50'
               : 'cursor-default border-gray-200 bg-white text-secondary-text disabled:opacity-60'
           } ${props.disabled ? 'opacity-60' : ''}`}
         >
@@ -321,21 +391,24 @@ export function DeliveryCupomTemplateEditor({
   onChange,
   disabled,
   resetSectionsWhen,
+  resolveImpressoraTeste,
 }: DeliveryCupomTemplateEditorProps) {
   const [modeloSelecionado, setModeloSelecionado] = useState<DeliveryCupomModelo>('expedicao')
-  const fontesModelo = value.fontesPorModelo?.[modeloSelecionado] ??
-    DEFAULT_DELIVERY_CUPOM_TEMPLATE.fontesPorModelo[modeloSelecionado]
+  const [imprimindoTeste, setImprimindoTeste] = useState(false)
+  const fontesModelo: DeliveryCupomModeloFonteConfig = {
+    ...DEFAULT_DELIVERY_CUPOM_TEMPLATE.fontesPorModelo[modeloSelecionado],
+    ...value.fontesPorModelo?.[modeloSelecionado],
+  }
 
-  const updateFonteModelo = (key: FonteBlocoKey, next: number | null) => {
+  const updateFonteModelo = (patch: Partial<DeliveryCupomModeloFonteConfig>) => {
     onChange({
       ...value,
       fontesPorModelo: {
         ...DEFAULT_DELIVERY_CUPOM_TEMPLATE.fontesPorModelo,
         ...value.fontesPorModelo,
         [modeloSelecionado]: {
-          ...DEFAULT_DELIVERY_CUPOM_TEMPLATE.fontesPorModelo[modeloSelecionado],
           ...fontesModelo,
-          [key]: next,
+          ...patch,
         },
       },
     })
@@ -361,25 +434,98 @@ export function DeliveryCupomTemplateEditor({
   const previewSelecionado = previewHtml[modeloSelecionado]
   const previewWidthPx = larguraCupomDeliveryPx(value.larguraMm)
 
+  const imprimirTeste = async () => {
+    const printerName = resolveImpressoraTeste?.(modeloSelecionado)?.trim() ?? ''
+    if (!printerName) {
+      showToast.warning(
+        modeloSelecionado === 'producao'
+          ? 'Vincule uma impressora da cozinha neste PC para imprimir o teste.'
+          : 'Vincule a impressora de expedição neste PC para imprimir o teste.'
+      )
+      return
+    }
+    setImprimindoTeste(true)
+    try {
+      const sample = sampleCupom(modeloSelecionado === 'producao' ? 'producao' : 'expedicao')
+      const document =
+        value.modoPapel === 'grafico'
+          ? await mapTicketToGraphicPrintDocument(sample.root, sample.ticket, {
+              nomeEmpresa: 'Espeto do Joaquim',
+              template: value,
+            })
+          : mapTicketToPrintDocument(sample.root, sample.ticket, {
+              nomeEmpresa: 'Espeto do Joaquim',
+              template: value,
+            })
+      const result = await printDeliveryCupom({
+        jobId: `teste-cupom-${modeloSelecionado}-${Date.now()}`,
+        printerName,
+        copies: 1,
+        document,
+      })
+      if (result.ok) {
+        showToast.success(`Teste de ${modeloPreview?.label ?? 'cupom'} enviado para ${printerName}.`)
+        return
+      }
+      showToast.error(result.mensagem ?? 'Não foi possível imprimir o teste.')
+    } catch (error) {
+      showToast.error(error instanceof Error && error.message.trim() ? error.message : 'Falha ao montar o cupom de teste.')
+    } finally {
+      setImprimindoTeste(false)
+    }
+  }
+
   return (
     <DeliveryConfigCollapsibleSection
       icon={<MdReceiptLong className="h-5 w-5" aria-hidden />}
       title="Modelo visual do cupom"
       resetExpandedWhen={resetSectionsWhen}
-      headerActions={
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => onChange(DEFAULT_DELIVERY_CUPOM_TEMPLATE)}
-          className="inline-flex h-9 items-center gap-2 rounded-lg border border-secondary px-3 text-sm font-semibold text-secondary transition-colors hover:bg-secondary/10 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <MdRestartAlt className="h-4 w-4" />
-          Restaurar padrão
-        </button>
-      }
     >
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(300px,340px)]">
         <div className="space-y-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-semibold text-primary-text">Como imprimir no papel</label>
+              <DeliveryModoPapelInfoTooltip />
+            </div>
+            <DeliveryModoPapelToggle
+              value={value.modoPapel ?? 'grafico'}
+              disabled={disabled}
+              onChange={next => onChange(update(value, 'modoPapel', next))}
+            />
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-semibold text-primary-text">Modelo do cupom</label>
+              <CupomCampoInfo
+                texto="Produção é o cupom da cozinha, com o que precisa para preparar. Expedição é o que vai na entrega, com cliente, endereço e pagamento."
+                ariaLabel="Modelo do cupom"
+              />
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {MODELOS_CUPOM.map(modelo => {
+                const selected = modeloSelecionado === modelo.value
+                return (
+                  <button
+                    key={modelo.value}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => setModeloSelecionado(modelo.value)}
+                    className={`rounded-lg border px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                      selected
+                        ? 'border-secondary bg-secondary text-white'
+                        : 'border-gray-200 bg-white text-primary-text hover:border-secondary/50'
+                    }`}
+                  >
+                    <span className="block text-sm font-semibold">{modelo.label}</span>
+                    <span className={`mt-0.5 block text-xs ${selected ? 'text-white/85' : 'text-secondary-text'}`}>
+                      {modelo.hint}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1">
               <label className="text-sm font-semibold text-primary-text">Largura</label>
@@ -423,7 +569,13 @@ export function DeliveryCupomTemplateEditor({
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1">
-              <label className="text-sm font-semibold text-primary-text">Densidade</label>
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-semibold text-primary-text">Densidade</label>
+                <CupomCampoInfo
+                  texto="Define o espaço entre as linhas. Compacto economiza papel. Normal é o equilíbrio do dia a dia. Espaçoso deixa a leitura mais folgada."
+                  ariaLabel="Densidade do cupom"
+                />
+              </div>
               <select
                 value={value.densidade}
                 disabled={disabled}
@@ -454,91 +606,39 @@ export function DeliveryCupomTemplateEditor({
           </div>
 
           <div className="rounded-lg border border-gray-100 bg-gray-50/80 p-3">
-            <div className="mb-3">
+            <div className="mb-3 flex items-center gap-2">
               <h4 className="text-sm font-semibold text-primary-text">Fonte por bloco</h4>
-              <p className="mt-0.5 text-xs text-secondary-text">
-                Escolha o modelo e ajuste individualmente. Deixe vazio para usar a fonte base.
-              </p>
+              <CupomCampoInfo
+                texto={`Ajuste o tamanho e o negrito de cada parte do cupom de ${modeloPreview?.label ?? 'modelo'}. Padrão volta para o tamanho de fábrica daquele bloco.`}
+                ariaLabel="Fonte por bloco"
+              />
             </div>
-            <div className="mb-3 grid gap-2 sm:grid-cols-2">
-              {MODELOS_CUPOM.map(modelo => {
-                const selected = modeloSelecionado === modelo.value
-                return (
-                  <button
-                    key={modelo.value}
-                    type="button"
-                    disabled={disabled}
-                    onClick={() => setModeloSelecionado(modelo.value)}
-                    className={`rounded-lg border px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-                      selected
-                        ? 'border-secondary bg-secondary text-white'
-                        : 'border-gray-200 bg-white text-primary-text hover:border-secondary/50'
-                    }`}
-                  >
-                    <span className="block text-sm font-semibold">{modelo.label}</span>
-                    <span className={`mt-0.5 block text-xs ${selected ? 'text-white/85' : 'text-secondary-text'}`}>
-                      {modelo.hint}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-            <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
-              {FONTES_BLOCO.map(([label, key]) => (
+            <div className="grid grid-cols-1 gap-y-2">
+              {FONTES_BLOCO.filter(bloco => bloco.modelos.includes(modeloSelecionado)).map(bloco => (
                 <FonteBlocoInput
-                  key={`${modeloSelecionado}-${key}`}
-                  label={label}
-                  value={fontesModelo[key]}
+                  key={`${modeloSelecionado}-${bloco.key}`}
+                  label={bloco.labelPorModelo?.[modeloSelecionado] ?? bloco.label}
+                  value={fontesModelo[bloco.key]}
+                  padrao={DEFAULT_DELIVERY_CUPOM_TEMPLATE.fontesPorModelo[modeloSelecionado][bloco.key]}
+                  negrito={fontesModelo[bloco.negritoKey]}
                   disabled={disabled}
-                  onChange={v => updateFonteModelo(key, v)}
+                  onChange={v => updateFonteModelo({ [bloco.key]: v })}
+                  onNegritoChange={v => updateFonteModelo({ [bloco.negritoKey]: v })}
                 />
               ))}
             </div>
           </div>
 
           <div className="grid gap-2 md:grid-cols-2">
-            <PreviewToggle
-              label="Mostrar nome/logo texto"
-              checked={value.mostrarLogoTexto}
-              disabled={disabled}
-              onChange={v => onChange(update(value, 'mostrarLogoTexto', v))}
-            />
-            <PreviewToggle
-              label="Produtos em destaque"
-              checked={value.destacarProdutos}
-              disabled={disabled}
-              onChange={v => onChange(update(value, 'destacarProdutos', v))}
-            />
-            <PreviewToggle
-              label="Telefone do cliente"
-              checked={value.mostrarTelefoneCliente}
-              disabled={disabled}
-              onChange={v => onChange(update(value, 'mostrarTelefoneCliente', v))}
-            />
-            <PreviewToggle
-              label="Endereço de entrega"
-              checked={value.mostrarEnderecoEntrega}
-              disabled={disabled}
-              onChange={v => onChange(update(value, 'mostrarEnderecoEntrega', v))}
-            />
-            <PreviewToggle
-              label="Valores"
-              checked={value.mostrarValores}
-              disabled={disabled}
-              onChange={v => onChange(update(value, 'mostrarValores', v))}
-            />
-            <PreviewToggle
-              label="Observação do pedido"
-              checked={value.mostrarObservacaoPedido}
-              disabled={disabled}
-              onChange={v => onChange(update(value, 'mostrarObservacaoPedido', v))}
-            />
-            <PreviewToggle
-              label="Data/hora no rodapé"
-              checked={value.mostrarDataHora}
-              disabled={disabled}
-              onChange={v => onChange(update(value, 'mostrarDataHora', v))}
-            />
+            {TOGGLES_CUPOM.filter(item => item.modelos.includes(modeloSelecionado)).map(item => (
+              <PreviewToggle
+                key={item.key}
+                label={item.label}
+                checked={value[item.key]}
+                disabled={disabled}
+                onChange={v => onChange(update(value, item.key, v))}
+              />
+            ))}
           </div>
 
           <div className="grid items-end gap-3 md:grid-cols-2">
@@ -568,13 +668,24 @@ export function DeliveryCupomTemplateEditor({
         </div>
 
         <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
-          <div className="mb-2">
-            <div className="text-xs font-semibold uppercase tracking-wide text-secondary-text">
-              Preview {modeloPreview?.label ?? ''}
+          <div className="mb-2 flex items-start justify-between gap-2">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-secondary-text">
+                Preview {modeloPreview?.label ?? ''}
+              </div>
+              <p className="mt-0.5 text-[11px] text-secondary-text">
+                Mostrando o modelo selecionado acima.
+              </p>
             </div>
-            <p className="mt-0.5 text-[11px] text-secondary-text">
-              Mostrando o mesmo modelo selecionado na edição de fontes.
-            </p>
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => onChange(DEFAULT_DELIVERY_CUPOM_TEMPLATE)}
+              className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-secondary px-2.5 text-xs font-semibold text-secondary transition-colors hover:bg-secondary/10 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <MdRestartAlt className="h-3.5 w-3.5" />
+              Restaurar padrão
+            </button>
           </div>
           <div className="overflow-hidden rounded-lg bg-white p-2 shadow-inner">
             <CupomPreviewIframe
@@ -584,6 +695,15 @@ export function DeliveryCupomTemplateEditor({
               widthPx={previewWidthPx}
             />
           </div>
+          <button
+            type="button"
+            disabled={disabled || imprimindoTeste}
+            onClick={() => void imprimirTeste()}
+            className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-secondary bg-secondary px-3 text-sm font-semibold text-white transition-colors hover:bg-secondary/90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <MdPrint className="h-4 w-4" />
+            {imprimindoTeste ? 'Imprimindo…' : 'Imprimir teste'}
+          </button>
         </div>
       </div>
     </DeliveryConfigCollapsibleSection>

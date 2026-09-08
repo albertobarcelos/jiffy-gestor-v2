@@ -1,4 +1,5 @@
 import { calcularPeriodoNoFusoEmpresa } from '@/src/shared/utils/periodoNoFusoEmpresa'
+import { intervaloDiaOperacionalKanban } from './diaOperacionalKanban'
 
 export type KanbanFiltroDataPreset = 'hoje' | 'ontem' | 'ultimos_7' | 'todos' | 'por_data'
 
@@ -24,11 +25,15 @@ const PRESET_TO_PERIODO_OPCAO: Record<
 
 export function intervaloPresetKanbanFiltroData(
   preset: Exclude<KanbanFiltroDataPreset, 'todos' | 'por_data'>,
-  timeZoneEmpresa: string
+  timeZoneEmpresa: string,
+  opcoes?: { diaOperacionalFlow?: boolean; agora?: Date }
 ): { inicio: Date; fim: Date } | null {
   const tz = timeZoneEmpresa.trim() || 'America/Sao_Paulo'
+  if (opcoes?.diaOperacionalFlow && (preset === 'hoje' || preset === 'ontem')) {
+    return intervaloDiaOperacionalKanban(preset, tz, opcoes.agora ?? new Date())
+  }
   const opcao = PRESET_TO_PERIODO_OPCAO[preset]
-  const { inicio, fim } = calcularPeriodoNoFusoEmpresa(opcao, tz)
+  const { inicio, fim } = calcularPeriodoNoFusoEmpresa(opcao, tz, opcoes?.agora)
   if (!inicio || !fim) return null
   return { inicio, fim }
 }

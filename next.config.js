@@ -38,6 +38,8 @@ const cadastrosLegacyRedirects = [
 
 const nextConfig = {
   reactStrictMode: true,
+  /** WebView do Flow usa 127.0.0.1; o Next anuncia localhost. */
+  allowedDevOrigins: ['127.0.0.1'],
   async redirects() {
     return [
       {

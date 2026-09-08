@@ -42,7 +42,7 @@ export interface PreferenciasImpressaoDelivery {
   imprimirAoReceber: boolean
   imprimirAoFicarPronto: boolean
   impressoraExpedicaoId: string | null
-  /** Fallback: `NEXT_PUBLIC_QZ_PRINTER_DEFAULT` parseado no cliente. */
+  /** Campo legado; impressão física fica no agente Windows. */
   impressoraPadraoNome: string | null
 }
 

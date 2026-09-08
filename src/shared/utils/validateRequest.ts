@@ -17,6 +17,17 @@ export type ValidateRequestOptions = {
    * Default: `true` (rotas multi-empresa).
    */
   requireEmpresaId?: boolean
+  /**
+   * Quando `true`, recusa cookie `tenant-token` (last-wins entre abas) e exige
+   * `Authorization: Bearer` do token per-tab. Usar em rotas fiscais / DANFE.
+   */
+  requireAuthorizationHeader?: boolean
+}
+
+function hasAuthorizationBearer(request: NextRequest): boolean {
+  const authHeader = request.headers.get('authorization')
+  if (!authHeader?.startsWith('Bearer ')) return false
+  return authHeader.substring(7).trim().length > 0
 }
 
 /**
@@ -26,6 +37,17 @@ export function validateRequest(
   request: NextRequest,
   options?: ValidateRequestOptions
 ): ValidationResult {
+  if (options?.requireAuthorizationHeader && !hasAuthorizationBearer(request)) {
+    return {
+      valid: false,
+      tokenInfo: null,
+      error: NextResponse.json(
+        { message: 'Token da empresa obrigatório no header Authorization' },
+        { status: 401 }
+      ),
+    }
+  }
+
   const tokenInfo = getTokenInfo(request)
 
   if (!tokenInfo) {

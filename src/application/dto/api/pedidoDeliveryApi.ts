@@ -19,7 +19,6 @@ export interface EnderecoClientePedidoDeliveryApi {
 
 export interface ClientePedidoDeliveryApi {
   telefone: string
-  nome?: string | null
   cpf?: string | null
   /** Endereço já cadastrado do cliente delivery (obrigatório quando há 2+ moradas). */
   enderecoIdEntrega?: string | null

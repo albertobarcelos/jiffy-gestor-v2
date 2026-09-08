@@ -32,7 +32,7 @@ export function warnImpressao(etapa: string, detalhes?: Record<string, unknown>)
 /**
  * `cause` deve ser o objeto de exceção original (ex: o `e` capturado no `catch`).
  * Passá-lo como argumento separado ao `console.error` garante que o DevTools
- * exiba o stack trace real — objetos não-Error lançados pelo QZ Tray têm
+ * exiba o stack trace real — objetos não-Error do transporte de impressão têm
  * propriedades não-enumeráveis que o spread `{ ...e }` perde completamente.
  */
 export function erroImpressao(

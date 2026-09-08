@@ -546,6 +546,8 @@ export interface JiffySidePanelModalProps {
   zIndex?: number
   title: React.ReactNode
   subtitle?: React.ReactNode
+  /** Ação à direita do título, à esquerda do X (ex.: download do app). */
+  headerExtra?: React.ReactNode
   /** Faixa de abas opcional — omitir quando o fluxo for uma única coluna de conteúdo */
   tabsSlot?: React.ReactNode
   children: React.ReactNode
@@ -604,6 +606,7 @@ export function JiffySidePanelModal({
   zIndex = 1300,
   title,
   subtitle,
+  headerExtra,
   tabsSlot,
   children,
   panelClassName = 'w-[min(53rem,95vw)] max-w-[100vw] sm:w-[min(900px,60vw)]',
@@ -742,6 +745,9 @@ export function JiffySidePanelModal({
                   </p>
                 ) : null}
               </div>
+              {headerExtra ? (
+                <div className="relative z-10 flex shrink-0 items-center self-center">{headerExtra}</div>
+              ) : null}
               <Button
                 type="button"
                 variant="ghost"

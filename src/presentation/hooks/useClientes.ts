@@ -23,7 +23,7 @@ interface ClientesResponse {
 /**
  * Hook para buscar clientes com React Query
  */
-export function useClientes(params: ClientesQueryParams = {}) {
+export function useClientes(params: ClientesQueryParams = {}, options?: { enabled?: boolean }) {
   return useSecureTenantQuery(
     ['clientes', params],
     async ({ token }) => {
@@ -50,7 +50,7 @@ export function useClientes(params: ClientesQueryParams = {}) {
         count: data.count || 0,
       }
     },
-    { staleTime: 1000 * 60 * 5 }
+    { staleTime: 1000 * 60 * 5, enabled: options?.enabled }
   )
 }
 

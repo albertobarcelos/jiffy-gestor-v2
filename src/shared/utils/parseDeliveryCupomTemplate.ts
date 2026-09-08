@@ -1,9 +1,13 @@
 import {
   DEFAULT_DELIVERY_CUPOM_TEMPLATE,
+  DEFAULT_FONTES_EXPEDICAO,
+  DEFAULT_FONTES_MODELO,
+  DEFAULT_FONTES_PRODUCAO,
   DELIVERY_CUPOM_MARGEM_LATERAL_MAX_MM,
   type DeliveryCupomDensidade,
   type DeliveryCupomLargura,
   type DeliveryCupomModeloFonteConfig,
+  type DeliveryCupomModoPapel,
   type DeliveryCupomTemplateConfig,
 } from '@/src/shared/types/deliveryCupomTemplate'
 
@@ -39,16 +43,38 @@ function densidade(v: unknown): DeliveryCupomDensidade {
   return v === 'compacto' || v === 'espacoso' ? v : 'normal'
 }
 
-function parseFontesModelo(raw: unknown): DeliveryCupomModeloFonteConfig {
+function modoPapel(v: unknown): DeliveryCupomModoPapel {
+  return v === 'grafico' ? 'grafico' : 'texto'
+}
+
+function tamanhoOuPadrao(v: unknown, fallback: number | null): number | null {
+  if (v === undefined) return fallback
+  return numOrNull(v, 8, 18)
+}
+
+function parseFontesModelo(
+  raw: unknown,
+  fallback: DeliveryCupomModeloFonteConfig = DEFAULT_FONTES_MODELO
+): DeliveryCupomModeloFonteConfig {
   const o = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {}
   return {
-    tamanhoFonteCabecalho: numOrNull(o.tamanhoFonteCabecalho, 8, 18),
-    tamanhoFontePedido: numOrNull(o.tamanhoFontePedido, 8, 18),
-    tamanhoFonteClienteEndereco: numOrNull(o.tamanhoFonteClienteEndereco, 8, 18),
-    tamanhoFonteItens: numOrNull(o.tamanhoFonteItens, 8, 18),
-    tamanhoFonteResumo: numOrNull(o.tamanhoFonteResumo, 8, 18),
-    tamanhoFontePagamento: numOrNull(o.tamanhoFontePagamento, 8, 18),
-    tamanhoFonteRodape: numOrNull(o.tamanhoFonteRodape, 8, 18),
+    tamanhoFonteCabecalho: tamanhoOuPadrao(o.tamanhoFonteCabecalho, fallback.tamanhoFonteCabecalho),
+    tamanhoFontePedido: tamanhoOuPadrao(o.tamanhoFontePedido, fallback.tamanhoFontePedido),
+    tamanhoFonteClienteEndereco: tamanhoOuPadrao(
+      o.tamanhoFonteClienteEndereco,
+      fallback.tamanhoFonteClienteEndereco
+    ),
+    tamanhoFonteItens: tamanhoOuPadrao(o.tamanhoFonteItens, fallback.tamanhoFonteItens),
+    tamanhoFonteResumo: tamanhoOuPadrao(o.tamanhoFonteResumo, fallback.tamanhoFonteResumo),
+    tamanhoFontePagamento: tamanhoOuPadrao(o.tamanhoFontePagamento, fallback.tamanhoFontePagamento),
+    tamanhoFonteRodape: tamanhoOuPadrao(o.tamanhoFonteRodape, fallback.tamanhoFonteRodape),
+    negritoCabecalho: bool(o.negritoCabecalho, fallback.negritoCabecalho),
+    negritoPedido: bool(o.negritoPedido, fallback.negritoPedido),
+    negritoClienteEndereco: bool(o.negritoClienteEndereco, fallback.negritoClienteEndereco),
+    negritoItens: bool(o.negritoItens, fallback.negritoItens),
+    negritoResumo: bool(o.negritoResumo, fallback.negritoResumo),
+    negritoPagamento: bool(o.negritoPagamento, fallback.negritoPagamento),
+    negritoRodape: bool(o.negritoRodape, fallback.negritoRodape),
   }
 }
 
@@ -75,20 +101,15 @@ export function parseDeliveryCupomTemplate(data: Record<string, unknown>): Deliv
       : {}
 
   return {
+    modoPapel: modoPapel(o.modoPapel),
     larguraMm: largura(o.larguraMm),
     margemLateralMm: num(o.margemLateralMm, d.margemLateralMm, 0, DELIVERY_CUPOM_MARGEM_LATERAL_MAX_MM),
     densidade: densidade(o.densidade),
     tamanhoFonteBase: num(o.tamanhoFonteBase, d.tamanhoFonteBase, 10, 18),
-    tamanhoFonteCabecalho: numOrNull(o.tamanhoFonteCabecalho, 8, 18),
-    tamanhoFontePedido: numOrNull(o.tamanhoFontePedido, 8, 18),
-    tamanhoFonteClienteEndereco: numOrNull(o.tamanhoFonteClienteEndereco, 8, 18),
-    tamanhoFonteItens: numOrNull(o.tamanhoFonteItens, 8, 18),
-    tamanhoFonteResumo: numOrNull(o.tamanhoFonteResumo, 8, 18),
-    tamanhoFontePagamento: numOrNull(o.tamanhoFontePagamento, 8, 18),
-    tamanhoFonteRodape: numOrNull(o.tamanhoFonteRodape, 8, 18),
+    ...parseFontesModelo(o),
     fontesPorModelo: {
-      producao: parseFontesModelo(fontesPorModelo.producao),
-      expedicao: parseFontesModelo(fontesPorModelo.expedicao),
+      producao: parseFontesModelo(fontesPorModelo.producao, DEFAULT_FONTES_PRODUCAO),
+      expedicao: parseFontesModelo(fontesPorModelo.expedicao, DEFAULT_FONTES_EXPEDICAO),
     },
     destacarProdutos: bool(o.destacarProdutos, d.destacarProdutos),
     mostrarLogoTexto: bool(o.mostrarLogoTexto, d.mostrarLogoTexto),

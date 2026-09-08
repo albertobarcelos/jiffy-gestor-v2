@@ -28,7 +28,7 @@ export function PedidoProdutosCategoriasColuna() {
     >
       <div className="flex shrink-0 border-b border-gray-200 px-2 py-2 items-center justify-center">
         <span className="text-xs font-semibold uppercase tracking-wide text-primary">
-          Categorias
+          Grupos
         </span>
       </div>
       <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-1">
@@ -39,7 +39,7 @@ export function PedidoProdutosCategoriasColuna() {
             <JiffyLoading />
           </div>
         ) : grupos.length === 0 ? (
-          <p className="px-1 py-4 text-center text-[10px] text-gray-500">Nenhuma categoria</p>
+          <p className="px-1 py-4 text-center text-[10px] text-gray-500">Nenhum grupo</p>
         ) : (
           <div className="flex flex-col gap-1">
             {grupos.map((grupo: { getId: () => string; getCorHex: () => string; getIconName: () => string; getNome: () => string }) => {

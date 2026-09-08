@@ -9,8 +9,8 @@ import { showToast } from '@/src/shared/utils/toast'
 import { useEmpresaDeliveryMe } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
 import { useTabsStore } from '@/src/presentation/stores/tabsStore'
 import { compartilharLinkDelivery } from '@/src/presentation/components/features/delivery-publico/shared/utils/compartilharProdutoDelivery'
-import { deliveryPublicoHomePath } from '@/src/presentation/components/features/delivery-publico/shared/utils/deliveryPublicoRoutes'
 import { lojaDeliveryDisponivel } from '@/src/shared/constants/empresaDeliveryPendencias'
+import { buildCardapioLojaUrl } from '@/src/shared/utils/cardapioPublicUrl'
 import {
   DELIVERY_HUB_ETAPAS,
   DELIVERY_HUB_PATH,
@@ -55,9 +55,9 @@ export function DeliveryHubView() {
   const linkPublico = useMemo(() => {
     const slug = empresaDelivery?.slug?.trim()
     if (!slug) return ''
-    const path = deliveryPublicoHomePath(slug)
-    if (typeof window === 'undefined') return path
-    return `${window.location.origin}${path}`
+    const origin =
+      typeof window !== 'undefined' ? window.location.origin : undefined
+    return buildCardapioLojaUrl(slug, origin)
   }, [empresaDelivery?.slug])
 
   useEffect(() => {

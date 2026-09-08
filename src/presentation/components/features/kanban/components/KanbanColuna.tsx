@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { FormControl, MenuItem, Select } from '@mui/material'
-import { MdArrowDownward, MdArrowUpward } from 'react-icons/md'
+import { MdArrowDownward, MdArrowUpward, MdVisibilityOff } from 'react-icons/md'
 import { DroppableColumnContent } from './DroppableColumnContent'
 import type {
   ColunaKanbanId,
@@ -18,6 +18,7 @@ interface KanbanColunaProps {
   direcaoOrdenacao: DirecaoOrdenacaoKanban
   onCriterioOrdenacaoChange: (columnId: ColunaKanbanId, criterio: CriterioOrdenacaoKanban) => void
   onToggleDirecaoOrdenacao: (columnId: ColunaKanbanId) => void
+  onOcultarColuna?: (columnId: ColunaKanbanId) => void
   onColumnScroll?: (columnId: ColunaKanbanId, event: React.UIEvent<HTMLDivElement>) => void
   columnFooter?: ReactNode
   /** Rodapé fixo abaixo da área rolável (ex.: ações em lote). */
@@ -33,6 +34,7 @@ export function KanbanColuna(props: KanbanColunaProps) {
     direcaoOrdenacao,
     onCriterioOrdenacaoChange,
     onToggleDirecaoOrdenacao,
+    onOcultarColuna,
     onColumnScroll,
     columnFooter,
     columnRodape,
@@ -42,14 +44,14 @@ export function KanbanColuna(props: KanbanColunaProps) {
 
   return (
     <div
-      className="flex h-full w-64 flex-shrink-0 flex-col overflow-hidden rounded-lg border border-gray-200 bg-gray-50 sm:w-60 md:w-64 lg:w-96"
+      className="flex h-full min-w-[15rem] flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-gray-50"
     >
       <div
         className={`px-3 py-2 ${column.color} border-b ${column.borderColor} flex flex-shrink-0 items-center justify-between`}
       >
-        <div className="flex items-center gap-1.5">
+        <div className="flex min-w-0 items-center gap-1.5">
           {column.icon}
-          <h3 className="text-xs font-medium text-gray-900">
+          <h3 className="truncate text-xs font-medium text-gray-900">
             {column.title} ({count})
           </h3>
         </div>
@@ -92,6 +94,17 @@ export function KanbanColuna(props: KanbanColunaProps) {
               <MenuItem value="numero">Nº da venda</MenuItem>
             </Select>
           </FormControl>
+          {onOcultarColuna ? (
+            <button
+              type="button"
+              className="flex h-6 w-6 items-center justify-center rounded bg-white/70 text-gray-700 hover:bg-white"
+              onClick={() => onOcultarColuna(colId)}
+              aria-label={`Esconder coluna ${column.title}`}
+              title="Esconder coluna"
+            >
+              <MdVisibilityOff className="h-4 w-4" />
+            </button>
+          ) : null}
           <button
             type="button"
             className="flex h-6 w-5 items-center justify-center rounded bg-white/70 text-gray-700 hover:bg-white"
