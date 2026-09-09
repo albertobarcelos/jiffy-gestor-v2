@@ -16,6 +16,7 @@ import {
 import { ProdutoMenusPanel, type ProdutoMenusHandle } from './ProdutoMenusPanel'
 import { MENU_WIDE_PANEL_CLASS } from '@/src/presentation/components/features/menus/menuPanelConstants'
 import { useMenus } from '@/src/presentation/hooks/menus/useMenus'
+import { useEmpresaMenuUnico } from '@/src/presentation/hooks/menus/useEmpresaMenuUnico'
 import { cn } from '@/src/shared/utils/cn'
 
 export type ProdutosTabsTabKey = 'produto' | 'complementos' | 'impressoras' | 'menus'
@@ -53,15 +54,19 @@ export function ProdutosTabsModal({
   const menusRef = useRef<ProdutoMenusHandle>(null)
 
   const isDraftProduto = state.mode === 'create' || state.mode === 'copy'
+  const { isMenuUnico, menuUnicoId } = useEmpresaMenuUnico()
 
   const { data: menusPrincipais } = useMenus({
     tipo: 'principal',
     limit: 10,
-    enabled: state.open && state.mode === 'create',
+    enabled: state.open && state.mode === 'create' && !isMenuUnico,
   })
   const principalMenuId = useMemo(
-    () => menusPrincipais?.items.find(m => m.tipo === 'principal')?.id ?? null,
-    [menusPrincipais]
+    () =>
+      menuUnicoId ??
+      menusPrincipais?.items.find(m => m.tipo === 'principal')?.id ??
+      null,
+    [menuUnicoId, menusPrincipais]
   )
 
   const [draftMenuIds, setDraftMenuIds] = useState<string[]>([])
@@ -153,6 +158,17 @@ export function ProdutosTabsModal({
     seededPrincipalCreateRef.current = true
     setDraftMenuIds(prev => (prev.length === 0 ? [principalMenuId] : prev))
   }, [state.open, state.mode, state.createMenuIds, principalMenuId])
+
+  /** Com 1 menu: vínculo fixo ao Principal — sem aba Menus. */
+  useEffect(() => {
+    if (!state.open || !isMenuUnico || !menuUnicoId) return
+    if (isDraftProduto) {
+      setDraftMenuIds([menuUnicoId])
+    }
+    if (state.tab === 'menus') {
+      onTabChange('produto')
+    }
+  }, [state.open, state.tab, isMenuUnico, menuUnicoId, isDraftProduto, onTabChange])
 
   // Limpa overlay de confirmação ao fechar
   useEffect(() => {
@@ -262,10 +278,10 @@ export function ProdutosTabsModal({
       setMountedComplementos(true)
       setMountedImpressoras(true)
     }
-    if (isDraftProduto || (produtoId && state.mode === 'edit')) {
+    if (!isMenuUnico && (isDraftProduto || (produtoId && state.mode === 'edit'))) {
       setMountedMenus(true)
     }
-  }, [state.open, state.tab, produtoId, state.mode, isDraftProduto])
+  }, [state.open, state.tab, produtoId, state.mode, isDraftProduto, isMenuUnico])
 
   const showProdutoPanel = state.open && (mountedProduto || state.tab === 'produto')
   const showComplementosPanel =
@@ -273,7 +289,9 @@ export function ProdutosTabsModal({
   const showImpressorasPanel =
     state.open && !!produtoId && (mountedImpressoras || state.tab === 'impressoras')
   const showMenusPanel =
-    state.open && (isDraftProduto || (state.mode === 'edit' && !!produtoId)) &&
+    state.open &&
+    !isMenuUnico &&
+    (isDraftProduto || (state.mode === 'edit' && !!produtoId)) &&
     (mountedMenus || state.tab === 'menus')
 
   useEffect(() => {
@@ -384,10 +402,10 @@ export function ProdutosTabsModal({
       saveDisabled: wizardSaving,
       showNext: true,
       nextLabel: 'Próximo',
-      onNext: () => onTabChange('menus'),
+      onNext: () => onTabChange(isMenuUnico ? 'complementos' : 'menus'),
       nextDisabled: wizardSaving,
     }
-  }, [state.tab, wizardStep, wizardSaving, fiscalOnlyBack, onTabChange])
+  }, [state.tab, wizardStep, wizardSaving, fiscalOnlyBack, onTabChange, isMenuUnico])
 
   const footerComplementos = useMemo(
     (): JiffySidePanelFooterActions => ({
@@ -481,11 +499,15 @@ export function ProdutosTabsModal({
                 { key: 'produto' as const, label: 'Produto', disabled: false },
                 { key: 'complementos' as const, label: 'Complementos', disabled: !produtoId },
                 { key: 'impressoras' as const, label: 'Impressoras', disabled: !produtoId },
-                {
-                  key: 'menus' as const,
-                  label: 'Menus',
-                  disabled: !(isDraftProduto || (state.mode === 'edit' && !!produtoId)),
-                },
+                ...(isMenuUnico
+                  ? []
+                  : [
+                      {
+                        key: 'menus' as const,
+                        label: 'Menus',
+                        disabled: !(isDraftProduto || (state.mode === 'edit' && !!produtoId)),
+                      },
+                    ]),
               ] as const
             ).map(tab => (
               <button
@@ -525,14 +547,30 @@ export function ProdutosTabsModal({
                 }
                 isCopyMode={state.mode === 'copy'}
                 defaultGrupoProdutoId={
-                  state.mode === 'create' ? state.prefillGrupoProdutoId : undefined
+                  state.mode === 'create'
+                    ? state.prefillGrupoProdutoId
+                    : (state.grupoId ??
+                      state.prefillGrupoProdutoId ??
+                      state.produto?.getGrupoId() ??
+                      undefined)
                 }
-                menuIds={isDraftProduto ? draftMenuIds : undefined}
+                menuIds={
+                  isDraftProduto
+                    ? isMenuUnico && menuUnicoId
+                      ? [menuUnicoId]
+                      : draftMenuIds
+                    : undefined
+                }
                 initialStep={state.initialStepProduto ?? 0}
                 isEmbedded
                 hideEmbeddedHeader
                 hideEmbeddedFormActions
-                showMobilePreview={false}
+                /** Com 1 menu: mesma preview/troca de imagem do wizard de criação no cardápio. */
+                previewMenuId={isMenuUnico ? menuUnicoId ?? undefined : undefined}
+                previewImagemUrl={
+                  isMenuUnico ? (state.produto?.getImagemUrl() ?? null) : null
+                }
+                showMobilePreview={isMenuUnico}
                 onWizardStepChange={setWizardStep}
                 onWizardSavingChange={setWizardSaving}
                 onFiscalUnavailableChange={setFiscalOnlyBack}

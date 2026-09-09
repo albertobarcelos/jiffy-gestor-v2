@@ -122,3 +122,8 @@ export const actionIconsConfig: ActionIconDef[] = [
     action: 'copy',
   },
 ]
+
+/** Ícones de permissão do cadastro base (sem copiar) — reutilizados na lista do cardápio com 1 menu. */
+export const permissionActionIconsConfig = actionIconsConfig.filter(
+  (def): def is Extract<ActionIconDef, { field: ToggleField }> => Boolean(def.field)
+)

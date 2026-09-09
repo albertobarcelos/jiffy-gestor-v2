@@ -477,6 +477,12 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
     const [grupoProduto, setGrupoProduto] = useState<string | null>(
       () => formSeed?.grupoProduto ?? defaultGrupoProdutoId ?? null
     )
+    const [grupoProdutoNome, setGrupoProdutoNome] = useState<string | null>(
+      () =>
+        (initialProduto && produtoId && initialProduto.getId() === produtoId
+          ? initialProduto.getNomeGrupo()
+          : null) ?? null
+    )
     const [codigoEanBarras, setCodigoEanBarras] = useState('')
     const [favorito, setFavorito] = useState(() => formSeed?.favorito ?? false)
     const [permiteDesconto, setPermiteDesconto] = useState(
@@ -894,7 +900,26 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
             // Preenche os campos com os dados do produto
             setPrecoVenda(produto.valor ? formatCurrency(produto.valor) : '')
             setUnidadeProduto(produto.unidadeMedida || null)
-            setGrupoProduto(extrairGrupoProdutoIdDoJsonProduto(produto as Record<string, unknown>))
+            {
+              const grupoFromApi = extrairGrupoProdutoIdDoJsonProduto(
+                produto as Record<string, unknown>
+              )
+              // Não apaga categoria já seedada (lista/menu) se o GET vier sem grupoId.
+              if (grupoFromApi) {
+                setGrupoProduto(grupoFromApi)
+              } else if (defaultGrupoProdutoId) {
+                setGrupoProduto(prev => prev ?? defaultGrupoProdutoId)
+              }
+              const grupoNested =
+                produto.grupo && typeof produto.grupo === 'object'
+                  ? (produto.grupo as Record<string, unknown>)
+                  : null
+              const nomeGrupoApi =
+                (typeof produto.nomeGrupo === 'string' && produto.nomeGrupo.trim()) ||
+                (typeof grupoNested?.nome === 'string' && grupoNested.nome.trim()) ||
+                null
+              if (nomeGrupoApi) setGrupoProdutoNome(nomeGrupoApi)
+            }
             const eanRaw =
               produto.codigoEan ?? produto.codigoBarras ?? produto.ean ?? produto.codigoEanBarras
             setCodigoEanBarras(
@@ -954,9 +979,11 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
               produto as Record<string, unknown>,
               currentEffectiveIsCopyMode
             )
-            grupoProdutoIdCarregadoRef.current = extrairGrupoProdutoIdDoJsonProduto(
-              produto as Record<string, unknown>
-            )
+            grupoProdutoIdCarregadoRef.current =
+              extrairGrupoProdutoIdDoJsonProduto(produto as Record<string, unknown>) ??
+              defaultGrupoProdutoId ??
+              formSeed?.grupoProduto ??
+              null
 
             if (currentEffectiveIsCopyMode) {
               const nomeOriginal = produto.nome || ''
@@ -2136,6 +2163,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
               onUnidadeProdutoChange={setUnidadeProduto}
               grupoProduto={grupoProduto}
               onGrupoProdutoChange={setGrupoProduto}
+              grupoProdutoNome={grupoProdutoNome}
               lockGrupoProduto={lockGrupoProduto}
               lockedGrupoLabel={lockedGrupoLabel}
               pendingNovaCategoriaLabel={pendingNovaCategoriaLabel}

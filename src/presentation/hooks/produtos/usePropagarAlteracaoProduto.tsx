@@ -191,12 +191,8 @@ export function usePropagarAlteracaoProduto(): {
           return { aplicarNoCadastroBase: false, menuIds: [] }
         }
 
-        // 1 menu + produto já vinculado a ele → aplica direto, sem diálogo
-        if (
-          temVinculo &&
-          todosMenus.length === 1 &&
-          vinculadosIds.has(todosMenus[0].id)
-        ) {
+        // 1 menu na empresa → sempre sincroniza nesse cardápio (sem diálogo)
+        if (todosMenus.length === 1) {
           return { aplicarNoCadastroBase: false, menuIds: [todosMenus[0].id] }
         }
 

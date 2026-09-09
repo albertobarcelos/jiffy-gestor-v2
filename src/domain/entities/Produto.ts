@@ -242,16 +242,27 @@ export class Produto {
       : []
 
     const fisc = extractFiscalStrings(data)
+    const grupoNested = asPlainRecord(data?.grupo)
+    /** API pode mandar só `grupo.id` / `grupo.nome` sem `grupoId`/`nomeGrupo` no root. */
+    const grupoId =
+      firstNonEmptyString(data?.grupoId, grupoNested.id) || undefined
+    const nomeGrupo =
+      firstNonEmptyString(data?.nomeGrupo, grupoNested.nome) || undefined
 
     return Produto.create(
       data.id?.toString() || '',
-      data.codigoProduto?.toString() || (typeof data.codigoProduto === 'number' ? data.codigoProduto.toString() : ''),
+      (() => {
+        const raw = data?.codigoProduto ?? data?.codigo
+        if (typeof raw === 'number' && Number.isFinite(raw)) return String(Math.trunc(raw))
+        if (typeof raw === 'string' && raw.trim() !== '') return raw.trim()
+        return ''
+      })(),
       data.nome?.toString() || '',
       typeof data.valor === 'number' ? data.valor : parseFloat(data.valor) || 0,
       data.ativo === true || data.ativo === 'true',
       data.descricao?.toString(),
-      data.nomeGrupo?.toString(),
-      data.grupoId?.toString(),
+      nomeGrupo,
+      grupoId,
       data.estoque,
       data.favorito === true || data.favorito === 'true',
       data.abreComplementos === true || data.abreComplementos === 'true',
