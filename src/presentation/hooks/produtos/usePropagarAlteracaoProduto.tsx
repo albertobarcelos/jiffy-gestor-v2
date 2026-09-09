@@ -252,6 +252,12 @@ export function usePropagarAlteracaoProduto(): {
         return { aplicarNoCadastroBase: false, menuIds: [] }
       }
 
+      // Origem menu: sem outros cardápios para propagar → salva só no atual (já feito pelo caller)
+      // e sincroniza o cadastro base, sem diálogo.
+      if (opts.origem === 'menu' && lista.length === 0) {
+        return { aplicarNoCadastroBase: true, menuIds: [] }
+      }
+
       return abrirDialogo({
         opts,
         variante,

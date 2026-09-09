@@ -464,6 +464,15 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     [tipoCadastro.pedirTipo, openWizardCadastro]
   )
 
+  /** Cabeçalho / empty state: com 1 menu vai direto ao cadastro (sem painel de vincular existentes). */
+  const handleAdicionarProdutosCabecalho = useCallback(() => {
+    if (isMenuUnico) {
+      tipoCadastro.pedirTipo(() => openWizardCadastro())
+      return
+    }
+    setAddOpen(true)
+  }, [isMenuUnico, tipoCadastro.pedirTipo, openWizardCadastro])
+
   const handleToggleGrupoStatus = useCallback(
     async (grupoId: string) => {
       const grupo = findGrupo(grupoId)
@@ -690,7 +699,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
           onValorChange={handleValorChange}
           onSwitchToggle={handleStatusToggle}
           onEdit={handleEditProduto}
-          onRemove={handleRemove}
+          onRemove={isMenuUnico ? undefined : handleRemove}
           onChangeImage={handleChangeImage}
           actionsSlot={
             <MenuProdutoRowQuickActions
@@ -833,7 +842,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
 
             {mostrarAcoesCabecalho ? (
               <MenuCardapioAcoes
-                onAdicionar={() => setAddOpen(true)}
+                onAdicionar={handleAdicionarProdutosCabecalho}
                 onReordenar={() => setReorderOpen(true)}
                 loteHref={toGestao(`/menus/${menuId}/atualizar-lote`)}
               />
@@ -874,7 +883,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
           emptyLabel="Nenhum produto encontrado com esses filtros."
           emptyContent={
             cardapioVazio && !isLoadingList ? (
-              <MenuCardapioEmptyState onAdicionar={() => setAddOpen(true)} />
+              <MenuCardapioEmptyState onAdicionar={handleAdicionarProdutosCabecalho} />
             ) : undefined
           }
           listAriaLabel="Produtos deste cardápio"
@@ -904,15 +913,17 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         }}
       />
 
-      <AddProdutosToMenuPanel
-        open={addOpen}
-        menuId={menuId}
-        produtosJaNoMenu={idsNoMenu}
-        onClose={() => setAddOpen(false)}
-        onCadastrarNovoProduto={() =>
-          tipoCadastro.pedirTipo(() => openWizardCadastro())
-        }
-      />
+      {!isMenuUnico ? (
+        <AddProdutosToMenuPanel
+          open={addOpen}
+          menuId={menuId}
+          produtosJaNoMenu={idsNoMenu}
+          onClose={() => setAddOpen(false)}
+          onCadastrarNovoProduto={() =>
+            tipoCadastro.pedirTipo(() => openWizardCadastro())
+          }
+        />
+      ) : null}
 
       <EscolherTipoProdutoModal
         open={tipoCadastro.open}

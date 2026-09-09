@@ -69,7 +69,7 @@ export interface MenuProdutoRowQuickActionsProps {
     input: UpdateMenuProdutoInput
   ) => boolean | Promise<boolean>
   /**
-   * Com 1 menu: exibe só os ícones de permissão do cadastro base
+   * Com 1 menu: favorito + ícones de permissão do cadastro base
    * (acréscimo, desconto, abrir complementos, preço, taxa).
    */
   showBasePermissoes?: boolean
@@ -114,6 +114,20 @@ export function MenuProdutoRowQuickActions({
   if (showBasePermissoes) {
     return (
       <div className="flex shrink-0 flex-nowrap items-center gap-1">
+        <RowIconButton
+          title={favorito ? 'Remover dos favoritos' : 'Marcar como favorito'}
+          active={favorito}
+          disabled={disabled}
+          onClick={() => {
+            const next = !favorito
+            void (async () => {
+              const ok = await onPatch(produto.produtoId, { favorito: next })
+              if (ok) setFavorito(next)
+            })()
+          }}
+        >
+          {favorito ? <MdStar className="text-lg" /> : <MdStarBorder className="text-lg" />}
+        </RowIconButton>
         {permissionActionIconsConfig.map(def => {
           const Icon = def.Icon
           const active = permissoes[def.field as BasePermissaoField]
