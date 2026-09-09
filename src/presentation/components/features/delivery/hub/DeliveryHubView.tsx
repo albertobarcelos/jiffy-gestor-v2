@@ -37,7 +37,7 @@ function SectionBox({ title, children }: { title: string; children: React.ReactN
   )
 }
 
-export function DeliveryHubView() {
+export function DeliveryHubView({ etapaId = null }: { etapaId?: string | null }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { addTab, activeTabId } = useTabsStore()
@@ -75,9 +75,10 @@ export function DeliveryHubView() {
     })
   }, [addTab])
 
-  // Deep-link ?abrir=delivery-*
+  // Deep-link ?abrir=delivery-* ou etapa da URL /config/delivery/:etapa
   useEffect(() => {
-    const abrir = searchParams.get('abrir')
+    const abrir =
+      etapaId && isDeliveryEtapaId(etapaId) ? etapaId : searchParams.get('abrir')
     if (!abrir || !isDeliveryEtapaId(abrir)) return
 
     const etapa = getDeliveryEtapaById(abrir)
@@ -95,7 +96,7 @@ export function DeliveryHubView() {
     }
 
     router.replace(DELIVERY_HUB_PATH, { scroll: false })
-  }, [addTab, configurado, empresaDeliveryQuery.isPending, router, searchParams])
+  }, [addTab, configurado, empresaDeliveryQuery.isPending, etapaId, router, searchParams])
 
   // Refetch pendências ao voltar ao hub
   useEffect(() => {

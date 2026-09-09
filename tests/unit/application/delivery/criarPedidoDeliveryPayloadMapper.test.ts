@@ -72,7 +72,7 @@ describe('CriarPedidoDeliveryPayloadMapper', () => {
     ])
   })
 
-  it('inclui taxa de entrega no payload quando pedido com entrega', () => {
+  it('não envia taxas no create — o backend calcula a cobertura', () => {
     const payload = buildCriarPedidoDeliveryPayload(
       baseInput({
         pedidoComEntrega: true,
@@ -85,7 +85,7 @@ describe('CriarPedidoDeliveryPayloadMapper', () => {
       })
     )
 
-    expect(payload.taxas).toEqual([{ taxaId: 'taxa-entrega-1', quantidade: 1 }])
+    expect(payload.taxas).toBeUndefined()
     expect(payload.cobrancas?.[0]?.valor).toBe(29)
   })
 
@@ -126,7 +126,7 @@ describe('CriarPedidoDeliveryPayloadMapper', () => {
     expect(payload.cliente.enderecos).toBeUndefined()
   })
 
-  it('envia enderecos bootstrap quando morada não possui id', () => {
+  it('não envia enderecos bootstrap — o create usa só enderecoIdEntrega', () => {
     const payload = buildCriarPedidoDeliveryPayload(
       baseInput({
         pedidoComEntrega: true,
@@ -148,18 +148,20 @@ describe('CriarPedidoDeliveryPayloadMapper', () => {
     )
 
     expect(payload.cliente.enderecoIdEntrega).toBeUndefined()
-    expect(payload.cliente.enderecos).toEqual([
-      {
-        etiqueta: 'casa',
-        rua: 'Rua Nova',
-        numero: '50',
-        bairro: 'Centro',
-        cidade: 'Campo Grande',
-        estado: 'MS',
-        cep: '79002000',
-        complemento: undefined,
-      },
-    ])
+    expect(payload.cliente.enderecos).toBeUndefined()
+  })
+
+  it('omite taxas mesmo quando há valor de cobertura', () => {
+    const payload = buildCriarPedidoDeliveryPayload(
+      baseInput({
+        pedidoComEntrega: true,
+        taxaEntregaSelecionada: { getId: () => 'taxa-entrega-1' },
+        taxaEntregaCoberturaValor: 7.5,
+        valorTaxaEntrega: 7.5,
+      })
+    )
+
+    expect(payload.taxas).toBeUndefined()
   })
 
   it('envia valorUnitario alterado nos produtos', () => {

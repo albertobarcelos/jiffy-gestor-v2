@@ -16,9 +16,10 @@ export const showToast = {
   /**
    * Exibe uma notificação de erro
    */
-  error: (message: string) => {
+  error: (message: string, options?: { id?: string; duration?: number }) => {
     toast.error(message, {
-      duration: 5000,
+      duration: options?.duration ?? 5000,
+      id: options?.id,
     })
   },
 
@@ -35,10 +36,10 @@ export const showToast = {
   /**
    * Exibe uma notificação de aviso
    */
-  warning: (message: string) => {
+  warning: (message: string, options?: { duration?: number }) => {
     toast(message, {
       icon: '⚠️',
-      duration: 4000,
+      duration: options?.duration ?? 4000,
       style: {
         background: '#fff',
         color: '#333',

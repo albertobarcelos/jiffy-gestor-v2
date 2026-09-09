@@ -29,6 +29,8 @@ export interface ValidarCriarVendaParams {
   telefoneClienteDelivery?: string | null
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
+  enderecoEntregaTemGeo?: boolean
+  enderecoEntregaCoberturaStatus?: 'ok' | 'fora' | 'pendente' | 'indisponivel' | null
   pedidoGestorComPagamentoNoPasso3: boolean
   pedidoEntregaAceitaPagamentoPendente: boolean
   pagamentosCount: number
@@ -47,6 +49,8 @@ export function validarInformacoesPedido(params: {
   telefoneClienteDelivery?: string | null
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
+  enderecoEntregaTemGeo?: boolean
+  enderecoEntregaCoberturaStatus?: 'ok' | 'fora' | 'pendente' | 'indisponivel' | null
   exibirToast?: boolean
   onError?: (message: string) => void
 }): boolean {
@@ -56,6 +60,8 @@ export function validarInformacoesPedido(params: {
     telefoneClienteDelivery: params.telefoneClienteDelivery,
     pedidoComEntrega: params.pedidoComEntrega,
     temEnderecoEntrega: params.temEnderecoEntrega,
+    enderecoEntregaTemGeo: params.enderecoEntregaTemGeo,
+    enderecoEntregaCoberturaStatus: params.enderecoEntregaCoberturaStatus,
   })
   if (!erro) return true
   if (params.exibirToast) {

@@ -23,6 +23,8 @@ export interface UseNovoPedidoNavegacaoParams {
   telefoneClienteDelivery?: string | null
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
+  enderecoEntregaTemGeo?: boolean
+  enderecoEntregaCoberturaStatus?: 'ok' | 'fora' | 'pendente' | 'indisponivel' | null
   /** Edição de produtos de pedido existente: trava a navegação entre etapas. */
   modoEdicaoProdutos?: boolean
 }
@@ -43,6 +45,8 @@ export function useNovoPedidoNavegacao({
   telefoneClienteDelivery,
   pedidoComEntrega,
   temEnderecoEntrega,
+  enderecoEntregaTemGeo,
+  enderecoEntregaCoberturaStatus,
   modoEdicaoProdutos,
 }: UseNovoPedidoNavegacaoParams) {
   const [modalConfirmacaoSaidaOpen, setModalConfirmacaoSaidaOpen] = useState(false)
@@ -84,10 +88,20 @@ export function useNovoPedidoNavegacao({
         telefoneClienteDelivery,
         pedidoComEntrega,
         temEnderecoEntrega,
+        enderecoEntregaTemGeo,
+        enderecoEntregaCoberturaStatus,
         exibirToast,
         onError: showToast.error,
       }),
-    [pedidoDeliveryGestor, clienteEntregaVinculadoId, telefoneClienteDelivery, pedidoComEntrega, temEnderecoEntrega]
+    [
+      pedidoDeliveryGestor,
+      clienteEntregaVinculadoId,
+      telefoneClienteDelivery,
+      pedidoComEntrega,
+      temEnderecoEntrega,
+      enderecoEntregaTemGeo,
+      enderecoEntregaCoberturaStatus,
+    ]
   )
 
   const canGoToStep2 = useCallback(() => {

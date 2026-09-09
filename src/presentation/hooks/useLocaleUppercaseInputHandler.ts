@@ -8,10 +8,12 @@ export { toLocaleUppercasePt }
 export interface UseLocaleUppercaseInputHandlerOptions {
   maxLength?: number
   locale?: string
+  /** Quando informado, substitui o `toLocaleUpperCase` padrão. */
+  transform?: (value: string) => string
 }
 
 /**
- * Preserva a posição do cursor ao aplicar toLocaleUpperCase no onChange
+ * Preserva a posição do cursor ao transformar o valor no onChange
  * (evita o cursor pular para o fim ao editar no meio do texto).
  */
 export function useLocaleUppercaseInputHandler<
@@ -21,7 +23,7 @@ export function useLocaleUppercaseInputHandler<
   onValueChange: (value: string) => void,
   options: UseLocaleUppercaseInputHandlerOptions = {}
 ) {
-  const { maxLength, locale = 'pt-BR' } = options
+  const { maxLength, locale = 'pt-BR', transform } = options
   const inputRef = useRef<TElement>(null)
   const cursorRef = useRef<{ start: number; end: number } | null>(null)
 
@@ -42,13 +44,13 @@ export function useLocaleUppercaseInputHandler<
         start: el.selectionStart ?? el.value.length,
         end: el.selectionEnd ?? el.value.length,
       }
-      let next = el.value.toLocaleUpperCase(locale)
+      let next = transform ? transform(el.value) : el.value.toLocaleUpperCase(locale)
       if (maxLength !== undefined) {
         next = next.slice(0, maxLength)
       }
       onValueChange(next)
     },
-    [onValueChange, maxLength, locale]
+    [onValueChange, maxLength, locale, transform]
   )
 
   return { inputRef, handleChange }

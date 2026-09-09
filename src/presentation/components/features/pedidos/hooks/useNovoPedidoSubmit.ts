@@ -62,6 +62,8 @@ export interface UseNovoPedidoSubmitParams {
     pedidoComRetirada: boolean
     pedidoComEntrega: boolean
     temEnderecoEntrega: boolean
+    enderecoEntregaTemGeo?: boolean
+    enderecoEntregaCoberturaStatus?: 'ok' | 'fora' | 'pendente' | 'indisponivel' | null
     troco: number
   }
   createVendaGestor: {
@@ -129,6 +131,8 @@ export function useNovoPedidoSubmit({
       telefoneClienteDelivery: input.telefoneCliente,
       pedidoComEntrega: validacao.pedidoComEntrega,
       temEnderecoEntrega: validacao.temEnderecoEntrega,
+      enderecoEntregaTemGeo: validacao.enderecoEntregaTemGeo,
+      enderecoEntregaCoberturaStatus: validacao.enderecoEntregaCoberturaStatus,
       pedidoGestorComPagamentoNoPasso3: validacao.pedidoGestorComPagamentoNoPasso3,
       pedidoEntregaAceitaPagamentoPendente: validacao.pedidoEntregaAceitaPagamentoPendente,
       pagamentosCount: input.pagamentos.length,
@@ -193,24 +197,35 @@ export function useNovoPedidoSubmit({
 
       if (idCriado) {
         setVendaIdCriada(idCriado)
-
-        if (
-          tipoInicioPedido === 'entrega' &&
-          status === 'ABERTA' &&
-          preferenciasAutoIniciarPreparo
-        ) {
-          await processarAposTransicaoVendaGestorId?.(idCriado, 'iniciar_preparo')
-        }
       }
 
       setInternalDialogOpen(false)
       onSuccess()
       onClose()
+
+      if (
+        idCriado &&
+        tipoInicioPedido === 'entrega' &&
+        status === 'ABERTA' &&
+        preferenciasAutoIniciarPreparo
+      ) {
+        void processarAposTransicaoVendaGestorId?.(idCriado, 'iniciar_preparo').catch(error => {
+          console.error('Impressão após criar pedido falhou; o pedido já foi criado.', error)
+        })
+      }
     } catch (error: unknown) {
       console.error('❌ Erro ao criar pedido:', error)
       const err = error as {
         message?: string
-        response?: { data?: { message?: string; error?: string } }
+        response?: {
+          data?: {
+            message?: string
+            error?: string
+            title?: string
+            code?: string
+            type?: string
+          }
+        }
         stack?: string
       }
       console.error('❌ Detalhes do erro:', {
@@ -219,12 +234,31 @@ export function useNovoPedidoSubmit({
         responseData: err?.response?.data,
         stack: err?.stack,
       })
-      const errorMessage =
-        err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        err?.message ||
-        'Erro ao criar pedido'
-      showToast.error(errorMessage)
+      const data = err?.response?.data
+      const code = String(data?.code ?? data?.type ?? data?.title ?? data?.error ?? '')
+      const rawMessage =
+        data?.message || data?.error || data?.title || err?.message || 'Erro ao criar pedido'
+
+      if (code.includes('GEOLOCALIZACAO_NAO_CONFIGURADA') || /geolocaliza/i.test(rawMessage)) {
+        showToast.error(
+          'Não foi possível obter a localização. Confira o endereço e a geo da empresa no hub Delivery.'
+        )
+        setCurrentStep(2)
+        return
+      }
+
+      if (
+        code.includes('ENDERECO_FORA_COBERTURA_ENTREGA') ||
+        /fora da cobertura|não está coberto/i.test(rawMessage)
+      ) {
+        showToast.error(
+          'O endereço ficou fora da cobertura cadastrada. Ajuste a área no hub Delivery se precisar aceitar este pedido.'
+        )
+        setCurrentStep(2)
+        return
+      }
+
+      showToast.error(rawMessage)
     } finally {
       finalizarSubmit()
     }

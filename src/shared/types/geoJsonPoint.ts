@@ -26,3 +26,15 @@ export function latLngFromGeoJsonPoint(point: GeoJsonPoint | null | undefined): 
   const [lng, lat] = point.coordinates
   return { lat, lng }
 }
+
+export function pontosGeoIguais(
+  a: GeoJsonPoint | null | undefined,
+  b: GeoJsonPoint | null | undefined,
+  epsilon = 1e-7
+): boolean {
+  if (!a || !b) return a == null && b == null
+  return (
+    Math.abs(a.coordinates[0] - b.coordinates[0]) < epsilon &&
+    Math.abs(a.coordinates[1] - b.coordinates[1]) < epsilon
+  )
+}

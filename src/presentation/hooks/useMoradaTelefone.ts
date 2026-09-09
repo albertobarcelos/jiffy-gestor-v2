@@ -69,9 +69,11 @@ export interface EnderecoMorada {
   estado: string
   complemento?: string
   referencia?: string
-  /** Geo opcional (Places Autocomplete). */
+  /** Geo do logradouro (Places / GPS / pin no mapa). */
   enderecoLocalizacao?: GeoJsonPoint | null
   providerEnderecoId?: string | null
+  /** Ponto de entrega distinto do logradouro (portaria, bloco etc.). */
+  preferenciaEntrega?: GeoJsonPoint | null
 }
 
 export interface MoradaTelefone {
@@ -115,6 +117,34 @@ function enderecoTemConteudoMinimo(e: EnderecoMorada): boolean {
 /** Monta `EnderecoMorada` a partir de um objeto (raiz ou `endereco` aninhado). */
 function extrairEnderecoDeRecord(rec: Record<string, unknown>): EnderecoMorada {
   const estadoRaw = asStr(pick(rec, ['estado', 'uf', 'state']))
+  const enderecoLocalizacao = (() => {
+    const raw = rec.enderecoLocalizacao ?? rec.endereco_localizacao
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+    const o = raw as Record<string, unknown>
+    if (o.type !== 'Point' || !Array.isArray(o.coordinates) || o.coordinates.length < 2) {
+      return null
+    }
+    const lng = Number(o.coordinates[0])
+    const lat = Number(o.coordinates[1])
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null
+    return { type: 'Point' as const, coordinates: [lng, lat] as [number, number] }
+  })()
+  const preferenciaEntrega = (() => {
+    const raw = rec.preferenciaEntrega ?? rec.preferencia_entrega
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+    const o = raw as Record<string, unknown>
+    if (o.type !== 'Point' || !Array.isArray(o.coordinates) || o.coordinates.length < 2) {
+      return null
+    }
+    const lng = Number(o.coordinates[0])
+    const lat = Number(o.coordinates[1])
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null
+    return { type: 'Point' as const, coordinates: [lng, lat] as [number, number] }
+  })()
+  const providerEnderecoId = optStr(
+    pick(rec, ['providerEnderecoId', 'provider_endereco_id'])
+  )
+
   return {
     cep: asStr(pick(rec, ['cep', 'CEP', 'codigoPostal', 'codigo_postal'])),
     rua: asStr(pick(rec, ['rua', 'logradouro', 'street'])),
@@ -124,6 +154,13 @@ function extrairEnderecoDeRecord(rec: Record<string, unknown>): EnderecoMorada {
     estado: estadoRaw.toUpperCase().slice(0, 2),
     complemento: optStr(pick(rec, ['complemento', 'complement'])),
     referencia: optStr(pick(rec, ['referencia', 'referência', 'reference'])),
+    ...(enderecoLocalizacao
+      ? {
+          enderecoLocalizacao,
+          providerEnderecoId: providerEnderecoId ?? null,
+          ...(preferenciaEntrega ? { preferenciaEntrega } : {}),
+        }
+      : {}),
   }
 }
 
@@ -299,6 +336,50 @@ export function useCriarClienteDeliveryRapido() {
         throw new Error('Resposta inválida ao cadastrar cliente delivery')
       }
       return cliente
+    }
+  )
+}
+
+/**
+ * Atualiza só o nome do cliente delivery (`PATCH /api/delivery/clientes/{telefone}`).
+ */
+export function useAtualizarNomeClienteDelivery() {
+  return useSecureTenantMutation(
+    async (
+      { token },
+      input: { telefone: string; nome: string }
+    ): Promise<ClienteDeliveryApi | null> => {
+      const telefone = extrairDigitosTelefone(input.telefone)
+      if (!telefoneCelularBrCompleto(telefone)) {
+        throw new Error('Informe o celular completo com DDD (11 dígitos).')
+      }
+      const nome = input.nome.trim()
+      if (!nome) {
+        throw new Error('Informe o nome do cliente.')
+      }
+
+      const response = await fetchGestorApi(
+        `/api/delivery/clientes/${encodeURIComponent(telefone)}`,
+        {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify({ nome }),
+        }
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(
+          mensagemErroResposta(errorData, response.status, 'Erro ao atualizar nome do cliente')
+        )
+      }
+
+      const data = await response.json().catch(() => ({}))
+      return normalizarClienteDeliveryApi(data)
     }
   )
 }
@@ -572,6 +653,94 @@ export function useAtualizarMoradaTelefone(options?: MoradaTelefoneHookOptions) 
       },
       onError: (error: Error) => {
         showToast.error(error.message || 'Erro ao atualizar endereço')
+      },
+    }
+  )
+}
+
+/**
+ * Remove morada do catálogo do cliente.
+ * Delivery: `PATCH …/clientes/{telefone}` com `enderecos.delete`.
+ * Legado: `DELETE …/gestor/morada-telefone/{id}`.
+ */
+export function useExcluirMoradaTelefone(options?: MoradaTelefoneHookOptions) {
+  const queryClient = useQueryClient()
+  const empresaId = useTenantEmpresaId()
+  const usarModuloDelivery = options?.usarModuloDelivery ?? false
+
+  return useSecureTenantMutation(
+    async (
+      { token },
+      {
+        id,
+        telefoneDigitos,
+      }: {
+        id: string
+        telefoneDigitos: string
+      }
+    ) => {
+      const telefone = telefoneDigitos.replace(/\D/g, '')
+      if (!id.trim() || !telefone) {
+        throw new Error('Endereço ou telefone inválido')
+      }
+
+      if (usarModuloDelivery) {
+        const response = await fetchGestorApi(
+          `/api/delivery/clientes/${encodeURIComponent(telefone)}`,
+          {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+            body: JSON.stringify({
+              enderecos: { delete: [id] },
+            }),
+          }
+        )
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(
+            mensagemErroResposta(errorData, response.status, 'Erro ao remover endereço')
+          )
+        }
+
+        return
+      }
+
+      const response = await fetchGestorApi(
+        `/api/gestor/morada-telefone/${encodeURIComponent(id)}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+          },
+        }
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(
+          mensagemErroResposta(errorData, response.status, 'Erro ao remover endereço')
+        )
+      }
+    },
+    {
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries({
+          queryKey: moradasTelefoneQueryKey(
+            variables.telefoneDigitos,
+            usarModuloDelivery,
+            empresaId
+          ),
+        })
+        showToast.success('Endereço removido com sucesso!')
+      },
+      onError: (error: Error) => {
+        showToast.error(error.message || 'Erro ao remover endereço')
       },
     }
   )

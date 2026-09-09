@@ -266,7 +266,9 @@ export function useKanbanOrchestrator() {
     sincronizarVendaAposTransicao: preTransicao.sincronizarVendaAposTransicao,
     agendarSincronizacaoLista: preTransicao.agendarSincronizacaoLista,
     onAfterTransicaoSucesso: ({ venda, acoesExecutadas, ticketsPreload }) => {
-      void preTransicao.processarAposTransicoes(venda, acoesExecutadas, ticketsPreload)
+      void preTransicao.processarAposTransicoes(venda, acoesExecutadas, ticketsPreload, {
+        omitirAvisoSemVinculoPc: true,
+      })
     },
     verificarImpressaoAntesTransicoes: preTransicao.verificarImpressaoAntesTransicoes,
     verificarEntregadorAntesDespachar: preTransicao.verificarEntregadorAntesDespachar,

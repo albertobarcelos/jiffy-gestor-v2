@@ -113,6 +113,45 @@ export function useAtualizarAreaEntregaDelivery() {
   )
 }
 
+/** Vários PATCH e uma invalidação — usado no Salvar da cobertura. */
+export function useAtualizarAreasEntregaEmLote() {
+  const invalidate = useInvalidateTenantQueries()
+
+  return useSecureTenantMutation<
+    { ok: number; total: number },
+    Array<{ id: string; input: UpdateAreaEntregaInput }>
+  >(
+    async ({ token }, patches) => {
+      let ok = 0
+      for (const patch of patches) {
+        const res = await fetchGestorApi(
+          `/api/delivery/empresas/me/areas-entrega/${encodeURIComponent(patch.id)}`,
+          {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(patch.input),
+          }
+        )
+        try {
+          await parseJsonOrThrow(res)
+          ok += 1
+        } catch {
+          // Continua as demais áreas; o Salvar reporta o parcial.
+        }
+      }
+      return { ok, total: patches.length }
+    },
+    {
+      onSettled: async () => {
+        await invalidate(AREAS_ENTREGA_DELIVERY_QUERY_KEY)
+      },
+    }
+  )
+}
+
 export function useExcluirAreaEntregaDelivery() {
   const invalidate = useInvalidateTenantQueries()
 

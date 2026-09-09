@@ -67,7 +67,7 @@ const PASSOS_BASE: Omit<DeliveryPassoChecklist, 'concluido'>[] = [
     id: 'delivery-whatsapp',
     label: 'Canal WhatsApp',
     obrigatoria: false,
-    etapaId: undefined,
+    etapaId: 'delivery-notificacoes',
   },
 ]
 

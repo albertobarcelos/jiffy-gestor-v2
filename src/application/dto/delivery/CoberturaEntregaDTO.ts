@@ -54,7 +54,11 @@ export const updateAreaEntregaInputValidator = z
 export type UpdateAreaEntregaInput = z.infer<typeof updateAreaEntregaInputValidator>
 
 export const areaEntregaFormValidator = z.object({
-  nome: z.string().max(255).optional(),
+  nome: z
+    .string({ invalid_type_error: 'Informe o nome da área' })
+    .trim()
+    .min(1, 'Informe o nome da área')
+    .max(255),
   valorTaxa: z
     .number({ invalid_type_error: 'Informe o valor da taxa' })
     .nonnegative('Valor da taxa não pode ser negativo'),
@@ -71,9 +75,9 @@ export function areaEntregaFormToCreateInput(
   values: AreaEntregaFormValues,
   area: GeoJsonPolygonLike
 ): CreateAreaEntregaInput {
-  const nome = values.nome?.trim()
+  const nome = values.nome.trim()
   return {
-    nome: nome ? nome : null,
+    nome,
     area,
     valorTaxa: values.valorTaxa,
     tempoEntregaInMinutes: values.tempoEntregaInMinutes,
@@ -82,9 +86,9 @@ export function areaEntregaFormToCreateInput(
 }
 
 export function areaEntregaFormToUpdateInput(values: AreaEntregaFormValues): UpdateAreaEntregaInput {
-  const nome = values.nome?.trim()
+  const nome = values.nome.trim()
   return {
-    nome: nome ? nome : null,
+    nome,
     valorTaxa: values.valorTaxa,
     tempoEntregaInMinutes: values.tempoEntregaInMinutes,
     ativo: values.ativo,
@@ -149,53 +153,35 @@ export const updateRaioEntregaInputValidator = z
 
 export type UpdateRaioEntregaInput = z.infer<typeof updateRaioEntregaInputValidator>
 
-/** Formulário UI — distância em metros (enviada direto à API). */
-export const raioEntregaFormValidator = z.object({
-  nome: z.string().max(255).optional(),
-  distanciaMetros: z
-    .number({ invalid_type_error: 'Informe a distância em metros' })
-    .int('Distância deve ser um número inteiro')
-    .positive('Distância deve ser maior que zero')
-    .max(500_000, 'Distância máxima de 500 km (500.000 m)'),
-  valorTaxa: z
-    .number({ invalid_type_error: 'Informe o valor da taxa' })
-    .nonnegative('Valor da taxa não pode ser negativo'),
-  tempoEntregaInMinutes: z
-    .number({ invalid_type_error: 'Informe o tempo de entrega' })
-    .int('Tempo deve ser inteiro')
-    .nonnegative('Tempo não pode ser negativo'),
-  ativo: z.boolean(),
-})
+export const METROS_POR_KM_RAIO = 1000
+export const DISTANCIA_MAXIMA_KM_RAIO = 500
 
-export type RaioEntregaFormValues = z.infer<typeof raioEntregaFormValidator>
-
-export function raioEntregaFormToCreateInput(values: RaioEntregaFormValues): CreateRaioEntregaInput {
-  const nome = values.nome?.trim()
-  return {
-    nome: nome ? nome : null,
-    distanciaMaximaEmMetros: values.distanciaMetros,
-    valorTaxa: values.valorTaxa,
-    tempoEntregaInMinutes: values.tempoEntregaInMinutes,
-    ativo: values.ativo,
-  }
+export function kmParaMetrosRaio(km: number): number {
+  return Math.round(km * METROS_POR_KM_RAIO)
 }
 
-export function raioEntregaFormToUpdateInput(values: RaioEntregaFormValues): UpdateRaioEntregaInput {
-  return raioEntregaFormToCreateInput(values)
-}
-
-export function raioEntregaToFormValues(raio: RaioEntregaDTO): RaioEntregaFormValues {
-  return {
-    nome: raio.nome ?? '',
-    distanciaMetros: raio.distanciaMaximaEmMetros,
-    valorTaxa: raio.valorTaxa,
-    tempoEntregaInMinutes: raio.tempoEntregaInMinutes,
-    ativo: raio.ativo,
-  }
+export function metrosParaKmRaio(metros: number): number {
+  return metros / METROS_POR_KM_RAIO
 }
 
 export function formatDistanciaRaio(metros: number): string {
-  return `${new Intl.NumberFormat('pt-BR').format(metros)} m`
+  const km = metrosParaKmRaio(metros)
+  const formatado = new Intl.NumberFormat('pt-BR', {
+    maximumFractionDigits: Number.isInteger(km) ? 0 : 2,
+  }).format(km)
+  return `${formatado} km`
+}
+
+export function formatAlcanceAteKm(metros: number): string {
+  return `Até ${formatDistanciaRaio(metros)}`
+}
+
+export function alcanceKmDaCobertura(
+  raios: Array<Pick<RaioEntregaDTO, 'distanciaMaximaEmMetros'>>
+): number {
+  if (raios.length === 0) return 0
+  const maxMetros = Math.max(...raios.map(raio => raio.distanciaMaximaEmMetros))
+  return Math.ceil(metrosParaKmRaio(maxMetros))
 }
 
 export function formatValorTaxaRaio(valor: number): string {

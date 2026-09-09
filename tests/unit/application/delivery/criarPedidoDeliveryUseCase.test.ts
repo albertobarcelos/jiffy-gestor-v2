@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { CriarPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/CriarPedidoDeliveryUseCase'
 import type { CriarPedidoDeliveryInputDTO } from '@/src/application/dto/CriarPedidoDeliveryDTO'
 import { atualizarCobrancasPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/AtualizarCobrancasPedidoDeliveryUseCase'
+import type { INovoPedidoReadRepository } from '@/src/domain/repositories/INovoPedidoReadRepository'
+import { TAXA_ENTREGA_SEM_TAXA_ID } from '@/src/shared/constants/taxaEntregaPedido'
 
 function baseInput(
   overrides: Partial<CriarPedidoDeliveryInputDTO> = {}
@@ -42,6 +44,30 @@ function baseInput(
   }
 }
 
+function repoMock(overrides: Partial<INovoPedidoReadRepository> = {}): INovoPedidoReadRepository {
+  return {
+    listarEntregadores: vi.fn(),
+    listarEntregadoresDelivery: vi.fn(),
+    listarProdutosDoGrupo: vi.fn(),
+    listarGrupoIdsComProdutosAtivos: vi.fn(),
+    buscarProdutoPorId: vi.fn(),
+    buscarProdutosPorNome: vi.fn(),
+    buscarClienteJson: vi.fn(),
+    atualizarPagamentosVendaGestor: vi.fn(),
+    buscarPedidoDelivery: vi.fn().mockResolvedValue({
+      taxasLancadas: [{ taxaId: 'tx-auto', tipo: 'entrega', valor: 8 }],
+      taxaEntregaId: 'tx-auto',
+      cobrancas: [],
+    }),
+    patchPedidoDelivery: vi.fn().mockResolvedValue(undefined),
+    transicionarStatusPedidoDelivery: vi.fn().mockResolvedValue(undefined),
+    emitirNotaPedidoDelivery: vi.fn(),
+    buscarAuthMe: vi.fn(),
+    buscarUsuarioGestor: vi.fn(),
+    ...overrides,
+  } as INovoPedidoReadRepository
+}
+
 describe('CriarPedidoDeliveryUseCase', () => {
   it('registra cobranças via PATCH após criar pedido já pago', async () => {
     const executeSpy = vi
@@ -64,6 +90,84 @@ describe('CriarPedidoDeliveryUseCase', () => {
       'ja_pago'
     )
 
-    executeSpy.restore()
+    executeSpy.mockRestore()
+  })
+
+  it('omite cobrança no POST, ajusta taxa e lança cobrança no mesmo PATCH, e cancela se o PATCH falhar', async () => {
+    const patchPedidoDelivery = vi.fn().mockRejectedValue(new Error('PATCH taxas falhou'))
+    const transicionarStatusPedidoDelivery = vi.fn().mockResolvedValue(undefined)
+    const repo = repoMock({ patchPedidoDelivery, transicionarStatusPedidoDelivery })
+    const cobrancas = { execute: vi.fn() }
+    const mutate = vi.fn().mockResolvedValue({ id: 'pedido-xyz' })
+    const useCase = new CriarPedidoDeliveryUseCase(cobrancas as never, repo)
+
+    await expect(
+      useCase.execute(
+        baseInput({
+          pedidoComEntrega: true,
+          taxaEntregaId: TAXA_ENTREGA_SEM_TAXA_ID,
+          entregaComCobrancaPeloEntregador: true,
+          pagamentos: [{ meioPagamentoId: 'mp-1', valor: 40 }],
+        }),
+        mutate,
+        'token-test'
+      )
+    ).rejects.toThrow(/não foi lançado/i)
+
+    const postPayload = mutate.mock.calls[0][0] as { cobrancas?: unknown }
+    expect(postPayload.cobrancas).toBeUndefined()
+    expect(cobrancas.execute).not.toHaveBeenCalled()
+    expect(transicionarStatusPedidoDelivery).toHaveBeenCalledWith(
+      'pedido-xyz',
+      'token-test',
+      expect.objectContaining({ toStatus: 'CANCELADO' })
+    )
+  })
+
+  it('não chama PATCH de cobrança avulso quando o override já lança taxa e cobrança juntos', async () => {
+    const patchPedidoDelivery = vi.fn().mockResolvedValue(undefined)
+    const repo = repoMock({
+      patchPedidoDelivery,
+      buscarPedidoDelivery: vi
+        .fn()
+        .mockResolvedValueOnce({
+          taxasLancadas: [{ taxaId: 'tx-auto', tipo: 'entrega', valor: 8 }],
+          taxaEntregaId: 'tx-auto',
+          cobrancas: [],
+        })
+        .mockResolvedValue({ cobrancas: [] }),
+    })
+    const cobrancas = { execute: vi.fn() }
+    const mutate = vi.fn().mockResolvedValue({ id: 'pedido-ok' })
+    const useCase = new CriarPedidoDeliveryUseCase(cobrancas as never, repo)
+
+    await useCase.execute(
+      baseInput({
+        pedidoComEntrega: true,
+        taxaEntregaId: TAXA_ENTREGA_SEM_TAXA_ID,
+        entregaComCobrancaPeloEntregador: true,
+        pagamentos: [{ meioPagamentoId: 'mp-1', valor: 40 }],
+      }),
+      mutate,
+      'token-test'
+    )
+
+    expect(cobrancas.execute).not.toHaveBeenCalled()
+    expect(patchPedidoDelivery).toHaveBeenCalledWith(
+      'pedido-ok',
+      'token-test',
+      expect.objectContaining({
+        taxas: { remove: ['tx-auto'] },
+        cobrancas: {
+          add: [
+            expect.objectContaining({
+              meioPagamentoId: 'mp-1',
+              valor: 40,
+              momentoCobranca: 'na_entrega',
+            }),
+          ],
+        },
+      })
+    )
   })
 })

@@ -10,12 +10,21 @@ import { ImpressorasList } from '@/src/presentation/components/features/impresso
 import { MeiosPagamentosList } from '@/src/presentation/components/features/meios-pagamentos/MeiosPagamentosList'
 import { TaxasList } from '@/src/presentation/components/features/taxas/TaxasList'
 import { MenusList } from '@/src/presentation/components/features/menus/MenusList'
+import {
+  CoberturaSairGuardProvider,
+  usePedirSaidaCobertura,
+} from '@/src/presentation/components/features/configuracoes/coberturaSairGuard'
 import { PageLoading } from '@/src/presentation/components/ui/PageLoading'
 import { cn } from '@/src/shared/utils/cn'
 import {
+  CONFIGURACOES_DELIVERY_TAB,
   configuracoesTabPath,
+  DELIVERY_HUB_PATH,
   type ConfiguracoesTabSlug,
+  type ConfiguracoesViewTab,
+  type DeliveryEtapaId,
 } from '@/src/shared/constants/configuracoesRoutes'
+import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 
 const CadastroPorPlanilha = dynamic(
   () =>
@@ -26,38 +35,68 @@ const CadastroPorPlanilha = dynamic(
 )
 
 type ConfiguracoesViewProps = {
-  activeTab: ConfiguracoesTabSlug
+  activeTab: ConfiguracoesViewTab
+  deliveryEtapaId?: DeliveryEtapaId | null
 }
 
 /**
- * Configurações — abas em `/configuracoes/:aba` (ex.: `/configuracoes/taxas`).
- * Delivery usa hub estilo Portal do Contador (etapas via TabBar SPA).
+ * Configurações — abas em `/configuracoes/:aba`.
+ * Delivery: hub em `/configuracoes/empresa-delivery` (e alias `/config/delivery`).
  */
-export function ConfiguracoesView({ activeTab }: ConfiguracoesViewProps) {
+export function ConfiguracoesView({
+  activeTab,
+  deliveryEtapaId = null,
+}: ConfiguracoesViewProps) {
+  return (
+    <CoberturaSairGuardProvider>
+      <ConfiguracoesViewInner activeTab={activeTab} deliveryEtapaId={deliveryEtapaId} />
+    </CoberturaSairGuardProvider>
+  )
+}
+
+function ConfiguracoesViewInner({
+  activeTab,
+  deliveryEtapaId = null,
+}: ConfiguracoesViewProps) {
   const router = useRouter()
+  const { toGestao } = useGestaoPath()
+  const pedirSaida = usePedirSaidaCobertura()
+
+  const deliveryAtivo =
+    activeTab === 'empresa-delivery' || activeTab === CONFIGURACOES_DELIVERY_TAB
 
   const goToTab = useCallback(
-    (tab: ConfiguracoesTabSlug) => {
-      router.replace(configuracoesTabPath(tab), { scroll: false })
+    (tab: ConfiguracoesViewTab) => {
+      const path =
+        tab === CONFIGURACOES_DELIVERY_TAB || tab === 'empresa-delivery'
+          ? DELIVERY_HUB_PATH
+          : configuracoesTabPath(tab as ConfiguracoesTabSlug)
+      pedirSaida(() => router.replace(toGestao(path), { scroll: false }))
     },
-    [router]
+    [pedirSaida, router, toGestao]
   )
 
-  const tabBtn = (tab: ConfiguracoesTabSlug, label: string) => (
-    <button
-      key={tab}
-      type="button"
-      onClick={() => goToTab(tab)}
-      className={cn(
-        'rounded-t-lg px-4 py-2 text-xs font-semibold transition-colors md:text-sm',
-        activeTab === tab
-          ? 'bg-primary text-white'
-          : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
-      )}
-    >
-      {label}
-    </button>
-  )
+  const tabBtn = (tab: ConfiguracoesViewTab, label: string) => {
+    const isActive =
+      tab === 'empresa-delivery' || tab === CONFIGURACOES_DELIVERY_TAB
+        ? deliveryAtivo
+        : activeTab === tab
+    return (
+      <button
+        key={tab}
+        type="button"
+        onClick={() => goToTab(tab)}
+        className={cn(
+          'rounded-t-lg px-4 py-2 text-xs font-semibold transition-colors md:text-sm',
+          isActive
+            ? 'bg-primary text-white'
+            : 'bg-gray-100 text-secondary-text hover:bg-gray-200'
+        )}
+      >
+        {label}
+      </button>
+    )
+  }
 
   return (
     <div className="flex h-full flex-col pt-2">
@@ -77,7 +116,7 @@ export function ConfiguracoesView({ activeTab }: ConfiguracoesViewProps) {
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="flex flex-1 flex-col overflow-hidden rounded-b-[10px] bg-info">
           {activeTab === 'empresa' && <EmpresaTab />}
-          {activeTab === 'empresa-delivery' && <DeliveryHubView />}
+          {deliveryAtivo && <DeliveryHubView etapaId={deliveryEtapaId} />}
           {activeTab === 'terminais' && <TerminaisTab />}
           {activeTab === 'impressoras' && <ImpressorasList />}
           {activeTab === 'meios-pagamentos' && (

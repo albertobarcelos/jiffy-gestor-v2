@@ -16,6 +16,8 @@ export type ValidarPedidoGestorInput = {
   telefoneClienteDelivery?: string | null
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
+  enderecoEntregaTemGeo?: boolean
+  enderecoEntregaCoberturaStatus?: 'ok' | 'fora' | 'pendente' | 'indisponivel' | null
   pedidoGestorComPagamentoNoPasso3: boolean
   pedidoEntregaAceitaPagamentoPendente: boolean
   pagamentosCount: number
@@ -40,6 +42,13 @@ export function validarInformacoesPedidoEntrega(params: {
   telefoneClienteDelivery?: string | null
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
+  /** Informativo — o Gestor não bloqueia o wizard por falta de pin. */
+  enderecoEntregaTemGeo?: boolean
+  /**
+   * Informativo — o Gestor não bloqueia por fora/pendente/indisponível.
+   * Taxa imprecisa é o trade-off de não achar a casa.
+   */
+  enderecoEntregaCoberturaStatus?: 'ok' | 'fora' | 'pendente' | 'indisponivel' | null
 }): ValidacaoErroPedido | null {
   if (!params.pedidoDeliveryGestor) return null
 
@@ -182,6 +191,8 @@ export function validarPedidoGestor(
     telefoneClienteDelivery: input.telefoneClienteDelivery,
     pedidoComEntrega: input.pedidoComEntrega,
     temEnderecoEntrega: input.temEnderecoEntrega,
+    enderecoEntregaTemGeo: input.enderecoEntregaTemGeo,
+    enderecoEntregaCoberturaStatus: input.enderecoEntregaCoberturaStatus,
   })
   if (erroEntrega) erros.push(erroEntrega)
 

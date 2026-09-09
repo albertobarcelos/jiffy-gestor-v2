@@ -3,6 +3,10 @@
 import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import {
+  dispararEmpresaDeliveryAtualizada,
+  EMPRESA_DELIVERY_ME_QUERY_KEY,
+} from '@/src/presentation/hooks/useEmpresaDeliveryMe'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
 import type {
@@ -55,27 +59,29 @@ export function useRaiosEntregaDelivery(options?: { enabled?: boolean }) {
   )
 }
 
-export function useCriarRaioEntregaDelivery() {
+export function useCriarRaiosEntregaEmLote() {
   const invalidate = useInvalidateTenantQueries()
 
-  return useSecureTenantMutation<RaioEntregaDTO, CreateRaioEntregaInput>(
-    async ({ token }, input) => {
-      const res = await fetchGestorApi('/api/delivery/empresas/me/raios-entrega', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(input),
-      })
-      const data = await parseJsonOrThrow(res)
-      const raio = normalizarRaioEntregaResposta(data)
-      if (!raio) throw new Error('Resposta inválida ao criar raio de entrega')
-      return raio
+  return useSecureTenantMutation<number, CreateRaioEntregaInput[]>(
+    async ({ token }, inputs) => {
+      for (const input of inputs) {
+        const res = await fetchGestorApi('/api/delivery/empresas/me/raios-entrega', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(input),
+        })
+        await parseJsonOrThrow(res)
+      }
+      return inputs.length
     },
     {
       onSuccess: async () => {
         await invalidate(RAIOS_ENTREGA_DELIVERY_QUERY_KEY)
+        await invalidate(EMPRESA_DELIVERY_ME_QUERY_KEY)
+        dispararEmpresaDeliveryAtualizada()
       },
     }
   )
@@ -113,25 +119,72 @@ export function useAtualizarRaioEntregaDelivery() {
   )
 }
 
-export function useExcluirRaioEntregaDelivery() {
+/** Vários PATCH e uma invalidação — usado no Salvar da cobertura. */
+export function useAtualizarRaiosEntregaEmLote() {
   const invalidate = useInvalidateTenantQueries()
 
-  return useSecureTenantMutation<void, string>(
-    async ({ token }, id) => {
-      const res = await fetchGestorApi(
-        `/api/delivery/empresas/me/raios-entrega/${encodeURIComponent(id)}`,
-        {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
+  return useSecureTenantMutation<
+    { ok: number; total: number },
+    Array<{ id: string; input: UpdateRaioEntregaInput }>
+  >(
+    async ({ token }, patches) => {
+      let ok = 0
+      for (const patch of patches) {
+        const res = await fetchGestorApi(
+          `/api/delivery/empresas/me/raios-entrega/${encodeURIComponent(patch.id)}`,
+          {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(patch.input),
+          }
+        )
+        try {
+          await parseJsonOrThrow(res)
+          ok += 1
+        } catch {
+          // Continua as demais faixas; o Salvar reporta o parcial.
         }
-      )
-      if (!res.ok && res.status !== 204) {
-        await parseJsonOrThrow(res)
       }
+      return { ok, total: patches.length }
+    },
+    {
+      onSettled: async () => {
+        await invalidate(RAIOS_ENTREGA_DELIVERY_QUERY_KEY)
+        await invalidate(EMPRESA_DELIVERY_ME_QUERY_KEY)
+        dispararEmpresaDeliveryAtualizada()
+      },
+    }
+  )
+}
+
+/** Apaga vários raios e invalida a lista uma vez. Usado ao reduzir o alcance (faixas acima). */
+export function useExcluirRaiosEntregaEmLote() {
+  const invalidate = useInvalidateTenantQueries()
+
+  return useSecureTenantMutation<number, string[]>(
+    async ({ token }, ids) => {
+      for (const id of ids) {
+        const res = await fetchGestorApi(
+          `/api/delivery/empresas/me/raios-entrega/${encodeURIComponent(id)}`,
+          {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        )
+        if (!res.ok && res.status !== 204) {
+          await parseJsonOrThrow(res)
+        }
+      }
+      return ids.length
     },
     {
       onSuccess: async () => {
         await invalidate(RAIOS_ENTREGA_DELIVERY_QUERY_KEY)
+        await invalidate(EMPRESA_DELIVERY_ME_QUERY_KEY)
+        dispararEmpresaDeliveryAtualizada()
       },
     }
   )

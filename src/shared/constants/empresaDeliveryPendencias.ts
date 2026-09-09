@@ -57,6 +57,10 @@ const ACAO_POR_TIPO: Partial<Record<EmpresaDeliveryPendenciaType, PendenciaAcao>
     label: 'Configurar fuso na aba Empresa',
     href: configuracoesTabPath('empresa'),
   },
+  [EMPRESA_DELIVERY_PENDENCIA_TYPES.CANAL_WHATSAPP_NAO_CONECTADO]: {
+    label: 'Conectar WhatsApp',
+    href: deliveryHubEtapaPath('delivery-notificacoes'),
+  },
 }
 
 export function resolverAcaoPendencia(type: string): PendenciaAcao | null {
@@ -85,10 +89,11 @@ export function filtrarPendenciasOrientacao(
  * Fallback legado (sem campo): bloqueia se houver pendência obrigatória.
  */
 export function lojaDeliveryDisponivel(
-  input: EmpresaDeliveryDisponibilidadeInput | undefined
+  input: EmpresaDeliveryDisponibilidadeInput | null | undefined
 ): boolean {
-  if (input?.available !== undefined) return input.available
-  return filtrarPendenciasObrigatorias(input?.pendencias).length === 0
+  if (!input) return false
+  if (typeof input.available === 'boolean') return input.available
+  return filtrarPendenciasObrigatorias(input.pendencias).length === 0
 }
 
 /** @deprecated Preferir `lojaDeliveryDisponivel`. */
