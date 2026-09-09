@@ -26,6 +26,7 @@ export type DeliveryEtapaId =
   | 'delivery-entregadores'
   | 'delivery-meios'
   | 'delivery-impressoras'
+  | 'delivery-notificacoes'
 
 const DELIVERY_ETAPA_SLUG: Record<DeliveryEtapaId, string> = {
   'delivery-geolocalizacao': 'empresa',
@@ -33,6 +34,7 @@ const DELIVERY_ETAPA_SLUG: Record<DeliveryEtapaId, string> = {
   'delivery-entregadores': 'entregadores',
   'delivery-meios': 'meios',
   'delivery-impressoras': 'impressoras',
+  'delivery-notificacoes': 'notificacoes',
 }
 
 const DELIVERY_SLUG_TO_ETAPA = Object.fromEntries(

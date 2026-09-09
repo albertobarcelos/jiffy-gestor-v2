@@ -80,6 +80,12 @@ describe('empresaDeliveryPendencias', () => {
       label: 'Configurar cobertura de entrega',
       href: '/config/delivery/cobertura',
     })
+    expect(
+      resolverAcaoPendencia(EMPRESA_DELIVERY_PENDENCIA_TYPES.CANAL_WHATSAPP_NAO_CONECTADO)
+    ).toEqual({
+      label: 'Conectar WhatsApp',
+      href: '/config/delivery/notificacoes',
+    })
     expect(resolverAcaoPendencia('TIPO_DESCONHECIDO')).toBeNull()
   })
 })

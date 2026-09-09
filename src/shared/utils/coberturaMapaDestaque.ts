@@ -86,12 +86,7 @@ export function estiloOverlayCobertura(params: {
 
   if (variante === 'raio') {
     if (!ativo) {
-      return {
-        fillOpacity: dimir ? 0.03 : 0.06,
-        strokeOpacity: dimir ? 0.15 : 0.3,
-        strokeWeight: 2,
-        zIndex: 1,
-      }
+      return { fillOpacity: 0, strokeOpacity: 0, strokeWeight: 0, zIndex: 0 }
     }
     if (destacado) {
       return { fillOpacity: 0.32, strokeOpacity: 1, strokeWeight: 2, zIndex: 4 }
@@ -103,12 +98,7 @@ export function estiloOverlayCobertura(params: {
   }
 
   if (!ativo) {
-    return {
-      fillOpacity: dimir ? 0.04 : 0.08,
-      strokeOpacity: dimir ? 0.18 : 0.35,
-      strokeWeight: destacado ? 3 : 2,
-      zIndex: 2,
-    }
+    return { fillOpacity: 0, strokeOpacity: 0, strokeWeight: 0, zIndex: 0 }
   }
   if (editando || destacado) {
     return {
@@ -122,4 +112,34 @@ export function estiloOverlayCobertura(params: {
     return { fillOpacity: 0.08, strokeOpacity: 0.25, strokeWeight: 1, zIndex: 2 }
   }
   return { fillOpacity: 0.28, strokeOpacity: 0.85, strokeWeight: 2, zIndex: 2 }
+}
+
+/** Identidade do enquadramento: só muda quando o pin, o alcance ou as áreas mudam. */
+export function assinaturaEnquadramentoCobertura(input: {
+  centro: { lat: number; lng: number } | null
+  raiosMetros: number[]
+  areaIds: string[]
+  rascunhoPontos: number
+}): string {
+  const centro = input.centro
+    ? `${input.centro.lat.toFixed(6)},${input.centro.lng.toFixed(6)}`
+    : ''
+  return `${centro}|${input.raiosMetros.join(',')}|${input.areaIds.join(',')}|${input.rascunhoPontos}`
+}
+
+/** Faixa que contém a distância; inativa vira buraco (null). */
+export function raioIdNoPonto(
+  raios: Array<{ id: string; distanciaMaximaEmMetros: number; ativo?: boolean }>,
+  distanciaMetros: number
+): string | null {
+  const ordenados = [...raios].sort(
+    (a, b) => a.distanciaMaximaEmMetros - b.distanciaMaximaEmMetros
+  )
+  for (let indice = 0; indice < ordenados.length; indice++) {
+    const innerMetros = indice === 0 ? 0 : ordenados[indice - 1].distanciaMaximaEmMetros
+    const outerMetros = ordenados[indice].distanciaMaximaEmMetros
+    if (distanciaMetros < innerMetros || distanciaMetros > outerMetros) continue
+    return ordenados[indice].ativo === false ? null : ordenados[indice].id
+  }
+  return null
 }

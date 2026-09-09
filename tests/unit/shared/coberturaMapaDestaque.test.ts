@@ -4,6 +4,8 @@ import {
   raioAlcanceMaximo,
   anelDaFaixaKm,
   resolverDestaqueCobertura,
+  assinaturaEnquadramentoCobertura,
+  raioIdNoPonto,
 } from '@/src/shared/utils/coberturaMapaDestaque'
 
 describe('coberturaMapaDestaque', () => {
@@ -71,5 +73,43 @@ describe('coberturaMapaDestaque', () => {
     ]
     expect(anelDaFaixaKm(raios, 'r3')).toEqual({ innerMetros: 2000, outerMetros: 3000 })
     expect(anelDaFaixaKm(raios, 'r1')).toEqual({ innerMetros: 0, outerMetros: 1000 })
+  })
+
+  it('mantém a mesma assinatura de enquadramento se só a identidade do array muda', () => {
+    const base = {
+      centro: { lat: -15.1, lng: -56.1 },
+      raiosMetros: [4000],
+      areaIds: [] as string[],
+      rascunhoPontos: 0,
+    }
+    expect(assinaturaEnquadramentoCobertura(base)).toBe(
+      assinaturaEnquadramentoCobertura({ ...base, areaIds: [] })
+    )
+    expect(assinaturaEnquadramentoCobertura({ ...base, raiosMetros: [5000] })).not.toBe(
+      assinaturaEnquadramentoCobertura(base)
+    )
+  })
+
+  it('some overlay inativo em vez de só clarear', () => {
+    const inativo = estiloOverlayCobertura({
+      ativo: false,
+      destacado: false,
+      haDestaqueAtivo: false,
+      variante: 'raio',
+    })
+    expect(inativo.fillOpacity).toBe(0)
+    expect(inativo.strokeOpacity).toBe(0)
+  })
+
+  it('a faixa inativa vira buraco no hover', () => {
+    const raios = [
+      { id: 'r1', distanciaMaximaEmMetros: 1000, ativo: true },
+      { id: 'r2', distanciaMaximaEmMetros: 2000, ativo: false },
+      { id: 'r3', distanciaMaximaEmMetros: 3000, ativo: true },
+    ]
+    expect(raioIdNoPonto(raios, 500)).toBe('r1')
+    expect(raioIdNoPonto(raios, 1500)).toBeNull()
+    expect(raioIdNoPonto(raios, 2500)).toBe('r3')
+    expect(raioIdNoPonto(raios, 4000)).toBeNull()
   })
 })

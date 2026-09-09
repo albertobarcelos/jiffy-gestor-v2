@@ -119,6 +119,47 @@ export function useAtualizarRaioEntregaDelivery() {
   )
 }
 
+/** Vários PATCH e uma invalidação — usado no Salvar da cobertura. */
+export function useAtualizarRaiosEntregaEmLote() {
+  const invalidate = useInvalidateTenantQueries()
+
+  return useSecureTenantMutation<
+    { ok: number; total: number },
+    Array<{ id: string; input: UpdateRaioEntregaInput }>
+  >(
+    async ({ token }, patches) => {
+      let ok = 0
+      for (const patch of patches) {
+        const res = await fetchGestorApi(
+          `/api/delivery/empresas/me/raios-entrega/${encodeURIComponent(patch.id)}`,
+          {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(patch.input),
+          }
+        )
+        try {
+          await parseJsonOrThrow(res)
+          ok += 1
+        } catch {
+          // Continua as demais faixas; o Salvar reporta o parcial.
+        }
+      }
+      return { ok, total: patches.length }
+    },
+    {
+      onSettled: async () => {
+        await invalidate(RAIOS_ENTREGA_DELIVERY_QUERY_KEY)
+        await invalidate(EMPRESA_DELIVERY_ME_QUERY_KEY)
+        dispararEmpresaDeliveryAtualizada()
+      },
+    }
+  )
+}
+
 /** Apaga vários raios e invalida a lista uma vez. Usado ao reduzir o alcance (faixas acima). */
 export function useExcluirRaiosEntregaEmLote() {
   const invalidate = useInvalidateTenantQueries()

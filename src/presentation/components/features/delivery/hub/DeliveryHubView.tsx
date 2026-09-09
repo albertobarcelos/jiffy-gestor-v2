@@ -6,6 +6,8 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useEmpresaDeliveryMe } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { useAreasEntregaDelivery } from '@/src/presentation/hooks/useAreasEntregaDelivery'
+import { useCanalWhatsAppDelivery, useCanalWhatsAppStatus } from '@/src/presentation/hooks/useCanalWhatsAppDelivery'
+import { useDeliveryHubCadastrosRecomendados } from '@/src/presentation/hooks/useDeliveryHubCadastrosRecomendados'
 import { useRaiosEntregaDelivery } from '@/src/presentation/hooks/useRaiosEntregaDelivery'
 import { useTabsStore } from '@/src/presentation/stores/tabsStore'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
@@ -50,6 +52,24 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
     () => resumirCoberturaHub(raiosQuery.data ?? [], areasQuery.data ?? []),
     [raiosQuery.data, areasQuery.data]
   )
+  const canalWhatsAppQuery = useCanalWhatsAppDelivery()
+  const statusWhatsAppQuery = useCanalWhatsAppStatus({
+    enabled: !etapaId && canalWhatsAppQuery.data != null,
+    pollar: false,
+  })
+  const cadastrosRecomendados = useDeliveryHubCadastrosRecomendados(!etapaId)
+  const refetchCadastros = cadastrosRecomendados.refetch
+  const whatsappConectado =
+    statusWhatsAppQuery.data != null
+      ? statusWhatsAppQuery.data.conectado === true
+      : canalWhatsAppQuery.data?.conectado === true
+  const passosExtras = useMemo(
+    () => ({
+      ...cadastrosRecomendados.extras,
+      whatsappConectado,
+    }),
+    [cadastrosRecomendados.extras, whatsappConectado]
+  )
 
   useEffect(() => {
     addTab({
@@ -76,13 +96,16 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
     if (estavaEmEtapa && voltouParaHub) {
       const timeoutId = setTimeout(() => {
         void empresaDeliveryQuery.refetch()
+        void canalWhatsAppQuery.refetch()
+        void statusWhatsAppQuery.refetch()
+        void refetchCadastros()
       }, 400)
       previousTabIdRef.current = activeTabId
       return () => clearTimeout(timeoutId)
     }
 
     previousTabIdRef.current = activeTabId
-  }, [activeTabId, empresaDeliveryQuery])
+  }, [activeTabId, canalWhatsAppQuery, empresaDeliveryQuery, refetchCadastros, statusWhatsAppQuery])
 
   const abrirEtapa = useCallback(
     (proximaEtapaId: DeliveryEtapaId) => {
@@ -150,6 +173,7 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
         resumoCobertura={resumoCobertura}
         endereco={empresaMe.empresa?.endereco ?? null}
         nomeEmpresa={empresaMe.empresa?.nomeExibicao ?? null}
+        passosExtras={passosExtras}
         onAbrirPasso={abrirPasso}
       />
     </div>
