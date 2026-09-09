@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react'
 import type { IconType } from 'react-icons'
+import { FaWhatsapp } from 'react-icons/fa'
 import {
   MdCreditCard,
   MdDeliveryDining,
@@ -18,6 +19,7 @@ import {
   EntregadoresDeliveryEtapa,
   ImpressorasDeliveryEtapa,
   MeiosDeliveryEtapa,
+  NotificacoesWhatsAppDeliveryEtapa,
 } from '@/src/presentation/components/features/delivery/hub/DeliveryEtapaPaineis'
 
 export {
@@ -99,6 +101,18 @@ export const DELIVERY_HUB_ETAPAS: DeliveryEtapaConfig[] = [
     path: deliveryHubEtapaPath('delivery-impressoras'),
     component: ImpressorasDeliveryEtapa,
     icon: MdPrint,
+    cta: 'Ver e editar',
+    obrigatoria: false,
+  },
+  {
+    id: 'delivery-notificacoes',
+    step: 6,
+    title: 'Notificações WhatsApp',
+    label: 'WhatsApp',
+    descricao: 'Avisos automáticos do pedido no WhatsApp do cliente.',
+    path: deliveryHubEtapaPath('delivery-notificacoes'),
+    component: NotificacoesWhatsAppDeliveryEtapa,
+    icon: FaWhatsapp,
     cta: 'Ver e editar',
     obrigatoria: false,
   },

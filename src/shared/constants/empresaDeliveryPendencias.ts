@@ -42,6 +42,10 @@ const ACAO_POR_TIPO: Partial<Record<EmpresaDeliveryPendenciaType, PendenciaAcao>
     label: 'Configurar fuso na aba Empresa',
     href: deliveryHubEtapaPath('delivery-geolocalizacao'),
   },
+  [EMPRESA_DELIVERY_PENDENCIA_TYPES.CANAL_WHATSAPP_NAO_CONECTADO]: {
+    label: 'Conectar WhatsApp',
+    href: deliveryHubEtapaPath('delivery-notificacoes'),
+  },
 }
 
 export function resolverAcaoPendencia(type: string): PendenciaAcao | null {

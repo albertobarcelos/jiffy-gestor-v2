@@ -5,6 +5,7 @@ import { MdClose, MdDesignServices } from 'react-icons/md'
 import { useTabsStore } from '@/src/presentation/stores/tabsStore'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import { DELIVERY_HUB_PATH } from '@/src/shared/constants/configuracoesRoutes'
+import { usePedirSaidaCobertura } from '@/src/presentation/components/features/configuracoes/coberturaSairGuard'
 import {
   DELIVERY_HUB_ETAPAS,
   DELIVERY_HUB_TAB_ID,
@@ -19,13 +20,16 @@ export function DeliveryTabBar() {
   const router = useRouter()
   const { toGestao } = useGestaoPath()
   const { tabs, activeTabId, setActiveTab, removeTab } = useTabsStore()
+  const pedirSaida = usePedirSaidaCobertura()
   const deliveryTabs = tabs.filter(t => isDeliveryTabId(t.id))
 
   if (deliveryTabs.length === 0) return null
 
   const irParaHub = () => {
-    setActiveTab(DELIVERY_HUB_TAB_ID)
-    router.push(toGestao(DELIVERY_HUB_PATH))
+    pedirSaida(() => {
+      setActiveTab(DELIVERY_HUB_TAB_ID)
+      router.push(toGestao(DELIVERY_HUB_PATH))
+    })
   }
 
   return (
@@ -48,13 +52,16 @@ export function DeliveryTabBar() {
                   : 'border-alternate/30 hover:bg-alternate/20'
               }`}
               onClick={() => {
+                if (tab.id === activeTabId) return
                 if (tab.id === DELIVERY_HUB_TAB_ID) {
                   irParaHub()
                   return
                 }
                 if (etapa) {
-                  setActiveTab(etapa.id)
-                  router.push(toGestao(etapa.path))
+                  pedirSaida(() => {
+                    setActiveTab(etapa.id)
+                    router.push(toGestao(etapa.path))
+                  })
                 }
               }}
               title={tab.label}

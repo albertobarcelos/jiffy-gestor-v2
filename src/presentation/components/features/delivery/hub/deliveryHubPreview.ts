@@ -2,6 +2,10 @@ import type { EnderecoEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { formatValorTaxaRaio } from '@/src/application/dto/delivery/CoberturaEntregaDTO'
 import type { DeliveryHubPassoUi } from '@/src/presentation/components/features/delivery/hub/deliveryHubPassosUi'
 import type { ResumoCoberturaHub } from '@/src/presentation/components/features/delivery/hub/deliveryHubResumoCobertura'
+import {
+  textoQuantidadeCadastrada,
+  type DeliveryHubPassosExtras,
+} from '@/src/presentation/components/features/delivery/hub/deliveryHubCadastros'
 
 export type DeliveryHubPreviewFatoId =
   | 'areas'
@@ -10,6 +14,10 @@ export type DeliveryHubPreviewFatoId =
   | 'empresa'
   | 'endereco'
   | 'descricao'
+  | 'whatsapp'
+  | 'entregadores'
+  | 'meios'
+  | 'impressoras'
 
 export type DeliveryHubPreviewFato = {
   id: DeliveryHubPreviewFatoId
@@ -25,10 +33,11 @@ export function linhaEnderecoHub(endereco: EnderecoEmpresaMe | null): string {
 }
 
 export function fatosPreviewHub(
-  passo: Pick<DeliveryHubPassoUi, 'id' | 'descricao'>,
+  passo: Pick<DeliveryHubPassoUi, 'id' | 'descricao' | 'concluido'>,
   resumo: ResumoCoberturaHub,
   endereco: EnderecoEmpresaMe | null,
-  nomeEmpresa: string | null
+  nomeEmpresa: string | null,
+  extras?: DeliveryHubPassosExtras
 ): DeliveryHubPreviewFato[] {
   if (passo.id === 'delivery-cobertura') {
     const fatos: DeliveryHubPreviewFato[] = [
@@ -66,13 +75,64 @@ export function fatosPreviewHub(
     ]
   }
 
+  if (passo.id === 'delivery-notificacoes') {
+    return [
+      {
+        id: 'whatsapp',
+        texto: passo.concluido ? 'WhatsApp conectado' : 'WhatsApp desconectado',
+      },
+    ]
+  }
+
+  if (passo.id === 'delivery-entregadores') {
+    return [
+      {
+        id: 'entregadores',
+        texto: textoQuantidadeCadastrada(extras?.qtdEntregadores ?? 0, {
+          nenhum: 'Nenhum entregador cadastrado',
+          um: '1 entregador cadastrado',
+          muitos: n => `${n} entregadores cadastrados`,
+        }),
+      },
+    ]
+  }
+
+  if (passo.id === 'delivery-meios') {
+    return [
+      {
+        id: 'meios',
+        texto: textoQuantidadeCadastrada(extras?.qtdMeiosPagamento ?? 0, {
+          nenhum: 'Nenhum meio de pagamento cadastrado',
+          um: '1 meio de pagamento cadastrado',
+          muitos: n => `${n} meios de pagamento cadastrados`,
+        }),
+      },
+    ]
+  }
+
+  if (passo.id === 'delivery-impressoras') {
+    return [
+      {
+        id: 'impressoras',
+        texto: textoQuantidadeCadastrada(extras?.qtdImpressoras ?? 0, {
+          nenhum: 'Nenhuma impressora cadastrada',
+          um: '1 impressora cadastrada',
+          muitos: n => `${n} impressoras cadastradas`,
+        }),
+      },
+    ]
+  }
+
   return [{ id: 'descricao', texto: passo.descricao }]
 }
 
 export function ctaPrimarioPreviewHub(
-  passo: Pick<DeliveryHubPassoUi, 'id' | 'cta' | 'titulo'>
+  passo: Pick<DeliveryHubPassoUi, 'id' | 'cta' | 'titulo' | 'concluido'>
 ): string {
   if (passo.id === 'delivery-cobertura') return 'Editar áreas de entrega'
+  if (passo.id === 'delivery-notificacoes') {
+    return passo.concluido ? 'Editar notificações' : 'Conectar WhatsApp'
+  }
   if (passo.cta === 'Editar') return `Editar ${passo.titulo.toLowerCase()}`
   return passo.cta
 }

@@ -22,12 +22,14 @@ import {
   fatosPreviewHub,
 } from './deliveryHubPreview'
 import type { ResumoCoberturaHub } from './deliveryHubResumoCobertura'
+import type { DeliveryHubPassosExtras } from './deliveryHubCadastros'
 
 type DeliveryHubHomeProps = {
   progresso: DeliveryHubProgresso
   resumoCobertura: ResumoCoberturaHub
   endereco: EnderecoEmpresaMe | null
   nomeEmpresa: string | null
+  passosExtras?: DeliveryHubPassosExtras
   onAbrirPasso: (passo: DeliveryHubPassoUi) => void
 }
 
@@ -51,7 +53,7 @@ function DeliveryHubMapIllustration() {
 }
 
 function BadgeStatus({ passo }: { passo: DeliveryHubPassoUi }) {
-  if (passo.obrigatoria && passo.concluido) {
+  if (passo.concluido) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2.5 py-0.5 text-[11px] font-semibold text-white">
         <MdCheck className="h-3.5 w-3.5" />
@@ -78,15 +80,17 @@ function DeliveryHubPreview({
   resumo,
   endereco,
   nomeEmpresa,
+  extras,
   onAbrirPasso,
 }: {
   passo: DeliveryHubPassoUi
   resumo: ResumoCoberturaHub
   endereco: EnderecoEmpresaMe | null
   nomeEmpresa: string | null
+  extras?: DeliveryHubPassosExtras
   onAbrirPasso: (passo: DeliveryHubPassoUi) => void
 }) {
-  const fatos = fatosPreviewHub(passo, resumo, endereco, nomeEmpresa).map(fato => ({
+  const fatos = fatosPreviewHub(passo, resumo, endereco, nomeEmpresa, extras).map(fato => ({
     ...fato,
     Icon:
       fato.id === 'areas' || fato.id === 'endereco'
@@ -142,9 +146,13 @@ export function DeliveryHubHome({
   resumoCobertura,
   endereco,
   nomeEmpresa,
+  passosExtras,
   onAbrirPasso,
 }: DeliveryHubHomeProps) {
-  const passos = useMemo(() => montarPassosHubDelivery(progresso), [progresso])
+  const passos = useMemo(
+    () => montarPassosHubDelivery(progresso, passosExtras),
+    [progresso, passosExtras]
+  )
   const [selecionadoId, setSelecionadoId] = useState('delivery-cobertura')
   const selecionado = passos.find(passo => passo.id === selecionadoId) ?? passos[1] ?? passos[0]
   const pronto = progresso.totalObrigatorios > 0 && progresso.concluidosObrigatorios === progresso.totalObrigatorios
@@ -247,6 +255,7 @@ export function DeliveryHubHome({
           resumo={resumoCobertura}
           endereco={endereco}
           nomeEmpresa={nomeEmpresa}
+          extras={passosExtras}
           onAbrirPasso={onAbrirPasso}
         />
       </div>

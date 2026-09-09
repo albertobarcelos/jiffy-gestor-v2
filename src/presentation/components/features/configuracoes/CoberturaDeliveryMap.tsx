@@ -43,8 +43,10 @@ import { pathsDeAnelFaixa } from '@/src/shared/utils/geoJsonCircle'
 import { RAIO_AJUSTE_PIN_METROS } from '@/src/shared/utils/ajustePinEmpresa'
 import {
   anelDaFaixaKm,
+  assinaturaEnquadramentoCobertura,
   estiloOverlayCobertura,
   raioAlcanceMaximo,
+  raioIdNoPonto,
 } from '@/src/shared/utils/coberturaMapaDestaque'
 import { criarOpcoesIconePinLoja } from '@/src/presentation/components/shared/geolocalizacao/geolocalizacaoMapPinIcons'
 
@@ -65,6 +67,7 @@ const MAP_CONTAINER_STYLE = { width: '100%', height: '100%' }
 const FALLBACK_CENTER = { lat: -12.6819, lng: -56.9211 }
 const FALLBACK_ZOOM = 6
 const LOCALIZADO_ZOOM = 15
+const NENHUM_RAIO_ENQUADRAMENTO: Array<{ distanciaMaximaEmMetros: number }> = []
 const MIN_VERTICES_AREA = 3
 
 const CORES_COBERTURA = [
@@ -95,6 +98,12 @@ function MapFitCobertura({
   congelarVisao: boolean
 }) {
   const map = useGoogleMap()
+  const assinatura = assinaturaEnquadramentoCobertura({
+    centro,
+    raiosMetros: raios.map(raio => raio.distanciaMaximaEmMetros),
+    areaIds: areas.map(area => area.id),
+    rascunhoPontos: rascunhoPaths?.length ?? 0,
+  })
 
   useEffect(() => {
     if (!map || typeof google === 'undefined' || congelarVisao || !centro) return
@@ -130,7 +139,9 @@ function MapFitCobertura({
     }
 
     map.fitBounds(bounds, 48)
-  }, [map, centro, raios, areas, rascunhoPaths, congelarVisao])
+    // Enquadra só quando pin, alcance ou áreas mudam — zoom e pan do operador ficam.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, assinatura, congelarVisao])
 
   return null
 }
@@ -164,22 +175,12 @@ function MapRaiosCirculos({
   centro,
   raios,
   haDestaqueAtivo,
-  hoverHabilitado,
-  onHoverRaio,
-  onHoverFim,
 }: {
   centro: LatLng
   raios: Array<Pick<RaioEntregaDTO, 'id' | 'distanciaMaximaEmMetros' | 'ativo'>>
   haDestaqueAtivo: boolean
-  hoverHabilitado: boolean
-  onHoverRaio?: (raioId: string) => void
-  onHoverFim?: () => void
 }) {
   const map = useGoogleMap()
-  const onHoverRaioRef = useRef(onHoverRaio)
-  const onHoverFimRef = useRef(onHoverFim)
-  onHoverRaioRef.current = onHoverRaio
-  onHoverFimRef.current = onHoverFim
 
   const raiosSignature = useMemo(
     () =>
@@ -192,61 +193,89 @@ function MapRaiosCirculos({
   useEffect(() => {
     if (!map || typeof google === 'undefined') return
 
-    const listeners: google.maps.MapsEventListener[] = []
     const ordenados = [...raios].sort(
       (a, b) => b.distanciaMaximaEmMetros - a.distanciaMaximaEmMetros
     )
-    const circles: google.maps.Circle[] = ordenados.map((raio, index) => {
+    const polygons: google.maps.Polygon[] = []
+    for (let index = 0; index < ordenados.length; index++) {
+      const raio = ordenados[index]
+      if (!raio.ativo) continue
+      const anel = anelDaFaixaKm(raios, raio.id)
+      if (!anel) continue
       const estilo = estiloOverlayCobertura({
-        ativo: raio.ativo,
+        ativo: true,
         destacado: false,
         haDestaqueAtivo,
         variante: 'raio',
       })
-      const circle = new google.maps.Circle({
-        map,
-        center: centro,
-        radius: raio.distanciaMaximaEmMetros,
-        strokeColor: COR_RAIO_IDLE.stroke,
-        strokeOpacity: estilo.strokeOpacity,
-        strokeWeight: estilo.strokeWeight,
-        fillColor: COR_RAIO_IDLE.fill,
-        fillOpacity: estilo.fillOpacity,
-        clickable: hoverHabilitado,
-        zIndex: index,
-      })
-
-      if (hoverHabilitado) {
-        listeners.push(
-          circle.addListener('mouseover', () => {
-            onHoverRaioRef.current?.(raio.id)
-          })
-        )
-        listeners.push(
-          circle.addListener('mouseout', () => {
-            onHoverFimRef.current?.()
-          })
-        )
-      }
-
-      return circle
-    })
+      polygons.push(
+        new google.maps.Polygon({
+          map,
+          paths: pathsDeAnelFaixa(centro, anel.innerMetros, anel.outerMetros),
+          strokeColor: COR_RAIO_IDLE.stroke,
+          strokeOpacity: estilo.strokeOpacity,
+          strokeWeight: estilo.strokeWeight,
+          fillColor: COR_RAIO_IDLE.fill,
+          fillOpacity: estilo.fillOpacity,
+          clickable: false,
+          zIndex: index,
+        })
+      )
+    }
 
     return () => {
-      for (const listener of listeners) listener.remove()
-      for (const circle of circles) {
-        circle.setMap(null)
-      }
+      for (const polygon of polygons) polygon.setMap(null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    map,
-    centro.lat,
-    centro.lng,
-    raiosSignature,
-    haDestaqueAtivo,
-    hoverHabilitado,
-  ])
+  }, [map, centro.lat, centro.lng, raiosSignature, haDestaqueAtivo])
+
+  return null
+}
+
+function MapRaioHoverPorDistancia({
+  centro,
+  raios,
+  habilitado,
+  onHoverRaio,
+  onHoverFim,
+}: {
+  centro: LatLng
+  raios: Array<Pick<RaioEntregaDTO, 'id' | 'distanciaMaximaEmMetros' | 'ativo'>>
+  habilitado: boolean
+  onHoverRaio?: (raioId: string) => void
+  onHoverFim?: () => void
+}) {
+  const map = useGoogleMap()
+  const onHoverRaioRef = useRef(onHoverRaio)
+  const onHoverFimRef = useRef(onHoverFim)
+  const raiosRef = useRef(raios)
+  onHoverRaioRef.current = onHoverRaio
+  onHoverFimRef.current = onHoverFim
+  raiosRef.current = raios
+
+  useEffect(() => {
+    if (!map || !habilitado) return
+    let ultimoId: string | null | undefined
+    const origem = geoJsonPointFromLatLng(centro.lat, centro.lng)
+    const move = map.addListener('mousemove', (event: google.maps.MapMouseEvent) => {
+      if (!event.latLng) return
+      const destino = geoJsonPointFromLatLng(event.latLng.lat(), event.latLng.lng())
+      const id = raioIdNoPonto(raiosRef.current, distanciaMetrosEntrePontos(origem, destino))
+      if (id === ultimoId) return
+      ultimoId = id
+      if (id) onHoverRaioRef.current?.(id)
+      else onHoverFimRef.current?.()
+    })
+    const sair = map.addListener('mouseout', () => {
+      if (ultimoId == null) return
+      ultimoId = null
+      onHoverFimRef.current?.()
+    })
+    return () => {
+      move.remove()
+      sair.remove()
+    }
+  }, [map, habilitado, centro.lat, centro.lng])
 
   return null
 }
@@ -363,6 +392,7 @@ function MapAreasPoligonos({
 
     for (let index = 0; index < areas.length; index++) {
       const area = areas[index]
+      if (!area.ativo && areaFormaEditandoId !== area.id) continue
       const cores = CORES_COBERTURA[(index + raiosCount) % CORES_COBERTURA.length]
       const editando = areaFormaEditandoId === area.id
       const destacada = editando || destacarTodasAreas || areaDestacadaId === area.id
@@ -396,14 +426,22 @@ function MapAreasPoligonos({
 
         if (apagarHabilitado && !editando) {
           listeners.push(
-            polygon.addListener('click', () => {
+            polygon.addListener('click', (event: google.maps.MapMouseEvent) => {
+              event.stop?.()
               onApagarAreaRef.current?.(area.id)
             })
           )
         } else if (selecaoHabilitada && !editando) {
           listeners.push(
-            polygon.addListener('click', () => {
+            polygon.addListener('click', (event: google.maps.MapMouseEvent) => {
+              event.stop?.()
               onSelecionarRef.current?.(area.id)
+            })
+          )
+        } else {
+          listeners.push(
+            polygon.addListener('click', (event: google.maps.MapMouseEvent) => {
+              event.stop?.()
             })
           )
         }
@@ -711,6 +749,7 @@ type CoberturaDeliveryMapProps = {
   destacarTodasAreas?: boolean
   areaFormaEditandoId?: string | null
   ferramentasHabilitadas?: boolean
+  desenhoHabilitado?: boolean
   onFerramentaChange?: (ferramenta: FerramentaCobertura) => void
   onPoligonoDesenhado?: (paths: LatLngLiteral[]) => void
   onCirculoDesenhado?: (centro: LatLngLiteral, raioMetros: number) => void
@@ -747,6 +786,7 @@ export function CoberturaDeliveryMap({
   destacarTodasAreas = false,
   areaFormaEditandoId = null,
   ferramentasHabilitadas = true,
+  desenhoHabilitado = true,
   onFerramentaChange,
   onPoligonoDesenhado,
   onCirculoDesenhado,
@@ -789,13 +829,19 @@ export function CoberturaDeliveryMap({
   const pinPendente = Boolean(pinRascunho && !pontosGeoIguais(pinRascunho, origem))
   const centroMapa = centroRaios ?? centroPin ?? FALLBACK_CENTER
   const zoomInicial = centroRaios || centroPin ? LOCALIZADO_ZOOM : FALLBACK_ZOOM
+  const centroMapaRef = useRef(centroMapa)
+  const zoomInicialRef = useRef(zoomInicial)
+  centroMapaRef.current = centroMapa
+  zoomInicialRef.current = zoomInicial
   const hoverHabilitado = ferramenta === 'navegar' && !areaFormaEditandoId
   const haDestaqueAtivo = Boolean(
     areaDestacadaId || raioDestacadoId || destacarTodasAreas || areaFormaEditandoId
   )
   const raiosEnquadramento = useMemo(() => {
-    const alcance = raioAlcanceMaximo(raios)
-    return alcance ? [{ distanciaMaximaEmMetros: alcance.distanciaMaximaEmMetros }] : []
+    const alcance = raioAlcanceMaximo(raios.filter(raio => raio.ativo))
+    return alcance
+      ? [{ distanciaMaximaEmMetros: alcance.distanciaMaximaEmMetros }]
+      : NENHUM_RAIO_ENQUADRAMENTO
   }, [raios])
 
   useEffect(() => {
@@ -860,6 +906,8 @@ export function CoberturaDeliveryMap({
 
   const handleLoadMapa = useCallback((map: google.maps.Map) => {
     mapRef.current = map
+    map.setCenter(centroMapaRef.current)
+    map.setZoom(zoomInicialRef.current)
   }, [])
 
   useEffect(() => {
@@ -883,10 +931,10 @@ export function CoberturaDeliveryMap({
 
   const handleMapClickParaPinar = useCallback(
     (event: google.maps.MapMouseEvent) => {
-      if (centroPin || ferramenta !== 'navegar' || !event.latLng) return
+      if (ferramenta !== 'navegar' || !event.latLng || areaFormaEditandoId) return
       onPinMovido?.(geoJsonPointFromLatLng(event.latLng.lat(), event.latLng.lng()))
     },
-    [centroPin, ferramenta, onPinMovido]
+    [areaFormaEditandoId, ferramenta, onPinMovido]
   )
 
   if (!apiKey || loadError || authFalhou) {
@@ -921,13 +969,13 @@ export function CoberturaDeliveryMap({
           : ferramenta === 'apagar'
             ? 'Clique em uma área para excluir.'
             : !centroPin
-              ? 'Clique no mapa para marcar a loja, até 1 km do endereço. Depois salve no card à esquerda.'
+              ? 'Clique no mapa para marcar a loja, até 1 km do endereço. Depois confirme no card à esquerda.'
               : areaFormaEditandoId
               ? 'Arraste os vértices. Use Salvar forma no card à esquerda.'
               : pinPendente
-                ? 'Pin movido (máx. 1 km do endereço). Salve no card à esquerda para atualizar os raios.'
+                ? 'Pin movido (máx. 1 km do endereço). Confirme no card à esquerda para atualizar os raios.'
                 : pinArrastavel
-                ? 'Arraste o pin até 1 km do endereço. Os raios só mudam depois de salvar.'
+                ? 'Clique no mapa ou arraste o pin até 1 km do endereço. Confirme no card para gravar.'
                 : null
 
   return (
@@ -961,6 +1009,8 @@ export function CoberturaDeliveryMap({
           >
             <MdSatelliteAlt className="h-5 w-5" aria-hidden />
           </button>
+          {desenhoHabilitado ? (
+            <>
           <span className="mx-2 border-t border-gray-100" />
           <button
             type="button"
@@ -998,6 +1048,8 @@ export function CoberturaDeliveryMap({
           >
             <MdDeleteOutline className="h-5 w-5" aria-hidden />
           </button>
+            </>
+          ) : null}
         </div>
       ) : null}
 
@@ -1009,8 +1061,6 @@ export function CoberturaDeliveryMap({
 
       <GoogleMap
         mapContainerStyle={MAP_CONTAINER_STYLE}
-        center={centroMapa}
-        zoom={zoomInicial}
         onLoad={handleLoadMapa}
         onClick={handleMapClickParaPinar}
         options={{
@@ -1020,6 +1070,7 @@ export function CoberturaDeliveryMap({
           zoomControl: false,
           mapTypeId: satelite ? 'hybrid' : 'roadmap',
           gestureHandling: arrasteHabilitado ? 'cooperative' : 'greedy',
+          clickableIcons: false,
         }}
       >
         <MapFitCobertura
@@ -1057,8 +1108,8 @@ export function CoberturaDeliveryMap({
               >
                 <p className="m-0 max-w-[14rem] pr-1 text-[13px] font-medium leading-snug text-gray-800">
                   {pinPendente
-                    ? 'Salve a localização no card à esquerda para atualizar os raios.'
-                    : 'Você está aqui? Ajuste até 1 km do endereço da empresa.'}
+                    ? 'Confirme a localização no card à esquerda para atualizar os raios.'
+                    : 'Você está aqui? Clique no mapa ou arraste até 1 km do endereço.'}
                 </p>
               </InfoWindow>
             ) : null}
@@ -1070,14 +1121,22 @@ export function CoberturaDeliveryMap({
               centro={centroRaios}
               raios={raios}
               haDestaqueAtivo={Boolean(areaDestacadaId || destacarTodasAreas)}
-              hoverHabilitado={hoverHabilitado}
+            />
+            <MapRaioHoverPorDistancia
+              centro={centroRaios}
+              raios={raios}
+              habilitado={hoverHabilitado}
               onHoverRaio={onHoverRaio}
               onHoverFim={onHoverFim}
             />
             <MapRaioFaixaDestaque
               centro={centroRaios}
               raios={raios}
-              raioDestacadoId={raioDestacadoId}
+              raioDestacadoId={
+                raioDestacadoId && raios.some(raio => raio.id === raioDestacadoId && raio.ativo)
+                  ? raioDestacadoId
+                  : null
+              }
             />
           </>
         ) : null}

@@ -6,6 +6,7 @@ import { EmpresaTab } from '@/src/presentation/components/features/configuracoes
 import { EntregadoresList } from '@/src/presentation/components/features/entregadores/EntregadoresList'
 import { MeiosPagamentosList } from '@/src/presentation/components/features/meios-pagamentos/MeiosPagamentosList'
 import { ImpressorasList } from '@/src/presentation/components/features/impressoras/ImpressorasList'
+import { NotificacoesWhatsAppDeliveryTab } from '@/src/presentation/components/features/configuracoes/tabs/NotificacoesWhatsAppDeliveryTab'
 
 function DeliveryEtapaPainel({ children }: { children: ReactNode }) {
   return (
@@ -41,6 +42,14 @@ export function ImpressorasDeliveryEtapa() {
   return (
     <DeliveryEtapaPainel>
       <ImpressorasList />
+    </DeliveryEtapaPainel>
+  )
+}
+
+export function NotificacoesWhatsAppDeliveryEtapa() {
+  return (
+    <DeliveryEtapaPainel>
+      <NotificacoesWhatsAppDeliveryTab />
     </DeliveryEtapaPainel>
   )
 }
