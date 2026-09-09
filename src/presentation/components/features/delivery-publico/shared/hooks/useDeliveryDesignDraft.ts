@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { DeliveryPublicoDesignConfig } from '../types/deliveryPublicoDesignConfig'
-import { createDefaultDesignConfig } from '../constants/defaultDesignConfig'
+import {
+  createDefaultDesignConfig,
+  syncNomeExibicaoCabecalho,
+} from '../constants/defaultDesignConfig'
 import { canPublishDesign } from '../constants/designPublishRules'
 import {
   isDesignConfigEqual,
@@ -33,10 +36,20 @@ export function useDeliveryDesignDraft({
   useEffect(() => {
     if (!empresaId) return
     const storage = readDesignStorage(empresaId, nomeExibicaoFallback)
-    setPublished(storage.published)
-    setDraft(storage.draft)
+    const nextPublished = syncNomeExibicaoCabecalho(storage.published, nomeExibicaoFallback)
+    const nextDraft = syncNomeExibicaoCabecalho(storage.draft, nomeExibicaoFallback)
+    setPublished(nextPublished)
+    setDraft(nextDraft)
     setHydrated(true)
-  }, [empresaId, nomeExibicaoFallback])
+
+    // Mantém localStorage alinhado ao fantasia atual (campo read-only do design).
+    if (nextPublished !== storage.published || nextDraft !== storage.draft) {
+      writeDesignStorage(empresaId, { published: nextPublished, draft: nextDraft })
+      if (slug?.trim()) {
+        writePublishedDesignBySlug(slug.trim(), nextPublished)
+      }
+    }
+  }, [empresaId, nomeExibicaoFallback, slug])
 
   const persist = useCallback(
     (nextPublished: DeliveryPublicoDesignConfig, nextDraft: DeliveryPublicoDesignConfig) => {
@@ -49,33 +62,36 @@ export function useDeliveryDesignDraft({
   const updateDraft = useCallback(
     (updater: (current: DeliveryPublicoDesignConfig) => DeliveryPublicoDesignConfig) => {
       setDraft(current => {
-        const next = updater(current)
+        const next = syncNomeExibicaoCabecalho(updater(current), nomeExibicaoFallback)
         if (empresaId) {
           writeDesignStorage(empresaId, { published, draft: next })
         }
         return next
       })
     },
-    [empresaId, published]
+    [empresaId, published, nomeExibicaoFallback]
   )
 
   const publish = useCallback(() => {
-    if (!canPublishDesign(draft)) return
-    setPublished(draft)
+    const toPublish = syncNomeExibicaoCabecalho(draft, nomeExibicaoFallback)
+    if (!canPublishDesign(toPublish)) return
+    setDraft(toPublish)
+    setPublished(toPublish)
     if (empresaId) {
-      writeDesignStorage(empresaId, { published: draft, draft })
+      writeDesignStorage(empresaId, { published: toPublish, draft: toPublish })
     }
     if (slug?.trim()) {
-      writePublishedDesignBySlug(slug.trim(), draft)
+      writePublishedDesignBySlug(slug.trim(), toPublish)
     }
-  }, [draft, empresaId, slug])
+  }, [draft, empresaId, slug, nomeExibicaoFallback])
 
   const restore = useCallback(() => {
-    setDraft(published)
+    const restored = syncNomeExibicaoCabecalho(published, nomeExibicaoFallback)
+    setDraft(restored)
     if (empresaId) {
-      writeDesignStorage(empresaId, { published, draft: published })
+      writeDesignStorage(empresaId, { published, draft: restored })
     }
-  }, [empresaId, published])
+  }, [empresaId, published, nomeExibicaoFallback])
 
   const isDirty = useMemo(() => !isDesignConfigEqual(draft, published), [draft, published])
 

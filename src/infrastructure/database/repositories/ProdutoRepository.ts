@@ -73,9 +73,21 @@ export class ProdutoRepository implements IProdutoRepository {
           : {},
       })
 
-      const produtos = (response.data.items || []).map((item) =>
-        Produto.fromJSON(item)
-      )
+      const produtos = (response.data.items || []).map((item) => {
+        const produto = Produto.fromJSON(item)
+        const rawCodigo = item?.codigoProduto ?? item?.codigo
+        const codigoRaw =
+          typeof rawCodigo === 'number' && Number.isFinite(rawCodigo)
+            ? String(Math.trunc(rawCodigo))
+            : typeof rawCodigo === 'string' && rawCodigo.trim() !== ''
+              ? rawCodigo.trim()
+              : ''
+        // Garante o código do cadastro base mesmo se o parse anterior falhar.
+        if (codigoRaw && produto.getCodigoProduto() !== codigoRaw) {
+          return Produto.fromJSON({ ...item, codigoProduto: rawCodigo })
+        }
+        return produto
+      })
 
       return {
         produtos,

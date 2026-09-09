@@ -1,7 +1,7 @@
 'use client'
 
-import type { ReactNode } from 'react'
-import { Bike, Clock, MapPin, Plus, RefreshCw, Store } from 'lucide-react'
+import { useEffect, type ReactNode } from 'react'
+import { Bike, /* Clock, */ MapPin, Plus, RefreshCw, Store } from 'lucide-react'
 import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { DeliveryTipoEntrega } from '../../../shared/stores/deliveryPreferenciaEntregaStore'
 import { formatDeliveryCurrency } from '../../../shared/utils/formatDeliveryCurrency'
@@ -31,6 +31,8 @@ type DeliveryCheckoutTipoEntregaOpcoesProps = {
   onTrocarEndereco: () => void
   /** Abre o formulário de novo endereço. */
   onCadastrarEndereco: () => void
+  /** Cliente já tem o máximo de endereços — botão fica visualmente bloqueado. */
+  novoEnderecoBloqueado?: boolean
 }
 
 const OPCOES: Array<{
@@ -41,21 +43,23 @@ const OPCOES: Array<{
   Icon: typeof Bike
 }> = [
   { key: 'entrega', label: 'Entrega', tipoEntrega: 'entrega', modoTempo: 'imediato', Icon: Bike },
-  {
-    key: 'entrega-agendada',
-    label: 'Entrega agendada',
-    tipoEntrega: 'entrega',
-    modoTempo: 'agendado',
-    Icon: Clock,
-  },
+  // TODO: reativar quando agendamento de entrega estiver disponível
+  // {
+  //   key: 'entrega-agendada',
+  //   label: 'Entrega agendada',
+  //   tipoEntrega: 'entrega',
+  //   modoTempo: 'agendado',
+  //   Icon: Clock,
+  // },
   { key: 'retirada', label: 'Retirada', tipoEntrega: 'retirada', modoTempo: 'imediato', Icon: Store },
-  {
-    key: 'retirada-agendada',
-    label: 'Retirada agendada',
-    tipoEntrega: 'retirada',
-    modoTempo: 'agendado',
-    Icon: Clock,
-  },
+  // TODO: reativar quando agendamento de retirada estiver disponível
+  // {
+  //   key: 'retirada-agendada',
+  //   label: 'Retirada agendada',
+  //   tipoEntrega: 'retirada',
+  //   modoTempo: 'agendado',
+  //   Icon: Clock,
+  // },
 ]
 
 function TaxaEntregaCardFooter({
@@ -104,16 +108,22 @@ function BotaoSecundarioEndereco({
   onClick,
   icon: Icon,
   children,
+  bloqueado = false,
 }: {
   onClick: () => void
   icon: typeof Plus
   children: ReactNode
+  /** Visualmente bloqueado, mas ainda clicável (ex.: aviso de limite). */
+  bloqueado?: boolean
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold delivery-text-primary"
+      aria-disabled={bloqueado || undefined}
+      className={`flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold delivery-text-primary ${
+        bloqueado ? 'opacity-50' : ''
+      }`}
       style={{ borderColor: 'var(--delivery-border)' }}
     >
       <Icon className="h-4 w-4 shrink-0" aria-hidden />
@@ -137,10 +147,17 @@ export function DeliveryCheckoutTipoEntregaOpcoes({
   onEditarEndereco,
   onTrocarEndereco,
   onCadastrarEndereco,
+  novoEnderecoBloqueado = false,
 }: DeliveryCheckoutTipoEntregaOpcoesProps) {
   const isEntrega = tipoEntrega === 'entrega'
   const precisaCadastrarEndereco = isEntrega && !enderecoCliente && !temEnderecosCadastrados
   const podeTrocarEndereco = isEntrega && quantidadeEnderecos > 1
+
+  // Enquanto agendamento estiver oculto, força modo imediato na UI.
+  useEffect(() => {
+    if (modoTempo !== 'agendado') return
+    onChangeOpcao({ tipoEntrega, modoTempo: 'imediato' })
+  }, [modoTempo, tipoEntrega, onChangeOpcao])
 
   return (
     <div className="space-y-5">
@@ -308,7 +325,11 @@ export function DeliveryCheckoutTipoEntregaOpcoes({
                 Trocar endereço
               </BotaoSecundarioEndereco>
             ) : null}
-            <BotaoSecundarioEndereco onClick={onCadastrarEndereco} icon={Plus}>
+            <BotaoSecundarioEndereco
+              onClick={onCadastrarEndereco}
+              icon={Plus}
+              bloqueado={novoEnderecoBloqueado}
+            >
               Novo endereço
             </BotaoSecundarioEndereco>
           </div>
@@ -316,7 +337,11 @@ export function DeliveryCheckoutTipoEntregaOpcoes({
 
         {isEntrega && !enderecoCliente && temEnderecosCadastrados ? (
           <div className="flex gap-2">
-            <BotaoSecundarioEndereco onClick={onCadastrarEndereco} icon={Plus}>
+            <BotaoSecundarioEndereco
+              onClick={onCadastrarEndereco}
+              icon={Plus}
+              bloqueado={novoEnderecoBloqueado}
+            >
               Novo endereço
             </BotaoSecundarioEndereco>
           </div>

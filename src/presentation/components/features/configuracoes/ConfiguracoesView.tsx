@@ -9,6 +9,7 @@ import { TerminaisTab } from './tabs/TerminaisTab'
 import { ImpressorasList } from '@/src/presentation/components/features/impressoras/ImpressorasList'
 import { MeiosPagamentosList } from '@/src/presentation/components/features/meios-pagamentos/MeiosPagamentosList'
 import { TaxasList } from '@/src/presentation/components/features/taxas/TaxasList'
+import { MenusList } from '@/src/presentation/components/features/menus/MenusList'
 import { PageLoading } from '@/src/presentation/components/ui/PageLoading'
 import { cn } from '@/src/shared/utils/cn'
 import {
@@ -68,6 +69,7 @@ export function ConfiguracoesView({ activeTab }: ConfiguracoesViewProps) {
           {tabBtn('impressoras', 'Impressoras')}
           {tabBtn('meios-pagamentos', 'Meios de pagamento')}
           {tabBtn('taxas', 'Taxas')}
+          {tabBtn('menus', 'Menus')}
           {tabBtn('importar-dados', 'Importar Dados')}
         </div>
       </div>
@@ -86,6 +88,11 @@ export function ConfiguracoesView({ activeTab }: ConfiguracoesViewProps) {
           {activeTab === 'taxas' && (
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
               <TaxasList />
+            </div>
+          )}
+          {activeTab === 'menus' && (
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <MenusList />
             </div>
           )}
           {activeTab === 'importar-dados' && (

@@ -9,6 +9,7 @@ import {
   enriquecerEnderecoParaGeocode,
   descreverCamposGeocodeFaltantes,
   geocodificarEnderecoViaGoogle,
+  mensagemAmigavelErroGeolocalizacao,
   montarEnderecoParaGeocode,
   serializarEnderecoParaGeocode,
   type EnderecoGeocodeInput,
@@ -119,6 +120,8 @@ export type EnderecoGeolocalizacaoSectionProps = {
   localizacaoReferencia?: GeoJsonPoint | null
   /** Oculta título, subtítulo e badge de status (ex.: checkout delivery). */
   hideHeader?: boolean
+  /** Oculta o botão de geocode pelo endereço (ex.: só marcar preferência de entrega). */
+  hideBuscar?: boolean
 }
 
 export function EnderecoGeolocalizacaoSection({
@@ -145,7 +148,9 @@ export function EnderecoGeolocalizacaoSection({
   pinModo = 'endereco',
   localizacaoReferencia = null,
   hideHeader = false,
+  hideBuscar = false,
 }: EnderecoGeolocalizacaoSectionProps) {
+  const ocultarBuscar = hideBuscar || pinModo === 'preferencia'
   const [buscandoGeocode, setBuscandoGeocode] = useState(false)
   const [buscandoGeocodeAuto, setBuscandoGeocodeAuto] = useState(false)
   const [erroGeocodeAuto, setErroGeocodeAuto] = useState<string | null>(null)
@@ -225,7 +230,7 @@ export function EnderecoGeolocalizacaoSection({
       if (seqEsperada !== undefined && seqEsperada !== geocodeAutoSeqRef.current) {
         return false
       }
-      const msg = error instanceof Error ? error.message : 'Erro ao buscar localização'
+      const msg = mensagemAmigavelErroGeolocalizacao(error, 'geocode')
       setErroGeocodeAuto(msg)
       if (!opts.silencioso) {
         showToast.error(msg)
@@ -361,7 +366,7 @@ export function EnderecoGeolocalizacaoSection({
         ) : null}
 
         {autoGeocode && erroGeocodeAuto && camposMinimosOk ? (
-          <p className={styles.warningClass}>
+          <p className={styles.warningClass} role="alert">
             {erroGeocodeAuto} Você pode ajustar o pin manualmente ou tentar novamente.
           </p>
         ) : null}
@@ -381,18 +386,20 @@ export function EnderecoGeolocalizacaoSection({
           </div>
         ) : null}
 
-        <div className={variant === 'delivery' ? undefined : 'flex flex-wrap gap-2'}>
-          <button
-            type="button"
-            onClick={() => void buscarLocalizacaoPeloEndereco()}
-            disabled={!podeBuscar || buscandoGeocode}
-            className={styles.buttonClass}
-            style={buttonStyle}
-          >
-            <MdMyLocation className="h-4 w-4" aria-hidden />
-            {buscandoGeocode ? 'Buscando…' : buscarLabel}
-          </button>
-        </div>
+        {!ocultarBuscar ? (
+          <div className={variant === 'delivery' ? undefined : 'flex flex-wrap gap-2'}>
+            <button
+              type="button"
+              onClick={() => void buscarLocalizacaoPeloEndereco()}
+              disabled={!podeBuscar || buscandoGeocode}
+              className={styles.buttonClass}
+              style={buttonStyle}
+            >
+              <MdMyLocation className="h-4 w-4" aria-hidden />
+              {buscandoGeocode ? 'Buscando…' : buscarLabel}
+            </button>
+          </div>
+        ) : null}
 
         {variant !== 'delivery' && ultimoEnderecoFormatado ? (
           <p className={styles.hintClass}>

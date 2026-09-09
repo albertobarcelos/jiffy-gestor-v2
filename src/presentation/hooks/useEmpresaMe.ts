@@ -16,6 +16,7 @@ import {
 import { parseDeliveryCupomTemplate } from '@/src/shared/utils/parseDeliveryCupomTemplate'
 import { getDeliveryCupomTemplateLocal } from '@/src/infrastructure/printing/deliveryCupomTemplateStorage'
 import { lerMenuIdDeParametroEmpresa } from '@/src/shared/utils/parametroEmpresaMenus'
+import { lerEnderecoLocalizacaoDoPayloadEmpresa } from '@/src/shared/utils/geolocalizacaoEmpresa'
 
 /** Endereço da empresa (GET `/api/empresas/me`) — usado em mensagens de retirada. */
 export interface EnderecoEmpresaMe {
@@ -47,6 +48,10 @@ export interface EmpresaMeQueryData {
   parametroEmpresa: Record<string, unknown>
   /** Cardápio usado nas vendas do gestor (`parametroEmpresa.menuVendaGestorId`). */
   menuVendaGestorId: string | null
+  /** Coordenada salva no endereço (`endereco.enderecoLocalizacao`). */
+  possuiGeolocalizacao: boolean
+  /** `parametroEmpresa.timezone` preenchido (não usa fallback por UF). */
+  timezoneConfigurado: boolean
 }
 
 function mapEnderecoEmpresaMe(enderecoRaw: Record<string, unknown>): EnderecoEmpresaMe | null {
@@ -126,6 +131,12 @@ export async function fetchEmpresaMeQueryData(
       ? { ...(rawPe as Record<string, unknown>) }
       : {}
 
+  const { enderecoLocalizacao } = lerEnderecoLocalizacaoDoPayloadEmpresa(endereco)
+  const timezoneSalvo =
+    (typeof parametroEmpresa.timezone === 'string' && parametroEmpresa.timezone.trim()) ||
+    (typeof parametroEmpresa.timeZone === 'string' && parametroEmpresa.timeZone.trim()) ||
+    ''
+
   return {
     empresa: {
       id,
@@ -140,6 +151,8 @@ export async function fetchEmpresaMeQueryData(
     deliveryCupomTemplate: getDeliveryCupomTemplateLocal(id) ?? parseDeliveryCupomTemplate(data),
     parametroEmpresa,
     menuVendaGestorId: lerMenuIdDeParametroEmpresa(parametroEmpresa, 'menuVendaGestorId'),
+    possuiGeolocalizacao: enderecoLocalizacao != null,
+    timezoneConfigurado: timezoneSalvo.length > 0,
   }
 }
 
@@ -179,6 +192,8 @@ export function useEmpresaMe() {
     deliveryCupomTemplate: data?.deliveryCupomTemplate ?? DEFAULT_DELIVERY_CUPOM_TEMPLATE,
     parametroEmpresa: data?.parametroEmpresa ?? {},
     menuVendaGestorId: data?.menuVendaGestorId ?? null,
+    possuiGeolocalizacao: data?.possuiGeolocalizacao ?? false,
+    timezoneConfigurado: data?.timezoneConfigurado ?? false,
     isLoading: query.isPending,
     error:
       query.error instanceof Error

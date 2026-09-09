@@ -13,6 +13,7 @@ import type { AbaDetalhesPedido } from '../../pedidos/types'
 import type { Venda } from '../types'
 import type { DateRange } from 'react-day-picker'
 import { AtribuirEntregadorKanbanPainel } from '../../delivery/kanban-panels/AtribuirEntregadorKanbanPainel'
+import { EmpresaDeliveryPendenteGestorModal } from '../../delivery/EmpresaDeliveryPendenteGestorModal'
 
 export interface KanbanModaisRendererProps {
   timezoneAgregacao: string
@@ -68,6 +69,9 @@ export interface KanbanModaisRendererProps {
   modoDespachoEntregador: boolean
   onCloseAtribuirEntregadorDespacho: () => void
   onSalvoAtribuirEntregadorDespacho: (vendaId: string, entregadorId: string | null) => void
+  empresaDeliveryPendenteOpen: boolean
+  onCloseEmpresaDeliveryPendente: () => void
+  empresaDeliveryPendenciasLabels: string[]
 }
 
 export function KanbanModaisRenderer({
@@ -113,6 +117,9 @@ export function KanbanModaisRenderer({
   modoDespachoEntregador,
   onCloseAtribuirEntregadorDespacho,
   onSalvoAtribuirEntregadorDespacho,
+  empresaDeliveryPendenteOpen,
+  onCloseEmpresaDeliveryPendente,
+  empresaDeliveryPendenciasLabels,
 }: KanbanModaisRendererProps) {
   return (
     <>
@@ -236,6 +243,11 @@ export function KanbanModaisRenderer({
         onContinuar={onContinuarCbenef}
         onConfigurar={onConfigurarCbenef}
         onCancelar={onCancelarCbenef}
+      />
+      <EmpresaDeliveryPendenteGestorModal
+        open={empresaDeliveryPendenteOpen}
+        onClose={onCloseEmpresaDeliveryPendente}
+        pendenciasLabels={empresaDeliveryPendenciasLabels}
       />
     </>
   )

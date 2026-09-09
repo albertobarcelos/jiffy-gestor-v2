@@ -112,7 +112,10 @@ export function useProdutos(params: ProdutosQueryParams = {}) {
 /**
  * Hook para buscar produtos com paginação infinita (scroll infinito)
  */
-export function useProdutosInfinite(params: Omit<ProdutosQueryParams, 'offset'> = {}) {
+export function useProdutosInfinite(
+  params: Omit<ProdutosQueryParams, 'offset'> = {},
+  options?: { enabled?: boolean }
+) {
   return useSecureTenantInfiniteQuery(
     ['produtos', 'infinite', params],
     async ({ token }, pageParam) => {
@@ -177,6 +180,7 @@ export function useProdutosInfinite(params: Omit<ProdutosQueryParams, 'offset'> 
       refetchOnReconnect: true,
       refetchOnMount: false,
       placeholderData: keepPreviousData,
+      enabled: options?.enabled ?? true,
     }
   )
 }

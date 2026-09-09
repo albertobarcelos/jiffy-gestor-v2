@@ -7,6 +7,7 @@ import { MdCheckCircle, MdOpenInNew, MdShare, MdStorefront } from 'react-icons/m
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
 import { useEmpresaDeliveryMe } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
+import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { useTabsStore } from '@/src/presentation/stores/tabsStore'
 import { compartilharLinkDelivery } from '@/src/presentation/components/features/delivery-publico/shared/utils/compartilharProdutoDelivery'
 import { lojaDeliveryDisponivel } from '@/src/shared/constants/empresaDeliveryPendencias'
@@ -41,6 +42,7 @@ export function DeliveryHubView() {
   const searchParams = useSearchParams()
   const { addTab, activeTabId } = useTabsStore()
   const empresaDeliveryQuery = useEmpresaDeliveryMe()
+  const { possuiGeolocalizacao, timezoneConfigurado } = useEmpresaMe()
   const previousTabIdRef = useRef<string | null>(null)
 
   const empresaDelivery = empresaDeliveryQuery.data
@@ -48,8 +50,12 @@ export function DeliveryHubView() {
   const pendencias = empresaDelivery?.pendencias ?? []
   const lojaPublicaPronta = lojaDeliveryDisponivel(empresaDelivery ?? undefined)
   const progresso = useMemo(
-    () => calcularDeliveryHubProgresso(pendencias, configurado),
-    [pendencias, configurado]
+    () =>
+      calcularDeliveryHubProgresso(pendencias, configurado, {
+        possuiGeolocalizacao,
+        timezoneConfigurado,
+      }),
+    [pendencias, configurado, possuiGeolocalizacao, timezoneConfigurado]
   )
 
   const linkPublico = useMemo(() => {

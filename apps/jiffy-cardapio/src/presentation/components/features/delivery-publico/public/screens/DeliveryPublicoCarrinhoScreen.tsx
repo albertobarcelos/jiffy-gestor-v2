@@ -9,6 +9,10 @@ import {
   usePublicDeliveryCatalogInfinite,
 } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import { showToast } from '@/src/shared/utils/toast'
+import {
+  clienteAtingiuMaxEnderecosDelivery,
+  MSG_MAX_ENDERECOS_CLIENTE_DELIVERY,
+} from '@/src/shared/constants/deliveryClienteEnderecos'
 import { DeliveryCarrinhoItemCard } from '../../shared/components/DeliveryCarrinhoItemCard'
 import { DeliveryCarrinhoSwipeableItem } from '../../shared/components/DeliveryCarrinhoSwipeableItem'
 import { DeliveryButton } from '../../shared/components/DeliveryButton'
@@ -120,6 +124,7 @@ export function DeliveryPublicoCarrinhoScreen({
     clienteLookup,
     selecionarEnderecoExistente,
     usarNovoEndereco,
+    restaurarEnderecoSelecaoCancelada,
     preencherFormParaEditarEndereco,
     removerEnderecoCliente,
     consultarClientePorTelefone,
@@ -178,6 +183,15 @@ export function DeliveryPublicoCarrinhoScreen({
     if (!id) return null
     return clienteLookup.cliente?.enderecos.find(e => e.id === id) ?? null
   }, [form.modoEndereco, form.enderecoIdSelecionado, clienteLookup.cliente?.enderecos])
+
+  const quantidadeEnderecosCliente = clienteLookup.cliente?.enderecos?.length ?? 0
+  const novoEnderecoBloqueado = clienteAtingiuMaxEnderecosDelivery(quantidadeEnderecosCliente)
+
+  const garantirPodeCriarNovoEndereco = useCallback((): boolean => {
+    if (!novoEnderecoBloqueado) return true
+    showToast.error(MSG_MAX_ENDERECOS_CLIENTE_DELIVERY)
+    return false
+  }, [novoEnderecoBloqueado])
 
   const enderecoParaRevisao =
     form.tipoEntrega === 'entrega' ? enderecoClienteSelecionado : null
@@ -330,19 +344,42 @@ export function DeliveryPublicoCarrinhoScreen({
     setHighestCheckoutPercentage(0)
     setVoltarParaRevisao(false)
     setVoltarParaIdentificacao(false)
+    setOrigemFormEndereco(null)
     prevCheckoutStepRef.current = null
     setCheckoutStep(null)
   }
 
   const fecharOuRevisao = () => {
+    const step = checkoutStep
+    const saindoDeFluxoEndereco =
+      step === 'enderecoForm' || step === 'enderecos' || step === 'enderecoGeo'
+
+    if (saindoDeFluxoEndereco) {
+      restaurarEnderecoSelecaoCancelada()
+      setOrigemFormEndereco(null)
+    }
+
     if (voltarParaRevisao) {
+      // Já na revisão (ou X com flag presa): fecha de verdade.
+      if (step === 'revisao') {
+        fecharCheckout()
+        return
+      }
       goToCheckoutStep('revisao')
       return
     }
+
     if (voltarParaIdentificacao) {
+      // Já em Identifique-se com a flag presa: o X precisa fechar o checkout.
+      if (step === 'telefone') {
+        fecharCheckout()
+        return
+      }
+      setVoltarParaIdentificacao(false)
       goToCheckoutStep('telefone')
       return
     }
+
     fecharCheckout()
   }
 
@@ -478,6 +515,7 @@ export function DeliveryPublicoCarrinhoScreen({
   }
 
   const handleUsarNovoEndereco = () => {
+    if (!garantirPodeCriarNovoEndereco()) return
     setOrigemFormEndereco('lista')
     usarNovoEndereco()
     goToCheckoutStep('enderecoForm')
@@ -515,6 +553,7 @@ export function DeliveryPublicoCarrinhoScreen({
       goToCheckoutStep('enderecos')
       return
     }
+    if (!garantirPodeCriarNovoEndereco()) return
     setOrigemFormEndereco(origem === 'identificacao' ? 'identificacao' : 'novo')
     usarNovoEndereco()
     goToCheckoutStep('enderecoForm')
@@ -523,6 +562,7 @@ export function DeliveryPublicoCarrinhoScreen({
   const handleNovoEnderecoDesdeIdentificacao = (
     origem: 'identificacao' | 'revisao' = 'identificacao'
   ) => {
+    if (!garantirPodeCriarNovoEndereco()) return
     if (origem === 'revisao') {
       setVoltarParaRevisao(true)
       setVoltarParaIdentificacao(false)
@@ -578,6 +618,7 @@ export function DeliveryPublicoCarrinhoScreen({
       goToCheckoutStep('enderecos')
       return
     }
+    if (!garantirPodeCriarNovoEndereco()) return
     usarNovoEndereco()
     setOrigemFormEndereco('novo')
     goToCheckoutStep('enderecoForm')
@@ -611,7 +652,11 @@ export function DeliveryPublicoCarrinhoScreen({
   }
 
   const handleCancelarEnderecoForm = () => {
-    if (origemFormEndereco === 'geo' && form.enderecoIdSelecionado.trim()) {
+    const restaurado = restaurarEnderecoSelecaoCancelada()
+    if (
+      origemFormEndereco === 'geo' &&
+      (restaurado || form.enderecoIdSelecionado.trim())
+    ) {
       setOrigemFormEndereco(null)
       goToCheckoutStep('enderecoGeo')
       return
@@ -895,8 +940,8 @@ export function DeliveryPublicoCarrinhoScreen({
             tipoEntrega={form.tipoEntrega}
             modoTempo={form.modoTempo}
             enderecoCliente={enderecoClienteSelecionado}
-            temEnderecosCadastrados={(clienteLookup.cliente?.enderecos?.length ?? 0) > 0}
-            quantidadeEnderecos={clienteLookup.cliente?.enderecos?.length ?? 0}
+            temEnderecosCadastrados={quantidadeEnderecosCliente > 0}
+            quantidadeEnderecos={quantidadeEnderecosCliente}
             enderecoEmpresaTexto={enderecoEmpresaTexto}
             taxaEntregaOficial={taxaEntregaOficial}
             cotacaoLoading={cotacaoLoading}
@@ -909,6 +954,7 @@ export function DeliveryPublicoCarrinhoScreen({
             onEditarEndereco={() => handleEditarEnderecoSelecionado('identificacao')}
             onTrocarEndereco={() => handleTrocarEndereco('identificacao')}
             onCadastrarEndereco={() => handleNovoEnderecoDesdeIdentificacao('identificacao')}
+            novoEnderecoBloqueado={novoEnderecoBloqueado}
             onSalvarNome={salvarNomeCliente}
             onLimparIdentificacao={limparIdentificacaoCliente}
             onClose={fecharOuRevisao}
@@ -925,6 +971,7 @@ export function DeliveryPublicoCarrinhoScreen({
             onUsarNovoEndereco={handleUsarNovoEndereco}
             onEditar={handleEditarEnderecoDaLista}
             onRemover={handleRemoverEnderecoDaLista}
+            novoEnderecoBloqueado={novoEnderecoBloqueado}
           />
         ) : null}
 

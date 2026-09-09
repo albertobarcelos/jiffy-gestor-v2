@@ -1,5 +1,9 @@
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import { parseGeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
+import {
+  backendForwardGeocode,
+  backendReverseGeocode,
+} from '@/src/shared/utils/geolocalizacaoBackendApi'
 
 export type EnderecoGeocodeInput = {
   rua: string
@@ -107,50 +111,96 @@ export type EnderecoGeocodeFallback = {
 
 export type PrepararEnderecoGeocodeResult = {
   endereco: EnderecoGeocodeInput
-  resolveuViaCep: boolean
   usouUfLoja: boolean
 }
 
 /**
- * Completa cidade/UF antes do geocode:
- * 1) ViaCEP quando houver CEP;
- * 2) UF da loja só se o cliente não informou cidade ou a cidade é a mesma da loja.
+ * Completa cidade/UF antes do geocode com fallback da loja
+ * (UF só se o cliente não informou cidade ou a cidade é a mesma da loja).
+ * Não usa ViaCEP — a busca de endereço no checkout é via Google Places.
  */
-export async function prepararEnderecoGeocodeCheckout(
+export function prepararEnderecoGeocodeCheckout(
   input: EnderecoGeocodeInput,
   fallback?: EnderecoGeocodeFallback
-): Promise<PrepararEnderecoGeocodeResult> {
-  let base: EnderecoGeocodeInput = { ...input }
-  let resolveuViaCep = false
-
-  const cep = normalizarCepEndereco(base.cep)
-  if (cep.length === 8 && (!base.estado?.trim() || !base.cidade?.trim())) {
-    try {
-      const { consultarCepViaApi } = await import('@/src/shared/utils/consultaCep')
-      const via = await consultarCepViaApi(cep)
-      base = {
-        ...base,
-        cidade: base.cidade?.trim() || via.localidade || base.cidade,
-        estado: base.estado?.trim() || via.uf || base.estado,
-        bairro: base.bairro?.trim() || via.bairro || base.bairro,
-      }
-      resolveuViaCep = true
-    } catch {
-      // CEP inválido ou indisponível — segue sem bloquear.
-    }
-  }
-
-  const endereco = enriquecerEnderecoParaGeocode(base, fallback)
+): PrepararEnderecoGeocodeResult {
+  const endereco = enriquecerEnderecoParaGeocode(input, fallback)
   const usouUfLoja =
     !input.estado?.trim() &&
     Boolean(endereco.estado?.trim()) &&
-    !resolveuViaCep &&
     (!input.cidade?.trim() ||
       (Boolean(fallback?.cidade?.trim()) &&
         normalizarNomeLocalidade(input.cidade) ===
           normalizarNomeLocalidade(fallback?.cidade)))
 
-  return { endereco, resolveuViaCep, usouUfLoja }
+  return { endereco, usouUfLoja }
+}
+
+export type ContextoErroGeolocalizacao = 'places' | 'details' | 'geocode' | 'gps'
+
+/**
+ * Traduz falhas técnicas do Google/BFF em mensagem clara para o cliente final.
+ */
+export function mensagemAmigavelErroGeolocalizacao(
+  error: unknown,
+  contexto: ContextoErroGeolocalizacao = 'geocode'
+): string {
+  const raw =
+    error instanceof Error
+      ? error.message.trim()
+      : typeof error === 'string'
+        ? error.trim()
+        : ''
+  const lower = raw.toLowerCase()
+
+  if (
+    raw.startsWith('Informe ') ||
+    raw.startsWith('Preencha ') ||
+    raw.startsWith('Permissão ') ||
+    raw.startsWith('Tempo esgotado ao obter') ||
+    raw.startsWith('Geolocalização não suportada')
+  ) {
+    return raw
+  }
+
+  if (/429|rate.?limit|muitas requisi|quota|OVER_QUERY_LIMIT/i.test(raw)) {
+    return 'Muitas tentativas de busca. Aguarde um momento e tente novamente.'
+  }
+
+  if (
+    /failed to fetch|networkerror|network error|load failed|econnrefused|etimedout|timeout|timed out|aborted/i.test(
+      lower
+    )
+  ) {
+    return 'Não foi possível conectar ao serviço de mapas. Verifique sua internet e tente novamente.'
+  }
+
+  if (
+    /zero_results|não encontr|nao encontr|not found|sem resultado|nenhum resultado|sem coordenadas/i.test(
+      lower
+    )
+  ) {
+    return 'Não encontramos esse endereço no mapa. Tente outra busca ou ajuste o pin manualmente.'
+  }
+
+  if (
+    /api.?key|não configurad|nao configurad|request_denied|maps.*indispon|serviço de mapas/i.test(
+      lower
+    )
+  ) {
+    return 'O serviço de mapas está temporariamente indisponível. Tente novamente em instantes.'
+  }
+
+  if (contexto === 'places') {
+    return 'Não foi possível buscar sugestões de endereço. Tente novamente ou preencha o endereço manualmente.'
+  }
+  if (contexto === 'details') {
+    return 'Não foi possível confirmar o endereço selecionado. Escolha outra sugestão ou preencha manualmente.'
+  }
+  if (contexto === 'gps') {
+    return 'Não foi possível obter sua localização. Verifique a permissão do GPS ou busque o endereço pelo Google.'
+  }
+
+  return 'Não foi possível localizar o endereço no mapa. Tente buscar novamente ou ajuste o pin manualmente.'
 }
 
 export function enriquecerEnderecoParaGeocode(
@@ -220,32 +270,22 @@ export async function geocodificarEnderecoViaGoogle(
     throw new Error(msg)
   }
 
-  const params = montarParametrosGeocodeEndereco(input)
-  const response = await fetch(`/api/geolocalizacao/forward?${params.toString()}`, {
-    method: 'GET',
-    headers: { Accept: 'application/json' },
-  })
-
-  const payload = await response.json().catch(() => ({}))
-  if (!response.ok) {
-    const msg =
-      typeof payload.error === 'string'
-        ? payload.error
-        : 'Não foi possível localizar o endereço no Google Maps'
-    throw new Error(msg)
-  }
-
-  const point = parseGeoJsonPoint(payload.enderecoLocalizacao)
-  if (!point) {
-    throw new Error('Resposta de geocodificação inválida')
-  }
-
-  return {
-    enderecoLocalizacao: point,
-    providerEnderecoId:
-      typeof payload.providerEnderecoId === 'string' ? payload.providerEnderecoId : null,
-    enderecoFormatado:
-      typeof payload.enderecoFormatado === 'string' ? payload.enderecoFormatado : null,
+  try {
+    const lookup = await backendForwardGeocode({
+      rua: input.rua,
+      numero: input.numero,
+      bairro: input.bairro,
+      cidade: input.cidade,
+      estado: input.estado,
+      cep: input.cep,
+    })
+    return {
+      enderecoLocalizacao: lookup.enderecoLocalizacao,
+      providerEnderecoId: lookup.providerEnderecoId,
+      enderecoFormatado: lookup.enderecoFormatado,
+    }
+  } catch (error) {
+    throw new Error(mensagemAmigavelErroGeolocalizacao(error, 'geocode'))
   }
 }
 
@@ -339,37 +379,23 @@ export function montarPayloadGeoEnderecoDelivery(input: {
   }
 }
 
-/** Reverse geocode (lat/lng → logradouro) via BFF (Google, fallback Nominatim). */
+/** Reverse geocode (lat/lng → logradouro) via backend `/api/v1/geolocalizacao/reverso`. */
 export async function resolverEnderecoPorCoordenadas(
   latitude: number,
   longitude: number
 ): Promise<EnderecoGeocodeInput> {
-  const response = await fetch(
-    `/api/geolocalizacao/reverso?lat=${encodeURIComponent(String(latitude))}&lon=${encodeURIComponent(String(longitude))}`,
-    { method: 'GET', headers: { Accept: 'application/json' } }
-  )
-
-  const payload = await response.json().catch(() => ({}))
-  if (!response.ok) {
-    const msg =
-      typeof payload.error === 'string'
-        ? payload.error
-        : 'Não foi possível obter o endereço pela localização do pin'
-    throw new Error(msg)
-  }
-
-  const cepDigits = normalizarCepEndereco(String(payload.cep ?? ''))
-
-  return {
-    rua: String(payload.rua ?? '').trim(),
-    numero: String(payload.numero ?? '').trim(),
-    bairro: String(payload.bairro ?? '').trim(),
-    cidade: String(payload.cidade ?? '').trim(),
-    estado: String(payload.estado ?? '')
-      .trim()
-      .toUpperCase()
-      .slice(0, 2),
-    cep: cepDigits.length === 8 ? cepDigits : '',
+  try {
+    const lookup = await backendReverseGeocode(latitude, longitude)
+    return {
+      rua: lookup.rua,
+      numero: lookup.numero,
+      bairro: lookup.bairro,
+      cidade: lookup.cidade,
+      estado: lookup.estado,
+      cep: lookup.cep,
+    }
+  } catch (error) {
+    throw new Error(mensagemAmigavelErroGeolocalizacao(error, 'geocode'))
   }
 }
 

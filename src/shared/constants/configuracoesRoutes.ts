@@ -6,6 +6,7 @@ export const CONFIGURACOES_TAB_SLUGS = [
   'impressoras',
   'meios-pagamentos',
   'taxas',
+  'menus',
   'importar-dados',
 ] as const
 

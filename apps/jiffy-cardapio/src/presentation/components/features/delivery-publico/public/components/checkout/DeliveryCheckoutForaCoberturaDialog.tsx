@@ -20,7 +20,7 @@ export function DeliveryCheckoutForaCoberturaDialog({
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-[100] flex overscroll-none items-end justify-center px-4 pb-6 sm:items-center">
+    <div className="fixed inset-0 z-[100] flex overscroll-none items-center justify-center px-4 py-6">
       <button
         type="button"
         className="absolute inset-0"

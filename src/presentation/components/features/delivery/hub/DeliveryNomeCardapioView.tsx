@@ -11,6 +11,7 @@ import {
 } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { useMenuDeliveryId } from '@/src/presentation/hooks/useMenuDeliveryId'
+import { useMenus } from '@/src/presentation/hooks/menus/useMenus'
 import {
   normalizeDeliverySlug,
   validateDeliverySlug,
@@ -28,6 +29,7 @@ export function DeliveryNomeCardapioView() {
   const slugInputPrefix = getCardapioSlugInputPrefix()
   const { empresa } = useEmpresaMe()
   const { menuDeliveryId: menuDeliveryIdSalvo } = useMenuDeliveryId()
+  const { data: menusData, isPending: menusPending } = useMenus({ limit: 2 })
   const empresaDeliveryQuery = useEmpresaDeliveryMe()
   const criarMutation = useCriarEmpresaDelivery()
   const atualizarMutation = useAtualizarEmpresaDelivery()
@@ -76,8 +78,21 @@ export function DeliveryNomeCardapioView() {
   ])
 
   useEffect(() => {
-    setMenuDeliveryId(menuDeliveryIdSalvo)
-  }, [menuDeliveryIdSalvo])
+    if (menuDeliveryIdSalvo) {
+      setMenuDeliveryId(menuDeliveryIdSalvo)
+      return
+    }
+
+    if (menusPending) return
+
+    const items = menusData?.items ?? []
+    const total = menusData?.count ?? items.length
+    if (total !== 1) return
+
+    const principal = items.find(m => m.tipo === 'principal')
+    const unicoId = principal?.id ?? items[0]?.id
+    if (unicoId) setMenuDeliveryId(unicoId)
+  }, [menuDeliveryIdSalvo, menusData, menusPending])
 
   const handleSlugBlur = useCallback(() => {
     const normalizado = normalizeDeliverySlug(slug)

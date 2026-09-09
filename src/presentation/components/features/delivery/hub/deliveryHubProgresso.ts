@@ -101,15 +101,23 @@ export type DeliveryHubProgresso = {
 }
 
 /**
- * Progresso do hub Delivery a partir das pendências da API.
- * Passo concluído = nenhum tipo associado presente em `pendencias`.
- * Design não tem pendência: fica concluído quando a loja já existe (`empresaConfigurada`).
+ * Progresso do hub Delivery a partir das pendências da API + estado real da empresa.
+ * Geo/fuso usam `empresas/me` (mesma fonte da aba Empresa), para não marcar concluído
+ * quando a lista de pendências do delivery está vazia (loja ainda não ativada).
  */
+export type DeliveryHubProgressoContextoEmpresa = {
+  possuiGeolocalizacao: boolean
+  timezoneConfigurado: boolean
+}
+
 export function calcularDeliveryHubProgresso(
   pendencias: EmpresaDeliveryPendenciaItem[] | undefined,
-  empresaConfigurada: boolean
+  empresaConfigurada: boolean,
+  contextoEmpresa?: DeliveryHubProgressoContextoEmpresa
 ): DeliveryHubProgresso {
   const lista = pendencias ?? []
+  const possuiGeolocalizacao = contextoEmpresa?.possuiGeolocalizacao ?? null
+  const timezoneConfigurado = contextoEmpresa?.timezoneConfigurado ?? null
 
   const passos: DeliveryPassoChecklist[] = PASSOS_BASE.map(passo => {
     const tipos = TIPOS_POR_PASSO[passo.id]
@@ -129,8 +137,23 @@ export function calcularDeliveryHubProgresso(
         concluido = true
       } else {
         concluido = false
-        // força obrigatoriedade conforme API
       }
+    }
+
+    // Sem loja delivery: agenda/cobertura não têm sinal confiável → incompletos.
+    if (
+      !empresaConfigurada &&
+      (passo.id === 'delivery-agenda' || passo.id === 'delivery-cobertura')
+    ) {
+      concluido = false
+    }
+
+    // Fonte de verdade alinhada à aba Empresa (não depende só das pendências delivery).
+    if (passo.id === 'delivery-geolocalizacao' && possuiGeolocalizacao !== null) {
+      concluido = possuiGeolocalizacao
+    }
+    if (passo.id === 'delivery-timezone' && timezoneConfigurado !== null) {
+      concluido = timezoneConfigurado
     }
 
     // Ajusta obrigatoriedade dinâmica pela API quando o tipo existe

@@ -31,6 +31,9 @@ import {
 import type { IconType } from 'react-icons'
 import { useAcessoFiscal } from '@/src/presentation/hooks/useAcessoFiscal'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
+import { useMenus } from '@/src/presentation/hooks/menus/useMenus'
+import { useDeliveryGestorConfigStatus } from '@/src/presentation/hooks/useDeliveryGestorConfigStatus'
+import { EmpresaDeliveryPendenteGestorModal } from '@/src/presentation/components/features/delivery/EmpresaDeliveryPendenteGestorModal'
 import { matchesModulePath } from '@/src/shared/utils/gestaoRoutes'
 
 const MENU_ICON_PARENT =
@@ -64,6 +67,7 @@ export function TopNav() {
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set())
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [empresaDeliveryPendenteOpen, setEmpresaDeliveryPendenteOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
   const { logoutTenant, logout, getUser } = useAuthStore()
@@ -74,6 +78,17 @@ export function TopNav() {
   useEmpresaUrlSync()
   const temAcessoFiscal = useAcessoFiscal()
   const { toGestao } = useGestaoPath()
+  const { data: menusData } = useMenus({ limit: 2 })
+  const deliveryGestorConfig = useDeliveryGestorConfigStatus()
+
+  /** Empresa com um único menu: oculta Menus e Produtos aponta para o editor desse menu. */
+  const menuUnicoId = useMemo(() => {
+    const total = menusData?.count ?? menusData?.items?.length ?? 0
+    if (total !== 1) return null
+    const items = menusData?.items ?? []
+    const principal = items.find(m => m.tipo === 'principal')
+    return principal?.id ?? items[0]?.id ?? null
+  }, [menusData])
   
   // Estado para controlar hidratação (evita hydration mismatch)
   const [isHydrated, setIsHydrated] = useState(false)
@@ -97,17 +112,18 @@ export function TopNav() {
       '/menus',
       '/estoque',
       '/pedidos',
+      ...(menuUnicoId ? [`/menus/${menuUnicoId}`] : []),
     ]
     
     // Prefetch com delay para não bloquear a renderização inicial
     const timer = setTimeout(() => {
       routesToPrefetch.forEach((route) => {
-        router.prefetch(route)
+        router.prefetch(toGestao(route))
       })
     }, 100)
 
     return () => clearTimeout(timer)
-  }, [router])
+  }, [menuUnicoId, router, toGestao])
 
   // Prefetch de rota ao hover
   const handleLinkHover = useCallback(
@@ -180,6 +196,20 @@ export function TopNav() {
   }
 
   const menuItems: MenuItem[] = useMemo(() => {
+    const cardapioChildren: ChildMenuItem[] = [
+      ...(menuUnicoId
+        ? []
+        : [{ name: 'Menus', path: '/menus', icon: MdMenuBook }]),
+      { name: 'Categorias', path: '/grupos-produtos', icon: MdCategory },
+      {
+        name: 'Produtos',
+        path: menuUnicoId ? `/menus/${menuUnicoId}` : '/produtos',
+        icon: MdShoppingBag,
+      },
+      { name: 'Grupo de Complementos', path: '/grupos-complementos', icon: MdCategory },
+      { name: 'Complementos', path: '/complementos', icon: MdAddCircle },
+    ]
+
     const items: MenuItem[] = [
       {
         name: 'Dashboard',
@@ -190,13 +220,7 @@ export function TopNav() {
         name: 'Cardápio',
         path: '#',
         icon: MdShoppingBag,
-        children: [
-          { name: 'Menus', path: '/menus', icon: MdMenuBook },
-          { name: 'Categorias', path: '/grupos-produtos', icon: MdCategory },
-          { name: 'Produtos', path: '/produtos', icon: MdShoppingBag },
-          { name: 'Grupo de Complementos', path: '/grupos-complementos', icon: MdCategory },
-          { name: 'Complementos', path: '/complementos', icon: MdAddCircle },
-        ],
+        children: cardapioChildren,
       },
       {
         name: 'Pessoas',
@@ -230,7 +254,7 @@ export function TopNav() {
       return items.filter(item => item.path !== '/portal-contador')
     }
     return items
-  }, [temAcessoFiscal])
+  }, [menuUnicoId, temAcessoFiscal])
 
   const isMenuActive = (item: typeof menuItems[0]) => {
     if (item.path !== '#') {
@@ -358,7 +382,7 @@ export function TopNav() {
                         const activeChild = isChildActive(child.path)
                         return (
                           <button
-                            key={child.path}
+                            key={`${child.name}-${child.path}`}
                             type="button"
                             onClick={() => handleMobileChildNavigate(child)}
                             className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left ${
@@ -487,7 +511,7 @@ export function TopNav() {
                         const childIsActive = isChildActive(child.path)
                         return (
                           <Link
-                            key={child.path}
+                            key={`${child.name}-${child.path}`}
                             href={toGestao(child.path)}
                             onMouseEnter={() => handleLinkHover(child.path)}
                             onClick={() => setExpandedMenus(new Set())}
@@ -573,13 +597,38 @@ export function TopNav() {
                   d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
                 />
               </svg>
+              {deliveryGestorConfig.temPendencia ? (
+                <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary ring-2 ring-white" />
+              ) : null}
             </button>
             {notificationsOpen ? (
               <div
-                role="tooltip"
-                className="absolute left-1/2 top-full z-50 mt-2 w-max max-w-[240px] -translate-x-1/2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-center text-xs text-gray-600 shadow-lg"
+                role="menu"
+                className="absolute right-0 top-full z-50 mt-2 w-72 rounded-lg border border-gray-200 bg-white py-2 text-left shadow-lg"
               >
-                Você não tem mensagens no momento.
+                {deliveryGestorConfig.temPendencia ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full flex-col gap-1 px-3 py-2.5 text-left transition-colors hover:bg-gray-50"
+                    onClick={() => {
+                      setNotificationsOpen(false)
+                      setEmpresaDeliveryPendenteOpen(true)
+                    }}
+                  >
+                    <span className="text-sm font-semibold text-primary-text">
+                      Delivery ainda não ativado
+                    </span>
+                    <span className="text-xs leading-snug text-secondary-text">
+                      Defina o nome da loja e o cardápio para começar a vender por
+                      entrega no gestor.
+                    </span>
+                  </button>
+                ) : (
+                  <p className="px-3 py-2 text-center text-xs text-gray-600">
+                    Você não tem mensagens no momento.
+                  </p>
+                )}
               </div>
             ) : null}
           </div>
@@ -629,6 +678,11 @@ export function TopNav() {
         </div>
       </div>
       {isMobileMenuOpen && MobileMenuSection}
+      <EmpresaDeliveryPendenteGestorModal
+        open={empresaDeliveryPendenteOpen}
+        onClose={() => setEmpresaDeliveryPendenteOpen(false)}
+        pendenciasLabels={deliveryGestorConfig.pendenciasLabels}
+      />
     </nav>
   )
 }

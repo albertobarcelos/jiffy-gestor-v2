@@ -1,5 +1,7 @@
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import { geoJsonPointFromLatLng, parseGeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
+import { backendForwardGeocode } from '@/src/shared/utils/geolocalizacaoBackendApi'
+import { mensagemAmigavelErroGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
 
 export type EnderecoEmpresaGeocodeInput = {
   rua: string
@@ -78,32 +80,22 @@ export async function geocodificarEnderecoEmpresaViaGoogle(
     throw new Error('Preencha rua, número, cidade e estado antes de buscar a localização.')
   }
 
-  const params = montarParametrosGeocodeEmpresa(input)
-  const response = await fetch(`/api/geolocalizacao/forward?${params.toString()}`, {
-    method: 'GET',
-    headers: { Accept: 'application/json' },
-  })
-
-  const payload = await response.json().catch(() => ({}))
-  if (!response.ok) {
-    const msg =
-      typeof payload.error === 'string'
-        ? payload.error
-        : 'Não foi possível localizar o endereço no Google Maps'
-    throw new Error(msg)
-  }
-
-  const point = parseGeoJsonPoint(payload.enderecoLocalizacao)
-  if (!point) {
-    throw new Error('Resposta de geocodificação inválida')
-  }
-
-  return {
-    enderecoLocalizacao: point,
-    providerEnderecoId:
-      typeof payload.providerEnderecoId === 'string' ? payload.providerEnderecoId : null,
-    enderecoFormatado:
-      typeof payload.enderecoFormatado === 'string' ? payload.enderecoFormatado : null,
+  try {
+    const lookup = await backendForwardGeocode({
+      rua: input.rua,
+      numero: input.numero,
+      bairro: input.bairro,
+      cidade: input.cidade,
+      estado: input.estado,
+      cep: input.cep,
+    })
+    return {
+      enderecoLocalizacao: lookup.enderecoLocalizacao,
+      providerEnderecoId: lookup.providerEnderecoId,
+      enderecoFormatado: lookup.enderecoFormatado,
+    }
+  } catch (error) {
+    throw new Error(mensagemAmigavelErroGeolocalizacao(error, 'geocode'))
   }
 }
 
