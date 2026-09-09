@@ -45,6 +45,7 @@ import { getVisibleKanbanColumns } from '../utils/kanbanColumnsConfig'
 import { aplicarColunasOcultas, resolverColunasOcultasKanban } from '../utils/kanbanColunasVisibilidade'
 import { useKanbanColunasVisibilidade } from './useKanbanColunasVisibilidade'
 import { useKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/kiosk/useKioskGestorPedidos'
+import { useDeliveryGestorConfigStatus } from '@/src/presentation/hooks/useDeliveryGestorConfigStatus'
 
 export interface KanbanToolbarProps {
   searchInput: string
@@ -132,6 +133,45 @@ export function useKanbanOrchestrator() {
     modoVisualizacaoLivre
   )
 
+  const deliveryGestorConfig = useDeliveryGestorConfigStatus()
+  const [empresaDeliveryPendenteOpen, setEmpresaDeliveryPendenteOpen] = useState(false)
+
+  const handleModoKanbanVendasChange = useCallback(
+    (next: ModoKanbanVendas) => {
+      if (next === 'delivery' && !kiosk) {
+        if (deliveryGestorConfig.isLoading) return
+        if (!deliveryGestorConfig.prontoParaVendaDelivery) {
+          setEmpresaDeliveryPendenteOpen(true)
+          return
+        }
+      }
+      setModoKanbanVendas(next)
+    },
+    [
+      deliveryGestorConfig.isLoading,
+      deliveryGestorConfig.prontoParaVendaDelivery,
+      kiosk,
+    ]
+  )
+
+  /** Sessão web: se Delivery está salvo mas ainda sem config, força Balcão e avisa. */
+  useEffect(() => {
+    if (kiosk) return
+    if (deliveryGestorConfig.isLoading) return
+    if (
+      modoKanbanVendasLivre === 'delivery' &&
+      !deliveryGestorConfig.prontoParaVendaDelivery
+    ) {
+      setModoKanbanVendas('balcao')
+      setEmpresaDeliveryPendenteOpen(true)
+    }
+  }, [
+    deliveryGestorConfig.isLoading,
+    deliveryGestorConfig.prontoParaVendaDelivery,
+    kiosk,
+    modoKanbanVendasLivre,
+  ])
+
   useEffect(() => {
     if (kiosk) return
     try {
@@ -172,6 +212,24 @@ export function useKanbanOrchestrator() {
   })
 
   const modais = useKanbanModais(modoKanbanVendas)
+
+  const handleAbrirNovoPedido = useCallback(() => {
+    if (
+      modoKanbanVendas === 'delivery' &&
+      !deliveryGestorConfig.prontoParaVendaDelivery
+    ) {
+      if (!deliveryGestorConfig.isLoading) {
+        setEmpresaDeliveryPendenteOpen(true)
+      }
+      return
+    }
+    modais.handleAbrirNovoPedido()
+  }, [
+    deliveryGestorConfig.isLoading,
+    deliveryGestorConfig.prontoParaVendaDelivery,
+    modais.handleAbrirNovoPedido,
+    modoKanbanVendas,
+  ])
 
   const preTransicao = useKanbanPreTransicao({
     isModoDeliveryKanban: data.isModoDeliveryKanban,
@@ -390,11 +448,11 @@ export function useKanbanOrchestrator() {
     periodoFim: periodoFimConsulta,
     onClearFilters: handleClearFiltersComTerminal,
     modoKanbanVendas,
-    onModoKanbanVendasChange: setModoKanbanVendas,
+    onModoKanbanVendasChange: handleModoKanbanVendasChange,
     modoVisualizacao,
     onModoVisualizacaoChange: setModoVisualizacaoLivre,
     onAbrirConfiguracoesDelivery: modais.abrirConfigImpressoraExpedicao,
-    onAbrirNovoPedido: modais.handleAbrirNovoPedido,
+    onAbrirNovoPedido: handleAbrirNovoPedido,
     colunasDoModo,
     colunasOcultas,
     onSetColunaVisivel: (id, visivel) =>
@@ -534,6 +592,9 @@ export function useKanbanOrchestrator() {
         void handleAvancarEtapa(pendente.venda, pendente.colunaAtual)
       }
     },
+    empresaDeliveryPendenteOpen,
+    onCloseEmpresaDeliveryPendente: () => setEmpresaDeliveryPendenteOpen(false),
+    empresaDeliveryPendenciasLabels: deliveryGestorConfig.pendenciasLabels,
   }
 
   return { toolbarProps, boardProps, modaisProps, modoVisualizacao }
