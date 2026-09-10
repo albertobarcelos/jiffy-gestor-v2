@@ -23,7 +23,7 @@ function StepCircle({
   return (
     <div
       className={`flex h-8 w-8 items-center justify-center rounded-full border-2 ${
-        ativo ? 'border-primary bg-primary text-white' : 'border-gray-300 bg-white text-gray-400'
+        ativo ? 'border-secondary bg-secondary text-white' : 'border-gray-300 bg-white text-gray-400'
       }`}
     >
       {concluido ? (
@@ -49,7 +49,7 @@ function StepItem({
   return (
     <div className="flex items-center gap-2">
       <StepCircle step={step} displayStep={displayStep} currentStep={currentStep} />
-      <span className={`text-sm font-medium ${currentStep >= step ? 'text-primary' : 'text-gray-400'}`}>
+      <span className={`text-sm font-medium ${currentStep >= step ? 'text-secondary' : 'text-gray-400'}`}>
         {label}
       </span>
     </div>
@@ -80,7 +80,7 @@ export function NovoPedidoStepper({
       {steps.map((item, index) => (
         <div key={item.step} className="contents">
           {index > 0 ? (
-            <div className={`h-0.5 w-12 ${currentStep >= item.step ? 'bg-primary' : 'bg-gray-300'}`} />
+            <div className={`h-0.5 w-12 ${currentStep >= item.step ? 'bg-secondary' : 'bg-gray-300'}`} />
           ) : null}
           <StepItem
             step={item.step}

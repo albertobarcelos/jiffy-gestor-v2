@@ -264,6 +264,7 @@ export function PedidoPagamentoStepView() {
                   meiosPagamento.map(meio => {
                     const Icone = obterIconeMeioPagamento(meio.getNome())
                     const estilo = estiloCardMeioPagamento(meio.getFormaPagamentoFiscal())
+                    const { labelColor, labelFontWeight, ...estiloCard } = estilo
                     return (
                       <button
                         key={meio.getId()}
@@ -274,11 +275,17 @@ export function PedidoPagamentoStepView() {
                           }
                         }}
                         disabled={valorAPagarLancamento <= 0 && !valorRecebido.trim()}
-                        style={estilo}
+                        style={estiloCard}
                         className={`flex ${MEIO_PAGAMENTO_CARD_SIZE_CLASS} cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 p-2 transition-all hover:brightness-110 ${valorAPagarLancamento <= 0 && !valorRecebido.trim() ? 'cursor-not-allowed opacity-50' : ''}`}
                       >
                         <Icone className="h-8 w-8 shrink-0" />
-                        <span className="line-clamp-2 w-full text-center text-xs font-medium leading-tight">
+                        <span
+                          className="line-clamp-2 w-full text-center text-xs leading-tight"
+                          style={{
+                            color: labelColor,
+                            fontWeight: labelFontWeight ?? 500,
+                          }}
+                        >
                           {meio.getNome()}
                         </span>
                       </button>
