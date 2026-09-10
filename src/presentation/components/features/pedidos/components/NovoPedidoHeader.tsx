@@ -2,6 +2,7 @@
 
 import { MdPerson } from 'react-icons/md'
 import type { AbaDetalhesPedido } from '../types'
+import { NOVO_PEDIDO_SHELL_PADDING_X_CLASS } from '../layout/novoPedidoShellLayout'
 import { PedidoDetalhesTabs } from './PedidoDetalhesTabs'
 import { NovoPedidoStepper } from './NovoPedidoStepper'
 
@@ -39,7 +40,7 @@ export function NovoPedidoHeader({
       : 'Novo Pedido'
 
   return (
-    <div className="px-6 py-2">
+    <div className={`${NOVO_PEDIDO_SHELL_PADDING_X_CLASS} py-2`}>
       <div className="flex min-w-0 items-center gap-4">
         <h1 className="shrink-0 text-2xl font-semibold">{titulo}</h1>
         {!modoEdicaoProdutos ? (

@@ -1,15 +1,20 @@
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { MIN_CARACTERES_BUSCA_CATALOGO_VENDA } from '@/src/domain/policies/pedido/CatalogoVendaPolicy'
 import { Produto } from '@/src/domain/entities/Produto'
 import type { INovoPedidoReadRepository } from '@/src/domain/repositories/INovoPedidoReadRepository'
 import {
   mergeProdutoComSnapshotMenu,
+  menuGrupoProdutoToGrupoProduto,
   menuProdutoToProduto,
 } from '@/src/application/mappers/MenuProdutoCatalogMapper'
+import type { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { normalizarListaEntregadoresDelivery } from '@/src/application/mappers/EntregadorDeliveryNormalizer'
 import type { UsuarioPdvEntregadorOption } from '@/src/domain/types/vendaDetalhe'
 import {
+  fetchAllMenuGruposProdutos,
   fetchAllMenuProdutos,
   fetchMenuProdutoSnapshot,
+  fetchMenuProdutosPagina,
 } from '@/src/infrastructure/api/repositories/menuCatalogFetch'
 
 async function fetchJson<T>(url: string, token: string, init?: RequestInit): Promise<T> {
@@ -69,6 +74,12 @@ export class NovoPedidoReadRepository implements INovoPedidoReadRepository {
     return normalizarListaEntregadoresDelivery(data)
   }
 
+  async listarGruposDoMenu(menuId: string, token: string): Promise<GrupoProduto[]> {
+    if (!menuId) return []
+    const items = await fetchAllMenuGruposProdutos(menuId, token)
+    return items.map(menuGrupoProdutoToGrupoProduto)
+  }
+
   async listarProdutosDoGrupo(
     grupoId: string,
     token: string,
@@ -94,6 +105,34 @@ export class NovoPedidoReadRepository implements INovoPedidoReadRepository {
     return { produtos, count: produtos.length }
   }
 
+  async listarProdutosCatalogoPagina(
+    token: string,
+    menuId: string,
+    params: {
+      grupoProdutoId?: string
+      q?: string
+      limit: number
+      offset: number
+    }
+  ): Promise<{ produtos: Produto[]; count: number; hasMore: boolean }> {
+    const page = await fetchMenuProdutosPagina(menuId, token, {
+      grupoProdutoId: params.grupoProdutoId,
+      q: params.q,
+      ativo: true,
+      tipo: 'all',
+      limit: params.limit,
+      offset: params.offset,
+    })
+    const produtos = page.items
+      .filter(item => item.ativo !== false)
+      .map(item => menuProdutoToProduto(item))
+    return {
+      produtos,
+      count: page.count,
+      hasMore: page.items.length === params.limit,
+    }
+  }
+
   async listarGrupoIdsComProdutosAtivos(
     token: string,
     menuId: string | null
@@ -116,7 +155,7 @@ export class NovoPedidoReadRepository implements INovoPedidoReadRepository {
     menuId: string | null
   ): Promise<Produto[]> {
     const filtro = nome.trim()
-    if (filtro.length < 2 || !menuId) return []
+    if (filtro.length < MIN_CARACTERES_BUSCA_CATALOGO_VENDA || !menuId) return []
 
     const snapshots = await fetchAllMenuProdutos(menuId, token, {
       q: filtro,

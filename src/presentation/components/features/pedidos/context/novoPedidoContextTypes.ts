@@ -95,6 +95,9 @@ export interface NovoPedidoCatalogoSlice {
   isLoadingProdutosVenda: boolean
   isLoadingProdutos: boolean
   isLoadingBuscaProdutos: boolean
+  hasNextProdutosCatalogo: boolean
+  isFetchingNextProdutosCatalogo: boolean
+  carregarProximaPaginaProdutosCatalogo: () => void
   menuCatalogoIndisponivel: boolean
   tipoInicioPedido: 'balcao' | 'entrega'
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { Skeleton } from '@/src/presentation/components/ui/skeleton'
+import { PEDIDO_CATALOGO_GRADE_CLASS } from './pedidoCatalogoLayout'
 
 export function PedidoCatalogoProdutoSkeleton() {
   return (
@@ -23,9 +24,6 @@ export function PedidoCatalogoProdutoSkeleton() {
 }
 
 const CATALOGO_SKELETON_ITENS = 8
-
-export const PEDIDO_CATALOGO_GRADE_CLASS =
-  'grid min-h-0 flex-1 grid-cols-2 content-start gap-x-2 gap-y-3 p-2 sm:grid-cols-3 lg:grid-cols-4'
 
 export function PedidoCatalogoGradeSkeleton() {
   return (

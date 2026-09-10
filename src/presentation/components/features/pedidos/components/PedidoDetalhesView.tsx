@@ -10,7 +10,7 @@ import { MdCreditCard, MdDelete } from 'react-icons/md'
 // Mantido para uso futuro (pagamento efetivado e depois cancelado):
 // import { pagamentoComDestaqueCanceladoDetalhes } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import { statusFiscalEhEmitida } from '@/src/domain/services/pedido/RegrasFiscaisVenda'
-import { obterUnidadeMedidaProdutoLinha } from '../produtoCatalogoHelpers'
+import { obterUnidadeMedidaProdutoLinha } from '@/src/domain/policies/pedido/CarrinhoCatalogoPolicy'
 import { formatarQuantidadeProdutoExibicao } from '@/src/shared/utils/quantidadeProdutoInput'
 import { formatarUnidadeMedidaProdutoExibicao } from '@/src/shared/types/unidadeMedidaProduto'
 import { taxaEntregaTemValor } from '@/src/application/mappers/PedidoDisplayMapper'

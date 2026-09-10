@@ -48,7 +48,9 @@ function repoMock(overrides: Partial<INovoPedidoReadRepository> = {}): INovoPedi
   return {
     listarEntregadores: vi.fn(),
     listarEntregadoresDelivery: vi.fn(),
+    listarGruposDoMenu: vi.fn(),
     listarProdutosDoGrupo: vi.fn(),
+    listarProdutosCatalogoPagina: vi.fn(),
     listarGrupoIdsComProdutosAtivos: vi.fn(),
     buscarProdutoPorId: vi.fn(),
     buscarProdutosPorNome: vi.fn(),
@@ -69,7 +71,7 @@ function repoMock(overrides: Partial<INovoPedidoReadRepository> = {}): INovoPedi
 }
 
 describe('CriarPedidoDeliveryUseCase', () => {
-  it('registra cobranças via PATCH após criar pedido já pago', async () => {
+  it('registra cobran?as via PATCH ap?s criar pedido j? pago', async () => {
     const executeSpy = vi
       .spyOn(atualizarCobrancasPedidoDeliveryUseCase, 'execute')
       .mockResolvedValue(true)
@@ -93,7 +95,7 @@ describe('CriarPedidoDeliveryUseCase', () => {
     executeSpy.mockRestore()
   })
 
-  it('omite cobrança no POST, ajusta taxa e lança cobrança no mesmo PATCH, e cancela se o PATCH falhar', async () => {
+  it('omite cobran?a no POST, ajusta taxa e lan?a cobran?a no mesmo PATCH, e cancela se o PATCH falhar', async () => {
     const patchPedidoDelivery = vi.fn().mockRejectedValue(new Error('PATCH taxas falhou'))
     const transicionarStatusPedidoDelivery = vi.fn().mockResolvedValue(undefined)
     const repo = repoMock({ patchPedidoDelivery, transicionarStatusPedidoDelivery })
@@ -112,7 +114,7 @@ describe('CriarPedidoDeliveryUseCase', () => {
         mutate,
         'token-test'
       )
-    ).rejects.toThrow(/não foi lançado/i)
+    ).rejects.toThrow(/n?o foi lan?ado/i)
 
     const postPayload = mutate.mock.calls[0][0] as { cobrancas?: unknown }
     expect(postPayload.cobrancas).toBeUndefined()
@@ -124,7 +126,7 @@ describe('CriarPedidoDeliveryUseCase', () => {
     )
   })
 
-  it('não chama PATCH de cobrança avulso quando o override já lança taxa e cobrança juntos', async () => {
+  it('n?o chama PATCH de cobran?a avulso quando o override j? lan?a taxa e cobran?a juntos', async () => {
     const patchPedidoDelivery = vi.fn().mockResolvedValue(undefined)
     const repo = repoMock({
       patchPedidoDelivery,

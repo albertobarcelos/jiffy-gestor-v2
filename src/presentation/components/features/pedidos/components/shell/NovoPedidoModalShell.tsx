@@ -3,6 +3,7 @@
 import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { PainelPedidoBackdrop, JiffyPainelSlide } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
+import { NOVO_PEDIDO_SHELL_PADDING_X_CLASS } from '../../layout/novoPedidoShellLayout'
 import { NovoPedidoHeader } from '../NovoPedidoHeader'
 import { NovoPedidoFooterShell } from '../NovoPedidoFooter'
 import { NovoPedidoAuxiliaryModals } from '../NovoPedidoAuxiliaryModals'
@@ -143,7 +144,7 @@ export function NovoPedidoModalShell(props: NovoPedidoShellProps) {
               overflowX: 'hidden',
               minHeight: 0,
             }}
-            className="scrollbar-thin flex min-h-0 flex-1 flex-col px-6"
+            className={`scrollbar-thin flex min-h-0 flex-1 flex-col ${NOVO_PEDIDO_SHELL_PADDING_X_CLASS}`}
           >
             {/* Loading em modo visualização - não mostrar steps até carregar */}
             {modoVisualizacao && isLoadingVenda && (

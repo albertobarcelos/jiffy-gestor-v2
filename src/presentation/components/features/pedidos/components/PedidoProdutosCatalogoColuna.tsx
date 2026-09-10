@@ -5,8 +5,9 @@ import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 import { MdClear, MdSearch } from 'react-icons/md'
 import { useNovoPedidoFormContext } from '../context/NovoPedidoFormContext'
 import { BUSCA_PRODUTO_INPUT_ID } from '../hooks/form/useNovoPedidoAtalhosTeclado'
-import { PedidoCatalogoGradeSkeleton, PEDIDO_CATALOGO_GRADE_CLASS } from './PedidoCatalogoGradeSkeleton'
-import { PedidoCatalogoProdutoBotao } from './PedidoCatalogoProdutoBotao'
+import { usePedidoCatalogoColunaView } from '../hooks/catalogo/usePedidoCatalogoColunaView'
+import { PedidoCatalogoGrade } from './catalogo/PedidoCatalogoGrade'
+import { PedidoCatalogoGradeSkeleton } from './catalogo/PedidoCatalogoGradeSkeleton'
 
 export function PedidoProdutosCatalogoColuna() {
   const {
@@ -22,23 +23,28 @@ export function PedidoProdutosCatalogoColuna() {
     produtosList,
     setBuscaProdutoTexto,
     tipoInicioPedido,
+    hasNextProdutosCatalogo,
+    isFetchingNextProdutosCatalogo,
+    carregarProximaPaginaProdutosCatalogo,
   } = useNovoPedidoFormContext()
 
-  const emBusca = buscaProdutoTexto.length >= 2
-  const podeExibirProdutos = emBusca || !!grupoSelecionadoId
-  const grupoSelecionado = grupos.find(
-    (g: { getId: () => string }) => g.getId() === grupoSelecionadoId
-  )
-  const corHexGrupo = grupoSelecionado?.getCorHex() || '#6b7280'
-  const tituloGrade = emBusca
-    ? `Resultados para "${buscaProdutoTexto}"`
-    : `Produtos do grupo: `
-  const isLoadingAtual = emBusca ? isLoadingBuscaProdutos : isLoadingProdutos
-  const isLoadingCatalogo = isLoadingGruposVenda || (podeExibirProdutos && isLoadingAtual)
-  const mensagemMenuIndisponivel =
-    tipoInicioPedido === 'entrega'
-      ? 'Configure o menu em Configurações → Delivery.'
-      : 'Configure o menu em Configurações → Empresa.'
+  const {
+    emBusca,
+    podeExibirProdutos,
+    grupoSelecionado,
+    corHexGrupo,
+    tituloGrade,
+    isLoadingCatalogo,
+    mensagemMenuIndisponivel,
+  } = usePedidoCatalogoColunaView({
+    buscaProdutoTexto,
+    grupoSelecionadoId,
+    grupos,
+    isLoadingGruposVenda,
+    isLoadingBuscaProdutos,
+    isLoadingProdutos,
+    tipoInicioPedido,
+  })
 
   return (
     <div className="flex min-h-0 min-w-0 flex-[3.8] basis-0 flex-col gap-2">
@@ -93,20 +99,19 @@ export function PedidoProdutosCatalogoColuna() {
               </div>
             ) : produtosList.length === 0 ? (
               <div className="flex flex-1 items-center justify-center py-4 text-gray-500">
-                Nenhum produto encontrado neste grupo
+                {emBusca
+                  ? 'Nenhum produto encontrado'
+                  : 'Nenhum produto encontrado neste grupo'}
               </div>
             ) : (
-              <div className={`scrollbar-thin ${PEDIDO_CATALOGO_GRADE_CLASS} overflow-y-auto`}>
-                {produtosList.map(produto => (
-                    <div key={produto.getId()} className="min-w-0">
-                      <PedidoCatalogoProdutoBotao
-                        produto={produto}
-                        corHex={corHexGrupo}
-                        onSelect={adicionarProduto}
-                      />
-                    </div>
-                  ))}
-              </div>
+              <PedidoCatalogoGrade
+                produtos={produtosList}
+                corHex={corHexGrupo}
+                onSelect={adicionarProduto}
+                hasNextPage={hasNextProdutosCatalogo}
+                isFetchingNextPage={isFetchingNextProdutosCatalogo}
+                onLoadMore={carregarProximaPaginaProdutosCatalogo}
+              />
             )}
           </div>
         ) : (

@@ -3,12 +3,15 @@
 import { useRef, useState, useCallback } from 'react'
 import type { Produto } from '@/src/domain/entities/Produto'
 import type { ModalLancamentoProdutoPainelConfirmPayload, ModalLancamentoProdutoPainelModo } from '../../components/ModalLancamentoProdutoPainel'
-import { aplicarProdutoAtualizadoNasLinhasCarrinho } from '../../produtoCatalogoHelpers'
 import type { ComplementoSelecionado, ProdutoSelecionado } from '../../types'
 import {
   type ComplementosTabsModalState,
 } from '@/src/presentation/components/features/complementos/ComplementosTabsModal'
-import { produtoPermiteAlterarPreco, obterUnidadeMedidaProdutoLinha } from '../../produtoCatalogoHelpers'
+import {
+  aplicarProdutoAtualizadoNasLinhasCarrinho,
+  obterUnidadeMedidaProdutoLinha,
+  produtoPermiteAlterarPreco,
+} from '@/src/domain/policies/pedido/CarrinhoCatalogoPolicy'
 import {
   aplicarQuantidadeComplementoNaLinha,
   aplicarQuantidadeProdutoNaLinha,
