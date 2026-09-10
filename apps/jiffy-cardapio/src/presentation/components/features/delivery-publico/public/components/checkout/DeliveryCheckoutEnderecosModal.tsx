@@ -3,14 +3,21 @@
 import { useState } from 'react'
 import { Home, MapPin, Pencil, Plus, Trash2 } from 'lucide-react'
 import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import { formatarResumoEnderecoPublico } from '../../../shared/utils/garantirEnderecoClientePublico'
 import { etiquetaEnderecoPublicoLabel } from '../../../shared/utils/etiquetaEnderecoPublicoLabel'
+import {
+  calcularDistanciaAproximadaDaLoja,
+  pontoClienteParaDistancia,
+} from '../../../shared/utils/formatarDistanciaAproximadaDaLoja'
 import { DeliveryCheckoutConfirmarRemocaoEnderecoDialog } from './DeliveryCheckoutConfirmarRemocaoEnderecoDialog'
 import { DeliveryCheckoutShellHeader } from './DeliveryCheckoutShell'
+import { DeliveryDistanciaLojaHint } from './DeliveryDistanciaLojaHint'
 
 type DeliveryCheckoutEnderecosModalProps = {
   enderecos: EnderecoClienteDeliveryPublicoDTO[]
   enderecoIdSelecionado: string
+  localizacaoEmpresa?: GeoJsonPoint | null
   onClose: () => void
   onSelecionar: (enderecoId: string) => void
   onUsarNovoEndereco: () => void
@@ -23,6 +30,7 @@ type DeliveryCheckoutEnderecosModalProps = {
 export function DeliveryCheckoutEnderecosModal({
   enderecos,
   enderecoIdSelecionado,
+  localizacaoEmpresa = null,
   onClose,
   onSelecionar,
   onUsarNovoEndereco,
@@ -143,6 +151,12 @@ export function DeliveryCheckoutEnderecosModal({
                   {linha2 ? (
                     <p className="mt-0.5 text-xs delivery-text-secondary">{linha2}</p>
                   ) : null}
+                  <DeliveryDistanciaLojaHint
+                    texto={calcularDistanciaAproximadaDaLoja(
+                      localizacaoEmpresa,
+                      pontoClienteParaDistancia(endereco)
+                    )}
+                  />
                   <p className="sr-only">{formatarResumoEnderecoPublico(endereco)}</p>
                 </div>
               </div>

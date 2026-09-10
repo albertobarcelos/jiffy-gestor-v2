@@ -3,13 +3,19 @@
 import Image from 'next/image'
 import { ClipboardList, MapPin, MessageCircle } from 'lucide-react'
 import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import { abrirWhatsapp, telefoneValidoParaWhatsapp } from '@/src/shared/utils/whatsappLink'
 import type { DeliveryTipoEntrega } from '../../../shared/stores/deliveryPreferenciaEntregaStore'
 import { formatarResumoEnderecoPublico } from '../../../shared/utils/garantirEnderecoClientePublico'
 import {
+  calcularDistanciaAproximadaDaLoja,
+  pontoClienteParaDistancia,
+} from '../../../shared/utils/formatarDistanciaAproximadaDaLoja'
+import {
   DeliveryCheckoutShellFooter,
   DeliveryCheckoutShellHeader,
 } from './DeliveryCheckoutShell'
+import { DeliveryDistanciaLojaHint } from './DeliveryDistanciaLojaHint'
 
 type DeliveryCheckoutSucessoModalProps = {
   nomeCliente: string
@@ -17,6 +23,7 @@ type DeliveryCheckoutSucessoModalProps = {
   modoTempo: 'imediato' | 'agendado'
   enderecoCliente: EnderecoClienteDeliveryPublicoDTO | null
   enderecoEmpresaTexto: string | null
+  localizacaoEmpresa?: GeoJsonPoint | null
   telefoneEmpresa: string | null
   nomeEmpresa: string | null
   codigoVenda: string | null
@@ -35,6 +42,7 @@ export function DeliveryCheckoutSucessoModal({
   modoTempo,
   enderecoCliente,
   enderecoEmpresaTexto,
+  localizacaoEmpresa = null,
   telefoneEmpresa,
   nomeEmpresa,
   codigoVenda,
@@ -54,6 +62,14 @@ export function DeliveryCheckoutSucessoModal({
       ? formatarResumoEnderecoPublico(enderecoCliente)
       : null
     : enderecoEmpresaTexto
+
+  const distanciaLoja =
+    isEntrega && enderecoCliente
+      ? calcularDistanciaAproximadaDaLoja(
+          localizacaoEmpresa,
+          pontoClienteParaDistancia(enderecoCliente)
+        )
+      : null
 
   const podeWhatsapp = telefoneValidoParaWhatsapp(telefoneEmpresa)
   const mensagemWhatsapp = nomeEmpresa
@@ -131,6 +147,7 @@ export function DeliveryCheckoutSucessoModal({
                   <p className="mt-0.5 text-sm font-semibold delivery-text-primary">
                     {enderecoResumo}
                   </p>
+                  <DeliveryDistanciaLojaHint texto={distanciaLoja} />
                 </div>
               </div>
             </div>

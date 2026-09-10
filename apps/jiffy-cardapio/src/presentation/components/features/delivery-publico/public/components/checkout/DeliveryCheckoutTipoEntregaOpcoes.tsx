@@ -3,9 +3,15 @@
 import { useEffect, type ReactNode } from 'react'
 import { Bike, /* Clock, */ MapPin, Plus, RefreshCw, Store } from 'lucide-react'
 import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import type { DeliveryTipoEntrega } from '../../../shared/stores/deliveryPreferenciaEntregaStore'
 import { formatDeliveryCurrency } from '../../../shared/utils/formatDeliveryCurrency'
 import { formatarResumoEnderecoPublico } from '../../../shared/utils/garantirEnderecoClientePublico'
+import {
+  calcularDistanciaAproximadaDaLoja,
+  pontoClienteParaDistancia,
+} from '../../../shared/utils/formatarDistanciaAproximadaDaLoja'
+import { DeliveryDistanciaLojaHint } from './DeliveryDistanciaLojaHint'
 
 export type ModoEntregaOpcao = {
   tipoEntrega: DeliveryTipoEntrega
@@ -21,6 +27,7 @@ type DeliveryCheckoutTipoEntregaOpcoesProps = {
   /** Quantidade de endereços do cliente (para exibir “Trocar endereço”). */
   quantidadeEnderecos?: number
   enderecoEmpresaTexto: string | null
+  localizacaoEmpresa?: GeoJsonPoint | null
   taxaEntregaOficial?: number | null
   cotacaoLoading?: boolean
   cotacaoPronta?: boolean
@@ -140,6 +147,7 @@ export function DeliveryCheckoutTipoEntregaOpcoes({
   temEnderecosCadastrados,
   quantidadeEnderecos = 0,
   enderecoEmpresaTexto,
+  localizacaoEmpresa = null,
   taxaEntregaOficial = null,
   cotacaoLoading = false,
   cotacaoPronta = false,
@@ -275,6 +283,12 @@ export function DeliveryCheckoutTipoEntregaOpcoes({
                         .filter(Boolean)
                         .join(' - ')}
                     </p>
+                    <DeliveryDistanciaLojaHint
+                      texto={calcularDistanciaAproximadaDaLoja(
+                        localizacaoEmpresa,
+                        pontoClienteParaDistancia(enderecoCliente)
+                      )}
+                    />
                     <p className="sr-only">{formatarResumoEnderecoPublico(enderecoCliente)}</p>
                     <TaxaEntregaCardFooter
                       isEntrega={isEntrega}

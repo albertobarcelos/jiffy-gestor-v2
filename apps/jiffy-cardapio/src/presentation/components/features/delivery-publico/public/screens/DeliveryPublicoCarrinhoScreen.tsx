@@ -34,6 +34,7 @@ import { itemSemComplemento } from '../../shared/utils/deliveryCarrinhoItemUtils
 import { formatEmpresaPublicaEndereco } from '../../shared/utils/formatEmpresaPublicaEndereco'
 import { formatDeliveryCurrency } from '../../shared/utils/formatDeliveryCurrency'
 import { isTokenCotacaoExpirado } from '../../shared/utils/deliveryCheckoutCotacaoUtils'
+import { useLocalizacaoEmpresaPublica } from '../../shared/hooks/useLocalizacaoEmpresaPublica'
 import { DeliveryProdutoModal } from '../components/DeliveryProdutoModal'
 import { DeliveryCheckoutFooterActions } from '../components/checkout/DeliveryCheckoutFooterActions'
 import { DeliveryCheckoutIdentifiqueSeModal } from '../components/checkout/DeliveryCheckoutIdentifiqueSeModal'
@@ -166,6 +167,11 @@ export function DeliveryPublicoCarrinhoScreen({
 
   const empresa = catalogQuery.data?.pages[0]?.empresa ?? null
   const enderecoEmpresaTexto = formatEmpresaPublicaEndereco(empresa?.endereco ?? null)
+  const { localizacaoEmpresa } = useLocalizacaoEmpresaPublica(
+    slug,
+    empresa?.endereco ?? null,
+    Boolean(empresa?.endereco)
+  )
 
   const grupos = useMemo(
     () => (catalogQuery.data?.pages ? flattenCatalogoGrupos(catalogQuery.data.pages) : []),
@@ -943,6 +949,7 @@ export function DeliveryPublicoCarrinhoScreen({
             temEnderecosCadastrados={quantidadeEnderecosCliente > 0}
             quantidadeEnderecos={quantidadeEnderecosCliente}
             enderecoEmpresaTexto={enderecoEmpresaTexto}
+            localizacaoEmpresa={localizacaoEmpresa}
             taxaEntregaOficial={taxaEntregaOficial}
             cotacaoLoading={cotacaoLoading}
             cotacaoPronta={cotacaoPronta}
@@ -966,6 +973,7 @@ export function DeliveryPublicoCarrinhoScreen({
           <DeliveryCheckoutEnderecosModal
             enderecos={clienteLookup.cliente?.enderecos ?? []}
             enderecoIdSelecionado={form.enderecoIdSelecionado}
+            localizacaoEmpresa={localizacaoEmpresa}
             onClose={fecharOuRevisao}
             onSelecionar={handleSelecionarEndereco}
             onUsarNovoEndereco={handleUsarNovoEndereco}
@@ -982,6 +990,7 @@ export function DeliveryPublicoCarrinhoScreen({
               form.modoEndereco === 'existente' ? enderecoClienteSelecionado : null
             }
             enderecosCadastrados={clienteLookup.cliente?.enderecos ?? []}
+            localizacaoEmpresa={localizacaoEmpresa}
             onSelecionarEnderecoCadastrado={handleSelecionarEndereco}
             onRemoverEnderecoCadastrado={handleRemoverEnderecoDaLista}
             onChange={updateForm}
@@ -1031,6 +1040,7 @@ export function DeliveryPublicoCarrinhoScreen({
             telefonePaisIso2={form.telefonePaisIso2}
             enderecoCliente={enderecoParaRevisao}
             enderecoEmpresaTexto={enderecoEmpresaTexto}
+            localizacaoEmpresa={localizacaoEmpresa}
             itens={itens}
             total={total}
             subtotalOficial={subtotalOficial}
@@ -1069,6 +1079,7 @@ export function DeliveryPublicoCarrinhoScreen({
             modoTempo={pedidoConfirmado.modoTempo}
             enderecoCliente={pedidoConfirmado.enderecoCliente}
             enderecoEmpresaTexto={pedidoConfirmado.enderecoEmpresaTexto}
+            localizacaoEmpresa={localizacaoEmpresa}
             telefoneEmpresa={empresa?.telefone ?? null}
             nomeEmpresa={empresa?.nomeFantasia ?? null}
             codigoVenda={pedidoConfirmado.codigoVenda}
@@ -1086,6 +1097,7 @@ export function DeliveryPublicoCarrinhoScreen({
             telefonePaisIso2={pedidoConfirmado.telefonePaisIso2}
             enderecoCliente={pedidoConfirmado.enderecoCliente}
             enderecoEmpresaTexto={pedidoConfirmado.enderecoEmpresaTexto}
+            localizacaoEmpresa={localizacaoEmpresa}
             itens={pedidoConfirmado.itens}
             total={pedidoConfirmado.total}
             pagamentos={pedidoConfirmado.pagamentos}

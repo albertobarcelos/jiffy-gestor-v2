@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Pencil, X } from 'lucide-react'
 import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import { showToast } from '@/src/shared/utils/toast'
 import { DeliveryPaisTelefoneSelect } from '../../../shared/components/DeliveryPaisTelefoneSelect'
 import { DELIVERY_PAIS_TELEFONE_PADRAO } from '../../../shared/constants/deliveryPaisesTelefone'
@@ -43,6 +44,7 @@ type DeliveryCheckoutIdentifiqueSeModalProps = {
   temEnderecosCadastrados: boolean
   quantidadeEnderecos?: number
   enderecoEmpresaTexto: string | null
+  localizacaoEmpresa?: GeoJsonPoint | null
   taxaEntregaOficial?: number | null
   cotacaoLoading?: boolean
   cotacaoPronta?: boolean
@@ -77,6 +79,7 @@ export function DeliveryCheckoutIdentifiqueSeModal({
   temEnderecosCadastrados,
   quantidadeEnderecos = 0,
   enderecoEmpresaTexto,
+  localizacaoEmpresa = null,
   taxaEntregaOficial = null,
   cotacaoLoading = false,
   cotacaoPronta = false,
@@ -439,6 +442,7 @@ export function DeliveryCheckoutIdentifiqueSeModal({
             temEnderecosCadastrados={temEnderecosCadastrados}
             quantidadeEnderecos={quantidadeEnderecos}
             enderecoEmpresaTexto={enderecoEmpresaTexto}
+            localizacaoEmpresa={localizacaoEmpresa}
             taxaEntregaOficial={taxaEntregaOficial}
             cotacaoLoading={cotacaoLoading}
             cotacaoPronta={cotacaoPronta}

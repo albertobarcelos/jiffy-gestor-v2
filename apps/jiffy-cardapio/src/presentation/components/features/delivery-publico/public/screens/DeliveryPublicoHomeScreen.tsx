@@ -22,6 +22,7 @@ import {
   useAutoFetchCatalogoGrupos,
   usePublicDeliveryCatalogInfinite,
 } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
+import { useLocalizacaoEmpresaPublica } from '../../shared/hooks/useLocalizacaoEmpresaPublica'
 import { isPublicDeliverySlugNotFound, isEmpresaDeliveryIndisponivel, extrairMensagensPendenciasCatalogo } from '@/src/infrastructure/api/publicDeliveryApi'
 import { DeliveryLojaIndisponivelScreen } from './DeliveryLojaIndisponivelScreen'
 import {
@@ -104,6 +105,9 @@ export function DeliveryPublicoHomeScreen({
   const empresa: EmpresaPublicaDTO | null = data?.pages[0]?.empresa ?? null
   const funcionamento: FuncionamentoPublicoDTO | null = data?.pages[0]?.funcionamento ?? null
   const lojaAberta = funcionamento?.aberta ?? true
+
+  // Aquece cache da geo da loja (1 geocode/sessão) para distância no checkout.
+  useLocalizacaoEmpresaPublica(slug, empresa?.endereco ?? null, Boolean(empresa?.endereco))
 
   const carrinhoItens = useDeliveryCarrinhoItens(slug)
   const carrinhoTotal = useDeliveryCarrinhoTotal(slug)

@@ -34,12 +34,17 @@ import {
 } from '@/src/shared/utils/normalizarTextoEnderecoPublico'
 import { formatarResumoEnderecoPublico } from '../../../shared/utils/garantirEnderecoClientePublico'
 import { etiquetaEnderecoPublicoLabel } from '../../../shared/utils/etiquetaEnderecoPublicoLabel'
+import {
+  calcularDistanciaAproximadaDaLoja,
+  pontoClienteParaDistancia,
+} from '../../../shared/utils/formatarDistanciaAproximadaDaLoja'
 import { useDeliveryBodyScrollLock } from '../../../shared/hooks/useDeliveryBodyScrollLock'
 import { DeliveryCheckoutConfirmarRemocaoEnderecoDialog } from './DeliveryCheckoutConfirmarRemocaoEnderecoDialog'
 import { DeliveryCheckoutConfirmarSairEnderecoDialog } from './DeliveryCheckoutConfirmarSairEnderecoDialog'
 import { DeliveryCheckoutEnderecoMapaModal } from './DeliveryCheckoutEnderecoMapaModal'
 import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
 import { DeliveryCheckoutUppercaseInput } from './DeliveryCheckoutUppercaseInput'
+import { DeliveryDistanciaLojaHint } from './DeliveryDistanciaLojaHint'
 import {
   DeliveryCheckoutShellFooter,
   DeliveryCheckoutShellHeader,
@@ -100,6 +105,8 @@ type DeliveryCheckoutEnderecoFormModalProps = {
   placesBias?: PlacesBias | null
   /** Ao editar endereço existente, hidrata o pin com as coordenadas já salvas. */
   enderecoSalvo?: EnderecoClienteDeliveryPublicoDTO | null
+  /** Coordenada da loja — distância aproximada no card e na lista. */
+  localizacaoEmpresa?: GeoJsonPoint | null
   /** Endereços já cadastrados — exibidos na etapa de busca (novo endereço). */
   enderecosCadastrados?: EnderecoClienteDeliveryPublicoDTO[]
   onSelecionarEnderecoCadastrado?: (enderecoId: string) => void
@@ -138,6 +145,7 @@ export function DeliveryCheckoutEnderecoFormModal({
   onConfirmar,
   placesBias = null,
   enderecoSalvo = null,
+  localizacaoEmpresa = null,
   enderecosCadastrados = [],
   onSelecionarEnderecoCadastrado,
   onRemoverEnderecoCadastrado,
@@ -822,6 +830,10 @@ export function DeliveryCheckoutEnderecoFormModal({
       cardEnderecoPreview.complemento ||
       cardEnderecoPreview.pontoReferencia
   )
+  const distanciaCardPreview = useMemo(
+    () => calcularDistanciaAproximadaDaLoja(localizacaoEmpresa, enderecoLocalizacao),
+    [localizacaoEmpresa, enderecoLocalizacao]
+  )
 
   const formularioOverlay =
     portalReady && formOverlayOpen
@@ -928,6 +940,7 @@ export function DeliveryCheckoutEnderecoFormModal({
                                 .join(' · ')}
                             </p>
                           ) : null}
+                          <DeliveryDistanciaLojaHint texto={distanciaCardPreview} />
                         </div>
                       ) : (
                         <p className="mt-1 text-xs delivery-text-secondary">
@@ -1232,6 +1245,12 @@ export function DeliveryCheckoutEnderecoFormModal({
                         <span className="mt-0.5 block truncate text-xs delivery-text-secondary">
                           {resumo}
                         </span>
+                        <DeliveryDistanciaLojaHint
+                          texto={calcularDistanciaAproximadaDaLoja(
+                            localizacaoEmpresa,
+                            pontoClienteParaDistancia(endereco)
+                          )}
+                        />
                       </span>
                     </button>
                     {onRemoverEnderecoCadastrado ? (

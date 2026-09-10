@@ -18,6 +18,10 @@ import { formatDeliveryCurrency } from '../../../shared/utils/formatDeliveryCurr
 import { formatarTelefoneExibicao } from '../../../shared/utils/deliveryTelefonePais'
 import { calcularTrocoCheckout } from '../../../shared/utils/checkoutPagamentosUtils'
 import { etiquetaEnderecoPublicoLabel } from '../../../shared/utils/etiquetaEnderecoPublicoLabel'
+import {
+  calcularDistanciaAproximadaDaLoja,
+  pontoClienteParaDistancia,
+} from '../../../shared/utils/formatarDistanciaAproximadaDaLoja'
 import { isMeioPagamentoDinheiro } from '../../../shared/utils/isMeioPagamentoDinheiro'
 import { obterIconeMeioPagamento } from '../../../shared/utils/obterIconeMeioPagamento'
 import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
@@ -25,6 +29,8 @@ import {
   DeliveryCheckoutShellFooter,
   DeliveryCheckoutShellHeader,
 } from './DeliveryCheckoutShell'
+import { DeliveryDistanciaLojaHint } from './DeliveryDistanciaLojaHint'
+import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 
 type DeliveryCheckoutRevisaoModalProps = {
   /** `somenteLeitura` = pós-confirmação (sem editar / sem enviar). */
@@ -35,6 +41,7 @@ type DeliveryCheckoutRevisaoModalProps = {
   telefonePaisIso2?: string
   enderecoCliente: EnderecoClienteDeliveryPublicoDTO | null
   enderecoEmpresaTexto: string | null
+  localizacaoEmpresa?: GeoJsonPoint | null
   itens: DeliveryCarrinhoItem[]
   total: number
   subtotalOficial?: number | null
@@ -143,6 +150,7 @@ export function DeliveryCheckoutRevisaoModal({
   telefonePaisIso2 = DELIVERY_PAIS_TELEFONE_PADRAO,
   enderecoCliente,
   enderecoEmpresaTexto,
+  localizacaoEmpresa = null,
   itens,
   total,
   subtotalOficial = null,
@@ -315,6 +323,12 @@ export function DeliveryCheckoutRevisaoModal({
                   .filter(Boolean)
                   .join(' - ')}
               </p>
+              <DeliveryDistanciaLojaHint
+                texto={calcularDistanciaAproximadaDaLoja(
+                  localizacaoEmpresa,
+                  pontoClienteParaDistancia(enderecoCliente)
+                )}
+              />
             </>
           ) : null}
           {isEntrega && !enderecoCliente ? (
