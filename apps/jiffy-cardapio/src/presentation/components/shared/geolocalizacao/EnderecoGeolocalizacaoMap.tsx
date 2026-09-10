@@ -1,7 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useMemo } from 'react'
-import { GoogleMap, Marker, useGoogleMap, useJsApiLoader } from '@react-google-maps/api'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import {
+  GoogleMap,
+  Marker,
+  OverlayView,
+  useGoogleMap,
+  useJsApiLoader,
+} from '@react-google-maps/api'
 import {
   geoJsonPointFromLatLng,
   latLngFromGeoJsonPoint,
@@ -9,9 +15,13 @@ import {
 } from '@/src/shared/types/geoJsonPoint'
 import { getGoogleMapsApiKeyClient } from '@/src/shared/utils/googleMapsClient'
 import { googleMapsLoaderConfig } from '@/src/shared/utils/googleMapsLoader'
-import { criarOpcoesIconePinPreferencia, labelPinPreferenciaMapa } from './geolocalizacaoMapPinIcons'
+import {
+  criarOpcoesIconePinEndereco,
+  criarOpcoesIconePinPreferencia,
+  labelPinPreferenciaMapa,
+} from './geolocalizacaoMapPinIcons'
 
-const MAP_CONTAINER_STYLE = { width: '100%', height: '320px' }
+const MAP_CONTAINER_STYLE_DEFAULT = { width: '100%', height: '320px' }
 
 /** Visão inicial do MT — evita sugerir Cuiabá antes da busca. */
 const FALLBACK_CENTER = { lat: -12.6819, lng: -56.9211 }
@@ -20,16 +30,69 @@ const LOCALIZADO_ZOOM = 17
 
 type LatLng = { lat: number; lng: number }
 
-function MapRecenter({ position, zoom }: { position: LatLng; zoom: number }) {
+/** Centraliza só na abertura — não reposiciona o mapa ao soltar/mover o pin. */
+function MapRecenterInicial({ position, zoom }: { position: LatLng; zoom: number }) {
   const map = useGoogleMap()
+  const jaCentralizou = useRef(false)
 
   useEffect(() => {
-    if (!map) return
+    if (!map || jaCentralizou.current) return
     map.panTo(position)
     map.setZoom(zoom)
+    jaCentralizou.current = true
   }, [map, position.lat, position.lng, zoom])
 
   return null
+}
+
+function BalaoPinArrastar({ texto }: { texto: string }) {
+  return (
+    <div
+      className="pointer-events-none"
+      style={{
+        // OverlayView ancora no canto superior esquerdo do lat/lng —
+        // translate(-50%) centra no pin sem depender da medição do Maps.
+        transform: 'translate(-50%, calc(-100% - 40px))',
+        width: 'max-content',
+        maxWidth: 'none',
+        overflow: 'visible',
+      }}
+    >
+      <div
+        style={{
+          position: 'relative',
+          width: 'max-content',
+          whiteSpace: 'nowrap',
+          backgroundColor: 'var(--delivery-surface, #ffffff)',
+          color: 'var(--delivery-text, #171717)',
+          border: '1px solid var(--delivery-border, #e5e5e5)',
+          borderRadius: 14,
+          padding: '8px 14px',
+          fontSize: 13,
+          fontWeight: 400,
+          lineHeight: 1.3,
+          boxShadow: '0 6px 18px rgba(0,0,0,0.18)',
+        }}
+      >
+        {texto}
+        <span
+          aria-hidden
+          style={{
+            position: 'absolute',
+            left: '50%',
+            top: '100%',
+            width: 0,
+            height: 0,
+            marginLeft: -7,
+            borderLeft: '7px solid transparent',
+            borderRight: '7px solid transparent',
+            borderTop: '7px solid var(--delivery-surface, #ffffff)',
+            filter: 'drop-shadow(0 1px 0 var(--delivery-border, #e5e5e5))',
+          }}
+        />
+      </div>
+    </div>
+  )
 }
 
 export type EnderecoGeolocalizacaoMapProps = {
@@ -51,6 +114,10 @@ export type EnderecoGeolocalizacaoMapProps = {
   pinModo?: 'endereco' | 'preferencia'
   /** Endereço fixo no mapa (vermelho padrão) quando `pinModo` é preferencia. */
   localizacaoReferencia?: GeoJsonPoint | null
+  /** Estilo do container interno do Google Map (ex.: altura fullscreen). */
+  mapContainerStyle?: CSSProperties
+  /** Texto do balão exibido após soltar o pin (fica até confirmar ou arrastar de novo). */
+  balaoArrastarTexto?: string
 }
 
 export function EnderecoGeolocalizacaoMap({
@@ -65,9 +132,18 @@ export function EnderecoGeolocalizacaoMap({
   overlayHintClassName = 'rounded-lg bg-white/95 px-3 py-2 text-center text-xs text-secondary-text shadow-sm',
   pinModo = 'endereco',
   localizacaoReferencia = null,
+  mapContainerStyle,
+  balaoArrastarTexto,
 }: EnderecoGeolocalizacaoMapProps) {
   const apiKey = getGoogleMapsApiKeyClient()
   const { isLoaded, loadError } = useJsApiLoader(googleMapsLoaderConfig(apiKey))
+  const mapStyle = mapContainerStyle ?? MAP_CONTAINER_STYLE_DEFAULT
+  const mapHeight =
+    typeof mapStyle.height === 'number'
+      ? `${mapStyle.height}px`
+      : (mapStyle.height ?? '320px')
+
+  const [mostrarBalaoAposSoltar, setMostrarBalaoAposSoltar] = useState(false)
 
   const posicaoMarcador = useMemo(() => latLngFromGeoJsonPoint(value), [value])
   const posicaoReferencia = useMemo(
@@ -82,9 +158,14 @@ export function EnderecoGeolocalizacaoMap({
     () => (modoPreferencia ? criarOpcoesIconePinPreferencia() : undefined),
     [modoPreferencia, isLoaded]
   )
+  const iconePinEndereco = useMemo(
+    () => (!modoPreferencia ? criarOpcoesIconePinEndereco() : undefined),
+    [modoPreferencia, isLoaded]
+  )
 
-  const centroInicial = posicaoMarcador ?? posicaoReferencia ?? FALLBACK_CENTER
-  const zoomInicial = posicaoMarcador || posicaoReferencia ? LOCALIZADO_ZOOM : FALLBACK_ZOOM
+  // Congela o centro inicial: o `center` controlado do GoogleMap recentralizaria a cada move do pin.
+  const centroInicialRef = useRef(posicaoMarcador ?? posicaoReferencia ?? FALLBACK_CENTER)
+  const zoomInicialRef = useRef(posicaoMarcador || posicaoReferencia ? LOCALIZADO_ZOOM : FALLBACK_ZOOM)
 
   const handlePositionChange = useCallback(
     (lat: number, lng: number) => {
@@ -112,7 +193,13 @@ export function EnderecoGeolocalizacaoMap({
   }
 
   if (!isLoaded) {
-    return <div className="h-[320px] animate-pulse rounded-lg bg-gray-100" aria-hidden />
+    return (
+      <div
+        className="animate-pulse rounded-lg bg-gray-100"
+        style={{ height: mapHeight }}
+        aria-hidden
+      />
+    )
   }
 
   return (
@@ -141,9 +228,9 @@ export function EnderecoGeolocalizacaoMap({
       ) : null}
 
       <GoogleMap
-        mapContainerStyle={MAP_CONTAINER_STYLE}
-        center={centroInicial}
-        zoom={zoomInicial}
+        mapContainerStyle={mapStyle}
+        center={centroInicialRef.current}
+        zoom={zoomInicialRef.current}
         onClick={event => {
           if (!event.latLng) return
           handlePositionChange(event.latLng.lat(), event.latLng.lng())
@@ -152,10 +239,11 @@ export function EnderecoGeolocalizacaoMap({
           streetViewControl: false,
           mapTypeControl: false,
           fullscreenControl: false,
+          gestureHandling: 'greedy',
         }}
       >
         {posicaoMarcador || posicaoReferencia ? (
-          <MapRecenter
+          <MapRecenterInicial
             position={posicaoMarcador ?? posicaoReferencia!}
             zoom={LOCALIZADO_ZOOM}
           />
@@ -172,14 +260,27 @@ export function EnderecoGeolocalizacaoMap({
           <Marker
             position={posicaoMarcador}
             draggable={!disabled}
-            icon={modoPreferencia ? iconePinPreferencia : undefined}
+            icon={modoPreferencia ? iconePinPreferencia : iconePinEndereco}
             title={modoPreferencia ? labelPinPreferenciaMapa() : 'Localização do endereço'}
             zIndex={2}
+            onDragStart={() => {
+              setMostrarBalaoAposSoltar(false)
+            }}
             onDragEnd={event => {
               if (!event.latLng) return
               handlePositionChange(event.latLng.lat(), event.latLng.lng())
+              setMostrarBalaoAposSoltar(true)
             }}
           />
+        ) : null}
+        {balaoArrastarTexto && mostrarBalaoAposSoltar && posicaoMarcador ? (
+          <OverlayView
+            position={posicaoMarcador}
+            mapPaneName={OverlayView.FLOAT_PANE}
+            getPixelPositionOffset={() => ({ x: 0, y: 0 })}
+          >
+            <BalaoPinArrastar texto={balaoArrastarTexto} />
+          </OverlayView>
         ) : null}
       </GoogleMap>
     </div>

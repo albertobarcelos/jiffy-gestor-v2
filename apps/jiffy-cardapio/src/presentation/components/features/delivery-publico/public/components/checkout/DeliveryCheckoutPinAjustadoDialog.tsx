@@ -29,18 +29,33 @@ export function DeliveryCheckoutPinAjustadoDialog({
       : 'O pin foi movido. Está no local correto para a entrega? O endereço escrito não muda.'
 
   return (
-    <div className="fixed inset-0 z-[100] flex overscroll-none items-end justify-center px-4 pb-6 sm:items-center">
+    <div
+      className="delivery-vv-panel z-[130] flex items-center justify-center overscroll-none p-4"
+      style={{
+        // Mesmo recorte do mapa/formulário (direita), sem forçar altura 100%.
+        height: 'calc(var(--delivery-vv-height, 100dvh) * 0.9)',
+        top: 'calc(var(--delivery-vv-offset-top, 0px) + var(--delivery-vv-height, 100dvh) * 0.1)',
+        backgroundColor: 'transparent',
+        pointerEvents: 'none',
+      }}
+    >
       <button
         type="button"
         className="absolute inset-0"
-        style={{ backgroundColor: 'var(--delivery-overlay, rgba(0, 0, 0, 0.55))' }}
+        style={{
+          backgroundColor: 'var(--delivery-overlay, rgba(0, 0, 0, 0.45))',
+          pointerEvents: 'auto',
+        }}
         aria-label="Cancelar"
         onClick={onCancelar}
       />
 
       <div
         className="relative w-full max-w-sm rounded-2xl px-5 pb-5 pt-6 shadow-xl"
-        style={{ backgroundColor: 'var(--delivery-surface, #ffffff)' }}
+        style={{
+          backgroundColor: 'var(--delivery-surface, #ffffff)',
+          pointerEvents: 'auto',
+        }}
         role="dialog"
         aria-modal="true"
         aria-labelledby="delivery-pin-ajustado-titulo"
@@ -73,9 +88,9 @@ export function DeliveryCheckoutPinAjustadoDialog({
           <button
             type="button"
             onClick={onConfirmar}
-            className="min-h-[48px] w-full rounded-xl px-4 py-3 text-sm font-semibold"
+            className="min-h-[48px] w-full rounded-xl px-4 py-3 text-sm font-semibold text-white"
             style={{
-              backgroundColor: 'var(--delivery-primary-dark)',
+              backgroundColor: 'var(--delivery-primary-dark, #171717)',
               color: 'var(--delivery-btn-text, #ffffff)',
             }}
           >
@@ -85,7 +100,10 @@ export function DeliveryCheckoutPinAjustadoDialog({
             type="button"
             onClick={onCancelar}
             className="min-h-[48px] w-full rounded-xl border px-4 py-3 text-sm font-semibold delivery-text-primary"
-            style={{ borderColor: 'var(--delivery-border)' }}
+            style={{
+              borderColor: 'var(--delivery-border)',
+              backgroundColor: 'var(--delivery-surface, #ffffff)',
+            }}
           >
             Cancelar
           </button>

@@ -981,6 +981,9 @@ export function DeliveryPublicoCarrinhoScreen({
             enderecoSalvo={
               form.modoEndereco === 'existente' ? enderecoClienteSelecionado : null
             }
+            enderecosCadastrados={clienteLookup.cliente?.enderecos ?? []}
+            onSelecionarEnderecoCadastrado={handleSelecionarEndereco}
+            onRemoverEnderecoCadastrado={handleRemoverEnderecoDaLista}
             onChange={updateForm}
             onClose={fecharOuRevisao}
             onCancelar={handleCancelarEnderecoForm}
