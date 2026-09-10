@@ -16,6 +16,18 @@ import {
 import { contarItensListaHub } from '@/src/presentation/components/features/delivery/hub/deliveryHubCadastros'
 import { isDeliveryEtapaId } from '@/src/shared/constants/configuracoesRoutes'
 
+const IDS_HUB = [
+  'delivery-geolocalizacao',
+  'delivery-nome-cardapio',
+  'delivery-design',
+  'delivery-agenda',
+  'delivery-cobertura',
+  'delivery-entregadores',
+  'delivery-meios',
+  'delivery-impressoras',
+  'delivery-notificacoes',
+] as const
+
 describe('resumirCoberturaHub', () => {
   it('conta áreas ativas, km do raio e a menor taxa só para exibir', () => {
     const resumo = resumirCoberturaHub(
@@ -66,50 +78,73 @@ describe('contarItensListaHub', () => {
 })
 
 describe('montarPassosHubDelivery', () => {
-  it('lista as etapas do hub de cardápio com cobertura e WhatsApp', () => {
-    const progresso = calcularDeliveryHubProgresso([], true, {
-      possuiGeolocalizacao: true,
-      timezoneConfigurado: true,
-    })
+  it('mantém o hub da main e acrescenta nome, design e agenda', () => {
+    const progresso = calcularDeliveryHubProgresso([], true)
     const passos = montarPassosHubDelivery(progresso)
-    expect(passos.map(passo => passo.id)).toEqual([
-      'delivery-nome-cardapio',
-      'delivery-design',
-      'delivery-agenda',
-      'delivery-cobertura',
-      'delivery-notificacoes',
-    ])
+    expect(passos.map(passo => passo.id)).toEqual([...IDS_HUB])
     expect(passos.filter(passo => passo.obrigatoria).map(passo => passo.id)).toEqual([
+      'delivery-geolocalizacao',
       'delivery-nome-cardapio',
       'delivery-agenda',
       'delivery-cobertura',
     ])
-    expect(passos.every(passo => passo.href === '/configuracoes/empresa-delivery')).toBe(true)
+    expect(passos[0]?.href).toBe('/config/delivery/empresa')
+    expect(passos[1]?.href).toBe('/config/delivery/nome-cardapio')
+    expect(passos[2]?.href).toBe('/config/delivery/design')
+    expect(passos[3]?.href).toBe('/config/delivery/agenda')
+    expect(passos[4]?.href).toBe('/config/delivery/cobertura')
+    expect(passos[5]?.href).toBe('/config/delivery/entregadores')
+    expect(passos[8]?.href).toBe('/config/delivery/notificacoes')
     expect(passos.every(passo => passo.etapaId === passo.id)).toBe(true)
   })
 
-  it('marca WhatsApp concluído só quando o canal está conectado', () => {
-    const progresso = calcularDeliveryHubProgresso([], true, {
-      possuiGeolocalizacao: true,
-      timezoneConfigurado: true,
+  it('não marca etapas recomendadas como concluídas pelo progresso obrigatório', () => {
+    const passos = montarPassosHubDelivery(calcularDeliveryHubProgresso([], true), {
+      empresaDeliveryConfigurada: true,
+      agendaConfigurada: true,
     })
-    const desconectado = montarPassosHubDelivery(progresso).find(
-      passo => passo.id === 'delivery-notificacoes'
+    const recomendados = passos.filter(passo => !passo.obrigatoria)
+    expect(recomendados.map(passo => passo.id)).toEqual([
+      'delivery-design',
+      'delivery-entregadores',
+      'delivery-meios',
+      'delivery-impressoras',
+      'delivery-notificacoes',
+    ])
+    expect(recomendados.filter(passo => passo.id !== 'delivery-design').every(passo => passo.concluido === false)).toBe(
+      true
     )
-    const conectado = montarPassosHubDelivery(progresso, { whatsappConectado: true }).find(
-      passo => passo.id === 'delivery-notificacoes'
-    )
-    expect(desconectado?.concluido).toBe(false)
-    expect(conectado?.concluido).toBe(true)
-    expect(conectado?.cta).toBe('Editar')
+    expect(passos.filter(passo => passo.obrigatoria).every(passo => passo.concluido)).toBe(true)
+  })
+
+  it('marca etapas recomendadas como concluídas só quando há cadastro ou WhatsApp conectado', () => {
+    const progresso = calcularDeliveryHubProgresso([], true)
+    const preenchidos = montarPassosHubDelivery(progresso, {
+      qtdEntregadores: 2,
+      qtdMeiosPagamento: 1,
+      qtdImpressoras: 3,
+      whatsappConectado: true,
+      empresaDeliveryConfigurada: true,
+      agendaConfigurada: true,
+    })
+    const entregadores = preenchidos.find(passo => passo.id === 'delivery-entregadores')
+    const meios = preenchidos.find(passo => passo.id === 'delivery-meios')
+    const impressoras = preenchidos.find(passo => passo.id === 'delivery-impressoras')
+    const notificacoes = preenchidos.find(passo => passo.id === 'delivery-notificacoes')
+    expect(entregadores?.concluido).toBe(true)
+    expect(meios?.concluido).toBe(true)
+    expect(impressoras?.concluido).toBe(true)
+    expect(notificacoes?.concluido).toBe(true)
+    expect([entregadores, meios, impressoras, notificacoes].every(passo => passo?.cta === 'Editar')).toBe(true)
   })
 })
 
 describe('DELIVERY_HUB_ETAPAS', () => {
-  it('expõe cinco etapas do cardápio, cobertura e WhatsApp', () => {
-    expect(DELIVERY_HUB_ETAPAS.map(etapa => etapa.step)).toEqual([1, 2, 3, 4, 5])
+  it('expõe as seis etapas da main mais nome, design e agenda', () => {
+    expect(DELIVERY_HUB_ETAPAS.map(etapa => etapa.step)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9])
+    expect(getDeliveryEtapaById('delivery-meios')?.label).toBe('Pagamento')
     expect(getDeliveryEtapaById('delivery-nome-cardapio')?.label).toBe('Nome e cardápio')
-    expect(getDeliveryEtapaById('delivery-cobertura')?.component).toBeTypeOf('function')
+    expect(getDeliveryEtapaById('delivery-impressoras')?.component).toBeTypeOf('function')
     expect(getDeliveryEtapaById('delivery-notificacoes')?.label).toBe('WhatsApp')
     expect(getDeliveryEtapaById('delivery-notificacoes')?.obrigatoria).toBe(false)
     expect(getDeliveryEtapaById('delivery-hub')).toBeUndefined()
@@ -117,8 +152,9 @@ describe('DELIVERY_HUB_ETAPAS', () => {
 
   it('reconhece o hub e as etapas internas como abas do Delivery', () => {
     expect(isDeliveryTabId(DELIVERY_HUB_TAB_ID)).toBe(true)
-    expect(isDeliveryTabId('delivery-cobertura')).toBe(true)
-    expect(isDeliveryEtapaId('delivery-notificacoes')).toBe(true)
+    expect(isDeliveryTabId('delivery-entregadores')).toBe(true)
+    expect(isDeliveryEtapaId('delivery-impressoras')).toBe(true)
+    expect(isDeliveryEtapaId('delivery-nome-cardapio')).toBe(true)
     expect(isDeliveryTabId('delivery-notificacoes')).toBe(true)
     expect(isDeliveryTabId(null)).toBe(false)
     expect(isDeliveryTabId('empresa')).toBe(false)
@@ -167,6 +203,28 @@ describe('preview do hub', () => {
       ).map(fato => fato.texto)
     ).toEqual(['0 áreas configuradas', 'Raio ainda não definido'])
     expect(ctaPrimarioPreviewHub(cobertura!)).toBe('Editar áreas de entrega')
+  })
+
+  it('mostra no cartão a quantidade cadastrada das etapas recomendadas', () => {
+    const progresso = calcularDeliveryHubProgresso([], false)
+    const extras = { qtdEntregadores: 2, qtdMeiosPagamento: 1, qtdImpressoras: 0 }
+    const passos = montarPassosHubDelivery(progresso, extras)
+    const entregadores = passos.find(passo => passo.id === 'delivery-entregadores')
+    const meios = passos.find(passo => passo.id === 'delivery-meios')
+    const impressoras = passos.find(passo => passo.id === 'delivery-impressoras')
+    const resumoVazio = { qtdAreas: 0, raioMaximoKm: null, taxaMinima: null }
+    expect(fatosPreviewHub(entregadores!, resumoVazio, null, null, extras)).toEqual([
+      { id: 'entregadores', texto: '2 entregadores cadastrados' },
+    ])
+    expect(ctaPrimarioPreviewHub(entregadores!)).toBe('Editar entregadores')
+    expect(fatosPreviewHub(meios!, resumoVazio, null, null, extras)).toEqual([
+      { id: 'meios', texto: '1 meio de pagamento cadastrado' },
+    ])
+    expect(ctaPrimarioPreviewHub(meios!)).toBe('Editar meios de pagamento')
+    expect(fatosPreviewHub(impressoras!, resumoVazio, null, null, extras)).toEqual([
+      { id: 'impressoras', texto: 'Nenhuma impressora cadastrada' },
+    ])
+    expect(ctaPrimarioPreviewHub(impressoras!)).toBe('Ver e editar')
   })
 
   it('mostra no cartão se o WhatsApp está conectado e o CTA correspondente', () => {

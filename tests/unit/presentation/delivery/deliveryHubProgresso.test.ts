@@ -1,17 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { calcularDeliveryHubProgresso } from '@/src/presentation/components/features/delivery/hub/deliveryHubProgresso'
 import { EMPRESA_DELIVERY_PENDENCIA_TYPES } from '@/src/shared/constants/empresaDeliveryPendencias'
-import { configuracoesTabPath } from '@/src/shared/constants/configuracoesRoutes'
 
 describe('calcularDeliveryHubProgresso', () => {
-  it('sem empresa, nome/agenda/cobertura ficam incompletos', () => {
+  it('trata geo e cobertura iguais quando a API não envia pendências', () => {
     const semEmpresa = calcularDeliveryHubProgresso([], false)
-    const ids = semEmpresa.passosObrigatorios
-      .filter(passo => !passo.concluido)
-      .map(passo => passo.id)
-    expect(ids).toEqual(
-      expect.arrayContaining(['delivery-nome-cardapio', 'delivery-agenda', 'delivery-cobertura'])
-    )
+    expect(semEmpresa.passos.every(passo => passo.concluido === false)).toBe(true)
+
+    const comEmpresa = calcularDeliveryHubProgresso([], true)
+    expect(comEmpresa.passos.every(passo => passo.concluido === true)).toBe(true)
   })
 
   it('marca só o passo com pendência explícita', () => {
@@ -22,14 +19,16 @@ describe('calcularDeliveryHubProgresso', () => {
           message: 'Cobertura ausente',
         },
       ],
-      true,
-      { possuiGeolocalizacao: true, timezoneConfigurado: true }
+      true
     )
 
     const geo = progresso.passos.find(passo => passo.id === 'delivery-geolocalizacao')
     const cobertura = progresso.passos.find(passo => passo.id === 'delivery-cobertura')
     expect(geo?.concluido).toBe(true)
     expect(cobertura?.concluido).toBe(false)
+    expect(progresso.concluidosObrigatorios).toBe(1)
+    expect(progresso.totalObrigatorios).toBe(2)
+    expect(progresso.porcentagemObrigatorias).toBe(50)
   })
 
   it('marca geo incompleta quando a pendência é de pin', () => {
@@ -40,13 +39,13 @@ describe('calcularDeliveryHubProgresso', () => {
           message: 'Pin ausente',
         },
       ],
-      true,
-      { possuiGeolocalizacao: false, timezoneConfigurado: true }
+      true
     )
     const geo = progresso.passos.find(passo => passo.id === 'delivery-geolocalizacao')
     const cobertura = progresso.passos.find(passo => passo.id === 'delivery-cobertura')
     expect(geo?.concluido).toBe(false)
     expect(cobertura?.concluido).toBe(true)
-    expect(geo?.href).toBe(`${configuracoesTabPath('empresa')}#geolocalizacao-empresa`)
+    expect(geo?.href).toBe('/config/delivery/empresa')
+    expect(cobertura?.href).toBe('/config/delivery/cobertura')
   })
 })

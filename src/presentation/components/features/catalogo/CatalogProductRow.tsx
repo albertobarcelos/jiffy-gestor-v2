@@ -32,7 +32,7 @@ export interface CatalogProductRowProps {
   isSavingImage?: boolean
   isSavingNome?: boolean
   onNomeChange?: (id: string, nome: string) => void | boolean | Promise<void | boolean>
-  onValorChange: (id: string, valor: number) => void | boolean | Promise<void | boolean>
+  onValorChange?: (id: string, valor: number) => void | boolean | Promise<void | boolean>
   onSwitchToggle: (id: string, status: boolean) => void
   onEdit: (id: string) => void
   onRemove?: (id: string) => void
@@ -69,6 +69,7 @@ function CatalogProductRowInner({
   const pausadoNoMenu = isMenu && !ativo
   const podeTrocarImagem = Boolean(onChangeImage)
   const podeEditarNome = Boolean(onNomeChange)
+  const podeEditarValor = Boolean(onValorChange)
 
   const abrirSeletorImagem = () => {
     if (isSavingImage) return
@@ -251,10 +252,7 @@ function CatalogProductRowInner({
         {isMenu ? (
           <div className="hidden min-w-0 md:block" aria-hidden />
         ) : categoriaSlot ? (
-          <div
-            className="min-w-0 justify-self-start max-md:col-span-2 md:col-span-1"
-            onClick={e => e.stopPropagation()}
-          >
+          <div className="min-w-0 justify-self-start max-md:col-span-2 md:col-span-1">
             {categoriaSlot}
           </div>
         ) : (
@@ -267,11 +265,13 @@ function CatalogProductRowInner({
             isMenu ? 'max-md:col-span-2' : 'max-md:col-span-2'
           )}
         >
-          <ProdutoValorInput
-            valor={valor}
-            disabled={isSavingValor}
-            onCommit={novoValor => onValorChange(id, novoValor)}
-          />
+          {podeEditarValor && onValorChange ? (
+            <ProdutoValorInput
+              valor={valor}
+              disabled={isSavingValor}
+              onCommit={novoValor => onValorChange(id, novoValor)}
+            />
+          ) : null}
           {isMenu ? (
             <MenuProdutoPauseControl
               isAtivo={ativo}

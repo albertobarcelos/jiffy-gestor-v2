@@ -1,7 +1,4 @@
-import {
-  configuracoesTabPath,
-  deliveryHubEtapaPath,
-} from '@/src/shared/constants/configuracoesRoutes'
+import { deliveryHubEtapaPath } from '@/src/shared/constants/configuracoesRoutes'
 
 export const EMPRESA_DELIVERY_PENDENCIA_TYPES = {
   EMPRESA_DELIVERY_NAO_CONFIGURADA: 'EMPRESA_DELIVERY_NAO_CONFIGURADA',
@@ -37,13 +34,13 @@ const ACAO_POR_TIPO: Partial<Record<EmpresaDeliveryPendenciaType, PendenciaAcao>
     label: 'Configurar nome e cardápio',
     href: deliveryHubEtapaPath('delivery-nome-cardapio'),
   },
-  [EMPRESA_DELIVERY_PENDENCIA_TYPES.GEOLOCALIZACAO_NAO_CONFIGURADA]: {
-    label: 'Configurar na aba Empresa',
-    href: `${configuracoesTabPath('empresa')}#geolocalizacao-empresa`,
-  },
   [EMPRESA_DELIVERY_PENDENCIA_TYPES.CARDAPIO_DELIVERY_NAO_CONFIGURADO]: {
     label: 'Selecionar cardápio',
     href: deliveryHubEtapaPath('delivery-nome-cardapio'),
+  },
+  [EMPRESA_DELIVERY_PENDENCIA_TYPES.GEOLOCALIZACAO_NAO_CONFIGURADA]: {
+    label: 'Definir pin na cobertura de entrega',
+    href: deliveryHubEtapaPath('delivery-cobertura'),
   },
   [EMPRESA_DELIVERY_PENDENCIA_TYPES.COBERTURA_NAO_CONFIGURADA]: {
     label: 'Configurar cobertura de entrega',
@@ -55,7 +52,7 @@ const ACAO_POR_TIPO: Partial<Record<EmpresaDeliveryPendenciaType, PendenciaAcao>
   },
   [EMPRESA_DELIVERY_PENDENCIA_TYPES.TIMEZONE_NAO_CONFIGURADO]: {
     label: 'Configurar fuso na aba Empresa',
-    href: configuracoesTabPath('empresa'),
+    href: deliveryHubEtapaPath('delivery-geolocalizacao'),
   },
   [EMPRESA_DELIVERY_PENDENCIA_TYPES.CANAL_WHATSAPP_NAO_CONECTADO]: {
     label: 'Conectar WhatsApp',
@@ -84,10 +81,6 @@ export function filtrarPendenciasOrientacao(
   return (pendencias ?? []).filter(item => item.obrigatoria === false)
 }
 
-/**
- * Loja pública liberada quando `available === true`.
- * Fallback legado (sem campo): bloqueia se houver pendência obrigatória.
- */
 export function lojaDeliveryDisponivel(
   input: EmpresaDeliveryDisponibilidadeInput | null | undefined
 ): boolean {

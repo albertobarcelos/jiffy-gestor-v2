@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 
 import { useProdutosInfinite } from '@/src/presentation/hooks/useProdutos'
+import { useEmpresaMenuUnico } from '@/src/presentation/hooks/menus/useEmpresaMenuUnico'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
 import { useProdutoPatchMutation, isSavingOf } from '@/src/presentation/hooks/useProdutoPatchMutation'
@@ -56,6 +57,9 @@ export function ProdutosList() {
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const isMobile = useIsMobile()
+  const { isMenuUnico } = useEmpresaMenuUnico()
+  /** Com 1 menu, cadastro base = cardápio: preço e edição rápida na lista. Com vários, preço só nos menus. */
+  const edicaoRapidaNaLista = isMenuUnico
 
   const { state: filters, actions, queryParams, filterStatus } = useProdutosFilters()
 
@@ -479,9 +483,9 @@ export function ProdutosList() {
                   isSavingStatus={isSavingOf(patchMutation, produto.getId(), 'status')}
                   isSavingNome={isSavingOf(patchMutation, produto.getId(), 'nome')}
                   isSavingGrupo={isSavingOf(patchMutation, produto.getId(), 'grupo')}
-                  onNomeChange={handleNomeChange}
-                  onValorChange={handleValorChange}
-                  onGrupoChange={handleGrupoChange}
+                  onNomeChange={edicaoRapidaNaLista ? handleNomeChange : undefined}
+                  onValorChange={edicaoRapidaNaLista ? handleValorChange : undefined}
+                  onGrupoChange={edicaoRapidaNaLista ? handleGrupoChange : undefined}
                   onSwitchToggle={handleStatusToggle}
                   onToggleBoolean={handleToggleBooleanField}
                   onEditProduto={handleEditProduto}

@@ -1,24 +1,16 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
-import { buildTenantQueryKey } from '@/src/presentation/hooks/useInvalidateTenantQueries'
-import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
-import { EMPRESA_DELIVERY_ME_QUERY_KEY } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { CidadeAutocomplete } from '@/src/presentation/components/ui/cidade-autocomplete'
 import { Input } from '@/src/presentation/components/ui/input'
-import { UppercaseLocaleInput } from '@/src/presentation/components/ui/UppercaseLocaleInput'
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
 import { MenuItem } from '@mui/material'
 import { LogoImpressaoCropModal } from '../LogoImpressaoCropModal'
-import { MenuParametroEmpresaSelect } from '../MenuParametroEmpresaSelect'
-import { lerMenuIdDeParametroEmpresa } from '@/src/shared/utils/parametroEmpresaMenus'
-import { EmpresaGeolocalizacaoSection } from '../EmpresaGeolocalizacaoSection'
 import { EnderecoPlacesAutocomplete } from '@/src/presentation/components/shared/geolocalizacao/EnderecoPlacesAutocomplete'
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import {
@@ -31,6 +23,10 @@ import {
   type PlaceDetailsResult,
 } from '@/src/shared/utils/geolocalizacaoPlaces'
 import { formatarCepMascara } from '@/src/shared/utils/consultaCep'
+import {
+  LOGO_IMPRESSAO_HEIGHT,
+  LOGO_IMPRESSAO_WIDTH,
+} from '@/src/presentation/utils/logoImpressaoCrop'
 
 /** Labels outlined — alinhado a NovoMeioPagamento / EditarTerminais */
 const sxOutlinedLabelTextoEscuro = {
@@ -61,12 +57,6 @@ const entradaCompactaSelect = {
 
 const sxEntradaEmpresa = {
   ...sxOutlinedLabelTextoEscuro,
-  marginTop: 0,
-  marginBottom: 0,
-  '& .MuiFormControl-root': {
-    marginTop: 0,
-    marginBottom: 0,
-  },
   '& .MuiOutlinedInput-root': {
     backgroundColor: 'transparent',
     borderRadius: '8px',
@@ -137,24 +127,17 @@ const FUSOS_IANA_BRASIL = [
 const MAX_LOGO_IMPRESSAO_BYTES = 1024 * 1024
 const LOGO_IMPRESSAO_ACCEPT = 'image/png,image/jpeg,image/webp'
 
-/** Pré-visualização — altura alinhada ao bloco de dados básicos (grid stretch no desktop). */
-function LogoImpressaoPreviewImage({
-  src,
-  alt,
-  className,
-}: {
-  src: string
-  alt: string
-  className?: string
-}) {
+/** Moldura 280×150 — `object-contain` evita distorção; largura fixa no desktop. */
+function LogoImpressaoPreviewImage({ src, alt }: { src: string; alt: string }) {
   return (
     <div
-      className={`relative min-h-0 w-full flex-1 overflow-hidden rounded-sm bg-white max-h-[140px] lg:max-h-none ${className ?? ''}`}
+      className="w-full overflow-hidden rounded-sm bg-white"
+      style={{ aspectRatio: `${LOGO_IMPRESSAO_WIDTH} / ${LOGO_IMPRESSAO_HEIGHT}` }}
     >
       <img
         src={src}
         alt={alt}
-        className="absolute inset-0 h-full w-full object-contain object-center"
+        className="block h-full w-full object-contain object-center"
         draggable={false}
       />
     </div>
@@ -163,18 +146,10 @@ function LogoImpressaoPreviewImage({
 
 const LOGO_COLUNA_LARGURA_CLASS = 'w-full shrink-0 lg:w-[280px]'
 
-function snapshotEnderecoGeocode(input: EnderecoEmpresaGeocodeInput): string {
-  return [input.rua, input.numero, input.bairro, input.cidade, input.estado, input.cep]
-    .map(valor => valor?.trim().toLocaleUpperCase('pt-BR') ?? '')
-    .join('|')
-}
-
 /**
  * Tab de Empresa - Edição de dados da empresa
  */
 export function EmpresaTab() {
-  const queryClient = useQueryClient()
-  const tenantEmpresaId = useTenantEmpresaId()
   const [empresa, setEmpresa] = useState<Cliente | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
@@ -197,11 +172,8 @@ export function EmpresaTab() {
   const [enderecoLocalizacao, setEnderecoLocalizacao] = useState<GeoJsonPoint | null>(null)
   const [providerEnderecoId, setProviderEnderecoId] = useState<string | null>(null)
   const [buscaPlacesEmpresa, setBuscaPlacesEmpresa] = useState('')
-  const enderecoGeoSnapshotRef = useRef('')
   /** Valor exibido no select (IANA); vem de `parametroEmpresa.timezone` no GET /empresas/me. */
   const [timezone, setTimezone] = useState('')
-  /** Menu usado nas vendas do gestor (`parametroEmpresa.menuVendaGestorId`). */
-  const [menuVendaGestorId, setMenuVendaGestorId] = useState<string | null>(null)
   /** Snapshot de `parametroEmpresa` para PATCH preservar tipos impressão/cobrança etc. */
   const [parametroEmpresaDraft, setParametroEmpresaDraft] = useState<Record<string, unknown>>({})
 
@@ -238,21 +210,6 @@ export function EmpresaTab() {
     [rua, numero, bairro, cidade, estado, cep, complemento]
   )
 
-  const enderecoAlteradoParaGeo = useMemo(() => {
-    if (!enderecoGeoSnapshotRef.current) return false
-    return snapshotEnderecoGeocode(enderecoGeocodeInput) !== enderecoGeoSnapshotRef.current
-  }, [enderecoGeocodeInput])
-
-  const handleLocalizacaoChange = useCallback(
-    (point: GeoJsonPoint | null, meta?: { providerEnderecoId?: string | null }) => {
-      setEnderecoLocalizacao(point)
-      if (meta?.providerEnderecoId !== undefined) {
-        setProviderEnderecoId(meta.providerEnderecoId)
-      }
-    },
-    []
-  )
-
   const aplicarPlaceDetailsEmpresa = useCallback((place: PlaceDetailsResult) => {
     const fields = placeDetailsParaEnderecoGeocode(place)
     if (fields.rua) setRua(maiusculasPt(fields.rua))
@@ -269,7 +226,7 @@ export function EmpresaTab() {
     setBuscaPlacesEmpresa(
       [fields.rua, fields.numero].filter(Boolean).join(', ') || place.enderecoFormatado || ''
     )
-    showToast.success('Endereço aplicado. Confira o pin no mapa e salve a empresa.')
+    showToast.success('Endereço aplicado. Salve a empresa. O pin da loja é definido na cobertura.')
   }, [])
 
   useEffect(() => {
@@ -424,11 +381,9 @@ export function EmpresaTab() {
             (typeof pe.timeZone === 'string' && pe.timeZone) ||
             ''
           setTimezone(String(tz).trim())
-          setMenuVendaGestorId(lerMenuIdDeParametroEmpresa(pe, 'menuVendaGestorId'))
         } else {
           setParametroEmpresaDraft({})
           setTimezone('')
-          setMenuVendaGestorId(null)
         }
 
         try {
@@ -443,47 +398,24 @@ export function EmpresaTab() {
           setTelefone(maiusculasPt(empresaData.getTelefone() || ''))
 
           const endereco = empresaData.getEndereco()
-          const enderecoRaw =
-            raw.endereco && typeof raw.endereco === 'object' && !Array.isArray(raw.endereco)
-              ? (raw.endereco as Record<string, unknown>)
-              : null
-          const ruaCarregada = String(
-            endereco?.rua ?? enderecoRaw?.rua ?? enderecoRaw?.logradouro ?? ''
-          )
-          const cepCarregado = String(endereco?.cep ?? enderecoRaw?.cep ?? '')
+          if (endereco) {
+            setCep(maiusculasPt(endereco.cep || ''))
+            setRua(maiusculasPt(endereco.rua || ''))
+            setNumero(maiusculasPt(endereco.numero || ''))
+            setComplemento(maiusculasPt(endereco.complemento || ''))
+            setBairro(maiusculasPt(endereco.bairro || ''))
+            setCidade(maiusculasPt(endereco.cidade || ''))
+            setEstado(endereco.estado || '')
 
-          if (endereco || enderecoRaw) {
-            setCep(maiusculasPt(cepCarregado || ''))
-            setRua(maiusculasPt(ruaCarregada || ''))
-            setNumero(maiusculasPt(String(endereco?.numero ?? enderecoRaw?.numero ?? '')))
-            setComplemento(
-              maiusculasPt(String(endereco?.complemento ?? enderecoRaw?.complemento ?? ''))
-            )
-            setBairro(maiusculasPt(String(endereco?.bairro ?? enderecoRaw?.bairro ?? '')))
-            setCidade(maiusculasPt(String(endereco?.cidade ?? enderecoRaw?.cidade ?? '')))
-            setEstado(String(endereco?.estado ?? enderecoRaw?.estado ?? ''))
-
-            enderecoGeoSnapshotRef.current = snapshotEnderecoGeocode({
-              rua: ruaCarregada || '',
-              numero: String(endereco?.numero ?? enderecoRaw?.numero ?? ''),
-              bairro: String(endereco?.bairro ?? enderecoRaw?.bairro ?? ''),
-              cidade: String(endereco?.cidade ?? enderecoRaw?.cidade ?? ''),
-              estado: String(endereco?.estado ?? enderecoRaw?.estado ?? ''),
-              cep: cepCarregado || '',
-            })
-
-            const cidadeCarregada = String(endereco?.cidade ?? enderecoRaw?.cidade ?? '')
-            const estadoCarregado = String(endereco?.estado ?? enderecoRaw?.estado ?? '')
-
-            if (cidadeCarregada && estadoCarregado) {
-              ultimaCidadeBuscada.current = cidadeCarregada
-              buscarCodigoIbge(cidadeCarregada, estadoCarregado)
+            // Carregar código IBGE se cidade e estado estiverem preenchidos
+            if (endereco.cidade && endereco.estado) {
+              const cidade = endereco.cidade
+              ultimaCidadeBuscada.current = cidade
+              buscarCodigoIbge(cidade, endereco.estado)
             } else {
               setCodigoCidadeIbge(null)
               ultimaCidadeBuscada.current = ''
             }
-          } else {
-            enderecoGeoSnapshotRef.current = ''
           }
 
           const { enderecoLocalizacao: geoSalva, providerEnderecoId: providerSalvo } =
@@ -858,7 +790,6 @@ export function EmpresaTab() {
         } else {
           delete parametroEmpresa.timezone
         }
-        parametroEmpresa.menuVendaGestorId = menuVendaGestorId
         if (Object.keys(parametroEmpresa).length > 0) {
           body.parametroEmpresa = parametroEmpresa
         }
@@ -884,16 +815,7 @@ export function EmpresaTab() {
         }
 
         setIsEditing(false)
-        enderecoGeoSnapshotRef.current = snapshotEnderecoGeocode(enderecoGeocodeInput)
         await loadEmpresa()
-        if (tenantEmpresaId) {
-          void queryClient.invalidateQueries({
-            queryKey: buildTenantQueryKey(tenantEmpresaId, EMPRESA_DELIVERY_ME_QUERY_KEY),
-          })
-        }
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new Event('jiffy:empresa-me-updated'))
-        }
         showToast.success('Empresa atualizada com sucesso!')
       } catch (error) {
         console.error('Erro ao salvar empresa:', error)
@@ -960,7 +882,7 @@ export function EmpresaTab() {
         <div className="space-y-2 bg-info px-1 md:px-[18px]">
           {/* Dados Básicos + Logo (títulos na mesma linha em desktop) */}
           <div>
-            <div className="mb-1 flex flex-col gap-1 lg:flex-row lg:items-baseline lg:gap-4">
+            <div className="mb-2 flex flex-col gap-1 lg:flex-row lg:items-baseline lg:gap-4">
               <h4 className="min-w-0 flex-1 text-lg font-semibold text-primary">
                 Dados Básicos
               </h4>
@@ -970,37 +892,37 @@ export function EmpresaTab() {
                 Logo de impressão
               </h4>
             </div>
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-stretch">
-              <div className="min-w-0 space-y-4">
-                <UppercaseLocaleInput
+            <div className="flex flex-col gap-7 lg:flex-row lg:items-start">
+              <div className="min-w-0 flex-1 space-y-7">
+                <Input
                   label="CNPJ"
                   value={cnpj}
-                  onValueChange={setCnpj}
+                  onChange={e => setCnpj(maiusculasPt(e.target.value))}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}
                 />
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <UppercaseLocaleInput
+                <div className="grid grid-cols-1 gap-7 md:grid-cols-2">
+                  <Input
                     label="Razão Social"
                     value={razaoSocial}
-                    onValueChange={setRazaoSocial}
+                    onChange={e => setRazaoSocial(maiusculasPt(e.target.value))}
                     disabled={!isEditing}
                     size="small"
                     sx={sxEntradaEmpresa}
                   />
-                  <UppercaseLocaleInput
+                  <Input
                     label="Nome Fantasia"
                     value={nomeFantasia}
-                    onValueChange={setNomeFantasia}
+                    onChange={e => setNomeFantasia(maiusculasPt(e.target.value))}
                     disabled={!isEditing}
                     size="small"
                     sx={sxEntradaEmpresa}
                   />
-                  <UppercaseLocaleInput
+                  <Input
                     label="Telefone"
                     value={telefone}
-                    onValueChange={setTelefone}
+                    onChange={e => setTelefone(maiusculasPt(e.target.value))}
                     disabled={!isEditing}
                     size="small"
                     sx={sxEntradaEmpresa}
@@ -1017,7 +939,7 @@ export function EmpresaTab() {
                 </div>
               </div>
 
-              <div className={`${LOGO_COLUNA_LARGURA_CLASS} flex min-h-0 flex-col`}>
+              <div className={LOGO_COLUNA_LARGURA_CLASS}>
                 <input
                   ref={logoFileInputRef}
                   type="file"
@@ -1049,10 +971,10 @@ export function EmpresaTab() {
                     setLogoDragActive(false)
                     handleLogoFileInput(e.dataTransfer.files)
                   }}
-                  className={`relative flex h-full min-h-[132px] flex-col overflow-hidden rounded-lg border-2 border-dashed transition-colors ${
+                  className={`relative flex w-full flex-col overflow-hidden rounded-lg border-2 border-dashed transition-colors ${
                     pendingLogoPreviewUrl || serverLogoObjectUrl
                       ? 'p-1.5'
-                      : ''
+                      : 'min-h-[150px]'
                   } ${
                     logoDragActive
                       ? 'border-primary bg-primary/10'
@@ -1060,8 +982,8 @@ export function EmpresaTab() {
                   } ${logoBusy ? 'pointer-events-none opacity-60' : ''}`}
                 >
                   {pendingLogoPreviewUrl ? (
-                    <div className="relative flex min-h-0 flex-1 flex-col gap-1">
-                      <div className="relative flex min-h-0 flex-1 flex-col">
+                    <div className="relative flex w-full flex-col gap-1">
+                      <div className="relative w-full">
                         <button
                           type="button"
                           title="Descartar alteração"
@@ -1079,7 +1001,7 @@ export function EmpresaTab() {
                           alt="Pré-visualização da logo de impressão"
                         />
                       </div>
-                      <div className="flex shrink-0 flex-wrap items-center justify-center gap-1">
+                      <div className="flex flex-wrap items-center justify-center gap-1 mt-2">
                         <button
                           type="button"
                           onClick={e => {
@@ -1158,8 +1080,8 @@ export function EmpresaTab() {
                       </div>
                     </div>
                   ) : serverLogoObjectUrl ? (
-                    <div className="relative flex min-h-0 flex-1 flex-col gap-1">
-                      <div className="relative flex min-h-0 flex-1 flex-col">
+                    <div className="relative flex w-full flex-col gap-1">
+                      <div className="relative w-full">
                         <button
                           type="button"
                           title="Remover logo de impressão"
@@ -1177,7 +1099,7 @@ export function EmpresaTab() {
                           alt="Logo de impressão atual"
                         />
                       </div>
-                      <div className="flex shrink-0 flex-wrap items-center justify-center gap-1">
+                      <div className="flex flex-wrap items-center justify-center gap-1">
                         <button
                           type="button"
                           onClick={e => {
@@ -1205,7 +1127,7 @@ export function EmpresaTab() {
                         if (logoBusy) return
                         logoFileInputRef.current?.click()
                       }}
-                      className={`flex min-h-0 flex-1 cursor-pointer flex-col items-center justify-center gap-1 px-2 py-2 text-center hover:border-primary/50 ${
+                      className={`flex min-h-[150px] cursor-pointer flex-col items-center justify-center gap-1 px-2 py-3 text-center hover:border-primary/50 ${
                         logoBusy ? 'pointer-events-none cursor-not-allowed' : ''
                       }`}
                     >
@@ -1226,8 +1148,8 @@ export function EmpresaTab() {
 
           {/* Endereço */}
           <div>
-            <h4 className="mb-1 text-lg font-semibold text-primary">Endereço</h4>
-            <div className="space-y-3">
+            <h4 className="mb-2 text-lg font-semibold text-primary">Endereço</h4>
+            <div className="space-y-6">
               {isEditing ? (
                 <EnderecoPlacesAutocomplete
                   variant="gestor"
@@ -1241,20 +1163,20 @@ export function EmpresaTab() {
               ) : null}
 
               {/* Linha 1: CEP + Rua */}
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <UppercaseLocaleInput
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <Input
                   label="CEP"
                   value={cep}
-                  onValueChange={setCep}
+                  onChange={e => setCep(maiusculasPt(e.target.value))}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}
                 />
                 <div className="md:col-span-2">
-                  <UppercaseLocaleInput
+                  <Input
                     label="Rua"
                     value={rua}
-                    onValueChange={setRua}
+                    onChange={e => setRua(maiusculasPt(e.target.value))}
                     disabled={!isEditing}
                     size="small"
                     sx={sxEntradaEmpresa}
@@ -1263,27 +1185,27 @@ export function EmpresaTab() {
               </div>
 
               {/* Linha 2: Número, Complemento e Bairro */}
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <UppercaseLocaleInput
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <Input
                   label="Número"
                   value={numero}
-                  onValueChange={setNumero}
+                  onChange={e => setNumero(maiusculasPt(e.target.value))}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}
                 />
-                <UppercaseLocaleInput
+                <Input
                   label="Complemento"
                   value={complemento}
-                  onValueChange={setComplemento}
+                  onChange={e => setComplemento(maiusculasPt(e.target.value))}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}
                 />
-                <UppercaseLocaleInput
+                <Input
                   label="Bairro"
                   value={bairro}
-                  onValueChange={setBairro}
+                  onChange={e => setBairro(maiusculasPt(e.target.value))}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}
@@ -1291,7 +1213,7 @@ export function EmpresaTab() {
               </div>
 
               {/* Linha 3: Estado + Cidade + Fuso horário (IANA) */}
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <Input
                   select
                   label="Estado"
@@ -1386,26 +1308,9 @@ export function EmpresaTab() {
                     </MenuItem>
                   ))}
                 </Input>
-                <MenuParametroEmpresaSelect
-                  id="empresa-menu-venda-gestor"
-                  variant="mui"
-                  sx={sxEntradaEmpresa}
-                  label="Menu usado nas vendas (gestor)"
-                  value={menuVendaGestorId}
-                  onChange={setMenuVendaGestorId}
-                  disabled={!isEditing}
-                />
               </div>
             </div>
           </div>
-
-          <EmpresaGeolocalizacaoSection
-            endereco={enderecoGeocodeInput}
-            localizacao={enderecoLocalizacao}
-            onLocalizacaoChange={handleLocalizacaoChange}
-            disabled={!isEditing}
-            enderecoAlterado={enderecoAlteradoParaGeo}
-          />
         </div>
       </div>
 

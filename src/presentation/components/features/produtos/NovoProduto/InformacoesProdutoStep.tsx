@@ -38,6 +38,8 @@ interface InformacoesProdutoStepProps {
   onSaveAndClose: () => void
   /** Quando true, ações ficam no rodapé do painel lateral (JiffySidePanelModal) */
   hideStepFooter?: boolean
+  /** Oculta o preço do cadastro base quando a empresa tem mais de um menu. */
+  ocultarPrecoVenda?: boolean
 }
 
 function grupoCategoriaFallback(id: string, nome: string): GrupoProduto {
@@ -76,6 +78,7 @@ export function InformacoesProdutoStep({
   lockedGrupoLabel,
   pendingNovaCategoriaLabel,
   showCategoriaField = true,
+  ocultarPrecoVenda = false,
   onNext,
   onSaveAndClose,
   hideStepFooter = false,
@@ -128,8 +131,8 @@ export function InformacoesProdutoStep({
       </p>
 
       <div className="space-y-4">
-        {/* Linha 1: Nome do Produto + Preço de Venda lado a lado */}
-        <div className="grid gap-4 md:grid-cols-[1fr_180px]">
+        {/* Linha 1: Nome do Produto + Preço de Venda (preço só com 1 menu / cadastro unificado) */}
+        <div className={ocultarPrecoVenda ? 'grid gap-4' : 'grid gap-4 md:grid-cols-[1fr_180px]'}>
           <Input
             label="Nome do Produto"
             required
@@ -144,16 +147,18 @@ export function InformacoesProdutoStep({
             InputLabelProps={{ required: true }}
           />
 
-          <Input
-            label="Preço de Venda"
-            size="small"
-            type="text"
-            value={precoVenda}
-            onChange={e => handlePrecoChange(e.target.value)}
-            placeholder="R$ 0,00"
-            className="bg-white"
-            sx={sxEntradaCompactaProduto}
-          />
+          {ocultarPrecoVenda ? null : (
+            <Input
+              label="Preço de Venda"
+              size="small"
+              type="text"
+              value={precoVenda}
+              onChange={e => handlePrecoChange(e.target.value)}
+              placeholder="R$ 0,00"
+              className="bg-white"
+              sx={sxEntradaCompactaProduto}
+            />
+          )}
         </div>
 
         {/* Linha 2: Categoria + Unidade + Código EAN */}

@@ -247,7 +247,7 @@ export function DesignCategoriasTab({
           menu.
         </p>
         <Link
-          href="/configuracoes/empresa-delivery"
+          href="/config/delivery"
           className="mt-3 inline-flex text-sm font-semibold text-primary underline-offset-2 hover:underline"
         >
           Ir para Delivery

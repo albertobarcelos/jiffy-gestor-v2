@@ -31,6 +31,11 @@ function dispatchEmpresaDeliveryUpdated(slug: string | null | undefined) {
   )
 }
 
+/** Recarrega pendências/hub quando cobertura, WhatsApp ou empresa delivery mudam. */
+export function dispararEmpresaDeliveryAtualizada(slug?: string | null): void {
+  dispatchEmpresaDeliveryUpdated(slug)
+}
+
 async function parseJsonOrThrow(res: Response): Promise<unknown> {
   const raw: unknown = await res.json().catch(() => ({}))
   if (!res.ok) {

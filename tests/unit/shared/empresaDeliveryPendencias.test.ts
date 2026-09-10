@@ -63,28 +63,34 @@ describe('empresaDeliveryPendencias', () => {
     ).toBe(false)
   })
 
-  it('manda fuso/pin para a aba Empresa e cobertura/WhatsApp para o hub', () => {
+  it('manda fuso para a etapa Empresa e pin/cobertura para o mapa', () => {
     expect(resolverAcaoPendencia(EMPRESA_DELIVERY_PENDENCIA_TYPES.TIMEZONE_NAO_CONFIGURADO)).toEqual({
       label: 'Configurar fuso na aba Empresa',
-      href: '/configuracoes/empresa',
+      href: '/config/delivery/empresa',
     })
     expect(
       resolverAcaoPendencia(EMPRESA_DELIVERY_PENDENCIA_TYPES.GEOLOCALIZACAO_NAO_CONFIGURADA)
     ).toEqual({
-      label: 'Configurar na aba Empresa',
-      href: '/configuracoes/empresa#geolocalizacao-empresa',
+      label: 'Definir pin na cobertura de entrega',
+      href: '/config/delivery/cobertura',
     })
     expect(
       resolverAcaoPendencia(EMPRESA_DELIVERY_PENDENCIA_TYPES.COBERTURA_NAO_CONFIGURADA)
     ).toEqual({
       label: 'Configurar cobertura de entrega',
-      href: '/configuracoes/empresa-delivery?abrir=delivery-cobertura',
+      href: '/config/delivery/cobertura',
     })
     expect(
       resolverAcaoPendencia(EMPRESA_DELIVERY_PENDENCIA_TYPES.CANAL_WHATSAPP_NAO_CONECTADO)
     ).toEqual({
       label: 'Conectar WhatsApp',
-      href: '/configuracoes/empresa-delivery?abrir=delivery-notificacoes',
+      href: '/config/delivery/notificacoes',
+    })
+    expect(
+      resolverAcaoPendencia(EMPRESA_DELIVERY_PENDENCIA_TYPES.CARDAPIO_DELIVERY_NAO_CONFIGURADO)
+    ).toEqual({
+      label: 'Selecionar cardápio',
+      href: '/config/delivery/nome-cardapio',
     })
     expect(resolverAcaoPendencia('TIPO_DESCONHECIDO')).toBeNull()
   })
