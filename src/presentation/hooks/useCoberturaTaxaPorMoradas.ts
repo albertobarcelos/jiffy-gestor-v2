@@ -3,17 +3,14 @@
 import { useMemo } from 'react'
 import { useAreasEntregaDelivery } from '@/src/presentation/hooks/useAreasEntregaDelivery'
 import { useRaiosEntregaDelivery } from '@/src/presentation/hooks/useRaiosEntregaDelivery'
-import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
-import { lerEnderecoLocalizacaoDoPayloadEmpresa } from '@/src/shared/utils/geolocalizacaoEmpresa'
+import { useGeoEmpresaEntrega } from '@/src/presentation/hooks/useMoradaTelefone'
 import { enderecoTemGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
-import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import {
   calcularTaxaCoberturaPonto,
   destinoGeoDaMoradaEndereco,
   type ResultadoTaxaCoberturaPonto,
 } from '@/src/shared/utils/calcularTaxaCoberturaPonto'
-import type { MoradaTelefone } from '@/src/presentation/hooks/useMoradaTelefone'
+import type { MoradaTelefone } from '@/src/domain/types/moradaEntrega'
 
 export type CoberturaTaxaPorMoradaMap = Record<string, ResultadoTaxaCoberturaPonto>
 
@@ -24,30 +21,7 @@ export function useCoberturaTaxaPorMoradas(params: {
   const areasQuery = useAreasEntregaDelivery({ enabled: params.enabled })
   const raiosQuery = useRaiosEntregaDelivery({ enabled: params.enabled })
 
-  const empresaGeoQuery = useSecureTenantQuery<{ enderecoLocalizacao: GeoJsonPoint | null }>(
-    ['empresa', 'endereco-geo', 'pedido-delivery'],
-    async ({ token }) => {
-      const res = await fetchGestorApi('/api/empresas/me', {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: 'no-store',
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(typeof body.error === 'string' ? body.error : `Erro ${res.status}`)
-      }
-      const data = await res.json()
-      const endereco =
-        data.endereco && typeof data.endereco === 'object' && !Array.isArray(data.endereco)
-          ? data.endereco
-          : null
-      return lerEnderecoLocalizacaoDoPayloadEmpresa(endereco)
-    },
-    {
-      enabled: params.enabled,
-      staleTime: 1000 * 60 * 2,
-      refetchOnWindowFocus: false,
-    }
-  )
+  const empresaGeoQuery = useGeoEmpresaEntrega(params.enabled)
 
   const isLoading =
     params.enabled &&

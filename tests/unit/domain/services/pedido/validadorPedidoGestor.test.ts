@@ -39,6 +39,15 @@ describe('validarInformacoesPedidoEntrega', () => {
     expect(
       validarInformacoesPedidoEntrega({
         pedidoDeliveryGestor: true,
+        telefoneClienteDelivery: '65992934536',
+        pedidoComEntrega: true,
+        temEnderecoEntrega: true,
+      })?.message
+    ).toMatch(/cliente nesta empresa/i)
+
+    expect(
+      validarInformacoesPedidoEntrega({
+        pedidoDeliveryGestor: true,
         clienteEntregaVinculadoId: 'cli-1',
         pedidoComEntrega: true,
         temEnderecoEntrega: false,

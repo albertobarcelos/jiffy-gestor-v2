@@ -1,4 +1,5 @@
 import { validarQuantidadesComplementosLinha } from '@/src/domain/policies/pedido/ComplementoQuantidadeLinhaPolicy'
+import { clienteCadastradoNestaEmpresa } from '@/src/domain/policies/pedido/ClienteEntregaPolicy'
 import { pagamentosCobremTotalPedido } from '@/src/domain/services/pedido/CalculadoraPagamentoPedido'
 import type { PagamentoSelecionado, ProdutoSelecionado, StatusVenda } from '@/src/domain/types/pedido'
 
@@ -39,6 +40,7 @@ export type ValidarPedidoGestorResult = {
 export function validarInformacoesPedidoEntrega(params: {
   pedidoDeliveryGestor: boolean
   clienteEntregaVinculadoId?: string
+  /** Mantido na assinatura: o telefone não substitui o cadastro desta empresa. */
   telefoneClienteDelivery?: string | null
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
@@ -52,12 +54,13 @@ export function validarInformacoesPedidoEntrega(params: {
 }): ValidacaoErroPedido | null {
   if (!params.pedidoDeliveryGestor) return null
 
-  const telefoneDelivery = (params.telefoneClienteDelivery ?? '').replace(/\D/g, '')
-  const temCliente =
-    Boolean(params.clienteEntregaVinculadoId?.trim()) || telefoneDelivery.length >= 11
+  const temCliente = clienteCadastradoNestaEmpresa(params.clienteEntregaVinculadoId)
 
   if (!temCliente) {
-    return { message: 'Informe o cliente do pedido antes de continuar.', goToStep: 2 }
+    return {
+      message: 'Cadastre o cliente nesta empresa antes de continuar.',
+      goToStep: 2,
+    }
   }
 
   if (params.pedidoComEntrega && !params.temEnderecoEntrega) {

@@ -17,12 +17,10 @@ import {
   useAtualizarMoradaTelefone,
   useExcluirMoradaTelefone,
   useRegistrarUsoMoradaTelefone,
-  useBuscarClienteDeliveryPorTelefone,
   useCriarClienteDeliveryRapido,
-  useAtualizarNomeClienteDelivery,
-  type MoradaTelefone,
-  type EnderecoMorada,
+  useGeoEmpresaEntrega,
 } from '@/src/presentation/hooks/useMoradaTelefone'
+import type { MoradaTelefone, EnderecoMorada } from '@/src/domain/types/moradaEntrega'
 import { useCoberturaTaxaPorMoradas } from '@/src/presentation/hooks/useCoberturaTaxaPorMoradas'
 import type { ResultadoTaxaCoberturaPonto } from '@/src/shared/utils/calcularTaxaCoberturaPonto'
 import {
@@ -41,10 +39,15 @@ import {
 } from '@/src/shared/utils/geolocalizacaoPlaces'
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import { enderecoTemGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
-import { lerEnderecoLocalizacaoDoPayloadEmpresa } from '@/src/shared/utils/geolocalizacaoEmpresa'
 import { resolverGeoMoradaDeliveryGestor } from '@/src/shared/utils/resolverGeoMoradaDeliveryGestor'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
-import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
+import {
+  clienteCadastradoNestaEmpresa,
+  ETIQUETAS_MORADA_ENTREGA,
+  nomePadraoMoradaEntrega,
+  normalizarTipoEtiquetaMorada,
+  podeExibirEnderecosClienteEntrega,
+  telefoneMinimoDigitosBuscaEntrega,
+} from '@/src/domain/policies/pedido/ClienteEntregaPolicy'
 
 /** Snapshot mínimo do cliente encontrado / criado. */
 interface ClienteEntrega {
@@ -115,22 +118,6 @@ interface FormNovasMorada {
   referencia: string
 }
 
-const ETIQUETAS_MORADA = ['Casa', 'Trabalho', 'Outro'] as const
-type TipoEtiquetaMorada = (typeof ETIQUETAS_MORADA)[number]
-
-function normalizarTipoEtiqueta(valor: string | undefined | null): TipoEtiquetaMorada {
-  const raw = String(valor ?? '').trim().toLowerCase()
-  if (raw === 'trabalho') return 'Trabalho'
-  if (raw === 'outro') return 'Outro'
-  return 'Casa'
-}
-
-function nomePadraoMorada(tipoEtiqueta: TipoEtiquetaMorada): string {
-  if (tipoEtiqueta === 'Casa') return 'Casa Principal'
-  if (tipoEtiqueta === 'Trabalho') return 'Trabalho'
-  return 'Outro'
-}
-
 const FORM_INICIAL: FormNovasMorada = {
   nomeMorada: 'Casa Principal',
   tipoEtiqueta: 'Casa',
@@ -164,10 +151,6 @@ function formatarTelefoneExibicao(valor: string): string {
   return `(${numeros.slice(0, 2)}) ${numeros.slice(2, 7)}-${numeros.slice(7, 11)}`
 }
 
-function telefoneMinimoParaBusca(usarModuloDeliveryClientes: boolean): number {
-  return usarModuloDeliveryClientes ? 11 : 8
-}
-
 const CAMPOS_ENDERECO_MAIUSCULA: ReadonlySet<keyof FormNovasMorada> = new Set([
   'rua',
   'numero',
@@ -184,9 +167,9 @@ function paraMaiusculaEndereco(valor: string): string {
 
 function moradaParaForm(m: MoradaTelefone): FormNovasMorada {
   const e = m.endereco
-  const tipoEtiqueta = normalizarTipoEtiqueta(m.tipoEtiqueta)
+  const tipoEtiqueta = normalizarTipoEtiquetaMorada(m.tipoEtiqueta)
   return {
-    nomeMorada: m.nomeMorada ?? nomePadraoMorada(tipoEtiqueta),
+    nomeMorada: m.nomeMorada ?? nomePadraoMoradaEntrega(tipoEtiqueta),
     tipoEtiqueta,
     cep: e?.cep ? formatarCepMascara(e.cep) : '',
     rua: e?.rua ? paraMaiusculaEndereco(e.rua) : '',
@@ -369,12 +352,12 @@ export function EntregaClienteSelector({
     ? onDigitosUltimaBuscaExternoChange!
     : setTelefoneBuscadoLocal
 
+  const temCadastroNestaEmpresa = clienteCadastradoNestaEmpresa(clienteVinculado?.id)
+
   /** Nome digitado pelo usuário quando o cliente não existe (para pré-preencher o painel de cadastro). */
   const [nomeDigitado, setNomeDigitado] = useState('')
-  /** `true` após busca sem resultado — exibe opção "Cadastrar cliente". */
+  /** `true` após busca sem cliente desta empresa — exibe opção "Cadastrar". */
   const [clienteNaoEncontrado, setClienteNaoEncontrado] = useState(false)
-  /** Cliente delivery localizado via `GET /delivery/clientes/{telefone}`. */
-  const [clienteDeliveryEncontrado, setClienteDeliveryEncontrado] = useState(false)
   /** Painel lateral de cadastro rápido de cliente. */
   const [painelClienteAberto, setPainelClienteAberto] = useState(false)
   /** Nome no formulário de cadastro rápido (separado do campo de busca). */
@@ -412,47 +395,22 @@ export function EntregaClienteSelector({
 
   const moradaHookOptions = { usarModuloDelivery: usarModuloDeliveryClientes }
 
-  const empresaGeoQuery = useSecureTenantQuery<{ enderecoLocalizacao: GeoJsonPoint | null }>(
-    ['empresa', 'endereco-geo', 'pedido-delivery'],
-    async ({ token }) => {
-      const res = await fetchGestorApi('/api/empresas/me', {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: 'no-store',
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(typeof body.error === 'string' ? body.error : `Erro ${res.status}`)
-      }
-      const data = await res.json()
-      const endereco =
-        data.endereco && typeof data.endereco === 'object' && !Array.isArray(data.endereco)
-          ? data.endereco
-          : null
-      return lerEnderecoLocalizacaoDoPayloadEmpresa(endereco)
-    },
-    {
-      enabled: usarModuloDeliveryClientes,
-      staleTime: 1000 * 60 * 2,
-      refetchOnWindowFocus: false,
-    }
-  )
+  const empresaGeoQuery = useGeoEmpresaEntrega(usarModuloDeliveryClientes)
   const fallbackEmpresaGeo = empresaGeoQuery.data?.enderecoLocalizacao ?? null
 
   const { data: moradas, isLoading: buscando, isError: erroMoradas, error: erroMoradasMsg } =
-    useMoradasPorTelefone(telefoneBuscado, moradaHookOptions)
+    useMoradasPorTelefone(temCadastroNestaEmpresa ? telefoneBuscado : null, moradaHookOptions)
   const criarMorada = useCriarMoradaTelefone(moradaHookOptions)
   const atualizarMorada = useAtualizarMoradaTelefone(moradaHookOptions)
   const excluirMorada = useExcluirMoradaTelefone(moradaHookOptions)
   const registrarUsoMorada = useRegistrarUsoMoradaTelefone(moradaHookOptions)
   const coberturaTaxa = useCoberturaTaxaPorMoradas({
-    enabled: usarModuloDeliveryClientes && mostrarEnderecos,
+    enabled: usarModuloDeliveryClientes && mostrarEnderecos && temCadastroNestaEmpresa,
     moradas: moradas ?? [],
   })
   const buscarCliente = useBuscarClientePorTelefone()
-  const buscarClienteDelivery = useBuscarClienteDeliveryPorTelefone()
   const criarCliente = useCriarClienteRapido()
   const criarClienteDelivery = useCriarClienteDeliveryRapido()
-  const atualizarNomeDelivery = useAtualizarNomeClienteDelivery()
   const atualizarNomeCliente = useAtualizarNomeCliente()
 
   useEffect(() => {
@@ -501,35 +459,15 @@ export function EntregaClienteSelector({
     setSalvandoNome(true)
     setEditandoNome(false)
     try {
-      if (usarModuloDeliveryClientes) {
-        const telefone =
-          telefoneBuscado || extrairDigitosTelefone(telefoneInput)
-        if (!telefoneCelularBrCompleto(telefone)) {
-          throw new Error('Informe o celular completo com DDD (11 dígitos).')
-        }
-        const atualizado = await atualizarNomeDelivery.mutateAsync({
-          telefone,
-          nome: nomeTrim,
-        })
-        const idErp =
-          atualizado?.clienteIdVinculado?.trim() ||
-          clienteVinculado.id.trim() ||
-          ''
-        onClienteVinculado({
-          id: idErp,
-          nome: atualizado?.nome?.trim() || nomeTrim,
-        })
-      } else {
-        const clienteId = clienteVinculado.id.trim()
-        if (!clienteId) {
-          throw new Error('Cliente inválido para atualizar o nome.')
-        }
-        await atualizarNomeCliente.mutateAsync({
-          clienteId,
-          nome: nomeTrim,
-        })
-        onClienteVinculado({ id: clienteId, nome: nomeTrim })
+      const clienteId = clienteVinculado.id.trim()
+      if (!clienteId) {
+        throw new Error('Cadastre o cliente nesta empresa para editar o nome.')
       }
+      await atualizarNomeCliente.mutateAsync({
+        clienteId,
+        nome: nomeTrim,
+      })
+      onClienteVinculado({ id: clienteId, nome: nomeTrim })
       setNomeDigitado(nomeTrim)
       showToast.success('Nome atualizado.')
     } catch (err) {
@@ -543,10 +481,6 @@ export function EntregaClienteSelector({
   }, [
     clienteVinculado,
     nomeEmEdicao,
-    usarModuloDeliveryClientes,
-    telefoneBuscado,
-    telefoneInput,
-    atualizarNomeDelivery,
     atualizarNomeCliente,
     onClienteVinculado,
   ])
@@ -624,9 +558,7 @@ export function EntregaClienteSelector({
     [onMoradaSelecionada, telefoneBuscado, registrarUsoMorada]
   )
 
-  const podeGerenciarEnderecos =
-    Boolean(clienteVinculado?.id?.trim()) ||
-    (usarModuloDeliveryClientes && clienteDeliveryEncontrado)
+  const podeGerenciarEnderecos = temCadastroNestaEmpresa
 
   const resetGeoPainelState = useCallback(() => {
     setBuscaPlacesMorada('')
@@ -796,7 +728,7 @@ export function EntregaClienteSelector({
   )
   const handleBuscar = useCallback(async (telefoneOverride?: string) => {
     const digitos = extrairDigitosTelefone(telefoneOverride ?? telefoneInput)
-    const minDigitos = telefoneMinimoParaBusca(usarModuloDeliveryClientes)
+    const minDigitos = telefoneMinimoDigitosBuscaEntrega(usarModuloDeliveryClientes)
 
     /**
      * Lupa sem telefone → seletor ERP (lista + novo cliente), como na main.
@@ -823,59 +755,26 @@ export function EntregaClienteSelector({
     }
 
     setClienteNaoEncontrado(false)
-    setClienteDeliveryEncontrado(false)
+    setNomeDigitado('')
     onClienteVinculado(null)
     onMoradaSelecionada(null)
-
-    if (usarModuloDeliveryClientes) {
-      setTelefoneBuscado(digitos)
-      try {
-        const delivery = await buscarClienteDelivery.mutateAsync(digitos)
-        if (delivery) {
-          setClienteDeliveryEncontrado(true)
-          const nomeDelivery = delivery.nome?.trim() || nomeDigitado.trim() || 'Cliente'
-          if (delivery.clienteIdVinculado?.trim()) {
-            onClienteVinculado({
-              id: delivery.clienteIdVinculado.trim(),
-              nome: nomeDelivery,
-            })
-          } else {
-            onClienteVinculado({ id: '', nome: nomeDelivery })
-          }
-          return
-        }
-
-        const clienteErp = await buscarCliente.mutateAsync(digitos)
-        if (clienteErp) {
-          onClienteVinculado({ id: clienteErp.getId(), nome: clienteErp.getNome() })
-          return
-        }
-
-        setClienteNaoEncontrado(true)
-      } catch {
-        setClienteNaoEncontrado(true)
-      }
-      return
-    }
-
     setTelefoneBuscado(digitos)
 
     try {
-      const cliente = await buscarCliente.mutateAsync(digitos)
-      if (cliente) {
-        onClienteVinculado({ id: cliente.getId(), nome: cliente.getNome() })
-      } else {
-        setClienteNaoEncontrado(true)
+      const clienteErp = await buscarCliente.mutateAsync(digitos)
+      if (clienteErp) {
+        onClienteVinculado({ id: clienteErp.getId(), nome: clienteErp.getNome() })
+        return
       }
+
+      setClienteNaoEncontrado(true)
     } catch {
       setClienteNaoEncontrado(true)
     }
   }, [
     telefoneInput,
     usarModuloDeliveryClientes,
-    nomeDigitado,
     buscarCliente,
-    buscarClienteDelivery,
     onClienteVinculado,
     onMoradaSelecionada,
     setTelefoneBuscado,
@@ -895,7 +794,7 @@ export function EntregaClienteSelector({
   /** Ao sair do campo de telefone, busca o cliente automaticamente (telefone completo e ainda não buscado). */
   const handleTelefoneBlur = useCallback(() => {
     const digitos = extrairDigitosTelefone(telefoneInput)
-    const minDigitos = telefoneMinimoParaBusca(usarModuloDeliveryClientes)
+    const minDigitos = telefoneMinimoDigitosBuscaEntrega(usarModuloDeliveryClientes)
     if (digitos.length >= minDigitos && digitos !== telefoneBuscado) {
       void handleBuscar()
     }
@@ -914,11 +813,11 @@ export function EntregaClienteSelector({
   )
 
   const handleTipoEtiquetaChange = useCallback((valor: string) => {
-    const tipoEtiqueta = normalizarTipoEtiqueta(valor)
+    const tipoEtiqueta = normalizarTipoEtiquetaMorada(valor)
     setFormNova(prev => ({
       ...prev,
       tipoEtiqueta,
-      nomeMorada: nomePadraoMorada(tipoEtiqueta),
+      nomeMorada: nomePadraoMoradaEntrega(tipoEtiqueta),
     }))
   }, [])
 
@@ -1068,8 +967,11 @@ export function EntregaClienteSelector({
     try {
       const novo = await criarCliente.mutateAsync({ nome, telefone: digitos })
       if (usarModuloDeliveryClientes) {
-        await criarClienteDelivery.mutateAsync({ telefone: digitos, nome })
-        setClienteDeliveryEncontrado(true)
+        try {
+          await criarClienteDelivery.mutateAsync({ telefone: digitos, nome })
+        } catch {
+          /* Perfil delivery deste telefone já pode existir — só o cadastro da empresa é obrigatório. */
+        }
         setTelefoneBuscado(digitos)
       }
       onClienteVinculado({ id: novo.getId(), nome: novo.getNome() })
@@ -1096,13 +998,17 @@ export function EntregaClienteSelector({
   }, [nomeDigitado])
 
   const moradasEncontradas = moradas ?? []
-  const buscaRealizada =
-    telefoneBuscado !== null || clienteVinculado !== null || clienteDeliveryEncontrado
-  const buscandoCliente = buscarCliente.isPending || buscarClienteDelivery.isPending
+  const buscaRealizada = telefoneBuscado !== null || clienteVinculado !== null
+  const buscandoCliente = buscarCliente.isPending
   const clienteCadastrado = podeGerenciarEnderecos
 
   useEffect(() => {
-    if (!mostrarEnderecos || !clienteCadastrado || moradaSelecionada || moradasEncontradas.length === 0) {
+    if (
+      !mostrarEnderecos ||
+      !clienteCadastrado ||
+      moradaSelecionada ||
+      moradasEncontradas.length === 0
+    ) {
       return
     }
 
@@ -1243,7 +1149,7 @@ export function EntregaClienteSelector({
             )}
             {clienteNaoEncontrado && !clienteVinculado && (
               <p className="mt-1 text-xs text-secondary">
-                Cliente não encontrado.{' '}
+                Cliente não cadastrado nesta empresa.{' '}
                 <button
                   type="button"
                   className="font-semibold text-secondary underline"
@@ -1315,13 +1221,19 @@ export function EntregaClienteSelector({
         </div>
       </div>
 
-      {/* Resultado da busca — endereços só após cliente cadastrado/vinculado */}
-      {mostrarEnderecos && telefoneBuscado !== null && !buscando && (
+      {/* Endereços só depois do cadastro nesta empresa */}
+      {podeExibirEnderecosClienteEntrega({
+        mostrarEnderecos: Boolean(mostrarEnderecos),
+        clienteId: clienteVinculado?.id,
+      }) &&
+        telefoneBuscado !== null &&
+        !buscando && (
         <div className="space-y-2">
-          {clienteCadastrado && moradasEncontradas.length > 0 ? (
+          {moradasEncontradas.length > 0 ? (
             <>
               <p className="text-xs font-medium text-gray-500">
-                {moradasEncontradas.length} endereço{moradasEncontradas.length !== 1 ? 's' : ''} encontrado{moradasEncontradas.length !== 1 ? 's' : ''}
+                {moradasEncontradas.length} endereço{moradasEncontradas.length !== 1 ? 's' : ''}{' '}
+                encontrado{moradasEncontradas.length !== 1 ? 's' : ''}
               </p>
               {moradasEncontradas.map(morada => (
                 <MoradaCard
@@ -1345,21 +1257,14 @@ export function EntregaClienteSelector({
             <div className="flex flex-col items-center gap-2 rounded-lg border-2 border-dashed border-gray-200 py-6 text-center">
               <MdAddLocation className="h-8 w-8 text-gray-300" />
               <p className="text-sm text-gray-500">
-                {clienteCadastrado
-                  ? 'Nenhum endereço cadastrado para este cliente.'
-                  : 'Cadastre o cliente antes de adicionar endereços de entrega.'}
+                Nenhum endereço cadastrado para este cliente.
               </p>
               <Button
                 type="button"
                 variant="outlined"
                 onClick={() => abrirPainelNovo()}
-                disabled={!clienteCadastrado}
-                className="mt-1 border-primary/30 text-primary hover:bg-primary/10 disabled:opacity-50"
-                title={
-                  clienteCadastrado
-                    ? 'Adicionar endereço de entrega'
-                    : 'Cadastre o cliente antes de adicionar um endereço'
-                }
+                className="mt-1 border-primary/30 text-primary hover:bg-primary/10"
+                title="Adicionar endereço de entrega"
               >
                 <MdAddLocation className="mr-1.5 h-4 w-4" />
                 Adicionar endereço
@@ -1471,7 +1376,7 @@ export function EntregaClienteSelector({
               onChange={e => handleTipoEtiquetaChange(e.target.value)}
               className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
             >
-              {ETIQUETAS_MORADA.map(etiqueta => (
+              {ETIQUETAS_MORADA_ENTREGA.map(etiqueta => (
                 <option key={etiqueta} value={etiqueta}>
                   {etiqueta}
                 </option>

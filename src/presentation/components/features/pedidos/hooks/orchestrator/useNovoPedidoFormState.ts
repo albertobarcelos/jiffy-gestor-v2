@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import type { MoradaTelefone } from '@/src/presentation/hooks/useMoradaTelefone'
+import type { MoradaTelefone } from '@/src/domain/types/moradaEntrega'
 import type { ProdutosTabsModalState } from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
 import { statusPadraoNovoPedido } from '@/src/domain/services/pedido/RegrasStatusPedido'
 import type {
