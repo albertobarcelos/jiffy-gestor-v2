@@ -29,10 +29,6 @@ export function useNovoPedidoCatalogoData({
   catalogoProdutosPorId,
   setCatalogoProdutosPorId,
 }: UseNovoPedidoCatalogoDataParams) {
-  const onGrupoSelecionadoInvalido = useCallback(() => {
-    setGrupoSelecionadoId(null)
-  }, [setGrupoSelecionadoId])
-
   const onProdutosGrupoCarregados = useCallback(
     (produtos: Produto[]) => {
       setCatalogoProdutosPorId(prev => {
@@ -51,7 +47,7 @@ export function useNovoPedidoCatalogoData({
     token,
     menuId,
     grupoSelecionadoId,
-    onGrupoSelecionadoInvalido,
+    setGrupoSelecionadoId,
   })
 
   const produtosQuery = useProdutosVendaQuery({

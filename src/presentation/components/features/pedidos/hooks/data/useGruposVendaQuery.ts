@@ -12,7 +12,7 @@ export type UseGruposVendaQueryParams = {
   token: string | undefined
   menuId: string | null
   grupoSelecionadoId: string | null
-  onGrupoSelecionadoInvalido: () => void
+  setGrupoSelecionadoId: (id: string | null) => void
 }
 
 export function useGruposVendaQuery({
@@ -20,7 +20,7 @@ export function useGruposVendaQuery({
   token,
   menuId,
   grupoSelecionadoId,
-  onGrupoSelecionadoInvalido,
+  setGrupoSelecionadoId,
 }: UseGruposVendaQueryParams) {
   const {
     data: gruposMenu = [],
@@ -81,11 +81,12 @@ export function useGruposVendaQuery({
   ])
 
   useEffect(() => {
-    if (!grupoSelecionadoId || !grupoIdsComProdutosAtivos) return
-    if (!grupoIdsComProdutosAtivos.has(grupoSelecionadoId)) {
-      onGrupoSelecionadoInvalido()
-    }
-  }, [grupoSelecionadoId, grupoIdsComProdutosAtivos, onGrupoSelecionadoInvalido])
+    if (grupos.length === 0) return
+    const selecionadoValido =
+      grupoSelecionadoId != null && grupos.some(grupo => grupo.getId() === grupoSelecionadoId)
+    if (selecionadoValido) return
+    setGrupoSelecionadoId(grupos[0].getId())
+  }, [grupos, grupoSelecionadoId, setGrupoSelecionadoId])
 
   const isLoadingGruposVenda =
     !menuId ? false : isLoadingGruposMenu || isLoadingGruposComProdutos

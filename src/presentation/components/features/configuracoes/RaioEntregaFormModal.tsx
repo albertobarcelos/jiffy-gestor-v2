@@ -12,8 +12,6 @@ import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitc
 import type { RaioEntregaDTO } from '@/src/application/dto/delivery/CoberturaEntregaDTO'
 import {
   raioEntregaFormValidator,
-  raioEntregaFormToCreateInput,
-  raioEntregaFormToUpdateInput,
   raioEntregaToFormValues,
   type RaioEntregaFormValues,
 } from '@/src/application/dto/delivery/CoberturaEntregaDTO'
@@ -89,13 +87,8 @@ export function RaioEntregaFormModal({
     }
 
     setErro(null)
-    if (editando) {
-      raioEntregaFormToUpdateInput(parsed.data)
-    } else {
-      raioEntregaFormToCreateInput(parsed.data)
-    }
     await onSubmit(parsed.data)
-  }, [editando, onSubmit, values])
+  }, [onSubmit, values])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -8,7 +8,7 @@ import { Label } from '@/src/presentation/components/ui/label'
 import { showToast } from '@/src/shared/utils/toast'
 import { formatarCepMascara, normalizarDigitosCep } from '@/src/shared/utils/consultaCep'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
-import { tituloCasePalavrasEndereco } from '@/src/shared/utils/normalizarTextoEnderecoPublico'
+import { maiusculasEnderecoInput } from '@/src/shared/utils/normalizarTextoEnderecoPublico'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { JiffyConfirmDialog } from '@/src/presentation/components/ui/jiffy-confirm-dialog'
 import {
@@ -1511,7 +1511,7 @@ export function EntregaClienteSelector({
                     providerEnderecoId: place.providerEnderecoId,
                   })
                   setBuscaPlacesMorada(
-                    tituloCasePalavrasEndereco(
+                    maiusculasEnderecoInput(
                       [fields.rua, fields.numero].filter(Boolean).join(', ') ||
                         place.enderecoFormatado ||
                         ''

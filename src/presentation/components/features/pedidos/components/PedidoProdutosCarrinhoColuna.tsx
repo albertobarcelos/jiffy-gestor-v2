@@ -1,8 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import Image from 'next/image'
-import Tooltip from '@mui/material/Tooltip'
 import { DropdownMenu, DropdownMenuItem } from '@/src/presentation/components/ui/dropdown-menu'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { produtoPermiteAlterarPreco, obterUnidadeMedidaProdutoLinha } from '../produtoCatalogoHelpers'
@@ -23,14 +22,14 @@ import {
   OBSERVACAO_PEDIDO_MAX_CHARS,
   observacaoTextoParcialInvalido,
 } from '@/src/shared/helpers/observacaoPedido'
+import { JiffyConfirmDialog } from '@/src/presentation/components/ui/jiffy-confirm-dialog'
 import { Textarea } from '@/src/presentation/components/ui/textarea'
 import {
   MdAdd,
-  MdClear,
-  MdDelete,
+  MdDeleteOutline,
   MdEdit,
   MdLaunch,
-  MdMoreVert,
+  MdMoreHoriz,
   MdNote,
   MdRemove,
 } from 'react-icons/md'
@@ -46,10 +45,28 @@ import { useNovoPedidoUIContext } from '../context/NovoPedidoUIContext'
  * Total "R$ 300.000,00"); Produto (1fr) absorve o espaço restante.
  */
 const CARRINHO_PRODUTOS_GRID_CLASS =
-  'grid grid-cols-[4.5rem_minmax(0,1fr)_2.75rem_4rem_5.5rem_7rem_34px] gap-x-1 items-center'
+  'grid grid-cols-[6.5rem_minmax(0,1fr)_2.75rem_4rem_5.5rem_7rem_3.5rem] gap-x-1 items-center'
 
-/** Desloca qtd/nome do complemento à direita sem mover Unid., Val Unit., Total etc. */
-const COMPLEMENTO_CARRINHO_QTD_DESLOCAMENTO_CLASS = 'justify-start pl-6'
+const STEPPER_BTN_CLASS =
+  'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-35'
+
+const ACAO_BTN_CLASS =
+  'flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-800'
+
+const ACAO_REMOVER_CLASS =
+  'flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-red-500 transition-colors hover:bg-red-50 hover:text-red-600'
+
+function PedidoCarrinhoQtdPilula({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex items-center justify-center">
+      <div className="inline-flex items-center rounded-full border border-gray-200 bg-white p-0.5">
+        {children}
+      </div>
+    </div>
+  )
+}
+
+/** Desloca o nome do complemento à direita sem mover Unid., Val Unit., Total etc. */
 const COMPLEMENTO_CARRINHO_NOME_DESLOCAMENTO_CLASS = 'pl-4'
 
 export function PedidoProdutosCarrinhoColuna() {
@@ -86,8 +103,13 @@ export function PedidoProdutosCarrinhoColuna() {
   const [observacaoPedidoVisivel, setObservacaoPedidoVisivel] = useState(
     () => observacaoPedido.trim().length > 0
   )
+  const [produtoPendendoRemocao, setProdutoPendendoRemocao] = useState<{
+    index: number
+    nome: string
+  } | null>(null)
 
   return (
+    <>
     <div className="flex min-h-0 min-w-0 flex-[5] basis-0 flex-col gap-2">
     <div className="scrollbar-thin flex min-h-0 flex-1 flex-col overflow-y-auto rounded-lg border bg-gray-50">
       {produtos.length > 0 ? (
@@ -120,9 +142,7 @@ export function PedidoProdutosCarrinhoColuna() {
                 Total
               </span>
             </div>
-            <div className="flex items-center justify-end">
-              <MdMoreVert className="h-4 w-4 text-gray-700" aria-hidden />
-            </div>
+            <div />
           </div>
           {/* Linhas de produtos */}
           <div className="space-y-1">
@@ -190,119 +210,119 @@ export function PedidoProdutosCarrinhoColuna() {
                     }}
                   >
                     {/* Quantidade */}
-                    <div className="flex items-center justify-center gap-0.5">
-                      <button
-                        type="button"
-                        aria-label="Diminuir quantidade"
-                        disabled={!quantidadeProdutoPodeDiminuir(produto.quantidade, unidadeMedida)}
-                        onClick={e => {
-                          e.stopPropagation()
-                          const proxima = incrementarQuantidadeProduto(
-                            produto.quantidade,
-                            -1,
-                            unidadeMedida
-                          )
-                          atualizarProduto(index, 'quantidade', proxima)
-                          setValoresEmEdicao((prev: Record<string | number, string>) => {
-                            const next = { ...prev }
-                            delete next[qtdProdKey]
-                            return next
-                          })
-                        }}
-                        className="flex h-3 w-3 shrink-0 items-center justify-center bg-white text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <MdRemove className="h-2 w-2" />
-                      </button>
-                      <input
-                        type="text"
-                        inputMode={qtdProdutoDecimal ? 'decimal' : 'numeric'}
-                        aria-label="Quantidade"
-                        value={
-                          valoresEmEdicao[qtdProdKey] !== undefined
-                            ? valoresEmEdicao[qtdProdKey]
-                            : formatarQuantidadeProdutoExibicao(produto.quantidade, unidadeMedida)
-                        }
-                        onClick={e => e.stopPropagation()}
-                        onChange={e => {
-                          e.stopPropagation()
-                          const texto = sanitizarTextoQuantidadeProdutoEmEdicao(
-                            e.target.value,
-                            unidadeMedida
-                          )
-                          setValoresEmEdicao((prev: Record<string | number, string>) => ({
-                            ...prev,
-                            [qtdProdKey]: texto,
-                          }))
-                          const parsed = parseQuantidadeProdutoInput(texto, unidadeMedida)
-                          if (parsed !== null) {
-                            atualizarProduto(
-                              index,
-                              'quantidade',
-                              normalizarQuantidadeProduto(parsed, unidadeMedida)
-                            )
-                          }
-                        }}
-                        onFocus={e => {
-                          e.stopPropagation()
-                          setValoresEmEdicao((prev: Record<string | number, string>) => ({
-                            ...prev,
-                            [qtdProdKey]: formatarQuantidadeProdutoExibicao(
+                    <PedidoCarrinhoQtdPilula>
+                        <button
+                          type="button"
+                          aria-label="Diminuir quantidade"
+                          disabled={!quantidadeProdutoPodeDiminuir(produto.quantidade, unidadeMedida)}
+                          onClick={e => {
+                            e.stopPropagation()
+                            const proxima = incrementarQuantidadeProduto(
                               produto.quantidade,
+                              -1,
                               unidadeMedida
-                            ),
-                          }))
-                          setTimeout(() => e.target.select(), 0)
-                        }}
-                        onBlur={e => {
-                          e.stopPropagation()
-                          const texto =
+                            )
+                            atualizarProduto(index, 'quantidade', proxima)
+                            setValoresEmEdicao((prev: Record<string | number, string>) => {
+                              const next = { ...prev }
+                              delete next[qtdProdKey]
+                              return next
+                            })
+                          }}
+                          className={STEPPER_BTN_CLASS}
+                        >
+                          <MdRemove className="h-3.5 w-3.5" />
+                        </button>
+                        <input
+                          type="text"
+                          inputMode={qtdProdutoDecimal ? 'decimal' : 'numeric'}
+                          aria-label="Quantidade"
+                          value={
                             valoresEmEdicao[qtdProdKey] !== undefined
                               ? valoresEmEdicao[qtdProdKey]
-                              : e.target.value
-                          const parsed = parseQuantidadeProdutoInput(texto, unidadeMedida)
-                          const qtdFinal = normalizarQuantidadeProduto(
-                            parsed ?? produto.quantidade,
-                            unidadeMedida
-                          )
-                          atualizarProduto(index, 'quantidade', qtdFinal)
-                          setValoresEmEdicao((prev: Record<string | number, string>) => {
-                            const next = { ...prev }
-                            delete next[qtdProdKey]
-                            return next
-                          })
-                        }}
-                        onKeyDown={e => {
-                          e.stopPropagation()
-                          if (e.key === 'Enter') {
-                            e.currentTarget.blur()
+                              : formatarQuantidadeProdutoExibicao(produto.quantidade, unidadeMedida)
                           }
-                        }}
-                        className={`h-5 min-w-0 border-0 bg-transparent p-0 text-center text-xs tabular-nums text-gray-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary ${
-                          qtdProdutoDecimal ? 'w-10' : 'w-6'
-                        }`}
-                      />
-                      <button
-                        type="button"
-                        aria-label="Aumentar quantidade"
-                        onClick={e => {
-                          e.stopPropagation()
-                          const proxima = incrementarQuantidadeProduto(
-                            produto.quantidade,
-                            1,
-                            unidadeMedida
-                          )
-                          atualizarProduto(index, 'quantidade', proxima)
-                          setValoresEmEdicao((prev: Record<string | number, string>) => {
-                            const next = { ...prev }
-                            delete next[qtdProdKey]
-                            return next
-                          })
-                        }}
-                        className="flex h-3 w-3 shrink-0 items-center justify-center bg-white text-gray-600 transition-colors hover:bg-gray-100"
-                      >
-                        <MdAdd className="h-3 w-3" />
-                      </button>
-                    </div>
+                          onClick={e => e.stopPropagation()}
+                          onChange={e => {
+                            e.stopPropagation()
+                            const texto = sanitizarTextoQuantidadeProdutoEmEdicao(
+                              e.target.value,
+                              unidadeMedida
+                            )
+                            setValoresEmEdicao((prev: Record<string | number, string>) => ({
+                              ...prev,
+                              [qtdProdKey]: texto,
+                            }))
+                            const parsed = parseQuantidadeProdutoInput(texto, unidadeMedida)
+                            if (parsed !== null) {
+                              atualizarProduto(
+                                index,
+                                'quantidade',
+                                normalizarQuantidadeProduto(parsed, unidadeMedida)
+                              )
+                            }
+                          }}
+                          onFocus={e => {
+                            e.stopPropagation()
+                            setValoresEmEdicao((prev: Record<string | number, string>) => ({
+                              ...prev,
+                              [qtdProdKey]: formatarQuantidadeProdutoExibicao(
+                                produto.quantidade,
+                                unidadeMedida
+                              ),
+                            }))
+                            setTimeout(() => e.target.select(), 0)
+                          }}
+                          onBlur={e => {
+                            e.stopPropagation()
+                            const texto =
+                              valoresEmEdicao[qtdProdKey] !== undefined
+                                ? valoresEmEdicao[qtdProdKey]
+                                : e.target.value
+                            const parsed = parseQuantidadeProdutoInput(texto, unidadeMedida)
+                            const qtdFinal = normalizarQuantidadeProduto(
+                              parsed ?? produto.quantidade,
+                              unidadeMedida
+                            )
+                            atualizarProduto(index, 'quantidade', qtdFinal)
+                            setValoresEmEdicao((prev: Record<string | number, string>) => {
+                              const next = { ...prev }
+                              delete next[qtdProdKey]
+                              return next
+                            })
+                          }}
+                          onKeyDown={e => {
+                            e.stopPropagation()
+                            if (e.key === 'Enter') {
+                              e.currentTarget.blur()
+                            }
+                          }}
+                          className={`h-6 min-w-0 border-0 bg-transparent p-0 text-center text-xs font-medium tabular-nums text-gray-900 focus:outline-none ${
+                            qtdProdutoDecimal ? 'w-10' : 'w-7'
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          aria-label="Aumentar quantidade"
+                          onClick={e => {
+                            e.stopPropagation()
+                            const proxima = incrementarQuantidadeProduto(
+                              produto.quantidade,
+                              1,
+                              unidadeMedida
+                            )
+                            atualizarProduto(index, 'quantidade', proxima)
+                            setValoresEmEdicao((prev: Record<string | number, string>) => {
+                              const next = { ...prev }
+                              delete next[qtdProdKey]
+                              return next
+                            })
+                          }}
+                          className={STEPPER_BTN_CLASS}
+                        >
+                          <MdAdd className="h-3.5 w-3.5" />
+                        </button>
+                    </PedidoCarrinhoQtdPilula>
                     {/* Nome do Produto */}
                     <div className="min-w-0">
                       <span
@@ -443,7 +463,7 @@ export function PedidoProdutosCarrinhoColuna() {
                     </div>
                     {/* Ações: menu compacto + remover */}
                     <div
-                      className="flex items-center justify-end gap-0"
+                      className="flex items-center justify-end gap-0.5"
                       role="group"
                       aria-label="Ações do produto"
                       onClick={e => e.stopPropagation()}
@@ -456,9 +476,9 @@ export function PedidoProdutosCarrinhoColuna() {
                           <button
                             type="button"
                             aria-label="Mais ações do produto"
-                            className="flex h-5 w-3 shrink-0 items-center justify-center rounded border-0 p-0 text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-700"
+                            className={ACAO_BTN_CLASS}
                           >
-                            <MdMoreVert className="h-4 w-4" />
+                            <MdMoreHoriz className="h-5 w-5" />
                           </button>
                         }
                       >
@@ -484,13 +504,15 @@ export function PedidoProdutosCarrinhoColuna() {
                         </DropdownMenuItem>
                       </DropdownMenu>
                       <button
-                        onClick={() => removerProduto(index)}
+                        onClick={() =>
+                          setProdutoPendendoRemocao({ index, nome: produto.nome })
+                        }
                         type="button"
                         title="Remover produto"
                         aria-label="Remover produto"
-                        className="flex h-4 w-3 shrink-0 items-center justify-center rounded border-0 p-0 transition-colors hover:bg-red-100"
+                        className={ACAO_REMOVER_CLASS}
                       >
-                        <MdDelete className="h-3 w-3 text-red-500" />
+                        <MdDeleteOutline className="h-4 w-4" />
                       </button>
                     </div>
                   </div>
@@ -501,13 +523,13 @@ export function PedidoProdutosCarrinhoColuna() {
                         index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
                       }`}
                     >
-                      <div className="w-[72px] shrink-0" />
+                      <div className="w-[6.5rem] shrink-0" />
                       <div className="min-w-0 flex-1">
                         <span className="block break-words text-[11px] leading-tight text-gray-500">
                           Obs: {produto.observacao.trim()}
                         </span>
                       </div>
-                      <div className="w-[44px] shrink-0" />
+                      <div className="w-[3.5rem] shrink-0" />
                     </div>
                   ) : null}
 
@@ -569,9 +591,7 @@ export function PedidoProdutosCarrinhoColuna() {
                         }}
                       >
                         {/* Quantidade do Complemento */}
-                        <div
-                          className={`flex items-center gap-0.5 ${COMPLEMENTO_CARRINHO_QTD_DESLOCAMENTO_CLASS}`}
-                        >
+                        <PedidoCarrinhoQtdPilula>
                           <button
                             type="button"
                             aria-label="Diminuir quantidade do complemento"
@@ -591,9 +611,9 @@ export function PedidoProdutosCarrinhoColuna() {
                                 return next
                               })
                             }}
-                            className="flex h-3 w-3 shrink-0 items-center justify-center bg-white text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                            className={STEPPER_BTN_CLASS}
                           >
-                            <MdRemove className="h-2 w-2" />
+                            <MdRemove className="h-3.5 w-3.5" />
                           </button>
                           <input
                             type="text"
@@ -660,7 +680,7 @@ export function PedidoProdutosCarrinhoColuna() {
                                 e.currentTarget.blur()
                               }
                             }}
-                            className="h-5 w-5 min-w-0 border-0 bg-transparent p-0 text-center text-xs tabular-nums text-gray-600 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary"
+                            className="h-6 w-7 min-w-0 border-0 bg-transparent p-0 text-center text-xs font-medium tabular-nums text-gray-600 focus:outline-none"
                           />
                           <button
                             type="button"
@@ -681,11 +701,11 @@ export function PedidoProdutosCarrinhoColuna() {
                                 return next
                               })
                             }}
-                            className="flex h-3 w-3 shrink-0 items-center justify-center bg-white text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                            className={STEPPER_BTN_CLASS}
                           >
-                            <MdAdd className="h-3 w-3" />
+                            <MdAdd className="h-3.5 w-3.5" />
                           </button>
-                        </div>
+                        </PedidoCarrinhoQtdPilula>
                         {/* Nome do Complemento com indentação */}
                         <div className={`min-w-0 ${COMPLEMENTO_CARRINHO_NOME_DESLOCAMENTO_CLASS}`}>
                           <span
@@ -717,19 +737,19 @@ export function PedidoProdutosCarrinhoColuna() {
                         <div aria-hidden />
                         {/* Ações: alinhado à coluna do produto (espaço do menu + remover) */}
                         <div
-                          className="flex items-center justify-end gap-0"
+                          className="flex items-center justify-end gap-0.5"
                           onClick={e => e.stopPropagation()}
                           onMouseDown={e => e.stopPropagation()}
                         >
-                          <span className="block h-5 w-3 shrink-0" aria-hidden />
+                          <span className="block h-7 w-7 shrink-0" aria-hidden />
                           <button
                             onClick={() => removerComplemento(index, compIndex)}
                             type="button"
                             title="Remover complemento"
                             aria-label="Remover complemento"
-                            className="flex h-5 w-3 shrink-0 items-center justify-center rounded border-0 p-0 transition-colors hover:bg-red-50"
+                            className={ACAO_REMOVER_CLASS}
                           >
-                            <MdClear className="h-3 w-3 text-red-500" />
+                            <MdDeleteOutline className="h-4 w-4" />
                           </button>
                         </div>
                       </div>
@@ -752,12 +772,12 @@ export function PedidoProdutosCarrinhoColuna() {
                 className="object-contain"
               />
             </div>
-            <p className="text-base leading-snug text-gray-600">
-              Selecione um grupo
+            <p className="max-w-[11rem] text-base leading-snug text-gray-600">
+              Nada por aqui ainda.
               <br />
-              e um produto
+              Escolha um produto
               <br />
-              na lista.
+              para lançar no pedido.
             </p>
           </div>
         </div>
@@ -786,30 +806,27 @@ export function PedidoProdutosCarrinhoColuna() {
       <div className="flex items-center justify-between gap-2 px-2 py-2">
         {produtos.length > 0 &&
           (!observacaoPedidoVisivel || !observacaoPedido.trim()) && (
-            <Tooltip
-              title={
+            <button
+              type="button"
+              aria-label={
                 observacaoPedidoVisivel
-                  ? 'Ocultar observação'
+                  ? 'Ocultar observação do pedido'
                   : 'Adicionar observação ao pedido'
               }
+              onClick={() => setObservacaoPedidoVisivel(!observacaoPedidoVisivel)}
+              className="flex h-7 max-w-full items-center gap-1.5 rounded border border-gray-300 bg-white px-2 text-gray-600 transition-colors hover:border-primary hover:text-primary"
             >
-              <button
-                type="button"
-                aria-label={
-                  observacaoPedidoVisivel
-                    ? 'Ocultar observação do pedido'
-                    : 'Adicionar observação ao pedido'
-                }
-                onClick={() => setObservacaoPedidoVisivel(!observacaoPedidoVisivel)}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded border border-gray-300 bg-white text-gray-600 transition-colors hover:border-primary hover:text-primary"
-              >
-                {observacaoPedidoVisivel ? (
-                  <MdRemove className="h-4 w-4" />
-                ) : (
-                  <MdEdit className="h-4 w-4" />
-                )}
-              </button>
-            </Tooltip>
+              {observacaoPedidoVisivel ? (
+                <MdRemove className="h-4 w-4 shrink-0" />
+              ) : (
+                <MdEdit className="h-4 w-4 shrink-0" />
+              )}
+              <span className="truncate text-xs font-medium">
+                {observacaoPedidoVisivel
+                  ? 'Ocultar recado'
+                  : 'Deixar um recado no pedido'}
+              </span>
+            </button>
           )}
         <div className="flex items-center justify-end gap-2 px-2 py-2">
         <span className="text-sm font-semibold text-gray-700">Total do Pedido:</span>
@@ -820,5 +837,33 @@ export function PedidoProdutosCarrinhoColuna() {
       </div>
     </div>
     </div>
+    <JiffyConfirmDialog
+      open={produtoPendendoRemocao != null}
+      onOpenChange={open => {
+        if (!open) setProdutoPendendoRemocao(null)
+      }}
+      title="Remover do pedido?"
+      description={
+        produtoPendendoRemocao ? (
+          <>
+            <strong>{produtoPendendoRemocao.nome}</strong> sai da lista. Se mudar de ideia, é
+            só lançar de novo.
+          </>
+        ) : null
+      }
+      cancelLabel="Manter"
+      confirmLabel="Remover"
+      confirmButtonClassName="bg-red-600 hover:bg-red-700"
+      onConfirm={() => {
+        if (produtoPendendoRemocao == null) return
+        removerProduto(produtoPendendoRemocao.index)
+        setProdutoPendendoRemocao(null)
+      }}
+      dialogSx={{
+        zIndex: 1400,
+        '& .MuiDialog-container': { zIndex: 1400 },
+      }}
+    />
+  </>
   )
 }
