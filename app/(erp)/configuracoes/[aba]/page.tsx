@@ -5,7 +5,9 @@ import { notFound, useRouter } from 'next/navigation'
 import { Suspense, use, useEffect } from 'react'
 import { PageLoading } from '@/src/presentation/components/ui/PageLoading'
 import {
+  DELIVERY_HUB_PATH,
   configuracoesTabPath,
+  deliveryHubEtapaPath,
   isConfiguracoesTabSlug,
   resolveConfiguracoesTabFromPath,
 } from '@/src/shared/constants/configuracoesRoutes'
@@ -31,15 +33,24 @@ export default function ConfiguracoesTabPage({
   const { aba } = use(params)
   const legacyTab = resolveConfiguracoesTabFromPath(aba)
   const isValidTab = isConfiguracoesTabSlug(aba)
+  const vaiParaHub = aba === 'empresa-delivery' || aba === 'cobertura-delivery'
 
   useEffect(() => {
+    if (aba === 'cobertura-delivery') {
+      router.replace(deliveryHubEtapaPath('delivery-cobertura'))
+      return
+    }
+    if (aba === 'empresa-delivery') {
+      router.replace(DELIVERY_HUB_PATH)
+      return
+    }
     if (!isValidTab && legacyTab) {
       router.replace(configuracoesTabPath(legacyTab))
     }
-  }, [isValidTab, legacyTab, router])
+  }, [aba, isValidTab, legacyTab, router])
 
   if (!isValidTab) {
-    if (legacyTab) {
+    if (legacyTab || vaiParaHub) {
       return (
         <div className="h-full">
           <PageLoading />

@@ -6,7 +6,8 @@ import { Button } from '@/src/presentation/components/ui/button'
 import { useLocaleUppercaseInputHandler } from '@/src/presentation/hooks/useLocaleUppercaseInputHandler'
 import { sxEntradaCompactaProduto, sxEntradaCompactaProdutoSelect } from './produtoFormMuiSx'
 import { UNIDADES_MEDIDA_PRODUTO_OPCOES } from '@/src/shared/types/unidadeMedidaProduto'
-import type { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
+import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
+import { useMemo } from 'react'
 
 interface InformacoesProdutoStepProps {
   nomeProduto: string
@@ -19,6 +20,8 @@ interface InformacoesProdutoStepProps {
   onUnidadeProdutoChange: (value: string | null) => void
   grupoProduto: string | null
   onGrupoProdutoChange: (value: string | null) => void
+  /** Nome da categoria já vinculada (exibe fallback se o id ainda não está em `grupos`). */
+  grupoProdutoNome?: string | null
   /** EAN / código de barras (GTIN — até 14 dígitos numéricos). */
   codigoEanBarras: string
   onCodigoEanBarrasChange: (value: string) => void
@@ -35,6 +38,20 @@ interface InformacoesProdutoStepProps {
   onSaveAndClose: () => void
   /** Quando true, ações ficam no rodapé do painel lateral (JiffySidePanelModal) */
   hideStepFooter?: boolean
+  /** Oculta o preço do cadastro base quando a empresa tem mais de um menu. */
+  ocultarPrecoVenda?: boolean
+}
+
+function grupoCategoriaFallback(id: string, nome: string): GrupoProduto {
+  return GrupoProduto.create({
+    id,
+    nome,
+    corHex: '#CCCCCC',
+    iconName: '',
+    ativo: true,
+    ativoDelivery: false,
+    ativoLocal: false,
+  })
 }
 
 /**
@@ -52,6 +69,7 @@ export function InformacoesProdutoStep({
   onUnidadeProdutoChange,
   grupoProduto,
   onGrupoProdutoChange,
+  grupoProdutoNome,
   codigoEanBarras,
   onCodigoEanBarrasChange,
   grupos,
@@ -60,6 +78,7 @@ export function InformacoesProdutoStep({
   lockedGrupoLabel,
   pendingNovaCategoriaLabel,
   showCategoriaField = true,
+  ocultarPrecoVenda = false,
   onNext,
   onSaveAndClose,
   hideStepFooter = false,
@@ -88,7 +107,18 @@ export function InformacoesProdutoStep({
     onPrecoVendaChange(formatted)
   }
 
-  const grupoSelecionado = grupos.find(g => g.getId() === grupoProduto) ?? null
+  const gruposComValor = useMemo(() => {
+    if (!grupoProduto) return grupos
+    if (grupos.some(g => g.getId() === grupoProduto)) return grupos
+    const nome =
+      grupoProdutoNome?.trim() ||
+      lockedGrupoLabel?.trim() ||
+      pendingNovaCategoriaLabel?.trim() ||
+      'Categoria selecionada'
+    return [grupoCategoriaFallback(grupoProduto, nome), ...grupos]
+  }, [grupos, grupoProduto, grupoProdutoNome, lockedGrupoLabel, pendingNovaCategoriaLabel])
+
+  const grupoSelecionado = gruposComValor.find(g => g.getId() === grupoProduto) ?? null
 
   return (
     <div className="rounded-[10px] bg-info p-2 md:p-4">
@@ -101,8 +131,8 @@ export function InformacoesProdutoStep({
       </p>
 
       <div className="space-y-4">
-        {/* Linha 1: Nome do Produto + Preço de Venda lado a lado */}
-        <div className="grid gap-4 md:grid-cols-[1fr_180px]">
+        {/* Linha 1: Nome do Produto + Preço de Venda (preço só com 1 menu / cadastro unificado) */}
+        <div className={ocultarPrecoVenda ? 'grid gap-4' : 'grid gap-4 md:grid-cols-[1fr_180px]'}>
           <Input
             label="Nome do Produto"
             required
@@ -117,16 +147,18 @@ export function InformacoesProdutoStep({
             InputLabelProps={{ required: true }}
           />
 
-          <Input
-            label="Preço de Venda"
-            size="small"
-            type="text"
-            value={precoVenda}
-            onChange={e => handlePrecoChange(e.target.value)}
-            placeholder="R$ 0,00"
-            className="bg-white"
-            sx={sxEntradaCompactaProduto}
-          />
+          {ocultarPrecoVenda ? null : (
+            <Input
+              label="Preço de Venda"
+              size="small"
+              type="text"
+              value={precoVenda}
+              onChange={e => handlePrecoChange(e.target.value)}
+              placeholder="R$ 0,00"
+              className="bg-white"
+              sx={sxEntradaCompactaProduto}
+            />
+          )}
         </div>
 
         {/* Linha 2: Categoria + Unidade + Código EAN */}
@@ -159,7 +191,7 @@ export function InformacoesProdutoStep({
                   <Autocomplete
                     id="np-grupo-produto-searchable"
                     size="small"
-                    options={grupos}
+                    options={gruposComValor}
                     loading={isLoadingGrupos}
                     loadingText="Carregando..."
                     noOptionsText="Nenhuma categoria encontrada"

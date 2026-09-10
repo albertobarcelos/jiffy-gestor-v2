@@ -1,7 +1,8 @@
 'use client'
 
-import { useMemo, useRef, useCallback } from 'react'
+import { useMemo, useRef, useCallback, useEffect } from 'react'
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
+import { ordenarMeiosPagamentoPadrao } from '@/src/shared/utils/corFormaPagamentoFiscal'
 import {
   useCreatePedidoDelivery,
   useCreateVendaGestor,
@@ -12,6 +13,7 @@ import {
 } from '@/src/presentation/hooks/useVendas'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
+import { useMenuDeliveryId } from '@/src/presentation/hooks/useMenuDeliveryId'
 import { usePreferenciasImpressaoDelivery } from '@/src/presentation/hooks/usePreferenciasImpressaoDelivery'
 import { useImpressaoDelivery } from '@/features/delivery/hooks/useImpressaoDelivery'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
@@ -49,6 +51,7 @@ import { createNovoPedidoResetForm } from './orchestrator/createNovoPedidoResetF
 import { assembleNovoPedidoContextSlices } from './orchestrator/assembleNovoPedidoContextSlices'
 import { canSubmitNovoPedido } from './orchestrator/canSubmitNovoPedido'
 import { useNovoPedidoOrchestratorFlags } from './orchestrator/useNovoPedidoOrchestratorFlags'
+import { enderecoTemGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
 import {
   formatarDataDetalhePedido as formatarDataDetalhePedidoOrchestrator,
   formatarDataHoraResumoFiscal,
@@ -72,8 +75,11 @@ export function useNovoPedidoOrchestrator({
   tipoVendaGestor = null,
   tipoInicioPedido = 'balcao',
   abaDetalhesInicial,
+  clienteInicial = null,
+  telefoneInicial,
 }: NovoPedidoModalProps) {
-  const { empresa, menuVendaGestorId, menuDeliveryId } = useEmpresaMe()
+  const { empresa, menuVendaGestorId } = useEmpresaMe()
+  const { menuDeliveryId } = useMenuDeliveryId()
   const { preferenciasImpressaoDelivery } = usePreferenciasImpressaoDelivery()
   const { processarAposTransicaoVendaGestorId } = useImpressaoDelivery()
   const empresaId = useTenantEmpresaId()
@@ -127,6 +133,10 @@ export function useNovoPedidoOrchestrator({
     setCurrentStep,
     moradaEntregaSelecionada,
     setMoradaEntregaSelecionada,
+    enderecoEntregaCoberturaStatus,
+    setEnderecoEntregaCoberturaStatus,
+    enderecoEntregaCoberturaValorTaxa,
+    setEnderecoEntregaCoberturaValorTaxa,
     telefoneBuscaEntrega,
     setTelefoneBuscaEntrega,
     telefoneBuscadoEntrega,
@@ -327,6 +337,29 @@ export function useNovoPedidoOrchestrator({
     getAccessToken: () => useAuthStore.getState().tenantAuth?.getAccessToken(),
   })
 
+  useEffect(() => {
+    if (!open || vendaId || modoVisualizacao) return
+    if (clienteInicial) {
+      handleSelectCliente(clienteInicial)
+      return
+    }
+    const tel = telefoneInicial?.trim()
+    if (!tel || tipoInicioPedido !== 'entrega') return
+    const digitos = tel.replace(/\D/g, '')
+    setTelefoneBuscaEntrega(tel)
+    setTelefoneBuscadoEntrega(digitos.length >= 8 ? digitos : null)
+  }, [
+    open,
+    vendaId,
+    modoVisualizacao,
+    clienteInicial,
+    telefoneInicial,
+    tipoInicioPedido,
+    handleSelectCliente,
+    setTelefoneBuscaEntrega,
+    setTelefoneBuscadoEntrega,
+  ])
+
   // Buscar meios de pagamento
   const {
     data: meiosPagamentoData,
@@ -342,7 +375,8 @@ export function useNovoPedidoOrchestrator({
 
   const meiosPagamento = useMemo(() => {
     if (!meiosPagamentoData?.pages) return []
-    return meiosPagamentoData.pages.flatMap(page => page.meiosPagamento || [])
+    const lista = meiosPagamentoData.pages.flatMap(page => page.meiosPagamento || [])
+    return ordenarMeiosPagamentoPadrao(lista)
   }, [meiosPagamentoData])
 
   const { entregadores, entregadoresQuery } = useEntregadoresQuery({
@@ -378,6 +412,7 @@ export function useNovoPedidoOrchestrator({
     pagamentos,
     taxaEntregaId,
     taxasEntrega,
+    enderecoEntregaCoberturaValorTaxa,
     resumoFinanceiroDetalhes,
     detalhesEntregaPedido,
   })
@@ -520,8 +555,14 @@ export function useNovoPedidoOrchestrator({
     setCurrentStep,
     pedidoDeliveryGestor,
     clienteEntregaVinculadoId: clienteEntregaVinculado?.id,
+    telefoneClienteDelivery: telefoneBuscadoEntrega,
     pedidoComEntrega,
     temEnderecoEntrega: Boolean(moradaEntregaSelecionada?.endereco),
+    enderecoEntregaTemGeo: Boolean(
+      moradaEntregaSelecionada?.endereco &&
+        enderecoTemGeolocalizacao(moradaEntregaSelecionada.endereco)
+    ),
+    enderecoEntregaCoberturaStatus,
     modoEdicaoProdutos,
   })
 
@@ -557,6 +598,8 @@ export function useNovoPedidoOrchestrator({
       tempoPrevistoMinutos,
       pedidoComEntrega,
       taxaEntregaSelecionada,
+      taxaEntregaId,
+      taxaEntregaCoberturaValor: enderecoEntregaCoberturaValorTaxa,
       valorTaxaEntrega,
       moradaEntregaSelecionada,
       entregaComCobrancaPeloEntregador,
@@ -576,6 +619,11 @@ export function useNovoPedidoOrchestrator({
       pedidoComRetirada,
       pedidoComEntrega,
       temEnderecoEntrega: Boolean(moradaEntregaSelecionada?.endereco),
+      enderecoEntregaTemGeo: Boolean(
+        moradaEntregaSelecionada?.endereco &&
+          enderecoTemGeolocalizacao(moradaEntregaSelecionada.endereco)
+      ),
+      enderecoEntregaCoberturaStatus,
       troco,
     },
     createVendaGestor,
@@ -678,13 +726,20 @@ export function useNovoPedidoOrchestrator({
   const handlePedidoPainelExited = useNovoPedidoResetOnExit(resetForm, onAfterClose)
 
   const temEnderecoEntrega = Boolean(moradaEntregaSelecionada?.endereco)
+  const enderecoEntregaTemGeo = Boolean(
+    moradaEntregaSelecionada?.endereco &&
+      enderecoTemGeolocalizacao(moradaEntregaSelecionada.endereco)
+  )
 
   const canSubmit = () =>
     canSubmitNovoPedido({
       pedidoDeliveryGestor,
       clienteEntregaVinculadoId: clienteEntregaVinculado?.id,
+      telefoneClienteDelivery: telefoneBuscadoEntrega,
       pedidoComEntrega,
       temEnderecoEntrega,
+      enderecoEntregaTemGeo,
+      enderecoEntregaCoberturaStatus,
       pedidoEntregaAceitaPagamentoPendente,
       entregaComCobrancaPeloEntregador,
       produtosCount: produtos.length,
@@ -780,6 +835,11 @@ export function useNovoPedidoOrchestrator({
     meiosPagamento,
     meiosPagamentoScrollRef,
     moradaEntregaSelecionada,
+    setMoradaEntregaSelecionada,
+    enderecoEntregaCoberturaStatus,
+    setEnderecoEntregaCoberturaStatus,
+    enderecoEntregaCoberturaValorTaxa,
+    setEnderecoEntregaCoberturaValorTaxa,
     mostrarLoadingFormasPagamento,
     modoVisualizacao,
     modalCancelarVendaOpen,
@@ -843,7 +903,6 @@ export function useNovoPedidoOrchestrator({
     setModalConfirmacaoSaidaOpen,
     setModalEdicaoProdutoOpen,
     setModalLancamentoProdutoPainelOpen,
-    setMoradaEntregaSelecionada,
     setPagamentos,
     setProdutoIndexEdicao,
     setProdutoParaLancamentoPainel,

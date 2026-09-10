@@ -57,14 +57,14 @@ export function DesignCabecalhoTab({
             className="mt-1 w-full max-w-md cursor-not-allowed rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-primary-text outline-none"
           />
           <p className="mt-0.5 text-xs text-secondary-text">
-            Nome fantasia da empresa, conforme cadastro.
+            Nome fantasia da empresa, conforme cadastro (até 20 caracteres no cabeçalho).
           </p>
         </div>
       </section>
 
       {!canUpload ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Configure a Empresa Delivery (slug) em Configurações antes de enviar logo e capa.
+          Configure o Delivery (slug) em Configurações antes de enviar logo e capa.
         </p>
       ) : null}
 

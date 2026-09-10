@@ -10,6 +10,7 @@ export const ERP_ROUTE_PREFIXES = [
   '/dashboard',
   '/produtos',
   '/grupos-produtos',
+  '/menus',
   '/grupos-complementos',
   '/complementos',
   '/taxas',
@@ -21,7 +22,7 @@ export const ERP_ROUTE_PREFIXES = [
   '/meios-pagamentos',
   '/estoque',
   '/meu-caixa',
-  '/pedidos-clientes',
+  '/pedidos',
   '/vendas',
   '/relatorios',
   '/relatorios-vendas',
@@ -29,6 +30,7 @@ export const ERP_ROUTE_PREFIXES = [
   '/painel-contador',
   '/historico-fechamento',
   '/configuracoes',
+  '/config',
   '/cadastro-por-planilha',
 ] as const
 

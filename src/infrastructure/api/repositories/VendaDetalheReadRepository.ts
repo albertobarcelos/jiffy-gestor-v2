@@ -111,8 +111,13 @@ export class VendaDetalheReadRepository implements IVendaDetalheReadRepository {
       options?.preferirModuloDelivery ?? deveUsarModuloDeliveryParaDetalhe(tabelaOrigem)
 
     if (preferirDelivery) {
-      const delivery = await this.fetchPedidoDelivery(vendaId, token)
-      if (delivery) return delivery
+      try {
+        const delivery = await this.fetchPedidoDelivery(vendaId, token)
+        if (delivery) return delivery
+      } catch {
+        // GET /delivery/pedidos/:id pode 500 no backend (ex.: "Erro ao buscar venda externa
+        // por id" em pedidos EM_ROTA). O detalhe em venda_gestor costuma continuar íntegro.
+      }
     }
 
     return this.fetchVendaGestor(vendaId, token, incluirFiscal)

@@ -1,34 +1,17 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { abrirDocumentoFiscalPdf } from '@/src/presentation/utils/abrirDocumentoFiscalPdf'
 import { abrirNotaFiscalPublica } from '@/src/shared/utils/notaFiscalPublicaUrl'
 import { showToast } from '@/src/shared/utils/toast'
 import { kanbanVendaUsaCupomPublicoNfce } from '../rules/vendasKanban.rules'
 import type { Venda } from '../types'
 
-export interface UseKanbanVendaCardStateParams {
-  abrirEntregadorSolicitado?: boolean
-  exibirAtribuirEntregador: boolean
-  onAbrirEntregadorConsumido?: () => void
-}
-
-export function useKanbanVendaCardState(params: UseKanbanVendaCardStateParams) {
-  const { abrirEntregadorSolicitado = false, exibirAtribuirEntregador, onAbrirEntregadorConsumido } =
-    params
-
+export function useKanbanVendaCardState() {
   const [entregaQuickViewAnchor, setEntregaQuickViewAnchor] = useState<HTMLElement | null>(null)
   const [atribuirEntregadorOpen, setAtribuirEntregadorOpen] = useState(false)
   const [observacaoPedidoOpen, setObservacaoPedidoOpen] = useState(false)
   const [enderecoEntregaOpen, setEnderecoEntregaOpen] = useState(false)
-
-  useEffect(() => {
-    if (!abrirEntregadorSolicitado) return
-    if (exibirAtribuirEntregador) {
-      setAtribuirEntregadorOpen(true)
-    }
-    onAbrirEntregadorConsumido?.()
-  }, [abrirEntregadorSolicitado, exibirAtribuirEntregador, onAbrirEntregadorConsumido])
 
   const quickViewAberto = Boolean(entregaQuickViewAnchor)
   const bloquearDragCard =

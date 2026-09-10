@@ -11,6 +11,14 @@ import { AuthEnvelopeIcon, AuthLockIcon } from '@/src/presentation/components/fe
 import { authFluid } from '@/src/presentation/components/features/auth/components/auth-input-fluid'
 import { cn } from '@/src/shared/utils/cn'
 import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
+import { fetchAccessTokenEscolherEmpresa } from '@/src/presentation/utils/escolherEmpresaApi'
+import { entrarEmpresaGestorNaAba } from '@/src/presentation/gestor-pedidos/sessao/entrarEmpresaGestorNaAba'
+import { lerSinalGestorDoBrowser, pathEscolherEmpresaKiosk } from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
+import { planearDestinoAposLogin } from '@/src/presentation/gestor-pedidos/sessao/planearDestinoAposLogin'
+import { lerUltimaEmpresaKiosk } from '@/src/presentation/gestor-pedidos/kiosk/ultimaEmpresaKiosk'
+import { estaNoAppJiffyFlow } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
+import { gravarEmpresasLoginFlow } from '@/src/presentation/gestor-pedidos/kiosk/empresasLoginFlow'
+import { clearTabSession } from '@/src/shared/utils/tabSession'
 
 /**
  * Componente de formulário de login
@@ -27,6 +35,10 @@ export function LoginForm() {
   const [resendMessage, setResendMessage] = useState<string | null>(null)
 
   const { loginWithHubEmpresas, setLoading, setError, isLoading } = useAuthStore()
+
+  useEffect(() => {
+    lerSinalGestorDoBrowser()
+  }, [])
 
   /** Convite por e-mail: `p` (base64url), ou legado `email` / `conviteId`. */
   useEffect(() => {
@@ -86,8 +98,45 @@ export function LoginForm() {
       }
 
       loginWithHubEmpresas(resultado.auth, resultado.empresas)
+      gravarEmpresasLoginFlow(resultado.empresas)
 
-      router.replace(HUB_PATH)
+      const destino = planearDestinoAposLogin({
+        empresas: resultado.empresas,
+        sinalGestor: lerSinalGestorDoBrowser(),
+        ultimaEmpresaId: lerUltimaEmpresaKiosk()?.empresaId,
+      })
+      if (destino.tipo === 'pedidos-gestor') {
+        const token = await fetchAccessTokenEscolherEmpresa(
+          destino.empresa.id,
+          resultado.auth.getAccessToken()
+        )
+        window.location.assign(
+          entrarEmpresaGestorNaAba({
+            accessToken: token,
+            empresaNome: destino.empresa.nomeFantasia,
+            empresaId: destino.empresa.id,
+          })
+        )
+        return
+      }
+
+      if (destino.tipo === 'escolher-empresa-kiosk') {
+        clearTabSession()
+        await new Promise<void>(resolve => {
+          window.setTimeout(resolve, 0)
+        })
+        window.location.assign(destino.path)
+        return
+      }
+
+      /** O .exe nunca abre Minhas Empresas — mesmo se o planner falhar. */
+      if (estaNoAppJiffyFlow()) {
+        clearTabSession()
+        window.location.assign(pathEscolherEmpresaKiosk())
+        return
+      }
+
+      router.replace(destino.path || HUB_PATH)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao fazer login'
       setError(message)

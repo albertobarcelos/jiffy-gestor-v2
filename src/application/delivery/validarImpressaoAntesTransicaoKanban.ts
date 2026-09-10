@@ -8,8 +8,8 @@ import type {
 } from '@/src/shared/types/vendaGestorTickets'
 import {
   temImpressoraExpedicaoConfigurada,
-  TOAST_IMPRESSORA_EXPEDICAO_MAPEAMENTO_WINDOWS,
-  TOAST_IMPRESSORA_EXPEDICAO_NECESSARIA,
+  TOAST_QUADRO_SEGUE_SEM_EXPEDICAO_ESCOLHIDA,
+  TOAST_QUADRO_SEGUE_SEM_VINCULO_EXPEDICAO,
   TOAST_IMPRESSORA_PRODUCAO_MAPEAMENTO_WINDOWS,
   transicaoExigeImpressoraExpedicao,
 } from '@/src/shared/utils/deliveryImpressoraExpedicao'
@@ -50,6 +50,13 @@ function ticketProducaoEhFallbackSemImpressoraProduto(ticket: VendaGestorTicket)
   return origem.includes('fallback') || origem.includes('expedicao') || origem.includes('padr')
 }
 
+function avisoSemPapelNaoBloqueia(toastWarning: string): Pick<
+  ValidarImpressaoAntesTransicaoResult,
+  'podeAvancar' | 'abrirModalConfig' | 'toastWarning'
+> {
+  return { podeAvancar: true, abrirModalConfig: false, toastWarning }
+}
+
 function validarExpedicaoParaTransicao(params: {
   modo: ModoImpressaoDelivery
   acoes: AcaoTransicaoGestor[]
@@ -62,21 +69,13 @@ function validarExpedicaoParaTransicao(params: {
   if (!exigeExpedicao) return null
 
   if (!temImpressoraExpedicaoConfigurada(params.impressoraExpedicaoId)) {
-    return {
-      podeAvancar: false,
-      abrirModalConfig: true,
-      toastWarning: TOAST_IMPRESSORA_EXPEDICAO_NECESSARIA,
-    }
+    return avisoSemPapelNaoBloqueia(TOAST_QUADRO_SEGUE_SEM_EXPEDICAO_ESCOLHIDA)
   }
 
   const tipoTicket = params.modo === 'unificado' ? 'unificado' : 'expedicao'
   const ticketExpedicao = params.tickets.find(t => t.tipoCupom === tipoTicket)
   if (ticketExpedicao && !ticketTemNomeWindows(ticketExpedicao)) {
-    return {
-      podeAvancar: false,
-      abrirModalConfig: true,
-      toastWarning: TOAST_IMPRESSORA_EXPEDICAO_MAPEAMENTO_WINDOWS,
-    }
+    return avisoSemPapelNaoBloqueia(TOAST_QUADRO_SEGUE_SEM_VINCULO_EXPEDICAO)
   }
 
   return null
@@ -96,11 +95,7 @@ function validarProducaoSeparadoParaIniciarPreparo(
       ticket.impressora?.nome?.trim() ||
       'produção'
 
-    return {
-      podeAvancar: false,
-      abrirModalConfig: true,
-      toastWarning: TOAST_IMPRESSORA_PRODUCAO_MAPEAMENTO_WINDOWS(nomeImpressora),
-    }
+    return avisoSemPapelNaoBloqueia(TOAST_IMPRESSORA_PRODUCAO_MAPEAMENTO_WINDOWS(nomeImpressora))
   }
 
   return null

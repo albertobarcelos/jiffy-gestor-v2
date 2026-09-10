@@ -16,6 +16,7 @@ import {
 import { parseDeliveryCupomTemplate } from '@/src/shared/utils/parseDeliveryCupomTemplate'
 import { getDeliveryCupomTemplateLocal } from '@/src/infrastructure/printing/deliveryCupomTemplateStorage'
 import { lerMenuIdDeParametroEmpresa } from '@/src/shared/utils/parametroEmpresaMenus'
+import { lerEnderecoLocalizacaoDoPayloadEmpresa } from '@/src/shared/utils/geolocalizacaoEmpresa'
 
 /** Endereço da empresa (GET `/api/empresas/me`) — usado em mensagens de retirada. */
 export interface EnderecoEmpresaMe {
@@ -43,12 +44,14 @@ export interface EmpresaMeQueryData {
   timezoneAgregacao: string
   preferenciasImpressaoDelivery: PreferenciasImpressaoDelivery
   deliveryCupomTemplate: DeliveryCupomTemplateConfig
-  /** Cópia de `parametroEmpresa` para PATCH parcial (ex.: modal delivery). */
+  /** Cópia de `parametroEmpresa` para PATCH parcial (ex.: aba Empresa). */
   parametroEmpresa: Record<string, unknown>
-  /** Cardápio publicado no delivery (`parametroEmpresa.menuDeliveryId`). */
-  menuDeliveryId: string | null
   /** Cardápio usado nas vendas do gestor (`parametroEmpresa.menuVendaGestorId`). */
   menuVendaGestorId: string | null
+  /** Coordenada salva no endereço (`endereco.enderecoLocalizacao`). */
+  possuiGeolocalizacao: boolean
+  /** `parametroEmpresa.timezone` preenchido (não usa fallback por UF). */
+  timezoneConfigurado: boolean
 }
 
 function mapEnderecoEmpresaMe(enderecoRaw: Record<string, unknown>): EnderecoEmpresaMe | null {
@@ -128,6 +131,12 @@ export async function fetchEmpresaMeQueryData(
       ? { ...(rawPe as Record<string, unknown>) }
       : {}
 
+  const { enderecoLocalizacao } = lerEnderecoLocalizacaoDoPayloadEmpresa(endereco)
+  const timezoneSalvo =
+    (typeof parametroEmpresa.timezone === 'string' && parametroEmpresa.timezone.trim()) ||
+    (typeof parametroEmpresa.timeZone === 'string' && parametroEmpresa.timeZone.trim()) ||
+    ''
+
   return {
     empresa: {
       id,
@@ -141,8 +150,9 @@ export async function fetchEmpresaMeQueryData(
     preferenciasImpressaoDelivery: parsePreferenciasImpressaoDelivery(data),
     deliveryCupomTemplate: getDeliveryCupomTemplateLocal(id) ?? parseDeliveryCupomTemplate(data),
     parametroEmpresa,
-    menuDeliveryId: lerMenuIdDeParametroEmpresa(parametroEmpresa, 'menuDeliveryId'),
     menuVendaGestorId: lerMenuIdDeParametroEmpresa(parametroEmpresa, 'menuVendaGestorId'),
+    possuiGeolocalizacao: enderecoLocalizacao != null,
+    timezoneConfigurado: timezoneSalvo.length > 0,
   }
 }
 
@@ -181,8 +191,9 @@ export function useEmpresaMe() {
       data?.preferenciasImpressaoDelivery ?? DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
     deliveryCupomTemplate: data?.deliveryCupomTemplate ?? DEFAULT_DELIVERY_CUPOM_TEMPLATE,
     parametroEmpresa: data?.parametroEmpresa ?? {},
-    menuDeliveryId: data?.menuDeliveryId ?? null,
     menuVendaGestorId: data?.menuVendaGestorId ?? null,
+    possuiGeolocalizacao: data?.possuiGeolocalizacao ?? false,
+    timezoneConfigurado: data?.timezoneConfigurado ?? false,
     isLoading: query.isPending,
     error:
       query.error instanceof Error

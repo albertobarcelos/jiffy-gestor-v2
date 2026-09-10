@@ -1,0 +1,50 @@
+import { describe, expect, it } from 'vitest'
+import {
+  CONFIGURACOES_DELIVERY_TAB,
+  configuracoesTabPath,
+  DELIVERY_HUB_PATH,
+  deliveryEtapaIdFromSlug,
+  deliveryHubEtapaPath,
+  isConfiguracoesModulePath,
+  isConfiguracoesTabSlug,
+  isDeliveryEtapaId,
+} from '@/src/shared/constants/configuracoesRoutes'
+
+describe('configuracoesRoutes — Delivery', () => {
+  it('usa /config/delivery no hub e /config/delivery/:etapa nas etapas', () => {
+    expect(DELIVERY_HUB_PATH).toBe('/config/delivery')
+    expect(CONFIGURACOES_DELIVERY_TAB).toBe('delivery')
+    expect(isConfiguracoesTabSlug('empresa-delivery')).toBe(false)
+    expect(isConfiguracoesTabSlug('cobertura-delivery')).toBe(false)
+    expect(isConfiguracoesTabSlug('menus')).toBe(true)
+    expect(isDeliveryEtapaId('delivery-cobertura')).toBe(true)
+    expect(isDeliveryEtapaId('delivery-nome-cardapio')).toBe(true)
+    expect(isDeliveryEtapaId('empresa-delivery')).toBe(false)
+    expect(deliveryHubEtapaPath('delivery-cobertura')).toBe('/config/delivery/cobertura')
+    expect(deliveryHubEtapaPath('delivery-geolocalizacao')).toBe('/config/delivery/empresa')
+    expect(deliveryHubEtapaPath('delivery-nome-cardapio')).toBe('/config/delivery/nome-cardapio')
+    expect(deliveryHubEtapaPath('delivery-design')).toBe('/config/delivery/design')
+    expect(deliveryHubEtapaPath('delivery-agenda')).toBe('/config/delivery/agenda')
+    expect(deliveryHubEtapaPath('delivery-entregadores')).toBe('/config/delivery/entregadores')
+    expect(deliveryHubEtapaPath('delivery-meios')).toBe('/config/delivery/meios')
+    expect(deliveryHubEtapaPath('delivery-impressoras')).toBe('/config/delivery/impressoras')
+    expect(deliveryHubEtapaPath('delivery-notificacoes')).toBe('/config/delivery/notificacoes')
+    expect(deliveryEtapaIdFromSlug('cobertura')).toBe('delivery-cobertura')
+    expect(deliveryEtapaIdFromSlug('nome-cardapio')).toBe('delivery-nome-cardapio')
+    expect(deliveryEtapaIdFromSlug('foo')).toBeNull()
+  })
+
+  it('reconhece o módulo Configurações em /config e /configuracoes', () => {
+    expect(isConfiguracoesModulePath('/config/delivery/cobertura')).toBe(true)
+    expect(isConfiguracoesModulePath('/gestao/loja-abc12345/config/delivery')).toBe(true)
+    expect(isConfiguracoesModulePath('/configuracoes/empresa')).toBe(true)
+    expect(isConfiguracoesModulePath('/pedidos')).toBe(false)
+  })
+
+  it('mantém as abas de Configurações em /configuracoes/:aba', () => {
+    expect(configuracoesTabPath('empresa')).toBe('/configuracoes/empresa')
+    expect(configuracoesTabPath('taxas')).toBe('/configuracoes/taxas')
+    expect(configuracoesTabPath('meios-pagamentos')).toBe('/configuracoes/meios-pagamentos')
+    expect(configuracoesTabPath('menus')).toBe('/configuracoes/menus')
+  })
+})

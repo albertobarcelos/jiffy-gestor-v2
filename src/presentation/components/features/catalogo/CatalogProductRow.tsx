@@ -36,7 +36,7 @@ export interface CatalogProductRowProps {
   isSavingImage?: boolean
   isSavingNome?: boolean
   onNomeChange?: (id: string, nome: string) => void | boolean | Promise<void | boolean>
-  onValorChange: (id: string, valor: number) => void | boolean | Promise<void | boolean>
+  onValorChange?: (id: string, valor: number) => void | boolean | Promise<void | boolean>
   onSwitchToggle: (id: string, status: boolean) => void
   onEdit: (id: string) => void
   onRemove?: (id: string) => void
@@ -75,6 +75,7 @@ function CatalogProductRowInner({
   const pausadoNoMenu = isMenu && !ativo
   const podeTrocarImagem = Boolean(onChangeImage)
   const podeEditarNome = Boolean(onNomeChange)
+  const podeEditarValor = Boolean(onValorChange)
 
   const abrirSeletorImagem = () => {
     if (isSavingImage) return
@@ -145,15 +146,17 @@ function CatalogProductRowInner({
       <div
         onClick={() => onEdit(id)}
         className={cn(
-          'grid cursor-pointer items-center gap-x-1.5 gap-y-2 border border-gray-200 px-2 py-2 md:gap-x-2 md:px-4',
+          'grid cursor-pointer items-center gap-x-1.5 gap-y-2 px-2 py-2 md:gap-x-2 md:px-4',
           'relative z-0 has-[.tooltip-hover-above:hover]:z-[100] has-[.tooltip-hover-below:hover]:z-[100]',
+          isMenu ? 'border border-gray-200' : null,
           pausadoNoMenu
             ? 'bg-gray-200 hover:bg-gray-200'
             : 'bg-white hover:bg-secondary-text/10',
           isMenu
-            ? '[grid-template-columns:auto_minmax(0,1fr)_auto] md:[grid-template-columns:auto_minmax(0,30ch)_auto_minmax(0,1fr)_auto]'
+            ? // imagem | nome | COD | ícones | espaço flex | preço/ações
+              '[grid-template-columns:auto_minmax(0,1fr)_auto_auto] md:[grid-template-columns:auto_minmax(0,28ch)_auto_auto_minmax(0,1fr)_auto]'
             : categoriaSlot
-              ? '[grid-template-columns:minmax(0,1fr)_auto] md:[grid-template-columns:minmax(0,30ch)_auto_auto_auto_auto]'
+              ? '[grid-template-columns:minmax(0,1fr)_auto] md:[grid-template-columns:minmax(0,30ch)_auto_auto_12rem_auto]'
               : '[grid-template-columns:minmax(0,1fr)_auto] md:[grid-template-columns:minmax(0,30ch)_auto_auto_minmax(0,1fr)_auto]'
         )}
       >
@@ -235,18 +238,16 @@ function CatalogProductRowInner({
           </span>
         )}
 
-        {!isMenu ? (
-          <span className="inline-flex shrink-0 items-center justify-center rounded-full border border-primary px-2 py-0.5 text-[10px] font-semibold leading-tight text-primary md:text-[11px]">
-            COD. {codigo ?? '—'}
-          </span>
-        ) : null}
+        <span className="inline-flex shrink-0 items-center justify-center justify-self-start rounded-full border border-primary px-2 py-0.5 text-[10px] font-semibold leading-tight text-primary md:text-[11px]">
+          COD. {codigo?.trim() ? codigo : '—'}
+        </span>
 
         {actionsSlot ? (
           <div
             className={cn(
-              'flex items-center gap-1 justify-self-start md:gap-1.5',
+              'flex flex-nowrap items-center gap-1 justify-self-start md:gap-1.5',
               isMenu
-                ? 'col-span-2 md:col-span-1'
+                ? 'max-md:col-span-2 max-md:overflow-x-auto max-md:pb-0.5'
                 : 'col-span-2 max-md:overflow-x-auto max-md:pb-0.5 md:col-span-1'
             )}
           >
@@ -254,13 +255,10 @@ function CatalogProductRowInner({
           </div>
         ) : null}
 
-        {categoriaSlot ? (
-          <div
-            className={cn(
-              'min-w-0 justify-self-start',
-              isMenu ? 'hidden md:block' : 'col-span-2 md:col-span-1'
-            )}
-          >
+        {isMenu ? (
+          <div className="hidden min-w-0 md:block" aria-hidden />
+        ) : categoriaSlot ? (
+          <div className="min-w-0 justify-self-start max-md:col-span-2 md:col-span-1">
             {categoriaSlot}
           </div>
         ) : (
@@ -269,10 +267,8 @@ function CatalogProductRowInner({
 
         <div
           className={cn(
-            'flex w-auto flex-wrap items-center justify-end gap-2 self-center justify-self-end md:gap-4',
-            isMenu
-              ? 'col-span-2 md:col-span-1 md:mr-4'
-              : 'col-span-2 md:col-span-1 md:mr-4'
+            'flex w-auto flex-nowrap items-center justify-end gap-2 self-center justify-self-end md:mr-4 md:gap-4',
+            isMenu ? 'max-md:col-span-2' : 'max-md:col-span-2'
           )}
         >
           {valorSomenteLeitura ? (
@@ -282,13 +278,13 @@ function CatalogProductRowInner({
             >
               {valorExibicao ?? '—'}
             </span>
-          ) : (
+          ) : podeEditarValor && onValorChange ? (
             <ProdutoValorInput
               valor={valor}
               disabled={isSavingValor}
               onCommit={novoValor => onValorChange(id, novoValor)}
             />
-          )}
+          ) : null}
           {isMenu ? (
             <MenuProdutoPauseControl
               isAtivo={ativo}

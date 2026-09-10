@@ -8,16 +8,25 @@ import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { CidadeAutocomplete } from '@/src/presentation/components/ui/cidade-autocomplete'
 import { Input } from '@/src/presentation/components/ui/input'
-import { UppercaseLocaleInput } from '@/src/presentation/components/ui/UppercaseLocaleInput'
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
 import { MenuItem } from '@mui/material'
 import { LogoImpressaoCropModal } from '../LogoImpressaoCropModal'
-import { MenuParametroEmpresaSelect } from '../MenuParametroEmpresaSelect'
+import { EnderecoPlacesAutocomplete } from '@/src/presentation/components/shared/geolocalizacao/EnderecoPlacesAutocomplete'
+import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
+import {
+  lerEnderecoLocalizacaoDoPayloadEmpresa,
+  montarPatchEnderecoGeolocalizacao,
+  type EnderecoEmpresaGeocodeInput,
+} from '@/src/shared/utils/geolocalizacaoEmpresa'
+import {
+  placeDetailsParaEnderecoGeocode,
+  type PlaceDetailsResult,
+} from '@/src/shared/utils/geolocalizacaoPlaces'
+import { formatarCepMascara } from '@/src/shared/utils/consultaCep'
 import {
   LOGO_IMPRESSAO_HEIGHT,
   LOGO_IMPRESSAO_WIDTH,
 } from '@/src/presentation/utils/logoImpressaoCrop'
-import { lerMenuIdDeParametroEmpresa } from '@/src/shared/utils/parametroEmpresaMenus'
 
 /** Labels outlined — alinhado a NovoMeioPagamento / EditarTerminais */
 const sxOutlinedLabelTextoEscuro = {
@@ -160,10 +169,11 @@ export function EmpresaTab() {
   const [estado, setEstado] = useState('')
   const [cidadeValida, setCidadeValida] = useState<boolean | null>(null)
   const [codigoCidadeIbge, setCodigoCidadeIbge] = useState<string | null>(null)
+  const [enderecoLocalizacao, setEnderecoLocalizacao] = useState<GeoJsonPoint | null>(null)
+  const [providerEnderecoId, setProviderEnderecoId] = useState<string | null>(null)
+  const [buscaPlacesEmpresa, setBuscaPlacesEmpresa] = useState('')
   /** Valor exibido no select (IANA); vem de `parametroEmpresa.timezone` no GET /empresas/me. */
   const [timezone, setTimezone] = useState('')
-  /** Menu usado nas vendas do gestor (`parametroEmpresa.menuVendaGestorId`). */
-  const [menuVendaGestorId, setMenuVendaGestorId] = useState<string | null>(null)
   /** Snapshot de `parametroEmpresa` para PATCH preservar tipos impressão/cobrança etc. */
   const [parametroEmpresaDraft, setParametroEmpresaDraft] = useState<Record<string, unknown>>({})
 
@@ -186,6 +196,38 @@ export function EmpresaTab() {
 
   // Ref para rastrear o último valor de cidade usado para buscar código IBGE
   const ultimaCidadeBuscada = useRef<string>('')
+
+  const enderecoGeocodeInput = useMemo<EnderecoEmpresaGeocodeInput>(
+    () => ({
+      rua,
+      numero,
+      bairro,
+      cidade: ultimaCidadeBuscada.current || cidade,
+      estado,
+      cep,
+      complemento,
+    }),
+    [rua, numero, bairro, cidade, estado, cep, complemento]
+  )
+
+  const aplicarPlaceDetailsEmpresa = useCallback((place: PlaceDetailsResult) => {
+    const fields = placeDetailsParaEnderecoGeocode(place)
+    if (fields.rua) setRua(maiusculasPt(fields.rua))
+    if (fields.numero) setNumero(maiusculasPt(fields.numero))
+    if (fields.bairro) setBairro(maiusculasPt(fields.bairro))
+    if (fields.cidade) {
+      setCidade(maiusculasPt(fields.cidade))
+      ultimaCidadeBuscada.current = fields.cidade
+    }
+    if (fields.estado) setEstado(fields.estado.toUpperCase().slice(0, 2))
+    if (fields.cep) setCep(maiusculasPt(formatarCepMascara(fields.cep)))
+    setEnderecoLocalizacao(place.enderecoLocalizacao)
+    setProviderEnderecoId(place.providerEnderecoId)
+    setBuscaPlacesEmpresa(
+      [fields.rua, fields.numero].filter(Boolean).join(', ') || place.enderecoFormatado || ''
+    )
+    showToast.success('Endereço aplicado. Salve a empresa. O pin da loja é definido na cobertura.')
+  }, [])
 
   useEffect(() => {
     loadEmpresa()
@@ -339,11 +381,9 @@ export function EmpresaTab() {
             (typeof pe.timeZone === 'string' && pe.timeZone) ||
             ''
           setTimezone(String(tz).trim())
-          setMenuVendaGestorId(lerMenuIdDeParametroEmpresa(pe, 'menuVendaGestorId'))
         } else {
           setParametroEmpresaDraft({})
           setTimezone('')
-          setMenuVendaGestorId(null)
         }
 
         try {
@@ -377,6 +417,11 @@ export function EmpresaTab() {
               ultimaCidadeBuscada.current = ''
             }
           }
+
+          const { enderecoLocalizacao: geoSalva, providerEnderecoId: providerSalvo } =
+            lerEnderecoLocalizacaoDoPayloadEmpresa(raw.endereco)
+          setEnderecoLocalizacao(geoSalva)
+          setProviderEnderecoId(providerSalvo)
         } catch (error) {
           console.error('Erro ao criar Cliente a partir dos dados da API:', error, 'Dados:', data)
           // Criar um Cliente vazio para evitar quebra da UI
@@ -725,6 +770,14 @@ export function EmpresaTab() {
         if (estado) endereco.estado = estado
         if (codigoCidadeIbge) endereco.codigoCidadeIbge = codigoCidadeIbge
 
+        const geoPatch = montarPatchEnderecoGeolocalizacao(
+          enderecoLocalizacao,
+          providerEnderecoId
+        )
+        if (geoPatch) {
+          Object.assign(endereco, geoPatch)
+        }
+
         // Adiciona endereco ao body apenas se houver pelo menos um campo
         if (Object.keys(endereco).length > 0) {
           body.endereco = endereco
@@ -737,7 +790,6 @@ export function EmpresaTab() {
         } else {
           delete parametroEmpresa.timezone
         }
-        parametroEmpresa.menuVendaGestorId = menuVendaGestorId
         if (Object.keys(parametroEmpresa).length > 0) {
           body.parametroEmpresa = parametroEmpresa
         }
@@ -764,9 +816,6 @@ export function EmpresaTab() {
 
         setIsEditing(false)
         await loadEmpresa()
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new Event('jiffy:empresa-me-updated'))
-        }
         showToast.success('Empresa atualizada com sucesso!')
       } catch (error) {
         console.error('Erro ao salvar empresa:', error)
@@ -845,35 +894,35 @@ export function EmpresaTab() {
             </div>
             <div className="flex flex-col gap-7 lg:flex-row lg:items-start">
               <div className="min-w-0 flex-1 space-y-7">
-                <UppercaseLocaleInput
+                <Input
                   label="CNPJ"
                   value={cnpj}
-                  onValueChange={setCnpj}
+                  onChange={e => setCnpj(maiusculasPt(e.target.value))}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}
                 />
                 <div className="grid grid-cols-1 gap-7 md:grid-cols-2">
-                  <UppercaseLocaleInput
+                  <Input
                     label="Razão Social"
                     value={razaoSocial}
-                    onValueChange={setRazaoSocial}
+                    onChange={e => setRazaoSocial(maiusculasPt(e.target.value))}
                     disabled={!isEditing}
                     size="small"
                     sx={sxEntradaEmpresa}
                   />
-                  <UppercaseLocaleInput
+                  <Input
                     label="Nome Fantasia"
                     value={nomeFantasia}
-                    onValueChange={setNomeFantasia}
+                    onChange={e => setNomeFantasia(maiusculasPt(e.target.value))}
                     disabled={!isEditing}
                     size="small"
                     sx={sxEntradaEmpresa}
                   />
-                  <UppercaseLocaleInput
+                  <Input
                     label="Telefone"
                     value={telefone}
-                    onValueChange={setTelefone}
+                    onChange={e => setTelefone(maiusculasPt(e.target.value))}
                     disabled={!isEditing}
                     size="small"
                     sx={sxEntradaEmpresa}
@@ -1101,21 +1150,33 @@ export function EmpresaTab() {
           <div>
             <h4 className="mb-2 text-lg font-semibold text-primary">Endereço</h4>
             <div className="space-y-6">
+              {isEditing ? (
+                <EnderecoPlacesAutocomplete
+                  variant="gestor"
+                  floatingLabel={false}
+                  label="Buscar endereço no Google"
+                  placeholder="Digite rua, bairro ou cidade…"
+                  value={buscaPlacesEmpresa}
+                  onChange={setBuscaPlacesEmpresa}
+                  onSelect={aplicarPlaceDetailsEmpresa}
+                />
+              ) : null}
+
               {/* Linha 1: CEP + Rua */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <UppercaseLocaleInput
+                <Input
                   label="CEP"
                   value={cep}
-                  onValueChange={setCep}
+                  onChange={e => setCep(maiusculasPt(e.target.value))}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}
                 />
                 <div className="md:col-span-2">
-                  <UppercaseLocaleInput
+                  <Input
                     label="Rua"
                     value={rua}
-                    onValueChange={setRua}
+                    onChange={e => setRua(maiusculasPt(e.target.value))}
                     disabled={!isEditing}
                     size="small"
                     sx={sxEntradaEmpresa}
@@ -1125,26 +1186,26 @@ export function EmpresaTab() {
 
               {/* Linha 2: Número, Complemento e Bairro */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <UppercaseLocaleInput
+                <Input
                   label="Número"
                   value={numero}
-                  onValueChange={setNumero}
+                  onChange={e => setNumero(maiusculasPt(e.target.value))}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}
                 />
-                <UppercaseLocaleInput
+                <Input
                   label="Complemento"
                   value={complemento}
-                  onValueChange={setComplemento}
+                  onChange={e => setComplemento(maiusculasPt(e.target.value))}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}
                 />
-                <UppercaseLocaleInput
+                <Input
                   label="Bairro"
                   value={bairro}
-                  onValueChange={setBairro}
+                  onChange={e => setBairro(maiusculasPt(e.target.value))}
                   disabled={!isEditing}
                   size="small"
                   sx={sxEntradaEmpresa}
@@ -1247,15 +1308,6 @@ export function EmpresaTab() {
                     </MenuItem>
                   ))}
                 </Input>
-                <MenuParametroEmpresaSelect
-                  id="empresa-menu-venda-gestor"
-                  variant="mui"
-                  sx={sxEntradaEmpresa}
-                  label="Menu usado nas vendas (gestor)"
-                  value={menuVendaGestorId}
-                  onChange={setMenuVendaGestorId}
-                  disabled={!isEditing}
-                />
               </div>
             </div>
           </div>

@@ -11,7 +11,17 @@ import {
   MdSettings,
 } from 'react-icons/md'
 import { KanbanModoVendasToggle, type ModoKanbanVendas } from '../KanbanModoVendasToggle'
-import type { ColunaKanbanFiltroExtra, OrigemFiltro, TipoEntregaFiltro } from '../types'
+import type {
+  ColunaKanbanFiltroExtra,
+  ColunaKanbanId,
+  KanbanColumn,
+  OrigemFiltro,
+  TipoEntregaFiltro,
+} from '../types'
+import type { ModoVisualizacaoKanban } from '../utils/kanbanModoVisualizacao'
+import { KanbanColunasMenu } from './KanbanColunasMenu'
+import { KanbanModoVisualizacaoSelect } from './KanbanModoVisualizacaoSelect'
+import { useKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/kiosk/useKioskGestorPedidos'
 import {
   KANBAN_FILTRO_DATA_PRESET_OPCOES,
   type KanbanFiltroDataPreset,
@@ -42,8 +52,14 @@ export interface KanbanToolbarProps {
   onClearFilters: () => void
   modoKanbanVendas: ModoKanbanVendas
   onModoKanbanVendasChange: (value: ModoKanbanVendas) => void
+  modoVisualizacao: ModoVisualizacaoKanban
+  onModoVisualizacaoChange: (value: ModoVisualizacaoKanban) => void
   onAbrirConfiguracoesDelivery: () => void
   onAbrirNovoPedido: () => void
+  colunasDoModo: KanbanColumn[]
+  colunasOcultas: readonly ColunaKanbanId[]
+  onSetColunaVisivel: (id: ColunaKanbanId, visivel: boolean) => void
+  contagemPorColuna: (id: ColunaKanbanId) => number
 }
 
 const KANBAN_BUTTON_COLOR = '#530CA3'
@@ -189,14 +205,21 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
     onClearFilters,
     modoKanbanVendas,
     onModoKanbanVendasChange,
+    modoVisualizacao,
+    onModoVisualizacaoChange,
     onAbrirConfiguracoesDelivery,
     onAbrirNovoPedido,
+    colunasDoModo,
+    colunasOcultas,
+    onSetColunaVisivel,
+    contagemPorColuna,
   } = props
 
   const isModoDelivery = modoKanbanVendas === 'delivery'
   const [refreshSpinning, setRefreshSpinning] = useState(false)
   const colunaKanbanFiltro = colunaKanbanFiltroProp ?? ''
   const onColunaKanbanFiltro = onColunaKanbanFiltroChange ?? (() => undefined)
+  const kiosk = useKioskGestorPedidos()
 
   return (
     <div className="bg-primary-background mt-2 flex-shrink-0 rounded-b-lg rounded-t-lg pb-0">
@@ -216,19 +239,26 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
       <div
         className={`flex flex-wrap items-end justify-center gap-x-1 gap-y-4 rounded-t-lg bg-custom-2 px-1 pb-2 pt-1.5 md:justify-start ${filtrosVisiveisMobile ? 'flex' : 'hidden sm:flex'}`}
       >
-        <div className="flex flex-col gap-1">
-          <div className="relative w-[250px] px-1 lg:w-[220px]">
+        <div
+          className={
+            kiosk
+              ? 'flex min-w-[18rem] flex-[1_1_18rem] flex-col gap-1 sm:max-w-xl'
+              : 'flex w-[13.5rem] shrink-0 flex-col gap-1'
+          }
+        >
+          <div className="relative w-full px-1">
             <MdSearch
               className="absolute left-2 top-1/2 -translate-y-1/2 text-secondary-text"
               size={20}
             />
             <input
               type="text"
-              placeholder="Digite o código ou cliente"
+              placeholder={kiosk ? 'Código, cliente ou telefone' : 'Buscar pedido'}
               value={searchInput}
               onChange={e => onSearchInputChange(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && onRefresh()}
-              className="h-8 w-full rounded-lg border bg-info pl-6 pr-4 text-sm shadow-sm"
+              className="h-8 w-full rounded-lg border bg-info pl-6 pr-3 text-sm shadow-sm"
+              aria-label={kiosk ? 'Código, cliente ou telefone' : 'Buscar pedido'}
             />
           </div>
         </div>
@@ -365,7 +395,23 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
           >
             <MdRefresh className={`h-5 w-5 ${refreshSpinning ? 'animate-spin' : ''}`} />
           </button>
-          <KanbanModoVendasToggle value={modoKanbanVendas} onChange={onModoKanbanVendasChange} />
+          {kiosk ? (
+            <>
+              <KanbanColunasMenu
+                colunasDoModo={colunasDoModo}
+                ocultas={colunasOcultas}
+                onSetColunaVisivel={onSetColunaVisivel}
+                contagemPorColuna={contagemPorColuna}
+              />
+              <KanbanModoVisualizacaoSelect
+                value={modoVisualizacao}
+                onChange={onModoVisualizacaoChange}
+              />
+            </>
+          ) : null}
+          {kiosk ? null : (
+            <KanbanModoVendasToggle value={modoKanbanVendas} onChange={onModoKanbanVendasChange} />
+          )}
           <button
             type="button"
             onClick={onAbrirConfiguracoesDelivery}

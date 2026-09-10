@@ -7,6 +7,9 @@ import {
   extrairTaxaEntregaIdDaVenda,
   taxaLancadaPedidoEstaAtiva,
 } from '@/src/application/mappers/VendaDetalheMapper'
+import { pagamentoEstaCancelado } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
+import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
+import type { FluxoPagamentoEntrega } from '@/src/domain/types/vendaDetalhe'
 
 /** Taxa de entrega ativa no pedido — fonte de verdade para o PATCH (ignora removidas). */
 export interface TaxaEntregaAtivaPedidoRef {
@@ -160,4 +163,57 @@ export function buildSalvarTaxaPedidoDeliveryPatch(
   }
 
   return { patch, mudou: true }
+}
+
+export type BuildFinalizarCreateOverrideTaxaArgs = {
+  taxaAtualId: string | null
+  taxaSelecionadaId: string | null
+  pagamentos: PagamentoSelecionado[]
+  fluxoPagamentoEntrega: FluxoPagamentoEntrega
+}
+
+/**
+ * PATCH único após o create com override: ajusta a taxa e já lança as cobranças do wizard.
+ * Sem cobranças prévias — o POST omitiu `cobrancas`.
+ */
+export function buildFinalizarCreateOverrideTaxaPatch(
+  args: BuildFinalizarCreateOverrideTaxaArgs
+): BuildSalvarTaxaPatchResult {
+  const taxaAtual = args.taxaAtualId?.trim() || null
+  const taxaSelecionada = args.taxaSelecionadaId?.trim() || null
+  const taxasMudou = taxaAtual !== taxaSelecionada
+
+  const patch: SalvarTaxaPedidoDeliveryApi = {}
+
+  if (taxasMudou) {
+    const taxas: { add?: TaxaPedidoDeliveryApi[]; remove?: string[] } = {}
+    if (taxaAtual) taxas.remove = [taxaAtual]
+    if (taxaSelecionada) taxas.add = [{ taxaId: taxaSelecionada, quantidade: 1 }]
+    patch.taxas = taxas
+  }
+
+  const momentoCobranca =
+    args.fluxoPagamentoEntrega === 'cobrar_entregador' ? 'na_entrega' : 'antecipado'
+
+  const add: CobrancaPedidoDeliveryApi[] = args.pagamentos
+    .filter(p => !pagamentoEstaCancelado(p))
+    .filter(p => p.valor > 0)
+    .map(p => {
+      const item: CobrancaPedidoDeliveryApi = {
+        meioPagamentoId: p.meioPagamentoId,
+        valor: p.valor,
+        momentoCobranca,
+      }
+      if (momentoCobranca === 'antecipado') {
+        item.pagamentoEfetivado = { confirmar: true }
+      }
+      return item
+    })
+
+  if (add.length > 0) {
+    patch.cobrancas = { add }
+  }
+
+  const mudou = Boolean(patch.taxas) || Boolean(patch.cobrancas)
+  return { patch, mudou }
 }

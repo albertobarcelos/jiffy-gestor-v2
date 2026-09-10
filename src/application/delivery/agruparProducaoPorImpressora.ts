@@ -2,7 +2,7 @@ import type { ItemCupomDelivery, VendaGestorCupomDTO } from '@/src/shared/types/
 
 /**
  * Cada linha vai para uma ou mais impressoras conforme cadastro do produto.
- * Mesma impressora: itens na mesma folha. Impressoras diferentes: folhas separadas (mesmo IP é irrelevante — nome QZ é por impressora lógica).
+ * Mesma impressora: itens na mesma folha. Impressoras diferentes: folhas separadas.
  * Linha sem produto/impressora não é impressa em produção; se todas estiverem sem vínculo, não há tickets.
  */
 export function agruparItensProducaoPorImpressora(

@@ -8,8 +8,24 @@ export const TOAST_IMPRESSORA_EXPEDICAO_NECESSARIA =
 export const TOAST_IMPRESSORA_EXPEDICAO_MAPEAMENTO_WINDOWS =
   'Vincule a impressora de expedição a uma impressora Windows neste terminal.'
 
+const SUFIXO_PEDIDO_SEGUE_SEM_PAPEL =
+  'O pedido já avançou no quadro e o fluxo segue mesmo sem o papel. Vincule em Configurações de impressão neste PC.'
+
+export const TOAST_QUADRO_SEGUE_SEM_EXPEDICAO_ESCOLHIDA =
+  `O cupom de expedição NÃO imprimiu: nenhuma impressora de expedição está escolhida. ${SUFIXO_PEDIDO_SEGUE_SEM_PAPEL}`
+
+export const TOAST_QUADRO_SEGUE_SEM_VINCULO_EXPEDICAO =
+  `O cupom de expedição NÃO imprimiu: a impressora de expedição não está vinculada a uma impressora deste PC. ${SUFIXO_PEDIDO_SEGUE_SEM_PAPEL}`
+
 export function TOAST_IMPRESSORA_PRODUCAO_MAPEAMENTO_WINDOWS(nomeImpressoraLogica: string): string {
-  return `Vincule a impressora "${nomeImpressoraLogica}" a uma impressora Windows neste terminal para imprimir o cupom de produção.`
+  const nome = nomeImpressoraLogica.trim() || 'lógica'
+  return `O cupom da "${nome}" NÃO imprimiu: essa impressora lógica não está vinculada a uma impressora deste PC. ${SUFIXO_PEDIDO_SEGUE_SEM_PAPEL}`
+}
+
+/** Toast após o pedido já ter sido criado: impressão é opcional e não desfaz o pedido. */
+export function TOAST_CUPOM_NAO_IMPRIMIU_SEM_VINCULO_PC(nomeImpressoraLogica: string): string {
+  const nome = nomeImpressoraLogica.trim() || 'lógica'
+  return `Pedido criado. O cupom da "${nome}" NÃO imprimiu: essa impressora lógica não está vinculada a uma impressora deste PC. ${SUFIXO_PEDIDO_SEGUE_SEM_PAPEL}`
 }
 
 export const DIALOG_SALVAR_SEM_IMPRESSORA_EXPEDICAO =

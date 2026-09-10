@@ -38,6 +38,8 @@ const cadastrosLegacyRedirects = [
 
 const nextConfig = {
   reactStrictMode: true,
+  /** Dev: WebView (127.0.0.1) e acesso pela LAN (ex.: http://192.168.0.126:porta). */
+  allowedDevOrigins: ['127.0.0.1', '192.168.*.*', '10.*.*.*'],
   async redirects() {
     return [
       {

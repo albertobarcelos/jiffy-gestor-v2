@@ -8,6 +8,19 @@ import { CatalogProductRow } from '@/src/presentation/components/features/catalo
 import { ProdutoActionIcons } from './ProdutoActionIcons'
 import { ProdutoCategoriaSelect } from './ProdutoCategoriaSelect'
 
+function CategoriaNomeTexto({ nome }: { nome?: string }) {
+  const categoria = nome?.trim() || '—'
+  const exibicao = categoria.length > 30 ? `${categoria.slice(0, 30)}…` : categoria
+  return (
+    <span
+      className="min-w-0 truncate text-sm font-normal tracking-wide text-primary-text md:text-base"
+      title={categoria.length > 30 ? categoria : undefined}
+    >
+      {exibicao}
+    </span>
+  )
+}
+
 export interface ProdutoListItemProps {
   produto: Produto
   gruposProdutos: GrupoProduto[]
@@ -16,9 +29,9 @@ export interface ProdutoListItemProps {
   isSavingStatus?: boolean
   isSavingNome?: boolean
   isSavingGrupo?: boolean
-  onNomeChange: (produtoId: string, nome: string) => void | boolean | Promise<void | boolean>
-  onValorChange: (produtoId: string, valor: number) => void | boolean | Promise<void | boolean>
-  onGrupoChange: (
+  onNomeChange?: (produtoId: string, nome: string) => void | boolean | Promise<void | boolean>
+  onValorChange?: (produtoId: string, valor: number) => void | boolean | Promise<void | boolean>
+  onGrupoChange?: (
     produtoId: string,
     novoGrupoId: string,
     novoGrupoNome: string
@@ -74,14 +87,20 @@ function ProdutoListItemBase({
       onSwitchToggle={onSwitchToggle}
       onEdit={onEditProduto}
       categoriaSlot={
-        <ProdutoCategoriaSelect
-          grupoId={produto.getGrupoId()}
-          grupoNome={produto.getNomeGrupo()}
-          grupos={gruposProdutos}
-          loading={isLoadingGruposProdutos}
-          disabled={isSavingGrupo}
-          onCommit={(novoGrupoId, novoGrupoNome) => onGrupoChange(produtoId, novoGrupoId, novoGrupoNome)}
-        />
+        onGrupoChange ? (
+          <ProdutoCategoriaSelect
+            grupoId={produto.getGrupoId()}
+            grupoNome={produto.getNomeGrupo()}
+            grupos={gruposProdutos}
+            loading={isLoadingGruposProdutos}
+            disabled={isSavingGrupo}
+            onCommit={(novoGrupoId, novoGrupoNome) =>
+              onGrupoChange(produtoId, novoGrupoId, novoGrupoNome)
+            }
+          />
+        ) : (
+          <CategoriaNomeTexto nome={produto.getNomeGrupo()} />
+        )
       }
       actionsSlot={
         <>

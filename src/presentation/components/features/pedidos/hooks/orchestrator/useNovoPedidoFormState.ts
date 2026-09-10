@@ -39,6 +39,12 @@ export function useNovoPedidoFormState(tipoInicioPedido: 'balcao' | 'entrega') {
   const [moradaEntregaSelecionada, setMoradaEntregaSelecionada] = useState<MoradaTelefone | null>(
     null
   )
+  const [enderecoEntregaCoberturaStatus, setEnderecoEntregaCoberturaStatus] = useState<
+    'ok' | 'fora' | 'pendente' | 'indisponivel' | null
+  >(null)
+  const [enderecoEntregaCoberturaValorTaxa, setEnderecoEntregaCoberturaValorTaxa] = useState<
+    number | null
+  >(null)
   const [telefoneBuscaEntrega, setTelefoneBuscaEntrega] = useState('')
   const [telefoneBuscadoEntrega, setTelefoneBuscadoEntrega] = useState<string | null>(null)
   const [tempoPrevistoMinutos, setTempoPrevistoMinutos] = useState<number>(45)
@@ -107,6 +113,10 @@ export function useNovoPedidoFormState(tipoInicioPedido: 'balcao' | 'entrega') {
     setCurrentStep,
     moradaEntregaSelecionada,
     setMoradaEntregaSelecionada,
+    enderecoEntregaCoberturaStatus,
+    setEnderecoEntregaCoberturaStatus,
+    enderecoEntregaCoberturaValorTaxa,
+    setEnderecoEntregaCoberturaValorTaxa,
     telefoneBuscaEntrega,
     setTelefoneBuscaEntrega,
     telefoneBuscadoEntrega,

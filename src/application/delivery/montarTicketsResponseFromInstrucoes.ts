@@ -5,7 +5,7 @@ import {
 import type { EnderecoEntregaDetalhe } from '@/src/domain/types/vendaDetalhe'
 import type { PreferenciasImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
 import type { EstacaoImpressaoMapeamento } from '@/src/infrastructure/api/estacoesImpressaoApi'
-import { isTcpPrinterRef } from '@/src/infrastructure/printing/qzTrayClient'
+import { isTcpPrinterRef } from '@/src/infrastructure/printing/tcpPrinterRef'
 import type { InstrucoesImpressaoResponse } from '@/src/shared/types/instrucoesImpressao'
 import type {
   VendaGestorTicket,

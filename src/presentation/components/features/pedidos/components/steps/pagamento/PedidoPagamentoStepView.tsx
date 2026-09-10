@@ -4,6 +4,10 @@ import { Button } from '@/src/presentation/components/ui/button'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { Label } from '@/src/presentation/components/ui/label'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
+import {
+  estiloCardMeioPagamento,
+  varsCardMeioPagamentoLancado,
+} from '@/src/shared/utils/corFormaPagamentoFiscal'
 import { MdCreditCard, MdDelete, MdPersonOutline } from 'react-icons/md'
 import { PedidoPagamentoStep } from '../../PedidoPagamentoStep'
 import { useNovoPedidoFormContext } from '../../../context/NovoPedidoFormContext'
@@ -259,6 +263,7 @@ export function PedidoPagamentoStepView() {
                 ) : (
                   meiosPagamento.map(meio => {
                     const Icone = obterIconeMeioPagamento(meio.getNome())
+                    const estilo = estiloCardMeioPagamento(meio.getFormaPagamentoFiscal())
                     return (
                       <button
                         key={meio.getId()}
@@ -269,10 +274,11 @@ export function PedidoPagamentoStepView() {
                           }
                         }}
                         disabled={valorAPagarLancamento <= 0 && !valorRecebido.trim()}
-                        className={`flex ${MEIO_PAGAMENTO_CARD_SIZE_CLASS} cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-secondary bg-secondary p-2 text-white transition-all hover:brightness-110 ${valorAPagarLancamento <= 0 && !valorRecebido.trim() ? 'cursor-not-allowed opacity-50' : ''}`}
+                        style={estilo}
+                        className={`flex ${MEIO_PAGAMENTO_CARD_SIZE_CLASS} cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 p-2 transition-all hover:brightness-110 ${valorAPagarLancamento <= 0 && !valorRecebido.trim() ? 'cursor-not-allowed opacity-50' : ''}`}
                       >
-                        <Icone className="h-8 w-8 shrink-0 text-white" />
-                        <span className="line-clamp-2 w-full text-center text-xs font-medium leading-tight text-white">
+                        <Icone className="h-8 w-8 shrink-0" />
+                        <span className="line-clamp-2 w-full text-center text-xs font-medium leading-tight">
                           {meio.getNome()}
                         </span>
                       </button>
@@ -325,25 +331,29 @@ export function PedidoPagamentoStepView() {
                   {pagamentos.map((pagamento, index) => {
                     const meio = meiosPagamento.find(m => m.getId() === pagamento.meioPagamentoId)
                     const Icone = meio ? obterIconeMeioPagamento(meio.getNome()) : MdCreditCard
+                    const varsLancado = varsCardMeioPagamentoLancado(
+                      meio?.getFormaPagamentoFiscal() ?? ''
+                    )
                     return (
                       <div
                         key={index}
-                        className={`relative flex ${MEIO_PAGAMENTO_CARD_SIZE_CLASS} flex-col items-center justify-center gap-0.5 rounded-lg border border-green-300 bg-green-100 p-2`}
+                        style={varsLancado}
+                        className={`group relative flex ${MEIO_PAGAMENTO_CARD_SIZE_CLASS} flex-col items-center justify-center gap-0.5 rounded-lg border-2 p-2 text-[var(--meio-cor)] transition-colors border-[color-mix(in_srgb,var(--meio-cor)_42%,white)] bg-[color-mix(in_srgb,var(--meio-cor)_24%,white)] hover:border-[var(--meio-cor)] hover:bg-[var(--meio-cor)] hover:text-[var(--meio-texto-forte)]`}
                       >
                         <button
                           onClick={() => removerPagamento(index)}
                           type="button"
                           aria-label="Remover pagamento"
-                          className="absolute right-0.5 top-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-green-100 p-0 hover:bg-green-200"
+                          className="absolute right-0.5 top-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-transparent p-0 text-current hover:bg-black/10"
                         >
-                          <MdDelete className="h-3.5 w-3.5 text-green-700" />
+                          <MdDelete className="h-3.5 w-3.5" />
                         </button>
-                        <Icone className="h-6 w-6 shrink-0 text-green-700" />
+                        <Icone className="h-6 w-6 shrink-0 text-current" />
                         <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-0.5 px-1">
-                          <span className="line-clamp-3 w-full text-center text-[11px] font-medium leading-tight text-green-900">
+                          <span className="line-clamp-3 w-full text-center text-[11px] font-medium leading-tight">
                             {meio?.getNome() || 'Meio de pagamento'}
                           </span>
-                          <span className="w-full shrink-0 truncate text-center text-xs font-semibold leading-tight text-green-900">
+                          <span className="w-full shrink-0 truncate text-center text-xs font-semibold leading-tight">
                             {transformarParaReal(pagamento.valor)}
                           </span>
                         </div>

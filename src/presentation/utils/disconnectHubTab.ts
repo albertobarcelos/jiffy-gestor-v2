@@ -1,4 +1,9 @@
 import { SESSION_STORAGE_HUB_LOGOUT_SELF } from '@/src/shared/constants/sessionCoordinator'
+import { isSinalKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
+import {
+  lerSinalGestorDoBrowser,
+  urlLoginDaSessaoAtual,
+} from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
 
 type DisconnectHubOpts = {
   logoutHub: () => Promise<void>
@@ -21,6 +26,16 @@ export async function disconnectHubTab({ logoutHub }: DisconnectHubOpts): Promis
     console.error('disconnectHubTab:', e)
   }
 
+  if (isSinalKioskGestorPedidos(lerSinalGestorDoBrowser())) {
+    try {
+      sessionStorage.removeItem(SESSION_STORAGE_HUB_LOGOUT_SELF)
+    } catch {
+      /* noop */
+    }
+    window.location.assign(urlLoginDaSessaoAtual())
+    return
+  }
+
   try {
     window.close()
   } catch {
@@ -34,7 +49,7 @@ export async function disconnectHubTab({ logoutHub }: DisconnectHubOpts): Promis
       /* noop */
     }
     if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-      window.location.assign('/login')
+      window.location.assign(urlLoginDaSessaoAtual())
     }
   }, 250)
 }

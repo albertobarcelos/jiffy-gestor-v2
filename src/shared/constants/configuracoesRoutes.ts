@@ -1,49 +1,92 @@
-/** Segmentos de URL em `/configuracoes/:aba` */
+import { stripGestaoEmpresaSlugFromPath } from '@/src/shared/utils/gestaoRoutes'
+
+/** Segmentos de URL em `/configuracoes/:aba`. Delivery não entra aqui. */
 export const CONFIGURACOES_TAB_SLUGS = [
   'empresa',
-  'empresa-delivery',
   'terminais',
   'impressoras',
   'meios-pagamentos',
   'taxas',
+  'menus',
   'importar-dados',
 ] as const
 
 export type ConfiguracoesTabSlug = (typeof CONFIGURACOES_TAB_SLUGS)[number]
 
-const LEGACY_QUERY_TAB: Record<string, ConfiguracoesTabSlug> = {
-  planilha: 'importar-dados',
-  'cardapio-digital': 'empresa-delivery',
+/** Hub Delivery — path canônico (design da main). */
+export const DELIVERY_HUB_PATH = '/config/delivery'
+
+/** Aba Delivery no chrome de Configurações (a URL é só `DELIVERY_HUB_PATH`). */
+export const CONFIGURACOES_DELIVERY_TAB = 'delivery' as const
+
+export type ConfiguracoesViewTab = ConfiguracoesTabSlug | typeof CONFIGURACOES_DELIVERY_TAB
+
+export type DeliveryEtapaId =
+  | 'delivery-geolocalizacao'
+  | 'delivery-nome-cardapio'
+  | 'delivery-design'
+  | 'delivery-agenda'
+  | 'delivery-cobertura'
+  | 'delivery-entregadores'
+  | 'delivery-meios'
+  | 'delivery-impressoras'
+  | 'delivery-notificacoes'
+
+const DELIVERY_ETAPA_SLUG: Record<DeliveryEtapaId, string> = {
+  'delivery-geolocalizacao': 'empresa',
+  'delivery-nome-cardapio': 'nome-cardapio',
+  'delivery-design': 'design',
+  'delivery-agenda': 'agenda',
+  'delivery-cobertura': 'cobertura',
+  'delivery-entregadores': 'entregadores',
+  'delivery-meios': 'meios',
+  'delivery-impressoras': 'impressoras',
+  'delivery-notificacoes': 'notificacoes',
 }
 
-/** Slugs de rota antigos → slug canônico (`/configuracoes/:aba`). */
-const LEGACY_PATH_TAB: Record<string, ConfiguracoesTabSlug> = {
-  'cardapio-digital': 'empresa-delivery',
-}
+const DELIVERY_SLUG_TO_ETAPA = Object.fromEntries(
+  Object.entries(DELIVERY_ETAPA_SLUG).map(([id, slug]) => [slug, id])
+) as Record<string, DeliveryEtapaId>
+
+/** Rotas antigas de `/configuracoes/:aba` → slug canônico (exceto Delivery, que vai ao hub). */
+const LEGACY_PATH_TAB: Record<string, ConfiguracoesTabSlug> = {}
 
 export function isConfiguracoesTabSlug(value: string): value is ConfiguracoesTabSlug {
   return (CONFIGURACOES_TAB_SLUGS as readonly string[]).includes(value)
 }
 
-/** Resolve slug da URL, incluindo redirecionamento de rotas legadas. */
-export function resolveConfiguracoesTabFromPath(
-  value: string
-): ConfiguracoesTabSlug | null {
+export function resolveConfiguracoesTabFromPath(value: string): ConfiguracoesTabSlug | null {
   if (isConfiguracoesTabSlug(value)) return value
   return LEGACY_PATH_TAB[value] ?? null
 }
 
-/** Converte `?tab=` legado (ex.: `planilha`) para o slug canônico da rota. */
-export function resolveConfiguracoesTabFromLegacyQuery(
-  tab: string | null | undefined
-): ConfiguracoesTabSlug {
-  if (!tab) return 'empresa'
-  const mapped = LEGACY_QUERY_TAB[tab]
-  if (mapped) return mapped
-  if (isConfiguracoesTabSlug(tab)) return tab
-  return 'empresa'
-}
-
 export function configuracoesTabPath(tab: ConfiguracoesTabSlug): string {
   return `/configuracoes/${tab}`
+}
+
+export function deliveryEtapaSlug(etapaId: DeliveryEtapaId): string {
+  return DELIVERY_ETAPA_SLUG[etapaId]
+}
+
+export function deliveryEtapaIdFromSlug(slug: string): DeliveryEtapaId | null {
+  return DELIVERY_SLUG_TO_ETAPA[slug] ?? null
+}
+
+export function isDeliveryEtapaId(value: string): value is DeliveryEtapaId {
+  return value in DELIVERY_ETAPA_SLUG
+}
+
+/** Path canônico da etapa (ex.: `/config/delivery/cobertura`). */
+export function deliveryHubEtapaPath(etapaId: DeliveryEtapaId): string {
+  return `${DELIVERY_HUB_PATH}/${deliveryEtapaSlug(etapaId)}`
+}
+
+export function isConfiguracoesModulePath(pathname: string): boolean {
+  const current = stripGestaoEmpresaSlugFromPath(pathname)
+  return (
+    current === '/configuracoes' ||
+    current.startsWith('/configuracoes/') ||
+    current === '/config' ||
+    current.startsWith('/config/')
+  )
 }

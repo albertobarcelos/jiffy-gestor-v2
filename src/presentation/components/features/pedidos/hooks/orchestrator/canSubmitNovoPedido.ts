@@ -5,8 +5,11 @@ import type { PagamentoSelecionado, ProdutoSelecionado, StatusVenda } from '../.
 export type CanSubmitNovoPedidoParams = {
   pedidoDeliveryGestor: boolean
   clienteEntregaVinculadoId?: string
+  telefoneClienteDelivery?: string | null
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
+  enderecoEntregaTemGeo?: boolean
+  enderecoEntregaCoberturaStatus?: 'ok' | 'fora' | 'pendente' | 'indisponivel' | null
   pedidoEntregaAceitaPagamentoPendente: boolean
   entregaComCobrancaPeloEntregador: boolean
   produtosCount: number
@@ -28,8 +31,11 @@ export function validarNovoPedidoSubmit(
     produtos: params.produtos,
     pedidoDeliveryGestor: params.pedidoDeliveryGestor,
     clienteEntregaVinculadoId: params.clienteEntregaVinculadoId,
+    telefoneClienteDelivery: params.telefoneClienteDelivery,
     pedidoComEntrega: params.pedidoComEntrega,
     temEnderecoEntrega: params.temEnderecoEntrega,
+    enderecoEntregaTemGeo: params.enderecoEntregaTemGeo,
+    enderecoEntregaCoberturaStatus: params.enderecoEntregaCoberturaStatus,
     pedidoGestorComPagamentoNoPasso3: params.pedidoGestorComPagamentoNoPasso3,
     pedidoEntregaAceitaPagamentoPendente: params.pedidoEntregaAceitaPagamentoPendente,
     pagamentosCount: params.pagamentos.length,

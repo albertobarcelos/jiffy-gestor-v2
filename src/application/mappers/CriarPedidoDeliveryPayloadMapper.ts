@@ -8,14 +8,6 @@ import type { ProdutoSelecionado } from '@/src/domain/types/pedido'
 import { deveEnviarValorUnitarioAlterado } from '@/src/domain/services/pedido/deveEnviarValorUnitarioAlterado'
 import { observacoesArrayFromTexto } from '@/src/shared/helpers/observacaoPedido'
 
-function mapEtiquetaDelivery(raw?: string): 'casa' | 'trabalho' | 'outro' {
-  const t = String(raw ?? '')
-    .trim()
-    .toLowerCase()
-  if (t === 'casa' || t === 'trabalho') return t
-  return 'outro'
-}
-
 function onlyDigits(value: string): string {
   return value.replace(/\D/g, '')
 }
@@ -83,40 +75,14 @@ function buildClientePedidoDeliveryPayload(input: CriarPedidoDeliveryInputDTO) {
 
   const cliente: CriarPedidoDeliveryApiRequest['cliente'] = { telefone }
 
-  const nome = input.clienteEntregaVinculado?.nome?.trim()
-  if (nome) cliente.nome = nome
-
   if (input.pedidoComEntrega && input.moradaEntregaSelecionada) {
-    const morada = input.moradaEntregaSelecionada
-    const moradaId = morada.id?.trim()
-
+    const moradaId = input.moradaEntregaSelecionada.id?.trim()
     if (moradaId) {
       cliente.enderecoIdEntrega = moradaId
-    } else if (morada.endereco) {
-      const e = morada.endereco
-      cliente.enderecos = [
-        {
-          etiqueta: mapEtiquetaDelivery(morada.tipoEtiqueta),
-          rua: String(e.rua ?? '').trim(),
-          numero: String(e.numero ?? '').trim(),
-          bairro: String(e.bairro ?? '').trim(),
-          cidade: e.cidade?.trim() || undefined,
-          estado: e.estado?.trim().slice(0, 2).toUpperCase() || undefined,
-          cep: onlyDigits(String(e.cep ?? '')).slice(0, 8) || undefined,
-          complemento: e.complemento?.trim() || undefined,
-        },
-      ]
     }
   }
 
   return cliente
-}
-
-function buildTaxasPedidoDeliveryPayload(input: CriarPedidoDeliveryInputDTO) {
-  if (!input.pedidoComEntrega) return undefined
-  const taxaId = input.taxaEntregaSelecionada?.getId()?.trim()
-  if (!taxaId) return undefined
-  return [{ taxaId, quantidade: 1 }]
 }
 
 export function buildCriarPedidoDeliveryPayload(
@@ -124,8 +90,9 @@ export function buildCriarPedidoDeliveryPayload(
 ): CriarPedidoDeliveryApiRequest {
   const observacoesPedido = observacoesArrayFromTexto(input.observacaoPedido)
   const cobrancas = buildCobrancasPedidoDeliveryPayload(input)
-  const taxas = buildTaxasPedidoDeliveryPayload(input)
 
+  // POST /delivery/pedidos (Gestor) não aceita `taxas` — additionalProperties: false.
+  // A cobertura é calculada no backend. Override do atendente é PATCH após o create.
   const payload: CriarPedidoDeliveryApiRequest = {
     origem: 'GESTOR',
     tipoEntrega: input.tipoAtendimentoDelivery,
@@ -140,10 +107,6 @@ export function buildCriarPedidoDeliveryPayload(
 
   if (cobrancas && cobrancas.length > 0) {
     payload.cobrancas = cobrancas
-  }
-
-  if (taxas && taxas.length > 0) {
-    payload.taxas = taxas
   }
 
   return payload

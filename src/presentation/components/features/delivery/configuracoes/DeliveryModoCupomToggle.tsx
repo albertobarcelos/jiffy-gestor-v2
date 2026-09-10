@@ -5,8 +5,8 @@ import { MdCallSplit, MdInfo, MdReceiptLong } from 'react-icons/md'
 import type { ModoImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
 
 export const DESCRICAO_MODO_CUPOM_DELIVERY: Record<ModoImpressaoDelivery, string> = {
-  unificado: 'Um cupom completo ao iniciar preparo (recomendado para a maioria)',
-  separado: 'Produção na cozinha ao receber e expedição ao marcar pronto',
+  unificado: 'Um cupom só, quando o preparo começa. Serve para a maioria das lojas.',
+  separado: 'Dois cupons: um na cozinha ao começar o preparo e outro na entrega ao marcar pronto.',
 }
 
 export interface DeliveryModoCupomToggleProps {

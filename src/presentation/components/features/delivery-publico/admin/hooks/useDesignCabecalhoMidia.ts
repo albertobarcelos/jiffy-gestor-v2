@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
-import { fetchEmpresaPublicaMidia } from '@/src/infrastructure/api/publicDeliveryApi'
 import {
   mensagemLegivelDeliveryMediaError,
   uploadEmpresaDeliveryBanner,
   uploadEmpresaDeliveryLogo,
 } from '@/src/infrastructure/api/deliveryMediaApi'
+import { fetchEmpresaPublicaMidia } from '@/src/infrastructure/api/empresaDeliveryMidiaApi'
 import { validateDeliveryImageFile } from '@/src/shared/constants/deliveryImageUpload'
 import { showToast } from '@/src/shared/utils/toast'
 import type { DeliveryPublicoDesignConfig } from '../../shared/types/deliveryPublicoDesignConfig'
@@ -113,7 +113,7 @@ export function useDesignCabecalhoMidia({
       }
 
       if (!hasEmpresaDelivery) {
-        showToast.error('Configure a Empresa Delivery antes de enviar imagens.')
+        showToast.error('Configure o Delivery antes de enviar imagens.')
         return
       }
 

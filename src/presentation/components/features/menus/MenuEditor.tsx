@@ -29,6 +29,10 @@ import {
   type MenuProdutoTabsModalState,
 } from './MenuProdutoTabsModal'
 import {
+  ProdutosTabsModal,
+  type ProdutosTabsModalState,
+} from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
+import {
   EscolherTipoProdutoModal,
   useEscolherTipoProdutoCadastro,
 } from '@/src/presentation/components/features/produtos/EscolherTipoProdutoModal'
@@ -55,6 +59,17 @@ import {
   isPizzaGrupoProdutoId,
 } from '@/src/presentation/utils/pizza/pizzaMenuHelpers'
 import type { CategoriaPizza } from '@/src/shared/types/pizza'
+import { useEmpresaMenuUnico } from '@/src/presentation/hooks/menus/useEmpresaMenuUnico'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { Produto } from '@/src/domain/entities/Produto'
+import { mergeProdutoComSnapshotMenu } from '@/src/application/mappers/MenuProdutoCatalogMapper'
+import {
+  produtosInfiniteQueryParams,
+  useProdutosInfinite,
+} from '@/src/presentation/hooks/useProdutos'
+import { useProdutoPatchMutation } from '@/src/presentation/hooks/useProdutoPatchMutation'
+import { useProdutosCodigoPorId } from '@/src/presentation/hooks/produtos/useProdutosCodigoPorId'
+import type { BasePermissaoField } from './MenuProdutoRowQuickActions'
 import type {
   MenuGrupoProduto,
   MenuProduto,
@@ -69,6 +84,7 @@ interface MenuEditorProps {
 export function MenuEditor({ menuId }: MenuEditorProps) {
   const { toGestao } = useGestaoPath()
   const isMobile = useIsMobile()
+  const { isMenuUnico } = useEmpresaMenuUnico()
   const { state: filters, query, temFiltroAtivo, actions } = useMenuProdutosFilters()
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(false)
   useEffect(() => {
@@ -149,9 +165,57 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   const { data: gruposComplementos = [], isLoading: isLoadingGruposComplementos } =
     useGruposComplementos({ limit: 100, ativo: null })
   const { syncProdutos, updateProduto, uploadImagemProduto } = useMenuMutations(menuId)
+  const patchProdutoBase = useProdutoPatchMutation()
+  const { codigoPorId } = useProdutosCodigoPorId()
+  const {
+    data: produtosBaseData,
+    fetchNextPage: fetchNextProdutosBase,
+    hasNextPage: hasNextProdutosBase,
+    isFetching: isFetchingProdutosBase,
+    isFetchingNextPage: isFetchingNextProdutosBase,
+  } = useProdutosInfinite(
+    produtosInfiniteQueryParams({ ativo: null, limit: 100 }),
+    { enabled: isMenuUnico }
+  )
   const { pedirConfirmacao, aplicarNosDestinos, aplicarImagemNosDestinos, dialog: dialogPropagacao } =
     usePropagarAlteracaoProduto()
   const invalidate = useInvalidateTenantQueries()
+
+  useEffect(() => {
+    if (!isMenuUnico) return
+    if (
+      hasNextProdutosBase &&
+      !isFetchingNextProdutosBase &&
+      !isFetchingProdutosBase &&
+      produtosBaseData
+    ) {
+      void fetchNextProdutosBase()
+    }
+  }, [
+    isMenuUnico,
+    hasNextProdutosBase,
+    isFetchingNextProdutosBase,
+    isFetchingProdutosBase,
+    fetchNextProdutosBase,
+    produtosBaseData,
+  ])
+
+  const produtosBaseById = useMemo(() => {
+    const map = new Map<string, Produto>()
+    for (const page of produtosBaseData?.pages ?? []) {
+      for (const p of page.produtos) {
+        map.set(p.getId(), p)
+      }
+    }
+    return map
+  }, [produtosBaseData])
+
+  const handleToggleBasePermissao = useCallback(
+    (produtoId: string, field: BasePermissaoField, novoValor: boolean) => {
+      patchProdutoBase.mutate({ type: 'toggle', produtoId, field, novoValor })
+    },
+    [patchProdutoBase]
+  )
 
   useEffect(() => {
     if (hasNextProdutos && !isFetchingNextProdutos && !isFetchingProdutos && produtosData) {
@@ -190,6 +254,11 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     tab: 'produto',
     produto: null,
     grupo: null,
+  })
+  const [baseTabsState, setBaseTabsState] = useState<ProdutosTabsModalState>({
+    open: false,
+    tab: 'produto',
+    mode: 'edit',
   })
 
   const openWizardCadastro = useCallback((categoriaId?: string) => {
@@ -368,11 +437,20 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     })
   }, [])
 
+  const closeBaseTabs = useCallback(() => {
+    setBaseTabsState({
+      open: false,
+      tab: 'produto',
+      mode: 'edit',
+    })
+  }, [])
+
   const handleEditProduto = useCallback(
-    (produtoId: string) => {
-      const produto = produtosDoMenu.find(p => p.produtoId === produtoId)
-      if (!produto) return
-      const grupoId = produto.grupoProduto?.id
+    async (produtoId: string) => {
+      const produtoMenu = produtosDoMenu.find(p => p.produtoId === produtoId)
+      if (!produtoMenu) return
+
+      const grupoId = produtoMenu.grupoProduto?.id
       if (isPizzaGrupoProdutoId(grupoId, pizzaCategoriaIds)) {
         const categoria = grupoId ? (pizzaCategoriaPorId.get(grupoId) ?? null) : null
         if (!categoria) {
@@ -384,13 +462,48 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         setPizzaSaborModalOpen(true)
         return
       }
+
+      if (isMenuUnico) {
+        try {
+          const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+          if (!token) {
+            showToast.error('Sessão inválida. Faça login novamente.')
+            return
+          }
+          const res = await fetchGestorApi(`/api/produtos/${produtoId}`, {
+            headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+          })
+          if (!res.ok) {
+            showToast.error('Não foi possível carregar o produto para edição.')
+            return
+          }
+          const data = await res.json()
+          const produtoBase = Produto.fromJSON(data)
+          /** Snapshot do menu garante categoria mesmo se o GET base vier sem `grupoId`. */
+          const produto = mergeProdutoComSnapshotMenu(produtoBase, produtoMenu)
+          setBaseTabsState({
+            open: true,
+            tab: 'produto',
+            mode: 'edit',
+            produto,
+            grupoId:
+              produto.getGrupoId() ||
+              produtoMenu.grupoProduto?.id ||
+              undefined,
+          })
+        } catch {
+          showToast.error('Não foi possível carregar o produto para edição.')
+        }
+        return
+      }
+
       openTabs({
         tab: 'produto',
-        produto,
-        grupo: findGrupo(produto.grupoProduto?.id),
+        produto: produtoMenu,
+        grupo: findGrupo(produtoMenu.grupoProduto?.id),
       })
     },
-    [produtosDoMenu, findGrupo, openTabs, pizzaCategoriaIds, pizzaCategoriaPorId]
+    [produtosDoMenu, findGrupo, openTabs, pizzaCategoriaIds, pizzaCategoriaPorId, isMenuUnico]
   )
 
   const handleEditGrupo = useCallback(
@@ -441,6 +554,15 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     },
     [openWizardCadastro, pizzaCategoriaIds, tipoCadastro]
   )
+
+  /** Cabeçalho / empty state: com 1 menu vai direto ao cadastro (sem painel de vincular existentes). */
+  const handleAdicionarProdutosCabecalho = useCallback(() => {
+    if (isMenuUnico) {
+      tipoCadastro.pedirTipo(() => openWizardCadastro())
+      return
+    }
+    setAddOpen(true)
+  }, [isMenuUnico, tipoCadastro.pedirTipo, openWizardCadastro])
 
   const handleToggleGrupoStatus = useCallback(
     async (grupoId: string) => {
@@ -667,22 +789,42 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
           valorExibicao={valorExibicao}
           ativo={produto.ativo}
           imagemUrl={produto.image?.imageUrl}
+          codigo={codigoPorId.get(produto.produtoId)}
           isSavingValor={savingThis && updateProduto.variables?.input.valor !== undefined}
           isSavingStatus={savingThis && updateProduto.variables?.input.ativo !== undefined}
           isSavingNome={savingThis && updateProduto.variables?.input.nome !== undefined}
           isSavingImage={savingImage}
           onNomeChange={isPizzaSabor ? undefined : handleNomeChange}
-          onValorChange={handleValorChange}
+          onValorChange={isPizzaSabor ? undefined : handleValorChange}
           onSwitchToggle={handleStatusToggle}
           onEdit={handleEditProduto}
-          onRemove={handleRemove}
+          onRemove={isMenuUnico ? undefined : handleRemove}
           onChangeImage={handleChangeImage}
           actionsSlot={
             <MenuProdutoRowQuickActions
               produto={produto}
-              disabled={savingThis}
-              ocultarComplementos={isPizzaSabor}
+              disabled={
+                savingThis ||
+                (patchProdutoBase.isPending &&
+                  patchProdutoBase.variables?.produtoId === produto.produtoId)
+              }
               onPatch={handleQuickPatch}
+              showBasePermissoes={isMenuUnico}
+              baseToggleStates={(() => {
+                if (!isMenuUnico) return null
+                const base = produtosBaseById.get(produto.produtoId)
+                if (!base) return null
+                return {
+                  permiteAcrescimo: base.permiteAcrescimoAtivo(),
+                  permiteDesconto: base.permiteDescontoAtivo(),
+                  abreComplementos: base.abreComplementosAtivo(),
+                  permiteAlterarPreco: base.permiteAlterarPrecoAtivo(),
+                  incideTaxa: base.incideTaxaAtivo(),
+                }
+              })()}
+              onToggleBasePermissao={(field, value) =>
+                handleToggleBasePermissao(produto.produtoId, field, value)
+              }
             />
           }
         />
@@ -695,6 +837,8 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
       updateProduto.variables,
       uploadImagemProduto.isPending,
       uploadImagemProduto.variables,
+      patchProdutoBase.isPending,
+      patchProdutoBase.variables,
       handleNomeChange,
       handleValorChange,
       handleStatusToggle,
@@ -702,6 +846,10 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
       handleRemove,
       handleChangeImage,
       handleQuickPatch,
+      handleToggleBasePermissao,
+      isMenuUnico,
+      produtosBaseById,
+      codigoPorId,
     ]
   )
 
@@ -795,7 +943,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
 
             {mostrarAcoesCabecalho ? (
               <MenuCardapioAcoes
-                onAdicionar={() => setAddOpen(true)}
+                onAdicionar={handleAdicionarProdutosCabecalho}
                 onReordenar={() => setReorderOpen(true)}
                 loteHref={toGestao(`/menus/${menuId}/atualizar-lote`)}
               />
@@ -836,7 +984,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
           emptyLabel="Nenhum produto encontrado com esses filtros."
           emptyContent={
             cardapioVazio && !isLoadingList ? (
-              <MenuCardapioEmptyState onAdicionar={() => setAddOpen(true)} />
+              <MenuCardapioEmptyState onAdicionar={handleAdicionarProdutosCabecalho} />
             ) : undefined
           }
           listAriaLabel="Produtos deste cardápio"
@@ -855,15 +1003,28 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         onTabChange={tab => setTabsState(prev => ({ ...prev, tab }))}
       />
 
-      <AddProdutosToMenuPanel
-        open={addOpen}
-        menuId={menuId}
-        produtosJaNoMenu={idsNoMenu}
-        onClose={() => setAddOpen(false)}
-        onCadastrarNovoProduto={() =>
-          tipoCadastro.pedirTipo(() => openWizardCadastro())
-        }
+      <ProdutosTabsModal
+        state={baseTabsState}
+        onClose={closeBaseTabs}
+        onTabChange={tab => setBaseTabsState(prev => ({ ...prev, tab }))}
+        onReload={() => {
+          void invalidate(['menus', menuId])
+          void invalidate(['menu-produtos', menuId])
+          void invalidate(['menu-grupos', menuId])
+        }}
       />
+
+      {!isMenuUnico ? (
+        <AddProdutosToMenuPanel
+          open={addOpen}
+          menuId={menuId}
+          produtosJaNoMenu={idsNoMenu}
+          onClose={() => setAddOpen(false)}
+          onCadastrarNovoProduto={() =>
+            tipoCadastro.pedirTipo(() => openWizardCadastro())
+          }
+        />
+      ) : null}
 
       <EscolherTipoProdutoModal
         open={tipoCadastro.open}

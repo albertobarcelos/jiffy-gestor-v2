@@ -23,7 +23,7 @@ interface ClientesResponse {
 /**
  * Hook para buscar clientes com React Query
  */
-export function useClientes(params: ClientesQueryParams = {}) {
+export function useClientes(params: ClientesQueryParams = {}, options?: { enabled?: boolean }) {
   return useSecureTenantQuery(
     ['clientes', params],
     async ({ token }) => {
@@ -50,7 +50,7 @@ export function useClientes(params: ClientesQueryParams = {}) {
         count: data.count || 0,
       }
     },
-    { staleTime: 1000 * 60 * 5 }
+    { staleTime: 1000 * 60 * 5, enabled: options?.enabled }
   )
 }
 
@@ -196,6 +196,53 @@ export function useCriarClienteRapido() {
       },
       onError: (error: Error) => {
         showToast.error(error.message || 'Erro ao criar cliente')
+      },
+    }
+  )
+}
+
+/**
+ * Atualiza apenas o nome do cliente ERP (`PATCH /api/clientes/{id}`).
+ */
+export function useAtualizarNomeCliente() {
+  const queryClient = useQueryClient()
+  const empresaId = useTenantEmpresaId()
+
+  return useSecureTenantMutation(
+    async (
+      { token },
+      { clienteId, nome }: { clienteId: string; nome: string }
+    ): Promise<void> => {
+      const nomeTrim = nome.trim()
+      if (!clienteId.trim()) {
+        throw new Error('Cliente inválido.')
+      }
+      if (!nomeTrim) {
+        throw new Error('Informe o nome do cliente.')
+      }
+
+      const response = await fetchGestorApi(`/api/clientes/${encodeURIComponent(clienteId)}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ nome: nomeTrim }),
+      })
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        throw new Error(err.error || err.message || `Erro ${response.status}`)
+      }
+    },
+    {
+      onSuccess: (_data, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['tenant', empresaId, 'clientes'] })
+        if (variables.clienteId) {
+          queryClient.invalidateQueries({
+            queryKey: ['tenant', empresaId, 'cliente', variables.clienteId],
+          })
+        }
       },
     }
   )

@@ -191,12 +191,8 @@ export function usePropagarAlteracaoProduto(): {
           return { aplicarNoCadastroBase: false, menuIds: [] }
         }
 
-        // 1 menu + produto já vinculado a ele → aplica direto, sem diálogo
-        if (
-          temVinculo &&
-          todosMenus.length === 1 &&
-          vinculadosIds.has(todosMenus[0].id)
-        ) {
+        // 1 menu na empresa → sempre sincroniza nesse cardápio (sem diálogo)
+        if (todosMenus.length === 1) {
           return { aplicarNoCadastroBase: false, menuIds: [todosMenus[0].id] }
         }
 
@@ -254,6 +250,12 @@ export function usePropagarAlteracaoProduto(): {
         lista.length === 0
       ) {
         return { aplicarNoCadastroBase: false, menuIds: [] }
+      }
+
+      // Origem menu: sem outros cardápios para propagar → salva só no atual (já feito pelo caller)
+      // e sincroniza o cadastro base, sem diálogo.
+      if (opts.origem === 'menu' && lista.length === 0) {
+        return { aplicarNoCadastroBase: true, menuIds: [] }
       }
 
       return abrirDialogo({

@@ -1,8 +1,9 @@
-﻿'use client'
+'use client'
 
 import { Button } from '@/src/presentation/components/ui/button'
 import { Label } from '@/src/presentation/components/ui/label'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
+import { estiloCardMeioPagamento } from '@/src/shared/utils/corFormaPagamentoFiscal'
 import { abrirDocumentoFiscalPdf, tipoDocFiscalFromModelo } from '@/src/presentation/utils/abrirDocumentoFiscalPdf'
 import { showToast } from '@/src/shared/utils/toast'
 import { MdCreditCard, MdDelete } from 'react-icons/md'
@@ -12,16 +13,13 @@ import { statusFiscalEhEmitida } from '@/src/domain/services/pedido/RegrasFiscai
 import { obterUnidadeMedidaProdutoLinha } from '../produtoCatalogoHelpers'
 import { formatarQuantidadeProdutoExibicao } from '@/src/shared/utils/quantidadeProdutoInput'
 import { formatarUnidadeMedidaProdutoExibicao } from '@/src/shared/types/unidadeMedidaProduto'
-import {
-  rotuloOrigemExibicao,
-  taxaEntregaTemValor,
-} from '@/src/application/mappers/PedidoDisplayMapper'
-import { PedidoDetalhesInfo } from './PedidoDetalhesInfo'
+import { taxaEntregaTemValor } from '@/src/application/mappers/PedidoDisplayMapper'
 import { PedidoDetalhesNotaFiscal } from './PedidoDetalhesNotaFiscal'
 import { PedidoDetalhesPagamentos } from './PedidoDetalhesPagamentos'
 import { PedidoDetalhesProdutos } from './PedidoDetalhesProdutos'
 import { PedidoDetalhesEntrega } from './PedidoDetalhesEntrega'
 import { PedidoDetalhesObservacoesSection } from './PedidoDetalhesObservacoesSection'
+import { PedidoDetalhesVisaoUnica } from './PedidoDetalhesVisaoUnica'
 import { useNovoPedidoDetalheContext } from '../context/NovoPedidoDetalheContext'
 import { useNovoPedidoFormContext } from '../context/NovoPedidoFormContext'
 import { useNovoPedidoUIContext } from '../context/NovoPedidoUIContext'
@@ -36,11 +34,9 @@ export function PedidoDetalhesView() {
     resumoFinanceiroDetalhes,
     resumoFiscal,
     statusFiscalUnificado,
-    detalhesPedidoMeta,
     detalhesEntregaPedido,
   } = useNovoPedidoDetalheContext()
   const { currentStep } = useNovoPedidoUIContext()
-  const { origem } = useNovoPedidoFormContext()
   const {
     adicionarPagamentoPorCard,
     calcularTotalProduto,
@@ -64,17 +60,13 @@ export function PedidoDetalhesView() {
     observacaoPedido,
     removerPagamento,
     rotuloModeloNfe,
-    rotuloStatusResumoModal,
     setValorRecebido,
-    totalItensPedido,
     totalPagamentos,
     totalPagamentosLancados,
     totalProdutos,
     trocoLancamento,
     valorAPagarLancamento,
     valorRecebido,
-    dataVenda,
-    clienteNome,
   } = useNovoPedidoFormContext()
 
   return (
@@ -206,141 +198,7 @@ export function PedidoDetalhesView() {
                       />
                     )}
 
-                    {abaDetalhesPedido === 'infoPedido' && (
-                      <PedidoDetalhesInfo
-                        role="tabpanel"
-                        aria-labelledby="tab-detalhes-info-pedido"
-                      >
-                        <h3 className="text-lg font-semibold">Informações do Pedido</h3>
-                        <div className="flex flex-col gap-3 text-sm">
-                          <div className="flex justify-between rounded-lg bg-white px-1">
-                            <span className="text-gray-600">Data:</span>
-                            <span className="font-medium">
-                              {(dataVenda ? new Date(dataVenda) : new Date()).toLocaleString(
-                                'pt-BR',
-                                {
-                                  day: '2-digit',
-                                  month: '2-digit',
-                                  year: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                }
-                              )}
-                            </span>
-                          </div>
-                          <div className="flex justify-between px-1">
-                            <span className="text-gray-600">Origem:</span>
-                            <span className="font-medium">
-                              {rotuloOrigemExibicao(origem)}
-                            </span>
-                          </div>
-                          <div className="flex justify-between rounded-lg bg-white px-1">
-                            <span className="text-gray-600">Status:</span>
-                            <span className="font-medium">{rotuloStatusResumoModal}</span>
-                          </div>
-                          {clienteNome && (
-                            <div className="flex justify-between px-1">
-                              <span className="text-gray-600">Cliente:</span>
-                              <span className="font-medium">{clienteNome}</span>
-                            </div>
-                          )}
-
-                          <div className="flex justify-between rounded-lg bg-white px-1">
-                            <span className="text-gray-600">Total de Itens:</span>
-                            <span className="font-medium">
-                              {totalItensPedido} {totalItensPedido === 1 ? 'produto' : 'produtos'}
-                            </span>
-                          </div>
-                          <div className="flex justify-between px-1">
-                            <span className="text-gray-600">Aberto por:</span>
-                            <span className="font-medium">
-                              {formatarUsuarioPorId(detalhesPedidoMeta?.abertoPorId)}
-                            </span>
-                          </div>
-                          {detalhesPedidoMeta?.ultimoResponsavelId && (
-                            <div className="flex justify-between rounded-lg bg-white px-1">
-                              <span className="text-gray-600">Última alteração por:</span>
-                              <span className="font-medium">
-                                {formatarUsuarioPorId(detalhesPedidoMeta.ultimoResponsavelId)}
-                              </span>
-                            </div>
-                          )}
-                          {detalhesPedidoMeta?.canceladoPorId && (
-                            <div className="flex justify-between px-1">
-                              <span className="text-gray-600">Cancelado por:</span>
-                              <span className="font-medium text-red-600">
-                                {formatarUsuarioPorId(detalhesPedidoMeta.canceladoPorId)}
-                              </span>
-                            </div>
-                          )}
-                          {detalhesPedidoMeta?.codigoTerminal && (
-                            <div className="flex justify-between rounded-lg bg-white px-1">
-                              <span className="text-gray-600">Código do terminal:</span>
-                              <span className="font-medium">
-                                {detalhesPedidoMeta.codigoTerminal}
-                              </span>
-                            </div>
-                          )}
-                          {detalhesPedidoMeta?.identificacao && (
-                            <div className="flex justify-between px-1">
-                              <span className="text-gray-600">Identificação:</span>
-                              <span className="font-medium">
-                                {detalhesPedidoMeta.identificacao}
-                              </span>
-                            </div>
-                          )}
-                          <div className="flex justify-between rounded-lg bg-white px-1">
-                            <span className="text-gray-600">Solicitar emissão fiscal:</span>
-                            <span className="font-medium">
-                              {detalhesPedidoMeta?.solicitarEmissaoFiscal ? 'Sim' : 'Não'}
-                            </span>
-                          </div>
-                          {detalhesPedidoMeta?.dataUltimaModificacao && (
-                            <div className="flex justify-between px-1">
-                              <span className="text-gray-600">Última modificação:</span>
-                              <span className="font-medium">
-                                {formatarDataDetalhePedido(
-                                  detalhesPedidoMeta.dataUltimaModificacao
-                                )}
-                              </span>
-                            </div>
-                          )}
-                          {detalhesPedidoMeta?.dataUltimoProdutoLancado && (
-                            <div className="flex justify-between rounded-lg bg-white px-1">
-                              <span className="text-gray-600">Último produto lançado:</span>
-                              <span className="font-medium">
-                                {formatarDataDetalhePedido(
-                                  detalhesPedidoMeta.dataUltimoProdutoLancado
-                                )}
-                              </span>
-                            </div>
-                          )}
-                          {detalhesPedidoMeta?.dataFinalizacao && (
-                            <div className="flex justify-between px-1">
-                              <span className="text-gray-600">Data finalização:</span>
-                              <span className="font-medium">
-                                {formatarDataDetalhePedido(detalhesPedidoMeta.dataFinalizacao)}
-                              </span>
-                            </div>
-                          )}
-                          {detalhesPedidoMeta?.dataCancelamento && (
-                            <div className="flex justify-between rounded-lg bg-white px-1">
-                              <span className="text-gray-600">Data cancelamento:</span>
-                              <span className="font-medium text-red-600">
-                                {formatarDataDetalhePedido(detalhesPedidoMeta.dataCancelamento)}
-                              </span>
-                            </div>
-                          )}
-                          <PedidoDetalhesObservacoesSection
-                            observacaoPedido={observacaoPedido}
-                            observacaoPedidoEntrega={detalhesEntregaPedido?.observacaoPedido}
-                            incluirObservacoesItens={false}
-                            exibirTituloSecao={false}
-                            className="border-t border-gray-200 pt-3"
-                          />
-                        </div>
-                      </PedidoDetalhesInfo>
-                    )}
+                    {abaDetalhesPedido === 'infoPedido' && <PedidoDetalhesVisaoUnica />}
 
                     {/* Lista de Produtos (Visualização) */}
                     {abaDetalhesPedido === 'listaProdutos' && (
@@ -744,18 +602,20 @@ export function PedidoDetalhesView() {
                                 const Icone = obterIconeMeioPagamento(meio.getNome())
                                 const semSaldoParaAdicionar =
                                   valorAPagarLancamento <= 0 && !valorRecebido.trim()
+                                const estilo = estiloCardMeioPagamento(meio.getFormaPagamentoFiscal())
                                 return (
                                   <button
                                     key={meio.getId()}
                                     type="button"
                                     onClick={() => adicionarPagamentoPorCard(meio.getId())}
                                     disabled={semSaldoParaAdicionar}
-                                    className={`flex w-[150px] shrink-0 flex-col items-center justify-center gap-1 rounded-lg border-2 border-secondary bg-secondary p-2 text-white transition-all hover:brightness-110 ${
+                                    style={estilo}
+                                    className={`flex w-[150px] shrink-0 flex-col items-center justify-center gap-1 rounded-lg border-2 p-2 transition-all hover:brightness-110 ${
                                       semSaldoParaAdicionar ? 'cursor-not-allowed opacity-50' : ''
                                     }`}
                                   >
-                                    <Icone className="h-8 w-8 shrink-0 text-white" />
-                                    <span className="line-clamp-2 w-full text-center text-xs font-medium leading-tight text-white">
+                                    <Icone className="h-8 w-8 shrink-0" />
+                                    <span className="line-clamp-2 w-full text-center text-xs font-medium leading-tight">
                                       {meio.getNome()}
                                     </span>
                                   </button>

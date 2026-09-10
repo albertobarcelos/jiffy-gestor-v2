@@ -22,7 +22,7 @@
  * | dataFinalizacao          | dataFinalizacao                |            |
  * | dataCancelamento         | dataCancelamento               |            |
  * | dataUltimaModificacao    | dataUltimaModificacao          |            |
- * | cliente                  | cliente                        |            |
+ * | cliente                  | cliente                        | id, nome, telefone (ou destinatário da entrega) |
  * | solicitarEmissaoFiscal   | solicitarEmissaoFiscal         |            |
  * | resumoFiscal.status      | statusFiscal                   | UPPER |
  * | resumoFiscal.documentoFiscalId | documentoFiscalId      |            |
@@ -101,6 +101,7 @@ export interface ResumoFiscalPedidoDeliverySummaryApi {
 export interface ClientePedidoDeliverySummaryApi {
   id: string
   nome: string
+  telefone?: string | null
 }
 
 /** Item da listagem — `VendaDeliverySummaryDTO` serializado (datas ISO). */

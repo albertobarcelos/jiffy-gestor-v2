@@ -1,0 +1,318 @@
+/**
+ * Tipo para resposta de erro da API
+ */
+type ApiErrorResponse = {
+  message?: string
+  error?: string
+  errors?: unknown
+}
+
+/** API_TLS_SKIP_VERIFY no .env.local não altera TLS sozinho — precisa virar NODE_TLS_REJECT_UNAUTHORIZED no processo Node. */
+function deveIgnorarVerificacaoTlsApi(): boolean {
+  return process.env.API_TLS_SKIP_VERIFY?.trim().toLowerCase() === 'true'
+}
+
+function aplicarTlsSkipDevSeConfigurado(): void {
+  if (typeof window !== 'undefined') return
+  if (!deveIgnorarVerificacaoTlsApi()) return
+  if (process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0') return
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+}
+
+aplicarTlsSkipDevSeConfigurado()
+
+function mensagemErroRede(error: unknown): ApiError | null {
+  if (!(error instanceof TypeError) || error.message !== 'fetch failed') {
+    return null
+  }
+
+  const cause = (error as { cause?: { code?: string } }).cause
+  if (cause?.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE') {
+    return new ApiError(
+      'Certificado SSL da API externa inválido. Em desenvolvimento, defina API_TLS_SKIP_VERIFY=true no .env.local e reinicie o servidor.',
+      503,
+      { ssl: true, code: cause.code }
+    )
+  }
+
+  return new ApiError(
+    'Não foi possível conectar à API externa. Verifique NEXT_PUBLIC_EXTERNAL_API_BASE_URL e a conexão de rede.',
+    503,
+    { network: true }
+  )
+}
+
+/**
+ * Cliente HTTP para comunicação com APIs externas
+ */
+export class ApiClient {
+  private baseUrl: string
+
+  constructor(baseUrl?: string) {
+    this.baseUrl = baseUrl || process.env.NEXT_PUBLIC_EXTERNAL_API_BASE_URL || ''
+  }
+
+  /**
+   * Verifica se estamos em modo de build
+   */
+  private isBuildTime(): boolean {
+    // Durante o build do Next.js, não devemos fazer requisições HTTP
+    // Verifica várias condições que indicam que estamos em modo de build
+    if (typeof window !== 'undefined') {
+      return false // Estamos no cliente, não é build
+    }
+
+    // Verifica se estamos em uma fase de build do Next.js
+    const nextPhase = process.env.NEXT_PHASE
+    if (nextPhase && (
+      nextPhase.includes('build') || 
+      nextPhase.includes('export') ||
+      nextPhase === 'phase-production-build' ||
+      nextPhase === 'phase-development-build'
+    )) {
+      return true
+    }
+
+    // Verifica se estamos executando next build
+    const nodeEnv = process.env.NODE_ENV
+    const isProductionBuild = (nodeEnv === 'production' && 
+                             process.argv.includes('build')) ||
+                             process.argv.some(arg => arg.includes('next') && arg.includes('build'))
+
+    return isProductionBuild
+  }
+
+  /**
+   * Realiza uma requisição HTTP
+   */
+  async request<T>(
+    endpoint: string,
+    options: RequestInit = {}
+  ): Promise<{ data: T; status: number }> {
+    // Se não houver baseUrl configurada, lança erro (mas não durante build)
+    if (!this.baseUrl && !this.isBuildTime()) {
+      throw new Error('NEXT_PUBLIC_EXTERNAL_API_BASE_URL não está configurada')
+    }
+
+    // Durante o build, não faz requisições reais
+    if (this.isBuildTime()) {
+      // Retorna uma resposta mockada durante o build para evitar erros
+      // Isso permite que o código seja analisado sem fazer conexões reais
+      return {
+        data: {} as T,
+        status: 200,
+      }
+    }
+
+    aplicarTlsSkipDevSeConfigurado()
+
+    const url = `${this.baseUrl}${endpoint}`
+
+    const isFormData =
+      typeof FormData !== 'undefined' && options.body instanceof FormData
+
+    const defaultHeaders: HeadersInit = {
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+      Accept: 'application/json',
+    }
+
+    // Timeout de 30 segundos para evitar espera indefinida se backend externo estiver lento
+    // (ex: quando microserviço fiscal está off e backend está tentando chamá-lo)
+    // Aumentado de 10s para 30s para dar mais tempo para serviços externos lentos responderem
+    // Se já houver um signal nas options, não criar um novo (permite cancelamento externo)
+    const hasExistingSignal = options.signal !== undefined
+    let controller: AbortController | undefined
+    let timeoutId: NodeJS.Timeout | null = null
+    
+    if (!hasExistingSignal) {
+      controller = new AbortController()
+      timeoutId = setTimeout(() => controller!.abort(), 30000) // 30 segundos
+    }
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        // Multi-tenant BFF: nunca cachear por URL — o Authorization muda por empresa/aba.
+        cache: 'no-store',
+        headers: {
+          ...defaultHeaders,
+          ...options.headers,
+        },
+        // Só adicionar signal se não houver um já definido
+        ...(controller ? { signal: controller.signal } : {}),
+      })
+
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+
+      if (!response.ok) {
+        const errorBody = await response.text().catch(() => '')
+        let errorData: ApiErrorResponse = {}
+        try {
+          errorData = errorBody ? (JSON.parse(errorBody) as ApiErrorResponse) : {}
+        } catch {
+          // Se não conseguir fazer parse, usa a mensagem do status
+          errorData = { message: `Erro ${response.status}: ${response.statusText}` }
+        }
+        throw new ApiError(
+          textoErroCorpoApi(errorData as unknown) ||
+            errorData.message ||
+            errorData.error ||
+            'Erro na requisição',
+          response.status,
+          errorData
+        )
+      }
+
+      // Para respostas 204 (No Content) ou outras sem corpo, retorna objeto vazio
+      if (response.status === 204 || response.headers.get('content-length') === '0') {
+        return { data: {} as T, status: response.status }
+      }
+
+      const raw = await response.text()
+      // Se não houver conteúdo, retorna objeto vazio
+      if (!raw || raw.trim() === '') {
+        return { data: {} as T, status: response.status }
+      }
+
+      let data: T
+      try {
+        data = JSON.parse(raw) as T
+      } catch {
+        // Se não conseguir fazer parse, retorna objeto vazio
+        data = {} as T
+      }
+      
+      return { data, status: response.status }
+    } catch (error: any) {
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+      // Se foi timeout, lançar erro específico
+      // No Node.js, o erro de abort pode ser DOMException ou Error com name 'AbortError'
+      if (
+        (error instanceof DOMException || error instanceof Error) &&
+        error.name === 'AbortError'
+      ) {
+        // Se foi abortado por timeout nosso (não por signal externo), lançar erro de timeout
+        if (controller) {
+          throw new ApiError(
+            'Timeout: O servidor demorou muito para responder. O serviço pode estar indisponível.',
+            504,
+            { timeout: true }
+          )
+        }
+        // Se foi abortado por signal externo, re-lançar o erro original
+      }
+      const networkError = mensagemErroRede(error)
+      if (networkError) throw networkError
+
+      throw error
+    }
+  }
+
+  /**
+   * Realiza uma requisição POST
+   */
+  async post<T>(endpoint: string, body: unknown): Promise<{ data: T; status: number }> {
+    return this.request<T>(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })
+  }
+}
+
+/**
+ * Classe de erro customizada para erros de API
+ */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public data?: unknown
+  ) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
+
+/**
+ * Extrai mensagem útil do corpo JSON de erro (Zod `issues`, Nest `detail`, `errors[]`, etc.).
+ */
+export function textoErroCorpoApi(body: unknown): string | null {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return null
+  }
+
+  const o = body as Record<string, unknown>
+
+  const issues = o.issues
+  if (Array.isArray(issues) && issues.length > 0) {
+    const text = issues
+      .map((issue: unknown) => {
+        if (issue && typeof issue === 'object') {
+          const path = Array.isArray((issue as { path?: unknown }).path)
+            ? (issue as { path: (string | number)[] }).path.join('.')
+            : ''
+          const msg =
+            typeof (issue as { message?: unknown }).message === 'string'
+              ? (issue as { message: string }).message
+              : ''
+          return path ? `${path}: ${msg}` : msg
+        }
+        return String(issue)
+      })
+      .filter(Boolean)
+      .join('; ')
+    if (text) return text
+  }
+
+  const errorsArr = o.errors
+  if (Array.isArray(errorsArr) && errorsArr.length > 0) {
+    const first = errorsArr[0]
+    if (typeof first === 'string') return first
+    if (first && typeof first === 'object' && typeof (first as { message?: unknown }).message === 'string') {
+      const m = (first as { message: string }).message.trim()
+      if (m) return m
+    }
+  }
+
+  const detail = o.detail
+  if (typeof detail === 'string' && detail.trim()) return detail.trim()
+
+  const nestedMsg = o.message
+  if (typeof nestedMsg === 'string' && nestedMsg.trim()) return nestedMsg.trim()
+
+  const errStr = o.error
+  if (typeof errStr === 'string' && errStr.trim()) return errStr.trim()
+
+  return null
+}
+
+/**
+ * Extrai texto útil do corpo JSON de erro da API externa (Zod issues, Nest detail, etc.).
+ * Evita só "Erro ao criar taxa" sem contexto quando o upstream envia validações em `issues`.
+ */
+export function mensagemLegivelApiError(error: ApiError): string {
+  const fromBody = textoErroCorpoApi(error.data)
+  if (fromBody) return fromBody
+
+  const data = error.data
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    const o = data as Record<string, unknown>
+
+    /** Formato comum do microserviço fiscal (ex.: POST /taxas). */
+    const tipoErro = o.type
+    if (typeof tipoErro === 'string' && tipoErro.trim()) {
+      const baseMsg = error.message.trim() || `Erro HTTP ${error.status}`
+      if (tipoErro === 'DATABASE_ERROR') {
+        return `${baseMsg} (${tipoErro}). Falha ao persistir no banco — consulte os logs do serviço fiscal.`
+      }
+      return `${baseMsg} (${tipoErro})`
+    }
+  }
+
+  return error.message.trim() || `Erro HTTP ${error.status}`
+}
+

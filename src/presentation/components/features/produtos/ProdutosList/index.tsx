@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 
 import { useProdutosInfinite } from '@/src/presentation/hooks/useProdutos'
+import { useEmpresaMenuUnico } from '@/src/presentation/hooks/menus/useEmpresaMenuUnico'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
 import { useProdutoPatchMutation, isSavingOf } from '@/src/presentation/hooks/useProdutoPatchMutation'
@@ -60,6 +61,9 @@ export function ProdutosList() {
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const isMobile = useIsMobile()
+  const { isMenuUnico } = useEmpresaMenuUnico()
+  /** Com 1 menu, cadastro base = cardápio: preço e edição rápida na lista. Com vários, preço só nos menus. */
+  const edicaoRapidaNaLista = isMenuUnico
 
   const { state: filters, actions, queryParams, filterStatus } = useProdutosFilters()
 
@@ -73,6 +77,25 @@ export function ProdutosList() {
   })
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const scrollIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleListScroll = useCallback(() => {
+    const root = scrollContainerRef.current
+    if (!root) return
+    if (document.querySelector('.MuiAutocomplete-popper')) return
+    root.classList.add('produtos-list-scrolling')
+    if (scrollIdleTimerRef.current) clearTimeout(scrollIdleTimerRef.current)
+    scrollIdleTimerRef.current = setTimeout(() => {
+      root.classList.remove('produtos-list-scrolling')
+      scrollIdleTimerRef.current = null
+    }, 140)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (scrollIdleTimerRef.current) clearTimeout(scrollIdleTimerRef.current)
+    }
+  }, [])
 
   const patchMutation = useProdutoPatchMutation()
   const invalidate = useInvalidateTenantQueries()
@@ -445,7 +468,8 @@ export function ProdutosList() {
 
       <div
         ref={scrollContainerRef}
-        className="flex-1 min-h-0 overflow-y-auto px-1 mt-2 scrollbar-hide"
+        onScroll={handleListScroll}
+        className="mt-2 min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-1 scrollbar-hide [&.produtos-list-scrolling]:[&_*]:hover:!bg-white"
       >
         {showInitialLoading ? (
           <div className="flex flex-col items-center justify-center gap-2 py-12">
@@ -456,7 +480,11 @@ export function ProdutosList() {
             <p className="text-secondary-text">Nenhum produto encontrado.</p>
           </div>
         ) : (
-          <div role="list" aria-label="Lista de produtos" className="space-y-1 pb-4">
+          <div
+            role="list"
+            aria-label="Lista de produtos"
+            className="divide-y divide-gray-200 border border-gray-200 pb-4"
+          >
             {produtosVisiveis.map((produto) => (
               <div key={produto.getId()} role="listitem">
                 <ProdutoListItem
@@ -467,9 +495,9 @@ export function ProdutosList() {
                   isSavingStatus={isSavingOf(patchMutation, produto.getId(), 'status')}
                   isSavingNome={isSavingOf(patchMutation, produto.getId(), 'nome')}
                   isSavingGrupo={isSavingOf(patchMutation, produto.getId(), 'grupo')}
-                  onNomeChange={handleNomeChange}
-                  onValorChange={handleValorChange}
-                  onGrupoChange={handleGrupoChange}
+                  onNomeChange={edicaoRapidaNaLista ? handleNomeChange : undefined}
+                  onValorChange={edicaoRapidaNaLista ? handleValorChange : undefined}
+                  onGrupoChange={edicaoRapidaNaLista ? handleGrupoChange : undefined}
                   onSwitchToggle={handleStatusToggle}
                   onToggleBoolean={handleToggleBooleanField}
                   onEditProduto={handleEditProduto}

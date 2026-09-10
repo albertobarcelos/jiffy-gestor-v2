@@ -11,8 +11,13 @@ import {
 } from '../utils/kanbanFiltroDataPresets'
 import {
   gravarFiltroColunaKanbanNoStorage,
+  gravarFiltrosToolbarKanbanNoStorage,
   lerFiltroColunaKanbanDoStorage,
+  lerFiltrosToolbarKanbanDoStorage,
+  mesclarPendenciaFiltrosToolbarKanban,
 } from '../rules/vendasKanban.storage'
+import { lerPendenciaQuadroFlow } from '@/src/presentation/gestor-pedidos/quadro/filtroPendenteQuadroFlow'
+import { termoBuscaKanbanParaApi } from '../rules/vendasKanban.rules'
 
 /** `periodo`: filtro por intervalo (default hoje quando sem datas explícitas). `todos`: sem filtro de data. */
 export type FiltroDataKanbanModo = 'periodo' | 'todos'
@@ -25,16 +30,46 @@ function criarIntervaloHoje() {
   }
 }
 
-export function useKanbanFilters(timeZoneEmpresa?: string) {
-  const [searchInput, setSearchInput] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
-  const intervaloPeriodoPadrao = useMemo(() => criarIntervaloHoje(), [])
-  const [periodoInicio, setPeriodoInicio] = useState<Date | null>(null)
-  const [periodoFim, setPeriodoFim] = useState<Date | null>(null)
-  const [periodoDataModo, setPeriodoDataModo] = useState<FiltroDataKanbanModo>('periodo')
-  const [periodoPreset, setPeriodoPreset] = useState<KanbanFiltroDataPreset>('hoje')
-  const [origemFilter, setOrigemFilter] = useState<OrigemFiltro>('')
-  const [tipoEntregaFilter, setTipoEntregaFilter] = useState<TipoEntregaFiltro>('')
+export function useKanbanFilters(
+  timeZoneEmpresa?: string,
+  opcoes?: { diaOperacionalFlow?: boolean }
+) {
+  const diaOperacionalFlow = Boolean(opcoes?.diaOperacionalFlow)
+  const tzEmpresa = timeZoneEmpresa ?? ''
+
+  const [filtrosIniciais] = useState(() =>
+    mesclarPendenciaFiltrosToolbarKanban(
+      lerFiltrosToolbarKanbanDoStorage(),
+      lerPendenciaQuadroFlow()
+    )
+  )
+  const [searchInput, setSearchInput] = useState(filtrosIniciais.searchInput)
+  const [searchQuery, setSearchQuery] = useState(filtrosIniciais.searchInput.trim())
+  const intervaloCivilHoje = useMemo(() => criarIntervaloHoje(), [])
+  const intervaloPeriodoPadrao = diaOperacionalFlow
+    ? intervaloPresetKanbanFiltroData('hoje', tzEmpresa, { diaOperacionalFlow: true }) ??
+      intervaloCivilHoje
+    : intervaloCivilHoje
+  const [periodoInicio, setPeriodoInicio] = useState<Date | null>(() => {
+    if (!filtrosIniciais.periodoInicioISO) return null
+    const d = new Date(filtrosIniciais.periodoInicioISO)
+    return Number.isFinite(d.getTime()) ? d : null
+  })
+  const [periodoFim, setPeriodoFim] = useState<Date | null>(() => {
+    if (!filtrosIniciais.periodoFimISO) return null
+    const d = new Date(filtrosIniciais.periodoFimISO)
+    return Number.isFinite(d.getTime()) ? d : null
+  })
+  const [periodoDataModo, setPeriodoDataModo] = useState<FiltroDataKanbanModo>(
+    filtrosIniciais.periodoDataModo
+  )
+  const [periodoPreset, setPeriodoPreset] = useState<KanbanFiltroDataPreset>(
+    filtrosIniciais.periodoPreset
+  )
+  const [origemFilter, setOrigemFilter] = useState<OrigemFiltro>(filtrosIniciais.origemFilter)
+  const [tipoEntregaFilter, setTipoEntregaFilter] = useState<TipoEntregaFiltro>(
+    filtrosIniciais.tipoEntregaFilter
+  )
   const [colunaKanbanFiltro, setColunaKanbanFiltroState] =
     useState<ColunaKanbanFiltroExtra>(lerFiltroColunaKanbanDoStorage)
 
@@ -64,12 +99,38 @@ export function useKanbanFilters(timeZoneEmpresa?: string) {
     }
   }, [searchInput])
 
+  useEffect(() => {
+    gravarFiltrosToolbarKanbanNoStorage({
+      searchInput,
+      origemFilter,
+      tipoEntregaFilter,
+      periodoPreset,
+      periodoDataModo,
+      periodoInicioISO: periodoInicio?.toISOString() ?? null,
+      periodoFimISO: periodoFim?.toISOString() ?? null,
+    })
+  }, [
+    searchInput,
+    origemFilter,
+    tipoEntregaFilter,
+    periodoPreset,
+    periodoDataModo,
+    periodoInicio,
+    periodoFim,
+  ])
+
   const deveUsarPeriodoPadrao =
     periodoDataModo === 'periodo' && !periodoInicio && !periodoFim
-  const periodoInicioConsulta =
-    periodoInicio ?? (deveUsarPeriodoPadrao ? intervaloPeriodoPadrao.inicio : null)
-  const periodoFimConsulta =
-    periodoFim ?? (deveUsarPeriodoPadrao ? intervaloPeriodoPadrao.fim : null)
+  const intervaloLiveFlow =
+    diaOperacionalFlow && (periodoPreset === 'hoje' || periodoPreset === 'ontem')
+      ? intervaloPresetKanbanFiltroData(periodoPreset, tzEmpresa, { diaOperacionalFlow: true })
+      : null
+  const periodoInicioConsulta = intervaloLiveFlow
+    ? intervaloLiveFlow.inicio
+    : periodoInicio ?? (deveUsarPeriodoPadrao ? intervaloPeriodoPadrao.inicio : null)
+  const periodoFimConsulta = intervaloLiveFlow
+    ? intervaloLiveFlow.fim
+    : periodoFim ?? (deveUsarPeriodoPadrao ? intervaloPeriodoPadrao.fim : null)
   const periodoAtivoNaConsulta =
     periodoDataModo === 'periodo' && periodoInicioConsulta != null && periodoFimConsulta != null
   const periodoInicioISO = periodoAtivoNaConsulta
@@ -79,7 +140,7 @@ export function useKanbanFilters(timeZoneEmpresa?: string) {
 
   /** Mesmo intervalo para criação (colunas operacionais) e finalização (colunas fiscais). */
   const vendasUnificadasQueryParams = useMemo(() => {
-    const qNormalizado = searchQuery.replace(/^#+/, '').trim()
+    const qNormalizado = termoBuscaKanbanParaApi(searchQuery)
     return {
       q: qNormalizado || undefined,
       origem: origemFilter || undefined,
@@ -183,14 +244,21 @@ export function useKanbanFilters(timeZoneEmpresa?: string) {
         abrirModalPeriodoDatas()
         return
       }
-      const intervalo = intervaloPresetKanbanFiltroData(preset, timeZoneEmpresa ?? '')
+      const intervalo = intervaloPresetKanbanFiltroData(preset, tzEmpresa, {
+        diaOperacionalFlow,
+      })
       if (!intervalo) return
       setPeriodoDataModo('periodo')
       setPeriodoPreset(preset)
+      if (diaOperacionalFlow && (preset === 'hoje' || preset === 'ontem')) {
+        setPeriodoInicio(null)
+        setPeriodoFim(null)
+        return
+      }
       setPeriodoInicio(intervalo.inicio)
       setPeriodoFim(intervalo.fim)
     },
-    [aplicarPeriodoTodos, abrirModalPeriodoDatas, timeZoneEmpresa]
+    [aplicarPeriodoTodos, abrirModalPeriodoDatas, diaOperacionalFlow, tzEmpresa]
   )
 
   return {

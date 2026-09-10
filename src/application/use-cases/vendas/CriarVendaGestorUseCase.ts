@@ -26,8 +26,11 @@ export interface ValidarCriarVendaParams {
   produtos?: ProdutoSelecionado[]
   pedidoDeliveryGestor: boolean
   clienteEntregaVinculadoId?: string
+  telefoneClienteDelivery?: string | null
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
+  enderecoEntregaTemGeo?: boolean
+  enderecoEntregaCoberturaStatus?: 'ok' | 'fora' | 'pendente' | 'indisponivel' | null
   pedidoGestorComPagamentoNoPasso3: boolean
   pedidoEntregaAceitaPagamentoPendente: boolean
   pagamentosCount: number
@@ -43,16 +46,22 @@ export interface ValidarCriarVendaParams {
 export function validarInformacoesPedido(params: {
   pedidoDeliveryGestor: boolean
   clienteEntregaVinculadoId?: string
+  telefoneClienteDelivery?: string | null
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
+  enderecoEntregaTemGeo?: boolean
+  enderecoEntregaCoberturaStatus?: 'ok' | 'fora' | 'pendente' | 'indisponivel' | null
   exibirToast?: boolean
   onError?: (message: string) => void
 }): boolean {
   const erro = validarInformacoesPedidoEntrega({
     pedidoDeliveryGestor: params.pedidoDeliveryGestor,
     clienteEntregaVinculadoId: params.clienteEntregaVinculadoId,
+    telefoneClienteDelivery: params.telefoneClienteDelivery,
     pedidoComEntrega: params.pedidoComEntrega,
     temEnderecoEntrega: params.temEnderecoEntrega,
+    enderecoEntregaTemGeo: params.enderecoEntregaTemGeo,
+    enderecoEntregaCoberturaStatus: params.enderecoEntregaCoberturaStatus,
   })
   if (!erro) return true
   if (params.exibirToast) {

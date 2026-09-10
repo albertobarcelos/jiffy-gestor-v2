@@ -1,10 +1,10 @@
 import { showToast } from '@/src/shared/utils/toast'
-import { deliveryPublicoHomePath } from './deliveryPublicoRoutes'
+import { buildCardapioLojaUrl } from '@/src/shared/utils/cardapioPublicUrl'
 
 export function buildProdutoShareUrl(slug: string, produtoId: string): string {
-  const origin = typeof window !== 'undefined' ? window.location.origin : ''
-  const path = deliveryPublicoHomePath(slug)
-  const url = new URL(path, origin || 'http://localhost')
+  const origin = typeof window !== 'undefined' ? window.location.origin : undefined
+  const lojaUrl = buildCardapioLojaUrl(slug, origin ?? 'http://localhost')
+  const url = new URL(lojaUrl)
   url.searchParams.set('produto', produtoId)
   return url.toString()
 }

@@ -173,6 +173,7 @@ describe('PedidoDeliveryListMapper — summary → VendaUnificadaDTO', () => {
     })
     expect(dto.contextoEntrega?.destinatarioTelefone).toBe('11988887777')
     expect(dto.contextoEntrega?.enderecoEntrega?.rua).toBe('Rua A')
+    expect(dto.cliente?.telefone).toBe('11988887777')
   })
 
   it('propaga statusDelivery e reconhece pedido entrega no Kanban', () => {
@@ -215,7 +216,7 @@ describe('PedidoDeliveryListMapper — summary → VendaUnificadaDTO', () => {
     expect(dto.retornoSefaz).toBe('Rejeição teste')
     expect(dto.modelo).toBe(65)
     expect(dto.tipoDocFiscal).toBe('NFCE')
-    expect(dto.getEtapaKanban()).toBe('PENDENTE_EMISSAO')
+    expect(dto.getEtapaKanban()).toBe('REJEITADAS')
   })
 
   it('nota emitida vai para coluna COM_FISCAL', () => {

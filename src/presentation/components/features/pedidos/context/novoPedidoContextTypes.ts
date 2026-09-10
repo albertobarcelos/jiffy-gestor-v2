@@ -184,6 +184,13 @@ export interface NovoPedidoEntregaSlice {
   setClienteEntregaVinculado: Dispatch<SetStateAction<NovoPedidoClienteEntregaVinculado>>
   moradaEntregaSelecionada: NovoPedidoMoradaEntrega
   setMoradaEntregaSelecionada: Dispatch<SetStateAction<NovoPedidoMoradaEntrega>>
+  enderecoEntregaCoberturaStatus: 'ok' | 'fora' | 'pendente' | 'indisponivel' | null
+  setEnderecoEntregaCoberturaStatus: Dispatch<
+    SetStateAction<'ok' | 'fora' | 'pendente' | 'indisponivel' | null>
+  >
+  /** Taxa calculada pela cobertura da morada selecionada. */
+  enderecoEntregaCoberturaValorTaxa: number | null
+  setEnderecoEntregaCoberturaValorTaxa: Dispatch<SetStateAction<number | null>>
   telefoneBuscaEntrega: string
   setTelefoneBuscaEntrega: Dispatch<SetStateAction<string>>
   telefoneBuscadoEntrega: string | null

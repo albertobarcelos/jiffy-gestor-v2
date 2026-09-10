@@ -1,6 +1,6 @@
 type YMD = { year: number; month: number; day: number }
 
-function ymdNoFuso(date: Date, timeZone: string): YMD {
+export function ymdNoFuso(date: Date, timeZone: string): YMD {
   const dtf = new Intl.DateTimeFormat('en-US', {
     timeZone,
     year: 'numeric',
@@ -49,7 +49,7 @@ function getTimeZoneOffsetMinutes(date: Date, timeZone: string): number {
   return Math.round((asUTC - date.getTime()) / 60000)
 }
 
-function zonedTimeToUtc(
+export function zonedTimeToUtc(
   dateParts: {
     year: number
     month: number

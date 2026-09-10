@@ -46,7 +46,15 @@ function ActionButton({
   const active = Boolean(isActive)
 
   return (
-    <MuiTooltip title={def.label} arrow placement="top" slotProps={TOOLTIP_SLOT}>
+    <MuiTooltip
+      title={def.label}
+      arrow
+      placement="top"
+      enterDelay={400}
+      enterNextDelay={400}
+      disableInteractive
+      slotProps={TOOLTIP_SLOT}
+    >
       <button
         type="button"
         aria-label={def.ariaLabel}

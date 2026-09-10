@@ -205,6 +205,21 @@ export class NovoPedidoReadRepository implements INovoPedidoReadRepository {
     })
   }
 
+  async transicionarStatusPedidoDelivery(
+    pedidoId: string,
+    token: string,
+    body: { toStatus: string; motivoCancelamento?: string }
+  ): Promise<void> {
+    await fetchJson<unknown>(
+      `/api/delivery/pedidos/${encodeURIComponent(pedidoId)}/transicao-status`,
+      token,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      }
+    )
+  }
+
   async emitirNotaPedidoDelivery(
     pedidoId: string,
     token: string,

@@ -31,6 +31,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast, handleApiError } from '@/src/shared/utils/toast'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
+import { useEmpresaMenuUnico } from '@/src/presentation/hooks/menus/useEmpresaMenuUnico'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { Produto } from '@/src/domain/entities/Produto'
 import { MdImage } from 'react-icons/md'
@@ -444,6 +445,9 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
     ref
   ) {
     const imagemNoCardapio = Boolean(previewMenuId)
+    const { isMenuUnico } = useEmpresaMenuUnico()
+    /** Com vários menus, o preço vive no snapshot do cardápio — não no cadastro base. */
+    const ocultarPrecoCadastroBase = !isMenuUnico
     const router = useRouter()
     const searchParams = useSearchParams()
     const invalidate = useInvalidateTenantQueries()
@@ -476,6 +480,12 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
     )
     const [grupoProduto, setGrupoProduto] = useState<string | null>(
       () => formSeed?.grupoProduto ?? defaultGrupoProdutoId ?? null
+    )
+    const [grupoProdutoNome, setGrupoProdutoNome] = useState<string | null>(
+      () =>
+        (initialProduto && produtoId && initialProduto.getId() === produtoId
+          ? initialProduto.getNomeGrupo()
+          : null) ?? null
     )
     const [codigoEanBarras, setCodigoEanBarras] = useState('')
     const [favorito, setFavorito] = useState(() => formSeed?.favorito ?? false)
@@ -894,7 +904,26 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
             // Preenche os campos com os dados do produto
             setPrecoVenda(produto.valor ? formatCurrency(produto.valor) : '')
             setUnidadeProduto(produto.unidadeMedida || null)
-            setGrupoProduto(extrairGrupoProdutoIdDoJsonProduto(produto as Record<string, unknown>))
+            {
+              const grupoFromApi = extrairGrupoProdutoIdDoJsonProduto(
+                produto as Record<string, unknown>
+              )
+              // Não apaga categoria já seedada (lista/menu) se o GET vier sem grupoId.
+              if (grupoFromApi) {
+                setGrupoProduto(grupoFromApi)
+              } else if (defaultGrupoProdutoId) {
+                setGrupoProduto(prev => prev ?? defaultGrupoProdutoId)
+              }
+              const grupoNested =
+                produto.grupo && typeof produto.grupo === 'object'
+                  ? (produto.grupo as Record<string, unknown>)
+                  : null
+              const nomeGrupoApi =
+                (typeof produto.nomeGrupo === 'string' && produto.nomeGrupo.trim()) ||
+                (typeof grupoNested?.nome === 'string' && grupoNested.nome.trim()) ||
+                null
+              if (nomeGrupoApi) setGrupoProdutoNome(nomeGrupoApi)
+            }
             const eanRaw =
               produto.codigoEan ?? produto.codigoBarras ?? produto.ean ?? produto.codigoEanBarras
             setCodigoEanBarras(
@@ -954,9 +983,11 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
               produto as Record<string, unknown>,
               currentEffectiveIsCopyMode
             )
-            grupoProdutoIdCarregadoRef.current = extrairGrupoProdutoIdDoJsonProduto(
-              produto as Record<string, unknown>
-            )
+            grupoProdutoIdCarregadoRef.current =
+              extrairGrupoProdutoIdDoJsonProduto(produto as Record<string, unknown>) ??
+              defaultGrupoProdutoId ??
+              formSeed?.grupoProduto ??
+              null
 
             if (currentEffectiveIsCopyMode) {
               const nomeOriginal = produto.nome || ''
@@ -1478,9 +1509,10 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         }
       }
 
-      // Validação do Preço de Venda
+      // Validação do Preço de Venda (cadastro base só exige preço quando há 1 menu)
       const precoVendaNum = parseFloat(precoVenda.replace(/[^\d,]/g, '').replace(',', '.'))
-      if (!precoVenda || precoVendaNum === 0) {
+      const precoCadastroValido = Number.isFinite(precoVendaNum) && precoVendaNum > 0
+      if (!ocultarPrecoCadastroBase && (!precoVenda || !precoCadastroValido)) {
         showToast.error('O campo "Preço de Venda" não pode ser vazio ou zero.')
         return false
       }
@@ -1588,7 +1620,11 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         const body: Record<string, unknown> = {
           nome: nomeProduto,
           descricao: descricaoProduto,
-          valor: precoVendaNum,
+          valor: ocultarPrecoCadastroBase
+            ? precoCadastroValido
+              ? precoVendaNum
+              : 0
+            : precoVendaNum,
           grupoId: grupoIdFinal,
           unidadeMedida: unidadeProduto,
           codigoEan: codigoEanBarras.trim(),
@@ -1877,7 +1913,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
             precoVenda.replace(/[^\d,]/g, '').replace(',', '.')
           )
           if (!nomeProduto?.trim()) return false
-          if (!precoVenda || precoNum <= 0) return false
+          if (!ocultarPrecoCadastroBase && (!precoVenda || precoNum <= 0)) return false
           if (!unidadeProduto) return false
           const isEditMode = Boolean(effectiveProdutoId) && !effectiveIsCopyMode
           // Criação/cópia: categoria existente ou nova pendente do wizard (passo 1).
@@ -1903,6 +1939,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         pendingNovaCategoriaLabel,
         effectiveProdutoId,
         effectiveIsCopyMode,
+        ocultarPrecoCadastroBase,
       ]
     )
 
@@ -2136,6 +2173,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
               onUnidadeProdutoChange={setUnidadeProduto}
               grupoProduto={grupoProduto}
               onGrupoProdutoChange={setGrupoProduto}
+              grupoProdutoNome={grupoProdutoNome}
               lockGrupoProduto={lockGrupoProduto}
               lockedGrupoLabel={lockedGrupoLabel}
               pendingNovaCategoriaLabel={pendingNovaCategoriaLabel}
@@ -2143,6 +2181,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
               onCodigoEanBarrasChange={setCodigoEanBarras}
               grupos={grupos}
               isLoadingGrupos={isLoadingGrupos}
+              ocultarPrecoVenda={ocultarPrecoCadastroBase}
               onNext={handleNext}
               onSaveAndClose={() => void handleSave({ salvarSomenteDadosGerais: true })}
               hideStepFooter={hideLocalStepFooter}

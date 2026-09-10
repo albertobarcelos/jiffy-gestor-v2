@@ -12,6 +12,8 @@ import type { TipoPedido } from '../../pedidos/components/EscolhaTipoPedidoModal
 import type { AbaDetalhesPedido } from '../../pedidos/types'
 import type { Venda } from '../types'
 import type { DateRange } from 'react-day-picker'
+import { AtribuirEntregadorKanbanPainel } from '../../delivery/kanban-panels/AtribuirEntregadorKanbanPainel'
+import { EmpresaDeliveryPendenteGestorModal } from '../../delivery/EmpresaDeliveryPendenteGestorModal'
 
 export interface KanbanModaisRendererProps {
   timezoneAgregacao: string
@@ -62,6 +64,14 @@ export interface KanbanModaisRendererProps {
   onAfterCloseVisualizacao: () => void
   onSuccessVisualizacao: () => void
   modoKanbanVendas: ModoKanbanVendas
+  pedidoAtribuirEntregador: Venda | null
+  entregadorVinculadoDespacho?: string | null
+  modoDespachoEntregador: boolean
+  onCloseAtribuirEntregadorDespacho: () => void
+  onSalvoAtribuirEntregadorDespacho: (vendaId: string, entregadorId: string | null) => void
+  empresaDeliveryPendenteOpen: boolean
+  onCloseEmpresaDeliveryPendente: () => void
+  empresaDeliveryPendenciasLabels: string[]
 }
 
 export function KanbanModaisRenderer({
@@ -102,6 +112,14 @@ export function KanbanModaisRenderer({
   onAfterCloseVisualizacao,
   onSuccessVisualizacao,
   modoKanbanVendas,
+  pedidoAtribuirEntregador,
+  entregadorVinculadoDespacho,
+  modoDespachoEntregador,
+  onCloseAtribuirEntregadorDespacho,
+  onSalvoAtribuirEntregadorDespacho,
+  empresaDeliveryPendenteOpen,
+  onCloseEmpresaDeliveryPendente,
+  empresaDeliveryPendenciasLabels,
 }: KanbanModaisRendererProps) {
   return (
     <>
@@ -206,12 +224,30 @@ export function KanbanModaisRenderer({
           modoVisualizacao={true}
         />
       )}
+      <AtribuirEntregadorKanbanPainel
+        key={
+          pedidoAtribuirEntregador
+            ? `despacho-entregador-${pedidoAtribuirEntregador.id}`
+            : 'despacho-entregador-fechado'
+        }
+        open={Boolean(pedidoAtribuirEntregador)}
+        venda={pedidoAtribuirEntregador}
+        entregadorVinculadoId={entregadorVinculadoDespacho}
+        modoDespacho={modoDespachoEntregador}
+        onClose={onCloseAtribuirEntregadorDespacho}
+        onSalvo={onSalvoAtribuirEntregadorDespacho}
+      />
       <AlertaCbenefEmissaoDialog
         open={Boolean(alertaCbenef)}
         itens={alertaCbenef?.itens ?? []}
         onContinuar={onContinuarCbenef}
         onConfigurar={onConfigurarCbenef}
         onCancelar={onCancelarCbenef}
+      />
+      <EmpresaDeliveryPendenteGestorModal
+        open={empresaDeliveryPendenteOpen}
+        onClose={onCloseEmpresaDeliveryPendente}
+        pendenciasLabels={empresaDeliveryPendenciasLabels}
       />
     </>
   )

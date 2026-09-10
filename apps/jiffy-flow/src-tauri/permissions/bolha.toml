@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-bolha"
+description = "Clique e arraste da bolha flutuante"
+commands.allow = ["bolha_clique", "bolha_arrastar"]
