@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import {
   GoogleMap,
   Marker,
+  Circle,
   OverlayView,
   useGoogleMap,
   useJsApiLoader,
@@ -11,6 +12,7 @@ import {
 import {
   geoJsonPointFromLatLng,
   latLngFromGeoJsonPoint,
+  limitarPontoAoRaioMetros,
   type GeoJsonPoint,
 } from '@/src/shared/types/geoJsonPoint'
 import { getGoogleMapsApiKeyClient } from '@/src/shared/utils/googleMapsClient'
@@ -118,6 +120,13 @@ export type EnderecoGeolocalizacaoMapProps = {
   mapContainerStyle?: CSSProperties
   /** Texto do balão exibido após soltar o pin (fica até confirmar ou arrastar de novo). */
   balaoArrastarTexto?: string
+  /**
+   * Centro do limite de arraste (ex.: geocode original do endereço).
+   * Se omitido junto com `limiteArrasteMetros`, o pin move livremente.
+   */
+  ancoraLimiteArraste?: GeoJsonPoint | null
+  /** Raio máximo (metros) em que o pin pode se afastar da âncora. */
+  limiteArrasteMetros?: number
 }
 
 export function EnderecoGeolocalizacaoMap({
@@ -134,6 +143,8 @@ export function EnderecoGeolocalizacaoMap({
   localizacaoReferencia = null,
   mapContainerStyle,
   balaoArrastarTexto,
+  ancoraLimiteArraste = null,
+  limiteArrasteMetros,
 }: EnderecoGeolocalizacaoMapProps) {
   const apiKey = getGoogleMapsApiKeyClient()
   const { isLoaded, loadError } = useJsApiLoader(googleMapsLoaderConfig(apiKey))
@@ -144,12 +155,22 @@ export function EnderecoGeolocalizacaoMap({
       : (mapStyle.height ?? '320px')
 
   const [mostrarBalaoAposSoltar, setMostrarBalaoAposSoltar] = useState(false)
+  const markerArrastavelRef = useRef<google.maps.Marker | null>(null)
 
   const posicaoMarcador = useMemo(() => latLngFromGeoJsonPoint(value), [value])
   const posicaoReferencia = useMemo(
     () => latLngFromGeoJsonPoint(localizacaoReferencia),
     [localizacaoReferencia]
   )
+  const posicaoAncoraLimite = useMemo(
+    () => latLngFromGeoJsonPoint(ancoraLimiteArraste),
+    [ancoraLimiteArraste]
+  )
+  const raioLimiteArraste =
+    typeof limiteArrasteMetros === 'number' && limiteArrasteMetros > 0
+      ? limiteArrasteMetros
+      : null
+  const limitarArrasteAtivo = Boolean(ancoraLimiteArraste && raioLimiteArraste)
 
   const modoPreferencia = pinModo === 'preferencia'
   const exibirReferenciaFixa = modoPreferencia && Boolean(posicaoReferencia)
@@ -167,12 +188,28 @@ export function EnderecoGeolocalizacaoMap({
   const centroInicialRef = useRef(posicaoMarcador ?? posicaoReferencia ?? FALLBACK_CENTER)
   const zoomInicialRef = useRef(posicaoMarcador || posicaoReferencia ? LOCALIZADO_ZOOM : FALLBACK_ZOOM)
 
+  const aplicarPosicaoComLimite = useCallback(
+    (lat: number, lng: number): { lat: number; lng: number } => {
+      if (!limitarArrasteAtivo || !ancoraLimiteArraste || !raioLimiteArraste) {
+        return { lat, lng }
+      }
+      const limitado = limitarPontoAoRaioMetros(
+        ancoraLimiteArraste,
+        geoJsonPointFromLatLng(lat, lng),
+        raioLimiteArraste
+      )
+      return latLngFromGeoJsonPoint(limitado) ?? { lat, lng }
+    },
+    [ancoraLimiteArraste, limitarArrasteAtivo, raioLimiteArraste]
+  )
+
   const handlePositionChange = useCallback(
     (lat: number, lng: number) => {
       if (disabled) return
-      onChange(geoJsonPointFromLatLng(lat, lng))
+      const limitada = aplicarPosicaoComLimite(lat, lng)
+      onChange(geoJsonPointFromLatLng(limitada.lat, limitada.lng))
     },
-    [disabled, onChange]
+    [aplicarPosicaoComLimite, disabled, onChange]
   )
 
   if (!apiKey) {
@@ -248,6 +285,23 @@ export function EnderecoGeolocalizacaoMap({
             zoom={LOCALIZADO_ZOOM}
           />
         ) : null}
+        {limitarArrasteAtivo && posicaoAncoraLimite && raioLimiteArraste ? (
+          <Circle
+            center={posicaoAncoraLimite}
+            radius={raioLimiteArraste}
+            options={{
+              strokeColor: '#171717',
+              strokeOpacity: 0.45,
+              strokeWeight: 2,
+              fillColor: '#171717',
+              fillOpacity: 0.06,
+              clickable: false,
+              draggable: false,
+              editable: false,
+              zIndex: 0,
+            }}
+          />
+        ) : null}
         {exibirReferenciaFixa && posicaoReferencia ? (
           <Marker
             position={posicaoReferencia}
@@ -263,12 +317,29 @@ export function EnderecoGeolocalizacaoMap({
             icon={modoPreferencia ? iconePinPreferencia : iconePinEndereco}
             title={modoPreferencia ? labelPinPreferenciaMapa() : 'Localização do endereço'}
             zIndex={2}
+            onLoad={marker => {
+              markerArrastavelRef.current = marker
+            }}
+            onUnmount={() => {
+              markerArrastavelRef.current = null
+            }}
             onDragStart={() => {
               setMostrarBalaoAposSoltar(false)
             }}
+            onDrag={event => {
+              if (!limitarArrasteAtivo || !event.latLng || !markerArrastavelRef.current) return
+              const limitada = aplicarPosicaoComLimite(event.latLng.lat(), event.latLng.lng())
+              markerArrastavelRef.current.setPosition(limitada)
+            }}
             onDragEnd={event => {
               if (!event.latLng) return
-              handlePositionChange(event.latLng.lat(), event.latLng.lng())
+              const lat = event.latLng.lat()
+              const lng = event.latLng.lng()
+              const limitada = aplicarPosicaoComLimite(lat, lng)
+              if (markerArrastavelRef.current) {
+                markerArrastavelRef.current.setPosition(limitada)
+              }
+              handlePositionChange(limitada.lat, limitada.lng)
               setMostrarBalaoAposSoltar(true)
             }}
           />
