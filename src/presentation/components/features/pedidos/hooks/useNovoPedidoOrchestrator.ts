@@ -51,6 +51,8 @@ import { createNovoPedidoResetForm } from './orchestrator/createNovoPedidoResetF
 import { assembleNovoPedidoContextSlices } from './orchestrator/assembleNovoPedidoContextSlices'
 import { canSubmitNovoPedido } from './orchestrator/canSubmitNovoPedido'
 import { useNovoPedidoOrchestratorFlags } from './orchestrator/useNovoPedidoOrchestratorFlags'
+import { useCotacaoTaxaPorMoradas } from '@/src/presentation/hooks/useCotacaoTaxaPorMoradas'
+import { resolverModoTaxaEntregaOverride } from '@/src/shared/constants/taxaEntregaPedido'
 import { enderecoTemGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
 import {
   formatarDataDetalhePedido as formatarDataDetalhePedidoOrchestrator,
@@ -392,6 +394,61 @@ export function useNovoPedidoOrchestrator({
     modoVisualizacao: Boolean(modoVisualizacao),
     pedidoComEntrega,
   })
+
+  const modoTaxaEntrega = resolverModoTaxaEntregaOverride(taxaEntregaId)
+  const telefoneCotacao =
+    telefoneBuscadoEntrega ||
+    moradaEntregaSelecionada?.telefone ||
+    telefoneBuscaEntrega ||
+    ''
+  const cotacaoTaxa = useCotacaoTaxaPorMoradas({
+    enabled:
+      open &&
+      !modoVisualizacao &&
+      !vendaId &&
+      pedidoDeliveryGestor &&
+      pedidoComEntrega &&
+      modoTaxaEntrega === 'automatica' &&
+      Boolean(moradaEntregaSelecionada?.id) &&
+      Boolean(
+        moradaEntregaSelecionada?.endereco &&
+          enderecoTemGeolocalizacao(moradaEntregaSelecionada.endereco)
+      ),
+    telefone: telefoneCotacao,
+    enderecoId: moradaEntregaSelecionada?.id ?? '',
+    produtos,
+  })
+
+  useEffect(() => {
+    if (!pedidoDeliveryGestor || !pedidoComEntrega || modoTaxaEntrega !== 'automatica') {
+      return
+    }
+    if (cotacaoTaxa.status === 'idle') return
+    if (cotacaoTaxa.status === 'loading') {
+      setEnderecoEntregaCoberturaStatus('pendente')
+      setEnderecoEntregaCoberturaValorTaxa(null)
+      return
+    }
+    if (cotacaoTaxa.status === 'fora') {
+      setEnderecoEntregaCoberturaStatus('fora')
+      setEnderecoEntregaCoberturaValorTaxa(null)
+      return
+    }
+    if (cotacaoTaxa.status === 'ok') {
+      setEnderecoEntregaCoberturaStatus('ok')
+      setEnderecoEntregaCoberturaValorTaxa(cotacaoTaxa.valorTaxa)
+      return
+    }
+    setEnderecoEntregaCoberturaStatus('indisponivel')
+    setEnderecoEntregaCoberturaValorTaxa(null)
+  }, [
+    pedidoDeliveryGestor,
+    pedidoComEntrega,
+    modoTaxaEntrega,
+    cotacaoTaxa,
+    setEnderecoEntregaCoberturaStatus,
+    setEnderecoEntregaCoberturaValorTaxa,
+  ])
 
   const flags = useNovoPedidoOrchestratorFlags({
     modoVisualizacao,

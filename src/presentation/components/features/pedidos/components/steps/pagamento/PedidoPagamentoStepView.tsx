@@ -4,6 +4,7 @@ import { Button } from '@/src/presentation/components/ui/button'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { Label } from '@/src/presentation/components/ui/label'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
+import { resolverModoTaxaEntregaOverride } from '@/src/shared/constants/taxaEntregaPedido'
 import {
   estiloCardMeioPagamento,
   varsCardMeioPagamentoLancado,
@@ -51,6 +52,9 @@ export function PedidoPagamentoStepView() {
     valorAPagarLancamento,
     valorRecebido,
     valorTaxaEntrega,
+    taxaEntregaId,
+    enderecoEntregaCoberturaStatus,
+    pedidoComEntrega,
   } = useNovoPedidoFormContext()
 
   const nomeClienteResumo =
@@ -63,6 +67,12 @@ export function PedidoPagamentoStepView() {
     pedidoEntregaAceitaPagamentoPendente && fluxoPagamentoEntrega === 'cobrar_entregador'
       ? 'Valor a receber:'
       : 'Valor Recebido:'
+  const modoTaxa = resolverModoTaxaEntregaOverride(taxaEntregaId)
+  const taxaPendente =
+    pedidoComEntrega &&
+    modoTaxa === 'automatica' &&
+    enderecoEntregaCoberturaStatus === 'pendente'
+  const mostrarResumoTaxa = pedidoEntregaAceitaPagamentoPendente && pedidoComEntrega
 
   return (
     <PedidoPagamentoStep>
@@ -186,7 +196,7 @@ export function PedidoPagamentoStepView() {
                   </button>
                 </div>
               )}
-              {pedidoEntregaAceitaPagamentoPendente && valorTaxaEntrega > 0 && (
+              {mostrarResumoTaxa && (
                 <>
                   <div className="flex items-center justify-between px-1 py-0.5">
                     <span className="font-medium text-gray-700">Produtos:</span>
@@ -197,7 +207,9 @@ export function PedidoPagamentoStepView() {
                   <div className="flex items-center justify-between px-1 py-0.5">
                     <span className="font-medium text-gray-700">Taxa de entrega:</span>
                     <span className="font-semibold text-gray-900">
-                      + {transformarParaReal(valorTaxaEntrega)}
+                      {taxaPendente
+                        ? 'Calculando…'
+                        : `+ ${transformarParaReal(valorTaxaEntrega)}`}
                     </span>
                   </div>
                 </>

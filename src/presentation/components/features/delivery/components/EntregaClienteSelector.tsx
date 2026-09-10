@@ -7,7 +7,6 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { Label } from '@/src/presentation/components/ui/label'
 import { showToast } from '@/src/shared/utils/toast'
 import { formatarCepMascara, normalizarDigitosCep } from '@/src/shared/utils/consultaCep'
-import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { maiusculasEnderecoInput } from '@/src/shared/utils/normalizarTextoEnderecoPublico'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { JiffyConfirmDialog } from '@/src/presentation/components/ui/jiffy-confirm-dialog'
@@ -21,8 +20,6 @@ import {
   useGeoEmpresaEntrega,
 } from '@/src/presentation/hooks/useMoradaTelefone'
 import type { MoradaTelefone, EnderecoMorada } from '@/src/domain/types/moradaEntrega'
-import { useCoberturaTaxaPorMoradas } from '@/src/presentation/hooks/useCoberturaTaxaPorMoradas'
-import type { ResultadoTaxaCoberturaPonto } from '@/src/shared/utils/calcularTaxaCoberturaPonto'
 import {
   useBuscarClientePorTelefone,
   useCriarClienteRapido,
@@ -190,8 +187,6 @@ function MoradaCard({
   onRemover,
   localizando,
   exigirGeo,
-  cobertura,
-  coberturaLoading,
   tempoPrevistoOverrideMinutos,
 }: {
   morada: MoradaTelefone
@@ -201,21 +196,15 @@ function MoradaCard({
   onRemover: () => void
   localizando?: boolean
   exigirGeo?: boolean
-  cobertura?: ResultadoTaxaCoberturaPonto | null
-  coberturaLoading?: boolean
-  /** Tempo do formulário — só aplica no card selecionado. */
   tempoPrevistoOverrideMinutos?: number | null
 }) {
   const etiqueta = morada.tipoEtiqueta || morada.nomeMorada || 'Endereço'
   const e = morada.endereco
   const temGeo = e ? enderecoTemGeolocalizacao(e) : false
-  const foraDaArea = Boolean(temGeo && cobertura && !cobertura.coberta)
   const tempoExibidoMinutos =
     selecionada && tempoPrevistoOverrideMinutos != null && tempoPrevistoOverrideMinutos > 0
       ? tempoPrevistoOverrideMinutos
-      : cobertura?.coberta && cobertura.tempoEntregaInMinutes > 0
-        ? cobertura.tempoEntregaInMinutes
-        : null
+      : null
   const linhaResumo =
     e ?
       `${e.rua || '—'}, ${e.numero || '—'} — ${e.cidade || '—'}`
@@ -224,12 +213,8 @@ function MoradaCard({
     <div
       className={`flex items-start justify-between gap-2 rounded-lg border-2 p-3 transition-colors ${
         selecionada
-          ? foraDaArea
-            ? 'border-amber-400 bg-amber-50'
-            : 'border-primary bg-primary/5'
-          : foraDaArea
-            ? 'border-amber-200 bg-amber-50/60 hover:border-amber-300'
-            : 'border-gray-200 bg-white hover:border-primary/40'
+          ? 'border-primary bg-primary/5'
+          : 'border-gray-200 bg-white hover:border-primary/40'
       }`}
     >
       <button
@@ -239,23 +224,13 @@ function MoradaCard({
       >
         <MdLocationOn
           className={`mt-0.5 h-5 w-5 flex-shrink-0 ${
-            selecionada
-              ? foraDaArea
-                ? 'text-amber-700'
-                : 'text-primary'
-              : foraDaArea
-                ? 'text-amber-500'
-                : 'text-gray-400'
+            selecionada ? 'text-primary' : 'text-gray-400'
           }`}
         />
         <div className="min-w-0">
           <p
             className={`text-sm font-semibold capitalize ${
-              selecionada
-                ? foraDaArea
-                  ? 'text-amber-800'
-                  : 'text-primary'
-                : 'text-gray-800'
+              selecionada ? 'text-primary' : 'text-gray-800'
             }`}
           >
             {etiqueta}
@@ -266,18 +241,9 @@ function MoradaCard({
               {localizando ? (
                 <p className="text-[11px] font-medium text-gray-500">Buscando localização…</p>
               ) : null}
-              {temGeo && coberturaLoading ? (
-                <p className="text-[11px] font-medium text-gray-500">Calculando taxa de entrega…</p>
-              ) : null}
-              {temGeo && cobertura?.coberta ? (
+              {temGeo && tempoExibidoMinutos != null ? (
                 <p className="text-[11px] font-semibold text-emerald-700">
-                  Taxa de entrega: {transformarParaReal(cobertura.valorTaxa)}
-                  {tempoExibidoMinutos != null ? ` · ~${tempoExibidoMinutos} min` : ''}
-                </p>
-              ) : null}
-              {temGeo && cobertura && !cobertura.coberta ? (
-                <p className="text-[11px] font-semibold text-amber-700">
-                  Fora da área cadastrada — taxa pode ser aproximada
+                  ~{tempoExibidoMinutos} min
                 </p>
               ) : null}
             </div>
@@ -404,10 +370,6 @@ export function EntregaClienteSelector({
   const atualizarMorada = useAtualizarMoradaTelefone(moradaHookOptions)
   const excluirMorada = useExcluirMoradaTelefone(moradaHookOptions)
   const registrarUsoMorada = useRegistrarUsoMoradaTelefone(moradaHookOptions)
-  const coberturaTaxa = useCoberturaTaxaPorMoradas({
-    enabled: usarModuloDeliveryClientes && mostrarEnderecos && temCadastroNestaEmpresa,
-    moradas: moradas ?? [],
-  })
   const buscarCliente = useBuscarClientePorTelefone()
   const criarCliente = useCriarClienteRapido()
   const criarClienteDelivery = useCriarClienteDeliveryRapido()
@@ -498,41 +460,17 @@ export function EntregaClienteSelector({
       return
     }
 
-    if (coberturaTaxa.isLoading) {
-      onCoberturaMoradaSelecionadaChange({ status: 'loading' })
-      return
-    }
-
-    if (coberturaTaxa.isError) {
-      onCoberturaMoradaSelecionadaChange({ status: 'erro' })
-      return
-    }
-
-    const cobertura = coberturaTaxa.porMoradaId[moradaSelecionada.id]
-    if (!cobertura) {
-      onCoberturaMoradaSelecionadaChange({ status: 'loading' })
-      return
-    }
-
-    if (!cobertura.coberta) {
-      onCoberturaMoradaSelecionadaChange({ status: 'fora' })
-      return
-    }
-
     onCoberturaMoradaSelecionadaChange({
       status: 'coberta',
       moradaId: moradaSelecionada.id,
-      valorTaxa: cobertura.valorTaxa,
-      tempoEntregaInMinutes: cobertura.tempoEntregaInMinutes,
+      valorTaxa: 0,
+      tempoEntregaInMinutes: 0,
     })
   }, [
     onCoberturaMoradaSelecionadaChange,
     usarModuloDeliveryClientes,
     mostrarEnderecos,
     moradaSelecionada,
-    coberturaTaxa.isLoading,
-    coberturaTaxa.isError,
-    coberturaTaxa.porMoradaId,
   ])
 
   useEffect(() => {
@@ -1245,8 +1183,6 @@ export function EntregaClienteSelector({
                   onRemover={() => abrirConfirmacaoExclusao(morada)}
                   localizando={localizandoMoradaId === morada.id}
                   exigirGeo={usarModuloDeliveryClientes}
-                  cobertura={coberturaTaxa.porMoradaId[morada.id] ?? null}
-                  coberturaLoading={coberturaTaxa.isLoading}
                   tempoPrevistoOverrideMinutos={
                     moradaSelecionada?.id === morada.id ? tempoPrevistoMinutos : null
                   }

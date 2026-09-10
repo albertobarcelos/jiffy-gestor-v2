@@ -24,9 +24,26 @@ export function selectValueParaTaxaEntregaId(value: string): string {
   return value
 }
 
-/** `taxaId` do catálogo para o PATCH; `null` = sem taxa / automática. */
+/** `taxaId` do catálogo para o PATCH do Kanban; `null` = sem taxa / automática. */
 export function taxaEntregaIdParaPatch(taxaEntregaId: string | null | undefined): string | null {
   const modo = resolverModoTaxaEntregaOverride(taxaEntregaId)
   if (modo !== 'catalogo') return null
   return taxaEntregaId!.trim()
+}
+
+/**
+ * Create Gestor: omite no automático (backend calcula);
+ * `0` sem taxa; valor do catálogo no override.
+ */
+export function valorTaxaEntregaParaCreate(args: {
+  pedidoComEntrega: boolean
+  taxaEntregaId?: string | null
+  valorTaxaEntrega: number
+}): number | undefined {
+  if (!args.pedidoComEntrega) return undefined
+  const modo = resolverModoTaxaEntregaOverride(args.taxaEntregaId)
+  if (modo === 'automatica') return undefined
+  if (modo === 'sem_taxa') return 0
+  const valor = Number(args.valorTaxaEntrega)
+  return Number.isFinite(valor) && valor >= 0 ? valor : 0
 }

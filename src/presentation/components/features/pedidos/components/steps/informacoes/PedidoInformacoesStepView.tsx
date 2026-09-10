@@ -38,17 +38,17 @@ export function PedidoInformacoesStepView() {
     setTelefoneBuscadoEntrega,
     tempoPrevistoMinutos,
     setTempoPrevistoMinutos,
-    enderecoEntregaCoberturaValorTaxa,
     setEnderecoEntregaCoberturaStatus,
     setEnderecoEntregaCoberturaValorTaxa,
     taxaEntregaId,
     setTaxaEntregaId,
     taxasEntrega,
     valorTaxaEntrega,
+    enderecoEntregaCoberturaValorTaxa,
+    enderecoEntregaCoberturaStatus,
   } = useNovoPedidoFormContext()
 
   const { empresa, setSeletorClienteOpen } = useNovoPedidoUIContext()
-  const ultimaMoradaAutoTempoRef = useRef<string | null>(null)
   const ultimaMoradaIdRef = useRef<string | null>(null)
 
   const resetOverrideSeMudouMorada = useCallback(
@@ -67,16 +67,8 @@ export function PedidoInformacoesStepView() {
       switch (cobertura.status) {
         case 'coberta': {
           resetOverrideSeMudouMorada(cobertura.moradaId)
-          setEnderecoEntregaCoberturaStatus('ok')
-          setEnderecoEntregaCoberturaValorTaxa(cobertura.valorTaxa)
-          if (
-            cobertura.moradaId !== ultimaMoradaAutoTempoRef.current &&
-            cobertura.tempoEntregaInMinutes > 0 &&
-            TEMPOS_PREVISTOS_ENTREGA.includes(cobertura.tempoEntregaInMinutes)
-          ) {
-            ultimaMoradaAutoTempoRef.current = cobertura.moradaId
-            setTempoPrevistoMinutos(cobertura.tempoEntregaInMinutes)
-          }
+          setEnderecoEntregaCoberturaStatus('pendente')
+          setEnderecoEntregaCoberturaValorTaxa(null)
           break
         }
         case 'fora':
@@ -94,7 +86,6 @@ export function PedidoInformacoesStepView() {
         case 'null':
         default:
           ultimaMoradaIdRef.current = null
-          ultimaMoradaAutoTempoRef.current = null
           setTaxaEntregaId('')
           setEnderecoEntregaCoberturaStatus(null)
           setEnderecoEntregaCoberturaValorTaxa(null)
@@ -105,7 +96,6 @@ export function PedidoInformacoesStepView() {
       resetOverrideSeMudouMorada,
       setEnderecoEntregaCoberturaStatus,
       setEnderecoEntregaCoberturaValorTaxa,
-      setTempoPrevistoMinutos,
       setTaxaEntregaId,
     ]
   )
@@ -113,14 +103,16 @@ export function PedidoInformacoesStepView() {
   const modoTaxa = resolverModoTaxaEntregaOverride(taxaEntregaId)
   const labelAutomatica =
     enderecoEntregaCoberturaValorTaxa == null
-      ? moradaEntregaSelecionada
+      ? enderecoEntregaCoberturaStatus === 'pendente'
         ? 'Automática (calculando…)'
         : 'Automática (selecione o endereço)'
       : `Automática (${transformarParaReal(enderecoEntregaCoberturaValorTaxa)})`
 
   const hintTaxa =
     modoTaxa === 'automatica'
-      ? 'Padrão da área/raio. Pode remover ou trocar por uma taxa do catálogo.'
+      ? enderecoEntregaCoberturaValorTaxa == null
+        ? 'O servidor calcula a taxa deste endereço. Assim que a prévia chegar, o pagamento já inclui produtos + taxa.'
+        : `Prévia oficial: ${transformarParaReal(enderecoEntregaCoberturaValorTaxa)}. O pagamento já soma essa taxa.`
       : modoTaxa === 'sem_taxa'
         ? 'Sem taxa neste pedido. O total do pagamento já ignora a entrega.'
         : `Taxa do catálogo: ${transformarParaReal(valorTaxaEntrega)}.`
