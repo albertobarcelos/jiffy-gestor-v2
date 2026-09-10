@@ -535,7 +535,7 @@ export function DeliveryCheckoutPagamentoModal({
             <p className="mb-1.5 text-sm font-medium delivery-text-primary">
               Formas lançadas
             </p>
-            <ul className="flex flex-wrap gap-2">
+            <ul className="grid grid-cols-3 gap-2.5">
               {pagamentos.map((pagamento, index) => {
                 const meio = meiosById.get(pagamento.meioPagamentoId)
                 const Icone = obterIconeMeioPagamento(meio?.nome ?? '')
