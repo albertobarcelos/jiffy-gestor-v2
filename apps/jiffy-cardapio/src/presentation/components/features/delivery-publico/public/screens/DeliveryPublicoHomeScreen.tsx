@@ -46,8 +46,16 @@ import { formatEmpresaPublicaEndereco } from '../../shared/utils/formatEmpresaPu
 import { produtoTemComplementosAtivos } from '../../shared/utils/produtoComplementosUtils'
 import { resolveDeliveryLayoutHome } from '../layouts/DeliveryPublicoLayoutRegistry'
 import type { DeliveryPublicoViewModel } from '../../shared/types/deliveryPublicoViewModel'
-import { DeliveryProdutoModal } from '../components/DeliveryProdutoModal'
+import dynamic from 'next/dynamic'
 import { DeliveryAdicionadoCarrinhoDialog } from '../components/DeliveryAdicionadoCarrinhoDialog'
+
+const DeliveryProdutoModal = dynamic(
+  () =>
+    import('../components/DeliveryProdutoModal').then(m => ({
+      default: m.DeliveryProdutoModal,
+    })),
+  { ssr: false }
+)
 import { DeliveryPublicoCarrinhoScreen } from './DeliveryPublicoCarrinhoScreen'
 import { useFlyToCart } from '../../shared/hooks/useFlyToCart'
 import { useDeliveryBodyScrollLock } from '../../shared/hooks/useDeliveryBodyScrollLock'

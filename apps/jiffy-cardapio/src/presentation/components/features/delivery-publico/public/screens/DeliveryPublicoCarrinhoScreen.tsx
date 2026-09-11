@@ -16,6 +16,7 @@ import { DeliveryButton } from '../../shared/components/DeliveryButton'
 import { DELIVERY_MSG_CELULAR_COMPLETO } from '../../shared/constants/deliveryPublicoPlaceholders'
 import { useDeliveryBodyScrollLock } from '../../shared/hooks/useDeliveryBodyScrollLock'
 import { useDeliveryCheckout } from '../../shared/hooks/useDeliveryCheckout'
+import { useDeliveryCheckoutFlow } from '../../shared/hooks/useDeliveryCheckoutFlow'
 import {
   useDeliveryCarrinhoStore,
   type DeliveryCarrinhoItem,
@@ -39,15 +40,8 @@ import { enderecoTemGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnde
 import { fingerprintItensCotacao } from '@/src/presentation/hooks/publicDeliveryCotacaoKeys'
 import type { ModoEntregaOpcao } from '../components/checkout/DeliveryCheckoutTipoEntregaOpcoes'
 import { DeliveryCheckoutProgressProvider } from '../components/checkout/DeliveryCheckoutProgressContext'
-import {
-  DeliveryCheckoutShell,
-  getCheckoutSlideDirection,
-} from '../components/checkout/DeliveryCheckoutShell'
-import {
-  calculateDeliveryCheckoutProgress,
-  isIdentificacaoCheckoutCompleta,
-  type DeliveryCheckoutStep,
-} from '../components/checkout/deliveryCheckoutProgress'
+import { DeliveryCheckoutShell } from '../components/checkout/DeliveryCheckoutShell'
+import type { DeliveryCheckoutStep } from '../components/checkout/deliveryCheckoutProgress'
 
 /** Placeholder leve enquanto o chunk do modal carrega (P4.1). */
 function CheckoutModalChunkFallback() {
@@ -145,14 +139,6 @@ export function DeliveryPublicoCarrinhoScreen({
   const removerItem = useDeliveryCarrinhoStore(s => s.removerItem)
   const substituirItem = useDeliveryCarrinhoStore(s => s.substituirItem)
   const [itemEditando, setItemEditando] = useState<DeliveryCarrinhoItem | null>(null)
-  const [checkoutStep, setCheckoutStep] = useState<DeliveryCheckoutStep>(null)
-  const [checkoutDirection, setCheckoutDirection] = useState<1 | -1>(1)
-  const prevCheckoutStepRef = useRef<DeliveryCheckoutStep>(null)
-  const [highestCheckoutPercentage, setHighestCheckoutPercentage] = useState(0)
-  /** Quando true, concluir um step intermediário volta para a revisão. */
-  const [voltarParaRevisao, setVoltarParaRevisao] = useState(false)
-  /** Quando true, concluir endereço volta ao modal unificado (identificação + tipo). */
-  const [voltarParaIdentificacao, setVoltarParaIdentificacao] = useState(false)
   const [aberto, setAberto] = useState(true)
   const [removingIds, setRemovingIds] = useState<Set<string>>(() => new Set())
   const [pedidoConfirmado, setPedidoConfirmado] =
@@ -161,10 +147,6 @@ export function DeliveryPublicoCarrinhoScreen({
     message: string
     cotacao: CotacaoPedidoPublicoDTO
   } | null>(null)
-  /** De onde o formulário de endereço foi aberto (volta correta ao cancelar). */
-  const [origemFormEndereco, setOrigemFormEndereco] = useState<
-    'geo' | 'lista' | 'novo' | 'identificacao' | null
-  >(null)
 
   const requestClose = () => setAberto(false)
 
@@ -220,17 +202,8 @@ export function DeliveryPublicoCarrinhoScreen({
     fecharForaCoberturaDialog,
     podeCriarNovoEndereco,
   } = useDeliveryCheckout(slug, {
-    // Steps após identificação (ou pagamento+) — fetch garantido
-    fetchMeiosPagamento:
-      checkoutStep === 'enderecos' ||
-      checkoutStep === 'enderecoForm' ||
-      checkoutStep === 'enderecoGeo' ||
-      checkoutStep === 'pagamento' ||
-      checkoutStep === 'revisao' ||
-      checkoutStep === 'sucesso' ||
-      checkoutStep === 'pedidoDetalhe',
-    // P4.2 — overlap: com ID completa ainda no telefone, meios já sobem
-    prefetchMeiosAposIdentificacao: checkoutStep === 'telefone',
+    fetchMeiosPagamento: true,
+    prefetchMeiosAposIdentificacao: true,
   })
 
   const quantidadeItens = useMemo(
@@ -272,7 +245,6 @@ export function DeliveryPublicoCarrinhoScreen({
 
   const quantidadeEnderecosCliente = clienteLookup.cliente?.enderecos?.length ?? 0
   const novoEnderecoBloqueado = clienteAtingiuMaxEnderecosDelivery(quantidadeEnderecosCliente)
-  const garantirPodeCriarNovoEndereco = podeCriarNovoEndereco
 
   const enderecoParaRevisao =
     form.tipoEntrega === 'entrega' ? enderecoClienteSelecionado : null
@@ -291,63 +263,6 @@ export function DeliveryPublicoCarrinhoScreen({
 
   const totalCheckout = totalOficial ?? total
 
-  const identificacaoCompleta = useMemo(
-    () =>
-      isIdentificacaoCheckoutCompleta({
-        lookupStatus: clienteLookup.status,
-        nomeCadastro: clienteLookup.cliente?.nome ?? null,
-        nomeDigitado: form.nome,
-      }),
-    [clienteLookup.status, clienteLookup.cliente?.nome, form.nome]
-  )
-
-  const currentCheckoutProgress = useMemo(
-    () =>
-      calculateDeliveryCheckoutProgress({
-        checkoutStep,
-        tipoEntrega: form.tipoEntrega,
-        preserveCompleted: voltarParaRevisao,
-        identificacaoCompleta,
-      }),
-    [checkoutStep, form.tipoEntrega, voltarParaRevisao, identificacaoCompleta]
-  )
-
-  useEffect(() => {
-    if (!currentCheckoutProgress) return
-    if (checkoutStep === 'telefone') {
-      // Na identificação a barra acompanha o estado atual (pode subir ou descer).
-      setHighestCheckoutPercentage(currentCheckoutProgress.percentage)
-      return
-    }
-    setHighestCheckoutPercentage(current =>
-      Math.max(current, currentCheckoutProgress.percentage)
-    )
-  }, [currentCheckoutProgress, checkoutStep])
-
-  const checkoutProgress = useMemo(() => {
-    if (!currentCheckoutProgress) return null
-
-    const percentage =
-      checkoutStep === 'telefone'
-        ? currentCheckoutProgress.percentage
-        : Math.max(currentCheckoutProgress.percentage, highestCheckoutPercentage)
-
-    return {
-      ...currentCheckoutProgress,
-      percentage,
-      label:
-        percentage === 100
-          ? 'Etapas do pedido concluídas'
-          : `${percentage}% das etapas concluídas`,
-    }
-  }, [currentCheckoutProgress, highestCheckoutPercentage, checkoutStep])
-
-  const goToCheckoutStep = useCallback((next: DeliveryCheckoutStep) => {
-    setCheckoutDirection(getCheckoutSlideDirection(prevCheckoutStepRef.current, next))
-    prevCheckoutStepRef.current = next
-    setCheckoutStep(next)
-  }, [])
-
   const prevCheckoutStepForCotacaoRef = useRef<DeliveryCheckoutStep>(null)
   const cotacaoAutoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const recotarPedidoRef = useRef(recotarPedido)
@@ -360,14 +275,56 @@ export function DeliveryPublicoCarrinhoScreen({
     return !isTokenCotacaoExpirado(cotacao.expiresAt)
   }, [cotacao, cotacaoPronta])
 
-  const irParaPagamentoComCotacao = useCallback(async () => {
-    if (cotacaoValidaParaPagamento) {
-      goToCheckoutStep('pagamento')
-      return
-    }
-    const result = await recotarPedido()
-    if (result.ok) goToCheckoutStep('pagamento')
-  }, [cotacaoValidaParaPagamento, recotarPedido, goToCheckoutStep])
+  const flow = useDeliveryCheckoutFlow({
+    tipoEntrega: form.tipoEntrega,
+    enderecoSelecionado: enderecoClienteSelecionado
+      ? {
+          id: enderecoClienteSelecionado.id,
+          temGeolocalizacao: enderecoTemGeolocalizacao(enderecoClienteSelecionado),
+        }
+      : null,
+    quantidadeEnderecos: quantidadeEnderecosCliente,
+    lookupStatus: clienteLookup.status,
+    nomeCadastro: clienteLookup.cliente?.nome ?? null,
+    nomeDigitado: form.nome,
+    cotacaoValidaParaPagamento,
+    recotarPedido,
+    restaurarEnderecoSelecaoCancelada,
+    enderecoIdSelecionado: form.enderecoIdSelecionado,
+    podeCriarNovoEndereco,
+    usarNovoEndereco,
+    selecionarEnderecoExistente,
+    limparCotacao,
+  })
+
+  const {
+    checkoutStep,
+    checkoutDirection,
+    checkoutProgress,
+    currentCheckoutProgress,
+    bumpProgressFromCurrent,
+    setOrigemFormEndereco,
+    goToCheckoutStep,
+    fecharCheckout,
+    fecharOuRevisao,
+    voltarDoPagamento,
+    abrirStepDaRevisao,
+    irParaProximoPassoAposEndereco,
+    avancarAposIdentificacao,
+    handleSelecionarEndereco: handleSelecionarEnderecoFlow,
+    handleUsarNovoEndereco,
+    handleTrocarEndereco,
+    handleNovoEnderecoDesdeIdentificacao,
+    handleContinuarCheckout: handleContinuarCheckoutFlow,
+    handlePagamentoContinuar,
+    handleCancelarEnderecoForm,
+    handleCancelarGeoEndereco,
+    marcarSucesso,
+  } = flow
+
+  useEffect(() => {
+    bumpProgressFromCurrent()
+  }, [currentCheckoutProgress, checkoutStep, bumpProgressFromCurrent])
 
   useEffect(() => {
     return () => {
@@ -420,63 +377,6 @@ export function DeliveryPublicoCarrinhoScreen({
     cotacaoValidaParaPagamento,
     itens,
   ])
-
-  const fecharCheckout = () => {
-    setHighestCheckoutPercentage(0)
-    setVoltarParaRevisao(false)
-    setVoltarParaIdentificacao(false)
-    setOrigemFormEndereco(null)
-    prevCheckoutStepRef.current = null
-    setCheckoutStep(null)
-  }
-
-  const fecharOuRevisao = () => {
-    const step = checkoutStep
-    const saindoDeFluxoEndereco =
-      step === 'enderecoForm' || step === 'enderecos' || step === 'enderecoGeo'
-
-    if (saindoDeFluxoEndereco) {
-      restaurarEnderecoSelecaoCancelada()
-      setOrigemFormEndereco(null)
-    }
-
-    if (voltarParaRevisao) {
-      // Já na revisão (ou X com flag presa): fecha de verdade.
-      if (step === 'revisao') {
-        fecharCheckout()
-        return
-      }
-      goToCheckoutStep('revisao')
-      return
-    }
-
-    if (voltarParaIdentificacao) {
-      // Já em Identifique-se com a flag presa: o X precisa fechar o checkout.
-      if (step === 'telefone') {
-        fecharCheckout()
-        return
-      }
-      setVoltarParaIdentificacao(false)
-      goToCheckoutStep('telefone')
-      return
-    }
-
-    fecharCheckout()
-  }
-
-  const voltarDoPagamento = () => {
-    if (voltarParaRevisao) {
-      goToCheckoutStep('revisao')
-      return
-    }
-    goToCheckoutStep('telefone')
-  }
-
-  const abrirStepDaRevisao = (step: DeliveryCheckoutStep) => {
-    setVoltarParaRevisao(true)
-    setVoltarParaIdentificacao(false)
-    goToCheckoutStep(step)
-  }
 
   useEffect(() => {
     if (!itemEditando) return
@@ -537,9 +437,7 @@ export function DeliveryPublicoCarrinhoScreen({
     }
 
     setPedidoConfirmado(mapPedidoPublicoCriadoParaConfirmado(resultado.pedido, fallback))
-    setVoltarParaRevisao(false)
-    setVoltarParaIdentificacao(false)
-    goToCheckoutStep('sucesso')
+    marcarSucesso()
     limparCarrinhoAposPedido()
   }
 
@@ -554,87 +452,12 @@ export function DeliveryPublicoCarrinhoScreen({
   const carregandoEdicao = Boolean(itemEditando) && !produtoEdicao
   useDeliveryBodyScrollLock(aberto)
 
-  const irParaProximoPassoAposEndereco = useCallback(async (): Promise<
-    boolean | 'fora_cobertura'
-  > => {
-    if (voltarParaRevisao) {
-      goToCheckoutStep('revisao')
-      return true
-    }
-    if (voltarParaIdentificacao) {
-      setVoltarParaIdentificacao(false)
-      goToCheckoutStep('telefone')
-      return true
-    }
-    if (cotacaoValidaParaPagamento) {
-      goToCheckoutStep('pagamento')
-      return true
-    }
-    const result = await recotarPedido()
-    if (result.ok) {
-      goToCheckoutStep('pagamento')
-      return true
-    }
-    if (result.reason === 'fora_cobertura') return 'fora_cobertura'
-    return false
-  }, [
-    voltarParaRevisao,
-    voltarParaIdentificacao,
-    goToCheckoutStep,
-    cotacaoValidaParaPagamento,
-    recotarPedido,
-  ])
-
   const handleSelecionarEndereco = (enderecoId: string) => {
-    selecionarEnderecoExistente(enderecoId)
-    const endereco = clienteLookup.cliente?.enderecos.find(e => e.id === enderecoId)
-    if (endereco && !enderecoTemGeolocalizacao(endereco)) {
-      goToCheckoutStep('enderecoGeo')
-      return
-    }
-    void irParaProximoPassoAposEndereco()
-  }
-
-  const handleUsarNovoEndereco = () => {
-    if (!garantirPodeCriarNovoEndereco()) return
-    setOrigemFormEndereco('lista')
-    usarNovoEndereco()
-    goToCheckoutStep('enderecoForm')
-  }
-
-  const handleTrocarEndereco = (origem: 'identificacao' | 'revisao' = 'identificacao') => {
-    if (origem === 'revisao') {
-      setVoltarParaRevisao(true)
-      setVoltarParaIdentificacao(false)
-    } else {
-      setVoltarParaIdentificacao(true)
-      setVoltarParaRevisao(false)
-    }
-    const enderecos = clienteLookup.cliente?.enderecos ?? []
-    if (enderecos.length > 0) {
-      goToCheckoutStep('enderecos')
-      return
-    }
-    if (!garantirPodeCriarNovoEndereco()) return
-    setOrigemFormEndereco(origem === 'identificacao' ? 'identificacao' : 'novo')
-    usarNovoEndereco()
-    goToCheckoutStep('enderecoForm')
-  }
-
-  const handleNovoEnderecoDesdeIdentificacao = (
-    origem: 'identificacao' | 'revisao' = 'identificacao'
-  ) => {
-    if (!garantirPodeCriarNovoEndereco()) return
-    if (origem === 'revisao') {
-      setVoltarParaRevisao(true)
-      setVoltarParaIdentificacao(false)
-    } else {
-      setVoltarParaIdentificacao(true)
-      setVoltarParaRevisao(false)
-    }
-    setOrigemFormEndereco(origem === 'identificacao' ? 'identificacao' : 'novo')
-    usarNovoEndereco()
-    goToCheckoutStep('enderecoForm')
+    const e = clienteLookup.cliente?.enderecos.find(end => end.id === enderecoId)
+    handleSelecionarEnderecoFlow(
+      enderecoId,
+      e ? { id: e.id, temGeolocalizacao: enderecoTemGeolocalizacao(e) } : null
+    )
   }
 
   const handleRemoverEnderecoDaLista = async (enderecoId: string) => {
@@ -651,80 +474,7 @@ export function DeliveryPublicoCarrinhoScreen({
       showToast.error('A loja está fechada no momento. Não é possível finalizar pedidos.')
       return
     }
-    setHighestCheckoutPercentage(0)
-    setVoltarParaRevisao(false)
-    setVoltarParaIdentificacao(false)
-    prevCheckoutStepRef.current = null
-    limparCotacao()
-    goToCheckoutStep('telefone')
-  }
-
-  const abrirFluxoEndereco = () => {
-    const enderecos = clienteLookup.cliente?.enderecos ?? []
-    if (enderecos.length > 0) {
-      goToCheckoutStep('enderecos')
-      return
-    }
-    if (!garantirPodeCriarNovoEndereco()) return
-    usarNovoEndereco()
-    setOrigemFormEndereco('novo')
-    goToCheckoutStep('enderecoForm')
-  }
-
-  const avancarAposIdentificacao = () => {
-    if (form.tipoEntrega === 'entrega' && !enderecoClienteSelecionado) {
-      setVoltarParaIdentificacao(false)
-      setVoltarParaRevisao(false)
-      abrirFluxoEndereco()
-      return
-    }
-    if (
-      form.tipoEntrega === 'entrega' &&
-      enderecoClienteSelecionado &&
-      !enderecoTemGeolocalizacao(enderecoClienteSelecionado)
-    ) {
-      goToCheckoutStep('enderecoGeo')
-      return
-    }
-    if (voltarParaRevisao) {
-      goToCheckoutStep('revisao')
-      return
-    }
-    void irParaPagamentoComCotacao()
-  }
-
-  const handlePagamentoContinuar = () => {
-    setVoltarParaRevisao(false)
-    goToCheckoutStep('revisao')
-  }
-
-  const handleCancelarEnderecoForm = () => {
-    const restaurado = restaurarEnderecoSelecaoCancelada()
-    if (
-      origemFormEndereco === 'geo' &&
-      (restaurado || form.enderecoIdSelecionado.trim())
-    ) {
-      setOrigemFormEndereco(null)
-      goToCheckoutStep('enderecoGeo')
-      return
-    }
-    const origem = origemFormEndereco
-    setOrigemFormEndereco(null)
-    if (origem === 'identificacao' || voltarParaIdentificacao) {
-      setVoltarParaIdentificacao(false)
-      goToCheckoutStep('telefone')
-      return
-    }
-    if (voltarParaRevisao) {
-      goToCheckoutStep('revisao')
-      return
-    }
-    const enderecos = clienteLookup.cliente?.enderecos ?? []
-    if (enderecos.length > 0) {
-      goToCheckoutStep('enderecos')
-      return
-    }
-    goToCheckoutStep('telefone')
+    handleContinuarCheckoutFlow()
   }
 
   const handleChangeOpcaoEntrega = (opcao: ModoEntregaOpcao) => {
@@ -770,19 +520,6 @@ export function DeliveryPublicoCarrinhoScreen({
     const passo = await irParaProximoPassoAposEndereco()
     if (passo === true) showToast.success('Localização salva!')
     return passo
-  }
-
-  const handleCancelarGeoEndereco = () => {
-    const enderecos = clienteLookup.cliente?.enderecos ?? []
-    if (enderecos.length > 0) {
-      goToCheckoutStep('enderecos')
-      return
-    }
-    if (voltarParaIdentificacao) {
-      goToCheckoutStep('telefone')
-      return
-    }
-    fecharOuRevisao()
   }
 
   return (
@@ -1087,15 +824,12 @@ export function DeliveryPublicoCarrinhoScreen({
             enviando={enviando}
             onClose={fecharCheckout}
             onVoltar={() => {
-              setVoltarParaRevisao(false)
               goToCheckoutStep('pagamento')
             }}
             onEditarTipoEntrega={() => abrirStepDaRevisao('telefone')}
             onEditarCliente={() => abrirStepDaRevisao('telefone')}
             onEditarEndereco={() => handleTrocarEndereco('revisao')}
             onEditarPedido={() => {
-              setVoltarParaRevisao(false)
-              setVoltarParaIdentificacao(false)
               fecharCheckout()
             }}
             onEditarPagamento={() => abrirStepDaRevisao('pagamento')}
@@ -1155,11 +889,8 @@ export function DeliveryPublicoCarrinhoScreen({
         onFechar={fecharForaCoberturaDialog}
         onEscolherRetirada={() => {
           updateForm('tipoEntrega', 'retirada')
-          limparCotacao()
           fecharForaCoberturaDialog()
-          setVoltarParaIdentificacao(false)
-          setVoltarParaRevisao(false)
-          goToCheckoutStep('telefone')
+          handleContinuarCheckoutFlow()
         }}
       />
     </DeliveryCheckoutProgressProvider>

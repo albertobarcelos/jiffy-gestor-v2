@@ -222,9 +222,19 @@ export function usePublicDeliveryCatalogInfinite(slug: string, enabled = true) {
   })
 }
 
+function catalogoAutoFetchBatchSize(): number {
+  if (typeof window === 'undefined') return 3
+  const coarse =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(pointer: coarse)').matches
+  const narrow = window.innerWidth > 0 && window.innerWidth < 768
+  return coarse || narrow ? 1 : 3
+}
+
 /**
- * Carrega as páginas restantes do catálogo em lotes paralelos (até 3),
- * usando `totalPages` da 1ª página — evita waterfall estritamente sequencial.
+ * Carrega as páginas restantes do catálogo em lotes paralelos (até 3 no desktop,
+ * 1 no mobile), usando `totalPages` da 1ª página — evita waterfall estritamente
+ * sequencial. Em mobile aguarda idle antes do primeiro lote.
  */
 export function useAutoFetchCatalogoGrupos(
   slug: string,
@@ -245,8 +255,10 @@ export function useAutoFetchCatalogoGrupos(
     if (totalPages <= 1 || pagesCarregadas >= totalPages) return
 
     let cancelled = false
+    let idleHandle: number | null = null
+    let timeoutHandle: ReturnType<typeof setTimeout> | null = null
     const queryKey = publicDeliveryCatalogInfiniteQueryKey(slug)
-    const BATCH = 3
+    const BATCH = catalogoAutoFetchBatchSize()
 
     const run = async () => {
       const loaded = new Set(
@@ -304,9 +316,25 @@ export function useAutoFetchCatalogoGrupos(
       }
     }
 
-    void run()
+    const schedule = () => {
+      if (cancelled) return
+      void run()
+    }
+
+    if (BATCH === 1 && typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      idleHandle = window.requestIdleCallback(schedule, { timeout: 1500 })
+    } else if (BATCH === 1) {
+      timeoutHandle = setTimeout(schedule, 200)
+    } else {
+      schedule()
+    }
+
     return () => {
       cancelled = true
+      if (idleHandle != null && typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+        window.cancelIdleCallback(idleHandle)
+      }
+      if (timeoutHandle) clearTimeout(timeoutHandle)
     }
   }, [
     slug,

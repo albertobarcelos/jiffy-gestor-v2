@@ -1,5 +1,6 @@
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import { parseGeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
+import { enderecoEntregaTemGeolocalizacao } from '@/src/domain/policies/EnderecoEntregaRequerGeolocalizacao'
 import {
   backendForwardGeocode,
   backendReverseGeocode,
@@ -324,7 +325,7 @@ export function resolverPreferenciaEntrega(
 export function enderecoTemGeolocalizacao(endereco: {
   enderecoLocalizacao?: GeoJsonPoint | null
 }): boolean {
-  return Boolean(parseGeoJsonPoint(endereco.enderecoLocalizacao))
+  return enderecoEntregaTemGeolocalizacao(endereco)
 }
 
 export type ModoPersistenciaGeoEnderecoDelivery = 'preferencia_entrega' | 'atualizar_endereco'

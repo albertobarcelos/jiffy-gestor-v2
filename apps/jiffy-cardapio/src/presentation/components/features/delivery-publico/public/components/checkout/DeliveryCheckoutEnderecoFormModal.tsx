@@ -39,9 +39,9 @@ import {
   pontoClienteParaDistancia,
 } from '../../../shared/utils/formatarDistanciaAproximadaDaLoja'
 import { useDeliveryBodyScrollLock } from '../../../shared/hooks/useDeliveryBodyScrollLock'
+import dynamic from 'next/dynamic'
 import { DeliveryCheckoutConfirmarRemocaoEnderecoDialog } from './DeliveryCheckoutConfirmarRemocaoEnderecoDialog'
 import { DeliveryCheckoutConfirmarSairEnderecoDialog } from './DeliveryCheckoutConfirmarSairEnderecoDialog'
-import { DeliveryCheckoutEnderecoMapaModal } from './DeliveryCheckoutEnderecoMapaModal'
 import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
 import { DeliveryCheckoutUppercaseInput } from './DeliveryCheckoutUppercaseInput'
 import { DeliveryDistanciaLojaHint } from './DeliveryDistanciaLojaHint'
@@ -50,6 +50,14 @@ import {
   DeliveryCheckoutShellHeader,
   useDeliveryCheckoutShellCloseHandler,
 } from './DeliveryCheckoutShell'
+
+const DeliveryCheckoutEnderecoMapaModal = dynamic(
+  () =>
+    import('./DeliveryCheckoutEnderecoMapaModal').then(m => ({
+      default: m.DeliveryCheckoutEnderecoMapaModal,
+    })),
+  { ssr: false }
+)
 
 /** Como a geo foi obtida — manual exige geocode ao abrir o mapa. */
 type OrigemGeoEndereco = 'places' | 'gps' | 'manual' | 'salvo'
