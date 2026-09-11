@@ -19,7 +19,7 @@ import {
 } from '@/src/shared/utils/normalizarTextoEnderecoPublico'
 import { toLocaleUppercasePt } from '@/src/shared/utils/localeUppercase'
 import { normalizarCepEndereco, type EnderecoGeocodeInput } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
-import { MAX_ENDERECOS_CLIENTE_DELIVERY } from '@/src/shared/constants/deliveryClienteEnderecos'
+import { MAX_ENDERECOS_CLIENTE_DELIVERY, MSG_MAX_ENDERECOS_CLIENTE_DELIVERY } from '@/src/domain/policies/LimiteEnderecosClienteDelivery'
 
 export type GarantirEnderecoEntregaPublicoParams = {
   telefone: string
@@ -308,9 +308,7 @@ export class GarantirEnderecoEntregaPublicoUseCase {
     }
 
     if (clienteAtual.enderecos.length >= MAX_ENDERECOS_CLIENTE_DELIVERY) {
-      throw new Error(
-        'Este telefone já possui o máximo de endereços cadastrados. Escolha um endereço existente.'
-      )
+      throw new Error(MSG_MAX_ENDERECOS_CLIENTE_DELIVERY)
     }
 
     const idsAnteriores = new Set(clienteAtual.enderecos.map(e => e.id))

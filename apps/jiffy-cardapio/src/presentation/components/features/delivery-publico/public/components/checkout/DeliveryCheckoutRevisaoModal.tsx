@@ -8,7 +8,7 @@ import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/de
 import type { MeioPagamentoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { formatarCpfCnpjInput } from '@/src/shared/utils/cpfCnpj'
-import { formatarValorComplemento } from '@/src/domain/services/pedido/CalculadoraPedido'
+import { formatarValorComplemento } from '@/src/presentation/components/features/delivery-publico/shared/utils/formatPedidoLinhaDisplay'
 import { normalizeTipoImpactoPreco } from '@/src/shared/utils/normalizeTipoImpactoPreco'
 import type { DeliveryCarrinhoItem } from '../../../shared/stores/deliveryCarrinhoStore'
 import type { DeliveryTipoEntrega } from '../../../shared/stores/deliveryPreferenciaEntregaStore'

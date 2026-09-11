@@ -2,30 +2,16 @@
 
 import { create } from 'zustand'
 import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware'
+import type {
+  ItemCarrinhoComplemento,
+  ItemCarrinhoDelivery,
+} from '@/src/domain/types/carrinho'
 import { generateUuid } from '@/src/shared/utils/generateUuid'
 import { encontrarItemIgual } from '../utils/deliveryCarrinhoItemUtils'
 
-export type DeliveryCarrinhoComplemento = {
-  complementoId: string
-  grupoComplementoId: string
-  quantidade: number
-  nome: string
-  valor: number
-  tipoImpactoPreco: string
-}
-
-export type DeliveryCarrinhoItem = {
-  id: string
-  produtoId: string
-  produtoNome: string
-  produtoImagemUrl: string | null
-  quantidade: number
-  valorUnitario: number
-  valorTotal: number
-  observacoes: string[]
-  complementos: DeliveryCarrinhoComplemento[]
-  adicionadoEm: string
-}
+/** Alias de presentation sobre o tipo canônico de domínio. */
+export type DeliveryCarrinhoComplemento = ItemCarrinhoComplemento
+export type DeliveryCarrinhoItem = ItemCarrinhoDelivery
 
 /** @deprecated Use DeliveryCarrinhoComplemento */
 export type CarrinhoComplementoPublico = DeliveryCarrinhoComplemento
