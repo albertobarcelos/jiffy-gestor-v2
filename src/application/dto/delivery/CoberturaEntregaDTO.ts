@@ -187,3 +187,46 @@ export function alcanceKmDaCobertura(
 export function formatValorTaxaRaio(valor: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor)
 }
+
+export const raioEntregaFormValidator = z.object({
+  nome: z.string().max(255),
+  distanciaMetros: z
+    .number({ invalid_type_error: 'Informe a distância máxima' })
+    .int('Distância deve ser inteira')
+    .positive('Distância máxima deve ser maior que zero'),
+  valorTaxa: z
+    .number({ invalid_type_error: 'Informe o valor da taxa' })
+    .nonnegative('Valor da taxa não pode ser negativo'),
+  tempoEntregaInMinutes: z
+    .number({ invalid_type_error: 'Informe o tempo de entrega' })
+    .int('Tempo deve ser inteiro')
+    .nonnegative('Tempo não pode ser negativo'),
+  ativo: z.boolean(),
+})
+
+export type RaioEntregaFormValues = z.infer<typeof raioEntregaFormValidator>
+
+export function raioEntregaFormToCreateInput(values: RaioEntregaFormValues): CreateRaioEntregaInput {
+  const nome = values.nome.trim()
+  return {
+    nome: nome || null,
+    distanciaMaximaEmMetros: values.distanciaMetros,
+    valorTaxa: values.valorTaxa,
+    tempoEntregaInMinutes: values.tempoEntregaInMinutes,
+    ativo: values.ativo,
+  }
+}
+
+export function raioEntregaFormToUpdateInput(values: RaioEntregaFormValues): UpdateRaioEntregaInput {
+  return raioEntregaFormToCreateInput(values)
+}
+
+export function raioEntregaToFormValues(raio: RaioEntregaDTO): RaioEntregaFormValues {
+  return {
+    nome: raio.nome ?? '',
+    distanciaMetros: raio.distanciaMaximaEmMetros,
+    valorTaxa: raio.valorTaxa,
+    tempoEntregaInMinutes: raio.tempoEntregaInMinutes,
+    ativo: raio.ativo,
+  }
+}

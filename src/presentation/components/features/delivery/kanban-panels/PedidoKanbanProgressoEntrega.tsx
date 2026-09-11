@@ -1,10 +1,6 @@
 'use client'
 
-import { Fragment } from 'react'
-import {
-  formatarHoraDetalhePedido,
-  formatarHoraPrevisaoEntrega,
-} from '@/src/application/mappers/PedidoDisplayMapper'
+import { formatarHoraDetalhePedido, formatarHoraPrevisaoEntrega } from '@/src/application/mappers/PedidoDisplayMapper'
 import type { DetalhesEntregaPedido } from '@/src/domain/types/vendaDetalhe'
 import { COLUNAS_ENTREGA_OPERACIONAIS } from '@/src/presentation/components/features/kanban/rules/vendasKanban.rules'
 import type { ColunaKanbanId } from '@/src/presentation/components/features/kanban/types'
@@ -56,45 +52,46 @@ export function PedidoKanbanProgressoEntrega({
   detalhesEntrega,
 }: PedidoKanbanProgressoEntregaProps) {
   const indiceEtapaAtual = resolverIndiceEtapaColuna(colunaAtual)
+  const ultimoIndice = ETAPAS_PROGRESSO.length - 1
+  const faixaPreenchidaPct =
+    indiceEtapaAtual <= 0 ? 0 : (indiceEtapaAtual / ultimoIndice) * 80
 
   return (
-    <div className="px-3 py-0.5">
-      <div className="grid grid-cols-5 gap-0">
+    <div className="px-1 py-0.5">
+      <div className="grid grid-cols-5">
         {ETAPAS_PROGRESSO.map(etapa => (
           <span
             key={etapa.id}
-            className="text-center text-[8px] font-normal leading-none text-secondary"
+            className="px-0.5 text-center text-[8px] font-normal leading-tight text-secondary"
           >
             {etapa.label}
           </span>
         ))}
       </div>
 
-      <div className="my-1 flex w-full items-center">
-        {ETAPAS_PROGRESSO.map((etapa, index) => {
-          const marcada = index <= indiceEtapaAtual
-          const segmentoConcluido = index > 0 && index <= indiceEtapaAtual
-
-          return (
-            <Fragment key={etapa.id}>
-              {index > 0 && (
+      <div className="relative my-1.5">
+        <div className="absolute left-[10%] right-[10%] top-1/2 h-0.5 -translate-y-1/2 bg-gray-300" />
+        <div
+          className="absolute left-[10%] top-1/2 h-0.5 -translate-y-1/2 bg-secondary"
+          style={{ width: `${faixaPreenchidaPct}%` }}
+        />
+        <div className="relative z-[1] grid grid-cols-5">
+          {ETAPAS_PROGRESSO.map((etapa, index) => {
+            const marcada = index <= indiceEtapaAtual
+            return (
+              <div key={etapa.id} className="flex justify-center">
                 <div
-                  className={`h-0.5 min-w-0 flex-1 ${
-                    segmentoConcluido ? 'bg-secondary' : 'bg-gray-300'
+                  className={`h-2 w-2 shrink-0 rounded-full ${
+                    marcada ? 'bg-secondary' : 'bg-gray-300'
                   }`}
                 />
-              )}
-              <div
-                className={`z-[1] h-2 w-2 shrink-0 rounded-full ${
-                  marcada ? 'bg-secondary' : 'bg-gray-300'
-                }`}
-              />
-            </Fragment>
-          )
-        })}
+              </div>
+            )
+          })}
+        </div>
       </div>
 
-      <div className="grid grid-cols-5 gap-0">
+      <div className="grid grid-cols-5">
         {ETAPAS_PROGRESSO.map((etapa, index) => {
           const marcada = index <= indiceEtapaAtual
           const hora = obterHoraEtapa(etapa.id, dataCriacao, detalhesEntrega)

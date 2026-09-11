@@ -4,7 +4,7 @@ import type {
   CriarMoradaTelefoneDTO,
   EnderecoMorada,
   MoradaTelefone,
-} from '@/src/presentation/hooks/useMoradaTelefone'
+} from '@/src/domain/types/moradaEntrega'
 import { parseGeoJsonPoint, type GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import { montarPayloadGeoEnderecoDelivery } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
 

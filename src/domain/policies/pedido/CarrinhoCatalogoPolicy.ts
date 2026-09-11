@@ -18,7 +18,10 @@ export function produtoPermiteAlterarPreco(
   catalogoProdutosPorId: Record<string, Produto>,
   produtosList: Produto[]
 ): boolean {
-  return obterProdutoDoCatalogo(produtoId, catalogoProdutosPorId, produtosList)?.permiteAlterarPrecoAtivo() ?? false
+  return (
+    obterProdutoDoCatalogo(produtoId, catalogoProdutosPorId, produtosList)?.permiteAlterarPrecoAtivo() ??
+    false
+  )
 }
 
 export function obterUnidadeMedidaProdutoLinha(

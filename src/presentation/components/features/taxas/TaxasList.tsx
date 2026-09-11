@@ -200,7 +200,7 @@ export function TaxasList() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const invalidate = useInvalidateTenantQueries()
+  const invalidate = useInvalidateTenantQueries()
   /** Evita PATCH concorrentes (ref); estado só para feedback visual na linha. */
   const savingAtivoLockRef = useRef(false)
   const [savingAtivoParaId, setSavingAtivoParaId] = useState<string | null>(null)
@@ -309,7 +309,7 @@ export function TaxasList() {
         }
 
         showToast.success(novoAtivo ? 'Taxa ativada.' : 'Taxa desativada.')
-        await invalidate(['taxas'])
+        await invalidate(['taxas'], { refetchType: 'all' })
       } catch (e) {
         console.error('salvarToggleAtivoTaxa:', e)
         showToast.error(e instanceof Error ? e.message : 'Erro ao atualizar taxa.')
@@ -353,7 +353,7 @@ export function TaxasList() {
 
       if (res.status === 204 || res.ok) {
         showToast.success('Taxa removida.')
-        await invalidate(['taxas'])
+        await invalidate(['taxas'], { refetchType: 'all' })
         setConfirmDeleteOpen(false)
         setTaxaParaExcluir(null)
         return
@@ -575,7 +575,7 @@ export function TaxasList() {
       taxaEditId={taxaEditId || undefined}
       onClose={fecharModalNovaTaxa}
       onReload={() => {
-        void invalidate(['taxas'])
+        void invalidate(['taxas'], { refetchType: 'all' })
       }}
     />
 

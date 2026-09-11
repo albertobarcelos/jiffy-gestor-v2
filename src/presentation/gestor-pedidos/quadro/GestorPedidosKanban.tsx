@@ -3,7 +3,7 @@
 import { useLayoutEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
-import { useKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/kiosk/useKioskGestorPedidos'
+import { useSuperficieQuadroPedidos } from '@/src/presentation/gestor-pedidos/kiosk/useSuperficieQuadroPedidos'
 import { isQuadroKioskAtual } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
 import { pathEscolherEmpresaKiosk } from '@/src/presentation/gestor-pedidos/sessao/pathsGestorSessao'
 import { getTabTenantToken } from '@/src/shared/utils/tabSession'
@@ -37,7 +37,7 @@ function kioskSemEmpresaAberta(): boolean {
 }
 
 export function GestorPedidosKanban() {
-  const kiosk = useKioskGestorPedidos()
+  const superficie = useSuperficieQuadroPedidos()
   const irALista = kioskSemEmpresaAberta()
 
   useLayoutEffect(() => {
@@ -55,7 +55,7 @@ export function GestorPedidosKanban() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {kiosk ? (
+      {superficie === 'fredy' ? (
         <JiffyWhatsAppToolbar aba="pedidos" />
       ) : (
         <div className="hidden" hidden aria-hidden />

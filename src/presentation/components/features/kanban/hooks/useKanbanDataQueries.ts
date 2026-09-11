@@ -6,6 +6,7 @@ import { useEntregadoresQuery } from '@/src/presentation/components/features/ped
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { mesclarNomesMeiosPagamentoCache } from '@/src/infrastructure/api/meiosPagamentoNomeCache'
 import {
   type VendasUnificadasQueryParams,
 } from './useVendasUnificadas'
@@ -52,7 +53,8 @@ export function useKanbanDataQueries({
   setTipoEntregaFilter,
   colunaKanbanFiltro = '',
 }: UseKanbanDataQueriesParams) {
-  const isModoDeliveryKanban = modoKanbanVendas === 'delivery'  const hasKanbanToken = !!useAuthStore.getState().tenantAuth?.getAccessToken()
+  const isModoDeliveryKanban = modoKanbanVendas === 'delivery'
+  const hasKanbanToken = !!useAuthStore.getState().tenantAuth?.getAccessToken()
   const empresaId = useTenantEmpresaId()
 
   const [terminalFilter, setTerminalFilter] = useState('')
@@ -88,6 +90,10 @@ export function useKanbanDataQueries({
     }
     return mapa
   }, [meiosPagamentoInfiniteData])
+
+  useEffect(() => {
+    mesclarNomesMeiosPagamentoCache(nomesMeiosPagamentoKanban)
+  }, [nomesMeiosPagamentoKanban])
 
   const pedidosDeliveryQueryParams = useMemo(
     () => vendasUnificadasQueryParamsParaPedidosDelivery(vendasUnificadasQueryParams),

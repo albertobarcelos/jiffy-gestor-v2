@@ -1,11 +1,13 @@
 'use client'
 
-import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { Label } from '@/src/presentation/components/ui/label'
-import { transformarParaReal } from '@/src/shared/utils/formatters'
+import { Skeleton } from '@/src/presentation/components/ui/skeleton'
 import { MdClear, MdSearch } from 'react-icons/md'
 import { useNovoPedidoFormContext } from '../context/NovoPedidoFormContext'
 import { BUSCA_PRODUTO_INPUT_ID } from '../hooks/form/useNovoPedidoAtalhosTeclado'
+import { usePedidoCatalogoColunaView } from '../hooks/catalogo/usePedidoCatalogoColunaView'
+import { PedidoCatalogoGrade } from './catalogo/PedidoCatalogoGrade'
+import { PedidoCatalogoGradeSkeleton } from './catalogo/PedidoCatalogoGradeSkeleton'
 
 export function PedidoProdutosCatalogoColuna() {
   const {
@@ -13,6 +15,7 @@ export function PedidoProdutosCatalogoColuna() {
     buscaProdutoTexto,
     grupoSelecionadoId,
     grupos,
+    isLoadingGruposVenda,
     isLoadingBuscaProdutos,
     isLoadingProdutos,
     menuCatalogoIndisponivel,
@@ -20,22 +23,28 @@ export function PedidoProdutosCatalogoColuna() {
     produtosList,
     setBuscaProdutoTexto,
     tipoInicioPedido,
+    hasNextProdutosCatalogo,
+    isFetchingNextProdutosCatalogo,
+    carregarProximaPaginaProdutosCatalogo,
   } = useNovoPedidoFormContext()
 
-  const emBusca = buscaProdutoTexto.length >= 2
-  const podeExibirProdutos = emBusca || !!grupoSelecionadoId
-  const grupoSelecionado = grupos.find(
-    (g: { getId: () => string }) => g.getId() === grupoSelecionadoId
-  )
-  const corHexGrupo = grupoSelecionado?.getCorHex() || '#6b7280'
-  const tituloGrade = emBusca
-    ? `Resultados para "${buscaProdutoTexto}"`
-    : `Produtos do grupo: `
-  const isLoadingAtual = emBusca ? isLoadingBuscaProdutos : isLoadingProdutos
-  const mensagemMenuIndisponivel =
-    tipoInicioPedido === 'entrega'
-      ? 'Configure o menu em Configurações → Delivery.'
-      : 'Configure o menu em Configurações → Empresa.'
+  const {
+    emBusca,
+    podeExibirProdutos,
+    grupoSelecionado,
+    corHexGrupo,
+    tituloGrade,
+    isLoadingCatalogo,
+    mensagemMenuIndisponivel,
+  } = usePedidoCatalogoColunaView({
+    buscaProdutoTexto,
+    grupoSelecionadoId,
+    grupos,
+    isLoadingGruposVenda,
+    isLoadingBuscaProdutos,
+    isLoadingProdutos,
+    tipoInicioPedido,
+  })
 
   return (
     <div className="flex min-h-0 min-w-0 flex-[3.8] basis-0 flex-col gap-2">
@@ -67,24 +76,22 @@ export function PedidoProdutosCatalogoColuna() {
           <div className="flex flex-1 items-center justify-center p-4">
             <p className="max-w-sm text-center text-sm text-gray-600">{mensagemMenuIndisponivel}</p>
           </div>
-        ) : !podeExibirProdutos ? (
-          <div className="flex flex-1 items-center justify-center p-4">
-            <p className="text-center text-sm text-gray-500">
-              Selecione uma categoria à esquerda ou pesquise pelo nome do produto
-            </p>
-          </div>
-        ) : (
+        ) : isLoadingCatalogo || podeExibirProdutos ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-2 pb-3 pt-2">
             <Label className="mb-2 shrink-0 text-sm text-gray-600">
-              {tituloGrade}
-              {!emBusca && (
-                <span className="font-semibold">{grupoSelecionado?.getNome()}</span>
+              {isLoadingGruposVenda && !emBusca && !grupoSelecionado ? (
+                <Skeleton animation="wave" variant="text" width={200} height={20} />
+              ) : (
+                <>
+                  {tituloGrade}
+                  {!emBusca && (
+                    <span className="font-semibold">{grupoSelecionado?.getNome()}</span>
+                  )}
+                </>
               )}
             </Label>
-            {isLoadingAtual ? (
-              <div className="flex flex-1 items-center justify-center py-4 text-gray-500">
-                <JiffyLoading />
-              </div>
+            {isLoadingCatalogo ? (
+              <PedidoCatalogoGradeSkeleton />
             ) : !emBusca && produtosError ? (
               <div className="flex flex-1 items-center justify-center py-4 text-center text-red-500">
                 Erro ao carregar produtos:{' '}
@@ -92,52 +99,26 @@ export function PedidoProdutosCatalogoColuna() {
               </div>
             ) : produtosList.length === 0 ? (
               <div className="flex flex-1 items-center justify-center py-4 text-gray-500">
-                Nenhum produto encontrado neste grupo
+                {emBusca
+                  ? 'Nenhum produto encontrado'
+                  : 'Nenhum produto encontrado neste grupo'}
               </div>
             ) : (
-              <div
-                className="scrollbar-thin grid min-h-0 flex-1 grid-cols-2 content-start gap-1 overflow-y-auto rounded-lg border p-1.5 sm:grid-cols-3 lg:grid-cols-4"
-                style={{ backgroundColor: `${corHexGrupo}15` }}
-              >
-                {produtosList.map(
-                  (produto: {
-                    getId: () => string
-                    getNome: () => string
-                    getValor: () => number
-                  }) => (
-                    <div key={produto.getId()} className="aspect-square w-full min-w-0">
-                      <button
-                        type="button"
-                        onClick={() => adicionarProduto(produto.getId())}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = corHexGrupo
-                          e.currentTarget.style.backgroundColor = '#ffffff'
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.borderColor = corHexGrupo
-                          e.currentTarget.style.backgroundColor = '#ffffff'
-                        }}
-                        className="flex h-full w-full min-h-0 cursor-pointer flex-col items-center rounded-md border-2 px-1 py-1.5 text-center transition-all active:scale-95"
-                        style={{
-                          borderColor: corHexGrupo,
-                          backgroundColor: '#ffffff',
-                        }}
-                      >
-                        <span className="flex min-h-0 w-full flex-1 items-end justify-center pb-0.5">
-                          <span className="line-clamp-2 w-full text-center text-[11px] font-medium leading-tight text-gray-900">
-                            {produto.getNome()}
-                          </span>
-                        </span>
-                        <span className="shrink-0 w-full text-center text-[14px] font-semibold tabular-nums text-gray-900">
-                          {transformarParaReal(produto.getValor())}
-                        </span>
-                        <span className="min-h-0 w-full flex-1" aria-hidden="true" />
-                      </button>
-                    </div>
-                  )
-                )}
-              </div>
+              <PedidoCatalogoGrade
+                produtos={produtosList}
+                corHex={corHexGrupo}
+                onSelect={adicionarProduto}
+                hasNextPage={hasNextProdutosCatalogo}
+                isFetchingNextPage={isFetchingNextProdutosCatalogo}
+                onLoadMore={carregarProximaPaginaProdutosCatalogo}
+              />
             )}
+          </div>
+        ) : (
+          <div className="flex flex-1 items-center justify-center p-4">
+            <p className="text-center text-sm text-gray-500">
+              Selecione uma categoria à esquerda ou pesquise pelo nome do produto
+            </p>
           </div>
         )}
       </div>

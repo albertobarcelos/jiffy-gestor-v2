@@ -39,6 +39,7 @@ import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { showToast } from '@/src/shared/utils/toast'
+import { TAXA_ENTREGA_SELECT_AUTOMATICA } from '@/src/shared/constants/taxaEntregaPedido'
 import {
   getUltimoEntregadorSelecionado,
   normalizarFiltroTipoEntregador,
@@ -47,6 +48,7 @@ import {
 import {
   formatarTaxaEntregaDetalheExibicao,
   resolverTaxaEntregaAtivaDetalheKanban,
+  taxaEntregaTemValor,
 } from '@/src/application/mappers/VendaDetalheMapper'
 import type { TaxaEntregaDetalhe } from '@/src/domain/types/vendaDetalhe'
 import type { UsuarioPdvEntregadorOption } from '@/src/domain/types/vendaDetalhe'
@@ -65,6 +67,13 @@ import {
 
 /** Valor sentinela do Select para "sem taxa" (Radix não aceita value vazio). */
 const SEM_TAXA = '__sem_taxa__'
+
+function idSelectTaxaPedido(detalhe: TaxaEntregaDetalhe | null): string {
+  const catalogoId = detalhe?.taxaId?.trim()
+  if (catalogoId) return catalogoId
+  if (taxaEntregaTemValor(detalhe)) return TAXA_ENTREGA_SELECT_AUTOMATICA
+  return SEM_TAXA
+}
 
 /** Valor sentinela do Select para "Nenhum" entregador (remove o vínculo). */
 const SEM_ENTREGADOR = '__sem_entregador__'
@@ -183,7 +192,7 @@ export function AtribuirEntregadorKanbanPainel({
 
   const ehPedidoGestor = !!venda && venda.tabelaOrigem === 'venda_gestor'
 
-  const { taxasEntrega } = useTaxasEntregaQuery({
+  const { taxasEntrega, refetchTaxasEntrega } = useTaxasEntregaQuery({
     open,
     modoVisualizacao: false,
     pedidoComEntrega: ehPedidoGestor,
@@ -206,7 +215,7 @@ export function AtribuirEntregadorKanbanPainel({
     return base
   }, [taxasEntrega, taxaEntregaDetalhe])
 
-  const selecaoTaxaAtual = taxaEntregaDetalhe?.taxaId?.trim() || SEM_TAXA
+  const selecaoTaxaAtual = idSelectTaxaPedido(taxaEntregaDetalhe)
   const taxaMudou = taxaSelecionadaId !== selecaoTaxaAtual
   const entregadorMudou = entregadorId.trim() !== entregadorInicialId.trim()
   const taxaMudouEEditavel = taxaMudou && !pedidoPago
@@ -230,7 +239,7 @@ export function AtribuirEntregadorKanbanPainel({
       const vendaData = adaptPedidoDeliveryToVendaGestorApiResponse(pedido)
       const taxaDetalhe = await resolverTaxaEntregaAtivaDetalheKanban(vendaData, token)
       setTaxaEntregaDetalhe(taxaDetalhe)
-      setTaxaSelecionadaId(taxaDetalhe?.taxaId?.trim() || SEM_TAXA)
+      setTaxaSelecionadaId(idSelectTaxaPedido(taxaDetalhe))
     },
     []
   )
@@ -384,7 +393,10 @@ export function AtribuirEntregadorKanbanPainel({
       let taxaFoiAtualizada = false
 
       if (deveSalvarTaxa) {
-        const selecionadaId = taxaSelecionadaId === SEM_TAXA ? null : taxaSelecionadaId
+        const selecionadaId =
+          taxaSelecionadaId === SEM_TAXA || taxaSelecionadaId === TAXA_ENTREGA_SELECT_AUTOMATICA
+            ? null
+            : taxaSelecionadaId
         const selecionadaValor = selecionadaId
           ? opcoesTaxa.find(opcao => opcao.id === selecionadaId)?.valor ?? 0
           : 0
@@ -582,6 +594,9 @@ export function AtribuirEntregadorKanbanPainel({
                     value={taxaSelecionadaId}
                     onValueChange={setTaxaSelecionadaId}
                     disabled={carregandoTaxa || salvando}
+                    onOpenChange={aberto => {
+                      if (aberto) void refetchTaxasEntrega()
+                    }}
                   >
                     <SelectTrigger className={SELECT_TRIGGER_ROXO}>
                       <SelectValue
@@ -589,6 +604,16 @@ export function AtribuirEntregadorKanbanPainel({
                       />
                     </SelectTrigger>
                     <SelectContent>
+                      {taxaSelecionadaId === TAXA_ENTREGA_SELECT_AUTOMATICA ||
+                      (taxaEntregaTemValor(taxaEntregaDetalhe) &&
+                        !taxaEntregaDetalhe?.taxaId?.trim()) ? (
+                        <SelectItem
+                          value={TAXA_ENTREGA_SELECT_AUTOMATICA}
+                          className={SELECT_ITEM_ROXO}
+                        >
+                          {`Automática (${transformarParaReal(taxaEntregaDetalhe?.valor ?? 0)})`}
+                        </SelectItem>
+                      ) : null}
                       <SelectItem value={SEM_TAXA} className={SELECT_ITEM_ROXO}>
                         Sem taxa
                       </SelectItem>

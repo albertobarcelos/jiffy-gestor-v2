@@ -2,6 +2,10 @@ import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import type { InstrucoesImpressaoResponse } from '@/src/shared/types/instrucoesImpressao'
 import { getEstacaoImpressaoId } from '@/src/infrastructure/printing/estacaoImpressaoStorage'
 import {
+  obterInstrucoesImpressaoCache,
+  salvarInstrucoesImpressaoCache,
+} from '@/src/infrastructure/api/instrucoesImpressaoPedidoCache'
+import {
   erroImpressao,
   logImpressao,
   warnImpressao,
@@ -76,6 +80,15 @@ export async function fetchInstrucoesImpressaoPedido(
     }
   }
 
+  const cached = obterInstrucoesImpressaoCache(vendaId, estacao)
+  if (cached) {
+    logImpressao('fetchInstrucoes.cache_hit', {
+      vendaId,
+      qMapeamentos: cached.mapeamentos.length,
+    })
+    return { ok: true, data: cached }
+  }
+
   const params = new URLSearchParams({ estacaoImpressaoId: estacao })
 
   logImpressao('fetchInstrucoes.inicio', {
@@ -112,6 +125,7 @@ export async function fetchInstrucoesImpressaoPedido(
 
   const raw = (await res.json()) as Record<string, unknown>
   const data = normalizarInstrucoes(raw)
+  salvarInstrucoesImpressaoCache(vendaId, estacao, data)
   logImpressao('fetchInstrucoes.ok', {
     vendaId,
     qMapeamentos: data.mapeamentos.length,
