@@ -589,7 +589,8 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
             (typeof err.error === 'string' && err.error) ||
             (typeof err.message === 'string' && err.message) ||
             'Erro ao atualizar taxa'
-          throw new Error(msg)
+          showToast.error(msg)
+          return
         }
         const atualizado = (await response.json().catch(() => null)) as Record<
           string,
@@ -622,13 +623,14 @@ export const NovaTaxa = forwardRef<NovaTaxaHandle, NovaTaxaProps>(function NovaT
             (typeof err.error === 'string' && err.error) ||
             (typeof err.message === 'string' && err.message) ||
             'Erro ao criar taxa'
-          throw new Error(msg)
+          showToast.error(msg)
+          return
         }
         showToast.success('Taxa criada com sucesso!')
       }
 
       commitBaselineLatestRef.current()
-      await invalidate(['taxas'])
+      await invalidate(['taxas'], { refetchType: 'all' })
       clearSelection()
       if (isEmbedded) {
         onSaved?.()
