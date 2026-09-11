@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CheckoutFormData } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
 import type { ClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { EnviarPedidoPublicoUseCase } from '@/src/application/use-cases/delivery-publico/EnviarPedidoPublicoUseCase'
-import { garantirEnderecoEntregaPublicoUseCase } from '@/src/application/use-cases/delivery-publico/GarantirEnderecoEntregaPublicoUseCase'
+import { GarantirEnderecoEntregaPublicoUseCase } from '@/src/application/use-cases/delivery-publico/GarantirEnderecoEntregaPublicoUseCase'
+import {
+  publicDeliveryClienteAdapter,
+  publicDeliveryPedidoAdapter,
+} from '@/src/infrastructure/api/adapters/PublicDeliveryApiAdapter'
 import * as publicDeliveryApi from '@/src/infrastructure/api/publicDeliveryApi'
 
 vi.mock('@/src/infrastructure/api/publicDeliveryApi', () => ({
@@ -47,6 +51,18 @@ const item = {
 
 const tokenCotacao = 'token-teste'
 
+function criarGarantirUseCase() {
+  return new GarantirEnderecoEntregaPublicoUseCase(publicDeliveryClienteAdapter)
+}
+
+function criarEnviarUseCase(garantir = criarGarantirUseCase()) {
+  return new EnviarPedidoPublicoUseCase(
+    publicDeliveryPedidoAdapter,
+    publicDeliveryClienteAdapter,
+    garantir
+  )
+}
+
 describe('EnviarPedidoPublicoUseCase', () => {
   beforeEach(() => {
     vi.mocked(publicDeliveryApi.criarPedidoPublico).mockReset()
@@ -60,7 +76,7 @@ describe('EnviarPedidoPublicoUseCase', () => {
   })
 
   it('cria pedido de retirada sem PATCH de CPF', async () => {
-    const useCase = new EnviarPedidoPublicoUseCase()
+    const useCase = criarEnviarUseCase()
     const result = await useCase.execute({
       slug: 'loja',
       telefoneApi: '11999999999',
@@ -93,7 +109,7 @@ describe('EnviarPedidoPublicoUseCase', () => {
       enderecos: [],
     })
 
-    const useCase = new EnviarPedidoPublicoUseCase()
+    const useCase = criarEnviarUseCase()
     const result = await useCase.execute({
       slug: 'loja',
       telefoneApi: '11999999999',
@@ -124,7 +140,7 @@ describe('EnviarPedidoPublicoUseCase', () => {
       enderecos: [],
     })
 
-    const useCase = new EnviarPedidoPublicoUseCase()
+    const useCase = criarEnviarUseCase()
     await useCase.execute({
       slug: 'loja',
       telefoneApi: '11999999999',
@@ -141,11 +157,12 @@ describe('EnviarPedidoPublicoUseCase', () => {
   })
 
   it('garante endereço antes do create em entrega', async () => {
+    const garantir = criarGarantirUseCase()
     const garantirSpy = vi
-      .spyOn(garantirEnderecoEntregaPublicoUseCase, 'execute')
+      .spyOn(garantir, 'execute')
       .mockResolvedValue({ enderecoId: 'end-1', cliente: null })
 
-    const useCase = new EnviarPedidoPublicoUseCase()
+    const useCase = criarEnviarUseCase(garantir)
     const result = await useCase.execute({
       slug: 'loja',
       telefoneApi: '11999999999',
@@ -169,7 +186,7 @@ describe('EnviarPedidoPublicoUseCase', () => {
   })
 
   it('retorna erro se telefone inválido', async () => {
-    const useCase = new EnviarPedidoPublicoUseCase()
+    const useCase = criarEnviarUseCase()
     const result = await useCase.execute({
       slug: 'loja',
       telefoneApi: '12',
@@ -193,7 +210,8 @@ describe('GarantirEnderecoEntregaPublicoUseCase', () => {
   })
 
   it('retorna id existente sem criar endereço', async () => {
-    const result = await garantirEnderecoEntregaPublicoUseCase.execute({
+    const useCase = criarGarantirUseCase()
+    const result = await useCase.execute({
       telefone: '11999999999',
       nome: 'Cliente',
       modoEndereco: 'existente',
@@ -246,7 +264,8 @@ describe('GarantirEnderecoEntregaPublicoUseCase', () => {
       },
     }
 
-    const result = await garantirEnderecoEntregaPublicoUseCase.execute({
+    const useCase = criarGarantirUseCase()
+    const result = await useCase.execute({
       telefone: '11999999999',
       nome: 'Cliente',
       modoEndereco: 'novo',

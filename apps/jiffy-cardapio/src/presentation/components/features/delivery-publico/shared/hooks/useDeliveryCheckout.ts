@@ -8,13 +8,15 @@ import type { CreatePedidoPublicoResponseDTO } from '@/src/application/dto/deliv
 import type { CotacaoPedidoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { ClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { normalizarClienteDeliveryPublico } from '@/src/application/mappers/ClienteDeliveryPublicoMapper'
-import { cotarPedidoPublicoUseCase } from '@/src/application/use-cases/delivery-publico/CotarPedidoPublicoUseCase'
 import {
   formatarMensagemErroCotacaoPublica,
   isErroCoberturaEntregaPublica,
-} from '@/src/infrastructure/api/publicDeliveryApi'
-import { enviarPedidoPublicoUseCase } from '@/src/application/use-cases/delivery-publico/EnviarPedidoPublicoUseCase'
-import { garantirEnderecoEntregaPublicoUseCase } from '@/src/application/use-cases/delivery-publico/GarantirEnderecoEntregaPublicoUseCase'
+} from '@/src/application/errors/publicDeliveryErrors'
+import {
+  cotarPedidoPublicoUseCase,
+  enviarPedidoPublicoUseCase,
+  garantirEnderecoEntregaPublicoUseCase,
+} from '@/src/infrastructure/di/deliveryPublicoUseCases'
 import {
   atualizarClienteDeliveryPublico,
   buscarClienteDeliveryPublico,

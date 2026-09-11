@@ -8,11 +8,7 @@ import type {
   EnderecoClienteDeliveryPublicoDTO,
 } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { normalizarClienteDeliveryPublico } from '@/src/application/mappers/ClienteDeliveryPublicoMapper'
-import {
-  atualizarClienteDeliveryPublico,
-  buscarClienteDeliveryPublico,
-  criarClienteDeliveryPublico,
-} from '@/src/infrastructure/api/publicDeliveryApi'
+import type { IClienteDeliveryPublicoPort } from '@/src/application/ports/delivery-publico'
 import {
   enderecoTemGeolocalizacao,
   montarPayloadGeoEnderecoDelivery,
@@ -213,6 +209,8 @@ export function resolverEnderecoIdEntregaSeJaGarantido(params: {
  * e retorna o `enderecoId` + cliente atualizado (quando houver write).
  */
 export class GarantirEnderecoEntregaPublicoUseCase {
+  constructor(private readonly clientePort: IClienteDeliveryPublicoPort) {}
+
   async execute(
     params: GarantirEnderecoEntregaPublicoParams
   ): Promise<GarantirEnderecoEntregaPublicoResult> {
@@ -233,7 +231,7 @@ export class GarantirEnderecoEntregaPublicoUseCase {
       if (nome) {
         const nomeAtual = cliente?.nome?.trim() || ''
         if (nomeAtual !== nome) {
-          const atualizadoRaw = await atualizarClienteDeliveryPublico(telefone, { nome })
+          const atualizadoRaw = await this.clientePort.atualizar(telefone, { nome })
           cliente = normalizarClienteDeliveryPublico(atualizadoRaw) ?? cliente
         }
       }
@@ -247,7 +245,7 @@ export class GarantirEnderecoEntregaPublicoUseCase {
           params.geo,
           params.enderecoNovo
         )
-        const atualizadoRaw = await atualizarClienteDeliveryPublico(telefone, {
+        const atualizadoRaw = await this.clientePort.atualizar(telefone, {
           enderecos: { update: [updatePayload] },
         })
         const atualizado = normalizarClienteDeliveryPublico(atualizadoRaw)
@@ -289,12 +287,12 @@ export class GarantirEnderecoEntregaPublicoUseCase {
         : null
 
     if (!clienteAtual) {
-      const raw = await buscarClienteDeliveryPublico(telefone)
+      const raw = await this.clientePort.buscarPorTelefone(telefone)
       clienteAtual = raw ? normalizarClienteDeliveryPublico(raw) : null
     }
 
     if (!clienteAtual) {
-      const criadoRaw = await criarClienteDeliveryPublico({
+      const criadoRaw = await this.clientePort.criar({
         telefone,
         nome,
         enderecos: [enderecoPayload],
@@ -316,7 +314,7 @@ export class GarantirEnderecoEntregaPublicoUseCase {
     }
 
     const idsAnteriores = new Set(clienteAtual.enderecos.map(e => e.id))
-    const atualizadoRaw = await atualizarClienteDeliveryPublico(telefone, {
+    const atualizadoRaw = await this.clientePort.atualizar(telefone, {
       ...(nome ? { nome } : {}),
       enderecos: { create: [enderecoPayload] },
     })
@@ -332,13 +330,11 @@ export class GarantirEnderecoEntregaPublicoUseCase {
   }
 }
 
-export const garantirEnderecoEntregaPublicoUseCase =
-  new GarantirEnderecoEntregaPublicoUseCase()
-
-/** @deprecated Preferir `garantirEnderecoEntregaPublicoUseCase.execute`. */
+/** @deprecated Preferir `garantirEnderecoEntregaPublicoUseCase` do composition root. */
 export async function garantirEnderecoEntregaPublico(
-  params: GarantirEnderecoEntregaPublicoParams
+  params: GarantirEnderecoEntregaPublicoParams,
+  clientePort: IClienteDeliveryPublicoPort
 ): Promise<string> {
-  const result = await garantirEnderecoEntregaPublicoUseCase.execute(params)
+  const result = await new GarantirEnderecoEntregaPublicoUseCase(clientePort).execute(params)
   return result.enderecoId
 }
