@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react'
 import { Pencil, X } from 'lucide-react'
 import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import { showToast } from '@/src/shared/utils/toast'
 import { DeliveryPaisTelefoneSelect } from '../../../shared/components/DeliveryPaisTelefoneSelect'
-import { DELIVERY_PAIS_TELEFONE_PADRAO } from '../../../shared/constants/deliveryPaisesTelefone'
+import { DELIVERY_PAIS_TELEFONE_PADRAO } from '@/src/shared/constants/deliveryPaisesTelefone'
 import {
   DELIVERY_CELULAR_BR_DIGITOS,
   DELIVERY_MSG_CELULAR_COMPLETO,
@@ -15,7 +16,7 @@ import {
   comporTelefoneApi,
   formatarTelefoneExibicao,
   formatarTelefonePorPais,
-} from '../../../shared/utils/deliveryTelefonePais'
+} from '@/src/shared/utils/deliveryTelefonePais'
 import type { ClienteLookupStatus } from '../../../shared/hooks/useDeliveryCheckout'
 import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
 import { isNomeCompletoCheckoutValido } from './deliveryCheckoutProgress'
@@ -43,16 +44,13 @@ type DeliveryCheckoutIdentifiqueSeModalProps = {
   temEnderecosCadastrados: boolean
   quantidadeEnderecos?: number
   enderecoEmpresaTexto: string | null
-  taxaEntregaOficial?: number | null
-  cotacaoLoading?: boolean
-  cotacaoPronta?: boolean
+  localizacaoEmpresa?: GeoJsonPoint | null
   onChangeTelefone: (value: string) => void
   onChangeTelefonePais?: (iso2: string) => void
   /** Busca manual (10 dígitos): blur do input ou Enter/OK do teclado. */
   onConsultarTelefone?: () => void
   onChangeNome: (value: string) => void
   onChangeOpcaoEntrega: (opcao: ModoEntregaOpcao) => void
-  onEditarEndereco: () => void
   onTrocarEndereco: () => void
   onCadastrarEndereco: () => void
   /** Cliente no limite de endereços — botão “Novo endereço” visualmente bloqueado. */
@@ -77,14 +75,11 @@ export function DeliveryCheckoutIdentifiqueSeModal({
   temEnderecosCadastrados,
   quantidadeEnderecos = 0,
   enderecoEmpresaTexto,
-  taxaEntregaOficial = null,
-  cotacaoLoading = false,
-  cotacaoPronta = false,
+  localizacaoEmpresa = null,
   onChangeTelefone,
   onConsultarTelefone,
   onChangeNome,
   onChangeOpcaoEntrega,
-  onEditarEndereco,
   onTrocarEndereco,
   onCadastrarEndereco,
   novoEnderecoBloqueado = false,
@@ -439,11 +434,8 @@ export function DeliveryCheckoutIdentifiqueSeModal({
             temEnderecosCadastrados={temEnderecosCadastrados}
             quantidadeEnderecos={quantidadeEnderecos}
             enderecoEmpresaTexto={enderecoEmpresaTexto}
-            taxaEntregaOficial={taxaEntregaOficial}
-            cotacaoLoading={cotacaoLoading}
-            cotacaoPronta={cotacaoPronta}
+            localizacaoEmpresa={localizacaoEmpresa}
             onChangeOpcao={onChangeOpcaoEntrega}
-            onEditarEndereco={onEditarEndereco}
             onTrocarEndereco={onTrocarEndereco}
             onCadastrarEndereco={onCadastrarEndereco}
             novoEnderecoBloqueado={novoEnderecoBloqueado}

@@ -1,20 +1,26 @@
 'use client'
 
 import { useState } from 'react'
-import { Home, MapPin, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Home, MapPin, Plus, Trash2 } from 'lucide-react'
 import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
-import { formatarResumoEnderecoPublico } from '../../../shared/utils/garantirEnderecoClientePublico'
+import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
+import { formatarResumoEnderecoPublico } from '@/src/application/mappers/ClienteDeliveryPublicoMapper'
 import { etiquetaEnderecoPublicoLabel } from '../../../shared/utils/etiquetaEnderecoPublicoLabel'
+import {
+  calcularDistanciaAproximadaDaLoja,
+  pontoClienteParaDistancia,
+} from '../../../shared/utils/formatarDistanciaAproximadaDaLoja'
 import { DeliveryCheckoutConfirmarRemocaoEnderecoDialog } from './DeliveryCheckoutConfirmarRemocaoEnderecoDialog'
 import { DeliveryCheckoutShellHeader } from './DeliveryCheckoutShell'
+import { DeliveryDistanciaLojaHint } from './DeliveryDistanciaLojaHint'
 
 type DeliveryCheckoutEnderecosModalProps = {
   enderecos: EnderecoClienteDeliveryPublicoDTO[]
   enderecoIdSelecionado: string
+  localizacaoEmpresa?: GeoJsonPoint | null
   onClose: () => void
   onSelecionar: (enderecoId: string) => void
   onUsarNovoEndereco: () => void
-  onEditar: (endereco: EnderecoClienteDeliveryPublicoDTO) => void
   onRemover: (enderecoId: string) => Promise<void> | void
   /** Cliente no limite — botão visualmente bloqueado, mas ainda clicável para o aviso. */
   novoEnderecoBloqueado?: boolean
@@ -23,10 +29,10 @@ type DeliveryCheckoutEnderecosModalProps = {
 export function DeliveryCheckoutEnderecosModal({
   enderecos,
   enderecoIdSelecionado,
+  localizacaoEmpresa = null,
   onClose,
   onSelecionar,
   onUsarNovoEndereco,
-  onEditar,
   onRemover,
   novoEnderecoBloqueado = false,
 }: DeliveryCheckoutEnderecosModalProps) {
@@ -112,18 +118,6 @@ export function DeliveryCheckoutEnderecosModal({
                     <div className="-mr-1 ml-auto flex shrink-0 items-center gap-0.5">
                       <button
                         type="button"
-                        aria-label={`Editar endereço ${endereco.rua}`}
-                        disabled={removendo}
-                        onClick={e => {
-                          e.stopPropagation()
-                          onEditar(endereco)
-                        }}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg delivery-text-primary disabled:opacity-50"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
                         aria-label={`Remover endereço ${endereco.rua}`}
                         disabled={removendo}
                         onClick={e => {
@@ -143,6 +137,12 @@ export function DeliveryCheckoutEnderecosModal({
                   {linha2 ? (
                     <p className="mt-0.5 text-xs delivery-text-secondary">{linha2}</p>
                   ) : null}
+                  <DeliveryDistanciaLojaHint
+                    texto={calcularDistanciaAproximadaDaLoja(
+                      localizacaoEmpresa,
+                      pontoClienteParaDistancia(endereco)
+                    )}
+                  />
                   <p className="sr-only">{formatarResumoEnderecoPublico(endereco)}</p>
                 </div>
               </div>

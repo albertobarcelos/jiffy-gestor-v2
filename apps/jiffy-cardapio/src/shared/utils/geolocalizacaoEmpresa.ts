@@ -1,6 +1,6 @@
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import { geoJsonPointFromLatLng, parseGeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
-import { backendForwardGeocode } from '@/src/shared/utils/geolocalizacaoBackendApi'
+import { backendForwardGeocode } from '@/src/infrastructure/api/geolocalizacaoBackendApi'
 import { mensagemAmigavelErroGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
 
 export type EnderecoEmpresaGeocodeInput = {
@@ -74,21 +74,25 @@ export function lerEnderecoLocalizacaoDoPayloadEmpresa(
 }
 
 export async function geocodificarEnderecoEmpresaViaGoogle(
-  input: EnderecoEmpresaGeocodeInput
+  input: EnderecoEmpresaGeocodeInput,
+  signal?: AbortSignal
 ): Promise<GeocodeEmpresaResult> {
   if (!enderecoEmpresaGeocodeMinimo(input)) {
     throw new Error('Preencha rua, número, cidade e estado antes de buscar a localização.')
   }
 
   try {
-    const lookup = await backendForwardGeocode({
-      rua: input.rua,
-      numero: input.numero,
-      bairro: input.bairro,
-      cidade: input.cidade,
-      estado: input.estado,
-      cep: input.cep,
-    })
+    const lookup = await backendForwardGeocode(
+      {
+        rua: input.rua,
+        numero: input.numero,
+        bairro: input.bairro,
+        cidade: input.cidade,
+        estado: input.estado,
+        cep: input.cep,
+      },
+      signal
+    )
     return {
       enderecoLocalizacao: lookup.enderecoLocalizacao,
       providerEnderecoId: lookup.providerEnderecoId,

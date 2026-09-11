@@ -4,7 +4,7 @@ import { mensagemAmigavelErroGeolocalizacao } from '@/src/shared/utils/geolocali
 import {
   backendPlaceDetails,
   backendPlacesAutocomplete,
-} from '@/src/shared/utils/geolocalizacaoBackendApi'
+} from '@/src/infrastructure/api/geolocalizacaoBackendApi'
 import { formatarCepMascara, normalizarDigitosCep } from '@/src/shared/utils/consultaCep'
 
 export type PlacesAutocompletePrediction = {

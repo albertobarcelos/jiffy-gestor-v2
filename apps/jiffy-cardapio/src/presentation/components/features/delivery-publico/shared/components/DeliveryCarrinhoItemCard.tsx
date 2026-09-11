@@ -27,7 +27,7 @@ function CarrinhoProdutoThumb({ imagemUrl, nome }: { imagemUrl: string | null; n
     >
       {imagemUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={imagemUrl} alt="" className="h-full w-full object-cover" />
+        <img src={imagemUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
       ) : (
         <div className="flex h-full w-full items-center justify-center">
           <Camera

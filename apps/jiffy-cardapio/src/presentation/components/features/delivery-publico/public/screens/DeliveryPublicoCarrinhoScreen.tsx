@@ -1,18 +1,15 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { AnimatePresence, motion } from 'framer-motion'
 import { MdClose } from 'react-icons/md'
 import {
   flattenCatalogoGrupos,
-  useAutoFetchCatalogoGrupos,
   usePublicDeliveryCatalogInfinite,
 } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import { showToast } from '@/src/shared/utils/toast'
-import {
-  clienteAtingiuMaxEnderecosDelivery,
-  MSG_MAX_ENDERECOS_CLIENTE_DELIVERY,
-} from '@/src/shared/constants/deliveryClienteEnderecos'
+import { clienteAtingiuMaxEnderecosDelivery } from '@/src/shared/constants/deliveryClienteEnderecos'
 import { DeliveryCarrinhoItemCard } from '../../shared/components/DeliveryCarrinhoItemCard'
 import { DeliveryCarrinhoSwipeableItem } from '../../shared/components/DeliveryCarrinhoSwipeableItem'
 import { DeliveryButton } from '../../shared/components/DeliveryButton'
@@ -28,26 +25,19 @@ import {
   type PedidoPublicoConfirmadoSnapshot,
 } from '@/src/application/mappers/PedidoPublicoConfirmadoMapper'
 import type { CotacaoPedidoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
-import { DELIVERY_PAIS_TELEFONE_PADRAO } from '../../shared/constants/deliveryPaisesTelefone'
+import { DELIVERY_PAIS_TELEFONE_PADRAO } from '@/src/shared/constants/deliveryPaisesTelefone'
 import { findCatalogoProdutoById } from '../../shared/utils/findCatalogoProdutoById'
 import { itemSemComplemento } from '../../shared/utils/deliveryCarrinhoItemUtils'
 import { formatEmpresaPublicaEndereco } from '../../shared/utils/formatEmpresaPublicaEndereco'
 import { formatDeliveryCurrency } from '../../shared/utils/formatDeliveryCurrency'
 import { isTokenCotacaoExpirado } from '../../shared/utils/deliveryCheckoutCotacaoUtils'
+import { useLocalizacaoEmpresaPublica } from '../../shared/hooks/useLocalizacaoEmpresaPublica'
 import { DeliveryProdutoModal } from '../components/DeliveryProdutoModal'
 import { DeliveryCheckoutFooterActions } from '../components/checkout/DeliveryCheckoutFooterActions'
-import { DeliveryCheckoutIdentifiqueSeModal } from '../components/checkout/DeliveryCheckoutIdentifiqueSeModal'
-import { DeliveryCheckoutEnderecosModal } from '../components/checkout/DeliveryCheckoutEnderecosModal'
-import { DeliveryCheckoutEnderecoFormModal } from '../components/checkout/DeliveryCheckoutEnderecoFormModal'
-import { DeliveryCheckoutEnderecoGeoModal } from '../components/checkout/DeliveryCheckoutEnderecoGeoModal'
 import type { EnderecoGeoCheckoutInput } from '@/src/application/dto/delivery-publico/EnderecoGeoCheckoutDTO'
 import { enderecoTemGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoDelivery'
+import { fingerprintItensCotacao } from '@/src/presentation/hooks/publicDeliveryCotacaoKeys'
 import type { ModoEntregaOpcao } from '../components/checkout/DeliveryCheckoutTipoEntregaOpcoes'
-import { DeliveryCheckoutPagamentoModal } from '../components/checkout/DeliveryCheckoutPagamentoModal'
-import { DeliveryCheckoutRevisaoModal } from '../components/checkout/DeliveryCheckoutRevisaoModal'
-import { DeliveryCotacaoDesatualizadaDialog } from '../components/checkout/DeliveryCotacaoDesatualizadaDialog'
-import { DeliveryCheckoutForaCoberturaDialog } from '../components/checkout/DeliveryCheckoutForaCoberturaDialog'
-import { DeliveryCheckoutSucessoModal } from '../components/checkout/DeliveryCheckoutSucessoModal'
 import { DeliveryCheckoutProgressProvider } from '../components/checkout/DeliveryCheckoutProgressContext'
 import {
   DeliveryCheckoutShell,
@@ -58,6 +48,86 @@ import {
   isIdentificacaoCheckoutCompleta,
   type DeliveryCheckoutStep,
 } from '../components/checkout/deliveryCheckoutProgress'
+
+/** Placeholder leve enquanto o chunk do modal carrega (P4.1). */
+function CheckoutModalChunkFallback() {
+  return (
+    <div
+      className="min-h-[240px] w-full animate-pulse rounded-2xl bg-neutral-100"
+      aria-hidden
+    />
+  )
+}
+
+const DeliveryCheckoutIdentifiqueSeModal = dynamic(
+  () =>
+    import('../components/checkout/DeliveryCheckoutIdentifiqueSeModal').then(m => ({
+      default: m.DeliveryCheckoutIdentifiqueSeModal,
+    })),
+  { loading: CheckoutModalChunkFallback }
+)
+
+const DeliveryCheckoutEnderecosModal = dynamic(
+  () =>
+    import('../components/checkout/DeliveryCheckoutEnderecosModal').then(m => ({
+      default: m.DeliveryCheckoutEnderecosModal,
+    })),
+  { loading: CheckoutModalChunkFallback }
+)
+
+const DeliveryCheckoutEnderecoFormModal = dynamic(
+  () =>
+    import('../components/checkout/DeliveryCheckoutEnderecoFormModal').then(m => ({
+      default: m.DeliveryCheckoutEnderecoFormModal,
+    })),
+  { loading: CheckoutModalChunkFallback }
+)
+
+const DeliveryCheckoutEnderecoGeoModal = dynamic(
+  () =>
+    import('../components/checkout/DeliveryCheckoutEnderecoGeoModal').then(m => ({
+      default: m.DeliveryCheckoutEnderecoGeoModal,
+    })),
+  { ssr: false, loading: CheckoutModalChunkFallback }
+)
+
+const DeliveryCheckoutPagamentoModal = dynamic(
+  () =>
+    import('../components/checkout/DeliveryCheckoutPagamentoModal').then(m => ({
+      default: m.DeliveryCheckoutPagamentoModal,
+    })),
+  { loading: CheckoutModalChunkFallback }
+)
+
+const DeliveryCheckoutRevisaoModal = dynamic(
+  () =>
+    import('../components/checkout/DeliveryCheckoutRevisaoModal').then(m => ({
+      default: m.DeliveryCheckoutRevisaoModal,
+    })),
+  { loading: CheckoutModalChunkFallback }
+)
+
+const DeliveryCheckoutSucessoModal = dynamic(
+  () =>
+    import('../components/checkout/DeliveryCheckoutSucessoModal').then(m => ({
+      default: m.DeliveryCheckoutSucessoModal,
+    })),
+  { loading: CheckoutModalChunkFallback }
+)
+
+const DeliveryCotacaoDesatualizadaDialog = dynamic(
+  () =>
+    import('../components/checkout/DeliveryCotacaoDesatualizadaDialog').then(m => ({
+      default: m.DeliveryCotacaoDesatualizadaDialog,
+    }))
+)
+
+const DeliveryCheckoutForaCoberturaDialog = dynamic(
+  () =>
+    import('../components/checkout/DeliveryCheckoutForaCoberturaDialog').then(m => ({
+      default: m.DeliveryCheckoutForaCoberturaDialog,
+    }))
+)
 
 type DeliveryPublicoCarrinhoScreenProps = {
   slug: string
@@ -125,7 +195,6 @@ export function DeliveryPublicoCarrinhoScreen({
     selecionarEnderecoExistente,
     usarNovoEndereco,
     restaurarEnderecoSelecaoCancelada,
-    preencherFormParaEditarEndereco,
     removerEnderecoCliente,
     consultarClientePorTelefone,
     confirmarNovoEndereco,
@@ -149,7 +218,20 @@ export function DeliveryPublicoCarrinhoScreen({
     limparCarrinhoAposPedido,
     foraCoberturaDialogAberto,
     fecharForaCoberturaDialog,
-  } = useDeliveryCheckout(slug)
+    podeCriarNovoEndereco,
+  } = useDeliveryCheckout(slug, {
+    // Steps após identificação (ou pagamento+) — fetch garantido
+    fetchMeiosPagamento:
+      checkoutStep === 'enderecos' ||
+      checkoutStep === 'enderecoForm' ||
+      checkoutStep === 'enderecoGeo' ||
+      checkoutStep === 'pagamento' ||
+      checkoutStep === 'revisao' ||
+      checkoutStep === 'sucesso' ||
+      checkoutStep === 'pedidoDetalhe',
+    // P4.2 — overlap: com ID completa ainda no telefone, meios já sobem
+    prefetchMeiosAposIdentificacao: checkoutStep === 'telefone',
+  })
 
   const quantidadeItens = useMemo(
     () => itens.reduce((acc, item) => acc + item.quantidade, 0),
@@ -162,10 +244,14 @@ export function DeliveryPublicoCarrinhoScreen({
   )
 
   const catalogQuery = usePublicDeliveryCatalogInfinite(slug)
-  useAutoFetchCatalogoGrupos(catalogQuery)
 
   const empresa = catalogQuery.data?.pages[0]?.empresa ?? null
   const enderecoEmpresaTexto = formatEmpresaPublicaEndereco(empresa?.endereco ?? null)
+  const { localizacaoEmpresa } = useLocalizacaoEmpresaPublica(
+    slug,
+    empresa?.endereco ?? null,
+    Boolean(empresa?.endereco)
+  )
 
   const grupos = useMemo(
     () => (catalogQuery.data?.pages ? flattenCatalogoGrupos(catalogQuery.data.pages) : []),
@@ -186,12 +272,7 @@ export function DeliveryPublicoCarrinhoScreen({
 
   const quantidadeEnderecosCliente = clienteLookup.cliente?.enderecos?.length ?? 0
   const novoEnderecoBloqueado = clienteAtingiuMaxEnderecosDelivery(quantidadeEnderecosCliente)
-
-  const garantirPodeCriarNovoEndereco = useCallback((): boolean => {
-    if (!novoEnderecoBloqueado) return true
-    showToast.error(MSG_MAX_ENDERECOS_CLIENTE_DELIVERY)
-    return false
-  }, [novoEnderecoBloqueado])
+  const garantirPodeCriarNovoEndereco = podeCriarNovoEndereco
 
   const enderecoParaRevisao =
     form.tipoEntrega === 'entrega' ? enderecoClienteSelecionado : null
@@ -314,7 +395,7 @@ export function DeliveryPublicoCarrinhoScreen({
       form.tipoEntrega,
       form.enderecoIdSelecionado.trim(),
       clienteLookup.telefoneConsultado ?? '',
-      itens.length,
+      fingerprintItensCotacao(itens),
     ].join('|')
 
     if (cotacaoAutoTimerRef.current) clearTimeout(cotacaoAutoTimerRef.current)
@@ -337,7 +418,7 @@ export function DeliveryPublicoCarrinhoScreen({
     clienteLookup.telefoneConsultado,
     cotacaoLoading,
     cotacaoValidaParaPagamento,
-    itens.length,
+    itens,
   ])
 
   const fecharCheckout = () => {
@@ -521,25 +602,6 @@ export function DeliveryPublicoCarrinhoScreen({
     goToCheckoutStep('enderecoForm')
   }
 
-  const handleEditarEnderecoSelecionado = (
-    origem: 'identificacao' | 'revisao' = 'identificacao'
-  ) => {
-    if (!enderecoClienteSelecionado) {
-      handleTrocarEndereco(origem)
-      return
-    }
-    if (origem === 'revisao') {
-      setVoltarParaRevisao(true)
-      setVoltarParaIdentificacao(false)
-    } else {
-      setVoltarParaIdentificacao(true)
-      setVoltarParaRevisao(false)
-    }
-    setOrigemFormEndereco('identificacao')
-    preencherFormParaEditarEndereco(enderecoClienteSelecionado)
-    goToCheckoutStep('enderecoForm')
-  }
-
   const handleTrocarEndereco = (origem: 'identificacao' | 'revisao' = 'identificacao') => {
     if (origem === 'revisao') {
       setVoltarParaRevisao(true)
@@ -572,21 +634,6 @@ export function DeliveryPublicoCarrinhoScreen({
     }
     setOrigemFormEndereco(origem === 'identificacao' ? 'identificacao' : 'novo')
     usarNovoEndereco()
-    goToCheckoutStep('enderecoForm')
-  }
-
-  const handleEditarEnderecoDesdeGeo = () => {
-    if (!enderecoClienteSelecionado) return
-    setOrigemFormEndereco('geo')
-    preencherFormParaEditarEndereco(enderecoClienteSelecionado)
-    goToCheckoutStep('enderecoForm')
-  }
-
-  const handleEditarEnderecoDaLista = (
-    endereco: NonNullable<typeof clienteLookup.cliente>['enderecos'][number]
-  ) => {
-    setOrigemFormEndereco('lista')
-    preencherFormParaEditarEndereco(endereco)
     goToCheckoutStep('enderecoForm')
   }
 
@@ -943,15 +990,12 @@ export function DeliveryPublicoCarrinhoScreen({
             temEnderecosCadastrados={quantidadeEnderecosCliente > 0}
             quantidadeEnderecos={quantidadeEnderecosCliente}
             enderecoEmpresaTexto={enderecoEmpresaTexto}
-            taxaEntregaOficial={taxaEntregaOficial}
-            cotacaoLoading={cotacaoLoading}
-            cotacaoPronta={cotacaoPronta}
+            localizacaoEmpresa={localizacaoEmpresa}
             onChangeTelefone={value => updateForm('telefone', value)}
             onChangeTelefonePais={iso2 => updateForm('telefonePaisIso2', iso2)}
             onConsultarTelefone={consultarTelefoneAtual}
             onChangeNome={value => updateForm('nome', value)}
             onChangeOpcaoEntrega={handleChangeOpcaoEntrega}
-            onEditarEndereco={() => handleEditarEnderecoSelecionado('identificacao')}
             onTrocarEndereco={() => handleTrocarEndereco('identificacao')}
             onCadastrarEndereco={() => handleNovoEnderecoDesdeIdentificacao('identificacao')}
             novoEnderecoBloqueado={novoEnderecoBloqueado}
@@ -966,10 +1010,10 @@ export function DeliveryPublicoCarrinhoScreen({
           <DeliveryCheckoutEnderecosModal
             enderecos={clienteLookup.cliente?.enderecos ?? []}
             enderecoIdSelecionado={form.enderecoIdSelecionado}
+            localizacaoEmpresa={localizacaoEmpresa}
             onClose={fecharOuRevisao}
             onSelecionar={handleSelecionarEndereco}
             onUsarNovoEndereco={handleUsarNovoEndereco}
-            onEditar={handleEditarEnderecoDaLista}
             onRemover={handleRemoverEnderecoDaLista}
             novoEnderecoBloqueado={novoEnderecoBloqueado}
           />
@@ -978,9 +1022,11 @@ export function DeliveryPublicoCarrinhoScreen({
         {checkoutStep === 'enderecoForm' ? (
           <DeliveryCheckoutEnderecoFormModal
             form={form}
-            enderecoSalvo={
-              form.modoEndereco === 'existente' ? enderecoClienteSelecionado : null
-            }
+            enderecoSalvo={null}
+            enderecosCadastrados={clienteLookup.cliente?.enderecos ?? []}
+            localizacaoEmpresa={localizacaoEmpresa}
+            onSelecionarEnderecoCadastrado={handleSelecionarEndereco}
+            onRemoverEnderecoCadastrado={handleRemoverEnderecoDaLista}
             onChange={updateForm}
             onClose={fecharOuRevisao}
             onCancelar={handleCancelarEnderecoForm}
@@ -996,7 +1042,6 @@ export function DeliveryPublicoCarrinhoScreen({
               estado: empresa?.endereco?.estado ?? null,
             }}
             onCancelar={handleCancelarGeoEndereco}
-            onEditar={handleEditarEnderecoDesdeGeo}
             onConfirmar={handleConfirmarGeoEndereco}
           />
         ) : null}
@@ -1028,6 +1073,7 @@ export function DeliveryPublicoCarrinhoScreen({
             telefonePaisIso2={form.telefonePaisIso2}
             enderecoCliente={enderecoParaRevisao}
             enderecoEmpresaTexto={enderecoEmpresaTexto}
+            localizacaoEmpresa={localizacaoEmpresa}
             itens={itens}
             total={total}
             subtotalOficial={subtotalOficial}
@@ -1046,7 +1092,7 @@ export function DeliveryPublicoCarrinhoScreen({
             }}
             onEditarTipoEntrega={() => abrirStepDaRevisao('telefone')}
             onEditarCliente={() => abrirStepDaRevisao('telefone')}
-            onEditarEndereco={() => handleEditarEnderecoSelecionado('revisao')}
+            onEditarEndereco={() => handleTrocarEndereco('revisao')}
             onEditarPedido={() => {
               setVoltarParaRevisao(false)
               setVoltarParaIdentificacao(false)
@@ -1066,6 +1112,7 @@ export function DeliveryPublicoCarrinhoScreen({
             modoTempo={pedidoConfirmado.modoTempo}
             enderecoCliente={pedidoConfirmado.enderecoCliente}
             enderecoEmpresaTexto={pedidoConfirmado.enderecoEmpresaTexto}
+            localizacaoEmpresa={localizacaoEmpresa}
             telefoneEmpresa={empresa?.telefone ?? null}
             nomeEmpresa={empresa?.nomeFantasia ?? null}
             codigoVenda={pedidoConfirmado.codigoVenda}
@@ -1083,6 +1130,7 @@ export function DeliveryPublicoCarrinhoScreen({
             telefonePaisIso2={pedidoConfirmado.telefonePaisIso2}
             enderecoCliente={pedidoConfirmado.enderecoCliente}
             enderecoEmpresaTexto={pedidoConfirmado.enderecoEmpresaTexto}
+            localizacaoEmpresa={localizacaoEmpresa}
             itens={pedidoConfirmado.itens}
             total={pedidoConfirmado.total}
             pagamentos={pedidoConfirmado.pagamentos}

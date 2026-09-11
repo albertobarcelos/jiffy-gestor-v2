@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import {
   proxyPublicDeliveryGet,
   proxyPublicDeliveryPatch,
-} from '@/src/shared/utils/proxyPublicDeliveryRoute'
+} from '@/src/infrastructure/bff/proxyPublicDeliveryRoute'
 
 type RouteContext = { params: Promise<{ telefone: string }> }
 

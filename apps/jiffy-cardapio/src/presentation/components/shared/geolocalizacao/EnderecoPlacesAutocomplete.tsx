@@ -11,7 +11,6 @@ import {
   type PlacesAutocompletePrediction,
   type PlacesBias,
 } from '@/src/shared/utils/geolocalizacaoPlaces'
-import { mensagemAmigavelErroGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
 import { cn } from '@/src/shared/utils/cn'
 import { maiusculasEnderecoInput } from '@/src/shared/utils/normalizarTextoEnderecoPublico'
 
@@ -23,6 +22,13 @@ type EnderecoPlacesAutocompleteProps = {
   onSelect: (place: PlaceDetailsResult) => void
   /** Chamado ao limpar a busca com o X (para resetar campos do formulário). */
   onClear?: () => void
+  /**
+   * Busca concluída sem sugestões (ou falha) — útil para oferecer preenchimento manual.
+   * Não dispara enquanto o termo ainda está abaixo do mínimo de caracteres.
+   */
+  onSemResultadoConfiavel?: () => void
+  /** Busca retornou ao menos uma sugestão válida. */
+  onResultadosEncontrados?: () => void
   bias?: PlacesBias | null
   variant?: EnderecoPlacesAutocompleteVariant
   disabled?: boolean
@@ -43,6 +49,8 @@ export function EnderecoPlacesAutocomplete({
   onChange,
   onSelect,
   onClear,
+  onSemResultadoConfiavel,
+  onResultadosEncontrados,
   bias = null,
   variant = 'delivery',
   disabled = false,
@@ -120,23 +128,25 @@ export function EnderecoPlacesAutocomplete({
             setAberto(true)
             setHighlight(lista.length > 0 ? 0 : -1)
             if (lista.length === 0) {
-              setErro(
-                'Não encontramos sugestões no Google. Continue digitando ou preencha o endereço manualmente.'
-              )
+              setErro(null)
+              onSemResultadoConfiavel?.()
+            } else {
+              onResultadosEncontrados?.()
             }
           })
           .catch(error => {
             if (controller.signal.aborted) return
             if (error instanceof DOMException && error.name === 'AbortError') return
             setPredictions([])
-            setErro(mensagemAmigavelErroGeolocalizacao(error, 'places'))
+            setErro(null)
+            onSemResultadoConfiavel?.()
           })
           .finally(() => {
             if (!controller.signal.aborted) setLoading(false)
           })
       }, DEBOUNCE_MS)
     },
-    [bias]
+    [bias, onSemResultadoConfiavel, onResultadosEncontrados]
   )
 
   const delivery = variant === 'delivery'
@@ -191,8 +201,10 @@ export function EnderecoPlacesAutocomplete({
       onSelect(details)
       setPredictions([])
       fecharLista()
-    } catch (error) {
-      setErro(mensagemAmigavelErroGeolocalizacao(error, 'details'))
+      onResultadosEncontrados?.()
+    } catch {
+      setErro(null)
+      onSemResultadoConfiavel?.()
     } finally {
       setLoadingDetails(false)
     }
@@ -227,19 +239,21 @@ export function EnderecoPlacesAutocomplete({
 
   return (
     <div ref={rootRef} className={cn('relative', className)}>
-      <label className={cn('relative block', floatingLabel ? '' : 'space-y-1')}>
-        {floatingLabel ? (
-          <span
-            className={cn(
-              'absolute -top-2 left-3 z-10 px-1 text-xs',
-              delivery ? 'bg-[var(--delivery-surface,#fff)] delivery-text-secondary' : 'bg-white text-secondary-text'
-            )}
-          >
-            {label}
-          </span>
-        ) : (
-          <span className="text-sm font-medium text-primary-text">{label}</span>
-        )}
+      <label className={cn('relative block', floatingLabel && label.trim() ? '' : label.trim() ? 'space-y-1' : '')}>
+        {label.trim() ? (
+          floatingLabel ? (
+            <span
+              className={cn(
+                'absolute -top-2 left-3 z-10 px-1 text-xs',
+                delivery ? 'bg-[var(--delivery-surface,#fff)] delivery-text-secondary' : 'bg-white text-secondary-text'
+              )}
+            >
+              {label}
+            </span>
+          ) : (
+            <span className="text-sm font-medium text-primary-text">{label}</span>
+          )
+        ) : null}
         <div className="relative">
           <Search
             className={cn(

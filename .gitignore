@@ -39,5 +39,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Cursor — rule/skill locais (não versionar)
+.cursor/rules/jiffy-arquitetura-limpa.mdc
+.cursor/skills/jiffy-arquitetura-limpa/
+
 # microserviço fiscal
 JIFFY GESTOR - MICROSERVIÇO FISCAL/

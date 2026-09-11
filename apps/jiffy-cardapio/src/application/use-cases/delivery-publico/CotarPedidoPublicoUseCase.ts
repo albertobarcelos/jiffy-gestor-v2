@@ -7,13 +7,16 @@ import {
   CotacaoPedidoPublicoInputSchema,
   type ClienteDeliveryPublicoDTO,
 } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
-import { montarCotacaoPublico } from '@/src/application/mappers/MontarPedidoPublicoMapper'
-import { garantirEnderecoEntregaPublicoUseCase } from '@/src/application/use-cases/delivery-publico/GarantirEnderecoEntregaPublicoUseCase'
 import {
-  cotarPedidoPublico,
   formatarMensagemErroCotacaoPublica,
   PublicDeliveryApiError,
-} from '@/src/infrastructure/api/publicDeliveryApi'
+} from '@/src/application/errors/publicDeliveryErrors'
+import { montarCotacaoPublico } from '@/src/application/mappers/MontarPedidoPublicoMapper'
+import type { ICotacaoPedidoPublicoPort } from '@/src/application/ports/delivery-publico'
+import {
+  GarantirEnderecoEntregaPublicoUseCase,
+  resolverEnderecoIdEntregaSeJaGarantido,
+} from '@/src/application/use-cases/delivery-publico/GarantirEnderecoEntregaPublicoUseCase'
 
 export type CotarPedidoPublicoInput = {
   slug: string
@@ -29,9 +32,14 @@ export type CotarPedidoPublicoResult =
   | { ok: false; error: string; httpStatus?: number }
 
 /**
- * Garante endereço (se entrega) → monta payload de cotação → POST /delivery/cotacao.
+ * Garante endereço (se entrega) → monta payload de cotação → POST cotação.
  */
 export class CotarPedidoPublicoUseCase {
+  constructor(
+    private readonly cotacaoPort: ICotacaoPedidoPublicoPort,
+    private readonly garantirEndereco: GarantirEnderecoEntregaPublicoUseCase
+  ) {}
+
   async execute(input: CotarPedidoPublicoInput): Promise<CotarPedidoPublicoResult> {
     const tel = input.telefoneApi.replace(/\D/g, '')
     if (tel.length < 8) {
@@ -49,24 +57,34 @@ export class CotarPedidoPublicoUseCase {
 
     if (formComNome.tipoEntrega === 'entrega') {
       try {
-        enderecoIdEntrega = await garantirEnderecoEntregaPublicoUseCase.execute({
-          telefone: tel,
-          nome: input.nomeEfetivo,
+        const jaGarantido = resolverEnderecoIdEntregaSeJaGarantido({
           modoEndereco: formComNome.modoEndereco,
-          enderecoIdSelecionado: formComNome.enderecoIdSelecionado || null,
+          enderecoIdSelecionado: formComNome.enderecoIdSelecionado,
           clienteLookup: input.clienteLookup,
-          enderecoNovo: {
-            rua: formComNome.rua,
-            numero: formComNome.numero,
-            bairro: formComNome.bairro,
-            cidade: formComNome.cidade,
-            estado: formComNome.estado,
-            cep: formComNome.cep,
-            complemento: formComNome.complemento,
-            pontoReferencia: formComNome.pontoReferencia,
-            etiqueta: formComNome.etiquetaEndereco,
-          },
         })
+        if (jaGarantido) {
+          enderecoIdEntrega = jaGarantido
+        } else {
+          const garantido = await this.garantirEndereco.execute({
+            telefone: tel,
+            nome: input.nomeEfetivo,
+            modoEndereco: formComNome.modoEndereco,
+            enderecoIdSelecionado: formComNome.enderecoIdSelecionado || null,
+            clienteLookup: input.clienteLookup,
+            enderecoNovo: {
+              rua: formComNome.rua,
+              numero: formComNome.numero,
+              bairro: formComNome.bairro,
+              cidade: formComNome.cidade,
+              estado: formComNome.estado,
+              cep: formComNome.cep,
+              complemento: formComNome.complemento,
+              pontoReferencia: formComNome.pontoReferencia,
+              etiqueta: formComNome.etiquetaEndereco,
+            },
+          })
+          enderecoIdEntrega = garantido.enderecoId
+        }
       } catch (error) {
         return {
           ok: false,
@@ -93,7 +111,7 @@ export class CotarPedidoPublicoUseCase {
     }
 
     try {
-      const cotacao = await cotarPedidoPublico(parsed.data)
+      const cotacao = await this.cotacaoPort.cotar(parsed.data)
       return { ok: true, cotacao }
     } catch (error) {
       if (error instanceof PublicDeliveryApiError) {
@@ -110,5 +128,3 @@ export class CotarPedidoPublicoUseCase {
     }
   }
 }
-
-export const cotarPedidoPublicoUseCase = new CotarPedidoPublicoUseCase()

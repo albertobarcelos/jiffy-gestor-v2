@@ -2,6 +2,10 @@ import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import { geoJsonPointFromLatLng } from '@/src/shared/types/geoJsonPoint'
 import { normalizarDigitosCep } from '@/src/shared/utils/consultaCep'
 
+/**
+ * Cliente HTTP de geolocalização (infrastructure).
+ * Shared deve manter apenas tipos/helpers puros; I/O fica aqui.
+ */
 /** Lookup público do backend `/api/v1/geolocalizacao/*` (details/forward/reverso). */
 type BackendLookupResponse = {
   placeId?: unknown

@@ -14,100 +14,25 @@ import {
   parseCotacaoPedidoPublicoResponse,
   type CotacaoPedidoPublicoDTO,
 } from '@/src/application/dto/delivery-publico/CotacaoPedidoPublicoDTO'
+import {
+  CotacaoDesatualizadaPublicDeliveryError,
+  formatarMensagemErroCotacaoPublica,
+  PublicDeliveryApiError,
+} from '@/src/application/errors/publicDeliveryErrors'
 
-export class PublicDeliveryApiError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-    readonly details?: unknown
-  ) {
-    super(message)
-    this.name = 'PublicDeliveryApiError'
-  }
-}
-
-export class CotacaoDesatualizadaPublicDeliveryError extends PublicDeliveryApiError {
-  readonly cotacao: CotacaoPedidoPublicoDTO
-
-  constructor(message: string, cotacao: CotacaoPedidoPublicoDTO, details?: unknown) {
-    super(message, 409, details)
-    this.name = 'CotacaoDesatualizadaPublicDeliveryError'
-    this.cotacao = cotacao
-  }
-}
-
-export function isCotacaoDesatualizadaError(
-  error: unknown
-): error is CotacaoDesatualizadaPublicDeliveryError {
-  return error instanceof CotacaoDesatualizadaPublicDeliveryError
-}
-
-/** Loja delivery indisponível (pendências de configuração). */
-export function isEmpresaDeliveryIndisponivel(error: unknown): boolean {
-  return error instanceof PublicDeliveryApiError && error.status === 403
-}
-
-export const EMPRESA_DELIVERY_FECHADA_CODE = 'EMPRESA_DELIVERY_FECHADA'
-
-export function isEmpresaDeliveryFechadaError(error: unknown): boolean {
-  if (!(error instanceof PublicDeliveryApiError) || error.status !== 409) return false
-  const body = error.details
-  if (!body || typeof body !== 'object' || Array.isArray(body)) {
-    return error.message.toLowerCase().includes('não está aberta')
-  }
-  const raiz = body as Record<string, unknown>
-  const candidatos = [raiz.details, raiz]
-  for (const bloco of candidatos) {
-    if (!bloco || typeof bloco !== 'object' || Array.isArray(bloco)) continue
-    const code = (bloco as Record<string, unknown>).code
-    if (code === EMPRESA_DELIVERY_FECHADA_CODE) return true
-  }
-  return error.message.toLowerCase().includes('não está aberta')
-}
-
-function extrairPendenciasDoCorpoErro(body: unknown): string[] {
-  if (!body || typeof body !== 'object' || Array.isArray(body)) return []
-  const raiz = body as Record<string, unknown>
-
-  const candidatos: unknown[] = []
-  if (raiz.details && typeof raiz.details === 'object') {
-    candidatos.push((raiz.details as Record<string, unknown>).details)
-    candidatos.push(raiz.details)
-  }
-  candidatos.push(raiz)
-
-  for (const bloco of candidatos) {
-    if (!bloco || typeof bloco !== 'object' || Array.isArray(bloco)) continue
-    const pendencias = (bloco as Record<string, unknown>).pendencias
-    if (!Array.isArray(pendencias)) continue
-    const mensagens = pendencias
-      .map(item => {
-        if (!item || typeof item !== 'object') return null
-        const msg = (item as Record<string, unknown>).message
-        return typeof msg === 'string' && msg.trim() ? msg.trim() : null
-      })
-      .filter((msg): msg is string => Boolean(msg))
-    if (mensagens.length) return mensagens
-  }
-
-  return []
-}
-
-/** Mensagens de pendência quando o catálogo público retorna 403. */
-export function extrairMensagensPendenciasCatalogo(error: unknown): string[] {
-  if (!(error instanceof PublicDeliveryApiError)) return []
-  const fromDetails = extrairPendenciasDoCorpoErro(error.details)
-  if (fromDetails.length) return fromDetails
-  return error.message ? [error.message] : []
-}
-
-export function isPublicDeliverySlugNotFound(error: unknown): boolean {
-  return (
-    error instanceof PublicDeliveryApiError &&
-    error.status === 404 &&
-    error.message.toLowerCase().includes('empresa delivery')
-  )
-}
+export {
+  CotacaoDesatualizadaPublicDeliveryError,
+  EMPRESA_DELIVERY_FECHADA_CODE,
+  extrairMensagensPendenciasCatalogo,
+  formatarMensagemErroCotacaoPublica,
+  isCotacaoDesatualizadaError,
+  isEmpresaDeliveryFechadaError,
+  isEmpresaDeliveryIndisponivel,
+  isErroCoberturaEntregaPublica,
+  isPublicDeliverySlugNotFound,
+  MSG_FORA_COBERTURA_ENTREGA_PUBLICA,
+  PublicDeliveryApiError,
+} from '@/src/application/errors/publicDeliveryErrors'
 
 function parseErrorMessageFromBody(body: unknown, status: number): string {
   if (status === 429) {
@@ -130,67 +55,6 @@ function parseErrorMessageFromBody(body: unknown, status: number): string {
     }
   }
   return formatarMensagemErroCotacaoPublica(status)
-}
-
-/** Mensagem ao cliente externo quando o endereço está fora da cobertura de entrega. */
-export const MSG_FORA_COBERTURA_ENTREGA_PUBLICA =
-  'Seu endereço está fora da nossa área de cobertura para entrega. Você ainda pode retirar o pedido na loja.'
-
-export function isErroCoberturaEntregaPublica(message: string): boolean {
-  const lower = message.toLowerCase()
-  return (
-    message === MSG_FORA_COBERTURA_ENTREGA_PUBLICA ||
-    lower.includes('cobertura') ||
-    lower.includes('fora da área') ||
-    lower.includes('fora da area') ||
-    lower.includes('fora do raio') ||
-    lower.includes('raio de entrega') ||
-    lower.includes('área de entrega') ||
-    lower.includes('area de entrega') ||
-    lower.includes('coberto por nenhuma') ||
-    lower.includes('não atend') ||
-    lower.includes('nao atend')
-  )
-}
-
-/** Mensagens amigáveis para falhas na cotação pública (inclui rate limit 429). */
-export function formatarMensagemErroCotacaoPublica(
-  status: number,
-  rawMessage?: string | null
-): string {
-  const msg = rawMessage?.trim() ?? ''
-
-  if (status === 429) {
-    return 'Muitas tentativas de calcular o frete. Aguarde cerca de 1 minuto e tente novamente.'
-  }
-
-  if (msg) {
-    const lower = msg.toLowerCase()
-    if (lower.includes('geolocalização') || lower.includes('geolocalizacao')) {
-      return 'Este endereço ainda não tem localização para entrega. Escolha outro endereço ou cadastre um novo.'
-    }
-    if (lower.includes('cardápio delivery') || lower.includes('cardapio delivery')) {
-      return 'O cardápio de delivery está indisponível no momento. Tente novamente mais tarde.'
-    }
-    if (isErroCoberturaEntregaPublica(msg)) {
-      return MSG_FORA_COBERTURA_ENTREGA_PUBLICA
-    }
-    return msg
-  }
-
-  if (status === 400) {
-    return 'Não foi possível calcular o frete com os dados informados. Verifique o endereço ou tente retirada no local.'
-  }
-
-  if (status === 403) {
-    return 'A loja não está disponível para pedidos no momento.'
-  }
-
-  if (status >= 500) {
-    return 'Não foi possível calcular o frete agora. Tente novamente em instantes.'
-  }
-
-  return status > 0 ? `Não foi possível calcular o frete (erro ${status}).` : 'Não foi possível calcular o frete.'
 }
 
 async function parseErrorMessage(res: Response): Promise<string> {
@@ -238,7 +102,10 @@ export async function fetchCatalogoPublico(
   const qs = search.toString()
   const url = `/api/public/delivery/catalogo/${encodeURIComponent(slug)}${qs ? `?${qs}` : ''}`
 
-  const res = await fetch(url, { cache: 'no-store' })
+  const res = await fetch(url, {
+    // Permite aproveitar Cache-Control do BFF (s-maxage / SWR).
+    headers: { Accept: 'application/json' },
+  })
   const body = await parseErrorBody(res)
   if (!res.ok) {
     throw new PublicDeliveryApiError(

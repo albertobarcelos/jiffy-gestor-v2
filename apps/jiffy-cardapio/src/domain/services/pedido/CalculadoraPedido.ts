@@ -1,33 +1,5 @@
 import type { ComplementoSelecionado, ProdutoSelecionado } from '@/src/domain/types/pedido'
 
-export function formatarNumeroComMilhar(valor: number): string {
-  if (valor === 0) return '0,00'
-  const partes = valor.toFixed(2).split('.')
-  const parteInteira = partes[0]
-  const parteDecimal = partes[1]
-  const parteInteiraFormatada = parteInteira.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
-
-  return `${parteInteiraFormatada},${parteDecimal}`
-}
-
-export function formatarValorComplemento(
-  valor: number,
-  tipoImpactoPreco?: 'aumenta' | 'diminui' | 'nenhum'
-): string {
-  const valorFormatado = formatarNumeroComMilhar(valor)
-  const tipo = tipoImpactoPreco || 'nenhum'
-
-  switch (tipo) {
-    case 'aumenta':
-      return `+ ${valorFormatado}`
-    case 'diminui':
-      return `- ${valorFormatado}`
-    case 'nenhum':
-    default:
-      return formatarNumeroComMilhar(0)
-  }
-}
-
 export function obterTotalComplemento(complemento: ComplementoSelecionado): number {
   const tipo = complemento.tipoImpactoPreco || 'nenhum'
   if (tipo === 'nenhum') {
@@ -73,32 +45,4 @@ export function calcularTotalProduto(produto: ProdutoSelecionado): number {
   }
 
   return subtotal - valorDesconto + valorAcrescimo
-}
-
-export function formatarDescontoAcrescimo(produto: ProdutoSelecionado): string {
-  if (produto.tipoDesconto && produto.valorDesconto) {
-    if (produto.tipoDesconto === 'porcentagem') {
-      const pct = produto.valorDesconto
-      const pctFormatado = Number.isInteger(pct) ? String(pct) : formatarNumeroComMilhar(pct)
-      return `-${pctFormatado}%`
-    }
-    const valorDesconto = produto.valorDesconto
-    if (valorDesconto > 0) {
-      return `-${formatarNumeroComMilhar(valorDesconto)}`
-    }
-  }
-
-  if (produto.tipoAcrescimo && produto.valorAcrescimo) {
-    if (produto.tipoAcrescimo === 'porcentagem') {
-      const pct = produto.valorAcrescimo
-      const pctFormatado = Number.isInteger(pct) ? String(pct) : formatarNumeroComMilhar(pct)
-      return `+${pctFormatado}%`
-    }
-    const valorAcrescimo = produto.valorAcrescimo
-    if (valorAcrescimo > 0) {
-      return `+${formatarNumeroComMilhar(valorAcrescimo)}`
-    }
-  }
-
-  return ''
 }

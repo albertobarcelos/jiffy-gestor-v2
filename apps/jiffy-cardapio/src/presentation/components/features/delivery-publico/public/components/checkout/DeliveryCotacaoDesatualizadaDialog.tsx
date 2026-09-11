@@ -2,7 +2,7 @@
 
 import { AlertTriangle } from 'lucide-react'
 import { useDeliveryBodyScrollLock } from '../../../shared/hooks/useDeliveryBodyScrollLock'
-import { transformarParaReal } from '@/src/shared/utils/formatters'
+import { formatDeliveryCurrency } from '../../../shared/utils/formatDeliveryCurrency'
 import type { CotacaoPedidoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 
 type DeliveryCotacaoDesatualizadaDialogProps = {
@@ -48,7 +48,7 @@ export function DeliveryCotacaoDesatualizadaDialog({
 
         <p className="mt-4 text-center text-sm delivery-text-primary">
           Novo total:{' '}
-          <span className="font-semibold">{transformarParaReal(cotacao.valorFinal)}</span>
+          <span className="font-semibold">{formatDeliveryCurrency(cotacao.valorFinal)}</span>
         </p>
 
         <button

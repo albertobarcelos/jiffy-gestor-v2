@@ -20,8 +20,4 @@ export function mapCotacaoDtoToCheckoutState(
   }
 }
 
-export function isTokenCotacaoExpirado(expiresAt: string): boolean {
-  const ts = Date.parse(expiresAt)
-  if (Number.isNaN(ts)) return true
-  return ts <= Date.now()
-}
+export { isTokenCotacaoExpirado } from '@/src/domain/policies/ValidadeTokenCotacao'

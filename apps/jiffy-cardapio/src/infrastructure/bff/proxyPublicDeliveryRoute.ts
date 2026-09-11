@@ -1,3 +1,9 @@
+/**
+ * Adapter de borda (BFF Next) do delivery público.
+ *
+ * Responsabilidade: proxy HTTP fino (CORS + Cache-Control + status) para o backend.
+ * Sem regra de negócio — orquestração fica nos use cases da application.
+ */
 import { NextResponse } from 'next/server'
 import { ApiClient, ApiError, mensagemLegivelApiError } from '@/src/infrastructure/api/apiClient'
 
@@ -12,11 +18,13 @@ const PUBLIC_CORS_HEADERS: HeadersInit = {
 function withPublicCors(init?: {
   status?: number
   headers?: HeadersInit
+  /** Sobrescreve o default `no-store` (ex.: cache curto no GET catálogo). */
+  cacheControl?: string
 }): { status: number; headers: HeadersInit } {
   return {
     status: init?.status ?? 200,
     headers: {
-      'Cache-Control': 'no-store',
+      'Cache-Control': init?.cacheControl ?? 'no-store',
       ...PUBLIC_CORS_HEADERS,
       ...(init?.headers ?? {}),
     },
@@ -29,7 +37,8 @@ export function publicDeliveryOptionsResponse(): NextResponse {
 
 export async function proxyPublicDeliveryGet(
   upstreamPath: string,
-  searchParams?: URLSearchParams
+  searchParams?: URLSearchParams,
+  options?: { cacheControl?: string }
 ): Promise<NextResponse> {
   try {
     const qs = searchParams?.toString()
@@ -41,7 +50,10 @@ export async function proxyPublicDeliveryGet(
     })
     return NextResponse.json(
       response.data ?? {},
-      withPublicCors({ status: response.status || 200 })
+      withPublicCors({
+        status: response.status || 200,
+        cacheControl: options?.cacheControl,
+      })
     )
   } catch (error) {
     if (error instanceof ApiError) {

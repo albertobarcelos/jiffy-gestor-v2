@@ -9,16 +9,20 @@ import {
   type ClienteDeliveryPublicoDTO,
   type CreatePedidoPublicoInput,
 } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
-import { normalizarClienteDeliveryPublico } from '@/src/application/mappers/ClienteDeliveryPublicoMapper'
-import { montarPedidoPublico } from '@/src/application/mappers/MontarPedidoPublicoMapper'
-import { garantirEnderecoEntregaPublicoUseCase } from '@/src/application/use-cases/delivery-publico/GarantirEnderecoEntregaPublicoUseCase'
 import {
-  atualizarClienteDeliveryPublico,
-  buscarClienteDeliveryPublico,
-  criarPedidoPublico,
   isCotacaoDesatualizadaError,
   isEmpresaDeliveryFechadaError,
-} from '@/src/infrastructure/api/publicDeliveryApi'
+} from '@/src/application/errors/publicDeliveryErrors'
+import { normalizarClienteDeliveryPublico } from '@/src/application/mappers/ClienteDeliveryPublicoMapper'
+import { montarPedidoPublico } from '@/src/application/mappers/MontarPedidoPublicoMapper'
+import type {
+  IClienteDeliveryPublicoPort,
+  IPedidoPublicoPort,
+} from '@/src/application/ports/delivery-publico'
+import {
+  GarantirEnderecoEntregaPublicoUseCase,
+  resolverEnderecoIdEntregaSeJaGarantido,
+} from '@/src/application/use-cases/delivery-publico/GarantirEnderecoEntregaPublicoUseCase'
 
 export type EnviarPedidoPublicoInput = {
   slug: string
@@ -51,6 +55,12 @@ export type EnviarPedidoPublicoResult =
  * garante endereço (se entrega) → monta payload → PATCH CPF se necessário → create.
  */
 export class EnviarPedidoPublicoUseCase {
+  constructor(
+    private readonly pedidoPort: IPedidoPublicoPort,
+    private readonly clientePort: IClienteDeliveryPublicoPort,
+    private readonly garantirEndereco: GarantirEnderecoEntregaPublicoUseCase
+  ) {}
+
   async execute(input: EnviarPedidoPublicoInput): Promise<EnviarPedidoPublicoResult> {
     const tel = input.telefoneApi.replace(/\D/g, '')
     if (tel.length < 8) {
@@ -71,24 +81,34 @@ export class EnviarPedidoPublicoUseCase {
 
     if (formComNome.tipoEntrega === 'entrega') {
       try {
-        enderecoIdEntrega = await garantirEnderecoEntregaPublicoUseCase.execute({
-          telefone: tel,
-          nome: input.nomeEfetivo,
+        const jaGarantido = resolverEnderecoIdEntregaSeJaGarantido({
           modoEndereco: formComNome.modoEndereco,
-          enderecoIdSelecionado: formComNome.enderecoIdSelecionado || null,
+          enderecoIdSelecionado: formComNome.enderecoIdSelecionado,
           clienteLookup: input.clienteLookup,
-          enderecoNovo: {
-            rua: formComNome.rua,
-            numero: formComNome.numero,
-            bairro: formComNome.bairro,
-            cidade: formComNome.cidade,
-            estado: formComNome.estado,
-            cep: formComNome.cep,
-            complemento: formComNome.complemento,
-            pontoReferencia: formComNome.pontoReferencia,
-            etiqueta: formComNome.etiquetaEndereco,
-          },
         })
+        if (jaGarantido) {
+          enderecoIdEntrega = jaGarantido
+        } else {
+          const garantido = await this.garantirEndereco.execute({
+            telefone: tel,
+            nome: input.nomeEfetivo,
+            modoEndereco: formComNome.modoEndereco,
+            enderecoIdSelecionado: formComNome.enderecoIdSelecionado || null,
+            clienteLookup: input.clienteLookup,
+            enderecoNovo: {
+              rua: formComNome.rua,
+              numero: formComNome.numero,
+              bairro: formComNome.bairro,
+              cidade: formComNome.cidade,
+              estado: formComNome.estado,
+              cep: formComNome.cep,
+              complemento: formComNome.complemento,
+              pontoReferencia: formComNome.pontoReferencia,
+              etiqueta: formComNome.etiquetaEndereco,
+            },
+          })
+          enderecoIdEntrega = garantido.enderecoId
+        }
       } catch (error) {
         return {
           ok: false,
@@ -119,10 +139,10 @@ export class EnviarPedidoPublicoUseCase {
     let clienteAtualizado: ClienteDeliveryPublicoDTO | null = null
     const cpfPedido = payload.documentoCpfCnpj?.replace(/\D/g, '') ?? ''
     if (cpfPedido.length === 11) {
-      const rawAtual = await buscarClienteDeliveryPublico(tel)
+      const rawAtual = await this.clientePort.buscarPorTelefone(tel)
       const cpfAtual = rawAtual?.cpf?.replace(/\D/g, '') ?? ''
       if (rawAtual && !cpfAtual) {
-        const atualizadoRaw = await atualizarClienteDeliveryPublico(tel, {
+        const atualizadoRaw = await this.clientePort.atualizar(tel, {
           cpf: cpfPedido,
         })
         clienteAtualizado = normalizarClienteDeliveryPublico(atualizadoRaw)
@@ -130,7 +150,7 @@ export class EnviarPedidoPublicoUseCase {
     }
 
     try {
-      const pedido = await criarPedidoPublico(payload)
+      const pedido = await this.pedidoPort.criar(payload)
       return { ok: true, clienteAtualizado, pedido }
     } catch (error) {
       if (isCotacaoDesatualizadaError(error)) {
@@ -158,5 +178,3 @@ export class EnviarPedidoPublicoUseCase {
     }
   }
 }
-
-export const enviarPedidoPublicoUseCase = new EnviarPedidoPublicoUseCase()
