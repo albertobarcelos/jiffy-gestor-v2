@@ -203,3 +203,32 @@ export function formatarHorarioFuncionamentoHoje(
     agendaSemanal: agendaSemanal ?? [],
   })
 }
+
+export type LinhaAgendaPublica = {
+  diaDaSemana: DiaDaSemanaApi
+  label: string
+  texto: string
+  aberto: boolean
+}
+
+/** Lista Segunda→Domingo com horários (ou “Fechado”) para o modal da loja. */
+export function listarAgendaSemanalPublica(
+  agendaSemanal: FuncionamentoPublicoDiaDTO[] | FuncionamentoDoDiaDTO[] | undefined
+): LinhaAgendaPublica[] {
+  const porDia = new Map((agendaSemanal ?? []).map(d => [d.diaDaSemana, d]))
+
+  return DIAS_DA_SEMANA_ORDEM_UI.map(diaDaSemana => {
+    const intervalos = porDia.get(diaDaSemana)?.intervalos ?? []
+    const aberto = intervalos.length > 0
+    const texto = aberto
+      ? intervalos.map(i => `${i.abreEm} – ${i.fechaEm}`).join(', ')
+      : 'Fechado'
+
+    return {
+      diaDaSemana,
+      label: LABEL_DIA_DA_SEMANA[diaDaSemana],
+      texto,
+      aberto,
+    }
+  })
+}

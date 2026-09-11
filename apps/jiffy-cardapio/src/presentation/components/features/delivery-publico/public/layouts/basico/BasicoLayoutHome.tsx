@@ -22,6 +22,7 @@ export function BasicoLayoutHome({
   onProdutoClick,
   onProdutoAddRapido,
   onPedidoClick,
+  onInformacoesClick,
   quantidadePorProduto,
   carrinhoThumbs,
   carrinhoThumbsBounceKey,
@@ -45,6 +46,7 @@ export function BasicoLayoutHome({
           disponivel={viewModel.disponivel}
           horarioTexto={viewModel.horarioTexto}
           interactive={interactive}
+          onInformacoesClick={onInformacoesClick}
         />
         <DeliveryBasicoCatalogToolbar
           config={config}

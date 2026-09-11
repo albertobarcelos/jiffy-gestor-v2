@@ -6,9 +6,16 @@ import type { DeliveryPublicoDesignConfig } from '../../../../shared/types/deliv
 type DeliveryGradeHeaderProps = {
   config: DeliveryPublicoDesignConfig
   disponivel: boolean
+  interactive?: boolean
+  onInformacoesClick?: () => void
 }
 
-export function DeliveryGradeHeader({ config, disponivel }: DeliveryGradeHeaderProps) {
+export function DeliveryGradeHeader({
+  config,
+  disponivel,
+  interactive = false,
+  onInformacoesClick,
+}: DeliveryGradeHeaderProps) {
   const nomeLoja = config.cabecalho.nomeExibicao.trim() || 'Sua loja'
   const logoRadius = config.cabecalho.logoFormato === 'circular' ? '9999px' : '12px'
 
@@ -26,8 +33,10 @@ export function DeliveryGradeHeader({ config, disponivel }: DeliveryGradeHeaderP
         <div className="relative flex items-start justify-between px-4 pb-6 pt-4">
           <button
             type="button"
-            aria-label="Informações"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/50 bg-black/20 text-white backdrop-blur-sm"
+            aria-label="Informações da loja"
+            disabled={!interactive}
+            onClick={() => interactive && onInformacoesClick?.()}
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/50 bg-black/20 text-white backdrop-blur-sm disabled:cursor-default"
           >
             <Info className="h-4 w-4" aria-hidden />
           </button>

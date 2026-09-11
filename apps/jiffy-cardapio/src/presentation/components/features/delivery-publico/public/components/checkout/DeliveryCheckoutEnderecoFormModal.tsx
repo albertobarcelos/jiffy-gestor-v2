@@ -197,7 +197,6 @@ export function DeliveryCheckoutEnderecoFormModal({
   const cidadeInputRef = useRef<HTMLInputElement>(null)
   const focoPendenteRef = useRef<CampoEnderecoFoco | null>(null)
   const aguardandoNumeroRef = useRef(false)
-  const toastNumeroSeqRef = useRef(0)
   const pinAntesRef = useRef<GeoJsonPoint | null>(null)
   const providerAntesRef = useRef<string | null>(null)
   aguardandoNumeroRef.current = aguardandoNumeroObrigatorio
@@ -276,24 +275,13 @@ export function DeliveryCheckoutEnderecoFormModal({
     })
   }, [])
 
-  const focarNumeroObrigatorio = useCallback((opcoes?: { avisar?: boolean }) => {
-    const avisar = opcoes?.avisar ?? false
+  const focarNumeroObrigatorio = useCallback(() => {
     const tentarFoco = () => {
       const el = numeroInputRef.current
       if (!el) return false
       el.focus({ preventScroll: false })
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
       return document.activeElement === el
-    }
-
-    if (avisar) {
-      const seq = ++toastNumeroSeqRef.current
-      window.setTimeout(() => {
-        if (seq !== toastNumeroSeqRef.current) return
-        if (!aguardandoNumeroRef.current) return
-        if (numeroInputRef.current?.value.trim()) return
-        showToast.error('Informe o número do endereço para continuar.')
-      }, 50)
     }
 
     tentarFoco()
@@ -329,25 +317,6 @@ export function DeliveryCheckoutEnderecoFormModal({
     if (!form.numero.trim()) return
     setAguardandoNumeroObrigatorio(false)
   }, [form.numero, aguardandoNumeroObrigatorio])
-
-  const handleNumeroBlur = useCallback(() => {
-    if (!aguardandoNumeroRef.current) return
-    if (numeroInputRef.current?.value.trim()) return
-
-    window.setTimeout(() => {
-      if (!aguardandoNumeroRef.current) return
-      if (numeroInputRef.current?.value.trim()) return
-      const ativo = document.activeElement
-      if (
-        ativo instanceof Element &&
-        ativo.closest('[data-checkout-leave-without-numero]')
-      ) {
-        return
-      }
-      if (ativo === numeroInputRef.current) return
-      focarNumeroObrigatorio({ avisar: true })
-    }, 0)
-  }, [focarNumeroObrigatorio])
 
   const aplicarGeoEncontrada = (point: GeoJsonPoint, providerId?: string | null) => {
     setEnderecoLocalizacao(point)
@@ -394,14 +363,8 @@ export function DeliveryCheckoutEnderecoFormModal({
       setEnderecoLocalizacao(null)
       setProviderEnderecoId(null)
       setUltimoGeoKeySincronizado(null)
-      if (!ruaFinal) {
-        setAguardandoNumeroObrigatorio(false)
-        focoPendenteRef.current = 'rua'
-      } else {
-        setAguardandoNumeroObrigatorio(true)
-        focoPendenteRef.current = 'numero'
-        window.setTimeout(() => focarNumeroObrigatorio(), 60)
-      }
+      setAguardandoNumeroObrigatorio(false)
+      focoPendenteRef.current = ruaFinal ? null : 'rua'
     }
 
     setDialogPinAberto(false)
@@ -512,11 +475,8 @@ export function DeliveryCheckoutEnderecoFormModal({
     }
     if (!form.numero.trim()) {
       showToast.error('Informe o número do endereço para continuar.')
-      if (aguardandoNumeroObrigatorio) {
-        focarNumeroObrigatorio()
-      } else {
-        solicitarFocoCampo('numero')
-      }
+      setAguardandoNumeroObrigatorio(true)
+      focarNumeroObrigatorio()
       return
     }
     if (!form.bairro.trim()) {
@@ -944,6 +904,13 @@ export function DeliveryCheckoutEnderecoFormModal({
                       placeholder="00000-000"
                       value={form.cep}
                       onChange={e => onChange('cep', formatarCepMascara(e.target.value))}
+                      onFocus={e => {
+                        if (!form.cep.trim()) return
+                        const el = e.currentTarget
+                        requestAnimationFrame(() => {
+                          el.select()
+                        })
+                      }}
                       className={fieldClass}
                       style={fieldStyle}
                     />
@@ -1004,7 +971,6 @@ export function DeliveryCheckoutEnderecoFormModal({
                       ref={numeroInputRef}
                       value={form.numero}
                       onValueChange={valor => onChange('numero', valor)}
-                      onBlur={handleNumeroBlur}
                       inputMode="numeric"
                       autoComplete="address-line2"
                       aria-required={aguardandoNumeroObrigatorio || undefined}
@@ -1013,12 +979,6 @@ export function DeliveryCheckoutEnderecoFormModal({
                     />
                   </label>
                 </div>
-
-                {aguardandoNumeroObrigatorio && !form.numero.trim() ? (
-                  <p className="text-xs font-medium" style={{ color: 'var(--delivery-primary)' }}>
-                    Digite o número do endereço para continuar.
-                  </p>
-                ) : null}
 
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   <label className="relative min-w-0">

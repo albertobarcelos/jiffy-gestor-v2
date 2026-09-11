@@ -56,6 +56,7 @@ const DeliveryProdutoModal = dynamic(
     })),
   { ssr: false }
 )
+import { DeliveryLojaInfoModal } from '../../shared/components/DeliveryLojaInfoModal'
 import { DeliveryPublicoCarrinhoScreen } from './DeliveryPublicoCarrinhoScreen'
 import { useFlyToCart } from '../../shared/hooks/useFlyToCart'
 import { useDeliveryBodyScrollLock } from '../../shared/hooks/useDeliveryBodyScrollLock'
@@ -475,6 +476,7 @@ function DeliveryPublicoHomeContent({
   bloquearUiFlyToCart,
 }: DeliveryPublicoHomeContentProps) {
   const { config } = useDeliveryThemeContext()
+  const [lojaInfoOpen, setLojaInfoOpen] = useState(false)
 
   const viewModel: DeliveryPublicoViewModel = useMemo(() => {
     const base = buildCatalogViewModel(
@@ -514,10 +516,20 @@ function DeliveryPublicoHomeContent({
         onProdutoClick={onProdutoClick}
         onProdutoAddRapido={onProdutoAddRapido}
         onPedidoClick={onPedidoClick}
+        onInformacoesClick={() => setLojaInfoOpen(true)}
         quantidadePorProduto={quantidadePorProduto}
         carrinhoThumbs={carrinhoThumbs}
         carrinhoThumbsBounceKey={carrinhoThumbsBounceKey}
         carrinhoThumbsTargetRef={carrinhoThumbsTargetRef}
+      />
+      <DeliveryLojaInfoModal
+        open={lojaInfoOpen}
+        onClose={() => setLojaInfoOpen(false)}
+        slug={slug}
+        empresa={empresa}
+        funcionamento={funcionamento}
+        nomeExibicao={config.cabecalho.nomeExibicao}
+        logoUrl={config.cabecalho.logoUrl}
       />
       {produtoSelecionado ? (
         <DeliveryProdutoModal
