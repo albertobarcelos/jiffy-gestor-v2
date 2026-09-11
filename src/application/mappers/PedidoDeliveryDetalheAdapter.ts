@@ -159,7 +159,18 @@ export function adaptPedidoDeliveryToVendaGestorApiResponse(
     : []
 
   const dataFinalizacao = isoString(registro.dataFinalizacao)
-  const statusDelivery = String(registro.statusDelivery ?? '').trim().toUpperCase()
+  const statusDeliveryCandidatos = [
+    registro.statusDelivery,
+    registro.statusEtapaOperacional,
+    registro.statusOperacional,
+  ]
+  let statusDelivery = ''
+  for (const candidato of statusDeliveryCandidatos) {
+    const raw = String(candidato ?? '').trim().toUpperCase()
+    if (!raw || raw === 'ABERTA' || raw === 'FINALIZADA') continue
+    statusDelivery = raw
+    break
+  }
 
   const totalFaltaPagar = Number(registro.totalFaltaPagar ?? 0) || 0
   const cobrarNaEntregaPendente = cobrancas.some(c => {
@@ -212,6 +223,11 @@ export function adaptPedidoDeliveryToVendaGestorApiResponse(
     totalDesconto: registro.totalDesconto,
     totalAcrescimo: registro.totalAcrescimo,
     taxasLancadas: Array.isArray(registro.taxasLancadas) ? registro.taxasLancadas : [],
+    taxaEntregaValor:
+      registro.taxaEntregaValor ??
+      (registro.resumoPedido && typeof registro.resumoPedido === 'object'
+        ? (registro.resumoPedido as Record<string, unknown>).taxaEntrega
+        : undefined),
     pagamento: {
       status: totalFaltaPagar > 0 ? 'pendente' : 'pago',
       cobrarCliente: cobrarNaEntregaPendente,

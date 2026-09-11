@@ -33,6 +33,7 @@ export interface PedidoEntregaDetalheConteudoProps {
   nomesMeiosPagamento?: Record<string, string>
   valorPedido?: number | null
   nomeEntregador?: string | null
+  telefoneEntregador?: string | null
   trocoExibicao?: number | null
   observacaoPedido?: string | null
   exibirTitulo?: boolean
@@ -47,6 +48,7 @@ export function PedidoEntregaDetalheConteudo({
   nomesMeiosPagamento = {},
   valorPedido,
   nomeEntregador,
+  telefoneEntregador,
   trocoExibicao,
   observacaoPedido,
   exibirTitulo = true,
@@ -97,6 +99,12 @@ export function PedidoEntregaDetalheConteudo({
         />
       )}
       <LinhaDetalhe label="Entregador:" value={entregadorExibicao} />
+      <LinhaDetalhe
+        label="WhatsApp entregador:"
+        value={formatarCelularExibicao(
+          telefoneEntregador || detalhesEntrega?.entregadorTelefone
+        )}
+      />
       <LinhaDetalhe label="Cliente:" value={nomeCliente} />
       <LinhaDetalhe
         label="CPF/CNPJ:"
