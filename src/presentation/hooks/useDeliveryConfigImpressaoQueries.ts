@@ -7,6 +7,7 @@ import {
 } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import {
   buscarImpressorasLogicas,
+  invalidarMapeamentosEstacaoCache,
   resolverEstacaoImpressaoConfig,
   type EstacaoImpressaoConfigResolvida,
   type ImpressoraLogica,
@@ -53,6 +54,7 @@ export function useInvalidateDeliveryConfigImpressaoQueries() {
   const invalidate = useInvalidateTenantQueries()
 
   return () => {
+    invalidarMapeamentosEstacaoCache()
     void invalidate(['delivery-config', 'impressoras-logicas'])
     void invalidate(['delivery-config', 'estacao-impressao'])
   }

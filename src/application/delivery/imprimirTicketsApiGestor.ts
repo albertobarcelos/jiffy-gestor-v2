@@ -110,112 +110,114 @@ export async function imprimirTicketsApiGestor(params: {
   let ignoradosSemItens = 0
   let ignoradosFallbackProdutoSemImpressora = 0
 
-  for (const ticket of ticketsAImprimir) {
-    if (ticketProducaoEhFallbackSemImpressoraProduto(ticket)) {
-      ignoradosFallbackProdutoSemImpressora += 1
-      warnImpressao('ticket.producao_fallback_produto_sem_impressora_pulado', {
-        tipoCupom: ticket.tipoCupom,
-        impressoraId: ticket.impressoraId,
-        impressoraOrigem: ticket.impressora?.origem ?? null,
-        qItens: ticket.itens?.length ?? 0,
-      })
-      continue
-    }
-
-    if (!ticket.itens?.length) {
-      ignoradosSemItens += 1
-      warnImpressao('ticket.pulado', {
-        motivo: 'sem_itens',
-        tipoCupom: ticket.tipoCupom,
-        impressoraId: ticket.impressoraId,
-      })
-      continue
-    }
-
-    const printerName =
-      ticket.impressora?.nomeImpressoraWindows?.trim() || ticket.nomeImpressoraWindows?.trim() || ''
-    if (!printerName) {
-      falhas += 1
-      const nomeLogica = ticket.impressoraNome?.trim() || ticket.impressora?.nome?.trim() || 'lógica'
-      const mensagem = TOAST_CUPOM_NAO_IMPRIMIU_SEM_VINCULO_PC(nomeLogica)
-      erroImpressao('ticket.sem_impressora_fisica', {
-        tipoCupom: ticket.tipoCupom,
-        impressoraId: ticket.impressoraId,
-      })
-      if (!omitirAvisoSemVinculoPc) {
-        if (onAviso) {
-          onAviso(mensagem)
-        } else {
-          onErro?.(mensagem)
-        }
+  await Promise.all(
+    ticketsAImprimir.map(async ticket => {
+      if (ticketProducaoEhFallbackSemImpressoraProduto(ticket)) {
+        ignoradosFallbackProdutoSemImpressora += 1
+        warnImpressao('ticket.producao_fallback_produto_sem_impressora_pulado', {
+          tipoCupom: ticket.tipoCupom,
+          impressoraId: ticket.impressoraId,
+          impressoraOrigem: ticket.impressora?.origem ?? null,
+          qItens: ticket.itens?.length ?? 0,
+        })
+        return
       }
-      continue
-    }
 
-    let document
-    try {
-      document =
-        cupomTemplate?.modoPapel === 'grafico'
-          ? await mapTicketToGraphicPrintDocument(response, ticket, {
-              nomeEmpresa,
-              template: cupomTemplate,
-            })
-          : mapTicketToPrintDocument(response, ticket, {
-              nomeEmpresa,
-              template: cupomTemplate,
-            })
-    } catch (error) {
-      falhas += 1
-      const mensagem =
-        error instanceof Error && error.message.trim()
-          ? error.message
-          : 'Falha ao montar o cupom gráfico.'
-      warnImpressao('ticket.grafico_falhou', {
-        mensagem,
-        causa: error instanceof Error ? error.message : String(error),
+      if (!ticket.itens?.length) {
+        ignoradosSemItens += 1
+        warnImpressao('ticket.pulado', {
+          motivo: 'sem_itens',
+          tipoCupom: ticket.tipoCupom,
+          impressoraId: ticket.impressoraId,
+        })
+        return
+      }
+
+      const printerName =
+        ticket.impressora?.nomeImpressoraWindows?.trim() || ticket.nomeImpressoraWindows?.trim() || ''
+      if (!printerName) {
+        falhas += 1
+        const nomeLogica = ticket.impressoraNome?.trim() || ticket.impressora?.nome?.trim() || 'lógica'
+        const mensagem = TOAST_CUPOM_NAO_IMPRIMIU_SEM_VINCULO_PC(nomeLogica)
+        erroImpressao('ticket.sem_impressora_fisica', {
+          tipoCupom: ticket.tipoCupom,
+          impressoraId: ticket.impressoraId,
+        })
+        if (!omitirAvisoSemVinculoPc) {
+          if (onAviso) {
+            onAviso(mensagem)
+          } else {
+            onErro?.(mensagem)
+          }
+        }
+        return
+      }
+
+      let document
+      try {
+        document =
+          cupomTemplate?.modoPapel === 'grafico'
+            ? await mapTicketToGraphicPrintDocument(response, ticket, {
+                nomeEmpresa,
+                template: cupomTemplate,
+              })
+            : mapTicketToPrintDocument(response, ticket, {
+                nomeEmpresa,
+                template: cupomTemplate,
+              })
+      } catch (error) {
+        falhas += 1
+        const mensagem =
+          error instanceof Error && error.message.trim()
+            ? error.message
+            : 'Falha ao montar o cupom gráfico.'
+        warnImpressao('ticket.grafico_falhou', {
+          mensagem,
+          causa: error instanceof Error ? error.message : String(error),
+        })
+        onErro?.(mensagem)
+        return
+      }
+      const jobId = buildPrintJobId({
+        vendaId: response.vendaId,
+        tipoCupom: ticket.tipoCupom,
+        ticketKey: ticketPrintKey(ticket),
+        reimpressao,
       })
-      onErro?.(mensagem)
-      continue
-    }
-    const jobId = buildPrintJobId({
-      vendaId: response.vendaId,
-      tipoCupom: ticket.tipoCupom,
-      ticketKey: ticketPrintKey(ticket),
-      reimpressao,
-    })
-    const copies = Math.min(20, Math.max(1, Number(ticket.copias) || 1))
+      const copies = Math.min(20, Math.max(1, Number(ticket.copias) || 1))
 
-    logImpressao('ticket.envio', {
-      tipoCupom: ticket.tipoCupom,
-      impressoraId: ticket.impressoraId ?? null,
-      printerName,
-      jobId,
-      copiasTicket: copies,
-      blocos: document.content.length,
-    })
+      logImpressao('ticket.envio', {
+        tipoCupom: ticket.tipoCupom,
+        impressoraId: ticket.impressoraId ?? null,
+        printerName,
+        jobId,
+        copiasTicket: copies,
+        blocos: document.content.length,
+      })
 
-    const r = await printDeliveryCupom({
-      jobId,
-      printerName,
-      copies,
-      document,
-    })
-    if (r.ok) impressos += 1
-    if (!r.ok) falhas += 1
+      const r = await printDeliveryCupom({
+        jobId,
+        printerName,
+        copies,
+        document,
+      })
+      if (r.ok) impressos += 1
+      if (!r.ok) falhas += 1
 
-    logImpressao('ticket.resultado_print', {
-      ok: r.ok,
-      duplicate: r.duplicate ?? false,
-      mensagemInterna: r.mensagem?.slice?.(0, 200) ?? null,
-      copies,
-      printerName,
-    })
+      logImpressao('ticket.resultado_print', {
+        ok: r.ok,
+        duplicate: r.duplicate ?? false,
+        mensagemInterna: r.mensagem?.slice?.(0, 200) ?? null,
+        copies,
+        printerName,
+      })
 
-    if (!r.ok) {
-      erroImpressao('ticket.print_falhou', { mensagem: r.mensagem ?? null })
-      onErro?.(r.mensagem ?? 'Falha ao imprimir o cupom.')
-    }
-  }
+      if (!r.ok) {
+        erroImpressao('ticket.print_falhou', { mensagem: r.mensagem ?? null })
+        onErro?.(r.mensagem ?? 'Falha ao imprimir o cupom.')
+      }
+    })
+  )
 
   logImpressao('imprimirLote.fim', {
     numeroVenda: response.numeroVenda,

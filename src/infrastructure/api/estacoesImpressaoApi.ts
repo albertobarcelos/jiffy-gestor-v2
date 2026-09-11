@@ -129,22 +129,39 @@ export async function buscarImpressorasLogicas(token: string): Promise<Impressor
   return normalizadas
 }
 
-export function buscarMapeamentosEstacao(
+const MAPEAMENTOS_ESTACAO_CACHE = new Map<string, EstacaoImpressaoMapeamento[]>()
+
+export function invalidarMapeamentosEstacaoCache(estacaoId?: string): void {
+  const id = estacaoId?.trim()
+  if (id) {
+    MAPEAMENTOS_ESTACAO_CACHE.delete(id)
+    return
+  }
+  MAPEAMENTOS_ESTACAO_CACHE.clear()
+}
+
+export async function buscarMapeamentosEstacao(
   token: string,
   estacaoId: string
 ): Promise<EstacaoImpressaoMapeamento[]> {
-  return requestJson<EstacaoImpressaoMapeamento[]>(
+  const id = estacaoId.trim()
+  const cached = id ? MAPEAMENTOS_ESTACAO_CACHE.get(id) : undefined
+  if (cached) return cached
+
+  const data = await requestJson<EstacaoImpressaoMapeamento[]>(
     `/api/gestor/estacoes-impressao/${encodeURIComponent(estacaoId)}/impressoras`,
     token
   )
+  if (id) MAPEAMENTOS_ESTACAO_CACHE.set(id, data)
+  return data
 }
 
-export function salvarMapeamentosEstacao(
+export async function salvarMapeamentosEstacao(
   token: string,
   estacaoId: string,
   mapeamentos: Array<{ impressoraId: string; nomeImpressoraWindows: string }>
 ): Promise<EstacaoImpressaoMapeamento[]> {
-  return requestJson<EstacaoImpressaoMapeamento[]>(
+  const data = await requestJson<EstacaoImpressaoMapeamento[]>(
     `/api/gestor/estacoes-impressao/${encodeURIComponent(estacaoId)}/impressoras`,
     token,
     {
@@ -152,6 +169,9 @@ export function salvarMapeamentosEstacao(
       body: JSON.stringify({ mapeamentos }),
     }
   )
+  const id = estacaoId.trim()
+  if (id) MAPEAMENTOS_ESTACAO_CACHE.set(id, data)
+  return data
 }
 
 export interface EstacaoImpressaoConfigResolvida {
