@@ -54,6 +54,7 @@ describe('cardapioPublicUrl', () => {
     expect(mapGestorPublicPathToCardapioUrl('/delivery')).toBe(
       'https://cardapio.jiffy.run/'
     )
+    expect(mapGestorPublicPathToCardapioUrl('/gestao/nexsyn-cmc6u1ef/cardapio')).toBeNull()
   })
 
   it('prefer NEXT_PUBLIC sobre CARDAPIO_PUBLIC_URL', () => {

@@ -27,11 +27,11 @@ import {
   MdPercent,
   MdAnalytics,
   MdMenuBook,
+  MdPrint,
 } from 'react-icons/md'
 import type { IconType } from 'react-icons'
 import { useAcessoFiscal } from '@/src/presentation/hooks/useAcessoFiscal'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
-import { useMenus } from '@/src/presentation/hooks/menus/useMenus'
 import { useDeliveryGestorConfigStatus } from '@/src/presentation/hooks/useDeliveryGestorConfigStatus'
 import { EmpresaDeliveryPendenteGestorModal } from '@/src/presentation/components/features/delivery/EmpresaDeliveryPendenteGestorModal'
 import { matchesModulePath } from '@/src/shared/utils/gestaoRoutes'
@@ -79,18 +79,8 @@ export function TopNav() {
   useEmpresaUrlSync()
   const temAcessoFiscal = useAcessoFiscal()
   const { toGestao } = useGestaoPath()
-  const { data: menusData } = useMenus({ limit: 2 })
   const deliveryGestorConfig = useDeliveryGestorConfigStatus()
 
-  /** Empresa com um único menu: oculta Menus e Produtos aponta para o editor desse menu. */
-  const menuUnicoId = useMemo(() => {
-    const total = menusData?.count ?? menusData?.items?.length ?? 0
-    if (total !== 1) return null
-    const items = menusData?.items ?? []
-    const principal = items.find(m => m.tipo === 'principal')
-    return principal?.id ?? items[0]?.id ?? null
-  }, [menusData])
-  
   // Estado para controlar hidratação (evita hydration mismatch)
   const [isHydrated, setIsHydrated] = useState(false)
   
@@ -105,15 +95,16 @@ export function TopNav() {
   // Prefetch agressivo das rotas mais acessadas na inicialização
   useEffect(() => {
     const routesToPrefetch = [
-      '/grupos-complementos',
-      '/complementos',
-      '/taxas',
+      '/cardapio',
       '/produtos',
       '/grupos-produtos',
+      '/grupos-complementos',
+      '/complementos',
+      '/impressoras',
+      '/taxas',
       '/menus',
       '/estoque',
       '/pedidos',
-      ...(menuUnicoId ? [`/menus/${menuUnicoId}`] : []),
     ]
     
     // Prefetch com delay para não bloquear a renderização inicial
@@ -124,7 +115,7 @@ export function TopNav() {
     }, 100)
 
     return () => clearTimeout(timer)
-  }, [menuUnicoId, router, toGestao])
+  }, [router, toGestao])
 
   // Prefetch de rota ao hover
   const handleLinkHover = useCallback(
@@ -197,18 +188,12 @@ export function TopNav() {
   }
 
   const menuItems: MenuItem[] = useMemo(() => {
-    const cardapioChildren: ChildMenuItem[] = [
-      ...(menuUnicoId
-        ? []
-        : [{ name: 'Menus', path: '/menus', icon: MdMenuBook }]),
+    const cadastrosChildren: ChildMenuItem[] = [
+      { name: 'Produtos', path: '/produtos', icon: MdShoppingBag },
       { name: 'Categorias', path: '/grupos-produtos', icon: MdCategory },
-      {
-        name: 'Produtos',
-        path: menuUnicoId ? `/menus/${menuUnicoId}` : '/produtos',
-        icon: MdShoppingBag,
-      },
       { name: 'Grupo de Complementos', path: '/grupos-complementos', icon: MdCategory },
       { name: 'Complementos', path: '/complementos', icon: MdAddCircle },
+      { name: 'Impressoras', path: '/impressoras', icon: MdPrint },
     ]
 
     const items: MenuItem[] = [
@@ -218,10 +203,15 @@ export function TopNav() {
         icon: MdDashboard,
       },
       {
-        name: 'Cardápio',
+        name: 'Cadastros',
         path: '#',
-        icon: MdShoppingBag,
-        children: cardapioChildren,
+        icon: MdInventory2,
+        children: cadastrosChildren,
+      },
+      {
+        name: 'Cardápio',
+        path: '/cardapio',
+        icon: MdMenuBook,
       },
       {
         name: 'Pessoas',
@@ -255,11 +245,17 @@ export function TopNav() {
       return items.filter(item => item.path !== '/portal-contador')
     }
     return items
-  }, [menuUnicoId, temAcessoFiscal])
+  }, [temAcessoFiscal])
 
   const isMenuActive = (item: typeof menuItems[0]) => {
     if (item.path === '/configuracoes/empresa') {
       return isConfiguracoesModulePath(pathname ?? '')
+    }
+    if (item.path === '/cardapio') {
+      return (
+        matchesModulePath(pathname ?? '', '/cardapio') ||
+        matchesModulePath(pathname ?? '', '/menus')
+      )
     }
     if (item.path !== '#') {
       return matchesModulePath(pathname ?? '', item.path)
