@@ -1125,7 +1125,7 @@ export function DeliveryCheckoutEnderecoFormModal({
         />
       </DeliveryCheckoutShellFooter>
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         <h2 className="text-center text-base font-semibold leading-snug delivery-text-primary">
           {TITULO_BUSCA_ENDERECO}
         </h2>
@@ -1144,6 +1144,17 @@ export function DeliveryCheckoutEnderecoFormModal({
           bias={placesBias}
           disabled={salvando || formOverlayOpen}
         />
+
+        <div className="-mt-3 flex justify-end">
+          <button
+            type="button"
+            disabled={salvando || formOverlayOpen}
+            onClick={iniciarPreenchimentoManual}
+            className="text-[11px] font-medium underline-offset-2 delivery-text-secondary hover:underline disabled:opacity-60"
+          >
+            Digitar endereço manualmente
+          </button>
+        </div>
 
         {mostrarOpcaoManual ? (
           <button
