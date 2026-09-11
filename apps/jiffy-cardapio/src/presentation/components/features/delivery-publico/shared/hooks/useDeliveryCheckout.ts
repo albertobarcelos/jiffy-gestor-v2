@@ -149,13 +149,20 @@ function limparLookupEstadoIncompleto(
   }))
 }
 
-export function useDeliveryCheckout(slug: string) {
+export function useDeliveryCheckout(
+  slug: string,
+  options?: { fetchMeiosPagamento?: boolean }
+) {
+  const fetchMeiosPagamento = options?.fetchMeiosPagamento ?? false
   const itens = useDeliveryCarrinhoItens(slug)
   const total = useDeliveryCarrinhoTotal(slug)
   const limpar = useDeliveryCarrinhoStore(s => s.limpar)
   const setTipoEntregaPreferencia = useDeliveryPreferenciaEntregaStore(s => s.setTipoEntrega)
 
-  const { data: meiosData, isLoading: loadingMeios } = usePublicDeliveryMeiosPagamento(slug)
+  const { data: meiosData, isLoading: loadingMeios } = usePublicDeliveryMeiosPagamento(
+    slug,
+    fetchMeiosPagamento
+  )
 
   const [form, setForm] = useState<CheckoutFormData>(() =>
     createInitialForm(

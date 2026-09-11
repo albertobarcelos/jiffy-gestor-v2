@@ -242,8 +242,8 @@ export function useAutoFetchCatalogoGrupos(
 }
 
 /**
- * Garante cache de complementos (offset=0) quando ausente —
- * ex.: refresh na página 2 ou acesso direto ao carrinho/modal.
+ * Garante cache de complementos quando ausente (modal/carrinho).
+ * Reusa a infinite query do catálogo (mesma query key) — sem GET offset=0 paralelo.
  */
 export function useEnsureComplementosCatalogo(slug: string, enabled = true) {
   const cache = usePublicDeliveryComplementosStore(s => s.porSlug[slug] ?? null)
@@ -254,20 +254,22 @@ export function useEnsureComplementosCatalogo(slug: string, enabled = true) {
     if (slug) hidratarDoStorage(slug)
   }, [slug, hidratarDoStorage])
 
-  return useQuery({
-    queryKey: ['public-delivery', slug, 'catalogo', 'complementos-bootstrap'] as const,
-    queryFn: async () => {
-      const data = await fetchCatalogoPublico(slug, {
-        offset: 0,
-        limit: CATALOGO_GRUPOS_PAGE_LIMIT,
-      })
-      persistirComplementosPrimeiraPagina(slug, 0, data.catalogo, salvarComplementos)
-      return data
-    },
-    enabled: enabled && !!slug && !cache,
-    staleTime: 60_000,
-    retry: catalogoRetry,
-  })
+  const precisaCatalogo = Boolean(enabled && slug && !cache)
+  const infinite = usePublicDeliveryCatalogInfinite(slug, precisaCatalogo)
+
+  useEffect(() => {
+    if (!slug || cache) return
+    const catalogo = infinite.data?.pages[0]?.catalogo
+    if (!catalogo) return
+    persistirComplementosPrimeiraPagina(slug, 0, catalogo, salvarComplementos)
+  }, [slug, cache, infinite.data, salvarComplementos])
+
+  return {
+    isLoading: Boolean(precisaCatalogo && !cache && infinite.isLoading),
+    isFetching: infinite.isFetching,
+    isError: infinite.isError,
+    error: infinite.error,
+  }
 }
 
 export function usePublicDeliveryMeiosPagamento(slug: string, enabled = true) {

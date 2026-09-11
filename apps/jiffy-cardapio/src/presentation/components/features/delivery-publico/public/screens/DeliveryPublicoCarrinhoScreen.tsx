@@ -5,7 +5,6 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { MdClose } from 'react-icons/md'
 import {
   flattenCatalogoGrupos,
-  useAutoFetchCatalogoGrupos,
   usePublicDeliveryCatalogInfinite,
 } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import { showToast } from '@/src/shared/utils/toast'
@@ -149,7 +148,13 @@ export function DeliveryPublicoCarrinhoScreen({
     limparCarrinhoAposPedido,
     foraCoberturaDialogAberto,
     fecharForaCoberturaDialog,
-  } = useDeliveryCheckout(slug)
+  } = useDeliveryCheckout(slug, {
+    fetchMeiosPagamento:
+      checkoutStep === 'pagamento' ||
+      checkoutStep === 'revisao' ||
+      checkoutStep === 'sucesso' ||
+      checkoutStep === 'pedidoDetalhe',
+  })
 
   const quantidadeItens = useMemo(
     () => itens.reduce((acc, item) => acc + item.quantidade, 0),
@@ -162,7 +167,6 @@ export function DeliveryPublicoCarrinhoScreen({
   )
 
   const catalogQuery = usePublicDeliveryCatalogInfinite(slug)
-  useAutoFetchCatalogoGrupos(catalogQuery)
 
   const empresa = catalogQuery.data?.pages[0]?.empresa ?? null
   const enderecoEmpresaTexto = formatEmpresaPublicaEndereco(empresa?.endereco ?? null)
