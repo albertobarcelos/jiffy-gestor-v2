@@ -270,16 +270,18 @@ pub fn restaurar(app: &AppHandle) {
     sincronizar_whatsapp(app);
 }
 
-/// Minimizar: bolha + bandeja, sem botão na barra de tarefas.
+/// Minimizar: bolha + bandeja + botão na barra de tarefas (a janela fica icónica).
 pub fn minimizar_para_bolha(app: &AppHandle) {
     if modo() == MODO_BOLHA {
         return;
     }
     MODO.store(MODO_BOLHA, Ordering::Relaxed);
-    esconder_principal(app);
+    if let Some(main) = janela_main(app) {
+        let _ = main.set_skip_taskbar(false);
+    }
     aplicar_visibilidade(app);
     sincronizar_whatsapp(app);
-    eprintln!("Fredy minimizado — bolha e bandeja");
+    eprintln!("Fredy minimizado — bolha, bandeja e barra de tarefas");
 }
 
 /// Fechar no X: só bandeja, sem bolha. Sair de verdade é o menu da bandeja.
@@ -399,6 +401,8 @@ pub fn no_evento(window: &tauri::Window, event: &WindowEvent) {
             WindowEvent::Resized(_) | WindowEvent::Moved(_) | WindowEvent::Focused(_) => {
                 if modo() == MODO_VISIVEL && principal_minimizada(window.app_handle()) {
                     minimizar_para_bolha(window.app_handle());
+                } else if modo() == MODO_BOLHA && !principal_minimizada(window.app_handle()) {
+                    restaurar(window.app_handle());
                 } else {
                     aplicar_visibilidade(window.app_handle());
                 }
