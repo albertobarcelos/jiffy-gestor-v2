@@ -32,7 +32,6 @@ type DeliveryCheckoutEnderecoGeoModalProps = {
   endereco: EnderecoClienteDeliveryPublicoDTO
   enderecoFallback?: EnderecoGeocodeFallback
   onCancelar: () => void
-  onEditar: () => void
   onConfirmar: (geo: EnderecoGeoCheckoutInput) => Promise<boolean | 'fora_cobertura' | void>
 }
 
@@ -52,7 +51,6 @@ export function DeliveryCheckoutEnderecoGeoModal({
   endereco,
   enderecoFallback,
   onCancelar,
-  onEditar,
   onConfirmar,
 }: DeliveryCheckoutEnderecoGeoModalProps) {
   const [salvando, setSalvando] = useState(false)
@@ -242,15 +240,6 @@ export function DeliveryCheckoutEnderecoGeoModal({
               <p className="font-semibold delivery-text-primary">Endereço selecionado</p>
               <p className="mt-1 delivery-text-secondary">{resumoEndereco}</p>
             </div>
-            <button
-              type="button"
-              onClick={onEditar}
-              disabled={salvando}
-              className="shrink-0 text-sm font-semibold underline disabled:opacity-50"
-              style={{ color: 'var(--delivery-primary-dark, #111)' }}
-            >
-              Editar
-            </button>
           </div>
         </div>
 

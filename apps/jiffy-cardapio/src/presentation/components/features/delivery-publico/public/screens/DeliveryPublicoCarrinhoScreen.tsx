@@ -126,7 +126,6 @@ export function DeliveryPublicoCarrinhoScreen({
     selecionarEnderecoExistente,
     usarNovoEndereco,
     restaurarEnderecoSelecaoCancelada,
-    preencherFormParaEditarEndereco,
     removerEnderecoCliente,
     consultarClientePorTelefone,
     confirmarNovoEndereco,
@@ -527,25 +526,6 @@ export function DeliveryPublicoCarrinhoScreen({
     goToCheckoutStep('enderecoForm')
   }
 
-  const handleEditarEnderecoSelecionado = (
-    origem: 'identificacao' | 'revisao' = 'identificacao'
-  ) => {
-    if (!enderecoClienteSelecionado) {
-      handleTrocarEndereco(origem)
-      return
-    }
-    if (origem === 'revisao') {
-      setVoltarParaRevisao(true)
-      setVoltarParaIdentificacao(false)
-    } else {
-      setVoltarParaIdentificacao(true)
-      setVoltarParaRevisao(false)
-    }
-    setOrigemFormEndereco('identificacao')
-    preencherFormParaEditarEndereco(enderecoClienteSelecionado)
-    goToCheckoutStep('enderecoForm')
-  }
-
   const handleTrocarEndereco = (origem: 'identificacao' | 'revisao' = 'identificacao') => {
     if (origem === 'revisao') {
       setVoltarParaRevisao(true)
@@ -578,21 +558,6 @@ export function DeliveryPublicoCarrinhoScreen({
     }
     setOrigemFormEndereco(origem === 'identificacao' ? 'identificacao' : 'novo')
     usarNovoEndereco()
-    goToCheckoutStep('enderecoForm')
-  }
-
-  const handleEditarEnderecoDesdeGeo = () => {
-    if (!enderecoClienteSelecionado) return
-    setOrigemFormEndereco('geo')
-    preencherFormParaEditarEndereco(enderecoClienteSelecionado)
-    goToCheckoutStep('enderecoForm')
-  }
-
-  const handleEditarEnderecoDaLista = (
-    endereco: NonNullable<typeof clienteLookup.cliente>['enderecos'][number]
-  ) => {
-    setOrigemFormEndereco('lista')
-    preencherFormParaEditarEndereco(endereco)
     goToCheckoutStep('enderecoForm')
   }
 
@@ -950,15 +915,11 @@ export function DeliveryPublicoCarrinhoScreen({
             quantidadeEnderecos={quantidadeEnderecosCliente}
             enderecoEmpresaTexto={enderecoEmpresaTexto}
             localizacaoEmpresa={localizacaoEmpresa}
-            taxaEntregaOficial={taxaEntregaOficial}
-            cotacaoLoading={cotacaoLoading}
-            cotacaoPronta={cotacaoPronta}
             onChangeTelefone={value => updateForm('telefone', value)}
             onChangeTelefonePais={iso2 => updateForm('telefonePaisIso2', iso2)}
             onConsultarTelefone={consultarTelefoneAtual}
             onChangeNome={value => updateForm('nome', value)}
             onChangeOpcaoEntrega={handleChangeOpcaoEntrega}
-            onEditarEndereco={() => handleEditarEnderecoSelecionado('identificacao')}
             onTrocarEndereco={() => handleTrocarEndereco('identificacao')}
             onCadastrarEndereco={() => handleNovoEnderecoDesdeIdentificacao('identificacao')}
             novoEnderecoBloqueado={novoEnderecoBloqueado}
@@ -977,7 +938,6 @@ export function DeliveryPublicoCarrinhoScreen({
             onClose={fecharOuRevisao}
             onSelecionar={handleSelecionarEndereco}
             onUsarNovoEndereco={handleUsarNovoEndereco}
-            onEditar={handleEditarEnderecoDaLista}
             onRemover={handleRemoverEnderecoDaLista}
             novoEnderecoBloqueado={novoEnderecoBloqueado}
           />
@@ -986,9 +946,7 @@ export function DeliveryPublicoCarrinhoScreen({
         {checkoutStep === 'enderecoForm' ? (
           <DeliveryCheckoutEnderecoFormModal
             form={form}
-            enderecoSalvo={
-              form.modoEndereco === 'existente' ? enderecoClienteSelecionado : null
-            }
+            enderecoSalvo={null}
             enderecosCadastrados={clienteLookup.cliente?.enderecos ?? []}
             localizacaoEmpresa={localizacaoEmpresa}
             onSelecionarEnderecoCadastrado={handleSelecionarEndereco}
@@ -1008,7 +966,6 @@ export function DeliveryPublicoCarrinhoScreen({
               estado: empresa?.endereco?.estado ?? null,
             }}
             onCancelar={handleCancelarGeoEndereco}
-            onEditar={handleEditarEnderecoDesdeGeo}
             onConfirmar={handleConfirmarGeoEndereco}
           />
         ) : null}
@@ -1059,7 +1016,7 @@ export function DeliveryPublicoCarrinhoScreen({
             }}
             onEditarTipoEntrega={() => abrirStepDaRevisao('telefone')}
             onEditarCliente={() => abrirStepDaRevisao('telefone')}
-            onEditarEndereco={() => handleEditarEnderecoSelecionado('revisao')}
+            onEditarEndereco={() => handleTrocarEndereco('revisao')}
             onEditarPedido={() => {
               setVoltarParaRevisao(false)
               setVoltarParaIdentificacao(false)

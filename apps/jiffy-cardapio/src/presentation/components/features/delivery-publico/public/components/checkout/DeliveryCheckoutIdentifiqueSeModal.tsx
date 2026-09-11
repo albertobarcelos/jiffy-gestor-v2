@@ -45,16 +45,12 @@ type DeliveryCheckoutIdentifiqueSeModalProps = {
   quantidadeEnderecos?: number
   enderecoEmpresaTexto: string | null
   localizacaoEmpresa?: GeoJsonPoint | null
-  taxaEntregaOficial?: number | null
-  cotacaoLoading?: boolean
-  cotacaoPronta?: boolean
   onChangeTelefone: (value: string) => void
   onChangeTelefonePais?: (iso2: string) => void
   /** Busca manual (10 dígitos): blur do input ou Enter/OK do teclado. */
   onConsultarTelefone?: () => void
   onChangeNome: (value: string) => void
   onChangeOpcaoEntrega: (opcao: ModoEntregaOpcao) => void
-  onEditarEndereco: () => void
   onTrocarEndereco: () => void
   onCadastrarEndereco: () => void
   /** Cliente no limite de endereços — botão “Novo endereço” visualmente bloqueado. */
@@ -80,14 +76,10 @@ export function DeliveryCheckoutIdentifiqueSeModal({
   quantidadeEnderecos = 0,
   enderecoEmpresaTexto,
   localizacaoEmpresa = null,
-  taxaEntregaOficial = null,
-  cotacaoLoading = false,
-  cotacaoPronta = false,
   onChangeTelefone,
   onConsultarTelefone,
   onChangeNome,
   onChangeOpcaoEntrega,
-  onEditarEndereco,
   onTrocarEndereco,
   onCadastrarEndereco,
   novoEnderecoBloqueado = false,
@@ -443,11 +435,7 @@ export function DeliveryCheckoutIdentifiqueSeModal({
             quantidadeEnderecos={quantidadeEnderecos}
             enderecoEmpresaTexto={enderecoEmpresaTexto}
             localizacaoEmpresa={localizacaoEmpresa}
-            taxaEntregaOficial={taxaEntregaOficial}
-            cotacaoLoading={cotacaoLoading}
-            cotacaoPronta={cotacaoPronta}
             onChangeOpcao={onChangeOpcaoEntrega}
-            onEditarEndereco={onEditarEndereco}
             onTrocarEndereco={onTrocarEndereco}
             onCadastrarEndereco={onCadastrarEndereco}
             novoEnderecoBloqueado={novoEnderecoBloqueado}

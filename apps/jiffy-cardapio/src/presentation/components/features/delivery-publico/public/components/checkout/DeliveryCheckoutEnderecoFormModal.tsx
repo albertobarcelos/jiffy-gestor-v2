@@ -166,10 +166,6 @@ export function DeliveryCheckoutEnderecoFormModal({
   const [enderecoLocalizacao, setEnderecoLocalizacao] = useState<GeoJsonPoint | null>(() =>
     geoInicialDoEnderecoSalvo(enderecoSalvo).enderecoLocalizacao
   )
-  /** Geocode original do texto do endereço — âncora fixa do limite de 500 m do pin. */
-  const [localizacaoAncoraGeocode, setLocalizacaoAncoraGeocode] = useState<GeoJsonPoint | null>(
-    null
-  )
   const [providerEnderecoId, setProviderEnderecoId] = useState<string | null>(
     () => geoInicialDoEnderecoSalvo(enderecoSalvo).providerEnderecoId
   )
@@ -257,13 +253,6 @@ export function DeliveryCheckoutEnderecoFormModal({
       return null
     })
   }, [origemGeo, enderecoLocalizacao, formOverlayOpen, enderecoGeoKey, form.numero])
-
-  /** Texto do endereço mudou → âncora do limite precisa ser recalculada no próximo geocode. */
-  useEffect(() => {
-    if (!formOverlayOpen) return
-    if (ultimoGeoKeySincronizado !== null) return
-    setLocalizacaoAncoraGeocode(null)
-  }, [formOverlayOpen, ultimoGeoKeySincronizado])
 
   const focarCampo = useCallback((campo: CampoEnderecoFoco) => {
     const refMap: Record<CampoEnderecoFoco, React.RefObject<HTMLInputElement | null>> = {
@@ -354,7 +343,6 @@ export function DeliveryCheckoutEnderecoFormModal({
 
   const aplicarGeoEncontrada = (point: GeoJsonPoint, providerId?: string | null) => {
     setEnderecoLocalizacao(point)
-    setLocalizacaoAncoraGeocode(point)
     setProviderEnderecoId(providerId ?? null)
     setDialogPinAberto(false)
     setPinMovido(false)
@@ -390,14 +378,12 @@ export function DeliveryCheckoutEnderecoFormModal({
 
     if (numeroFinal && ruaFinal) {
       setEnderecoLocalizacao(place.enderecoLocalizacao)
-      setLocalizacaoAncoraGeocode(place.enderecoLocalizacao)
       setProviderEnderecoId(place.providerEnderecoId)
       marcarGeoSincronizada(enderecoParaSync)
       setAguardandoNumeroObrigatorio(false)
       focoPendenteRef.current = null
     } else {
       setEnderecoLocalizacao(null)
-      setLocalizacaoAncoraGeocode(null)
       setProviderEnderecoId(null)
       setUltimoGeoKeySincronizado(null)
       if (!ruaFinal) {
@@ -435,7 +421,6 @@ export function DeliveryCheckoutEnderecoFormModal({
     onChange('complemento', '')
     onChange('pontoReferencia', '')
     setEnderecoLocalizacao(null)
-    setLocalizacaoAncoraGeocode(null)
     setProviderEnderecoId(null)
     setUltimoGeoKeySincronizado(null)
     setOrigemGeo(null)
@@ -462,7 +447,6 @@ export function DeliveryCheckoutEnderecoFormModal({
     setPinMovido(false)
     setDialogPinAberto(false)
     setEnderecoLocalizacao(null)
-    setLocalizacaoAncoraGeocode(null)
     setProviderEnderecoId(null)
     setUltimoGeoKeySincronizado(null)
     setFormOverlayOpen(true)
@@ -545,18 +529,8 @@ export function DeliveryCheckoutEnderecoFormModal({
         return
       }
 
-      // Reusa a coordenada já salva/sincronizada (ex.: editar endereço sem alterar o form).
-      // Só geocodifica de novo quando não há pin válido ou o texto do endereço mudou.
-      // A âncora do limite de 500 m é sempre o geocode do texto — não o último pin.
+      // Reusa a coordenada já sincronizada; só geocodifica de novo se o texto mudou.
       if (enderecoLocalizacao && geoSincronizadaComEndereco) {
-        let ancora = localizacaoAncoraGeocode
-        if (!ancora) {
-          const resultadoAncora = await geocodificarEnderecoViaGoogle(enderecoGeocode, {
-            minimo: 'flexivel',
-          })
-          ancora = resultadoAncora.enderecoLocalizacao
-          setLocalizacaoAncoraGeocode(ancora)
-        }
         pinAntesRef.current = enderecoLocalizacao
         providerAntesRef.current = providerEnderecoId
         setPinMovido(false)
@@ -571,7 +545,6 @@ export function DeliveryCheckoutEnderecoFormModal({
       const pin = resultado.enderecoLocalizacao
       const providerId = resultado.providerEnderecoId
       setEnderecoLocalizacao(pin)
-      setLocalizacaoAncoraGeocode(pin)
       setProviderEnderecoId(providerId)
       marcarGeoSincronizada()
       pinAntesRef.current = pin
@@ -1277,7 +1250,6 @@ export function DeliveryCheckoutEnderecoFormModal({
       <DeliveryCheckoutEnderecoMapaModal
         open={mapaModalOpen}
         localizacao={enderecoLocalizacao}
-        localizacaoAncora={localizacaoAncoraGeocode}
         pinMovido={pinMovido}
         salvando={salvando}
         dialogPinAberto={dialogPinAberto}

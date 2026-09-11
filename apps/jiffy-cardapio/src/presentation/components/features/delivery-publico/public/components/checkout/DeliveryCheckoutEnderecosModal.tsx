@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Home, MapPin, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Home, MapPin, Plus, Trash2 } from 'lucide-react'
 import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import { formatarResumoEnderecoPublico } from '../../../shared/utils/garantirEnderecoClientePublico'
@@ -21,7 +21,6 @@ type DeliveryCheckoutEnderecosModalProps = {
   onClose: () => void
   onSelecionar: (enderecoId: string) => void
   onUsarNovoEndereco: () => void
-  onEditar: (endereco: EnderecoClienteDeliveryPublicoDTO) => void
   onRemover: (enderecoId: string) => Promise<void> | void
   /** Cliente no limite — botão visualmente bloqueado, mas ainda clicável para o aviso. */
   novoEnderecoBloqueado?: boolean
@@ -34,7 +33,6 @@ export function DeliveryCheckoutEnderecosModal({
   onClose,
   onSelecionar,
   onUsarNovoEndereco,
-  onEditar,
   onRemover,
   novoEnderecoBloqueado = false,
 }: DeliveryCheckoutEnderecosModalProps) {
@@ -118,18 +116,6 @@ export function DeliveryCheckoutEnderecosModal({
                       {etiquetaEnderecoPublicoLabel(endereco.etiqueta)}
                     </span>
                     <div className="-mr-1 ml-auto flex shrink-0 items-center gap-0.5">
-                      <button
-                        type="button"
-                        aria-label={`Editar endereço ${endereco.rua}`}
-                        disabled={removendo}
-                        onClick={e => {
-                          e.stopPropagation()
-                          onEditar(endereco)
-                        }}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg delivery-text-primary disabled:opacity-50"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
                       <button
                         type="button"
                         aria-label={`Remover endereço ${endereco.rua}`}

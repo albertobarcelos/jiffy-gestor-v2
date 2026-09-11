@@ -11,10 +11,6 @@ import { DeliveryCheckoutPinAjustadoDialog } from './DeliveryCheckoutPinAjustado
 type DeliveryCheckoutEnderecoMapaModalProps = {
   open: boolean
   localizacao: GeoJsonPoint | null
-  /** Geocode original do endereço — centro do limite de arraste do pin. */
-  localizacaoAncora?: GeoJsonPoint | null
-  /** Raio máximo (m) a partir da âncora. Padrão: 500. */
-  limiteArrasteMetros?: number
   pinMovido: boolean
   salvando?: boolean
   dialogPinAberto: boolean
@@ -26,17 +22,13 @@ type DeliveryCheckoutEnderecoMapaModalProps = {
   resumoEndereco?: string
 }
 
-const LIMITE_ARRASTE_PIN_METROS_PADRAO = 500
-
 /**
  * Modal do mapa sobre o formulário (portal no body): pin no endereço digitado;
- * arrastar só altera coordenadas (limitado ao raio da âncora do geocode).
+ * arrastar altera só as coordenadas (sem limite de raio).
  */
 export function DeliveryCheckoutEnderecoMapaModal({
   open,
   localizacao,
-  localizacaoAncora = null,
-  limiteArrasteMetros = LIMITE_ARRASTE_PIN_METROS_PADRAO,
   pinMovido,
   salvando = false,
   dialogPinAberto,
@@ -123,8 +115,6 @@ export function DeliveryCheckoutEnderecoMapaModal({
             overlayHintClassName="rounded-lg bg-white/95 px-3 py-2 text-center text-xs delivery-text-secondary shadow-sm"
             mapContainerStyle={{ width: '100%', height: '100%' }}
             balaoArrastarTexto="Você está aqui?"
-            ancoraLimiteArraste={localizacaoAncora}
-            limiteArrasteMetros={limiteArrasteMetros}
           />
           <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center px-4">
             <p
@@ -136,7 +126,7 @@ export function DeliveryCheckoutEnderecoMapaModal({
             >
               {pinMovido
                 ? 'Pin movido — o endereço digitado não será alterado'
-                : `Arraste o pin até ${limiteArrasteMetros} m do endereço`}
+                : 'Arraste o pin para ajustar a localização'}
             </p>
           </div>
         </div>

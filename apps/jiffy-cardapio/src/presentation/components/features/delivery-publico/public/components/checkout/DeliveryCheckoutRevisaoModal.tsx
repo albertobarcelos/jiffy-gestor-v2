@@ -61,6 +61,7 @@ type DeliveryCheckoutRevisaoModalProps = {
   onVoltar: () => void
   onEditarTipoEntrega?: () => void
   onEditarCliente?: () => void
+  /** Abre troca/lista de endereços (endereço salvo não é editável). */
   onEditarEndereco?: () => void
   onEditarPedido?: () => void
   onEditarPagamento?: () => void
@@ -308,7 +309,7 @@ export function DeliveryCheckoutRevisaoModal({
           icone={<MapPin className="h-5 w-5 text-black" />}
           label={isEntrega ? 'Seu endereço:' : 'Retirada no local:'}
           onEditar={somenteLeitura || !isEntrega ? undefined : onEditarEndereco}
-          editLabel="Editar endereço"
+          editLabel="Trocar endereço"
         >
           {isEntrega && enderecoCliente ? (
             <>
