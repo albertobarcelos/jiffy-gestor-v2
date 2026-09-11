@@ -17,12 +17,35 @@ describe('validarInformacoesPedidoEntrega', () => {
         enderecoEntregaCoberturaStatus: 'fora',
       })
     ).toBeNull()
+  })
+
+  it('bloqueia Pagamento enquanto a taxa automática está calculando', () => {
+    expect(
+      validarInformacoesPedidoEntrega({
+        ...base,
+        enderecoEntregaTemGeo: true,
+        enderecoEntregaCoberturaStatus: 'pendente',
+        taxaEntregaOverride: 'automatica',
+      })?.message
+    ).toMatch(/aguarde o cálculo da taxa/i)
+  })
+
+  it('libera Pagamento se o atendente escolher outra taxa durante o cálculo', () => {
+    expect(
+      validarInformacoesPedidoEntrega({
+        ...base,
+        enderecoEntregaTemGeo: true,
+        enderecoEntregaCoberturaStatus: 'pendente',
+        taxaEntregaOverride: 'catalogo',
+      })
+    ).toBeNull()
 
     expect(
       validarInformacoesPedidoEntrega({
         ...base,
         enderecoEntregaTemGeo: true,
         enderecoEntregaCoberturaStatus: 'pendente',
+        taxaEntregaOverride: 'sem_taxa',
       })
     ).toBeNull()
   })

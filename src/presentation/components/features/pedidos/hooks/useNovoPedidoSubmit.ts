@@ -38,13 +38,21 @@ export function useNovoPedidoSubmitGuard(isPending: boolean) {
   }
 }
 
-export function useNovoPedidoResetOnExit(resetForm: () => void, onAfterClose?: () => void) {
+export function useNovoPedidoResetOnExit(
+  resetForm: () => void,
+  onAfterClose?: () => void,
+  deveResetar?: () => boolean
+) {
   const resetFormRef = useRef(resetForm)
   resetFormRef.current = resetForm
+  const deveResetarRef = useRef(deveResetar)
+  deveResetarRef.current = deveResetar
 
   /** Após o Slide de saída: evita reset síncrono que quebra a animação e notifica o pai. */
   return useCallback(() => {
-    resetFormRef.current()
+    if (deveResetarRef.current?.() !== false) {
+      resetFormRef.current()
+    }
     onAfterClose?.()
   }, [onAfterClose])
 }
@@ -64,6 +72,7 @@ export interface UseNovoPedidoSubmitParams {
     temEnderecoEntrega: boolean
     enderecoEntregaTemGeo?: boolean
     enderecoEntregaCoberturaStatus?: 'ok' | 'fora' | 'pendente' | 'indisponivel' | null
+    taxaEntregaOverride?: 'automatica' | 'sem_taxa' | 'catalogo'
     troco: number
   }
   createVendaGestor: {
@@ -133,6 +142,7 @@ export function useNovoPedidoSubmit({
       temEnderecoEntrega: validacao.temEnderecoEntrega,
       enderecoEntregaTemGeo: validacao.enderecoEntregaTemGeo,
       enderecoEntregaCoberturaStatus: validacao.enderecoEntregaCoberturaStatus,
+      taxaEntregaOverride: validacao.taxaEntregaOverride,
       pedidoGestorComPagamentoNoPasso3: validacao.pedidoGestorComPagamentoNoPasso3,
       pedidoEntregaAceitaPagamentoPendente: validacao.pedidoEntregaAceitaPagamentoPendente,
       pagamentosCount: input.pagamentos.length,

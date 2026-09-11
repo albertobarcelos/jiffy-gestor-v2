@@ -2,10 +2,19 @@ import { ApiClient, ApiError, mensagemLegivelApiError } from '@/src/infrastructu
 import type { CotacaoPedidoDeliveryBackendRequest } from '@/src/application/dto/api/cotacaoPedidoDeliveryApi'
 import type { ICotacaoPedidoDeliveryRepository } from '@/src/domain/repositories/ICotacaoPedidoDeliveryRepository'
 
+const SLUG_CACHE_TTL_MS = 1000 * 60 * 5
+const slugCache = new Map<string, { slug: string; expiraEm: number }>()
+
 export class CotacaoPedidoDeliveryRepository implements ICotacaoPedidoDeliveryRepository {
   constructor(private readonly api = new ApiClient()) {}
 
   async buscarSlugEmpresaDelivery(token: string): Promise<string> {
+    const agora = Date.now()
+    const cached = slugCache.get(token)
+    if (cached && cached.expiraEm > agora) {
+      return cached.slug
+    }
+
     try {
       const response = await this.api.request<{ slug?: unknown }>('/api/v1/delivery/empresas/me', {
         method: 'GET',
@@ -18,6 +27,7 @@ export class CotacaoPedidoDeliveryRepository implements ICotacaoPedidoDeliveryRe
       if (!slug) {
         throw new Error('Configure o slug do cardápio no hub Delivery para cotar a taxa.')
       }
+      slugCache.set(token, { slug, expiraEm: agora + SLUG_CACHE_TTL_MS })
       return slug
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {

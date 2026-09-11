@@ -52,10 +52,12 @@ export interface KanbanBoardRendererProps {
   onEditarProdutos?: (venda: Venda) => void
   onAvancarEtapa: (venda: Venda, colunaAtual: ColunaKanbanId) => void
   onEmitirNfe: (venda: Venda) => void
-  onReimprimirCupomDelivery?: (venda: Venda, colunaAtual: ColunaKanbanId) => void
+  onReimprimirCupomDelivery?: (
+    venda: Venda,
+    colunaAtual: ColunaKanbanId
+  ) => void | Promise<void>
   entregadorPorVendaId: Record<string, string>
   onEntregadorAtualizado: (vendaId: string, entregadorId: string | null) => void
-  onConfirmarCobranca?: (venda: Venda) => void
   nomesMeiosPagamento: Record<string, string>
   reemissaoEmLote?: ReemissaoEmLoteReturn
   superficie: SuperficieQuadroPedidos
@@ -91,7 +93,6 @@ export function KanbanBoardRenderer({
   onReimprimirCupomDelivery,
   entregadorPorVendaId,
   onEntregadorAtualizado,
-  onConfirmarCobranca,
   nomesMeiosPagamento,
   reemissaoEmLote,
   superficie,
@@ -182,7 +183,6 @@ export function KanbanBoardRenderer({
                         definirEntregadorKanbanCache(vendaId, entregadorId)
                         onEntregadorAtualizado(vendaId, entregadorId)
                       }}
-                      onConfirmarCobranca={onConfirmarCobranca}
                       nomesMeiosPagamento={nomesMeiosPagamento}
                     />
                   ))}

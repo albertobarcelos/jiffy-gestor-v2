@@ -16,6 +16,7 @@ import {
   fetchMenuProdutoSnapshot,
   fetchMenuProdutosPagina,
 } from '@/src/infrastructure/api/repositories/menuCatalogFetch'
+import { salvarPedidoDeliveryDetalheCache } from '@/src/infrastructure/api/pedidoDeliveryDetalheCache'
 
 async function fetchJson<T>(url: string, token: string, init?: RequestInit): Promise<T> {
   const response = await fetchGestorApi(url, {
@@ -223,14 +224,7 @@ export class NovoPedidoReadRepository implements INovoPedidoReadRepository {
       `/api/delivery/pedidos/${encodeURIComponent(pedidoId)}`,
       token
     )
-    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-      const o = raw as Record<string, unknown>
-      if (o.data != null && typeof o.data === 'object' && !Array.isArray(o.data)) {
-        return o.data as Record<string, unknown>
-      }
-      return o
-    }
-    return {}
+    return salvarPedidoDeliveryDetalheCache(pedidoId, raw)
   }
 
   async patchPedidoDelivery(

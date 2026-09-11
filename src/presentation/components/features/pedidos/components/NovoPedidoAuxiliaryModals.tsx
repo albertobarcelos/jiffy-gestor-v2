@@ -63,6 +63,7 @@ export function NovoPedidoAuxiliaryModals() {
     handleReloadClienteEntregaAposEdicao,
     handleSelectCliente,
     handleTabChangeClienteTabsModalEntrega,
+    telefoneBuscaEntrega,
     indiceLinhaPainelProduto,
     painelLinhaModo,
     produtoIndexEdicao,
@@ -93,6 +94,8 @@ export function NovoPedidoAuxiliaryModals() {
             onClose={() => setSeletorClienteOpen(false)}
             onSelect={handleSelectCliente}
             title={tipoInicioPedido === 'entrega' ? 'Selecionar cliente' : undefined}
+            cadastroRapido={tipoInicioPedido === 'entrega'}
+            telefoneCadastro={tipoInicioPedido === 'entrega' ? telefoneBuscaEntrega : ''}
           />
         )}
 

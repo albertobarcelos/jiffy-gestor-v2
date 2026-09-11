@@ -17,14 +17,20 @@ import { Input } from '@/src/presentation/components/ui/input'
 import { Label } from '@/src/presentation/components/ui/label'
 import { useClientesInfinite } from '@/src/presentation/hooks/useClientes'
 import { Cliente } from '@/src/domain/entities/Cliente'
-import { MdSearch, MdAdd } from 'react-icons/md'
+import { MdSearch, MdAdd, MdPhone } from 'react-icons/md'
 import {
   ClientesTabsModal,
   ClientesTabsModalState,
 } from '@/src/presentation/components/features/clientes/ClientesTabsModal'
+import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import { useCriarClienteRapido } from '@/src/presentation/hooks/useClientes'
+import { useCriarClienteDeliveryRapido } from '@/src/presentation/hooks/useMoradaTelefone'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
-import { clienteTelefoneContem } from '@/src/shared/utils/telefoneClienteMatch'
+import { clienteTelefoneContem, termoBuscaClientePorTelefone } from '@/src/shared/utils/telefoneClienteMatch'
+import { formatarTelefoneBr, telefoneCelularBrCompleto } from '@/src/shared/utils/telefoneBr'
+import { showToast } from '@/src/shared/utils/toast'
+
 interface SeletorClienteModalProps {
   open: boolean
   onClose: () => void
@@ -33,6 +39,12 @@ interface SeletorClienteModalProps {
   title?: string
   /** Prefenche a busca (número da conversa no Flow). */
   buscaInicial?: string
+  /** Cadastro só com nome + confirmar (WhatsApp / delivery). */
+  cadastroRapido?: boolean
+  /** Telefone da conversa — gravado no cadastro rápido. */
+  telefoneCadastro?: string
+  /** Nome sugerido (título da conversa). */
+  nomeSugerido?: string
 }
 
 export function SeletorClienteModal({
@@ -41,8 +53,13 @@ export function SeletorClienteModal({
   onSelect,
   title = 'Selecionar Cliente',
   buscaInicial = '',
+  cadastroRapido = false,
+  telefoneCadastro = '',
+  nomeSugerido = '',
 }: SeletorClienteModalProps) {
   const invalidate = useInvalidateTenantQueries()
+  const criarCliente = useCriarClienteRapido()
+  const criarClienteDelivery = useCriarClienteDeliveryRapido()
   const [searchText, setSearchText] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<'Todos' | 'Ativo' | 'Desativado'>('Ativo')
@@ -52,6 +69,8 @@ export function SeletorClienteModal({
     mode: 'create',
     clienteId: undefined,
   })
+  const [painelRapidoAberto, setPainelRapidoAberto] = useState(false)
+  const [nomeNovoCliente, setNomeNovoCliente] = useState('')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const loadMoreRef = useRef<HTMLDivElement>(null)
@@ -169,17 +188,67 @@ export function SeletorClienteModal({
   const handleClose = useCallback(() => {
     setSearchText('')
     setDebouncedSearch('')
+    setPainelRapidoAberto(false)
+    setNomeNovoCliente('')
     onClose()
   }, [onClose])
 
+  const telefoneRapidoDigitos = termoBuscaClientePorTelefone(telefoneCadastro)
+  const telefoneRapidoExibicao = telefoneRapidoDigitos
+    ? formatarTelefoneBr(telefoneRapidoDigitos)
+    : ''
+
   const handleOpenNovoCliente = useCallback(() => {
+    if (cadastroRapido) {
+      const busca = searchText.trim()
+      const buscaEhTelefone = termoBuscaClientePorTelefone(busca).length >= 8
+      setNomeNovoCliente(nomeSugerido.trim() || (buscaEhTelefone ? '' : busca))
+      setPainelRapidoAberto(true)
+      return
+    }
     setClienteTabsModalState({
       open: true,
       tab: 'cliente',
       mode: 'create',
       clienteId: undefined,
     })
-  }, [])
+  }, [cadastroRapido, nomeSugerido, searchText])
+
+  const handleSalvarClienteRapido = useCallback(async () => {
+    const nome = nomeNovoCliente.trim()
+    if (!nome) {
+      showToast.warning('Informe o nome do cliente.')
+      return
+    }
+    try {
+      const novo = await criarCliente.mutateAsync({
+        nome,
+        telefone: telefoneRapidoDigitos,
+      })
+      if (telefoneCelularBrCompleto(telefoneRapidoDigitos)) {
+        try {
+          await criarClienteDelivery.mutateAsync({
+            telefone: telefoneRapidoDigitos,
+            nome,
+          })
+        } catch {
+          /* perfil delivery deste telefone já pode existir */
+        }
+      }
+      showToast.success('Cliente cadastrado.')
+      setPainelRapidoAberto(false)
+      setNomeNovoCliente('')
+      handleSelect(novo)
+    } catch {
+      /* erro no hook */
+    }
+  }, [
+    nomeNovoCliente,
+    telefoneRapidoDigitos,
+    criarCliente,
+    criarClienteDelivery,
+    handleSelect,
+  ])
 
   const handleCloseClienteTabsModal = useCallback(() => {
     setClienteTabsModalState(prev => ({
@@ -439,6 +508,64 @@ export function SeletorClienteModal({
         onReload={handleClienteTabsModalReload}
         onTabChange={handleClienteTabsModalTabChange}
       />
+
+      {cadastroRapido ? (
+        <JiffySidePanelModal
+          open={painelRapidoAberto}
+          onClose={() => {
+            setPainelRapidoAberto(false)
+            setNomeNovoCliente('')
+          }}
+          title="Cadastrar cliente"
+          zIndex={1600}
+          panelClassName="w-[min(36rem,94vw)] sm:w-[min(38rem,90vw)]"
+          footerVariant="bar"
+          footerActions={{
+            showSave: true,
+            saveLabel: 'Confirmar',
+            saveLoading: criarCliente.isPending,
+            saveDisabled: criarCliente.isPending || !nomeNovoCliente.trim(),
+            onSave: handleSalvarClienteRapido,
+            showCancel: true,
+            cancelLabel: 'Cancelar',
+            onCancel: () => {
+              setPainelRapidoAberto(false)
+              setNomeNovoCliente('')
+            },
+          }}
+        >
+          <div className="space-y-4 px-4 py-4 text-sm">
+            <div>
+              <Label className="mb-1 block text-xs font-medium text-gray-600">
+                Nome do cliente <span className="text-red-500">*</span>
+              </Label>
+              <input
+                value={nomeNovoCliente}
+                onChange={e => setNomeNovoCliente(e.target.value)}
+                placeholder="Ex.: João Silva"
+                autoFocus
+                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+              />
+            </div>
+            {telefoneRapidoExibicao ? (
+              <div>
+                <Label className="mb-1 block text-xs font-medium text-gray-600">Telefone</Label>
+                <div className="relative">
+                  <MdPhone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <input
+                    value={telefoneRapidoExibicao}
+                    readOnly
+                    className="w-full rounded-md border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm text-gray-500"
+                  />
+                </div>
+                <p className="mt-0.5 text-xs text-gray-400">
+                  Preenchido automaticamente pelo número do atendimento.
+                </p>
+              </div>
+            ) : null}
+          </div>
+        </JiffySidePanelModal>
+      ) : null}
     </Dialog>
   )
 }

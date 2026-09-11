@@ -6,7 +6,11 @@ import { Button } from '@/src/presentation/components/ui/button'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { Label } from '@/src/presentation/components/ui/label'
 import { showToast } from '@/src/shared/utils/toast'
-import { formatarCepMascara, normalizarDigitosCep } from '@/src/shared/utils/consultaCep'
+import {
+  consultarCepViaApi,
+  formatarCepMascara,
+  normalizarDigitosCep,
+} from '@/src/shared/utils/consultaCep'
 import { maiusculasEnderecoInput } from '@/src/shared/utils/normalizarTextoEnderecoPublico'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { JiffyConfirmDialog } from '@/src/presentation/components/ui/jiffy-confirm-dialog'
@@ -344,9 +348,11 @@ export function EntregaClienteSelector({
   const [editandoNome, setEditandoNome] = useState(false)
   const [nomeEmEdicao, setNomeEmEdicao] = useState('')
   const [salvandoNome, setSalvandoNome] = useState(false)
+  const [buscandoCep, setBuscandoCep] = useState(false)
 
   const telefoneInputRef = useRef<HTMLInputElement>(null)
   const nomeInputRef = useRef<HTMLInputElement>(null)
+  const numeroMoradaInputRef = useRef<HTMLInputElement>(null)
   const abrirCadastroCliente = onAbrirCadastroCliente ?? onEditarClientePorDuploClique
   /** Evita blur+salvar quando o clique foi no lápis (que tira o foco do input). */
   const ignorarBlurSalvarNomeRef = useRef(false)
@@ -532,6 +538,7 @@ export function EntregaClienteSelector({
     setPainelMoradaAberto(false)
     setMoradaEditando(null)
     setFormNova(formInicialComEnderecoPadrao(enderecoPadrao))
+    setBuscandoCep(false)
     resetGeoPainelState()
   }, [enderecoPadrao, resetGeoPainelState])
 
@@ -749,6 +756,32 @@ export function EntregaClienteSelector({
     },
     []
   )
+
+  const handleBuscarCep = useCallback(async () => {
+    const cep = normalizarDigitosCep(formNova.cep)
+    if (cep.length !== 8) {
+      showToast.warning('Informe um CEP com 8 dígitos.')
+      return
+    }
+    setBuscandoCep(true)
+    try {
+      const via = await consultarCepViaApi(cep)
+      setFormNova(prev => ({
+        ...prev,
+        cep: formatarCepMascara(via.cep || cep),
+        ...(via.logradouro ? { rua: paraMaiusculaEndereco(via.logradouro) } : {}),
+        ...(via.bairro ? { bairro: paraMaiusculaEndereco(via.bairro) } : {}),
+        ...(via.localidade ? { cidade: paraMaiusculaEndereco(via.localidade) } : {}),
+        ...(via.uf ? { estado: via.uf.toUpperCase().slice(0, 2) } : {}),
+      }))
+      showToast.success('Endereço preenchido pelo CEP.')
+      window.setTimeout(() => numeroMoradaInputRef.current?.focus(), 50)
+    } catch (err) {
+      showToast.error(err instanceof Error ? err.message : 'Não foi possível consultar o CEP.')
+    } finally {
+      setBuscandoCep(false)
+    }
+  }, [formNova.cep])
 
   const handleTipoEtiquetaChange = useCallback((valor: string) => {
     const tipoEtiqueta = normalizarTipoEtiquetaMorada(valor)
@@ -1324,45 +1357,68 @@ export function EntregaClienteSelector({
           </div>
 
           <div>
-            {usarModuloDeliveryClientes ? (
-              <p className="rounded-md border border-gray-100 bg-gray-50 px-3 py-2 text-[11px] text-gray-500">
-                Preencha o endereço. A localização é buscada automaticamente ao salvar, sem alterar o texto digitado.
-              </p>
-            ) : (
-              <EnderecoPlacesAutocomplete
-                variant="gestor"
-                floatingLabel={false}
-                label="Buscar endereço no Google"
-                placeholder="Digite rua, bairro ou cidade…"
-                value={buscaPlacesMorada}
-                onChange={setBuscaPlacesMorada}
-                onSelect={(place: PlaceDetailsResult) => {
-                  const fields = placeDetailsParaEnderecoGeocode(place)
-                  setFormNova(prev => ({
-                    ...prev,
-                    ...(fields.rua ? { rua: paraMaiusculaEndereco(fields.rua) } : {}),
-                    ...(fields.numero ? { numero: paraMaiusculaEndereco(fields.numero) } : {}),
-                    ...(fields.bairro ? { bairro: paraMaiusculaEndereco(fields.bairro) } : {}),
-                    ...(fields.cidade ? { cidade: paraMaiusculaEndereco(fields.cidade) } : {}),
-                    ...(fields.estado ? { estado: fields.estado.toUpperCase().slice(0, 2) } : {}),
-                    ...(fields.cep ? { cep: formatarCepMascara(fields.cep) } : {}),
-                  }))
-                  setMoradaGeo({
-                    enderecoLocalizacao: place.enderecoLocalizacao,
-                    providerEnderecoId: place.providerEnderecoId,
-                  })
-                  setBuscaPlacesMorada(
-                    maiusculasEnderecoInput(
-                      [fields.rua, fields.numero].filter(Boolean).join(', ') ||
-                        place.enderecoFormatado ||
-                        ''
-                    )
-                  )
-                  showToast.success('Endereço aplicado a partir da sugestão do Google.')
+            <Label className="mb-1 block text-xs font-medium text-gray-600">CEP</Label>
+            <div className="flex gap-2">
+              <input
+                value={formNova.cep}
+                onChange={e => handleFormChange('cep', formatarCepMascara(e.target.value))}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    void handleBuscarCep()
+                  }
                 }}
+                placeholder="00000-000"
+                inputMode="numeric"
+                autoComplete="postal-code"
+                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
               />
-            )}
+              <button
+                type="button"
+                onClick={() => void handleBuscarCep()}
+                disabled={buscandoCep || normalizarDigitosCep(formNova.cep).length !== 8}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <MdSearch className="h-4 w-4" />
+                {buscandoCep ? 'Buscando…' : 'Buscar'}
+              </button>
+            </div>
           </div>
+
+          {!usarModuloDeliveryClientes ? (
+            <EnderecoPlacesAutocomplete
+              variant="gestor"
+              floatingLabel={false}
+              label="Buscar endereço no Google"
+              placeholder="Digite rua, bairro ou cidade…"
+              value={buscaPlacesMorada}
+              onChange={setBuscaPlacesMorada}
+              onSelect={(place: PlaceDetailsResult) => {
+                const fields = placeDetailsParaEnderecoGeocode(place)
+                setFormNova(prev => ({
+                  ...prev,
+                  ...(fields.rua ? { rua: paraMaiusculaEndereco(fields.rua) } : {}),
+                  ...(fields.numero ? { numero: paraMaiusculaEndereco(fields.numero) } : {}),
+                  ...(fields.bairro ? { bairro: paraMaiusculaEndereco(fields.bairro) } : {}),
+                  ...(fields.cidade ? { cidade: paraMaiusculaEndereco(fields.cidade) } : {}),
+                  ...(fields.estado ? { estado: fields.estado.toUpperCase().slice(0, 2) } : {}),
+                  ...(fields.cep ? { cep: formatarCepMascara(fields.cep) } : {}),
+                }))
+                setMoradaGeo({
+                  enderecoLocalizacao: place.enderecoLocalizacao,
+                  providerEnderecoId: place.providerEnderecoId,
+                })
+                setBuscaPlacesMorada(
+                  maiusculasEnderecoInput(
+                    [fields.rua, fields.numero].filter(Boolean).join(', ') ||
+                      place.enderecoFormatado ||
+                      ''
+                  )
+                )
+                showToast.success('Endereço aplicado a partir da sugestão do Google.')
+              }}
+            />
+          ) : null}
 
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2">
@@ -1386,6 +1442,7 @@ export function EntregaClienteSelector({
                 Nº <span className="text-red-500">*</span>
               </Label>
               <input
+                ref={numeroMoradaInputRef}
                 value={formNova.numero}
                 onChange={e => handleFormChange('numero', e.target.value)}
                 placeholder="100"
@@ -1401,17 +1458,6 @@ export function EntregaClienteSelector({
               onChange={e => handleFormChange('bairro', e.target.value)}
               placeholder="CENTRO"
               className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-primary/40"
-            />
-          </div>
-
-          <div>
-            <Label className="mb-1 block text-xs font-medium text-gray-600">CEP</Label>
-            <input
-              value={formNova.cep}
-              onChange={e => handleFormChange('cep', formatarCepMascara(e.target.value))}
-              placeholder="00000-000"
-              inputMode="numeric"
-              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
           </div>
 

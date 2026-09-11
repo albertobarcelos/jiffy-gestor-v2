@@ -465,14 +465,10 @@ export function useKanbanOrchestrator() {
     onReimprimirCupomDelivery:
       modoKanbanVendas === 'delivery'
         ? (vendaAtual, colunaAtual) =>
-            void preTransicao.reimprimirCupomEntrega(vendaAtual, colunaAtual)
+            preTransicao.reimprimirCupomEntrega(vendaAtual, colunaAtual)
         : undefined,
     entregadorPorVendaId: entregador.entregadorPorVendaId,
     onEntregadorAtualizado: entregador.handleEntregadorAtualizado,
-    onConfirmarCobranca:
-      modoKanbanVendas === 'delivery'
-        ? vendaAtual => modais.abrirDetalhesPagamentoPedido(vendaAtual)
-        : undefined,
     nomesMeiosPagamento: data.nomesMeiosPagamentoKanban,
     reemissaoEmLote: data.isModoDeliveryKanban ? undefined : reemissaoEmLote,
   }

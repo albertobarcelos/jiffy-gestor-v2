@@ -55,6 +55,7 @@ export function PedidoPagamentoStepView() {
     taxaEntregaId,
     enderecoEntregaCoberturaStatus,
     pedidoComEntrega,
+    moradaEntregaSelecionada,
   } = useNovoPedidoFormContext()
 
   const nomeClienteResumo =
@@ -70,6 +71,7 @@ export function PedidoPagamentoStepView() {
   const modoTaxa = resolverModoTaxaEntregaOverride(taxaEntregaId)
   const taxaPendente =
     pedidoComEntrega &&
+    Boolean(moradaEntregaSelecionada?.id) &&
     modoTaxa === 'automatica' &&
     enderecoEntregaCoberturaStatus === 'pendente'
   const mostrarResumoTaxa = pedidoEntregaAceitaPagamentoPendente && pedidoComEntrega
@@ -209,7 +211,9 @@ export function PedidoPagamentoStepView() {
                     <span className="font-semibold text-gray-900">
                       {taxaPendente
                         ? 'Calculando…'
-                        : `+ ${transformarParaReal(valorTaxaEntrega)}`}
+                        : modoTaxa === 'automatica' && !moradaEntregaSelecionada?.id
+                          ? 'Cadastre o endereço'
+                          : `+ ${transformarParaReal(valorTaxaEntrega)}`}
                     </span>
                   </div>
                 </>
