@@ -261,6 +261,22 @@ export class MenuBffRepository {
       }
     )
   }
+
+  async uploadImagemGrupo(
+    token: string,
+    menuId: string,
+    grupoProdutoId: string,
+    file: File
+  ): Promise<MenuGrupoProduto> {
+    const form = new FormData()
+    form.append('file', file)
+    const data = await fetchBffFormData<{ data: MenuGrupoProduto }>(
+      `/api/menus/${encodeURIComponent(menuId)}/grupos-produtos/${encodeURIComponent(grupoProdutoId)}/imagem`,
+      token,
+      form
+    )
+    return unwrapData(data)
+  }
 }
 
 export const menuBffRepository = new MenuBffRepository()
