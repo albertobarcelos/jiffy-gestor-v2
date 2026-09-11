@@ -70,6 +70,12 @@ export const MENU_PRODUTO_CROP_PRESET = createDeliverySquarePreset(
   'Ajustar imagem do produto'
 )
 
+/** Snapshot de categoria no cardápio (mesmo recorte quadrado do produto). */
+export const MENU_GRUPO_CROP_PRESET = createDeliverySquarePreset(
+  'menu-grupo',
+  'Ajustar imagem da categoria'
+)
+
 /** @deprecated Preferir `DELIVERY_GRUPO_BANNER_CROP_PRESET` no Design (banner 1200×150). */
 export const DELIVERY_GRUPO_PRODUTO_CROP_PRESET = createDeliverySquarePreset(
   'delivery-grupo-produto',

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { MdSearch } from 'react-icons/md'
 import { useMenus } from '@/src/presentation/hooks/menus/useMenus'
@@ -10,12 +11,15 @@ import { MenuListItem } from './MenuListItem'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { showToast } from '@/src/shared/utils/toast'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
+import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { gravarMenuCardapioSessao } from '@/src/shared/utils/menuCardapioSessao'
 import type { Menu } from '@/src/shared/types/menus'
 
 type StatusFilter = 'Todos' | 'Ativo' | 'Inativo'
 
 export function MenusList() {
   const { toGestao } = useGestaoPath()
+  const empresaId = useTenantEmpresaId()
   const router = useRouter()
   const [searchText, setSearchText] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -86,10 +90,16 @@ export function MenusList() {
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="md:pl-5">
-              <p className="text-sm font-semibold text-primary">Menus cadastrados</p>
+              <p className="text-sm font-semibold text-primary">Gerenciar menus</p>
               <p className="text-sm font-normal text-tertiary md:text-[22px]">
                 Total {items.length} de {total}
               </p>
+              <Link
+                href={toGestao('/cardapio')}
+                className="text-xs font-medium text-primary hover:underline"
+              >
+                Voltar ao cardápio
+              </Link>
             </div>
             <div className="flex flex-1 flex-wrap items-center justify-end gap-2 md:flex-nowrap">
               <button
@@ -188,7 +198,10 @@ export function MenusList() {
               setEditing(m)
               setPanelOpen(true)
             }}
-            onOpenCardapio={(m) => router.push(toGestao(`/menus/${m.id}`))}
+            onOpenCardapio={(m) => {
+              if (empresaId) gravarMenuCardapioSessao(empresaId, m.id)
+              router.push(toGestao(`/menus/${m.id}`))
+            }}
             onToggleStatus={handleToggleStatus}
             onDelete={handleDelete}
           />

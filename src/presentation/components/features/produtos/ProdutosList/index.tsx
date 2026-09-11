@@ -5,7 +5,6 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 
 import { useProdutosInfinite } from '@/src/presentation/hooks/useProdutos'
-import { useEmpresaMenuUnico } from '@/src/presentation/hooks/menus/useEmpresaMenuUnico'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
 import { useProdutoPatchMutation, isSavingOf } from '@/src/presentation/hooks/useProdutoPatchMutation'
@@ -57,9 +56,6 @@ export function ProdutosList() {
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const isMobile = useIsMobile()
-  const { isMenuUnico } = useEmpresaMenuUnico()
-  /** Com 1 menu, cadastro base = cardápio: preço e edição rápida na lista. Com vários, preço só nos menus. */
-  const edicaoRapidaNaLista = isMenuUnico
 
   const { state: filters, actions, queryParams, filterStatus } = useProdutosFilters()
 
@@ -297,71 +293,6 @@ export function ProdutosList() {
     })
   }, [queryClient, empresaId, updateProdutoInCache])
 
-  // Handlers de produto — recebem produtoId como arg, sem closure por item
-  const handleNomeChange = useCallback(async (produtoId: string, novoNome: string) => {
-    const destinos = await pedirConfirmacao({ origem: 'cadastroBase', produtoId })
-    if (destinos === null) return false
-    patchMutation.mutate(
-      { type: 'nome', produtoId, novoNome },
-      {
-        onSuccess: () => {
-          if (destinos.menuIds.length === 0) return
-          void aplicarNosDestinos({
-            produtoId,
-            snapshot: { nome: novoNome },
-            destinos: { aplicarNoCadastroBase: false, menuIds: destinos.menuIds },
-          })
-        },
-      }
-    )
-    return true
-  }, [patchMutation, pedirConfirmacao, aplicarNosDestinos])
-
-  const handleValorChange = useCallback(async (produtoId: string, novoValor: number) => {
-    const destinos = await pedirConfirmacao({ origem: 'cadastroBase', produtoId })
-    if (destinos === null) return false
-    patchMutation.mutate(
-      { type: 'valor', produtoId, novoValor },
-      {
-        onSuccess: () => {
-          if (destinos.menuIds.length === 0) return
-          void aplicarNosDestinos({
-            produtoId,
-            snapshot: { valor: novoValor },
-            destinos: { aplicarNoCadastroBase: false, menuIds: destinos.menuIds },
-          })
-        },
-      }
-    )
-    return true
-  }, [patchMutation, pedirConfirmacao, aplicarNosDestinos])
-
-  const handleGrupoChange = useCallback(
-    async (produtoId: string, novoGrupoId: string, novoGrupoNome: string) => {
-      const produto = produtos.find(p => p.getId() === produtoId)
-      if (!produto || produto.getGrupoId() === novoGrupoId) return false
-
-      const destinos = await pedirConfirmacao({ origem: 'cadastroBase', produtoId })
-      if (destinos === null) return false
-
-      patchMutation.mutate(
-        { type: 'grupo', produtoId, novoGrupoId, novoGrupoNome },
-        {
-          onSuccess: () => {
-            if (destinos.menuIds.length === 0) return
-            void aplicarNosDestinos({
-              produtoId,
-              snapshot: { grupoProdutoId: novoGrupoId },
-              destinos: { aplicarNoCadastroBase: false, menuIds: destinos.menuIds },
-            })
-          },
-        }
-      )
-      return true
-    },
-    [produtos, patchMutation, pedirConfirmacao, aplicarNosDestinos]
-  )
-
   const handleStatusToggle = useCallback(async (produtoId: string, novoStatus: boolean) => {
     const destinos = await pedirConfirmacao({
       origem: 'cadastroBase',
@@ -483,9 +414,6 @@ export function ProdutosList() {
                   isSavingStatus={isSavingOf(patchMutation, produto.getId(), 'status')}
                   isSavingNome={isSavingOf(patchMutation, produto.getId(), 'nome')}
                   isSavingGrupo={isSavingOf(patchMutation, produto.getId(), 'grupo')}
-                  onNomeChange={edicaoRapidaNaLista ? handleNomeChange : undefined}
-                  onValorChange={edicaoRapidaNaLista ? handleValorChange : undefined}
-                  onGrupoChange={edicaoRapidaNaLista ? handleGrupoChange : undefined}
                   onSwitchToggle={handleStatusToggle}
                   onToggleBoolean={handleToggleBooleanField}
                   onEditProduto={handleEditProduto}

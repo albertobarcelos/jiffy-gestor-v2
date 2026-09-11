@@ -47,8 +47,10 @@ export function Sidebar() {
     const routesToPrefetch = [
       '/grupos-complementos',
       '/complementos',
+      '/cardapio',
       '/produtos',
       '/grupos-produtos',
+      '/impressoras',
       '/menus',
       '/estoque',
     ]
@@ -105,21 +107,23 @@ export function Sidebar() {
         path: '#',
         icon: '📋',
         children: [
-          { name: 'Menus', path: '/menus', icon: '📖' },
-          { name: 'Categorias', path: '/grupos-produtos', icon: '📦' },
           { name: 'Produtos', path: '/produtos', icon: '🛍️' },
+          { name: 'Categorias', path: '/grupos-produtos', icon: '📦' },
           { name: 'Grupo Complementos', path: '/grupos-complementos', icon: '📋' },
           { name: 'Complementos', path: '/complementos', icon: '➕' },
+          { name: 'Impressoras', path: '/impressoras', icon: '🖨️' },
+        ],
+      },
+      { name: 'Cardápio', path: '/cardapio', icon: '📖' },
+      {
+        name: 'Pessoas',
+        path: '#',
+        icon: '👥',
+        children: [
+          { name: 'Perfis PDV', path: '/perfis-usuarios-pdv', icon: '👥' },
           { name: 'Usuários PDV', path: '/usuarios', icon: '👤' },
           { name: 'Entregadores', path: '/entregadores', icon: '🛵' },
-          { name: 'Perfis de Usuários', path: '/perfis-usuarios-pdv', icon: '👥' },
           { name: 'Clientes', path: '/clientes', icon: '👥' },
-          { name: 'Impressoras', path: '/impressoras', icon: '🖨️' },
-          {
-            name: 'Meios de Pagamentos',
-            path: '/configuracoes/meios-pagamentos',
-            icon: '💳',
-          },
         ],
       },
       { name: 'Estoque', path: '/estoque', icon: '📦' },
@@ -145,6 +149,12 @@ export function Sidebar() {
   }, [temAcessoFiscal])
 
   const isMenuActive = (item: typeof menuItems[0]) => {
+    if (item.path === '/cardapio') {
+      return (
+        matchesModulePath(pathname ?? '', '/cardapio') ||
+        matchesModulePath(pathname ?? '', '/menus')
+      )
+    }
     if (item.path !== '#') {
       return matchesModulePath(pathname ?? '', item.path)
     }

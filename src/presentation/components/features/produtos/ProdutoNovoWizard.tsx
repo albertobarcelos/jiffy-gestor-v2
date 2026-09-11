@@ -10,7 +10,6 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useMenus } from '@/src/presentation/hooks/menus/useMenus'
-import { useEmpresaMenuUnico } from '@/src/presentation/hooks/menus/useEmpresaMenuUnico'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { showToast } from '@/src/shared/utils/toast'
 import { cn } from '@/src/shared/utils/cn'
@@ -64,7 +63,6 @@ function CategoriaIconeNome({ grupo, size = 18 }: { grupo: GrupoProduto; size?: 
 type WizardStep = 0 | 1 | 2 | 3 | 4
 
 const STEP_LABELS = ['Categoria', 'Produto', 'Complementos', 'Impressoras', 'Menus'] as const
-const STEP_LABELS_MENU_UNICO = ['Categoria', 'Produto', 'Complementos', 'Impressoras'] as const
 
 export interface ProdutoNovoWizardProps {
   open: boolean
@@ -124,29 +122,26 @@ export function ProdutoNovoWizard({
     enabled: open,
   })
   const { data: menusLista } = useMenus({ tipo: 'principal', limit: 10, enabled: open })
-  const { isMenuUnico, menuUnicoId } = useEmpresaMenuUnico()
   const principalMenuId = useMemo(
     () =>
-      menuUnicoId ??
       menusLista?.items.find(m => m.tipo === 'principal')?.id ??
+      menusLista?.items[0]?.id ??
       null,
-    [menuUnicoId, menusLista]
+    [menusLista]
   )
 
-  const stepLabels = isMenuUnico ? STEP_LABELS_MENU_UNICO : STEP_LABELS
+  const stepLabels = STEP_LABELS
 
-  /** Pré-seleção: menu único / cadastro → principal; menu → cardápio atual (só ele travado). */
+  /** Cadastro → Principal pré-marcado (desmarcável). Cardápio → menu atual travado. */
   const menusIniciaisWizard = useMemo(() => {
-    if (isMenuUnico && menuUnicoId) return [menuUnicoId]
     if (origem === 'menu') return menuId ? [menuId] : []
     return principalMenuId ? [principalMenuId] : []
-  }, [isMenuUnico, menuUnicoId, origem, menuId, principalMenuId])
+  }, [origem, menuId, principalMenuId])
 
   const menusTravadosWizard = useMemo(() => {
-    if (isMenuUnico && menuUnicoId) return [menuUnicoId]
     if (origem !== 'menu') return [] as string[]
     return menuId ? [menuId] : []
-  }, [isMenuUnico, menuUnicoId, origem, menuId])
+  }, [origem, menuId])
 
   const previewMenuId = origem === 'menu' ? menuId : undefined
 
@@ -334,7 +329,7 @@ export function ProdutoNovoWizard({
   }, [produtoInnerStep])
 
   const finishWizard = useCallback(async () => {
-    if (!isMenuUnico && origem === 'menu' && !menuId) {
+    if (origem === 'menu' && !menuId) {
       showToast.error('Menu inválido para concluir o cadastro')
       return
     }
@@ -357,21 +352,13 @@ export function ProdutoNovoWizard({
       const menusEscolhidos = menusRef.current?.getSelectedIds() ?? []
       let menuIds = unirMenuIds(menusEscolhidos)
 
-      if (isMenuUnico) {
-        const id = menuUnicoId ?? principalMenuId
-        if (!id) {
-          showToast.error('Menu principal não encontrado para vincular o produto')
-          return
-        }
-        menuIds = [id]
-      } else if (origem === 'menu') {
+      if (origem === 'menu') {
         menuIds = unirMenuIds(menuId, menusEscolhidos)
         if (!menuId || !menuIds.includes(menuId)) {
           showToast.error('Mantenha o cardápio atual vinculado ao produto')
           return
         }
       }
-      // Cadastro base (vários menus): seleção vazia é válida (só produto base).
 
       const ok = await npRef.current?.saveFinal({
         grupoId,
@@ -390,9 +377,6 @@ export function ProdutoNovoWizard({
       setSaving(false)
     }
   }, [
-    isMenuUnico,
-    menuUnicoId,
-    principalMenuId,
     origem,
     menuId,
     ensureCategoria,
@@ -470,29 +454,6 @@ export function ProdutoNovoWizard({
     }
 
     if (step === 3) {
-      if (isMenuUnico) {
-        return {
-          showCancel: true,
-          cancelLabel: 'Fechar',
-          cancelVariant,
-          onCancel: handleRequestClose,
-          showPrevious: true,
-          previousLabel: 'Anterior',
-          onPrevious: () => setStep(2),
-          previousDisabled: busy,
-          showSave: true,
-          saveLabel: 'Concluir',
-          onSave: () => {
-            setSkipImpressoras(false)
-            void finishWizard()
-          },
-          saveLoading: busy,
-          saveDisabled: busy,
-          barShowPrevNextIcons: true,
-          barSecondaryTone: 'primary',
-          barActionOrder: ['prev', 'save'],
-        }
-      }
       return {
         showCancel: true,
         cancelLabel: 'Fechar',
@@ -535,7 +496,6 @@ export function ProdutoNovoWizard({
   }, [
     step,
     origem,
-    isMenuUnico,
     handleRequestClose,
     handleNextFromCategoria,
     handleNextFromProduto,
@@ -775,7 +735,7 @@ export function ProdutoNovoWizard({
             </div>
           ) : null}
 
-          {!isMenuUnico && (step === 4 || keepMenus) ? (
+          {(step === 4 || keepMenus) ? (
             <div className={cn('flex h-full min-h-[320px] flex-col', step !== 4 && 'hidden')}>
               <ProdutoMenusPanel
                 key={`wizard-menus-${wizardSession}-${origem}-${menusIniciaisWizard.join('|')}-${menusTravadosWizard.join('|')}`}

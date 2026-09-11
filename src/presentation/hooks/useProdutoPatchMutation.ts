@@ -8,6 +8,12 @@ import { updateProdutoPatch } from '@/src/application/use-cases/produtos/UpdateP
 import { applyPatchToInfinitePages } from '@/src/presentation/components/features/produtos/ProdutosList/utils'
 import { toggleFieldConfig } from '@/src/presentation/components/features/produtos/ProdutosList/constants'
 import type { ProdutoPatch, ToggleField } from '@/src/shared/types/produto'
+import {
+  aplicarTogglePermissaoNoIndex,
+  MENU_PRODUTO_PERMISSAO_FIELDS,
+  type CatalogoProdutoListaIndex,
+} from '@/src/shared/utils/menuProdutoPermissoes'
+import { CATALOGO_PRODUTOS_INDEX_QUERY_KEY } from '@/src/presentation/hooks/produtos/useProdutosCodigoPorId'
 
 export type ProdutoPatchPayload =
   | { type: 'nome'; produtoId: string; novoNome: string }
@@ -63,6 +69,12 @@ function successMessage(payload: ProdutoPatchPayload): string {
   }
 }
 
+type ProdutoPatchMutationContext = {
+  snapshot: [unknown, unknown][]
+  catalogoIndex: CatalogoProdutoListaIndex | undefined
+  catalogoIndexKey: readonly unknown[]
+}
+
 /**
  * Mutation com atualização otimista + rollback automático para patches de produto.
  * Usa updateProdutoPatch como único use-case de infra para todos os tipos de patch.
@@ -71,13 +83,16 @@ export function useProdutoPatchMutation() {
   const queryClient = useQueryClient()
   const empresaId = useTenantEmpresaId()
 
-  return useSecureTenantMutation<void, ProdutoPatchPayload, { snapshot: [unknown, unknown][] }>(
+  return useSecureTenantMutation<void, ProdutoPatchPayload, ProdutoPatchMutationContext>(
     async ({ token }, payload) =>
       updateProdutoPatch({ produtoId: payload.produtoId, patch: payloadToPatch(payload), token }),
     {
     onMutate: async (payload) => {
+      const catalogoIndexKey = ['tenant', empresaId, ...CATALOGO_PRODUTOS_INDEX_QUERY_KEY]
       await queryClient.cancelQueries({ queryKey: ['tenant', empresaId, 'produtos', 'infinite'], exact: false })
+      await queryClient.cancelQueries({ queryKey: catalogoIndexKey })
       const snapshot = queryClient.getQueriesData<unknown>({ queryKey: ['tenant', empresaId, 'produtos', 'infinite'] })
+      const catalogoIndex = queryClient.getQueryData<CatalogoProdutoListaIndex>(catalogoIndexKey)
       const patch = payloadToPatch(payload)
 
       queryClient.setQueriesData(
@@ -85,7 +100,28 @@ export function useProdutoPatchMutation() {
         (old) => applyPatchToInfinitePages(old, payload.produtoId, patch)
       )
 
-      return { snapshot: snapshot as [unknown, unknown][] }
+      if (
+        payload.type === 'toggle' &&
+        MENU_PRODUTO_PERMISSAO_FIELDS.includes(
+          payload.field as (typeof MENU_PRODUTO_PERMISSAO_FIELDS)[number]
+        )
+      ) {
+        queryClient.setQueryData(
+          catalogoIndexKey,
+          aplicarTogglePermissaoNoIndex(
+            catalogoIndex,
+            payload.produtoId,
+            payload.field as (typeof MENU_PRODUTO_PERMISSAO_FIELDS)[number],
+            payload.novoValor
+          )
+        )
+      }
+
+      return {
+        snapshot: snapshot as [unknown, unknown][],
+        catalogoIndex,
+        catalogoIndexKey,
+      }
     },
 
     onError: (_err, _payload, ctx) => {
@@ -93,6 +129,9 @@ export function useProdutoPatchMutation() {
         ctx.snapshot.forEach(([key, data]) => {
           queryClient.setQueryData(key as Parameters<typeof queryClient.setQueryData>[0], data)
         })
+      }
+      if (ctx) {
+        queryClient.setQueryData(ctx.catalogoIndexKey, ctx.catalogoIndex)
       }
       showToast.error(_err.message || 'Erro ao atualizar produto')
     },

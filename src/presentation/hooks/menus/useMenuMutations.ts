@@ -10,6 +10,7 @@ import {
   reordenarMenuGrupoViaBffUseCase,
   reordenarMenuProdutoViaBffUseCase,
   uploadImagemMenuProdutoViaBffUseCase,
+  uploadImagemMenuGrupoViaBffUseCase,
 } from '@/src/application/use-cases/menus/menuBffUseCases'
 import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
@@ -146,6 +147,19 @@ export function useMenuMutations(menuId?: string) {
     { onSuccess: () => invalidate(['menu-grupos', menuId]) }
   )
 
+  const uploadImagemGrupo = useSecureTenantMutation(
+    async ({ token }, vars: { grupoProdutoId: string; file: File }) => {
+      if (!menuId) throw new Error('menuId é obrigatório')
+      return uploadImagemMenuGrupoViaBffUseCase.execute({
+        token,
+        menuId,
+        grupoProdutoId: vars.grupoProdutoId,
+        file: vars.file,
+      })
+    },
+    { onSuccess: () => invalidateMenuTree(invalidate, menuId) }
+  )
+
   return {
     createMenu,
     updateMenu,
@@ -156,5 +170,6 @@ export function useMenuMutations(menuId?: string) {
     uploadImagemProduto,
     renameGrupo,
     reorderGrupo,
+    uploadImagemGrupo,
   }
 }

@@ -7,6 +7,7 @@ interface MenuCardapioAcoesProps {
   onAdicionar: () => void
   onReordenar?: () => void
   loteHref?: string
+  adicionarLabel?: string
   className?: string
 }
 
@@ -14,6 +15,7 @@ export function MenuCardapioAcoes({
   onAdicionar,
   onReordenar,
   loteHref,
+  adicionarLabel = 'Adicionar produtos',
   className,
 }: MenuCardapioAcoesProps) {
   return (
@@ -40,7 +42,7 @@ export function MenuCardapioAcoes({
         onClick={onAdicionar}
         className="flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-lg bg-primary px-3 text-xs font-semibold text-info transition-colors hover:bg-primary/90 md:gap-2 md:px-4 md:text-sm"
       >
-        Adicionar produtos
+        {adicionarLabel}
         <span className="text-base md:text-lg">+</span>
       </button>
     </div>

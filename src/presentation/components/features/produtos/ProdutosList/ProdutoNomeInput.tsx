@@ -1,6 +1,10 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import {
+  NOME_CATALOGO_LISTA_MAX_CHARS,
+  truncarNomeCatalogoLista,
+} from '@/src/shared/utils/catalogoListaNome'
 import { useLocaleUppercaseInputHandler } from '@/src/presentation/hooks/useLocaleUppercaseInputHandler'
 
 export type ProdutoNomeCommitResult = void | boolean | Promise<void | boolean>
@@ -8,6 +12,8 @@ export type ProdutoNomeCommitResult = void | boolean | Promise<void | boolean>
 interface ProdutoNomeInputProps {
   nome: string
   disabled?: boolean
+  /** Truncamento visual na lista (o valor completo fica no title). */
+  maxChars?: number
   /**
    * Retorne `false` (ou Promise de `false`) para indicar cancelamento —
    * o campo volta ao `nome` prop.
@@ -23,7 +29,12 @@ function normalizarNome(value: string): string {
  * Nome clicável na lista: exibe texto truncado; ao clicar, vira input editável.
  * Enter/blur confirma; Escape cancela sem chamar onCommit.
  */
-export function ProdutoNomeInput({ nome, disabled = false, onCommit }: ProdutoNomeInputProps) {
+export function ProdutoNomeInput({
+  nome,
+  disabled = false,
+  maxChars = NOME_CATALOGO_LISTA_MAX_CHARS,
+  onCommit,
+}: ProdutoNomeInputProps) {
   const [editing, setEditing] = useState(false)
   const [inputValue, setInputValue] = useState(nome)
   const committingRef = useRef(false)
@@ -97,11 +108,11 @@ export function ProdutoNomeInput({ nome, disabled = false, onCommit }: ProdutoNo
   }, [inputValue, nome, disabled])
 
   if (!editing) {
-    const nomeExibicao = nome.length > 30 ? `${nome.slice(0, 30)}…` : nome
+    const { exibicao, truncado } = truncarNomeCatalogoLista(nome, maxChars)
     return (
       <button
         type="button"
-        title={nome.length > 30 ? nome : 'Clique para editar o nome'}
+        title={truncado ? nome : 'Clique para editar o nome'}
         aria-label={`Editar nome: ${nome}`}
         disabled={disabled}
         onClick={startEdit}
@@ -111,9 +122,9 @@ export function ProdutoNomeInput({ nome, disabled = false, onCommit }: ProdutoNo
             startEdit(e)
           }
         }}
-        className="min-w-0 truncate rounded px-0.5 text-left text-sm font-normal tracking-wide text-primary-text hover:bg-primary/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-secondary/80 disabled:cursor-not-allowed disabled:opacity-60 md:text-base"
+        className="min-w-0 max-w-full truncate rounded px-0.5 text-left text-sm font-normal tracking-wide text-primary-text hover:bg-primary/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-secondary/80 disabled:cursor-not-allowed disabled:opacity-60 md:text-base"
       >
-        {nomeExibicao}
+        {exibicao}
       </button>
     )
   }

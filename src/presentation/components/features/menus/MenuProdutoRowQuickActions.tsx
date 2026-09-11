@@ -1,94 +1,43 @@
 'use client'
 
-import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
-import { Tooltip } from '@mui/material'
-import { MdStar, MdStarBorder } from 'react-icons/md'
-import { cn } from '@/src/shared/utils/cn'
+import { useEffect, useMemo, useState } from 'react'
 import type { MenuProduto, UpdateMenuProdutoInput } from '@/src/shared/types/menus'
-import type { ToggleField } from '@/src/shared/types/produto'
+import { menuQuickActionIconsConfig } from '@/src/presentation/components/features/produtos/ProdutosList/constants'
+import { CatalogQuickActionButton } from '@/src/presentation/components/features/catalogo/CatalogQuickActionButton'
 import {
-  permissionActionIconsConfig,
-  type ActionIconDef,
-} from '@/src/presentation/components/features/produtos/ProdutosList/constants'
-
-const ROW_ICON_BTN =
-  'flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-secondary/60 bg-white text-secondary transition-colors hover:bg-secondary/10'
-
-export type BasePermissaoField = Exclude<ToggleField, 'favorito'>
-
-function RowIconButton({
-  title,
-  active,
-  onClick,
-  disabled,
-  children,
-}: {
-  title: string
-  active?: boolean
-  onClick: (e: MouseEvent<HTMLButtonElement>) => void
-  disabled?: boolean
-  children: ReactNode
-}) {
-  return (
-    <Tooltip title={title} arrow placement="top">
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={e => {
-          e.stopPropagation()
-          onClick(e)
-        }}
-        className={cn(
-          ROW_ICON_BTN,
-          active && 'border-secondary bg-secondary text-white hover:bg-secondary',
-          disabled && 'cursor-not-allowed opacity-50'
-        )}
-      >
-        {children}
-      </button>
-    </Tooltip>
-  )
-}
-
-function estadosPermissaoVazios(): Record<BasePermissaoField, boolean> {
-  return {
-    permiteAcrescimo: false,
-    permiteDesconto: false,
-    abreComplementos: false,
-    permiteAlterarPreco: false,
-    incideTaxa: false,
-  }
-}
+  resolverPermissoesMenuProduto,
+  type MenuProdutoPermissaoField,
+  type MenuProdutoPermissoes,
+} from '@/src/shared/utils/menuProdutoPermissoes'
 
 export interface MenuProdutoRowQuickActionsProps {
   produto: MenuProduto
   disabled?: boolean
+  /** Fallback do cadastro enquanto o snapshot do menu não traz as permissões. */
+  permissoesCadastro?: Partial<MenuProdutoPermissoes> | null
   /** Retorna `false` se o usuário cancelar ou se o patch falhar. */
   onPatch: (
     produtoId: string,
     input: UpdateMenuProdutoInput
   ) => boolean | Promise<boolean>
-  /**
-   * Com 1 menu: favorito + ícones de permissão do cadastro base
-   * (acréscimo, desconto, abrir complementos, preço, taxa).
-   */
-  showBasePermissoes?: boolean
-  baseToggleStates?: Record<BasePermissaoField, boolean> | null
-  onToggleBasePermissao?: (field: BasePermissaoField, value: boolean) => void
+  onTogglePermissao: (
+    produtoId: string,
+    field: MenuProdutoPermissaoField,
+    value: boolean
+  ) => boolean | Promise<boolean>
 }
 
-/** Ícones rápidos na lista do cardápio. */
+/** Ícones rápidos na lista do cardápio (favorito no snapshot; permissões prontas para o menu). */
 export function MenuProdutoRowQuickActions({
   produto,
   disabled,
+  permissoesCadastro,
   onPatch,
-  showBasePermissoes = false,
-  baseToggleStates = null,
-  onToggleBasePermissao,
+  onTogglePermissao,
 }: MenuProdutoRowQuickActionsProps) {
   const [favorito, setFavorito] = useState(produto.favorito)
   const [permissoesOverride, setPermissoesOverride] = useState<
-    Partial<Record<BasePermissaoField, boolean>>
+    Partial<MenuProdutoPermissoes>
   >({})
 
   useEffect(() => {
@@ -97,72 +46,50 @@ export function MenuProdutoRowQuickActions({
 
   useEffect(() => {
     setPermissoesOverride({})
-  }, [produto.produtoId])
+  }, [produto.produtoId, permissoesCadastro])
 
   const permissoes = useMemo(() => {
-    const base = baseToggleStates ?? estadosPermissaoVazios()
-    return { ...base, ...permissoesOverride }
-  }, [baseToggleStates, permissoesOverride])
-
-  const handleTogglePermissao = (def: Extract<ActionIconDef, { field: ToggleField }>) => {
-    const field = def.field as BasePermissaoField
-    const next = !permissoes[field]
-    setPermissoesOverride(prev => ({ ...prev, [field]: next }))
-    onToggleBasePermissao?.(field, next)
-  }
-
-  if (showBasePermissoes) {
-    return (
-      <div className="flex shrink-0 flex-nowrap items-center gap-1">
-        <RowIconButton
-          title={favorito ? 'Remover dos favoritos' : 'Marcar como favorito'}
-          active={favorito}
-          disabled={disabled}
-          onClick={() => {
-            const next = !favorito
-            void (async () => {
-              const ok = await onPatch(produto.produtoId, { favorito: next })
-              if (ok) setFavorito(next)
-            })()
-          }}
-        >
-          {favorito ? <MdStar className="text-lg" /> : <MdStarBorder className="text-lg" />}
-        </RowIconButton>
-        {permissionActionIconsConfig.map(def => {
-          const Icon = def.Icon
-          const active = permissoes[def.field as BasePermissaoField]
-          return (
-            <RowIconButton
-              key={`${produto.produtoId}-${def.key}`}
-              title={def.label}
-              active={active}
-              disabled={disabled || !onToggleBasePermissao}
-              onClick={() => handleTogglePermissao(def)}
-            >
-              <Icon className="h-[1.05em] w-[1.05em] text-lg" />
-            </RowIconButton>
-          )
-        })}
-      </div>
-    )
-  }
+    const resolvidas = resolverPermissoesMenuProduto(produto, permissoesCadastro)
+    return { ...resolvidas, ...permissoesOverride }
+  }, [produto, permissoesCadastro, permissoesOverride])
 
   return (
-    <div className="flex shrink-0 flex-nowrap items-center gap-1">
-      <RowIconButton
-        title={favorito ? 'Remover dos favoritos' : 'Marcar como favorito'}
-        active={favorito}
-        disabled={disabled}
-        onClick={() => {
-          const next = !favorito
-          void (async () => {
-            const ok = await onPatch(produto.produtoId, { favorito: next })
-            if (ok) setFavorito(next)
-          })()
-        }}
-      >
-        {favorito ? <MdStar className="text-lg" /> : <MdStarBorder className="text-lg" />}
-      </RowIconButton>
+    <div className="flex flex-nowrap items-center gap-2.5 md:gap-3">
+      {menuQuickActionIconsConfig.map(def => {
+        const isFavorito = def.field === 'favorito'
+        const active = isFavorito
+          ? favorito
+          : permissoes[def.field as MenuProdutoPermissaoField]
+
+        return (
+          <CatalogQuickActionButton
+            key={`${produto.produtoId}-${def.key}`}
+            def={def}
+            active={active}
+            disabled={disabled}
+            onClick={() => {
+              if (isFavorito) {
+                const next = !favorito
+                void (async () => {
+                  const ok = await onPatch(produto.produtoId, { favorito: next })
+                  if (ok) setFavorito(next)
+                })()
+                return
+              }
+
+              const permissao = def.field as MenuProdutoPermissaoField
+              const next = !permissoes[permissao]
+              setPermissoesOverride(prev => ({ ...prev, [permissao]: next }))
+              void (async () => {
+                const ok = await onTogglePermissao(produto.produtoId, permissao, next)
+                if (!ok) {
+                  setPermissoesOverride(prev => ({ ...prev, [permissao]: !next }))
+                }
+              })()
+            }}
+          />
+        )
+      })}
     </div>
   )
 }

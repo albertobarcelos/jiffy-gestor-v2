@@ -69,6 +69,12 @@ export interface MenuProduto {
   gruposComplementos: MenuProdutoComplementoResumo[]
   dataCriacao: string
   dataAtualizacao: string
+  /** Futuro: permissões do PDV neste menu. Se ausente, o front usa o cadastro. */
+  permiteAcrescimo?: boolean
+  permiteDesconto?: boolean
+  abreComplementos?: boolean
+  permiteAlterarPreco?: boolean
+  incideTaxa?: boolean
 }
 
 export interface PaginatedMenusResponse {
@@ -105,6 +111,12 @@ export interface UpdateMenuProdutoInput {
   grupoProdutoId?: string
   gruposComplementosIds?: string[]
   imageId?: string | null
+  /** Preparado para quando o snapshot persistir permissões do PDV. */
+  permiteAcrescimo?: boolean
+  permiteDesconto?: boolean
+  abreComplementos?: boolean
+  permiteAlterarPreco?: boolean
+  incideTaxa?: boolean
 }
 
 export interface UpdateMenuProdutosBatchInput {
