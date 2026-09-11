@@ -4,6 +4,7 @@ import type {
 } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { normalizarClienteDeliveryApi } from '@/src/application/mappers/ClienteDeliveryMoradaMapper'
 import { parseGeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
+import { formatarResumoEndereco } from '@/src/shared/utils/formatarResumoEndereco'
 
 /** Códigos IBGE de UF → sigla (quando a API não manda `estado` preenchido). */
 const UF_POR_CODIGO_IBGE: Record<string, string> = {
@@ -143,12 +144,5 @@ export function normalizarClienteDeliveryPublico(
 export function formatarResumoEnderecoPublico(
   endereco: EnderecoClienteDeliveryPublicoDTO
 ): string {
-  const cidadeEstado = [endereco.cidade, endereco.estado].filter(Boolean).join('/')
-  const partes = [
-    endereco.rua,
-    endereco.numero ? `nº ${endereco.numero}` : '',
-    endereco.bairro,
-    cidadeEstado,
-  ].filter(Boolean)
-  return partes.join(', ')
+  return formatarResumoEndereco(endereco)
 }

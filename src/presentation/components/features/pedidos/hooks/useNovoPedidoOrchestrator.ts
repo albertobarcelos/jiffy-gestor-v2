@@ -26,6 +26,7 @@ import {
   obterTotalComplemento,
 } from '@/src/domain/services/pedido/CalculadoraPedido'
 import type { CanalVendaNovoPedido } from '../novoPedidoProdutosApi'
+import { showToast } from '@/src/shared/utils/toast'
 import { useNovoPedidoCatalogoData } from './data/useNovoPedidoCatalogoData'
 import { useCarregarVenda } from './data/useCarregarVenda'
 import { useEntregadoresQuery } from './data/useEntregadoresQuery'
@@ -43,6 +44,9 @@ import { useNovoPedidoPagamentosForm } from './form/useNovoPedidoPagamentosForm'
 import { useNovoPedidoCliente } from './form/useNovoPedidoCliente'
 import { useNovoPedidoEdicaoLinha } from './form/useNovoPedidoEdicaoLinha'
 import { useNovoPedidoNavegacao } from './form/useNovoPedidoNavegacao'
+import { useRascunhoPedidoWhatsApp } from './form/useRascunhoPedidoWhatsApp'
+import { limparRascunhoPedidoWhatsApp, obterRascunhoPedidoWhatsApp } from '../rascunho/rascunhoPedidoWhatsAppCache'
+import { telefoneWhatsAppParaCampoPedido, digitosTelefonePedidoWhatsApp } from '@/src/presentation/gestor-pedidos/whatsapp/telefonePedidoWhatsApp'
 import { useNovoPedidoFormState } from './orchestrator/useNovoPedidoFormState'
 import { useEdicaoProdutosDelivery } from './orchestrator/useEdicaoProdutosDelivery'
 import { useNovoPedidoGestorActions } from './orchestrator/useNovoPedidoGestorActions'
@@ -51,6 +55,8 @@ import { createNovoPedidoResetForm } from './orchestrator/createNovoPedidoResetF
 import { assembleNovoPedidoContextSlices } from './orchestrator/assembleNovoPedidoContextSlices'
 import { canSubmitNovoPedido } from './orchestrator/canSubmitNovoPedido'
 import { useNovoPedidoOrchestratorFlags } from './orchestrator/useNovoPedidoOrchestratorFlags'
+import { useCotacaoTaxaPorMoradas } from '@/src/presentation/hooks/useCotacaoTaxaPorMoradas'
+import { resolverModoTaxaEntregaOverride } from '@/src/shared/constants/taxaEntregaPedido'
 import { enderecoTemGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
 import {
   formatarDataDetalhePedido as formatarDataDetalhePedidoOrchestrator,
@@ -77,12 +83,22 @@ export function useNovoPedidoOrchestrator({
   abaDetalhesInicial,
   clienteInicial = null,
   telefoneInicial,
+  statusEtapaOperacionalHint = null,
+  entregadorHint = null,
+  preservarRascunhoAoFechar = false,
+  chaveRascunho,
 }: NovoPedidoModalProps) {
   const { empresa, menuVendaGestorId } = useEmpresaMe()
   const { menuDeliveryId } = useMenuDeliveryId()
   const { preferenciasImpressaoDelivery } = usePreferenciasImpressaoDelivery()
   const { processarAposTransicaoVendaGestorId } = useImpressaoDelivery()
   const empresaId = useTenantEmpresaId()
+  const resetarAoSairRef = useRef(false)
+  const notificarSucesso = useCallback(() => {
+    resetarAoSairRef.current = true
+    if (chaveRascunho) limparRascunhoPedidoWhatsApp(chaveRascunho)
+    onSuccess()
+  }, [chaveRascunho, onSuccess])
   const createVendaGestor = useCreateVendaGestor()
   const createPedidoDelivery = useCreatePedidoDelivery()
   const createSubmitPending =
@@ -187,6 +203,44 @@ export function useNovoPedidoOrchestrator({
     setVendaIdCriada,
   } = form
 
+  useRascunhoPedidoWhatsApp({
+    ativo: preservarRascunhoAoFechar,
+    chave: chaveRascunho,
+    sucessoRef: resetarAoSairRef,
+    currentStep,
+    produtos,
+    observacaoPedido,
+    pagamentos,
+    clienteId,
+    clienteNome,
+    clienteEntregaVinculado,
+    moradaEntregaSelecionada,
+    telefoneBuscaEntrega,
+    telefoneBuscadoEntrega,
+    tipoAtendimentoDelivery,
+    fluxoPagamentoEntrega,
+    taxaEntregaId,
+    tempoPrevistoMinutos,
+    enderecoEntregaCoberturaStatus,
+    enderecoEntregaCoberturaValorTaxa,
+    setCurrentStep,
+    setProdutos,
+    setObservacaoPedido,
+    setPagamentos,
+    setClienteId,
+    setClienteNome,
+    setClienteEntregaVinculado,
+    setMoradaEntregaSelecionada,
+    setTelefoneBuscaEntrega,
+    setTelefoneBuscadoEntrega,
+    setTipoAtendimentoDelivery,
+    setFluxoPagamentoEntrega,
+    setTaxaEntregaId,
+    setTempoPrevistoMinutos,
+    setEnderecoEntregaCoberturaStatus,
+    setEnderecoEntregaCoberturaValorTaxa,
+  })
+
   const tipoVendaHint = tipoVendaGestor ?? detalhesPedidoMeta?.tipoVenda ?? null
 
   const { pedidoDeliveryGestor, pedidoComEntrega, pedidoComRetirada } = useNovoPedidoDelivery({
@@ -230,6 +284,9 @@ export function useNovoPedidoOrchestrator({
     isLoadingBuscaProdutos,
     isLoadingProdutos,
     produtosError,
+    hasNextProdutosCatalogo,
+    isFetchingNextProdutosCatalogo,
+    carregarProximaPaginaProdutosCatalogo,
     carregarProdutoNoCatalogoSeNecessario,
     menuCatalogoIndisponivel,
   } = useNovoPedidoCatalogoData({
@@ -339,15 +396,21 @@ export function useNovoPedidoOrchestrator({
 
   useEffect(() => {
     if (!open || vendaId || modoVisualizacao) return
-    if (clienteInicial) {
-      handleSelectCliente(clienteInicial)
+    if (tipoInicioPedido !== 'entrega') return
+
+    const telCampo = telefoneWhatsAppParaCampoPedido(telefoneInicial)
+    const digitos = digitosTelefonePedidoWhatsApp(telefoneInicial)
+    if (telCampo) {
+      setTelefoneBuscaEntrega(atual => (atual.trim() ? atual : telCampo))
+      setTelefoneBuscadoEntrega(atual => atual || digitos || null)
+    }
+
+    if (preservarRascunhoAoFechar && chaveRascunho && obterRascunhoPedidoWhatsApp(chaveRascunho)) {
       return
     }
-    const tel = telefoneInicial?.trim()
-    if (!tel || tipoInicioPedido !== 'entrega') return
-    const digitos = tel.replace(/\D/g, '')
-    setTelefoneBuscaEntrega(tel)
-    setTelefoneBuscadoEntrega(digitos.length >= 8 ? digitos : null)
+    if (clienteInicial) {
+      handleSelectCliente(clienteInicial)
+    }
   }, [
     open,
     vendaId,
@@ -358,6 +421,8 @@ export function useNovoPedidoOrchestrator({
     handleSelectCliente,
     setTelefoneBuscaEntrega,
     setTelefoneBuscadoEntrega,
+    preservarRascunhoAoFechar,
+    chaveRascunho,
   ])
 
   // Buscar meios de pagamento
@@ -389,6 +454,87 @@ export function useNovoPedidoOrchestrator({
     modoVisualizacao: Boolean(modoVisualizacao),
     pedidoComEntrega,
   })
+
+  const modoTaxaEntrega = resolverModoTaxaEntregaOverride(taxaEntregaId)
+  const telefoneCotacao =
+    telefoneBuscadoEntrega ||
+    moradaEntregaSelecionada?.telefone ||
+    telefoneBuscaEntrega ||
+    ''
+  const cotacaoTaxa = useCotacaoTaxaPorMoradas({
+    enabled:
+      open &&
+      !modoVisualizacao &&
+      !vendaId &&
+      pedidoDeliveryGestor &&
+      pedidoComEntrega &&
+      modoTaxaEntrega === 'automatica' &&
+      Boolean(moradaEntregaSelecionada?.id) &&
+      Boolean(
+        moradaEntregaSelecionada?.endereco &&
+          enderecoTemGeolocalizacao(moradaEntregaSelecionada.endereco)
+      ),
+    telefone: telefoneCotacao,
+    enderecoId: moradaEntregaSelecionada?.id ?? '',
+    produtos,
+  })
+  const cotacaoTaxaStatus = cotacaoTaxa.status
+  const cotacaoTaxaValor = cotacaoTaxa.status === 'ok' ? cotacaoTaxa.valorTaxa : null
+
+  const recotarTaxaEntregaAutomatica = useCallback(() => {
+    const morada = moradaEntregaSelecionada
+    if (!morada?.id) return
+    if (!morada.endereco || !enderecoTemGeolocalizacao(morada.endereco)) {
+      showToast.error('Este endereço não tem localização. Edite o endereço para calcular a taxa.')
+      return
+    }
+    setEnderecoEntregaCoberturaStatus('pendente')
+    setEnderecoEntregaCoberturaValorTaxa(null)
+    void cotacaoTaxa.recotar()
+  }, [
+    moradaEntregaSelecionada,
+    cotacaoTaxa.recotar,
+    setEnderecoEntregaCoberturaStatus,
+    setEnderecoEntregaCoberturaValorTaxa,
+  ])
+
+  useEffect(() => {
+    if (!pedidoDeliveryGestor || !pedidoComEntrega || modoTaxaEntrega !== 'automatica') {
+      return
+    }
+    if (!moradaEntregaSelecionada?.id) {
+      setEnderecoEntregaCoberturaStatus(null)
+      setEnderecoEntregaCoberturaValorTaxa(null)
+      return
+    }
+    if (cotacaoTaxaStatus === 'idle') return
+    if (cotacaoTaxaStatus === 'loading') {
+      setEnderecoEntregaCoberturaStatus('pendente')
+      setEnderecoEntregaCoberturaValorTaxa(null)
+      return
+    }
+    if (cotacaoTaxaStatus === 'fora') {
+      setEnderecoEntregaCoberturaStatus('fora')
+      setEnderecoEntregaCoberturaValorTaxa(null)
+      return
+    }
+    if (cotacaoTaxaStatus === 'ok') {
+      setEnderecoEntregaCoberturaStatus('ok')
+      setEnderecoEntregaCoberturaValorTaxa(cotacaoTaxaValor)
+      return
+    }
+    setEnderecoEntregaCoberturaStatus('indisponivel')
+    setEnderecoEntregaCoberturaValorTaxa(null)
+  }, [
+    pedidoDeliveryGestor,
+    pedidoComEntrega,
+    modoTaxaEntrega,
+    moradaEntregaSelecionada?.id,
+    cotacaoTaxaStatus,
+    cotacaoTaxaValor,
+    setEnderecoEntregaCoberturaStatus,
+    setEnderecoEntregaCoberturaValorTaxa,
+  ])
 
   const flags = useNovoPedidoOrchestratorFlags({
     modoVisualizacao,
@@ -463,6 +609,8 @@ export function useNovoPedidoOrchestrator({
     modoVisualizacao,
     tabelaOrigemVenda,
     tipoVendaGestor: tipoVendaParaDetalhe,
+    statusEtapaOperacionalHint,
+    entregadorHint,
     meiosPagamentoRef,
     getToken: () => tenantAuthRef.current?.getAccessToken(),
     onClose,
@@ -563,8 +711,16 @@ export function useNovoPedidoOrchestrator({
         enderecoTemGeolocalizacao(moradaEntregaSelecionada.endereco)
     ),
     enderecoEntregaCoberturaStatus,
+    taxaEntregaOverride: modoTaxaEntrega,
     modoEdicaoProdutos,
+    preservarRascunhoAoFechar,
   })
+
+  const handleConfirmarSaidaDescartando = useCallback(() => {
+    resetarAoSairRef.current = true
+    if (chaveRascunho) limparRascunhoPedidoWhatsApp(chaveRascunho)
+    handleConfirmarSaida()
+  }, [chaveRascunho, handleConfirmarSaida])
 
   const { salvandoProdutos, handleSalvarProdutos } = useEdicaoProdutosDelivery({
     ativo: modoEdicaoProdutos,
@@ -624,11 +780,12 @@ export function useNovoPedidoOrchestrator({
           enderecoTemGeolocalizacao(moradaEntregaSelecionada.endereco)
       ),
       enderecoEntregaCoberturaStatus,
+      taxaEntregaOverride: modoTaxaEntrega,
       troco,
     },
     createVendaGestor,
     createPedidoDelivery,
-    onSuccess,
+    onSuccess: notificarSucesso,
     onClose,
     setInternalDialogOpen,
     setCurrentStep,
@@ -700,6 +857,7 @@ export function useNovoPedidoOrchestrator({
     setNomeUsuario,
     longPressTimeoutRef,
     longPressComplementoTimeoutRef,
+    preservarRascunhoAoFechar,
   })
 
   const resetForm = createNovoPedidoResetForm({
@@ -723,7 +881,14 @@ export function useNovoPedidoOrchestrator({
     setIsLoadingVenda,
   })
 
-  const handlePedidoPainelExited = useNovoPedidoResetOnExit(resetForm, onAfterClose)
+  const handlePedidoPainelExited = useNovoPedidoResetOnExit(
+    resetForm,
+    () => {
+      resetarAoSairRef.current = false
+      onAfterClose?.()
+    },
+    () => !preservarRascunhoAoFechar || resetarAoSairRef.current
+  )
 
   const temEnderecoEntrega = Boolean(moradaEntregaSelecionada?.endereco)
   const enderecoEntregaTemGeo = Boolean(
@@ -740,6 +905,7 @@ export function useNovoPedidoOrchestrator({
       temEnderecoEntrega,
       enderecoEntregaTemGeo,
       enderecoEntregaCoberturaStatus,
+      taxaEntregaOverride: modoTaxaEntrega,
       pedidoEntregaAceitaPagamentoPendente,
       entregaComCobrancaPeloEntregador,
       produtosCount: produtos.length,
@@ -802,7 +968,7 @@ export function useNovoPedidoOrchestrator({
     handleFecharProdutoTabsModal,
     handleClose,
     handleConfirmarCancelamentoVenda,
-    handleConfirmarSaida,
+    handleConfirmarSaida: handleConfirmarSaidaDescartando,
     handleMouseDown,
     handleGruposWheel,
     handleMouseDownMeiosPagamento,
@@ -825,6 +991,9 @@ export function useNovoPedidoOrchestrator({
     isLoadingBuscaProdutos,
     isLoadingProdutos,
     menuCatalogoIndisponivel,
+    hasNextProdutosCatalogo,
+    isFetchingNextProdutosCatalogo,
+    carregarProximaPaginaProdutosCatalogo,
     indiceLinhaPainelProduto,
     justificativaCancelamento,
     longPressComplementoIndexRef,
@@ -840,6 +1009,8 @@ export function useNovoPedidoOrchestrator({
     setEnderecoEntregaCoberturaStatus,
     enderecoEntregaCoberturaValorTaxa,
     setEnderecoEntregaCoberturaValorTaxa,
+    recotarTaxaEntregaAutomatica,
+    cotacaoTaxaEntregaBuscando: cotacaoTaxa.isFetching || cotacaoTaxaStatus === 'loading',
     mostrarLoadingFormasPagamento,
     modoVisualizacao,
     modalCancelarVendaOpen,

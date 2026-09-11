@@ -131,7 +131,7 @@ export function InformacoesProdutoStep({
       </p>
 
       <div className="space-y-4">
-        {/* Linha 1: Nome do Produto + Preço de Venda (preço só com 1 menu / cadastro unificado) */}
+        {/* Linha 1: Nome do Produto + Preço de Venda (preço só no contexto de cardápio) */}
         <div className={ocultarPrecoVenda ? 'grid gap-4' : 'grid gap-4 md:grid-cols-[1fr_180px]'}>
           <Input
             label="Nome do Produto"

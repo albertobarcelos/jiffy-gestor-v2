@@ -5,6 +5,37 @@ const PAGE_LIMIT = 100
 
 export type MenuProdutoCatalogTipoFiltro = 'all' | 'padrao' | 'pizza'
 
+export async function fetchMenuProdutosPagina(
+  menuId: string,
+  token: string,
+  filters?: {
+    grupoProdutoId?: string
+    q?: string
+    ativo?: boolean
+    tipo?: MenuProdutoCatalogTipoFiltro
+    limit?: number
+    offset?: number
+  }
+): Promise<{ items: MenuProduto[]; count: number }> {
+  const limit = filters?.limit ?? PAGE_LIMIT
+  const offset = filters?.offset ?? 0
+  const params = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+  })
+  if (filters?.grupoProdutoId) params.set('grupoProdutoId', filters.grupoProdutoId)
+  if (filters?.q?.trim()) params.set('q', filters.q.trim())
+  if (filters?.ativo !== undefined) params.set('ativo', String(filters.ativo))
+  if (filters?.tipo) params.set('tipo', filters.tipo)
+
+  const data = await fetchBffJson<{ items?: MenuProduto[]; count?: number }>(
+    `/api/menus/${encodeURIComponent(menuId)}/produtos?${params}`,
+    token
+  )
+  const items = Array.isArray(data.items) ? data.items : []
+  return { items, count: data.count ?? items.length }
+}
+
 export async function fetchAllMenuProdutos(
   menuId: string,
   token: string,
@@ -19,23 +50,14 @@ export async function fetchAllMenuProdutos(
   let offset = 0
 
   while (true) {
-    const params = new URLSearchParams({
-      limit: String(PAGE_LIMIT),
-      offset: String(offset),
+    const page = await fetchMenuProdutosPagina(menuId, token, {
+      ...filters,
+      limit: PAGE_LIMIT,
+      offset,
     })
-    if (filters?.grupoProdutoId) params.set('grupoProdutoId', filters.grupoProdutoId)
-    if (filters?.q?.trim()) params.set('q', filters.q.trim())
-    if (filters?.ativo !== undefined) params.set('ativo', String(filters.ativo))
-    if (filters?.tipo) params.set('tipo', filters.tipo)
-
-    const data = await fetchBffJson<{ items?: MenuProduto[] }>(
-      `/api/menus/${encodeURIComponent(menuId)}/produtos?${params}`,
-      token
-    )
-    const page = Array.isArray(data.items) ? data.items : []
-    items.push(...page)
-    if (page.length < PAGE_LIMIT) break
-    offset += page.length
+    items.push(...page.items)
+    if (page.items.length < PAGE_LIMIT) break
+    offset += page.items.length
   }
 
   return items

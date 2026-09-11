@@ -1,5 +1,7 @@
 'use client'
 
+import { useRef, useState } from 'react'
+import CircularProgress from '@mui/material/CircularProgress'
 import {
   MdArrowForward,
   MdEditNote,
@@ -43,13 +45,17 @@ export interface KanbanVendaCardActionsProps {
   exibirBotaoObservacaoPedido: boolean
   exibirBotaoAlterarEndereco: boolean
   onAvancarEtapa: (venda: Venda, colunaAtual: ColunaKanbanId) => void
-  onReimprimirCupomDelivery?: (venda: Venda, colunaAtual: ColunaKanbanId) => void
+  onReimprimirCupomDelivery?: (
+    venda: Venda,
+    colunaAtual: ColunaKanbanId
+  ) => void | Promise<void>
   onEmitirNfe: (venda: Venda) => void
   onAbrirEntregador: () => void
   onAbrirObservacao: () => void
   onAbrirEndereco: () => void
   onAbrirQuickView: (anchor: HTMLElement) => void
   onAbrirDocumentoVenda: (venda: Venda) => void
+  linhaEtapa?: { texto: string; titulo: string } | null
 }
 
 export function KanbanVendaCardActions(props: KanbanVendaCardActionsProps) {
@@ -72,6 +78,7 @@ export function KanbanVendaCardActions(props: KanbanVendaCardActionsProps) {
     onAbrirEndereco,
     onAbrirQuickView,
     onAbrirDocumentoVenda,
+    linhaEtapa = null,
   } = props
 
   const colunaAtual = column.id as ColunaKanbanId
@@ -109,6 +116,20 @@ export function KanbanVendaCardActions(props: KanbanVendaCardActionsProps) {
     mostrarInutilizada ||
     mostrarVerDocumento
   const rotuloAvancar = rotuloBotaoAvancarEtapaKanban(colunaAtual, venda.tipoVenda)
+  const [reimprimindo, setReimprimindo] = useState(false)
+  const reimprimindoLockRef = useRef(false)
+
+  const handleReimprimir = async () => {
+    if (reimprimindoLockRef.current || !onReimprimirCupomDelivery) return
+    reimprimindoLockRef.current = true
+    setReimprimindo(true)
+    try {
+      await onReimprimirCupomDelivery(venda, colunaAtual)
+    } finally {
+      reimprimindoLockRef.current = false
+      setReimprimindo(false)
+    }
+  }
 
   return (
     <div
@@ -116,8 +137,20 @@ export function KanbanVendaCardActions(props: KanbanVendaCardActionsProps) {
       onClick={e => e.stopPropagation()}
       onDoubleClick={e => e.stopPropagation()}
     >
-      {temIcones ? (
-        <div className="flex justify-end gap-1">
+      {temIcones || linhaEtapa ? (
+        <div className="flex items-center gap-1">
+          {linhaEtapa ? (
+            <span
+              className="min-w-0 flex-1 text-[11px] leading-snug text-gray-500"
+              title={linhaEtapa.titulo}
+            >
+              {linhaEtapa.texto}
+            </span>
+          ) : (
+            <span className="min-w-0 flex-1" />
+          )}
+          {temIcones ? (
+            <div className="flex shrink-0 justify-end gap-1">
           {exibirBotaoAlterarEndereco ? (
             <Button
               size="sm"
@@ -189,6 +222,8 @@ export function KanbanVendaCardActions(props: KanbanVendaCardActionsProps) {
               <MdVisibility size={16} />
             </Button>
           )}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -200,11 +235,17 @@ export function KanbanVendaCardActions(props: KanbanVendaCardActionsProps) {
               variant="outlined"
               className={`${classIconeAcao} !self-stretch`}
               sx={{ ...sxIconeAcao, minHeight: 36, py: 0.75 }}
-              onClick={() => onReimprimirCupomDelivery?.(venda, colunaAtual)}
-              title="Reimprimir"
-              aria-label="Reimprimir"
+              onClick={() => void handleReimprimir()}
+              disabled={reimprimindo}
+              title={reimprimindo ? 'Reimprimindo…' : 'Reimprimir'}
+              aria-label={reimprimindo ? 'Reimprimindo cupom' : 'Reimprimir'}
+              aria-busy={reimprimindo || undefined}
             >
-              <MdPrint size={16} />
+              {reimprimindo ? (
+                <CircularProgress size={16} sx={{ color: 'inherit' }} aria-hidden />
+              ) : (
+                <MdPrint size={16} />
+              )}
             </Button>
           ) : null}
 

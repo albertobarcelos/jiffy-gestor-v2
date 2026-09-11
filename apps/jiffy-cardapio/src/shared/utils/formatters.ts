@@ -37,8 +37,8 @@ export function formatBRLFromMaskedInput(value: number | string): string {
 }
 
 /**
- * Formata valor para Real (R$)
- * Replica exatamente a função transformarParaReal do Flutter
+ * Formata valor para Real (R$) — alias canônico de display do cardápio.
+ * Preferir `formatDeliveryCurrency` em código novo do delivery público.
  */
 export function transformarParaReal(valor: number | string | null | undefined): string {
   if (valor === null || valor === undefined) return 'R$ 0,00'
@@ -53,10 +53,10 @@ export function transformarParaReal(valor: number | string | null | undefined): 
     return 'R$ 0,00'
   }
 
-  const [inteiro, decimal] = Math.abs(numero).toFixed(2).split('.')
-  const inteiroComMilhar = inteiro.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
-  const sinal = numero < 0 ? '-' : ''
-  return `R$ ${sinal}${inteiroComMilhar},${decimal}`
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(numero)
 }
 
 /**

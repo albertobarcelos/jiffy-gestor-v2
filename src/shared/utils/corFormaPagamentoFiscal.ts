@@ -2,15 +2,22 @@
  * Cor por forma de pagamento fiscal (cadastro — campo estável; o nome do meio pode ser “dindin”).
  * Chaves como em NovoMeioPagamento / API (minúsculas, snake_case).
  */
+/** Cartão (crédito, débito e vales). Dinheiro e PIX ficam fora. */
+const COR_CARTAO = '#003366'
+/** Verde Jiffy (accent5) — fundo do dinheiro. */
+const COR_VERDE_JIFFY = '#00B074'
+/** Verde-limão da paleta (accent1) — texto e ícone de todo cartão (crédito, débito e vales). */
+const COR_VERDE_LIMA = '#B4DD2B'
+
 const COR_POR_FORMA_PAGAMENTO_FISCAL: Record<string, string> = {
-  dinheiro: '#00B074',
-  pix: '#B4DD2B',
-  cartao_credito: '#003366',
-  cartao_debito: '#006699',
-  vale_alimentacao: '#530CA3',
-  vale_refeicao: '#FF9800',
-  vale_presente: '#9C27B0',
-  vale_combustivel: '#00BCD4',
+  dinheiro: COR_VERDE_JIFFY,
+  pix: '#32BCAD',
+  cartao_credito: COR_CARTAO,
+  cartao_debito: COR_CARTAO,
+  vale_alimentacao: COR_CARTAO,
+  vale_refeicao: COR_CARTAO,
+  vale_presente: COR_CARTAO,
+  vale_combustivel: COR_CARTAO,
 }
 
 const ALIAS_FORMA_PAGAMENTO_FISCAL: Record<string, keyof typeof COR_POR_FORMA_PAGAMENTO_FISCAL> = {
@@ -39,7 +46,7 @@ export function corFormaPagamentoFiscal(formaRaw: string): string {
   return COR_FORMA_FISCAL_FALLBACK
 }
 
-/** Texto legível sobre o fundo da forma (PIX lima pede texto escuro). */
+/** Texto legível sobre o fundo da forma. */
 export function textoContrasteSobreHex(hex: string): '#ffffff' | '#1a1a1a' {
   const n = hex.replace('#', '')
   if (n.length !== 6) return '#ffffff'
@@ -54,12 +61,18 @@ export function estiloCardMeioPagamento(formaFiscal: string): {
   backgroundColor: string
   borderColor: string
   color: string
+  labelColor: string
+  labelFontWeight?: number
 } {
   const backgroundColor = corFormaPagamentoFiscal(formaFiscal)
+  const isCartao = backgroundColor === COR_CARTAO
+  const contraste = isCartao ? COR_VERDE_LIMA : textoContrasteSobreHex(backgroundColor)
   return {
     backgroundColor,
     borderColor: backgroundColor,
-    color: textoContrasteSobreHex(backgroundColor),
+    color: contraste,
+    labelColor: contraste,
+    labelFontWeight: isCartao ? 600 : undefined,
   }
 }
 

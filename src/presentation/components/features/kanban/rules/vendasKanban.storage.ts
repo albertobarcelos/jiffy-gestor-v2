@@ -218,7 +218,7 @@ function lerMapaColunasOcultas(): MapaColunasOcultas | null {
   }
 }
 
-/** Sem chave do modo no storage: delivery esconde Novos + Com NF; balcão mostra todas. */
+/** Fredy sem chave no storage: delivery esconde Novos + Com NF; balcão mostra todas. O Gestor web ignora este mapa. */
 export function lerColunasOcultasDoStorage(modo: ModoKanbanVendas): ColunaKanbanId[] {
   const mapa = lerMapaColunasOcultas()
   if (mapa == null || !(modo in mapa)) {

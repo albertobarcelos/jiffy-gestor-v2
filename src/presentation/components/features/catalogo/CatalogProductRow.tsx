@@ -15,7 +15,34 @@ import { ProdutoNomeInput } from '@/src/presentation/components/features/produto
 import { ProdutoStatusSwitch } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoStatusSwitch'
 import { MenuProdutoPauseControl } from '@/src/presentation/components/features/menus/MenuProdutoPauseControl'
 import { cn } from '@/src/shared/utils/cn'
+import {
+  NOME_CATALOGO_LISTA_MAX_CHARS,
+  truncarNomeCatalogoLista,
+} from '@/src/shared/utils/catalogoListaNome'
 import type { CatalogListVariant } from './types'
+
+const FOTO_BOX = 'h-14 w-14 shrink-0 md:h-16 md:w-16'
+const NOME_COL = 'min-w-0 max-w-[25ch] justify-self-start'
+
+function catalogRowGridClass(opts: {
+  isMenu: boolean
+  hideCodigo: boolean
+  hasActions: boolean
+  hasCategoria: boolean
+}): string {
+  if (opts.isMenu && opts.hideCodigo) {
+    return opts.hasActions
+      ? '[grid-template-columns:auto_minmax(0,1fr)_auto_auto]'
+      : '[grid-template-columns:auto_minmax(0,1fr)_auto]'
+  }
+  if (opts.isMenu) {
+    return '[grid-template-columns:auto_minmax(0,1fr)_4.75rem] md:[grid-template-columns:auto_25ch_4.75rem_minmax(0,1fr)_auto]'
+  }
+  if (opts.hasCategoria) {
+    return '[grid-template-columns:minmax(0,1fr)_4.75rem] md:[grid-template-columns:25ch_4.75rem_auto_12rem_auto]'
+  }
+  return '[grid-template-columns:minmax(0,1fr)_4.75rem] md:[grid-template-columns:25ch_4.75rem_auto_minmax(0,1fr)_auto]'
+}
 
 export interface CatalogProductRowProps {
   variant: CatalogListVariant
@@ -37,11 +64,15 @@ export interface CatalogProductRowProps {
   isSavingNome?: boolean
   onNomeChange?: (id: string, nome: string) => void | boolean | Promise<void | boolean>
   onValorChange?: (id: string, valor: number) => void | boolean | Promise<void | boolean>
-  onSwitchToggle: (id: string, status: boolean) => void
+  onSwitchToggle?: (id: string, status: boolean) => void
   onEdit: (id: string) => void
   onRemove?: (id: string) => void
   /** Troca a imagem (cadastro base ou snapshot do cardápio) — abre o crop no pai. */
   onChangeImage?: (id: string, file: File) => void
+  /** Esconde preço e pause/status (ex.: categorias neste cardápio). */
+  hidePauseAndPrice?: boolean
+  /** Esconde o selo COD. */
+  hideCodigo?: boolean
 }
 
 function CatalogProductRowInner({
@@ -66,10 +97,15 @@ function CatalogProductRowInner({
   onEdit,
   onRemove,
   onChangeImage,
+  hidePauseAndPrice = false,
+  hideCodigo = false,
 }: CatalogProductRowProps) {
   const [imagemExpandida, setImagemExpandida] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const nomeExibicao = nome.length > 30 ? `${nome.slice(0, 30)}…` : nome
+  const { exibicao: nomeExibicao, truncado: nomeTruncado } = truncarNomeCatalogoLista(
+    nome,
+    NOME_CATALOGO_LISTA_MAX_CHARS
+  )
   const imagemPreview = imagemUrl?.trim() || null
   const isMenu = variant === 'menu'
   const pausadoNoMenu = isMenu && !ativo
@@ -129,7 +165,8 @@ function CatalogProductRowInner({
   const placeholderSemImagem = (
     <span
       className={cn(
-        'flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-dashed md:h-12 md:w-12',
+        'flex items-center justify-center rounded-lg border border-dashed',
+        FOTO_BOX,
         podeTrocarImagem
           ? 'border-primary/40 bg-primary/5 text-primary hover:bg-primary/10'
           : 'border-gray-300 bg-gray-50 text-secondary-text'
@@ -137,7 +174,7 @@ function CatalogProductRowInner({
       aria-hidden={!podeTrocarImagem}
       title={podeTrocarImagem ? undefined : 'Sem imagem'}
     >
-      <MdImageNotSupported className="h-6 w-6 md:h-7 md:w-7" />
+      <MdImageNotSupported className="h-7 w-7 md:h-8 md:w-8" />
     </span>
   )
 
@@ -152,57 +189,46 @@ function CatalogProductRowInner({
           pausadoNoMenu
             ? 'bg-gray-200 hover:bg-gray-200'
             : 'bg-white hover:bg-secondary-text/10',
-          isMenu
-            ? // imagem | nome | COD | ícones | espaço flex | preço/ações
-              '[grid-template-columns:auto_minmax(0,1fr)_auto_auto] md:[grid-template-columns:auto_minmax(0,28ch)_auto_auto_minmax(0,1fr)_auto]'
-            : categoriaSlot
-              ? '[grid-template-columns:minmax(0,1fr)_auto] md:[grid-template-columns:minmax(0,30ch)_auto_auto_12rem_auto]'
-              : '[grid-template-columns:minmax(0,1fr)_auto] md:[grid-template-columns:minmax(0,30ch)_auto_auto_minmax(0,1fr)_auto]'
+          catalogRowGridClass({
+            isMenu,
+            hideCodigo,
+            hasActions: Boolean(actionsSlot),
+            hasCategoria: Boolean(categoriaSlot),
+          })
         )}
       >
         {isMenu && imagemPreview ? (
-          <div className="relative h-11 w-11 shrink-0 md:h-12 md:w-12">
-            <button
-              type="button"
-              title={podeTrocarImagem ? 'Trocar imagem' : 'Ver imagem'}
-              aria-label={
-                podeTrocarImagem ? `Trocar imagem de ${nome}` : `Ver imagem de ${nome}`
-              }
-              disabled={isSavingImage}
-              onClick={e => {
-                e.stopPropagation()
-                if (podeTrocarImagem) abrirSeletorImagem()
-                else setImagemExpandida(true)
-              }}
-              className="group relative h-full w-full overflow-hidden rounded-lg border border-gray-200 bg-white disabled:opacity-60"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element -- preview do snapshot/cadastro */}
-              <img
-                src={imagemPreview}
-                alt=""
-                className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
-              />
-              <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
-                {podeTrocarImagem ? (
-                  <MdAddAPhoto className="text-white drop-shadow" size={20} />
-                ) : (
-                  <MdVisibility className="text-white drop-shadow" size={22} />
-                )}
-              </span>
-            </button>
-            <button
-              type="button"
-              title="Ver imagem"
-              aria-label={`Ver imagem de ${nome}`}
-              onClick={e => {
-                e.stopPropagation()
-                setImagemExpandida(true)
-              }}
-              className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border border-white bg-primary text-white shadow"
-            >
-              <MdVisibility size={12} />
-            </button>
-          </div>
+          <button
+            type="button"
+            title={podeTrocarImagem ? 'Trocar imagem' : 'Ver imagem'}
+            aria-label={
+              podeTrocarImagem ? `Trocar imagem de ${nome}` : `Ver imagem de ${nome}`
+            }
+            disabled={isSavingImage}
+            onClick={e => {
+              e.stopPropagation()
+              if (podeTrocarImagem) abrirSeletorImagem()
+              else setImagemExpandida(true)
+            }}
+            className={cn(
+              'group relative overflow-hidden rounded-lg border border-gray-200 bg-white disabled:opacity-60',
+              FOTO_BOX
+            )}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- preview do snapshot/cadastro */}
+            <img
+              src={imagemPreview}
+              alt=""
+              className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+            />
+            <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
+              {podeTrocarImagem ? (
+                <MdAddAPhoto className="text-white drop-shadow" size={22} />
+              ) : (
+                <MdVisibility className="text-white drop-shadow" size={24} />
+              )}
+            </span>
+          </button>
         ) : isMenu && podeTrocarImagem ? (
           <button
             type="button"
@@ -222,42 +248,48 @@ function CatalogProductRowInner({
         ) : null}
 
         {podeEditarNome && onNomeChange ? (
-          <div className="min-w-0 justify-self-start">
+          <div className={NOME_COL}>
             <ProdutoNomeInput
               nome={nome}
+              maxChars={NOME_CATALOGO_LISTA_MAX_CHARS}
               disabled={isSavingNome}
               onCommit={novoNome => onNomeChange(id, novoNome)}
             />
           </div>
         ) : (
           <span
-            className="min-w-0 truncate text-sm font-normal tracking-wide text-primary-text md:text-base"
-            title={nome.length > 30 ? nome : undefined}
+            className={cn(
+              NOME_COL,
+              'truncate text-sm font-normal tracking-wide text-primary-text md:text-base'
+            )}
+            title={nomeTruncado ? nome : undefined}
           >
             {nomeExibicao}
           </span>
         )}
 
-        <span className="inline-flex shrink-0 items-center justify-center justify-self-start rounded-full border border-primary px-2 py-0.5 text-[10px] font-semibold leading-tight text-primary md:text-[11px]">
-          COD. {codigo?.trim() ? codigo : '—'}
-        </span>
+        {hideCodigo ? null : (
+          <span className="inline-flex h-8 w-[4.75rem] shrink-0 items-center justify-center justify-self-start rounded-lg border border-primary px-1 text-[10px] font-semibold tabular-nums leading-tight text-primary md:text-[11px]">
+            COD. {codigo?.trim() ? codigo : '—'}
+          </span>
+        )}
 
         {actionsSlot ? (
           <div
             className={cn(
-              'flex flex-nowrap items-center gap-1 justify-self-start md:gap-1.5',
-              isMenu
-                ? 'max-md:col-span-2 max-md:overflow-x-auto max-md:pb-0.5'
-                : 'col-span-2 max-md:overflow-x-auto max-md:pb-0.5 md:col-span-1'
+              'flex min-w-0 flex-nowrap items-center',
+              isMenu && !hideCodigo
+                ? 'w-full justify-center max-md:col-span-full max-md:justify-start max-md:overflow-x-auto max-md:pb-0.5'
+                : hideCodigo
+                  ? 'justify-self-start'
+                  : 'justify-self-start max-md:col-span-full max-md:overflow-x-auto max-md:pb-0.5'
             )}
           >
             {actionsSlot}
           </div>
         ) : null}
 
-        {isMenu ? (
-          <div className="hidden min-w-0 md:block" aria-hidden />
-        ) : categoriaSlot ? (
+        {isMenu ? null : categoriaSlot ? (
           <div className="min-w-0 justify-self-start max-md:col-span-2 md:col-span-1">
             {categoriaSlot}
           </div>
@@ -268,7 +300,7 @@ function CatalogProductRowInner({
         <div
           className={cn(
             'flex w-auto flex-nowrap items-center justify-end gap-2 self-center justify-self-end md:mr-4 md:gap-4',
-            isMenu ? 'max-md:col-span-2' : 'max-md:col-span-2'
+            isMenu && hideCodigo ? null : 'max-md:col-span-full'
           )}
         >
           {valorSomenteLeitura ? (
@@ -278,24 +310,24 @@ function CatalogProductRowInner({
             >
               {valorExibicao ?? '—'}
             </span>
-          ) : podeEditarValor && onValorChange ? (
+          ) : hidePauseAndPrice ? null : podeEditarValor && onValorChange ? (
             <ProdutoValorInput
               valor={valor}
               disabled={isSavingValor}
               onCommit={novoValor => onValorChange(id, novoValor)}
             />
           ) : null}
-          {isMenu ? (
+          {hidePauseAndPrice ? null : isMenu ? (
             <MenuProdutoPauseControl
               isAtivo={ativo}
               disabled={isSavingStatus}
-              onToggle={status => onSwitchToggle(id, status)}
+              onToggle={status => onSwitchToggle?.(id, status)}
             />
           ) : (
             <ProdutoStatusSwitch
               isAtivo={ativo}
               disabled={isSavingStatus}
-              onChange={status => onSwitchToggle(id, status)}
+              onChange={status => onSwitchToggle?.(id, status)}
             />
           )}
           {isMenu && onRemove ? (
@@ -355,7 +387,9 @@ function arePropsEqual(prev: CatalogProductRowProps, next: CatalogProductRowProp
     prev.onSwitchToggle === next.onSwitchToggle &&
     prev.onEdit === next.onEdit &&
     prev.onRemove === next.onRemove &&
-    prev.onChangeImage === next.onChangeImage
+    prev.onChangeImage === next.onChangeImage &&
+    prev.hidePauseAndPrice === next.hidePauseAndPrice &&
+    prev.hideCodigo === next.hideCodigo
   )
 }
 

@@ -48,7 +48,9 @@ function repoMock(overrides: Partial<INovoPedidoReadRepository> = {}): INovoPedi
   return {
     listarEntregadores: vi.fn(),
     listarEntregadoresDelivery: vi.fn(),
+    listarGruposDoMenu: vi.fn(),
     listarProdutosDoGrupo: vi.fn(),
+    listarProdutosCatalogoPagina: vi.fn(),
     listarGrupoIdsComProdutosAtivos: vi.fn(),
     buscarProdutoPorId: vi.fn(),
     buscarProdutosPorNome: vi.fn(),
@@ -69,7 +71,7 @@ function repoMock(overrides: Partial<INovoPedidoReadRepository> = {}): INovoPedi
 }
 
 describe('CriarPedidoDeliveryUseCase', () => {
-  it('registra cobranças via PATCH após criar pedido já pago', async () => {
+  it('registra cobran?as via PATCH ap?s criar pedido j? pago', async () => {
     const executeSpy = vi
       .spyOn(atualizarCobrancasPedidoDeliveryUseCase, 'execute')
       .mockResolvedValue(true)
@@ -80,8 +82,12 @@ describe('CriarPedidoDeliveryUseCase', () => {
     await useCase.execute(baseInput(), mutate, 'token-test')
 
     expect(mutate).toHaveBeenCalledOnce()
-    const postPayload = mutate.mock.calls[0][0] as { cobrancas?: unknown }
+    const postPayload = mutate.mock.calls[0][0] as {
+      cobrancas?: unknown
+      valorTaxaEntrega?: number
+    }
     expect(postPayload.cobrancas).toBeUndefined()
+    expect(postPayload.valorTaxaEntrega).toBeUndefined()
 
     expect(executeSpy).toHaveBeenCalledWith(
       'pedido-abc',
@@ -93,30 +99,20 @@ describe('CriarPedidoDeliveryUseCase', () => {
     executeSpy.mockRestore()
   })
 
-  it('omite cobrança no POST, ajusta taxa e lança cobrança no mesmo PATCH, e cancela se o PATCH falhar', async () => {
-    const patchPedidoDelivery = vi.fn().mockRejectedValue(new Error('PATCH taxas falhou'))
+  it('cancela o pedido se o PATCH de cobran?as falhar ap?s create j? pago', async () => {
     const transicionarStatusPedidoDelivery = vi.fn().mockResolvedValue(undefined)
-    const repo = repoMock({ patchPedidoDelivery, transicionarStatusPedidoDelivery })
-    const cobrancas = { execute: vi.fn() }
+    const repo = repoMock({ transicionarStatusPedidoDelivery })
+    const cobrancas = { execute: vi.fn().mockRejectedValue(new Error('PATCH cobran?as falhou')) }
     const mutate = vi.fn().mockResolvedValue({ id: 'pedido-xyz' })
     const useCase = new CriarPedidoDeliveryUseCase(cobrancas as never, repo)
 
-    await expect(
-      useCase.execute(
-        baseInput({
-          pedidoComEntrega: true,
-          taxaEntregaId: TAXA_ENTREGA_SEM_TAXA_ID,
-          entregaComCobrancaPeloEntregador: true,
-          pagamentos: [{ meioPagamentoId: 'mp-1', valor: 40 }],
-        }),
-        mutate,
-        'token-test'
-      )
-    ).rejects.toThrow(/não foi lançado/i)
+    await expect(useCase.execute(baseInput(), mutate, 'token-test')).rejects.toThrow(
+      /O pedido n.o foi lan.ado/
+    )
 
     const postPayload = mutate.mock.calls[0][0] as { cobrancas?: unknown }
     expect(postPayload.cobrancas).toBeUndefined()
-    expect(cobrancas.execute).not.toHaveBeenCalled()
+    expect(cobrancas.execute).toHaveBeenCalled()
     expect(transicionarStatusPedidoDelivery).toHaveBeenCalledWith(
       'pedido-xyz',
       'token-test',
@@ -124,19 +120,9 @@ describe('CriarPedidoDeliveryUseCase', () => {
     )
   })
 
-  it('não chama PATCH de cobrança avulso quando o override já lança taxa e cobrança juntos', async () => {
+  it('envia valorTaxaEntrega e cobran?as juntos no POST quando o entregador cobra', async () => {
     const patchPedidoDelivery = vi.fn().mockResolvedValue(undefined)
-    const repo = repoMock({
-      patchPedidoDelivery,
-      buscarPedidoDelivery: vi
-        .fn()
-        .mockResolvedValueOnce({
-          taxasLancadas: [{ taxaId: 'tx-auto', tipo: 'entrega', valor: 8 }],
-          taxaEntregaId: 'tx-auto',
-          cobrancas: [],
-        })
-        .mockResolvedValue({ cobrancas: [] }),
-    })
+    const repo = repoMock({ patchPedidoDelivery })
     const cobrancas = { execute: vi.fn() }
     const mutate = vi.fn().mockResolvedValue({ id: 'pedido-ok' })
     const useCase = new CriarPedidoDeliveryUseCase(cobrancas as never, repo)
@@ -153,21 +139,47 @@ describe('CriarPedidoDeliveryUseCase', () => {
     )
 
     expect(cobrancas.execute).not.toHaveBeenCalled()
-    expect(patchPedidoDelivery).toHaveBeenCalledWith(
-      'pedido-ok',
-      'token-test',
+    expect(patchPedidoDelivery).not.toHaveBeenCalled()
+    expect(mutate).toHaveBeenCalledWith(
       expect.objectContaining({
-        taxas: { remove: ['tx-auto'] },
-        cobrancas: {
-          add: [
-            expect.objectContaining({
-              meioPagamentoId: 'mp-1',
-              valor: 40,
-              momentoCobranca: 'na_entrega',
-            }),
-          ],
-        },
+        valorTaxaEntrega: 0,
+        cobrancas: [
+          expect.objectContaining({
+            meioPagamentoId: 'mp-1',
+            valor: 40,
+            momentoCobranca: 'na_entrega',
+          }),
+        ],
       })
     )
+  })
+
+  it('envia o valor do cat?logo no POST sem PATCH de taxas', async () => {
+    const patchPedidoDelivery = vi.fn().mockResolvedValue(undefined)
+    const repo = repoMock({ patchPedidoDelivery })
+    const cobrancas = { execute: vi.fn() }
+    const mutate = vi.fn().mockResolvedValue({ id: 'pedido-cat' })
+    const useCase = new CriarPedidoDeliveryUseCase(cobrancas as never, repo)
+
+    await useCase.execute(
+      baseInput({
+        pedidoComEntrega: true,
+        taxaEntregaId: 'taxa-catalogo-1',
+        valorTaxaEntrega: 15,
+        entregaComCobrancaPeloEntregador: true,
+        pagamentos: [{ meioPagamentoId: 'mp-1', valor: 39 }],
+      }),
+      mutate,
+      'token-test'
+    )
+
+    expect(cobrancas.execute).not.toHaveBeenCalled()
+    expect(patchPedidoDelivery).not.toHaveBeenCalled()
+    const postPayload = mutate.mock.calls[0][0] as {
+      valorTaxaEntrega?: number
+      taxas?: unknown
+    }
+    expect(postPayload.valorTaxaEntrega).toBe(15)
+    expect(postPayload.taxas).toBeUndefined()
   })
 })

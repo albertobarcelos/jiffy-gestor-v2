@@ -54,6 +54,11 @@ export function DeliveryCheckoutFooterActions({
         <button
           type="button"
           disabled={continuarDisabled}
+          data-checkout-leave-without-numero=""
+          onMouseDown={e => {
+            // Evita blur do número antes do click (senão toast duplica com a validação).
+            if (!continuarDisabled) e.preventDefault()
+          }}
           onClick={onContinuar}
           className="flex min-w-0 flex-1 items-center justify-center border-0 bg-black px-5 text-base font-semibold text-white disabled:opacity-60"
         >

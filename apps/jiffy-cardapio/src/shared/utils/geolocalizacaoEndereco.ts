@@ -1,7 +1,7 @@
 import { formatarCepMascara, normalizarDigitosCep } from '@/src/shared/utils/consultaCep'
 import {
   backendReverseGeocode,
-} from '@/src/shared/utils/geolocalizacaoBackendApi'
+} from '@/src/infrastructure/api/geolocalizacaoBackendApi'
 import { mensagemAmigavelErroGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
 
 export type EnderecoPorLocalizacao = {

@@ -22,7 +22,12 @@ import {
   useAutoFetchCatalogoGrupos,
   usePublicDeliveryCatalogInfinite,
 } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
-import { isPublicDeliverySlugNotFound, isEmpresaDeliveryIndisponivel, extrairMensagensPendenciasCatalogo } from '@/src/infrastructure/api/publicDeliveryApi'
+import { useLocalizacaoEmpresaPublica } from '../../shared/hooks/useLocalizacaoEmpresaPublica'
+import {
+  isPublicDeliverySlugNotFound,
+  isEmpresaDeliveryIndisponivel,
+  extrairMensagensPendenciasCatalogo,
+} from '@/src/application/errors/publicDeliveryErrors'
 import { DeliveryLojaIndisponivelScreen } from './DeliveryLojaIndisponivelScreen'
 import {
   DeliveryThemeScope,
@@ -98,12 +103,15 @@ export function DeliveryPublicoHomeScreen({
   useDeliveryBodyScrollLock(bloquearUiFlyToCart)
 
   const catalogQuery = usePublicDeliveryCatalogInfinite(slug)
-  useAutoFetchCatalogoGrupos(catalogQuery)
+  useAutoFetchCatalogoGrupos(slug, catalogQuery)
 
   const { data, isLoading, isError, error, isFetchingNextPage } = catalogQuery
   const empresa: EmpresaPublicaDTO | null = data?.pages[0]?.empresa ?? null
   const funcionamento: FuncionamentoPublicoDTO | null = data?.pages[0]?.funcionamento ?? null
   const lojaAberta = funcionamento?.aberta ?? true
+
+  // Aquece cache da geo da loja (1 geocode/sessão) para distância no checkout.
+  useLocalizacaoEmpresaPublica(slug, empresa?.endereco ?? null, Boolean(empresa?.endereco))
 
   const carrinhoItens = useDeliveryCarrinhoItens(slug)
   const carrinhoTotal = useDeliveryCarrinhoTotal(slug)

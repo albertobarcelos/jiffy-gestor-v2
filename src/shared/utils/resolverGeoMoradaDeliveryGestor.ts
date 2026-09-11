@@ -1,6 +1,6 @@
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import { geocodificarEnderecoViaGoogle } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
-import type { EnderecoMorada } from '@/src/presentation/hooks/useMoradaTelefone'
+import type { EnderecoMorada } from '@/src/domain/types/moradaEntrega'
 
 export type GeoMoradaResolvida = {
   enderecoLocalizacao: GeoJsonPoint

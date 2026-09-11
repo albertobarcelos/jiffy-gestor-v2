@@ -51,13 +51,17 @@ export async function proxyCanalWhatsApp(
       )
     }
 
-    logFalhaCanalWhatsApp(options.logContext, error)
     if (error instanceof ApiError) {
+      // GET 404 = empresa sem canal. A UI trata como vazio; não é falha operacional.
+      if (error.status !== 404) {
+        logFalhaCanalWhatsApp(options.logContext, error)
+      }
       return NextResponse.json(
         { error: mensagemLegivelApiError(error), details: error.data },
         { status: error.status }
       )
     }
+    logFalhaCanalWhatsApp(options.logContext, error)
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
   }
 }

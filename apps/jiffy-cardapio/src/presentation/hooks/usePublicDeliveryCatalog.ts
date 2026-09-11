@@ -10,9 +10,9 @@ import {
   type UseInfiniteQueryResult,
 } from '@tanstack/react-query'
 import {
-  fetchCatalogoPublico,
-  fetchMeiosPagamentoPublicos,
-} from '@/src/infrastructure/api/publicDeliveryApi'
+  listarMeiosPagamentoPublicoUseCase,
+  obterCatalogoPublicoUseCase,
+} from '@/src/infrastructure/di/deliveryPublicoUseCases'
 import type {
   CatalogoPublicoComplementoDTO,
   CatalogoPublicoGrupoComplementoDTO,
@@ -20,23 +20,23 @@ import type {
   GetCatalogoPublicoResponseDTO,
 } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { create } from 'zustand'
+import {
+  CATALOGO_GRUPOS_PAGE_LIMIT,
+  CATALOGO_QUERY_STALE_MS,
+  publicDeliveryCatalogInfiniteQueryKey,
+  publicDeliveryCatalogQueryKey,
+  publicDeliveryMeiosPagamentoQueryKey,
+} from '@/src/presentation/hooks/publicDeliveryCatalogKeys'
 
-/** Paginação por grupos — máximo permitido pelo backend. */
-export const CATALOGO_GRUPOS_PAGE_LIMIT = 20
+export {
+  CATALOGO_GRUPOS_PAGE_LIMIT,
+  CATALOGO_QUERY_STALE_MS,
+  publicDeliveryCatalogInfiniteQueryKey,
+  publicDeliveryCatalogQueryKey,
+  publicDeliveryMeiosPagamentoQueryKey,
+} from '@/src/presentation/hooks/publicDeliveryCatalogKeys'
 
 const complementosStorageKey = (slug: string) => `cardapio-delivery-complementos:${slug}`
-
-export function publicDeliveryCatalogQueryKey(slug: string, offset: number, limit: number) {
-  return ['public-delivery', slug, 'catalogo', offset, limit] as const
-}
-
-export function publicDeliveryCatalogInfiniteQueryKey(slug: string) {
-  return ['public-delivery', slug, 'catalogo', 'infinite', CATALOGO_GRUPOS_PAGE_LIMIT] as const
-}
-
-export function publicDeliveryMeiosPagamentoQueryKey(slug: string) {
-  return ['public-delivery', slug, 'meios-pagamento'] as const
-}
 
 /** Cache local de complementos (enviados só na 1ª página, offset=0). */
 type ComplementosCache = {
@@ -168,12 +168,12 @@ export function usePublicDeliveryCatalogPage(
   return useQuery({
     queryKey: publicDeliveryCatalogQueryKey(slug, offset, limit),
     queryFn: async () => {
-      const data = await fetchCatalogoPublico(slug, { offset, limit })
+      const data = await obterCatalogoPublicoUseCase.execute(slug, { offset, limit })
       persistirComplementosPrimeiraPagina(slug, offset, data.catalogo, salvarComplementos)
       return data
     },
     enabled: (options?.enabled ?? true) && !!slug,
-    staleTime: 60_000,
+    staleTime: CATALOGO_QUERY_STALE_MS,
     retry: catalogoRetry,
   })
 }
@@ -204,7 +204,7 @@ export function usePublicDeliveryCatalogInfinite(slug: string, enabled = true) {
     queryKey: publicDeliveryCatalogInfiniteQueryKey(slug),
     queryFn: async ({ pageParam }) => {
       const offset = pageParam as number
-      const data = await fetchCatalogoPublico(slug, {
+      const data = await obterCatalogoPublicoUseCase.execute(slug, {
         offset,
         limit: CATALOGO_GRUPOS_PAGE_LIMIT,
       })
@@ -217,33 +217,112 @@ export function usePublicDeliveryCatalogInfinite(slug: string, enabled = true) {
       return (lastPageParam as number) + lastPage.catalogo.paginacao.limit
     },
     enabled: enabled && !!slug,
-    staleTime: 60_000,
+    staleTime: CATALOGO_QUERY_STALE_MS,
     retry: catalogoRetry,
   })
 }
 
 /**
- * Carrega automaticamente todas as páginas de grupos (offset += limit).
- * Complementos continuam vindo só na 1ª — demais páginas retornam null.
+ * Carrega as páginas restantes do catálogo em lotes paralelos (até 3),
+ * usando `totalPages` da 1ª página — evita waterfall estritamente sequencial.
  */
 export function useAutoFetchCatalogoGrupos(
+  slug: string,
   query: Pick<
     UseInfiniteQueryResult<InfiniteData<GetCatalogoPublicoResponseDTO>, Error>,
-    'hasNextPage' | 'isFetchingNextPage' | 'fetchNextPage' | 'isSuccess' | 'isError'
+    'data' | 'isSuccess' | 'isError'
   >
 ) {
-  const { hasNextPage, isFetchingNextPage, fetchNextPage, isSuccess, isError } = query
+  const queryClient = useQueryClient()
+  const salvarComplementos = usePublicDeliveryComplementosStore(s => s.salvar)
+  const totalPages = query.data?.pages[0]?.catalogo.paginacao.totalPages ?? 0
+  const limit =
+    query.data?.pages[0]?.catalogo.paginacao.limit || CATALOGO_GRUPOS_PAGE_LIMIT
+  const pagesCarregadas = query.data?.pages.length ?? 0
 
   useEffect(() => {
-    if (isSuccess && !isError && hasNextPage && !isFetchingNextPage) {
-      fetchNextPage()
+    if (!query.isSuccess || query.isError || !slug.trim()) return
+    if (totalPages <= 1 || pagesCarregadas >= totalPages) return
+
+    let cancelled = false
+    const queryKey = publicDeliveryCatalogInfiniteQueryKey(slug)
+    const BATCH = 3
+
+    const run = async () => {
+      const loaded = new Set(
+        (
+          queryClient.getQueryData<InfiniteData<GetCatalogoPublicoResponseDTO>>(queryKey)
+            ?.pageParams ?? []
+        ).map(p => Number(p))
+      )
+
+      const missingOffsets: number[] = []
+      for (let pageIndex = 1; pageIndex < totalPages; pageIndex++) {
+        const offset = pageIndex * limit
+        if (!loaded.has(offset)) missingOffsets.push(offset)
+      }
+      if (!missingOffsets.length) return
+
+      for (let i = 0; i < missingOffsets.length; i += BATCH) {
+        if (cancelled) return
+        const batch = missingOffsets.slice(i, i + BATCH)
+        const results = await Promise.all(
+          batch.map(offset =>
+            obterCatalogoPublicoUseCase.execute(slug, { offset, limit })
+          )
+        )
+        if (cancelled) return
+
+        queryClient.setQueryData<InfiniteData<GetCatalogoPublicoResponseDTO>>(
+          queryKey,
+          old => {
+            if (!old) return old
+            const paired = old.pages.map((page, idx) => ({
+              page,
+              param: Number(old.pageParams[idx]),
+            }))
+            const existing = new Set(paired.map(p => p.param))
+            for (let j = 0; j < results.length; j++) {
+              const offset = batch[j]
+              if (existing.has(offset)) continue
+              paired.push({ page: results[j], param: offset })
+              existing.add(offset)
+              persistirComplementosPrimeiraPagina(
+                slug,
+                offset,
+                results[j].catalogo,
+                salvarComplementos
+              )
+            }
+            paired.sort((a, b) => a.param - b.param)
+            return {
+              pages: paired.map(p => p.page),
+              pageParams: paired.map(p => p.param),
+            }
+          }
+        )
+      }
     }
-  }, [isSuccess, isError, hasNextPage, isFetchingNextPage, fetchNextPage])
+
+    void run()
+    return () => {
+      cancelled = true
+    }
+  }, [
+    slug,
+    query.isSuccess,
+    query.isError,
+    totalPages,
+    limit,
+    pagesCarregadas,
+    queryClient,
+    salvarComplementos,
+  ])
 }
 
 /**
- * Garante cache de complementos (offset=0) quando ausente —
- * ex.: refresh na página 2 ou acesso direto ao carrinho/modal.
+ * Garante cache de complementos quando ausente (modal/carrinho).
+ * Reusa a infinite query do catálogo (mesma query key) — sem GET offset=0 paralelo.
  */
 export function useEnsureComplementosCatalogo(slug: string, enabled = true) {
   const cache = usePublicDeliveryComplementosStore(s => s.porSlug[slug] ?? null)
@@ -254,28 +333,30 @@ export function useEnsureComplementosCatalogo(slug: string, enabled = true) {
     if (slug) hidratarDoStorage(slug)
   }, [slug, hidratarDoStorage])
 
-  return useQuery({
-    queryKey: ['public-delivery', slug, 'catalogo', 'complementos-bootstrap'] as const,
-    queryFn: async () => {
-      const data = await fetchCatalogoPublico(slug, {
-        offset: 0,
-        limit: CATALOGO_GRUPOS_PAGE_LIMIT,
-      })
-      persistirComplementosPrimeiraPagina(slug, 0, data.catalogo, salvarComplementos)
-      return data
-    },
-    enabled: enabled && !!slug && !cache,
-    staleTime: 60_000,
-    retry: catalogoRetry,
-  })
+  const precisaCatalogo = Boolean(enabled && slug && !cache)
+  const infinite = usePublicDeliveryCatalogInfinite(slug, precisaCatalogo)
+
+  useEffect(() => {
+    if (!slug || cache) return
+    const catalogo = infinite.data?.pages[0]?.catalogo
+    if (!catalogo) return
+    persistirComplementosPrimeiraPagina(slug, 0, catalogo, salvarComplementos)
+  }, [slug, cache, infinite.data, salvarComplementos])
+
+  return {
+    isLoading: Boolean(precisaCatalogo && !cache && infinite.isLoading),
+    isFetching: infinite.isFetching,
+    isError: infinite.isError,
+    error: infinite.error,
+  }
 }
 
 export function usePublicDeliveryMeiosPagamento(slug: string, enabled = true) {
   return useQuery({
     queryKey: publicDeliveryMeiosPagamentoQueryKey(slug),
-    queryFn: () => fetchMeiosPagamentoPublicos(slug),
+    queryFn: () => listarMeiosPagamentoPublicoUseCase.execute(slug),
     enabled: enabled && !!slug,
-    staleTime: 60_000,
+    staleTime: CATALOGO_QUERY_STALE_MS,
   })
 }
 

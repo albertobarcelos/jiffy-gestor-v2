@@ -86,7 +86,7 @@ function mapDetalhesPedidoMeta(vendaData: Record<string, unknown>): DetalhesPedi
   }
 }
 
-async function resolverNomeEntregador(
+async function resolverDadosEntregador(
   repo: IVendaDetalheReadRepository,
   entregadorIdVenda: string,
   token: string,
@@ -96,9 +96,16 @@ async function resolverNomeEntregador(
   if (!entregadorData) return detalhesEntrega
 
   const nomeEntregador = String(entregadorData.nome ?? entregadorData.name ?? '').trim()
-  if (!nomeEntregador) return detalhesEntrega
+  const telefoneEntregador = String(
+    entregadorData.telefone ?? entregadorData.celular ?? ''
+  ).trim()
+  if (!nomeEntregador && !telefoneEntregador) return detalhesEntrega
 
-  return { ...detalhesEntrega, entregadorNome: nomeEntregador }
+  return {
+    ...detalhesEntrega,
+    ...(nomeEntregador ? { entregadorNome: nomeEntregador } : {}),
+    ...(telefoneEntregador ? { entregadorTelefone: telefoneEntregador } : {}),
+  }
 }
 
 async function resolverNomeCliente(
@@ -350,13 +357,24 @@ export class CarregarVendaDetalheUseCase {
         vendaData.entregador && typeof vendaData.entregador === 'object'
           ? (vendaData.entregador as Record<string, unknown>)
           : null
-      const entregadorNomeApi = entregadorNested?.nome != null
-        ? String(entregadorNested.nome).trim() || null
-        : null
-      if (entregadorNomeApi) {
-        detalhesEntrega = { ...detalhesEntrega, entregadorNome: entregadorNomeApi }
-      } else if (entregadorIdVenda) {
-        detalhesEntrega = await resolverNomeEntregador(
+      const entregadorNomeApi =
+        entregadorNested?.nome != null
+          ? String(entregadorNested.nome).trim() || null
+          : entregadorNested?.name != null
+            ? String(entregadorNested.name).trim() || null
+            : null
+      const entregadorTelefoneApi = String(
+        entregadorNested?.telefone ?? entregadorNested?.celular ?? ''
+      ).trim()
+      if (entregadorNomeApi || entregadorTelefoneApi) {
+        detalhesEntrega = {
+          ...detalhesEntrega,
+          ...(entregadorNomeApi ? { entregadorNome: entregadorNomeApi } : {}),
+          ...(entregadorTelefoneApi ? { entregadorTelefone: entregadorTelefoneApi } : {}),
+        }
+      }
+      if (entregadorIdVenda && (!detalhesEntrega.entregadorNome || !detalhesEntrega.entregadorTelefone)) {
+        detalhesEntrega = await resolverDadosEntregador(
           this.vendaDetalheRepo,
           entregadorIdVenda,
           token,

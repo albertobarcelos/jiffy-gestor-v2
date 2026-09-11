@@ -4,7 +4,7 @@ import { useCallback, useRef } from 'react'
 import { Label } from '@/src/presentation/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/presentation/components/ui/select'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
-import { MdAccessTime, MdAttachMoney, MdPersonOutline, MdStore } from 'react-icons/md'
+import { MdAccessTime, MdAttachMoney, MdPersonOutline, MdRefresh, MdStore } from 'react-icons/md'
 import {
   EntregaClienteSelector,
   type CoberturaMoradaSelecionadaStatus,
@@ -16,7 +16,6 @@ import {
   TAXA_ENTREGA_SEM_TAXA_ID,
   taxaEntregaIdParaSelect,
   selectValueParaTaxaEntregaId,
-  resolverModoTaxaEntregaOverride,
 } from '@/src/shared/constants/taxaEntregaPedido'
 import { useNovoPedidoFormContext } from '../../../context/NovoPedidoFormContext'
 import { useNovoPedidoUIContext } from '../../../context/NovoPedidoUIContext'
@@ -38,17 +37,19 @@ export function PedidoInformacoesStepView() {
     setTelefoneBuscadoEntrega,
     tempoPrevistoMinutos,
     setTempoPrevistoMinutos,
-    enderecoEntregaCoberturaValorTaxa,
     setEnderecoEntregaCoberturaStatus,
     setEnderecoEntregaCoberturaValorTaxa,
     taxaEntregaId,
     setTaxaEntregaId,
     taxasEntrega,
-    valorTaxaEntrega,
+    taxasEntregaQuery,
+    enderecoEntregaCoberturaValorTaxa,
+    enderecoEntregaCoberturaStatus,
+    recotarTaxaEntregaAutomatica,
+    cotacaoTaxaEntregaBuscando,
   } = useNovoPedidoFormContext()
 
   const { empresa, setSeletorClienteOpen } = useNovoPedidoUIContext()
-  const ultimaMoradaAutoTempoRef = useRef<string | null>(null)
   const ultimaMoradaIdRef = useRef<string | null>(null)
 
   const resetOverrideSeMudouMorada = useCallback(
@@ -67,16 +68,6 @@ export function PedidoInformacoesStepView() {
       switch (cobertura.status) {
         case 'coberta': {
           resetOverrideSeMudouMorada(cobertura.moradaId)
-          setEnderecoEntregaCoberturaStatus('ok')
-          setEnderecoEntregaCoberturaValorTaxa(cobertura.valorTaxa)
-          if (
-            cobertura.moradaId !== ultimaMoradaAutoTempoRef.current &&
-            cobertura.tempoEntregaInMinutes > 0 &&
-            TEMPOS_PREVISTOS_ENTREGA.includes(cobertura.tempoEntregaInMinutes)
-          ) {
-            ultimaMoradaAutoTempoRef.current = cobertura.moradaId
-            setTempoPrevistoMinutos(cobertura.tempoEntregaInMinutes)
-          }
           break
         }
         case 'fora':
@@ -91,10 +82,17 @@ export function PedidoInformacoesStepView() {
           setEnderecoEntregaCoberturaValorTaxa(null)
           break
         case 'sem_geo':
+          ultimaMoradaIdRef.current = null
+          setTaxaEntregaId('')
+          setEnderecoEntregaCoberturaStatus(null)
+          setEnderecoEntregaCoberturaValorTaxa(null)
+          break
         case 'null':
         default:
+          if (moradaEntregaSelecionada?.id) {
+            break
+          }
           ultimaMoradaIdRef.current = null
-          ultimaMoradaAutoTempoRef.current = null
           setTaxaEntregaId('')
           setEnderecoEntregaCoberturaStatus(null)
           setEnderecoEntregaCoberturaValorTaxa(null)
@@ -103,27 +101,28 @@ export function PedidoInformacoesStepView() {
     },
     [
       resetOverrideSeMudouMorada,
+      moradaEntregaSelecionada?.id,
       setEnderecoEntregaCoberturaStatus,
       setEnderecoEntregaCoberturaValorTaxa,
-      setTempoPrevistoMinutos,
       setTaxaEntregaId,
     ]
   )
 
-  const modoTaxa = resolverModoTaxaEntregaOverride(taxaEntregaId)
-  const labelAutomatica =
-    enderecoEntregaCoberturaValorTaxa == null
-      ? moradaEntregaSelecionada
+  const temEnderecoParaCotar = Boolean(moradaEntregaSelecionada?.id)
+  const taxaAutomaticaSelecionada = taxaEntregaIdParaSelect(taxaEntregaId) === TAXA_ENTREGA_SELECT_AUTOMATICA
+  const labelAutomatica = !temEnderecoParaCotar
+    ? 'Automática'
+    : enderecoEntregaCoberturaValorTaxa == null
+      ? enderecoEntregaCoberturaStatus === 'pendente' || cotacaoTaxaEntregaBuscando
         ? 'Automática (calculando…)'
-        : 'Automática (selecione o endereço)'
+        : enderecoEntregaCoberturaStatus === 'fora'
+          ? 'Automática (fora da cobertura)'
+          : enderecoEntregaCoberturaStatus === 'indisponivel'
+            ? 'Automática (não calculou)'
+            : 'Automática'
       : `Automática (${transformarParaReal(enderecoEntregaCoberturaValorTaxa)})`
-
-  const hintTaxa =
-    modoTaxa === 'automatica'
-      ? 'Padrão da área/raio. Pode remover ou trocar por uma taxa do catálogo.'
-      : modoTaxa === 'sem_taxa'
-        ? 'Sem taxa neste pedido. O total do pagamento já ignora a entrega.'
-        : `Taxa do catálogo: ${transformarParaReal(valorTaxaEntrega)}.`
+  const mostrarBuscarTaxaDeNovo =
+    pedidoComEntrega && temEnderecoParaCotar && taxaAutomaticaSelecionada
 
   return (
     <PedidoInformacoesStep>
@@ -221,19 +220,32 @@ export function PedidoInformacoesStepView() {
                   ))}
                 </SelectContent>
               </Select>
-              <p className="mt-1.5 text-[11px] text-secondary-text">
-                Pode ajustar o tempo; o valor escolhido vale no pedido e no card do endereço.
-              </p>
             </div>
 
             <div className="rounded-lg border border-primary/15 bg-white p-3">
               <div className="mb-2 flex items-center gap-2">
                 <MdAttachMoney className="h-5 w-5 text-primary" />
                 <Label className="text-sm font-semibold text-primary-text">Taxa de entrega</Label>
+                {mostrarBuscarTaxaDeNovo ? (
+                  <button
+                    type="button"
+                    onClick={recotarTaxaEntregaAutomatica}
+                    disabled={cotacaoTaxaEntregaBuscando}
+                    className="ml-auto inline-flex items-center gap-1 rounded-md border border-primary/30 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <MdRefresh
+                      className={`h-3.5 w-3.5 ${cotacaoTaxaEntregaBuscando ? 'animate-spin' : ''}`}
+                    />
+                    Buscar de novo
+                  </button>
+                ) : null}
               </div>
               <Select
                 value={taxaEntregaIdParaSelect(taxaEntregaId)}
                 onValueChange={value => setTaxaEntregaId(selectValueParaTaxaEntregaId(value))}
+                onOpenChange={aberto => {
+                  if (aberto) void taxasEntregaQuery.refetch()
+                }}
               >
                 <SelectTrigger className="border-primary/30 bg-white">
                   <SelectValue placeholder="Taxa de entrega" />
@@ -248,7 +260,13 @@ export function PedidoInformacoesStepView() {
                   ))}
                 </SelectContent>
               </Select>
-              <p className="mt-1.5 text-[11px] text-secondary-text">{hintTaxa}</p>
+              {enderecoEntregaCoberturaStatus === 'indisponivel' &&
+              !cotacaoTaxaEntregaBuscando &&
+              taxaAutomaticaSelecionada ? (
+                <p className="mt-2 text-xs text-secondary-text">
+                  A cotação demorou ou falhou. Busque de novo ou escolha outra taxa.
+                </p>
+              ) : null}
             </div>
           </div>
         )}

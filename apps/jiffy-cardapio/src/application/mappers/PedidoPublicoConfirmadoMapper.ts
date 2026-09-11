@@ -3,8 +3,8 @@ import type {
   EnderecoClienteDeliveryPublicoDTO,
   MeioPagamentoPublicoDTO,
 } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
-import type { DeliveryCarrinhoItem } from '@/src/presentation/components/features/delivery-publico/shared/stores/deliveryCarrinhoStore'
-import type { DeliveryTipoEntrega } from '@/src/presentation/components/features/delivery-publico/shared/stores/deliveryPreferenciaEntregaStore'
+import type { ItemCarrinhoDelivery } from '@/src/domain/types/carrinho'
+import type { DeliveryTipoEntrega } from '@/src/domain/types/entrega'
 
 export type PedidoPublicoConfirmadoSnapshot = {
   codigoVenda: string | null
@@ -15,7 +15,7 @@ export type PedidoPublicoConfirmadoSnapshot = {
   telefonePaisIso2: string
   enderecoCliente: EnderecoClienteDeliveryPublicoDTO | null
   enderecoEmpresaTexto: string | null
-  itens: DeliveryCarrinhoItem[]
+  itens: ItemCarrinhoDelivery[]
   total: number
   pagamentos: Array<{
     meioPagamentoId: string
@@ -35,7 +35,7 @@ export type MapPedidoPublicoConfirmadoFallback = {
   telefonePaisIso2: string
   enderecoCliente: EnderecoClienteDeliveryPublicoDTO | null
   enderecoEmpresaTexto: string | null
-  itensCarrinho: DeliveryCarrinhoItem[]
+  itensCarrinho: ItemCarrinhoDelivery[]
   total: number
   pagamentos: Array<{
     meioPagamentoId: string
@@ -88,7 +88,7 @@ export function mapPedidoPublicoCriadoParaConfirmado(
     fallback.itensCarrinho.map(item => [item.produtoId, item.produtoImagemUrl] as const)
   )
 
-  const itensFromApi: DeliveryCarrinhoItem[] = pedido.produtosLancados.map(p => ({
+  const itensFromApi: ItemCarrinhoDelivery[] = pedido.produtosLancados.map(p => ({
     id: p.id,
     produtoId: p.produtoId,
     produtoNome: p.nomeProduto,

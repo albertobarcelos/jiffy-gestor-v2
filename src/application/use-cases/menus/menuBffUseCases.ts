@@ -6,6 +6,7 @@ import type {
   UpdateMenuProdutosBatchInput,
 } from '@/src/shared/types/menus'
 import type { MenuProdutoCatalogTipoFiltro } from '@/src/infrastructure/api/repositories/menuCatalogFetch'
+import { sanitizarPatchMenuProduto } from '@/src/shared/utils/menuProdutoPermissoes'
 
 type TokenInput = { token: string }
 
@@ -90,7 +91,7 @@ export class AtualizarMenuProdutoViaBffUseCase {
       input.token,
       input.menuId,
       input.produtoId,
-      input.data
+      sanitizarPatchMenuProduto(input.data)
     )
   }
 }
@@ -159,6 +160,19 @@ export class ReordenarMenuGrupoViaBffUseCase {
   }
 }
 
+export class UploadImagemMenuGrupoViaBffUseCase {
+  execute(
+    input: TokenInput & { menuId: string; grupoProdutoId: string; file: File }
+  ) {
+    return menuBffRepository.uploadImagemGrupo(
+      input.token,
+      input.menuId,
+      input.grupoProdutoId,
+      input.file
+    )
+  }
+}
+
 export const listarMenusViaBffUseCase = new ListarMenusViaBffUseCase()
 export const buscarMenuViaBffUseCase = new BuscarMenuViaBffUseCase()
 export const criarMenuViaBffUseCase = new CriarMenuViaBffUseCase()
@@ -173,3 +187,4 @@ export const uploadImagemMenuProdutoViaBffUseCase = new UploadImagemMenuProdutoV
 export const listarMenuGruposViaBffUseCase = new ListarMenuGruposViaBffUseCase()
 export const renomearMenuGrupoViaBffUseCase = new RenomearMenuGrupoViaBffUseCase()
 export const reordenarMenuGrupoViaBffUseCase = new ReordenarMenuGrupoViaBffUseCase()
+export const uploadImagemMenuGrupoViaBffUseCase = new UploadImagemMenuGrupoViaBffUseCase()

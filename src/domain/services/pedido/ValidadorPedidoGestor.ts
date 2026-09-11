@@ -1,4 +1,10 @@
 import { validarQuantidadesComplementosLinha } from '@/src/domain/policies/pedido/ComplementoQuantidadeLinhaPolicy'
+import { clienteCadastradoNestaEmpresa } from '@/src/domain/policies/pedido/ClienteEntregaPolicy'
+import {
+  mensagemBloqueioTaxaAutomatica,
+  type StatusCoberturaEntregaPedido,
+  type TaxaEntregaOverrideModoPolicy,
+} from '@/src/domain/policies/pedido/cotacaoEntregaPolicy'
 import { pagamentosCobremTotalPedido } from '@/src/domain/services/pedido/CalculadoraPagamentoPedido'
 import type { PagamentoSelecionado, ProdutoSelecionado, StatusVenda } from '@/src/domain/types/pedido'
 
@@ -17,7 +23,8 @@ export type ValidarPedidoGestorInput = {
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
   enderecoEntregaTemGeo?: boolean
-  enderecoEntregaCoberturaStatus?: 'ok' | 'fora' | 'pendente' | 'indisponivel' | null
+  enderecoEntregaCoberturaStatus?: StatusCoberturaEntregaPedido
+  taxaEntregaOverride?: TaxaEntregaOverrideModoPolicy
   pedidoGestorComPagamentoNoPasso3: boolean
   pedidoEntregaAceitaPagamentoPendente: boolean
   pagamentosCount: number
@@ -39,29 +46,38 @@ export type ValidarPedidoGestorResult = {
 export function validarInformacoesPedidoEntrega(params: {
   pedidoDeliveryGestor: boolean
   clienteEntregaVinculadoId?: string
+  /** Mantido na assinatura: o telefone não substitui o cadastro desta empresa. */
   telefoneClienteDelivery?: string | null
   pedidoComEntrega: boolean
   temEnderecoEntrega: boolean
   /** Informativo — o Gestor não bloqueia o wizard por falta de pin. */
   enderecoEntregaTemGeo?: boolean
-  /**
-   * Informativo — o Gestor não bloqueia por fora/pendente/indisponível.
-   * Taxa imprecisa é o trade-off de não achar a casa.
-   */
-  enderecoEntregaCoberturaStatus?: 'ok' | 'fora' | 'pendente' | 'indisponivel' | null
+  enderecoEntregaCoberturaStatus?: StatusCoberturaEntregaPedido
+  taxaEntregaOverride?: TaxaEntregaOverrideModoPolicy
 }): ValidacaoErroPedido | null {
   if (!params.pedidoDeliveryGestor) return null
 
-  const telefoneDelivery = (params.telefoneClienteDelivery ?? '').replace(/\D/g, '')
-  const temCliente =
-    Boolean(params.clienteEntregaVinculadoId?.trim()) || telefoneDelivery.length >= 11
+  const temCliente = clienteCadastradoNestaEmpresa(params.clienteEntregaVinculadoId)
 
   if (!temCliente) {
-    return { message: 'Informe o cliente do pedido antes de continuar.', goToStep: 2 }
+    return {
+      message: 'Cadastre o cliente nesta empresa antes de continuar.',
+      goToStep: 2,
+    }
   }
 
   if (params.pedidoComEntrega && !params.temEnderecoEntrega) {
     return { message: 'Selecione ou cadastre o endereço de entrega.', goToStep: 2 }
+  }
+
+  const bloqueioTaxa = mensagemBloqueioTaxaAutomatica({
+    pedidoComEntrega: params.pedidoComEntrega,
+    taxaEntregaOverride: params.taxaEntregaOverride,
+    enderecoEntregaCoberturaStatus: params.enderecoEntregaCoberturaStatus,
+    enderecoEntregaTemGeo: params.enderecoEntregaTemGeo,
+  })
+  if (bloqueioTaxa) {
+    return { message: bloqueioTaxa, goToStep: 2 }
   }
 
   return null
@@ -193,6 +209,7 @@ export function validarPedidoGestor(
     temEnderecoEntrega: input.temEnderecoEntrega,
     enderecoEntregaTemGeo: input.enderecoEntregaTemGeo,
     enderecoEntregaCoberturaStatus: input.enderecoEntregaCoberturaStatus,
+    taxaEntregaOverride: input.taxaEntregaOverride,
   })
   if (erroEntrega) erros.push(erroEntrega)
 

@@ -15,7 +15,7 @@ export const PEDIDOS_PATH = '/pedidos'
 export const PEDIDOS_WHATSAPP_PATH = '/pedidos/whatsapp'
 
 /** Largura do painel Jiffy ao lado do WhatsApp (px lógicos). */
-export const WHATSAPP_PAINEL_LARGURA_PX = 320
+export const WHATSAPP_PAINEL_LARGURA_PX = 360
 
 /** Busca do quadro ao voltar de «Pedidos do cliente». */
 export const STORAGE_KANBAN_BUSCA_FLOW = 'jiffy.flow.kanban.busca'

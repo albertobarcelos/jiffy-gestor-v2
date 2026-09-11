@@ -2,6 +2,7 @@ import {
   extrairContextoEntregaDeVendaData,
   extrairEnderecoEntregaSnapshotDeVendaData,
 } from '@/src/application/mappers/ContextoEntregaDeliveryMapper'
+import { resolverTaxaEntregaValorSync } from '@/src/application/mappers/VendaDetalheMapper'
 import type { EnderecoEntregaDetalhe } from '@/src/domain/types/vendaDetalhe'
 import type { PreferenciasImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
 import type { EstacaoImpressaoMapeamento } from '@/src/infrastructure/api/estacoesImpressaoApi'
@@ -39,6 +40,33 @@ function isoOrEmpty(v: unknown): string {
 function numeroFinito(v: unknown): number {
   const n = Number(v)
   return Number.isFinite(n) ? n : 0
+}
+
+function numeroOpcional(v: unknown): number | null {
+  if (v == null || v === '') return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
+/**
+ * Taxa do cupom — mesma regra do card/quick view (taxas ativas + valorFinal).
+ * Não soma taxa antiga (soft-delete) com a nova.
+ */
+function taxaEntregaDoPedidoParaTicket(
+  pedido: Record<string, unknown>,
+  valorItens: number
+): number {
+  const sync = resolverTaxaEntregaValorSync(pedido, valorItens)
+  if (sync > 0) return sync
+  const resumo = asRecord(pedido.resumoPedido)
+  return numeroOpcional(resumo?.taxaEntrega) ?? numeroOpcional(pedido.taxaEntregaValor) ?? 0
+}
+
+function cobrancaAtivaNoCupom(r: Record<string, unknown>): boolean {
+  const status = asStr(r.status).toLowerCase()
+  if (status === 'cancelada') return false
+  if (r.dataCancelamento != null && asStr(r.dataCancelamento)) return false
+  return true
 }
 
 function enderecoDetalheParaTicketsEndereco(
@@ -125,13 +153,11 @@ function buildResumoPedido(
       }, 0)
     )
   }, 0)
-  const taxas = Array.isArray(pedido.taxasLancadas) ? pedido.taxasLancadas : []
-  const taxaEntrega = taxas.reduce((s, t) => {
-    const r = asRecord(t)
-    if (!r) return s
-    return s + numeroFinito(r.valorCalculado ?? r.valor)
-  }, 0)
-  const valorTotal = numeroFinito(pedido.valorFinal)
+  const taxaEntrega = taxaEntregaDoPedidoParaTicket(pedido, valorItens)
+  const valorTotal =
+    numeroOpcional(pedido.valorFinal) ??
+    numeroOpcional(asRecord(pedido.resumoPedido)?.valorTotal) ??
+    0
   return { valorItens, valorAdicionais, taxaEntrega, valorTotal }
 }
 
@@ -171,10 +197,10 @@ function buildPagamento(
   let cobrancaNaEntrega: Record<string, unknown> | null = null
   for (const c of cobrancas) {
     const r = asRecord(c)
-    if (!r) continue
+    if (!r || !cobrancaAtivaNoCupom(r)) continue
     const momento = asStr(r.momentoCobranca).toLowerCase()
     const status = asStr(r.status).toLowerCase()
-    if (momento === 'na_entrega' && status !== 'paga' && status !== 'cancelada') {
+    if (momento === 'na_entrega' && status !== 'paga') {
       cobrancaNaEntrega = r
       break
     }
@@ -203,9 +229,7 @@ function buildPagamento(
   const meios: VendaGestorTicketsPagamentoMeio[] = []
   for (const c of cobrancas) {
     const r = asRecord(c)
-    if (!r) continue
-    const status = asStr(r.status).toLowerCase()
-    if (status === 'cancelada') continue
+    if (!r || !cobrancaAtivaNoCupom(r)) continue
     const meioId = asStr(r.meioPagamentoId)
     const nome = extrairNomeMeioPagamentoDeRegistro(r, meioId, nomesMeiosPagamentoPorId)
     if (!nome) continue

@@ -26,3 +26,45 @@ export function latLngFromGeoJsonPoint(point: GeoJsonPoint | null | undefined): 
   const [lng, lat] = point.coordinates
   return { lat, lng }
 }
+
+const EARTH_RADIUS_M = 6_371_000
+
+/** Distância em linha reta (metros) entre dois GeoJSON Points. */
+export function distanciaMetrosEntrePontos(
+  a: GeoJsonPoint,
+  b: GeoJsonPoint
+): number {
+  const [lng1, lat1] = a.coordinates
+  const [lng2, lat2] = b.coordinates
+  const toRad = (deg: number) => (deg * Math.PI) / 180
+  const dLat = toRad(lat2 - lat1)
+  const dLng = toRad(lng2 - lng1)
+  const lat1R = toRad(lat1)
+  const lat2R = toRad(lat2)
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1R) * Math.cos(lat2R) * Math.sin(dLng / 2) ** 2
+  return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(h)))
+}
+
+/**
+ * Se `ponto` estiver além de `raioMetros` da `ancora`, devolve o ponto na borda
+ * do círculo na mesma direção; caso contrário devolve o próprio ponto.
+ */
+export function limitarPontoAoRaioMetros(
+  ancora: GeoJsonPoint,
+  ponto: GeoJsonPoint,
+  raioMetros: number
+): GeoJsonPoint {
+  if (!(raioMetros > 0)) return ponto
+  const distancia = distanciaMetrosEntrePontos(ancora, ponto)
+  if (distancia <= raioMetros) return ponto
+
+  const [lngA, latA] = ancora.coordinates
+  const [lngB, latB] = ponto.coordinates
+  const fator = raioMetros / distancia
+  return {
+    type: 'Point',
+    coordinates: [lngA + (lngB - lngA) * fator, latA + (latB - latA) * fator],
+  }
+}

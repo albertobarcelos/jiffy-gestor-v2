@@ -3,7 +3,7 @@ import { parseGeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import {
   backendForwardGeocode,
   backendReverseGeocode,
-} from '@/src/shared/utils/geolocalizacaoBackendApi'
+} from '@/src/infrastructure/api/geolocalizacaoBackendApi'
 
 export type EnderecoGeocodeInput = {
   rua: string

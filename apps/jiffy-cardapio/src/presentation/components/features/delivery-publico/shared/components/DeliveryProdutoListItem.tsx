@@ -37,7 +37,13 @@ function ProdutoThumb({
 }) {
   const media = imagemUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={imagemUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+    <img
+      src={imagemUrl}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      className="absolute inset-0 h-full w-full object-cover"
+    />
   ) : (
     <div className="absolute inset-0 flex items-center justify-center">
       <Camera

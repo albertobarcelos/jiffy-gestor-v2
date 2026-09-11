@@ -1,4 +1,4 @@
-import { proxyPublicDeliveryGet } from '@/src/shared/utils/proxyPublicDeliveryRoute'
+import { proxyPublicDeliveryGet } from '@/src/infrastructure/bff/proxyPublicDeliveryRoute'
 
 /**
  * GET /api/public/delivery/meios-pagamento/[slug]

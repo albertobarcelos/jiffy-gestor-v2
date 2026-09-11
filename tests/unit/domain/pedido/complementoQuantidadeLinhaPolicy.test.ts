@@ -3,6 +3,8 @@ import {
   aplicarQuantidadeComplementoNaLinha,
   aplicarQuantidadeProdutoNaLinha,
   normalizarComplementosLinha,
+  ajustarQuantidadeComplementoLivre,
+  controleQuantidadeComplementoNaLinha,
   quantidadeComplementoValidaParaLinha,
   quantidadeMaximaComplementoNaLinha,
 } from '@/src/domain/policies/pedido/ComplementoQuantidadeLinhaPolicy'
@@ -114,6 +116,30 @@ describe('quantidadeMaximaComplementoNaLinha', () => {
 
   it('não trava complemento em KG', () => {
     expect(quantidadeMaximaComplementoNaLinha(2.5, 'KG')).toBeNull()
+  })
+})
+
+describe('controleQuantidadeComplementoNaLinha', () => {
+  it('trava o stepper quando produto UN > 1', () => {
+    const controle = controleQuantidadeComplementoNaLinha(2, 2, 'UN')
+    expect(controle.travada).toBe(true)
+    expect(controle.menosDesabilitado).toBe(true)
+    expect(controle.maisDesabilitado).toBe(true)
+  })
+
+  it('permite ajustar quando produto UN = 1', () => {
+    const controle = controleQuantidadeComplementoNaLinha(1, 2, 'UN')
+    expect(controle.travada).toBe(false)
+    expect(controle.menosDesabilitado).toBe(false)
+    expect(controle.maisDesabilitado).toBe(false)
+  })
+})
+
+describe('ajustarQuantidadeComplementoLivre', () => {
+  it('não reduz abaixo de 1', () => {
+    expect(ajustarQuantidadeComplementoLivre(1, -1)).toBe(1)
+    expect(ajustarQuantidadeComplementoLivre(3, -1)).toBe(2)
+    expect(ajustarQuantidadeComplementoLivre(1, 1)).toBe(2)
   })
 })
 

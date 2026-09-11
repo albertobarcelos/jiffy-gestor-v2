@@ -4,6 +4,7 @@ import { Button } from '@/src/presentation/components/ui/button'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { Label } from '@/src/presentation/components/ui/label'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
+import { resolverModoTaxaEntregaOverride } from '@/src/shared/constants/taxaEntregaPedido'
 import {
   estiloCardMeioPagamento,
   varsCardMeioPagamentoLancado,
@@ -51,6 +52,10 @@ export function PedidoPagamentoStepView() {
     valorAPagarLancamento,
     valorRecebido,
     valorTaxaEntrega,
+    taxaEntregaId,
+    enderecoEntregaCoberturaStatus,
+    pedidoComEntrega,
+    moradaEntregaSelecionada,
   } = useNovoPedidoFormContext()
 
   const nomeClienteResumo =
@@ -63,6 +68,13 @@ export function PedidoPagamentoStepView() {
     pedidoEntregaAceitaPagamentoPendente && fluxoPagamentoEntrega === 'cobrar_entregador'
       ? 'Valor a receber:'
       : 'Valor Recebido:'
+  const modoTaxa = resolverModoTaxaEntregaOverride(taxaEntregaId)
+  const taxaPendente =
+    pedidoComEntrega &&
+    Boolean(moradaEntregaSelecionada?.id) &&
+    modoTaxa === 'automatica' &&
+    enderecoEntregaCoberturaStatus === 'pendente'
+  const mostrarResumoTaxa = pedidoEntregaAceitaPagamentoPendente && pedidoComEntrega
 
   return (
     <PedidoPagamentoStep>
@@ -186,7 +198,7 @@ export function PedidoPagamentoStepView() {
                   </button>
                 </div>
               )}
-              {pedidoEntregaAceitaPagamentoPendente && valorTaxaEntrega > 0 && (
+              {mostrarResumoTaxa && (
                 <>
                   <div className="flex items-center justify-between px-1 py-0.5">
                     <span className="font-medium text-gray-700">Produtos:</span>
@@ -197,7 +209,11 @@ export function PedidoPagamentoStepView() {
                   <div className="flex items-center justify-between px-1 py-0.5">
                     <span className="font-medium text-gray-700">Taxa de entrega:</span>
                     <span className="font-semibold text-gray-900">
-                      + {transformarParaReal(valorTaxaEntrega)}
+                      {taxaPendente
+                        ? 'Calculando…'
+                        : modoTaxa === 'automatica' && !moradaEntregaSelecionada?.id
+                          ? 'Cadastre o endereço'
+                          : `+ ${transformarParaReal(valorTaxaEntrega)}`}
                     </span>
                   </div>
                 </>
@@ -264,6 +280,7 @@ export function PedidoPagamentoStepView() {
                   meiosPagamento.map(meio => {
                     const Icone = obterIconeMeioPagamento(meio.getNome())
                     const estilo = estiloCardMeioPagamento(meio.getFormaPagamentoFiscal())
+                    const { labelColor, labelFontWeight, ...estiloCard } = estilo
                     return (
                       <button
                         key={meio.getId()}
@@ -274,11 +291,17 @@ export function PedidoPagamentoStepView() {
                           }
                         }}
                         disabled={valorAPagarLancamento <= 0 && !valorRecebido.trim()}
-                        style={estilo}
+                        style={estiloCard}
                         className={`flex ${MEIO_PAGAMENTO_CARD_SIZE_CLASS} cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 p-2 transition-all hover:brightness-110 ${valorAPagarLancamento <= 0 && !valorRecebido.trim() ? 'cursor-not-allowed opacity-50' : ''}`}
                       >
                         <Icone className="h-8 w-8 shrink-0" />
-                        <span className="line-clamp-2 w-full text-center text-xs font-medium leading-tight">
+                        <span
+                          className="line-clamp-2 w-full text-center text-xs leading-tight"
+                          style={{
+                            color: labelColor,
+                            fontWeight: labelFontWeight ?? 500,
+                          }}
+                        >
                           {meio.getNome()}
                         </span>
                       </button>

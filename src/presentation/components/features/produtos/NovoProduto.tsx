@@ -31,7 +31,6 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { showToast, handleApiError } from '@/src/shared/utils/toast'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
-import { useEmpresaMenuUnico } from '@/src/presentation/hooks/menus/useEmpresaMenuUnico'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { Produto } from '@/src/domain/entities/Produto'
 import { MdImage } from 'react-icons/md'
@@ -445,9 +444,8 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
     ref
   ) {
     const imagemNoCardapio = Boolean(previewMenuId)
-    const { isMenuUnico } = useEmpresaMenuUnico()
-    /** Com vários menus, o preço vive no snapshot do cardápio — não no cadastro base. */
-    const ocultarPrecoCadastroBase = !isMenuUnico
+    /** Preço no cadastro base só quando o wizard já está no contexto de um cardápio. */
+    const ocultarPrecoCadastroBase = !previewMenuId
     const router = useRouter()
     const searchParams = useSearchParams()
     const invalidate = useInvalidateTenantQueries()
@@ -1509,7 +1507,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         }
       }
 
-      // Validação do Preço de Venda (cadastro base só exige preço quando há 1 menu)
+      // Validação do Preço de Venda (obrigatório só no contexto de cardápio)
       const precoVendaNum = parseFloat(precoVenda.replace(/[^\d,]/g, '').replace(',', '.'))
       const precoCadastroValido = Number.isFinite(precoVendaNum) && precoVendaNum > 0
       if (!ocultarPrecoCadastroBase && (!precoVenda || !precoCadastroValido)) {

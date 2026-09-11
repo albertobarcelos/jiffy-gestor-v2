@@ -1,3 +1,5 @@
+import { invalidarInstrucoesImpressaoCache } from '@/src/infrastructure/api/instrucoesImpressaoPedidoCache'
+
 /**
  * Cache em memória do GET `/api/delivery/pedidos/{id}` (registro expandido).
  * Compartilhado entre quick view, impressão e sincronização do Kanban.
@@ -19,6 +21,18 @@ export function obterPedidoDeliveryDetalheCache(vendaId: string): Record<string,
   return PEDIDO_DELIVERY_DETALHE_CACHE.get(id) ?? null
 }
 
+function chaveProdutosLancados(registro: Record<string, unknown>): string {
+  const raw = Array.isArray(registro.produtosLancados) ? registro.produtosLancados : []
+  const ids: string[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const id = String((item as Record<string, unknown>).id ?? '').trim()
+    if (id) ids.push(id)
+  }
+  ids.sort()
+  return ids.join(',')
+}
+
 export function salvarPedidoDeliveryDetalheCache(
   vendaId: string,
   raw: unknown
@@ -26,7 +40,14 @@ export function salvarPedidoDeliveryDetalheCache(
   const id = vendaId.trim()
   const registro = extrairRegistroPedidoDelivery(raw)
   if (!id) return registro
+
+  const anterior = PEDIDO_DELIVERY_DETALHE_CACHE.get(id)
   PEDIDO_DELIVERY_DETALHE_CACHE.set(id, registro)
+
+  if (anterior && chaveProdutosLancados(anterior) !== chaveProdutosLancados(registro)) {
+    invalidarInstrucoesImpressaoCache(id)
+  }
+
   return registro
 }
 

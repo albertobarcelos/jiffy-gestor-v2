@@ -3,6 +3,9 @@ import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecureTenantInfiniteQuery'
 import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
+import { identificarClienteEntregaPorTelefoneUseCase } from '@/src/application/use-cases/clientes/IdentificarClienteEntregaPorTelefoneUseCase'
+import { criarClienteEntregaRapidoUseCase } from '@/src/application/use-cases/clientes/CriarClienteEntregaRapidoUseCase'
+import { atualizarNomeClienteEntregaUseCase } from '@/src/application/use-cases/clientes/AtualizarNomeClienteEntregaUseCase'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
@@ -141,22 +144,7 @@ export function useCliente(id: string) {
  */
 export function useBuscarClientePorTelefone() {
   return useSecureTenantMutation(async ({ token }, q: string): Promise<Cliente | null> => {
-    const params = new URLSearchParams({ q, limit: '1', offset: '0' })
-    const response = await fetchGestorApi(`/api/clientes?${params.toString()}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    })
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}))
-      throw new Error(err.message || `Erro ${response.status}`)
-    }
-
-    const data: ClientesResponse = await response.json()
-    const itens = (data.items || []).map((item: any) => Cliente.fromJSON(item))
-    return itens.length > 0 ? itens[0] : null
+    return identificarClienteEntregaPorTelefoneUseCase.execute(q, token)
   })
 }
 
@@ -170,25 +158,7 @@ export function useCriarClienteRapido() {
 
   return useSecureTenantMutation(
     async ({ token }, { nome, telefone }: { nome: string; telefone: string }): Promise<Cliente> => {
-      const response = await fetchGestorApi('/api/clientes', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nome,
-          telefone: telefone.replace(/\D/g, ''),
-        }),
-      })
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}))
-        throw new Error(err.error || err.message || `Erro ${response.status}`)
-      }
-
-      const data = await response.json()
-      return Cliente.fromJSON(data)
+      return criarClienteEntregaRapidoUseCase.execute({ nome, telefone }, token)
     },
     {
       onSuccess: () => {
@@ -221,19 +191,7 @@ export function useAtualizarNomeCliente() {
         throw new Error('Informe o nome do cliente.')
       }
 
-      const response = await fetchGestorApi(`/api/clientes/${encodeURIComponent(clienteId)}`, {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ nome: nomeTrim }),
-      })
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}))
-        throw new Error(err.error || err.message || `Erro ${response.status}`)
-      }
+      await atualizarNomeClienteEntregaUseCase.execute(clienteId, nomeTrim, token)
     },
     {
       onSuccess: (_data, variables) => {

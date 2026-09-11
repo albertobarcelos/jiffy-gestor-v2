@@ -2,10 +2,13 @@
 
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
+import {
+  DEFAULT_DELIVERY_TIPO_ENTREGA,
+  type DeliveryTipoEntrega,
+} from '@/src/domain/types/entrega'
 
-export type DeliveryTipoEntrega = 'entrega' | 'retirada'
-
-export const DEFAULT_DELIVERY_TIPO_ENTREGA: DeliveryTipoEntrega = 'entrega'
+export type { DeliveryTipoEntrega }
+export { DEFAULT_DELIVERY_TIPO_ENTREGA }
 
 const STORAGE_KEY = 'jiffy:delivery-publico-preferencias'
 

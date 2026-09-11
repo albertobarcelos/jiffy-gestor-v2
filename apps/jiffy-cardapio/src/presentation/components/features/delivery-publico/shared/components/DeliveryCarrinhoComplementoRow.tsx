@@ -2,7 +2,7 @@
 
 import { MdClose } from 'react-icons/md'
 import { normalizeTipoImpactoPreco } from '@/src/shared/utils/normalizeTipoImpactoPreco'
-import { formatarValorComplemento } from '@/src/domain/services/pedido/CalculadoraPedido'
+import { formatarValorComplemento } from '../utils/formatPedidoLinhaDisplay'
 import type { DeliveryCarrinhoComplemento } from '../stores/deliveryCarrinhoStore'
 
 type DeliveryCarrinhoComplementoRowProps = {

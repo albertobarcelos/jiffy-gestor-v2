@@ -46,6 +46,18 @@ export function PedidoDetalhesEntrega({ className = '', ...props }: PedidoDetalh
     formatarUsuarioPorId,
   ])
 
+  const telefoneEntregador = useMemo(() => {
+    const persistido = detalhesEntregaPedido?.entregadorTelefone?.trim()
+    if (persistido) return persistido
+    const id = detalhesEntregaPedido?.entregadorId
+    if (!id) return ''
+    return entregadores?.find((e: { id: string; telefone?: string }) => e.id === id)?.telefone?.trim() || ''
+  }, [
+    detalhesEntregaPedido?.entregadorId,
+    detalhesEntregaPedido?.entregadorTelefone,
+    entregadores,
+  ])
+
   const trocoExibicao = useMemo(() => {
     const trocoApi = detalhesEntregaPedido?.trocoApi
     if (trocoApi != null && trocoApi > 0) return trocoApi
@@ -79,6 +91,7 @@ export function PedidoDetalhesEntrega({ className = '', ...props }: PedidoDetalh
         nomesMeiosPagamento={nomesMeiosPagamento}
         valorPedido={valorPedido}
         nomeEntregador={nomeEntregador}
+        telefoneEntregador={telefoneEntregador}
         trocoExibicao={trocoExibicao}
         observacaoPedido={observacaoPedido}
       />

@@ -58,6 +58,8 @@ export interface KanbanModaisRendererProps {
     statusFiscal: Venda['statusFiscal']
     tipoVenda?: string | null
     abaDetalhesInicial?: AbaDetalhesPedido
+    statusEtapaOperacional?: string | null
+    entregador?: Venda['entregador']
   } | null
   novoPedidoModalVisualizacaoOpen: boolean
   onCloseVisualizacao: () => void
@@ -222,6 +224,8 @@ export function KanbanModaisRenderer({
           }
           abaDetalhesInicial={pedidoVisualizacaoContext.abaDetalhesInicial}
           modoVisualizacao={true}
+          statusEtapaOperacionalHint={pedidoVisualizacaoContext.statusEtapaOperacional}
+          entregadorHint={pedidoVisualizacaoContext.entregador}
         />
       )}
       <AtribuirEntregadorKanbanPainel

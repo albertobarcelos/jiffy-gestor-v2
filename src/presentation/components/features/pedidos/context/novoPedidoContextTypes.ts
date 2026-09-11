@@ -95,6 +95,9 @@ export interface NovoPedidoCatalogoSlice {
   isLoadingProdutosVenda: boolean
   isLoadingProdutos: boolean
   isLoadingBuscaProdutos: boolean
+  hasNextProdutosCatalogo: boolean
+  isFetchingNextProdutosCatalogo: boolean
+  carregarProximaPaginaProdutosCatalogo: () => void
   menuCatalogoIndisponivel: boolean
   tipoInicioPedido: 'balcao' | 'entrega'
 }
@@ -188,9 +191,11 @@ export interface NovoPedidoEntregaSlice {
   setEnderecoEntregaCoberturaStatus: Dispatch<
     SetStateAction<'ok' | 'fora' | 'pendente' | 'indisponivel' | null>
   >
-  /** Taxa calculada pela cobertura da morada selecionada. */
+  /** Prévia oficial (`POST /delivery/cotacao`) para a morada selecionada. */
   enderecoEntregaCoberturaValorTaxa: number | null
   setEnderecoEntregaCoberturaValorTaxa: Dispatch<SetStateAction<number | null>>
+  recotarTaxaEntregaAutomatica: () => void
+  cotacaoTaxaEntregaBuscando: boolean
   telefoneBuscaEntrega: string
   setTelefoneBuscaEntrega: Dispatch<SetStateAction<string>>
   telefoneBuscadoEntrega: string | null

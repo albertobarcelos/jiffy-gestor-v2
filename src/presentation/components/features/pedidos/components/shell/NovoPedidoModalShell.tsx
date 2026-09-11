@@ -3,8 +3,8 @@
 import { Dialog, DialogContent } from '@/src/presentation/components/ui/dialog'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { PainelPedidoBackdrop, JiffyPainelSlide } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
+import { NOVO_PEDIDO_SHELL_PADDING_X_CLASS } from '../../layout/novoPedidoShellLayout'
 import { NovoPedidoHeader } from '../NovoPedidoHeader'
-import { NovoPedidoStepper } from '../NovoPedidoStepper'
 import { NovoPedidoFooterShell } from '../NovoPedidoFooter'
 import { NovoPedidoAuxiliaryModals } from '../NovoPedidoAuxiliaryModals'
 import { PedidoWizardStepsView } from '../PedidoWizardStepsView'
@@ -134,24 +134,17 @@ export function NovoPedidoModalShell(props: NovoPedidoShellProps) {
             onAbaDetalhesPedidoChange={setAbaDetalhesPedido}
             podeExibirAbaNotaFiscal={podeExibirAbaNotaFiscal}
             podeExibirAbaDadosEntrega={podeExibirAbaDadosEntrega}
+            tipoInicioPedido={tipoInicioPedido}
           />
-          {!modoEdicaoProdutos && (
-            <NovoPedidoStepper
-              currentStep={currentStep}
-              modoVisualizacao={modoVisualizacao}
-              tipoInicioPedido={tipoInicioPedido}
-            />
-          )}
 
           <div
             style={{
               flex: 1,
               overflowY: 'auto',
               overflowX: 'hidden',
-              padding: '0 24px',
               minHeight: 0,
             }}
-            className="scrollbar-thin flex min-h-0 flex-1 flex-col"
+            className={`scrollbar-thin flex min-h-0 flex-1 flex-col ${NOVO_PEDIDO_SHELL_PADDING_X_CLASS}`}
           >
             {/* Loading em modo visualização - não mostrar steps até carregar */}
             {modoVisualizacao && isLoadingVenda && (

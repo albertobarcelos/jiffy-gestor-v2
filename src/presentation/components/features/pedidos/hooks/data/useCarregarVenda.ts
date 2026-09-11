@@ -14,6 +14,7 @@ import type {
   StatusVenda,
 } from '../../types'
 import { showToast } from '@/src/shared/utils/toast'
+import { aplicarHintKanbanNoDtoDetalhe } from '../../utils/detalheVisaoUnica'
 import { useVendaDetalheCarregadaQuery } from './useVendaDetalheCarregadaQuery'
 
 export interface AplicarVendaDetalheHandlers {
@@ -99,6 +100,12 @@ export interface UseCarregarVendaParams {
   modoVisualizacao?: boolean
   tabelaOrigemVenda: 'venda' | 'venda_gestor'
   tipoVendaGestor?: string | null
+  statusEtapaOperacionalHint?: string | null
+  entregadorHint?: {
+    id?: string | null
+    nome?: string | null
+    telefone?: string | null
+  } | null
   meiosPagamentoRef: React.RefObject<MeioPagamentoLike[]>
   getToken: () => string | null | undefined
   onClose: () => void
@@ -112,6 +119,8 @@ export function useCarregarVenda({
   modoVisualizacao,
   tabelaOrigemVenda,
   tipoVendaGestor,
+  statusEtapaOperacionalHint = null,
+  entregadorHint = null,
   meiosPagamentoRef,
   getToken,
   onClose,
@@ -147,13 +156,19 @@ export function useCarregarVenda({
     }
     if (!query.data) return
 
-    const chaveAplicacao = `${vendaIdParaCarregar}:${query.dataUpdatedAt}`
+    const chaveAplicacao = `${vendaIdParaCarregar}:${query.dataUpdatedAt}:${statusEtapaOperacionalHint ?? ''}:${entregadorHint?.id ?? ''}:${entregadorHint?.telefone ?? ''}`
     if (ultimoDtoAplicadoRef.current === chaveAplicacao) return
     ultimoDtoAplicadoRef.current = chaveAplicacao
 
-    aplicarVendaDetalheCarregada(query.data, handlersRef.current)
+    aplicarVendaDetalheCarregada(
+      aplicarHintKanbanNoDtoDetalhe(query.data, {
+        statusEtapaOperacional: statusEtapaOperacionalHint,
+        entregador: entregadorHint,
+      }),
+      handlersRef.current
+    )
     setDadosVendaAplicados(true)
-  }, [open, query.data, query.dataUpdatedAt, vendaIdParaCarregar])
+  }, [open, query.data, query.dataUpdatedAt, vendaIdParaCarregar, statusEtapaOperacionalHint, entregadorHint])
 
   useEffect(() => {
     if (!open || !query.isError || !query.error) return

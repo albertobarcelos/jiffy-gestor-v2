@@ -1,0 +1,5 @@
+export type { ICatalogoPublicoPort } from './ICatalogoPublicoPort'
+export type { IClienteDeliveryPublicoPort } from './IClienteDeliveryPublicoPort'
+export type { ICotacaoPedidoPublicoPort } from './ICotacaoPedidoPublicoPort'
+export type { IMeiosPagamentoPublicoPort } from './IMeiosPagamentoPublicoPort'
+export type { IPedidoPublicoPort } from './IPedidoPublicoPort'

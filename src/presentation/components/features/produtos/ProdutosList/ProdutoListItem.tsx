@@ -7,6 +7,7 @@ import type { ToggleField } from '@/src/shared/types/produto'
 import { CatalogProductRow } from '@/src/presentation/components/features/catalogo/CatalogProductRow'
 import { ProdutoActionIcons } from './ProdutoActionIcons'
 import { ProdutoCategoriaSelect } from './ProdutoCategoriaSelect'
+import { toggleStatesFromProduto } from './toggleStatesFromProduto'
 
 function CategoriaNomeTexto({ nome }: { nome?: string }) {
   const categoria = nome?.trim() || '—'
@@ -59,17 +60,7 @@ function ProdutoListItemBase({
   onCopyProduto,
 }: ProdutoListItemProps) {
   const produtoId = produto.getId()
-  const toggleStates = useMemo<Record<ToggleField, boolean>>(
-    () => ({
-      favorito: produto.isFavorito(),
-      permiteAcrescimo: produto.permiteAcrescimoAtivo(),
-      permiteDesconto: produto.permiteDescontoAtivo(),
-      abreComplementos: produto.abreComplementosAtivo(),
-      permiteAlterarPreco: produto.permiteAlterarPrecoAtivo(),
-      incideTaxa: produto.incideTaxaAtivo(),
-    }),
-    [produto]
-  )
+  const toggleStates = useMemo(() => toggleStatesFromProduto(produto), [produto])
 
   return (
     <CatalogProductRow
@@ -103,26 +94,12 @@ function ProdutoListItemBase({
         )
       }
       actionsSlot={
-        <>
-          <div className="md:hidden">
-            <ProdutoActionIcons
-              produto={produto}
-              toggleStates={toggleStates}
-              variant="mobile"
-              onToggleBoolean={onToggleBoolean}
-              onCopyProduto={onCopyProduto}
-            />
-          </div>
-          <div className="hidden md:block">
-            <ProdutoActionIcons
-              produto={produto}
-              toggleStates={toggleStates}
-              variant="desktop"
-              onToggleBoolean={onToggleBoolean}
-              onCopyProduto={onCopyProduto}
-            />
-          </div>
-        </>
+        <ProdutoActionIcons
+          produto={produto}
+          toggleStates={toggleStates}
+          onToggleBoolean={onToggleBoolean}
+          onCopyProduto={onCopyProduto}
+        />
       }
     />
   )

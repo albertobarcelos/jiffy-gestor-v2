@@ -38,6 +38,8 @@ export function DeliverySugestoesProdutoCard({
           <img
             src={produto.imagemUrl}
             alt=""
+            loading="lazy"
+            decoding="async"
             className="absolute inset-0 h-full w-full object-cover"
           />
         ) : (

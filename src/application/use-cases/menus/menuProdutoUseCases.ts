@@ -11,6 +11,7 @@ import type {
   UpdateMenuProdutoInput,
   UpdateMenuProdutosBatchInput,
 } from '@/src/shared/types/menus'
+import { sanitizarPatchMenuProduto } from '@/src/shared/utils/menuProdutoPermissoes'
 
 const MIME_PERMITIDOS = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const TAMANHO_MAXIMO_BYTES = 5_242_880
@@ -62,7 +63,11 @@ export class AtualizarMenuProdutoUseCase {
     if (!menuId?.trim() || !produtoId?.trim()) {
       throw new Error('Menu e produto são obrigatórios')
     }
-    return this.menuRepository.atualizarProduto(menuId.trim(), produtoId.trim(), input)
+    return this.menuRepository.atualizarProduto(
+      menuId.trim(),
+      produtoId.trim(),
+      sanitizarPatchMenuProduto(input)
+    )
   }
 }
 

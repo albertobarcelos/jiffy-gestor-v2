@@ -202,4 +202,78 @@ describe('montarTicketsResponseFromInstrucoes', () => {
     expect(result.pagamento?.meioPagamento).toBe('Dinheiro')
     expect(result.pagamento?.valorCobrarNaEntrega).toBe(29)
   })
+
+  it('nao soma taxa removida com a taxa ativa no cupom', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      modo: 'separado' as const,
+      impressoraExpedicaoId: 'imp-exp',
+    }
+
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: { mapeamentos: [], warnings: [] },
+      pedido: {
+        ...pedidoBase,
+        valorFinal: 48,
+        totalFaltaPagar: 48,
+        taxasLancadas: [
+          {
+            tipo: 'entrega',
+            valorCalculado: 5,
+            dataRemocao: '2026-09-10T22:00:00.000Z',
+            status: 'removida',
+          },
+          {
+            taxaId: 'tx-nova',
+            tipo: 'entrega',
+            valorCalculado: 8,
+          },
+        ],
+        cobrancas: [
+          {
+            id: 'cob-antiga',
+            meioPagamentoId: 'mp-dinheiro',
+            valor: 45,
+            momentoCobranca: 'na_entrega',
+            status: 'cancelada',
+            dataCancelamento: '2026-09-10T22:00:00.000Z',
+          },
+          {
+            id: 'cob-nova',
+            meioPagamentoId: 'mp-dinheiro',
+            valor: 48,
+            momentoCobranca: 'na_entrega',
+            status: 'pendente',
+          },
+        ],
+      },
+      prefs,
+      nomesMeiosPagamentoPorId: { 'mp-dinheiro': 'Dinheiro' },
+    })
+
+    expect(result.resumoPedido?.taxaEntrega).toBe(8)
+    expect(result.resumoPedido?.valorTotal).toBe(48)
+    expect(result.valorFinal).toBe(48)
+    expect(result.pagamento?.valorCobrarNaEntrega).toBe(48)
+    expect(result.pagamento?.meios).toEqual([{ nome: 'Dinheiro', valor: 48 }])
+  })
+
+  it('usa a taxa ativa mesmo se resumoPedido do GET ainda tiver o valor antigo', () => {
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: { mapeamentos: [], warnings: [] },
+      pedido: {
+        ...pedidoBase,
+        valorFinal: 48,
+        resumoPedido: { valorItens: 40, valorAdicionais: 0, taxaEntrega: 13, valorTotal: 53 },
+        taxasLancadas: [
+          { tipo: 'entrega', valor: 5, dataRemocao: '2026-09-10T22:00:00.000Z' },
+          { taxaId: 'tx-nova', tipo: 'entrega', valor: 8 },
+        ],
+      },
+      prefs: DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+    })
+
+    expect(result.resumoPedido?.taxaEntrega).toBe(8)
+    expect(result.resumoPedido?.valorTotal).toBe(48)
+  })
 })

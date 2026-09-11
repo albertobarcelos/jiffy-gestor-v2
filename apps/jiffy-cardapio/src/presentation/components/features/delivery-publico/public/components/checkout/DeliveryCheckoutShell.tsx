@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useLayoutEffect,
   useMemo,
@@ -33,6 +34,11 @@ export type DeliveryCheckoutHeaderConfig = {
 type ShellSlotsContextValue = {
   footerHost: HTMLElement | null
   setHeader: (config: DeliveryCheckoutHeaderConfig) => void
+  /**
+   * Intercepta clique no backdrop / X do shell.
+   * `null` restaura o `onClose` padrão do shell.
+   */
+  setCloseHandler: (handler: (() => void) | null) => void
 }
 
 const DeliveryCheckoutShellSlotsContext = createContext<ShellSlotsContextValue | null>(null)
@@ -150,6 +156,18 @@ export function DeliveryCheckoutShellFooter({ children }: { children: ReactNode 
   return createPortal(children, footerHost)
 }
 
+/**
+ * Registra handler para backdrop / botão X do shell enquanto o step estiver montado.
+ * Útil para confirmar saída com formulário incompleto.
+ */
+export function useDeliveryCheckoutShellCloseHandler(handler: (() => void) | null) {
+  const { setCloseHandler } = useShellSlots()
+  useLayoutEffect(() => {
+    setCloseHandler(handler)
+    return () => setCloseHandler(null)
+  }, [setCloseHandler, handler])
+}
+
 type DeliveryCheckoutShellProps = {
   open: boolean
   stepKey: Exclude<DeliveryCheckoutStep, null>
@@ -168,19 +186,34 @@ export function DeliveryCheckoutShell({
   useDeliveryBodyScrollLock(open)
 
   const [footerHost, setFooterHost] = useState<HTMLElement | null>(null)
+  const [closeHandler, setCloseHandlerState] = useState<(() => void) | null>(null)
   const [header, setHeader] = useState<DeliveryCheckoutHeaderConfig>({
     title: '',
     showBack: false,
     headerTone: 'default',
   })
 
+  // useState interpreta função como updater — embrulha para guardar o callback.
+  const setCloseHandler = useCallback((handler: (() => void) | null) => {
+    setCloseHandlerState(() => handler)
+  }, [])
+
   const slotsCtx = useMemo(
     () => ({
       footerHost,
       setHeader,
+      setCloseHandler,
     }),
-    [footerHost]
+    [footerHost, setCloseHandler]
   )
+
+  const handleRequestClose = () => {
+    if (closeHandler) {
+      closeHandler()
+      return
+    }
+    onClose()
+  }
 
   const isDarkHeader = header.headerTone === 'dark'
   const headerFg = isDarkHeader ? '#ffffff' : 'var(--delivery-text-primary)'
@@ -204,7 +237,9 @@ export function DeliveryCheckoutShell({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25 }}
-            onClick={onClose}
+            data-checkout-leave-without-numero=""
+            onMouseDown={e => e.preventDefault()}
+            onClick={handleRequestClose}
             aria-hidden
           />
 
@@ -242,7 +277,7 @@ export function DeliveryCheckoutShell({
                     type="button"
                     data-checkout-leave-without-numero=""
                     onMouseDown={e => e.preventDefault()}
-                    onClick={header.onBack ?? onClose}
+                    onClick={header.onBack ?? handleRequestClose}
                     aria-label="Voltar"
                     className={`flex items-center justify-center rounded-full ${
                       isDarkHeader ? 'h-8 w-8' : 'h-9 w-9'
@@ -268,7 +303,7 @@ export function DeliveryCheckoutShell({
                     type="button"
                     data-checkout-leave-without-numero=""
                     onMouseDown={e => e.preventDefault()}
-                    onClick={onClose}
+                    onClick={handleRequestClose}
                     aria-label="Fechar"
                     className={`flex shrink-0 items-center justify-center rounded-full ${
                       isDarkHeader ? 'h-8 w-8' : 'h-9 w-9'

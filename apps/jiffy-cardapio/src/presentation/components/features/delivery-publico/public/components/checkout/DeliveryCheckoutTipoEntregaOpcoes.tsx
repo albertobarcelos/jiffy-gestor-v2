@@ -3,9 +3,14 @@
 import { useEffect, type ReactNode } from 'react'
 import { Bike, /* Clock, */ MapPin, Plus, RefreshCw, Store } from 'lucide-react'
 import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import type { DeliveryTipoEntrega } from '../../../shared/stores/deliveryPreferenciaEntregaStore'
-import { formatDeliveryCurrency } from '../../../shared/utils/formatDeliveryCurrency'
-import { formatarResumoEnderecoPublico } from '../../../shared/utils/garantirEnderecoClientePublico'
+import { formatarResumoEnderecoPublico } from '@/src/application/mappers/ClienteDeliveryPublicoMapper'
+import {
+  calcularDistanciaAproximadaDaLoja,
+  pontoClienteParaDistancia,
+} from '../../../shared/utils/formatarDistanciaAproximadaDaLoja'
+import { DeliveryDistanciaLojaHint } from './DeliveryDistanciaLojaHint'
 
 export type ModoEntregaOpcao = {
   tipoEntrega: DeliveryTipoEntrega
@@ -21,12 +26,8 @@ type DeliveryCheckoutTipoEntregaOpcoesProps = {
   /** Quantidade de endereços do cliente (para exibir “Trocar endereço”). */
   quantidadeEnderecos?: number
   enderecoEmpresaTexto: string | null
-  taxaEntregaOficial?: number | null
-  cotacaoLoading?: boolean
-  cotacaoPronta?: boolean
+  localizacaoEmpresa?: GeoJsonPoint | null
   onChangeOpcao: (opcao: ModoEntregaOpcao) => void
-  /** Edita o endereço exibido no card. */
-  onEditarEndereco: () => void
   /** Abre a lista de endereços cadastrados. */
   onTrocarEndereco: () => void
   /** Abre o formulário de novo endereço. */
@@ -61,48 +62,6 @@ const OPCOES: Array<{
   //   Icon: Clock,
   // },
 ]
-
-function TaxaEntregaCardFooter({
-  isEntrega,
-  enderecoCliente,
-  cotacaoLoading = false,
-  cotacaoPronta = false,
-  taxaEntregaOficial = null,
-}: {
-  isEntrega: boolean
-  enderecoCliente: EnderecoClienteDeliveryPublicoDTO | null
-  cotacaoLoading?: boolean
-  cotacaoPronta?: boolean
-  taxaEntregaOficial?: number | null
-}) {
-  if (!isEntrega) {
-    return (
-      <p className="mt-2 text-xs font-medium" style={{ color: 'var(--delivery-primary)' }}>
-        Sem taxa de entrega
-      </p>
-    )
-  }
-
-  if (!enderecoCliente) return null
-
-  if (cotacaoLoading) {
-    return (
-      <p className="mt-2 text-xs font-medium delivery-text-secondary">
-        Calculando taxa de entrega...
-      </p>
-    )
-  }
-
-  if (cotacaoPronta && taxaEntregaOficial != null) {
-    return (
-      <p className="mt-2 text-xs font-medium" style={{ color: 'var(--delivery-primary)' }}>
-        Taxa de entrega {formatDeliveryCurrency(taxaEntregaOficial)}
-      </p>
-    )
-  }
-
-  return null
-}
 
 function BotaoSecundarioEndereco({
   onClick,
@@ -140,18 +99,16 @@ export function DeliveryCheckoutTipoEntregaOpcoes({
   temEnderecosCadastrados,
   quantidadeEnderecos = 0,
   enderecoEmpresaTexto,
-  taxaEntregaOficial = null,
-  cotacaoLoading = false,
-  cotacaoPronta = false,
+  localizacaoEmpresa = null,
   onChangeOpcao,
-  onEditarEndereco,
   onTrocarEndereco,
   onCadastrarEndereco,
   novoEnderecoBloqueado = false,
 }: DeliveryCheckoutTipoEntregaOpcoesProps) {
   const isEntrega = tipoEntrega === 'entrega'
   const precisaCadastrarEndereco = isEntrega && !enderecoCliente && !temEnderecosCadastrados
-  const podeTrocarEndereco = isEntrega && quantidadeEnderecos > 1
+  /** Lista para trocar ou remover — mesmo com 1 endereço. */
+  const podeTrocarEndereco = isEntrega && quantidadeEnderecos > 0
 
   // Enquanto agendamento estiver oculto, força modo imediato na UI.
   useEffect(() => {
@@ -212,7 +169,6 @@ export function DeliveryCheckoutTipoEntregaOpcoes({
                 <p className="text-sm font-semibold delivery-text-primary">
                   {enderecoEmpresaTexto || 'Endereço da loja indisponível'}
                 </p>
-                <TaxaEntregaCardFooter isEntrega={false} enderecoCliente={null} />
               </div>
             </div>
           ) : precisaCadastrarEndereco ? (
@@ -275,14 +231,13 @@ export function DeliveryCheckoutTipoEntregaOpcoes({
                         .filter(Boolean)
                         .join(' - ')}
                     </p>
-                    <p className="sr-only">{formatarResumoEnderecoPublico(enderecoCliente)}</p>
-                    <TaxaEntregaCardFooter
-                      isEntrega={isEntrega}
-                      enderecoCliente={enderecoCliente}
-                      cotacaoLoading={cotacaoLoading}
-                      cotacaoPronta={cotacaoPronta}
-                      taxaEntregaOficial={taxaEntregaOficial}
+                    <DeliveryDistanciaLojaHint
+                      texto={calcularDistanciaAproximadaDaLoja(
+                        localizacaoEmpresa,
+                        pontoClienteParaDistancia(enderecoCliente)
+                      )}
                     />
+                    <p className="sr-only">{formatarResumoEnderecoPublico(enderecoCliente)}</p>
                   </>
                 ) : (
                   <>
@@ -295,16 +250,7 @@ export function DeliveryCheckoutTipoEntregaOpcoes({
                   </>
                 )}
               </div>
-              {enderecoCliente ? (
-                <button
-                  type="button"
-                  onClick={onEditarEndereco}
-                  className="shrink-0 text-sm font-semibold"
-                  style={{ color: 'var(--delivery-primary)' }}
-                >
-                  Editar
-                </button>
-              ) : (
+              {!enderecoCliente ? (
                 <button
                   type="button"
                   onClick={onTrocarEndereco}
@@ -313,7 +259,7 @@ export function DeliveryCheckoutTipoEntregaOpcoes({
                 >
                   Selecionar
                 </button>
-              )}
+              ) : null}
             </div>
           )}
         </div>

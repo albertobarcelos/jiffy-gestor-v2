@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from 'react'
+import { MdDeleteOutline } from 'react-icons/md'
 import { Input } from '@/src/presentation/components/ui/input'
 import { UppercaseLocaleInput } from '@/src/presentation/components/ui/UppercaseLocaleInput'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
@@ -32,6 +33,7 @@ interface MenuProdutoSnapshotFormProps {
   formId?: string
   onDirtyChange?: (dirty: boolean) => void
   onSavingChange?: (saving: boolean) => void
+  onRemoverDesteCardapio?: () => void
 }
 
 function formatCurrency(value: string) {
@@ -60,6 +62,7 @@ export const MenuProdutoSnapshotForm = forwardRef<
     formId = MENU_PRODUTO_FORM_ID,
     onDirtyChange,
     onSavingChange,
+    onRemoverDesteCardapio,
   },
   ref
 ) {
@@ -321,6 +324,16 @@ export const MenuProdutoSnapshotForm = forwardRef<
               className="justify-end"
             />
           </div>
+          {onRemoverDesteCardapio ? (
+            <button
+              type="button"
+              onClick={onRemoverDesteCardapio}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-red-600/40 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-600/10"
+            >
+              <MdDeleteOutline size={18} />
+              Remover deste cardápio
+            </button>
+          ) : null}
         </div>
       </div>
       {dialogPropagacao}

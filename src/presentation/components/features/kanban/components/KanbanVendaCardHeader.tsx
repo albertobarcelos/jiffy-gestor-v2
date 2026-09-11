@@ -1,7 +1,7 @@
 'use client'
 
 import Tooltip from '@mui/material/Tooltip'
-import { MdAccessTime, MdEdit, MdSync } from 'react-icons/md'
+import { MdAccessTime, MdEdit } from 'react-icons/md'
 import { TipoVendaIcon } from '@/src/presentation/components/features/vendas/TipoVendaIcon'
 import { StatusFiscalBadge } from '../../fiscal/StatusFiscalBadge'
 import { fiscalKanbanPodeReemitirAposCooldown } from '../rules/vendasKanban.rules'
@@ -16,9 +16,7 @@ export interface KanbanVendaCardHeaderProps {
   clienteNome: string
   valorFormatado: string
   podeEditarProdutosNaVenda: boolean
-  exibirBotaoSalvarCobranca: boolean
   onEditarProdutos?: (venda: Venda) => void
-  onConfirmarCobranca?: (venda: Venda) => void
   formaCobrancaKanban: string | null
   formaPagamentoKanban: string | null
   observacaoPedidoTexto: string
@@ -83,19 +81,9 @@ function TipoVendaIconCard({
 }
 
 function ClienteValorBlock({
-  venda,
   clienteNome,
   valorFormatado,
-  exibirBotaoSalvarCobranca,
-  onConfirmarCobranca,
-}: Pick<
-  KanbanVendaCardHeaderProps,
-  | 'venda'
-  | 'clienteNome'
-  | 'valorFormatado'
-  | 'exibirBotaoSalvarCobranca'
-  | 'onConfirmarCobranca'
->) {
+}: Pick<KanbanVendaCardHeaderProps, 'clienteNome' | 'valorFormatado'>) {
   return (
     <>
       <div className="flex min-w-0 items-center gap-1">
@@ -103,26 +91,21 @@ function ClienteValorBlock({
           {clienteNome}
         </span>
       </div>
-      <div className="flex items-center gap-1">
-        <span className="text-sm font-semibold text-gray-900">{valorFormatado}</span>
-        {exibirBotaoSalvarCobranca && onConfirmarCobranca ? (
-          <Tooltip title="Modificar Pagamento">
-            <button
-              type="button"
-              onClick={e => {
-                e.stopPropagation()
-                onConfirmarCobranca(venda)
-              }}
-              onDoubleClick={e => e.stopPropagation()}
-              className="shrink-0 rounded p-0.5 text-primary transition-colors hover:bg-primary/10"
-              aria-label="Modificar pagamento"
-            >
-              <MdSync className="h-4 w-4" />
-            </button>
-          </Tooltip>
-        ) : null}
-      </div>
+      <span className="text-sm font-semibold text-gray-900">{valorFormatado}</span>
     </>
+  )
+}
+
+function RotuloCobrancaKanban({ rotulo }: { rotulo: string }) {
+  const pendente = rotulo !== 'Já foi pago'
+  if (!pendente) {
+    return <p className="text-xs font-medium text-emerald-700">{rotulo}</p>
+  }
+
+  return (
+    <p className="mt-0.5 inline-flex rounded-md bg-amber-100 px-1.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-amber-950">
+      {rotulo}
+    </p>
   )
 }
 
@@ -161,9 +144,7 @@ export function KanbanVendaCardHeader(props: KanbanVendaCardHeaderProps) {
     clienteNome,
     valorFormatado,
     podeEditarProdutosNaVenda,
-    exibirBotaoSalvarCobranca,
     onEditarProdutos,
-    onConfirmarCobranca,
     formaCobrancaKanban,
     formaPagamentoKanban,
     observacaoPedidoTexto,
@@ -228,21 +209,19 @@ export function KanbanVendaCardHeader(props: KanbanVendaCardHeaderProps) {
             {editarProdutosBtn}
           </div>
           <ClienteValorBlock
-            venda={venda}
             clienteNome={clienteNome}
             valorFormatado={valorFormatado}
-            exibirBotaoSalvarCobranca={exibirBotaoSalvarCobranca}
-            onConfirmarCobranca={onConfirmarCobranca}
           />
           {formaCobrancaKanban || formaPagamentoKanban ? (
-            <div className="mt-0.5 gap-1">
+            <div className="mt-0.5 flex flex-col items-start gap-1">
               {formaPagamentoKanban ? (
                 <p className="text-xs text-gray-600">
-                  <span className="font-medium text-gray-700">Pagamento:</span> {formaPagamentoKanban}
+                  <span className="font-medium text-gray-700">Pagamento:</span>{' '}
+                  <span className="font-semibold text-gray-900">{formaPagamentoKanban}</span>
                 </p>
               ) : null}
               {formaCobrancaKanban ? (
-                <p className="text-xs font-medium text-gray-600">{formaCobrancaKanban}</p>
+                <RotuloCobrancaKanban rotulo={formaCobrancaKanban} />
               ) : null}
             </div>
           ) : null}
@@ -271,11 +250,8 @@ export function KanbanVendaCardHeader(props: KanbanVendaCardHeaderProps) {
           {editarProdutosBtn}
         </div>
         <ClienteValorBlock
-          venda={venda}
           clienteNome={clienteNome}
           valorFormatado={valorFormatado}
-          exibirBotaoSalvarCobranca={exibirBotaoSalvarCobranca}
-          onConfirmarCobranca={onConfirmarCobranca}
         />
         {observacaoPedidoTexto ? (
           <p className="mt-1 line-clamp-2 text-xs text-gray-600" title={observacaoPedidoTexto}>

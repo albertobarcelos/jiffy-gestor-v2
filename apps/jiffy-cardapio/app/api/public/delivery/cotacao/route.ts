@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { proxyPublicDeliveryPost } from '@/src/shared/utils/proxyPublicDeliveryRoute'
+import { proxyPublicDeliveryPost } from '@/src/infrastructure/bff/proxyPublicDeliveryRoute'
 
 /**
  * POST /api/public/delivery/cotacao

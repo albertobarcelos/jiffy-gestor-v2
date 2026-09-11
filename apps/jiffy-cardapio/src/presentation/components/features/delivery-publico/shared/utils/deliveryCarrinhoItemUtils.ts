@@ -1,5 +1,5 @@
-import { normalizeTipoImpactoPreco } from '@/src/shared/utils/normalizeTipoImpactoPreco'
 import { calcularTotalComplementos } from '@/src/domain/services/pedido/CalculadoraPedido'
+import { itemCarrinhoParaProdutoSelecionado } from '@/src/application/mappers/CarrinhoDeliveryMapper'
 import type {
   DeliveryCarrinhoComplemento,
   DeliveryCarrinhoItem,
@@ -7,20 +7,9 @@ import type {
 
 export function valorUnitarioBaseProduto(item: DeliveryCarrinhoItem): number {
   if (item.complementos.length === 0) return item.valorUnitario
-  const impactoComplementos = calcularTotalComplementos({
-    produtoId: item.produtoId,
-    nome: item.produtoNome,
-    quantidade: 1,
-    valorUnitario: 0,
-    complementos: item.complementos.map(c => ({
-      id: c.complementoId,
-      grupoId: c.grupoComplementoId,
-      nome: c.nome,
-      valor: c.valor,
-      quantidade: c.quantidade,
-      tipoImpactoPreco: normalizeTipoImpactoPreco(c.tipoImpactoPreco),
-    })),
-  })
+  const impactoComplementos = calcularTotalComplementos(
+    itemCarrinhoParaProdutoSelecionado(item, { quantidade: 1, valorUnitario: 0 })
+  )
   return item.valorUnitario - impactoComplementos
 }
 
@@ -71,24 +60,23 @@ export function encontrarItemIgual(
 }
 
 function impactoComplementos(
-  item: Pick<DeliveryCarrinhoItem, 'produtoId' | 'produtoNome'>,
+  item: Pick<DeliveryCarrinhoItem, 'produtoId' | 'produtoNome' | 'observacoes'>,
   complementos: DeliveryCarrinhoComplemento[]
 ): number {
   if (complementos.length === 0) return 0
-  return calcularTotalComplementos({
-    produtoId: item.produtoId,
-    nome: item.produtoNome,
-    quantidade: 1,
-    valorUnitario: 0,
-    complementos: complementos.map(c => ({
-      id: c.complementoId,
-      grupoId: c.grupoComplementoId,
-      nome: c.nome,
-      valor: c.valor,
-      quantidade: c.quantidade,
-      tipoImpactoPreco: normalizeTipoImpactoPreco(c.tipoImpactoPreco),
-    })),
-  })
+  return calcularTotalComplementos(
+    itemCarrinhoParaProdutoSelecionado(
+      {
+        produtoId: item.produtoId,
+        produtoNome: item.produtoNome,
+        quantidade: 1,
+        valorUnitario: 0,
+        observacoes: item.observacoes,
+        complementos,
+      },
+      { quantidade: 1, valorUnitario: 0 }
+    )
+  )
 }
 
 /** Remove um complemento do item e recalcula valor unitário/total. */

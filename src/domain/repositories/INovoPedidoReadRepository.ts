@@ -1,4 +1,5 @@
 import { Produto } from '@/src/domain/entities/Produto'
+import type { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import type { UsuarioPdvEntregadorOption } from '@/src/domain/types/vendaDetalhe'
 
 export type CanalVendaCatalogo = 'balcao' | 'entrega'
@@ -8,11 +9,24 @@ export interface INovoPedidoReadRepository {
 
   listarEntregadoresDelivery(token: string): Promise<UsuarioPdvEntregadorOption[]>
 
+  listarGruposDoMenu(menuId: string, token: string): Promise<GrupoProduto[]>
+
   listarProdutosDoGrupo(
     grupoId: string,
     token: string,
     menuId: string | null
   ): Promise<{ produtos: Produto[]; count: number }>
+
+  listarProdutosCatalogoPagina(
+    token: string,
+    menuId: string,
+    params: {
+      grupoProdutoId?: string
+      q?: string
+      limit: number
+      offset: number
+    }
+  ): Promise<{ produtos: Produto[]; count: number; hasMore: boolean }>
 
   listarGrupoIdsComProdutosAtivos(token: string, menuId: string | null): Promise<Set<string>>
 

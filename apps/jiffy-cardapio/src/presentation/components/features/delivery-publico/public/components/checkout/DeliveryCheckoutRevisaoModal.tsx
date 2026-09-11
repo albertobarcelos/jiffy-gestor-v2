@@ -6,18 +6,21 @@ import { MdDeliveryDining } from 'react-icons/md'
 import { TbPaperBag } from 'react-icons/tb'
 import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { MeioPagamentoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
-import { transformarParaReal } from '@/src/shared/utils/formatters'
+import { calcularTrocoCheckout } from '@/src/application/services/delivery-publico/checkoutPagamentos'
 import { formatarCpfCnpjInput } from '@/src/shared/utils/cpfCnpj'
-import { formatarValorComplemento } from '@/src/domain/services/pedido/CalculadoraPedido'
+import { DELIVERY_PAIS_TELEFONE_PADRAO } from '@/src/shared/constants/deliveryPaisesTelefone'
+import { formatarTelefoneExibicao } from '@/src/shared/utils/deliveryTelefonePais'
+import { formatarValorComplemento } from '@/src/presentation/components/features/delivery-publico/shared/utils/formatPedidoLinhaDisplay'
 import { normalizeTipoImpactoPreco } from '@/src/shared/utils/normalizeTipoImpactoPreco'
 import type { DeliveryCarrinhoItem } from '../../../shared/stores/deliveryCarrinhoStore'
 import type { DeliveryTipoEntrega } from '../../../shared/stores/deliveryPreferenciaEntregaStore'
-import { DELIVERY_PAIS_TELEFONE_PADRAO } from '../../../shared/constants/deliveryPaisesTelefone'
 import { observacaoItemCarrinho } from '../../../shared/utils/deliveryCarrinhoItemUtils'
 import { formatDeliveryCurrency } from '../../../shared/utils/formatDeliveryCurrency'
-import { formatarTelefoneExibicao } from '../../../shared/utils/deliveryTelefonePais'
-import { calcularTrocoCheckout } from '../../../shared/utils/checkoutPagamentosUtils'
 import { etiquetaEnderecoPublicoLabel } from '../../../shared/utils/etiquetaEnderecoPublicoLabel'
+import {
+  calcularDistanciaAproximadaDaLoja,
+  pontoClienteParaDistancia,
+} from '../../../shared/utils/formatarDistanciaAproximadaDaLoja'
 import { isMeioPagamentoDinheiro } from '../../../shared/utils/isMeioPagamentoDinheiro'
 import { obterIconeMeioPagamento } from '../../../shared/utils/obterIconeMeioPagamento'
 import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
@@ -25,6 +28,8 @@ import {
   DeliveryCheckoutShellFooter,
   DeliveryCheckoutShellHeader,
 } from './DeliveryCheckoutShell'
+import { DeliveryDistanciaLojaHint } from './DeliveryDistanciaLojaHint'
+import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 
 type DeliveryCheckoutRevisaoModalProps = {
   /** `somenteLeitura` = pós-confirmação (sem editar / sem enviar). */
@@ -35,6 +40,7 @@ type DeliveryCheckoutRevisaoModalProps = {
   telefonePaisIso2?: string
   enderecoCliente: EnderecoClienteDeliveryPublicoDTO | null
   enderecoEmpresaTexto: string | null
+  localizacaoEmpresa?: GeoJsonPoint | null
   itens: DeliveryCarrinhoItem[]
   total: number
   subtotalOficial?: number | null
@@ -54,6 +60,7 @@ type DeliveryCheckoutRevisaoModalProps = {
   onVoltar: () => void
   onEditarTipoEntrega?: () => void
   onEditarCliente?: () => void
+  /** Abre troca/lista de endereços (endereço salvo não é editável). */
   onEditarEndereco?: () => void
   onEditarPedido?: () => void
   onEditarPagamento?: () => void
@@ -143,6 +150,7 @@ export function DeliveryCheckoutRevisaoModal({
   telefonePaisIso2 = DELIVERY_PAIS_TELEFONE_PADRAO,
   enderecoCliente,
   enderecoEmpresaTexto,
+  localizacaoEmpresa = null,
   itens,
   total,
   subtotalOficial = null,
@@ -184,7 +192,7 @@ export function DeliveryCheckoutRevisaoModal({
   const exibirTaxaEntrega = isEntrega
   const taxaEntregaTexto = cotacaoLoading
     ? 'Calculando...'
-    : transformarParaReal(taxaExibicao)
+    : formatDeliveryCurrency(taxaExibicao)
   const trocoReceber = calcularTrocoCheckout(
     totalExibicao,
     pagamentos.map(p => ({ meioPagamentoId: p.meioPagamentoId, valor: p.valor })),
@@ -300,7 +308,7 @@ export function DeliveryCheckoutRevisaoModal({
           icone={<MapPin className="h-5 w-5 text-black" />}
           label={isEntrega ? 'Seu endereço:' : 'Retirada no local:'}
           onEditar={somenteLeitura || !isEntrega ? undefined : onEditarEndereco}
-          editLabel="Editar endereço"
+          editLabel="Trocar endereço"
         >
           {isEntrega && enderecoCliente ? (
             <>
@@ -315,6 +323,12 @@ export function DeliveryCheckoutRevisaoModal({
                   .filter(Boolean)
                   .join(' - ')}
               </p>
+              <DeliveryDistanciaLojaHint
+                texto={calcularDistanciaAproximadaDaLoja(
+                  localizacaoEmpresa,
+                  pontoClienteParaDistancia(enderecoCliente)
+                )}
+              />
             </>
           ) : null}
           {isEntrega && !enderecoCliente ? (
@@ -346,7 +360,7 @@ export function DeliveryCheckoutRevisaoModal({
                     {pagamento.meio?.nome ?? 'Pagamento'}
                   </span>
                   <span className="shrink-0 tabular-nums delivery-text-primary">
-                    {transformarParaReal(pagamento.valor)}
+                    {formatDeliveryCurrency(pagamento.valor)}
                   </span>
                 </li>
               ))}
@@ -354,7 +368,7 @@ export function DeliveryCheckoutRevisaoModal({
           )}
           {trocoReceber > 0 ? (
             <p className="text-sm font-semibold text-green-700">
-              Troco a receber: {transformarParaReal(trocoReceber)}
+              Troco a receber: {formatDeliveryCurrency(trocoReceber)}
             </p>
           ) : null}
         </LinhaSecao>
@@ -581,7 +595,7 @@ export function DeliveryCheckoutRevisaoModal({
           <div className="flex items-center justify-between text-sm">
             <span className="delivery-text-secondary">Subtotal</span>
             <span className="font-medium delivery-text-primary">
-              {transformarParaReal(subtotalExibicao)}
+              {formatDeliveryCurrency(subtotalExibicao)}
             </span>
           </div>
           {exibirTaxaEntrega ? (
@@ -592,7 +606,7 @@ export function DeliveryCheckoutRevisaoModal({
           ) : null}
           <div className="flex items-center justify-between text-sm font-semibold">
             <span className="delivery-text-primary">Total</span>
-            <span className="delivery-text-primary">{transformarParaReal(totalExibicao)}</span>
+            <span className="delivery-text-primary">{formatDeliveryCurrency(totalExibicao)}</span>
           </div>
         </div>
       </div>

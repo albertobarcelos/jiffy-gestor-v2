@@ -47,35 +47,87 @@ pub struct WhatsAppChatHint {
     pub titulo: Option<String>,
 }
 
-/// Identidade da conversa aberta (número / título). Não lê mensagens.
+/// Número da conversa aberta. Só o chat selecionado, o header dela ou os Dados do contato
+/// (se o nome bater). Não varre a lista — senão pega o +55 de outro chat.
 const CHAT_HINT_JS: &str = r#"
 (function () {
   function fromWid(s) {
-    var m = String(s || '').match(/(\d{10,15})@c\.us/);
+    var m = String(s || '').match(/(\d{10,15})(?::\d+)?@(?:c\.us|s\.whatsapp\.net)/);
     return m ? m[1] : '';
   }
-  function digitsPhone(s) {
+  function soDigitosNacionais(s) {
     var d = String(s || '').replace(/\D/g, '');
-    return d.length >= 10 && d.length <= 15 ? d : '';
+    if (d.startsWith('55') && d.length >= 12 && d.length <= 13) d = d.slice(2);
+    return d.length >= 10 && d.length <= 11 ? d : '';
   }
-  var tel = '';
-  var titulo = '';
+  function brPhoneFormatado(s) {
+    var text = String(s || '').replace(/\u00a0/g, ' ').replace(/[\u2010-\u2015]/g, '-');
+    var m = text.match(/\+55\s*\(?\s*(\d{2})\s*\)?\s*(\d{4,5})\s*-?\s*(\d{4})/);
+    return m ? m[1] + m[2] + m[3] : '';
+  }
+  function brPhoneCurto(s) {
+    var t = String(s || '');
+    if (t.length > 48) return brPhoneFormatado(t);
+    return brPhoneFormatado(t) || soDigitosNacionais(t);
+  }
+  function painelMisturouLista(text) {
+    return /Pesquisar ou come|Search or start|Baixar o WhatsApp|Download (WhatsApp|the app)/i.test(text);
+  }
+  function nomeChave(s) {
+    return String(s || '')
+      .toLowerCase()
+      .replace(/[^\w\u00c0-\u024f]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
   var sel = document.querySelector('#pane-side [aria-selected="true"]');
+  var titulo = '';
+  var tel = '';
   if (sel) {
-    tel = fromWid(sel.getAttribute('data-id') || '') || fromWid(sel.outerHTML);
-    var t = sel.querySelector('[title]');
-    titulo = (t && t.getAttribute('title')) || '';
+    tel = fromWid(sel.getAttribute('data-id') || '');
+    var st = sel.querySelector('[title]');
+    titulo = (st && st.getAttribute('title')) || '';
+    if (!tel) tel = brPhoneCurto(titulo);
   }
   var main = document.querySelector('#main header');
   if (main) {
-    if (!tel) tel = fromWid(main.outerHTML);
-    var ht = main.querySelector('span[title], [data-testid="conversation-info-header-chat-title"]');
+    if (!tel) tel = fromWid(main.getAttribute('data-id') || '') || fromWid(main.outerHTML);
+    var titles = main.querySelectorAll('[title]');
+    for (var i = 0; i < titles.length; i++) {
+      var rawTitle = titles[i].getAttribute('title') || '';
+      if (!titulo) titulo = rawTitle;
+      if (!tel) tel = brPhoneCurto(rawTitle);
+    }
+    var ht = main.querySelector('[data-testid="conversation-info-header-chat-title"], span[title]');
     if (ht) {
       titulo = titulo || ht.getAttribute('title') || String(ht.textContent || '').trim();
     }
-    if (!tel) tel = digitsPhone(titulo);
+    if (!tel) tel = brPhoneCurto(String(main.innerText || '').slice(0, 80));
   }
-  return { telefone: tel || null, titulo: titulo || null };
+  if (!tel) {
+    var esperado = nomeChave(titulo);
+    var headers = document.querySelectorAll('#app header, #app h1, #app [role="heading"]');
+    for (var h = 0; h < headers.length; h++) {
+      var rotulo = String(headers[h].textContent || '').replace(/\s+/g, ' ').trim();
+      if (!/Dados do contato|Contact info|Info\. del contacto|Info contatto/i.test(rotulo)) continue;
+      if (painelMisturouLista(rotulo)) continue;
+      var box = headers[h].parentElement;
+      for (var up = 0; up < 6 && box && box !== document.body; up++) {
+        var txt = String(box.innerText || '');
+        if (painelMisturouLista(txt) || txt.length > 2500) break;
+        var p = brPhoneFormatado(txt);
+        var nomePainel = nomeChave(txt.slice(0, 400));
+        var nomeBate = !esperado || nomePainel.indexOf(esperado) !== -1;
+        if (p && nomeBate) {
+          tel = p;
+          break;
+        }
+        box = box.parentElement;
+      }
+      if (tel) break;
+    }
+  }
+  return JSON.stringify({ telefone: tel || null, titulo: titulo || null });
 })()
 "#;
 
@@ -274,13 +326,13 @@ pub async fn whatsapp_chat_hint(app: AppHandle) -> WhatsAppChatHint {
 }
 
 fn parse_chat_hint(raw: &str) -> WhatsAppChatHint {
-    let texto = raw.trim().trim_matches('"');
+    let texto = raw.trim();
     let Ok(v) = serde_json::from_str::<serde_json::Value>(texto) else {
-        if let Ok(inner) = serde_json::from_str::<String>(raw) {
-            return parse_chat_hint(&inner);
-        }
         return WhatsAppChatHint::default();
     };
+    if let Some(inner) = v.as_str() {
+        return parse_chat_hint(inner);
+    }
     let tel = v
         .get("telefone")
         .and_then(|x| x.as_str())
@@ -308,6 +360,13 @@ mod tests {
         let h = parse_chat_hint(r#"{"telefone":"5565992934536","titulo":"Alberto"}"#);
         assert_eq!(h.telefone.as_deref(), Some("5565992934536"));
         assert_eq!(h.titulo.as_deref(), Some("Alberto"));
+    }
+
+    #[test]
+    fn le_hint_json_embutido_em_string() {
+        let h = parse_chat_hint(r#""{\"telefone\":\"6598138428\",\"titulo\":\"Meu Amor\"}""#);
+        assert_eq!(h.telefone.as_deref(), Some("6598138428"));
+        assert_eq!(h.titulo.as_deref(), Some("Meu Amor"));
     }
 }
 
