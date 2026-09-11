@@ -42,6 +42,7 @@ interface MenuProdutoTabsModalProps {
   state: MenuProdutoTabsModalState
   onClose: () => void
   onTabChange: (tab: MenuProdutoTabsKey) => void
+  onRemoverDesteCardapio?: (produtoId: string) => void
 }
 
 export function MenuProdutoTabsModal({
@@ -49,6 +50,7 @@ export function MenuProdutoTabsModal({
   state,
   onClose,
   onTabChange,
+  onRemoverDesteCardapio,
 }: MenuProdutoTabsModalProps) {
   const produtoRef = useRef<MenuProdutoSnapshotHandle>(null)
   const grupoRef = useRef<MenuGrupoSnapshotHandle>(null)
@@ -216,6 +218,14 @@ export function MenuProdutoTabsModal({
               produto={state.produto}
               onDirtyChange={setProdutoDirty}
               onSavingChange={setSaving}
+              onRemoverDesteCardapio={
+                onRemoverDesteCardapio
+                  ? () => {
+                      const produtoId = state.produto?.produtoId
+                      if (produtoId) onRemoverDesteCardapio(produtoId)
+                    }
+                  : undefined
+              }
             />
           </div>
         ) : null}

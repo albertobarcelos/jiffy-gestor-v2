@@ -4,6 +4,7 @@
   MdRemoveCircleOutline,
   MdLaunch,
   MdAttachMoney,
+  MdStar,
 } from 'react-icons/md'
 import type { ComponentType } from 'react'
 import type { ToggleField, ProdutoPatch } from '@/src/shared/types/produto'
@@ -74,6 +75,13 @@ export type ActionIconDef =
 
 export const actionIconsConfig: ActionIconDef[] = [
   {
+    key: 'favorito',
+    ariaLabel: 'Favorito',
+    label: 'Destaca o produto como favorito no Jiffy POS.',
+    Icon: MdStar,
+    field: 'favorito',
+  },
+  {
     key: 'acrescentar',
     ariaLabel: 'Permitir acréscimo',
     label:
@@ -123,7 +131,7 @@ export const actionIconsConfig: ActionIconDef[] = [
   },
 ]
 
-/** Ícones de permissão do cadastro base (sem copiar) — reutilizados na lista do cardápio com 1 menu. */
-export const permissionActionIconsConfig = actionIconsConfig.filter(
+/** Favorito + permissões do PDV (sem copiar). Usado no cadastro e no cardápio. */
+export const menuQuickActionIconsConfig = actionIconsConfig.filter(
   (def): def is Extract<ActionIconDef, { field: ToggleField }> => Boolean(def.field)
 )

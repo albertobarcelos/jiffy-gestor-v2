@@ -3,23 +3,21 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { InputAdornment, TextField } from '@mui/material'
-import { MdArrowBack, MdSearch } from 'react-icons/md'
+import { MdSearch } from 'react-icons/md'
 import { useMenu } from '@/src/presentation/hooks/menus/useMenus'
 import {
   useMenuGruposProdutos,
   useMenuProdutos,
 } from '@/src/presentation/hooks/menus/useMenuCatalog'
 import { useMenuProdutosFilters } from '@/src/presentation/hooks/menus/useMenuProdutosFilters'
-import { useMenuMutations } from '@/src/presentation/hooks/menus/useMenuMutations'
-import { usePropagarAlteracaoProduto } from '@/src/presentation/hooks/produtos/usePropagarAlteracaoProduto'
-import { useEntityImageCropUpload } from '@/src/presentation/hooks/useEntityImageCropUpload'
-import { MENU_PRODUTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
+import { useMenuProdutoLista } from '@/src/presentation/hooks/menus/useMenuProdutoLista'
 import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
 import { useIsMobile } from '@/src/presentation/hooks/useIsMobile'
 import { AddProdutosToMenuPanel } from './AddProdutosToMenuPanel'
 import { MenuNovoProdutoWizard } from './MenuNovoProdutoWizard'
 import { MenuReorderCardapioModal } from './reorder/MenuReorderCardapioModal'
 import { MenuCardapioAcoes } from './MenuCardapioAcoes'
+import { MenuCardapioChrome } from './MenuCardapioChrome'
 import { MenuCardapioEmptyState } from './MenuCardapioEmptyState'
 import { MenuProdutosFilters } from './MenuProdutosFilters'
 import {
@@ -27,10 +25,6 @@ import {
   type MenuProdutoTabsKey,
   type MenuProdutoTabsModalState,
 } from './MenuProdutoTabsModal'
-import {
-  ProdutosTabsModal,
-  type ProdutosTabsModalState,
-} from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
 import {
   EscolherTipoProdutoModal,
   useEscolherTipoProdutoCadastro,
@@ -49,23 +43,7 @@ import { atualizarGrupoProdutoViaBffUseCase } from '@/src/application/use-cases/
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
-import { useEmpresaMenuUnico } from '@/src/presentation/hooks/menus/useEmpresaMenuUnico'
-import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
-import { Produto } from '@/src/domain/entities/Produto'
-import { mergeProdutoComSnapshotMenu } from '@/src/application/mappers/MenuProdutoCatalogMapper'
-import {
-  produtosInfiniteQueryParams,
-  useProdutosInfinite,
-} from '@/src/presentation/hooks/useProdutos'
-import { useProdutoPatchMutation } from '@/src/presentation/hooks/useProdutoPatchMutation'
-import { useProdutosCodigoPorId } from '@/src/presentation/hooks/produtos/useProdutosCodigoPorId'
-import type { BasePermissaoField } from './MenuProdutoRowQuickActions'
-import type {
-  MenuGrupoProduto,
-  MenuProduto,
-  UpdateMenuProdutoInput,
-} from '@/src/shared/types/menus'
-import type { SnapshotProdutoPropagavel } from '@/src/shared/types/propagarAlteracaoProduto'
+import type { MenuGrupoProduto, MenuProduto } from '@/src/shared/types/menus'
 
 interface MenuEditorProps {
   menuId: string
@@ -74,7 +52,6 @@ interface MenuEditorProps {
 export function MenuEditor({ menuId }: MenuEditorProps) {
   const { toGestao } = useGestaoPath()
   const isMobile = useIsMobile()
-  const { isMenuUnico } = useEmpresaMenuUnico()
   const { state: filters, query, temFiltroAtivo, actions } = useMenuProdutosFilters()
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(false)
   useEffect(() => {
@@ -112,11 +89,6 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   const [wizardOpen, setWizardOpen] = useState(false)
   const [wizardCategoriaId, setWizardCategoriaId] = useState<string | undefined>()
   const [reorderOpen, setReorderOpen] = useState(false)
-  const [statusConfirm, setStatusConfirm] = useState<{
-    produtoId: string
-    ativo: boolean
-  } | null>(null)
-  const [statusConfirmSaving, setStatusConfirmSaving] = useState(false)
   const tipoCadastro = useEscolherTipoProdutoCadastro()
   const {
     data: produtosTodosData,
@@ -132,58 +104,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   })
   const { data: gruposComplementos = [], isLoading: isLoadingGruposComplementos } =
     useGruposComplementos({ limit: 100, ativo: null })
-  const { syncProdutos, updateProduto, uploadImagemProduto } = useMenuMutations(menuId)
-  const patchProdutoBase = useProdutoPatchMutation()
-  const { codigoPorId } = useProdutosCodigoPorId()
-  const {
-    data: produtosBaseData,
-    fetchNextPage: fetchNextProdutosBase,
-    hasNextPage: hasNextProdutosBase,
-    isFetching: isFetchingProdutosBase,
-    isFetchingNextPage: isFetchingNextProdutosBase,
-  } = useProdutosInfinite(
-    produtosInfiniteQueryParams({ ativo: null, limit: 100 }),
-    { enabled: isMenuUnico }
-  )
-  const { pedirConfirmacao, aplicarNosDestinos, aplicarImagemNosDestinos, dialog: dialogPropagacao } =
-    usePropagarAlteracaoProduto()
   const invalidate = useInvalidateTenantQueries()
-
-  useEffect(() => {
-    if (!isMenuUnico) return
-    if (
-      hasNextProdutosBase &&
-      !isFetchingNextProdutosBase &&
-      !isFetchingProdutosBase &&
-      produtosBaseData
-    ) {
-      void fetchNextProdutosBase()
-    }
-  }, [
-    isMenuUnico,
-    hasNextProdutosBase,
-    isFetchingNextProdutosBase,
-    isFetchingProdutosBase,
-    fetchNextProdutosBase,
-    produtosBaseData,
-  ])
-
-  const produtosBaseById = useMemo(() => {
-    const map = new Map<string, Produto>()
-    for (const page of produtosBaseData?.pages ?? []) {
-      for (const p of page.produtos) {
-        map.set(p.getId(), p)
-      }
-    }
-    return map
-  }, [produtosBaseData])
-
-  const handleToggleBasePermissao = useCallback(
-    (produtoId: string, field: BasePermissaoField, novoValor: boolean) => {
-      patchProdutoBase.mutate({ type: 'toggle', produtoId, field, novoValor })
-    },
-    [patchProdutoBase]
-  )
 
   useEffect(() => {
     if (hasNextProdutos && !isFetchingNextProdutos && !isFetchingProdutos && produtosData) {
@@ -222,11 +143,6 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     tab: 'produto',
     produto: null,
     grupo: null,
-  })
-  const [baseTabsState, setBaseTabsState] = useState<ProdutosTabsModalState>({
-    open: false,
-    tab: 'produto',
-    mode: 'edit',
   })
 
   const openWizardCadastro = useCallback((categoriaId?: string) => {
@@ -386,60 +302,46 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     })
   }, [])
 
-  const closeBaseTabs = useCallback(() => {
-    setBaseTabsState({
-      open: false,
-      tab: 'produto',
-      mode: 'edit',
-    })
+  const handleProdutoRemovido = useCallback((produtoId: string) => {
+    setTabsState(prev =>
+      prev.produto?.produtoId === produtoId
+        ? { open: false, tab: 'produto', produto: null, grupo: null }
+        : prev
+    )
   }, [])
 
+  const {
+    codigoPorId,
+    permissoesPorId,
+    savingDaLinha,
+    handleNomeChange,
+    handleValorChange,
+    handleQuickPatch,
+    handleTogglePermissao,
+    handleStatusToggle,
+    handleRemove,
+    dialogPropagacao,
+    statusConfirm,
+    statusConfirmSaving,
+    confirmStatusToggle,
+    fecharStatusConfirm,
+  } = useMenuProdutoLista({
+    menuId,
+    produtosDoMenu,
+    onProdutoRemovido: handleProdutoRemovido,
+  })
+
   const handleEditProduto = useCallback(
-    async (produtoId: string) => {
+    (produtoId: string) => {
       const produtoMenu = produtosDoMenu.find(p => p.produtoId === produtoId)
       if (!produtoMenu) return
-
-      if (isMenuUnico) {
-        try {
-          const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-          if (!token) {
-            showToast.error('Sessão inválida. Faça login novamente.')
-            return
-          }
-          const res = await fetchGestorApi(`/api/produtos/${produtoId}`, {
-            headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-          })
-          if (!res.ok) {
-            showToast.error('Não foi possível carregar o produto para edição.')
-            return
-          }
-          const data = await res.json()
-          const produtoBase = Produto.fromJSON(data)
-          /** Snapshot do menu garante categoria mesmo se o GET base vier sem `grupoId`. */
-          const produto = mergeProdutoComSnapshotMenu(produtoBase, produtoMenu)
-          setBaseTabsState({
-            open: true,
-            tab: 'produto',
-            mode: 'edit',
-            produto,
-            grupoId:
-              produto.getGrupoId() ||
-              produtoMenu.grupoProduto?.id ||
-              undefined,
-          })
-        } catch {
-          showToast.error('Não foi possível carregar o produto para edição.')
-        }
-        return
-      }
-
       openTabs({
         tab: 'produto',
         produto: produtoMenu,
         grupo: findGrupo(produtoMenu.grupoProduto?.id),
       })
     },
-    [produtosDoMenu, findGrupo, openTabs, isMenuUnico]
+    [produtosDoMenu, findGrupo, openTabs]
   )
 
   const handleEditGrupo = useCallback(
@@ -464,14 +366,10 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     [tipoCadastro.pedirTipo, openWizardCadastro]
   )
 
-  /** Cabeçalho / empty state: com 1 menu vai direto ao cadastro (sem painel de vincular existentes). */
+  /** Cabeçalho / empty state: painel para vincular produtos do cadastro base. */
   const handleAdicionarProdutosCabecalho = useCallback(() => {
-    if (isMenuUnico) {
-      tipoCadastro.pedirTipo(() => openWizardCadastro())
-      return
-    }
     setAddOpen(true)
-  }, [isMenuUnico, tipoCadastro.pedirTipo, openWizardCadastro])
+  }, [])
 
   const handleToggleGrupoStatus = useCallback(
     async (grupoId: string) => {
@@ -503,185 +401,9 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     [findGrupo, invalidate, menuId]
   )
 
-  const handleNomeChange = useCallback(
-    async (produtoId: string, nome: string) => {
-      const destinos = await pedirConfirmacao({
-        origem: 'menu',
-        produtoId,
-        menuIdAtual: menuId,
-      })
-      if (destinos === null) return false
-      try {
-        await updateProduto.mutateAsync({ produtoId, input: { nome } })
-        if (destinos.aplicarNoCadastroBase || destinos.menuIds.length > 0) {
-          await aplicarNosDestinos({
-            produtoId,
-            snapshot: { nome },
-            destinos,
-          })
-        }
-        showToast.success('Nome atualizado neste cardápio')
-        return true
-      } catch (err) {
-        showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar nome')
-        return false
-      }
-    },
-    [updateProduto, pedirConfirmacao, aplicarNosDestinos, menuId]
-  )
-
-  const handleValorChange = useCallback(
-    async (produtoId: string, valor: number) => {
-      const destinos = await pedirConfirmacao({
-        origem: 'menu',
-        produtoId,
-        menuIdAtual: menuId,
-      })
-      if (destinos === null) return false
-      try {
-        await updateProduto.mutateAsync({ produtoId, input: { valor } })
-        if (destinos.aplicarNoCadastroBase || destinos.menuIds.length > 0) {
-          await aplicarNosDestinos({
-            produtoId,
-            snapshot: { valor },
-            destinos,
-          })
-        }
-        showToast.success('Preço atualizado neste cardápio')
-        return true
-      } catch (err) {
-        showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar preço')
-        return false
-      }
-    },
-    [updateProduto, pedirConfirmacao, aplicarNosDestinos, menuId]
-  )
-
-  const handleStatusToggle = useCallback((produtoId: string, ativo: boolean) => {
-    setStatusConfirm({ produtoId, ativo })
-  }, [])
-
-  const confirmStatusToggle = useCallback(async () => {
-    if (!statusConfirm) return
-    const { produtoId, ativo } = statusConfirm
-    setStatusConfirmSaving(true)
-    try {
-      await updateProduto.mutateAsync({ produtoId, input: { ativo } })
-      showToast.success(
-        ativo ? 'Produto disponível neste cardápio' : 'Produto pausado neste cardápio'
-      )
-      setStatusConfirm(null)
-    } catch (err) {
-      showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar status')
-    } finally {
-      setStatusConfirmSaving(false)
-    }
-  }, [statusConfirm, updateProduto])
-
-  const handleQuickPatch = useCallback(
-    async (produtoId: string, input: UpdateMenuProdutoInput): Promise<boolean> => {
-      const destinos = await pedirConfirmacao({
-        origem: 'menu',
-        produtoId,
-        menuIdAtual: menuId,
-      })
-      if (destinos === null) return false
-      try {
-        await updateProduto.mutateAsync({ produtoId, input })
-        const snapshot = input as SnapshotProdutoPropagavel
-        if (destinos.aplicarNoCadastroBase || destinos.menuIds.length > 0) {
-          await aplicarNosDestinos({
-            produtoId,
-            snapshot,
-            destinos,
-          })
-        }
-        if (input.favorito !== undefined) {
-          showToast.success(
-            input.favorito ? 'Marcado como favorito neste cardápio' : 'Removido dos favoritos'
-          )
-        } else if (input.descricao !== undefined) {
-          showToast.success('Descrição atualizada neste cardápio')
-        } else if (input.gruposComplementosIds !== undefined) {
-          showToast.success('Complementos atualizados neste cardápio')
-        } else {
-          showToast.success('Produto atualizado neste cardápio')
-        }
-        return true
-      } catch (err) {
-        showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar produto')
-        return false
-      }
-    },
-    [updateProduto, pedirConfirmacao, aplicarNosDestinos, menuId]
-  )
-
-  const handleRemove = useCallback(
-    (produtoId: string) => {
-      const produto = produtosDoMenu.find(p => p.produtoId === produtoId)
-      if (!produto) return
-      if (!window.confirm(`Remover "${produto.nome}" deste cardápio?`)) return
-      void syncProdutos
-        .mutateAsync({ remove: [produto.produtoId] })
-        .then(() => {
-          showToast.success('Produto removido deste cardápio')
-          if (tabsState.produto?.produtoId === produto.produtoId) closeTabs()
-        })
-        .catch(err =>
-          showToast.error(err instanceof Error ? err.message : 'Erro ao remover')
-        )
-    },
-    [produtosDoMenu, syncProdutos, tabsState.produto, closeTabs]
-  )
-
-  const handleUploadImagem = useCallback(
-    async (produtoId: string, file: File) => {
-      try {
-        await uploadImagemProduto.mutateAsync({ produtoId, file })
-        const destinos = await pedirConfirmacao({
-          origem: 'menu',
-          produtoId,
-          menuIdAtual: menuId,
-          variante: 'imagem',
-        })
-        if (destinos && destinos.menuIds.length > 0) {
-          await aplicarImagemNosDestinos({
-            produtoId,
-            file,
-            destinos,
-            vincularSeAusente: true,
-          })
-          showToast.success('Imagem atualizada neste cardápio e nos selecionados')
-        } else {
-          showToast.success('Imagem atualizada neste cardápio')
-        }
-      } catch (err) {
-        showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar imagem')
-      }
-    },
-    [uploadImagemProduto, pedirConfirmacao, aplicarImagemNosDestinos, menuId]
-  )
-
-  const { selectForEntity: selectProdutoImagem, cropModal: produtoCropModal } =
-    useEntityImageCropUpload({
-      preset: MENU_PRODUTO_CROP_PRESET,
-      upload: handleUploadImagem,
-    })
-
-  const handleChangeImage = useCallback(
-    (produtoId: string, file: File) => {
-      selectProdutoImagem(produtoId, file)
-    },
-    [selectProdutoImagem]
-  )
-
   const renderItem = useCallback(
     (produto: MenuProduto) => {
-      const savingThis =
-        updateProduto.isPending && updateProduto.variables?.produtoId === produto.produtoId
-      const savingImage =
-        uploadImagemProduto.isPending &&
-        uploadImagemProduto.variables?.produtoId === produto.produtoId
+      const saving = savingDaLinha(produto.produtoId)
       return (
         <CatalogProductRow
           variant="menu"
@@ -691,64 +413,35 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
           ativo={produto.ativo}
           imagemUrl={produto.image?.imageUrl}
           codigo={codigoPorId.get(produto.produtoId)}
-          isSavingValor={savingThis && updateProduto.variables?.input.valor !== undefined}
-          isSavingStatus={savingThis && updateProduto.variables?.input.ativo !== undefined}
-          isSavingNome={savingThis && updateProduto.variables?.input.nome !== undefined}
-          isSavingImage={savingImage}
+          isSavingValor={saving.valor}
+          isSavingStatus={saving.status}
+          isSavingNome={saving.nome}
           onNomeChange={handleNomeChange}
           onValorChange={handleValorChange}
           onSwitchToggle={handleStatusToggle}
           onEdit={handleEditProduto}
-          onRemove={isMenuUnico ? undefined : handleRemove}
-          onChangeImage={handleChangeImage}
           actionsSlot={
             <MenuProdutoRowQuickActions
               produto={produto}
-              disabled={
-                savingThis ||
-                (patchProdutoBase.isPending &&
-                  patchProdutoBase.variables?.produtoId === produto.produtoId)
-              }
+              disabled={saving.acoes}
+              permissoesCadastro={permissoesPorId.get(produto.produtoId)}
               onPatch={handleQuickPatch}
-              showBasePermissoes={isMenuUnico}
-              baseToggleStates={(() => {
-                if (!isMenuUnico) return null
-                const base = produtosBaseById.get(produto.produtoId)
-                if (!base) return null
-                return {
-                  permiteAcrescimo: base.permiteAcrescimoAtivo(),
-                  permiteDesconto: base.permiteDescontoAtivo(),
-                  abreComplementos: base.abreComplementosAtivo(),
-                  permiteAlterarPreco: base.permiteAlterarPrecoAtivo(),
-                  incideTaxa: base.incideTaxaAtivo(),
-                }
-              })()}
-              onToggleBasePermissao={(field, value) =>
-                handleToggleBasePermissao(produto.produtoId, field, value)
-              }
+              onTogglePermissao={handleTogglePermissao}
             />
           }
         />
       )
     },
     [
-      updateProduto.isPending,
-      updateProduto.variables,
-      uploadImagemProduto.isPending,
-      uploadImagemProduto.variables,
-      patchProdutoBase.isPending,
-      patchProdutoBase.variables,
-      handleNomeChange,
-      handleValorChange,
-      handleStatusToggle,
-      handleEditProduto,
-      handleRemove,
-      handleChangeImage,
-      handleQuickPatch,
-      handleToggleBasePermissao,
-      isMenuUnico,
-      produtosBaseById,
       codigoPorId,
+      handleEditProduto,
+      handleNomeChange,
+      handleQuickPatch,
+      handleStatusToggle,
+      handleTogglePermissao,
+      handleValorChange,
+      permissoesPorId,
+      savingDaLinha,
     ]
   )
 
@@ -765,10 +458,10 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
       <div className="p-6">
         <p className="text-sm text-secondary-text">Menu não encontrado.</p>
         <Link
-          href={toGestao('/menus')}
+          href={toGestao('/cardapio')}
           className="mt-2 inline-block text-sm font-semibold text-primary"
         >
-          Voltar
+          Voltar ao cardápio
         </Link>
       </div>
     )
@@ -779,80 +472,55 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   const mostrarAcoesCabecalho = !cardapioVazio
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex-shrink-0 px-1 py-[4px] md:px-[30px]">
-        <div className="flex flex-nowrap items-center gap-2 md:gap-3">
-          <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3 md:pl-5">
-            <Link
-              href={toGestao('/menus')}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-primary/50 text-primary transition-colors hover:bg-primary/10"
-              aria-label="Voltar"
-            >
-              <MdArrowBack className="h-5 w-5" />
-            </Link>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-primary">Produtos do menu</p>
-              <p
-                className="truncate text-sm font-normal text-tertiary md:text-xl"
-                title={menu.nome}
-              >
-                {menu.nome}
-              </p>
-            </div>
+    <MenuCardapioChrome
+      menuId={menuId}
+      nomeMenu={menu.nome}
+      aba="produtos"
+      toolbar={
+        <div className="flex h-8 shrink-0 items-center gap-2">
+          <div className="w-[min(220px,22vw)] shrink-0">
+            <TextField
+              id="menu-produtos-search"
+              size="small"
+              fullWidth
+              value={filters.searchText}
+              onChange={e => actions.setSearch(e.target.value)}
+              placeholder="Pesquisar"
+              sx={{
+                ...sxEntradaCompactaProduto,
+                '& .MuiOutlinedInput-root': {
+                  backgroundColor: '#fff',
+                  height: 32,
+                  minHeight: 32,
+                },
+                '& .MuiOutlinedInput-input': {
+                  padding: '4px 6px',
+                  fontSize: '0.8125rem',
+                },
+                '& .MuiInputAdornment-root': {
+                  marginRight: '2px',
+                },
+              }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <MdSearch className="text-secondary-text" size={16} />
+                  </InputAdornment>
+                ),
+              }}
+            />
           </div>
 
-          <div className="flex shrink-0 items-center gap-2">
-            <div className="w-[min(220px,22vw)] shrink-0">
-              <TextField
-                id="menu-produtos-search"
-                size="small"
-                fullWidth
-                value={filters.searchText}
-                onChange={e => actions.setSearch(e.target.value)}
-                label="Pesquisar"
-                placeholder="Nome ou descrição"
-                InputLabelProps={{ shrink: true }}
-                sx={{
-                  ...sxEntradaCompactaProduto,
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: '#fff',
-                    height: 32,
-                    minHeight: 32,
-                  },
-                  '& .MuiOutlinedInput-input': {
-                    padding: '4px 6px',
-                    fontSize: '0.8125rem',
-                  },
-                  '& .MuiInputAdornment-root': {
-                    marginRight: '2px',
-                  },
-                  '& .MuiInputLabel-root': {
-                    fontSize: '0.8125rem',
-                  },
-                }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <MdSearch className="text-secondary-text" size={16} />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </div>
-
-            {mostrarAcoesCabecalho ? (
-              <MenuCardapioAcoes
-                onAdicionar={handleAdicionarProdutosCabecalho}
-                onReordenar={() => setReorderOpen(true)}
-                loteHref={toGestao(`/menus/${menuId}/atualizar-lote`)}
-              />
-            ) : null}
-          </div>
+          {mostrarAcoesCabecalho ? (
+            <MenuCardapioAcoes
+              onAdicionar={handleAdicionarProdutosCabecalho}
+              onReordenar={() => setReorderOpen(true)}
+              loteHref={toGestao(`/menus/${menuId}/atualizar-lote`)}
+            />
+          ) : null}
         </div>
-      </div>
-
-      <div className="h-[4px] flex-shrink-0 border-t-2 border-primary/50" />
-
+      }
+    >
       <MenuProdutosFilters
         filtrosVisiveis={filtrosVisiveis}
         isMobile={isMobile}
@@ -900,30 +568,18 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         state={tabsState}
         onClose={closeTabs}
         onTabChange={tab => setTabsState(prev => ({ ...prev, tab }))}
+        onRemoverDesteCardapio={handleRemove}
       />
 
-      <ProdutosTabsModal
-        state={baseTabsState}
-        onClose={closeBaseTabs}
-        onTabChange={tab => setBaseTabsState(prev => ({ ...prev, tab }))}
-        onReload={() => {
-          void invalidate(['menus', menuId])
-          void invalidate(['menu-produtos', menuId])
-          void invalidate(['menu-grupos', menuId])
-        }}
+      <AddProdutosToMenuPanel
+        open={addOpen}
+        menuId={menuId}
+        produtosJaNoMenu={idsNoMenu}
+        onClose={() => setAddOpen(false)}
+        onCadastrarNovoProduto={() =>
+          tipoCadastro.pedirTipo(() => openWizardCadastro())
+        }
       />
-
-      {!isMenuUnico ? (
-        <AddProdutosToMenuPanel
-          open={addOpen}
-          menuId={menuId}
-          produtosJaNoMenu={idsNoMenu}
-          onClose={() => setAddOpen(false)}
-          onCadastrarNovoProduto={() =>
-            tipoCadastro.pedirTipo(() => openWizardCadastro())
-          }
-        />
-      ) : null}
 
       <EscolherTipoProdutoModal
         open={tipoCadastro.open}
@@ -946,9 +602,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
       {dialogPropagacao}
       <JiffyFriendlyAlertDialog
         open={Boolean(statusConfirm)}
-        onClose={() => {
-          if (!statusConfirmSaving) setStatusConfirm(null)
-        }}
+        onClose={fecharStatusConfirm}
         onConfirm={() => void confirmStatusToggle()}
         title={
           statusConfirm?.ativo
@@ -964,7 +618,6 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         iconVariant={statusConfirm?.ativo ? 'success' : 'warning'}
         busy={statusConfirmSaving}
       />
-      {produtoCropModal}
-    </div>
+    </MenuCardapioChrome>
   )
 }
