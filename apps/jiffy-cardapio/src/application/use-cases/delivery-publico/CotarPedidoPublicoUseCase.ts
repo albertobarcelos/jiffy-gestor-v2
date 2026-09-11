@@ -8,7 +8,7 @@ import {
   type ClienteDeliveryPublicoDTO,
 } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import { montarCotacaoPublico } from '@/src/application/mappers/MontarPedidoPublicoMapper'
-import { garantirEnderecoEntregaPublicoUseCase } from '@/src/application/use-cases/delivery-publico/GarantirEnderecoEntregaPublicoUseCase'
+import { garantirEnderecoEntregaPublicoUseCase, resolverEnderecoIdEntregaSeJaGarantido } from '@/src/application/use-cases/delivery-publico/GarantirEnderecoEntregaPublicoUseCase'
 import {
   cotarPedidoPublico,
   formatarMensagemErroCotacaoPublica,
@@ -49,24 +49,34 @@ export class CotarPedidoPublicoUseCase {
 
     if (formComNome.tipoEntrega === 'entrega') {
       try {
-        enderecoIdEntrega = await garantirEnderecoEntregaPublicoUseCase.execute({
-          telefone: tel,
-          nome: input.nomeEfetivo,
+        const jaGarantido = resolverEnderecoIdEntregaSeJaGarantido({
           modoEndereco: formComNome.modoEndereco,
-          enderecoIdSelecionado: formComNome.enderecoIdSelecionado || null,
+          enderecoIdSelecionado: formComNome.enderecoIdSelecionado,
           clienteLookup: input.clienteLookup,
-          enderecoNovo: {
-            rua: formComNome.rua,
-            numero: formComNome.numero,
-            bairro: formComNome.bairro,
-            cidade: formComNome.cidade,
-            estado: formComNome.estado,
-            cep: formComNome.cep,
-            complemento: formComNome.complemento,
-            pontoReferencia: formComNome.pontoReferencia,
-            etiqueta: formComNome.etiquetaEndereco,
-          },
         })
+        if (jaGarantido) {
+          enderecoIdEntrega = jaGarantido
+        } else {
+          const garantido = await garantirEnderecoEntregaPublicoUseCase.execute({
+            telefone: tel,
+            nome: input.nomeEfetivo,
+            modoEndereco: formComNome.modoEndereco,
+            enderecoIdSelecionado: formComNome.enderecoIdSelecionado || null,
+            clienteLookup: input.clienteLookup,
+            enderecoNovo: {
+              rua: formComNome.rua,
+              numero: formComNome.numero,
+              bairro: formComNome.bairro,
+              cidade: formComNome.cidade,
+              estado: formComNome.estado,
+              cep: formComNome.cep,
+              complemento: formComNome.complemento,
+              pontoReferencia: formComNome.pontoReferencia,
+              etiqueta: formComNome.etiquetaEndereco,
+            },
+          })
+          enderecoIdEntrega = garantido.enderecoId
+        }
       } catch (error) {
         return {
           ok: false,

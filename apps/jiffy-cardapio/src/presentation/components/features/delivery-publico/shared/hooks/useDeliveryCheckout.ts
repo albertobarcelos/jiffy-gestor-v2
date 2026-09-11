@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import type { CheckoutFormData } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
 import type { EnderecoGeoCheckoutInput } from '@/src/application/dto/delivery-publico/EnderecoGeoCheckoutDTO'
 import type { CreatePedidoPublicoResponseDTO } from '@/src/application/dto/delivery-publico/CreatePedidoPublicoResponseDTO'
@@ -19,6 +20,11 @@ import {
   buscarClienteDeliveryPublico,
 } from '@/src/infrastructure/api/publicDeliveryApi'
 import { usePublicDeliveryMeiosPagamento } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
+import {
+  fingerprintItensCotacao,
+  publicDeliveryCotacaoQueryKey,
+  type CotacaoQueryCacheEntry,
+} from '@/src/presentation/hooks/publicDeliveryCotacaoKeys'
 import { showToast } from '@/src/shared/utils/toast'
 import {
   normalizarEnderecoFormPublico,
@@ -154,6 +160,7 @@ export function useDeliveryCheckout(
   options?: { fetchMeiosPagamento?: boolean }
 ) {
   const fetchMeiosPagamento = options?.fetchMeiosPagamento ?? false
+  const queryClient = useQueryClient()
   const itens = useDeliveryCarrinhoItens(slug)
   const total = useDeliveryCarrinhoTotal(slug)
   const limpar = useDeliveryCarrinhoStore(s => s.limpar)
@@ -249,11 +256,14 @@ export function useDeliveryCheckout(
     cotacaoAutoBloqueioRef.current = { chaveFalha: null, rateLimitAte: 0 }
     setCotacao(null)
     setCotacaoLoading(false)
+    void queryClient.removeQueries({
+      queryKey: ['public-delivery', slug, 'cotacao'],
+    })
     setForm(prev => {
       if (prev.pagamentos.length === 0) return prev
       return { ...prev, pagamentos: [] }
     })
-  }, [])
+  }, [queryClient, slug])
 
   useEffect(() => {
     limparCotacao()
@@ -711,7 +721,8 @@ export function useDeliveryCheckout(
 
     preferirNovoEnderecoRef.current = true
 
-    const enderecoId = await garantirEnderecoEntregaPublicoUseCase.execute({
+    const { enderecoId, cliente: clienteAposWrite } =
+      await garantirEnderecoEntregaPublicoUseCase.execute({
       telefone: tel,
       nome: nomeEfetivo,
       modoEndereco: 'novo',
@@ -721,8 +732,7 @@ export function useDeliveryCheckout(
       geo,
     })
 
-    const raw = await buscarClienteDeliveryPublico(tel)
-    const cliente = raw ? normalizarClienteDeliveryPublico(raw) : null
+    const cliente = clienteAposWrite
     setClienteLookup({
       status: cliente ? 'encontrado' : 'nao_encontrado',
       telefoneConsultado: tel,
@@ -756,7 +766,7 @@ export function useDeliveryCheckout(
       const nomeEfetivo =
         f.nome.trim() || clienteLookupRef.current.cliente?.nome?.trim() || null
 
-      await garantirEnderecoEntregaPublicoUseCase.execute({
+      const { cliente: clienteAposWrite } = await garantirEnderecoEntregaPublicoUseCase.execute({
         telefone: tel,
         nome: nomeEfetivo,
         modoEndereco: 'existente',
@@ -766,8 +776,7 @@ export function useDeliveryCheckout(
         geo,
       })
 
-      const raw = await buscarClienteDeliveryPublico(tel)
-      const cliente = raw ? normalizarClienteDeliveryPublico(raw) : null
+      const cliente = clienteAposWrite ?? clienteLookupRef.current.cliente
       setClienteLookup({
         status: cliente ? 'encontrado' : 'nao_encontrado',
         telefoneConsultado: tel,
@@ -778,9 +787,24 @@ export function useDeliveryCheckout(
     [montarEnderecoNovoForm, resolveTelefoneApi]
   )
 
-  const aplicarCotacaoAtualizada = useCallback((dto: CotacaoPedidoPublicoDTO) => {
-    setCotacao(mapCotacaoDtoToCheckoutState(dto))
-  }, [])
+  const aplicarCotacaoAtualizada = useCallback(
+    (dto: CotacaoPedidoPublicoDTO) => {
+      const state = mapCotacaoDtoToCheckoutState(dto)
+      setCotacao(state)
+      const f = formRef.current
+      const tel = resolveTelefoneApi(f)
+      const queryKey = publicDeliveryCotacaoQueryKey({
+        slug,
+        tipoEntrega: f.tipoEntrega,
+        enderecoIdEntrega:
+          f.tipoEntrega === 'entrega' ? f.enderecoIdSelecionado.trim() : '',
+        telefone: tel,
+        fingerprintItens: fingerprintItensCotacao(itens),
+      })
+      queryClient.setQueryData<CotacaoQueryCacheEntry>(queryKey, { state })
+    },
+    [itens, queryClient, resolveTelefoneApi, slug]
+  )
 
   const recotarPedido = useCallback(
     async (options?: { silencioso?: boolean; chaveAuto?: string }): Promise<RecotarPedidoResult> => {
@@ -807,6 +831,22 @@ export function useDeliveryCheckout(
       }
       if (itens.length === 0) {
         return { ok: false, reason: 'erro' }
+      }
+
+      const queryKey = publicDeliveryCotacaoQueryKey({
+        slug,
+        tipoEntrega: f.tipoEntrega,
+        enderecoIdEntrega:
+          f.tipoEntrega === 'entrega' ? f.enderecoIdSelecionado.trim() : '',
+        telefone: tel,
+        fingerprintItens: fingerprintItensCotacao(itens),
+      })
+      const cached = queryClient.getQueryData<CotacaoQueryCacheEntry>(queryKey)
+      if (cached?.state && !isTokenCotacaoExpirado(cached.state.expiresAt)) {
+        cotacaoSeqRef.current += 1
+        setCotacao(cached.state)
+        setCotacaoLoading(false)
+        return { ok: true }
       }
 
       const nomeEfetivo =
@@ -857,7 +897,9 @@ export function useDeliveryCheckout(
         if (options?.chaveAuto) {
           cotacaoAutoBloqueioRef.current = { chaveFalha: null, rateLimitAte: 0 }
         }
-        setCotacao(mapCotacaoDtoToCheckoutState(resultado.cotacao))
+        const state = mapCotacaoDtoToCheckoutState(resultado.cotacao)
+        setCotacao(state)
+        queryClient.setQueryData<CotacaoQueryCacheEntry>(queryKey, { state })
         return { ok: true }
       } catch (error) {
         if (seq !== cotacaoSeqRef.current) return { ok: false, reason: 'bloqueado' }
@@ -884,7 +926,7 @@ export function useDeliveryCheckout(
         }
       }
     },
-    [slug, itens, resolveTelefoneApi]
+    [slug, itens, queryClient, resolveTelefoneApi]
   )
 
   const enviarPedido = useCallback(async (): Promise<EnviarPedidoCheckoutResult> => {

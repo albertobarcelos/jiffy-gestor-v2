@@ -1,29 +1,33 @@
-'use client'
-
 import { Suspense } from 'react'
-import { useParams } from 'next/navigation'
+import { HydrationBoundary } from '@tanstack/react-query'
 import { DeliveryPublicoHomeScreen } from '@/src/presentation/components/features/delivery-publico/public/screens/DeliveryPublicoHomeScreen'
+import { dehydrateCatalogoPrimeiraPagina } from '@/src/infrastructure/api/dehydrateCatalogoPrimeiraPagina'
 
-function DeliveryPublicoSlugContent() {
-  const params = useParams()
-  const slug = (params.slug as string)?.trim() ?? ''
-
-  return <DeliveryPublicoHomeScreen slug={slug} />
+type PageProps = {
+  params: Promise<{ slug: string }>
 }
 
-export default function CardapioSlugPage() {
+function HomeFallback() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center">
-          <div
-            className="animate-spin rounded-full h-12 w-12 border-b-2"
-            style={{ borderColor: 'var(--delivery-primary, #333)' }}
-          />
-        </div>
-      }
-    >
-      <DeliveryPublicoSlugContent />
+    <div className="min-h-screen flex items-center justify-center">
+      <div
+        className="animate-spin rounded-full h-12 w-12 border-b-2"
+        style={{ borderColor: 'var(--delivery-primary, #333)' }}
+      />
+    </div>
+  )
+}
+
+export default async function CardapioSlugPage({ params }: PageProps) {
+  const { slug: rawSlug } = await params
+  const slug = rawSlug?.trim() ?? ''
+  const state = await dehydrateCatalogoPrimeiraPagina(slug)
+
+  return (
+    <Suspense fallback={<HomeFallback />}>
+      <HydrationBoundary state={state}>
+        <DeliveryPublicoHomeScreen slug={slug} />
+      </HydrationBoundary>
     </Suspense>
   )
 }

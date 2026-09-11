@@ -37,6 +37,12 @@ export type GarantirEnderecoEntregaPublicoParams = {
   geo?: EnderecoGeoCheckoutInput | null
 }
 
+export type GarantirEnderecoEntregaPublicoResult = {
+  enderecoId: string
+  /** Cliente mais recente após create/update; null se só reusou id sem write. */
+  cliente: ClienteDeliveryPublicoDTO | null
+}
+
 function enderecoCadastroParaGeocodeInput(
   endereco: EnderecoClienteDeliveryPublicoDTO
 ): EnderecoGeocodeInput {
@@ -187,11 +193,29 @@ function localizarEnderecoPorId(
 }
 
 /**
+ * Se o endereço já está no lookup com geo e modo existente, evita write/garantir.
+ */
+export function resolverEnderecoIdEntregaSeJaGarantido(params: {
+  modoEndereco: 'existente' | 'novo'
+  enderecoIdSelecionado: string | null | undefined
+  clienteLookup: ClienteDeliveryPublicoDTO | null
+}): string | null {
+  if (params.modoEndereco !== 'existente') return null
+  const id = params.enderecoIdSelecionado?.trim()
+  if (!id) return null
+  const endereco = localizarEnderecoPorId(params.clienteLookup, id)
+  if (!endereco || !enderecoTemGeolocalizacao(endereco)) return null
+  return id
+}
+
+/**
  * Garante que o endereço de entrega exista no cadastro do cliente delivery
- * e retorna o `enderecoIdEntrega` a ser usado no pedido.
+ * e retorna o `enderecoId` + cliente atualizado (quando houver write).
  */
 export class GarantirEnderecoEntregaPublicoUseCase {
-  async execute(params: GarantirEnderecoEntregaPublicoParams): Promise<string> {
+  async execute(
+    params: GarantirEnderecoEntregaPublicoParams
+  ): Promise<GarantirEnderecoEntregaPublicoResult> {
     const telefone = params.telefone.replace(/\D/g, '')
     if (telefone.length < 8) {
       throw new Error('Informe um telefone válido')
@@ -203,15 +227,18 @@ export class GarantirEnderecoEntregaPublicoUseCase {
         throw new Error('Selecione um endereço de entrega')
       }
 
+      let cliente: ClienteDeliveryPublicoDTO | null = params.clienteLookup
+
       const nome = params.nome?.trim()
       if (nome) {
-        const nomeAtual = params.clienteLookup?.nome?.trim() || ''
+        const nomeAtual = cliente?.nome?.trim() || ''
         if (nomeAtual !== nome) {
-          await atualizarClienteDeliveryPublico(telefone, { nome })
+          const atualizadoRaw = await atualizarClienteDeliveryPublico(telefone, { nome })
+          cliente = normalizarClienteDeliveryPublico(atualizadoRaw) ?? cliente
         }
       }
 
-      const enderecoAtual = localizarEnderecoPorId(params.clienteLookup, id)
+      const enderecoAtual = localizarEnderecoPorId(cliente, id)
       const geoInformada = Boolean(params.geo?.enderecoLocalizacao)
 
       if (enderecoAtual && geoInformada && params.geo) {
@@ -228,13 +255,16 @@ export class GarantirEnderecoEntregaPublicoUseCase {
         if (!enderecoPersistido || !enderecoTemGeolocalizacao(enderecoPersistido)) {
           throw new Error('Não foi possível salvar a localização do endereço.')
         }
-      } else if (enderecoAtual && !enderecoTemGeolocalizacao(enderecoAtual)) {
+        return { enderecoId: id, cliente: atualizado }
+      }
+
+      if (enderecoAtual && !enderecoTemGeolocalizacao(enderecoAtual)) {
         throw new Error(
           'Este endereço precisa de confirmação no mapa antes de continuar.'
         )
       }
 
-      return id
+      return { enderecoId: id, cliente }
     }
 
     if (
@@ -273,7 +303,10 @@ export class GarantirEnderecoEntregaPublicoUseCase {
       if (!criado?.enderecos.length) {
         throw new Error('Não foi possível cadastrar o endereço do cliente')
       }
-      return localizarEnderecoCriado(criado, params.enderecoNovo, new Set())
+      return {
+        enderecoId: localizarEnderecoCriado(criado, params.enderecoNovo, new Set()),
+        cliente: criado,
+      }
     }
 
     if (clienteAtual.enderecos.length >= MAX_ENDERECOS_CLIENTE_DELIVERY) {
@@ -292,7 +325,10 @@ export class GarantirEnderecoEntregaPublicoUseCase {
       throw new Error('Não foi possível salvar o novo endereço')
     }
 
-    return localizarEnderecoCriado(atualizado, params.enderecoNovo, idsAnteriores)
+    return {
+      enderecoId: localizarEnderecoCriado(atualizado, params.enderecoNovo, idsAnteriores),
+      cliente: atualizado,
+    }
   }
 }
 
@@ -303,5 +339,6 @@ export const garantirEnderecoEntregaPublicoUseCase =
 export async function garantirEnderecoEntregaPublico(
   params: GarantirEnderecoEntregaPublicoParams
 ): Promise<string> {
-  return garantirEnderecoEntregaPublicoUseCase.execute(params)
+  const result = await garantirEnderecoEntregaPublicoUseCase.execute(params)
+  return result.enderecoId
 }

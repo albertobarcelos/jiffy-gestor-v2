@@ -42,6 +42,7 @@ import { DeliveryCheckoutEnderecoFormModal } from '../components/checkout/Delive
 import { DeliveryCheckoutEnderecoGeoModal } from '../components/checkout/DeliveryCheckoutEnderecoGeoModal'
 import type { EnderecoGeoCheckoutInput } from '@/src/application/dto/delivery-publico/EnderecoGeoCheckoutDTO'
 import { enderecoTemGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoDelivery'
+import { fingerprintItensCotacao } from '@/src/presentation/hooks/publicDeliveryCotacaoKeys'
 import type { ModoEntregaOpcao } from '../components/checkout/DeliveryCheckoutTipoEntregaOpcoes'
 import { DeliveryCheckoutPagamentoModal } from '../components/checkout/DeliveryCheckoutPagamentoModal'
 import { DeliveryCheckoutRevisaoModal } from '../components/checkout/DeliveryCheckoutRevisaoModal'
@@ -323,7 +324,7 @@ export function DeliveryPublicoCarrinhoScreen({
       form.tipoEntrega,
       form.enderecoIdSelecionado.trim(),
       clienteLookup.telefoneConsultado ?? '',
-      itens.length,
+      fingerprintItensCotacao(itens),
     ].join('|')
 
     if (cotacaoAutoTimerRef.current) clearTimeout(cotacaoAutoTimerRef.current)
@@ -346,7 +347,7 @@ export function DeliveryPublicoCarrinhoScreen({
     clienteLookup.telefoneConsultado,
     cotacaoLoading,
     cotacaoValidaParaPagamento,
-    itens.length,
+    itens,
   ])
 
   const fecharCheckout = () => {

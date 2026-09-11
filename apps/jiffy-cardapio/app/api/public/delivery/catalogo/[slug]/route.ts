@@ -4,6 +4,8 @@ import { proxyPublicDeliveryGet } from '@/src/shared/utils/proxyPublicDeliveryRo
 /**
  * GET /api/public/delivery/catalogo/[slug]
  * Proxy público → GET /api/v1/delivery/catalogo/:slug
+ *
+ * Cache curto no edge/browser: catálogo muda pouco; invalidação fina fica no React Query.
  */
 export async function GET(
   request: NextRequest,
@@ -23,6 +25,7 @@ export async function GET(
 
   return proxyPublicDeliveryGet(
     `/api/v1/delivery/catalogo/${encodeURIComponent(slug.trim())}`,
-    allowed
+    allowed,
+    { cacheControl: 'public, s-maxage=30, stale-while-revalidate=60' }
   )
 }

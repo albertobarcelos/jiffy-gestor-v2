@@ -99,7 +99,7 @@ export function DeliveryPublicoHomeScreen({
   useDeliveryBodyScrollLock(bloquearUiFlyToCart)
 
   const catalogQuery = usePublicDeliveryCatalogInfinite(slug)
-  useAutoFetchCatalogoGrupos(catalogQuery)
+  useAutoFetchCatalogoGrupos(slug, catalogQuery)
 
   const { data, isLoading, isError, error, isFetchingNextPage } = catalogQuery
   const empresa: EmpresaPublicaDTO | null = data?.pages[0]?.empresa ?? null

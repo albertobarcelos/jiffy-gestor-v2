@@ -238,7 +238,10 @@ export async function fetchCatalogoPublico(
   const qs = search.toString()
   const url = `/api/public/delivery/catalogo/${encodeURIComponent(slug)}${qs ? `?${qs}` : ''}`
 
-  const res = await fetch(url, { cache: 'no-store' })
+  const res = await fetch(url, {
+    // Permite aproveitar Cache-Control do BFF (s-maxage / SWR).
+    headers: { Accept: 'application/json' },
+  })
   const body = await parseErrorBody(res)
   if (!res.ok) {
     throw new PublicDeliveryApiError(

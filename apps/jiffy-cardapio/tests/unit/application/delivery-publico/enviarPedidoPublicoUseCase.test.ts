@@ -143,7 +143,7 @@ describe('EnviarPedidoPublicoUseCase', () => {
   it('garante endereço antes do create em entrega', async () => {
     const garantirSpy = vi
       .spyOn(garantirEnderecoEntregaPublicoUseCase, 'execute')
-      .mockResolvedValue('end-1')
+      .mockResolvedValue({ enderecoId: 'end-1', cliente: null })
 
     const useCase = new EnviarPedidoPublicoUseCase()
     const result = await useCase.execute({
@@ -193,7 +193,7 @@ describe('GarantirEnderecoEntregaPublicoUseCase', () => {
   })
 
   it('retorna id existente sem criar endereço', async () => {
-    const id = await garantirEnderecoEntregaPublicoUseCase.execute({
+    const result = await garantirEnderecoEntregaPublicoUseCase.execute({
       telefone: '11999999999',
       nome: 'Cliente',
       modoEndereco: 'existente',
@@ -213,7 +213,7 @@ describe('GarantirEnderecoEntregaPublicoUseCase', () => {
         estado: '',
       },
     })
-    expect(id).toBe('end-abc')
+    expect(result.enderecoId).toBe('end-abc')
     expect(publicDeliveryApi.criarClienteDeliveryPublico).not.toHaveBeenCalled()
   })
 
@@ -246,7 +246,7 @@ describe('GarantirEnderecoEntregaPublicoUseCase', () => {
       },
     }
 
-    const id = await garantirEnderecoEntregaPublicoUseCase.execute({
+    const result = await garantirEnderecoEntregaPublicoUseCase.execute({
       telefone: '11999999999',
       nome: 'Cliente',
       modoEndereco: 'novo',
@@ -263,7 +263,8 @@ describe('GarantirEnderecoEntregaPublicoUseCase', () => {
       geo: geoMock,
     })
 
-    expect(id).toBe('end-novo')
+    expect(result.enderecoId).toBe('end-novo')
+    expect(result.cliente?.enderecos[0]?.id).toBe('end-novo')
     expect(publicDeliveryApi.criarClienteDeliveryPublico).toHaveBeenCalledOnce()
   })
 })
