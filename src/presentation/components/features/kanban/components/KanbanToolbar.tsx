@@ -244,11 +244,11 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
         <div
           className={
             noFredy
-              ? 'flex min-w-[18rem] flex-[1_1_18rem] flex-col gap-1 sm:max-w-xl'
+              ? 'flex min-w-[18rem] flex-[1_1_18rem] items-end gap-0.5 sm:max-w-2xl'
               : 'flex w-[13.5rem] shrink-0 flex-col gap-1'
           }
         >
-          <div className="relative w-full px-1">
+          <div className="relative min-w-0 w-full flex-1 px-1">
             <MdSearch
               className="absolute left-2 top-1/2 -translate-y-1/2 text-secondary-text"
               size={20}
@@ -263,6 +263,15 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
               aria-label={noFredy ? 'Código, cliente ou telefone' : 'Buscar pedido'}
             />
           </div>
+          {noFredy ? (
+            <KanbanColunasMenu
+              variante="discreto"
+              colunasDoModo={colunasDoModo}
+              ocultas={colunasOcultas}
+              onSetColunaVisivel={onSetColunaVisivel}
+              contagemPorColuna={contagemPorColuna}
+            />
+          ) : null}
         </div>
 
         {!isModoDelivery ? (
@@ -398,18 +407,10 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
             <MdRefresh className={`h-5 w-5 ${refreshSpinning ? 'animate-spin' : ''}`} />
           </button>
           {noFredy ? (
-            <>
-              <KanbanColunasMenu
-                colunasDoModo={colunasDoModo}
-                ocultas={colunasOcultas}
-                onSetColunaVisivel={onSetColunaVisivel}
-                contagemPorColuna={contagemPorColuna}
-              />
-              <KanbanModoVisualizacaoSelect
-                value={modoVisualizacao}
-                onChange={onModoVisualizacaoChange}
-              />
-            </>
+            <KanbanModoVisualizacaoSelect
+              value={modoVisualizacao}
+              onChange={onModoVisualizacaoChange}
+            />
           ) : null}
           {noFredy ? null : (
             <KanbanModoVendasToggle value={modoKanbanVendas} onChange={onModoKanbanVendasChange} />
