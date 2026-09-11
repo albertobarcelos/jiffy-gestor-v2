@@ -1,7 +1,7 @@
 'use client'
 
 import { Store } from 'lucide-react'
-import { MSG_FORA_COBERTURA_ENTREGA_PUBLICA } from '@/src/infrastructure/api/publicDeliveryApi'
+import { MSG_FORA_COBERTURA_ENTREGA_PUBLICA } from '@/src/application/errors/publicDeliveryErrors'
 import { useDeliveryBodyScrollLock } from '../../../shared/hooks/useDeliveryBodyScrollLock'
 
 type DeliveryCheckoutForaCoberturaDialogProps = {

@@ -8,10 +8,7 @@ import {
   usePublicDeliveryCatalogInfinite,
 } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import { showToast } from '@/src/shared/utils/toast'
-import {
-  clienteAtingiuMaxEnderecosDelivery,
-  MSG_MAX_ENDERECOS_CLIENTE_DELIVERY,
-} from '@/src/shared/constants/deliveryClienteEnderecos'
+import { clienteAtingiuMaxEnderecosDelivery } from '@/src/shared/constants/deliveryClienteEnderecos'
 import { DeliveryCarrinhoItemCard } from '../../shared/components/DeliveryCarrinhoItemCard'
 import { DeliveryCarrinhoSwipeableItem } from '../../shared/components/DeliveryCarrinhoSwipeableItem'
 import { DeliveryButton } from '../../shared/components/DeliveryButton'
@@ -149,6 +146,7 @@ export function DeliveryPublicoCarrinhoScreen({
     limparCarrinhoAposPedido,
     foraCoberturaDialogAberto,
     fecharForaCoberturaDialog,
+    podeCriarNovoEndereco,
   } = useDeliveryCheckout(slug, {
     fetchMeiosPagamento:
       checkoutStep === 'pagamento' ||
@@ -196,12 +194,7 @@ export function DeliveryPublicoCarrinhoScreen({
 
   const quantidadeEnderecosCliente = clienteLookup.cliente?.enderecos?.length ?? 0
   const novoEnderecoBloqueado = clienteAtingiuMaxEnderecosDelivery(quantidadeEnderecosCliente)
-
-  const garantirPodeCriarNovoEndereco = useCallback((): boolean => {
-    if (!novoEnderecoBloqueado) return true
-    showToast.error(MSG_MAX_ENDERECOS_CLIENTE_DELIVERY)
-    return false
-  }, [novoEnderecoBloqueado])
+  const garantirPodeCriarNovoEndereco = podeCriarNovoEndereco
 
   const enderecoParaRevisao =
     form.tipoEntrega === 'entrega' ? enderecoClienteSelecionado : null

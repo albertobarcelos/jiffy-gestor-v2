@@ -7,20 +7,18 @@ import type { EnderecoGeoCheckoutInput } from '@/src/application/dto/delivery-pu
 import type { CreatePedidoPublicoResponseDTO } from '@/src/application/dto/delivery-publico/CreatePedidoPublicoResponseDTO'
 import type { CotacaoPedidoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { ClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
-import { normalizarClienteDeliveryPublico } from '@/src/application/mappers/ClienteDeliveryPublicoMapper'
 import {
   formatarMensagemErroCotacaoPublica,
   isErroCoberturaEntregaPublica,
 } from '@/src/application/errors/publicDeliveryErrors'
 import {
+  atualizarNomeClienteDeliveryPublicoUseCase,
+  buscarClienteDeliveryPublicoUseCase,
   cotarPedidoPublicoUseCase,
   enviarPedidoPublicoUseCase,
   garantirEnderecoEntregaPublicoUseCase,
+  removerEnderecoClienteDeliveryPublicoUseCase,
 } from '@/src/infrastructure/di/deliveryPublicoUseCases'
-import {
-  atualizarClienteDeliveryPublico,
-  buscarClienteDeliveryPublico,
-} from '@/src/infrastructure/api/publicDeliveryApi'
 import { usePublicDeliveryMeiosPagamento } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import {
   fingerprintItensCotacao,
@@ -28,6 +26,10 @@ import {
   type CotacaoQueryCacheEntry,
 } from '@/src/presentation/hooks/publicDeliveryCotacaoKeys'
 import { showToast } from '@/src/shared/utils/toast'
+import {
+  clienteAtingiuMaxEnderecosDelivery,
+  MSG_MAX_ENDERECOS_CLIENTE_DELIVERY,
+} from '@/src/shared/constants/deliveryClienteEnderecos'
 import {
   normalizarEnderecoFormPublico,
   normalizarEnderecoGeocodeInput,
@@ -400,10 +402,20 @@ export function useDeliveryCheckout(
       })
 
       try {
-        const raw = await buscarClienteDeliveryPublico(tel)
+        const resultado = await buscarClienteDeliveryPublicoUseCase.execute(tel)
         if (seq !== lookupSeqRef.current) return { status: 'idle', cliente: null }
 
-        if (!raw) {
+        if (!resultado.ok) {
+          setClienteLookup({
+            status: 'erro',
+            telefoneConsultado: tel,
+            cliente: null,
+            mensagemErro: resultado.error,
+          })
+          return { status: 'erro', cliente: null }
+        }
+
+        if (!resultado.encontrado) {
           preferirNovoEnderecoRef.current = false
           setClienteLookup({
             status: 'nao_encontrado',
@@ -415,17 +427,7 @@ export function useDeliveryCheckout(
           return { status: 'nao_encontrado', cliente: null }
         }
 
-        const cliente = normalizarClienteDeliveryPublico(raw)
-        if (!cliente) {
-          setClienteLookup({
-            status: 'erro',
-            telefoneConsultado: tel,
-            cliente: null,
-            mensagemErro: 'Resposta inválida ao buscar cliente',
-          })
-          return { status: 'erro', cliente: null }
-        }
-
+        const cliente = resultado.cliente
         telefoneDigitsRef.current = tel
         setClienteLookup({
           status: 'encontrado',
@@ -605,23 +607,20 @@ export function useDeliveryCheckout(
         telefoneDigitsRef.current ||
         clienteLookupRef.current.telefoneConsultado ||
         resolveTelefoneApi(formRef.current)
-      if (tel.length < 8) {
-        throw new Error('Informe um telefone válido')
-      }
 
-      const atualizadoRaw = await atualizarClienteDeliveryPublico(tel, {
-        enderecos: { delete: [id] },
+      const resultado = await removerEnderecoClienteDeliveryPublicoUseCase.execute({
+        telefone: tel,
+        enderecoId: id,
       })
-      const cliente = normalizarClienteDeliveryPublico(atualizadoRaw)
-      if (!cliente) {
-        throw new Error('Não foi possível remover o endereço')
+      if (!resultado.ok) {
+        throw new Error(resultado.error)
       }
 
       limparCotacao()
       setClienteLookup({
         status: 'encontrado',
-        telefoneConsultado: tel,
-        cliente,
+        telefoneConsultado: tel.replace(/\D/g, '') || tel,
+        cliente: resultado.cliente,
         mensagemErro: null,
       })
       setForm(prev =>
@@ -673,28 +672,24 @@ export function useDeliveryCheckout(
       telefoneDigitsRef.current ||
       clienteLookupRef.current.telefoneConsultado ||
       ''
-    if (tel.length < 8) {
-      throw new Error('Informe um telefone válido')
-    }
-    const nome = nomeInformado.trim()
-    if (!nome) {
-      throw new Error('Informe o nome')
+
+    const resultado = await atualizarNomeClienteDeliveryPublicoUseCase.execute({
+      telefone: tel,
+      nome: nomeInformado,
+    })
+    if (!resultado.ok) {
+      throw new Error(resultado.error)
     }
 
-    const atualizadoRaw = await atualizarClienteDeliveryPublico(tel, { nome })
-    const cliente = normalizarClienteDeliveryPublico(atualizadoRaw)
-    if (!cliente) {
-      throw new Error('Não foi possível atualizar o nome')
-    }
-
+    const cliente = resultado.cliente
     setClienteLookup(prev => ({
       ...prev,
       status: 'encontrado',
-      telefoneConsultado: tel,
+      telefoneConsultado: tel.replace(/\D/g, '') || tel,
       cliente,
       mensagemErro: null,
     }))
-    setForm(prev => ({ ...prev, nome: cliente.nome?.trim() || nome }))
+    setForm(prev => ({ ...prev, nome: cliente.nome?.trim() || nomeInformado.trim() }))
   }, [])
 
   const montarEnderecoNovoForm = useCallback(
@@ -1028,6 +1023,13 @@ export function useDeliveryCheckout(
     limpar(slug)
   }, [limpar, slug, limparCotacao])
 
+  const podeCriarNovoEndereco = useCallback((): boolean => {
+    const quantidade = clienteLookup.cliente?.enderecos?.length ?? 0
+    if (!clienteAtingiuMaxEnderecosDelivery(quantidade)) return true
+    showToast.error(MSG_MAX_ENDERECOS_CLIENTE_DELIVERY)
+    return false
+  }, [clienteLookup.cliente?.enderecos?.length])
+
   return {
     itens,
     total,
@@ -1058,6 +1060,7 @@ export function useDeliveryCheckout(
     confirmarNovoEndereco,
     confirmarGeoEnderecoExistente,
     salvarNomeCliente,
+    podeCriarNovoEndereco,
     meiosPagamento: meiosData?.meiosPagamento ?? [],
     loadingMeios,
     enviando,

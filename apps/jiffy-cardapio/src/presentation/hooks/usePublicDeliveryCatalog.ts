@@ -10,9 +10,9 @@ import {
   type UseInfiniteQueryResult,
 } from '@tanstack/react-query'
 import {
-  fetchCatalogoPublico,
-  fetchMeiosPagamentoPublicos,
-} from '@/src/infrastructure/api/publicDeliveryApi'
+  listarMeiosPagamentoPublicoUseCase,
+  obterCatalogoPublicoUseCase,
+} from '@/src/infrastructure/di/deliveryPublicoUseCases'
 import type {
   CatalogoPublicoComplementoDTO,
   CatalogoPublicoGrupoComplementoDTO,
@@ -168,7 +168,7 @@ export function usePublicDeliveryCatalogPage(
   return useQuery({
     queryKey: publicDeliveryCatalogQueryKey(slug, offset, limit),
     queryFn: async () => {
-      const data = await fetchCatalogoPublico(slug, { offset, limit })
+      const data = await obterCatalogoPublicoUseCase.execute(slug, { offset, limit })
       persistirComplementosPrimeiraPagina(slug, offset, data.catalogo, salvarComplementos)
       return data
     },
@@ -204,7 +204,7 @@ export function usePublicDeliveryCatalogInfinite(slug: string, enabled = true) {
     queryKey: publicDeliveryCatalogInfiniteQueryKey(slug),
     queryFn: async ({ pageParam }) => {
       const offset = pageParam as number
-      const data = await fetchCatalogoPublico(slug, {
+      const data = await obterCatalogoPublicoUseCase.execute(slug, {
         offset,
         limit: CATALOGO_GRUPOS_PAGE_LIMIT,
       })
@@ -267,7 +267,9 @@ export function useAutoFetchCatalogoGrupos(
         if (cancelled) return
         const batch = missingOffsets.slice(i, i + BATCH)
         const results = await Promise.all(
-          batch.map(offset => fetchCatalogoPublico(slug, { offset, limit }))
+          batch.map(offset =>
+            obterCatalogoPublicoUseCase.execute(slug, { offset, limit })
+          )
         )
         if (cancelled) return
 
@@ -352,7 +354,7 @@ export function useEnsureComplementosCatalogo(slug: string, enabled = true) {
 export function usePublicDeliveryMeiosPagamento(slug: string, enabled = true) {
   return useQuery({
     queryKey: publicDeliveryMeiosPagamentoQueryKey(slug),
-    queryFn: () => fetchMeiosPagamentoPublicos(slug),
+    queryFn: () => listarMeiosPagamentoPublicoUseCase.execute(slug),
     enabled: enabled && !!slug,
     staleTime: CATALOGO_QUERY_STALE_MS,
   })

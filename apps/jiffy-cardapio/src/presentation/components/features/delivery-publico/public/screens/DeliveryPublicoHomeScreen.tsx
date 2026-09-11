@@ -23,7 +23,11 @@ import {
   usePublicDeliveryCatalogInfinite,
 } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import { useLocalizacaoEmpresaPublica } from '../../shared/hooks/useLocalizacaoEmpresaPublica'
-import { isPublicDeliverySlugNotFound, isEmpresaDeliveryIndisponivel, extrairMensagensPendenciasCatalogo } from '@/src/infrastructure/api/publicDeliveryApi'
+import {
+  isPublicDeliverySlugNotFound,
+  isEmpresaDeliveryIndisponivel,
+  extrairMensagensPendenciasCatalogo,
+} from '@/src/application/errors/publicDeliveryErrors'
 import { DeliveryLojaIndisponivelScreen } from './DeliveryLojaIndisponivelScreen'
 import {
   DeliveryThemeScope,
