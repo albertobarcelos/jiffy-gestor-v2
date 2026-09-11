@@ -6,17 +6,16 @@ import { MdDeliveryDining } from 'react-icons/md'
 import { TbPaperBag } from 'react-icons/tb'
 import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { MeioPagamentoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
-import { transformarParaReal } from '@/src/shared/utils/formatters'
+import { calcularTrocoCheckout } from '@/src/application/services/delivery-publico/checkoutPagamentos'
 import { formatarCpfCnpjInput } from '@/src/shared/utils/cpfCnpj'
+import { DELIVERY_PAIS_TELEFONE_PADRAO } from '@/src/shared/constants/deliveryPaisesTelefone'
+import { formatarTelefoneExibicao } from '@/src/shared/utils/deliveryTelefonePais'
 import { formatarValorComplemento } from '@/src/presentation/components/features/delivery-publico/shared/utils/formatPedidoLinhaDisplay'
 import { normalizeTipoImpactoPreco } from '@/src/shared/utils/normalizeTipoImpactoPreco'
 import type { DeliveryCarrinhoItem } from '../../../shared/stores/deliveryCarrinhoStore'
 import type { DeliveryTipoEntrega } from '../../../shared/stores/deliveryPreferenciaEntregaStore'
-import { DELIVERY_PAIS_TELEFONE_PADRAO } from '../../../shared/constants/deliveryPaisesTelefone'
 import { observacaoItemCarrinho } from '../../../shared/utils/deliveryCarrinhoItemUtils'
 import { formatDeliveryCurrency } from '../../../shared/utils/formatDeliveryCurrency'
-import { formatarTelefoneExibicao } from '../../../shared/utils/deliveryTelefonePais'
-import { calcularTrocoCheckout } from '../../../shared/utils/checkoutPagamentosUtils'
 import { etiquetaEnderecoPublicoLabel } from '../../../shared/utils/etiquetaEnderecoPublicoLabel'
 import {
   calcularDistanciaAproximadaDaLoja,
@@ -193,7 +192,7 @@ export function DeliveryCheckoutRevisaoModal({
   const exibirTaxaEntrega = isEntrega
   const taxaEntregaTexto = cotacaoLoading
     ? 'Calculando...'
-    : transformarParaReal(taxaExibicao)
+    : formatDeliveryCurrency(taxaExibicao)
   const trocoReceber = calcularTrocoCheckout(
     totalExibicao,
     pagamentos.map(p => ({ meioPagamentoId: p.meioPagamentoId, valor: p.valor })),
@@ -361,7 +360,7 @@ export function DeliveryCheckoutRevisaoModal({
                     {pagamento.meio?.nome ?? 'Pagamento'}
                   </span>
                   <span className="shrink-0 tabular-nums delivery-text-primary">
-                    {transformarParaReal(pagamento.valor)}
+                    {formatDeliveryCurrency(pagamento.valor)}
                   </span>
                 </li>
               ))}
@@ -369,7 +368,7 @@ export function DeliveryCheckoutRevisaoModal({
           )}
           {trocoReceber > 0 ? (
             <p className="text-sm font-semibold text-green-700">
-              Troco a receber: {transformarParaReal(trocoReceber)}
+              Troco a receber: {formatDeliveryCurrency(trocoReceber)}
             </p>
           ) : null}
         </LinhaSecao>
@@ -596,7 +595,7 @@ export function DeliveryCheckoutRevisaoModal({
           <div className="flex items-center justify-between text-sm">
             <span className="delivery-text-secondary">Subtotal</span>
             <span className="font-medium delivery-text-primary">
-              {transformarParaReal(subtotalExibicao)}
+              {formatDeliveryCurrency(subtotalExibicao)}
             </span>
           </div>
           {exibirTaxaEntrega ? (
@@ -607,7 +606,7 @@ export function DeliveryCheckoutRevisaoModal({
           ) : null}
           <div className="flex items-center justify-between text-sm font-semibold">
             <span className="delivery-text-primary">Total</span>
-            <span className="delivery-text-primary">{transformarParaReal(totalExibicao)}</span>
+            <span className="delivery-text-primary">{formatDeliveryCurrency(totalExibicao)}</span>
           </div>
         </div>
       </div>

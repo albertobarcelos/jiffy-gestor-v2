@@ -4,14 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { MdDelete } from 'react-icons/md'
 import type { MeioPagamentoPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { DeliveryTipoEntrega } from '../../../shared/stores/deliveryPreferenciaEntregaStore'
-import {
-  formatBRLFromMaskedInput,
-  parseBRLToNumber,
-  transformarParaReal,
-} from '@/src/shared/utils/formatters'
-import { showToast } from '@/src/shared/utils/toast'
-import { useHorizontalDragScroll } from '@/src/presentation/hooks/useHorizontalDragScroll'
-import type { CheckoutPagamentoItem } from '../../../shared/utils/checkoutPagamentosUtils'
+import type { CheckoutPagamentoItem } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
 import {
   calcularTrocoCheckout,
   calcularTrocoReceberCheckout,
@@ -19,7 +12,14 @@ import {
   restantePagamentoCheckout,
   resolverAdicaoPagamentoCheckout,
   somaPagamentosCheckout,
-} from '../../../shared/utils/checkoutPagamentosUtils'
+} from '@/src/application/services/delivery-publico/checkoutPagamentos'
+import {
+  formatBRLFromMaskedInput,
+  parseBRLToNumber,
+} from '@/src/shared/utils/formatters'
+import { showToast } from '@/src/shared/utils/toast'
+import { useHorizontalDragScroll } from '@/src/presentation/hooks/useHorizontalDragScroll'
+import { formatDeliveryCurrency } from '../../../shared/utils/formatDeliveryCurrency'
 import { isMeioPagamentoDinheiro } from '../../../shared/utils/isMeioPagamentoDinheiro'
 import { obterIconeMeioPagamento } from '../../../shared/utils/obterIconeMeioPagamento'
 import { obterEstiloMeioPagamentoPublico } from '../../../shared/utils/obterEstiloMeioPagamentoPublico'
@@ -97,7 +97,7 @@ export function DeliveryCheckoutPagamentoModal({
   const exibirTaxaEntrega = isEntrega
   const taxaEntregaTexto = cotacaoLoading
     ? 'Calculando...'
-    : transformarParaReal(taxaExibicao)
+    : formatDeliveryCurrency(taxaExibicao)
   const totalLancado = somaPagamentosCheckout(pagamentos)
   const restante = restantePagamentoCheckout(total, pagamentos)
   const pagamentoCompleto = restante <= 0.01 && pagamentos.length > 0
@@ -295,7 +295,7 @@ export function DeliveryCheckoutPagamentoModal({
           <div className="flex items-center justify-between text-sm">
             <span className="delivery-text-secondary">Subtotal</span>
             <span className="font-medium delivery-text-primary">
-              {cotacaoLoading ? 'Calculando...' : transformarParaReal(subtotalExibicao)}
+              {cotacaoLoading ? 'Calculando...' : formatDeliveryCurrency(subtotalExibicao)}
             </span>
           </div>
           {exibirTaxaEntrega ? (
@@ -310,18 +310,18 @@ export function DeliveryCheckoutPagamentoModal({
           >
             <span className="delivery-text-primary">Total</span>
             <span className="delivery-text-primary">
-              {cotacaoLoading ? 'Calculando...' : transformarParaReal(total)}
+              {cotacaoLoading ? 'Calculando...' : formatDeliveryCurrency(total)}
             </span>
           </div>
           {restante > 0.01 ? (
             <div className="flex items-center justify-between text-sm font-semibold">
               <span className="text-red-600">Falta pagar</span>
-              <span className="text-red-600">{transformarParaReal(restante)}</span>
+              <span className="text-red-600">{formatDeliveryCurrency(restante)}</span>
             </div>
           ) : pagamentos.length > 0 ? (
             <div className="flex items-center justify-between text-sm font-semibold">
               <span className="text-green-700">Pagamento completo</span>
-              <span className="text-green-700">{transformarParaReal(totalLancado)}</span>
+              <span className="text-green-700">{formatDeliveryCurrency(totalLancado)}</span>
             </div>
           ) : null}
         </div>
@@ -408,7 +408,7 @@ export function DeliveryCheckoutPagamentoModal({
               aria-label="Valor deste pagamento"
             />
             <p className="text-xs delivery-text-secondary">
-              Pode pagar o total restante ({transformarParaReal(restante)}) ou só uma parte.
+              Pode pagar o total restante ({formatDeliveryCurrency(restante)}) ou só uma parte.
             </p>
 
             <button
@@ -468,7 +468,7 @@ export function DeliveryCheckoutPagamentoModal({
               </div>
             </div>
             <p className="text-xs delivery-text-secondary">
-              Restante a pagar: {transformarParaReal(restante)}
+              Restante a pagar: {formatDeliveryCurrency(restante)}
             </p>
 
             {precisaTroco === false ? (
@@ -486,7 +486,7 @@ export function DeliveryCheckoutPagamentoModal({
                   aria-label="Valor deste pagamento em dinheiro"
                 />
                 <p className="text-xs delivery-text-secondary">
-                Pode pagar o total restante ({transformarParaReal(restante)}) ou só uma parte.
+                Pode pagar o total restante ({formatDeliveryCurrency(restante)}) ou só uma parte.
                 </p>
               </>
             ) : null}
@@ -507,11 +507,11 @@ export function DeliveryCheckoutPagamentoModal({
                 />
                 {trocoPreview > 0 ? (
                   <p className="text-sm font-semibold text-green-700">
-                    Troco a receber: {transformarParaReal(trocoPreview)}
+                    Troco a receber: {formatDeliveryCurrency(trocoPreview)}
                   </p>
                 ) : (
                   <p className="text-xs delivery-text-secondary">
-                    Digite um valor maior que {transformarParaReal(restante)} para calcular o
+                    Digite um valor maior que {formatDeliveryCurrency(restante)} para calcular o
                     troco.
                   </p>
                 )}
@@ -562,7 +562,7 @@ export function DeliveryCheckoutPagamentoModal({
                       {meio?.nome ?? 'Pagamento'}
                     </span>
                     <span className="text-xs font-bold tabular-nums text-green-700">
-                      {transformarParaReal(pagamento.valor)}
+                      {formatDeliveryCurrency(pagamento.valor)}
                     </span>
                   </li>
                 )
@@ -570,7 +570,7 @@ export function DeliveryCheckoutPagamentoModal({
             </ul>
             {trocoReceberPersistido > 0 ? (
               <p className="mt-2 text-sm font-semibold text-green-700">
-                Troco a receber: {transformarParaReal(trocoReceberPersistido)}
+                Troco a receber: {formatDeliveryCurrency(trocoReceberPersistido)}
               </p>
             ) : null}
           </div>

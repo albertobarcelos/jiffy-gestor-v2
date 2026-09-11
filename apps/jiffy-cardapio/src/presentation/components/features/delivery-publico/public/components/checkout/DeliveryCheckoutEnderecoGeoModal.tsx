@@ -18,7 +18,7 @@ import {
   type EnderecoGeocodeInput,
 } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
 import { showToast } from '@/src/shared/utils/toast'
-import { formatarResumoEnderecoPublico } from '../../../shared/utils/garantirEnderecoClientePublico'
+import { formatarResumoEnderecoPublico } from '@/src/application/mappers/ClienteDeliveryPublicoMapper'
 import { useDeliveryCheckoutPinAjustado } from '../../../shared/hooks/useDeliveryCheckoutPinAjustado'
 import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
 import { DeliveryCheckoutPinAjustadoDialog } from './DeliveryCheckoutPinAjustadoDialog'

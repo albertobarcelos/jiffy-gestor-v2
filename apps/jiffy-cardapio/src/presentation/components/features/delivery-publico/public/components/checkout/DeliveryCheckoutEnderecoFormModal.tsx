@@ -26,13 +26,13 @@ import {
 } from '@/src/shared/utils/geolocalizacaoPlaces'
 import { showToast } from '@/src/shared/utils/toast'
 import { EnderecoPlacesAutocomplete } from '@/src/presentation/components/shared/geolocalizacao/EnderecoPlacesAutocomplete'
-import type { CheckoutFormData } from '../../../shared/utils/montarPedidoPublico'
+import type { CheckoutFormData } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
 import {
   maiusculasEnderecoInput,
   normalizarEnderecoGeocodeInput,
   normalizarEstadoEndereco,
 } from '@/src/shared/utils/normalizarTextoEnderecoPublico'
-import { formatarResumoEnderecoPublico } from '../../../shared/utils/garantirEnderecoClientePublico'
+import { formatarResumoEnderecoPublico } from '@/src/application/mappers/ClienteDeliveryPublicoMapper'
 import { etiquetaEnderecoPublicoLabel } from '../../../shared/utils/etiquetaEnderecoPublicoLabel'
 import {
   calcularDistanciaAproximadaDaLoja,

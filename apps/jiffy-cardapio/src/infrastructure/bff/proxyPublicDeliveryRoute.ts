@@ -1,3 +1,9 @@
+/**
+ * Adapter de borda (BFF Next) do delivery público.
+ *
+ * Responsabilidade: proxy HTTP fino (CORS + Cache-Control + status) para o backend.
+ * Sem regra de negócio — orquestração fica nos use cases da application.
+ */
 import { NextResponse } from 'next/server'
 import { ApiClient, ApiError, mensagemLegivelApiError } from '@/src/infrastructure/api/apiClient'
 

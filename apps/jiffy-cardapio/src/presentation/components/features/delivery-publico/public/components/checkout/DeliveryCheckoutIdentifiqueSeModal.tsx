@@ -6,7 +6,7 @@ import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/de
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import { showToast } from '@/src/shared/utils/toast'
 import { DeliveryPaisTelefoneSelect } from '../../../shared/components/DeliveryPaisTelefoneSelect'
-import { DELIVERY_PAIS_TELEFONE_PADRAO } from '../../../shared/constants/deliveryPaisesTelefone'
+import { DELIVERY_PAIS_TELEFONE_PADRAO } from '@/src/shared/constants/deliveryPaisesTelefone'
 import {
   DELIVERY_CELULAR_BR_DIGITOS,
   DELIVERY_MSG_CELULAR_COMPLETO,
@@ -16,7 +16,7 @@ import {
   comporTelefoneApi,
   formatarTelefoneExibicao,
   formatarTelefonePorPais,
-} from '../../../shared/utils/deliveryTelefonePais'
+} from '@/src/shared/utils/deliveryTelefonePais'
 import type { ClienteLookupStatus } from '../../../shared/hooks/useDeliveryCheckout'
 import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
 import { isNomeCompletoCheckoutValido } from './deliveryCheckoutProgress'

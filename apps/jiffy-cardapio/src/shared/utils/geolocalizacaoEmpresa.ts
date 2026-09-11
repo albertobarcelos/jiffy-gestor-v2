@@ -1,6 +1,6 @@
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import { geoJsonPointFromLatLng, parseGeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
-import { backendForwardGeocode } from '@/src/shared/utils/geolocalizacaoBackendApi'
+import { backendForwardGeocode } from '@/src/infrastructure/api/geolocalizacaoBackendApi'
 import { mensagemAmigavelErroGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
 
 export type EnderecoEmpresaGeocodeInput = {

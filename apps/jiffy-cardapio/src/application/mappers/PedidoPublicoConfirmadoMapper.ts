@@ -4,7 +4,7 @@ import type {
   MeioPagamentoPublicoDTO,
 } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { ItemCarrinhoDelivery } from '@/src/domain/types/carrinho'
-import type { DeliveryTipoEntrega } from '@/src/presentation/components/features/delivery-publico/shared/stores/deliveryPreferenciaEntregaStore'
+import type { DeliveryTipoEntrega } from '@/src/domain/types/entrega'
 
 export type PedidoPublicoConfirmadoSnapshot = {
   codigoVenda: string | null

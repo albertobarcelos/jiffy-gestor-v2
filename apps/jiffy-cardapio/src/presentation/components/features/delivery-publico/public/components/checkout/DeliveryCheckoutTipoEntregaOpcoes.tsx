@@ -5,7 +5,7 @@ import { Bike, /* Clock, */ MapPin, Plus, RefreshCw, Store } from 'lucide-react'
 import type { EnderecoClienteDeliveryPublicoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import type { DeliveryTipoEntrega } from '../../../shared/stores/deliveryPreferenciaEntregaStore'
-import { formatarResumoEnderecoPublico } from '../../../shared/utils/garantirEnderecoClientePublico'
+import { formatarResumoEnderecoPublico } from '@/src/application/mappers/ClienteDeliveryPublicoMapper'
 import {
   calcularDistanciaAproximadaDaLoja,
   pontoClienteParaDistancia,

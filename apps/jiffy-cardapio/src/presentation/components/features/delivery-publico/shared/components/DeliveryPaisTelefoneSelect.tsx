@@ -9,7 +9,7 @@ import {
   deliveryPaisFlagUrl,
   findDeliveryPaisTelefone,
   type DeliveryPaisTelefone,
-} from '../constants/deliveryPaisesTelefone'
+} from '@/src/shared/constants/deliveryPaisesTelefone'
 
 type DeliveryPaisTelefoneSelectProps = {
   value: string

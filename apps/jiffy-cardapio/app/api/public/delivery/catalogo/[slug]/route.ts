@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { proxyPublicDeliveryGet } from '@/src/shared/utils/proxyPublicDeliveryRoute'
+import { proxyPublicDeliveryGet } from '@/src/infrastructure/bff/proxyPublicDeliveryRoute'
 
 /**
  * GET /api/public/delivery/catalogo/[slug]
