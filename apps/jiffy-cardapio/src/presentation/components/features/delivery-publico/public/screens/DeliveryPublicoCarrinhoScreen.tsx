@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { AnimatePresence, motion } from 'framer-motion'
 import { MdClose } from 'react-icons/md'
 import {
@@ -33,19 +34,10 @@ import { isTokenCotacaoExpirado } from '../../shared/utils/deliveryCheckoutCotac
 import { useLocalizacaoEmpresaPublica } from '../../shared/hooks/useLocalizacaoEmpresaPublica'
 import { DeliveryProdutoModal } from '../components/DeliveryProdutoModal'
 import { DeliveryCheckoutFooterActions } from '../components/checkout/DeliveryCheckoutFooterActions'
-import { DeliveryCheckoutIdentifiqueSeModal } from '../components/checkout/DeliveryCheckoutIdentifiqueSeModal'
-import { DeliveryCheckoutEnderecosModal } from '../components/checkout/DeliveryCheckoutEnderecosModal'
-import { DeliveryCheckoutEnderecoFormModal } from '../components/checkout/DeliveryCheckoutEnderecoFormModal'
-import { DeliveryCheckoutEnderecoGeoModal } from '../components/checkout/DeliveryCheckoutEnderecoGeoModal'
 import type { EnderecoGeoCheckoutInput } from '@/src/application/dto/delivery-publico/EnderecoGeoCheckoutDTO'
 import { enderecoTemGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoDelivery'
 import { fingerprintItensCotacao } from '@/src/presentation/hooks/publicDeliveryCotacaoKeys'
 import type { ModoEntregaOpcao } from '../components/checkout/DeliveryCheckoutTipoEntregaOpcoes'
-import { DeliveryCheckoutPagamentoModal } from '../components/checkout/DeliveryCheckoutPagamentoModal'
-import { DeliveryCheckoutRevisaoModal } from '../components/checkout/DeliveryCheckoutRevisaoModal'
-import { DeliveryCotacaoDesatualizadaDialog } from '../components/checkout/DeliveryCotacaoDesatualizadaDialog'
-import { DeliveryCheckoutForaCoberturaDialog } from '../components/checkout/DeliveryCheckoutForaCoberturaDialog'
-import { DeliveryCheckoutSucessoModal } from '../components/checkout/DeliveryCheckoutSucessoModal'
 import { DeliveryCheckoutProgressProvider } from '../components/checkout/DeliveryCheckoutProgressContext'
 import {
   DeliveryCheckoutShell,
@@ -56,6 +48,86 @@ import {
   isIdentificacaoCheckoutCompleta,
   type DeliveryCheckoutStep,
 } from '../components/checkout/deliveryCheckoutProgress'
+
+/** Placeholder leve enquanto o chunk do modal carrega (P4.1). */
+function CheckoutModalChunkFallback() {
+  return (
+    <div
+      className="min-h-[240px] w-full animate-pulse rounded-2xl bg-neutral-100"
+      aria-hidden
+    />
+  )
+}
+
+const DeliveryCheckoutIdentifiqueSeModal = dynamic(
+  () =>
+    import('../components/checkout/DeliveryCheckoutIdentifiqueSeModal').then(m => ({
+      default: m.DeliveryCheckoutIdentifiqueSeModal,
+    })),
+  { loading: CheckoutModalChunkFallback }
+)
+
+const DeliveryCheckoutEnderecosModal = dynamic(
+  () =>
+    import('../components/checkout/DeliveryCheckoutEnderecosModal').then(m => ({
+      default: m.DeliveryCheckoutEnderecosModal,
+    })),
+  { loading: CheckoutModalChunkFallback }
+)
+
+const DeliveryCheckoutEnderecoFormModal = dynamic(
+  () =>
+    import('../components/checkout/DeliveryCheckoutEnderecoFormModal').then(m => ({
+      default: m.DeliveryCheckoutEnderecoFormModal,
+    })),
+  { loading: CheckoutModalChunkFallback }
+)
+
+const DeliveryCheckoutEnderecoGeoModal = dynamic(
+  () =>
+    import('../components/checkout/DeliveryCheckoutEnderecoGeoModal').then(m => ({
+      default: m.DeliveryCheckoutEnderecoGeoModal,
+    })),
+  { ssr: false, loading: CheckoutModalChunkFallback }
+)
+
+const DeliveryCheckoutPagamentoModal = dynamic(
+  () =>
+    import('../components/checkout/DeliveryCheckoutPagamentoModal').then(m => ({
+      default: m.DeliveryCheckoutPagamentoModal,
+    })),
+  { loading: CheckoutModalChunkFallback }
+)
+
+const DeliveryCheckoutRevisaoModal = dynamic(
+  () =>
+    import('../components/checkout/DeliveryCheckoutRevisaoModal').then(m => ({
+      default: m.DeliveryCheckoutRevisaoModal,
+    })),
+  { loading: CheckoutModalChunkFallback }
+)
+
+const DeliveryCheckoutSucessoModal = dynamic(
+  () =>
+    import('../components/checkout/DeliveryCheckoutSucessoModal').then(m => ({
+      default: m.DeliveryCheckoutSucessoModal,
+    })),
+  { loading: CheckoutModalChunkFallback }
+)
+
+const DeliveryCotacaoDesatualizadaDialog = dynamic(
+  () =>
+    import('../components/checkout/DeliveryCotacaoDesatualizadaDialog').then(m => ({
+      default: m.DeliveryCotacaoDesatualizadaDialog,
+    }))
+)
+
+const DeliveryCheckoutForaCoberturaDialog = dynamic(
+  () =>
+    import('../components/checkout/DeliveryCheckoutForaCoberturaDialog').then(m => ({
+      default: m.DeliveryCheckoutForaCoberturaDialog,
+    }))
+)
 
 type DeliveryPublicoCarrinhoScreenProps = {
   slug: string
@@ -148,11 +220,17 @@ export function DeliveryPublicoCarrinhoScreen({
     fecharForaCoberturaDialog,
     podeCriarNovoEndereco,
   } = useDeliveryCheckout(slug, {
+    // Steps após identificação (ou pagamento+) — fetch garantido
     fetchMeiosPagamento:
+      checkoutStep === 'enderecos' ||
+      checkoutStep === 'enderecoForm' ||
+      checkoutStep === 'enderecoGeo' ||
       checkoutStep === 'pagamento' ||
       checkoutStep === 'revisao' ||
       checkoutStep === 'sucesso' ||
       checkoutStep === 'pedidoDetalhe',
+    // P4.2 — overlap: com ID completa ainda no telefone, meios já sobem
+    prefetchMeiosAposIdentificacao: checkoutStep === 'telefone',
   })
 
   const quantidadeItens = useMemo(

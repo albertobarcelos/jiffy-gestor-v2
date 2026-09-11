@@ -1,7 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { isIdentificacaoCheckoutCompleta } from '../../public/components/checkout/deliveryCheckoutProgress'
 import type { CheckoutFormData } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
 import type { EnderecoGeoCheckoutInput } from '@/src/application/dto/delivery-publico/EnderecoGeoCheckoutDTO'
 import type { CreatePedidoPublicoResponseDTO } from '@/src/application/dto/delivery-publico/CreatePedidoPublicoResponseDTO'
@@ -161,19 +162,21 @@ function limparLookupEstadoIncompleto(
 
 export function useDeliveryCheckout(
   slug: string,
-  options?: { fetchMeiosPagamento?: boolean }
+  options?: {
+    /** Força fetch (steps pós-identificação / pagamento / revisão). */
+    fetchMeiosPagamento?: boolean
+    /**
+     * P4.2 — inicia o GET de meios quando a identificação já está completa
+     * (ainda no step telefone), em overlap com o resto do fluxo.
+     */
+    prefetchMeiosAposIdentificacao?: boolean
+  }
 ) {
-  const fetchMeiosPagamento = options?.fetchMeiosPagamento ?? false
   const queryClient = useQueryClient()
   const itens = useDeliveryCarrinhoItens(slug)
   const total = useDeliveryCarrinhoTotal(slug)
   const limpar = useDeliveryCarrinhoStore(s => s.limpar)
   const setTipoEntregaPreferencia = useDeliveryPreferenciaEntregaStore(s => s.setTipoEntrega)
-
-  const { data: meiosData, isLoading: loadingMeios } = usePublicDeliveryMeiosPagamento(
-    slug,
-    fetchMeiosPagamento
-  )
 
   const [form, setForm] = useState<CheckoutFormData>(() =>
     createInitialForm(
@@ -185,6 +188,25 @@ export function useDeliveryCheckout(
   const [cotacao, setCotacao] = useState<DeliveryCheckoutCotacaoState | null>(null)
   const [cotacaoLoading, setCotacaoLoading] = useState(false)
   const [foraCoberturaDialogAberto, setForaCoberturaDialogAberto] = useState(false)
+
+  const identificacaoCompletaParaMeios = useMemo(
+    () =>
+      isIdentificacaoCheckoutCompleta({
+        lookupStatus: clienteLookup.status,
+        nomeCadastro: clienteLookup.cliente?.nome ?? null,
+        nomeDigitado: form.nome,
+      }),
+    [clienteLookup.status, clienteLookup.cliente?.nome, form.nome]
+  )
+
+  const fetchMeiosPagamento =
+    (options?.fetchMeiosPagamento ?? false) ||
+    ((options?.prefetchMeiosAposIdentificacao ?? false) && identificacaoCompletaParaMeios)
+
+  const { data: meiosData, isLoading: loadingMeios } = usePublicDeliveryMeiosPagamento(
+    slug,
+    fetchMeiosPagamento
+  )
 
   const lookupSeqRef = useRef(0)
   const cotacaoSeqRef = useRef(0)
