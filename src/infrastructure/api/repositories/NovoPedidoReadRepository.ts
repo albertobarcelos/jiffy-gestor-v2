@@ -17,6 +17,7 @@ import {
   fetchMenuProdutosPagina,
 } from '@/src/infrastructure/api/repositories/menuCatalogFetch'
 import { salvarPedidoDeliveryDetalheCache } from '@/src/infrastructure/api/pedidoDeliveryDetalheCache'
+import { anexarInformacoesAdicionaisEmitirNota } from '@/src/shared/helpers/informacoesAdicionaisNota'
 
 async function fetchJson<T>(url: string, token: string, init?: RequestInit): Promise<T> {
   const response = await fetchGestorApi(url, {
@@ -263,7 +264,7 @@ export class NovoPedidoReadRepository implements INovoPedidoReadRepository {
       token,
       {
         method: 'POST',
-        body: JSON.stringify({ modelo }),
+        body: JSON.stringify(anexarInformacoesAdicionaisEmitirNota({ modelo }, pedidoId)),
       }
     )
     if (raw && typeof raw === 'object' && !Array.isArray(raw)) {

@@ -16,6 +16,7 @@ import type { CriarPedidoDeliveryApiRequest } from '@/src/application/dto/api/pe
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { showToast } from '@/src/shared/utils/toast'
 import { validarObservacoesPedido } from '@/src/shared/helpers/observacaoPedido'
+import { salvarRascunhoInformacoesAdicionais } from '@/src/shared/helpers/informacoesAdicionaisNota'
 
 export { validarInformacoesPedido }
 
@@ -88,6 +89,7 @@ export interface UseNovoPedidoSubmitParams {
   setInternalDialogOpen: (open: boolean) => void
   setCurrentStep: (step: 1 | 2 | 3 | 4) => void
   setVendaIdCriada: (id: string | null) => void
+  observacaoNota?: string
   status: CriarVendaGestorInputDTO['status']
   tipoInicioPedido: CriarVendaGestorInputDTO['tipoInicioPedido']
   processarAposTransicaoVendaGestorId?: (
@@ -111,6 +113,7 @@ export function useNovoPedidoSubmit({
   setInternalDialogOpen,
   setCurrentStep,
   setVendaIdCriada,
+  observacaoNota,
   status,
   tipoInicioPedido,
   processarAposTransicaoVendaGestorId,
@@ -207,6 +210,9 @@ export function useNovoPedidoSubmit({
 
       if (idCriado) {
         setVendaIdCriada(idCriado)
+        if (observacaoNota) {
+          salvarRascunhoInformacoesAdicionais(idCriado, observacaoNota)
+        }
       }
 
       setInternalDialogOpen(false)
@@ -283,6 +289,7 @@ export function useNovoPedidoSubmit({
     createVendaGestor,
     createPedidoDelivery,
     setVendaIdCriada,
+    observacaoNota,
     status,
     tipoInicioPedido,
     processarAposTransicaoVendaGestorId,

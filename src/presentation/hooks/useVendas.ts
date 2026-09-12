@@ -16,6 +16,7 @@ import {
 } from '@/src/application/mappers/TransicaoPedidoDeliveryMapper'
 import { emitirNotaPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/EmitirNotaPedidoDeliveryUseCase'
 import { deveUsarModuloDeliveryParaDetalhe } from '@/src/application/mappers/PedidoDeliveryDetalheAdapter'
+import { anexarInformacoesAdicionaisEmitirNota } from '@/src/shared/helpers/informacoesAdicionaisNota'
 
 /**
  * Extrai o motivo de rejeição (xMotivo) do XML de retorno da SEFAZ
@@ -839,13 +840,18 @@ export function useEmitirNfe() {
       const response = await fetchGestorApi(`/api/vendas/${id}/emitir-nota`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tipoDocumento: fiscalConfig.tipoDocumento,
-          modelo,
-          serie: fiscalConfig.serie,
-          ambiente: fiscalConfig.ambiente,
-          crt: fiscalConfig.crt,
-        }),
+        body: JSON.stringify(
+          anexarInformacoesAdicionaisEmitirNota(
+            {
+              tipoDocumento: fiscalConfig.tipoDocumento,
+              modelo,
+              serie: fiscalConfig.serie,
+              ambiente: fiscalConfig.ambiente,
+              crt: fiscalConfig.crt,
+            },
+            id
+          )
+        ),
       })
 
       if (!response.ok) {
@@ -930,13 +936,18 @@ export function useEmitirNfeGestor() {
       const response = await fetchGestorApi(`/api/vendas/gestor/${id}/emitir-nota`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tipoDocumento: fiscalConfig.tipoDocumento,
-          modelo,
-          serie: fiscalConfig.serie,
-          ambiente: fiscalConfig.ambiente,
-          crt: fiscalConfig.crt,
-        }),
+        body: JSON.stringify(
+          anexarInformacoesAdicionaisEmitirNota(
+            {
+              tipoDocumento: fiscalConfig.tipoDocumento,
+              modelo,
+              serie: fiscalConfig.serie,
+              ambiente: fiscalConfig.ambiente,
+              crt: fiscalConfig.crt,
+            },
+            id
+          )
+        ),
       })
 
       if (!response.ok) {
