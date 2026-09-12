@@ -20,9 +20,11 @@ import { PedidoDetalhesProdutos } from './PedidoDetalhesProdutos'
 import { PedidoDetalhesEntrega } from './PedidoDetalhesEntrega'
 import { PedidoDetalhesObservacoesSection } from './PedidoDetalhesObservacoesSection'
 import { PedidoDetalhesVisaoUnica } from './PedidoDetalhesVisaoUnica'
+import { PedidoDetalhesResumoBalcao } from './PedidoDetalhesResumoBalcao'
 import { useNovoPedidoDetalheContext } from '../context/NovoPedidoDetalheContext'
 import { useNovoPedidoFormContext } from '../context/NovoPedidoFormContext'
 import { useNovoPedidoUIContext } from '../context/NovoPedidoUIContext'
+import { deveUsarVisaoUnicaDetalhePedido } from '../utils/detalheVisaoUnica'
 
 export function PedidoDetalhesView() {
   const {
@@ -35,7 +37,13 @@ export function PedidoDetalhesView() {
     resumoFiscal,
     statusFiscalUnificado,
     detalhesEntregaPedido,
+    detalhesPedidoMeta,
+    tipoInicioPedido,
   } = useNovoPedidoDetalheContext()
+  const usarVisaoUnicaDelivery = deveUsarVisaoUnicaDetalhePedido({
+    tipoInicioPedido,
+    tipoVenda: detalhesPedidoMeta?.tipoVenda,
+  })
   const { currentStep } = useNovoPedidoUIContext()
   const {
     adicionarPagamentoPorCard,
@@ -198,7 +206,12 @@ export function PedidoDetalhesView() {
                       />
                     )}
 
-                    {abaDetalhesPedido === 'infoPedido' && <PedidoDetalhesVisaoUnica />}
+                    {abaDetalhesPedido === 'infoPedido' &&
+                      (usarVisaoUnicaDelivery ? (
+                        <PedidoDetalhesVisaoUnica />
+                      ) : (
+                        <PedidoDetalhesResumoBalcao />
+                      ))}
 
                     {/* Lista de Produtos (Visualização) */}
                     {abaDetalhesPedido === 'listaProdutos' && (
