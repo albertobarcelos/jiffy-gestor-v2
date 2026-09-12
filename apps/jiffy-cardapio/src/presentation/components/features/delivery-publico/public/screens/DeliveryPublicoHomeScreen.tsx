@@ -57,6 +57,7 @@ const DeliveryProdutoModal = dynamic(
   { ssr: false }
 )
 import { DeliveryLojaInfoModal } from '../../shared/components/DeliveryLojaInfoModal'
+import { DeliveryWhatsAppFab } from '../../shared/components/DeliveryWhatsAppFab'
 import { DeliveryPublicoCarrinhoScreen } from './DeliveryPublicoCarrinhoScreen'
 import { useFlyToCart } from '../../shared/hooks/useFlyToCart'
 import { useDeliveryBodyScrollLock } from '../../shared/hooks/useDeliveryBodyScrollLock'
@@ -117,10 +118,21 @@ export function DeliveryPublicoHomeScreen({
   const { data, isLoading, isError, error, isFetchingNextPage } = catalogQuery
   const empresa: EmpresaPublicaDTO | null = data?.pages[0]?.empresa ?? null
   const funcionamento: FuncionamentoPublicoDTO | null = data?.pages[0]?.funcionamento ?? null
+  const canalWhatsApp = data?.pages[0]?.canalWhatsApp ?? null
   const lojaAberta = funcionamento?.aberta ?? true
 
-  // Aquece cache da geo da loja (1 geocode/sessão) para distância no checkout.
-  useLocalizacaoEmpresaPublica(slug, empresa?.endereco ?? null, Boolean(empresa?.endereco))
+  const telefoneWhatsAppFab =
+    canalWhatsApp?.conectado && canalWhatsApp.telefone
+      ? canalWhatsApp.telefone
+      : null
+
+  // Preferência: localizacao do catálogo (P3). Fallback: geocode FE 1×/sessão.
+  useLocalizacaoEmpresaPublica(
+    slug,
+    empresa?.endereco ?? null,
+    Boolean(empresa?.endereco || empresa?.localizacao),
+    empresa?.localizacao
+  )
 
   const carrinhoItens = useDeliveryCarrinhoItens(slug)
   const carrinhoTotal = useDeliveryCarrinhoTotal(slug)
@@ -414,6 +426,11 @@ export function DeliveryPublicoHomeScreen({
           onClose={fecharCarrinho}
         />
       ) : null}
+      <DeliveryWhatsAppFab
+        telefone={telefoneWhatsAppFab}
+        nomeLoja={empresa?.nomeFantasia}
+        visible={!carrinhoAberto}
+      />
     </DeliveryThemeScope>
   )
 }

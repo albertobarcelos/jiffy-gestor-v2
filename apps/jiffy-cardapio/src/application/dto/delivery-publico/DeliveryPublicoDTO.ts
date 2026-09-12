@@ -64,6 +64,14 @@ export type CatalogoPublicoPaginaDTO = {
   paginacao: CatalogoPublicoPaginacaoDTO
 }
 
+export type CanalWhatsAppPublicoStatus = 'conectando' | 'conectado' | 'desconectado'
+
+export type CanalWhatsAppPublicoDTO = {
+  status: CanalWhatsAppPublicoStatus
+  conectado: boolean
+  telefone: string | null
+}
+
 export type EmpresaPublicaDTO = {
   id: string
   nomeFantasia: string
@@ -80,10 +88,14 @@ export type EmpresaPublicaDTO = {
     estado: string | null
     cep: string | null
   } | null
+  /** GeoJSON Point da loja (contrato backend). Null se ainda não geocodificada. */
+  localizacao?: GeoJsonPoint | null
 }
 
 export type GetCatalogoPublicoResponseDTO = {
   empresa: EmpresaPublicaDTO
+  /** Presente quando a empresa tem canal WhatsApp cadastrado. */
+  canalWhatsApp?: CanalWhatsAppPublicoDTO | null
   funcionamento: FuncionamentoPublicoDTO
   catalogo: CatalogoPublicoPaginaDTO
 }

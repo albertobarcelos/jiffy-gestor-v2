@@ -223,7 +223,8 @@ export function DeliveryPublicoCarrinhoScreen({
   const { localizacaoEmpresa } = useLocalizacaoEmpresaPublica(
     slug,
     empresa?.endereco ?? null,
-    Boolean(empresa?.endereco)
+    Boolean(empresa?.endereco || empresa?.localizacao),
+    empresa?.localizacao
   )
 
   const grupos = useMemo(
