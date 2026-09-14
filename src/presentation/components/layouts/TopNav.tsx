@@ -474,7 +474,7 @@ export function TopNav() {
         {/* Menu Items */}
         <div
           ref={menuRef}
-          className="hidden min-w-0 flex-1 items-center justify-start gap-1 overflow-x-auto pl-2 lg:flex"
+          className="hidden min-w-0 flex-1 items-center justify-start gap-1 pl-2 lg:flex"
         >
           {menuItems
             .filter(item => item.name !== 'Configurações')
