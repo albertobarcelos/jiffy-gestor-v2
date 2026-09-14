@@ -26,6 +26,10 @@ import { showToast } from '@/src/shared/utils/toast'
 import { cn } from '@/src/shared/utils/cn'
 import type { Menu, ProdutoMenuResumo } from '@/src/shared/types/menus'
 import {
+  idsMenuPrincipalTravados,
+  idMenuPrincipalDeLista,
+} from '@/src/domain/policies/produto/syncCadastroComMenuPrincipal'
+import {
   ProdutoMenuVinculoForm,
   type ProdutoMenuVinculoFormHandle,
 } from './ProdutoMenuVinculoForm'
@@ -105,10 +109,6 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
     ref
   ) {
     const seedIds = initialIdsFromProps(initialMenuIds, initialMenusResumo)
-    const lockedSet = useMemo(
-      () => new Set((lockedMenuIds ?? []).filter(Boolean)),
-      [lockedMenuIds]
-    )
     const [searchQuery, setSearchQuery] = useState('')
     const [selectedIds, setSelectedIds] = useState<string[]>(() => {
       const locked = (lockedMenuIds ?? []).filter(Boolean)
@@ -130,6 +130,12 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
       limit: MENUS_API_MAX_LIMIT,
       enabled: true,
     })
+    const menus = menusData?.items ?? []
+    const principalId = idMenuPrincipalDeLista(menus)
+    const lockedSet = useMemo(
+      () => new Set(idsMenuPrincipalTravados(principalId, lockedMenuIds)),
+      [lockedMenuIds, principalId]
+    )
     const { data: produtoDetalhe, isLoading: loadingProduto } = useProduto(
       persistChanges && produtoId ? produtoId : ''
     )
@@ -193,14 +199,8 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
     const [savingLocal, setSavingLocal] = useState(false)
     const initialIdsRef = useRef(seedIds)
 
-    const menus = menusData?.items ?? []
-
     /** Snapshot só existe em menus já persistidos (baseline), não em vínculo só local. */
-    const persistedVinculoIds = useMemo(() => {
-      const ids = new Set(baselineIds)
-      for (const id of lockedSet) ids.add(id)
-      return ids
-    }, [baselineIds, lockedSet])
+    const persistedVinculoIds = useMemo(() => new Set(baselineIds), [baselineIds])
 
     useEffect(() => {
       if (!persistChanges) return
@@ -209,11 +209,10 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
       const nextIds = produtoDetalhe
         ? idsFromResumo(produtoDetalhe.getMenus())
         : initialIdsRef.current
-      const withLocked = [...new Set([...nextIds, ...lockedSet])]
-      baselineIdsRef.current = withLocked
-      setBaselineIds(withLocked)
-      setSelectedIds(withLocked)
-      onSelectionChange?.(withLocked)
+      baselineIdsRef.current = nextIds
+      setBaselineIds(nextIds)
+      setSelectedIds(nextIds)
+      onSelectionChange?.(nextIds)
       onEmbedStateChange?.({ isDirty: false, isSaving: false })
     }, [
       persistChanges,
@@ -222,7 +221,6 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
       loadingProduto,
       onEmbedStateChange,
       onSelectionChange,
-      lockedSet,
     ])
 
     /** Criação/cópia: aplica `initialMenuIds` tardios (ex.: principal carregou depois) se ainda não houve edição. */
@@ -507,9 +505,11 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
             {description
               ? description
               : persistChanges
-                ? 'Marque os cardápios em que este produto deve aparecer. Ao ativar um novo vínculo, ele é salvo na hora e você já pode expandir para editar os dados naquele cardápio. Ao salvar alterações nos dados, você pode copiar para outros menus.'
+                ? principalId && lockedSet.has(principalId)
+                  ? 'Marque os cardápios em que este produto deve aparecer. O menu principal fica sempre vinculado (igual ao cadastro). Ao ativar um novo vínculo, ele é salvo na hora e você já pode expandir para editar os dados naquele cardápio.'
+                  : 'Marque os cardápios em que este produto deve aparecer. Ao ativar um novo vínculo, ele é salvo na hora e você já pode expandir para editar os dados naquele cardápio. Ao salvar alterações nos dados, você pode copiar para outros menus.'
                 : lockedSet.size > 0
-                  ? 'Este cardápio já entra e não pode ser desmarcado. Marque outros se quiser o produto em mais menus.'
+                  ? 'O menu principal já entra e não pode ser desmarcado. Marque outros se quiser o produto em mais menus.'
                   : 'Marque os cardápios em que este produto deve aparecer ao salvar. Se nenhum for marcado, o produto fica só no cadastro base.'}
           </p>
         <div className="shrink-0 px-4 py-3">
@@ -541,9 +541,9 @@ export const ProdutoMenusPanel = forwardRef<ProdutoMenusHandle, ProdutoMenusPane
             </li>
           ) : (
             filteredMenus.map((menu, index) => {
-              const vinculado = selectedIds.includes(menu.id) || lockedSet.has(menu.id)
+              const vinculado = selectedIds.includes(menu.id)
               const isPrincipal = menu.tipo === 'principal'
-              const isLocked = lockedSet.has(menu.id)
+              const isLocked = lockedSet.has(menu.id) && vinculado
               const snapshotDisponivel =
                 canShowSnapshot && vinculado && persistedVinculoIds.has(menu.id)
               const isExpanded = snapshotDisponivel && expandedIds.has(menu.id)

@@ -19,6 +19,14 @@ import {
   aplicarImagemProdutoNosMenus,
   buscarMenusDaEmpresa,
 } from '@/src/presentation/utils/uploadImagemProdutoMenus'
+import {
+  completarDestinosSyncCadastroPrincipal,
+  ehMenuPrincipal,
+  idMenuPrincipalDeLista,
+  labelCadastroNaPropagacao,
+  menusParaPerguntarReplicacao,
+  syncCadastroComMenuPrincipalAtivo,
+} from '@/src/domain/policies/produto/syncCadastroComMenuPrincipal'
 
 type Pedido = {
   origem: OrigemAlteracaoProduto
@@ -36,6 +44,7 @@ type Pedido = {
   confirmacaoStatusGlobal?: boolean
   /** Se true, não permite confirmar com zero menus. */
   exigePeloMenosUmMenu?: boolean
+  principalId?: string | null
   resolve: (value: DestinoAlteracaoProduto | null) => void
 }
 
@@ -54,6 +63,22 @@ type PedirConfirmacaoOpts = {
   passoInicial?: 'perguntar' | 'escolher'
   /** Impede confirmar sem pelo menos um menu marcado. */
   exigePeloMenosUmMenu?: boolean
+}
+
+function aplicarPoliticaDestinos(params: {
+  destinos: DestinoAlteracaoProduto
+  origem: OrigemAlteracaoProduto
+  menuIdAtual?: string
+  principalId?: string | null
+  variante: VariantePropagacaoProduto
+}): DestinoAlteracaoProduto {
+  return completarDestinosSyncCadastroPrincipal({
+    destinos: params.destinos,
+    origem: params.origem,
+    menuIdAtual: params.menuIdAtual,
+    principalId: params.principalId,
+    variante: params.variante,
+  })
 }
 
 /**
@@ -87,7 +112,18 @@ export function usePropagarAlteracaoProduto(): {
   const pedidoRef = useRef<Pedido | null>(null)
 
   const fechar = useCallback((resultado: DestinoAlteracaoProduto | null) => {
-    pedidoRef.current?.resolve(resultado)
+    const atual = pedidoRef.current
+    const destinos =
+      resultado && atual
+        ? aplicarPoliticaDestinos({
+            destinos: resultado,
+            origem: atual.origem,
+            menuIdAtual: atual.menuIdAtual,
+            principalId: atual.principalId,
+            variante: atual.variante,
+          })
+        : resultado
+    atual?.resolve(destinos)
     pedidoRef.current = null
     setPedido(null)
     setPasso('perguntar')
@@ -103,6 +139,7 @@ export function usePropagarAlteracaoProduto(): {
       opts: PedirConfirmacaoOpts
       variante: VariantePropagacaoProduto
       lista: MenuAlvoPropagacao[]
+      principalId?: string | null
       preSelecionados?: Set<string>
       menusJaVinculados?: Set<string>
       fluxoListaCadastroBase?: boolean
@@ -117,6 +154,7 @@ export function usePropagarAlteracaoProduto(): {
           fluxoListaCadastroBase: params.fluxoListaCadastroBase,
           confirmacaoStatusGlobal: params.confirmacaoStatusGlobal,
           exigePeloMenosUmMenu: params.exigePeloMenosUmMenu,
+          principalId: params.principalId,
           resolve,
         }
         pedidoRef.current = next
@@ -141,14 +179,38 @@ export function usePropagarAlteracaoProduto(): {
           .filter(Boolean)
       )
 
-      // --- Lista base: ativo/inativo → confirmação global (todos os menus vinculados) ---
+      const wrap = (
+        destinos: DestinoAlteracaoProduto,
+        principalId?: string | null
+      ): DestinoAlteracaoProduto =>
+        aplicarPoliticaDestinos({
+          destinos,
+          origem: opts.origem,
+          menuIdAtual: opts.menuIdAtual,
+          principalId,
+          variante,
+        })
+
+      // --- Lista base: ativo/inativo → só o menu principal (sem perguntar os outros) ---
       if (opts.origem === 'cadastroBase' && variante === 'statusAtivo' && token) {
+        if (syncCadastroComMenuPrincipalAtivo()) {
+          let principalId: string | null = null
+          try {
+            principalId = idMenuPrincipalDeLista(await buscarMenusDaEmpresa({ token }))
+          } catch {
+            principalId = null
+          }
+          return wrap({ aplicarNoCadastroBase: false, menuIds: [] }, principalId)
+        }
         let menusDoProduto: MenuAlvoPropagacao[] = []
+        let principalId: string | null = null
         try {
-          menusDoProduto = await listarMenusDoProduto({
-            produtoId: opts.produtoId,
-            token,
-          })
+          const [vinculados, todosMenus] = await Promise.all([
+            listarMenusDoProduto({ produtoId: opts.produtoId, token }),
+            buscarMenusDaEmpresa({ token }),
+          ])
+          menusDoProduto = vinculados
+          principalId = idMenuPrincipalDeLista(todosMenus)
         } catch {
           menusDoProduto = []
         }
@@ -157,6 +219,7 @@ export function usePropagarAlteracaoProduto(): {
           opts,
           variante,
           lista: menusDoProduto,
+          principalId,
           preSelecionados: vinculadosIds,
           menusJaVinculados: vinculadosIds,
           confirmacaoStatusGlobal: true,
@@ -164,43 +227,55 @@ export function usePropagarAlteracaoProduto(): {
         })
       }
 
-      // --- Fluxo lista de produtos base (alteração de dados): regras de vínculo/menus ---
+      // --- Cadastro: espelha só o principal, sem diálogo de outros menus ---
       if (opts.origem === 'cadastroBase' && variante === 'dados' && token) {
-        let todosMenus: MenuAlvoPropagacao[] = []
+        let todosMenus: Array<{ id: string; nome: string; tipo?: string }> = []
+        try {
+          todosMenus = await buscarMenusDaEmpresa({ token })
+        } catch {
+          todosMenus = []
+        }
+        const principalId = idMenuPrincipalDeLista(todosMenus)
+
+        if (syncCadastroComMenuPrincipalAtivo()) {
+          return wrap({ aplicarNoCadastroBase: false, menuIds: [] }, principalId)
+        }
+
         let menusDoProduto: MenuAlvoPropagacao[] = []
         try {
-          todosMenus = (await buscarMenusDaEmpresa({ token })).map(m => ({
-            id: m.id,
-            nome: m.nome,
-          }))
           menusDoProduto = await listarMenusDoProduto({
             produtoId: opts.produtoId,
             token,
           })
         } catch {
-          todosMenus = []
           menusDoProduto = []
         }
 
-        const vinculadosIds = new Set(
-          menusDoProduto.map(m => m.id).filter(Boolean)
-        )
+        const vinculadosIds = new Set(menusDoProduto.map(m => m.id).filter(Boolean))
         const temVinculo = vinculadosIds.size > 0
+        const outros = menusParaPerguntarReplicacao({
+          menus: todosMenus,
+          origem: 'cadastroBase',
+          principalId,
+          variante,
+        })
 
         if (todosMenus.length === 0) {
-          return { aplicarNoCadastroBase: false, menuIds: [] }
+          return wrap({ aplicarNoCadastroBase: false, menuIds: [] }, principalId)
         }
 
-        // 1 menu na empresa → sempre sincroniza nesse cardápio (sem diálogo)
-        if (todosMenus.length === 1) {
-          return { aplicarNoCadastroBase: false, menuIds: [todosMenus[0].id] }
+        if (todosMenus.length === 1 || outros.length === 0) {
+          return wrap({ aplicarNoCadastroBase: false, menuIds: [] }, principalId)
         }
 
         return abrirDialogo({
           opts,
           variante,
-          lista: todosMenus,
-          preSelecionados: new Set(vinculadosIds),
+          lista: outros,
+          principalId,
+          preSelecionados: new Set(
+            [...vinculadosIds].filter(id => outros.some(m => m.id === id))
+          ),
           menusJaVinculados: vinculadosIds,
           fluxoListaCadastroBase: true,
           exigePeloMenosUmMenu: temVinculo,
@@ -208,60 +283,103 @@ export function usePropagarAlteracaoProduto(): {
         })
       }
 
+      if (
+        opts.origem === 'cadastroBase' &&
+        variante === 'imagem' &&
+        token &&
+        syncCadastroComMenuPrincipalAtivo()
+      ) {
+        let principalId: string | null = null
+        try {
+          principalId = idMenuPrincipalDeLista(await buscarMenusDaEmpresa({ token }))
+        } catch {
+          principalId = null
+        }
+        return wrap({ aplicarNoCadastroBase: false, menuIds: [] }, principalId)
+      }
+
       let lista = opts.menusIniciais ?? []
-      if (lista.length === 0 && token) {
+      let menusEmpresa: Array<{ id: string; nome: string; tipo?: string }> = []
+      if (token) {
         try {
           const precisaEmpresa =
             opts.fonteMenus === 'empresa' ||
             variante === 'vinculoMenus' ||
-            (variante === 'imagem' && opts.origem === 'cadastroBase')
+            (variante === 'imagem' && opts.origem === 'cadastroBase') ||
+            syncCadastroComMenuPrincipalAtivo()
 
           if (precisaEmpresa) {
-            lista = (await buscarMenusDaEmpresa({ token })).map(m => ({
-              id: m.id,
-              nome: m.nome,
-            }))
-          } else {
-            lista = await listarMenusDoProduto({
-              produtoId: opts.produtoId,
-              token,
-            })
+            menusEmpresa = await buscarMenusDaEmpresa({ token })
+          }
+
+          if (lista.length === 0) {
             if (
-              variante === 'imagem' &&
-              lista.filter(m => !excluir.has(m.id)).length === 0
+              opts.fonteMenus === 'empresa' ||
+              variante === 'vinculoMenus' ||
+              (variante === 'imagem' && opts.origem === 'cadastroBase')
             ) {
-              lista = (await buscarMenusDaEmpresa({ token })).map(m => ({
-                id: m.id,
-                nome: m.nome,
-              }))
+              lista = menusEmpresa.map(m => ({ id: m.id, nome: m.nome }))
+            } else {
+              lista = await listarMenusDoProduto({
+                produtoId: opts.produtoId,
+                token,
+              })
+              if (
+                variante === 'imagem' &&
+                lista.filter(m => !excluir.has(m.id)).length === 0
+              ) {
+                if (menusEmpresa.length === 0) {
+                  menusEmpresa = await buscarMenusDaEmpresa({ token })
+                }
+                lista = menusEmpresa.map(m => ({ id: m.id, nome: m.nome }))
+              }
             }
           }
         } catch {
-          lista = []
+          lista = lista.length > 0 ? lista : []
         }
       }
+
+      const principalId = idMenuPrincipalDeLista(menusEmpresa)
       lista = lista.filter(m => !excluir.has(m.id))
+      lista = menusParaPerguntarReplicacao({
+        menus: lista,
+        origem: opts.origem,
+        menuIdAtual: opts.menuIdAtual,
+        principalId,
+        variante,
+      })
+
+      const origemEhPrincipal = ehMenuPrincipal(opts.menuIdAtual, principalId)
 
       if (opts.origem === 'cadastroBase' && lista.length === 0) {
-        return { aplicarNoCadastroBase: false, menuIds: [] }
+        return wrap({ aplicarNoCadastroBase: false, menuIds: [] }, principalId)
       }
       if (
         (variante === 'imagem' || variante === 'vinculoMenus') &&
         lista.length === 0
       ) {
-        return { aplicarNoCadastroBase: false, menuIds: [] }
+        return wrap({ aplicarNoCadastroBase: false, menuIds: [] }, principalId)
       }
 
-      // Origem menu: sem outros cardápios para propagar → salva só no atual (já feito pelo caller)
-      // e sincroniza o cadastro base, sem diálogo.
+      // Origem menu principal (ou único cardápio): sem outros destinos → espelha cadastro, sem diálogo.
+      // Origem menu secundário com a ponte ligada: ainda pergunta cadastro+principal.
       if (opts.origem === 'menu' && lista.length === 0) {
-        return { aplicarNoCadastroBase: true, menuIds: [] }
+        const perguntarCadastroSecundario =
+          syncCadastroComMenuPrincipalAtivo() &&
+          !origemEhPrincipal &&
+          variante !== 'imagem' &&
+          variante !== 'vinculoMenus'
+        if (!perguntarCadastroSecundario) {
+          return wrap({ aplicarNoCadastroBase: true, menuIds: [] }, principalId)
+        }
       }
 
       return abrirDialogo({
         opts,
         variante,
         lista,
+        principalId,
         passoInicial: opts.passoInicial ?? 'perguntar',
         exigePeloMenosUmMenu: opts.exigePeloMenosUmMenu,
       })
@@ -335,6 +453,14 @@ export function usePropagarAlteracaoProduto(): {
   const confirmacaoStatusGlobal = Boolean(pedido?.confirmacaoStatusGlobal)
   const exigeMenu = Boolean(pedido?.exigePeloMenosUmMenu)
   const podeConfirmarLista = !exigeMenu || selecionados.size > 0
+  const origemEhPrincipal = ehMenuPrincipal(pedido?.menuIdAtual, pedido?.principalId)
+  const incluirCadastroBase =
+    !fluxoLista &&
+    !confirmacaoStatusGlobal &&
+    pedido?.variante !== 'imagem' &&
+    pedido?.variante !== 'vinculoMenus' &&
+    pedido?.origem === 'menu' &&
+    !origemEhPrincipal
 
   const dialog = (
     <PropagarAlteracaoProdutoDialog
@@ -344,13 +470,14 @@ export function usePropagarAlteracaoProduto(): {
       variante={pedido?.variante ?? 'dados'}
       novoAtivo={pedido?.novoAtivo}
       menusJaSalvos={pedido?.menusJaSalvos}
-      incluirCadastroBase={
-        !fluxoLista &&
-        !confirmacaoStatusGlobal &&
-        pedido?.variante !== 'imagem' &&
-        pedido?.variante !== 'vinculoMenus' &&
-        pedido?.origem === 'menu'
-      }
+      incluirCadastroBase={incluirCadastroBase}
+      labelCadastroBase={labelCadastroNaPropagacao({
+        origem: pedido?.origem ?? 'cadastroBase',
+        menuIdAtual: pedido?.menuIdAtual,
+        principalId: pedido?.principalId,
+      })}
+      espelhoCadastroPrincipal={syncCadastroComMenuPrincipalAtivo()}
+      origemEhMenuPrincipal={origemEhPrincipal}
       fluxoListaCadastroBase={fluxoLista}
       confirmacaoStatusGlobal={confirmacaoStatusGlobal}
       exigePeloMenosUmMenu={exigeMenu}

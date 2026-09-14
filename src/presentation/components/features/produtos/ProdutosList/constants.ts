@@ -1,4 +1,4 @@
-﻿import {
+import {
   MdContentCopy,
   MdAddCircleOutline,
   MdRemoveCircleOutline,
@@ -60,23 +60,30 @@ export type ActionIconDef =
       ariaLabel: string
       /** Texto completo do tooltip */
       label: string
+      /** Rótulo do cabeçalho da lista (desktop). */
+      headerLabel: string
       Icon: ActionIconComponent
       field: ToggleField
       action?: never
+      /** Some PDV toggles don't fit on a phone row. */
+      hideOnMobile?: boolean
     }
   | {
       key: 'copiar'
       ariaLabel: string
       label: string
+      headerLabel: string
       Icon: ActionIconComponent
       action: 'copy'
       field?: never
+      hideOnMobile?: boolean
     }
 
 export const actionIconsConfig: ActionIconDef[] = [
   {
     key: 'favorito',
     ariaLabel: 'Favorito',
+    headerLabel: 'Fav',
     label: 'Destaca o produto como favorito no Jiffy POS.',
     Icon: MdStar,
     field: 'favorito',
@@ -84,6 +91,7 @@ export const actionIconsConfig: ActionIconDef[] = [
   {
     key: 'acrescentar',
     ariaLabel: 'Permitir acréscimo',
+    headerLabel: 'Acrésc.',
     label:
       'Permite que o operador acrescente valor ao produto no Jiffy POS, útil para personalizações cobradas à parte.',
     Icon: MdAddCircleOutline,
@@ -92,6 +100,7 @@ export const actionIconsConfig: ActionIconDef[] = [
   {
     key: 'diminuir',
     ariaLabel: 'Permitir desconto',
+    headerLabel: 'Desc.',
     label:
       'Permite aplicar desconto neste produto no Jiffy POS, sem alterar o preço base cadastrado.',
     Icon: MdRemoveCircleOutline,
@@ -100,6 +109,7 @@ export const actionIconsConfig: ActionIconDef[] = [
   {
     key: 'abrir',
     ariaLabel: 'Abrir complementos automaticamente',
+    headerLabel: 'Compl.',
     label:
       'Ao selecionar o produto no Jiffy POS, abre automaticamente a tela de complementos para o cliente escolher.',
     Icon: MdLaunch,
@@ -108,14 +118,17 @@ export const actionIconsConfig: ActionIconDef[] = [
   {
     key: 'alterar-preco',
     ariaLabel: 'Permitir alterar preço no Jiffy POS',
+    headerLabel: 'Preço',
     label:
       'Permite que o operador altere o preço deste produto no momento da venda no Jiffy POS.',
     Icon: MdAttachMoney,
     field: 'permiteAlterarPreco',
+    hideOnMobile: true,
   },
   {
     key: 'incide-taxa',
     ariaLabel: 'Incide taxa',
+    headerLabel: 'Taxa',
     label:
       'Quando ativo, este produto entra no cálculo das taxas configuradas (serviço, couvert, etc.) no pedido.',
     Icon: TaxasIcon,
@@ -124,6 +137,7 @@ export const actionIconsConfig: ActionIconDef[] = [
   {
     key: 'copiar',
     ariaLabel: 'Copiar produto',
+    headerLabel: 'Copiar',
     label:
       'Essa função cria uma cópia do produto, mantendo suas informações e imagens. Ideal para produtos similares.',
     Icon: MdContentCopy,

@@ -10,6 +10,9 @@ import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplem
 import { useProdutoPatchMutation, isSavingOf } from '@/src/presentation/hooks/useProdutoPatchMutation'
 import { usePropagarAlteracaoProduto } from '@/src/presentation/hooks/produtos/usePropagarAlteracaoProduto'
 import { useProdutosFilters } from '@/src/presentation/hooks/useProdutosFilters'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { syncCadastroComMenuPrincipalAtivo } from '@/src/domain/policies/produto/syncCadastroComMenuPrincipal'
+import { buscarIdMenuPrincipal } from '@/src/presentation/utils/uploadImagemProdutoMenus'
 import { useIsMobile } from '@/src/presentation/hooks/useIsMobile'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 
@@ -23,6 +26,7 @@ import { ProdutoNovoWizard } from '../ProdutoNovoWizard'
 import { ProdutosHeader } from './ProdutosHeader'
 import { ProdutosFilters } from './ProdutosFilters'
 import { ProdutoListItem } from './ProdutoListItem'
+import { CatalogProductColumnHeader } from '@/src/presentation/components/features/catalogo/CatalogProductColumnHeader'
 
 import { Produto } from '@/src/domain/entities/Produto'
 import type { ToggleField } from '@/src/shared/types/produto'
@@ -316,27 +320,51 @@ export function ProdutosList() {
     )
   }, [patchMutation, filterStatus, pedirConfirmacao, aplicarNosDestinos])
 
+  const aplicarSnapshotNoMenuPrincipal = useCallback(
+    async (produtoId: string, snapshot: { favorito?: boolean; valor?: number }) => {
+      if (!syncCadastroComMenuPrincipalAtivo()) return
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+      if (!token) return
+      try {
+        const principalId = await buscarIdMenuPrincipal(token)
+        if (!principalId) return
+        await aplicarNosDestinos({
+          produtoId,
+          snapshot,
+          destinos: { aplicarNoCadastroBase: false, menuIds: [principalId] },
+        })
+      } catch {
+        /* cadastro já foi salvo; o principal recebe na próxima edição */
+      }
+    },
+    [aplicarNosDestinos]
+  )
+
   const handleToggleBooleanField = useCallback(async (produtoId: string, field: ToggleField, novoValor: boolean) => {
-    if (field !== 'favorito') {
-      patchMutation.mutate({ type: 'toggle', produtoId, field, novoValor })
-      return
-    }
-    const destinos = await pedirConfirmacao({ origem: 'cadastroBase', produtoId })
-    if (destinos === null) return
     patchMutation.mutate(
       { type: 'toggle', produtoId, field, novoValor },
       {
         onSuccess: () => {
-          if (destinos.menuIds.length === 0) return
-          void aplicarNosDestinos({
-            produtoId,
-            snapshot: { favorito: novoValor },
-            destinos: { aplicarNoCadastroBase: false, menuIds: destinos.menuIds },
-          })
+          if (field !== 'favorito') return
+          void aplicarSnapshotNoMenuPrincipal(produtoId, { favorito: novoValor })
         },
       }
     )
-  }, [patchMutation, pedirConfirmacao, aplicarNosDestinos])
+  }, [patchMutation, aplicarSnapshotNoMenuPrincipal])
+
+  const handleValorChange = useCallback(
+    (produtoId: string, novoValor: number) => {
+      patchMutation.mutate(
+        { type: 'valor', produtoId, novoValor },
+        {
+          onSuccess: () => {
+            void aplicarSnapshotNoMenuPrincipal(produtoId, { valor: novoValor })
+          },
+        }
+      )
+    },
+    [patchMutation, aplicarSnapshotNoMenuPrincipal]
+  )
 
   const handleEditProduto = useCallback((produtoId: string) => {
     const produto = produtos.find((p) => p.getId() === produtoId)
@@ -404,6 +432,7 @@ export function ProdutosList() {
             aria-label="Lista de produtos"
             className="divide-y divide-gray-200 border border-gray-200 pb-4"
           >
+            <CatalogProductColumnHeader variant="base" />
             {produtosVisiveis.map((produto) => (
               <div key={produto.getId()} role="listitem">
                 <ProdutoListItem
@@ -414,6 +443,7 @@ export function ProdutosList() {
                   isSavingStatus={isSavingOf(patchMutation, produto.getId(), 'status')}
                   isSavingNome={isSavingOf(patchMutation, produto.getId(), 'nome')}
                   isSavingGrupo={isSavingOf(patchMutation, produto.getId(), 'grupo')}
+                  onValorChange={handleValorChange}
                   onSwitchToggle={handleStatusToggle}
                   onToggleBoolean={handleToggleBooleanField}
                   onEditProduto={handleEditProduto}

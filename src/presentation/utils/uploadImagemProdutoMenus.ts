@@ -68,7 +68,8 @@ export async function buscarMenuIdsDoProduto(params: {
 
 /**
  * Usa menus já conhecidos, depois os da resposta da API e, se ainda vazio,
- * busca os vínculos do produto. Create sem `menuIds` NÃO amarra o menu principal.
+ * busca os vínculos do produto. Create sem `menuIds` só deixa de amarrar o
+ * principal se a ponte temporária cadastro↔principal estiver desligada.
  */
 export async function resolverMenuIdsParaImagemProduto(params: {
   token: string

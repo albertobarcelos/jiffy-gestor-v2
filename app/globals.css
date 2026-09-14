@@ -297,6 +297,98 @@ h6 {
   }
 }
 
+/* Lista do catálogo: no celular, código/preço/pausa empilham à direita. */
+@media (max-width: 767px) {
+  .catalog-row-menu,
+  .catalog-row-menu-hidecodigo,
+  .catalog-row-menu-hidecodigo-actions {
+    grid-template-areas:
+      'foto nome side'
+      'foto acoes side';
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .catalog-row-base {
+    grid-template-areas:
+      'nome side'
+      'acoes side';
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .catalog-row-base-categoria {
+    grid-template-areas:
+      'nome side'
+      'acoes side'
+      'categ categ';
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .catalog-row-area-foto {
+    grid-area: foto;
+  }
+  .catalog-row-area-nome {
+    grid-area: nome;
+  }
+  .catalog-row-area-acoes {
+    grid-area: acoes;
+  }
+  .catalog-row-area-categ {
+    grid-area: categ;
+  }
+  .catalog-row-area-side {
+    grid-area: side;
+  }
+}
+
+@media (min-width: 768px) {
+  .catalog-row-menu {
+    grid-template-areas: 'foto nome codigo acoes meta';
+    grid-template-columns: auto 25ch 4.75rem minmax(0, 1fr) auto;
+  }
+
+  .catalog-row-menu-hidecodigo {
+    grid-template-areas: 'foto nome meta';
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .catalog-row-menu-hidecodigo-actions {
+    grid-template-areas: 'foto nome acoes meta';
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+  }
+
+  .catalog-row-base {
+    grid-template-areas: 'nome codigo acoes spacer meta';
+    grid-template-columns: 25ch 4.75rem auto minmax(0, 1fr) auto;
+  }
+
+  .catalog-row-base-categoria {
+    grid-template-areas: 'nome codigo acoes categ meta';
+    grid-template-columns: 25ch 4.75rem auto 12rem auto;
+  }
+
+  .catalog-row-area-foto {
+    grid-area: foto;
+  }
+  .catalog-row-area-nome {
+    grid-area: nome;
+  }
+  .catalog-row-area-codigo {
+    grid-area: codigo;
+  }
+  .catalog-row-area-acoes {
+    grid-area: acoes;
+  }
+  .catalog-row-area-categ {
+    grid-area: categ;
+  }
+  .catalog-row-area-meta {
+    grid-area: meta;
+  }
+  .catalog-row-area-spacer {
+    grid-area: spacer;
+  }
+}
+
 /* Remover warnings do normalize.css - não são erros críticos */
 /* Os warnings sobre -webkit-text-size-adjust, :host, -moz-focus-inner são do normalize.css */
 /* e não afetam a funcionalidade da aplicação */

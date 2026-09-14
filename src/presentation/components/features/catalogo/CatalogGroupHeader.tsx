@@ -46,11 +46,11 @@ function CatalogGroupHeaderInner({
   onAddProduto,
 }: CatalogGroupHeaderProps) {
   return (
-    <div className="flex items-center justify-between gap-5 bg-gray-50 px-1 py-1">
-      <div className="flex items-center gap-3">
+    <div className="flex items-start justify-between gap-2 bg-gray-50 px-1 py-1 md:items-center md:gap-5">
+      <div className="flex min-w-0 items-center gap-2 md:gap-3">
         {grupoVisual ? (
           <span
-            className="flex h-12 w-12 items-center justify-center rounded-[10px] border-2 bg-white text-[var(--grupo-color)] transition-colors hover:bg-[var(--grupo-color)] hover:text-white"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border-2 bg-white text-[var(--grupo-color)] transition-colors hover:bg-[var(--grupo-color)] hover:text-white md:h-12 md:w-12"
             style={{
               borderColor: grupoVisual.corHex,
               ['--grupo-color' as string]: grupoVisual.corHex,
@@ -62,9 +62,9 @@ function CatalogGroupHeaderInner({
           <span className="h-9 w-9 rounded-full border border-gray-300 bg-gray-200" />
         ) : null}
 
-        <div>
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-semibold tracking-wide text-primary-text md:text-base">
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
+            <p className="truncate text-sm font-semibold tracking-wide text-primary-text md:text-base">
               {grupo}
             </p>
             {headerAddon}
@@ -119,14 +119,15 @@ function CatalogGroupHeaderInner({
         </div>
       </div>
 
-      <div className="flex shrink-0 flex-col-reverse items-center justify-end gap-2 md:flex-row md:gap-4">
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 md:gap-4">
         {showHeaderActions ? (
           <button
             type="button"
             onClick={() => onAddProduto?.(grupo, grupoId)}
             className="flex h-8 items-center px-2 text-xs font-semibold text-primary transition-colors rounded-lg border border-primary/50 bg-info hover:bg-primary/10 md:gap-2 md:px-[20px] md:text-sm"
           >
-            {addProdutoLabel}
+            <span className="md:hidden">Adicionar</span>
+            <span className="hidden md:inline">{addProdutoLabel}</span>
             <span className="text-sm">+</span>
           </button>
         ) : null}
