@@ -262,6 +262,10 @@ export function DeliveryPublicoCarrinhoScreen({
   const nomeClienteExibicao =
     form.nome.trim() || clienteLookup.cliente?.nome?.trim() || ''
 
+  /** Após lookup o form.telefone é limpo de propósito; a fonte fica em telefoneConsultado. */
+  const telefoneClienteExibicao =
+    form.telefone.trim() || clienteLookup.telefoneConsultado?.trim() || ''
+
   const totalCheckout = totalOficial ?? total
 
   const prevCheckoutStepForCotacaoRef = useRef<DeliveryCheckoutStep>(null)
@@ -411,7 +415,7 @@ export function DeliveryPublicoCarrinhoScreen({
       tipoEntrega: form.tipoEntrega,
       modoTempo: form.modoTempo,
       nome: nomeClienteExibicao,
-      telefone: form.telefone,
+      telefone: telefoneClienteExibicao,
       telefonePaisIso2: form.telefonePaisIso2 || DELIVERY_PAIS_TELEFONE_PADRAO,
       enderecoCliente: enderecoParaRevisao,
       enderecoEmpresaTexto,
@@ -763,6 +767,10 @@ export function DeliveryPublicoCarrinhoScreen({
             enderecoSalvo={null}
             enderecosCadastrados={clienteLookup.cliente?.enderecos ?? []}
             localizacaoEmpresa={localizacaoEmpresa}
+            enderecoFallback={{
+              cidade: empresa?.endereco?.cidade ?? null,
+              estado: empresa?.endereco?.estado ?? null,
+            }}
             onSelecionarEnderecoCadastrado={handleSelecionarEndereco}
             onRemoverEnderecoCadastrado={handleRemoverEnderecoDaLista}
             onChange={updateForm}
@@ -807,7 +815,7 @@ export function DeliveryPublicoCarrinhoScreen({
           <DeliveryCheckoutRevisaoModal
             tipoEntrega={form.tipoEntrega}
             nome={nomeClienteExibicao}
-            telefone={form.telefone}
+            telefone={telefoneClienteExibicao}
             telefonePaisIso2={form.telefonePaisIso2}
             enderecoCliente={enderecoParaRevisao}
             enderecoEmpresaTexto={enderecoEmpresaTexto}

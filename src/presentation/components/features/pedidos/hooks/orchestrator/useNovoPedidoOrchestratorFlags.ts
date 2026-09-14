@@ -31,6 +31,8 @@ import { pagamentoEntregaConfirmadoNoPedido } from '@/src/domain/services/pedido
 
 export type UseNovoPedidoOrchestratorFlagsParams = {
   modoVisualizacao: boolean | undefined
+  /** No modo editar produtos, total/subtotal vêm do carrinho vivo — não do resumo da carga. */
+  modoEdicaoProdutos?: boolean
   tabelaOrigemVenda: 'venda' | 'venda_gestor'
   statusFiscalUnificado: string | null | undefined
   statusFiscalDetalhe: string | null
@@ -59,6 +61,7 @@ export type UseNovoPedidoOrchestratorFlagsParams = {
 
 export function useNovoPedidoOrchestratorFlags({
   modoVisualizacao,
+  modoEdicaoProdutos = false,
   tabelaOrigemVenda,
   statusFiscalUnificado,
   statusFiscalDetalhe,
@@ -83,6 +86,8 @@ export function useNovoPedidoOrchestratorFlags({
   resumoFinanceiroDetalhes,
   detalhesEntregaPedido,
 }: UseNovoPedidoOrchestratorFlagsParams) {
+  const resumoParaTotais = modoEdicaoProdutos ? null : resumoFinanceiroDetalhes
+  const valorFinalParaTotais = modoEdicaoProdutos ? null : valorFinalVenda
   const statusFiscal = useMemo(
     () =>
       resolverStatusFiscalExibicao(
@@ -159,7 +164,7 @@ export function useNovoPedidoOrchestratorFlags({
       resolverValorTaxaEntregaPedido({
         pedidoComEntrega,
         taxaEntregaValor: detalhesEntregaPedido?.taxaEntrega?.valor,
-        resumoFinanceiroDetalhes,
+        resumoFinanceiroDetalhes: resumoParaTotais,
         taxaEntregaCoberturaValor: enderecoEntregaCoberturaValorTaxa,
         taxaEntregaCatalogoValor: taxaEntregaSelecionada?.getValor(),
         taxaEntregaOverride: resolverModoTaxaEntregaOverride(taxaEntregaId),
@@ -167,7 +172,7 @@ export function useNovoPedidoOrchestratorFlags({
     [
       pedidoComEntrega,
       detalhesEntregaPedido?.taxaEntrega?.valor,
-      resumoFinanceiroDetalhes,
+      resumoParaTotais,
       enderecoEntregaCoberturaValorTaxa,
       taxaEntregaSelecionada,
       taxaEntregaId,
@@ -175,8 +180,8 @@ export function useNovoPedidoOrchestratorFlags({
   )
 
   const subtotalProdutos = useMemo(
-    () => resolverSubtotalItensPedido(subtotalProdutosCalculado, resumoFinanceiroDetalhes),
-    [subtotalProdutosCalculado, resumoFinanceiroDetalhes]
+    () => resolverSubtotalItensPedido(subtotalProdutosCalculado, resumoParaTotais),
+    [subtotalProdutosCalculado, resumoParaTotais]
   )
 
   const totalProdutos = useMemo(
@@ -184,10 +189,10 @@ export function useNovoPedidoOrchestratorFlags({
       resolverTotalPedidoComTaxaEntrega({
         subtotalItens: subtotalProdutos,
         taxaEntrega: valorTaxaEntrega,
-        valorFinalApi: valorFinalVenda,
-        resumoFinanceiroDetalhes,
+        valorFinalApi: valorFinalParaTotais,
+        resumoFinanceiroDetalhes: resumoParaTotais,
       }),
-    [subtotalProdutos, valorTaxaEntrega, valorFinalVenda, resumoFinanceiroDetalhes]
+    [subtotalProdutos, valorTaxaEntrega, valorFinalParaTotais, resumoParaTotais]
   )
 
   const totalItensPedido = useMemo(

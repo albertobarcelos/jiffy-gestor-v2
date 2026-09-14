@@ -13,6 +13,7 @@ import {
 import { DeliveryCheckoutConfirmarRemocaoEnderecoDialog } from './DeliveryCheckoutConfirmarRemocaoEnderecoDialog'
 import { DeliveryCheckoutShellHeader } from './DeliveryCheckoutShell'
 import { DeliveryDistanciaLojaHint } from './DeliveryDistanciaLojaHint'
+import { ordenarEnderecosPorUltimaUtilizacao } from '../../../shared/utils/ordenarEnderecosPorUltimaUtilizacao'
 
 type DeliveryCheckoutEnderecosModalProps = {
   enderecos: EnderecoClienteDeliveryPublicoDTO[]
@@ -40,11 +41,7 @@ export function DeliveryCheckoutEnderecosModal({
     useState<EnderecoClienteDeliveryPublicoDTO | null>(null)
   const [removendo, setRemovendo] = useState(false)
 
-  const ordenados = [...enderecos].sort((a, b) => {
-    const ta = a.ultimaUtilizacaoEm ? Date.parse(a.ultimaUtilizacaoEm) : 0
-    const tb = b.ultimaUtilizacaoEm ? Date.parse(b.ultimaUtilizacaoEm) : 0
-    return tb - ta
-  })
+  const ordenados = ordenarEnderecosPorUltimaUtilizacao(enderecos)
 
   const confirmarRemocao = async () => {
     if (!enderecoParaRemover) return

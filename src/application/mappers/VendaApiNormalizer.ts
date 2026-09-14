@@ -26,6 +26,8 @@ export function normalizeStatusVenda(venda: VendaGestorApiResponse): StatusVenda
 
 const ORIGEM_API_MAP: Record<string, OrigemVenda> = {
   GESTOR: 'GESTOR',
+  JIFFY_DELIVERY: 'DELIVERY',
+  DELIVERY: 'DELIVERY',
   IFOOD: 'IFOOD',
   DELIVERY_IFOOD: 'IFOOD',
   RAPPI: 'RAPPI',
@@ -44,6 +46,7 @@ export function normalizeOrigemApi(raw: string | null | undefined): OrigemVenda 
 /** Rótulo de exibição para origem (UI). */
 export function rotuloOrigemParaExibicao(origem: OrigemVenda | null, origemBrutaApi?: string | null): string {
   if (origem === 'GESTOR') return 'Gestor'
+  if (origem === 'DELIVERY') return 'Delivery'
   if (origem === 'IFOOD') return 'iFood'
   if (origem === 'RAPPI') return 'Rappi'
   if (origem === 'OUTROS') return 'Outros'

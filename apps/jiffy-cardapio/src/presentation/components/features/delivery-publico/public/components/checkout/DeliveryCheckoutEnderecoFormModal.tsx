@@ -15,10 +15,13 @@ import {
 import { obterEnderecoPorGps } from '@/src/shared/utils/geolocalizacaoEndereco'
 import {
   enderecoGeocodeAtendeMinimo,
-  geocodificarEnderecoViaGoogle,
+  erroGeocodeEhSemResultado,
+  geocodificarEnderecoComRetrySemCep,
   mensagemAmigavelErroGeolocalizacao,
   serializarEnderecoParaGeocode,
+  type EnderecoGeocodeFallback,
 } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
+import { useCepMaskedInputHandler } from '@/src/presentation/hooks/useCepMaskedInputHandler'
 import {
   placeDetailsParaEnderecoGeocode,
   type PlaceDetailsResult,
@@ -38,6 +41,7 @@ import {
   calcularDistanciaAproximadaDaLoja,
   pontoClienteParaDistancia,
 } from '../../../shared/utils/formatarDistanciaAproximadaDaLoja'
+import { ordenarEnderecosPorUltimaUtilizacao } from '../../../shared/utils/ordenarEnderecosPorUltimaUtilizacao'
 import { useDeliveryBodyScrollLock } from '../../../shared/hooks/useDeliveryBodyScrollLock'
 import dynamic from 'next/dynamic'
 import { DeliveryCheckoutConfirmarRemocaoEnderecoDialog } from './DeliveryCheckoutConfirmarRemocaoEnderecoDialog'
@@ -115,6 +119,8 @@ type DeliveryCheckoutEnderecoFormModalProps = {
   enderecoSalvo?: EnderecoClienteDeliveryPublicoDTO | null
   /** Coordenada da loja — distância aproximada no card e na lista. */
   localizacaoEmpresa?: GeoJsonPoint | null
+  /** Cidade/UF da loja — preenche o form manual quando vazios. */
+  enderecoFallback?: EnderecoGeocodeFallback
   /** Endereços já cadastrados — exibidos na etapa de busca (novo endereço). */
   enderecosCadastrados?: EnderecoClienteDeliveryPublicoDTO[]
   onSelecionarEnderecoCadastrado?: (enderecoId: string) => void
@@ -154,10 +160,22 @@ export function DeliveryCheckoutEnderecoFormModal({
   placesBias = null,
   enderecoSalvo = null,
   localizacaoEmpresa = null,
+  enderecoFallback,
   enderecosCadastrados = [],
   onSelecionarEnderecoCadastrado,
   onRemoverEnderecoCadastrado,
 }: DeliveryCheckoutEnderecoFormModalProps) {
+  const onCepChange = useCallback(
+    (cep: string) => {
+      onChange('cep', cep)
+    },
+    [onChange]
+  )
+  const { inputRef: cepInputRef, handleChange: handleCepChange } = useCepMaskedInputHandler(
+    form.cep,
+    onCepChange
+  )
+
   const [formOverlayOpen, setFormOverlayOpen] = useState(() => Boolean(form.rua.trim()))
   const [mapaModalOpen, setMapaModalOpen] = useState(false)
   const [pinMovido, setPinMovido] = useState(false)
@@ -413,6 +431,14 @@ export function DeliveryCheckoutEnderecoFormModal({
         onChange('rua', maiusculasEnderecoInput(textoBusca))
       }
     }
+    const cidadeLoja = enderecoFallback?.cidade?.trim()
+    const estadoLoja = enderecoFallback?.estado?.trim()
+    if (!form.cidade.trim() && cidadeLoja) {
+      onChange('cidade', maiusculasEnderecoInput(cidadeLoja))
+    }
+    if (!form.estado.trim() && estadoLoja) {
+      onChange('estado', normalizarEstadoEndereco(estadoLoja))
+    }
     setMostrarOpcaoManual(false)
     setOrigemGeo('manual')
     setPinMovido(false)
@@ -463,6 +489,24 @@ export function DeliveryCheckoutEnderecoFormModal({
     }
   }
 
+  const abrirMapaComPin = useCallback(
+    (pin: GeoJsonPoint, providerId: string | null, opts: { sincronizado: boolean; pinMovido: boolean }) => {
+      setEnderecoLocalizacao(pin)
+      setProviderEnderecoId(providerId)
+      if (opts.sincronizado) {
+        marcarGeoSincronizada()
+      } else {
+        setUltimoGeoKeySincronizado(null)
+      }
+      pinAntesRef.current = pin
+      providerAntesRef.current = providerId
+      setPinMovido(opts.pinMovido)
+      setDialogPinAberto(false)
+      setMapaModalOpen(true)
+    },
+    [marcarGeoSincronizada]
+  )
+
   const handleConfirmarLocalizacaoForm = async () => {
     if (dialogPinAberto) {
       showToast.error('Confirme ou cancele o ajuste do pin no mapa.')
@@ -499,28 +543,31 @@ export function DeliveryCheckoutEnderecoFormModal({
 
       // Reusa a coordenada já sincronizada; só geocodifica de novo se o texto mudou.
       if (enderecoLocalizacao && geoSincronizadaComEndereco) {
-        pinAntesRef.current = enderecoLocalizacao
-        providerAntesRef.current = providerEnderecoId
-        setPinMovido(false)
-        setDialogPinAberto(false)
-        setMapaModalOpen(true)
+        abrirMapaComPin(enderecoLocalizacao, providerEnderecoId, {
+          sincronizado: true,
+          pinMovido: false,
+        })
         return
       }
 
-      const resultado = await geocodificarEnderecoViaGoogle(enderecoGeocode, {
+      const resultado = await geocodificarEnderecoComRetrySemCep(enderecoGeocode, {
         minimo: 'flexivel',
       })
-      const pin = resultado.enderecoLocalizacao
-      const providerId = resultado.providerEnderecoId
-      setEnderecoLocalizacao(pin)
-      setProviderEnderecoId(providerId)
-      marcarGeoSincronizada()
-      pinAntesRef.current = pin
-      providerAntesRef.current = providerId
-      setPinMovido(false)
-      setDialogPinAberto(false)
-      setMapaModalOpen(true)
+      abrirMapaComPin(resultado.enderecoLocalizacao, resultado.providerEnderecoId, {
+        sincronizado: true,
+        pinMovido: false,
+      })
     } catch (error) {
+      if (localizacaoEmpresa && erroGeocodeEhSemResultado(error)) {
+        abrirMapaComPin(localizacaoEmpresa, null, {
+          sincronizado: false,
+          pinMovido: true,
+        })
+        showToast.warning(
+          'Não achamos esse endereço exato no mapa. Abrimos perto da loja — arraste o pin até o local certo e confirme.'
+        )
+        return
+      }
       showToast.error(mensagemAmigavelErroGeolocalizacao(error, 'geocode'))
     } finally {
       setAbrindoMapa(false)
@@ -725,11 +772,7 @@ export function DeliveryCheckoutEnderecoFormModal({
 
   const enderecosOrdenados = useMemo(() => {
     if (!mostrarListaEnderecosCadastrados) return []
-    return [...enderecosCadastrados].sort((a, b) => {
-      const ta = a.ultimaUtilizacaoEm ? Date.parse(a.ultimaUtilizacaoEm) : 0
-      const tb = b.ultimaUtilizacaoEm ? Date.parse(b.ultimaUtilizacaoEm) : 0
-      return tb - ta
-    })
+    return ordenarEnderecosPorUltimaUtilizacao(enderecosCadastrados)
   }, [mostrarListaEnderecosCadastrados, enderecosCadastrados])
 
   const confirmarRemocaoEndereco = async () => {
@@ -898,19 +941,13 @@ export function DeliveryCheckoutEnderecoFormModal({
                       CEP
                     </span>
                     <input
+                      ref={cepInputRef}
                       type="text"
                       inputMode="numeric"
                       maxLength={9}
                       placeholder="00000-000"
                       value={form.cep}
-                      onChange={e => onChange('cep', formatarCepMascara(e.target.value))}
-                      onFocus={e => {
-                        if (!form.cep.trim()) return
-                        const el = e.currentTarget
-                        requestAnimationFrame(() => {
-                          el.select()
-                        })
-                      }}
+                      onChange={handleCepChange}
                       className={fieldClass}
                       style={fieldStyle}
                     />

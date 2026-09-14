@@ -36,6 +36,7 @@ import {
   onlyDigits,
 } from './formHelpers'
 import type { ClienteLookupState } from './types'
+import { escolherEnderecoMaisRecenteCliente } from '../../utils/ordenarEnderecosPorUltimaUtilizacao'
 
 type UseCheckoutClienteParams = {
   formRef: MutableRefObject<CheckoutFormData>
@@ -135,7 +136,7 @@ export function useCheckoutCliente({
     (cliente: ClienteDeliveryPublicoDTO | null) => {
       setForm(prev => {
         const enderecos = cliente?.enderecos ?? []
-        const primeiro = enderecos[0]
+        const maisRecente = escolherEnderecoMaisRecenteCliente(enderecos)
         const nomeApi = cliente?.nome?.trim() ?? ''
         const nome = nomeApi || prev.nome.trim() || ''
 
@@ -148,16 +149,12 @@ export function useCheckoutCliente({
           }
         }
 
-        if (enderecos.length > 0 && primeiro) {
-          const idAtual = prev.enderecoIdSelecionado.trim()
-          const idValido =
-            idAtual && enderecos.some(e => e.id === idAtual) ? idAtual : primeiro.id
-
+        if (enderecos.length > 0 && maisRecente) {
           return {
             ...prev,
             nome,
             modoEndereco: 'existente',
-            enderecoIdSelecionado: idValido,
+            enderecoIdSelecionado: maisRecente.id,
           }
         }
 

@@ -261,6 +261,8 @@ export function DeliveryCheckoutPagamentoModal({
       return
     }
 
+    // Garante o estado final no form antes de ir à revisão (evita race do último lançamento).
+    onChangePagamentos(listaFinal)
     onContinuar()
   }
 
@@ -405,6 +407,7 @@ export function DeliveryCheckoutPagamentoModal({
               placeholder="R$ 0,00"
               value={valorInput}
               onChange={e => handleValorChange(e.target.value)}
+              onFocus={e => e.currentTarget.select()}
               aria-label="Valor deste pagamento"
             />
             <p className="text-xs delivery-text-secondary">
@@ -483,6 +486,7 @@ export function DeliveryCheckoutPagamentoModal({
                   placeholder="R$ 0,00"
                   value={valorInput}
                   onChange={e => handleValorChange(e.target.value)}
+                  onFocus={e => e.currentTarget.select()}
                   aria-label="Valor deste pagamento em dinheiro"
                 />
                 <p className="text-xs delivery-text-secondary">

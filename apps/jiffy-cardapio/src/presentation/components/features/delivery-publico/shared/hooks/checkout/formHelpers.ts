@@ -2,11 +2,14 @@ import type { CheckoutFormData } from '@/src/application/dto/delivery-publico/Ch
 import type { DeliveryTipoEntrega } from '../../stores/deliveryPreferenciaEntregaStore'
 import type { ClienteLookupState } from './types'
 
+/**
+ * Campos que mudam frete/total → invalidam cotação e lançamentos de pagamento.
+ * Não incluir nome, CPF NF nem observação: editar na revisão não pode apagar o pagamento.
+ */
 export const COTACAO_INVALIDATING_FORM_KEYS = new Set<keyof CheckoutFormData>([
   'tipoEntrega',
   'telefone',
   'telefonePaisIso2',
-  'nome',
   'modoEndereco',
   'enderecoIdSelecionado',
   'rua',
@@ -18,7 +21,6 @@ export const COTACAO_INVALIDATING_FORM_KEYS = new Set<keyof CheckoutFormData>([
   'complemento',
   'pontoReferencia',
   'etiquetaEndereco',
-  'cpfNotaFiscal',
 ])
 
 export const LOOKUP_DEBOUNCE_MS = 450

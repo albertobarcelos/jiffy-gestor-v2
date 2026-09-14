@@ -1,6 +1,6 @@
 /** Tipos de detalhe de venda/pedido gestor (contrato domain ↔ application). */
 
-export type OrigemVenda = 'GESTOR' | 'IFOOD' | 'RAPPI' | 'OUTROS'
+export type OrigemVenda = 'GESTOR' | 'DELIVERY' | 'IFOOD' | 'RAPPI' | 'OUTROS'
 
 export type FluxoPagamentoEntrega = 'cobrar_entregador' | 'ja_pago'
 

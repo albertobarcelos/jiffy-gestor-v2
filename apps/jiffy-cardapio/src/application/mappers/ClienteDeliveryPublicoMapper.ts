@@ -90,7 +90,9 @@ function normalizeEnderecoRecord(
     cep: asStr(pickField(e, ['cep', 'CEP'])) || null,
     complemento: asStr(pickField(e, ['complemento'])) || null,
     ultimaUtilizacaoEm:
-      e.ultimaUtilizacaoEm != null ? asStr(e.ultimaUtilizacaoEm) || null : null,
+      asStr(
+        pickField(e, ['ultimaUtilizacaoEm', 'ultima_utilizacao_em', 'ultimaUtilizacao'])
+      ) || null,
     enderecoLocalizacao: parseGeoJsonPoint(e.enderecoLocalizacao),
     preferenciaEntrega: parseGeoJsonPoint(e.preferenciaEntrega),
     geocodingProvider: asStr(pickField(e, ['geocodingProvider', 'geocoding_provider'])) || null,
