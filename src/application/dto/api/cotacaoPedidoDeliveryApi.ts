@@ -18,16 +18,15 @@ export type CotacaoPedidoDeliveryCliente = {
   enderecoIdEntrega?: string
 }
 
-/** Body do BFF Gestor: sem slug e sem origem. O servidor injeta o slug da empresa autenticada. */
+/** Body do BFF Gestor: sem slug e sem origem. O backend resolve `empresaId` pelo JWT. */
 export type CotacaoPedidoDeliveryBffRequest = {
   tipoEntrega: CotacaoPedidoDeliveryTipoEntrega
   cliente: CotacaoPedidoDeliveryCliente
   produtos: CotacaoPedidoDeliveryProdutoItem[]
 }
 
-export type CotacaoPedidoDeliveryBackendRequest = CotacaoPedidoDeliveryBffRequest & {
-  slug: string
-}
+/** Mesmo contrato do BFF: JWT no header, sem slug. */
+export type CotacaoPedidoDeliveryBackendRequest = CotacaoPedidoDeliveryBffRequest
 
 export type ResultadoCotacaoTaxaMorada =
   | { status: 'ok'; valorTaxa: number }

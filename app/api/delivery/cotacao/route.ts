@@ -5,8 +5,8 @@ import type { CotacaoPedidoDeliveryBffRequest } from '@/src/application/dto/api/
 
 /**
  * POST /api/delivery/cotacao
- * Gestor autenticado. Injeta o slug da empresa e chama a cotação pública
- * (`POST /api/v1/delivery/cotacao`) sem `origem`.
+ * Gestor autenticado. Encaminha o JWT para `POST /api/v1/delivery/cotacao`.
+ * Com autenticação o backend resolve `empresaId` pelo token — sem slug e sem `origem`.
  */
 export async function POST(request: NextRequest) {
   try {

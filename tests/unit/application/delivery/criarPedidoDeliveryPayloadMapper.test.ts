@@ -61,13 +61,41 @@ describe('CriarPedidoDeliveryPayloadMapper', () => {
 
   it('não confirma cobrança na entrega quando entregador vai cobrar', () => {
     const payload = buildCriarPedidoDeliveryPayload(
-      baseInput({ entregaComCobrancaPeloEntregador: true })
+      baseInput({
+        entregaComCobrancaPeloEntregador: true,
+        pagamentos: [{ meioPagamentoId: 'mp-1', valor: 24, cobrarNaEntrega: true, naoEfetivo: true }],
+      })
     )
 
     expect(payload.cobrancas).toEqual([
       {
         meioPagamentoId: 'mp-1',
         valor: 24,
+        momentoCobranca: 'na_entrega',
+      },
+    ])
+  })
+
+  it('permite parte já paga e parte na entrega no mesmo pedido', () => {
+    const payload = buildCriarPedidoDeliveryPayload(
+      baseInput({
+        pagamentos: [
+          { meioPagamentoId: 'mp-pix', valor: 30 },
+          { meioPagamentoId: 'mp-dinheiro', valor: 46, cobrarNaEntrega: true, naoEfetivo: true },
+        ],
+      })
+    )
+
+    expect(payload.cobrancas).toEqual([
+      {
+        meioPagamentoId: 'mp-pix',
+        valor: 30,
+        momentoCobranca: 'antecipado',
+        pagamentoEfetivado: { confirmar: true },
+      },
+      {
+        meioPagamentoId: 'mp-dinheiro',
+        valor: 46,
         momentoCobranca: 'na_entrega',
       },
     ])
@@ -81,7 +109,7 @@ describe('CriarPedidoDeliveryPayloadMapper', () => {
         taxaEntregaCoberturaValor: 8,
         valorTaxaEntrega: 8,
         totalProdutos: 29,
-        pagamentos: [{ meioPagamentoId: 'mp-1', valor: 29 }],
+        pagamentos: [{ meioPagamentoId: 'mp-1', valor: 29, cobrarNaEntrega: true, naoEfetivo: true }],
         totalPagamentos: 29,
         totalPagamentosLancados: 29,
       })

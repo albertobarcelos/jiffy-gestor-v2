@@ -43,15 +43,13 @@ export function chaveItensCotacaoDelivery(produtos: CotacaoPedidoDeliveryProduto
   )
 }
 
-export function montarCotacaoPedidoDeliveryBackend(args: {
-  slug: string
+export function montarCotacaoPedidoDeliveryBackend(
   body: CotacaoPedidoDeliveryBffRequest
-}): CotacaoPedidoDeliveryBackendRequest {
+): CotacaoPedidoDeliveryBackendRequest {
   return {
-    slug: args.slug.trim(),
-    tipoEntrega: args.body.tipoEntrega,
-    cliente: args.body.cliente,
-    produtos: args.body.produtos,
+    tipoEntrega: body.tipoEntrega,
+    cliente: body.cliente,
+    produtos: body.produtos,
   }
 }
 

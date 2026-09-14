@@ -76,7 +76,7 @@ export function estiloCardMeioPagamento(formaFiscal: string): {
   }
 }
 
-/** Variáveis CSS para o chip lançado: mesma cor, mais clara; hover volta à cor cheia. */
+/** Variáveis CSS para o chip lançado: cor cheia da forma. */
 export function varsCardMeioPagamentoLancado(formaFiscal: string): Record<string, string> {
   const cor = corFormaPagamentoFiscal(formaFiscal)
   return {

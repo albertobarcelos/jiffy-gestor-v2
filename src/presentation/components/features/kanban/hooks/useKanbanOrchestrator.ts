@@ -258,6 +258,7 @@ export function useKanbanOrchestrator() {
     handleContinuarCbenefKanban,
     handleConfigurarCbenefKanban,
     handleCancelarCbenefKanban,
+    liberarEmissaoPreparando,
   } =
     useFiscalEmissaoKanban({
       reemitirNfePdv: payload => reemitirNfePdv.mutateAsync(payload),
@@ -493,6 +494,7 @@ export function useKanbanOrchestrator() {
     vendaSelecionadaParaEmissao: modais.vendaSelecionadaParaEmissao,
     emitirNfeModalOpen: modais.emitirNfeModalOpen,
     onCloseEmitirNfe: () => {
+      liberarEmissaoPreparando()
       modais.setEmitirNfeModalOpen(false)
       modais.setSelectedVendaId(null)
       modais.setVendaSelecionadaParaEmissao(null)

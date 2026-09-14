@@ -254,6 +254,7 @@ export function KanbanVendaCardActions(props: KanbanVendaCardActionsProps) {
               startIcon={!avancandoEtapaIds[venda.id] ? <MdArrowForward size={14} /> : undefined}
               onClick={() => onAvancarEtapa(venda, colunaAtual)}
               disabled={!!avancandoEtapaIds[venda.id]}
+              loading={!!avancandoEtapaIds[venda.id]}
             >
               {avancandoEtapaIds[venda.id] ? rotuloAvancar.loading : rotuloAvancar.label}
             </KanbanCardAcaoButton>

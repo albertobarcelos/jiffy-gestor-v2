@@ -34,23 +34,19 @@ export class CotarPedidoDeliveryUseCase {
       return { status: 'erro', message: 'Selecione o endereço de entrega para cotar a taxa.' }
     }
 
-    const slug = await this.repo.buscarSlugEmpresaDelivery(token)
     const payload = montarCotacaoPedidoDeliveryBackend({
-      slug,
-      body: {
-        tipoEntrega: input.tipoEntrega,
-        cliente: {
-          telefone,
-          ...(input.cliente.enderecoIdEntrega?.trim()
-            ? { enderecoIdEntrega: input.cliente.enderecoIdEntrega.trim() }
-            : {}),
-        },
-        produtos: input.produtos,
+      tipoEntrega: input.tipoEntrega,
+      cliente: {
+        telefone,
+        ...(input.cliente.enderecoIdEntrega?.trim()
+          ? { enderecoIdEntrega: input.cliente.enderecoIdEntrega.trim() }
+          : {}),
       },
+      produtos: input.produtos,
     })
 
     try {
-      const raw = await this.repo.cotarPublico(payload)
+      const raw = await this.repo.cotar(payload, token)
       return parseResultadoCotacaoTaxaMorada(raw)
     } catch (error) {
       if (error instanceof ApiError) {
