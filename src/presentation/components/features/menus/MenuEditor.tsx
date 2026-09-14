@@ -30,9 +30,8 @@ import {
   useEscolherTipoProdutoCadastro,
 } from '@/src/presentation/components/features/produtos/EscolherTipoProdutoModal'
 import { CatalogGroupedList } from '@/src/presentation/components/features/catalogo/CatalogGroupedList'
-import { CatalogProductRow } from '@/src/presentation/components/features/catalogo/CatalogProductRow'
 import type { CatalogGroup } from '@/src/presentation/components/features/catalogo/types'
-import { MenuProdutoRowQuickActions } from './MenuProdutoRowQuickActions'
+import { MenuProdutoCatalogRow } from './MenuProdutoCatalogRow'
 import { MENU_MODAL_CANCEL_VARIANT } from './menuPanelConstants'
 import { coletarGruposMenuPorSnapshot, ordemSnapshotCategoria } from './ordenarGruposMenuSnapshot'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
@@ -43,6 +42,7 @@ import { atualizarGrupoProdutoViaBffUseCase } from '@/src/application/use-cases/
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import { resolverCodigoMenuProduto } from '@/src/shared/utils/catalogoProdutoIndex'
 import type { MenuGrupoProduto, MenuProduto } from '@/src/shared/types/menus'
 
 interface MenuEditorProps {
@@ -62,20 +62,12 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   const {
     data: gruposData,
     isLoading: loadingGrupos,
-    fetchNextPage: fetchNextGrupos,
-    hasNextPage: hasNextGrupos,
-    isFetching: isFetchingGrupos,
-    isFetchingNextPage: isFetchingNextGrupos,
   } = useMenuGruposProdutos({
     menuId,
   })
   const {
     data: produtosData,
     isLoading: loadingProdutos,
-    fetchNextPage: fetchNextProdutos,
-    hasNextPage: hasNextProdutos,
-    isFetching: isFetchingProdutos,
-    isFetchingNextPage: isFetchingNextProdutos,
   } = useMenuProdutos({
     menuId,
     q: query.q,
@@ -92,10 +84,6 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   const tipoCadastro = useEscolherTipoProdutoCadastro()
   const {
     data: produtosTodosData,
-    fetchNextPage: fetchNextTodos,
-    hasNextPage: hasNextTodos,
-    isFetching: isFetchingTodos,
-    isFetchingNextPage: isFetchingNextTodos,
   } = useMenuProdutos({
     menuId,
     ativo: null,
@@ -105,37 +93,6 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   const { data: gruposComplementos = [], isLoading: isLoadingGruposComplementos } =
     useGruposComplementos({ limit: 100, ativo: null })
   const invalidate = useInvalidateTenantQueries()
-
-  useEffect(() => {
-    if (hasNextProdutos && !isFetchingNextProdutos && !isFetchingProdutos && produtosData) {
-      void fetchNextProdutos()
-    }
-  }, [
-    hasNextProdutos,
-    isFetchingNextProdutos,
-    isFetchingProdutos,
-    fetchNextProdutos,
-    produtosData,
-  ])
-
-  useEffect(() => {
-    if (hasNextGrupos && !isFetchingNextGrupos && !isFetchingGrupos && gruposData) {
-      void fetchNextGrupos()
-    }
-  }, [hasNextGrupos, isFetchingNextGrupos, isFetchingGrupos, fetchNextGrupos, gruposData])
-
-  useEffect(() => {
-    if (addOpen && hasNextTodos && !isFetchingNextTodos && !isFetchingTodos && produtosTodosData) {
-      void fetchNextTodos()
-    }
-  }, [
-    addOpen,
-    hasNextTodos,
-    isFetchingNextTodos,
-    isFetchingTodos,
-    fetchNextTodos,
-    produtosTodosData,
-  ])
 
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
   const [tabsState, setTabsState] = useState<MenuProdutoTabsModalState>({
@@ -405,30 +362,20 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     (produto: MenuProduto) => {
       const saving = savingDaLinha(produto.produtoId)
       return (
-        <CatalogProductRow
-          variant="menu"
-          id={produto.produtoId}
-          nome={produto.nome}
-          valor={Number(produto.valor)}
-          ativo={produto.ativo}
-          imagemUrl={produto.image?.imageUrl}
-          codigo={codigoPorId.get(produto.produtoId)}
-          isSavingValor={saving.valor}
-          isSavingStatus={saving.status}
-          isSavingNome={saving.nome}
+        <MenuProdutoCatalogRow
+          produto={produto}
+          codigo={resolverCodigoMenuProduto(
+            produto,
+            codigoPorId.get(produto.produtoId)
+          )}
+          permissoesCadastro={permissoesPorId.get(produto.produtoId)}
+          saving={saving}
           onNomeChange={handleNomeChange}
           onValorChange={handleValorChange}
           onSwitchToggle={handleStatusToggle}
           onEdit={handleEditProduto}
-          actionsSlot={
-            <MenuProdutoRowQuickActions
-              produto={produto}
-              disabled={saving.acoes}
-              permissoesCadastro={permissoesPorId.get(produto.produtoId)}
-              onPatch={handleQuickPatch}
-              onTogglePermissao={handleTogglePermissao}
-            />
-          }
+          onPatch={handleQuickPatch}
+          onTogglePermissao={handleTogglePermissao}
         />
       )
     },
@@ -541,8 +488,10 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         onClearFilters={actions.reset}
       />
 
-      <div className="mt-2 min-h-0 flex-1 overflow-y-auto px-1 scrollbar-hide">
+      <div className="mt-2 min-h-0 flex-1 px-1">
         <CatalogGroupedList
+          virtualize
+          className="scrollbar-hide"
           groups={catalogGroupsVisiveis}
           getItemKey={item => item.produtoId}
           renderItem={renderItem}

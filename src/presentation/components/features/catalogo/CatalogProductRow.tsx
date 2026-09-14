@@ -213,6 +213,8 @@ function CatalogProductRowInner({
             <img
               src={imagemPreview}
               alt=""
+              loading="lazy"
+              decoding="async"
               className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
             />
             <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
