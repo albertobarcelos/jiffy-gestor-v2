@@ -53,6 +53,7 @@ import { useNovoPedidoGestorActions } from './orchestrator/useNovoPedidoGestorAc
 import { useNovoPedidoOrchestratorEffects } from './orchestrator/useNovoPedidoOrchestratorEffects'
 import { createNovoPedidoResetForm } from './orchestrator/createNovoPedidoResetForm'
 import { assembleNovoPedidoContextSlices } from './orchestrator/assembleNovoPedidoContextSlices'
+import { usarTrocoLancamentoPedido } from '@/src/domain/services/pedido/CalculadoraPagamentoPedido'
 import { canSubmitNovoPedido } from './orchestrator/canSubmitNovoPedido'
 import { useNovoPedidoOrchestratorFlags } from './orchestrator/useNovoPedidoOrchestratorFlags'
 import { useCotacaoTaxaPorMoradas } from '@/src/presentation/hooks/useCotacaoTaxaPorMoradas'
@@ -123,6 +124,8 @@ export function useNovoPedidoOrchestrator({
     setProdutos,
     observacaoPedido,
     setObservacaoPedido,
+    observacaoNota,
+    setObservacaoNota,
     catalogoProdutosPorId,
     setCatalogoProdutosPorId,
     pagamentos,
@@ -656,6 +659,13 @@ export function useNovoPedidoOrchestrator({
     meiosPagamento,
   })
 
+  const trocoValidacao = usarTrocoLancamentoPedido(
+    pagamentos,
+    entregaComCobrancaPeloEntregador
+  )
+    ? trocoLancamento
+    : troco
+
   const {
     obterIconeMeioPagamento,
     formatarValorRecebido,
@@ -670,9 +680,6 @@ export function useNovoPedidoOrchestrator({
     valorRecebido,
     setValorRecebido,
     meiosPagamento,
-    pagamentoModoCobranca,
-    valorAPagar,
-    valorAPagarLancamento,
     totalProdutos,
     totalPagamentos,
     entregaComCobrancaPeloEntregador,
@@ -781,7 +788,7 @@ export function useNovoPedidoOrchestrator({
       ),
       enderecoEntregaCoberturaStatus,
       taxaEntregaOverride: modoTaxaEntrega,
-      troco,
+      troco: trocoValidacao,
     },
     createVendaGestor,
     createPedidoDelivery,
@@ -790,6 +797,7 @@ export function useNovoPedidoOrchestrator({
     setInternalDialogOpen,
     setCurrentStep,
     setVendaIdCriada,
+    observacaoNota,
     status,
     tipoInicioPedido,
     processarAposTransicaoVendaGestorId,
@@ -913,7 +921,7 @@ export function useNovoPedidoOrchestrator({
       pagamentos,
       totalProdutos,
       totalPagamentos,
-      troco,
+      troco: trocoValidacao,
       pedidoGestorComPagamentoNoPasso3,
       pedidoComRetirada,
       status,
@@ -1022,6 +1030,8 @@ export function useNovoPedidoOrchestrator({
     obterTotalComplemento,
     observacaoPedido,
     setObservacaoPedido,
+    observacaoNota,
+    setObservacaoNota,
     origem,
     statusFiscalDetalhe,
     pagamentoModoCobranca,

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   COLUNAS_ENTREGA_OPERACIONAIS,
   dataOrdenacaoCardKanban,
+  isPedidoTipoDeliveryKanban,
   normalizarTermoBuscaKanban,
   ordenarVendasKanbanPorCriterio,
   vendaAtendeBuscaKanban,
@@ -212,6 +213,7 @@ export function useKanbanVendasPorColuna({
       // Paliativo: a API pode devolver a mesma venda em mais de uma coluna.
       // Reclassifica no client com getEtapaKanban (prefere etapaKanbanBalcao).
       let vendas = items.filter(v => {
+        if (isPedidoTipoDeliveryKanban(v)) return false
         const etapaLocal = etapaLocalPorVendaId[v.id]
         if (etapaLocal && etapaLocal !== columnId) {
           return false
@@ -223,6 +225,7 @@ export function useKanbanVendasPorColuna({
       })
 
       for (const venda of todasVendasCarregadas) {
+        if (isPedidoTipoDeliveryKanban(venda)) continue
         if (vendas.some(v => v.id === venda.id)) continue
         const etapaLocal = etapaLocalPorVendaId[venda.id]
         if (etapaLocal && etapaLocal !== columnId) continue
@@ -235,7 +238,7 @@ export function useKanbanVendasPorColuna({
         if (colunaDestino !== columnId) continue
         if (vendas.some(v => v.id === vendaId)) continue
         const vendaTransicao = todasVendasCarregadas.find(v => v.id === vendaId)
-        if (vendaTransicao) {
+        if (vendaTransicao && !isPedidoTipoDeliveryKanban(vendaTransicao)) {
           const patch =
             colunaDestino === 'PENDENTE_EMISSAO'
               ? { etapaKanbanBalcao: 'PENDENTE_EMISSAO' as const, solicitarEmissaoFiscal: true }

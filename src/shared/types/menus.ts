@@ -69,6 +69,13 @@ export interface MenuProduto {
   gruposComplementos: MenuProdutoComplementoResumo[]
   dataCriacao: string
   dataAtualizacao: string
+  /**
+   * Código do cadastro base quando o snapshot do menu já incluir.
+   * Preferido sobre o índice `/catalogo-index` na lista do cardápio.
+   */
+  codigoProduto?: string
+  /** Alias legado se a API mandar `codigo` em vez de `codigoProduto`. */
+  codigo?: string
   /** Futuro: permissões do PDV neste menu. Se ausente, o front usa o cadastro. */
   permiteAcrescimo?: boolean
   permiteDesconto?: boolean

@@ -5,6 +5,7 @@ import {
   colunaKanbanDeStatusEtapa,
   colunaKanbanDeTimestampsEntrega,
   resolverColunaDetalhePedido,
+  deveUsarVisaoUnicaDetalhePedido,
   rotuloEtapaDetalhePedido,
   rotuloTipoAtendimento,
 } from '@/src/presentation/components/features/pedidos/utils/detalheVisaoUnica'
@@ -122,5 +123,17 @@ describe('rotuloTipoAtendimento', () => {
     expect(rotuloTipoAtendimento('entrega')).toBe('Entrega')
     expect(rotuloTipoAtendimento('retirada')).toBe('Retirada')
     expect(rotuloTipoAtendimento('balcao')).toBe('Balcão')
+  })
+})
+
+describe('deveUsarVisaoUnicaDetalhePedido', () => {
+  it('usa o resumo de delivery só em entrega/retirada', () => {
+    expect(deveUsarVisaoUnicaDetalhePedido({ tipoInicioPedido: 'entrega' })).toBe(true)
+    expect(deveUsarVisaoUnicaDetalhePedido({ tipoInicioPedido: 'balcao' })).toBe(false)
+    expect(
+      deveUsarVisaoUnicaDetalhePedido({ tipoInicioPedido: 'balcao', tipoVenda: 'entrega' })
+    ).toBe(false)
+    expect(deveUsarVisaoUnicaDetalhePedido({ tipoVenda: 'retirada' })).toBe(true)
+    expect(deveUsarVisaoUnicaDetalhePedido({ tipoVenda: 'balcao' })).toBe(false)
   })
 })

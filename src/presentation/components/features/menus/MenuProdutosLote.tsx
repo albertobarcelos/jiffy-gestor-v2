@@ -114,9 +114,7 @@ export function MenuProdutosLote({ menuId }: MenuProdutosLoteProps) {
   const {
     data: produtosData,
     isLoading,
-    isFetchingNextPage,
-    hasNextPage,
-    fetchNextPage,
+    isFetching,
   } = useMenuProdutos({
     menuId,
     q: debouncedSearch,
@@ -127,14 +125,7 @@ export function MenuProdutosLote({ menuId }: MenuProdutosLoteProps) {
 
   const {
     data: gruposData,
-    fetchNextPage: fetchNextGrupos,
-    hasNextPage: hasNextGrupos,
-    isFetchingNextPage: isFetchingNextGrupos,
   } = useMenuGruposProdutos({ menuId })
-
-  useEffect(() => {
-    if (hasNextGrupos && !isFetchingNextGrupos) void fetchNextGrupos()
-  }, [hasNextGrupos, isFetchingNextGrupos, fetchNextGrupos])
 
   const gruposDoMenu = useMemo(
     () => coletarGruposMenuPorSnapshot(gruposData?.pages),
@@ -166,10 +157,6 @@ export function MenuProdutosLote({ menuId }: MenuProdutosLoteProps) {
   }, [produtosData, gruposDoMenu])
 
   const totalApi = produtosData?.pages?.[0]?.count ?? 0
-
-  useEffect(() => {
-    if (hasNextPage && !isFetchingNextPage) void fetchNextPage()
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage, produtos.length])
 
   const todosSelecionados =
     produtos.length > 0 && produtos.every(p => selecionados.has(p.produtoId))
@@ -946,7 +933,7 @@ export function MenuProdutosLote({ menuId }: MenuProdutosLoteProps) {
                 )
               })}
             </div>
-            {isFetchingNextPage ? (
+            {isFetching && !isLoading ? (
               <div className="flex justify-center py-4">
                 <JiffyLoading />
               </div>

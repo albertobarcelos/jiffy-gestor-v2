@@ -1,8 +1,8 @@
 'use client'
 
-import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { DinamicIcon } from '@/src/shared/utils/iconRenderer'
 import { useNovoPedidoFormContext } from '../context/NovoPedidoFormContext'
+import { PedidoCatalogoGruposSkeleton } from './catalogo/PedidoCatalogoGruposSkeleton'
 
 export function PedidoProdutosCategoriasColuna() {
   const {
@@ -35,9 +35,7 @@ export function PedidoProdutosCategoriasColuna() {
         {menuCatalogoIndisponivel ? (
           <p className="px-1 py-4 text-center text-[10px] text-gray-500">{mensagemMenuIndisponivel}</p>
         ) : isLoadingGruposVenda ? (
-          <div className="flex justify-center py-4">
-            <JiffyLoading />
-          </div>
+          <PedidoCatalogoGruposSkeleton />
         ) : grupos.length === 0 ? (
           <p className="px-1 py-4 text-center text-[10px] text-gray-500">Nenhum grupo</p>
         ) : (

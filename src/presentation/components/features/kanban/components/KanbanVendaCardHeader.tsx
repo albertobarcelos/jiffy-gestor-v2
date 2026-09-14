@@ -97,13 +97,16 @@ function ClienteValorBlock({
 }
 
 function RotuloCobrancaKanban({ rotulo }: { rotulo: string }) {
-  const pendente = rotulo !== 'Já foi pago'
-  if (!pendente) {
-    return <p className="text-xs font-medium text-emerald-700">{rotulo}</p>
-  }
+  const jaPago = rotulo === 'Já foi pago'
 
   return (
-    <p className="mt-0.5 inline-flex rounded-md bg-amber-100 px-1.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-amber-950">
+    <p
+      className={
+        jaPago
+          ? 'mt-0.5 inline-flex rounded-md bg-emerald-100 px-1.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-emerald-950'
+          : 'mt-0.5 inline-flex rounded-md bg-amber-100 px-1.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-amber-950'
+      }
+    >
       {rotulo}
     </p>
   )

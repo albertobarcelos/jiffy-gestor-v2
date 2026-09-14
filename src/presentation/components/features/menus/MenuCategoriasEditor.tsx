@@ -71,49 +71,17 @@ export function MenuCategoriasEditor({ menuId }: MenuCategoriasEditorProps) {
   const {
     data: gruposData,
     isLoading: loadingGrupos,
-    fetchNextPage: fetchNextGrupos,
-    hasNextPage: hasNextGrupos,
-    isFetching: isFetchingGrupos,
-    isFetchingNextPage: isFetchingNextGrupos,
   } = useMenuGruposProdutos({
     menuId,
   })
 
   const {
     data: produtosData,
-    fetchNextPage: fetchNextProdutos,
-    hasNextPage: hasNextProdutos,
-    isFetching: isFetchingProdutos,
-    isFetchingNextPage: isFetchingNextProdutos,
   } = useMenuProdutos({
     menuId,
     tipo: 'all',
     ativo: null,
   })
-
-  useEffect(() => {
-    if (hasNextGrupos && !isFetchingNextGrupos && !isFetchingGrupos && gruposData) {
-      void fetchNextGrupos()
-    }
-  }, [
-    hasNextGrupos,
-    isFetchingNextGrupos,
-    isFetchingGrupos,
-    fetchNextGrupos,
-    gruposData,
-  ])
-
-  useEffect(() => {
-    if (hasNextProdutos && !isFetchingNextProdutos && !isFetchingProdutos && produtosData) {
-      void fetchNextProdutos()
-    }
-  }, [
-    hasNextProdutos,
-    isFetchingNextProdutos,
-    isFetchingProdutos,
-    fetchNextProdutos,
-    produtosData,
-  ])
 
   const gruposTodos = useMemo(
     () => coletarGruposMenuPorSnapshot(gruposData?.pages),

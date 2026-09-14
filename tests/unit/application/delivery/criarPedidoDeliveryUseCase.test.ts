@@ -132,7 +132,7 @@ describe('CriarPedidoDeliveryUseCase', () => {
         pedidoComEntrega: true,
         taxaEntregaId: TAXA_ENTREGA_SEM_TAXA_ID,
         entregaComCobrancaPeloEntregador: true,
-        pagamentos: [{ meioPagamentoId: 'mp-1', valor: 40 }],
+        pagamentos: [{ meioPagamentoId: 'mp-1', valor: 40, cobrarNaEntrega: true, naoEfetivo: true }],
       }),
       mutate,
       'token-test'
@@ -167,7 +167,7 @@ describe('CriarPedidoDeliveryUseCase', () => {
         taxaEntregaId: 'taxa-catalogo-1',
         valorTaxaEntrega: 15,
         entregaComCobrancaPeloEntregador: true,
-        pagamentos: [{ meioPagamentoId: 'mp-1', valor: 39 }],
+        pagamentos: [{ meioPagamentoId: 'mp-1', valor: 39, cobrarNaEntrega: true, naoEfetivo: true }],
       }),
       mutate,
       'token-test'

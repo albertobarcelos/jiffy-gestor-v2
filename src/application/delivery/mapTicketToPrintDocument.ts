@@ -13,6 +13,11 @@ import type {
   PrintSize,
 } from '@/src/infrastructure/printing/agent/printJobTypes'
 import {
+  avisoCobrancaEntregadorCupom,
+  deveCobrarNaEntregaCupom,
+  linhasResumoPagamentoCupom,
+} from '@/src/application/delivery/textoPagamentoCupomDelivery'
+import {
   columnsFromCupomTemplate,
   cupomPrintFontes,
   cupomPrintNegrito,
@@ -222,41 +227,29 @@ function mapWhatsappQr(telefone: string, larguraMm: number): PrintContentBlock[]
 
 function mapPagamento(root: VendaGestorTicketsResponse, size: PrintSize, bold: boolean): PrintContentBlock[] {
   const p = root.pagamento
-  const total = numeroFinito(root.resumoPedido?.valorTotal) ?? numeroFinito(root.valorFinal) ?? 0
-  const status = String(p?.status || '').toLowerCase()
-  const faltante = numeroFinito(p?.valorFaltante) ?? (status === 'pago' ? 0 : total)
-  const recebido = numeroFinito(p?.valorRecebido) ?? 0
-  const receber = numeroFinito(p?.valorCobrarNaEntrega) ?? 0
-  const meio = p?.meioPagamento || p?.formaPagamento || p?.meios?.[0]?.nome || p?.meios?.[0]?.tipo || ''
   const trocoCalculado = numeroFinito(p?.trocoParaLevar) ?? 0
-  const deveCobrar = p?.cobrarCliente === true || status === 'pendente' || (!status && receber > 0)
+  const aviso = avisoCobrancaEntregadorCupom(p, fmtBrl)
   const blocks: PrintContentBlock[] = [{ type: 'divider', style: 'double' }]
 
-  if (deveCobrar) {
-    pushText(blocks, 'COBRAR DO CLIENTE', { align: 'center', bold, size })
-    blocks.push({ type: 'row', left: 'Cobrar na entrega', right: fmtBrl(receber), size })
-    if (meio.trim()) pushText(blocks, `Pag.: ${meio.trim()}`, { align: 'center', size })
-    if (trocoCalculado > 0) blocks.push({ type: 'row', left: 'Levar troco', right: fmtBrl(trocoCalculado), size })
+  if (aviso) {
+    for (const linha of aviso.linhas) {
+      pushText(blocks, `${linha.left}: ${linha.right}`, { align: 'center', bold: true, size })
+    }
+    if (trocoCalculado != null && trocoCalculado > 0) {
+      blocks.push({ type: 'row', left: 'Levar troco', right: fmtBrl(trocoCalculado), size })
+    }
+    return blocks
+  }
+
+  if (deveCobrarNaEntregaCupom(p)) {
+    pushText(blocks, 'COBRAR NA ENTREGA', { align: 'center', bold: true, size })
     return blocks
   }
 
   pushText(blocks, 'PEDIDO PAGO', { align: 'center', bold, size })
-  if (p?.meios?.length) {
-    for (const m of p.meios) {
-      const nome = m.nome || m.tipo || 'PAGO'
-      const valor = numeroFinito(m.valor) ?? recebido ?? total
-      blocks.push({ type: 'row', left: nome.toUpperCase(), right: fmtBrl(valor), size })
-    }
-  } else {
-    blocks.push({
-      type: 'row',
-      left: (meio || 'PAGO').toUpperCase(),
-      right: fmtBrl(recebido || total - faltante),
-      size,
-    })
+  if (trocoCalculado != null && trocoCalculado > 0) {
+    blocks.push({ type: 'row', left: 'Levar troco', right: fmtBrl(trocoCalculado), size })
   }
-  if (faltante > 0) blocks.push({ type: 'row', left: 'FALTA', right: fmtBrl(Math.max(0, faltante)), bold, size })
-  if (trocoCalculado > 0) blocks.push({ type: 'row', left: 'Levar troco', right: fmtBrl(trocoCalculado), size })
   return blocks
 }
 
@@ -284,6 +277,13 @@ function mapResumo(
     { type: 'row', left: 'Adicionais', right: fmtBrl(resumo.valorAdicionais), bold, size },
     { type: 'row', left: 'Taxa de Entrega', right: fmtBrl(resumo.taxaEntrega), bold, size },
     { type: 'row', left: 'Total do Pedido', right: fmtBrl(resumo.valorTotal), bold, size },
+    ...linhasResumoPagamentoCupom(root.pagamento, fmtBrl).map(linha => ({
+      type: 'row' as const,
+      left: linha.left,
+      right: linha.right,
+      bold,
+      size,
+    })),
   ]
 }
 

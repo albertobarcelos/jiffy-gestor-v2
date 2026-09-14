@@ -7,6 +7,7 @@ import {
   extrairTaxaEntregaIdDaVenda,
   taxaLancadaPedidoEstaAtiva,
 } from '@/src/application/mappers/VendaDetalheMapper'
+import { cobrancaPedidoFromPagamento } from '@/src/application/mappers/CobrancaPedidoDeliveryPayloadMapper'
 import { pagamentoEstaCancelado } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
 import type { FluxoPagamentoEntrega } from '@/src/domain/types/vendaDetalhe'
@@ -192,23 +193,10 @@ export function buildFinalizarCreateOverrideTaxaPatch(
     patch.taxas = taxas
   }
 
-  const momentoCobranca =
-    args.fluxoPagamentoEntrega === 'cobrar_entregador' ? 'na_entrega' : 'antecipado'
-
   const add: CobrancaPedidoDeliveryApi[] = args.pagamentos
     .filter(p => !pagamentoEstaCancelado(p))
     .filter(p => p.valor > 0)
-    .map(p => {
-      const item: CobrancaPedidoDeliveryApi = {
-        meioPagamentoId: p.meioPagamentoId,
-        valor: p.valor,
-        momentoCobranca,
-      }
-      if (momentoCobranca === 'antecipado') {
-        item.pagamentoEfetivado = { confirmar: true }
-      }
-      return item
-    })
+    .map(cobrancaPedidoFromPagamento)
 
   if (add.length > 0) {
     patch.cobrancas = { add }

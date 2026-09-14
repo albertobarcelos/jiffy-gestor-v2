@@ -12,6 +12,11 @@ import {
   type DeliveryCupomTemplateConfig,
 } from '@/src/shared/types/deliveryCupomTemplate'
 import { renderDashSeparatorHtml, renderQrSvg } from '@/src/infrastructure/printing/receiptBitmaps'
+import {
+  avisoCobrancaEntregadorCupom,
+  deveCobrarNaEntregaCupom,
+  linhasResumoPagamentoCupom,
+} from '@/src/application/delivery/textoPagamentoCupomDelivery'
 
 export interface RenderDeliveryCupomHtmlInput {
   root: VendaGestorTicketsResponse
@@ -50,17 +55,6 @@ function escapeMultiline(s: string): string {
 
 function fmtBrl(n: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n)
-}
-
-function labelMeioPagamentoCupom(raw: string): string {
-  const t = raw.trim()
-  if (!t) return ''
-  if (/[a-záàâãéêíóôõúç]/.test(t)) return t
-  return t
-    .toLowerCase()
-    .split(/\s+/)
-    .map(word => (word ? word.charAt(0).toUpperCase() + word.slice(1) : ''))
-    .join(' ')
 }
 
 function numeroFinito(v: unknown): number | null {
@@ -414,35 +408,11 @@ function renderWhatsappQr(telefone: string): string {
 
 function renderResumoExpedicao(root: VendaGestorTicketsResponse, ticket: VendaGestorTicket): string {
   const resumo = resumoPedido(root, ticket)
-  const p = root.pagamento
-  const total = numeroFinito(root.resumoPedido?.valorTotal) ?? numeroFinito(root.valorFinal) ?? 0
-  const status = String(p?.status || '').toLowerCase()
-  const faltante = numeroFinito(p?.valorFaltante) ?? (status === 'pago' ? 0 : total)
-  const recebido = numeroFinito(p?.valorRecebido) ?? 0
-
-  let pagamentosHtml = ''
-  if (recebido > 0) {
-    const meios = p?.meios?.length
-      ? p.meios
-          .map(m => {
-            const nome = m.nome || m.tipo || 'PAGO'
-            const valor = numeroFinito(m.valor) ?? recebido
-            return renderLinhaValor(
-              `Pago em ${escapeHtml(nome.toUpperCase())}:`,
-              escapeHtml(fmtBrl(valor))
-            )
-          })
-          .join('')
-      : renderLinhaValor('Valor Pago:', escapeHtml(fmtBrl(recebido)))
-
-    pagamentosHtml = `
-    ${meios}
-    ${
-      faltante > 0
-        ? renderLinhaValor('Falta Pagar:', escapeHtml(fmtBrl(faltante)), { strong: true })
-        : ''
-    }`
-  }
+  const linhasPago = linhasResumoPagamentoCupom(root.pagamento, fmtBrl)
+    .map(linha =>
+      renderLinhaValor(`${escapeHtml(linha.left)}:`, escapeHtml(linha.right))
+    )
+    .join('')
 
   return `${htmlSeparator()}
   <div class="summary-section">
@@ -451,54 +421,44 @@ function renderResumoExpedicao(root: VendaGestorTicketsResponse, ticket: VendaGe
     ${renderLinhaValor('Adicionais:', escapeHtml(fmtBrl(resumo.valorAdicionais)))}
     ${renderLinhaValor('Taxa de Entrega:', escapeHtml(fmtBrl(resumo.taxaEntrega)))}
     ${renderLinhaValor('Total do Pedido:', escapeHtml(fmtBrl(resumo.valorTotal)), { strong: true })}
-    ${pagamentosHtml}
+    ${linhasPago}
   </div>`
 }
 
 function renderPagamento(root: VendaGestorTicketsResponse): string {
   const p = root.pagamento
-  const total = numeroFinito(root.resumoPedido?.valorTotal) ?? numeroFinito(root.valorFinal) ?? 0
-  const status = String(p?.status || '').toLowerCase()
-  const faltante = numeroFinito(p?.valorFaltante) ?? (status === 'pago' ? 0 : total)
-  const recebido = numeroFinito(p?.valorRecebido) ?? 0
-  const receber = numeroFinito(p?.valorCobrarNaEntrega) ?? 0
-  const meio = p?.meioPagamento || p?.formaPagamento || p?.meios?.[0]?.nome || p?.meios?.[0]?.tipo || ''
-  const meioLabel = meio ? labelMeioPagamentoCupom(meio) : ''
   const trocoCalculado = numeroFinito(p?.trocoParaLevar) ?? 0
   const trocoHtml =
     trocoCalculado > 0
-      ? `<div style="display: block; word-wrap: break-word; text-align: right;"><strong>Levar troco:</strong> ${fmtBrl(trocoCalculado)}</div>`
+      ? `<div class="charge-troco">Levar troco: ${fmtBrl(trocoCalculado)}</div>`
       : ''
-  const deveCobrar = p?.cobrarCliente === true || status === 'pendente' || (!status && receber > 0)
+  const aviso = avisoCobrancaEntregadorCupom(p, fmtBrl)
 
-  if (deveCobrar) {
+  if (aviso) {
+    const linhas = aviso.linhas
+      .map(
+        linha =>
+          `<div class="charge-linha"><strong>${escapeHtml(linha.left)}:</strong> ${escapeHtml(linha.right)}</div>`
+      )
+      .join('')
     return `${htmlSeparator(true)}
-    <div class="payment-section">
-      <div class="charge">COBRAR DO CLIENTE</div>
-      <div style="display: block; word-wrap: break-word; text-align: center; margin-top: 4px;">
-        <strong>Cobrar na entrega:</strong><br/>
-        ${fmtBrl(receber)}
-      </div>
-      ${meioLabel ? `<div style="display: block; word-wrap: break-word; text-align: center; margin-top: 4px;">Pag. : ${escapeHtml(meioLabel)}</div>` : ''}
+    <div class="payment-section charge-box">
+      ${linhas}
       ${trocoHtml}
     </div>`
   }
 
-  const meios = p?.meios?.length
-    ? p.meios
-        .map(m => {
-          const nome = m.nome || m.tipo || 'PAGO'
-          const valor = numeroFinito(m.valor) ?? recebido ?? total
-          return `<div><span>${escapeHtml(nome.toUpperCase())}:</span> ${fmtBrl(valor)}</div>`
-        })
-        .join('')
-    : `<div><span>${escapeHtml((meio || 'PAGO').toUpperCase())}:</span> ${fmtBrl(recebido ?? total - faltante)}</div>`
+  if (deveCobrarNaEntregaCupom(p)) {
+    return `${htmlSeparator(true)}
+    <div class="payment-section charge-box">
+      <div class="charge-linha"><strong>COBRAR NA ENTREGA</strong></div>
+      ${trocoHtml}
+    </div>`
+  }
 
   return `${htmlSeparator(true)}
   <div class="payment-section">
     <div class="paid">PEDIDO PAGO</div>
-    ${meios}
-    ${faltante > 0 ? `<div><strong>FALTA:</strong> ${fmtBrl(Math.max(0, faltante))}</div>` : ''}
     ${trocoHtml}
   </div>
   ${htmlSeparator()}`
@@ -645,6 +605,10 @@ export function renderDeliveryCupomHtml(input: RenderDeliveryCupomHtmlInput): st
   .summary-section .items-title { font-size:${fonteResumo}px; font-weight:${peso(negritoResumo)}; }
   .payment-section, .payment-section strong { font-size:${fontePagamento}px; font-weight:${peso(negritoPagamento)}; }
   .charge, .paid { text-align:center; font-weight:${negritoPagamento ? 900 : 400}; }
+  .charge-box { box-sizing:border-box; padding:4px 8px 10px; border:2px solid #000; border-radius:4px; line-height:1; text-align:center; }
+  .charge-linha { display:block; margin:0; padding:0; font-size:${fontePagamento}px; font-weight:700; line-height:1; }
+  .charge-linha strong { font-size:inherit; font-weight:800; line-height:1; }
+  .charge-troco { margin-top:4px; font-weight:700; }
   .extra-header { margin-top:${extraMt}px; font-size:${Math.max(8, fonteRodape)}px; white-space:normal; font-weight:${peso(negritoCabecalho)}; }
   .extra-footer { margin-top:${extraMt}px; font-size:${Math.max(8, fonteRodape)}px; white-space:normal; font-weight:${peso(negritoRodape)}; }
   .footer { margin-top:${footerMt}px; font-size:${fonteRodape}px; text-align:center; font-weight:${peso(negritoRodape)}; }

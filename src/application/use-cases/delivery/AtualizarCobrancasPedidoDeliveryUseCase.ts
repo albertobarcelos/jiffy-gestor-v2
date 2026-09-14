@@ -1,5 +1,6 @@
 import type { INovoPedidoReadRepository } from '@/src/domain/repositories/INovoPedidoReadRepository'
 import type { FluxoPagamentoEntrega } from '@/src/domain/types/vendaDetalhe'
+import { pagamentoPendenteNaEntrega } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
 import { novoPedidoReadRepository } from '@/src/infrastructure/api/repositories/NovoPedidoReadRepository'
 import {
@@ -37,7 +38,8 @@ export class AtualizarCobrancasPedidoDeliveryUseCase {
       patch as unknown as Record<string, unknown>
     )
 
-    if (fluxoPagamentoEntrega === 'ja_pago') {
+    const todosAntecipados = pagamentos.every(p => !pagamentoPendenteNaEntrega(p))
+    if (todosAntecipados) {
       const pedidoAposPatch = await this.repo.buscarPedidoDelivery(pedidoId, token)
       const cobrancaIdsPendentesApos = extrairIdsCobrancasPendentesPedidoDelivery(pedidoAposPatch)
       if (cobrancaIdsPendentesApos.length > 0) {

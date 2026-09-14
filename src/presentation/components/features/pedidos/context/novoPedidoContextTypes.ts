@@ -78,6 +78,8 @@ export interface NovoPedidoFormSlice {
   dataVenda: string
   observacaoPedido: string
   setObservacaoPedido: Dispatch<SetStateAction<string>>
+  observacaoNota: string
+  setObservacaoNota: Dispatch<SetStateAction<string>>
 }
 
 /** Catálogo: grupos, produtos do grupo e busca. */

@@ -1,6 +1,7 @@
 import {
   pagamentoContaComoEfetivo,
   pagamentoEstaCancelado,
+  pedidoTemCobrancaPendenteNaEntrega,
 } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
 
@@ -35,6 +36,39 @@ export function calcularValorAPagar(totalProdutos: number, totalPagamentos: numb
   return Math.max(0, totalProdutos - totalPagamentos)
 }
 
+export type ResultadoLancamentoPagamento =
+  | { ok: true; valor: number }
+  | { ok: false; message: string }
+
+/**
+ * Próximo lançamento: o saldo ignora a aba atual e desconta tudo que já foi lançado
+ * (já pago + cobrança na entrega).
+ */
+export function resolverLancamentoPagamento(args: {
+  totalPedido: number
+  pagamentosJaLancados: PagamentoSelecionado[]
+  valorDigitado: number | null
+  isDinheiro: boolean
+}): ResultadoLancamentoPagamento {
+  const saldo = calcularValorAPagar(
+    args.totalPedido,
+    totalPagamentosLancados(args.pagamentosJaLancados)
+  )
+  const valor =
+    args.valorDigitado != null && args.valorDigitado > 0 ? args.valorDigitado : saldo
+
+  if (valor <= 0) {
+    return { ok: false, message: 'Valor inválido' }
+  }
+  if (valor > saldo && (!args.isDinheiro || saldo <= 0)) {
+    return {
+      ok: false,
+      message: 'Este meio de pagamento não pode ultrapassar o valor a pagar.',
+    }
+  }
+  return { ok: true, valor }
+}
+
 export function resolverStatusPagamentoPedido(
   totalPagamentos: number,
   valorAPagar: number
@@ -48,6 +82,25 @@ export function rotuloStatusPagamento(status: StatusPagamentoPedido): string {
   if (status === 'pago') return 'Pago'
   if (status === 'parcial') return 'Parcial'
   return 'Pendente'
+}
+
+/** Status da tela: não marca Pago se ainda existe cobrança na entrega. */
+export function resolverStatusPagamentoExibicaoPedido(
+  pagamentos: PagamentoSelecionado[],
+  totalEfetivo: number,
+  valorAPagarEfetivo: number
+): StatusPagamentoPedido {
+  if (pedidoTemCobrancaPendenteNaEntrega(pagamentos)) {
+    return totalEfetivo > 0 ? 'parcial' : 'pendente'
+  }
+  return resolverStatusPagamentoPedido(totalEfetivo, valorAPagarEfetivo)
+}
+
+export function usarTrocoLancamentoPedido(
+  pagamentos: PagamentoSelecionado[],
+  entregaComCobrancaPeloEntregador: boolean
+): boolean {
+  return entregaComCobrancaPeloEntregador || pedidoTemCobrancaPendenteNaEntrega(pagamentos)
 }
 
 export function pagamentosCobremTotalPedido(
@@ -86,9 +139,10 @@ export function calcularTrocoSobreLancamentos(args: {
 
     const totalAntes = lancamentos.slice(0, i).reduce((acc, x) => acc + x.valor, 0)
     const valorFaltavaPagar = total - totalAntes
+    if (valorFaltavaPagar <= 0) continue
 
     if (p.valor > valorFaltavaPagar) {
-      return p.valor - Math.max(0, valorFaltavaPagar)
+      return p.valor - valorFaltavaPagar
     }
     return 0
   }

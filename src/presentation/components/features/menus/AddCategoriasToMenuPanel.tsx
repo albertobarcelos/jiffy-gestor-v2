@@ -50,6 +50,7 @@ export function AddCategoriasToMenuPanel({
       ativo: true as boolean,
       limit: 100,
       enabled: open,
+      prefetchRemaining: open,
     }),
     [debouncedSearch, open]
   )
@@ -58,17 +59,7 @@ export function AddCategoriasToMenuPanel({
     data,
     isLoading,
     isFetching,
-    isFetchingNextPage,
-    hasNextPage,
-    fetchNextPage,
   } = useGruposProdutosInfinite(queryParams)
-
-  useEffect(() => {
-    if (!open) return
-    if (hasNextPage && !isFetchingNextPage && !isFetching && data) {
-      void fetchNextPage()
-    }
-  }, [open, hasNextPage, isFetchingNextPage, isFetching, fetchNextPage, data])
 
   const grupos = useMemo(() => {
     if (!data?.pages) return []
@@ -266,7 +257,7 @@ export function AddCategoriasToMenuPanel({
               </label>
             )
           })}
-          {isFetchingNextPage && (
+          {isFetching && !isLoading && (
             <div className="flex justify-center py-4">
               <JiffyLoading />
             </div>

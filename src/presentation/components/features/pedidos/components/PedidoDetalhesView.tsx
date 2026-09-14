@@ -20,9 +20,11 @@ import { PedidoDetalhesProdutos } from './PedidoDetalhesProdutos'
 import { PedidoDetalhesEntrega } from './PedidoDetalhesEntrega'
 import { PedidoDetalhesObservacoesSection } from './PedidoDetalhesObservacoesSection'
 import { PedidoDetalhesVisaoUnica } from './PedidoDetalhesVisaoUnica'
+import { PedidoDetalhesResumoBalcao } from './PedidoDetalhesResumoBalcao'
 import { useNovoPedidoDetalheContext } from '../context/NovoPedidoDetalheContext'
 import { useNovoPedidoFormContext } from '../context/NovoPedidoFormContext'
 import { useNovoPedidoUIContext } from '../context/NovoPedidoUIContext'
+import { deveUsarVisaoUnicaDetalhePedido } from '../utils/detalheVisaoUnica'
 
 export function PedidoDetalhesView() {
   const {
@@ -35,7 +37,13 @@ export function PedidoDetalhesView() {
     resumoFiscal,
     statusFiscalUnificado,
     detalhesEntregaPedido,
+    detalhesPedidoMeta,
+    tipoInicioPedido,
   } = useNovoPedidoDetalheContext()
+  const usarVisaoUnicaDelivery = deveUsarVisaoUnicaDetalhePedido({
+    tipoInicioPedido,
+    tipoVenda: detalhesPedidoMeta?.tipoVenda,
+  })
   const { currentStep } = useNovoPedidoUIContext()
   const {
     adicionarPagamentoPorCard,
@@ -198,7 +206,12 @@ export function PedidoDetalhesView() {
                       />
                     )}
 
-                    {abaDetalhesPedido === 'infoPedido' && <PedidoDetalhesVisaoUnica />}
+                    {abaDetalhesPedido === 'infoPedido' &&
+                      (usarVisaoUnicaDelivery ? (
+                        <PedidoDetalhesVisaoUnica />
+                      ) : (
+                        <PedidoDetalhesResumoBalcao />
+                      ))}
 
                     {/* Lista de Produtos (Visualização) */}
                     {abaDetalhesPedido === 'listaProdutos' && (
@@ -656,7 +669,8 @@ export function PedidoDetalhesView() {
                               // cancelado abaixo está comentada e preservada para uso futuro:
                               // quando houver pagamento efetivado e depois cancelado.
                               // const emCancelado = pagamentoComDestaqueCanceladoDetalhes(pagamento)
-                              const usuarioPagamento = pagamento.realizadoPorId
+                              const usuarioPagamento =
+                                pagamento.realizadoPorId || detalhesPedidoMeta?.abertoPorId
                               const dataPagamento = pagamento.dataCriacao
 
                               return (

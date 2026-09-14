@@ -9,6 +9,7 @@ import { parsePedidoDeliveryApiResponse } from '@/src/application/mappers/Pedido
 import { atualizarCobrancasPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/AtualizarCobrancasPedidoDeliveryUseCase'
 import type { INovoPedidoReadRepository } from '@/src/domain/repositories/INovoPedidoReadRepository'
 import { novoPedidoReadRepository } from '@/src/infrastructure/api/repositories/NovoPedidoReadRepository'
+import { pagamentoPendenteNaEntrega } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import type { FluxoPagamentoEntrega } from '@/src/domain/types/vendaDetalhe'
 
 export type CriarPedidoDeliveryMutateFn = (payload: CriarPedidoDeliveryPayload) => Promise<unknown>
@@ -48,8 +49,13 @@ export class CriarPedidoDeliveryUseCase {
     token?: string
   ): Promise<unknown> {
     const { payload } = this.buildPayload(input)
-    const jaPago = !input.entregaComCobrancaPeloEntregador
-    const omitirCobrancasNoPost = deveOmitirCobrancasNoPostCreate(payload, jaPago)
+    const temCobrancaAntecipada = input.pagamentos.some(
+      p => !pagamentoPendenteNaEntrega(p)
+    )
+    const omitirCobrancasNoPost = deveOmitirCobrancasNoPostCreate(
+      payload,
+      temCobrancaAntecipada
+    )
 
     const createPayload: CriarPedidoDeliveryApiRequest = omitirCobrancasNoPost
       ? { ...payload, cobrancas: undefined }

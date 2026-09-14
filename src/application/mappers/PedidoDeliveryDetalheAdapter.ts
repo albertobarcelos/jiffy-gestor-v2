@@ -76,7 +76,10 @@ function mapCobrancaDeliveryToPagamento(raw: unknown): PagamentoApiItem | null {
         ? String(pagamentoEfetivado.realizadoPorId)
         : realizadoPorNested
           ? atorUsuarioId(realizadoPorNested)
-          : undefined,
+          : atorUsuarioId(c.criadaPor) ??
+            atorUsuarioId(c.criadoPor) ??
+            atorUsuarioId(c.lancadaPor) ??
+            atorUsuarioId(c.abertaPor),
     isTefUsed,
     isTefConfirmed,
     tefIdentifier:
@@ -234,6 +237,15 @@ export function adaptPedidoDeliveryToVendaGestorApiResponse(
       valorReceber: Number(registro.valorFinal ?? 0) || 0,
       valorRecebido: Number(registro.totalPago ?? 0) || 0,
       valorFaltante: totalFaltaPagar,
+      valorCobrarNaEntrega: cobrancas
+        .filter(c => {
+          if (!c || typeof c !== 'object') return false
+          const cob = c as Record<string, unknown>
+          const momento = String(cob.momentoCobranca ?? cob.momento_cobranca ?? '').toLowerCase()
+          const status = String(cob.status ?? '').toLowerCase()
+          return momento === 'na_entrega' && status !== 'paga' && status !== 'cancelada'
+        })
+        .reduce((soma, c) => soma + (Number((c as Record<string, unknown>).valor) || 0), 0),
     },
   }
 }

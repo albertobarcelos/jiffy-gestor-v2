@@ -106,6 +106,17 @@ export function rotuloTipoAtendimento(tipoVenda?: string | null): string {
   return tipo ? tipo : '—'
 }
 
+/** Resumo estilo delivery (trilha Preparo/Rota) só para entrega ou retirada. */
+export function deveUsarVisaoUnicaDetalhePedido(params: {
+  tipoInicioPedido?: 'balcao' | 'entrega' | null
+  tipoVenda?: string | null
+}): boolean {
+  if (params.tipoInicioPedido === 'entrega') return true
+  if (params.tipoInicioPedido === 'balcao') return false
+  const tipo = String(params.tipoVenda ?? '').trim().toLowerCase()
+  return tipo === 'entrega' || tipo === 'retirada' || tipo === 'delivery'
+}
+
 export interface HintKanbanDetalhePedido {
   statusEtapaOperacional?: string | null
   entregador?: {

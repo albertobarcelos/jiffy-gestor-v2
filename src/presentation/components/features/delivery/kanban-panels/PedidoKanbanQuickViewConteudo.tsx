@@ -141,16 +141,32 @@ export function PedidoKanbanQuickViewConteudo({
             value={formatarCelularExibicao(dados.telefoneEntregador)}
           />
         )}
-        <LinhaCompacta
-          label="Pagamento:"
-          value={rotuloPagamentoPedidoQuickView(dados.fluxoPagamentoEntrega)}
-          className="text-secondary pt-1"
-        />
-        <LinhaCompacta
-          label="Tipo Pagamento:"
-          value={dados.tipoPagamento ?? '—'}
-          className="text-secondary"
-        />
+        {dados.linhasPagamento?.length ? (
+          dados.linhasPagamento.map(linha => (
+            <LinhaCompacta
+              key={linha}
+              value={linha}
+              className={
+                linha.startsWith('Cobrar')
+                  ? 'pt-1 font-semibold text-amber-700'
+                  : 'pt-1 font-semibold text-green-700'
+              }
+            />
+          ))
+        ) : (
+          <>
+            <LinhaCompacta
+              label="Pagamento:"
+              value={rotuloPagamentoPedidoQuickView(dados.fluxoPagamentoEntrega)}
+              className="text-secondary pt-1"
+            />
+            <LinhaCompacta
+              label="Tipo Pagamento:"
+              value={dados.tipoPagamento ?? '—'}
+              className="text-secondary"
+            />
+          </>
+        )}
 
         <Separador />
 
