@@ -17,6 +17,11 @@ import { ProdutoMenusPanel, type ProdutoMenusHandle } from './ProdutoMenusPanel'
 import { MENU_WIDE_PANEL_CLASS } from '@/src/presentation/components/features/menus/menuPanelConstants'
 import { useMenus } from '@/src/presentation/hooks/menus/useMenus'
 import { cn } from '@/src/shared/utils/cn'
+import {
+  descricaoVinculoMenusCriacao,
+  garantirMenuPrincipalNosIds,
+  idsMenuPrincipalTravados,
+} from '@/src/domain/policies/produto/syncCadastroComMenuPrincipal'
 
 export type ProdutosTabsTabKey = 'produto' | 'complementos' | 'impressoras' | 'menus'
 type TabKey = ProdutosTabsTabKey
@@ -57,7 +62,7 @@ export function ProdutosTabsModal({
   const { data: menusPrincipais } = useMenus({
     tipo: 'principal',
     limit: 10,
-    enabled: state.open && state.mode === 'create',
+    enabled: state.open,
   })
   const principalMenuId = useMemo(
     () =>
@@ -128,7 +133,7 @@ export function ProdutosTabsModal({
       if (state.mode === 'create') {
         const fromCaller = state.createMenuIds ?? []
         if (fromCaller.length > 0) {
-          setDraftMenuIds(fromCaller)
+          setDraftMenuIds(garantirMenuPrincipalNosIds(fromCaller, principalMenuId))
           seededPrincipalCreateRef.current = true
         } else if (principalMenuId) {
           setDraftMenuIds([principalMenuId])
@@ -137,7 +142,12 @@ export function ProdutosTabsModal({
           setDraftMenuIds([])
         }
       } else if (state.mode === 'copy') {
-        setDraftMenuIds((state.produto?.getMenus() ?? []).map(m => m.id).filter(Boolean))
+        setDraftMenuIds(
+          garantirMenuPrincipalNosIds(
+            (state.produto?.getMenus() ?? []).map(m => m.id).filter(Boolean),
+            principalMenuId
+          )
+        )
       } else {
         setDraftMenuIds([])
       }
@@ -154,7 +164,7 @@ export function ProdutosTabsModal({
     if ((state.createMenuIds?.length ?? 0) > 0) return
     if (seededPrincipalCreateRef.current || !principalMenuId) return
     seededPrincipalCreateRef.current = true
-    setDraftMenuIds(prev => (prev.length === 0 ? [principalMenuId] : prev))
+    setDraftMenuIds(prev => garantirMenuPrincipalNosIds(prev, principalMenuId))
   }, [state.open, state.mode, state.createMenuIds, principalMenuId])
 
   // Limpa overlay de confirmação ao fechar
@@ -619,12 +629,11 @@ export function ProdutosTabsModal({
                 isEmbedded
                 initialMenusResumo={state.mode === 'edit' ? state.produto?.getMenus() : undefined}
                 initialMenuIds={isDraftProduto ? draftMenuIds : undefined}
+                lockedMenuIds={idsMenuPrincipalTravados(principalMenuId)}
                 onSelectionChange={isDraftProduto ? setDraftMenuIds : undefined}
                 onEmbedStateChange={handleEmbedMenusChange}
                 description={
-                  state.mode === 'create'
-                    ? 'O menu principal já vem marcado. Você pode desmarcá-lo e salvar só o produto base, ou incluir outros cardápios.'
-                    : undefined
+                  isDraftProduto ? descricaoVinculoMenusCriacao(false) : undefined
                 }
               />
             </div>

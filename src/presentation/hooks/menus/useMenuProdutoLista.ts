@@ -13,6 +13,7 @@ import {
   PERMISSOES_GRAVAM_NO_SNAPSHOT_MENU,
   type MenuProdutoPermissaoField,
 } from '@/src/shared/utils/menuProdutoPermissoes'
+import { podeDesvincularProdutoDoMenu } from '@/src/domain/policies/produto/syncCadastroComMenuPrincipal'
 
 export type StatusConfirmLista = { produtoId: string; ativo: boolean }
 
@@ -27,6 +28,7 @@ interface UseMenuProdutoListaParams {
   menuId: string
   produtosDoMenu: MenuProduto[]
   onProdutoRemovido?: (produtoId: string) => void
+  tipoMenu?: string | null
 }
 
 /**
@@ -37,6 +39,7 @@ export function useMenuProdutoLista({
   menuId,
   produtosDoMenu,
   onProdutoRemovido,
+  tipoMenu,
 }: UseMenuProdutoListaParams) {
   const { syncProdutos, updateProduto } = useMenuMutations(menuId)
   const { codigoPorId, permissoesPorId } = useProdutosCodigoPorId()
@@ -103,16 +106,42 @@ export function useMenuProdutoLista({
     setStatusConfirmSaving(true)
     try {
       await updateProduto.mutateAsync({ produtoId, input: { ativo } })
+      setStatusConfirm(null)
       showToast.success(
         ativo ? 'Produto disponível neste cardápio' : 'Produto pausado neste cardápio'
       )
-      setStatusConfirm(null)
+
+      const destinos = await pedirConfirmacao({
+        origem: 'menu',
+        produtoId,
+        menuIdAtual: menuId,
+        variante: 'statusAtivo',
+        novoAtivo: ativo,
+      })
+      const ehPrincipal = !podeDesvincularProdutoDoMenu(tipoMenu)
+      const aplicar =
+        destinos ??
+        (ehPrincipal ? { aplicarNoCadastroBase: true, menuIds: [] } : null)
+      if (aplicar && (aplicar.aplicarNoCadastroBase || aplicar.menuIds.length > 0)) {
+        await aplicarNosDestinos({
+          produtoId,
+          snapshot: { ativo },
+          destinos: aplicar,
+        })
+      }
     } catch (err) {
       showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar status')
     } finally {
       setStatusConfirmSaving(false)
     }
-  }, [statusConfirm, updateProduto])
+  }, [
+    statusConfirm,
+    updateProduto,
+    tipoMenu,
+    aplicarNosDestinos,
+    pedirConfirmacao,
+    menuId,
+  ])
 
   const handleTogglePermissao = useCallback(
     async (
@@ -140,6 +169,10 @@ export function useMenuProdutoLista({
 
   const handleRemove = useCallback(
     (produtoId: string) => {
+      if (!podeDesvincularProdutoDoMenu(tipoMenu)) {
+        showToast.error('O produto não pode ser removido do menu principal.')
+        return
+      }
       const produto = produtosDoMenu.find(item => item.produtoId === produtoId)
       if (!produto) return
       if (!window.confirm(`Remover "${produto.nome}" deste cardápio?`)) return
@@ -153,7 +186,7 @@ export function useMenuProdutoLista({
           showToast.error(err instanceof Error ? err.message : 'Erro ao remover')
         )
     },
-    [onProdutoRemovido, produtosDoMenu, syncProdutos]
+    [onProdutoRemovido, produtosDoMenu, syncProdutos, tipoMenu]
   )
 
   const savingDaLinha = useCallback(
