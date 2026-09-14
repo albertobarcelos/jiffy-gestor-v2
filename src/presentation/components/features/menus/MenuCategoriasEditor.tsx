@@ -226,8 +226,8 @@ export function MenuCategoriasEditor({ menuId }: MenuCategoriasEditorProps) {
       nomeMenu={menu.nome}
       aba="categorias"
       toolbar={
-        <div className="flex h-8 shrink-0 items-center gap-2">
-          <div className="w-[min(220px,22vw)] shrink-0">
+        <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="w-full min-w-0 sm:max-w-[220px] sm:flex-1 md:w-[min(220px,22vw)] md:flex-none">
             <TextField
               id="menu-categorias-search"
               size="small"
@@ -264,6 +264,7 @@ export function MenuCategoriasEditor({ menuId }: MenuCategoriasEditorProps) {
               onAdicionar={() => setAddOpen(true)}
               onReordenar={() => setReorderOpen(true)}
               adicionarLabel="Adicionar categorias"
+              className="w-full justify-start sm:w-auto sm:flex-none"
             />
           ) : null}
         </div>

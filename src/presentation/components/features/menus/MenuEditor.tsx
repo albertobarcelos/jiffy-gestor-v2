@@ -30,6 +30,7 @@ import {
   useEscolherTipoProdutoCadastro,
 } from '@/src/presentation/components/features/produtos/EscolherTipoProdutoModal'
 import { CatalogGroupedList } from '@/src/presentation/components/features/catalogo/CatalogGroupedList'
+import { CatalogProductColumnHeader } from '@/src/presentation/components/features/catalogo/CatalogProductColumnHeader'
 import type { CatalogGroup } from '@/src/presentation/components/features/catalogo/types'
 import { MenuProdutoCatalogRow } from './MenuProdutoCatalogRow'
 import { MENU_MODAL_CANCEL_VARIANT } from './menuPanelConstants'
@@ -43,6 +44,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { resolverCodigoMenuProduto } from '@/src/shared/utils/catalogoProdutoIndex'
+import { podeDesvincularProdutoDoMenu } from '@/src/domain/policies/produto/syncCadastroComMenuPrincipal'
 import type { MenuGrupoProduto, MenuProduto } from '@/src/shared/types/menus'
 
 interface MenuEditorProps {
@@ -286,6 +288,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     menuId,
     produtosDoMenu,
     onProdutoRemovido: handleProdutoRemovido,
+    tipoMenu: menu?.tipo,
   })
 
   const handleEditProduto = useCallback(
@@ -424,8 +427,8 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
       nomeMenu={menu.nome}
       aba="produtos"
       toolbar={
-        <div className="flex h-8 shrink-0 items-center gap-2">
-          <div className="w-[min(220px,22vw)] shrink-0">
+        <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="w-full min-w-0 sm:max-w-[220px] sm:flex-1 md:w-[min(220px,22vw)] md:flex-none">
             <TextField
               id="menu-produtos-search"
               size="small"
@@ -463,6 +466,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
               onAdicionar={handleAdicionarProdutosCabecalho}
               onReordenar={() => setReorderOpen(true)}
               loteHref={toGestao(`/menus/${menuId}/atualizar-lote`)}
+              className="w-full justify-start sm:w-auto sm:flex-none"
             />
           ) : null}
         </div>
@@ -488,7 +492,9 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         onClearFilters={actions.reset}
       />
 
-      <div className="mt-2 min-h-0 flex-1 px-1">
+      <div className="mt-2 flex min-h-0 flex-1 flex-col px-1">
+        <CatalogProductColumnHeader variant="menu" className="shrink-0" />
+        <div className="min-h-0 flex-1">
         <CatalogGroupedList
           virtualize
           className="scrollbar-hide"
@@ -510,6 +516,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
           onToggleGrupoStatus={handleToggleGrupoStatus}
           onAddProduto={handleAddProduto}
         />
+        </div>
       </div>
 
       <MenuProdutoTabsModal
@@ -517,7 +524,9 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         state={tabsState}
         onClose={closeTabs}
         onTabChange={tab => setTabsState(prev => ({ ...prev, tab }))}
-        onRemoverDesteCardapio={handleRemove}
+        onRemoverDesteCardapio={
+          podeDesvincularProdutoDoMenu(menu?.tipo) ? handleRemove : undefined
+        }
       />
 
       <AddProdutosToMenuPanel
