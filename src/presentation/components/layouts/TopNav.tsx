@@ -323,7 +323,7 @@ export function TopNav() {
   }, [pathname])
 
   const MobileMenuSection = (
-    <div className="fixed inset-0 z-50 sm:hidden">
+    <div className="fixed inset-0 z-50 lg:hidden">
       <div
         className="absolute inset-0 bg-black/40"
         onClick={closeMobileMenu}
@@ -438,7 +438,7 @@ export function TopNav() {
           >
             <MdApps className="w-6 h-6" />
           </button>
-          {/* Logout no mobile: ações do usuário ficam em `hidden sm:flex` na barra superior */}
+          {/* Logout no drawer: ações do usuário ficam na barra só a partir de `lg` */}
           <button
             type="button"
             onClick={() => void handleLogout()}
@@ -474,7 +474,7 @@ export function TopNav() {
         {/* Menu Items */}
         <div
           ref={menuRef}
-          className="hidden sm:flex flex-1 items-center justify-start gap-1 pl-2"
+          className="hidden min-w-0 flex-1 items-center justify-start gap-1 pl-2 lg:flex"
         >
           {menuItems
             .filter(item => item.name !== 'Configurações')
@@ -542,6 +542,8 @@ export function TopNav() {
                 href={toGestao(item.path)}
                 onMouseEnter={() => handleLinkHover(item.path)}
                 prefetch={true}
+                title={item.name}
+                aria-label={item.name}
                 className={`flex items-center gap-1.5 xl:px-4 px-1 py-2 rounded-lg text-xs lg:text-sm font-medium transition-all duration-200 ${
                   isActive
                     ? 'bg-gray-100 text-gray-900'
@@ -549,7 +551,15 @@ export function TopNav() {
                 }`}
               >
                 {renderedIcon}
-                <span className="text-xs lg:text-sm">{item.name}</span>
+                <span
+                  className={
+                    item.name === 'Portal do Contador'
+                      ? 'hidden text-xs xl:inline xl:text-sm'
+                      : 'text-xs lg:text-sm'
+                  }
+                >
+                  {item.name}
+                </span>
               </Link>
             )
           })}
@@ -560,14 +570,14 @@ export function TopNav() {
         {/* Mobile toggler */}
         <button
           type="button"
-          className="sm:hidden p-2 rounded-lg hover:bg-gray-100 text-gray-600"
+          className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 lg:hidden"
           onClick={() => setIsMobileMenuOpen(true)}
         >
           <MdMenu className="w-6 h-6" />
         </button>
 
         {/* User Actions */}
-        <div className="hidden sm:flex items-center gap-2">
+        <div className="hidden items-center gap-2 lg:flex">
           {/* Meu Jiffy */}
           <button
             type="button"
@@ -650,7 +660,7 @@ export function TopNav() {
 
           {/* Dados do usuário (perfil será acessado noutro local) */}
           <div
-            className="flex min-w-0 max-w-[min(100%,14rem)] flex-col items-end justify-center pl-3 text-right sm:max-w-[min(100%,18rem)] xl:max-w-[min(100%,22rem)] border-l border-gray-200 px-2 py-1.5"
+            className="hidden min-w-0 max-w-[min(100%,14rem)] flex-col items-end justify-center border-l border-gray-200 px-2 py-1.5 text-right xl:flex xl:max-w-[min(100%,22rem)]"
             title={
               isHydrated
                 ? `${user?.getName() || 'Usuário'}${user?.getEmail() ? ` • ${user.getEmail()}` : ''}`

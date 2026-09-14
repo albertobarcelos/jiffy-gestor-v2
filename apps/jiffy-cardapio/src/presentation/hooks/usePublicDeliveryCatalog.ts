@@ -23,6 +23,7 @@ import { create } from 'zustand'
 import {
   CATALOGO_GRUPOS_PAGE_LIMIT,
   CATALOGO_QUERY_STALE_MS,
+  getCatalogoInfiniteNextPageParam,
   publicDeliveryCatalogInfiniteQueryKey,
   publicDeliveryCatalogQueryKey,
   publicDeliveryMeiosPagamentoQueryKey,
@@ -212,10 +213,7 @@ export function usePublicDeliveryCatalogInfinite(slug: string, enabled = true) {
       return data
     },
     initialPageParam: 0,
-    getNextPageParam: (lastPage, _pages, lastPageParam) => {
-      if (!lastPage.catalogo.paginacao.hasNext) return undefined
-      return (lastPageParam as number) + lastPage.catalogo.paginacao.limit
-    },
+    getNextPageParam: getCatalogoInfiniteNextPageParam,
     enabled: enabled && !!slug,
     staleTime: CATALOGO_QUERY_STALE_MS,
     retry: catalogoRetry,

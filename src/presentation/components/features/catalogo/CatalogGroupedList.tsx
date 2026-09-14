@@ -45,8 +45,8 @@ type FlatRow<T> =
   | { kind: 'item'; group: CatalogGroup<T>; item: T; index: number }
   | { kind: 'collapsed'; group: CatalogGroup<T> }
 
-const EST_HEADER = 52
-const EST_ITEM = 76
+const EST_HEADER = 56
+const EST_ITEM = 120
 const EST_COLLAPSED = 44
 const EST_BEFORE = 40
 

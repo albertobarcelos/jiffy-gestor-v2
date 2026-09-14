@@ -40,6 +40,10 @@ import {
   snapshotPropagavelDePatch,
   type DestinoAlteracaoProduto,
 } from '@/src/shared/types/propagarAlteracaoProduto'
+import {
+  garantirMenuPrincipalNosIds,
+  syncCadastroComMenuPrincipalAtivo,
+} from '@/src/domain/policies/produto/syncCadastroComMenuPrincipal'
 
 /** Snapshot serializado por `getFormSnapshot` — deve permanecer alinhado a esse método. */
 interface BaselineSnapshotProduto {
@@ -575,11 +579,18 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       usePropagarAlteracaoProduto()
 
     const resolverDestinosPadraoImagem = useCallback(
-      async (_token: string, extras: Iterable<string> = []) => {
+      async (token: string, extras: Iterable<string> = []) => {
         if (!imagemNoCardapio) return []
+        if (syncCadastroComMenuPrincipalAtivo()) {
+          const principalId = await buscarIdMenuPrincipal(token)
+          if (idPersistidoParaSave) {
+            return unirMenuIds(principalId)
+          }
+          return unirMenuIds(principalId, extras)
+        }
         return unirMenuIds(previewMenuId, menusVinculadosIds, extras)
       },
-      [imagemNoCardapio, previewMenuId, menusVinculadosIds]
+      [imagemNoCardapio, previewMenuId, menusVinculadosIds, idPersistidoParaSave]
     )
 
     const perguntarVinculoOutrosMenusAposCriacao = useCallback(
@@ -1490,7 +1501,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
       const grupoIdFinal = opcoes?.grupoId ?? grupoProduto
       const gruposComplementosIdsFinal = opcoes?.gruposComplementosIds ?? grupoComplementosIds
       const impressorasIdsFinal = opcoes?.impressorasIds ?? impressorasIds
-      const menuIdsFinal = opcoes?.menuIds ?? menuIds
+      let menuIdsFinal = unirMenuIds(opcoes?.menuIds ?? menuIds)
 
       if (salvarSomenteDadosGerais) {
         if (!nomeProduto?.trim()) {
@@ -1614,6 +1625,10 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         }
 
         const isEditMode = Boolean(idPersistidoParaSave)
+        if (!isEditMode) {
+          const principalId = await buscarIdMenuPrincipal(token)
+          menuIdsFinal = garantirMenuPrincipalNosIds(menuIdsFinal, principalId)
+        }
 
         const body: Record<string, unknown> = {
           nome: nomeProduto,
