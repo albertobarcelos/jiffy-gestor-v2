@@ -7,6 +7,7 @@ import { fetchCatalogoPublicoUpstream } from '@/src/infrastructure/api/fetchCata
 import {
   CATALOGO_GRUPOS_PAGE_LIMIT,
   CATALOGO_QUERY_STALE_MS,
+  getCatalogoInfiniteNextPageParam,
   publicDeliveryCatalogInfiniteQueryKey,
 } from '@/src/presentation/hooks/publicDeliveryCatalogKeys'
 
@@ -36,6 +37,7 @@ export async function dehydrateCatalogoPrimeiraPagina(
           limit: CATALOGO_GRUPOS_PAGE_LIMIT,
         }),
       initialPageParam: 0,
+      getNextPageParam: getCatalogoInfiniteNextPageParam,
       pages: 1,
       staleTime: CATALOGO_QUERY_STALE_MS,
     })
