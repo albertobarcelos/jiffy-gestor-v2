@@ -9,7 +9,8 @@ import {
   formatarHoraDetalhePedido,
   formatarHoraPrevisaoEntrega,
   formatarTipoPagamentoDetalhe,
-  rotuloCobrancaEntrega,
+  montarLinhasResumoPagamentoPedido,
+  totalCobrarNaEntregaPagamentos,
   rotuloOrigemExibicao,
 } from '@/src/application/mappers/PedidoDisplayMapper'
 import { montarMensagemWhatsappClienteKanban } from '@/src/application/delivery/montarMensagemWhatsappClienteKanban'
@@ -114,6 +115,13 @@ export function PedidoDetalhesVisaoUnica() {
     meiosPagamento ?? [],
     nomesMeiosPagamentoPedido ?? {}
   )
+  const linhasPagamento = montarLinhasResumoPagamentoPedido(
+    pagamentos,
+    meiosPagamento ?? [],
+    nomesMeiosPagamentoPedido ?? {},
+    transformarParaReal
+  )
+  const valorCobrarNaEntrega = totalCobrarNaEntregaPagamentos(pagamentos)
   const total =
     valorFinalVenda != null && !Number.isNaN(Number(valorFinalVenda))
       ? Number(valorFinalVenda)
@@ -165,10 +173,11 @@ export function PedidoDetalhesVisaoUnica() {
     })),
     totalItens: totalProdutos,
     taxaEntrega: taxa ?? 0,
-    totalAReceber: fluxoPagamentoEntrega === 'ja_pago' ? 0 : total,
+    totalAReceber: valorCobrarNaEntrega,
     troco,
     fluxoPagamentoEntrega,
     tipoPagamento,
+    linhasPagamento: linhasPagamento.map(linha => linha.texto),
     observacaoPedido: observacao || null,
   }
 
@@ -334,10 +343,24 @@ export function PedidoDetalhesVisaoUnica() {
             <span>Total</span>
             <span className="tabular-nums">{transformarParaReal(total)}</span>
           </div>
-          <p className="pt-1 text-xs text-gray-600">
-            {rotuloCobrancaEntrega(fluxoPagamentoEntrega)}
-            {tipoPagamento !== '—' ? ` · ${tipoPagamento}` : ''}
-          </p>
+          {linhasPagamento.length > 0 ? (
+            <div className="space-y-0.5 pt-1">
+              {linhasPagamento.map(linha => (
+                <p
+                  key={linha.texto}
+                  className={
+                    linha.kind === 'cobrar'
+                      ? 'text-xs font-semibold text-amber-700'
+                      : 'text-xs font-semibold text-green-700'
+                  }
+                >
+                  {linha.texto}
+                </p>
+              ))}
+            </div>
+          ) : (
+            <p className="pt-1 text-xs text-gray-600">{tipoPagamento}</p>
+          )}
         </div>
       </Cartao>
     </div>

@@ -669,7 +669,8 @@ export function PedidoDetalhesView() {
                               // cancelado abaixo está comentada e preservada para uso futuro:
                               // quando houver pagamento efetivado e depois cancelado.
                               // const emCancelado = pagamentoComDestaqueCanceladoDetalhes(pagamento)
-                              const usuarioPagamento = pagamento.realizadoPorId
+                              const usuarioPagamento =
+                                pagamento.realizadoPorId || detalhesPedidoMeta?.abertoPorId
                               const dataPagamento = pagamento.dataCriacao
 
                               return (

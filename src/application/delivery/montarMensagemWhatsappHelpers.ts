@@ -106,18 +106,22 @@ export function rotuloStatusPagamentoClienteWhatsapp(
   return 'Já pago'
 }
 
-export function montarLinhaFormaPagamentoWhatsapp(
-  tipoPagamento: string,
-  totalPedido: number,
-  fluxo: PedidoKanbanQuickViewData['fluxoPagamentoEntrega']
-): string {
+export function montarLinhasFormaPagamentoWhatsapp(
+  dados: PedidoKanbanQuickViewData,
+  totalPedido: number
+): string[] {
+  if (dados.linhasPagamento?.length) {
+    return dados.linhasPagamento.map(linha => `${E.bullet} ${linha}`)
+  }
   const forma =
-    tipoPagamento.trim() && tipoPagamento !== '—'
-      ? tipoPagamento
-      : fluxo === 'cobrar_entregador'
+    dados.tipoPagamento.trim() && dados.tipoPagamento !== '—'
+      ? dados.tipoPagamento
+      : dados.fluxoPagamentoEntrega === 'cobrar_entregador'
         ? 'Cobrar na entrega'
         : '—'
-  return `${E.bullet} ${forma}: ${transformarParaReal(totalPedido)}`
+  const valor =
+    dados.totalAReceber > 0 ? dados.totalAReceber : totalPedido
+  return [`${E.bullet} ${forma}: ${transformarParaReal(valor)}`]
 }
 
 export function montarDetalhesPedidoClienteWhatsapp(args: {
@@ -143,12 +147,11 @@ export function montarDetalhesPedidoClienteWhatsapp(args: {
   )
   const totalPedido = calcularTotalPedidoWhatsapp(dados)
   const linhasProdutos = montarLinhasProdutosWhatsapp(dados.produtos)
-  const linhaPagamento = montarLinhaFormaPagamentoWhatsapp(
-    dados.tipoPagamento,
-    totalPedido,
-    dados.fluxoPagamentoEntrega
-  )
-  const statusPagamento = rotuloStatusPagamentoClienteWhatsapp(dados.fluxoPagamentoEntrega)
+  const linhasPagamento = montarLinhasFormaPagamentoWhatsapp(dados, totalPedido)
+  const statusPagamento =
+    dados.totalAReceber > 0 && dados.linhasPagamento?.some(l => l.startsWith('Já pago'))
+      ? 'Parcial'
+      : rotuloStatusPagamentoClienteWhatsapp(dados.fluxoPagamentoEntrega)
 
   const linhas: string[] = [
     `Oi, ${nome}! ${E.smile}`,
@@ -178,7 +181,7 @@ export function montarDetalhesPedidoClienteWhatsapp(args: {
     `${E.dollar} Total: ${transformarParaReal(totalPedido)}`,
     '',
     `${E.card} Forma de pagamento:`,
-    linhaPagamento,
+    ...linhasPagamento,
     statusPagamento
   )
 

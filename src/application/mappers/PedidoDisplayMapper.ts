@@ -2,7 +2,10 @@ import {
   normalizeOrigemApi,
   rotuloOrigemParaExibicao as rotuloOrigemNormalizado,
 } from '@/src/application/mappers/VendaApiNormalizer'
-import { pagamentoEstaCancelado } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
+import {
+  pagamentoEstaCancelado,
+  pagamentoPendenteNaEntrega,
+} from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
 import type {
   EnderecoEntregaDetalhe,
@@ -99,6 +102,71 @@ export function formatarTipoPagamentoDetalhe(
   }
 
   return nomesUnicos.length > 0 ? nomesUnicos.join(', ') : '—'
+}
+
+export type LinhaResumoPagamentoPedido = {
+  kind: 'ja_pago' | 'cobrar'
+  texto: string
+}
+
+function nomeMeioPagamentoPedido(
+  pagamento: PagamentoSelecionado,
+  meiosPagamento: MeioPagamentoLookup[],
+  nomesMeiosPorId: Record<string, string>
+): string {
+  const meioId = String(pagamento.meioPagamentoId ?? '').trim()
+  const meioLista = meiosPagamento.find(m => m.getId() === meioId)
+  return meioLista?.getNome()?.trim() || nomesMeiosPorId[meioId]?.trim() || 'Pagamento'
+}
+
+function juntarMeiosComValor(
+  pagamentos: PagamentoSelecionado[],
+  meiosPagamento: MeioPagamentoLookup[],
+  nomesMeiosPorId: Record<string, string>,
+  formatarValor: (valor: number) => string
+): string {
+  return pagamentos
+    .map(
+      pag =>
+        `${nomeMeioPagamentoPedido(pag, meiosPagamento, nomesMeiosPorId)} ${formatarValor(pag.valor)}`
+    )
+    .join(', ')
+}
+
+/** Já pago e a cobrar separados — o fluxo único esconde pagamento misto. */
+export function montarLinhasResumoPagamentoPedido(
+  pagamentos: PagamentoSelecionado[],
+  meiosPagamento: MeioPagamentoLookup[],
+  nomesMeiosPorId: Record<string, string>,
+  formatarValor: (valor: number) => string
+): LinhaResumoPagamentoPedido[] {
+  const ativos = pagamentos.filter(
+    p => !pagamentoEstaCancelado(p) && String(p.meioPagamentoId ?? '').trim()
+  )
+  const jaPagos = ativos.filter(p => !pagamentoPendenteNaEntrega(p))
+  const aCobrar = ativos.filter(p => pagamentoPendenteNaEntrega(p))
+  const linhas: LinhaResumoPagamentoPedido[] = []
+
+  if (jaPagos.length > 0) {
+    linhas.push({
+      kind: 'ja_pago',
+      texto: `Já pago: ${juntarMeiosComValor(jaPagos, meiosPagamento, nomesMeiosPorId, formatarValor)}`,
+    })
+  }
+  if (aCobrar.length > 0) {
+    linhas.push({
+      kind: 'cobrar',
+      texto: `Cobrar na entrega: ${juntarMeiosComValor(aCobrar, meiosPagamento, nomesMeiosPorId, formatarValor)}`,
+    })
+  }
+  return linhas
+}
+
+export function totalCobrarNaEntregaPagamentos(pagamentos: PagamentoSelecionado[]): number {
+  const total = pagamentos
+    .filter(p => !pagamentoEstaCancelado(p) && pagamentoPendenteNaEntrega(p))
+    .reduce((sum, p) => sum + (Number(p.valor) || 0), 0)
+  return total > 0 ? Math.round(total * 100) / 100 : 0
 }
 
 export function formatarCpfCnpjExibicao(valor: string | null | undefined): string {

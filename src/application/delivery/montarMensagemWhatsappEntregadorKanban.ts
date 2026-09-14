@@ -38,7 +38,9 @@ export function montarMensagemWhatsappEntregadorKanban(args: {
     `${E.store} ${empresa}`,
     '',
     `${E.numbers} Pedido: ${montarRotuloPedidoWhatsapp(dados.numeroVenda, dados.codigoVenda)}`,
-    `${E.moneyBag} *${rotuloPagamento(dados.fluxoPagamentoEntrega)}*`,
+    ...(dados.linhasPagamento?.length
+      ? dados.linhasPagamento.map(linha => `${E.moneyBag} *${linha}*`)
+      : [`${E.moneyBag} *${rotuloPagamento(dados.fluxoPagamentoEntrega)}*`]),
     '',
     `${E.user} Cliente: ${dados.clienteNome}`,
     `${E.mobile} Celular: ${formatarCelularExibicao(dados.detalhesEntrega.clienteCelular)}`,

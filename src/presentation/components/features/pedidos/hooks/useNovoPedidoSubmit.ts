@@ -166,8 +166,13 @@ export function useNovoPedidoSubmit({
       }
 
       if (validacaoResult.code === 'pagamentos_total') {
+        const valorInformado =
+          validacao.entregaComCobrancaPeloEntregador ||
+          input.totalPagamentosLancados > input.totalPagamentos
+            ? input.totalPagamentosLancados
+            : input.totalPagamentos
         showToast.error(
-          `Valor dos pagamentos (${transformarParaReal(input.totalPagamentos)}) não corresponde ao total (${transformarParaReal(input.totalProdutos)})`
+          `Valor dos pagamentos (${transformarParaReal(valorInformado)}) não corresponde ao total (${transformarParaReal(input.totalProdutos)})`
         )
         return
       }

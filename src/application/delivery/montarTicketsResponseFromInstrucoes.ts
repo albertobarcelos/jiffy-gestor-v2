@@ -69,6 +69,26 @@ function cobrancaAtivaNoCupom(r: Record<string, unknown>): boolean {
   return true
 }
 
+function fontesPagamentoCupom(pedido: Record<string, unknown>): Record<string, unknown>[] {
+  const cobrancas = Array.isArray(pedido.cobrancas) ? pedido.cobrancas : []
+  if (cobrancas.length > 0) {
+    return cobrancas.map(asRecord).filter((r): r is Record<string, unknown> => r != null)
+  }
+  const pagamentos = Array.isArray(pedido.pagamentos) ? pedido.pagamentos : []
+  return pagamentos.map(asRecord).filter((r): r is Record<string, unknown> => r != null)
+}
+
+function cobrancaPendenteNaEntregaNoCupom(r: Record<string, unknown>): boolean {
+  if (!cobrancaAtivaNoCupom(r)) return false
+  const status = asStr(r.status).toLowerCase()
+  const momento = asStr(r.momentoCobranca || r.momento_cobranca).toLowerCase()
+  if (status === 'paga' || asRecord(r.pagamentoEfetivado)) return false
+  if (r.cobrarNaEntrega === true || r.naoEfetivo === true) return true
+  if (momento === 'antecipado') return false
+  if (momento === 'na_entrega') return true
+  return status === 'pendente'
+}
+
 function enderecoDetalheParaTicketsEndereco(
   endereco: EnderecoEntregaDetalhe | null | undefined
 ): VendaGestorTicketsEndereco | null {
@@ -193,49 +213,46 @@ function buildPagamento(
   const totalPago = numeroFinito(pedido.totalPago)
   const troco = numeroFinito(pedido.troco)
 
-  const cobrancas = Array.isArray(pedido.cobrancas) ? pedido.cobrancas : []
-  let cobrancaNaEntrega: Record<string, unknown> | null = null
-  for (const c of cobrancas) {
-    const r = asRecord(c)
-    if (!r || !cobrancaAtivaNoCupom(r)) continue
-    const momento = asStr(r.momentoCobranca).toLowerCase()
-    const status = asStr(r.status).toLowerCase()
-    if (momento === 'na_entrega' && status !== 'paga') {
-      cobrancaNaEntrega = r
-      break
-    }
-  }
+  const cobrancas = fontesPagamentoCupom(pedido)
+  const cobrancasAtivas = cobrancas.filter(cobrancaAtivaNoCupom)
+  const cobrancasNaEntregaPendentes = cobrancasAtivas.filter(cobrancaPendenteNaEntregaNoCupom)
 
-  const valorCobrarNaEntrega = cobrancaNaEntrega
-    ? numeroFinito(cobrancaNaEntrega.valor)
+  const valorCobrarNaEntrega = cobrancasAtivas.length
+    ? cobrancasNaEntregaPendentes.reduce(
+        (soma, cobranca) => soma + numeroFinito(cobranca.valor),
+        0
+      )
     : totalFaltaPagar
   const cobrarCliente = valorCobrarNaEntrega > 0
 
-  const meioIdCobranca = cobrancaNaEntrega ? asStr(cobrancaNaEntrega.meioPagamentoId) : ''
-  let meioPagamentoNome = extrairNomeMeioPagamentoDeRegistro(
-    cobrancaNaEntrega,
-    meioIdCobranca,
-    nomesMeiosPagamentoPorId
-  )
-  if (!meioPagamentoNome && cobrancaNaEntrega) {
-    const pagamentoEfetivado = asRecord(cobrancaNaEntrega.pagamentoEfetivado)
-    meioPagamentoNome = extrairNomeMeioPagamentoDeRegistro(
-      pagamentoEfetivado,
-      asStr(pagamentoEfetivado?.meioPagamentoId) || meioIdCobranca,
-      nomesMeiosPagamentoPorId
-    )
-  }
+  const nomesNaEntrega = cobrancasNaEntregaPendentes
+    .map(cobranca => {
+      const meioId = asStr(cobranca.meioPagamentoId)
+      const nome = extrairNomeMeioPagamentoDeRegistro(
+        cobranca,
+        meioId,
+        nomesMeiosPagamentoPorId
+      )
+      if (nome) return nome
+      const pagamentoEfetivado = asRecord(cobranca.pagamentoEfetivado)
+      return extrairNomeMeioPagamentoDeRegistro(
+        pagamentoEfetivado,
+        asStr(pagamentoEfetivado?.meioPagamentoId) || meioId,
+        nomesMeiosPagamentoPorId
+      )
+    })
+    .filter((nome): nome is string => Boolean(nome))
+  const meioPagamentoNome = nomesNaEntrega.join(' + ') || null
 
   const meios: VendaGestorTicketsPagamentoMeio[] = []
-  for (const c of cobrancas) {
-    const r = asRecord(c)
-    if (!r || !cobrancaAtivaNoCupom(r)) continue
-    const meioId = asStr(r.meioPagamentoId)
-    const nome = extrairNomeMeioPagamentoDeRegistro(r, meioId, nomesMeiosPagamentoPorId)
-    if (!nome) continue
+  for (const r of cobrancasAtivas) {
+    const meioId = asStr(r.meioPagamentoId || r.meio_pagamento_id)
+    const nome =
+      extrairNomeMeioPagamentoDeRegistro(r, meioId, nomesMeiosPagamentoPorId) || 'PAGAMENTO'
     meios.push({
       nome,
       valor: numeroFinito(r.valor),
+      naEntrega: cobrancaPendenteNaEntregaNoCupom(r),
     })
   }
 

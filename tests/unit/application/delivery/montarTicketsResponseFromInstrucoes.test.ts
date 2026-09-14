@@ -255,7 +255,9 @@ describe('montarTicketsResponseFromInstrucoes', () => {
     expect(result.resumoPedido?.valorTotal).toBe(48)
     expect(result.valorFinal).toBe(48)
     expect(result.pagamento?.valorCobrarNaEntrega).toBe(48)
-    expect(result.pagamento?.meios).toEqual([{ nome: 'Dinheiro', valor: 48 }])
+    expect(result.pagamento?.meios).toEqual([
+      { nome: 'Dinheiro', valor: 48, naEntrega: true },
+    ])
   })
 
   it('usa a taxa ativa mesmo se resumoPedido do GET ainda tiver o valor antigo', () => {
@@ -275,5 +277,103 @@ describe('montarTicketsResponseFromInstrucoes', () => {
 
     expect(result.resumoPedido?.taxaEntrega).toBe(8)
     expect(result.resumoPedido?.valorTotal).toBe(48)
+  })
+
+  it('soma só o pendente na entrega e marca o que já foi pago', () => {
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: { mapeamentos: [], warnings: [] },
+      pedido: {
+        ...pedidoBase,
+        valorFinal: 76,
+        totalPago: 30,
+        totalFaltaPagar: 46,
+        cobrancas: [
+          {
+            id: 'cob-pix',
+            meioPagamentoId: 'mp-pix',
+            valor: 30,
+            momentoCobranca: 'antecipado',
+            status: 'paga',
+          },
+          {
+            id: 'cob-dinheiro',
+            meioPagamentoId: 'mp-dinheiro',
+            valor: 46,
+            momentoCobranca: 'na_entrega',
+            status: 'pendente',
+          },
+        ],
+      },
+      prefs: DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      nomesMeiosPagamentoPorId: { 'mp-pix': 'Pix', 'mp-dinheiro': 'Dinheiro' },
+    })
+
+    expect(result.pagamento?.cobrarCliente).toBe(true)
+    expect(result.pagamento?.valorCobrarNaEntrega).toBe(46)
+    expect(result.pagamento?.meioPagamento).toBe('Dinheiro')
+    expect(result.pagamento?.meios).toEqual([
+      { nome: 'Pix', valor: 30, naEntrega: false },
+      { nome: 'Dinheiro', valor: 46, naEntrega: true },
+    ])
+  })
+
+  it('cobra só o pendente mesmo se totalFaltaPagar vier igual ao total do pedido', () => {
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: { mapeamentos: [], warnings: [] },
+      pedido: {
+        ...pedidoBase,
+        valorFinal: 45,
+        totalPago: 30,
+        totalFaltaPagar: 45,
+        cobrancas: [
+          {
+            id: 'cob-dinheiro',
+            meioPagamentoId: 'mp-dinheiro',
+            valor: 30,
+            momentoCobranca: 'antecipado',
+            status: 'paga',
+          },
+          {
+            id: 'cob-credito',
+            meioPagamentoId: 'mp-credito',
+            valor: 15,
+            momentoCobranca: 'na_entrega',
+            status: 'pendente',
+          },
+        ],
+      },
+      prefs: DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      nomesMeiosPagamentoPorId: { 'mp-dinheiro': 'Dinheiro', 'mp-credito': 'Crédito' },
+    })
+
+    expect(result.pagamento?.valorCobrarNaEntrega).toBe(15)
+    expect(result.pagamento?.meios).toEqual([
+      { nome: 'Dinheiro', valor: 30, naEntrega: false },
+      { nome: 'Crédito', valor: 15, naEntrega: true },
+    ])
+  })
+
+  it('classifica pagamentos do cache adaptado quando não vêm cobrancas', () => {
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: { mapeamentos: [], warnings: [] },
+      pedido: {
+        ...pedidoBase,
+        valorFinal: 45,
+        totalPago: 30,
+        totalFaltaPagar: 45,
+        pagamentos: [
+          { meioPagamentoId: 'mp-dinheiro', valor: 30, cobrarNaEntrega: false },
+          { meioPagamentoId: 'mp-credito', valor: 15, cobrarNaEntrega: true, naoEfetivo: true },
+        ],
+      },
+      prefs: DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      nomesMeiosPagamentoPorId: { 'mp-dinheiro': 'Dinheiro', 'mp-credito': 'Crédito' },
+    })
+
+    expect(result.pagamento?.valorCobrarNaEntrega).toBe(15)
+    expect(result.pagamento?.meios).toEqual([
+      { nome: 'Dinheiro', valor: 30, naEntrega: false },
+      { nome: 'Crédito', valor: 15, naEntrega: true },
+    ])
   })
 })

@@ -44,7 +44,6 @@ export function PedidoPagamentoStepView() {
     rotuloCobrancaPendente,
     rotuloStatusPagamentoExibicao,
     setFluxoPagamentoEntrega,
-    setPagamentos,
     setValorRecebido,
     statusPagamentoExibicao,
     subtotalProdutos,
@@ -218,48 +217,40 @@ export function PedidoPagamentoStepView() {
             <h3 className="text-lg font-semibold">Pagamento</h3>
             <div className="mb-2 space-y-0.5 text-sm">
               {pedidoEntregaAceitaPagamentoPendente && (
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFluxoPagamentoEntrega('cobrar_entregador')
-                      setPagamentos(prev =>
-                        prev.map(pagamento => ({
-                          ...pagamento,
-                          cobrarNaEntrega: true,
-                          naoEfetivo: true,
-                        }))
-                      )
-                    }}
-                    className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
-                      fluxoPagamentoEntrega === 'cobrar_entregador'
-                        ? 'border-secondary bg-secondary text-white'
-                        : 'border-gray-200 bg-white text-primary-text'
-                    }`}
-                  >
-                    {rotuloCobrancaPendente}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFluxoPagamentoEntrega('ja_pago')
-                      setPagamentos(prev =>
-                        prev.map(pagamento => ({
-                          ...pagamento,
-                          cobrarNaEntrega: false,
-                          naoEfetivo: false,
-                        }))
-                      )
-                    }}
-                    className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
-                      fluxoPagamentoEntrega === 'ja_pago'
-                        ? 'border-secondary bg-secondary text-white'
-                        : 'border-gray-200 bg-white text-primary-text'
-                    }`}
-                  >
-                    Já foi pago
-                  </button>
-                </div>
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFluxoPagamentoEntrega('cobrar_entregador')
+                      }}
+                      className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
+                        fluxoPagamentoEntrega === 'cobrar_entregador'
+                          ? 'border-secondary bg-secondary text-white'
+                          : 'border-gray-200 bg-white text-primary-text'
+                      }`}
+                    >
+                      {rotuloCobrancaPendente}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFluxoPagamentoEntrega('ja_pago')
+                      }}
+                      className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
+                        fluxoPagamentoEntrega === 'ja_pago'
+                          ? 'border-secondary bg-secondary text-white'
+                          : 'border-gray-200 bg-white text-primary-text'
+                      }`}
+                    >
+                      Já foi pago
+                    </button>
+                  </div>
+                  <p className="px-1 text-[11px] text-gray-500">
+                    A aba vale para o próximo lançamento. Você pode misturar já pago e cobrança na
+                    entrega.
+                  </p>
+                </>
               )}
               {mostrarResumoTaxa && (
                 <>
@@ -291,10 +282,10 @@ export function PedidoPagamentoStepView() {
                 <span className="font-medium text-gray-700">A pagar:</span>
                 <span
                   className={`font-semibold ${
-                    valorAPagar > 0 ? 'text-red-600' : 'text-green-600'
+                    restanteALancarExibicao > 0 ? 'text-red-600' : 'text-green-600'
                   }`}
                 >
-                  {transformarParaReal(valorAPagar)}
+                  {transformarParaReal(restanteALancarExibicao)}
                 </span>
               </div>
               {pedidoEntregaAceitaPagamentoPendente && (
@@ -400,14 +391,6 @@ export function PedidoPagamentoStepView() {
                   </span>
                 </div>
               )}
-              {pedidoEntregaAceitaPagamentoPendente && restanteALancarExibicao > 0 && (
-                <div className="flex items-center justify-between px-1 py-0">
-                  <span className="font-semibold text-gray-700">Restante a lançar:</span>
-                  <span className="font-semibold text-red-600">
-                    {transformarParaReal(restanteALancarExibicao)}
-                  </span>
-                </div>
-              )}
             </div>
 
             {pagamentos.length > 0 && (
@@ -424,7 +407,7 @@ export function PedidoPagamentoStepView() {
                       <div
                         key={index}
                         style={varsLancado}
-                        className={`group relative flex ${MEIO_PAGAMENTO_CARD_SIZE_CLASS} flex-col items-center justify-center gap-0.5 rounded-lg border-2 p-2 text-[var(--meio-cor)] transition-colors border-[color-mix(in_srgb,var(--meio-cor)_42%,white)] bg-[color-mix(in_srgb,var(--meio-cor)_24%,white)] hover:border-[var(--meio-cor)] hover:bg-[var(--meio-cor)] hover:text-[var(--meio-texto-forte)]`}
+                        className={`group relative flex ${MEIO_PAGAMENTO_CARD_SIZE_CLASS} flex-col items-center justify-center gap-0.5 rounded-lg border-2 border-[var(--meio-cor)] bg-[var(--meio-cor)] p-2 text-[var(--meio-texto-forte)] transition-all hover:brightness-110`}
                       >
                         <button
                           onClick={() => removerPagamento(index)}
@@ -441,6 +424,11 @@ export function PedidoPagamentoStepView() {
                           </span>
                           <span className="w-full shrink-0 truncate text-center text-xs font-semibold leading-tight">
                             {transformarParaReal(pagamento.valor)}
+                          </span>
+                          <span className="w-full truncate text-center text-[10px] font-medium leading-tight opacity-80">
+                            {pagamento.cobrarNaEntrega || pagamento.naoEfetivo
+                              ? 'Na entrega'
+                              : 'Já pago'}
                           </span>
                         </div>
                       </div>
