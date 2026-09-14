@@ -235,6 +235,7 @@ export function TopNav() {
           { name: 'Relatório de Produtos', path: '/relatorios-produtos-vendidos', icon: MdAnalytics },
           { name: 'Hist. Fechamentos', path: '/historico-fechamento', icon: MdHistory },
           { name: 'Comissões', path: '/vendas/comissoes', icon: MdPercent },
+          { name: 'Relatório entregadores', path: '/vendas/relatorio-entregadores', icon: MdDeliveryDining },
         ],
       },
       { name: 'Portal do Contador', path: '/portal-contador', icon: MdAccountBalance },
