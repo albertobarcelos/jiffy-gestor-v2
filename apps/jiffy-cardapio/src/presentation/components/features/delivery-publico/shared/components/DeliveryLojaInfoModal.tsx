@@ -179,19 +179,25 @@ export function DeliveryLojaInfoModal({
                     return (
                       <div
                         key={meio.id}
-                        className="flex h-[88px] w-full flex-col items-center justify-center gap-1 rounded-xl border p-2"
+                        className="flex h-[88px] w-full flex-col items-center justify-center gap-1 rounded-lg border-2 p-2"
                         style={{
-                          borderColor: estilo.backgroundColor,
+                          borderColor: estilo.borderColor,
                           backgroundColor: estilo.backgroundColor,
                           color: estilo.color,
                         }}
                       >
                         <Icone
-                          className="h-9 w-9 shrink-0"
-                          style={{ color: estilo.iconColor ?? estilo.color }}
+                          className="h-8 w-8 shrink-0"
+                          style={{ color: estilo.iconColor }}
                           aria-hidden
                         />
-                        <span className="line-clamp-2 w-full text-center text-[11px] font-medium leading-tight">
+                        <span
+                          className="line-clamp-2 w-full text-center text-xs leading-tight"
+                          style={{
+                            color: estilo.labelColor,
+                            fontWeight: estilo.labelFontWeight ?? 500,
+                          }}
+                        >
                           {meio.nome}
                         </span>
                       </div>

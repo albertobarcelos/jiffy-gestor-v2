@@ -363,20 +363,26 @@ export function DeliveryCheckoutPagamentoModal({
                       type="button"
                       disabled={cardsDesabilitados}
                       onClick={() => handleSelecionarMeio(meio.id)}
-                      className={`flex ${MEIO_CARD_CLASS} flex-col items-center justify-center gap-1 rounded-xl border p-2 transition-opacity ${
+                      className={`flex ${MEIO_CARD_CLASS} flex-col items-center justify-center gap-1 rounded-lg border-2 p-2 transition-opacity hover:brightness-110 ${
                         cardsDesabilitados ? 'cursor-not-allowed opacity-45' : ''
                       } ${selecionado ? 'outline outline-2 outline-offset-2 outline-[var(--delivery-primary,#171717)]' : ''}`}
                       style={{
-                        borderColor: estilo.backgroundColor,
+                        borderColor: estilo.borderColor,
                         backgroundColor: estilo.backgroundColor,
                         color: estilo.color,
                       }}
                     >
                       <Icone
-                        className="h-9 w-9 shrink-0"
-                        style={{ color: estilo.iconColor ?? estilo.color }}
+                        className="h-8 w-8 shrink-0"
+                        style={{ color: estilo.iconColor }}
                       />
-                      <span className="line-clamp-2 w-full text-center text-[11px] font-medium leading-tight">
+                      <span
+                        className="line-clamp-2 w-full text-center text-xs leading-tight"
+                        style={{
+                          color: estilo.labelColor,
+                          fontWeight: estilo.labelFontWeight ?? 500,
+                        }}
+                      >
                         {meio.nome}
                       </span>
                     </button>
@@ -543,29 +549,46 @@ export function DeliveryCheckoutPagamentoModal({
               {pagamentos.map((pagamento, index) => {
                 const meio = meiosById.get(pagamento.meioPagamentoId)
                 const Icone = obterIconeMeioPagamento(meio?.nome ?? '')
+                const estilo = obterEstiloMeioPagamentoPublico({
+                  nome: meio?.nome ?? '',
+                  formaPagamentoFiscal: meio?.formaPagamentoFiscal,
+                })
                 return (
                   <li
                     key={`${pagamento.meioPagamentoId}-${index}`}
-                    className={`relative flex ${MEIO_CARD_CLASS} flex-col items-center justify-center gap-0.5 rounded-xl border px-2 pt-2 pb-1.5`}
+                    className={`group relative flex ${MEIO_CARD_CLASS} flex-col items-center justify-center gap-0.5 rounded-lg border-2 p-2`}
                     style={{
-                      borderColor: 'color-mix(in srgb, #16a34a 35%, var(--delivery-border))',
-                      backgroundColor:
-                        'color-mix(in srgb, #16a34a 10%, var(--delivery-surface))',
+                      borderColor: estilo.borderColor,
+                      backgroundColor: estilo.backgroundColor,
+                      color: estilo.color,
                     }}
                   >
                     <button
                       type="button"
                       onClick={() => handleRemover(index)}
                       aria-label={`Remover ${meio?.nome ?? 'pagamento'}`}
-                      className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full text-red-600"
+                      className="absolute right-0.5 top-0.5 flex h-6 w-6 items-center justify-center rounded-md hover:bg-black/10"
+                      style={{ color: estilo.color }}
                     >
-                      <MdDelete className="h-4 w-4" />
+                      <MdDelete className="h-3.5 w-3.5" />
                     </button>
-                    <Icone className="h-6 w-6 shrink-0 delivery-text-primary" />
-                    <span className="line-clamp-1 w-full px-1 text-center text-[10px] font-medium leading-tight delivery-text-primary">
+                    <Icone
+                      className="h-6 w-6 shrink-0"
+                      style={{ color: estilo.iconColor }}
+                    />
+                    <span
+                      className="line-clamp-2 w-full px-1 text-center text-[11px] font-medium leading-tight"
+                      style={{
+                        color: estilo.labelColor,
+                        fontWeight: estilo.labelFontWeight ?? 500,
+                      }}
+                    >
                       {meio?.nome ?? 'Pagamento'}
                     </span>
-                    <span className="text-xs font-bold tabular-nums text-green-700">
+                    <span
+                      className="w-full truncate text-center text-xs font-semibold leading-tight"
+                      style={{ color: estilo.labelColor }}
+                    >
                       {formatDeliveryCurrency(pagamento.valor)}
                     </span>
                   </li>
