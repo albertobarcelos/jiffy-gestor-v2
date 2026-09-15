@@ -14,6 +14,14 @@ import {
 import { getEstacaoImpressaoId } from '@/src/infrastructure/printing/estacaoImpressaoStorage'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useSuperficieQuadroPedidos } from '@/src/presentation/gestor-pedidos/kiosk/useSuperficieQuadroPedidos'
+import { prepararSomPedidoNovo } from '@/src/presentation/gestor-pedidos/som/somPedidoNovo'
+import {
+  obterAlarmeSomPedidoNovo,
+  resolverModoSomPedidoNovo,
+  sincronizarAlarmeSomComPedidoDelivery,
+} from '@/src/presentation/gestor-pedidos/som/alarmeSomPedidoNovo'
+import { extrairVendaUnificadaDeRespostaDeliverySummary } from '@/features/kanban/utils/kanbanVendaCacheUpdate'
 import { createDebouncedKanbanInvalidator } from '@/src/presentation/realtime/debouncedInvalidateKanban'
 import {
   DELIVERY_REALTIME_EVENTS,
@@ -29,6 +37,7 @@ export function DeliveryRealtimeBridge() {
   const queryClient = useQueryClient()
   const empresaId = useTenantEmpresaId()
   const tenantAuth = useAuthStore(s => s.tenantAuth)
+  const superficie = useSuperficieQuadroPedidos()
   const { imprimirPorComandoRealtime } = useImpressaoDelivery()
   const [estacaoId, setEstacaoId] = useState<string | null>(() => getEstacaoImpressaoId())
   const socketRef = useRef<Socket | null>(null)
@@ -43,6 +52,13 @@ export function DeliveryRealtimeBridge() {
     const invalidator = invalidateDebouncedRef.current
     return () => invalidator.cancel()
   }, [])
+
+  useEffect(() => {
+    if (superficie !== 'fredy') return
+    const destravar = () => prepararSomPedidoNovo()
+    window.addEventListener('pointerdown', destravar, { once: true })
+    return () => window.removeEventListener('pointerdown', destravar)
+  }, [superficie])
 
   const syncEstacaoId = useCallback(() => {
     setEstacaoId(getEstacaoImpressaoId())
@@ -110,6 +126,13 @@ export function DeliveryRealtimeBridge() {
         )
         scheduleInvalidate()
       }
+      const card = extrairVendaUnificadaDeRespostaDeliverySummary(payload)
+      if (card && superficie === 'fredy') {
+        obterAlarmeSomPedidoNovo().onPedidoCriado(
+          card.id,
+          resolverModoSomPedidoNovo(card.getEtapaKanban())
+        )
+      }
     })
 
     socket.on(DELIVERY_REALTIME_EVENTS.PEDIDO_DELIVERY_STATUS_ALTERADO, payload => {
@@ -120,6 +143,14 @@ export function DeliveryRealtimeBridge() {
           '[delivery-realtime] PEDIDO_DELIVERY_STATUS_ALTERADO sem summary utilizavel; fallback invalidate'
         )
         scheduleInvalidate()
+      }
+      const card = extrairVendaUnificadaDeRespostaDeliverySummary(payload)
+      if (card && superficie === 'fredy') {
+        sincronizarAlarmeSomComPedidoDelivery({
+          vendaId: card.id,
+          etapaKanban: card.getEtapaKanban(),
+          statusOperacional: card.statusEtapaOperacional,
+        })
       }
     })
 
@@ -141,7 +172,7 @@ export function DeliveryRealtimeBridge() {
       disconnectDeliverySocket(socket)
       if (socketRef.current === socket) socketRef.current = null
     }
-  }, [empresaId, estacaoId, queryClient, tenantAuth])
+  }, [empresaId, estacaoId, queryClient, superficie, tenantAuth])
 
   return null
 }
