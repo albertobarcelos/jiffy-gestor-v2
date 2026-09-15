@@ -13,14 +13,35 @@ const base = {
 }
 
 describe('validarInformacoesPedidoEntrega', () => {
-  it('não bloqueia o wizard por falta de pin ou cobertura fora', () => {
+  it('não bloqueia o wizard por falta de pin', () => {
     expect(
       validarInformacoesPedidoEntrega({
         ...base,
         enderecoEntregaTemGeo: false,
-        enderecoEntregaCoberturaStatus: 'fora',
+        enderecoEntregaCoberturaStatus: 'ok',
       })
     ).toBeNull()
+  })
+
+  it('bloqueia avançar quando o endereço está fora da cobertura', () => {
+    const erro = validarInformacoesPedidoEntrega({
+      ...base,
+      enderecoEntregaTemGeo: true,
+      enderecoEntregaCoberturaStatus: 'fora',
+    })
+    expect(erro?.code).toBe('cobertura')
+    expect(erro?.goToStep).toBe(2)
+    expect(erro?.message).toMatch(/fora da área de cobertura/i)
+  })
+
+  it('não libera Pagamento com taxa de catálogo se estiver fora da cobertura', () => {
+    expect(
+      validarInformacoesPedidoEntrega({
+        ...base,
+        enderecoEntregaCoberturaStatus: 'fora',
+        taxaEntregaOverride: 'catalogo',
+      })?.code
+    ).toBe('cobertura')
   })
 
   it('bloqueia Pagamento enquanto a taxa automática está calculando', () => {

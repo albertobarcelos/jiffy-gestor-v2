@@ -73,13 +73,31 @@ export function montarProdutosCatalogoVenda<T extends ProdutoCatalogo>(input: {
   return fonte.filter(produto => produto.isAtivo())
 }
 
-export function mesclarProdutosNoCatalogo<T extends { getId: () => string }>(
-  atual: Record<string, T>,
-  produtos: T[]
-): Record<string, T> {
+function produtoCatalogoTemComplementosCarregados(produto: {
+  getGruposComplementos?: () => Array<{ complementos?: readonly unknown[] }>
+}): boolean {
+  const grupos = produto.getGruposComplementos?.() ?? []
+  return grupos.some(grupo => (grupo.complementos?.length ?? 0) > 0)
+}
+
+export function mesclarProdutosNoCatalogo<
+  T extends {
+    getId: () => string
+    getGruposComplementos?: () => Array<{ complementos?: readonly unknown[] }>
+  },
+>(atual: Record<string, T>, produtos: T[]): Record<string, T> {
   const next = { ...atual }
   for (const produto of produtos) {
-    next[produto.getId()] = produto
+    const id = produto.getId()
+    const existente = next[id]
+    if (
+      existente &&
+      produtoCatalogoTemComplementosCarregados(existente) &&
+      !produtoCatalogoTemComplementosCarregados(produto)
+    ) {
+      continue
+    }
+    next[id] = produto
   }
   return next
 }

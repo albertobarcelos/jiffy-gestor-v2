@@ -1,6 +1,7 @@
 import { validarQuantidadesComplementosLinha } from '@/src/domain/policies/pedido/ComplementoQuantidadeLinhaPolicy'
 import { clienteCadastradoNestaEmpresa } from '@/src/domain/policies/pedido/ClienteEntregaPolicy'
 import {
+  mensagemBloqueioForaDaCobertura,
   mensagemBloqueioTaxaAutomatica,
   type StatusCoberturaEntregaPedido,
   type TaxaEntregaOverrideModoPolicy,
@@ -15,7 +16,13 @@ import type { PagamentoSelecionado, ProdutoSelecionado, StatusVenda } from '@/sr
 export type ValidacaoErroPedido = {
   message: string
   goToStep?: 1 | 2 | 3
-  code?: 'pagamentos_total' | 'produtos' | 'complementos' | 'entrega' | 'pagamento_entrega'
+  code?:
+    | 'pagamentos_total'
+    | 'produtos'
+    | 'complementos'
+    | 'entrega'
+    | 'pagamento_entrega'
+    | 'cobertura'
 }
 
 export type ValidarPedidoGestorInput = {
@@ -72,6 +79,14 @@ export function validarInformacoesPedidoEntrega(params: {
 
   if (params.pedidoComEntrega && !params.temEnderecoEntrega) {
     return { message: 'Selecione ou cadastre o endereço de entrega.', goToStep: 2 }
+  }
+
+  const bloqueioCobertura = mensagemBloqueioForaDaCobertura({
+    pedidoComEntrega: params.pedidoComEntrega,
+    enderecoEntregaCoberturaStatus: params.enderecoEntregaCoberturaStatus,
+  })
+  if (bloqueioCobertura) {
+    return { message: bloqueioCobertura, goToStep: 2, code: 'cobertura' }
   }
 
   const bloqueioTaxa = mensagemBloqueioTaxaAutomatica({

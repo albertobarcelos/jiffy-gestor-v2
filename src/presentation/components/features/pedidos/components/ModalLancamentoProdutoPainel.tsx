@@ -216,25 +216,35 @@ export function ModalLancamentoProdutoPainel({
     onAfterClose?.()
   }, [onAfterClose])
 
-  // Inicializa preço/complementos ao abrir (uma vez por abertura — não sobrescreve toggles durante a edição)
+  // Inicializa preço/complementos ao abrir. Se o cadastro hidratar grupos depois (lazy load),
+  // completa o mapa sem apagar quantidades já escolhidas.
   useEffect(() => {
     if (!open) {
       painelJaAbertoRef.current = false
       return
     }
     if (!produto) return
-    if (painelJaAbertoRef.current) return
-    painelJaAbertoRef.current = true
 
-    const base =
-      valorUnitarioInicial !== undefined && valorUnitarioInicial !== null
-        ? valorUnitarioInicial
-        : produto.getValor()
-    setValorInput(formatarNumeroComMilhar(Number.isFinite(base) && base >= 0 ? base : 0))
-    setQuantidadesComplementos(
-      buildMapQuantidadesComplementos(produto, quantidadesComplementosIniciais)
-    )
-    setObservacaoInput(observacaoInicial ?? '')
+    if (!painelJaAbertoRef.current) {
+      painelJaAbertoRef.current = true
+      const base =
+        valorUnitarioInicial !== undefined && valorUnitarioInicial !== null
+          ? valorUnitarioInicial
+          : produto.getValor()
+      setValorInput(formatarNumeroComMilhar(Number.isFinite(base) && base >= 0 ? base : 0))
+      setQuantidadesComplementos(
+        buildMapQuantidadesComplementos(produto, quantidadesComplementosIniciais)
+      )
+      setObservacaoInput(observacaoInicial ?? '')
+      return
+    }
+
+    setQuantidadesComplementos(prev => {
+      const hidratado = buildMapQuantidadesComplementos(produto, quantidadesComplementosIniciais)
+      const chavesNovas = Object.keys(hidratado).filter(chave => !(chave in prev))
+      if (chavesNovas.length === 0) return prev
+      return { ...hidratado, ...prev }
+    })
   }, [open, produto, valorUnitarioInicial, quantidadesComplementosIniciais, observacaoInicial])
 
   const complementosSelecionadosPreview = useMemo(() => {
