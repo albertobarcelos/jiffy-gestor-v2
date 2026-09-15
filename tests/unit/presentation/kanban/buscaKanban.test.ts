@@ -4,6 +4,7 @@ import {
   isTermoBuscaValorKanban,
   normalizarTermoBuscaKanban,
   parseValorBuscaKanban,
+  qListagemDeliveryKanban,
   termoBuscaKanbanParaApi,
   vendaAtendeBuscaKanban,
 } from '@/src/presentation/components/features/kanban/rules/vendasKanban.rules'
@@ -85,6 +86,13 @@ describe('busca Kanban — número e código do card', () => {
     expect(vendaAtendeBuscaKanban(venda, normalizarTermoBuscaKanban('11999999999'), '11999999999')).toBe(
       false
     )
+  })
+
+  it('não envia telefone no q da listagem delivery', () => {
+    expect(qListagemDeliveryKanban('maria')).toBe('maria')
+    expect(qListagemDeliveryKanban('ULUGSBYD')).toBe('ULUGSBYD')
+    expect(qListagemDeliveryKanban('659992341536')).toBeUndefined()
+    expect(qListagemDeliveryKanban('5565992934536')).toBeUndefined()
   })
 
   it('encontra pelo telefone do destinatário na entrega', () => {
