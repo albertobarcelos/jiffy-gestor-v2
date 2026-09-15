@@ -16,6 +16,7 @@ import type { CriarPedidoDeliveryApiRequest } from '@/src/application/dto/api/pe
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { showToast } from '@/src/shared/utils/toast'
 import { validarObservacoesPedido } from '@/src/shared/helpers/observacaoPedido'
+import { salvarRascunhoInformacoesAdicionais } from '@/src/shared/helpers/informacoesAdicionaisNota'
 
 export { validarInformacoesPedido }
 
@@ -38,13 +39,21 @@ export function useNovoPedidoSubmitGuard(isPending: boolean) {
   }
 }
 
-export function useNovoPedidoResetOnExit(resetForm: () => void, onAfterClose?: () => void) {
+export function useNovoPedidoResetOnExit(
+  resetForm: () => void,
+  onAfterClose?: () => void,
+  deveResetar?: () => boolean
+) {
   const resetFormRef = useRef(resetForm)
   resetFormRef.current = resetForm
+  const deveResetarRef = useRef(deveResetar)
+  deveResetarRef.current = deveResetar
 
   /** Após o Slide de saída: evita reset síncrono que quebra a animação e notifica o pai. */
   return useCallback(() => {
-    resetFormRef.current()
+    if (deveResetarRef.current?.() !== false) {
+      resetFormRef.current()
+    }
     onAfterClose?.()
   }, [onAfterClose])
 }
@@ -64,6 +73,7 @@ export interface UseNovoPedidoSubmitParams {
     temEnderecoEntrega: boolean
     enderecoEntregaTemGeo?: boolean
     enderecoEntregaCoberturaStatus?: 'ok' | 'fora' | 'pendente' | 'indisponivel' | null
+    taxaEntregaOverride?: 'automatica' | 'sem_taxa' | 'catalogo'
     troco: number
   }
   createVendaGestor: {
@@ -79,6 +89,7 @@ export interface UseNovoPedidoSubmitParams {
   setInternalDialogOpen: (open: boolean) => void
   setCurrentStep: (step: 1 | 2 | 3 | 4) => void
   setVendaIdCriada: (id: string | null) => void
+  observacaoNota?: string
   status: CriarVendaGestorInputDTO['status']
   tipoInicioPedido: CriarVendaGestorInputDTO['tipoInicioPedido']
   processarAposTransicaoVendaGestorId?: (
@@ -102,6 +113,7 @@ export function useNovoPedidoSubmit({
   setInternalDialogOpen,
   setCurrentStep,
   setVendaIdCriada,
+  observacaoNota,
   status,
   tipoInicioPedido,
   processarAposTransicaoVendaGestorId,
@@ -133,6 +145,7 @@ export function useNovoPedidoSubmit({
       temEnderecoEntrega: validacao.temEnderecoEntrega,
       enderecoEntregaTemGeo: validacao.enderecoEntregaTemGeo,
       enderecoEntregaCoberturaStatus: validacao.enderecoEntregaCoberturaStatus,
+      taxaEntregaOverride: validacao.taxaEntregaOverride,
       pedidoGestorComPagamentoNoPasso3: validacao.pedidoGestorComPagamentoNoPasso3,
       pedidoEntregaAceitaPagamentoPendente: validacao.pedidoEntregaAceitaPagamentoPendente,
       pagamentosCount: input.pagamentos.length,
@@ -153,8 +166,13 @@ export function useNovoPedidoSubmit({
       }
 
       if (validacaoResult.code === 'pagamentos_total') {
+        const valorInformado =
+          validacao.entregaComCobrancaPeloEntregador ||
+          input.totalPagamentosLancados > input.totalPagamentos
+            ? input.totalPagamentosLancados
+            : input.totalPagamentos
         showToast.error(
-          `Valor dos pagamentos (${transformarParaReal(input.totalPagamentos)}) não corresponde ao total (${transformarParaReal(input.totalProdutos)})`
+          `Valor dos pagamentos (${transformarParaReal(valorInformado)}) não corresponde ao total (${transformarParaReal(input.totalProdutos)})`
         )
         return
       }
@@ -197,6 +215,9 @@ export function useNovoPedidoSubmit({
 
       if (idCriado) {
         setVendaIdCriada(idCriado)
+        if (observacaoNota) {
+          salvarRascunhoInformacoesAdicionais(idCriado, observacaoNota)
+        }
       }
 
       setInternalDialogOpen(false)
@@ -273,6 +294,7 @@ export function useNovoPedidoSubmit({
     createVendaGestor,
     createPedidoDelivery,
     setVendaIdCriada,
+    observacaoNota,
     status,
     tipoInicioPedido,
     processarAposTransicaoVendaGestorId,

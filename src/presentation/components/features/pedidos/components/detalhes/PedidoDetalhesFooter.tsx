@@ -8,6 +8,9 @@ import {
   footerSavePrimaryBarSx,
 } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { MdArrowBack, MdArrowForward, MdCancel } from 'react-icons/md'
+import { resolverModoTaxaEntregaOverride } from '@/src/shared/constants/taxaEntregaPedido'
+import { mensagemBloqueioTaxaAutomatica } from '@/src/domain/policies/pedido/cotacaoEntregaPolicy'
+import { enderecoTemGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
 import { useNovoPedidoDetalheContext } from '../../context/NovoPedidoDetalheContext'
 import { useNovoPedidoFormContext } from '../../context/NovoPedidoFormContext'
 import { useNovoPedidoUIContext } from '../../context/NovoPedidoUIContext'
@@ -54,7 +57,13 @@ export function PedidoDetalhesFooter({
     transicaoPedidoDelivery,
     setTipoCancelamentoSelecionado,
   } = useNovoPedidoDetalheContext()
-  const { pagamentos } = useNovoPedidoFormContext()
+  const {
+    pagamentos,
+    pedidoComEntrega,
+    taxaEntregaId,
+    enderecoEntregaCoberturaStatus,
+    moradaEntregaSelecionada,
+  } = useNovoPedidoFormContext()
   const { currentStep, setModalCancelarVendaOpen, handleClose } = useNovoPedidoUIContext()
 
   /** Detalhes: rodapé só após a venda carregar (evita Fechar sozinho → Cancelar venda + Fechar). */
@@ -178,6 +187,18 @@ export function PedidoDetalhesFooter({
 
   const painelRaioEsqInf = '0.75rem'
   const showVoltar = currentStep > 1
+  const mensagemBloqueioTaxa =
+    currentStep === 2
+      ? mensagemBloqueioTaxaAutomatica({
+          pedidoComEntrega,
+          taxaEntregaOverride: resolverModoTaxaEntregaOverride(taxaEntregaId),
+          enderecoEntregaCoberturaStatus,
+          enderecoEntregaTemGeo: Boolean(
+            moradaEntregaSelecionada?.endereco &&
+              enderecoTemGeolocalizacao(moradaEntregaSelecionada.endereco)
+          ),
+        })
+      : null
 
   return (
     <div className="shrink-0 bg-white">
@@ -234,9 +255,12 @@ export function PedidoDetalhesFooter({
               type="button"
               variant="contained"
               color="primary"
+              title={mensagemBloqueioTaxa ?? undefined}
               onClick={onNextStep}
               fullWidth
-              className="h-12 min-h-12 w-full font-semibold shadow-none"
+              className={`h-12 min-h-12 w-full font-semibold shadow-none${
+                mensagemBloqueioTaxa ? ' opacity-60' : ''
+              }`}
               sx={{
                 ...footerSavePrimaryBarSx(false),
                 borderBottomRightRadius: painelRaioEsqInf,

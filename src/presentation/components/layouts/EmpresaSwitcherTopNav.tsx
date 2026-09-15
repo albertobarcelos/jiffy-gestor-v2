@@ -62,7 +62,7 @@ export function EmpresaSwitcherTopNav({ variant }: EmpresaSwitcherTopNavProps) {
         className="inline-flex items-center border-l px-3 py-2 text-xs font-semibold text-primary-text"
         title="Empresa logada"
       >
-        <span className="max-w-[150px] truncate text-sm text-primary-text">{nomeExibicao}</span>
+        <span className="max-w-[5.5rem] truncate text-sm text-primary-text xl:max-w-[150px]">{nomeExibicao}</span>
       </span>
     </div>
   )

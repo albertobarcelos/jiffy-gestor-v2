@@ -1,14 +1,20 @@
+import { useCallback } from 'react'
 import { useQueryClient, keepPreviousData } from '@tanstack/react-query'
-import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
+import { useTenantEmpresaId, useTenantQueryKey } from '@/src/presentation/hooks/useTenantQueryKey'
 import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecureTenantInfiniteQuery'
 import { useSecureTenantMutation } from '@/src/presentation/hooks/useSecureTenantMutation'
+import {
+  usePrefetchRemainingCatalogPages,
+  useStableFetchPage,
+} from '@/src/presentation/hooks/menus/usePrefetchRemainingCatalogPages'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { Produto } from '@/src/domain/entities/Produto'
 import { handleApiError, showToast } from '@/src/shared/utils/toast'
 import { ApiError } from '@/src/infrastructure/api/apiClient'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 
-interface ProdutosQueryParams {
+export interface ProdutosQueryParams {
   name?: string
   ativo?: boolean | null
   ativoLocal?: boolean | null
@@ -17,6 +23,26 @@ interface ProdutosQueryParams {
   grupoComplementosId?: string
   limit?: number
   offset?: number
+}
+
+/**
+ * Params da listagem infinita de produtos (tela /produtos).
+ * A query key do React Query inclui este objeto — o modal de menus
+ * precisa usar o mesmo formato para reaproveitar o cache (5 min stale / 30 min gc).
+ */
+export function produtosInfiniteQueryParams(
+  overrides: Partial<Omit<ProdutosQueryParams, 'offset'>> = {}
+): Omit<ProdutosQueryParams, 'offset'> {
+  return {
+    name: undefined,
+    ativo: true,
+    ativoLocal: null,
+    ativoDelivery: null,
+    grupoProdutoId: undefined,
+    grupoComplementosId: undefined,
+    limit: 100,
+    ...overrides,
+  }
 }
 
 interface ProdutosResponse {
@@ -90,13 +116,23 @@ export function useProdutos(params: ProdutosQueryParams = {}) {
 }
 
 /**
- * Hook para buscar produtos com paginação infinita (scroll infinito)
+ * Hook para buscar produtos com paginação infinita (scroll infinito).
+ * Com `prefetchRemaining: true`, carrega as páginas restantes em paralelo após a 1ª
+ * (painéis “adicionar ao cardápio”).
  */
-export function useProdutosInfinite(params: Omit<ProdutosQueryParams, 'offset'> = {}) {
-  return useSecureTenantInfiniteQuery(
-    ['produtos', 'infinite', params],
-    async ({ token }, pageParam) => {
-      const limit = params.limit || 10
+export function useProdutosInfinite(
+  params: Omit<ProdutosQueryParams, 'offset'> = {},
+  options?: { enabled?: boolean; prefetchRemaining?: boolean }
+) {
+  const limit = params.limit || 10
+  const baseKey = ['produtos', 'infinite', params] as const
+  const queryKey = useTenantQueryKey(baseKey)
+  const tenantAuth = useAuthStore(s => s.tenantAuth)
+  const enabled = options?.enabled ?? true
+  const prefetchRemaining = options?.prefetchRemaining ?? false
+
+  const buildPage = useCallback(
+    async (token: string, pageParam: number) => {
       const searchParams = new URLSearchParams()
       if (params.name) searchParams.append('name', params.name)
       if (params.ativo !== undefined && params.ativo !== null) {
@@ -128,7 +164,9 @@ export function useProdutosInfinite(params: Omit<ProdutosQueryParams, 'offset'> 
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        const errorMessage = errorData.message || `Erro ${response.status}: ${response.statusText}`
+        const errorMessage =
+          (errorData as { message?: string }).message ||
+          `Erro ${response.status}: ${response.statusText}`
         throw new Error(errorMessage)
       }
 
@@ -148,6 +186,20 @@ export function useProdutosInfinite(params: Omit<ProdutosQueryParams, 'offset'> 
         nextOffset,
       }
     },
+    [
+      limit,
+      params.ativo,
+      params.ativoDelivery,
+      params.ativoLocal,
+      params.grupoComplementosId,
+      params.grupoProdutoId,
+      params.name,
+    ]
+  )
+
+  const query = useSecureTenantInfiniteQuery(
+    baseKey,
+    async ({ token }, pageParam) => buildPage(token, pageParam as number),
     {
       initialPageParam: 0,
       getNextPageParam: lastPage => lastPage.nextOffset,
@@ -157,8 +209,31 @@ export function useProdutosInfinite(params: Omit<ProdutosQueryParams, 'offset'> 
       refetchOnReconnect: true,
       refetchOnMount: false,
       placeholderData: keepPreviousData,
+      enabled,
     }
   )
+
+  const fetchPage = useStableFetchPage(
+    useCallback(
+      async (offset: number) => {
+        const token = tenantAuth?.getAccessToken()
+        if (!token) throw new Error('Sessão de empresa não encontrada')
+        return buildPage(token, offset)
+      },
+      [buildPage, tenantAuth]
+    )
+  )
+
+  usePrefetchRemainingCatalogPages({
+    queryKey,
+    data: query.data,
+    isFetching: query.isFetching,
+    pageSize: limit,
+    enabled: prefetchRemaining && enabled,
+    fetchPage,
+  })
+
+  return query
 }
 
 /**

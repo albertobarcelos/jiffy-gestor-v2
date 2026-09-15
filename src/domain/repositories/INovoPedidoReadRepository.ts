@@ -1,4 +1,5 @@
 import { Produto } from '@/src/domain/entities/Produto'
+import type { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import type { UsuarioPdvEntregadorOption } from '@/src/domain/types/vendaDetalhe'
 
 export type CanalVendaCatalogo = 'balcao' | 'entrega'
@@ -8,19 +9,34 @@ export interface INovoPedidoReadRepository {
 
   listarEntregadoresDelivery(token: string): Promise<UsuarioPdvEntregadorOption[]>
 
+  listarGruposDoMenu(menuId: string, token: string): Promise<GrupoProduto[]>
+
   listarProdutosDoGrupo(
     grupoId: string,
-    token: string
+    token: string,
+    menuId: string | null
   ): Promise<{ produtos: Produto[]; count: number }>
 
-  listarGrupoIdsComProdutosAtivos(
+  listarProdutosCatalogoPagina(
     token: string,
-    canal: CanalVendaCatalogo
-  ): Promise<Set<string>>
+    menuId: string,
+    params: {
+      grupoProdutoId?: string
+      q?: string
+      limit: number
+      offset: number
+    }
+  ): Promise<{ produtos: Produto[]; count: number; hasMore: boolean }>
 
-  buscarProdutoPorId(produtoId: string, token: string): Promise<Produto | null>
+  listarGrupoIdsComProdutosAtivos(token: string, menuId: string | null): Promise<Set<string>>
 
-  buscarProdutosPorNome(nome: string, token: string): Promise<Produto[]>
+  buscarProdutoPorId(
+    produtoId: string,
+    token: string,
+    menuId?: string | null
+  ): Promise<Produto | null>
+
+  buscarProdutosPorNome(nome: string, token: string, menuId: string | null): Promise<Produto[]>
 
   buscarClienteJson(clienteId: string, token: string): Promise<Record<string, unknown> | null>
 

@@ -23,7 +23,7 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const { nome, modeloDispositivo, versaoApk, bloqueado } = body
+    const { nome, modeloDispositivo, versaoApk, bloqueado, menuPrincipalId } = body
 
     // Validação básica
     if (bloqueado !== undefined && typeof bloqueado !== 'boolean') {
@@ -34,11 +34,14 @@ export async function PATCH(
     }
 
     // Monta o body apenas com campos fornecidos
-    const updateBody: any = {}
+    const updateBody: Record<string, unknown> = {}
     if (nome !== undefined) updateBody.nome = nome
     if (modeloDispositivo !== undefined) updateBody.modeloDispositivo = modeloDispositivo
     if (versaoApk !== undefined) updateBody.versaoApk = versaoApk
     if (bloqueado !== undefined) updateBody.bloqueado = bloqueado
+    if (typeof menuPrincipalId === 'string' && menuPrincipalId.trim()) {
+      updateBody.menuPrincipalId = menuPrincipalId.trim()
+    }
 
     const apiClient = new ApiClient()
     const response = await apiClient.request<any>(

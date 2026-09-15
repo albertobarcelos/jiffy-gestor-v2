@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import type { MoradaTelefone } from '@/src/presentation/hooks/useMoradaTelefone'
+import type { MoradaTelefone } from '@/src/domain/types/moradaEntrega'
 import type { ProdutosTabsModalState } from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
 import { statusPadraoNovoPedido } from '@/src/domain/services/pedido/RegrasStatusPedido'
 import type {
@@ -22,6 +22,7 @@ export function useNovoPedidoFormState(tipoInicioPedido: 'balcao' | 'entrega') {
   const [clienteNome, setClienteNome] = useState<string>('')
   const [produtos, setProdutos] = useState<ProdutoSelecionado[]>([])
   const [observacaoPedido, setObservacaoPedido] = useState<string>('')
+  const [observacaoNota, setObservacaoNota] = useState<string>('')
   const { catalogoProdutosPorId, setCatalogoProdutosPorId } = useNovoPedidoCatalogo()
   const [pagamentos, setPagamentos] = useState<PagamentoSelecionado[]>([])
   const [meioPagamentoId, setMeioPagamentoId] = useState<string>('')
@@ -87,6 +88,8 @@ export function useNovoPedidoFormState(tipoInicioPedido: 'balcao' | 'entrega') {
     setProdutos,
     observacaoPedido,
     setObservacaoPedido,
+    observacaoNota,
+    setObservacaoNota,
     catalogoProdutosPorId,
     setCatalogoProdutosPorId,
     pagamentos,

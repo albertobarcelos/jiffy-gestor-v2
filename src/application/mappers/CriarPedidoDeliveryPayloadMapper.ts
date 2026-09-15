@@ -1,12 +1,10 @@
-import type {
-  CriarPedidoDeliveryApiRequest,
-  CobrancaPedidoDeliveryApi,
-  MomentoCobrancaDeliveryApi,
-} from '@/src/application/dto/api/pedidoDeliveryApi'
+import type { CriarPedidoDeliveryApiRequest } from '@/src/application/dto/api/pedidoDeliveryApi'
+import { cobrancaPedidoFromPagamento } from '@/src/application/mappers/CobrancaPedidoDeliveryPayloadMapper'
 import type { CriarPedidoDeliveryInputDTO } from '@/src/application/dto/CriarPedidoDeliveryDTO'
 import type { ProdutoSelecionado } from '@/src/domain/types/pedido'
 import { deveEnviarValorUnitarioAlterado } from '@/src/domain/services/pedido/deveEnviarValorUnitarioAlterado'
 import { observacoesArrayFromTexto } from '@/src/shared/helpers/observacaoPedido'
+import { valorTaxaEntregaParaCreate } from '@/src/shared/constants/taxaEntregaPedido'
 
 function onlyDigits(value: string): string {
   return value.replace(/\D/g, '')
@@ -48,22 +46,7 @@ export function mapProdutosPedidoDeliveryPayload(produtos: ProdutoSelecionado[])
 
 function buildCobrancasPedidoDeliveryPayload(input: CriarPedidoDeliveryInputDTO) {
   if (input.pagamentos.length === 0) return undefined
-
-  const momentoCobranca: MomentoCobrancaDeliveryApi = input.entregaComCobrancaPeloEntregador
-    ? 'na_entrega'
-    : 'antecipado'
-
-  return input.pagamentos.map(p => {
-    const item: CobrancaPedidoDeliveryApi = {
-        meioPagamentoId: p.meioPagamentoId,
-        valor: p.valor,
-        momentoCobranca,
-      }
-    if (momentoCobranca === 'antecipado') {
-      item.pagamentoEfetivado = { confirmar: true }
-    }
-    return item
-  })
+  return input.pagamentos.map(cobrancaPedidoFromPagamento)
 }
 
 function buildClientePedidoDeliveryPayload(input: CriarPedidoDeliveryInputDTO) {
@@ -91,14 +74,22 @@ export function buildCriarPedidoDeliveryPayload(
   const observacoesPedido = observacoesArrayFromTexto(input.observacaoPedido)
   const cobrancas = buildCobrancasPedidoDeliveryPayload(input)
 
-  // POST /delivery/pedidos (Gestor) não aceita `taxas` — additionalProperties: false.
-  // A cobertura é calculada no backend. Override do atendente é PATCH após o create.
+  // POST Gestor não aceita `taxas`. Automática omite o valor; override manda `valorTaxaEntrega`.
   const payload: CriarPedidoDeliveryApiRequest = {
     origem: 'GESTOR',
     tipoEntrega: input.tipoAtendimentoDelivery,
     cliente: buildClientePedidoDeliveryPayload(input),
     produtos: mapProdutosPedidoDeliveryPayload(input.produtos),
     tempoTotalEstimadoSegundos: Math.max(0, Math.round(input.tempoPrevistoMinutos * 60)),
+  }
+
+  const valorTaxa = valorTaxaEntregaParaCreate({
+    pedidoComEntrega: input.pedidoComEntrega,
+    taxaEntregaId: input.taxaEntregaId,
+    valorTaxaEntrega: input.valorTaxaEntrega,
+  })
+  if (valorTaxa !== undefined) {
+    payload.valorTaxaEntrega = valorTaxa
   }
 
   if (observacoesPedido) {

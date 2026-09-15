@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { textoFromObservacoesApi } from '@/src/shared/helpers/observacaoPedido'
 import type { ModoKanbanVendas } from '../KanbanModoVendasToggle'
@@ -29,12 +30,12 @@ import {
   LABEL_SEM_CLIENTE,
   colunaParaEstiloCardKanban,
   deveExibirBotaoObservacaoPedidoKanban,
-  deveExibirBotaoSalvarCobrancaKanban,
   exibirAtribuirEntregadorKanban,
   formatarDataCard,
   getCardBorderEFundoKanban,
   getLinhaTempoPedidoEntregaKanban,
   podeEditarProdutosNaKanbanCard,
+  rotuloLinhaTempoCardCompacto,
 } from '../rules/vendasKanban.rules'
 
 export interface KanbanVendaCardProps {
@@ -50,12 +51,17 @@ export interface KanbanVendaCardProps {
   onAvancarEtapa: (venda: Venda, colunaAtual: ColunaKanbanId) => void
   onEmitirNfe: (venda: Venda) => void
   /** Modo delivery: reimprime cupom (mesmo layout da automática). */
-  onReimprimirCupomDelivery?: (venda: Venda, colunaAtual: ColunaKanbanId) => void
+  onReimprimirCupomDelivery?: (
+    venda: Venda,
+    colunaAtual: ColunaKanbanId
+  ) => void | Promise<void>
   entregadorVinculadoId?: string | null
   onEntregadorAtualizado?: (vendaId: string, entregadorId: string | null) => void
-  /** Abre o modal de detalhes na guia de pagamento para confirmar a cobrança (coluna Em Rota). */
-  onConfirmarCobranca?: (venda: Venda) => void
   nomesMeiosPagamento?: Record<string, string>
+  /** Painel lateral (WhatsApp): não usa DnD. */
+  arrastarDesabilitado?: boolean
+  /** Painéis do card (entregador, observação, endereço, quick view). */
+  onPainelAbertoChange?: (aberto: boolean) => void
 }
 
 export function KanbanVendaCard(props: KanbanVendaCardProps) {
@@ -73,8 +79,9 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
     onReimprimirCupomDelivery,
     entregadorVinculadoId = null,
     onEntregadorAtualizado,
-    onConfirmarCobranca,
     nomesMeiosPagamento = {},
+    arrastarDesabilitado = false,
+    onPainelAbertoChange,
   } = props
 
   const colunaAtual = column.id as ColunaKanbanId
@@ -99,6 +106,12 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
   const entregadorJaVinculado = Boolean(entregadorVinculadoId?.trim())
 
   const cardState = useKanbanVendaCardState()
+
+  useEffect(() => {
+    if (!cardState.bloquearDragCard) return
+    onPainelAbertoChange?.(true)
+    return () => onPainelAbertoChange?.(false)
+  }, [cardState.bloquearDragCard, onPainelAbertoChange])
 
   const valorFormatado = transformarParaReal(venda.valorFinal)
   const clienteNome = venda.cliente?.nome?.trim() ? venda.cliente.nome : LABEL_SEM_CLIENTE
@@ -128,11 +141,6 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
     venda,
     modoKanbanVendas
   )
-  const exibirBotaoSalvarCobranca = deveExibirBotaoSalvarCobrancaKanban(
-    colunaAtual,
-    venda,
-    modoKanbanVendas
-  )
   const exibirMetaDeliveryKanban =
     modoKanbanVendas === 'delivery' && venda.isPedidoEntregaGestor()
   const previsaoEntregaKanban = exibirMetaDeliveryKanban
@@ -155,10 +163,10 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
     <DraggableVendaCard
       venda={venda}
       column={column}
-      dragDisabled={cardState.bloquearDragCard}
+      dragDisabled={arrastarDesabilitado || cardState.bloquearDragCard}
     >
       <div
-        className={`relative rounded-lg border-l-4 ${cardBorderClass} ${cardBgClass} cursor-pointer border border-gray-200/80 p-3 transition-all hover:shadow-md`}
+        className={`relative rounded-lg border-l-4 ${cardBorderClass} ${cardBgClass} cursor-pointer border border-gray-200/80 ${arrastarDesabilitado ? 'p-2.5 shadow-sm' : 'p-3'} transition-all hover:shadow-md`}
         onClick={() => onViewDetails(venda)}
         onDoubleClick={() => onViewDetails(venda)}
       >
@@ -171,9 +179,7 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
             clienteNome={clienteNome}
             valorFormatado={valorFormatado}
             podeEditarProdutosNaVenda={exibirBotaoEditarProdutos}
-            exibirBotaoSalvarCobranca={exibirBotaoSalvarCobranca}
             onEditarProdutos={onEditarProdutos}
-            onConfirmarCobranca={onConfirmarCobranca}
             formaCobrancaKanban={formaCobrancaKanban}
             formaPagamentoKanban={formaPagamentoKanban}
             observacaoPedidoTexto={observacaoPedidoTexto}
@@ -185,24 +191,15 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
           />
         </div>
 
-        <div className="space-y-0.5">
-          {linhaTempo ? (
-            <div className="flex items-center justify-between gap-1">
-              <span className="text-xs text-gray-500">
-                {linhaTempo.prefixo} {formatarDataCard(linhaTempo.iso)}
-              </span>
-            </div>
-          ) : null}
-          {venda.dataFinalizacao && (
+          {venda.dataFinalizacao ? (
             <div className="flex items-center justify-between gap-1">
               <span className="text-xs text-gray-500">
                 Finalizada: {formatarDataCard(venda.dataFinalizacao)}
               </span>
             </div>
-          )}
-        </div>
+          ) : null}
 
-        <KanbanVendaCardActions
+          <KanbanVendaCardActions
           venda={venda}
           column={column}
           modoKanbanVendas={modoKanbanVendas}
@@ -221,6 +218,7 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
           onAbrirEndereco={() => cardState.setEnderecoEntregaOpen(true)}
           onAbrirQuickView={anchor => cardState.setEntregaQuickViewAnchor(anchor)}
           onAbrirDocumentoVenda={cardState.abrirDocumentoVendaKanban}
+          linhaEtapa={linhaTempo ? rotuloLinhaTempoCardCompacto(linhaTempo) : null}
         />
       </div>
 

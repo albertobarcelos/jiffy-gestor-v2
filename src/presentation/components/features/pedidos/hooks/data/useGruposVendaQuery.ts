@@ -2,99 +2,61 @@
 
 import { useEffect, useMemo } from 'react'
 import type { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
-import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
-import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
 import {
-  fetchGrupoIdsComProdutosAtivosVenda,
-  type CanalVendaNovoPedido,
-} from '../../novoPedidoProdutosApi'
+  montarGruposCatalogoVenda,
+  resolverGrupoCatalogoSelecionadoId,
+} from '@/src/domain/policies/pedido/CatalogoVendaPolicy'
+import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
+import { fetchGruposCatalogoVenda } from '../../novoPedidoProdutosApi'
 
 export type UseGruposVendaQueryParams = {
   enabled: boolean
   token: string | undefined
-  empresaId: string | undefined
-  canal: CanalVendaNovoPedido
+  menuId: string | null
   grupoSelecionadoId: string | null
-  onGrupoSelecionadoInvalido: () => void
+  setGrupoSelecionadoId: (id: string | null) => void
 }
 
 export function useGruposVendaQuery({
   enabled,
   token,
-  empresaId,
-  canal,
+  menuId,
   grupoSelecionadoId,
-  onGrupoSelecionadoInvalido,
+  setGrupoSelecionadoId,
 }: UseGruposVendaQueryParams) {
-  const { data: gruposData, isLoading: isLoadingGrupos } = useGruposProdutos({
-    ativo: true,
-    limit: 1000,
-    enabled,
-    refetchOnWindowFocus: false,
-  })
-
   const {
-    data: grupoIdsComProdutosAtivos,
-    isLoading: isLoadingGruposComProdutos,
-    isError: erroGruposComProdutos,
+    data: gruposMenu = [],
+    isLoading: isLoadingGruposMenu,
   } = useSecureTenantQuery(
-    ['novo-pedido-grupos-com-produtos', canal],
+    ['novo-pedido-menu-grupos', menuId],
     async ({ token: tenantToken }) => {
-      return fetchGrupoIdsComProdutosAtivosVenda(tenantToken, canal)
+      if (!menuId) return [] as GrupoProduto[]
+      return fetchGruposCatalogoVenda(menuId, tenantToken)
     },
     {
-      enabled: enabled && !!token,
+      enabled: enabled && !!token && !!menuId,
       staleTime: 1000 * 60 * 5,
     }
   )
 
-  const gruposOrdenados = useMemo(() => {
-    if (!gruposData) return []
-    return [...gruposData].sort((a, b) => {
-      const ordemA = a.getOrdem()
-      const ordemB = b.getOrdem()
-      if (ordemA !== undefined && ordemB !== undefined) return ordemA - ordemB
-      if (ordemA !== undefined && ordemB === undefined) return -1
-      if (ordemA === undefined && ordemB !== undefined) return 1
-      return a.getNome().localeCompare(b.getNome())
-    })
-  }, [gruposData])
-
-  const grupos = useMemo(() => {
-    const elegivelNoCanal = gruposOrdenados.filter((grupo: GrupoProduto) => {
-      if (!grupo.isAtivo()) return false
-      if (canal === 'entrega' && !grupo.isAtivoDelivery()) return false
-      if (canal === 'balcao' && !grupo.isAtivoLocal()) return false
-      return true
-    })
-
-    if (!grupoIdsComProdutosAtivos) {
-      if (isLoadingGruposComProdutos) return []
-      if (erroGruposComProdutos) return elegivelNoCanal
-      return []
-    }
-
-    return elegivelNoCanal.filter(grupo => grupoIdsComProdutosAtivos.has(grupo.getId()))
-  }, [
-    gruposOrdenados,
-    grupoIdsComProdutosAtivos,
-    canal,
-    isLoadingGruposComProdutos,
-    erroGruposComProdutos,
-  ])
+  const grupos = useMemo(
+    () =>
+      montarGruposCatalogoVenda({
+        menuId,
+        gruposMenu,
+      }),
+    [menuId, gruposMenu]
+  )
 
   useEffect(() => {
-    if (!grupoSelecionadoId || !grupoIdsComProdutosAtivos) return
-    if (!grupoIdsComProdutosAtivos.has(grupoSelecionadoId)) {
-      onGrupoSelecionadoInvalido()
-    }
-  }, [grupoSelecionadoId, grupoIdsComProdutosAtivos, onGrupoSelecionadoInvalido])
-
-  const isLoadingGruposVenda = isLoadingGrupos || isLoadingGruposComProdutos
+    const proximoId = resolverGrupoCatalogoSelecionadoId(grupos, grupoSelecionadoId)
+    if (proximoId === grupoSelecionadoId) return
+    setGrupoSelecionadoId(proximoId)
+  }, [grupos, grupoSelecionadoId, setGrupoSelecionadoId])
 
   return {
     grupos,
-    isLoadingGruposVenda,
-    grupoIdsComProdutosAtivos,
+    isLoadingGruposVenda: !menuId ? false : isLoadingGruposMenu,
+    menuCatalogoIndisponivel: enabled && !menuId,
   }
 }

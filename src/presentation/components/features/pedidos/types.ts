@@ -1,6 +1,6 @@
 'use client'
 
-import type { MoradaTelefone } from '@/src/presentation/hooks/useMoradaTelefone'
+import type { MoradaTelefone } from '@/src/domain/types/moradaEntrega'
 
 export type { NovoPedidoModalProps } from './types.ui'
 

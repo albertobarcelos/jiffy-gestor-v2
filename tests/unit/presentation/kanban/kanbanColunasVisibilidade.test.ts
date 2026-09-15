@@ -48,16 +48,17 @@ describe('colunasOcultasPadraoDoModo', () => {
 })
 
 describe('resolverColunasOcultasKanban', () => {
-  it('no Gestor web ignora a preferência e usa o padrão do modo', () => {
-    expect(resolverColunasOcultasKanban(false, 'delivery', [])).toEqual([
+  it('no Gestor mostra todas as etapas e ignora preferência persistida', () => {
+    expect(resolverColunasOcultasKanban('gestor', ['NOVOS_PEDIDOS', 'COM_FISCAL'])).toEqual([])
+    expect(resolverColunasOcultasKanban('gestor', ['COM_FISCAL'])).toEqual([])
+  })
+
+  it('no Fredy usa a preferência do operador', () => {
+    expect(resolverColunasOcultasKanban('fredy', ['EM_ROTA'])).toEqual(['EM_ROTA'])
+    expect(resolverColunasOcultasKanban('fredy', ['NOVOS_PEDIDOS', 'COM_FISCAL'])).toEqual([
       'NOVOS_PEDIDOS',
       'COM_FISCAL',
     ])
-    expect(resolverColunasOcultasKanban(false, 'balcao', ['COM_FISCAL'])).toEqual([])
-  })
-
-  it('no Flow usa a preferência do operador', () => {
-    expect(resolverColunasOcultasKanban(true, 'delivery', ['EM_ROTA'])).toEqual(['EM_ROTA'])
   })
 })
 

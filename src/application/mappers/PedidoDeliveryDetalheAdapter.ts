@@ -76,7 +76,10 @@ function mapCobrancaDeliveryToPagamento(raw: unknown): PagamentoApiItem | null {
         ? String(pagamentoEfetivado.realizadoPorId)
         : realizadoPorNested
           ? atorUsuarioId(realizadoPorNested)
-          : undefined,
+          : atorUsuarioId(c.criadaPor) ??
+            atorUsuarioId(c.criadoPor) ??
+            atorUsuarioId(c.lancadaPor) ??
+            atorUsuarioId(c.abertaPor),
     isTefUsed,
     isTefConfirmed,
     tefIdentifier:
@@ -159,7 +162,18 @@ export function adaptPedidoDeliveryToVendaGestorApiResponse(
     : []
 
   const dataFinalizacao = isoString(registro.dataFinalizacao)
-  const statusDelivery = String(registro.statusDelivery ?? '').trim().toUpperCase()
+  const statusDeliveryCandidatos = [
+    registro.statusDelivery,
+    registro.statusEtapaOperacional,
+    registro.statusOperacional,
+  ]
+  let statusDelivery = ''
+  for (const candidato of statusDeliveryCandidatos) {
+    const raw = String(candidato ?? '').trim().toUpperCase()
+    if (!raw || raw === 'ABERTA' || raw === 'FINALIZADA') continue
+    statusDelivery = raw
+    break
+  }
 
   const totalFaltaPagar = Number(registro.totalFaltaPagar ?? 0) || 0
   const cobrarNaEntregaPendente = cobrancas.some(c => {
@@ -212,12 +226,26 @@ export function adaptPedidoDeliveryToVendaGestorApiResponse(
     totalDesconto: registro.totalDesconto,
     totalAcrescimo: registro.totalAcrescimo,
     taxasLancadas: Array.isArray(registro.taxasLancadas) ? registro.taxasLancadas : [],
+    taxaEntregaValor:
+      registro.taxaEntregaValor ??
+      (registro.resumoPedido && typeof registro.resumoPedido === 'object'
+        ? (registro.resumoPedido as Record<string, unknown>).taxaEntrega
+        : undefined),
     pagamento: {
       status: totalFaltaPagar > 0 ? 'pendente' : 'pago',
       cobrarCliente: cobrarNaEntregaPendente,
       valorReceber: Number(registro.valorFinal ?? 0) || 0,
       valorRecebido: Number(registro.totalPago ?? 0) || 0,
       valorFaltante: totalFaltaPagar,
+      valorCobrarNaEntrega: cobrancas
+        .filter(c => {
+          if (!c || typeof c !== 'object') return false
+          const cob = c as Record<string, unknown>
+          const momento = String(cob.momentoCobranca ?? cob.momento_cobranca ?? '').toLowerCase()
+          const status = String(cob.status ?? '').toLowerCase()
+          return momento === 'na_entrega' && status !== 'paga' && status !== 'cancelada'
+        })
+        .reduce((soma, c) => soma + (Number((c as Record<string, unknown>).valor) || 0), 0),
     },
   }
 }

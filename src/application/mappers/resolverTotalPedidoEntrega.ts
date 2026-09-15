@@ -18,7 +18,7 @@ export function resolverValorTaxaEntregaPedido(args: {
   pedidoComEntrega: boolean
   taxaEntregaValor?: number | null
   resumoFinanceiroDetalhes?: ResumoFinanceiroDetalhes | null
-  /** Taxa calculada pela cobertura (área/raio) da morada selecionada. */
+  /** Prévia oficial da cotação do backend para a morada selecionada. */
   taxaEntregaCoberturaValor?: number | null
   taxaEntregaCatalogoValor?: number | null
   /** Override do atendente no wizard de criação. Pedido existente ignora (detalhe/resumo vencem). */
@@ -37,6 +37,15 @@ export function resolverValorTaxaEntregaPedido(args: {
   const fromCatalogo = args.taxaEntregaCatalogoValor
   if (args.taxaEntregaOverride === 'catalogo' && fromCatalogo != null && fromCatalogo > 0) {
     return fromCatalogo
+  }
+
+  // Automática no wizard: prévia oficial da cotação do backend (não catálogo).
+  if (args.taxaEntregaOverride === 'automatica') {
+    const fromCobertura = args.taxaEntregaCoberturaValor
+    if (fromCobertura != null && Number.isFinite(fromCobertura)) {
+      return Math.max(0, Number(fromCobertura))
+    }
+    return 0
   }
 
   const fromCobertura = args.taxaEntregaCoberturaValor

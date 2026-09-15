@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import React, { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
@@ -11,6 +11,7 @@ import { useDeliveryHubCadastrosRecomendados } from '@/src/presentation/hooks/us
 import { useRaiosEntregaDelivery } from '@/src/presentation/hooks/useRaiosEntregaDelivery'
 import { useTabsStore } from '@/src/presentation/stores/tabsStore'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
+import { EMPRESA_DELIVERY_PENDENCIA_TYPES } from '@/src/shared/constants/empresaDeliveryPendencias'
 import {
   DELIVERY_HUB_PATH,
   DELIVERY_HUB_TAB_ID,
@@ -26,7 +27,7 @@ import type { DeliveryHubPassoUi } from './deliveryHubPassosUi'
 import { resumirCoberturaHub } from './deliveryHubResumoCobertura'
 
 /**
- * Hub Delivery — home de setup (checklist + resumo).
+ * Hub Delivery ÔÇö home de setup (checklist + resumo).
  * A cobertura em tela cheia continua em `/config/delivery/cobertura`.
  */
 export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId | null }) {
@@ -67,8 +68,14 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
     () => ({
       ...cadastrosRecomendados.extras,
       whatsappConectado,
+      empresaDeliveryConfigurada: configurado,
+      agendaConfigurada:
+        configurado &&
+        !pendencias.some(
+          p => p.type === EMPRESA_DELIVERY_PENDENCIA_TYPES.FUNCIONAMENTO_AGENDA_NAO_CONFIGURADA
+        ),
     }),
-    [cadastrosRecomendados.extras, whatsappConectado]
+    [cadastrosRecomendados.extras, configurado, pendencias, whatsappConectado]
   )
 
   useEffect(() => {

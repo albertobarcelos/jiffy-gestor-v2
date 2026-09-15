@@ -8,8 +8,9 @@ import {
   chromeErpCasco,
   isRotaPedidos,
 } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
-import { useKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/kiosk/useKioskGestorPedidos'
+import { useSuperficieQuadroPedidos } from '@/src/presentation/gestor-pedidos/kiosk/useSuperficieQuadroPedidos'
 import { WhatsAppWebViewHost } from '@/src/presentation/gestor-pedidos/whatsapp/WhatsAppWebViewHost'
+import { DeliveryRealtimeBridge } from '@/src/presentation/realtime/DeliveryRealtimeBridge'
 import { useDetectCacheLeaks } from '@/src/presentation/hooks/useDetectCacheLeaks'
 import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 import { stripGestaoEmpresaSlugFromPath } from '@/src/shared/utils/gestaoRoutes'
@@ -17,7 +18,7 @@ import { stripGestaoEmpresaSlugFromPath } from '@/src/shared/utils/gestaoRoutes'
 function ErpAppShellInner({ children }: { children: ReactNode }) {
   useDetectCacheLeaks()
   const pathname = usePathname()
-  const kiosk = useKioskGestorPedidos()
+  const superficie = useSuperficieQuadroPedidos()
   const pedidos = isRotaPedidos(stripGestaoEmpresaSlugFromPath(pathname ?? ''))
   const [clientePronto, setClientePronto] = useState(false)
 
@@ -26,14 +27,15 @@ function ErpAppShellInner({ children }: { children: ReactNode }) {
   }, [])
 
   const { layoutKiosk, mostrarTopNav } = chromeErpCasco({
-    kiosk,
+    superficie,
     rotaPedidos: pedidos,
     clientePronto,
   })
 
   return (
     <div className="flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-gray-50">
-      {kiosk && clientePronto ? <WhatsAppWebViewHost /> : null}
+      <DeliveryRealtimeBridge />
+      {superficie === 'fredy' && clientePronto ? <WhatsAppWebViewHost /> : null}
       {mostrarTopNav ? <TopNav /> : null}
 
       <main

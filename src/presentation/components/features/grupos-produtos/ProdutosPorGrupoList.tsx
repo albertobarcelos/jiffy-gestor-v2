@@ -22,7 +22,16 @@ import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecure
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
-import { ProdutosTabsModal, ProdutosTabsModalState } from '../produtos/ProdutosTabsModal'
+import {
+  ProdutosTabsModal,
+  type ProdutosTabsModalState,
+  type ProdutosTabsTabKey,
+} from '../produtos/ProdutosTabsModal'
+import {
+  EscolherTipoProdutoModal,
+  useEscolherTipoProdutoCadastro,
+} from '../produtos/EscolherTipoProdutoModal'
+import { ProdutoNovoWizard } from '../produtos/ProdutoNovoWizard'
 import { Produto } from '@/src/domain/entities/Produto'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
@@ -50,6 +59,8 @@ interface ProdutosPorGrupoListProps {
 const PAGE_SIZE = 10
 
 export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListProps) {
+  const tipoCadastro = useEscolherTipoProdutoCadastro()
+  const [wizardOpen, setWizardOpen] = useState(false)
   const [localProdutos, setLocalProdutos] = useState<ProdutoGrupo[]>([])
   const [tabsModalState, setTabsModalState] = useState<ProdutosTabsModalState>({
     open: false,
@@ -103,7 +114,7 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
-        throw new Error(body.message || 'Erro ao carregar produtos do grupo')
+        throw new Error(body.message || 'Erro ao carregar produtos da categoria')
       }
 
       return res.json()
@@ -210,16 +221,13 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
   }, [])
 
   const handleOpenNovoProdutoModal = useCallback(() => {
-    setTabsModalState({
-      open: true,
-      tab: 'produto',
-      mode: 'create',
-      produto: undefined,
-      prefillGrupoProdutoId: grupoProdutoId,
-      grupoId: undefined,
-    })
-  }, [grupoProdutoId])
+    tipoCadastro.pedirTipo(() => setWizardOpen(true))
+  }, [tipoCadastro.pedirTipo])
 
+  const handleCloseWizard = useCallback(() => {
+    setWizardOpen(false)
+    void refetch()
+  }, [refetch])
   const handleCloseTabsModal = useCallback(() => {
     setTabsModalState((prev) => ({
       ...prev,
@@ -231,15 +239,12 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
     refetch()
   }, [refetch])
 
-  const handleTabsModalTabChange = useCallback(
-    (tab: 'produto' | 'complementos' | 'impressoras' | 'grupo') => {
-      setTabsModalState((prev) => ({
-        ...prev,
-        tab,
-      }))
-    },
-    []
-  )
+  const handleTabsModalTabChange = useCallback((tab: ProdutosTabsTabKey) => {
+    setTabsModalState(prev => ({
+      ...prev,
+      tab,
+    }))
+  }, [])
 
   const handleEditProduto = useCallback(
     async (produtoId: string) => {
@@ -353,7 +358,7 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
     return (
       <div className="flex flex-col items-center justify-center py-6 px-2 gap-4">
         <p className="text-secondary-text text-sm text-center">
-          Não foi possível carregar os produtos deste grupo.
+          Não foi possível carregar os produtos desta categoria.
         </p>
         <button
           type="button"
@@ -370,7 +375,7 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
     return (
       <div className="text-center py-12">
         <p className="text-secondary-text text-sm ">
-          Nenhum produto associado a este grupo.
+          Nenhum produto associado a esta categoria.
         </p>
       </div>
     )
@@ -451,6 +456,18 @@ export function ProdutosPorGrupoList({ grupoProdutoId }: ProdutosPorGrupoListPro
         </div>
       </div>
 
+      <EscolherTipoProdutoModal
+        open={tipoCadastro.open}
+        onClose={tipoCadastro.fechar}
+        onContinuar={tipoCadastro.continuar}
+      />
+      <ProdutoNovoWizard
+        origem="cadastro"
+        open={wizardOpen}
+        initialCategoriaId={grupoProdutoId}
+        onClose={handleCloseWizard}
+        onSuccess={() => void refetch()}
+      />
       <ProdutosTabsModal
         state={tabsModalState}
         onClose={handleCloseTabsModal}

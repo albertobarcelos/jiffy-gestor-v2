@@ -1,5 +1,10 @@
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import type { EnderecoGeocodeInput } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
+import { mensagemAmigavelErroGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
+import {
+  backendPlaceDetails,
+  backendPlacesAutocomplete,
+} from '@/src/shared/utils/geolocalizacaoBackendApi'
 import { formatarCepMascara, normalizarDigitosCep } from '@/src/shared/utils/consultaCep'
 
 export type PlacesAutocompletePrediction = {
@@ -60,40 +65,18 @@ export async function buscarPlacesAutocomplete(input: {
   const termo = input.input.trim()
   if (termo.length < 3) return []
 
-  const params = new URLSearchParams({
-    input: termo,
-    sessionToken: input.sessionToken,
-  })
-  if (input.bias && Number.isFinite(input.bias.lat) && Number.isFinite(input.bias.lng)) {
-    params.set('lat', String(input.bias.lat))
-    params.set('lng', String(input.bias.lng))
-    if (input.bias.radiusMeters != null) {
-      params.set('radius', String(input.bias.radiusMeters))
-    }
+  try {
+    return await backendPlacesAutocomplete({
+      input: termo,
+      sessionToken: input.sessionToken,
+      lat: input.bias?.lat,
+      lng: input.bias?.lng,
+      radiusMeters: input.bias?.radiusMeters,
+      signal: input.signal,
+    })
+  } catch (error) {
+    throw new Error(mensagemAmigavelErroGeolocalizacao(error, 'places'))
   }
-
-  const response = await fetch(`/api/geolocalizacao/places/autocomplete?${params}`, {
-    method: 'GET',
-    headers: { Accept: 'application/json' },
-    signal: input.signal,
-  })
-
-  const payload = await response.json().catch(() => ({}))
-  if (!response.ok) {
-    const msg =
-      typeof payload.error === 'string' ? payload.error : 'Não foi possível buscar sugestões de endereço'
-    throw new Error(msg)
-  }
-
-  const predictions = Array.isArray(payload.predictions) ? payload.predictions : []
-  return predictions
-    .map((p: Record<string, unknown>) => ({
-      placeId: String(p.placeId ?? '').trim(),
-      descricao: String(p.descricao ?? '').trim(),
-      descricaoPrincipal: String(p.descricaoPrincipal ?? '').trim(),
-      descricaoSecundaria: String(p.descricaoSecundaria ?? '').trim(),
-    }))
-    .filter((p: PlacesAutocompletePrediction) => Boolean(p.placeId && p.descricao))
 }
 
 export async function buscarPlaceDetails(input: {
@@ -106,55 +89,24 @@ export async function buscarPlaceDetails(input: {
     throw new Error('placeId é obrigatório')
   }
 
-  const params = new URLSearchParams({
-    placeId,
-    sessionToken: input.sessionToken,
-  })
-
-  const response = await fetch(`/api/geolocalizacao/places/details?${params}`, {
-    method: 'GET',
-    headers: { Accept: 'application/json' },
-    signal: input.signal,
-  })
-
-  const payload = await response.json().catch(() => ({}))
-  if (!response.ok) {
-    const msg =
-      typeof payload.error === 'string' ? payload.error : 'Não foi possível obter detalhes do endereço'
-    throw new Error(msg)
-  }
-
-  const coords = payload.enderecoLocalizacao?.coordinates
-  if (
-    !payload.enderecoLocalizacao ||
-    payload.enderecoLocalizacao.type !== 'Point' ||
-    !Array.isArray(coords) ||
-    coords.length !== 2
-  ) {
-    throw new Error('Resposta de Place Details sem coordenadas válidas')
-  }
-
-  const providerEnderecoId = String(payload.providerEnderecoId ?? placeId).trim()
-  if (!providerEnderecoId) {
-    throw new Error('Place Details sem place_id')
-  }
-
-  return {
-    providerEnderecoId,
-    enderecoLocalizacao: {
-      type: 'Point',
-      coordinates: [Number(coords[0]), Number(coords[1])],
-    },
-    enderecoFormatado:
-      typeof payload.enderecoFormatado === 'string' ? payload.enderecoFormatado.trim() || null : null,
-    rua: String(payload.rua ?? '').trim(),
-    numero: String(payload.numero ?? '').trim(),
-    bairro: String(payload.bairro ?? '').trim(),
-    cidade: String(payload.cidade ?? '').trim(),
-    estado: String(payload.estado ?? '')
-      .trim()
-      .toUpperCase()
-      .slice(0, 2),
-    cep: normalizarDigitosCep(String(payload.cep ?? '')).slice(0, 8),
+  try {
+    const lookup = await backendPlaceDetails({
+      placeId,
+      sessionToken: input.sessionToken,
+      signal: input.signal,
+    })
+    return {
+      providerEnderecoId: lookup.providerEnderecoId,
+      enderecoLocalizacao: lookup.enderecoLocalizacao,
+      enderecoFormatado: lookup.enderecoFormatado,
+      rua: lookup.rua,
+      numero: lookup.numero,
+      bairro: lookup.bairro,
+      cidade: lookup.cidade,
+      estado: lookup.estado,
+      cep: lookup.cep,
+    }
+  } catch (error) {
+    throw new Error(mensagemAmigavelErroGeolocalizacao(error, 'details'))
   }
 }

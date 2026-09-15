@@ -8,25 +8,31 @@ import { useProdutosInfinite } from '@/src/presentation/hooks/useProdutos'
 import { useGruposProdutos } from '@/src/presentation/hooks/useGruposProdutos'
 import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
 import { useProdutoPatchMutation, isSavingOf } from '@/src/presentation/hooks/useProdutoPatchMutation'
-import { useGrupoProdutoPatchMutation } from '@/src/presentation/hooks/useGrupoProdutoPatchMutation'
+import { usePropagarAlteracaoProduto } from '@/src/presentation/hooks/produtos/usePropagarAlteracaoProduto'
 import { useProdutosFilters } from '@/src/presentation/hooks/useProdutosFilters'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { syncCadastroComMenuPrincipalAtivo } from '@/src/domain/policies/produto/syncCadastroComMenuPrincipal'
+import { buscarIdMenuPrincipal } from '@/src/presentation/utils/uploadImagemProdutoMenus'
 import { useIsMobile } from '@/src/presentation/hooks/useIsMobile'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { ProdutosTabsModal, type ProdutosTabsModalState } from '../ProdutosTabsModal'
+import {
+  EscolherTipoProdutoModal,
+  useEscolherTipoProdutoCadastro,
+} from '../EscolherTipoProdutoModal'
+import { ProdutoNovoWizard } from '../ProdutoNovoWizard'
 import { ProdutosHeader } from './ProdutosHeader'
 import { ProdutosFilters } from './ProdutosFilters'
-import { ProdutosGroupHeader } from './ProdutosGroupHeader'
 import { ProdutoListItem } from './ProdutoListItem'
+import { CatalogProductColumnHeader } from '@/src/presentation/components/features/catalogo/CatalogProductColumnHeader'
 
 import { Produto } from '@/src/domain/entities/Produto'
 import type { ToggleField } from '@/src/shared/types/produto'
 import {
-  sortProdutosAlphabetically,
-  sortProdutosWithinGroup,
-  normalizeGroupName,
-  buildProdutoGroupKey,
+  sortProdutosPorOrdemMenu,
+  mapaOrdemGrupoProduto,
   produtoFromApiPreservandoOrdem,
 } from './utils'
 
@@ -61,31 +67,40 @@ export function ProdutosList() {
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(false)
   useEffect(() => { setFiltrosVisiveis(!isMobile) }, [isMobile])
 
-  // Indexado por grupoId (ou '__sem_grupo__') para evitar colisões de nome normalizado.
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
-
   const [tabsModalState, setTabsModalState] = useState<ProdutosTabsModalState>({
     open: false, tab: 'produto', mode: 'create',
     prefillGrupoProdutoId: undefined, grupoId: undefined,
   })
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const scrollIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleListScroll = useCallback(() => {
+    const root = scrollContainerRef.current
+    if (!root) return
+    if (document.querySelector('.MuiAutocomplete-popper')) return
+    root.classList.add('produtos-list-scrolling')
+    if (scrollIdleTimerRef.current) clearTimeout(scrollIdleTimerRef.current)
+    scrollIdleTimerRef.current = setTimeout(() => {
+      root.classList.remove('produtos-list-scrolling')
+      scrollIdleTimerRef.current = null
+    }, 140)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (scrollIdleTimerRef.current) clearTimeout(scrollIdleTimerRef.current)
+    }
+  }, [])
 
   const patchMutation = useProdutoPatchMutation()
-  const grupoPatchMutation = useGrupoProdutoPatchMutation()
+  const tipoCadastro = useEscolherTipoProdutoCadastro()
+  const [wizardOpen, setWizardOpen] = useState(false)
+  const { pedirConfirmacao, aplicarNosDestinos, dialog: dialogPropagacao } =
+    usePropagarAlteracaoProduto()
 
   const { data: gruposProdutos = [], isLoading: isLoadingGruposProdutos } = useGruposProdutos({ limit: 100, ativo: null })
   const { data: gruposComplementos = [], isLoading: isLoadingGruposComplementos } = useGruposComplementos({ limit: 100, ativo: null })
-
-  const gruposProdutosFiltrados = useMemo(() => {
-    if (filters.statusGrupoFilter === 'Ativo') {
-      return gruposProdutos.filter((g) => g.isAtivo())
-    }
-    if (filters.statusGrupoFilter === 'Desativado') {
-      return gruposProdutos.filter((g) => !g.isAtivo())
-    }
-    return gruposProdutos
-  }, [gruposProdutos, filters.statusGrupoFilter])
 
   const { data, fetchNextPage, hasNextPage, isFetching, isFetchingNextPage, isLoading, error } =
     useProdutosInfinite(queryParams)
@@ -104,107 +119,96 @@ export function ProdutosList() {
 
   const totalProdutos = useMemo(() => data?.pages?.[0]?.count ?? 0, [data])
 
-  const produtosSorted = useMemo(() => sortProdutosAlphabetically(produtos), [produtos])
-
-  const produtosAgrupados = useMemo(() => {
-    const map = new Map<string, Produto[]>()
-    produtosSorted.forEach((p) => {
-      const key = buildProdutoGroupKey(p)
-      if (!map.has(key)) map.set(key, [])
-      map.get(key)!.push(p)
-    })
-    return Array.from(map.entries()).map(([groupKey, items]) => ({
-      groupKey,
-      grupoLabel: normalizeGroupName(items[0]?.getNomeGrupo()),
-      items: sortProdutosWithinGroup(items),
-    }))
-  }, [produtosSorted])
-
-  // Map consolidado: visual + ativo por grupoId. Evita lookup O(N) por render.
   const grupoProdutoMap = useMemo(() => {
-    const map = new Map<string, { corHex: string; iconName: string; ativo: boolean; ordem: number }>()
-    gruposProdutos.forEach((g) =>
-      map.set(g.getId(), {
-        corHex: g.getCorHex(),
-        iconName: g.getIconName(),
-        ativo: g.isAtivo(),
-        ordem: g.getOrdem() ?? Number.MAX_SAFE_INTEGER,
-      })
-    )
+    const map = new Map<string, { ativo: boolean }>()
+    gruposProdutos.forEach(g => map.set(g.getId(), { ativo: g.isAtivo() }))
     return map
   }, [gruposProdutos])
 
-  /** Grupos ordenados por `ordem` (API), fallback por nome do grupo. */
-  const produtosAgrupadosOrdenados = useMemo(() => {
-    const ordenados = [...produtosAgrupados].sort((a, b) => {
-      const grupoIdA = a.items[0]?.getGrupoId()
-      const grupoIdB = b.items[0]?.getGrupoId()
+  const ordemGrupoPorId = useMemo(
+    () => mapaOrdemGrupoProduto(gruposProdutos),
+    [gruposProdutos]
+  )
 
-      // "Sem grupo" sempre por último
-      const semGrupoA = !grupoIdA
-      const semGrupoB = !grupoIdB
-      if (semGrupoA && !semGrupoB) return 1
-      if (!semGrupoA && semGrupoB) return -1
+  const filtraStatusCategoria = filters.statusGrupoFilter !== 'Todos'
 
-      const ordemA = grupoIdA ? (grupoProdutoMap.get(grupoIdA)?.ordem ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER
-      const ordemB = grupoIdB ? (grupoProdutoMap.get(grupoIdB)?.ordem ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER
-      if (ordemA !== ordemB) return ordemA - ordemB
+  const produtosVisiveis = useMemo(() => {
+    let list = produtos
 
-      const labelCmp = a.grupoLabel.localeCompare(b.grupoLabel, 'pt-BR', { sensitivity: 'base' })
-      if (labelCmp !== 0) return labelCmp
-      return a.groupKey.localeCompare(b.groupKey)
-    })
-
-    if (filters.statusGrupoFilter === 'Todos') {
-      if (filters.grupoProdutoFilter.length === 0) return ordenados
+    if (filters.grupoProdutoFilter.length > 1) {
       const idsSelecionados = new Set(filters.grupoProdutoFilter)
-      return ordenados.filter(({ items }) => {
-        const grupoId = items[0]?.getGrupoId()
+      list = list.filter(p => {
+        const grupoId = p.getGrupoId()
         return Boolean(grupoId && idsSelecionados.has(grupoId))
       })
     }
 
-    const porStatus = ordenados.filter(({ items }) => {
-      const grupoId = items[0]?.getGrupoId()
-      if (!grupoId) {
-        // "Sem grupo" só aparece quando o filtro de status do grupo é Ativo/Todos
-        return filters.statusGrupoFilter === 'Ativo'
-      }
-      const ativo = grupoProdutoMap.get(grupoId)?.ativo
-      if (typeof ativo !== 'boolean') return filters.statusGrupoFilter === 'Ativo'
-      return filters.statusGrupoFilter === 'Ativo' ? ativo : !ativo
-    })
-
-    if (filters.grupoProdutoFilter.length === 0) return porStatus
-
-    const idsSelecionados = new Set(filters.grupoProdutoFilter)
-    return porStatus.filter(({ items }) => {
-      const grupoId = items[0]?.getGrupoId()
-      return Boolean(grupoId && idsSelecionados.has(grupoId))
-    })
-  }, [produtosAgrupados, grupoProdutoMap, filters.statusGrupoFilter, filters.grupoProdutoFilter])
-
-  // Inicializar grupos expandidos quando novos grupos aparecem
-  useEffect(() => {
-    setExpandedGroups((prev) => {
-      let changed = false
-      const next: Record<string, boolean> = {}
-      produtosAgrupadosOrdenados.forEach(({ groupKey }) => {
-        if (typeof prev[groupKey] === 'undefined') {
-          changed = true
-          next[groupKey] = true
-        } else next[groupKey] = prev[groupKey]
+    if (filtraStatusCategoria) {
+      list = list.filter(p => {
+        const grupoId = p.getGrupoId()
+        if (!grupoId) {
+          return filters.statusGrupoFilter === 'Ativo'
+        }
+        const ativo = grupoProdutoMap.get(grupoId)?.ativo
+        if (typeof ativo !== 'boolean') return filters.statusGrupoFilter === 'Ativo'
+        return filters.statusGrupoFilter === 'Ativo' ? ativo : !ativo
       })
-      return changed ? next : prev
-    })
-  }, [produtosAgrupadosOrdenados])
-
-  // Scroll infinito: carrega próxima página quando o usuário chega perto do fim
-  useEffect(() => {
-    if (hasNextPage && !isFetchingNextPage && !isFetching && data) {
-      fetchNextPage()
     }
-  }, [hasNextPage, isFetchingNextPage, isFetching, fetchNextPage, data])
+
+    return sortProdutosPorOrdemMenu(list, ordemGrupoPorId)
+  }, [
+    produtos,
+    grupoProdutoMap,
+    ordemGrupoPorId,
+    filtraStatusCategoria,
+    filters.statusGrupoFilter,
+    filters.grupoProdutoFilter,
+  ])
+
+  /** Status categoria filtra no cliente — carrega todas as páginas da API antes de contar/exibir. */
+  useEffect(() => {
+    if (!filtraStatusCategoria) return
+    if (hasNextPage && !isFetchingNextPage && !isFetching) {
+      void fetchNextPage()
+    }
+  }, [
+    filtraStatusCategoria,
+    hasNextPage,
+    isFetchingNextPage,
+    isFetching,
+    fetchNextPage,
+    produtos.length,
+  ])
+
+  const totalContagem = filtraStatusCategoria ? produtosVisiveis.length : totalProdutos
+
+  const loadMoreRef = useRef<HTMLDivElement>(null)
+
+  // Scroll infinito: só busca a próxima página quando o sentinela entra na viewport da lista
+  useEffect(() => {
+    const sentinel = loadMoreRef.current
+    const root = scrollContainerRef.current
+    if (!sentinel || !root || !hasNextPage || isFetchingNextPage || isFetching) {
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries.some(e => e.isIntersecting) && hasNextPage && !isFetchingNextPage && !isFetching) {
+          void fetchNextPage()
+        }
+      },
+      { root, rootMargin: '120px', threshold: 0 }
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [
+    hasNextPage,
+    isFetchingNextPage,
+    isFetching,
+    fetchNextPage,
+    produtosVisiveis.length,
+  ])
 
   useEffect(() => {
     if (error) console.error('Erro ao carregar produtos:', error)
@@ -218,22 +222,17 @@ export function ProdutosList() {
   // Modal helpers
   const openTabsModal = useCallback(
     (config: Partial<ProdutosTabsModalState>) => {
-      const grupoId = config.grupoId
-      const initialGrupo =
-        config.initialGrupo ??
-        (grupoId ? gruposProdutos.find(g => g.getId() === grupoId) : undefined)
       setTabsModalState({
         open: true,
         tab: 'produto',
         mode: 'create',
         ...config,
-        initialGrupo,
       })
       const params = new URLSearchParams(Array.from(searchParams.entries()))
       params.set('modalOpen', 'true')
       router.replace(`${pathname}?${params.toString()}`, { scroll: false })
     },
-    [router, searchParams, pathname, gruposProdutos]
+    [router, searchParams, pathname]
   )
 
   const closeTabsModal = useCallback(() => {
@@ -243,13 +242,19 @@ export function ProdutosList() {
       mode: 'create',
       prefillGrupoProdutoId: undefined,
       grupoId: undefined,
-      initialGrupo: undefined,
     })
     const params = new URLSearchParams(Array.from(searchParams.entries()))
     params.delete('modalOpen')
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }, [router, searchParams, pathname])
 
+  const openWizardCadastro = useCallback(() => {
+    setWizardOpen(true)
+  }, [])
+
+  const closeWizardCadastro = useCallback(() => {
+    setWizardOpen(false)
+  }, [])
   const updateProdutoInCache = useCallback((produtoId: string, produtoData: unknown) => {
     if (!empresaId) return
     queryClient.setQueriesData<InfinitePagesData>(
@@ -292,18 +297,74 @@ export function ProdutosList() {
     })
   }, [queryClient, empresaId, updateProdutoInCache])
 
-  // Handlers de produto — recebem produtoId como arg, sem closure por item
-  const handleValorChange = useCallback((produtoId: string, novoValor: number) => {
-    patchMutation.mutate({ type: 'valor', produtoId, novoValor })
-  }, [patchMutation])
+  const handleStatusToggle = useCallback(async (produtoId: string, novoStatus: boolean) => {
+    const destinos = await pedirConfirmacao({
+      origem: 'cadastroBase',
+      produtoId,
+      variante: 'statusAtivo',
+      novoAtivo: novoStatus,
+    })
+    if (destinos === null) return
+    patchMutation.mutate(
+      { type: 'status', produtoId, novoStatus, filterStatus },
+      {
+        onSuccess: () => {
+          if (destinos.menuIds.length === 0) return
+          void aplicarNosDestinos({
+            produtoId,
+            snapshot: { ativo: novoStatus },
+            destinos: { aplicarNoCadastroBase: false, menuIds: destinos.menuIds },
+          })
+        },
+      }
+    )
+  }, [patchMutation, filterStatus, pedirConfirmacao, aplicarNosDestinos])
 
-  const handleStatusToggle = useCallback((produtoId: string, novoStatus: boolean) => {
-    patchMutation.mutate({ type: 'status', produtoId, novoStatus, filterStatus })
-  }, [patchMutation, filterStatus])
+  const aplicarSnapshotNoMenuPrincipal = useCallback(
+    async (produtoId: string, snapshot: { favorito?: boolean; valor?: number }) => {
+      if (!syncCadastroComMenuPrincipalAtivo()) return
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+      if (!token) return
+      try {
+        const principalId = await buscarIdMenuPrincipal(token)
+        if (!principalId) return
+        await aplicarNosDestinos({
+          produtoId,
+          snapshot,
+          destinos: { aplicarNoCadastroBase: false, menuIds: [principalId] },
+        })
+      } catch {
+        /* cadastro já foi salvo; o principal recebe na próxima edição */
+      }
+    },
+    [aplicarNosDestinos]
+  )
 
-  const handleToggleBooleanField = useCallback((produtoId: string, field: ToggleField, novoValor: boolean) => {
-    patchMutation.mutate({ type: 'toggle', produtoId, field, novoValor })
-  }, [patchMutation])
+  const handleToggleBooleanField = useCallback(async (produtoId: string, field: ToggleField, novoValor: boolean) => {
+    patchMutation.mutate(
+      { type: 'toggle', produtoId, field, novoValor },
+      {
+        onSuccess: () => {
+          if (field !== 'favorito') return
+          void aplicarSnapshotNoMenuPrincipal(produtoId, { favorito: novoValor })
+        },
+      }
+    )
+  }, [patchMutation, aplicarSnapshotNoMenuPrincipal])
+
+  const handleValorChange = useCallback(
+    (produtoId: string, novoValor: number) => {
+      patchMutation.mutate(
+        { type: 'valor', produtoId, novoValor },
+        {
+          onSuccess: () => {
+            void aplicarSnapshotNoMenuPrincipal(produtoId, { valor: novoValor })
+          },
+        }
+      )
+    },
+    [patchMutation, aplicarSnapshotNoMenuPrincipal]
+  )
 
   const handleEditProduto = useCallback((produtoId: string) => {
     const produto = produtos.find((p) => p.getId() === produtoId)
@@ -317,44 +378,18 @@ export function ProdutosList() {
     openTabsModal({ tab: 'produto', mode: 'copy', produto, grupoId: produto.getGrupoId() })
   }, [produtos, openTabsModal])
 
-  // Handlers de grupo — todos estáveis, recebem IDs como argumento
-  const handleToggleExpand = useCallback((groupKey: string) => {
-    setExpandedGroups((prev) => {
-      const currentlyExpanded = prev[groupKey] !== false
-      return { ...prev, [groupKey]: !currentlyExpanded }
-    })
-  }, [])
-
-  const handleToggleGroupStatus = useCallback((grupoId: string) => {
-    const info = grupoProdutoMap.get(grupoId)
-    if (!info) return
-    grupoPatchMutation.mutate({ grupoId, novoStatus: !info.ativo })
-  }, [grupoProdutoMap, grupoPatchMutation])
-
-  const handleEditGrupoProduto = useCallback((grupoId: string | undefined) => {
-    if (!grupoId) return
-    const primeiroProduto = produtos.find((p) => p.getGrupoId() === grupoId)
-    openTabsModal({ tab: 'grupo', mode: 'edit', grupoId, produto: primeiroProduto })
-  }, [produtos, openTabsModal])
-
-  const handleAddProdutoForGroup = useCallback((grupoNome: string, grupoId: string | undefined) => {
-    if (!grupoId || grupoNome.toLowerCase() === 'sem grupo') {
-      openTabsModal({ tab: 'produto', mode: 'create' })
-      return
-    }
-    openTabsModal({ tab: 'produto', mode: 'create', prefillGrupoProdutoId: grupoId })
-  }, [openTabsModal])
-
   const isLoadingAny = isLoading || isFetching || isFetchingNextPage
+  const showInitialLoading = isLoadingAny && produtosVisiveis.length === 0
+  const showEmpty = !isLoadingAny && produtosVisiveis.length === 0
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <ProdutosHeader
-        totalLocal={produtos.length}
-        totalApi={totalProdutos}
+        totalLocal={produtosVisiveis.length}
+        totalApi={totalContagem}
         searchText={filters.searchText}
         onSearchChange={actions.setSearch}
-        onNovoProduto={() => openTabsModal({ tab: 'produto', mode: 'create' })}
+        onNovoProduto={() => tipoCadastro.pedirTipo(() => openWizardCadastro())}
       />
 
       <div className="h-[4px] border-t-2 border-primary/50 flex-shrink-0" />
@@ -367,13 +402,9 @@ export function ProdutosList() {
         onFilterStatusChange={actions.setStatus}
         statusGrupoFilter={filters.statusGrupoFilter}
         onStatusGrupoChange={actions.setStatusGrupo}
-        ativoLocalFilter={filters.ativoLocalFilter}
-        onAtivoLocalChange={actions.setAtivoLocal}
-        ativoDeliveryFilter={filters.ativoDeliveryFilter}
-        onAtivoDeliveryChange={actions.setAtivoDelivery}
         grupoProdutoFilter={filters.grupoProdutoFilter}
         onGrupoProdutoChange={actions.setGrupoProduto}
-        gruposProdutos={gruposProdutosFiltrados}
+        gruposProdutos={gruposProdutos}
         isLoadingGruposProdutos={isLoadingGruposProdutos}
         grupoComplementoFilter={filters.grupoComplementoFilter}
         onGrupoComplementoChange={actions.setGrupoComplemento}
@@ -384,89 +415,43 @@ export function ProdutosList() {
 
       <div
         ref={scrollContainerRef}
-        className="mt-2 min-h-0 flex-1 overflow-y-auto px-1 scrollbar-thin"
+        onScroll={handleListScroll}
+        className="mt-2 min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-1 scrollbar-hide [&.produtos-list-scrolling]:[&_*]:hover:!bg-white"
       >
-        {/* Loading inicial */}
-        {isLoadingAny && produtos.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-12 gap-2">
+        {showInitialLoading ? (
+          <div className="flex flex-col items-center justify-center gap-2 py-12">
             <JiffyLoading />
           </div>
-        )}
-
-        {/* Sem resultados */}
-        {!isLoadingAny && produtos.length === 0 && data && (
+        ) : showEmpty ? (
           <div className="flex items-center justify-center py-12">
             <p className="text-secondary-text">Nenhum produto encontrado.</p>
           </div>
-        )}
-
-        {/* Lista agrupada */}
-        {produtosAgrupadosOrdenados.length > 0 && (
-          <div role="list" aria-label="Lista de produtos" className="space-y-4 pb-4">
-            {produtosAgrupadosOrdenados.map(({ groupKey, grupoLabel, items }) => {
-              const grupoId = items[0]?.getGrupoId()
-              const info = grupoId ? grupoProdutoMap.get(grupoId) : undefined
-              const grupoVisual = info ? { corHex: info.corHex, iconName: info.iconName } : undefined
-              const grupoAtivo = info?.ativo ?? true
-              const isExpanded = expandedGroups[groupKey] !== false
-
-              return (
-                <div key={groupKey} role="listitem" className="space-y-1">
-                  {/* sticky top-0 z-20: CSS nativo, sem JS, sem complexidade */}
-                  <div className="sticky top-0 z-20 -mx-1 bg-gray-50">
-                    <ProdutosGroupHeader
-                      grupo={grupoLabel}
-                      grupoId={grupoId}
-                      groupKey={groupKey}
-                      grupoVisual={grupoVisual}
-                      grupoAtivo={grupoAtivo}
-                      itemCount={items.length}
-                      isExpanded={isExpanded}
-                      onToggleExpand={handleToggleExpand}
-                      onEditGrupo={handleEditGrupoProduto}
-                      onToggleGrupoStatus={handleToggleGroupStatus}
-                      onAddProduto={handleAddProdutoForGroup}
-                    />
-                  </div>
-
-                  {!isExpanded ? (
-                    <div className="rounded-xl border border-dashed border-secondary/40 px-4 py-1 text-sm text-secondary-text mx-1">
-                      Produtos ocultos. Clique{' '}
-                      <button
-                        type="button"
-                        onClick={() => handleToggleExpand(groupKey)}
-                        className="font-medium text-primary underline underline-offset-2 transition-colors hover:text-primary/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded-sm"
-                      >
-                        aqui!
-                      </button>{' '}
-                      para visualizar.
-                    </div>
-                  ) : (
-                    <div>
-                      {items.map((produto) => (
-                        // content-visibility: auto faz o browser pular layout/paint de itens
-                        // fora do viewport — virtualização CSS nativa, sem quebrar o sticky.
-                        <div
-                          key={produto.getId()}
-                          style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 90px' }}
-                        >
-                          <ProdutoListItem
-                            produto={produto}
-                            isSavingValor={isSavingOf(patchMutation, produto.getId(), 'valor')}
-                            isSavingStatus={isSavingOf(patchMutation, produto.getId(), 'status')}
-                            onValorChange={handleValorChange}
-                            onSwitchToggle={handleStatusToggle}
-                            onToggleBoolean={handleToggleBooleanField}
-                            onEditProduto={handleEditProduto}
-                            onCopyProduto={handleCopyProduto}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+        ) : (
+          <div
+            role="list"
+            aria-label="Lista de produtos"
+            className="divide-y divide-gray-200 border border-gray-200 pb-4"
+          >
+            <CatalogProductColumnHeader variant="base" />
+            {produtosVisiveis.map((produto) => (
+              <div key={produto.getId()} role="listitem">
+                <ProdutoListItem
+                  produto={produto}
+                  gruposProdutos={gruposProdutos}
+                  isLoadingGruposProdutos={isLoadingGruposProdutos}
+                  isSavingValor={isSavingOf(patchMutation, produto.getId(), 'valor')}
+                  isSavingStatus={isSavingOf(patchMutation, produto.getId(), 'status')}
+                  isSavingNome={isSavingOf(patchMutation, produto.getId(), 'nome')}
+                  isSavingGrupo={isSavingOf(patchMutation, produto.getId(), 'grupo')}
+                  onValorChange={handleValorChange}
+                  onSwitchToggle={handleStatusToggle}
+                  onToggleBoolean={handleToggleBooleanField}
+                  onEditProduto={handleEditProduto}
+                  onCopyProduto={handleCopyProduto}
+                />
+              </div>
+            ))}
+            {hasNextPage ? <div ref={loadMoreRef} className="h-4 w-full" aria-hidden /> : null}
           </div>
         )}
 
@@ -477,12 +462,24 @@ export function ProdutosList() {
         )}
       </div>
 
+      <EscolherTipoProdutoModal
+        open={tipoCadastro.open}
+        onClose={tipoCadastro.fechar}
+        onContinuar={tipoCadastro.continuar}
+      />
+      <ProdutoNovoWizard
+        origem="cadastro"
+        open={wizardOpen}
+        onClose={closeWizardCadastro}
+        onSuccess={() => handleTabsModalReload()}
+      />
       <ProdutosTabsModal
         state={tabsModalState}
         onClose={closeTabsModal}
         onReload={handleTabsModalReload}
         onTabChange={(tab) => setTabsModalState((prev) => ({ ...prev, tab }))}
       />
+      {dialogPropagacao}
     </div>
   )
 }

@@ -1,0 +1,264 @@
+/**
+ * Tokens derivados do design publicado (--delivery-* injetados via applyDesignConfig).
+ * Escopo `.delivery-theme` — modal, carrinho e telas públicas.
+ */
+.delivery-theme {
+  color: var(--delivery-text);
+  font-family: var(--delivery-font-body);
+  background-color: var(--delivery-bg, var(--delivery-surface));
+
+  --delivery-text-secondary: color-mix(in srgb, var(--delivery-text) 72%, transparent);
+  --delivery-text-muted: color-mix(in srgb, var(--delivery-text) 55%, transparent);
+  --delivery-border: color-mix(in srgb, var(--delivery-primary) 14%, transparent);
+  --delivery-surface-muted: color-mix(in srgb, var(--delivery-primary) 8%, var(--delivery-surface));
+  --delivery-card-border: color-mix(in srgb, var(--delivery-primary-dark) 14%, transparent);
+  --delivery-card-hover: color-mix(in srgb, var(--delivery-primary) 6%, var(--delivery-surface));
+  --delivery-overlay: rgba(0, 0, 0, 0.5);
+}
+
+.delivery-font-title {
+  font-family: var(--delivery-font-title);
+}
+
+.delivery-font-body {
+  font-family: var(--delivery-font-body);
+}
+
+.delivery-text-primary {
+  color: var(--delivery-text);
+}
+
+.delivery-text-secondary {
+  color: var(--delivery-text-secondary);
+}
+
+.delivery-text-muted {
+  color: var(--delivery-text-muted);
+}
+
+.delivery-text-accent {
+  color: var(--delivery-primary);
+}
+
+.delivery-grupo-title {
+  background-color: var(--delivery-primary-dark, #171717);
+  color: var(--delivery-btn-text, #ffffff);
+  font-family: var(--delivery-font-title);
+}
+/**
+ * Layout Básico — topnav rola com a página; busca + chips ficam sticky no topo.
+ * Conteúdo abaixo do topnav limitado a 1024px (centralizado no desktop).
+ */
+.delivery-basico-catalog-root {
+  --delivery-sticky-toolbar-h: 0px;
+}
+
+.delivery-basico-content-column {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+}
+
+.delivery-basico-sticky-nav {
+  z-index: 40;
+  min-width: 0;
+  background-color: var(--delivery-bg, var(--delivery-surface));
+  box-shadow: 0 1px 0 var(--delivery-border);
+  /* Camada própria — reduz jitter no iOS ao pinar a barra. */
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+.delivery-basico-grupo-section {
+  scroll-margin-top: var(--delivery-sticky-toolbar-h);
+}
+
+.delivery-basico-grupo-title-sticky {
+  /* Mobile: título rola com a lista. Desktop (md+): fica sticky abaixo da toolbar. */
+  position: static;
+}
+
+@media (min-width: 768px) {
+  .delivery-basico-grupo-title-sticky {
+    position: sticky;
+    top: var(--delivery-sticky-toolbar-h);
+    z-index: 20;
+    background-color: var(--delivery-primary-dark, #171717);
+    color: var(--delivery-btn-text, #ffffff);
+  }
+}
+
+/**
+ * Shell público `/delivery/*` — evita rubber-band / overscroll lateral do Safari iOS.
+ * O documento fica travado; o scroll acontece só em `.delivery-publico-scroll`.
+ */
+html.delivery-publico-ios-lock,
+body.delivery-publico-ios-lock {
+  overflow: hidden;
+  overscroll-behavior: none;
+  height: 100%;
+  width: 100%;
+  max-width: 100%;
+  /* Impede pan horizontal residual após zoom do teclado no iOS. */
+  position: relative;
+  left: 0;
+}
+
+/**
+ * Safari iOS dá zoom no foco se o input tiver fonte < 16px; o layout fica
+ * “estourado” e contamina as telas seguintes do checkout.
+ */
+html.delivery-publico-ios-lock input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']),
+html.delivery-publico-ios-lock textarea,
+html.delivery-publico-ios-lock select {
+  font-size: 16px !important;
+}
+
+.delivery-publico-shell {
+  position: fixed;
+  top: var(--delivery-vv-offset-top, 0px);
+  left: var(--delivery-vv-offset-left, 0px);
+  z-index: 0;
+  width: var(--delivery-vv-width, 100%);
+  max-width: 100%;
+  height: var(--delivery-vv-height, 100dvh);
+  overflow: hidden;
+  overscroll-behavior: none;
+  background-color: var(--delivery-bg, var(--delivery-surface, #f5f5f5));
+}
+
+.delivery-publico-scroll {
+  height: 100%;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/**
+ * Overlays full-screen (checkout, produto) — mesma altura/largura útil do teclado.
+ */
+.delivery-vv-overlay {
+  position: fixed;
+  top: var(--delivery-vv-offset-top, 0px);
+  left: var(--delivery-vv-offset-left, 0px);
+  z-index: 50;
+  width: var(--delivery-vv-width, 100%);
+  max-width: 100%;
+  height: var(--delivery-vv-height, 100dvh);
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+/**
+ * Painéis laterais (carrinho / checkout) — mesmos bounds da visualViewport no mobile.
+ */
+.delivery-vv-panel {
+  position: fixed;
+  top: var(--delivery-vv-offset-top, 0px);
+  left: var(--delivery-vv-offset-left, 0px);
+  z-index: 50;
+  width: var(--delivery-vv-width, 100%);
+  max-width: 100%;
+  height: var(--delivery-vv-height, 100dvh);
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+@media (min-width: 1024px) {
+  .delivery-vv-panel {
+    left: auto;
+    right: 0;
+    width: 40%;
+    max-width: 40%;
+  }
+}
+
+/**
+ * Preview mobile do designer — conteúdo ocupa 100% da largura útil do frame.
+ * `transform` cria containing block para `position: fixed` (footer do carrinho etc.).
+ */
+.delivery-preview-shell {
+  width: 100%;
+  max-width: 24rem;
+  margin-inline: auto;
+  min-height: 0;
+  transform: translateZ(0);
+}
+
+.delivery-preview-viewport {
+  width: 100%;
+  min-height: 0;
+}
+
+.delivery-preview-scale-host {
+  width: 100%;
+}
+
+/**
+ * Preview do Design — barra de título do grupo mais baixa (só visualização).
+ * No delivery público real mantém a altura normal.
+ * `!important` necessário para vencer `min-h-*` / `@sm:min-h-*` do componente.
+ */
+.delivery-preview-shell .delivery-grupo-title {
+  min-height: 2rem !important;
+  padding-top: 0.35rem !important;
+  padding-bottom: 0.35rem !important;
+  font-size: 0.75rem !important;
+  line-height: 1.15 !important;
+}
+
+.delivery-preview-shell .delivery-grupo-title[style*='background-image'] {
+  min-height: 2.35rem !important;
+}
+
+/** Capa — mobile: proporção do crop (1200×300 · 4:1). */
+.delivery-loja-capa {
+  aspect-ratio: 4 / 1;
+}
+
+/** Preview — mesma proporção 4:1. Sem radius: preview simula mobile. */
+.delivery-preview-shell .delivery-loja-capa {
+  height: auto !important;
+  aspect-ratio: 4 / 1;
+  margin-top: 0.75rem !important;
+  border-radius: 0 !important;
+}
+
+/**
+ * Desktop — largura total do conteúdo, altura alinhada ao crop (1200×300).
+ */
+@media (min-width: 1024px) {
+  .delivery-loja-capa {
+    aspect-ratio: auto;
+    width: 100%;
+    height: 300px;
+  }
+}
+
+/**
+ * Formulário de checkout — card com tinta clara da paleta; campos brancos com texto na cor primária.
+ */
+.delivery-checkout-form-card {
+  background-color: var(--delivery-surface-muted);
+  border-color: color-mix(in srgb, var(--delivery-primary) 12%, transparent);
+}
+
+.delivery-checkout-form-card .delivery-checkout-field {
+  background-color: #ffffff;
+  color: var(--delivery-primary);
+  border-color: color-mix(in srgb, var(--delivery-primary) 22%, transparent);
+}
+
+.delivery-checkout-form-card .delivery-checkout-field::placeholder {
+  color: var(--delivery-primary);
+  opacity: 0.72;
+}
+
+.delivery-checkout-form-title {
+  color: var(--delivery-primary-dark);
+}

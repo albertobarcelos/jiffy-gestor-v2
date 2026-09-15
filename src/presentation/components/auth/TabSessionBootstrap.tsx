@@ -44,7 +44,7 @@ const ROTAS_PUBLICAS_PREFIXO = [
   '/esqueci-senha',
   '/redefinir-senha',
   '/notas-fiscais',
-  '/cardapio',
+  // `/cardapio` no ERP é `/gestao/{slug}/cardapio` (rewrite interno). Loja pública redireciona no middleware.
   '/delivery',
 ]
 

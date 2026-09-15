@@ -5,6 +5,7 @@ import {
   placeDetailsParaEnderecoGeocode,
 } from '@/src/shared/utils/geolocalizacaoPlaces'
 import { montarPayloadGeoEnderecoDelivery } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
+import { moradaDtoParaEnderecoDeliveryPayload } from '@/src/application/mappers/ClienteDeliveryMoradaMapper'
 
 describe('parseGoogleAddressComponents', () => {
   it('extrai campos BR de address_components (legado)', () => {
@@ -78,5 +79,30 @@ describe('place_id no payload geo', () => {
     })
     expect(payload.enderecoLocalizacao.geocoding?.enderecoId).toBe('ChIJ_place')
     expect(payload.preferenciaEntrega).toBeUndefined()
+  })
+})
+
+describe('moradaDtoParaEnderecoDeliveryPayload', () => {
+  it('inclui geo e place_id quando presentes', () => {
+    const payload = moradaDtoParaEnderecoDeliveryPayload({
+      telefone: '12991912571',
+      tipoEtiqueta: 'casa',
+      endereco: {
+        cep: '12620000',
+        rua: 'Rua A',
+        numero: '10',
+        bairro: 'Centro',
+        cidade: 'Piquete',
+        estado: 'SP',
+        enderecoLocalizacao: { type: 'Point', coordinates: [-45.18, -22.61] },
+        providerEnderecoId: 'ChIJ_morada',
+      },
+    })
+
+    expect(payload.enderecoLocalizacao).toEqual({
+      type: 'Point',
+      coordinates: [-45.18, -22.61],
+      geocoding: { provider: 'GOOGLE', enderecoId: 'ChIJ_morada' },
+    })
   })
 })

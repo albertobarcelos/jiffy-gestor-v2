@@ -27,6 +27,8 @@ export function useKanbanModais(modoKanbanVendas: ModoKanbanVendas) {
     statusFiscal: Venda['statusFiscal']
     tipoVenda?: string | null
     abaDetalhesInicial?: AbaDetalhesPedido
+    statusEtapaOperacional?: string | null
+    entregador?: Venda['entregador']
   } | null>(null)
 
   const [novoPedidoModalEdicaoProdutosOpen, setNovoPedidoModalEdicaoProdutosOpen] = useState(false)
@@ -51,6 +53,8 @@ export function useKanbanModais(modoKanbanVendas: ModoKanbanVendas) {
       tabelaOrigem: venda.tabelaOrigem,
       statusFiscal: venda.statusFiscal,
       tipoVenda: venda.tipoVenda,
+      statusEtapaOperacional: venda.getEtapaKanban() || venda.statusEtapaOperacional,
+      entregador: venda.entregador,
     })
     setNovoPedidoModalVisualizacaoOpen(true)
   }, [])
@@ -72,6 +76,8 @@ export function useKanbanModais(modoKanbanVendas: ModoKanbanVendas) {
       statusFiscal: venda.statusFiscal,
       tipoVenda: venda.tipoVenda,
       abaDetalhesInicial: 'pagamentos',
+      statusEtapaOperacional: venda.getEtapaKanban() || venda.statusEtapaOperacional,
+      entregador: venda.entregador,
     })
     setNovoPedidoModalVisualizacaoOpen(true)
   }, [])

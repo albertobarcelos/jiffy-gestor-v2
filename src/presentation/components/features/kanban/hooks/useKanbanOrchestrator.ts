@@ -29,6 +29,7 @@ import {
   type ModoVisualizacaoKanban,
 } from '../utils/kanbanModoVisualizacao'
 import type { KanbanBoardRendererProps } from '../components/KanbanBoardRenderer'
+import type { KanbanToolbarProps } from '../components/KanbanToolbar'
 import type { KanbanModaisRendererProps } from '../components/KanbanModaisRenderer'
 import { useKanbanFilters } from './useKanbanFilters'
 import { useKanbanPinning } from './useKanbanPinning'
@@ -44,50 +45,19 @@ import { invalidateKanbanVendasListagens } from './kanbanListagemQueryCache'
 import { getVisibleKanbanColumns } from '../utils/kanbanColumnsConfig'
 import { aplicarColunasOcultas, resolverColunasOcultasKanban } from '../utils/kanbanColunasVisibilidade'
 import { useKanbanColunasVisibilidade } from './useKanbanColunasVisibilidade'
-import { useKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/kiosk/useKioskGestorPedidos'
-
-export interface KanbanToolbarProps {
-  searchInput: string
-  onSearchInputChange: (value: string) => void
-  onRefresh: () => void | Promise<void>
-  filtrosVisiveisMobile: boolean
-  onToggleFiltrosMobile: () => void
-  origemFilter: ReturnType<typeof useKanbanFilters>['origemFilter']
-  onOrigemFilterChange: ReturnType<typeof useKanbanFilters>['setOrigemFilter']
-  tipoEntregaFilter: ReturnType<typeof useKanbanFilters>['tipoEntregaFilter']
-  onTipoEntregaFilterChange: ReturnType<typeof useKanbanFilters>['setTipoEntregaFilter']
-  colunaKanbanFiltro: ReturnType<typeof useKanbanFilters>['colunaKanbanFiltro']
-  onColunaKanbanFiltroChange: ReturnType<typeof useKanbanFilters>['setColunaKanbanFiltro']
-  terminalFilter: string
-  onTerminalFilterChange: (value: string) => void
-  terminais: { id: string; nome: string }[]
-  isLoadingTerminais: boolean
-  origemFilterDisabled?: boolean
-  periodoPreset: ReturnType<typeof useKanbanFilters>['periodoPreset']
-  onPeriodoPresetChange: ReturnType<typeof useKanbanFilters>['aplicarPeriodoPreset']
-  periodoInicio: ReturnType<typeof useKanbanFilters>['periodoInicioConsulta']
-  periodoFim: ReturnType<typeof useKanbanFilters>['periodoFimConsulta']
-  onClearFilters: () => void
-  modoKanbanVendas: ModoKanbanVendas
-  onModoKanbanVendasChange: (value: ModoKanbanVendas) => void
-  modoVisualizacao: ModoVisualizacaoKanban
-  onModoVisualizacaoChange: (value: ModoVisualizacaoKanban) => void
-  onAbrirConfiguracoesDelivery: () => void
-  onAbrirNovoPedido: () => void
-  colunasDoModo: KanbanColumn[]
-  colunasOcultas: readonly ColunaKanbanId[]
-  onSetColunaVisivel: (id: ColunaKanbanId, visivel: boolean) => void
-  contagemPorColuna: (id: ColunaKanbanId) => number
-}
+import { useSuperficieQuadroPedidos } from '@/src/presentation/gestor-pedidos/kiosk/useSuperficieQuadroPedidos'
+import { useDeliveryGestorConfigStatus } from '@/src/presentation/hooks/useDeliveryGestorConfigStatus'
 
 export function useKanbanOrchestrator() {
   const { timezoneAgregacao, empresa } = useEmpresaMe()
   const { preferenciasImpressaoDelivery } = usePreferenciasImpressaoDelivery()
   const queryClient = useQueryClient()
   const empresaId = useTenantEmpresaId()
-  const kiosk = useKioskGestorPedidos()
+  const superficie = useSuperficieQuadroPedidos()
 
-  const filters = useKanbanFilters(timezoneAgregacao, { diaOperacionalFlow: kiosk })
+  const filters = useKanbanFilters(timezoneAgregacao, {
+    diaOperacionalFlow: superficie === 'fredy',
+  })
   const {
     searchInput,
     setSearchInput,
@@ -121,41 +91,77 @@ export function useKanbanOrchestrator() {
   const [modoKanbanVendasLivre, setModoKanbanVendas] = useState<ModoKanbanVendas>(() =>
     lerModoKanbanVendasDoStorage()
   )
-  /** Casco Windows: só delivery. O Gestor web continua a escolher balcão/delivery. */
-  const modoKanbanVendas: ModoKanbanVendas = kiosk ? 'delivery' : modoKanbanVendasLivre
+  /** Fredy: só delivery. O Gestor continua a escolher balcão/delivery. */
+  const modoKanbanVendas: ModoKanbanVendas =
+    superficie === 'fredy' ? 'delivery' : modoKanbanVendasLivre
   const [modoVisualizacaoLivre, setModoVisualizacaoLivre] = useState<ModoVisualizacaoKanban>(() =>
     lerModoVisualizacaoKanbanDoStorage()
   )
-  /** Gestor web: sempre Quadro. Flow: Quadro / Operação / Lista. */
+  /** Gestor: sempre Quadro. Fredy: Quadro / Operação / Lista. */
   const modoVisualizacao: ModoVisualizacaoKanban = resolverModoVisualizacaoKanban(
-    kiosk,
+    superficie,
     modoVisualizacaoLivre
   )
 
+  const deliveryGestorConfig = useDeliveryGestorConfigStatus()
+  const [empresaDeliveryPendenteOpen, setEmpresaDeliveryPendenteOpen] = useState(false)
+
+  const handleModoKanbanVendasChange = useCallback(
+    (next: ModoKanbanVendas) => {
+      if (next === 'delivery' && superficie === 'gestor') {
+        if (deliveryGestorConfig.isLoading) return
+        if (!deliveryGestorConfig.prontoParaVendaDelivery) {
+          setEmpresaDeliveryPendenteOpen(true)
+          return
+        }
+      }
+      setModoKanbanVendas(next)
+    },
+    [
+      deliveryGestorConfig.isLoading,
+      deliveryGestorConfig.prontoParaVendaDelivery,
+      superficie,
+    ]
+  )
+
+  /** Sessão web: se Delivery está salvo mas ainda sem config, força Balcão e avisa. */
   useEffect(() => {
-    if (kiosk) return
+    if (superficie === 'fredy') return
+    if (deliveryGestorConfig.isLoading) return
+    if (
+      modoKanbanVendasLivre === 'delivery' &&
+      !deliveryGestorConfig.prontoParaVendaDelivery
+    ) {
+      setModoKanbanVendas('balcao')
+      setEmpresaDeliveryPendenteOpen(true)
+    }
+  }, [
+    deliveryGestorConfig.isLoading,
+    deliveryGestorConfig.prontoParaVendaDelivery,
+    superficie,
+    modoKanbanVendasLivre,
+  ])
+
+  useEffect(() => {
+    if (superficie === 'fredy') return
     try {
       localStorage.setItem(KANBAN_MODO_VENDAS_STORAGE_KEY, modoKanbanVendasLivre)
     } catch {
       /* quota / modo privado */
     }
-  }, [kiosk, modoKanbanVendasLivre])
+  }, [superficie, modoKanbanVendasLivre])
 
   useEffect(() => {
-    if (!kiosk) return
+    if (superficie === 'gestor') return
     try {
       localStorage.setItem(KANBAN_MODO_VISUALIZACAO_STORAGE_KEY, modoVisualizacaoLivre)
     } catch {
       /* quota / modo privado */
     }
-  }, [kiosk, modoVisualizacaoLivre])
+  }, [superficie, modoVisualizacaoLivre])
 
   const visibilidadeColunas = useKanbanColunasVisibilidade(modoKanbanVendas)
-  const colunasOcultas = resolverColunasOcultasKanban(
-    kiosk,
-    modoKanbanVendas,
-    visibilidadeColunas.ocultas
-  )
+  const colunasOcultas = resolverColunasOcultasKanban(superficie, visibilidadeColunas.ocultas)
 
   const { primeiroPorColuna, setPrimeiroPorColuna } = useKanbanPinning()
   const getEtapaKanbanParaExibicaoRef = useRef<(v: Venda) => string>(v => v.getEtapaKanban())
@@ -172,6 +178,24 @@ export function useKanbanOrchestrator() {
   })
 
   const modais = useKanbanModais(modoKanbanVendas)
+
+  const handleAbrirNovoPedido = useCallback(() => {
+    if (
+      modoKanbanVendas === 'delivery' &&
+      !deliveryGestorConfig.prontoParaVendaDelivery
+    ) {
+      if (!deliveryGestorConfig.isLoading) {
+        setEmpresaDeliveryPendenteOpen(true)
+      }
+      return
+    }
+    modais.handleAbrirNovoPedido()
+  }, [
+    deliveryGestorConfig.isLoading,
+    deliveryGestorConfig.prontoParaVendaDelivery,
+    modais.handleAbrirNovoPedido,
+    modoKanbanVendas,
+  ])
 
   const preTransicao = useKanbanPreTransicao({
     isModoDeliveryKanban: data.isModoDeliveryKanban,
@@ -234,6 +258,7 @@ export function useKanbanOrchestrator() {
     handleContinuarCbenefKanban,
     handleConfigurarCbenefKanban,
     handleCancelarCbenefKanban,
+    liberarEmissaoPreparando,
   } =
     useFiscalEmissaoKanban({
       reemitirNfePdv: payload => reemitirNfePdv.mutateAsync(payload),
@@ -392,16 +417,17 @@ export function useKanbanOrchestrator() {
     periodoFim: periodoFimConsulta,
     onClearFilters: handleClearFiltersComTerminal,
     modoKanbanVendas,
-    onModoKanbanVendasChange: setModoKanbanVendas,
+    onModoKanbanVendasChange: handleModoKanbanVendasChange,
     modoVisualizacao,
     onModoVisualizacaoChange: setModoVisualizacaoLivre,
     onAbrirConfiguracoesDelivery: modais.abrirConfigImpressoraExpedicao,
-    onAbrirNovoPedido: modais.handleAbrirNovoPedido,
+    onAbrirNovoPedido: handleAbrirNovoPedido,
     colunasDoModo,
     colunasOcultas,
     onSetColunaVisivel: (id, visivel) =>
       visibilidadeColunas.setColunaVisivel(id, visivel, colunasDoModo),
     contagemPorColuna: colunas.getColumnTotalCount,
+    superficie,
   }
 
   const boardProps: KanbanBoardRendererProps = {
@@ -409,6 +435,7 @@ export function useKanbanOrchestrator() {
     mostrarLoadingLista,
     isModoDeliveryKanban: data.isModoDeliveryKanban,
     modoKanbanVendas,
+    superficie,
     sensors: dnd.sensors,
     draggingVenda: dnd.draggingVenda,
     onDragStart: dnd.handleDragStart,
@@ -420,9 +447,10 @@ export function useKanbanOrchestrator() {
     direcaoOrdenacaoPorColuna: colunas.direcaoOrdenacaoPorColuna,
     onCriterioOrdenacaoChange: handleCriterioOrdenacaoChange,
     onToggleDirecaoOrdenacao: handleToggleDirecaoOrdenacao,
-    onOcultarColuna: kiosk
-      ? (id: ColunaKanbanId) => visibilidadeColunas.setColunaVisivel(id, false, colunasDoModo)
-      : undefined,
+    onOcultarColuna:
+      superficie === 'fredy'
+        ? (id: ColunaKanbanId) => visibilidadeColunas.setColunaVisivel(id, false, colunasDoModo)
+        : undefined,
     onColumnScroll: data.handleColumnScroll,
     deliveryKanban: data.deliveryKanban,
     balcaoKanban: data.balcaoKanban,
@@ -438,14 +466,10 @@ export function useKanbanOrchestrator() {
     onReimprimirCupomDelivery:
       modoKanbanVendas === 'delivery'
         ? (vendaAtual, colunaAtual) =>
-            void preTransicao.reimprimirCupomEntrega(vendaAtual, colunaAtual)
+            preTransicao.reimprimirCupomEntrega(vendaAtual, colunaAtual)
         : undefined,
     entregadorPorVendaId: entregador.entregadorPorVendaId,
     onEntregadorAtualizado: entregador.handleEntregadorAtualizado,
-    onConfirmarCobranca:
-      modoKanbanVendas === 'delivery'
-        ? vendaAtual => modais.abrirDetalhesPagamentoPedido(vendaAtual)
-        : undefined,
     nomesMeiosPagamento: data.nomesMeiosPagamentoKanban,
     reemissaoEmLote: data.isModoDeliveryKanban ? undefined : reemissaoEmLote,
   }
@@ -470,6 +494,7 @@ export function useKanbanOrchestrator() {
     vendaSelecionadaParaEmissao: modais.vendaSelecionadaParaEmissao,
     emitirNfeModalOpen: modais.emitirNfeModalOpen,
     onCloseEmitirNfe: () => {
+      liberarEmissaoPreparando()
       modais.setEmitirNfeModalOpen(false)
       modais.setSelectedVendaId(null)
       modais.setVendaSelecionadaParaEmissao(null)
@@ -536,6 +561,9 @@ export function useKanbanOrchestrator() {
         void handleAvancarEtapa(pendente.venda, pendente.colunaAtual)
       }
     },
+    empresaDeliveryPendenteOpen,
+    onCloseEmpresaDeliveryPendente: () => setEmpresaDeliveryPendenteOpen(false),
+    empresaDeliveryPendenciasLabels: deliveryGestorConfig.pendenciasLabels,
   }
 
   return { toolbarProps, boardProps, modaisProps, modoVisualizacao }

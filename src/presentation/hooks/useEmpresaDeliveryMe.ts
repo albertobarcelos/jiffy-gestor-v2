@@ -15,12 +15,25 @@ import type {
   EmpresaDeliveryDTO,
   UpdateEmpresaDeliveryInput,
 } from '@/src/application/dto/delivery/EmpresaDeliveryDTO'
+import {
+  EMPRESA_DELIVERY_UPDATED_EVENT,
+  type EmpresaDeliveryUpdatedDetail,
+} from '@/src/shared/constants/empresaDeliveryEvents'
 
 export const EMPRESA_DELIVERY_ME_QUERY_KEY = ['delivery', 'empresa-me'] as const
 
-export function dispararEmpresaDeliveryAtualizada(): void {
+function dispatchEmpresaDeliveryUpdated(slug: string | null | undefined) {
   if (typeof window === 'undefined') return
-  window.dispatchEvent(new Event('jiffy:empresa-delivery-updated'))
+  window.dispatchEvent(
+    new CustomEvent<EmpresaDeliveryUpdatedDetail>(EMPRESA_DELIVERY_UPDATED_EVENT, {
+      detail: { slug: slug ?? null },
+    })
+  )
+}
+
+/** Recarrega pendências/hub quando cobertura, WhatsApp ou empresa delivery mudam. */
+export function dispararEmpresaDeliveryAtualizada(slug?: string | null): void {
+  dispatchEmpresaDeliveryUpdated(slug)
 }
 
 async function parseJsonOrThrow(res: Response): Promise<unknown> {
@@ -79,9 +92,9 @@ export function useCriarEmpresaDelivery() {
       return data as EmpresaDeliveryDTO
     },
     {
-      onSuccess: async () => {
+      onSuccess: async data => {
         await invalidate(EMPRESA_DELIVERY_ME_QUERY_KEY)
-        dispararEmpresaDeliveryAtualizada()
+        dispatchEmpresaDeliveryUpdated(data.slug)
       },
     }
   )
@@ -112,7 +125,7 @@ export function useAtualizarEmpresaDelivery() {
           data
         )
         await invalidate(EMPRESA_DELIVERY_ME_QUERY_KEY)
-        dispararEmpresaDeliveryAtualizada()
+        dispatchEmpresaDeliveryUpdated(data.slug)
       },
     }
   )

@@ -7,6 +7,9 @@ import { EntregadoresList } from '@/src/presentation/components/features/entrega
 import { MeiosPagamentosList } from '@/src/presentation/components/features/meios-pagamentos/MeiosPagamentosList'
 import { ImpressorasList } from '@/src/presentation/components/features/impressoras/ImpressorasList'
 import { NotificacoesWhatsAppDeliveryTab } from '@/src/presentation/components/features/configuracoes/tabs/NotificacoesWhatsAppDeliveryTab'
+import { DeliveryNomeCardapioView } from './DeliveryNomeCardapioView'
+import { DeliveryAgendaView } from './DeliveryAgendaView'
+import { DeliveryDesignEtapaView } from './DeliveryDesignEtapaView'
 
 function DeliveryEtapaPainel({ children }: { children: ReactNode }) {
   return (
@@ -50,6 +53,30 @@ export function NotificacoesWhatsAppDeliveryEtapa() {
   return (
     <DeliveryEtapaPainel>
       <NotificacoesWhatsAppDeliveryTab />
+    </DeliveryEtapaPainel>
+  )
+}
+
+export function NomeCardapioDeliveryEtapa() {
+  return (
+    <DeliveryEtapaPainel>
+      <DeliveryNomeCardapioView />
+    </DeliveryEtapaPainel>
+  )
+}
+
+export function DesignDeliveryEtapa() {
+  return (
+    <DeliveryEtapaPainel>
+      <DeliveryDesignEtapaView />
+    </DeliveryEtapaPainel>
+  )
+}
+
+export function AgendaDeliveryEtapa() {
+  return (
+    <DeliveryEtapaPainel>
+      <DeliveryAgendaView />
     </DeliveryEtapaPainel>
   )
 }

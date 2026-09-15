@@ -1,6 +1,6 @@
 'use client'
 
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueryClient, type InvalidateQueryFilters } from '@tanstack/react-query'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 
 /**
@@ -39,11 +39,11 @@ export function useInvalidateTenantQueries() {
 
   return (
     baseKey: readonly unknown[],
-    options?: Parameters<typeof queryClient.invalidateQueries>[1]
+    filters?: Omit<InvalidateQueryFilters, 'queryKey'>
   ) => {
-    return queryClient.invalidateQueries(
-      { queryKey: buildTenantQueryKey(empresaId, baseKey) },
-      options
-    )
+    return queryClient.invalidateQueries({
+      queryKey: buildTenantQueryKey(empresaId, baseKey),
+      ...filters,
+    })
   }
 }

@@ -114,6 +114,8 @@ export interface VendaGestorTicketsPagamentoMeio {
   nome?: string
   tipo?: string
   valor?: number
+  /** Cobrança ainda pendente para o entregador. */
+  naEntrega?: boolean
 }
 
 export interface VendaGestorTicketsPagamento {

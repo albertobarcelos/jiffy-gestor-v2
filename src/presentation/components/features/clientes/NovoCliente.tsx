@@ -13,6 +13,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { Cliente } from '@/src/domain/entities/Cliente'
 import { Input } from '@/src/presentation/components/ui/input'
+import { UppercaseLocaleInput } from '@/src/presentation/components/ui/UppercaseLocaleInput'
 import { Button } from '@/src/presentation/components/ui/button'
 import { CidadeAutocomplete } from '@/src/presentation/components/ui/cidade-autocomplete'
 import { showToast } from '@/src/shared/utils/toast'
@@ -109,7 +110,8 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
   },
   ref
 ) {
-  const router = useRouter()  const isEditing = !!clienteId
+  const router = useRouter()
+  const isEditing = !!clienteId
 
   // Estados do formulário
   const [nome, setNome] = useState('')
@@ -894,10 +896,10 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
             </div>
 
             <div className="grid grid-cols-2 md:gap-2 gap-1">
-              <Input
+              <UppercaseLocaleInput
                 label="Nome"
                 value={nome}
-                onChange={(e) => setNome(e.target.value.toLocaleUpperCase('pt-BR'))}
+                onValueChange={setNome}
                 required
                 placeholder="Nome Completo"
                 size="small"
@@ -915,10 +917,10 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
                   },
                 }}
               />
-              <Input
+              <UppercaseLocaleInput
                 label="Razão Social"
                 value={razaoSocial}
-                onChange={(e) => setRazaoSocial(e.target.value.toLocaleUpperCase('pt-BR'))}
+                onValueChange={setRazaoSocial}
                 placeholder="Razão Social"
                 size="small"
                 InputLabelProps={INPUT_LABEL_PROPS}
@@ -1037,10 +1039,10 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
               />
             </div>
 
-            <Input
+            <UppercaseLocaleInput
               label="Nome Fantasia"
               value={nomeFantasia}
-              onChange={(e) => setNomeFantasia(e.target.value.toLocaleUpperCase('pt-BR'))}
+              onValueChange={setNomeFantasia}
               placeholder="Nome Fantasia"
               size="small"
               InputLabelProps={INPUT_LABEL_PROPS}
@@ -1203,10 +1205,10 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
                     }}
                   />
                 </div>
-                <Input
+                <UppercaseLocaleInput
                   label="Rua"
                   value={rua}
-                  onChange={(e) => setRua(e.target.value.toLocaleUpperCase('pt-BR'))}
+                  onValueChange={setRua}
                   placeholder="Nome Da Rua"
                   size="small"
                   InputLabelProps={INPUT_LABEL_PROPS}
@@ -1245,10 +1247,10 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
                   },
                 }}
                 />
-                <Input
+                <UppercaseLocaleInput
                   label="Bairro"
                   value={bairro}
-                  onChange={(e) => setBairro(e.target.value.toLocaleUpperCase('pt-BR'))}
+                  onValueChange={setBairro}
                   placeholder="Bairro"
                   size="small"
                   className="col-span-2"
@@ -1266,10 +1268,10 @@ export const NovoCliente = forwardRef<NovoClienteHandle, NovoClienteProps>(funct
                   },
                 }}
                 />
-                <Input
+                <UppercaseLocaleInput
                   label="Complemento"
                   value={complemento}
-                  onChange={(e) => setComplemento(e.target.value.toLocaleUpperCase('pt-BR'))}
+                  onValueChange={setComplemento}
                   placeholder="Complemento"
                   size="small"
                   InputLabelProps={INPUT_LABEL_PROPS}

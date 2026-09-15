@@ -3,6 +3,8 @@ export type DeliveryHubPassosExtras = {
   qtdEntregadores?: number
   qtdMeiosPagamento?: number
   qtdImpressoras?: number
+  empresaDeliveryConfigurada?: boolean
+  agendaConfigurada?: boolean
 }
 
 export function contarItensListaHub(payload: unknown): number {

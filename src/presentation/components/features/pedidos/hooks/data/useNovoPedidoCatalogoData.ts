@@ -2,14 +2,17 @@
 
 import { useCallback, useRef, type Dispatch, type SetStateAction } from 'react'
 import { Produto } from '@/src/domain/entities/Produto'
+import { obterProdutoDoCatalogo } from '@/src/domain/policies/pedido/CarrinhoCatalogoPolicy'
+import { mesclarProdutosNoCatalogo } from '@/src/domain/policies/pedido/CatalogoVendaPolicy'
 import type { CanalVendaNovoPedido } from '../../novoPedidoProdutosApi'
+import { fetchProdutoCatalogoPorId } from '../../novoPedidoProdutosApi'
 import { useGruposVendaQuery } from './useGruposVendaQuery'
 import { useProdutosVendaQuery } from './useProdutosVendaQuery'
 
 export type UseNovoPedidoCatalogoDataParams = {
   estaNoPassoProdutos: boolean
   token: string | undefined
-  empresaId: string | undefined
+  menuId: string | null
   canal: CanalVendaNovoPedido
   grupoSelecionadoId: string | null
   setGrupoSelecionadoId: (id: string | null) => void
@@ -21,7 +24,7 @@ export type UseNovoPedidoCatalogoDataParams = {
 export function useNovoPedidoCatalogoData({
   estaNoPassoProdutos,
   token,
-  empresaId,
+  menuId,
   canal,
   grupoSelecionadoId,
   setGrupoSelecionadoId,
@@ -29,19 +32,9 @@ export function useNovoPedidoCatalogoData({
   catalogoProdutosPorId,
   setCatalogoProdutosPorId,
 }: UseNovoPedidoCatalogoDataParams) {
-  const onGrupoSelecionadoInvalido = useCallback(() => {
-    setGrupoSelecionadoId(null)
-  }, [setGrupoSelecionadoId])
-
   const onProdutosGrupoCarregados = useCallback(
     (produtos: Produto[]) => {
-      setCatalogoProdutosPorId(prev => {
-        const next = { ...prev }
-        for (const produto of produtos) {
-          next[produto.getId()] = produto
-        }
-        return next
-      })
+      setCatalogoProdutosPorId(prev => mesclarProdutosNoCatalogo(prev, produtos))
     },
     [setCatalogoProdutosPorId]
   )
@@ -49,16 +42,15 @@ export function useNovoPedidoCatalogoData({
   const gruposQuery = useGruposVendaQuery({
     enabled: estaNoPassoProdutos,
     token,
-    empresaId,
-    canal,
+    menuId,
     grupoSelecionadoId,
-    onGrupoSelecionadoInvalido,
+    setGrupoSelecionadoId,
   })
 
   const produtosQuery = useProdutosVendaQuery({
     enabled: estaNoPassoProdutos,
     token,
-    empresaId,
+    menuId,
     grupoSelecionadoId,
     buscaProdutoTexto,
     onProdutosGrupoCarregados,
@@ -72,9 +64,11 @@ export function useNovoPedidoCatalogoData({
       options?: { forceRefresh?: boolean }
     ): Promise<Produto | null> => {
       if (!options?.forceRefresh) {
-        const emCache =
-          catalogoProdutosPorId[produtoId] ??
-          produtosQuery.produtosList.find(p => p.getId() === produtoId)
+        const emCache = obterProdutoDoCatalogo(
+          produtoId,
+          catalogoProdutosPorId,
+          produtosQuery.produtosList
+        )
         if (emCache) {
           setCatalogoProdutosPorId(prev =>
             prev[produtoId] ? prev : { ...prev, [emCache.getId()]: emCache }
@@ -90,8 +84,7 @@ export function useNovoPedidoCatalogoData({
 
       const fetchProduto = (async (): Promise<Produto | null> => {
         try {
-          const { fetchProdutoCatalogoPorId } = await import('../../novoPedidoProdutosApi')
-          const entity = await fetchProdutoCatalogoPorId(produtoId, token)
+          const entity = await fetchProdutoCatalogoPorId(produtoId, token, menuId)
           if (!entity) return null
           setCatalogoProdutosPorId(prev => ({ ...prev, [entity.getId()]: entity }))
           return entity
@@ -110,8 +103,12 @@ export function useNovoPedidoCatalogoData({
         inflightProdutoPorIdRef.current.delete(produtoId)
       }
     },
-    [catalogoProdutosPorId, produtosQuery.produtosList, token, setCatalogoProdutosPorId]
+    [catalogoProdutosPorId, menuId, produtosQuery.produtosList, token, setCatalogoProdutosPorId]
   )
+
+  const menuCatalogoIndisponivel =
+    estaNoPassoProdutos &&
+    (gruposQuery.menuCatalogoIndisponivel || produtosQuery.menuCatalogoIndisponivel)
 
   return {
     grupos: gruposQuery.grupos,
@@ -122,7 +119,11 @@ export function useNovoPedidoCatalogoData({
     isLoadingBuscaProdutos: produtosQuery.isLoadingBuscaProdutos,
     isLoadingProdutos: produtosQuery.isLoadingProdutos,
     produtosError: produtosQuery.produtosError,
+    hasNextProdutosCatalogo: produtosQuery.hasNextProdutosCatalogo,
+    isFetchingNextProdutosCatalogo: produtosQuery.isFetchingNextProdutosCatalogo,
+    carregarProximaPaginaProdutosCatalogo: produtosQuery.carregarProximaPaginaProdutosCatalogo,
     carregarProdutoNoCatalogoSeNecessario,
     canal,
+    menuCatalogoIndisponivel,
   }
 }

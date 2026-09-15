@@ -31,6 +31,7 @@ export interface ValidarCriarVendaParams {
   temEnderecoEntrega: boolean
   enderecoEntregaTemGeo?: boolean
   enderecoEntregaCoberturaStatus?: 'ok' | 'fora' | 'pendente' | 'indisponivel' | null
+  taxaEntregaOverride?: 'automatica' | 'sem_taxa' | 'catalogo'
   pedidoGestorComPagamentoNoPasso3: boolean
   pedidoEntregaAceitaPagamentoPendente: boolean
   pagamentosCount: number
@@ -51,6 +52,7 @@ export function validarInformacoesPedido(params: {
   temEnderecoEntrega: boolean
   enderecoEntregaTemGeo?: boolean
   enderecoEntregaCoberturaStatus?: 'ok' | 'fora' | 'pendente' | 'indisponivel' | null
+  taxaEntregaOverride?: 'automatica' | 'sem_taxa' | 'catalogo'
   exibirToast?: boolean
   onError?: (message: string) => void
 }): boolean {
@@ -62,6 +64,7 @@ export function validarInformacoesPedido(params: {
     temEnderecoEntrega: params.temEnderecoEntrega,
     enderecoEntregaTemGeo: params.enderecoEntregaTemGeo,
     enderecoEntregaCoberturaStatus: params.enderecoEntregaCoberturaStatus,
+    taxaEntregaOverride: params.taxaEntregaOverride,
   })
   if (!erro) return true
   if (params.exibirToast) {

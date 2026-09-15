@@ -25,6 +25,10 @@ function concluidoEtapaRecomendada(
   if (etapaId === 'delivery-entregadores') return (extras?.qtdEntregadores ?? 0) > 0
   if (etapaId === 'delivery-meios') return (extras?.qtdMeiosPagamento ?? 0) > 0
   if (etapaId === 'delivery-impressoras') return (extras?.qtdImpressoras ?? 0) > 0
+  if (etapaId === 'delivery-nome-cardapio' || etapaId === 'delivery-design') {
+    return extras?.empresaDeliveryConfigurada === true
+  }
+  if (etapaId === 'delivery-agenda') return extras?.agendaConfigurada === true
   return null
 }
 

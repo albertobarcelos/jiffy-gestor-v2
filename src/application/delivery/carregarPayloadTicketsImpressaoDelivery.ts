@@ -2,6 +2,11 @@ import { montarTicketsResponseFromInstrucoes } from '@/src/application/delivery/
 import { fetchInstrucoesImpressaoPedido } from '@/src/infrastructure/api/fetchInstrucoesImpressaoPedido'
 import { fetchPedidoDeliveryDetalhe } from '@/src/infrastructure/api/fetchPedidoDeliveryDetalhe'
 import { buscarMapeamentosEstacao } from '@/src/infrastructure/api/estacoesImpressaoApi'
+import {
+  lembrarNomeMeioPagamento,
+  obterNomeMeioPagamentoCache,
+  snapshotNomesMeiosPagamentoCache,
+} from '@/src/infrastructure/api/meiosPagamentoNomeCache'
 import { getEstacaoImpressaoId } from '@/src/infrastructure/printing/estacaoImpressaoStorage'
 import type { PreferenciasImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
 import type { VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
@@ -18,7 +23,7 @@ async function resolverNomesMeiosPagamentoPedido(
   pedido: Record<string, unknown>,
   accessToken: string | undefined
 ): Promise<Record<string, string>> {
-  const map: Record<string, string> = {}
+  const map: Record<string, string> = { ...snapshotNomesMeiosPagamentoCache() }
   const ids = new Set<string>()
   const cobrancas = Array.isArray(pedido.cobrancas) ? pedido.cobrancas : []
 
@@ -30,24 +35,34 @@ async function resolverNomesMeiosPagamentoPedido(
 
     const nested = asRecord(r.meioPagamento)
     const nome = String(nested?.nome ?? r.nomeMeioPagamento ?? '').trim()
-    if (meioId && nome) map[meioId] = nome
+    if (meioId && nome) {
+      map[meioId] = nome
+      lembrarNomeMeioPagamento(meioId, nome)
+    }
   }
 
+  const faltando = Array.from(ids).filter(id => !map[id]?.trim())
   const token = accessToken?.trim()
-  if (!token) return map
+  if (!token || faltando.length === 0) return map
 
   await Promise.all(
-    Array.from(ids)
-      .filter(id => !map[id])
-      .map(async id => {
-        try {
-          const data = await vendaDetalheReadRepository.fetchMeioPagamento(id, token)
-          const nome = String(data?.nome ?? data?.name ?? '').trim()
-          if (nome) map[id] = nome
-        } catch {
-          /* ignora falha individual */
+    faltando.map(async id => {
+      const cached = obterNomeMeioPagamentoCache(id)
+      if (cached) {
+        map[id] = cached
+        return
+      }
+      try {
+        const data = await vendaDetalheReadRepository.fetchMeioPagamento(id, token)
+        const nome = String(data?.nome ?? data?.name ?? '').trim()
+        if (nome) {
+          map[id] = nome
+          lembrarNomeMeioPagamento(id, nome)
         }
-      })
+      } catch {
+        /* ignora falha individual */
+      }
+    })
   )
 
   return map
@@ -58,7 +73,7 @@ export type CarregarPayloadTicketsImpressaoResult =
   | { ok: false; status: number; error?: string }
 
 /**
- * Carrega instruções de impressão + detalhe do pedido e monta payload compatível com tickets.
+ * Carrega instruções + detalhe + mapeamentos em paralelo (cache em memória quando fresco).
  */
 export async function carregarPayloadTicketsImpressaoDelivery(params: {
   vendaId: string
@@ -74,36 +89,37 @@ export async function carregarPayloadTicketsImpressaoDelivery(params: {
     temEstacao: Boolean(estacao),
   })
 
-  const instrucoesFetch = await fetchInstrucoesImpressaoPedido(
-    params.vendaId,
-    params.accessToken,
-    estacao
-  )
+  const mapeamentosPromise =
+    estacao && params.accessToken
+      ? buscarMapeamentosEstacao(params.accessToken, estacao).catch(error => {
+          erroImpressao('carregarPayloadTickets.mapeamentos_estacao_falhou', {
+            vendaId: params.vendaId,
+            estacao,
+            mensagem: error instanceof Error ? error.message : String(error),
+          })
+          return []
+        })
+      : Promise.resolve([])
+
+  const [instrucoesFetch, pedidoFetch, mapeamentosEstacao] = await Promise.all([
+    fetchInstrucoesImpressaoPedido(params.vendaId, params.accessToken, estacao),
+    fetchPedidoDeliveryDetalhe(params.vendaId, params.accessToken),
+    mapeamentosPromise,
+  ])
+
   if (!instrucoesFetch.ok) {
     return instrucoesFetch
   }
-
-  const pedidoFetch = await fetchPedidoDeliveryDetalhe(params.vendaId, params.accessToken)
   if (!pedidoFetch.ok) {
     return pedidoFetch
   }
 
-  let mapeamentosEstacao: Awaited<ReturnType<typeof buscarMapeamentosEstacao>> = []
-  if (estacao && params.accessToken) {
-    try {
-      mapeamentosEstacao = await buscarMapeamentosEstacao(params.accessToken, estacao)
-      logImpressao('carregarPayloadTickets.mapeamentos_estacao', {
-        vendaId: params.vendaId,
-        estacao,
-        qMapeamentos: mapeamentosEstacao.length,
-      })
-    } catch (error) {
-      erroImpressao('carregarPayloadTickets.mapeamentos_estacao_falhou', {
-        vendaId: params.vendaId,
-        estacao,
-        mensagem: error instanceof Error ? error.message : String(error),
-      })
-    }
+  if (estacao) {
+    logImpressao('carregarPayloadTickets.mapeamentos_estacao', {
+      vendaId: params.vendaId,
+      estacao,
+      qMapeamentos: mapeamentosEstacao.length,
+    })
   }
 
   let nomesMeiosPagamentoPorId: Record<string, string> = {}

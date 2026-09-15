@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
+import type { JiffySidePanelFooterActions } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import {
   NovoGrupoComplemento,
@@ -33,6 +34,11 @@ interface GruposComplementosTabsModalProps {
   onClose: () => void
   onTabChange: (tab: TabKey) => void
   onReload?: () => void
+  /** Empilhar acima de outro painel (ex.: wizard do cardápio). */
+  zIndex?: number
+  /** Após criar um grupo novo — para auto-vincular ao produto no fluxo do wizard. */
+  onCreated?: (grupoId: string) => void | Promise<void>
+  cancelVariant?: JiffySidePanelFooterActions['cancelVariant']
 }
 
 export function GruposComplementosTabsModal({
@@ -40,6 +46,9 @@ export function GruposComplementosTabsModal({
   onClose,
   onTabChange,
   onReload,
+  zIndex = 1300,
+  onCreated,
+  cancelVariant = 'primaryTint10',
 }: GruposComplementosTabsModalProps) {
   const grupoId = state.grupo?.getId()
   const ngcRef = useRef<NovoGrupoComplementoHandle>(null)
@@ -123,7 +132,7 @@ export function GruposComplementosTabsModal({
       ? {
           showCancel: true,
           cancelLabel: 'Fechar',
-          cancelVariant: 'primaryTint10' as const,
+          cancelVariant,
           onCancel: handleRequestClose,
           showSave: true,
           saveLabel: 'Salvar',
@@ -136,7 +145,7 @@ export function GruposComplementosTabsModal({
         ? {
             showCancel: true,
             cancelLabel: 'Fechar',
-            cancelVariant: 'primaryTint10' as const,
+            cancelVariant,
             onCancel: handleRequestClose,
             showSave: true,
             saveLabel: 'Salvar',
@@ -155,6 +164,7 @@ export function GruposComplementosTabsModal({
         title={title}
         scrollableBody={false}
         footerVariant="bar"
+        zIndex={zIndex}
         panelClassName="w-[95vw] max-w-[100vw] sm:w-[90vw] md:w-[min(900px,45vw)]"
         footerActions={footerActions}
         tabsSlot={
@@ -209,7 +219,10 @@ export function GruposComplementosTabsModal({
               complementosIdsDraft={draftComplementosIds}
               onBasicDataChange={setBasicData}
               onGoToComplementosTab={goToComplementosTab}
-              onSaved={() => {
+              onSaved={async (id) => {
+                if (state.mode === 'create' && id) {
+                  await onCreated?.(id)
+                }
                 onReload?.()
                 onClose()
               }}
@@ -233,6 +246,7 @@ export function GruposComplementosTabsModal({
               onDraftLinkedIdsChange={setDraftComplementosIds}
               onClose={handleRequestClose}
               onUpdated={onReload}
+              nestedModalZIndex={zIndex + 150}
             />
           </div>
         </div>

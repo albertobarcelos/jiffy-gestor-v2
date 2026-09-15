@@ -5,7 +5,9 @@ import {
   MdCreditCard,
   MdDeliveryDining,
   MdLocationOn,
+  MdPalette,
   MdPrint,
+  MdSchedule,
   MdStorefront,
 } from 'react-icons/md'
 import {
@@ -14,11 +16,14 @@ import {
   type DeliveryEtapaId,
 } from '@/src/shared/constants/configuracoesRoutes'
 import {
+  AgendaDeliveryEtapa,
   CoberturaDeliveryTab,
+  DesignDeliveryEtapa,
   EmpresaDeliveryEtapa,
   EntregadoresDeliveryEtapa,
   ImpressorasDeliveryEtapa,
   MeiosDeliveryEtapa,
+  NomeCardapioDeliveryEtapa,
   NotificacoesWhatsAppDeliveryEtapa,
 } from '@/src/presentation/components/features/delivery/hub/DeliveryEtapaPaineis'
 
@@ -57,8 +62,44 @@ export const DELIVERY_HUB_ETAPAS: DeliveryEtapaConfig[] = [
     obrigatoria: true,
   },
   {
-    id: 'delivery-cobertura',
+    id: 'delivery-nome-cardapio',
     step: 2,
+    title: 'Nome da loja e cardápio',
+    label: 'Nome e cardápio',
+    descricao: 'Slug, menu e link público da loja.',
+    path: deliveryHubEtapaPath('delivery-nome-cardapio'),
+    component: NomeCardapioDeliveryEtapa,
+    icon: MdStorefront,
+    cta: 'Configurar',
+    obrigatoria: true,
+  },
+  {
+    id: 'delivery-design',
+    step: 3,
+    title: 'Personalizar loja',
+    label: 'Design',
+    descricao: 'Logo, banner e identidade do cardápio.',
+    path: deliveryHubEtapaPath('delivery-design'),
+    component: DesignDeliveryEtapa,
+    icon: MdPalette,
+    cta: 'Design',
+    obrigatoria: false,
+  },
+  {
+    id: 'delivery-agenda',
+    step: 4,
+    title: 'Agenda e funcionamento',
+    label: 'Agenda',
+    descricao: 'Horários em que a loja aceita pedidos.',
+    path: deliveryHubEtapaPath('delivery-agenda'),
+    component: AgendaDeliveryEtapa,
+    icon: MdSchedule,
+    cta: 'Abrir',
+    obrigatoria: true,
+  },
+  {
+    id: 'delivery-cobertura',
+    step: 5,
     title: 'Áreas de entrega',
     label: 'Cobertura',
     descricao: 'Raio em km e áreas com taxa própria no mapa.',
@@ -70,7 +111,7 @@ export const DELIVERY_HUB_ETAPAS: DeliveryEtapaConfig[] = [
   },
   {
     id: 'delivery-entregadores',
-    step: 3,
+    step: 6,
     title: 'Entregadores',
     label: 'Entregadores',
     descricao: 'Quem sai com os pedidos no quadro.',
@@ -82,7 +123,7 @@ export const DELIVERY_HUB_ETAPAS: DeliveryEtapaConfig[] = [
   },
   {
     id: 'delivery-meios',
-    step: 4,
+    step: 7,
     title: 'Meios de pagamento',
     label: 'Pagamento',
     descricao: 'Formas usadas no pedido gestor.',
@@ -94,7 +135,7 @@ export const DELIVERY_HUB_ETAPAS: DeliveryEtapaConfig[] = [
   },
   {
     id: 'delivery-impressoras',
-    step: 5,
+    step: 8,
     title: 'Impressão',
     label: 'Impressão',
     descricao: 'Vínculo das impressoras lógicas neste PC.',
@@ -106,7 +147,7 @@ export const DELIVERY_HUB_ETAPAS: DeliveryEtapaConfig[] = [
   },
   {
     id: 'delivery-notificacoes',
-    step: 6,
+    step: 9,
     title: 'Notificações WhatsApp',
     label: 'WhatsApp',
     descricao: 'Avisos automáticos do pedido no WhatsApp do cliente.',

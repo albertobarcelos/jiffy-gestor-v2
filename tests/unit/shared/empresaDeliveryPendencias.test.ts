@@ -86,6 +86,12 @@ describe('empresaDeliveryPendencias', () => {
       label: 'Conectar WhatsApp',
       href: '/config/delivery/notificacoes',
     })
+    expect(
+      resolverAcaoPendencia(EMPRESA_DELIVERY_PENDENCIA_TYPES.CARDAPIO_DELIVERY_NAO_CONFIGURADO)
+    ).toEqual({
+      label: 'Selecionar cardápio',
+      href: '/config/delivery/nome-cardapio',
+    })
     expect(resolverAcaoPendencia('TIPO_DESCONHECIDO')).toBeNull()
   })
 })

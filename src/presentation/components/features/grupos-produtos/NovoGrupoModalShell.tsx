@@ -21,7 +21,7 @@ export function NovoGrupoModalShell({ grupoId }: NovoGrupoModalShellProps) {
   const [grupoNome, setGrupoNome] = useState('')
 
   const title = useMemo(
-    () => (mode === 'create' ? 'Novo Grupo de Produtos' : 'Editar Grupo de Produtos'),
+    () => (mode === 'create' ? 'Nova Categoria' : 'Editar Categoria'),
     [mode]
   )
 

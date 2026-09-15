@@ -1,13 +1,23 @@
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { MIN_CARACTERES_BUSCA_CATALOGO_VENDA } from '@/src/domain/policies/pedido/CatalogoVendaPolicy'
 import { Produto } from '@/src/domain/entities/Produto'
-import type {
-  CanalVendaCatalogo,
-  INovoPedidoReadRepository,
-} from '@/src/domain/repositories/INovoPedidoReadRepository'
+import type { INovoPedidoReadRepository } from '@/src/domain/repositories/INovoPedidoReadRepository'
+import {
+  mergeProdutoComSnapshotMenu,
+  menuGrupoProdutoToGrupoProduto,
+  menuProdutoToProduto,
+} from '@/src/application/mappers/MenuProdutoCatalogMapper'
+import type { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { normalizarListaEntregadoresDelivery } from '@/src/application/mappers/EntregadorDeliveryNormalizer'
 import type { UsuarioPdvEntregadorOption } from '@/src/domain/types/vendaDetalhe'
-
-const PRODUTOS_POR_PAGINA = 100
+import {
+  fetchAllMenuGruposProdutos,
+  fetchAllMenuProdutos,
+  fetchMenuProdutoSnapshot,
+  fetchMenuProdutosPagina,
+} from '@/src/infrastructure/api/repositories/menuCatalogFetch'
+import { salvarPedidoDeliveryDetalheCache } from '@/src/infrastructure/api/pedidoDeliveryDetalheCache'
+import { anexarInformacoesAdicionaisEmitirNota } from '@/src/shared/helpers/informacoesAdicionaisNota'
 
 async function fetchJson<T>(url: string, token: string, init?: RequestInit): Promise<T> {
   const response = await fetchGestorApi(url, {
@@ -66,97 +76,123 @@ export class NovoPedidoReadRepository implements INovoPedidoReadRepository {
     return normalizarListaEntregadoresDelivery(data)
   }
 
+  async listarGruposDoMenu(menuId: string, token: string): Promise<GrupoProduto[]> {
+    if (!menuId) return []
+    const items = await fetchAllMenuGruposProdutos(menuId, token)
+    return items.map(menuGrupoProdutoToGrupoProduto)
+  }
+
   async listarProdutosDoGrupo(
     grupoId: string,
-    token: string
+    token: string,
+    menuId: string | null
   ): Promise<{ produtos: Produto[]; count: number }> {
-    const produtos: Produto[] = []
-    let offset = 0
+    if (!menuId) return { produtos: [], count: 0 }
 
-    while (true) {
-      const data = await fetchJson<{
-        items?: unknown[]
-        nextOffset?: number | null
-      }>(
-        `/api/grupos-produtos/${grupoId}/produtos?limit=${PRODUTOS_POR_PAGINA}&offset=${offset}`,
-        token
-      )
-      const items = Array.isArray(data.items) ? data.items : []
-      produtos.push(...items.map(item => Produto.fromJSON(item)))
-
-      if (items.length < PRODUTOS_POR_PAGINA) break
-
-      if (typeof data.nextOffset === 'number') {
-        offset = data.nextOffset
-        continue
-      }
-
-      offset += PRODUTOS_POR_PAGINA
-    }
+    const snapshots = await fetchAllMenuProdutos(menuId, token, {
+      grupoProdutoId: grupoId,
+      ativo: true,
+      tipo: 'all',
+    })
+    const produtos = snapshots
+      .filter(item => item.ativo !== false)
+      .map(item => menuProdutoToProduto(item))
+      .sort((a, b) => {
+        const ordemA = a.getOrdem() ?? Number.MAX_SAFE_INTEGER
+        const ordemB = b.getOrdem() ?? Number.MAX_SAFE_INTEGER
+        if (ordemA !== ordemB) return ordemA - ordemB
+        return a.getNome().localeCompare(b.getNome(), 'pt-BR')
+      })
 
     return { produtos, count: produtos.length }
   }
 
+  async listarProdutosCatalogoPagina(
+    token: string,
+    menuId: string,
+    params: {
+      grupoProdutoId?: string
+      q?: string
+      limit: number
+      offset: number
+    }
+  ): Promise<{ produtos: Produto[]; count: number; hasMore: boolean }> {
+    const page = await fetchMenuProdutosPagina(menuId, token, {
+      grupoProdutoId: params.grupoProdutoId,
+      q: params.q,
+      ativo: true,
+      tipo: 'all',
+      limit: params.limit,
+      offset: params.offset,
+    })
+    const produtos = page.items
+      .filter(item => item.ativo !== false)
+      .map(item => menuProdutoToProduto(item))
+    return {
+      produtos,
+      count: page.count,
+      hasMore: page.items.length === params.limit,
+    }
+  }
+
   async listarGrupoIdsComProdutosAtivos(
     token: string,
-    canal: CanalVendaCatalogo
+    menuId: string | null
   ): Promise<Set<string>> {
+    if (!menuId) return new Set()
+
+    const snapshots = await fetchAllMenuProdutos(menuId, token, { ativo: true, tipo: 'all' })
     const grupoIds = new Set<string>()
-    let offset = 0
-
-    while (true) {
-      const params = new URLSearchParams({
-        ativo: 'true',
-        limit: String(PRODUTOS_POR_PAGINA),
-        offset: String(offset),
-      })
-      if (canal === 'entrega') {
-        params.set('ativoDelivery', 'true')
-      } else {
-        params.set('ativoLocal', 'true')
-      }
-
-      const data = await fetchJson<{ items?: unknown[] }>(
-        `/api/produtos?${params.toString()}`,
-        token
-      )
-      const items = Array.isArray(data.items) ? data.items : []
-
-      for (const item of items) {
-        const produto = Produto.fromJSON(item)
-        if (!produto.isAtivo()) continue
-        const grupoId = produto.getGrupoId()?.trim()
-        if (grupoId) grupoIds.add(grupoId)
-      }
-
-      if (items.length < PRODUTOS_POR_PAGINA) break
-      offset += PRODUTOS_POR_PAGINA
+    for (const item of snapshots) {
+      if (item.ativo === false) continue
+      const grupoId = item.grupoProduto?.id?.trim()
+      if (grupoId) grupoIds.add(grupoId)
     }
-
     return grupoIds
   }
 
-  async buscarProdutosPorNome(nome: string, token: string): Promise<Produto[]> {
+  async buscarProdutosPorNome(
+    nome: string,
+    token: string,
+    menuId: string | null
+  ): Promise<Produto[]> {
     const filtro = nome.trim()
-    if (filtro.length < 2) return []
-    const data = await fetchJson<{ items?: unknown[] }>(
-      `/api/produtos?name=${encodeURIComponent(filtro)}&ativo=true&limit=50`,
-      token
-    )
-    const items = Array.isArray(data.items) ? data.items : []
-    return items.map(item => Produto.fromJSON(item))
+    if (filtro.length < MIN_CARACTERES_BUSCA_CATALOGO_VENDA || !menuId) return []
+
+    const snapshots = await fetchAllMenuProdutos(menuId, token, {
+      q: filtro,
+      ativo: true,
+      tipo: 'all',
+    })
+
+    return snapshots
+      .filter(item => item.ativo !== false)
+      .map(item => menuProdutoToProduto(item))
+      .sort((a, b) => a.getNome().localeCompare(b.getNome(), 'pt-BR'))
   }
 
-  async buscarProdutoPorId(produtoId: string, token: string): Promise<Produto | null> {
+  async buscarProdutoPorId(
+    produtoId: string,
+    token: string,
+    menuId?: string | null
+  ): Promise<Produto | null> {
+    let base: Produto | null = null
     try {
       const data = await fetchJson<unknown>(
         `/api/produtos/${encodeURIComponent(produtoId)}`,
         token
       )
-      return Produto.fromJSON(data)
+      base = Produto.fromJSON(data)
     } catch {
-      return null
+      base = null
     }
+
+    if (!menuId) return base
+
+    const snapshot = await fetchMenuProdutoSnapshot(menuId, produtoId, token)
+    if (snapshot && base) return mergeProdutoComSnapshotMenu(base, snapshot)
+    if (snapshot) return menuProdutoToProduto(snapshot, base)
+    return base
   }
 
   async buscarClienteJson(
@@ -189,14 +225,7 @@ export class NovoPedidoReadRepository implements INovoPedidoReadRepository {
       `/api/delivery/pedidos/${encodeURIComponent(pedidoId)}`,
       token
     )
-    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-      const o = raw as Record<string, unknown>
-      if (o.data != null && typeof o.data === 'object' && !Array.isArray(o.data)) {
-        return o.data as Record<string, unknown>
-      }
-      return o
-    }
-    return {}
+    return salvarPedidoDeliveryDetalheCache(pedidoId, raw)
   }
 
   async patchPedidoDelivery(
@@ -235,7 +264,7 @@ export class NovoPedidoReadRepository implements INovoPedidoReadRepository {
       token,
       {
         method: 'POST',
-        body: JSON.stringify({ modelo }),
+        body: JSON.stringify(anexarInformacoesAdicionaisEmitirNota({ modelo }, pedidoId)),
       }
     )
     if (raw && typeof raw === 'object' && !Array.isArray(raw)) {

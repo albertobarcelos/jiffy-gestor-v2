@@ -18,6 +18,8 @@ import type {
 import type { usePedidosDeliveryKanbanColumns } from '../hooks/usePedidosDeliveryKanbanColumns'
 import type { useVendasUnificadasKanbanColumns } from '../hooks/useVendasUnificadasKanbanColumns'
 import type { useReemissaoFiscalEmLote } from '../hooks/useReemissaoFiscalEmLote'
+import { classesKanbanQuadroFaixa, classesKanbanQuadroRow } from '../utils/kanbanQuadroLayout'
+import type { SuperficieQuadroPedidos } from '@/src/presentation/gestor-pedidos/superficieQuadroPedidos'
 
 type DeliveryKanbanReturn = ReturnType<typeof usePedidosDeliveryKanbanColumns>
 type BalcaoKanbanReturn = ReturnType<typeof useVendasUnificadasKanbanColumns>
@@ -50,12 +52,15 @@ export interface KanbanBoardRendererProps {
   onEditarProdutos?: (venda: Venda) => void
   onAvancarEtapa: (venda: Venda, colunaAtual: ColunaKanbanId) => void
   onEmitirNfe: (venda: Venda) => void
-  onReimprimirCupomDelivery?: (venda: Venda, colunaAtual: ColunaKanbanId) => void
+  onReimprimirCupomDelivery?: (
+    venda: Venda,
+    colunaAtual: ColunaKanbanId
+  ) => void | Promise<void>
   entregadorPorVendaId: Record<string, string>
   onEntregadorAtualizado: (vendaId: string, entregadorId: string | null) => void
-  onConfirmarCobranca?: (venda: Venda) => void
   nomesMeiosPagamento: Record<string, string>
   reemissaoEmLote?: ReemissaoEmLoteReturn
+  superficie: SuperficieQuadroPedidos
 }
 
 export function KanbanBoardRenderer({
@@ -88,12 +93,12 @@ export function KanbanBoardRenderer({
   onReimprimirCupomDelivery,
   entregadorPorVendaId,
   onEntregadorAtualizado,
-  onConfirmarCobranca,
   nomesMeiosPagamento,
   reemissaoEmLote,
+  superficie,
 }: KanbanBoardRendererProps) {
   return (
-    <div className="scrollbar-thin flex min-h-0 flex-1 flex-col overflow-x-auto px-2 py-2">
+    <div className={classesKanbanQuadroFaixa(superficie)}>
       {mostrarLoadingLista ? (
         <div className="flex h-full min-h-[200px] items-center justify-center">
           <JiffyLoading />
@@ -106,7 +111,7 @@ export function KanbanBoardRenderer({
             onDragEnd={onDragEnd}
             onDragCancel={onDragCancel}
           >
-            <div className="flex h-full min-h-0 w-full min-w-0 flex-1 gap-3">
+            <div className={classesKanbanQuadroRow(superficie)}>
             {columns.map(column => {
               const colId = column.id as ColunaKanbanId
               const columnTotalCount = getColumnTotalCount(colId)
@@ -116,6 +121,7 @@ export function KanbanBoardRenderer({
                 <KanbanColuna
                   key={column.id}
                   column={column}
+                  superficie={superficie}
                   count={columnTotalCount}
                   criterioOrdenacao={criterioOrdenacaoPorColuna[colId] ?? 'data'}
                   direcaoOrdenacao={direcaoOrdenacaoPorColuna[colId] ?? 'desc'}
@@ -177,7 +183,6 @@ export function KanbanBoardRenderer({
                         definirEntregadorKanbanCache(vendaId, entregadorId)
                         onEntregadorAtualizado(vendaId, entregadorId)
                       }}
-                      onConfirmarCobranca={onConfirmarCobranca}
                       nomesMeiosPagamento={nomesMeiosPagamento}
                     />
                   ))}

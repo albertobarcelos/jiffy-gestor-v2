@@ -2,7 +2,9 @@
 
 import { MdPerson } from 'react-icons/md'
 import type { AbaDetalhesPedido } from '../types'
+import { NOVO_PEDIDO_SHELL_PADDING_X_CLASS } from '../layout/novoPedidoShellLayout'
 import { PedidoDetalhesTabs } from './PedidoDetalhesTabs'
+import { NovoPedidoStepper } from './NovoPedidoStepper'
 
 interface NovoPedidoHeaderProps {
   modoVisualizacao?: boolean
@@ -14,6 +16,7 @@ interface NovoPedidoHeaderProps {
   onAbaDetalhesPedidoChange: (aba: AbaDetalhesPedido) => void
   podeExibirAbaNotaFiscal: boolean
   podeExibirAbaDadosEntrega: boolean
+  tipoInicioPedido: 'balcao' | 'entrega'
 }
 
 export function NovoPedidoHeader({
@@ -26,6 +29,7 @@ export function NovoPedidoHeader({
   onAbaDetalhesPedidoChange,
   podeExibirAbaNotaFiscal,
   podeExibirAbaDadosEntrega,
+  tipoInicioPedido,
 }: NovoPedidoHeaderProps) {
   const deveMostrarAbas = currentStep === 4 && !isLoadingVenda
 
@@ -36,17 +40,28 @@ export function NovoPedidoHeader({
       : 'Novo Pedido'
 
   return (
-    <div className="px-4 py-2">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">{titulo}</h1>
-        {nomeUsuario && (
-          <div className="flex items-center gap-2">
-            <MdPerson className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium text-gray-600">
+    <div className={`${NOVO_PEDIDO_SHELL_PADDING_X_CLASS} py-2`}>
+      <div className="flex min-w-0 items-center gap-4">
+        <h1 className="shrink-0 text-2xl font-semibold">{titulo}</h1>
+        {!modoEdicaoProdutos ? (
+          <div className="flex min-w-0 flex-1 justify-center">
+            <NovoPedidoStepper
+              currentStep={currentStep}
+              modoVisualizacao={modoVisualizacao}
+              tipoInicioPedido={tipoInicioPedido}
+            />
+          </div>
+        ) : (
+          <div className="min-w-0 flex-1" />
+        )}
+        {nomeUsuario ? (
+          <div className="flex shrink-0 items-center justify-end gap-2">
+            <MdPerson className="h-4 w-4 shrink-0 text-primary" />
+            <span className="whitespace-nowrap text-right text-sm font-medium text-gray-600">
               Usuário: <span className="font-semibold text-primary">{nomeUsuario}</span>
             </span>
           </div>
-        )}
+        ) : null}
       </div>
 
       {deveMostrarAbas && (

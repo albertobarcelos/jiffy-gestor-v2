@@ -1,8 +1,7 @@
-import { parseGeoJsonPoint, type GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
-import {
-  erroGeocodeForwardParaCliente,
-  fetchGeocodeForward,
-} from '@/src/shared/utils/googleMapsFalha'
+import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
+import { geoJsonPointFromLatLng, parseGeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
+import { backendForwardGeocode } from '@/src/shared/utils/geolocalizacaoBackendApi'
+import { mensagemAmigavelErroGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
 
 export type EnderecoEmpresaGeocodeInput = {
   rua: string
@@ -102,24 +101,22 @@ export async function geocodificarEnderecoEmpresaViaGoogle(
     throw new Error('Preencha rua, número, cidade e estado antes de buscar a localização.')
   }
 
-  const params = montarParametrosGeocodeEmpresa(input)
-  const { ok, status, payload } = await fetchGeocodeForward(params)
-  if (!ok) {
-    throw erroGeocodeForwardParaCliente(payload, status)
-  }
-
-  const corpo = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {}
-  const point = parseGeoJsonPoint(corpo.enderecoLocalizacao)
-  if (!point) {
-    throw new Error('Resposta de geocodificação inválida')
-  }
-
-  return {
-    enderecoLocalizacao: point,
-    providerEnderecoId:
-      typeof corpo.providerEnderecoId === 'string' ? corpo.providerEnderecoId : null,
-    enderecoFormatado:
-      typeof corpo.enderecoFormatado === 'string' ? corpo.enderecoFormatado : null,
+  try {
+    const lookup = await backendForwardGeocode({
+      rua: input.rua,
+      numero: input.numero,
+      bairro: input.bairro,
+      cidade: input.cidade,
+      estado: input.estado,
+      cep: input.cep,
+    })
+    return {
+      enderecoLocalizacao: lookup.enderecoLocalizacao,
+      providerEnderecoId: lookup.providerEnderecoId,
+      enderecoFormatado: lookup.enderecoFormatado,
+    }
+  } catch (error) {
+    throw new Error(mensagemAmigavelErroGeolocalizacao(error, 'geocode'))
   }
 }
 
@@ -133,4 +130,9 @@ export function montarPatchEnderecoGeolocalizacao(
     geocodingProvider: 'GOOGLE',
     ...(providerEnderecoId ? { providerEnderecoId } : {}),
   }
+}
+
+/** Converte lat/lng do mapa para GeoJSON Point. */
+export function geoPointFromMapLatLng(lat: number, lng: number): GeoJsonPoint {
+  return geoJsonPointFromLatLng(lat, lng)
 }

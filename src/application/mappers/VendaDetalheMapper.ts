@@ -58,9 +58,28 @@ export function mapDetalhesEntregaFromVendaApi(vendaData: Record<string, unknown
     extrairEnderecoEntregaSnapshotDeVendaData(vendaData) ??
     mapEnderecoEntrega(vendaData.enderecoEntrega)
 
+  const entregadorNested =
+    vendaData.entregador && typeof vendaData.entregador === 'object'
+      ? (vendaData.entregador as Record<string, unknown>)
+      : null
+  const entregadorIdNested =
+    entregadorNested?.id != null ? String(entregadorNested.id).trim() || null : null
+  const entregadorNomeNested =
+    entregadorNested?.nome != null
+      ? String(entregadorNested.nome).trim() || null
+      : entregadorNested?.name != null
+        ? String(entregadorNested.name).trim() || null
+        : null
+  const entregadorTelefoneNested = String(
+    entregadorNested?.telefone ?? entregadorNested?.celular ?? ''
+  ).trim()
+
   return {
     entregadorId:
-      vendaData.entregadorId != null ? String(vendaData.entregadorId).trim() || null : null,
+      (vendaData.entregadorId != null ? String(vendaData.entregadorId).trim() || null : null) ||
+      entregadorIdNested,
+    entregadorNome: entregadorNomeNested,
+    entregadorTelefone: entregadorTelefoneNested || null,
     clienteNome:
       contextoEntrega?.destinatarioNome?.trim() ||
       (clienteNested?.nome != null ? String(clienteNested.nome).trim() || null : null),
@@ -246,7 +265,11 @@ function mapTaxaEntregaSnapshotFromVenda(
   vendaData: Record<string, unknown>
 ): TaxaEntregaDetalhe | null {
   const taxas = listarTaxasLancadasAtivas(vendaData)
-  const valorRaiz = parseNumeroTaxa(vendaData.taxaEntregaValor)
+  const valorRaiz = parseNumeroTaxa(vendaData.taxaEntregaValor) ?? parseNumeroTaxa(
+    vendaData.resumoPedido && typeof vendaData.resumoPedido === 'object'
+      ? (vendaData.resumoPedido as Record<string, unknown>).taxaEntrega
+      : undefined
+  )
 
   let candidata: Record<string, unknown> | null = null
   for (const raw of taxas) {
@@ -551,7 +574,8 @@ export function resolverTaxaEntregaValorSync(
 }
 
 /**
- * Resolve taxa de entrega **ativa** no pedido (somente `taxasLancadas` não removidas).
+ * Resolve taxa de entrega **ativa** no pedido (somente `taxasLancadas` não removidas
+ * ou o valor oficial da cobertura automática, sem `taxaId` de catálogo).
  * Não infere taxa por diferença de totais — evita "fantasma" após remoção via PATCH.
  */
 export async function resolverTaxaEntregaAtivaDetalheKanban(
@@ -559,8 +583,15 @@ export async function resolverTaxaEntregaAtivaDetalheKanban(
   token: string
 ): Promise<TaxaEntregaDetalhe | null> {
   const snapshot = mapTaxaEntregaSnapshotFromVenda(vendaData)
-  if (!snapshot?.taxaId?.trim() || !taxaEntregaTemValor(snapshot)) return null
-  if (snapshot.nome?.trim()) return snapshot
+  if (!taxaEntregaTemValor(snapshot)) return null
+  if (!snapshot!.taxaId?.trim()) {
+    return {
+      taxaId: null,
+      nome: snapshot!.nome?.trim() || 'Automática',
+      valor: snapshot!.valor,
+    }
+  }
+  if (snapshot!.nome?.trim()) return snapshot
   return enrichTaxaEntregaDetalhe(vendaData, token)
 }
 

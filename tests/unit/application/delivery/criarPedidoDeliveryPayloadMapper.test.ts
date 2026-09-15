@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildCriarPedidoDeliveryPayload } from '@/src/application/mappers/CriarPedidoDeliveryPayloadMapper'
 import type { CriarPedidoDeliveryInputDTO } from '@/src/application/dto/CriarPedidoDeliveryDTO'
+import { TAXA_ENTREGA_SEM_TAXA_ID } from '@/src/shared/constants/taxaEntregaPedido'
 
 function baseInput(
   overrides: Partial<CriarPedidoDeliveryInputDTO> = {}
@@ -60,7 +61,10 @@ describe('CriarPedidoDeliveryPayloadMapper', () => {
 
   it('não confirma cobrança na entrega quando entregador vai cobrar', () => {
     const payload = buildCriarPedidoDeliveryPayload(
-      baseInput({ entregaComCobrancaPeloEntregador: true })
+      baseInput({
+        entregaComCobrancaPeloEntregador: true,
+        pagamentos: [{ meioPagamentoId: 'mp-1', valor: 24, cobrarNaEntrega: true, naoEfetivo: true }],
+      })
     )
 
     expect(payload.cobrancas).toEqual([
@@ -72,20 +76,47 @@ describe('CriarPedidoDeliveryPayloadMapper', () => {
     ])
   })
 
-  it('não envia taxas no create — o backend calcula a cobertura', () => {
+  it('permite parte já paga e parte na entrega no mesmo pedido', () => {
+    const payload = buildCriarPedidoDeliveryPayload(
+      baseInput({
+        pagamentos: [
+          { meioPagamentoId: 'mp-pix', valor: 30 },
+          { meioPagamentoId: 'mp-dinheiro', valor: 46, cobrarNaEntrega: true, naoEfetivo: true },
+        ],
+      })
+    )
+
+    expect(payload.cobrancas).toEqual([
+      {
+        meioPagamentoId: 'mp-pix',
+        valor: 30,
+        momentoCobranca: 'antecipado',
+        pagamentoEfetivado: { confirmar: true },
+      },
+      {
+        meioPagamentoId: 'mp-dinheiro',
+        valor: 46,
+        momentoCobranca: 'na_entrega',
+      },
+    ])
+  })
+
+  it('omite valorTaxaEntrega na automática — o backend calcula a cobertura', () => {
     const payload = buildCriarPedidoDeliveryPayload(
       baseInput({
         pedidoComEntrega: true,
-        taxaEntregaSelecionada: { getId: () => 'taxa-entrega-1' },
-        valorTaxaEntrega: 5,
+        taxaEntregaId: '',
+        taxaEntregaCoberturaValor: 8,
+        valorTaxaEntrega: 8,
         totalProdutos: 29,
-        pagamentos: [{ meioPagamentoId: 'mp-1', valor: 29 }],
+        pagamentos: [{ meioPagamentoId: 'mp-1', valor: 29, cobrarNaEntrega: true, naoEfetivo: true }],
         totalPagamentos: 29,
         totalPagamentosLancados: 29,
       })
     )
 
     expect(payload.taxas).toBeUndefined()
+    expect(payload.valorTaxaEntrega).toBeUndefined()
     expect(payload.cobrancas?.[0]?.valor).toBe(29)
   })
 
@@ -151,17 +182,31 @@ describe('CriarPedidoDeliveryPayloadMapper', () => {
     expect(payload.cliente.enderecos).toBeUndefined()
   })
 
-  it('omite taxas mesmo quando há valor de cobertura', () => {
+  it('envia valorTaxaEntrega 0 quando o atendente remove a taxa', () => {
     const payload = buildCriarPedidoDeliveryPayload(
       baseInput({
         pedidoComEntrega: true,
-        taxaEntregaSelecionada: { getId: () => 'taxa-entrega-1' },
-        taxaEntregaCoberturaValor: 7.5,
-        valorTaxaEntrega: 7.5,
+        taxaEntregaId: TAXA_ENTREGA_SEM_TAXA_ID,
+        taxaEntregaCoberturaValor: 8,
+        valorTaxaEntrega: 0,
       })
     )
 
     expect(payload.taxas).toBeUndefined()
+    expect(payload.valorTaxaEntrega).toBe(0)
+  })
+
+  it('envia o valor do catálogo no override', () => {
+    const payload = buildCriarPedidoDeliveryPayload(
+      baseInput({
+        pedidoComEntrega: true,
+        taxaEntregaId: 'taxa-catalogo-1',
+        valorTaxaEntrega: 15,
+      })
+    )
+
+    expect(payload.taxas).toBeUndefined()
+    expect(payload.valorTaxaEntrega).toBe(15)
   })
 
   it('envia valorUnitario alterado nos produtos', () => {

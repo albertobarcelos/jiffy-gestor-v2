@@ -3,9 +3,11 @@
 import { Autocomplete, FormControl, InputLabel, MenuItem, Select, TextField } from '@mui/material'
 import { Input } from '@/src/presentation/components/ui/input'
 import { Button } from '@/src/presentation/components/ui/button'
+import { useLocaleUppercaseInputHandler } from '@/src/presentation/hooks/useLocaleUppercaseInputHandler'
 import { sxEntradaCompactaProduto, sxEntradaCompactaProdutoSelect } from './produtoFormMuiSx'
 import { UNIDADES_MEDIDA_PRODUTO_OPCOES } from '@/src/shared/types/unidadeMedidaProduto'
-import type { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
+import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
+import { useMemo } from 'react'
 
 interface InformacoesProdutoStepProps {
   nomeProduto: string
@@ -18,16 +20,38 @@ interface InformacoesProdutoStepProps {
   onUnidadeProdutoChange: (value: string | null) => void
   grupoProduto: string | null
   onGrupoProdutoChange: (value: string | null) => void
+  /** Nome da categoria já vinculada (exibe fallback se o id ainda não está em `grupos`). */
+  grupoProdutoNome?: string | null
   /** EAN / código de barras (GTIN — até 14 dígitos numéricos). */
   codigoEanBarras: string
   onCodigoEanBarrasChange: (value: string) => void
   grupos: GrupoProduto[]
   isLoadingGrupos: boolean
+  lockGrupoProduto?: boolean
+  lockedGrupoLabel?: string
+  /** Nome da categoria nova ainda não gravada (wizard passo 1). */
+  pendingNovaCategoriaLabel?: string
+  /** Oculta o campo Categoria (ex.: fluxos que fixam a categoria). */
+  showCategoriaField?: boolean
   onNext: () => void
   /** Salva com dados preenchidos até aqui e encerra o fluxo (sem passos seguintes) */
   onSaveAndClose: () => void
   /** Quando true, ações ficam no rodapé do painel lateral (JiffySidePanelModal) */
   hideStepFooter?: boolean
+  /** Oculta o preço do cadastro base quando a empresa tem mais de um menu. */
+  ocultarPrecoVenda?: boolean
+}
+
+function grupoCategoriaFallback(id: string, nome: string): GrupoProduto {
+  return GrupoProduto.create({
+    id,
+    nome,
+    corHex: '#CCCCCC',
+    iconName: '',
+    ativo: true,
+    ativoDelivery: false,
+    ativoLocal: false,
+  })
 }
 
 /**
@@ -45,14 +69,28 @@ export function InformacoesProdutoStep({
   onUnidadeProdutoChange,
   grupoProduto,
   onGrupoProdutoChange,
+  grupoProdutoNome,
   codigoEanBarras,
   onCodigoEanBarrasChange,
   grupos,
   isLoadingGrupos,
+  lockGrupoProduto = false,
+  lockedGrupoLabel,
+  pendingNovaCategoriaLabel,
+  showCategoriaField = true,
+  ocultarPrecoVenda = false,
   onNext,
   onSaveAndClose,
   hideStepFooter = false,
 }: InformacoesProdutoStepProps) {
+  const { inputRef: nomeInputRef, handleChange: handleNomeChange } =
+    useLocaleUppercaseInputHandler(nomeProduto, onNomeProdutoChange)
+  const { inputRef: descricaoInputRef, handleChange: handleDescricaoChange } =
+    useLocaleUppercaseInputHandler<HTMLTextAreaElement>(
+      descricaoProduto,
+      onDescricaoProdutoChange
+    )
+
   const formatCurrency = (value: string) => {
     const numbers = value.replace(/\D/g, '')
     if (!numbers) return ''
@@ -69,7 +107,18 @@ export function InformacoesProdutoStep({
     onPrecoVendaChange(formatted)
   }
 
-  const grupoSelecionado = grupos.find(g => g.getId() === grupoProduto) ?? null
+  const gruposComValor = useMemo(() => {
+    if (!grupoProduto) return grupos
+    if (grupos.some(g => g.getId() === grupoProduto)) return grupos
+    const nome =
+      grupoProdutoNome?.trim() ||
+      lockedGrupoLabel?.trim() ||
+      pendingNovaCategoriaLabel?.trim() ||
+      'Categoria selecionada'
+    return [grupoCategoriaFallback(grupoProduto, nome), ...grupos]
+  }, [grupos, grupoProduto, grupoProdutoNome, lockedGrupoLabel, pendingNovaCategoriaLabel])
+
+  const grupoSelecionado = gruposComValor.find(g => g.getId() === grupoProduto) ?? null
 
   return (
     <div className="rounded-[10px] bg-info p-2 md:p-4">
@@ -82,70 +131,54 @@ export function InformacoesProdutoStep({
       </p>
 
       <div className="space-y-4">
-        {/* Linha 1: Nome do Produto + Preço de Venda lado a lado */}
-        <div className="grid gap-4 md:grid-cols-[1fr_180px]">
+        {/* Linha 1: Nome do Produto + Preço de Venda (preço só no contexto de cardápio) */}
+        <div className={ocultarPrecoVenda ? 'grid gap-4' : 'grid gap-4 md:grid-cols-[1fr_180px]'}>
           <Input
             label="Nome do Produto"
             required
             size="small"
             type="text"
             value={nomeProduto}
-            onChange={e => onNomeProdutoChange(e.target.value.toLocaleUpperCase('pt-BR'))}
+            inputRef={nomeInputRef}
+            onChange={handleNomeChange}
             placeholder="Nome que Aparecerá no Jiffy POS"
             className="bg-white"
             sx={sxEntradaCompactaProduto}
             InputLabelProps={{ required: true }}
           />
 
-          <Input
-            label="Preço de Venda"
-            size="small"
-            type="text"
-            value={precoVenda}
-            onChange={e => handlePrecoChange(e.target.value)}
-            placeholder="R$ 0,00"
-            className="bg-white"
-            sx={sxEntradaCompactaProduto}
-          />
+          {ocultarPrecoVenda ? null : (
+            <Input
+              label="Preço de Venda"
+              size="small"
+              type="text"
+              value={precoVenda}
+              onChange={e => handlePrecoChange(e.target.value)}
+              placeholder="R$ 0,00"
+              className="bg-white"
+              sx={sxEntradaCompactaProduto}
+            />
+          )}
         </div>
 
-        {/* Linha 2: Grupo (com pesquisa) + Unidade + Código EAN */}
-        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,9.5rem)_minmax(0,1fr)]">
-          <div className="relative z-20 min-w-0">
-            <Autocomplete
-              id="np-grupo-produto-searchable"
-              size="small"
-              options={grupos}
-              loading={isLoadingGrupos}
-              loadingText="Carregando..."
-              noOptionsText="Nenhum grupo encontrado"
-              getOptionLabel={grupo =>
-                grupo.isAtivo() ? grupo.getNome() : `${grupo.getNome()} (Inativo)`
-              }
-              isOptionEqualToValue={(a, b) => a.getId() === b.getId()}
-              value={grupoSelecionado}
-              onChange={(_, grupo) => onGrupoProdutoChange(grupo?.getId() ?? null)}
-              renderOption={(props, grupo) => (
-                <li
-                  {...props}
-                  key={grupo.getId()}
-                  style={{
-                    ...props.style,
-                    color: grupo.isAtivo() ? undefined : '#9CA3AF',
-                  }}
-                >
-                  {grupo.isAtivo() ? grupo.getNome() : `${grupo.getNome()} (Inativo)`}
-                </li>
-              )}
-              renderInput={params => (
+        {/* Linha 2: Categoria + Unidade + Código EAN */}
+        <div
+          className={
+            showCategoriaField
+              ? 'grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,9.5rem)_minmax(0,1fr)]'
+              : 'grid grid-cols-[minmax(0,9.5rem)_minmax(0,1fr)] gap-4'
+          }
+        >
+          {showCategoriaField ? (
+            <div className="relative z-20 min-w-0">
+              {lockGrupoProduto && !grupoSelecionado && lockedGrupoLabel ? (
                 <TextField
-                  {...params}
-                  label="Grupo"
-                  placeholder="Pesquise ou selecione"
-                  InputLabelProps={{
-                    ...params.InputLabelProps,
-                    shrink: true,
-                  }}
+                  size="small"
+                  fullWidth
+                  label="Categoria"
+                  value={lockedGrupoLabel}
+                  disabled
+                  InputLabelProps={{ shrink: true }}
                   sx={{
                     ...sxEntradaCompactaProduto,
                     '& .MuiOutlinedInput-root': {
@@ -153,9 +186,67 @@ export function InformacoesProdutoStep({
                     },
                   }}
                 />
+              ) : (
+                <>
+                  <Autocomplete
+                    id="np-grupo-produto-searchable"
+                    size="small"
+                    options={gruposComValor}
+                    loading={isLoadingGrupos}
+                    loadingText="Carregando..."
+                    noOptionsText="Nenhuma categoria encontrada"
+                    disabled={lockGrupoProduto}
+                    getOptionLabel={grupo =>
+                      grupo.isAtivo() ? grupo.getNome() : `${grupo.getNome()} (Inativo)`
+                    }
+                    isOptionEqualToValue={(a, b) => a.getId() === b.getId()}
+                    value={grupoSelecionado}
+                    onChange={(_, grupo) => onGrupoProdutoChange(grupo?.getId() ?? null)}
+                    renderOption={(props, grupo) => (
+                      <li
+                        {...props}
+                        key={grupo.getId()}
+                        style={{
+                          ...props.style,
+                          color: grupo.isAtivo() ? undefined : '#9CA3AF',
+                        }}
+                      >
+                        {grupo.isAtivo() ? grupo.getNome() : `${grupo.getNome()} (Inativo)`}
+                      </li>
+                    )}
+                    renderInput={params => (
+                      <TextField
+                        {...params}
+                        label="Categoria"
+                        placeholder={
+                          pendingNovaCategoriaLabel && !grupoSelecionado
+                            ? `Nova: ${pendingNovaCategoriaLabel}`
+                            : 'Pesquise ou selecione'
+                        }
+                        InputLabelProps={{
+                          ...params.InputLabelProps,
+                          shrink: true,
+                        }}
+                        sx={{
+                          ...sxEntradaCompactaProduto,
+                          '& .MuiOutlinedInput-root': {
+                            backgroundColor: '#fff',
+                          },
+                        }}
+                      />
+                    )}
+                  />
+                  {pendingNovaCategoriaLabel?.trim() && !grupoSelecionado ? (
+                    <p className="mt-1 text-[10px] leading-snug text-secondary-text">
+                      Ao concluir, será criada a categoria “{pendingNovaCategoriaLabel.trim()}”.
+                      Selecione uma existente para usar no lugar, ou volte ao passo anterior para
+                      alterar a nova.
+                    </p>
+                  ) : null}
+                </>
               )}
-            />
-          </div>
+            </div>
+          ) : null}
           <div className="min-w-0">
             <FormControl
               fullWidth
@@ -206,7 +297,8 @@ export function InformacoesProdutoStep({
           label="Descrição"
           size="small"
           value={descricaoProduto}
-          onChange={e => onDescricaoProdutoChange(e.target.value.toLocaleUpperCase('pt-BR'))}
+          inputRef={descricaoInputRef}
+          onChange={handleDescricaoChange}
           placeholder="Descrição do Produto"
           className="bg-white"
           multiline

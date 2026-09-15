@@ -1,7 +1,7 @@
-import {
-  EMPRESA_DELIVERY_PENDENCIA_TYPES,
+﻿import {
   pendenciaEhObrigatoria,
   type EmpresaDeliveryPendenciaItem,
+  EMPRESA_DELIVERY_PENDENCIA_TYPES,
 } from '@/src/shared/constants/empresaDeliveryPendencias'
 import {
   deliveryHubEtapaPath,

@@ -25,8 +25,14 @@ export interface UseNovoPedidoNavegacaoParams {
   temEnderecoEntrega: boolean
   enderecoEntregaTemGeo?: boolean
   enderecoEntregaCoberturaStatus?: 'ok' | 'fora' | 'pendente' | 'indisponivel' | null
+  taxaEntregaOverride?: 'automatica' | 'sem_taxa' | 'catalogo'
   /** Edição de produtos de pedido existente: trava a navegação entre etapas. */
   modoEdicaoProdutos?: boolean
+  /**
+   * Fecha o painel sem descartar o lançamento (atalho WhatsApp).
+   * O rascunho volta ao reabrir o pedido da mesma conversa.
+   */
+  preservarRascunhoAoFechar?: boolean
 }
 
 export function useNovoPedidoNavegacao({
@@ -47,7 +53,9 @@ export function useNovoPedidoNavegacao({
   temEnderecoEntrega,
   enderecoEntregaTemGeo,
   enderecoEntregaCoberturaStatus,
+  taxaEntregaOverride,
   modoEdicaoProdutos,
+  preservarRascunhoAoFechar = false,
 }: UseNovoPedidoNavegacaoParams) {
   const [modalConfirmacaoSaidaOpen, setModalConfirmacaoSaidaOpen] = useState(false)
   const [internalDialogOpen, setInternalDialogOpen] = useState(open)
@@ -90,6 +98,7 @@ export function useNovoPedidoNavegacao({
         temEnderecoEntrega,
         enderecoEntregaTemGeo,
         enderecoEntregaCoberturaStatus,
+        taxaEntregaOverride,
         exibirToast,
         onError: showToast.error,
       }),
@@ -101,6 +110,7 @@ export function useNovoPedidoNavegacao({
       temEnderecoEntrega,
       enderecoEntregaTemGeo,
       enderecoEntregaCoberturaStatus,
+      taxaEntregaOverride,
     ]
   )
 
@@ -160,6 +170,11 @@ export function useNovoPedidoNavegacao({
           setInternalDialogOpen(true)
           return
         }
+        if (preservarRascunhoAoFechar && reason === 'backdropClick') {
+          setInternalDialogOpen(false)
+          onClose()
+          return
+        }
         if (temDadosVenda()) {
           setInternalDialogOpen(true)
           setModalConfirmacaoSaidaOpen(true)
@@ -171,7 +186,7 @@ export function useNovoPedidoNavegacao({
         setInternalDialogOpen(true)
       }
     },
-    [temDadosVenda, onClose]
+    [temDadosVenda, onClose, preservarRascunhoAoFechar]
   )
 
   useEffect(() => {

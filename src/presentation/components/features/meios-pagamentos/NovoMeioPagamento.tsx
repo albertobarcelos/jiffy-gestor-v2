@@ -7,6 +7,7 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { MeioPagamento, type TipoParcelamento } from '@/src/domain/entities/MeioPagamento'
 import { Input } from '@/src/presentation/components/ui/input'
+import { UppercaseLocaleInput } from '@/src/presentation/components/ui/UppercaseLocaleInput'
 import { Button } from '@/src/presentation/components/ui/button'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
@@ -88,7 +89,8 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
     },
     ref
   ) {
-  const router = useRouter()  const isEditing = !!meioPagamentoId
+  const router = useRouter()
+  const isEditing = !!meioPagamentoId
   const formId = embeddedFormId ?? 'novo-meio-pagamento-form'
 
   // Estados do formulário
@@ -365,10 +367,10 @@ export const NovoMeioPagamento = forwardRef<NovoMeioPagamentoHandle, NovoMeioPag
             </div>
 
             <div className="space-y-8">
-              <Input
+              <UppercaseLocaleInput
                 label="Nome do Meio de Pagamento"
                 value={nome}
-                onChange={(e) => setNome(maiusculasPt(e.target.value))}
+                onValueChange={setNome}
                 required
                 size="small"
                 placeholder="Digite o nome do meio de pagamento"

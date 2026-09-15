@@ -5,12 +5,16 @@ import type { PagamentoSelecionado } from '../types'
 import {
   calcularTrocoPedido,
   calcularValorAPagar,
+  resolverStatusPagamentoExibicaoPedido,
   resolverStatusPagamentoPedido,
   rotuloStatusPagamento,
   totalPagamentosEfetivos,
   totalPagamentosLancados,
 } from '@/src/domain/services/pedido/CalculadoraPagamentoPedido'
-import { pagamentoDeveAparecerNosDetalhesPedido } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
+import {
+  pagamentoDeveAparecerNosDetalhesPedido,
+  pedidoTemCobrancaPendenteNaEntrega,
+} from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 
 interface MeioPagamentoLike {
   getId(): string
@@ -45,16 +49,19 @@ export function useNovoPedidoPagamentos({
     [totalPagamentos, totalProdutos]
   )
 
-  const valorAPagarLancamento = useMemo(() => {
-    if (pagamentoModoCobranca) {
-      return calcularValorAPagar(totalProdutos, totalPagamentosLancadosValor)
-    }
-    return valorAPagar
-  }, [pagamentoModoCobranca, totalPagamentosLancadosValor, totalProdutos, valorAPagar])
+  const valorAPagarLancamento = useMemo(
+    () => calcularValorAPagar(totalProdutos, totalPagamentosLancadosValor),
+    [totalPagamentosLancadosValor, totalProdutos]
+  )
 
   const statusPagamentoPedido = useMemo(
     () => resolverStatusPagamentoPedido(totalPagamentos, valorAPagar),
     [totalPagamentos, valorAPagar]
+  )
+
+  const statusPagamentoExibicao = useMemo(
+    () => resolverStatusPagamentoExibicaoPedido(pagamentos, totalPagamentos, valorAPagar),
+    [pagamentos, totalPagamentos, valorAPagar]
   )
 
   const rotuloStatusPagamentoValor = useMemo(
@@ -62,8 +69,10 @@ export function useNovoPedidoPagamentos({
     [statusPagamentoPedido]
   )
 
-  const statusPagamentoExibicao = pagamentoModoCobranca ? 'pendente' : statusPagamentoPedido
-  const rotuloStatusPagamentoExibicao = pagamentoModoCobranca ? 'Pendente' : rotuloStatusPagamentoValor
+  const rotuloStatusPagamentoExibicao = useMemo(
+    () => rotuloStatusPagamento(statusPagamentoExibicao),
+    [statusPagamentoExibicao]
+  )
 
   const troco = useMemo(
     () =>
@@ -76,7 +85,9 @@ export function useNovoPedidoPagamentos({
   )
 
   const trocoLancamento = useMemo(() => {
-    if (!pagamentoModoCobranca) return troco
+    if (!pagamentoModoCobranca && !pedidoTemCobrancaPendenteNaEntrega(pagamentos)) {
+      return troco
+    }
     return calcularTrocoPedido({
       pagamentos,
       totalProdutos,

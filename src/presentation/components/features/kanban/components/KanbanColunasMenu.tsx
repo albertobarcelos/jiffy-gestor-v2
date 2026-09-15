@@ -13,6 +13,8 @@ export interface KanbanColunasMenuProps {
   ocultas: readonly ColunaKanbanId[]
   onSetColunaVisivel: (id: ColunaKanbanId, visivel: boolean) => void
   contagemPorColuna: (id: ColunaKanbanId) => number
+  /** `discreto`: ícone ao lado da busca, sem o destaque da barra principal. */
+  variante?: 'padrao' | 'discreto'
 }
 
 export function KanbanColunasMenu({
@@ -20,30 +22,40 @@ export function KanbanColunasMenu({
   ocultas,
   onSetColunaVisivel,
   contagemPorColuna,
+  variante = 'padrao',
 }: KanbanColunasMenuProps) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null)
-  const ocultasCount = ocultas.filter(id => colunasDoModo.some(c => c.id === id)).length
+  const visiveisCount = colunasDoModo.filter(
+    coluna => !ocultas.includes(coluna.id as ColunaKanbanId)
+  ).length
+  const discreto = variante === 'discreto'
 
   return (
     <>
       <button
         type="button"
         onClick={e => setAnchor(e.currentTarget)}
-        className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-700 shadow-sm transition-colors hover:bg-gray-50 hover:text-primary"
+        className={
+          discreto
+            ? 'relative flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-white/70 hover:text-gray-700'
+            : 'flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-700 shadow-sm transition-colors hover:bg-gray-50 hover:text-primary'
+        }
         title="Mostrar ou esconder colunas"
         aria-label="Mostrar ou esconder colunas"
         aria-expanded={Boolean(anchor)}
       >
-        <MdViewColumn className="h-5 w-5" />
-        <span className="hidden sm:inline">Colunas</span>
-        {ocultasCount > 0 ? (
-          <span
-            className="rounded-full px-1.5 text-[11px] font-semibold text-white"
-            style={{ backgroundColor: KANBAN_BUTTON_COLOR }}
-          >
-            {ocultasCount}
-          </span>
-        ) : null}
+        <MdViewColumn className={discreto ? 'h-4 w-4' : 'h-5 w-5'} />
+        {discreto ? null : <span className="hidden sm:inline">Colunas</span>}
+        <span
+          className={
+            discreto
+              ? 'absolute -right-0.5 -top-0.5 min-w-[0.9rem] rounded-full bg-gray-400 px-1 text-[9px] font-medium leading-4 text-white'
+              : 'rounded-full px-1.5 text-[11px] font-semibold text-white'
+          }
+          style={discreto ? undefined : { backgroundColor: KANBAN_BUTTON_COLOR }}
+        >
+          {visiveisCount}
+        </span>
       </button>
       <Menu
         anchorEl={anchor}

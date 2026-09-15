@@ -11,8 +11,9 @@ import {
   type PlacesAutocompletePrediction,
   type PlacesBias,
 } from '@/src/shared/utils/geolocalizacaoPlaces'
+import { mensagemAmigavelErroGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
 import { cn } from '@/src/shared/utils/cn'
-import { maiusculasEnderecoInput, tituloCasePalavrasEndereco } from '@/src/shared/utils/normalizarTextoEnderecoPublico'
+import { maiusculasEnderecoInput } from '@/src/shared/utils/normalizarTextoEnderecoPublico'
 
 export type EnderecoPlacesAutocompleteVariant = 'delivery' | 'gestor'
 
@@ -126,7 +127,7 @@ export function EnderecoPlacesAutocomplete({
             if (controller.signal.aborted) return
             if (error instanceof DOMException && error.name === 'AbortError') return
             setPredictions([])
-            setErro(error instanceof Error ? error.message : 'Erro ao buscar sugestões')
+            setErro(mensagemAmigavelErroGeolocalizacao(error, 'places'))
           })
           .finally(() => {
             if (!controller.signal.aborted) setLoading(false)
@@ -140,11 +141,6 @@ export function EnderecoPlacesAutocomplete({
   const busy = loading || loadingDetails
   const podeLimpar = value.trim().length > 0 && !disabled && !loadingDetails
 
-  const formatarTextoBusca = useCallback(
-    (texto: string) => (delivery ? maiusculasEnderecoInput(texto) : tituloCasePalavrasEndereco(texto)),
-    [delivery]
-  )
-
   const propagarValorInput = useCallback(
     (next: string) => {
       onChange(next)
@@ -157,10 +153,8 @@ export function EnderecoPlacesAutocomplete({
     [onChange, dispararBusca]
   )
 
-  const { inputRef: textoInputRef, handleChange: handleTextoChange } =
-    useLocaleUppercaseInputHandler(value, propagarValorInput, {
-      transform: formatarTextoBusca,
-    })
+  const { inputRef: uppercaseInputRef, handleChange: handleUppercaseChange } =
+    useLocaleUppercaseInputHandler(value, propagarValorInput)
 
   const limparBusca = () => {
     if (disabled || loadingDetails) return
@@ -190,12 +184,13 @@ export function EnderecoPlacesAutocomplete({
         [details.rua, details.numero].filter(Boolean).join(', ') ||
         details.enderecoFormatado ||
         prediction.descricao
-      onChange(formatarTextoBusca(textoBruto))
+      const texto = delivery ? maiusculasEnderecoInput(textoBruto) : textoBruto
+      onChange(texto)
       onSelect(details)
       setPredictions([])
       fecharLista()
     } catch (error) {
-      setErro(error instanceof Error ? error.message : 'Erro ao obter detalhes do endereço')
+      setErro(mensagemAmigavelErroGeolocalizacao(error, 'details'))
     } finally {
       setLoadingDetails(false)
     }
@@ -254,7 +249,7 @@ export function EnderecoPlacesAutocomplete({
           <input
             type="text"
             role="combobox"
-            ref={textoInputRef}
+            ref={delivery ? uppercaseInputRef : undefined}
             aria-expanded={aberto}
             aria-controls={listId}
             aria-autocomplete="list"
@@ -266,7 +261,9 @@ export function EnderecoPlacesAutocomplete({
             disabled={disabled || loadingDetails}
             placeholder={placeholder}
             value={value}
-            onChange={handleTextoChange}
+            onChange={
+              delivery ? handleUppercaseChange : event => propagarValorInput(event.target.value)
+            }
             onFocus={() => {
               if (predictions.length > 0) setAberto(true)
             }}

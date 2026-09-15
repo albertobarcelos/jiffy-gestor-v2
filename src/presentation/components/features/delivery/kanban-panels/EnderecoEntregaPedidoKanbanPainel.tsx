@@ -22,10 +22,8 @@ import { Button } from '@/src/presentation/components/ui/button'
 import { Input } from '@/src/presentation/components/ui/input'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
-import {
-  useMoradasPorTelefone,
-  type MoradaTelefone,
-} from '@/src/presentation/hooks/useMoradaTelefone'
+import { useMoradasPorTelefone } from '@/src/presentation/hooks/useMoradaTelefone'
+import type { MoradaTelefone } from '@/src/domain/types/moradaEntrega'
 import { formatarCepMascara, normalizarDigitosCep } from '@/src/shared/utils/consultaCep'
 import { showToast } from '@/src/shared/utils/toast'
 import { invalidateKanbanVendasListagens } from '@/features/kanban/hooks/kanbanListagemQueryCache'
@@ -115,7 +113,7 @@ export function EnderecoEntregaPedidoKanbanPainel({
   onSalvo,
 }: EnderecoEntregaPedidoKanbanPainelProps) {
   const queryClient = useQueryClient()
-  const empresaId = useTenantEmpresaId()
+  const empresaId = useTenantEmpresaId()
   const [carregando, setCarregando] = useState(false)
   const [salvando, setSalvando] = useState(false)
   const [telefoneCliente, setTelefoneCliente] = useState<string | null>(null)

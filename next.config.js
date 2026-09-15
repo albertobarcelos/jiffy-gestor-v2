@@ -38,6 +38,8 @@ const cadastrosLegacyRedirects = [
 
 const nextConfig = {
   reactStrictMode: true,
+  /** Evita 308 de `/ws/` → `/ws` que quebra o polling do Socket.IO. */
+  skipTrailingSlashRedirect: true,
   /** Dev: WebView (127.0.0.1) e acesso pela LAN (ex.: http://192.168.0.126:porta). */
   allowedDevOrigins: ['127.0.0.1', '192.168.*.*', '10.*.*.*'],
   async redirects() {
@@ -87,6 +89,22 @@ const nextConfig = {
   experimental: {
     optimizeCss: true,
     optimizePackageImports: ['@mui/material', '@mui/icons-material'],
+  },
+  /**
+   * Socket.IO delivery: browser fala com a mesma origem do Gestor (/ws).
+   * beforeFiles: Engine.IO pede /ws/?EIO=... (barra final); sem isso o Next
+   * devolve 308/404 e o middleware pode interceptar antes do proxy.
+   */
+  async rewrites() {
+    const api = (process.env.NEXT_PUBLIC_EXTERNAL_API_BASE_URL || '').replace(/\/$/, '')
+    if (!api) return []
+    return {
+      beforeFiles: [
+        { source: '/ws/', destination: `${api}/ws/` },
+        { source: '/ws', destination: `${api}/ws` },
+        { source: '/ws/:path*', destination: `${api}/ws/:path*` },
+      ],
+    }
   },
   webpack: (config, { isServer }) => {
     if (!isServer) {

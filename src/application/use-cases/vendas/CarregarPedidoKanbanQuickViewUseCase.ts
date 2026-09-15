@@ -1,4 +1,8 @@
-import { formatarTipoPagamentoDetalhe } from '@/src/application/mappers/PedidoDisplayMapper'
+import {
+  formatarTipoPagamentoDetalhe,
+  montarLinhasResumoPagamentoPedido,
+  totalCobrarNaEntregaPagamentos,
+} from '@/src/application/mappers/PedidoDisplayMapper'
 import {
   calcularTotalDosItensResumoEntrega,
   mapDetalhesEntregaFromVendaApi,
@@ -11,8 +15,8 @@ import { mapearPagamentoDetalheVenda } from '@/src/application/mappers/VendaDeta
 import type { VendaGestorApiResponse } from '@/src/application/dto/api/vendaGestorApi'
 import { pickProdutosLancados } from '@/src/application/mappers/VendaApiNormalizer'
 import type { IVendaDetalheReadRepository } from '@/src/domain/repositories/IVendaDetalheReadRepository'
-import { pagamentoEstaCancelado } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
+import { transformarParaReal } from '@/src/shared/utils/formatters'
 import type {
   DetalhesEntregaPedido,
   FluxoPagamentoEntrega,
@@ -47,14 +51,12 @@ export interface PedidoKanbanQuickViewData {
   troco: number
   fluxoPagamentoEntrega: FluxoPagamentoEntrega
   tipoPagamento: string
+  linhasPagamento: string[]
   observacaoPedido: string | null
 }
 
 function calcularTotalAReceberPagamentos(pagamentos: PagamentoSelecionado[]): number {
-  const total = pagamentos
-    .filter(p => !pagamentoEstaCancelado(p))
-    .reduce((sum, p) => sum + (Number(p.valor) || 0), 0)
-  return total > 0 ? Math.round(total * 100) / 100 : 0
+  return totalCobrarNaEntregaPagamentos(pagamentos)
 }
 
 function resolverFluxoPagamentoEntrega(
@@ -304,6 +306,12 @@ export class CarregarPedidoKanbanQuickViewUseCase {
       token,
     })
     const tipoPagamento = formatarTipoPagamentoDetalhe(pagamentos, [], nomesMeiosPagamento)
+    const linhasPagamento = montarLinhasResumoPagamentoPedido(
+      pagamentos,
+      [],
+      nomesMeiosPagamento,
+      transformarParaReal
+    ).map(linha => linha.texto)
 
     const observacaoPedidoResolvida = (() => {
       const fromApi = resolverObservacaoPedidoQuickView(vendaData, detalhesEntrega)
@@ -327,6 +335,7 @@ export class CarregarPedidoKanbanQuickViewUseCase {
       troco: troco > 0 ? troco : 0,
       fluxoPagamentoEntrega,
       tipoPagamento,
+      linhasPagamento,
       observacaoPedido: observacaoPedidoResolvida,
     }
   }

@@ -59,4 +59,14 @@ describe('resolverTotalPedidoEntrega', () => {
     })
     expect(taxa).toBe(12)
   })
+
+  it('automática no wizard usa a prévia oficial da cotação, não o catálogo', () => {
+    const taxa = resolverValorTaxaEntregaPedido({
+      pedidoComEntrega: true,
+      taxaEntregaCoberturaValor: 8,
+      taxaEntregaCatalogoValor: 15,
+      taxaEntregaOverride: 'automatica',
+    })
+    expect(taxa).toBe(8)
+  })
 })

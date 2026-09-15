@@ -21,7 +21,7 @@ import type {
 import type { ModoVisualizacaoKanban } from '../utils/kanbanModoVisualizacao'
 import { KanbanColunasMenu } from './KanbanColunasMenu'
 import { KanbanModoVisualizacaoSelect } from './KanbanModoVisualizacaoSelect'
-import { useKioskGestorPedidos } from '@/src/presentation/gestor-pedidos/kiosk/useKioskGestorPedidos'
+import type { SuperficieQuadroPedidos } from '@/src/presentation/gestor-pedidos/superficieQuadroPedidos'
 import {
   KANBAN_FILTRO_DATA_PRESET_OPCOES,
   type KanbanFiltroDataPreset,
@@ -60,6 +60,7 @@ export interface KanbanToolbarProps {
   colunasOcultas: readonly ColunaKanbanId[]
   onSetColunaVisivel: (id: ColunaKanbanId, visivel: boolean) => void
   contagemPorColuna: (id: ColunaKanbanId) => number
+  superficie: SuperficieQuadroPedidos
 }
 
 const KANBAN_BUTTON_COLOR = '#530CA3'
@@ -213,13 +214,14 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
     colunasOcultas,
     onSetColunaVisivel,
     contagemPorColuna,
+    superficie,
   } = props
 
   const isModoDelivery = modoKanbanVendas === 'delivery'
   const [refreshSpinning, setRefreshSpinning] = useState(false)
   const colunaKanbanFiltro = colunaKanbanFiltroProp ?? ''
   const onColunaKanbanFiltro = onColunaKanbanFiltroChange ?? (() => undefined)
-  const kiosk = useKioskGestorPedidos()
+  const noFredy = superficie === 'fredy'
 
   return (
     <div className="bg-primary-background mt-2 flex-shrink-0 rounded-b-lg rounded-t-lg pb-0">
@@ -241,26 +243,35 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
       >
         <div
           className={
-            kiosk
-              ? 'flex min-w-[18rem] flex-[1_1_18rem] flex-col gap-1 sm:max-w-xl'
+            noFredy
+              ? 'flex min-w-[18rem] flex-[1_1_18rem] items-end gap-0.5 sm:max-w-2xl'
               : 'flex w-[13.5rem] shrink-0 flex-col gap-1'
           }
         >
-          <div className="relative w-full px-1">
+          <div className="relative min-w-0 w-full flex-1 px-1">
             <MdSearch
               className="absolute left-2 top-1/2 -translate-y-1/2 text-secondary-text"
               size={20}
             />
             <input
               type="text"
-              placeholder={kiosk ? 'Código, cliente ou telefone' : 'Buscar pedido'}
+              placeholder={noFredy ? 'Código, cliente ou telefone' : 'Buscar pedido'}
               value={searchInput}
               onChange={e => onSearchInputChange(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && onRefresh()}
               className="h-8 w-full rounded-lg border bg-info pl-6 pr-3 text-sm shadow-sm"
-              aria-label={kiosk ? 'Código, cliente ou telefone' : 'Buscar pedido'}
+              aria-label={noFredy ? 'Código, cliente ou telefone' : 'Buscar pedido'}
             />
           </div>
+          {noFredy ? (
+            <KanbanColunasMenu
+              variante="discreto"
+              colunasDoModo={colunasDoModo}
+              ocultas={colunasOcultas}
+              onSetColunaVisivel={onSetColunaVisivel}
+              contagemPorColuna={contagemPorColuna}
+            />
+          ) : null}
         </div>
 
         {!isModoDelivery ? (
@@ -395,21 +406,13 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
           >
             <MdRefresh className={`h-5 w-5 ${refreshSpinning ? 'animate-spin' : ''}`} />
           </button>
-          {kiosk ? (
-            <>
-              <KanbanColunasMenu
-                colunasDoModo={colunasDoModo}
-                ocultas={colunasOcultas}
-                onSetColunaVisivel={onSetColunaVisivel}
-                contagemPorColuna={contagemPorColuna}
-              />
-              <KanbanModoVisualizacaoSelect
-                value={modoVisualizacao}
-                onChange={onModoVisualizacaoChange}
-              />
-            </>
+          {noFredy ? (
+            <KanbanModoVisualizacaoSelect
+              value={modoVisualizacao}
+              onChange={onModoVisualizacaoChange}
+            />
           ) : null}
-          {kiosk ? null : (
+          {noFredy ? null : (
             <KanbanModoVendasToggle value={modoKanbanVendas} onChange={onModoKanbanVendasChange} />
           )}
           <button

@@ -6,6 +6,7 @@ export {
   footerBarGrayBarSx,
   footerBarErrorBarSx,
   footerBarPrimaryTint10BarSx,
+  footerBarDangerOutlineBarSx,
 } from './JiffySidePanelModal'
 export type {
   JiffySidePanelModalProps,

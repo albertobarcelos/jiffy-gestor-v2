@@ -26,6 +26,10 @@ import {
   TOKEN_USER_AGENT_JIFFY_FLOW,
 } from '@/src/presentation/gestor-pedidos/constantes'
 import { isRotaPermitidaNoJiffyFlow } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
+import {
+  isCardapioPublicRedirectEnabled,
+  mapGestorPublicPathToCardapioUrl,
+} from '@/src/shared/utils/cardapioPublicUrl'
 
 function pedidoVeioDoAppJiffyFlow(request: NextRequest): boolean {
   const ua = request.headers.get('user-agent') ?? ''
@@ -81,8 +85,25 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  /**
+   * Loja pública vive em apps/jiffy-cardapio.
+   * Com NEXT_PUBLIC_CARDAPIO_PUBLIC_URL / CARDAPIO_PUBLIC_URL,
+   * /delivery e /cardapio redirecionam (308) para o host do Cardápio.
+   */
+  if (isCardapioPublicRedirectEnabled()) {
+    const cardapioDest = mapGestorPublicPathToCardapioUrl(
+      pathname,
+      request.nextUrl.search
+    )
+    if (cardapioDest) {
+      return NextResponse.redirect(cardapioDest, 308)
+    }
+  }
+
   // Rotas públicas - bypass rápido
   if (
+    pathname === '/ws' ||
+    pathname.startsWith('/ws/') ||
     pathname === '/login' ||
     pathname === '/registro' ||
     pathname.startsWith('/registro/') ||
@@ -94,6 +115,7 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/api/auth/usuario/') ||
     pathname.startsWith('/api/consulta-cnpj') ||
     pathname.startsWith('/api/consulta-cep') ||
+    pathname.startsWith('/api/geolocalizacao/') ||
     pathname.startsWith('/notas-fiscais') ||
     pathname.startsWith('/api/public/notas-fiscais-consumidor')
   ) {
@@ -234,7 +256,7 @@ export const config = {
      * - images (image files)
      * - public files
      */
-    '/((?!_next/static|_next/image|favicon.ico|videos|images|jiffy-flow-bolha\\.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|videos|images|ws(?:/|$)|jiffy-flow-bolha\\.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
 

@@ -98,7 +98,7 @@ export function getLinhaTempoPedidoEntregaKanban(
       ? isoLocalTransicao
       : ultimaApi
   if (escolhida) {
-    return { prefixo: 'Na etapa desde:', iso: escolhida }
+    return { prefixo: 'Desde:', iso: escolhida }
   }
   return { prefixo: 'Pedido em:', iso: v.dataCriacao }
 }
@@ -118,17 +118,6 @@ export function vendaCobrancaEmAbertoOuIndeterminadaKanban(venda: VendaUnificada
   if (status === 'pago' || status === 'cancelado') return false
   if (status === 'pendente' || status === 'parcial') return true
   return !status
-}
-
-/** Atalho no card: confirmar cobrança sem abrir o modal de detalhes (coluna Em Rota / Retirada). */
-export function deveExibirBotaoSalvarCobrancaKanban(
-  columnId: ColunaKanbanId,
-  venda: VendaUnificadaDTO,
-  modoKanbanVendas: ModoKanbanVendas
-): boolean {
-  if (modoKanbanVendas !== 'delivery') return false
-  if (columnId !== 'EM_ROTA') return false
-  return vendaCobrancaEmAbertoOuIndeterminadaKanban(venda)
 }
 
 /** Encadeia transições ao soltar à direita (ex.: Novos → Em rota = preparo + pronto + despacho). */
@@ -371,7 +360,7 @@ function dataOrdenacaoPadraoKanban(v: Venda): string {
 /**
  * Data usada para ordenar o card na coluna, espelhando a data exibida no próprio card:
  * - Novos pedidos → criação ("Recebido em")
- * - Em preparo / Pronto / Em rota → entrada na etapa ("Na etapa desde", `dataUltimaModificacao`/transição local)
+ * - Em preparo / Pronto / Em rota → entrada na etapa ("Desde", `dataUltimaModificacao`/transição local)
  * - Demais colunas → finalização → emissão fiscal → criação
  */
 export function dataOrdenacaoCardKanban(
@@ -557,6 +546,16 @@ export function formatarDataCard(dataISO: string | null | undefined): string {
   } catch {
     return '—'
   }
+}
+
+export function rotuloLinhaTempoCardCompacto(linha: {
+  prefixo: string
+  iso: string
+}): { texto: string; titulo: string } {
+  const dataCompleta = formatarDataCard(linha.iso)
+  const prefixo = linha.prefixo.replace(/:$/, '').trim()
+  const texto = `${prefixo} ${dataCompleta}`
+  return { texto, titulo: texto }
 }
 
 export function formatarTipoVenda(tipo: string | null | undefined): string {

@@ -1,0 +1,581 @@
+'use client'
+
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import { InputAdornment, TextField } from '@mui/material'
+import { MdSearch } from 'react-icons/md'
+import { useMenu } from '@/src/presentation/hooks/menus/useMenus'
+import {
+  useMenuGruposProdutos,
+  useMenuProdutos,
+} from '@/src/presentation/hooks/menus/useMenuCatalog'
+import { useMenuProdutosFilters } from '@/src/presentation/hooks/menus/useMenuProdutosFilters'
+import { useMenuProdutoLista } from '@/src/presentation/hooks/menus/useMenuProdutoLista'
+import { useGruposComplementos } from '@/src/presentation/hooks/useGruposComplementos'
+import { useIsMobile } from '@/src/presentation/hooks/useIsMobile'
+import { AddProdutosToMenuPanel } from './AddProdutosToMenuPanel'
+import { MenuNovoProdutoWizard } from './MenuNovoProdutoWizard'
+import { MenuReorderCardapioModal } from './reorder/MenuReorderCardapioModal'
+import { MenuCardapioAcoes } from './MenuCardapioAcoes'
+import { MenuCardapioChrome } from './MenuCardapioChrome'
+import { MenuCardapioEmptyState } from './MenuCardapioEmptyState'
+import { MenuProdutosFilters } from './MenuProdutosFilters'
+import {
+  MenuProdutoTabsModal,
+  type MenuProdutoTabsKey,
+  type MenuProdutoTabsModalState,
+} from './MenuProdutoTabsModal'
+import {
+  EscolherTipoProdutoModal,
+  useEscolherTipoProdutoCadastro,
+} from '@/src/presentation/components/features/produtos/EscolherTipoProdutoModal'
+import { CatalogGroupedList } from '@/src/presentation/components/features/catalogo/CatalogGroupedList'
+import { CatalogProductColumnHeader } from '@/src/presentation/components/features/catalogo/CatalogProductColumnHeader'
+import type { CatalogGroup } from '@/src/presentation/components/features/catalogo/types'
+import { MenuProdutoCatalogRow } from './MenuProdutoCatalogRow'
+import { MENU_MODAL_CANCEL_VARIANT } from './menuPanelConstants'
+import { coletarGruposMenuPorSnapshot, ordemSnapshotCategoria } from './ordenarGruposMenuSnapshot'
+import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
+import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { JiffyFriendlyAlertDialog } from '@/src/presentation/components/ui/JiffyFriendlyAlertDialog'
+import { showToast } from '@/src/shared/utils/toast'
+import { atualizarGrupoProdutoViaBffUseCase } from '@/src/application/use-cases/grupos-produtos/AtualizarGrupoProdutoViaBffUseCase'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
+import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import { resolverCodigoMenuProduto } from '@/src/shared/utils/catalogoProdutoIndex'
+import { podeDesvincularProdutoDoMenu } from '@/src/domain/policies/produto/syncCadastroComMenuPrincipal'
+import type { MenuGrupoProduto, MenuProduto } from '@/src/shared/types/menus'
+
+interface MenuEditorProps {
+  menuId: string
+}
+
+export function MenuEditor({ menuId }: MenuEditorProps) {
+  const { toGestao } = useGestaoPath()
+  const isMobile = useIsMobile()
+  const { state: filters, query, temFiltroAtivo, actions } = useMenuProdutosFilters()
+  const [filtrosVisiveis, setFiltrosVisiveis] = useState(false)
+  useEffect(() => {
+    setFiltrosVisiveis(!isMobile)
+  }, [isMobile])
+
+  const { data: menu, isLoading: loadingMenu } = useMenu(menuId)
+  const {
+    data: gruposData,
+    isLoading: loadingGrupos,
+  } = useMenuGruposProdutos({
+    menuId,
+  })
+  const {
+    data: produtosData,
+    isLoading: loadingProdutos,
+  } = useMenuProdutos({
+    menuId,
+    q: query.q,
+    ativo: query.ativo,
+    favorito: query.favorito,
+    grupoProdutoId: query.grupoProdutoId,
+    grupoComplementosId: query.grupoComplementosId,
+    tipo: query.tipo,
+  })
+  const [addOpen, setAddOpen] = useState(false)
+  const [wizardOpen, setWizardOpen] = useState(false)
+  const [wizardCategoriaId, setWizardCategoriaId] = useState<string | undefined>()
+  const [reorderOpen, setReorderOpen] = useState(false)
+  const tipoCadastro = useEscolherTipoProdutoCadastro()
+  const {
+    data: produtosTodosData,
+  } = useMenuProdutos({
+    menuId,
+    ativo: null,
+    tipo: 'all',
+    enabled: addOpen,
+  })
+  const { data: gruposComplementos = [], isLoading: isLoadingGruposComplementos } =
+    useGruposComplementos({ limit: 100, ativo: null })
+  const invalidate = useInvalidateTenantQueries()
+
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
+  const [tabsState, setTabsState] = useState<MenuProdutoTabsModalState>({
+    open: false,
+    tab: 'produto',
+    produto: null,
+    grupo: null,
+  })
+
+  const openWizardCadastro = useCallback((categoriaId?: string) => {
+    setWizardCategoriaId(categoriaId)
+    setWizardOpen(true)
+  }, [])
+
+  const closeWizardCadastro = useCallback(() => {
+    setWizardOpen(false)
+    setWizardCategoriaId(undefined)
+  }, [])
+
+  const grupos = useMemo(
+    () => coletarGruposMenuPorSnapshot(gruposData?.pages),
+    [gruposData?.pages]
+  )
+
+  const produtosDoMenu = useMemo(() => {
+    const map = new Map<string, MenuProduto>()
+    for (const page of produtosData?.pages ?? []) {
+      for (const produto of page.items) {
+        if (!map.has(produto.produtoId)) map.set(produto.produtoId, produto)
+      }
+    }
+    return Array.from(map.values())
+  }, [produtosData?.pages])
+
+  const idsNoMenu = useMemo(() => {
+    const source = addOpen ? produtosTodosData?.pages : produtosData?.pages
+    const ids = new Set<string>()
+    for (const page of source ?? []) {
+      for (const produto of page.items) ids.add(produto.produtoId)
+    }
+    return ids
+  }, [addOpen, produtosTodosData?.pages, produtosData?.pages])
+
+  const gruposDoMenu = useMemo(() => {
+    const map = new Map<string, { id: string; nome: string }>()
+    for (const grupo of grupos) {
+      const id = grupo.grupoBase.id
+      if (!map.has(id)) {
+        map.set(id, { id, nome: grupo.nome || grupo.grupoBase.nome })
+      }
+    }
+    return Array.from(map.values())
+  }, [grupos])
+
+  const produtosPorGrupo = useMemo(() => {
+    const map = new Map<string, MenuProduto[]>()
+    for (const produto of produtosDoMenu) {
+      const key = produto.grupoProduto?.id ?? 'sem-grupo'
+      const list = map.get(key) ?? []
+      list.push(produto)
+      map.set(key, list)
+    }
+    for (const [, list] of map) {
+      list.sort((a, b) => a.ordem - b.ordem)
+    }
+    return map
+  }, [produtosDoMenu])
+
+  const catalogGroups = useMemo<CatalogGroup<MenuProduto>[]>(() => {
+    const used = new Set<string>()
+    const groups: CatalogGroup<MenuProduto>[] = grupos.map(grupo => {
+      const baseId = grupo.grupoBase.id
+      used.add(baseId)
+      const cor = grupo.grupoBase.corHex
+      const icon = grupo.grupoBase.iconName
+      return {
+        groupKey: `gid:${baseId}`,
+        grupoLabel: grupo.nome || grupo.grupoBase.nome,
+        grupoId: baseId,
+        grupoVisual:
+          cor && icon ? { corHex: cor, iconName: icon } : undefined,
+        grupoAtivo: grupo.grupoBase.ativo ?? true,
+        ordem: ordemSnapshotCategoria(grupo),
+        items: produtosPorGrupo.get(baseId) ?? [],
+      }
+    })
+
+    for (const [baseId, items] of produtosPorGrupo) {
+      if (used.has(baseId) || baseId === 'sem-grupo') continue
+      groups.push({
+        groupKey: `gid:${baseId}`,
+        grupoLabel: items[0]?.grupoProduto?.nome || 'Categoria',
+        grupoId: baseId,
+        grupoAtivo: true,
+        ordem: Number.MAX_SAFE_INTEGER,
+        items,
+      })
+    }
+
+    const semGrupo = produtosPorGrupo.get('sem-grupo')
+    if (semGrupo?.length) {
+      groups.push({
+        groupKey: 'sem_grupo',
+        grupoLabel: 'Sem categoria',
+        grupoAtivo: true,
+        ordem: Number.MAX_SAFE_INTEGER,
+        items: semGrupo,
+      })
+    }
+
+    return groups.sort((a, b) => (a.ordem ?? Number.MAX_SAFE_INTEGER) - (b.ordem ?? Number.MAX_SAFE_INTEGER))
+  }, [grupos, produtosPorGrupo])
+
+  const catalogGroupsVisiveis = useMemo(() => {
+    if (!temFiltroAtivo) return catalogGroups
+    return catalogGroups.filter(grupo => grupo.items.length > 0)
+  }, [catalogGroups, temFiltroAtivo])
+
+  useEffect(() => {
+    setExpandedGroups(prev => {
+      let changed = false
+      const next: Record<string, boolean> = {}
+      catalogGroupsVisiveis.forEach(({ groupKey }) => {
+        if (typeof prev[groupKey] === 'undefined') {
+          changed = true
+          next[groupKey] = true
+        } else next[groupKey] = prev[groupKey]
+      })
+      return changed ? next : prev
+    })
+  }, [catalogGroupsVisiveis])
+
+  const findGrupo = useCallback(
+    (grupoBaseId: string | undefined) =>
+      grupos.find(g => g.grupoBase.id === grupoBaseId) ?? null,
+    [grupos]
+  )
+
+  const handleToggleExpand = useCallback((groupKey: string) => {
+    setExpandedGroups(prev => {
+      const currentlyExpanded = prev[groupKey] !== false
+      return { ...prev, [groupKey]: !currentlyExpanded }
+    })
+  }, [])
+
+  const openTabs = useCallback(
+    (config: Partial<MenuProdutoTabsModalState> & { tab: MenuProdutoTabsKey }) => {
+      setTabsState(prev => ({
+        open: true,
+        produto: config.produto ?? prev.produto,
+        grupo: config.grupo ?? prev.grupo,
+        ...config,
+      }))
+    },
+    []
+  )
+
+  const closeTabs = useCallback(() => {
+    setTabsState({
+      open: false,
+      tab: 'produto',
+      produto: null,
+      grupo: null,
+    })
+  }, [])
+
+  const handleProdutoRemovido = useCallback((produtoId: string) => {
+    setTabsState(prev =>
+      prev.produto?.produtoId === produtoId
+        ? { open: false, tab: 'produto', produto: null, grupo: null }
+        : prev
+    )
+  }, [])
+
+  const {
+    codigoPorId,
+    permissoesPorId,
+    savingDaLinha,
+    handleNomeChange,
+    handleValorChange,
+    handleQuickPatch,
+    handleTogglePermissao,
+    handleStatusToggle,
+    handleRemove,
+    dialogPropagacao,
+    statusConfirm,
+    statusConfirmSaving,
+    confirmStatusToggle,
+    fecharStatusConfirm,
+  } = useMenuProdutoLista({
+    menuId,
+    produtosDoMenu,
+    onProdutoRemovido: handleProdutoRemovido,
+    tipoMenu: menu?.tipo,
+  })
+
+  const handleEditProduto = useCallback(
+    (produtoId: string) => {
+      const produtoMenu = produtosDoMenu.find(p => p.produtoId === produtoId)
+      if (!produtoMenu) return
+      openTabs({
+        tab: 'produto',
+        produto: produtoMenu,
+        grupo: findGrupo(produtoMenu.grupoProduto?.id),
+      })
+    },
+    [produtosDoMenu, findGrupo, openTabs]
+  )
+
+  const handleEditGrupo = useCallback(
+    (grupoId: string | undefined) => {
+      if (!grupoId) return
+      const grupo = findGrupo(grupoId)
+      if (!grupo) return
+      const primeiro = produtosPorGrupo.get(grupoId)?.[0] ?? null
+      openTabs({
+        tab: 'grupo',
+        grupo,
+        produto: primeiro,
+      })
+    },
+    [findGrupo, produtosPorGrupo, openTabs]
+  )
+
+  const handleAddProduto = useCallback(
+    (_grupoNome: string, grupoId: string | undefined) => {
+      tipoCadastro.pedirTipo(() => openWizardCadastro(grupoId))
+    },
+    [tipoCadastro.pedirTipo, openWizardCadastro]
+  )
+
+  /** Cabeçalho / empty state: painel para vincular produtos do cadastro base. */
+  const handleAdicionarProdutosCabecalho = useCallback(() => {
+    setAddOpen(true)
+  }, [])
+
+  const handleToggleGrupoStatus = useCallback(
+    async (grupoId: string) => {
+      const grupo = findGrupo(grupoId)
+      if (!grupo) return
+
+      const novoStatus = !(grupo.grupoBase.ativo ?? true)
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+      if (!token) return
+
+      try {
+        await atualizarGrupoProdutoViaBffUseCase.execute({
+          token,
+          grupoId,
+          patch: { ativo: novoStatus },
+        })
+
+        showToast.success(
+          novoStatus ? 'Categoria ativada com sucesso!' : 'Categoria desativada com sucesso!'
+        )
+        await invalidate(['menu-grupos', menuId])
+        await invalidate(['grupos-produtos'])
+      } catch (err) {
+        showToast.error(
+          err instanceof Error ? err.message : 'Não foi possível atualizar o status da categoria.'
+        )
+      }
+    },
+    [findGrupo, invalidate, menuId]
+  )
+
+  const renderItem = useCallback(
+    (produto: MenuProduto) => {
+      const saving = savingDaLinha(produto.produtoId)
+      return (
+        <MenuProdutoCatalogRow
+          produto={produto}
+          codigo={resolverCodigoMenuProduto(
+            produto,
+            codigoPorId.get(produto.produtoId)
+          )}
+          permissoesCadastro={permissoesPorId.get(produto.produtoId)}
+          saving={saving}
+          onNomeChange={handleNomeChange}
+          onValorChange={handleValorChange}
+          onSwitchToggle={handleStatusToggle}
+          onEdit={handleEditProduto}
+          onPatch={handleQuickPatch}
+          onTogglePermissao={handleTogglePermissao}
+        />
+      )
+    },
+    [
+      codigoPorId,
+      handleEditProduto,
+      handleNomeChange,
+      handleQuickPatch,
+      handleStatusToggle,
+      handleTogglePermissao,
+      handleValorChange,
+      permissoesPorId,
+      savingDaLinha,
+    ]
+  )
+
+  if (loadingMenu) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <JiffyLoading />
+      </div>
+    )
+  }
+
+  if (!menu) {
+    return (
+      <div className="p-6">
+        <p className="text-sm text-secondary-text">Menu não encontrado.</p>
+        <Link
+          href={toGestao('/cardapio')}
+          className="mt-2 inline-block text-sm font-semibold text-primary"
+        >
+          Voltar ao cardápio
+        </Link>
+      </div>
+    )
+  }
+
+  const isLoadingList = loadingGrupos || loadingProdutos
+  const cardapioVazio = !temFiltroAtivo && produtosDoMenu.length === 0
+  const mostrarAcoesCabecalho = !cardapioVazio
+
+  return (
+    <MenuCardapioChrome
+      menuId={menuId}
+      nomeMenu={menu.nome}
+      aba="produtos"
+      toolbar={
+        <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="w-full min-w-0 sm:max-w-[220px] sm:flex-1 md:w-[min(220px,22vw)] md:flex-none">
+            <TextField
+              id="menu-produtos-search"
+              size="small"
+              fullWidth
+              value={filters.searchText}
+              onChange={e => actions.setSearch(e.target.value)}
+              placeholder="Pesquisar"
+              sx={{
+                ...sxEntradaCompactaProduto,
+                '& .MuiOutlinedInput-root': {
+                  backgroundColor: '#fff',
+                  height: 32,
+                  minHeight: 32,
+                },
+                '& .MuiOutlinedInput-input': {
+                  padding: '4px 6px',
+                  fontSize: '0.8125rem',
+                },
+                '& .MuiInputAdornment-root': {
+                  marginRight: '2px',
+                },
+              }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <MdSearch className="text-secondary-text" size={16} />
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </div>
+
+          {mostrarAcoesCabecalho ? (
+            <MenuCardapioAcoes
+              onAdicionar={handleAdicionarProdutosCabecalho}
+              onReordenar={() => setReorderOpen(true)}
+              loteHref={toGestao(`/menus/${menuId}/atualizar-lote`)}
+              className="w-full justify-start sm:w-auto sm:flex-none"
+            />
+          ) : null}
+        </div>
+      }
+    >
+      <MenuProdutosFilters
+        filtrosVisiveis={filtrosVisiveis}
+        isMobile={isMobile}
+        onToggleFiltros={() => setFiltrosVisiveis(v => !v)}
+        filterStatus={filters.filterStatus}
+        onFilterStatusChange={actions.setStatus}
+        favoritoFilter={filters.favoritoFilter}
+        onFavoritoChange={actions.setFavorito}
+        tipo={filters.tipo}
+        onTipoChange={actions.setTipo}
+        grupoProdutoId={filters.grupoProdutoId}
+        onGrupoProdutoChange={actions.setGrupo}
+        gruposDoMenu={gruposDoMenu}
+        grupoComplementosId={filters.grupoComplementosId}
+        onGrupoComplementoChange={actions.setGrupoComplemento}
+        gruposComplementos={gruposComplementos}
+        isLoadingGruposComplementos={isLoadingGruposComplementos}
+        onClearFilters={actions.reset}
+      />
+
+      <div className="mt-2 flex min-h-0 flex-1 flex-col px-1">
+        <CatalogProductColumnHeader variant="menu" className="shrink-0" />
+        <div className="min-h-0 flex-1">
+        <CatalogGroupedList
+          virtualize
+          className="scrollbar-hide"
+          groups={catalogGroupsVisiveis}
+          getItemKey={item => item.produtoId}
+          renderItem={renderItem}
+          expandedGroups={expandedGroups}
+          isLoading={isLoadingList && catalogGroupsVisiveis.length === 0}
+          emptyLabel="Nenhum produto encontrado com esses filtros."
+          emptyContent={
+            cardapioVazio && !isLoadingList ? (
+              <MenuCardapioEmptyState onAdicionar={handleAdicionarProdutosCabecalho} />
+            ) : undefined
+          }
+          listAriaLabel="Produtos deste cardápio"
+          addProdutoLabel="Adicionar produto"
+          onToggleExpand={handleToggleExpand}
+          onEditGrupo={handleEditGrupo}
+          onToggleGrupoStatus={handleToggleGrupoStatus}
+          onAddProduto={handleAddProduto}
+        />
+        </div>
+      </div>
+
+      <MenuProdutoTabsModal
+        menuId={menuId}
+        state={tabsState}
+        onClose={closeTabs}
+        onTabChange={tab => setTabsState(prev => ({ ...prev, tab }))}
+        onRemoverDesteCardapio={
+          podeDesvincularProdutoDoMenu(menu?.tipo) ? handleRemove : undefined
+        }
+      />
+
+      <AddProdutosToMenuPanel
+        open={addOpen}
+        menuId={menuId}
+        produtosJaNoMenu={idsNoMenu}
+        onClose={() => setAddOpen(false)}
+        onCadastrarNovoProduto={() =>
+          tipoCadastro.pedirTipo(() => openWizardCadastro())
+        }
+      />
+
+      <EscolherTipoProdutoModal
+        open={tipoCadastro.open}
+        onClose={tipoCadastro.fechar}
+        onContinuar={tipoCadastro.continuar}
+        cancelVariant={MENU_MODAL_CANCEL_VARIANT}
+      />
+      <MenuNovoProdutoWizard
+        open={wizardOpen}
+        menuId={menuId}
+        menuNome={menu.nome}
+        initialCategoriaId={wizardCategoriaId}
+        onClose={closeWizardCadastro}
+      />
+      <MenuReorderCardapioModal
+        open={reorderOpen}
+        menuId={menuId}
+        onClose={() => setReorderOpen(false)}
+      />
+      {dialogPropagacao}
+      <JiffyFriendlyAlertDialog
+        open={Boolean(statusConfirm)}
+        onClose={fecharStatusConfirm}
+        onConfirm={() => void confirmStatusToggle()}
+        title={
+          statusConfirm?.ativo
+            ? 'Retomar este produto neste cardápio?'
+            : 'Ops! Pausar este produto neste cardápio?'
+        }
+        description={
+          statusConfirm?.ativo
+            ? 'O produto voltará a ficar disponível apenas neste cardápio. O cadastro base e os demais menus não serão alterados.'
+            : 'Ao pausar, o produto deixará de aparecer neste cardápio. O cadastro base e os demais menus não serão alterados. Confirme se é isso mesmo que você deseja.'
+        }
+        confirmLabel="Ok, entendi!"
+        iconVariant={statusConfirm?.ativo ? 'success' : 'warning'}
+        busy={statusConfirmSaving}
+      />
+    </MenuCardapioChrome>
+  )
+}

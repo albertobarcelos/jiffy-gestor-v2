@@ -23,6 +23,17 @@ export interface NovoPedidoModalProps {
   statusFiscalUnificado?: string | null
   /** `tipoVenda` do unificado (Kanban) — orienta GET delivery vs gestor no detalhe. */
   tipoVendaGestor?: string | null
+  /**
+   * Etapa do card no Kanban. O GET `/delivery/pedidos/{id}` pode falhar em EM_ROTA
+   * e o fallback gestor ficar desatualizado.
+   */
+  statusEtapaOperacionalHint?: string | null
+  /** Entregador do card Kanban — preenche nome/WhatsApp se o GET do detalhe omitir. */
+  entregadorHint?: {
+    id?: string | null
+    nome?: string | null
+    telefone?: string | null
+  } | null
   /** Ao abrir detalhes (step 4), seleciona esta aba — ex.: pagamentos antes de finalizar. */
   abaDetalhesInicial?: AbaDetalhesPedido
   /**
@@ -34,4 +45,11 @@ export interface NovoPedidoModalProps {
   clienteInicial?: Cliente | null
   /** Telefone da conversa quando ainda não há cadastro. */
   telefoneInicial?: string
+  /**
+   * Ao fechar (voltar ao WhatsApp), guarda o lançamento em cache da conversa
+   * em vez de apagar o pedido.
+   */
+  preservarRascunhoAoFechar?: boolean
+  /** Chave do rascunho (id da conversa WhatsApp). */
+  chaveRascunho?: string
 }

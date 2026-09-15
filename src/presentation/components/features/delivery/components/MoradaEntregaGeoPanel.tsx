@@ -9,7 +9,7 @@ import {
   placeDetailsParaEnderecoGeocode,
   type PlaceDetailsResult,
 } from '@/src/shared/utils/geolocalizacaoPlaces'
-import { tituloCasePalavrasEndereco } from '@/src/shared/utils/normalizarTextoEnderecoPublico'
+import { maiusculasEnderecoInput } from '@/src/shared/utils/normalizarTextoEnderecoPublico'
 import { showToast } from '@/src/shared/utils/toast'
 
 export type MoradaEntregaGeoFormPatch = {
@@ -99,7 +99,7 @@ export function MoradaEntregaGeoPanel({
       setOrigem('places')
       onGeoStateChange?.({ geo: next, origem: 'places' })
       setBuscaPlaces(
-        tituloCasePalavrasEndereco(
+        maiusculasEnderecoInput(
           [fields.rua, fields.numero].filter(Boolean).join(', ') ||
             place.enderecoFormatado ||
             ''

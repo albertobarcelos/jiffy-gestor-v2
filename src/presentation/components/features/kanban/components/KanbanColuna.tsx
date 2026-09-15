@@ -10,9 +10,12 @@ import type {
   DirecaoOrdenacaoKanban,
   KanbanColumn,
 } from '../types'
+import { classesKanbanColunaCasco } from '../utils/kanbanQuadroLayout'
+import type { SuperficieQuadroPedidos } from '@/src/presentation/gestor-pedidos/superficieQuadroPedidos'
 
 interface KanbanColunaProps {
   column: KanbanColumn
+  superficie: SuperficieQuadroPedidos
   count: number
   criterioOrdenacao: CriterioOrdenacaoKanban
   direcaoOrdenacao: DirecaoOrdenacaoKanban
@@ -29,6 +32,7 @@ interface KanbanColunaProps {
 export function KanbanColuna(props: KanbanColunaProps) {
   const {
     column,
+    superficie,
     count,
     criterioOrdenacao,
     direcaoOrdenacao,
@@ -43,9 +47,7 @@ export function KanbanColuna(props: KanbanColunaProps) {
   const colId = column.id as ColunaKanbanId
 
   return (
-    <div
-      className="flex h-full min-w-[15rem] flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-gray-50"
-    >
+    <div className={classesKanbanColunaCasco(superficie)}>
       <div
         className={`px-3 py-2 ${column.color} border-b ${column.borderColor} flex flex-shrink-0 items-center justify-between`}
       >

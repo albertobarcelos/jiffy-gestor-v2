@@ -197,7 +197,7 @@ describe('TaxaPedidoDeliveryPayloadMapper', () => {
       const result = buildFinalizarCreateOverrideTaxaPatch({
         taxaAtualId: 'tx-auto',
         taxaSelecionadaId: null,
-        pagamentos: [{ meioPagamentoId: 'mp-1', valor: 40 }],
+        pagamentos: [{ meioPagamentoId: 'mp-1', valor: 40, cobrarNaEntrega: true, naoEfetivo: true }],
         fluxoPagamentoEntrega: 'cobrar_entregador',
       })
 

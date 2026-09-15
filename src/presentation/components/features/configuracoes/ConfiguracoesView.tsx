@@ -9,7 +9,10 @@ import { ImpressorasList } from '@/src/presentation/components/features/impresso
 import { MeiosPagamentosList } from '@/src/presentation/components/features/meios-pagamentos/MeiosPagamentosList'
 import { TaxasList } from '@/src/presentation/components/features/taxas/TaxasList'
 import { DeliveryHubView } from '@/src/presentation/components/features/delivery/hub/DeliveryHubView'
-import { CoberturaSairGuardProvider, usePedirSaidaCobertura } from '@/src/presentation/components/features/configuracoes/coberturaSairGuard'
+import {
+  CoberturaSairGuardProvider,
+  usePedirSaidaCobertura,
+} from '@/src/presentation/components/features/configuracoes/coberturaSairGuard'
 import { PageLoading } from '@/src/presentation/components/ui/PageLoading'
 import { cn } from '@/src/shared/utils/cn'
 import {
@@ -38,7 +41,10 @@ type ConfiguracoesViewProps = {
  * Configurações — abas em `/configuracoes/:aba`.
  * Delivery usa `/config/delivery` e `/config/delivery/:etapa`.
  */
-export function ConfiguracoesView({ activeTab, deliveryEtapaId = null }: ConfiguracoesViewProps) {
+export function ConfiguracoesView({
+  activeTab,
+  deliveryEtapaId = null,
+}: ConfiguracoesViewProps) {
   return (
     <CoberturaSairGuardProvider>
       <ConfiguracoesViewInner activeTab={activeTab} deliveryEtapaId={deliveryEtapaId} />
@@ -46,7 +52,10 @@ export function ConfiguracoesView({ activeTab, deliveryEtapaId = null }: Configu
   )
 }
 
-function ConfiguracoesViewInner({ activeTab, deliveryEtapaId = null }: ConfiguracoesViewProps) {
+function ConfiguracoesViewInner({
+  activeTab,
+  deliveryEtapaId = null,
+}: ConfiguracoesViewProps) {
   const router = useRouter()
   const { toGestao } = useGestaoPath()
   const pedirSaida = usePedirSaidaCobertura()

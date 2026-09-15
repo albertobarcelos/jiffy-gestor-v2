@@ -97,18 +97,18 @@ describe('rota /pedidos', () => {
     expect(kioskNesteBrowser('/dashboard')).toBe(false)
   })
 
-  it('não pinta TopNav no SSR de /pedidos até o cliente confirmar', () => {
+  it('não pinta TopNav no SSR de /pedidos até o cliente confirmar, sem travar o layout do Gestor', () => {
     expect(
-      chromeErpCasco({ kiosk: false, rotaPedidos: true, clientePronto: false })
+      chromeErpCasco({ superficie: 'gestor', rotaPedidos: true, clientePronto: false })
+    ).toEqual({ layoutKiosk: false, mostrarTopNav: false })
+    expect(
+      chromeErpCasco({ superficie: 'fredy', rotaPedidos: true, clientePronto: true })
     ).toEqual({ layoutKiosk: true, mostrarTopNav: false })
     expect(
-      chromeErpCasco({ kiosk: true, rotaPedidos: true, clientePronto: true })
-    ).toEqual({ layoutKiosk: true, mostrarTopNav: false })
-    expect(
-      chromeErpCasco({ kiosk: false, rotaPedidos: false, clientePronto: false })
+      chromeErpCasco({ superficie: 'gestor', rotaPedidos: false, clientePronto: false })
     ).toEqual({ layoutKiosk: false, mostrarTopNav: true })
     expect(
-      chromeErpCasco({ kiosk: false, rotaPedidos: true, clientePronto: true })
+      chromeErpCasco({ superficie: 'gestor', rotaPedidos: true, clientePronto: true })
     ).toEqual({ layoutKiosk: false, mostrarTopNav: true })
   })
 })

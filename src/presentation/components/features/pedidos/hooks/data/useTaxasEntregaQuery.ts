@@ -14,11 +14,13 @@ export function useTaxasEntregaQuery({
   modoVisualizacao,
   pedidoComEntrega,
 }: UseTaxasEntregaQueryParams) {
-  // Só ativa a query quando o painel está aberto e o pedido envolve entrega; o cache
-  // (staleTime 5min) é compartilhado entre consumidores via mesma queryKey, evitando refetch redundante.
+  // Lista do select de taxa precisa estar fresca após cadastro em /taxas.
+  // staleTime 0 + refetchOnMount always: o cache de 5 min da listagem geral não esconde taxa nova.
   const taxasEntregaQuery = useTaxasInfinite({
     limit: 100,
     enabled: open && (pedidoComEntrega || modoVisualizacao),
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
   const refetchTaxasEntrega = taxasEntregaQuery.refetch
 

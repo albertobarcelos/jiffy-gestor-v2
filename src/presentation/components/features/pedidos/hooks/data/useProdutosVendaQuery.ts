@@ -1,15 +1,26 @@
 'use client'
 
 import { useEffect, useMemo } from 'react'
-import { Produto } from '@/src/domain/entities/Produto'
 import type { Produto as ProdutoEntity } from '@/src/domain/entities/Produto'
-import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
-import { fetchProdutosDoGrupo, fetchProdutosPorNomeBusca } from '../../novoPedidoProdutosApi'
+import {
+  TAMANHO_PAGINA_CATALOGO_BUSCA,
+  TAMANHO_PAGINA_CATALOGO_GRUPO,
+  buscaCatalogoVendaAtiva,
+  montarProdutosCatalogoVenda,
+} from '@/src/domain/policies/pedido/CatalogoVendaPolicy'
+import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecureTenantInfiniteQuery'
+import { fetchProdutosCatalogoPagina } from '../../novoPedidoProdutosApi'
+
+export type ProdutosCatalogoPagina = {
+  produtos: ProdutoEntity[]
+  count: number
+  nextOffset: number | null
+}
 
 export type UseProdutosVendaQueryParams = {
   enabled: boolean
   token: string | undefined
-  empresaId: string | undefined
+  menuId: string | null
   grupoSelecionadoId: string | null
   buscaProdutoTexto: string
   onProdutosGrupoCarregados: (produtos: ProdutoEntity[]) => void
@@ -18,75 +29,113 @@ export type UseProdutosVendaQueryParams = {
 export function useProdutosVendaQuery({
   enabled,
   token,
-  empresaId,
+  menuId,
   grupoSelecionadoId,
   buscaProdutoTexto,
   onProdutosGrupoCarregados,
 }: UseProdutosVendaQueryParams) {
   const buscaProdutoFiltrada = buscaProdutoTexto.trim().toLowerCase()
+  const catalogoHabilitado = enabled && !!menuId
+  const emBusca = buscaCatalogoVendaAtiva(buscaProdutoFiltrada)
 
-  const { data: produtosBuscadosData, isLoading: isLoadingBuscaProdutos } = useSecureTenantQuery(
-    ['produtos-busca', buscaProdutoFiltrada],
-    async ({ token: tenantToken }) => {
-      const produtos = await fetchProdutosPorNomeBusca(buscaProdutoFiltrada, tenantToken)
-      return { produtos }
+  const buscaQuery = useSecureTenantInfiniteQuery<ProdutosCatalogoPagina, number>(
+    ['produtos-busca', menuId, buscaProdutoFiltrada, TAMANHO_PAGINA_CATALOGO_BUSCA],
+    async ({ token: tenantToken }, offset) => {
+      if (!menuId) {
+        return { produtos: [], count: 0, nextOffset: null }
+      }
+      const page = await fetchProdutosCatalogoPagina(tenantToken, menuId, {
+        q: buscaProdutoFiltrada,
+        limit: TAMANHO_PAGINA_CATALOGO_BUSCA,
+        offset,
+      })
+      return {
+        produtos: page.produtos,
+        count: page.count,
+        nextOffset: page.hasMore ? offset + TAMANHO_PAGINA_CATALOGO_BUSCA : null,
+      }
     },
     {
-      enabled: !!token && enabled && buscaProdutoFiltrada.length >= 2,
+      enabled: !!token && catalogoHabilitado && emBusca,
+      initialPageParam: 0,
+      getNextPageParam: lastPage => lastPage.nextOffset,
       staleTime: 1000 * 60 * 5,
     }
   )
 
-  const {
-    data: produtosPorGrupoData,
-    isLoading: isLoadingProdutos,
-    error: produtosError,
-  } = useSecureTenantQuery(
-    ['produtos-por-grupo', grupoSelecionadoId],
-    async ({ token: tenantToken }) => {
-      if (!grupoSelecionadoId) {
-        return { produtos: [] as Produto[], count: 0 }
+  const grupoQuery = useSecureTenantInfiniteQuery<ProdutosCatalogoPagina, number>(
+    ['produtos-por-grupo', menuId, grupoSelecionadoId, TAMANHO_PAGINA_CATALOGO_GRUPO],
+    async ({ token: tenantToken }, offset) => {
+      if (!grupoSelecionadoId || !menuId) {
+        return { produtos: [], count: 0, nextOffset: null }
       }
-      return fetchProdutosDoGrupo(grupoSelecionadoId, tenantToken)
+      const page = await fetchProdutosCatalogoPagina(tenantToken, menuId, {
+        grupoProdutoId: grupoSelecionadoId,
+        limit: TAMANHO_PAGINA_CATALOGO_GRUPO,
+        offset,
+      })
+      return {
+        produtos: page.produtos,
+        count: page.count,
+        nextOffset: page.hasMore ? offset + TAMANHO_PAGINA_CATALOGO_GRUPO : null,
+      }
     },
     {
-      enabled: enabled && !!grupoSelecionadoId && !!token,
+      enabled: catalogoHabilitado && !!grupoSelecionadoId && !!token && !emBusca,
+      initialPageParam: 0,
+      getNextPageParam: lastPage => lastPage.nextOffset,
       staleTime: 1000 * 60 * 5,
       gcTime: 1000 * 60 * 15,
       retry: 1,
     }
   )
 
+  const produtosGrupo = useMemo(
+    () => grupoQuery.data?.pages.flatMap(page => page.produtos) ?? [],
+    [grupoQuery.data]
+  )
+  const produtosBusca = useMemo(
+    () => buscaQuery.data?.pages.flatMap(page => page.produtos) ?? [],
+    [buscaQuery.data]
+  )
+
   useEffect(() => {
-    if (!produtosPorGrupoData?.produtos?.length) return
-    onProdutosGrupoCarregados(produtosPorGrupoData.produtos)
-  }, [produtosPorGrupoData, onProdutosGrupoCarregados])
+    if (!produtosGrupo.length) return
+    onProdutosGrupoCarregados(produtosGrupo)
+  }, [produtosGrupo, onProdutosGrupoCarregados])
 
-  const produtosList = useMemo(() => {
-    if (buscaProdutoFiltrada.length >= 2) {
-      if (!produtosBuscadosData?.produtos) return []
-      return [...produtosBuscadosData.produtos]
-        .filter(p => p.isAtivo())
-        .sort((a, b) => a.getNome().localeCompare(b.getNome()))
-    }
+  useEffect(() => {
+    if (!produtosBusca.length) return
+    onProdutosGrupoCarregados(produtosBusca)
+  }, [produtosBusca, onProdutosGrupoCarregados])
 
-    if (!produtosPorGrupoData?.produtos) return []
-    return [...produtosPorGrupoData.produtos]
-      .filter(p => p.isAtivo())
-      .sort((a, b) => a.getNome().localeCompare(b.getNome()))
-  }, [buscaProdutoFiltrada, produtosBuscadosData, produtosPorGrupoData])
+  const produtosList = useMemo(
+    () =>
+      montarProdutosCatalogoVenda({
+        menuId,
+        buscaFiltrada: buscaProdutoFiltrada,
+        produtosBusca,
+        produtosGrupo,
+      }),
+    [menuId, buscaProdutoFiltrada, produtosBusca, produtosGrupo]
+  )
 
-  const isLoadingProdutosVenda =
-    buscaProdutoFiltrada.length >= 2 ? isLoadingBuscaProdutos : isLoadingProdutos
+  const catalogoAtivo = emBusca ? buscaQuery : grupoQuery
+  const isLoadingAtual = emBusca ? buscaQuery.isLoading : grupoQuery.isLoading
 
   return {
     produtosList,
     buscaProdutoFiltrada,
-    isLoadingProdutosVenda,
-    isLoadingBuscaProdutos,
-    isLoadingProdutos,
-    produtosError,
-    produtosPorGrupoData,
-    produtosBuscadosData,
+    isLoadingProdutosVenda: !menuId ? false : isLoadingAtual,
+    isLoadingBuscaProdutos: buscaQuery.isLoading,
+    isLoadingProdutos: grupoQuery.isLoading,
+    produtosError: emBusca ? buscaQuery.error : grupoQuery.error,
+    hasNextProdutosCatalogo: Boolean(catalogoAtivo.hasNextPage),
+    isFetchingNextProdutosCatalogo: catalogoAtivo.isFetchingNextPage,
+    carregarProximaPaginaProdutosCatalogo: () => {
+      if (!catalogoAtivo.hasNextPage || catalogoAtivo.isFetchingNextPage) return
+      void catalogoAtivo.fetchNextPage()
+    },
+    menuCatalogoIndisponivel: enabled && !menuId,
   }
 }

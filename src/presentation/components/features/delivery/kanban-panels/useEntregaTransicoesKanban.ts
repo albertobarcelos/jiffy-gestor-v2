@@ -278,6 +278,7 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
       const origIdx = COLUNAS_ENTREGA_OPERACIONAIS.indexOf(colunaAtual)
       if (origIdx < 0) return
 
+      setAvancandoEtapaIds(prev => ({ ...prev, [venda.id]: true }))
       try {
         if (colunaAtual === 'EM_ROTA') {
           await finalizarEntrega(venda, colunaAtual)
@@ -288,6 +289,12 @@ export function useEntregaTransicoesKanban(params: UseEntregaTransicoesKanbanPar
         await executarAvancoEntrega(venda, origIdx, origIdx + 1)
       } catch {
         /* toast em onError do hook de transição */
+      } finally {
+        setAvancandoEtapaIds(prev => {
+          if (!(venda.id in prev)) return prev
+          const { [venda.id]: _, ...rest } = prev
+          return rest
+        })
       }
     },
     [avancandoEtapaIds, executarAvancoEntrega, finalizarEntrega]

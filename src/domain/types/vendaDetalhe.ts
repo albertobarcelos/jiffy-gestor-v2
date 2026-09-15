@@ -36,6 +36,8 @@ export interface DetalhesEntregaPedido {
   entregadorId?: string | null
   /** Nome resolvido via usuário PDV (`/api/usuarios/{id}`), não usuário gestor. */
   entregadorNome?: string | null
+  /** Celular do entregador (summary delivery ou GET `/api/usuarios/{id}`). */
+  entregadorTelefone?: string | null
   clienteNome?: string | null
   clienteCpfCnpj?: string | null
   clienteCelular?: string | null

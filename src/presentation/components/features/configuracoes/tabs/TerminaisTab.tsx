@@ -8,7 +8,60 @@ import { MdDelete, MdPhone, MdSearch } from 'react-icons/md'
 import { showToast } from '@/src/shared/utils/toast'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
+import { useMenus } from '@/src/presentation/hooks/menus/useMenus'
+import { CatalogGroupedList } from '@/src/presentation/components/features/catalogo/CatalogGroupedList'
+import type { CatalogGroup } from '@/src/presentation/components/features/catalogo/types'
+import type { Menu } from '@/src/shared/types/menus'
+import { JiffyFriendlyAlertDialog } from '@/src/presentation/components/ui/JiffyFriendlyAlertDialog'
+import { TerminaisGroupMenuSelector } from './TerminaisGroupMenuSelector'
 import { TerminaisTabsModal, TerminaisTabsModalState } from './TerminaisTabsModal'
+
+const SEM_MENU_GROUP_KEY = 'sem_menu'
+
+function formatMenuGroupLabel(menu: Pick<Menu, 'nome' | 'tipo' | 'ativo'>): string {
+  let label = menu.nome.trim()
+  if (menu.tipo === 'principal' && !/^menu\s/i.test(label)) {
+    label = `Menu ${label}`
+  }
+  return menu.ativo === false ? `${label} (inativo)` : label
+}
+
+function menusParaGrupoSelect(
+  group: CatalogGroup<TerminalData>,
+  menusAtivos: Menu[],
+  allMenus: Menu[]
+): Menu[] {
+  if (group.grupoId && !menusAtivos.some(menu => menu.id === group.grupoId)) {
+    const atual = allMenus.find(menu => menu.id === group.grupoId)
+    if (atual) return [atual, ...menusAtivos]
+  }
+  return menusAtivos
+}
+
+const TERMINAIS_COL_HEADER =
+  'font-semibold text-[10px] text-primary-text uppercase'
+
+function TerminaisListColumnHeader() {
+  return (
+    <div className="mb-1 flex min-h-8 items-center gap-[10px] px-4 py-1 bg-primary/10">
+      <div className={`flex-[2] hidden md:block ${TERMINAIS_COL_HEADER}`}>
+        Código do Terminal
+      </div>
+      <div className={`flex-[2] ${TERMINAIS_COL_HEADER}`}>Nome do Terminal</div>
+      <div className={`flex-[2] ${TERMINAIS_COL_HEADER}`}>Modelo Dispositivo</div>
+      <div className={`w-16 shrink-0 text-center leading-tight ${TERMINAIS_COL_HEADER}`}>
+        <span className="block">Versão APK</span>
+      </div>
+      <div className={`flex-[2] hidden md:flex ${TERMINAIS_COL_HEADER}`}>Imp. Finalização</div>
+      <div className={`flex-[1.5] text-center ${TERMINAIS_COL_HEADER}`}>Comp. Mesas</div>
+      <div className={`flex-[1.5] text-center ${TERMINAIS_COL_HEADER}`}>Fiscal ativo</div>
+      <div className={`flex-[1.5] text-center leading-tight ${TERMINAIS_COL_HEADER}`}>
+        <span className="block">Leitor C. Barras</span>
+      </div>
+      <div className="w-10 shrink-0" aria-hidden />
+    </div>
+  )
+}
 
 /** Tamanho de página alinhado ao backend (Swagger): menos round-trips na listagem */
 const PAGE_SIZE_TERMINAIS = 100
@@ -84,8 +137,21 @@ export function TerminaisTab() {
   const [updatingFiscal, setUpdatingFiscal] = useState<Record<string, boolean>>({})
   const [updatingLeitor, setUpdatingLeitor] = useState<Record<string, boolean>>({})
   const [updatingPrinter, setUpdatingPrinter] = useState<Record<string, boolean>>({})
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
+  const [updatingGroupMenuKey, setUpdatingGroupMenuKey] = useState<string | null>(null)
+  const [bulkMenuConfirm, setBulkMenuConfirm] = useState<{
+    group: CatalogGroup<TerminalData>
+    newMenuId: string
+    newMenuLabel: string
+  } | null>(null)
+  const [bulkMenuSaving, setBulkMenuSaving] = useState(false)
   const [impressoras, setImpressoras] = useState<Array<{ id: string; nome: string }>>([])
   const [loadingImpressoras, setLoadingImpressoras] = useState(false)
+  const menusQuery = useMenus({ limit: 100 })
+  const menusAtivos = useMemo(
+    () => (menusQuery.data?.items ?? []).filter(menu => menu.ativo),
+    [menusQuery.data?.items]
+  )
   const [tabsModalState, setTabsModalState] = useState<TerminaisTabsModalState>({
     open: false,
     tab: 'terminal',
@@ -745,7 +811,139 @@ export function TerminaisTab() {
         })
       }
     },
-    [ impressoras]
+    [impressoras]
+  )
+
+  const handleRequestBulkMenuChange = useCallback(
+    (group: CatalogGroup<TerminalData>, newMenuId: string) => {
+      const menu =
+        menusAtivos.find(item => item.id === newMenuId) ??
+        (menusQuery.data?.items ?? []).find(item => item.id === newMenuId)
+
+      if (!menu) {
+        showToast.error('Menu selecionado não encontrado')
+        return
+      }
+
+      setBulkMenuConfirm({
+        group,
+        newMenuId,
+        newMenuLabel: formatMenuGroupLabel(menu),
+      })
+    },
+    [menusAtivos, menusQuery.data?.items]
+  )
+
+  const confirmBulkMenuChange = useCallback(async () => {
+    if (!bulkMenuConfirm) return
+
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+    if (!token) {
+      showToast.error('Token não encontrado. Faça login novamente.')
+      return
+    }
+
+    const { group, newMenuId } = bulkMenuConfirm
+    const terminalIds = group.items.map(item => item.terminal.getId())
+    const previousById = new Map(
+      group.items.map(item => [item.terminal.getId(), item.rawData?.menuPrincipalId as string | undefined])
+    )
+
+    setBulkMenuSaving(true)
+    setUpdatingGroupMenuKey(group.groupKey)
+
+    setTerminais(prev =>
+      prev.map(item => {
+        if (!terminalIds.includes(item.terminal.getId())) return item
+        return {
+          ...item,
+          rawData: {
+            ...item.rawData,
+            menuPrincipalId: newMenuId,
+          },
+        }
+      })
+    )
+
+    try {
+      const results = await Promise.allSettled(
+        terminalIds.map(async terminalId => {
+          const response = await fetchGestorApi(`/api/terminais/${terminalId}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ menuPrincipalId: newMenuId }),
+          })
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            throw new Error(
+              (errorData as { error?: string }).error || 'Erro ao atualizar menu do terminal'
+            )
+          }
+        })
+      )
+
+      const failedIds = terminalIds.filter((_, index) => results[index].status === 'rejected')
+
+      if (failedIds.length > 0) {
+        setTerminais(prev =>
+          prev.map(item => {
+            const terminalId = item.terminal.getId()
+            if (!failedIds.includes(terminalId)) return item
+            return {
+              ...item,
+              rawData: {
+                ...item.rawData,
+                menuPrincipalId: previousById.get(terminalId),
+              },
+            }
+          })
+        )
+        showToast.error(
+          `${failedIds.length} de ${terminalIds.length} terminal(is) não puderam ser atualizados.`
+        )
+        await loadAllTerminais()
+      } else {
+        showToast.success(
+          `Menu atualizado para ${terminalIds.length} terminal${terminalIds.length === 1 ? '' : 'is'}!`
+        )
+      }
+    } catch (error: unknown) {
+      console.error('Erro ao atualizar menu em lote:', error)
+      showToast.error(
+        error instanceof Error ? error.message : 'Erro ao atualizar menu dos terminais'
+      )
+      await loadAllTerminais()
+    } finally {
+      setBulkMenuSaving(false)
+      setUpdatingGroupMenuKey(null)
+      setBulkMenuConfirm(null)
+    }
+  }, [bulkMenuConfirm, loadAllTerminais])
+
+  const renderGroupMenuSelector = useCallback(
+    (group: CatalogGroup<TerminalData>) => (
+      <TerminaisGroupMenuSelector
+        currentMenuId={group.grupoId}
+        menus={menusParaGrupoSelect(group, menusAtivos, menusQuery.data?.items ?? [])}
+        disabled={
+          bulkMenuSaving || updatingGroupMenuKey === group.groupKey || menusQuery.isPending
+        }
+        formatMenuLabel={formatMenuGroupLabel}
+        onRequestChange={newMenuId => handleRequestBulkMenuChange(group, newMenuId)}
+      />
+    ),
+    [
+      bulkMenuSaving,
+      updatingGroupMenuKey,
+      menusAtivos,
+      menusQuery.data?.items,
+      menusQuery.isPending,
+      handleRequestBulkMenuChange,
+    ]
   )
 
   // Carrega dados iniciais
@@ -762,6 +960,271 @@ export function TerminaisTab() {
       return !bloqueado
     })
   }, [terminais])
+
+  const terminalGroups = useMemo<CatalogGroup<TerminalData>[]>(() => {
+    const allMenus = menusQuery.data?.items ?? []
+    const groupsMap = new Map<string, CatalogGroup<TerminalData>>()
+    const semMenuItems: TerminalData[] = []
+
+    for (const menu of menusAtivos) {
+      groupsMap.set(menu.id, {
+        groupKey: `menu:${menu.id}`,
+        grupoLabel: formatMenuGroupLabel(menu),
+        grupoId: menu.id,
+        grupoAtivo: true,
+        items: [],
+      })
+    }
+
+    for (const item of terminaisFiltrados) {
+      const menuId =
+        typeof item.rawData?.menuPrincipalId === 'string'
+          ? item.rawData.menuPrincipalId.trim()
+          : ''
+
+      if (!menuId) {
+        semMenuItems.push(item)
+        continue
+      }
+
+      let group = groupsMap.get(menuId)
+      if (!group) {
+        const menu = allMenus.find(m => m.id === menuId)
+        group = {
+          groupKey: `menu:${menuId}`,
+          grupoLabel: menu ? formatMenuGroupLabel(menu) : 'Menu desconhecido',
+          grupoId: menuId,
+          grupoAtivo: menu?.ativo ?? false,
+          items: [],
+        }
+        groupsMap.set(menuId, group)
+      }
+
+      group.items.push(item)
+    }
+
+    const groups: CatalogGroup<TerminalData>[] = []
+
+    for (const menu of menusAtivos) {
+      const group = groupsMap.get(menu.id)
+      if (group && group.items.length > 0) {
+        groups.push(group)
+      }
+    }
+
+    for (const [menuId, group] of groupsMap) {
+      if (menusAtivos.some(menu => menu.id === menuId)) continue
+      if (group.items.length > 0) {
+        groups.push(group)
+      }
+    }
+
+    if (semMenuItems.length > 0) {
+      groups.push({
+        groupKey: SEM_MENU_GROUP_KEY,
+        grupoLabel: 'Sem menu',
+        grupoAtivo: true,
+        items: semMenuItems,
+      })
+    }
+
+    return groups
+  }, [terminaisFiltrados, menusAtivos, menusQuery.data?.items])
+
+  const terminalGroupsVisiveis = useMemo(
+    () => terminalGroups.filter(group => group.items.length > 0),
+    [terminalGroups]
+  )
+
+  useEffect(() => {
+    setExpandedGroups(prev => {
+      let changed = false
+      const next: Record<string, boolean> = {}
+      terminalGroupsVisiveis.forEach(({ groupKey }) => {
+        if (typeof prev[groupKey] === 'undefined') {
+          changed = true
+          next[groupKey] = true
+        } else {
+          next[groupKey] = prev[groupKey]
+        }
+      })
+      return changed ? next : prev
+    })
+  }, [terminalGroupsVisiveis])
+
+  const handleToggleExpand = useCallback((groupKey: string) => {
+    setExpandedGroups(prev => {
+      const currentlyExpanded = prev[groupKey] !== false
+      return { ...prev, [groupKey]: !currentlyExpanded }
+    })
+  }, [])
+
+  const renderTerminalRow = useCallback(
+    (item: TerminalData, index: number) => {
+      const { terminal, rawData } = item
+      const codigo =
+        rawData?.codigoInterno ||
+        rawData?.codigo ||
+        rawData?.code ||
+        terminal.getName() ||
+        'N/A'
+      const nome = rawData?.nome || terminal.getName() || codigo
+      const modelo = rawData?.modeloDispositivo || rawData?.modelo || rawData?.deviceModel || 'Unknown'
+      const versao =
+        rawData?.versaoApk || rawData?.versao || rawData?.apkVersion || rawData?.version || '1.0.0'
+      const prefs = resolvePreferencesForTerminal(terminal.getId(), preferencesMap)
+      const compartilhamentoAtivo = prefs.compartilharMesas
+      const fiscalAtivo = prefs.fiscalAtivo
+      const leitorHabilitado = prefs.leitorHabilitado
+
+      return (
+        <div
+          onClick={() =>
+            setTabsModalState({
+              open: true,
+              tab: 'terminal',
+              mode: 'edit',
+              terminalId: terminal.getId(),
+            })
+          }
+          className={`px-4 py-2 flex items-center gap-[10px] rounded-lg hover:bg-primary/10 transition-colors cursor-pointer ${
+            index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
+          }`}
+        >
+          <div className="flex-[2] hidden md:flex items-center gap-3">
+            <span className="text-sm font-normal text-primary-text"># {codigo}</span>
+          </div>
+          <div className="flex-[2] flex items-center gap-1 md:text-sm text-[10px] text-primary-text">
+            {nome}
+          </div>
+          <div className="flex-[2] md:text-sm text-[10px] text-secondary-text">{modelo}</div>
+          <div className="w-14 shrink-0 text-center md:text-sm text-[10px] text-secondary-text">
+            {versao}
+          </div>
+          <div className="flex-[2] md:text-sm text-[10px] text-secondary-text hidden md:flex">
+            {preferencesLoaded ? (
+              <select
+                value={prefs.impressoraFinalizacaoId ?? ''}
+                onChange={event => {
+                  event.stopPropagation()
+                  handleChangeImpressora(terminal.getId(), event.target.value)
+                }}
+                onClick={event => event.stopPropagation()}
+                disabled={updatingPrinter[terminal.getId()] || loadingImpressoras}
+                className="w-full max-w-[220px] h-8 rounded-lg border border-gray-200 bg-white md:text-sm text-xs text-primary-text px-2 focus:outline-none focus:border-primary"
+              >
+                <option value="">Nenhuma</option>
+                {impressoras.map(imp => (
+                  <option key={imp.id} value={imp.id}>
+                    {imp.nome}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="md:text-xs text-[10px] text-secondary-text">Carregando...</div>
+            )}
+          </div>
+          <div
+            className="flex-[1.5] flex justify-center"
+            onClick={e => e.stopPropagation()}
+            onMouseDown={e => e.stopPropagation()}
+          >
+            <JiffyIconSwitch
+              checked={compartilhamentoAtivo}
+              onChange={e => {
+                e.stopPropagation()
+                handleToggleCompartilhar(terminal.getId(), e.target.checked)
+              }}
+              disabled={!!updatingShare[terminal.getId()]}
+              size="sm"
+              className="justify-center gap-0 px-0 py-0"
+              inputProps={{
+                'aria-label': `Compartilhar mesas — ${nome}`,
+                title: compartilhamentoAtivo
+                  ? 'Compartilhamento habilitado'
+                  : 'Compartilhamento desabilitado',
+              }}
+            />
+          </div>
+          <div
+            className="flex-[1.5] flex justify-center"
+            onClick={e => e.stopPropagation()}
+            onMouseDown={e => e.stopPropagation()}
+          >
+            <JiffyIconSwitch
+              checked={fiscalAtivo}
+              onChange={e => {
+                e.stopPropagation()
+                handleToggleFiscalAtivo(terminal.getId(), e.target.checked)
+              }}
+              disabled={!!updatingFiscal[terminal.getId()]}
+              size="sm"
+              className="justify-center gap-0 px-0 py-0"
+              inputProps={{
+                'aria-label': `Fiscal ativo — ${nome}`,
+                title: fiscalAtivo ? 'Fiscal ativo' : 'Fiscal inativo',
+              }}
+            />
+          </div>
+          <div
+            className="flex-[1.5] flex justify-center"
+            onClick={e => e.stopPropagation()}
+            onMouseDown={e => e.stopPropagation()}
+          >
+            <JiffyIconSwitch
+              checked={leitorHabilitado}
+              onChange={e => {
+                e.stopPropagation()
+                handleToggleLeitorCodigoBarras(terminal.getId(), e.target.checked)
+              }}
+              disabled={!!updatingLeitor[terminal.getId()]}
+              size="sm"
+              className="justify-center gap-0 px-0 py-0"
+              inputProps={{
+                'aria-label': `Leitor código de barras — ${nome}`,
+                title: leitorHabilitado ? 'Leitor habilitado' : 'Leitor desabilitado',
+              }}
+            />
+          </div>
+          <div
+            className="w-10 shrink-0 flex justify-center"
+            onClick={e => e.stopPropagation()}
+            onMouseDown={e => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={e => {
+                e.stopPropagation()
+                void handleToggleTerminalStatus(terminal.getId(), true)
+              }}
+              disabled={!!togglingStatus[terminal.getId()]}
+              className="rounded-lg p-1.5 text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              title="Desativar terminal"
+              aria-label={`Desativar terminal — ${nome}`}
+            >
+              <MdDelete className="h-6 w-6" />
+            </button>
+          </div>
+        </div>
+      )
+    },
+    [
+      preferencesMap,
+      preferencesLoaded,
+      impressoras,
+      loadingImpressoras,
+      updatingPrinter,
+      updatingShare,
+      updatingFiscal,
+      updatingLeitor,
+      togglingStatus,
+      handleChangeImpressora,
+      handleToggleCompartilhar,
+      handleToggleFiscalAtivo,
+      handleToggleLeitorCodigoBarras,
+      handleToggleTerminalStatus,
+    ]
+  )
 
   return (
     <div className="flex flex-col h-full overflow-hidden py-1">
@@ -817,39 +1280,6 @@ export function TerminaisTab() {
 
       {/* Lista de terminais com scroll */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden md:px-[20px] px-1 scrollbar-hide">
-        {/* Barra de títulos das colunas - sticky dentro do scroll */}
-        {terminaisFiltrados.length > 0 && (
-          <div className="h-10 bg-custom-2 rounded-lg px-4 flex items-center gap-[10px] sticky top-0 z-10 mb-2">
-            <div className="flex-[2] font-semibold text-xs text-primary-text uppercase hidden md:block">
-              Código do Terminal
-            </div>
-            <div className="flex-[2] font-semibold md:text-xs text-[10px] text-primary-text uppercase">
-              Nome do Terminal
-            </div>
-            <div className="flex-[2] font-semibold md:text-xs text-[10px] text-primary-text uppercase">
-              Modelo Dispositivo
-            </div>
-            <div className="flex-[1.5] font-semibold md:text-xs text-[10px] text-primary-text uppercase">
-              Versão APK
-            </div>
-            <div className="flex-[2] font-semibold md:text-xs text-[10px] text-primary-text uppercase hidden md:flex">
-              Imp. Finalização
-            </div>
-            <div className="flex-[1.5] text-center font-semibold md:text-xs text-[10px] text-primary-text uppercase">
-              Comp. Mesas
-            </div>
-            <div className="flex-[1.5] text-center font-semibold md:text-xs text-[10px] text-primary-text uppercase">
-              Fiscal ativo
-            </div>
-            <div className="flex-[1.5] text-center font-semibold md:text-xs text-[10px] text-primary-text uppercase">
-              Leitor C. Barras
-            </div>
-            <div className="md:flex-[1.5] flex-[1] text-center font-semibold md:text-xs text-[10px] text-primary-text uppercase">
-              Remover
-            </div>
-          </div>
-        )}
-
         {terminais.length === 0 && !isLoading && (
           <div className="flex flex-col items-center justify-center py-12">
             <MdPhone className="text-secondary-text mb-4" size={48} />
@@ -890,156 +1320,26 @@ export function TerminaisTab() {
           </div>
         )}
 
-        {terminaisFiltrados.map(({ terminal, rawData }, index) => {
-          // Extrai campos dos dados brutos conforme documentação da API
-          const codigo = rawData?.codigoInterno || rawData?.codigo || rawData?.code || terminal.getName() || 'N/A'
-          const nome = rawData?.nome || terminal.getName() || codigo
-          const modelo = rawData?.modeloDispositivo || rawData?.modelo || rawData?.deviceModel || 'Unknown'
-          const versao = rawData?.versaoApk || rawData?.versao || rawData?.apkVersion || rawData?.version || '1.0.0'
-          const prefs = resolvePreferencesForTerminal(terminal.getId(), preferencesMap)
-          const compartilhamentoAtivo = prefs.compartilharMesas
-          const fiscalAtivo = prefs.fiscalAtivo
-          const leitorHabilitado = prefs.leitorHabilitado
+        {terminaisFiltrados.length > 0 && (
+          <CatalogGroupedList
+            groups={terminalGroupsVisiveis}
+            getItemKey={item => item.terminal.getId()}
+            renderItem={(item, index) => renderTerminalRow(item, index)}
+            expandedGroups={expandedGroups}
+            isLoading={isLoading && terminalGroupsVisiveis.length === 0}
+            emptyLabel="Nenhum terminal encontrado com essa pesquisa."
+            listAriaLabel="Terminais cadastrados por menu"
+            showHeaderActions={false}
+            showGrupoStatusSwitch={false}
+            itemCountSuffix="terminais"
+            showCollapsedHint={false}
+            onToggleExpand={handleToggleExpand}
+            renderBeforeGroupItems={() => <TerminaisListColumnHeader />}
+            renderGroupHeaderAddon={renderGroupMenuSelector}
+          />
+        )}
 
-          return (
-              <div
-              key={terminal.getId()}
-              onClick={() =>
-                setTabsModalState({
-                  open: true,
-                  tab: 'terminal',
-                  mode: 'edit',
-                  terminalId: terminal.getId(),
-                })
-              }
-              className={`px-4 py-2 flex items-center gap-[10px] rounded-lg hover:bg-primary/10 transition-colors cursor-pointer ${
-                index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
-              }`}
-            >
-              <div className="flex-[2] hidden md:flex items-center gap-3">
-                
-                <span className="text-sm font-normal text-primary-text">
-                 # {codigo}
-                </span>
-              </div>
-              <div className="flex-[2] flex items-center gap-1 md:text-sm text-[10px] text-primary-text ">
-                {nome}
-              </div>
-              <div className="flex-[2] md:text-sm text-[10px] text-secondary-text ">
-                {modelo}
-              </div>
-              <div className="flex-[1.5] md:text-sm text-[10px] text-secondary-text ">
-                {versao}
-              </div>
-              <div className="flex-[2] md:text-sm text-[10px] text-secondary-text hidden md:flex">
-                {preferencesLoaded ? (
-                  <select
-                    value={prefs.impressoraFinalizacaoId ?? ''}
-                    onChange={(event) => {
-                      event.stopPropagation()
-                      handleChangeImpressora(terminal.getId(), event.target.value)
-                    }}
-                    onClick={(event) => event.stopPropagation()}
-                    disabled={updatingPrinter[terminal.getId()] || loadingImpressoras}
-                    className="w-full max-w-[220px] h-8 rounded-lg border border-gray-200 bg-white md:text-sm text-xs text-primary-text px-2 focus:outline-none focus:border-primary"
-                  >
-                    <option value="">Nenhuma</option>
-                    {impressoras.map((imp) => (
-                      <option key={imp.id} value={imp.id}>
-                        {imp.nome}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <div className="md:text-xs text-[10px] text-secondary-text">Carregando...</div>
-                )}
-              </div>
-              <div
-                className="flex-[1.5] flex justify-center"
-                onClick={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-              >
-                <JiffyIconSwitch
-                  checked={compartilhamentoAtivo}
-                  onChange={(e) => {
-                    e.stopPropagation()
-                    handleToggleCompartilhar(terminal.getId(), e.target.checked)
-                  }}
-                  disabled={!!updatingShare[terminal.getId()]}
-                  size="sm"
-                  className="justify-center gap-0 px-0 py-0"
-                  inputProps={{
-                    'aria-label': `Compartilhar mesas — ${nome}`,
-                    title: compartilhamentoAtivo
-                      ? 'Compartilhamento habilitado'
-                      : 'Compartilhamento desabilitado',
-                  }}
-                />
-              </div>
-              <div
-                className="flex-[1.5] flex justify-center"
-                onClick={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-              >
-                <JiffyIconSwitch
-                  checked={fiscalAtivo}
-                  onChange={(e) => {
-                    e.stopPropagation()
-                    handleToggleFiscalAtivo(terminal.getId(), e.target.checked)
-                  }}
-                  disabled={!!updatingFiscal[terminal.getId()]}
-                  size="sm"
-                  className="justify-center gap-0 px-0 py-0"
-                  inputProps={{
-                    'aria-label': `Fiscal ativo — ${nome}`,
-                    title: fiscalAtivo ? 'Fiscal ativo' : 'Fiscal inativo',
-                  }}
-                />
-              </div>
-              <div
-                className="flex-[1.5] flex justify-center"
-                onClick={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-              >
-                <JiffyIconSwitch
-                  checked={leitorHabilitado}
-                  onChange={(e) => {
-                    e.stopPropagation()
-                    handleToggleLeitorCodigoBarras(terminal.getId(), e.target.checked)
-                  }}
-                  disabled={!!updatingLeitor[terminal.getId()]}
-                  size="sm"
-                  className="justify-center gap-0 px-0 py-0"
-                  inputProps={{
-                    'aria-label': `Leitor código de barras — ${nome}`,
-                    title: leitorHabilitado ? 'Leitor habilitado' : 'Leitor desabilitado',
-                  }}
-                />
-              </div>
-              <div
-                className="md:flex-[1.5] flex-[1] flex justify-center"
-                onClick={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-              >
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    void handleToggleTerminalStatus(terminal.getId(), true)
-                  }}
-                  disabled={!!togglingStatus[terminal.getId()]}
-                  className="rounded-lg p-1.5 text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  title="Desativar terminal"
-                  aria-label={`Desativar terminal — ${nome}`}
-                >
-                  <MdDelete className="h-6 w-6" />
-                </button>
-              </div>
-            </div>
-          )
-        })} 
-
-        {isLoading && (
+        {isLoading && terminaisFiltrados.length === 0 && (
           <div className="flex flex-col items-center justify-center py-8">
             <JiffyLoading />
           </div>
@@ -1059,6 +1359,23 @@ export function TerminaisTab() {
         }
         onTabChange={(tab) => setTabsModalState((prev) => ({ ...prev, tab }))}
         onReload={loadAllTerminais}
+      />
+
+      <JiffyFriendlyAlertDialog
+        open={Boolean(bulkMenuConfirm)}
+        onClose={() => {
+          if (!bulkMenuSaving) setBulkMenuConfirm(null)
+        }}
+        onConfirm={() => void confirmBulkMenuChange()}
+        title="Alterar menu de todos os terminais?"
+        description={
+          bulkMenuConfirm
+            ? `Esta ação aplicará o menu "${bulkMenuConfirm.newMenuLabel}" a ${bulkMenuConfirm.group.items.length} terminal${bulkMenuConfirm.group.items.length === 1 ? '' : 'is'} do grupo "${bulkMenuConfirm.group.grupoLabel}".`
+            : ''
+        }
+        confirmLabel="Sim, alterar"
+        iconVariant="warning"
+        busy={bulkMenuSaving}
       />
     </div>
   )

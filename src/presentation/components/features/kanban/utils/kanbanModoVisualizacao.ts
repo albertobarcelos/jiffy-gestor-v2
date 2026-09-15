@@ -1,3 +1,5 @@
+import type { SuperficieQuadroPedidos } from '@/src/presentation/gestor-pedidos/superficieQuadroPedidos'
+
 export const MODOS_VISUALIZACAO_KANBAN = ['quadro', 'expedicao', 'lista'] as const
 
 export type ModoVisualizacaoKanban = (typeof MODOS_VISUALIZACAO_KANBAN)[number]
@@ -20,11 +22,11 @@ export function parseModoVisualizacaoKanban(value: unknown): ModoVisualizacaoKan
   return isModoVisualizacaoKanban(value) ? value : 'quadro'
 }
 
-/** Gestor web: só Quadro. Flow (kiosk): os três modos. */
+/** Gestor: só Quadro. Fredy: Quadro / Operação / Lista. */
 export function resolverModoVisualizacaoKanban(
-  kiosk: boolean,
+  superficie: SuperficieQuadroPedidos,
   stored: unknown
 ): ModoVisualizacaoKanban {
-  if (!kiosk) return 'quadro'
+  if (superficie === 'gestor') return 'quadro'
   return parseModoVisualizacaoKanban(stored)
 }

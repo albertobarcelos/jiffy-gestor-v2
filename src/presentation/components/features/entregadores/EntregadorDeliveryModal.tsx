@@ -7,6 +7,7 @@ import {
   type JiffySidePanelFooterActions,
 } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { Input } from '@/src/presentation/components/ui/input'
+import { UppercaseLocaleInput } from '@/src/presentation/components/ui/UppercaseLocaleInput'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
@@ -85,7 +86,8 @@ export function EntregadorDeliveryModal({
   entregadorId,
   onClose,
   onSalvo,
-}: EntregadorDeliveryModalProps) {  const [form, setForm] = useState<EntregadorFormState>(EMPTY_FORM)
+}: EntregadorDeliveryModalProps) {
+  const [form, setForm] = useState<EntregadorFormState>(EMPTY_FORM)
   const [carregando, setCarregando] = useState(false)
   const [salvando, setSalvando] = useState(false)
 
@@ -286,13 +288,13 @@ export function EntregadorDeliveryModal({
                 </div>
 
                 <div className="flex flex-col gap-8">
-                  <Input
+                  <UppercaseLocaleInput
                     label="Nome"
                     value={form.nome}
-                    onChange={e =>
+                    onValueChange={nome =>
                       setForm(prev => ({
                         ...prev,
-                        nome: e.target.value.toLocaleUpperCase('pt-BR'),
+                        nome,
                       }))
                     }
                     required

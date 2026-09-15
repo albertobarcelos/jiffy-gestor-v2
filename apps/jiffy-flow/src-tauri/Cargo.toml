@@ -1,6 +1,6 @@
 [package]
 name = "jiffy-flow"
-version = "0.1.4"
+version = "0.1.5"
 description = "Fredy — gestor de pedidos no Windows. Por Jiffy."
 authors = ["NexSyn"]
 edition = "2021"

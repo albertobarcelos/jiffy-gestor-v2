@@ -10,6 +10,8 @@ export const ERP_ROUTE_PREFIXES = [
   '/dashboard',
   '/produtos',
   '/grupos-produtos',
+  '/cardapio',
+  '/menus',
   '/grupos-complementos',
   '/complementos',
   '/taxas',

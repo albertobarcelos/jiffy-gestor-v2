@@ -1,15 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { MdMoreVert } from 'react-icons/md'
 import type { Cliente } from '@/src/domain/entities/Cliente'
 import { Button } from '@/src/presentation/components/ui/button'
 import { SeletorClienteModal } from '@/src/presentation/components/features/pedidos/components/SeletorClienteModal'
 import { NovoPedidoModal } from '@/src/presentation/components/features/pedidos/NovoPedidoModal'
+import { obterRascunhoPedidoWhatsApp } from '@/src/presentation/components/features/pedidos/rascunho/rascunhoPedidoWhatsAppCache'
 import { useClientes } from '@/src/presentation/hooks/useClientes'
-import { gravarPendenciaQuadroFlow } from '../quadro/filtroPendenteQuadroFlow'
-import { pathQuadroDaSessaoAtual } from '../sessao/pathsGestorSessao'
 import { WHATSAPP_PAINEL_LARGURA_PX } from '../constantes'
 import { termoBuscaClientePorTelefone } from '@/src/shared/utils/telefoneClienteMatch'
 import {
@@ -22,13 +20,14 @@ import { setWhatsAppWebViewSuspenso } from './whatsappUiState'
 import { AtalhosWhatsAppSection } from './AtalhosWhatsAppSection'
 import { escolherClienteDaConversa } from './escolherClienteDaConversa'
 import { useWhatsAppConversaAtual } from './useWhatsAppConversaAtual'
+import { telefoneWhatsAppParaCampoPedido } from './telefonePedidoWhatsApp'
+import { WhatsAppPedidosHojeSection } from './WhatsAppPedidosHojeSection'
 
 type Props = {
   onPedirLimparSessao: () => void
 }
 
 export function JiffyCustomerPanel({ onPedirLimparSessao }: Props) {
-  const router = useRouter()
   const conversa = useWhatsAppConversaAtual()
   const [cliente, setCliente] = useState<Cliente | null>(null)
   const [manualNestaConversa, setManualNestaConversa] = useState(false)
@@ -102,12 +101,23 @@ export function JiffyCustomerPanel({ onPedirLimparSessao }: Props) {
     }
   }, [])
 
+  const [overlayPedidosHoje, setOverlayPedidosHoje] = useState(false)
+
   useEffect(() => {
-    setWhatsAppWebViewSuspenso(buscaAberta || novoPedidoAberto || configMensagensAberta)
+    setWhatsAppWebViewSuspenso(
+      buscaAberta || novoPedidoAberto || configMensagensAberta || overlayPedidosHoje
+    )
     return () => setWhatsAppWebViewSuspenso(false)
-  }, [buscaAberta, novoPedidoAberto, configMensagensAberta])
+  }, [buscaAberta, novoPedidoAberto, configMensagensAberta, overlayPedidosHoje])
 
   const telefoneExibido = cliente?.getTelefone()?.trim() || telefoneConversa || ''
+  const telefoneCampoPedido = telefoneWhatsAppParaCampoPedido(telefoneExibido)
+  const chaveRascunhoPedido = idConversa || telefoneExibido || 'whatsapp'
+  const [temRascunhoPedido, setTemRascunhoPedido] = useState(false)
+
+  useEffect(() => {
+    setTemRascunhoPedido(Boolean(obterRascunhoPedidoWhatsApp(chaveRascunhoPedido)))
+  }, [chaveRascunhoPedido, novoPedidoAberto])
 
   const copiarTelefone = useCallback(async () => {
     if (!telefoneExibido) {
@@ -115,21 +125,12 @@ export function JiffyCustomerPanel({ onPedirLimparSessao }: Props) {
       return
     }
     try {
-      await navigator.clipboard.writeText(telefoneExibido)
+      await navigator.clipboard.writeText(telefoneCampoPedido || telefoneExibido)
       setAviso('Telefone copiado.')
     } catch {
       setAviso('Não foi possível copiar.')
     }
-  }, [telefoneExibido])
-
-  const verPedidosCliente = useCallback(() => {
-    if (!cliente && !telefoneExibido) {
-      setAviso('Abra uma conversa ou selecione um cliente.')
-      return
-    }
-    gravarPendenciaQuadroFlow(telefoneExibido || cliente?.getNome() || '', true)
-    router.replace(pathQuadroDaSessaoAtual())
-  }, [cliente, router, telefoneExibido])
+  }, [telefoneExibido, telefoneCampoPedido])
 
   const abrirNovoPedido = useCallback(() => {
     setNovoPedidoAberto(true)
@@ -217,7 +218,9 @@ export function JiffyCustomerPanel({ onPedirLimparSessao }: Props) {
         {estadoCliente === 'vinculado' && cliente ? (
           <div className="mt-2 rounded-lg border border-primary/20 bg-primary-bg/60 px-3 py-2">
             <p className="text-sm font-semibold text-primary-text">{cliente.getNome()}</p>
-            {telefoneExibido ? <p className="text-xs text-secondary-text">{telefoneExibido}</p> : null}
+            {telefoneCampoPedido ? (
+              <p className="text-xs text-secondary-text">{telefoneCampoPedido}</p>
+            ) : null}
             <div className="mt-2 flex flex-col gap-2">
               <Button type="button" variant="outlined" className="w-full" onClick={() => setBuscaAberta(true)}>
                 Trocar cliente
@@ -248,7 +251,7 @@ export function JiffyCustomerPanel({ onPedirLimparSessao }: Props) {
                     ? 'Desvinculado desta conversa'
                     : 'Abra uma conversa'}
             </p>
-            {telefoneExibido ? <p className="text-xs text-secondary-text">{telefoneExibido}</p> : null}
+            {telefoneCampoPedido ? <p className="text-xs text-secondary-text">{telefoneCampoPedido}</p> : null}
             <Button
               type="button"
               variant="outlined"
@@ -260,18 +263,22 @@ export function JiffyCustomerPanel({ onPedirLimparSessao }: Props) {
           </>
         )}
 
-        <p className="mt-5 text-[11px] font-semibold uppercase tracking-wide text-secondary-text">Pedidos</p>
+        <p className="mt-5 text-[11px] font-semibold uppercase tracking-wide text-secondary-text">
+          Pedidos de hoje
+        </p>
         <div className="mt-2 flex flex-col gap-2">
           <Button
             type="button"
             className="w-full !bg-secondary !text-white hover:!bg-secondary/90"
             onClick={abrirNovoPedido}
           >
-            + Novo pedido (F2)
+            {temRascunhoPedido ? 'Continuar pedido (F2)' : '+ Novo pedido (F2)'}
           </Button>
-          <Button type="button" variant="outlined" className="w-full" onClick={verPedidosCliente}>
-            Pedidos do cliente
-          </Button>
+          <WhatsAppPedidosHojeSection
+            telefone={telefoneExibido}
+            clienteNome={cliente?.getNome() || tituloConversa || undefined}
+            onOverlayAberto={setOverlayPedidosHoje}
+          />
         </div>
 
         <AtalhosWhatsAppSection
@@ -285,6 +292,9 @@ export function JiffyCustomerPanel({ onPedirLimparSessao }: Props) {
       <SeletorClienteModal
         open={buscaAberta}
         buscaInicial={termoApi}
+        cadastroRapido
+        telefoneCadastro={telefoneCampoPedido || telefoneExibido}
+        nomeSugerido={!tituloConversaGenerico(tituloConversa) ? String(tituloConversa) : ''}
         onClose={() => setBuscaAberta(false)}
         onSelect={c => {
           setCliente(c)
@@ -300,7 +310,9 @@ export function JiffyCustomerPanel({ onPedirLimparSessao }: Props) {
         open={novoPedidoAberto}
         tipoInicioPedido="entrega"
         clienteInicial={cliente}
-        telefoneInicial={telefoneExibido}
+        telefoneInicial={telefoneCampoPedido || telefoneExibido}
+        preservarRascunhoAoFechar
+        chaveRascunho={chaveRascunhoPedido}
         onClose={() => setNovoPedidoAberto(false)}
         onAfterClose={() => setNovoPedidoAberto(false)}
         onSuccess={() => setNovoPedidoAberto(false)}

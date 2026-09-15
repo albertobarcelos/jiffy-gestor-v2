@@ -11,6 +11,7 @@ import {
   stripEmpresaSlugFromSearch,
   stripGestaoEmpresaSlugFromPath,
 } from '@/src/shared/utils/gestaoRoutes'
+import { limparMenusCardapioSessao } from '@/src/shared/utils/menuCardapioSessao'
 
 /**
  * Segmento de query usado na URL da aba ERP (ex.: `nexsyn-ab12cd34`):
@@ -152,6 +153,7 @@ export function clearTabSession(): void {
     sessionStorage.removeItem(SESSION_STORAGE_TENANT_TOKEN)
     sessionStorage.removeItem(SESSION_STORAGE_EMPRESA_SLUG)
     sessionStorage.removeItem(SESSION_STORAGE_EMPRESA_ID)
+    limparMenusCardapioSessao()
   } catch {
     /* ignore */
   }

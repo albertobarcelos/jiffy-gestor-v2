@@ -180,3 +180,33 @@ export function unidadeMedidaEfetivaLinha(
 ): ReturnType<typeof normalizarUnidadeMedidaProduto> {
   return unidadeDaLinha(produto)
 }
+
+export function controleQuantidadeComplementoNaLinha(
+  quantidadeProduto: number,
+  quantidadeComplemento: number,
+  unidadeMedida?: ProdutoSelecionado['unidadeMedida']
+): {
+  quantidadeExibida: number
+  travada: boolean
+  menosDesabilitado: boolean
+  maisDesabilitado: boolean
+} {
+  const quantidadeExibida = Math.floor(quantidadeComplemento)
+  const quantidadeMaxima = quantidadeMaximaComplementoNaLinha(quantidadeProduto, unidadeMedida)
+  const travada = quantidadeMaxima !== null
+  return {
+    quantidadeExibida,
+    travada,
+    menosDesabilitado: travada || quantidadeExibida <= 1,
+    maisDesabilitado: travada || (quantidadeMaxima !== null && quantidadeExibida >= quantidadeMaxima),
+  }
+}
+
+export function ajustarQuantidadeComplementoLivre(
+  quantidadeAtual: number,
+  delta: -1 | 1
+): number {
+  const atual = Math.floor(quantidadeAtual)
+  if (delta < 0) return Math.max(1, atual - 1)
+  return atual + 1
+}

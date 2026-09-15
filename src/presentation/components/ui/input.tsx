@@ -19,7 +19,7 @@ export interface InputProps extends Omit<TextFieldProps, 'variant'> {
  * - size="small" → altura ~40px (h-10)
  * - borderRadius: 6px → equivalente ao rounded-md do Tailwind
  */
-export const Input = React.forwardRef<HTMLInputElement, InputProps>(
+export const Input = React.forwardRef<HTMLDivElement, InputProps>(
   ({ variant = 'outlined', value, size, min, max, step, maxLength, minLength, pattern, inputProps, ...props }, ref) => {
     const normalizedValue = value === null || value === undefined ? '' : value
 

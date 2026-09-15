@@ -1,4 +1,6 @@
 import { formatarCepMascara, normalizarDigitosCep } from '@/src/shared/utils/consultaCep'
+import { backendReverseGeocode } from '@/src/shared/utils/geolocalizacaoBackendApi'
+import { mensagemAmigavelErroGeolocalizacao } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
 
 export type EnderecoPorLocalizacao = {
   rua: string
@@ -26,56 +28,52 @@ function obterPosicaoAtual(): Promise<GeolocationPosition> {
   })
 }
 
-function mensagemErroGeo(error: unknown): string {
+function mensagemErroGpsNavegador(error: unknown): string {
   if (error && typeof error === 'object' && 'code' in error) {
     const code = (error as GeolocationPositionError).code
-    if (code === 1) return 'Permissão de localização negada'
-    if (code === 2) return 'Não foi possível obter a localização'
-    if (code === 3) return 'Tempo esgotado ao obter a localização'
+    if (code === 1) {
+      return 'Permissão de localização negada. Autorize o GPS ou busque o endereço pelo Google.'
+    }
+    if (code === 2) {
+      return 'Não foi possível obter a localização do dispositivo. Tente buscar o endereço pelo Google.'
+    }
+    if (code === 3) {
+      return 'Tempo esgotado ao obter a localização. Tente novamente ou busque o endereço pelo Google.'
+    }
   }
   if (error instanceof Error) return error.message
   return 'Erro ao obter localização'
 }
 
 /**
- * Obtém coordenadas do GPS e resolve endereço via BFF `/api/geolocalizacao/reverso`
- * (Google Geocoding, com fallback Nominatim).
+ * Obtém coordenadas do GPS e resolve endereço via backend
+ * `GET /api/v1/geolocalizacao/reverso`.
  */
 export async function obterEnderecoPorGps(): Promise<EnderecoPorLocalizacao> {
   let position: GeolocationPosition
   try {
     position = await obterPosicaoAtual()
   } catch (error) {
-    throw new Error(mensagemErroGeo(error))
+    throw new Error(mensagemAmigavelErroGeolocalizacao(mensagemErroGpsNavegador(error), 'gps'))
   }
 
   const { latitude, longitude } = position.coords
-  const response = await fetch(
-    `/api/geolocalizacao/reverso?lat=${encodeURIComponent(String(latitude))}&lon=${encodeURIComponent(String(longitude))}`,
-    { method: 'GET', headers: { Accept: 'application/json' } }
-  )
+  try {
+    const lookup = await backendReverseGeocode(latitude, longitude)
+    const cepDigits = normalizarDigitosCep(lookup.cep)
 
-  const payload = await response.json().catch(() => ({}))
-  if (!response.ok) {
-    const msg =
-      typeof payload.error === 'string'
-        ? payload.error
-        : 'Não foi possível obter o endereço pela localização'
-    throw new Error(msg)
-  }
-
-  const cepDigits = normalizarDigitosCep(String(payload.cep ?? ''))
-
-  return {
-    rua: String(payload.rua ?? ''),
-    numero: String(payload.numero ?? ''),
-    bairro: String(payload.bairro ?? ''),
-    cidade: String(payload.cidade ?? ''),
-    estado: String(payload.estado ?? '').toUpperCase().slice(0, 2),
-    cep: cepDigits.length === 8 ? formatarCepMascara(cepDigits) : '',
-    latitude,
-    longitude,
-    providerEnderecoId:
-      typeof payload.providerEnderecoId === 'string' ? payload.providerEnderecoId : null,
+    return {
+      rua: lookup.rua,
+      numero: lookup.numero,
+      bairro: lookup.bairro,
+      cidade: lookup.cidade,
+      estado: lookup.estado,
+      cep: cepDigits.length === 8 ? formatarCepMascara(cepDigits) : '',
+      latitude,
+      longitude,
+      providerEnderecoId: lookup.providerEnderecoId,
+    }
+  } catch (error) {
+    throw new Error(mensagemAmigavelErroGeolocalizacao(error, 'gps'))
   }
 }

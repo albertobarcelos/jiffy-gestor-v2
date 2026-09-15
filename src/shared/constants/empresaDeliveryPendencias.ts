@@ -30,6 +30,14 @@ export type PendenciaAcao = {
 }
 
 const ACAO_POR_TIPO: Partial<Record<EmpresaDeliveryPendenciaType, PendenciaAcao>> = {
+  [EMPRESA_DELIVERY_PENDENCIA_TYPES.EMPRESA_DELIVERY_NAO_CONFIGURADA]: {
+    label: 'Configurar nome e cardápio',
+    href: deliveryHubEtapaPath('delivery-nome-cardapio'),
+  },
+  [EMPRESA_DELIVERY_PENDENCIA_TYPES.CARDAPIO_DELIVERY_NAO_CONFIGURADO]: {
+    label: 'Selecionar cardápio',
+    href: deliveryHubEtapaPath('delivery-nome-cardapio'),
+  },
   [EMPRESA_DELIVERY_PENDENCIA_TYPES.GEOLOCALIZACAO_NAO_CONFIGURADA]: {
     label: 'Definir pin na cobertura de entrega',
     href: deliveryHubEtapaPath('delivery-cobertura'),
@@ -37,6 +45,10 @@ const ACAO_POR_TIPO: Partial<Record<EmpresaDeliveryPendenciaType, PendenciaAcao>
   [EMPRESA_DELIVERY_PENDENCIA_TYPES.COBERTURA_NAO_CONFIGURADA]: {
     label: 'Configurar cobertura de entrega',
     href: deliveryHubEtapaPath('delivery-cobertura'),
+  },
+  [EMPRESA_DELIVERY_PENDENCIA_TYPES.FUNCIONAMENTO_AGENDA_NAO_CONFIGURADA]: {
+    label: 'Configurar agenda',
+    href: deliveryHubEtapaPath('delivery-agenda'),
   },
   [EMPRESA_DELIVERY_PENDENCIA_TYPES.TIMEZONE_NAO_CONFIGURADO]: {
     label: 'Configurar fuso na aba Empresa',
@@ -75,4 +87,11 @@ export function lojaDeliveryDisponivel(
   if (!input) return false
   if (typeof input.available === 'boolean') return input.available
   return filtrarPendenciasObrigatorias(input.pendencias).length === 0
+}
+
+/** @deprecated Preferir `lojaDeliveryDisponivel`. */
+export function lojaDeliveryProntaParaPublico(
+  pendencias: EmpresaDeliveryPendenciaItem[] | undefined
+): boolean {
+  return lojaDeliveryDisponivel({ pendencias })
 }

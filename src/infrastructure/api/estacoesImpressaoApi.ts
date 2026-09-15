@@ -1,5 +1,6 @@
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
+import { normalizarEstacaoImpressaoResumo } from '@/src/infrastructure/api/normalizarEstacaoImpressaoResumo'
 import {
   getEstacaoImpressaoId,
   limparEstacaoImpressaoId,
@@ -10,6 +11,14 @@ export interface EstacaoImpressaoResumo {
   id: string
   nome: string
   ativo: boolean
+  /** Quando true, esta estação recebe PEDIDO_DELIVERY_IMPRESSAO_SOLICITADA via Socket.IO. */
+  gestorDelivery: boolean
+}
+
+export type AtualizarEstacaoImpressaoPatch = {
+  nome?: string
+  ativo?: boolean
+  gestorDelivery?: boolean
 }
 
 export interface ImpressoraLogica {
@@ -70,25 +79,47 @@ export async function criarEstacaoImpressao(
   token: string,
   nome: string
 ): Promise<EstacaoImpressaoResumo> {
-  const data = await requestJson<EstacaoImpressaoResumo>('/api/gestor/estacoes-impressao', token, {
+  const data = await requestJson<unknown>('/api/gestor/estacoes-impressao', token, {
     method: 'POST',
     body: JSON.stringify({ nome }),
   })
-  const id = data?.id != null ? String(data.id).trim() : ''
-  if (!id) {
+  const normalized = normalizarEstacaoImpressaoResumo(data)
+  if (!normalized) {
     throw new Error(
       'Criação de estação retornou sem id. Verifique o BFF e o contrato da API gestor.'
     )
   }
-  return {
-    id,
-    nome: data?.nome != null ? String(data.nome) : '',
-    ativo: typeof data?.ativo === 'boolean' ? data.ativo : true,
-  }
+  return normalized
 }
 
 export function listarEstacoesImpressao(token: string): Promise<EstacaoImpressaoResumo[]> {
   return requestJson<EstacaoImpressaoResumo[]>('/api/gestor/estacoes-impressao', token)
+}
+
+export async function atualizarEstacaoImpressao(
+  token: string,
+  estacaoId: string,
+  patch: AtualizarEstacaoImpressaoPatch
+): Promise<EstacaoImpressaoResumo> {
+  const id = estacaoId.trim()
+  if (!id) {
+    throw new Error('ID da estação é obrigatório.')
+  }
+  const data = await requestJson<unknown>(
+    `/api/gestor/estacoes-impressao/${encodeURIComponent(id)}`,
+    token,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }
+  )
+  const normalized = normalizarEstacaoImpressaoResumo(data)
+  if (!normalized) {
+    throw new Error(
+      'Atualização de estação retornou sem id. Verifique o BFF e o contrato da API gestor.'
+    )
+  }
+  return normalized
 }
 
 export async function buscarImpressorasLogicas(token: string): Promise<ImpressoraLogica[]> {
@@ -129,22 +160,39 @@ export async function buscarImpressorasLogicas(token: string): Promise<Impressor
   return normalizadas
 }
 
-export function buscarMapeamentosEstacao(
+const MAPEAMENTOS_ESTACAO_CACHE = new Map<string, EstacaoImpressaoMapeamento[]>()
+
+export function invalidarMapeamentosEstacaoCache(estacaoId?: string): void {
+  const id = estacaoId?.trim()
+  if (id) {
+    MAPEAMENTOS_ESTACAO_CACHE.delete(id)
+    return
+  }
+  MAPEAMENTOS_ESTACAO_CACHE.clear()
+}
+
+export async function buscarMapeamentosEstacao(
   token: string,
   estacaoId: string
 ): Promise<EstacaoImpressaoMapeamento[]> {
-  return requestJson<EstacaoImpressaoMapeamento[]>(
+  const id = estacaoId.trim()
+  const cached = id ? MAPEAMENTOS_ESTACAO_CACHE.get(id) : undefined
+  if (cached) return cached
+
+  const data = await requestJson<EstacaoImpressaoMapeamento[]>(
     `/api/gestor/estacoes-impressao/${encodeURIComponent(estacaoId)}/impressoras`,
     token
   )
+  if (id) MAPEAMENTOS_ESTACAO_CACHE.set(id, data)
+  return data
 }
 
-export function salvarMapeamentosEstacao(
+export async function salvarMapeamentosEstacao(
   token: string,
   estacaoId: string,
   mapeamentos: Array<{ impressoraId: string; nomeImpressoraWindows: string }>
 ): Promise<EstacaoImpressaoMapeamento[]> {
-  return requestJson<EstacaoImpressaoMapeamento[]>(
+  const data = await requestJson<EstacaoImpressaoMapeamento[]>(
     `/api/gestor/estacoes-impressao/${encodeURIComponent(estacaoId)}/impressoras`,
     token,
     {
@@ -152,11 +200,24 @@ export function salvarMapeamentosEstacao(
       body: JSON.stringify({ mapeamentos }),
     }
   )
+  const id = estacaoId.trim()
+  if (id) MAPEAMENTOS_ESTACAO_CACHE.set(id, data)
+  return data
 }
 
 export interface EstacaoImpressaoConfigResolvida {
   estacaoId: string
+  gestorDelivery: boolean
   mapeamentos: EstacaoImpressaoMapeamento[]
+}
+
+async function resolverGestorDeliveryDaEstacao(
+  token: string,
+  estacaoId: string
+): Promise<boolean> {
+  const estacoes = await listarEstacoesImpressao(token).catch(() => [])
+  const encontrada = estacoes.find(e => e.id === estacaoId)
+  return encontrada?.gestorDelivery === true
 }
 
 /** Nome sugerido ao criar estação local (browser + data). */
@@ -200,13 +261,19 @@ export async function resolverEstacaoImpressaoConfig(
   }
 
   try {
-    const mapeamentos = await buscarMapeamentosEstacao(token, estacaoId)
-    return { estacaoId, mapeamentos }
+    const [mapeamentos, gestorDelivery] = await Promise.all([
+      buscarMapeamentosEstacao(token, estacaoId),
+      resolverGestorDeliveryDaEstacao(token, estacaoId),
+    ])
+    return { estacaoId, gestorDelivery, mapeamentos }
   } catch (error) {
     if (!isEstacaoImpressaoNotFoundError(error)) throw error
     limparEstacaoImpressaoId()
     estacaoId = await criarOuReaproveitarEstacaoImpressao(token)
-    const mapeamentos = await buscarMapeamentosEstacao(token, estacaoId)
-    return { estacaoId, mapeamentos }
+    const [mapeamentos, gestorDelivery] = await Promise.all([
+      buscarMapeamentosEstacao(token, estacaoId),
+      resolverGestorDeliveryDaEstacao(token, estacaoId),
+    ])
+    return { estacaoId, gestorDelivery, mapeamentos }
   }
 }

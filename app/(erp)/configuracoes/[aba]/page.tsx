@@ -1,10 +1,16 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { notFound } from 'next/navigation'
-import { Suspense, use } from 'react'
+import { notFound, useRouter } from 'next/navigation'
+import { Suspense, use, useEffect } from 'react'
 import { PageLoading } from '@/src/presentation/components/ui/PageLoading'
-import { isConfiguracoesTabSlug } from '@/src/shared/constants/configuracoesRoutes'
+import {
+  DELIVERY_HUB_PATH,
+  configuracoesTabPath,
+  deliveryHubEtapaPath,
+  isConfiguracoesTabSlug,
+  resolveConfiguracoesTabFromPath,
+} from '@/src/shared/constants/configuracoesRoutes'
 import type { ConfiguracoesTabSlug } from '@/src/shared/constants/configuracoesRoutes'
 
 const ConfiguracoesView = dynamic(
@@ -23,8 +29,34 @@ export default function ConfiguracoesTabPage({
 }: {
   params: Promise<{ aba: string }>
 }) {
+  const router = useRouter()
   const { aba } = use(params)
-  if (!isConfiguracoesTabSlug(aba)) {
+  const legacyTab = resolveConfiguracoesTabFromPath(aba)
+  const isValidTab = isConfiguracoesTabSlug(aba)
+  const vaiParaHub = aba === 'empresa-delivery' || aba === 'cobertura-delivery'
+
+  useEffect(() => {
+    if (aba === 'cobertura-delivery') {
+      router.replace(deliveryHubEtapaPath('delivery-cobertura'))
+      return
+    }
+    if (aba === 'empresa-delivery') {
+      router.replace(DELIVERY_HUB_PATH)
+      return
+    }
+    if (!isValidTab && legacyTab) {
+      router.replace(configuracoesTabPath(legacyTab))
+    }
+  }, [aba, isValidTab, legacyTab, router])
+
+  if (!isValidTab) {
+    if (legacyTab || vaiParaHub) {
+      return (
+        <div className="h-full">
+          <PageLoading />
+        </div>
+      )
+    }
     notFound()
   }
 

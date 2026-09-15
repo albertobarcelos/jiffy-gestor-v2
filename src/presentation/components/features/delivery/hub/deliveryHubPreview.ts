@@ -33,7 +33,7 @@ export function linhaEnderecoHub(endereco: EnderecoEmpresaMe | null): string {
 }
 
 export function fatosPreviewHub(
-  passo: Pick<DeliveryHubPassoUi, 'id' | 'descricao' | 'concluido'>,
+  passo: Pick<DeliveryHubPassoUi, 'descricao' | 'concluido'> & { id: string },
   resumo: ResumoCoberturaHub,
   endereco: EnderecoEmpresaMe | null,
   nomeEmpresa: string | null,
@@ -127,7 +127,7 @@ export function fatosPreviewHub(
 }
 
 export function ctaPrimarioPreviewHub(
-  passo: Pick<DeliveryHubPassoUi, 'id' | 'cta' | 'titulo' | 'concluido'>
+  passo: Pick<DeliveryHubPassoUi, 'cta' | 'titulo' | 'concluido'> & { id: string }
 ): string {
   if (passo.id === 'delivery-cobertura') return 'Editar áreas de entrega'
   if (passo.id === 'delivery-notificacoes') {

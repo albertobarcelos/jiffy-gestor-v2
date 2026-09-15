@@ -23,6 +23,7 @@ export type UseNovoPedidoOrchestratorEffectsParams = {
   setNomeUsuario: (nome: string) => void
   longPressTimeoutRef: React.RefObject<ReturnType<typeof setTimeout> | null>
   longPressComplementoTimeoutRef: React.RefObject<ReturnType<typeof setTimeout> | null>
+  preservarRascunhoAoFechar?: boolean
 }
 
 export function useNovoPedidoOrchestratorEffects({
@@ -43,6 +44,7 @@ export function useNovoPedidoOrchestratorEffects({
   setNomeUsuario,
   longPressTimeoutRef,
   longPressComplementoTimeoutRef,
+  preservarRascunhoAoFechar = false,
 }: UseNovoPedidoOrchestratorEffectsParams) {
   const tenantAuth = useAuthStore(s => s.tenantAuth)
   useEffect(() => {
@@ -82,9 +84,10 @@ export function useNovoPedidoOrchestratorEffects({
 
   useEffect(() => {
     if (open && !vendaId) {
+      if (preservarRascunhoAoFechar) return
       setCurrentStep(1)
     }
-  }, [open, vendaId, setCurrentStep])
+  }, [open, vendaId, setCurrentStep, preservarRascunhoAoFechar])
 
   useEffect(() => {
     if (!open || !vendaId) return

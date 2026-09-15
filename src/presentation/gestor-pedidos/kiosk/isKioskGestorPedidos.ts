@@ -7,6 +7,7 @@ import {
   TOKEN_USER_AGENT_FREDY,
   TOKEN_USER_AGENT_JIFFY_FLOW,
 } from '../constantes'
+import type { SuperficieQuadroPedidos } from '../superficieQuadroPedidos'
 
 export function pedidoVeioDoAppJiffyFlow(userAgent: string | null | undefined): boolean {
   const ua = String(userAgent ?? '')
@@ -101,16 +102,17 @@ export function isQuadroKioskAtual(): boolean {
 }
 
 /**
- * SSR de `/pedidos*` não vê UA/`?gestor`. Até hidratar, o casco trata como kiosk
- * para o TopNav do ERP não piscar.
+ * SSR de `/pedidos*` não vê UA/`?gestor`. Até hidratar, esconde o TopNav
+ * para o chrome do ERP não piscar. O viewport travado só no Fredy.
  */
 export function chromeErpCasco(input: {
-  kiosk: boolean
+  superficie: SuperficieQuadroPedidos
   rotaPedidos: boolean
   clientePronto: boolean
 }): { layoutKiosk: boolean; mostrarTopNav: boolean } {
+  const noFredy = input.superficie === 'fredy'
   return {
-    layoutKiosk: input.kiosk || (input.rotaPedidos && !input.clientePronto),
-    mostrarTopNav: !input.kiosk && (input.clientePronto || !input.rotaPedidos),
+    layoutKiosk: noFredy,
+    mostrarTopNav: !noFredy && (input.clientePronto || !input.rotaPedidos),
   }
 }

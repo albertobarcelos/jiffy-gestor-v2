@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   corFormaPagamentoFiscal,
   ehFormaPagamentoDinheiro,
+  estiloCardMeioPagamento,
   ordenarMeiosPagamentoPadrao,
   textoContrasteSobreHex,
   varsCardMeioPagamentoLancado,
@@ -15,23 +16,43 @@ function meio(nome: string, fiscal: string) {
 }
 
 describe('corFormaPagamentoFiscal', () => {
-  it('distingue dinheiro, pix, cartão e vale', () => {
+  it('distingue dinheiro, pix e cartão (crédito, débito e vale no mesmo azul)', () => {
     expect(corFormaPagamentoFiscal('dinheiro')).toBe('#00B074')
-    expect(corFormaPagamentoFiscal('pix')).toBe('#B4DD2B')
+    expect(corFormaPagamentoFiscal('pix')).toBe('#32BCAD')
     expect(corFormaPagamentoFiscal('cartao_credito')).toBe('#003366')
-    expect(corFormaPagamentoFiscal('vale_alimentacao')).toBe('#530CA3')
+    expect(corFormaPagamentoFiscal('cartao_debito')).toBe('#003366')
+    expect(corFormaPagamentoFiscal('vale_alimentacao')).toBe('#003366')
   })
 
-  it('usa texto escuro no PIX lima e claro no cartão', () => {
-    expect(textoContrasteSobreHex(corFormaPagamentoFiscal('pix'))).toBe('#1a1a1a')
+  it('usa texto claro no PIX e no cartão', () => {
+    expect(textoContrasteSobreHex(corFormaPagamentoFiscal('pix'))).toBe('#ffffff')
     expect(textoContrasteSobreHex(corFormaPagamentoFiscal('cartao_credito'))).toBe('#ffffff')
+  })
+
+  it('em todo cartão usa verde-limão no ícone e no texto, mais grosso', () => {
+    for (const forma of [
+      'cartao_credito',
+      'cartao_debito',
+      'vale_alimentacao',
+      'vale_refeicao',
+      'vale_presente',
+      'vale_combustivel',
+    ] as const) {
+      const card = estiloCardMeioPagamento(forma)
+      expect(card.backgroundColor).toBe('#003366')
+      expect(card.color).toBe('#B4DD2B')
+      expect(card.labelColor).toBe('#B4DD2B')
+      expect(card.labelFontWeight).toBe(600)
+    }
+    expect(estiloCardMeioPagamento('dinheiro').labelColor).toBe('#ffffff')
+    expect(estiloCardMeioPagamento('pix').labelColor).toBe('#ffffff')
   })
 })
 
 describe('varsCardMeioPagamentoLancado', () => {
   it('reusa a cor da forma para o chip e o hover forte', () => {
     const vars = varsCardMeioPagamentoLancado('vale_alimentacao')
-    expect(vars['--meio-cor']).toBe('#530CA3')
+    expect(vars['--meio-cor']).toBe('#003366')
     expect(vars['--meio-texto-forte']).toBe('#ffffff')
   })
 })

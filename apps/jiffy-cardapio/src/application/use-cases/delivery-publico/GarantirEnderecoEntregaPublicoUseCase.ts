@@ -1,0 +1,338 @@
+import type {
+  EnderecoFormPublico,
+} from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
+import type { EnderecoGeoCheckoutInput } from '@/src/application/dto/delivery-publico/EnderecoGeoCheckoutDTO'
+import type {
+  ClienteDeliveryPublicoDTO,
+  EnderecoDeliveryPublicoInput,
+  EnderecoClienteDeliveryPublicoDTO,
+} from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import { normalizarClienteDeliveryPublico } from '@/src/application/mappers/ClienteDeliveryPublicoMapper'
+import type { IClienteDeliveryPublicoPort } from '@/src/application/ports/delivery-publico'
+import {
+  enderecoTemGeolocalizacao,
+  montarPayloadGeoEnderecoDelivery,
+} from '@/src/shared/utils/geolocalizacaoEnderecoDelivery'
+import {
+  normalizarEnderecoFormPublico,
+  normalizarEnderecoGeocodeInput,
+} from '@/src/shared/utils/normalizarTextoEnderecoPublico'
+import { toLocaleUppercasePt } from '@/src/shared/utils/localeUppercase'
+import { normalizarCepEndereco, type EnderecoGeocodeInput } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
+import { MAX_ENDERECOS_CLIENTE_DELIVERY, MSG_MAX_ENDERECOS_CLIENTE_DELIVERY } from '@/src/domain/policies/LimiteEnderecosClienteDelivery'
+
+export type GarantirEnderecoEntregaPublicoParams = {
+  telefone: string
+  nome: string | null
+  modoEndereco: 'existente' | 'novo'
+  enderecoIdSelecionado: string | null
+  /** Snapshot do lookup anterior (pode estar desatualizado). */
+  clienteLookup: ClienteDeliveryPublicoDTO | null
+  enderecoNovo: EnderecoFormPublico
+  /** Geolocalização obrigatória para entrega (novo endereço ou backfill). */
+  geo?: EnderecoGeoCheckoutInput | null
+}
+
+export type GarantirEnderecoEntregaPublicoResult = {
+  enderecoId: string
+  /** Cliente mais recente após create/update; null se só reusou id sem write. */
+  cliente: ClienteDeliveryPublicoDTO | null
+}
+
+function enderecoCadastroParaGeocodeInput(
+  endereco: EnderecoClienteDeliveryPublicoDTO
+): EnderecoGeocodeInput {
+  return {
+    rua: endereco.rua,
+    numero: endereco.numero,
+    bairro: endereco.bairro,
+    cidade: endereco.cidade ?? '',
+    estado: endereco.estado ?? '',
+    cep: endereco.cep ?? '',
+    complemento: endereco.complemento ?? '',
+  }
+}
+
+function enderecoFormParaGeocodeInput(form: EnderecoFormPublico): EnderecoGeocodeInput {
+  return {
+    rua: form.rua,
+    numero: form.numero,
+    bairro: form.bairro,
+    cidade: form.cidade,
+    estado: form.estado,
+    cep: form.cep ?? '',
+    complemento: form.complemento ?? '',
+  }
+}
+
+function montarTextoEnderecoPayload(
+  base: EnderecoGeocodeInput,
+  etiqueta: 'casa' | 'trabalho' | 'outro',
+  pontoReferencia?: string | null
+): Omit<EnderecoDeliveryPublicoInput, 'enderecoLocalizacao' | 'preferenciaEntrega'> {
+  const estado = (base.estado ?? '').trim().toUpperCase().slice(0, 2)
+  const cep = normalizarCepEndereco(base.cep).slice(0, 8)
+  const complementoParts = [base.complemento?.trim(), pontoReferencia?.trim()]
+    .filter(Boolean)
+    .join(' | ')
+  const complementoSalvo =
+    complementoParts.length > 0 ? toLocaleUppercasePt(complementoParts) : ''
+
+  const textoNormalizado = normalizarEnderecoGeocodeInput({
+    rua: base.rua.trim(),
+    numero: base.numero.trim(),
+    bairro: (base.bairro ?? '').trim(),
+    cidade: (base.cidade ?? '').trim(),
+    estado,
+    cep: base.cep ?? '',
+    complemento: base.complemento?.trim() ?? '',
+  })
+
+  return {
+    etiqueta,
+    rua: textoNormalizado.rua,
+    numero: textoNormalizado.numero,
+    bairro: textoNormalizado.bairro ?? '',
+    cidade: textoNormalizado.cidade || null,
+    estado: textoNormalizado.estado || null,
+    ...(cep.length === 8 ? { cep } : {}),
+    ...(complementoSalvo ? { complemento: complementoSalvo } : {}),
+  }
+}
+
+function montarEnderecoPayload(
+  form: EnderecoFormPublico,
+  geo?: EnderecoGeoCheckoutInput | null
+): EnderecoDeliveryPublicoInput {
+  const formNormalizado = normalizarEnderecoFormPublico(form)
+  const textoBase = enderecoFormParaGeocodeInput(formNormalizado)
+
+  const base = montarTextoEnderecoPayload(
+    textoBase,
+    formNormalizado.etiqueta ?? 'casa',
+    formNormalizado.pontoReferencia
+  )
+
+  if (!geo?.enderecoLocalizacao) {
+    return base
+  }
+
+  const geoPayload = montarPayloadGeoEnderecoDelivery({
+    enderecoLocalizacao: geo.enderecoLocalizacao,
+    providerEnderecoId: geo.providerEnderecoId,
+    preferenciaEntrega: geo.preferenciaEntrega,
+  })
+
+  return {
+    ...base,
+    ...geoPayload,
+  }
+}
+
+function montarUpdatePayloadExistente(
+  endereco: EnderecoClienteDeliveryPublicoDTO,
+  geo: EnderecoGeoCheckoutInput,
+  enderecoForm?: EnderecoFormPublico | null
+): EnderecoDeliveryPublicoInput & { id: string } {
+  const textoBase = enderecoForm
+    ? enderecoFormParaGeocodeInput(normalizarEnderecoFormPublico(enderecoForm))
+    : enderecoCadastroParaGeocodeInput(endereco)
+
+  const geoPayload = montarPayloadGeoEnderecoDelivery({
+    enderecoLocalizacao: geo.enderecoLocalizacao,
+    providerEnderecoId: geo.providerEnderecoId,
+    preferenciaEntrega: geo.preferenciaEntrega,
+  })
+
+  const etiqueta =
+    (enderecoForm?.etiqueta as 'casa' | 'trabalho' | 'outro' | undefined) ||
+    (endereco.etiqueta as 'casa' | 'trabalho' | 'outro') ||
+    'casa'
+
+  return {
+    id: endereco.id,
+    ...montarTextoEnderecoPayload(textoBase, etiqueta, enderecoForm?.pontoReferencia),
+    ...geoPayload,
+  }
+}
+
+function localizarEnderecoCriado(
+  cliente: ClienteDeliveryPublicoDTO,
+  form: EnderecoFormPublico,
+  idsAnteriores: Set<string>
+): string {
+  const novos = cliente.enderecos.filter(e => !idsAnteriores.has(e.id))
+  if (novos.length === 1) return novos[0].id
+
+  const rua = form.rua.trim().toLowerCase()
+  const numero = form.numero.trim()
+  const porCampos = cliente.enderecos.find(
+    e => e.rua.trim().toLowerCase() === rua && e.numero.trim() === numero
+  )
+  if (porCampos) return porCampos.id
+
+  if (novos.length > 0) return novos[novos.length - 1].id
+  if (cliente.enderecos.length > 0) {
+    return cliente.enderecos[cliente.enderecos.length - 1].id
+  }
+
+  throw new Error(
+    'O endereço foi enviado, mas a resposta não trouxe o identificador. Tente novamente.'
+  )
+}
+
+function localizarEnderecoPorId(
+  clienteLookup: ClienteDeliveryPublicoDTO | null,
+  enderecoId: string
+): EnderecoClienteDeliveryPublicoDTO | null {
+  return clienteLookup?.enderecos.find(e => e.id === enderecoId) ?? null
+}
+
+/**
+ * Se o endereço já está no lookup com geo e modo existente, evita write/garantir.
+ */
+export function resolverEnderecoIdEntregaSeJaGarantido(params: {
+  modoEndereco: 'existente' | 'novo'
+  enderecoIdSelecionado: string | null | undefined
+  clienteLookup: ClienteDeliveryPublicoDTO | null
+}): string | null {
+  if (params.modoEndereco !== 'existente') return null
+  const id = params.enderecoIdSelecionado?.trim()
+  if (!id) return null
+  const endereco = localizarEnderecoPorId(params.clienteLookup, id)
+  if (!endereco || !enderecoTemGeolocalizacao(endereco)) return null
+  return id
+}
+
+/**
+ * Garante que o endereço de entrega exista no cadastro do cliente delivery
+ * e retorna o `enderecoId` + cliente atualizado (quando houver write).
+ */
+export class GarantirEnderecoEntregaPublicoUseCase {
+  constructor(private readonly clientePort: IClienteDeliveryPublicoPort) {}
+
+  async execute(
+    params: GarantirEnderecoEntregaPublicoParams
+  ): Promise<GarantirEnderecoEntregaPublicoResult> {
+    const telefone = params.telefone.replace(/\D/g, '')
+    if (telefone.length < 8) {
+      throw new Error('Informe um telefone válido')
+    }
+
+    if (params.modoEndereco === 'existente') {
+      const id = params.enderecoIdSelecionado?.trim()
+      if (!id) {
+        throw new Error('Selecione um endereço de entrega')
+      }
+
+      let cliente: ClienteDeliveryPublicoDTO | null = params.clienteLookup
+
+      const nome = params.nome?.trim()
+      if (nome) {
+        const nomeAtual = cliente?.nome?.trim() || ''
+        if (nomeAtual !== nome) {
+          const atualizadoRaw = await this.clientePort.atualizar(telefone, { nome })
+          cliente = normalizarClienteDeliveryPublico(atualizadoRaw) ?? cliente
+        }
+      }
+
+      const enderecoAtual = localizarEnderecoPorId(cliente, id)
+      const geoInformada = Boolean(params.geo?.enderecoLocalizacao)
+
+      if (enderecoAtual && geoInformada && params.geo) {
+        const updatePayload = montarUpdatePayloadExistente(
+          enderecoAtual,
+          params.geo,
+          params.enderecoNovo
+        )
+        const atualizadoRaw = await this.clientePort.atualizar(telefone, {
+          enderecos: { update: [updatePayload] },
+        })
+        const atualizado = normalizarClienteDeliveryPublico(atualizadoRaw)
+        const enderecoPersistido = atualizado?.enderecos.find(e => e.id === id)
+        if (!enderecoPersistido || !enderecoTemGeolocalizacao(enderecoPersistido)) {
+          throw new Error('Não foi possível salvar a localização do endereço.')
+        }
+        return { enderecoId: id, cliente: atualizado }
+      }
+
+      if (enderecoAtual && !enderecoTemGeolocalizacao(enderecoAtual)) {
+        throw new Error(
+          'Este endereço precisa de confirmação no mapa antes de continuar.'
+        )
+      }
+
+      return { enderecoId: id, cliente }
+    }
+
+    if (
+      !params.enderecoNovo.rua.trim() ||
+      !params.enderecoNovo.numero.trim() ||
+      !params.enderecoNovo.bairro.trim()
+    ) {
+      throw new Error('Preencha o endereço de entrega')
+    }
+
+    if (!params.geo?.enderecoLocalizacao) {
+      throw new Error('Confirme a localização no mapa antes de salvar o endereço.')
+    }
+
+    const enderecoPayload = montarEnderecoPayload(params.enderecoNovo, params.geo)
+    const nome = params.nome?.trim() || null
+
+    let clienteAtual =
+      params.clienteLookup &&
+      params.clienteLookup.telefone.replace(/\D/g, '') === telefone
+        ? params.clienteLookup
+        : null
+
+    if (!clienteAtual) {
+      const raw = await this.clientePort.buscarPorTelefone(telefone)
+      clienteAtual = raw ? normalizarClienteDeliveryPublico(raw) : null
+    }
+
+    if (!clienteAtual) {
+      const criadoRaw = await this.clientePort.criar({
+        telefone,
+        nome,
+        enderecos: [enderecoPayload],
+      })
+      const criado = normalizarClienteDeliveryPublico(criadoRaw)
+      if (!criado?.enderecos.length) {
+        throw new Error('Não foi possível cadastrar o endereço do cliente')
+      }
+      return {
+        enderecoId: localizarEnderecoCriado(criado, params.enderecoNovo, new Set()),
+        cliente: criado,
+      }
+    }
+
+    if (clienteAtual.enderecos.length >= MAX_ENDERECOS_CLIENTE_DELIVERY) {
+      throw new Error(MSG_MAX_ENDERECOS_CLIENTE_DELIVERY)
+    }
+
+    const idsAnteriores = new Set(clienteAtual.enderecos.map(e => e.id))
+    const atualizadoRaw = await this.clientePort.atualizar(telefone, {
+      ...(nome ? { nome } : {}),
+      enderecos: { create: [enderecoPayload] },
+    })
+    const atualizado = normalizarClienteDeliveryPublico(atualizadoRaw)
+    if (!atualizado) {
+      throw new Error('Não foi possível salvar o novo endereço')
+    }
+
+    return {
+      enderecoId: localizarEnderecoCriado(atualizado, params.enderecoNovo, idsAnteriores),
+      cliente: atualizado,
+    }
+  }
+}
+
+/** @deprecated Preferir `garantirEnderecoEntregaPublicoUseCase` do composition root. */
+export async function garantirEnderecoEntregaPublico(
+  params: GarantirEnderecoEntregaPublicoParams,
+  clientePort: IClienteDeliveryPublicoPort
+): Promise<string> {
+  const result = await new GarantirEnderecoEntregaPublicoUseCase(clientePort).execute(params)
+  return result.enderecoId
+}

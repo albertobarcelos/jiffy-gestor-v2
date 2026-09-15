@@ -17,7 +17,10 @@ import type {
   useCancelarNotaFiscalVendaGestor,
   useTransicaoPedidoDelivery,
 } from '@/src/presentation/hooks/useVendas'
-import type { ProdutosTabsModalState } from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
+import type {
+  ProdutosTabsModalState,
+  ProdutosTabsTabKey,
+} from '@/src/presentation/components/features/produtos/ProdutosTabsModal'
 import type { ClientesTabsModalState } from '@/src/presentation/components/features/clientes/ClientesTabsModal'
 import type { ComplementosTabsModalState } from '@/src/presentation/components/features/complementos/ComplementosTabsModal'
 import type { ModalLancamentoProdutoPainelConfirmPayload, ModalLancamentoProdutoPainelModo } from '../components/ModalLancamentoProdutoPainel'
@@ -75,6 +78,8 @@ export interface NovoPedidoFormSlice {
   dataVenda: string
   observacaoPedido: string
   setObservacaoPedido: Dispatch<SetStateAction<string>>
+  observacaoNota: string
+  setObservacaoNota: Dispatch<SetStateAction<string>>
 }
 
 /** Catálogo: grupos, produtos do grupo e busca. */
@@ -92,6 +97,10 @@ export interface NovoPedidoCatalogoSlice {
   isLoadingProdutosVenda: boolean
   isLoadingProdutos: boolean
   isLoadingBuscaProdutos: boolean
+  hasNextProdutosCatalogo: boolean
+  isFetchingNextProdutosCatalogo: boolean
+  carregarProximaPaginaProdutosCatalogo: () => void
+  menuCatalogoIndisponivel: boolean
   tipoInicioPedido: 'balcao' | 'entrega'
 }
 
@@ -184,9 +193,11 @@ export interface NovoPedidoEntregaSlice {
   setEnderecoEntregaCoberturaStatus: Dispatch<
     SetStateAction<'ok' | 'fora' | 'pendente' | 'indisponivel' | null>
   >
-  /** Taxa calculada pela cobertura da morada selecionada. */
+  /** Prévia oficial (`POST /delivery/cotacao`) para a morada selecionada. */
   enderecoEntregaCoberturaValorTaxa: number | null
   setEnderecoEntregaCoberturaValorTaxa: Dispatch<SetStateAction<number | null>>
+  recotarTaxaEntregaAutomatica: () => void
+  cotacaoTaxaEntregaBuscando: boolean
   telefoneBuscaEntrega: string
   setTelefoneBuscaEntrega: Dispatch<SetStateAction<string>>
   telefoneBuscadoEntrega: string | null
@@ -273,9 +284,7 @@ export interface NovoPedidoDetalheSlice {
     options?: { initialStepProduto?: 0 | 1 | 2 }
   ) => void
   handleFecharProdutoTabsModal: () => void
-  handleTabChangeProdutoModal: (
-    tab: 'produto' | 'complementos' | 'impressoras' | 'grupo'
-  ) => void
+  handleTabChangeProdutoModal: (tab: ProdutosTabsTabKey) => void
   handleConfirmarCancelamentoVenda: () => void
   cancelarVendaGestor: ReturnType<typeof useCancelarVendaGestor>
   cancelarNotaFiscalVendaPdv: ReturnType<typeof useCancelarNotaFiscalVendaPdv>

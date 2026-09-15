@@ -101,6 +101,9 @@ export async function POST(request: NextRequest) {
     }
     if (body.buildNumber !== undefined) createBody.buildNumber = body.buildNumber
     if (body.numeroSerie !== undefined) createBody.numeroSerie = body.numeroSerie
+    const menuPrincipalId =
+      typeof body.menuPrincipalId === 'string' ? body.menuPrincipalId.trim() : ''
+    if (menuPrincipalId) createBody.menuPrincipalId = menuPrincipalId
 
     const apiClient = new ApiClient()
     const response = await apiClient.request<Record<string, unknown>>(

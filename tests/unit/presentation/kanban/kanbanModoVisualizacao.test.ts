@@ -63,15 +63,15 @@ describe('parseModoVisualizacaoKanban', () => {
 })
 
 describe('resolverModoVisualizacaoKanban', () => {
-  it('no Gestor web ignora o storage e fica no quadro', () => {
-    expect(resolverModoVisualizacaoKanban(false, 'expedicao')).toBe('quadro')
-    expect(resolverModoVisualizacaoKanban(false, 'lista')).toBe('quadro')
+  it('no Gestor ignora o storage e fica no quadro', () => {
+    expect(resolverModoVisualizacaoKanban('gestor', 'expedicao')).toBe('quadro')
+    expect(resolverModoVisualizacaoKanban('gestor', 'lista')).toBe('quadro')
   })
 
-  it('no Flow respeita o modo guardado', () => {
-    expect(resolverModoVisualizacaoKanban(true, 'expedicao')).toBe('expedicao')
-    expect(resolverModoVisualizacaoKanban(true, 'lista')).toBe('lista')
-    expect(resolverModoVisualizacaoKanban(true, 'invalido')).toBe('quadro')
+  it('no Fredy respeita o modo guardado', () => {
+    expect(resolverModoVisualizacaoKanban('fredy', 'expedicao')).toBe('expedicao')
+    expect(resolverModoVisualizacaoKanban('fredy', 'lista')).toBe('lista')
+    expect(resolverModoVisualizacaoKanban('fredy', 'invalido')).toBe('quadro')
   })
 })
 

@@ -6,7 +6,7 @@ import { showToast } from '@/src/shared/utils/toast'
 import { formatarNumeroComMilhar } from '@/src/domain/services/pedido/CalculadoraPedido'
 import { aplicarQuantidadeProdutoNaLinha } from '@/src/domain/policies/pedido/ComplementoQuantidadeLinhaPolicy'
 import type { ProdutoSelecionado } from '../../types'
-import { obterUnidadeMedidaProdutoLinha } from '../../produtoCatalogoHelpers'
+import { obterUnidadeMedidaProdutoLinha } from '@/src/domain/policies/pedido/CarrinhoCatalogoPolicy'
 import type { UnidadeMedidaProduto } from '@/src/shared/types/unidadeMedidaProduto'
 
 export interface UseNovoPedidoEdicaoLinhaParams {

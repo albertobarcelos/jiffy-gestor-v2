@@ -7,12 +7,13 @@ export const CONFIGURACOES_TAB_SLUGS = [
   'impressoras',
   'meios-pagamentos',
   'taxas',
+  'menus',
   'importar-dados',
 ] as const
 
 export type ConfiguracoesTabSlug = (typeof CONFIGURACOES_TAB_SLUGS)[number]
 
-/** Hub Delivery — path canônico. */
+/** Hub Delivery — path canônico (design da main). */
 export const DELIVERY_HUB_PATH = '/config/delivery'
 
 /** Aba Delivery no chrome de Configurações (a URL é só `DELIVERY_HUB_PATH`). */
@@ -22,6 +23,9 @@ export type ConfiguracoesViewTab = ConfiguracoesTabSlug | typeof CONFIGURACOES_D
 
 export type DeliveryEtapaId =
   | 'delivery-geolocalizacao'
+  | 'delivery-nome-cardapio'
+  | 'delivery-design'
+  | 'delivery-agenda'
   | 'delivery-cobertura'
   | 'delivery-entregadores'
   | 'delivery-meios'
@@ -30,6 +34,9 @@ export type DeliveryEtapaId =
 
 const DELIVERY_ETAPA_SLUG: Record<DeliveryEtapaId, string> = {
   'delivery-geolocalizacao': 'empresa',
+  'delivery-nome-cardapio': 'nome-cardapio',
+  'delivery-design': 'design',
+  'delivery-agenda': 'agenda',
   'delivery-cobertura': 'cobertura',
   'delivery-entregadores': 'entregadores',
   'delivery-meios': 'meios',
@@ -41,8 +48,16 @@ const DELIVERY_SLUG_TO_ETAPA = Object.fromEntries(
   Object.entries(DELIVERY_ETAPA_SLUG).map(([id, slug]) => [slug, id])
 ) as Record<string, DeliveryEtapaId>
 
+/** Rotas antigas de `/configuracoes/:aba` → slug canônico (exceto Delivery, que vai ao hub). */
+const LEGACY_PATH_TAB: Record<string, ConfiguracoesTabSlug> = {}
+
 export function isConfiguracoesTabSlug(value: string): value is ConfiguracoesTabSlug {
   return (CONFIGURACOES_TAB_SLUGS as readonly string[]).includes(value)
+}
+
+export function resolveConfiguracoesTabFromPath(value: string): ConfiguracoesTabSlug | null {
+  if (isConfiguracoesTabSlug(value)) return value
+  return LEGACY_PATH_TAB[value] ?? null
 }
 
 export function configuracoesTabPath(tab: ConfiguracoesTabSlug): string {

@@ -1,3 +1,4 @@
+import type { SuperficieQuadroPedidos } from '@/src/presentation/gestor-pedidos/superficieQuadroPedidos'
 import type { ColunaKanbanId, KanbanColumn } from '../types'
 import type { ModoKanbanVendas } from '../KanbanModoVendasToggle'
 
@@ -12,7 +13,7 @@ export const COLUNAS_KANBAN_IDS: readonly ColunaKanbanId[] = [
   'REJEITADAS',
 ]
 
-/** Delivery: Novos + Com NF ficam de fora até o operador voltar a marcar. */
+/** Fredy (Flow): Novos + Com NF ficam de fora até o operador voltar a marcar. O Gestor web não usa isto. */
 export const COLUNAS_OCULTAS_PADRAO_DELIVERY: readonly ColunaKanbanId[] = [
   'NOVOS_PEDIDOS',
   'COM_FISCAL',
@@ -38,13 +39,15 @@ export function colunasOcultasPadraoDoModo(modo: ModoKanbanVendas): ColunaKanban
   return modo === 'delivery' ? [...COLUNAS_OCULTAS_PADRAO_DELIVERY] : []
 }
 
-/** Gestor web: só o padrão do modo. Flow: preferência do operador. */
+/**
+ * Gestor: todas as etapas do modo.
+ * Fredy: preferência do operador — por padrão esconde Novos + Com NF no delivery.
+ */
 export function resolverColunasOcultasKanban(
-  kiosk: boolean,
-  modo: ModoKanbanVendas,
+  superficie: SuperficieQuadroPedidos,
   ocultasPersistidas: readonly ColunaKanbanId[]
 ): ColunaKanbanId[] {
-  if (!kiosk) return colunasOcultasPadraoDoModo(modo)
+  if (superficie === 'gestor') return []
   return [...ocultasPersistidas]
 }
 

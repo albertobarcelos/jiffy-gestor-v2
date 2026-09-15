@@ -138,6 +138,8 @@ export interface CriarPedidoDeliveryApiRequest {
   observacoes?: string[]
   cobrancas?: CobrancaPedidoDeliveryApi[]
   taxas?: TaxaPedidoDeliveryApi[]
+  /** Override no create Gestor. Omitir = backend calcula a cobertura. */
+  valorTaxaEntrega?: number
   documentoCpfCnpj?: string | null
 }
 

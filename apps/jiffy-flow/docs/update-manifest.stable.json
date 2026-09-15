@@ -2,10 +2,10 @@
     "schemaVersion":  1,
     "channel":  "stable",
     "latest":  {
-                   "version":  "0.1.4",
+                   "version":  "0.1.5",
                    "minAgentVersion":  "0.1.0",
-                   "url":  "https://pub-143026e1401641a5ad59a389410eed2a.r2.dev/releases/0.1.4/Fredy.exe",
-                   "sha256":  "a3037ab2f8d52bdb2589741ea8f609f6ba485d427c432a4b522a1aff83085612",
-                   "notes":  "Fredy 0.1.4 - gestor de pedidos (app.jiffy.run)"
+                   "url":  "https://pub-143026e1401641a5ad59a389410eed2a.r2.dev/releases/0.1.5/Fredy.exe",
+                   "sha256":  "800b0936aa1109ecb1519c7b5589c70567800450d9ad325689d98a1bb9485d66",
+                   "notes":  "Fredy 0.1.5 - gestor de pedidos (app.jiffy.run)"
                }
 }

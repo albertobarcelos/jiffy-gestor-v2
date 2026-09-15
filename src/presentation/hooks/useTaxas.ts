@@ -6,6 +6,8 @@ type TaxasQueryParams = {
   q?: string
   limit?: number
   enabled?: boolean
+  staleTime?: number
+  refetchOnMount?: boolean | 'always'
 }
 
 type TaxasResponse = {
@@ -17,7 +19,12 @@ type TaxasResponse = {
  * Lista taxas com paginação infinita (mesmo contrato de complementos: items + count).
  */
 export function useTaxasInfinite(params: TaxasQueryParams = {}) {
-  const { enabled = true, ...queryParams } = params
+  const {
+    enabled = true,
+    staleTime = 1000 * 60 * 5,
+    refetchOnMount,
+    ...queryParams
+  } = params
 
   return useSecureTenantInfiniteQuery(
     ['taxas', 'infinite', queryParams],
@@ -60,7 +67,8 @@ export function useTaxasInfinite(params: TaxasQueryParams = {}) {
       enabled,
       initialPageParam: 0,
       getNextPageParam: lastPage => lastPage.nextOffset,
-      staleTime: 1000 * 60 * 5,
+      staleTime,
+      ...(refetchOnMount !== undefined ? { refetchOnMount } : {}),
     }
   )
 }

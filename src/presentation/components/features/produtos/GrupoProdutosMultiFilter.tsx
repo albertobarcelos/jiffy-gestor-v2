@@ -15,7 +15,7 @@ interface GrupoProdutosMultiFilterProps {
 function rotuloGruposSelecionados(selecionados: GrupoProduto[]): string | null {
   if (selecionados.length === 0) return null
   if (selecionados.length === 1) return selecionados[0].getNome()
-  return `${selecionados.length} grupos selecionados`
+  return `${selecionados.length} categorias selecionadas`
 }
 
 export function GrupoProdutosMultiFilter({
@@ -37,8 +37,9 @@ export function GrupoProdutosMultiFilter({
       loading={loading}
       disabled={loading}
       loadingText="Carregando..."
-      noOptionsText="Nenhum grupo encontrado"
+      noOptionsText="Nenhuma categoria encontrada"
       getOptionLabel={grupo => grupo.getNome()}
+      getOptionKey={grupo => grupo.getId()}
       isOptionEqualToValue={(a, b) => a.getId() === b.getId()}
       value={selecionados}
       onChange={(_, gruposEscolhidos) => onChange(gruposEscolhidos.map(g => g.getId()))}
@@ -59,7 +60,7 @@ export function GrupoProdutosMultiFilter({
       renderInput={params => (
         <TextField
           {...params}
-          label="Grupo de produtos"
+          label="Categoria"
           placeholder={value.length === 0 ? 'Pesquise ou Selecione' : ''}
           InputLabelProps={{
             ...params.InputLabelProps,

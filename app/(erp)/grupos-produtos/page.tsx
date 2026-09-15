@@ -10,7 +10,7 @@ import { GruposProdutosList } from '@/src/presentation/components/features/grupo
 export default function GruposProdutosPage() {
   return (
     <div className="h-full flex flex-col">
-      <Suspense fallback={<div>Carregando grupos...</div>}>
+      <Suspense fallback={<div>Carregando categorias...</div>}>
         <GruposProdutosList />
       </Suspense>
     </div>

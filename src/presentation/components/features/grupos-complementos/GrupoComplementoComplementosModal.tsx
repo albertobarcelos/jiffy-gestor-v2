@@ -25,6 +25,8 @@ interface GrupoComplementoComplementosModalProps {
   draftGrupoNome?: string
   draftLinkedIds?: string[]
   onDraftLinkedIdsChange?: (ids: string[]) => void
+  /** Painel de novo/editar complemento deve ficar acima do modal do grupo. */
+  nestedModalZIndex?: number
 }
 
 /** Evita `[]` novo a cada render quando o React Query ainda não devolveu `data` (causa loop em useEffect). */
@@ -58,6 +60,7 @@ export function GrupoComplementoComplementosModal({
   draftGrupoNome,
   draftLinkedIds = [],
   onDraftLinkedIdsChange,
+  nestedModalZIndex = 1450,
 }: GrupoComplementoComplementosModalProps) {
   const invalidate = useInvalidateTenantQueries()
   const isDraftMode = mode === 'draft'
@@ -904,6 +907,7 @@ export function GrupoComplementoComplementosModal({
           onTabChange={handleComplementosTabChange}
           onReload={handleComplementosTabsReload}
           onCreated={handleComplementoCreated}
+          zIndex={nestedModalZIndex}
         />
       </>
     )
@@ -920,6 +924,7 @@ export function GrupoComplementoComplementosModal({
         onTabChange={handleComplementosTabChange}
         onReload={handleComplementosTabsReload}
         onCreated={handleComplementoCreated}
+        zIndex={nestedModalZIndex}
       />
     </>
   )
