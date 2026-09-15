@@ -24,11 +24,10 @@ import {
 } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import { useLocalizacaoEmpresaPublica } from '../../shared/hooks/useLocalizacaoEmpresaPublica'
 import {
-  isPublicDeliverySlugNotFound,
-  isEmpresaDeliveryIndisponivel,
-  extrairMensagensPendenciasCatalogo,
-} from '@/src/application/errors/publicDeliveryErrors'
-import { DeliveryLojaIndisponivelScreen } from './DeliveryLojaIndisponivelScreen'
+  logErroCatalogoPublico,
+  resolverMensagemErroCatalogoPublicoUi,
+} from '@/src/application/errors/resolverMensagemErroCatalogoPublico'
+import { DeliveryCatalogoErroScreen } from './DeliveryCatalogoErroScreen'
 import {
   DeliveryThemeScope,
   useDeliveryThemeContext,
@@ -66,7 +65,6 @@ import { buildCarrinhoThumbsFromItens } from '../../shared/utils/buildCarrinhoTh
 import {
   deliveryPublicoCarrinhoPath,
   deliveryPublicoHomePath,
-  deliveryPublicoInstrucoesPath,
 } from '../../shared/utils/deliveryPublicoRoutes'
 
 type DeliveryPublicoHomeScreenProps = {
@@ -187,10 +185,9 @@ export function DeliveryPublicoHomeScreen({
   )
 
   useEffect(() => {
-    if (isError && isPublicDeliverySlugNotFound(error)) {
-      router.replace(deliveryPublicoInstrucoesPath())
-    }
-  }, [isError, error, router])
+    if (!isError || !error) return
+    logErroCatalogoPublico(error, { slug, origem: 'DeliveryPublicoHomeScreen' })
+  }, [isError, error, slug])
 
   const grupos = useMemo(
     () => (data?.pages ? flattenCatalogoGrupos(data.pages) : []),
@@ -368,20 +365,14 @@ export function DeliveryPublicoHomeScreen({
 
   const isCatalogLoading = isLoading && !data
 
-  if (isError && isEmpresaDeliveryIndisponivel(error)) {
+  if (isError) {
+    const ui = resolverMensagemErroCatalogoPublicoUi(error)
     return (
-      <DeliveryLojaIndisponivelScreen mensagens={extrairMensagensPendenciasCatalogo(error)} />
-    )
-  }
-
-  if (isError && !isPublicDeliverySlugNotFound(error)) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-white px-6 text-center">
-        <p className="text-lg font-semibold text-gray-800">Não foi possível carregar o cardápio</p>
-        <p className="mt-2 text-sm text-gray-500">
-          {error instanceof Error ? error.message : 'Tente novamente em instantes.'}
-        </p>
-      </div>
+      <DeliveryCatalogoErroScreen
+        tipo={ui.tipo}
+        titulo={ui.titulo}
+        descricao={ui.descricao}
+      />
     )
   }
 

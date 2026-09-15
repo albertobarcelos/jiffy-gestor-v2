@@ -40,7 +40,7 @@ export function DeliveryPublicoShell({ children }: { children: ReactNode }) {
       {toastHost
         ? createPortal(
             <Toaster
-              position="top-center"
+              position="top-right"
               containerStyle={{ zIndex: TOAST_Z_INDEX }}
             />,
             toastHost
