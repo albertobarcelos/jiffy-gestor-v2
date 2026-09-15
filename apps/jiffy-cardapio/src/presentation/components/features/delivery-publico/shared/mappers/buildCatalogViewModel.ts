@@ -1,7 +1,10 @@
 import type { CatalogoPublicoGrupoProdutoDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
 import type { FuncionamentoPublicoDTO } from '@/src/application/dto/delivery/FuncionamentoDeliveryDTO'
 import { listarProdutosFavoritos } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
-import { formatarHorarioFuncionamentoPublico } from '@/src/shared/utils/funcionamentoDelivery'
+import {
+  formatarHorarioFuncionamentoPublico,
+  formatarStatusLojaPublica,
+} from '@/src/shared/utils/funcionamentoDelivery'
 import {
   DELIVERY_PUBLICO_GRUPO_SUGESTOES_ICON,
   DELIVERY_PUBLICO_GRUPO_SUGESTOES_ID,
@@ -78,12 +81,18 @@ export function buildCatalogViewModel(
     ? buildGrupoSugestoes(grupos, carrier.imagemUrl?.trim() || null)
     : null
 
+  const status = funcionamento
+    ? formatarStatusLojaPublica(funcionamento)
+    : { mensagem: 'Aberto, faça seu pedido!', detalheHorario: null }
+
   return {
     grupos: sugestoes ? [sugestoes, ...gruposMapeados] : gruposMapeados,
     disponivel: funcionamento?.aberta ?? true,
     horarioTexto: funcionamento
       ? formatarHorarioFuncionamentoPublico(funcionamento)
       : 'Consulte os horários',
+    statusMensagem: status.mensagem,
+    statusDetalheHorario: status.detalheHorario,
     termoBusca: '',
     carrinho: { total: 0, quantidadeItens: 0 },
     ...overrides,

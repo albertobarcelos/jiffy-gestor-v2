@@ -136,8 +136,12 @@ const MAP_JS_DIA_PARA_API: Record<number, DiaDaSemanaApi> = {
   6: 'SABADO',
 }
 
+function diaDaSemanaEm(agora: Date = new Date()): DiaDaSemanaApi {
+  return MAP_JS_DIA_PARA_API[agora.getDay()] ?? 'SEGUNDA'
+}
+
 function diaDaSemanaHoje(): DiaDaSemanaApi {
-  return MAP_JS_DIA_PARA_API[new Date().getDay()] ?? 'SEGUNDA'
+  return diaDaSemanaEm()
 }
 
 function formatarIntervalo(abreEm: string, fechaEm: string): string {
@@ -145,37 +149,119 @@ function formatarIntervalo(abreEm: string, fechaEm: string): string {
 }
 
 function buscarIntervaloHoje(
-  agendaSemanal: FuncionamentoPublicoDiaDTO[] | FuncionamentoDoDiaDTO[]
+  agendaSemanal: FuncionamentoPublicoDiaDTO[] | FuncionamentoDoDiaDTO[],
+  agora: Date = new Date()
 ): { abreEm: string; fechaEm: string } | null {
-  const hoje = diaDaSemanaHoje()
+  const hoje = diaDaSemanaEm(agora)
   const dia = agendaSemanal.find(d => d.diaDaSemana === hoje)
   return dia?.intervalos[0] ?? null
 }
 
-function buscarProximaAbertura(
-  agendaSemanal: FuncionamentoPublicoDiaDTO[] | FuncionamentoDoDiaDTO[]
-): string | null {
-  const ordem = [...DIAS_DA_SEMANA_ORDEM_UI]
-  const hojeIdx = ordem.indexOf(diaDaSemanaHoje())
-  const rotacionado = [...ordem.slice(hojeIdx), ...ordem.slice(0, hojeIdx)]
+function horarioParaMinutos(hhmm: string): number {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim())
+  if (!match) return 0
+  const horas = Math.min(23, Math.max(0, Number(match[1])))
+  const minutos = Math.min(59, Math.max(0, Number(match[2])))
+  return horas * 60 + minutos
+}
 
-  for (let offset = 0; offset < rotacionado.length; offset++) {
-    const diaKey = rotacionado[offset]!
+function agoraEmMinutos(agora: Date = new Date()): number {
+  return agora.getHours() * 60 + agora.getMinutes()
+}
+
+export type ProximaAberturaPublica = {
+  abreEm: string
+  diaDaSemana: DiaDaSemanaApi
+  ehHoje: boolean
+  ehAmanha: boolean
+}
+
+/** Próximo horário de abertura a partir de agora (considera se o de hoje ainda não passou). */
+export function resolverProximaAbertura(
+  agendaSemanal: FuncionamentoPublicoDiaDTO[] | FuncionamentoDoDiaDTO[],
+  agora: Date = new Date()
+): ProximaAberturaPublica | null {
+  const ordem = DIAS_DA_SEMANA_ORDEM_UI
+  const hojeIdx = ordem.indexOf(MAP_JS_DIA_PARA_API[agora.getDay()] ?? 'SEGUNDA')
+  const minutosAgora = agoraEmMinutos(agora)
+
+  for (let offset = 0; offset < ordem.length; offset++) {
+    const diaKey = ordem[(hojeIdx + offset) % ordem.length]!
     const dia = agendaSemanal.find(d => d.diaDaSemana === diaKey)
     const intervalo = dia?.intervalos[0]
     if (!intervalo) continue
-    if (offset === 0) return intervalo.abreEm
-    return intervalo.abreEm
+
+    if (offset === 0 && horarioParaMinutos(intervalo.abreEm) <= minutosAgora) {
+      continue
+    }
+
+    return {
+      abreEm: intervalo.abreEm,
+      diaDaSemana: diaKey,
+      ehHoje: offset === 0,
+      ehAmanha: offset === 1,
+    }
   }
+
   return null
+}
+
+function formatarProximaAberturaDetalhe(proxima: ProximaAberturaPublica): string {
+  if (proxima.ehHoje) return `Abriremos às ${proxima.abreEm}`
+  if (proxima.ehAmanha) return `Abriremos amanhã às ${proxima.abreEm}`
+  return `Abriremos ${LABEL_DIA_DA_SEMANA[proxima.diaDaSemana].toLowerCase()} às ${proxima.abreEm}`
+}
+
+export type StatusLojaPublica = {
+  /** Linha principal (ex.: "Aberto, faça seu pedido!" / "Estamos fechado!"). */
+  mensagem: string
+  /** Linha secundária com horário (ex.: "até as 22:45" / "Abriremos amanhã às 09:00"). */
+  detalheHorario: string | null
+}
+
+/**
+ * Status da loja no cardápio público (mensagem + horário opcional).
+ */
+export function formatarStatusLojaPublica(input: {
+  aberta: boolean
+  agendaSemanal: FuncionamentoPublicoDiaDTO[] | FuncionamentoDoDiaDTO[]
+  agora?: Date
+}): StatusLojaPublica {
+  if (input.aberta) {
+    const intervaloHoje = buscarIntervaloHoje(input.agendaSemanal, input.agora)
+    return {
+      mensagem: 'Aberto, faça seu pedido!',
+      detalheHorario: intervaloHoje?.fechaEm
+        ? `até as ${intervaloHoje.fechaEm}`
+        : null,
+    }
+  }
+
+  const proxima = resolverProximaAbertura(input.agendaSemanal, input.agora)
+  return {
+    mensagem: 'Estamos fechado!',
+    detalheHorario: proxima
+      ? formatarProximaAberturaDetalhe(proxima)
+      : 'Consulte os horários',
+  }
+}
+
+/** @deprecated Preferir `formatarStatusLojaPublica`. */
+export function formatarMensagemStatusLojaPublica(input: {
+  aberta: boolean
+  agendaSemanal: FuncionamentoPublicoDiaDTO[] | FuncionamentoDoDiaDTO[]
+  agora?: Date
+}): string {
+  return formatarStatusLojaPublica(input).mensagem
 }
 
 /** Texto curto para badge de horário na loja pública. */
 export function formatarHorarioFuncionamentoPublico(input: {
   aberta: boolean
   agendaSemanal: FuncionamentoPublicoDiaDTO[] | FuncionamentoDoDiaDTO[]
+  agora?: Date
 }): string {
-  const intervaloHoje = buscarIntervaloHoje(input.agendaSemanal)
+  const intervaloHoje = buscarIntervaloHoje(input.agendaSemanal, input.agora)
 
   if (input.aberta && intervaloHoje) {
     return formatarIntervalo(intervaloHoje.abreEm, intervaloHoje.fechaEm)
@@ -185,12 +271,12 @@ export function formatarHorarioFuncionamentoPublico(input: {
     return 'Aberta agora'
   }
 
-  if (intervaloHoje) {
+  if (intervaloHoje && horarioParaMinutos(intervaloHoje.abreEm) > agoraEmMinutos(input.agora)) {
     return `abre às ${intervaloHoje.abreEm}`
   }
 
-  const proxima = buscarProximaAbertura(input.agendaSemanal)
-  if (proxima) return `abre às ${proxima}`
+  const proxima = resolverProximaAbertura(input.agendaSemanal, input.agora)
+  if (proxima) return `abre às ${proxima.abreEm}`
 
   return 'Consulte os horários'
 }

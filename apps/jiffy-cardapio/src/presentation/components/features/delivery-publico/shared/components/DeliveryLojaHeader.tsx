@@ -12,7 +12,7 @@ export function DeliveryLojaHeader({ config }: DeliveryLojaHeaderProps) {
 
   return (
     <div
-      className="delivery-loja-capa relative mt-5 h-auto w-full overflow-hidden lg:rounded-2xl"
+      className="delivery-loja-capa relative mt-0 h-auto w-full overflow-hidden lg:mt-5 lg:rounded-2xl"
       style={{ backgroundColor: 'var(--delivery-hero-bg)' }}
       role="img"
       aria-label="Capa da loja"

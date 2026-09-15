@@ -28,6 +28,7 @@ import {
   resolverMensagemErroCatalogoPublicoUi,
 } from '@/src/application/errors/resolverMensagemErroCatalogoPublico'
 import { DeliveryCatalogoErroScreen } from './DeliveryCatalogoErroScreen'
+import { DeliveryPublicoHomeSkeleton } from './DeliveryPublicoHomeSkeleton'
 import {
   DeliveryThemeScope,
   useDeliveryThemeContext,
@@ -502,14 +503,7 @@ function DeliveryPublicoHomeContent({
   const enderecoTexto = formatEmpresaPublicaEndereco(empresa?.endereco ?? null)
 
   if (isCatalogLoading) {
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <div
-          className="h-12 w-12 animate-spin rounded-full border-b-2"
-          style={{ borderColor: 'var(--delivery-primary)' }}
-        />
-      </div>
-    )
+    return <DeliveryPublicoHomeSkeleton />
   }
 
   return (

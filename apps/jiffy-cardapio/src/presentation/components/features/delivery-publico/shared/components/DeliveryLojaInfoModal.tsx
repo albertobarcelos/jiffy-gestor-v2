@@ -64,7 +64,7 @@ export function DeliveryLojaInfoModal({
       />
 
       <div
-        className="relative flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl shadow-xl sm:rounded-2xl"
+        className="relative flex h-[95dvh] max-h-[95dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl shadow-xl sm:h-auto sm:max-h-[85vh] sm:rounded-2xl"
         style={{ backgroundColor: 'var(--delivery-surface, #ffffff)' }}
         role="dialog"
         aria-modal="true"
