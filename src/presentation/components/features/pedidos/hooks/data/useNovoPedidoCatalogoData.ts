@@ -19,6 +19,8 @@ export type UseNovoPedidoCatalogoDataParams = {
   estaNoPassoProdutos: boolean
   token: string | undefined
   menuId: string | null
+  /** True enquanto o ID do cardápio do canal ainda está carregando. */
+  menuIdCarregando?: boolean
   canal: CanalVendaNovoPedido
   grupoSelecionadoId: string | null
   setGrupoSelecionadoId: (id: string | null) => void
@@ -31,6 +33,7 @@ export function useNovoPedidoCatalogoData({
   estaNoPassoProdutos,
   token,
   menuId,
+  menuIdCarregando = false,
   canal,
   grupoSelecionadoId,
   setGrupoSelecionadoId,
@@ -145,11 +148,12 @@ export function useNovoPedidoCatalogoData({
 
   const menuCatalogoIndisponivel =
     estaNoPassoProdutos &&
+    !menuIdCarregando &&
     (gruposQuery.menuCatalogoIndisponivel || produtosQuery.menuCatalogoIndisponivel)
 
   return {
     grupos: gruposQuery.grupos,
-    isLoadingGruposVenda: gruposQuery.isLoadingGruposVenda,
+    isLoadingGruposVenda: menuIdCarregando || gruposQuery.isLoadingGruposVenda,
     produtosList,
     buscaProdutoFiltrada: produtosQuery.buscaProdutoFiltrada,
     isLoadingProdutosVenda: produtosQuery.isLoadingProdutosVenda,

@@ -1,10 +1,12 @@
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
-import { normalizarEstacaoImpressaoResumo } from '@/src/infrastructure/api/normalizarEstacaoImpressaoResumo'
+import {
+  normalizarEstacaoImpressaoResumo,
+  normalizarListaEstacoesImpressao,
+} from '@/src/infrastructure/api/normalizarEstacaoImpressaoResumo'
 import {
   getEstacaoImpressaoId,
   limparEstacaoImpressaoId,
-  salvarEstacaoImpressaoId,
 } from '@/src/infrastructure/printing/estacaoImpressaoStorage'
 
 export interface EstacaoImpressaoResumo {
@@ -93,7 +95,9 @@ export async function criarEstacaoImpressao(
 }
 
 export function listarEstacoesImpressao(token: string): Promise<EstacaoImpressaoResumo[]> {
-  return requestJson<EstacaoImpressaoResumo[]>('/api/gestor/estacoes-impressao', token)
+  return requestJson<unknown>('/api/gestor/estacoes-impressao', token).then(data =>
+    normalizarListaEstacoesImpressao(data)
+  )
 }
 
 export async function atualizarEstacaoImpressao(
@@ -232,33 +236,21 @@ export function nomeEstacaoImpressaoPadrao(): string {
   return `Estação ${browser} - ${new Date().toLocaleDateString('pt-BR')}`
 }
 
-async function criarOuReaproveitarEstacaoImpressao(token: string): Promise<string> {
-  try {
-    const estacao = await criarEstacaoImpressao(token, nomeEstacaoImpressaoPadrao())
-    salvarEstacaoImpressaoId(estacao.id)
-    return estacao.id
-  } catch (createError) {
-    const estacoes = await listarEstacoesImpressao(token).catch(() => [])
-    const existente = estacoes.find(e => e.ativo) ?? estacoes[0]
-    if (existente) {
-      salvarEstacaoImpressaoId(existente.id)
-      return existente.id
-    }
-    throw createError
-  }
+const CONFIG_VAZIA: EstacaoImpressaoConfigResolvida = {
+  estacaoId: '',
+  gestorDelivery: false,
+  mapeamentos: [],
 }
 
 /**
- * Resolve o id da estação local (localStorage) e carrega mapeamentos.
- * Recria estação se o id salvo não existir mais (404).
+ * Carrega a estação escolhida neste PC (`localStorage`) e os mapeamentos.
+ * Não cria estação automaticamente — o operador cadastra/seleciona no painel.
  */
 export async function resolverEstacaoImpressaoConfig(
   token: string
 ): Promise<EstacaoImpressaoConfigResolvida> {
-  let estacaoId = getEstacaoImpressaoId()
-  if (!estacaoId) {
-    estacaoId = await criarOuReaproveitarEstacaoImpressao(token)
-  }
+  const estacaoId = getEstacaoImpressaoId()
+  if (!estacaoId) return CONFIG_VAZIA
 
   try {
     const [mapeamentos, gestorDelivery] = await Promise.all([
@@ -269,11 +261,6 @@ export async function resolverEstacaoImpressaoConfig(
   } catch (error) {
     if (!isEstacaoImpressaoNotFoundError(error)) throw error
     limparEstacaoImpressaoId()
-    estacaoId = await criarOuReaproveitarEstacaoImpressao(token)
-    const [mapeamentos, gestorDelivery] = await Promise.all([
-      buscarMapeamentosEstacao(token, estacaoId),
-      resolverGestorDeliveryDaEstacao(token, estacaoId),
-    ])
-    return { estacaoId, gestorDelivery, mapeamentos }
+    return CONFIG_VAZIA
   }
 }

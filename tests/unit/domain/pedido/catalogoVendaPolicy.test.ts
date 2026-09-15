@@ -8,6 +8,7 @@ import {
   montarProdutosCatalogoVenda,
   mesclarProdutosNoCatalogo,
   resolverGrupoCatalogoSelecionadoId,
+  resolverMenuCatalogoNovoPedido,
 } from '@/src/domain/policies/pedido/CatalogoVendaPolicy'
 
 function grupo(params: { id: string; nome: string; ativo?: boolean; ordem?: number }): GrupoProduto {
@@ -131,5 +132,15 @@ describe('CatalogoVendaPolicy', () => {
     const next = mesclarProdutosNoCatalogo({ p1: completo }, [slim])
     expect(next.p1).toBe(completo)
     expect(next.p1.getGruposComplementos()[0]?.complementos).toHaveLength(1)
+  })
+
+  it('delivery manual e público usam menuDeliveryId; balcão usa menuVendaGestorId', () => {
+    expect(resolverMenuCatalogoNovoPedido('entrega', 'menu-delivery', 'menu-balcao')).toBe(
+      'menu-delivery'
+    )
+    expect(resolverMenuCatalogoNovoPedido('balcao', 'menu-delivery', 'menu-balcao')).toBe(
+      'menu-balcao'
+    )
+    expect(resolverMenuCatalogoNovoPedido('entrega', null, 'menu-balcao')).toBeNull()
   })
 })

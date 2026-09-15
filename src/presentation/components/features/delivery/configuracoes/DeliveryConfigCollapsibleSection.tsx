@@ -15,6 +15,7 @@ interface DeliveryConfigCollapsibleSectionProps {
   resetExpandedWhen?: unknown
   /** Classes do bloco de conteúdo expandido (default: mt-4 space-y-4). */
   contentClassName?: string
+  className?: string
   children: ReactNode
 }
 
@@ -27,6 +28,7 @@ export function DeliveryConfigCollapsibleSection({
   defaultExpanded = true,
   resetExpandedWhen,
   contentClassName = 'mt-4 space-y-4',
+  className,
   children,
 }: DeliveryConfigCollapsibleSectionProps) {
   const [expanded, setExpanded] = useState(defaultExpanded)
@@ -37,7 +39,7 @@ export function DeliveryConfigCollapsibleSection({
   }, [defaultExpanded, resetExpandedWhen])
 
   return (
-    <section className="rounded-lg border border-gray-200 bg-white p-2 shadow-sm">
+    <section className={`rounded-lg border border-gray-200 bg-white p-2 shadow-sm ${className ?? ''}`}>
       <div className="flex items-start gap-2">
         <span className="shrink-0 rounded-lg bg-secondary p-2 text-white">{icon}</span>
         <div className="min-w-0 flex-1">

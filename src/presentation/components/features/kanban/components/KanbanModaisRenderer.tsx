@@ -4,6 +4,7 @@ import { EmitirNfeModal } from '../../fiscal/EmitirNfeModal'
 import { AlertaCbenefEmissaoDialog } from '../../fiscal/AlertaCbenefEmissaoDialog'
 import { NovoPedidoModal } from '../../pedidos/NovoPedidoModal'
 import { DeliveryConfiguracoesModal } from '../../delivery/configuracoes/DeliveryConfiguracoesModal'
+import { KanbanBalcaoConfiguracoesModal } from './KanbanBalcaoConfiguracoesModal'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { FaturamentoRangeCalendar } from '@/src/presentation/components/ui/FaturamentoRangeCalendar'
 import type { ModoKanbanVendas } from '../KanbanModoVendasToggle'
@@ -126,7 +127,11 @@ export function KanbanModaisRenderer({
   return (
     <>
       {deliveryConfiguracoesOpen ? (
-        <DeliveryConfiguracoesModal open onClose={onCloseDeliveryConfiguracoes} />
+        modoKanbanVendas === 'balcao' ? (
+          <KanbanBalcaoConfiguracoesModal open onClose={onCloseDeliveryConfiguracoes} />
+        ) : (
+          <DeliveryConfiguracoesModal open onClose={onCloseDeliveryConfiguracoes} />
+        )
       ) : null}
 
       <JiffySidePanelModal

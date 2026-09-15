@@ -180,6 +180,15 @@ export function DeliveryNomeCardapioView() {
         ) : null}
 
         <section className="space-y-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm md:p-6">
+          <MenuParametroEmpresaSelect
+            id="delivery-hub-menu"
+            label="Cardápio publicado no delivery"
+            description="Produtos, preços e fotos do app público e do delivery manual no Gestor saem deste menu."
+            value={menuDeliveryId}
+            onChange={setMenuDeliveryId}
+            disabled={carregando}
+          />
+
           <div>
             <label
               htmlFor="delivery-hub-slug"
@@ -210,15 +219,6 @@ export function DeliveryNomeCardapioView() {
             </div>
             {slugErro ? <p className="mt-1 text-xs text-red-600">{slugErro}</p> : null}
           </div>
-
-          <MenuParametroEmpresaSelect
-            id="delivery-hub-menu"
-            label="Cardápio publicado no delivery"
-            description="Produtos, preços e fotos do app público saem deste menu."
-            value={menuDeliveryId}
-            onChange={setMenuDeliveryId}
-            disabled={carregando}
-          />
 
           {!configurado ? (
             <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">

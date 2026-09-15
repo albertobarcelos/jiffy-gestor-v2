@@ -4,6 +4,7 @@ import { memo } from 'react'
 import { CatalogProductRow } from '@/src/presentation/components/features/catalogo/CatalogProductRow'
 import { MenuProdutoRowQuickActions } from '@/src/presentation/components/features/menus/MenuProdutoRowQuickActions'
 import type { MenuProduto, UpdateMenuProdutoInput } from '@/src/shared/types/menus'
+import { resolverImagemMenuProduto } from '@/src/shared/utils/catalogoProdutoIndex'
 import type {
   MenuProdutoPermissaoField,
   MenuProdutoPermissoes,
@@ -13,6 +14,7 @@ import type { MenuProdutoListaSaving } from '@/src/presentation/hooks/menus/useM
 export type MenuProdutoCatalogRowProps = {
   produto: MenuProduto
   codigo?: string
+  imagemCadastro?: string | null
   permissoesCadastro?: Partial<MenuProdutoPermissoes> | null
   saving: MenuProdutoListaSaving
   onNomeChange: (produtoId: string, nome: string) => void | boolean | Promise<void | boolean>
@@ -33,6 +35,7 @@ export type MenuProdutoCatalogRowProps = {
 function MenuProdutoCatalogRowInner({
   produto,
   codigo,
+  imagemCadastro,
   permissoesCadastro,
   saving,
   onNomeChange,
@@ -49,7 +52,7 @@ function MenuProdutoCatalogRowInner({
       nome={produto.nome}
       valor={Number(produto.valor)}
       ativo={produto.ativo}
-      imagemUrl={produto.image?.imageUrl}
+      imagemUrl={resolverImagemMenuProduto(produto, imagemCadastro)}
       codigo={codigo}
       isSavingValor={saving.valor}
       isSavingStatus={saving.status}
@@ -78,6 +81,7 @@ function areEqual(
   return (
     prev.produto === next.produto &&
     prev.codigo === next.codigo &&
+    prev.imagemCadastro === next.imagemCadastro &&
     prev.permissoesCadastro === next.permissoesCadastro &&
     prev.saving.nome === next.saving.nome &&
     prev.saving.valor === next.saving.valor &&

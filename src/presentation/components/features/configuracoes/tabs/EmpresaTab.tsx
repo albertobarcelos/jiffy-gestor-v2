@@ -275,7 +275,8 @@ export function EmpresaTab() {
         setServerHasLogo(false)
       }
     } catch (e) {
-      console.error('Erro ao carregar logo de impressão:', e)
+      const msg = e instanceof Error ? e.message : String(e)
+      console.warn(`Erro ao carregar logo de impressão: ${msg}`)
       setServerHasLogo(false)
     }
   }
@@ -411,7 +412,7 @@ export function EmpresaTab() {
             if (endereco.cidade && endereco.estado) {
               const cidade = endereco.cidade
               ultimaCidadeBuscada.current = cidade
-              buscarCodigoIbge(cidade, endereco.estado)
+              void buscarCodigoIbge(cidade, endereco.estado)
             } else {
               setCodigoCidadeIbge(null)
               ultimaCidadeBuscada.current = ''
@@ -518,7 +519,8 @@ export function EmpresaTab() {
         return false
       }
     } catch (error) {
-      console.error('Erro ao buscar código IBGE:', error)
+      const msg = error instanceof Error ? error.message : String(error)
+      console.warn(`Erro ao buscar código IBGE: ${msg}`)
       setCodigoCidadeIbge(null)
       return false
     }
@@ -816,6 +818,9 @@ export function EmpresaTab() {
 
         setIsEditing(false)
         await loadEmpresa()
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('jiffy:empresa-me-updated'))
+        }
         showToast.success('Empresa atualizada com sucesso!')
       } catch (error) {
         console.error('Erro ao salvar empresa:', error)

@@ -6,10 +6,13 @@ import { Skeleton as MuiSkeleton, SkeletonProps as MuiSkeletonProps } from '@mui
 export interface SkeletonProps extends MuiSkeletonProps {}
 
 /**
- * Componente Skeleton usando Material UI
+ * Placeholder de carregamento (Material UI).
+ * A animação padrão é `wave` — o mesmo shimmer usado no catálogo de produtos.
  */
-export const Skeleton = React.forwardRef<HTMLDivElement, SkeletonProps>((props, ref) => {
-  return <MuiSkeleton ref={ref} {...props} />
-})
+export const Skeleton = React.forwardRef<HTMLSpanElement, SkeletonProps>(
+  ({ animation = 'wave', ...props }, ref) => {
+    return <MuiSkeleton ref={ref} animation={animation} {...props} />
+  }
+)
 
 Skeleton.displayName = 'Skeleton'
