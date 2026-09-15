@@ -54,7 +54,6 @@ export function BasicoLayoutHome({
           interactive={interactive}
           catalogRootRef={catalogRootRef}
           onBuscaChange={onBuscaChange}
-          onGrupoClick={onGrupoClick}
         />
         <div className="flex-1">
           {filtered.grupos.map((grupo, index) => (
