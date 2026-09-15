@@ -144,6 +144,8 @@ export function useNovoPedidoOrchestrator({
     setBuscaProdutoTexto,
     seletorClienteOpen,
     setSeletorClienteOpen,
+    abrirCadastroRapidoEntregaPedido,
+    setAbrirCadastroRapidoEntregaPedido,
     tooltipGrupoId,
     setTooltipGrupoId,
     tooltipPosition,
@@ -1091,6 +1093,7 @@ export function useNovoPedidoOrchestrator({
     setUnidadeMedidaEdicao,
     setOrigem,
     setSeletorClienteOpen,
+    setAbrirCadastroRapidoEntregaPedido,
     setStatus,
     setTaxaEntregaId,
     setTelefoneBuscadoEntrega,
@@ -1138,6 +1141,7 @@ export function useNovoPedidoOrchestrator({
     quantidadeEdicao,
     unidadeMedidaEdicao,
     seletorClienteOpen,
+    abrirCadastroRapidoEntregaPedido,
   })
 
   const shell: NovoPedidoShellProps = {

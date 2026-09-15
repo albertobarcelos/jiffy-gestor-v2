@@ -30,7 +30,6 @@ import {
   useEscolherTipoProdutoCadastro,
 } from '@/src/presentation/components/features/produtos/EscolherTipoProdutoModal'
 import { CatalogGroupedList } from '@/src/presentation/components/features/catalogo/CatalogGroupedList'
-import { CatalogProductColumnHeader } from '@/src/presentation/components/features/catalogo/CatalogProductColumnHeader'
 import type { CatalogGroup } from '@/src/presentation/components/features/catalogo/types'
 import { MenuProdutoCatalogRow } from './MenuProdutoCatalogRow'
 import { MENU_MODAL_CANCEL_VARIANT } from './menuPanelConstants'
@@ -93,7 +92,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     enabled: addOpen,
   })
   const { data: gruposComplementos = [], isLoading: isLoadingGruposComplementos } =
-    useGruposComplementos({ limit: 100, ativo: null })
+    useGruposComplementos({ limit: 100, ativo: true })
   const invalidate = useInvalidateTenantQueries()
 
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
@@ -141,6 +140,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   const gruposDoMenu = useMemo(() => {
     const map = new Map<string, { id: string; nome: string }>()
     for (const grupo of grupos) {
+      if (grupo.grupoBase.ativo === false) continue
       const id = grupo.grupoBase.id
       if (!map.has(id)) {
         map.set(id, { id, nome: grupo.nome || grupo.grupoBase.nome })
@@ -493,7 +493,6 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
       />
 
       <div className="mt-2 flex min-h-0 flex-1 flex-col px-1">
-        <CatalogProductColumnHeader variant="menu" className="shrink-0" />
         <div className="min-h-0 flex-1">
         <CatalogGroupedList
           virtualize

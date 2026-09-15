@@ -3,6 +3,10 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { showToast } from '@/src/shared/utils/toast'
 import {
+  notificarEnderecoForaDaCobertura,
+  useHrefCoberturaEntregaPedido,
+} from '../../utils/coberturaEntregaPedidoUi'
+import {
   validarInformacoesPedido as validarInformacoesPedidoEntrega,
 } from '../useNovoPedidoSubmit'
 import type { PagamentoSelecionado, ProdutoSelecionado } from '../../types'
@@ -57,6 +61,7 @@ export function useNovoPedidoNavegacao({
   modoEdicaoProdutos,
   preservarRascunhoAoFechar = false,
 }: UseNovoPedidoNavegacaoParams) {
+  const hrefCoberturaEntrega = useHrefCoberturaEntregaPedido()
   const [modalConfirmacaoSaidaOpen, setModalConfirmacaoSaidaOpen] = useState(false)
   const [internalDialogOpen, setInternalDialogOpen] = useState(open)
   const ignorarBackdropAteRef = useRef(0)
@@ -100,7 +105,13 @@ export function useNovoPedidoNavegacao({
         enderecoEntregaCoberturaStatus,
         taxaEntregaOverride,
         exibirToast,
-        onError: showToast.error,
+        onError: message => {
+          if (enderecoEntregaCoberturaStatus === 'fora') {
+            notificarEnderecoForaDaCobertura(hrefCoberturaEntrega)
+            return
+          }
+          showToast.error(message)
+        },
       }),
     [
       pedidoDeliveryGestor,
@@ -111,6 +122,7 @@ export function useNovoPedidoNavegacao({
       enderecoEntregaTemGeo,
       enderecoEntregaCoberturaStatus,
       taxaEntregaOverride,
+      hrefCoberturaEntrega,
     ]
   )
 

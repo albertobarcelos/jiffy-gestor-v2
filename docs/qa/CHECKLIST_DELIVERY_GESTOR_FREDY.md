@@ -95,7 +95,7 @@ Passos: **1 Produtos → 2 Informações → 3 Pagamento**.
 - [ ] Com cliente cadastrado: lista moradas; dá para selecionar, editar, excluir e **adicionar novo endereço**.
 - [ ] Novo endereço exige geolocalização (mapa / pin). Sem geo, não cotar taxa automática.
 - [ ] Endereço **dentro** da cobertura: tempo previsto visível no cartão (ex.: ~45 min) **não é a taxa**.
-- [ ] Endereço **fora** da cobertura: taxa automática indica **fora da cobertura**; dá para escolher outra taxa ou não avançar conforme regra.
+- [ ] Endereço **fora** da cobertura: **não** avança para Pagamento; aviso com botão **Configurar cobertura** (abre em nova aba). Escolher outra taxa **não** libera o passo.
 - [ ] Tempo previsto (select 30/45/…) é independente da taxa.
 
 ### 3.3 Taxa automática (passo 2) — regressão crítica
@@ -254,7 +254,7 @@ Não é o foco, mas quebra operação se falhar.
 | N2 | Entrega sem endereço | Bloqueia | [ ] |
 | N3 | Endereço sem geo + taxa automática | Não calcula; recotar avisa | [ ] |
 | N4 | Taxa automática em timeout | “não calculou” + Buscar de novo | [ ] |
-| N5 | Fora da cobertura | “fora da cobertura”; não afirma taxa | [ ] |
+| N5 | Fora da cobertura | Não avança; aviso + botão Configurar cobertura (nova aba) | [ ] |
 | N6 | Despachar entrega sem motoboy | Painel de entregador, não avança | [ ] |
 | N7 | Finalizar com cobrança em aberto | Pede confirmar pagamento | [ ] |
 | N8 | Editar produtos em Em rota | Bloqueado | [ ] |

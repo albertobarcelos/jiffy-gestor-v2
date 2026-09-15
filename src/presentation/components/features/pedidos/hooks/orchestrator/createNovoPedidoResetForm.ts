@@ -88,6 +88,7 @@ export function createNovoPedidoResetForm({
     setValorUnitarioEdicaoPainel('')
     form.setValorFinalVenda(null)
     form.setSeletorClienteOpen(false)
+    form.setAbrirCadastroRapidoEntregaPedido(0)
     setModalConfirmacaoSaidaOpen(false)
     form.setDataFinalizacaoCarregada(null)
     form.setVendaGestorJaCancelada(false)

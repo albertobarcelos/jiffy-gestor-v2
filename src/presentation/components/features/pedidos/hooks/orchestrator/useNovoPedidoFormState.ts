@@ -34,6 +34,8 @@ export function useNovoPedidoFormState(tipoInicioPedido: 'balcao' | 'entrega') {
   const [grupoSelecionadoId, setGrupoSelecionadoId] = useState<string | null>(null)
   const [buscaProdutoTexto, setBuscaProdutoTexto] = useState<string>('')
   const [seletorClienteOpen, setSeletorClienteOpen] = useState(false)
+  /** Incrementado pelo botão Novo Cliente do seletor — abre o mesmo painel de “Cadastrar”. */
+  const [abrirCadastroRapidoEntregaPedido, setAbrirCadastroRapidoEntregaPedido] = useState(0)
   const [tooltipGrupoId, setTooltipGrupoId] = useState<string | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null)
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1)
@@ -108,6 +110,8 @@ export function useNovoPedidoFormState(tipoInicioPedido: 'balcao' | 'entrega') {
     setBuscaProdutoTexto,
     seletorClienteOpen,
     setSeletorClienteOpen,
+    abrirCadastroRapidoEntregaPedido,
+    setAbrirCadastroRapidoEntregaPedido,
     tooltipGrupoId,
     setTooltipGrupoId,
     tooltipPosition,
