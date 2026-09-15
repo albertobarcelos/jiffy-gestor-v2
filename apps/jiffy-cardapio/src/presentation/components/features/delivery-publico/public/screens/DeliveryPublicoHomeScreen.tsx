@@ -523,11 +523,13 @@ function DeliveryPublicoHomeContent({
 
   return (
     <>
+      {/* interactive permanece true no fly-to-cart: desligar some o "+" e troca o
+          layout do card (fonte/padding), fazendo o texto saltar. Bloqueio fica no overlay. */}
       <LayoutHome
         config={config}
         viewModel={viewModel}
         enderecoTexto={enderecoTexto}
-        interactive={!bloquearUiFlyToCart}
+        interactive
         onBuscaChange={onBuscaChange}
         onGrupoClick={onGrupoClick}
         onProdutoClick={onProdutoClick}

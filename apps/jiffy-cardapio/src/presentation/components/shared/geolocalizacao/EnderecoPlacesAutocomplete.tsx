@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { MapPin, Search, X } from 'lucide-react'
-import { useLocaleUppercaseInputHandler } from '@/src/presentation/hooks/useLocaleUppercaseInputHandler'
+import { useBuscaEnderecoPlacesInputHandler } from '@/src/presentation/hooks/useBuscaEnderecoPlacesInputHandler'
 import {
   buscarPlaceDetails,
   buscarPlacesAutocomplete,
@@ -13,6 +13,7 @@ import {
 } from '@/src/shared/utils/geolocalizacaoPlaces'
 import { cn } from '@/src/shared/utils/cn'
 import { maiusculasEnderecoInput } from '@/src/shared/utils/normalizarTextoEnderecoPublico'
+import { resolverModoMascaraBuscaEnderecoPlaces } from '@/src/shared/utils/buscaEnderecoPlacesInput'
 
 export type EnderecoPlacesAutocompleteVariant = 'delivery' | 'gestor'
 
@@ -165,8 +166,14 @@ export function EnderecoPlacesAutocomplete({
     [onChange, dispararBusca]
   )
 
-  const { inputRef: uppercaseInputRef, handleChange: handleUppercaseChange } =
-    useLocaleUppercaseInputHandler(value, propagarValorInput)
+  const { inputRef: buscaInputRef, handleChange: handleBuscaChange } =
+    useBuscaEnderecoPlacesInputHandler(value, propagarValorInput, {
+      upperCaseLivre: delivery,
+    })
+
+  const modoBusca = resolverModoMascaraBuscaEnderecoPlaces(value)
+  const inputMode = modoBusca === 'cep' ? 'numeric' : 'text'
+  const autoCompleteAttr = modoBusca === 'cep' ? 'postal-code' : 'off'
 
   const limparBusca = () => {
     if (disabled || loadingDetails) return
@@ -265,7 +272,8 @@ export function EnderecoPlacesAutocomplete({
           <input
             type="text"
             role="combobox"
-            ref={delivery ? uppercaseInputRef : undefined}
+            ref={buscaInputRef}
+            inputMode={inputMode}
             aria-expanded={aberto}
             aria-controls={listId}
             aria-autocomplete="list"
@@ -277,9 +285,7 @@ export function EnderecoPlacesAutocomplete({
             disabled={disabled || loadingDetails}
             placeholder={placeholder}
             value={value}
-            onChange={
-              delivery ? handleUppercaseChange : event => propagarValorInput(event.target.value)
-            }
+            onChange={handleBuscaChange}
             onFocus={() => {
               if (predictions.length > 0) setAberto(true)
             }}
@@ -296,7 +302,7 @@ export function EnderecoPlacesAutocomplete({
                 ? { borderColor: 'var(--delivery-border)', ...inputStyle }
                 : inputStyle
             }
-            autoComplete="off"
+            autoComplete={autoCompleteAttr}
           />
           {busy ? (
             <span
