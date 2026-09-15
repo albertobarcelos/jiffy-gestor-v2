@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useId, useRef, useState } from 'react'
-import { Info, Menu, ShoppingCart, X } from 'lucide-react'
+import { ClipboardList, Info, Menu, ShoppingCart, X } from 'lucide-react'
 import { DeliveryStatusHorario } from '../../../shared/components/DeliveryStatusHorario'
 import type { DeliveryPublicoDesignConfig } from '../../../shared/types/deliveryPublicoDesignConfig'
 
@@ -13,6 +13,7 @@ type DeliveryBasicoTopNavProps = {
   statusDetalheHorario?: string | null
   interactive?: boolean
   onPedidoClick?: () => void
+  onMeuPedidoClick?: () => void
   onInformacoesClick?: () => void
 }
 
@@ -25,6 +26,7 @@ export function DeliveryBasicoTopNav({
   statusDetalheHorario = null,
   interactive = false,
   onPedidoClick,
+  onMeuPedidoClick,
   onInformacoesClick,
 }: DeliveryBasicoTopNavProps) {
   const nomeLoja = config.cabecalho.nomeExibicao.trim() || 'Sua loja'
@@ -64,7 +66,7 @@ export function DeliveryBasicoTopNav({
 
   return (
     <header
-      className="delivery-basico-topnav relative z-10 flex items-center gap-2 px-3 py-2.5 @sm:gap-2.5 @sm:px-4 @sm:py-3"
+      className="delivery-basico-topnav relative z-50 flex items-center gap-2 px-3 py-2.5 @sm:gap-2.5 @sm:px-4 @sm:py-3"
       style={{
         backgroundColor: 'var(--delivery-primary-dark, #171717)',
         color: 'var(--delivery-btn-text, #ffffff)',
@@ -160,10 +162,25 @@ export function DeliveryBasicoTopNav({
                 <ShoppingCart className="h-4 w-4 shrink-0" aria-hidden />
                 <span className="min-w-0 flex-1">Carrinho</span>
                 {carrinhoQuantidade > 0 ? (
-                  <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                  <span className="inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold leading-none text-white">
                     {carrinhoQuantidade > 99 ? '99+' : carrinhoQuantidade}
                   </span>
                 ) : null}
+              </button>
+              <div
+                className="h-px"
+                style={{ backgroundColor: 'var(--delivery-border, #e5e7eb)' }}
+                aria-hidden
+              />
+              <button
+                type="button"
+                role="menuitem"
+                className="flex w-full items-center gap-2.5 px-3.5 py-3 text-left text-sm font-medium transition-colors hover:bg-black/5"
+                style={{ color: 'var(--delivery-text-primary, #171717)' }}
+                onClick={() => fecharEExecutar(onMeuPedidoClick)}
+              >
+                <ClipboardList className="h-4 w-4 shrink-0" aria-hidden />
+                Meu pedido
               </button>
               <div
                 className="h-px"

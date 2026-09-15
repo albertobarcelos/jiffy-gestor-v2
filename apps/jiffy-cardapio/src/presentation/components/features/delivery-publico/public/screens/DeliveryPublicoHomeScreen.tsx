@@ -66,7 +66,10 @@ import { buildCarrinhoThumbsFromItens } from '../../shared/utils/buildCarrinhoTh
 import {
   deliveryPublicoCarrinhoPath,
   deliveryPublicoHomePath,
+  deliveryPublicoPedidoPath,
 } from '../../shared/utils/deliveryPublicoRoutes'
+import { lerUltimoPedidoPublicoConfirmado } from '../../shared/utils/pedidoConfirmadoStorage'
+import { showToast } from '@/src/shared/utils/toast'
 
 type DeliveryPublicoHomeScreenProps = {
   slug: string
@@ -360,6 +363,15 @@ export function DeliveryPublicoHomeScreen({
     abrirCarrinho()
   }, [abrirCarrinho])
 
+  const handleMeuPedidoClick = useCallback(() => {
+    const ultimo = lerUltimoPedidoPublicoConfirmado(slug)
+    if (!ultimo) {
+      showToast.info('Nenhum pedido recente neste dispositivo.')
+      return
+    }
+    router.push(deliveryPublicoPedidoPath(slug, ultimo.codigo))
+  }, [router, slug])
+
   const handleIrParaCarrinhoAposAdicionar = useCallback(() => {
     abrirCarrinho()
   }, [abrirCarrinho])
@@ -399,6 +411,7 @@ export function DeliveryPublicoHomeScreen({
         onProdutoClick={handleProdutoClick}
         onProdutoAddRapido={handleProdutoAddRapido}
         onPedidoClick={handlePedidoClick}
+        onMeuPedidoClick={handleMeuPedidoClick}
         onCloseProduto={handleCloseProduto}
         onProdutoAdicionado={handleProdutoAdicionado}
         produtoAdicionadoNome={produtoAdicionadoNome}
@@ -443,6 +456,7 @@ type DeliveryPublicoHomeContentProps = {
   onProdutoClick: (produtoId: string) => void
   onProdutoAddRapido: (produtoId: string) => void
   onPedidoClick: () => void
+  onMeuPedidoClick: () => void
   onCloseProduto: () => void
   onProdutoAdicionado: (payload: ProdutoAdicionadoPayload) => void
   produtoAdicionadoNome: string | null
@@ -472,6 +486,7 @@ function DeliveryPublicoHomeContent({
   onProdutoClick,
   onProdutoAddRapido,
   onPedidoClick,
+  onMeuPedidoClick,
   onCloseProduto,
   onProdutoAdicionado,
   produtoAdicionadoNome,
@@ -520,6 +535,7 @@ function DeliveryPublicoHomeContent({
         onProdutoClick={onProdutoClick}
         onProdutoAddRapido={onProdutoAddRapido}
         onPedidoClick={onPedidoClick}
+        onMeuPedidoClick={onMeuPedidoClick}
         onInformacoesClick={() => setLojaInfoOpen(true)}
         quantidadePorProduto={quantidadePorProduto}
         carrinhoThumbs={carrinhoThumbs}

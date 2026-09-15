@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
+import { useRouter } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
 import { MdClose } from 'react-icons/md'
 import {
@@ -32,6 +33,8 @@ import { itemSemComplemento } from '../../shared/utils/deliveryCarrinhoItemUtils
 import { formatEmpresaPublicaEndereco } from '../../shared/utils/formatEmpresaPublicaEndereco'
 import { formatDeliveryCurrency } from '../../shared/utils/formatDeliveryCurrency'
 import { isTokenCotacaoExpirado } from '../../shared/utils/deliveryCheckoutCotacaoUtils'
+import { deliveryPublicoPedidoPath } from '../../shared/utils/deliveryPublicoRoutes'
+import { salvarPedidoPublicoConfirmado } from '../../shared/utils/pedidoConfirmadoStorage'
 import { useLocalizacaoEmpresaPublica } from '../../shared/hooks/useLocalizacaoEmpresaPublica'
 import { DeliveryProdutoModal } from '../components/DeliveryProdutoModal'
 import { DeliveryCheckoutFooterActions } from '../components/checkout/DeliveryCheckoutFooterActions'
@@ -135,6 +138,7 @@ export function DeliveryPublicoCarrinhoScreen({
   lojaAberta = true,
   onClose,
 }: DeliveryPublicoCarrinhoScreenProps) {
+  const router = useRouter()
   const atualizarQuantidade = useDeliveryCarrinhoStore(s => s.atualizarQuantidade)
   const removerItem = useDeliveryCarrinhoStore(s => s.removerItem)
   const substituirItem = useDeliveryCarrinhoStore(s => s.substituirItem)
@@ -441,9 +445,30 @@ export function DeliveryPublicoCarrinhoScreen({
       return
     }
 
-    setPedidoConfirmado(mapPedidoPublicoCriadoParaConfirmado(resultado.pedido, fallback))
-    marcarSucesso()
+    const snapshot = mapPedidoPublicoCriadoParaConfirmado(resultado.pedido, fallback)
+    const codigoRota =
+      snapshot.codigoVenda?.trim() || snapshot.pedidoId?.trim() || ''
+
     limparCarrinhoAposPedido()
+
+    if (codigoRota) {
+      salvarPedidoPublicoConfirmado(slug, codigoRota, {
+        snapshot,
+        meta: {
+          telefoneEmpresa: empresa?.telefone ?? null,
+          nomeEmpresa: empresa?.nomeFantasia ?? null,
+          localizacaoEmpresa,
+        },
+      })
+      // Não fecha o checkout aqui: o clique de "enviar" ainda está no ar e
+      // fecharia a tela de sucesso na rota nova. replace evita voltar ao checkout vazio.
+      router.replace(deliveryPublicoPedidoPath(slug, codigoRota))
+      return
+    }
+
+    // Fallback raro: API sem id/código — mantém modal no checkout.
+    setPedidoConfirmado(snapshot)
+    marcarSucesso()
   }
 
   const handleConfirmarCotacaoDesatualizada = async () => {

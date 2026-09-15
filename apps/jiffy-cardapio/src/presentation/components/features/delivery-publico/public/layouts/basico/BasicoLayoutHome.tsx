@@ -21,6 +21,7 @@ export function BasicoLayoutHome({
   onProdutoClick,
   onProdutoAddRapido,
   onPedidoClick,
+  onMeuPedidoClick,
   onInformacoesClick,
   quantidadePorProduto,
   carrinhoThumbs,
@@ -40,6 +41,7 @@ export function BasicoLayoutHome({
         statusDetalheHorario={viewModel.statusDetalheHorario}
         interactive={interactive}
         onPedidoClick={onPedidoClick}
+        onMeuPedidoClick={onMeuPedidoClick}
         onInformacoesClick={onInformacoesClick}
       />
 
