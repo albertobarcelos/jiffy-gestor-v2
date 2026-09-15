@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { AtualizarStatusProdutoUseCase } from '@/src/application/use-cases/produtos/AtualizarStatusProdutoUseCase'
+import { ExcluirProdutoUseCase } from '@/src/application/use-cases/produtos/ExcluirProdutoUseCase'
 import { ProdutoRepository } from '@/src/infrastructure/database/repositories/ProdutoRepository'
-import { ApiClient } from '@/src/infrastructure/api/apiClient'
+import { ApiClient, ApiError, mensagemLegivelApiError } from '@/src/infrastructure/api/apiClient'
 import { getTokenInfo } from '@/src/shared/utils/getTokenInfo'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 
@@ -120,5 +121,40 @@ export async function PATCH(
       { message: error.message || 'Erro interno do servidor' },
       { status: error.status || 500 }
     )
+  }
+}
+
+/**
+ * DELETE - Exclui o produto do cadastro base
+ */
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const validation = validateRequest(req)
+    if (!validation.valid || !validation.tokenInfo) {
+      return validation.error || NextResponse.json({ message: 'Token inválido ou expirado' }, { status: 401 })
+    }
+
+    const { id } = await params
+    if (!id?.trim()) {
+      return NextResponse.json({ message: 'ID inválido' }, { status: 400 })
+    }
+
+    const apiClient = new ApiClient()
+    const produtoRepository = new ProdutoRepository(apiClient, validation.tokenInfo.token)
+    const excluirProdutoUseCase = new ExcluirProdutoUseCase(produtoRepository)
+    await excluirProdutoUseCase.execute(id)
+
+    return new NextResponse(null, { status: 204 })
+  } catch (error: unknown) {
+    console.error('Erro na API de exclusão de produto:', error)
+    if (error instanceof ApiError) {
+      const status = error.status >= 400 && error.status < 600 ? error.status : 500
+      return NextResponse.json({ message: mensagemLegivelApiError(error) }, { status })
+    }
+    const message = error instanceof Error ? error.message : 'Erro ao excluir produto'
+    return NextResponse.json({ message }, { status: 500 })
   }
 }

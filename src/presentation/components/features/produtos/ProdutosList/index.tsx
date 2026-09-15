@@ -11,6 +11,9 @@ import { useProdutoPatchMutation, isSavingOf } from '@/src/presentation/hooks/us
 import { usePropagarAlteracaoProduto } from '@/src/presentation/hooks/produtos/usePropagarAlteracaoProduto'
 import { useProdutosFilters } from '@/src/presentation/hooks/useProdutosFilters'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
+import { showToast } from '@/src/shared/utils/toast'
+import { CATALOGO_PRODUTOS_INDEX_QUERY_KEY } from '@/src/presentation/hooks/produtos/useProdutosCodigoPorId'
 import { syncCadastroComMenuPrincipalAtivo } from '@/src/domain/policies/produto/syncCadastroComMenuPrincipal'
 import { buscarIdMenuPrincipal } from '@/src/presentation/utils/uploadImagemProdutoMenus'
 import { useIsMobile } from '@/src/presentation/hooks/useIsMobile'
@@ -26,6 +29,7 @@ import { ProdutoNovoWizard } from '../ProdutoNovoWizard'
 import { ProdutosHeader } from './ProdutosHeader'
 import { ProdutosFilters } from './ProdutosFilters'
 import { ProdutoListItem } from './ProdutoListItem'
+import { ProdutoExcluirConfirmDialog } from './ProdutoExcluirConfirmDialog'
 import { CatalogProductColumnHeader } from '@/src/presentation/components/features/catalogo/CatalogProductColumnHeader'
 
 import { Produto } from '@/src/domain/entities/Produto'
@@ -61,7 +65,7 @@ export function ProdutosList() {
   const pathname = usePathname()
   const isMobile = useIsMobile()
 
-  const { state: filters, actions, queryParams, filterStatus } = useProdutosFilters()
+  const { state: filters, actions, queryParams } = useProdutosFilters()
 
   // Sempre inicia como `false` para coincidir com o SSR; corrigido após hidratação via useIsMobile.
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(false)
@@ -96,7 +100,9 @@ export function ProdutosList() {
   const patchMutation = useProdutoPatchMutation()
   const tipoCadastro = useEscolherTipoProdutoCadastro()
   const [wizardOpen, setWizardOpen] = useState(false)
-  const { pedirConfirmacao, aplicarNosDestinos, dialog: dialogPropagacao } =
+  const [produtoParaExcluir, setProdutoParaExcluir] = useState<Produto | null>(null)
+  const [excluindoProduto, setExcluindoProduto] = useState(false)
+  const { aplicarNosDestinos, dialog: dialogPropagacao } =
     usePropagarAlteracaoProduto()
 
   const { data: gruposProdutos = [], isLoading: isLoadingGruposProdutos } = useGruposProdutos({ limit: 100, ativo: null })
@@ -297,28 +303,77 @@ export function ProdutosList() {
     })
   }, [queryClient, empresaId, updateProdutoInCache])
 
-  const handleStatusToggle = useCallback(async (produtoId: string, novoStatus: boolean) => {
-    const destinos = await pedirConfirmacao({
-      origem: 'cadastroBase',
-      produtoId,
-      variante: 'statusAtivo',
-      novoAtivo: novoStatus,
-    })
-    if (destinos === null) return
-    patchMutation.mutate(
-      { type: 'status', produtoId, novoStatus, filterStatus },
-      {
-        onSuccess: () => {
-          if (destinos.menuIds.length === 0) return
-          void aplicarNosDestinos({
-            produtoId,
-            snapshot: { ativo: novoStatus },
-            destinos: { aplicarNoCadastroBase: false, menuIds: destinos.menuIds },
-          })
-        },
+  const handleExcluirProduto = useCallback((produtoId: string) => {
+    const produto = produtos.find(p => p.getId() === produtoId)
+    if (!produto) return
+    setProdutoParaExcluir(produto)
+  }, [produtos])
+
+  const fecharExclusaoProduto = useCallback(() => {
+    if (excluindoProduto) return
+    setProdutoParaExcluir(null)
+  }, [excluindoProduto])
+
+  const confirmarExclusaoProduto = useCallback(async () => {
+    const produto = produtoParaExcluir
+    if (!produto || excluindoProduto) return
+
+    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+    if (!token) {
+      showToast.error('Sessão inválida. Faça login novamente.')
+      return
+    }
+
+    setExcluindoProduto(true)
+    const produtoId = produto.getId()
+    try {
+      const res = await fetchGestorApi(`/api/produtos/${encodeURIComponent(produtoId)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (res.status !== 204 && !res.ok) {
+        const err = await res.json().catch(() => ({}))
+        const msg =
+          (typeof err.message === 'string' && err.message) ||
+          (typeof err.error === 'string' && err.error) ||
+          'Erro ao excluir produto.'
+        throw new Error(msg)
       }
-    )
-  }, [patchMutation, filterStatus, pedirConfirmacao, aplicarNosDestinos])
+
+      if (empresaId) {
+        queryClient.setQueriesData<InfinitePagesData>(
+          { queryKey: ['tenant', empresaId, 'produtos', 'infinite'], exact: false },
+          oldData => {
+            if (!oldData?.pages) return oldData
+            return {
+              ...oldData,
+              pages: oldData.pages.map(page => ({
+                ...page,
+                produtos: page.produtos.filter(p => p.getId() !== produtoId),
+                count: typeof page.count === 'number' ? Math.max(0, page.count - 1) : page.count,
+              })),
+            }
+          }
+        )
+        void queryClient.invalidateQueries({
+          queryKey: ['tenant', empresaId, ...CATALOGO_PRODUTOS_INDEX_QUERY_KEY],
+          exact: false,
+        })
+        void queryClient.invalidateQueries({
+          queryKey: ['tenant', empresaId, 'menu-produtos'],
+          exact: false,
+        })
+      }
+
+      showToast.success('Produto excluído.')
+      setProdutoParaExcluir(null)
+    } catch (e) {
+      showToast.error(e instanceof Error ? e.message : 'Erro ao excluir produto.')
+    } finally {
+      setExcluindoProduto(false)
+    }
+  }, [produtoParaExcluir, excluindoProduto, empresaId, queryClient])
 
   const aplicarSnapshotNoMenuPrincipal = useCallback(
     async (produtoId: string, snapshot: { favorito?: boolean; valor?: number }) => {
@@ -416,7 +471,7 @@ export function ProdutosList() {
       <div
         ref={scrollContainerRef}
         onScroll={handleListScroll}
-        className="mt-2 min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-1 scrollbar-hide [&.produtos-list-scrolling]:[&_*]:hover:!bg-white"
+        className="mt-2 min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-1 scrollbar-thin [&.produtos-list-scrolling]:[&_*]:hover:!bg-white"
       >
         {showInitialLoading ? (
           <div className="flex flex-col items-center justify-center gap-2 py-12">
@@ -440,11 +495,10 @@ export function ProdutosList() {
                   gruposProdutos={gruposProdutos}
                   isLoadingGruposProdutos={isLoadingGruposProdutos}
                   isSavingValor={isSavingOf(patchMutation, produto.getId(), 'valor')}
-                  isSavingStatus={isSavingOf(patchMutation, produto.getId(), 'status')}
                   isSavingNome={isSavingOf(patchMutation, produto.getId(), 'nome')}
                   isSavingGrupo={isSavingOf(patchMutation, produto.getId(), 'grupo')}
                   onValorChange={handleValorChange}
-                  onSwitchToggle={handleStatusToggle}
+                  onRemove={handleExcluirProduto}
                   onToggleBoolean={handleToggleBooleanField}
                   onEditProduto={handleEditProduto}
                   onCopyProduto={handleCopyProduto}
@@ -480,6 +534,13 @@ export function ProdutosList() {
         onTabChange={(tab) => setTabsModalState((prev) => ({ ...prev, tab }))}
       />
       {dialogPropagacao}
+      <ProdutoExcluirConfirmDialog
+        open={Boolean(produtoParaExcluir)}
+        nomeProduto={produtoParaExcluir?.getNome() ?? ''}
+        busy={excluindoProduto}
+        onClose={fecharExclusaoProduto}
+        onConfirm={() => void confirmarExclusaoProduto()}
+      />
     </div>
   )
 }
