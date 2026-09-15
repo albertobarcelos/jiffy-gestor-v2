@@ -20,6 +20,7 @@ import { useSecureTenantInfiniteQuery } from '@/src/presentation/hooks/useSecure
 import { buildTenantQueryKey } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { preservarObservacoesKanbanCacheNosItems } from '../utils/kanbanVendaCacheUpdate'
+import { qListagemDeliveryKanban } from '../rules/vendasKanban.rules'
 import {
   flattenVendasUnificadasInfinite,
   getNextOffsetVendasUnificadas,
@@ -68,7 +69,7 @@ export function vendasUnificadasQueryParamsParaPedidosDelivery(
       : undefined
 
   return {
-    q: params.q,
+    q: qListagemDeliveryKanban(params.q),
     origemFiltroKanban,
     tipoEntrega,
     dataCriacaoInicial: params.dataCriacaoInicial ?? params.periodoInicial,

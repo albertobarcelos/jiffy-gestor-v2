@@ -2,13 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { MdAccessTime, MdPowerSettingsNew, MdSave } from 'react-icons/md'
+import { MdAccessTime, MdSave } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import {
   useFuncionamentoDelivery,
   useSubstituirAgendaFuncionamento,
-  useToggleFuncionamentoManual,
 } from '@/src/presentation/hooks/useFuncionamentoDelivery'
 import { showToast } from '@/src/shared/utils/toast'
 import { configuracoesTabPath } from '@/src/shared/constants/configuracoesRoutes'
@@ -17,11 +16,9 @@ import {
   criarFormAgendaPadrao,
   formAgendaParaRequest,
   LABEL_DIA_DA_SEMANA,
-  LABEL_MOTIVO_DISPONIBILIDADE,
   listarHorariosFuncionamento15Min,
   type DiaAgendaFormState,
 } from '@/src/shared/utils/funcionamentoDelivery'
-import { cn } from '@/src/shared/utils/cn'
 
 type FuncionamentoDeliverySectionProps = {
   empresaDeliveryConfigurada: boolean
@@ -39,7 +36,6 @@ export function FuncionamentoDeliverySection({
     enabled: empresaDeliveryConfigurada,
   })
   const substituirMutation = useSubstituirAgendaFuncionamento()
-  const toggleMutation = useToggleFuncionamentoManual()
 
   const [dias, setDias] = useState<DiaAgendaFormState[]>(() => criarFormAgendaPadrao())
   const [abreAutomaticamente, setAbreAutomaticamente] = useState(true)
@@ -82,19 +78,7 @@ export function FuncionamentoDeliverySection({
     }
   }, [abreAutomaticamente, dias, fechaAutomaticamente, substituirMutation])
 
-  const handleToggleManual = useCallback(async () => {
-    try {
-      const result = await toggleMutation.mutateAsync()
-      showToast.success(result.aberta ? 'Loja aberta manualmente.' : 'Loja fechada manualmente.')
-    } catch (error) {
-      const msg =
-        error instanceof Error ? error.message : 'Não foi possível alterar o status da loja.'
-      showToast.error(msg)
-    }
-  }, [toggleMutation])
-
   const salvando = substituirMutation.isPending
-  const alternando = toggleMutation.isPending
   const carregando = funcionamentoQuery.isPending && empresaDeliveryConfigurada
 
   if (!empresaDeliveryConfigurada) {
@@ -140,11 +124,6 @@ export function FuncionamentoDeliverySection({
     )
   }
 
-  const aberta = funcionamento?.aberta ?? true
-  const motivoLabel = funcionamento?.motivo
-    ? LABEL_MOTIVO_DISPONIBILIDADE[funcionamento.motivo]
-    : null
-
   return (
     <section id="empresa-delivery-agenda" className={AGENDA_CARD_CLASS}>
       <AgendaHeader compact />
@@ -161,37 +140,6 @@ export function FuncionamentoDeliverySection({
           antes de salvar a agenda.
         </div>
       ) : null}
-
-      <div className="mt-3 flex flex-col gap-2 rounded-lg border border-gray-100 bg-gray-50 p-2.5 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <span
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold',
-                aberta ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-700'
-              )}
-            >
-              <span
-                className={cn('h-1.5 w-1.5 rounded-full', aberta ? 'bg-green-500' : 'bg-gray-400')}
-                aria-hidden
-              />
-              {aberta ? 'Aberta agora' : 'Fechada agora'}
-            </span>
-          </div>
-          {motivoLabel ? (
-            <p className="mt-0.5 text-[11px] leading-tight text-secondary-text">{motivoLabel}</p>
-          ) : null}
-        </div>
-        <button
-          type="button"
-          onClick={() => void handleToggleManual()}
-          disabled={alternando || salvando}
-          className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-secondary px-2.5 text-xs font-semibold text-secondary transition-colors hover:bg-secondary/10 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <MdPowerSettingsNew className="h-3.5 w-3.5" aria-hidden />
-          {alternando ? 'Alterando...' : aberta ? 'Fechar loja agora' : 'Abrir loja agora'}
-        </button>
-      </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
         <JiffyIconSwitch
@@ -282,7 +230,7 @@ export function FuncionamentoDeliverySection({
         <button
           type="button"
           onClick={() => void handleSalvar()}
-          disabled={salvando || alternando}
+          disabled={salvando}
           className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-secondary px-4 text-xs font-semibold text-white transition-colors hover:bg-secondary/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <MdSave className="h-3.5 w-3.5" aria-hidden />

@@ -25,6 +25,7 @@ import {
   formatarValorComplemento,
   obterTotalComplemento,
 } from '@/src/domain/services/pedido/CalculadoraPedido'
+import { resolverMenuCatalogoNovoPedido } from '@/src/domain/policies/pedido/CatalogoVendaPolicy'
 import type { CanalVendaNovoPedido } from '../novoPedidoProdutosApi'
 import { showToast } from '@/src/shared/utils/toast'
 import { useNovoPedidoCatalogoData } from './data/useNovoPedidoCatalogoData'
@@ -89,8 +90,8 @@ export function useNovoPedidoOrchestrator({
   preservarRascunhoAoFechar = false,
   chaveRascunho,
 }: NovoPedidoModalProps) {
-  const { empresa, menuVendaGestorId } = useEmpresaMe()
-  const { menuDeliveryId } = useMenuDeliveryId()
+  const { empresa, menuVendaGestorId, isLoading: empresaMeLoading } = useEmpresaMe()
+  const { menuDeliveryId, isLoading: menuDeliveryLoading } = useMenuDeliveryId()
   const { preferenciasImpressaoDelivery } = usePreferenciasImpressaoDelivery()
   const { processarAposTransicaoVendaGestorId } = useImpressaoDelivery()
   const empresaId = useTenantEmpresaId()
@@ -144,6 +145,8 @@ export function useNovoPedidoOrchestrator({
     setBuscaProdutoTexto,
     seletorClienteOpen,
     setSeletorClienteOpen,
+    abrirCadastroRapidoEntregaPedido,
+    setAbrirCadastroRapidoEntregaPedido,
     tooltipGrupoId,
     setTooltipGrupoId,
     tooltipPosition,
@@ -255,8 +258,13 @@ export function useNovoPedidoOrchestrator({
   const pedidoBalcao = tipoInicioPedido !== 'entrega'
   const canalVendaNovoPedido: CanalVendaNovoPedido =
     tipoInicioPedido === 'entrega' ? 'entrega' : 'balcao'
-  const menuCatalogoId =
-    canalVendaNovoPedido === 'entrega' ? menuDeliveryId : menuVendaGestorId
+  const menuCatalogoId = resolverMenuCatalogoNovoPedido(
+    canalVendaNovoPedido,
+    menuDeliveryId,
+    menuVendaGestorId
+  )
+  const menuIdCarregando =
+    canalVendaNovoPedido === 'entrega' ? menuDeliveryLoading : empresaMeLoading
   /** Balcão e delivery: passo de produtos é sempre o step 1 na criação. */
   const estaNoPassoProdutos = open && !modoVisualizacao && currentStep === 1
 
@@ -296,6 +304,7 @@ export function useNovoPedidoOrchestrator({
     estaNoPassoProdutos,
     token,
     menuId: menuCatalogoId,
+    menuIdCarregando,
     canal: canalVendaNovoPedido,
     grupoSelecionadoId,
     setGrupoSelecionadoId,
@@ -1092,6 +1101,7 @@ export function useNovoPedidoOrchestrator({
     setUnidadeMedidaEdicao,
     setOrigem,
     setSeletorClienteOpen,
+    setAbrirCadastroRapidoEntregaPedido,
     setStatus,
     setTaxaEntregaId,
     setTelefoneBuscadoEntrega,
@@ -1139,6 +1149,7 @@ export function useNovoPedidoOrchestrator({
     quantidadeEdicao,
     unidadeMedidaEdicao,
     seletorClienteOpen,
+    abrirCadastroRapidoEntregaPedido,
   })
 
   const shell: NovoPedidoShellProps = {

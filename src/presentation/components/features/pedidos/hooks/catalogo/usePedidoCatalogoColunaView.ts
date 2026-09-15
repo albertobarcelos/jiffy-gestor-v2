@@ -25,8 +25,8 @@ export function usePedidoCatalogoColunaView(input: {
   const isLoadingCatalogo = input.isLoadingGruposVenda || (podeExibirProdutos && isLoadingAtual)
   const mensagemMenuIndisponivel =
     input.tipoInicioPedido === 'entrega'
-      ? 'Configure o menu em Configurações → Delivery.'
-      : 'Configure o menu em Configurações → Empresa.'
+      ? 'Escolha o cardápio na engrenagem do quadro Delivery.'
+      : 'Escolha o cardápio na engrenagem do quadro Balcão.'
 
   return {
     emBusca,

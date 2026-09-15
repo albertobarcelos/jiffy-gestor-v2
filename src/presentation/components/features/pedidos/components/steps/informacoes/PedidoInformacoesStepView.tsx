@@ -19,6 +19,10 @@ import {
 } from '@/src/shared/constants/taxaEntregaPedido'
 import { useNovoPedidoFormContext } from '../../../context/NovoPedidoFormContext'
 import { useNovoPedidoUIContext } from '../../../context/NovoPedidoUIContext'
+import {
+  AlertaEnderecoForaDaCobertura,
+  useHrefCoberturaEntregaPedido,
+} from '../../../utils/coberturaEntregaPedidoUi'
 
 export function PedidoInformacoesStepView() {
   const {
@@ -49,8 +53,14 @@ export function PedidoInformacoesStepView() {
     cotacaoTaxaEntregaBuscando,
   } = useNovoPedidoFormContext()
 
-  const { empresa, setSeletorClienteOpen } = useNovoPedidoUIContext()
+  const { empresa, setSeletorClienteOpen, abrirCadastroRapidoEntregaPedido, setAbrirCadastroRapidoEntregaPedido } =
+    useNovoPedidoUIContext()
+  const hrefCoberturaEntrega = useHrefCoberturaEntregaPedido()
   const ultimaMoradaIdRef = useRef<string | null>(null)
+
+  const handleCadastroRapidoPedidoConsumido = useCallback(() => {
+    setAbrirCadastroRapidoEntregaPedido(0)
+  }, [setAbrirCadastroRapidoEntregaPedido])
 
   const resetOverrideSeMudouMorada = useCallback(
     (moradaId: string | undefined) => {
@@ -177,6 +187,8 @@ export function PedidoInformacoesStepView() {
           onClienteVinculado={setClienteEntregaVinculado}
           onAbrirCadastroCliente={handleAbrirEdicaoClienteEntrega}
           onAbrirSeletorCliente={() => setSeletorClienteOpen(true)}
+          abrirCadastroRapidoPedido={abrirCadastroRapidoEntregaPedido}
+          onCadastroRapidoPedidoConsumido={handleCadastroRapidoPedidoConsumido}
           telefoneExibicaoExterno={telefoneBuscaEntrega}
           onTelefoneExibicaoExternoChange={setTelefoneBuscaEntrega}
           digitosUltimaBuscaExterno={telefoneBuscadoEntrega}
@@ -192,6 +204,9 @@ export function PedidoInformacoesStepView() {
             pedidoDeliveryGestor && pedidoComEntrega ? handleCoberturaMoradaChange : undefined
           }
         />
+        {pedidoComEntrega && enderecoEntregaCoberturaStatus === 'fora' ? (
+          <AlertaEnderecoForaDaCobertura href={hrefCoberturaEntrega} />
+        ) : null}
         {pedidoComRetirada ? (
           <div className="mt-3 rounded-lg border border-primary/15 bg-white p-3 text-sm text-secondary-text">
             Pedido configurado para retirada no balcão. Entregador e taxa de entrega não são

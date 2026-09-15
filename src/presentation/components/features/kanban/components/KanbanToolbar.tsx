@@ -10,6 +10,7 @@ import {
   MdSearch,
   MdSettings,
 } from 'react-icons/md'
+import { FredySomPedidosToggle } from '@/src/presentation/gestor-pedidos/som/FredySomPedidosToggle'
 import { KanbanModoVendasToggle, type ModoKanbanVendas } from '../KanbanModoVendasToggle'
 import type {
   ColunaKanbanFiltroExtra,
@@ -21,6 +22,7 @@ import type {
 import type { ModoVisualizacaoKanban } from '../utils/kanbanModoVisualizacao'
 import { KanbanColunasMenu } from './KanbanColunasMenu'
 import { KanbanModoVisualizacaoSelect } from './KanbanModoVisualizacaoSelect'
+import { LojaAbertaToggle } from '@/src/presentation/components/features/delivery/LojaAbertaToggle'
 import type { SuperficieQuadroPedidos } from '@/src/presentation/gestor-pedidos/superficieQuadroPedidos'
 import {
   KANBAN_FILTRO_DATA_PRESET_OPCOES,
@@ -406,6 +408,7 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
           >
             <MdRefresh className={`h-5 w-5 ${refreshSpinning ? 'animate-spin' : ''}`} />
           </button>
+          {noFredy ? <FredySomPedidosToggle /> : null}
           {noFredy ? (
             <KanbanModoVisualizacaoSelect
               value={modoVisualizacao}
@@ -415,12 +418,19 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
           {noFredy ? null : (
             <KanbanModoVendasToggle value={modoKanbanVendas} onChange={onModoKanbanVendasChange} />
           )}
+          {isModoDelivery ? <LojaAbertaToggle /> : null}
           <button
             type="button"
             onClick={onAbrirConfiguracoesDelivery}
             className="rounded-lg border border-gray-200 bg-white p-1.5 text-gray-600 shadow-sm transition-colors hover:bg-gray-50 hover:text-primary"
-            title="Configurações do delivery"
-            aria-label="Abrir configurações do delivery"
+            title={
+              isModoDelivery ? 'Configurações do delivery' : 'Cardápio do balcão'
+            }
+            aria-label={
+              isModoDelivery
+                ? 'Abrir configurações do delivery'
+                : 'Escolher cardápio do balcão'
+            }
           >
             <MdSettings className="h-5 w-5" />
           </button>

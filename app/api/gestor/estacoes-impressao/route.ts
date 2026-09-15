@@ -1,41 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateRequest } from '@/src/shared/utils/validateRequest'
 import { ApiClient, ApiError, mensagemLegivelApiError } from '@/src/infrastructure/api/apiClient'
-import type { EstacaoImpressaoResumo } from '@/src/infrastructure/api/estacoesImpressaoApi'
-
-/** Corpo típico: `{ id, nome, ativo }` ou `{ data: { … } }` (OpenAPI/variações do gateway). */
-function extrairObjetoPayload(raw: unknown): Record<string, unknown> | null {
-  if (!raw || typeof raw !== 'object') return null
-  const o = raw as Record<string, unknown>
-  if (o.data != null && typeof o.data === 'object' && !Array.isArray(o.data)) {
-    return o.data as Record<string, unknown>
-  }
-  return o
-}
-
-function normalizarEstacaoResumo(payload: unknown): EstacaoImpressaoResumo | null {
-  const o = extrairObjetoPayload(payload)
-  if (!o) return null
-  const id = o.id != null ? String(o.id).trim() : ''
-  if (!id) return null
-  const nome = o.nome != null ? String(o.nome) : ''
-  const ativo = typeof o.ativo === 'boolean' ? o.ativo : true
-  return { id, nome, ativo }
-}
-
-function normalizarListaEstacoes(payload: unknown): EstacaoImpressaoResumo[] {
-  let rows: unknown[] | null = null
-  if (Array.isArray(payload)) rows = payload
-  else if (payload && typeof payload === 'object') {
-    const o = payload as Record<string, unknown>
-    const inner = o.items ?? o.data ?? o.results
-    if (Array.isArray(inner)) rows = inner
-  }
-  if (!rows) return []
-  return rows
-    .map(r => normalizarEstacaoResumo(r))
-    .filter((item): item is EstacaoImpressaoResumo => item !== null)
-}
+import {
+  normalizarEstacaoImpressaoResumo,
+  normalizarListaEstacoesImpressao,
+} from '@/src/infrastructure/api/normalizarEstacaoImpressaoResumo'
 
 export async function POST(request: NextRequest) {
   try {
@@ -54,7 +23,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify(body),
     })
 
-    const normalized = normalizarEstacaoResumo(response.data)
+    const normalized = normalizarEstacaoImpressaoResumo(response.data)
     if (!normalized) {
       console.error(
         '[estacoes-impressao] POST upstream sem objeto com id:',
@@ -63,7 +32,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            'A API criou a estação, mas a resposta não trouxe um id utilizável (esperado: { id, nome, ativo } ou { data: { id, nome, ativo } }). Verifique contrato/OpenAPI ou versão do backend.',
+            'A API criou a estação, mas a resposta não trouxe um id utilizável (esperado: { id, nome, ativo, gestorDelivery } ou { data: { … } }). Verifique contrato/OpenAPI ou versão do backend.',
         },
         { status: 502 }
       )
@@ -95,7 +64,7 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    return NextResponse.json(normalizarListaEstacoes(response.data))
+    return NextResponse.json(normalizarListaEstacoesImpressao(response.data))
   } catch (error) {
     console.error('Erro ao listar estações de impressão:', error)
     if (error instanceof ApiError) {

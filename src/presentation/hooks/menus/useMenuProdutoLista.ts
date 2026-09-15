@@ -42,7 +42,7 @@ export function useMenuProdutoLista({
   tipoMenu,
 }: UseMenuProdutoListaParams) {
   const { syncProdutos, updateProduto } = useMenuMutations(menuId)
-  const { codigoPorId, permissoesPorId } = useProdutosCodigoPorId()
+  const { codigoPorId, permissoesPorId, imagemPorId } = useProdutosCodigoPorId()
   const produtoPatch = useProdutoPatchMutation()
   const { pedirConfirmacao, aplicarNosDestinos, dialog: dialogPropagacao } =
     usePropagarAlteracaoProduto()
@@ -216,6 +216,7 @@ export function useMenuProdutoLista({
   return {
     codigoPorId,
     permissoesPorId,
+    imagemPorId,
     savingDaLinha,
     handleNomeChange,
     handleValorChange,

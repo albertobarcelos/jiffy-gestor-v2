@@ -6,7 +6,7 @@ import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import type { CatalogoProdutoListaIndex } from '@/src/shared/utils/menuProdutoPermissoes'
 import type { MenuProdutoPermissoes } from '@/src/shared/utils/menuProdutoPermissoes'
 
-export const CATALOGO_PRODUTOS_INDEX_QUERY_KEY = ['produtos', 'codigos-por-id'] as const
+export const CATALOGO_PRODUTOS_INDEX_QUERY_KEY = ['produtos', 'codigos-por-id', 'v2'] as const
 
 export type { CatalogoProdutoListaIndex }
 
@@ -41,6 +41,7 @@ export function useProdutosCodigoPorId(options?: { enabled?: boolean }) {
         message?: string
         codigos?: Record<string, string>
         permissoes?: Record<string, MenuProdutoPermissoes>
+        imagens?: Record<string, string>
       }
 
       if (data.success === false) {
@@ -50,6 +51,7 @@ export function useProdutosCodigoPorId(options?: { enabled?: boolean }) {
       return {
         codigos: data.codigos ?? {},
         permissoes: data.permissoes ?? {},
+        imagens: data.imagens ?? {},
       }
     },
     {
@@ -76,5 +78,13 @@ export function useProdutosCodigoPorId(options?: { enabled?: boolean }) {
     return map
   }, [query.data?.permissoes])
 
-  return { codigoPorId, permissoesPorId, ...query }
+  const imagemPorId = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const [id, url] of Object.entries(query.data?.imagens ?? {})) {
+      if (url.trim()) map.set(id, url.trim())
+    }
+    return map
+  }, [query.data?.imagens])
+
+  return { codigoPorId, permissoesPorId, imagemPorId, ...query }
 }

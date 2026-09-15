@@ -30,7 +30,6 @@ import {
   useEscolherTipoProdutoCadastro,
 } from '@/src/presentation/components/features/produtos/EscolherTipoProdutoModal'
 import { CatalogGroupedList } from '@/src/presentation/components/features/catalogo/CatalogGroupedList'
-import { CatalogProductColumnHeader } from '@/src/presentation/components/features/catalogo/CatalogProductColumnHeader'
 import type { CatalogGroup } from '@/src/presentation/components/features/catalogo/types'
 import { MenuProdutoCatalogRow } from './MenuProdutoCatalogRow'
 import { MENU_MODAL_CANCEL_VARIANT } from './menuPanelConstants'
@@ -43,7 +42,7 @@ import { atualizarGrupoProdutoViaBffUseCase } from '@/src/application/use-cases/
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
-import { resolverCodigoMenuProduto } from '@/src/shared/utils/catalogoProdutoIndex'
+import { resolverCodigoMenuProduto, resolverImagemMenuProduto } from '@/src/shared/utils/catalogoProdutoIndex'
 import { podeDesvincularProdutoDoMenu } from '@/src/domain/policies/produto/syncCadastroComMenuPrincipal'
 import type { MenuGrupoProduto, MenuProduto } from '@/src/shared/types/menus'
 
@@ -93,7 +92,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     enabled: addOpen,
   })
   const { data: gruposComplementos = [], isLoading: isLoadingGruposComplementos } =
-    useGruposComplementos({ limit: 100, ativo: null })
+    useGruposComplementos({ limit: 100, ativo: true })
   const invalidate = useInvalidateTenantQueries()
 
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
@@ -141,6 +140,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   const gruposDoMenu = useMemo(() => {
     const map = new Map<string, { id: string; nome: string }>()
     for (const grupo of grupos) {
+      if (grupo.grupoBase.ativo === false) continue
       const id = grupo.grupoBase.id
       if (!map.has(id)) {
         map.set(id, { id, nome: grupo.nome || grupo.grupoBase.nome })
@@ -272,6 +272,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   const {
     codigoPorId,
     permissoesPorId,
+    imagemPorId,
     savingDaLinha,
     handleNomeChange,
     handleValorChange,
@@ -371,6 +372,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
             produto,
             codigoPorId.get(produto.produtoId)
           )}
+          imagemCadastro={imagemPorId.get(produto.produtoId)}
           permissoesCadastro={permissoesPorId.get(produto.produtoId)}
           saving={saving}
           onNomeChange={handleNomeChange}
@@ -390,6 +392,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
       handleStatusToggle,
       handleTogglePermissao,
       handleValorChange,
+      imagemPorId,
       permissoesPorId,
       savingDaLinha,
     ]
@@ -493,11 +496,8 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
       />
 
       <div className="mt-2 flex min-h-0 flex-1 flex-col px-1">
-        <CatalogProductColumnHeader variant="menu" className="shrink-0" />
-        <div className="min-h-0 flex-1">
         <CatalogGroupedList
           virtualize
-          className="scrollbar-hide"
           groups={catalogGroupsVisiveis}
           getItemKey={item => item.produtoId}
           renderItem={renderItem}
@@ -516,7 +516,6 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
           onToggleGrupoStatus={handleToggleGrupoStatus}
           onAddProduto={handleAddProduto}
         />
-        </div>
       </div>
 
       <MenuProdutoTabsModal

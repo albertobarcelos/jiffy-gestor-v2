@@ -1,15 +1,26 @@
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { textoErroCorpoApi } from '@/src/infrastructure/api/apiClient'
 import {
+  normalizarEstacaoImpressaoResumo,
+  normalizarListaEstacoesImpressao,
+} from '@/src/infrastructure/api/normalizarEstacaoImpressaoResumo'
+import {
   getEstacaoImpressaoId,
   limparEstacaoImpressaoId,
-  salvarEstacaoImpressaoId,
 } from '@/src/infrastructure/printing/estacaoImpressaoStorage'
 
 export interface EstacaoImpressaoResumo {
   id: string
   nome: string
   ativo: boolean
+  /** Quando true, esta estação recebe PEDIDO_DELIVERY_IMPRESSAO_SOLICITADA via Socket.IO. */
+  gestorDelivery: boolean
+}
+
+export type AtualizarEstacaoImpressaoPatch = {
+  nome?: string
+  ativo?: boolean
+  gestorDelivery?: boolean
 }
 
 export interface ImpressoraLogica {
@@ -70,25 +81,49 @@ export async function criarEstacaoImpressao(
   token: string,
   nome: string
 ): Promise<EstacaoImpressaoResumo> {
-  const data = await requestJson<EstacaoImpressaoResumo>('/api/gestor/estacoes-impressao', token, {
+  const data = await requestJson<unknown>('/api/gestor/estacoes-impressao', token, {
     method: 'POST',
     body: JSON.stringify({ nome }),
   })
-  const id = data?.id != null ? String(data.id).trim() : ''
-  if (!id) {
+  const normalized = normalizarEstacaoImpressaoResumo(data)
+  if (!normalized) {
     throw new Error(
       'Criação de estação retornou sem id. Verifique o BFF e o contrato da API gestor.'
     )
   }
-  return {
-    id,
-    nome: data?.nome != null ? String(data.nome) : '',
-    ativo: typeof data?.ativo === 'boolean' ? data.ativo : true,
-  }
+  return normalized
 }
 
 export function listarEstacoesImpressao(token: string): Promise<EstacaoImpressaoResumo[]> {
-  return requestJson<EstacaoImpressaoResumo[]>('/api/gestor/estacoes-impressao', token)
+  return requestJson<unknown>('/api/gestor/estacoes-impressao', token).then(data =>
+    normalizarListaEstacoesImpressao(data)
+  )
+}
+
+export async function atualizarEstacaoImpressao(
+  token: string,
+  estacaoId: string,
+  patch: AtualizarEstacaoImpressaoPatch
+): Promise<EstacaoImpressaoResumo> {
+  const id = estacaoId.trim()
+  if (!id) {
+    throw new Error('ID da estação é obrigatório.')
+  }
+  const data = await requestJson<unknown>(
+    `/api/gestor/estacoes-impressao/${encodeURIComponent(id)}`,
+    token,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }
+  )
+  const normalized = normalizarEstacaoImpressaoResumo(data)
+  if (!normalized) {
+    throw new Error(
+      'Atualização de estação retornou sem id. Verifique o BFF e o contrato da API gestor.'
+    )
+  }
+  return normalized
 }
 
 export async function buscarImpressorasLogicas(token: string): Promise<ImpressoraLogica[]> {
@@ -176,7 +211,17 @@ export async function salvarMapeamentosEstacao(
 
 export interface EstacaoImpressaoConfigResolvida {
   estacaoId: string
+  gestorDelivery: boolean
   mapeamentos: EstacaoImpressaoMapeamento[]
+}
+
+async function resolverGestorDeliveryDaEstacao(
+  token: string,
+  estacaoId: string
+): Promise<boolean> {
+  const estacoes = await listarEstacoesImpressao(token).catch(() => [])
+  const encontrada = estacoes.find(e => e.id === estacaoId)
+  return encontrada?.gestorDelivery === true
 }
 
 /** Nome sugerido ao criar estação local (browser + data). */
@@ -191,42 +236,31 @@ export function nomeEstacaoImpressaoPadrao(): string {
   return `Estação ${browser} - ${new Date().toLocaleDateString('pt-BR')}`
 }
 
-async function criarOuReaproveitarEstacaoImpressao(token: string): Promise<string> {
-  try {
-    const estacao = await criarEstacaoImpressao(token, nomeEstacaoImpressaoPadrao())
-    salvarEstacaoImpressaoId(estacao.id)
-    return estacao.id
-  } catch (createError) {
-    const estacoes = await listarEstacoesImpressao(token).catch(() => [])
-    const existente = estacoes.find(e => e.ativo) ?? estacoes[0]
-    if (existente) {
-      salvarEstacaoImpressaoId(existente.id)
-      return existente.id
-    }
-    throw createError
-  }
+const CONFIG_VAZIA: EstacaoImpressaoConfigResolvida = {
+  estacaoId: '',
+  gestorDelivery: false,
+  mapeamentos: [],
 }
 
 /**
- * Resolve o id da estação local (localStorage) e carrega mapeamentos.
- * Recria estação se o id salvo não existir mais (404).
+ * Carrega a estação escolhida neste PC (`localStorage`) e os mapeamentos.
+ * Não cria estação automaticamente — o operador cadastra/seleciona no painel.
  */
 export async function resolverEstacaoImpressaoConfig(
   token: string
 ): Promise<EstacaoImpressaoConfigResolvida> {
-  let estacaoId = getEstacaoImpressaoId()
-  if (!estacaoId) {
-    estacaoId = await criarOuReaproveitarEstacaoImpressao(token)
-  }
+  const estacaoId = getEstacaoImpressaoId()
+  if (!estacaoId) return CONFIG_VAZIA
 
   try {
-    const mapeamentos = await buscarMapeamentosEstacao(token, estacaoId)
-    return { estacaoId, mapeamentos }
+    const [mapeamentos, gestorDelivery] = await Promise.all([
+      buscarMapeamentosEstacao(token, estacaoId),
+      resolverGestorDeliveryDaEstacao(token, estacaoId),
+    ])
+    return { estacaoId, gestorDelivery, mapeamentos }
   } catch (error) {
     if (!isEstacaoImpressaoNotFoundError(error)) throw error
     limparEstacaoImpressaoId()
-    estacaoId = await criarOuReaproveitarEstacaoImpressao(token)
-    const mapeamentos = await buscarMapeamentosEstacao(token, estacaoId)
-    return { estacaoId, mapeamentos }
+    return CONFIG_VAZIA
   }
 }

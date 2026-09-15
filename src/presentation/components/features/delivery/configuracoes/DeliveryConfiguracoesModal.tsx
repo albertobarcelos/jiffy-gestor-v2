@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { MdPrint, MdTune } from 'react-icons/md'
+import { MdMenuBook, MdPrint, MdTune } from 'react-icons/md'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
@@ -23,17 +23,30 @@ import {
 } from '@/src/shared/utils/deliveryImpressoraExpedicao'
 import { salvarDeliveryCupomTemplateLocal } from '@/src/infrastructure/printing/deliveryCupomTemplateStorage'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
+import { useMenuDeliveryId } from '@/src/presentation/hooks/useMenuDeliveryId'
 import { useAtualizarEmpresaDelivery } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
 import { usePreferenciasImpressaoDelivery } from '@/src/presentation/hooks/usePreferenciasImpressaoDelivery'
 import {
   useDeliveryConfigEstacaoImpressao,
+  useDeliveryConfigEstacoesImpressao,
   useDeliveryConfigImpressorasLogicas,
   useInvalidateDeliveryConfigImpressaoQueries,
 } from '@/src/presentation/hooks/useDeliveryConfigImpressaoQueries'
-import { salvarMapeamentosEstacao } from '@/src/infrastructure/api/estacoesImpressaoApi'
+import {
+  atualizarEstacaoImpressao,
+  criarEstacaoImpressao,
+  salvarMapeamentosEstacao,
+} from '@/src/infrastructure/api/estacoesImpressaoApi'
+import {
+  limparEstacaoImpressaoId,
+  salvarEstacaoImpressaoId,
+} from '@/src/infrastructure/printing/estacaoImpressaoStorage'
 import { DeliveryVinculoImpressorasFisicas } from './DeliveryVinculoImpressorasFisicas'
+import { DeliveryEstacaoDestePcCampos } from './DeliveryEstacaoDestePcCampos'
 import { CupomCampoInfo } from './DeliveryModoPapelToggle'
 import { BaixarFredyCard } from '@/src/presentation/gestor-pedidos/windows/BaixarFredyCard'
+import { MenuParametroEmpresaSelect } from '@/src/presentation/components/features/configuracoes/MenuParametroEmpresaSelect'
+import { DeliveryConfiguracoesSkeleton } from './DeliveryConfiguracoesSkeleton'
 
 interface DeliveryConfiguracoesModalProps {
   open: boolean
@@ -90,8 +103,11 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
     isFetching: buscandoPreferenciasDelivery,
     refetch: refetchPreferenciasDelivery,
   } = usePreferenciasImpressaoDelivery()
+  const { menuDeliveryId: menuDeliveryIdSalvo, isLoading: carregandoMenuDelivery } =
+    useMenuDeliveryId()
   const atualizarEmpresaDelivery = useAtualizarEmpresaDelivery()
   const impressorasLogicasQuery = useDeliveryConfigImpressorasLogicas(open)
+  const estacoesQuery = useDeliveryConfigEstacoesImpressao(open)
   const estacaoImpressaoQuery = useDeliveryConfigEstacaoImpressao(open)
   const invalidateDeliveryConfigQueries = useInvalidateDeliveryConfigImpressaoQueries()
 
@@ -101,24 +117,47 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
   const [imprimirAoReceber, setImprimirAoReceber] = useState(true)
   const [imprimirAoFicarPronto, setImprimirAoFicarPronto] = useState(true)
   const [impressoraExpedicaoId, setImpressoraExpedicaoId] = useState<string>('')
+  const [menuDeliveryId, setMenuDeliveryId] = useState<string | null>(null)
   const [vinculosFisicos, setVinculosFisicos] = useState<Record<string, string>>({})
+  const [gestorDelivery, setGestorDelivery] = useState(false)
+  const [salvandoGestorDelivery, setSalvandoGestorDelivery] = useState(false)
+  const [ocupadoEstacao, setOcupadoEstacao] = useState(false)
+  const [estacaoIdLocal, setEstacaoIdLocal] = useState('')
   const [cupomTemplate, setCupomTemplate] = useState<DeliveryCupomTemplateConfig>(
     DEFAULT_DELIVERY_CUPOM_TEMPLATE
   )
   const [salvando, setSalvando] = useState(false)
   const [confirmSalvarSemImpressoraOpen, setConfirmSalvarSemImpressoraOpen] = useState(false)
+  const [painelAberto, setPainelAberto] = useState(open)
+  const [formularioHidratado, setFormularioHidratado] = useState(false)
 
-  const formularioHidratadoRef = useRef(false)
   const estacaoErroToastRef = useRef(false)
 
+  if (open !== painelAberto) {
+    setPainelAberto(open)
+    setFormularioHidratado(false)
+  }
+
   const impressorasLogicas = impressorasLogicasQuery.data ?? []
+  const estacoes = estacoesQuery.data ?? []
+  const estacaoIdSelecionada =
+    estacaoIdLocal || estacaoImpressaoQuery.data?.estacaoId?.trim() || ''
 
   const carregando =
     open &&
     (carregandoEmpresaMe ||
       carregandoPreferenciasDelivery ||
       buscandoPreferenciasDelivery ||
+      carregandoMenuDelivery ||
       impressorasLogicasQuery.isPending ||
+      estacoesQuery.isPending ||
+      estacaoImpressaoQuery.isPending)
+
+  const exibirSkeleton =
+    open &&
+    (!formularioHidratado ||
+      impressorasLogicasQuery.isPending ||
+      estacoesQuery.isPending ||
       estacaoImpressaoQuery.isPending)
 
   const erroConfiguracao = useMemo(() => {
@@ -128,56 +167,173 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
   }, [estacaoImpressaoQuery.error])
 
   useEffect(() => {
-    if (!open) {
-      formularioHidratadoRef.current = false
-      return
-    }
-    formularioHidratadoRef.current = false
+    if (!open) return
     void refetchPreferenciasDelivery()
   }, [open, refetchPreferenciasDelivery])
 
   useEffect(() => {
     if (!open) return
     if (
-      formularioHidratadoRef.current ||
+      formularioHidratado ||
       carregandoEmpresaMe ||
       carregandoPreferenciasDelivery ||
       buscandoPreferenciasDelivery ||
-      !empresa?.id
+      carregandoMenuDelivery
     )
       return
 
+    setFormularioHidratado(true)
+    if (!empresa?.id) return
+
     const prefs = preferenciasImpressaoDelivery
-    formularioHidratadoRef.current = true
     setModoImpressao(prefs.modo)
     setCopiasUnificado(Math.min(99, Math.max(1, prefs.copiasCupomUnificado)))
     setAutoIniciarPreparoNovosPedidos(prefs.autoIniciarPreparoNovosPedidos)
     setImprimirAoReceber(prefs.imprimirAoReceber)
     setImprimirAoFicarPronto(prefs.imprimirAoFicarPronto)
     setImpressoraExpedicaoId(prefs.impressoraExpedicaoId ?? '')
+    setMenuDeliveryId(menuDeliveryIdSalvo)
     setCupomTemplate(cupomTemplateRemoto)
   }, [
     open,
+    formularioHidratado,
     carregandoEmpresaMe,
     carregandoPreferenciasDelivery,
     buscandoPreferenciasDelivery,
+    carregandoMenuDelivery,
     empresa?.id,
     preferenciasImpressaoDelivery,
     cupomTemplateRemoto,
+    menuDeliveryIdSalvo,
   ])
 
   useEffect(() => {
+    if (!open) {
+      setEstacaoIdLocal('')
+      return
+    }
+    const id = estacaoImpressaoQuery.data?.estacaoId?.trim() ?? ''
+    if (id) setEstacaoIdLocal(id)
+  }, [open, estacaoImpressaoQuery.data?.estacaoId])
+
+  useEffect(() => {
     if (!open) return
-    const mapeamentos = estacaoImpressaoQuery.data?.mapeamentos
-    if (!mapeamentos) return
+    const data = estacaoImpressaoQuery.data
+    if (!data?.estacaoId) return
     const next: Record<string, string> = {}
-    for (const item of mapeamentos) {
+    for (const item of data.mapeamentos) {
       const id = item.impressoraId?.trim()
       const fisica = item.nomeImpressoraWindows?.trim()
       if (id && fisica) next[id] = fisica
     }
     setVinculosFisicos(next)
+    setGestorDelivery(data.gestorDelivery === true)
   }, [open, estacaoImpressaoQuery.data])
+
+  const handleGestorDeliveryChange = useCallback(
+    async (next: boolean) => {
+      const estacaoId = estacaoImpressaoQuery.data?.estacaoId?.trim()
+      const accessToken = useAuthStore.getState().tenantAuth?.getAccessToken()
+      if (!accessToken || !estacaoId) {
+        showToast.error('Selecione ou crie uma estação neste computador.')
+        return
+      }
+      setGestorDelivery(next)
+      setSalvandoGestorDelivery(true)
+      try {
+        const atualizada = await atualizarEstacaoImpressao(accessToken, estacaoId, {
+          gestorDelivery: next,
+        })
+        setGestorDelivery(atualizada.gestorDelivery === true)
+        invalidateDeliveryConfigQueries()
+        window.dispatchEvent(new Event('jiffy:estacao-impressao-changed'))
+        showToast.success(
+          next
+            ? 'Este computador passou a receber comandos de impressão delivery.'
+            : 'Este computador deixou de ser gestor de impressão delivery.'
+        )
+      } catch (error) {
+        setGestorDelivery(!next)
+        showToast.error(
+          error instanceof Error
+            ? error.message
+            : 'Não foi possível atualizar o gestor de impressão delivery.'
+        )
+      } finally {
+        setSalvandoGestorDelivery(false)
+      }
+    },
+    [estacaoImpressaoQuery.data?.estacaoId, invalidateDeliveryConfigQueries]
+  )
+
+  const handleSelecionarEstacao = useCallback(
+    (id: string) => {
+      const next = id.trim()
+      setEstacaoIdLocal(next)
+      if (!next) {
+        limparEstacaoImpressaoId()
+        setVinculosFisicos({})
+        setGestorDelivery(false)
+      } else {
+        salvarEstacaoImpressaoId(next)
+      }
+      invalidateDeliveryConfigQueries()
+    },
+    [invalidateDeliveryConfigQueries]
+  )
+
+  const handleCriarEstacao = useCallback(
+    async (nome: string) => {
+      const accessToken = useAuthStore.getState().tenantAuth?.getAccessToken()
+      if (!accessToken) {
+        showToast.error('Sessão expirada.')
+        return
+      }
+      setOcupadoEstacao(true)
+      try {
+        const criada = await criarEstacaoImpressao(accessToken, nome)
+        salvarEstacaoImpressaoId(criada.id)
+        setEstacaoIdLocal(criada.id)
+        setGestorDelivery(criada.gestorDelivery === true)
+        setVinculosFisicos({})
+        invalidateDeliveryConfigQueries()
+        showToast.success('Estação criada. Vincule as impressoras deste PC abaixo.')
+      } catch (error) {
+        showToast.error(
+          error instanceof Error ? error.message : 'Não foi possível criar a estação.'
+        )
+        throw error
+      } finally {
+        setOcupadoEstacao(false)
+      }
+    },
+    [invalidateDeliveryConfigQueries]
+  )
+
+  const handleRenomearEstacao = useCallback(
+    async (nome: string) => {
+      const accessToken = useAuthStore.getState().tenantAuth?.getAccessToken()
+      const estacaoId = estacaoImpressaoQuery.data?.estacaoId?.trim()
+      if (!accessToken || !estacaoId) {
+        showToast.error('Selecione uma estação para renomear.')
+        return
+      }
+      setOcupadoEstacao(true)
+      try {
+        await atualizarEstacaoImpressao(accessToken, estacaoId, { nome })
+        invalidateDeliveryConfigQueries()
+        showToast.success('Estação renomeada.')
+      } catch (error) {
+        showToast.error(
+          error instanceof Error ? error.message : 'Não foi possível renomear a estação.'
+        )
+        throw error
+      } finally {
+        setOcupadoEstacao(false)
+      }
+    },
+    [estacaoImpressaoQuery.data?.estacaoId, invalidateDeliveryConfigQueries]
+  )
 
   useEffect(() => {
     if (!open) {
@@ -186,7 +342,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
     }
     if (!estacaoImpressaoQuery.isError || estacaoErroToastRef.current) return
     estacaoErroToastRef.current = true
-    const msg = erroConfiguracao ?? 'Não foi possível inicializar a estação de impressão.'
+    const msg = erroConfiguracao ?? 'Não foi possível carregar a estação de impressão.'
     showToast.error(msg)
   }, [estacaoImpressaoQuery.isError, erroConfiguracao, open])
 
@@ -202,6 +358,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
       imprimirAoReceber,
       imprimirAoFicarPronto,
       impressoraExpedicaoId: expId || null,
+      menuDeliveryId: menuDeliveryId ?? menuDeliveryIdSalvo ?? null,
     }
 
     setSalvando(true)
@@ -244,6 +401,8 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
     impressoraExpedicaoId,
     imprimirAoFicarPronto,
     imprimirAoReceber,
+    menuDeliveryId,
+    menuDeliveryIdSalvo,
     modoImpressao,
     copiasUnificado,
     cupomTemplate,
@@ -281,7 +440,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
         open={open}
         onClose={onClose}
         title="Configurações de Impressão Delivery"
-        subtitle="Neste PC: vincule cada impressora lógica à impressora física. O agente só imprime o destino escolhido."
+        subtitle="Escolha o cardápio, a estação deste PC e o vínculo das impressoras físicas."
         headerExtra={<BaixarFredyCard />}
         panelClassName="w-[min(72rem,96vw)] max-w-[100vw] sm:w-[min(1200px,90vw)]"
         footerVariant="bar"
@@ -298,13 +457,59 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
           saveAndCloseDisabled: carregando || !empresa?.id,
         }}
       >
+        {exibirSkeleton ? (
+          <DeliveryConfiguracoesSkeleton />
+        ) : (
         <div className="space-y-4 p-5 md:p-7">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
+          <DeliveryConfigCollapsibleSection
+            icon={<MdMenuBook className="h-5 w-5" aria-hidden />}
+            title="Cardápio do delivery"
+            info="App público e pedidos manuais no Gestor usam este mesmo menu."
+            resetExpandedWhen={open}
+            contentClassName="mt-3 space-y-2"
+            className="min-w-0"
+          >
+            <MenuParametroEmpresaSelect
+              id="delivery-kanban-menu"
+              label="Cardápio em uso"
+              description="Produtos, preços e fotos saem deste cardápio."
+              value={menuDeliveryId}
+              onChange={setMenuDeliveryId}
+              disabled={carregando}
+            />
+            <DeliveryEstacaoDestePcCampos
+              estacoes={estacoes}
+              estacaoId={estacaoIdSelecionada}
+              disabled={carregando || salvando}
+              ocupado={ocupadoEstacao}
+              onSelecionar={handleSelecionarEstacao}
+              onCriar={handleCriarEstacao}
+              onRenomear={handleRenomearEstacao}
+            />
+            <DeliveryToggleRow
+              id="delivery-gestor-impressao"
+              checked={gestorDelivery}
+              disabled={
+                carregando ||
+                salvando ||
+                salvandoGestorDelivery ||
+                ocupadoEstacao ||
+                !estacaoIdSelecionada
+              }
+              onChecked={v => void handleGestorDeliveryChange(v)}
+              titulo="Este computador imprime pedidos delivery"
+              info="Marque só nos PCs que devem receber o comando de impressão em tempo real. É preciso ter uma estação selecionada e vínculos de impressora. Vários PCs marcados imprimem o mesmo pedido."
+            />
+          </DeliveryConfigCollapsibleSection>
+
           <DeliveryConfigCollapsibleSection
             icon={<MdTune className="h-5 w-5" aria-hidden />}
             title="Comportamento da impressão"
             info="Define o que acontece quando o pedido chega e quando fica pronto: se vai sozinho para a cozinha e quando cada cupom deve sair."
             resetExpandedWhen={open}
             contentClassName="mt-3 space-y-2"
+            className="min-w-0"
           >
             <DeliveryToggleRow
               id="delivery-auto-iniciar-preparo"
@@ -459,6 +664,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
               </select>
             </div>
           </DeliveryConfigCollapsibleSection>
+          </div>
 
           <DeliveryCupomTemplateEditor
             value={cupomTemplate}
@@ -481,21 +687,29 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
             info="Escolha, para cada nome do Gestor, qual impressora deste computador deve receber o cupom. O Jiffy Print precisa estar aberto."
             resetExpandedWhen={open}
           >
-            <DeliveryVinculoImpressorasFisicas
-              impressorasLogicas={impressorasLogicas}
-              vinculos={vinculosFisicos}
-              onChange={setVinculosFisicos}
-              disabled={carregando || salvando}
-              enabled={open}
-            />
+            {estacaoIdSelecionada ? (
+              <DeliveryVinculoImpressorasFisicas
+                impressorasLogicas={impressorasLogicas}
+                vinculos={vinculosFisicos}
+                onChange={setVinculosFisicos}
+                disabled={carregando || salvando}
+                enabled={open}
+              />
+            ) : (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                Selecione ou crie uma estação em Cardápio do delivery para vincular as impressoras
+                deste computador.
+              </p>
+            )}
 
             {erroConfiguracao ? (
               <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                Não foi possível inicializar a estação de impressão: {erroConfiguracao}
+                Não foi possível carregar a estação de impressão: {erroConfiguracao}
               </div>
             ) : null}
           </DeliveryConfigCollapsibleSection>
         </div>
+        )}
       </JiffySidePanelModal>
 
       <JiffyConfirmDialog

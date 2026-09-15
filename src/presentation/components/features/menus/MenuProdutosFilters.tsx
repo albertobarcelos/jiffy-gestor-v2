@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import type { GrupoComplemento } from '@/src/domain/entities/GrupoComplemento'
 import type { MenuProdutoTipoFiltro } from '@/src/domain/repositories/IMenuRepository'
 import type { StatusFilter, TriState } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutosFilters'
@@ -61,6 +62,11 @@ export function MenuProdutosFilters({
   isLoadingGruposComplementos,
   onClearFilters,
 }: MenuProdutosFiltersProps) {
+  const gruposComplementosAtivos = useMemo(
+    () => gruposComplementos.filter(grupo => grupo.isAtivo()),
+    [gruposComplementos]
+  )
+
   return (
     <div className="flex-shrink-0 border-b border-gray-100 bg-white px-1 md:py-2">
       <div className="mt-2 flex w-full items-center justify-end sm:hidden">
@@ -140,6 +146,7 @@ export function MenuProdutosFilters({
             options={gruposDoMenu}
             noOptionsText="Nenhuma categoria neste cardápio"
             getOptionLabel={grupo => grupo.nome}
+            getOptionKey={grupo => grupo.id}
             isOptionEqualToValue={(a, b) => a.id === b.id}
             value={gruposDoMenu.find(g => g.id === grupoProdutoId) ?? null}
             onChange={(_, grupo) => onGrupoProdutoChange(grupo?.id ?? '')}
@@ -162,14 +169,15 @@ export function MenuProdutosFilters({
           <Autocomplete
             id="menu-produtos-filter-grupo-complemento"
             size="small"
-            options={gruposComplementos}
+            options={gruposComplementosAtivos}
             loading={isLoadingGruposComplementos}
             disabled={isLoadingGruposComplementos}
             loadingText="Carregando..."
             noOptionsText="Nenhum grupo encontrado"
             getOptionLabel={grupo => grupo.getNome()}
+            getOptionKey={grupo => grupo.getId()}
             isOptionEqualToValue={(a, b) => a.getId() === b.getId()}
-            value={gruposComplementos.find(g => g.getId() === grupoComplementosId) ?? null}
+            value={gruposComplementosAtivos.find(g => g.getId() === grupoComplementosId) ?? null}
             onChange={(_, grupo) => onGrupoComplementoChange(grupo?.getId() ?? '')}
             renderInput={params => (
               <TextField

@@ -43,7 +43,8 @@ function AcoesHeader({ incluirCopiar }: { incluirCopiar: boolean }) {
 }
 
 /**
- * Cabeçalho desktop alinhado ao grid da lista (cadastro e cardápio).
+ * Cabeçalho desktop alinhado ao grid da lista do cadastro (produto principal).
+ * Não usar no cardápio/menu: os rótulos das colunas só fazem sentido no cadastro.
  */
 export function CatalogProductColumnHeader({
   variant,
@@ -78,8 +79,8 @@ export function CatalogProductColumnHeader({
       {isMenu ? null : <Rotulo className="catalog-row-area-categ">Categoria</Rotulo>}
       <div className="catalog-row-area-meta flex w-full items-center justify-end gap-2 md:mr-4 md:gap-4">
         <Rotulo className="w-24">Valor</Rotulo>
-        <Rotulo className="w-14">{isMenu ? 'Pause' : 'Status'}</Rotulo>
-        {isMenu ? <span className="w-8" aria-hidden /> : null}
+        {isMenu ? <Rotulo className="w-14">Pause</Rotulo> : null}
+        <span className="w-8" aria-hidden />
       </div>
     </div>
   )

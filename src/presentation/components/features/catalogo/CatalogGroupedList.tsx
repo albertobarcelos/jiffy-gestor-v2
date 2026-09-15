@@ -128,6 +128,8 @@ export function CatalogGroupedList<T>({
     getScrollElement: () => parentRef.current,
     estimateSize: index => estimateRowSize(flatRows[index]!),
     overscan: 8,
+    // React 19 / Next overlay: measure durante o commit não pode usar flushSync.
+    useFlushSync: false,
     getItemKey: index => {
       const row = flatRows[index]
       if (!row) return index
@@ -197,7 +199,10 @@ export function CatalogGroupedList<T>({
         ref={parentRef}
         role="list"
         aria-label={listAriaLabel}
-        className={cn('h-full overflow-y-auto pb-4', className)}
+        className={cn(
+          'min-h-0 h-full flex-1 overflow-y-auto overscroll-y-contain pb-4 scrollbar-thin',
+          className
+        )}
       >
         <div
           className="relative w-full"

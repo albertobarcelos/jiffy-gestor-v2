@@ -11,6 +11,8 @@ import {
   aplicarProdutoAtualizadoNasLinhasCarrinho,
   obterUnidadeMedidaProdutoLinha,
   produtoPermiteAlterarPreco,
+  produtoTemComplementosCarregados,
+  type CarregarProdutoCatalogoOptions,
 } from '@/src/domain/policies/pedido/CarrinhoCatalogoPolicy'
 import {
   aplicarQuantidadeComplementoNaLinha,
@@ -27,7 +29,7 @@ export interface UseNovoPedidoProdutosParams {
   produtosList: Produto[]
   carregarProdutoNoCatalogoSeNecessario: (
     produtoId: string,
-    options?: { forceRefresh?: boolean }
+    options?: CarregarProdutoCatalogoOptions
   ) => Promise<Produto | null>
 }
 
@@ -61,21 +63,20 @@ export function useNovoPedidoProdutos({
   const longPressComplementoIndexRef = useRef<number | null>(null)
   const produtoIdContextoEdicaoComplementoRef = useRef<string | undefined>(undefined)
 
-  const produtoTemComplementos = useCallback((produto: Produto): boolean => {
-    const gruposComplementos = produto.getGruposComplementos()
-    if (!gruposComplementos || gruposComplementos.length === 0) return false
-    return gruposComplementos.some(grupo => grupo.complementos && grupo.complementos.length > 0)
-  }, [])
+  const produtoTemComplementos = useCallback(
+    (produto: Produto): boolean => produtoTemComplementosCarregados(produto),
+    []
+  )
 
   const garantirComplementosProdutoNoPainel = useCallback(
     (produtoId: string, produtoBase: Produto) => {
-      if (!produtoBase.abreComplementosAtivo() || produtoTemComplementos(produtoBase)) {
+      if (produtoTemComplementosCarregados(produtoBase)) {
         setCarregandoComplementosPainel(false)
         return
       }
 
       setCarregandoComplementosPainel(true)
-      void carregarProdutoNoCatalogoSeNecessario(produtoId)
+      void carregarProdutoNoCatalogoSeNecessario(produtoId, { requireComplementos: true })
         .then(produtoAtualizado => {
           if (!produtoAtualizado) return
           setProdutoParaLancamentoPainel(prev =>
@@ -86,7 +87,7 @@ export function useNovoPedidoProdutos({
           setCarregandoComplementosPainel(false)
         })
     },
-    [carregarProdutoNoCatalogoSeNecessario, produtoTemComplementos]
+    [carregarProdutoNoCatalogoSeNecessario]
   )
 
   const abrirEdicaoComplementoNoPainel = useCallback(

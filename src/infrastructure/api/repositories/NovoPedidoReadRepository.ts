@@ -42,6 +42,22 @@ async function fetchJson<T>(url: string, token: string, init?: RequestInit): Pro
   return (await response.json()) as T
 }
 
+function unwrapProdutoCadastroPayload(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw
+  const obj = raw as Record<string, unknown>
+  const nested = obj.data
+  if (
+    nested &&
+    typeof nested === 'object' &&
+    !Array.isArray(nested) &&
+    ((nested as Record<string, unknown>).id != null ||
+      (nested as Record<string, unknown>).gruposComplementos != null)
+  ) {
+    return nested
+  }
+  return raw
+}
+
 export class NovoPedidoReadRepository implements INovoPedidoReadRepository {
   async listarEntregadores(token: string): Promise<UsuarioPdvEntregadorOption[]> {
     const data = await fetchJson<{ items?: unknown[] }>(
@@ -182,7 +198,7 @@ export class NovoPedidoReadRepository implements INovoPedidoReadRepository {
         `/api/produtos/${encodeURIComponent(produtoId)}`,
         token
       )
-      base = Produto.fromJSON(data)
+      base = Produto.fromJSON(unwrapProdutoCadastroPayload(data))
     } catch {
       base = null
     }

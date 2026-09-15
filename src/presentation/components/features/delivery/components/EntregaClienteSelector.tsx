@@ -70,6 +70,11 @@ interface EntregaClienteSelectorProps {
   /** Abre o seletor completo de clientes quando a busca por telefone não for possível. */
   onAbrirSeletorCliente?: () => void
   /**
+   * Incremento externo (ex.: “Novo Cliente” no seletor) — abre o mesmo painel do link Cadastrar.
+   */
+  abrirCadastroRapidoPedido?: number
+  onCadastroRapidoPedidoConsumido?: () => void
+  /**
    * Modo controlado: telefone exibido + últimos dígitos usados na busca (ex.: wizard com troca de etapa).
    * Se os quatro forem passados, o estado local de telefone não é usado.
    */
@@ -294,6 +299,8 @@ export function EntregaClienteSelector({
   onAbrirCadastroCliente,
   onEditarClientePorDuploClique,
   onAbrirSeletorCliente,
+  abrirCadastroRapidoPedido,
+  onCadastroRapidoPedidoConsumido,
   telefoneExibicaoExterno,
   onTelefoneExibicaoExternoChange,
   digitosUltimaBuscaExterno,
@@ -351,6 +358,9 @@ export function EntregaClienteSelector({
   const [buscandoCep, setBuscandoCep] = useState(false)
 
   const telefoneInputRef = useRef<HTMLInputElement>(null)
+  const telefonePainelCadastroRef = useRef<HTMLInputElement>(null)
+  const nomeNovoClienteInputRef = useRef<HTMLInputElement>(null)
+  const focarTelefoneNoPainelRef = useRef(false)
   const nomeInputRef = useRef<HTMLInputElement>(null)
   const numeroMoradaInputRef = useRef<HTMLInputElement>(null)
   const abrirCadastroCliente = onAbrirCadastroCliente ?? onEditarClientePorDuploClique
@@ -965,8 +975,31 @@ export function EntregaClienteSelector({
 
   const handleAbrirPainelCliente = useCallback(() => {
     setNomeNovoCliente(nomeDigitado.trim())
+    focarTelefoneNoPainelRef.current = extrairDigitosTelefone(telefoneInput).length === 0
     setPainelClienteAberto(true)
-  }, [nomeDigitado])
+  }, [nomeDigitado, telefoneInput])
+
+  useEffect(() => {
+    if (!painelClienteAberto) return
+    const focarTelefone = focarTelefoneNoPainelRef.current
+    const id = window.setTimeout(() => {
+      if (focarTelefone) {
+        telefonePainelCadastroRef.current?.focus()
+        return
+      }
+      nomeNovoClienteInputRef.current?.focus()
+    }, 50)
+    return () => window.clearTimeout(id)
+  }, [painelClienteAberto])
+
+  useEffect(() => {
+    if (!abrirCadastroRapidoPedido) return
+    const id = window.setTimeout(() => {
+      handleAbrirPainelCliente()
+      onCadastroRapidoPedidoConsumido?.()
+    }, 80)
+    return () => window.clearTimeout(id)
+  }, [abrirCadastroRapidoPedido, handleAbrirPainelCliente, onCadastroRapidoPedidoConsumido])
 
   const moradasEncontradas = moradas ?? []
   const buscaRealizada = telefoneBuscado !== null || clienteVinculado !== null
@@ -1269,7 +1302,11 @@ export function EntregaClienteSelector({
           showSave: true,
           saveLabel: 'Salvar cliente',
           saveLoading: criarCliente.isPending,
-          saveDisabled: criarCliente.isPending || !nomeNovoCliente.trim(),
+          saveDisabled:
+            criarCliente.isPending ||
+            !nomeNovoCliente.trim() ||
+            (usarModuloDeliveryClientes &&
+              !telefoneCelularBrCompleto(extrairDigitosTelefone(telefoneInput))),
           onSave: handleSalvarClienteRapido,
           showCancel: true,
           cancelLabel: 'Cancelar',
@@ -1285,24 +1322,38 @@ export function EntregaClienteSelector({
               Nome do cliente <span className="text-red-500">*</span>
             </Label>
             <input
+              ref={nomeNovoClienteInputRef}
               value={nomeNovoCliente}
               onChange={e => setNomeNovoCliente(e.target.value)}
               placeholder="Ex.: João Silva"
-              autoFocus
               className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
           </div>
           <div>
-            <Label className="mb-1 block text-xs font-medium text-gray-600">Telefone</Label>
+            <Label className="mb-1 block text-xs font-medium text-gray-600">
+              Telefone
+              {usarModuloDeliveryClientes ? (
+                <span className="text-red-500"> *</span>
+              ) : null}
+            </Label>
             <div className="relative">
               <MdPhone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <input
+                ref={telefonePainelCadastroRef}
+                type="tel"
                 value={telefoneInput}
-                readOnly
-                className="w-full rounded-md border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm text-gray-500"
+                onChange={e => setTelefoneInput(formatarTelefoneExibicao(e.target.value))}
+                placeholder="(00) 00000-0000"
+                maxLength={15}
+                inputMode="numeric"
+                className="w-full rounded-md border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-primary-text focus:outline-none focus:ring-2 focus:ring-primary/40"
               />
             </div>
-            <p className="mt-0.5 text-xs text-gray-400">Preenchido automaticamente pelo número digitado.</p>
+            <p className="mt-0.5 text-xs text-gray-400">
+              {extrairDigitosTelefone(telefoneInput).length === 0
+                ? 'Informe o celular com DDD (11 dígitos).'
+                : 'Celular com DDD. Altere se precisar.'}
+            </p>
           </div>
         </div>
       </JiffySidePanelModal>
