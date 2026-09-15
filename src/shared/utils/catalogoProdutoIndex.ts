@@ -21,6 +21,22 @@ export function parseProdutoIdIndex(value: unknown): string {
   return ''
 }
 
+export function parseImagemUrlProdutoIndex(item: Record<string, unknown>): string | null {
+  const image = item.image
+  const nested =
+    image && typeof image === 'object' && !Array.isArray(image)
+      ? ((image as Record<string, unknown>).imageUrl ??
+        (image as Record<string, unknown>).imagemUrl ??
+        (image as Record<string, unknown>).url)
+      : typeof image === 'string'
+        ? image
+        : null
+  const raw = item.imagemUrl ?? item.imageUrl ?? nested
+  if (typeof raw !== 'string') return null
+  const trimmed = raw.trim()
+  return trimmed || null
+}
+
 export function parsePermissoesIndex(item: Record<string, unknown>): MenuProdutoPermissoes {
   return {
     permiteAcrescimo: boolFlagProduto(item.permiteAcrescimo),
@@ -35,6 +51,7 @@ export function parsePermissoesIndex(item: Record<string, unknown>): MenuProduto
 export type CatalogoProdutoIndexItem = {
   id: string
   codigo: string
+  imagemUrl: string | null
   permiteAcrescimo: boolean
   permiteDesconto: boolean
   abreComplementos: boolean
@@ -52,6 +69,7 @@ export function slimCatalogoProdutoIndexItem(
   return {
     id,
     codigo: parseCodigoProdutoIndex(item.codigoProduto ?? item.codigo),
+    imagemUrl: parseImagemUrlProdutoIndex(item),
     ...parsePermissoesIndex(item),
   }
 }
@@ -59,11 +77,13 @@ export function slimCatalogoProdutoIndexItem(
 export function montarCatalogoProdutoIndex(
   items: readonly unknown[]
 ): CatalogoProdutoListaIndex {
-  const index: CatalogoProdutoListaIndex = { codigos: {}, permissoes: {} }
+  const index: CatalogoProdutoListaIndex = { codigos: {}, permissoes: {}, imagens: {} }
+  const imagens: Record<string, string> = {}
   for (const raw of items) {
     const slim = slimCatalogoProdutoIndexItem(raw)
     if (!slim) continue
     if (slim.codigo) index.codigos[slim.id] = slim.codigo
+    if (slim.imagemUrl) imagens[slim.id] = slim.imagemUrl
     index.permissoes[slim.id] = {
       permiteAcrescimo: slim.permiteAcrescimo,
       permiteDesconto: slim.permiteDesconto,
@@ -72,6 +92,7 @@ export function montarCatalogoProdutoIndex(
       incideTaxa: slim.incideTaxa,
     }
   }
+  index.imagens = imagens
   return index
 }
 
@@ -89,4 +110,19 @@ export function resolverCodigoMenuProduto(
   if (doSnapshot) return doSnapshot
   const doCadastro = parseCodigoProdutoIndex(codigoCadastro)
   return doCadastro || undefined
+}
+
+/**
+ * Prefere a foto do snapshot do menu; se o listão não mandar, usa a do cadastro.
+ */
+export function resolverImagemMenuProduto(
+  snapshot: unknown,
+  imagemCadastro?: string | null
+): string | null {
+  if (snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot)) {
+    const doMenu = parseImagemUrlProdutoIndex(snapshot as Record<string, unknown>)
+    if (doMenu) return doMenu
+  }
+  const cadastro = imagemCadastro?.trim()
+  return cadastro || null
 }

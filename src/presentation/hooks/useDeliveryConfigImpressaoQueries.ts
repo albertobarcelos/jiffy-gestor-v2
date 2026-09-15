@@ -8,8 +8,10 @@ import {
 import {
   buscarImpressorasLogicas,
   invalidarMapeamentosEstacaoCache,
+  listarEstacoesImpressao,
   resolverEstacaoImpressaoConfig,
   type EstacaoImpressaoConfigResolvida,
+  type EstacaoImpressaoResumo,
   type ImpressoraLogica,
 } from '@/src/infrastructure/api/estacoesImpressaoApi'
 
@@ -17,6 +19,10 @@ const STALE_MS = 1000 * 60 * 5
 
 export function deliveryConfigImpressorasLogicasQueryKey(empresaId: string | null) {
   return buildTenantQueryKey(empresaId, ['delivery-config', 'impressoras-logicas'])
+}
+
+export function deliveryConfigEstacoesImpressaoQueryKey(empresaId: string | null) {
+  return buildTenantQueryKey(empresaId, ['delivery-config', 'estacoes-impressao'])
 }
 
 export function deliveryConfigEstacaoImpressaoQueryKey(empresaId: string | null) {
@@ -27,6 +33,19 @@ export function useDeliveryConfigImpressorasLogicas(enabled: boolean) {
   return useSecureTenantQuery<ImpressoraLogica[]>(
     ['delivery-config', 'impressoras-logicas'],
     ({ token }) => buscarImpressorasLogicas(token),
+    {
+      enabled,
+      staleTime: STALE_MS,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    }
+  )
+}
+
+export function useDeliveryConfigEstacoesImpressao(enabled: boolean) {
+  return useSecureTenantQuery<EstacaoImpressaoResumo[]>(
+    ['delivery-config', 'estacoes-impressao'],
+    ({ token }) => listarEstacoesImpressao(token),
     {
       enabled,
       staleTime: STALE_MS,
@@ -57,5 +76,6 @@ export function useInvalidateDeliveryConfigImpressaoQueries() {
     invalidarMapeamentosEstacaoCache()
     void invalidate(['delivery-config', 'impressoras-logicas'])
     void invalidate(['delivery-config', 'estacao-impressao'])
+    void invalidate(['delivery-config', 'estacoes-impressao'])
   }
 }

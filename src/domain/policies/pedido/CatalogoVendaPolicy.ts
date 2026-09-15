@@ -1,5 +1,6 @@
 import type { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import type { Produto } from '@/src/domain/entities/Produto'
+import type { CanalVendaCatalogo } from '@/src/domain/repositories/INovoPedidoReadRepository'
 
 export const MIN_CARACTERES_BUSCA_CATALOGO_VENDA = 2
 /** Máximo aceito pelo BFF de menus (`limit` ≤ 100). */
@@ -12,6 +13,15 @@ type ProdutoCatalogo = Pick<Produto, 'getNome' | 'isAtivo'>
 
 export function buscaCatalogoVendaAtiva(textoBusca: string): boolean {
   return textoBusca.trim().length >= MIN_CARACTERES_BUSCA_CATALOGO_VENDA
+}
+
+/** Delivery manual e delivery público usam `menuDeliveryId`; balcão usa `menuVendaGestorId`. */
+export function resolverMenuCatalogoNovoPedido(
+  canal: CanalVendaCatalogo,
+  menuDeliveryId: string | null,
+  menuVendaGestorId: string | null
+): string | null {
+  return canal === 'entrega' ? menuDeliveryId : menuVendaGestorId
 }
 
 export function ordenarGruposCatalogoVenda<T extends GrupoCatalogo>(grupos: T[]): T[] {

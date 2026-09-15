@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react'
 import { useTaxasInfinite } from '@/src/presentation/hooks/useTaxas'
+import { useRefetchCadastroAoAbrir } from '@/src/presentation/hooks/useRefetchCadastroAoAbrir'
 
 export type UseTaxasEntregaQueryParams = {
   open: boolean
@@ -23,6 +24,7 @@ export function useTaxasEntregaQuery({
     refetchOnMount: 'always',
   })
   const refetchTaxasEntrega = taxasEntregaQuery.refetch
+  useRefetchCadastroAoAbrir(open && (pedidoComEntrega || modoVisualizacao), refetchTaxasEntrega)
 
   const taxasEntrega = useMemo(() => {
     return (taxasEntregaQuery.data?.pages.flatMap(page => page.taxas) ?? []).filter(taxa => {

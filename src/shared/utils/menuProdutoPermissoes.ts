@@ -72,6 +72,8 @@ export function boolFlagProduto(value: unknown): boolean {
 export type CatalogoProdutoListaIndex = {
   codigos: Record<string, string>
   permissoes: Record<string, MenuProdutoPermissoes>
+  /** Foto do cadastro — fallback quando o snapshot do menu não manda imageUrl. */
+  imagens?: Record<string, string>
 }
 
 export function aplicarTogglePermissaoNoIndex(
@@ -88,5 +90,6 @@ export function aplicarTogglePermissaoNoIndex(
       ...index.permissoes,
       [produtoId]: { ...atual, [field]: value },
     },
+    imagens: index.imagens ?? {},
   }
 }
