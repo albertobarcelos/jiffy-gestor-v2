@@ -1,0 +1,104 @@
+# WebSocket (Socket.IO) — guia rápido para o frontend gestor
+
+## Conexão
+
+- Mesma origem/porta da API HTTP. Path Engine.IO: **`/ws`** (não é WebSocket cru).
+- Lib: `socket.io-client`.
+- Auth: **access token de gestor** (mesmo JWT do HTTP). Tokens identity/refresh/PowerSync são rejeitados.
+- O cliente **só escuta**. Não emite eventos de negócio; mutações continuam no HTTP.
+- O servidor decide as salas após o handshake — o cliente **não** dá `join`.
+
+```js
+import { io } from "socket.io-client";
+
+const socket = io("http://localhost:3000", {
+  path: "/ws",
+  auth: {
+    token: accessTokenGestor, // obrigatório
+    estacaoId: estacaoImpressaoId, // opcional; só vale para token gestor
+  },
+  withCredentials: true,
+});
+```
+
+`estacaoId` ausente/vazio: entra só em `empresa:{empresaId}` e `usuarioGestor:{id}`.  
+Com `estacaoId`: entra também em `estacao:{estacaoId}` (necessário para receber impressão).
+
+Erros de auth chegam como `connect_error`.
+
+---
+
+## Eventos atuais
+
+Payload = JSON direto (sem envelope `{ type, data }`).
+
+### 1) `PEDIDO_DELIVERY_CRIADO`
+
+| | |
+|---|---|
+| **Para quem** | Sala da **empresa** (todo gestor/PDV conectado da empresa) |
+| **Payload** | Summary da listagem do pedido (mesmo DTO do HTTP de listagem/card) |
+| **Quando** | Depois de persistir um pedido novo (qualquer origem: gestor, público, integração) |
+| **Uso no front** | Inserir o card **só na coluna do status** (sem refetch). Fallback: invalidate debounced (~400ms) se payload inválido |
+
+### 2) `PEDIDO_DELIVERY_STATUS_ALTERADO`
+
+| | |
+|---|---|
+| **Para quem** | Sala da **empresa** |
+| **Payload** | Summary da listagem (mesmo DTO do CRIADO), com o status já atualizado |
+| **Quando** | Após transição de status (`PENDENTE`, `EM_PREPARO`, `PRONTO`, `EM_ROTA`, `FINALIZADO`, `CANCELADO`) |
+| **Uso no front** | Upsert/move entre colunas; `CANCELADO` remove o card. Fallback: invalidate debounced se payload inválido |
+
+Não substitui impressão: impressão continua só em `PEDIDO_DELIVERY_IMPRESSAO_SOLICITADA`.
+
+### 3) `PEDIDO_DELIVERY_IMPRESSAO_SOLICITADA`
+
+| | |
+|---|---|
+| **Para quem** | Só salas `estacao:{id}` de estações **ativas** com `gestorDelivery = true` |
+| **Payload** | `{ vendaId, codigoVenda, numeroVenda }` |
+| **Quando** | (a) transição **PENDENTE → EM_PREPARO**; ou (b) pedido que **já nasce** em `EM_PREPARO` — sempre **depois** de `PEDIDO_DELIVERY_CRIADO` |
+| **Uso no front** | Comando: imprimir essa venda (buscar instruções de impressão no HTTP, falar com a impressora local, etc.). **Não** reavaliar regra de negócio — o backend já decidiu |
+
+Ordem no caso “nasce em preparo”: primeiro `PEDIDO_DELIVERY_CRIADO`, depois `PEDIDO_DELIVERY_IMPRESSAO_SOLICITADA`.
+
+```js
+socket.on("PEDIDO_DELIVERY_CRIADO", (summary) => {
+  // Inserir só na coluna do status (sem refetch full).
+  // Fallback: invalidate debounced se o payload nao mapear coluna.
+});
+
+socket.on("PEDIDO_DELIVERY_STATUS_ALTERADO", (summary) => {
+  // Upsert/move entre colunas; CANCELADO remove.
+});
+
+socket.on("PEDIDO_DELIVERY_IMPRESSAO_SOLICITADA", ({ vendaId, codigoVenda, numeroVenda }) => {
+  // disparar fluxo de impressão para vendaId
+});
+```
+
+---
+
+## Checklist gestor delivery (impressão)
+
+1. Token de **gestor** válido.
+2. Passar `estacaoId` da estação de impressão no `auth`.
+3. Essa estação precisa estar **ativa** e com **`gestorDelivery: true`** no backend.
+4. Escutar `PEDIDO_DELIVERY_IMPRESSAO_SOLICITADA` e obedecer o comando.
+
+### Como marcar no Gestor
+
+1. Abrir **Configurações de delivery**.
+2. Na seção **Vínculo com impressoras deste PC**, ativar **Este computador imprime pedidos delivery**.
+3. Isso faz `PATCH` em `/api/v1/gestor/estacoes-impressao/{id}` com `{ gestorDelivery: true }`.
+4. O `DeliveryRealtimeBridge` (montado no ERP) conecta em `/ws` com o `estacaoId` do `localStorage` e dispara a impressão local ao receber o evento.
+
+### Validação homolog
+
+1. Apontar `NEXT_PUBLIC_EXTERNAL_API_BASE_URL` para a API homolog **com** `PEDIDO_DELIVERY_STATUS_ALTERADO` deployado.
+2. Ativar o toggle acima neste PC.
+3. Pedido do cardápio/público → kanban atualiza sem F5 (`PEDIDO_DELIVERY_CRIADO` → insert na coluna; fallback invalidate debounced).
+4. Transição de status noutro PC → card move sem F5 (`PEDIDO_DELIVERY_STATUS_ALTERADO`).
+5. Pedido em preparo (ou já nasce em preparo) → cupom sai só nos PCs com `gestorDelivery`.
+6. Transição local no mesmo PC → um cupom só (dedupe ~20s entre local e WS).

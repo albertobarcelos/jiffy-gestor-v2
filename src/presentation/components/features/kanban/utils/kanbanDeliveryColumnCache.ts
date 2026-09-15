@@ -83,6 +83,92 @@ export function vendaPertenceAlgumaColunaDeliveryKanban(venda: VendaUnificadaDTO
   )
 }
 
+/**
+ * Nivel A/C realtime: aplica PEDIDO_DELIVERY_CRIADO so na coluna do status (sem varredura).
+ * @returns true se o summary virou card em coluna conhecida; false = caller deve invalidar.
+ */
+export function aplicarPedidoDeliveryCriadoNoKanbanCache(
+  queryClient: QueryClient,
+  payload: unknown
+): boolean {
+  const card = extrairVendaUnificadaDeRespostaDeliverySummary(payload)
+  if (!card) return false
+
+  const colunaAlvo = DELIVERY_KANBAN_COLUMN_IDS.find(columnId =>
+    vendaPertenceColunaDeliveryKanban(card, columnId, etapaKanbanDeliveryCache)
+  )
+  if (!colunaAlvo) return false
+
+  const queries = queryClient.getQueriesData<InfiniteData<PedidosDeliveryInfinitePage>>(
+    kanbanPedidosDeliveryInfiniteQueryFilter()
+  )
+
+  for (const [queryKey, data] of queries) {
+    const columnId = extrairColumnIdDePedidosDeliveryKanbanQueryKey(queryKey)
+    if (columnId !== colunaAlvo) continue
+    queryClient.setQueryData(queryKey, inserirVendaNaPrimeiraPagina(data, card))
+  }
+  // Summary valido: sucesso mesmo sem query da coluna montada (evita invalidate cego).
+  return true
+}
+
+/**
+ * Remove o card de todas as colunas delivery (ex.: CANCELADO).
+ * @returns true se removeu de pelo menos uma query.
+ */
+export function removerVendaDeliveryKanbanColumnCaches(
+  queryClient: QueryClient,
+  vendaId: string
+): boolean {
+  const id = vendaId.trim()
+  if (!id) return false
+
+  const queries = queryClient.getQueriesData<InfiniteData<PedidosDeliveryInfinitePage>>(
+    kanbanPedidosDeliveryInfiniteQueryFilter()
+  )
+
+  let removeu = false
+  for (const [queryKey, data] of queries) {
+    const columnId = extrairColumnIdDePedidosDeliveryKanbanQueryKey(queryKey)
+    if (!columnId) continue
+    const semVenda = removerVendaDasPaginas(data, id)
+    if (semVenda !== data) {
+      queryClient.setQueryData(queryKey, semVenda)
+      removeu = true
+    }
+  }
+  return removeu
+}
+
+/**
+ * Nivel D realtime: aplica PEDIDO_DELIVERY_STATUS_ALTERADO (move ou remove).
+ * @returns true se aplicou no cache; false = caller deve invalidar.
+ */
+export function aplicarPedidoDeliveryStatusAlteradoNoKanbanCache(
+  queryClient: QueryClient,
+  payload: unknown
+): boolean {
+  const card = extrairVendaUnificadaDeRespostaDeliverySummary(payload)
+  if (!card) return false
+
+  const statusOp = String(card.statusEtapaOperacional ?? '')
+    .trim()
+    .toUpperCase()
+  // CANCELADO nao tem coluna operacional; getEtapaKanban pode cair em NOVOS_PEDIDOS.
+  if (statusOp === 'CANCELADO' || statusOp === 'CANCELADA') {
+    removerVendaDeliveryKanbanColumnCaches(queryClient, card.id)
+    return true
+  }
+
+  if (!vendaPertenceAlgumaColunaDeliveryKanban(card)) {
+    removerVendaDeliveryKanbanColumnCaches(queryClient, card.id)
+    return true
+  }
+
+  upsertVendaDeliveryKanbanColumnCaches(queryClient, card)
+  return true
+}
+
 /** Substitui ou move o card entre caches de colunas após transição de status. */
 export function upsertVendaDeliveryKanbanColumnCaches(
   queryClient: QueryClient,

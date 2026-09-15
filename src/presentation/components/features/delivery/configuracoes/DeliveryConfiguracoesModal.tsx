@@ -30,7 +30,7 @@ import {
   useDeliveryConfigImpressorasLogicas,
   useInvalidateDeliveryConfigImpressaoQueries,
 } from '@/src/presentation/hooks/useDeliveryConfigImpressaoQueries'
-import { salvarMapeamentosEstacao } from '@/src/infrastructure/api/estacoesImpressaoApi'
+import { atualizarEstacaoImpressao, salvarMapeamentosEstacao } from '@/src/infrastructure/api/estacoesImpressaoApi'
 import { DeliveryVinculoImpressorasFisicas } from './DeliveryVinculoImpressorasFisicas'
 import { CupomCampoInfo } from './DeliveryModoPapelToggle'
 import { BaixarFredyCard } from '@/src/presentation/gestor-pedidos/windows/BaixarFredyCard'
@@ -102,6 +102,8 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
   const [imprimirAoFicarPronto, setImprimirAoFicarPronto] = useState(true)
   const [impressoraExpedicaoId, setImpressoraExpedicaoId] = useState<string>('')
   const [vinculosFisicos, setVinculosFisicos] = useState<Record<string, string>>({})
+  const [gestorDelivery, setGestorDelivery] = useState(false)
+  const [salvandoGestorDelivery, setSalvandoGestorDelivery] = useState(false)
   const [cupomTemplate, setCupomTemplate] = useState<DeliveryCupomTemplateConfig>(
     DEFAULT_DELIVERY_CUPOM_TEMPLATE
   )
@@ -168,16 +170,53 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
 
   useEffect(() => {
     if (!open) return
-    const mapeamentos = estacaoImpressaoQuery.data?.mapeamentos
-    if (!mapeamentos) return
+    const data = estacaoImpressaoQuery.data
+    if (!data) return
     const next: Record<string, string> = {}
-    for (const item of mapeamentos) {
+    for (const item of data.mapeamentos) {
       const id = item.impressoraId?.trim()
       const fisica = item.nomeImpressoraWindows?.trim()
       if (id && fisica) next[id] = fisica
     }
     setVinculosFisicos(next)
+    setGestorDelivery(data.gestorDelivery === true)
   }, [open, estacaoImpressaoQuery.data])
+
+  const handleGestorDeliveryChange = useCallback(
+    async (next: boolean) => {
+      const estacaoId = estacaoImpressaoQuery.data?.estacaoId?.trim()
+      const accessToken = useAuthStore.getState().tenantAuth?.getAccessToken()
+      if (!accessToken || !estacaoId) {
+        showToast.error('Estação de impressão ainda não está pronta neste computador.')
+        return
+      }
+      setGestorDelivery(next)
+      setSalvandoGestorDelivery(true)
+      try {
+        const atualizada = await atualizarEstacaoImpressao(accessToken, estacaoId, {
+          gestorDelivery: next,
+        })
+        setGestorDelivery(atualizada.gestorDelivery === true)
+        invalidateDeliveryConfigQueries()
+        window.dispatchEvent(new Event('jiffy:estacao-impressao-changed'))
+        showToast.success(
+          next
+            ? 'Este computador passou a receber comandos de impressão delivery.'
+            : 'Este computador deixou de ser gestor de impressão delivery.'
+        )
+      } catch (error) {
+        setGestorDelivery(!next)
+        showToast.error(
+          error instanceof Error
+            ? error.message
+            : 'Não foi possível atualizar o gestor de impressão delivery.'
+        )
+      } finally {
+        setSalvandoGestorDelivery(false)
+      }
+    },
+    [estacaoImpressaoQuery.data?.estacaoId, invalidateDeliveryConfigQueries]
+  )
 
   useEffect(() => {
     if (!open) {
@@ -481,6 +520,22 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
             info="Escolha, para cada nome do Gestor, qual impressora deste computador deve receber o cupom. O Jiffy Print precisa estar aberto."
             resetExpandedWhen={open}
           >
+            <div className="mb-3 space-y-2">
+              <DeliveryToggleRow
+                id="delivery-gestor-impressao"
+                checked={gestorDelivery}
+                disabled={
+                  carregando ||
+                  salvando ||
+                  salvandoGestorDelivery ||
+                  !estacaoImpressaoQuery.data?.estacaoId
+                }
+                onChecked={v => void handleGestorDeliveryChange(v)}
+                titulo="Este computador imprime pedidos delivery"
+                info="Marque só nos PCs que devem receber o comando de impressão em tempo real. É preciso ter estação criada e vínculos de impressora. Vários PCs marcados imprimem o mesmo pedido."
+              />
+            </div>
+
             <DeliveryVinculoImpressorasFisicas
               impressorasLogicas={impressorasLogicas}
               vinculos={vinculosFisicos}

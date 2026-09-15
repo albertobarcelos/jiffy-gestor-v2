@@ -208,6 +208,12 @@ Executar no PC com Jiffy Print + impressora vinculada.
 - [ ] Várias estações: cupons em paralelo (não travar um até o outro acabar).
 - [ ] Sem impressora física vinculada: mensagem de vínculo, não “sucesso falso”.
 - [ ] Modo gráfico vs texto (se a loja tiver os dois): cupom legível, sem cortar logo/itens.
+- [ ] Toggle **Este computador imprime pedidos delivery** ligado → recebe `PEDIDO_DELIVERY_IMPRESSAO_SOLICITADA` (pedido cardápio / outro PC).
+- [ ] Toggle desligado → não imprime por comando realtime.
+- [ ] Pedido novo no cardápio atualiza o kanban sem refresh (Socket.IO `PEDIDO_DELIVERY_CRIADO` → insert na coluna, sem rajada de GETs).
+- [ ] Transição de status noutro PC move o card sem F5 (`PEDIDO_DELIVERY_STATUS_ALTERADO`).
+- [ ] Cancelamento noutro PC remove o card das colunas operacionais.
+- [ ] Mesmo PC que avançou o pedido: não sai cupom duplicado (local + WS).
 
 ---
 
