@@ -12,7 +12,6 @@ import {
 } from 'react-icons/md'
 import { ProdutoValorInput } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoValorInput'
 import { ProdutoNomeInput } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoNomeInput'
-import { ProdutoStatusSwitch } from '@/src/presentation/components/features/produtos/ProdutosList/ProdutoStatusSwitch'
 import { MenuProdutoPauseControl } from '@/src/presentation/components/features/menus/MenuProdutoPauseControl'
 import { cn } from '@/src/shared/utils/cn'
 import { formatBRLFromMaskedInput } from '@/src/shared/utils/formatters'
@@ -115,18 +114,12 @@ function CatalogProductRowInner({
   const podeEditarNome = Boolean(onNomeChange)
   const podeEditarValor = Boolean(onValorChange)
 
-  const renderPauseOuStatus = () =>
-    hidePauseAndPrice ? null : isMenu ? (
+  const renderPauseMenu = () =>
+    hidePauseAndPrice ? null : (
       <MenuProdutoPauseControl
         isAtivo={ativo}
         disabled={isSavingStatus}
         onToggle={status => onSwitchToggle?.(id, status)}
-      />
-    ) : (
-      <ProdutoStatusSwitch
-        isAtivo={ativo}
-        disabled={isSavingStatus}
-        onChange={status => onSwitchToggle?.(id, status)}
       />
     )
 
@@ -237,7 +230,7 @@ function CatalogProductRowInner({
             <img
               src={imagemPreview}
               alt=""
-              loading="lazy"
+              loading="eager"
               decoding="async"
               className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
             />
@@ -321,8 +314,8 @@ function CatalogProductRowInner({
                 COD. {codigo?.trim() ? codigo : '—'}
               </span>
             )}
-            {hidePauseAndPrice ? null : (
-              <span className="inline-flex shrink-0 md:hidden">{renderPauseOuStatus()}</span>
+            {hidePauseAndPrice || !isMenu ? null : (
+              <span className="inline-flex shrink-0 md:hidden">{renderPauseMenu()}</span>
             )}
           </div>
 
@@ -343,19 +336,25 @@ function CatalogProductRowInner({
                 {formatBRLFromMaskedInput(valor)}
               </span>
             )}
-            {hidePauseAndPrice ? null : (
-              <span className="hidden shrink-0 md:inline-flex">{renderPauseOuStatus()}</span>
+            {hidePauseAndPrice || !isMenu ? null : (
+              <span className="hidden shrink-0 md:inline-flex">{renderPauseMenu()}</span>
             )}
-            {isMenu && onRemove ? (
-              <Tooltip title="Remover deste cardápio" arrow placement="top">
+            {onRemove ? (
+              <Tooltip
+                title={isMenu ? 'Remover deste cardápio' : 'Excluir produto'}
+                arrow
+                placement="top"
+              >
                 <button
                   type="button"
-                  aria-label={`Remover ${nome} deste cardápio`}
+                  aria-label={
+                    isMenu ? `Remover ${nome} deste cardápio` : `Excluir produto ${nome}`
+                  }
                   onClick={e => {
                     e.stopPropagation()
                     onRemove(id)
                   }}
-                  className="flex h-8 w-8 items-center justify-center rounded-full border border-primary/50 text-primary transition-colors hover:bg-primary/10"
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-red-400 text-red-500 transition-colors hover:bg-red-50 hover:text-red-600"
                 >
                   <MdDeleteOutline size={18} />
                 </button>

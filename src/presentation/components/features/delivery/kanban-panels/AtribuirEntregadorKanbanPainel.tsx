@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MdAttachMoney, MdSportsMotorsports } from 'react-icons/md'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSecureTenantQuery } from '@/src/presentation/hooks/useSecureTenantQuery'
+import { useRefetchCadastroAoAbrir } from '@/src/presentation/hooks/useRefetchCadastroAoAbrir'
 import { listarEntregadoresDeliveryUseCase } from '@/src/application/use-cases/delivery/ListarEntregadoresDeliveryUseCase'
 import {
   adaptPedidoDeliveryToVendaGestorApiResponse,
@@ -228,11 +229,13 @@ export function AtribuirEntregadorKanbanPainel({
     },
     {
       enabled: open,
-      staleTime: 1000 * 60 * 5,
+      staleTime: 0,
+      refetchOnMount: 'always',
     }
   )
 
   const entregadores = entregadoresQuery.data ?? []
+  useRefetchCadastroAoAbrir(open, entregadoresQuery.refetch)
 
   const carregarTaxaEntrega = useCallback(
     async (pedido: Record<string, unknown>, token: string) => {

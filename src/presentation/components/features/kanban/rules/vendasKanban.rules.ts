@@ -506,6 +506,18 @@ export function termoBuscaKanbanParaApi(termo: string): string {
   return trimmed
 }
 
+/**
+ * Listagem delivery (`GET /pedidos`) não filtra `q` por telefone.
+ * Se enviarmos o número, a API devolve vazio e o quadro some após o debounce.
+ * Telefone fica só no filtro local do Kanban (mesmo critério do Gestor).
+ */
+export function qListagemDeliveryKanban(q: string | undefined): string | undefined {
+  const t = String(q ?? '').trim()
+  if (!t) return undefined
+  if (ehTermoBuscaTelefoneKanban(t)) return undefined
+  return t
+}
+
 export function telefonesDoPedidoKanban(
   venda: Pick<Venda, 'cliente' | 'contextoEntrega'>
 ): string[] {

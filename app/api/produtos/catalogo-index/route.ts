@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
         success: true,
         codigos: index.codigos,
         permissoes: index.permissoes,
+        imagens: index.imagens,
       },
       {
         headers: {
@@ -47,6 +48,7 @@ export async function GET(req: NextRequest) {
           success: true,
           codigos: {},
           permissoes: {},
+          imagens: {},
           warning: 'O serviço está temporariamente indisponível.',
         },
         { status: 200 }

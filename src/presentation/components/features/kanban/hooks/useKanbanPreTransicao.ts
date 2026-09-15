@@ -23,6 +23,7 @@ import {
   resolverEntregadorIdVendaKanban,
 } from '../../delivery/kanban-panels/entregadorKanbanStore'
 import { vendaExigeEntregadorParaDespachar } from '../rules/vendasKanban.rules'
+import { sincronizarAlarmeSomComPedidoDelivery } from '@/src/presentation/gestor-pedidos/som/alarmeSomPedidoNovo'
 import { showToast } from '@/src/shared/utils/toast'
 import type { AcaoTransicaoGestor } from '@/src/presentation/hooks/useVendas'
 import type { EmpresaMeResumo } from '@/src/presentation/hooks/useEmpresaMe'
@@ -49,7 +50,8 @@ export function useKanbanPreTransicao({
   preferenciasImpressaoDelivery,
   empresa,
   onAbrirConfigImpressoraExpedicao,
-}: UseKanbanPreTransicaoParams) {  const queryClient = useQueryClient()
+}: UseKanbanPreTransicaoParams) {
+  const queryClient = useQueryClient()
 
   const { processarAposTransicoes, reimprimirCupomEntrega } = useImpressaoDelivery({
     onImpressoraExpedicaoNecessaria: onAbrirConfigImpressoraExpedicao,
@@ -70,6 +72,12 @@ export function useKanbanPreTransicao({
         if (ok) {
           const cardAtualizado =
             extrairVendaUnificadaDeRespostaDeliverySummary(respostaTransicao)
+          sincronizarAlarmeSomComPedidoDelivery({
+            vendaId,
+            etapaKanban:
+              cardAtualizado?.getEtapaKanban() ?? colunaDestino ?? null,
+            statusOperacional: cardAtualizado?.statusEtapaOperacional,
+          })
           if (cardAtualizado?.entregador?.id) {
             definirEntregadorKanbanCache(vendaId, cardAtualizado.entregador.id)
             onPatchEntregadorPorVendaId(vendaId, cardAtualizado.entregador.id)

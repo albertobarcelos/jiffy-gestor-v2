@@ -33,6 +33,19 @@ function requestPathname(input: RequestInfo | URL): string {
 }
 
 /**
+ * Falha de rede no browser (`TypeError: Failed to fetch`) não deve virar overlay
+ * do Next.js. Devolve 503 para o chamador tratar `res.ok`.
+ */
+function respostaFalhaDeRede(pathname: string, error: unknown): Response {
+  const message = error instanceof Error ? error.message : 'Falha de rede'
+  console.warn(`[fetchGestorApi] ${pathname}: ${message}`)
+  return new Response(JSON.stringify({ error: 'Falha de rede' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
+/**
  * Em 401, não tentar refresh em rotas públicas de auth / consultas sem sessão,
  * para evitar pedidos inúteis (ex.: senha errada no login).
  */
@@ -112,13 +125,18 @@ export async function fetchGestorApi(
     credentials: fetchInit.credentials ?? 'include',
   }
 
-  const response = await fetch(input, nextInit)
+  const pathname = requestPathname(input)
+  let response: Response
+  try {
+    response = await fetch(input, nextInit)
+  } catch (error) {
+    return respostaFalhaDeRede(pathname, error)
+  }
 
   if (response.status !== 401 || !autoRefresh || typeof window === 'undefined') {
     return response
   }
 
-  const pathname = requestPathname(input)
   if (!shouldRetryGestorSessionAfter401(pathname)) {
     return response
   }
@@ -145,5 +163,9 @@ export async function fetchGestorApi(
   const retryHeaders = new Headers(fetchInit.headers)
   retryHeaders.set('Authorization', `Bearer ${newToken}`)
 
-  return fetch(input, { ...nextInit, headers: retryHeaders })
+  try {
+    return await fetch(input, { ...nextInit, headers: retryHeaders })
+  } catch (error) {
+    return respostaFalhaDeRede(pathname, error)
+  }
 }

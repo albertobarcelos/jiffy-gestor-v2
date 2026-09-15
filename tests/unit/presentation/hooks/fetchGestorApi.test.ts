@@ -171,4 +171,15 @@ describe('fetchGestorApi', () => {
     expect(fetchTenantRefreshAccessToken).not.toHaveBeenCalled()
     expect(result.status).toBe(401)
   })
+
+  it('retorna 503 em vez de lançar TypeError quando fetch falha', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'))
+
+    const result = await fetchGestorApi('/api/empresas/me/logo-impressao')
+
+    expect(result.status).toBe(503)
+    expect(result.ok).toBe(false)
+    const body = (await result.json()) as { error?: string }
+    expect(body.error).toBe('Falha de rede')
+  })
 })

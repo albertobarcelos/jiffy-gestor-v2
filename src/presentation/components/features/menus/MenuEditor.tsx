@@ -42,7 +42,7 @@ import { atualizarGrupoProdutoViaBffUseCase } from '@/src/application/use-cases/
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
-import { resolverCodigoMenuProduto } from '@/src/shared/utils/catalogoProdutoIndex'
+import { resolverCodigoMenuProduto, resolverImagemMenuProduto } from '@/src/shared/utils/catalogoProdutoIndex'
 import { podeDesvincularProdutoDoMenu } from '@/src/domain/policies/produto/syncCadastroComMenuPrincipal'
 import type { MenuGrupoProduto, MenuProduto } from '@/src/shared/types/menus'
 
@@ -272,6 +272,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
   const {
     codigoPorId,
     permissoesPorId,
+    imagemPorId,
     savingDaLinha,
     handleNomeChange,
     handleValorChange,
@@ -371,6 +372,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
             produto,
             codigoPorId.get(produto.produtoId)
           )}
+          imagemCadastro={imagemPorId.get(produto.produtoId)}
           permissoesCadastro={permissoesPorId.get(produto.produtoId)}
           saving={saving}
           onNomeChange={handleNomeChange}
@@ -390,6 +392,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
       handleStatusToggle,
       handleTogglePermissao,
       handleValorChange,
+      imagemPorId,
       permissoesPorId,
       savingDaLinha,
     ]
@@ -493,10 +496,8 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
       />
 
       <div className="mt-2 flex min-h-0 flex-1 flex-col px-1">
-        <div className="min-h-0 flex-1">
         <CatalogGroupedList
           virtualize
-          className="scrollbar-hide"
           groups={catalogGroupsVisiveis}
           getItemKey={item => item.produtoId}
           renderItem={renderItem}
@@ -515,7 +516,6 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
           onToggleGrupoStatus={handleToggleGrupoStatus}
           onAddProduto={handleAddProduto}
         />
-        </div>
       </div>
 
       <MenuProdutoTabsModal

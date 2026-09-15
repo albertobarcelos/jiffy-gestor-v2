@@ -61,6 +61,15 @@ describe('vendasUnificadasQueryParamsParaPedidosDelivery', () => {
       dataFinalizacaoFim: undefined,
     })
   })
+
+  it('omite q quando o termo é telefone', () => {
+    expect(
+      vendasUnificadasQueryParamsParaPedidosDelivery({
+        q: '659992341536',
+        origem: 'GESTOR',
+      }).q
+    ).toBeUndefined()
+  })
 })
 
 describe('getNextOffsetPedidosDelivery', () => {

@@ -24,6 +24,7 @@ import {
 } from '@/src/presentation/components/features/clientes/ClientesTabsModal'
 import { JiffySidePanelModal } from '@/src/presentation/components/ui/jiffy-side-panel-modal'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
+import { useRefetchCadastroAoAbrir } from '@/src/presentation/hooks/useRefetchCadastroAoAbrir'
 import { useCriarClienteRapido } from '@/src/presentation/hooks/useClientes'
 import { useCriarClienteDeliveryRapido } from '@/src/presentation/hooks/useMoradaTelefone'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
@@ -126,8 +127,9 @@ export function SeletorClienteModal({
   )
 
   // Hook com paginação infinita - limit 100 para carregar mais clientes por página
-  const { data, fetchNextPage, hasNextPage, isFetching, isFetchingNextPage, isLoading, error } =
+  const { data, fetchNextPage, hasNextPage, isFetching, isFetchingNextPage, isLoading, error, refetch } =
     useClientesInfinite(clientesQueryParams)
+  useRefetchCadastroAoAbrir(open, refetch)
 
   // Achata páginas, remove duplicatas por id (se a API repetir offset) e aplica filtro local no nome
   // quando há texto — defesa se o backend ignorar o parâmetro `q`.

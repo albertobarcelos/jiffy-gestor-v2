@@ -26,6 +26,9 @@ export function buildTenantQueryKey(
  * por:
  *   `invalidate(['vendas'])` → invalida `['tenant', empresaId, 'vendas']`
  *
+ * Toda invalidação também é espelhada nas outras abas (BroadcastChannel).
+ * Cadastros de operação (entregador, taxa, cliente) ainda refetch ao abrir o painel.
+ *
  * @example
  * const invalidate = useInvalidateTenantQueries()
  *
