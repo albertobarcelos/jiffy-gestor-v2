@@ -21,6 +21,7 @@ import type {
 import type { ModoVisualizacaoKanban } from '../utils/kanbanModoVisualizacao'
 import { KanbanColunasMenu } from './KanbanColunasMenu'
 import { KanbanModoVisualizacaoSelect } from './KanbanModoVisualizacaoSelect'
+import { LojaAbertaToggle } from '@/src/presentation/components/features/delivery/LojaAbertaToggle'
 import type { SuperficieQuadroPedidos } from '@/src/presentation/gestor-pedidos/superficieQuadroPedidos'
 import {
   KANBAN_FILTRO_DATA_PRESET_OPCOES,
@@ -415,6 +416,7 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
           {noFredy ? null : (
             <KanbanModoVendasToggle value={modoKanbanVendas} onChange={onModoKanbanVendasChange} />
           )}
+          {isModoDelivery ? <LojaAbertaToggle /> : null}
           <button
             type="button"
             onClick={onAbrirConfiguracoesDelivery}

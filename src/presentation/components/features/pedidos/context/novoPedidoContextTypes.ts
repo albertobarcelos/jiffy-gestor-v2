@@ -227,6 +227,8 @@ export interface NovoPedidoUISlice {
   empresa: EmpresaMe
   seletorClienteOpen: boolean
   setSeletorClienteOpen: Dispatch<SetStateAction<boolean>>
+  abrirCadastroRapidoEntregaPedido: number
+  setAbrirCadastroRapidoEntregaPedido: Dispatch<SetStateAction<number>>
   tooltipGrupoId: string | null
   setTooltipGrupoId: Dispatch<SetStateAction<string | null>>
   tooltipPosition: { x: number; y: number } | null

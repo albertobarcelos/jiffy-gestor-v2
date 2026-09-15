@@ -43,7 +43,8 @@ function AcoesHeader({ incluirCopiar }: { incluirCopiar: boolean }) {
 }
 
 /**
- * Cabeçalho desktop alinhado ao grid da lista (cadastro e cardápio).
+ * Cabeçalho desktop alinhado ao grid da lista do cadastro (produto principal).
+ * Não usar no cardápio/menu: os rótulos das colunas só fazem sentido no cadastro.
  */
 export function CatalogProductColumnHeader({
   variant,

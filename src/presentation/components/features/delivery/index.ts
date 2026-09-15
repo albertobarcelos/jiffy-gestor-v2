@@ -8,6 +8,7 @@ export {
   type DeliveryModoCupomToggleProps,
 } from './configuracoes'
 export { EntregaClienteSelector } from './components'
+export { LojaAbertaToggle } from './LojaAbertaToggle'
 export {
   EnderecoEntregaPedidoKanbanPainel,
   AtribuirEntregadorKanbanPainel,

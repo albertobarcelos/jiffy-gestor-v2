@@ -15,6 +15,7 @@ import {
 import type { CriarPedidoDeliveryApiRequest } from '@/src/application/dto/api/pedidoDeliveryApi'
 import { transformarParaReal } from '@/src/shared/utils/formatters'
 import { showToast } from '@/src/shared/utils/toast'
+import { notificarEnderecoForaDaCobertura, useHrefCoberturaEntregaPedido } from '../utils/coberturaEntregaPedidoUi'
 import { validarObservacoesPedido } from '@/src/shared/helpers/observacaoPedido'
 import { salvarRascunhoInformacoesAdicionais } from '@/src/shared/helpers/informacoesAdicionaisNota'
 
@@ -120,6 +121,7 @@ export function useNovoPedidoSubmit({
   preferenciasAutoIniciarPreparo,
   accessToken,
 }: UseNovoPedidoSubmitParams) {
+  const hrefCoberturaEntrega = useHrefCoberturaEntregaPedido()
   const criarVendaGestorUseCase = useMemo(() => new CriarVendaGestorUseCase(), [])
   const criarPedidoDeliveryUseCase = useMemo(() => new CriarPedidoDeliveryUseCase(), [])
 
@@ -159,6 +161,12 @@ export function useNovoPedidoSubmit({
     })
 
     if (!validacaoResult.ok) {
+      if (validacaoResult.code === 'cobertura') {
+        notificarEnderecoForaDaCobertura(hrefCoberturaEntrega)
+        setCurrentStep(validacaoResult.goToStep ?? 2)
+        return
+      }
+
       if (validacaoResult.goToStep === 2 || validacaoResult.goToStep === 1) {
         showToast.error(validacaoResult.message)
         setCurrentStep(validacaoResult.goToStep)
@@ -272,9 +280,7 @@ export function useNovoPedidoSubmit({
         code.includes('ENDERECO_FORA_COBERTURA_ENTREGA') ||
         /fora da cobertura|não está coberto/i.test(rawMessage)
       ) {
-        showToast.error(
-          'O endereço ficou fora da cobertura cadastrada. Ajuste a área no hub Delivery se precisar aceitar este pedido.'
-        )
+        notificarEnderecoForaDaCobertura(hrefCoberturaEntrega)
         setCurrentStep(2)
         return
       }
@@ -304,6 +310,7 @@ export function useNovoPedidoSubmit({
     onClose,
     setCurrentStep,
     accessToken,
+    hrefCoberturaEntrega,
   ])
 
   return { handleSubmit }

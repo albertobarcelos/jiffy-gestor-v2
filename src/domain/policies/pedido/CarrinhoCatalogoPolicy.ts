@@ -1,9 +1,66 @@
-import type { Produto } from '@/src/domain/entities/Produto'
+import { Produto } from '@/src/domain/entities/Produto'
 import type { ComplementoSelecionado, ProdutoSelecionado } from '@/src/domain/types/pedido'
 import {
   normalizarUnidadeMedidaProduto,
   type UnidadeMedidaProduto,
 } from '@/src/shared/types/unidadeMedidaProduto'
+import type { MenuProdutoPermissoes } from '@/src/shared/utils/menuProdutoPermissoes'
+
+export type CarregarProdutoCatalogoOptions = {
+  forceRefresh?: boolean
+  /** Não reutilizar snapshot slim da grade — precisa dos grupos/itens do cadastro. */
+  requireComplementos?: boolean
+}
+
+export function produtoTemComplementosCarregados(
+  produto: Pick<Produto, 'getGruposComplementos'>
+): boolean {
+  return produto
+    .getGruposComplementos()
+    .some(grupo => (grupo.complementos?.length ?? 0) > 0)
+}
+
+/**
+ * Snapshot da grade do menu não traz os itens de complemento.
+ * Só reutiliza cache quando ele já tem os grupos carregados (GET do cadastro).
+ */
+export function cacheProdutoCatalogoAtendePedido(
+  produto: Produto | undefined,
+  options?: CarregarProdutoCatalogoOptions
+): produto is Produto {
+  if (options?.forceRefresh) return false
+  if (!produto) return false
+  if (options?.requireComplementos && !produtoTemComplementosCarregados(produto)) {
+    return false
+  }
+  return true
+}
+
+/** Aplica flags do cadastro (índice slim) no snapshot da grade, sem apagar complementos já hidratados. */
+export function aplicarPermissoesCadastroNoProdutoCatalogo(
+  produto: Produto,
+  permissoes: MenuProdutoPermissoes | undefined
+): Produto {
+  if (!permissoes) return produto
+  if (produtoTemComplementosCarregados(produto)) return produto
+  if (
+    produto.abreComplementosAtivo() === permissoes.abreComplementos &&
+    produto.permiteAcrescimoAtivo() === permissoes.permiteAcrescimo &&
+    produto.permiteDescontoAtivo() === permissoes.permiteDesconto &&
+    produto.permiteAlterarPrecoAtivo() === permissoes.permiteAlterarPreco &&
+    produto.incideTaxaAtivo() === permissoes.incideTaxa
+  ) {
+    return produto
+  }
+  return Produto.fromJSON({
+    ...produto.toJSON(),
+    abreComplementos: permissoes.abreComplementos,
+    permiteAcrescimo: permissoes.permiteAcrescimo,
+    permiteDesconto: permissoes.permiteDesconto,
+    permiteAlterarPreco: permissoes.permiteAlterarPreco,
+    incideTaxa: permissoes.incideTaxa,
+  })
+}
 
 export function obterProdutoDoCatalogo(
   produtoId: string,

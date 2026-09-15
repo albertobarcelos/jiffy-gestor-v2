@@ -45,6 +45,11 @@ interface SeletorClienteModalProps {
   telefoneCadastro?: string
   /** Nome sugerido (título da conversa). */
   nomeSugerido?: string
+  /**
+   * Substitui o cadastro interno (mesmo fluxo do link “Cadastrar” na entrega).
+   * O pai deve fechar este seletor e abrir o painel correspondente.
+   */
+  onCadastrarCliente?: () => void
 }
 
 export function SeletorClienteModal({
@@ -56,6 +61,7 @@ export function SeletorClienteModal({
   cadastroRapido = false,
   telefoneCadastro = '',
   nomeSugerido = '',
+  onCadastrarCliente,
 }: SeletorClienteModalProps) {
   const invalidate = useInvalidateTenantQueries()
   const criarCliente = useCriarClienteRapido()
@@ -199,6 +205,10 @@ export function SeletorClienteModal({
     : ''
 
   const handleOpenNovoCliente = useCallback(() => {
+    if (onCadastrarCliente) {
+      onCadastrarCliente()
+      return
+    }
     if (cadastroRapido) {
       const busca = searchText.trim()
       const buscaEhTelefone = termoBuscaClientePorTelefone(busca).length >= 8
@@ -212,7 +222,7 @@ export function SeletorClienteModal({
       mode: 'create',
       clienteId: undefined,
     })
-  }, [cadastroRapido, nomeSugerido, searchText])
+  }, [cadastroRapido, nomeSugerido, onCadastrarCliente, searchText])
 
   const handleSalvarClienteRapido = useCallback(async () => {
     const nome = nomeNovoCliente.trim()

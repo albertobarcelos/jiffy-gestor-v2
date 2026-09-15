@@ -16,7 +16,7 @@ export interface UseNovoPedidoEdicaoLinhaParams {
   produtosList: Produto[]
   carregarProdutoNoCatalogoSeNecessario: (
     produtoId: string,
-    options?: { forceRefresh?: boolean }
+    options?: { forceRefresh?: boolean; requireComplementos?: boolean }
   ) => Promise<Produto | null>
 }
 

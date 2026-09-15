@@ -34,6 +34,7 @@ export function NovoPedidoAuxiliaryModals() {
   const {
     seletorClienteOpen,
     setSeletorClienteOpen,
+    setAbrirCadastroRapidoEntregaPedido,
     modalCancelarVendaOpen,
     setModalCancelarVendaOpen,
     modalConfirmacaoSaidaOpen,
@@ -96,6 +97,14 @@ export function NovoPedidoAuxiliaryModals() {
             title={tipoInicioPedido === 'entrega' ? 'Selecionar cliente' : undefined}
             cadastroRapido={tipoInicioPedido === 'entrega'}
             telefoneCadastro={tipoInicioPedido === 'entrega' ? telefoneBuscaEntrega : ''}
+            onCadastrarCliente={
+              tipoInicioPedido === 'entrega'
+                ? () => {
+                    setSeletorClienteOpen(false)
+                    setAbrirCadastroRapidoEntregaPedido(n => n + 1)
+                  }
+                : undefined
+            }
           />
         )}
 
