@@ -10,6 +10,7 @@ import {
 } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
 import { useSuperficieQuadroPedidos } from '@/src/presentation/gestor-pedidos/kiosk/useSuperficieQuadroPedidos'
 import { WhatsAppWebViewHost } from '@/src/presentation/gestor-pedidos/whatsapp/WhatsAppWebViewHost'
+import { DeliveryRealtimeBridge } from '@/src/presentation/realtime/DeliveryRealtimeBridge'
 import { useDetectCacheLeaks } from '@/src/presentation/hooks/useDetectCacheLeaks'
 import { HUB_PATH } from '@/src/shared/constants/hubRoutes'
 import { stripGestaoEmpresaSlugFromPath } from '@/src/shared/utils/gestaoRoutes'
@@ -33,6 +34,7 @@ function ErpAppShellInner({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-gray-50">
+      <DeliveryRealtimeBridge />
       {superficie === 'fredy' && clientePronto ? <WhatsAppWebViewHost /> : null}
       {mostrarTopNav ? <TopNav /> : null}
 

@@ -5,13 +5,15 @@ import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { usePreferenciasImpressaoDelivery } from '@/src/presentation/hooks/usePreferenciasImpressaoDelivery'
 import { decidirImpressaoAposAcao } from '@/src/application/delivery/decidirImpressaoPosTransicao'
-import { fetchVendaGestorTickets } from '@/src/infrastructure/api/fetchVendaGestorTickets'
 import { filtrarTicketsPorTipoDecidido } from '@/src/application/delivery/filtrarTicketsPorTipoDecidido'
 import { filtrarWarningsTicketsParaImpressao } from '@/src/application/delivery/filtrarWarningsTicketsParaImpressao'
+import { marcarImpressaoDeliveryRecente } from '@/src/application/delivery/impressaoDeliveryDedupe'
+import { imprimirPorComandoRealtime as imprimirPorComandoRealtimeApp } from '@/src/application/delivery/imprimirPorComandoRealtime'
 import {
   imprimirTicketsApiGestor,
   notificarWarningsTickets,
 } from '@/src/application/delivery/imprimirTicketsApiGestor'
+import { fetchVendaGestorTickets } from '@/src/infrastructure/api/fetchVendaGestorTickets'
 import type { AcaoTransicaoGestor } from '@/src/presentation/hooks/useVendas'
 import type { ColunaKanbanId, Venda } from '@/src/presentation/components/features/kanban/types'
 import { COLUNAS_ENTREGA_OPERACIONAIS } from '@/src/presentation/components/features/kanban/rules/vendasKanban.rules'
@@ -177,10 +179,13 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
           onAviso: m => showToast.warning(m),
           omitirAvisoSemVinculoPc: opcoes?.omitirAvisoSemVinculoPc,
         })
+        if (acao === 'iniciar_preparo') {
+          marcarImpressaoDeliveryRecente(venda.id)
+        }
         logImpressao('hook.imprimir_tickets_concluido', { vendaId: venda.id })
       }
     },
-    [ deliveryCupomTemplate, empresa, preferenciasImpressaoDelivery]
+    [deliveryCupomTemplate, empresa, preferenciasImpressaoDelivery]
   )
 
   const processarAposTransicaoVendaGestorId = useCallback(
@@ -194,6 +199,23 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
       )
     },
     [processarAposTransicoes]
+  )
+
+  const imprimirPorComandoRealtime = useCallback(
+    async (vendaId: string) => {
+      const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+      return imprimirPorComandoRealtimeApp({
+        vendaId,
+        accessToken: token,
+        prefs: preferenciasImpressaoDelivery,
+        empresa,
+        cupomTemplate: deliveryCupomTemplate,
+        onMensagem: m => showToast.info(m),
+        onErro: m => showToast.error(m),
+        onAviso: m => showToast.warning(m),
+      })
+    },
+    [deliveryCupomTemplate, empresa, preferenciasImpressaoDelivery]
   )
 
   const reimprimirCupomEntrega = useCallback(
@@ -294,5 +316,10 @@ export function useImpressaoDelivery(options?: UseImpressaoDeliveryOptions) {
     ]
   )
 
-  return { processarAposTransicoes, processarAposTransicaoVendaGestorId, reimprimirCupomEntrega }
+  return {
+    processarAposTransicoes,
+    processarAposTransicaoVendaGestorId,
+    imprimirPorComandoRealtime,
+    reimprimirCupomEntrega,
+  }
 }
