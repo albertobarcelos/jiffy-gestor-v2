@@ -32,6 +32,7 @@ import {
 import { CatalogGroupedList } from '@/src/presentation/components/features/catalogo/CatalogGroupedList'
 import type { CatalogGroup } from '@/src/presentation/components/features/catalogo/types'
 import { MenuProdutoCatalogRow } from './MenuProdutoCatalogRow'
+import { MenuCategoriaSnapshotPanel } from './MenuCategoriaSnapshotPanel'
 import { MENU_MODAL_CANCEL_VARIANT } from './menuPanelConstants'
 import { coletarGruposMenuPorSnapshot, ordemSnapshotCategoria } from './ordenarGruposMenuSnapshot'
 import { sxEntradaCompactaProduto } from '@/src/presentation/components/features/produtos/NovoProduto/produtoFormMuiSx'
@@ -102,6 +103,7 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
     produto: null,
     grupo: null,
   })
+  const [categoriaPanelGrupo, setCategoriaPanelGrupo] = useState<MenuGrupoProduto | null>(null)
 
   const openWizardCadastro = useCallback((categoriaId?: string) => {
     setWizardCategoriaId(categoriaId)
@@ -311,11 +313,15 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
       const grupo = findGrupo(grupoId)
       if (!grupo) return
       const primeiro = produtosPorGrupo.get(grupoId)?.[0] ?? null
-      openTabs({
-        tab: 'grupo',
-        grupo,
-        produto: primeiro,
-      })
+      if (primeiro) {
+        openTabs({
+          tab: 'produto',
+          grupo,
+          produto: primeiro,
+        })
+        return
+      }
+      setCategoriaPanelGrupo(grupo)
     },
     [findGrupo, produtosPorGrupo, openTabs]
   )
@@ -523,9 +529,17 @@ export function MenuEditor({ menuId }: MenuEditorProps) {
         state={tabsState}
         onClose={closeTabs}
         onTabChange={tab => setTabsState(prev => ({ ...prev, tab }))}
+        onGrupoChange={grupo => setTabsState(prev => ({ ...prev, grupo }))}
         onRemoverDesteCardapio={
           podeDesvincularProdutoDoMenu(menu?.tipo) ? handleRemove : undefined
         }
+      />
+
+      <MenuCategoriaSnapshotPanel
+        open={Boolean(categoriaPanelGrupo)}
+        menuId={menuId}
+        grupo={categoriaPanelGrupo}
+        onClose={() => setCategoriaPanelGrupo(null)}
       />
 
       <AddProdutosToMenuPanel

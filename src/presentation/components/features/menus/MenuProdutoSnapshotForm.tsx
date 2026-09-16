@@ -16,8 +16,9 @@ import { sxEntradaCompactaProduto } from '@/src/presentation/components/features
 import { useMenuMutations } from '@/src/presentation/hooks/menus/useMenuMutations'
 import { usePropagarAlteracaoProduto } from '@/src/presentation/hooks/produtos/usePropagarAlteracaoProduto'
 import { showToast } from '@/src/shared/utils/toast'
-import type { MenuProduto } from '@/src/shared/types/menus'
+import type { MenuGrupoProduto, MenuProduto } from '@/src/shared/types/menus'
 import { MENU_PRODUTO_FORM_ID } from './menuPanelConstants'
+import { MenuCategoriaNesteCardapioCampos } from './MenuCategoriaNesteCardapioCampos'
 import { ProdutoFormWithPreviewLayout } from '@/src/presentation/components/features/produtos/preview/ProdutoFormWithPreviewLayout'
 import { parsePrecoPreviewFromInput } from '@/src/presentation/components/features/produtos/preview/produtoPreviewModel'
 import type { ProdutoPreviewImageUpload } from '@/src/presentation/components/features/produtos/preview/ProdutoSimplePreviewCard'
@@ -30,9 +31,11 @@ export type MenuProdutoSnapshotHandle = {
 interface MenuProdutoSnapshotFormProps {
   menuId: string
   produto: MenuProduto
+  grupo?: MenuGrupoProduto | null
   formId?: string
   onDirtyChange?: (dirty: boolean) => void
   onSavingChange?: (saving: boolean) => void
+  onGrupoChange?: (grupo: MenuGrupoProduto) => void
   onRemoverDesteCardapio?: () => void
 }
 
@@ -59,9 +62,11 @@ export const MenuProdutoSnapshotForm = forwardRef<
   {
     menuId,
     produto,
+    grupo = null,
     formId = MENU_PRODUTO_FORM_ID,
     onDirtyChange,
     onSavingChange,
+    onGrupoChange,
     onRemoverDesteCardapio,
   },
   ref
@@ -292,6 +297,15 @@ export const MenuProdutoSnapshotForm = forwardRef<
               sx={sxEntradaCompactaProduto}
             />
           </div>
+
+          {grupo ? (
+            <MenuCategoriaNesteCardapioCampos
+              menuId={menuId}
+              grupo={grupo}
+              produtoId={produto.produtoId}
+              onGrupoChange={onGrupoChange}
+            />
+          ) : null}
 
           <Input
             label="Descrição"
