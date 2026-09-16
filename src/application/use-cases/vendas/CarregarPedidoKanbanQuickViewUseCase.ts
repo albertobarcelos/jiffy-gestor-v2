@@ -297,14 +297,19 @@ export class CarregarPedidoKanbanQuickViewUseCase {
       pagamentoEntregaApi
     )
 
-    const troco = resolverTrocoLevarPedidoEntrega(vendaData, pagamentos)
-    const totalAReceber = calcularTotalAReceberPagamentos(pagamentos)
     const nomesMeiosPagamento = await resolverNomesMeiosPagamentoQuickView({
       pagamentosApi,
       meiosCobrancaApi,
       repo: this.repo,
       token,
     })
+    const troco = resolverTrocoLevarPedidoEntrega(vendaData, pagamentos, nomesMeiosPagamento)
+    if (troco > 0) {
+      detalhesEntrega = { ...detalhesEntrega, trocoApi: troco }
+    } else if (detalhesEntrega.trocoApi) {
+      detalhesEntrega = { ...detalhesEntrega, trocoApi: null }
+    }
+    const totalAReceber = calcularTotalAReceberPagamentos(pagamentos)
     const tipoPagamento = formatarTipoPagamentoDetalhe(pagamentos, [], nomesMeiosPagamento)
     const linhasPagamento = montarLinhasResumoPagamentoPedido(
       pagamentos,

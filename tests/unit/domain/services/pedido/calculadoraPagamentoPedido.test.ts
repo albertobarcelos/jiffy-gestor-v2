@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  calcularTrocoPedido,
   calcularTrocoSobreLancamentos,
   calcularValorAPagar,
   resolverLancamentoPagamento,
@@ -61,6 +62,42 @@ describe('cálculo de lançamento misto', () => {
           { valor: 45, isDinheiro: false },
           { valor: 10, isDinheiro: true },
         ],
+      })
+    ).toBe(0)
+  })
+
+  it('calcula troco da cédula na entrega com o mesmo núcleo da aba Pagamento', () => {
+    expect(
+      calcularTrocoPedido({
+        totalProdutos: 39.9,
+        pagamentos: [
+          {
+            meioPagamentoId: 'mp-dinheiro',
+            valor: 50,
+            cobrarNaEntrega: true,
+            naoEfetivo: true,
+          },
+        ],
+        nomesMeiosPagamentoPorId: { 'mp-dinheiro': 'Dinheiro' },
+        considerarApenasNaoCancelados: true,
+      })
+    ).toBeCloseTo(10.1)
+  })
+
+  it('nao gera troco para PIX nomeado acima do total', () => {
+    expect(
+      calcularTrocoPedido({
+        totalProdutos: 39.9,
+        pagamentos: [
+          {
+            meioPagamentoId: 'mp-pix',
+            valor: 50,
+            cobrarNaEntrega: true,
+            naoEfetivo: true,
+          },
+        ],
+        nomesMeiosPagamentoPorId: { 'mp-pix': 'PIX' },
+        considerarApenasNaoCancelados: true,
       })
     ).toBe(0)
   })

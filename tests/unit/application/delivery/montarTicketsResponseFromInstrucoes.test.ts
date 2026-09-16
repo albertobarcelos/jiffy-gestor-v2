@@ -203,6 +203,71 @@ describe('montarTicketsResponseFromInstrucoes', () => {
     expect(result.pagamento?.valorCobrarNaEntrega).toBe(29)
   })
 
+  it('leva troco da cédula na cobrança quando o GET manda troco 0 (cardapio)', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      modo: 'separado' as const,
+      impressoraExpedicaoId: 'imp-exp',
+    }
+
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: { mapeamentos: [], warnings: [] },
+      pedido: {
+        ...pedidoBase,
+        valorFinal: 39.9,
+        totalPago: 0,
+        totalFaltaPagar: 39.9,
+        troco: 0,
+        cobrancas: [
+          {
+            id: 'cob-1',
+            meioPagamentoId: 'mp-dinheiro',
+            valor: 50,
+            momentoCobranca: 'na_entrega',
+            status: 'pendente',
+          },
+        ],
+      },
+      prefs,
+      nomesMeiosPagamentoPorId: { 'mp-dinheiro': 'Dinheiro' },
+    })
+
+    expect(result.pagamento?.trocoParaLevar).toBe(10.1)
+    expect(result.pagamento?.valorCobrarNaEntrega).toBe(50)
+  })
+
+  it('nao leva troco no cupom quando a cobranca na entrega e PIX', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      modo: 'separado' as const,
+      impressoraExpedicaoId: 'imp-exp',
+    }
+
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: { mapeamentos: [], warnings: [] },
+      pedido: {
+        ...pedidoBase,
+        valorFinal: 39.9,
+        totalPago: 0,
+        totalFaltaPagar: 39.9,
+        troco: 0,
+        cobrancas: [
+          {
+            id: 'cob-1',
+            meioPagamentoId: 'mp-pix',
+            valor: 50,
+            momentoCobranca: 'na_entrega',
+            status: 'pendente',
+          },
+        ],
+      },
+      prefs,
+      nomesMeiosPagamentoPorId: { 'mp-pix': 'PIX' },
+    })
+
+    expect(result.pagamento?.trocoParaLevar).toBeUndefined()
+  })
+
   it('nao soma taxa removida com a taxa ativa no cupom', () => {
     const prefs = {
       ...DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
