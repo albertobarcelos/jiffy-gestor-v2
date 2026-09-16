@@ -12,8 +12,13 @@ import {
 export function mapOrigemApiDeliveryParaVendaUnificada(
   origem: string | null | undefined
 ): VendaUnificadaDTO['origem'] {
-  const o = String(origem ?? '').trim().toUpperCase()
-  if (o === 'GESTOR' || o === 'JIFFY_DELIVERY') return 'GESTOR'
+  const o = String(origem ?? '')
+    .trim()
+    .toUpperCase()
+  if (o === 'GESTOR') return 'GESTOR'
+  if (o === 'JIFFY_DELIVERY' || o === 'DELIVERY') return 'JIFFY_DELIVERY'
+  if (o === 'AIQFOME') return 'AIQFOME'
+  if (o === 'PDV') return 'PDV'
   return 'GESTOR'
 }
 

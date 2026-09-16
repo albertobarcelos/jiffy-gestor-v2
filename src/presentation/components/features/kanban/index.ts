@@ -10,6 +10,7 @@ export type {
   DirecaoOrdenacaoKanban,
   KanbanColumn,
   OrigemFiltro,
+  TipoCanalFiltro,
   PeriodoOpcao,
   Priority,
   Venda,
