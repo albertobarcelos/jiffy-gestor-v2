@@ -1,7 +1,6 @@
 import { lerSomPedidosSilenciado, tocarSomPedidoNovo } from '@/src/presentation/gestor-pedidos/som/somPedidoNovo'
 
-export const INTERVALO_INICIAL_SOM_NOVOS_MS = 2000
-export const INCREMENTO_INTERVALO_SOM_NOVOS_MS = 1000
+export const INTERVALO_SOM_NOVOS_MS = 1000
 export const INTERVALO_SOM_PRODUCAO_MS = 2000
 export const TOQUES_SOM_PRODUCAO = 2
 
@@ -35,10 +34,6 @@ export function sincronizarAlarmeSomComPedidoDelivery(input: {
   alarme.onPedidoResolvido(input.vendaId)
 }
 
-export function proximoIntervaloSomNovos(intervaloAtualMs: number): number {
-  return intervaloAtualMs + INCREMENTO_INTERVALO_SOM_NOVOS_MS
-}
-
 export type AlarmeSomPedidoNovoDeps = {
   tocar: () => void
   podeTocar: () => boolean
@@ -54,13 +49,12 @@ const depsBrowser: AlarmeSomPedidoNovoDeps = {
 }
 
 /**
- * Fredy: Novos (PENDENTE) — toca, espera 2s, toca, 3s, 4s… até aceitar/recusar.
+ * Fredy: Novos — 1 toque por segundo até sair da coluna ou silenciar.
  * Produção (já aceito) — dois toques com 2s de intervalo.
  */
 export class AlarmeSomPedidoNovo {
   private readonly aguardando = new Set<string>()
   private loopId: ReturnType<typeof setTimeout> | null = null
-  private intervaloProximoMs = INTERVALO_INICIAL_SOM_NOVOS_MS
   private readonly producaoIds: ReturnType<typeof setTimeout>[] = []
 
   constructor(private readonly deps: AlarmeSomPedidoNovoDeps) {}
@@ -109,7 +103,6 @@ export class AlarmeSomPedidoNovo {
 
   private iniciarLoopNovos(): void {
     this.pararLoopNovos()
-    this.intervaloProximoMs = INTERVALO_INICIAL_SOM_NOVOS_MS
     this.deps.tocar()
     this.agendarProximoLoop()
   }
@@ -119,9 +112,8 @@ export class AlarmeSomPedidoNovo {
       this.loopId = null
       if (this.aguardando.size === 0 || !this.deps.podeTocar()) return
       this.deps.tocar()
-      this.intervaloProximoMs = proximoIntervaloSomNovos(this.intervaloProximoMs)
       this.agendarProximoLoop()
-    }, this.intervaloProximoMs)
+    }, INTERVALO_SOM_NOVOS_MS)
   }
 
   private pararLoopNovos(): void {
@@ -129,7 +121,6 @@ export class AlarmeSomPedidoNovo {
       this.deps.cancelar(this.loopId)
       this.loopId = null
     }
-    this.intervaloProximoMs = INTERVALO_INICIAL_SOM_NOVOS_MS
   }
 
   private tocarProducao(): void {

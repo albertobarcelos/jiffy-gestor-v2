@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-som"
+description = "Toca o aviso sonoro de pedido novo no Windows"
+commands.allow = ["tocar_som_pedido_novo"]

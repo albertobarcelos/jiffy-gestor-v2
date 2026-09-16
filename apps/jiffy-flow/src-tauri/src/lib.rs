@@ -3,7 +3,9 @@ use tauri_plugin_deep_link::DeepLinkExt;
 
 mod bandeja;
 mod bolha;
+mod env_arquivo;
 mod quadro_url;
+mod som;
 mod update;
 mod whatsapp;
 
@@ -11,6 +13,7 @@ pub use update::try_run_apply_pending;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    env_arquivo::carregar_env_local();
     let mut builder = tauri::Builder::default();
 
     #[cfg(desktop)]
@@ -38,6 +41,7 @@ pub fn run() {
             whatsapp::whatsapp_inserir_texto,
             bolha::bolha_clique,
             bolha::bolha_arrastar,
+            som::tocar_som_pedido_novo,
         ])
         .on_window_event(|window, event| bolha::no_evento(window, event))
         .setup(|app| {
@@ -49,7 +53,7 @@ pub fn run() {
             let url = quadro_url::url_do_quadro();
             eprintln!("Fredy a abrir {url}");
             let parsed: url::Url = url.parse().expect("GESTOR_PEDIDOS_URL inválida");
-            WebviewWindowBuilder::new(app, "main", WebviewUrl::External(parsed))
+            let mut janela = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(parsed))
                 .title("Fredy")
                 .maximized(true)
                 .resizable(true)
@@ -59,9 +63,21 @@ pub fn run() {
                     "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Fredy/0.1.4 JiffyFlow/0.1.4"
                 ))
                 .initialization_script(
-                    "Object.defineProperty(window,'__JIFFY_FLOW_KIOSK__',{value:true,enumerable:true});",
-                )
-                .build()?;
+                    "Object.defineProperty(window,'__JIFFY_FLOW_KIOSK__',{value:true,enumerable:true});"
+                        .to_string()
+                        + som::SCRIPT_INTERCEPTA_AUDIO,
+                );
+            #[cfg(windows)]
+            {
+                janela = janela.additional_browser_args(
+                    "--autoplay-policy=no-user-gesture-required \
+                     --disable-background-timer-throttling \
+                     --disable-backgrounding-occluded-windows \
+                     --disable-renderer-backgrounding \
+                     --disable-features=CalculateNativeWinOcclusion",
+                );
+            }
+            janela.build()?;
 
             if let Err(err) = bolha::abrir(app.handle()) {
                 eprintln!("Fredy: bolha não criou ({err})");
