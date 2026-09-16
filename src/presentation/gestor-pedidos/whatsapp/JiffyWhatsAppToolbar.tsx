@@ -2,11 +2,13 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { MdViewKanban } from 'react-icons/md'
+import { MdLogout, MdViewKanban } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
 import { GestorEmpresaSelectKiosk } from '../kiosk/GestorEmpresaSelectKiosk'
 import { pathQuadroDaSessaoAtual, pathWhatsAppKiosk } from '../sessao/pathsGestorSessao'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
+import { disconnectHubTab } from '@/src/presentation/utils/disconnectHubTab'
 import { cn } from '@/src/shared/utils/cn'
 
 type Aba = 'pedidos' | 'whatsapp'
@@ -25,6 +27,7 @@ function SpinnerBotao({ className }: { className: string }) {
 
 export function JiffyWhatsAppToolbar({ aba }: { aba: Aba }) {
   const router = useRouter()
+  const logoutHub = useAuthStore(s => s.logoutHub)
   const [indoPara, setIndoPara] = useState<Aba | null>(null)
   const aTrocar = indoPara != null && indoPara !== aba
 
@@ -32,6 +35,11 @@ export function JiffyWhatsAppToolbar({ aba }: { aba: Aba }) {
     if (prox === aba || indoPara) return
     setIndoPara(prox)
     router.replace(prox === 'whatsapp' ? pathWhatsAppKiosk() : pathQuadroDaSessaoAtual())
+  }
+
+  const sair = () => {
+    if (aTrocar) return
+    void disconnectHubTab({ logoutHub })
   }
 
   return (
@@ -88,6 +96,16 @@ export function JiffyWhatsAppToolbar({ aba }: { aba: Aba }) {
               <FaWhatsapp size={16} aria-hidden />
             )}
             {indoPara === 'whatsapp' && aba !== 'whatsapp' ? 'A abrir…' : 'WhatsApp'}
+          </button>
+          <button
+            type="button"
+            disabled={aTrocar}
+            onClick={sair}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 transition hover:bg-primary-bg hover:text-gray-900 disabled:opacity-80"
+            aria-label="Sair"
+            title="Sair"
+          >
+            <MdLogout size={18} aria-hidden />
           </button>
         </div>
       </div>
