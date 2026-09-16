@@ -176,6 +176,12 @@ html.delivery-publico-ios-lock select {
     width: 40%;
     max-width: 40%;
   }
+
+  /** Produto com complementos: painel mais largo para split 2 colunas. */
+  .delivery-vv-panel--produto-complementos {
+    width: min(1100px, 82%);
+    max-width: min(1100px, 82%);
+  }
 }
 
 /**

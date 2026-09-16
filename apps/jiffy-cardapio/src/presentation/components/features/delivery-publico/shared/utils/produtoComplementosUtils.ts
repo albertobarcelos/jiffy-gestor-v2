@@ -45,6 +45,19 @@ export function resolveGruposComplementos(
     .sort((a, b) => a.ordem - b.ordem)
 }
 
+/**
+ * True quando o cache local cobre os grupos do produto (ou o produto não precisa).
+ * False com cache ausente/desatualizado → força refetch (ex.: sessionStorage velho pós-SSR).
+ */
+export function cacheComplementosCobreProduto(
+  cache: ComplementosCatalogoCache | null,
+  produto: CatalogoPublicoProdutoDTO
+): boolean {
+  if (!produtoTemComplementosAtivos(produto)) return true
+  if (!cache) return false
+  return resolveGruposComplementos(cache, produto).length > 0
+}
+
 export function somarQuantidadeNoGrupo(
   quantidades: Record<string, number>,
   grupoId: string,
