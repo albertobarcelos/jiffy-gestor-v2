@@ -12,7 +12,9 @@ import {
 export type { KanbanVendaCachePatch } from '@/src/application/dto/TransicaoKanbanDTO'
 export {
   extrairPatchKanbanDeRespostaTransicao,
+  extrairPatchOperacionalKanbanDeStatusDelivery,
   extrairVendaUnificadaDeRespostaDeliverySummary,
+  pedidoDeliverySummaryTemCamposComerciais,
 } from '@/src/application/mappers/TransicaoPedidoDeliveryMapper'
 
 import {
