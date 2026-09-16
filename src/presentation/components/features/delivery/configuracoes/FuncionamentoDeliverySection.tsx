@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { MdAccessTime, MdSave } from 'react-icons/md'
+import Menu from '@mui/material/Menu'
+import MenuItem from '@mui/material/MenuItem'
+import { MdMoreVert, MdSave } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import {
@@ -11,18 +13,28 @@ import {
 } from '@/src/presentation/hooks/useFuncionamentoDelivery'
 import { showToast } from '@/src/shared/utils/toast'
 import { configuracoesTabPath } from '@/src/shared/constants/configuracoesRoutes'
+import type { DiaDaSemanaApi } from '@/src/application/dto/delivery/FuncionamentoDeliveryDTO'
 import {
   agendaDtoParaForm,
+  agruparDiasAgendaPorIntervalo,
   criarFormAgendaPadrao,
+  formatarDiasGrupoCurto,
+  formatarIntervaloGrupo,
   formAgendaParaRequest,
-  LABEL_DIA_DA_SEMANA,
-  listarHorariosFuncionamento15Min,
+  intervaloAgendaEhValido,
   type DiaAgendaFormState,
+  type GrupoHorarioAgenda,
 } from '@/src/shared/utils/funcionamentoDelivery'
+import {
+  HorarioAgendaSidePanel,
+  type HorarioAgendaComposerResult,
+} from './HorarioAgendaSidePanel'
 
 type FuncionamentoDeliverySectionProps = {
   empresaDeliveryConfigurada: boolean
   timezonePendente?: boolean
+  /** Incrementa para abrir o modal de novo horário (botão no título da página). */
+  adicionarHorarioRequestKey?: number
 }
 
 const AGENDA_CARD_CLASS =
@@ -31,6 +43,7 @@ const AGENDA_CARD_CLASS =
 export function FuncionamentoDeliverySection({
   empresaDeliveryConfigurada,
   timezonePendente = false,
+  adicionarHorarioRequestKey = 0,
 }: FuncionamentoDeliverySectionProps) {
   const funcionamentoQuery = useFuncionamentoDelivery({
     enabled: empresaDeliveryConfigurada,
@@ -42,8 +55,14 @@ export function FuncionamentoDeliverySection({
   const [fechaAutomaticamente, setFechaAutomaticamente] = useState(true)
   const [formHidratado, setFormHidratado] = useState(false)
 
+  const [painelAberto, setPainelAberto] = useState(false)
+  const [grupoEditando, setGrupoEditando] = useState<GrupoHorarioAgenda | null>(null)
+  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null)
+  const [menuGrupo, setMenuGrupo] = useState<GrupoHorarioAgenda | null>(null)
+
   const funcionamento = funcionamentoQuery.data
-  const horarios = useMemo(() => listarHorariosFuncionamento15Min(), [])
+
+  const grupos = useMemo(() => agruparDiasAgendaPorIntervalo(dias), [dias])
 
   useEffect(() => {
     if (!funcionamento || formHidratado) return
@@ -53,16 +72,69 @@ export function FuncionamentoDeliverySection({
     setFormHidratado(true)
   }, [formHidratado, funcionamento])
 
-  const atualizarDia = useCallback(
-    (diaDaSemana: DiaAgendaFormState['diaDaSemana'], patch: Partial<DiaAgendaFormState>) => {
-      setDias(prev =>
-        prev.map(d => (d.diaDaSemana === diaDaSemana ? { ...d, ...patch } : d))
-      )
-    },
-    []
-  )
+  const fecharPainel = useCallback(() => {
+    setPainelAberto(false)
+    setGrupoEditando(null)
+  }, [])
+
+  const abrirNovoHorario = useCallback(() => {
+    setGrupoEditando(null)
+    setPainelAberto(true)
+  }, [])
+
+  useEffect(() => {
+    if (!adicionarHorarioRequestKey || !empresaDeliveryConfigurada) return
+    abrirNovoHorario()
+  }, [adicionarHorarioRequestKey, abrirNovoHorario, empresaDeliveryConfigurada])
+
+  const abrirEditarHorario = useCallback((grupo: GrupoHorarioAgenda) => {
+    setGrupoEditando(grupo)
+    setPainelAberto(true)
+  }, [])
+
+  const fecharMenu = useCallback(() => {
+    setMenuAnchor(null)
+    setMenuGrupo(null)
+  }, [])
+
+  const aplicarComposer = useCallback((result: HorarioAgendaComposerResult) => {
+    const selecionados = new Set(result.dias)
+    const originais = result.diasOriginais ? new Set(result.diasOriginais) : null
+
+    setDias(prev => {
+      const manter = prev.filter(d => {
+        if (selecionados.has(d.diaDaSemana)) return false
+        if (originais?.has(d.diaDaSemana)) return false
+        return true
+      })
+      const novos: DiaAgendaFormState[] = result.dias.map(diaDaSemana => ({
+        diaDaSemana,
+        aberto: true,
+        abreEm: result.abreEm,
+        fechaEm: result.fechaEm,
+      }))
+      return [...manter, ...novos]
+    })
+
+    fecharPainel()
+    showToast.success(
+      originais ? 'Horário atualizado.' : 'Horário adicionado à agenda.'
+    )
+  }, [fecharPainel])
+
+  const removerGrupo = useCallback((grupo: GrupoHorarioAgenda) => {
+    const remover = new Set(grupo.dias)
+    setDias(prev => prev.filter(d => !remover.has(d.diaDaSemana)))
+    showToast.success('Horário removido da agenda.')
+  }, [])
 
   const handleSalvar = useCallback(async () => {
+    const invalidos = dias.filter(d => !intervaloAgendaEhValido(d.abreEm, d.fechaEm))
+    if (invalidos.length > 0) {
+      showToast.error('Há dias com horário de abertura igual ao de fechamento.')
+      return
+    }
+
     const payload = formAgendaParaRequest(dias, {
       abreAutomaticamente,
       fechaAutomaticamente,
@@ -84,8 +156,7 @@ export function FuncionamentoDeliverySection({
   if (!empresaDeliveryConfigurada) {
     return (
       <section id="empresa-delivery-agenda" className={AGENDA_CARD_CLASS}>
-        <AgendaHeader />
-        <p className="mt-4 flex-1 text-sm text-secondary-text">
+        <p className="text-sm text-secondary-text">
           Ative o Delivery para configurar dias e horários de funcionamento.
         </p>
       </section>
@@ -109,10 +180,7 @@ export function FuncionamentoDeliverySection({
         id="empresa-delivery-agenda"
         className={`${AGENDA_CARD_CLASS} border-red-200 bg-red-50`}
       >
-        <AgendaHeader />
-        <p className="mt-4 flex-1 text-sm text-red-800">
-          {funcionamentoQuery.error.message}
-        </p>
+        <p className="text-sm text-red-800">{funcionamentoQuery.error.message}</p>
         <button
           type="button"
           onClick={() => void funcionamentoQuery.refetch()}
@@ -125,140 +193,156 @@ export function FuncionamentoDeliverySection({
   }
 
   return (
-    <section id="empresa-delivery-agenda" className={AGENDA_CARD_CLASS}>
-      <AgendaHeader compact />
+    <>
+      <section id="empresa-delivery-agenda" className={AGENDA_CARD_CLASS}>
+        {timezonePendente ? (
+          <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-950">
+            Configure o fuso horário na{' '}
+            <Link
+              href={configuracoesTabPath('empresa')}
+              className="font-semibold underline underline-offset-2"
+            >
+              aba Empresa
+            </Link>{' '}
+            antes de salvar a agenda.
+          </div>
+        ) : null}
 
-      {timezonePendente ? (
-        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-950">
-          Configure o fuso horário na{' '}
-          <Link
-            href={configuracoesTabPath('empresa')}
-            className="font-semibold underline underline-offset-2"
-          >
-            aba Empresa
-          </Link>{' '}
-          antes de salvar a agenda.
-        </div>
-      ) : null}
-
-      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
-        <JiffyIconSwitch
-          checked={abreAutomaticamente}
-          onChange={e => setAbreAutomaticamente(e.target.checked)}
-          disabled={salvando}
-          label="Abrir automaticamente"
-          size="xs"
-          labelPosition="end"
-        />
-        <JiffyIconSwitch
-          checked={fechaAutomaticamente}
-          onChange={e => setFechaAutomaticamente(e.target.checked)}
-          disabled={salvando}
-          label="Fechar automaticamente"
-          size="xs"
-          labelPosition="end"
-        />
-      </div>
-
-      <div className="mt-3">
-        <p className="text-xs font-semibold text-primary-text">Horários por dia</p>
-        <p className="text-[11px] leading-tight text-secondary-text">
-          Intervalos de 15 min. Desligue o dia para mantê-lo fechado.
-        </p>
-
-        <div className="mt-1.5 overflow-x-auto">
-          <table className="min-w-full text-xs">
-            <thead>
-              <tr className="border-b border-gray-200 text-left text-[10px] uppercase tracking-wide text-secondary-text">
-                <th className="py-1 pr-2 font-semibold">Dia</th>
-                <th className="py-1 pr-2 font-semibold">Aberto</th>
-                <th className="py-1 pr-2 font-semibold">Abre</th>
-                <th className="py-1 font-semibold">Fecha</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dias.map(dia => (
-                <tr key={dia.diaDaSemana} className="border-b border-gray-50">
-                  <td className="py-1 pr-2 font-medium text-primary-text">
-                    {LABEL_DIA_DA_SEMANA[dia.diaDaSemana]}
-                  </td>
-                  <td className="py-1 pr-2">
-                    <JiffyIconSwitch
-                      checked={dia.aberto}
-                      onChange={e => atualizarDia(dia.diaDaSemana, { aberto: e.target.checked })}
-                      disabled={salvando}
-                      size="xs"
-                      inputProps={{ 'aria-label': `Aberto ${LABEL_DIA_DA_SEMANA[dia.diaDaSemana]}` }}
-                    />
-                  </td>
-                  <td className="py-1 pr-2">
-                    <select
-                      value={dia.abreEm}
-                      disabled={!dia.aberto || salvando}
-                      onChange={e => atualizarDia(dia.diaDaSemana, { abreEm: e.target.value })}
-                      className="h-7 min-w-[5.5rem] rounded-md border border-gray-200 bg-white px-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {horarios.map(h => (
-                        <option key={h} value={h}>
-                          {h}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="py-1">
-                    <select
-                      value={dia.fechaEm}
-                      disabled={!dia.aberto || salvando}
-                      onChange={e => atualizarDia(dia.diaDaSemana, { fechaEm: e.target.value })}
-                      className="h-7 min-w-[5.5rem] rounded-md border border-gray-200 bg-white px-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {horarios.map(h => (
-                        <option key={h} value={h}>
-                          {h}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="mt-auto flex justify-end pt-3">
-        <button
-          type="button"
-          onClick={() => void handleSalvar()}
-          disabled={salvando}
-          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-secondary px-4 text-xs font-semibold text-white transition-colors hover:bg-secondary/90 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <MdSave className="h-3.5 w-3.5" aria-hidden />
-          {salvando ? 'Salvando...' : 'Salvar agenda'}
-        </button>
-      </div>
-    </section>
-  )
-}
-
-function AgendaHeader({ compact = false }: { compact?: boolean }) {
-  return (
-    <div className="flex items-center gap-2.5">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary/10 text-secondary">
-        <MdAccessTime className="h-4 w-4" aria-hidden />
-      </div>
-      <div className="min-w-0">
-        <h2 className="text-sm font-bold text-primary-text">Agenda de funcionamento</h2>
-        {!compact ? (
-          <p className="mt-0.5 text-sm text-secondary-text">
-            Defina os dias e horários em que a loja online aceita pedidos.
-          </p>
-        ) : (
+        <div>
+          <p className="text-xs font-semibold text-primary-text">Dias da semana e horários</p>
           <p className="text-[11px] leading-tight text-secondary-text">
-            Horários em que a loja aceita pedidos.
+            Cadastre os períodos em que a loja recebe pedidos. Intervalos de 15 min.
           </p>
-        )}
-      </div>
-    </div>
+
+          {grupos.length === 0 ? (
+            <p className="mt-3 rounded-xl border border-dashed border-gray-200 bg-gray-50/60 px-3 py-6 text-center text-xs text-secondary-text">
+              Nenhum horário cadastrado. Clique em Adicionar Horário para começar.
+            </p>
+          ) : (
+            <ul className="mt-3 space-y-2">
+              {grupos.map(grupo => (
+                <li
+                  key={grupo.id}
+                  className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white px-3.5 py-3 shadow-sm"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-primary-text">
+                      {formatarDiasGrupoCurto(grupo.dias)}
+                    </p>
+                    <p className="mt-0.5 text-sm text-secondary-text">
+                      {formatarIntervaloGrupo(grupo.abreEm, grupo.fechaEm)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={salvando}
+                    aria-label={`Opções do horário ${formatarIntervaloGrupo(grupo.abreEm, grupo.fechaEm)}`}
+                    onClick={e => {
+                      setMenuAnchor(e.currentTarget)
+                      setMenuGrupo(grupo)
+                    }}
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-gray-100 hover:text-primary-text disabled:opacity-50"
+                  >
+                    <MdMoreVert className="h-5 w-5" aria-hidden />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="mt-5">
+          <p className="text-xs font-semibold text-primary-text">Configuração</p>
+          <ul className="mt-2 divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-200">
+            <li className="flex items-start gap-3 bg-white px-3.5 py-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-primary-text">
+                  Fechar loja automaticamente
+                </p>
+                <p className="mt-0.5 text-xs leading-snug text-secondary-text">
+                  Ativando essa opção o fechamento da loja será automático conforme os horários
+                  de atendimento definidos.
+                </p>
+              </div>
+              <JiffyIconSwitch
+                checked={fechaAutomaticamente}
+                onChange={e => setFechaAutomaticamente(e.target.checked)}
+                disabled={salvando}
+                size="xs"
+                inputProps={{ 'aria-label': 'Fechar loja automaticamente' }}
+              />
+            </li>
+            <li className="flex items-start gap-3 bg-white px-3.5 py-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-primary-text">
+                  Abrir loja automaticamente
+                </p>
+                <p className="mt-0.5 text-xs leading-snug text-secondary-text">
+                  Ativando essa opção a loja abre automaticamente no horário definido. Caso
+                  contrário, use o controle manual na tela de pedidos.
+                </p>
+              </div>
+              <JiffyIconSwitch
+                checked={abreAutomaticamente}
+                onChange={e => setAbreAutomaticamente(e.target.checked)}
+                disabled={salvando}
+                size="xs"
+                inputProps={{ 'aria-label': 'Abrir loja automaticamente' }}
+              />
+            </li>
+          </ul>
+        </div>
+
+        <div className="mt-auto flex justify-end pt-4">
+          <button
+            type="button"
+            onClick={() => void handleSalvar()}
+            disabled={salvando}
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-secondary px-4 text-xs font-semibold text-white transition-colors hover:bg-secondary/90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <MdSave className="h-3.5 w-3.5" aria-hidden />
+            {salvando ? 'Salvando...' : 'Salvar agenda'}
+          </button>
+        </div>
+      </section>
+
+      <Menu
+        anchorEl={menuAnchor}
+        open={Boolean(menuAnchor) && menuGrupo != null}
+        onClose={fecharMenu}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <MenuItem
+          onClick={() => {
+            if (!menuGrupo) return
+            const grupo = menuGrupo
+            fecharMenu()
+            abrirEditarHorario(grupo)
+          }}
+        >
+          Editar
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            if (!menuGrupo) return
+            const grupo = menuGrupo
+            fecharMenu()
+            removerGrupo(grupo)
+          }}
+          sx={{ color: 'error.main' }}
+        >
+          Remover
+        </MenuItem>
+      </Menu>
+
+      <HorarioAgendaSidePanel
+        open={painelAberto}
+        onClose={fecharPainel}
+        grupoEditando={grupoEditando}
+        disabled={salvando}
+        onConfirm={aplicarComposer}
+      />
+    </>
   )
 }
