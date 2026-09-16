@@ -31,6 +31,7 @@ export function gravarSomPedidosSilenciado(silenciado: boolean): void {
 }
 
 let audioPedidoNovo: HTMLAudioElement | null = null
+let somPedidoNovoDestravado = false
 
 function obterAudioPedidoNovo(): HTMLAudioElement | null {
   if (typeof Audio === 'undefined') return null
@@ -41,26 +42,57 @@ function obterAudioPedidoNovo(): HTMLAudioElement | null {
   return audioPedidoNovo
 }
 
-/** Primeiro clique no Fredy destrava autoplay do WebView. */
+/** Primeiro gesto no Fredy destrava autoplay do WebView. */
 export function prepararSomPedidoNovo(): void {
   const audio = obterAudioPedidoNovo()
-  if (!audio) return
+  if (!audio || somPedidoNovoDestravado) return
   audio.muted = true
-  void audio.play().then(() => {
-    audio.pause()
-    audio.currentTime = 0
-    audio.muted = false
-  }).catch(() => {
-    audio.muted = false
-  })
+  void audio
+    .play()
+    .then(() => {
+      somPedidoNovoDestravado = true
+      audio.pause()
+      audio.currentTime = 0
+      audio.muted = false
+    })
+    .catch(() => {
+      audio.muted = false
+    })
+}
+
+function invocarSomNativoFredy(): boolean {
+  if (typeof window === 'undefined') return false
+  const w = window as Window & {
+    __TAURI__?: { core?: { invoke?: (cmd: string) => Promise<unknown> } }
+    __TAURI_INTERNALS__?: { invoke?: (cmd: string) => unknown }
+  }
+  try {
+    if (typeof w.__TAURI__?.core?.invoke === 'function') {
+      void w.__TAURI__.core.invoke('tocar_som_pedido_novo')
+      return true
+    }
+    if (typeof w.__TAURI_INTERNALS__?.invoke === 'function') {
+      void w.__TAURI_INTERNALS__.invoke('tocar_som_pedido_novo')
+      return true
+    }
+  } catch {
+    return false
+  }
+  return false
 }
 
 export function tocarSomPedidoNovo(): void {
+  if (invocarSomNativoFredy()) {
+    somPedidoNovoDestravado = true
+    return
+  }
   const audio = obterAudioPedidoNovo()
   if (!audio) return
   audio.muted = false
   audio.currentTime = 0
-  void audio.play().catch(() => {
-    /* autoplay bloqueado até um clique */
+  void audio.play().then(() => {
+    somPedidoNovoDestravado = true
+  }).catch(error => {
+    console.warn('[som-pedido] autoplay bloqueado; clique na janela do Fredy', error)
   })
 }
