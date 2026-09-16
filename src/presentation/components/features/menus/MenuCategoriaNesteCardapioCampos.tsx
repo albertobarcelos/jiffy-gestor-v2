@@ -14,6 +14,8 @@ import type { MenuGrupoProduto } from '@/src/shared/types/menus'
 export type MenuCategoriaNesteCardapioHandle = {
   isDirty: () => boolean
   save: () => Promise<boolean>
+  grupoProdutoIdSelecionado: () => string
+  confirmarGrupoSelecionado: () => void
 }
 
 interface MenuCategoriaNesteCardapioCamposProps {
@@ -47,6 +49,8 @@ export const MenuCategoriaNesteCardapioCampos = forwardRef<
     save,
     isDirty,
     trocarCategoria,
+    confirmarGrupoSelecionado,
+    grupoProdutoIdSelecionado,
     persistVisual,
     dialogPropagacao,
     corHex,
@@ -64,7 +68,16 @@ export const MenuCategoriaNesteCardapioCampos = forwardRef<
   const [isIconPickerOpen, setIsIconPickerOpen] = useState(false)
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false)
 
-  useImperativeHandle(ref, () => ({ isDirty, save }), [isDirty, save])
+  useImperativeHandle(
+    ref,
+    () => ({
+      isDirty,
+      save,
+      grupoProdutoIdSelecionado: () => grupoProdutoIdSelecionado,
+      confirmarGrupoSelecionado,
+    }),
+    [isDirty, save, grupoProdutoIdSelecionado, confirmarGrupoSelecionado]
+  )
 
   return (
     <>
@@ -179,18 +192,36 @@ export const MenuCategoriaNesteCardapioCampos = forwardRef<
               const cor = g.grupoBase.corHex?.trim() || '#530CA3'
               const icone = g.grupoBase.iconName?.trim()
               const label = g.nome || g.grupoBase.nome
+              const desativada = g.grupoBase.ativo === false
               return (
                 <li key={key} {...rest}>
-                  <span className="flex min-w-0 items-center gap-2">
+                  <span className="flex min-w-0 w-full items-center gap-2">
                     <span
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border-2 bg-white"
+                      className={cn(
+                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-md border-2 bg-white',
+                        desativada && 'opacity-50'
+                      )}
                       style={{ borderColor: cor }}
                     >
                       {icone ? (
                         <DinamicIcon iconName={icone} color={cor} size={18} />
                       ) : null}
                     </span>
-                    <span className="truncate text-sm text-primary-text">{label}</span>
+                    <span className="flex min-w-0 items-center gap-1">
+                      <span
+                        className={cn(
+                          'min-w-0 truncate text-sm text-primary-text',
+                          desativada && 'text-secondary-text'
+                        )}
+                      >
+                        {label}
+                      </span>
+                      {desativada ? (
+                        <span className="shrink-0 text-[11px] text-secondary-text">
+                          (desativada)
+                        </span>
+                      ) : null}
+                    </span>
                   </span>
                 </li>
               )

@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { atualizarGrupoProdutoViaBffUseCase } from '@/src/application/use-cases/grupos-produtos/AtualizarGrupoProdutoViaBffUseCase'
 import { useMenuGruposProdutos } from '@/src/presentation/hooks/menus/useMenuCatalog'
-import { useMenuMutations } from '@/src/presentation/hooks/menus/useMenuMutations'
 import { useRenomearCategoriaNesteCardapio } from '@/src/presentation/hooks/menus/useRenomearCategoriaNesteCardapio'
 import { useLocaleUppercaseInputHandler } from '@/src/presentation/hooks/useLocaleUppercaseInputHandler'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
@@ -15,10 +14,10 @@ import { coletarGruposMenuPorSnapshot } from '@/src/presentation/components/feat
 type VisualPatch = { corHex?: string; iconName?: string }
 
 /**
- * Orquestra as 3 escritas da categoria no cardápio:
- * - lápis: snapshot do nome neste menu
- * - dropdown: move o produto para outro grupo
- * - ícone: cor/ícone no cadastro base
+ * Orquestra a categoria no cardápio:
+ * - lápis: snapshot do nome neste menu (grava na hora)
+ * - dropdown: só seleciona; o produto só muda de grupo no Salvar do formulário
+ * - ícone: cor/ícone no cadastro base (grava na hora)
  */
 export function useCategoriaNesteCardapio(params: {
   menuId: string
@@ -29,7 +28,6 @@ export function useCategoriaNesteCardapio(params: {
   onGrupoChange?: (grupo: MenuGrupoProduto) => void
 }) {
   const { menuId, grupo, produtoId, onDirtyChange, onSavingChange, onGrupoChange } = params
-  const { updateProduto } = useMenuMutations(menuId)
   const invalidate = useInvalidateTenantQueries()
   const { data: gruposData, isLoading: loadingGrupos } = useMenuGruposProdutos({ menuId })
   const gruposDoMenu = useMemo(
@@ -38,6 +36,7 @@ export function useCategoriaNesteCardapio(params: {
   )
 
   const [grupoAtual, setGrupoAtual] = useState(grupo)
+  const [grupoIdPersistido, setGrupoIdPersistido] = useState(grupo.grupoBase.id)
   const { renomear, saving: savingNome, dialogPropagacao } = useRenomearCategoriaNesteCardapio({
     menuId,
     grupoProdutoId: grupoAtual.grupoBase.id,
@@ -46,7 +45,6 @@ export function useCategoriaNesteCardapio(params: {
   const [nome, setNome] = useState(grupo.nome)
   const [nomeSalvo, setNomeSalvo] = useState(grupo.nome)
   const [editandoNome, setEditandoNome] = useState(false)
-  const [movendo, setMovendo] = useState(false)
   const { inputRef, handleChange: handleNomeChange } = useLocaleUppercaseInputHandler(
     nome,
     setNome
@@ -64,17 +62,19 @@ export function useCategoriaNesteCardapio(params: {
 
   useEffect(() => {
     setGrupoAtual(grupo)
+    setGrupoIdPersistido(grupo.grupoBase.id)
     setNome(grupo.nome)
     setNomeSalvo(grupo.nome)
     setEditandoNome(false)
   }, [grupo])
 
   const isDirty = useCallback(
-    () => nome.trim() !== nomeSalvo.trim(),
-    [nome, nomeSalvo]
+    () =>
+      nome.trim() !== nomeSalvo.trim() || grupoAtual.grupoBase.id !== grupoIdPersistido,
+    [nome, nomeSalvo, grupoAtual.grupoBase.id, grupoIdPersistido]
   )
 
-  const saving = savingNome || movendo || persistVisualMutation.isPending
+  const saving = savingNome || persistVisualMutation.isPending
 
   useEffect(() => {
     onDirtyChange?.(isDirty())
@@ -121,29 +121,18 @@ export function useCategoriaNesteCardapio(params: {
     setEditandoNome(false)
   }
 
-  const trocarCategoria = useCallback(
-    async (_: unknown, next: MenuGrupoProduto) => {
-      if (!produtoId || next.grupoBase.id === grupoAtual.grupoBase.id) return
-      setMovendo(true)
-      try {
-        await updateProduto.mutateAsync({
-          produtoId,
-          input: { grupoProdutoId: next.grupoBase.id },
-        })
-        setGrupoAtual(next)
-        setNome(next.nome)
-        setNomeSalvo(next.nome)
-        setEditandoNome(false)
-        onGrupoChange?.(next)
-        showToast.success('Categoria do produto atualizada neste cardápio')
-      } catch (err) {
-        showToast.error(err instanceof Error ? err.message : 'Erro ao alterar categoria')
-      } finally {
-        setMovendo(false)
-      }
-    },
-    [produtoId, grupoAtual.grupoBase.id, updateProduto, onGrupoChange]
-  )
+  const trocarCategoria = (_: unknown, next: MenuGrupoProduto) => {
+    if (next.grupoBase.id === grupoAtual.grupoBase.id) return
+    setGrupoAtual(next)
+    setNome(next.nome)
+    setNomeSalvo(next.nome)
+    setEditandoNome(false)
+  }
+
+  const confirmarGrupoSelecionado = useCallback(() => {
+    setGrupoIdPersistido(grupoAtual.grupoBase.id)
+    onGrupoChange?.(grupoAtual)
+  }, [grupoAtual, onGrupoChange])
 
   const persistVisual = useCallback(
     async (patch: VisualPatch) => {
@@ -160,7 +149,6 @@ export function useCategoriaNesteCardapio(params: {
           },
         }
         setGrupoAtual(next)
-        onGrupoChange?.(next)
         await invalidate(['grupos-produtos'])
         await invalidate(['menu-grupos'])
         showToast.success('Categoria atualizada')
@@ -168,7 +156,7 @@ export function useCategoriaNesteCardapio(params: {
         showToast.error(err instanceof Error ? err.message : 'Erro ao atualizar categoria')
       }
     },
-    [grupoAtual, invalidate, onGrupoChange, persistVisualMutation]
+    [grupoAtual, invalidate, persistVisualMutation]
   )
 
   return {
@@ -186,6 +174,8 @@ export function useCategoriaNesteCardapio(params: {
     save,
     isDirty,
     trocarCategoria,
+    confirmarGrupoSelecionado,
+    grupoProdutoIdSelecionado: grupoAtual.grupoBase.id,
     persistVisual,
     dialogPropagacao,
     corHex: grupoAtual.grupoBase.corHex?.trim() || '#530CA3',
