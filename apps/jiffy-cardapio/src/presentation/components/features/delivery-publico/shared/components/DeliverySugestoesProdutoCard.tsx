@@ -83,8 +83,11 @@ export function DeliverySugestoesProdutoCard({
               onAddRapido?.(produto.id)
             }}
             aria-label={`Adicionar ${produto.nome} ao carrinho`}
-            className="absolute bottom-1.5 right-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full shadow-sm transition-transform active:scale-95"
-            style={{ backgroundColor: 'rgba(255, 255, 255, 0.92)' }}
+            className="absolute bottom-1.5 right-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border shadow-sm transition-transform active:scale-95"
+            style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.92)',
+              borderColor: '#4b5563',
+            }}
           >
             <Plus
               className="h-4 w-4"

@@ -28,7 +28,12 @@ export type DeliveryPublicoCarrinhoViewModel = {
 export type DeliveryPublicoViewModel = {
   grupos: DeliveryPublicoGrupoViewModel[]
   disponivel: boolean
+  /** Texto curto de horário (footer / agenda). */
   horarioTexto: string
+  /** Mensagem completa de status (topnav): aberto/fechado + próxima abertura. */
+  statusMensagem: string
+  /** Horário complementar (ex.: "até as 22:45"); null quando não aplica. */
+  statusDetalheHorario: string | null
   termoBusca: string
   carrinho: DeliveryPublicoCarrinhoViewModel
 }

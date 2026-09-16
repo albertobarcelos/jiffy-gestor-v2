@@ -550,6 +550,7 @@ export function useNovoPedidoOrchestrator({
 
   const flags = useNovoPedidoOrchestratorFlags({
     modoVisualizacao,
+    modoEdicaoProdutos,
     tabelaOrigemVenda,
     statusFiscalUnificado,
     resumoFiscal,

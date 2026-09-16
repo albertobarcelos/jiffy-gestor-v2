@@ -15,10 +15,13 @@ import {
 import { obterEnderecoPorGps } from '@/src/shared/utils/geolocalizacaoEndereco'
 import {
   enderecoGeocodeAtendeMinimo,
-  geocodificarEnderecoViaGoogle,
+  erroGeocodeEhSemResultado,
+  geocodificarEnderecoComRetrySemCep,
   mensagemAmigavelErroGeolocalizacao,
   serializarEnderecoParaGeocode,
+  type EnderecoGeocodeFallback,
 } from '@/src/shared/utils/geolocalizacaoEnderecoShared'
+import { useCepMaskedInputHandler } from '@/src/presentation/hooks/useCepMaskedInputHandler'
 import {
   placeDetailsParaEnderecoGeocode,
   type PlaceDetailsResult,
@@ -38,10 +41,11 @@ import {
   calcularDistanciaAproximadaDaLoja,
   pontoClienteParaDistancia,
 } from '../../../shared/utils/formatarDistanciaAproximadaDaLoja'
+import { ordenarEnderecosPorUltimaUtilizacao } from '../../../shared/utils/ordenarEnderecosPorUltimaUtilizacao'
 import { useDeliveryBodyScrollLock } from '../../../shared/hooks/useDeliveryBodyScrollLock'
+import dynamic from 'next/dynamic'
 import { DeliveryCheckoutConfirmarRemocaoEnderecoDialog } from './DeliveryCheckoutConfirmarRemocaoEnderecoDialog'
 import { DeliveryCheckoutConfirmarSairEnderecoDialog } from './DeliveryCheckoutConfirmarSairEnderecoDialog'
-import { DeliveryCheckoutEnderecoMapaModal } from './DeliveryCheckoutEnderecoMapaModal'
 import { DeliveryCheckoutFooterActions } from './DeliveryCheckoutFooterActions'
 import { DeliveryCheckoutUppercaseInput } from './DeliveryCheckoutUppercaseInput'
 import { DeliveryDistanciaLojaHint } from './DeliveryDistanciaLojaHint'
@@ -50,6 +54,14 @@ import {
   DeliveryCheckoutShellHeader,
   useDeliveryCheckoutShellCloseHandler,
 } from './DeliveryCheckoutShell'
+
+const DeliveryCheckoutEnderecoMapaModal = dynamic(
+  () =>
+    import('./DeliveryCheckoutEnderecoMapaModal').then(m => ({
+      default: m.DeliveryCheckoutEnderecoMapaModal,
+    })),
+  { ssr: false }
+)
 
 /** Como a geo foi obtida — manual exige geocode ao abrir o mapa. */
 type OrigemGeoEndereco = 'places' | 'gps' | 'manual' | 'salvo'
@@ -107,6 +119,8 @@ type DeliveryCheckoutEnderecoFormModalProps = {
   enderecoSalvo?: EnderecoClienteDeliveryPublicoDTO | null
   /** Coordenada da loja — distância aproximada no card e na lista. */
   localizacaoEmpresa?: GeoJsonPoint | null
+  /** Cidade/UF da loja — preenche o form manual quando vazios. */
+  enderecoFallback?: EnderecoGeocodeFallback
   /** Endereços já cadastrados — exibidos na etapa de busca (novo endereço). */
   enderecosCadastrados?: EnderecoClienteDeliveryPublicoDTO[]
   onSelecionarEnderecoCadastrado?: (enderecoId: string) => void
@@ -146,10 +160,22 @@ export function DeliveryCheckoutEnderecoFormModal({
   placesBias = null,
   enderecoSalvo = null,
   localizacaoEmpresa = null,
+  enderecoFallback,
   enderecosCadastrados = [],
   onSelecionarEnderecoCadastrado,
   onRemoverEnderecoCadastrado,
 }: DeliveryCheckoutEnderecoFormModalProps) {
+  const onCepChange = useCallback(
+    (cep: string) => {
+      onChange('cep', cep)
+    },
+    [onChange]
+  )
+  const { inputRef: cepInputRef, handleChange: handleCepChange } = useCepMaskedInputHandler(
+    form.cep,
+    onCepChange
+  )
+
   const [formOverlayOpen, setFormOverlayOpen] = useState(() => Boolean(form.rua.trim()))
   const [mapaModalOpen, setMapaModalOpen] = useState(false)
   const [pinMovido, setPinMovido] = useState(false)
@@ -189,7 +215,6 @@ export function DeliveryCheckoutEnderecoFormModal({
   const cidadeInputRef = useRef<HTMLInputElement>(null)
   const focoPendenteRef = useRef<CampoEnderecoFoco | null>(null)
   const aguardandoNumeroRef = useRef(false)
-  const toastNumeroSeqRef = useRef(0)
   const pinAntesRef = useRef<GeoJsonPoint | null>(null)
   const providerAntesRef = useRef<string | null>(null)
   aguardandoNumeroRef.current = aguardandoNumeroObrigatorio
@@ -268,24 +293,13 @@ export function DeliveryCheckoutEnderecoFormModal({
     })
   }, [])
 
-  const focarNumeroObrigatorio = useCallback((opcoes?: { avisar?: boolean }) => {
-    const avisar = opcoes?.avisar ?? false
+  const focarNumeroObrigatorio = useCallback(() => {
     const tentarFoco = () => {
       const el = numeroInputRef.current
       if (!el) return false
       el.focus({ preventScroll: false })
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
       return document.activeElement === el
-    }
-
-    if (avisar) {
-      const seq = ++toastNumeroSeqRef.current
-      window.setTimeout(() => {
-        if (seq !== toastNumeroSeqRef.current) return
-        if (!aguardandoNumeroRef.current) return
-        if (numeroInputRef.current?.value.trim()) return
-        showToast.error('Informe o número do endereço para continuar.')
-      }, 50)
     }
 
     tentarFoco()
@@ -321,25 +335,6 @@ export function DeliveryCheckoutEnderecoFormModal({
     if (!form.numero.trim()) return
     setAguardandoNumeroObrigatorio(false)
   }, [form.numero, aguardandoNumeroObrigatorio])
-
-  const handleNumeroBlur = useCallback(() => {
-    if (!aguardandoNumeroRef.current) return
-    if (numeroInputRef.current?.value.trim()) return
-
-    window.setTimeout(() => {
-      if (!aguardandoNumeroRef.current) return
-      if (numeroInputRef.current?.value.trim()) return
-      const ativo = document.activeElement
-      if (
-        ativo instanceof Element &&
-        ativo.closest('[data-checkout-leave-without-numero]')
-      ) {
-        return
-      }
-      if (ativo === numeroInputRef.current) return
-      focarNumeroObrigatorio({ avisar: true })
-    }, 0)
-  }, [focarNumeroObrigatorio])
 
   const aplicarGeoEncontrada = (point: GeoJsonPoint, providerId?: string | null) => {
     setEnderecoLocalizacao(point)
@@ -386,14 +381,8 @@ export function DeliveryCheckoutEnderecoFormModal({
       setEnderecoLocalizacao(null)
       setProviderEnderecoId(null)
       setUltimoGeoKeySincronizado(null)
-      if (!ruaFinal) {
-        setAguardandoNumeroObrigatorio(false)
-        focoPendenteRef.current = 'rua'
-      } else {
-        setAguardandoNumeroObrigatorio(true)
-        focoPendenteRef.current = 'numero'
-        window.setTimeout(() => focarNumeroObrigatorio(), 60)
-      }
+      setAguardandoNumeroObrigatorio(false)
+      focoPendenteRef.current = ruaFinal ? null : 'rua'
     }
 
     setDialogPinAberto(false)
@@ -441,6 +430,14 @@ export function DeliveryCheckoutEnderecoFormModal({
       } else if (!form.rua.trim()) {
         onChange('rua', maiusculasEnderecoInput(textoBusca))
       }
+    }
+    const cidadeLoja = enderecoFallback?.cidade?.trim()
+    const estadoLoja = enderecoFallback?.estado?.trim()
+    if (!form.cidade.trim() && cidadeLoja) {
+      onChange('cidade', maiusculasEnderecoInput(cidadeLoja))
+    }
+    if (!form.estado.trim() && estadoLoja) {
+      onChange('estado', normalizarEstadoEndereco(estadoLoja))
     }
     setMostrarOpcaoManual(false)
     setOrigemGeo('manual')
@@ -492,6 +489,24 @@ export function DeliveryCheckoutEnderecoFormModal({
     }
   }
 
+  const abrirMapaComPin = useCallback(
+    (pin: GeoJsonPoint, providerId: string | null, opts: { sincronizado: boolean; pinMovido: boolean }) => {
+      setEnderecoLocalizacao(pin)
+      setProviderEnderecoId(providerId)
+      if (opts.sincronizado) {
+        marcarGeoSincronizada()
+      } else {
+        setUltimoGeoKeySincronizado(null)
+      }
+      pinAntesRef.current = pin
+      providerAntesRef.current = providerId
+      setPinMovido(opts.pinMovido)
+      setDialogPinAberto(false)
+      setMapaModalOpen(true)
+    },
+    [marcarGeoSincronizada]
+  )
+
   const handleConfirmarLocalizacaoForm = async () => {
     if (dialogPinAberto) {
       showToast.error('Confirme ou cancele o ajuste do pin no mapa.')
@@ -504,11 +519,8 @@ export function DeliveryCheckoutEnderecoFormModal({
     }
     if (!form.numero.trim()) {
       showToast.error('Informe o número do endereço para continuar.')
-      if (aguardandoNumeroObrigatorio) {
-        focarNumeroObrigatorio()
-      } else {
-        solicitarFocoCampo('numero')
-      }
+      setAguardandoNumeroObrigatorio(true)
+      focarNumeroObrigatorio()
       return
     }
     if (!form.bairro.trim()) {
@@ -531,28 +543,31 @@ export function DeliveryCheckoutEnderecoFormModal({
 
       // Reusa a coordenada já sincronizada; só geocodifica de novo se o texto mudou.
       if (enderecoLocalizacao && geoSincronizadaComEndereco) {
-        pinAntesRef.current = enderecoLocalizacao
-        providerAntesRef.current = providerEnderecoId
-        setPinMovido(false)
-        setDialogPinAberto(false)
-        setMapaModalOpen(true)
+        abrirMapaComPin(enderecoLocalizacao, providerEnderecoId, {
+          sincronizado: true,
+          pinMovido: false,
+        })
         return
       }
 
-      const resultado = await geocodificarEnderecoViaGoogle(enderecoGeocode, {
+      const resultado = await geocodificarEnderecoComRetrySemCep(enderecoGeocode, {
         minimo: 'flexivel',
       })
-      const pin = resultado.enderecoLocalizacao
-      const providerId = resultado.providerEnderecoId
-      setEnderecoLocalizacao(pin)
-      setProviderEnderecoId(providerId)
-      marcarGeoSincronizada()
-      pinAntesRef.current = pin
-      providerAntesRef.current = providerId
-      setPinMovido(false)
-      setDialogPinAberto(false)
-      setMapaModalOpen(true)
+      abrirMapaComPin(resultado.enderecoLocalizacao, resultado.providerEnderecoId, {
+        sincronizado: true,
+        pinMovido: false,
+      })
     } catch (error) {
+      if (localizacaoEmpresa && erroGeocodeEhSemResultado(error)) {
+        abrirMapaComPin(localizacaoEmpresa, null, {
+          sincronizado: false,
+          pinMovido: true,
+        })
+        showToast.warning(
+          'Não achamos esse endereço exato no mapa. Abrimos perto da loja — arraste o pin até o local certo e confirme.'
+        )
+        return
+      }
       showToast.error(mensagemAmigavelErroGeolocalizacao(error, 'geocode'))
     } finally {
       setAbrindoMapa(false)
@@ -757,11 +772,7 @@ export function DeliveryCheckoutEnderecoFormModal({
 
   const enderecosOrdenados = useMemo(() => {
     if (!mostrarListaEnderecosCadastrados) return []
-    return [...enderecosCadastrados].sort((a, b) => {
-      const ta = a.ultimaUtilizacaoEm ? Date.parse(a.ultimaUtilizacaoEm) : 0
-      const tb = b.ultimaUtilizacaoEm ? Date.parse(b.ultimaUtilizacaoEm) : 0
-      return tb - ta
-    })
+    return ordenarEnderecosPorUltimaUtilizacao(enderecosCadastrados)
   }, [mostrarListaEnderecosCadastrados, enderecosCadastrados])
 
   const confirmarRemocaoEndereco = async () => {
@@ -930,12 +941,13 @@ export function DeliveryCheckoutEnderecoFormModal({
                       CEP
                     </span>
                     <input
+                      ref={cepInputRef}
                       type="text"
                       inputMode="numeric"
                       maxLength={9}
                       placeholder="00000-000"
                       value={form.cep}
-                      onChange={e => onChange('cep', formatarCepMascara(e.target.value))}
+                      onChange={handleCepChange}
                       className={fieldClass}
                       style={fieldStyle}
                     />
@@ -996,7 +1008,6 @@ export function DeliveryCheckoutEnderecoFormModal({
                       ref={numeroInputRef}
                       value={form.numero}
                       onValueChange={valor => onChange('numero', valor)}
-                      onBlur={handleNumeroBlur}
                       inputMode="numeric"
                       autoComplete="address-line2"
                       aria-required={aguardandoNumeroObrigatorio || undefined}
@@ -1005,12 +1016,6 @@ export function DeliveryCheckoutEnderecoFormModal({
                     />
                   </label>
                 </div>
-
-                {aguardandoNumeroObrigatorio && !form.numero.trim() ? (
-                  <p className="text-xs font-medium" style={{ color: 'var(--delivery-primary)' }}>
-                    Digite o número do endereço para continuar.
-                  </p>
-                ) : null}
 
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   <label className="relative min-w-0">

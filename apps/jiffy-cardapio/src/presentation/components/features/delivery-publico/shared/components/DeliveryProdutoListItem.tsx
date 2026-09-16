@@ -80,8 +80,11 @@ function ProdutoThumb({
             onAddClick()
           }}
           aria-label={`Adicionar ${produtoNome} ao carrinho`}
-          className="absolute bottom-2 right-2 z-10 flex h-8 w-8 items-center justify-center rounded-full shadow-sm transition-transform active:scale-95 @lg:h-9 @lg:w-9"
-          style={{ backgroundColor: 'rgba(255, 255, 255, 0.8)' }}
+          className="absolute bottom-2 right-2 z-10 flex h-8 w-8 items-center justify-center rounded-full border shadow-sm transition-transform active:scale-95 @lg:h-9 @lg:w-9"
+          style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.8)',
+            borderColor: '#4b5563',
+          }}
         >
           <Plus
             className="h-5 w-5 @lg:h-5 @lg:w-5"

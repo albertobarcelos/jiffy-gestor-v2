@@ -6,6 +6,8 @@ import type { DeliveryPublicoGrupoViewModel } from '../types/deliveryPublicoView
 
 const CHIP_GAP_PX = 8
 const SIDE_PADDING_PX = 16
+/** Distância mínima para tratar o gesto como arraste (evita engolir clique). */
+const DRAG_THRESHOLD_PX = 10
 
 type DeliveryGrupoChipsProps = {
   config: DeliveryPublicoDesignConfig
@@ -13,7 +15,25 @@ type DeliveryGrupoChipsProps = {
   activeGrupoId?: string | null
   interactive?: boolean
   embedded?: boolean
+  /**
+   * Quando true, centraliza o chip ativo na barra.
+   * Deve ser true só em clique do usuário — não no scroll-spy
+   * (com muitas categorias o auto-scroll compete com o dedo/clique).
+   */
+  centerActiveChip?: boolean
   onGrupoClick?: (grupoId: string) => void
+}
+
+function centralizarChipNaBarra(scroller: HTMLElement, chip: HTMLElement) {
+  const scrollerRect = scroller.getBoundingClientRect()
+  const chipRect = chip.getBoundingClientRect()
+  const chipOffset = chipRect.left - scrollerRect.left + scroller.scrollLeft
+  const target = chipOffset - (scroller.clientWidth - chipRect.width) / 2
+  const maxScroll = Math.max(0, scroller.scrollWidth - scroller.clientWidth)
+  const nextLeft = Math.max(0, Math.min(target, maxScroll))
+
+  if (Math.abs(scroller.scrollLeft - nextLeft) < 1) return
+  scroller.scrollTo({ left: nextLeft, behavior: 'auto' })
 }
 
 export function DeliveryGrupoChips({
@@ -22,6 +42,7 @@ export function DeliveryGrupoChips({
   activeGrupoId = null,
   interactive = false,
   embedded = false,
+  centerActiveChip = false,
   onGrupoClick,
 }: DeliveryGrupoChipsProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -35,25 +56,12 @@ export function DeliveryGrupoChips({
   const suppressClickRef = useRef(false)
 
   useEffect(() => {
-    if (!activeGrupoId) return
+    if (!centerActiveChip || !activeGrupoId) return
     const scroller = scrollRef.current
     const chip = activeChipRef.current
     if (!scroller || !chip) return
-
-    // Só mexe no scrollLeft da barra — scrollIntoView no chip
-    // pode alterar o scroll vertical da página (micro-saltos).
-    const scrollerRect = scroller.getBoundingClientRect()
-    const chipRect = chip.getBoundingClientRect()
-    const chipOffset =
-      chipRect.left - scrollerRect.left + scroller.scrollLeft
-    const target = chipOffset - (scroller.clientWidth - chipRect.width) / 2
-    const maxScroll = Math.max(0, scroller.scrollWidth - scroller.clientWidth)
-    const nextLeft = Math.max(0, Math.min(target, maxScroll))
-
-    if (Math.abs(scroller.scrollLeft - nextLeft) < 1) return
-    // Instantâneo: smooth na barra durante o scroll-spy compete com o dedo.
-    scroller.scrollTo({ left: nextLeft, behavior: 'auto' })
-  }, [activeGrupoId])
+    centralizarChipNaBarra(scroller, chip)
+  }, [activeGrupoId, centerActiveChip])
 
   if (grupos.length === 0) return null
 
@@ -79,10 +87,11 @@ export function DeliveryGrupoChips({
     if (!drag || !scroller || drag.pointerId !== event.pointerId) return
 
     const delta = event.clientX - drag.startX
-    if (Math.abs(delta) > 4) {
+    if (Math.abs(delta) > DRAG_THRESHOLD_PX) {
       drag.moved = true
       suppressClickRef.current = true
     }
+    if (!drag.moved) return
     scroller.scrollLeft = drag.startScrollLeft - delta
   }
 
@@ -109,7 +118,7 @@ export function DeliveryGrupoChips({
     <div className={`w-full max-w-full min-w-0 ${marginClass}`.trim()}>
       <div
         ref={scrollRef}
-        className="w-full max-w-full min-w-0 cursor-grab touch-pan-x overflow-x-auto overflow-y-hidden active:cursor-grabbing [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="w-full max-w-full min-w-0 cursor-grab touch-pan-x overflow-x-auto overflow-y-hidden overscroll-x-contain active:cursor-grabbing [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         style={{ WebkitOverflowScrolling: 'touch' }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}

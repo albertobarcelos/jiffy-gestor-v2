@@ -30,6 +30,8 @@ const baseViewModel: DeliveryPublicoViewModel = {
   ],
   disponivel: true,
   horarioTexto: '',
+  statusMensagem: '',
+  statusDetalheHorario: null,
   termoBusca: '',
   carrinho: { total: 0, quantidadeItens: 0 },
 }

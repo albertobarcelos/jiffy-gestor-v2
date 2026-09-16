@@ -397,6 +397,7 @@ export function DeliveryProdutoModal({
                       {grupo.complementos.map(comp => {
                         const qtdComp = getQuantidadeComplemento(grupo.id, comp.id)
                         const tipoIp = normalizeTipoImpactoPreco(comp.tipoImpactoPreco)
+                        const valorTxt = formatarValorComplemento(comp.valor, tipoIp)
 
                         return (
                           <div
@@ -412,9 +413,11 @@ export function DeliveryProdutoModal({
                                 >
                                   {comp.nome}
                                 </p>
-                                <p className="mt-0.5 text-xs font-semibold tabular-nums delivery-text-accent sm:text-sm">
-                                  {formatarValorComplemento(comp.valor, tipoIp)}
-                                </p>
+                                {valorTxt ? (
+                                  <p className="mt-0.5 text-xs font-semibold tabular-nums delivery-text-accent sm:text-sm">
+                                    {valorTxt}
+                                  </p>
+                                ) : null}
                               </div>
                             </div>
                             <DeliveryQuantidadeStepper

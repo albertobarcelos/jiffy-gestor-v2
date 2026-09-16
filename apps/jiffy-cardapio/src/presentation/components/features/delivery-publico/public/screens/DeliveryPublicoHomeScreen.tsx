@@ -24,11 +24,11 @@ import {
 } from '@/src/presentation/hooks/usePublicDeliveryCatalog'
 import { useLocalizacaoEmpresaPublica } from '../../shared/hooks/useLocalizacaoEmpresaPublica'
 import {
-  isPublicDeliverySlugNotFound,
-  isEmpresaDeliveryIndisponivel,
-  extrairMensagensPendenciasCatalogo,
-} from '@/src/application/errors/publicDeliveryErrors'
-import { DeliveryLojaIndisponivelScreen } from './DeliveryLojaIndisponivelScreen'
+  logErroCatalogoPublico,
+  resolverMensagemErroCatalogoPublicoUi,
+} from '@/src/application/errors/resolverMensagemErroCatalogoPublico'
+import { DeliveryCatalogoErroScreen } from './DeliveryCatalogoErroScreen'
+import { DeliveryPublicoHomeSkeleton } from './DeliveryPublicoHomeSkeleton'
 import {
   DeliveryThemeScope,
   useDeliveryThemeContext,
@@ -46,8 +46,18 @@ import { formatEmpresaPublicaEndereco } from '../../shared/utils/formatEmpresaPu
 import { produtoTemComplementosAtivos } from '../../shared/utils/produtoComplementosUtils'
 import { resolveDeliveryLayoutHome } from '../layouts/DeliveryPublicoLayoutRegistry'
 import type { DeliveryPublicoViewModel } from '../../shared/types/deliveryPublicoViewModel'
-import { DeliveryProdutoModal } from '../components/DeliveryProdutoModal'
+import dynamic from 'next/dynamic'
 import { DeliveryAdicionadoCarrinhoDialog } from '../components/DeliveryAdicionadoCarrinhoDialog'
+
+const DeliveryProdutoModal = dynamic(
+  () =>
+    import('../components/DeliveryProdutoModal').then(m => ({
+      default: m.DeliveryProdutoModal,
+    })),
+  { ssr: false }
+)
+import { DeliveryLojaInfoModal } from '../../shared/components/DeliveryLojaInfoModal'
+import { DeliveryWhatsAppFab } from '../../shared/components/DeliveryWhatsAppFab'
 import { DeliveryPublicoCarrinhoScreen } from './DeliveryPublicoCarrinhoScreen'
 import { useFlyToCart } from '../../shared/hooks/useFlyToCart'
 import { useDeliveryBodyScrollLock } from '../../shared/hooks/useDeliveryBodyScrollLock'
@@ -56,8 +66,10 @@ import { buildCarrinhoThumbsFromItens } from '../../shared/utils/buildCarrinhoTh
 import {
   deliveryPublicoCarrinhoPath,
   deliveryPublicoHomePath,
-  deliveryPublicoInstrucoesPath,
+  deliveryPublicoPedidoPath,
 } from '../../shared/utils/deliveryPublicoRoutes'
+import { lerUltimoPedidoPublicoConfirmado } from '../../shared/utils/pedidoConfirmadoStorage'
+import { showToast } from '@/src/shared/utils/toast'
 
 type DeliveryPublicoHomeScreenProps = {
   slug: string
@@ -108,10 +120,21 @@ export function DeliveryPublicoHomeScreen({
   const { data, isLoading, isError, error, isFetchingNextPage } = catalogQuery
   const empresa: EmpresaPublicaDTO | null = data?.pages[0]?.empresa ?? null
   const funcionamento: FuncionamentoPublicoDTO | null = data?.pages[0]?.funcionamento ?? null
+  const canalWhatsApp = data?.pages[0]?.canalWhatsApp ?? null
   const lojaAberta = funcionamento?.aberta ?? true
 
-  // Aquece cache da geo da loja (1 geocode/sessão) para distância no checkout.
-  useLocalizacaoEmpresaPublica(slug, empresa?.endereco ?? null, Boolean(empresa?.endereco))
+  const telefoneWhatsAppFab =
+    canalWhatsApp?.conectado && canalWhatsApp.telefone
+      ? canalWhatsApp.telefone
+      : null
+
+  // Preferência: localizacao do catálogo (P3). Fallback: geocode FE 1×/sessão.
+  useLocalizacaoEmpresaPublica(
+    slug,
+    empresa?.endereco ?? null,
+    Boolean(empresa?.endereco || empresa?.localizacao),
+    empresa?.localizacao
+  )
 
   const carrinhoItens = useDeliveryCarrinhoItens(slug)
   const carrinhoTotal = useDeliveryCarrinhoTotal(slug)
@@ -166,10 +189,9 @@ export function DeliveryPublicoHomeScreen({
   )
 
   useEffect(() => {
-    if (isError && isPublicDeliverySlugNotFound(error)) {
-      router.replace(deliveryPublicoInstrucoesPath())
-    }
-  }, [isError, error, router])
+    if (!isError || !error) return
+    logErroCatalogoPublico(error, { slug, origem: 'DeliveryPublicoHomeScreen' })
+  }, [isError, error, slug])
 
   const grupos = useMemo(
     () => (data?.pages ? flattenCatalogoGrupos(data.pages) : []),
@@ -341,26 +363,29 @@ export function DeliveryPublicoHomeScreen({
     abrirCarrinho()
   }, [abrirCarrinho])
 
+  const handleMeuPedidoClick = useCallback(() => {
+    const ultimo = lerUltimoPedidoPublicoConfirmado(slug)
+    if (!ultimo) {
+      showToast.info('Nenhum pedido recente neste dispositivo.')
+      return
+    }
+    router.push(deliveryPublicoPedidoPath(slug, ultimo.codigo))
+  }, [router, slug])
+
   const handleIrParaCarrinhoAposAdicionar = useCallback(() => {
     abrirCarrinho()
   }, [abrirCarrinho])
 
   const isCatalogLoading = isLoading && !data
 
-  if (isError && isEmpresaDeliveryIndisponivel(error)) {
+  if (isError) {
+    const ui = resolverMensagemErroCatalogoPublicoUi(error)
     return (
-      <DeliveryLojaIndisponivelScreen mensagens={extrairMensagensPendenciasCatalogo(error)} />
-    )
-  }
-
-  if (isError && !isPublicDeliverySlugNotFound(error)) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-white px-6 text-center">
-        <p className="text-lg font-semibold text-gray-800">Não foi possível carregar o cardápio</p>
-        <p className="mt-2 text-sm text-gray-500">
-          {error instanceof Error ? error.message : 'Tente novamente em instantes.'}
-        </p>
-      </div>
+      <DeliveryCatalogoErroScreen
+        tipo={ui.tipo}
+        titulo={ui.titulo}
+        descricao={ui.descricao}
+      />
     )
   }
 
@@ -386,6 +411,7 @@ export function DeliveryPublicoHomeScreen({
         onProdutoClick={handleProdutoClick}
         onProdutoAddRapido={handleProdutoAddRapido}
         onPedidoClick={handlePedidoClick}
+        onMeuPedidoClick={handleMeuPedidoClick}
         onCloseProduto={handleCloseProduto}
         onProdutoAdicionado={handleProdutoAdicionado}
         produtoAdicionadoNome={produtoAdicionadoNome}
@@ -405,6 +431,11 @@ export function DeliveryPublicoHomeScreen({
           onClose={fecharCarrinho}
         />
       ) : null}
+      <DeliveryWhatsAppFab
+        telefone={telefoneWhatsAppFab}
+        nomeLoja={empresa?.nomeFantasia}
+        visible={!carrinhoAberto}
+      />
     </DeliveryThemeScope>
   )
 }
@@ -425,6 +456,7 @@ type DeliveryPublicoHomeContentProps = {
   onProdutoClick: (produtoId: string) => void
   onProdutoAddRapido: (produtoId: string) => void
   onPedidoClick: () => void
+  onMeuPedidoClick: () => void
   onCloseProduto: () => void
   onProdutoAdicionado: (payload: ProdutoAdicionadoPayload) => void
   produtoAdicionadoNome: string | null
@@ -454,6 +486,7 @@ function DeliveryPublicoHomeContent({
   onProdutoClick,
   onProdutoAddRapido,
   onPedidoClick,
+  onMeuPedidoClick,
   onCloseProduto,
   onProdutoAdicionado,
   produtoAdicionadoNome,
@@ -467,6 +500,7 @@ function DeliveryPublicoHomeContent({
   bloquearUiFlyToCart,
 }: DeliveryPublicoHomeContentProps) {
   const { config } = useDeliveryThemeContext()
+  const [lojaInfoOpen, setLojaInfoOpen] = useState(false)
 
   const viewModel: DeliveryPublicoViewModel = useMemo(() => {
     const base = buildCatalogViewModel(
@@ -484,32 +518,38 @@ function DeliveryPublicoHomeContent({
   const enderecoTexto = formatEmpresaPublicaEndereco(empresa?.endereco ?? null)
 
   if (isCatalogLoading) {
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <div
-          className="h-12 w-12 animate-spin rounded-full border-b-2"
-          style={{ borderColor: 'var(--delivery-primary)' }}
-        />
-      </div>
-    )
+    return <DeliveryPublicoHomeSkeleton />
   }
 
   return (
     <>
+      {/* interactive permanece true no fly-to-cart: desligar some o "+" e troca o
+          layout do card (fonte/padding), fazendo o texto saltar. Bloqueio fica no overlay. */}
       <LayoutHome
         config={config}
         viewModel={viewModel}
         enderecoTexto={enderecoTexto}
-        interactive={!bloquearUiFlyToCart}
+        interactive
         onBuscaChange={onBuscaChange}
         onGrupoClick={onGrupoClick}
         onProdutoClick={onProdutoClick}
         onProdutoAddRapido={onProdutoAddRapido}
         onPedidoClick={onPedidoClick}
+        onMeuPedidoClick={onMeuPedidoClick}
+        onInformacoesClick={() => setLojaInfoOpen(true)}
         quantidadePorProduto={quantidadePorProduto}
         carrinhoThumbs={carrinhoThumbs}
         carrinhoThumbsBounceKey={carrinhoThumbsBounceKey}
         carrinhoThumbsTargetRef={carrinhoThumbsTargetRef}
+      />
+      <DeliveryLojaInfoModal
+        open={lojaInfoOpen}
+        onClose={() => setLojaInfoOpen(false)}
+        slug={slug}
+        empresa={empresa}
+        funcionamento={funcionamento}
+        nomeExibicao={config.cabecalho.nomeExibicao}
+        logoUrl={config.cabecalho.logoUrl}
       />
       {produtoSelecionado ? (
         <DeliveryProdutoModal

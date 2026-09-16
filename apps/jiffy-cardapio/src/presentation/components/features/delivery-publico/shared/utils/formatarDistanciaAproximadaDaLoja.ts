@@ -1,8 +1,8 @@
 import {
-  distanciaMetrosEntrePontos,
-  parseGeoJsonPoint,
-  type GeoJsonPoint,
-} from '@/src/shared/types/geoJsonPoint'
+  calcularDistanciaMetrosEntrePontos,
+  pontoClientePreferidoParaDistancia,
+} from '@/src/domain/services/DistanciaEntrePontos'
+import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 
 /** Formata metros em texto curto para o cliente (linha reta aproximada). */
 export function formatarDistanciaAproximadaMetros(metros: number): string {
@@ -22,10 +22,11 @@ export function calcularDistanciaAproximadaDaLoja(
   localizacaoEmpresa: GeoJsonPoint | null | undefined,
   localizacaoCliente: GeoJsonPoint | null | undefined
 ): string | null {
-  const empresa = parseGeoJsonPoint(localizacaoEmpresa)
-  const cliente = parseGeoJsonPoint(localizacaoCliente)
-  if (!empresa || !cliente) return null
-  const metros = distanciaMetrosEntrePontos(empresa, cliente)
+  const metros = calcularDistanciaMetrosEntrePontos(
+    localizacaoEmpresa,
+    localizacaoCliente
+  )
+  if (metros == null) return null
   const texto = formatarDistanciaAproximadaMetros(metros)
   return texto || null
 }
@@ -35,8 +36,5 @@ export function pontoClienteParaDistancia(endereco: {
   enderecoLocalizacao?: GeoJsonPoint | null
   preferenciaEntrega?: GeoJsonPoint | null
 }): GeoJsonPoint | null {
-  return (
-    parseGeoJsonPoint(endereco.preferenciaEntrega) ??
-    parseGeoJsonPoint(endereco.enderecoLocalizacao)
-  )
+  return pontoClientePreferidoParaDistancia(endereco)
 }

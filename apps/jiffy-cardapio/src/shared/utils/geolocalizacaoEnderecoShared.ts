@@ -1,5 +1,6 @@
 import type { GeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
 import { parseGeoJsonPoint } from '@/src/shared/types/geoJsonPoint'
+import { enderecoEntregaTemGeolocalizacao } from '@/src/domain/policies/EnderecoEntregaRequerGeolocalizacao'
 import {
   backendForwardGeocode,
   backendReverseGeocode,
@@ -137,6 +138,39 @@ export function prepararEnderecoGeocodeCheckout(
 
 export type ContextoErroGeolocalizacao = 'places' | 'details' | 'geocode' | 'gps'
 
+function textoErroGeolocalizacao(error: unknown): string {
+  if (error instanceof Error) return error.message.trim()
+  if (typeof error === 'string') return error.trim()
+  return ''
+}
+
+/** Falha típica de ZERO_RESULTS / endereço não resolvido pelo Google. */
+export function erroGeocodeEhSemResultado(error: unknown): boolean {
+  const lower = textoErroGeolocalizacao(error).toLowerCase()
+  return /zero_results|não encontr|nao encontr|não achamos|nao achamos|not found|sem resultado|nenhum resultado|sem coordenadas/.test(
+    lower
+  )
+}
+
+/**
+ * Geocodifica; se falhar por “não encontrado” e houver CEP, tenta de novo sem o CEP
+ * (CEP inválido/errado costuma derrubar a busca mesmo com rua/cidade corretos).
+ */
+export async function geocodificarEnderecoComRetrySemCep(
+  input: EnderecoGeocodeInput,
+  options?: { minimo?: GeocodeMinimoModo }
+): Promise<GeocodeEnderecoResult> {
+  try {
+    return await geocodificarEnderecoViaGoogle(input, options)
+  } catch (error) {
+    const cepDigits = normalizarCepEndereco(input.cep)
+    if (cepDigits.length === 8 && erroGeocodeEhSemResultado(error)) {
+      return await geocodificarEnderecoViaGoogle({ ...input, cep: '' }, options)
+    }
+    throw error
+  }
+}
+
 /**
  * Traduz falhas técnicas do Google/BFF em mensagem clara para o cliente final.
  */
@@ -144,12 +178,7 @@ export function mensagemAmigavelErroGeolocalizacao(
   error: unknown,
   contexto: ContextoErroGeolocalizacao = 'geocode'
 ): string {
-  const raw =
-    error instanceof Error
-      ? error.message.trim()
-      : typeof error === 'string'
-        ? error.trim()
-        : ''
+  const raw = textoErroGeolocalizacao(error)
   const lower = raw.toLowerCase()
 
   if (
@@ -174,12 +203,8 @@ export function mensagemAmigavelErroGeolocalizacao(
     return 'Não foi possível conectar ao serviço de mapas. Verifique sua internet e tente novamente.'
   }
 
-  if (
-    /zero_results|não encontr|nao encontr|not found|sem resultado|nenhum resultado|sem coordenadas/i.test(
-      lower
-    )
-  ) {
-    return 'Não encontramos esse endereço no mapa. Tente outra busca ou ajuste o pin manualmente.'
+  if (erroGeocodeEhSemResultado(error)) {
+    return 'Não achamos esse endereço exato no mapa. Confira os dados ou marque o local arrastando o pin.'
   }
 
   if (
@@ -324,7 +349,7 @@ export function resolverPreferenciaEntrega(
 export function enderecoTemGeolocalizacao(endereco: {
   enderecoLocalizacao?: GeoJsonPoint | null
 }): boolean {
-  return Boolean(parseGeoJsonPoint(endereco.enderecoLocalizacao))
+  return enderecoEntregaTemGeolocalizacao(endereco)
 }
 
 export type ModoPersistenciaGeoEnderecoDelivery = 'preferencia_entrega' | 'atualizar_endereco'

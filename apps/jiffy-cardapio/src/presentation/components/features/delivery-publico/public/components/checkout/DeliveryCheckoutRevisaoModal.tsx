@@ -181,9 +181,10 @@ export function DeliveryCheckoutRevisaoModal({
   const [desejaNotaFiscal, setDesejaNotaFiscal] = useState(
     () => cpfNotaFiscal.replace(/\D/g, '').length > 0
   )
-  const telefoneExibicao = telefone.trim()
+  const telefoneTrim = telefone.trim()
+  const telefoneExibicao = telefoneTrim
     ? formatarTelefoneExibicao(telefone, telefonePaisIso2)
-    : 'Não informado'
+    : null
   const nomeExibicao = nome.trim() || 'Não informado'
   const isEntrega = tipoEntrega === 'entrega'
   const totalExibicao = totalOficial ?? total
@@ -301,7 +302,9 @@ export function DeliveryCheckoutRevisaoModal({
           editLabel="Editar cliente"
         >
           <p className="text-sm font-semibold delivery-text-primary">{nomeExibicao}</p>
-          <p className="text-sm delivery-text-secondary">{telefoneExibicao}</p>
+          {telefoneExibicao ? (
+            <p className="text-sm delivery-text-secondary">{telefoneExibicao}</p>
+          ) : null}
         </LinhaSecao>
 
         <LinhaSecao
@@ -404,23 +407,28 @@ export function DeliveryCheckoutRevisaoModal({
 
                 {item.complementos.length > 0 ? (
                   <ul className="mt-2 space-y-0.5 pl-[3.625rem]">
-                    {item.complementos.map(c => (
-                      <li
-                        key={`${c.complementoId}-${c.grupoComplementoId}`}
-                        className="flex items-center gap-2 text-xs delivery-text-secondary"
-                      >
-                        <span className="min-w-0 flex-1 truncate">
-                          <span className="font-medium tabular-nums">{c.quantidade}x</span>{' '}
-                          {c.nome}
-                        </span>
-                        <span className="shrink-0 tabular-nums delivery-text-accent">
-                          {formatarValorComplemento(
-                            c.valor,
-                            normalizeTipoImpactoPreco(c.tipoImpactoPreco)
-                          )}
-                        </span>
-                      </li>
-                    ))}
+                    {item.complementos.map(c => {
+                      const valorTxt = formatarValorComplemento(
+                        c.valor,
+                        normalizeTipoImpactoPreco(c.tipoImpactoPreco)
+                      )
+                      return (
+                        <li
+                          key={`${c.complementoId}-${c.grupoComplementoId}`}
+                          className="flex items-center gap-2 text-xs delivery-text-secondary"
+                        >
+                          <span className="min-w-0 flex-1 truncate">
+                            <span className="font-medium tabular-nums">{c.quantidade}x</span>{' '}
+                            {c.nome}
+                          </span>
+                          {valorTxt ? (
+                            <span className="shrink-0 tabular-nums delivery-text-accent">
+                              {valorTxt}
+                            </span>
+                          ) : null}
+                        </li>
+                      )
+                    })}
                   </ul>
                 ) : null}
 
