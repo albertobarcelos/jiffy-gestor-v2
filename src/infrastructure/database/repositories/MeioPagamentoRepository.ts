@@ -103,6 +103,7 @@ export class MeioPagamentoRepository implements IMeioPagamentoRepository {
       const body: Record<string, unknown> = {
         nome: data.nome,
         tefAtivo: data.tefAtivo !== undefined ? data.tefAtivo : true,
+        isDelivery: data.isDelivery !== undefined ? data.isDelivery : false,
         formaPagamentoFiscal: data.formaPagamentoFiscal || 'Dinheiro',
         ativo: data.ativo !== undefined ? data.ativo : true,
         isParcelavel: data.isParcelavel !== undefined ? data.isParcelavel : false,
@@ -145,6 +146,7 @@ export class MeioPagamentoRepository implements IMeioPagamentoRepository {
 
       if (data.nome) requestBody.nome = data.nome
       if (data.tefAtivo !== undefined) requestBody.tefAtivo = data.tefAtivo
+      if (data.isDelivery !== undefined) requestBody.isDelivery = data.isDelivery
       if (data.formaPagamentoFiscal !== undefined) requestBody.formaPagamentoFiscal = data.formaPagamentoFiscal
       if (data.ativo !== undefined) requestBody.ativo = data.ativo
       if (data.isParcelavel !== undefined) requestBody.isParcelavel = data.isParcelavel

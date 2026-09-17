@@ -12,6 +12,7 @@ export type TipoParcelamento = 'jurosVendedor' | 'jurosCliente'
 export interface CriarMeioPagamentoDTO {
   nome: string
   tefAtivo?: boolean
+  isDelivery?: boolean
   formaPagamentoFiscal?: string
   ativo?: boolean
   isParcelavel?: boolean
@@ -21,6 +22,7 @@ export interface CriarMeioPagamentoDTO {
 export interface AtualizarMeioPagamentoDTO {
   nome?: string
   tefAtivo?: boolean
+  isDelivery?: boolean
   formaPagamentoFiscal?: string
   ativo?: boolean
   isParcelavel?: boolean
