@@ -118,6 +118,22 @@ export function meioNomeEhDinheiro(nome: string): boolean {
   return lower.includes('dinheiro') || lower.includes('cash')
 }
 
+/**
+ * Só dinheiro gera troco.
+ * Sem catálogo/nome: cobrança na entrega é o único lançamento que pode carregar cédula
+ * (cardápio / entregador). Meio nomeado que não é dinheiro nunca gera troco.
+ */
+export function lancamentoEhDinheiroParaTroco(
+  pagamento: PagamentoSelecionado,
+  meiosPagamento: MeioPagamentoNomeLike[] = [],
+  nomesMeiosPagamentoPorId: Record<string, string> = {}
+): boolean {
+  const meio = meiosPagamento.find(m => m.getId() === pagamento.meioPagamentoId)
+  const nome = (meio?.getNome() || nomesMeiosPagamentoPorId[pagamento.meioPagamentoId] || '').trim()
+  if (nome) return meioNomeEhDinheiro(nome)
+  return Boolean(pagamento.cobrarNaEntrega || pagamento.naoEfetivo)
+}
+
 export type LancamentoTroco = {
   valor: number
   isDinheiro: boolean
@@ -153,10 +169,17 @@ export function calcularTrocoSobreLancamentos(args: {
 export function calcularTrocoPedido(args: {
   pagamentos: PagamentoSelecionado[]
   totalProdutos: number
-  meiosPagamento: MeioPagamentoNomeLike[]
+  meiosPagamento?: MeioPagamentoNomeLike[]
+  nomesMeiosPagamentoPorId?: Record<string, string>
   considerarApenasNaoCancelados?: boolean
 }): number {
-  const { pagamentos, totalProdutos, meiosPagamento, considerarApenasNaoCancelados } = args
+  const {
+    pagamentos,
+    totalProdutos,
+    meiosPagamento = [],
+    nomesMeiosPagamentoPorId = {},
+    considerarApenasNaoCancelados,
+  } = args
 
   const lancamentos: LancamentoTroco[] = []
   for (const p of pagamentos) {
@@ -166,10 +189,9 @@ export function calcularTrocoPedido(args: {
       continue
     }
 
-    const meio = meiosPagamento.find(m => m.getId() === p.meioPagamentoId)
     lancamentos.push({
       valor: p.valor,
-      isDinheiro: Boolean(meio && meioNomeEhDinheiro(meio.getNome())),
+      isDinheiro: lancamentoEhDinheiroParaTroco(p, meiosPagamento, nomesMeiosPagamentoPorId),
     })
   }
 

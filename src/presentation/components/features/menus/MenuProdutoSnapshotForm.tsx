@@ -6,6 +6,7 @@ import {
   useEffect,
   useImperativeHandle,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 import { MdDeleteOutline } from 'react-icons/md'
@@ -16,8 +17,12 @@ import { sxEntradaCompactaProduto } from '@/src/presentation/components/features
 import { useMenuMutations } from '@/src/presentation/hooks/menus/useMenuMutations'
 import { usePropagarAlteracaoProduto } from '@/src/presentation/hooks/produtos/usePropagarAlteracaoProduto'
 import { showToast } from '@/src/shared/utils/toast'
-import type { MenuProduto } from '@/src/shared/types/menus'
+import type { MenuGrupoProduto, MenuProduto } from '@/src/shared/types/menus'
 import { MENU_PRODUTO_FORM_ID } from './menuPanelConstants'
+import {
+  MenuCategoriaNesteCardapioCampos,
+  type MenuCategoriaNesteCardapioHandle,
+} from './MenuCategoriaNesteCardapioCampos'
 import { ProdutoFormWithPreviewLayout } from '@/src/presentation/components/features/produtos/preview/ProdutoFormWithPreviewLayout'
 import { parsePrecoPreviewFromInput } from '@/src/presentation/components/features/produtos/preview/produtoPreviewModel'
 import type { ProdutoPreviewImageUpload } from '@/src/presentation/components/features/produtos/preview/ProdutoSimplePreviewCard'
@@ -30,9 +35,11 @@ export type MenuProdutoSnapshotHandle = {
 interface MenuProdutoSnapshotFormProps {
   menuId: string
   produto: MenuProduto
+  grupo?: MenuGrupoProduto | null
   formId?: string
   onDirtyChange?: (dirty: boolean) => void
   onSavingChange?: (saving: boolean) => void
+  onGrupoChange?: (grupo: MenuGrupoProduto) => void
   onRemoverDesteCardapio?: () => void
 }
 
@@ -59,14 +66,18 @@ export const MenuProdutoSnapshotForm = forwardRef<
   {
     menuId,
     produto,
+    grupo = null,
     formId = MENU_PRODUTO_FORM_ID,
     onDirtyChange,
     onSavingChange,
+    onGrupoChange,
     onRemoverDesteCardapio,
   },
   ref
 ) {
   const { updateProduto, uploadImagemProduto } = useMenuMutations(menuId)
+  const categoriaRef = useRef<MenuCategoriaNesteCardapioHandle>(null)
+  const [categoriaDirty, setCategoriaDirty] = useState(false)
   const [imagemPreviewOverride, setImagemPreviewOverride] = useState<string | null>(null)
   const { pedirConfirmacao, aplicarNosDestinos, aplicarImagemNosDestinos, dialog: dialogPropagacao } =
     usePropagarAlteracaoProduto()
@@ -149,13 +160,14 @@ export const MenuProdutoSnapshotForm = forwardRef<
   const isDirty = useCallback(() => {
     const valorNum = parseCurrency(valor)
     return (
+      categoriaDirty ||
       nome.trim() !== produto.nome ||
       (descricao.trim() || '') !== (produto.descricao ?? '').trim() ||
       (Number.isFinite(valorNum) ? valorNum : -1) !== Number(produto.valor) ||
       ativo !== produto.ativo ||
       favorito !== produto.favorito
     )
-  }, [nome, descricao, valor, ativo, favorito, produto])
+  }, [categoriaDirty, nome, descricao, valor, ativo, favorito, produto])
 
   useEffect(() => {
     onDirtyChange?.(isDirty())
@@ -180,6 +192,14 @@ export const MenuProdutoSnapshotForm = forwardRef<
     })
     if (destinos === null) return false
 
+    const nomeCategoriaOk = (await categoriaRef.current?.save()) ?? true
+    if (!nomeCategoriaOk) return false
+
+    const grupoProdutoIdSelecionado = categoriaRef.current?.grupoProdutoIdSelecionado()
+    const grupoMudou =
+      Boolean(grupoProdutoIdSelecionado) &&
+      grupoProdutoIdSelecionado !== grupo?.grupoBase.id
+
     const snapshot = {
       nome: nomeTrim,
       descricao: descricao.trim() || null,
@@ -192,8 +212,14 @@ export const MenuProdutoSnapshotForm = forwardRef<
     try {
       await updateProduto.mutateAsync({
         produtoId: produto.produtoId,
-        input: snapshot,
+        input: {
+          ...snapshot,
+          ...(grupoMudou ? { grupoProdutoId: grupoProdutoIdSelecionado } : {}),
+        },
       })
+      if (grupoMudou) {
+        categoriaRef.current?.confirmarGrupoSelecionado()
+      }
       if (destinos.aplicarNoCadastroBase || destinos.menuIds.length > 0) {
         await aplicarNosDestinos({
           produtoId: produto.produtoId,
@@ -217,6 +243,7 @@ export const MenuProdutoSnapshotForm = forwardRef<
     favorito,
     produto.produtoId,
     menuId,
+    grupo?.grupoBase.id,
     updateProduto,
     onSavingChange,
     pedirConfirmacao,
@@ -292,6 +319,17 @@ export const MenuProdutoSnapshotForm = forwardRef<
               sx={sxEntradaCompactaProduto}
             />
           </div>
+
+          {grupo ? (
+            <MenuCategoriaNesteCardapioCampos
+              ref={categoriaRef}
+              menuId={menuId}
+              grupo={grupo}
+              produtoId={produto.produtoId}
+              onDirtyChange={setCategoriaDirty}
+              onGrupoChange={onGrupoChange}
+            />
+          ) : null}
 
           <Input
             label="Descrição"

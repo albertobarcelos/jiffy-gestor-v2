@@ -14,7 +14,7 @@ import {
 import { getEstacaoImpressaoId } from '@/src/infrastructure/printing/estacaoImpressaoStorage'
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
-import { useSuperficieQuadroPedidos } from '@/src/presentation/gestor-pedidos/kiosk/useSuperficieQuadroPedidos'
+import { estaNoAppJiffyFlow } from '@/src/presentation/gestor-pedidos/kiosk/isKioskGestorPedidos'
 import { prepararSomPedidoNovo } from '@/src/presentation/gestor-pedidos/som/somPedidoNovo'
 import {
   obterAlarmeSomPedidoNovo,
@@ -37,7 +37,6 @@ export function DeliveryRealtimeBridge() {
   const queryClient = useQueryClient()
   const empresaId = useTenantEmpresaId()
   const tenantAuth = useAuthStore(s => s.tenantAuth)
-  const superficie = useSuperficieQuadroPedidos()
   const { imprimirPorComandoRealtime } = useImpressaoDelivery()
   const [estacaoId, setEstacaoId] = useState<string | null>(() => getEstacaoImpressaoId())
   const socketRef = useRef<Socket | null>(null)
@@ -54,11 +53,15 @@ export function DeliveryRealtimeBridge() {
   }, [])
 
   useEffect(() => {
-    if (superficie !== 'fredy') return
+    if (!estaNoAppJiffyFlow()) return
     const destravar = () => prepararSomPedidoNovo()
-    window.addEventListener('pointerdown', destravar, { once: true })
-    return () => window.removeEventListener('pointerdown', destravar)
-  }, [superficie])
+    window.addEventListener('pointerdown', destravar)
+    window.addEventListener('keydown', destravar)
+    return () => {
+      window.removeEventListener('pointerdown', destravar)
+      window.removeEventListener('keydown', destravar)
+    }
+  }, [])
 
   const syncEstacaoId = useCallback(() => {
     setEstacaoId(getEstacaoImpressaoId())
@@ -127,7 +130,7 @@ export function DeliveryRealtimeBridge() {
         scheduleInvalidate()
       }
       const card = extrairVendaUnificadaDeRespostaDeliverySummary(payload)
-      if (card && superficie === 'fredy') {
+      if (card && estaNoAppJiffyFlow()) {
         obterAlarmeSomPedidoNovo().onPedidoCriado(
           card.id,
           resolverModoSomPedidoNovo(card.getEtapaKanban())
@@ -145,7 +148,7 @@ export function DeliveryRealtimeBridge() {
         scheduleInvalidate()
       }
       const card = extrairVendaUnificadaDeRespostaDeliverySummary(payload)
-      if (card && superficie === 'fredy') {
+      if (card && estaNoAppJiffyFlow()) {
         sincronizarAlarmeSomComPedidoDelivery({
           vendaId: card.id,
           etapaKanban: card.getEtapaKanban(),
@@ -172,7 +175,7 @@ export function DeliveryRealtimeBridge() {
       disconnectDeliverySocket(socket)
       if (socketRef.current === socket) socketRef.current = null
     }
-  }, [empresaId, estacaoId, queryClient, superficie, tenantAuth])
+  }, [empresaId, estacaoId, queryClient, tenantAuth])
 
   return null
 }

@@ -42,6 +42,7 @@ import {
 } from '@/src/shared/types/propagarAlteracaoProduto'
 import {
   garantirMenuPrincipalNosIds,
+  menuIdsParaEspelharAposSalvarCadastro,
   syncCadastroComMenuPrincipalAtivo,
 } from '@/src/domain/policies/produto/syncCadastroComMenuPrincipal'
 
@@ -448,8 +449,6 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
     ref
   ) {
     const imagemNoCardapio = Boolean(previewMenuId)
-    /** Preço no cadastro base só quando o wizard já está no contexto de um cardápio. */
-    const ocultarPrecoCadastroBase = !previewMenuId
     const router = useRouter()
     const searchParams = useSearchParams()
     const invalidate = useInvalidateTenantQueries()
@@ -1518,10 +1517,9 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         }
       }
 
-      // Validação do Preço de Venda (obrigatório só no contexto de cardápio)
       const precoVendaNum = parseFloat(precoVenda.replace(/[^\d,]/g, '').replace(',', '.'))
       const precoCadastroValido = Number.isFinite(precoVendaNum) && precoVendaNum > 0
-      if (!ocultarPrecoCadastroBase && (!precoVenda || !precoCadastroValido)) {
+      if (!precoVenda || !precoCadastroValido) {
         showToast.error('O campo "Preço de Venda" não pode ser vazio ou zero.')
         return false
       }
@@ -1633,11 +1631,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         const body: Record<string, unknown> = {
           nome: nomeProduto,
           descricao: descricaoProduto,
-          valor: ocultarPrecoCadastroBase
-            ? precoCadastroValido
-              ? precoVendaNum
-              : 0
-            : precoVendaNum,
+          valor: precoVendaNum,
           grupoId: grupoIdFinal,
           unidadeMedida: unidadeProduto,
           codigoEan: codigoEanBarras.trim(),
@@ -1808,14 +1802,19 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         const snapPropagar = snapshotPropagavelDePatch(
           (bodyToSend ?? {}) as Record<string, unknown>
         )
-        if (snapPropagar && idSalvo && destinosPropagacao.menuIds.length > 0) {
+        const destinosMenu = menuIdsParaEspelharAposSalvarCadastro({
+          isEdit: jaExistiaAntesDoSave,
+          destinosEdicao: destinosPropagacao.menuIds,
+          menuIdsCriacao: menuIdsFinal ?? [],
+        })
+        if (snapPropagar && idSalvo && destinosMenu.length > 0) {
           try {
             await aplicarNosDestinos({
               produtoId: idSalvo,
               snapshot: snapPropagar,
               destinos: {
                 aplicarNoCadastroBase: false,
-                menuIds: destinosPropagacao.menuIds,
+                menuIds: destinosMenu,
               },
             })
           } catch (propErr) {
@@ -1926,7 +1925,7 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
             precoVenda.replace(/[^\d,]/g, '').replace(',', '.')
           )
           if (!nomeProduto?.trim()) return false
-          if (!ocultarPrecoCadastroBase && (!precoVenda || precoNum <= 0)) return false
+          if (!precoVenda || precoNum <= 0) return false
           if (!unidadeProduto) return false
           const isEditMode = Boolean(effectiveProdutoId) && !effectiveIsCopyMode
           // Criação/cópia: categoria existente ou nova pendente do wizard (passo 1).
@@ -1952,7 +1951,6 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
         pendingNovaCategoriaLabel,
         effectiveProdutoId,
         effectiveIsCopyMode,
-        ocultarPrecoCadastroBase,
       ]
     )
 
@@ -2194,7 +2192,6 @@ const NovoProdutoContent = forwardRef<NovoProdutoHandle, NovoProdutoProps>(
               onCodigoEanBarrasChange={setCodigoEanBarras}
               grupos={grupos}
               isLoadingGrupos={isLoadingGrupos}
-              ocultarPrecoVenda={ocultarPrecoCadastroBase}
               onNext={handleNext}
               onSaveAndClose={() => void handleSave({ salvarSomenteDadosGerais: true })}
               hideStepFooter={hideLocalStepFooter}

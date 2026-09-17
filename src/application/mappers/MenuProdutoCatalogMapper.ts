@@ -1,6 +1,101 @@
 import { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { Produto } from '@/src/domain/entities/Produto'
-import type { MenuGrupoProduto, MenuProduto } from '@/src/shared/types/menus'
+import type {
+  MenuGrupoProduto,
+  MenuProduto,
+  MenuProdutoComplementoItemResumo,
+  MenuProdutoComplementoResumo,
+} from '@/src/shared/types/menus'
+
+type ProdutoGrupoComplemento = {
+  id: string
+  nome: string
+  complementos: MenuProdutoComplementoItemResumo[]
+}
+
+function asPlainRecord(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>
+  }
+  return {}
+}
+
+function mapComplementoResumo(raw: unknown): MenuProdutoComplementoItemResumo | null {
+  const rec = asPlainRecord(raw)
+  const id = rec.id != null ? String(rec.id).trim() : ''
+  const nome = rec.nome != null ? String(rec.nome).trim() : ''
+  if (!id) return null
+  const valor =
+    typeof rec.valor === 'number' ? rec.valor : rec.valor != null ? Number(rec.valor) || 0 : 0
+  const tipo = rec.tipoImpactoPreco
+  return {
+    id,
+    nome: nome || 'Complemento',
+    valor,
+    tipoImpactoPreco:
+      tipo === 'aumenta' || tipo === 'diminui' || tipo === 'nenhum' ? tipo : 'nenhum',
+  }
+}
+
+export function mapMenuGruposComplementosToProduto(
+  grupos: MenuProdutoComplementoResumo[] | undefined
+): ProdutoGrupoComplemento[] {
+  if (!Array.isArray(grupos)) return []
+  return grupos
+    .map(grupo => {
+      const id = grupo?.id != null ? String(grupo.id).trim() : ''
+      if (!id) return null
+      return {
+        id,
+        nome: grupo.nome?.trim() || 'Grupo',
+        complementos: Array.isArray(grupo.complementos)
+          ? grupo.complementos.map(mapComplementoResumo).filter((item): item is MenuProdutoComplementoItemResumo => item != null)
+          : [],
+      }
+    })
+    .filter((grupo): grupo is ProdutoGrupoComplemento => grupo != null)
+}
+
+export function gruposComplementosPrecisamHidratacao(
+  grupos: Array<{ complementos?: readonly unknown[] }>
+): boolean {
+  return grupos.some(grupo => (grupo.complementos?.length ?? 0) === 0)
+}
+
+export function mapGrupoComplementoJsonToProdutoGrupo(raw: unknown): ProdutoGrupoComplemento | null {
+  const root = asPlainRecord(raw)
+  const nested = asPlainRecord(root.data)
+  const rec = nested.id != null || nested.nome != null ? nested : root
+  const id = rec.id != null ? String(rec.id).trim() : ''
+  if (!id) return null
+  return {
+    id,
+    nome: rec.nome != null ? String(rec.nome).trim() || 'Grupo' : 'Grupo',
+    complementos: Array.isArray(rec.complementos)
+      ? rec.complementos
+          .map(mapComplementoResumo)
+          .filter((item): item is MenuProdutoComplementoItemResumo => item != null)
+      : [],
+  }
+}
+
+export function substituirGruposComplementosDoProduto(
+  produto: Produto,
+  grupos: ProdutoGrupoComplemento[]
+): Produto {
+  return Produto.fromJSON({
+    ...produto.toJSON(),
+    gruposComplementos: grupos,
+  })
+}
+
+function abreComplementosDoSnapshot(
+  snapshot: MenuProduto,
+  gruposMenu: ProdutoGrupoComplemento[]
+): boolean {
+  if (typeof snapshot.abreComplementos === 'boolean') return snapshot.abreComplementos
+  return gruposMenu.length > 0
+}
 
 export function menuGrupoProdutoToGrupoProduto(item: MenuGrupoProduto): GrupoProduto {
   const base = item.grupoBase
@@ -17,17 +112,19 @@ export function menuGrupoProdutoToGrupoProduto(item: MenuGrupoProduto): GrupoPro
   })
 }
 
-/** Snapshot leve para grade do catálogo (complementos completos vêm do cadastro base no lazy load). */
+/**
+ * Snapshot do produto neste cardápio.
+ * Complementos vêm só dos grupos vinculados ao produto do menu — nunca do cadastro base.
+ */
 export function menuProdutoToProduto(snapshot: MenuProduto, base?: Produto | null): Produto {
-  const produtoId = snapshot.produtoId?.trim() || snapshot.id
-  const grupoId = snapshot.grupoProduto?.id?.trim()
-  const grupoNome = snapshot.grupoProduto?.nome?.trim()
-
   if (base) {
     return mergeProdutoComSnapshotMenu(base, snapshot)
   }
 
-  const temComplementosResumo = (snapshot.gruposComplementos?.length ?? 0) > 0
+  const produtoId = snapshot.produtoId?.trim() || snapshot.id
+  const grupoId = snapshot.grupoProduto?.id?.trim()
+  const grupoNome = snapshot.grupoProduto?.nome?.trim()
+  const gruposMenu = mapMenuGruposComplementosToProduto(snapshot.gruposComplementos)
 
   return Produto.create(
     produtoId,
@@ -40,9 +137,7 @@ export function menuProdutoToProduto(snapshot: MenuProduto, base?: Produto | nul
     grupoId,
     undefined,
     snapshot.favorito === true,
-    typeof snapshot.abreComplementos === 'boolean'
-      ? snapshot.abreComplementos
-      : temComplementosResumo,
+    abreComplementosDoSnapshot(snapshot, gruposMenu),
     snapshot.permiteAcrescimo === true,
     snapshot.permiteDesconto === true,
     snapshot.permiteAlterarPreco === true,
@@ -50,7 +145,7 @@ export function menuProdutoToProduto(snapshot: MenuProduto, base?: Produto | nul
     true,
     true,
     typeof snapshot.ordem === 'number' ? snapshot.ordem : undefined,
-    [],
+    gruposMenu,
     [],
     undefined,
     undefined,
@@ -66,6 +161,7 @@ export function menuProdutoToProduto(snapshot: MenuProduto, base?: Produto | nul
 export function mergeProdutoComSnapshotMenu(base: Produto, snapshot: MenuProduto): Produto {
   const grupoId = snapshot.grupoProduto?.id?.trim() || base.getGrupoId()
   const grupoNome = snapshot.grupoProduto?.nome?.trim() || base.getNomeGrupo()
+  const gruposMenu = mapMenuGruposComplementosToProduto(snapshot.gruposComplementos)
 
   return Produto.create(
     base.getId(),
@@ -78,7 +174,7 @@ export function mergeProdutoComSnapshotMenu(base: Produto, snapshot: MenuProduto
     grupoId,
     base.getEstoque(),
     snapshot.favorito ?? base.isFavorito(),
-    snapshot.abreComplementos ?? base.abreComplementosAtivo(),
+    abreComplementosDoSnapshot(snapshot, gruposMenu),
     snapshot.permiteAcrescimo ?? base.permiteAcrescimoAtivo(),
     snapshot.permiteDesconto ?? base.permiteDescontoAtivo(),
     snapshot.permiteAlterarPreco ?? base.permiteAlterarPrecoAtivo(),
@@ -86,7 +182,7 @@ export function mergeProdutoComSnapshotMenu(base: Produto, snapshot: MenuProduto
     base.isAtivoDelivery(),
     base.isAtivoLocal(),
     typeof snapshot.ordem === 'number' ? snapshot.ordem : base.getOrdem(),
-    base.getGruposComplementos(),
+    gruposMenu,
     base.getImpressoras(),
     base.getNcm(),
     base.getCest(),

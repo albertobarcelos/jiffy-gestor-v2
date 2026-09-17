@@ -3,6 +3,7 @@ import {
   extrairEnderecoEntregaSnapshotDeVendaData,
 } from '@/src/application/mappers/ContextoEntregaDeliveryMapper'
 import { resolverTaxaEntregaValorSync } from '@/src/application/mappers/VendaDetalheMapper'
+import { resolverTrocoLevarPedidoEntrega } from '@/src/application/mappers/resolverTrocoLevarPedidoEntrega'
 import type { EnderecoEntregaDetalhe } from '@/src/domain/types/vendaDetalhe'
 import type { PreferenciasImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
 import type { EstacaoImpressaoMapeamento } from '@/src/infrastructure/api/estacoesImpressaoApi'
@@ -211,7 +212,7 @@ function buildPagamento(
   const totalFaltaPagar = numeroFinito(pedido.totalFaltaPagar)
   const valorFinal = numeroFinito(pedido.valorFinal)
   const totalPago = numeroFinito(pedido.totalPago)
-  const troco = numeroFinito(pedido.troco)
+  const troco = resolverTrocoLevarPedidoEntrega(pedido, [], nomesMeiosPagamentoPorId)
 
   const cobrancas = fontesPagamentoCupom(pedido)
   const cobrancasAtivas = cobrancas.filter(cobrancaAtivaNoCupom)

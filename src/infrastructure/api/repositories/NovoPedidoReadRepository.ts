@@ -3,9 +3,11 @@ import { MIN_CARACTERES_BUSCA_CATALOGO_VENDA } from '@/src/domain/policies/pedid
 import { Produto } from '@/src/domain/entities/Produto'
 import type { INovoPedidoReadRepository } from '@/src/domain/repositories/INovoPedidoReadRepository'
 import {
-  mergeProdutoComSnapshotMenu,
+  gruposComplementosPrecisamHidratacao,
+  mapGrupoComplementoJsonToProdutoGrupo,
   menuGrupoProdutoToGrupoProduto,
   menuProdutoToProduto,
+  substituirGruposComplementosDoProduto,
 } from '@/src/application/mappers/MenuProdutoCatalogMapper'
 import type { GrupoProduto } from '@/src/domain/entities/GrupoProduto'
 import { normalizarListaEntregadoresDelivery } from '@/src/application/mappers/EntregadorDeliveryNormalizer'
@@ -56,6 +58,53 @@ function unwrapProdutoCadastroPayload(raw: unknown): unknown {
     return nested
   }
   return raw
+}
+
+async function fetchProdutoCadastroPorId(produtoId: string, token: string): Promise<Produto | null> {
+  try {
+    const data = await fetchJson<unknown>(
+      `/api/produtos/${encodeURIComponent(produtoId)}`,
+      token
+    )
+    return Produto.fromJSON(unwrapProdutoCadastroPayload(data))
+  } catch {
+    return null
+  }
+}
+
+async function hidratarComplementosDoProdutoMenu(
+  produto: Produto,
+  token: string
+): Promise<Produto> {
+  const grupos = produto.getGruposComplementos()
+  if (grupos.length === 0 || !gruposComplementosPrecisamHidratacao(grupos)) {
+    return produto
+  }
+
+  const hidratados = await Promise.all(
+    grupos.map(async grupo => {
+      if ((grupo.complementos?.length ?? 0) > 0) {
+        return { id: grupo.id, nome: grupo.nome, complementos: [...grupo.complementos] }
+      }
+      try {
+        const raw = await fetchJson<unknown>(
+          `/api/grupos-complementos/${encodeURIComponent(grupo.id)}`,
+          token
+        )
+        return (
+          mapGrupoComplementoJsonToProdutoGrupo(raw) ?? {
+            id: grupo.id,
+            nome: grupo.nome,
+            complementos: [],
+          }
+        )
+      } catch {
+        return { id: grupo.id, nome: grupo.nome, complementos: [] }
+      }
+    })
+  )
+
+  return substituirGruposComplementosDoProduto(produto, hidratados)
 }
 
 export class NovoPedidoReadRepository implements INovoPedidoReadRepository {
@@ -192,23 +241,22 @@ export class NovoPedidoReadRepository implements INovoPedidoReadRepository {
     token: string,
     menuId?: string | null
   ): Promise<Produto | null> {
-    let base: Produto | null = null
-    try {
-      const data = await fetchJson<unknown>(
-        `/api/produtos/${encodeURIComponent(produtoId)}`,
-        token
-      )
-      base = Produto.fromJSON(unwrapProdutoCadastroPayload(data))
-    } catch {
-      base = null
+    const [base, snapshot] = await Promise.all([
+      fetchProdutoCadastroPorId(produtoId, token),
+      menuId ? fetchMenuProdutoSnapshot(menuId, produtoId, token) : Promise.resolve(null),
+    ])
+
+    if (!snapshot) {
+      if (!menuId || !base) return base
+      return Produto.fromJSON({
+        ...base.toJSON(),
+        gruposComplementos: [],
+        abreComplementos: false,
+      })
     }
 
-    if (!menuId) return base
-
-    const snapshot = await fetchMenuProdutoSnapshot(menuId, produtoId, token)
-    if (snapshot && base) return mergeProdutoComSnapshotMenu(base, snapshot)
-    if (snapshot) return menuProdutoToProduto(snapshot, base)
-    return base
+    const produto = menuProdutoToProduto(snapshot, base)
+    return hidratarComplementosDoProdutoMenu(produto, token)
   }
 
   async buscarClienteJson(

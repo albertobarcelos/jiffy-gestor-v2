@@ -41,6 +41,73 @@ function isoDeCampoApi(valor: unknown): string | null {
   return texto || null
 }
 
+function objetoRaizDeliverySummary(raw: unknown): Record<string, unknown> | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const registro = raw as Record<string, unknown>
+  if (registro.data != null && typeof registro.data === 'object' && !Array.isArray(registro.data)) {
+    return registro.data as Record<string, unknown>
+  }
+  return registro
+}
+
+function campoPresenteNoSummary(o: Record<string, unknown>, campo: string): boolean {
+  return Object.prototype.hasOwnProperty.call(o, campo) && o[campo] != null
+}
+
+/**
+ * Summary de listagem de verdade (cliente/valor/tipo no JSON). Payload fino de
+ * STATUS_ALTERADO só com id+status — ou com tipo/valor defaultados — passa no mapper
+ * com defaults (R$ 0, entrega, sem cliente, já pago) e não pode substituir o card.
+ */
+export function pedidoDeliverySummaryTemCamposComerciais(raw: unknown): boolean {
+  const o = objetoRaizDeliverySummary(raw)
+  if (!o) return false
+  const tipo = String(o.tipoEntrega ?? '')
+    .trim()
+    .toLowerCase()
+  const temTipo =
+    campoPresenteNoSummary(o, 'tipoEntrega') && (tipo === 'entrega' || tipo === 'retirada')
+  const valor = Number(o.valorFinal)
+  const temValor = campoPresenteNoSummary(o, 'valorFinal') && Number.isFinite(valor)
+  const cliente =
+    o.cliente && typeof o.cliente === 'object' && !Array.isArray(o.cliente)
+      ? (o.cliente as Record<string, unknown>)
+      : null
+  const temClienteNome = Boolean(cliente && String(cliente.nome ?? '').trim())
+  return temTipo && temValor && temClienteNome
+}
+
+/** Só etapa/datas/entregador — não pisa valor, cliente nem pagamento com default do mapper. */
+export function extrairPatchOperacionalKanbanDeStatusDelivery(raw: unknown): KanbanVendaCachePatch {
+  const o = objetoRaizDeliverySummary(raw) ?? {}
+  const status = isoDeCampoApi(o.statusDelivery) ?? isoDeCampoApi(o.statusEtapaOperacional)
+  const patch: KanbanVendaCachePatch = {
+    statusEtapaOperacional: status,
+    dataUltimaModificacao: isoDeCampoApi(o.dataUltimaModificacao),
+    dataFinalizacao: inferirDataFinalizacaoPatch(status, isoDeCampoApi(o.dataFinalizacao)),
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(o, 'entregador')) return patch
+
+  const entregadorRaw = o.entregador
+  if (entregadorRaw == null) {
+    patch.entregador = null
+    return patch
+  }
+  if (typeof entregadorRaw === 'object' && !Array.isArray(entregadorRaw)) {
+    const r = entregadorRaw as Record<string, unknown>
+    const id = String(r.id ?? '').trim()
+    if (id) {
+      patch.entregador = {
+        id,
+        nome: r.nome != null ? String(r.nome) : null,
+        telefone: r.telefone != null ? String(r.telefone) : null,
+      }
+    }
+  }
+  return patch
+}
+
 /** Mapeia ação operacional do Kanban gestor → `toStatus` do módulo delivery. */
 export function mapAcaoTransicaoGestorToStatusDelivery(
   acao: AcaoTransicaoKanbanEntrega

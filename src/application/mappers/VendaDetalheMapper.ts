@@ -1,6 +1,6 @@
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
-import { pagamentoEstaCancelado } from '@/src/domain/services/pedido/RegrasPagamentoPedido'
 import { textoFromObservacoesApi } from '@/src/shared/helpers/observacaoPedido'
+import { resolverTrocoLevarPedidoEntrega } from '@/src/application/mappers/resolverTrocoLevarPedidoEntrega'
 import {
   extrairContextoEntregaDeVendaData,
   extrairEnderecoEntregaSnapshotDeVendaData,
@@ -11,7 +11,6 @@ import {
   extrairTelefoneClienteDeliveryDeFontes,
   normalizarClienteDeliveryApi,
 } from '@/src/application/mappers/ClienteDeliveryMoradaMapper'
-import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
 import type {
   DetalhesEntregaPedido,
   EnderecoEntregaDetalhe,
@@ -48,11 +47,8 @@ export function mapDetalhesEntregaFromVendaApi(vendaData: Record<string, unknown
 
   const contextoEntrega = extrairContextoEntregaDeVendaData(vendaData)
 
-  const trocoRaw = vendaData.troco
-  const trocoApi =
-    trocoRaw !== undefined && trocoRaw !== null && !Number.isNaN(Number(trocoRaw))
-      ? Number(trocoRaw)
-      : null
+  const trocoResolvido = resolverTrocoLevarPedidoEntrega(vendaData)
+  const trocoApi = trocoResolvido > 0 ? trocoResolvido : null
 
   const enderecoSnapshot =
     extrairEnderecoEntregaSnapshotDeVendaData(vendaData) ??
@@ -665,39 +661,7 @@ export function formatarHoraPrevisaoEntrega(
   return formatarHoraDetalhePedido(str)
 }
 
-/**
- * Troco que o entregador deve levar ao cliente.
- * - Pedido já pago: `troco` na raiz (pagamento efetivo acima do total).
- * - Cobrar na entrega: `totalCobrarNaEntrega − valorFaltante` (mesma regra de `VendaGestor.trocoParaLevar`).
- */
-export function resolverTrocoLevarPedidoEntrega(
-  vendaData: Record<string, unknown>,
-  pagamentos: PagamentoSelecionado[] = []
-): number {
-  const trocoRaiz = Number(vendaData.troco)
-  if (Number.isFinite(trocoRaiz) && trocoRaiz > 0) {
-    return Math.round(trocoRaiz * 100) / 100
-  }
-
-  const valorFinal = Number(vendaData.valorFinal)
-  if (!Number.isFinite(valorFinal) || valorFinal <= 0) return 0
-
-  const pagamentosValidos = pagamentos.filter(p => !pagamentoEstaCancelado(p))
-  const totalPagoSemCobranca = pagamentosValidos
-    .filter(p => !p.cobrarNaEntrega && !p.naoEfetivo)
-    .reduce((sum, p) => sum + (Number(p.valor) || 0), 0)
-
-  const totalCobrarNaEntrega = pagamentosValidos
-    .filter(p => p.cobrarNaEntrega || p.naoEfetivo)
-    .reduce((sum, p) => sum + (Number(p.valor) || 0), 0)
-
-  if (totalCobrarNaEntrega <= 0) return 0
-
-  const valorFaltanteAntes = Math.max(0, valorFinal - totalPagoSemCobranca)
-  const troco = totalCobrarNaEntrega - valorFaltanteAntes
-
-  return troco > 0 ? Math.round(troco * 100) / 100 : 0
-}
+export { resolverTrocoLevarPedidoEntrega }
 
 export function formatarEnderecoEntregaMultilinha(
   endereco: EnderecoEntregaDetalhe | null | undefined

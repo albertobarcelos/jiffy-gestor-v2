@@ -7,6 +7,7 @@
 
 import { useRef, useEffect, useMemo, useCallback } from 'react'
 import {
+  notifyManager,
   useQueryClient,
   type InfiniteData,
   type QueryClient,
@@ -188,7 +189,8 @@ export function usePedidosDeliveryKanbanColumns(
   options?: PedidosDeliveryInfiniteOptions & {
     getEtapaKanban?: (v: VendaUnificadaDTO) => string
   }
-) {  const token = useAuthStore.getState().tenantAuth?.getAccessToken()
+) {
+  const token = useAuthStore.getState().tenantAuth?.getAccessToken()
   const empresaId = useTenantEmpresaId()
   const queryClient = useQueryClient()
 
@@ -290,20 +292,22 @@ export function usePedidosDeliveryKanbanColumns(
           queryClient
         )
 
-        for (const columnId of DELIVERY_KANBAN_COLUMN_IDS) {
-          const queryKey = columnQueryKeys[columnId]
-          if (!queryKey) continue
-          queryClient.setQueryData<InfiniteData<PedidosDeliveryInfinitePage>>(
-            queryKey,
-            current =>
-              mergeDeltaIntoColumnPages(
-                current as InfiniteData<PedidosDeliveryInfinitePage> | undefined,
-                columnId,
-                deltaItems,
-                getEtapaKanban
-              )
-          )
-        }
+        notifyManager.batch(() => {
+          for (const columnId of DELIVERY_KANBAN_COLUMN_IDS) {
+            const queryKey = columnQueryKeys[columnId]
+            if (!queryKey) continue
+            queryClient.setQueryData<InfiniteData<PedidosDeliveryInfinitePage>>(
+              queryKey,
+              current =>
+                mergeDeltaIntoColumnPages(
+                  current as InfiniteData<PedidosDeliveryInfinitePage> | undefined,
+                  columnId,
+                  deltaItems,
+                  getEtapaKanban
+                )
+            )
+          }
+        })
 
         lastPollAtRef.current = pollStartedAt
       } catch {
@@ -352,20 +356,22 @@ export function usePedidosDeliveryKanbanColumns(
             return
           }
 
-          for (const columnId of DELIVERY_KANBAN_COLUMN_IDS) {
-            const queryKey = columnQueryKeys[columnId]
-            if (!queryKey) continue
-            queryClient.setQueryData<InfiniteData<PedidosDeliveryInfinitePage>>(
-              queryKey,
-              current =>
-                mergeDeltaIntoColumnPages(
-                  current as InfiniteData<PedidosDeliveryInfinitePage> | undefined,
-                  columnId,
-                  deltaItems,
-                  getEtapaKanban
-                )
-            )
-          }
+          notifyManager.batch(() => {
+            for (const columnId of DELIVERY_KANBAN_COLUMN_IDS) {
+              const queryKey = columnQueryKeys[columnId]
+              if (!queryKey) continue
+              queryClient.setQueryData<InfiniteData<PedidosDeliveryInfinitePage>>(
+                queryKey,
+                current =>
+                  mergeDeltaIntoColumnPages(
+                    current as InfiniteData<PedidosDeliveryInfinitePage> | undefined,
+                    columnId,
+                    deltaItems,
+                    getEtapaKanban
+                  )
+              )
+            }
+          })
           lastPollAtRef.current = pollStartedAt
         } catch {
           /* falha silenciosa */
