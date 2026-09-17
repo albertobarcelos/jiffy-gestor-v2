@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import { snapshotPropagavelDePatch } from '@/src/shared/types/propagarAlteracaoProduto'
 import {
   completarDestinosSyncCadastroPrincipal,
   descricaoVinculoMenusCriacao,
   ehMenuPrincipal,
   garantirMenuPrincipalNosIds,
+  menuIdsParaEspelharAposSalvarCadastro,
   idMenuPrincipalDeLista,
   idsMenuPrincipalTravados,
   labelCadastroNaPropagacao,
@@ -30,6 +32,56 @@ describe('syncCadastroComMenuPrincipal', () => {
       ])
     ).toBeNull()
     expect(idMenuPrincipalDeLista([{ id: PRINCIPAL }])).toBe(PRINCIPAL)
+  })
+
+  it('cadastro novo manda valor/nome no snapshot do menu principal por padrão', () => {
+    const menuIdsCriacao = garantirMenuPrincipalNosIds([], PRINCIPAL)
+    const body = {
+      nome: 'X-Bacon',
+      descricao: 'No ponto',
+      valor: 25.5,
+      grupoId: 'cat-1',
+      menuIds: menuIdsCriacao,
+    }
+    const snapshot = snapshotPropagavelDePatch(body)
+    const destinos = menuIdsParaEspelharAposSalvarCadastro({
+      isEdit: false,
+      destinosEdicao: [],
+      menuIdsCriacao,
+    })
+
+    expect(menuIdsCriacao).toEqual([PRINCIPAL])
+    expect(snapshot).toMatchObject({
+      nome: 'X-Bacon',
+      descricao: 'No ponto',
+      valor: 25.5,
+      grupoProdutoId: 'cat-1',
+    })
+    expect(destinos).toEqual([PRINCIPAL])
+  })
+
+  it('na criação espelha o snapshot nos menus do POST; na edição só os destinos da política', () => {
+    expect(
+      menuIdsParaEspelharAposSalvarCadastro({
+        isEdit: false,
+        destinosEdicao: [],
+        menuIdsCriacao: [PRINCIPAL, DELIVERY],
+      })
+    ).toEqual([PRINCIPAL, DELIVERY])
+    expect(
+      menuIdsParaEspelharAposSalvarCadastro({
+        isEdit: true,
+        destinosEdicao: [PRINCIPAL],
+        menuIdsCriacao: [PRINCIPAL, DELIVERY],
+      })
+    ).toEqual([PRINCIPAL])
+    expect(
+      menuIdsParaEspelharAposSalvarCadastro({
+        isEdit: true,
+        destinosEdicao: [],
+        menuIdsCriacao: [PRINCIPAL],
+      })
+    ).toEqual([])
   })
 
   it('na criação sempre inclui o principal e o trava', () => {

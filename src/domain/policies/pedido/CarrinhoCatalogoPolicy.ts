@@ -8,7 +8,7 @@ import type { MenuProdutoPermissoes } from '@/src/shared/utils/menuProdutoPermis
 
 export type CarregarProdutoCatalogoOptions = {
   forceRefresh?: boolean
-  /** Não reutilizar snapshot slim da grade — precisa dos grupos/itens do cadastro. */
+  /** Não reutilizar snapshot slim da grade — precisa dos itens dos grupos do produto do menu. */
   requireComplementos?: boolean
 }
 
@@ -21,8 +21,8 @@ export function produtoTemComplementosCarregados(
 }
 
 /**
- * Snapshot da grade do menu não traz os itens de complemento.
- * Só reutiliza cache quando ele já tem os grupos carregados (GET do cadastro).
+ * Snapshot da grade do menu traz só o resumo dos grupos (id/nome).
+ * Só reutiliza cache quando os itens já foram hidratados a partir do produto do menu.
  */
 export function cacheProdutoCatalogoAtendePedido(
   produto: Produto | undefined,
@@ -36,7 +36,10 @@ export function cacheProdutoCatalogoAtendePedido(
   return true
 }
 
-/** Aplica flags do cadastro (índice slim) no snapshot da grade, sem apagar complementos já hidratados. */
+/**
+ * Aplica flags do cadastro (índice slim) no snapshot da grade.
+ * `abreComplementos` fica com o produto do menu — o vínculo de grupos no cadastro base vai deixar de existir.
+ */
 export function aplicarPermissoesCadastroNoProdutoCatalogo(
   produto: Produto,
   permissoes: MenuProdutoPermissoes | undefined
@@ -44,7 +47,6 @@ export function aplicarPermissoesCadastroNoProdutoCatalogo(
   if (!permissoes) return produto
   if (produtoTemComplementosCarregados(produto)) return produto
   if (
-    produto.abreComplementosAtivo() === permissoes.abreComplementos &&
     produto.permiteAcrescimoAtivo() === permissoes.permiteAcrescimo &&
     produto.permiteDescontoAtivo() === permissoes.permiteDesconto &&
     produto.permiteAlterarPrecoAtivo() === permissoes.permiteAlterarPreco &&
@@ -54,7 +56,6 @@ export function aplicarPermissoesCadastroNoProdutoCatalogo(
   }
   return Produto.fromJSON({
     ...produto.toJSON(),
-    abreComplementos: permissoes.abreComplementos,
     permiteAcrescimo: permissoes.permiteAcrescimo,
     permiteDesconto: permissoes.permiteDesconto,
     permiteAlterarPreco: permissoes.permiteAlterarPreco,
