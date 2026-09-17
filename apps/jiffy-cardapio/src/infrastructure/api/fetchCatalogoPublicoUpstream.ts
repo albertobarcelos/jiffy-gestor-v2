@@ -1,5 +1,6 @@
 import { ApiClient, ApiError } from '@/src/infrastructure/api/apiClient'
 import type { GetCatalogoPublicoResponseDTO } from '@/src/application/dto/delivery-publico/DeliveryPublicoDTO'
+import { normalizarCatalogoPublicoImagens } from '@/src/application/mappers/normalizarCatalogoPublicoImagens'
 import { CATALOGO_GRUPOS_PAGE_LIMIT } from '@/src/presentation/hooks/publicDeliveryCatalogKeys'
 
 /**
@@ -34,7 +35,7 @@ export async function fetchCatalogoPublicoUpstream(
     if (!response.data) {
       throw new Error('Catálogo vazio')
     }
-    return response.data
+    return normalizarCatalogoPublicoImagens(response.data)
   } catch (error) {
     if (error instanceof ApiError) throw error
     throw error
