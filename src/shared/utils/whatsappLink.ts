@@ -32,3 +32,13 @@ export function abrirWhatsapp(
   window.open(link, '_blank', 'noopener,noreferrer')
   return true
 }
+
+/** Link do WhatsApp sem destinatário — o app pede o contato. */
+export function montarLinkWhatsappCompartilhar(mensagem: string): string {
+  const text = encodeURIComponent(mensagem.normalize('NFC'))
+  return `https://api.whatsapp.com/send?text=${text}`
+}
+
+export function abrirWhatsappCompartilhar(mensagem: string): void {
+  window.open(montarLinkWhatsappCompartilhar(mensagem), '_blank', 'noopener,noreferrer')
+}

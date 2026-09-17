@@ -34,11 +34,17 @@ export function EmpresaSwitcherTopNav({ variant }: EmpresaSwitcherTopNavProps) {
   })()
 
   if (carregandoEmpresa && !nomeExibicao) {
-    const skeletonClass =
-      variant === 'mobile'
-        ? 'mt-2 h-10 w-full animate-pulse rounded-lg bg-gray-200/80'
-        : 'ml-auto mr-2 h-9 w-[8.5rem] animate-pulse rounded-lg border-l border-gray-200 bg-gray-200/80'
-    return <div className={skeletonClass} aria-hidden />
+    if (variant === 'mobile') {
+      return (
+        <div className="mt-2 h-10 w-full animate-pulse rounded-lg bg-gray-200/80" aria-hidden />
+      )
+    }
+    return (
+      <div
+        className="h-8 w-[7rem] shrink-0 animate-pulse rounded-lg bg-gray-200/80 sm:w-[9rem]"
+        aria-hidden
+      />
+    )
   }
 
   if (!nomeExibicao) {
@@ -57,12 +63,12 @@ export function EmpresaSwitcherTopNav({ variant }: EmpresaSwitcherTopNavProps) {
   }
 
   return (
-    <div className="ml-auto mr-2 flex items-center">
-      <span
-        className="inline-flex items-center border-l px-3 py-2 text-xs font-semibold text-primary-text"
-        title="Empresa logada"
-      >
-        <span className="max-w-[5.5rem] truncate text-sm text-primary-text xl:max-w-[150px]">{nomeExibicao}</span>
+    <div
+      className="min-w-0 max-w-[7rem] px-2 py-1.5 sm:max-w-[9rem] sm:px-3 lg:max-w-[12rem] xl:max-w-[18rem] 2xl:max-w-[24rem]"
+      title={nomeExibicao}
+    >
+      <span className="block truncate whitespace-nowrap border-l border-gray-200 pl-2 text-xs font-semibold text-primary-text sm:pl-3 sm:text-sm">
+        {nomeExibicao}
       </span>
     </div>
   )
