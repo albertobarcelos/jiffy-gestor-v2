@@ -21,25 +21,24 @@ function isRectVisible(rect: DOMRect): boolean {
 export function getProdutoImageSourceRect(produtoId: string): FlySourceRect | null {
   if (typeof document === 'undefined') return null
   const nodes = document.querySelectorAll(deliveryProdutoImgSelector(produtoId))
-  let best: DOMRect | null = null
+  let best: FlySourceRect | null = null
   let bestArea = 0
 
-  nodes.forEach(node => {
-    if (!(node instanceof HTMLElement)) return
+  for (const node of nodes) {
+    if (!(node instanceof HTMLElement)) continue
     const rect = node.getBoundingClientRect()
-    if (!isRectVisible(rect)) return
+    if (!isRectVisible(rect)) continue
     const area = rect.width * rect.height
     if (area > bestArea) {
       bestArea = area
-      best = rect
+      best = {
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+      }
     }
-  })
-
-  if (!best) return null
-  return {
-    left: best.left,
-    top: best.top,
-    width: best.width,
-    height: best.height,
   }
+
+  return best
 }
