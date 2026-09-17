@@ -27,6 +27,25 @@ export const LOOKUP_DEBOUNCE_MS = 450
 /** BR: celular completo = DDD + 9 dígitos. Backend só aceita 11. */
 export const BR_CELULAR_DIGITOS = 11
 
+/**
+ * Aplica alteração no form de checkout.
+ * Campos que invalidam cotação zeram `pagamentos` no mesmo objeto (evita race
+ * tipoEntrega → modoTempo reidratando lançamentos via formRef).
+ */
+export function aplicarPatchFormCheckout<K extends keyof CheckoutFormData>(
+  current: CheckoutFormData,
+  key: K,
+  value: CheckoutFormData[K]
+): CheckoutFormData {
+  const invalidaCotacao = COTACAO_INVALIDATING_FORM_KEYS.has(key)
+  return {
+    ...current,
+    [key]: value,
+    ...(invalidaCotacao ? { pagamentos: [] as CheckoutFormData['pagamentos'] } : {}),
+    telefonePaisIso2: 'BR',
+  }
+}
+
 export function createInitialForm(tipoEntrega: DeliveryTipoEntrega): CheckoutFormData {
   return {
     tipoEntrega,

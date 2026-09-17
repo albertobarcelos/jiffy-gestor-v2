@@ -11,6 +11,7 @@ import {
 import type { DeliveryCarrinhoComplemento } from '../stores/deliveryCarrinhoStore'
 import { showToast } from '@/src/shared/utils/toast'
 import {
+  cacheComplementosCobreProduto,
   chaveComplemento,
   listarGruposComplementosPendentes,
   produtoTemComplementosAtivos,
@@ -40,9 +41,11 @@ export function useProdutoComplementos(
 ) {
   const cacheComplementos = usePublicDeliveryComplementosStore(s => s.porSlug[slug] ?? null)
   const precisaComplementos = produtoTemComplementosAtivos(produto)
+  const cacheCobreProduto = cacheComplementosCobreProduto(cacheComplementos, produto)
   const { isLoading: carregandoComplementos } = useEnsureComplementosCatalogo(
     slug,
-    precisaComplementos && !cacheComplementos
+    precisaComplementos && !cacheCobreProduto,
+    { forceRefetch: Boolean(precisaComplementos && cacheComplementos && !cacheCobreProduto) }
   )
 
   const [quantidadesComplementos, setQuantidadesComplementos] = useState<Record<string, number>>(

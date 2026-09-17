@@ -174,6 +174,11 @@ type DeliveryCheckoutShellProps = {
   direction: 1 | -1
   onClose: () => void
   children: ReactNode
+  /**
+   * `drawer` — painel lateral com overlay (checkout no carrinho).
+   * `page` — coluna centralizada em tela cheia (rota de pedido confirmado).
+   */
+  presentation?: 'drawer' | 'page'
 }
 
 export function DeliveryCheckoutShell({
@@ -182,7 +187,9 @@ export function DeliveryCheckoutShell({
   direction,
   onClose,
   children,
+  presentation = 'drawer',
 }: DeliveryCheckoutShellProps) {
+  const isPage = presentation === 'page'
   useDeliveryBodyScrollLock(open)
 
   const [footerHost, setFooterHost] = useState<HTMLElement | null>(null)
@@ -225,121 +232,146 @@ export function DeliveryCheckoutShell({
     exit: (dir: 1 | -1) => ({ x: dir > 0 ? '-100%' : '100%' }),
   }
 
-  return (
-    <AnimatePresence>
-      {open ? (
-        <>
-          <motion.div
-            key="checkout-shell-backdrop"
-            className="delivery-vv-overlay z-[60]"
-            style={{ backgroundColor: 'rgba(0, 0, 0, 0.45)' }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
+  const panelBody = (
+    <DeliveryCheckoutShellSlotsContext.Provider value={slotsCtx}>
+      <div
+        className={`relative flex shrink-0 items-center gap-2 border-b px-4 ${
+          isDarkHeader ? 'py-2' : 'py-3'
+        }`}
+        style={{
+          borderColor: isDarkHeader
+            ? 'var(--delivery-primary-dark, #171717)'
+            : 'var(--delivery-border)',
+          backgroundColor: isDarkHeader
+            ? 'var(--delivery-primary-dark, #171717)'
+            : undefined,
+          color: headerFg,
+        }}
+      >
+        {header.showBack ? (
+          <button
+            type="button"
+            data-checkout-leave-without-numero=""
+            onMouseDown={e => e.preventDefault()}
+            onClick={header.onBack ?? handleRequestClose}
+            aria-label="Voltar"
+            className={`flex items-center justify-center rounded-full ${
+              isDarkHeader ? 'h-8 w-8' : 'h-9 w-9'
+            }`}
+            style={{ color: headerFg }}
+          >
+            <span className="text-lg leading-none">‹</span>
+          </button>
+        ) : (
+          <span className="w-9 shrink-0" aria-hidden />
+        )}
+        <h2
+          className={`delivery-font-title absolute left-1/2 -translate-x-1/2 truncate text-center text-base font-semibold ${
+            progress ? 'max-w-[calc(100%_-_10rem)]' : 'max-w-[calc(100%_-_6rem)]'
+          }`}
+          style={{ color: headerFg }}
+        >
+          {header.title}
+        </h2>
+        <div className="ml-auto flex shrink-0 items-center gap-1">
+          <DeliveryCheckoutProgressIndicator dark={isDarkHeader} />
+          <button
+            type="button"
             data-checkout-leave-without-numero=""
             onMouseDown={e => e.preventDefault()}
             onClick={handleRequestClose}
-            aria-hidden
-          />
-
-          <motion.aside
-            key="checkout-shell"
-            role="dialog"
-            aria-modal="true"
-            aria-label={header.title || 'Checkout'}
-            className="delivery-vv-panel z-[60] flex flex-col shadow-2xl"
-            style={{
-              backgroundColor: 'var(--delivery-surface, #ffffff)',
-            }}
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={SLIDE_TRANSITION}
+            aria-label="Fechar"
+            className={`flex shrink-0 items-center justify-center rounded-full ${
+              isDarkHeader ? 'h-8 w-8' : 'h-9 w-9'
+            }`}
+            style={{ color: headerFg }}
           >
-            <DeliveryCheckoutShellSlotsContext.Provider value={slotsCtx}>
-              <div
-                className={`relative flex shrink-0 items-center gap-2 border-b px-4 ${
-                  isDarkHeader ? 'py-2' : 'py-3'
-                }`}
-                style={{
-                  borderColor: isDarkHeader
-                    ? 'var(--delivery-primary-dark, #171717)'
-                    : 'var(--delivery-border)',
-                  backgroundColor: isDarkHeader
-                    ? 'var(--delivery-primary-dark, #171717)'
-                    : undefined,
-                  color: headerFg,
-                }}
-              >
-                {header.showBack ? (
-                  <button
-                    type="button"
-                    data-checkout-leave-without-numero=""
-                    onMouseDown={e => e.preventDefault()}
-                    onClick={header.onBack ?? handleRequestClose}
-                    aria-label="Voltar"
-                    className={`flex items-center justify-center rounded-full ${
-                      isDarkHeader ? 'h-8 w-8' : 'h-9 w-9'
-                    }`}
-                    style={{ color: headerFg }}
-                  >
-                    <span className="text-lg leading-none">‹</span>
-                  </button>
-                ) : (
-                  <span className="w-9 shrink-0" aria-hidden />
-                )}
-                <h2
-                  className={`delivery-font-title absolute left-1/2 -translate-x-1/2 truncate text-center text-base font-semibold ${
-                    progress ? 'max-w-[calc(100%_-_10rem)]' : 'max-w-[calc(100%_-_6rem)]'
-                  }`}
-                  style={{ color: headerFg }}
-                >
-                  {header.title}
-                </h2>
-                <div className="ml-auto flex shrink-0 items-center gap-1">
-                  <DeliveryCheckoutProgressIndicator dark={isDarkHeader} />
-                  <button
-                    type="button"
-                    data-checkout-leave-without-numero=""
-                    onMouseDown={e => e.preventDefault()}
-                    onClick={handleRequestClose}
-                    aria-label="Fechar"
-                    className={`flex shrink-0 items-center justify-center rounded-full ${
-                      isDarkHeader ? 'h-8 w-8' : 'h-9 w-9'
-                    }`}
-                    style={{ color: headerFg }}
-                  >
-                    <MdClose className={isDarkHeader ? 'h-4 w-4' : 'h-5 w-5'} />
-                  </button>
-                </div>
-              </div>
+            <MdClose className={isDarkHeader ? 'h-4 w-4' : 'h-5 w-5'} />
+          </button>
+        </div>
+      </div>
 
-              <div className="relative min-h-0 flex-1 overflow-hidden">
-                <AnimatePresence initial={false} custom={direction} mode="wait">
-                  <motion.div
-                    key={stepKey}
-                    custom={direction}
-                    variants={variants}
-                    initial="enter"
-                    animate="center"
-                    exit="exit"
-                    transition={SLIDE_TRANSITION}
-                    className="absolute inset-0 max-w-full touch-pan-y overflow-x-hidden overflow-y-auto overscroll-y-contain px-4 py-4"
-                  >
-                    {children}
-                  </motion.div>
-                </AnimatePresence>
-              </div>
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+        <AnimatePresence initial={false} custom={direction} mode="wait">
+          <motion.div
+            key={stepKey}
+            custom={direction}
+            variants={variants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={SLIDE_TRANSITION}
+            className="absolute inset-0 max-w-full touch-pan-y overflow-x-hidden overflow-y-auto overscroll-y-contain px-4 py-4"
+          >
+            {children}
+          </motion.div>
+        </AnimatePresence>
+      </div>
 
-              <div
-                ref={setFooterHost}
-                className="shrink-0 border-t border-neutral-200 bg-white empty:hidden"
-                style={{ borderColor: 'var(--delivery-border)' }}
-              />
-            </DeliveryCheckoutShellSlotsContext.Provider>
-          </motion.aside>
-        </>
+      <div
+        ref={setFooterHost}
+        className="shrink-0 border-t border-neutral-200 bg-white empty:hidden"
+        style={{ borderColor: 'var(--delivery-border)' }}
+      />
+    </DeliveryCheckoutShellSlotsContext.Provider>
+  )
+
+  return (
+    <AnimatePresence>
+      {open ? (
+        isPage ? (
+          <motion.div
+            key="checkout-shell-page"
+            className="delivery-vv-page-backdrop z-[60]"
+            style={{ backgroundColor: 'var(--delivery-bg, #f5f5f5)' }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <aside
+              role="region"
+              aria-label={header.title || 'Pedido confirmado'}
+              className="delivery-vv-page-column"
+              style={{ backgroundColor: 'var(--delivery-surface, #ffffff)' }}
+            >
+              {panelBody}
+            </aside>
+          </motion.div>
+        ) : (
+          <>
+            <motion.div
+              key="checkout-shell-backdrop"
+              className="delivery-vv-overlay z-[60]"
+              style={{ backgroundColor: 'rgba(0, 0, 0, 0.45)' }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              data-checkout-leave-without-numero=""
+              onMouseDown={e => e.preventDefault()}
+              onClick={handleRequestClose}
+              aria-hidden
+            />
+
+            <motion.aside
+              key="checkout-shell"
+              role="dialog"
+              aria-modal="true"
+              aria-label={header.title || 'Checkout'}
+              className="delivery-vv-panel z-[60] flex flex-col shadow-2xl"
+              style={{
+                backgroundColor: 'var(--delivery-surface, #ffffff)',
+              }}
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={SLIDE_TRANSITION}
+            >
+              {panelBody}
+            </motion.aside>
+          </>
+        )
       ) : null}
     </AnimatePresence>
   )

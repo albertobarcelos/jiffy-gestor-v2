@@ -17,6 +17,7 @@ import type {
   ColunaKanbanId,
   KanbanColumn,
   OrigemFiltro,
+  TipoCanalFiltro,
   TipoEntregaFiltro,
 } from '../types'
 import type { ModoVisualizacaoKanban } from '../utils/kanbanModoVisualizacao'
@@ -37,6 +38,9 @@ export interface KanbanToolbarProps {
   onToggleFiltrosMobile: () => void
   origemFilter: OrigemFiltro
   onOrigemFilterChange: (value: OrigemFiltro) => void
+  /** Canal unificado (`tipo` na API) — modo balcão. */
+  tipoCanalFilter: TipoCanalFiltro
+  onTipoCanalFilterChange: (value: TipoCanalFiltro) => void
   tipoEntregaFilter: TipoEntregaFiltro
   onTipoEntregaFilterChange: (value: TipoEntregaFiltro) => void
   /** Filtro extra balcão: Emitidas / Pendentes / Rejeitadas / Todas (`colunaKanban`). */
@@ -47,6 +51,7 @@ export interface KanbanToolbarProps {
   terminais: { id: string; nome: string }[]
   isLoadingTerminais: boolean
   origemFilterDisabled?: boolean
+  tipoCanalFilterDisabled?: boolean
   periodoPreset: KanbanFiltroDataPreset
   onPeriodoPresetChange: (preset: KanbanFiltroDataPreset) => void
   periodoInicio: Date | null
@@ -192,6 +197,8 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
     onToggleFiltrosMobile,
     origemFilter,
     onOrigemFilterChange,
+    tipoCanalFilter,
+    onTipoCanalFilterChange,
     tipoEntregaFilter,
     onTipoEntregaFilterChange,
     colunaKanbanFiltro: colunaKanbanFiltroProp,
@@ -201,6 +208,7 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
     terminais,
     isLoadingTerminais,
     origemFilterDisabled = false,
+    tipoCanalFilterDisabled = false,
     periodoPreset,
     onPeriodoPresetChange,
     periodoInicio,
@@ -279,6 +287,28 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
         {!isModoDelivery ? (
         <div className="flex flex-col gap-1">
           <FormControl size="small" variant="outlined" sx={sxKanbanFiltroSelect}>
+            <InputLabel id="kanban-filtro-tipo-canal-label" shrink>
+              Canal
+            </InputLabel>
+            <Select
+              labelId="kanban-filtro-tipo-canal-label"
+              label="Canal"
+              value={tipoCanalFilter}
+              onChange={e => onTipoCanalFilterChange(e.target.value as TipoCanalFiltro)}
+              displayEmpty
+              disabled={tipoCanalFilterDisabled}
+              className=""
+            >
+              <MenuItem value="">Todos</MenuItem>
+              <MenuItem value="PDV">POS</MenuItem>
+              <MenuItem value="GESTOR">Balcão</MenuItem>
+            </Select>
+          </FormControl>
+        </div>
+        ) : null}
+
+        <div className="flex flex-col gap-1">
+          <FormControl size="small" variant="outlined" sx={sxKanbanFiltroSelect}>
             <InputLabel id="kanban-filtro-origem-label" shrink>
               Origem
             </InputLabel>
@@ -291,13 +321,16 @@ export function KanbanToolbar(props: KanbanToolbarProps) {
               disabled={origemFilterDisabled}
               className=""
             >
-              <MenuItem value="">Todos</MenuItem>
-              <MenuItem value="PDV">POS</MenuItem>
-              <MenuItem value="GESTOR">Gestor</MenuItem>
+              <MenuItem value="">Todas</MenuItem>
+              {!isModoDelivery ? <MenuItem value="PDV">POS</MenuItem> : null}
+              <MenuItem value="GESTOR">
+                {isModoDelivery ? 'Gestor Delivery' : 'Gestor'}
+              </MenuItem>
+              <MenuItem value="JIFFY_DELIVERY">Jiffy Delivery</MenuItem>
+              <MenuItem value="AIQFOME">Aiqfome</MenuItem>
             </Select>
           </FormControl>
         </div>
-        ) : null}
 
         {isModoDelivery ? (
         <div className="flex flex-col gap-1">

@@ -48,9 +48,10 @@ function criarSummary(
 }
 
 describe('PedidoDeliveryListMapper — origem e financeiro', () => {
-  it('mapeia JIFFY_DELIVERY para origem GESTOR no DTO unificado', () => {
-    expect(mapOrigemApiDeliveryParaVendaUnificada('JIFFY_DELIVERY')).toBe('GESTOR')
+  it('preserva origem real da API delivery no DTO unificado', () => {
+    expect(mapOrigemApiDeliveryParaVendaUnificada('JIFFY_DELIVERY')).toBe('JIFFY_DELIVERY')
     expect(mapOrigemApiDeliveryParaVendaUnificada('GESTOR')).toBe('GESTOR')
+    expect(mapOrigemApiDeliveryParaVendaUnificada('AIQFOME')).toBe('AIQFOME')
   })
 
   it('deriva status financeiro pago, pendente e parcial', () => {

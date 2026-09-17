@@ -7,8 +7,10 @@
  * |-------------------|---------------------------|-------|
  * | '' (todas)        | omitido                   |       |
  * | GESTOR            | GESTOR                    | Pedidos criados no gestor web |
- * | DELIVERY          | JIFFY_DELIVERY            | App Jiffy Delivery |
- * | PDV               | omitido                   | Não se aplica à listagem delivery; modo Balcão usa `/vendas/unificado` |
+ * | JIFFY_DELIVERY    | JIFFY_DELIVERY            | App / rota pública Jiffy |
+ * | AIQFOME           | AIQFOME                   | Integração Aiqfome |
+ * | PDV               | omitido                   | Não se aplica à listagem delivery |
+ * | DELIVERY (legado) | JIFFY_DELIVERY            | Snapshot antigo da toolbar |
  *
  * Datas: o Kanban hoje envia `dataFinalizacaoInicio/Fim` ao unificado; na API delivery
  * os nomes são `dataFinalizacaoInicial/Final` (mapeados em `montarPedidosDeliveryQueryParams`).
@@ -25,10 +27,16 @@ import type {
 import { PEDIDOS_DELIVERY_KANBAN_PAGE_SIZE } from '@/src/application/dto/api/pedidoDeliveryListApi'
 
 /**
- * Espelho de `OrigemFiltro` (`kanban/types.ts`) — definido aqui para não acoplar
- * application → presentation.
+ * Espelho de `OrigemFiltro` do Kanban — origem real (sem `DELIVERY` como origem).
+ * `DELIVERY` permanece só como legado de snapshot antigo → mapeia para JIFFY_DELIVERY.
  */
-export type OrigemFiltroKanbanListagem = '' | 'PDV' | 'GESTOR' | 'DELIVERY'
+export type OrigemFiltroKanbanListagem =
+  | ''
+  | 'PDV'
+  | 'GESTOR'
+  | 'JIFFY_DELIVERY'
+  | 'AIQFOME'
+  | 'DELIVERY'
 
 /** Filtros do hook `useKanbanFilters` adaptados para a listagem delivery. */
 export interface FiltrosKanbanParaPedidosDelivery {
@@ -53,14 +61,15 @@ export interface FiltrosKanbanParaPedidosDelivery {
 
 /**
  * Converte filtro de origem da toolbar para valor da API delivery.
- * `PDV` não tem equivalente — retorna `undefined` (sem filtro de origem).
+ * `PDV` não se aplica à listagem delivery — omite.
  */
 export function mapOrigemFiltroKanbanParaApi(
   origem: OrigemFiltroKanbanListagem | undefined
 ): OrigemPedidoDeliveryApi | undefined {
   if (!origem || origem === 'PDV') return undefined
   if (origem === 'GESTOR') return 'GESTOR'
-  if (origem === 'DELIVERY') return 'JIFFY_DELIVERY'
+  if (origem === 'JIFFY_DELIVERY' || origem === 'DELIVERY') return 'JIFFY_DELIVERY'
+  if (origem === 'AIQFOME') return 'AIQFOME'
   return undefined
 }
 
@@ -70,7 +79,9 @@ export function mapOrigemApiParaFiltroKanban(
 ): OrigemFiltroKanbanListagem | undefined {
   const o = String(origem ?? '').trim().toUpperCase()
   if (o === 'GESTOR') return 'GESTOR'
-  if (o === 'JIFFY_DELIVERY') return 'DELIVERY'
+  if (o === 'JIFFY_DELIVERY') return 'JIFFY_DELIVERY'
+  if (o === 'AIQFOME') return 'AIQFOME'
+  if (o === 'PDV') return 'PDV'
   return undefined
 }
 

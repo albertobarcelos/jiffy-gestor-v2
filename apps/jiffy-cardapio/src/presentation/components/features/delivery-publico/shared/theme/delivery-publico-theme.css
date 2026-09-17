@@ -176,6 +176,47 @@ html.delivery-publico-ios-lock select {
     width: 40%;
     max-width: 40%;
   }
+
+  /** Produto com complementos: painel mais largo para split 2 colunas. */
+  .delivery-vv-panel--produto-complementos {
+    width: min(1100px, 82%);
+    max-width: min(1100px, 82%);
+  }
+}
+
+/**
+ * Fundo full-bleed da página de confirmação (coluna centralizada por flex).
+ */
+.delivery-vv-page-backdrop {
+  position: fixed;
+  top: var(--delivery-vv-offset-top, 0px);
+  left: var(--delivery-vv-offset-left, 0px);
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  width: var(--delivery-vv-width, 100%);
+  max-width: 100%;
+  height: var(--delivery-vv-height, 100dvh);
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.delivery-vv-page-column {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+@media (min-width: 1024px) {
+  .delivery-vv-page-column {
+    width: 40%;
+    max-width: 40%;
+    border-left: 1px solid var(--delivery-border, #e5e5e5);
+    border-right: 1px solid var(--delivery-border, #e5e5e5);
+  }
 }
 
 /**

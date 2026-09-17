@@ -113,12 +113,10 @@ export function DeliveryPublicoPedidoConfirmadoScreen({
   return (
     <DeliveryThemeScope slug={slug} nomeExibicaoFallback={meta.nomeEmpresa ?? ''}>
       <DeliveryPublicoShell>
-        <div
-          className="min-h-screen"
-          style={{ backgroundColor: 'var(--delivery-bg)' }}
-        >
+        <div className="min-h-screen">
           <DeliveryCheckoutShell
             open
+            presentation="page"
             stepKey={view}
             direction={direction}
             onClose={view === 'pedidoDetalhe' ? voltarSucesso : irParaCardapio}

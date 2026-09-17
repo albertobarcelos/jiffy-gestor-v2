@@ -28,6 +28,28 @@ export const LABEL_DIA_DA_SEMANA: Record<DiaDaSemanaApi, string> = {
   SABADO: 'Sábado',
 }
 
+/** Abreviações para o composer (dom → sáb). */
+export const LABEL_DIA_DA_SEMANA_CURTO: Record<DiaDaSemanaApi, string> = {
+  DOMINGO: 'dom',
+  SEGUNDA: 'seg',
+  TERCA: 'ter',
+  QUARTA: 'qua',
+  QUINTA: 'qui',
+  SEXTA: 'sex',
+  SABADO: 'sáb',
+}
+
+/** Ordem dos checkboxes no composer (Domingo → Sábado). */
+export const DIAS_DA_SEMANA_ORDEM_COMPOSER: DiaDaSemanaApi[] = [
+  'DOMINGO',
+  'SEGUNDA',
+  'TERCA',
+  'QUARTA',
+  'QUINTA',
+  'SEXTA',
+  'SABADO',
+]
+
 export const LABEL_MOTIVO_DISPONIBILIDADE: Record<MotivoDisponibilidadeDelivery, string> = {
   ABERTO_PELO_HORARIO: 'Aberta pelo horário da agenda',
   FECHADO_FORA_DO_HORARIO: 'Fechada fora do horário da agenda',
@@ -76,12 +98,8 @@ export function criarAgendaSemanalVazia(): FuncionamentoDoDiaDTO[] {
 }
 
 export function criarFormAgendaPadrao(): DiaAgendaFormState[] {
-  return DIAS_DA_SEMANA_ORDEM_UI.map(diaDaSemana => ({
-    diaDaSemana,
-    aberto: diaDaSemana !== 'DOMINGO',
-    abreEm: '09:00',
-    fechaEm: '22:00',
-  }))
+  // Lista começa vazia — dias entram só após o composer.
+  return []
 }
 
 export function agendaDtoParaForm(
@@ -89,15 +107,18 @@ export function agendaDtoParaForm(
 ): DiaAgendaFormState[] {
   const porDia = new Map((agendaSemanal ?? []).map(d => [d.diaDaSemana, d]))
 
-  return DIAS_DA_SEMANA_ORDEM_UI.map(diaDaSemana => {
+  return DIAS_DA_SEMANA_ORDEM_UI.flatMap(diaDaSemana => {
     const dto = porDia.get(diaDaSemana)
     const intervalo = dto?.intervalos[0]
-    return {
-      diaDaSemana,
-      aberto: Boolean(intervalo),
-      abreEm: intervalo ? arredondarHorarioFuncionamento15Min(intervalo.abreEm) : '09:00',
-      fechaEm: intervalo ? arredondarHorarioFuncionamento15Min(intervalo.fechaEm) : '22:00',
-    }
+    if (!intervalo) return []
+    return [
+      {
+        diaDaSemana,
+        aberto: true,
+        abreEm: arredondarHorarioFuncionamento15Min(intervalo.abreEm),
+        fechaEm: arredondarHorarioFuncionamento15Min(intervalo.fechaEm),
+      },
+    ]
   })
 }
 
@@ -105,21 +126,92 @@ export function formAgendaParaRequest(
   form: DiaAgendaFormState[],
   automacao: { abreAutomaticamente: boolean; fechaAutomaticamente: boolean }
 ): SubstituirAgendaFuncionamentoDeliveryRequest {
+  const abertos = new Map(
+    form.filter(dia => dia.aberto).map(dia => [dia.diaDaSemana, dia] as const)
+  )
+
   return {
     abreAutomaticamente: automacao.abreAutomaticamente,
     fechaAutomaticamente: automacao.fechaAutomaticamente,
-    agendaSemanal: form.map(dia => ({
-      diaDaSemana: dia.diaDaSemana,
-      intervalos: dia.aberto
-        ? [
-            {
-              abreEm: arredondarHorarioFuncionamento15Min(dia.abreEm),
-              fechaEm: arredondarHorarioFuncionamento15Min(dia.fechaEm),
-            },
-          ]
-        : [],
-    })),
+    // Sempre envia os 7 dias; ausentes na lista = fechados.
+    agendaSemanal: DIAS_DA_SEMANA_ORDEM_UI.map(diaDaSemana => {
+      const dia = abertos.get(diaDaSemana)
+      return {
+        diaDaSemana,
+        intervalos: dia
+          ? [
+              {
+                abreEm: arredondarHorarioFuncionamento15Min(dia.abreEm),
+                fechaEm: arredondarHorarioFuncionamento15Min(dia.fechaEm),
+              },
+            ]
+          : [],
+      }
+    }),
   }
+}
+
+export function intervaloAgendaEhValido(abreEm: string, fechaEm: string): boolean {
+  const abre = arredondarHorarioFuncionamento15Min(abreEm)
+  const fecha = arredondarHorarioFuncionamento15Min(fechaEm)
+  return abre !== fecha
+}
+
+/** Card visual: dias que compartilham o mesmo intervalo. */
+export type GrupoHorarioAgenda = {
+  id: string
+  abreEm: string
+  fechaEm: string
+  dias: DiaDaSemanaApi[]
+}
+
+export function agruparDiasAgendaPorIntervalo(
+  dias: DiaAgendaFormState[]
+): GrupoHorarioAgenda[] {
+  const ordem = new Map(DIAS_DA_SEMANA_ORDEM_UI.map((dia, idx) => [dia, idx]))
+  const porIntervalo = new Map<string, GrupoHorarioAgenda>()
+
+  for (const dia of dias) {
+    if (!dia.aberto) continue
+    const abreEm = arredondarHorarioFuncionamento15Min(dia.abreEm)
+    const fechaEm = arredondarHorarioFuncionamento15Min(dia.fechaEm)
+    const id = `${abreEm}|${fechaEm}`
+    const existente = porIntervalo.get(id)
+    if (existente) {
+      existente.dias.push(dia.diaDaSemana)
+    } else {
+      porIntervalo.set(id, { id, abreEm, fechaEm, dias: [dia.diaDaSemana] })
+    }
+  }
+
+  return [...porIntervalo.values()]
+    .map(grupo => ({
+      ...grupo,
+      dias: [...grupo.dias].sort(
+        (a, b) => (ordem.get(a) ?? 0) - (ordem.get(b) ?? 0)
+      ),
+    }))
+    .sort((a, b) => {
+      const aIdx = ordem.get(a.dias[0]!) ?? 0
+      const bIdx = ordem.get(b.dias[0]!) ?? 0
+      return aIdx - bIdx
+    })
+}
+
+/** Ex.: "Dom, Ter, Qua, Qui, Sex, Sáb" */
+export function formatarDiasGrupoCurto(dias: DiaDaSemanaApi[]): string {
+  const ordem = new Map(DIAS_DA_SEMANA_ORDEM_COMPOSER.map((dia, idx) => [dia, idx]))
+  return [...dias]
+    .sort((a, b) => (ordem.get(a) ?? 0) - (ordem.get(b) ?? 0))
+    .map(dia => {
+      const curto = LABEL_DIA_DA_SEMANA_CURTO[dia]
+      return curto.charAt(0).toUpperCase() + curto.slice(1)
+    })
+    .join(', ')
+}
+
+export function formatarIntervaloGrupo(abreEm: string, fechaEm: string): string {
+  return `${arredondarHorarioFuncionamento15Min(abreEm)} – ${arredondarHorarioFuncionamento15Min(fechaEm)}`
 }
 
 export function agendaTemDiaAberto(agendaSemanal: FuncionamentoDoDiaDTO[] | undefined): boolean {

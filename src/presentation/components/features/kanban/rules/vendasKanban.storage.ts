@@ -3,6 +3,7 @@ import type {
   ColunaKanbanFiltroExtra,
   ColunaKanbanId,
   OrigemFiltro,
+  TipoCanalFiltro,
   TipoEntregaFiltro,
 } from '../types'
 import {
@@ -28,6 +29,8 @@ export type FiltroDataKanbanModoStorage = 'periodo' | 'todos'
 export type SnapshotFiltrosToolbarKanban = {
   searchInput: string
   origemFilter: OrigemFiltro
+  /** Canal unificado → query `tipo` no unificado. */
+  tipoCanalFilter: TipoCanalFiltro
   tipoEntregaFilter: TipoEntregaFiltro
   periodoPreset: KanbanFiltroDataPreset
   periodoDataModo: FiltroDataKanbanModoStorage
@@ -35,7 +38,14 @@ export type SnapshotFiltrosToolbarKanban = {
   periodoFimISO: string | null
 }
 
-const ORIGENS_FILTRO: readonly OrigemFiltro[] = ['', 'PDV', 'GESTOR', 'DELIVERY']
+const ORIGENS_FILTRO: readonly OrigemFiltro[] = [
+  '',
+  'PDV',
+  'GESTOR',
+  'JIFFY_DELIVERY',
+  'AIQFOME',
+]
+const TIPOS_CANAL_FILTRO: readonly TipoCanalFiltro[] = ['', 'PDV', 'GESTOR', 'DELIVERY']
 const TIPOS_ENTREGA_FILTRO: readonly TipoEntregaFiltro[] = ['', 'entrega', 'retirada']
 const PRESETS_PERIODO: readonly KanbanFiltroDataPreset[] = [
   'hoje',
@@ -49,6 +59,7 @@ export function snapshotFiltrosToolbarKanbanPadrao(): SnapshotFiltrosToolbarKanb
   return {
     searchInput: '',
     origemFilter: '',
+    tipoCanalFilter: '',
     tipoEntregaFilter: '',
     periodoPreset: 'hoje',
     periodoDataModo: 'periodo',
@@ -59,6 +70,10 @@ export function snapshotFiltrosToolbarKanbanPadrao(): SnapshotFiltrosToolbarKanb
 
 function isOrigemFiltro(value: unknown): value is OrigemFiltro {
   return typeof value === 'string' && (ORIGENS_FILTRO as readonly string[]).includes(value)
+}
+
+function isTipoCanalFiltro(value: unknown): value is TipoCanalFiltro {
+  return typeof value === 'string' && (TIPOS_CANAL_FILTRO as readonly string[]).includes(value)
 }
 
 function isTipoEntregaFiltro(value: unknown): value is TipoEntregaFiltro {
@@ -86,9 +101,27 @@ export function sanitizarSnapshotFiltrosToolbarKanban(
   const periodoDataModo: FiltroDataKanbanModoStorage =
     o.periodoDataModo === 'todos' || periodoPreset === 'todos' ? 'todos' : 'periodo'
   const presetComDatas = periodoPreset === 'por_data' || periodoPreset === 'ultimos_7'
+
+  let origemFilter: OrigemFiltro = isOrigemFiltro(o.origemFilter) ? o.origemFilter : ''
+  let tipoCanalFilter: TipoCanalFiltro = isTipoCanalFiltro(o.tipoCanalFilter)
+    ? o.tipoCanalFilter
+    : ''
+
+  // Snapshot antigo sem `tipoCanalFilter`: PDV/GESTOR/DELIVERY em `origemFilter` eram canal.
+  if (!('tipoCanalFilter' in o)) {
+    const legado = String(o.origemFilter ?? '')
+      .trim()
+      .toUpperCase()
+    if (legado === 'DELIVERY' || legado === 'PDV' || legado === 'GESTOR') {
+      tipoCanalFilter = legado as TipoCanalFiltro
+      origemFilter = ''
+    }
+  }
+
   return {
     searchInput: typeof o.searchInput === 'string' ? o.searchInput : '',
-    origemFilter: isOrigemFiltro(o.origemFilter) ? o.origemFilter : '',
+    origemFilter,
+    tipoCanalFilter,
     tipoEntregaFilter: isTipoEntregaFiltro(o.tipoEntregaFilter) ? o.tipoEntregaFilter : '',
     periodoPreset,
     periodoDataModo,

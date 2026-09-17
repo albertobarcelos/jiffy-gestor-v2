@@ -18,7 +18,8 @@ describe('sanitizarSnapshotFiltrosToolbarKanban', () => {
   it('mantém busca, tipo de entrega e período ao mudar a vista', () => {
     const snap = sanitizarSnapshotFiltrosToolbarKanban({
       searchInput: 'Ana',
-      origemFilter: 'GESTOR',
+      origemFilter: 'JIFFY_DELIVERY',
+      tipoCanalFilter: 'GESTOR',
       tipoEntregaFilter: 'retirada',
       periodoPreset: 'todos',
       periodoDataModo: 'todos',
@@ -26,9 +27,25 @@ describe('sanitizarSnapshotFiltrosToolbarKanban', () => {
       periodoFimISO: '2026-08-31T23:59:00.000Z',
     })
     expect(snap.searchInput).toBe('Ana')
+    expect(snap.origemFilter).toBe('JIFFY_DELIVERY')
+    expect(snap.tipoCanalFilter).toBe('GESTOR')
     expect(snap.tipoEntregaFilter).toBe('retirada')
     expect(snap.periodoPreset).toBe('todos')
     expect(snap.periodoInicioISO).toBeNull()
+  })
+
+  it('migra origem legada PDV/GESTOR/DELIVERY para canal (tipo)', () => {
+    const legado = sanitizarSnapshotFiltrosToolbarKanban({
+      searchInput: '',
+      origemFilter: 'PDV',
+      tipoEntregaFilter: '',
+      periodoPreset: 'hoje',
+      periodoDataModo: 'periodo',
+      periodoInicioISO: null,
+      periodoFimISO: null,
+    })
+    expect(legado.tipoCanalFilter).toBe('PDV')
+    expect(legado.origemFilter).toBe('')
   })
 
   it('guarda datas só em últimos 7 dias e por data', () => {

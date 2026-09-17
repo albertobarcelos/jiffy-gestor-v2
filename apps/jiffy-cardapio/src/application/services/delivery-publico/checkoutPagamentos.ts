@@ -16,6 +16,21 @@ function roundMoney(value: number): number {
   return roundMoneyCheckout(value)
 }
 
+/**
+ * Total oficial mudou o bastante para invalidar lançamentos já feitos.
+ * Usado para limpar pagamentos quando frete/subtotal mudam (ex.: entrega→retirada).
+ */
+export function deveLimparPagamentosPorMudancaTotal(
+  totalAnterior: number | null,
+  totalNovo: number | null,
+  quantidadePagamentos: number,
+  tolerancia: number = TOLERANCIA_CENTAVOS
+): boolean {
+  if (quantidadePagamentos <= 0) return false
+  if (totalAnterior == null || totalNovo == null) return false
+  return Math.abs(totalNovo - totalAnterior) > tolerancia
+}
+
 export function somaPagamentosCheckout(pagamentos: CheckoutPagamentoItem[]): number {
   return pagamentos.reduce((acc, p) => acc + p.valor, 0)
 }
@@ -64,6 +79,22 @@ export function pagamentosCobremTotalCheckout(
   const troco =
     isDinheiro != null ? calcularTrocoCheckout(total, pagamentos, isDinheiro) : 0
   return pagamentosCobremTotalPedido(total, soma, troco)
+}
+
+/**
+ * Lançamentos somam mais que o total e não há troco válido de dinheiro
+ * (ex.: crédito lançado antes do total cair).
+ */
+export function pagamentosExcedemTotalSemTroco(
+  total: number,
+  pagamentos: CheckoutPagamentoItem[],
+  isDinheiro: (meioPagamentoId: string) => boolean
+): boolean {
+  if (pagamentos.length === 0) return false
+  const soma = somaPagamentosCheckout(pagamentos)
+  if (soma - total <= TOLERANCIA_CENTAVOS) return false
+  const troco = calcularTrocoCheckout(total, pagamentos, isDinheiro)
+  return troco <= TOLERANCIA_CENTAVOS
 }
 
 export type AdicaoPagamentoCheckout =

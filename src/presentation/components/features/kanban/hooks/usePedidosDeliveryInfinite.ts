@@ -61,7 +61,12 @@ export function vendasUnificadasQueryParamsParaPedidosDelivery(
 ): PedidosDeliveryInfiniteParams {
   const origem = params.origem
   const origemFiltroKanban =
-    origem === 'PDV' || origem === 'GESTOR' || origem === 'DELIVERY' ? origem : undefined
+    origem === 'PDV' ||
+    origem === 'GESTOR' ||
+    origem === 'JIFFY_DELIVERY' ||
+    origem === 'AIQFOME'
+      ? origem
+      : undefined
 
   const tipoEntrega =
     params.tipoEntrega === 'entrega' || params.tipoEntrega === 'retirada'

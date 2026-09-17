@@ -298,8 +298,10 @@ function normalizarOrigemUnificado(raw: unknown): VendaUnificadaDTO['origem'] {
     .toUpperCase()
   if (s === 'PDV') return 'PDV'
   if (s === 'GESTOR') return 'GESTOR'
-  if (s === 'DELIVERY' || s === 'DELIVERY_IFOOD') return 'DELIVERY_IFOOD'
-  if (s === 'DELIVERY_UBER') return 'DELIVERY_UBER'
+  if (s === 'JIFFY_DELIVERY' || s === 'DELIVERY' || s === 'DELIVERY_IFOOD' || s === 'DELIVERY_UBER') {
+    return 'JIFFY_DELIVERY'
+  }
+  if (s === 'AIQFOME') return 'AIQFOME'
   return 'GESTOR'
 }
 
@@ -346,7 +348,7 @@ export class VendaUnificadaDTO {
     public readonly numeroVenda: number,
     public readonly codigoVenda: string,
     public readonly tipoVenda: string | null,
-    public readonly origem: 'PDV' | 'GESTOR' | 'DELIVERY_IFOOD' | 'DELIVERY_UBER',
+    public readonly origem: 'PDV' | 'GESTOR' | 'JIFFY_DELIVERY' | 'AIQFOME',
     public readonly tabelaOrigem: 'venda' | 'venda_gestor',
     public readonly valorFinal: number,
     public readonly totalDesconto: number,
@@ -445,8 +447,12 @@ export class VendaUnificadaDTO {
   }
 
   isDelivery(): boolean {
+    const tipo = String(this.tipoVenda ?? '')
+      .trim()
+      .toLowerCase()
+    if (tipo === 'delivery' || tipo === 'entrega' || tipo === 'retirada') return true
     const o = String(this.origem).toUpperCase()
-    return o === 'DELIVERY' || o === 'DELIVERY_IFOOD' || o === 'DELIVERY_UBER'
+    return o === 'JIFFY_DELIVERY' || o === 'AIQFOME'
   }
 
   /** Venda cancelada: por dataCancelamento ou por statusFiscal CANCELADA (API pode não enviar dataCancelamento) */
@@ -569,12 +575,16 @@ export function resolveModeloParaEmitirNota(v: VendaUnificadaDTO): 55 | 65 | nul
 
 /**
  * Parâmetros alinhados ao contrato do backend GET /vendas/unificado:
- * - origem, periodoInicial, periodoFinal (filtro por dataCriacao)
+ * - origem (PDV | GESTOR | JIFFY_DELIVERY | AIQFOME) — canal de criação real
+ * - tipo (PDV | GESTOR | DELIVERY) — canal de negócio unificado
+ * - periodoInicial, periodoFinal (filtro por dataCriacao)
  * - dataFinalizacaoInicio, dataFinalizacaoFim
  * - q (busca no servidor — pesquisa em todo o dataset, não só itens já carregados)
  */
 export interface VendasUnificadasQueryParams {
-  origem?: 'PDV' | 'GESTOR' | 'DELIVERY'
+  origem?: 'PDV' | 'GESTOR' | 'JIFFY_DELIVERY' | 'AIQFOME'
+  /** Canal unificado (`tipo` na API). Não confundir com `origem`. */
+  tipo?: 'PDV' | 'GESTOR' | 'DELIVERY'
   /** Filtro operacional do modo delivery (entrega/retirada). Ignorado pelo unificado/balcão. */
   tipoEntrega?: 'entrega' | 'retirada'
   /** Kanban balcão: filtra server-side por coluna fiscal. */
@@ -695,6 +705,7 @@ export function montarSearchParamsVendasUnificadas(
 ): URLSearchParams {
   const searchParams = new URLSearchParams()
   if (params.origem) searchParams.append('origem', params.origem)
+  if (params.tipo) searchParams.append('tipo', params.tipo)
   if (params.colunaKanban) searchParams.append('colunaKanban', params.colunaKanban)
   if (params.terminalId?.trim()) searchParams.append('terminalId', params.terminalId.trim())
   if (params.statusFiscal) searchParams.append('statusFiscal', params.statusFiscal)

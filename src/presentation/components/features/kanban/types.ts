@@ -27,7 +27,19 @@ export type ColunaKanbanId =
 export type CriterioOrdenacaoKanban = 'data' | 'numero'
 export type DirecaoOrdenacaoKanban = 'asc' | 'desc'
 
-export type OrigemFiltro = '' | 'PDV' | 'GESTOR' | 'DELIVERY'
+/**
+ * Origem real da venda (contrato GET /vendas/unificado).
+ * Não existe origem `DELIVERY` — delivery é `TipoCanalFiltro`.
+ */
+export type OrigemFiltro = '' | 'PDV' | 'GESTOR' | 'JIFFY_DELIVERY' | 'AIQFOME'
+
+/**
+ * Tipo/canal de negócio unificado (`tipo` na API).
+ * - PDV → vendas do PDV
+ * - GESTOR → só balcão (não delivery)
+ * - DELIVERY → qualquer delivery (qualquer origem)
+ */
+export type TipoCanalFiltro = '' | 'PDV' | 'GESTOR' | 'DELIVERY'
 
 /** Filtro de tipo de entrega no modo delivery (`''` = todos). */
 export type TipoEntregaFiltro = '' | 'entrega' | 'retirada'

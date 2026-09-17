@@ -13,7 +13,7 @@
  * | numeroVenda              | numeroVenda                    |            |
  * | codigoVenda              | codigoVenda                    |            |
  * | tipoEntrega              | tipoVenda                      | usar entrega/retirada; ignorar `tipoVenda: "delivery"` da API |
- * | origem                   | origem                         | GESTOR→GESTOR; JIFFY_DELIVERY→GESTOR (filtro por origem na API) |
+ * | origem                   | origem                         | GESTOR / JIFFY_DELIVERY / AIQFOME (origem real) |
  * | (fixo)                   | tabelaOrigem                   | sempre `'venda_gestor'` |
  * | statusDelivery           | statusEtapaOperacional         | PENDENTE→NOVOS_PEDIDOS, EM_PREPARO, PRONTO→PRONTO_ENTREGA, EM_ROTA, FINALIZADO→regras fiscais |
  * | valorFinal               | valorFinal                     |            |
@@ -51,7 +51,7 @@ export interface ObservacaoPedidoDeliverySummaryApi {
 }
 
 /** Valores persistidos em `origem` no módulo delivery (`OrigemVendaExterna`). */
-export type OrigemPedidoDeliveryApi = 'GESTOR' | 'JIFFY_DELIVERY'
+export type OrigemPedidoDeliveryApi = 'GESTOR' | 'JIFFY_DELIVERY' | 'AIQFOME'
 
 export interface AtorPedidoDeliverySummaryApi {
   id: string

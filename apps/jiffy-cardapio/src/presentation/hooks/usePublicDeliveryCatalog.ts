@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import {
   useInfiniteQuery,
   useQuery,
@@ -201,7 +201,7 @@ export function usePublicDeliveryCatalogInfinite(slug: string, enabled = true) {
       window.removeEventListener(EMPRESA_DELIVERY_UPDATED_EVENT, onDeliveryUpdated)
   }, [queryClient, slug])
 
-  return useInfiniteQuery<GetCatalogoPublicoResponseDTO, Error>({
+  const query = useInfiniteQuery<GetCatalogoPublicoResponseDTO, Error>({
     queryKey: publicDeliveryCatalogInfiniteQueryKey(slug),
     queryFn: async ({ pageParam }) => {
       const offset = pageParam as number
@@ -218,6 +218,19 @@ export function usePublicDeliveryCatalogInfinite(slug: string, enabled = true) {
     staleTime: CATALOGO_QUERY_STALE_MS,
     retry: catalogoRetry,
   })
+
+  /**
+   * SSR/dehydrate entrega a 1ª página sem passar pelo queryFn do client.
+   * Sem este sync, o sessionStorage antigo sobrescreve os complementos frescos.
+   */
+  useEffect(() => {
+    if (!slug) return
+    const catalogo = query.data?.pages[0]?.catalogo
+    if (!catalogo) return
+    persistirComplementosPrimeiraPagina(slug, 0, catalogo, salvarComplementos)
+  }, [slug, query.data, salvarComplementos])
+
+  return query
 }
 
 function catalogoAutoFetchBatchSize(): number {
@@ -347,30 +360,57 @@ export function useAutoFetchCatalogoGrupos(
 }
 
 /**
- * Garante cache de complementos quando ausente (modal/carrinho).
+ * Garante cache de complementos quando ausente ou incompleto (modal/carrinho).
  * Reusa a infinite query do catálogo (mesma query key) — sem GET offset=0 paralelo.
+ * `forceRefetch`: limpa cache local e busca de novo (ex.: produto com grupos não resolvidos).
  */
-export function useEnsureComplementosCatalogo(slug: string, enabled = true) {
+export function useEnsureComplementosCatalogo(
+  slug: string,
+  enabled = true,
+  options?: { forceRefetch?: boolean }
+) {
+  const forceRefetch = options?.forceRefetch ?? false
   const cache = usePublicDeliveryComplementosStore(s => s.porSlug[slug] ?? null)
   const salvarComplementos = usePublicDeliveryComplementosStore(s => s.salvar)
   const hidratarDoStorage = usePublicDeliveryComplementosStore(s => s.hidratarDoStorage)
+  const queryClient = useQueryClient()
+  const forceRefetchFeitoRef = useRef(false)
+
+  useEffect(() => {
+    forceRefetchFeitoRef.current = false
+  }, [slug])
 
   useEffect(() => {
     if (slug) hidratarDoStorage(slug)
   }, [slug, hidratarDoStorage])
 
-  const precisaCatalogo = Boolean(enabled && slug && !cache)
+  useEffect(() => {
+    if (!forceRefetch || !slug || forceRefetchFeitoRef.current) return
+    forceRefetchFeitoRef.current = true
+    limparComplementosStorage(slug)
+    usePublicDeliveryComplementosStore.setState(state => {
+      if (!state.porSlug[slug]) return state
+      const next = { ...state.porSlug }
+      delete next[slug]
+      return { porSlug: next }
+    })
+    void queryClient.invalidateQueries({
+      queryKey: publicDeliveryCatalogInfiniteQueryKey(slug),
+    })
+  }, [forceRefetch, slug, queryClient])
+
+  const precisaCatalogo = Boolean(enabled && slug && (!cache || forceRefetch))
   const infinite = usePublicDeliveryCatalogInfinite(slug, precisaCatalogo)
 
   useEffect(() => {
-    if (!slug || cache) return
+    if (!slug) return
     const catalogo = infinite.data?.pages[0]?.catalogo
     if (!catalogo) return
     persistirComplementosPrimeiraPagina(slug, 0, catalogo, salvarComplementos)
-  }, [slug, cache, infinite.data, salvarComplementos])
+  }, [slug, infinite.data, salvarComplementos])
 
   return {
-    isLoading: Boolean(precisaCatalogo && !cache && infinite.isLoading),
+    isLoading: Boolean(precisaCatalogo && (!cache || forceRefetch) && infinite.isLoading),
     isFetching: infinite.isFetching,
     isError: infinite.isError,
     error: infinite.error,
