@@ -16,10 +16,6 @@ import {
   type MenuProdutoSnapshotHandle,
 } from './MenuProdutoSnapshotForm'
 import {
-  MenuGrupoSnapshotForm,
-  type MenuGrupoSnapshotHandle,
-} from './MenuGrupoSnapshotForm'
-import {
   ComplementosMultiSelectDialog,
   type ComplementosMultiSelectHandle,
 } from '@/src/presentation/components/features/produtos/ComplementosMultiSelectDialog'
@@ -28,7 +24,7 @@ import {
   type ProdutoMenusHandle,
 } from '@/src/presentation/components/features/produtos/ProdutoMenusPanel'
 
-export type MenuProdutoTabsKey = 'produto' | 'grupo' | 'complementos' | 'menus'
+export type MenuProdutoTabsKey = 'produto' | 'complementos' | 'menus'
 
 export interface MenuProdutoTabsModalState {
   open: boolean
@@ -42,6 +38,7 @@ interface MenuProdutoTabsModalProps {
   state: MenuProdutoTabsModalState
   onClose: () => void
   onTabChange: (tab: MenuProdutoTabsKey) => void
+  onGrupoChange?: (grupo: MenuGrupoProduto) => void
   onRemoverDesteCardapio?: (produtoId: string) => void
 }
 
@@ -50,16 +47,15 @@ export function MenuProdutoTabsModal({
   state,
   onClose,
   onTabChange,
+  onGrupoChange,
   onRemoverDesteCardapio,
 }: MenuProdutoTabsModalProps) {
   const produtoRef = useRef<MenuProdutoSnapshotHandle>(null)
-  const grupoRef = useRef<MenuGrupoSnapshotHandle>(null)
   const complementosRef = useRef<ComplementosMultiSelectHandle>(null)
   const menusRef = useRef<ProdutoMenusHandle>(null)
   const invalidate = useInvalidateTenantQueries()
 
   const [produtoDirty, setProdutoDirty] = useState(false)
-  const [grupoDirty, setGrupoDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [embedComplementos, setEmbedComplementos] = useState({
     isDirty: false,
@@ -125,7 +121,6 @@ export function MenuProdutoTabsModal({
   const handleSave = useCallback(async () => {
     let ok = false
     if (state.tab === 'produto') ok = (await produtoRef.current?.save()) ?? false
-    else if (state.tab === 'grupo') ok = (await grupoRef.current?.save()) ?? false
     else if (state.tab === 'menus') ok = (await menusRef.current?.save()) ?? false
     else ok = (await complementosRef.current?.save()) ?? false
     if (ok) onClose()
@@ -134,11 +129,9 @@ export function MenuProdutoTabsModal({
   const currentDirty =
     state.tab === 'produto'
       ? produtoDirty
-      : state.tab === 'grupo'
-        ? grupoDirty
-        : state.tab === 'menus'
-          ? embedMenus.isDirty
-          : embedComplementos.isDirty
+      : state.tab === 'menus'
+        ? embedMenus.isDirty
+        : embedComplementos.isDirty
   const currentSaving =
     state.tab === 'complementos'
       ? embedComplementos.isSaving
@@ -159,7 +152,6 @@ export function MenuProdutoTabsModal({
   }
 
   const produtoEnabled = Boolean(state.produto)
-  const grupoEnabled = Boolean(state.grupo)
   const complementosEnabled = Boolean(state.produto)
 
   return (
@@ -177,7 +169,6 @@ export function MenuProdutoTabsModal({
           {(
             [
               { key: 'produto' as const, label: 'Produto', disabled: !produtoEnabled },
-              { key: 'grupo' as const, label: 'Categoria', disabled: !grupoEnabled },
               {
                 key: 'complementos' as const,
                 label: 'Complementos',
@@ -216,8 +207,10 @@ export function MenuProdutoTabsModal({
               ref={produtoRef}
               menuId={menuId}
               produto={state.produto}
+              grupo={state.grupo}
               onDirtyChange={setProdutoDirty}
               onSavingChange={setSaving}
+              onGrupoChange={onGrupoChange}
               onRemoverDesteCardapio={
                 onRemoverDesteCardapio
                   ? () => {
@@ -226,25 +219,6 @@ export function MenuProdutoTabsModal({
                     }
                   : undefined
               }
-            />
-          </div>
-        ) : null}
-
-        {state.grupo ? (
-          <div
-            className={cn(
-              'flex h-full min-h-0 flex-1 flex-col overflow-hidden',
-              state.tab !== 'grupo' && 'hidden'
-            )}
-            aria-hidden={state.tab !== 'grupo'}
-          >
-            <MenuGrupoSnapshotForm
-              ref={grupoRef}
-              menuId={menuId}
-              grupo={state.grupo}
-              produtoId={state.produto?.produtoId}
-              onDirtyChange={setGrupoDirty}
-              onSavingChange={setSaving}
             />
           </div>
         ) : null}

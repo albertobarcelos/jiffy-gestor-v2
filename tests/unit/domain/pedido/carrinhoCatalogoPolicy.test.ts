@@ -62,11 +62,11 @@ describe('CarrinhoCatalogoPolicy — complementos da venda', () => {
     expect(cacheProdutoCatalogoAtendePedido(undefined, { requireComplementos: true })).toBe(false)
   })
 
-  it('aplica abreComplementos do cadastro no snapshot slim da venda', () => {
+  it('não sobrescreve abreComplementos do produto do menu com o cadastro', () => {
     const slim = produtoSlim()
     expect(slim.abreComplementosAtivo()).toBe(false)
     const aplicado = aplicarPermissoesCadastroNoProdutoCatalogo(slim, permissoesCadastro)
-    expect(aplicado.abreComplementosAtivo()).toBe(true)
+    expect(aplicado.abreComplementosAtivo()).toBe(false)
     expect(aplicado.incideTaxaAtivo()).toBe(true)
   })
 

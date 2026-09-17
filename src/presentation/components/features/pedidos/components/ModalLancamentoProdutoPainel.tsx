@@ -105,9 +105,9 @@ interface ModalLancamentoProdutoPainelProps {
   produto: Produto | null
   /** Cadastro `permiteAlterarPreco` — exibe input de valor */
   mostrarAlterarPreco: boolean
-  /** Cadastro `abreComplementos` ou edição via carrinho — exibe seção de seleção de complementos */
+  /** Produto do menu com `abreComplementos` ou edição via carrinho — exibe a seleção de complementos */
   mostrarComplementos: boolean
-  /** Complementos ainda sendo carregados (GET produto por id) */
+  /** Complementos ainda sendo carregados (GET do produto do menu + grupos) */
   carregandoComplementos?: boolean
   /**
    * Lançamento pelo catálogo com `abreComplementos` desativado — orienta a usar o menu ⋮ no carrinho.

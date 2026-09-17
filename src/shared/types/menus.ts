@@ -49,9 +49,18 @@ export interface MenuProdutoImage {
   imageUrl: string | null
 }
 
+export interface MenuProdutoComplementoItemResumo {
+  id: string
+  nome: string
+  valor?: number
+  tipoImpactoPreco?: 'aumenta' | 'diminui' | 'nenhum'
+}
+
 export interface MenuProdutoComplementoResumo {
   id: string
   nome: string
+  /** Presente só em alguns GETs; a listagem do menu costuma mandar só id/nome. */
+  complementos?: MenuProdutoComplementoItemResumo[]
 }
 
 export interface MenuProduto {

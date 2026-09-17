@@ -6,6 +6,7 @@ import {
   mapOrigemApiDeliveryParaVendaUnificada,
   mapPedidoDeliverySummaryParaVendaUnificadaDTO,
   mapPedidosDeliveryListResponseParaVendaUnificadaDTO,
+  normalizarPedidoDeliverySummaryJson,
   normalizarPedidosDeliveryListResponse,
   pedidoDeliverySummaryParaUnifiedRecord,
 } from '@/src/application/mappers/PedidoDeliveryListMapper'
@@ -147,6 +148,30 @@ describe('PedidoDeliveryListMapper — summary → VendaUnificadaDTO', () => {
     expect(dto.cobrancasDelivery).toEqual([
       { meioPagamentoId: 'mp1', status: 'pendente', momentoCobranca: 'na_entrega' },
     ])
+  })
+
+  it('deriva troco da cédula na cobrança quando a listagem manda troco 0', () => {
+    const summary = normalizarPedidoDeliverySummaryJson({
+      ...criarSummary({
+        valorFinal: 39.9,
+        troco: 0,
+        totalPago: 0,
+        totalFaltaPagar: 39.9,
+        cobrancas: [
+          {
+            id: 'c1',
+            valor: 50,
+            meioPagamentoId: 'mp-dinheiro',
+            momentoCobranca: 'na_entrega',
+            status: 'pendente',
+            dataCriacao: '2026-06-15T10:00:00.000Z',
+            meioPagamento: { id: 'mp-dinheiro', nome: 'Dinheiro' },
+          },
+        ],
+      }),
+    })
+
+    expect(summary?.troco).toBe(10.1)
   })
 
   it('propaga entregador e contextoEntrega do summary', () => {

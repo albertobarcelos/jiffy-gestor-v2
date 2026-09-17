@@ -47,22 +47,24 @@ describe('AlarmeSomPedidoNovo', () => {
     } }
   }
 
-  it('novos: toca, 2s, toca, 3s, toca, e para ao aceitar', () => {
+  it('novos: toca a cada 1s e para ao sair da coluna', () => {
     const { alarme, tocar } = criarAlarme()
     alarme.onPedidoCriado('p1', 'aguardando_triagem')
     expect(tocar).toHaveBeenCalledTimes(1)
 
-    vi.advanceTimersByTime(1999)
+    vi.advanceTimersByTime(999)
     expect(tocar).toHaveBeenCalledTimes(1)
     vi.advanceTimersByTime(1)
     expect(tocar).toHaveBeenCalledTimes(2)
 
-    vi.advanceTimersByTime(3000)
+    vi.advanceTimersByTime(1000)
     expect(tocar).toHaveBeenCalledTimes(3)
+    vi.advanceTimersByTime(1000)
+    expect(tocar).toHaveBeenCalledTimes(4)
 
     alarme.onPedidoResolvido('p1')
     vi.advanceTimersByTime(10_000)
-    expect(tocar).toHaveBeenCalledTimes(3)
+    expect(tocar).toHaveBeenCalledTimes(4)
   })
 
   it('producao: dois toques com 2s', () => {

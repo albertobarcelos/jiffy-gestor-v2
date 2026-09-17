@@ -38,7 +38,7 @@ interface InformacoesProdutoStepProps {
   onSaveAndClose: () => void
   /** Quando true, ações ficam no rodapé do painel lateral (JiffySidePanelModal) */
   hideStepFooter?: boolean
-  /** Oculta o preço do cadastro base quando a empresa tem mais de um menu. */
+  /** Reserva do layout: o cadastro base sempre exibe o preço de venda. */
   ocultarPrecoVenda?: boolean
 }
 
@@ -131,7 +131,7 @@ export function InformacoesProdutoStep({
       </p>
 
       <div className="space-y-4">
-        {/* Linha 1: Nome do Produto + Preço de Venda (preço só no contexto de cardápio) */}
+        {/* Linha 1: Nome do Produto + Preço de Venda */}
         <div className={ocultarPrecoVenda ? 'grid gap-4' : 'grid gap-4 md:grid-cols-[1fr_180px]'}>
           <Input
             label="Nome do Produto"
@@ -150,6 +150,7 @@ export function InformacoesProdutoStep({
           {ocultarPrecoVenda ? null : (
             <Input
               label="Preço de Venda"
+              required
               size="small"
               type="text"
               value={precoVenda}
@@ -157,6 +158,7 @@ export function InformacoesProdutoStep({
               placeholder="R$ 0,00"
               className="bg-white"
               sx={sxEntradaCompactaProduto}
+              InputLabelProps={{ required: true }}
             />
           )}
         </div>

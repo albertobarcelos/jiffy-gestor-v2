@@ -3,6 +3,7 @@ import type {
   PedidosDeliveryListResponse,
 } from '@/src/application/dto/api/pedidoDeliveryListApi'
 import { derivarFluxoPagamentoEntregaDeliverySummary } from '@/src/application/mappers/DeliveryFluxoPagamentoMapper'
+import { resolverTrocoLevarPedidoEntrega } from '@/src/application/mappers/resolverTrocoLevarPedidoEntrega'
 import {
   mapItemJsonParaVendaUnificadaDTO,
   type VendaUnificadaDTO,
@@ -232,7 +233,11 @@ export function normalizarPedidoDeliverySummaryJson(raw: unknown): PedidoDeliver
     origem: String(o.origem ?? 'GESTOR'),
     statusDelivery,
     valorFinal: parseNumero(o.valorFinal, 0),
-    troco: parseNumero(o.troco, 0),
+    troco: resolverTrocoLevarPedidoEntrega({
+      valorFinal: parseNumero(o.valorFinal, 0),
+      troco: o.troco,
+      cobrancas,
+    }),
     totalPago: parseNumero(o.totalPago, 0),
     totalFaltaPagar: parseNumero(o.totalFaltaPagar, 0),
     totalCobrancasCriadas: parseNumero(o.totalCobrancasCriadas, 0),

@@ -53,6 +53,23 @@ export function ehMenuPrincipal(
   return menuId === principalId
 }
 
+/**
+ * Destinos do snapshot após salvar o cadastro.
+ * Edição: só os menus da política (principal, sem pergunta).
+ * Criação: os menus do POST (principal já entra) — o backend vincula, mas o valor/nome
+ * do snapshot precisa ser gravado de propósito.
+ */
+export function menuIdsParaEspelharAposSalvarCadastro(input: {
+  isEdit: boolean
+  destinosEdicao: readonly string[]
+  menuIdsCriacao: readonly string[]
+}): string[] {
+  const daEdicao = idsUnicos(input.destinosEdicao)
+  if (daEdicao.length > 0) return daEdicao
+  if (input.isEdit) return []
+  return idsUnicos(input.menuIdsCriacao)
+}
+
 /** Criação/cópia: o produto sempre entra no menu principal. */
 export function garantirMenuPrincipalNosIds(
   menuIds: readonly string[],

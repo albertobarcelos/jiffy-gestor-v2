@@ -156,4 +156,158 @@ describe('aplicarPedidoDeliveryStatusAlteradoNoKanbanCache', () => {
     ).toBe(true)
     expect(encontrarVendaNasColunasDeliveryKanban(queryClient, 'ped-rt-1')).toBeNull()
   })
+
+  it('payload fino nao apaga cliente, valor nem tipo do card ja no cache', () => {
+    const queryClient = new QueryClient()
+    seedColuna(queryClient, 'EM_PREPARO')
+    seedColuna(queryClient, 'EM_ROTA')
+
+    expect(
+      aplicarPedidoDeliveryCriadoNoKanbanCache(
+        queryClient,
+        summary({
+          statusDelivery: 'EM_PREPARO',
+          tipoEntrega: 'retirada',
+          valorFinal: 39.9,
+          totalFaltaPagar: 39.9,
+          totalPago: 0,
+          cliente: { id: 'cli-k', nome: 'KLEVERSON JARA' },
+          cobrancas: [
+            {
+              id: 'cob-1',
+              status: 'pendente',
+              momentoCobranca: 'na_entrega',
+              valor: 39.9,
+            },
+          ],
+        })
+      )
+    ).toBe(true)
+
+    expect(
+      aplicarPedidoDeliveryStatusAlteradoNoKanbanCache(queryClient, {
+        id: 'ped-rt-1',
+        numeroVenda: 99,
+        codigoVenda: 'V0099',
+        statusDelivery: 'EM_ROTA',
+      })
+    ).toBe(true)
+
+    const preparo = queryClient.getQueryData<InfiniteData<PedidosDeliveryInfinitePage>>([
+      'tenant',
+      'emp-1',
+      'delivery',
+      'pedidos',
+      'infinite',
+      'column',
+      'EM_PREPARO',
+      {},
+    ])
+    const rota = queryClient.getQueryData<InfiniteData<PedidosDeliveryInfinitePage>>([
+      'tenant',
+      'emp-1',
+      'delivery',
+      'pedidos',
+      'infinite',
+      'column',
+      'EM_ROTA',
+      {},
+    ])
+
+    expect(preparo?.pages[0].items).toEqual([])
+    const card = rota?.pages[0].items[0]
+    expect(card?.id).toBe('ped-rt-1')
+    expect(card?.tipoVenda).toBe('retirada')
+    expect(card?.valorFinal).toBe(39.9)
+    expect(card?.cliente?.nome).toBe('KLEVERSON JARA')
+    expect(card?.statusEtapaOperacional).toBe('EM_ROTA')
+    expect(String(card?.statusFinanceiro ?? '').toLowerCase()).not.toBe('pago')
+  })
+
+  it('summary com tipo e valor mas sem cliente nao apaga o nome ja no cache', () => {
+    const queryClient = new QueryClient()
+    seedColuna(queryClient, 'EM_PREPARO')
+    seedColuna(queryClient, 'PRONTO_ENTREGA')
+
+    expect(
+      aplicarPedidoDeliveryCriadoNoKanbanCache(
+        queryClient,
+        summary({
+          statusDelivery: 'EM_PREPARO',
+          tipoEntrega: 'entrega',
+          valorFinal: 45,
+          cliente: { id: 'cli-1', nome: 'Ana' },
+        })
+      )
+    ).toBe(true)
+
+    expect(
+      aplicarPedidoDeliveryStatusAlteradoNoKanbanCache(
+        queryClient,
+        {
+          id: 'ped-rt-1',
+          numeroVenda: 99,
+          codigoVenda: 'V0099',
+          statusDelivery: 'PRONTO',
+          tipoEntrega: 'entrega',
+          valorFinal: 45,
+        }
+      )
+    ).toBe(true)
+
+    const card = encontrarVendaNasColunasDeliveryKanban(queryClient, 'ped-rt-1')
+    expect(card?.cliente?.nome).toBe('Ana')
+    expect(card?.valorFinal).toBe(45)
+    expect(card?.statusEtapaOperacional).toBe('PRONTO')
+  })
+
+  it('echo na mesma coluna atualiza o card no lugar sem jogar para o topo', () => {
+    const queryClient = new QueryClient()
+    seedColuna(queryClient, 'EM_ROTA')
+    aplicarPedidoDeliveryCriadoNoKanbanCache(
+      queryClient,
+      summary({ id: 'ped-a', numeroVenda: 1, codigoVenda: 'V0001', statusDelivery: 'EM_ROTA' })
+    )
+    aplicarPedidoDeliveryCriadoNoKanbanCache(
+      queryClient,
+      summary({
+        id: 'ped-b',
+        numeroVenda: 2,
+        codigoVenda: 'V0002',
+        statusDelivery: 'EM_ROTA',
+        cliente: { id: 'cli-b', nome: 'Bia' },
+      })
+    )
+
+    expect(
+      aplicarPedidoDeliveryStatusAlteradoNoKanbanCache(queryClient, {
+        id: 'ped-a',
+        statusDelivery: 'EM_ROTA',
+      })
+    ).toBe(true)
+
+    const rota = queryClient.getQueryData<InfiniteData<PedidosDeliveryInfinitePage>>([
+      'tenant',
+      'emp-1',
+      'delivery',
+      'pedidos',
+      'infinite',
+      'column',
+      'EM_ROTA',
+      {},
+    ])
+    expect(rota?.pages[0].items.map(i => i.id)).toEqual(['ped-b', 'ped-a'])
+    expect(rota?.pages[0].items[1]?.cliente?.nome).toBe('Ana')
+  })
+
+  it('payload fino sem card no cache pede invalidate', () => {
+    const queryClient = new QueryClient()
+    seedColuna(queryClient, 'EM_ROTA')
+    expect(
+      aplicarPedidoDeliveryStatusAlteradoNoKanbanCache(queryClient, {
+        id: 'ped-rt-1',
+        statusDelivery: 'EM_ROTA',
+      })
+    ).toBe(false)
+  })
 })

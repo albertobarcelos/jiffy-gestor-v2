@@ -390,7 +390,7 @@ export function SeletorClienteModal({
                   inputRef={searchInputRef}
                   value={searchText}
                   onChange={e => setSearchText(e.target.value)}
-                  placeholder="Pesquisar por nome..."
+                  placeholder="Pesquisar por nome ou telefone..."
                   className="w-full rounded-lg border border-gray-200 bg-info text-sm text-primary-text placeholder:text-secondary-text focus:border-primary focus:outline-none"
                   sx={{
                     '& .MuiOutlinedInput-root': {
@@ -433,9 +433,12 @@ export function SeletorClienteModal({
           >
             {/* Barra de título */}
             {!isLoading && !error && (
-              <div className="mb-2 rounded-lg bg-primary/15 px-4 py-2">
-                <p className="text-sm font-semibold text-primary-text">
+              <div className="mb-2 flex items-center gap-3 rounded-lg bg-primary/15 px-4 py-2">
+                <p className="min-w-0 flex-[2] text-sm font-semibold text-primary-text">
                   Nome do Cliente
+                </p>
+                <p className="min-w-0 flex-1 text-sm font-semibold text-primary-text">
+                  Telefone
                 </p>
               </div>
             )}
@@ -462,7 +465,16 @@ export function SeletorClienteModal({
                       index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
                     } hover:bg-custom-2`}
                   >
-                    <div className="text-sm font-medium text-primary-text uppercase">{cliente.getNome()}</div>
+                    <div className="flex items-center gap-3">
+                      <div className="min-w-0 flex-[2] text-sm font-medium uppercase text-primary-text">
+                        {cliente.getNome()}
+                      </div>
+                      <div className="min-w-0 flex-1 text-sm text-secondary-text">
+                        {cliente.getTelefone()?.trim()
+                          ? formatarTelefoneBr(cliente.getTelefone()!)
+                          : '—'}
+                      </div>
+                    </div>
                   </button>
                 ))}
 
