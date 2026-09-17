@@ -52,6 +52,32 @@ export function pagamentoEntregaConfirmadoNoPedido(
 }
 
 /**
+ * Compara o total do pedido (itens + taxa) com o total lançado nas formas de pagamento.
+ * `diferenca` > 0: falta pagar; < 0: pagamento ficou acima do novo total.
+ */
+export function divergenciaPagamentoVsTotalPedido(
+  totalPedido: number,
+  totalLancado: number
+): { divergente: boolean; diferenca: number } {
+  const diferenca = Math.round((Number(totalPedido) - Number(totalLancado)) * 100) / 100
+  return {
+    divergente: Math.abs(diferenca) > TOLERANCIA_TOTAL_PEDIDO,
+    diferenca,
+  }
+}
+
+export type DirecaoDivergenciaPagamento = 'faltando' | 'excedente' | 'ok'
+
+export function classificarDivergenciaPagamentoVsTotal(
+  totalPedido: number,
+  totalLancado: number
+): DirecaoDivergenciaPagamento {
+  const { divergente, diferenca } = divergenciaPagamentoVsTotalPedido(totalPedido, totalLancado)
+  if (!divergente) return 'ok'
+  return diferenca > 0 ? 'faltando' : 'excedente'
+}
+
+/**
  * Lista exibida no passo 4: mostra apenas pagamentos ativos/efetivados.
  * Oculta cancelados (o backend cancela o pagamento anterior ao trocar a forma de pagamento,
  * gerando um "cancelado" que nunca foi efetivado) e TEF não confirmado em pagamento ativo.

@@ -8,8 +8,10 @@ import { useNovoPedidoDetalheContext } from '../context/NovoPedidoContext'
 import { useNovoPedidoUIContext } from '../context/NovoPedidoContext'
 
 export function PedidoWizardStepsView() {
-  const { modoVisualizacao, tipoInicioPedido } = useNovoPedidoDetalheContext()
+  const { modoVisualizacao, tipoInicioPedido, modoEdicaoProdutos } = useNovoPedidoDetalheContext()
   const { currentStep } = useNovoPedidoUIContext()
+  const mostrarCatalogoProdutos =
+    currentStep === 1 && (!modoVisualizacao || modoEdicaoProdutos)
 
   return (
     <>
@@ -17,7 +19,7 @@ export function PedidoWizardStepsView() {
         <PedidoInformacoesStepView />
       )}
 
-      {!modoVisualizacao && currentStep === 1 && (
+      {mostrarCatalogoProdutos && (
         <PedidoProdutosStep>
           <PedidoProdutosStepLayout />
         </PedidoProdutosStep>

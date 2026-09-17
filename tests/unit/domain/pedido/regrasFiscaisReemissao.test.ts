@@ -145,6 +145,9 @@ describe('vendasKanban.rules — desbloqueio no Kanban', () => {
   it('move card para pendente emissão após cooldown', () => {
     const venda = criarVendaKanban({
       dataUltimaModificacao: '2026-06-08T12:00:00.000Z',
+      statusEtapaOperacional: 'FINALIZADO',
+      solicitarEmissaoFiscal: true,
+      statusFiscal: null,
     })
 
     const agoraAnterior = Date.now
@@ -164,24 +167,26 @@ describe('vendasKanban.rules — desbloqueio no Kanban', () => {
 })
 
 describe('getEtapaKanban — REJEITADA com numeração', () => {
-  it('coloca REJEITADA com número e série em Com Nota Solicitada', () => {
+  it('coloca REJEITADA com número e série em Rejeitadas após a logística', () => {
     const venda = criarVendaKanban({
+      statusEtapaOperacional: 'FINALIZADO',
       statusFiscal: 'REJEITADA',
       numeroFiscal: 333,
       serieFiscal: '2',
       retornoSefaz: null,
     })
-    expect(venda.getEtapaKanban()).toBe('COM_FISCAL')
+    expect(venda.getEtapaKanban()).toBe('REJEITADAS')
   })
 
-  it('mantém REJEITADA sem numeração em Pendente Emissão', () => {
+  it('mantém REJEITADA sem numeração em Rejeitadas após a logística', () => {
     const venda = criarVendaKanban({
+      statusEtapaOperacional: 'FINALIZADO',
       statusFiscal: 'REJEITADA',
       numeroFiscal: null,
       serieFiscal: null,
       retornoSefaz: null,
     })
-    expect(venda.getEtapaKanban()).toBe('PENDENTE_EMISSAO')
+    expect(venda.getEtapaKanban()).toBe('REJEITADAS')
   })
 })
 
@@ -212,5 +217,29 @@ describe('kanbanVendaUsaCupomPublicoNfce', () => {
         criarVendaKanban({ origem: 'DELIVERY_IFOOD', tipoDocFiscal: 'NFCE' })
       )
     ).toBe(false)
+  })
+})
+
+describe('deveExibirBotaoEmitirNotaNoKanban — Entregues', () => {
+  it('mostra emitir só para pedido finalizado sem nota', () => {
+    const semNota = criarVendaKanban({
+      statusEtapaOperacional: 'FINALIZADO',
+      etapaKanbanBalcao: 'FINALIZADAS',
+      statusFiscal: null,
+      solicitarEmissaoFiscal: false,
+      retornoSefaz: null,
+      documentoFiscalId: null,
+    })
+    const emitida = criarVendaKanban({
+      statusEtapaOperacional: 'FINALIZADO',
+      etapaKanbanBalcao: 'COM_FISCAL',
+      statusFiscal: 'EMITIDA',
+      retornoSefaz: null,
+    })
+
+    expect(semNota.getEtapaKanban()).toBe('FINALIZADAS')
+    expect(deveExibirBotaoEmitirNotaNoKanban('FINALIZADAS', semNota, {})).toBe(true)
+    expect(emitida.getEtapaKanban()).toBe('COM_FISCAL')
+    expect(deveExibirBotaoEmitirNotaNoKanban('FINALIZADAS', emitida, {})).toBe(false)
   })
 })

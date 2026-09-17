@@ -1,3 +1,4 @@
+import { atorUsuarioId } from '@/src/application/mappers/atorPedidoDelivery'
 import type {
   PagamentoApiItem,
   ProdutoLancadoApiItem,
@@ -15,13 +16,6 @@ function isoString(value: unknown): string | null {
   if (value == null) return null
   const s = String(value).trim()
   return s || null
-}
-
-function atorUsuarioId(ator: unknown): string | null {
-  if (!ator || typeof ator !== 'object') return null
-  const a = ator as Record<string, unknown>
-  const ref = String(a.sourceReference ?? a.id ?? '').trim()
-  return ref || null
 }
 
 /**
@@ -84,9 +78,18 @@ export function adaptPedidoDeliveryToVendaGestorApiResponse(
     .map(mapCobrancaDeliveryToPagamento)
     .filter((p): p is PagamentoApiItem => p != null)
 
-  const produtosLancados = Array.isArray(registro.produtosLancados)
+  const produtosLancados = (Array.isArray(registro.produtosLancados)
     ? (registro.produtosLancados as ProdutoLancadoApiItem[])
     : []
+  ).map(item => {
+    const lancadoPorId = atorUsuarioId(item.lancadoPor) ?? String(item.lancadoPorId ?? '').trim()
+    const removidoPorId = atorUsuarioId(item.removidoPor) ?? String(item.removidoPorId ?? '').trim()
+    return {
+      ...item,
+      ...(lancadoPorId ? { lancadoPorId } : {}),
+      ...(removidoPorId ? { removidoPorId } : {}),
+    }
+  })
 
   const dataFinalizacao = isoString(registro.dataFinalizacao)
   const statusDeliveryCandidatos = [

@@ -13,6 +13,7 @@ import {
   podeExibirAbaNotaFiscalDetalhe,
   podeExibirCancelarNotaFiscalDetalhe,
   podeExibirCancelarPedidoDeliveryOperacional as regraPodeExibirCancelarPedidoDeliveryOperacional,
+  podeEditarItensPedidoDeliveryDetalhe as regraPodeEditarItensPedidoDeliveryDetalhe,
   resolverStatusFiscalExibicao,
 } from '@/src/domain/services/pedido/RegrasFluxoPedidoGestor'
 import { Taxa } from '@/src/domain/entities/Taxa'
@@ -57,6 +58,8 @@ export type UseNovoPedidoOrchestratorFlagsParams = {
   enderecoEntregaCoberturaValorTaxa?: number | null
   resumoFinanceiroDetalhes: ResumoFinanceiroDetalhes | null
   detalhesEntregaPedido: DetalhesEntregaPedido | null
+  /** Após editar itens, força o ajuste de cobrança mesmo se o pagamento anterior estava quitado. */
+  ajustandoPagamentoAposEdicaoItens?: boolean
 }
 
 export function useNovoPedidoOrchestratorFlags({
@@ -85,6 +88,7 @@ export function useNovoPedidoOrchestratorFlags({
   enderecoEntregaCoberturaValorTaxa = null,
   resumoFinanceiroDetalhes,
   detalhesEntregaPedido,
+  ajustandoPagamentoAposEdicaoItens = false,
 }: UseNovoPedidoOrchestratorFlagsParams) {
   const resumoParaTotais = modoEdicaoProdutos ? null : resumoFinanceiroDetalhes
   const valorFinalParaTotais = modoEdicaoProdutos ? null : valorFinalVenda
@@ -276,8 +280,36 @@ export function useNovoPedidoOrchestratorFlags({
   )
 
   const podeAjustarPagamentoEntregaEmAberto = useMemo(
-    () => podeEditarPagamentoEntregaEmAberto && !pagamentoEntregaConfirmado,
-    [podeEditarPagamentoEntregaEmAberto, pagamentoEntregaConfirmado]
+    () =>
+      podeEditarPagamentoEntregaEmAberto &&
+      (!pagamentoEntregaConfirmado || ajustandoPagamentoAposEdicaoItens),
+    [
+      podeEditarPagamentoEntregaEmAberto,
+      pagamentoEntregaConfirmado,
+      ajustandoPagamentoAposEdicaoItens,
+    ]
+  )
+
+  const podeEditarItensPedidoDetalhe = useMemo(
+    () =>
+      regraPodeEditarItensPedidoDeliveryDetalhe({
+        modoVisualizacao,
+        tabelaOrigemVenda,
+        tipoVenda: detalhesPedidoMeta?.tipoVenda,
+        origem,
+        vendaId,
+        vendaGestorJaCancelada,
+        statusEtapaOperacional: detalhesPedidoMeta?.statusEtapaOperacional,
+      }),
+    [
+      modoVisualizacao,
+      tabelaOrigemVenda,
+      detalhesPedidoMeta?.tipoVenda,
+      detalhesPedidoMeta?.statusEtapaOperacional,
+      origem,
+      vendaId,
+      vendaGestorJaCancelada,
+    ]
   )
 
   return {
@@ -302,5 +334,6 @@ export function useNovoPedidoOrchestratorFlags({
     podeEditarPagamentoEntregaEmAberto,
     podeAjustarPagamentoEntregaEmAberto,
     pagamentoEntregaConfirmado,
+    podeEditarItensPedidoDetalhe,
   }
 }

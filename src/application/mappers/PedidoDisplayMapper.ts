@@ -14,6 +14,7 @@ import type {
   TaxaEntregaDetalhe,
 } from '@/src/domain/types/vendaDetalhe'
 import { formatarTelefoneBr } from '@/src/shared/utils/telefoneBr'
+import { idUsuarioGestorConsultavel } from '@/src/application/mappers/atorPedidoDelivery'
 
 export {
   formatarDataDetalhePedido,
@@ -52,7 +53,52 @@ export function formatarUsuarioPorId(
 ): string {
   const id = String(usuarioId || '').trim()
   if (!id) return '—'
-  return nomesUsuariosPedido[id] || 'Usuário não identificado'
+  const nome = nomesUsuariosPedido[id]
+  if (nome) return nome
+  if (!idUsuarioGestorConsultavel(id)) return 'Cliente'
+  return 'Usuário não identificado'
+}
+
+export function rotuloUsuarioPagamentoPedido(params: {
+  realizadoPorId?: string | null
+  realizadoPorNome?: string | null
+  pagamentoId?: string | null
+  abertoPorId?: string | null
+  clienteId?: string | null
+  nomesUsuariosPedido: Record<string, string>
+  clienteNome?: string | null
+  nomeUsuarioGestor?: string | null
+  usuarioGestorId?: string | null
+  origem?: string | null
+}): string {
+  const realizadoPorId = String(params.realizadoPorId ?? '').trim()
+  const gestorId = String(params.usuarioGestorId ?? '').trim()
+  const nomeGestor = String(params.nomeUsuarioGestor ?? '').trim()
+  const cliente = String(params.clienteNome ?? '').trim()
+  const abertoPorId = String(params.abertoPorId ?? '').trim()
+  const clienteId = String(params.clienteId ?? '').trim()
+  const persistido = Boolean(String(params.pagamentoId ?? '').trim())
+  const nomePersistido = String(params.realizadoPorNome ?? '').trim()
+
+  const ehAtorCliente = (id: string) =>
+    Boolean(id) && ((abertoPorId && id === abertoPorId) || (clienteId && id === clienteId))
+
+  if (realizadoPorId) {
+    if (gestorId && realizadoPorId === gestorId && nomeGestor) return nomeGestor
+    if (nomePersistido) return nomePersistido
+    const rotulo = formatarUsuarioPorId(realizadoPorId, params.nomesUsuariosPedido)
+    if (rotulo !== 'Usuário não identificado' && rotulo !== '—') return rotulo
+    if (ehAtorCliente(realizadoPorId)) return cliente || 'Cliente'
+    return rotulo
+  }
+
+  if (!persistido && nomeGestor) return nomeGestor
+  if (nomePersistido) return nomePersistido
+
+  if (cliente) return cliente
+  const origem = String(params.origem ?? '').trim().toUpperCase()
+  if (origem === 'DELIVERY' || origem === 'JIFFY_DELIVERY') return 'Cliente'
+  return formatarUsuarioPorId(abertoPorId, params.nomesUsuariosPedido)
 }
 
 export function rotuloModeloNfe(modelo: number | null | undefined): string {

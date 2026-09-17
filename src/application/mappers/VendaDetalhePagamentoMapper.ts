@@ -1,4 +1,5 @@
 import type { PagamentoSelecionado } from '@/src/domain/types/pedido'
+import { atorUsuarioId, rotuloAtorPedido } from '@/src/application/mappers/atorPedidoDelivery'
 
 /**
  * Mapeia item de pagamento do GET venda (PDV ou Gestor) para o estado do modal.
@@ -41,6 +42,16 @@ export function mapearPagamentoDetalheVenda(pag: Record<string, unknown>): Pagam
 
   const efetivadoFalse = p.efetivado === false || p.efetivado === 'false'
 
+  const atorPagamento = p.realizadoPor ?? p.criadaPor ?? p.criadoPor
+  const realizadoPorId =
+    p.realizadoPorId != null
+      ? String(p.realizadoPorId)
+      : p.realizado_por_id != null
+        ? String(p.realizado_por_id)
+        : atorUsuarioId(atorPagamento) ?? undefined
+  const realizadoPorNome =
+    String(p.realizadoPorNome ?? '').trim() || rotuloAtorPedido(atorPagamento) || undefined
+
   return {
     id:
       p.id != null
@@ -54,12 +65,8 @@ export function mapearPagamentoDetalheVenda(pag: Record<string, unknown>): Pagam
     valor: typeof p.valor === 'number' ? p.valor : Number(p.valor) || 0,
     cobrarNaEntrega: cobrarNaEntregaTrue,
     naoEfetivo: cobrarNaEntregaTrue || (efetivadoFalse && !cobrarNaEntregaFalse),
-    realizadoPorId:
-      p.realizadoPorId != null
-        ? String(p.realizadoPorId)
-        : p.realizado_por_id != null
-          ? String(p.realizado_por_id)
-          : undefined,
+    realizadoPorId: realizadoPorId || undefined,
+    realizadoPorNome,
     cancelado,
     canceladoPorId:
       p.canceladoPorId != null

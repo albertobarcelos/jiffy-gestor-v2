@@ -19,6 +19,15 @@ import {
 } from '@/src/application/mappers/VendaApiNormalizer'
 import type { VendaGestorApiResponse } from '@/src/application/dto/api/vendaGestorApi'
 import { deveUsarModuloDeliveryParaDetalhe } from '@/src/application/mappers/PedidoDeliveryDetalheAdapter'
+import {
+  atorUsuarioId,
+  copiarNomeEntreIdsDoAtor,
+  idUsuarioGestorConsultavel,
+  idsConsultaveisDoAtor,
+  nomeUsuarioDePayloadApi,
+  rotuloAtorPedido,
+  completarNomesAtoresPedidoDelivery,
+} from '@/src/application/mappers/atorPedidoDelivery'
 import { textoFromObservacoesApi } from '@/src/shared/helpers/observacaoPedido'
 import type { IVendaDetalheReadRepository } from '@/src/domain/repositories/IVendaDetalheReadRepository'
 import { vendaDetalheReadRepository } from '@/src/infrastructure/api/repositories/VendaDetalheReadRepository'
@@ -174,23 +183,45 @@ async function resolverNomesUsuarios(
   repo: IVendaDetalheReadRepository,
   idsUsuarios: Set<string>,
   tabelaOrigemVenda: 'venda' | 'venda_gestor',
-  token: string
+  token: string,
+  nomesEmbutidos: Record<string, string> = {}
 ): Promise<Record<string, string>> {
-  const mapUsuarios: Record<string, string> = {}
+  const mapUsuarios: Record<string, string> = { ...nomesEmbutidos }
 
   await Promise.all(
     Array.from(idsUsuarios).map(async usuarioId => {
-      const d =
-        tabelaOrigemVenda === 'venda_gestor'
-          ? await repo.fetchUsuarioGestor(usuarioId, token)
-          : await repo.fetchUsuarioPdv(usuarioId, token)
-      if (!d) return
-      const nome = String(d.nome ?? d.name ?? d.username ?? '').trim()
+      if (mapUsuarios[usuarioId]) return
+      if (!idUsuarioGestorConsultavel(usuarioId)) return
+      const nome = await buscarNomeUsuarioPedido(repo, usuarioId, tabelaOrigemVenda, token)
       if (nome) mapUsuarios[usuarioId] = nome
     })
   )
 
   return mapUsuarios
+}
+
+async function buscarNomeUsuarioPedido(
+  repo: IVendaDetalheReadRepository,
+  usuarioId: string,
+  tabelaOrigemVenda: 'venda' | 'venda_gestor',
+  token: string
+): Promise<string> {
+  const tentativas =
+    tabelaOrigemVenda === 'venda_gestor'
+      ? [
+          () => repo.fetchUsuarioGestor(usuarioId, token),
+          () => repo.fetchUsuarioPdv(usuarioId, token),
+        ]
+      : [
+          () => repo.fetchUsuarioPdv(usuarioId, token),
+          () => repo.fetchUsuarioGestor(usuarioId, token),
+        ]
+
+  for (const tentar of tentativas) {
+    const nome = nomeUsuarioDePayloadApi(await tentar())
+    if (nome) return nome
+  }
+  return ''
 }
 
 async function resolverNomesMeiosPagamento(
@@ -245,31 +276,151 @@ async function resolverNomesMeiosPagamento(
 
 function coletarIdsUsuarios(vendaData: VendaGestorApiResponse): Set<string> {
   const idsUsuarios = new Set<string>()
+  const anexar = (ator: unknown) => {
+    for (const id of idsConsultaveisDoAtor(ator)) idsUsuarios.add(id)
+    const unico = atorUsuarioId(ator)
+    if (unico) idsUsuarios.add(unico)
+  }
+  const anexarId = (id: unknown) => {
+    const v = String(id || '').trim()
+    if (v) idsUsuarios.add(v)
+  }
+
   ;[vendaData.abertoPorId, vendaData.ultimoResponsavelId, vendaData.canceladoPorId].forEach(
-    (id: unknown) => {
-      const v = String(id || '').trim()
-      if (v) idsUsuarios.add(v)
-    }
+    anexarId
   )
+  anexar(vendaData.abertoPor)
+  anexar(vendaData.ultimoResponsavel)
+  anexar(vendaData.canceladoPor)
 
   pickProdutosLancados(vendaData).forEach((prod: unknown) => {
       const p = prod as Record<string, unknown>
-      const lancadoPorId = String(p.lancadoPorId ?? '').trim()
-      const removidoPorId = String(p.removidoPorId ?? '').trim()
+      const lancadoPorId =
+        String(p.lancadoPorId ?? '').trim() || atorUsuarioId(p.lancadoPor) || ''
+      const removidoPorId =
+        String(p.removidoPorId ?? '').trim() || atorUsuarioId(p.removidoPor) || ''
       if (lancadoPorId) idsUsuarios.add(lancadoPorId)
       if (removidoPorId) idsUsuarios.add(removidoPorId)
+      anexar(p.lancadoPor)
+      anexar(p.removidoPor)
   })
 
   const pagamentos = Array.isArray(vendaData.pagamentos) ? vendaData.pagamentos : []
   pagamentos.forEach((pag: unknown) => {
     const p = pag as Record<string, unknown>
-    const realizadoPorId = String(p.realizadoPorId ?? '').trim()
-    const canceladoPorId = String(p.canceladoPorId ?? '').trim()
-    if (realizadoPorId) idsUsuarios.add(realizadoPorId)
-    if (canceladoPorId) idsUsuarios.add(canceladoPorId)
+    anexarId(p.realizadoPorId)
+    anexarId(p.canceladoPorId)
+    anexar(p.realizadoPor)
+    anexar(p.criadaPor)
+    anexar(p.criadoPor)
+    anexar(p.canceladoPor)
+  })
+
+  const cobrancas = Array.isArray(vendaData.cobrancas) ? vendaData.cobrancas : []
+  cobrancas.forEach(raw => {
+    if (!raw || typeof raw !== 'object') return
+    const c = raw as Record<string, unknown>
+    anexar(c.criadaPor)
+    anexar(c.criadoPor)
+    anexar(c.lancadaPor)
+    anexar(c.abertaPor)
+    anexar(c.canceladaPor)
+    anexarId(c.criadaPorId)
+    anexarId(c.criadoPorId)
+    const efetivado =
+      c.pagamentoEfetivado && typeof c.pagamentoEfetivado === 'object'
+        ? (c.pagamentoEfetivado as Record<string, unknown>)
+        : null
+    anexar(efetivado?.realizadoPor)
+    anexarId(efetivado?.realizadoPorId)
   })
 
   return idsUsuarios
+}
+
+function registrarNomeAtor(map: Record<string, string>, ator: unknown) {
+  const id = atorUsuarioId(ator)
+  const rotulo = rotuloAtorPedido(ator)
+  if (id && rotulo) map[id] = rotulo
+}
+
+function coletarNomesAtoresEmbutidos(vendaData: VendaGestorApiResponse): Record<string, string> {
+  const map: Record<string, string> = {}
+  const anexar = (ator: unknown) => {
+    registrarNomeAtor(map, ator)
+    copiarNomeEntreIdsDoAtor(map, ator)
+  }
+  anexar(vendaData.abertoPor)
+  anexar(vendaData.ultimoResponsavel)
+  anexar(vendaData.canceladoPor)
+  anexar(vendaData.cliente)
+
+  pickProdutosLancados(vendaData).forEach(prod => {
+    const p = prod as Record<string, unknown>
+    anexar(p.lancadoPor)
+    anexar(p.removidoPor)
+  })
+
+  const pagamentos = Array.isArray(vendaData.pagamentos) ? vendaData.pagamentos : []
+  pagamentos.forEach(pag => {
+    const p = pag as Record<string, unknown>
+    anexar(p.realizadoPor)
+    anexar(p.canceladoPor)
+    anexar(p.criadaPor)
+    anexar(p.criadoPor)
+  })
+
+  const cobrancas = Array.isArray(vendaData.cobrancas) ? vendaData.cobrancas : []
+  cobrancas.forEach(raw => {
+    if (!raw || typeof raw !== 'object') return
+    const c = raw as Record<string, unknown>
+    anexar(c.criadaPor)
+    anexar(c.criadoPor)
+    anexar(c.lancadaPor)
+    anexar(c.abertaPor)
+    anexar(c.canceladaPor)
+    const efetivado =
+      c.pagamentoEfetivado && typeof c.pagamentoEfetivado === 'object'
+        ? (c.pagamentoEfetivado as Record<string, unknown>)
+        : null
+    anexar(efetivado?.realizadoPor)
+  })
+
+  return map
+}
+
+function propagarNomesEntreAtoresRelacionados(
+  map: Record<string, string>,
+  vendaData: VendaGestorApiResponse
+): Record<string, string> {
+  const next = { ...map }
+  const atores: unknown[] = [
+    vendaData.abertoPor,
+    vendaData.ultimoResponsavel,
+    vendaData.canceladoPor,
+  ]
+  pickProdutosLancados(vendaData).forEach(prod => {
+    const p = prod as Record<string, unknown>
+    atores.push(p.lancadoPor, p.removidoPor)
+  })
+  const pagamentos = Array.isArray(vendaData.pagamentos) ? vendaData.pagamentos : []
+  pagamentos.forEach(pag => {
+    const p = pag as Record<string, unknown>
+    atores.push(p.realizadoPor, p.criadaPor, p.criadoPor, p.canceladoPor)
+  })
+  const cobrancas = Array.isArray(vendaData.cobrancas) ? vendaData.cobrancas : []
+  cobrancas.forEach(raw => {
+    if (!raw || typeof raw !== 'object') return
+    const c = raw as Record<string, unknown>
+    atores.push(c.criadaPor, c.criadoPor, c.lancadaPor, c.abertaPor, c.canceladaPor)
+    const efetivado =
+      c.pagamentoEfetivado && typeof c.pagamentoEfetivado === 'object'
+        ? (c.pagamentoEfetivado as Record<string, unknown>)
+        : null
+    atores.push(efetivado?.realizadoPor)
+  })
+  for (const ator of atores) copiarNomeEntreIdsDoAtor(next, ator)
+  return next
 }
 
 export class CarregarVendaDetalheUseCase {
@@ -440,12 +591,32 @@ export class CarregarVendaDetalheUseCase {
     const { pagamentos, fluxoPagamentoEntrega } = mapPagamentosDetalheVenda(vendaData)
 
     const idsUsuarios = coletarIdsUsuarios(vendaData)
-    const nomesUsuariosPedido = await resolverNomesUsuarios(
+    const nomesEmbutidos = coletarNomesAtoresEmbutidos(vendaData)
+    if (clienteId && clienteNome) nomesEmbutidos[clienteId] = clienteNome
+    const nomesResolvidos = await resolverNomesUsuarios(
       this.vendaDetalheRepo,
       idsUsuarios,
       tabelaOrigemVenda,
-      token
+      token,
+      nomesEmbutidos
     )
+    const nomesComAtoresRelacionados = propagarNomesEntreAtoresRelacionados(
+      nomesResolvidos,
+      vendaData
+    )
+    const nomesUsuariosPedido = completarNomesAtoresPedidoDelivery(
+      nomesComAtoresRelacionados,
+      [clienteId, vendaData.abertoPorId].filter(
+        (id): id is string => Boolean(String(id ?? '').trim())
+      ),
+      origemTextoApi,
+      clienteNome
+    )
+    for (const pagamento of pagamentos) {
+      const id = String(pagamento.realizadoPorId ?? '').trim()
+      const nome = String(pagamento.realizadoPorNome ?? '').trim()
+      if (id && nome && !nomesUsuariosPedido[id]) nomesUsuariosPedido[id] = nome
+    }
     const nomesMeiosPagamentoPedido = await resolverNomesMeiosPagamento(
       this.vendaDetalheRepo,
       vendaData,

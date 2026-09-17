@@ -6,6 +6,7 @@ import { HiOutlineCreditCard } from 'react-icons/hi2'
 import { MdPix } from 'react-icons/md'
 import type { IconType } from 'react-icons'
 import type { MeioPagamento } from '@/src/domain/entities/MeioPagamento'
+import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { formatarNumeroComMilhar } from '@/src/domain/services/pedido/CalculadoraPedido'
 import { resolverLancamentoPagamento } from '@/src/domain/services/pedido/CalculadoraPagamentoPedido'
@@ -17,6 +18,23 @@ function valorDigitadoDoCampo(valorRecebido: string): number | null {
   const valor = parseFloat(valorLimpo)
   if (!Number.isFinite(valor) || valor <= 0) return null
   return valor
+}
+
+function idUsuarioGestorLogado(): string {
+  return useAuthStore.getState().tenantAuth?.getUser()?.getId()?.trim() ?? ''
+}
+
+function nomeUsuarioGestorLogado(): string {
+  return useAuthStore.getState().tenantAuth?.getUser()?.getName()?.trim() ?? ''
+}
+
+function carimboAtorGestorLogado(): { realizadoPorId?: string; realizadoPorNome?: string } {
+  const realizadoPorId = idUsuarioGestorLogado()
+  const realizadoPorNome = nomeUsuarioGestorLogado()
+  return {
+    ...(realizadoPorId ? { realizadoPorId } : {}),
+    ...(realizadoPorNome ? { realizadoPorNome } : {}),
+  }
 }
 
 export interface UseNovoPedidoPagamentosFormParams {
@@ -111,6 +129,7 @@ export function useNovoPedidoPagamentosForm({
             valor: resultado.valor,
             cobrarNaEntrega: entregaComCobrancaPeloEntregador,
             naoEfetivo: entregaComCobrancaPeloEntregador,
+            ...carimboAtorGestorLogado(),
           },
         ]
       })
@@ -144,6 +163,7 @@ export function useNovoPedidoPagamentosForm({
       {
         meioPagamentoId,
         valor: valorRestante,
+        ...carimboAtorGestorLogado(),
       },
     ])
     setMeioPagamentoId('')

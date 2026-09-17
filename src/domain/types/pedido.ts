@@ -53,6 +53,8 @@ export interface PagamentoSelecionado {
   cobrarNaEntrega?: boolean
   naoEfetivo?: boolean
   realizadoPorId?: string
+  /** Nome embutido no GET (`criadaPor.nome`) — evita lookup após gravar a cobrança. */
+  realizadoPorNome?: string
   cancelado?: boolean
   canceladoPorId?: string
   dataCriacao?: string
