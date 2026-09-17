@@ -71,6 +71,7 @@ import {
 import {
   limitarPontoAoRaio,
   pinDentroDoRaioPermitido,
+  pinEmpresaDeveSeguirNovoEndereco,
   RAIO_AJUSTE_PIN_METROS,
 } from '@/src/shared/utils/ajustePinEmpresa'
 import type {
@@ -568,8 +569,16 @@ export function CoberturaDeliveryTab() {
         geocodeAssinaturaRef.current = enderecoAssinatura
         geocodeResultadoRef.current = resultado
         setCentroEnderecoGeo(resultado.enderecoLocalizacao)
-        if (!origemGeo) {
-          setPinRascunho(prev => prev ?? resultado.enderecoLocalizacao)
+        if (
+          !origemGeo ||
+          pinEmpresaDeveSeguirNovoEndereco(resultado.enderecoLocalizacao, origemGeo)
+        ) {
+          setPinRascunho(prev => {
+            if (prev && pinDentroDoRaioPermitido(resultado.enderecoLocalizacao, prev)) {
+              return prev
+            }
+            return resultado.enderecoLocalizacao
+          })
         }
       } catch (error) {
         if (cancelado) return
@@ -588,6 +597,21 @@ export function CoberturaDeliveryTab() {
       cancelado = true
     }
   }, [enderecoAssinatura, enderecoEmpresa, mapaIndisponivel, origemGeo])
+
+  useEffect(() => {
+    if (!centroEnderecoGeo) return
+    const pinExibido = pinRascunho ?? origemGeo
+    if (!pinEmpresaDeveSeguirNovoEndereco(centroEnderecoGeo, pinExibido)) return
+    setPinRascunho(centroEnderecoGeo)
+  }, [centroEnderecoGeo, origemGeo, pinRascunho])
+
+  useEffect(() => {
+    const onEmpresaAtualizada = () => {
+      void geoQuery.refetch()
+    }
+    window.addEventListener('jiffy:empresa-me-updated', onEmpresaAtualizada)
+    return () => window.removeEventListener('jiffy:empresa-me-updated', onEmpresaAtualizada)
+  }, [geoQuery.refetch])
 
   const alertas = useMemo(() => {
     const items: { titulo: string; descricao: string; href?: string; label?: string }[] = []
@@ -628,7 +652,7 @@ export function CoberturaDeliveryTab() {
       items.push({
         titulo: 'Pin fora do endereço',
         descricao:
-          'O pin está a mais de 1 km do endereço da empresa. Ajuste para dentro do raio permitido e salve.',
+          'O pin está a mais de 1 km do endereço da empresa. Recentre no endereço atual e salve a localização.',
       })
     }
     if (
@@ -1353,18 +1377,21 @@ export function CoberturaDeliveryTab() {
               <div className="mx-3 mt-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2.5">
                 <p className="text-sm font-semibold text-primary-text">Pin movido</p>
                 <p className="mt-0.5 text-xs text-secondary-text">
-                  Salve para recentrar os raios a partir do novo ponto. Até lá, a cobertura continua no
-                  endereço gravado.
+                  {pinSalvoForaDoRaio
+                    ? 'O endereço da empresa mudou. Salve para mover o pin e recentrar os raios no novo local.'
+                    : 'Salve para recentrar os raios a partir do novo ponto. Até lá, a cobertura continua no endereço gravado.'}
                 </p>
                 <div className="mt-2.5 flex gap-1.5">
-                  <button
-                    type="button"
-                    onClick={handleCancelarPinRascunho}
-                    disabled={salvandoPin}
-                    className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-primary-text hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Cancelar
-                  </button>
+                  {pinSalvoForaDoRaio ? null : (
+                    <button
+                      type="button"
+                      onClick={handleCancelarPinRascunho}
+                      disabled={salvandoPin}
+                      className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-primary-text hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Cancelar
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => void handleSalvarLocalizacaoPin()}
