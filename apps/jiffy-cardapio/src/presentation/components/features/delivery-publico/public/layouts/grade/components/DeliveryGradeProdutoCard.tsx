@@ -31,6 +31,7 @@ export function DeliveryGradeProdutoCard({
             alt=""
             loading="lazy"
             decoding="async"
+            data-delivery-produto-img={produto.id}
             className="absolute inset-0 h-full w-full rounded-xl object-cover"
           />
         ) : (

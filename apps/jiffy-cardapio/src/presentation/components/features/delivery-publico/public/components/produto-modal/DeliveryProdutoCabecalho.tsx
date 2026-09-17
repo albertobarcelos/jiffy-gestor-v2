@@ -25,6 +25,7 @@ export function DeliveryProdutoCabecalho({
           <img
             src={produto.imagemUrl}
             alt=""
+            data-delivery-produto-img={produto.id}
             className="absolute inset-0 h-full w-full object-cover"
           />
         ) : (

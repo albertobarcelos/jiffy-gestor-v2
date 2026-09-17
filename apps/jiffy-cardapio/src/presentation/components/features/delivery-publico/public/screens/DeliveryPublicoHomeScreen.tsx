@@ -60,6 +60,8 @@ import { DeliveryLojaInfoModal } from '../../shared/components/DeliveryLojaInfoM
 import { DeliveryWhatsAppFab } from '../../shared/components/DeliveryWhatsAppFab'
 import { DeliveryPublicoCarrinhoScreen } from './DeliveryPublicoCarrinhoScreen'
 import { useFlyToCart } from '../../shared/hooks/useFlyToCart'
+import type { FlySourceRect } from '../../shared/components/FlyingProduct'
+import { getProdutoImageSourceRect } from '../../shared/utils/getProdutoImageSourceRect'
 import { useDeliveryBodyScrollLock } from '../../shared/hooks/useDeliveryBodyScrollLock'
 import type { DeliveryCarrinhoThumb } from '../../shared/components/DeliveryPedidoFooter'
 import { buildCarrinhoThumbsFromItens } from '../../shared/utils/buildCarrinhoThumbsFromItens'
@@ -81,6 +83,7 @@ type ProdutoAdicionadoPayload = {
   produtoId: string
   nome: string
   imagemUrl: string | null
+  sourceRect?: FlySourceRect | null
   /** Se false, só anima o fly-to-cart (atalho "+"); padrão true abre o modal. */
   abrirDialogo?: boolean
 }
@@ -253,6 +256,7 @@ export function DeliveryPublicoHomeScreen({
         produtoId: produto.id,
         nome: produto.nome,
         imagemUrl: produto.imagemUrl,
+        sourceRect: getProdutoImageSourceRect(produto.id),
         abrirDialogo: false,
       })
     },
@@ -275,7 +279,7 @@ export function DeliveryPublicoHomeScreen({
         return
       }
 
-      const { nome, imagemUrl, produtoId, abrirDialogo = true } = pendingFly
+      const { nome, imagemUrl, produtoId, abrirDialogo = true, sourceRect } = pendingFly
       setPendingFly(null)
 
       if (!imagemUrl?.trim() || !target) {
@@ -298,6 +302,7 @@ export function DeliveryPublicoHomeScreen({
       flyToCart({
         imageUrl: imagemUrl,
         targetElement: target,
+        sourceRect: sourceRect ?? getProdutoImageSourceRect(produtoId),
         onArrive: () => {
           setFlyingProdutoId(null)
           setThumbsCongeladas(null)

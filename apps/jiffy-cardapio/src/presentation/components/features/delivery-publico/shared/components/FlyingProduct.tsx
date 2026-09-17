@@ -1,31 +1,72 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, useAnimationControls } from 'framer-motion'
 
-const START_SIZE = 168
-/** Tamanho no centro, antes de cair (ótimo visual atual). */
-const MID_SIZE = 72
+/** Tamanho base do elemento animado (escala relativa). */
+const BASE_SIZE = 168
 /** Tamanho final = miniatura do footer (h-10 / 40px). */
 const FOOTER_SIZE = 40
+/**
+ * Teto do tamanho visual de partida (≈ thumb da lista `w-28` / 112px).
+ * Evita miniatura enorme ao partir da foto full do modal.
+ */
+const MAX_START_SIDE = 112
 const EASE = [0.22, 1, 0.36, 1] as const
+
+export type FlySourceRect = {
+  left: number
+  top: number
+  width: number
+  height: number
+}
 
 export type FlyingProductProps = {
   imageUrl: string
   targetElement: HTMLElement
+  /** Retângulo da imagem de origem (viewport). Sem isso, usa o centro da tela. */
+  sourceRect?: FlySourceRect | null
   onArrive: () => void
   onFinish: () => void
+}
+
+function resolveStart(sourceRect: FlySourceRect | null | undefined) {
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+
+  if (sourceRect && sourceRect.width > 0 && sourceRect.height > 0) {
+    const side = Math.min(Math.max(sourceRect.width, sourceRect.height), MAX_START_SIDE)
+    const startScale = side / BASE_SIZE
+    const startX = sourceRect.left + sourceRect.width / 2 - BASE_SIZE / 2
+    const startY = sourceRect.top + sourceRect.height / 2 - BASE_SIZE / 2
+    return { startX, startY, startScale }
+  }
+
+  return {
+    startX: vw / 2 - BASE_SIZE / 2,
+    startY: vh / 2 - BASE_SIZE / 2,
+    startScale: MAX_START_SIDE / BASE_SIZE,
+  }
 }
 
 export function FlyingProduct({
   imageUrl,
   targetElement,
+  sourceRect = null,
   onArrive,
   onFinish,
 }: FlyingProductProps) {
   const controls = useAnimationControls()
   const [mounted, setMounted] = useState(false)
+
+  const initialPose = useMemo(() => {
+    if (typeof window === 'undefined') {
+      return { x: 0, y: 0, scale: 1, rotate: 0, opacity: 0 }
+    }
+    const { startX, startY, startScale } = resolveStart(sourceRect)
+    return { x: startX, y: startY, scale: startScale, rotate: 0, opacity: 1 }
+  }, [sourceRect])
 
   useEffect(() => {
     setMounted(true)
@@ -37,23 +78,21 @@ export function FlyingProduct({
     let cancelled = false
 
     const run = async () => {
-      const vw = window.innerWidth
-      const vh = window.innerHeight
       const target = targetElement.getBoundingClientRect()
+      const { startX, startY, startScale } = resolveStart(sourceRect)
 
-      const startX = vw / 2 - START_SIZE / 2
-      const startY = vh / 2 - START_SIZE / 2
-      const endX = target.left + target.width / 2 - START_SIZE / 2
-      const endY = target.top + target.height / 2 - START_SIZE / 2
+      const endX = target.left + target.width / 2 - BASE_SIZE / 2
+      const endY = target.top + target.height / 2 - BASE_SIZE / 2
       const midX = (startX + endX) / 2
-      const midY = Math.min(startY, endY) - Math.max(60, Math.abs(endY - startY) * 0.25)
-      const midScale = MID_SIZE / START_SIZE
-      const footerScale = FOOTER_SIZE / START_SIZE
+      const midY = Math.min(startY, endY) - Math.max(40, Math.abs(endY - startY) * 0.2)
+      const midScale = (startScale + FOOTER_SIZE / BASE_SIZE) / 2
+      const footerScale = FOOTER_SIZE / BASE_SIZE
 
+      // Garante pose correta sem frame em (0,0).
       await controls.set({
         x: startX,
         y: startY,
-        scale: 1.08,
+        scale: startScale,
         rotate: 0,
         opacity: 1,
       })
@@ -61,28 +100,20 @@ export function FlyingProduct({
       if (cancelled) return
 
       await controls.start({
-        scale: midScale,
-        transition: { duration: 0.32, ease: EASE, delay: 0.08 },
-      })
-
-      if (cancelled) return
-
-      await controls.start({
         x: [startX, midX, endX],
         y: [startY, midY, endY],
-        rotate: [0, -14, 10],
-        scale: [midScale, midScale, footerScale],
+        rotate: [0, -12, 8],
+        scale: [startScale, midScale, footerScale],
         opacity: 1,
         transition: {
-          duration: 0.55,
+          duration: 0.62,
           ease: EASE,
-          times: [0, 0.55, 1],
+          times: [0, 0.45, 1],
         },
       })
 
       if (cancelled) return
 
-      // Miniatura entra no footer no instante do pouso.
       onArrive()
 
       await controls.start({
@@ -98,7 +129,7 @@ export function FlyingProduct({
     return () => {
       cancelled = true
     }
-  }, [controls, mounted, onArrive, onFinish, targetElement])
+  }, [controls, mounted, onArrive, onFinish, sourceRect, targetElement])
 
   if (!mounted) return null
 
@@ -108,7 +139,6 @@ export function FlyingProduct({
       role="presentation"
       aria-busy="true"
       aria-label="Adicionando item ao carrinho"
-      // Captura cliques/toques para ninguém navegar ou adicionar outro item no meio do fly.
       onPointerDown={e => e.preventDefault()}
       onClick={e => {
         e.preventDefault()
@@ -116,11 +146,12 @@ export function FlyingProduct({
       }}
     >
       <motion.div
+        initial={initialPose}
         animate={controls}
         className="pointer-events-none fixed left-0 top-0 overflow-hidden rounded-2xl shadow-xl"
         style={{
-          width: START_SIZE,
-          height: START_SIZE,
+          width: BASE_SIZE,
+          height: BASE_SIZE,
           willChange: 'transform',
         }}
       >

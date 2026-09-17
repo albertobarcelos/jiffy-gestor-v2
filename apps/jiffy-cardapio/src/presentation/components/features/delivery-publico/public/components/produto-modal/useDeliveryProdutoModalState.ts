@@ -12,6 +12,8 @@ import {
   buildProdutoShareUrl,
   compartilharLinkDelivery,
 } from '../../../shared/utils/compartilharProdutoDelivery'
+import { getProdutoImageSourceRect } from '../../../shared/utils/getProdutoImageSourceRect'
+import type { FlySourceRect } from '../../../shared/components/FlyingProduct'
 import { observacaoItemCarrinho } from '../../../shared/utils/deliveryCarrinhoItemUtils'
 import type { GrupoComplementoPendente } from '../../../shared/utils/produtoComplementosUtils'
 
@@ -24,6 +26,7 @@ export type DeliveryProdutoModalProps = {
     produtoId: string
     nome: string
     imagemUrl: string | null
+    sourceRect?: FlySourceRect | null
   }) => void
   /** Quando informado, atualiza o item do carrinho em vez de adicionar um novo. */
   itemEdicao?: DeliveryCarrinhoItem
@@ -170,6 +173,7 @@ export function useDeliveryProdutoModalState({
           produtoId: produto.id,
           nome: produto.nome,
           imagemUrl: produto.imagemUrl,
+          sourceRect: getProdutoImageSourceRect(produto.id),
         })
         requestClose()
       }

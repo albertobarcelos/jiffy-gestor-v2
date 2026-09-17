@@ -24,12 +24,14 @@ const textClassName =
 
 function ProdutoThumb({
   imagemUrl,
+  produtoId,
   produtoNome,
   interactive,
   onOpenClick,
   onAddClick,
 }: {
   imagemUrl: string | null
+  produtoId: string
   produtoNome: string
   interactive: boolean
   onOpenClick?: () => void
@@ -42,6 +44,7 @@ function ProdutoThumb({
       alt=""
       loading="lazy"
       decoding="async"
+      data-delivery-produto-img={produtoId}
       className="absolute inset-0 h-full w-full object-cover"
     />
   ) : (
@@ -198,6 +201,7 @@ export function DeliveryProdutoListItem({
         />
         <ProdutoThumb
           imagemUrl={produto.imagemUrl}
+          produtoId={produto.id}
           produtoNome={produto.nome}
           interactive
           onOpenClick={handleOpenProduto}
@@ -237,6 +241,7 @@ export function DeliveryProdutoListItem({
       <QuantidadeCarrinhoBadge quantidade={quantidadeNoCarrinho} produtoNome={produto.nome} />
       <ProdutoThumb
         imagemUrl={produto.imagemUrl}
+        produtoId={produto.id}
         produtoNome={produto.nome}
         interactive={false}
       />
