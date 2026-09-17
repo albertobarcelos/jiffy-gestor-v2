@@ -20,10 +20,10 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { DeliveryImageUploadField } from '@/src/presentation/components/ui/DeliveryImageUploadField'
 import { DELIVERY_COMPLEMENTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
 import { showToast } from '@/src/shared/utils/toast'
+import { urlImagemHttp } from '@/src/application/services/cadastroImagem'
 import {
-  fetchComplementoImagemUrl,
+  complementoImagemMedia,
   mensagemLegivelDeliveryMediaError,
-  uploadComplementoImagem,
 } from '@/src/infrastructure/api/deliveryMediaApi'
 
 /** Labels outlined em preto (MUI usa cinza por padrão) */
@@ -85,8 +85,8 @@ interface NovoComplementoProps {
     isSubmitting: boolean
     canSubmit: boolean
   }) => void
-  /** Chamado após salvar; passa o id do complemento criado/editado. */
-  onSaved?: (id?: string) => void
+  /** Chamado após salvar; passa o id e a foto persistida para atualizar a linha da lista. */
+  onSaved?: (id?: string, imagemUrl?: string | null) => void
   onCancel?: () => void
 }
 
@@ -253,8 +253,8 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
           setTipoImpactoPreco(tipoNormalizado)
           setAtivo(complemento.isAtivo())
 
-          const deliveryImagemUrl = await fetchComplementoImagemUrl(complementoId, accessToken)
-          applyImagemUrl(deliveryImagemUrl)
+          const deliveryImagemUrl = await complementoImagemMedia.resolverUma(complementoId, accessToken)
+          applyImagemUrl(deliveryImagemUrl ?? complemento.getImagemUrl() ?? null)
 
           window.setTimeout(() => {
             commitBaselineLatestRef.current()
@@ -300,8 +300,7 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
       const toastId = showToast.loading('Enviando imagem...')
 
       try {
-        await uploadComplementoImagem(complementoId, file, token)
-        const persistedUrl = await fetchComplementoImagemUrl(complementoId, token)
+        const persistedUrl = await complementoImagemMedia.enviar(complementoId, file, token)
         applyImagemUrl(persistedUrl ?? preview)
         showToast.successLoading(toastId, 'Imagem enviada com sucesso!')
       } catch (error) {
@@ -367,11 +366,20 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
       }
 
       const savedData = (await response.json().catch(() => ({}))) as { id?: string }
-      const savedId = savedData?.id?.toString()
+      const savedId = savedData?.id?.toString() || complementoId
       showToast.success(isEditing ? 'Complemento atualizado com sucesso!' : 'Complemento criado com sucesso!')
       commitBaselineLatestRef.current()
+      let imagemPersistida =
+        urlImagemHttp(serverImagemUrl) ?? urlImagemHttp(imagemPreviewUrl)
+      if (savedId) {
+        complementoImagemMedia.lembrar(savedId, imagemPersistida)
+        if (!imagemPersistida) {
+          imagemPersistida = await complementoImagemMedia.resolverUma(savedId, token)
+          complementoImagemMedia.lembrar(savedId, imagemPersistida)
+        }
+      }
       if (isEmbedded) {
-        onSaved?.(savedId)
+        await Promise.resolve(onSaved?.(savedId, imagemPersistida))
       } else {
         router.push('/complementos')
       }
@@ -392,6 +400,8 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
     isEmbedded,
     onSaved,
     router,
+    serverImagemUrl,
+    imagemPreviewUrl,
   ])
 
   useImperativeHandle(
@@ -571,20 +581,20 @@ export const NovoComplemento = forwardRef<NovoComplementoHandle, NovoComplemento
               </div>
 
               <DeliveryImageUploadField
-                label="Imagem do complemento (cardápio digital)"
+                label="Foto do complemento"
                 disabled={!isEditing}
                 busy={isUploadingImagem}
                 previewUrl={imagemPreviewUrl}
                 cropPreset={DELIVERY_COMPLEMENTO_CROP_PRESET}
                 helperText={
                   isEditing
-                    ? 'Após escolher o arquivo, ajuste o recorte (máx. 280×280). A imagem aparece no cardápio digital após o upload.'
-                    : 'Salve o complemento para habilitar o envio de imagem.'
+                    ? 'Ela aparece no pedido, no cardápio e no delivery. Escolha a foto e ajuste o recorte.'
+                    : 'Salve o complemento primeiro para adicionar a foto.'
                 }
                 emptyHint={
                   isEditing
-                    ? 'Arraste uma imagem ou clique para selecionar'
-                    : 'Disponível após salvar o complemento'
+                    ? 'Clique ou solte uma foto aqui'
+                    : 'Disponível depois de salvar'
                 }
                 onFileSelected={handleImagemUpload}
                 onClearPreview={

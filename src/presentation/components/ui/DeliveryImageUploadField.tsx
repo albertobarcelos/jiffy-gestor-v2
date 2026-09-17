@@ -113,6 +113,7 @@ export function DeliveryImageUploadField({
   onFileSelectedRef.current = onFileSelected
 
   const isDisabled = disabled || busy
+  const hint = busy ? 'Quase lá — estamos enviando a foto.' : helperText
 
   const { openWithFile, cropModal } = useImageCropFlow({
     // Hook sempre precisa de preset; só usamos openWithFile quando cropPreset existe.
@@ -204,18 +205,20 @@ export function DeliveryImageUploadField({
           void handleFiles(e.dataTransfer.files)
         }}
         style={cropDropzoneStyle}
+        aria-busy={busy}
         className={cn(
           'relative flex flex-col overflow-hidden rounded-lg border-2 border-dashed transition-colors',
           previewUrl ? 'p-1.5' : '',
           styles.dropzone,
           dragActive ? 'border-primary bg-primary/10' : 'border-neutral-400/80 bg-white/50',
-          isDisabled ? 'pointer-events-none opacity-60' : 'cursor-pointer'
+          isDisabled ? 'pointer-events-none' : 'cursor-pointer',
+          disabled && !busy ? 'opacity-60' : null
         )}
       >
         {previewUrl ? (
           <div className="relative flex h-full w-full flex-col items-center justify-center gap-0.5">
             <div className="relative flex h-full w-full items-center justify-center">
-              {onClearPreview ? (
+              {onClearPreview && !busy ? (
                 <button
                   type="button"
                   title="Remover preview"
@@ -233,18 +236,15 @@ export function DeliveryImageUploadField({
               <img
                 src={previewUrl}
                 alt="Preview da imagem"
-                className={cn('mx-auto rounded-md object-contain', styles.previewImage)}
+                className={cn(
+                  'mx-auto rounded-md object-contain',
+                  styles.previewImage,
+                  busy ? 'opacity-40' : null
+                )}
               />
             </div>
-            {!isLogo && !hasCrop ? (
-              <p className="text-center text-xs text-neutral-500">
-                {busy ? 'Enviando imagem...' : 'Clique ou arraste para substituir'}
-              </p>
-            ) : null}
-            {hasCrop && busy ? (
-              <p className="absolute bottom-1 left-0 right-0 text-center text-[10px] text-neutral-500">
-                Enviando imagem...
-              </p>
+            {!isLogo && !hasCrop && !busy ? (
+              <p className="text-center text-xs text-neutral-500">Clique ou arraste para substituir</p>
             ) : null}
           </div>
         ) : (
@@ -270,18 +270,32 @@ export function DeliveryImageUploadField({
             ) : null}
           </div>
         )}
+        {busy ? (
+          <div
+            className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 rounded-[6px] bg-black/45"
+            role="status"
+            aria-live="polite"
+          >
+            <span
+              className="h-8 w-8 animate-spin rounded-full border-[3px] border-white/40 border-t-white"
+              aria-hidden
+            />
+            <p className="px-2 text-center text-sm font-medium text-white">Enviando foto…</p>
+          </div>
+        ) : null}
       </div>
 
-      {helperText ? (
+      {hint ? (
         <p
           className={cn(
             'text-xs text-neutral-500',
+            busy && 'font-medium text-primary',
             hasCrop && 'w-full text-center',
             hasCrop && isCropSquare && 'max-w-[280px]',
             hasCrop && !isCropSquare && 'max-w-[360px]'
           )}
         >
-          {helperText}
+          {hint}
         </p>
       ) : null}
       {cropPreset ? cropModal : null}

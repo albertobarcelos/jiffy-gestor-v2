@@ -33,7 +33,7 @@ interface GruposComplementosTabsModalProps {
   state: GruposComplementosTabsModalState
   onClose: () => void
   onTabChange: (tab: TabKey) => void
-  onReload?: () => void
+  onReload?: (savedId?: string, imagemUrl?: string | null) => void
   /** Empilhar acima de outro painel (ex.: wizard do cardápio). */
   zIndex?: number
   /** Após criar um grupo novo — para auto-vincular ao produto no fluxo do wizard. */
@@ -219,11 +219,11 @@ export function GruposComplementosTabsModal({
               complementosIdsDraft={draftComplementosIds}
               onBasicDataChange={setBasicData}
               onGoToComplementosTab={goToComplementosTab}
-              onSaved={async (id) => {
+              onSaved={async (id, imagemUrl) => {
                 if (state.mode === 'create' && id) {
                   await onCreated?.(id)
                 }
-                onReload?.()
+                await Promise.resolve(onReload?.(id, imagemUrl))
                 onClose()
               }}
             />

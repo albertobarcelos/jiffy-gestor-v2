@@ -18,13 +18,12 @@ import {
   EntityListThumbnail,
 } from '@/src/presentation/components/ui/cadastro-list'
 import { useComplementosInfinite } from '@/src/presentation/hooks/useComplementos'
+import { useCadastroListImagens } from '@/src/presentation/hooks/useCadastroListImagens'
 import { useInvalidateTenantQueries } from '@/src/presentation/hooks/useInvalidateTenantQueries'
 import { DELIVERY_IMAGE_ACCEPT } from '@/src/shared/constants/deliveryImageUpload'
 import {
-  fetchComplementoImagemUrl,
-  fetchComplementosImagemUrlsBatch,
+  complementoImagemMedia,
   mensagemLegivelDeliveryMediaError,
-  uploadComplementoImagem,
 } from '@/src/infrastructure/api/deliveryMediaApi'
 import { DELIVERY_COMPLEMENTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
 import { useEntityImageCropUpload } from '@/src/presentation/hooks/useEntityImageCropUpload'
@@ -32,6 +31,11 @@ import {
   ComplementosTabsModal,
   ComplementosTabsModalState,
 } from './ComplementosTabsModal'
+
+const complementoListId = (c: Complemento) => c.getId()
+const complementoListUrl = (c: Complemento) => c.getImagemUrl()
+const complementoWithImagem = (c: Complemento, url: string | null) => c.withImagemUrl(url)
+const COMPLEMENTOS_INFINITE_KEY = ['complementos', 'infinite'] as const
 
 interface ComplementosListProps {
   onReload?: () => void
@@ -302,58 +306,35 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
 
   const totalComplementos = useMemo(() => data?.pages[0]?.count ?? 0, [data])
 
-  const [imagensPorComplementoId, setImagensPorComplementoId] = useState<
-    Record<string, string | null>
-  >({})
-  const [uploadingImagemComplementoId, setUploadingImagemComplementoId] = useState<string | null>(
-    null
-  )
-
-  useEffect(() => {
-    const idsFaltantes = complementos
-      .map(c => c.getId())
-      .filter(id => !(id in imagensPorComplementoId))
-
-    if (idsFaltantes.length === 0) return
-
-    let cancelled = false
-    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-    if (!token) return
-
-    void fetchComplementosImagemUrlsBatch(idsFaltantes, token).then(resolved => {
-      if (cancelled) return
-      setImagensPorComplementoId(prev => ({ ...prev, ...resolved }))
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [complementos, imagensPorComplementoId])
+  const {
+    uploadingId: uploadingImagemComplementoId,
+    uploadFromList,
+    applyAfterSave,
+    refreshOne,
+    urlDaLista,
+  } = useCadastroListImagens({
+    media: complementoImagemMedia,
+    items: complementos,
+    getId: complementoListId,
+    getUrl: complementoListUrl,
+    withUrl: complementoWithImagem,
+    queryKeyBase: COMPLEMENTOS_INFINITE_KEY,
+    pageItemsKey: 'complementos',
+  })
 
   const handleUploadImagem = useCallback(async (complementoId: string, file: File) => {
-    const token = useAuthStore.getState().tenantAuth?.getAccessToken()
-    if (!token) {
-      showToast.error('Token não encontrado')
-      return
-    }
-
-    setUploadingImagemComplementoId(complementoId)
     const toastId = showToast.loading('Enviando imagem...')
-
     try {
-      await uploadComplementoImagem(complementoId, file, token)
-      const persistedUrl = await fetchComplementoImagemUrl(complementoId, token)
-      setImagensPorComplementoId(prev => ({
-        ...prev,
-        [complementoId]: persistedUrl,
-      }))
+      await uploadFromList(complementoId, file)
       showToast.successLoading(toastId, 'Imagem salva com sucesso!')
     } catch (uploadError) {
+      if (uploadError instanceof Error && uploadError.message === 'Token não encontrado') {
+        showToast.errorLoading(toastId, 'Token não encontrado')
+        return
+      }
       showToast.errorLoading(toastId, mensagemLegivelDeliveryMediaError(uploadError))
-    } finally {
-      setUploadingImagemComplementoId(null)
     }
-  }, [])
+  }, [uploadFromList])
 
   const { selectForEntity: selectComplementoImagem, cropModal: complementoCropModal } =
     useEntityImageCropUpload({
@@ -703,10 +684,11 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
     await invalidate(['complementos'])
   }, [router, searchParams, pathname, invalidate])
 
-  const handleTabsModalReload = useCallback(async () => {
-    setImagensPorComplementoId({})
+  const handleTabsModalReload = useCallback(async (savedId?: string, imagemUrl?: string | null) => {
+    await applyAfterSave(savedId, imagemUrl)
     await handleActionsReload()
-  }, [handleActionsReload])
+    await refreshOne(savedId)
+  }, [applyAfterSave, handleActionsReload, refreshOne])
 
   const handleTabsModalTabChange = useCallback((tab: 'complemento') => {
     setTabsModalState(prev => ({
@@ -841,7 +823,7 @@ export function ComplementosList({ onReload }: ComplementosListProps) {
             savingValor={!!savingValorMap[complemento.getId()]}
             savingTipo={!!savingTipoMap[complemento.getId()]}
             togglingStatus={!!togglingStatus[complemento.getId()]}
-            imagemUrl={imagensPorComplementoId[complemento.getId()] ?? null}
+            imagemUrl={urlDaLista(complemento.getId(), complemento.getImagemUrl())}
             isUploadingImagem={uploadingImagemComplementoId === complemento.getId()}
             onUploadImagem={selectComplementoImagem}
           />

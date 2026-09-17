@@ -21,10 +21,10 @@ import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { JiffyIconSwitch } from '@/src/presentation/components/ui/JiffyIconSwitch'
 import { DeliveryImageUploadField } from '@/src/presentation/components/ui/DeliveryImageUploadField'
 import { DELIVERY_GRUPO_COMPLEMENTO_CROP_PRESET } from '@/src/presentation/constants/imageCropPresets'
+import { urlImagemHttp } from '@/src/application/services/cadastroImagem'
 import {
+  grupoComplementoImagemMedia,
   mensagemLegivelDeliveryMediaError,
-  uploadGrupoComplementoImagem,
-  fetchGrupoComplementoImagemUrl,
 } from '@/src/infrastructure/api/deliveryMediaApi'
 
 /** Labels outlined em preto (MUI usa cinza por padrão) — igual NovoComplemento */
@@ -75,9 +75,9 @@ interface NovoGrupoComplementoProps {
     canSubmit: boolean
   }) => void
   onClose?: () => void
-  onSaved?: (id?: string) => void
+  onSaved?: (id?: string, imagemUrl?: string | null) => void
   /** Após salvar mantendo o painel aberto (rodapé na aba Complementos) — invalida listas. */
-  onReload?: () => void
+  onReload?: (savedId?: string, imagemUrl?: string | null) => void
   /** IDs mantidos pelo modal pai durante a criação; edição persiste vínculos na aba Complementos. */
   complementosIdsDraft?: string[]
   /** Expõe os dados básicos para o fluxo do modal de abas (ex.: título na aba Complementos em criação). */
@@ -253,7 +253,7 @@ export const NovoGrupoComplemento = forwardRef<
             setVinculadosCount(ids.length || (grupo.getComplementos()?.length ?? 0))
 
             if (grupoId) {
-              const deliveryImagemUrl = await fetchGrupoComplementoImagemUrl(grupoId, token)
+              const deliveryImagemUrl = await grupoComplementoImagemMedia.resolverUma(grupoId, token)
               applyImagemUrl(deliveryImagemUrl ?? grupo.getImagemUrl() ?? null)
             } else {
               applyImagemUrl(grupo.getImagemUrl() ?? null)
@@ -363,12 +363,22 @@ export const NovoGrupoComplemento = forwardRef<
 
       commitBaselineLatestRef.current()
 
+      let imagemPersistida =
+        urlImagemHttp(serverImagemUrl) ?? urlImagemHttp(imagemPreviewUrl)
+      if (idCriado) {
+        grupoComplementoImagemMedia.lembrar(idCriado, imagemPersistida)
+        if (!imagemPersistida) {
+          imagemPersistida = await grupoComplementoImagemMedia.resolverUma(idCriado, token)
+          grupoComplementoImagemMedia.lembrar(idCriado, imagemPersistida)
+        }
+      }
+
       if (isEmbedded) {
         if (opts?.keepModalOpen) {
-          onReload?.()
+          onReload?.(idCriado, imagemPersistida)
           return
         }
-        await Promise.resolve(onSaved?.(idCriado))
+        await Promise.resolve(onSaved?.(idCriado, imagemPersistida))
         onClose?.()
       } else {
         setTimeout(() => {
@@ -395,6 +405,8 @@ export const NovoGrupoComplemento = forwardRef<
     onSaved,
     onClose,
     router,
+    serverImagemUrl,
+    imagemPreviewUrl,
   ])
 
   useImperativeHandle(
@@ -445,8 +457,7 @@ export const NovoGrupoComplemento = forwardRef<
       const toastId = showToast.loading('Enviando imagem...')
 
       try {
-        await uploadGrupoComplementoImagem(grupoId, file, token)
-        const persistedUrl = await fetchGrupoComplementoImagemUrl(grupoId, token)
+        const persistedUrl = await grupoComplementoImagemMedia.enviar(grupoId, file, token)
         applyImagemUrl(persistedUrl ?? preview)
         showToast.successLoading(toastId, 'Imagem enviada com sucesso!')
         onReload?.()
@@ -576,20 +587,20 @@ export const NovoGrupoComplemento = forwardRef<
               </div>
 
               <DeliveryImageUploadField
-                label="Imagem do grupo (cardápio digital)"
+                label="Foto do grupo"
                 disabled={!isEditing}
                 busy={isUploadingImagem}
                 previewUrl={imagemPreviewUrl}
                 cropPreset={DELIVERY_GRUPO_COMPLEMENTO_CROP_PRESET}
                 helperText={
                   isEditing
-                    ? 'Após escolher o arquivo, ajuste o recorte (máx. 280×280). A imagem aparece no cardápio digital após o upload.'
-                    : 'Salve o grupo para habilitar o envio de imagem.'
+                    ? 'Ela identifica o grupo no pedido, no cardápio e no delivery. Escolha a foto e ajuste o recorte.'
+                    : 'Salve o grupo primeiro para adicionar a foto.'
                 }
                 emptyHint={
                   isEditing
-                    ? 'Arraste uma imagem ou clique para selecionar'
-                    : 'Disponível após salvar o grupo'
+                    ? 'Clique ou solte uma foto aqui'
+                    : 'Disponível depois de salvar'
                 }
                 onFileSelected={handleImagemUpload}
                 onClearPreview={

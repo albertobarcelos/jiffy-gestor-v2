@@ -133,7 +133,8 @@ function atualizarAtivoNaLista(
           c.getValor(),
           ativo,
           c.getTipoImpactoPreco(),
-          c.getOrdem()
+          c.getOrdem(),
+          c.getImagemUrl()
         )
   )
 }
