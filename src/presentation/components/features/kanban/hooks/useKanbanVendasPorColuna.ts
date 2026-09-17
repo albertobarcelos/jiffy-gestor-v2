@@ -13,7 +13,9 @@ import { flattenPedidosDeliveryInfinite } from './usePedidosDeliveryInfinite'
 import { flattenVendasUnificadasInfinite } from './useVendasUnificadas'
 import {
   DELIVERY_KANBAN_COLUMN_IDS,
+  FILTRO_STATUS_ENTREGUES_PADRAO,
   isColunaKanbanDeliveryFiscalSplit,
+  vendaAtendeFiltroStatusEntregues,
   vendaPertenceColunaDeliveryKanban,
 } from '../utils/kanbanDeliveryColumnConfig'
 import {
@@ -26,6 +28,7 @@ import type {
   ColunaKanbanId,
   CriterioOrdenacaoKanban,
   DirecaoOrdenacaoKanban,
+  FiltroStatusEntreguesKanban,
   Venda,
 } from '../types'
 import type { usePedidosDeliveryKanbanColumns } from './usePedidosDeliveryKanbanColumns'
@@ -101,9 +104,15 @@ export function useKanbanVendasPorColuna({
   const [direcaoOrdenacaoPorColuna, setDirecaoOrdenacaoPorColuna] =
     useState<Record<ColunaKanbanId, DirecaoOrdenacaoKanban>>(DIRECAO_PADRAO)
 
-  /** Páginas auto-carregadas em Finalizadas quando o refiltro esvazia a 1ª página. */
+  const [filtroStatusFiscalComNf, setFiltroStatusFiscalComNf] =
+    useState<FiltroStatusEntreguesKanban>(FILTRO_STATUS_ENTREGUES_PADRAO)
+
+  /** Páginas auto-carregadas em Finalizadas/balcão quando o refiltro esvazia a 1ª página. */
   const finalizadasAutoFetchPagesRef = useRef(0)
   const MAX_AUTO_FETCH_FINALIZADAS = 25
+  /** Entregues com filtro ≠ Todas pode esvaziar a 1ª página sem scrollbar. */
+  const entreguesAutoFetchPagesRef = useRef(0)
+  const MAX_AUTO_FETCH_ENTREGUES = 25
 
   const todasVendas = useMemo(() => {
     return todasVendasCarregadas
@@ -173,11 +182,23 @@ export function useKanbanVendasPorColuna({
           if (etapaLocal && etapaLocal !== columnId) {
             return false
           }
-          return filtrarVendaDeliveryKanbanColunaPorDatasToolbar(
-            v,
-            columnId,
-            vendasUnificadasQueryParams
-          )
+          if (
+            !filtrarVendaDeliveryKanbanColunaPorDatasToolbar(
+              v,
+              columnId,
+              vendasUnificadasQueryParams
+            )
+          ) {
+            return false
+          }
+          if (columnId === 'FINALIZADAS') {
+            return vendaAtendeFiltroStatusEntregues(
+              v,
+              filtroStatusFiscalComNf,
+              getEtapaKanbanParaExibicao
+            )
+          }
+          return true
         })
 
         if (!isColunaKanbanDeliveryFiscalSplit(columnId)) {
@@ -267,6 +288,7 @@ export function useKanbanVendasPorColuna({
     direcaoOrdenacaoPorColuna,
     primeiroPorColuna,
     vendasUnificadasQueryParams,
+    filtroStatusFiscalComNf,
   ])
 
   // A API de FINALIZADAS mistura vendas já EMITIDA; o refiltro client remove essas da 1ª página
@@ -274,7 +296,8 @@ export function useKanbanVendasPorColuna({
   // até achar cards da etapa FINALIZADAS (ou esgotar páginas / limite de segurança).
   useEffect(() => {
     finalizadasAutoFetchPagesRef.current = 0
-  }, [vendasUnificadasQueryParams, isModoDeliveryKanban])
+    entreguesAutoFetchPagesRef.current = 0
+  }, [vendasUnificadasQueryParams, isModoDeliveryKanban, filtroStatusFiscalComNf])
 
   useEffect(() => {
     if (isModoDeliveryKanban) return
@@ -298,6 +321,30 @@ export function useKanbanVendasPorColuna({
     vendasPorColuna.FINALIZADAS,
   ])
 
+  useEffect(() => {
+    if (!isModoDeliveryKanban) return
+    if (filtroStatusFiscalComNf === 'TODAS') return
+
+    const state = deliveryKanban.columnStates.FINALIZADAS
+    if (!state?.hasNextPage || state.isFetchingNextPage || state.isLoading) return
+
+    const visible = vendasPorColuna.FINALIZADAS?.length ?? 0
+    if (visible > 0) return
+
+    const { items } = flattenPedidosDeliveryInfinite(state.data)
+    if (items.length === 0) return
+    if (entreguesAutoFetchPagesRef.current >= MAX_AUTO_FETCH_ENTREGUES) return
+
+    entreguesAutoFetchPagesRef.current += 1
+    deliveryKanban.fetchNextPageForColumn('FINALIZADAS')
+  }, [
+    isModoDeliveryKanban,
+    deliveryKanban.columnStates.FINALIZADAS,
+    deliveryKanban.fetchNextPageForColumn,
+    vendasPorColuna.FINALIZADAS,
+    filtroStatusFiscalComNf,
+  ])
+
   const getColumnTotalCount = useCallback(
     (columnId: ColunaKanbanId): number => {
       if (isModoDeliveryKanban) {
@@ -315,6 +362,13 @@ export function useKanbanVendasPorColuna({
         if (isOperacional) {
           return Math.max(0, base + (deltaContagemColunasTransicao[columnId] ?? 0))
         }
+
+        if (columnId === 'FINALIZADAS') {
+          const visible = vendasPorColuna[columnId]?.length ?? 0
+          if (filtroStatusFiscalComNf !== 'TODAS') return visible
+          if (colState && !colState.hasNextPage) return visible
+        }
+
         return base
       }
 
@@ -333,6 +387,7 @@ export function useKanbanVendasPorColuna({
       balcaoKanban.columnStates,
       deltaContagemColunasTransicao,
       vendasPorColuna,
+      filtroStatusFiscalComNf,
     ]
   )
 
@@ -356,6 +411,8 @@ export function useKanbanVendasPorColuna({
     setCriterioOrdenacaoPorColuna,
     direcaoOrdenacaoPorColuna,
     setDirecaoOrdenacaoPorColuna,
+    filtroStatusFiscalComNf,
+    setFiltroStatusFiscalComNf,
     limparPinColuna,
   }
 }

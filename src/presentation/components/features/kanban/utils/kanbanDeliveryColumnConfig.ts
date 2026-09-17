@@ -1,5 +1,5 @@
 import type { StatusDeliveryApi } from '@/src/application/dto/api/pedidoDeliveryApi'
-import type { ColunaKanbanId } from '../types'
+import type { ColunaKanbanId, FiltroStatusEntreguesKanban } from '../types'
 import type { PedidosDeliveryInfiniteParams } from '../hooks/usePedidosDeliveryInfinite'
 import type { VendaUnificadaDTO } from '../hooks/useVendasUnificadas'
 
@@ -10,7 +10,6 @@ export const DELIVERY_KANBAN_COLUMN_IDS: ColunaKanbanId[] = [
   'PRONTO_ENTREGA',
   'EM_ROTA',
   'FINALIZADAS',
-  'COM_FISCAL',
 ]
 
 export interface PedidosDeliveryKanbanColumnFilterOptions {
@@ -98,9 +97,9 @@ export function buildPedidosDeliveryParamsForKanbanColumn(
   }
 }
 
-/** Colunas que compartilham a mesma query API (`FINALIZADO`) e exigem split client-side. */
+/** Coluna visual Entregues: um único pool `FINALIZADO` filtrado no client por status. */
 export function isColunaKanbanDeliveryFiscalSplit(columnId: ColunaKanbanId): boolean {
-  return columnId === 'FINALIZADAS' || columnId === 'COM_FISCAL'
+  return columnId === 'FINALIZADAS'
 }
 
 /** Filtra itens da listagem para a coluna visual (etapa Kanban + regras delivery). */
@@ -121,13 +120,54 @@ export function vendaPertenceColunaDeliveryKanban(
     case 'EM_ROTA':
       return etapa === 'EM_ROTA'
     case 'FINALIZADAS':
-      return etapa === 'FINALIZADAS' || etapa === 'PENDENTE_EMISSAO'
-    case 'COM_FISCAL':
-      return etapa === 'COM_FISCAL'
+      return (
+        etapa === 'FINALIZADAS' ||
+        etapa === 'COM_FISCAL' ||
+        etapa === 'REJEITADAS' ||
+        etapa === 'PENDENTE_EMISSAO'
+      )
     default:
       return false
   }
 }
+
+export function bucketStatusEntreguesKanban(
+  venda: VendaUnificadaDTO,
+  getEtapaKanban: (v: VendaUnificadaDTO) => string
+): Exclude<FiltroStatusEntreguesKanban, 'TODAS'> | null {
+  const etapa = getEtapaKanban(venda)
+  if (etapa === 'FINALIZADAS') return 'FINALIZADA'
+  if (etapa === 'REJEITADAS') return 'REJEITADA'
+  if (etapa === 'PENDENTE_EMISSAO') return 'PENDENTE'
+  if (etapa !== 'COM_FISCAL') return null
+
+  const sf = String(venda.statusFiscal ?? '').trim().toUpperCase()
+  if (sf === 'EMITIDA' || sf === 'CANCELADA' || sf === 'INUTILIZADA') return 'EMITIDA'
+  if (sf === 'REJEITADA' || sf === 'DENEGADA') return 'REJEITADA'
+  return 'PENDENTE'
+}
+
+export function vendaAtendeFiltroStatusEntregues(
+  venda: VendaUnificadaDTO,
+  filtro: FiltroStatusEntreguesKanban,
+  getEtapaKanban: (v: VendaUnificadaDTO) => string
+): boolean {
+  if (filtro === 'TODAS') return true
+  return bucketStatusEntreguesKanban(venda, getEtapaKanban) === filtro
+}
+
+export const FILTRO_STATUS_ENTREGUES_PADRAO: FiltroStatusEntreguesKanban = 'TODAS'
+
+export const OPCOES_FILTRO_STATUS_ENTREGUES: {
+  value: FiltroStatusEntreguesKanban
+  label: string
+}[] = [
+  { value: 'TODAS', label: 'Todas' },
+  { value: 'FINALIZADA', label: 'Finalizada' },
+  { value: 'EMITIDA', label: 'Emitida' },
+  { value: 'PENDENTE', label: 'Pendente' },
+  { value: 'REJEITADA', label: 'Rejeitada' },
+]
 
 /**
  * Extrai o id da coluna de keys no padrão:

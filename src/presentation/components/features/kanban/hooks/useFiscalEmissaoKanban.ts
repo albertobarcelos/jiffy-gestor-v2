@@ -425,7 +425,11 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
         }
       }
 
-      setPrimeiroPorColuna(prev => ({ ...prev, COM_FISCAL: venda.id }))
+      setPrimeiroPorColuna(prev => ({
+        ...prev,
+        COM_FISCAL: venda.id,
+        FINALIZADAS: venda.id,
+      }))
       setVendaSelecionadaParaEmissao({
         id: venda.id,
         tabelaOrigem: venda.tabelaOrigem,

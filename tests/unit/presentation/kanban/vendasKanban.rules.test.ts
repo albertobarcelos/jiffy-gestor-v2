@@ -169,8 +169,9 @@ describe('rotuloBotaoAvancarEtapaKanban', () => {
 describe('classeBordaEsquerdaColunaKanban', () => {
   it('usa as mesmas cores da faixa dos cards do quadro', () => {
     expect(classeBordaEsquerdaColunaKanban('EM_PREPARO')).toBe('border-l-amber-500')
-    expect(classeBordaEsquerdaColunaKanban('PRONTO_ENTREGA')).toBe('border-l-teal-500')
+    expect(classeBordaEsquerdaColunaKanban('PRONTO_ENTREGA')).toBe('border-l-sky-500')
     expect(classeBordaEsquerdaColunaKanban('EM_ROTA')).toBe('border-l-indigo-500')
     expect(classeBordaEsquerdaColunaKanban('FINALIZADAS')).toBe('border-l-primary')
+    expect(classeBordaEsquerdaColunaKanban('FINALIZADAS', 'delivery')).toBe('border-l-emerald-500')
   })
 })

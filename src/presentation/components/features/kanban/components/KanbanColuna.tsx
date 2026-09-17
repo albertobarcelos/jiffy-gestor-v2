@@ -8,10 +8,39 @@ import type {
   ColunaKanbanId,
   CriterioOrdenacaoKanban,
   DirecaoOrdenacaoKanban,
+  FiltroStatusEntreguesKanban,
   KanbanColumn,
 } from '../types'
+import { OPCOES_FILTRO_STATUS_ENTREGUES } from '../utils/kanbanDeliveryColumnConfig'
 import { classesKanbanColunaCasco } from '../utils/kanbanQuadroLayout'
 import type { SuperficieQuadroPedidos } from '@/src/presentation/gestor-pedidos/superficieQuadroPedidos'
+
+const SX_SELECT_CABECALHO_KANBAN = {
+  height: 26,
+  fontSize: 12,
+  borderRadius: '8px',
+  backgroundColor: 'rgba(255,255,255,0.9)',
+  '& .MuiOutlinedInput-notchedOutline': {
+    borderColor: '#e5e7eb',
+  },
+  '&:hover .MuiOutlinedInput-notchedOutline': {
+    borderColor: '#d1d5db',
+  },
+  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+    borderColor: '#d1d5db',
+    borderWidth: '1px',
+  },
+} as const
+
+const MENU_PROPS_CABECALHO_KANBAN = {
+  PaperProps: {
+    sx: {
+      borderRadius: '4px',
+      border: '1px solid #e5e7eb',
+      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.06)',
+    },
+  },
+}
 
 interface KanbanColunaProps {
   column: KanbanColumn
@@ -26,6 +55,11 @@ interface KanbanColunaProps {
   columnFooter?: ReactNode
   /** Rodapé fixo abaixo da área rolável (ex.: ações em lote). */
   columnRodape?: ReactNode
+  filtroStatusFiscal?: FiltroStatusEntreguesKanban
+  onFiltroStatusFiscalChange?: (
+    columnId: ColunaKanbanId,
+    filtro: FiltroStatusEntreguesKanban
+  ) => void
   children: ReactNode
 }
 
@@ -42,9 +76,12 @@ export function KanbanColuna(props: KanbanColunaProps) {
     onColumnScroll,
     columnFooter,
     columnRodape,
+    filtroStatusFiscal,
+    onFiltroStatusFiscalChange,
     children,
   } = props
   const colId = column.id as ColunaKanbanId
+  const mostrarFiltroStatusFiscal = Boolean(onFiltroStatusFiscalChange && filtroStatusFiscal)
 
   return (
     <div className={classesKanbanColunaCasco(superficie)}>
@@ -53,49 +90,52 @@ export function KanbanColuna(props: KanbanColunaProps) {
       >
         <div className="flex min-w-0 items-center gap-1.5">
           {column.icon}
-          <h3 className="truncate text-xs font-medium text-gray-900">
+          <h3 className={`truncate text-xs font-medium ${column.tituloClasse ?? 'text-gray-900'}`}>
             {column.title} ({count})
           </h3>
         </div>
         <div className="flex items-center gap-1">
-          <span className="text-[11px] font-medium text-gray-700">Ordem</span>
-          <FormControl size="small" sx={{ minWidth: 80 }}>
-            <Select
-              value={criterioOrdenacao}
-              onChange={e =>
-                onCriterioOrdenacaoChange(colId, e.target.value as CriterioOrdenacaoKanban)
-              }
-              MenuProps={{
-                PaperProps: {
-                  sx: {
-                    borderRadius: '4px',
-                    border: '1px solid #e5e7eb',
-                    boxShadow:
-                      '0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.06)',
-                  },
-                },
-              }}
-              sx={{
-                height: 26,
-                fontSize: 12,
-                borderRadius: '8px',
-                backgroundColor: 'rgba(255,255,255,0.9)',
-                '& .MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#e5e7eb',
-                },
-                '&:hover .MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#d1d5db',
-                },
-                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#d1d5db',
-                  borderWidth: '1px',
-                },
-              }}
-            >
-              <MenuItem value="data">Data</MenuItem>
-              <MenuItem value="numero">Nº da venda</MenuItem>
-            </Select>
-          </FormControl>
+          {mostrarFiltroStatusFiscal ? (
+            <>
+              <span className={`text-[11px] font-medium ${column.tituloClasse ?? 'text-gray-700'}`}>Status</span>
+              <FormControl size="small" sx={{ minWidth: 108 }}>
+                <Select
+                  value={filtroStatusFiscal}
+                  onChange={e =>
+                    onFiltroStatusFiscalChange?.(
+                      colId,
+                      e.target.value as FiltroStatusEntreguesKanban
+                    )
+                  }
+                  MenuProps={MENU_PROPS_CABECALHO_KANBAN}
+                  sx={SX_SELECT_CABECALHO_KANBAN}
+                >
+                  {OPCOES_FILTRO_STATUS_ENTREGUES.map(opcao => (
+                    <MenuItem key={opcao.value} value={opcao.value}>
+                      {opcao.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </>
+          ) : (
+            <>
+              <span className={`text-[11px] font-medium ${column.tituloClasse ?? 'text-gray-700'}`}>Ordem</span>
+              <FormControl size="small" sx={{ minWidth: 80 }}>
+                <Select
+                  value={criterioOrdenacao}
+                  onChange={e =>
+                    onCriterioOrdenacaoChange(colId, e.target.value as CriterioOrdenacaoKanban)
+                  }
+                  MenuProps={MENU_PROPS_CABECALHO_KANBAN}
+                  sx={SX_SELECT_CABECALHO_KANBAN}
+                >
+                  <MenuItem value="data">Data</MenuItem>
+                  <MenuItem value="numero">Nº da venda</MenuItem>
+                </Select>
+              </FormControl>
+            </>
+          )}
           {onOcultarColuna ? (
             <button
               type="button"

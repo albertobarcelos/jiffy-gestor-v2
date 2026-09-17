@@ -95,7 +95,8 @@ export function KanbanVendaCard(props: KanbanVendaCardProps) {
   const { borderClass: cardBorderClass, cardBgClass } = getCardBorderEFundoKanban(
     colunaIdParaEstiloCard,
     venda,
-    acaoFiscalEmAndamentoPorVenda
+    acaoFiscalEmAndamentoPorVenda,
+    modoKanbanVendas
   )
 
   const exibirAtribuirEntregador = exibirAtribuirEntregadorKanban(

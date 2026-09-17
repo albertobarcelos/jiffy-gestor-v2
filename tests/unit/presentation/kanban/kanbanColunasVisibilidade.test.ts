@@ -38,8 +38,8 @@ describe('sanitizarColunasOcultas', () => {
 })
 
 describe('colunasOcultasPadraoDoModo', () => {
-  it('delivery esconde Novos e Com NF', () => {
-    expect(colunasOcultasPadraoDoModo('delivery')).toEqual(['NOVOS_PEDIDOS', 'COM_FISCAL'])
+  it('delivery esconde Novos por defeito', () => {
+    expect(colunasOcultasPadraoDoModo('delivery')).toEqual(['NOVOS_PEDIDOS'])
   })
 
   it('balcão não esconde nada por defeito', () => {

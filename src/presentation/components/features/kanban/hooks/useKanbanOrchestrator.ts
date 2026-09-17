@@ -17,7 +17,13 @@ import { invalidateVendaDetalheCarregadaCache } from '../../pedidos/hooks/data/u
 import { useEntregaTransicoesKanban } from '../../delivery/kanban-panels/useEntregaTransicoesKanban'
 import { definirEntregadorKanbanCache } from '../../delivery/kanban-panels/entregadorKanbanStore'
 import type { ModoKanbanVendas } from '../KanbanModoVendasToggle'
-import type { ColunaKanbanId, CriterioOrdenacaoKanban, KanbanColumn, Venda } from '../types'
+import type {
+  ColunaKanbanId,
+  CriterioOrdenacaoKanban,
+  FiltroStatusEntreguesKanban,
+  KanbanColumn,
+  Venda,
+} from '../types'
 import {
   KANBAN_MODO_VENDAS_STORAGE_KEY,
   KANBAN_MODO_VISUALIZACAO_STORAGE_KEY,
@@ -400,6 +406,14 @@ export function useKanbanOrchestrator() {
     [colunas]
   )
 
+  const handleFiltroStatusFiscalComNfChange = useCallback(
+    (columnId: ColunaKanbanId, filtro: FiltroStatusEntreguesKanban) => {
+      colunas.setFiltroStatusFiscalComNf(filtro)
+      colunas.limparPinColuna(columnId)
+    },
+    [colunas]
+  )
+
   const toolbarProps: KanbanToolbarProps = {
     searchInput,
     onSearchInputChange: setSearchInput,
@@ -456,6 +470,8 @@ export function useKanbanOrchestrator() {
     direcaoOrdenacaoPorColuna: colunas.direcaoOrdenacaoPorColuna,
     onCriterioOrdenacaoChange: handleCriterioOrdenacaoChange,
     onToggleDirecaoOrdenacao: handleToggleDirecaoOrdenacao,
+    filtroStatusFiscalComNf: colunas.filtroStatusFiscalComNf,
+    onFiltroStatusFiscalComNfChange: handleFiltroStatusFiscalComNfChange,
     onOcultarColuna:
       superficie === 'fredy'
         ? (id: ColunaKanbanId) => visibilidadeColunas.setColunaVisivel(id, false, colunasDoModo)

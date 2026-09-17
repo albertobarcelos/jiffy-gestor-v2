@@ -12,6 +12,7 @@ import type {
   ColunaKanbanId,
   CriterioOrdenacaoKanban,
   DirecaoOrdenacaoKanban,
+  FiltroStatusEntreguesKanban,
   KanbanColumn,
   Venda,
 } from '../types'
@@ -41,6 +42,11 @@ export interface KanbanBoardRendererProps {
   direcaoOrdenacaoPorColuna: Record<ColunaKanbanId, DirecaoOrdenacaoKanban>
   onCriterioOrdenacaoChange: (columnId: ColunaKanbanId, criterio: CriterioOrdenacaoKanban) => void
   onToggleDirecaoOrdenacao: (columnId: ColunaKanbanId) => void
+  filtroStatusFiscalComNf?: FiltroStatusEntreguesKanban
+  onFiltroStatusFiscalComNfChange?: (
+    columnId: ColunaKanbanId,
+    filtro: FiltroStatusEntreguesKanban
+  ) => void
   onOcultarColuna?: (columnId: ColunaKanbanId) => void
   onColumnScroll: (columnId: ColunaKanbanId, event: React.UIEvent<HTMLDivElement>) => void
   deliveryKanban: DeliveryKanbanReturn
@@ -79,6 +85,8 @@ export function KanbanBoardRenderer({
   direcaoOrdenacaoPorColuna,
   onCriterioOrdenacaoChange,
   onToggleDirecaoOrdenacao,
+  filtroStatusFiscalComNf,
+  onFiltroStatusFiscalComNfChange,
   onOcultarColuna,
   onColumnScroll,
   deliveryKanban,
@@ -127,6 +135,16 @@ export function KanbanBoardRenderer({
                   direcaoOrdenacao={direcaoOrdenacaoPorColuna[colId] ?? 'desc'}
                   onCriterioOrdenacaoChange={onCriterioOrdenacaoChange}
                   onToggleDirecaoOrdenacao={onToggleDirecaoOrdenacao}
+                  filtroStatusFiscal={
+                    isModoDeliveryKanban && colId === 'FINALIZADAS'
+                      ? filtroStatusFiscalComNf
+                      : undefined
+                  }
+                  onFiltroStatusFiscalChange={
+                    isModoDeliveryKanban && colId === 'FINALIZADAS'
+                      ? onFiltroStatusFiscalComNfChange
+                      : undefined
+                  }
                   onOcultarColuna={onOcultarColuna}
                   onColumnScroll={onColumnScroll}
                   columnRodape={

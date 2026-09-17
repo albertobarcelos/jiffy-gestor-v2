@@ -10,6 +10,8 @@ export interface KanbanColumn {
   borderColor: string
   icon: ReactNode
   placeholder: string
+  /** Cor do título no cabeçalho (padrão cinza). */
+  tituloClasse?: string
 }
 
 export type Venda = VendaUnificadaDTO
@@ -26,6 +28,14 @@ export type ColunaKanbanId =
 
 export type CriterioOrdenacaoKanban = 'data' | 'numero'
 export type DirecaoOrdenacaoKanban = 'asc' | 'desc'
+
+/** Filtro do cabeçalho da coluna Entregues no Kanban delivery. */
+export type FiltroStatusEntreguesKanban =
+  | 'TODAS'
+  | 'FINALIZADA'
+  | 'EMITIDA'
+  | 'PENDENTE'
+  | 'REJEITADA'
 
 /**
  * Origem real da venda (contrato GET /vendas/unificado).

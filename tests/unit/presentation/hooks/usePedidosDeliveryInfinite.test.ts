@@ -48,13 +48,14 @@ describe('vendasUnificadasQueryParamsParaPedidosDelivery', () => {
     expect(
       vendasUnificadasQueryParamsParaPedidosDelivery({
         q: 'maria',
-        origem: 'DELIVERY',
+        origem: 'JIFFY_DELIVERY',
         dataCriacaoInicial: '2026-06-01T00:00:00.000Z',
         dataFinalizacaoInicio: '2026-06-02T00:00:00.000Z',
       })
     ).toEqual({
       q: 'maria',
-      origemFiltroKanban: 'DELIVERY',
+      origemFiltroKanban: 'JIFFY_DELIVERY',
+      tipoEntrega: undefined,
       dataCriacaoInicial: '2026-06-01T00:00:00.000Z',
       dataCriacaoFinal: undefined,
       dataFinalizacaoInicio: '2026-06-02T00:00:00.000Z',
@@ -66,6 +67,12 @@ describe('vendasUnificadasQueryParamsParaPedidosDelivery', () => {
     expect(
       vendasUnificadasQueryParamsParaPedidosDelivery({
         q: '659992341536',
+        origem: 'GESTOR',
+      }).q
+    ).toBeUndefined()
+    expect(
+      vendasUnificadasQueryParamsParaPedidosDelivery({
+        q: '4536',
         origem: 'GESTOR',
       }).q
     ).toBeUndefined()
