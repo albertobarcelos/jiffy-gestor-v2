@@ -4,12 +4,14 @@ import {
   fatosPreviewHub,
   linhaEnderecoHub,
 } from '@/src/presentation/components/features/delivery/hub/deliveryHubPreview'
-import { montarPassosHubDelivery } from '@/src/presentation/components/features/delivery/hub/deliveryHubPassosUi'
+import { montarPassosHubDelivery, montarPassosLojaHub, montarPassosOperacaoHub } from '@/src/presentation/components/features/delivery/hub/deliveryHubPassosUi'
 import { calcularDeliveryHubProgresso } from '@/src/presentation/components/features/delivery/hub/deliveryHubProgresso'
 import { resumirCoberturaHub } from '@/src/presentation/components/features/delivery/hub/deliveryHubResumoCobertura'
 import {
   DELIVERY_HUB_ETAPAS,
   DELIVERY_HUB_TAB_ID,
+  DELIVERY_LOJA_CARD_IDS,
+  DELIVERY_OPERACAO_ETAPA_IDS,
   getDeliveryEtapaById,
   isDeliveryTabId,
 } from '@/src/presentation/components/features/delivery/hub/deliveryHubEtapas'
@@ -150,15 +152,62 @@ describe('DELIVERY_HUB_ETAPAS', () => {
     expect(getDeliveryEtapaById('delivery-hub')).toBeUndefined()
   })
 
+  it('registra o lobby Configurar Loja Delivery fora da timeline', () => {
+    expect(getDeliveryEtapaById('delivery-loja')?.path).toBe('/config/delivery/loja')
+    expect(getDeliveryEtapaById('delivery-loja')?.label).toBe('Loja')
+    expect(DELIVERY_HUB_ETAPAS.some(e => e.id === 'delivery-loja')).toBe(false)
+    expect(DELIVERY_LOJA_CARD_IDS).toEqual([
+      'delivery-nome-cardapio',
+      'delivery-cobertura',
+      'delivery-agenda',
+      'delivery-design',
+      'delivery-notificacoes',
+    ])
+    expect(DELIVERY_OPERACAO_ETAPA_IDS).toEqual([
+      'delivery-entregadores',
+      'delivery-meios',
+      'delivery-impressoras',
+    ])
+  })
+
   it('reconhece o hub e as etapas internas como abas do Delivery', () => {
     expect(isDeliveryTabId(DELIVERY_HUB_TAB_ID)).toBe(true)
     expect(isDeliveryTabId('delivery-entregadores')).toBe(true)
+    expect(isDeliveryTabId('delivery-loja')).toBe(true)
     expect(isDeliveryEtapaId('delivery-impressoras')).toBe(true)
     expect(isDeliveryEtapaId('delivery-nome-cardapio')).toBe(true)
+    expect(isDeliveryEtapaId('delivery-loja')).toBe(true)
     expect(isDeliveryTabId('delivery-notificacoes')).toBe(true)
     expect(isDeliveryTabId(null)).toBe(false)
     expect(isDeliveryTabId('empresa')).toBe(false)
     expect(isDeliveryEtapaId('delivery-hub')).toBe(false)
+  })
+})
+
+describe('montarPassosLojaHub e operação', () => {
+  it('monta os 5 cards do lobby na ordem definida', () => {
+    const cards = montarPassosLojaHub(calcularDeliveryHubProgresso([], true), {
+      empresaDeliveryConfigurada: true,
+      agendaConfigurada: true,
+    })
+    expect(cards.map(c => c.id)).toEqual([...DELIVERY_LOJA_CARD_IDS])
+    expect(cards.filter(c => c.obrigatoria).map(c => c.id)).toEqual([
+      'delivery-nome-cardapio',
+      'delivery-cobertura',
+      'delivery-agenda',
+    ])
+  })
+
+  it('monta os 3 itens de operação da home', () => {
+    const ops = montarPassosOperacaoHub({
+      qtdEntregadores: 1,
+      qtdMeiosPagamento: 0,
+      qtdImpressoras: 2,
+    })
+    expect(ops.map(o => o.id)).toEqual([...DELIVERY_OPERACAO_ETAPA_IDS])
+    expect(ops.find(o => o.id === 'delivery-entregadores')?.concluido).toBe(true)
+    expect(ops.find(o => o.id === 'delivery-meios')?.concluido).toBe(false)
+    expect(ops.find(o => o.id === 'delivery-impressoras')?.concluido).toBe(true)
   })
 })
 

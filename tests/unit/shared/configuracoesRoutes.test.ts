@@ -29,9 +29,12 @@ describe('configuracoesRoutes — Delivery', () => {
     expect(deliveryHubEtapaPath('delivery-meios')).toBe('/config/delivery/meios')
     expect(deliveryHubEtapaPath('delivery-impressoras')).toBe('/config/delivery/impressoras')
     expect(deliveryHubEtapaPath('delivery-notificacoes')).toBe('/config/delivery/notificacoes')
+    expect(deliveryHubEtapaPath('delivery-loja')).toBe('/config/delivery/loja')
     expect(deliveryEtapaIdFromSlug('cobertura')).toBe('delivery-cobertura')
     expect(deliveryEtapaIdFromSlug('nome-cardapio')).toBe('delivery-nome-cardapio')
+    expect(deliveryEtapaIdFromSlug('loja')).toBe('delivery-loja')
     expect(deliveryEtapaIdFromSlug('foo')).toBeNull()
+    expect(isDeliveryEtapaId('delivery-loja')).toBe(true)
   })
 
   it('reconhece o módulo Configurações em /config e /configuracoes', () => {

@@ -32,6 +32,41 @@ export function DeliveryTabBar() {
     })
   }
 
+  const irParaAba = (tabId: string, path: string) => {
+    setActiveTab(tabId)
+    router.push(toGestao(path))
+  }
+
+  /** Fecha a aba e navega para a guia Delivery anterior (ou o hub se não houver outra). */
+  const fecharAba = (tabId: string) => {
+    pedirSaida(() => {
+      const wasActive = activeTabId === tabId
+      const index = deliveryTabs.findIndex(t => t.id === tabId)
+      const previousDelivery =
+        index > 0
+          ? deliveryTabs[index - 1]
+          : deliveryTabs.find(t => t.id !== tabId && t.id !== DELIVERY_HUB_TAB_ID) ??
+            deliveryTabs.find(t => t.id === DELIVERY_HUB_TAB_ID)
+
+      removeTab(tabId)
+      if (!wasActive) return
+
+      if (!previousDelivery || previousDelivery.id === DELIVERY_HUB_TAB_ID) {
+        irParaAba(DELIVERY_HUB_TAB_ID, DELIVERY_HUB_PATH)
+        return
+      }
+
+      const etapa = getDeliveryEtapaById(previousDelivery.id)
+      const path = previousDelivery.path || etapa?.path
+      if (path) {
+        irParaAba(previousDelivery.id, path)
+        return
+      }
+
+      irParaAba(DELIVERY_HUB_TAB_ID, DELIVERY_HUB_PATH)
+    })
+  }
+
   return (
     <div className="shrink-0 border-b border-gray-200 bg-white/90 backdrop-blur-sm">
       <div className="flex items-center gap-2 overflow-x-auto px-2 scrollbar-hide">
@@ -59,8 +94,11 @@ export function DeliveryTabBar() {
                 }
                 if (etapa) {
                   pedirSaida(() => {
-                    setActiveTab(etapa.id)
-                    router.push(toGestao(etapa.path))
+                    irParaAba(etapa.id, etapa.path)
+                  })
+                } else if (tab.path) {
+                  pedirSaida(() => {
+                    irParaAba(tab.id, tab.path)
                   })
                 }
               }}
@@ -86,8 +124,7 @@ export function DeliveryTabBar() {
                   type="button"
                   onClick={e => {
                     e.stopPropagation()
-                    removeTab(tab.id)
-                    irParaHub()
+                    fecharAba(tab.id)
                   }}
                   className={`rounded-full p-0.5 hover:bg-alternate/20 ${
                     isActive ? 'text-secondary' : 'text-alternate'

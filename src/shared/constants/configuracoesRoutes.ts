@@ -22,6 +22,7 @@ export const CONFIGURACOES_DELIVERY_TAB = 'delivery' as const
 export type ConfiguracoesViewTab = ConfiguracoesTabSlug | typeof CONFIGURACOES_DELIVERY_TAB
 
 export type DeliveryEtapaId =
+  | 'delivery-loja'
   | 'delivery-geolocalizacao'
   | 'delivery-nome-cardapio'
   | 'delivery-design'
@@ -33,6 +34,7 @@ export type DeliveryEtapaId =
   | 'delivery-notificacoes'
 
 const DELIVERY_ETAPA_SLUG: Record<DeliveryEtapaId, string> = {
+  'delivery-loja': 'loja',
   'delivery-geolocalizacao': 'empresa',
   'delivery-nome-cardapio': 'nome-cardapio',
   'delivery-design': 'design',

@@ -1,17 +1,19 @@
 ﻿'use client'
 
 import React, { useCallback, useEffect, useMemo, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useEmpresaDeliveryMe } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
-import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
-import { useAreasEntregaDelivery } from '@/src/presentation/hooks/useAreasEntregaDelivery'
 import { useCanalWhatsAppDelivery, useCanalWhatsAppStatus } from '@/src/presentation/hooks/useCanalWhatsAppDelivery'
 import { useDeliveryHubCadastrosRecomendados } from '@/src/presentation/hooks/useDeliveryHubCadastrosRecomendados'
-import { useRaiosEntregaDelivery } from '@/src/presentation/hooks/useRaiosEntregaDelivery'
 import { useTabsStore } from '@/src/presentation/stores/tabsStore'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
 import { EMPRESA_DELIVERY_PENDENCIA_TYPES } from '@/src/shared/constants/empresaDeliveryPendencias'
+import {
+  DESIGN_SECTION_QUERY_KEY,
+  designSectionTabId,
+  isDesignTabId,
+} from '@/src/presentation/components/features/delivery-publico/shared/constants/designTabs'
 import {
   DELIVERY_HUB_PATH,
   DELIVERY_HUB_TAB_ID,
@@ -23,20 +25,22 @@ import {
 import { calcularDeliveryHubProgresso } from './deliveryHubProgresso'
 import { DeliveryTabBar } from './DeliveryTabBar'
 import { DeliveryHubHome } from './DeliveryHubHome'
-import type { DeliveryHubPassoUi } from './deliveryHubPassosUi'
-import { resumirCoberturaHub } from './deliveryHubResumoCobertura'
 
 /**
- * Hub Delivery ÔÇö home de setup (checklist + resumo).
- * A cobertura em tela cheia continua em `/config/delivery/cobertura`.
+ * Hub Delivery — home (loja + operação) e etapas em abas.
  */
 export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId | null }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { toGestao } = useGestaoPath()
   const { addTab, setActiveTab, activeTabId } = useTabsStore()
   const empresaDeliveryQuery = useEmpresaDeliveryMe()
-  const empresaMe = useEmpresaMe()
   const previousTabIdRef = useRef<string | null>(null)
+  const designSectionParam = searchParams.get(DESIGN_SECTION_QUERY_KEY)
+  const designSection =
+    etapaId === 'delivery-design' && isDesignTabId(designSectionParam)
+      ? designSectionParam
+      : null
 
   const empresaDelivery = empresaDeliveryQuery.data
   const configurado = empresaDelivery != null
@@ -46,19 +50,14 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
     [pendencias, configurado]
   )
 
-  const coberturaHabilitada = empresaDeliveryQuery.isSuccess && empresaDelivery != null
-  const raiosQuery = useRaiosEntregaDelivery({ enabled: coberturaHabilitada })
-  const areasQuery = useAreasEntregaDelivery({ enabled: coberturaHabilitada })
-  const resumoCobertura = useMemo(
-    () => resumirCoberturaHub(raiosQuery.data ?? [], areasQuery.data ?? []),
-    [raiosQuery.data, areasQuery.data]
-  )
   const canalWhatsAppQuery = useCanalWhatsAppDelivery()
   const statusWhatsAppQuery = useCanalWhatsAppStatus({
-    enabled: !etapaId && canalWhatsAppQuery.data != null,
+    enabled: (!etapaId || etapaId === 'delivery-loja') && canalWhatsAppQuery.data != null,
     pollar: false,
   })
-  const cadastrosRecomendados = useDeliveryHubCadastrosRecomendados(!etapaId)
+  const cadastrosRecomendados = useDeliveryHubCadastrosRecomendados(
+    !etapaId || etapaId === 'delivery-loja'
+  )
   const refetchCadastros = cadastrosRecomendados.refetch
   const whatsappConectado =
     statusWhatsAppQuery.data != null
@@ -86,6 +85,13 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
       isFixed: true,
     })
     if (etapaId) {
+      if (etapaId === 'delivery-design' && designSection) {
+        const secaoEtapa = getDeliveryEtapaById(designSectionTabId(designSection))
+        if (secaoEtapa) {
+          addTab({ id: secaoEtapa.id, label: secaoEtapa.label, path: secaoEtapa.path })
+        }
+        return
+      }
       const etapa = getDeliveryEtapaById(etapaId)
       if (etapa) {
         addTab({ id: etapa.id, label: etapa.label, path: etapa.path })
@@ -93,8 +99,7 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
     } else {
       setActiveTab(DELIVERY_HUB_TAB_ID)
     }
-  }, [addTab, etapaId, setActiveTab])
-
+  }, [addTab, designSection, etapaId, setActiveTab])
   useEffect(() => {
     const voltouParaHub = activeTabId === DELIVERY_HUB_TAB_ID
     const estavaEmEtapa =
@@ -122,13 +127,6 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
       router.push(toGestao(etapa.path))
     },
     [addTab, router, toGestao]
-  )
-
-  const abrirPasso = useCallback(
-    (passo: DeliveryHubPassoUi) => {
-      abrirEtapa(passo.etapaId)
-    },
-    [abrirEtapa]
   )
 
   const etapaAtiva = etapaId ? getDeliveryEtapaById(etapaId) : undefined
@@ -177,11 +175,8 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
       <DeliveryHubEnsureActive />
       <DeliveryHubHome
         progresso={progresso}
-        resumoCobertura={resumoCobertura}
-        endereco={empresaMe.empresa?.endereco ?? null}
-        nomeEmpresa={empresaMe.empresa?.nomeExibicao ?? null}
         passosExtras={passosExtras}
-        onAbrirPasso={abrirPasso}
+        onAbrirEtapa={abrirEtapa}
       />
     </div>
   )
