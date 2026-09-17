@@ -11,7 +11,7 @@ export function DeliveryProdutoComplementoThumb({
 }) {
   return (
     <div
-      className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md"
+      className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md lg:h-12 lg:w-12"
       style={{ backgroundColor: 'var(--delivery-surface-muted)' }}
     >
       {imagemUrl ? (

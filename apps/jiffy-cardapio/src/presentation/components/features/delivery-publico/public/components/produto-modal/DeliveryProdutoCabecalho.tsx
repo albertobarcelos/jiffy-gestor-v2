@@ -42,7 +42,7 @@ export function DeliveryProdutoCabecalho({
         )}
       </div>
 
-      <div className="flex flex-1 flex-col px-4 pt-4">
+      <div className="flex flex-1 flex-col px-4 pb-4 pt-4">
         <h2 className="delivery-font-title text-xl font-bold delivery-text-primary">
           {produto.nome}
         </h2>
