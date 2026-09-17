@@ -61,7 +61,7 @@ export interface DeliveryEtapaConfig {
   obrigatoria: boolean
 }
 
-/** Cards do lobby Configurar Loja Delivery (sem Empresa/endereço). */
+/** Itens do grupo Loja no menu do hub (sem Empresa/endereço). */
 export const DELIVERY_LOJA_CARD_IDS: DeliveryEtapaId[] = [
   'delivery-nome-cardapio',
   'delivery-cobertura',
@@ -70,20 +70,23 @@ export const DELIVERY_LOJA_CARD_IDS: DeliveryEtapaId[] = [
   'delivery-notificacoes',
 ]
 
-/** Itens de operação exibidos na home do hub (fora do lobby). */
+/** Itens do grupo Operações no menu do hub. */
 export const DELIVERY_OPERACAO_ETAPA_IDS: DeliveryEtapaId[] = [
   'delivery-entregadores',
   'delivery-meios',
   'delivery-impressoras',
 ]
 
-/** Lobby — não entra na timeline numerada do hub. */
+/**
+ * Rota legada `/config/delivery/loja` — redireciona ao hub.
+ * Mantida para deep links e abas antigas.
+ */
 export const DELIVERY_LOJA_ETAPA: DeliveryEtapaConfig = {
   id: 'delivery-loja',
   step: 0,
-  title: 'Configurar Loja Delivery',
-  label: 'Loja',
-  descricao: 'Nome, cobertura, agenda, design e WhatsApp.',
+  title: 'Configurações Delivery',
+  label: 'Delivery',
+  descricao: 'Redireciona ao hub de configurações.',
   path: deliveryHubEtapaPath('delivery-loja'),
   component: LojaDeliveryEtapa,
   icon: MdStorefront,
@@ -107,8 +110,8 @@ export const DELIVERY_HUB_ETAPAS: DeliveryEtapaConfig[] = [
   {
     id: 'delivery-nome-cardapio',
     step: 2,
-    title: 'Nome da loja e cardápio',
-    label: 'Nome e cardápio',
+    title: 'Nome da Loja',
+    label: 'Nome da Loja',
     descricao: 'Slug, menu e link público da loja.',
     path: deliveryHubEtapaPath('delivery-nome-cardapio'),
     component: NomeCardapioDeliveryEtapa,
@@ -119,7 +122,7 @@ export const DELIVERY_HUB_ETAPAS: DeliveryEtapaConfig[] = [
   {
     id: 'delivery-design',
     step: 3,
-    title: 'Personalizar loja',
+    title: 'Personalizar Loja',
     label: 'Design',
     descricao: 'Logo, banner e identidade do cardápio.',
     path: deliveryHubEtapaPath('delivery-design'),
@@ -167,7 +170,7 @@ export const DELIVERY_HUB_ETAPAS: DeliveryEtapaConfig[] = [
   {
     id: 'delivery-meios',
     step: 7,
-    title: 'Meios de pagamento',
+    title: 'Meios de Pagamento',
     label: 'Pagamento',
     descricao: 'Formas usadas no pedido gestor.',
     path: deliveryHubEtapaPath('delivery-meios'),

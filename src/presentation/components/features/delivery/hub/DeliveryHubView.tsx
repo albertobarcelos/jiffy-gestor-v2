@@ -1,46 +1,34 @@
 ﻿'use client'
 
 import React, { useCallback, useEffect, useMemo, useRef } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useEmpresaDeliveryMe } from '@/src/presentation/hooks/useEmpresaDeliveryMe'
 import { useCanalWhatsAppDelivery, useCanalWhatsAppStatus } from '@/src/presentation/hooks/useCanalWhatsAppDelivery'
 import { useDeliveryHubCadastrosRecomendados } from '@/src/presentation/hooks/useDeliveryHubCadastrosRecomendados'
-import { useTabsStore } from '@/src/presentation/stores/tabsStore'
 import { useGestaoPath } from '@/src/presentation/hooks/useGestaoPath'
+import { usePedirSaidaCobertura } from '@/src/presentation/components/features/configuracoes/coberturaSairGuard'
 import { EMPRESA_DELIVERY_PENDENCIA_TYPES } from '@/src/shared/constants/empresaDeliveryPendencias'
 import {
-  DESIGN_SECTION_QUERY_KEY,
-  designSectionTabId,
-  isDesignTabId,
-} from '@/src/presentation/components/features/delivery-publico/shared/constants/designTabs'
-import {
   DELIVERY_HUB_PATH,
-  DELIVERY_HUB_TAB_ID,
   getDeliveryEtapaById,
-  isDeliveryEtapaId,
-  isDeliveryTabId,
   type DeliveryEtapaId,
 } from './deliveryHubEtapas'
 import { calcularDeliveryHubProgresso } from './deliveryHubProgresso'
-import { DeliveryTabBar } from './DeliveryTabBar'
 import { DeliveryHubHome } from './DeliveryHubHome'
 
 /**
- * Hub Delivery — home (loja + operação) e etapas em abas.
+ * Hub Delivery — menu lateral + painel direito inline (sem TabBar de etapas).
  */
 export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId | null }) {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { toGestao } = useGestaoPath()
-  const { addTab, setActiveTab, activeTabId } = useTabsStore()
+  const pedirSaida = usePedirSaidaCobertura()
   const empresaDeliveryQuery = useEmpresaDeliveryMe()
-  const previousTabIdRef = useRef<string | null>(null)
-  const designSectionParam = searchParams.get(DESIGN_SECTION_QUERY_KEY)
-  const designSection =
-    etapaId === 'delivery-design' && isDesignTabId(designSectionParam)
-      ? designSectionParam
-      : null
+  const previousEtapaRef = useRef<DeliveryEtapaId | null>(null)
+
+  const activeEtapaId =
+    etapaId && etapaId !== 'delivery-loja' ? etapaId : null
 
   const empresaDelivery = empresaDeliveryQuery.data
   const configurado = empresaDelivery != null
@@ -52,12 +40,10 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
 
   const canalWhatsAppQuery = useCanalWhatsAppDelivery()
   const statusWhatsAppQuery = useCanalWhatsAppStatus({
-    enabled: (!etapaId || etapaId === 'delivery-loja') && canalWhatsAppQuery.data != null,
+    enabled: canalWhatsAppQuery.data != null,
     pollar: false,
   })
-  const cadastrosRecomendados = useDeliveryHubCadastrosRecomendados(
-    !etapaId || etapaId === 'delivery-loja'
-  )
+  const cadastrosRecomendados = useDeliveryHubCadastrosRecomendados(true)
   const refetchCadastros = cadastrosRecomendados.refetch
   const whatsappConectado =
     statusWhatsAppQuery.data != null
@@ -78,67 +64,48 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
   )
 
   useEffect(() => {
-    addTab({
-      id: DELIVERY_HUB_TAB_ID,
-      label: 'Delivery',
-      path: DELIVERY_HUB_PATH,
-      isFixed: true,
-    })
-    if (etapaId) {
-      if (etapaId === 'delivery-design' && designSection) {
-        const secaoEtapa = getDeliveryEtapaById(designSectionTabId(designSection))
-        if (secaoEtapa) {
-          addTab({ id: secaoEtapa.id, label: secaoEtapa.label, path: secaoEtapa.path })
-        }
-        return
-      }
-      const etapa = getDeliveryEtapaById(etapaId)
-      if (etapa) {
-        addTab({ id: etapa.id, label: etapa.label, path: etapa.path })
-      }
-    } else {
-      setActiveTab(DELIVERY_HUB_TAB_ID)
+    if (etapaId === 'delivery-loja') {
+      router.replace(toGestao(DELIVERY_HUB_PATH))
     }
-  }, [addTab, designSection, etapaId, setActiveTab])
-  useEffect(() => {
-    const voltouParaHub = activeTabId === DELIVERY_HUB_TAB_ID
-    const estavaEmEtapa =
-      previousTabIdRef.current && isDeliveryEtapaId(previousTabIdRef.current)
+  }, [etapaId, router, toGestao])
 
-    if (estavaEmEtapa && voltouParaHub) {
+  useEffect(() => {
+    const saiuDaEtapa = previousEtapaRef.current != null && activeEtapaId == null
+    if (saiuDaEtapa) {
       const timeoutId = setTimeout(() => {
         void empresaDeliveryQuery.refetch()
         void canalWhatsAppQuery.refetch()
         void statusWhatsAppQuery.refetch()
         void refetchCadastros()
       }, 400)
-      previousTabIdRef.current = activeTabId
+      previousEtapaRef.current = activeEtapaId
       return () => clearTimeout(timeoutId)
     }
-
-    previousTabIdRef.current = activeTabId
-  }, [activeTabId, canalWhatsAppQuery, empresaDeliveryQuery, refetchCadastros, statusWhatsAppQuery])
+    previousEtapaRef.current = activeEtapaId
+  }, [
+    activeEtapaId,
+    canalWhatsAppQuery,
+    empresaDeliveryQuery,
+    refetchCadastros,
+    statusWhatsAppQuery,
+  ])
 
   const abrirEtapa = useCallback(
     (proximaEtapaId: DeliveryEtapaId) => {
+      if (proximaEtapaId === activeEtapaId) return
       const etapa = getDeliveryEtapaById(proximaEtapaId)
-      if (!etapa) return
-      addTab({ id: etapa.id, label: etapa.label, path: etapa.path })
-      router.push(toGestao(etapa.path))
+      if (!etapa || etapa.id === 'delivery-loja') return
+      pedirSaida(() => {
+        router.push(toGestao(etapa.path))
+      })
     },
-    [addTab, router, toGestao]
+    [activeEtapaId, pedirSaida, router, toGestao]
   )
 
-  const etapaAtiva = etapaId ? getDeliveryEtapaById(etapaId) : undefined
-
-  if (etapaAtiva) {
-    const EtapaComponent = etapaAtiva.component
+  if (etapaId === 'delivery-loja') {
     return (
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <DeliveryTabBar />
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <EtapaComponent />
-        </div>
+      <div className="flex flex-1 items-center justify-center p-8">
+        <JiffyLoading />
       </div>
     )
   }
@@ -169,28 +136,22 @@ export function DeliveryHubView({ etapaId = null }: { etapaId?: DeliveryEtapaId 
     )
   }
 
+  const etapaAtiva = activeEtapaId ? getDeliveryEtapaById(activeEtapaId) : undefined
+  const EtapaComponent = etapaAtiva?.component
+  const panel =
+    EtapaComponent != null ? (
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <EtapaComponent />
+      </div>
+    ) : null
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-gray-50">
-      <DeliveryTabBar />
-      <DeliveryHubEnsureActive />
-      <DeliveryHubHome
-        progresso={progresso}
-        passosExtras={passosExtras}
-        onAbrirEtapa={abrirEtapa}
-      />
-    </div>
+    <DeliveryHubHome
+      progresso={progresso}
+      passosExtras={passosExtras}
+      activeEtapaId={activeEtapaId}
+      onAbrirEtapa={abrirEtapa}
+      panel={panel}
+    />
   )
-}
-
-function DeliveryHubEnsureActive() {
-  const { activeTabId, setActiveTab, tabs } = useTabsStore()
-
-  useEffect(() => {
-    if (!isDeliveryTabId(activeTabId)) {
-      const hub = tabs.find(t => t.id === DELIVERY_HUB_TAB_ID)
-      if (hub) setActiveTab(DELIVERY_HUB_TAB_ID)
-    }
-  }, [activeTabId, setActiveTab, tabs])
-
-  return null
 }

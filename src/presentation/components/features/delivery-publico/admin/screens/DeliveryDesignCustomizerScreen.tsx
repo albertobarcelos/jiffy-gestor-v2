@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { MdArrowBack, MdChevronRight } from 'react-icons/md'
+import { MdArrowBack } from 'react-icons/md'
 import { JiffyLoading } from '@/src/presentation/components/ui/JiffyLoading'
 import { useEmpresaMe } from '@/src/presentation/hooks/useEmpresaMe'
 import { useMenuDeliveryId } from '@/src/presentation/hooks/useMenuDeliveryId'
@@ -17,8 +17,6 @@ import {
 import {
   DESIGN_SECTION_QUERY_KEY,
   DESIGN_TABS,
-  designSectionTabId,
-  deliveryHubDesignPath,
   deliveryHubDesignSectionPath,
   isDesignTabId,
 } from '../../shared/constants/designTabs'
@@ -27,17 +25,13 @@ import { useDesignCategoriaGrupos } from '../../shared/hooks/useDesignCategoriaG
 import type { DesignCategoriaGrupo } from '../../shared/types/designCategoriaGrupo'
 import { mergeDesignCategoriaGrupos } from '../../shared/utils/mergeDesignCategoriaGrupos'
 import { DeliveryMobilePreviewFrame } from '../components/DeliveryMobilePreviewFrame'
+import { DesignTabNav } from '../components/DesignTabNav'
 import { DesignCabecalhoTab } from '../components/tabs/DesignCabecalhoTab'
 import { DesignModelosTab } from '../components/tabs/DesignModelosTab'
 import { DesignCoresTab } from '../components/tabs/DesignCoresTab'
 import { DesignTipografiasTab } from '../components/tabs/DesignTipografiasTab'
 import { DesignCategoriasTab } from '../components/tabs/DesignCategoriasTab'
-import { useTabsStore } from '@/src/presentation/stores/tabsStore'
-import {
-  DELIVERY_HUB_PATH,
-  DELIVERY_HUB_TAB_ID,
-  getDeliveryEtapaById,
-} from '@/src/presentation/components/features/delivery/hub/deliveryHubEtapas'
+import { DELIVERY_HUB_PATH } from '@/src/presentation/components/features/delivery/hub/deliveryHubEtapas'
 
 function DesignSectionForm({
   activeSection,
@@ -104,11 +98,9 @@ export function DeliveryDesignCustomizerScreen() {
   const { empresa, isLoading: empresaLoading } = useEmpresaMe()
   const { menuDeliveryId, isLoading: menuDeliveryLoading } = useMenuDeliveryId()
   const { data: empresaDelivery, isLoading: deliveryLoading } = useEmpresaDeliveryMe()
-  const setDeliveryHubTab = useTabsStore(s => s.setActiveTab)
-  const addTab = useTabsStore(s => s.addTab)
 
   const secaoParam = searchParams.get(DESIGN_SECTION_QUERY_KEY)
-  const activeSection = isDesignTabId(secaoParam) ? secaoParam : null
+  const activeSection: DesignTabId = isDesignTabId(secaoParam) ? secaoParam : 'cabecalho'
 
   const { draft, hydrated, isDirty, updateDraft, publish } = useDeliveryDesignDraft({
     empresaId: empresa?.id,
@@ -131,12 +123,14 @@ export function DeliveryDesignCustomizerScreen() {
     )
   }, [categoriasGrupos])
 
+  useEffect(() => {
+    if (!isDesignTabId(secaoParam)) {
+      router.replace(toGestao(deliveryHubDesignSectionPath('cabecalho')))
+    }
+  }, [router, secaoParam, toGestao])
+
   const canSave = canPublishDesign(draft)
-  const lojaEtapa = getDeliveryEtapaById('delivery-loja')
-  const designEtapa = getDeliveryEtapaById('delivery-design')
-  const sectionMeta = activeSection
-    ? DESIGN_TABS.find(tab => tab.id === activeSection)
-    : null
+  const sectionMeta = DESIGN_TABS.find(tab => tab.id === activeSection)
 
   const handleSave = useCallback(() => {
     if (!canPublishDesign(draft)) return
@@ -144,37 +138,15 @@ export function DeliveryDesignCustomizerScreen() {
     showToast.success('Design salvo! As alterações já valem no cardápio público.')
   }, [draft, publish])
 
-  const voltarAoLobbyLoja = useCallback(() => {
-    if (lojaEtapa) {
-      addTab({ id: lojaEtapa.id, label: lojaEtapa.label, path: lojaEtapa.path })
-      router.push(toGestao(lojaEtapa.path))
-      return
-    }
-    setDeliveryHubTab(DELIVERY_HUB_TAB_ID)
+  const voltarAoHubDelivery = useCallback(() => {
     router.push(toGestao(DELIVERY_HUB_PATH))
-  }, [addTab, lojaEtapa, router, setDeliveryHubTab, toGestao])
-
-  const voltarAoLobbyDesign = useCallback(() => {
-    if (designEtapa) {
-      addTab({ id: designEtapa.id, label: designEtapa.label, path: designEtapa.path })
-    }
-    router.push(toGestao(deliveryHubDesignPath()))
-  }, [addTab, designEtapa, router, toGestao])
+  }, [router, toGestao])
 
   const abrirSecao = useCallback(
     (section: DesignTabId) => {
-      const tabId = designSectionTabId(section)
-      const secaoEtapa = getDeliveryEtapaById(tabId)
-      const path = deliveryHubDesignSectionPath(section)
-      if (secaoEtapa) {
-        addTab({ id: secaoEtapa.id, label: secaoEtapa.label, path: secaoEtapa.path })
-      } else {
-        const tabMeta = DESIGN_TABS.find(tab => tab.id === section)
-        addTab({ id: tabId, label: tabMeta?.label ?? section, path })
-      }
-      router.push(toGestao(path))
+      router.push(toGestao(deliveryHubDesignSectionPath(section)))
     },
-    [addTab, router, toGestao]
+    [router, toGestao]
   )
 
   if (empresaLoading || deliveryLoading || menuDeliveryLoading || !hydrated) {
@@ -185,107 +157,62 @@ export function DeliveryDesignCustomizerScreen() {
     )
   }
 
-  // Lobby e seções compartilham o mesmo shell: draft/preview ficam montados;
-  // no lobby só ocultamos o painel de preview para ficar mais leve.
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white lg:flex-row">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:border-r lg:border-gray-200">
-        {activeSection == null ? (
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-gray-50 p-4 sm:p-6">
-            <div className="mb-6">
-              <button
-                type="button"
-                onClick={voltarAoLobbyLoja}
-                className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
-              >
-                <MdArrowBack className="h-4 w-4" aria-hidden />
-                Voltar à Loja
-              </button>
-              <h1 className="text-2xl font-bold text-primary sm:text-3xl">Design</h1>
-              <p className="mt-1 max-w-2xl text-sm text-secondary-text">
-                Escolha o que deseja personalizar no cardápio público.
-              </p>
-            </div>
+        <header className="shrink-0 border-b border-gray-200 px-4 pt-2 md:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={voltarAoHubDelivery}
+              className="inline-flex items-center gap-1 text-sm font-semibold text-primary-text transition-colors hover:text-primary"
+            >
+              <MdArrowBack className="h-4 w-4" aria-hidden />
+              Voltar
+            </button>
 
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {DESIGN_TABS.map(tab => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => abrirSecao(tab.id)}
-                  className="flex flex-col rounded-2xl border border-gray-200 bg-white p-4 text-left shadow-sm transition-colors hover:border-primary hover:bg-primary/5"
-                >
-                  <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-secondary/10 text-secondary">
-                    <tab.icon className="h-5 w-5" aria-hidden />
-                  </span>
-                  <span className="text-sm font-semibold text-primary">{tab.label}</span>
-                  <span className="mt-1 text-xs text-secondary-text">{tab.descricao}</span>
-                  <span className="mt-3 inline-flex items-center text-xs font-semibold text-primary">
-                    {tab.cta}
-                    <MdChevronRight className="h-4 w-4" />
-                  </span>
-                </button>
-              ))}
-            </div>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={!canSave || !isDirty}
+              title={
+                getPublishDisabledReason(draft) ?? 'Salva e aplica no cardápio público'
+              }
+              className="inline-flex h-9 items-center rounded-lg bg-secondary px-5 text-sm font-semibold text-white transition-colors hover:bg-secondary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Salvar
+            </button>
           </div>
-        ) : (
-          <>
-            <header className="shrink-0 border-b border-gray-200 px-4 pt-2 md:px-6">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={voltarAoLobbyDesign}
-                  className="inline-flex items-center gap-1 text-sm font-semibold text-primary-text transition-colors hover:text-primary"
-                >
-                  <MdArrowBack className="h-4 w-4" aria-hidden />
-                  Voltar
-                </button>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleSave}
-                    disabled={!canSave || !isDirty}
-                    title={
-                      getPublishDisabledReason(draft) ??
-                      'Salva e aplica no cardápio público'
-                    }
-                    className="inline-flex h-9 items-center rounded-lg bg-secondary px-5 text-sm font-semibold text-white transition-colors hover:bg-secondary/90 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Salvar
-                  </button>
-                </div>
-              </div>
+          <h1 className="mt-1 text-xl font-bold text-primary">
+            {sectionMeta?.label ?? 'Personalizar Loja'}
+          </h1>
 
-              <h1 className="mt-1 pb-3 text-xl font-bold text-primary">
-                {sectionMeta?.label ?? 'Design'}
-              </h1>
-            </header>
+          <div className="mt-2">
+            <DesignTabNav activeTab={activeSection} onTabChange={abrirSecao} />
+          </div>
+        </header>
 
-            <div className="min-h-0 flex-1 overflow-y-auto p-3 md:p-4">
-              <DesignSectionForm
-                activeSection={activeSection}
-                draft={draft}
-                slug={empresaDelivery?.slug}
-                hasEmpresaDelivery={Boolean(empresaDelivery)}
-                updateDraft={updateDraft}
-                previewCategoriasGrupos={previewCategoriasGrupos}
-                setPreviewCategoriasGrupos={setPreviewCategoriasGrupos}
-                menuDeliveryId={menuDeliveryId}
-                hasMenu={hasMenu}
-                categoriasGruposLoading={categoriasGruposLoading}
-                categoriasGruposError={categoriasGruposError}
-              />
-            </div>
-          </>
-        )}
+        <div className="min-h-0 flex-1 overflow-y-auto p-3 md:p-4">
+          <DesignSectionForm
+            activeSection={activeSection}
+            draft={draft}
+            slug={empresaDelivery?.slug}
+            hasEmpresaDelivery={Boolean(empresaDelivery)}
+            updateDraft={updateDraft}
+            previewCategoriasGrupos={previewCategoriasGrupos}
+            setPreviewCategoriasGrupos={setPreviewCategoriasGrupos}
+            menuDeliveryId={menuDeliveryId}
+            hasMenu={hasMenu}
+            categoriasGruposLoading={categoriasGruposLoading}
+            categoriasGruposError={categoriasGruposError}
+          />
+        </div>
       </div>
 
-      {activeSection != null ? (
-        <aside className="flex min-h-0 flex-1 flex-col overflow-hidden border-t border-gray-200 bg-gray-50 p-3 lg:w-[min(100%,26.25rem)] lg:max-w-[26.25rem] lg:flex-none lg:shrink-0 lg:border-l lg:border-t-0 lg:p-4 xl:w-[min(100%,27.5rem)] xl:max-w-[27.5rem]">
-          <DeliveryMobilePreviewFrame config={draft} categoriasGrupos={previewCategoriasGrupos} />
-        </aside>
-      ) : null}
+      <aside className="flex min-h-0 flex-1 flex-col overflow-hidden border-t border-gray-200 bg-gray-50 p-3 lg:w-[min(100%,26.25rem)] lg:max-w-[26.25rem] lg:flex-none lg:shrink-0 lg:border-l lg:border-t-0 lg:p-4 xl:w-[min(100%,27.5rem)] xl:max-w-[27.5rem]">
+        <DeliveryMobilePreviewFrame config={draft} categoriasGrupos={previewCategoriasGrupos} />
+      </aside>
     </div>
   )
 }

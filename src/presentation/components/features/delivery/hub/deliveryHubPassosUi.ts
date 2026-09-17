@@ -72,7 +72,7 @@ export function montarPassosHubDelivery(
   })
 }
 
-/** Cards do lobby Configurar Loja. */
+/** Itens do grupo Loja no menu do hub. */
 export function montarPassosLojaHub(
   progresso: DeliveryHubProgresso,
   extras?: DeliveryHubPassosExtras
@@ -82,7 +82,7 @@ export function montarPassosLojaHub(
   )
 }
 
-/** Itens de operação na home do hub. */
+/** Itens do grupo Operações no menu do hub. */
 export function montarPassosOperacaoHub(extras?: DeliveryHubPassosExtras): DeliveryHubPassoUi[] {
   return DELIVERY_OPERACAO_ETAPA_IDS.map(id => montarPassoUi(id, null, extras)).filter(
     (passo): passo is DeliveryHubPassoUi => passo != null
