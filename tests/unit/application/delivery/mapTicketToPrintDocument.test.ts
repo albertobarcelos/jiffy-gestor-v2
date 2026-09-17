@@ -113,6 +113,24 @@ describe('mapTicketToPrintDocument', () => {
     expect(doc.content.some(b => b.type === 'item' && b.name === 'X-Bacon')).toBe(true)
   })
 
+  it('via de conferência e unidade aparecem no documento térmico', () => {
+    const conferencia = mapTicketToPrintDocument(root, {
+      ...ticketProducao,
+      viaProducao: { kind: 'conference' },
+    })
+    expect(
+      conferencia.content.some(b => b.type === 'text' && b.text === '*** VIA DE CONFERENCIA ***')
+    ).toBe(true)
+
+    const unidade = mapTicketToPrintDocument(root, {
+      ...ticketProducao,
+      viaProducao: { kind: 'unit', unitIndex: 2, unitTotal: 4 },
+    })
+    expect(
+      unidade.content.some(b => b.type === 'text' && b.text === 'PEDIDO ABC123 - 2 DE 4')
+    ).toBe(true)
+  })
+
   it('58 mm reduz colunas', () => {
     const doc = mapTicketToPrintDocument(root, ticketExpedicao, {
       template: { ...DEFAULT_DELIVERY_CUPOM_TEMPLATE, larguraMm: 58 },

@@ -352,6 +352,27 @@ function renderRodape(template: DeliveryCupomTemplateConfig, rodapeExtra: string
   </div>`
 }
 
+function renderOverlayViaProducao(
+  root: VendaGestorTicketsResponse,
+  ticket: VendaGestorTicket
+): string {
+  if (ticket.tipoCupom !== 'producao' || !ticket.viaProducao) return ''
+  if (ticket.viaProducao.kind === 'conference') {
+    return `<div class="method" style="text-align:center;font-weight:800;">*** VIA DE CONFERENCIA ***</div>
+  ${htmlSeparator()}`
+  }
+  if (
+    ticket.viaProducao.kind === 'unit' &&
+    ticket.viaProducao.unitIndex != null &&
+    ticket.viaProducao.unitTotal != null
+  ) {
+    const codigoVia = root.codigoVenda || String(root.numeroVenda ?? '')
+    return `<div class="method" style="text-align:center;font-weight:800;">PEDIDO ${escapeHtml(codigoVia)} - ${ticket.viaProducao.unitIndex} DE ${ticket.viaProducao.unitTotal}</div>
+  ${htmlSeparator()}`
+  }
+  return ''
+}
+
 function renderProducao(
   input: RenderDeliveryCupomHtmlInput,
   template: DeliveryCupomTemplateConfig,
@@ -364,6 +385,7 @@ function renderProducao(
   const cliente = root.cliente?.nome?.trim() || '—'
 
   return `${renderCabecalho(root, template, empresa, cabecalhoExtra)}
+  ${renderOverlayViaProducao(root, ticket)}
   ${renderMetaPedido(root, true)}
   ${htmlSeparator()}
   <div class="section customer-section" style="white-space: normal; word-wrap: break-word; overflow-wrap: break-word; word-break: normal;"><strong>Cliente:</strong> ${escapeHtml(cliente)}</div>

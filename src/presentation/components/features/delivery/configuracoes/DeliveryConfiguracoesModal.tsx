@@ -367,10 +367,19 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
       salvarDeliveryCupomTemplateLocal(empresaId, cupomTemplate)
       const estacaoId = estacaoImpressaoQuery.data?.estacaoId?.trim()
       if (estacaoId) {
+        const modoPorImpressoraId = Object.fromEntries(
+          (estacaoImpressaoQuery.data?.mapeamentos ?? []).map(item => [
+            item.impressoraId,
+            item.modoImpressao,
+          ])
+        )
         const mapeamentos = Object.entries(vinculosFisicos)
           .map(([impressoraId, nome]) => ({
             impressoraId,
             nomeImpressoraWindows: nome.trim(),
+            ...(modoPorImpressoraId[impressoraId]
+              ? { modoImpressao: modoPorImpressoraId[impressoraId] }
+              : {}),
           }))
           .filter(item => item.impressoraId && item.nomeImpressoraWindows)
         await salvarMapeamentosEstacao(token, estacaoId, mapeamentos)
@@ -410,6 +419,7 @@ export function DeliveryConfiguracoesModal({ open, onClose }: DeliveryConfigurac
     token,
     vinculosFisicos,
     estacaoImpressaoQuery.data?.estacaoId,
+    estacaoImpressaoQuery.data?.mapeamentos,
   ])
 
   const handleSalvar = useCallback(() => {

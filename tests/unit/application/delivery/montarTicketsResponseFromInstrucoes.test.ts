@@ -441,4 +441,212 @@ describe('montarTicketsResponseFromInstrucoes', () => {
       { nome: 'Crédito', valor: 15, naEntrega: true },
     ])
   })
+
+  it('modo agrupado soma itens equivalentes só no ticket de produção', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      modo: 'separado' as const,
+      impressoraExpedicaoId: 'imp-exp',
+    }
+    const pedido = {
+      ...pedidoBase,
+      produtosLancados: [
+        {
+          id: 'pl-1',
+          produtoId: 'h',
+          nomeProduto: 'Heineken',
+          quantidade: 1,
+          valorUnitario: 10,
+          valorFinal: 10,
+          removido: false,
+          complementos: [],
+          observacoes: [],
+        },
+        {
+          id: 'pl-2',
+          produtoId: 'h',
+          nomeProduto: 'Heineken',
+          quantidade: 1,
+          valorUnitario: 10,
+          valorFinal: 10,
+          removido: false,
+          complementos: [],
+          observacoes: [],
+        },
+      ],
+    }
+
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: {
+        mapeamentos: [
+          {
+            impressoraId: 'imp-cozinha',
+            impressoraNome: 'Cozinha',
+            nomeImpressoraWindows: 'EPSON_COZ',
+            produtosLancadosIds: ['pl-1', 'pl-2'],
+          },
+        ],
+        warnings: [],
+      },
+      pedido,
+      prefs,
+      modoPorImpressoraId: { 'imp-cozinha': 'agrupado' },
+    })
+
+    const producao = result.tickets.filter(t => t.tipoCupom === 'producao')
+    const expedicao = result.tickets.find(t => t.tipoCupom === 'expedicao')
+    expect(producao).toHaveLength(1)
+    expect(producao[0].itens).toHaveLength(1)
+    expect(producao[0].itens[0].quantidade).toBe(2)
+    expect(producao[0].viaProducao?.kind).toBe('single')
+    expect(expedicao?.itens).toHaveLength(2)
+  })
+
+  it('modo porUnidade gera vias unitárias e conferência na produção', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      modo: 'separado' as const,
+      impressoraExpedicaoId: 'imp-exp',
+    }
+
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: {
+        mapeamentos: [
+          {
+            impressoraId: 'imp-cozinha',
+            impressoraNome: 'Cozinha',
+            nomeImpressoraWindows: 'EPSON_COZ',
+            produtosLancadosIds: ['pl-1'],
+          },
+        ],
+        warnings: [],
+      },
+      pedido: pedidoBase,
+      prefs,
+      modoPorImpressoraId: { 'imp-cozinha': 'porUnidade' },
+    })
+
+    const producao = result.tickets.filter(t => t.tipoCupom === 'producao')
+    expect(producao).toHaveLength(3)
+    expect(producao.map(t => t.viaProducao?.kind)).toEqual(['unit', 'unit', 'conference'])
+    expect(producao[0].ticketId).toBe('imp-cozinha-producao-unit-1')
+    expect(producao[2].itens[0].quantidade).toBe(2)
+    expect(result.tickets.find(t => t.tipoCupom === 'expedicao')?.itens).toHaveLength(2)
+  })
+
+  it('modo ficha na impressora não expande o ticket de produção', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      modo: 'separado' as const,
+      impressoraExpedicaoId: 'imp-exp',
+    }
+
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: {
+        mapeamentos: [
+          {
+            impressoraId: 'imp-cozinha',
+            impressoraNome: 'Cozinha',
+            nomeImpressoraWindows: 'EPSON_COZ',
+            produtosLancadosIds: ['pl-1', 'pl-2'],
+          },
+        ],
+        warnings: [],
+      },
+      pedido: pedidoBase,
+      prefs,
+      modoPorImpressoraId: { 'imp-cozinha': 'ficha' },
+    })
+
+    const producao = result.tickets.filter(t => t.tipoCupom === 'producao')
+    expect(producao).toHaveLength(1)
+    expect(producao[0].itens).toHaveLength(2)
+    expect(producao[0].viaProducao?.kind).toBe('single')
+  })
+
+  it('unificado ignora o planner mesmo com modo porUnidade no mapa', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      modo: 'unificado' as const,
+      impressoraExpedicaoId: 'imp-exp',
+    }
+
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: {
+        mapeamentos: [
+          {
+            impressoraId: 'imp-exp',
+            impressoraNome: 'Expedição',
+            nomeImpressoraWindows: 'EPSON_EXP',
+            produtosLancadosIds: ['pl-1', 'pl-2'],
+          },
+        ],
+        warnings: [],
+      },
+      pedido: pedidoBase,
+      prefs,
+      modoPorImpressoraId: { 'imp-exp': 'porUnidade' },
+    })
+
+    expect(result.tickets).toHaveLength(1)
+    expect(result.tickets[0].tipoCupom).toBe('unificado')
+    expect(result.tickets[0].itens).toHaveLength(2)
+    expect(result.tickets[0].viaProducao).toBeUndefined()
+  })
+
+  it('usa modoImpressao vindo das instruções da estação quando o mapa extra está vazio', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+      modo: 'separado' as const,
+      impressoraExpedicaoId: 'imp-exp',
+    }
+
+    const result = montarTicketsResponseFromInstrucoes({
+      instrucoes: {
+        mapeamentos: [
+          {
+            impressoraId: 'imp-cozinha',
+            impressoraNome: 'Cozinha',
+            nomeImpressoraWindows: 'EPSON_COZ',
+            produtosLancadosIds: ['pl-1', 'pl-2'],
+            modoImpressao: 'agrupado',
+          },
+        ],
+        warnings: [],
+      },
+      pedido: {
+        ...pedidoBase,
+        produtosLancados: [
+          {
+            id: 'pl-1',
+            produtoId: 'h',
+            nomeProduto: 'Heineken',
+            quantidade: 1,
+            valorUnitario: 10,
+            valorFinal: 10,
+            removido: false,
+            complementos: [],
+            observacoes: [],
+          },
+          {
+            id: 'pl-2',
+            produtoId: 'h',
+            nomeProduto: 'Heineken',
+            quantidade: 1,
+            valorUnitario: 10,
+            valorFinal: 10,
+            removido: false,
+            complementos: [],
+            observacoes: [],
+          },
+        ],
+      },
+      prefs,
+    })
+
+    const producao = result.tickets.filter(t => t.tipoCupom === 'producao')
+    expect(producao).toHaveLength(1)
+    expect(producao[0].itens).toHaveLength(1)
+    expect(producao[0].itens[0].quantidade).toBe(2)
+  })
 })

@@ -20,6 +20,14 @@ import type {
   VendaGestorTicketsResponse,
 } from '@/src/shared/types/vendaGestorTickets'
 import type { EmpresaMeResumo } from '@/src/presentation/hooks/useEmpresaMe'
+import {
+  modoImpressaoDeMapeamentoOpcional,
+  type ModoImpressaoImpressora,
+} from '@/src/domain/types/modoImpressaoImpressora'
+import {
+  planejarTicketsProducaoImpressora,
+  ticketIdViaProducao,
+} from '@/src/application/delivery/planejarTicketsProducaoImpressora'
 
 function asRecord(v: unknown): Record<string, unknown> | null {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return null
@@ -118,6 +126,8 @@ function mapComplemento(c: Record<string, unknown>): VendaGestorTicketItemComple
   return {
     nome: asStr(c.nomeComplemento) || asStr(c.nome),
     quantidade,
+    complementoId: asStr(c.complementoId) || asStr(c.id) || undefined,
+    tipoImpactoPreco: asStr(c.tipoImpactoPreco) || undefined,
     impressao: {
       quantidade,
       valorUnitario,
@@ -392,6 +402,24 @@ function montarTicket(params: {
   }
 }
 
+function expandirTicketProducao(
+  ticket: VendaGestorTicket,
+  modo: ModoImpressaoImpressora
+): VendaGestorTicket[] {
+  const vias = planejarTicketsProducaoImpressora(ticket.itens, modo)
+  if (vias.length === 0) return []
+  return vias.map((via, index) => ({
+    ...ticket,
+    ticketId: ticketIdViaProducao(ticket.impressoraId, via.kind, index),
+    itens: via.items,
+    viaProducao: {
+      kind: via.kind,
+      unitIndex: via.unitIndex,
+      unitTotal: via.unitTotal,
+    },
+  }))
+}
+
 /**
  * Monta `VendaGestorTicketsResponse` compatível com o fluxo legado de tickets,
  * combinando instruções de roteamento + detalhe do pedido + prefs da empresa.
@@ -406,6 +434,8 @@ export function montarTicketsResponseFromInstrucoes(params: {
   mapeamentosEstacao?: EstacaoImpressaoMapeamento[]
   /** Nomes dos meios de pagamento (id → nome) para o rodapé do cupom. */
   nomesMeiosPagamentoPorId?: Record<string, string>
+  /** Modo da estação atual por impressora lógica (`normal` se ausente). Só tickets `producao`. */
+  modoPorImpressoraId?: Record<string, ModoImpressaoImpressora>
 }): VendaGestorTicketsResponse {
   const {
     instrucoes,
@@ -415,6 +445,7 @@ export function montarTicketsResponseFromInstrucoes(params: {
     estacaoImpressaoId,
     mapeamentosEstacao,
     nomesMeiosPagamentoPorId,
+    modoPorImpressoraId,
   } = params
   const modo = prefs.modo
   const impressoraExpedicaoId = prefs.impressoraExpedicaoId
@@ -491,7 +522,12 @@ export function montarTicketsResponseFromInstrucoes(params: {
         produtoPorId,
         origemImpressora: origemFallback ? 'fallback_expedicao' : 'produto',
       })
-      if (ticket) tickets.push(ticket)
+      if (!ticket) continue
+      const modoImpressora =
+        (mapping.impressoraId && modoPorImpressoraId?.[mapping.impressoraId]) ||
+        modoImpressaoDeMapeamentoOpcional(mapping) ||
+        'normal'
+      tickets.push(...expandirTicketProducao(ticket, modoImpressora))
     }
 
     const expedicaoMapping = instrucoes.mapeamentos.find(

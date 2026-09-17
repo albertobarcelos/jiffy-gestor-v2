@@ -2,6 +2,11 @@ import { montarTicketsResponseFromInstrucoes } from '@/src/application/delivery/
 import { fetchInstrucoesImpressaoPedido } from '@/src/infrastructure/api/fetchInstrucoesImpressaoPedido'
 import { fetchPedidoDeliveryDetalhe } from '@/src/infrastructure/api/fetchPedidoDeliveryDetalhe'
 import { buscarMapeamentosEstacao } from '@/src/infrastructure/api/estacoesImpressaoApi'
+import { fetchModosImpressaoDaEstacaoPorIds } from '@/src/infrastructure/api/fetchModosImpressaoDaEstacaoPorIds'
+import {
+  modosImpressaoPorImpressoraIdDeMapeamentos,
+  type ModoImpressaoImpressora,
+} from '@/src/domain/types/modoImpressaoImpressora'
 import {
   lembrarNomeMeioPagamento,
   obterNomeMeioPagamentoCache,
@@ -135,6 +140,34 @@ export async function carregarPayloadTicketsImpressaoDelivery(params: {
     })
   }
 
+  let modoPorImpressoraId: Record<string, ModoImpressaoImpressora> = {}
+  if (params.prefs.modo === 'separado') {
+    const ids = instrucoesFetch.data.mapeamentos
+      .map(m => m.impressoraId)
+      .filter((id): id is string => Boolean(id?.trim()))
+    modoPorImpressoraId = {
+      ...modosImpressaoPorImpressoraIdDeMapeamentos(instrucoesFetch.data.mapeamentos),
+      ...modosImpressaoPorImpressoraIdDeMapeamentos(mapeamentosEstacao),
+    }
+    const faltando = ids.filter(id => !modoPorImpressoraId[id])
+    if (faltando.length > 0) {
+      try {
+        const fetched = await fetchModosImpressaoDaEstacaoPorIds(
+          faltando,
+          params.accessToken,
+          estacao
+        )
+        modoPorImpressoraId = { ...fetched, ...modoPorImpressoraId }
+      } catch (error) {
+        erroImpressao('carregarPayloadTickets.modos_impressora_falhou', {
+          vendaId: params.vendaId,
+          estacao,
+          mensagem: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
+  }
+
   try {
     const data = montarTicketsResponseFromInstrucoes({
       instrucoes: instrucoesFetch.data,
@@ -144,6 +177,7 @@ export async function carregarPayloadTicketsImpressaoDelivery(params: {
       estacaoImpressaoId: estacao,
       mapeamentosEstacao,
       nomesMeiosPagamentoPorId,
+      modoPorImpressoraId,
     })
 
     logImpressao('carregarPayloadTickets.ok', {

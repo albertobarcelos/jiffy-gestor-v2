@@ -31,6 +31,8 @@ function normalizarInstrucoes(raw: Record<string, unknown>): InstrucoesImpressao
           nomeImpressoraWindows:
             o.nomeImpressoraWindows != null ? String(o.nomeImpressoraWindows) : null,
           produtosLancadosIds,
+          modoImpressao: o.modoImpressao ?? o.modo_impressao,
+          modoFicha: o.modoFicha ?? o.modo_ficha,
         }
       })
     : []

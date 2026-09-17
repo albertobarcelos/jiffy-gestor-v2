@@ -312,6 +312,26 @@ export function mapTicketToPrintDocument(
     pushText(content, empresa, { align: 'center', bold: negrito.cabecalho, size: fontes.cabecalho })
   }
   pushText(content, titulo, { align: 'center', bold: negrito.cabecalho, size: 'double' })
+  if (producao && ticket.viaProducao?.kind === 'conference') {
+    pushText(content, '*** VIA DE CONFERENCIA ***', {
+      align: 'center',
+      bold: true,
+      size: 'double',
+    })
+  }
+  if (
+    producao &&
+    ticket.viaProducao?.kind === 'unit' &&
+    ticket.viaProducao.unitIndex != null &&
+    ticket.viaProducao.unitTotal != null
+  ) {
+    const codigoVia = root.codigoVenda || String(root.numeroVenda ?? '')
+    pushText(
+      content,
+      `PEDIDO ${codigoVia} - ${ticket.viaProducao.unitIndex} DE ${ticket.viaProducao.unitTotal}`,
+      { align: 'center', bold: true, size: 'double' }
+    )
+  }
   if (template.cabecalhoExtra.trim()) {
     pushText(content, template.cabecalhoExtra.trim(), { align: 'center', bold: negrito.cabecalho, size: fontes.cabecalho })
   }

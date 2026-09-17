@@ -16,6 +16,9 @@ export interface VendaGestorTicketItemComplemento {
   nome?: string
   descricao?: string
   quantidade?: number
+  /** Usado pelo planner de vias (`agrupado` / `porUnidade`) para equivalência. */
+  complementoId?: string
+  tipoImpactoPreco?: string
   /** Dados calculados apenas para impressão; não devem alterar a montagem fiscal da venda. */
   impressao?: {
     quantidade?: number
@@ -40,9 +43,19 @@ export interface VendaGestorTicketItem {
   complementos?: VendaGestorTicketItemComplemento[]
 }
 
+export type ViaProducaoKind = 'single' | 'unit' | 'conference'
+
+export interface ViaProducaoTicket {
+  kind: ViaProducaoKind
+  unitIndex?: number
+  unitTotal?: number
+}
+
 export interface VendaGestorTicket {
   ticketId?: string
   tipoCupom: TicketTipoCupomApi
+  /** Overlay de via (por unidade / conferência). Só tickets `producao`. */
+  viaProducao?: ViaProducaoTicket
   impressoraId: string | null
   /** Nome lógico/cadastral, apenas exibição. */
   impressoraNome: string | null
