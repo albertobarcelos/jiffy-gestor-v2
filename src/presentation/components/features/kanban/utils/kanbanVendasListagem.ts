@@ -76,15 +76,24 @@ export function filtrarVendaDeliveryKanbanColunaPorDatasToolbar(
     }
   }
 
-  if (temFiltroFinalizacao && isColunaFiscal && venda.dataFinalizacao?.trim()) {
-    if (
-      !dentroDoIntervaloIso(
-        venda.dataFinalizacao,
-        params.dataFinalizacaoInicio,
-        params.dataFinalizacaoFim
-      )
-    ) {
-      return false
+  if (temFiltroFinalizacao && isColunaFiscal) {
+    const dataFinalizacao = venda.dataFinalizacao?.trim()
+    const dataEmissao = venda.dataEmissaoFiscal?.trim()
+    const dataCancelamento = venda.dataCancelamento?.trim()
+    const dataModificacao = venda.dataUltimaModificacao?.trim()
+    if (dataFinalizacao || dataEmissao || dataCancelamento || dataModificacao) {
+      const noPeriodo = (iso: string | undefined) =>
+        iso
+          ? dentroDoIntervaloIso(iso, params.dataFinalizacaoInicio, params.dataFinalizacaoFim)
+          : false
+      if (
+        !noPeriodo(dataFinalizacao) &&
+        !noPeriodo(dataEmissao) &&
+        !noPeriodo(dataCancelamento) &&
+        !noPeriodo(dataModificacao)
+      ) {
+        return false
+      }
     }
   }
 

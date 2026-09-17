@@ -55,7 +55,7 @@ function CabecalhoBloco({
         </span>
       ) : null}
       {filtroStatus && onFiltroStatusChange ? (
-        <FormControl size="small" sx={{ minWidth: 104, ml: 'auto' }}>
+        <FormControl size="small" sx={{ minWidth: 118, ml: 'auto' }}>
           <Select
             value={filtroStatus}
             onChange={e => onFiltroStatusChange(e.target.value as FiltroStatusEntreguesKanban)}

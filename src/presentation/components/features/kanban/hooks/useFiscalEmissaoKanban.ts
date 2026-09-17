@@ -97,7 +97,7 @@ export function deveEncerrarPollComStatus(
 ): boolean {
   const s = normalizarStatusFiscal(status)
   if (!s) return false
-  if (s === 'EMITIDA' || s === 'CANCELADA' || s === 'INUTILIZADA') return true
+  if (s === 'EMITIDA' || s === 'AUTORIZADA' || s === 'AUTORIZADO' || s === 'CANCELADA' || s === 'INUTILIZADA') return true
   if ((s === 'REJEITADA' || s === 'DENEGADA') && viuAguardando) return true
   if ((s === 'REJEITADA' || s === 'DENEGADA') && s !== statusAnterior) return true
   return false

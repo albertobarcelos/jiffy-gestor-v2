@@ -143,7 +143,16 @@ async function listarPedidosModuloJiffy(request: NextRequest): Promise<NextRespo
 
   if (queryParams.offset == null) queryParams.offset = 0
   if (queryParams.limit == null) queryParams.limit = PEDIDOS_DELIVERY_KANBAN_PAGE_SIZE
-  if (queryParams.cancelado == null) queryParams.cancelado = false
+  const statusDelivery = queryParams.statusDelivery
+  const statusLista = Array.isArray(statusDelivery)
+    ? statusDelivery
+    : statusDelivery
+      ? [statusDelivery]
+      : []
+  const incluiCancelado = statusLista.includes('CANCELADO')
+  if (queryParams.cancelado == null && !incluiCancelado) {
+    queryParams.cancelado = false
+  }
 
   const query = serializarPedidosDeliveryQueryParams(queryParams).toString()
 

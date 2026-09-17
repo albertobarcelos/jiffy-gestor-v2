@@ -79,7 +79,7 @@ export function pedidoDeliverySummaryParaUnifiedRecord(
         }
       : null,
     solicitarEmissaoFiscal: summary.solicitarEmissaoFiscal,
-    statusFiscal: resumoFiscal?.status ?? null,
+    statusFiscal: resumoFiscal?.status ?? (summary as { statusFiscal?: string }).statusFiscal ?? null,
     resumoFiscal,
     documentoFiscalId: resumoFiscal?.documentoFiscalId ?? null,
     abertoPor: { id: '', nome: '—' },

@@ -30,6 +30,15 @@ describe('pedidoDeliveryListQuery — origem toolbar ↔ API', () => {
 })
 
 describe('pedidoDeliveryListQuery — serialização', () => {
+  it('omite cancelado quando o filtro manda null', () => {
+    const params = montarPedidosDeliveryQueryParams({
+      statusDelivery: ['FINALIZADO', 'CANCELADO'],
+      cancelado: null,
+    })
+    expect(params.cancelado).toBeUndefined()
+    expect(params.statusDelivery).toEqual(['FINALIZADO', 'CANCELADO'])
+  })
+
   it('monta params do Kanban com cancelado=false e datas de finalização renomeadas', () => {
     const params = montarPedidosDeliveryQueryParams({
       q: '  cliente  ',

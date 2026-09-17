@@ -63,7 +63,9 @@ function normalizarStatusFiscalUnificado(
     rf?.statusFiscal
   )
   if (!raw) return null
-  return raw.toUpperCase() as VendaUnificadaDTO['statusFiscal']
+  const upper = raw.toUpperCase()
+  if (upper === 'AUTORIZADA' || upper === 'AUTORIZADO') return 'EMITIDA'
+  return upper as VendaUnificadaDTO['statusFiscal']
 }
 
 /** Evita Boolean("false") === true se a API enviar string */
@@ -432,10 +434,13 @@ export class VendaUnificadaDTO {
   }
 
   temNFeEmitida(): boolean {
+    const sf = String(this.statusFiscal ?? '')
+      .trim()
+      .toUpperCase()
     const statusComDocumentoValido =
-      this.statusFiscal === 'EMITIDA' || this.statusFiscal === 'CANCELADA'
-
-    return statusComDocumentoValido && this.possuiDocumentoFiscal()
+      sf === 'EMITIDA' || sf === 'AUTORIZADA' || sf === 'AUTORIZADO' || sf === 'CANCELADA'
+    if (statusComDocumentoValido && this.possuiDocumentoFiscal()) return true
+    return Boolean(String(this.dataEmissaoFiscal ?? '').trim()) && this.possuiDocumentoFiscal()
   }
 
   isVendaPdv(): boolean {
@@ -510,7 +515,9 @@ export class VendaUnificadaDTO {
     }
 
     if (raw && map[raw]) return map[raw]
-    // Sem etapa na API: pedido recém-criado permanece em Novos Pedidos (mesmo com pagamento registrado)
+    // Sem etapa na API: recém-criado fica em Novos. Já finalizado/com nota não pode
+    // cair aí — patch fiscal fino às vezes apaga `statusDelivery`.
+    if (this.dataFinalizacao || this.statusFiscal) return null
     return 'NOVOS_PEDIDOS'
   }
 
@@ -647,7 +654,8 @@ export function mapItemJsonParaVendaUnificadaDTO(v: Record<string, unknown>): Ve
     extrairNumeroMesa(v),
     v.numeroFiscal as number | null | undefined,
     v.serieFiscal as string | null | undefined,
-    v.dataEmissaoFiscal as string | null | undefined,
+    (v.dataEmissaoFiscal as string | null | undefined) ??
+      (resumoFiscalRecord(v)?.dataEmissao as string | null | undefined),
     v.tipoDocFiscal as VendaUnificadaDTO['tipoDocFiscal'],
     parseModeloFiscalApi(v.modelo),
     extrairRetornoSefaz(v),

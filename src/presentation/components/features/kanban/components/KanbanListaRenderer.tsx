@@ -124,7 +124,7 @@ export function KanbanListaRenderer(props: KanbanBoardRendererProps) {
             filtroStatusFiscalComNf &&
             onFiltroStatusFiscalComNfChange ? (
               <div className="pr-3">
-                <FormControl size="small" sx={{ minWidth: 108 }}>
+                <FormControl size="small" sx={{ minWidth: 118 }}>
                   <Select
                     value={filtroStatusFiscalComNf}
                     onChange={e =>

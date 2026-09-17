@@ -81,10 +81,15 @@ export function pedidoDeliverySummaryTemCamposComerciais(raw: unknown): boolean 
 export function extrairPatchOperacionalKanbanDeStatusDelivery(raw: unknown): KanbanVendaCachePatch {
   const o = objetoRaizDeliverySummary(raw) ?? {}
   const status = isoDeCampoApi(o.statusDelivery) ?? isoDeCampoApi(o.statusEtapaOperacional)
+  const dataFinalizacao = inferirDataFinalizacaoPatch(status, isoDeCampoApi(o.dataFinalizacao))
   const patch: KanbanVendaCachePatch = {
-    statusEtapaOperacional: status,
-    dataUltimaModificacao: isoDeCampoApi(o.dataUltimaModificacao),
-    dataFinalizacao: inferirDataFinalizacaoPatch(status, isoDeCampoApi(o.dataFinalizacao)),
+    dataUltimaModificacao: isoDeCampoApi(o.dataUltimaModificacao) ?? undefined,
+  }
+  if (status) {
+    patch.statusEtapaOperacional = status
+  }
+  if (dataFinalizacao) {
+    patch.dataFinalizacao = dataFinalizacao
   }
 
   if (!Object.prototype.hasOwnProperty.call(o, 'entregador')) return patch

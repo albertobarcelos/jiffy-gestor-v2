@@ -1,4 +1,5 @@
 import type { StatusDeliveryApi } from '@/src/application/dto/api/pedidoDeliveryApi'
+import { isPedidoEntregaKanban } from '@/src/shared/helpers/pedidoEntregaKanban'
 import type { ColunaKanbanId, FiltroStatusEntreguesKanban } from '../types'
 import type { PedidosDeliveryInfiniteParams } from '../hooks/usePedidosDeliveryInfinite'
 import type { VendaUnificadaDTO } from '../hooks/useVendasUnificadas'
@@ -61,10 +62,13 @@ function paramsFinalizadosKanbanColumn(
 
   return {
     ...base,
-    statusDelivery: 'FINALIZADO',
-    cancelado: false,
-    dataFinalizacaoInicio: temFiltroFinalizacao ? params.dataFinalizacaoInicio : undefined,
-    dataFinalizacaoFim: temFiltroFinalizacao ? params.dataFinalizacaoFim : undefined,
+    statusDelivery: ['FINALIZADO', 'CANCELADO'],
+    cancelado: null,
+    dataFinalizacaoInicio: undefined,
+    dataFinalizacaoFim: undefined,
+    dataUltimaModificacaoInicial: temFiltroFinalizacao
+      ? params.dataFinalizacaoInicio
+      : undefined,
   }
 }
 
@@ -97,7 +101,7 @@ export function buildPedidosDeliveryParamsForKanbanColumn(
   }
 }
 
-/** Coluna visual Entregues: um único pool `FINALIZADO` filtrado no client por status. */
+/** Coluna visual Entregues: pool FINALIZADO+CANCELADO filtrado no client por status. */
 export function isColunaKanbanDeliveryFiscalSplit(columnId: ColunaKanbanId): boolean {
   return columnId === 'FINALIZADAS'
 }
@@ -120,6 +124,16 @@ export function vendaPertenceColunaDeliveryKanban(
     case 'EM_ROTA':
       return etapa === 'EM_ROTA'
     case 'FINALIZADAS':
+      if (
+        pedidoDeliveryCancelado(venda) &&
+        isPedidoEntregaKanban(
+          venda.tabelaOrigem,
+          venda.tipoVenda,
+          venda.statusEtapaOperacional
+        )
+      ) {
+        return true
+      }
       return (
         etapa === 'FINALIZADAS' ||
         etapa === 'COM_FISCAL' ||
@@ -131,20 +145,65 @@ export function vendaPertenceColunaDeliveryKanban(
   }
 }
 
+const STATUS_ENTREGUES_EMITIDA = new Set([
+  'EMITIDA',
+  'AUTORIZADA',
+  'AUTORIZADO',
+])
+const STATUS_ENTREGUES_CANCELADA = new Set(['CANCELADA', 'INUTILIZADA'])
+const STATUS_ENTREGUES_REJEITADA = new Set(['REJEITADA', 'DENEGADA'])
+const STATUS_ENTREGUES_PENDENTE = new Set([
+  'PENDENTE',
+  'PENDENTE_EMISSAO',
+  'PENDENTE_AUTORIZACAO',
+  'EMITINDO',
+  'CONTINGENCIA',
+])
+
+function statusFiscalEntregues(venda: VendaUnificadaDTO): string {
+  return String(venda.statusFiscal ?? '')
+    .trim()
+    .toUpperCase()
+}
+
+function pedidoDeliveryCancelado(venda: VendaUnificadaDTO): boolean {
+  if (String(venda.dataCancelamento ?? '').trim()) return true
+  const op = String(venda.statusEtapaOperacional ?? '')
+    .trim()
+    .toUpperCase()
+  return op === 'CANCELADO' || op === 'CANCELADA'
+}
+
+function vendaEntreguesTemNotaEmitida(venda: VendaUnificadaDTO): boolean {
+  const sf = statusFiscalEntregues(venda)
+  if (STATUS_ENTREGUES_EMITIDA.has(sf)) return true
+  if (
+    STATUS_ENTREGUES_REJEITADA.has(sf) ||
+    STATUS_ENTREGUES_PENDENTE.has(sf) ||
+    STATUS_ENTREGUES_CANCELADA.has(sf)
+  ) {
+    return false
+  }
+  if (String(venda.dataEmissaoFiscal ?? '').trim()) return true
+  if (typeof venda.temNFeEmitida === 'function' && venda.temNFeEmitida()) return true
+  return false
+}
+
 export function bucketStatusEntreguesKanban(
   venda: VendaUnificadaDTO,
   getEtapaKanban: (v: VendaUnificadaDTO) => string
 ): Exclude<FiltroStatusEntreguesKanban, 'TODAS'> | null {
-  const etapa = getEtapaKanban(venda)
-  if (etapa === 'FINALIZADAS') return 'FINALIZADA'
-  if (etapa === 'REJEITADAS') return 'REJEITADA'
-  if (etapa === 'PENDENTE_EMISSAO') return 'PENDENTE'
-  if (etapa !== 'COM_FISCAL') return null
+  const sf = statusFiscalEntregues(venda)
+  if (STATUS_ENTREGUES_CANCELADA.has(sf) || pedidoDeliveryCancelado(venda)) return 'CANCELADA'
+  if (vendaEntreguesTemNotaEmitida(venda)) return 'EMITIDA'
+  if (STATUS_ENTREGUES_REJEITADA.has(sf)) return 'REJEITADA'
 
-  const sf = String(venda.statusFiscal ?? '').trim().toUpperCase()
-  if (sf === 'EMITIDA' || sf === 'CANCELADA' || sf === 'INUTILIZADA') return 'EMITIDA'
-  if (sf === 'REJEITADA' || sf === 'DENEGADA') return 'REJEITADA'
-  return 'PENDENTE'
+  const etapa = getEtapaKanban(venda)
+  if (etapa === 'REJEITADAS') return 'REJEITADA'
+  if (etapa === 'PENDENTE_EMISSAO' || STATUS_ENTREGUES_PENDENTE.has(sf)) return 'PENDENTE'
+  if (etapa === 'COM_FISCAL') return 'PENDENTE'
+  if (etapa === 'FINALIZADAS') return 'FINALIZADA'
+  return null
 }
 
 export function vendaAtendeFiltroStatusEntregues(
@@ -167,6 +226,7 @@ export const OPCOES_FILTRO_STATUS_ENTREGUES: {
   { value: 'EMITIDA', label: 'Emitida' },
   { value: 'PENDENTE', label: 'Pendente' },
   { value: 'REJEITADA', label: 'Rejeitada' },
+  { value: 'CANCELADA', label: 'Cancelada' },
 ]
 
 /**

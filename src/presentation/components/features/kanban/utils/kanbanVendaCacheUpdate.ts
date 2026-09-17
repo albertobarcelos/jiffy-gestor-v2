@@ -119,7 +119,9 @@ export function cloneVendaUnificadaDTO(
     venda.totalDesconto,
     venda.totalAcrescimo,
     venda.dataCriacao,
-    patch.dataFinalizacao !== undefined ? patch.dataFinalizacao : venda.dataFinalizacao,
+    patch.dataFinalizacao != null && String(patch.dataFinalizacao).trim()
+      ? patch.dataFinalizacao
+      : venda.dataFinalizacao,
     venda.dataCancelamento,
     venda.cliente,
     patch.solicitarEmissaoFiscal !== undefined
@@ -143,7 +145,7 @@ export function cloneVendaUnificadaDTO(
       ? normalizarModeloFiscalPatch(patch.modelo, venda.modelo)
       : venda.modelo,
     patch.retornoSefaz !== undefined ? patch.retornoSefaz : venda.retornoSefaz,
-    patch.statusEtapaOperacional !== undefined
+    patch.statusEtapaOperacional != null && String(patch.statusEtapaOperacional).trim()
       ? patch.statusEtapaOperacional
       : venda.statusEtapaOperacional,
     patch.dataUltimaModificacao !== undefined
@@ -553,11 +555,42 @@ export function extrairPatchFiscalKanban(data: unknown): KanbanVendaCachePatch {
       ? (root.resumoFiscal as Record<string, unknown>)
       : null
 
+  const statusOperacional = new Set([
+    'FINALIZADO',
+    'FINALIZADA',
+    'EM_PREPARO',
+    'PRONTO',
+    'EM_ROTA',
+    'PENDENTE',
+    'CANCELADO',
+    'ENTREGUE',
+    'CONCLUIDO',
+  ])
+  const statusFiscalUnico = new Set([
+    'EMITIDA',
+    'AUTORIZADA',
+    'AUTORIZADO',
+    'REJEITADA',
+    'DENEGADA',
+    'EMITINDO',
+    'PENDENTE_AUTORIZACAO',
+    'PENDENTE_EMISSAO',
+    'INUTILIZADA',
+    'CONTINGENCIA',
+    'CANCELADA',
+  ])
+  const statusRaizGenerico = isoOuNull(root.status)
+  const statusRaizFiscal =
+    statusRaizGenerico &&
+    statusFiscalUnico.has(statusRaizGenerico.toUpperCase()) &&
+    !statusOperacional.has(statusRaizGenerico.toUpperCase())
+      ? statusRaizGenerico
+      : null
   const statusRaw =
     isoOuNull(root.statusFiscal) ??
-    isoOuNull(root.status) ??
     isoOuNull(rf?.status) ??
-    isoOuNull(rf?.statusFiscal)
+    isoOuNull(rf?.statusFiscal) ??
+    statusRaizFiscal
 
   const modeloRaw = numeroOuNull(root.modelo) ?? numeroOuNull(rf?.modelo)
   const tipoDocRaw = isoOuNull(root.tipoDocFiscal) ?? isoOuNull(root.tipoDocumento)
@@ -648,16 +681,20 @@ export function aplicarPatchFiscalKanbanSemRefetch(
     atualizouListagem = patchKanbanVendasListagemCache(queryClient, vendaId, patch)
   } else {
     const atualizada = cloneVendaUnificadaDTO(venda, patch)
-    const etapa = atualizada.getEtapaKanban()
-    if ((COLUNAS_FISCAIS_BALCAO as string[]).includes(etapa)) {
-      atualizouListagem = moveVendaKanbanBalcaoEntreColunas(
-        queryClient,
-        vendaId,
-        etapa as EtapaKanbanBalcao,
-        patch
-      )
-    } else {
-      atualizouListagem = patchKanbanVendasListagemCache(queryClient, vendaId, patch)
+    const entregaKanban = atualizada.isPedidoEntregaGestor() || atualizada.isDelivery()
+    // Delivery: Entregues absorve COM_FISCAL. Não mover para coluna de balcão.
+    atualizouListagem = patchKanbanVendasListagemCache(queryClient, vendaId, patch)
+    if (!entregaKanban) {
+      const etapa = atualizada.getEtapaKanban()
+      if ((COLUNAS_FISCAIS_BALCAO as string[]).includes(etapa)) {
+        atualizouListagem =
+          moveVendaKanbanBalcaoEntreColunas(
+            queryClient,
+            vendaId,
+            etapa as EtapaKanbanBalcao,
+            patch
+          ) || atualizouListagem
+      }
     }
   }
 

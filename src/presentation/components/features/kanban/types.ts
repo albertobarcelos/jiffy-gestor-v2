@@ -36,6 +36,7 @@ export type FiltroStatusEntreguesKanban =
   | 'EMITIDA'
   | 'PENDENTE'
   | 'REJEITADA'
+  | 'CANCELADA'
 
 /**
  * Origem real da venda (contrato GET /vendas/unificado).

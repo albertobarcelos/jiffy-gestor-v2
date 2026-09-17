@@ -171,4 +171,16 @@ describe('VendaUnificadaDTO.getEtapaKanban — delivery operacional (prioridade 
     })
     expect(venda.getEtapaKanban()).toBe('FINALIZADAS')
   })
+
+  it('pedido entregue com nota emitida e sem statusDelivery permanece no fiscal', () => {
+    const venda = makeVenda({
+      tipoVenda: 'entrega',
+      tabelaOrigem: 'venda_gestor',
+      statusEtapaOperacional: null,
+      statusFiscal: 'EMITIDA',
+      dataFinalizacao: '2026-07-01T11:00:00.000Z',
+      etapaKanbanBalcao: null,
+    })
+    expect(venda.getEtapaKanban()).toBe('COM_FISCAL')
+  })
 })

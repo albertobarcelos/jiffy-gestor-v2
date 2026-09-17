@@ -95,7 +95,13 @@ async function fetchDeltaPedidosDelivery(
       signal
     ),
     fetchPedidosDeliveryItems(
-      { ...base, statusDelivery: 'FINALIZADO', dataFinalizacaoInicio: lastPollAt },
+      {
+        offset: 0,
+        limit: KANBAN_DELIVERY_COLUMN_PAGE_SIZE,
+        statusDelivery: ['FINALIZADO', 'CANCELADO'],
+        cancelado: null,
+        dataUltimaModificacaoInicial: lastPollAt,
+      },
       token,
       queryClient,
       signal

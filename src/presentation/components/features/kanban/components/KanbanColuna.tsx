@@ -98,7 +98,7 @@ export function KanbanColuna(props: KanbanColunaProps) {
           {mostrarFiltroStatusFiscal ? (
             <>
               <span className={`text-[11px] font-medium ${column.tituloClasse ?? 'text-gray-700'}`}>Status</span>
-              <FormControl size="small" sx={{ minWidth: 108 }}>
+              <FormControl size="small" sx={{ minWidth: 118 }}>
                 <Select
                   value={filtroStatusFiscal}
                   onChange={e =>

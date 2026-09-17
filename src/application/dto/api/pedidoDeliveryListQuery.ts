@@ -53,8 +53,8 @@ export interface FiltrosKanbanParaPedidosDelivery {
   statusDelivery?: StatusDeliveryApi | StatusDeliveryApi[]
   /** Filtro por tipo de entrega (entrega/retirada) — modo delivery. */
   tipoEntrega?: TipoEntregaDeliveryApi | TipoEntregaDeliveryApi[]
-  /** Default operacional: excluir cancelados (`cancelado=false`). */
-  cancelado?: boolean
+  /** Default operacional: excluir cancelados (`cancelado=false`). `null` omite o param (Entregues mistura FINALIZADO+CANCELADO). */
+  cancelado?: boolean | null
   /** Filtro delta: retorna itens com `dataUltimaModificacao >= valor`. Usado no re-poll do Kanban. */
   dataUltimaModificacaoInicial?: string
 }
@@ -157,7 +157,7 @@ export function montarPedidosDeliveryQueryParams(
     dataCriacaoFinal: filtros.dataCriacaoFinal,
     dataFinalizacaoInicial: filtros.dataFinalizacaoInicio,
     dataFinalizacaoFinal: filtros.dataFinalizacaoFim,
-    cancelado: filtros.cancelado ?? false,
+    cancelado: filtros.cancelado === null ? undefined : filtros.cancelado ?? false,
     dataUltimaModificacaoInicial: filtros.dataUltimaModificacaoInicial,
   }
 }
