@@ -96,8 +96,6 @@ async function fetchDeltaPedidosDelivery(
     ),
     fetchPedidosDeliveryItems(
       {
-        offset: 0,
-        limit: KANBAN_DELIVERY_COLUMN_PAGE_SIZE,
         statusDelivery: ['FINALIZADO', 'CANCELADO'],
         cancelado: null,
         dataUltimaModificacaoInicial: lastPollAt,
