@@ -9,6 +9,7 @@ import {
   calcularTrocoCheckout,
   calcularTrocoReceberCheckout,
   pagamentosCobremTotalCheckout,
+  pagamentosExcedemTotalSemTroco,
   restantePagamentoCheckout,
   resolverAdicaoPagamentoCheckout,
   somaPagamentosCheckout,
@@ -100,8 +101,17 @@ export function DeliveryCheckoutPagamentoModal({
     : formatDeliveryCurrency(taxaExibicao)
   const totalLancado = somaPagamentosCheckout(pagamentos)
   const restante = restantePagamentoCheckout(total, pagamentos)
-  const pagamentoCompleto = restante <= 0.01 && pagamentos.length > 0
-  const cardsDesabilitados = pagamentoCompleto || cotacaoLoading || !cotacaoPronta
+  const isDinheiroId = (meioPagamentoId: string) =>
+    isMeioPagamentoDinheiro(meiosById.get(meioPagamentoId))
+  const pagamentoInconsistente = pagamentosExcedemTotalSemTroco(
+    total,
+    pagamentos,
+    isDinheiroId
+  )
+  const pagamentoCompleto =
+    !pagamentoInconsistente && restante <= 0.01 && pagamentos.length > 0
+  const cardsDesabilitados =
+    pagamentoCompleto || pagamentoInconsistente || cotacaoLoading || !cotacaoPronta
 
   const meioSelecionado = meioSelecionadoId
     ? (meiosById.get(meioSelecionadoId) ?? null)
@@ -114,9 +124,6 @@ export function DeliveryCheckoutPagamentoModal({
     ehDinheiro && precisaTroco === true
       ? calcularTrocoReceberCheckout(valorCedula, restante)
       : 0
-
-  const isDinheiroId = (meioPagamentoId: string) =>
-    isMeioPagamentoDinheiro(meiosById.get(meioPagamentoId))
 
   const trocoReceberPersistido = useMemo(
     () => calcularTrocoCheckout(total, pagamentos, isDinheiroId),
@@ -252,6 +259,12 @@ export function DeliveryCheckoutPagamentoModal({
     }
 
     const listaFinal = result.nextPagamentos
+    if (pagamentosExcedemTotalSemTroco(total, listaFinal, isDinheiroId)) {
+      showToast.error(
+        'O valor dos pagamentos é maior que o total do pedido. Remova e lance novamente.'
+      )
+      return
+    }
     if (!pagamentosCobremTotalCheckout(total, listaFinal, isDinheiroId)) {
       showToast.error(
         listaFinal.length === 0
@@ -272,7 +285,8 @@ export function DeliveryCheckoutPagamentoModal({
     !cotacaoLoading &&
     cotacaoPronta
 
-  const continuarDisabled = cotacaoLoading || !cotacaoPronta
+  const continuarDisabled =
+    cotacaoLoading || !cotacaoPronta || pagamentoInconsistente
 
   const fieldClass =
     'w-full rounded-xl border bg-transparent px-3 py-3 text-base outline-none delivery-text-primary'
@@ -315,7 +329,17 @@ export function DeliveryCheckoutPagamentoModal({
               {cotacaoLoading ? 'Calculando...' : formatDeliveryCurrency(total)}
             </span>
           </div>
-          {restante > 0.01 ? (
+          {pagamentoInconsistente ? (
+            <div className="flex flex-col gap-0.5 text-sm font-semibold">
+              <div className="flex items-center justify-between">
+                <span className="text-red-600">Pagamento inconsistente</span>
+                <span className="text-red-600">{formatDeliveryCurrency(totalLancado)}</span>
+              </div>
+              <p className="text-xs font-medium text-red-600">
+                O valor lançado é maior que o total. Remova e lance novamente.
+              </p>
+            </div>
+          ) : restante > 0.01 ? (
             <div className="flex items-center justify-between text-sm font-semibold">
               <span className="text-red-600">Falta pagar</span>
               <span className="text-red-600">{formatDeliveryCurrency(restante)}</span>

@@ -23,11 +23,12 @@ import {
   useDeliveryPreferenciaEntregaStore,
   type DeliveryTipoEntrega,
 } from '../../stores/deliveryPreferenciaEntregaStore'
-import { COTACAO_INVALIDATING_FORM_KEYS, createInitialForm } from './formHelpers'
+import { COTACAO_INVALIDATING_FORM_KEYS, aplicarPatchFormCheckout, createInitialForm } from './formHelpers'
 import type { UseDeliveryCheckoutOptions } from './types'
 import { useCheckoutCliente } from './useCheckoutCliente'
 import { useCheckoutCotacao } from './useCheckoutCotacao'
 import { useCheckoutPedido } from './useCheckoutPedido'
+import { deveLimparPagamentosPorMudancaTotal } from '@/src/application/services/delivery-publico/checkoutPagamentos'
 
 export type {
   ClienteLookupState,
@@ -74,10 +75,10 @@ export function useDeliveryCheckout(slug: string, options?: UseDeliveryCheckoutO
 
   const limparCotacaoComPagamentos = useCallback(() => {
     cotacaoApi.limparCotacao()
-    setForm(prev => {
-      if (prev.pagamentos.length === 0) return prev
-      return { ...prev, pagamentos: [] }
-    })
+    if (formRef.current.pagamentos.length === 0) return
+    const next = { ...formRef.current, pagamentos: [] }
+    formRef.current = next
+    setForm(next)
   }, [cotacaoApi.limparCotacao])
 
   useEffect(() => {
@@ -134,8 +135,8 @@ export function useDeliveryCheckout(slug: string, options?: UseDeliveryCheckoutO
 
   const updateForm = useCallback(
     <K extends keyof CheckoutFormData>(key: K, value: CheckoutFormData[K]) => {
-      const next = { ...formRef.current, [key]: value }
-      next.telefonePaisIso2 = 'BR'
+      const invalidaCotacao = COTACAO_INVALIDATING_FORM_KEYS.has(key)
+      const next = aplicarPatchFormCheckout(formRef.current, key, value)
       if (key === 'telefone' || key === 'telefonePaisIso2') {
         telefoneDigitsRef.current = comporTelefoneApi(next.telefone, 'BR')
       }
@@ -147,11 +148,11 @@ export function useDeliveryCheckout(slug: string, options?: UseDeliveryCheckoutO
       if (key === 'telefone' || key === 'telefonePaisIso2') {
         agendarConsultaTelefone(next.telefone)
       }
-      if (COTACAO_INVALIDATING_FORM_KEYS.has(key)) {
-        limparCotacaoComPagamentos()
+      if (invalidaCotacao) {
+        cotacaoApi.limparCotacao()
       }
     },
-    [slug, setTipoEntregaPreferencia, agendarConsultaTelefone, limparCotacaoComPagamentos]
+    [slug, setTipoEntregaPreferencia, agendarConsultaTelefone, cotacaoApi.limparCotacao]
   )
 
   const pedidoApi = useCheckoutPedido({
@@ -175,6 +176,31 @@ export function useDeliveryCheckout(slug: string, options?: UseDeliveryCheckoutO
   const taxaEntregaOficial = cotacaoApi.cotacao?.taxaEntrega ?? null
   const cotacaoPronta =
     Boolean(cotacaoApi.cotacao?.tokenCotacao) && !cotacaoApi.cotacaoLoading
+
+  /** Total sob o qual os pagamentos atuais foram lançados / validados. */
+  const totalPagamentosBaselineRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    const pagamentos = formRef.current.pagamentos
+    const baseline = totalPagamentosBaselineRef.current
+
+    if (pagamentos.length === 0) {
+      totalPagamentosBaselineRef.current = totalOficial
+      return
+    }
+
+    if (deveLimparPagamentosPorMudancaTotal(baseline, totalOficial, pagamentos.length)) {
+      const next = { ...formRef.current, pagamentos: [] }
+      formRef.current = next
+      setForm(next)
+      totalPagamentosBaselineRef.current = totalOficial
+      return
+    }
+
+    if (baseline == null && totalOficial != null) {
+      totalPagamentosBaselineRef.current = totalOficial
+    }
+  }, [totalOficial])
 
   const limparCarrinhoAposPedido = useCallback(() => {
     limparCotacaoComPagamentos()

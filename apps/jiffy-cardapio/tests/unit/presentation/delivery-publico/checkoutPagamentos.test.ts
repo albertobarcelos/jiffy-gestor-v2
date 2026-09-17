@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   calcularTrocoCheckout,
   calcularTrocoReceberCheckout,
+  deveLimparPagamentosPorMudancaTotal,
   pagamentosCobremTotalCheckout,
+  pagamentosExcedemTotalSemTroco,
   restantePagamentoCheckout,
   resolverAdicaoPagamentoCheckout,
   somaPagamentosCheckout,
@@ -10,6 +12,7 @@ import {
 import { montarPedidoPublico } from '@/src/application/mappers/MontarPedidoPublicoMapper'
 import type { CheckoutFormData } from '@/src/application/dto/delivery-publico/CheckoutPublicoFormDTO'
 import type { DeliveryCarrinhoItem } from '@/src/presentation/components/features/delivery-publico/shared/stores/deliveryCarrinhoStore'
+import { aplicarPatchFormCheckout } from '@/src/presentation/components/features/delivery-publico/shared/hooks/checkout/formHelpers'
 
 const itemCarrinho: DeliveryCarrinhoItem = {
   id: 'i1',
@@ -101,6 +104,33 @@ describe('checkoutPagamentosUtils', () => {
         isDinheiro
       )
     ).toBe(false)
+  })
+
+  it('detecta overpayment sem troco válido (crédito/pix)', () => {
+    expect(
+      pagamentosExcedemTotalSemTroco(
+        40,
+        [{ meioPagamentoId: 'credito', valor: 50 }],
+        isDinheiro
+      )
+    ).toBe(true)
+  })
+
+  it('não marca overpayment inconsistente quando há troco de dinheiro', () => {
+    expect(
+      pagamentosExcedemTotalSemTroco(
+        40,
+        [{ meioPagamentoId: 'dinheiro', valor: 50 }],
+        isDinheiro
+      )
+    ).toBe(false)
+  })
+
+  it('limpa pagamentos só quando o total oficial muda', () => {
+    expect(deveLimparPagamentosPorMudancaTotal(50, 40, 1)).toBe(true)
+    expect(deveLimparPagamentosPorMudancaTotal(50, 50, 1)).toBe(false)
+    expect(deveLimparPagamentosPorMudancaTotal(50, 40, 0)).toBe(false)
+    expect(deveLimparPagamentosPorMudancaTotal(null, 40, 1)).toBe(false)
   })
 
   it('soma pagamentos', () => {
@@ -302,5 +332,32 @@ describe('montarPedidoPublico cobrancas', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.payload.cliente.telefone).toBe('11999999999')
+  })
+})
+
+describe('aplicarPatchFormCheckout', () => {
+  it('zera pagamentos ao mudar tipoEntrega e não reidrata em modoTempo seguinte', () => {
+    const comPagamento = formBase({
+      tipoEntrega: 'entrega',
+      pagamentos: [{ meioPagamentoId: 'credito', valor: 55 }],
+    })
+
+    const aposTipo = aplicarPatchFormCheckout(comPagamento, 'tipoEntrega', 'retirada')
+    expect(aposTipo.tipoEntrega).toBe('retirada')
+    expect(aposTipo.pagamentos).toEqual([])
+
+    const aposModo = aplicarPatchFormCheckout(aposTipo, 'modoTempo', 'imediato')
+    expect(aposModo.pagamentos).toEqual([])
+    expect(aposModo.modoTempo).toBe('imediato')
+  })
+
+  it('preserva pagamentos ao editar campos que não invalidam cotação', () => {
+    const comPagamento = formBase({
+      pagamentos: [{ meioPagamentoId: 'pix', valor: 30 }],
+      observacaoPedido: '',
+    })
+    const next = aplicarPatchFormCheckout(comPagamento, 'observacaoPedido', 'Sem cebola')
+    expect(next.pagamentos).toEqual([{ meioPagamentoId: 'pix', valor: 30 }])
+    expect(next.observacaoPedido).toBe('Sem cebola')
   })
 })
