@@ -526,6 +526,18 @@ export function DeliveryPublicoCarrinhoScreen({
     avancarAposIdentificacao()
   }
 
+  /** Após limpar identificação: só reconsulta, sem avançar de step. */
+  const handleBuscarTelefoneIdentificacao = async (digits: string) => {
+    const { status } = await consultarClientePorTelefone(digits)
+    if (status === 'invalido') {
+      showToast.error(DELIVERY_MSG_CELULAR_COMPLETO)
+      return
+    }
+    if (status === 'erro') {
+      showToast.error('Erro ao consultar cadastro. Tente novamente.')
+    }
+  }
+
   const handleConfirmarEnderecoForm = async (geo: EnderecoGeoCheckoutInput) => {
     const editandoExistente =
       form.modoEndereco === 'existente' && Boolean(form.enderecoIdSelecionado.trim())
@@ -768,6 +780,7 @@ export function DeliveryPublicoCarrinhoScreen({
             novoEnderecoBloqueado={novoEnderecoBloqueado}
             onSalvarNome={salvarNomeCliente}
             onLimparIdentificacao={limparIdentificacaoCliente}
+            onBuscarTelefone={handleBuscarTelefoneIdentificacao}
             onClose={fecharOuRevisao}
             onContinuar={handleTelefoneContinuar}
           />
