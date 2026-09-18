@@ -242,4 +242,16 @@ describe('deveExibirBotaoEmitirNotaNoKanban — Entregues', () => {
     expect(emitida.getEtapaKanban()).toBe('COM_FISCAL')
     expect(deveExibirBotaoEmitirNotaNoKanban('FINALIZADAS', emitida, {})).toBe(false)
   })
+
+  it('não mostra emitir nas colunas operacionais do delivery', () => {
+    const emPreparo = criarVendaKanban({
+      statusEtapaOperacional: 'EM_PREPARO',
+      solicitarEmissaoFiscal: true,
+      statusFiscal: null,
+      documentoFiscalId: null,
+    })
+    expect(emPreparo.getEtapaKanban()).toBe('EM_PREPARO')
+    expect(deveExibirBotaoEmitirNotaNoKanban('EM_PREPARO', emPreparo, {})).toBe(false)
+    expect(deveExibirBotaoEmitirNotaNoKanban('PENDENTE_EMISSAO', emPreparo, {})).toBe(false)
+  })
 })

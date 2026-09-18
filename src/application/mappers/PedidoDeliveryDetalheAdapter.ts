@@ -1,3 +1,4 @@
+import { ehPedidoModuloDelivery } from '@/src/domain/services/pedido/PedidoModuloDelivery'
 import { atorUsuarioId } from '@/src/application/mappers/atorPedidoDelivery'
 import type {
   PagamentoApiItem,
@@ -177,8 +178,5 @@ export function deveUsarModuloDeliveryParaDetalhe(
   tabelaOrigem: 'venda' | 'venda_gestor',
   tipoVenda?: string | null
 ): boolean {
-  if (tabelaOrigem !== 'venda_gestor') return false
-  const tipo = String(tipoVenda ?? '').trim().toLowerCase()
-  if (!tipo || tipo === 'balcao') return false
-  return tipo === 'entrega' || tipo === 'retirada'
+  return ehPedidoModuloDelivery(tabelaOrigem, tipoVenda)
 }

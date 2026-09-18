@@ -21,7 +21,6 @@ const prefsSeparado: PreferenciasImpressaoDelivery = {
   imprimirAoReceber: true,
   imprimirAoFicarPronto: true,
   impressoraExpedicaoId: 'exp-1',
-  impressoraPadraoNome: null,
 }
 
 function payloadCom(tickets: VendaGestorTicket[]): VendaGestorTicketsResponse {

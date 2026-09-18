@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import {
   useReemitirNfe,
   useReemitirNfeGestor,
+  useReemitirNfeDelivery,
   useEmitirNfe,
   useEmitirNfeGestor,
   useEmitirNfeDelivery,
@@ -258,6 +259,7 @@ export function useKanbanOrchestrator() {
 
   const reemitirNfePdv = useReemitirNfe()
   const reemitirNfeGestor = useReemitirNfeGestor()
+  const reemitirNfeDelivery = useReemitirNfeDelivery()
   const emitirNotaPdv = useEmitirNfe()
   const emitirNotaGestor = useEmitirNfeGestor()
   const emitirNotaDelivery = useEmitirNfeDelivery()
@@ -275,6 +277,7 @@ export function useKanbanOrchestrator() {
     useFiscalEmissaoKanban({
       reemitirNfePdv: payload => reemitirNfePdv.mutateAsync(payload),
       reemitirNfeGestor: payload => reemitirNfeGestor.mutateAsync(payload),
+      reemitirNfeDelivery: payload => reemitirNfeDelivery.mutateAsync(payload),
       emitirNotaPdv: payload => emitirNotaPdv.mutateAsync(payload),
       emitirNotaGestor: payload => emitirNotaGestor.mutateAsync(payload),
       emitirNotaDelivery: payload => emitirNotaDelivery.mutateAsync(payload),

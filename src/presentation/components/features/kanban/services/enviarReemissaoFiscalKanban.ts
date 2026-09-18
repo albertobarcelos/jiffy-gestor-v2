@@ -1,9 +1,12 @@
 import { emitirNotaPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/EmitirNotaPedidoDeliveryUseCase'
+import { reemitirNotaPedidoDeliveryUseCase } from '@/src/application/use-cases/delivery/ReemitirNotaPedidoDeliveryUseCase'
 import {
   deveUsarModuloDeliveryParaEmissaoFiscal,
   montarBodyReemitirNota,
   resolveFiscalEmissionConfig,
 } from '@/src/presentation/hooks/useVendas'
+import { numeroOpcionalReemitirNotaDelivery } from '@/src/domain/services/pedido/RegrasEmissaoFiscalDelivery'
+import { assertVendaKanbanPodeEmitirFiscalDelivery } from '../rules/emissaoFiscalDelivery.kanban'
 import { fetchGestorApi } from '@/src/presentation/utils/fetchGestorApi'
 import { resolveModeloParaEmitirNota } from '../hooks/useVendasUnificadas'
 import type { Venda } from '../types'
@@ -73,6 +76,13 @@ async function reemitirNotaSilenciosa(token: string, venda: Venda): Promise<void
   }
 }
 
+function statusFiscalRejeitado(venda: Venda): boolean {
+  const sf = String(venda.statusFiscal ?? '')
+    .trim()
+    .toUpperCase()
+  return sf === 'REJEITADA' || sf === 'DENEGADA'
+}
+
 /**
  * Envia reemissão/emissão fiscal de uma venda sem toasts nem polling de status.
  * Usado pelo processamento em lote do Kanban.
@@ -81,12 +91,34 @@ export async function enviarReemissaoFiscalKanban(
   token: string,
   venda: Venda
 ): Promise<void> {
+  assertVendaKanbanPodeEmitirFiscalDelivery(venda)
+
   const docId = venda.documentoFiscalId?.trim()
   const usarDelivery = deveUsarModuloDeliveryParaEmissaoFiscal(
     venda.tabelaOrigem,
     venda.tipoVenda
   )
   const modelo = resolveModeloParaEmitirNota(venda)
+
+  if (usarDelivery) {
+    if (docId || statusFiscalRejeitado(venda)) {
+      await reemitirNotaPedidoDeliveryUseCase.execute(
+        venda.id,
+        token,
+        numeroOpcionalReemitirNotaDelivery(venda.numeroFiscal)
+      )
+      return
+    }
+
+    if (modelo === null) {
+      throw new Error('Modelo fiscal não definido para emissão.')
+    }
+    if (modelo === 55 && !venda.cliente?.id?.trim()) {
+      throw new Error('NF-e exige cliente cadastrado na venda.')
+    }
+    await emitirNotaPedidoDeliveryUseCase.execute(venda.id, token, modelo)
+    return
+  }
 
   if (docId) {
     await reemitirNotaSilenciosa(token, venda)
@@ -99,11 +131,6 @@ export async function enviarReemissaoFiscalKanban(
 
   if (modelo === 55 && !venda.cliente?.id?.trim()) {
     throw new Error('NF-e exige cliente cadastrado na venda.')
-  }
-
-  if (usarDelivery) {
-    await emitirNotaPedidoDeliveryUseCase.execute(venda.id, token, modelo)
-    return
   }
 
   await emitirNotaSilenciosa(token, venda, modelo)

@@ -1,4 +1,6 @@
 import { fiscalPendentePodeReemitirAposCooldown } from '@/src/domain/services/pedido/RegrasFiscaisVenda'
+import { ehPedidoModuloDelivery } from '@/src/domain/services/pedido/PedidoModuloDelivery'
+import { vendaKanbanPermiteEmissaoFiscalDelivery } from './emissaoFiscalDelivery.kanban'
 import {
   clienteTelefoneContem,
   digitosTelefone,
@@ -304,6 +306,17 @@ export function deveExibirBotaoEmitirNotaNoKanban(
   if (venda.statusFiscal === 'INUTILIZADA') return false
   const acao = acaoFiscalEmAndamentoPorVenda[venda.id]
   if (acao === 'reemitindo' || acao === 'emitindo') return true
+
+  if (!vendaKanbanPermiteEmissaoFiscalDelivery(venda, columnId)) {
+    return false
+  }
+
+  if (
+    COLUNAS_ENTREGA_OPERACIONAIS.includes(columnId) &&
+    venda.isPedidoEntregaGestor()
+  ) {
+    return false
+  }
 
   const etapa = venda.getEtapaKanban()
   if (columnId === 'PENDENTE_EMISSAO' || etapa === 'PENDENTE_EMISSAO') return true
@@ -720,6 +733,7 @@ export function vendaElegivelParaReemissaoAutomaticaLote(
   acaoFiscalEmAndamentoPorVenda: Record<string, 'emitindo' | 'reemitindo'>
 ): boolean {
   if (vendaBloqueadaParaEmissaoInterativa(venda, acaoFiscalEmAndamentoPorVenda)) return false
+  if (!vendaKanbanPermiteEmissaoFiscalDelivery(venda)) return false
 
   const sf = String(venda.statusFiscal ?? '')
     .trim()
@@ -727,6 +741,7 @@ export function vendaElegivelParaReemissaoAutomaticaLote(
   if (sf !== 'REJEITADA' && sf !== 'DENEGADA') return false
 
   if (venda.documentoFiscalId?.trim()) return true
+  if (ehPedidoModuloDelivery(venda.tabelaOrigem, venda.tipoVenda)) return true
 
   const tipoDoc = String(venda.tipoDocFiscal ?? '')
     .trim()

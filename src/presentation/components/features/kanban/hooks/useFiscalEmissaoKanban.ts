@@ -6,6 +6,11 @@ import { deveUsarModuloDeliveryParaEmissaoFiscal } from '@/src/presentation/hook
 import { useAuthStore } from '@/src/presentation/stores/authStore'
 import { showToast } from '@/src/shared/utils/toast'
 import { fiscalPendentePodeReemitirAposCooldown } from '@/src/domain/services/pedido/RegrasFiscaisVenda'
+import {
+  MENSAGEM_EMISSAO_DELIVERY_SO_FINALIZADO,
+  numeroOpcionalReemitirNotaDelivery,
+} from '@/src/domain/services/pedido/RegrasEmissaoFiscalDelivery'
+import { vendaKanbanPermiteEmissaoFiscalDelivery } from '../rules/emissaoFiscalDelivery.kanban'
 import { STATUS_FISCAL_AGUARDANDO_SEFAZ } from '../rules/vendasKanban.rules'
 import {
   aplicarPatchFiscalKanbanSemRefetch,
@@ -126,6 +131,7 @@ interface UseFiscalEmissaoKanbanParams {
     documentId: string
     numero?: number
   }) => Promise<unknown>
+  reemitirNfeDelivery: (payload: { id: string; numero?: number }) => Promise<unknown>
   emitirNotaPdv: (payload: { id: string; modelo: 55 | 65 }) => Promise<unknown>
   emitirNotaGestor: (payload: { id: string; modelo: 55 | 65 }) => Promise<unknown>
   emitirNotaDelivery: (payload: { id: string; modelo: 55 | 65 }) => Promise<unknown>
@@ -139,6 +145,7 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
   const {
     reemitirNfePdv,
     reemitirNfeGestor,
+    reemitirNfeDelivery,
     emitirNotaPdv,
     emitirNotaGestor,
     emitirNotaDelivery,
@@ -345,6 +352,18 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
       if (!iniciarAcaoFiscal(venda.id, 'emitindo')) return
       vendaIdEmissaoPreparandoRef.current = venda.id
 
+      if (!vendaKanbanPermiteEmissaoFiscalDelivery(venda)) {
+        showToast.error(MENSAGEM_EMISSAO_DELIVERY_SO_FINALIZADO)
+        encerrarAcaoFiscal(venda.id)
+        vendaIdEmissaoPreparandoRef.current = null
+        return
+      }
+
+      const usarDelivery = deveUsarModuloDeliveryParaEmissaoFiscal(
+        venda.tabelaOrigem,
+        venda.tipoVenda
+      )
+
       const podeReemitirInterativo =
         venda.statusFiscal === 'REJEITADA' ||
         venda.statusFiscal === 'DENEGADA' ||
@@ -361,7 +380,18 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
 
       if (podeReemitirInterativo) {
         const docId = venda.documentoFiscalId?.trim()
+        const numeroFiscal = numeroOpcionalReemitirNotaDelivery(venda.numeroFiscal)
         const executarAtalho = async () => {
+          if (usarDelivery) {
+            await executarAcaoFiscalComLock(
+              venda,
+              'reemitindo',
+              venda.statusFiscal,
+              () => reemitirNfeDelivery({ id: venda.id, numero: numeroFiscal }),
+              { jaTravado: true }
+            )
+            return
+          }
           if (docId) {
             const payload = {
               id: venda.id,
@@ -402,7 +432,7 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
           }
         }
 
-        if (docId || resolveModeloParaEmitirNota(venda) !== null) {
+        if (usarDelivery || docId || resolveModeloParaEmitirNota(venda) !== null) {
           try {
             const itens = await verificarCbenef.mutateAsync({
               vendaId: venda.id,
@@ -445,11 +475,11 @@ export function useFiscalEmissaoKanban(params: UseFiscalEmissaoKanbanParams) {
     },
     [
       emissaoFiscalLock,
-      emitirNotaDelivery,
       emitirNotaParaVenda,
       encerrarAcaoFiscal,
       executarAcaoFiscalComLock,
       iniciarAcaoFiscal,
+      reemitirNfeDelivery,
       reemitirNfeGestor,
       reemitirNfePdv,
       setEmitirNfeModalOpen,

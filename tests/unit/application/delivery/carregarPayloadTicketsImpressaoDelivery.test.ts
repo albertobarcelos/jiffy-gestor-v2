@@ -5,6 +5,7 @@ import { fetchPedidoDeliveryDetalhe } from '@/src/infrastructure/api/fetchPedido
 import { buscarMapeamentosEstacao } from '@/src/infrastructure/api/estacoesImpressaoApi'
 import { fetchModosImpressaoDaEstacaoPorIds } from '@/src/infrastructure/api/fetchModosImpressaoDaEstacaoPorIds'
 import { getEstacaoImpressaoId } from '@/src/infrastructure/printing/estacaoImpressaoStorage'
+import { lerModosImpressaoEstacaoLocal } from '@/src/infrastructure/printing/modosImpressaoEstacaoStorage'
 import { DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY } from '@/src/shared/types/deliveryImpressao'
 import { lembrarNomeMeioPagamento } from '@/src/infrastructure/api/meiosPagamentoNomeCache'
 import { vendaDetalheReadRepository } from '@/src/infrastructure/api/repositories/VendaDetalheReadRepository'
@@ -24,6 +25,9 @@ vi.mock('@/src/infrastructure/api/fetchModosImpressaoDaEstacaoPorIds', () => ({
 vi.mock('@/src/infrastructure/printing/estacaoImpressaoStorage', () => ({
   getEstacaoImpressaoId: vi.fn(),
 }))
+vi.mock('@/src/infrastructure/printing/modosImpressaoEstacaoStorage', () => ({
+  lerModosImpressaoEstacaoLocal: vi.fn(() => ({})),
+}))
 vi.mock('@/src/infrastructure/api/repositories/VendaDetalheReadRepository', () => ({
   vendaDetalheReadRepository: {
     fetchMeioPagamento: vi.fn(),
@@ -35,6 +39,7 @@ const fetchPedidoMock = vi.mocked(fetchPedidoDeliveryDetalhe)
 const buscarMapeamentosMock = vi.mocked(buscarMapeamentosEstacao)
 const fetchModosMock = vi.mocked(fetchModosImpressaoDaEstacaoPorIds)
 const getEstacaoMock = vi.mocked(getEstacaoImpressaoId)
+const lerModosLocalMock = vi.mocked(lerModosImpressaoEstacaoLocal)
 const fetchMeioMock = vi.mocked(vendaDetalheReadRepository.fetchMeioPagamento)
 
 function deferred<T>() {
@@ -52,8 +57,10 @@ describe('carregarPayloadTicketsImpressaoDelivery', () => {
     buscarMapeamentosMock.mockReset()
     fetchModosMock.mockReset()
     getEstacaoMock.mockReset()
+    lerModosLocalMock.mockReset()
     fetchMeioMock.mockReset()
     getEstacaoMock.mockReturnValue('est-1')
+    lerModosLocalMock.mockReturnValue({})
   })
 
   it('dispara instrucoes, pedido e mapeamentos juntos e nao forca GET do pedido', async () => {
@@ -206,5 +213,69 @@ describe('carregarPayloadTicketsImpressaoDelivery', () => {
     expect(producao).toHaveLength(1)
     expect(producao[0].itens).toHaveLength(1)
     expect(producao[0].itens[0].quantidade).toBe(2)
+  })
+
+  it('via local desta estação prevalece sobre o modo do mapeamento', async () => {
+    lerModosLocalMock.mockReturnValue({ 'imp-cozinha': 'porUnidade' })
+    fetchInstrucoesMock.mockResolvedValue({
+      ok: true,
+      data: {
+        mapeamentos: [
+          {
+            impressoraId: 'imp-cozinha',
+            impressoraNome: 'Cozinha',
+            nomeImpressoraWindows: 'EPSON_COZ',
+            produtosLancadosIds: ['pl-1'],
+          },
+        ],
+        warnings: [],
+      },
+    })
+    fetchPedidoMock.mockResolvedValue({
+      ok: true,
+      data: {
+        id: 'venda-1',
+        numeroVenda: 1,
+        valorFinal: 40,
+        produtosLancados: [
+          {
+            id: 'pl-1',
+            produtoId: 'p-1',
+            nomeProduto: 'Hambúrguer',
+            quantidade: 2,
+            valorUnitario: 20,
+            valorFinal: 40,
+            removido: false,
+            complementos: [],
+            observacoes: [],
+          },
+        ],
+        cobrancas: [],
+        taxasLancadas: [],
+      },
+    })
+    buscarMapeamentosMock.mockResolvedValue([
+      {
+        impressoraId: 'imp-cozinha',
+        nomeImpressora: 'Cozinha',
+        nomeImpressoraWindows: 'EPSON_COZ',
+        modoImpressao: 'agrupado',
+      },
+    ])
+
+    const result = await carregarPayloadTicketsImpressaoDelivery({
+      vendaId: 'venda-1',
+      accessToken: 'tok',
+      prefs: {
+        ...DEFAULT_PREFERENCIAS_IMPRESSAO_DELIVERY,
+        modo: 'separado',
+        impressoraExpedicaoId: 'imp-exp',
+      },
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const producao = result.data.tickets.filter(t => t.tipoCupom === 'producao')
+    expect(producao.map(t => t.viaProducao?.kind)).toEqual(['unit', 'unit', 'conference'])
   })
 })

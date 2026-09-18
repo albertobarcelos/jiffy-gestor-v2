@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { MdContentCopy, MdSettings } from 'react-icons/md'
+import { MdBolt, MdContentCopy, MdExpandLess, MdSettings } from 'react-icons/md'
 import { Button } from '@/src/presentation/components/ui/button'
 import { useTenantEmpresaId } from '@/src/presentation/hooks/useTenantQueryKey'
 import { MensagensRapidasWhatsAppDialog } from './MensagensRapidasWhatsAppDialog'
@@ -28,6 +28,7 @@ export function AtalhosWhatsAppSection({
   const empresaId = useTenantEmpresaId() ?? ''
   const [pacote, setPacote] = useState<PacoteMensagensFlow>(() => lerPacoteMensagensFlow(empresaId))
   const [enviandoId, setEnviandoId] = useState<string | null>(null)
+  const [aberto, setAberto] = useState(false)
   const enviandoRef = useRef(false)
 
   useEffect(() => {
@@ -53,43 +54,57 @@ export function AtalhosWhatsAppSection({
 
   return (
     <>
-      <div className="mt-5 flex items-center justify-between gap-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-secondary-text">
-          Atalhos
-        </p>
+      <div className="mt-5 flex items-center justify-end gap-1">
         <button
           type="button"
-          onClick={() => onConfigAbertaChange(true)}
-          className="rounded-md p-1 text-terciary-text transition hover:bg-primary-bg hover:text-secondary-text"
-          aria-label="Configurar mensagens rápidas"
-          title="Configurar mensagens"
+          onClick={() => setAberto(v => !v)}
+          className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-terciary-text transition hover:bg-primary-bg hover:text-secondary-text"
+          aria-expanded={aberto}
+          aria-label={aberto ? 'Recolher atalhos' : 'Mostrar atalhos'}
+          title="Atalhos"
         >
-          <MdSettings size={16} aria-hidden />
+          {aberto ? <MdExpandLess size={18} aria-hidden /> : <MdBolt size={18} aria-hidden />}
+          {aberto ? (
+            <span className="text-[11px] font-semibold uppercase tracking-wide">Atalhos</span>
+          ) : null}
         </button>
+        {aberto ? (
+          <button
+            type="button"
+            onClick={() => onConfigAbertaChange(true)}
+            className="rounded-md p-1 text-terciary-text transition hover:bg-primary-bg hover:text-secondary-text"
+            aria-label="Configurar mensagens rápidas"
+            title="Configurar mensagens"
+          >
+            <MdSettings size={16} aria-hidden />
+          </button>
+        ) : null}
       </div>
-      <div className="mt-2 flex flex-col gap-2">
-        {pacote.mensagens.length === 0 ? (
-          <p className="text-xs text-secondary-text">Nenhuma mensagem. Toque em configurar.</p>
-        ) : (
-          pacote.mensagens.map(msg => (
-            <Button
-              key={msg.id}
-              type="button"
-              variant="outlined"
-              size="small"
-              className="w-full justify-start !normal-case"
-              disabled={Boolean(enviandoId)}
-              onClick={() => void enviar(msg)}
-            >
-              {msg.titulo}
-            </Button>
-          ))
-        )}
-        <Button type="button" variant="outlined" className="w-full" onClick={onCopiarTelefone}>
-          <MdContentCopy className="mr-1" size={16} aria-hidden />
-          Copiar telefone
-        </Button>
-      </div>
+      {aberto ? (
+        <div className="mt-2 flex flex-col gap-2">
+          {pacote.mensagens.length === 0 ? (
+            <p className="text-xs text-secondary-text">Nenhuma mensagem. Toque em configurar.</p>
+          ) : (
+            pacote.mensagens.map(msg => (
+              <Button
+                key={msg.id}
+                type="button"
+                variant="outlined"
+                size="small"
+                className="w-full justify-start !normal-case"
+                disabled={Boolean(enviandoId)}
+                onClick={() => void enviar(msg)}
+              >
+                {msg.titulo}
+              </Button>
+            ))
+          )}
+          <Button type="button" variant="outlined" className="w-full" onClick={onCopiarTelefone}>
+            <MdContentCopy className="mr-1" size={16} aria-hidden />
+            Copiar telefone
+          </Button>
+        </div>
+      ) : null}
 
       <MensagensRapidasWhatsAppDialog
         open={configAberta}
