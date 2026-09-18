@@ -7,6 +7,7 @@ import { usePreferenciasImpressaoDelivery } from '@/src/presentation/hooks/usePr
 import { useMeiosPagamentoInfinite } from '@/src/presentation/hooks/useMeiosPagamento'
 import {
   useEmitirNfeDelivery,
+  useReemitirNfeDelivery,
   useTransicaoPedidoDelivery,
 } from '@/src/presentation/hooks/useVendas'
 import { useEntregaTransicoesKanban } from '@/src/presentation/components/features/delivery/kanban-panels/useEntregaTransicoesKanban'
@@ -178,10 +179,12 @@ export function WhatsAppPedidosHojeSection({ telefone, clienteNome, onOverlayAbe
   })
 
   const emitirNotaDelivery = useEmitirNfeDelivery()
+  const reemitirNfeDelivery = useReemitirNfeDelivery()
   const [, setPrimeiroPorColuna] = useState<Record<string, string>>({})
   const { alertaCbenef, handleContinuarCbenefKanban, handleConfigurarCbenefKanban, handleCancelarCbenefKanban } = useFiscalEmissaoKanban({
     reemitirNfePdv: async () => undefined,
     reemitirNfeGestor: async () => undefined,
+    reemitirNfeDelivery: payload => reemitirNfeDelivery.mutateAsync(payload),
     emitirNotaPdv: async () => undefined,
     emitirNotaGestor: async () => undefined,
     emitirNotaDelivery: payload => emitirNotaDelivery.mutateAsync(payload),

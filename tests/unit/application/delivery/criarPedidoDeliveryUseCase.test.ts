@@ -64,6 +64,7 @@ function repoMock(overrides: Partial<INovoPedidoReadRepository> = {}): INovoPedi
     patchPedidoDelivery: vi.fn().mockResolvedValue(undefined),
     transicionarStatusPedidoDelivery: vi.fn().mockResolvedValue(undefined),
     emitirNotaPedidoDelivery: vi.fn(),
+    reemitirNotaPedidoDelivery: vi.fn(),
     buscarAuthMe: vi.fn(),
     buscarUsuarioGestor: vi.fn(),
     ...overrides,

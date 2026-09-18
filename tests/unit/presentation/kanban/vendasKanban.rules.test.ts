@@ -22,6 +22,9 @@ function makeVenda(
       | 'dataFinalizacao'
       | 'dataCriacao'
       | 'numeroFiscal'
+      | 'tabelaOrigem'
+      | 'tipoVenda'
+      | 'statusEtapaOperacional'
     >
   > = {}
 ): VendaUnificadaDTO {
@@ -96,6 +99,28 @@ describe('vendaElegivelParaReemissaoAutomaticaLote', () => {
     const venda = makeVenda({ statusFiscal: 'REJEITADA', documentoFiscalId: 'doc-111' })
     const acoes: Record<string, 'emitindo' | 'reemitindo'> = { 'venda-test-1': 'reemitindo' }
     expect(vendaElegivelParaReemissaoAutomaticaLote(venda, acoes)).toBe(false)
+  })
+
+  it('retorna false para delivery ainda em etapa operacional', () => {
+    const venda = makeVenda({
+      statusFiscal: 'REJEITADA',
+      documentoFiscalId: 'doc-op',
+      tabelaOrigem: 'venda_gestor',
+      tipoVenda: 'entrega',
+      statusEtapaOperacional: 'EM_PREPARO',
+    })
+    expect(vendaElegivelParaReemissaoAutomaticaLote(venda, SEM_ACAO_EM_ANDAMENTO)).toBe(false)
+  })
+
+  it('retorna true para delivery finalizado rejeitado sem documentId', () => {
+    const venda = makeVenda({
+      statusFiscal: 'REJEITADA',
+      documentoFiscalId: null,
+      tabelaOrigem: 'venda_gestor',
+      tipoVenda: 'entrega',
+      statusEtapaOperacional: 'FINALIZADO',
+    })
+    expect(vendaElegivelParaReemissaoAutomaticaLote(venda, SEM_ACAO_EM_ANDAMENTO)).toBe(true)
   })
 })
 
