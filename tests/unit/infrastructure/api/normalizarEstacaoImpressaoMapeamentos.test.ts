@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { normalizarListaMapeamentosEstacao } from '@/src/infrastructure/api/normalizarEstacaoImpressaoMapeamentos'
+import {
+  montarMapeamentosEstacaoParaSalvar,
+  normalizarListaMapeamentosEstacao,
+} from '@/src/infrastructure/api/normalizarEstacaoImpressaoMapeamentos'
 
 describe('normalizarListaMapeamentosEstacao', () => {
   it('preserva modoImpressao da estação', () => {
@@ -51,6 +54,39 @@ describe('normalizarListaMapeamentosEstacao', () => {
       ])
     ).toEqual([
       { impressoraId: 'imp-3', nomeImpressora: '', nomeImpressoraWindows: 'X' },
+    ])
+  })
+})
+
+describe('montarMapeamentosEstacaoParaSalvar', () => {
+  it('grava o modo da estação junto com o vínculo físico', () => {
+    expect(
+      montarMapeamentosEstacaoParaSalvar(
+        { 'imp-1': 'EPSON_COZ', 'imp-2': '  ' },
+        { 'imp-1': 'agrupado' }
+      )
+    ).toEqual([
+      {
+        impressoraId: 'imp-1',
+        nomeImpressoraWindows: 'EPSON_COZ',
+        modoImpressao: 'agrupado',
+        modo_impressao: 'agrupado',
+        modoFicha: false,
+      },
+    ])
+  })
+
+  it('usa normal quando o modo não veio', () => {
+    expect(
+      montarMapeamentosEstacaoParaSalvar({ 'imp-1': 'EPSON_COZ' }, {})
+    ).toEqual([
+      {
+        impressoraId: 'imp-1',
+        nomeImpressoraWindows: 'EPSON_COZ',
+        modoImpressao: 'normal',
+        modo_impressao: 'normal',
+        modoFicha: false,
+      },
     ])
   })
 })

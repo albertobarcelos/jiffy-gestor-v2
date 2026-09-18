@@ -3,6 +3,8 @@ import { fetchInstrucoesImpressaoPedido } from '@/src/infrastructure/api/fetchIn
 import { fetchPedidoDeliveryDetalhe } from '@/src/infrastructure/api/fetchPedidoDeliveryDetalhe'
 import { buscarMapeamentosEstacao } from '@/src/infrastructure/api/estacoesImpressaoApi'
 import { fetchModosImpressaoDaEstacaoPorIds } from '@/src/infrastructure/api/fetchModosImpressaoDaEstacaoPorIds'
+import { getEstacaoImpressaoId } from '@/src/infrastructure/printing/estacaoImpressaoStorage'
+import { lerModosImpressaoEstacaoLocal } from '@/src/infrastructure/printing/modosImpressaoEstacaoStorage'
 import {
   modosImpressaoPorImpressoraIdDeMapeamentos,
   type ModoImpressaoImpressora,
@@ -12,7 +14,6 @@ import {
   obterNomeMeioPagamentoCache,
   snapshotNomesMeiosPagamentoCache,
 } from '@/src/infrastructure/api/meiosPagamentoNomeCache'
-import { getEstacaoImpressaoId } from '@/src/infrastructure/printing/estacaoImpressaoStorage'
 import type { PreferenciasImpressaoDelivery } from '@/src/shared/types/deliveryImpressao'
 import type { VendaGestorTicketsResponse } from '@/src/shared/types/vendaGestorTickets'
 import type { EmpresaMeResumo } from '@/src/presentation/hooks/useEmpresaMe'
@@ -166,6 +167,10 @@ export async function carregarPayloadTicketsImpressaoDelivery(params: {
         })
       }
     }
+    modoPorImpressoraId = {
+      ...modoPorImpressoraId,
+      ...lerModosImpressaoEstacaoLocal(estacao),
+    }
   }
 
   try {
@@ -185,7 +190,12 @@ export async function carregarPayloadTicketsImpressaoDelivery(params: {
       numeroVenda: data.numeroVenda,
       qTickets: data.tickets.length,
       tiposCupom: data.tickets.map(t => t.tipoCupom),
-      modo: data.modoImpressaoDelivery,
+      viasProducao: data.tickets
+        .filter(t => t.tipoCupom === 'producao')
+        .map(t => t.viaProducao?.kind ?? 'single'),
+      modoCupom: data.modoImpressaoDelivery,
+      modosLocais: lerModosImpressaoEstacaoLocal(estacao),
+      modoPorImpressoraId,
     })
 
     return { ok: true, data }

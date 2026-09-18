@@ -1,4 +1,7 @@
-import { modoImpressaoDeMapeamentoOpcional } from '@/src/domain/types/modoImpressaoImpressora'
+import {
+  modoImpressaoDeMapeamentoOpcional,
+  parseModoImpressaoImpressora,
+} from '@/src/domain/types/modoImpressaoImpressora'
 import type { ModoImpressaoImpressora } from '@/src/domain/types/modoImpressaoImpressora'
 
 export type EstacaoImpressaoMapeamentoNormalizado = {
@@ -45,4 +48,34 @@ export function normalizarListaMapeamentosEstacao(
   return extrairLista(payload)
     .map(normalizarEstacaoImpressaoMapeamento)
     .filter((item): item is EstacaoImpressaoMapeamentoNormalizado => item !== null)
+}
+
+export type MapeamentoEstacaoParaSalvar = {
+  impressoraId: string
+  nomeImpressoraWindows: string
+  modoImpressao: ModoImpressaoImpressora
+  modo_impressao: ModoImpressaoImpressora
+  modoFicha: boolean
+}
+
+/** Vínculo físico + via de produção desta estação. Sem destino físico, o item não entra. */
+export function montarMapeamentosEstacaoParaSalvar(
+  vinculos: Record<string, string>,
+  modos: Record<string, ModoImpressaoImpressora | undefined>
+): MapeamentoEstacaoParaSalvar[] {
+  const result: MapeamentoEstacaoParaSalvar[] = []
+  for (const [impressoraIdRaw, nomeRaw] of Object.entries(vinculos)) {
+    const impressoraId = impressoraIdRaw.trim()
+    const nomeImpressoraWindows = nomeRaw.trim()
+    if (!impressoraId || !nomeImpressoraWindows) continue
+    const modoImpressao = parseModoImpressaoImpressora(modos[impressoraId])
+    result.push({
+      impressoraId,
+      nomeImpressoraWindows,
+      modoImpressao,
+      modo_impressao: modoImpressao,
+      modoFicha: modoImpressao === 'ficha',
+    })
+  }
+  return result
 }

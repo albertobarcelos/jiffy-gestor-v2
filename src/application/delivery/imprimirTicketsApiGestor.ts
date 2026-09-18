@@ -69,7 +69,7 @@ export function notificarWarningsTickets(
 }
 
 /**
- * Envia cada ticket ao Print Orchestrator (agente Windows).
+ * Envia cada ticket ao Jiffy Print neste PC (`127.0.0.1:38471`).
  */
 export async function imprimirTicketsApiGestor(params: {
   response: VendaGestorTicketsResponse
