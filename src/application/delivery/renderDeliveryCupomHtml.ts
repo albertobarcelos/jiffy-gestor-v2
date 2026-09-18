@@ -1,7 +1,6 @@
 import type {
   VendaGestorTicket,
   VendaGestorTicketItem,
-  VendaGestorTicketItemComplemento,
   VendaGestorTicketsEndereco,
   VendaGestorTicketsResponse,
 } from '@/src/shared/types/vendaGestorTickets'
@@ -239,7 +238,13 @@ function valorItem(item: VendaGestorTicketItem): number | null {
   return numeroFinito(item.valorFinal ?? item.valorTotal)
 }
 
-function valorComplemento(comp: VendaGestorTicketItemComplemento): number | null {
+function valorComplemento(comp: {
+  impressao?: {
+    valorFinal?: number | null
+    valorTotal?: number | null
+    valorUnitario?: number | null
+  } | null
+} | null): number | null {
   return numeroFinito(comp?.impressao?.valorFinal ?? comp?.impressao?.valorTotal ?? comp?.impressao?.valorUnitario)
 }
 
